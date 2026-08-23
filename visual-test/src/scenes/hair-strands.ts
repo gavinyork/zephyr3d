@@ -5,6 +5,7 @@ import {
   HairMaterial,
   HairStrandData,
   HairStrandMaterial,
+  HairNode,
   Mesh,
   Primitive,
   SharedModel,
@@ -16,7 +17,8 @@ import {
   type AlembicHairImportOptions,
   type HairFileImportOptions
 } from '@zephyr3d/loaders';
-import { Vector3, Vector4 } from '@zephyr3d/base';
+import { Quaternion, Vector3, Vector4 } from '@zephyr3d/base';
+import { createSphereCollider } from '@zephyr3d/scene';
 import type { PrimitiveType, VertexAttribFormat } from '@zephyr3d/device';
 import type { ShadowMode } from '@zephyr3d/scene';
 import type { SceneContext, VisualScene } from '../types';
@@ -310,6 +312,135 @@ export const hairStrandsGpuHelix: VisualScene = {
     placeCamera(ctx.camera, new Vector3(1.9, 1.1, 2.5));
   }
 };
+
+/**
+ * The same strands drawn three times through {@link HairNode} at different
+ * transforms.
+ *
+ * @remarks
+ * Strand control points live in the node's local space and reach world space
+ * through its world matrix, which is what lets a groom hang off a head bone.
+ * Three instances of one strand set pin that the transform is applied and applied
+ * correctly: the left copy is translated, the middle rotated, the right scaled
+ * down. A material that ignored the matrix would stack all three on top of each
+ * other; one that applied it in the wrong order - expanding the camera-facing
+ * quad before transforming rather than after - would shear the scaled copy's
+ * ribbons rather than just narrowing them.
+ *
+ * The scaled copy is the sensitive one: width is a length in the same space as
+ * the control points, so it has to scale with them. Left unscaled it would draw
+ * at full thickness on a third-size groom, which reads as rope.
+ *
+ * WebGPU only: the vertex shader reads storage buffers.
+ */
+export const hairNodeTransform: VisualScene = {
+  name: 'hair-node-transform',
+  description: 'One strand set drawn by three HairNodes: pins world matrix, rotation and uniform scale.',
+  supports: (backend) => backend === 'webgpu',
+  setup(ctx) {
+    bareScene(ctx.scene);
+    keyLight(ctx.scene);
+    const source = toStrandSource(helixCurves());
+    const place = (position: Vector3, scale: number, rotation?: Quaternion) => {
+      const node = new HairNode(ctx.scene);
+      node.albedoColor = new Vector4(0.24, 0.14, 0.1, 1);
+      node.specular1Color = new Vector3(0.45, 0.45, 0.45);
+      node.specular2Color = new Vector3(0.55, 0.4, 0.3);
+      node.segmentsPerStrand = 16;
+      node.minStrandWidth = 0;
+      // Matches hair-strands-gpu-helix: a camera-facing quad always presents its
+      // full width, so the fixture widths need scaling down to stay separable.
+      node.strandWidthScale = 0.25;
+      node.setStrands(source);
+      node.position.set(position);
+      node.scale.setXYZ(scale, scale, scale);
+      if (rotation) {
+        node.rotation.set(rotation);
+      }
+      return node;
+    };
+    place(new Vector3(-1.1, 0, 0), 1);
+    place(new Vector3(0, 0, 0), 1, Quaternion.fromAxisAngle(Vector3.axisPX(), Math.PI * 0.5));
+    place(new Vector3(1.0, 0, 0), 0.35);
+    placeCamera(ctx.camera, new Vector3(0.2, 1.4, 3.6), new Vector3(0, 0.4, 0));
+  }
+};
+
+/**
+ * Strands falling under gravity onto a sphere.
+ *
+ * @remarks
+ * The one scene that shows the solver actually ran. It is a still of a moving
+ * system, which the harness makes reproducible: `device.setFixedFrameTime`
+ * replaces the clock with a synthetic 60 Hz one, and the solver's own step is
+ * fixed at 1/60, so frame N is the same N steps of simulation every run.
+ *
+ * The strands start as a vertical curtain and are drawn after 45 frames, by
+ * which time gravity has swung them down and the collider has pushed the ones
+ * that meet it aside. Three things fail visibly here and nowhere else: a solver
+ * that never ran leaves the curtain straight; one that ignores rest lengths lets
+ * the strands stretch away or collapse into their roots; one whose contacts are
+ * in the wrong space leaves them hanging through the sphere.
+ *
+ * WebGPU only: the solver is a compute pass.
+ */
+export const hairSimulation: VisualScene = {
+  name: 'hair-simulation',
+  description: 'Strand dynamics after a fixed number of steps: pins the solver, rest lengths and contacts.',
+  supports: (backend) => backend === 'webgpu',
+  frames: 45,
+  setup(ctx) {
+    bareScene(ctx.scene);
+    keyLight(ctx.scene);
+    const node = new HairNode(ctx.scene);
+    node.albedoColor = new Vector4(0.24, 0.14, 0.1, 1);
+    node.specular1Color = new Vector3(0.45, 0.45, 0.45);
+    node.specular2Color = new Vector3(0.55, 0.4, 0.3);
+    node.segmentsPerStrand = 12;
+    node.minStrandWidth = 0;
+    node.strandWidthScale = 0.4;
+    node.setStrands(curtainStrands());
+    // No damping and a low stiffness so the motion is large enough to read in a
+    // single frame; a styled groom would use far more of both.
+    node.damping = 0;
+    node.stiffness = 0.02;
+    node.gravity = new Vector3(0, -9.8, 0);
+    node.simulationEnabled = true;
+    // Sits under the middle of the curtain, so the strands that clear it and the
+    // strands it deflects appear side by side.
+    node.simulation!.colliders = [createSphereCollider(new Vector3(0, 0.15, 0), 0.42)];
+    placeCamera(ctx.camera, new Vector3(0, 0.75, 3.1), new Vector3(0, 0.15, 0));
+  }
+};
+
+/**
+ * A flat curtain of vertical strands.
+ *
+ * @remarks
+ * Deliberately not the helix the other scenes use: a curtain starts with every
+ * strand identical and straight, so any bend in the captured frame is the
+ * solver's doing and nothing else's.
+ */
+function curtainStrands(): HairStrandSource {
+  const strandCount = 28;
+  const pointsPerStrand = 10;
+  const positions = new Float32Array(strandCount * pointsPerStrand * 3);
+  const pointCounts = new Uint32Array(strandCount);
+  const widths = new Float32Array(strandCount * pointsPerStrand);
+  for (let s = 0; s < strandCount; s++) {
+    pointCounts[s] = pointsPerStrand;
+    const x = (s / (strandCount - 1) - 0.5) * 1.5;
+    for (let i = 0; i < pointsPerStrand; i++) {
+      const p = s * pointsPerStrand + i;
+      positions[p * 3] = x;
+      // Roots at the top, hanging straight down.
+      positions[p * 3 + 1] = 0.95 - (i / (pointsPerStrand - 1)) * 0.9;
+      positions[p * 3 + 2] = 0;
+      widths[p] = 0.02;
+    }
+  }
+  return { positions, pointCounts, widths, widthPerStrand: false };
+}
 
 export const hairStrandsWidth: VisualScene = {
   name: 'hair-strands-width',

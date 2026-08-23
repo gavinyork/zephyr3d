@@ -30,5 +30,6 @@ export * from './spring_modifier';
 export * from './ik';
 export * from './spring';
 export * from './cloth';
+export * from './hair';
 export * from './joint_dynamics';
 export * from './joint_dynamics_modifier';

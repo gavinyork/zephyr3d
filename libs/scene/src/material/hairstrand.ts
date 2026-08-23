@@ -28,6 +28,10 @@ import type { HairStrandData } from './hairstrand_data';
  * Lighting is inherited unchanged from {@link HairMaterial}, so the two paths
  * shade identically and can be compared against each other.
  *
+ * Control points are read in the drawing node's local space and put through its
+ * world matrix, so a groom follows the node it hangs off - a head bone, say -
+ * and several nodes can share one set of strands at different transforms.
+ *
  * Requires storage buffers in the vertex stage, which means WebGPU.
  * @public
  */
@@ -260,13 +264,27 @@ export class HairStrandMaterial extends HairMaterial implements Clonable<HairStr
   get vertexCount() {
     return this._strands ? this._strands.strandCount * this._segmentsPerStrand * 6 : 0;
   }
-  vertexShader(scope: PBFunctionScope) {
-    // Deliberately does not call super.vertexShader(): the inherited path resolves
-    // position from a vertex attribute, and this material has none. The global
-    // uniform block it would have set up is still needed - camera position among
-    // others - so it is prepared directly here.
+  /**
+   * Albedo, with alpha scaled by how much the ribbon was widened to meet the
+   * pixel floor.
+   *
+   * @remarks
+   * Widening a sub-pixel strand to a pixel adds coverage that is not physically
+   * there. Scaling alpha by the inverse keeps the strand's contribution roughly
+   * constant, so distant hair thins out in opacity instead of breaking into a
+   * flickering dotted line.
+   */
+  calculateAlbedoColor(scope: PBInsideFunctionScope, uv?: PBShaderExp) {
     const pb = scope.$builder;
-    ShaderHelper.prepareVertexShader(pb, this.drawContext);
+    const albedo = super.calculateAlbedoColor(scope, uv);
+    const coverage = scope.$inputs.zStrandCoverage;
+    if (!coverage) {
+      return albedo;
+    }
+    return pb.vec4(albedo.rgb, pb.mul(albedo.a, coverage));
+  }
+  protected vertexShaderImpl(scope: PBFunctionScope) {
+    const pb = scope.$builder;
     this.declareStrandBindings(scope);
     scope.$l.strand = this.expandStrandVertex(scope);
     scope.$outputs.worldPos = scope.strand.worldPos;
@@ -290,41 +308,28 @@ export class HairStrandMaterial extends HairMaterial implements Clonable<HairStr
     // history and falls back to the raw frame, which on dithered strands is
     // visible as noise that only settles once the camera stops.
     //
-    // Both ends use the current world position on purpose. The control points
-    // are already world space and no world matrix is applied, so a static groom
-    // does not move between frames; all that differs is the camera-facing offset,
-    // whose per-frame change is the ribbon half-width times the per-frame camera
-    // rotation - hundredths of a pixel even while orbiting quickly. Re-running
-    // the expansion against the previous camera to recover that would double the
-    // control point fetches for a sub-pixel correction.
+    // The previous position is the strand's control point put through the
+    // previous frame's world matrix, which is what moves when the node - a head
+    // bone, say - moves. The camera-facing offset is reused rather than rebuilt
+    // against the previous camera: its per-frame change is the ribbon half-width
+    // times the per-frame camera rotation, hundredths of a pixel even while
+    // orbiting quickly, and recomputing it would double the control point
+    // fetches for a sub-pixel correction.
     //
-    // This does assume the control points are static. A simulation pass writing
-    // the point buffer in place would invalidate it, and would need the previous
-    // frame's points kept alongside the current ones to fix properly.
-    ShaderHelper.resolveMotionVector(scope, scope.strand.worldPos, scope.strand.worldPos);
+    // This still assumes the control points themselves are static between
+    // frames. A simulation pass writing the point buffer in place invalidates
+    // that, and has to keep the previous frame's points to fix it properly.
+    if (ShaderHelper.getPrevUnjitteredViewProjectionMatrix(scope)) {
+      scope.$l.zPrevWorldPos = pb.add(
+        pb.mul(ShaderHelper.getPrevWorldMatrix(scope), pb.vec4(scope.strand.localCentre, 1)).xyz,
+        scope.strand.offset
+      );
+      ShaderHelper.resolveMotionVector(scope, scope.strand.worldPos, scope.zPrevWorldPos);
+    }
     ShaderHelper.setClipSpacePosition(
       scope,
       pb.mul(ShaderHelper.getViewProjectionMatrix(scope), pb.vec4(scope.strand.worldPos, 1))
     );
-  }
-  /**
-   * Albedo, with alpha scaled by how much the ribbon was widened to meet the
-   * pixel floor.
-   *
-   * @remarks
-   * Widening a sub-pixel strand to a pixel adds coverage that is not physically
-   * there. Scaling alpha by the inverse keeps the strand's contribution roughly
-   * constant, so distant hair thins out in opacity instead of breaking into a
-   * flickering dotted line.
-   */
-  calculateAlbedoColor(scope: PBInsideFunctionScope, uv?: PBShaderExp) {
-    const pb = scope.$builder;
-    const albedo = super.calculateAlbedoColor(scope, uv);
-    const coverage = scope.$inputs.zStrandCoverage;
-    if (!coverage) {
-      return albedo;
-    }
-    return pb.vec4(albedo.rgb, pb.mul(albedo.a, coverage));
   }
   /**
    * Rebuilds the cylinder normal the flat quad stands for.
@@ -531,6 +536,37 @@ export class HairStrandMaterial extends HairMaterial implements Clonable<HairStr
     return pb.getGlobalScope()[funcName](firstPoint, pointCount, t) as PBShaderExp;
   }
   /**
+   * Rotates a strand direction into world space and renormalises it.
+   *
+   * @remarks
+   * The direction is transformed by the world matrix rather than by its inverse
+   * transpose on purpose: this is a tangent, not a normal. The shading normal is
+   * rebuilt from the tangent and the ribbon's side vector after the fact, so a
+   * non-uniform scale reaches the lighting through the frame it actually bends.
+   *
+   * A degenerate scale can collapse the direction entirely, which would leave a
+   * zero-length tangent and produce NaN once it is normalised, so the untransformed
+   * direction stands in for that case.
+   * @internal
+   */
+  private transformStrandDirection(
+    scope: PBInsideFunctionScope,
+    worldMatrix: PBShaderExp,
+    direction: PBShaderExp
+  ) {
+    const pb = scope.$builder;
+    const funcName = 'Z_strandDirectionToWorld';
+    pb.func(funcName, [pb.mat4('worldMatrix'), pb.vec3('direction')], function () {
+      this.$l.transformed = pb.mul(this.worldMatrix, pb.vec4(this.direction, 0)).xyz;
+      this.$l.len = pb.length(this.transformed);
+      this.$if(pb.greaterThan(this.len, 0.000001), function () {
+        this.$return(pb.div(this.transformed, this.len));
+      });
+      this.$return(this.direction);
+    });
+    return pb.getGlobalScope()[funcName](worldMatrix, direction) as PBShaderExp;
+  }
+  /**
    * Derives this vertex's ribbon corner from the vertex index.
    *
    * @remarks
@@ -550,7 +586,9 @@ export class HairStrandMaterial extends HairMaterial implements Clonable<HairStr
       pb.vec3('tangent'),
       pb.vec3('side'),
       pb.float('coverage'),
-      pb.float('across')
+      pb.float('across'),
+      pb.vec3('localCentre'),
+      pb.vec3('offset')
     ]);
     pb.func(funcName, [], function () {
       this.$l.vid = pb.uint(this.$builtins.vertexIndex);
@@ -597,9 +635,27 @@ export class HairStrandMaterial extends HairMaterial implements Clonable<HairStr
 
       this.$l.t = pb.div(pb.float(this.ring), pb.float(this.segCount));
       this.$l.curve = that.evaluateStrand(this, this.firstPoint, this.pointCount, this.t);
-      this.$l.centre = this.curve.sample.xyz;
-      this.$l.tangent = this.curve.tangent;
-      this.$l.halfWidth = pb.mul(this.curve.sample.w, 0.5, this.zStrandParams.y);
+      // Control points are stored in the node's local space, so the frame is
+      // built after the world transform rather than before it: the ribbon faces
+      // the camera in world space, and a non-uniform scale must not be allowed
+      // to shear that facing direction.
+      this.$l.worldMatrix = ShaderHelper.getWorldMatrix(this);
+      this.$l.localCentre = this.curve.sample.xyz;
+      this.$l.centre = pb.mul(this.worldMatrix, pb.vec4(this.localCentre, 1)).xyz;
+      this.$l.tangent = that.transformStrandDirection(this, this.worldMatrix, this.curve.tangent);
+      // Width is a length in the same space as the control points, so it follows
+      // the same transform. A single factor stands in for the three axis scales
+      // because a strand is a fibre with no preferred cross-section direction -
+      // and the mean is what keeps a uniformly scaled groom exactly proportional.
+      this.$l.worldScale = pb.div(
+        pb.add(
+          pb.length(this.worldMatrix[0].xyz),
+          pb.length(this.worldMatrix[1].xyz),
+          pb.length(this.worldMatrix[2].xyz)
+        ),
+        3
+      );
+      this.$l.halfWidth = pb.mul(this.curve.sample.w, 0.5, this.zStrandParams.y, this.worldScale);
 
       // Camera-facing side vector: perpendicular to the strand and to the view
       // ray, so the ribbon always presents its full width.
@@ -642,12 +698,21 @@ export class HairStrandMaterial extends HairMaterial implements Clonable<HairStr
         // cut-off and lop them off partway down their length.
         const points = this.zStrandPoints;
         this.$l.rootBase = pb.mul(this.firstPoint, 4);
-        this.$l.rootPos = pb.vec3(
+        this.$l.rootLocal = pb.vec3(
           points.at(this.rootBase),
           points.at(pb.add(this.rootBase, 1)),
           points.at(pb.add(this.rootBase, 2))
         );
-        this.$l.rootHalf = pb.mul(points.at(pb.add(this.rootBase, 3)), 0.5, this.zStrandParams.y);
+        // The threshold compares a width against a view distance, so the root has
+        // to reach world space like everything else - otherwise a scaled groom
+        // would decimate against distances measured in its own local units.
+        this.$l.rootPos = pb.mul(this.worldMatrix, pb.vec4(this.rootLocal, 1)).xyz;
+        this.$l.rootHalf = pb.mul(
+          points.at(pb.add(this.rootBase, 3)),
+          0.5,
+          this.zStrandParams.y,
+          this.worldScale
+        );
         this.$l.rootFloor = pb.mul(this.zStrandParams.w, pb.distance(this.camPos, this.rootPos));
         this.$l.keep = pb.float(1);
         this.$if(pb.greaterThan(this.rootFloor, 0), function () {
@@ -665,6 +730,7 @@ export class HairStrandMaterial extends HairMaterial implements Clonable<HairStr
           // have produced becomes zero-area and is dropped before rasterisation,
           // so a culled strand costs no fragments at all.
           this.centre = this.rootPos;
+          this.localCentre = this.rootLocal;
           this.halfW = pb.float(0);
         });
       }
@@ -680,6 +746,10 @@ export class HairStrandMaterial extends HairMaterial implements Clonable<HairStr
       this.result.side = this.side;
       this.result.coverage = this.coverage;
       this.result.across = pb.mul(this.acrossSign, this.zStrandShape.x);
+      // Carried out so the caller can rebuild this vertex against the previous
+      // frame's world matrix without re-running the expansion.
+      this.result.localCentre = this.localCentre;
+      this.result.offset = this.offset;
       this.$return(this.result);
     });
     return pb.getGlobalScope()[funcName]() as PBShaderExp;

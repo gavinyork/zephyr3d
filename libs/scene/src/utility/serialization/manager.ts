@@ -54,6 +54,7 @@ import {
 import { getSceneClass } from './scene/scene';
 import { getTerrainClass } from './scene/terrain';
 import { getWaterClass, getFFTWaveGeneratorClass, getFBMWaveGeneratorClass } from './scene/water';
+import { getHairNodeClass } from './scene/hair';
 import { getMSDFTextClass, getMSDFTextSpriteClass, getTextSpriteClass } from './scene/text';
 import {
   getAnimationClass,
@@ -319,6 +320,7 @@ export class ResourceManager {
         getMSDFTextSpriteClass(),
         getMSDFTextClass(),
         getWaterClass(this),
+        getHairNodeClass(),
         getTerrainClass(this),
         getFFTWaveGeneratorClass(),
         getFBMWaveGeneratorClass(),

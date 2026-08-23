@@ -57,6 +57,8 @@ import { BaseView } from './baseview';
 import { CommandManager, CompositeCommand, type Command } from '../core/command';
 import {
   AddAssetCommand,
+  AddHairCommand,
+  createHairNodeFromAsset,
   AddMeshCommand,
   BUILTIN_LAMBERT_MATERIAL_PATH,
   AddChildCommand,
@@ -139,7 +141,7 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
   private _workspaceDragging: boolean;
   private _renderDropZone: boolean;
   private readonly _nodeToBePlaced: DRef<SceneNode>;
-  private _typeToBePlaced: 'shape' | 'asset' | 'mesh' | 'prefab' | 'node' | 'none';
+  private _typeToBePlaced: 'shape' | 'asset' | 'mesh' | 'prefab' | 'node' | 'hair' | 'none';
   private _ctorToBePlaced: Nullable<{ new (scene: Scene): SceneNode }>;
   private _descToBePlaced: Nullable<string>;
   private _assetToBeAdded: Nullable<string>;
@@ -1411,6 +1413,16 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
             const pos = placeNode.position.clone();
             this._nodeToBePlaced.dispose();
             switch (this._typeToBePlaced) {
+              case 'hair':
+                this._cmdManager
+                  .execute(
+                    new AddHairCommand(this.controller.model.scene, this._assetToBeAdded!, pos, placeNode)
+                  )
+                  .then((node) => {
+                    this._sceneHierarchy!.selectNode(node);
+                    eventBus.dispatchEvent('scene_changed');
+                  });
+                break;
               case 'asset':
                 this._cmdManager
                   .execute(
@@ -2671,6 +2683,8 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
       this.handleAddAsset(payload.path);
     } else if (mimeType === mimeTypeOf('.zprefab')) {
       this.handleAddPrefab(payload.path);
+    } else if (mimeType === mimeTypeOf('.zhair')) {
+      this.handleAddHair(payload.path);
     }
   }
   private handleWorkspaceDragLeave() {}
@@ -2710,16 +2724,18 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
       placeNode.parent = null;
       this._nodeToBePlaced.dispose();
       const command =
-        this._typeToBePlaced === 'mesh'
-          ? new AddMeshCommand(
-              this.controller.model.scene,
-              this._assetToBeAdded!,
-              pos,
-              placeNode instanceof Mesh ? placeNode : null
-            )
-          : this._typeToBePlaced === 'asset'
-            ? new AddAssetCommand(this.controller.model.scene, this._assetToBeAdded!, pos, placeNode)
-            : new AddPrefabCommand(this.controller.model.scene, this._assetToBeAdded!, pos, placeNode);
+        this._typeToBePlaced === 'hair'
+          ? new AddHairCommand(this.controller.model.scene, this._assetToBeAdded!, pos, placeNode)
+          : this._typeToBePlaced === 'mesh'
+            ? new AddMeshCommand(
+                this.controller.model.scene,
+                this._assetToBeAdded!,
+                pos,
+                placeNode instanceof Mesh ? placeNode : null
+              )
+            : this._typeToBePlaced === 'asset'
+              ? new AddAssetCommand(this.controller.model.scene, this._assetToBeAdded!, pos, placeNode)
+              : new AddPrefabCommand(this.controller.model.scene, this._assetToBeAdded!, pos, placeNode);
       this._cmdManager.execute(command).then((node) => {
         this._sceneHierarchy!.selectNode(node);
         eventBus.dispatchEvent('scene_changed');
@@ -3126,6 +3142,41 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
         this._nodeToBePlaced.set(node);
         this._assetToBeAdded = asset;
         this._typeToBePlaced = 'asset';
+        this._ctorToBePlaced = null;
+      })
+      .catch((err) => {
+        Dialog.messageBox('Error', `${err}`);
+      })
+      .finally(() => {
+        this._assetPlacementLoadingCount = Math.max(0, this._assetPlacementLoadingCount - 1);
+      });
+  }
+  /**
+   * Loads a `.zhair` groom as the node being positioned by the drag.
+   *
+   * @remarks
+   * Decoding can be slow - a production groom is millions of control points -
+   * so the node created here is handed to the command when the drop commits
+   * rather than being loaded a second time.
+   */
+  private handleAddHair(asset: string) {
+    const placeNode = this._nodeToBePlaced.get();
+    if (placeNode) {
+      placeNode.remove();
+      this._nodeToBePlaced.dispose();
+      this._typeToBePlaced = 'none';
+    }
+    this._assetPlacementLoadingCount++;
+    createHairNodeFromAsset(this.controller.model.scene, asset)
+      .then((node) => {
+        node.parent = null;
+        ensureNodeDefaultName(node, getDefaultNodeNameFromAssetPath(asset));
+        node.iterate((n) => {
+          n.gpuPickable = false;
+        });
+        this._nodeToBePlaced.set(node);
+        this._assetToBeAdded = asset;
+        this._typeToBePlaced = 'hair';
         this._ctorToBePlaced = null;
       })
       .catch((err) => {

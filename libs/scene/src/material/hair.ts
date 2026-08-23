@@ -540,28 +540,7 @@ export class HairMaterial
   }
   vertexShader(scope: PBFunctionScope) {
     super.vertexShader(scope);
-    const pb = scope.$builder;
-    scope.$l.oPos = ShaderHelper.resolveVertexPosition(scope);
-    scope.$outputs.worldPos = pb.mul(ShaderHelper.getWorldMatrix(scope), pb.vec4(scope.oPos, 1)).xyz;
-    ShaderHelper.setClipSpacePosition(
-      scope,
-      pb.mul(ShaderHelper.getViewProjectionMatrix(scope), pb.vec4(scope.$outputs.worldPos, 1))
-    );
-    if (this.vertexNormal) {
-      scope.$l.oNorm = ShaderHelper.resolveVertexNormal(scope);
-      scope.$outputs.wNorm = pb.mul(ShaderHelper.getNormalMatrix(scope), pb.vec4(scope.oNorm, 0)).xyz;
-      if (this.vertexTangent) {
-        scope.$l.oTangent = ShaderHelper.resolveVertexTangent(scope);
-        scope.$outputs.wTangent = pb.mul(
-          ShaderHelper.getNormalMatrix(scope),
-          pb.vec4(scope.oTangent.xyz, 0)
-        ).xyz;
-        scope.$outputs.wBinormal = pb.mul(
-          pb.cross(scope.$outputs.wNorm, scope.$outputs.wTangent),
-          scope.oTangent.w
-        );
-      }
-    }
+    this.vertexShaderImpl(scope);
   }
   fragmentShader(scope: PBFunctionScope) {
     super.fragmentShader(scope);
@@ -727,6 +706,30 @@ export class HairMaterial
         bindGroup.setValue(
           'zHairMarschner2',
           scratch.setXYZW(this._marschnerLobes.x, this._marschnerLobes.y, this._marschnerLobes.z, f0 * f0)
+        );
+      }
+    }
+  }
+  protected vertexShaderImpl(scope: PBFunctionScope) {
+    const pb = scope.$builder;
+    scope.$l.oPos = ShaderHelper.resolveVertexPosition(scope);
+    scope.$outputs.worldPos = pb.mul(ShaderHelper.getWorldMatrix(scope), pb.vec4(scope.oPos, 1)).xyz;
+    ShaderHelper.setClipSpacePosition(
+      scope,
+      pb.mul(ShaderHelper.getViewProjectionMatrix(scope), pb.vec4(scope.$outputs.worldPos, 1))
+    );
+    if (this.vertexNormal) {
+      scope.$l.oNorm = ShaderHelper.resolveVertexNormal(scope);
+      scope.$outputs.wNorm = pb.mul(ShaderHelper.getNormalMatrix(scope), pb.vec4(scope.oNorm, 0)).xyz;
+      if (this.vertexTangent) {
+        scope.$l.oTangent = ShaderHelper.resolveVertexTangent(scope);
+        scope.$outputs.wTangent = pb.mul(
+          ShaderHelper.getNormalMatrix(scope),
+          pb.vec4(scope.oTangent.xyz, 0)
+        ).xyz;
+        scope.$outputs.wBinormal = pb.mul(
+          pb.cross(scope.$outputs.wNorm, scope.$outputs.wTangent),
+          scope.oTangent.w
         );
       }
     }

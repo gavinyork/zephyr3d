@@ -19,6 +19,8 @@ import { DlgNoiseTextureCreator } from '../views/dlg/noisetexturedlg';
 import { TreeViewData, TreeView } from './treeview';
 import { DlgImport } from '../views/dlg/importdlg';
 import { DlgZABCCompress, type ZABCCompressDialogResult } from '../views/dlg/zabccompressdlg';
+import { DlgHairImport, type HairImportDialogResult } from '../views/dlg/hairimportdlg';
+import { importCurvesToZHairFile } from '@zephyr3d/loaders';
 import { ListView, ListViewData } from './listview';
 import { ResourceService } from '../core/services/resource';
 import { DlgSaveFile } from '../views/dlg/savefiledlg';
@@ -1728,6 +1730,11 @@ export class VFSRenderer extends makeObservable(Disposable)<{
 
     const ext = meta.name.split('.').pop()?.toLowerCase();
     switch (ext) {
+      // Groom assets and the curve archives they are converted from.
+      case 'zhair':
+      case 'abc':
+      case 'hair':
+        return '🦰';
       case 'js':
       case 'ts':
       case 'jsx':
@@ -2717,6 +2724,25 @@ export class VFSRenderer extends makeObservable(Disposable)<{
       const droppedFiles = await dtVFS.glob('/**/*', { recursive: true, includeDirs: false });
       const onlyZabcDrop =
         droppedFiles.length > 0 && droppedFiles.every((entry) => entry.path.toLowerCase().endsWith('.zabc'));
+      // Curve archives take a path of their own: they hold strands, not a mesh
+      // hierarchy, so they convert to a `.zhair` asset rather than importing as
+      // a prefab. Parsing an 84 MB Ogawa archive is expensive enough that doing
+      // it once here rather than on every scene load is the whole point.
+      const droppedCurves = droppedFiles.filter((entry) => {
+        const lower = entry.path.toLowerCase();
+        return lower.endsWith('.abc') || lower.endsWith('.hair');
+      });
+      const onlyCurveDrop = droppedFiles.length > 0 && droppedCurves.length === droppedFiles.length;
+      const curveDecision =
+        droppedCurves.length > 0
+          ? await DlgHairImport.prompt(
+              droppedCurves.length,
+              droppedCurves.some((entry) => entry.path.toLowerCase().endsWith('.hair'))
+            )
+          : ({ action: 'keep', unitScale: 1, upAxis: 'z', keepSource: true } as HairImportDialogResult);
+      if (curveDecision.action === 'cancel') {
+        return;
+      }
       const rawZabcPaths = await this.filterRawZabcPaths(
         dtVFS,
         droppedZabc.map((entry) => entry.path)
@@ -2729,11 +2755,51 @@ export class VFSRenderer extends makeObservable(Disposable)<{
         return;
       }
 
+      const convertDroppedCurves = async () => {
+        if (curveDecision.action !== 'convert' || droppedCurves.length === 0) {
+          return;
+        }
+        const dlgProgressBar = new DlgProgress('Convert Hair##HairProgress', 300);
+        dlgProgressBar.showModal();
+        try {
+          for (let i = 0; i < droppedCurves.length; i++) {
+            dlgProgressBar.setProgress(i + 1, droppedCurves.length);
+            const sourcePath = droppedCurves[i].path;
+            const destination = this._vfs.join(
+              info.targetDirectory.path,
+              sourcePath.replace(/^\/+/, '').replace(/\.(abc|hair)$/i, '.zhair')
+            );
+            try {
+              await importCurvesToZHairFile(dtVFS, sourcePath, this._vfs, destination, {
+                unitScale: curveDecision.unitScale,
+                upAxis: curveDecision.upAxis
+              });
+            } catch (err) {
+              console.error(`Convert hair archive ${sourcePath} failed: ${err}`);
+            }
+          }
+        } finally {
+          dlgProgressBar.close();
+        }
+      };
+
       const copyDroppedFiles = async () => {
+        await convertDroppedCurves();
         const dlgProgressBar = new DlgProgress('Copy File##CopyProgress', 300);
         dlgProgressBar.showModal();
         try {
-          await dtVFS.copyFileEx('/**/*', info.targetDirectory.path, {
+          // A converted archive is only copied in as well when it was asked for:
+          // the source is large and the `.zhair` beside it is what scenes read.
+          // An explicit path list rather than a negated glob, because the VFS
+          // pattern syntax has no negation.
+          const dropSource =
+            curveDecision.action === 'convert' && !curveDecision.keepSource
+              ? droppedFiles.filter((entry) => !droppedCurves.includes(entry)).map((entry) => entry.path)
+              : '/**/*';
+          if (Array.isArray(dropSource) && dropSource.length === 0) {
+            return;
+          }
+          await dtVFS.copyFileEx(dropSource, info.targetDirectory.path, {
             overwrite: true,
             targetVFS: this._vfs,
             onProgress: (current, total) => {
@@ -2755,7 +2821,7 @@ export class VFSRenderer extends makeObservable(Disposable)<{
         }
       };
 
-      if (onlyZabcDrop) {
+      if (onlyZabcDrop || onlyCurveDrop) {
         await copyDroppedFiles();
         return;
       }

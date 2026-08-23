@@ -14,6 +14,7 @@ import type { SceneNode } from '../scene/scene_node';
 import type { BatchGroup } from '../scene/batchgroup';
 import type { MSDFText, MSDFTextSprite, ParticleSystem, Sprite } from '../scene';
 import type { Water } from '../scene/water';
+import type { HairNode } from '../scene/hair';
 
 /**
  * Node visitor for culling
@@ -97,6 +98,8 @@ export class CullVisitor implements Visitor<SceneNode | OctreeNode> {
       return this.visitSprite(target);
     } else if (target.isWater()) {
       return this.visitWater(target);
+    } else if (target.isHair()) {
+      return this.visitHair(target);
     } else if (target.isParticleSystem()) {
       return this.visitParticleSystem(target);
     } else if (target.isClipmapTerrain()) {
@@ -201,6 +204,28 @@ export class CullVisitor implements Visitor<SceneNode | OctreeNode> {
   }
   /** @internal */
   visitMesh(node: Mesh) {
+    if (
+      !node.hidden &&
+      (node.castShadow || !this._isShadowMapping) &&
+      (node.gpuPickable || !this._isGPUPicking)
+    ) {
+      const clipState = this.getClipStateWithNode(node);
+      if (clipState !== ClipState.NOT_CLIPPED) {
+        this.push(this._camera, node);
+        return true;
+      }
+    }
+    return false;
+  }
+  /**
+   * Visits a hair node.
+   *
+   * @remarks
+   * Treated like a mesh rather than like water: hair casts shadows, and the
+   * strand material has a transparent shadow caster path built for exactly that.
+   * @internal
+   */
+  visitHair(node: HairNode) {
     if (
       !node.hidden &&
       (node.castShadow || !this._isShadowMapping) &&

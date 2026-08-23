@@ -14,6 +14,7 @@ import type { SkeletonRig, SkinBinding } from '../animation';
 import { AnimationSet } from '../animation/animationset';
 import type { SharedModel } from '../asset';
 import type { Water } from './water';
+import type { HairNode } from './hair';
 import type { ClipmapTerrain } from './terrain-cm/terrain-cm';
 import type { Metadata } from 'draco3d';
 import { getEngine } from '../app/api';
@@ -679,6 +680,10 @@ export class SceneNode
   }
   /** Type guard: true if this node is a water node. */
   isWater(): this is Water {
+    return false;
+  }
+  /** Type guard: true if this node is a hair node. */
+  isHair(): this is HairNode {
     return false;
   }
   /** Type guard: true if this node is a particle system. */

@@ -2,6 +2,7 @@ import type { MeshMaterial, PropertyAccessor, PropertyValue, Scene, SceneNode } 
 import { getEngine } from '@zephyr3d/scene';
 import { ParticleSystem } from '@zephyr3d/scene';
 import { Mesh } from '@zephyr3d/scene';
+import { HairNode } from '@zephyr3d/scene';
 import { Command } from '../core/command';
 import type { Nullable, RequireOptionals } from '@zephyr3d/base';
 import { ASSERT, DRef, Matrix4x4, Quaternion, Vector3 } from '@zephyr3d/base';
@@ -183,6 +184,83 @@ export class AddAssetCommand extends Command<Nullable<SceneNode>> {
       node.remove();
     }
   }
+}
+
+/**
+ * Adds a hair node backed by a `.zhair` strand asset.
+ *
+ * The optional preview node is the one the viewport has been positioning during
+ * the drag, and reusing it avoids decoding a groom - which can be millions of
+ * control points - a second time when the drop is committed.
+ */
+export class AddHairCommand extends Command<Nullable<SceneNode>> {
+  private readonly _scene: Scene;
+  private readonly _asset: string;
+  private readonly _position: Vector3;
+  private _nodeId: string;
+  private _previewNodeRef: Nullable<DRef<SceneNode>>;
+  constructor(scene: Scene, asset: string, position: Vector3, previewNode?: Nullable<SceneNode>) {
+    super('Add hair');
+    this._scene = scene;
+    this._asset = asset;
+    this._position = new Vector3(position);
+    this._nodeId = '';
+    this._previewNodeRef = previewNode ? new DRef(previewNode) : null;
+  }
+  async execute() {
+    let node: Nullable<SceneNode> = this._previewNodeRef?.get() ?? null;
+    if (!node) {
+      try {
+        node = await createHairNodeFromAsset(this._scene, this._asset);
+      } catch (err) {
+        console.error(`Load hair asset failed: ${this._asset}: ${err}`);
+      }
+    }
+    if (node) {
+      node.parent = this._scene.rootNode;
+      node.position.set(this._position);
+      ensureNodeDefaultName(node, getDefaultNodeNameFromAssetPath(this._asset));
+      node.iterate((n) => {
+        n.gpuPickable = true;
+        return false;
+      });
+      if (this._nodeId) {
+        node.persistentId = this._nodeId.split('/').at(-1)!;
+      } else {
+        this._nodeId = getNodePath(node);
+      }
+      this._previewNodeRef?.dispose();
+      this._previewNodeRef = null;
+      return node;
+    }
+    this._nodeId = '';
+    this._previewNodeRef?.dispose();
+    this._previewNodeRef = null;
+    return null;
+  }
+  async undo() {
+    if (this._nodeId) {
+      const node = findNodeByPath(this._scene.rootNode, this._nodeId);
+      node.remove();
+    }
+  }
+}
+
+/**
+ * Creates a hair node and loads a `.zhair` asset into it.
+ *
+ * @remarks
+ * Note that this sets the asset directly rather than going through
+ * `deserializeObjectProps`: that call applies every property of the class,
+ * defaulting the ones absent from the patch, which would wipe the persistent id
+ * the constructor had just assigned. A node without one resolves to an empty
+ * path, and an empty path resolves to the scene root - so a later gizmo drag
+ * would transform the whole scene.
+ */
+export async function createHairNodeFromAsset(scene: Scene, asset: string) {
+  const node = new HairNode(scene);
+  await node.setHairAsset(asset);
+  return node;
 }
 
 /**

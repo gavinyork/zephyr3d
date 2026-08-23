@@ -41,7 +41,10 @@ const mimeTypes: Record<string, string> = {
   '.zmf': 'application/vnd.zephyr3d.blueprint.mf+json',
   '.zscn': 'application/vnd.zephyr3d.scene+json',
   '.zprefab': 'application/vnd.zephyr3d.prefab+json',
-  '.zabc': 'application/vnd.zephyr3d.alembic-cache+json'
+  '.zabc': 'application/vnd.zephyr3d.alembic-cache+json',
+  // Binary rather than JSON: a groom is millions of control points, and the
+  // "+json" suffix would also make the editor file list treat it as text.
+  '.zhair': 'application/vnd.zephyr3d.hair'
 };
 
 /**

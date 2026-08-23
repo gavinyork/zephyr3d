@@ -110,6 +110,8 @@ const SCENE_NAMES = [
   'hair-strands-fan',
   'hair-strands-width',
   'hair-strands-gpu-helix',
+  'hair-node-transform',
+  'hair-simulation',
   'hair-shadow-pcf',
   'hair-shadow-dom',
   'hair-scatter-off',

@@ -3,6 +3,7 @@ import type { BlendMode } from '../../../material';
 import {
   BlinnMaterial,
   HairMaterial,
+  HairStrandMaterial,
   LambertMaterial,
   MeshMaterial,
   MToonMaterial,
@@ -2493,6 +2494,128 @@ export function getHairMaterialClass(manager: ResourceManager): SerializableClas
       }
     },
     getMeshMaterialInstanceUniformsClass(HairMaterial)
+  ];
+}
+
+/**
+ * Serialization for the GPU strand expansion material.
+ *
+ * @remarks
+ * Declared as a child of {@link HairMaterial}, so every lighting property the
+ * parent exposes is inherited and only the expansion controls appear here.
+ * The strand geometry itself is deliberately absent: it belongs to the node that
+ * draws it, which references a `.zhair` asset, and duplicating millions of
+ * control points into a material would defeat the point of having that file.
+ * @internal
+ */
+export function getHairStrandMaterialClass(): SerializableClass[] {
+  return [
+    {
+      ctor: HairStrandMaterial,
+      parent: HairMaterial,
+      name: 'HairStrandMaterial',
+      getProps() {
+        return defineProps([
+          {
+            name: 'SegmentsPerStrand',
+            description:
+              'Ribbon segments generated per strand. Independent of the control point count, so the same strands can be drawn coarser at a distance',
+            type: 'int',
+            default: 8,
+            options: { minValue: 1, maxValue: 64 },
+            get(this: HairStrandMaterial, value) {
+              value.num[0] = this.segmentsPerStrand;
+            },
+            set(this: HairStrandMaterial, value) {
+              this.segmentsPerStrand = value.num[0];
+            }
+          },
+          {
+            name: 'StrandWidthScale',
+            description: 'Multiplier on the width stored in the strand data',
+            type: 'float',
+            default: 1,
+            options: { animatable: true, minValue: 0, maxValue: 100 },
+            get(this: HairStrandMaterial, value) {
+              value.num[0] = this.strandWidthScale;
+            },
+            set(this: HairStrandMaterial, value) {
+              this.strandWidthScale = value.num[0];
+            }
+          },
+          {
+            name: 'MinStrandWidth',
+            description: 'Lower bound on ribbon width, in world units',
+            type: 'float',
+            default: 0,
+            options: { minValue: 0, maxValue: 1 },
+            get(this: HairStrandMaterial, value) {
+              value.num[0] = this.minStrandWidth;
+            },
+            set(this: HairStrandMaterial, value) {
+              this.minStrandWidth = value.num[0];
+            }
+          },
+          {
+            name: 'MinPixelWidth',
+            description:
+              'Lower bound on ribbon width in pixels. Real hair is thinner than a pixel; widening it and paying the coverage back in alpha keeps distant hair from breaking into a flickering dotted line',
+            type: 'float',
+            default: 1.4,
+            options: { minValue: 0, maxValue: 8 },
+            get(this: HairStrandMaterial, value) {
+              value.num[0] = this.minPixelWidth;
+            },
+            set(this: HairStrandMaterial, value) {
+              this.minPixelWidth = value.num[0];
+            }
+          },
+          {
+            name: 'StrandRoundness',
+            description:
+              'How far the shading normal bends across the ribbon. At 0 the strand shades as a flat tape, at 1 as a cylinder',
+            type: 'float',
+            default: 1,
+            options: { animatable: true, minValue: 0, maxValue: 1 },
+            get(this: HairStrandMaterial, value) {
+              value.num[0] = this.strandRoundness;
+            },
+            set(this: HairStrandMaterial, value) {
+              this.strandRoundness = value.num[0];
+            }
+          },
+          {
+            name: 'StrandLOD',
+            description: 'Drop strands with distance, redistributing their coverage to the survivors',
+            type: 'bool',
+            default: false,
+            get(this: HairStrandMaterial, value) {
+              value.bool[0] = this.strandLOD;
+            },
+            set(this: HairStrandMaterial, value) {
+              this.strandLOD = value.bool[0];
+            }
+          },
+          {
+            name: 'MinStrandLODRatio',
+            description: 'Floor on the fraction of strands distance decimation keeps',
+            type: 'float',
+            default: 0.05,
+            options: { minValue: 0, maxValue: 1 },
+            isValid(this: HairStrandMaterial) {
+              return this.strandLOD;
+            },
+            get(this: HairStrandMaterial, value) {
+              value.num[0] = this.minStrandLODRatio;
+            },
+            set(this: HairStrandMaterial, value) {
+              this.minStrandLODRatio = value.num[0];
+            }
+          }
+        ]);
+      }
+    },
+    getMeshMaterialInstanceUniformsClass(HairStrandMaterial)
   ];
 }
 
