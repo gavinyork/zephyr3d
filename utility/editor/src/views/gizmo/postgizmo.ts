@@ -398,7 +398,6 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
   endEditAABB(aabb?: AABB) {
     aabb = aabb && this._aabbForEdit;
     if (aabb && aabb === this._aabbForEdit) {
-      PostGizmoRenderer._aabbMesh.get()?.off('transformchanged', this.applyAABBChange, this);
       this._aabbForEdit = null;
       this.node = null;
       this.mode = 'select';
