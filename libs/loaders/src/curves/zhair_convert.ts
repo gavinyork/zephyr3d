@@ -12,11 +12,12 @@
  * the node that draws it decides how much to use, so an artist can change strand
  * count without returning to the source archive.
  */
-import type { VFS } from '@zephyr3d/base';
+import type { Nullable, VFS } from '@zephyr3d/base';
 import { PathUtils } from '@zephyr3d/base';
 import { encodeZHair, type ZHairStrandSetSource } from '@zephyr3d/scene';
 import { parseAlembicCurves } from '../alembic/parser';
 import { parseHairFile } from '../hair/parser';
+import { applyStrandOriginAnchor, type StrandOriginAnchor } from './origin';
 import type { StrandUpAxis } from './upaxis';
 
 /** Container a groom arrived in. @public */
@@ -45,6 +46,18 @@ export type ZHairConvertOptions = {
    * for Alembic, which carries its own orientation.
    */
   upAxis?: StrandUpAxis;
+  /**
+   * Point of the groom's bounding box to move onto the origin.
+   *
+   * @remarks
+   * Null or absent leaves the control points where the archive put them, which
+   * is the historical behaviour. A groom combed in place carries the offset its
+   * character had in the authoring scene, so an archive that looks fine in Maya
+   * can arrive tens of units from its own origin; anchoring it makes the node's
+   * transform mean what it says. Applied after the up-axis conversion, so the
+   * anchor's axes are the engine's rather than the source's.
+   */
+  originAnchor?: Nullable<StrandOriginAnchor>;
   /** Path recorded in the file so it can be traced back to its source. */
   sourcePath?: string;
 };
@@ -81,7 +94,7 @@ export function detectCurveFormat(buffer: ArrayBuffer): CurveSourceFormat | null
  * Converts a curve archive into `.zhair` bytes.
  *
  * @param buffer - The source archive.
- * @param options - Unit scale and provenance.
+ * @param options - Unit scale, origin anchor and provenance.
  * @returns The `.zhair` file.
  *
  * @public
@@ -126,6 +139,11 @@ export function convertCurvesToZHair(buffer: ArrayBuffer, options?: ZHairConvert
       transparency: hair.transparency
     });
   }
+  if (options?.originAnchor) {
+    // After both branches, so the whole archive moves as one piece and its curve
+    // objects keep their positions relative to each other.
+    applyStrandOriginAnchor(sets, options.originAnchor);
+  }
   return encodeZHair(sets, {
     unitScale: options?.unitScale ?? (format === 'alembic' ? 0.01 : 1),
     sourceFormat: format,
@@ -140,7 +158,7 @@ export function convertCurvesToZHair(buffer: ArrayBuffer, options?: ZHairConvert
  * @param srcPath - Path of the source archive.
  * @param dstVFS - Filesystem to write into.
  * @param dstPath - Destination path, which should end in `.zhair`.
- * @param options - Unit scale and up axis.
+ * @param options - Unit scale, up axis and origin anchor.
  * @returns The number of bytes written.
  *
  * @public

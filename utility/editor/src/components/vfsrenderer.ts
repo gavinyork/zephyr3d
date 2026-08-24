@@ -2739,7 +2739,13 @@ export class VFSRenderer extends makeObservable(Disposable)<{
               droppedCurves.length,
               droppedCurves.some((entry) => entry.path.toLowerCase().endsWith('.hair'))
             )
-          : ({ action: 'keep', unitScale: 1, upAxis: 'z', keepSource: true } as HairImportDialogResult);
+          : ({
+              action: 'keep',
+              unitScale: 1,
+              upAxis: 'z',
+              originAnchor: null,
+              keepSource: true
+            } as HairImportDialogResult);
       if (curveDecision.action === 'cancel') {
         return;
       }
@@ -2772,7 +2778,8 @@ export class VFSRenderer extends makeObservable(Disposable)<{
             try {
               await importCurvesToZHairFile(dtVFS, sourcePath, this._vfs, destination, {
                 unitScale: curveDecision.unitScale,
-                upAxis: curveDecision.upAxis
+                upAxis: curveDecision.upAxis,
+                originAnchor: curveDecision.originAnchor
               });
             } catch (err) {
               console.error(`Convert hair archive ${sourcePath} failed: ${err}`);
