@@ -663,9 +663,9 @@ export function getHairNodeClass(): SerializableClass {
         {
           name: 'Stiffness',
           description:
-            'How strongly strands return to their authored shape. Low values let a styled groom collapse into a curtain',
+            'Fraction of the deviation from the authored shape removed per fixed step. High values pin the styling and erase visible motion',
           type: 'float',
-          default: 0.35,
+          default: 0.05,
           options: { group: 'Simulation', animatable: true, minValue: 0, maxValue: 1 },
           isHidden(this: HairNode) {
             return !this.simulationEnabled;

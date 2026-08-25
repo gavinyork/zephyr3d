@@ -69,6 +69,8 @@ export class HairNode extends applyMixins(GraphNode, mixinDrawable) implements D
   private readonly _strands: DRef<HairStrandData>;
   /** @internal Local-space bounds of the control points, width included. */
   private _bounds: Nullable<BoundingBox>;
+  /** @internal Length of the longest strand, for padding the bounds while simulating. */
+  private _maxStrandLength: number;
   /** @internal */
   private _castShadow: boolean;
   /** @internal Kept so the simulation can be rebuilt from the authored pose. */
@@ -108,6 +110,7 @@ export class HairNode extends applyMixins(GraphNode, mixinDrawable) implements D
     this._primitive = new DRef();
     this._strands = new DRef();
     this._bounds = null;
+    this._maxStrandLength = 0;
     this._castShadow = true;
     this._source = null;
     this._hairAsset = '';
@@ -119,7 +122,7 @@ export class HairNode extends applyMixins(GraphNode, mixinDrawable) implements D
     this._simulationOptions = {
       gravity: new Vector3(0, -9.8, 0),
       damping: 0.05,
-      stiffness: 0.35,
+      stiffness: 0.05,
       substeps: 2,
       friction: 0.2
     };
@@ -230,6 +233,7 @@ export class HairNode extends applyMixins(GraphNode, mixinDrawable) implements D
     this._disposeSimulation();
     this._strands.dispose();
     this._bounds = null;
+    this._maxStrandLength = 0;
     this._source = null;
     if (!source) {
       this.material.strands = null;
@@ -241,7 +245,9 @@ export class HairNode extends applyMixins(GraphNode, mixinDrawable) implements D
     this._strands.set(data);
     this._source = source;
     this.material.strands = data;
-    this._bounds = computeStrandBounds(source);
+    const extents = computeStrandExtents(source);
+    this._bounds = extents.bounds;
+    this._maxStrandLength = extents.maxStrandLength;
     this._ensurePrimitive();
     this._syncDrawRange();
     this.invalidateBoundingVolume();
@@ -615,6 +621,8 @@ export class HairNode extends applyMixins(GraphNode, mixinDrawable) implements D
         this._strands.set(new HairStrandData(this._source));
         this.material.strands = this._strands.get();
       }
+      // Back to the tight rest bounds.
+      this.invalidateBoundingVolume();
     }
   }
   /**
@@ -637,7 +645,16 @@ export class HairNode extends applyMixins(GraphNode, mixinDrawable) implements D
       this._simulation.gravity = this._simulationOptions.gravity;
     }
   }
-  /** How strongly strands return to their authored shape, in [0, 1]. */
+  /**
+   * How strongly strands return to their authored shape, in [0, 1].
+   *
+   * @remarks
+   * The fraction of the remaining deviation removed per fixed 1/60 s step,
+   * independent of {@link HairNode.substeps}. This is also what erases the
+   * swing a moving node produces, so grooms that should visibly react to motion
+   * want it low; high values pin the groom to its styling within a frame or
+   * two.
+   */
   get stiffness() {
     return this._simulationOptions.stiffness!;
   }
@@ -704,9 +721,23 @@ export class HairNode extends applyMixins(GraphNode, mixinDrawable) implements D
    * Derived on the CPU from the control points, because the ribbons are built in
    * the vertex shader and the engine never sees them. The box is in local space;
    * the base class applies the world matrix.
+   *
+   * While a simulation runs, the strands swing out of their authored pose, so
+   * the rest bounds are padded by the longest strand: the solver keeps every
+   * point within its strand's length of the pinned root, which bounds any pose
+   * it can produce.
    */
   computeBoundingVolume(): Nullable<BoundingBox> {
-    return this._bounds ? new BoundingBox(this._bounds) : null;
+    if (!this._bounds) {
+      return null;
+    }
+    const box = new BoundingBox(this._bounds);
+    if (this._simulation) {
+      const pad = this._maxStrandLength;
+      box.minPoint.setXYZ(box.minPoint.x - pad, box.minPoint.y - pad, box.minPoint.z - pad);
+      box.maxPoint.setXYZ(box.maxPoint.x + pad, box.maxPoint.y + pad, box.maxPoint.z + pad);
+    }
+    return box;
   }
   /** {@inheritDoc SceneNode.isHair} */
   isHair(): this is HairNode {
@@ -819,6 +850,8 @@ export class HairNode extends applyMixins(GraphNode, mixinDrawable) implements D
     const simulation = new GPUHairSimulation(data, this._source, this._simulationOptions);
     if (simulation.enabled) {
       this._simulation = simulation;
+      // The bounds widen while a simulation runs - see computeBoundingVolume.
+      this.invalidateBoundingVolume();
       this.scene?.queueUpdateNode(this);
     } else {
       console.warn(simulation.disabledReason ?? 'GPU hair simulation could not start');
@@ -865,25 +898,49 @@ export class HairNode extends applyMixins(GraphNode, mixinDrawable) implements D
 }
 
 /**
- * Local-space bounds of a strand source, padded by the widest strand.
+ * Local-space bounds of a strand source, padded by the widest strand, along
+ * with the length of the longest strand.
  *
  * @remarks
  * The ribbon is built around the control point, so half a width would suffice;
  * a full width is used because {@link HairNode.minPixelWidth} widens sub-pixel
  * strands beyond their authored size and the box has to survive that.
+ *
+ * The strand length is measured here because the same pass already touches
+ * every point; it pads the bounds while a simulation runs.
  * @internal
  */
-function computeStrandBounds(source: HairStrandSource): BoundingBox {
+function computeStrandExtents(source: HairStrandSource): {
+  bounds: BoundingBox;
+  maxStrandLength: number;
+} {
   const scale = source.scale ?? 1;
   const positions = source.positions;
-  let pointCount = 0;
-  for (let i = 0; i < source.pointCounts.length; i++) {
-    pointCount += source.pointCounts[i];
-  }
   const box = new BoundingBox();
   box.beginExtend();
-  for (let i = 0; i < pointCount; i++) {
-    box.extend3(positions[i * 3] * scale, positions[i * 3 + 1] * scale, positions[i * 3 + 2] * scale);
+  let maxStrandLength = 0;
+  let first = 0;
+  for (let s = 0; s < source.pointCounts.length; s++) {
+    const count = source.pointCounts[s];
+    let length = 0;
+    for (let i = 0; i < count; i++) {
+      const p = (first + i) * 3;
+      const x = positions[p] * scale;
+      const y = positions[p + 1] * scale;
+      const z = positions[p + 2] * scale;
+      box.extend3(x, y, z);
+      if (i > 0) {
+        length += Math.hypot(
+          x - positions[p - 3] * scale,
+          y - positions[p - 2] * scale,
+          z - positions[p - 1] * scale
+        );
+      }
+    }
+    if (length > maxStrandLength) {
+      maxStrandLength = length;
+    }
+    first += count;
   }
   let widest = source.defaultWidth ?? 0.0001;
   if (source.widths) {
@@ -896,5 +953,5 @@ function computeStrandBounds(source: HairStrandSource): BoundingBox {
   const pad = widest * scale * (source.widthScale ?? 1);
   box.minPoint.setXYZ(box.minPoint.x - pad, box.minPoint.y - pad, box.minPoint.z - pad);
   box.maxPoint.setXYZ(box.maxPoint.x + pad, box.maxPoint.y + pad, box.maxPoint.z + pad);
-  return box;
+  return { bounds: box, maxStrandLength };
 }

@@ -19,7 +19,7 @@ import {
   type HairFileImportOptions
 } from '@zephyr3d/loaders';
 import { Quaternion, Vector3, Vector4 } from '@zephyr3d/base';
-import { createSphereCollider } from '@zephyr3d/scene';
+import { createSphereCollider, getDevice } from '@zephyr3d/scene';
 import type { PrimitiveType, VertexAttribFormat } from '@zephyr3d/device';
 import type { ShadowMode } from '@zephyr3d/scene';
 import type { SceneContext, VisualScene } from '../types';
@@ -402,15 +402,137 @@ export const hairSimulation: VisualScene = {
     node.strandWidthScale = 0.4;
     node.setStrands(curtainStrands());
     // No damping and a low stiffness so the motion is large enough to read in a
-    // single frame; a styled groom would use far more of both.
+    // single frame; a styled groom would use far more of both. The stiffness
+    // dial is the per-fixed-step fraction and the solver runs two substeps, so
+    // 0.0396 = 1 - (1 - 0.02)^2 reproduces the 0.02-per-substep pull the
+    // snapshot was recorded with.
     node.damping = 0;
-    node.stiffness = 0.02;
+    node.stiffness = 0.0396;
     node.gravity = new Vector3(0, -9.8, 0);
     node.simulationEnabled = true;
     // Sits under the middle of the curtain, so the strands that clear it and the
     // strands it deflects appear side by side.
     node.simulation!.colliders = [createSphereCollider(new Vector3(0, 0.15, 0), 0.42)];
     placeCamera(ctx.camera, new Vector3(0, 0.75, 3.1), new Vector3(0, 0.15, 0));
+  }
+};
+
+/**
+ * Strands simulated on a node that moves and turns while the solver runs.
+ *
+ * @remarks
+ * The one scene that pins the motion-response path: the solver works in local
+ * space and reproduces node motion through the frame-to-frame relative
+ * transform, a path the static {@link hairSimulation} scene never exercises.
+ * The node sweeps on X and yaws around Y, and the capture lands mid-swing, so
+ * the curtain must show a bounded, trailing bend. Two failures read instantly:
+ * a solver that ignores node motion leaves the curtain straight, and a
+ * motion-injection with the wrong sign winds node displacement up into strand
+ * velocity until the strands stream out to full extension.
+ *
+ * WebGPU only: the solver is a compute pass.
+ */
+export const hairSimulationMotion: VisualScene = {
+  name: 'hair-simulation-motion',
+  description: 'Strands on a moving node: pins the swing produced by the relative transform.',
+  supports: (backend) => backend === 'webgpu',
+  frames: 90,
+  setup(ctx) {
+    bareScene(ctx.scene);
+    keyLight(ctx.scene);
+    const node = new HairNode(ctx.scene);
+    node.albedoColor = new Vector4(0.24, 0.14, 0.1, 1);
+    node.segmentsPerStrand = 12;
+    node.minStrandWidth = 0;
+    node.strandWidthScale = 0.4;
+    node.setStrands(curtainStrands());
+    node.simulationEnabled = true;
+    // Driven from the frame counter, not the clock, so frame N is the same
+    // pose every run. Gentle editor-drag speeds: the response should be a
+    // clean trailing bend, not a whip.
+    let frame = 0;
+    ctx.scene.on('update', () => {
+      frame++;
+      node.position.setXYZ(0.25 * Math.sin(frame * 0.12), 0, 0);
+      node.rotation.set(Quaternion.fromAxisAngle(Vector3.axisPY(), 0.3 * Math.sin(frame * 0.07)));
+    });
+    placeCamera(ctx.camera, new Vector3(0, 0.75, 3.1), new Vector3(0, 0.15, 0));
+  }
+};
+
+/**
+ * Long strands on a node driven with jerky motion under frame-time jitter.
+ *
+ * @remarks
+ * Pins the failure mode that only appears off the steady clock: the solver
+ * spreads the node's per-frame motion over its substeps by interpolating the
+ * world transform, and before it did, a frame-time hitch lumped several frames
+ * of motion into a single substep. Each such lump yanked strand roots by more
+ * than a segment length, the constraint corrections fed back as velocity, and
+ * jerky dragging wound the strands up until the groom burst into a tangle.
+ * The drive here reproduces that regime deterministically: the velocity jumps
+ * between values every few frames and the frame interval swings between 5 ms
+ * and 50 ms, both indexed off the frame counter. The capture must show a
+ * hanging, gently trailing curtain; strands streaming sideways or upward mean
+ * the injection is being lumped again.
+ *
+ * The strands match the groom the blow-up was reported on: ~6 m long, 30
+ * control points, a curled lower third.
+ *
+ * WebGPU only: the solver is a compute pass.
+ */
+export const hairSimulationJitter: VisualScene = {
+  name: 'hair-simulation-jitter',
+  description: 'Jerky motion under frame-time jitter: pins substep-distributed motion injection.',
+  supports: (backend) => backend === 'webgpu',
+  frames: 600,
+  setup(ctx) {
+    bareScene(ctx.scene);
+    keyLight(ctx.scene);
+    const node = new HairNode(ctx.scene);
+    node.albedoColor = new Vector4(0.45, 0.12, 0.1, 1);
+    node.segmentsPerStrand = 16;
+    node.minStrandWidth = 0;
+    node.strandWidthScale = 0.5;
+    // Long strands matching the reported groom: ~6m hanging with a curled
+    // lower third (styled rest pose), 30 control points.
+    const strandCount = 40;
+    const pointsPerStrand = 30;
+    const positions = new Float32Array(strandCount * pointsPerStrand * 3);
+    const pointCounts = new Uint32Array(strandCount);
+    const widths = new Float32Array(strandCount * pointsPerStrand);
+    for (let s = 0; s < strandCount; s++) {
+      pointCounts[s] = pointsPerStrand;
+      const x = (s / (strandCount - 1) - 0.5) * 4;
+      for (let i = 0; i < pointsPerStrand; i++) {
+        const p = s * pointsPerStrand + i;
+        const t = i / (pointsPerStrand - 1);
+        // Inward curl over the lower third, like a combed bob.
+        const curl = t > 0.66 ? (t - 0.66) * 3 : 0;
+        positions[p * 3] = x;
+        positions[p * 3 + 1] = 6 - t * 6 + curl * curl * 0.5;
+        positions[p * 3 + 2] = curl * 1.2;
+        widths[p] = 0.03;
+      }
+    }
+    node.setStrands({ positions, pointCounts, widths, widthPerStrand: false });
+    node.simulationEnabled = true;
+    // Hand-tremor drive plus frame-time jitter: velocity JUMPS between values
+    // and the frame interval swings between 5ms and 50ms, approximating an
+    // editor under jerky input. Both patterns are frame-indexed, so the run
+    // stays deterministic.
+    let frame = 0;
+    let x = 0;
+    const speeds = [5, -3, 0, 4, -5, 2, -4, 0, 3];
+    const frameTimes = [16.7, 8, 33, 16.7, 5, 50, 25, 16.7, 11, 40];
+    ctx.scene.on('update', () => {
+      frame++;
+      const dtMs = frameTimes[frame % frameTimes.length];
+      getDevice().setFixedFrameTime(dtMs);
+      x += (speeds[Math.floor(frame / 7) % speeds.length] * dtMs) / 1000;
+      node.position.setXYZ(x, 0, 0);
+    });
+    placeCamera(ctx.camera, new Vector3(0, 3.5, 14), new Vector3(0, 3, 0));
   }
 };
 

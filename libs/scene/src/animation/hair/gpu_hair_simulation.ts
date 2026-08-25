@@ -20,15 +20,29 @@
  * Solving locally still has to reproduce the swing a moving node gives its hair.
  * The trick is the frame-to-frame transform: a point that stood still in world
  * space has moved in local space by exactly `inverse(world) * prevWorld`, so
- * pushing the previous position through that matrix before integrating leaves
- * the strand lagging behind its root, which is the drag. Gravity and colliders
- * come the other way, from world space into local, on the CPU.
+ * pushing the stored positions through that matrix before integrating keeps the
+ * strand where it was in world space, and the root - pinned in local space -
+ * then drags it along, which is the swing. Both the current and the previous
+ * position go through the matrix: transforming only one of them would read the
+ * node's own motion as strand velocity and throw the hair ahead of the movement
+ * instead of trailing behind it. Gravity and colliders come the other way, from
+ * world space into local, on the CPU.
+ *
+ * The node's motion is spread evenly over every substep of the frame by
+ * interpolating between the two world transforms, rather than being applied
+ * whole in the first substep. Under a steady frame rate the difference is
+ * small, but real frame times jitter - and a hitch lumps several frames of
+ * motion into what the solver treats as 1/120 s, yanking roots by more than a
+ * segment length per substep. Each such yank feeds the constraint correction
+ * into the Verlet history as velocity, and on jerky input the strands wind up
+ * until the groom bursts. Distributed injection keeps the per-substep transport
+ * no larger than it would be at a steady 60 Hz.
  *
  * WebGPU only, like the rendering path it feeds.
  */
 import type { AbstractDevice, BindGroup, GPUDataBuffer, GPUProgram } from '@zephyr3d/device';
 import type { Nullable } from '@zephyr3d/base';
-import { Matrix4x4, Vector3, Disposable } from '@zephyr3d/base';
+import { Matrix4x4, Quaternion, Vector3, Disposable } from '@zephyr3d/base';
 import { getDevice } from '../../app/api';
 import type { HairStrandData, HairStrandSource } from '../../material/hairstrand_data';
 import type {
@@ -53,6 +67,12 @@ const CAPSULE_STRIDE = 8;
 const PLANE_STRIDE = 8;
 /** Colliders of one kind the buffers make room for. @internal */
 const MAX_COLLIDERS = 16;
+/**
+ * Node motion beyond this many strand lengths in one frame is treated as a
+ * teleport and snaps the pose instead of swinging it.
+ * @internal
+ */
+const TELEPORT_DISTANCE_FACTOR = 4;
 
 /**
  * Tuning for {@link GPUHairSimulation}.
@@ -71,6 +91,13 @@ export type GPUHairSimulationOptions = {
    * The dial that decides whether a groom reads as hair or as string. At 0 the
    * strands only fall; a styled groom needs enough of this to hold its shape and
    * merely move within it.
+   *
+   * The value is the fraction of the remaining deviation removed per fixed
+   * 1/60 s step, independent of the substep count. It is also what erases the
+   * swing a moving node produces: at 0.3 a displaced strand is back in its
+   * styled pose within a couple of frames, so grooms that should visibly react
+   * to motion want this low - the 0.05 default keeps the styling over roughly a
+   * third of a second while letting the swing read.
    */
   stiffness?: number;
   /** Integration substeps per fixed step, in [1, 8]. */
@@ -101,6 +128,16 @@ export function isHairSimulationSupported(device?: Nullable<AbstractDevice>) {
 
 function clamp(value: number, min: number, max: number) {
   return value < min ? min : value > max ? max : value;
+}
+
+/** Exact element-wise matrix comparison, for skipping the interpolation. @internal */
+function matrixEquals(a: Matrix4x4, b: Matrix4x4) {
+  for (let i = 0; i < 16; i++) {
+    if (a[i] !== b[i]) {
+      return false;
+    }
+  }
+  return true;
 }
 
 /**
@@ -162,13 +199,27 @@ export class GPUHairSimulation extends Disposable {
   private readonly _relativeTransform: Matrix4x4;
   private readonly _invWorldMatrix: Matrix4x4;
   private readonly _prevWorldMatrix: Matrix4x4;
-  /** @internal Reused for the steps that must not re-apply node motion. */
+  /** @internal Bound while the node stands still, so those frames upload nothing new. */
   private readonly _identity: Matrix4x4;
   private readonly _localGravity: Vector3;
   private readonly _scratchVec: Vector3;
   private readonly _scratchVec2: Vector3;
+  /** @internal Endpoints and scratch of the per-substep transform interpolation. */
+  private readonly _scaleFrom: Vector3;
+  private readonly _scaleTo: Vector3;
+  private readonly _translationFrom: Vector3;
+  private readonly _translationTo: Vector3;
+  private readonly _rotationFrom: Quaternion;
+  private readonly _rotationTo: Quaternion;
+  private readonly _rotationLerp: Quaternion;
+  private readonly _stepFrom: Matrix4x4;
+  private readonly _stepTo: Matrix4x4;
   /** @internal True until the first step has seen a world matrix. */
   private _hasPrevWorldMatrix: boolean;
+  /** @internal Length of the longest strand, for the teleport threshold. */
+  private _maxStrandLength: number;
+  /** @internal Centre of the rest pose, whose world motion detects teleports. */
+  private readonly _restCenter: Vector3;
   /**
    * Creates a simulation over an uploaded strand set.
    *
@@ -194,7 +245,7 @@ export class GPUHairSimulation extends Disposable {
     this._strandCount = strands.strandCount;
     this._gravity = options?.gravity ? new Vector3(options.gravity) : new Vector3(0, -9.8, 0);
     this._damping = clamp(options?.damping ?? 0.05, 0, 1);
-    this._stiffness = clamp(options?.stiffness ?? 0.35, 0, 1);
+    this._stiffness = clamp(options?.stiffness ?? 0.05, 0, 1);
     this._substeps = clamp(options?.substeps ?? 2, 1, 8) | 0;
     this._friction = clamp(options?.friction ?? 0.2, 0, 1);
     this._colliders = options?.colliders ? [...options.colliders] : [];
@@ -209,7 +260,18 @@ export class GPUHairSimulation extends Disposable {
     this._localGravity = new Vector3();
     this._scratchVec = new Vector3();
     this._scratchVec2 = new Vector3();
+    this._scaleFrom = new Vector3();
+    this._scaleTo = new Vector3();
+    this._translationFrom = new Vector3();
+    this._translationTo = new Vector3();
+    this._rotationFrom = new Quaternion();
+    this._rotationTo = new Quaternion();
+    this._rotationLerp = new Quaternion();
+    this._stepFrom = Matrix4x4.identity();
+    this._stepTo = Matrix4x4.identity();
     this._hasPrevWorldMatrix = false;
+    this._maxStrandLength = 0;
+    this._restCenter = new Vector3();
     this._workgroupCount = Math.ceil(this._strandCount / DEFAULT_WORKGROUP_SIZE);
 
     if (!isHairSimulationSupported(this._device)) {
@@ -250,7 +312,7 @@ export class GPUHairSimulation extends Disposable {
   set damping(value: number) {
     this._damping = clamp(value, 0, 1);
   }
-  /** How strongly strands return to their authored shape, in [0, 1]. */
+  /** Fraction of the deviation from the authored shape removed per fixed step, in [0, 1]. */
   get stiffness() {
     return this._stiffness;
   }
@@ -288,7 +350,10 @@ export class GPUHairSimulation extends Disposable {
    * @remarks
    * Wanted whenever a node is moved rather than animated - teleporting a
    * character would otherwise register as one enormous frame of inertia and fling
-   * the hair.
+   * the hair. {@link GPUHairSimulation.update} calls this by itself when the
+   * groom jumps farther in one frame than a few times its own strand length;
+   * calling it directly remains useful for scripted scene changes that should
+   * not leave the hair settling.
    */
   reset(worldMatrix: Matrix4x4) {
     if (!this._enabled) {
@@ -312,6 +377,22 @@ export class GPUHairSimulation extends Disposable {
     if (!this._hasPrevWorldMatrix) {
       this._prevWorldMatrix.set(worldMatrix);
       this._hasPrevWorldMatrix = true;
+    } else if (this._maxStrandLength > 0) {
+      // A jump larger than a few times the hair itself is a teleport rather
+      // than motion: fed to the solver it would register as one enormous frame
+      // of inertia and fling the strands, so the pose snaps instead. The rest
+      // centre stands in for the groom, so a rotation around a distant pivot
+      // counts as the displacement it actually produces.
+      this._prevWorldMatrix.transformPointAffine(this._restCenter, this._scratchVec);
+      worldMatrix.transformPointAffine(this._restCenter, this._scratchVec2);
+      const dx = this._scratchVec.x - this._scratchVec2.x;
+      const dy = this._scratchVec.y - this._scratchVec2.y;
+      const dz = this._scratchVec.z - this._scratchVec2.z;
+      const threshold = this._maxStrandLength * TELEPORT_DISTANCE_FACTOR;
+      if (dx * dx + dy * dy + dz * dz > threshold * threshold) {
+        this.reset(worldMatrix);
+        return;
+      }
     }
     const frameDt = clamp(Number(deltaTime) || 0, 0, MAX_ACCUMULATED_SIMULATION_TIME);
     if (frameDt <= 0) {
@@ -324,29 +405,75 @@ export class GPUHairSimulation extends Disposable {
     }
     this._timeAccumulator = Math.max(0, this._timeAccumulator - stepCount * FIXED_SIMULATION_TIME_STEP);
 
-    // Local space is where the solver works, so everything world-space has to be
-    // brought in: the frame-to-frame motion of the node, gravity, and colliders.
+    // Local space is where the solver works, so everything world-space has to
+    // be brought in: gravity and colliders here, from the frame-end transform -
+    // they change too slowly for the substep interpolation below to matter -
+    // and the node's own motion per substep inside the loop.
     this._invWorldMatrix.set(worldMatrix);
     this._invWorldMatrix.inplaceInvert();
-    Matrix4x4.multiply(this._invWorldMatrix, this._prevWorldMatrix, this._relativeTransform);
     this._invWorldMatrix.transformVectorAffine(this._gravity, this._localGravity);
     this._uploadColliders(this._invWorldMatrix);
 
     const bindGroup = this._bindGroup!;
     bindGroup.setValue('strandCount', this._strandCount);
     bindGroup.setValue('damping', this._damping);
-    bindGroup.setValue('stiffness', this._stiffness);
+    // The dial is the fraction removed per fixed step; the shader applies it
+    // once per substep, so convert it to the per-substep fraction that
+    // compounds back to the dialled value.
+    bindGroup.setValue('stiffness', 1 - Math.pow(1 - this._stiffness, 1 / this._substeps));
     bindGroup.setValue('friction', this._friction);
     bindGroup.setValue('gravity', this._localGravity);
     bindGroup.setValue('minDistance', MIN_DISTANCE);
+    bindGroup.setValue('deltaTime', FIXED_SIMULATION_TIME_STEP / this._substeps);
 
+    const totalSubsteps = stepCount * this._substeps;
     this._device!.pushDeviceStates();
     try {
-      for (let step = 0; step < stepCount; step++) {
-        // Only the first step of a frame carries the node's motion; replaying it
-        // per step would multiply the inertia by the step count.
-        bindGroup.setValue('relativeTransform', step === 0 ? this._relativeTransform : this._identity);
-        this._runStep();
+      this._device!.setProgram(this._program!);
+      this._device!.setBindGroup(0, bindGroup);
+      if (matrixEquals(this._prevWorldMatrix, worldMatrix)) {
+        // The node stood still; nothing to distribute.
+        bindGroup.setValue('relativeTransform', this._identity);
+        for (let i = 0; i < totalSubsteps; i++) {
+          this._device!.compute(this._workgroupCount, 1, 1);
+        }
+      } else {
+        // The node's frame motion, distributed evenly over every substep by
+        // interpolating between the two world transforms. Lumping it into the
+        // first substep instead would let a frame-time hitch move roots by more
+        // than a segment length in what the solver treats as one substep, and
+        // repeated hitches under jerky input wind the strands up until they
+        // burst - see the class remarks.
+        this._prevWorldMatrix.decompose(this._scaleFrom, this._rotationFrom, this._translationFrom);
+        worldMatrix.decompose(this._scaleTo, this._rotationTo, this._translationTo);
+        this._stepFrom.set(this._prevWorldMatrix);
+        for (let i = 1; i <= totalSubsteps; i++) {
+          if (i === totalSubsteps) {
+            // The exact endpoint, so decompose round-tripping cannot leave the
+            // solver's idea of the transform drifting from the node's.
+            this._stepTo.set(worldMatrix);
+          } else {
+            const t = i / totalSubsteps;
+            this._scratchVec.setXYZ(
+              this._scaleFrom.x + (this._scaleTo.x - this._scaleFrom.x) * t,
+              this._scaleFrom.y + (this._scaleTo.y - this._scaleFrom.y) * t,
+              this._scaleFrom.z + (this._scaleTo.z - this._scaleFrom.z) * t
+            );
+            this._scratchVec2.setXYZ(
+              this._translationFrom.x + (this._translationTo.x - this._translationFrom.x) * t,
+              this._translationFrom.y + (this._translationTo.y - this._translationFrom.y) * t,
+              this._translationFrom.z + (this._translationTo.z - this._translationFrom.z) * t
+            );
+            Quaternion.slerp(this._rotationFrom, this._rotationTo, t, this._rotationLerp);
+            this._stepTo.compose(this._scratchVec, this._rotationLerp, this._scratchVec2);
+          }
+          this._invWorldMatrix.set(this._stepTo);
+          this._invWorldMatrix.inplaceInvert();
+          Matrix4x4.multiply(this._invWorldMatrix, this._stepFrom, this._relativeTransform);
+          bindGroup.setValue('relativeTransform', this._relativeTransform);
+          this._device!.compute(this._workgroupCount, 1, 1);
+          this._stepFrom.set(this._stepTo);
+        }
       }
     } finally {
       this._device!.popDeviceStates();
@@ -355,21 +482,6 @@ export class GPUHairSimulation extends Disposable {
   }
   protected onDispose() {
     this._releaseResources();
-  }
-  /** Runs the substeps of one fixed step. @internal */
-  private _runStep() {
-    const bindGroup = this._bindGroup!;
-    const substepDt = FIXED_SIMULATION_TIME_STEP / this._substeps;
-    bindGroup.setValue('deltaTime', substepDt);
-    this._device!.setProgram(this._program!);
-    this._device!.setBindGroup(0, bindGroup);
-    for (let i = 0; i < this._substeps; i++) {
-      this._device!.compute(this._workgroupCount, 1, 1);
-      if (i === 0) {
-        // The node's motion has been consumed by the first substep.
-        bindGroup.setValue('relativeTransform', this._identity);
-      }
-    }
   }
   /** Copies the rest pose over the live points. @internal */
   private _resetLivePoints() {
@@ -396,26 +508,54 @@ export class GPUHairSimulation extends Disposable {
     // Rest pose and rest lengths, derived from the same control points that were
     // uploaded, and in the same units - the strand data applies the scale on
     // upload, so this has to as well or every constraint would be wrong by it.
+    // The same pass measures the longest strand and the centre of the rest
+    // pose, which the teleport guard in update() works from.
     const restPoints = new Float32Array(pointCount * 3) as Float32Array<ArrayBuffer>;
     const restLengths = new Float32Array(pointCount) as Float32Array<ArrayBuffer>;
     const counts = source.pointCounts;
     let first = 0;
+    let maxStrandLength = 0;
+    let minX = Infinity;
+    let minY = Infinity;
+    let minZ = Infinity;
+    let maxX = -Infinity;
+    let maxY = -Infinity;
+    let maxZ = -Infinity;
     for (let s = 0; s < counts.length; s++) {
       const count = counts[s];
+      let strandLength = 0;
       for (let i = 0; i < count; i++) {
         const src = (first + i) * 3;
         const dst = (first + i) * 3;
-        restPoints[dst] = source.positions[src] * scale;
-        restPoints[dst + 1] = source.positions[src + 1] * scale;
-        restPoints[dst + 2] = source.positions[src + 2] * scale;
+        const x = source.positions[src] * scale;
+        const y = source.positions[src + 1] * scale;
+        const z = source.positions[src + 2] * scale;
+        restPoints[dst] = x;
+        restPoints[dst + 1] = y;
+        restPoints[dst + 2] = z;
+        minX = x < minX ? x : minX;
+        minY = y < minY ? y : minY;
+        minZ = z < minZ ? z : minZ;
+        maxX = x > maxX ? x : maxX;
+        maxY = y > maxY ? y : maxY;
+        maxZ = z > maxZ ? z : maxZ;
         if (i > 0) {
-          const dx = restPoints[dst] - restPoints[dst - 3];
-          const dy = restPoints[dst + 1] - restPoints[dst - 2];
-          const dz = restPoints[dst + 2] - restPoints[dst - 1];
-          restLengths[first + i] = Math.sqrt(dx * dx + dy * dy + dz * dz);
+          const dx = x - restPoints[dst - 3];
+          const dy = y - restPoints[dst - 2];
+          const dz = z - restPoints[dst - 1];
+          const len = Math.sqrt(dx * dx + dy * dy + dz * dz);
+          restLengths[first + i] = len;
+          strandLength += len;
         }
       }
+      if (strandLength > maxStrandLength) {
+        maxStrandLength = strandLength;
+      }
       first += count;
+    }
+    this._maxStrandLength = maxStrandLength;
+    if (pointCount > 0) {
+      this._restCenter.setXYZ((minX + maxX) * 0.5, (minY + maxY) * 0.5, (minZ + maxZ) * 0.5);
     }
 
     this._pointBuffer = strands.pointBuffer;
@@ -588,9 +728,11 @@ function transformNormal(invWorldMatrix: Matrix4x4, normal: Vector3, out: Vector
  * point is final by the time the next one is reached, corrections propagate down
  * the strand within the pass - Gauss-Seidel, without the graph colouring that
  * would need on shared topology.
+ *
+ * Exported for shader-generation tests only.
  * @internal
  */
-function createHairSimulationProgram(device: AbstractDevice, workgroupSize: number) {
+export function createHairSimulationProgram(device: AbstractDevice, workgroupSize: number) {
   const program = device.buildComputeProgram({
     workgroupSize: [workgroupSize, 1, 1],
     compute(pb) {
@@ -764,9 +906,13 @@ function createHairSimulationProgram(device: AbstractDevice, workgroupSize: numb
                 this.restPoints.at(pb.add(this.rbase, 2))
               );
               // The node's frame-to-frame motion, expressed in local space. A
-              // point that stood still in the world has moved by exactly this, so
-              // carrying the previous position through it leaves the strand
-              // trailing behind its root - which is the swing.
+              // point that stood still in the world has moved by exactly this,
+              // so carrying both stored positions through it keeps the strand
+              // where it was in world space; the pinned root then drags it
+              // along - which is the swing. Transforming only one of the two
+              // would turn the node's own motion into strand velocity and throw
+              // the hair ahead of the movement instead of trailing behind it.
+              this.current = pb.mul(this.relativeTransform, pb.vec4(this.current, 1)).xyz;
               this.previous = pb.mul(this.relativeTransform, pb.vec4(this.previous, 1)).xyz;
               this.$l.velocity = pb.mul(pb.sub(this.current, this.previous), pb.sub(1, this.damping));
               this.$l.next = pb.add(this.current, this.velocity, pb.mul(this.gravity, this.dt2));
