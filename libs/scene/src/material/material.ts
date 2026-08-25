@@ -7,6 +7,7 @@ import { RenderBundleWrapper } from '../render/renderbundle_wrapper';
 import { Disposable } from '@zephyr3d/base';
 import type { Clonable, IDisposable, Nullable } from '@zephyr3d/base';
 import { getEngine } from '../app/api';
+import type { OIT } from '../render';
 
 type MaterialState = {
   program: Nullable<GPUProgram>;
@@ -14,6 +15,8 @@ type MaterialState = {
   bindGroupTag: string;
   renderStateSet: RenderStateSet;
   materialTag: number;
+  OIT: Nullable<OIT>;
+  oitUniformTag: number;
 };
 
 type ProgramCacheEntry = {
@@ -193,6 +196,16 @@ export class Material extends Disposable implements Clonable<Material>, IDisposa
     this._numPasses = val;
   }
   /**
+   * Get the number of passes this material will render for the given draw context.
+   *
+   * Default returns `numPasses`. Subclasses may override to skip passes based on context flags.
+   * @param _ctx - Draw context (device, flags, pass hash, instance data, etc.).
+   * @returns Number of passes to render for this context.
+   */
+  protected getNumPassesForRender(_ctx: DrawContext) {
+    return this._numPasses;
+  }
+  /**
    * Get or compute the per-pass shader hash used for program caching.
    *
    * Calls `createHash(pass)` lazily and caches the result.
@@ -285,7 +298,8 @@ export class Material extends Disposable implements Clonable<Material>, IDisposa
    * @returns `true` if successful; `false` if any pass lacks a valid program.
    */
   apply(ctx: DrawContext) {
-    for (let pass = 0; pass < this._numPasses; pass++) {
+    const numPasses = this.getNumPassesForRender(ctx);
+    for (let pass = 0; pass < numPasses; pass++) {
       const hash = this.calcGlobalHash(ctx, pass);
       let state = this._states[hash];
       if (!state) {
@@ -310,7 +324,9 @@ export class Material extends Disposable implements Clonable<Material>, IDisposa
               bindGroup: null,
               bindGroupTag: '',
               renderStateSet: ctx.device.createRenderStateSet(),
-              materialTag: -1
+              materialTag: -1,
+              OIT: null,
+              oitUniformTag: -1
             };
             this._states[hash] = state;
             return false;
@@ -329,7 +345,9 @@ export class Material extends Disposable implements Clonable<Material>, IDisposa
           bindGroup,
           bindGroupTag: bindGroup?.getVersion() ?? '',
           renderStateSet: ctx.device.createRenderStateSet(),
-          materialTag: -1
+          materialTag: -1,
+          OIT: null,
+          oitUniformTag: -1
         };
         this._states[hash] = state;
       }
@@ -337,6 +355,11 @@ export class Material extends Disposable implements Clonable<Material>, IDisposa
         return false;
       }
       if (state.bindGroup) {
+        if (ctx.oit && (state.OIT !== ctx.oit || state.oitUniformTag !== ctx.oit.uniformTag)) {
+          state.OIT = ctx.oit;
+          state.oitUniformTag = ctx.oit.uniformTag;
+          ctx.oit.applyUniforms(ctx, state.bindGroup);
+        }
         this.applyUniforms(state.bindGroup, ctx, state.materialTag !== this._optionTag, pass);
       }
       state.materialTag = this._optionTag;
@@ -408,7 +431,8 @@ export class Material extends Disposable implements Clonable<Material>, IDisposa
    * @internal
    */
   draw(primitive: Primitive, ctx: DrawContext, numInstances = 0) {
-    for (let pass = 0; pass < this._numPasses; pass++) {
+    const numPasses = this.getNumPassesForRender(ctx);
+    for (let pass = 0; pass < numPasses; pass++) {
       this.bind(ctx.device, pass);
       this.drawPrimitive(pass, primitive, ctx, numInstances);
     }

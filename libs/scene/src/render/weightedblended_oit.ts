@@ -8,10 +8,10 @@ import type {
   RenderStateSet,
   Texture2D
 } from '@zephyr3d/device';
-import type { OIT } from './oit';
+import { OIT } from './oit';
 import type { DrawContext } from './drawable';
 import { drawFullscreenQuad } from './fullscreenquad';
-import { DEPTH_FARTHEST, Disposable, REVERSE_Z, Vector4 } from '@zephyr3d/base';
+import { DEPTH_FARTHEST, REVERSE_Z, Vector4 } from '@zephyr3d/base';
 
 /**
  * Weighted-blended OIT renderer.
@@ -21,7 +21,7 @@ import { DEPTH_FARTHEST, Disposable, REVERSE_Z, Vector4 } from '@zephyr3d/base';
  *
  * @public
  */
-export class WeightedBlendedOIT extends Disposable implements OIT {
+export class WeightedBlendedOIT extends OIT {
   /** Type name of WeightedBlendedOIT */
   public static readonly type = 'wb';
   private static _compositeProgram: GPUProgram;

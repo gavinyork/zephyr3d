@@ -12,8 +12,8 @@ import type {
   TextureFormat
 } from '@zephyr3d/device';
 import type { Nullable } from '@zephyr3d/base';
-import { DEPTH_FARTHEST, Disposable, REVERSE_Z, Vector4 } from '@zephyr3d/base';
-import type { OIT } from './oit';
+import { DEPTH_FARTHEST, REVERSE_Z, Vector4 } from '@zephyr3d/base';
+import { OIT } from './oit';
 import type { DrawContext } from './drawable';
 import { drawFullscreenQuad } from './fullscreenquad';
 import { tryGetApp } from '../app/api';
@@ -36,7 +36,7 @@ const COLOR_ATTACHMENT_BYTES_PER_SAMPLE = 4 + 8 + 8;
  *
  * @public
  */
-export class DualDepthPeelingOIT extends Disposable implements OIT {
+export class DualDepthPeelingOIT extends OIT {
   /** Type name of DualDepthPeelingOIT */
   public static readonly type = 'ddp';
   private static readonly DEPTH_CLEAR = new Vector4(-1, -1, -1, -1);

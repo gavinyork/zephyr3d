@@ -718,7 +718,7 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
   /**
    * Whether this pass needs an alpha-cutoff uniform bound.
    */
-  protected usesAlphaCutoff(ctx?: DrawContext, pass = this.pass) {
+  protected usesAlphaCutoff(ctx: DrawContext, pass: number) {
     return this._alphaCutoff > 0 || (!!ctx && this.useTransparentShadowCaster(ctx, pass));
   }
   /**
@@ -826,9 +826,6 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
       !(ctx.materialFlags & MaterialVaryingFlags.INSTANCING)
     ) {
       bindGroup.setValue('zOpacity', this._opacity);
-    }
-    if (ctx.oit) {
-      ctx.oit.applyUniforms(ctx, bindGroup);
     }
     if (ctx.renderPass!.type === RENDER_PASS_TYPE_DEPTH && ctx.motionVectors) {
       bindGroup.setValue('zTAAStrength', (1 - this._taaStrength) * 50000);

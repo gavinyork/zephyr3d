@@ -10,12 +10,12 @@ import type {
   PBShaderExp,
   RenderStateSet
 } from '@zephyr3d/device';
-import type { OIT } from './oit';
+import { OIT } from './oit';
 import type { DrawContext } from './drawable';
 import { drawFullscreenQuad } from './fullscreenquad';
 import { ShaderHelper } from '../material';
 import type { Nullable } from '@zephyr3d/base';
-import { DEPTH_FARTHEST, Disposable } from '@zephyr3d/base';
+import { DEPTH_FARTHEST } from '@zephyr3d/base';
 
 /**
  * per-pixel linked list OIT renderer using ABuffer.
@@ -25,7 +25,7 @@ import { DEPTH_FARTHEST, Disposable } from '@zephyr3d/base';
  *
  * @public
  */
-export class ABufferOIT extends Disposable implements OIT {
+export class ABufferOIT extends OIT {
   /** Type name of ABufferOIT */
   public static readonly type = 'ab';
   public static readonly usePremultipliedAlpha = true;
@@ -105,6 +105,8 @@ export class ABufferOIT extends Disposable implements OIT {
     const screenWidth = device.screenXToDevice(viewport.width);
     const screenHeight = device.screenYToDevice(Math.max(viewport.height, 1));
     if (screenWidth !== this._screenSize[0] || screenHeight !== this._screenSize[1]) {
+      // Mark uniform changed
+      this.uniformChanged();
       // Resize buffers if viewport was changed
       this._screenSize[0] = screenWidth;
       this._screenSize[1] = screenHeight;

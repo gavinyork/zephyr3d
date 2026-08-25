@@ -6,7 +6,7 @@ import type {
   RenderStateSet
 } from '@zephyr3d/device';
 import type { DrawContext } from './drawable';
-import type { IDisposable } from '@zephyr3d/base';
+import { Disposable } from '@zephyr3d/base';
 
 /**
  * Abstract class for order-independent transparency renderers.
@@ -20,26 +20,37 @@ import type { IDisposable } from '@zephyr3d/base';
  *
  * @public
  */
-export interface OIT extends IDisposable {
+export abstract class OIT extends Disposable {
+  private _uniformTag: number;
+  constructor() {
+    super();
+    this._uniformTag = 0;
+  }
+  get uniformTag() {
+    return this._uniformTag;
+  }
+  uniformChanged() {
+    this._uniformTag++;
+  }
   /**
    * Returns the type of the renderer.
    *
    * @returns The type of the renderer.
    */
-  getType(): string;
+  abstract getType(): string;
   /**
    * Checks whether the renderer supports the given device type.
    *
    * @param deviceType - The device type.
    * @returns True if the renderer supports the device type, false otherwise.
    */
-  supportDevice(deviceType: string): boolean;
+  abstract supportDevice(deviceType: string): boolean;
   /**
    * Whether this OIT algorithm wants pre-multiplied alpha
    *
    * @returns True if the OIT wants pre-multiplied alpha, false otherwise
    */
-  wantsPremultipliedAlpha(): boolean;
+  abstract wantsPremultipliedAlpha(): boolean;
   /**
    * Begins rendering the transparent objects.
    *
@@ -53,13 +64,13 @@ export interface OIT extends IDisposable {
    * @param ctx - The draw context.
    * @returns The number of passes required for rendering.
    */
-  begin(ctx: DrawContext): number;
+  abstract begin(ctx: DrawContext): number;
   /**
    * Ends rendering the transparent objects.
    *
    * @param ctx - The draw context.
    */
-  end(ctx: DrawContext): void;
+  abstract end(ctx: DrawContext): void;
   /**
    * Begins rendering for the given pass.
    *
@@ -67,14 +78,14 @@ export interface OIT extends IDisposable {
    * @param pass - The pass number.
    * @returns True if the transparent objects should be rendered, false otherwise.
    */
-  beginPass(ctx: DrawContext, pass: number): boolean;
+  abstract beginPass(ctx: DrawContext, pass: number): boolean;
   /**
    * Ends rendering for the given pass.
    *
    * @param ctx - The draw context.
    * @param pass - The pass number.
    */
-  endPass(ctx: DrawContext, pass: number): void;
+  abstract endPass(ctx: DrawContext, pass: number): void;
   /**
    * Sets up the fragment output.
    *
@@ -83,7 +94,7 @@ export interface OIT extends IDisposable {
    *
    * @param scope - The global shader scope.
    */
-  setupFragmentOutput(scope: PBGlobalScope): void;
+  abstract setupFragmentOutput(scope: PBGlobalScope): void;
   /**
    * Do the fragment color output.
    *
@@ -93,7 +104,7 @@ export interface OIT extends IDisposable {
    * @param scope - The global shader scope.
    * @param color - The calculated fragment color.
    */
-  outputFragmentColor(scope: PBInsideFunctionScope, color: PBShaderExp, ctx: DrawContext): boolean;
+  abstract outputFragmentColor(scope: PBInsideFunctionScope, color: PBShaderExp, ctx: DrawContext): boolean;
   /**
    * Applies the uniforms for the given draw context and bind group.
    *
@@ -102,7 +113,7 @@ export interface OIT extends IDisposable {
    * @param ctx - The draw context.
    * @param bindGroup - The bind group.
    */
-  applyUniforms(ctx: DrawContext, bindGroup: BindGroup): void;
+  abstract applyUniforms(ctx: DrawContext, bindGroup: BindGroup): void;
   /**
    * Whether additive light passes should keep the material alpha before OIT output.
    *
@@ -110,7 +121,7 @@ export interface OIT extends IDisposable {
    * Some OIT algorithms need the original material alpha to weight additive light color,
    * but write zero alpha to their accumulation targets so transmittance is not counted twice.
    */
-  wantsAdditiveLightPassAlpha?(): boolean;
+  abstract wantsAdditiveLightPassAlpha(): boolean;
   /**
    * Calculates the hash of the renderer.
    *
@@ -119,7 +130,7 @@ export interface OIT extends IDisposable {
    *
    * @returns The hash of the renderer.
    */
-  calculateHash(): string;
+  abstract calculateHash(): string;
   /**
    * Sets the render states for the renderer.
    *
@@ -127,13 +138,5 @@ export interface OIT extends IDisposable {
    *
    * @param rs - The render states.
    */
-  setRenderStates(rs: RenderStateSet): void;
-  /**
-   * Disposes the renderer.
-   */
-  dispose(): void;
-  /**
-   * Whether this is disposed
-   */
-  readonly disposed: boolean;
+  abstract setRenderStates(rs: RenderStateSet): void;
 }
