@@ -170,7 +170,7 @@ export function getPunctualLightClass(): SerializableClass {
             return aabb;
           },
           get(this: PunctualLight, value) {
-            value.object[0] = this.shadow.shadowRegion.region;
+            value.object[0] = this.shadow.shadowRegion.manualRegion;
           },
           set(this: PunctualLight, value) {
             this.shadow.shadowRegion.setRegion(value.object[0] as AABB);
