@@ -205,8 +205,10 @@ const SSS_QUALITY_PRESET_SETTINGS: Record<SSSQualityPreset, SSSResolvedSettings>
  * @public
  */
 export class Camera extends SceneNode {
-  /** @internal Halton 2-3 sequence used for TAA jittering. */
-  private static readonly _halton23 = halton23(16);
+  /** @internal Halton 2-3 sequence used for TAA jittering. An 8-phase cycle
+   * repeats faster than the history accumulation window, so residual jitter
+   * ripple is attenuated further than with a 16-phase cycle. */
+  private static readonly _halton23 = halton23(8);
   /** @internal Per-camera history resources. */
   private static readonly _historyData: WeakMap<Camera, CameraHistoryData> = new WeakMap();
   /** @internal Per-camera history resource manager. */

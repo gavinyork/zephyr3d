@@ -111,7 +111,10 @@ export function temporalResolve(
       }
       this.colorAvg = pb.div(this.colorAvg, n - 1);
       this.colorAvg2 = pb.div(this.colorAvg2, n - 1);
-      this.$l.boxSize = pb.mix(2.5, 0, pb.smoothStep(0, 0.02, pb.length(this.closestVelocity)));
+      // Keep a non-zero floor: collapsing the box to the 3x3 mean while moving
+      // discards all sub-pixel detail and turns the output into a box-filtered
+      // jittered frame, which shimmers with the jitter phase.
+      this.$l.boxSize = pb.mix(2.5, 0.75, pb.smoothStep(0, 0.02, pb.length(this.closestVelocity)));
       this.$l.dev = pb.mul(
         pb.sqrt(pb.abs(pb.sub(this.colorAvg2, pb.mul(this.colorAvg, this.colorAvg)))),
         this.boxSize
@@ -241,10 +244,13 @@ export function temporalResolve(
         this.$return(this.sampleColor);
       }
     );
-    this.$l.reprojectedUV = pb.sub(this.screenUV, this.velocity);
+    // Reproject with the depth-dilated (closest) velocity so silhouette pixels
+    // follow the foreground geometry; using the center velocity causes edge
+    // crawling/shimmer at object boundaries.
+    this.$l.velocityClosest = this.getClosestVelocity(this.screenUV, this.texSize);
+    this.$l.reprojectedUV = pb.sub(this.screenUV, this.velocityClosest.xy);
     //this.$l.historyColor = pb.textureSampleLevel(historyColorTex, this.reprojectedUV, 0).rgb;
     this.$l.historyColor = this.sampleHistoryColorCatmulRom9(this.reprojectedUV, this.texSize);
-    this.$l.velocityClosest = this.getClosestVelocity(this.screenUV, this.texSize);
     this.$l.blendFactor = pb.div(this.velocityClosest.z, 50000);
     this.prevColor = this.clipHistoryColor(
       this.screenUV,
@@ -260,20 +266,28 @@ export function temporalResolve(
       pb.float(1),
       pb.float(0)
     );
-    this.$l.disocclusionFactor = this.getDisocclusionFactor(this.reprojectedUV, this.velocity, this.texSize);
+    this.$l.disocclusionFactor = this.getDisocclusionFactor(
+      this.reprojectedUV,
+      this.velocityClosest.xy,
+      this.texSize
+    );
     this.$l.alpha = pb.clamp(pb.add(this.blendFactor, this.screenFactor, this.disocclusionFactor), 0, 1);
     //this.alpha = 0.1;
     this.prevColor = this.reinhard(this.prevColor);
     this.currentColor = this.reinhard(this.sampleColor);
     this.$l.currentLum = this.luminance(this.currentColor);
     this.$l.prevLum = this.luminance(this.prevColor);
+    // Luminance is in Reinhard space (always < 1), so a 1.001 floor makes the
+    // denominator constant and the ratio degenerates to an absolute difference,
+    // leaving dark-area flicker almost undamped. Use a smaller floor so the
+    // difference stays relative.
     this.$l.diff = pb.div(
       pb.abs(pb.sub(this.currentLum, this.prevLum)),
-      pb.max(this.currentLum, pb.max(this.prevLum, 1.001))
+      pb.max(this.currentLum, pb.max(this.prevLum, 0.2))
     );
     this.diff = pb.sub(1, this.diff);
     this.diff = pb.mul(this.diff, this.diff);
-    this.alpha = pb.clamp(pb.mix(0, this.alpha, this.diff), 0.1, 1);
+    this.alpha = pb.clamp(pb.mix(0, this.alpha, this.diff), 0.05, 1);
     this.$l.resolvedColor = pb.vec3();
     if (debug === TAA_DEBUG_CURRENT_COLOR) {
       this.resolvedColor = this.currentColor.rgb;
