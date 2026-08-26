@@ -121,10 +121,17 @@ export class HairNode extends applyMixins(GraphNode, mixinDrawable) implements D
     this._simulationEnabled = false;
     this._simulationOptions = {
       gravity: new Vector3(0, -9.8, 0),
-      damping: 0.05,
-      stiffness: 0.05,
-      substeps: 2,
-      friction: 0.2
+      damping: 0.08,
+      globalStiffness: 0,
+      globalRange: 0,
+      localStiffness: 0.9,
+      localIterations: 2,
+      ftlDamping: 0.7,
+      vspCoeff: 0.8,
+      vspAccelThreshold: 50,
+      substeps: 1,
+      friction: 0.2,
+      maxSpeedFactor: 4
     };
   }
 
@@ -646,22 +653,78 @@ export class HairNode extends applyMixins(GraphNode, mixinDrawable) implements D
     }
   }
   /**
-   * How strongly strands return to their authored shape, in [0, 1].
+   * How strongly strands keep the shape they were authored with, in [0, 1].
    *
    * @remarks
-   * The fraction of the remaining deviation removed per fixed 1/60 s step,
-   * independent of {@link HairNode.substeps}. This is also what erases the
-   * swing a moving node produces, so grooms that should visibly react to motion
-   * want it low; high values pin the groom to its styling within a frame or
-   * two.
+   * The dial to reach for first. It holds the angle each segment makes with the
+   * one before it, measured against that segment's current direction rather
+   * than a fixed pose, so a groom keeps its curl while remaining free to hang
+   * and swing. It is also what damps a groom: without bending resistance a
+   * strand carries a disturbance up and down its length for seconds.
    */
-  get stiffness() {
-    return this._simulationOptions.stiffness!;
+  get localStiffness() {
+    return this._simulationOptions.localStiffness!;
   }
-  set stiffness(value: number) {
-    this._simulationOptions.stiffness = value;
+  set localStiffness(value: number) {
+    this._simulationOptions.localStiffness = value;
     if (this._simulation) {
-      this._simulation.stiffness = value;
+      this._simulation.localStiffness = value;
+    }
+  }
+  /** Local shape constraint passes per substep. */
+  get localIterations() {
+    return this._simulationOptions.localIterations!;
+  }
+  set localIterations(value: number) {
+    this._simulationOptions.localIterations = value;
+    if (this._simulation) {
+      this._simulation.localIterations = value;
+    }
+  }
+  /**
+   * How strongly strands are pulled back to their authored pose, in [0, 1].
+   *
+   * @remarks
+   * Off by default. It anchors a point to a fixed place rather than to its
+   * neighbours, which is a spring, and a groom held by springs reads as one.
+   * {@link HairNode.localStiffness} is what holds styling without that; this is
+   * for grooms that genuinely should not move far from how they were authored,
+   * and wants {@link HairNode.globalRange} set as well.
+   */
+  get globalStiffness() {
+    return this._simulationOptions.globalStiffness!;
+  }
+  set globalStiffness(value: number) {
+    this._simulationOptions.globalStiffness = value;
+    if (this._simulation) {
+      this._simulation.globalStiffness = value;
+    }
+  }
+  /** Fraction of a strand, from the root, the pose pull acts on, in [0, 1]. */
+  get globalRange() {
+    return this._simulationOptions.globalRange!;
+  }
+  set globalRange(value: number) {
+    this._simulationOptions.globalRange = value;
+    if (this._simulation) {
+      this._simulation.globalRange = value;
+    }
+  }
+  /**
+   * Share of a point's length correction fed back into its parent, in [0, 1].
+   *
+   * @remarks
+   * What keeps the solver from gaining energy as the node moves. Lowering it
+   * makes a groom livelier and, past a point, makes it whip; 0 removes the
+   * feedback entirely.
+   */
+  get ftlDamping() {
+    return this._simulationOptions.ftlDamping!;
+  }
+  set ftlDamping(value: number) {
+    this._simulationOptions.ftlDamping = value;
+    if (this._simulation) {
+      this._simulation.ftlDamping = value;
     }
   }
   /** Velocity lost each step, in [0, 1]. */
@@ -682,6 +745,49 @@ export class HairNode extends applyMixins(GraphNode, mixinDrawable) implements D
     this._simulationOptions.friction = value;
     if (this._simulation) {
       this._simulation.friction = value;
+    }
+  }
+  /**
+   * How much of the node's motion strands are carried along by, in [0, 1].
+   *
+   * @remarks
+   * 0 leaves a groom exactly where it was in the world and lets the pinned
+   * roots drag it along, which is what produces lag; 1 carries it rigidly with
+   * the node, so it never lags. Lower values give a livelier, floppier groom.
+   */
+  get vspCoeff() {
+    return this._simulationOptions.vspCoeff!;
+  }
+  set vspCoeff(value: number) {
+    this._simulationOptions.vspCoeff = value;
+    if (this._simulation) {
+      this._simulation.vspCoeff = value;
+    }
+  }
+  /** Node acceleration above which strands are carried rigidly, in units/s². */
+  get vspAccelThreshold() {
+    return this._simulationOptions.vspAccelThreshold!;
+  }
+  set vspAccelThreshold(value: number) {
+    this._simulationOptions.vspAccelThreshold = value;
+    if (this._simulation) {
+      this._simulation.vspAccelThreshold = value;
+    }
+  }
+  /**
+   * Per-substep ceiling on how far a point may travel, in segment lengths.
+   *
+   * @remarks
+   * A backstop against a single bad substep, not a dial to shape motion with:
+   * at the default it never engages during ordinary movement.
+   */
+  get maxSpeedFactor() {
+    return this._simulationOptions.maxSpeedFactor!;
+  }
+  set maxSpeedFactor(value: number) {
+    this._simulationOptions.maxSpeedFactor = value;
+    if (this._simulation) {
+      this._simulation.maxSpeedFactor = value;
     }
   }
   /** Integration substeps per fixed step. */

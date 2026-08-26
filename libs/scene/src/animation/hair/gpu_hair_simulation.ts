@@ -68,6 +68,27 @@ const PLANE_STRIDE = 8;
 /** Colliders of one kind the buffers make room for. @internal */
 const MAX_COLLIDERS = 16;
 /**
+ * Solver defaults, taken from TressFXSimulationSettings so that a groom behaves
+ * the way one authored against TressFX would.
+ * @internal
+ */
+const DEFAULT_DAMPING = 0.08;
+const DEFAULT_GLOBAL_STIFFNESS = 0;
+const DEFAULT_GLOBAL_RANGE = 0;
+const DEFAULT_LOCAL_STIFFNESS = 0.9;
+const DEFAULT_LOCAL_ITERATIONS = 2;
+const DEFAULT_FTL_DAMPING = 0.7;
+const DEFAULT_VSP_COEFF = 0.8;
+/**
+ * TressFX compares a per-frame second difference against 1.4 in its own units;
+ * expressed as an acceleration that is roughly five gravities, which is the form
+ * that survives a change of scene units.
+ * @internal
+ */
+const DEFAULT_VSP_ACCEL_THRESHOLD = 50;
+/** Default per-substep speed ceiling, in segment lengths. @internal */
+const DEFAULT_MAX_SPEED_FACTOR = 4;
+/**
  * Node motion beyond this many strand lengths in one frame is treated as a
  * teleport and snaps the pose instead of swinging it.
  * @internal
@@ -82,30 +103,126 @@ const TELEPORT_DISTANCE_FACTOR = 4;
 export type GPUHairSimulationOptions = {
   /** World-space gravity. Defaults to earth gravity along -Y. */
   gravity?: Vector3;
-  /** Velocity lost each step, in [0, 1]. 0 keeps full inertia. */
-  damping?: number;
   /**
-   * How strongly a strand returns to its authored shape, in [0, 1].
+   * Velocity lost per fixed 1/60 s step, in [0, 1]. 0 keeps full inertia.
    *
    * @remarks
-   * The dial that decides whether a groom reads as hair or as string. At 0 the
-   * strands only fall; a styled groom needs enough of this to hold its shape and
-   * merely move within it.
-   *
-   * The value is the fraction of the remaining deviation removed per fixed
-   * 1/60 s step, independent of the substep count. It is also what erases the
-   * swing a moving node produces: at 0.3 a displaced strand is back in its
-   * styled pose within a couple of frames, so grooms that should visibly react
-   * to motion want this low - the 0.05 default keeps the styling over roughly a
-   * third of a second while letting the swing read.
+   * Applied as an exponential decay, `exp(-damping * dt * 60)` per substep, so
+   * the dial means the same thing whatever {@link GPUHairSimulationOptions.substeps}
+   * is set to.
    */
-  stiffness?: number;
+  damping?: number;
+  /**
+   * How strongly a strand is pulled back to its authored pose, in [0, 1].
+   *
+   * @remarks
+   * Off by default, as in TressFX, and worth understanding before turning it
+   * on: it anchors a point to a fixed place rather than to its neighbours,
+   * which is a spring, and a groom held by springs reads as one - a disturbance
+   * rings around the authored pose instead of settling out of it. What holds a
+   * groom's styling without that is
+   * {@link GPUHairSimulationOptions.localStiffness}, which constrains the shape
+   * a strand makes rather than where it sits.
+   *
+   * Useful where a groom genuinely should not move far from how it was
+   * authored, and pairs with {@link GPUHairSimulationOptions.globalRange} to
+   * confine the pull to the part of the strand nearest the scalp. The value is
+   * the fraction of the remaining deviation removed per fixed 1/60 s step,
+   * independent of the substep count.
+   */
+  globalStiffness?: number;
+  /**
+   * Fraction of each strand, from the root, that
+   * {@link GPUHairSimulationOptions.globalStiffness} acts on, in [0, 1].
+   *
+   * @remarks
+   * 0 disables the pull outright whatever the stiffness is - both have to be
+   * non-zero for it to do anything. Confining it near the root is the usual
+   * way to use it: the scalp end holds its styling while the length is left
+   * free to swing.
+   */
+  globalRange?: number;
+  /**
+   * How strongly a strand keeps the shape it was authored with, in [0, 1].
+   *
+   * @remarks
+   * The dial that decides whether a groom reads as hair or as loose chain, and
+   * the one to reach for first. It holds the angle each segment makes with the
+   * one before it, measured against the previous segment's current direction
+   * rather than against a fixed pose - so a strand keeps its curl while being
+   * free to hang, swing and settle anywhere, which is what real fibre does.
+   *
+   * It is also what damps a groom. A chain with no bending resistance carries a
+   * disturbance up and down its length for seconds; give it bending resistance
+   * and the disturbance dies within a swing or two.
+   */
+  localStiffness?: number;
+  /**
+   * Times the local shape constraint is applied per substep, in [1, 8].
+   *
+   * @remarks
+   * The constraint moves both points it touches, so one pass leaves the strand
+   * short of the shape it is aiming for. More passes converge on it, at
+   * proportional cost.
+   */
+  localIterations?: number;
+  /**
+   * Share of a point's length correction fed back into its parent, in [0, 1].
+   *
+   * @remarks
+   * The length constraint places each point at exactly its authored distance
+   * from the one before it, which satisfies the segment by moving the child
+   * alone and so leaves the momentum that correction represents unaccounted
+   * for. Left unaccounted it accumulates: every root movement pumps energy into
+   * the chain, and because the segments are coupled in series it collects at the
+   * free end, so a groom whips instead of trailing. Handing the correction back
+   * to the parent as reverse momentum - Mueller's FTL damping - is what keeps
+   * the solver from gaining energy, and 0 reproduces the uncorrected behaviour.
+   */
+  ftlDamping?: number;
+  /**
+   * How much of the node's motion a strand is carried along by, in [0, 1].
+   *
+   * @remarks
+   * Velocity shock propagation. 0 leaves a strand exactly where it was in the
+   * world and lets the pinned root drag it along through the constraints alone,
+   * which is what produces lag - but a root that moves fast enough outruns its
+   * strand within a single step, and the length constraint then has to snap it
+   * back. 1 carries the strand rigidly with the node, so it never lags at all.
+   *
+   * The default sits near the top of that range because most of a groom's
+   * apparent motion should come from the head it is attached to, with the lag
+   * as a garnish. Lower values give a livelier, floppier groom and need the
+   * length constraint iterated harder to stay convincing.
+   */
+  vspCoeff?: number;
+  /**
+   * Node acceleration above which a strand is carried rigidly, in world units
+   * per second squared.
+   *
+   * @remarks
+   * A hard shove is where lag turns into over-stretching, so past this
+   * threshold {@link GPUHairSimulationOptions.vspCoeff} is treated as 1 for
+   * that step and the groom moves with the node instead. The default is around
+   * five gravities, which ordinary animation does not reach.
+   */
+  vspAccelThreshold?: number;
   /** Integration substeps per fixed step, in [1, 8]. */
   substeps?: number;
   /** Colliders the strands are pushed out of. */
   colliders?: SpringCollider[];
   /** Friction applied to the tangential motion of a contact, in [0, 1]. */
   friction?: number;
+  /**
+   * Per-substep ceiling on how far a point may travel, in segment lengths.
+   *
+   * @remarks
+   * A backstop rather than a dial: it bounds what a single substep can do when
+   * something else has already gone wrong, and at the default it never engages
+   * during ordinary motion. Measured in the strand's own segment length, so it
+   * is independent of the units the groom is authored in.
+   */
+  maxSpeedFactor?: number;
 };
 
 /**
@@ -183,11 +300,25 @@ export class GPUHairSimulation extends Disposable {
   /** @internal */
   private _damping: number;
   /** @internal */
-  private _stiffness: number;
+  private _globalStiffness: number;
+  /** @internal */
+  private _globalRange: number;
+  /** @internal */
+  private _localStiffness: number;
+  /** @internal */
+  private _localIterations: number;
+  /** @internal */
+  private _ftlDamping: number;
+  /** @internal */
+  private _vspCoeff: number;
+  /** @internal */
+  private _vspAccelThreshold: number;
   /** @internal */
   private _substeps: number;
   /** @internal */
   private _friction: number;
+  /** @internal */
+  private _maxSpeedFactor: number;
   /** @internal */
   private _colliders: SpringCollider[];
   /** @internal */
@@ -221,6 +352,15 @@ export class GPUHairSimulation extends Disposable {
   /** @internal Centre of the rest pose, whose world motion detects teleports. */
   private readonly _restCenter: Vector3;
   /**
+   * @internal Where the rest centre stood in the world last frame, and how fast
+   * it was moving, which is all the shock propagation threshold needs: the
+   * roots are pinned in local space, so their acceleration is the node's.
+   */
+  private readonly _prevRootWorld: Vector3;
+  private readonly _prevRootVelocity: Vector3;
+  /** @internal Frames seen so far, capped at 2; acceleration needs three. */
+  private _rootHistoryDepth: number;
+  /**
    * Creates a simulation over an uploaded strand set.
    *
    * @param strands - GPU strand data; its point buffer is written in place.
@@ -244,10 +384,17 @@ export class GPUHairSimulation extends Disposable {
     this._planeBuffer = null;
     this._strandCount = strands.strandCount;
     this._gravity = options?.gravity ? new Vector3(options.gravity) : new Vector3(0, -9.8, 0);
-    this._damping = clamp(options?.damping ?? 0.05, 0, 1);
-    this._stiffness = clamp(options?.stiffness ?? 0.05, 0, 1);
-    this._substeps = clamp(options?.substeps ?? 2, 1, 8) | 0;
+    this._damping = clamp(options?.damping ?? DEFAULT_DAMPING, 0, 1);
+    this._globalStiffness = clamp(options?.globalStiffness ?? DEFAULT_GLOBAL_STIFFNESS, 0, 1);
+    this._globalRange = clamp(options?.globalRange ?? DEFAULT_GLOBAL_RANGE, 0, 1);
+    this._localStiffness = clamp(options?.localStiffness ?? DEFAULT_LOCAL_STIFFNESS, 0, 1);
+    this._localIterations = clamp(options?.localIterations ?? DEFAULT_LOCAL_ITERATIONS, 1, 8) | 0;
+    this._ftlDamping = clamp(options?.ftlDamping ?? DEFAULT_FTL_DAMPING, 0, 1);
+    this._vspCoeff = clamp(options?.vspCoeff ?? DEFAULT_VSP_COEFF, 0, 1);
+    this._vspAccelThreshold = Math.max(0, options?.vspAccelThreshold ?? DEFAULT_VSP_ACCEL_THRESHOLD);
+    this._substeps = clamp(options?.substeps ?? 1, 1, 8) | 0;
     this._friction = clamp(options?.friction ?? 0.2, 0, 1);
+    this._maxSpeedFactor = Math.max(0, options?.maxSpeedFactor ?? DEFAULT_MAX_SPEED_FACTOR);
     this._colliders = options?.colliders ? [...options.colliders] : [];
     this._timeAccumulator = 0;
     this._sphereData = new Float32Array(MAX_COLLIDERS * SPHERE_STRIDE);
@@ -272,6 +419,9 @@ export class GPUHairSimulation extends Disposable {
     this._hasPrevWorldMatrix = false;
     this._maxStrandLength = 0;
     this._restCenter = new Vector3();
+    this._prevRootWorld = new Vector3();
+    this._prevRootVelocity = new Vector3();
+    this._rootHistoryDepth = 0;
     this._workgroupCount = Math.ceil(this._strandCount / DEFAULT_WORKGROUP_SIZE);
 
     if (!isHairSimulationSupported(this._device)) {
@@ -312,12 +462,61 @@ export class GPUHairSimulation extends Disposable {
   set damping(value: number) {
     this._damping = clamp(value, 0, 1);
   }
-  /** Fraction of the deviation from the authored shape removed per fixed step, in [0, 1]. */
-  get stiffness() {
-    return this._stiffness;
+  /** Per-substep ceiling on point travel, in segment lengths. */
+  get maxSpeedFactor() {
+    return this._maxSpeedFactor;
   }
-  set stiffness(value: number) {
-    this._stiffness = clamp(value, 0, 1);
+  set maxSpeedFactor(value: number) {
+    this._maxSpeedFactor = Math.max(0, value);
+  }
+  /** Pull back to the authored pose per fixed step, in [0, 1]. Off by default. */
+  get globalStiffness() {
+    return this._globalStiffness;
+  }
+  set globalStiffness(value: number) {
+    this._globalStiffness = clamp(value, 0, 1);
+  }
+  /** Fraction of a strand, from the root, the pose pull acts on, in [0, 1]. */
+  get globalRange() {
+    return this._globalRange;
+  }
+  set globalRange(value: number) {
+    this._globalRange = clamp(value, 0, 1);
+  }
+  /** How strongly a strand keeps its authored shape, in [0, 1]. */
+  get localStiffness() {
+    return this._localStiffness;
+  }
+  set localStiffness(value: number) {
+    this._localStiffness = clamp(value, 0, 1);
+  }
+  /** Local shape constraint passes per substep. */
+  get localIterations() {
+    return this._localIterations;
+  }
+  set localIterations(value: number) {
+    this._localIterations = clamp(value, 1, 8) | 0;
+  }
+  /** Share of a point's length correction fed back into its parent, in [0, 1]. */
+  get ftlDamping() {
+    return this._ftlDamping;
+  }
+  set ftlDamping(value: number) {
+    this._ftlDamping = clamp(value, 0, 1);
+  }
+  /** How much of the node's motion a strand is carried along by, in [0, 1]. */
+  get vspCoeff() {
+    return this._vspCoeff;
+  }
+  set vspCoeff(value: number) {
+    this._vspCoeff = clamp(value, 0, 1);
+  }
+  /** Node acceleration above which a strand is carried rigidly, in units/s². */
+  get vspAccelThreshold() {
+    return this._vspAccelThreshold;
+  }
+  set vspAccelThreshold(value: number) {
+    this._vspAccelThreshold = Math.max(0, value);
   }
   /** Integration substeps per fixed step. */
   get substeps() {
@@ -362,6 +561,7 @@ export class GPUHairSimulation extends Disposable {
     this._timeAccumulator = 0;
     this._prevWorldMatrix.set(worldMatrix);
     this._hasPrevWorldMatrix = true;
+    this._rootHistoryDepth = 0;
     this._resetLivePoints();
   }
   /**
@@ -405,6 +605,14 @@ export class GPUHairSimulation extends Disposable {
     }
     this._timeAccumulator = Math.max(0, this._timeAccumulator - stepCount * FIXED_SIMULATION_TIME_STEP);
 
+    // How hard the node is being shoved, which decides whether the strands are
+    // allowed to lag at all this step. Taken from the world path of the rest
+    // centre, because the roots are pinned in local space and so move exactly as
+    // the node does. Real frame intervals rather than the fixed step, since the
+    // second difference of a position over uneven intervals is not an
+    // acceleration.
+    const rigid = this._measureRootAcceleration(worldMatrix, frameDt);
+
     // Local space is where the solver works, so everything world-space has to
     // be brought in: gravity and colliders here, from the frame-end transform -
     // they change too slowly for the substep interpolation below to matter -
@@ -415,16 +623,29 @@ export class GPUHairSimulation extends Disposable {
     this._uploadColliders(this._invWorldMatrix);
 
     const bindGroup = this._bindGroup!;
+    const substepTime = FIXED_SIMULATION_TIME_STEP / this._substeps;
     bindGroup.setValue('strandCount', this._strandCount);
-    bindGroup.setValue('damping', this._damping);
+    // Damping is an exponential decay rather than a linear scale, so that
+    // halving the substep and applying it twice as often leaves the same amount
+    // of velocity behind. A linear factor per substep would tie the dial to the
+    // substep count and make it impossible to tune once and leave alone.
+    bindGroup.setValue('dampingDecay', Math.exp(-this._damping * substepTime * 60));
     // The dial is the fraction removed per fixed step; the shader applies it
     // once per substep, so convert it to the per-substep fraction that
     // compounds back to the dialled value.
-    bindGroup.setValue('stiffness', 1 - Math.pow(1 - this._stiffness, 1 / this._substeps));
+    bindGroup.setValue('globalStiffness', 1 - Math.pow(1 - this._globalStiffness, 1 / this._substeps));
+    bindGroup.setValue('globalRange', this._globalRange);
+    bindGroup.setValue('localStiffness', this._localStiffness);
+    bindGroup.setValue('localIterations', this._localIterations);
+    bindGroup.setValue('ftlDamping', this._ftlDamping);
+    // A shove hard enough to over-stretch a strand suspends the lag for the
+    // frame and carries the groom rigidly instead.
+    bindGroup.setValue('vspCoeff', rigid ? 1 : this._vspCoeff);
     bindGroup.setValue('friction', this._friction);
+    bindGroup.setValue('maxSpeedFactor', this._maxSpeedFactor);
     bindGroup.setValue('gravity', this._localGravity);
     bindGroup.setValue('minDistance', MIN_DISTANCE);
-    bindGroup.setValue('deltaTime', FIXED_SIMULATION_TIME_STEP / this._substeps);
+    bindGroup.setValue('deltaTime', substepTime);
 
     const totalSubsteps = stepCount * this._substeps;
     this._device!.pushDeviceStates();
@@ -482,6 +703,40 @@ export class GPUHairSimulation extends Disposable {
   }
   protected onDispose() {
     this._releaseResources();
+  }
+  /**
+   * Whether the node is accelerating hard enough to suspend strand lag.
+   *
+   * @remarks
+   * Tracks the rest centre through world space and differentiates twice. The
+   * two differences are taken over the frame intervals they actually spanned
+   * rather than over the fixed step, because a second difference of position
+   * only is an acceleration when the samples are evenly spaced, and frame times
+   * are not. The first two frames have nothing to differentiate and report
+   * false.
+   * @internal
+   */
+  private _measureRootAcceleration(worldMatrix: Matrix4x4, frameDt: number) {
+    worldMatrix.transformPointAffine(this._restCenter, this._scratchVec);
+    let rigid = false;
+    if (this._rootHistoryDepth > 0) {
+      const vx = (this._scratchVec.x - this._prevRootWorld.x) / frameDt;
+      const vy = (this._scratchVec.y - this._prevRootWorld.y) / frameDt;
+      const vz = (this._scratchVec.z - this._prevRootWorld.z) / frameDt;
+      if (this._rootHistoryDepth > 1) {
+        const ax = (vx - this._prevRootVelocity.x) / frameDt;
+        const ay = (vy - this._prevRootVelocity.y) / frameDt;
+        const az = (vz - this._prevRootVelocity.z) / frameDt;
+        const threshold = this._vspAccelThreshold;
+        rigid = ax * ax + ay * ay + az * az > threshold * threshold;
+      }
+      this._prevRootVelocity.setXYZ(vx, vy, vz);
+    }
+    this._prevRootWorld.set(this._scratchVec);
+    if (this._rootHistoryDepth < 2) {
+      this._rootHistoryDepth++;
+    }
+    return rigid;
   }
   /** Copies the rest pose over the live points. @internal */
   private _resetLivePoints() {
@@ -586,6 +841,13 @@ export class GPUHairSimulation extends Disposable {
     this._bindGroup.setValue('capsuleCount', 0);
     this._bindGroup.setValue('planeCount', 0);
     this._bindGroup.setValue('minDistance', MIN_DISTANCE);
+    this._bindGroup.setValue('maxSpeedFactor', this._maxSpeedFactor);
+    this._bindGroup.setValue('globalStiffness', this._globalStiffness);
+    this._bindGroup.setValue('globalRange', this._globalRange);
+    this._bindGroup.setValue('localStiffness', this._localStiffness);
+    this._bindGroup.setValue('localIterations', this._localIterations);
+    this._bindGroup.setValue('ftlDamping', this._ftlDamping);
+    this._bindGroup.setValue('vspCoeff', this._vspCoeff);
   }
   /** @internal */
   private _createStorage(data: Float32Array<ArrayBuffer>) {
@@ -722,12 +984,27 @@ function transformNormal(invWorldMatrix: Matrix4x4, normal: Vector3, out: Vector
  * Builds the solver pass.
  *
  * @remarks
- * One thread per strand. It reads the strand's header to find its slice of the
- * point buffer, then walks the strand root to tip: integrate, constrain against
- * the point already settled behind it, resolve contacts. Because the previous
- * point is final by the time the next one is reached, corrections propagate down
- * the strand within the pass - Gauss-Seidel, without the graph colouring that
- * would need on shared topology.
+ * TressFX's solver, reproduced pass for pass. TressFX dispatches five compute
+ * shaders with a thread per vertex and group-shared memory; this runs the same
+ * five stages back to back inside one kernel with a thread per strand, which
+ * needs no barriers, no shared memory, and - the reason it matters here - no
+ * fixed vertex count per strand, since a groom imported from an archive has
+ * whatever point count each curve was authored with.
+ *
+ * The stages stay numerically equivalent under that rearrangement. Integration,
+ * the global shape constraint and shock propagation are per-vertex with no
+ * cross-vertex dependency. The local shape constraint is already a serial walk
+ * over a strand in TressFX. The length constraint is Jacobi over alternating
+ * even and odd segments, and within one of those sweeps the segments are
+ * disjoint, so running them in order in a single thread lands on the same
+ * answer a synchronised group would.
+ *
+ * Everything is solved in the node's local space rather than TressFX's world
+ * space, which costs nothing and simplifies two stages: the skinning quaternion
+ * that rotates the bind pose for the local shape constraint is the identity, and
+ * shock propagation becomes a blend between two positions the solver already
+ * has. See the class remarks for why local space, and
+ * {@link GPUHairSimulationOptions.vspCoeff} for the shock propagation mapping.
  *
  * Exported for shader-generation tests only.
  * @internal
@@ -748,9 +1025,15 @@ export function createHairSimulationProgram(device: AbstractDevice, workgroupSiz
       this.planeData = pb.float[0]().storageBufferReadonly(0);
       this.strandCount = pb.uint().uniform(0);
       this.deltaTime = pb.float().uniform(0);
-      this.damping = pb.float().uniform(0);
-      this.stiffness = pb.float().uniform(0);
+      this.dampingDecay = pb.float().uniform(0);
+      this.globalStiffness = pb.float().uniform(0);
+      this.globalRange = pb.float().uniform(0);
+      this.localStiffness = pb.float().uniform(0);
+      this.localIterations = pb.uint().uniform(0);
+      this.ftlDamping = pb.float().uniform(0);
+      this.vspCoeff = pb.float().uniform(0);
       this.friction = pb.float().uniform(0);
+      this.maxSpeedFactor = pb.float().uniform(0);
       this.gravity = pb.vec3().uniform(0);
       this.relativeTransform = pb.mat4().uniform(0);
       this.sphereCount = pb.uint().uniform(0);
@@ -759,8 +1042,11 @@ export function createHairSimulationProgram(device: AbstractDevice, workgroupSiz
       this.minDistance = pb.float().uniform(0);
       this.resetPose = pb.uint().uniform(0);
 
-      // Pushes a point out of every collider, and rubs off tangential motion.
-      pb.func('Z_hairResolveContacts', [pb.vec3('position'), pb.vec3('previous')], function () {
+      // Pushes a point out of every collider. The push is a position fix only -
+      // friction, and carrying the history along so the push does not read as
+      // velocity, are the caller's job, because both need the history the
+      // caller is still assembling.
+      pb.func('Z_hairResolveContacts', [pb.vec3('position')], function () {
         this.$l.result = this.position;
         this.$for(pb.uint('i'), 0, this.sphereCount, function () {
           this.$l.base = pb.mul(this.i, 4);
@@ -831,15 +1117,98 @@ export function createHairSimulationProgram(device: AbstractDevice, workgroupSiz
             this.result = pb.sub(this.result, pb.mul(this.pnormal, this.signedDist));
           });
         });
-        // Friction removes part of the motion along the contact surface. Applied
-        // once for all contacts rather than per collider, so overlapping
-        // colliders do not multiply the effect.
-        this.$l.moved = pb.sub(this.result, this.position);
-        this.$if(pb.greaterThan(pb.length(this.moved), this.minDistance), function () {
-          this.$l.step = pb.sub(this.position, this.previous);
-          this.$l.normalDir = pb.normalize(this.moved);
-          this.$l.tangential = pb.sub(this.step, pb.mul(this.normalDir, pb.dot(this.step, this.normalDir)));
-          this.result = pb.sub(this.result, pb.mul(this.tangential, this.friction));
+        this.$return(this.result);
+      });
+
+      // Reads and writes of the interleaved point buffer, which every stage
+      // below does often enough that spelling out the three components each time
+      // buries what the stage is actually doing.
+      pb.func('Z_hairGetPoint', [pb.uint('index')], function () {
+        this.$l.base = pb.mul(this.index, 4);
+        this.$return(
+          pb.vec3(
+            this.points.at(this.base),
+            this.points.at(pb.add(this.base, 1)),
+            this.points.at(pb.add(this.base, 2))
+          )
+        );
+      });
+      pb.func('Z_hairSetPoint', [pb.uint('index'), pb.vec3('value')], function () {
+        this.$l.base = pb.mul(this.index, 4);
+        this.points.setAt(this.base, this.value.x);
+        this.points.setAt(pb.add(this.base, 1), this.value.y);
+        this.points.setAt(pb.add(this.base, 2), this.value.z);
+        this.$return(pb.float(0));
+      });
+      pb.func('Z_hairGetRest', [pb.uint('index')], function () {
+        this.$l.base = pb.mul(this.index, 3);
+        this.$return(
+          pb.vec3(
+            this.restPoints.at(this.base),
+            this.restPoints.at(pb.add(this.base, 1)),
+            this.restPoints.at(pb.add(this.base, 2))
+          )
+        );
+      });
+      pb.func('Z_hairGetHistory', [pb.uint('index')], function () {
+        this.$l.base = pb.mul(this.index, 3);
+        this.$return(
+          pb.vec3(
+            this.prevPoints.at(this.base),
+            this.prevPoints.at(pb.add(this.base, 1)),
+            this.prevPoints.at(pb.add(this.base, 2))
+          )
+        );
+      });
+      pb.func('Z_hairSetHistory', [pb.uint('index'), pb.vec3('value')], function () {
+        this.$l.base = pb.mul(this.index, 3);
+        this.prevPoints.setAt(this.base, this.value.x);
+        this.prevPoints.setAt(pb.add(this.base, 1), this.value.y);
+        this.prevPoints.setAt(pb.add(this.base, 2), this.value.z);
+        this.$return(pb.float(0));
+      });
+
+      // Rotates a vector by a quaternion, the usual two-cross-product form.
+      pb.func('Z_hairQuatRotate', [pb.vec4('q'), pb.vec3('v')], function () {
+        this.$l.uv = pb.cross(this.q.xyz, this.v);
+        this.$l.uuv = pb.cross(this.q.xyz, this.uv);
+        this.$return(pb.add(this.v, pb.mul(this.uv, pb.mul(this.q.w, 2)), pb.mul(this.uuv, 2)));
+      });
+
+      // The shortest-arc rotation taking unit u onto unit v. Antiparallel inputs
+      // leave the axis undefined, so one perpendicular to u is picked - any of
+      // them is as good as another for a half turn.
+      pb.func('Z_hairQuatFromUnitVectors', [pb.vec3('u'), pb.vec3('v')], function () {
+        this.$l.r = pb.add(1, pb.dot(this.u, this.v));
+        this.$l.axis = pb.cross(this.u, this.v);
+        this.$if(pb.lessThan(this.r, 1e-7), function () {
+          this.r = pb.float(0);
+          this.axis = this.$choice(
+            pb.greaterThan(pb.abs(this.u.x), pb.abs(this.u.z)),
+            pb.vec3(pb.neg(this.u.y), this.u.x, 0),
+            pb.vec3(0, pb.neg(this.u.z), this.u.y)
+          );
+        });
+        this.$l.q = pb.vec4(this.axis, this.r);
+        this.$l.lengthSq = pb.dot(this.q, this.q);
+        this.$l.result = pb.vec4(0, 0, 0, 1);
+        this.$if(pb.greaterThan(this.lengthSq, 1e-10), function () {
+          this.result = pb.mul(this.q, pb.inverseSqrt(this.lengthSq));
+        });
+        this.$return(this.result);
+      });
+
+      // Bounds the velocity a stored history implies. Nothing in ordinary motion
+      // reaches the ceiling; it exists so that a single bad substep - a collider
+      // teleporting through a strand, a degenerate segment - cannot hand the
+      // next step a velocity that no amount of damping will bring back.
+      pb.func('Z_hairClampHistory', [pb.uint('index'), pb.vec3('position'), pb.vec3('history')], function () {
+        this.$l.result = this.history;
+        this.$l.delta = pb.sub(this.position, this.result);
+        this.$l.speed = pb.length(this.delta);
+        this.$l.limit = pb.mul(this.restLengths.at(this.index), this.maxSpeedFactor);
+        this.$if(pb.greaterThan(this.speed, this.limit), function () {
+          this.result = pb.sub(this.position, pb.mul(this.delta, pb.div(this.limit, this.speed)));
         });
         this.$return(this.result);
       });
@@ -856,90 +1225,211 @@ export function createHairSimulationProgram(device: AbstractDevice, workgroupSiz
             // the previous ones, which leaves the strand still as well as in place.
             this.$for(pb.uint('i'), 0, this.pointCount, function () {
               this.$l.idx = pb.add(this.firstPoint, this.i);
-              this.$l.rbase = pb.mul(this.idx, 3);
-              this.$l.wbase = pb.mul(this.idx, 4);
-              this.points.setAt(this.wbase, this.restPoints.at(this.rbase));
-              this.points.setAt(pb.add(this.wbase, 1), this.restPoints.at(pb.add(this.rbase, 1)));
-              this.points.setAt(pb.add(this.wbase, 2), this.restPoints.at(pb.add(this.rbase, 2)));
-              this.prevPoints.setAt(this.rbase, this.restPoints.at(this.rbase));
-              this.prevPoints.setAt(pb.add(this.rbase, 1), this.restPoints.at(pb.add(this.rbase, 1)));
-              this.prevPoints.setAt(pb.add(this.rbase, 2), this.restPoints.at(pb.add(this.rbase, 2)));
+              this.$l.rest = this.Z_hairGetRest(this.idx);
+              this.Z_hairSetPoint(this.idx, this.rest);
+              this.Z_hairSetHistory(this.idx, this.rest);
             });
           }).$else(function () {
-            // The root is pinned to its authored position. It is the strand's
-            // anchor to the scalp, and it moves only because the node does - which
-            // in local space means it does not move at all.
-            this.$l.rootWrite = pb.mul(this.firstPoint, 4);
-            this.$l.rootRest = pb.mul(this.firstPoint, 3);
-            this.points.setAt(this.rootWrite, this.restPoints.at(this.rootRest));
-            this.points.setAt(pb.add(this.rootWrite, 1), this.restPoints.at(pb.add(this.rootRest, 1)));
-            this.points.setAt(pb.add(this.rootWrite, 2), this.restPoints.at(pb.add(this.rootRest, 2)));
-            this.prevPoints.setAt(this.rootRest, this.restPoints.at(this.rootRest));
-            this.prevPoints.setAt(pb.add(this.rootRest, 1), this.restPoints.at(pb.add(this.rootRest, 1)));
-            this.prevPoints.setAt(pb.add(this.rootRest, 2), this.restPoints.at(pb.add(this.rootRest, 2)));
+            // The first two points are pinned to their authored positions. Two,
+            // not one: a single pinned point fixes where a strand hangs from but
+            // leaves the direction it leaves the scalp in free, so the root end
+            // flops and can invert. The second point is what gives every strand
+            // a root frame, and the local shape constraint below is defined
+            // relative to that frame. In local space "pinned" means unchanged,
+            // because the node's motion is carried by the transform rather than
+            // by moving the roots.
+            this.$l.rootRest = this.Z_hairGetRest(this.firstPoint);
+            this.Z_hairSetPoint(this.firstPoint, this.rootRest);
+            this.Z_hairSetHistory(this.firstPoint, this.rootRest);
+            this.$if(pb.greaterThan(this.pointCount, 1), function () {
+              this.$l.nextIdx = pb.add(this.firstPoint, 1);
+              this.$l.nextRest = this.Z_hairGetRest(this.nextIdx);
+              this.Z_hairSetPoint(this.nextIdx, this.nextRest);
+              this.Z_hairSetHistory(this.nextIdx, this.nextRest);
+            });
 
             this.$l.dt2 = pb.mul(this.deltaTime, this.deltaTime);
-            this.$l.anchor = pb.vec3(
-              this.restPoints.at(this.rootRest),
-              this.restPoints.at(pb.add(this.rootRest, 1)),
-              this.restPoints.at(pb.add(this.rootRest, 2))
-            );
-            // Walking root to tip: each point is constrained against the one
-            // before it, which has already been finalised this pass.
-            this.$for(pb.uint('i'), 1, this.pointCount, function () {
+            this.$l.rangeLimit = pb.mul(this.globalRange, pb.float(this.pointCount));
+
+            //
+            // Stage 1 - integration, shock propagation and the global shape
+            // constraint. Per-vertex, no dependency between points.
+            //
+            this.$for(pb.uint('i'), 2, this.pointCount, function () {
               this.$l.idx = pb.add(this.firstPoint, this.i);
-              this.$l.wbase = pb.mul(this.idx, 4);
-              this.$l.rbase = pb.mul(this.idx, 3);
-              this.$l.current = pb.vec3(
-                this.points.at(this.wbase),
-                this.points.at(pb.add(this.wbase, 1)),
-                this.points.at(pb.add(this.wbase, 2))
-              );
-              this.$l.previous = pb.vec3(
-                this.prevPoints.at(this.rbase),
-                this.prevPoints.at(pb.add(this.rbase, 1)),
-                this.prevPoints.at(pb.add(this.rbase, 2))
-              );
-              this.$l.rest = pb.vec3(
-                this.restPoints.at(this.rbase),
-                this.restPoints.at(pb.add(this.rbase, 1)),
-                this.restPoints.at(pb.add(this.rbase, 2))
-              );
-              // The node's frame-to-frame motion, expressed in local space. A
-              // point that stood still in the world has moved by exactly this,
-              // so carrying both stored positions through it keeps the strand
-              // where it was in world space; the pinned root then drags it
-              // along - which is the swing. Transforming only one of the two
-              // would turn the node's own motion into strand velocity and throw
-              // the hair ahead of the movement instead of trailing behind it.
-              this.current = pb.mul(this.relativeTransform, pb.vec4(this.current, 1)).xyz;
-              this.previous = pb.mul(this.relativeTransform, pb.vec4(this.previous, 1)).xyz;
-              this.$l.velocity = pb.mul(pb.sub(this.current, this.previous), pb.sub(1, this.damping));
+              this.$l.current = this.Z_hairGetPoint(this.idx);
+              this.$l.previous = this.Z_hairGetHistory(this.idx);
+              // The node's frame-to-frame motion, expressed in local space: a
+              // point that stood still in the world has moved by exactly this.
+              // Carrying both stored positions through it leaves the strand
+              // where it was in the world, so the pinned root drags it along.
+              // Transforming only one of the two would read the node's own
+              // motion as strand velocity and throw the hair ahead of the
+              // movement instead of trailing behind it.
+              this.$l.lagged = pb.mul(this.relativeTransform, pb.vec4(this.current, 1)).xyz;
+              this.$l.laggedPrev = pb.mul(this.relativeTransform, pb.vec4(this.previous, 1)).xyz;
+              // Velocity shock propagation. TressFX drags each point part of the
+              // way along the rigid motion its root just underwent; in local
+              // space the two ends of that blend are already to hand, because
+              // leaving a point untransformed *is* carrying it rigidly with the
+              // node. So the coefficient interpolates between the two: 0 leaves
+              // the strand behind entirely, 1 makes it follow the head as if
+              // welded. What it buys is that a fast-moving root cannot outrun
+              // the strand far enough in one step for the length constraint to
+              // have to snap it back.
+              this.current = pb.mix(this.lagged, this.current, this.vspCoeff);
+              this.previous = pb.mix(this.laggedPrev, this.previous, this.vspCoeff);
+              this.$l.velocity = pb.mul(pb.sub(this.current, this.previous), this.dampingDecay);
               this.$l.next = pb.add(this.current, this.velocity, pb.mul(this.gravity, this.dt2));
-              // Pull back toward the authored shape. Without this a groom falls
-              // into a curtain and never recovers its styling.
-              this.next = pb.add(this.next, pb.mul(pb.sub(this.rest, this.next), this.stiffness));
-              // Follow the leader: hold the authored spacing from the previous
-              // point, which is already final.
-              this.$l.restLength = this.restLengths.at(this.idx);
-              this.$l.toPrev = pb.sub(this.next, this.anchor);
-              this.$l.dist = pb.length(this.toPrev);
-              this.$if(pb.greaterThan(this.dist, this.minDistance), function () {
-                this.next = pb.add(this.anchor, pb.mul(pb.div(this.toPrev, this.dist), this.restLength));
-              }).$else(function () {
-                // Coincident with the previous point leaves the direction
-                // undefined; any offset of the right length will do, and the next
-                // step's gravity will pull it back into a sensible one.
-                this.next = pb.add(this.anchor, pb.vec3(0, this.restLength, 0));
+              // Pull toward the authored pose, over the fraction of the strand
+              // the range covers. Off by default: it anchors a point to a fixed
+              // place rather than to its neighbours, which is a spring, and the
+              // local shape constraint below holds a groom's styling without
+              // that. It stays available for grooms that want to be pinned.
+              this.$if(
+                pb.and(
+                  pb.greaterThan(this.globalStiffness, 0),
+                  pb.lessThan(pb.float(this.i), this.rangeLimit)
+                ),
+                function () {
+                  this.$l.rest = this.Z_hairGetRest(this.idx);
+                  this.next = pb.add(this.next, pb.mul(pb.sub(this.rest, this.next), this.globalStiffness));
+                }
+              );
+              this.Z_hairSetHistory(this.idx, this.current);
+              this.Z_hairSetPoint(this.idx, this.next);
+            });
+
+            //
+            // Stage 2 - local shape constraint. This is what makes a groom read
+            // as hair rather than as a chain: it holds the angle each segment
+            // makes with the one before it, measured in the frame the previous
+            // segment currently occupies rather than against a fixed pose. A
+            // strand can therefore hang, swing and settle anywhere while keeping
+            // the curl it was authored with, and it resists bending the way a
+            // fibre does - which is also what stops a disturbance ringing up and
+            // down the strand for seconds.
+            //
+            // Stiffness is halved and capped below 1, as in TressFX: the
+            // constraint moves both of the points it touches, so a full-strength
+            // correction applied at both ends overshoots.
+            //
+            this.$l.localStrength = pb.mul(pb.min(this.localStiffness, 0.95), 0.5);
+            this.$if(pb.greaterThan(this.pointCount, 2), function () {
+              this.$for(pb.uint('iter'), 0, this.localIterations, function () {
+                this.$for(pb.uint('i'), 1, pb.sub(this.pointCount, 1), function () {
+                  this.$l.idx = pb.add(this.firstPoint, this.i);
+                  this.$l.pos = this.Z_hairGetPoint(this.idx);
+                  this.$l.posPlus = this.Z_hairGetPoint(pb.add(this.idx, 1));
+                  this.$l.posMinus = this.Z_hairGetPoint(pb.sub(this.idx, 1));
+                  this.$l.bind = this.Z_hairGetRest(this.idx);
+                  this.$l.bindPlus = this.Z_hairGetRest(pb.add(this.idx, 1));
+                  this.$l.bindMinus = this.Z_hairGetRest(pb.sub(this.idx, 1));
+                  // Where the next point would sit if the bend it makes with the
+                  // previous segment still matched the bind pose, carried into
+                  // whatever direction that previous segment points in now.
+                  this.$l.lastVec = pb.sub(this.pos, this.posMinus);
+                  this.$l.bindVec = pb.sub(this.bindPlus, this.bind);
+                  this.$l.lastBindVec = pb.sub(this.bind, this.bindMinus);
+                  this.$l.rotation = this.Z_hairQuatFromUnitVectors(
+                    pb.normalize(this.lastBindVec),
+                    pb.normalize(this.lastVec)
+                  );
+                  this.$l.bendTarget = pb.add(this.Z_hairQuatRotate(this.rotation, this.bindVec), this.pos);
+                  this.$l.del = pb.mul(pb.sub(this.bendTarget, this.posPlus), this.localStrength);
+                  // The correction is shared between the two ends, except where
+                  // one of them is a pinned root and cannot take its half.
+                  this.$if(pb.greaterThan(this.i, 1), function () {
+                    this.Z_hairSetPoint(this.idx, pb.sub(this.pos, this.del));
+                  });
+                  this.Z_hairSetPoint(pb.add(this.idx, 1), pb.add(this.posPlus, this.del));
+                });
               });
-              this.next = this.Z_hairResolveContacts(this.next, this.current);
-              this.prevPoints.setAt(this.rbase, this.current.x);
-              this.prevPoints.setAt(pb.add(this.rbase, 1), this.current.y);
-              this.prevPoints.setAt(pb.add(this.rbase, 2), this.current.z);
-              this.points.setAt(this.wbase, this.next.x);
-              this.points.setAt(pb.add(this.wbase, 1), this.next.y);
-              this.points.setAt(pb.add(this.wbase, 2), this.next.z);
-              this.anchor = this.next;
+            });
+
+            //
+            // Stage 3 - length constraints, root to tip. Each point is placed at
+            // exactly its authored distance from the one before it, which is
+            // already final, so one pass leaves the strand inextensible - no
+            // iteration count to tune and nothing left over.
+            //
+            // This is the one place the port leaves TressFX, which sweeps
+            // alternating even and odd segments Jacobi-style instead. It has to:
+            // a thread there owns one vertex, so a serial walk down a strand is
+            // not available to it. Jacobi transports tension one segment per
+            // sweep, and a hanging strand needs it transported from tip to root,
+            // so the strand stretches until the residual balances - on a 24-point
+            // strand under earth gravity that is 22% at TressFX's two sweeps and
+            // still 4.5% at sixteen. TressFX does not see this because its own
+            // default gravity is zero.
+            //
+            // Moving the child alone leaves the momentum that correction
+            // represents unaccounted for, and unaccounted it accumulates: every
+            // root movement pumps the chain, and since the segments are coupled
+            // in series it collects at the free end and the groom whips. Handing
+            // the correction back to the parent as reverse momentum - Mueller's
+            // FTL damping - is what keeps that from happening.
+            //
+            this.$if(pb.greaterThan(this.pointCount, 2), function () {
+              this.$for(pb.uint('j'), 1, pb.sub(this.pointCount, 1), function () {
+                this.$l.parentIdx = pb.add(this.firstPoint, this.j);
+                this.$l.childIdx = pb.add(this.parentIdx, 1);
+                this.$l.parent = this.Z_hairGetPoint(this.parentIdx);
+                this.$l.predicted = this.Z_hairGetPoint(this.childIdx);
+                // Rest lengths are indexed by the far end of a segment.
+                this.$l.restLength = this.restLengths.at(this.childIdx);
+                this.$l.offset = pb.sub(this.predicted, this.parent);
+                this.$l.dist = pb.length(this.offset);
+                // Coincident with the parent leaves the direction undefined; any
+                // offset of the right length will do, and the next step's gravity
+                // pulls it back into a sensible one.
+                this.$l.projected = pb.add(this.parent, pb.vec3(0, this.restLength, 0));
+                this.$if(pb.greaterThan(this.dist, this.minDistance), function () {
+                  this.projected = pb.add(
+                    this.parent,
+                    pb.mul(pb.div(this.offset, this.dist), this.restLength)
+                  );
+                });
+                this.Z_hairSetPoint(this.childIdx, this.projected);
+                // The parent takes the reverse momentum, unless it is one of the
+                // pinned roots and has none to take.
+                this.$if(pb.greaterThan(this.j, 1), function () {
+                  this.$l.correction = pb.sub(this.projected, this.predicted);
+                  this.Z_hairSetHistory(
+                    this.parentIdx,
+                    pb.add(this.Z_hairGetHistory(this.parentIdx), pb.mul(this.correction, this.ftlDamping))
+                  );
+                });
+              });
+            });
+
+            //
+            // Stage 4 - contacts, and the ceiling on how far a point may have
+            // travelled this substep.
+            //
+            this.$for(pb.uint('i'), 2, this.pointCount, function () {
+              this.$l.idx = pb.add(this.firstPoint, this.i);
+              this.$l.position = this.Z_hairGetPoint(this.idx);
+              this.$l.history = this.Z_hairGetHistory(this.idx);
+              this.$l.resolved = this.Z_hairResolveContacts(this.position);
+              // Being pushed out of a collider is a position fix, not a shove:
+              // the history follows the push so the point leaves the surface
+              // with the velocity it arrived with, and friction then takes its
+              // share of the part of that velocity along the surface.
+              this.$l.push = pb.sub(this.resolved, this.position);
+              this.$l.pushDist = pb.length(this.push);
+              this.history = pb.add(this.history, this.push);
+              this.$if(pb.greaterThan(this.pushDist, this.minDistance), function () {
+                this.$l.normalDir = pb.div(this.push, this.pushDist);
+                this.$l.contactVelocity = pb.sub(this.resolved, this.history);
+                this.$l.tangential = pb.sub(
+                  this.contactVelocity,
+                  pb.mul(this.normalDir, pb.dot(this.contactVelocity, this.normalDir))
+                );
+                this.history = pb.add(this.history, pb.mul(this.tangential, this.friction));
+              });
+              this.Z_hairSetHistory(this.idx, this.Z_hairClampHistory(this.idx, this.resolved, this.history));
+              this.Z_hairSetPoint(this.idx, this.resolved);
             });
           });
         });

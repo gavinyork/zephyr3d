@@ -383,6 +383,12 @@ export const hairNodeTransform: VisualScene = {
  * the strands stretch away or collapse into their roots; one whose contacts are
  * in the wrong space leaves them hanging through the sphere.
  *
+ * The first of those is worth its own note, because it is not hypothetical and
+ * it is invisible everywhere else: a solver whose WGSL is rejected at pipeline
+ * creation fails exactly this way, since the compute pass simply never runs and
+ * the strands stay in the pose they were uploaded in. Nothing about the picture
+ * says "shader error"; it just looks like hair that was never simulated.
+ *
  * WebGPU only: the solver is a compute pass.
  */
 export const hairSimulation: VisualScene = {
@@ -401,13 +407,13 @@ export const hairSimulation: VisualScene = {
     node.minStrandWidth = 0;
     node.strandWidthScale = 0.4;
     node.setStrands(curtainStrands());
-    // No damping and a low stiffness so the motion is large enough to read in a
-    // single frame; a styled groom would use far more of both. The stiffness
-    // dial is the per-fixed-step fraction and the solver runs two substeps, so
-    // 0.0396 = 1 - (1 - 0.02)^2 reproduces the 0.02-per-substep pull the
-    // snapshot was recorded with.
+    // No velocity damping and no bending resistance, so the strands fall freely
+    // and the collider's effect is the only thing shaping them: this scene is
+    // about the solver reaching the right place, and a styled groom's shape
+    // retention would mask that. The other scenes exercise the defaults.
     node.damping = 0;
-    node.stiffness = 0.0396;
+    node.localStiffness = 0;
+    node.vspCoeff = 0;
     node.gravity = new Vector3(0, -9.8, 0);
     node.simulationEnabled = true;
     // Sits under the middle of the curtain, so the strands that clear it and the
@@ -478,6 +484,12 @@ export const hairSimulationMotion: VisualScene = {
  *
  * The strands match the groom the blow-up was reported on: ~6 m long, 30
  * control points, a curled lower third.
+ *
+ * That curl is the second thing this pins. It is authored, not held in place by
+ * anything, so it survives 600 frames of shaking only if the local shape
+ * constraint is doing its job - a solver with no bending resistance combs it
+ * straight, and one that holds the authored *pose* rather than the authored
+ * *shape* leaves the whole groom rigid instead of hanging.
  *
  * WebGPU only: the solver is a compute pass.
  */

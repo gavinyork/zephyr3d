@@ -220,19 +220,33 @@ describe('HairNode serialization', () => {
   it('round-trips the simulation dials', async () => {
     const scene = new Scene();
     const node = createNode(scene);
-    node.stiffness = 0.8;
+    node.localStiffness = 0.8;
+    node.localIterations = 3;
+    node.globalStiffness = 0.4;
+    node.globalRange = 0.25;
+    node.ftlDamping = 0.55;
+    node.vspCoeff = 0.65;
+    node.vspAccelThreshold = 120;
     node.damping = 0.3;
     node.friction = 0.6;
     node.substeps = 5;
+    node.maxSpeedFactor = 6;
 
     const manager = new ResourceManager(new MemoryFS());
     const serialized = (await manager.serializeObject(node)) as any;
     const restored = createNode(scene);
     await manager.deserializeObjectProps(restored, serialized.Object ?? serialized);
 
-    expect(restored.stiffness).toBeCloseTo(0.8);
+    expect(restored.localStiffness).toBeCloseTo(0.8);
+    expect(restored.localIterations).toBe(3);
+    expect(restored.globalStiffness).toBeCloseTo(0.4);
+    expect(restored.globalRange).toBeCloseTo(0.25);
+    expect(restored.ftlDamping).toBeCloseTo(0.55);
+    expect(restored.vspCoeff).toBeCloseTo(0.65);
+    expect(restored.vspAccelThreshold).toBeCloseTo(120);
     expect(restored.damping).toBeCloseTo(0.3);
     expect(restored.friction).toBeCloseTo(0.6);
     expect(restored.substeps).toBe(5);
+    expect(restored.maxSpeedFactor).toBeCloseTo(6);
   });
 });

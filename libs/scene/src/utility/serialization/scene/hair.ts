@@ -661,27 +661,125 @@ export function getHairNodeClass(): SerializableClass {
           }
         },
         {
-          name: 'Stiffness',
-          description:
-            'Fraction of the deviation from the authored shape removed per fixed step. High values pin the styling and erase visible motion',
+          name: 'Local Stiffness',
+          description: 'How strongly a strand keeps its authored shape. Holds the curl, and damps the groom',
           type: 'float',
-          default: 0.05,
+          default: 0.9,
           options: { group: 'Simulation', animatable: true, minValue: 0, maxValue: 1 },
           isHidden(this: HairNode) {
             return !this.simulationEnabled;
           },
           get(this: HairNode, value) {
-            value.num[0] = this.stiffness;
+            value.num[0] = this.localStiffness;
           },
           set(this: HairNode, value) {
-            this.stiffness = value.num[0];
+            this.localStiffness = value.num[0];
+          }
+        },
+        {
+          name: 'Local Iterations',
+          description: 'Local shape constraint passes per substep. More converges closer',
+          type: 'int',
+          default: 2,
+          options: { group: 'Simulation', minValue: 1, maxValue: 8 },
+          isHidden(this: HairNode) {
+            return !this.simulationEnabled;
+          },
+          get(this: HairNode, value) {
+            value.num[0] = this.localIterations;
+          },
+          set(this: HairNode, value) {
+            this.localIterations = value.num[0];
+          }
+        },
+        {
+          name: 'Global Stiffness',
+          description:
+            'Pull back to the authored pose. Off by default: it anchors points in place, which reads as a spring',
+          type: 'float',
+          default: 0,
+          options: { group: 'Simulation', animatable: true, minValue: 0, maxValue: 1 },
+          isHidden(this: HairNode) {
+            return !this.simulationEnabled;
+          },
+          get(this: HairNode, value) {
+            value.num[0] = this.globalStiffness;
+          },
+          set(this: HairNode, value) {
+            this.globalStiffness = value.num[0];
+          }
+        },
+        {
+          name: 'Global Range',
+          description: 'Fraction of a strand, from the root, the pose pull acts on',
+          type: 'float',
+          default: 0,
+          options: { group: 'Simulation', minValue: 0, maxValue: 1 },
+          isHidden(this: HairNode) {
+            return !this.simulationEnabled;
+          },
+          get(this: HairNode, value) {
+            value.num[0] = this.globalRange;
+          },
+          set(this: HairNode, value) {
+            this.globalRange = value.num[0];
+          }
+        },
+        {
+          name: 'FTL Damping',
+          description:
+            'Length correction handed back to the parent point as reverse momentum. Lower whips more',
+          type: 'float',
+          default: 0.7,
+          options: { group: 'Simulation', minValue: 0, maxValue: 1 },
+          isHidden(this: HairNode) {
+            return !this.simulationEnabled;
+          },
+          get(this: HairNode, value) {
+            value.num[0] = this.ftlDamping;
+          },
+          set(this: HairNode, value) {
+            this.ftlDamping = value.num[0];
+          }
+        },
+        {
+          name: 'Shock Propagation',
+          description:
+            'How much of the node motion strands are carried along by. 0 lags fully, 1 follows rigidly',
+          type: 'float',
+          default: 0.8,
+          options: { group: 'Simulation', animatable: true, minValue: 0, maxValue: 1 },
+          isHidden(this: HairNode) {
+            return !this.simulationEnabled;
+          },
+          get(this: HairNode, value) {
+            value.num[0] = this.vspCoeff;
+          },
+          set(this: HairNode, value) {
+            this.vspCoeff = value.num[0];
+          }
+        },
+        {
+          name: 'Shock Threshold',
+          description: 'Node acceleration above which strands stop lagging, in units per second squared',
+          type: 'float',
+          default: 50,
+          options: { group: 'Simulation', minValue: 0, maxValue: 500 },
+          isHidden(this: HairNode) {
+            return !this.simulationEnabled;
+          },
+          get(this: HairNode, value) {
+            value.num[0] = this.vspAccelThreshold;
+          },
+          set(this: HairNode, value) {
+            this.vspAccelThreshold = value.num[0];
           }
         },
         {
           name: 'Damping',
           description: 'Velocity lost each step. 0 keeps full inertia',
           type: 'float',
-          default: 0.05,
+          default: 0.08,
           options: { group: 'Simulation', animatable: true, minValue: 0, maxValue: 1 },
           isHidden(this: HairNode) {
             return !this.simulationEnabled;
@@ -713,7 +811,7 @@ export function getHairNodeClass(): SerializableClass {
           name: 'Substeps',
           description: 'Integration substeps per fixed step. More is stabler and slower',
           type: 'int',
-          default: 2,
+          default: 1,
           options: { group: 'Simulation', minValue: 1, maxValue: 8 },
           isHidden(this: HairNode) {
             return !this.simulationEnabled;
@@ -723,6 +821,22 @@ export function getHairNodeClass(): SerializableClass {
           },
           set(this: HairNode, value) {
             this.substeps = value.num[0];
+          }
+        },
+        {
+          name: 'Max Speed Factor',
+          description: 'Per-substep ceiling on point travel, in segment lengths',
+          type: 'float',
+          default: 4,
+          options: { group: 'Simulation', minValue: 0, maxValue: 32 },
+          isHidden(this: HairNode) {
+            return !this.simulationEnabled;
+          },
+          get(this: HairNode, value) {
+            value.num[0] = this.maxSpeedFactor;
+          },
+          set(this: HairNode, value) {
+            this.maxSpeedFactor = value.num[0];
           }
         }
       ]);
