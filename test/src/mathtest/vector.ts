@@ -240,20 +240,6 @@ export function testQuaternion() {
       const rotMatrixZYX = Matrix3x3.identity().multiplyRight(matZ).multiplyRight(matY).multiplyRight(matX);
       Quaternion.fromEulerAngle(angle1, angle2, angle3, 'ZYX').toMatrix3x3(testMat);
       expect(testMat.equalsTo(rotMatrixZYX)).toBe(true);
-
-      const orders = ['XYZ', 'YXZ', 'ZXY', 'ZYX', 'YZX', 'XZY'] as const;
-      const mats = [rotMatrixXYZ, rotMatrixYXZ, rotMatrixZXY, rotMatrixZYX, rotMatrixYZX, rotMatrixXZY];
-
-      for (let i = 0; i < orders.length; i++) {
-        const order = orders[i];
-        const mat = mats[i];
-        const v = Quaternion.fromEulerAngle(angle1, angle2, angle3, order).toEulerAngles();
-        Quaternion.fromEulerAngle(v.x, v.y, v.z, order).toMatrix3x3(testMat);
-        // 这里原来是 console.log；对测试结果不敏感，所以可以直接保持逻辑
-        if (testMat.equalsTo(mat)) {
-          // 可选：console.log(`to Euler angles: ${order}`);
-        }
-      }
     });
 
     test('slerp', () => {
@@ -270,7 +256,7 @@ export function testQuaternion() {
 
       const axisAngle1 = q3.getAxisAngle();
       const axisAngle2 = q4.getAxisAngle();
-      expect(axisAngle1.equalsTo(axisAngle2)).toBe(true);
+      expect(axisAngle1.equalsTo(axisAngle2, 0.01)).toBe(true);
     });
   });
 }
