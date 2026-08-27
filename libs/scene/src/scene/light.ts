@@ -882,8 +882,17 @@ export class SpotLight extends PunctualLight {
   /** @internal */
   computeBoundingVolume() {
     const bbox = new BoundingBox();
-    const cosCutoff =
-      this.scene?.lightingMode === 'physical' ? Math.cos(this._outerConeAngle) : Math.cos(this._cutoff);
+    // In legacy mode `_cutoff` already stores the cosine of the cone half-angle (see the
+    // constructor default and computeUniforms), so it must be used as-is. Physical mode keeps the
+    // half-angle in radians instead, hence the conversion there.
+    // The lower clamp keeps the radius finite for half-angles at or beyond 90 degrees.
+    const cosCutoff = Math.min(
+      1,
+      Math.max(
+        0.0001,
+        this.scene?.lightingMode === 'physical' ? Math.cos(this._outerConeAngle) : this._cutoff
+      )
+    );
     const range = this.positionAndRange.w;
     const r = (range / cosCutoff) * Math.sqrt(1 - cosCutoff * cosCutoff);
     bbox.minPoint = new Vector3(-r, -r, 0);

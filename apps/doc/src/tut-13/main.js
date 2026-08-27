@@ -28,8 +28,8 @@ myApp.ready().then(function () {
   const light = new SpotLight(scene);
   // light color
   light.color = new Vector4(1, 1, 1, 1);
-  // light cutoff angle
-  light.cutoff = Math.PI * 0.2;
+  // Cosine of the cone half-angle, not the angle itself
+  light.cutoff = Math.cos(Math.PI * 0.2);
   // light range
   light.range = 200;
   // light position
