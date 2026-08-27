@@ -956,6 +956,10 @@ export class HairNode extends applyMixins(GraphNode, mixinDrawable) implements D
     const simulation = new GPUHairSimulation(data, this._source, this._simulationOptions);
     if (simulation.enabled) {
       this._simulation = simulation;
+      // Motion vectors have to follow the control points once something is
+      // moving them, or a groom swinging under a still head reports no motion
+      // and a temporal filter smears it.
+      this.material.prevPoints = simulation.framePointBuffer;
       // The bounds widen while a simulation runs - see computeBoundingVolume.
       this.invalidateBoundingVolume();
       this.scene?.queueUpdateNode(this);
@@ -966,6 +970,7 @@ export class HairNode extends applyMixins(GraphNode, mixinDrawable) implements D
   }
   /** @internal */
   private _disposeSimulation() {
+    this.material.prevPoints = null;
     this._simulation?.dispose();
     this._simulation = null;
   }

@@ -1,4 +1,10 @@
-import type { BindGroup, PBFunctionScope, PBInsideFunctionScope, PBShaderExp } from '@zephyr3d/device';
+import type {
+  BindGroup,
+  GPUDataBuffer,
+  PBFunctionScope,
+  PBInsideFunctionScope,
+  PBShaderExp
+} from '@zephyr3d/device';
 import { HairMaterial } from './hair';
 import { ShaderHelper } from './shader/helper';
 import type { DrawContext } from '../render';
@@ -38,8 +44,12 @@ import type { HairStrandData } from './hairstrand_data';
 export class HairStrandMaterial extends HairMaterial implements Clonable<HairStrandMaterial> {
   /** @internal Enables per-strand distance decimation in the vertex shader. */
   private static readonly FEATURE_STRAND_LOD = this.defineFeature();
+  /** @internal Samples a second point buffer to build motion vectors. */
+  private static readonly FEATURE_STRAND_MOTION = this.defineFeature();
   /** @internal */
   private _strands: Nullable<HairStrandData>;
+  /** @internal Control points as of the previously rendered frame. */
+  private _prevPoints: Nullable<GPUDataBuffer>;
   /** @internal Ribbon segments generated per strand. */
   private _segmentsPerStrand: number;
   /** @internal Multiplier on the width stored in the strand data. */
@@ -79,7 +89,9 @@ export class HairStrandMaterial extends HairMaterial implements Clonable<HairStr
     this._strandScratch = new Vector4();
     this._lodScratch = new Vector4();
     this._shapeScratch = new Vector4();
+    this._prevPoints = null;
     this.useFeature(HairStrandMaterial.FEATURE_STRAND_LOD, false);
+    this.useFeature(HairStrandMaterial.FEATURE_STRAND_MOTION, false);
     // The quad is built facing the camera, so there is no back face to cull.
     this.cullMode = 'none';
     // Strand geometry carries no vertex attributes at all: the frame is derived
@@ -212,6 +224,29 @@ export class HairStrandMaterial extends HairMaterial implements Clonable<HairStr
   }
   set strandLOD(val: boolean) {
     this.useFeature(HairStrandMaterial.FEATURE_STRAND_LOD, !!val);
+  }
+  /**
+   * Control points as of the previously rendered frame, or null.
+   *
+   * @remarks
+   * Set by {@link HairNode} while a simulation is running. Without it the
+   * previous position is the *current* control point put through the previous
+   * world matrix, which carries the node's motion but none of the strand's own -
+   * so a groom swinging under a still head reports no motion at all, and a
+   * temporal filter blends a history that has nothing to do with the pixel.
+   * Costs four extra point fetches per vertex, hence a feature rather than an
+   * always-on path: a static groom does not need it.
+   */
+  get prevPoints() {
+    return this._prevPoints;
+  }
+  set prevPoints(buffer: Nullable<GPUDataBuffer>) {
+    this._prevPoints = buffer ?? null;
+    this.useFeature(HairStrandMaterial.FEATURE_STRAND_MOTION, !!this._prevPoints);
+  }
+  /** Whether motion vectors follow the control points. @internal */
+  get strandMotion() {
+    return this.featureUsed<boolean>(HairStrandMaterial.FEATURE_STRAND_MOTION);
   }
   /**
    * Floor on the fraction of strands {@link strandLOD} keeps.
@@ -368,20 +403,21 @@ export class HairStrandMaterial extends HairMaterial implements Clonable<HairStr
     // history and falls back to the raw frame, which on dithered strands is
     // visible as noise that only settles once the camera stops.
     //
-    // The previous position is the strand's control point put through the
-    // previous frame's world matrix, which is what moves when the node - a head
-    // bone, say - moves. The camera-facing offset is reused rather than rebuilt
-    // against the previous camera: its per-frame change is the ribbon half-width
-    // times the per-frame camera rotation, hundredths of a pixel even while
-    // orbiting quickly, and recomputing it would double the control point
-    // fetches for a sub-pixel correction.
+    // The previous position is the previous frame's control point put through
+    // the previous frame's world matrix. The two halves are independent: the
+    // matrix carries the node - a head bone, say - and the control point carries
+    // whatever the solver did to the strand. With a static groom the previous
+    // control point is the current one and only the matrix contributes; see
+    // {@link HairStrandMaterial.prevPoints} for the other case.
     //
-    // This still assumes the control points themselves are static between
-    // frames. A simulation pass writing the point buffer in place invalidates
-    // that, and has to keep the previous frame's points to fix it properly.
+    // The camera-facing offset is reused rather than rebuilt against the previous
+    // camera: its per-frame change is the ribbon half-width times the per-frame
+    // camera rotation, hundredths of a pixel even while orbiting quickly, and
+    // recomputing it would double the control point fetches for a sub-pixel
+    // correction.
     if (ShaderHelper.getPrevUnjitteredViewProjectionMatrix(scope)) {
       scope.$l.zPrevWorldPos = pb.add(
-        pb.mul(ShaderHelper.getPrevWorldMatrix(scope), pb.vec4(scope.strand.localCentre, 1)).xyz,
+        pb.mul(ShaderHelper.getPrevWorldMatrix(scope), pb.vec4(scope.strand.prevLocalCentre, 1)).xyz,
         scope.strand.offset
       );
       ShaderHelper.resolveMotionVector(scope, scope.strand.worldPos, scope.zPrevWorldPos);
@@ -463,6 +499,9 @@ export class HairStrandMaterial extends HairMaterial implements Clonable<HairStr
     }
     bindGroup.setBuffer('zStrandHeaders', strands.headerBuffer);
     bindGroup.setBuffer('zStrandPoints', strands.pointBuffer);
+    if (this.strandMotion && this._prevPoints) {
+      bindGroup.setBuffer('zStrandPrevPoints', this._prevPoints);
+    }
     // The pixel floor, in the form the rendering camera calls for. Perspective:
     // half a pixel subtends tan(fovY/2)/renderHeight radians, so a per-distance
     // factor multiplied by view distance in the shader yields the world-space
@@ -523,6 +562,9 @@ export class HairStrandMaterial extends HairMaterial implements Clonable<HairStr
     const pb = scope.$builder;
     scope.zStrandHeaders = pb.uint[0]().storageBufferReadonly(2);
     scope.zStrandPoints = pb.float[0]().storageBufferReadonly(2);
+    if (this.strandMotion) {
+      scope.zStrandPrevPoints = pb.float[0]().storageBufferReadonly(2);
+    }
     scope.zStrandParams = pb.vec4().uniform(2);
     scope.zStrandShape = pb.vec4().uniform(2);
     if (this.strandLOD) {
@@ -533,20 +575,35 @@ export class HairStrandMaterial extends HairMaterial implements Clonable<HairStr
    * Reads one control point as position in xyz and width in w.
    * @internal
    */
-  private fetchStrandPoint(scope: PBInsideFunctionScope, index: PBShaderExp) {
+  private fetchStrandPoint(scope: PBInsideFunctionScope, index: PBShaderExp, prev = false) {
     const pb = scope.$builder;
-    const funcName = 'Z_strandPoint';
+    const funcName = prev ? 'Z_strandPointPrev' : 'Z_strandPoint';
     pb.func(funcName, [pb.uint('index')], function () {
-      const points = this.zStrandPoints;
-      this.$l.base = pb.mul(this.index, 4);
-      this.$return(
-        pb.vec4(
-          points.at(this.base),
-          points.at(pb.add(this.base, 1)),
-          points.at(pb.add(this.base, 2)),
-          points.at(pb.add(this.base, 3))
-        )
-      );
+      if (prev) {
+        // The snapshot carries positions only - three floats per point, against
+        // the live buffer's four. Width does not change between frames and the
+        // caller only reads xyz off the previous sample, so w is left at zero
+        // rather than given a buffer to come from.
+        this.$l.base = pb.mul(this.index, 3);
+        this.$return(
+          pb.vec4(
+            this.zStrandPrevPoints.at(this.base),
+            this.zStrandPrevPoints.at(pb.add(this.base, 1)),
+            this.zStrandPrevPoints.at(pb.add(this.base, 2)),
+            0
+          )
+        );
+      } else {
+        this.$l.base = pb.mul(this.index, 4);
+        this.$return(
+          pb.vec4(
+            this.zStrandPoints.at(this.base),
+            this.zStrandPoints.at(pb.add(this.base, 1)),
+            this.zStrandPoints.at(pb.add(this.base, 2)),
+            this.zStrandPoints.at(pb.add(this.base, 3))
+          )
+        );
+      }
     });
     return pb.getGlobalScope()[funcName](index) as PBShaderExp;
   }
@@ -579,11 +636,12 @@ export class HairStrandMaterial extends HairMaterial implements Clonable<HairStr
     scope: PBInsideFunctionScope,
     firstPoint: PBShaderExp,
     pointCount: PBShaderExp,
-    t: PBShaderExp
+    t: PBShaderExp,
+    prev = false
   ) {
     const pb = scope.$builder;
     const that = this;
-    const funcName = 'Z_strandEvaluate';
+    const funcName = prev ? 'Z_strandEvaluatePrev' : 'Z_strandEvaluate';
     const StrandSample = pb.defineStruct([pb.vec4('sample'), pb.vec3('tangent')]);
     pb.func(funcName, [pb.uint('firstPoint'), pb.uint('pointCount'), pb.float('t')], function () {
       this.$l.last = pb.sub(this.pointCount, 1);
@@ -594,12 +652,13 @@ export class HairStrandMaterial extends HairMaterial implements Clonable<HairStr
       // curvature. Both ends duplicate rather than wrap: max(i,1)-1 gives i-1
       // without underflowing at the root, and the tip clamps to the last point,
       // which is the usual way to end a Catmull-Rom without inventing points.
-      this.$l.p0 = that.fetchStrandPoint(this, pb.add(this.firstPoint, pb.sub(pb.max(this.i1, 1), 1)));
-      this.$l.p1 = that.fetchStrandPoint(this, pb.add(this.firstPoint, this.i1));
-      this.$l.p2 = that.fetchStrandPoint(this, pb.add(this.firstPoint, pb.add(this.i1, 1)));
+      this.$l.p0 = that.fetchStrandPoint(this, pb.add(this.firstPoint, pb.sub(pb.max(this.i1, 1), 1)), prev);
+      this.$l.p1 = that.fetchStrandPoint(this, pb.add(this.firstPoint, this.i1), prev);
+      this.$l.p2 = that.fetchStrandPoint(this, pb.add(this.firstPoint, pb.add(this.i1, 1)), prev);
       this.$l.p3 = that.fetchStrandPoint(
         this,
-        pb.add(this.firstPoint, pb.min(pb.add(this.i1, 2), this.last))
+        pb.add(this.firstPoint, pb.min(pb.add(this.i1, 2), this.last)),
+        prev
       );
       // Uniform Catmull-Rom in Hermite form: the span p1..p2 with the endpoint
       // tangents each spline segment inherits from its neighbours. Kept in this
@@ -699,6 +758,7 @@ export class HairStrandMaterial extends HairMaterial implements Clonable<HairStr
       pb.float('coverage'),
       pb.float('across'),
       pb.vec3('localCentre'),
+      pb.vec3('prevLocalCentre'),
       pb.vec3('offset'),
       pb.float('occlusion')
     ]);
@@ -753,6 +813,20 @@ export class HairStrandMaterial extends HairMaterial implements Clonable<HairStr
       // to shear that facing direction.
       this.$l.worldMatrix = ShaderHelper.getWorldMatrix(this);
       this.$l.localCentre = this.curve.sample.xyz;
+      // Where this vertex's control point sat when the last frame was drawn. The
+      // spline weights depend only on t and the span index, both of which are
+      // fixed by the topology, so the second evaluation costs four fetches and
+      // repeats arithmetic the compiler is free to share.
+      this.$l.prevLocalCentre = this.localCentre;
+      if (that.strandMotion) {
+        this.prevLocalCentre = that.evaluateStrand(
+          this,
+          this.firstPoint,
+          this.pointCount,
+          this.t,
+          true
+        ).sample.xyz;
+      }
       this.$l.centre = pb.mul(this.worldMatrix, pb.vec4(this.localCentre, 1)).xyz;
       this.$l.tangent = that.transformStrandDirection(this, this.worldMatrix, this.curve.tangent);
       // Width is a length in the same space as the control points, so it follows
@@ -853,6 +927,7 @@ export class HairStrandMaterial extends HairMaterial implements Clonable<HairStr
           // so a culled strand costs no fragments at all.
           this.centre = this.rootPos;
           this.localCentre = this.rootLocal;
+          this.prevLocalCentre = this.rootLocal;
           this.halfW = pb.float(0);
         });
       }
@@ -871,6 +946,7 @@ export class HairStrandMaterial extends HairMaterial implements Clonable<HairStr
       // Carried out so the caller can rebuild this vertex against the previous
       // frame's world matrix without re-running the expansion.
       this.result.localCentre = this.localCentre;
+      this.result.prevLocalCentre = this.prevLocalCentre;
       this.result.offset = this.offset;
       // How deep in the groom this vertex sits, stood in for by where along the
       // strand it is: full occlusion at the root, fading to none once the strand

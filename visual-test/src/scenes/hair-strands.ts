@@ -19,7 +19,7 @@ import {
   type HairFileImportOptions
 } from '@zephyr3d/loaders';
 import { Quaternion, Vector3, Vector4 } from '@zephyr3d/base';
-import { createSphereCollider, getDevice } from '@zephyr3d/scene';
+import { createSphereCollider, getDevice, TAA_DEBUG_MOTION_VECTOR } from '@zephyr3d/scene';
 import type { PrimitiveType, VertexAttribFormat } from '@zephyr3d/device';
 import type { ShadowMode } from '@zephyr3d/scene';
 import type { SceneContext, VisualScene } from '../types';
@@ -876,5 +876,119 @@ export const hairMarschnerStrands: VisualScene = {
     shadowFloor(ctx.scene);
     placeCamera(ctx.camera, new Vector3(2.1, 1.3, 2.8), new Vector3(0, 0.05, 0));
     ctx.camera.far = 40;
+  }
+};
+
+/**
+ * Motion vectors of a groom swinging under a still camera and a still node.
+ *
+ * @remarks
+ * The one configuration that isolates the strands' own motion. Node motion
+ * reaches a motion vector through the previous world matrix and camera motion
+ * through the previous view-projection, so holding both still leaves the solver
+ * as the only thing that can move a pixel - and before the material sampled a
+ * previous point buffer, that left the motion vector identically zero while the
+ * hair visibly swung. TAA then reprojected each strand pixel onto itself and
+ * blended a history belonging to whatever was behind it, which on thin dithered
+ * geometry the neighbourhood clamp cannot catch: a hair pixel's 3x3 colour box
+ * spans strand and background both, so it clips nothing.
+ *
+ * Rendered through the TAA motion vector debug view, so the capture is the
+ * vector field itself rather than its consequences. A regression here reads as
+ * the groom going black - vectors collapsing to zero - which is exactly the
+ * failure, and is impossible to mistake for a shading change.
+ *
+ * The groom is released from a pose rotated away from where it hangs, so it is
+ * mid-swing at the capture with nothing else in the frame moving.
+ *
+ * WebGPU only: the solver is a compute pass.
+ */
+export const hairSimulationMotionVectors: VisualScene = {
+  name: 'hair-simulation-motion-vectors',
+  description: 'Motion vectors of a swinging groom under a still camera: pins strand-driven velocity.',
+  supports: (backend) => backend === 'webgpu',
+  frames: 24,
+  setup(ctx) {
+    bareScene(ctx.scene);
+    keyLight(ctx.scene);
+    const node = new HairNode(ctx.scene);
+    node.segmentsPerStrand = 12;
+    node.minStrandWidth = 0;
+    node.strandWidthScale = 0.4;
+    node.setStrands(curtainStrands());
+    // No pose pull and little damping, so the swing is still large at frame 24.
+    node.globalStiffness = 0;
+    node.damping = 0.02;
+    node.localStiffness = 0.9;
+    // Carried entirely by the solver rather than by the node: shock propagation
+    // would otherwise hide most of the lag this scene exists to measure.
+    node.vspCoeff = 0;
+    node.gravity = new Vector3(0, -9.8, 0);
+    node.simulationEnabled = true;
+    // One shove on the first frame, then the node is still for the rest of the
+    // run. Everything the capture shows after that is the strands alone.
+    let frame = 0;
+    ctx.scene.on('update', () => {
+      frame++;
+      node.rotation.set(Quaternion.fromAxisAngle(Vector3.axisPZ(), frame < 2 ? 0.9 : 0));
+    });
+    ctx.camera.TAA = true;
+    ctx.camera.TAADebug = TAA_DEBUG_MOTION_VECTOR;
+    placeCamera(ctx.camera, new Vector3(0, 0.75, 3.1), new Vector3(0, 0.15, 0));
+  }
+};
+
+/**
+ * Motion vectors of a groom that is not moving at all.
+ *
+ * @remarks
+ * The other half of {@link hairSimulationMotionVectors}, and the one that
+ * catches the failures that scene cannot. Node, camera, gravity and drive are
+ * all off, so every control point holds its authored position for the whole run
+ * and the strands must report exactly no motion. A moving box shares the frame
+ * to prove the pass is alive and writing - without it a capture that is black
+ * because the velocity buffer never got written would look like a pass.
+ *
+ * A previous-frame position that is merely *plausible* passes the swinging
+ * scene: any structured field over the strands looks like motion there. Only a
+ * scene where the right answer is zero can tell a correct previous position from
+ * a wrong one, which is how a stride mismatch between the three-float snapshot
+ * and a four-float read went unnoticed - it produced confident, entirely
+ * fictional vectors that the swinging capture happily accepted.
+ *
+ * WebGPU only: the solver is a compute pass.
+ */
+export const hairSimulationMotionRest: VisualScene = {
+  name: 'hair-simulation-motion-rest',
+  description: 'Motion vectors of a still groom beside a moving box: strands must report zero.',
+  supports: (backend) => backend === 'webgpu',
+  frames: 12,
+  setup(ctx) {
+    bareScene(ctx.scene);
+    keyLight(ctx.scene);
+    const node = new HairNode(ctx.scene);
+    node.segmentsPerStrand = 12;
+    node.minStrandWidth = 0;
+    node.strandWidthScale = 0.4;
+    node.setStrands(curtainStrands());
+    // Nothing may disturb the strands: no gravity, and the solver starts them at
+    // the pose every constraint is defined against, so each stage is a no-op.
+    node.gravity = new Vector3(0, 0, 0);
+    node.simulationEnabled = true;
+    // The reference. It moves, so its own vectors are large, and any strand
+    // colour has to be read against it rather than against an empty frame.
+    const box = new Mesh(
+      ctx.scene,
+      new BoxShape({ sizeX: 0.3, sizeY: 0.3, sizeZ: 0.3 }),
+      lambert(new Vector4(0.8, 0.8, 0.8, 1))
+    );
+    let frame = 0;
+    ctx.scene.on('update', () => {
+      frame++;
+      box.position.setXYZ(-1.4 + frame * 0.05, 0.5, 0);
+    });
+    ctx.camera.TAA = true;
+    ctx.camera.TAADebug = TAA_DEBUG_MOTION_VECTOR;
+    placeCamera(ctx.camera, new Vector3(0, 0.75, 3.1), new Vector3(0, 0.15, 0));
   }
 };

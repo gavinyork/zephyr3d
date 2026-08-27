@@ -262,6 +262,14 @@ export class GPUHairSimulation extends Disposable {
   private _prevPointBuffer: Nullable<GPUDataBuffer>;
   /** @internal Authored positions, the target the pose pull reaches for. */
   private _restPointBuffer: Nullable<GPUDataBuffer>;
+  /**
+   * @internal Local positions as of the previously rendered frame, which is what
+   * a motion vector needs. Distinct from the Verlet history: that is one substep
+   * old, sits in the current frame's local space, and has the length, contact and
+   * friction corrections folded into it to encode velocity, so it is not a
+   * position anything was ever drawn at.
+   */
+  private _framePointBuffer: Nullable<GPUDataBuffer>;
   /** @internal Authored distance between consecutive control points. */
   private _restLengthBuffer: Nullable<GPUDataBuffer>;
   /** @internal */
@@ -357,6 +365,7 @@ export class GPUHairSimulation extends Disposable {
     this._pointBuffer = null;
     this._prevPointBuffer = null;
     this._restPointBuffer = null;
+    this._framePointBuffer = null;
     this._restLengthBuffer = null;
     this._sphereBuffer = null;
     this._capsuleBuffer = null;
@@ -518,9 +527,13 @@ export class GPUHairSimulation extends Disposable {
   set colliders(value: readonly SpringCollider[]) {
     this._colliders = [...value];
   }
-  /** Previous-frame positions, for motion vectors. */
+  /** Verlet history. Not a previous-frame position - see the field remarks. */
   get prevPointBuffer() {
     return this._prevPointBuffer;
+  }
+  /** Local positions as of the previously rendered frame, for motion vectors. */
+  get framePointBuffer() {
+    return this._framePointBuffer;
   }
   /**
    * Discards accumulated motion and returns every strand to its rest pose.
@@ -570,6 +583,12 @@ export class GPUHairSimulation extends Disposable {
         return;
       }
     }
+    // Before anything moves: put aside the points the last frame was drawn with,
+    // which is what the material differences against to build a motion vector.
+    // Unconditional, and ahead of the early returns below - a frame that takes no
+    // step still has to advance the snapshot, or it would report the previous
+    // frame's motion a second time and smear rather than sharpen.
+    this._snapshotFramePoints();
     const frameDt = clamp(Number(deltaTime) || 0, 0, MAX_ACCUMULATED_SIMULATION_TIME);
     if (frameDt <= 0) {
       return;
@@ -696,6 +715,30 @@ export class GPUHairSimulation extends Disposable {
     }
     return rigid;
   }
+  /**
+   * Copies the live points into the frame snapshot the material differences
+   * against.
+   *
+   * @remarks
+   * A dispatch of its own rather than a stage of the solve, because it has to
+   * happen on every frame while the solve only happens on frames that take a
+   * step, and because it has to see the points before the first substep touches
+   * them.
+   * @internal
+   */
+  private _snapshotFramePoints() {
+    this._bindGroup!.setValue('strandCount', this._strandCount);
+    this._bindGroup!.setValue('snapshotFrame', 1);
+    this._device!.pushDeviceStates();
+    try {
+      this._device!.setProgram(this._program!);
+      this._device!.setBindGroup(0, this._bindGroup!);
+      this._device!.compute(this._workgroupCount, 1, 1);
+    } finally {
+      this._device!.popDeviceStates();
+    }
+    this._bindGroup!.setValue('snapshotFrame', 0);
+  }
   /** Copies the rest pose over the live points. @internal */
   private _resetLivePoints() {
     // Rest points are xyz only while the live buffer interleaves width, so this
@@ -773,6 +816,7 @@ export class GPUHairSimulation extends Disposable {
     this._pointBuffer = strands.pointBuffer;
     this._restPointBuffer = this._createStorage(restPoints);
     this._prevPointBuffer = this._createStorage(restPoints);
+    this._framePointBuffer = this._createStorage(restPoints);
     this._restLengthBuffer = this._createStorage(restLengths);
     this._sphereBuffer = this._createStorage(this._sphereData);
     this._capsuleBuffer = this._createStorage(this._capsuleData);
@@ -785,6 +829,7 @@ export class GPUHairSimulation extends Disposable {
     this._bindGroup = device.createBindGroup(this._program.bindGroupLayouts[0]);
     this._bindGroup.setBuffer('points', this._pointBuffer!);
     this._bindGroup.setBuffer('prevPoints', this._prevPointBuffer);
+    this._bindGroup.setBuffer('framePoints', this._framePointBuffer);
     this._bindGroup.setBuffer('restPoints', this._restPointBuffer);
     this._bindGroup.setBuffer('restLengths', this._restLengthBuffer);
     this._bindGroup.setBuffer('headers', strands.headerBuffer!);
@@ -798,6 +843,7 @@ export class GPUHairSimulation extends Disposable {
     this._bindGroup.setValue('capsuleCount', 0);
     this._bindGroup.setValue('planeCount', 0);
     this._bindGroup.setValue('minDistance', MIN_DISTANCE);
+    this._bindGroup.setValue('snapshotFrame', 0);
     this._bindGroup.setValue('maxSpeedFactor', this._maxSpeedFactor);
     this._bindGroup.setValue('globalStiffness', this._globalStiffness);
     this._bindGroup.setValue('globalRange', this._globalRange);
@@ -891,6 +937,8 @@ export class GPUHairSimulation extends Disposable {
     this._prevPointBuffer = null;
     this._restPointBuffer?.dispose();
     this._restPointBuffer = null;
+    this._framePointBuffer?.dispose();
+    this._framePointBuffer = null;
     this._restLengthBuffer?.dispose();
     this._restLengthBuffer = null;
     this._sphereBuffer?.dispose();
@@ -952,6 +1000,7 @@ export function createHairSimulationProgram(device: AbstractDevice, workgroupSiz
       // writes xyz and leaves w alone, which is why they share a buffer.
       this.points = pb.float[0]().storageBuffer(0);
       this.prevPoints = pb.float[0]().storageBuffer(0);
+      this.framePoints = pb.float[0]().storageBuffer(0);
       this.restPoints = pb.float[0]().storageBufferReadonly(0);
       this.restLengths = pb.float[0]().storageBufferReadonly(0);
       this.headers = pb.uint[0]().storageBufferReadonly(0);
@@ -976,6 +1025,7 @@ export function createHairSimulationProgram(device: AbstractDevice, workgroupSiz
       this.planeCount = pb.uint().uniform(0);
       this.minDistance = pb.float().uniform(0);
       this.resetPose = pb.uint().uniform(0);
+      this.snapshotFrame = pb.uint().uniform(0);
 
       // Pushes a point out of every collider. Position only; friction and
       // carrying the history along are the caller's job, since both need the
@@ -1099,6 +1149,13 @@ export function createHairSimulationProgram(device: AbstractDevice, workgroupSiz
         this.prevPoints.setAt(pb.add(this.base, 2), this.value.z);
         this.$return(pb.float(0));
       });
+      pb.func('Z_hairSetFramePoint', [pb.uint('index'), pb.vec3('value')], function () {
+        this.$l.base = pb.mul(this.index, 3);
+        this.framePoints.setAt(this.base, this.value.x);
+        this.framePoints.setAt(pb.add(this.base, 1), this.value.y);
+        this.framePoints.setAt(pb.add(this.base, 2), this.value.z);
+        this.$return(pb.float(0));
+      });
 
       // Rotates a vector by a quaternion.
       pb.func('Z_hairQuatRotate', [pb.vec4('q'), pb.vec3('v')], function () {
@@ -1149,178 +1206,194 @@ export function createHairSimulationProgram(device: AbstractDevice, workgroupSiz
           this.$l.firstPoint = this.headers.at(this.hbase);
           this.$l.pointCount = this.headers.at(pb.add(this.hbase, 1));
 
-          this.$if(pb.notEqual(this.resetPose, 0), function () {
-            // Rest into both buffers, so the strand is still as well as in place.
+          this.$if(pb.notEqual(this.snapshotFrame, 0), function () {
+            // Copy the points the last frame was drawn with aside, before this
+            // frame's substeps overwrite them. Run once per frame from update(),
+            // including on frames that take no step - skipping those would leave
+            // the snapshot a frame stale and report motion that already happened.
             this.$for(pb.uint('i'), 0, this.pointCount, function () {
               this.$l.idx = pb.add(this.firstPoint, this.i);
-              this.$l.rest = this.Z_hairGetRest(this.idx);
-              this.Z_hairSetPoint(this.idx, this.rest);
-              this.Z_hairSetHistory(this.idx, this.rest);
+              this.Z_hairSetFramePoint(this.idx, this.Z_hairGetPoint(this.idx));
             });
-          }).$else(function () {
-            // Two pinned points, not one: one fixes where a strand hangs from but
-            // leaves the direction it leaves the scalp in free, so the root end
-            // flops and can invert. The second gives every strand the root frame
-            // the local shape constraint is defined against. In local space
-            // "pinned" means unchanged - node motion rides the transform.
-            this.$l.rootRest = this.Z_hairGetRest(this.firstPoint);
-            this.Z_hairSetPoint(this.firstPoint, this.rootRest);
-            this.Z_hairSetHistory(this.firstPoint, this.rootRest);
-            this.$if(pb.greaterThan(this.pointCount, 1), function () {
-              this.$l.nextIdx = pb.add(this.firstPoint, 1);
-              this.$l.nextRest = this.Z_hairGetRest(this.nextIdx);
-              this.Z_hairSetPoint(this.nextIdx, this.nextRest);
-              this.Z_hairSetHistory(this.nextIdx, this.nextRest);
-            });
-
-            this.$l.dt2 = pb.mul(this.deltaTime, this.deltaTime);
-            this.$l.rangeLimit = pb.mul(this.globalRange, pb.float(this.pointCount));
-
-            // Stage 1 - integration, shock propagation, global shape constraint.
-            this.$for(pb.uint('i'), 2, this.pointCount, function () {
-              this.$l.idx = pb.add(this.firstPoint, this.i);
-              this.$l.current = this.Z_hairGetPoint(this.idx);
-              this.$l.previous = this.Z_hairGetHistory(this.idx);
-              // Both stored positions go through the node's frame-to-frame
-              // motion: transforming only one would read that motion as strand
-              // velocity and throw the hair ahead of the movement.
-              this.$l.lagged = pb.mul(this.relativeTransform, pb.vec4(this.current, 1)).xyz;
-              this.$l.laggedPrev = pb.mul(this.relativeTransform, pb.vec4(this.previous, 1)).xyz;
-              // Shock propagation. Leaving a point untransformed is exactly
-              // carrying it rigidly with the node, so the coefficient blends
-              // between the two ends TressFX interpolates: 0 lags fully, 1
-              // follows. It stops a fast root outrunning its strand in one step.
-              this.current = pb.mix(this.lagged, this.current, this.vspCoeff);
-              this.previous = pb.mix(this.laggedPrev, this.previous, this.vspCoeff);
-              this.$l.velocity = pb.mul(pb.sub(this.current, this.previous), this.dampingDecay);
-              this.$l.next = pb.add(this.current, this.velocity, pb.mul(this.gravity, this.dt2));
-              // Pull toward the authored pose, over the range's fraction of the
-              // strand. Off by default - anchoring a point to a fixed place is a
-              // spring, and the local shape constraint holds styling without it.
-              this.$if(
-                pb.and(
-                  pb.greaterThan(this.globalStiffness, 0),
-                  pb.lessThan(pb.float(this.i), this.rangeLimit)
-                ),
-                function () {
-                  this.$l.rest = this.Z_hairGetRest(this.idx);
-                  this.next = pb.add(this.next, pb.mul(pb.sub(this.rest, this.next), this.globalStiffness));
-                }
-              );
-              this.Z_hairSetHistory(this.idx, this.current);
-              this.Z_hairSetPoint(this.idx, this.next);
-            });
-
-            // Stage 2 - local shape constraint, what makes a groom read as hair
-            // rather than as a chain. It holds each segment's angle to the one
-            // before it in that segment's *current* frame, so a strand keeps its
-            // curl while free to hang and swing, and resists bending - which is
-            // also what stops a disturbance ringing for seconds. Stiffness is
-            // halved and capped below 1 as in TressFX, since the constraint
-            // moves both points it touches and would otherwise overshoot.
-            this.$l.localStrength = pb.mul(pb.min(this.localStiffness, 0.95), 0.5);
-            this.$if(pb.greaterThan(this.pointCount, 2), function () {
-              this.$for(pb.uint('iter'), 0, this.localIterations, function () {
-                this.$for(pb.uint('i'), 1, pb.sub(this.pointCount, 1), function () {
-                  this.$l.idx = pb.add(this.firstPoint, this.i);
-                  this.$l.pos = this.Z_hairGetPoint(this.idx);
-                  this.$l.posPlus = this.Z_hairGetPoint(pb.add(this.idx, 1));
-                  this.$l.posMinus = this.Z_hairGetPoint(pb.sub(this.idx, 1));
-                  this.$l.bind = this.Z_hairGetRest(this.idx);
-                  this.$l.bindPlus = this.Z_hairGetRest(pb.add(this.idx, 1));
-                  this.$l.bindMinus = this.Z_hairGetRest(pb.sub(this.idx, 1));
-                  // Where the next point sits if its bend still matches the bind
-                  // pose, carried into the previous segment's current direction.
-                  this.$l.lastVec = pb.sub(this.pos, this.posMinus);
-                  this.$l.bindVec = pb.sub(this.bindPlus, this.bind);
-                  this.$l.lastBindVec = pb.sub(this.bind, this.bindMinus);
-                  this.$l.rotation = this.Z_hairQuatFromUnitVectors(
-                    pb.normalize(this.lastBindVec),
-                    pb.normalize(this.lastVec)
-                  );
-                  this.$l.bendTarget = pb.add(this.Z_hairQuatRotate(this.rotation, this.bindVec), this.pos);
-                  this.$l.del = pb.mul(pb.sub(this.bendTarget, this.posPlus), this.localStrength);
-                  // Shared between both ends, unless one is a pinned root.
-                  this.$if(pb.greaterThan(this.i, 1), function () {
-                    this.Z_hairSetPoint(this.idx, pb.sub(this.pos, this.del));
-                  });
-                  this.Z_hairSetPoint(pb.add(this.idx, 1), pb.add(this.posPlus, this.del));
-                });
+          })
+            .$elseif(pb.notEqual(this.resetPose, 0), function () {
+              // Rest into all three, so the strand is still as well as in place
+              // and the frame it snaps on reports no motion of its own.
+              this.$for(pb.uint('i'), 0, this.pointCount, function () {
+                this.$l.idx = pb.add(this.firstPoint, this.i);
+                this.$l.rest = this.Z_hairGetRest(this.idx);
+                this.Z_hairSetPoint(this.idx, this.rest);
+                this.Z_hairSetHistory(this.idx, this.rest);
+                this.Z_hairSetFramePoint(this.idx, this.rest);
               });
-            });
-
-            // Stage 3 - length constraints, root to tip. Placing each point at
-            // its authored distance from an already-final parent leaves the
-            // strand inextensible in one pass.
-            //
-            // The one place the port leaves TressFX, which sweeps even and odd
-            // segments Jacobi-style because a thread there owns a single vertex
-            // and cannot walk a strand. Jacobi transports tension one segment
-            // per sweep, so a hanging strand stretches until the residual
-            // balances: 22% on a 24-point strand under earth gravity at its two
-            // sweeps, still 4.5% at sixteen. TressFX's own default gravity is
-            // zero, so it never sees this.
-            //
-            // Moving the child alone leaves that correction's momentum
-            // unaccounted for, and unaccounted it pumps the chain until the
-            // groom whips; handing it back to the parent is Mueller's FTL
-            // damping.
-            this.$if(pb.greaterThan(this.pointCount, 2), function () {
-              this.$for(pb.uint('j'), 1, pb.sub(this.pointCount, 1), function () {
-                this.$l.parentIdx = pb.add(this.firstPoint, this.j);
-                this.$l.childIdx = pb.add(this.parentIdx, 1);
-                this.$l.parent = this.Z_hairGetPoint(this.parentIdx);
-                this.$l.predicted = this.Z_hairGetPoint(this.childIdx);
-                // Rest lengths are indexed by the far end of a segment.
-                this.$l.restLength = this.restLengths.at(this.childIdx);
-                this.$l.offset = pb.sub(this.predicted, this.parent);
-                this.$l.dist = pb.length(this.offset);
-                // Coincident with the parent leaves the direction undefined; any
-                // offset of the right length will do.
-                this.$l.projected = pb.add(this.parent, pb.vec3(0, this.restLength, 0));
-                this.$if(pb.greaterThan(this.dist, this.minDistance), function () {
-                  this.projected = pb.add(
-                    this.parent,
-                    pb.mul(pb.div(this.offset, this.dist), this.restLength)
-                  );
-                });
-                this.Z_hairSetPoint(this.childIdx, this.projected);
-                // The parent takes the reverse momentum, unless it is pinned.
-                this.$if(pb.greaterThan(this.j, 1), function () {
-                  this.$l.correction = pb.sub(this.projected, this.predicted);
-                  this.Z_hairSetHistory(
-                    this.parentIdx,
-                    pb.add(this.Z_hairGetHistory(this.parentIdx), pb.mul(this.correction, this.ftlDamping))
-                  );
-                });
+            })
+            .$else(function () {
+              // Two pinned points, not one: one fixes where a strand hangs from but
+              // leaves the direction it leaves the scalp in free, so the root end
+              // flops and can invert. The second gives every strand the root frame
+              // the local shape constraint is defined against. In local space
+              // "pinned" means unchanged - node motion rides the transform.
+              this.$l.rootRest = this.Z_hairGetRest(this.firstPoint);
+              this.Z_hairSetPoint(this.firstPoint, this.rootRest);
+              this.Z_hairSetHistory(this.firstPoint, this.rootRest);
+              this.$if(pb.greaterThan(this.pointCount, 1), function () {
+                this.$l.nextIdx = pb.add(this.firstPoint, 1);
+                this.$l.nextRest = this.Z_hairGetRest(this.nextIdx);
+                this.Z_hairSetPoint(this.nextIdx, this.nextRest);
+                this.Z_hairSetHistory(this.nextIdx, this.nextRest);
               });
-            });
 
-            // Stage 4 - contacts, and the ceiling on this substep's travel.
-            this.$for(pb.uint('i'), 2, this.pointCount, function () {
-              this.$l.idx = pb.add(this.firstPoint, this.i);
-              this.$l.position = this.Z_hairGetPoint(this.idx);
-              this.$l.history = this.Z_hairGetHistory(this.idx);
-              this.$l.resolved = this.Z_hairResolveContacts(this.position);
-              // A push out is a position fix, not a shove: the history follows
-              // it so the point keeps the velocity it arrived with, and friction
-              // then takes its share of the tangential part.
-              this.$l.push = pb.sub(this.resolved, this.position);
-              this.$l.pushDist = pb.length(this.push);
-              this.history = pb.add(this.history, this.push);
-              this.$if(pb.greaterThan(this.pushDist, this.minDistance), function () {
-                this.$l.normalDir = pb.div(this.push, this.pushDist);
-                this.$l.contactVelocity = pb.sub(this.resolved, this.history);
-                this.$l.tangential = pb.sub(
-                  this.contactVelocity,
-                  pb.mul(this.normalDir, pb.dot(this.contactVelocity, this.normalDir))
+              this.$l.dt2 = pb.mul(this.deltaTime, this.deltaTime);
+              this.$l.rangeLimit = pb.mul(this.globalRange, pb.float(this.pointCount));
+
+              // Stage 1 - integration, shock propagation, global shape constraint.
+              this.$for(pb.uint('i'), 2, this.pointCount, function () {
+                this.$l.idx = pb.add(this.firstPoint, this.i);
+                this.$l.current = this.Z_hairGetPoint(this.idx);
+                this.$l.previous = this.Z_hairGetHistory(this.idx);
+                // Both stored positions go through the node's frame-to-frame
+                // motion: transforming only one would read that motion as strand
+                // velocity and throw the hair ahead of the movement.
+                this.$l.lagged = pb.mul(this.relativeTransform, pb.vec4(this.current, 1)).xyz;
+                this.$l.laggedPrev = pb.mul(this.relativeTransform, pb.vec4(this.previous, 1)).xyz;
+                // Shock propagation. Leaving a point untransformed is exactly
+                // carrying it rigidly with the node, so the coefficient blends
+                // between the two ends TressFX interpolates: 0 lags fully, 1
+                // follows. It stops a fast root outrunning its strand in one step.
+                this.current = pb.mix(this.lagged, this.current, this.vspCoeff);
+                this.previous = pb.mix(this.laggedPrev, this.previous, this.vspCoeff);
+                this.$l.velocity = pb.mul(pb.sub(this.current, this.previous), this.dampingDecay);
+                this.$l.next = pb.add(this.current, this.velocity, pb.mul(this.gravity, this.dt2));
+                // Pull toward the authored pose, over the range's fraction of the
+                // strand. Off by default - anchoring a point to a fixed place is a
+                // spring, and the local shape constraint holds styling without it.
+                this.$if(
+                  pb.and(
+                    pb.greaterThan(this.globalStiffness, 0),
+                    pb.lessThan(pb.float(this.i), this.rangeLimit)
+                  ),
+                  function () {
+                    this.$l.rest = this.Z_hairGetRest(this.idx);
+                    this.next = pb.add(this.next, pb.mul(pb.sub(this.rest, this.next), this.globalStiffness));
+                  }
                 );
-                this.history = pb.add(this.history, pb.mul(this.tangential, this.friction));
+                this.Z_hairSetHistory(this.idx, this.current);
+                this.Z_hairSetPoint(this.idx, this.next);
               });
-              this.Z_hairSetHistory(this.idx, this.Z_hairClampHistory(this.idx, this.resolved, this.history));
-              this.Z_hairSetPoint(this.idx, this.resolved);
+
+              // Stage 2 - local shape constraint, what makes a groom read as hair
+              // rather than as a chain. It holds each segment's angle to the one
+              // before it in that segment's *current* frame, so a strand keeps its
+              // curl while free to hang and swing, and resists bending - which is
+              // also what stops a disturbance ringing for seconds. Stiffness is
+              // halved and capped below 1 as in TressFX, since the constraint
+              // moves both points it touches and would otherwise overshoot.
+              this.$l.localStrength = pb.mul(pb.min(this.localStiffness, 0.95), 0.5);
+              this.$if(pb.greaterThan(this.pointCount, 2), function () {
+                this.$for(pb.uint('iter'), 0, this.localIterations, function () {
+                  this.$for(pb.uint('i'), 1, pb.sub(this.pointCount, 1), function () {
+                    this.$l.idx = pb.add(this.firstPoint, this.i);
+                    this.$l.pos = this.Z_hairGetPoint(this.idx);
+                    this.$l.posPlus = this.Z_hairGetPoint(pb.add(this.idx, 1));
+                    this.$l.posMinus = this.Z_hairGetPoint(pb.sub(this.idx, 1));
+                    this.$l.bind = this.Z_hairGetRest(this.idx);
+                    this.$l.bindPlus = this.Z_hairGetRest(pb.add(this.idx, 1));
+                    this.$l.bindMinus = this.Z_hairGetRest(pb.sub(this.idx, 1));
+                    // Where the next point sits if its bend still matches the bind
+                    // pose, carried into the previous segment's current direction.
+                    this.$l.lastVec = pb.sub(this.pos, this.posMinus);
+                    this.$l.bindVec = pb.sub(this.bindPlus, this.bind);
+                    this.$l.lastBindVec = pb.sub(this.bind, this.bindMinus);
+                    this.$l.rotation = this.Z_hairQuatFromUnitVectors(
+                      pb.normalize(this.lastBindVec),
+                      pb.normalize(this.lastVec)
+                    );
+                    this.$l.bendTarget = pb.add(this.Z_hairQuatRotate(this.rotation, this.bindVec), this.pos);
+                    this.$l.del = pb.mul(pb.sub(this.bendTarget, this.posPlus), this.localStrength);
+                    // Shared between both ends, unless one is a pinned root.
+                    this.$if(pb.greaterThan(this.i, 1), function () {
+                      this.Z_hairSetPoint(this.idx, pb.sub(this.pos, this.del));
+                    });
+                    this.Z_hairSetPoint(pb.add(this.idx, 1), pb.add(this.posPlus, this.del));
+                  });
+                });
+              });
+
+              // Stage 3 - length constraints, root to tip. Placing each point at
+              // its authored distance from an already-final parent leaves the
+              // strand inextensible in one pass.
+              //
+              // The one place the port leaves TressFX, which sweeps even and odd
+              // segments Jacobi-style because a thread there owns a single vertex
+              // and cannot walk a strand. Jacobi transports tension one segment
+              // per sweep, so a hanging strand stretches until the residual
+              // balances: 22% on a 24-point strand under earth gravity at its two
+              // sweeps, still 4.5% at sixteen. TressFX's own default gravity is
+              // zero, so it never sees this.
+              //
+              // Moving the child alone leaves that correction's momentum
+              // unaccounted for, and unaccounted it pumps the chain until the
+              // groom whips; handing it back to the parent is Mueller's FTL
+              // damping.
+              this.$if(pb.greaterThan(this.pointCount, 2), function () {
+                this.$for(pb.uint('j'), 1, pb.sub(this.pointCount, 1), function () {
+                  this.$l.parentIdx = pb.add(this.firstPoint, this.j);
+                  this.$l.childIdx = pb.add(this.parentIdx, 1);
+                  this.$l.parent = this.Z_hairGetPoint(this.parentIdx);
+                  this.$l.predicted = this.Z_hairGetPoint(this.childIdx);
+                  // Rest lengths are indexed by the far end of a segment.
+                  this.$l.restLength = this.restLengths.at(this.childIdx);
+                  this.$l.offset = pb.sub(this.predicted, this.parent);
+                  this.$l.dist = pb.length(this.offset);
+                  // Coincident with the parent leaves the direction undefined; any
+                  // offset of the right length will do.
+                  this.$l.projected = pb.add(this.parent, pb.vec3(0, this.restLength, 0));
+                  this.$if(pb.greaterThan(this.dist, this.minDistance), function () {
+                    this.projected = pb.add(
+                      this.parent,
+                      pb.mul(pb.div(this.offset, this.dist), this.restLength)
+                    );
+                  });
+                  this.Z_hairSetPoint(this.childIdx, this.projected);
+                  // The parent takes the reverse momentum, unless it is pinned.
+                  this.$if(pb.greaterThan(this.j, 1), function () {
+                    this.$l.correction = pb.sub(this.projected, this.predicted);
+                    this.Z_hairSetHistory(
+                      this.parentIdx,
+                      pb.add(this.Z_hairGetHistory(this.parentIdx), pb.mul(this.correction, this.ftlDamping))
+                    );
+                  });
+                });
+              });
+
+              // Stage 4 - contacts, and the ceiling on this substep's travel.
+              this.$for(pb.uint('i'), 2, this.pointCount, function () {
+                this.$l.idx = pb.add(this.firstPoint, this.i);
+                this.$l.position = this.Z_hairGetPoint(this.idx);
+                this.$l.history = this.Z_hairGetHistory(this.idx);
+                this.$l.resolved = this.Z_hairResolveContacts(this.position);
+                // A push out is a position fix, not a shove: the history follows
+                // it so the point keeps the velocity it arrived with, and friction
+                // then takes its share of the tangential part.
+                this.$l.push = pb.sub(this.resolved, this.position);
+                this.$l.pushDist = pb.length(this.push);
+                this.history = pb.add(this.history, this.push);
+                this.$if(pb.greaterThan(this.pushDist, this.minDistance), function () {
+                  this.$l.normalDir = pb.div(this.push, this.pushDist);
+                  this.$l.contactVelocity = pb.sub(this.resolved, this.history);
+                  this.$l.tangential = pb.sub(
+                    this.contactVelocity,
+                    pb.mul(this.normalDir, pb.dot(this.contactVelocity, this.normalDir))
+                  );
+                  this.history = pb.add(this.history, pb.mul(this.tangential, this.friction));
+                });
+                this.Z_hairSetHistory(
+                  this.idx,
+                  this.Z_hairClampHistory(this.idx, this.resolved, this.history)
+                );
+                this.Z_hairSetPoint(this.idx, this.resolved);
+              });
             });
-          });
         });
       });
     }

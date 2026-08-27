@@ -37,6 +37,8 @@ import {
   hairSimulation,
   hairSimulationMotion,
   hairSimulationJitter,
+  hairSimulationMotionVectors,
+  hairSimulationMotionRest,
   hairShadowReceive,
   hairShadowDomDeep,
   hairStrandsHelix,
@@ -96,6 +98,8 @@ export const SCENES: VisualScene[] = [
   hairSimulation,
   hairSimulationMotion,
   hairSimulationJitter,
+  hairSimulationMotionVectors,
+  hairSimulationMotionRest,
   hairShadowReceive,
   hairShadowDomDeep,
   // Hair self-shadowing: the deep opacity map and its depth-based control.
