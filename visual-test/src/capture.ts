@@ -81,6 +81,22 @@ export class SceneCapturer {
         }
       });
 
+      // Rewind the clock as well as the counter, and in that order: the two
+      // together are what make a scene's capture independent of how many ran
+      // before it.
+      //
+      // setFixedFrameTime seeds its synthetic clock from frameTimestamp so that
+      // enabling it mid-run stays continuous, and beginFrame treats a zero
+      // frameTimestamp as "first frame ever" and reports an elapsed of 0. Leave
+      // frameTimestamp alone and the two behaviours combine into an order
+      // dependence: the first scene in the process takes that zero-length first
+      // frame, every later scene inherits a running clock and takes a full one.
+      // Anything integrating over delta time - the hair solver, most obviously -
+      // then advances one step further in every scene but the first, and its
+      // baseline only matches in the position it was recorded in.
+      device.frameInfo.frameTimestamp = 0;
+      device.frameInfo.elapsedFrame = 0;
+      device.frameInfo.elapsedOverall = 0;
       device.setFixedFrameTime(FIXED_DT_MS);
       // Rewind the frame counter, so every scene is captured from frame 0.
       //

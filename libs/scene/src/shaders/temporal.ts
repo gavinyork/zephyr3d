@@ -1,20 +1,29 @@
 import type { PBInsideFunctionScope, PBShaderExp } from '@zephyr3d/device';
 
-/** @internal */
+/**
+ * Views {@link Camera.TAADebug} selects between, in place of the resolved image.
+ *
+ * @remarks
+ * Public because the property they name is: a setter taking a bare number whose
+ * legal values cannot be spelled is not usable from outside the package, and the
+ * editor already surfaces them as an enum.
+ *
+ * @public
+ */
 export const TAA_DEBUG_NONE = 0;
-/** @internal */
+/** {@inheritDoc TAA_DEBUG_NONE} @public */
 export const TAA_DEBUG_CURRENT_COLOR = 1;
-/** @internal */
+/** {@inheritDoc TAA_DEBUG_NONE} @public */
 export const TAA_DEBUG_HISTORY_COLOR = 2;
-/** @internal */
+/** {@inheritDoc TAA_DEBUG_NONE} @public */
 export const TAA_DEBUG_VELOCITY = 3;
-/** @internal */
+/** {@inheritDoc TAA_DEBUG_NONE} @public */
 export const TAA_DEBUG_EDGE = 4;
-/** @internal */
+/** {@inheritDoc TAA_DEBUG_NONE} @public */
 export const TAA_DEBUG_ALAPH = 5;
-/** @internal */
+/** {@inheritDoc TAA_DEBUG_NONE} @public */
 export const TAA_DEBUG_MOTION_VECTOR = 6;
-/** @internal */
+/** {@inheritDoc TAA_DEBUG_NONE} @public */
 export const TAA_DEBUG_STRENGTH = 7;
 
 const FLT_MIN = 0.00000001;

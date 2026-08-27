@@ -50,7 +50,11 @@ function makeStrandSet(name: string, strandCount: number, pointsPerStrand: numbe
 describe('zhair container', () => {
   test('round-trips a strand set value for value', () => {
     const set = makeStrandSet('Curves0', 5, 4);
-    const buffer = encodeZHair([set], { unitScale: 0.01, sourceFormat: 'alembic', sourcePath: '/a/hair.abc' });
+    const buffer = encodeZHair([set], {
+      unitScale: 0.01,
+      sourceFormat: 'alembic',
+      sourcePath: '/a/hair.abc'
+    });
 
     expect(isZHair(buffer)).toBe(true);
     const parsed = parseZHair(buffer);

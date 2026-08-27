@@ -575,6 +575,23 @@ export class HairNode extends applyMixins(GraphNode, mixinDrawable) implements D
   set alphaDither(value: boolean) {
     this.material.alphaDither = value;
   }
+  /**
+   * Whether a blended groom contributes motion vectors.
+   *
+   * @remarks
+   * Only meaningful with {@link HairNode.blendMode} set to something other than
+   * `none`. Blended geometry is otherwise absent from the prepass, so a groom
+   * carries the velocity of whatever is behind it and a temporal filter smears
+   * it as it swings - the same ghosting the dithered path avoids by being
+   * opaque. On by default, because a groom is dense enough to own its pixels
+   * and there is no reason to want the ghosting.
+   */
+  get transparentMotionVector() {
+    return this.material.transparentMotionVector;
+  }
+  set transparentMotionVector(value: boolean) {
+    this.material.transparentMotionVector = value;
+  }
   /** Whether the groom is drawn into shadow maps. */
   get castShadow() {
     return this._castShadow;

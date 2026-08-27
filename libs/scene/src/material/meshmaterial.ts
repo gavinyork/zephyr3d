@@ -80,6 +80,7 @@ let FEATURE_CULLMODE = 0;
 let FEATURE_ALPHATOCOVERAGE = 0;
 let FEATURE_ALPHADITHER = 0;
 let FEATURE_DISABLE_TAA = 0;
+let FEATURE_TRANSPARENT_MOTION_VECTOR = 0;
 
 /**
  * Instance uniform data type
@@ -564,6 +565,26 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
     this.useFeature(FEATURE_DISABLE_TAA, !!val);
   }
   /**
+   * Whether a blended material contributes motion vectors.
+   *
+   * @remarks
+   * Off by default, and only meaningful with `blendMode !== 'none'`: blended
+   * geometry is normally absent from the prepass, so it writes no velocity and a
+   * temporal filter reprojects it with whatever is behind it. Turning this on
+   * adds it to a motion-vector-only pass over the transparent queue.
+   *
+   * Right for geometry that is dense enough to own its pixels - hair, foliage
+   * cards - where one velocity per pixel is a fair summary. Wrong for genuinely
+   * see-through surfaces such as glass, where the background's own velocity is
+   * the one that should survive, which is why this is opt-in.
+   */
+  get transparentMotionVector() {
+    return !!this.featureUsed(FEATURE_TRANSPARENT_MOTION_VECTOR);
+  }
+  set transparentMotionVector(val) {
+    this.useFeature(FEATURE_TRANSPARENT_MOTION_VECTOR, !!val);
+  }
+  /**
    * TAA strength in [0, 1].
    * - Higher values generally imply stronger accumulation.
    * - The value is mapped when writing motion-vector outputs during depth pass.
@@ -691,7 +712,23 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
     ) {
       return 'none';
     }
+    // The prepass records depth and velocity, neither of which is a quantity
+    // that blends. Blended geometry only reaches it through the motion vector
+    // pass, and there the nearest fragment should replace what is under it
+    // rather than tint it.
+    if (ctx && ctx.renderPass?.type === RENDER_PASS_TYPE_DEPTH) {
+      return 'none';
+    }
     return this.featureUsed<BlendMode>(FEATURE_ALPHABLEND);
+  }
+  /**
+   * Whether this draw is the motion-vector-only pass over the transparent queue.
+   * @internal
+   */
+  protected isMotionVectorOnlyPass(ctx: DrawContext) {
+    return (
+      ctx.renderPass?.type === RENDER_PASS_TYPE_DEPTH && !!(ctx.renderPass as DepthPass).motionVectorOnly
+    );
   }
   /**
    * Returns the alpha cutoff that should be used for the current pass.
@@ -752,6 +789,22 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
       ctx.queue === QUEUE_OPAQUE &&
       !!ctx.depthPrepassAttachment &&
       !ctx.sceneColorTexture;
+    if (this.isMotionVectorOnlyPass(ctx)) {
+      // Tested against the opaque depth, so anything behind the scene is
+      // rejected, but never written: the prepass depth is what the light pass
+      // and every screen-space effect read, and blended geometry does not
+      // belong in it.
+      stateSet.defaultBlendingState();
+      stateSet.useDepthState().enableTest(true).enableWrite(false);
+      if (ctx.forceCullMode || this._cullMode !== 'back') {
+        stateSet.useRasterizerState().cullMode = ctx.forceCullMode || this._cullMode;
+      } else {
+        stateSet.defaultRasterizerState();
+      }
+      stateSet.defaultColorState();
+      stateSet.defaultStencilState();
+      return;
+    }
     if (blending || a2c) {
       const blendingState = stateSet.useBlendingState();
       if (blending) {
@@ -1018,6 +1071,12 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
       fragment(pb) {
         if (that.drawContext.oit) {
           that.drawContext.oit.setupFragmentOutput(this);
+        } else if (that.isMotionVectorOnlyPass(ctx)) {
+          // One attachment, so the motion vector has to be the first output
+          // declared rather than the second - the framebuffer this pass runs
+          // against carries no linear depth target to write.
+          this.$outputs.zMotionVector = pb.vec4();
+          this.zTAAStrength = pb.float().uniform(2);
         } else {
           this.$outputs.zFragmentOutput = pb.vec4();
           if (ctx.materialFlags & MaterialVaryingFlags.SCENE_STORE_ROUGHNESS) {
@@ -1229,13 +1288,22 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
           }
         }
         const depthPass = that.drawContext.renderPass! as DepthPass;
-        this.$l.depth = ShaderHelper.nonLinearDepthToLinearNormalized(this, this.$builtins.fragCoord.z);
-        if (depthPass.encodeDepth) {
-          this.$outputs.zFragmentOutput = encodeNormalizedFloatToRGBA(this, this.depth);
-        } else if (depthPass.renderBackface) {
-          this.$outputs.zFragmentOutput = pb.vec4(0, this.depth, 0, 1);
+        if (depthPass.motionVectorOnly) {
+          // The whole transparent queue is submitted to this pass; a material
+          // that has not opted in leaves the velocity underneath it alone,
+          // which for a see-through surface is the right answer.
+          if (!that.featureUsed(FEATURE_TRANSPARENT_MOTION_VECTOR)) {
+            pb.discard();
+          }
         } else {
-          this.$outputs.zFragmentOutput = pb.vec4(this.depth, 0, 0, 1);
+          this.$l.depth = ShaderHelper.nonLinearDepthToLinearNormalized(this, this.$builtins.fragCoord.z);
+          if (depthPass.encodeDepth) {
+            this.$outputs.zFragmentOutput = encodeNormalizedFloatToRGBA(this, this.depth);
+          } else if (depthPass.renderBackface) {
+            this.$outputs.zFragmentOutput = pb.vec4(0, this.depth, 0, 1);
+          } else {
+            this.$outputs.zFragmentOutput = pb.vec4(this.depth, 0, 0, 1);
+          }
         }
         if (that.drawContext.motionVectors) {
           if (that.featureUsed(FEATURE_DISABLE_TAA)) {
@@ -1374,3 +1442,4 @@ FEATURE_CULLMODE = MeshMaterial.defineFeature();
 FEATURE_ALPHATOCOVERAGE = MeshMaterial.defineFeature();
 FEATURE_ALPHADITHER = MeshMaterial.defineFeature();
 FEATURE_DISABLE_TAA = MeshMaterial.defineFeature();
+FEATURE_TRANSPARENT_MOTION_VECTOR = MeshMaterial.defineFeature();

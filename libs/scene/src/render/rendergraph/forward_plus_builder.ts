@@ -686,6 +686,11 @@ const DepthPrepassModule: RenderModule<FrameGraphContext> = {
         builder.addSubpass('SkyMotionVectors', (rgCtx) => {
           renderSkyMotionVectors(ctx, rgCtx, skyMotionVectorFramebufferHandle);
         });
+        // After the sky, which writes at the far plane: a blended surface in
+        // front of empty background has to replace what the sky put there.
+        builder.addSubpass('TransparentMotionVectors', (rgCtx) => {
+          renderTransparentMotionVectors(frame, rgCtx, skyMotionVectorFramebufferHandle);
+        });
       }
 
       return {
@@ -1876,6 +1881,52 @@ let _skyMVBindGroup: Nullable<BindGroup> = null;
 let _skyMVBox: Nullable<Primitive> = null;
 
 /** @internal */
+/**
+ * Fills in motion vectors for blended geometry that opted into them.
+ *
+ * @remarks
+ * The transparent queue never reaches the ordinary prepass, so without this a
+ * blended surface carries whatever velocity belongs to what is behind it. The
+ * framebuffer here holds the motion vector attachment alone, so nothing touches
+ * the linear depth the light pass and the screen-space effects read, and the
+ * materials run with depth test on and depth write off, so the scene depth is
+ * left as the opaque pass built it.
+ *
+ * Materials that have not opted in discard, which leaves the velocity beneath
+ * them intact. See {@link MeshMaterial.transparentMotionVector} for why that is
+ * the right default and where the approximation breaks.
+ * @internal
+ */
+function renderTransparentMotionVectors(
+  frame: FrameState,
+  rgCtx: RGExecuteContext,
+  framebufferHandle: RGHandle
+): void {
+  const ctx = frame.ctx;
+  const renderQueue = frame.renderQueue;
+  if (!ctx.motionVectors || !renderQueue.itemList?.transparent) {
+    return;
+  }
+  const device = ctx.device;
+  device.pushDeviceStates();
+  try {
+    device.setFramebuffer(rgCtx.getFramebuffer<FrameBuffer>(framebufferHandle));
+    _depthPass.motionVectorOnly = true;
+    _depthPass.encodeDepth = false;
+    _depthPass.transmission = false;
+    _depthPass.renderBackface = false;
+    // Nothing is cleared: this pass only replaces the pixels its own geometry
+    // covers, and everything else in the target is already correct.
+    _depthPass.clearColor = null;
+    _depthPass.clearDepth = null;
+    _depthPass.clearStencil = null;
+    _depthPass.render(ctx, null, null, renderQueue);
+  } finally {
+    _depthPass.motionVectorOnly = false;
+    device.popDeviceStates();
+  }
+}
+
 function renderSkyMotionVectors(
   ctx: DrawContext,
   rgCtx: RGExecuteContext,

@@ -1,7 +1,4 @@
-import {
-  convertCurvesToZHair,
-  detectCurveFormat
-} from '../../../libs/loaders/src/curves/zhair_convert';
+import { convertCurvesToZHair, detectCurveFormat } from '../../../libs/loaders/src/curves/zhair_convert';
 import {
   parseZHair,
   readZHairFloats,

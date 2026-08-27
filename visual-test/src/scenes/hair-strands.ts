@@ -992,3 +992,56 @@ export const hairSimulationMotionRest: VisualScene = {
     placeCamera(ctx.camera, new Vector3(0, 0.75, 3.1), new Vector3(0, 0.15, 0));
   }
 };
+
+/**
+ * Motion vectors of a blended groom, which the prepass does not see.
+ *
+ * @remarks
+ * The alpha-dithered path is opaque, so it reaches the depth prepass and writes
+ * velocity like anything else. Alpha blending does not: the transparent queue
+ * skips that pass entirely, so a blended groom used to carry the velocity of
+ * whatever was behind it - zero, against a still background - and TAA smeared it
+ * across the swing. Covering that is what the motion-vector-only pass over the
+ * transparent queue exists for.
+ *
+ * Same drive and same view as {@link hairSimulationMotionVectors}, so the two
+ * captures are meant to be read side by side: blending changes which strands
+ * survive into the buffer, not whether the field is there at all. A regression
+ * reads as the groom going black while the dithered scene stays lit.
+ *
+ * WebGPU only: the solver is a compute pass.
+ */
+export const hairSimulationMotionBlended: VisualScene = {
+  name: 'hair-simulation-motion-blended',
+  description: 'Motion vectors of an alpha-blended swinging groom: pins the transparent-queue pass.',
+  supports: (backend) => backend === 'webgpu',
+  frames: 24,
+  setup(ctx) {
+    bareScene(ctx.scene);
+    keyLight(ctx.scene);
+    const node = new HairNode(ctx.scene);
+    node.segmentsPerStrand = 12;
+    node.minStrandWidth = 0;
+    node.strandWidthScale = 0.4;
+    node.setStrands(curtainStrands());
+    // The quality path: blended rather than dithered, which is what puts the
+    // groom in the transparent queue and out of the prepass.
+    node.blendMode = 'blend';
+    node.alphaDither = false;
+    node.minPixelWidth = 1.3;
+    node.globalStiffness = 0;
+    node.damping = 0.02;
+    node.localStiffness = 0.9;
+    node.vspCoeff = 0;
+    node.gravity = new Vector3(0, -9.8, 0);
+    node.simulationEnabled = true;
+    let frame = 0;
+    ctx.scene.on('update', () => {
+      frame++;
+      node.rotation.set(Quaternion.fromAxisAngle(Vector3.axisPZ(), frame < 2 ? 0.9 : 0));
+    });
+    ctx.camera.TAA = true;
+    ctx.camera.TAADebug = TAA_DEBUG_MOTION_VECTOR;
+    placeCamera(ctx.camera, new Vector3(0, 0.75, 3.1), new Vector3(0, 0.15, 0));
+  }
+};

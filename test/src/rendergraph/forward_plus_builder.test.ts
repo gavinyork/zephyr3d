@@ -486,7 +486,16 @@ describe('Forward+ render graph builder', () => {
     const { graph } = buildForwardPlusGraphForTest(createOptions({ motionVectors: true }));
     const depthPass = graph.passes.find((pass) => pass.name === 'DepthPrepass');
 
-    expect(depthPass?.subpasses.map((subpass) => subpass.name)).toEqual(['SceneDepth', 'SkyMotionVectors']);
+    // The order is the point, not just the membership. The sky writes at the far
+    // plane across everything the opaque pass left empty, so a blended surface
+    // in front of background has to come after it to replace what it wrote -
+    // reversed, the sky would erase the velocity of every blended pixel that has
+    // nothing opaque behind it.
+    expect(depthPass?.subpasses.map((subpass) => subpass.name)).toEqual([
+      'SceneDepth',
+      'SkyMotionVectors',
+      'TransparentMotionVectors'
+    ]);
   });
 
   test('keeps GPUPicking side-effect pass before DepthPrepass when enabled', () => {

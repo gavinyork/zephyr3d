@@ -116,6 +116,7 @@ const SCENE_NAMES = [
   'hair-simulation-jitter',
   'hair-simulation-motion-vectors',
   'hair-simulation-motion-rest',
+  'hair-simulation-motion-blended',
   'hair-shadow-receive',
   'hair-shadow-dom-deep',
   'hair-shadow-pcf',
