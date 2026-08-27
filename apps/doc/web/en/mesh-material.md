@@ -18,67 +18,34 @@ The system provides several predefined geometric primitives such as a box, spher
 The following example creates a sphere mesh and assigns it a Lambert material.  
 A directional light is added to illuminate the object (lighting will be discussed in later sections).
 
-```javascript
-import { Vector3, Vector4 } from '@zephyr3d/base';
-import {
-  Scene,
-  Application,
-  LambertMaterial,
-  Mesh,
-  OrbitCameraController,
-  PerspectiveCamera,
-  SphereShape,
-  DirectionalLight
-} from '@zephyr3d/scene';
+<<< @/../src/tut-5/main.js{js}
 
-// ... ...
+The three essential steps are on lines 28–31: create a `LambertMaterial`, set its `albedoColor`,
+and hand the primitive and material to `new Mesh(scene, primitive, material)`.
 
-// Add a directional light to illuminate the mesh
-const light = new DirectionalLight(scene);
-light.lookAt(Vector3.one(), Vector3.zero(), Vector3.axisPY());
-
-// Create a red Lambert material
-const material = new LambertMaterial();
-material.albedoColor = new Vector4(1, 0, 0, 1);
-
-// Create a sphere mesh and assign the material
-const sphere = new Mesh(scene, new SphereShape(), material);
-
-// Create the main camera
-// The mesh is located at world origin by default, so we place the camera at (0, 0, 4) looking toward the origin
-scene.mainCamera = new PerspectiveCamera(scene, Math.PI / 3, 1, 100);
-scene.mainCamera.lookAt(new Vector3(0, 0, 4), Vector3.zero(), new Vector3(0, 1, 0));
-// Orbit controller with center at world origin
-scene.mainCamera.controller = new OrbitCameraController({ center: Vector3.zero() });
-```
+A new mesh sits at the world origin by default, which is why line 35 puts the camera at `(0, 0, 4)`
+looking at the origin. `lookAt(eye, target, up)` is defined on `SceneNode`, so cameras and ordinary
+nodes both have it — line 25 uses the same method to orient the directional light.
 
 <div class="showcase" case="tut-5"></div>
 
 Next, we'll assign a PBR material to the sphere and add texture maps.
 
-We use [`ResourceManager`](/doc/markdown/./scene.resourcemanager)'s  
-[`fetchTexture()`](/doc/markdown/./scene.resourcemanager.fetchtexture)  
-method to load textures by URL.  
-Loading results are cached — if a texture was already loaded, it will not be fetched again.
+Textures are loaded with
+[`ResourceManager.fetchTexture()`](/doc/markdown/./scene.resourcemanager.fetchtexture), which takes
+a URL plus an optional [options object](/doc/markdown/./scene.texturefetchoptions) and returns a
+promise. Results are cached — requesting the same path again will not re-fetch it.
 
-```javascript
-// Create a PBR material
-const material = new PBRMetallicRoughnessMaterial();
-material.metallic = 0.9;
-material.roughness = 0.6;
+<<< @/../src/tut-6/main.js{27-47 js}
 
-// Add an albedo (diffuse) texture
-getEngine().resourceManager.fetchTexture('https://cdn.zephyr3d.org/doc/assets/images/earthcolor.jpg').then(texture => {
-  material.albedoTexture = texture;
-});
+`PBRMetallicRoughnessMaterial` describes a surface with the metallic/roughness workflow: higher
+`metallic` looks more like metal, higher `roughness` spreads the highlight out.
 
-// Add a normal map texture
-getEngine().resourceManager.fetchTexture('https://cdn.zephyr3d.org/doc/assets/images/earthnormal.png', {
-  linearColorSpace: true
-}).then(texture => {
-  material.normalTexture = texture;
-});
-```
+**Note that the normal map on lines 40–42 passes `linearColorSpace: true` while the color map does
+not.** This is not a stylistic choice: a color map stores sRGB-encoded color and must be converted
+to linear space for lighting, whereas normal maps, metallic-roughness maps, masks and height maps
+store **data** rather than color, and applying an sRGB conversion to them gives wrong results.
+Forgetting this option usually shows up as incorrect bump direction and strength.
 
 <div class="showcase" case="tut-6"></div>
 
@@ -86,47 +53,19 @@ getEngine().resourceManager.fetchTexture('https://cdn.zephyr3d.org/doc/assets/im
 
 ## Loading Existing Materials
 
-When using the editor workflow, you can create custom materials within the editor,  
-then load them at runtime using  
+When using the editor workflow, you can create custom materials in the editor (`.zmtl`) and load
+them at runtime with
 [`ResourceManager.fetchMaterial()`](/doc/markdown/./scene.resourcemanager.fetchmaterial).
 
-```javascript
-const myApp = new Application({
-  backend: backendWebGL2,
-  canvas: document.querySelector('#my-canvas'),
-  runtimeOptions: {
-    // When using the editor workflow, the asset path must be correctly configured
-    VFS: new HttpFS('https://cdn.zephyr3d.org/doc/tut-50')
-  }
-});
+<<< @/../src/tut-50/main.js{js}
 
-myApp.ready().then(function () {
-  // Create scene and main light
-  const scene = new Scene();
-  const light = new DirectionalLight(scene);
-  light.lookAt(Vector3.one(), Vector3.zero(), Vector3.axisPY());
+Compared with the earlier examples, this one adds `runtimeOptions.VFS` on lines 18–21. **Loading
+editor-produced assets requires a configured VFS**, because the path in
+`fetchMaterial('/assets/earth.zmtl')` is a VFS path rather than a URL — here `HttpFS` maps it onto
+an HTTP root. Other VFS implementations (in-memory, IndexedDB) are covered in
+[Virtual File System](en/vfs.md).
 
-  // Load material and create the mesh
-  getEngine()
-    .resourceManager.fetchMaterial('/assets/earth.zmtl')
-    .then((material) => {
-      new Mesh(scene, new SphereShape(), material);
-    });
-
-  // Create the main camera
-  scene.mainCamera = new PerspectiveCamera(scene, Math.PI / 3, 1, 100);
-  scene.mainCamera.lookAt(new Vector3(0, 0, 4), Vector3.zero(), new Vector3(0, 1, 0));
-  scene.mainCamera.controller = new OrbitCameraController();
-
-  // Enable interactive camera controls
-  getInput().use(scene.mainCamera.handleEvent, scene.mainCamera);
-
-  // Register the scene as render layer 0
-  getEngine().setRenderable(scene, 0);
-
-  myApp.run();
-});
-```
+Note that the material loads asynchronously, so `new Mesh(...)` happens inside `then()` (line 34).
 
 <div class="showcase" case="tut-50"></div>
 
@@ -139,35 +78,18 @@ upload the data, and assign them to a mesh primitive.
 
 The example below manually creates a simple triangle mesh using an Unlit material.
 
-```javascript
-// Create an unlit material
-const material = new UnlitMaterial();
-// Disable back-face culling
-material.cullMode = 'none';
-// Enable vertex colors
-material.vertexColor = true;
+<<< @/../src/tut-9/main.js{24-44 js}
 
-// Fill vertex data for a triangle
-const triangle = new Primitive();
-const vertices = myApp.device.createVertexBuffer('position_f32x3', new Float32Array([
-  2, -2, 0,
-  0,  2, 0,
- -2, -2, 0
-]));
-const diffuse = myApp.device.createVertexBuffer('diffuse_u8normx4', new Uint8Array([
-  255, 0, 0, 255,
-  0, 255, 0, 255,
-  0, 0, 255, 255
-]));
-const indices = myApp.device.createIndexBuffer(new Uint16Array([0, 1, 2]));
+Worth noting:
 
-triangle.setVertexBuffer(vertices);
-triangle.setVertexBuffer(diffuse);
-triangle.setIndexBuffer(indices);
-
-// Create the mesh
-const triangleMesh = new Mesh(scene, triangle, material);
-```
+- A vertex buffer's **purpose is determined by its name**, not by extra arguments.
+  `'position_f32x3'` means position data as three float32s; `'diffuse_u8normx4'` means vertex color
+  as four normalized uint8s. The name encodes both semantics and data format, and the engine derives
+  the vertex layout from it.
+- Vertex colors require explicitly enabling `material.vertexColor = true` (line 28); otherwise the
+  attribute takes no part in shading.
+- A triangle has a single face, so the wrong winding order gets back-face culled and nothing appears.
+  This example sidesteps that with `material.cullMode = 'none'` (line 26).
 
 <div class="showcase" case="tut-9"></div>
 
@@ -175,60 +97,26 @@ const triangleMesh = new Mesh(scene, triangle, material);
 
 ## Loading Models
 
-The most common way to create a mesh is by loading an existing model.  
-To keep the core lightweight, Zephyr3D does not embed file format loaders for every model type.  
-Instead, models should first be imported into the editor and saved as **Zephyr3D prefabs** (`.zprefab` files),  
-which can then be loaded through the `ResourceManager`.
+In real projects the most common way to create meshes is loading an existing model. There are two
+paths:
 
-```javascript
+1. **Load a prefab (recommended)** — import the model in the editor, save it as a Zephyr3D prefab
+   (`.zprefab`), and load it at runtime with `instantiatePrefab()`.
+2. **Load the source model directly** — install `@zephyr3d/loaders`, register the matching importer,
+   and read glTF/GLB/FBX files with `fetchModel()`.
 
-import { HttpFS, Vector3 } from '@zephyr3d/base';
-import {
-  Scene,
-  Application,
-  OrbitCameraController,
-  PerspectiveCamera,
-  DirectionalLight,
-  getInput,
-  getEngine
-} from '@zephyr3d/scene';
-import { backendWebGL2 } from '@zephyr3d/backend-webgl';
+The first path is recommended: `@zephyr3d/scene` itself contains no model-format parsing code, so
+going through prefabs keeps those importers out of your bundle. A prefab also stores a serialized
+engine object graph, so material tweaks, node properties and scripts you set up in the editor are
+restored with it. Use the second path when you need to load arbitrary user-supplied model files at
+runtime. The tradeoff is covered in detail in
+[Resource Loading and Model Import](en/asset-loading.md).
 
-const myApp = new Application({
-  backend: backendWebGL2,
-  canvas: document.querySelector('#my-canvas'),
-  runtimeOptions: {
-    // When using the editor workflow, the asset path must be correctly configured
-    VFS: new HttpFS('https://cdn.zephyr3d.org/doc/tut-10')
-  }
-});
+Here is the prefab example:
 
-myApp.ready().then(function () {
-  // Create scene and light
-  const scene = new Scene();
-  const light = new DirectionalLight(scene);
-  light.lookAt(Vector3.one(), Vector3.zero(), Vector3.axisPY());
+<<< @/../src/tut-10/main.js{js}
 
-  // Load a model
-  getEngine()
-    .resourceManager.instantiatePrefab(scene.rootNode, '/assets/Duck.zprefab')
-    .then((model) => {
-      model.position.setXYZ(0, -0.5, 0);
-    });
-
-  // Create camera
-  scene.mainCamera = new PerspectiveCamera(scene, Math.PI / 3, 1, 100);
-  scene.mainCamera.lookAt(new Vector3(0, 0, 3), Vector3.zero(), new Vector3(0, 1, 0));
-  scene.mainCamera.controller = new OrbitCameraController();
-
-  getInput().use(scene.mainCamera.handleEvent, scene.mainCamera);
-
-  getEngine().setRenderable(scene, 0);
-
-  myApp.run();
-});
-
-
-```
+`instantiatePrefab(parent, path)` instantiates the prefab under the given parent node and returns the
+instantiated root, which you can transform like any other node (line 32).
 
 <div class="showcase" case="tut-10"></div>

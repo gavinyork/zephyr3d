@@ -6,62 +6,42 @@ For direct illumination, we need to create a light source node. This allows us t
 
 ## Directional light
 
-The code below demonstrates how to use a directional light.
+A directional light models a source infinitely far away: it has a direction but no position, which
+makes it the usual choice for sunlight.
 
-```javascript
+<<< @/../src/tut-11/main.js{23-32 js}
 
-// Create a directional light object
-const light = new DirectionalLight(scene);
-// light direction
-light.rotation.fromEulerAngle(Math.PI/4, Math.PI/4, 0);
-// light color
-light.color = new Vector4(1, 1, 0, 1);
-// light intensity
-light.intensity = 8;
-
-```
+The direction comes from the node's rotation, set here with `rotation.fromEulerAngle()`. Note that
+line 25 turns environment lighting off (`scene.env.light.type = 'none'`) — **scenes have environment
+lighting by default**, and leaving it on makes it hard to see what a single light contributes. Real
+projects usually want both; see [Indirect lighting](en/lighting-indirect.md).
 
 <div class="showcase" case="tut-11"></div>
 
 ## Point light
 
-The code below demonstrates how to use a point light.
+A point light emits from a position in all directions. Its position comes from the node's
+`position`; its orientation is irrelevant.
 
-```javascript
+<<< @/../src/tut-12/main.js{23-31 js}
 
-// Create a point light object
-const light = new PointLight(scene);
-// light color
-light.color = new Vector4(1, 1, 1, 1);
-// light intensity
-light.intensity = 20;
-// light position
-light.position.setXYZ(0, 1, 0);
-
-```
+Point and spot lights both have a `range`. **When `range` stays at its default of 0, the engine
+derives a falloff radius from `intensity`**, which is why the example above only sets `intensity`.
+Setting `range` explicitly bounds the light's influence — a smaller range means fewer pixels take
+part in its lighting computation.
 
 <div class="showcase" case="tut-12"></div>
 
 ## Spot light
 
-The code below demonstrates how to use a spot light.
+A spot light has both a position and a direction, with its light confined to a cone.
 
-```javascript
+<<< @/../src/tut-13/main.js{23-36 js}
 
-// Creates a spot light object
-const light = new SpotLight(scene);
-// light direction
-light.rotation.fromEulerAngle(-Math.PI/4, Math.PI/4, 0);
-// light color
-light.color = new Vector4(1, 1, 1, 1);
-// light intensity
-light.intensity = 20;
-// light cutoff
-light.cutoff = Math.cos(Math.PI * 0.25);
-// light position
-light.position.setXYZ(0, 15, 0);
-
-```
+**`cutoff` is the cosine of the cone half-angle, not the angle itself.** To express a 36-degree half
+angle you write `Math.cos(Math.PI * 0.2)`; assigning `Math.PI * 0.2` directly produces a much wider
+cone than intended, since a smaller cosine corresponds to a larger angle. This is an easy mistake to
+make.
 
 <div class="showcase" case="tut-13"></div>
 

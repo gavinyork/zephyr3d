@@ -12,106 +12,57 @@
 import { Application } from '@zephyr3d/scene';
 import { backendWebGL2 } from '@zephyr3d/backend-webgl';
 
-// 创建一个应用实例
 const myApp = new Application({
-  // 使用WebGL2作为渲染后端
-  // 目前我们支持三种渲染设备：WebGL, WebGL2和WebGPU。
   backend: backendWebGL2,
-  // Canvas元素用于渲染
   canvas: document.querySelector('#my-canvas')
 });
 
-// 等待渲染设备就绪
-myApp.ready().then(function(){
-  // 应用已经初始化完成，开始渲染循环
+myApp.ready().then(function () {
   myApp.run();
 });
-
 ```
 
-以上是一个最基本的应用框架，它创建应用，然后初始化渲染环境并开始主循环，目前我们并未在帧循环内做任何事情，所以只能看到一个黑窗口。下面我们来添加一些渲染代码。
+构造 `Application` 时的两个必要选项：
+
+- `backend`：渲染后端。目前可选 `backendWebGL`、`backendWebGL2`（均来自 `@zephyr3d/backend-webgl`）
+  和 `backendWebGPU`（来自 `@zephyr3d/backend-webgpu`）。
+- `canvas`：用于渲染的画布元素。
+
+`ready()` 返回一个 Promise，渲染设备初始化完成后 resolve；`run()` 启动主循环。上面这段代码
+只是把渲染环境跑起来，帧循环里什么也没做，所以你会看到一个黑窗口。下面往循环里加内容。
 
 ## 添加帧事件响应
 
-帧事件会在渲染循环的每帧触发一次，我们可以在该事件处理函数中执行更新和渲染。
+`tick` 事件在渲染循环的每帧触发一次，更新和渲染都写在它的处理函数里。
 
-```javascript
+<<< @/../src/tut-0/main.js{js}
 
-// 引入Vector4
-import { Vector4 } from '@zephyr3d/base';
-import { Application } from '@zephyr3d/scene';
-import { backendWebGL2 } from '@zephyr3d/backend-webgl';
+关键是第 20 行的 `clearFrameBuffer()`，它把整个画面清成绿色。三个参数依次是：
 
-// 创建一个应用实例
-const myApp = new Application({
-  // 使用WebGL2作为渲染后端
-  // 目前我们支持三种渲染设备：WebGL, WebGL2和WebGPU。
-  backend: backendWebGL2,
-  // Canvas元素用于渲染
-  canvas: document.querySelector('#my-canvas')
-});
+- 颜色缓冲区的清除颜色（`Vector4`，RGBA）；
+- 深度缓冲区的清除值——**用 `@zephyr3d/base` 导出的 `DEPTH_CLEAR_VALUE` 常量，不要硬编码 0 或 1**。
+  引擎支持 reverse-Z 深度约定，近平面对应的深度值会随约定改变，这个常量保证两种约定下都正确；
+- 模板缓冲区的清除值。
 
-// 等待渲染设备就绪
-myApp.ready().then(function(){
-  // 添加帧事件处理
-  myApp.on('tick', function(){
-    // device是渲染设备，我们调用其clearFrameBuffer方法把屏幕清为绿色
-    // 其中，第一个参数为清除颜色缓冲区的RGBA颜色，第二个参数指定深度缓冲区的清除值，第三个指定模板缓冲区的清除值。
-    myApp.device.clearFrameBuffer(new Vector4(0, 1, 0, 1), DEPTH_CLEAR_VALUE, 0);
-  });
-  // 应用已经初始化完成，开始渲染循环
-  myApp.run();
-});
+传 `null` 可以跳过对应缓冲区的清除。
 
-```
-
-现在，你应该可以看到一个绿色的屏幕。
+现在你应该可以看到一个绿色的屏幕。
 
 <div class="showcase" case="tut-0"></div>
 
 ## 响应输入
 
-我们可以通过捕获事件来响应用户输入。
+用户输入通过和 `tick` 相同的方式监听。下面这个例子跟踪鼠标位置并把坐标画在屏幕上：
 
-```javascript
+<<< @/../src/tut-1/main.js{js}
 
-// 引入Vector4
-import { Vector4 } from '@zephyr3d/base';
-import { Application } from '@zephyr3d/scene';
-import { backendWebGL2 } from '@zephyr3d/backend-webgl';
+几个要点：
 
-// 创建一个应用实例
-const myApp = new Application({
-  // 使用WebGL2作为渲染后端
-  // 目前我们支持三种渲染设备：WebGL, WebGL2和WebGPU。
-  backend: backendWebGL2,
-  // Canvas元素用于渲染
-  canvas: document.querySelector('#my-canvas')
-});
-
-// 等待渲染设备就绪
-myApp.ready().then(function () {
-  let str = '';
-  // 设置字体
-  myApp.device.setFont('16px arial');
-  // 添加帧事件处理
-  myApp.on('tick', function () {
-    // device是渲染设备，我们调用其clearFrameBuffer方法把屏幕清为绿色
-    // 其中，第一个参数为清除颜色缓冲区的RGBA颜色，第二个参数指定深度缓冲区的清除值，第三个指定模板缓冲区的清除值。
-    myApp.device.clearFrameBuffer(new Vector4(0, 0, 0, 1), DEPTH_CLEAR_VALUE, 0);
-    // 调用device的drawText方法在屏幕上渲染文字
-    myApp.device.drawText(str, 30, 30, '#ffff00');
-  });
-  // Pointer移动事件
-  myApp.on('pointermove', function (ev) {
-    // 更新显示内容
-    str = `X:${ev.offsetX.toFixed()} Y:${ev.offsetY.toFixed()}`;
-  });
-  // 应用已经初始化完成，开始渲染循环
-  myApp.run();
-});
-
-```
+- 第 29 行的 `pointermove` 处理函数只更新 `str` 变量，真正的绘制发生在第 26 行的 `tick` 里。
+  输入处理和渲染分开是有意的：事件可能一帧内触发多次，而绘制每帧只需要做一次。
+- 第 18 行把 `clearColor` 提到循环外复用。每帧 `new Vector4()` 会产生不必要的垃圾回收压力，
+  在数学对象上尤其值得注意。
+- `drawText()` 需要先用 `setFont()` 设置字体（第 20 行）。
 
 <div class="showcase" case="tut-1"></div>
 
@@ -162,44 +113,25 @@ getInput().use(function(evt, type) {
 
 ## 渲染场景
 
-下面我们演示如何渲染一个场景。
+渲染一个场景需要三样东西：装载渲染元素的 `Scene`、决定从哪个视角渲染的相机，以及把场景注册为
+活动渲染对象。
 
-首先我们需要通过构造一个Scene对象来创建一个场景。场景是一个包含了若干需要渲染的元素的容器。
-另外我们还需要一个摄像机对象来执行对场景的渲染。我们可以通过构造PerspectiveCamera对象来创建一个透视相机或通过构造一个OrthoCamera来创建一个正交相机。
-最后我们调用引擎实例的setRenderable方法将场景设置为活动渲染对象。
+<<< @/../src/tut-2/main.js{js}
 
-```javascript
+对照第 17、19、21 行：
 
-import { Application, PerspectiveCamera } from '@zephyr3d/scene';
-import { backendWebGL2 } from '@zephyr3d/backend-webgl';
-import { Scene } from '@zephyr3d/scene';
+- `new Scene()` 创建场景容器。
+- `new PerspectiveCamera(scene, ...)` 创建透视相机。参数依次是**所属场景、垂直视场角（弧度）、
+  近裁剪面、远裁剪面**；宽高比是可选的第 5 个参数，但相机默认开启 `autoAspect`，会自动跟随
+  渲染目标的宽高比，通常不需要传。需要正交投影时改用 `OrthoCamera`。
+- `getEngine().setRenderable(scene, 0)` 把场景设为第 0 层的活动渲染对象。这一步不做的话，
+  即使场景和相机都建好了，画面上也不会有任何东西。
 
-// 创建一个应用实例
-const myApp = new Application({
-  // 使用WebGL2作为渲染后端
-  // 目前我们支持三种渲染设备：WebGL, WebGL2和WebGPU。
-  backend: backendWebGL2,
-  // Canvas元素用于渲染
-  canvas: document.querySelector('#my-canvas')
-});
+注意这里的相机构造出来没有赋值给任何变量，场景却仍然渲染了：**当场景还没有主相机时，
+新构造的相机会自动成为该场景的 `mainCamera`**。后面需要操作相机时（比如设置控制器）
+仍然建议显式接住它，像下一节那样写成 `scene.mainCamera = new PerspectiveCamera(...)`。
 
-// 等待渲染设备就绪
-myApp.ready().then(function () {
-  // 创建场景
-  const scene = new Scene();
-  // 创建主相机
-  // 参数依次为：所属场景、垂直视场角(弧度)、近裁剪面、远裁剪面
-  // 宽高比是可选的第5个参数，默认开启 autoAspect，会自动跟随渲染目标的宽高比，通常无需指定
-  scene.mainCamera = new PerspectiveCamera(scene, Math.PI/3, 1, 100);
-  // 将场景设置为第0层的活动渲染对象
-  getEngine().setRenderable(scene, 0);
-  // 应用已经初始化完成，开始渲染循环
-  myApp.run();
-});
-
-```
-
-通过以上代码，我们渲染了一个空的场景，效果如下：
+以上代码渲染了一个空场景，效果如下：
 
 <div class="showcase" case="tut-2"></div>
 
@@ -218,24 +150,15 @@ myApp.ready().then(function () {
 
 下面我们为刚才的代码添加一个摄像机控制器：
 
-```javascript
+<<< @/../src/tut-4/main.js{js}
 
-import { Application, PerspectiveCamera, OrbitCameraController } from '@zephyr3d/scene';
+相比上一节只多了两行（第 22 和 24 行）：
 
-// ...
-
-// 创建相机
-scene.mainCamera = new PerspectiveCamera(scene, Math.PI/3, 1, 100);
-
-// 添加代码，设置摄像机控制器
-scene.mainCamera.controller = new OrbitCameraController();
-
-// camera.handleEvent可作为输入事件中间件，允许摄像机控制器接受交互
-getInput().use(scene.mainCamera.handleEvent, scene.mainCamera);
-
-//...
-
-```  
+- `scene.mainCamera.controller = new OrbitCameraController({ center: ... })` 给相机装上控制器。
+  `center` 指定环绕的中心点。
+- `getInput().use(scene.mainCamera.handleEvent, scene.mainCamera)` 把控制器接入输入系统。
+  **只设 `controller` 而不注册这一行，控制器收不到输入，相机不会响应鼠标。** 第二个参数是
+  调用 `handleEvent` 时的 `this`。
 
 以下是运行效果, 尝试用鼠标左键控制摄像机的观察角度：
 

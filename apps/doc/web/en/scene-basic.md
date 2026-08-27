@@ -14,24 +14,25 @@ Once the application is created, you can access the global instance using the [`
 import { Application } from '@zephyr3d/scene';
 import { backendWebGL2 } from '@zephyr3d/backend-webgl';
 
-// Create an application instance
 const myApp = new Application({
-  // Use WebGL2 as the rendering backend
-  // Currently supported backends: WebGL, WebGL2, and WebGPU
   backend: backendWebGL2,
-  // Canvas element used for rendering
   canvas: document.querySelector('#my-canvas')
 });
 
-// Wait for the rendering device to initialize
 myApp.ready().then(function () {
-  // Application is ready, start the render loop
   myApp.run();
 });
 ```
 
-The above example shows the most basic application framework. It creates the application, initializes the rendering environment, and starts the main loop.  
-Since nothing is rendered yet, the window will simply appear black. Let’s add some rendering logic next.
+`Application` takes two required options:
+
+- `backend` — the rendering backend. Available choices are `backendWebGL` and `backendWebGL2`
+  (both from `@zephyr3d/backend-webgl`) and `backendWebGPU` (from `@zephyr3d/backend-webgpu`).
+- `canvas` — the canvas element to render into.
+
+`ready()` returns a promise that resolves once the rendering device is initialized, and `run()`
+starts the main loop. This code only brings up the rendering environment — the frame loop does
+nothing yet, so you get a black window. Let's put something in it.
 
 ---
 
@@ -40,34 +41,18 @@ Since nothing is rendered yet, the window will simply appear black. Let’s add 
 The **frame event** is triggered once every frame during the render loop.  
 We can perform scene updates or custom drawing logic within this handler.
 
-```javascript
-// Import Vector4
-import { Vector4 } from '@zephyr3d/base';
-import { Application } from '@zephyr3d/scene';
-import { backendWebGL2 } from '@zephyr3d/backend-webgl';
+<<< @/../src/tut-0/main.js{js}
 
-// Create an application instance
-const myApp = new Application({
-  // Use WebGL2 as the rendering backend
-  backend: backendWebGL2,
-  // Canvas element used for rendering
-  canvas: document.querySelector('#my-canvas')
-});
+The important call is `clearFrameBuffer()` on line 20, which clears the whole frame to green.
+Its three arguments are:
 
-// Wait for the rendering device to be ready
-myApp.ready().then(function () {
-  // Add a frame event handler
-  myApp.on('tick', function () {
-    // 'device' is the rendering device.
-    // clearFrameBuffer clears the screen — 
-    // first argument: RGBA color, second: depth clear value, third: stencil clear value
-    myApp.device.clearFrameBuffer(new Vector4(0, 1, 0, 1), DEPTH_CLEAR_VALUE, 0);
-  });
+- the clear color for the color buffer (a `Vector4`, RGBA);
+- the depth buffer clear value — **use the `DEPTH_CLEAR_VALUE` constant from `@zephyr3d/base`
+  instead of hard-coding 0 or 1**. The engine supports the reverse-Z depth convention, which
+  changes which value corresponds to the near plane; this constant is correct under both;
+- the stencil buffer clear value.
 
-  // Start the render loop
-  myApp.run();
-});
-```
+Passing `null` for depth or stencil skips clearing that buffer.
 
 Now you should see a **green screen**.
 
@@ -77,44 +62,19 @@ Now you should see a **green screen**.
 
 ## Handling Input
 
-We can respond to user input by handling events exposed by the application instance.
+Input is subscribed the same way as `tick`. The example below tracks the pointer and draws its
+coordinates on screen:
 
-```javascript
-// Import Vector4
-import { Vector4 } from '@zephyr3d/base';
-import { Application } from '@zephyr3d/scene';
-import { backendWebGL2 } from '@zephyr3d/backend-webgl';
+<<< @/../src/tut-1/main.js{js}
 
-// Create an application instance
-const myApp = new Application({
-  backend: backendWebGL2,
-  canvas: document.querySelector('#my-canvas')
-});
+A few things worth noting:
 
-// Wait for the rendering device
-myApp.ready().then(function () {
-  let str = '';
-  // Set a font for text rendering
-  myApp.device.setFont('16px arial');
-
-  // Frame event handler
-  myApp.on('tick', function () {
-    // Clear framebuffer to black
-    myApp.device.clearFrameBuffer(new Vector4(0, 0, 0, 1), DEPTH_CLEAR_VALUE, 0);
-    // Draw text on the screen
-    myApp.device.drawText(str, 30, 30, '#ffff00');
-  });
-
-  // Pointer move event handler
-  myApp.on('pointermove', function (ev) {
-    // Update coordinate text
-    str = `X:${ev.offsetX.toFixed()} Y:${ev.offsetY.toFixed()}`;
-  });
-
-  // Start render loop
-  myApp.run();
-});
-```
+- The `pointermove` handler on line 29 only updates the `str` variable; the actual drawing happens
+  in `tick` on line 26. Keeping input handling separate from rendering is deliberate: an event can
+  fire several times within one frame, while drawing only needs to happen once per frame.
+- Line 18 hoists `clearColor` out of the loop. Allocating `new Vector4()` every frame creates
+  avoidable GC pressure, which is especially worth avoiding for math objects.
+- `drawText()` requires a font to be set first via `setFont()` (line 20).
 
 <div class="showcase" case="tut-1"></div>
 
@@ -169,37 +129,26 @@ getInput().use(function (evt, type) {
 
 ## Rendering a Scene
 
-Now, let’s look at how to render an actual scene.
+Rendering a scene takes three things: a `Scene` to hold the renderable elements, a camera that
+decides the viewpoint, and registering the scene as an active renderable.
 
-First, create a **Scene** object, which serves as a container for renderable elements.  
-Then, create a camera — either a **PerspectiveCamera** (for perspective projection) or an **OrthoCamera** (for orthographic projection).  
-Finally, use the engine’s `setRenderable()` method to set the active renderable scene.
+<<< @/../src/tut-2/main.js{js}
 
-```javascript
-import { Application, PerspectiveCamera, Scene } from '@zephyr3d/scene';
-import { backendWebGL2 } from '@zephyr3d/backend-webgl';
+Looking at lines 17, 19 and 21:
 
-// Create an application instance
-const myApp = new Application({
-  backend: backendWebGL2,
-  canvas: document.querySelector('#my-canvas')
-});
+- `new Scene()` creates the scene container.
+- `new PerspectiveCamera(scene, ...)` creates a perspective camera. The arguments are the
+  **owning scene, vertical field of view (radians), near plane and far plane**. Aspect ratio is an
+  optional 5th argument, but the camera enables `autoAspect` by default and keeps it in sync with
+  the render target, so you normally don't pass it. Use `OrthoCamera` for orthographic projection.
+- `getEngine().setRenderable(scene, 0)` makes the scene the active renderable on layer 0. Without
+  this call nothing appears on screen, even with a scene and camera set up.
 
-// Wait for the rendering device
-myApp.ready().then(function () {
-  // Create a scene
-  const scene = new Scene();
-  // Create the main camera
-  // Arguments are: owning scene, vertical field of view (radians), near plane, far plane.
-  // Aspect ratio is an optional 5th argument; autoAspect is on by default and keeps it in
-  // sync with the render target, so you normally do not pass it.
-  scene.mainCamera = new PerspectiveCamera(scene, Math.PI / 3, 1, 100);
-  // Set the scene as the active renderable for layer 0
-  getEngine().setRenderable(scene, 0);
-  // Start the render loop
-  myApp.run();
-});
-```
+Note that the camera here is never assigned to anything, yet the scene still renders: **when a
+scene has no main camera yet, a newly constructed camera automatically becomes that scene's
+`mainCamera`**. When you need to work with the camera afterwards — to attach a controller, for
+instance — still capture it explicitly as `scene.mainCamera = new PerspectiveCamera(...)`, the way
+the next section does.
 
 With this code, we render an empty scene. The result should look like this:
 
@@ -221,22 +170,16 @@ Currently, Zephyr3D provides two built-in camera controllers:
 
 Let’s extend the previous example with a camera controller:
 
-```javascript
-import { Application, PerspectiveCamera, OrbitCameraController } from '@zephyr3d/scene';
+<<< @/../src/tut-4/main.js{js}
 
-// ...
+Only two lines differ from the previous section (lines 22 and 24):
 
-// Create the camera
-scene.mainCamera = new PerspectiveCamera(scene, Math.PI / 3, 1, 100);
-
-// Add an orbit camera controller
-scene.mainCamera.controller = new OrbitCameraController();
-
-// Enable camera controller to receive input by registering it as middleware
-getInput().use(scene.mainCamera.handleEvent, scene.mainCamera);
-
-// ...
-```
+- `scene.mainCamera.controller = new OrbitCameraController({ center: ... })` attaches the
+  controller, where `center` is the point to orbit around.
+- `getInput().use(scene.mainCamera.handleEvent, scene.mainCamera)` wires the controller into the
+  input system. **Setting `controller` without this registration leaves the controller with no
+  input, and the camera will not respond to the mouse.** The second argument is the `this` value
+  used when calling `handleEvent`.
 
 Now, try dragging the left mouse button — you can rotate the camera around the scene’s target point.
 
