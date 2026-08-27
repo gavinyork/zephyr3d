@@ -188,6 +188,8 @@ myApp.ready().then(function () {
   // 创建场景
   const scene = new Scene();
   // 创建主相机
+  // 参数依次为：所属场景、垂直视场角(弧度)、近裁剪面、远裁剪面
+  // 宽高比是可选的第5个参数，默认开启 autoAspect，会自动跟随渲染目标的宽高比，通常无需指定
   scene.mainCamera = new PerspectiveCamera(scene, Math.PI/3, 1, 100);
   // 将场景设置为第0层的活动渲染对象
   getEngine().setRenderable(scene, 0);

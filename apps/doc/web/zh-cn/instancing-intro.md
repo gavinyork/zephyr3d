@@ -92,8 +92,10 @@ for (let i = 0; i < 10; i++) {
 const batchGroup = new BatchGroup(scene);  
 
 // 将多个实例化对象加入批次组  
+// 注意：Mesh 的第一个参数始终是所属场景，加入批次组要通过设置 parent 完成  
 for (let i = 0; i < 100; i++) {  
-  const obj = new Mesh(batchGroup);  
+  const obj = new Mesh(scene);  
+  obj.parent = batchGroup;  
   obj.primitive = boxShape;  
   obj.material = material.createInstance();  
   obj.position.setXYZ(Math.random() * 20, 0, Math.random() * 20);  

@@ -96,8 +96,11 @@ All meshes within that group will be automatically combined into a single static
 const batchGroup = new BatchGroup(scene);  
 
 // Add multiple instanced objects into the batch group  
+// Note: the first argument of Mesh is always the owning scene; joining a batch group
+// is done by setting parent  
 for (let i = 0; i < 100; i++) {  
-  const obj = new Mesh(batchGroup);  
+  const obj = new Mesh(scene);  
+  obj.parent = batchGroup;  
   obj.primitive = boxShape;  
   obj.material = material.createInstance();  
   obj.position.setXYZ(Math.random() * 20, 0, Math.random() * 20);  

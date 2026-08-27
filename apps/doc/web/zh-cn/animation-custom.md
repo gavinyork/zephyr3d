@@ -42,6 +42,11 @@ class MyAnimationTrack extends AnimationTrack {
     this._state = new Float32Array(1);
   }
 
+  // 克隆该轨道（抽象方法，必须实现）
+  clone() {
+    return new MyAnimationTrack(this._interpolator);
+  }
+
   // 计算并返回给定时刻的轨道状态
   calculateState(target, currentTime) {
     this._interpolator.interpolate(currentTime, this._state);
@@ -72,8 +77,16 @@ class MyAnimationTrack extends AnimationTrack {
   getBlendId() {
     return 'uv-animation';
   }
+
+  // 轨道时长（秒），抽象方法，必须实现
+  getDuration() {
+    return this._interpolator.maxTime;
+  }
 }
 ```
+
+> `AnimationTrack` 共有六个抽象成员必须实现：`clone()`、`calculateState()`、`applyState()`、
+> `mixState()`、`getBlendId()` 和 `getDuration()`。遗漏任意一个在 TypeScript 下都无法通过编译。
 
 ---
 

@@ -43,6 +43,11 @@ class MyAnimationTrack extends AnimationTrack {
     this._state = new Float32Array(1);
   }
 
+  // Clone this track (abstract, must be implemented)
+  clone() {
+    return new MyAnimationTrack(this._interpolator);
+  }
+
   // Calculate and return the state at the given time
   calculateState(target, currentTime) {
     this._interpolator.interpolate(currentTime, this._state);
@@ -73,8 +78,17 @@ class MyAnimationTrack extends AnimationTrack {
   getBlendId() {
     return 'uv-animation';
   }
+
+  // Track duration in seconds (abstract, must be implemented)
+  getDuration() {
+    return this._interpolator.maxTime;
+  }
 }
 ```
+
+> `AnimationTrack` has six abstract members that must all be implemented: `clone()`,
+> `calculateState()`, `applyState()`, `mixState()`, `getBlendId()` and `getDuration()`.
+> Omitting any of them fails to compile under TypeScript.
 
 ---
 

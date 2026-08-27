@@ -67,7 +67,7 @@ interface IDisposable {
 通常通过继承 `Disposable` 基类实现：
 
 ```typescript  
-import { Disposable } from "zephyr3d/core";  
+import { Disposable } from "@zephyr3d/base";  
 
 class MyResource extends Disposable {  
   constructor() {  
@@ -146,7 +146,10 @@ texRef.dispose();
 使用 `.get()` 方法可临时访问对象：
 
 ```typescript  
-const weakTex = texRef.toWeakRef();  
+import { DWeakRef } from "@zephyr3d/base";  
+
+// 直接用被引用对象构造弱引用
+const weakTex = new DWeakRef(texRef.get());  
 
 const tex = weakTex.get();
 if (tex) {  

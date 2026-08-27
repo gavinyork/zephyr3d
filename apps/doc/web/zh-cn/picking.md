@@ -25,16 +25,26 @@
 // 构造一条从摄像机原点穿过该屏幕坐标的射线  
 const ray = camera.constructRay(x, y);  
 
-// 对场景执行射线检测  
+// 对场景执行射线检测，可选的第二个参数用于限制射线长度  
 const pickResult = scene.raycast(ray);  
 
-// 若拾取到物体，则 pickResult 包含拾取结果信息  
+// 若拾取到物体，则 pickResult 为 { target, dist, point }  
 if (pickResult) {  
   console.log(`节点: ${pickResult.target.node}`);  
   console.log(`距离: ${pickResult.dist}`);  
   console.log(`交点: ${pickResult.point}`);  
 }  
 ```
+
+> 注意：`scene.raycast()` 与后文的 `camera.pickAsync()` 返回的字段名并不相同：
+>
+> | | `scene.raycast()` | `camera.pickAsync()` |
+> | --- | --- | --- |
+> | 命中对象 | `target`（`{ node, label? }`） | `target`（同左），另有 `drawable` |
+> | 距离 | `dist` | `distance` |
+> | 交点 | `point` | `intersectedPoint` |
+>
+> 两者的 `target.node` 用法一致，但距离和交点字段不可混用。
 
 > 射线检测通过与物体的**包围盒（Bounding Box）**求交来计算命中结果，  
 > 因此精度有限 —— 对于不规则网格、透明物体或具有骨骼变形的物体，可能无法精确拾取。  

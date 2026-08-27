@@ -52,7 +52,9 @@ const data = LOAD_MIPMAP_DATA();
 // 参数1：像素内容
 // 参数2: 图像颜色空间是否sRGB，true为sRGB颜色空间，false为线性颜色空间
 // 参数3：创建选项
-const texture = device.createTexture2DFromMipmapData(data, false, {
+// 注意：该方法根据mipmap数据本身决定创建的纹理类型（2D/立方体等），
+// 在TypeScript中可通过类型参数指定返回类型，例如 createTextureFromMipmapData<Texture2D>(...)
+const texture = device.createTextureFromMipmapData(data, false, {
   samplerOptions: {
     magFilter: 'nearest',
     minFilter: 'nearest',
@@ -69,7 +71,6 @@ const texture = device.createTexture2DFromMipmapData(data, false, {
 - [device.createTextureFromMipmapData()](/doc/markdown/./device.abstractdevice.createtexturefrommipmapdata)
 - [device.createTexture2DArray()](/doc/markdown/./device.abstractdevice.createtexture2darray)
 - [device.createTexture2DArrayFromImages()](/doc/markdown/./device.abstractdevice.createtexture2darrayfromimages)
-- [device.createTexture2DArrayFromMipmapData](/doc/markdown/./device.abstractdevice.createtexture2darrayfrommipmapdata)
 - [device.createTexture3D()](/doc/markdown/./device.abstractdevice.createtexture3d)
 - [device.createCubeTexture()](/doc/markdown/./device.abstractdevice.createcubetexture)
 - [device.createTextureVideo()](/doc/markdown/./device.abstractdevice.createtexturevideo)

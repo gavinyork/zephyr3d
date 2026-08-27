@@ -65,11 +65,13 @@ const app = new Application({
 Engine 中的反序列化与加载流程均通过 VFS 进行：
 
 ```typescript
-const scene = await engine.serializationManager.loadScene('/scenes/demo.json');
+// 加载场景的入口是 Engine.loadSceneFromFile()，
+// 它会对相同路径的并发请求复用同一个 Promise，并在场景加载后附加脚本
+const scene = await engine.loadSceneFromFile('/scenes/demo.zscn');
 const texData = await engine.VFS.readFile('/textures/stone.png');
 ```
 
-当引擎序列化或保存场景时，`SerializationManager` 会使用当前的 VFS 进行 I/O：
+内部实现中，该方法最终委托给 `engine.resourceManager.loadScene()`。当引擎序列化或保存场景时，序列化层同样使用当前的 VFS 进行 I/O：
 
 ```typescript
 await this._vfs.writeFile(filename, JSON.stringify(content), { encoding: 'utf8', create: true });

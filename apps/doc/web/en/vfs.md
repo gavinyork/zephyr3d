@@ -67,11 +67,14 @@ Once set, all file and resource operations within Zephyr3D — including texture
 In the engine, all serialization and resource loading operations rely on VFS:
 
 ```typescript
-const scene = await engine.serializationManager.loadScene('/scenes/demo.json');
+// Engine.loadSceneFromFile() is the entry point for loading a scene. It shares one
+// promise across concurrent requests for the same path and attaches declared scripts
+// once the scene is loaded.
+const scene = await engine.loadSceneFromFile('/scenes/demo.zscn');
 const texData = await engine.VFS.readFile('/textures/stone.png');
 ```
 
-When saving or serializing scenes, the engine’s `SerializationManager` uses VFS for I/O as well:
+Internally it delegates to `engine.resourceManager.loadScene()`. When saving or serializing scenes, the serialization layer uses VFS for I/O as well:
 
 ```typescript
 await this._vfs.writeFile(filename, JSON.stringify(content), { encoding: 'utf8', create: true });

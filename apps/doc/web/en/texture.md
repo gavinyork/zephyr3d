@@ -52,7 +52,9 @@ const data = LOAD_MIPMAP_DATA();
 // parameter 1：texel data
 // parameter 2: Whether the image color space is sRGB, true is the sRGB color space, and false is the linear color space
 // parameter 3：Creation options
-const texture = device.createTexture2DFromMipmapData(data, false, {
+// Note: this method picks the texture type (2D/cube/array/3D) from the mipmap data itself.
+// In TypeScript you can specify the return type, e.g. createTextureFromMipmapData<Texture2D>(...)
+const texture = device.createTextureFromMipmapData(data, false, {
   samplerOptions: {
     magFilter: 'nearest',
     minFilter: 'nearest',

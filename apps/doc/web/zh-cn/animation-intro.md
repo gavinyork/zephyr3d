@@ -84,25 +84,29 @@ moveClip.timeDuration = 2.0;
 轨道类定义了动画过程中“怎么算”、“怎么用”和“怎么混合”的逻辑。
 
 ```typescript
-abstract class AnimationTrack<StateType> {
+abstract class AnimationTrack<StateType = unknown> {
+  abstract clone(): this;
   abstract calculateState(target: object, currentTime: number): StateType;
-  abstract applyState(target: object, state: StateType): void;
+  abstract applyState(target: object, state: StateType): unknown;
   abstract mixState(a: StateType, b: StateType, t: number): StateType;
   abstract getBlendId(): unknown;
   abstract getDuration(): number;
-  reset(target: object) {}
+  reset(_target: object) {}
 }
 ```
 
 ### 核心方法说明
 | 方法 | 作用 |
 |------|------|
+| `clone()` | 克隆该轨道（抽象，必须实现） |
 | `calculateState(target, time)` | 根据当前时间计算状态（例如位置或旋转） |
 | `applyState(target, state)` | 将状态应用到目标 |
 | `mixState(a, b, t)` | 混合两个状态，用于动画混合 |
 | `getBlendId()` | 返回轨道类型标识，同 ID 轨道可混合 |
 | `getDuration()` | 返回轨道时长（秒） |
-| `reset(target)` | 重置对象初始状态（可选） |
+| `reset(target)` | 重置对象初始状态，有默认空实现，可选重写 |
+
+上表中除 `reset()` 外的六个方法都是抽象方法，自定义轨道必须全部实现。
 
 ---
 

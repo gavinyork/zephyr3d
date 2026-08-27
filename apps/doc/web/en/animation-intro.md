@@ -82,25 +82,29 @@ moveClip.timeDuration = 2.0;
 Animation tracks define *how* the animation is computed, applied, and blended.
 
 ```typescript
-abstract class AnimationTrack<StateType> {
+abstract class AnimationTrack<StateType = unknown> {
+  abstract clone(): this;
   abstract calculateState(target: object, currentTime: number): StateType;
-  abstract applyState(target: object, state: StateType): void;
+  abstract applyState(target: object, state: StateType): unknown;
   abstract mixState(a: StateType, b: StateType, t: number): StateType;
   abstract getBlendId(): unknown;
   abstract getDuration(): number;
-  reset(target: object) {}
+  reset(_target: object) {}
 }
 ```
 
 ### Core Methods
 | Method | Description |
 |---------|--------------|
+| `clone()` | Clones the track (abstract, must be implemented). |
 | `calculateState(target, time)` | Calculates the current state based on elapsed time (e.g., position or rotation). |
 | `applyState(target, state)` | Applies the calculated state to the target object. |
 | `mixState(a, b, t)` | Blends two states for smooth transitions. |
 | `getBlendId()` | Returns a blending identifier; tracks with the same ID can be blended together. |
 | `getDuration()` | Returns the track duration (in seconds). |
-| `reset(target)` | Resets the target to its initial state (optional). |
+| `reset(target)` | Resets the target to its initial state; has a default empty implementation, so overriding is optional. |
+
+Every method above except `reset()` is abstract — a custom track must implement all six.
 
 ---
 

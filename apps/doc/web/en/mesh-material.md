@@ -15,11 +15,21 @@ Constructing a `Mesh` object requires three parameters — **scene**, **primitiv
 
 The system provides several predefined geometric primitives such as a box, sphere, cylinder, and plane.
 
-The following example creates a cube mesh and assigns it a Lambert material.  
+The following example creates a sphere mesh and assigns it a Lambert material.  
 A directional light is added to illuminate the object (lighting will be discussed in later sections).
 
 ```javascript
-import { Scene, Application, LambertMaterial, Mesh, OrbitCameraController, PerspectiveCamera, BoxShape } from '@zephyr3d/scene';
+import { Vector3, Vector4 } from '@zephyr3d/base';
+import {
+  Scene,
+  Application,
+  LambertMaterial,
+  Mesh,
+  OrbitCameraController,
+  PerspectiveCamera,
+  SphereShape,
+  DirectionalLight
+} from '@zephyr3d/scene';
 
 // ... ...
 
@@ -133,7 +143,7 @@ The example below manually creates a simple triangle mesh using an Unlit materia
 // Create an unlit material
 const material = new UnlitMaterial();
 // Disable back-face culling
-material.getRenderStateSet(0).useRasterizerState().setCullMode('none');
+material.cullMode = 'none';
 // Enable vertex colors
 material.vertexColor = true;
 

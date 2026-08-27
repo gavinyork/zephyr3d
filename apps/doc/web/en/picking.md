@@ -25,16 +25,26 @@ Example:
 // Construct a ray from the camera through this screen position  
 const ray = camera.constructRay(x, y);  
 
-// Perform ray intersection test in the scene  
+// Perform ray intersection test in the scene. An optional second argument limits ray length.  
 const pickResult = scene.raycast(ray);  
 
-// If an object is hit, pickResult contains intersection information  
+// If an object is hit, pickResult is { target, dist, point }  
 if (pickResult) {  
   console.log(`Node: ${pickResult.target.node}`);  
   console.log(`Distance: ${pickResult.dist}`);  
   console.log(`Intersection: ${pickResult.point}`);  
 }  
 ```
+
+> Note that `scene.raycast()` and `camera.pickAsync()` (below) do not use the same field names:
+>
+> | | `scene.raycast()` | `camera.pickAsync()` |
+> | --- | --- | --- |
+> | Hit object | `target` (`{ node, label? }`) | `target` (same), plus `drawable` |
+> | Distance | `dist` | `distance` |
+> | Intersection point | `point` | `intersectedPoint` |
+>
+> `target.node` works the same way in both, but the distance and point fields are not interchangeable.
 
 > Ray‑based picking tests intersections using object **bounding boxes**,  
 > so it is approximate by nature — for irregular meshes, transparent surfaces, or skinned/animated geometry,  

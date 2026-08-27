@@ -68,7 +68,7 @@ The `dispose()` method defines the cleanup logic executed when the engine releas
 A typical resource class inherits from `Disposable` and implements `onDispose()`:
 
 ```typescript
-import { Disposable } from "zephyr3d/core";
+import { Disposable } from "@zephyr3d/base";
 
 class MyResource extends Disposable {
   constructor() {
@@ -147,7 +147,10 @@ This action:
 Its `.get()` method can temporarily access the target if it still exists:
 
 ```typescript
-const weakTex = texRef.toWeakRef();
+import { DWeakRef } from "@zephyr3d/base";
+
+// Construct the weak reference directly from the referenced object
+const weakTex = new DWeakRef(texRef.get());
 
 const tex = weakTex.get();
 if (tex) {

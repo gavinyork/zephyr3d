@@ -27,9 +27,11 @@ export class PerspectiveCamera extends Camera {
    * Creates an instance of PerspectiveCamera
    * @param scene - The scene that the camera belongs to.
    * @param fovY - A radian value indicates the field of view in Y axis
-   * @param aspect - Aspect ratio of the perspective transform
    * @param near - The near clip plane
    * @param far - The far clip plane
+   * @param aspect - Aspect ratio of the perspective transform. Note that {@link PerspectiveCamera.autoAspect}
+   *                 is enabled by default, in which case this value is overwritten by the aspect ratio of
+   *                 the render target.
    */
   constructor(scene: Nullable<Scene>, fovY = Math.PI / 3, near = 1, far = 1000, aspect = 1) {
     super(scene);

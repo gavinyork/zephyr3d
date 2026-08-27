@@ -190,6 +190,9 @@ myApp.ready().then(function () {
   // Create a scene
   const scene = new Scene();
   // Create the main camera
+  // Arguments are: owning scene, vertical field of view (radians), near plane, far plane.
+  // Aspect ratio is an optional 5th argument; autoAspect is on by default and keeps it in
+  // sync with the render target, so you normally do not pass it.
   scene.mainCamera = new PerspectiveCamera(scene, Math.PI / 3, 1, 100);
   // Set the scene as the active renderable for layer 0
   getEngine().setRenderable(scene, 0);

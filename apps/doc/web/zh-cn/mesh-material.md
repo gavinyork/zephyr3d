@@ -10,12 +10,22 @@ material为该网格的材质，我们支持unlit(非光照)材质，Lambert/Bli
 
 系统内置了几种常见的网格顶点数据，例如盒子，球体，圆柱，平面等。
 
-以下代码创建了一个正方体网格并且赋予一个Lambert材质.
+以下代码创建了一个球体网格并且赋予一个Lambert材质.
 
 在场景中我们添加了一个方向光以便照亮该网格。关于光源和光照我们将在后续章节详细介绍。
 
 ```javascript
-import { Scene, Application, LambertMaterial, Mesh, OrbitCameraController, PerspectiveCamera, BoxShape } from '@zephyr3d/scene';
+import { Vector3, Vector4 } from '@zephyr3d/base';
+import {
+  Scene,
+  Application,
+  LambertMaterial,
+  Mesh,
+  OrbitCameraController,
+  PerspectiveCamera,
+  SphereShape,
+  DirectionalLight
+} from '@zephyr3d/scene';
 
 // ... ...
 
@@ -141,7 +151,7 @@ myApp.ready().then(function () {
   // 创建一个无光照材质
   const material = new UnlitMaterial();
   // 禁止背面剔除
-  material.getRenderStateSet(0).useRasterizerState().setCullMode('none');
+  material.cullMode = 'none';
   // 使用顶点色
   material.vertexColor = true;
 
