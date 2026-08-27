@@ -4,7 +4,9 @@
 
 我们使用Mesh对象来表示一个网格。构造一个mesh对象需要三个参数scene, primitive和material，其中scene是场景对象，网格构造后将会添加到该场景。
 primitive为网格的顶点数据。可以使用内置的SphereShape,BoxShape,PlaneShape,CylinderShape来创建球体，盒子，平面和圆柱形顶点数据，也可手动填充。
-material为该网格的材质，我们支持unlit(非光照)材质，Lambert/Blinn材质和PBR材质。
+material为该网格的材质。通用材质有 unlit(非光照)、Lambert/Blinn 和 PBR 几种，本页的示例都用它们。
+除此之外还有若干专用材质：角色渲染用的[皮肤材质](zh-cn/material-skin.md)、头发、眼睛，
+卡通渲染用的 MToon，地形和植被材质，以及用编辑器蓝图自定义的材质。
 
 ## 使用预定义网格
 

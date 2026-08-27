@@ -18,6 +18,7 @@
 | SSGI | `SSGI` | 基于历史 HDR 场景颜色的屏幕空间漫反射全局光照 |
 | SSAO/SAO | `SAO` | 屏幕空间环境光遮蔽 |
 | Motion Blur | `MotionBlur` | 相机或物体运动造成的模糊 |
+| Skin SSS | `SkinSSS` | 皮肤次表面散射，配合 `SkinMaterial` 使用，见[皮肤与次表面散射](zh-cn/material-skin.md) |
 | Color Adjust | `ColorAdjust` | 饱和度、对比度、色相和锐化调整 |
 | Grayscale | `Grayscale` | 用于自定义 compositor 链的灰度转换 |
 

@@ -51,6 +51,8 @@
     - [概述](zh-cn/picking.md)
   - 几何体实例化
     - [概述](zh-cn/instancing-intro.md)
+  - 角色渲染
+    - [皮肤与次表面散射](zh-cn/material-skin.md)
   - 自定义材质
     - [概述](zh-cn/user-material.md)
     - [无光照材质](zh-cn/user-material-unlit.md)

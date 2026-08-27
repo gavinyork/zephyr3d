@@ -7,7 +7,10 @@ We use the `Mesh` object to represent a mesh.
 Constructing a `Mesh` object requires three parameters — **scene**, **primitive**, and **material**:  
 - **scene**: the scene object to which the mesh will be added after creation.  
 - **primitive**: the vertex data for the mesh. You can use the built‑in shapes `SphereShape`, `BoxShape`, `PlaneShape`, and `CylinderShape` to create spheres, boxes, planes, or cylinders, or you can manually fill your own data.  
-- **material**: the material for this mesh. We support *Unlit* (non‑lit) materials, Lambert/Blinn materials, and PBR materials.
+- **material**: the material for this mesh. The general-purpose materials are *Unlit* (non‑lit),
+  Lambert/Blinn and PBR, and the examples on this page all use those. Beyond them there are several
+  dedicated materials: [skin](en/material-skin.md), hair and eyes for character rendering, MToon for
+  cartoon shading, terrain and foliage materials, and materials authored with editor blueprints.
 
 ---
 

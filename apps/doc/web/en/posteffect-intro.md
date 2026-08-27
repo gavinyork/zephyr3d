@@ -18,6 +18,7 @@ Built-in effects:
 | SSGI | `SSGI` | Screen-space diffuse global illumination using opaque HDR history |
 | SSAO/SAO | `SAO` | Screen-space ambient occlusion |
 | Motion Blur | `MotionBlur` | Blur from camera or object motion |
+| Skin SSS | `SkinSSS` | Skin subsurface scattering, used with `SkinMaterial`; see [Skin and Subsurface Scattering](en/material-skin.md) |
 | Color Adjust | `ColorAdjust` | Saturation, contrast, hue, and sharpen adjustment |
 | Grayscale | `Grayscale` | Grayscale conversion for custom compositor chains |
 
