@@ -51,6 +51,10 @@ camera.viewport = null; // 视口覆盖整个画布（全屏绘制）
 
 以下示例展示如何在同一相机上使用两个视口，从而实现「画中画」效果。
 
+注意开头的 `camera.updateController()`：这里自己在 `tick` 里调 `camera.render(scene)` 驱动渲染，
+如果该相机不是场景的 `mainCamera`，控制器就不会被自动更新，必须像这样每帧手动更新一次，
+否则相机控制器不起作用。
+
 ```javascript  
 myApp.on('tick', () => {  
   camera.updateController();  

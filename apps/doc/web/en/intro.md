@@ -63,3 +63,22 @@ It enables the interactive development of 3D web applications with real-time vis
   - Prefab system support
   - Store project assets in **IndexedDB**
 
+---
+
+## Where to start
+
+If you are **building a 3D application in code**, just read these in order:
+
+1. [Installation](en/installation.md) — figure out which packages you need
+2. [Your First Application](en/first-app.md) — get the first frame on screen
+3. [Adding Models and Materials](en/first-scene.md) — put things in the scene
+4. [Shadows and Post-processing](en/first-polish.md) — make it look presentable
+
+After that, go deeper into individual topics under "Using the Scene API" as needed.
+
+If you would rather use a **visual workflow**, start with the
+[editor overview](en/editor/overview.md).
+
+If you are **writing your own renderer** and do not plan to use the engine's scene management, go
+straight to the [low-level graphics API](en/device-intro.md).
+

@@ -50,6 +50,11 @@ camera.viewport = null; // Fullscreen viewport
 
 The following code demonstrates how to use two viewports on the same camera to create a picture‑in‑picture effect.
 
+Note the `camera.updateController()` at the top: because rendering is driven manually here with
+`camera.render(scene)` inside `tick`, a camera that is not the scene's `mainCamera` does not get its
+controller updated automatically, and must be advanced once per frame like this or the camera
+controller will not respond.
+
 ```javascript  
 myApp.on('tick', () => {  
   camera.updateController();  

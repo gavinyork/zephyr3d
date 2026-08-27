@@ -1,17 +1,10 @@
-- 简介
+- 快速上手
 
   - [概述](zh-cn/intro.md)
   - [安装](zh-cn/installation.md)
-
-- 使用设备API
-
-  - [创建设备](zh-cn/device.md)
-  - [编写shader](zh-cn/shader.md)
-  - [渲染状态](zh-cn/renderstate.md)
-  - [缓冲区(Buffer)](zh-cn/buffer.md)
-  - [纹理(Texture)](zh-cn/texture.md)
-  - [渲染图元](zh-cn/drawcall.md)
-  - [示例](zh-cn/devicesamples.md)
+  - [第一个应用](zh-cn/first-app.md)
+  - [放入模型与材质](zh-cn/first-scene.md)
+  - [加上阴影与后处理](zh-cn/first-polish.md)
 
 - 使用场景API
 
@@ -72,7 +65,7 @@
     - [内存管理](zh-cn/lifetime.md)
     - [虚拟文件系统](zh-cn/vfs.md)
 
-- Zephyr3d Editor 使用指南
+- Zephyr3d Editor 使用指南
 
   - 总体介绍
     - [概述](zh-cn/editor/overview.md)
@@ -106,3 +99,13 @@
     - [实时预览](zh-cn/editor/preview.md)
     - [构建与部署](zh-cn/editor/build-deploy.md)
 
+- 底层图形API（Device API）
+
+  - [何时需要 Device API](zh-cn/device-intro.md)
+  - [创建设备](zh-cn/device.md)
+  - [编写shader](zh-cn/shader.md)
+  - [渲染状态](zh-cn/renderstate.md)
+  - [缓冲区(Buffer)](zh-cn/buffer.md)
+  - [纹理(Texture)](zh-cn/texture.md)
+  - [渲染图元](zh-cn/drawcall.md)
+  - [示例](zh-cn/devicesamples.md)

@@ -1,40 +1,69 @@
 # Installation
 
-Zephyr3d is released as ES6 modules and requires npm for installation. It is designed to be used in conjunction with front-end build tools such as Webpack or Vite for development.
+Zephyr3d ships as ES6 modules, installed through npm and used with a bundler such as Vite or Webpack.
 
-- @zephyr3d/base
+## Which packages do I need
 
-  The basic module includes a math library and content commonly used in other modules.
+The engine is split into several packages and you rarely need all of them. Find your case below:
 
-  ```npm install --save @zephyr3d/base```
+| What you want to do | Install |
+| --- | --- |
+| Build a 3D app with the Scene API (**most common**) | `@zephyr3d/base` + `@zephyr3d/scene` + one backend |
+| Write your own renderer on the Device API | `@zephyr3d/base` + `@zephyr3d/device` + one backend |
+| Load glTF/FBX source models at runtime | add `@zephyr3d/loaders` |
+| Need a debug GUI panel | add `@zephyr3d/imgui` |
 
-- @zephyr3d/device
+At least one backend package is required; it decides which graphics API the engine runs on:
 
-  Includes the basic definitions and abstract interfaces of the rendering API.
+- `@zephyr3d/backend-webgl` — provides both the WebGL and WebGL2 backends; the most compatible option.
+- `@zephyr3d/backend-webgpu` — the WebGPU backend, with better performance. Some advanced features
+  (ABuffer OIT, compute shaders) are only available here.
 
-  ```npm install --save @zephyr3d/device```
+You can install both and choose at runtime based on device capability — see
+[Your First Application](en/first-app.md).
 
-- @zephyr3d/backend-webgl
+## The common combination
 
-  WebGL backend, WebGL/WebGL2 rendering.
+For a 3D application that should run on WebGPU where available and WebGL otherwise:
 
-  ```npm install --save @zephyr3d/backend-webgl```
+```bash
+npm install --save @zephyr3d/base @zephyr3d/scene @zephyr3d/backend-webgl @zephyr3d/backend-webgpu
+```
 
-- @zephyr3d/backend-webgpu
+Note that `@zephyr3d/scene` depends on `@zephyr3d/device`, which your package manager installs
+automatically — you do not need to declare it.
 
-  WebGPU backend.
+## What each package does
 
-  ```npm install --save @zephyr3d/backend-webgpu```
+- **`@zephyr3d/base`**
 
-- @zephyr3d/scene
+  Foundation module: math library (`Vector3`, `Matrix4x4`, `Quaternion`, ...), virtual file system,
+  events, reference counting. Nearly every project uses it.
 
-  The SceneAPI module, built on top of the DeviceAPI module, facilitates rapid development of rendering projects.
-  
-  ```npm install --save @zephyr3d/scene```
+- **`@zephyr3d/device`**
 
-- @zephyr3d/imgui
+  The graphics API abstraction and the shader generator. With the Scene API it is an indirect
+  dependency; you only depend on it directly when writing your own render pipeline.
 
-  To render a GUI, you can install the ImGui binding module.
+- **`@zephyr3d/backend-webgl`** / **`@zephyr3d/backend-webgpu`**
 
-  ```npm install --save @zephyr3d/imgui```
+  The concrete backend implementations, as above.
 
+- **`@zephyr3d/scene`**
+
+  The Scene API: scene graph, materials, lighting, shadows, animation, post-processing and resource
+  management. The high-level framework, suited to getting things done quickly.
+
+- **`@zephyr3d/loaders`**
+
+  Importers for source model formats — glTF/GLB, FBX, Alembic and others. **If you use the editor
+  workflow and load models as prefabs (`.zprefab`), you do not need this package**, which also keeps
+  your bundle smaller. See [Resource Loading and Model Import](en/asset-loading.md) for the tradeoff.
+
+- **`@zephyr3d/imgui`**
+
+  ImGui bindings, useful for debug panels and tooling UI.
+
+## Next
+
+With the packages installed, write [your first application](en/first-app.md).

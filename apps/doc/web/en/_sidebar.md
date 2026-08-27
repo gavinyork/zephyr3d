@@ -1,17 +1,10 @@
-- Introduction
+- Getting Started
 
   - [Overview](en/intro.md)
   - [Installation](en/installation.md)
-
-- Using the Device API
-
-  - [Create Device](en/device.md)
-  - [Writing Shaders](en/shader.md)
-  - [Render States](en/renderstate.md)
-  - [Buffers](en/buffer.md)
-  - [Textures](en/texture.md)
-  - [Drawing Primitives](en/drawcall.md)
-  - [Examples](en/devicesamples.md)
+  - [Your First Application](en/first-app.md)
+  - [Adding Models and Materials](en/first-scene.md)
+  - [Shadows and Post-processing](en/first-polish.md)
 
 - Using the Scene API
 
@@ -106,3 +99,13 @@
     - [Live Preview](en/editor/preview.md)
     - [Deployment](en/editor/build-deploy.md)
 
+- Low-level Graphics API (Device API)
+
+  - [When You Need the Device API](en/device-intro.md)
+  - [Create Device](en/device.md)
+  - [Writing Shaders](en/shader.md)
+  - [Render States](en/renderstate.md)
+  - [Buffers](en/buffer.md)
+  - [Textures](en/texture.md)
+  - [Drawing Primitives](en/drawcall.md)
+  - [Examples](en/devicesamples.md)
