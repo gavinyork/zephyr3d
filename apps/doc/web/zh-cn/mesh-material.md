@@ -171,7 +171,7 @@ myApp.ready().then(function () {
 
 ## 加载模型
 
-最常用的创建网格的方法就是加载现有的模型。为精简核心，避免核心库包含大量不同模型格式的加载器代码，你需要先通过编辑器导入模型存为zephyr3d预制件(.zprefb)，然后可以通过ResourceManager来加载。
+最常用的创建网格的方法就是加载现有的模型。为精简核心，避免核心库包含大量不同模型格式的加载器代码，你需要先通过编辑器导入模型存为zephyr3d预制体(.zprefab)，然后可以通过ResourceManager来加载。
 
 ```javascript
 

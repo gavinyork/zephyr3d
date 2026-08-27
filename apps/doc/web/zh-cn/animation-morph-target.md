@@ -45,7 +45,7 @@ console.log(groupNames);
 
 对于 VRM 模型，VRM 0.x 的 BlendShape 组和 VRM 1.0 的 expressions 会被导入为 morph target group。常见 group 名包括 `happy`、`angry`、`blink` 等表情名，或 `aa` 这样的口型名。
 
-加载 Zephyr3D 预制件时，也会自动恢复 Morph Target：
+加载 Zephyr3D 预制体时，也会自动恢复 Morph Target：
 
 ```javascript
 const model = await getEngine().resourceManager.instantiatePrefab(
@@ -54,7 +54,7 @@ const model = await getEngine().resourceManager.instantiatePrefab(
 );
 ```
 
-对于 `.zprefab`，序列化的 morph target 数据、target 名称、当前权重、包围盒信息和 morph target group 都会作为 prefab 内容恢复。这一点和直接加载模型不同：模型资源会从源文件导入 morph target，但模型的 Morph Target 设置不会作为模型资源数据序列化。如果需要持久化编辑后的 Morph Target 设置，应保存为预制件。
+对于 `.zprefab`，序列化的 morph target 数据、target 名称、当前权重、包围盒信息和 morph target group 都会作为 prefab 内容恢复。这一点和直接加载模型不同：模型资源会从源文件导入 morph target，但模型的 Morph Target 设置不会作为模型资源数据序列化。如果需要持久化编辑后的 Morph Target 设置，应保存为预制体。
 
 ---
 
