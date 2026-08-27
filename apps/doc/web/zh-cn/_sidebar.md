@@ -19,6 +19,7 @@
     - [概述](zh-cn/lighting-intro.md)
     - [直接光照](zh-cn/lighting-direct.md)
     - [间接光照](zh-cn/lighting-indirect.md)
+    - [物理光照模式](zh-cn/lighting-physical.md)
   - 环境
     - [天空](zh-cn/sky.md)
     - [水面](zh-cn/water.md)

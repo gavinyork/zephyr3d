@@ -4,6 +4,13 @@ For direct illumination, we need to create a light source node. This allows us t
 
 **The direction of the light source is oriented towards the negative Z-axis of its own coordinate system.**
 
+The engine provides four light types: directional, point, spot and rect (area) lights.
+
+> The `color` and `intensity` used on this page belong to the default `legacy` lighting mode, where
+> `intensity` is a unitless multiplier. If your scene uses
+> [physical lighting mode](en/lighting-physical.md), intensity comes from photometric properties
+> instead (`illuminance` / `luminousPower` / `luminance`) and `intensity` no longer applies.
+
 ## Directional light
 
 A directional light models a source infinitely far away: it has a direction but no position, which
@@ -43,5 +50,31 @@ angle you write `Math.cos(Math.PI * 0.2)`; assigning `Math.PI * 0.2` directly pr
 cone than intended, since a smaller cosine corresponds to a larger angle. This is an easy mistake to
 make.
 
+(In physical lighting mode the cone is set with `innerConeAngle` / `outerConeAngle`, which are
+real angles in radians.)
+
 <div class="showcase" case="tut-13"></div>
+
+## Rect light
+
+A rect light (`RectLight`) is a rectangular emitting surface. It produces softer, more directional
+lighting and highlights than a point light, which suits windows, light boxes and screens.
+
+```javascript
+const light = new RectLight(scene);
+// Rectangle dimensions in scene units
+light.width = 4;
+light.height = 2;
+// Falloff range
+light.range = 10;
+light.color = new Vector4(1, 1, 1, 1);
+light.intensity = 5;
+// Position and orientation come from the node transform; light travels along its -Z axis
+light.position.setXYZ(0, 5, 0);
+light.lookAt(new Vector3(0, 5, 0), Vector3.zero(), Vector3.axisPY());
+```
+
+Rect light highlights use an LTC (Linearly Transformed Cosines) approximation and work on all
+backends. Because it integrates over the rectangle area it costs more than the other light types,
+so keep their count in check.
 

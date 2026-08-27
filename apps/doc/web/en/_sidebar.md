@@ -19,6 +19,7 @@
     - [Overview](en/lighting-intro.md)
     - [Direct lighting](en/lighting-direct.md)
     - [Indirect lighting](en/lighting-indirect.md)
+    - [Physical Lighting Mode](en/lighting-physical.md)
   - Environment
     - [Sky](en/sky.md)
     - [Water](en/water.md)

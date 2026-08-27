@@ -23,6 +23,11 @@ camera.toneMap = true;
 camera.toneMapExposure = 1.5;
 ```
 
+> **注意曝光的控制方式取决于光照模式。** 上面用 `toneMapExposure` 的写法适用于默认的
+> `legacy` 光照模式。在[物理光照模式](zh-cn/lighting-physical.md)下，曝光由相机的光圈、
+> 快门和 ISO 推导（只读的 `camera.exposure`），`toneMapExposure` 会被忽略，
+> 色调映射只负责应用 ACES 曲线。
+
 <div class="showcase" case="tut-27" style="width:600px;height:800px;"></div>
 
 ---

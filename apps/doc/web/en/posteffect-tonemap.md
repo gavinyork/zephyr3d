@@ -23,6 +23,12 @@ camera.toneMap = true;
 camera.toneMapExposure = 1.5;  
 ```
 
+> **How exposure is controlled depends on the lighting mode.** The `toneMapExposure` approach above
+> applies to the default `legacy` lighting mode. In
+> [physical lighting mode](en/lighting-physical.md), exposure is derived from the camera's aperture,
+> shutter speed and ISO (the read-only `camera.exposure`), `toneMapExposure` is ignored, and tone
+> mapping only applies the ACES curve.
+
 <div class="showcase" case="tut-27" style="width:600px;height:800px;"></div>
 
 ---

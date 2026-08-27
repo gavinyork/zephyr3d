@@ -4,6 +4,12 @@
 
 **光源方向是朝向自身坐标系的负Z轴方向**
 
+引擎提供四种光源：平行光、点光、锥光和面光源。
+
+> 本页的 `color` 和 `intensity` 属于默认的 `legacy` 光照模式，`intensity` 是一个无单位的倍数。
+> 如果场景使用[物理光照模式](zh-cn/lighting-physical.md)，强度改用光度单位的属性
+> （`illuminance` / `luminousPower` / `luminance`），本页的 `intensity` 不再生效。
+
 ## 平行光
 
 平行光模拟无限远处的光源，只有方向没有位置，常用来当太阳光。
@@ -38,5 +44,29 @@
 `Math.cos(Math.PI * 0.2)`，直接赋值 `Math.PI * 0.2` 会得到一个远大于预期的光锥
 （余弦值越小对应的锥角越大）。这一点很容易搞错。
 
+（在物理光照模式下，锥角改用 `innerConeAngle` / `outerConeAngle`，是真实的弧度值。）
+
 <div class="showcase" case="tut-13"></div>
+
+## 面光源
+
+面光源（`RectLight`）是一个矩形发光面，能产生比点光更柔和、有方向性的照明和高光，
+适合表现窗户、灯箱、屏幕这类光源。
+
+```javascript
+const light = new RectLight(scene);
+// 矩形的宽高（场景单位）
+light.width = 4;
+light.height = 2;
+// 照射范围
+light.range = 10;
+light.color = new Vector4(1, 1, 1, 1);
+light.intensity = 5;
+// 位置和朝向同样由节点变换决定，光线朝自身 -Z 方向
+light.position.setXYZ(0, 5, 0);
+light.lookAt(new Vector3(0, 5, 0), Vector3.zero(), Vector3.axisPY());
+```
+
+面光源的高光使用 LTC（Linearly Transformed Cosines）近似，各后端都支持。
+由于要计算矩形面积上的积分，它比其他光源开销更高，数量上要控制。
 
