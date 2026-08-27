@@ -264,6 +264,8 @@ shadowRegion.clearCasters();
 | **VSM** | Statistical variance smoothing | Stable, noise‑free, supports blur | Possible light bleeding | 🟡 Medium |
 | **ESM** | Exponential depth attenuation | Smooth, noise‑free, efficient | Sensitive to tuning | 🟢 High efficiency |
 | **CSM** | Multi‑layer shadow maps by distance | High detail near camera | Complex to manage | 🔵 High |
+| **hard** | Single sample, no filtering | Cheapest | Visibly aliased edges | 🟢 Lowest |
+| **dom** | Records fractional occlusion through a medium | Soft light bleed for hair and other fine geometry | **WebGPU only**; falls back to `pcf` elsewhere | 🔵 High |
 
 ---
 
@@ -271,3 +273,11 @@ By combining these methods appropriately—
 for instance, **PCF/PCSS/VSM/ESM filtering**, **CSM segmentation**, or **distance limiting**—
 you can achieve a balanced compromise between **shadow quality**, **scene scale**, and **rendering performance**  
 in Zephyr3D‑based real‑time rendering.
+
+
+> `mode` also accepts `'hard'` (no filtering) and `'dom'` (Deep Opacity Map, for hair — see
+> [Hair Rendering](en/material-hair.md)). Two further values, `'pcf-pd'` and `'pcf-opt'`, are
+> **deprecated**; use `'pcf'` instead.
+>
+> `light.shadow.applyQualityPreset(preset)` configures a whole set of parameters at once, with
+> `'character-small'` and `'outdoor-large'` available.

@@ -53,6 +53,8 @@
     - [Overview](en/instancing-intro.md)
   - Character Rendering
     - [Skin and Subsurface Scattering](en/material-skin.md)
+    - [Hair Rendering](en/material-hair.md)
+    - [Eye Material](en/material-eye.md)
   - Custom Materials
     - [Overview](en/user-material.md)
     - [Unlit Material](en/user-material-unlit.md)

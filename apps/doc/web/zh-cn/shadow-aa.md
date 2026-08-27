@@ -260,4 +260,12 @@ shadowRegion.clearCasters();
 | **VSM** | 利用方差统计实现平滑 | 稳定自然、可模糊 | 可能光漏 | 🟡 中等 |
 | **ESM** | 深度指数衰减 | 柔和、无噪点 | 参数敏感 | 🟢 高效 |
 | **CSM** | 多层分级 ShadowMap | 近景细节高 | 管理复杂 | 🔵 较高 |
+| **hard** | 单次采样，不做过滤 | 开销最低 | 边缘锯齿明显 | 🟢 最低 |
+| **dom** | 记录穿过介质的部分遮挡 | 头发等细密几何的柔和透光 | **仅 WebGPU**，其他后端回退 `pcf` | 🔵 较高 |
 
+> `mode` 还可以取 `'hard'`（无过滤）和 `'dom'`（Deep Opacity Map，用于头发，
+> 见[头发渲染](zh-cn/material-hair.md)）。另有 `'pcf-pd'` 和 `'pcf-opt'` 两个取值**已废弃**，
+> 请改用 `'pcf'`。
+>
+> `light.shadow.applyQualityPreset(preset)` 可以一次性配好一组参数，预设有
+> `'character-small'` 和 `'outdoor-large'` 两种。
