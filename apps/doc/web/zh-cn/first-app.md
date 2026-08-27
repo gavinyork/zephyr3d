@@ -48,7 +48,7 @@ canvas 的 CSS 尺寸就是渲染分辨率的依据，引擎会自动跟随它�
 
 关于 `clearFrameBuffer()` 的深度参数：**用 `@zephyr3d/base` 导出的 `DEPTH_CLEAR_VALUE`
 常量，不要硬编码 0 或 1**。引擎支持 reverse-Z 深度约定，近平面对应的深度值会随约定改变，
-这个常量在两种约定下都正确。
+这个常量在两种约定下都正确，详见[深度约定](zh-cn/reverse-z.md)。
 
 应用创建后，任何地方都可以用 `getApp()`、`getEngine()`、`getDevice()`、`getInput()`
 这几个全局函数取到实例，不必到处传递引用。

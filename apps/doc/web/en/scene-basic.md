@@ -49,7 +49,7 @@ Its three arguments are:
 - the clear color for the color buffer (a `Vector4`, RGBA);
 - the depth buffer clear value — **use the `DEPTH_CLEAR_VALUE` constant from `@zephyr3d/base`
   instead of hard-coding 0 or 1**. The engine supports the reverse-Z depth convention, which
-  changes which value corresponds to the near plane; this constant is correct under both;
+  changes which value corresponds to the near plane; this constant is correct under both (see [Depth Convention](en/reverse-z.md));
 - the stencil buffer clear value.
 
 Passing `null` for depth or stencil skips clearing that buffer.

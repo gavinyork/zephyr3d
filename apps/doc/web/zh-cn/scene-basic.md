@@ -41,7 +41,7 @@ myApp.ready().then(function () {
 
 - 颜色缓冲区的清除颜色（`Vector4`，RGBA）；
 - 深度缓冲区的清除值——**用 `@zephyr3d/base` 导出的 `DEPTH_CLEAR_VALUE` 常量，不要硬编码 0 或 1**。
-  引擎支持 reverse-Z 深度约定，近平面对应的深度值会随约定改变，这个常量保证两种约定下都正确；
+  引擎支持 reverse-Z 深度约定，近平面对应的深度值会随约定改变，这个常量保证两种约定下都正确（详见[深度约定](zh-cn/reverse-z.md)）；
 - 模板缓冲区的清除值。
 
 传 `null` 可以跳过对应缓冲区的清除。

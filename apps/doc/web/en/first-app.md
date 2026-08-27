@@ -50,7 +50,7 @@ example clears the frame to green each frame, so you get a solid green screen.
 About the depth argument to `clearFrameBuffer()`: **use the `DEPTH_CLEAR_VALUE` constant from
 `@zephyr3d/base` instead of hard-coding 0 or 1**. The engine supports the reverse-Z depth
 convention, which changes which value corresponds to the near plane; this constant is correct under
-both.
+both. See [Depth Convention](en/reverse-z.md).
 
 Once the application exists, `getApp()`, `getEngine()`, `getDevice()` and `getInput()` reach the
 instances from anywhere, so you do not have to thread references through your code.
