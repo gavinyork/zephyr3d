@@ -1,6 +1,9 @@
 
 # Indirect Lighting
 
+> Code on this page is illustrative and omits imports and application setup. See the embedded
+> live demos for complete runnable examples.
+
 In **Zephyr3D**, a scene supports only a single **ambient light source**,  
 which simulates indirect illumination from the surrounding environment.
 

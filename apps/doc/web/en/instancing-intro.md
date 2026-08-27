@@ -1,5 +1,8 @@
 # Geometry Instancing
 
+> Code on this page is illustrative and omits imports and application setup. See the embedded
+> live demos for complete runnable examples.
+
 ## Overview
 
 **Geometry Instancing** is an efficient rendering technique  

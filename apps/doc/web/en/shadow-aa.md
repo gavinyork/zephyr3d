@@ -1,6 +1,9 @@
 
 # Shadow Anti-Aliasing
 
+> Code on this page is illustrative and omits imports and application setup. See the embedded
+> live demos for complete runnable examples.
+
 In **Zephyr3D**, real‑time shadows are implemented using **Shadow Maps**.  
 Because shadow maps have finite resolution, the edges of shadows may appear **jagged or aliased**,  
 especially in large scenes or when using low‑resolution maps.

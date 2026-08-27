@@ -1,5 +1,8 @@
 # Multi‑Viewport Rendering
 
+> Code on this page is illustrative and omits imports and application setup. See the embedded
+> live demos for complete runnable examples.
+
 ## Overview
 
 **Multi‑Viewport Rendering** is an advanced rendering feature in Zephyr3D that allows you to draw multiple view regions within a single canvas.  

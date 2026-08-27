@@ -1,5 +1,8 @@
 # Scene Picking
 
+> Code on this page is illustrative and omits imports and application setup. See the embedded
+> live demos for complete runnable examples.
+
 ## Overview
 
 **Scene Picking** refers to the technique of selecting or identifying objects in a virtual 3D scene through mouse, touch, or other input devices.  

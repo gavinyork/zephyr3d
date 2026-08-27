@@ -12,19 +12,7 @@ Zephyr3D 提供了三种用于文本渲染的场景节点：
 
 `TextSprite` 内部通过 `device.drawText()` 绘制文字。当 `text`、`font`、`resolutionX`、`resolutionY` 或 `textColor` 变化时，节点会重新绘制离屏纹理。
 
-```javascript
-import { Vector3 } from '@zephyr3d/base';
-import { TextSprite } from '@zephyr3d/scene';
-
-const label = new TextSprite(scene);
-label.text = 'TextSprite\nCanvas texture';
-label.font = 'bold 42px Arial';
-label.textColor = new Vector3(1, 0.95, 0.2);
-label.resolutionX = 512;
-label.resolutionY = 192;
-label.position.setXYZ(0, 1.6, 0);
-label.scale.setXYZ(4.5, 1.7, 1);
-```
+<<< @/../src/tut-54/main.js{88-98 js}
 
 常用属性：
 
@@ -34,7 +22,10 @@ label.scale.setXYZ(4.5, 1.7, 1);
 - `textColor`：线性 RGB 文本颜色。
 - `anchorX` / `anchorY`：归一化 sprite 轴心，默认是 `(0.5, 0.5)`。
 
-如果 `TextSprite` 使用远程字体，需要先通过 CSS `@font-face` 或浏览器 `FontFace` API 加载字体，再设置 `font` 字符串。
+如果 `TextSprite` 使用远程字体，需要先通过 CSS `@font-face` 或浏览器 `FontFace` API 加载字体，
+再设置 `font` 字符串——`font` 走的是浏览器 Canvas 的字体解析，字体没就绪会静默回退到默认字体：
+
+<<< @/../src/tut-54/main.js{60-74 js}
 
 由于文字会被烘焙到纹理中，除非标签数量很少，否则不建议每帧修改 `text`。
 
@@ -42,14 +33,7 @@ label.scale.setXYZ(4.5, 1.7, 1);
 
 `MSDFText` 和 `MSDFTextSprite` 都需要 `FontAsset`。可以通过 `ResourceManager.fetchFontAsset()` 加载：
 
-```javascript
-const FONT_URL = 'https://cdn.zephyr3d.org/doc/assets/fonts/Inter-Regular.otf';
-
-const fontAsset = await getEngine().resourceManager.fetchFontAsset(FONT_URL, {
-  pageSize: 1024,
-  glyphSize: 64
-});
-```
+<<< @/../src/tut-54/main.js{76-86 js}
 
 `pageSize` 控制每张图集纹理的尺寸。`glyphSize` 控制 MSDF 字形的基础分辨率。值越大，大字号显示质量越好，但会增加内存占用和生成开销。同一个 URL 首次加载时会应用这些选项，之后命中缓存时会复用已有 `FontAsset`。
 
@@ -59,23 +43,7 @@ const fontAsset = await getEngine().resourceManager.fetchFontAsset(FONT_URL, {
 
 `MSDFText` 会创建普通场景几何体。它完整遵循节点的位置、旋转和缩放，适合放在 3D 面板、标牌或其它场景表面上。
 
-```javascript
-import { Vector2, Vector3 } from '@zephyr3d/base';
-import { MSDFText } from '@zephyr3d/scene';
-
-const title = new MSDFText(scene);
-title.fontAsset = fontAsset;
-title.text = 'MSDFText\n3D layout node';
-title.fontSize = 0.45;
-title.maxWidth = 4.5;
-title.textAlign = 'center';
-title.anchor = new Vector2(0.5, 0.5);
-title.textColor = new Vector3(0.45, 0.9, 1);
-title.outlineColor = new Vector3(0.02, 0.05, 0.08);
-title.outlineWidth = 0.025;
-title.position.setXYZ(-2.3, -0.3, 0);
-title.rotation.fromEulerAngle(0, -0.35, 0);
-```
+<<< @/../src/tut-54/main.js{100-113 js}
 
 主要排版属性：
 
@@ -91,22 +59,7 @@ title.rotation.fromEulerAngle(0, -0.35, 0);
 
 `MSDFTextSprite` 暴露的文本排版和样式属性与 `MSDFText` 相同，但生成的几何体会以 billboard 方式渲染。它适合浮动标签、名称牌和需要在摄像机移动时保持可读的标记。
 
-```javascript
-import { Vector2, Vector3 } from '@zephyr3d/base';
-import { MSDFTextSprite } from '@zephyr3d/scene';
-
-const marker = new MSDFTextSprite(scene);
-marker.fontAsset = fontAsset;
-marker.text = 'MSDFTextSprite\ncamera-facing marker';
-marker.fontSize = 0.36;
-marker.maxWidth = 3.6;
-marker.textAlign = 'center';
-marker.anchor = new Vector2(0.5, 0.5);
-marker.textColor = new Vector3(1, 0.85, 0.35);
-marker.outlineColor = new Vector3(0, 0, 0);
-marker.outlineWidth = 0.02;
-marker.position.setXYZ(2.2, -1.45, 0);
-```
+<<< @/../src/tut-54/main.js{115-128 js}
 
 `MSDFTextSprite` 不参与阴影图渲染。它的 Z 轴旋转会作为 billboard 平面内旋转处理。
 

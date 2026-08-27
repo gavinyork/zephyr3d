@@ -1,6 +1,8 @@
 
 # 反走样（Shadow Anti-Aliasing）
 
+> 本页代码为片段示意，省略了 import 与应用初始化，完整可运行示例见页内嵌入的实例。
+
 在 Zephyr3D 中，我们通过 **Shadow Map（阴影贴图）** 实现实时阴影。  
 由于阴影贴图的分辨率有限，阴影边缘会出现明显的锯齿（aliasing），  
 尤其在大型场景或低分辨率 ShadowMap 下更为突出。

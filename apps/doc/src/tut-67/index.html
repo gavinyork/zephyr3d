@@ -63,13 +63,30 @@
         border-color: rgba(125, 186, 255, 0.7);
         background: #2f6fc5;
       }
+      #ui button:disabled {
+        opacity: 0.35;
+        cursor: not-allowed;
+      }
+      #ui button:disabled:hover {
+        background: transparent;
+      }
+      #ui .device {
+        display: inline-flex;
+        align-items: center;
+        padding: 0 10px 0 6px;
+        opacity: 0.7;
+        white-space: nowrap;
+      }
     </style>
   </head>
   <body>
     <canvas id="my-canvas"></canvas>
     <div id="ui" aria-label="OIT mode">
       <button id="btn-none" type="button">No OIT</button>
-      <button id="btn-wb" class="active" type="button">Weighted Blended</button>
+      <button id="btn-wb" type="button">Weighted Blended</button>
+      <button id="btn-ddp" type="button">Dual Depth Peeling</button>
+      <button id="btn-abuffer" type="button">ABuffer</button>
+      <span class="device">Device: <span id="device-type">…</span></span>
     </div>
     <script type="module" src="js/tut-67.js"></script>
   </body>

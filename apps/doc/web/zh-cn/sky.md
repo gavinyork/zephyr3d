@@ -9,20 +9,22 @@
 
 要使用天空盒渲染，只需要在场景中设置天空渲染方式为天空盒并设置天空盒贴图即可。
 
-```javascript
+<<< @/../src/tut-32/main.js{27-37 js}
 
-// 设置天空渲染模式为天空盒
-scene.env.sky.skyType = 'skybox';
-// 设置天空盒贴图
-scene.env.sky.skyboxTexture = skyboxTexture;
-
-```
+天空盒贴图是一张立方体贴图（`TextureCube`）。上例直接加载了一个 `.dds` 立方体贴图文件。
 
 <div class="showcase" case="tut-32"></div>
 
 <br>
 
-下面的例子演示了如何通过全景图实时生成天空盒
+如果手头只有全景图（等距圆柱投影，常见于 HDRI 素材），可以用内置的 `panoramaToCubemap()`
+在运行时转成立方体贴图：
+
+<<< @/../src/tut-33/main.js{28-44 js}
+
+要点是先用 `device.createCubeTexture()` 建一张空的立方体贴图作为目标（第 35 行），
+再把全景图渲染进去。这里用 `rgba16f` 格式是因为 HDR 全景图的亮度超出 [0,1] 范围，
+用 8 位格式会把高光截断。
 
 <div class="showcase" case="tut-33"></div>
 
@@ -33,9 +35,7 @@ scene.env.sky.skyboxTexture = skyboxTexture;
 要使用大气散射渲染天空，只需要设置天空渲染模式为大气散射即可，天空效果会根据阳光的方向实时计算。
 
 ```javascript
-
 scene.env.sky.skyType = 'scatter';
-
 ```
 
 注意：场景中的每个方向光都可以被设置为阳光，但是只能设置一个方向光为阳光，当一个方向光被设置为阳光后，之前被设置为阳光的方向光会被取消阳光属性。默认场景中第一个被创建的方向光会被设置为阳光。如果场景中不存在具有阳光属性的方向光，大气散射天空将会取一个默认的阳光方向。
@@ -50,21 +50,28 @@ directionalLight.sunLight = false;
 
 ```
 
-大气散射计算出的天空通常为高动态范围，需要配合Tonemap后处理效果。
+大气散射计算出的天空通常为高动态范围，需要配合 [Tonemap](zh-cn/posteffect-tonemap.md) 后处理效果。
+
+下面是一个完整的大气散射天空设置：
+
+<<< @/../src/tut-34/main.js{27-37 js}
+
+注意第 28 行创建方向光时并没有显式设置 `sunLight = true`——**场景中第一个被创建的方向光会自动
+成为阳光**，所以这里只需要用 `lookAt()` 定好它的朝向，天空就会随之变化。
 
 <div class="showcase" case="tut-34"></div>
 
-可以看到，天空中我们使用2D噪声函数创建了云层，云层的覆盖率可以通过代码调节
+天空中的云层是用 2D 噪声函数生成的，有三个可调参数：
 
 ```javascript
-
-// 设置云层覆盖率，仅在使用大气散射渲染模式时有效
+// 云层覆盖率，仅在大气散射模式下有效
 scene.env.sky.cloudy = 0.5;
 
-// 设置云层亮度
-scene.env.sky.cloudIntensity = 1.5
+// 云层亮度
+scene.env.sky.cloudIntensity = 1.5;
 
-// 设置风力，风力大小影响云层移动速度
+// 风力，影响云层移动速度和方向
 scene.env.sky.wind = new Vector2(300, 500);
-
+// 也可以就地修改，避免额外分配
+scene.env.sky.wind.setXY(600, 0);
 ```

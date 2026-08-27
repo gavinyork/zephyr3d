@@ -12,10 +12,14 @@ To solve this problem, Zephyr3D implements **Order‑Independent Transparency (O
 OIT allows transparent fragments to be correctly blended **without explicit sorting**,  
 achieving a balance between visual quality and rendering performance.
 
-The engine supports two OIT techniques:
+The engine supports three OIT techniques:
 
 1. **Weighted Blended OIT** — a high‑performance, weighted‑average‑based transparency blending method.  
-2. **Per‑Pixel Linked List OIT (ABuffer OIT)** — a per‑pixel linked‑list approach with fully accurate depth sorting.
+2. **Per‑Pixel Linked List OIT (ABuffer OIT)** — a per‑pixel linked‑list approach with fully accurate depth sorting.  
+3. **Dual Depth Peeling OIT** — a layer‑peeling approach whose accuracy and compatibility sit between the two.
+
+> Code on this page is illustrative and omits imports and application setup. See the embedded live
+> demo for a complete runnable example.
 
 ---
 
@@ -58,9 +62,6 @@ This approach is suitable for most transparent surfaces such as **glass, water, 
 > Tip  
 > When Weighted Blended OIT is enabled, **manual sorting of transparent objects is not required**.
 
-The following demo shows intersecting transparent objects; toggle OIT off to see the blend-order artifacts:
-
-<div class="showcase" case="tut-67"></div>
 
 ---
 
@@ -106,6 +107,58 @@ camera.oit = new ABufferOIT(20);
 
 ---
 
+## Dual Depth Peeling OIT
+
+### Principle
+
+**Dual depth peeling** strips both the nearest and the farthest remaining transparent layer in a
+single pass, so each pass resolves two layers. After a number of iterations the accumulated front and
+back colors are composited. Unlike ABuffer it needs no per‑pixel linked list storage, and unlike
+weighted blending it produces layer‑accurate results.
+
+The layer count comes from the constructor argument; fragments beyond that count are not blended
+correctly, so accuracy depends on the number of iterations you allow.
+
+### Supported Platforms
+
+The device must provide multiple render targets (at least 3), per‑target blending, min/max blend
+equations and blendable floating‑point color buffers. **WebGL1 does not qualify**; WebGL2 depends on
+the implementation, and WebGPU generally supports it.
+
+When those capabilities are missing, `supportDevice()` returns false and transparent geometry
+**silently falls back to sorted alpha blending** without raising an error — so verify on your target
+platform that it is actually active.
+
+### Example
+
+```javascript
+// The argument is the number of peel iterations after the initialization pass; default is 8
+camera.oit = new DualDepthPeelingOIT(8);
+```
+
+You can also select a mode by string through `camera.oitMode`, where the three techniques map to
+`'weighted'`, `'abuffer'` and `'dual-depth'` (`'none'` disables OIT):
+
+```javascript
+camera.oitMode = 'dual-depth';
+```
+
+---
+
+## Comparing the Modes
+
+The demo below contains several intersecting transparent spheres and a torus whose blend order
+changes continuously as they animate. You can switch between all four modes to compare them —
+with OIT off, the blend-order artifacts are clearly visible.
+
+The example prefers a WebGPU device and falls back to WebGL2 and then WebGL, showing the active
+device type in the UI. **Modes the current device cannot run are greyed out** — ABuffer is
+unavailable on WebGL2, for instance.
+
+<div class="showcase" case="tut-67"></div>
+
+---
+
 ## Resource Management
 
 When a **camera** is released, its associated **OIT resources** are automatically released as well.  
@@ -115,16 +168,18 @@ Manual disposal is generally unnecessary unless you reassign OIT objects explici
 
 ## Performance and Recommendations
 
-| Technique | Accuracy | Performance | Supported Platforms | Typical Use Cases | Recommendation |
-|------------|-----------|-------------|---------------------|------------------|----------------|
-| **Weighted Blended OIT** | Approximate | Excellent (high FPS) | WebGL / WebGL2 / WebGPU | General transparent objects, water, glass, particles | Default preferred method |
-| **Per‑Pixel Linked List OIT** | Precise | High (more GPU memory) | WebGPU | Complex layered transparency, deep alpha blending | Use when maximum quality is required |
+| Technique | `oitMode` | Accuracy | Performance | Supported Platforms | Recommendation |
+|------------|-----------|-----------|-------------|---------------------|----------------|
+| **Weighted Blended OIT** | `'weighted'` | Approximate | Excellent (high FPS) | WebGL / WebGL2 / WebGPU | Default preferred method |
+| **Dual Depth Peeling OIT** | `'dual-depth'` | Layer‑accurate, bounded by peel count | Moderate (slower with more passes) | WebGL2 / WebGPU (capability‑gated) | When weighted is not accurate enough but ABuffer is impractical |
+| **Per‑Pixel Linked List OIT** | `'abuffer'` | Precise | High (more GPU memory) | WebGPU | Use when maximum quality is required |
 
 > Recommended Practices:  
 > 1. Prefer **Weighted Blended OIT** for the best balance between performance and visual quality.  
 > 2. Use **ABuffer OIT** when running on WebGPU with heavy transparent layering.  
-> 3. When rendering **transparent instanced geometry**, enable OIT to avoid sorting artifacts.  
-> 4. OIT integrates smoothly with **TAA**, **Bloom**, **SSR**, and other post‑processing effects.
+> 3. For needs in between, try **Dual Depth Peeling**, keeping in mind that it silently falls back to sorted blending when capabilities are missing.  
+> 4. When rendering **transparent instanced geometry**, enable OIT to avoid sorting artifacts.  
+> 5. OIT integrates smoothly with **TAA**, **Bloom**, **SSR**, and other post‑processing effects.
 
 ---
 
@@ -135,8 +190,8 @@ It eliminates the dependency on rendering order for transparent objects,
 allowing visually correct transparency while maintaining high frame rate and flexibility.
 
 - **Weighted Blended OIT**: performance‑oriented, approximate blending — ideal for most cases.  
-- **ABuffer (Per‑Pixel Linked List) OIT**: quality‑oriented, pixel‑accurate blending — suited for advanced or cinematic scenes.  
-- Proper use and resource handling ensure both reliable and efficient transparency rendering.
+- **Dual Depth Peeling OIT**: layer peeling, accuracy bounded by the peel count, silently falls back to sorted blending when unsupported.  
+- **ABuffer (Per‑Pixel Linked List) OIT**: quality‑oriented, pixel‑accurate blending — suited for advanced or cinematic scenes.
 
 Through OIT, Zephyr3D achieves an ideal balance of **precision, performance, and usability**  
 for all transparency rendering scenarios.

@@ -11,13 +11,31 @@ import {
   PlaneShape,
   PBRMetallicRoughnessMaterial,
   WeightedBlendedOIT,
+  ABufferOIT,
+  DualDepthPeelingOIT,
   getInput,
   getEngine
 } from '@zephyr3d/scene';
-import { backendWebGL2 } from '@zephyr3d/backend-webgl';
+import { backendWebGL1, backendWebGL2 } from '@zephyr3d/backend-webgl';
+import { backendWebGPU } from '@zephyr3d/backend-webgpu';
+
+// Prefer WebGPU so that every OIT mode can be demonstrated: ABuffer OIT is
+// WebGPU-only, and dual depth peeling needs capabilities WebGL1 lacks.
+// Fall back to WebGL2, then WebGL1.
+async function selectBackend() {
+  if (await backendWebGPU.supported()) {
+    return backendWebGPU;
+  }
+  console.warn('No WebGPU support, fall back to WebGL2');
+  if (await backendWebGL2.supported()) {
+    return backendWebGL2;
+  }
+  console.warn('No WebGL2 support, fall back to WebGL');
+  return backendWebGL1;
+}
 
 const myApp = new Application({
-  backend: backendWebGL2,
+  backend: await selectBackend(),
   canvas: document.querySelector('#my-canvas')
 });
 
@@ -69,24 +87,52 @@ myApp.ready().then(function () {
   scene.mainCamera.lookAt(new Vector3(0, 12, 32), Vector3.zero(), Vector3.axisPY());
   scene.mainCamera.controller = new OrbitCameraController();
 
-  // Enable Weighted Blended OIT: transparent fragments blend correctly
-  // without any manual sorting. Works on WebGL/WebGL2/WebGPU.
-  // On WebGPU devices, `camera.oit = new ABufferOIT()` gives exact
-  // per-pixel sorted results at a higher cost.
-  scene.mainCamera.oit = new WeightedBlendedOIT();
+  // The three OIT implementations. Each one reports whether the current device
+  // can run it via supportDevice(); unsupported modes are greyed out below
+  // instead of silently falling back to sorted alpha blending.
+  const modes = [
+    { id: 'btn-none', label: 'No OIT', create: () => null },
+    { id: 'btn-wb', label: 'Weighted Blended', create: () => new WeightedBlendedOIT() },
+    { id: 'btn-ddp', label: 'Dual Depth Peeling', create: () => new DualDepthPeelingOIT(8) },
+    { id: 'btn-abuffer', label: 'ABuffer', create: () => new ABufferOIT() }
+  ];
 
-  const btnNone = document.querySelector('#btn-none');
-  const btnWb = document.querySelector('#btn-wb');
-  btnNone.addEventListener('click', () => {
-    scene.mainCamera.oit = null;
-    btnNone.classList.add('active');
-    btnWb.classList.remove('active');
-  });
-  btnWb.addEventListener('click', () => {
-    scene.mainCamera.oit = new WeightedBlendedOIT();
-    btnWb.classList.add('active');
-    btnNone.classList.remove('active');
-  });
+  const deviceType = myApp.device.type;
+  document.querySelector('#device-type').textContent = deviceType;
+
+  let activeButton = null;
+
+  function selectMode(mode, button) {
+    // The camera holds its OIT through a reference-counted handle, so assigning
+    // a new one releases the previous instance.
+    scene.mainCamera.oit = mode.create();
+    activeButton?.classList.remove('active');
+    button.classList.add('active');
+    activeButton = button;
+  }
+
+  const available = [];
+  for (const mode of modes) {
+    const button = document.querySelector(`#${mode.id}`);
+    // "No OIT" has nothing to probe and is always available. For the rest,
+    // build one throwaway instance just to ask the device about it.
+    const probe = mode.create();
+    const supported = !probe || probe.supportDevice(deviceType);
+    probe?.dispose();
+
+    if (!supported) {
+      button.disabled = true;
+      button.title = `${mode.label} is not supported on ${deviceType}`;
+      continue;
+    }
+    button.addEventListener('click', () => selectMode(mode, button));
+    available.push({ mode, button });
+  }
+
+  // Start on the most accurate mode this device supports, which is the last
+  // available entry since `modes` is ordered from cheapest to most accurate.
+  const initial = available[available.length - 1];
+  selectMode(initial.mode, initial.button);
 
   getInput().use(scene.mainCamera.handleEvent, scene.mainCamera);
 

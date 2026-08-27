@@ -1,5 +1,7 @@
 # 多视口渲染（Multi‑Viewport Rendering）
 
+> 本页代码为片段示意，省略了 import 与应用初始化，完整可运行示例见页内嵌入的实例。
+
 ## 概述
 
 **多视口渲染（Multi‑Viewport Rendering）** 是 Zephyr3D 引擎提供的一项高级绘制能力，  

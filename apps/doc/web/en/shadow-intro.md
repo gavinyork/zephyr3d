@@ -1,5 +1,8 @@
 # Shadow
 
+> Code on this page is illustrative and omits imports and application setup. See the embedded
+> live demos for complete runnable examples.
+
 Shadows add depth and realism to scenes. Currently, we support casting shadows with directional, point, and spotlight sources.
 
 ## Enable shadow

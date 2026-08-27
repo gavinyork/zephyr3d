@@ -10,10 +10,13 @@
 为了解决这一问题，Zephyr3D 提供了 **顺序无关透明度渲染（Order‑Independent Transparency, OIT）** 技术。  
 OIT 允许透明片元在无需显式排序的情况下正确混合，从而在性能与质量之间取得平衡。
 
-我们的引擎支持以下两种 OIT 技术：
+我们的引擎支持以下三种 OIT 技术：
 
 1. **Weighted Blended OIT** —— 基于加权平均的高性能透明度混合方案；  
-2. **Per‑Pixel Linked List OIT（ABuffer OIT）** —— 精确排序的像素级链表方案。
+2. **Per‑Pixel Linked List OIT（ABuffer OIT）** —— 精确排序的像素级链表方案；  
+3. **Dual Depth Peeling OIT** —— 逐层剥离深度的方案，精度和兼容性介于两者之间。
+
+> 本页代码为片段示意，省略了 import 与应用初始化，完整可运行示例见页内嵌入的实例。
 
 ---
 
@@ -55,9 +58,6 @@ camera.oit = new WeightedBlendedOIT();
 > 提示  
 > 在启用 Weighted Blended OIT 时，无需进行透明物体的排序处理。
 
-下面的演示展示了多个相互穿插的透明物体；关闭 OIT 可以看到混合顺序错误产生的瑕疵：
-
-<div class="showcase" case="tut-67"></div>
 
 ---
 
@@ -99,6 +99,51 @@ camera.oit = new ABufferOIT(20);
 
 ---
 
+## Dual Depth Peeling OIT
+
+### 原理简介
+
+**Dual Depth Peeling** 每一趟渲染同时剥离当前最近和最远的一层透明片元，因此一趟能处理两层，
+迭代若干趟后再把前向和后向累积的颜色合成起来。相比 ABuffer 不需要为每像素分配链表存储，
+相比 Weighted Blended 又能得到按层精确混合的结果。
+
+层数由构造参数决定，超出层数的片元不会被正确混合，所以它的精度取决于给定的迭代次数。
+
+### 支持平台
+
+需要设备同时具备：多渲染目标（至少 3 个）、逐目标混合、min/max 混合方程、
+可混合的浮点颜色缓冲。**WebGL1 不满足条件**；WebGL2 视具体实现而定，WebGPU 通常都支持。
+
+能力不足时 `supportDevice()` 返回 false，透明物体会**自动退回按排序的普通 alpha 混合**，
+不会报错——所以在目标平台上要实际确认它是否生效。
+
+### 用法示例
+
+```javascript
+// 参数为初始化 pass 之后的剥离迭代次数，默认 8
+camera.oit = new DualDepthPeelingOIT(8);
+```
+
+也可以通过 `camera.oitMode` 用字符串选择，三种模式分别对应
+`'weighted'`、`'abuffer'` 和 `'dual-depth'`（`'none'` 表示关闭）：
+
+```javascript
+camera.oitMode = 'dual-depth';
+```
+
+---
+
+## 效果对比
+
+下面的演示中有多个相互穿插的透明球体和圆环，它们的混合顺序随动画持续变化。
+可以在四种模式之间切换对比：关闭 OIT 时能明显看到混合顺序错误产生的瑕疵。
+
+该示例会优先创建 WebGPU 设备，不支持则依次回退到 WebGL2 和 WebGL，并在界面上显示当前设备类型。**当前设备不支持的模式会被置灰**——例如在 WebGL2 上 ABuffer 不可用。
+
+<div class="showcase" case="tut-67"></div>
+
+---
+
 ## 资源管理与释放
 
 当camera被释放时会自行释放其持有的OIT资源
@@ -107,16 +152,18 @@ camera.oit = new ABufferOIT(20);
 
 ## 性能与使用建议
 
-| 技术类型 | 精度 | 性能表现 | 适用平台 | 典型场景 | 建议 |
-|-----------|-------|------------|------------|------------|------|
-| **Weighted Blended OIT** | 近似 | 极佳（高帧率） | WebGL / WebGL2 / WebGPU | 一般透明物体、水面、玻璃、粒子 | 默认推荐使用 |
-| **Per‑Pixel Linked List OIT** | 精确 | 较高（显存开销大） | WebGPU | 层叠复杂、透明度深的场景 | 对质量要求极高时使用 |
+| 技术类型 | `oitMode` | 精度 | 性能表现 | 适用平台 | 建议 |
+|-----------|-----------|-------|------------|------------|------|
+| **Weighted Blended OIT** | `'weighted'` | 近似 | 极佳（高帧率） | WebGL / WebGL2 / WebGPU | 默认推荐使用 |
+| **Dual Depth Peeling OIT** | `'dual-depth'` | 按层精确，受层数限制 | 中等（趟数越多越慢） | WebGL2 / WebGPU（依赖能力检测） | 需要比加权更准、又不便用 ABuffer 时 |
+| **Per‑Pixel Linked List OIT** | `'abuffer'` | 精确 | 较高（显存开销大） | WebGPU | 对质量要求极高时使用 |
 
 > 推荐实践：  
 > 1. 优先使用 **Weighted Blended OIT**，在性能与效果间取得最佳平衡。  
 > 2. 若平台支持 WebGPU，且场景包含大量重叠透明层，可启用 **ABuffer OIT**。  
-> 3. 若与 **几何体实例化** 结合使用透明对象，请务必启用 OIT 以避免排序误差。  
-> 4. 可与 **TAA**、**Bloom**、**SSR** 等后处理协同使用，增强最终视觉质量。
+> 3. 介于两者之间的需求可以试 **Dual Depth Peeling**，但要注意它在能力不足时会静默退回排序混合。  
+> 4. 若与 **几何体实例化** 结合使用透明对象，请务必启用 OIT 以避免排序误差。  
+> 5. 可与 **TAA**、**Bloom**、**SSR** 等后处理协同使用，增强最终视觉质量。
 
 ---
 
@@ -126,7 +173,7 @@ camera.oit = new ABufferOIT(20);
 它消除了透明物体渲染对前后顺序的依赖，使渲染系统可在保持高帧率的同时获得正确的透明组合效果。
 
 - **Weighted Blended OIT**：性能优先，近似混合，适合大多数透明场景；  
-- **ABuffer（Per‑Pixel Linked List）OIT**：质量优先，像素精确混合，用于复杂或高端项目；  
-- 合理选用与资源释放可保证透明渲染既稳定又高效。
+- **Dual Depth Peeling OIT**：按层剥离，精度取决于迭代趟数，能力不足会静默退回排序混合；  
+- **ABuffer（Per‑Pixel Linked List）OIT**：质量优先，像素精确混合，用于复杂或高端项目。
 
 通过 OIT，Zephyr3D 的透明度渲染在 **精度、性能与易用性** 之间达成理想平衡。
