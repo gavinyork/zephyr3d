@@ -62,6 +62,7 @@
   - Multi-view Rendering
     - [Overview](en/multi-views.md)
   - Advanced Topics
+    - [Render Graph and Custom Passes](en/rendergraph.md)
     - [Serialization and Prefabs](en/serialization.md)
     - [Memory Management](en/lifetime.md)
     - [Virtual File System](en/vfs.md)

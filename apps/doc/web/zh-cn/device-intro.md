@@ -23,7 +23,8 @@ Scene API 建立在 Device API 之上，两者可以混用：用 Scene API 搭�
 - **要自研渲染框架**，不想用引擎的场景管理和渲染管线。
 - **要写自定义材质** —— 材质的 shader 用 Device API 的 shader 生成器编写，
   见[自定义材质](zh-cn/user-material.md)。
-- **要写自定义后处理效果**或者往渲染管线里插自己的 pass。
+- **要写自定义后处理效果**或者往渲染管线里插自己的 pass，
+  见[渲染图与自定义 Pass](zh-cn/rendergraph.md)。
 - **要用计算着色器**（仅 WebGPU）做 GPU 通用计算。
 - 想理解引擎内部如何工作。
 

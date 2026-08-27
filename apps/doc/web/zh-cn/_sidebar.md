@@ -62,6 +62,7 @@
   - 多视口渲染
     - [概述](zh-cn/multi-views.md)
   - 进阶内容
+    - [渲染图与自定义 Pass](zh-cn/rendergraph.md)
     - [序列化与预制体](zh-cn/serialization.md)
     - [内存管理](zh-cn/lifetime.md)
     - [虚拟文件系统](zh-cn/vfs.md)

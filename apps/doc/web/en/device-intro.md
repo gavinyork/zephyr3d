@@ -24,7 +24,8 @@ while using the Device API to write custom material shaders or insert your own r
 - You are **writing your own renderer** and do not want the engine's scene management or pipeline.
 - You are **writing a custom material** — material shaders are authored with the Device API's shader
   generator; see [Custom Materials](en/user-material.md).
-- You are **writing a custom post-processing effect** or inserting a pass into the pipeline.
+- You are **writing a custom post-processing effect** or inserting a pass into the pipeline; see
+  [Render Graph and Custom Passes](en/rendergraph.md).
 - You want **compute shaders** (WebGPU only) for general-purpose GPU work.
 - You want to understand how the engine works internally.
 
