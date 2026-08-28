@@ -223,7 +223,7 @@ export class ShadowRegion extends Disposable {
 
   /** @internal */
   private isShadowCaster(caster: SceneNode): boolean {
-    return !caster.disposed && (caster.isMesh() || caster.isClipmapTerrain());
+    return !caster.disposed && (caster.isMesh() || caster.isClipmapTerrain() || caster.isHair());
   }
 
   /** @internal */

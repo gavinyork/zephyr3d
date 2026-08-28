@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Zephyr3d hair rendering</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+      }
+      canvas {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        z-index: 0;
+      }
+      #ui {
+        position: absolute;
+        top: 8px;
+        left: 8px;
+        z-index: 10;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        width: 168px;
+        padding: 8px;
+        border: 1px solid rgba(255, 255, 255, 0.14);
+        border-radius: 6px;
+        background: rgba(15, 20, 28, 0.78);
+        color: #f4f7fb;
+        font:
+          12px/1.25 system-ui,
+          -apple-system,
+          BlinkMacSystemFont,
+          'Segoe UI',
+          sans-serif;
+        backdrop-filter: blur(8px);
+      }
+      #ui label {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        white-space: nowrap;
+      }
+      #ui label > span {
+        min-width: 56px;
+      }
+      #ui select {
+        flex: 1;
+        min-width: 0;
+        min-height: 22px;
+        padding: 0 4px;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        border-radius: 4px;
+        background: rgba(255, 255, 255, 0.06);
+        color: inherit;
+        font: inherit;
+        cursor: pointer;
+      }
+      #ui select:disabled,
+      #ui input:disabled {
+        opacity: 0.4;
+        cursor: not-allowed;
+      }
+      #ui input[type='checkbox'] {
+        width: 14px;
+        height: 14px;
+        cursor: pointer;
+      }
+      #ui hr {
+        border: none;
+        border-top: 1px solid rgba(255, 255, 255, 0.14);
+      }
+      #ui .note {
+        opacity: 0.7;
+        white-space: normal;
+      }
+    </style>
+  </head>
+  <body>
+    <canvas id="my-canvas"></canvas>
+    <div id="ui" aria-label="Hair rendering options">
+      <label>
+        <span>Blend</span>
+        <select id="blend-mode" disabled>
+          <option value="blend">AlphaBlend</option>
+          <option value="dither">AlphaDither</option>
+        </select>
+      </label>
+      <label>
+        <span>Shading</span>
+        <select id="shading-model" disabled>
+          <option value="marschner">Marschner</option>
+          <option value="kajiya-kay">Kajiya-Kay</option>
+        </select>
+      </label>
+      <label>
+        <span>Shadow</span>
+        <select id="shadow-mode" disabled>
+          <option value="none">None</option>
+          <option value="pcf">PCF</option>
+          <option value="dom">DOM</option>
+        </select>
+      </label>
+      <label>
+        <span>Simulation</span>
+        <input id="simulation" type="checkbox" disabled />
+      </label>
+      <hr />
+      <div class="note" id="status">Loading...</div>
+      <div class="note">Left drag: turn the hair. Right drag: orbit. Wheel: zoom.</div>
+    </div>
+    <script type="module" src="js/tut-71.js"></script>
+  </body>
+</html>

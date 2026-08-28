@@ -178,6 +178,8 @@ light.shadow.mode = 'dom';
 
 相关参数：`domLayerDistance`、`domDensity`、`domFilterSize`，都在 `light.shadow` 上。
 
+<div class="showcase" case="tut-71"></div>
+
 ## 相关
 
 - [皮肤与次表面散射](zh-cn/material-skin.md) —— 角色渲染的另一部分

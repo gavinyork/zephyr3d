@@ -96,6 +96,7 @@ export class HairStrandMaterial extends HairMaterial implements Clonable<HairStr
     // it, so a blended groom writes motion vectors rather than inheriting the
     // background's and ghosting as it swings.
     this.transparentMotionVector = true;
+    this.transparentShadowCaster = true;
     // The quad is built facing the camera, so there is no back face to cull.
     this.cullMode = 'none';
     // Strand geometry carries no vertex attributes at all: the frame is derived
