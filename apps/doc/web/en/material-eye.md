@@ -117,6 +117,8 @@ available; where none is bound the term **silently resolves to no occlusion** ra
 Both layers can be enabled together: the analytic one provides stable base occlusion, and contact
 occlusion adds the dynamic detail of the real lids.
 
+<div class="showcase" case="tut-72"></div>
+
 ## See also
 
 - [Skin and Subsurface Scattering](en/material-skin.md) — the skin half of character rendering

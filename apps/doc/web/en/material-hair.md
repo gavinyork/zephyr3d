@@ -189,6 +189,8 @@ took effect when it did not.
 
 Related parameters, all on `light.shadow`: `domLayerDistance`, `domDensity`, `domFilterSize`.
 
+<div class="showcase" case="tut-71"></div>
+
 ## See also
 
 - [Skin and Subsurface Scattering](en/material-skin.md) — the other half of character rendering

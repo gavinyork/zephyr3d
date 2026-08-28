@@ -108,6 +108,8 @@ material.contactAO = true;
 
 两层可以同时开：解析式提供稳定的基础遮蔽，接触遮蔽补上真实眼睑的动态细节。
 
+<div class="showcase" case="tut-72"></div>
+
 ## 相关
 
 - [皮肤与次表面散射](zh-cn/material-skin.md) —— 角色渲染的皮肤部分
