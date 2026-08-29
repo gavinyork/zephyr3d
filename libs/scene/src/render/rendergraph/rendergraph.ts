@@ -15,6 +15,7 @@ import {
   type RGResourceLifetime,
   type RGWriteOptions
 } from './types';
+import type { BaseTexture } from '@zephyr3d/device';
 
 /** Declarative render pass and resource dependency graph. @public */
 export class RenderGraph {
@@ -27,7 +28,7 @@ export class RenderGraph {
   private static _warnedCulledPasses = new Set<string>();
 
   /** Import an external texture that the graph does not own. */
-  importTexture<TTexture = unknown>(name: string): RGTextureHandle<TTexture> {
+  importTexture<TTexture = BaseTexture>(name: string): RGTextureHandle<TTexture> {
     const id = this._nextResourceId++;
     const resource = new RGResource(id, name, 'imported', null);
     this._resources.set(id, resource);
@@ -231,7 +232,7 @@ export class RenderGraph {
         }
         return new RGHandle(id, versionName, 'texture');
       },
-      createTexture<TTexture = unknown>(desc: RGTextureDesc): RGTextureHandle<TTexture> {
+      createTexture<TTexture = BaseTexture>(desc: RGTextureDesc): RGTextureHandle<TTexture> {
         if (desc.allocationKey !== undefined && desc.allocationKey.length === 0) {
           throw new Error(`RenderGraph: pass "${pass.name}" specified an empty texture allocationKey.`);
         }

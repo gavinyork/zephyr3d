@@ -43,7 +43,7 @@ import type { RenderModule } from './render_module';
 import { RenderPipeline } from './render_pipeline';
 import type { FrameResourceRequirements } from './frame_resource_requirements';
 import { mergeFrameResourceRequirements } from './frame_resource_requirements';
-import type { RGExecuteContext, RGHandle } from './types';
+import type { RGExecuteContext, RGHandle, RGTextureAttachment, RGTextureHandle } from './types';
 import { renderObjectColors } from '../gpu_picking';
 import type { Primitive } from '../primitive';
 import { BoxShape } from '../../shapes';
@@ -503,7 +503,7 @@ export interface ForwardPlusBuildState {
   /** Depth prepass outputs. */
   depth?: DepthPrepassResult;
   /** Depth attachment used by scene-color/SSS framebuffers (handle or backend texture). */
-  renderDepthAttachment: RGHandle | Texture2D | null;
+  renderDepthAttachment: Nullable<RGTextureAttachment>;
   /** True when the scene renders directly into the final framebuffer. */
   useFinalFramebufferAsIntermediate: boolean;
   /** Ordering token from the pre-light transmission-depth pass, if any. */
@@ -814,7 +814,7 @@ const HiZModule: RenderModule<FrameGraphContext> = {
     const preLightTransmissionDepthToken = fg.state.preLightTransmissionDepthToken;
     //const hiZWidth = nextPowerOf2(ctx.renderWidth);
     //const hiZHeight = nextPowerOf2(ctx.renderHeight);
-    let hiZHandle: RGHandle | undefined;
+    let hiZHandle: RGTextureHandle | undefined;
     graph.addPass('HiZ', (builder) => {
       builder.read(blackboard.expect(FrameResources.LinearDepth));
       builder.read(depthPassResult.depthFramebufferHandle);

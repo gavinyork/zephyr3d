@@ -13,6 +13,7 @@ import type {
   RGExecuteFn,
   RGPass,
   RGTextureHandle,
+  RGTextureAttachment,
   RGFramebufferHandle,
   RenderGraphExecutionBindings
 } from './types';
@@ -20,6 +21,7 @@ import { RGHandle } from './types';
 import type { RGTextureAffinityCache, RGTextureAffinityEntry } from './texture_affinity_cache';
 import type {
   AbstractDevice,
+  BaseTexture,
   FrameBuffer,
   TimestampQueryResult,
   TimestampQueryStatus
@@ -65,7 +67,7 @@ const DEFAULT_PROFILING_OPTIONS: RGResolvedProfilingOptions = {
 };
 
 /** Executes compiled graphs with automatic resource lifetimes. @public */
-export class RenderGraphExecutor<TTexture = unknown> {
+export class RenderGraphExecutor<TTexture = BaseTexture> {
   private static _defaultProfilingOptions: boolean | RGProfilingOptions = false;
   private static _latestProfileResult: RGProfileResult | null = null;
   private static _latestPendingProfileFrame: RGProfileFrameInternal | null = null;
@@ -711,19 +713,23 @@ export class RenderGraphExecutor<TTexture = unknown> {
     desc: RGFramebufferDesc,
     accessScope?: RGPassAccessScope
   ): RGFramebufferDesc {
-    const resolveAttachment = (attachment: unknown): unknown => {
+    const resolveAttachment = <T extends RGTextureAttachment | null | undefined>(
+      attachment: T
+    ): RGTextureAttachment | null | undefined => {
       if (attachment instanceof RGHandle) {
         if (accessScope) {
           this._assertDeclaredAccess(accessScope, attachment, 'texture');
         }
-        return this._resolveResource(attachment);
+        // The resolved physical texture stands in for the handle; the graph is
+        // only parameterized by TTexture, which the allocator produces.
+        return this._resolveResource(attachment) as RGTextureAttachment;
       }
       return attachment;
     };
     const colors = Array.isArray(desc.colorAttachments)
-      ? desc.colorAttachments.map(resolveAttachment)
+      ? (desc.colorAttachments.map(resolveAttachment) as RGTextureAttachment[])
       : desc.colorAttachments
-        ? resolveAttachment(desc.colorAttachments)
+        ? (resolveAttachment(desc.colorAttachments) as RGTextureAttachment)
         : null;
     return {
       ...desc,

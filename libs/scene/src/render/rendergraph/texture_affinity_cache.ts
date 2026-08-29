@@ -1,3 +1,5 @@
+import type { BaseTexture } from '@zephyr3d/device';
+
 /** A texture and the resolved descriptor it satisfied in the previous execution. */
 interface RGTextureAffinityEntry<TTexture> {
   texture: TTexture;
@@ -5,7 +7,7 @@ interface RGTextureAffinityEntry<TTexture> {
 }
 
 /** Remembers transient texture identities across executions without owning them. @public */
-export class RGTextureAffinityCache<TTexture = unknown> {
+export class RGTextureAffinityCache<TTexture = BaseTexture> {
   /** @internal */
   private _entries = new Map<string, RGTextureAffinityEntry<TTexture>>();
 

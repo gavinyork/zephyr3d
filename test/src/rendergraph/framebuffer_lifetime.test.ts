@@ -5,10 +5,11 @@ import { RenderGraph, RenderGraphExecutor } from '../../../libs/scene/src/render
 import { DevicePoolAllocator } from '../../../libs/scene/src/render/rendergraph/device_pool_allocator';
 import type {
   RGFramebufferDesc,
-  RGHandle,
+  RGFramebufferHandle,
   RGResolvedSize,
   RGTextureAllocator,
-  RGTextureDesc
+  RGTextureDesc,
+  RGTextureHandle
 } from '../../../libs/scene/src/render/rendergraph';
 
 // ─── Strict Allocator ────────────────────────────────────────────────
@@ -85,8 +86,8 @@ describe('Framebuffer attachment lifetime', () => {
     const { allocator, allocated, released, renderThrough } = createStrictAllocator(device);
     const graph = new RenderGraph();
 
-    let depthTexHandle: RGHandle;
-    let depthFbHandle: RGHandle;
+    let depthTexHandle: RGTextureHandle;
+    let depthFbHandle: RGFramebufferHandle;
     graph.addPass('DepthPrepass', (builder) => {
       depthTexHandle = builder.createTexture({ format: 'd24s8', label: 'sceneDepth' });
       depthFbHandle = builder.createFramebuffer({
@@ -102,7 +103,7 @@ describe('Framebuffer attachment lifetime', () => {
     // Intermediate pass that neither reads the depth texture nor the
     // framebuffer: without lifetime propagation the texture's lastUse would
     // be DepthPrepass and it would be released before TransparentPass runs.
-    let colorHandle: RGHandle;
+    let colorHandle: RGTextureHandle;
     graph.addPass('LightPass', (builder) => {
       builder.read(depthFbHandle);
       colorHandle = builder.createTexture({ format: 'rgba8unorm', label: 'sceneColor' });
@@ -155,9 +156,9 @@ describe('Framebuffer attachment lifetime', () => {
     // Mirrors DepthPrepass creating both the MRT depth framebuffer and the
     // sky motion vector framebuffer over the same motionVector texture, with
     // the second framebuffer read much later.
-    let mvHandle: RGHandle;
-    let fbA: RGHandle;
-    let fbB: RGHandle;
+    let mvHandle: RGTextureHandle;
+    let fbA: RGFramebufferHandle;
+    let fbB: RGFramebufferHandle;
     graph.addPass('Produce', (builder) => {
       mvHandle = builder.createTexture({ format: 'rgba16f', label: 'motionVector' });
       fbA = builder.createFramebuffer({ label: 'fbA', colorAttachments: mvHandle });

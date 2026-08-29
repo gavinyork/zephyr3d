@@ -7,6 +7,7 @@ import {
 import type {
   RGTextureAllocator,
   RGTextureDesc,
+  RGTextureHandle,
   RGResolvedSize,
   RGExecuteContext,
   RGFramebufferDesc
@@ -214,7 +215,9 @@ describe('RenderGraph', () => {
         graph.addPass('BadFramebuffer', (builder) => {
           const token = builder.createToken('done');
           builder.createFramebuffer({
-            colorAttachments: token,
+            // Deliberately wrong handle kind: the cast keeps the runtime
+            // validation reachable now that the type rejects it up front.
+            colorAttachments: token as unknown as RGTextureHandle,
             depthAttachment: null
           });
         });
@@ -242,7 +245,7 @@ describe('RenderGraph', () => {
 
   describe('dependency resolution', () => {
     test('framebuffer attachments infer texture dependencies', () => {
-      let color: RGHandle;
+      let color: RGTextureHandle;
       let backbuffer = graph.importTexture('backbuffer');
 
       graph.addPass('ProduceColor', (builder) => {
@@ -437,7 +440,7 @@ describe('RenderGraph', () => {
 
     test('reader of an overwritten version is still culled when its output is unused', () => {
       let backbuffer = graph.importTexture('backbuffer');
-      let color: RGHandle;
+      let color: RGTextureHandle;
 
       graph.addPass('LightPass', (builder) => {
         color = builder.createTexture({ format: 'rgba8unorm', label: 'color' });
@@ -474,7 +477,7 @@ describe('RenderGraph', () => {
     test('transient resource lifetime spans producer to last consumer', () => {
       let backbuffer = graph.importTexture('backbuffer');
       let depth: RGHandle;
-      let color: RGHandle;
+      let color: RGTextureHandle;
 
       graph.addPass('DepthPrepass', (builder) => {
         depth = builder.createTexture({ format: 'r32f', label: 'depth' });
@@ -742,7 +745,7 @@ describe('RenderGraph mutation safety', () => {
   test('WAR: reader of the old version runs before the overwriting pass', () => {
     const graph = new RenderGraph();
     let backbuffer = graph.importTexture('backbuffer');
-    let color: RGHandle;
+    let color: RGTextureHandle;
     let debugOut: RGHandle;
 
     graph.addPass('LightPass', (builder) => {
@@ -781,7 +784,7 @@ describe('RenderGraph mutation safety', () => {
   test('read of a superseded version is ordered before the overwriting pass', () => {
     const graph = new RenderGraph();
     let backbuffer = graph.importTexture('backbuffer');
-    let colorV0: RGHandle;
+    let colorV0: RGTextureHandle;
     let colorV1: RGHandle;
     let lateOut: RGHandle;
 
@@ -815,7 +818,7 @@ describe('RenderGraph mutation safety', () => {
   test('stale read of a forked write is ordered before the FIRST overwriting pass', () => {
     const graph = new RenderGraph();
     let backbuffer = graph.importTexture('backbuffer');
-    let colorV0: RGHandle;
+    let colorV0: RGTextureHandle;
     let lateOut: RGHandle;
 
     graph.addPass('Producer', (builder) => {
@@ -851,7 +854,7 @@ describe('RenderGraph mutation safety', () => {
 
   test('setup failure rolls back retroactive WAR edges and nextWriter', () => {
     const graph = new RenderGraph();
-    let color: RGHandle;
+    let color: RGTextureHandle;
 
     graph.addPass('Producer', (builder) => {
       color = builder.createTexture({ format: 'rgba8unorm', label: 'color' });
@@ -889,7 +892,7 @@ describe('RenderGraph mutation safety', () => {
 
   test('stale color framebuffer attachment is ordered before its overwriting pass', () => {
     const graph = new RenderGraph();
-    let colorV0: RGHandle;
+    let colorV0: RGTextureHandle;
 
     graph.addPass('Producer', (builder) => {
       colorV0 = builder.createTexture({ format: 'rgba8unorm', label: 'color' });
@@ -912,7 +915,7 @@ describe('RenderGraph mutation safety', () => {
 
   test('stale depth framebuffer attachment is ordered before its overwriting pass', () => {
     const graph = new RenderGraph();
-    let depthV0: RGHandle;
+    let depthV0: RGTextureHandle;
 
     graph.addPass('Producer', (builder) => {
       depthV0 = builder.createTexture({ format: 'd24s8', label: 'depth' });
@@ -935,7 +938,7 @@ describe('RenderGraph mutation safety', () => {
 
   test('framebuffer setup failure rolls back retroactive attachment WAR edges', () => {
     const graph = new RenderGraph();
-    let colorV0: RGHandle;
+    let colorV0: RGTextureHandle;
 
     graph.addPass('Producer', (builder) => {
       colorV0 = builder.createTexture({ format: 'rgba8unorm', label: 'color' });
@@ -950,7 +953,10 @@ describe('RenderGraph mutation safety', () => {
 
     expect(() =>
       graph.addPass('BrokenFramebuffer', (builder) => {
-        builder.createFramebuffer({ colorAttachments: [colorV0!, token] });
+        builder.createFramebuffer({
+          // See above: the token is an intentionally invalid attachment.
+          colorAttachments: [colorV0!, token as unknown as RGTextureHandle]
+        });
       })
     ).toThrow('must be a texture resource');
 
@@ -964,7 +970,7 @@ describe('RenderGraph mutation safety', () => {
 
   test('discard write culls passes needed only for previous contents', () => {
     const graph = new RenderGraph();
-    let color: RGHandle;
+    let color: RGTextureHandle;
 
     graph.addPass('OldContents', (builder) => {
       color = builder.createTexture({ format: 'rgba8unorm', label: 'color' });
@@ -981,7 +987,7 @@ describe('RenderGraph mutation safety', () => {
 
   test('load write keeps the previous contents producer alive', () => {
     const graph = new RenderGraph();
-    let color: RGHandle;
+    let color: RGTextureHandle;
 
     graph.addPass('OldContents', (builder) => {
       color = builder.createTexture({ format: 'rgba8unorm', label: 'color' });
@@ -1168,7 +1174,7 @@ describe('RenderGraphExecutor', () => {
     let backbuffer = graph.importTexture('backbuffer');
 
     let depth: RGHandle;
-    let color: RGHandle;
+    let color: RGTextureHandle;
     const events: string[] = [];
 
     graph.addPass('DepthPrepass', (builder) => {
@@ -1289,7 +1295,7 @@ describe('RenderGraphExecutor', () => {
 
   test('getTexture requires a declared read or write dependency', () => {
     const { allocator } = createMockAllocator();
-    let texture: RGHandle;
+    let texture: RGTextureHandle;
     let done: RGHandle;
 
     graph.addPass('Producer', (builder) => {
@@ -1315,7 +1321,7 @@ describe('RenderGraphExecutor', () => {
 
   test('subpass access validation reports pass and subpass names', () => {
     const { allocator } = createMockAllocator();
-    let texture: RGHandle;
+    let texture: RGTextureHandle;
     let done: RGHandle;
 
     graph.addPass('Producer', (builder) => {
@@ -1365,8 +1371,12 @@ describe('RenderGraphExecutor', () => {
     executor.execute(compiled);
 
     expect(resolvedFramebuffer).toBe(allocatedFramebuffers[0]);
-    expect((allocatedFramebuffers[0].desc.colorAttachments as MockTexture).desc.label).toBe('color');
-    expect((allocatedFramebuffers[0].desc.depthAttachment as MockTexture).desc.label).toBe('depth');
+    expect((allocatedFramebuffers[0].desc.colorAttachments as unknown as MockTexture).desc.label).toBe(
+      'color'
+    );
+    expect((allocatedFramebuffers[0].desc.depthAttachment as unknown as MockTexture).desc.label).toBe(
+      'depth'
+    );
     expect(releasedFramebuffers).toHaveLength(1);
   });
 
@@ -1439,7 +1449,7 @@ describe('RenderGraphExecutor', () => {
 
   test('createFramebuffer requires declared dependencies for handle attachments', () => {
     const { allocator } = createMockAllocator();
-    let texture: RGHandle;
+    let texture: RGTextureHandle;
     let done: RGHandle;
 
     graph.addPass('Producer', (builder) => {

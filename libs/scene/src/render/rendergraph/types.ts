@@ -1,4 +1,10 @@
-import type { AbstractDevice, FrameBuffer, TextureFormat, TimestampQueryStatus } from '@zephyr3d/device';
+import type {
+  AbstractDevice,
+  BaseTexture,
+  FrameBuffer,
+  TextureFormat,
+  TimestampQueryStatus
+} from '@zephyr3d/device';
 import type { RGTextureAffinityCache } from './texture_affinity_cache';
 
 /**
@@ -57,7 +63,7 @@ export class RGHandle<K extends RGHandleKind = RGHandleKind, TValue = unknown> {
 }
 
 /** Texture resource handle. @public */
-export type RGTextureHandle<TTexture = unknown> = RGHandle<'texture', TTexture>;
+export type RGTextureHandle<TTexture = BaseTexture> = RGHandle<'texture', TTexture>;
 
 /** Framebuffer resource handle. @public */
 export type RGFramebufferHandle = RGHandle<'framebuffer', FrameBuffer>;
@@ -110,7 +116,7 @@ export interface RGExecuteContext {
    */
   getTexture<TTexture>(handle: RGTextureHandle<TTexture>): TTexture;
   /** Resolve a texture handle stored in a generic resource container. */
-  getTexture<TTexture = unknown>(handle: RGHandle<RGHandleKind, any>): TTexture;
+  getTexture<TTexture = BaseTexture>(handle: RGHandle<RGHandleKind, any>): TTexture;
 
   /** Resolve a framebuffer declared or created by the current pass. */
   getFramebuffer(handle: RGFramebufferHandle): FrameBuffer;
@@ -203,7 +209,7 @@ export interface RGPassBuilder<TData = any> {
   write(handle: RGHandle, options?: RGWriteOptions): RGTextureHandle;
 
   /** Create a transient texture produced by this pass. */
-  createTexture<TTexture = unknown>(desc: RGTextureDesc): RGTextureHandle<TTexture>;
+  createTexture<TTexture = BaseTexture>(desc: RGTextureDesc): RGTextureHandle<TTexture>;
 
   /** Create a logical token for ordering passes without resource dependencies. */
   createToken(name?: string): RGTokenHandle;
@@ -265,7 +271,7 @@ export interface RGProfilingOptions {
 }
 
 /** Render graph executor options. @public */
-export interface RenderGraphExecutorOptions<TTexture = unknown> {
+export interface RenderGraphExecutorOptions<TTexture = BaseTexture> {
   /** Device used for timestamp queries. If omitted, the scene global getDevice() is used. */
   device?: AbstractDevice;
   /** Render graph timestamp profiling options. Default false. */
@@ -275,7 +281,7 @@ export interface RenderGraphExecutorOptions<TTexture = unknown> {
 }
 
 /** External resources bound for one graph execution. @public */
-export interface RenderGraphExecutionBindings<TTexture = unknown> {
+export interface RenderGraphExecutionBindings<TTexture = BaseTexture> {
   /** Imported graph texture handles and their physical textures. */
   readonly importedTextures?: ReadonlyMap<RGTextureHandle<TTexture>, TTexture>;
 }
@@ -316,10 +322,13 @@ export interface RGResolvedSize {
   height: number;
 }
 
-export type RGTextureAttachment<TTexture = unknown> = RGTextureHandle<TTexture> | TTexture | TextureFormat;
+export type RGTextureAttachment<TTexture = BaseTexture> =
+  | RGTextureHandle<TTexture>
+  | TTexture
+  | TextureFormat;
 
 /** Backend-independent framebuffer descriptor. @public */
-export interface RGFramebufferDesc<TTexture = unknown> {
+export interface RGFramebufferDesc<TTexture = BaseTexture> {
   /** Debug label for this framebuffer. */
   label?: string;
   /** Framebuffer width. Required when attachments are formats. */
@@ -352,7 +361,7 @@ export interface RGFramebufferDesc<TTexture = unknown> {
  *
  * @public
  */
-export interface RGTextureAllocator<TTexture = unknown> {
+export interface RGTextureAllocator<TTexture = BaseTexture> {
   /** Allocate a transient texture, preferring a compatible prior allocation. */
   allocate(desc: RGTextureDesc, size: RGResolvedSize, preferred?: TTexture): TTexture;
 

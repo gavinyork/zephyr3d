@@ -5,7 +5,7 @@ import { PostEffectLayer } from './posteffect';
 import type { Nullable } from '@zephyr3d/base';
 import { DRef } from '@zephyr3d/base';
 import type { RenderGraph } from '../render/rendergraph/rendergraph';
-import type { RGHandle } from '../render/rendergraph/types';
+import type { RGHandle, RGTextureAttachment } from '../render/rendergraph/types';
 import type { RGBlackboard } from '../render/rendergraph/blackboard';
 import type { HistoryResourceManager } from '../render/rendergraph/history_resource_manager';
 import type { FrameResourceRequirements } from '../render/rendergraph/frame_resource_requirements';
@@ -44,7 +44,7 @@ export interface CompositorBuildLayerOptions {
    * Depth attachment for intermediate effect outputs that request one:
    * either a graph texture handle or a backend depth texture.
    */
-  sceneDepthAttachment?: unknown;
+  sceneDepthAttachment?: Nullable<RGTextureAttachment>;
   /** Ordering/lifetime dependencies declared by every effect pass. */
   dependencies?: RGHandle[];
   /** History bindings kept in a read scope while effects execute. */

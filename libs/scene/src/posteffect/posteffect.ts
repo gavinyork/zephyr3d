@@ -5,7 +5,7 @@ import { copyTexture, fetchSampler } from '../utility/misc';
 import { Disposable } from '@zephyr3d/base';
 import type { Nullable } from '@zephyr3d/base';
 import type { RenderGraph } from '../render/rendergraph/rendergraph';
-import type { RGHandle, RGPassBuilder } from '../render/rendergraph/types';
+import type { RGHandle, RGPassBuilder, RGTextureAttachment } from '../render/rendergraph/types';
 import type { RGBlackboard } from '../render/rendergraph/blackboard';
 import { FrameResources } from '../render/rendergraph/blackboard';
 import type { FrameResourceRequirements } from '../render/rendergraph/frame_resource_requirements';
@@ -82,7 +82,7 @@ export interface PostEffectSetupContext {
    * Pass it as the depthAttachment of intermediate framebuffers; the final
    * pass gets it through createOutput({needDepthAttachment: true}).
    */
-  readonly sceneDepthAttachment: unknown;
+  readonly sceneDepthAttachment: Nullable<RGTextureAttachment>;
   /**
    * Ordering/lifetime dependencies that every pass created by this effect must
    * declare with {@link RGPassBuilder.read}.

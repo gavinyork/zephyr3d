@@ -12,7 +12,7 @@ import type { NullDevice } from '@zephyr3d/backend-null';
 import { createNullDevice } from '@zephyr3d/backend-null';
 import { RenderGraph, RenderGraphExecutor } from '../../../libs/scene/src/render/rendergraph';
 import { DevicePoolAllocator } from '../../../libs/scene/src/render/rendergraph/device_pool_allocator';
-import type { RGHandle } from '../../../libs/scene/src/render/rendergraph';
+import type { RGFramebufferHandle, RGTextureHandle } from '../../../libs/scene/src/render/rendergraph';
 
 describe('DevicePoolAllocator on a null device', () => {
   let device: NullDevice;
@@ -49,9 +49,9 @@ describe('DevicePoolAllocator on a null device', () => {
 
   test('graph execution releases every transient texture back to the pool', () => {
     const graph = new RenderGraph();
-    let depth: RGHandle;
-    let color: RGHandle;
-    let depthFb: RGHandle;
+    let depth: RGTextureHandle;
+    let color: RGTextureHandle;
+    let depthFb: RGFramebufferHandle;
     let depthTexture: Texture2D;
     let colorTexture: Texture2D;
 
@@ -112,7 +112,7 @@ describe('DevicePoolAllocator on a null device', () => {
 
     const run = () => {
       const graph = new RenderGraph();
-      let handle: RGHandle;
+      let handle: RGTextureHandle;
       let resolved: Texture2D;
       let backbuffer = graph.importTexture('backbuffer');
       graph.addPass('Pass', (builder) => {

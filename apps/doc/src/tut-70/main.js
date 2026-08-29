@@ -1,5 +1,4 @@
 import { Vector2, Vector3, Vector4 } from '@zephyr3d/base';
-import type { RenderModule, FrameGraphContext } from '@zephyr3d/scene';
 import {
   Scene,
   Application,
@@ -19,7 +18,6 @@ import {
   getEngine
 } from '@zephyr3d/scene';
 import { backendWebGL2 } from '@zephyr3d/backend-webgl';
-import type { Texture2D } from '@zephyr3d/device';
 
 const myApp = new Application({
   backend: backendWebGL2,
@@ -112,14 +110,13 @@ function getOutlineResources() {
   return { outlineProgram, outlineBindGroup, outlineVertexLayout, outlineRenderStates };
 }
 
-const outlineModule: RenderModule<FrameGraphContext> = {
+const outlineModule = {
   // Stable identifier; must be unique within a pipeline.
   type: 'MyOutline',
   // Declare what we touch so the graph can order us correctly.
-  reads: [
-    { resource: FrameResources.SceneColor, version: 'current' },
-    { resource: FrameResources.LinearDepth }
-  ] as const,
+  // 'current' is the default version, meaning the writer that is current at
+  // our position; pass version: 'final' to read the last writer instead.
+  reads: [{ resource: FrameResources.SceneColor }, { resource: FrameResources.LinearDepth }],
   writes: [FrameResources.SceneColor],
 
   // Per-frame feature decision. Module ordering happens before setup(),
@@ -156,7 +153,7 @@ const outlineModule: RenderModule<FrameGraphContext> = {
         const device = ctx.device;
         const srcColor = rgCtx.getTexture(sceneColor);
         const depthTex = rgCtx.getTexture(linearDepth);
-        const dstColor = rgCtx.getTexture<Texture2D>(written);
+        const dstColor = rgCtx.getTexture(written);
         const res = getOutlineResources();
 
         // Draw into a temporary framebuffer wrapping our own output texture.
@@ -225,6 +222,7 @@ myApp.ready().then(function () {
 
   const btnOff = document.querySelector('#btn-off');
   const btnOn = document.querySelector('#btn-on');
+  /** @param {boolean} on */
   function select(on) {
     // null falls back to the shared default pipeline, which has no outline pass.
     scene.mainCamera.renderPipeline = on ? pipelineWithOutline : null;
