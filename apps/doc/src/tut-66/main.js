@@ -24,11 +24,6 @@ const myApp = new Application({
 myApp.ready().then(function () {
   const scene = new Scene();
 
-  // Atmospheric scattering sky provides the reflection environment for the water
-  scene.env.sky.skyType = 'scatter';
-  scene.env.sky.fogType = 'none';
-  scene.env.light.strength = 0.6;
-
   // Directional light acts as the sun
   const sun = new DirectionalLight(scene);
   sun.rotation.fromEulerAngle(-Math.PI / 5, Math.PI / 4, 0);
@@ -73,21 +68,22 @@ myApp.ready().then(function () {
 
   // FBM waves: cheap procedural waves, a good default
   const waves = new FBMWaveGenerator();
-  waves.amplitude = 0.6;
-  waves.frequency = 0.03;
-  waves.numOctaves = 5;
-  waves.wind = new Vector2(1, 0.35);
+  waves.amplitude = 0.3;
+  waves.frequency = 3;
+  waves.numOctaves = 4;
+  waves.wind = new Vector2(0.1, 0);
   water.waveGenerator = waves;
 
   // Water shading controls
   water.material.depthMulti = 0.1;
-  water.material.displace = 0.3;
+  water.material.displace = 32;
   water.material.refractionStrength = 0.2;
 
   // Create camera
   scene.mainCamera = new PerspectiveCamera(scene, Math.PI / 3, 1, 1000);
   scene.mainCamera.lookAt(new Vector3(0, 18, 60), new Vector3(0, 0, 0), Vector3.axisPY());
   scene.mainCamera.controller = new OrbitCameraController();
+  scene.mainCamera.FXAA = true;
 
   getInput().use(scene.mainCamera.handleEvent, scene.mainCamera);
 

@@ -22,7 +22,10 @@
     "deploy": "npm run build:site && shx rm -rf ../homepage/doc && shx cp -R dist/web ../homepage/doc",
     "lint": "cross-env NODE_OPTIONS=--max_old_space_size=8192 eslint \"src/**/*.js\" -f compact",
     "lint-fix": "cross-env NODE_OPTIONS=--max_old_space_size=8192 eslint --fix \"src/**/*.ts\" -f compact",
-    "dev": "cross-env DOC_BASE=/doc/ vitepress dev web --host 0.0.0.0",
+    "dev": "node dev.mjs",
+    "dev:vitepress": "cross-env DOC_BASE=/doc/ vitepress dev web --host 0.0.0.0",
+    "dev:tutorials": "node watch-tutorials.mjs",
+    "dev:showcase": "rollup -c rollup.config.showcase.mjs --watch",
     "serve": "cross-env DOC_BASE=/doc/ vitepress preview web --host 0.0.0.0"
   },
   "engines": {

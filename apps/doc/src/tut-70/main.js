@@ -163,10 +163,7 @@ const outlineModule = {
         device.setFramebuffer(fb);
         res.outlineBindGroup.setTexture('sceneColor', srcColor);
         res.outlineBindGroup.setTexture('linearDepth', depthTex);
-        res.outlineBindGroup.setValue(
-          'texelSize',
-          new Vector2(1 / dstColor.width, 1 / dstColor.height)
-        );
+        res.outlineBindGroup.setValue('texelSize', new Vector2(1 / dstColor.width, 1 / dstColor.height));
         res.outlineBindGroup.setValue('outlineColor', new Vector3(0, 0, 0));
         res.outlineBindGroup.setValue('threshold', 0.04);
         device.setProgram(res.outlineProgram);

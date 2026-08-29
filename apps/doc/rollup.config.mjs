@@ -17,6 +17,7 @@ const srcfiles = [];
 const zephyr3d = path.join(__dirname, 'node_modules', '@zephyr3d');
 const cacheFile = path.join(__dirname, '.buildcache.json');
 const tmpcacheFile = path.join(__dirname, '.buildcache.tmp.json');
+const watchMode = process.env.ROLLUP_WATCH === 'true';
 
 function deepEqual(obj1, obj2) {
   if (obj1 === obj2) {
@@ -86,11 +87,13 @@ try {
 } catch (err) {
   console.log('Build cache file not exists');
 }
-fs.writeFileSync(tmpcacheFile, JSON.stringify(buildCache, null, 2));
+if (!watchMode) {
+  fs.writeFileSync(tmpcacheFile, JSON.stringify(buildCache, null, 2));
+}
 
 let cacheChanged = false;
 let invalidAll = false;
-let codeCompress = true;
+let codeCompress = !watchMode;
 const dict = traverseDirectory(zephyr3d, zephyr3d);
 const cachedZephr3d = buildCache['@zephyr3d'];
 if (!deepEqual(cachedZephr3d, dict)) {
@@ -123,7 +126,7 @@ fs.readdirSync(srcdir).filter((dir) => {
     ) {
       const cache = buildCache[dir];
       const dict = traverseDirectory(fullpath, fullpath);
-      if (invalidAll || !deepEqual(cache, dict) || !hasTutOutput(dir)) {
+      if (watchMode || invalidAll || !deepEqual(cache, dict) || !hasTutOutput(dir)) {
         buildCache[dir] = dict;
         cacheChanged = true;
         srcfiles.push([main, dir]);
@@ -132,7 +135,7 @@ fs.readdirSync(srcdir).filter((dir) => {
   }
 });
 
-if (cacheChanged) {
+if (cacheChanged && !watchMode) {
   fs.writeFileSync(tmpcacheFile, JSON.stringify(buildCache, null, 2), 'utf8');
 }
 
@@ -171,6 +174,44 @@ function getCacheTarget() {
 }
 
 function getTutTarget(input, output) {
+  const plugins = [
+    nodeResolve(),
+    swc({
+      sourceMaps: true,
+      inlineSourcesContent: false
+    }),
+    commonjs()
+  ];
+  if (codeCompress) {
+    plugins.push(
+      terser({
+        compress: true,
+        mangle: true,
+        module: true,
+        toplevel: true,
+        output: {
+          comments: false
+        }
+      })
+    );
+  }
+  plugins.push(
+    copy({
+      targets: [
+        {
+          src: `src/${output}/index.html`,
+          dest: 'web/public/tut',
+          rename: `${output}.html`
+        },
+        {
+          src: `src/${output}/main.js`,
+          dest: 'web/public/tut',
+          rename: `${output}.main.js`
+        }
+      ],
+      verbose: true
+    })
+  );
   return {
     input: input,
     preserveSymlinks: false,
@@ -179,43 +220,12 @@ function getTutTarget(input, output) {
       format: 'esm',
       sourcemap: true
     },
-    plugins: [
-      nodeResolve(),
-      swc({
-        sourceMaps: true,
-        inlineSourcesContent: false
-      }),
-      commonjs(),
-      terser({
-        compress: codeCompress,
-        mangle: codeCompress,
-        module: true,
-        toplevel: true,
-        output: {
-          comments: false
-        }
-      }),
-      copy({
-        targets: [
-          {
-            src: `src/${output}/index.html`,
-            dest: 'web/public/tut',
-            rename: `${output}.html`
-          },
-          {
-            src: `src/${output}/main.js`,
-            dest: 'web/public/tut',
-            rename: `${output}.main.js`
-          }
-        ],
-        verbose: true
-      })
-    ]
+    plugins
   };
 }
 
 export default (args) => {
   console.log(JSON.stringify(srcfiles));
   const tutTargets = srcfiles.map((f) => getTutTarget(f[0], f[1]));
-  return [...tutTargets, getCacheTarget()];
+  return watchMode ? tutTargets : [...tutTargets, getCacheTarget()];
 };
