@@ -239,17 +239,65 @@ function parseSidebar(relativePath: string): DefaultTheme.SidebarItem[] {
   return roots;
 }
 
-function apiSidebar(): DefaultTheme.SidebarItem[] {
+function readApiSidebar(): DefaultTheme.SidebarItem[] {
   // TypeDoc (typedoc-vitepress-theme) writes the API sidebar tree here at build time.
   // Each top-level node is a package (named via the @module tag in its index.ts),
   // already shaped as: package -> kind (Classes/Interfaces/...) -> symbol.
-  let raw: DefaultTheme.SidebarItem[];
   try {
-    raw = JSON.parse(fs.readFileSync(path.join(apiRoot, 'typedoc-sidebar.json'), 'utf8'));
+    return JSON.parse(fs.readFileSync(path.join(apiRoot, 'typedoc-sidebar.json'), 'utf8'));
   } catch {
     return [];
   }
-  return [{ text: 'API Reference', items: raw }];
+}
+
+/** First path segment under /api/ for a sidebar entry, e.g. `scene`. */
+function apiPackageDir(item: DefaultTheme.SidebarItem): string | undefined {
+  const link = item.link;
+  if (typeof link === 'string') {
+    return link.split('/').filter(Boolean)[1];
+  }
+  for (const child of item.items ?? []) {
+    const found = apiPackageDir(child);
+    if (found) {
+      return found;
+    }
+  }
+  return undefined;
+}
+
+/**
+ * Per-package sidebars for the API reference.
+ *
+ * A single `/api/` sidebar holding all ~1590 symbols is server-rendered into
+ * every one of the ~1569 generated pages, which made the sidebar markup dominate
+ * both build time and output size. Scoping by package means a page only carries
+ * its own package's tree plus a short list of the other packages.
+ */
+function apiSidebars(): DefaultTheme.SidebarMulti {
+  const packages = readApiSidebar();
+  if (!packages.length) {
+    return {};
+  }
+
+  const links = packages.map((pkg) => {
+    const dir = apiPackageDir(pkg);
+    return { text: pkg.text ?? dir ?? '', link: dir ? `/api/${dir}/` : '/api/' };
+  });
+
+  const sidebars: DefaultTheme.SidebarMulti = {};
+  packages.forEach((pkg, index) => {
+    const dir = apiPackageDir(pkg);
+    if (!dir) {
+      return;
+    }
+    sidebars[`/api/${dir}/`] = [
+      { text: 'API Reference', items: links.filter((_link, i) => i !== index) },
+      { text: pkg.text ?? dir, items: pkg.items ?? [] }
+    ];
+  });
+  // Landing page and anything not under a package directory.
+  sidebars['/api/'] = [{ text: 'API Reference', items: links }];
+  return sidebars;
 }
 
 function getLastUpdated(relativePath: string): number | undefined {
@@ -280,7 +328,10 @@ export default defineConfig({
   cleanUrls: false,
   lastUpdated: false,
   ignoreDeadLinks: true,
-  srcExclude: ['**/_*.md'],
+  // The ~1569 generated API pages dominate build time. Set DOC_SKIP_API=1 to
+  // exclude them when iterating on the guides or the examples; never use it for
+  // a release build, which must contain the API reference.
+  srcExclude: process.env.DOC_SKIP_API ? ['**/_*.md', 'api/**'] : ['**/_*.md'],
   transformPageData(pageData) {
     const lastUpdated = getLastUpdated(pageData.filePath);
     return lastUpdated ? { lastUpdated } : undefined;
@@ -321,7 +372,8 @@ export default defineConfig({
     sidebar: {
       '/en/': parseSidebar('en/_sidebar.md'),
       '/zh-cn/': parseSidebar('zh-cn/_sidebar.md'),
-      '/api/': apiSidebar()
+      // More specific /api/<pkg>/ keys must come before the /api/ fallback.
+      ...apiSidebars()
     },
     search: {
       provider: 'local',

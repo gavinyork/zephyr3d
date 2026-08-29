@@ -30,3 +30,25 @@ Two consequences worth knowing:
 Both steps keep a content-hash cache (`.buildcache.json` for examples, `.libcache.json` for
 the engine) and skip work that is already current. `npm run clean:cache` forces a full
 rebuild.
+
+## Build times
+
+`build:vitepress` is by far the slowest step, and the ~1569 generated API pages are
+almost all of it. VitePress does not cache rendered pages between runs, so every full
+build re-renders them even when only a guide page changed:
+
+| step | time |
+| --- | --- |
+| `build:vitepress` (full) | ~150 s |
+| `build:vitepress:noapi` | ~31 s |
+| `build:tutorials` (cold) | ~44 s |
+| `build:tutorials` (one example changed) | ~2 s |
+
+Use `npm run build:vitepress:noapi` while iterating on the guides or the examples. It sets
+`DOC_SKIP_API=1`, which drops `api/**` from the build — everything else (guides, examples,
+engine bundles, search index) is produced normally. **Never** use it for a release: the
+published site must include the API reference. `npm run deploy` and `build:site` always run
+the full build.
+
+For fast feedback prefer `npm run dev`, which serves `web/public/` directly and needs no
+VitePress build at all.
