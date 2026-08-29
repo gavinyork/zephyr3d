@@ -19,24 +19,66 @@ function normalizeBase(value: string): string {
   return normalized.startsWith('/') ? normalized : `/${normalized}`;
 }
 
-function isPathInside(directory: string, file: string): boolean {
-  const relative = path.relative(directory, path.resolve(file));
-  return relative === '' || (!relative.startsWith('..') && !path.isAbsolute(relative));
-}
-
+/**
+ * Reloads the browser when the generated tutorial/showcase output changes.
+ *
+ * These files are build products, not Vite modules, so they are excluded from
+ * Vite's own watcher and handled by a dedicated one here. Letting them reach
+ * Vite's HMR pipeline crashed `npm run dev`: the tutorial and showcase watchers
+ * start in parallel with VitePress and write into `web/public` immediately, and
+ * a change arriving before `@vitejs/plugin-vue` has run `buildStart` hit its
+ * `handleHotUpdate` while `options.compiler` was still null
+ * ("Cannot read properties of null (reading 'invalidateTypeCache')").
+ * Returning `[]` from our own hook could not prevent that, because Vite runs
+ * every `handleHotUpdate` hook regardless of what earlier ones return.
+ */
 const generatedAssetReloadPlugin = {
   name: 'reload-generated-doc-assets',
-  handleHotUpdate({ file, server }: { file: string; server: { ws: { send: (payload: object) => void } } }) {
-    if (!isPathInside(generatedTutorialRoot, file) && path.resolve(file) !== generatedShowcaseBundle) {
-      return;
-    }
-    if (!generatedReloadTimer) {
+  config() {
+    // These become picomatch patterns, which only match POSIX separators, so a
+    // Windows path has to be normalized. Glob metacharacters that can appear in
+    // a real path are escaped.
+    const toGlob = (target: string) =>
+      target
+        .split(path.sep)
+        .join('/')
+        .replace(/[()[\]{}!*?]/g, '\\$&');
+    return {
+      server: {
+        watch: {
+          ignored: [`${toGlob(generatedTutorialRoot)}/**`, toGlob(generatedShowcaseBundle)]
+        }
+      }
+    };
+  },
+  configureServer(server: {
+    ws: { send: (payload: object) => void };
+    httpServer?: { once: (event: string, listener: () => void) => void } | null;
+  }) {
+    const scheduleReload = () => {
+      if (generatedReloadTimer) {
+        return;
+      }
       generatedReloadTimer = setTimeout(() => {
         generatedReloadTimer = undefined;
         server.ws.send({ type: 'full-reload', path: '*' });
       }, 50);
+    };
+    // Either path may be missing before the first tutorial/showcase build.
+    const watchers: fs.FSWatcher[] = [];
+    for (const [target, options] of [
+      [generatedTutorialRoot, { recursive: true }],
+      [generatedShowcaseBundle, {}]
+    ] as const) {
+      if (fs.existsSync(target)) {
+        watchers.push(fs.watch(target, options, scheduleReload));
+      }
     }
-    return [];
+    server.httpServer?.once('close', () => {
+      for (const watcher of watchers) {
+        watcher.close();
+      }
+    });
   }
 };
 
