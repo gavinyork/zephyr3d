@@ -1811,7 +1811,7 @@ export function mixinPBRCommon<T extends typeof MeshMaterial>(BaseCls: T) {
         ctx.SSGI &&
         ctx.SSGIIrradianceHistoryTexture &&
         ctx.SSGISurfaceHistoryTexture &&
-        (ctx.device.type !== 'webgpu' || ctx.motionVectorTexture)
+        (ctx.device.type === 'webgl' || ctx.motionVectorTexture)
       );
       const funcName = 'Z_PBRIndirectLighting';
       pb.func(

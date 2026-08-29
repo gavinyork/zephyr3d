@@ -17,7 +17,7 @@ import { backendWebGPU } from '@zephyr3d/backend-webgpu';
 import { backendWebGL2 } from '@zephyr3d/backend-webgl';
 
 const myApp = new Application({
-  backend: backendWebGL2,
+  backend: (await backendWebGPU.supported()) ? backendWebGPU : backendWebGL2,
   canvas: document.querySelector('#my-canvas')
 });
 

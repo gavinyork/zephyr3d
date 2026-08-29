@@ -43,8 +43,8 @@ The camera must use HDR, SSGI intensity must be greater than zero, and the IBL m
 <div class="showcase" case="tut-68"></div>
 
 **Backend differences:**
-- **WebGPU**: Uses motion vectors, Hi-Z acceleration, historical scene color and full temporal filtering for higher quality
-- **WebGL**: Uses linear ray marching with spatial filtering and same-pixel history validation
+- **WebGPU and WebGL2**: Use motion vectors, Hi-Z acceleration, historical scene color and full temporal filtering for higher quality
+- **WebGL1**: Has neither motion vectors nor Hi-Z, so it falls back to linear ray marching with spatial filtering only, single-bounce hits and same-pixel history validation - expect more noise and less indirect light
 
 ---
 
@@ -83,7 +83,7 @@ Changing any custom setting through the API automatically switches the preset to
 | `ssgiSkyOcclusion` | `1` | How much occluding geometry blocks environment light. `1` is full physical occlusion; lower values reduce darkening |
 | `ssgiMaxDistance` | `32` | Maximum view-space trace distance. Larger values capture more distant bounces but cost more performance |
 | `ssgiThickness` | `0.5` | Depth intersection thickness for ray hits |
-| `ssgiStride` | `1` | Pixel stride for linear ray marching (WebGL only) |
+| `ssgiStride` | `1` | Pixel stride for linear ray marching (WebGL1 only) |
 | `ssgiMaxRayIntensity` | `10` | Clamps overly bright samples to reduce firefly artifacts |
 | `ssgiTemporal` | `true` | Enables temporal accumulation to reduce noise |
 | `ssgiTemporalWeight` | `0.94` | Maximum history weight for temporal filtering after stabilization |
@@ -96,6 +96,6 @@ Changing any custom setting through the API automatically switches the preset to
 
 - Start with the **`balanced`** preset and adjust from there
 - Use **half resolution** (`ssgiHalfResolution = true`) for significant performance gains with minimal visual loss
-- Enable **Hi-Z** (`camera.HiZ = true`) on WebGPU for faster ray tracing
+- SSGI requests the Hi-Z pyramid itself on WebGPU and WebGL2, so ray tracing is already accelerated there
 - Reduce `ssgiRaysPerPixel` if you have strong temporal filtering
 - Lower `ssgiMaxSteps` in scenes with simple geometry or limited depth complexity

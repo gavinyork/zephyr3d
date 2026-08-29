@@ -819,7 +819,7 @@ export class EnvShIBL extends EnvironmentLighting {
       ctx?.SSGI &&
       ctx.SSGIIrradianceHistoryTexture &&
       ctx.SSGISurfaceHistoryTexture &&
-      (ctx.device.type !== 'webgpu' || ctx.motionVectorTexture) &&
+      (ctx.device.type === 'webgl' || ctx.motionVectorTexture) &&
       ctx.linearDepthTexture
     );
   }

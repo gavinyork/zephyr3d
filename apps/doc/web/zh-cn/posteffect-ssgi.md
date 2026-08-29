@@ -43,8 +43,8 @@ camera.SSGI = true;
 <div class="showcase" case="tut-68"></div>
 
 **后端差异：**
-- **WebGPU**：使用运动矢量、Hi-Z 加速、历史场景颜色和完整的时域过滤，质量更高
-- **WebGL**：使用线性光线步进、空间过滤和同像素历史验证
+- **WebGPU 和 WebGL2**：使用运动矢量、Hi-Z 加速、历史场景颜色和完整的时域过滤，质量更高
+- **WebGL1**：没有运动矢量也没有 Hi-Z，退化为线性光线步进 + 纯空间过滤、单次弹射，历史仅按同像素验证 —— 噪点更明显，间接光更弱
 
 ---
 
@@ -83,7 +83,7 @@ camera.ssgiDenoisePasses = 2;
 | `ssgiSkyOcclusion` | `1` | 遮挡几何体阻挡环境光的程度。`1` 为完整的物理遮蔽；降低该值会减少变暗效果 |
 | `ssgiMaxDistance` | `32` | 视空间最大追踪距离。更大的值可以捕捉更远的光线反弹，但性能开销更高 |
 | `ssgiThickness` | `0.5` | 光线命中的深度相交厚度 |
-| `ssgiStride` | `1` | 线性光线步进的像素步长（仅 WebGL） |
+| `ssgiStride` | `1` | 线性光线步进的像素步长（仅 WebGL1） |
 | `ssgiMaxRayIntensity` | `10` | 限制过亮采样以减少萤火虫瑕疵 |
 | `ssgiTemporal` | `true` | 是否启用时域累积以减少噪声 |
 | `ssgiTemporalWeight` | `0.94` | 历史稳定后时域过滤的最大历史帧权重 |
@@ -96,6 +96,6 @@ camera.ssgiDenoisePasses = 2;
 
 - 从 **`balanced`** 档位开始，然后根据需要调整
 - 使用**半分辨率**（`ssgiHalfResolution = true`）可以显著提升性能，视觉损失极小
-- 在 WebGPU 上启用 **Hi-Z**（`camera.HiZ = true`）以加快光线追踪
+- 在 WebGPU 和 WebGL2 上 SSGI 会自行申请 Hi-Z 金字塔，光线追踪已经是加速的
 - 如果有强时域过滤，可以降低 `ssgiRaysPerPixel`
 - 在几何体简单或深度复杂度有限的场景中降低 `ssgiMaxSteps`

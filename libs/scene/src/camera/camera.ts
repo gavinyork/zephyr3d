@@ -1144,7 +1144,7 @@ export class Camera extends SceneNode {
       this.invalidateSSGIHistory();
     }
   }
-  /** Whether WebGPU SSGI temporal accumulation is enabled. */
+  /** Whether SSGI temporal accumulation is enabled. Has no effect on WebGL1, which has no motion vectors. */
   get ssgiTemporal() {
     return this._ssgiTemporal;
   }

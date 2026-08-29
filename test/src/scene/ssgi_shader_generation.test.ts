@@ -42,7 +42,7 @@ function createShaderContext(type: 'webgl' | 'webgpu') {
   } as any;
 }
 
-function buildSSGIHistoryRepairProgram(type: 'webgl' | 'webgpu') {
+function buildSSGIHistoryRepairProgram(type: 'webgl' | 'webgl2' | 'webgpu') {
   const device: any = { type };
   const builder = new ProgramBuilder(device);
   const envLight = Object.create(EnvShIBL.prototype) as EnvShIBL;
@@ -52,7 +52,7 @@ function buildSSGIHistoryRepairProgram(type: 'webgl' | 'webgpu') {
     SSGI: true,
     SSGIIrradianceHistoryTexture: {},
     SSGISurfaceHistoryTexture: {},
-    motionVectorTexture: type === 'webgpu' ? {} : null,
+    motionVectorTexture: type === 'webgl' ? null : {},
     linearDepthTexture: {}
   } as any;
   const result = builder.buildRender({
@@ -68,7 +68,7 @@ function buildSSGIHistoryRepairProgram(type: 'webgl' | 'webgpu') {
       this[EnvShIBL.UNIFORM_NAME_SSGI_IRRADIANCE] = pb.tex2D().uniform(0);
       this[EnvShIBL.UNIFORM_NAME_SSGI_SURFACE] = pb.tex2D().uniform(0);
       this[EnvShIBL.UNIFORM_NAME_SSGI_CURRENT_DEPTH] = pb.tex2D().uniform(0);
-      if (type === 'webgpu') {
+      if (type !== 'webgl') {
         this[EnvShIBL.UNIFORM_NAME_SSGI_MOTION] = pb.tex2D().uniform(0);
       }
       this[EnvShIBL.UNIFORM_NAME_SSGI_TARGET_SIZE] = pb.vec2().uniform(0);
@@ -192,7 +192,43 @@ describe('SSGI shader generation', () => {
     expect(src).toContain('mix(8.0,1.0,historyConfidence)');
   });
 
-  test.each(['webgpu', 'webgl'] as const)('builds %s lighting history repair', (type) => {
+  test.each(['webgpu', 'webgl2', 'webgl'] as const)('builds %s lighting history repair', (type) => {
     expect(buildSSGIHistoryRepairProgram(type)).toBeTruthy();
+  });
+
+  // 'webgl' is WebGL1 and 'webgl2' is WebGL2 - only the former lacks motion
+  // vectors and Hi-Z, so WebGL2 has to take the same temporal, multi-bounce path
+  // as WebGPU rather than the degraded single-frame one.
+  test('requests the temporal inputs on every backend except WebGL1', () => {
+    const effect = new SSGI();
+    const ctxOf = (type: string) => ({ SSGI: true, device: { type } }) as any;
+    for (const type of ['webgpu', 'webgl2']) {
+      expect(effect.requireMotionVectorTexture(ctxOf(type))).toBe(true);
+      expect(effect.requireHiZTexture(ctxOf(type))).toBe(true);
+    }
+    expect(effect.requireMotionVectorTexture(ctxOf('webgl'))).toBe(false);
+    expect(effect.requireHiZTexture(ctxOf('webgl'))).toBe(false);
+  });
+
+  // The lighting-pass reprojection assumes previousUV === uv when there are no
+  // motion vectors, which is only correct for a static camera. WebGL1 has no
+  // choice; every other backend must have the real motion vectors before the
+  // history is consumed, otherwise a moving camera reads stale irradiance.
+  test.each([
+    ['webgpu', true],
+    ['webgl2', true],
+    ['webgl', false]
+  ] as const)('requires motion vectors before consuming SSGI history on %s', (type, needsMotion) => {
+    const ctx = (motionVectorTexture: unknown) =>
+      ({
+        device: { type },
+        SSGI: true,
+        SSGIIrradianceHistoryTexture: {},
+        SSGISurfaceHistoryTexture: {},
+        motionVectorTexture,
+        linearDepthTexture: {}
+      }) as any;
+    expect(EnvShIBL.hasSSGIHistory(ctx({}))).toBe(true);
+    expect(EnvShIBL.hasSSGIHistory(ctx(null))).toBe(!needsMotion);
   });
 });

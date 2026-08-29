@@ -501,7 +501,7 @@ export function mixinLight<T extends typeof MeshMaterial>(BaseCls: T) {
         ? ((this.drawContext.SSGI &&
           this.drawContext.SSGIIrradianceHistoryTexture &&
           this.drawContext.SSGISurfaceHistoryTexture &&
-          (this.drawContext.device.type !== 'webgpu' || this.drawContext.motionVectorTexture)
+          (this.drawContext.device.type === 'webgl' || this.drawContext.motionVectorTexture)
             ? this.drawContext.env!.light.envLight.getIrradiance(scope, normal, this.drawContext).rgb
             : scope.$builder.mul(
                 this.drawContext.env!.light.envLight.getIrradiance(scope, normal, this.drawContext).rgb,
