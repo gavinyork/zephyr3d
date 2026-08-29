@@ -116,5 +116,6 @@ common/temp/
 # site tmp cache
 .buildcache.json
 .buildcache.tmp.json
+.libcache.json
 web/api/
 web/public/

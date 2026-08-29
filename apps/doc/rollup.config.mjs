@@ -7,6 +7,7 @@ import crypto from 'crypto';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import copy from 'rollup-plugin-copy';
+import { exampleImportPath, isEngineSpecifier } from './engine-bundles.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -14,7 +15,6 @@ const __dirname = path.dirname(__filename);
 const srcdir = path.join(__dirname, 'src');
 const destdir = path.join(__dirname, 'web', 'public', 'tut');
 const srcfiles = [];
-const zephyr3d = path.join(__dirname, 'node_modules', '@zephyr3d');
 const cacheFile = path.join(__dirname, '.buildcache.json');
 const tmpcacheFile = path.join(__dirname, '.buildcache.tmp.json');
 const watchMode = process.env.ROLLUP_WATCH === 'true';
@@ -78,28 +78,32 @@ function hasTutOutput(output) {
   );
 }
 
+// Identifies how the outputs were produced. Bumping it discards cache entries
+// written by an older scheme, so every example is rebuilt once. Without this, a
+// cache from the previous scheme (which inlined the engine) would look valid and
+// leave stale bundles in place.
+const CACHE_SCHEMA = 'external-engine-1';
+
 let buildCache = {};
 try {
   if (fs.existsSync(destdir) && fs.statSync(cacheFile).isFile()) {
-    const content = fs.readFileSync(cacheFile, 'utf8');
-    buildCache = JSON.parse(content);
+    const content = JSON.parse(fs.readFileSync(cacheFile, 'utf8'));
+    if (content.schema === CACHE_SCHEMA) {
+      buildCache = content;
+    } else {
+      console.log('Build cache was written by a different build scheme; rebuilding all examples');
+    }
   }
 } catch (err) {
   console.log('Build cache file not exists');
 }
+buildCache.schema = CACHE_SCHEMA;
 if (!watchMode) {
   fs.writeFileSync(tmpcacheFile, JSON.stringify(buildCache, null, 2));
 }
 
 let cacheChanged = false;
-let invalidAll = false;
 let codeCompress = !watchMode;
-const dict = traverseDirectory(zephyr3d, zephyr3d);
-const cachedZephr3d = buildCache['@zephyr3d'];
-if (!deepEqual(cachedZephr3d, dict)) {
-  buildCache['@zephyr3d'] = dict;
-  invalidAll = true;
-}
 const pattern = process.env.SITE_TUT ? process.env.SITE_TUT.split(';') : null;
 console.log(`Build pattern: ${JSON.stringify(pattern, null, 2)}`);
 if (process.env.SITE_NO_COMPRESS) {
@@ -126,7 +130,7 @@ fs.readdirSync(srcdir).filter((dir) => {
     ) {
       const cache = buildCache[dir];
       const dict = traverseDirectory(fullpath, fullpath);
-      if (watchMode || invalidAll || !deepEqual(cache, dict) || !hasTutOutput(dir)) {
+      if (watchMode || !deepEqual(cache, dict) || !hasTutOutput(dir)) {
         buildCache[dir] = dict;
         cacheChanged = true;
         srcfiles.push([main, dir]);
@@ -147,25 +151,16 @@ function getCacheTarget() {
       format: 'esm'
     },
     plugins: [
-      copy({
-        targets: [
-          {
-            src: tmpcacheFile,
-            dest: cacheFile
+      {
+        // Rollup runs `buildEnd` hooks in parallel, so the copy and the delete
+        // must happen in one hook: as separate plugins they raced and the build
+        // failed intermittently with ENOENT on the temp file.
+        name: 'commit-build-cache',
+        buildEnd: () => {
+          if (!fs.existsSync(tmpcacheFile)) {
+            return;
           }
-        ],
-        hook: 'buildEnd'
-      }),
-      {
-        name: 'copy-cache-file',
-        buildEnd: async () => {
           fs.copyFileSync(tmpcacheFile, cacheFile);
-        }
-      },
-      {
-        name: 'delete-tmp-cache',
-        buildEnd: async () => {
-          console.log('Delete tmporal cache file');
           fs.rmSync(tmpcacheFile);
         }
       }
@@ -215,10 +210,14 @@ function getTutTarget(input, output) {
   return {
     input: input,
     preserveSymlinks: false,
+    // The engine ships as separate bundles in `tut/lib`, so each example only
+    // compiles its own code and the browser caches the engine across examples.
+    external: isEngineSpecifier,
     output: {
       file: path.join(destdir, 'js', `${output}.js`),
       format: 'esm',
-      sourcemap: true
+      sourcemap: true,
+      paths: exampleImportPath
     },
     plugins
   };

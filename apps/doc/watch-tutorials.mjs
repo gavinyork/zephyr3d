@@ -38,6 +38,7 @@ const watchers = [];
 let activeBuild;
 let drainTimer;
 let stopping = false;
+let engineDirty = false;
 
 function hasOutput(target) {
   return (
@@ -72,29 +73,29 @@ function scheduleDrain() {
   }, 120);
 }
 
-function buildTarget(target) {
+function runRollup(label, configArgs, extraEnv) {
   return new Promise((resolve) => {
-    const env = { ...process.env, SITE_TUT: target, SITE_NO_COMPRESS: '1' };
+    const env = { ...process.env, SITE_NO_COMPRESS: '1', ...extraEnv };
     delete env.ROLLUP_WATCH;
     if (!env.NODE_OPTIONS) {
       env.NODE_OPTIONS = '--max_old_space_size=8192';
     }
 
-    console.log(`\nBuilding tutorial ${target}...`);
-    const child = spawn(process.execPath, [rollupBin, '-c', '--silent'], {
+    console.log(`\nBuilding ${label}...`);
+    const child = spawn(process.execPath, [rollupBin, ...configArgs, '--silent'], {
       cwd: docRoot,
       env,
       stdio: 'inherit'
     });
     activeBuild = child;
     child.once('error', (error) => {
-      console.error(`Failed to build tutorial ${target}:`, error);
+      console.error(`Failed to build ${label}:`, error);
       activeBuild = undefined;
       resolve();
     });
     child.once('exit', (code, signal) => {
       if (code !== 0 && !stopping) {
-        console.error(`Tutorial ${target} build failed (${code ?? signal}).`);
+        console.error(`Build of ${label} failed (${code ?? signal}).`);
       }
       activeBuild = undefined;
       resolve();
@@ -102,14 +103,35 @@ function buildTarget(target) {
   });
 }
 
+function buildEngine() {
+  // Only the engine bundles are rebuilt; the examples import them at runtime and
+  // do not need to be recompiled when the engine changes.
+  return runRollup('engine bundles', ['-c', 'rollup.config.libs.mjs']);
+}
+
+function buildTarget(target) {
+  return runRollup(`tutorial ${target}`, ['-c'], { SITE_TUT: target });
+}
+
 async function drainQueue() {
-  if (activeBuild || stopping || !pending.size) {
+  if (activeBuild || stopping) {
+    return;
+  }
+  if (engineDirty) {
+    engineDirty = false;
+    await buildEngine();
+    if (!stopping && (pending.size || engineDirty)) {
+      scheduleDrain();
+    }
+    return;
+  }
+  if (!pending.size) {
     return;
   }
   const target = pending.values().next().value;
   pending.delete(target);
   await buildTarget(target);
-  if (pending.size) {
+  if (pending.size || engineDirty) {
     scheduleDrain();
   }
 }
@@ -165,7 +187,8 @@ function handleLibraryChange(file) {
   if (file && file.split(path.sep).includes('node_modules')) {
     return;
   }
-  queueTargets(targets.keys());
+  engineDirty = true;
+  scheduleDrain();
 }
 
 function stop(code = 0) {
@@ -185,6 +208,11 @@ function stop(code = 0) {
     process.exit();
   }
 }
+
+// The examples import the engine from `tut/lib`, so those bundles must exist
+// before any example can run. Rebuilding them is a no-op when already current.
+engineDirty = true;
+scheduleDrain();
 
 const missing = [...targets.keys()].filter((target) => !hasOutput(target));
 if (requested) {
@@ -210,9 +238,9 @@ if (fs.existsSync(libsRoot)) {
     if (!entry.isDirectory()) {
       continue;
     }
-    for (const directory of ['src', 'dist']) {
-      watchRoot(path.join(libsRoot, entry.name, directory), handleLibraryChange);
-    }
+    // Only `dist` matters: the engine bundles are built from compiled output, so a
+    // `src` edit is picked up once that package's own build has emitted it.
+    watchRoot(path.join(libsRoot, entry.name, 'dist'), handleLibraryChange);
   }
 }
 console.log(
