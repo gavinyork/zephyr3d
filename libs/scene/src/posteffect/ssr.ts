@@ -125,7 +125,7 @@ export class SSR extends AbstractPostEffect {
         const device = ctx.device;
         device.pushDeviceStates();
         try {
-          device.setFramebuffer(rg.getFramebuffer<FrameBuffer>(fb));
+          device.setFramebuffer(rg.getFramebuffer(fb));
           this.intersect(ctx, rg.getTexture<Texture2D>(s.input), getLinearDepth(rg), true, false);
         } finally {
           device.popDeviceStates();
@@ -155,7 +155,7 @@ export class SSR extends AbstractPostEffect {
         const device = ctx.device;
         device.pushDeviceStates();
         try {
-          device.setFramebuffer(rg.getFramebuffer<FrameBuffer>(fb));
+          device.setFramebuffer(rg.getFramebuffer(fb));
           const inputTex = rg.getTexture<Texture2D>(s.input);
           this.resolve(
             ctx,
@@ -217,7 +217,7 @@ export class SSR extends AbstractPostEffect {
               stdDev,
               depthCutoff,
               rg.getTexture<Texture2D>(resolveHandle),
-              rg.getFramebuffer<FrameBuffer>(middleFB)
+              rg.getFramebuffer(middleFB)
             );
             const blitterV = (SSR._blurBlitterV = SSR._blurBlitterV ?? new BilateralBlurBlitter(true));
             blitterV.renderStates = AbstractPostEffect.getDefaultRenderState(ctx, DEPTH_COMPARE_FARTHER);
@@ -231,7 +231,7 @@ export class SSR extends AbstractPostEffect {
               stdDev,
               depthCutoff,
               rg.getTexture<Texture2D>(middle),
-              rg.getFramebuffer<FrameBuffer>(outFB)
+              rg.getFramebuffer(outFB)
             );
           } finally {
             device.popDeviceStates();
@@ -285,7 +285,7 @@ export class SSR extends AbstractPostEffect {
               getLinearDepth(rg),
               rg.getTexture<Texture2D>(prevReflectHandle),
               rg.getTexture<Texture2D>(prevMotionVectorHandle),
-              rg.getFramebuffer<FrameBuffer>(fb)
+              rg.getFramebuffer(fb)
             );
           } finally {
             device.popDeviceStates();
@@ -309,9 +309,7 @@ export class SSR extends AbstractPostEffect {
         const device = ctx.device;
         device.pushDeviceStates();
         try {
-          device.setFramebuffer(
-            output.framebuffer ? rg.getFramebuffer<FrameBuffer>(output.framebuffer) : null
-          );
+          device.setFramebuffer(output.framebuffer ? rg.getFramebuffer(output.framebuffer) : null);
           const inputTex = rg.getTexture<Texture2D>(s.input);
           const reflectanceTex = rg.getTexture<Texture2D>(finalReflectHandle);
           copyTexture(

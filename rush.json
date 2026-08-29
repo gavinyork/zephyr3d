@@ -459,6 +459,10 @@
       "shouldPublish": true
     },
     {
+      "packageName": "@zephyr3d/backend-null",
+      "projectFolder": "libs/backend-null"
+    },
+    {
       "packageName": "@zephyr3d/editor",
       "projectFolder": "utility/editor",
       "shouldPublish": true

@@ -1,5 +1,5 @@
 import { DEPTH_FARTHEST, Matrix4x4, Vector2, Vector4 } from '@zephyr3d/base';
-import type { BindGroup, FrameBuffer, GPUProgram, Texture2D } from '@zephyr3d/device';
+import type { BindGroup, GPUProgram, Texture2D } from '@zephyr3d/device';
 import type { DrawContext } from '../render';
 import { FrameResources } from '../render/rendergraph/blackboard';
 import { RGHistoryResources } from '../render/rendergraph/history_resources';
@@ -205,7 +205,7 @@ export class SSGI extends AbstractPostEffect {
         const device = ctx.device;
         device.pushDeviceStates();
         try {
-          device.setFramebuffer(rg.getFramebuffer<FrameBuffer>(fb));
+          device.setFramebuffer(rg.getFramebuffer(fb));
           this.trace(
             ctx,
             rg.getTexture<Texture2D>(sampleColorHandle),
@@ -243,7 +243,7 @@ export class SSGI extends AbstractPostEffect {
         const device = ctx.device;
         device.pushDeviceStates();
         try {
-          device.setFramebuffer(rg.getFramebuffer<FrameBuffer>(fb));
+          device.setFramebuffer(rg.getFramebuffer(fb));
           this.writeSurface(
             ctx,
             rg.getTexture<Texture2D>(linearDepthHandle),
@@ -294,7 +294,7 @@ export class SSGI extends AbstractPostEffect {
         const device = ctx.device;
         device.pushDeviceStates();
         try {
-          device.setFramebuffer(rg.getFramebuffer<FrameBuffer>(fb));
+          device.setFramebuffer(rg.getFramebuffer(fb));
           this.temporal(
             ctx,
             rg.getTexture<Texture2D>(traceResult.irradiance),
@@ -344,7 +344,7 @@ export class SSGI extends AbstractPostEffect {
           const device = ctx.device;
           device.pushDeviceStates();
           try {
-            device.setFramebuffer(rg.getFramebuffer<FrameBuffer>(fb));
+            device.setFramebuffer(rg.getFramebuffer(fb));
             this.atrous(
               ctx,
               rg.getTexture<Texture2D>(source),
@@ -393,7 +393,7 @@ export class SSGI extends AbstractPostEffect {
           const device = ctx.device;
           device.pushDeviceStates();
           try {
-            device.setFramebuffer(rg.getFramebuffer<FrameBuffer>(fb));
+            device.setFramebuffer(rg.getFramebuffer(fb));
             this.upsample(
               ctx,
               rg.getTexture<Texture2D>(source),
@@ -436,9 +436,7 @@ export class SSGI extends AbstractPostEffect {
         const device = ctx.device;
         device.pushDeviceStates();
         try {
-          device.setFramebuffer(
-            output.framebuffer ? rg.getFramebuffer<FrameBuffer>(output.framebuffer) : null
-          );
+          device.setFramebuffer(output.framebuffer ? rg.getFramebuffer(output.framebuffer) : null);
           const sceneColor = rg.getTexture<Texture2D>(s.input);
           const irradiance = rg.getTexture<Texture2D>(finalIrradianceHandle);
           const ao = rg.getTexture<Texture2D>(finalAOHandle);

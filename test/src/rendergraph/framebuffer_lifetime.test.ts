@@ -1,86 +1,65 @@
+import { createNullDevice } from '@zephyr3d/backend-null';
+import type { NullDevice } from '@zephyr3d/backend-null';
+import type { FrameBuffer, Texture2D } from '@zephyr3d/device';
 import { RenderGraph, RenderGraphExecutor } from '../../../libs/scene/src/render/rendergraph';
+import { DevicePoolAllocator } from '../../../libs/scene/src/render/rendergraph/device_pool_allocator';
 import type {
-  RGTextureAllocator,
-  RGTextureDesc,
-  RGResolvedSize,
   RGFramebufferDesc,
-  RGHandle
+  RGHandle,
+  RGResolvedSize,
+  RGTextureAllocator,
+  RGTextureDesc
 } from '../../../libs/scene/src/render/rendergraph';
 
-// ─── Strict Mock Allocator ───────────────────────────────────────────
+// ─── Strict Allocator ────────────────────────────────────────────────
 //
-// Unlike the device pool, this allocator does NOT refcount framebuffer
-// attachments: a texture released back to the allocator is immediately
-// invalid. This models the weakest legal RGTextureAllocator and catches
-// any executor schedule that releases a texture while a graph-managed
+// Wraps the real device pool allocator, but unlike the pool it does NOT
+// refcount framebuffer attachments: a texture released back to the allocator
+// is immediately disposed. This models the weakest legal RGTextureAllocator and
+// catches any executor schedule that releases a texture while a graph-managed
 // framebuffer referencing it can still be used by a later pass.
+//
+// The textures and framebuffers are real device objects, so "still usable" is
+// decided by the device itself rather than by bookkeeping in the test.
 
-interface MockTexture {
-  id: number;
-  desc: RGTextureDesc;
-  size: RGResolvedSize;
-  alive: boolean;
-}
-
-interface MockFramebuffer {
-  id: number;
-  attachments: MockTexture[];
-  alive: boolean;
-}
-
-function createStrictAllocator() {
-  let nextTextureId = 0;
-  let nextFramebufferId = 0;
-  const allocated: MockTexture[] = [];
-  const released: MockTexture[] = [];
-  const framebuffers: MockFramebuffer[] = [];
-  const allocator: RGTextureAllocator<MockTexture, MockFramebuffer> = {
-    allocate(desc: RGTextureDesc, size: RGResolvedSize): MockTexture {
-      const tex: MockTexture = { id: nextTextureId++, desc, size, alive: true };
-      allocated.push(tex);
-      return tex;
+function createStrictAllocator(device: NullDevice) {
+  const pool = new DevicePoolAllocator(device as never);
+  const allocated: Texture2D[] = [];
+  const released: Texture2D[] = [];
+  const framebuffers: FrameBuffer[] = [];
+  const allocator: RGTextureAllocator<Texture2D> = {
+    allocate(desc: RGTextureDesc, size: RGResolvedSize, preferred?: Texture2D): Texture2D {
+      const texture = pool.allocate(desc, size, preferred);
+      allocated.push(texture);
+      return texture;
     },
-    release(texture: MockTexture): void {
-      if (!texture.alive) {
-        throw new Error(`double release of texture ${texture.id}`);
+    release(texture: Texture2D): void {
+      if (texture.disposed) {
+        throw new Error(`double release of texture ${texture.uid}`);
       }
-      texture.alive = false;
       released.push(texture);
+      // Dispose instead of recycling: the weakest allowed allocator behavior.
+      texture.dispose();
+      texture.destroy();
     },
-    allocateFramebuffer(desc: RGFramebufferDesc): MockFramebuffer {
-      const colors = Array.isArray(desc.colorAttachments)
-        ? desc.colorAttachments
-        : desc.colorAttachments
-          ? [desc.colorAttachments]
-          : [];
-      const attachments = [...colors, desc.depthAttachment].filter(
-        (attachment): attachment is MockTexture =>
-          !!attachment && typeof attachment === 'object' && 'alive' in (attachment as object)
-      );
-      for (const tex of attachments) {
-        if (!tex.alive) {
-          throw new Error(`framebuffer created with released texture ${tex.id}`);
-        }
-      }
-      const fb: MockFramebuffer = { id: nextFramebufferId++, attachments, alive: true };
+    allocateFramebuffer(desc: RGFramebufferDesc): FrameBuffer {
+      const fb = pool.allocateFramebuffer(desc);
       framebuffers.push(fb);
       return fb;
     },
-    releaseFramebuffer(framebuffer: MockFramebuffer): void {
-      framebuffer.alive = false;
+    releaseFramebuffer(framebuffer: FrameBuffer): void {
+      pool.releaseFramebuffer(framebuffer);
     }
   };
-  // Simulates a pass rendering through a framebuffer: every attachment must
-  // still be alive.
-  const renderThrough = (fb: MockFramebuffer) => {
-    if (!fb.alive) {
-      throw new Error(`render through released framebuffer ${fb.id}`);
+  // Simulates a pass rendering through a framebuffer: binding fails on the
+  // device when any attachment has been disposed.
+  const renderThrough = (fb: FrameBuffer) => {
+    device.setFramebuffer(fb);
+    if (device.getFramebuffer() !== fb) {
+      throw new Error(`render through framebuffer ${fb.uid} with a released attachment`);
     }
-    for (const tex of fb.attachments) {
-      if (!tex.alive) {
-        throw new Error(`render through framebuffer ${fb.id} with released attachment ${tex.id}`);
-      }
-    }
+    device.draw('triangle-list', 0, 3);
+    device.setFramebuffer(null);
   };
   return { allocator, allocated, released, framebuffers, renderThrough };
 }
@@ -94,8 +73,16 @@ function createStrictAllocator() {
 // itself has no direct consumers after its producer.
 
 describe('Framebuffer attachment lifetime', () => {
+  let device: NullDevice;
+
+  beforeEach(async () => {
+    // strict: a device level validation failure fails the test instead of
+    // only writing to the console.
+    device = await createNullDevice({ width: 256, height: 256, strict: true });
+  });
+
   test('attachment texture outlives the last pass reading the framebuffer', () => {
-    const { allocator, allocated, released, renderThrough } = createStrictAllocator();
+    const { allocator, allocated, released, renderThrough } = createStrictAllocator(device);
     const graph = new RenderGraph();
 
     let depthTexHandle: RGHandle;
@@ -108,7 +95,7 @@ describe('Framebuffer attachment lifetime', () => {
         depthAttachment: depthTexHandle
       });
       builder.setExecute((rgCtx) => {
-        renderThrough(rgCtx.getFramebuffer<MockFramebuffer>(depthFbHandle));
+        renderThrough(rgCtx.getFramebuffer(depthFbHandle as never));
       });
     });
 
@@ -120,8 +107,8 @@ describe('Framebuffer attachment lifetime', () => {
       builder.read(depthFbHandle);
       colorHandle = builder.createTexture({ format: 'rgba8unorm', label: 'sceneColor' });
       builder.setExecute((rgCtx) => {
-        renderThrough(rgCtx.getFramebuffer<MockFramebuffer>(depthFbHandle));
-        rgCtx.getTexture<MockTexture>(colorHandle);
+        renderThrough(rgCtx.getFramebuffer(depthFbHandle as never));
+        rgCtx.getTexture<Texture2D>(colorHandle as never);
       });
     });
 
@@ -133,7 +120,7 @@ describe('Framebuffer attachment lifetime', () => {
       builder.setExecute((rgCtx) => {
         // Renders depth-tested geometry through the prepass framebuffer's
         // depth attachment: the backing texture must still be alive here.
-        renderThrough(rgCtx.getFramebuffer<MockFramebuffer>(depthFbHandle));
+        renderThrough(rgCtx.getFramebuffer(depthFbHandle as never));
       });
     });
 
@@ -148,13 +135,11 @@ describe('Framebuffer attachment lifetime', () => {
     expect(depthLifetime.lastUse).toBeGreaterThanOrEqual(fbLifetime.lastUse);
 
     const executor = new RenderGraphExecutor(allocator, 256, 256);
-    executor.setImportedTexture(backbuffer, {
-      id: -1,
-      desc: {} as RGTextureDesc,
-      size: { width: 256, height: 256 },
-      alive: true
-    });
-    // Throws "render through framebuffer with released attachment" without
+    executor.setImportedTexture(
+      backbuffer,
+      device.createTexture2D('rgba8unorm', 256, 256, { mipmapping: false })!
+    );
+    // Throws "render through framebuffer with a released attachment" without
     // framebuffer-attachment lifetime propagation.
     executor.execute(compiled);
 
@@ -164,7 +149,7 @@ describe('Framebuffer attachment lifetime', () => {
   });
 
   test('color attachment shared by two framebuffers stays alive for both', () => {
-    const { allocator, allocated, released, renderThrough } = createStrictAllocator();
+    const { allocator, allocated, released, renderThrough } = createStrictAllocator(device);
     const graph = new RenderGraph();
 
     // Mirrors DepthPrepass creating both the MRT depth framebuffer and the
@@ -178,8 +163,8 @@ describe('Framebuffer attachment lifetime', () => {
       fbA = builder.createFramebuffer({ label: 'fbA', colorAttachments: mvHandle });
       fbB = builder.createFramebuffer({ label: 'fbB', colorAttachments: mvHandle });
       builder.setExecute((rgCtx) => {
-        renderThrough(rgCtx.getFramebuffer<MockFramebuffer>(fbA));
-        renderThrough(rgCtx.getFramebuffer<MockFramebuffer>(fbB));
+        renderThrough(rgCtx.getFramebuffer(fbA as never));
+        renderThrough(rgCtx.getFramebuffer(fbB as never));
       });
     });
 
@@ -188,18 +173,16 @@ describe('Framebuffer attachment lifetime', () => {
       builder.read(fbB);
       backbuffer = builder.write(backbuffer);
       builder.setExecute((rgCtx) => {
-        renderThrough(rgCtx.getFramebuffer<MockFramebuffer>(fbB));
+        renderThrough(rgCtx.getFramebuffer(fbB as never));
       });
     });
 
     const compiled = graph.compile([backbuffer]);
     const executor = new RenderGraphExecutor(allocator, 128, 128);
-    executor.setImportedTexture(backbuffer, {
-      id: -1,
-      desc: {} as RGTextureDesc,
-      size: { width: 128, height: 128 },
-      alive: true
-    });
+    executor.setImportedTexture(
+      backbuffer,
+      device.createTexture2D('rgba8unorm', 128, 128, { mipmapping: false })!
+    );
     executor.execute(compiled);
 
     expect(released.length).toBe(allocated.length);

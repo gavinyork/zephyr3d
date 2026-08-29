@@ -672,7 +672,7 @@ const DepthPrepassModule: RenderModule<FrameGraphContext> = {
         : undefined;
 
       builder.addSubpass('SceneDepth', (rgCtx) => {
-        const depthFramebuffer = rgCtx.getFramebuffer<FrameBuffer>(depthFramebufferHandle);
+        const depthFramebuffer = rgCtx.getFramebuffer(depthFramebufferHandle);
         frame.depthFramebuffer = renderSceneDepth(
           frame,
           depthFramebuffer,
@@ -761,7 +761,7 @@ const ShadowMaskModule: RenderModule<FrameGraphContext> = {
         const depthTex = rgCtx.getTexture<Texture2D>(maskDepthHandle);
         const maskTex = rgCtx.getTexture<Texture2DArray>(maskHandle);
         _shadowMaskRenderer.render(ctx, depthTex, renderQueue.shadowedLights, (layer) =>
-          rgCtx.createFramebuffer<FrameBuffer>({
+          rgCtx.createFramebuffer({
             width: maskTex.width,
             height: maskTex.height,
             colorAttachments: maskTex,
@@ -836,13 +836,13 @@ const HiZModule: RenderModule<FrameGraphContext> = {
       builder.setExecute((rgCtx) => {
         const passCtx = frame.ctx;
         // Resolve the declared handle, not mutable framebuffer state.
-        const depthFb = rgCtx.getFramebuffer<FrameBuffer>(depthPassResult.depthFramebufferHandle);
+        const depthFb = rgCtx.getFramebuffer(depthPassResult.depthFramebufferHandle);
         const depthTex = depthFb.getDepthAttachment() as Texture2D;
         if (!depthTex) {
           throw new Error('HiZ pass: depth prepass framebuffer has no depth attachment.');
         }
         const hiZTex = rgCtx.getTexture<Texture2D>(hiZHandle!);
-        const HiZFrameBuffer = rgCtx.getFramebuffer<FrameBuffer>(hiZFramebufferHandle);
+        const HiZFrameBuffer = rgCtx.getFramebuffer(hiZFramebufferHandle);
         buildHiZ(depthTex, HiZFrameBuffer);
         passCtx.HiZTexture = hiZTex;
       });
@@ -896,7 +896,7 @@ const SSSProfileModule: RenderModule<FrameGraphContext> = {
         ctx.shadowMaskTexture = shadowMaskHandle ? rgCtx.getTexture<Texture2DArray>(shadowMaskHandle) : null;
         renderForwardSSSProfile(
           frame,
-          rgCtx.getFramebuffer<FrameBuffer>(framebufferHandle),
+          rgCtx.getFramebuffer(framebufferHandle),
           rgCtx.getTexture<Texture2D>(profileHandle),
           rgCtx.getTexture<Texture2D>(paramHandle),
           null
@@ -1775,7 +1775,7 @@ function renderSceneDepth(
       const depthAttachment = ctx.finalFramebuffer?.getDepthAttachment();
       const depthTexOrFormat = depthAttachment?.isTexture2D() ? depthAttachment : ctx.depthFormat;
 
-      depthFramebuffer = rgCtx.createFramebuffer<FrameBuffer>({
+      depthFramebuffer = rgCtx.createFramebuffer({
         width: depthTex.width,
         height: depthTex.height,
         colorAttachments,
@@ -1793,7 +1793,7 @@ function renderSceneDepth(
             : 'r32f';
       const mvFormat: TextureFormat = 'rgba16f';
       if (!ctx.finalFramebuffer) {
-        depthFramebuffer = rgCtx.createFramebuffer<FrameBuffer>({
+        depthFramebuffer = rgCtx.createFramebuffer({
           width: ctx.renderWidth,
           height: ctx.renderHeight,
           colorAttachments: ctx.motionVectors ? [format, mvFormat] : format,
@@ -1803,7 +1803,7 @@ function renderSceneDepth(
       } else {
         const originDepth = ctx.finalFramebuffer?.getDepthAttachment();
         if (originDepth?.isTexture2D()) {
-          depthFramebuffer = rgCtx.createFramebuffer<FrameBuffer>({
+          depthFramebuffer = rgCtx.createFramebuffer({
             width: originDepth.width,
             height: originDepth.height,
             colorAttachments: ctx.motionVectors ? [format, mvFormat] : format,
@@ -1811,7 +1811,7 @@ function renderSceneDepth(
             ignoreDepthStencil: false
           });
         } else {
-          depthFramebuffer = rgCtx.createFramebuffer<FrameBuffer>({
+          depthFramebuffer = rgCtx.createFramebuffer({
             width: ctx.renderWidth,
             height: ctx.renderHeight,
             colorAttachments: ctx.motionVectors ? [format, mvFormat] : format,
@@ -1910,7 +1910,7 @@ function renderTransparentMotionVectors(
   const device = ctx.device;
   device.pushDeviceStates();
   try {
-    device.setFramebuffer(rgCtx.getFramebuffer<FrameBuffer>(framebufferHandle));
+    device.setFramebuffer(rgCtx.getFramebuffer(framebufferHandle));
     _depthPass.motionVectorOnly = true;
     _depthPass.encodeDepth = false;
     _depthPass.transmission = false;
@@ -1938,8 +1938,8 @@ function renderSkyMotionVectors(
 
   const device = ctx.device;
   const fb = framebufferHandle
-    ? rgCtx.getFramebuffer<FrameBuffer>(framebufferHandle)
-    : rgCtx.createFramebuffer<FrameBuffer>({
+    ? rgCtx.getFramebuffer(framebufferHandle)
+    : rgCtx.createFramebuffer({
         colorAttachments: ctx.motionVectorTexture,
         depthAttachment: ctx.depthTexture
       });
@@ -2028,8 +2028,8 @@ function renderSceneColorGrab(
   // The background copy has no surface MRT attachments.
   const sceneColorMaterialFlags = ctx.materialFlags & ~SURFACE_MRT_FLAGS;
   const sceneColorFramebuffer = copyFramebufferHandle
-    ? rgCtx.getFramebuffer<FrameBuffer>(copyFramebufferHandle)
-    : rgCtx.createFramebuffer<FrameBuffer>({
+    ? rgCtx.getFramebuffer(copyFramebufferHandle)
+    : rgCtx.createFramebuffer({
         width: copyTex.width,
         height: copyTex.height,
         colorAttachments: copyTex,
@@ -2105,11 +2105,11 @@ export function renderOpaqueScenePass(
 
   // Prefer the graph framebuffer; final-target mode has no graph framebuffer.
   if (sceneColorFramebufferHandle && !hasSurfaceMRT(ctx)) {
-    ctx.intermediateFramebuffer = rgCtx.getFramebuffer<FrameBuffer>(sceneColorFramebufferHandle);
+    ctx.intermediateFramebuffer = rgCtx.getFramebuffer(sceneColorFramebufferHandle);
   } else if (!sceneColorFramebufferHandle && depthTex === ctx.finalFramebuffer?.getDepthAttachment()) {
     ctx.intermediateFramebuffer = ctx.finalFramebuffer;
   } else {
-    ctx.intermediateFramebuffer = rgCtx.createFramebuffer<FrameBuffer>({
+    ctx.intermediateFramebuffer = rgCtx.createFramebuffer({
       width: sceneColorTex.width,
       height: sceneColorTex.height,
       colorAttachments: getLightPassColorAttachments(ctx, sceneColorTex),
@@ -2169,7 +2169,7 @@ export function renderSkyScenePass(
 ): void {
   const { ctx } = frame;
   const framebuffer = sceneColorFramebufferHandle
-    ? rgCtx.getFramebuffer<FrameBuffer>(sceneColorFramebufferHandle)
+    ? rgCtx.getFramebuffer(sceneColorFramebufferHandle)
     : ctx.finalFramebuffer;
   const device = ctx.device;
   device.pushDeviceStates();
@@ -2213,7 +2213,7 @@ export function renderTransparentScenePass(
     // Opaque effects redirect transparent rendering to their chain output.
     const chainTex = rgCtx.getTexture<Texture2D>(opaqueChainOutput);
     const depthTex = frame.depthFramebuffer?.getDepthAttachment() as Texture2D;
-    framebuffer = rgCtx.createFramebuffer<FrameBuffer>({
+    framebuffer = rgCtx.createFramebuffer({
       width: chainTex.width,
       height: chainTex.height,
       colorAttachments: chainTex,
@@ -2223,7 +2223,7 @@ export function renderTransparentScenePass(
     ctx.materialFlags &= ~SURFACE_MRT_FLAGS;
   } else if (sceneColorFramebufferHandle) {
     // Continue in the light pass target when no opaque effect ran.
-    framebuffer = rgCtx.getFramebuffer<FrameBuffer>(sceneColorFramebufferHandle);
+    framebuffer = rgCtx.getFramebuffer(sceneColorFramebufferHandle);
   } else {
     // Scene color already resides in the final framebuffer.
     framebuffer = ctx.finalFramebuffer;
@@ -2264,7 +2264,7 @@ export function executeForwardPlusGraph(ctx: DrawContext): void {
   const graph = new RenderGraph();
   let renderQueue: RenderQueue | null = null;
   let frame: FrameState | null = null;
-  let executor: RenderGraphExecutor<Texture2D, FrameBuffer> | null = null;
+  let executor: RenderGraphExecutor<Texture2D> | null = null;
   let historyManager: HistoryResourceManager<Texture2D> | null = null;
   let historyFrameStarted = false;
   let motionVectorFramePrepared = false;

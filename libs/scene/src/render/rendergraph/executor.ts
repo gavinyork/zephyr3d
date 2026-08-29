@@ -18,7 +18,12 @@ import type {
 } from './types';
 import { RGHandle } from './types';
 import type { RGTextureAffinityCache, RGTextureAffinityEntry } from './texture_affinity_cache';
-import type { AbstractDevice, TimestampQueryResult, TimestampQueryStatus } from '@zephyr3d/device';
+import type {
+  AbstractDevice,
+  FrameBuffer,
+  TimestampQueryResult,
+  TimestampQueryStatus
+} from '@zephyr3d/device';
 import { getDevice } from '../../app/api';
 
 interface RGPassAccessScope {
@@ -60,19 +65,19 @@ const DEFAULT_PROFILING_OPTIONS: RGResolvedProfilingOptions = {
 };
 
 /** Executes compiled graphs with automatic resource lifetimes. @public */
-export class RenderGraphExecutor<TTexture = unknown, TFramebuffer = unknown> {
+export class RenderGraphExecutor<TTexture = unknown> {
   private static _defaultProfilingOptions: boolean | RGProfilingOptions = false;
   private static _latestProfileResult: RGProfileResult | null = null;
   private static _latestPendingProfileFrame: RGProfileFrameInternal | null = null;
   private static _latestResolvedProfileSerial = 0;
   private static _nextProfileSerial = 0;
 
-  private _allocator: RGTextureAllocator<TTexture, TFramebuffer>;
+  private _allocator: RGTextureAllocator<TTexture>;
   private _backbufferWidth: number;
   private _backbufferHeight: number;
   private _importedTextures: Map<number, TTexture> = new Map();
   private _allocatedTextures: Map<number, TTexture> = new Map();
-  private _allocatedFramebuffers: Map<number, TFramebuffer> = new Map();
+  private _allocatedFramebuffers: Map<number, FrameBuffer> = new Map();
   private _importedTextureAliases: Map<number, number> = new Map();
   private _transientTextureAliases: Map<number, number> = new Map();
   private _resolvedImportedTextures: Map<number, TTexture> = new Map();
@@ -84,7 +89,7 @@ export class RenderGraphExecutor<TTexture = unknown, TFramebuffer = unknown> {
   private _textureAffinityCache: RGTextureAffinityCache<TTexture> | null;
 
   constructor(
-    allocator: RGTextureAllocator<TTexture, TFramebuffer>,
+    allocator: RGTextureAllocator<TTexture>,
     backbufferWidth: number,
     backbufferHeight: number,
     options?: RenderGraphExecutorOptions<TTexture>
@@ -682,7 +687,7 @@ export class RenderGraphExecutor<TTexture = unknown, TFramebuffer = unknown> {
     }
   }
 
-  private _createFramebuffer(desc: RGFramebufferDesc, autoCleanup = true): TFramebuffer {
+  private _createFramebuffer(desc: RGFramebufferDesc, autoCleanup = true): FrameBuffer {
     if (!this._allocator.allocateFramebuffer || !this._allocator.releaseFramebuffer) {
       throw new Error('RenderGraphExecutor: framebuffer allocation is not supported by this allocator.');
     }
@@ -695,7 +700,7 @@ export class RenderGraphExecutor<TTexture = unknown, TFramebuffer = unknown> {
     return framebuffer;
   }
 
-  private _releaseFramebuffer(framebuffer: TFramebuffer): void {
+  private _releaseFramebuffer(framebuffer: FrameBuffer): void {
     if (!this._allocator.releaseFramebuffer) {
       throw new Error('RenderGraphExecutor: framebuffer release is not supported by this allocator.');
     }
@@ -831,21 +836,19 @@ export class RenderGraphExecutor<TTexture = unknown, TFramebuffer = unknown> {
         self._assertDeclaredAccess(accessScope, handle, 'texture');
         return self._resolveResource(handle) as unknown as T;
       },
-      getFramebuffer<TFramebuffer>(handle: RGFramebufferHandle<TFramebuffer>): TFramebuffer {
+      getFramebuffer(handle: RGFramebufferHandle): FrameBuffer {
         self._assertDeclaredAccess(accessScope, handle, 'framebuffer');
         const framebuffer = self._allocatedFramebuffers.get(handle._id);
         if (framebuffer !== undefined) {
-          return framebuffer as unknown as TFramebuffer;
+          return framebuffer;
         }
         throw new Error(
           `RenderGraphExecutor: cannot resolve framebuffer "${handle.name}" (id=${handle._id}). ` +
             `It may not have been allocated yet or was already released.`
         );
       },
-      createFramebuffer<TFramebuffer = unknown>(desc: RGFramebufferDesc): TFramebuffer {
-        return self._createFramebuffer(
-          self._resolveFramebufferDesc(desc, accessScope)
-        ) as unknown as TFramebuffer;
+      createFramebuffer(desc: RGFramebufferDesc): FrameBuffer {
+        return self._createFramebuffer(self._resolveFramebufferDesc(desc, accessScope));
       },
       deferCleanup(callback: () => void): void {
         self._cleanupCallbacks.push(callback);

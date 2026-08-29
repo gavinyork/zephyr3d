@@ -1,4 +1,4 @@
-import type { AbstractDevice, TextureFormat, TimestampQueryStatus } from '@zephyr3d/device';
+import type { AbstractDevice, FrameBuffer, TextureFormat, TimestampQueryStatus } from '@zephyr3d/device';
 import type { RGTextureAffinityCache } from './texture_affinity_cache';
 
 /**
@@ -60,7 +60,7 @@ export class RGHandle<K extends RGHandleKind = RGHandleKind, TValue = unknown> {
 export type RGTextureHandle<TTexture = unknown> = RGHandle<'texture', TTexture>;
 
 /** Framebuffer resource handle. @public */
-export type RGFramebufferHandle<TFramebuffer = unknown> = RGHandle<'framebuffer', TFramebuffer>;
+export type RGFramebufferHandle = RGHandle<'framebuffer', FrameBuffer>;
 
 /** Ordering-only resource handle. @public */
 export type RGTokenHandle = RGHandle<'token', void>;
@@ -113,15 +113,15 @@ export interface RGExecuteContext {
   getTexture<TTexture = unknown>(handle: RGHandle<RGHandleKind, any>): TTexture;
 
   /** Resolve a framebuffer declared or created by the current pass. */
-  getFramebuffer<TFramebuffer>(handle: RGFramebufferHandle<TFramebuffer>): TFramebuffer;
+  getFramebuffer(handle: RGFramebufferHandle): FrameBuffer;
   /** Resolve a framebuffer handle stored in a generic resource container. */
-  getFramebuffer<TFramebuffer = unknown>(handle: RGHandle<RGHandleKind, any>): TFramebuffer;
+  getFramebuffer(handle: RGHandle<RGHandleKind, any>): FrameBuffer;
 
   /**
    * Create a temporary framebuffer released after execution. Handle attachments
    * must be declared by the current pass.
    */
-  createFramebuffer<TFramebuffer = unknown>(desc: RGFramebufferDesc): TFramebuffer;
+  createFramebuffer(desc: RGFramebufferDesc): FrameBuffer;
 
   /**
    * Run cleanup after execution or abort. Callbacks run in reverse order.
@@ -209,7 +209,7 @@ export interface RGPassBuilder<TData = any> {
   createToken(name?: string): RGTokenHandle;
 
   /** Create a graph-managed framebuffer and infer attachment dependencies. */
-  createFramebuffer<TFramebuffer = unknown>(desc: RGFramebufferDesc): RGFramebufferHandle<TFramebuffer>;
+  createFramebuffer(desc: RGFramebufferDesc): RGFramebufferHandle;
 
   /** Prevent this pass from being culled. */
   sideEffect(): void;
@@ -352,7 +352,7 @@ export interface RGFramebufferDesc<TTexture = unknown> {
  *
  * @public
  */
-export interface RGTextureAllocator<TTexture = unknown, TFramebuffer = unknown> {
+export interface RGTextureAllocator<TTexture = unknown> {
   /** Allocate a transient texture, preferring a compatible prior allocation. */
   allocate(desc: RGTextureDesc, size: RGResolvedSize, preferred?: TTexture): TTexture;
 
@@ -366,8 +366,8 @@ export interface RGTextureAllocator<TTexture = unknown, TFramebuffer = unknown> 
   retain?(texture: TTexture): void;
 
   /** Allocate a framebuffer released by the executor. */
-  allocateFramebuffer?(desc: RGFramebufferDesc): TFramebuffer;
+  allocateFramebuffer?(desc: RGFramebufferDesc): FrameBuffer;
 
   /** Release a temporary framebuffer. */
-  releaseFramebuffer?(framebuffer: TFramebuffer): void;
+  releaseFramebuffer?(framebuffer: FrameBuffer): void;
 }

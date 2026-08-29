@@ -11,7 +11,12 @@ import type {
   RGExecuteContext,
   RGFramebufferDesc
 } from '../../../libs/scene/src/render/rendergraph';
-import type { AbstractDevice, TimestampQueryOptions, TimestampQueryResult } from '@zephyr3d/device';
+import type {
+  AbstractDevice,
+  FrameBuffer,
+  TimestampQueryOptions,
+  TimestampQueryResult
+} from '@zephyr3d/device';
 import { Pool } from '../../../libs/device/src/pool';
 
 // ─── Mock Allocator ──────────────────────────────────────────────────
@@ -22,9 +27,21 @@ interface MockTexture {
   size: RGResolvedSize;
 }
 
+// The graph resolves framebuffers as FrameBuffer, so the mock carries the
+// identity fields these tests assert on and is cast at the allocator boundary.
+// Tests that need real device framebuffers use a null device instead, see
+// framebuffer_lifetime.test.ts.
 interface MockFramebuffer {
   id: number;
   desc: RGFramebufferDesc;
+}
+
+function asFramebuffer(fb: MockFramebuffer): FrameBuffer {
+  return fb as unknown as FrameBuffer;
+}
+
+function asMockFramebuffer(fb: FrameBuffer): MockFramebuffer {
+  return fb as unknown as MockFramebuffer;
 }
 
 function createMockAllocator() {
@@ -34,7 +51,7 @@ function createMockAllocator() {
   const released: MockTexture[] = [];
   const allocatedFramebuffers: MockFramebuffer[] = [];
   const releasedFramebuffers: MockFramebuffer[] = [];
-  const allocator: RGTextureAllocator<MockTexture, MockFramebuffer> = {
+  const allocator: RGTextureAllocator<MockTexture> = {
     allocate(desc: RGTextureDesc, size: RGResolvedSize): MockTexture {
       const tex = { id: nextId++, desc, size };
       allocated.push(tex);
@@ -43,13 +60,13 @@ function createMockAllocator() {
     release(texture: MockTexture): void {
       released.push(texture);
     },
-    allocateFramebuffer(desc: RGFramebufferDesc): MockFramebuffer {
+    allocateFramebuffer(desc: RGFramebufferDesc): FrameBuffer {
       const fb = { id: nextFramebufferId++, desc };
       allocatedFramebuffers.push(fb);
-      return fb;
+      return asFramebuffer(fb);
     },
-    releaseFramebuffer(framebuffer: MockFramebuffer): void {
-      releasedFramebuffers.push(framebuffer);
+    releaseFramebuffer(framebuffer: FrameBuffer): void {
+      releasedFramebuffers.push(asMockFramebuffer(framebuffer));
     }
   };
   return { allocator, allocated, released, allocatedFramebuffers, releasedFramebuffers };
@@ -1257,7 +1274,7 @@ describe('RenderGraphExecutor', () => {
         events.push(`texture:${texture.desc.label}`);
       });
       builder.addSubpass('ResolveFramebuffer', (ctx: RGExecuteContext) => {
-        ctx.getFramebuffer<MockFramebuffer>(framebuffer);
+        ctx.getFramebuffer(framebuffer);
         events.push('framebuffer');
       });
     });
@@ -1338,7 +1355,7 @@ describe('RenderGraphExecutor', () => {
       });
       backbuffer = builder.write(backbuffer);
       builder.setExecute((ctx: RGExecuteContext) => {
-        resolvedFramebuffer = ctx.getFramebuffer<MockFramebuffer>(framebuffer);
+        resolvedFramebuffer = asMockFramebuffer(ctx.getFramebuffer(framebuffer));
       });
     });
 
@@ -1375,7 +1392,7 @@ describe('RenderGraphExecutor', () => {
       builder.read(framebuffer!);
       backbuffer = builder.write(backbuffer);
       builder.setExecute((ctx: RGExecuteContext) => {
-        ctx.getFramebuffer<MockFramebuffer>(framebuffer);
+        ctx.getFramebuffer(framebuffer);
         events.push(`use:released=${releasedFramebuffers.length}`);
       });
     });
@@ -1408,7 +1425,7 @@ describe('RenderGraphExecutor', () => {
       builder.read(done!);
       builder.sideEffect();
       builder.setExecute((ctx: RGExecuteContext) => {
-        ctx.getFramebuffer<MockFramebuffer>(framebuffer!);
+        ctx.getFramebuffer(framebuffer!);
       });
     });
 
@@ -1434,7 +1451,7 @@ describe('RenderGraphExecutor', () => {
       builder.read(done!);
       builder.sideEffect();
       builder.setExecute((ctx: RGExecuteContext) => {
-        ctx.createFramebuffer<MockFramebuffer>({
+        ctx.createFramebuffer({
           colorAttachments: texture!,
           depthAttachment: null
         });
@@ -1461,8 +1478,8 @@ describe('RenderGraphExecutor', () => {
       });
       backbuffer = builder.write(backbuffer);
       builder.setExecute((ctx: RGExecuteContext) => {
-        ctx.getFramebuffer<MockFramebuffer>(framebuffer);
-        ctx.createFramebuffer<MockFramebuffer>({
+        ctx.getFramebuffer(framebuffer);
+        ctx.createFramebuffer({
           colorAttachments: 'rgba8unorm',
           depthAttachment: null
         });
@@ -1495,8 +1512,8 @@ describe('RenderGraphExecutor', () => {
       });
       backbuffer = builder.write(backbuffer);
       builder.addSubpass('ThrowingSubpass', (ctx: RGExecuteContext) => {
-        ctx.getFramebuffer<MockFramebuffer>(framebuffer);
-        ctx.createFramebuffer<MockFramebuffer>({
+        ctx.getFramebuffer(framebuffer);
+        ctx.createFramebuffer({
           colorAttachments: 'rgba8unorm',
           depthAttachment: null
         });

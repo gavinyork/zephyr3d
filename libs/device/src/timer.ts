@@ -23,7 +23,10 @@ export class CPUTimer implements ITimer {
   /** @internal */
   private _ended: boolean;
   constructor() {
-    this._cpuTimer = window.performance || window.Date;
+    // globalThis instead of window so the timer also works in non-browser
+    // hosts such as web workers or a node based test runner.
+    const g = globalThis as unknown as { performance?: Performance; Date: DateConstructor };
+    this._cpuTimer = g.performance || g.Date;
     this._cpuStart = 0;
     this._cpuTime = 0;
     this._ended = false;

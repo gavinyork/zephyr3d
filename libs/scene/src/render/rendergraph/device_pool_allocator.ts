@@ -4,7 +4,7 @@ import { getDevice } from '../../app/api';
 import type { Nullable } from '@zephyr3d/base';
 
 /** Render graph allocator backed by the device resource pool. @public */
-export class DevicePoolAllocator implements RGTextureAllocator<Texture2D, FrameBuffer> {
+export class DevicePoolAllocator implements RGTextureAllocator<Texture2D> {
   private _device: Nullable<AbstractDevice>;
   /** Create an allocator using the given device or the global device. */
   constructor(device?: AbstractDevice) {

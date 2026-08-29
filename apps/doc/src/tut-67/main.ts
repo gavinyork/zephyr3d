@@ -71,11 +71,15 @@ myApp.ready().then(function () {
     [1, 1, 0.2],
     [1, 0.2, 1],
     [0.2, 1, 1]
-  ];
+  ] as const;
   const spheres = [];
   for (let i = 0; i < colors.length; i++) {
     const angle = (i / colors.length) * Math.PI * 2;
-    const sphere = new Mesh(scene, new SphereShape({ radius: 6 }), transparentMaterial(...colors[i]));
+    const sphere = new Mesh(
+      scene,
+      new SphereShape({ radius: 6 }),
+      transparentMaterial(colors[i][0], colors[i][1], colors[i][2])
+    );
     sphere.position.setXYZ(Math.cos(angle) * 5, 0, Math.sin(angle) * 5);
     spheres.push({ mesh: sphere, angle });
   }
@@ -113,7 +117,7 @@ myApp.ready().then(function () {
 
   const available = [];
   for (const mode of modes) {
-    const button = document.querySelector(`#${mode.id}`);
+    const button = document.querySelector<HTMLButtonElement>(`#${mode.id}`);
     // "No OIT" has nothing to probe and is always available. For the rest,
     // build one throwaway instance just to ask the device about it.
     const probe = mode.create();

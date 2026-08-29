@@ -1,11 +1,4 @@
-import type {
-  AbstractDevice,
-  CompareFunc,
-  FrameBuffer,
-  RenderStateSet,
-  Texture2D,
-  TextureFormat
-} from '@zephyr3d/device';
+import type { AbstractDevice, CompareFunc, RenderStateSet, Texture2D, TextureFormat } from '@zephyr3d/device';
 import type { DrawContext } from '../render';
 import { drawFullscreenQuad } from '../render/fullscreenquad';
 import { copyTexture, fetchSampler } from '../utility/misc';
@@ -300,9 +293,7 @@ export class AbstractPostEffect extends Disposable {
         const applyEffect = () => {
           device.pushDeviceStates();
           try {
-            device.setFramebuffer(
-              output.framebuffer ? rg.getFramebuffer<FrameBuffer>(output.framebuffer) : null
-            );
+            device.setFramebuffer(output.framebuffer ? rg.getFramebuffer(output.framebuffer) : null);
             // A framebuffer bind may be a backend no-op when the requested target is already
             // current. Never let a previous multi-resolution effect (for example Bloom) leak its
             // smaller viewport/scissor into this fullscreen pass.

@@ -259,7 +259,7 @@ export class RenderGraph {
         pass.writes.push(res);
         return new RGHandle(id, tokenName, 'token');
       },
-      createFramebuffer<TFramebuffer = unknown>(desc: RGFramebufferDesc): RGFramebufferHandle<TFramebuffer> {
+      createFramebuffer(desc: RGFramebufferDesc): RGFramebufferHandle {
         const id = graph._nextResourceId++;
         const name = desc.label ?? `_fb_${id}`;
         const res = new RGResource(id, name, 'framebuffer', desc);

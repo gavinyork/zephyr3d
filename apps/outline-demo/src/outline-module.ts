@@ -1,6 +1,5 @@
 import { createSceneRenderer, FrameResources, ProxyDrawable } from '@zephyr3d/scene';
 import type { ForwardPlusModuleContext, Mesh, RenderModule } from '@zephyr3d/scene';
-import type { FrameBuffer } from '@zephyr3d/device';
 import { OutlineMaterial } from './outline-material';
 
 /** Runtime controls shared by the demo UI and the render module. */
@@ -63,7 +62,7 @@ export function createOutlineModule(
           const outlineQueue = renderer.createQueue().add(outlineProxy, camera).finalize(camera);
 
           outlineMaterial.outlineWidth = settings.width;
-          renderer.renderOpaque(rgCtx.getFramebuffer<FrameBuffer>(framebuffer), outlineQueue);
+          renderer.renderOpaque(rgCtx.getFramebuffer(framebuffer), outlineQueue);
         });
         return output;
       });
