@@ -124,7 +124,13 @@ export class WebGPUTextureCaps implements TextureCaps {
     this.supportFloatTexture = true;
     this.supportFloatColorBuffer = true;
     this.supportHalfFloatColorBuffer = true;
-    this.supportFloatBlending = true;
+    // Blending a 32-bit float target requires the optional `float32-blendable` feature. Hardcoding
+    // this to true made every consumer believe it was always available: on an adapter without the
+    // feature (Firefox at the time of writing), dual-depth-peeling OIT then reported itself as
+    // supported, and its first pipeline over an rg32f/rgba32f target failed validation with
+    // "Format Rgba32Float is not blendable". WebGPUFramebufferCaps queries the same feature
+    // correctly, so the two must not disagree.
+    this.supportFloatBlending = device.device.features.has('float32-blendable');
     this.supportS3TC = device.device.features.has('texture-compression-bc');
     this.supportS3TCSRGB = this.supportS3TC;
     this.supportBPTC = this.supportS3TC;
