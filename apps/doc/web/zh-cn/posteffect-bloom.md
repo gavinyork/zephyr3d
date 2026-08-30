@@ -1,22 +1,64 @@
 # Bloom（泛光）
 
-**用途**：在高亮区域生成柔和的光晕效果，提升画面亮度层次与氛围感。
+真实镜头在拍摄很亮的物体时，光会溢出到相邻区域形成柔和的光晕。Bloom 就是模拟这一现象：
+把画面中超过某个亮度的像素提取出来，模糊后再叠加回原图。它的用处不只是"好看"——发光的
+灯管、屏幕、火焰如果没有光晕，看上去只是贴了一张亮色贴图，而不像真的在发光。
 
-**属性接口**：
+> 本页代码为片段示意，省略了 import 与应用初始化。完整可运行示例见页内嵌入的实例。
 
-- `camera.bloom`: `boolean` — 启用 Bloom。
-- `camera.bloomIntensity`: `number` — 泛光强度。
-- `camera.bloomThreshold`: `number` — 阈值，高于该亮度的像素将产生 Bloom。
-- `camera.bloomThresholdKnee`: `number` — 平滑阈值过渡范围。
-- `camera.bloomMaxDownsampleLevels`: `number` — 最大降采样层级。
-- `camera.bloomDownsampleLimit`: `number` — 降采样分辨率下限。
+## 最小可跑例
 
-**示例**：
+Bloom 只需要在相机上打开：
+
 ```javascript
 camera.bloom = true;
-camera.bloomIntensity = 1.5;
-camera.bloomThreshold = 0.9;
 ```
+
+但只打开开关往往看不出效果，**因为画面里没有东西够亮**。Bloom 处理的是颜色缓冲里超过
+阈值的像素，一个正常曝光的白色物体通常还不够。让物体真正"发光"要靠材质的自发光：
+
+```javascript
+const material = new PBRMetallicRoughnessMaterial();
+material.emissiveColor = new Vector3(1, 0.92, 0.78);
+material.emissiveStrength = 8;
+```
+
+下面的实例是一排完全相同的球，唯一的区别是 `emissiveStrength` 逐个翻倍（0.5 到 16）。
+拖动 Threshold 滑杆可以看到光晕从右向左依次出现——这正是阈值在起作用。
 
 <div class="showcase" case="tut-28" style="width:600px;height:500px"></div>
 
+## 调参与取舍
+
+`bloomThreshold` 决定多亮才开始泛光，是最需要先调的一个。Bloom 在色调映射**之前**执行，
+所以它比较的是**场景线性亮度**，不是画面上的显示值——一个在屏幕上看起来纯白的像素，其线性
+值可能是 1.2 也可能是 200，两者的泛光表现完全不同。
+
+阈值的物理含义取决于[光照模式](zh-cn/lighting-physical.md)：
+
+| 光照模式 | 缓冲内容 | 阈值 0.8 的含义 |
+| --- | --- | --- |
+| `legacy`（默认） | 场景线性亮度，无单位 | 略高于"曝光正确的白色" |
+| `physical` | 相机预曝光后的亮度 | Sunny-16 下约 30,700 cd/m²，近似阳光下的白色表面 |
+
+`physical` 下默认阈值相当严格，只有真正的发光体和高光会泛光；想要更明显的光晕应当调低，
+约 `0.3` 能让白色表面开始泛光，`0.15` 会覆盖中灰以上的一切。
+
+`bloomThresholdKnee` 控制阈值附近的过渡宽度。为 `0` 时是硬切换：亮度刚好跨过阈值的物体
+会突然出现光晕，物体缓慢变亮时会看到"跳变"。给一个非零值（例如 `0.5`）能让这个过程连续。
+
+`bloomIntensity` 是最终叠加的强度，纯粹是观感偏好。它不改变哪些像素参与泛光，只改变叠加
+多少，所以调它之前应先用阈值把范围选对。注意它作用在线性光上，之后还要经过色调映射，因此
+**有效范围比直觉小得多**：页内实例用的是 `0.35`，超过 1 很容易把高光区糊成一片白。
+
+`bloomMaxDownsampleLevels` 与 `bloomDownsampleLimit` 决定模糊金字塔的层数和最小分辨率，
+也就是光晕能扩散多远：层数越多，光晕范围越大，代价是每层都有一次模糊的开销。默认的 4 层
+适合大部分场景，只在需要大范围柔光时才提高。
+
+`bloomFilterRadius` 是升采样时 3×3 tent 滤波核的半径（单位为源纹理像素），默认 `1`。这个
+值控制光晕的柔和程度，但**不宜超过 2**：tent 的三个采样点会因间距过大而不再重叠，反而重新
+制造出它本来要消除的网格感。调到 0 则退化为单次双线性采样，方块状条带会回来。
+
+`bloomKarisAverage` 默认开启，用于抑制"火萤"（fireflies）——法线贴图偶然让某个像素的 NdotL
+接近 1 时会产生孤立的超亮点，物体一动就剧烈闪烁。代价是光晕会略微变暗变小，因为该加权本身
+就是在压制最亮的采样。完全静态、且没有高频高光的场景可以关掉它换取更大的扩散范围。

@@ -311,6 +311,10 @@ export class Camera extends SceneNode {
   protected _bloomThresholdKnee: number;
   /** @internal Bloom intensity. */
   protected _bloomIntensity: number;
+  /** @internal */
+  protected _bloomFilterRadius: number;
+  /** @internal */
+  protected _bloomKarisAverage: boolean;
   /** @internal Color adjustment enable flag (via post effect). */
   protected _colorAdjustEnabled: boolean;
   /** @internal Color adjustment post effect reference. */
@@ -543,6 +547,8 @@ export class Camera extends SceneNode {
     this._bloomThreshold = 0.8;
     this._bloomThresholdKnee = 0;
     this._bloomIntensity = 1;
+    this._bloomFilterRadius = 1;
+    this._bloomKarisAverage = true;
     this._colorAdjustEnabled = false;
     this._postEffectColorAdjust = new DRef();
     this._colorAdjustSaturation = 1;
@@ -827,6 +833,51 @@ export class Camera extends SceneNode {
     if (this._postEffectBloom.get()) {
       this._postEffectBloom.get()!.intensity = val;
     }
+  }
+  /**
+   * Radius of the tent filter used to upsample the bloom pyramid, in source texels.
+   *
+   * @remarks
+   * See {@link Bloom.filterRadius}. 1 is the natural width; raising it softens the halo but past
+   * ~2 the tent's taps stop overlapping and a grid pattern reappears.
+   */
+  get bloomFilterRadius() {
+    return this._bloomFilterRadius;
+  }
+  set bloomFilterRadius(val) {
+    this._bloomFilterRadius = Math.max(0, val);
+    if (this._postEffectBloom.get()) {
+      this._postEffectBloom.get()!.filterRadius = this._bloomFilterRadius;
+    }
+  }
+  /**
+   * Whether the first bloom downsample uses the Karis average to suppress fireflies.
+   *
+   * @remarks
+   * See {@link Bloom.karisAverage}. On by default; costs a little halo reach in exchange for
+   * stability on high-frequency speculars.
+   */
+  get bloomKarisAverage() {
+    return this._bloomKarisAverage;
+  }
+  set bloomKarisAverage(val) {
+    this._bloomKarisAverage = !!val;
+    if (this._postEffectBloom.get()) {
+      this._postEffectBloom.get()!.karisAverage = this._bloomKarisAverage;
+    }
+  }
+  /**
+   * Whether tone mapping dithers its result before the 8-bit write.
+   *
+   * @remarks
+   * See {@link Tonemap.dither}. On by default; removes the banding shallow gradients such as bloom
+   * halos otherwise show once quantized. Turn it off for reproducible pixel captures.
+   */
+  get toneMapDither() {
+    return this._postEffectTonemap.get()!.dither;
+  }
+  set toneMapDither(val) {
+    this._postEffectTonemap.get()!.dither = !!val;
   }
   /** Whether color adjustment is enabled. */
   get colorAdjust() {
@@ -2072,6 +2123,24 @@ export class Camera extends SceneNode {
       this._postEffectMotionBlur.set(motionBlur);
       this._compositor.appendPostEffect(motionBlur);
     }
+    // Bloom is created before Tonemap so the transparent layer ends up in HDR pipeline order:
+    // MotionBlur -> Bloom -> Tonemap -> ColorAdjust -> FXAA. Bloom must see scene-linear radiance:
+    // its threshold, its blur and its additive compose are all only meaningful in linear light.
+    // Running it after the ACES curve compressed everything into [0, 1] flattened the emitter range
+    // (a 100x brighter emitter produced the same halo) and made the compose hard-clip.
+    if (!this._postEffectBloom.get()) {
+      const bloom = new Bloom();
+      bloom.enabled = false;
+      bloom.maxDownsampleLevel = this._bloomMaxDownsampleLevels;
+      bloom.downsampleLimit = this._bloomDownsampleLimit;
+      bloom.threshold = this._bloomThreshold;
+      bloom.thresholdKnee = this._bloomThresholdKnee;
+      bloom.intensity = this._bloomIntensity;
+      bloom.filterRadius = this._bloomFilterRadius;
+      bloom.karisAverage = this._bloomKarisAverage;
+      this._postEffectBloom.set(bloom);
+      this._compositor.appendPostEffect(bloom);
+    }
     if (!this._postEffectTonemap.get()) {
       const tonemap = new Tonemap();
       tonemap.enabled = true;
@@ -2095,17 +2164,6 @@ export class Camera extends SceneNode {
       this._postEffectFXAA.set(fxaa);
       this._compositor.appendPostEffect(fxaa);
     }
-    if (!this._postEffectBloom.get()) {
-      const bloom = new Bloom();
-      bloom.enabled = false;
-      bloom.maxDownsampleLevel = this._bloomMaxDownsampleLevels;
-      bloom.downsampleLimit = this._bloomDownsampleLimit;
-      bloom.threshold = this._bloomThreshold;
-      bloom.thresholdKnee = this._bloomThresholdKnee;
-      bloom.intensity = this._bloomIntensity;
-      this._postEffectBloom.set(bloom);
-      this._compositor.appendPostEffect(bloom);
-    }
   }
 
   /** @internal */
@@ -2116,15 +2174,11 @@ export class Camera extends SceneNode {
     // keeps its plain exposure multiplier.
     const usePhysicalExposure = scene.lightingMode === 'physical';
     tonemap.exposure = usePhysicalExposure ? 1 : this._tonemapExposure;
-    const bloom = this._postEffectBloom.get()!;
+    // The chain order no longer depends on the lighting mode: Bloom always precedes Tonemap, so it
+    // always works on scene-linear radiance. Only the SSGI histories still care about the switch.
     if (this._postProcessingLightingMode !== scene.lightingMode) {
       // SSGI histories contain scene-linear radiance. Never reuse them across lighting unit models.
       this.invalidateSSGIHistory();
-      if (scene.lightingMode === 'physical') {
-        this._compositor.movePostEffectBefore(bloom, tonemap);
-      } else {
-        this._compositor.movePostEffectAfter(bloom, this._postEffectFXAA.get()!);
-      }
       this._postProcessingLightingMode = scene.lightingMode;
     }
   }

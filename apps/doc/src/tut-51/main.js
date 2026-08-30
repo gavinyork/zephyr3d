@@ -35,9 +35,11 @@ myApp.ready().then(function () {
   material.roughness = 0.9;
   const box = new Mesh(scene, new BoxShape({ size: 10 }), material);
   box.position.setXYZ(16, 5, -12);
+  dirLight.shadow.shadowRegion.addStaticCaster(box);
   new Mesh(scene, new PlaneShape({ size: 60, resolution: 10 }), material);
   const torus = new Mesh(scene, new TorusShape({ innerRadius: 2, outerRadius: 5 }), material);
   torus.position.setXYZ(0, 2, 0);
+  dirLight.shadow.shadowRegion.addStaticCaster(torus);
 
   // Create camera
   scene.mainCamera = new PerspectiveCamera(scene, Math.PI / 3, 1, 600);

@@ -41,7 +41,7 @@ myApp.ready().then(async () => {
   scene.mainCamera.lookAt(new Vector3(-2, 1, 1), new Vector3(-2, 1, 0), Vector3.axisPY());
   scene.mainCamera.controller = new FPSCameraController();
   scene.mainCamera.HiZ = true;
-  scene.mainCamera.ssrRoughnessFactor = 0.01;
+  scene.mainCamera.ssrRoughnessFactor = 0.002;
   scene.mainCamera.ssrBlurScale = 0.06;
 
   scene.mainCamera.FXAA = true;

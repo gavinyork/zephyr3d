@@ -1,6 +1,7 @@
 import type { AbstractDevice, BindGroup, GPUProgram, RenderStateSet, Texture2D } from '@zephyr3d/device';
 import { AbstractPostEffect, PostEffectLayer } from './posteffect';
 import type { PostEffectSetupContext } from './posteffect';
+import { linearToGamma } from '../shaders/misc';
 import type { DrawContext } from '../render';
 import type { Nullable } from '@zephyr3d/base';
 import { Vector2, Vector4 } from '@zephyr3d/base';
@@ -32,6 +33,8 @@ export class Bloom extends AbstractPostEffect {
   private _threshold: number;
   private _thresholdKnee: number;
   private _intensity: number;
+  private _filterRadius: number;
+  private _karisAverage: boolean;
   /**
    * Creates an instance of tonemap post effect
    */
@@ -45,6 +48,8 @@ export class Bloom extends AbstractPostEffect {
     this._threshold = 0.8;
     this._thresholdKnee = 0;
     this._intensity = 1;
+    this._filterRadius = 1;
+    this._karisAverage = true;
   }
   /** The maximum downsample levels */
   get maxDownsampleLevel() {
@@ -97,6 +102,38 @@ export class Bloom extends AbstractPostEffect {
   }
   set intensity(val) {
     this._intensity = val;
+  }
+  /**
+   * Radius of the 3x3 tent filter used when upsampling the pyramid, in source texels.
+   *
+   * @remarks
+   * 1 is the natural width and what the Call of Duty presentation uses. Raising it spreads each
+   * level further and softens the halo, at the cost of the tent's taps drifting apart: past ~2 the
+   * three lobes stop overlapping and the filter reintroduces the very grid pattern it exists to
+   * remove. Lowering it toward 0 collapses the filter back to a plain bilinear tap and the blocky
+   * banding returns.
+   */
+  get filterRadius() {
+    return this._filterRadius;
+  }
+  set filterRadius(val) {
+    this._filterRadius = Math.max(0, val);
+  }
+  /**
+   * Whether the first downsample weights its taps by `1 / (1 + luma)` (the "Karis average").
+   *
+   * @remarks
+   * Suppresses the fireflies a single blown-out specular texel produces: without it, such a texel
+   * dominates its 2x2 group and flickers as the surface moves, since whether a normal map lands on
+   * NdotL ~ 1 changes frame to frame. The trade is a slightly dimmer, slightly tighter halo,
+   * because the weighting deliberately holds the brightest samples back. Turn it off for a static
+   * scene that wants maximum reach and has no high-frequency speculars to stabilize.
+   */
+  get karisAverage() {
+    return this._karisAverage;
+  }
+  set karisAverage(val) {
+    this._karisAverage = !!val;
   }
   /** {@inheritDoc AbstractPostEffect.requireLinearDepthTexture} */
   requireLinearDepthTexture() {
@@ -243,7 +280,12 @@ export class Bloom extends AbstractPostEffect {
           device.setFramebuffer(output.framebuffer ? rg.getFramebuffer(output.framebuffer) : null);
           device.setViewport(null);
           device.setScissor(null);
-          this.finalCompose(device, rg.getTexture<Texture2D>(s.input), rg.getTexture<Texture2D>(bloomHandle));
+          this.finalCompose(
+            device,
+            rg.getTexture<Texture2D>(s.input),
+            rg.getTexture<Texture2D>(bloomHandle),
+            output.srgbOutput
+          );
         } finally {
           device.popDeviceStates();
         }
@@ -252,7 +294,7 @@ export class Bloom extends AbstractPostEffect {
     });
   }
   /** {@inheritDoc AbstractPostEffect.apply} */
-  apply(ctx: DrawContext, inputColorTexture: Texture2D, _sceneDepthTexture: Texture2D, _srgbOutput: boolean) {
+  apply(ctx: DrawContext, inputColorTexture: Texture2D, _sceneDepthTexture: Texture2D, srgbOutput: boolean) {
     const device = ctx.device;
     const downsampleTextures: Texture2D[] = [];
     this._prepare(device, inputColorTexture);
@@ -264,7 +306,7 @@ export class Bloom extends AbstractPostEffect {
     this.downsample(device, colorTex, downsampleTextures);
     this.upsample(device, downsampleTextures);
     device.popDeviceStates();
-    this.finalCompose(device, inputColorTexture, downsampleTextures[0]);
+    this.finalCompose(device, inputColorTexture, downsampleTextures[0], srgbOutput);
     for (const tex of downsampleTextures) {
       device.pool.releaseTexture(tex);
     }
@@ -285,15 +327,23 @@ export class Bloom extends AbstractPostEffect {
     Bloom._bindgroupPrefilter!.setTexture('tex', srcTexture);
     Bloom._bindgroupPrefilter!.setValue('flip', device.type === 'webgpu' ? 1 : 0);
     Bloom._bindgroupPrefilter!.setValue('threshold', this._thresholdValue);
+    // Half-texel diagonals of the *source*, so each fetch lands on a 2x2 group boundary.
+    this._invTexSize.setXY(1 / srcTexture.width, 1 / srcTexture.height);
+    Bloom._bindgroupPrefilter!.setValue('invTexSize', this._invTexSize);
+    Bloom._bindgroupPrefilter!.setValue('karis', this._karisAverage ? 1 : 0);
     this.drawFullscreenQuad();
   }
   /** @internal */
-  finalCompose(device: AbstractDevice, srcTexture: Texture2D, bloomTexture: Texture2D) {
+  finalCompose(device: AbstractDevice, srcTexture: Texture2D, bloomTexture: Texture2D, srgbOutput: boolean) {
     device.setProgram(Bloom._programFinalCompose);
     device.setBindGroup(0, Bloom._bindgroupFinalCompose!);
     Bloom._bindgroupFinalCompose!.setTexture('srcTex', srcTexture);
     Bloom._bindgroupFinalCompose!.setTexture('bloomTex', bloomTexture);
     Bloom._bindgroupFinalCompose!.setValue('intensity', this._intensity);
+    // Legacy lighting puts Bloom last in the chain (see Camera.syncPostProcessingMode), so this
+    // pass may be the one writing the sRGB screen. Without this the whole frame is handed to the
+    // display scene-linear and everything darkens the moment bloom is switched on.
+    Bloom._bindgroupFinalCompose!.setValue('srgbOut', srgbOutput ? 1 : 0);
     Bloom._bindgroupFinalCompose!.setValue(
       'flip',
       device.type === 'webgpu' && device.getFramebuffer() ? 1 : 0
@@ -312,6 +362,11 @@ export class Bloom extends AbstractPostEffect {
     device.setBindGroup(0, Bloom._bindgroupUpsample!);
     Bloom._bindgroupUpsample!.setValue('flip', device.type === 'webgpu' ? 1 : 0);
     Bloom._bindgroupUpsample!.setTexture('tex', srcTexture);
+    // Tent offsets are in source-texel units, so the filter widens with the level it reads
+    // from and every level contributes a similarly shaped blur in screen space.
+    this._invTexSize.setXY(1 / srcTexture.width, 1 / srcTexture.height);
+    Bloom._bindgroupUpsample!.setValue('invTexSize', this._invTexSize);
+    Bloom._bindgroupUpsample!.setValue('radius', this._filterRadius);
     device.setFramebuffer([dstTexture]);
     device.setViewport(null);
     device.setScissor(null);
@@ -387,6 +442,7 @@ export class Bloom extends AbstractPostEffect {
           this.srcTex = pb.tex2D().uniform(0);
           this.bloomTex = pb.tex2D().uniform(0);
           this.intensity = pb.float().uniform(0);
+          this.srgbOut = pb.int().uniform(0);
           this.$outputs.outColor = pb.vec4();
           pb.main(function () {
             this.$l.srcSample = pb.textureSampleLevel(this.srcTex, this.$inputs.uv, 0);
@@ -413,6 +469,10 @@ export class Bloom extends AbstractPostEffect {
               pb.vec3(0),
               pb.vec3(Bloom.HALF_FLOAT_MAX)
             );
+            // Only when this pass writes the screen directly; intermediate targets stay linear.
+            this.$if(pb.notEqual(this.srgbOut, 0), function () {
+              this.composed = linearToGamma(this, pb.clamp(this.composed, pb.vec3(0), pb.vec3(1)));
+            });
             this.$outputs.outColor = pb.vec4(this.composed, 1);
           });
         }
@@ -437,9 +497,50 @@ export class Bloom extends AbstractPostEffect {
         fragment(pb) {
           this.tex = pb.tex2D().uniform(0);
           this.threshold = pb.vec4().uniform(0);
+          this.invTexSize = pb.vec2().uniform(0);
+          this.karis = pb.int().uniform(0);
           this.$outputs.outColor = pb.vec4();
           pb.main(function () {
-            this.$l.raw = pb.textureSampleLevel(this.tex, this.$inputs.uv, 0);
+            // This pass is also the first (full -> half resolution) downsample, which is where the
+            // Call of Duty presentation puts the Karis average: a lone very bright texel -- a
+            // specular hit where a normal map happens to put NdotL near 1 -- otherwise dominates
+            // its 2x2 group, and flickers violently as the surface moves. Weighting each tap by
+            // 1/(1+luma) lets the group's dimmer texels hold that spike down.
+            //
+            // The four taps sit at half-texel diagonals so each bilinear fetch already averages a
+            // 2x2 block of the source, giving 4 groups (16 source texels) for 4 fetches.
+            this.$l.raw = pb.vec4(0);
+            this.$if(pb.notEqual(this.karis, 0), function () {
+              this.$l.o = pb.mul(this.invTexSize, 0.5);
+              this.$l.acc = pb.vec3(0);
+              this.$l.wsum = pb.float(0);
+              const quad: [number, number][] = [
+                [-1, -1],
+                [1, -1],
+                [-1, 1],
+                [1, 1]
+              ];
+              for (const [dx, dy] of quad) {
+                this.$l.s = pb.textureSampleLevel(
+                  this.tex,
+                  pb.add(this.$inputs.uv, pb.mul(this.o, pb.vec2(dx, dy))),
+                  0
+                ).rgb;
+                // Reject non-finite taps here too; see the guard below for why.
+                this.s = this.$choice(
+                  pb.all(pb.lessThan(pb.abs(this.s), pb.vec3(1e30))),
+                  pb.clamp(this.s, pb.vec3(0), pb.vec3(Bloom.HALF_FLOAT_MAX)),
+                  pb.vec3(0)
+                );
+                // Karis weight uses perceived luminance, matching the original.
+                this.$l.w = pb.div(1, pb.add(1, pb.dot(this.s, pb.vec3(0.2126, 0.7152, 0.0722))));
+                this.acc = pb.add(this.acc, pb.mul(this.s, this.w));
+                this.wsum = pb.add(this.wsum, this.w);
+              }
+              this.raw = pb.vec4(pb.div(this.acc, pb.max(this.wsum, 0.0001)), 1);
+            }).$else(function () {
+              this.raw = pb.textureSampleLevel(this.tex, this.$inputs.uv, 0);
+            });
             // Reject non-finite input before any arithmetic. An Inf makes the contribution below
             // evaluate Inf/Inf = NaN, and a NaN survives every subsequent operation: the separable
             // blur smears it across the coarsest mip and the upsample chain expands that single
@@ -486,9 +587,39 @@ export class Bloom extends AbstractPostEffect {
         },
         fragment(pb) {
           this.tex = pb.tex2D().uniform(0);
+          this.invTexSize = pb.vec2().uniform(0);
+          this.radius = pb.float().uniform(0);
           this.$outputs.outColor = pb.vec4();
           pb.main(function () {
-            this.$outputs.outColor = pb.textureSampleLevel(this.tex, this.$inputs.uv, 0);
+            // 3x3 tent filter, the upsample kernel from "Next Generation Post Processing in
+            // Call of Duty: Advanced Warfare". A bare bilinear tap here is what produced the
+            // blocky halo: one coarse texel covers a large screen area, so the level's square
+            // texel grid survives magnification and shows up as axis-aligned banding. The tent
+            // weights (1 2 1 / 2 4 2 / 1 2 1) / 16 reconstruct a smooth ramp between texels.
+            this.$l.o = pb.mul(this.invTexSize, this.radius);
+            this.$l.sum = pb.vec3(0);
+            const taps: [number, number, number][] = [
+              [-1, -1, 1],
+              [0, -1, 2],
+              [1, -1, 1],
+              [-1, 0, 2],
+              [0, 0, 4],
+              [1, 0, 2],
+              [-1, 1, 1],
+              [0, 1, 2],
+              [1, 1, 1]
+            ];
+            for (const [dx, dy, w] of taps) {
+              this.sum = pb.add(
+                this.sum,
+                pb.mul(
+                  pb.textureSampleLevel(this.tex, pb.add(this.$inputs.uv, pb.mul(this.o, pb.vec2(dx, dy))), 0)
+                    .rgb,
+                  w / 16
+                )
+              );
+            }
+            this.$outputs.outColor = pb.vec4(this.sum, 1);
           });
         }
       })!;

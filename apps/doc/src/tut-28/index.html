@@ -29,7 +29,9 @@
         left: 12px;
         z-index: 10;
         display: inline-flex;
-        gap: 4px;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 4px 10px;
         max-width: calc(100vw - 24px);
         padding: 4px;
         border: 1px solid rgba(255, 255, 255, 0.14);
@@ -43,6 +45,26 @@
           "Segoe UI",
           sans-serif;
         backdrop-filter: blur(8px);
+      }
+      #ui .group {
+        display: inline-flex;
+        gap: 4px;
+      }
+      #ui label {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        min-height: 32px;
+        padding: 0 4px;
+        white-space: nowrap;
+      }
+      #ui input[type="range"] {
+        width: min(110px, 28vw);
+      }
+      #ui output {
+        min-width: 30px;
+        color: #9ed0ff;
+        font-variant-numeric: tabular-nums;
       }
       #ui button {
         min-width: 72px;
@@ -85,8 +107,20 @@
   <body>
     <canvas id="my-canvas"></canvas>
     <div id="ui" aria-label="Bloom">
-      <button id="btn-off" type="button" aria-pressed="false">Bloom Off</button>
-      <button id="btn-on" class="active" type="button" aria-pressed="true">Bloom On</button>
+      <div class="group">
+        <button id="btn-off" type="button" aria-pressed="false">Bloom Off</button>
+        <button id="btn-on" class="active" type="button" aria-pressed="true">Bloom On</button>
+      </div>
+      <label>
+        Threshold
+        <input id="threshold" type="range" min="0" max="3" step="0.01" value="0.9" />
+        <output id="threshold-value" for="threshold">0.90</output>
+      </label>
+      <label>
+        Intensity
+        <input id="intensity" type="range" min="0" max="1.5" step="0.05" value="0.35" />
+        <output id="intensity-value" for="intensity">0.35</output>
+      </label>
     </div>
     <script type="module" src="js/tut-28.js"></script>
   </body>
