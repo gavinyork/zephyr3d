@@ -28,7 +28,7 @@ camera.toneMapExposure = 1.5;
 > 快门和 ISO 推导（只读的 `camera.exposure`），`toneMapExposure` 会被忽略，
 > 色调映射只负责应用 ACES 曲线。
 
-<div class="showcase" case="tut-27" style="width:600px;height:800px;"></div>
+<div class="showcase" case="tut-27" style="width:600px;height:500px"></div>
 
 ---
 

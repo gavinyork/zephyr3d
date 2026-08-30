@@ -30,6 +30,7 @@
         z-index: 10;
         display: inline-flex;
         gap: 4px;
+        max-width: calc(100vw - 24px);
         padding: 4px;
         border: 1px solid rgba(255, 255, 255, 0.14);
         border-radius: 6px;
@@ -63,13 +64,29 @@
         border-color: rgba(125, 186, 255, 0.7);
         background: #2f6fc5;
       }
+      #ui button:focus-visible {
+        outline: 2px solid #9ed0ff;
+        outline-offset: 2px;
+      }
+      @media (max-width: 420px) {
+        #ui {
+          left: 8px;
+          right: 8px;
+          max-width: none;
+        }
+        #ui button {
+          flex: 1;
+          min-width: 0;
+          padding: 0 8px;
+        }
+      }
     </style>
   </head>
   <body>
     <canvas id="my-canvas"></canvas>
     <div id="ui" aria-label="SSGI">
-      <button id="btn-off" type="button">SSGI Off</button>
-      <button id="btn-on" class="active" type="button">SSGI On</button>
+      <button id="btn-off" type="button" aria-pressed="false">SSGI Off</button>
+      <button id="btn-on" class="active" type="button" aria-pressed="true">SSGI On</button>
     </div>
     <script type="module" src="js/tut-68.js"></script>
   </body>

@@ -41,13 +41,30 @@ myApp.ready().then(async () => {
   scene.mainCamera.lookAt(new Vector3(-2, 1, 1), new Vector3(-2, 1, 0), Vector3.axisPY());
   scene.mainCamera.controller = new FPSCameraController();
   scene.mainCamera.HiZ = true;
-  scene.mainCamera.SSR = true;
   scene.mainCamera.ssrRoughnessFactor = 0.01;
   scene.mainCamera.ssrBlurScale = 0.06;
 
   scene.mainCamera.FXAA = true;
 
   getInput().use(scene.mainCamera.handleEvent, scene.mainCamera);
+
+  // Toggle SSR through the UI buttons
+  const btnOff = document.querySelector('#btn-off');
+  const btnOn = document.querySelector('#btn-on');
+
+  function setSSR(enabled) {
+    scene.mainCamera.SSR = enabled;
+    btnOff.classList.toggle('active', !enabled);
+    btnOn.classList.toggle('active', enabled);
+    btnOff.setAttribute('aria-pressed', String(!enabled));
+    btnOn.setAttribute('aria-pressed', String(enabled));
+    // Hand keyboard focus back so the WASD camera controls keep working
+    myApp.focus();
+  }
+
+  btnOff.addEventListener('click', () => setSSR(false));
+  btnOn.addEventListener('click', () => setSSR(true));
+  setSSR(true);
 
   getEngine().setRenderable(scene, 0);
 

@@ -35,25 +35,23 @@ myApp.ready().then(function () {
 
   getInput().use(scene.mainCamera.handleEvent, scene.mainCamera);
 
-  getEngine().setRenderable(scene, 0, {
-    beforeRender(scene) {
-      const width = myApp.device.deviceXToScreen(myApp.device.canvas.width);
-      const height = myApp.device.deviceYToScreen(myApp.device.canvas.height);
-      // The lower half of the screen uses Tonemap
-      scene.mainCamera.viewport = [0, 0, width, height >> 1];
-      scene.mainCamera.toneMap = false;
-    }
-  });
+  // Toggle Tonemap through the UI buttons
+  const btnOff = document.querySelector('#btn-off');
+  const btnOn = document.querySelector('#btn-on');
 
-  getEngine().setRenderable(scene, 1, {
-    beforeRender(scene) {
-      const width = myApp.device.deviceXToScreen(myApp.device.canvas.width);
-      const height = myApp.device.deviceYToScreen(myApp.device.canvas.height);
-      // The lower half of the screen uses Tonemap
-      scene.mainCamera.viewport = [0, height >> 1, width, height - (height >> 1)];
-      scene.mainCamera.toneMap = true;
-    }
-  });
+  function setToneMap(enabled) {
+    scene.mainCamera.toneMap = enabled;
+    btnOff.classList.toggle('active', !enabled);
+    btnOn.classList.toggle('active', enabled);
+    btnOff.setAttribute('aria-pressed', String(!enabled));
+    btnOn.setAttribute('aria-pressed', String(enabled));
+  }
+
+  btnOff.addEventListener('click', () => setToneMap(false));
+  btnOn.addEventListener('click', () => setToneMap(true));
+  setToneMap(true);
+
+  getEngine().setRenderable(scene, 0);
 
   myApp.run();
 });

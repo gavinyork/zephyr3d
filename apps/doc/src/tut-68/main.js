@@ -71,26 +71,28 @@ myApp.ready().then(async function () {
   scene.mainCamera.TAA = true;
 
   // Enable SSGI
-  scene.mainCamera.SSGI = true;
   scene.mainCamera.ssgiQualityPreset = 'quality';
   scene.mainCamera.ssgiIntensity = 2;
   scene.mainCamera.ssgiAOIntensity = 1;
   scene.mainCamera.ssgiAOPower = 3;
 
+  getInput().use(scene.mainCamera.handleEvent, scene.mainCamera);
+
+  // Toggle SSGI through the UI buttons
   const btnOff = document.querySelector('#btn-off');
   const btnOn = document.querySelector('#btn-on');
-  btnOff.addEventListener('click', () => {
-    scene.mainCamera.SSGI = false;
-    btnOff.classList.add('active');
-    btnOn.classList.remove('active');
-  });
-  btnOn.addEventListener('click', () => {
-    scene.mainCamera.SSGI = true;
-    btnOn.classList.add('active');
-    btnOff.classList.remove('active');
-  });
 
-  getInput().use(scene.mainCamera.handleEvent, scene.mainCamera);
+  function setSSGI(enabled) {
+    scene.mainCamera.SSGI = enabled;
+    btnOff.classList.toggle('active', !enabled);
+    btnOn.classList.toggle('active', enabled);
+    btnOff.setAttribute('aria-pressed', String(!enabled));
+    btnOn.setAttribute('aria-pressed', String(enabled));
+  }
+
+  btnOff.addEventListener('click', () => setSSGI(false));
+  btnOn.addEventListener('click', () => setSSGI(true));
+  setSSGI(true);
 
   getEngine().setRenderable(scene, 0);
 

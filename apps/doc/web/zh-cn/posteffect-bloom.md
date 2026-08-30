@@ -18,5 +18,5 @@ camera.bloomIntensity = 1.5;
 camera.bloomThreshold = 0.9;
 ```
 
-<div class="showcase" case="tut-28" style="width:600px;height:800px;"></div>
+<div class="showcase" case="tut-28" style="width:600px;height:500px"></div>
 

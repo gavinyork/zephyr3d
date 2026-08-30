@@ -17,4 +17,4 @@ camera.SSAO = true;
 camera.SSAOIntensity = 0.05;  
 ```
 
-<div class="showcase" case="tut-29" style="width:600px;height:800px;"></div>
+<div class="showcase" case="tut-29" style="width:600px;height:500px"></div>

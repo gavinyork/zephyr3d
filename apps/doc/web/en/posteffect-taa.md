@@ -21,7 +21,7 @@ It uses sub‑pixel jittering and temporal feedback to combine previous frame da
 camera.TAA = true;  
 ```
 
-<div class="showcase" case="tut-51" style="width:600px;height:800px;"></div>
+<div class="showcase" case="tut-51" style="width:600px;height:500px"></div>
 
 ---
 

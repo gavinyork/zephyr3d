@@ -29,7 +29,7 @@ camera.toneMapExposure = 1.5;
 > shutter speed and ISO (the read-only `camera.exposure`), `toneMapExposure` is ignored, and tone
 > mapping only applies the ACES curve.
 
-<div class="showcase" case="tut-27" style="width:600px;height:800px;"></div>
+<div class="showcase" case="tut-27" style="width:600px;height:500px"></div>
 
 ---
 

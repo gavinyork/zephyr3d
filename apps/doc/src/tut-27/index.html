@@ -2,28 +2,92 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Zephyr3d test</title>
     <style>
       * {
         margin: 0;
         padding: 0;
+        box-sizing: border-box;
       }
       html,
       body {
-        width: 100vw;
-        height: 100vh;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
       }
       canvas {
         position: absolute;
-        left: 0;
-        top: 0;
+        inset: 0;
         width: 100%;
         height: 100%;
+        z-index: 0;
+      }
+      #ui {
+        position: absolute;
+        top: 12px;
+        left: 12px;
+        z-index: 10;
+        display: inline-flex;
+        gap: 4px;
+        max-width: calc(100vw - 24px);
+        padding: 4px;
+        border: 1px solid rgba(255, 255, 255, 0.14);
+        border-radius: 6px;
+        background: rgba(15, 20, 28, 0.78);
+        color: #f4f7fb;
+        font:
+          13px/1.2 system-ui,
+          -apple-system,
+          BlinkMacSystemFont,
+          "Segoe UI",
+          sans-serif;
+        backdrop-filter: blur(8px);
+      }
+      #ui button {
+        min-width: 72px;
+        min-height: 32px;
+        padding: 0 12px;
+        border: 1px solid transparent;
+        border-radius: 4px;
+        background: transparent;
+        color: inherit;
+        cursor: pointer;
+        font: inherit;
+        font-weight: 600;
+        white-space: nowrap;
+      }
+      #ui button:hover {
+        background: rgba(255, 255, 255, 0.1);
+      }
+      #ui button.active {
+        border-color: rgba(125, 186, 255, 0.7);
+        background: #2f6fc5;
+      }
+      #ui button:focus-visible {
+        outline: 2px solid #9ed0ff;
+        outline-offset: 2px;
+      }
+      @media (max-width: 420px) {
+        #ui {
+          left: 8px;
+          right: 8px;
+          max-width: none;
+        }
+        #ui button {
+          flex: 1;
+          min-width: 0;
+          padding: 0 8px;
+        }
       }
     </style>
   </head>
   <body>
     <canvas id="my-canvas"></canvas>
+    <div id="ui" aria-label="Tonemap">
+      <button id="btn-off" type="button" aria-pressed="false">Tonemap Off</button>
+      <button id="btn-on" class="active" type="button" aria-pressed="true">Tonemap On</button>
+    </div>
     <script type="module" src="js/tut-27.js"></script>
   </body>
 </html>

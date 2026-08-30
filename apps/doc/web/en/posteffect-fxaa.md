@@ -11,4 +11,4 @@
 camera.FXAA = true; // Enable FXAA anti-aliasing  
 ```
 
-<div class="showcase" case="tut-30" style="width:600px;height:800px;"></div>
+<div class="showcase" case="tut-30" style="width:600px;height:500px"></div>

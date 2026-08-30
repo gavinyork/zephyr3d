@@ -21,7 +21,7 @@
 camera.TAA = true;
 ```
 
-<div class="showcase" case="tut-51" style="width:600px;height:800px;"></div>
+<div class="showcase" case="tut-51" style="width:600px;height:500px"></div>
 
 ---
 
