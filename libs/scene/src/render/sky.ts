@@ -1448,13 +1448,25 @@ export class SkyRenderer extends Disposable {
     if (!SkyRenderer._renderStatesFog) {
       SkyRenderer._renderStatesFog = device.createRenderStateSet();
       SkyRenderer._renderStatesFog.useRasterizerState().setCullMode('none');
-      SkyRenderer._renderStatesFog.useBlendingState().enable(true).setBlendFunc('one', 'src-alpha');
+      // RGB composites premultiplied inscattering over the scene weighted by transmittance. Alpha is
+      // left untouched: `src-alpha` applied to the alpha channel too would fold transmittance into
+      // the framebuffer coverage (dstA = T + dstA * T), so dense fog drove the backbuffer alpha
+      // toward 0 and the page showed through wherever the canvas alpha is composited.
+      SkyRenderer._renderStatesFog
+        .useBlendingState()
+        .enable(true)
+        .setBlendFuncRGB('one', 'src-alpha')
+        .setBlendFuncAlpha('zero', 'one');
       SkyRenderer._renderStatesFog.useDepthState().enableTest(false).enableWrite(false);
     }
     if (!SkyRenderer._renderStatesFogScatter) {
       SkyRenderer._renderStatesFogScatter = device.createRenderStateSet();
       SkyRenderer._renderStatesFogScatter.useRasterizerState().setCullMode('none');
-      SkyRenderer._renderStatesFogScatter.useBlendingState().enable(true).setBlendFunc('one', 'src-alpha');
+      SkyRenderer._renderStatesFogScatter
+        .useBlendingState()
+        .enable(true)
+        .setBlendFuncRGB('one', 'src-alpha')
+        .setBlendFuncAlpha('zero', 'one');
       SkyRenderer._renderStatesFogScatter
         .useDepthState()
         .enableTest(true)
