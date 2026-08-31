@@ -5,7 +5,7 @@ import { DialogRenderer } from '../components/modal';
 import { ModuleManager } from './module';
 import { SceneController } from '../controllers/scenecontroller';
 import { FontGlyph } from './fontglyph';
-import { AssetManager, ResourceManager, getDevice, getEngine } from '@zephyr3d/scene';
+import { getDevice, getEngine } from '@zephyr3d/scene';
 import type { Texture2D } from '@zephyr3d/device';
 import {
   analyzeGPUObjectGrowth,
@@ -492,17 +492,22 @@ export class Editor {
     await this.loadSystemPlugins();
   }
   async loadAssets() {
-    const assetManager = new AssetManager(
-      new ResourceManager(new HttpFS(window.location.href.slice(0, window.location.href.lastIndexOf('/'))))
-    );
-    const brushConfig = await assetManager.fetchJsonData('conf/brushes.json');
+    const vfs = new HttpFS(window.location.href.slice(0, window.location.href.lastIndexOf('/')));
+    const brushConfig = await getEngine().resourceManager.fetchJsonData('conf/brushes.json', {
+      overrideVFS: vfs
+    });
     for (const name in brushConfig) {
-      const tex = await assetManager.fetchTexture<Texture2D>(brushConfig[name]);
+      const tex = await getEngine().resourceManager.fetchTexture<Texture2D>(brushConfig[name], {
+        overrideVFS: vfs
+      });
       this._assetImages.brushes[name] = new DRef(tex);
     }
-    const appConfig = await assetManager.fetchJsonData('conf/app.json');
+    const appConfig = await getEngine().resourceManager.fetchJsonData('conf/app.json', {
+      overrideVFS: vfs
+    });
     for (const name in appConfig) {
-      const tex = await assetManager.fetchTexture<Texture2D>(appConfig[name], {
+      const tex = await getEngine().resourceManager.fetchTexture<Texture2D>(appConfig[name], {
+        overrideVFS: vfs,
         samplerOptions: { mipFilter: 'none' }
       });
       this._assetImages.app[name] = new DRef(tex);

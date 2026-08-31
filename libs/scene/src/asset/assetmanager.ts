@@ -535,8 +535,8 @@ export class AssetManager {
    */
   async fetchJsonData<T = any>(
     url: string,
-    postProcess?: (json: T) => T,
-    httpRequest?: HttpRequest,
+    postProcess?: Nullable<(json: T) => T>,
+    httpRequest?: Nullable<HttpRequest>,
     options?: BaseFetchOptions
   ): Promise<T> {
     const hash = httpRequest?.urlResolver?.(url) ?? url;
@@ -556,6 +556,7 @@ export class AssetManager {
    * @param url - Resource URL or VFS path.
    * @param postProcess - Optional transformation applied to the loaded ArrayBuffer.
    * @param httpRequest - Optional HttpRequest for custom URL resolution/headers.
+   * @param options - Optional fetch options
    * @returns A promise that resolves to the loaded (and optionally processed) ArrayBuffer.
    */
   async fetchBinaryData(
@@ -820,7 +821,11 @@ export class AssetManager {
    * @returns A promise that resolves to the loaded (and optionally processed) JSON.
    * @internal
    */
-  async loadJsonData<T = unknown>(url: string, postProcess?: (json: any) => any, vfs?: VFS): Promise<T> {
+  async loadJsonData<T = unknown>(
+    url: string,
+    postProcess?: Nullable<(json: any) => any>,
+    vfs?: VFS
+  ): Promise<T> {
     let json = JSON.parse((await this.readFileFromVFS(url, { encoding: 'utf8' }, vfs)) as string) as T;
 
     if (postProcess) {

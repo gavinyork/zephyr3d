@@ -2,7 +2,6 @@ import { backendWebGL2 } from '@zephyr3d/backend-webgl';
 import { Vector3 } from '@zephyr3d/base';
 import {
   Scene,
-  AssetManager,
   Application,
   PerspectiveCamera,
   OrbitCameraController,
@@ -25,10 +24,9 @@ myApp.ready().then(async () => {
   scene.mainCamera.controller = new OrbitCameraController({ center: new Vector3(0, 0, 1) });
   getInput().use(scene.mainCamera.handleEvent, scene.mainCamera);
 
-  const assetManager = new AssetManager();
   // Load panorama
   /** @type {import('@zephyr3d/device').Texture2D} */
-  const panorama = await assetManager.fetchTexture(
+  const panorama = await getEngine().resourceManager.fetchTexture(
     'https://cdn.zephyr3d.org/doc/assets/images/Wide_Street.hdr'
   );
   // Create the skybox cubemap

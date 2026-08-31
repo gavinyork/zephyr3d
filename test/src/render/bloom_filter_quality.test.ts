@@ -118,7 +118,8 @@ describe('Bloom pyramid filtering', () => {
       }
       return acc.map((v) => v / wsum);
     };
-    const plain = (taps: number[][]) => taps[0].map((_, i) => taps.reduce((a, t) => a + t[i], 0) / taps.length);
+    const plain = (taps: number[][]) =>
+      taps[0].map((_, i) => taps.reduce((a, t) => a + t[i], 0) / taps.length);
 
     // One firefly among three dim neighbours.
     const group = [
@@ -195,7 +196,9 @@ describe('Tonemap dithers the 8-bit write', () => {
       return seed / 0x7fffffff;
     };
     const plainBands = runsOf(ramp.map(q)).filter((r) => r >= 3).length;
-    const ditherBands = runsOf(ramp.map((v) => q(v + (rnd() + rnd() - 1) / 255))).filter((r) => r >= 3).length;
+    const ditherBands = runsOf(ramp.map((v) => q(v + (rnd() + rnd() - 1) / 255))).filter(
+      (r) => r >= 3
+    ).length;
     expect(plainBands).toBeGreaterThan(0);
     expect(ditherBands).toBeLessThan(plainBands);
   });

@@ -144,7 +144,9 @@ myApp.ready().then(function () {
   setBloom(true);
 
   // Threshold and intensity are the two parameters worth feeling directly
+  /** @type {HTMLInputElement} */
   const thresholdInput = document.querySelector('#threshold');
+  /** @type {HTMLInputElement} */
   const intensityInput = document.querySelector('#intensity');
   const thresholdValue = document.querySelector('#threshold-value');
   const intensityValue = document.querySelector('#intensity-value');

@@ -26,7 +26,8 @@ const EMOJI_TO_PRIVATE_MAP: Record<string, number> = {
   '🦴': 0xe015, // Bone,
   '🧩': 0xe016, // Prefab
   '🔌': 0xe017, // Plugin
-  '🚫': 0xe018 // Forbidden
+  '🚫': 0xe018, // Forbidden,
+  '🦰': 0xe019 // hair
 };
 
 export function initEmojiMapping() {

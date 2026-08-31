@@ -78,7 +78,7 @@ import {
 import type { Scene } from '../../scene';
 import { SceneNode } from '../../scene';
 import type { PropertyTrack } from '../../animation';
-import type { ModelFetchOptions, ModelLoader, TextureFetchOptions } from '../../asset';
+import type { BaseFetchOptions, ModelFetchOptions, ModelLoader, TextureFetchOptions } from '../../asset';
 import { AssetManager } from '../../asset';
 import type { BaseTexture, SamplerOptions, Texture2D, Texture2DArray, TextureCube } from '@zephyr3d/device';
 import {
@@ -892,14 +892,33 @@ export class ResourceManager {
    * - Associates the returned data with the given ID for future reverse lookup.
    * - The ID is typically a VFS path or locator.
    *
-   * @param id - Asset identifier or path.
+   * @param path - VFS path.
+   * @param options - Optional fetch options
    *
    * @returns A Promise that resolves to the binary content, or `null` if not found.
    */
-  async fetchBinary(id: string) {
-    const data = await this._assetManager.fetchBinaryData(id);
+  async fetchBinary(path: string, options?: BaseFetchOptions) {
+    const data = await this._assetManager.fetchBinaryData(path, null, null, options);
     if (data) {
-      this._allocated.set(data, id);
+      this._allocated.set(data, path);
+    }
+    return data;
+  }
+  /**
+   * Fetch a JSON resource via VFS.
+   *
+   * - Parses as JSON after text load.
+   * - Cached per resolved URL. Post-process is applied only on the first load for a given cache key.
+   *
+   * @param path - Resource URL or VFS path.
+   * @param options - Optional fetch options
+   *
+   * @returns A promise that resolves to the loaded JSON value.
+   */
+  async fetchJsonData<T = any>(path: string, options?: BaseFetchOptions): Promise<T> {
+    const data = await this._assetManager.fetchJsonData(path, null, null, options);
+    if (data) {
+      this._allocated.set(data, path);
     }
     return data;
   }
