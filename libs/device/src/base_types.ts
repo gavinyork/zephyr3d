@@ -3008,6 +3008,12 @@ export interface AbstractDevice extends IEventTarget<DeviceEventMap> {
    */
   endFrame(): void;
   /**
+   * Whether currently inside a beginFrame()/endFrame() pair
+   *
+   * @returns true if currently inside a beginFrame()endFrame() pair
+   */
+  inFrame(): boolean;
+  /**
    * Get the vertex attribute format from vertex semantic and data type
    *
    * @param semantic - The vertex semantic

@@ -360,9 +360,9 @@ export class WebGPURenderPass {
         this._device.defaultRenderPassDesc.colorAttachments as GPURenderPassColorAttachment[]
       )[0];
       if (this._frameBufferInfo.sampleCount > 1) {
-        colorAttachmentDesc.resolveTarget = this._device.context!.getCurrentTexture().createView();
+        colorAttachmentDesc.resolveTarget = this._device.backbufferTexture.createView();
       } else {
-        colorAttachmentDesc.view = this._device.context!.getCurrentTexture().createView();
+        colorAttachmentDesc.view = this._device.backbufferTexture.createView();
       }
       const attachmentClearColor = getFrameBufferClearColor(color, 0);
       colorAttachmentDesc.loadOp = attachmentClearColor ? 'clear' : 'load';

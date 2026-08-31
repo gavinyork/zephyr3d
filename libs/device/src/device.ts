@@ -663,6 +663,9 @@ export abstract class BaseDevice extends Observable<DeviceEventMap> {
       }
     }
   }
+  inFrame() {
+    return this._beginFrameCounter > 0;
+  }
   getVertexAttribFormat(semantic: VertexSemantic, dataType: DataType, componentCount: number) {
     return getVertexAttribFormat(semantic, dataType, componentCount);
   }

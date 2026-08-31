@@ -94,6 +94,7 @@ export class WebGPUDevice extends BaseDevice {
   private _bindGroupCache!: BindGroupCache;
   private _vertexLayoutCache!: VertexLayoutCache;
   private readonly _samplerCache: SamplerCache;
+  private _backbufferTexture: Nullable<GPUTexture>;
   private _currentProgram: Nullable<WebGPUProgram>;
   private _currentVertexData: Nullable<WebGPUVertexLayout>;
   private _currentStateSet: Nullable<WebGPURenderStateSet>;
@@ -126,6 +127,7 @@ export class WebGPUDevice extends BaseDevice {
     this._samplerCache = new SamplerCache(this);
     this._adapterInfo = {};
     this._latestGPUFrameId = -1;
+    this._backbufferTexture = null;
   }
   get context() {
     return this._context;
@@ -138,6 +140,19 @@ export class WebGPUDevice extends BaseDevice {
   }
   get adapter() {
     return this._adapter;
+  }
+  get backbufferTexture(): GPUTexture {
+    const frameid = this._frameInfo.frameCounter;
+    const label = this.inFrame() ? `swapchain-frame-${frameid}` : `swapchain-out-${frameid}`;
+    const tex = this._context.getCurrentTexture();
+    if (tex !== this._backbufferTexture) {
+      this._backbufferTexture = tex;
+      this._backbufferTexture.label = label;
+      if (!this.inFrame()) {
+        console.log(`backbuffer ouside a frame: ${this._backbufferTexture.label}`);
+      }
+    }
+    return this._backbufferTexture!;
   }
   get commandQueue() {
     return this._commandQueue;
@@ -783,7 +798,7 @@ export class WebGPUDevice extends BaseDevice {
     const fb = this.getFramebuffer();
     const colorAttachment = fb
       ? (fb.getColorAttachments()[index]?.object as GPUTexture)
-      : this.context!.getCurrentTexture();
+      : this.backbufferTexture;
     const texFormat = fb
       ? fb.getColorAttachments()[index]?.format
       : textureFormatInvMap[this._backBufferFormat];
@@ -805,7 +820,7 @@ export class WebGPUDevice extends BaseDevice {
     const fb = this.getFramebuffer();
     const colorAttachment = fb
       ? (fb.getColorAttachments()[index]?.object as GPUTexture)
-      : this.context!.getCurrentTexture();
+      : this.backbufferTexture;
     const texFormat = fb
       ? fb.getColorAttachments()[index]?.format
       : textureFormatInvMap[this._backBufferFormat];

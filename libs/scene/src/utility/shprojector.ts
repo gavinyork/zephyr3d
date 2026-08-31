@@ -72,6 +72,13 @@ export class CubemapSHProjector extends Disposable {
    * ```
    */
   projectCubemap(cubemap: TextureCube, outBuffer: GPUDataBuffer, radianceSource = true) {
+    const device = getDevice();
+    if (!this._renderTarget.get()) {
+      const texture = device.createTexture2D('rgba32f', 3, 3, {
+        mipmapping: false
+      })!;
+      this._renderTarget.set(device.createFrameBuffer([texture], null));
+    }
     this.projectCubemapToTexture(cubemap, this._renderTarget.get()!, radianceSource);
     this._renderTarget.get()!.getColorAttachments()[0].readPixelsToBuffer(0, 0, 3, 3, 0, 0, outBuffer);
   }
@@ -163,13 +170,6 @@ export class CubemapSHProjector extends Disposable {
       primitive.indexStart = 0;
       primitive.primitiveType = 'point-list';
       this._primitive.set(primitive);
-    }
-
-    if (!this._renderTarget.get()) {
-      const texture = device.createTexture2D('rgba32f', 3, 3, {
-        mipmapping: false
-      })!;
-      this._renderTarget.set(device.createFrameBuffer([texture], null));
     }
 
     if (!CubemapSHProjector._renderStats) {
