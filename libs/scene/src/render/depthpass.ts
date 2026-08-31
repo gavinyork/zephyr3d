@@ -82,6 +82,15 @@ export class DepthPass extends RenderPass {
       ctx.drawEnvLight = false;
       ctx.env = null;
       ctx.flip = this.isAutoFlip(ctx);
+      // This pass keys its programs off renderPassHash, which Material.calcGlobalHash only
+      // consults when shaderVariantHash is null. LightPass clears that field on entry but not
+      // on exit, so a depth pass running after it would otherwise inherit the light pass's
+      // variant hash and hash to the same key -- handing this pass the light pass's program.
+      // The prepass never noticed (it runs first, while the field is still null); the
+      // transmission depth pass runs after the light pass and did, silently reusing a
+      // single-output program. With motion vectors on, its framebuffer has two attachments and
+      // the reuse finally surfaced as a fragment output count mismatch.
+      ctx.shaderVariantHash = null;
       ctx.renderPassHash = this.getGlobalBindGroupHash(ctx, renderCamera);
       const bindGroup = ctx.globalBindGroupAllocator.getGlobalBindGroup(ctx);
       ctx.device.setBindGroup(0, bindGroup);
