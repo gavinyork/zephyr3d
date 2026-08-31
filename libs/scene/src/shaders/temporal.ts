@@ -28,6 +28,10 @@ export const TAA_DEBUG_STRENGTH = 7;
 
 const FLT_MIN = 0.00000001;
 const FLT_MAX = 32767;
+/** Reinhard-space ceiling whose inverse is {@link FLT_MAX}, so clipping in
+ * tonemapped space keeps the same linear ceiling the resolve had when it
+ * clamped afterwards. */
+const TONEMAPPED_MAX = FLT_MAX / (FLT_MAX + 1);
 
 /**
  * Temporal resolve implementation
@@ -57,6 +61,22 @@ export function temporalResolve(
   debug = TAA_DEBUG_NONE
 ) {
   const pb = scope.$builder;
+  // Defined ahead of the neighbourhood helpers because clipHistoryColor calls
+  // reinhard: pb emits functions in definition order and GLSL requires a callee
+  // to be declared before its caller.
+  pb.func('reinhard', [pb.vec3('hdr')], function () {
+    // Floor at zero: x / (1 + x) has a pole at -1, and the 3x3 neighbourhood is
+    // sampled straight from the scene color, which an upstream effect can leave
+    // slightly negative.
+    this.$l.c = pb.max(this.hdr, pb.vec3(0));
+    this.$return(pb.div(this.c, pb.add(this.c, pb.vec3(1))));
+  });
+  pb.func('reinhardInv', [pb.vec3('sdr')], function () {
+    this.$return(pb.div(this.sdr, pb.sub(pb.vec3(1), this.sdr)));
+  });
+  pb.func('luminance', [pb.vec3('color')], function () {
+    this.$return(pb.max(pb.dot(this.color, pb.vec3(0.299, 0.587, 0.114)), 0.0001));
+  });
   pb.func('getClosestVelocity', [pb.vec2('uv'), pb.vec2('texSize')], function () {
     this.$l.minDepth = pb.float(1);
     this.$l.closestUV = this.uv;
@@ -108,11 +128,16 @@ export function temporalResolve(
       this.$l.colorAvg2 = pb.vec3(0);
       for (let i = -1; i <= 1; i++) {
         for (let j = -1; j <= 1; j++) {
-          this.$l[`s${n}`] = pb.textureSampleLevel(
-            currentColorTex,
-            pb.add(this.uv, pb.div(pb.vec2(i, j), this.texSize)),
-            0
-          ).rgb;
+          // The box is built in Reinhard space and `historyColor` arrives
+          // tonemapped to match. Gathering it in linear HDR instead makes a
+          // single specular texel of a few thousand, sitting next to neighbours
+          // near 1, blow the standard deviation up until the AABB contains any
+          // history at all -- the clip then stops constraining exactly the
+          // pixels that flicker, which is where it is needed most.
+          this.$l[`s${n}`] = this.reinhard(
+            pb.textureSampleLevel(currentColorTex, pb.add(this.uv, pb.div(pb.vec2(i, j), this.texSize)), 0)
+              .rgb
+          );
           this.colorAvg = pb.add(this.colorAvg, this[`s${n}`]);
           this.colorAvg2 = pb.add(this.colorAvg2, pb.mul(this[`s${n}`], this[`s${n}`]));
           n++;
@@ -136,19 +161,10 @@ export function temporalResolve(
         pb.clamp(this.colorAvg, this.colorMin, this.colorMax),
         this.historyColor
       );
-      this.color = pb.clamp(this.color, pb.vec3(FLT_MIN), pb.vec3(FLT_MAX));
+      this.color = pb.clamp(this.color, pb.vec3(0), pb.vec3(TONEMAPPED_MAX));
       this.$return(this.color);
     }
   );
-  pb.func('reinhard', [pb.vec3('hdr')], function () {
-    this.$return(pb.div(this.hdr, pb.add(this.hdr, pb.vec3(1))));
-  });
-  pb.func('reinhardInv', [pb.vec3('sdr')], function () {
-    this.$return(pb.div(this.sdr, pb.sub(pb.vec3(1), this.sdr)));
-  });
-  pb.func('luminance', [pb.vec3('color')], function () {
-    this.$return(pb.max(pb.dot(this.color, pb.vec3(0.299, 0.587, 0.114)), 0.0001));
-  });
   pb.func('getDisocclusionFactor', [pb.vec2('uv'), pb.vec2('velocity'), pb.vec2('texSize')], function () {
     this.$l.prevVelocitySample = pb.textureSampleLevel(prevMotionVectorTex, this.uv, 0);
     this.$l.prevVelocity = this.prevVelocitySample.xy;
@@ -261,9 +277,12 @@ export function temporalResolve(
     //this.$l.historyColor = pb.textureSampleLevel(historyColorTex, this.reprojectedUV, 0).rgb;
     this.$l.historyColor = this.sampleHistoryColorCatmulRom9(this.reprojectedUV, this.texSize);
     this.$l.blendFactor = pb.div(this.velocityClosest.z, 50000);
+    // Tonemap, then clip -- not the other way round. The neighbourhood box is
+    // built in Reinhard space, so the history has to be in it as well; the
+    // resolve stays there until the final reinhardInv below.
     this.prevColor = this.clipHistoryColor(
       this.screenUV,
-      this.historyColor,
+      this.reinhard(this.historyColor),
       this.velocityClosest.xy,
       this.texSize
     );
@@ -282,7 +301,7 @@ export function temporalResolve(
     );
     this.$l.alpha = pb.clamp(pb.add(this.blendFactor, this.screenFactor, this.disocclusionFactor), 0, 1);
     //this.alpha = 0.1;
-    this.prevColor = this.reinhard(this.prevColor);
+    // prevColor is already tonemapped (and clipped in that space) above.
     this.currentColor = this.reinhard(this.sampleColor);
     this.$l.currentLum = this.luminance(this.currentColor);
     this.$l.prevLum = this.luminance(this.prevColor);
