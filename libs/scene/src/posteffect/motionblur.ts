@@ -24,7 +24,10 @@ export class MotionBlur extends AbstractPostEffect {
     super();
     this._intensity = 1;
     this._aspect = new Vector2();
-    this._layer = PostEffectLayer.transparent;
+    // End layer: the display chain runs after the TAA resolve (see Camera.setupPostEffects).
+    // Motion vectors are unaffected by the move -- the blackboard handle is final before
+    // either post chain is built.
+    this._layer = PostEffectLayer.end;
   }
   /** Motion blur strength */
   get strength() {

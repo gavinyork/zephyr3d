@@ -23,7 +23,8 @@ export class ColorAdjust extends AbstractPostEffect {
    */
   constructor() {
     super();
-    this._layer = PostEffectLayer.transparent;
+    // End layer: the display chain runs after the TAA resolve (see Camera.setupPostEffects).
+    this._layer = PostEffectLayer.end;
     this._invTexSize = new Vector2();
     this._saturation = 1;
     this._contrast = 1;

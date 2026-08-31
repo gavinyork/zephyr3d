@@ -27,7 +27,8 @@ export class Tonemap extends AbstractPostEffect {
    */
   constructor() {
     super();
-    this._layer = PostEffectLayer.transparent;
+    // End layer: the display chain runs after the TAA resolve (see Camera.setupPostEffects).
+    this._layer = PostEffectLayer.end;
     this._exposure = 1;
     this._dither = true;
   }

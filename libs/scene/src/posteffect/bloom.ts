@@ -40,7 +40,10 @@ export class Bloom extends AbstractPostEffect {
    */
   constructor() {
     super();
-    this._layer = PostEffectLayer.transparent;
+    // End layer, so the pyramid is built from the TAA-resolved frame rather than the
+    // jittered one (see Camera.setupPostEffects). Bloom does not read depth, so nothing
+    // here depends on the transmission depth rewrite the transparent layer sits ahead of.
+    this._layer = PostEffectLayer.end;
     this._thresholdValue = new Vector4();
     this._invTexSize = new Vector2();
     this._maxDownsampleLevels = 4;

@@ -2110,6 +2110,22 @@ export class Camera extends SceneNode {
       this._postEffectSSAO.set(ssao);
       this._compositor.appendPostEffect(ssao);
     }
+    // Every effect from here down shares the `end` layer, and appendPostEffect keeps insertion
+    // order within a layer, so the chain is TAA -> MotionBlur -> Bloom -> Tonemap -> ColorAdjust
+    // -> FXAA.
+    //
+    // The resolve leads because everything after it spreads energy -- Bloom spatially, MotionBlur
+    // along the velocity field -- and doing that to an unconverged frame turns the per-frame
+    // brightness swing of a sub-pixel specular highlight into a pulsing halo that no later pass can
+    // take back: the halo is low frequency, so the 3x3 neighbourhood TAA's history clip is built
+    // from pulses in step with it and admits the pulsing value as valid.
+    //
+    // The display chain sits in `end` rather than `transparent` specifically so that TAA does not
+    // have to move. Effects in the transparent layer read the linear depth from before the
+    // TransmissionDepth pass rewrites it with the full scene depth, and TAA dilates its velocities
+    // by that depth; run there, it reads opaque-only depth and picks up its neighbours' motion on
+    // any geometry the prepass never saw (alpha-blended hair, most visibly). None of the display
+    // effects read depth at all, so moving them instead is free.
     if (!this._postEffectTAA.get()) {
       const taa = new TAA();
       taa.enabled = false;
@@ -2123,8 +2139,7 @@ export class Camera extends SceneNode {
       this._postEffectMotionBlur.set(motionBlur);
       this._compositor.appendPostEffect(motionBlur);
     }
-    // Bloom is created before Tonemap so the transparent layer ends up in HDR pipeline order:
-    // MotionBlur -> Bloom -> Tonemap -> ColorAdjust -> FXAA. Bloom must see scene-linear radiance:
+    // Bloom is created before Tonemap because it must see scene-linear radiance:
     // its threshold, its blur and its additive compose are all only meaningful in linear light.
     // Running it after the ACES curve compressed everything into [0, 1] flattened the emitter range
     // (a 100x brighter emitter produced the same halo) and made the compose hard-clip.

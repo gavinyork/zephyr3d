@@ -934,6 +934,12 @@ export const hairSimulationMotionVectors: VisualScene = {
     });
     ctx.camera.TAA = true;
     ctx.camera.TAADebug = TAA_DEBUG_MOTION_VECTOR;
+    // A debug view emits diagnostic data, not radiance: TAA_DEBUG_MOTION_VECTOR writes
+    // abs(velocity * 20), whose z component runs to six figures. The resolve now leads the
+    // chain instead of ending it, so tone mapping would get the readout -- and ACES mixes
+    // channels through its input matrix before clamping to [0, 1], turning the saturated blue
+    // of a correct capture white and making every strand look alike whatever its velocity.
+    ctx.camera.toneMap = false;
     placeCamera(ctx.camera, new Vector3(0, 0.75, 3.1), new Vector3(0, 0.15, 0));
   }
 };
@@ -989,6 +995,12 @@ export const hairSimulationMotionRest: VisualScene = {
     });
     ctx.camera.TAA = true;
     ctx.camera.TAADebug = TAA_DEBUG_MOTION_VECTOR;
+    // A debug view emits diagnostic data, not radiance: TAA_DEBUG_MOTION_VECTOR writes
+    // abs(velocity * 20), whose z component runs to six figures. The resolve now leads the
+    // chain instead of ending it, so tone mapping would get the readout -- and ACES mixes
+    // channels through its input matrix before clamping to [0, 1], turning the saturated blue
+    // of a correct capture white and making every strand look alike whatever its velocity.
+    ctx.camera.toneMap = false;
     placeCamera(ctx.camera, new Vector3(0, 0.75, 3.1), new Vector3(0, 0.15, 0));
   }
 };
@@ -1042,6 +1054,12 @@ export const hairSimulationMotionBlended: VisualScene = {
     });
     ctx.camera.TAA = true;
     ctx.camera.TAADebug = TAA_DEBUG_MOTION_VECTOR;
+    // A debug view emits diagnostic data, not radiance: TAA_DEBUG_MOTION_VECTOR writes
+    // abs(velocity * 20), whose z component runs to six figures. The resolve now leads the
+    // chain instead of ending it, so tone mapping would get the readout -- and ACES mixes
+    // channels through its input matrix before clamping to [0, 1], turning the saturated blue
+    // of a correct capture white and making every strand look alike whatever its velocity.
+    ctx.camera.toneMap = false;
     placeCamera(ctx.camera, new Vector3(0, 0.75, 3.1), new Vector3(0, 0.15, 0));
   }
 };

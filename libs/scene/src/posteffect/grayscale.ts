@@ -17,7 +17,9 @@ export class Grayscale extends AbstractPostEffect {
    */
   constructor() {
     super();
-    this._layer = PostEffectLayer.transparent;
+    // End layer with the rest of the display-referred effects, so appending one still
+    // lands it after tone mapping rather than ahead of the whole chain.
+    this._layer = PostEffectLayer.end;
   }
   /** {@inheritDoc AbstractPostEffect.requireLinearDepthTexture} */
   requireLinearDepthTexture() {
