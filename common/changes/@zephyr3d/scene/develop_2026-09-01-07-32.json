@@ -1,0 +1,10 @@
+{
+  "changes": [
+    {
+      "packageName": "@zephyr3d/scene",
+      "comment": "Rework the skin material: per-channel, energy-conserving SkinSSS diffusion, shadow tint / scatter color, and smoothness and specular detail tuning.",
+      "type": "patch"
+    }
+  ],
+  "packageName": "@zephyr3d/scene"
+}
