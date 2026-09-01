@@ -343,9 +343,3 @@ just as appreciated.
 ## License
 
 Released under the [MIT License](https://opensource.org/licenses/MIT).
-
-<div align="center">
-
-**Built with 💙 in TypeScript for the web.**
-
-</div>
