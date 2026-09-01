@@ -13,7 +13,9 @@ const {
 
 const projectRoot = path.resolve(__dirname, '..');
 const explicitDevUrl = process.env.ZEPHYR_EDITOR_ELECTRON_URL || '';
-const devHost = process.env.ZEPHYR_EDITOR_DEV_HOST || 'localhost';
+// Use an explicit loopback address so Electron and Vite cannot resolve
+// localhost to different stacks (or attach to another workspace's dev server).
+const devHost = process.env.ZEPHYR_EDITOR_DEV_HOST || '127.0.0.1';
 const parsedPort = Number.parseInt(process.env.ZEPHYR_EDITOR_DEV_PORT || '8000', 10);
 const devPort = Number.isInteger(parsedPort) && parsedPort > 0 ? parsedPort : 8000;
 const requestedDevUrl = `http://${devHost}:${devPort}`;

@@ -232,12 +232,24 @@ editorApp.ready().then(async () => {
       flushPendingCaptures(device.canvas as HTMLCanvasElement);
     });
 
+    document.getElementById('zephyr-loading')?.remove();
+    if (!headless) {
+      // Start rendering before opening a project. Project/plugin initialization
+      // is asynchronous; keeping the frame loop alive lets the welcome page or
+      // project progress dialog provide immediate feedback instead of a black
+      // canvas during startup.
+      editorApp.run();
+    }
+
     if (project) {
       if (remote) {
         await editor.openRemoteProject(project);
       } else {
         await editor.openProject(project);
       }
+    }
+    if (!headless) {
+      return;
     }
   } else if (headless) {
     // One-shot headless capture: await startup (scene graph + attached runtime
@@ -259,6 +271,7 @@ editorApp.ready().then(async () => {
     }
     return;
   } else {
+    document.getElementById('zephyr-loading')?.remove();
     getEngine().startup(
       previewScene ?? settings!.startupScene,
       settings!.splashScreen,
@@ -278,6 +291,8 @@ editorApp.ready().then(async () => {
     };
     loop();
   } else {
+    // The editor-mode frame loop starts before project loading above. Preview
+    // mode still starts here after its startup scene has been initialized.
     editorApp.run();
   }
 });
