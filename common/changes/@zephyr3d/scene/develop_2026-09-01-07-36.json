@@ -1,0 +1,10 @@
+{
+  "changes": [
+    {
+      "packageName": "@zephyr3d/scene",
+      "comment": "Add HairStrandMaterial strand-based hair pipeline: Kajiya-Kay plus an optional Marschner scattering model, multiple scattering, round-strand normals and spline sampling, distance decimation LOD, and motion vector output.",
+      "type": "patch"
+    }
+  ],
+  "packageName": "@zephyr3d/scene"
+}
