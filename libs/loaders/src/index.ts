@@ -7,6 +7,7 @@
 export * from './importer';
 export * from './gltf';
 export * from './fbx';
+export * from './obj';
 export * from './curves';
 export * from './alembic';
 export * from './hair';

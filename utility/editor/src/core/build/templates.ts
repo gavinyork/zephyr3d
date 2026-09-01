@@ -175,7 +175,7 @@ export function generateIndexTS(settings: ProjectSettings) {
   const rhiList = settings.preferredRHI?.map((val) => val.toLowerCase()) ?? [];
   return `import { Application, getEngine, setActiveMorphTargetLimit, setMorphTargetLimit, setSkinInfluenceLimit } from '@zephyr3d/scene';
 import { HttpFS } from '@zephyr3d/base';
-import { FBXImporter, GLTFImporter } from '@zephyr3d/loaders';
+import { FBXImporter, GLTFImporter, OBJImporter } from '@zephyr3d/loaders';
 import type { DeviceBackend } from '@zephyr3d/device';
 let backend: DeviceBackend = null;
 ${
@@ -233,6 +233,7 @@ application.ready().then(async () => {
   getEngine().resourceManager.setModelLoader('model/gltf+json', new GLTFImporter());
   getEngine().resourceManager.setModelLoader('model/gltf-binary', new GLTFImporter());
   getEngine().resourceManager.setModelLoader('model/fbx', new FBXImporter());
+  getEngine().resourceManager.setModelLoader('model/obj', new OBJImporter());
   getEngine().startup('${settings.startupScene ?? ''}', '${settings.splashScreen ?? ''}', '${settings.startupScript ?? ''}');
   application.run();
 });
@@ -241,7 +242,7 @@ application.ready().then(async () => {
 
 export const templateIndex = `import { Application, getEngine, setActiveMorphTargetLimit, setMorphTargetLimit, setSkinInfluenceLimit } from '@zephyr3d/scene';
 import { HttpFS } from '@zephyr3d/base';
-import { FBXImporter, GLTFImporter } from '@zephyr3d/loaders';
+import { FBXImporter, GLTFImporter, OBJImporter } from '@zephyr3d/loaders';
 import type { DeviceBackend } from '@zephyr3d/device';
 const VFS = new HttpFS('./');
 const settingsJson = await VFS.readFile('/${projectFileName}', { encoding: 'utf8' }) as string;
@@ -296,6 +297,7 @@ application.ready().then(async () => {
   getEngine().resourceManager.setModelLoader('model/gltf+json', new GLTFImporter());
   getEngine().resourceManager.setModelLoader('model/gltf-binary', new GLTFImporter());
   getEngine().resourceManager.setModelLoader('model/fbx', new FBXImporter());
+  getEngine().resourceManager.setModelLoader('model/obj', new OBJImporter());
   getEngine().startup(settings.startupScene ?? '', settings.splashScreen, settings.startupScript);
   application.run();
 });

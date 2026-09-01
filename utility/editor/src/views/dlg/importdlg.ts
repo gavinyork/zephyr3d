@@ -40,7 +40,7 @@ export class DlgImport extends DialogRenderer<{
         this._paths = [];
         this._selected = [];
         this._vfs
-          .glob('/**/*.{gltf,glb,vrm,vrma,fbx}', { recursive: true, includeDirs: false })
+          .glob('/**/*.{gltf,glb,vrm,vrma,fbx,obj}', { recursive: true, includeDirs: false })
           .then((files) => {
             for (const f of files) {
               this._paths.push(f.path);

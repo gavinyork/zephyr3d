@@ -2678,7 +2678,8 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
     } else if (
       mimeType === 'model/gltf-binary' ||
       mimeType === 'model/gltf+json' ||
-      mimeType === 'model/fbx'
+      mimeType === 'model/fbx' ||
+      mimeType === 'model/obj'
     ) {
       this.handleAddAsset(payload.path);
     } else if (mimeType === mimeTypeOf('.zprefab')) {
