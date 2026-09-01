@@ -1,0 +1,10 @@
+{
+  "changes": [
+    {
+      "packageName": "@zephyr3d/scene",
+      "comment": "Write motion vectors for opted-in blended geometry; add a normal Y-flip parameter to standard PBR; expose the blueprint PBR output evaluation interface.",
+      "type": "patch"
+    }
+  ],
+  "packageName": "@zephyr3d/scene"
+}
