@@ -22,7 +22,14 @@ import {
 } from './scenes/shadows';
 import { clusterManyLights, spotShadow } from './scenes/lighting';
 import { oitABuffer, oitDualDepth, oitWeighted } from './scenes/oit';
-import { postFxaa, postToneMapBloom, taaMultiframe } from './scenes/post';
+import {
+  postFxaa,
+  postMotionBlurCamera,
+  postMotionBlurObject,
+  postMotionBlurTrailing,
+  postToneMapBloom,
+  taaMultiframe
+} from './scenes/post';
 import { eyeAngled, eyeFrontal, eyePupilDilated, eyeSocketOcclusion } from './scenes/eye';
 import {
   hairScatterOff,
@@ -82,6 +89,9 @@ export const SCENES: VisualScene[] = [
   // Post-processing.
   postToneMapBloom,
   postFxaa,
+  postMotionBlurObject,
+  postMotionBlurCamera,
+  postMotionBlurTrailing,
   taaMultiframe,
   // Digital-human materials.
   skinSss,
