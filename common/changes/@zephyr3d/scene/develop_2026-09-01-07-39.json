@@ -1,0 +1,10 @@
+{
+  "changes": [
+    {
+      "packageName": "@zephyr3d/scene",
+      "comment": "Add hair physics simulation (TressFX solver ported in), with the TressFX license included.",
+      "type": "patch"
+    }
+  ],
+  "packageName": "@zephyr3d/scene"
+}
