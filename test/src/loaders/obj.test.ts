@@ -74,6 +74,10 @@ describe('OBJImporter', () => {
         Kd 1 0 0
         Ns 250
         map_Kd textures/albedo.png
+        map_Ks textures/specular.png
+        map_Ke textures/emissive.png
+        bump textures/normal.png
+        map_d textures/alpha.png
       `,
       { create: true }
     );
@@ -107,6 +111,13 @@ describe('OBJImporter', () => {
     expect(material.diffuse.y).toBe(0);
     expect(material.diffuse.z).toBe(0);
     expect(material.diffuseMap.image.uri).toBe('/models/textures/albedo.png');
+    expect(material.diffuseMap.sRGB).toBe(true);
+    expect(material.specularColorMap.image.uri).toBe('/models/textures/specular.png');
+    expect(material.specularColorMap.sRGB).toBe(true);
+    expect(material.common.normalMap.image.uri).toBe('/models/textures/normal.png');
+    expect(material.common.normalMap.sRGB).toBe(false);
+    expect(material.common.emissiveMap.image.uri).toBe('/models/textures/emissive.png');
+    expect(material.common.emissiveMap.sRGB).toBe(true);
     expect(model.getImage(0)?.uri).toBe('/models/textures/albedo.png');
   });
 

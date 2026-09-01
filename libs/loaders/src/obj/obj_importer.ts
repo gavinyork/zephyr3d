@@ -148,10 +148,10 @@ function createMaterialAsset(
   };
   const diffuseMap = createTextureInfo(basePath, material.diffuseMap, vfs, true, imageCache);
   const normalMap = createTextureInfo(basePath, material.normalMap, vfs, false, imageCache);
-  const specularMap = createTextureInfo(basePath, material.specularMap, vfs, false, imageCache);
+  const specularColorMap = createTextureInfo(basePath, material.specularColorMap, vfs, true, imageCache);
   const emissiveMap = createTextureInfo(basePath, material.emissiveMap, vfs, true, imageCache);
   const alphaMap = createTextureInfo(basePath, material.alphaMap, vfs, false, imageCache);
-  for (const info of [diffuseMap, normalMap, specularMap, emissiveMap, alphaMap]) {
+  for (const info of [diffuseMap, normalMap, specularColorMap, emissiveMap, alphaMap]) {
     registerTextureInfo(model, info?.image ?? null, imageIndices);
   }
   const alpha = Math.max(0, Math.min(1, material.opacity));
@@ -175,7 +175,7 @@ function createMaterialAsset(
     metallic: material.metallic ?? 0,
     roughness: material.roughness ?? Math.max(0.04, 1 - Math.min(material.shininess / 1000, 1)),
     diffuseMap,
-    specularMap,
+    specularColorMap,
     specularFactor: new Vector4(material.specular[0], material.specular[1], material.specular[2], 1),
     metallicIndex: 2,
     roughnessIndex: 1

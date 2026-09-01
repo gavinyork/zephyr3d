@@ -54,7 +54,7 @@ export type ObjMaterial = {
   opacity: number;
   ior: number;
   diffuseMap?: ObjTextureMap;
-  specularMap?: ObjTextureMap;
+  specularColorMap?: ObjTextureMap;
   normalMap?: ObjTextureMap;
   emissiveMap?: ObjTextureMap;
   alphaMap?: ObjTextureMap;
@@ -295,7 +295,7 @@ export function parseMtl(source: string): Map<string, ObjMaterial> {
         current.diffuseMap = parseTextureMap(value);
         break;
       case 'map_ks':
-        current.specularMap = parseTextureMap(value);
+        current.specularColorMap = parseTextureMap(value);
         break;
       case 'map_ke':
         current.emissiveMap = parseTextureMap(value);
