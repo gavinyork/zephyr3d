@@ -1,0 +1,10 @@
+{
+  "changes": [
+    {
+      "packageName": "@zephyr3d/scene",
+      "comment": "Post-processing chain: bloom color space and pyramid filtering, display chain moved behind the TAA resolve, TAA history clipped in tonemapped space with reduced flicker, and stale history textures on scene open.",
+      "type": "patch"
+    }
+  ],
+  "packageName": "@zephyr3d/scene"
+}

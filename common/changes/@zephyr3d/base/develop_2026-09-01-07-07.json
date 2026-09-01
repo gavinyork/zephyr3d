@@ -1,0 +1,10 @@
+{
+  "changes": [
+    {
+      "packageName": "@zephyr3d/base",
+      "comment": "Recognize new asset types in the VFS (hair / abc, etc.).",
+      "type": "patch"
+    }
+  ],
+  "packageName": "@zephyr3d/base"
+}

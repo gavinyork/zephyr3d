@@ -1,0 +1,10 @@
+{
+  "changes": [
+    {
+      "packageName": "@zephyr3d/backend-webgl",
+      "comment": "Implement indirect draw capability reporting and dispatch for the device API.",
+      "type": "patch"
+    }
+  ],
+  "packageName": "@zephyr3d/backend-webgl"
+}

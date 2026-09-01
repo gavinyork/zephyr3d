@@ -1,0 +1,10 @@
+{
+  "changes": [
+    {
+      "packageName": "@zephyr3d/device",
+      "comment": "Add an indirect draw abstraction (new API across base_types / device / gpuobject).",
+      "type": "patch"
+    }
+  ],
+  "packageName": "@zephyr3d/device"
+}

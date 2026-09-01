@@ -1,0 +1,10 @@
+{
+  "changes": [
+    {
+      "packageName": "@zephyr3d/backend-webgpu",
+      "comment": "Implement indirect draw (buffer / commandqueue / renderpass / capabilities).",
+      "type": "patch"
+    }
+  ],
+  "packageName": "@zephyr3d/backend-webgpu"
+}

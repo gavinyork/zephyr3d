@@ -1,0 +1,10 @@
+{
+  "changes": [
+    {
+      "packageName": "@zephyr3d/editor",
+      "comment": "Material workflow: switch a material instance's parent material, clone materials, material preview toggle, resizable instance property panel, HDR color parameter editing, and instance sync after parent material hot reload.",
+      "type": "patch"
+    }
+  ],
+  "packageName": "@zephyr3d/editor"
+}
