@@ -1,0 +1,10 @@
+{
+  "changes": [
+    {
+      "packageName": "@zephyr3d/scene",
+      "comment": "Extend the blueprint material system: material instances switched to an inheritance model, Expose toggle for texture parameters, value range limits for scalar parameters, material functions with tex2D inputs, single-output returns and explicit interface ordering, plus new TextureProperty / ChannelSDFMask / MorphBlur nodes.",
+      "type": "patch"
+    }
+  ],
+  "packageName": "@zephyr3d/scene"
+}
