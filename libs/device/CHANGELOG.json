@@ -2,6 +2,32 @@
   "name": "@zephyr3d/device",
   "entries": [
     {
+      "version": "0.2.19",
+      "tag": "@zephyr3d/device_v0.2.19",
+      "date": "Tue, 01 Sep 2026 07:54:12 GMT",
+      "comments": {
+        "patch": [
+          {
+            "comment": "Add an indirect draw abstraction (new API across base_types / device / gpuobject)."
+          },
+          {
+            "comment": "Program builder: rewritten uniform reuse for identical textures, corrected sampler sharing (fixes black screen on multi-sampled transparent materials), and fixes to material function sampling and program caching."
+          },
+          {
+            "comment": "Add a debug log hook for swapchain textures allocated outside a frame."
+          },
+          {
+            "comment": "Add a texture pool cleanup path, fixing leftover TAA history textures."
+          }
+        ],
+        "dependency": [
+          {
+            "comment": "Updating dependency \"@zephyr3d/base\" from `^0.2.9` to `0.2.10`"
+          }
+        ]
+      }
+    },
+    {
       "version": "0.2.18",
       "tag": "@zephyr3d/device_v0.2.18",
       "date": "Wed, 05 Aug 2026 08:50:14 GMT",

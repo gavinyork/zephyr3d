@@ -1,6 +1,13 @@
 # Change Log - @zephyr3d/backend-webgl
 
-This log was last generated on Tue, 04 Aug 2026 10:43:23 GMT and should not be manually modified.
+This log was last generated on Tue, 01 Sep 2026 07:54:12 GMT and should not be manually modified.
+
+## 0.1.17
+Tue, 01 Sep 2026 07:54:12 GMT
+
+### Patches
+
+- Implement indirect draw capability reporting and dispatch for the device API.
 
 ## 0.1.16
 Tue, 04 Aug 2026 10:43:23 GMT

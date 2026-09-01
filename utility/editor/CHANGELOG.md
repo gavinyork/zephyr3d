@@ -1,6 +1,17 @@
 # Change Log - @zephyr3d/editor
 
-This log was last generated on Thu, 06 Aug 2026 08:52:56 GMT and should not be manually modified.
+This log was last generated on Tue, 01 Sep 2026 07:54:12 GMT and should not be manually modified.
+
+## 0.3.15
+Tue, 01 Sep 2026 07:54:12 GMT
+
+### Patches
+
+- Material workflow: switch a material instance's parent material, clone materials, material preview toggle, resizable instance property panel, HDR color parameter editing, and instance sync after parent material hot reload.
+- Add editor support for the eye and hair materials.
+- Assets: drag scene nodes into the asset window to create prefabs, drag .zmsh geometry into the scene, export default zmsh primitives to GLB, clone primitives, and a unified import source-reference toggle with FBX reference mode.
+- Project settings: morph target limit and active morph upload limit, skin influence limit (with runtime downgrade notice).
+- A batch of UI/interaction fixes: asset tree expansion state and occasional jump back to root, first-click focus in property panel text fields, script panel conditional visibility and duplicate array entries, Shift to batch expand/collapse, Ctrl+D duplicate, AABB editing, hidden dev-server child process window, and plugin unload lifecycle.
 
 ## 0.3.14
 Thu, 06 Aug 2026 08:52:56 GMT

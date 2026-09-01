@@ -2,6 +2,24 @@
   "name": "@zephyr3d/base",
   "entries": [
     {
+      "version": "0.2.10",
+      "tag": "@zephyr3d/base_v0.2.10",
+      "date": "Tue, 01 Sep 2026 07:54:12 GMT",
+      "comments": {
+        "patch": [
+          {
+            "comment": "Recognize new asset types in the VFS (hair / abc, etc.)."
+          },
+          {
+            "comment": "Improve VFS asset cache invalidation performance."
+          },
+          {
+            "comment": "Fix diff (root cause of SpringModifier prefab scene serialization failures)."
+          }
+        ]
+      }
+    },
+    {
       "version": "0.2.9",
       "tag": "@zephyr3d/base_v0.2.9",
       "date": "Tue, 04 Aug 2026 10:43:23 GMT",

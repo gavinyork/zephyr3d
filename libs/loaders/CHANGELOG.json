@@ -2,6 +2,38 @@
   "name": "@zephyr3d/loaders",
   "entries": [
     {
+      "version": "0.1.5",
+      "tag": "@zephyr3d/loaders_v0.1.5",
+      "date": "Tue, 01 Sep 2026 07:54:12 GMT",
+      "comments": {
+        "patch": [
+          {
+            "comment": "Add an Alembic model loader."
+          },
+          {
+            "comment": "Support importing Cem Yuksel's hair models (.hair), including origin options."
+          },
+          {
+            "comment": "A batch of FBX import fixes: unify skeletons into a single main rig, import bone TRS animation aligned with the bind pose, correct skin bind matrix computation, stop creating duplicate joint nodes, fix global unit conversion, fix UV channels and texture coordinates, fix bind pose for complex skeletons, fix lost morph targets, preserve original mesh material texture names, fix lost HairRoot local pose, and fix hair child-bone rest pose."
+          },
+          {
+            "comment": "Fix vertex corruption with multi-weight skinning (#29)."
+          }
+        ],
+        "dependency": [
+          {
+            "comment": "Updating dependency \"@zephyr3d/base\" from `^0.2.9` to `0.2.10`"
+          },
+          {
+            "comment": "Updating dependency \"@zephyr3d/scene\" from `^0.9.25` to `0.9.26`"
+          },
+          {
+            "comment": "Updating dependency \"@zephyr3d/device\" from `^0.2.18` to `0.2.19`"
+          }
+        ]
+      }
+    },
+    {
       "version": "0.1.4",
       "tag": "@zephyr3d/loaders_v0.1.4",
       "date": "Sat, 04 Jul 2026 17:00:36 GMT",

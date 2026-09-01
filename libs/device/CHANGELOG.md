@@ -1,6 +1,16 @@
 # Change Log - @zephyr3d/device
 
-This log was last generated on Wed, 05 Aug 2026 08:50:14 GMT and should not be manually modified.
+This log was last generated on Tue, 01 Sep 2026 07:54:12 GMT and should not be manually modified.
+
+## 0.2.19
+Tue, 01 Sep 2026 07:54:12 GMT
+
+### Patches
+
+- Add an indirect draw abstraction (new API across base_types / device / gpuobject).
+- Program builder: rewritten uniform reuse for identical textures, corrected sampler sharing (fixes black screen on multi-sampled transparent materials), and fixes to material function sampling and program caching.
+- Add a debug log hook for swapchain textures allocated outside a frame.
+- Add a texture pool cleanup path, fixing leftover TAA history textures.
 
 ## 0.2.18
 Wed, 05 Aug 2026 08:50:14 GMT

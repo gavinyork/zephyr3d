@@ -1,6 +1,15 @@
 # Change Log - @zephyr3d/base
 
-This log was last generated on Tue, 04 Aug 2026 10:43:23 GMT and should not be manually modified.
+This log was last generated on Tue, 01 Sep 2026 07:54:12 GMT and should not be manually modified.
+
+## 0.2.10
+Tue, 01 Sep 2026 07:54:12 GMT
+
+### Patches
+
+- Recognize new asset types in the VFS (hair / abc, etc.).
+- Improve VFS asset cache invalidation performance.
+- Fix diff (root cause of SpringModifier prefab scene serialization failures).
 
 ## 0.2.9
 Tue, 04 Aug 2026 10:43:23 GMT
