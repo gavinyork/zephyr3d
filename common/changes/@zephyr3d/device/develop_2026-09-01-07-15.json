@@ -1,0 +1,10 @@
+{
+  "changes": [
+    {
+      "packageName": "@zephyr3d/device",
+      "comment": "Add a texture pool cleanup path, fixing leftover TAA history textures.",
+      "type": "patch"
+    }
+  ],
+  "packageName": "@zephyr3d/device"
+}

@@ -1,0 +1,10 @@
+{
+  "changes": [
+    {
+      "packageName": "@zephyr3d/scene",
+      "comment": "NaN tangent frame when the screen-space UV jacobian degenerates; alpha dither noise degenerating into a static pattern.",
+      "type": "patch"
+    }
+  ],
+  "packageName": "@zephyr3d/scene"
+}

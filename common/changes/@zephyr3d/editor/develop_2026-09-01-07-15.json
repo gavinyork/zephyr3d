@@ -1,0 +1,10 @@
+{
+  "changes": [
+    {
+      "packageName": "@zephyr3d/editor",
+      "comment": "Project settings: morph target limit and active morph upload limit, skin influence limit (with runtime downgrade notice).",
+      "type": "patch"
+    }
+  ],
+  "packageName": "@zephyr3d/editor"
+}
