@@ -1,0 +1,10 @@
+{
+  "changes": [
+    {
+      "packageName": "@zephyr3d/scene",
+      "comment": "Automatically disable the corresponding backend PBR texture channel when a blueprint output takes it over (isMaterialTextureEnabled / hasXxxTexture); metallicRoughness supports single-channel takeover.",
+      "type": "patch"
+    }
+  ],
+  "packageName": "@zephyr3d/scene"
+}
