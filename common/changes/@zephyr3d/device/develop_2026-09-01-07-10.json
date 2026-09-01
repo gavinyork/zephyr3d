@@ -1,0 +1,10 @@
+{
+  "changes": [
+    {
+      "packageName": "@zephyr3d/device",
+      "comment": "Program builder: rewritten uniform reuse for identical textures, corrected sampler sharing (fixes black screen on multi-sampled transparent materials), and fixes to material function sampling and program caching.",
+      "type": "patch"
+    }
+  ],
+  "packageName": "@zephyr3d/device"
+}

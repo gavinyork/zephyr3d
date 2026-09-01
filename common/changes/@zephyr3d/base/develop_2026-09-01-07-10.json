@@ -1,0 +1,10 @@
+{
+  "changes": [
+    {
+      "packageName": "@zephyr3d/base",
+      "comment": "Improve VFS asset cache invalidation performance.",
+      "type": "patch"
+    }
+  ],
+  "packageName": "@zephyr3d/base"
+}

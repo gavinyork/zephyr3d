@@ -1,0 +1,10 @@
+{
+  "changes": [
+    {
+      "packageName": "@zephyr3d/scene",
+      "comment": "Fog blending corrupting backbuffer alpha on WebGL; SSGI on WebGL2 devices; OIT rendering when the screen size changes.",
+      "type": "patch"
+    }
+  ],
+  "packageName": "@zephyr3d/scene"
+}
