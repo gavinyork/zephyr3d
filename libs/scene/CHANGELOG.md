@@ -1,6 +1,31 @@
 # Change Log - @zephyr3d/scene
 
-This log was last generated on Thu, 06 Aug 2026 08:52:56 GMT and should not be manually modified.
+This log was last generated on Tue, 01 Sep 2026 07:54:12 GMT and should not be manually modified.
+
+## 0.9.26
+Tue, 01 Sep 2026 07:54:12 GMT
+
+### Patches
+
+- Post-processing chain: bloom color space and pyramid filtering, display chain moved behind the TAA resolve, TAA history clipped in tonemapped space with reduced flicker, and stale history textures on scene open.
+- Fog blending corrupting backbuffer alpha on WebGL; SSGI on WebGL2 devices; OIT rendering when the screen size changes.
+- Stale shader variant hash reused when a depth pass keys its programs; TransparentPass not declaring its ShadowMask read, so the mask did not outlive LightPass.
+- NaN tangent frame when the screen-space UV jacobian degenerates; alpha dither noise degenerating into a static pattern.
+- MetaHuman humanoid bone mapping, humanoid helper node mismatching, morph target normal blending, and selection bounds for skinned meshes with morph targets.
+- MorphSourceData serialization blowing up memory when deleting GLB scene nodes; a missing resource reference failing the whole scene load.
+- Performance: faster morph target updates and node transform invalidation; parallel deserialization of complex character assets.
+- Attenuate direct sunlight by cloud coverage for energy conservation; add shadow normal offset bias.
+- Write motion vectors for opted-in blended geometry; add a normal Y-flip parameter to standard PBR; expose the blueprint PBR output evaluation interface.
+- SpringModifier / SpringSystem: serialization support, anchor offset inputs, unified solve and writeback for MultiChainSpringSystem, dual-anchor chains for JointDynamics.
+- Skinning: configurable multi-bone influence import and runtime binding; duplicate SkinBinding resources merged at runtime.
+- Morph target system: sparse storage with active-subset upload, configurable morph target limit and active upload limit, and a new Source GLB Morph Reference mode for prefab import.
+- Automatically disable the corresponding backend PBR texture channel when a blueprint output takes it over (isMaterialTextureEnabled / hasXxxTexture); metallicRoughness supports single-channel takeover.
+- Extend the blueprint material system: material instances switched to an inheritance model, Expose toggle for texture parameters, value range limits for scalar parameters, material functions with tex2D inputs, single-output returns and explicit interface ordering, plus new TextureProperty / ChannelSDFMask / MorphBlur nodes.
+- Rework the skin material: per-channel, energy-conserving SkinSSS diffusion, shadow tint / scatter color, and smoothness and specular detail tuning.
+- Add EyeMaterial: corneal refraction, limbal ring, pupil dilation, socket occlusion, energy conservation.
+- Add HairStrandMaterial strand-based hair pipeline: Kajiya-Kay plus an optional Marschner scattering model, multiple scattering, round-strand normals and spline sampling, distance decimation LOD, and motion vector output.
+- Add deep opacity map shadows for hair self-shadowing: kernel-filtered lookups, optical depth recorded so solid casters shadow correctly, and caster alpha passed to shadow implementations explicitly.
+- Add hair physics simulation (TressFX solver ported in), with the TressFX license included.
 
 ## 0.9.25
 Thu, 06 Aug 2026 08:52:56 GMT

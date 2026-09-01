@@ -2,6 +2,26 @@
   "name": "@zephyr3d/imgui",
   "entries": [
     {
+      "version": "0.2.8",
+      "tag": "@zephyr3d/imgui_v0.2.8",
+      "date": "Tue, 01 Sep 2026 07:54:12 GMT",
+      "comments": {
+        "patch": [
+          {
+            "comment": "Add getLastPointerInputType() to distinguish mouse from touch input (fixes accidental scrolling when dragging in the asset window)."
+          }
+        ],
+        "dependency": [
+          {
+            "comment": "Updating dependency \"@zephyr3d/base\" from `^0.2.9` to `0.2.10`"
+          },
+          {
+            "comment": "Updating dependency \"@zephyr3d/device\" from `^0.2.18` to `0.2.19`"
+          }
+        ]
+      }
+    },
+    {
       "version": "0.2.7",
       "tag": "@zephyr3d/imgui_v0.2.7",
       "date": "Tue, 04 Aug 2026 10:43:23 GMT",

@@ -2,6 +2,26 @@
   "name": "@zephyr3d/backend-webgl",
   "entries": [
     {
+      "version": "0.1.17",
+      "tag": "@zephyr3d/backend-webgl_v0.1.17",
+      "date": "Tue, 01 Sep 2026 07:54:12 GMT",
+      "comments": {
+        "patch": [
+          {
+            "comment": "Implement indirect draw capability reporting and dispatch for the device API."
+          }
+        ],
+        "dependency": [
+          {
+            "comment": "Updating dependency \"@zephyr3d/base\" from `^0.2.9` to `0.2.10`"
+          },
+          {
+            "comment": "Updating dependency \"@zephyr3d/device\" from `^0.2.18` to `0.2.19`"
+          }
+        ]
+      }
+    },
+    {
       "version": "0.1.16",
       "tag": "@zephyr3d/backend-webgl_v0.1.16",
       "date": "Tue, 04 Aug 2026 10:43:23 GMT",

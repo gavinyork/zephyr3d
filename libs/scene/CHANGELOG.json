@@ -2,6 +2,80 @@
   "name": "@zephyr3d/scene",
   "entries": [
     {
+      "version": "0.9.26",
+      "tag": "@zephyr3d/scene_v0.9.26",
+      "date": "Tue, 01 Sep 2026 07:54:12 GMT",
+      "comments": {
+        "patch": [
+          {
+            "comment": "Post-processing chain: bloom color space and pyramid filtering, display chain moved behind the TAA resolve, TAA history clipped in tonemapped space with reduced flicker, and stale history textures on scene open."
+          },
+          {
+            "comment": "Fog blending corrupting backbuffer alpha on WebGL; SSGI on WebGL2 devices; OIT rendering when the screen size changes."
+          },
+          {
+            "comment": "Stale shader variant hash reused when a depth pass keys its programs; TransparentPass not declaring its ShadowMask read, so the mask did not outlive LightPass."
+          },
+          {
+            "comment": "NaN tangent frame when the screen-space UV jacobian degenerates; alpha dither noise degenerating into a static pattern."
+          },
+          {
+            "comment": "MetaHuman humanoid bone mapping, humanoid helper node mismatching, morph target normal blending, and selection bounds for skinned meshes with morph targets."
+          },
+          {
+            "comment": "MorphSourceData serialization blowing up memory when deleting GLB scene nodes; a missing resource reference failing the whole scene load."
+          },
+          {
+            "comment": "Performance: faster morph target updates and node transform invalidation; parallel deserialization of complex character assets."
+          },
+          {
+            "comment": "Attenuate direct sunlight by cloud coverage for energy conservation; add shadow normal offset bias."
+          },
+          {
+            "comment": "Write motion vectors for opted-in blended geometry; add a normal Y-flip parameter to standard PBR; expose the blueprint PBR output evaluation interface."
+          },
+          {
+            "comment": "SpringModifier / SpringSystem: serialization support, anchor offset inputs, unified solve and writeback for MultiChainSpringSystem, dual-anchor chains for JointDynamics."
+          },
+          {
+            "comment": "Skinning: configurable multi-bone influence import and runtime binding; duplicate SkinBinding resources merged at runtime."
+          },
+          {
+            "comment": "Morph target system: sparse storage with active-subset upload, configurable morph target limit and active upload limit, and a new Source GLB Morph Reference mode for prefab import."
+          },
+          {
+            "comment": "Automatically disable the corresponding backend PBR texture channel when a blueprint output takes it over (isMaterialTextureEnabled / hasXxxTexture); metallicRoughness supports single-channel takeover."
+          },
+          {
+            "comment": "Extend the blueprint material system: material instances switched to an inheritance model, Expose toggle for texture parameters, value range limits for scalar parameters, material functions with tex2D inputs, single-output returns and explicit interface ordering, plus new TextureProperty / ChannelSDFMask / MorphBlur nodes."
+          },
+          {
+            "comment": "Rework the skin material: per-channel, energy-conserving SkinSSS diffusion, shadow tint / scatter color, and smoothness and specular detail tuning."
+          },
+          {
+            "comment": "Add EyeMaterial: corneal refraction, limbal ring, pupil dilation, socket occlusion, energy conservation."
+          },
+          {
+            "comment": "Add HairStrandMaterial strand-based hair pipeline: Kajiya-Kay plus an optional Marschner scattering model, multiple scattering, round-strand normals and spline sampling, distance decimation LOD, and motion vector output."
+          },
+          {
+            "comment": "Add deep opacity map shadows for hair self-shadowing: kernel-filtered lookups, optical depth recorded so solid casters shadow correctly, and caster alpha passed to shadow implementations explicitly."
+          },
+          {
+            "comment": "Add hair physics simulation (TressFX solver ported in), with the TressFX license included."
+          }
+        ],
+        "dependency": [
+          {
+            "comment": "Updating dependency \"@zephyr3d/base\" from `^0.2.9` to `0.2.10`"
+          },
+          {
+            "comment": "Updating dependency \"@zephyr3d/device\" from `^0.2.18` to `0.2.19`"
+          }
+        ]
+      }
+    },
+    {
       "version": "0.9.25",
       "tag": "@zephyr3d/scene_v0.9.25",
       "date": "Thu, 06 Aug 2026 08:52:56 GMT",

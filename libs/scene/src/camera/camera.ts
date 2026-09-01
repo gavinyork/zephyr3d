@@ -297,6 +297,8 @@ export class Camera extends SceneNode {
   protected _postEffectMotionBlur: DRef<MotionBlur>;
   /** @internal Motion blur strength. */
   protected _motionBlurStrength: number;
+  /** @internal Motion blur shutter bias. */
+  protected _motionBlurShutterBias: number;
   /** @internal Bloom enable flag (via post effect). */
   protected _bloom: boolean;
   /** @internal Bloom post effect reference. */
@@ -540,6 +542,7 @@ export class Camera extends SceneNode {
     this._motionBlur = false;
     this._postEffectMotionBlur = new DRef();
     this._motionBlurStrength = 1;
+    this._motionBlurShutterBias = 0.5;
     this._bloom = false;
     this._postEffectBloom = new DRef();
     this._bloomMaxDownsampleLevels = 4;
@@ -763,6 +766,23 @@ export class Camera extends SceneNode {
     this._motionBlurStrength = val;
     if (this._postEffectMotionBlur.get()) {
       this._postEffectMotionBlur.get()!.strength = this._motionBlurStrength;
+    }
+  }
+  /**
+   * How much of the motion blur streak lies ahead of where an object is now,
+   * as a fraction of its length. 0 trails the streak fully behind the object,
+   * 0.5 (the default) centres it. See {@link MotionBlur.shutterBias}.
+   */
+  get motionBlurShutterBias() {
+    return this._motionBlurShutterBias;
+  }
+  set motionBlurShutterBias(val) {
+    this._motionBlurShutterBias = val;
+    if (this._postEffectMotionBlur.get()) {
+      this._postEffectMotionBlur.get()!.shutterBias = val;
+      // The effect clamps; read it back so the camera and the effect cannot
+      // disagree about what was actually applied.
+      this._motionBlurShutterBias = this._postEffectMotionBlur.get()!.shutterBias;
     }
   }
   /**
@@ -2136,6 +2156,7 @@ export class Camera extends SceneNode {
       const motionBlur = new MotionBlur();
       motionBlur.enabled = false;
       motionBlur.strength = this._motionBlurStrength;
+      motionBlur.shutterBias = this._motionBlurShutterBias;
       this._postEffectMotionBlur.set(motionBlur);
       this._compositor.appendPostEffect(motionBlur);
     }

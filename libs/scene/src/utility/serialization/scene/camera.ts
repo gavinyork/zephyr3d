@@ -621,6 +621,28 @@ export function getCameraClass(): SerializableClass {
           }
         },
         {
+          name: 'MotionBlurShutterBias',
+          type: 'float',
+          phase: 1,
+          default: 0.5,
+          options: {
+            label: 'Shutter bias',
+            group: 'PostProcessing/MotionBlur',
+            animatable: true,
+            minValue: 0,
+            maxValue: 1
+          },
+          get(this: Camera, value) {
+            value.num[0] = this.motionBlurShutterBias;
+          },
+          set(this: Camera, value) {
+            this.motionBlurShutterBias = value.num[0];
+          },
+          isValid(this: Camera) {
+            return this.motionBlur;
+          }
+        },
+        {
           name: 'SSGIEnabled',
           type: 'bool',
           phase: 0,

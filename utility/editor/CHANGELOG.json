@@ -2,6 +2,53 @@
   "name": "@zephyr3d/editor",
   "entries": [
     {
+      "version": "0.3.15",
+      "tag": "@zephyr3d/editor_v0.3.15",
+      "date": "Tue, 01 Sep 2026 07:54:12 GMT",
+      "comments": {
+        "patch": [
+          {
+            "comment": "Material workflow: switch a material instance's parent material, clone materials, material preview toggle, resizable instance property panel, HDR color parameter editing, and instance sync after parent material hot reload."
+          },
+          {
+            "comment": "Add editor support for the eye and hair materials."
+          },
+          {
+            "comment": "Assets: drag scene nodes into the asset window to create prefabs, drag .zmsh geometry into the scene, export default zmsh primitives to GLB, clone primitives, and a unified import source-reference toggle with FBX reference mode."
+          },
+          {
+            "comment": "Project settings: morph target limit and active morph upload limit, skin influence limit (with runtime downgrade notice)."
+          },
+          {
+            "comment": "A batch of UI/interaction fixes: asset tree expansion state and occasional jump back to root, first-click focus in property panel text fields, script panel conditional visibility and duplicate array entries, Shift to batch expand/collapse, Ctrl+D duplicate, AABB editing, hidden dev-server child process window, and plugin unload lifecycle."
+          }
+        ],
+        "dependency": [
+          {
+            "comment": "Updating dependency \"@zephyr3d/base\" from `^0.2.9` to `0.2.10`"
+          },
+          {
+            "comment": "Updating dependency \"@zephyr3d/device\" from `^0.2.18` to `0.2.19`"
+          },
+          {
+            "comment": "Updating dependency \"@zephyr3d/scene\" from `^0.9.25` to `0.9.26`"
+          },
+          {
+            "comment": "Updating dependency \"@zephyr3d/loaders\" from `^0.1.4` to `0.1.5`"
+          },
+          {
+            "comment": "Updating dependency \"@zephyr3d/imgui\" from `^0.2.7` to `0.2.8`"
+          },
+          {
+            "comment": "Updating dependency \"@zephyr3d/backend-webgl\" from `^0.1.16` to `0.1.17`"
+          },
+          {
+            "comment": "Updating dependency \"@zephyr3d/backend-webgpu\" from `^0.1.20` to `0.1.21`"
+          }
+        ]
+      }
+    },
+    {
       "version": "0.3.14",
       "tag": "@zephyr3d/editor_v0.3.14",
       "date": "Thu, 06 Aug 2026 08:52:56 GMT",

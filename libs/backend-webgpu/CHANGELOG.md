@@ -1,6 +1,15 @@
 # Change Log - @zephyr3d/backend-webgpu
 
-This log was last generated on Tue, 04 Aug 2026 10:43:23 GMT and should not be manually modified.
+This log was last generated on Tue, 01 Sep 2026 07:54:12 GMT and should not be manually modified.
+
+## 0.1.21
+Tue, 01 Sep 2026 07:54:12 GMT
+
+### Patches
+
+- Implement indirect draw (buffer / commandqueue / renderpass / capabilities).
+- Report float32-blendable from an actual query instead of assuming support.
+- Fix exceeding the material sampler binding limit; remove the Samplers debug logging.
 
 ## 0.1.20
 Tue, 04 Aug 2026 10:43:23 GMT

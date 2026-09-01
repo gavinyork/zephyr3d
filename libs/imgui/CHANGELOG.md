@@ -1,6 +1,13 @@
 # Change Log - @zephyr3d/imgui
 
-This log was last generated on Tue, 04 Aug 2026 10:43:23 GMT and should not be manually modified.
+This log was last generated on Tue, 01 Sep 2026 07:54:12 GMT and should not be manually modified.
+
+## 0.2.8
+Tue, 01 Sep 2026 07:54:12 GMT
+
+### Patches
+
+- Add getLastPointerInputType() to distinguish mouse from touch input (fixes accidental scrolling when dragging in the asset window).
 
 ## 0.2.7
 Tue, 04 Aug 2026 10:43:23 GMT
