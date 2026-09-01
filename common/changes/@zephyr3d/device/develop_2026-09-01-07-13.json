@@ -1,0 +1,10 @@
+{
+  "changes": [
+    {
+      "packageName": "@zephyr3d/device",
+      "comment": "Add a debug log hook for swapchain textures allocated outside a frame.",
+      "type": "patch"
+    }
+  ],
+  "packageName": "@zephyr3d/device"
+}

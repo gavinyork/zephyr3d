@@ -1,0 +1,10 @@
+{
+  "changes": [
+    {
+      "packageName": "@zephyr3d/loaders",
+      "comment": "A batch of FBX import fixes: unify skeletons into a single main rig, import bone TRS animation aligned with the bind pose, correct skin bind matrix computation, stop creating duplicate joint nodes, fix global unit conversion, fix UV channels and texture coordinates, fix bind pose for complex skeletons, fix lost morph targets, preserve original mesh material texture names, fix lost HairRoot local pose, and fix hair child-bone rest pose.",
+      "type": "patch"
+    }
+  ],
+  "packageName": "@zephyr3d/loaders"
+}

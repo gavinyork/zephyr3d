@@ -1,0 +1,10 @@
+{
+  "changes": [
+    {
+      "packageName": "@zephyr3d/base",
+      "comment": "Fix diff (root cause of SpringModifier prefab scene serialization failures).",
+      "type": "patch"
+    }
+  ],
+  "packageName": "@zephyr3d/base"
+}

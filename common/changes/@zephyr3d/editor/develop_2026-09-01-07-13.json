@@ -1,0 +1,10 @@
+{
+  "changes": [
+    {
+      "packageName": "@zephyr3d/editor",
+      "comment": "Assets: drag scene nodes into the asset window to create prefabs, drag .zmsh geometry into the scene, export default zmsh primitives to GLB, clone primitives, and a unified import source-reference toggle with FBX reference mode.",
+      "type": "patch"
+    }
+  ],
+  "packageName": "@zephyr3d/editor"
+}
