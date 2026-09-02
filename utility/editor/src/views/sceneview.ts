@@ -1649,6 +1649,9 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
     });
     this._toolbar.on('action', this.handleSceneAction, this);
     this.editor.plugins.on('pluginContributionsChanged', this.refreshPluginContributions, this);
+    // Plugins may have been loaded before SceneView activation. Refresh once
+    // after subscribing so their menus, tools and panels are visible on first open.
+    this.refreshPluginContributions();
     eventBus.on('refresh_properties', this.handleRefreshProperties, this);
     this._assetView.renderer.on('selection_changed', this.handleAssetSelectionChanged, this);
     this._assetView.renderer.on('asset_picker_drop', this.handleAssetPickerDrop, this);
