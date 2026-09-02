@@ -74,11 +74,15 @@ function createMockDrawContext(overrides: Record<string, unknown> = {}) {
 interface MockRenderQueueOptions {
   needSceneColor: boolean;
   shadowedLights?: unknown[];
+  waters?: unknown[];
 }
 
 function createMockRenderQueue(options: MockRenderQueueOptions) {
   return {
     shadowedLights: options.shadowedLights ?? [],
+    // Culled water surfaces; the WaterCaustics module reads this to decide
+    // whether it has anything to build a map from.
+    waters: options.waters ?? [],
     needSceneColor: () => options.needSceneColor
   } as any;
 }

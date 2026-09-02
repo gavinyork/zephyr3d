@@ -663,7 +663,7 @@ export function mixinLight<T extends typeof MeshMaterial>(BaseCls: T) {
       extra?: PBShaderExp
     ) {
       const pb = scope.$builder;
-      return scope.$choice(
+      const attenuation = scope.$choice(
         pb.equal(type, LIGHT_TYPE_DIRECTIONAL),
         pb.float(1),
         scope.$choice(
@@ -676,6 +676,21 @@ export function mixinLight<T extends typeof MeshMaterial>(BaseCls: T) {
           )
         )
       );
+      // Water caustics ride here rather than on calculateShadow(): every light
+      // model already folds this value into its light colour and nothing else
+      // reads it, so a vec3 return applies the caustic tint everywhere without
+      // touching a single call site. It also covers both lighting paths, which
+      // matters because a shadow-casting sun goes through the clustered path
+      // when the screen-space shadow mask is on and through a per-light additive
+      // pass when it is off.
+      const caustic = ShaderHelper.calculateWaterCaustic(
+        scope,
+        worldPos.xyz,
+        type,
+        dirCutoff.xyz,
+        this.drawContext
+      );
+      return caustic ? pb.mul(caustic, attenuation) : attenuation;
     }
     calculateLightDirection(
       scope: PBInsideFunctionScope,

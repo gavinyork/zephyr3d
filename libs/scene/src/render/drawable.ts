@@ -20,6 +20,7 @@ import type { ClusteredLight } from './cluster_light';
 import type { MeshMaterial } from '../material';
 import type { GlobalBindGroupAllocator } from './globalbindgroup_allocator';
 import type { OIT } from './oit';
+import type { WaterCausticUniforms } from './water_caustics';
 
 /**
  * Picking result target container.
@@ -86,6 +87,21 @@ export interface DrawContext {
    * surfaces. Only meaningful while {@link DrawContext.screenSpaceShadowMask} is on.
    */
   shadowMaskClusterSample?: boolean;
+  /**
+   * Whether a water caustic map was produced this frame and should modulate the
+   * caustic light. Keyed into the light pass shader/bind group hashes, so the
+   * declared and bound global layouts always agree.
+   */
+  waterCaustics: boolean;
+  /**
+   * The light whose additive shadow pass receives the caustics. Only that pass
+   * applies them; every other light is unaffected.
+   */
+  waterCausticLight?: Nullable<PunctualLight>;
+  /** Caustic map produced by the WaterCaustics pass. */
+  waterCausticTexture?: Nullable<Texture2D>;
+  /** Parameters describing the projection of {@link DrawContext.waterCausticTexture}. */
+  waterCausticUniforms?: Nullable<WaterCausticUniforms>;
   /** The scene currently being drawn. */
   readonly scene: Scene;
   /** The render pass to which this drawing task belongs. */

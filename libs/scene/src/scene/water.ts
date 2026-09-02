@@ -105,6 +105,40 @@ export class Water extends applyMixins(GraphNode, mixinDrawable) implements Draw
   set TAAStrength(val) {
     this.material.TAAStrength = val;
   }
+  /**
+   * Whether this water projects caustics onto the geometry below it.
+   *
+   * Needs a shadow-casting directional light and a WebGL2/WebGPU device; the
+   * caustics pass switches itself off when either is missing, and when the sun
+   * drops close to the horizon.
+   */
+  get causticsEnabled() {
+    return this.material.causticsEnabled;
+  }
+  set causticsEnabled(val: boolean) {
+    this.material.causticsEnabled = val;
+  }
+  /** Strength of the caustic contrast. 0 leaves the light unmodulated. */
+  get causticsIntensity() {
+    return this.material.causticsIntensity;
+  }
+  set causticsIntensity(val: number) {
+    this.material.causticsIntensity = val;
+  }
+  /** Depth in meters below the surface where the caustics are in focus. */
+  get causticsDepth() {
+    return this.material.causticsDepth;
+  }
+  set causticsDepth(val: number) {
+    this.material.causticsDepth = val;
+  }
+  /** Half-extent in meters of the camera-centred area the caustic map covers. */
+  get causticsRange() {
+    return this.material.causticsRange;
+  }
+  set causticsRange(val: number) {
+    this.material.causticsRange = val;
+  }
   /** {@inheritDoc SceneNode.update} */
   update(frameId: number, elapsedInSeconds: number) {
     if (this.material.needUpdate()) {

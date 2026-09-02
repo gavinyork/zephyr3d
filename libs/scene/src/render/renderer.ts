@@ -69,6 +69,8 @@ export class SceneRenderer {
           // WebGL1 has no 2D array textures; degrade gracefully to the legacy
           // per-light additive shadow path (mirrors the HiZ gating above).
           screenSpaceShadowMask: camera.screenSpaceShadowMask && device.type !== 'webgl',
+          // Set by the WaterCaustics module once it has produced a map.
+          waterCaustics: false,
           globalBindGroupAllocator,
           camera,
           compositor: camera.compositor,

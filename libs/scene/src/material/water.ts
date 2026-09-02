@@ -18,7 +18,22 @@ import { mixinLight } from './mixins/lit';
 import { distributionGGX, fresnelSchlick, visGGX } from '../shaders/pbr';
 import { getDevice } from '../app/api';
 
+/**
+ * How the water medium converts a path length into transmittance and in-scattering.
+ *
+ * - `physical`: Beer-Lambert with authored absorption/scattering coefficients in 1/m.
+ *   The same coefficients drive the caustic transmittance, so surface shading and
+ *   underwater caustics agree by construction.
+ * - `ramp`: the legacy artist-authored ramp textures indexed by `depth * depthMulti`.
+ *   Kept as an override for scenes tuned against it; caustics still use the physical
+ *   coefficients, so the two can disagree in this mode.
+ *
+ * @public
+ */
+export type WaterMediumMode = 'physical' | 'ramp';
+
 export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight) {
+  private static readonly FEATURE_MEDIUM_MODE = this.defineFeature();
   private static readonly _absorptionGrad = new Interpolator(
     'linear',
     'vec3',
@@ -45,9 +60,32 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
   private readonly _clipmapInfo: Vector4;
   private readonly _clipmapGridInfo: Vector4;
   private readonly _ssrParams: Vector4;
+  /** Absorption coefficient sigma_a, per meter, per RGB channel. */
+  private readonly _absorption: Vector3;
+  /** Scattering coefficient sigma_s, per meter, per RGB channel. */
+  private readonly _scattering: Vector3;
+  /** sigma_a + sigma_s, recomputed whenever either coefficient changes. */
+  private readonly _extinction: Vector3;
+  /** sigma_s / sigma_t, the single-scattering albedo. */
+  private readonly _scatterAlbedo: Vector3;
+  private _causticsEnabled: boolean;
+  private _causticsIntensity: number;
+  private _causticsDepth: number;
+  private _causticsRange: number;
+  private _causticsDefocus: number;
+  private _causticsResolution: number;
+  private _causticsPhotonResolution: number;
+  private _causticsBlurPasses: number;
   constructor() {
     super();
     this._region = new Vector4(-99999, -99999, 99999, 99999);
+    // Defaults are fitted to the legacy absorption ramp at depthMulti = 0.1, so
+    // switching the medium to physical does not change the out-of-box look much.
+    this._absorption = new Vector3(1.0, 0.25, 0.15);
+    this._scattering = new Vector3(0.05, 0.12, 0.18);
+    this._extinction = new Vector3();
+    this._scatterAlbedo = new Vector3();
+    this._updateMediumCoefficients();
     this._clipmapInfo = new Vector4();
     this._clipmapGridInfo = new Vector4();
     this._waveGenerator = new DRef();
@@ -58,7 +96,16 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
     this._displace = 16;
     this._depthMulti = 0.1;
     this._refractionStrength = 0;
+    this._causticsEnabled = true;
+    this._causticsIntensity = 1;
+    this._causticsDepth = 4;
+    this._causticsRange = 60;
+    this._causticsDefocus = 0.12;
+    this._causticsResolution = 512;
+    this._causticsPhotonResolution = 512;
+    this._causticsBlurPasses = 2;
     this.cullMode = 'none';
+    this.useFeature(WaterMaterial.FEATURE_MEDIUM_MODE, 'physical' as WaterMediumMode);
     //this.TAADisabled = true;
   }
   /** {@inheritDoc Material.onDispose} */
@@ -108,6 +155,149 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
       this._absorptionRampTexture.set(tex);
       this.uniformChanged();
     }
+  }
+  /**
+   * How the medium turns a path length into transmittance and in-scattering.
+   *
+   * Defaults to `physical`. `ramp` restores the legacy ramp-texture lookup for
+   * scenes that were tuned against it.
+   */
+  get mediumMode(): WaterMediumMode {
+    return this.featureUsed<WaterMediumMode>(WaterMaterial.FEATURE_MEDIUM_MODE) ?? 'physical';
+  }
+  set mediumMode(val: WaterMediumMode) {
+    if (val !== this.mediumMode) {
+      this.useFeature(WaterMaterial.FEATURE_MEDIUM_MODE, val);
+    }
+  }
+  /** Absorption coefficient sigma_a in 1/m, per RGB channel. */
+  get absorption() {
+    return this._absorption;
+  }
+  set absorption(val: Vector3) {
+    if (!val.equalsTo(this._absorption)) {
+      this._absorption.set(val);
+      this._updateMediumCoefficients();
+      this.uniformChanged();
+    }
+  }
+  /** Scattering coefficient sigma_s in 1/m, per RGB channel. */
+  get scattering() {
+    return this._scattering;
+  }
+  set scattering(val: Vector3) {
+    if (!val.equalsTo(this._scattering)) {
+      this._scattering.set(val);
+      this._updateMediumCoefficients();
+      this.uniformChanged();
+    }
+  }
+  /**
+   * Extinction coefficient sigma_t = sigma_a + sigma_s in 1/m.
+   *
+   * Read by the caustics pass so the light attenuated along the refracted path
+   * uses the same medium as the surface shading. Do not mutate the result.
+   */
+  get extinction() {
+    return this._extinction;
+  }
+  /** Single-scattering albedo sigma_s / sigma_t. Do not mutate the result. */
+  get scatterAlbedo() {
+    return this._scatterAlbedo;
+  }
+  /**
+   * Whether this water projects caustics onto the geometry below it.
+   *
+   * Requires a shadow-casting directional light and a non-WebGL1 device; the
+   * caustics pass disables itself when either is missing.
+   */
+  get causticsEnabled() {
+    return this._causticsEnabled;
+  }
+  set causticsEnabled(val: boolean) {
+    this._causticsEnabled = !!val;
+  }
+  /** Strength of the caustic contrast. 0 leaves the light unmodulated. */
+  get causticsIntensity() {
+    return this._causticsIntensity;
+  }
+  set causticsIntensity(val: number) {
+    this._causticsIntensity = val;
+  }
+  /**
+   * Depth in meters below the surface where the caustics are in focus.
+   *
+   * Photons are splatted onto a horizontal plane at this depth. Receivers away
+   * from it are progressively defocused rather than displaced, so set this near
+   * the depth of the sea bed that should show the sharpest pattern.
+   */
+  get causticsDepth() {
+    return this._causticsDepth;
+  }
+  set causticsDepth(val: number) {
+    this._causticsDepth = Math.max(0.01, val);
+  }
+  /** Half-extent in meters of the camera-centred area the caustic map covers. */
+  get causticsRange() {
+    return this._causticsRange;
+  }
+  set causticsRange(val: number) {
+    this._causticsRange = Math.max(1, val);
+  }
+  /** How fast the caustic contrast falls off per meter away from {@link causticsDepth}. */
+  get causticsDefocus() {
+    return this._causticsDefocus;
+  }
+  set causticsDefocus(val: number) {
+    this._causticsDefocus = Math.max(0, val);
+  }
+  /** Edge length of the square caustic map. */
+  get causticsResolution() {
+    return this._causticsResolution;
+  }
+  set causticsResolution(val: number) {
+    this._causticsResolution = Math.max(16, Math.min(2048, val | 0));
+  }
+  /**
+   * Edge length of the photon grid.
+   *
+   * Matching {@link causticsResolution} deposits exactly one photon per texel,
+   * which is the cheapest setting that still fills the map. Raising it trades
+   * vertex throughput for less shot noise.
+   */
+  get causticsPhotonResolution() {
+    return this._causticsPhotonResolution;
+  }
+  set causticsPhotonResolution(val: number) {
+    this._causticsPhotonResolution = Math.max(16, Math.min(4096, val | 0));
+  }
+  /**
+   * Number of 2x2 blur iterations applied to the accumulated map.
+   *
+   * Rounded up to an even count: the blur ping-pongs between the map and a
+   * scratch target, and only an even number of passes ends back in the map.
+   */
+  get causticsBlurPasses() {
+    return this._causticsBlurPasses;
+  }
+  set causticsBlurPasses(val: number) {
+    const clamped = Math.max(0, Math.min(4, val | 0));
+    this._causticsBlurPasses = clamped + (clamped & 1);
+  }
+  /** @internal */
+  private _updateMediumCoefficients() {
+    this._extinction.setXYZ(
+      this._absorption.x + this._scattering.x,
+      this._absorption.y + this._scattering.y,
+      this._absorption.z + this._scattering.z
+    );
+    // A channel with no interaction at all transmits fully and scatters nothing;
+    // the albedo of such a channel is arbitrary, so pick 0 rather than divide.
+    this._scatterAlbedo.setXYZ(
+      this._extinction.x > 0 ? this._scattering.x / this._extinction.x : 0,
+      this._extinction.y > 0 ? this._scattering.y / this._extinction.y : 0,
+      this._extinction.z > 0 ? this._scattering.z / this._extinction.z : 0
+    );
   }
   get depthMulti() {
     return this._depthMulti;
@@ -225,11 +415,16 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
     scope.region = pb.vec4().uniform(2);
     if (this.needFragmentColor()) {
       scope.displace = pb.float().uniform(2);
-      scope.depthMulti = pb.float().uniform(2);
       scope.refractionStrength = pb.float().uniform(2);
       scope.ssrParams = pb.vec4().uniform(2);
-      scope.scatterRampTex = pb.tex2D().uniform(2);
-      scope.absorptionRampTex = pb.tex2D().uniform(2);
+      if (this.mediumMode === 'ramp') {
+        scope.depthMulti = pb.float().uniform(2);
+        scope.scatterRampTex = pb.tex2D().uniform(2);
+        scope.absorptionRampTex = pb.tex2D().uniform(2);
+      } else {
+        scope.mediumExtinction = pb.vec3().uniform(2);
+        scope.mediumAlbedo = pb.vec3().uniform(2);
+      }
     }
     scope.$l.discardable = pb.or(
       pb.any(pb.lessThan(scope.$inputs.worldPos.xz, scope.region.xy)),
@@ -277,21 +472,40 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
   ) {
     const pb = scope.$builder;
     const that = this;
+    const ramp = this.mediumMode === 'ramp';
+    // Transmittance of the medium over `depth` meters of path.
     pb.func('getAbsorption', [pb.float('depth')], function () {
-      this.$l.c = pb.textureSampleLevel(
-        this.absorptionRampTex,
-        pb.vec2(pb.mul(this.depth, this.depthMulti), 0.5),
-        0
-      ).rgb;
-      this.$return(pb.mul(this.c, this.c));
+      if (ramp) {
+        this.$l.c = pb.textureSampleLevel(
+          this.absorptionRampTex,
+          pb.vec2(pb.mul(this.depth, this.depthMulti), 0.5),
+          0
+        ).rgb;
+        this.$return(pb.mul(this.c, this.c));
+      } else {
+        this.$return(pb.exp(pb.neg(pb.mul(this.mediumExtinction, this.depth))));
+      }
     });
+    // Radiance scattered back out of the medium over `depth` meters of path,
+    // as a fraction of the incident irradiance.
     pb.func('getScattering', [pb.float('depth')], function () {
-      this.$l.c = pb.textureSampleLevel(
-        this.scatterRampTex,
-        pb.vec2(pb.mul(this.depth, this.depthMulti), 0.5),
-        0
-      ).rgb;
-      this.$return(pb.mul(this.c, this.c));
+      if (ramp) {
+        this.$l.c = pb.textureSampleLevel(
+          this.scatterRampTex,
+          pb.vec2(pb.mul(this.depth, this.depthMulti), 0.5),
+          0
+        ).rgb;
+        this.$return(pb.mul(this.c, this.c));
+      } else {
+        // Single-scattering: the albedo weighs how much of the extinguished
+        // energy comes back rather than being absorbed.
+        this.$return(
+          pb.mul(
+            this.mediumAlbedo,
+            pb.sub(pb.vec3(1), pb.exp(pb.neg(pb.mul(this.mediumExtinction, this.depth))))
+          )
+        );
+      }
     });
     pb.func('fresnel', [pb.vec3('normal'), pb.vec3('eyeVec')], function () {
       this.$return(
@@ -479,19 +693,24 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
     bindGroup.setValue('region', this._region);
     if (this.needFragmentColor(ctx)) {
       bindGroup.setValue('displace', this._displace / ctx.renderWidth);
-      bindGroup.setValue('depthMulti', this._depthMulti);
       bindGroup.setValue('refractionStrength', this._refractionStrength);
       bindGroup.setValue('ssrParams', this._ssrParams);
-      bindGroup.setTexture(
-        'scatterRampTex',
-        this._getScatterRampTexture(ctx.device),
-        fetchSampler('clamp_linear_nomip')
-      );
-      bindGroup.setTexture(
-        'absorptionRampTex',
-        this._getAbsorptionRampTexture(ctx.device),
-        fetchSampler('clamp_linear_nomip')
-      );
+      if (this.mediumMode === 'ramp') {
+        bindGroup.setValue('depthMulti', this._depthMulti);
+        bindGroup.setTexture(
+          'scatterRampTex',
+          this._getScatterRampTexture(ctx.device),
+          fetchSampler('clamp_linear_nomip')
+        );
+        bindGroup.setTexture(
+          'absorptionRampTex',
+          this._getAbsorptionRampTexture(ctx.device),
+          fetchSampler('clamp_linear_nomip')
+        );
+      } else {
+        bindGroup.setValue('mediumExtinction', this._extinction);
+        bindGroup.setValue('mediumAlbedo', this._scatterAlbedo);
+      }
     }
     if (this.waveGenerator) {
       this.waveGenerator.applyWaterBindGroup(bindGroup);

@@ -47,12 +47,15 @@ import type { RGExecuteContext, RGHandle, RGTextureAttachment, RGTextureHandle }
 import { renderObjectColors } from '../gpu_picking';
 import type { Primitive } from '../primitive';
 import { BoxShape } from '../../shapes';
+import type { Water } from '../../scene/water';
+import { WaterCausticsRenderer } from '../water_caustics';
 
 const _scenePass = new LightPass();
 const _depthPass = new DepthPass();
 const _shadowMapPass = new ShadowMapPass();
 const _clusters: ClusteredLight[] = [];
 const _shadowMaskRenderer = new ShadowMaskRenderer();
+const _waterCausticsRenderer = new WaterCausticsRenderer();
 const _devicePoolAllocator = new DevicePoolAllocator();
 const _textureAffinityCaches = new WeakMap<
   Camera,
@@ -606,6 +609,110 @@ const ShadowMapsModule: RenderModule<FrameGraphContext> = {
   }
 };
 
+/**
+ * Picks the water surface and light the caustic map is built from.
+ *
+ * Only one pair is handled per frame: the caustics ride on a single light's
+ * additive pass, and a second water body would need a second map. The largest
+ * visible water surface wins, which is the one a camera near several of them is
+ * most likely to be looking through.
+ * @internal
+ */
+function selectWaterCausticSource(
+  ctx: DrawContext,
+  renderQueue: RenderQueue
+): Nullable<{ water: Water; light: PunctualLight }> {
+  if (ctx.device.type === 'webgl' || renderQueue.waters.length === 0) {
+    return null;
+  }
+  // The caustic light must own an additive shadow pass, because that is the pass
+  // the caustic uniforms are declared and bound on.
+  const candidate = renderQueue.sunLight ?? renderQueue.primaryDirectionalLight;
+  const light =
+    candidate && candidate.castShadow && renderQueue.shadowedLights.indexOf(candidate) >= 0
+      ? candidate
+      : null;
+  if (!light) {
+    return null;
+  }
+  let best: Nullable<Water> = null;
+  let bestArea = 0;
+  for (const water of renderQueue.waters) {
+    if (!WaterCausticsRenderer.canRender(water, light)) {
+      continue;
+    }
+    const region = water.material.region;
+    const area = Math.max(0, region.z - region.x) * Math.max(0, region.w - region.y);
+    if (!best || area > bestArea) {
+      best = water;
+      bestArea = area;
+    }
+  }
+  return best ? { water: best, light } : null;
+}
+
+/** @internal */
+const WaterCausticsModule: RenderModule<FrameGraphContext> = {
+  type: 'WaterCaustics',
+  writes: [FrameResources.WaterCaustics],
+  prepare: ({ ctx, renderQueue }) => ({ enabled: !!selectWaterCausticSource(ctx, renderQueue) }),
+  setup(fg: FrameGraphContext) {
+    const { graph, ctx, renderQueue, ordering, blackboard } = fg;
+    const source = selectWaterCausticSource(ctx, renderQueue)!;
+    const material = source.water.material;
+    const size = material.causticsResolution;
+    const format = WaterCausticsRenderer.getMapFormat(ctx.device);
+    const result = graph.addPass('WaterCaustics', (builder) => {
+      // The wave textures the splat pass samples are updated by the scene, not by
+      // the graph, so chain after the passes that have already run rather than
+      // declaring a resource dependency on them.
+      ordering.chainInto(builder);
+      ordering.emit(builder, 'WaterCausticsDone');
+      // The map leaves the graph through the draw context rather than through a
+      // handle a later pass samples, so nothing would otherwise keep this alive.
+      builder.sideEffect();
+      // Fixed-size, unlike almost every other graph texture: the map covers a
+      // world-space footprint, not the screen.
+      const mapHandle = builder.createTexture({
+        format,
+        sizeMode: 'absolute',
+        width: size,
+        height: size,
+        label: 'waterCaustics',
+        allocationKey: 'ForwardPlus.WaterCaustics'
+      });
+      const scratchHandle = builder.createTexture({
+        format,
+        sizeMode: 'absolute',
+        width: size,
+        height: size,
+        label: 'waterCausticsScratch',
+        allocationKey: 'ForwardPlus.WaterCausticsScratch'
+      });
+      builder.setExecute((rgCtx) => {
+        const map = rgCtx.getTexture<Texture2D>(mapHandle);
+        const scratch = rgCtx.getTexture<Texture2D>(scratchHandle);
+        _waterCausticsRenderer.render(ctx, source.water, source.light, map, scratch, (texture: Texture2D) =>
+          rgCtx.createFramebuffer({
+            width: texture.width,
+            height: texture.height,
+            colorAttachments: texture,
+            depthAttachment: null
+          })
+        );
+        // Publish only after the map exists: the light pass keys its shader
+        // variant on this flag and binds the texture in the same step.
+        ctx.waterCaustics = true;
+        ctx.waterCausticLight = source.light;
+        ctx.waterCausticTexture = map;
+        ctx.waterCausticUniforms = _waterCausticsRenderer.uniforms;
+      });
+      return { mapHandle };
+    });
+    blackboard.set(FrameResources.WaterCaustics, result.mapHandle);
+  }
+};
+
 /** @internal */
 const DepthPrepassModule: RenderModule<FrameGraphContext> = {
   type: 'DepthPrepass',
@@ -862,6 +969,7 @@ const SSSProfileModule: RenderModule<FrameGraphContext> = {
     const depthPassResult = requireBuildState(fg, 'depth', 'DepthPrepass', 'SSSProfile');
     const preLightTransmissionDepthToken = fg.state.preLightTransmissionDepthToken;
     const shadowMaskHandle = blackboard.get(FrameResources.ShadowMask);
+    const waterCausticsHandle = blackboard.get(FrameResources.WaterCaustics);
     const renderDepthAttachment = fg.state.renderDepthAttachment;
     const sssProfileResult = graph.addPass('SSSProfile', (builder) => {
       builder.read(blackboard.expect(FrameResources.LinearDepth));
@@ -871,6 +979,12 @@ const SSSProfileModule: RenderModule<FrameGraphContext> = {
       }
       if (shadowMaskHandle) {
         builder.read(shadowMaskHandle);
+      }
+      if (waterCausticsHandle) {
+        // Same reason as the shadow mask: the map reaches the shader through
+        // ctx.waterCausticTexture, so only a declared read stops the executor
+        // from recycling it while this pass is still sampling it.
+        builder.read(waterCausticsHandle);
       }
       const profileHandle = builder.createTexture({
         format: 'rgba16f',
@@ -924,6 +1038,7 @@ const SceneColorGrabModule: RenderModule<FrameGraphContext> = {
     const depthPassResult = requireBuildState(fg, 'depth', 'DepthPrepass', 'SceneColorGrab');
     const preLightTransmissionDepthToken = fg.state.preLightTransmissionDepthToken;
     const shadowMaskHandle = blackboard.get(FrameResources.ShadowMask);
+    const waterCausticsHandle = blackboard.get(FrameResources.WaterCaustics);
     const renderDepthAttachment = fg.state.renderDepthAttachment;
     const grabResult = graph.addPass('SceneColorGrab', (builder) => {
       builder.read(blackboard.expect(FrameResources.LinearDepth));
@@ -933,6 +1048,12 @@ const SceneColorGrabModule: RenderModule<FrameGraphContext> = {
       }
       if (shadowMaskHandle) {
         builder.read(shadowMaskHandle);
+      }
+      if (waterCausticsHandle) {
+        // Same reason as the shadow mask: the map reaches the shader through
+        // ctx.waterCausticTexture, so only a declared read stops the executor
+        // from recycling it while this pass is still sampling it.
+        builder.read(waterCausticsHandle);
       }
       const copyHandle = builder.createTexture({
         format: ctx.colorFormat!,
@@ -976,6 +1097,7 @@ const LightPassModule: RenderModule<FrameGraphContext> = {
     const { graph, ctx, frame, blackboard, options, backbuffer } = fg;
     const depthPassResult = requireBuildState(fg, 'depth', 'DepthPrepass', 'LightPass');
     const shadowMaskHandle = blackboard.get(FrameResources.ShadowMask);
+    const waterCausticsHandle = blackboard.get(FrameResources.WaterCaustics);
     const preLightTransmissionDepthToken = fg.state.preLightTransmissionDepthToken;
     const hiZHandle = blackboard.get(FrameResources.HiZ);
     const sssProfileHandle = blackboard.get(FrameResources.SSSProfile);
@@ -1055,6 +1177,12 @@ const LightPassModule: RenderModule<FrameGraphContext> = {
       builder.read(depthPassResult.depthFramebufferHandle);
       if (shadowMaskHandle) {
         builder.read(shadowMaskHandle);
+      }
+      if (waterCausticsHandle) {
+        // Same reason as the shadow mask: the map reaches the shader through
+        // ctx.waterCausticTexture, so only a declared read stops the executor
+        // from recycling it while this pass is still sampling it.
+        builder.read(waterCausticsHandle);
       }
       if (preLightTransmissionDepthToken) {
         builder.read(preLightTransmissionDepthToken);
@@ -1298,6 +1426,7 @@ const CompositeTailModule: RenderModule<FrameGraphContext> = {
     const hiZHandle = blackboard.get(FrameResources.HiZ);
     const sceneColorCopyHandle = blackboard.get(FrameResources.SceneColorCopy);
     const shadowMaskHandle = blackboard.get(FrameResources.ShadowMask);
+    const waterCausticsHandle = blackboard.get(FrameResources.WaterCaustics);
     const lightPassResult = requireBuildState(fg, 'lightPass', 'LightPass', 'CompositeTail');
     const renderDepthAttachment = fg.state.renderDepthAttachment;
     const useFinalFramebufferAsIntermediate = fg.state.useFinalFramebufferAsIntermediate;
@@ -1369,6 +1498,10 @@ const CompositeTailModule: RenderModule<FrameGraphContext> = {
         // the pool immediately after, so without this the mask would be recycled
         // after LightPass while this pass is still sampling it.
         builder.read(shadowMaskHandle);
+      }
+      if (waterCausticsHandle) {
+        // Same lifetime argument as the shadow mask above.
+        builder.read(waterCausticsHandle);
       }
       builder.read(opaqueChainResult.color);
       const out = builder.write(opaqueChainResult.color);
@@ -1489,6 +1622,7 @@ export const ForwardPlusModules = {
   ClusterLights: ClusterLightsModule,
   GPUPicking: GPUPickingModule,
   ShadowMaps: ShadowMapsModule,
+  WaterCaustics: WaterCausticsModule,
   DepthPrepass: DepthPrepassModule,
   ShadowMask: ShadowMaskModule,
   TransmissionDepthForSSR: TransmissionDepthForSSRModule,
@@ -1506,6 +1640,7 @@ const DEFAULT_FORWARD_PLUS_MODULES: readonly RenderModule<FrameGraphContext>[] =
   ClusterLightsModule,
   GPUPickingModule,
   ShadowMapsModule,
+  WaterCausticsModule,
   DepthPrepassModule,
   ShadowMaskModule,
   TransmissionDepthForSSRModule,
@@ -1560,6 +1695,12 @@ function buildForwardPlusGraphInternal(
   ctx.SkinSSSTexture = null;
   // ShadowMask sets this only when it produces a texture.
   ctx.shadowMaskTexture = null;
+  // WaterCaustics turns these on together once it has produced a map; they are
+  // read by every light pass, so they must start cleared each frame.
+  ctx.waterCaustics = false;
+  ctx.waterCausticLight = null;
+  ctx.waterCausticTexture = null;
+  ctx.waterCausticUniforms = null;
 
   const blackboard = new RGBlackboard();
 

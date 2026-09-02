@@ -245,6 +245,7 @@ export class CullVisitor implements Visitor<SceneNode | OctreeNode> {
       const clipState = this.getClipStateWithNode(node);
       if (clipState !== ClipState.NOT_CLIPPED) {
         this.push(this._camera, node);
+        this.renderQueue.pushWater(node);
         return true;
       }
     }
