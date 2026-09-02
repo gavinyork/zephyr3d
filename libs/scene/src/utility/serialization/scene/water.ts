@@ -1,11 +1,12 @@
 import type { Nullable } from '@zephyr3d/base';
-import { Vector2 } from '@zephyr3d/base';
+import { Vector2, Vector3 } from '@zephyr3d/base';
 import type { SceneNode } from '../../../scene';
 import { GraphNode } from '../../../scene';
 import { Water } from '../../../scene/water';
 import { defineProps, type SerializableClass } from '../types';
 import type { WaveGenerator } from '../../../render';
 import { FBMWaveGenerator, FFTWaveGenerator } from '../../../render';
+import type { WaterMediumMode } from '../../../material/water';
 import type { Texture2D } from '@zephyr3d/device';
 import type { ResourceManager } from '../manager';
 
@@ -266,11 +267,129 @@ export function getWaterClass(manager: ResourceManager): SerializableClass {
           }
         },
         {
+          name: 'CausticsEnabled',
+          description: 'Whether the water projects caustics onto the geometry below it',
+          type: 'bool',
+          default: true,
+          get(this: Water, value) {
+            value.bool[0] = this.causticsEnabled;
+          },
+          set(this: Water, value) {
+            this.causticsEnabled = value.bool[0];
+          }
+        },
+        {
+          name: 'CausticsIntensity',
+          description: 'Strength of the caustic contrast',
+          type: 'float',
+          default: 1,
+          options: { animatable: true, minValue: 0, maxValue: 5 },
+          isHidden(this: Water) {
+            return !this.causticsEnabled;
+          },
+          get(this: Water, value) {
+            value.num[0] = this.causticsIntensity;
+          },
+          set(this: Water, value) {
+            this.causticsIntensity = value.num[0];
+          }
+        },
+        {
+          name: 'CausticsDepth',
+          description: 'Depth in meters below the surface where the caustics are in focus',
+          type: 'float',
+          default: 4,
+          options: { animatable: true, minValue: 0.01, maxValue: 100 },
+          isHidden(this: Water) {
+            return !this.causticsEnabled;
+          },
+          get(this: Water, value) {
+            value.num[0] = this.causticsDepth;
+          },
+          set(this: Water, value) {
+            this.causticsDepth = value.num[0];
+          }
+        },
+        {
+          name: 'CausticsRange',
+          description: 'Half-extent in meters of the camera-centred area the caustic map covers',
+          type: 'float',
+          default: 60,
+          options: { minValue: 1, maxValue: 1000 },
+          isHidden(this: Water) {
+            return !this.causticsEnabled;
+          },
+          get(this: Water, value) {
+            value.num[0] = this.causticsRange;
+          },
+          set(this: Water, value) {
+            this.causticsRange = value.num[0];
+          }
+        },
+        {
+          name: 'MediumMode',
+          description:
+            'How the water medium attenuates light: physical coefficients, or the legacy ramp textures',
+          type: 'string',
+          default: 'physical',
+          options: {
+            enum: {
+              labels: ['Physical', 'Ramp'],
+              values: ['physical', 'ramp']
+            }
+          },
+          get(this: Water, value) {
+            value.str[0] = this.material.mediumMode;
+          },
+          set(this: Water, value) {
+            this.material.mediumMode = value.str[0] as WaterMediumMode;
+          }
+        },
+        {
+          name: 'Absorption',
+          description: 'Absorption coefficient sigma_a of the water medium, per meter, per channel',
+          type: 'vec3',
+          default: [1.0, 0.25, 0.15],
+          options: { animatable: true, minValue: 0, maxValue: 10 },
+          isHidden(this: Water) {
+            return this.material.mediumMode !== 'physical';
+          },
+          get(this: Water, value) {
+            value.num[0] = this.material.absorption.x;
+            value.num[1] = this.material.absorption.y;
+            value.num[2] = this.material.absorption.z;
+          },
+          set(this: Water, value) {
+            this.material.absorption = new Vector3(value.num[0], value.num[1], value.num[2]);
+          }
+        },
+        {
+          name: 'Scattering',
+          description: 'Scattering coefficient sigma_s of the water medium, per meter, per channel',
+          type: 'vec3',
+          default: [0.05, 0.12, 0.18],
+          options: { animatable: true, minValue: 0, maxValue: 10 },
+          isHidden(this: Water) {
+            return this.material.mediumMode !== 'physical';
+          },
+          get(this: Water, value) {
+            value.num[0] = this.material.scattering.x;
+            value.num[1] = this.material.scattering.y;
+            value.num[2] = this.material.scattering.z;
+          },
+          set(this: Water, value) {
+            this.material.scattering = new Vector3(value.num[0], value.num[1], value.num[2]);
+          }
+        },
+        {
           name: 'DepthScale',
-          description: 'Depth attenuation scale for the water material',
+          description: 'Depth attenuation scale for the water material (ramp medium only)',
           type: 'float',
           default: 10,
           options: { animatable: true, minValue: 0, maxValue: 100 },
+          isHidden(this: Water) {
+            return this.material.mediumMode !== 'ramp';
+          },
           get(this: Water, value) {
             value.num[0] = this.material.depthMulti;
           },

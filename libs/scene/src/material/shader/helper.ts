@@ -56,6 +56,8 @@ const UNIFORM_NAME_SKYDISTANTLIGHT_LUT = 'Z_UniformSkyDistantLightLUT';
 const UNIFORM_NAME_SHADOW_MAP = 'Z_UniformShadowMap';
 const UNIFORM_NAME_SHADOW_MASK = 'Z_UniformShadowMask';
 const UNIFORM_NAME_SHADOW_MASK_MODE = 'Z_UniformShadowMaskMode';
+const UNIFORM_NAME_CAUSTIC_MAP = 'Z_UniformCausticMap';
+const UNIFORM_NAME_CAUSTIC_PARAMS = 'Z_UniformCausticParams';
 const UNIFORM_NAME_LINEAR_DEPTH_MAP = 'Z_UniformLinearDepth';
 const UNIFORM_NAME_LINEAR_DEPTH_MAP_SIZE = 'Z_UniformLinearDepthSize';
 const UNIFORM_NAME_SCENE_COLOR_MAP = 'Z_UniformSceneColor';
@@ -371,6 +373,9 @@ export class ShaderHelper {
           tex.noSampler();
         }
         scope[UNIFORM_NAME_SHADOW_MAP] = tex.uniform(0);
+      }
+      if (this.usesWaterCaustics(ctx)) {
+        this.declareWaterCausticUniforms(pb);
       }
       if (ctx.drawEnvLight) {
         ctx.env!.light.envLight.initShaderBindings(pb, ctx);
@@ -1378,9 +1383,165 @@ export class ShaderHelper {
       );
     }
     bindGroup.setTexture(UNIFORM_NAME_BAKED_SKY_MAP, ctx.scene.env.sky.getBakedSkyTexture(ctx));
+    if (this.usesWaterCaustics(ctx)) {
+      this.setWaterCausticUniforms(bindGroup, ctx);
+    }
     if (ctx.drawEnvLight) {
       ctx.env!.light.envLight.updateBindGroup(bindGroup, ctx);
     }
+  }
+  /**
+   * Whether the pass being built modulates its light with the water caustic map.
+   *
+   * True for every light pass of a frame that produced a map; which light the
+   * caustics actually attach to is decided per-fragment by
+   * {@link ShaderHelper.calculateWaterCaustic}. Both the shader variant hash and
+   * the global bind group hash fold this in, so a program that declares the
+   * caustic uniforms is always paired with a bind group that supplies them.
+   *
+   * @param ctx - Current draw context.
+   * @returns True when the caustic uniforms take part in this pass.
+   * @internal
+   */
+  static usesWaterCaustics(ctx: DrawContext): boolean {
+    return !!ctx.waterCaustics && !!ctx.waterCausticLight && ctx.renderPass!.type === RENDER_PASS_TYPE_LIGHT;
+  }
+  /**
+   * Declares the global uniforms {@link ShaderHelper.calculateWaterCaustic} reads.
+   *
+   * Split out of the global uniform setup so a test can build a program that
+   * exercises the sampling code without standing up a whole light pass.
+   *
+   * @param pb - Program builder whose global scope receives the uniforms.
+   * @internal
+   */
+  static declareWaterCausticUniforms(pb: ProgramBuilder) {
+    const scope = pb.getGlobalScope();
+    const causticStruct = pb.defineStruct([
+      pb.vec4('frameX'),
+      pb.vec4('frameY'),
+      pb.vec4('center'),
+      pb.vec4('lightDir'),
+      pb.vec4('params'),
+      pb.vec4('extinction'),
+      pb.vec4('region')
+    ]);
+    scope[UNIFORM_NAME_CAUSTIC_PARAMS] = causticStruct().uniform(0);
+    // The map is single mip and read bilinearly; clamping keeps receivers
+    // outside the covered area reading the border rather than wrapping.
+    scope[UNIFORM_NAME_CAUSTIC_MAP] = pb
+      .tex2D()
+      .uniform(0)
+      .withSampler(getSamplerOptions('clamp_linear_nomip'));
+  }
+  /**
+   * Attenuation the water caustics apply to one light at a world position.
+   *
+   * Returns the product of two effects: the caustic pattern focused by the waves,
+   * and the Beer-Lambert transmittance of the water column the light travelled
+   * through to reach the point. The result is 1 for any light that is not the
+   * caustic light, above the surface, and outside the water region, so the caller
+   * can multiply unconditionally.
+   *
+   * The caustic light is identified at runtime by comparing directions rather
+   * than by which pass is running. Shadow-casting lights reach the opaque queue
+   * through the clustered path when the screen-space shadow mask is on (the
+   * default) and through a per-light additive pass when it is off; only a runtime
+   * test covers both. Two directional lights pointing the same way would both
+   * pick up the caustics, but they are physically the same light.
+   *
+   * @param scope - Current shader scope.
+   * @param worldPos - World position of the shaded fragment.
+   * @param lightType - The light's type constant.
+   * @param lightDirection - Direction the light travels, i.e. `directionAndCutoff.xyz`.
+   * @param ctx - Current draw context.
+   * @returns A `vec3` multiplier, or null when this pass has no caustics.
+   */
+  static calculateWaterCaustic(
+    scope: PBInsideFunctionScope,
+    worldPos: PBShaderExp,
+    lightType: PBShaderExp,
+    lightDirection: PBShaderExp,
+    ctx: DrawContext
+  ): Nullable<PBShaderExp> {
+    if (!this.usesWaterCaustics(ctx)) {
+      return null;
+    }
+    const pb = scope.$builder;
+    const funcName = 'Z_calculateWaterCaustic';
+    pb.func(funcName, [pb.vec3('worldPos'), pb.int('lightType'), pb.vec3('lightDirection')], function () {
+      this.$l.cu = this[UNIFORM_NAME_CAUSTIC_PARAMS];
+      this.$l.depth = pb.sub(this.cu.center.w, this.worldPos.y);
+      // Length of the light path inside the water, straight down the sun ray.
+      this.$l.pathLength = pb.mul(this.depth, this.cu.lightDir.w);
+      // Where the sun ray that lights this point crossed the water plane. The
+      // splat pass clips photons by their entry point, so the receiver must ask
+      // the same question: a point under the water's footprint that the sun
+      // reaches from outside it saw no water at all, and a point beyond the
+      // footprint that the sun reaches through it did. Testing the point's own
+      // xz gets both wrong by the horizontal offset depth / tan(elevation).
+      this.$l.entryXZ = pb.sub(this.worldPos.xz, pb.mul(this.cu.lightDir.xz, this.pathLength));
+      // Not the caustic light, above the surface, or the ray never entered the
+      // water: nothing to attenuate.
+      this.$if(
+        pb.or(
+          pb.notEqual(this.lightType, LIGHT_TYPE_DIRECTIONAL),
+          pb.lessThan(pb.dot(this.lightDirection, this.cu.lightDir.xyz), 0.999),
+          pb.lessThanEqual(this.depth, 0),
+          pb.any(pb.lessThan(this.entryXZ, this.cu.region.xy)),
+          pb.any(pb.greaterThan(this.entryXZ, this.cu.region.zw))
+        ),
+        function () {
+          this.$return(pb.vec3(1));
+        }
+      );
+      this.$l.transmittance = pb.exp(pb.neg(pb.mul(this.cu.extinction.xyz, this.pathLength)));
+      // Project into the map: frameX/frameY are orthonormal and perpendicular to
+      // the light, so the same two dot products the splat pass used invert it.
+      this.$l.rel = pb.sub(this.worldPos, this.cu.center.xyz);
+      this.$l.mapNDC = pb.mul(
+        pb.vec2(pb.dot(this.rel, this.cu.frameX.xyz), pb.dot(this.rel, this.cu.frameY.xyz)),
+        this.cu.frameX.w
+      );
+      this.$l.uv = pb.add(pb.mul(this.mapNDC, 0.5), pb.vec2(0.5));
+      // Fade the pattern out over the last tenth of the map so its border does
+      // not draw a visible rectangle on the sea bed.
+      this.$l.edge = pb.mul(
+        pb.smoothStep(0, 0.1, pb.min(this.uv.x, pb.sub(1, this.uv.x))),
+        pb.smoothStep(0, 0.1, pb.min(this.uv.y, pb.sub(1, this.uv.y)))
+      );
+      this.$l.pattern = pb.textureSampleLevel(this[UNIFORM_NAME_CAUSTIC_MAP], this.uv, 0).x;
+      // Receivers away from the focal plane see a defocused, lower-contrast
+      // pattern rather than a displaced one.
+      this.$l.defocus = pb.div(
+        1,
+        pb.add(1, pb.mul(pb.abs(pb.sub(this.depth, this.cu.params.y)), this.cu.params.z))
+      );
+      this.$l.weight = pb.mul(this.cu.params.x, this.defocus, this.edge);
+      this.$l.caustic = pb.add(1, pb.mul(pb.sub(this.pattern, 1), this.weight));
+      // Soften the waterline so the transmittance does not switch on abruptly.
+      this.$l.submerged = pb.smoothStep(0, 0.05, this.depth);
+      this.$return(pb.mix(pb.vec3(1), pb.mul(pb.vec3(this.caustic), this.transmittance), this.submerged));
+    });
+    return pb.getGlobalScope()[funcName](worldPos, lightType, lightDirection) as PBShaderExp;
+  }
+  /** @internal */
+  static setWaterCausticUniforms(bindGroup: BindGroup, ctx: DrawContext) {
+    const uniforms = ctx.waterCausticUniforms!;
+    bindGroup.setValue(UNIFORM_NAME_CAUSTIC_PARAMS, {
+      frameX: uniforms.frameX,
+      frameY: uniforms.frameY,
+      center: uniforms.center,
+      lightDir: uniforms.lightDir,
+      params: uniforms.params,
+      extinction: uniforms.extinction,
+      region: uniforms.region
+    });
+    bindGroup.setTexture(
+      UNIFORM_NAME_CAUSTIC_MAP,
+      ctx.waterCausticTexture!,
+      fetchSampler('clamp_linear_nomip')
+    );
   }
   /** @internal */
   static setLightUniformsShadow(bindGroup: BindGroup, ctx: DrawContext, light: PunctualLight) {
@@ -1408,6 +1569,9 @@ export class ShaderHelper {
       shadowMapParams.shadowMap!,
       shadowMapParams.shadowMapSampler
     );
+    if (this.usesWaterCaustics(ctx)) {
+      this.setWaterCausticUniforms(bindGroup, ctx);
+    }
     bindGroup.setTexture(UNIFORM_NAME_BAKED_SKY_MAP, ctx.scene.env.sky.getBakedSkyTexture(ctx));
     if (ctx.drawEnvLight) {
       ctx.env!.light.envLight.updateBindGroup(bindGroup, ctx);
@@ -1543,6 +1707,49 @@ export class ShaderHelper {
    */
   static getElapsedTime(scope: PBInsideFunctionScope): PBShaderExp {
     return scope.camera.elapsedTime;
+  }
+  /**
+   * Declares the one camera field {@link ShaderHelper.getElapsedTime} reads.
+   *
+   * Wave generators animate off `camera.elapsedTime`, which the light and depth
+   * passes provide as part of the full camera struct. A standalone program that
+   * drives a wave generator - the caustics splat pass - has no such struct, so it
+   * declares that single field under the same name. Any generator that starts
+   * reading a second camera field will need it added here.
+   *
+   * The three padding floats round the struct up to 16 bytes. std140 aligns a
+   * struct to a vec4 boundary, so a lone float leaves the GLSL block larger than
+   * the buffer the engine sizes from the struct's own members - WebGL2 then
+   * rejects every draw with "uniform buffer that is too small" and rasterises
+   * nothing, while WebGPU is unaffected.
+   *
+   * @param scope - Global scope of the standalone program.
+   * @param uniformGroup - Bind group the uniform belongs to.
+   * @internal
+   */
+  static declareStandaloneCameraTime(scope: PBGlobalScope, uniformGroup: number) {
+    const pb = scope.$builder;
+    scope.camera = pb
+      .defineStruct([pb.float('elapsedTime'), pb.float('_pad0'), pb.float('_pad1'), pb.float('_pad2')])()
+      .uniform(uniformGroup);
+  }
+  /**
+   * Uploads the value declared by {@link ShaderHelper.declareStandaloneCameraTime}.
+   *
+   * Must be the same clock the light pass uses, or a wave generator's caustics
+   * would animate out of step with the surface they are refracted through.
+   *
+   * @param bindGroup - Bind group of the standalone program.
+   * @param ctx - Current draw context.
+   * @internal
+   */
+  static setStandaloneCameraTime(bindGroup: BindGroup, ctx: DrawContext) {
+    bindGroup.setValue('camera', {
+      elapsedTime: ctx.device.frameInfo.elapsedOverall * 0.001,
+      _pad0: 0,
+      _pad1: 0,
+      _pad2: 0
+    });
   }
   /**
    * Gets the elapsed time since last frame in seconds

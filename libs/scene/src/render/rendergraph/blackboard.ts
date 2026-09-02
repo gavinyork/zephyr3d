@@ -22,6 +22,7 @@ type FrameResourceMap = {
   readonly SSSTransmission: FrameResourceKey<RGTextureHandle>;
   readonly SkinSSS: FrameResourceKey<RGTextureHandle>;
   readonly ShadowMask: FrameResourceKey<RGTextureHandle>;
+  readonly WaterCaustics: FrameResourceKey<RGTextureHandle>;
   readonly PresentedColor: FrameResourceKey<RGTextureHandle>;
 };
 
@@ -51,6 +52,8 @@ export const FrameResources = {
   SSSTransmission: 'sssTransmission',
   SkinSSS: 'skinSSS',
   ShadowMask: 'shadowMask',
+  /** Light-space caustic map projected onto whatever sits under the water. */
+  WaterCaustics: 'waterCaustics',
   /** Final presented color. The last registration becomes the graph sink. */
   PresentedColor: 'presentedColor'
 } as unknown as FrameResourceMap;

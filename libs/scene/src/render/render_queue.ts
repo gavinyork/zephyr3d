@@ -3,6 +3,7 @@ import { Disposable, objectKeys, Vector3 } from '@zephyr3d/base';
 import type { Camera } from '../camera/camera';
 import type { BatchDrawable, Drawable } from './drawable';
 import type { DirectionalLight, PunctualLight } from '../scene/light';
+import type { Water } from '../scene/water';
 import type { RenderPass } from '.';
 import { QUEUE_TRANSPARENT, RENDER_PASS_TYPE_SHADOWMAP } from '../values';
 import type { BindGroup, BindGroupLayout } from '@zephyr3d/device';
@@ -191,6 +192,15 @@ export class RenderQueue extends Disposable {
   private _primaryDirectionalLight: Nullable<DirectionalLight>;
   /** @internal */
   private _primaryTransmissionLight: Nullable<PunctualLight>;
+  /**
+   * Visible water surfaces, in visit order.
+   *
+   * Collected separately from the item lists so passes that run before the light
+   * pass - the caustics pass, which has to know where the water plane is before
+   * anything shades under it - can find them without walking every draw item.
+   * @internal
+   */
+  private _waterList: Water[];
   /** @internal */
   private readonly _bindGroupAllocator: InstanceBindGroupAllocator;
   /** @internal */
@@ -219,6 +229,7 @@ export class RenderQueue extends Disposable {
     this._sunLight = null;
     this._primaryDirectionalLight = null;
     this._primaryTransmissionLight = null;
+    this._waterList = [];
     this._ref = { ref: this, valid: true };
     this._instanceInfo = new Map();
     this._needSceneColor = false;
@@ -297,6 +308,17 @@ export class RenderQueue extends Disposable {
   get shadowedLights() {
     return this._shadowedLightList;
   }
+  /** Visible water surfaces collected while culling. */
+  get waters(): readonly Water[] {
+    return this._waterList;
+  }
+  /**
+   * Record a visible water surface.
+   * @param water - The water node that passed culling.
+   */
+  pushWater(water: Water) {
+    this._waterList.push(water);
+  }
   /**
    * Gets the unshadowed lights
    */
@@ -355,6 +377,7 @@ export class RenderQueue extends Disposable {
    * @param queue - The render queue to be pushed
    */
   pushRenderQueue(queue: RenderQueue) {
+    this._waterList.push(...queue._waterList);
     const newItemLists = queue._itemList;
     if (!newItemLists) {
       return;
@@ -546,6 +569,7 @@ export class RenderQueue extends Disposable {
     this._sunLight = null;
     this._primaryDirectionalLight = null;
     this._primaryTransmissionLight = null;
+    this._waterList = [];
     this._needSceneColor = false;
     this._needSceneDepth = false;
     this._needSceneColorWithDepth = false;
