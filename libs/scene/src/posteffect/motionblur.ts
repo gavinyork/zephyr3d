@@ -19,62 +19,69 @@ import { Vector2 } from '@zephyr3d/base';
 import { FrameResources } from '../render/rendergraph/blackboard';
 import type { RGHandle } from '../render/rendergraph/types';
 
-/**
- * Edge length in pixels of a velocity tile, which is also the furthest a point
- * may throw its streak: NeighborMax dilates across one tile, so anything a
- * pixel can be reached by has to live within a tile of it. McGuire et al.
- * suggest 20 and the reconstruction guarantee is stated in terms of exactly
- * this equality.
- * @internal
- */
-const TILE_SIZE = 20;
+/** Default for {@link MotionBlur.maxBlurLength}. @internal */
+const DEFAULT_MAX_BLUR_LENGTH = 40;
 
 /**
- * Longest streak the filter can reconstruct at a given shutter bias, in pixels.
- *
- * The binding constraint is reach, not length: a tap may not travel further
- * than {@link TILE_SIZE} from the pixel, or it leaves the region NeighborMax
- * searched and the streak silently loses its tail. A centred shutter spends
- * that budget symmetrically and so affords twice the tile size, but a shutter
- * pushed fully to one end spends it all in one direction and affords only the
- * tile size itself. Halving the streak is the price of the trailing look; the
- * alternative would be widening the NeighborMax kernel.
+ * Sample spacing along a streak, in pixels. The taps are not dithered, so this
+ * is all that stands between a long streak and ghosting.
  * @internal
  */
-function maxBlurLength(shutterBias: number): number {
-  return TILE_SIZE / Math.max(shutterBias, 1 - shutterBias);
+const TARGET_STEP_PX = 3.3;
+
+/**
+ * Cost ceiling, and the one place the spacing above is allowed to slip. Past
+ * `MAX_WALK_STEPS * TARGET_STEP_PX` per direction the taps thin out and long
+ * streaks ghost, which caps the usable {@link MotionBlur.maxBlurLength} at
+ * roughly 210 px on a fully biased shutter, twice that on a centred one.
+ * @internal
+ */
+const MIN_WALK_STEPS = 4;
+const MAX_WALK_STEPS = 64;
+
+/**
+ * Velocity tile size, which is also the furthest a point may throw its streak:
+ * NeighborMax dilates across one tile, so anything that can reach a pixel has
+ * to live within a tile of it. A centred shutter spends that reach both ways
+ * and affords twice the tile size; a fully biased one spends it all one way.
+ * @internal
+ */
+function tileSizeFor(maxBlurLength: number, shutterBias: number): number {
+  return Math.max(2, Math.ceil(maxBlurLength * Math.max(shutterBias, 1 - shutterBias)));
 }
 
 /**
- * Taps taken along the reconstruction line, excluding the centre pixel, which
- * is accumulated separately with its own weight. Kept even so that no tap lands
- * exactly on the centre and none has to be skipped.
- *
- * The paper suggests 15 samples in total. This is 24 plus the centre, because
- * the taps here are not jittered (see the sample loop) and undithered taps have
- * to be dense enough to not ghost on their own: 24 keeps the spacing under
- * 1.7 px even at the maximum streak length.
+ * Steps for a walk spanning `spanPx` pixels, at {@link TARGET_STEP_PX} stride.
+ * Per direction rather than per pair: the bias splits the streak unevenly, and
+ * a direction with no share must take no steps (see the walk).
  * @internal
  */
-const NUM_TAPS = 24;
+function walkStepsFor(spanPx: number): number {
+  if (spanPx <= 0) {
+    return 0;
+  }
+  return Math.min(MAX_WALK_STEPS, Math.max(MIN_WALK_STEPS, Math.ceil(spanPx / TARGET_STEP_PX)));
+}
 
 /**
- * Velocity written by materials that opt out of temporal reuse
- * ({@link MeshMaterial.disableTAA} emits `(6e4, 6e4)`). Same threshold
- * `temporalResolve()` tests against; without it the filter would read the
- * sentinel as an enormous velocity and smear those pixels across the screen.
+ * Sentinel velocity emitted by materials opting out of temporal reuse
+ * ({@link MeshMaterial.disableTAA} writes `(6e4, 6e4)`). Read literally it
+ * would smear those pixels across the screen. Same threshold
+ * `temporalResolve()` tests against.
  * @internal
  */
 const MV_SENTINEL = 5e4;
 
 /**
- * Depth difference in view-space units past which two samples are considered
- * to be on separate surfaces. Small on purpose: the comparison is meant to be
- * an almost binary foreground/background test, and the ramp only softens the
- * transition between near-coplanar surfaces.
+ * View-space depth gap past which two samples count as separate surfaces.
+ * Small on purpose: the test is meant to be near-binary, with the ramp only
+ * softening near-coplanar cases.
  * @internal
  */
 const SOFT_Z_EXTENT = 0.01;
+
+/** Half the separation between the two walks per direction. @internal */
+const RIBBON_WIDTH = 3;
 
 /** Velocity tiles keep the sign of the motion, so a signed float format. @internal */
 const TILE_FORMAT: TextureFormat = 'rgba16f';
@@ -82,11 +89,10 @@ const TILE_FORMAT: TextureFormat = 'rgba16f';
 const FUNC_PROCESS_VELOCITY = 'Z_mbProcessVelocity';
 
 /**
- * Turns a raw motion vector sample into the velocity the filter works with:
- * sentinel rejected, scaled by the shutter strength and clamped to the longest
- * reconstructible streak. Every pass must apply exactly this transform,
- * otherwise the dilated tile velocities and the per-pixel velocities disagree
- * and the weights break.
+ * Raw motion vector to the velocity the filter works with: sentinel rejected,
+ * scaled by strength, clamped to the longest reconstructible streak. Every
+ * pass must apply exactly this, or the dilated and per-pixel velocities
+ * disagree and the weights break.
  * @internal
  */
 function processVelocity(
@@ -118,14 +124,15 @@ function processVelocity(
  * The motion blur post effect
  *
  * @remarks
- * Implements the reconstruction filter of McGuire et al., "A Reconstruction
- * Filter for Plausible Motion Blur" (2012). Velocity is dilated over
- * {@link TILE_SIZE}-pixel tiles first (TileMax, then NeighborMax), so a pixel
- * that is itself static still gets blurred when fast geometry passes near it.
- * That dilation is what makes moving *objects* streak over the background;
- * a filter that only reads the velocity under the current pixel can reproduce
- * camera motion, where the velocity field is smooth over the whole screen, but
- * leaves moving objects with hard edges.
+ * The reconstruction filter of McGuire et al., "A Reconstruction Filter for
+ * Plausible Motion Blur" (2012), with the tap path walking the velocity field
+ * rather than a straight line so that rotating geometry does not tear.
+ *
+ * Velocity is dilated over tiles first (TileMax, then NeighborMax) so a static
+ * pixel still blurs when fast geometry passes near it. That dilation is what
+ * makes moving *objects* streak over the background: reading only the velocity
+ * under the current pixel reproduces camera motion, where the field is smooth
+ * screen-wide, but leaves moving objects with hard edges.
  *
  * @public
  */
@@ -143,6 +150,8 @@ export class MotionBlur extends AbstractPostEffect {
   /** @internal */
   private _shutterBias: number;
   /** @internal */
+  private _maxBlurLength: number;
+  /** @internal */
   private readonly _texSize: Vector2;
   /**
    * Creates an instance of tonemap post effect
@@ -151,10 +160,11 @@ export class MotionBlur extends AbstractPostEffect {
     super();
     this._intensity = 1;
     this._shutterBias = 0.5;
+    this._maxBlurLength = DEFAULT_MAX_BLUR_LENGTH;
     this._texSize = new Vector2();
-    // End layer: the display chain runs after the TAA resolve (see Camera.setupPostEffects).
-    // Motion vectors are unaffected by the move -- the blackboard handle is final before
-    // either post chain is built.
+    // End layer, so the display chain runs after the TAA resolve (see
+    // Camera.setupPostEffects). Motion vectors are unaffected: the blackboard
+    // handle is final before either post chain is built.
     this._layer = PostEffectLayer.end;
   }
   /**
@@ -163,10 +173,9 @@ export class MotionBlur extends AbstractPostEffect {
    * over half of it (the cinematic 180 degree shutter), 0 disables the effect.
    *
    * @remarks
-   * The motion vectors already carry the displacement accumulated over one
-   * frame, so this is a plain dimensionless factor and must not be scaled by
-   * the frame time again. The streak length is capped whatever the strength;
-   * see {@link MotionBlur.shutterBias} for what the cap is and why it moves.
+   * Motion vectors already carry one frame of displacement, so this is a plain
+   * dimensionless factor and must not be scaled by frame time again. The
+   * result is capped by {@link MotionBlur.maxBlurLength} whatever the strength.
    */
   get strength() {
     return this._intensity;
@@ -178,30 +187,45 @@ export class MotionBlur extends AbstractPostEffect {
    * How much of the streak lies ahead of where the object is now, as a fraction
    * of its length. Clamped to [0, 1].
    *
-   * - `0` leaves the whole streak trailing behind the object. This is what a
-   *   shutter that closes on the current frame actually produces, since the
-   *   motion vector runs from the previous frame to this one, and it reads as
-   *   the object dragging a tail.
-   * - `0.5` (the default) centres the streak on the current position, which is
-   *   what McGuire et al. describe and what most implementations ship. Nothing
-   *   lags, at the cost of the object blurring into where it has not been yet.
-   * - `1` puts the streak entirely ahead. Offered for symmetry; it looks like
-   *   the object is anticipating its own motion and is rarely what anyone wants.
+   * - `0` trails the streak entirely behind, which is what a shutter closing
+   *   on the current frame produces and reads as the object dragging a tail.
+   * - `0.5` (the default) centres it, as McGuire et al. describe: nothing lags,
+   *   at the cost of blurring into where the object has not been yet.
+   * - `1` puts it entirely ahead. Offered for symmetry, rarely wanted.
    *
    * @remarks
-   * Biasing the shutter does not lengthen the streak, it only slides it. It
-   * does change how far a single tap reaches, though, and reach is what the
-   * velocity dilation bounds: a centred shutter splits its budget over both
-   * directions and so allows a streak of `2 * TILE_SIZE` pixels, while a fully
-   * biased one spends the whole budget one way and allows `TILE_SIZE`. So the
-   * maximum blur halves as this moves away from 0.5. Nothing breaks at the
-   * boundary - the velocity is simply clamped harder.
+   * This slides the streak without lengthening it;
+   * {@link MotionBlur.maxBlurLength} is honoured at any bias, paid for with a
+   * coarser tile grid towards the extremes.
    */
   get shutterBias() {
     return this._shutterBias;
   }
   set shutterBias(val: number) {
     this._shutterBias = Math.min(1, Math.max(0, val));
+  }
+  /**
+   * Longest streak the filter will reconstruct, in pixels at render
+   * resolution. Velocity beyond this is clamped: the direction survives, the
+   * length does not.
+   *
+   * @remarks
+   * This is the ceiling {@link MotionBlur.strength} runs into: an object
+   * crossing `V` pixels per frame stops responding once `V * strength` reaches
+   * it. The clamp is per pixel, so fast objects saturate first and pushing
+   * strength further only flattens the fast/slow difference. Raise this instead.
+   *
+   * Cost is linear in it - 28 samples per pixel at the default 40, 100 at 160,
+   * since step counts are derived from the length to keep the sampling dense.
+   * The quality limit comes sooner though: a tile is as wide as the reach, so
+   * raising this spreads the dilated velocity further and a fast object starts
+   * dragging nearby slow geometry into its blur.
+   */
+  get maxBlurLength() {
+    return this._maxBlurLength;
+  }
+  set maxBlurLength(val: number) {
+    this._maxBlurLength = Math.max(1, val);
   }
   /** {@inheritDoc AbstractPostEffect.requireLinearDepthTexture} */
   requireLinearDepthTexture() {
@@ -225,13 +249,15 @@ export class MotionBlur extends AbstractPostEffect {
       // legacy path degrades to a pass-through.
       return this._setupFromApply(s);
     }
-    const tileCountX = Math.max(1, Math.ceil(s.width / TILE_SIZE));
-    const tileCountY = Math.max(1, Math.ceil(s.height / TILE_SIZE));
+    // Tile size follows the requested streak length, and is what every pass
+    // this frame sizes itself against. Read once here so the tile textures, the
+    // shader loop bounds and the velocity clamp cannot disagree.
+    const tileSize = tileSizeFor(this._maxBlurLength, this._shutterBias);
+    const tileCountX = Math.max(1, Math.ceil(s.width / tileSize));
+    const tileCountY = Math.max(1, Math.ceil(s.height / tileSize));
 
-    // 1. TileMax, separable: max velocity over each TILE_SIZE-wide row segment,
-    //    then over each TILE_SIZE-tall column segment. max() is separable, so
-    //    the two passes together give the max over the whole tile at a fraction
-    //    of the samples a single 2D reduction would need per invocation.
+    // 1. TileMax, separable: rows then columns. max() is separable, so the two
+    //    passes together cover the tile far more cheaply than a 2D reduction.
     const tileMaxHHandle = graph.addPass('MotionBlur:TileMaxH', (builder) => {
       builder.read(motionVectorHandle);
       for (const dep of s.dependencies) {
@@ -252,7 +278,8 @@ export class MotionBlur extends AbstractPostEffect {
             device,
             rg.getTexture<Texture2D>(motionVectorHandle),
             rg.getTexture<Texture2D>(out),
-            tileCountX
+            tileCountX,
+            tileSize
           );
         } finally {
           device.popDeviceStates();
@@ -278,7 +305,8 @@ export class MotionBlur extends AbstractPostEffect {
             device,
             rg.getTexture<Texture2D>(tileMaxHHandle),
             rg.getTexture<Texture2D>(out),
-            tileCountY
+            tileCountY,
+            tileSize
           );
         } finally {
           device.popDeviceStates();
@@ -287,9 +315,9 @@ export class MotionBlur extends AbstractPostEffect {
       return out;
     });
 
-    // 2. NeighborMax: max over the 3x3 tile neighbourhood, so a tile that holds
-    //    only background still learns about the fast geometry next to it and
-    //    the streak is allowed to cross the silhouette.
+    // 2. NeighborMax: max over the 3x3 tile neighbourhood, so a background-only
+    //    tile learns about the fast geometry beside it and the streak may cross
+    //    the silhouette.
     const neighborMaxHandle = graph.addPass('MotionBlur:NeighborMax', (builder) => {
       builder.read(tileMaxHandle);
       const out = builder.createTexture({
@@ -353,10 +381,9 @@ export class MotionBlur extends AbstractPostEffect {
    * {@inheritDoc AbstractPostEffect.apply}
    *
    * @remarks
-   * Reconstruction needs the dilated velocity tiles built by {@link MotionBlur.setup},
-   * which the single-pass apply() entry cannot produce. This path is only
-   * reached when motion vectors are unavailable, where no blur is the correct
-   * answer anyway.
+   * Reconstruction needs the dilated tiles that {@link MotionBlur.setup} builds
+   * and this single-pass entry cannot. Only reached without motion vectors,
+   * where no blur is the right answer anyway.
    */
   apply(ctx: DrawContext, inputColorTexture: Texture2D, _sceneDepthTexture: Texture2D, srgbOutput: boolean) {
     this.passThrough(ctx, inputColorTexture, srgbOutput);
@@ -366,7 +393,8 @@ export class MotionBlur extends AbstractPostEffect {
     device: AbstractDevice,
     motionVectorTexture: Texture2D,
     target: Texture2D,
-    tileCountX: number
+    tileCountX: number,
+    tileSize: number
   ) {
     this._prepareTileMax(device);
     device.setFramebuffer([target]);
@@ -377,15 +405,22 @@ export class MotionBlur extends AbstractPostEffect {
     this._texSize.setXY(motionVectorTexture.width, motionVectorTexture.height);
     bindGroup.setValue('srcSize', this._texSize);
     bindGroup.setValue('tileCount', tileCountX);
+    bindGroup.setValue('tileSize', tileSize);
     bindGroup.setValue('strength', this._intensity);
-    bindGroup.setValue('maxBlurLength', maxBlurLength(this._shutterBias));
+    bindGroup.setValue('maxBlurLength', this._maxBlurLength);
     bindGroup.setValue('flip', this.needFlip(device) ? 1 : 0);
     device.setProgram(MotionBlur._programTileMaxH);
     device.setBindGroup(0, bindGroup);
     this.drawFullscreenQuad();
   }
   /** @internal */
-  private _tileMaxV(device: AbstractDevice, srcTexture: Texture2D, target: Texture2D, tileCountY: number) {
+  private _tileMaxV(
+    device: AbstractDevice,
+    srcTexture: Texture2D,
+    target: Texture2D,
+    tileCountY: number,
+    tileSize: number
+  ) {
     this._prepareTileMax(device);
     device.setFramebuffer([target]);
     device.setViewport(null);
@@ -395,6 +430,7 @@ export class MotionBlur extends AbstractPostEffect {
     this._texSize.setXY(srcTexture.width, srcTexture.height);
     bindGroup.setValue('srcSize', this._texSize);
     bindGroup.setValue('tileCount', tileCountY);
+    bindGroup.setValue('tileSize', tileSize);
     bindGroup.setValue('flip', this.needFlip(device) ? 1 : 0);
     device.setProgram(MotionBlur._programTileMaxV);
     device.setBindGroup(0, bindGroup);
@@ -428,12 +464,9 @@ export class MotionBlur extends AbstractPostEffect {
     this._prepareReconstruct(device);
     const bindGroup = MotionBlur._bindgroupMotionBlur!;
     const nearest = fetchSampler('clamp_nearest_nomip');
-    // Colour is filtered because the taps land on sub-pixel offsets: with point
-    // sampling a tap straddling a silhouette flips between the two surfaces
-    // wholesale, and the per-pixel jitter turns that into visible speckle along
-    // every blurred edge. Velocity and depth stay point-sampled - interpolating
-    // either across a silhouette invents a surface that is at neither depth and
-    // moving at neither speed.
+    // Taps land on sub-pixel offsets, so colour is filtered. Velocity and depth
+    // stay point-sampled: interpolating either across a silhouette invents a
+    // surface at neither depth, moving at neither speed.
     bindGroup.setTexture('inputTexture', inputColorTexture, fetchSampler('clamp_linear_nomip'));
     bindGroup.setTexture('motionVectorTexture', motionVectorTexture, nearest);
     bindGroup.setTexture('linearDepthTexture', linearDepthTexture, nearest);
@@ -441,8 +474,19 @@ export class MotionBlur extends AbstractPostEffect {
     this._texSize.setXY(motionVectorTexture.width, motionVectorTexture.height);
     bindGroup.setValue('texSize', this._texSize);
     bindGroup.setValue('strength', this._intensity);
-    bindGroup.setValue('maxBlurLength', maxBlurLength(this._shutterBias));
+    bindGroup.setValue('maxBlurLength', this._maxBlurLength);
     bindGroup.setValue('shutterBias', this._shutterBias);
+    // Split the streak between the two directions and give each the steps its
+    // own share needs. The strides are resolved here rather than in the shader
+    // so that a direction with no share divides by nothing.
+    const spanBack = this._maxBlurLength * this._shutterBias;
+    const spanFwd = this._maxBlurLength * (1 - this._shutterBias);
+    const stepsBack = walkStepsFor(spanBack);
+    const stepsFwd = walkStepsFor(spanFwd);
+    bindGroup.setValue('stepsBack', stepsBack);
+    bindGroup.setValue('stepsFwd', stepsFwd);
+    bindGroup.setValue('dtBack', stepsBack > 0 ? this._shutterBias / stepsBack : 0);
+    bindGroup.setValue('dtFwd', stepsFwd > 0 ? (1 - this._shutterBias) / stepsFwd : 0);
     // Linear depth is stored normalized against the far plane; the filter
     // compares depths in view-space units so the extent above is scene units.
     bindGroup.setValue('cameraFar', ctx.camera.getFarPlane());
@@ -463,16 +507,17 @@ export class MotionBlur extends AbstractPostEffect {
           this.tileCount = pb.float().uniform(0);
           this.strength = pb.float().uniform(0);
           this.maxBlurLength = pb.float().uniform(0);
+          this.tileSize = pb.float().uniform(0);
           this.$outputs.outColor = pb.vec4();
           pb.main(function () {
             // Destination is one texel per tile column but keeps the source
             // height, so the row index maps straight through.
             this.$l.tileX = pb.floor(pb.mul(this.$inputs.uv.x, this.tileCount));
             this.$l.srcY = pb.floor(pb.mul(this.$inputs.uv.y, this.srcSize.y));
-            this.$l.baseX = pb.mul(this.tileX, TILE_SIZE);
+            this.$l.baseX = pb.mul(this.tileX, this.tileSize);
             this.$l.best = pb.vec2(0);
             this.$l.bestLen = pb.float(0);
-            this.$for(pb.float('i'), 0, TILE_SIZE, function () {
+            this.$for(pb.float('i'), 0, this.tileSize, function () {
               this.$l.srcUV = pb.div(
                 pb.add(pb.vec2(pb.add(this.baseX, this.i), this.srcY), pb.vec2(0.5)),
                 this.srcSize
@@ -501,16 +546,17 @@ export class MotionBlur extends AbstractPostEffect {
           this.srcTexture = pb.tex2D().uniform(0);
           this.srcSize = pb.vec2().uniform(0);
           this.tileCount = pb.float().uniform(0);
+          this.tileSize = pb.float().uniform(0);
           this.$outputs.outColor = pb.vec4();
           pb.main(function () {
             // Source already holds one texel per tile column, so the column
             // index maps straight through and only rows are reduced here.
             this.$l.srcX = pb.floor(pb.mul(this.$inputs.uv.x, this.srcSize.x));
             this.$l.tileY = pb.floor(pb.mul(this.$inputs.uv.y, this.tileCount));
-            this.$l.baseY = pb.mul(this.tileY, TILE_SIZE);
+            this.$l.baseY = pb.mul(this.tileY, this.tileSize);
             this.$l.best = pb.vec2(0);
             this.$l.bestLen = pb.float(0);
-            this.$for(pb.float('i'), 0, TILE_SIZE, function () {
+            this.$for(pb.float('i'), 0, this.tileSize, function () {
               this.$l.srcUV = pb.div(
                 pb.add(pb.vec2(this.srcX, pb.add(this.baseY, this.i)), pb.vec2(0.5)),
                 this.srcSize
@@ -588,14 +634,16 @@ export class MotionBlur extends AbstractPostEffect {
         this.strength = pb.float().uniform(0);
         this.maxBlurLength = pb.float().uniform(0);
         this.shutterBias = pb.float().uniform(0);
+        this.stepsBack = pb.float().uniform(0);
+        this.stepsFwd = pb.float().uniform(0);
+        this.dtBack = pb.float().uniform(0);
+        this.dtFwd = pb.float().uniform(0);
         this.cameraFar = pb.float().uniform(0);
         this.srgbOut = pb.int().uniform(0);
         this.$outputs.outColor = pb.vec4();
 
-        // How much of a streak of length `len` still covers a point `dist`
-        // pixels away. Velocities are floored at half a pixel so a static
-        // sample cannot divide by zero; at that length the cone is already
-        // zero everywhere outside the pixel itself.
+        // Coverage of a streak of length `len` at a point `dist` away. The half
+        // pixel floor keeps a static sample from dividing by zero.
         pb.func('Z_mbCone', [pb.float('dist'), pb.float('len')], function () {
           this.$return(pb.clamp(pb.sub(1, pb.div(this.dist, pb.max(this.len, 0.5))), 0, 1));
         });
@@ -614,23 +662,26 @@ export class MotionBlur extends AbstractPostEffect {
           // against the RGBA-packed depth variant that backend uses.
           this.$return(pb.mul(pb.textureSampleLevel(this.linearDepthTexture, this.uv, 0).r, this.cameraFar));
         });
+        // Velocity to advance the walk by: the field where there is one, else the
+        // dilated vector. That fallback is what starts a walk at all - a
+        // background pixel has no velocity of its own to leave on.
+        pb.func('Z_mbFlowAt', [pb.vec2('uv'), pb.vec2('vFallback')], function () {
+          this.$l.v = processVelocity(
+            this,
+            pb.textureSampleLevel(this.motionVectorTexture, this.uv, 0).xy,
+            this.texSize,
+            this.strength,
+            this.maxBlurLength
+          );
+          this.$l.len = pb.length(pb.mul(this.v, this.texSize));
+          this.$return(this.$choice(pb.greaterThan(this.len, 0.5), this.v, this.vFallback));
+        });
         // One tap of the reconstruction filter, returning the weighted colour
         // in rgb and the weight in a.
         pb.func(
           'Z_mbTap',
-          [
-            pb.vec2('uv'),
-            pb.vec2('vStep'),
-            pb.float('t'),
-            pb.float('lenStep'),
-            pb.float('zC'),
-            pb.float('lenC')
-          ],
+          [pb.vec2('sampleUV'), pb.float('dist'), pb.float('zC'), pb.float('lenC')],
           function () {
-            this.$l.sampleUV = pb.clamp(pb.add(this.uv, pb.mul(this.vStep, this.t)), pb.vec2(0), pb.vec2(1));
-            // The offset is vStep * t, so its pixel length follows directly
-            // from the length of the velocity we stepped along.
-            this.$l.dist = pb.mul(pb.abs(this.t), this.lenStep);
             this.$l.zS = this.Z_mbLinearDepth(this.sampleUV);
             this.$l.vS = processVelocity(
               this,
@@ -659,8 +710,8 @@ export class MotionBlur extends AbstractPostEffect {
           this.$l.uv = this.$inputs.uv;
           this.$l.sourceSample = pb.textureSampleLevel(this.inputTexture, this.uv, 0);
           this.$l.color = this.sourceSample.rgb;
-          // Dilated velocity of the tile neighbourhood: non-zero even where the
-          // pixel itself is static but fast geometry passes close by.
+          // Dilated tile velocity: non-zero even where the pixel is static but
+          // fast geometry passes close by.
           this.$l.vN = pb.textureSampleLevel(this.neighborMaxTexture, this.uv, 0).xy;
           this.$l.lenN = pb.length(pb.mul(this.vN, this.texSize));
           this.$if(pb.greaterThan(this.lenN, 0.5), function () {
@@ -671,48 +722,115 @@ export class MotionBlur extends AbstractPostEffect {
               this.strength,
               this.maxBlurLength
             );
-            // Floored at half a pixel, as the paper floors the stored velocity
-            // itself: a sharp centre must still get a finite, large self weight
-            // rather than an infinite one.
+            // Floored at half a pixel, as the paper floors the stored velocity:
+            // a sharp centre needs a large but finite self weight.
             this.$l.lenC = pb.max(pb.length(pb.mul(this.vC, this.texSize)), 0.5);
             this.$l.zC = this.Z_mbLinearDepth(this.uv);
             // The sharper this pixel is, the more of its own colour it keeps.
             this.$l.weight = pb.div(1, this.lenC);
             this.$l.sum = pb.mul(this.sourceSample.rgb, this.weight);
-            // Every tap walks the dilated tile velocity, never this pixel's own.
-            // That is what lets a static pixel gather from the moving geometry
-            // beside it, and it is the whole reason the dilation exists: a pixel
-            // stepping along its own velocity would, where that velocity is
-            // zero, sample nothing but itself.
-            this.$for(pb.float('i'), 0, NUM_TAPS / 2, function () {
-              this.$l.k0 = pb.mul(this.i, 2);
-              // t spans a unit interval against a whole-frame velocity, the same
-              // sweep as the paper's [-1, 1] against the half velocity it
-              // stores: one frame of movement at strength 1. shutterBias slides
-              // that interval without resizing it, from [0, 1] (streak wholly
-              // behind the object) through [-0.5, 0.5] (centred, the paper's
-              // placement) to [-1, 0].
-              //
-              // The taps run downstream while the streak they paint runs
-              // upstream, which is the usual gather/scatter inversion: a pixel
-              // that the object has already left finds that object ahead of it.
-              //
-              // Deliberately unjittered, which the paper is not. Dithering the
-              // tap positions trades ghosting for noise, and the noise is worse
-              // here than the arithmetic suggests: a tap's weight is built from
-              // the velocity and depth *at the tap*, both necessarily
-              // point-sampled, so a sub-pixel shift flips them across a
-              // silhouette wholesale. Measured on post-motionblur-object it put
-              // a +/-12% one-pixel speckle along every blurred edge, and
-              // filtering the colour does not touch it because the jump is in
-              // the weight. NUM_TAPS is raised instead, to keep the taps dense
-              // enough that there is no ghosting left to dither away.
-              this.$l.t0 = pb.sub(pb.div(pb.add(this.k0, 1), NUM_TAPS + 1), this.shutterBias);
-              this.$l.t1 = pb.sub(pb.div(pb.add(this.k0, 2), NUM_TAPS + 1), this.shutterBias);
-              this.$l.tap0 = this.Z_mbTap(this.uv, this.vN, this.t0, this.lenN, this.zC, this.lenC);
-              this.$l.tap1 = this.Z_mbTap(this.uv, this.vN, this.t1, this.lenN, this.zC, this.lenC);
-              this.sum = pb.add(this.sum, this.tap0.rgb, this.tap1.rgb);
-              this.weight = pb.add(this.weight, this.tap0.a, this.tap1.a);
+            // Four walks leave the pixel: backwards into the points arriving
+            // here during the shutter, forwards into the ones this pixel's
+            // motion carries it onto, each doubled across the streak.
+            //
+            // They follow the velocity field rather than a straight line. A
+            // point Y covers this pixel only if X - Y runs along Y's own
+            // velocity; translation makes that locus a line, self-rotation
+            // curves it into an arc, and a straight walk cuts across the arc,
+            // catching a different set of points at every pixel - the crack a
+            // spinning object shows. Re-reading the field each step follows the
+            // arc, and reduces to the straight line when the field is uniform.
+            //
+            // The doubling averages over silhouette tangency, where a lone walk
+            // loses several taps at once for a one-pixel shift. Its offset is
+            // perpendicular to the motion, which a blur must not smear along,
+            // so it stays as narrow as the tangency allows.
+            //
+            // shutterBias splits the streak between the two directions, each
+            // getting steps in proportion. A direction with no share must take
+            // none: zero-length steps park every tap on the centre at distance
+            // zero, where cone, cylinder and the depth test all peak, spending
+            // the heaviest weight in the filter on the pixel's own colour.
+            this.$l.nrmN = pb.normalize(this.vN);
+            this.$l.lane = pb.div(
+              pb.mul(pb.vec2(pb.neg(this.nrmN.y), this.nrmN.x), RIBBON_WIDTH),
+              this.texSize
+            );
+            this.$l.posBack = this.uv;
+            this.$l.posFwd = this.uv;
+            this.$l.posBack2 = this.uv;
+            this.$l.posFwd2 = this.uv;
+            // Arc length walked, in pixels: the weights compare it against a
+            // sample speed, so it must follow the curve, not the chord.
+            this.$l.arcBack = pb.float(0);
+            this.$l.arcFwd = pb.float(0);
+            this.$l.arcBack2 = pb.float(0);
+            this.$l.arcFwd2 = pb.float(0);
+            // Direction carried between steps, seeded with the dilated vector.
+            // Carried rather than re-seeded so that leaving the geometry again
+            // does not kink the path mid-arc.
+            this.$l.flowBack = this.vN;
+            this.$l.flowFwd = this.vN;
+            this.$l.flowBack2 = this.vN;
+            this.$l.flowFwd2 = this.vN;
+            // The lanes separate with distance rather than running parallel:
+            // coincident at the pixel, where sharpness shows, and a few pixels
+            // apart far along the streak, where the tangency needs averaging.
+            this.$for(pb.float('i'), 0, this.stepsBack, function () {
+              this.$l.spread = pb.mul(this.lane, pb.div(pb.add(this.i, 1), this.stepsBack));
+
+              this.flowBack = this.Z_mbFlowAt(this.posBack, this.flowBack);
+              this.$l.stepBack = pb.mul(this.flowBack, pb.neg(this.dtBack));
+              this.posBack = pb.clamp(pb.add(this.posBack, this.stepBack), pb.vec2(0), pb.vec2(1));
+              this.arcBack = pb.add(this.arcBack, pb.length(pb.mul(this.stepBack, this.texSize)));
+              this.$l.tapBack = this.Z_mbTap(
+                pb.add(this.posBack, this.spread),
+                this.arcBack,
+                this.zC,
+                this.lenC
+              );
+
+              this.flowBack2 = this.Z_mbFlowAt(this.posBack2, this.flowBack2);
+              this.$l.stepBack2 = pb.mul(this.flowBack2, pb.neg(this.dtBack));
+              this.posBack2 = pb.clamp(pb.add(this.posBack2, this.stepBack2), pb.vec2(0), pb.vec2(1));
+              this.arcBack2 = pb.add(this.arcBack2, pb.length(pb.mul(this.stepBack2, this.texSize)));
+              this.$l.tapBack2 = this.Z_mbTap(
+                pb.sub(this.posBack2, this.spread),
+                this.arcBack2,
+                this.zC,
+                this.lenC
+              );
+
+              this.sum = pb.add(this.sum, this.tapBack.rgb, this.tapBack2.rgb);
+              this.weight = pb.add(this.weight, this.tapBack.a, this.tapBack2.a);
+            });
+            this.$for(pb.float('i'), 0, this.stepsFwd, function () {
+              this.$l.spread = pb.mul(this.lane, pb.div(pb.add(this.i, 1), this.stepsFwd));
+
+              this.flowFwd = this.Z_mbFlowAt(this.posFwd, this.flowFwd);
+              this.$l.stepFwd = pb.mul(this.flowFwd, this.dtFwd);
+              this.posFwd = pb.clamp(pb.add(this.posFwd, this.stepFwd), pb.vec2(0), pb.vec2(1));
+              this.arcFwd = pb.add(this.arcFwd, pb.length(pb.mul(this.stepFwd, this.texSize)));
+              this.$l.tapFwd = this.Z_mbTap(
+                pb.add(this.posFwd, this.spread),
+                this.arcFwd,
+                this.zC,
+                this.lenC
+              );
+
+              this.flowFwd2 = this.Z_mbFlowAt(this.posFwd2, this.flowFwd2);
+              this.$l.stepFwd2 = pb.mul(this.flowFwd2, this.dtFwd);
+              this.posFwd2 = pb.clamp(pb.add(this.posFwd2, this.stepFwd2), pb.vec2(0), pb.vec2(1));
+              this.arcFwd2 = pb.add(this.arcFwd2, pb.length(pb.mul(this.stepFwd2, this.texSize)));
+              this.$l.tapFwd2 = this.Z_mbTap(
+                pb.sub(this.posFwd2, this.spread),
+                this.arcFwd2,
+                this.zC,
+                this.lenC
+              );
+
+              this.sum = pb.add(this.sum, this.tapFwd.rgb, this.tapFwd2.rgb);
+              this.weight = pb.add(this.weight, this.tapFwd.a, this.tapFwd2.a);
             });
             this.color = pb.div(this.sum, pb.max(this.weight, 1e-5));
           });

@@ -1,4 +1,4 @@
-import { Vector3, Vector4 } from '@zephyr3d/base';
+import { Quaternion, Vector3, Vector4 } from '@zephyr3d/base';
 import { BoxShape, Mesh, PlaneShape, SphereShape, UnlitMaterial } from '@zephyr3d/scene';
 import type { VisualScene } from '../types';
 import { bareScene, keyLight, lambert, pbr, placeCamera, proceduralTexture, shadowStage } from './common';
@@ -241,6 +241,123 @@ export const postMotionBlurTrailing: VisualScene = {
     camera.motionBlur = true;
     camera.motionBlurStrength = 1;
     camera.motionBlurShutterBias = 0;
+    camera.toneMap = false;
+    placeCamera(camera, new Vector3(0, 0, 7));
+  }
+};
+
+/**
+ * A cube spinning about its own axis under a still camera, at a strength high
+ * enough to saturate the velocity clamp.
+ *
+ * This is the case that forced the reconstruction to walk the velocity field
+ * instead of a straight line, and the scene that measures whether it still
+ * does. A self-rotating object is the one motion where the velocity turns
+ * across the object, so the locus of points that sweep over a given pixel
+ * curves; walk it straight and the streak tears along thin dark cracks
+ * parallel to the blur direction. Translation never produces this, which is
+ * why the other three scenes stayed clean throughout.
+ *
+ * Measured here, as the maximum luminance dip across the crack on the scan
+ * line through it: 47 for the straight-line walk this replaced, 35 once the
+ * walk followed the field, 19 once each direction was walked twice to either
+ * side. A regression that reintroduces the straight walk shows up as that dip
+ * roughly tripling.
+ *
+ * Approaches that did NOT work, each measured on this scene - do not
+ * re-attempt without new evidence:
+ *
+ *  - filtering the NeighborMax lookup instead of point-sampling it (dip 48 ->
+ *    56; Guertin et al. section 4.2 explains why - the average of two
+ *    directions is not a direction anything moves along)
+ *  - stochastically offsetting the tile lookup (no change, adds noise)
+ *  - jittering tap positions along the streak (47 -> 58, adds noise)
+ *  - offsetting the whole tap line perpendicular by a per-pixel random amount
+ *    (no change - a single random offset per pixel resamples the profile
+ *    rather than averaging over it, so the dip survives intact and only moves)
+ *  - splitting taps between the dilated and the per-pixel velocity, per
+ *    Guertin et al. (no change here: a background pixel has no velocity of its
+ *    own, so both directions collapse to the dilated one)
+ *  - quadrupling the tap count to 96 (47 -> 44, so never a sampling rate
+ *    problem)
+ *
+ * Strength 2 rather than 1, because the artifact needs a long streak: it is
+ * absent at 0.5 and appears from 1 upwards. Its severity jumps around rather
+ * than growing smoothly with strength, which is the signature of a geometric
+ * grazing effect - it depends on whether an edge happens to line up, not on
+ * how long the streak is.
+ *
+ * Black background and no backdrop, deliberately: only an empty background
+ * shows a hole in the smear as a hole. Over a textured backdrop the same gap
+ * fills with backdrop colour and reads as ordinary translucency, which is why
+ * the first version of this scene missed the artifact entirely.
+ */
+export const postMotionBlurRotation: VisualScene = {
+  name: 'post-motionblur-rotation',
+  description:
+    'A spinning cube on black. Pins the curved-path walk that keeps a rotational streak from cracking.',
+  frames: 4,
+  setup({ scene, camera }) {
+    bareScene(scene);
+    keyLight(scene);
+
+    // Mid-tone albedo so the lit faces stay well short of clipping: a saturated
+    // white object hides exactly the intensity dips this scene is looking for.
+    const box = new Mesh(scene, new BoxShape({ size: 1.8 }), lambert(new Vector4(0.55, 0.5, 0.3, 1)));
+    let frame = 0;
+    scene.on('update', () => {
+      // Spin about the view axis, so the whole velocity field lies in the image
+      // plane and none of the swing is lost to foreshortening.
+      box.rotation.set(Quaternion.fromAxisAngle(Vector3.axisPZ(), frame * 0.3));
+      frame++;
+    });
+
+    camera.motionBlur = true;
+    camera.motionBlurStrength = 2;
+    camera.toneMap = false;
+    placeCamera(camera, new Vector3(0, 0, 7));
+  }
+};
+
+/**
+ * A fast box on black with the streak ceiling raised well past the default.
+ *
+ * Pins {@link MotionBlur.maxBlurLength} doing what it says, and the machinery
+ * that has to follow it. The velocity tiles, the loop bounds of both TileMax
+ * passes and the number of steps each walk takes are all derived from this one
+ * number at runtime rather than baked in, so a mistake in any of them shows up
+ * here and nowhere else: too small a tile and the streak loses its tail, too
+ * few steps and the taps thin out until the box ghosts into copies of itself
+ * instead of smearing.
+ *
+ * Measured when this was added: the smear reaches exactly `maxBlurLength / 2`
+ * beyond the geometry at a centred shutter, checked at 40, 80 and 160 against
+ * a fixed geometric edge. That is the invariant worth re-deriving if this
+ * baseline ever moves.
+ *
+ * Strength 4 against a box crossing ~32 px per frame asks for a 128 px streak,
+ * comfortably past the 80 px this scene allows, so the clamp is what sets the
+ * length and the scene measures the ceiling rather than the object's speed.
+ */
+export const postMotionBlurLong: VisualScene = {
+  name: 'post-motionblur-long',
+  description:
+    'A fast box on black with a raised streak ceiling. Pins maxBlurLength and the sizing derived from it.',
+  frames: 4,
+  setup({ scene, camera }) {
+    bareScene(scene);
+    keyLight(scene);
+
+    const box = new Mesh(scene, new BoxShape({ size: 1.4 }), lambert(new Vector4(0.85, 0.5, 0.25, 1)));
+    let frame = 0;
+    scene.on('update', () => {
+      box.position.setXYZ(-1.6 + frame * 0.5, 0, 0);
+      frame++;
+    });
+
+    camera.motionBlur = true;
+    camera.motionBlurStrength = 4;
+    camera.motionBlurMaxLength = 160;
     camera.toneMap = false;
     placeCamera(camera, new Vector3(0, 0, 7));
   }

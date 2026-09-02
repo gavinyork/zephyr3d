@@ -643,6 +643,28 @@ export function getCameraClass(): SerializableClass {
           }
         },
         {
+          name: 'MotionBlurMaxLength',
+          type: 'float',
+          phase: 1,
+          default: 40,
+          options: {
+            label: 'Max length (px)',
+            group: 'PostProcessing/MotionBlur',
+            animatable: true,
+            minValue: 4,
+            maxValue: 400
+          },
+          get(this: Camera, value) {
+            value.num[0] = this.motionBlurMaxLength;
+          },
+          set(this: Camera, value) {
+            this.motionBlurMaxLength = value.num[0];
+          },
+          isValid(this: Camera) {
+            return this.motionBlur;
+          }
+        },
+        {
           name: 'SSGIEnabled',
           type: 'bool',
           phase: 0,

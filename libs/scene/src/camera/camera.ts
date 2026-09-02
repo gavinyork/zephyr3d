@@ -299,6 +299,8 @@ export class Camera extends SceneNode {
   protected _motionBlurStrength: number;
   /** @internal Motion blur shutter bias. */
   protected _motionBlurShutterBias: number;
+  /** @internal Motion blur maximum streak length in pixels. */
+  protected _motionBlurMaxLength: number;
   /** @internal Bloom enable flag (via post effect). */
   protected _bloom: boolean;
   /** @internal Bloom post effect reference. */
@@ -543,6 +545,7 @@ export class Camera extends SceneNode {
     this._postEffectMotionBlur = new DRef();
     this._motionBlurStrength = 1;
     this._motionBlurShutterBias = 0.5;
+    this._motionBlurMaxLength = 40;
     this._bloom = false;
     this._postEffectBloom = new DRef();
     this._bloomMaxDownsampleLevels = 4;
@@ -783,6 +786,23 @@ export class Camera extends SceneNode {
       // The effect clamps; read it back so the camera and the effect cannot
       // disagree about what was actually applied.
       this._motionBlurShutterBias = this._postEffectMotionBlur.get()!.shutterBias;
+    }
+  }
+  /**
+   * Longest motion blur streak, in pixels at render resolution. This is the
+   * ceiling {@link Camera.motionBlurStrength} runs into; raising it costs
+   * samples in proportion. See {@link MotionBlur.maxBlurLength}.
+   */
+  get motionBlurMaxLength() {
+    return this._motionBlurMaxLength;
+  }
+  set motionBlurMaxLength(val) {
+    this._motionBlurMaxLength = val;
+    if (this._postEffectMotionBlur.get()) {
+      this._postEffectMotionBlur.get()!.maxBlurLength = val;
+      // The effect clamps; read it back so the camera and the effect cannot
+      // disagree about what was actually applied.
+      this._motionBlurMaxLength = this._postEffectMotionBlur.get()!.maxBlurLength;
     }
   }
   /**
@@ -2157,6 +2177,7 @@ export class Camera extends SceneNode {
       motionBlur.enabled = false;
       motionBlur.strength = this._motionBlurStrength;
       motionBlur.shutterBias = this._motionBlurShutterBias;
+      motionBlur.maxBlurLength = this._motionBlurMaxLength;
       this._postEffectMotionBlur.set(motionBlur);
       this._compositor.appendPostEffect(motionBlur);
     }

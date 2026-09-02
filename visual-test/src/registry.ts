@@ -25,7 +25,9 @@ import { oitABuffer, oitDualDepth, oitWeighted } from './scenes/oit';
 import {
   postFxaa,
   postMotionBlurCamera,
+  postMotionBlurLong,
   postMotionBlurObject,
+  postMotionBlurRotation,
   postMotionBlurTrailing,
   postToneMapBloom,
   taaMultiframe
@@ -90,8 +92,10 @@ export const SCENES: VisualScene[] = [
   postToneMapBloom,
   postFxaa,
   postMotionBlurObject,
+  postMotionBlurRotation,
   postMotionBlurCamera,
   postMotionBlurTrailing,
+  postMotionBlurLong,
   taaMultiframe,
   // Digital-human materials.
   skinSss,
