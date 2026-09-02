@@ -4,6 +4,8 @@ import { DialogRenderer } from '../../components/modal';
 import type { VFS } from '@zephyr3d/base';
 import { DlgSkeletonEditor } from './skeletoneditor';
 import type { SaveOptions } from '../../core/services/resource';
+import { ResourceService } from '../../core/services/resource';
+import { FilePicker } from '../../components/filepicker';
 
 export class DlgImportOptions extends DialogRenderer<SaveOptions[]> {
   protected _vfs: VFS;
@@ -11,6 +13,9 @@ export class DlgImportOptions extends DialogRenderer<SaveOptions[]> {
   protected _current: number;
   protected _modelNames: string[];
   protected _options: SaveOptions[];
+  protected _retargetPoseModes: number[];
+  protected _retargetPoseStatus: string[];
+  protected _retargetPoseLoading: boolean[];
   public static promptImportOptions(
     title: string,
     vfs: VFS,
@@ -33,6 +38,11 @@ export class DlgImportOptions extends DialogRenderer<SaveOptions[]> {
       importAnimations: model.animations.length > 0,
       importJointDynamics: model.jointDynamicsSpringBones.length > 0
     }));
+    this._retargetPoseModes = models.map((model) =>
+      model.skeletons.some((skeleton) => !!skeleton.retargetPose) ? 1 : 0
+    );
+    this._retargetPoseStatus = models.map(() => '');
+    this._retargetPoseLoading = models.map(() => false);
   }
   doRender(): void {
     const selected = [this._current] as [number];
@@ -75,6 +85,55 @@ export class DlgImportOptions extends DialogRenderer<SaveOptions[]> {
       if (ImGui.Button('Settings...')) {
         DlgSkeletonEditor.editSkeleton('SkeletonEditor', this._models[this._current].skeletons, 500, 500);
       }
+      const retargetPoseMode = [this._retargetPoseModes[this._current]] as [number];
+      if (ImGui.Combo('Retarget Pose', retargetPoseMode, ['Use Model Bind Pose', 'External GLB'])) {
+        this._retargetPoseModes[this._current] = retargetPoseMode[0];
+        this._retargetPoseStatus[this._current] = '';
+        if (retargetPoseMode[0] === 0) {
+          ResourceService.clearRetargetPose(this._models[this._current]);
+        }
+      }
+      if (this._retargetPoseModes[this._current] === 1) {
+        if (this._retargetPoseLoading[this._current]) {
+          ImGui.TextDisabled('Loading external pose...');
+        } else if (ImGui.Button('Choose Pose GLB...')) {
+          const modelIndex = this._current;
+          FilePicker.chooseFiles(false, '.glb,.vrm,.vrma').then(async (files) => {
+            if (files.length === 0) {
+              if (!this._models[modelIndex].skeletons.some((skeleton) => !!skeleton.retargetPose)) {
+                this._retargetPoseModes[modelIndex] = 0;
+              }
+              return;
+            }
+            this._retargetPoseLoading[modelIndex] = true;
+            this._retargetPoseStatus[modelIndex] = '';
+            try {
+              const referenceModel = await ResourceService.importRetargetPoseModel(files[0]);
+              try {
+                const result = ResourceService.applyRetargetPoseModel(
+                  this._models[modelIndex],
+                  referenceModel
+                );
+                this._retargetPoseStatus[modelIndex] =
+                  `${files[0].name}: ${result.skeletonCount} skeleton(s), ${result.jointCount} joint(s)`;
+              } finally {
+                referenceModel.dispose();
+              }
+            } catch (err) {
+              console.error(`Load retarget pose ${files[0].name} failed: ${err}`);
+              this._retargetPoseStatus[modelIndex] = `Failed: ${files[0].name}`;
+              if (!this._models[modelIndex].skeletons.some((skeleton) => !!skeleton.retargetPose)) {
+                this._retargetPoseModes[modelIndex] = 0;
+              }
+            } finally {
+              this._retargetPoseLoading[modelIndex] = false;
+            }
+          });
+        }
+        if (this._retargetPoseStatus[this._current]) {
+          ImGui.TextWrapped(this._retargetPoseStatus[this._current]);
+        }
+      }
     }
 
     // Animation option
@@ -111,7 +170,16 @@ export class DlgImportOptions extends DialogRenderer<SaveOptions[]> {
 
     ImGui.Separator();
     if (ImGui.Button('OK')) {
-      this.close(this._options);
+      const incompletePoseIndex = this._models.findIndex(
+        (model, index) =>
+          this._retargetPoseModes[index] === 1 && !model.skeletons.some((skeleton) => !!skeleton.retargetPose)
+      );
+      if (incompletePoseIndex >= 0) {
+        this._current = incompletePoseIndex;
+        this._retargetPoseStatus[incompletePoseIndex] = 'Choose a compatible pose GLB before importing';
+      } else {
+        this.close(this._options);
+      }
     }
     ImGui.SameLine();
     if (ImGui.Button('Cancel')) {
