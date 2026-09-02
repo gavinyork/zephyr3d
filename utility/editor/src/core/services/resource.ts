@@ -32,6 +32,63 @@ type SharedModelWithPreprocessOptions = SharedModel & {
 };
 
 export class ResourceService {
+  private static normalizeSkeletonJointName(name: string) {
+    const normalized = name.trim();
+    const separator = Math.max(normalized.lastIndexOf(':'), normalized.lastIndexOf('|'));
+    return normalized.slice(separator + 1).toLowerCase();
+  }
+  private static getUniqueJointMap(skeleton: AssetSkeleton) {
+    const result = new Map<string, AssetHierarchyNode>();
+    const duplicates = new Set<string>();
+    for (const joint of skeleton.joints) {
+      const name = ResourceService.normalizeSkeletonJointName(joint.name);
+      if (result.has(name)) {
+        result.delete(name);
+        duplicates.add(name);
+      } else if (!duplicates.has(name)) {
+        result.set(name, joint);
+      }
+    }
+    return result;
+  }
+  private static getSkeletonCompatibility(target: AssetSkeleton, reference: AssetSkeleton) {
+    const targetJointSet = new Set(target.joints);
+    const referenceJointSet = new Set(reference.joints);
+    const referenceByName = ResourceService.getUniqueJointMap(reference);
+    let nameMatches = 0;
+    let hierarchyMatches = 0;
+    const findSkeletonParent = (
+      joint: AssetHierarchyNode,
+      jointSet: Set<AssetHierarchyNode>
+    ): AssetHierarchyNode | null => {
+      let parent = joint.parent;
+      while (parent && !jointSet.has(parent)) {
+        parent = parent.parent;
+      }
+      return parent;
+    };
+    for (const targetJoint of target.joints) {
+      const referenceJoint = referenceByName.get(
+        ResourceService.normalizeSkeletonJointName(targetJoint.name)
+      );
+      if (!referenceJoint) {
+        continue;
+      }
+      nameMatches++;
+      const targetParent = findSkeletonParent(targetJoint, targetJointSet);
+      const referenceParent = findSkeletonParent(referenceJoint, referenceJointSet);
+      if (
+        (!targetParent && !referenceParent) ||
+        (targetParent &&
+          referenceParent &&
+          ResourceService.normalizeSkeletonJointName(targetParent.name) ===
+            ResourceService.normalizeSkeletonJointName(referenceParent.name))
+      ) {
+        hierarchyMatches++;
+      }
+    }
+    return { nameMatches, hierarchyMatches };
+  }
   private static getAssetHumanoidMapping(skeleton: AssetSkeleton) {
     const mapping =
       skeleton.humanoidJointMapping ??
@@ -99,16 +156,19 @@ export class ResourceService {
           ResourceService.getAssetHumanoidMapping(referenceSkeleton)
         );
         const semanticMatches = [...targetSemantic.keys()].filter((key) => referenceSemantic.has(key)).length;
-        const referenceNames = new Set(referenceSkeleton.joints.map((joint) => joint.name));
-        const nameMatches = targetSkeleton.joints.filter((joint) => referenceNames.has(joint.name)).length;
+        const { nameMatches, hierarchyMatches } = ResourceService.getSkeletonCompatibility(
+          targetSkeleton,
+          referenceSkeleton
+        );
         const minimumNameMatches = Math.max(
           1,
           Math.ceil(Math.min(targetSkeleton.joints.length, referenceSkeleton.joints.length) * 0.5)
         );
-        if (nameMatches < minimumNameMatches) {
+        const minimumHierarchyMatches = Math.ceil(nameMatches * 0.8);
+        if (nameMatches < minimumNameMatches || hierarchyMatches < minimumHierarchyMatches) {
           continue;
         }
-        const score = semanticMatches * 1000 + nameMatches;
+        const score = semanticMatches * 1000000 + hierarchyMatches * 1000 + nameMatches;
         if (score > bestScore) {
           bestScore = score;
           bestReference = referenceSkeleton;
@@ -124,9 +184,11 @@ export class ResourceService {
         scale: transform.scale.clone()
       }));
       const matchedTargetIndices = new Set<number>();
-      const referenceByName = new Map(bestReference.joints.map((joint) => [joint.name, joint]));
+      const referenceByName = ResourceService.getUniqueJointMap(bestReference);
       for (let i = 0; i < targetSkeleton.joints.length; i++) {
-        const referenceJoint = referenceByName.get(targetSkeleton.joints[i].name);
+        const referenceJoint = referenceByName.get(
+          ResourceService.normalizeSkeletonJointName(targetSkeleton.joints[i].name)
+        );
         const transform = referenceJoint
           ? ResourceService.cloneAssetPoseTransform(bestReference, referenceJoint)
           : null;
