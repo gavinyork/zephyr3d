@@ -106,7 +106,8 @@ type Programs = {
 type Globales = {
   programs: Programs;
   quad: Primitive;
-  noiseTextures: Map<number, Texture2D>;
+  /** Keyed `${size}:${randomSeed}`, since both select the contents. */
+  noiseTextures: Map<string, Texture2D>;
   butterflyTextures: Map<number, Texture2D>;
 };
 
@@ -456,14 +457,19 @@ export class FFTWaveGenerator extends Disposable implements WaveGenerator {
   /** @internal */
   private getNoiseTexture(size: number, randomSeed: number) {
     const device = getDevice();
-    let tex = FFTWaveGenerator._globals!.noiseTextures.get(size);
+    // Keyed on the seed as well as the size. Keying on size alone let the first
+    // generator of a given resolution decide the noise for every later one,
+    // silently discarding their seeds - two differently seeded oceans came out
+    // identical, and which seed won depended on creation order.
+    const key = `${size}:${randomSeed}`;
+    let tex = FFTWaveGenerator._globals!.noiseTextures.get(key);
     if (!tex) {
       tex = device.createTexture2D(device.type === 'webgl' ? 'rgba32f' : 'rg32f', size, size, {
         mipmapping: false
       })!;
-      tex.name = `noiseTex${size}`;
+      tex.name = `noiseTex${size}_${randomSeed}`;
       tex.update(this.getNoise2d(size, randomSeed, device.type === 'webgl'), 0, 0, size, size);
-      FFTWaveGenerator._globals!.noiseTextures.set(size, tex);
+      FFTWaveGenerator._globals!.noiseTextures.set(key, tex);
     }
     return tex;
   }

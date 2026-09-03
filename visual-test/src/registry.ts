@@ -26,6 +26,8 @@ import {
   waterCausticsMoving,
   waterCausticsOff,
   waterCausticsOn,
+  waterFoamStorm,
+  waterSubsurfaceBacklit,
   waterSurfaceGrazing
 } from './scenes/water';
 import { oitABuffer, oitDualDepth, oitWeighted } from './scenes/oit';
@@ -97,6 +99,8 @@ export const SCENES: VisualScene[] = [
   waterCausticsDeepBed,
   waterCausticsMoving,
   waterSurfaceGrazing,
+  waterSubsurfaceBacklit,
+  waterFoamStorm,
   // Transparency: one scene per OIT implementation.
   oitWeighted,
   oitABuffer,
