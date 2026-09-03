@@ -43,26 +43,75 @@ const MIN_SUN_ELEVATION = 0.15;
  * fully converged map would need.
  */
 const PHOTONS_PER_TEXEL = 4;
+/**
+ * Automatic edge fade width, as a fraction of the map half-extent.
+ *
+ * Matches the band the receiver used when the fade was hard-coded as a share of
+ * the map, so a scene that never touches the setting keeps the look it had at
+ * the ranges where that band was already wide enough.
+ */
+const AUTO_FADE_FRACTION = 0.2;
+/** Floor in meters under the automatic fade width. */
+const AUTO_FADE_MIN_DISTANCE = 3;
+/** Bounds on the share of the map half-extent the fade may consume. */
+const MIN_FADE_FRACTION = 0.001;
+const MAX_FADE_FRACTION = 0.9;
+/**
+ * Largest ratio between the fitted slice's two half-extents.
+ *
+ * The map is square, so an anisotropic slice gives its axes different world
+ * texel sizes and resolves the pattern at different frequencies along each.
+ */
+const MAX_SLICE_ASPECT = 2;
+/**
+ * Steps per octave the fitted half-extents are quantised to.
+ *
+ * Four costs at most 2^(1/4) - 19% of linear resolution - against a perfect fit,
+ * and keeps a level change small enough to pass as a slight change in sharpness
+ * rather than a pop.
+ */
+const SLICE_QUANTISE_STEPS = 4;
+/** Smallest half-extent in meters a fitted slice may shrink to. */
+const MIN_SLICE_EXTENT = 0.5;
+
+/**
+ * Rounds a fitted half-extent up onto a discrete ladder below `range`.
+ *
+ * The ladder is geometric and anchored at `range`, so a slice that is a whole
+ * fraction of the range - the common case of water that fills it - lands exactly
+ * on a level and never wastes anything.
+ *
+ * @internal
+ */
+function quantiseSliceExtent(half: number, range: number): number {
+  if (!(half > 0) || half >= range) {
+    return range;
+  }
+  const steps = Math.floor(Math.log2(range / half) * SLICE_QUANTISE_STEPS);
+  return range / Math.pow(2, steps / SLICE_QUANTISE_STEPS);
+}
 
 /**
  * CPU-side parameters describing the caustic map, uploaded to the light pass.
  *
- * The map is a single orthographic slice of light space centred on the camera.
- * `frameX`/`frameY` are the two axes perpendicular to the light direction, so a
- * world position projects into the map with two dot products and no matrix.
+ * The map is a single orthographic slice of light space, fitted to the water
+ * within range of the camera. `frameX`/`frameY` are the two axes perpendicular
+ * to the light direction, carrying the reciprocal of the slice's half-extent
+ * along each, so a world position projects into the map with two dot products
+ * and no matrix.
  *
  * @public
  */
 export interface WaterCausticUniforms {
-  /** (right.xyz, 1 / coverage radius) */
+  /** (right.xyz, 1 / half-extent along right) */
   frameX: Vector4;
-  /** (up.xyz, unused) */
+  /** (up.xyz, 1 / half-extent along up) */
   frameY: Vector4;
   /** (center.xyz, water surface level) */
   center: Vector4;
   /** (lightDir.xyz, 1 / max(-lightDir.y, MIN_SUN_ELEVATION)) */
   lightDir: Vector4;
-  /** (intensity, focal depth, defocus rate, 0) */
+  /** (intensity, focal depth, defocus rate, edge fade start in map-radius units) */
   params: Vector4;
   /** (sigma_t.xyz, 0) */
   extinction: Vector4;
@@ -112,8 +161,10 @@ export function createCausticSplatShader(waveGenerator: WaveGenerator): PBRender
       this.$outputs.photonWeight = pb.float();
       setupUniforms(this);
       pb.main(function () {
-        this.$l.invRadius = this.causticSplatParams.x;
-        this.$l.radius = pb.div(1, this.invRadius);
+        // Per-axis: the slice is fitted to the water, so its two half-extents
+        // are independent and the map is only square in texels.
+        this.$l.invRadius = pb.vec2(this.causticFrameX.w, this.causticFrameY.w);
+        this.$l.radius = pb.div(pb.vec2(1), this.invRadius);
         this.$l.focalDepth = this.causticSplatParams.y;
         this.$l.eta = this.causticSplatParams.z;
         this.$l.L = this.causticLightDir.xyz;
@@ -129,8 +180,8 @@ export function createCausticSplatShader(waveGenerator: WaveGenerator): PBRender
         this.$l.ndc = pb.mix(this.causticGridBounds.xy, this.causticGridBounds.zw, this.$inputs.photonUV);
         this.$l.planePos = pb.add(
           this.causticCenter.xyz,
-          pb.mul(this.causticFrameX.xyz, pb.mul(this.ndc.x, this.radius)),
-          pb.mul(this.causticFrameY.xyz, pb.mul(this.ndc.y, this.radius))
+          pb.mul(this.causticFrameX.xyz, pb.mul(this.ndc.x, this.radius.x)),
+          pb.mul(this.causticFrameY.xyz, pb.mul(this.ndc.y, this.radius.y))
         );
         // Sweep along the light direction onto the undisturbed water plane.
         this.$l.sweep = pb.div(pb.sub(this.waterLevel, this.planePos.y), this.L.y);
@@ -309,16 +360,16 @@ export function createCausticResolveShader(): PBRenderOptions {
         // This texel's world point on the slice, then where the previous frame
         // put that same point.
         this.$l.ndc = pb.sub(pb.mul(this.$inputs.uv, 2), pb.vec2(1));
-        this.$l.radius = pb.div(1, this.causticFrameX.w);
+        this.$l.radius = pb.div(pb.vec2(1), pb.vec2(this.causticFrameX.w, this.causticFrameY.w));
         this.$l.world = pb.add(
           this.causticCenter.xyz,
-          pb.mul(this.causticFrameX.xyz, pb.mul(this.ndc.x, this.radius)),
-          pb.mul(this.causticFrameY.xyz, pb.mul(this.ndc.y, this.radius))
+          pb.mul(this.causticFrameX.xyz, pb.mul(this.ndc.x, this.radius.x)),
+          pb.mul(this.causticFrameY.xyz, pb.mul(this.ndc.y, this.radius.y))
         );
         this.$l.rel = pb.sub(this.world, this.causticPrevCenter.xyz);
         this.$l.prevNDC = pb.mul(
           pb.vec2(pb.dot(this.rel, this.causticPrevFrameX.xyz), pb.dot(this.rel, this.causticPrevFrameY.xyz)),
-          this.causticPrevFrameX.w
+          pb.vec2(this.causticPrevFrameX.w, this.causticPrevFrameY.w)
         );
         this.$l.prevUV = pb.add(pb.mul(this.prevNDC, 0.5), pb.vec2(0.5));
         // Ground the camera has just scrolled into has no history at all.
@@ -687,28 +738,120 @@ export class WaterCausticsRenderer {
     const right = this._tmpRight;
     const up = this._tmpUp;
     const waterLevel = water.worldMatrix.m13;
-    const radius = Math.max(1, material.causticsRange);
+    const range = Math.max(1, material.causticsRange);
     const camera = ctx.camera.getWorldPosition();
-    // Centre the slice on the camera, projected onto the water plane.
     const center = this._tmpCenter.setXYZ(camera.x, waterLevel, camera.z);
-    // Snap the two in-plane components to whole texels so the map does not crawl
-    // as the camera moves; the component along the light direction is irrelevant
-    // because both projection and the photon sweep are invariant along it.
-    const texelSize = (2 * radius) / mapSize;
-    const alongRight = Math.round(Vector3.dot(center, right) / texelSize) * texelSize;
-    const alongUp = Math.round(Vector3.dot(center, up) / texelSize) * texelSize;
+    const cameraRight = Vector3.dot(center, right);
+    const cameraUp = Vector3.dot(center, up);
+    // The component along the light direction is arbitrary: both the projection
+    // into the map and the photon sweep are invariant along it.
     const alongDir = Vector3.dot(center, dir);
+
+    // Water region in light space. A world-axis-aligned rectangle projects to a
+    // parallelogram here, so its bounds come from the four corners; the map is a
+    // box in these coordinates, which is why the fit is done against the AABB
+    // rather than the parallelogram itself.
+    const region = material.region;
+    let regionMinR = Infinity;
+    let regionMaxR = -Infinity;
+    let regionMinU = Infinity;
+    let regionMaxU = -Infinity;
+    for (const [x, z] of [
+      [region.x, region.y],
+      [region.z, region.y],
+      [region.x, region.w],
+      [region.z, region.w]
+    ]) {
+      const r = x * right.x + waterLevel * right.y + z * right.z;
+      const v = x * up.x + waterLevel * up.y + z * up.z;
+      regionMinR = Math.min(regionMinR, r);
+      regionMaxR = Math.max(regionMaxR, r);
+      regionMinU = Math.min(regionMinU, v);
+      regionMaxU = Math.max(regionMaxU, v);
+    }
+    // Fit the slice to what the water can actually cast into, instead of always
+    // spending the map on a camera-centred square of `range`. A pool far smaller
+    // than the range used to leave most of the map permanently zero, and every
+    // wasted texel is resolution the caustics never get back.
+    //
+    // `causticsRange` becomes a cap on how far from the camera the map reaches
+    // rather than its literal half-extent.
+    let loR = Math.max(regionMinR, cameraRight - range);
+    let hiR = Math.min(regionMaxR, cameraRight + range);
+    let loU = Math.max(regionMinU, cameraUp - range);
+    let hiU = Math.min(regionMaxU, cameraUp + range);
+    if (hiR <= loR || hiU <= loU) {
+      // The water casts nowhere within range. Nothing will be drawn, but the
+      // slice still has to be finite: the receiver projects through it whatever
+      // the map holds, and the grid bounds below have to come out empty rather
+      // than inverted.
+      loR = cameraRight - range;
+      hiR = cameraRight + range;
+      loU = cameraUp - range;
+      hiU = cameraUp + range;
+    }
+    let halfR = Math.max(MIN_SLICE_EXTENT, (hiR - loR) * 0.5);
+    let halfU = Math.max(MIN_SLICE_EXTENT, (hiU - loU) * 0.5);
+    // The map is square, so an anisotropic slice gives its two axes different
+    // world texel sizes - the pattern then resolves at different frequencies
+    // along each, which reads as directional smearing. Capping the ratio keeps
+    // most of the fit while bounding that, and bounds the same asymmetry in the
+    // edge fade, whose band is a share of each axis.
+    halfR = Math.max(halfR, halfU / MAX_SLICE_ASPECT);
+    halfU = Math.max(halfU, halfR / MAX_SLICE_ASPECT);
+    // Quantise so the extent holds still while the camera moves. Texel snapping
+    // below only stops the map crawling if the texel size itself is stable; a
+    // continuously shrinking slice rescales the map every frame, which resamples
+    // the temporal history every frame and blurs away what it accumulated. The
+    // ladder is fine enough that a level change is a small change in sharpness,
+    // and the two common cases - a pool wholly inside the range, a sea wholly
+    // covering it - sit on a fixed level and never change at all.
+    halfR = Math.min(range, quantiseSliceExtent(halfR, range));
+    halfU = Math.min(range, quantiseSliceExtent(halfU, range));
+    // Snap each in-plane component to whole texels of its own axis so the map
+    // does not crawl as the camera moves.
+    const texelR = (2 * halfR) / mapSize;
+    const texelU = (2 * halfU) / mapSize;
+    const centerR = Math.round(((loR + hiR) * 0.5) / texelR) * texelR;
+    const centerU = Math.round(((loU + hiU) * 0.5) / texelU) * texelU;
     center.setXYZ(
-      right.x * alongRight + up.x * alongUp + dir.x * alongDir,
-      right.y * alongRight + up.y * alongUp + dir.y * alongDir,
-      right.z * alongRight + up.z * alongUp + dir.z * alongDir
+      right.x * centerR + up.x * centerU + dir.x * alongDir,
+      right.y * centerR + up.y * centerU + dir.y * alongDir,
+      right.z * centerR + up.z * centerU + dir.z * alongDir
     );
     const u = this._uniforms;
-    u.frameX.setXYZW(right.x, right.y, right.z, 1 / radius);
-    u.frameY.setXYZW(up.x, up.y, up.z, 0);
+    u.frameX.setXYZW(right.x, right.y, right.z, 1 / halfR);
+    u.frameY.setXYZW(up.x, up.y, up.z, 1 / halfU);
     u.center.setXYZW(center.x, center.y, center.z, waterLevel);
     u.lightDir.setXYZW(dir.x, dir.y, dir.z, 1 / Math.max(-dir.y, MIN_SUN_ELEVATION));
-    u.params.setXYZW(material.causticsIntensity, material.causticsDepth, material.causticsDefocus, 0);
+    // Edge fade, expressed to the receiver as the distance from the map centre
+    // the fade begins at, in units of the map half-extent. Resolving it here
+    // keeps the shader free of the extents and lets the auto width put a floor
+    // in meters under a band the map fraction alone would collapse.
+    //
+    // Only a border the range put there needs fading. Where the fit stopped at
+    // the water instead, the border already coincides with the region the
+    // receiver gates on, so a band there is at best a no-op - it lies outside
+    // the region, which reads neutral anyway - and at worst eats caustics from
+    // the last few meters of a pool the map now fits exactly.
+    const minHalf = Math.min(halfR, halfU);
+    const rangeLimited =
+      regionMinR < cameraRight - range ||
+      regionMaxR > cameraRight + range ||
+      regionMinU < cameraUp - range ||
+      regionMaxU > cameraUp + range;
+    const fadeDistance = !rangeLimited
+      ? 0
+      : material.causticsFadeDistance > 0
+        ? material.causticsFadeDistance
+        : Math.max(AUTO_FADE_MIN_DISTANCE, AUTO_FADE_FRACTION * minHalf);
+    const fadeFraction = Math.max(MIN_FADE_FRACTION, Math.min(MAX_FADE_FRACTION, fadeDistance / minHalf));
+    u.params.setXYZW(
+      material.causticsIntensity,
+      material.causticsDepth,
+      material.causticsDefocus,
+      1 - fadeFraction
+    );
     const extinction = material.extinction;
     u.extinction.setXYZW(extinction.x, extinction.y, extinction.z, 0);
     u.region.set(material.region);
@@ -716,35 +859,14 @@ export class WaterCausticsRenderer {
     // Map-NDC bounds of the water region, so the photon grid can be laid out
     // over just that. Projecting into the slice is invariant along the light and
     // the slice is normal to it, so a point on the water plane and the photon it
-    // launches share a map position: the region's four corners bound the grid
-    // exactly. The projection is affine, so four corners are enough.
-    const region = material.region;
-    const dy = waterLevel - center.y;
-    let minX = Infinity;
-    let minY = Infinity;
-    let maxX = -Infinity;
-    let maxY = -Infinity;
-    for (const [x, z] of [
-      [region.x, region.y],
-      [region.z, region.y],
-      [region.x, region.w],
-      [region.z, region.w]
-    ]) {
-      const rx = x - center.x;
-      const rz = z - center.z;
-      const nx = (rx * right.x + dy * right.y + rz * right.z) / radius;
-      const ny = (rx * up.x + dy * up.y + rz * up.z) / radius;
-      minX = Math.min(minX, nx);
-      minY = Math.min(minY, ny);
-      maxX = Math.max(maxX, nx);
-      maxY = Math.max(maxY, ny);
-    }
-    // Clamp to the map: photons outside it are rasterised away, and the fraction
-    // has to describe what is left or the normalisation drifts.
-    minX = Math.max(-1, Math.min(1, minX));
-    minY = Math.max(-1, Math.min(1, minY));
-    maxX = Math.max(-1, Math.min(1, maxX));
-    maxY = Math.max(-1, Math.min(1, maxY));
+    // launches share a map position: the region's light-space bounds carry over
+    // directly. Clamped to the map, because photons outside it are rasterised
+    // away and the fraction has to describe what is left or the normalisation
+    // drifts.
+    const minX = Math.max(-1, Math.min(1, (regionMinR - centerR) / halfR));
+    const maxX = Math.max(-1, Math.min(1, (regionMaxR - centerR) / halfR));
+    const minY = Math.max(-1, Math.min(1, (regionMinU - centerU) / halfU));
+    const maxY = Math.max(-1, Math.min(1, (regionMaxU - centerU) / halfU));
     this._gridBounds.setXYZW(minX, minY, maxX, maxY);
     // Share of the map the grid covers, which is what keeps calm water at 1.0:
     // the same photon count spread over a smaller area has to deposit

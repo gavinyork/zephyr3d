@@ -312,7 +312,7 @@ export function getWaterClass(manager: ResourceManager): SerializableClass {
         },
         {
           name: 'CausticsRange',
-          description: 'Half-extent in meters of the camera-centred area the caustic map covers',
+          description: 'Furthest distance in meters from the camera the caustic map reaches',
           type: 'float',
           default: 4,
           options: { minValue: 1, maxValue: 1000 },
@@ -324,6 +324,23 @@ export function getWaterClass(manager: ResourceManager): SerializableClass {
           },
           set(this: Water, value) {
             this.causticsRange = value.num[0];
+          }
+        },
+        {
+          name: 'CausticsFadeDistance',
+          description:
+            'Width in meters the caustics fade out over at the edge of the map, or 0 to derive it from the range',
+          type: 'float',
+          default: 0,
+          options: { minValue: 0, maxValue: 100 },
+          isHidden(this: Water) {
+            return !this.causticsEnabled;
+          },
+          get(this: Water, value) {
+            value.num[0] = this.causticsFadeDistance;
+          },
+          set(this: Water, value) {
+            this.causticsFadeDistance = value.num[0];
           }
         },
         {

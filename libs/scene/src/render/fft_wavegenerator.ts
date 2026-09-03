@@ -1126,9 +1126,7 @@ export class FFTWaveGenerator extends Disposable implements WaveGenerator {
       scope.dx_hy_dz_dxdz2 = pb.tex2D().uniform(uniformGroup);
       scope.sx_sz_dxdx_dzdz2 = pb.tex2D().uniform(uniformGroup);
     }
-    if (pb.shaderKind === 'fragment') {
-      scope.foamParams = pb.vec2().uniform(uniformGroup);
-    }
+    scope.foamParams = pb.vec2().uniform(uniformGroup);
   }
   /** {@inheritDoc WaveGenerator.calcVertexPositionAndNormal} */
   calcVertexPositionAndNormal(

@@ -98,6 +98,7 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
   private _causticsIntensity: number;
   private _causticsDepth: number;
   private _causticsRange: number;
+  private _causticsFadeDistance: number;
   private _causticsDefocus: number;
   private _causticsResolution: number;
   private _causticsPhotonResolution: number;
@@ -134,6 +135,7 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
     this._causticsIntensity = 1;
     this._causticsDepth = 4;
     this._causticsRange = 60;
+    this._causticsFadeDistance = 0;
     this._causticsDefocus = 0.12;
     this._causticsResolution = 512;
     this._causticsPhotonResolution = 0;
@@ -291,12 +293,38 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
   set causticsDepth(val: number) {
     this._causticsDepth = Math.max(0.01, val);
   }
-  /** Half-extent in meters of the camera-centred area the caustic map covers. */
+  /**
+   * Furthest distance in meters from the camera the caustic map reaches.
+   *
+   * A cap rather than a fixed extent: the map is fitted to the part of the water
+   * within this distance, so water smaller than it spends the whole map on the
+   * water instead of on empty margin. Raise it to light more of the scene, at
+   * the cost of resolution wherever the water is large enough to fill it.
+   */
   get causticsRange() {
     return this._causticsRange;
   }
   set causticsRange(val: number) {
     this._causticsRange = Math.max(1, val);
+  }
+  /**
+   * Width in meters of the band the pattern fades out over at the edge of the
+   * map, or 0 to derive it from {@link causticsRange}.
+   *
+   * The map covers a bounded area and the pattern has to reach the neutral 1.0
+   * outside it. Fading over a fixed fraction of the map ties that band to the
+   * range, which collapses it to almost nothing once the range is small - and a
+   * narrow band is exactly where the boundary starts reading as a hard line
+   * across the sea bed. Auto keeps the fraction but puts a floor under it in
+   * meters.
+   *
+   * Capped at 90% of the range, so a core of the map always survives.
+   */
+  get causticsFadeDistance() {
+    return this._causticsFadeDistance;
+  }
+  set causticsFadeDistance(val: number) {
+    this._causticsFadeDistance = Math.max(0, val);
   }
   /** How fast the caustic contrast falls off per meter away from {@link causticsDepth}. */
   get causticsDefocus() {

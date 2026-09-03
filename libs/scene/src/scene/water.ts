@@ -132,12 +132,27 @@ export class Water extends applyMixins(GraphNode, mixinDrawable) implements Draw
   set causticsDepth(val: number) {
     this.material.causticsDepth = val;
   }
-  /** Half-extent in meters of the camera-centred area the caustic map covers. */
+  /**
+   * Furthest distance in meters from the camera the caustic map reaches.
+   *
+   * A cap rather than a fixed extent: the map is fitted to the part of the water
+   * within this distance.
+   */
   get causticsRange() {
     return this.material.causticsRange;
   }
   set causticsRange(val: number) {
     this.material.causticsRange = val;
+  }
+  /**
+   * Width in meters of the band the caustics fade out over at the edge of the
+   * map, or 0 to derive it from {@link causticsRange}.
+   */
+  get causticsFadeDistance() {
+    return this.material.causticsFadeDistance;
+  }
+  set causticsFadeDistance(val: number) {
+    this.material.causticsFadeDistance = val;
   }
   /** {@inheritDoc SceneNode.update} */
   update(frameId: number, elapsedInSeconds: number) {
