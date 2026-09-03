@@ -3,6 +3,7 @@ import {
   BoxShape,
   DirectionalLight,
   FBMWaveGenerator,
+  FFTWaveGenerator,
   LambertMaterial,
   Mesh,
   PlaneShape,
@@ -175,6 +176,146 @@ export const waterCausticsOn = waterScene(
   true,
   'The same scene with caustics on. Pins the photon splat, its blur, and the light-path transmittance the caustic term folds into the sun. Must differ from water-caustics-off; if the two ever converge, the caustic map has gone uniform and the feature is dead.'
 );
+
+/**
+ * Steep waves seen nearly edge-on against a low sun, in scattering-heavy water.
+ *
+ * Every condition the forward-scattering term needs, at once, because it needs
+ * all of them: the eye almost along the direction the refracted sunlight
+ * continues in, crests tall enough to saturate the thickness ramp, and a medium
+ * whose single-scattering albedo is high enough for the light to come back out
+ * rather than be absorbed. `water-surface-grazing` has the first condition only
+ * in a thin band at the horizon and clear ocean water for the third, which is
+ * why the term is nearly invisible there and needs a scene of its own.
+ *
+ * The sky is deliberately dim relative to the sun. The ambient scattering term
+ * is driven by sky irradiance and would otherwise wash out the directional term
+ * this scene exists to pin - and washing it out is exactly the regression that
+ * would go unnoticed, since both terms carry the same medium hue.
+ */
+export const waterSubsurfaceBacklit: VisualScene = {
+  name: 'water-subsurface-backlit',
+  description:
+    'Steep waves edge-on against a low sun in turbid water. Pins the directional subsurface term: sunlight scattered forward through a crest towards the eye. Distinct from the ambient scattering term in that it needs the sun, the view direction and the wave height together - a regression that drops any one of the three leaves this scene flat while every other water baseline still passes.',
+  frames: 3,
+  setup({ scene, camera }) {
+    bareScene(scene);
+    // A sky to reflect - at this grazing an angle the surface is nearly all
+    // reflection, and without one the frame is black. The environment *light*
+    // stays a dim constant rather than an IBL of that sky, which keeps the
+    // ambient scattering term small so the directional one is what this
+    // baseline is measuring.
+    scene.env.sky.skyType = 'scatter';
+    scene.env.light.type = 'constant';
+    scene.env.light.ambientColor = new Vector4(0.05, 0.07, 0.09, 1);
+
+    // Just above the horizon, directly behind the water from the camera's point
+    // of view, so the refracted sun continues almost straight at the eye.
+    const light = new DirectionalLight(scene);
+    light.lookAt(new Vector3(0, 3, -60), Vector3.zero(), Vector3.axisPY());
+    light.color = new Vector4(1, 0.95, 0.85, 1);
+    light.intensity = 4;
+
+    const water = new Water(scene);
+    water.scale.setXYZ(120, 1, 120);
+    water.position.setXYZ(0, 0, 0);
+    // FFT rather than FBM, which every other water scene uses. FBM's base
+    // wavelength is fixed at 100 m, so at any sane amplitude its surface is
+    // flat to within a fraction of a degree - measured at 1e-4 off vertical -
+    // and a term gated on how steeply the surface tilts has nothing to work
+    // with. FFT's shortest cascade is metres across and genuinely steep. It is
+    // just as reproducible: its spectrum is seeded from randomSeed through a
+    // PRNG, not from anything ambient.
+    const waves = new FFTWaveGenerator();
+    waves.wind = new Vector2(6, 2);
+    waves.setWaveLength(0, 200);
+    waves.setWaveLength(1, 40);
+    waves.setWaveLength(2, 8);
+    waves.setWaveStrength(0, 0.4);
+    waves.setWaveStrength(1, 0.5);
+    waves.setWaveStrength(2, 0.6);
+    water.waveGenerator = waves;
+
+    // Turbid, shallow-tropical water: scattering comparable to absorption, so
+    // the single-scattering albedo is high and light that enters a crest comes
+    // back out instead of being swallowed.
+    water.material.absorption = new Vector3(0.25, 0.12, 0.1);
+    water.material.scattering = new Vector3(0.25, 0.45, 0.4);
+    water.causticsEnabled = false;
+
+    // A moderate downward angle, not a grazing one. Grazing maximises the
+    // alignment between the eye and the refracted sunlight, but it also drives
+    // Fresnel to 1, and a surface that is all reflection shows nothing of what
+    // came through it - the glow is there and drowned. Tilting down trades a
+    // little of that alignment for a surface that is mostly transmission, which
+    // is also where the effect appears in photographs.
+    placeCamera(camera, new Vector3(0, 3.2, 11), new Vector3(0, 0.1, -22));
+    camera.far = 400;
+  }
+};
+
+/**
+ * A storm sea under an overcast sky, close enough that individual crests break.
+ *
+ * Foam is the one part of the water that is not shaded like water: it is a dense
+ * scattering layer sitting on the surface, so it takes light diffusely, hides
+ * the specular reflection underneath, and hides the light coming up through the
+ * water column. Before this it was a flat white composited before the lights ran
+ * at all, which meant a breaking crest looked identical at noon, at sunset, and
+ * inside a shadow.
+ *
+ * The sky is overcast rather than clear, and the sun weak, so that most of what
+ * reaches the foam is ambient. That is deliberate: the ambient and direct paths
+ * are separate code, and a scene lit mostly by the sun would pin only one of
+ * them. Steep short cascades and a high croppiness are what make the surface
+ * actually fold - foam comes from the Jacobian of the displacement going
+ * negative, which gentle swell never does.
+ */
+export const waterFoamStorm: VisualScene = {
+  name: 'water-foam-storm',
+  description:
+    'A breaking storm sea under an overcast sky. Pins foam as a lit surface: diffuse response to both the sun and the ambient, suppression of the specular underneath it, and suppression of the water body scattering it covers. A regression that returns foam to a flat white composite leaves this scene bright but unlit, and identical whatever the lighting does.',
+  frames: 3,
+  setup({ scene, camera }) {
+    bareScene(scene);
+    scene.env.sky.skyType = 'scatter';
+    scene.env.light.type = 'ibl';
+
+    // Weak and high: an overcast day, where the ambient dominates.
+    const light = new DirectionalLight(scene);
+    light.lookAt(new Vector3(-10, 16, 12), Vector3.zero(), Vector3.axisPY());
+    light.color = new Vector4(1, 0.98, 0.95, 1);
+    light.intensity = 6;
+    light.castShadow = true;
+    light.shadow.applyQualityPreset('outdoor-large');
+
+    const water = new Water(scene);
+    water.scale.setXYZ(150, 1, 150);
+    water.position.setXYZ(0, 0, 0);
+    const waves = new FFTWaveGenerator();
+    waves.wind = new Vector2(14, 5);
+    waves.setWaveLength(0, 120);
+    waves.setWaveLength(1, 30);
+    waves.setWaveLength(2, 6);
+    waves.setWaveStrength(0, 0.7);
+    waves.setWaveStrength(1, 0.8);
+    waves.setWaveStrength(2, 0.9);
+    // Croppiness is the horizontal displacement that sharpens crests until they
+    // fold; without pushing it there is no foam to shade.
+    waves.setWaveCroppiness(0, -2.2);
+    waves.setWaveCroppiness(1, -2);
+    waves.setWaveCroppiness(2, -1.4);
+    waves.foamWidth = 1.1;
+    waves.foamContrast = 2.5;
+    water.waveGenerator = waves;
+    water.material.absorption = new Vector3(0.4, 0.14, 0.09);
+    water.material.scattering = new Vector3(0.06, 0.12, 0.15);
+    water.causticsEnabled = false;
+
+    placeCamera(camera, new Vector3(0, 5, 14), new Vector3(0, 1.5, -20));
+    camera.far = 500;
+  }
+};
 
 /**
  * A small pool over a deep floor, with the camera sliding sideways as it

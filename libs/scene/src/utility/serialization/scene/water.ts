@@ -314,7 +314,7 @@ export function getWaterClass(manager: ResourceManager): SerializableClass {
           name: 'CausticsRange',
           description: 'Half-extent in meters of the camera-centred area the caustic map covers',
           type: 'float',
-          default: 60,
+          default: 4,
           options: { minValue: 1, maxValue: 1000 },
           isHidden(this: Water) {
             return !this.causticsEnabled;
@@ -408,6 +408,34 @@ export function getWaterClass(manager: ResourceManager): SerializableClass {
           },
           set(this: Water, value) {
             this.material.refractionStrength = value.num[0];
+          }
+        },
+        {
+          name: 'SubsurfaceIntensity',
+          description:
+            'Strength of the sunlight scattered forward through a wave crest, which is what makes a backlit crest glow. Grazing views of a low sun show it; looking down at the water does not.',
+          type: 'float',
+          default: 1.5,
+          options: { animatable: true, minValue: 0, maxValue: 10 },
+          get(this: Water, value) {
+            value.num[0] = this.material.subsurfaceIntensity;
+          },
+          set(this: Water, value) {
+            this.material.subsurfaceIntensity = value.num[0];
+          }
+        },
+        {
+          name: 'SubsurfaceSteepness',
+          description:
+            'How sharply surface tilt gates the subsurface glow. Higher makes gentle swell glow too; lower restricts it to steep wave flanks.',
+          type: 'float',
+          default: 60,
+          options: { animatable: true, minValue: 0, maxValue: 100 },
+          get(this: Water, value) {
+            value.num[0] = this.material.subsurfaceSteepness;
+          },
+          set(this: Water, value) {
+            this.material.subsurfaceSteepness = value.num[0];
           }
         },
         {

@@ -49,6 +49,14 @@ const WATER_DISTANT_ROUGHNESS = 0.35;
 const REFRACT_REF_DEPTH = 4;
 /** Distance out to which the refraction offset keeps its authored strength. */
 const REFRACT_REF_DIST = 40;
+/**
+ * How far the surface normal bends the transmitted direction in the subsurface
+ * term. Zero would make the glow a pure "looking at the sun through the water"
+ * term with no shape to it; this is what lets the wave itself modulate it.
+ */
+const SSS_DISTORTION = 0.25;
+/** Falloff of the subsurface lobe. Higher keeps the glow closer to the sun. */
+const SSS_POWER = 4;
 
 export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight) {
   private static readonly FEATURE_MEDIUM_MODE = this.defineFeature();
@@ -95,6 +103,13 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
   private _causticsPhotonResolution: number;
   private _causticsBlurPasses: number;
   private _causticsTemporalStrength: number;
+  private _subsurfaceIntensity: number;
+  private _subsurfaceSteepness: number;
+  private readonly _subsurfaceParams: Vector4;
+  private _foamAmount: number;
+  private _foamFalloff: number;
+  private readonly _foamColor: Vector3;
+  private readonly _foamParams: Vector4;
   constructor() {
     super();
     this._region = new Vector4(-99999, -99999, 99999, 99999);
@@ -124,6 +139,25 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
     this._causticsPhotonResolution = 0;
     this._causticsBlurPasses = 2;
     this._causticsTemporalStrength = 0.85;
+    // Sized so a fully lit crest contributes about as much as the ambient
+    // scattering term already does, rather than to a picked-by-eye number. That
+    // term is albedo * irradiance / PI, and this one is albedo * sunEnergy *
+    // intensity at thickness 1, so an intensity near 1 puts the two on the same
+    // footing for a sun and sky of comparable strength.
+    this._subsurfaceIntensity = 1.5;
+    // Chosen against the backlit scene: at 4 the wave flanks carry the glow
+    // and the troughs stay dark, while 20 turns the whole sea into a lamp.
+    this._subsurfaceSteepness = 4;
+    this._subsurfaceParams = new Vector4();
+    // Coverage from the generator is a folded-surface measure, not an area
+    // fraction; these map it onto one. The falloff above 1 keeps light folding
+    // - the shoulder of a wave about to break - from reading as foam.
+    this._foamAmount = 1;
+    this._foamFalloff = 1.5;
+    // Slightly off-white and slightly blue: sea foam is water and air, and a
+    // pure white one reads as snow.
+    this._foamColor = new Vector3(0.92, 0.95, 0.97);
+    this._foamParams = new Vector4();
     this.cullMode = 'none';
     this.useFeature(WaterMaterial.FEATURE_MEDIUM_MODE, 'physical' as WaterMediumMode);
     //this.TAADisabled = true;
@@ -333,6 +367,84 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
   set causticsTemporalStrength(val: number) {
     this._causticsTemporalStrength = Math.max(0, Math.min(0.95, val));
   }
+  /**
+   * Strength of the sunlight scattered forward through a wave crest.
+   *
+   * This is the term that makes a backlit crest glow. It is authored rather than
+   * derived because the geometric thickness of a crest is far too small to
+   * scatter a visible amount on its own; the medium's albedo still supplies the
+   * colour, so raising this brightens the glow without shifting its hue. Set to
+   * 0 to disable.
+   */
+  get subsurfaceIntensity() {
+    return this._subsurfaceIntensity;
+  }
+  set subsurfaceIntensity(val: number) {
+    if (val !== this._subsurfaceIntensity) {
+      this._subsurfaceIntensity = Math.max(0, val);
+      this.uniformChanged();
+    }
+  }
+  /**
+   * How sharply surface tilt gates the subsurface glow.
+   *
+   * The glow is scaled by `(1 - normal.y) * subsurfaceSteepness`, clamped to 1,
+   * so this is the reciprocal of the tilt at which it saturates. Unitless, and
+   * larger than it looks like it should be: an ocean surface is nearly flat in
+   * these terms, with even a wind-driven flank only a few hundredths off
+   * vertical.
+   */
+  get subsurfaceSteepness() {
+    return this._subsurfaceSteepness;
+  }
+  set subsurfaceSteepness(val: number) {
+    if (val !== this._subsurfaceSteepness) {
+      this._subsurfaceSteepness = Math.max(0, val);
+      this.uniformChanged();
+    }
+  }
+  /**
+   * How much of a folded texel reads as foam.
+   *
+   * The wave generator reports where the surface has folded over on itself,
+   * which is a measure of the fold rather than of area; this scales it into a
+   * coverage fraction. 0 disables foam.
+   */
+  get foamAmount() {
+    return this._foamAmount;
+  }
+  set foamAmount(val: number) {
+    if (val !== this._foamAmount) {
+      this._foamAmount = Math.max(0, val);
+      this.uniformChanged();
+    }
+  }
+  /**
+   * Falloff applied to foam coverage before it is scaled.
+   *
+   * Above 1 this pushes light folding towards no foam at all, so only a crest
+   * that has genuinely broken shows any - which is what keeps a windy sea from
+   * turning uniformly white.
+   */
+  get foamFalloff() {
+    return this._foamFalloff;
+  }
+  set foamFalloff(val: number) {
+    if (val !== this._foamFalloff) {
+      this._foamFalloff = Math.max(0.01, val);
+      this.uniformChanged();
+    }
+  }
+  /** Diffuse albedo of the foam. */
+  get foamColor() {
+    return this._foamColor;
+  }
+  set foamColor(val: Vector3) {
+    if (!val.equalsTo(this._foamColor)) {
+      this._foamColor.set(val);
+      this.uniformChanged();
+    }
+  }
   /** @internal */
   private _updateMediumCoefficients() {
     this._extinction.setXYZ(
@@ -466,13 +578,21 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
       scope.displace = pb.float().uniform(2);
       scope.refractionStrength = pb.float().uniform(2);
       scope.ssrParams = pb.vec4().uniform(2);
+      // (intensity, 1 / full-scatter crest height, 0, 0)
+      scope.subsurfaceParams = pb.vec4().uniform(2);
+      // (coverage scale, coverage falloff, 0, 0)
+      scope.foamShadingParams = pb.vec4().uniform(2);
+      scope.foamColor = pb.vec3().uniform(2);
+      // Declared in both medium modes: the ramp only replaces the depth-driven
+      // absorption and scattering, while the subsurface term needs the medium's
+      // hue regardless of how those two are authored.
+      scope.mediumAlbedo = pb.vec3().uniform(2);
       if (this.mediumMode === 'ramp') {
         scope.depthMulti = pb.float().uniform(2);
         scope.scatterRampTex = pb.tex2D().uniform(2);
         scope.absorptionRampTex = pb.tex2D().uniform(2);
       } else {
         scope.mediumExtinction = pb.vec3().uniform(2);
-        scope.mediumAlbedo = pb.vec3().uniform(2);
       }
     }
     scope.$l.discardable = pb.or(
@@ -498,7 +618,10 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
         this.drawContext.materialFlags &
         (MaterialVaryingFlags.SCENE_STORE_ROUGHNESS | MaterialVaryingFlags.SCENE_STORE_NORMAL)
       ) {
-        scope.$l.outRoughness = pb.vec4(1, 1, 1, 0);
+        // The real roughness, not a constant 1. Anything reading this buffer to
+        // reflect the water - SSR on another surface - would otherwise treat a
+        // near-mirror sea as fully diffuse.
+        scope.$l.outRoughness = pb.vec4(pb.vec3(this.waterRoughness(scope, scope.$inputs.worldPos)), 0);
         this.outputFragmentColor(
           scope,
           scope.$inputs.worldPos,
@@ -512,6 +635,23 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
     } else {
       this.outputFragmentColor(scope, scope.$inputs.worldPos, null);
     }
+  }
+  /**
+   * Specular roughness of the surface at a world position.
+   *
+   * Distance fades the wave normals flat, and this hands that lost slope to the
+   * specular lobe instead of dropping it - a distant mirror aliases into
+   * crawling speckle. Shared with the scene roughness buffer so a surface
+   * reflecting the water sees the same value the water shades itself with.
+   */
+  waterRoughness(scope: PBInsideFunctionScope, worldPos: PBShaderExp) {
+    const pb = scope.$builder;
+    pb.func('waterRoughness', [pb.vec3('worldPos')], function () {
+      this.$l.dist = pb.length(pb.sub(this.worldPos, ShaderHelper.getCameraPosition(this)));
+      this.$l.normalScale = pb.clamp(pb.div(100, this.dist), 0, 1);
+      this.$return(pb.mix(WATER_DISTANT_ROUGHNESS, WATER_BASE_ROUGHNESS, this.normalScale));
+    });
+    return scope.waterRoughness(worldPos) as PBShaderExp;
   }
   waterShading(
     scope: PBInsideFunctionScope,
@@ -607,11 +747,7 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
         this.$l.normal = pb.normalize(
           pb.mul(this.worldNormal, pb.vec3(this.normalScale, 1, this.normalScale))
         );
-        // The slope the fade above discards is what used to break the sun's
-        // highlight into glitter. Hand that lost detail to the specular lobe
-        // instead of dropping it, or distant water becomes a mirror that
-        // aliases into a crawling speckle.
-        this.$l.roughness = pb.mix(WATER_DISTANT_ROUGHNESS, WATER_BASE_ROUGHNESS, this.normalScale);
+        this.$l.roughness = that.waterRoughness(this, this.worldPos);
         this.$l.wPos = ShaderHelper.samplePositionFromDepth(
           this,
           ShaderHelper.getLinearDepthTexture(this),
@@ -722,11 +858,19 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
         ).rgb;
         this.refraction = pb.mul(this.refraction, this.getAbsorption(this.depth));
         this.$l.fresnelTerm = this.fresnel(this.normal, pb.neg(this.eyeVecNorm));
-        this.$l.finalColor = pb.mix(
-          pb.mix(this.refraction, this.reflectance, this.fresnelTerm),
-          pb.vec3(1),
-          this.foamFactor
+        // Foam coverage. The generator reports where the surface has folded over
+        // on itself; the ramp turns that into how much of the texel is actually
+        // covered, so the two ends of a breaking crest can be tuned apart.
+        this.$l.foam = pb.clamp(
+          pb.mul(pb.pow(pb.clamp(this.foamFactor, 0, 1), this.foamShadingParams.y), this.foamShadingParams.x),
+          0,
+          1
         );
+        // Foam suppresses the specular lobe rather than adding to it: it is a
+        // dense scattering layer sitting on the water, and where it is thick the
+        // mirror underneath stops being visible at all.
+        this.fresnelTerm = pb.mul(this.fresnelTerm, pb.sub(1, this.foam));
+        this.$l.finalColor = pb.mix(this.refraction, this.reflectance, this.fresnelTerm);
         that.forEachLight(this, function (type, posRange, dirCutoff, colorIntensity, extra, shadow) {
           this.$l.lightAtten = that.calculateLightAttenuation(
             this,
@@ -738,12 +882,46 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
           );
           this.$l.lightDir = that.calculateLightDirection(this, type, this.worldPos, posRange, dirCutoff);
           this.$l.NoL = pb.clamp(pb.dot(this.normal, this.lightDir), 0, 1);
+          this.$l.lightEnergy = pb.mul(colorIntensity.rgb, colorIntensity.a, this.lightAtten);
           this.$l.lightContrib = this.lightSpecular(
             this.lightDir,
             this.eyeVecNorm,
             this.normal,
-            pb.mul(colorIntensity.rgb, colorIntensity.a, this.lightAtten),
+            this.lightEnergy,
             this.roughness
+          );
+          // Sunlight that entered the far side of a wave and scattered back out
+          // towards the eye. This is what makes a backlit crest glow, and it has
+          // to come from the light loop: the ambient scattering term below is
+          // built from the environment irradiance, which has no direction and so
+          // cannot produce it at all.
+          //
+          // Standard translucency approximation - the transmitted direction is
+          // the light continuing through the surface, bent by the normal, and
+          // the term peaks when the eye looks back along it.
+          this.$l.sssDir = pb.normalize(pb.add(pb.neg(this.lightDir), pb.mul(this.normal, SSS_DISTORTION)));
+          this.$l.sssFacing = pb.pow(pb.clamp(pb.dot(pb.neg(this.eyeVecNorm), this.sssDir), 0, 1), SSS_POWER);
+          // Crests glow and troughs do not: height above the undisplaced surface
+          // stands in for how much lit water the ray passed through. The medium's
+          // own albedo carries the hue, so this agrees with the colour the depth
+          // terms produce; the magnitude is authored, because a real crest is far
+          // too thin to scatter a visible amount on its own.
+          this.$l.sssThickness = pb.clamp(pb.mul(pb.sub(1, this.normal.y), this.subsurfaceParams.y), 0, 1);
+          this.lightContrib = pb.add(
+            this.lightContrib,
+            pb.mul(
+              this.lightEnergy,
+              this.mediumAlbedo,
+              pb.mul(this.sssFacing, this.sssThickness, this.subsurfaceParams.x)
+            )
+          );
+          // Foam is a rough dielectric layer, so it takes the light the way any
+          // matte surface does. Previously it replaced the water colour with a
+          // flat white before the lights ran at all, which left a breaking crest
+          // reading the same at noon, at sunset and in shadow.
+          this.lightContrib = pb.add(
+            this.lightContrib,
+            pb.mul(this.lightEnergy, this.foamColor, this.foam, this.NoL, 1 / Math.PI)
           );
           if (shadow) {
             // Water is a horizontal clipmap, so +Y is the geometric normal. The
@@ -755,8 +933,20 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
         });
         if (that.needCalculateEnvLight()) {
           this.$l.irradiance = that.getEnvLightIrradiance(this, this.normal);
-          this.$l.sss = pb.mul(this.getScattering(this.depth), this.irradiance, 1 / Math.PI);
+          // Scattering from the water body itself, and from the foam sitting on
+          // it. The water term is weighted away under foam because that light
+          // came up through the water column, which the foam is covering.
+          this.$l.sss = pb.mul(
+            this.getScattering(this.depth),
+            this.irradiance,
+            pb.sub(1, this.foam),
+            1 / Math.PI
+          );
           this.finalColor = pb.add(this.finalColor, this.sss);
+          this.finalColor = pb.add(
+            this.finalColor,
+            pb.mul(this.irradiance, this.foamColor, this.foam, 1 / Math.PI)
+          );
         }
         this.$return(this.finalColor);
       }
@@ -780,6 +970,12 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
       bindGroup.setValue('displace', this._displace);
       bindGroup.setValue('refractionStrength', this._refractionStrength);
       bindGroup.setValue('ssrParams', this._ssrParams);
+      this._subsurfaceParams.setXYZW(this._subsurfaceIntensity, this._subsurfaceSteepness, 0, 0);
+      bindGroup.setValue('subsurfaceParams', this._subsurfaceParams);
+      this._foamParams.setXYZW(this._foamAmount, this._foamFalloff, 0, 0);
+      bindGroup.setValue('foamShadingParams', this._foamParams);
+      bindGroup.setValue('foamColor', this._foamColor);
+      bindGroup.setValue('mediumAlbedo', this._scatterAlbedo);
       if (this.mediumMode === 'ramp') {
         bindGroup.setValue('depthMulti', this._depthMulti);
         bindGroup.setTexture(
@@ -794,7 +990,6 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
         );
       } else {
         bindGroup.setValue('mediumExtinction', this._extinction);
-        bindGroup.setValue('mediumAlbedo', this._scatterAlbedo);
       }
     }
     if (this.waveGenerator) {
