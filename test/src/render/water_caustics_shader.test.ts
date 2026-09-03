@@ -20,6 +20,7 @@ import type { DrawContext } from '../../../libs/scene/src/render/drawable';
 import type { WaveGenerator } from '../../../libs/scene/src/render/wavegenerator';
 import {
   createCausticBlurShader,
+  createCausticResolveShader,
   createCausticSplatShader
 } from '../../../libs/scene/src/render/water_caustics';
 
@@ -229,6 +230,47 @@ describe('water caustics splat shader', () => {
     const ret = pb.buildRender(createCausticBlurShader());
     expect(ret).not.toBeNull();
     expect(ret![1]).toContain('causticTexelSize');
+  });
+});
+
+describe('water caustics temporal resolve shader', () => {
+  test.each(DEVICE_TYPES)('builds the resolve program on %s', (type) => {
+    const pb = new ProgramBuilder(createMockDevice(type));
+    const ret = pb.buildRender(createCausticResolveShader());
+    expect(ret).not.toBeNull();
+    const fragmentSource = ret![1];
+    // Reprojection needs both frames' slices; dropping either silently turns the
+    // resolve into a plain blend that smears whenever the camera moves.
+    for (const uniform of [
+      'causticFrameX',
+      'causticPrevFrameX',
+      'causticPrevFrameY',
+      'causticPrevCenter'
+    ]) {
+      expect(fragmentSource).toContain(uniform);
+    }
+    expect(fragmentSource).toContain('causticHistory');
+  });
+
+  test.each(DEVICE_TYPES)('bounds the history by the current neighbourhood on %s', (type) => {
+    const pb = new ProgramBuilder(createMockDevice(type));
+    const fragmentSource = pb.buildRender(createCausticResolveShader())![1];
+    // Without the clamp a long blend smears the animated pattern instead of just
+    // stabilising it, which is the whole reason the blend can be this long.
+    expect(fragmentSource).toMatch(/clamp\s*\(/);
+    // Eight neighbours plus the centre, and one history tap.
+    const taps = fragmentSource.match(/textureSampleLevel|textureLod/g) ?? [];
+    expect(taps.length).toBe(10);
+  });
+
+  test.each(DEVICE_TYPES)('maps NDC to UV the way receivers do on %s', (type) => {
+    const pb = new ProgramBuilder(createMockDevice(type));
+    const fragmentSource = pb.buildRender(createCausticResolveShader())![1];
+    // The resolve reads and writes the same map the light pass samples, so it has
+    // to use that pass's `ndc * 0.5 + 0.5`. Inverting v here instead would put the
+    // reprojection a full map-height out on one backend only, which is the shape
+    // of bug that the even blur-pass count already hides once.
+    expect(fragmentSource).not.toMatch(/1(\.0)?\s*-\s*\(?\s*\w*[uU][vV]/);
   });
 });
 

@@ -59,6 +59,49 @@ function sun(scene: Scene) {
   return light;
 }
 
+/** Depth of the floor under the pool used by the deep-bed scenes. */
+const DEEP_BED_DEPTH = 6;
+
+/**
+ * A 16 m pool over a large, dark floor 6 m down, lit by a sun well off vertical.
+ *
+ * Shared by the two scenes built on it because the pool edge is the point of
+ * both: it is the only structure in the caustic map strong enough to make a
+ * misplaced lookup visible.
+ */
+function deepBed(scene: Scene, causticsEnabled: boolean) {
+  bareScene(scene);
+  scene.env.light.type = 'constant';
+  scene.env.light.ambientColor = new Vector4(0.1, 0.13, 0.16, 1);
+  const light = new DirectionalLight(scene);
+  // Low enough that depth / tan(elevation) is a large fraction of the pool size.
+  light.lookAt(new Vector3(-5, 7, 3), Vector3.zero(), Vector3.axisPY());
+  light.color = new Vector4(1, 0.97, 0.9, 1);
+  light.castShadow = true;
+  light.shadow.applyQualityPreset('outdoor-large');
+
+  const floor = new Mesh(scene, new PlaneShape({ size: 120 }), lambert(new Vector4(0.2, 0.34, 0.16, 1)));
+  floor.position.setXYZ(0, -DEEP_BED_DEPTH, 0);
+
+  const water = new Water(scene);
+  water.scale.setXYZ(8, 1, 8);
+  water.position.setXYZ(0, 0, 0);
+  const waves = new FBMWaveGenerator();
+  waves.numOctaves = 5;
+  waves.wind = new Vector2(0.35, 0.12);
+  waves.amplitude = 0.1;
+  waves.frequency = 8;
+  water.waveGenerator = waves;
+  // Very clear, or six metres of medium would black the floor out and hide
+  // exactly the shear these scenes exist to show.
+  water.material.absorption = new Vector3(0.08, 0.03, 0.02);
+  water.material.scattering = new Vector3(0.01, 0.015, 0.02);
+  water.causticsEnabled = causticsEnabled;
+  water.causticsDepth = DEEP_BED_DEPTH;
+  water.causticsRange = 30;
+  return water;
+}
+
 /** A water surface with deterministic, analytic waves. */
 function calmWater(scene: Scene, causticsEnabled: boolean) {
   const water = new Water(scene);
@@ -132,6 +175,49 @@ export const waterCausticsOn = waterScene(
   true,
   'The same scene with caustics on. Pins the photon splat, its blur, and the light-path transmittance the caustic term folds into the sun. Must differ from water-caustics-off; if the two ever converge, the caustic map has gone uniform and the feature is dead.'
 );
+
+/**
+ * A small pool over a deep floor, with the camera sliding sideways as it
+ * renders.
+ *
+ * The caustic map is centred on the camera, so moving the camera scrolls it, and
+ * the temporal resolve has to undo that scroll before it can reuse the previous
+ * map. No scene that builds itself once exercises that: a static camera makes
+ * the previous slice equal to the current one and the reprojection the identity,
+ * so a version reprojecting to entirely the wrong place passes every other
+ * baseline here.
+ *
+ * The small pool is what makes this measurable, and it took a wrong turn to
+ * find. Over open water the map is a stationary speckle field, and the resolve
+ * clamps the reprojected value into the current 3x3 range - so history fetched
+ * from completely the wrong texel still lands inside that range and still reads
+ * as a plausible, temporally smooth result. Deliberately negating the
+ * reprojection there moved the frame by 0.4/255 on average: the accumulation
+ * looked healthy either way. A pool inside a much larger map puts a hard edge in
+ * the field, and a misplaced fetch pulls lit values into unlit ground where no
+ * clamp can hide it.
+ *
+ * The step is a few map texels per frame: far enough for a sign error to land
+ * well outside the clamp, close enough that most of the map still has history.
+ */
+export const waterCausticsMoving: VisualScene = {
+  name: 'water-caustics-moving',
+  description:
+    'A pool over a deep floor with a laterally moving camera. Pins the temporal resolve reprojection, which every other scene leaves as the identity. The pool edge is load-bearing: on open water the neighbourhood clamp makes even a completely wrong reprojection look plausible.',
+  frames: 6,
+  setup(ctx) {
+    deepBed(ctx.scene, true);
+    ctx.camera.far = 120;
+    this.onFrame!(ctx, 0);
+  },
+  onFrame({ camera }, frame) {
+    // Small steps on purpose: the map is centred on the camera, and walking far
+    // enough would push the pool out to the map's rim, where the photon grid
+    // stops covering it. That is a coverage limit of the pass, not a temporal
+    // one, and it would dominate what this scene is trying to show.
+    placeCamera(camera, new Vector3(14 + frame * 0.35, 22, 20), new Vector3(0, -DEEP_BED_DEPTH, 0));
+  }
+};
 
 /**
  * Open water seen at a grazing angle under a real sky, with the sun ahead.
@@ -219,39 +305,9 @@ export const waterCausticsDeepBed: VisualScene = {
   description:
     'A 16 m pool over a dark floor 6 m down, sun ~40 degrees off vertical. Pins that the caustic term is gated by where the sun ray entered the water, not by the receiver footprint: the shaded patch must be the pool outline sheared down-sun, with no dark band inside the outline and no unshaded band beyond it.',
   frames: 3,
-  setup({ scene, camera }) {
-    bareScene(scene);
-    scene.env.light.type = 'constant';
-    scene.env.light.ambientColor = new Vector4(0.1, 0.13, 0.16, 1);
-    const light = new DirectionalLight(scene);
-    // Low enough that depth / tan(elevation) is a large fraction of the pool size.
-    light.lookAt(new Vector3(-5, 7, 3), Vector3.zero(), Vector3.axisPY());
-    light.color = new Vector4(1, 0.97, 0.9, 1);
-    light.castShadow = true;
-    light.shadow.applyQualityPreset('outdoor-large');
-
-    const floorDepth = 6;
-    const floor = new Mesh(scene, new PlaneShape({ size: 120 }), lambert(new Vector4(0.2, 0.34, 0.16, 1)));
-    floor.position.setXYZ(0, -floorDepth, 0);
-
-    const water = new Water(scene);
-    water.scale.setXYZ(8, 1, 8);
-    water.position.setXYZ(0, 0, 0);
-    const waves = new FBMWaveGenerator();
-    waves.numOctaves = 5;
-    waves.wind = new Vector2(0.35, 0.12);
-    waves.amplitude = 0.1;
-    waves.frequency = 8;
-    water.waveGenerator = waves;
-    // Very clear, or six metres of medium would black the floor out and hide
-    // exactly the shear this scene exists to show.
-    water.material.absorption = new Vector3(0.08, 0.03, 0.02);
-    water.material.scattering = new Vector3(0.01, 0.015, 0.02);
-    water.causticsEnabled = true;
-    water.causticsDepth = floorDepth;
-    water.causticsRange = 30;
-
-    placeCamera(camera, new Vector3(14, 22, 20), new Vector3(0, -floorDepth, 0));
-    camera.far = 120;
+  setup(ctx) {
+    deepBed(ctx.scene, true);
+    placeCamera(ctx.camera, new Vector3(14, 22, 20), new Vector3(0, -DEEP_BED_DEPTH, 0));
+    ctx.camera.far = 120;
   }
 };

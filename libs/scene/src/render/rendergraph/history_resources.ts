@@ -13,5 +13,13 @@ export const RGHistoryResources = {
   /** First and second luminance moments used by the SSGI temporal filter. */
   SSGI_MOMENTS: 'ssgiMoments',
   /** Temporally accumulated screen space ambient occlusion traced alongside SSGI. */
-  SSGI_AO: 'ssgiAO'
+  SSGI_AO: 'ssgiAO',
+  /**
+   * Previous frame's resolved water caustic map.
+   *
+   * Reprojected in light space rather than screen space: the map is an
+   * orthographic slice perpendicular to the sun, so it needs no motion vectors
+   * and survives the camera turning on the spot.
+   */
+  WATER_CAUSTICS: 'waterCaustics'
 } as const;

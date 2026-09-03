@@ -45,6 +45,18 @@ export interface VisualScene {
   supports?: (backend: BackendId) => boolean;
   /** Build the scene. Must await every asset it needs. */
   setup: (ctx: SceneContext) => void | Promise<void>;
+  /**
+   * Called before each of the `frames` steps, with the zero-based frame index.
+   *
+   * For features whose whole point is that the view changes between frames -
+   * reprojection of any kind - a scene that only builds itself once cannot tell
+   * a working implementation from one that silently falls back to the current
+   * frame. Moving the camera here is what puts those paths under the baseline.
+   *
+   * Must be a pure function of the frame index, for the same reason `setup` must
+   * be pure: the harness replays scenes in arbitrary order.
+   */
+  onFrame?: (ctx: SceneContext, frame: number) => void;
   tolerance?: Tolerance;
 }
 
