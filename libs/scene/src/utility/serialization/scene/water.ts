@@ -412,7 +412,8 @@ export function getWaterClass(manager: ResourceManager): SerializableClass {
         },
         {
           name: 'Displace',
-          description: 'Vertex displacement scale for water waves',
+          description:
+            'How far the wave normals push the refracted background, in pixels. Reached in deep water close to the camera; shallower or further away it scales down.',
           type: 'float',
           default: 16,
           options: { minValue: 1, maxValue: 256 },

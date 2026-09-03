@@ -134,6 +134,72 @@ export const waterCausticsOn = waterScene(
 );
 
 /**
+ * Open water seen at a grazing angle under a real sky, with the sun ahead.
+ *
+ * The caustics scenes look almost straight down at a dull constant environment,
+ * which is the one configuration where the surface shading terms barely move.
+ * This one is built to be the opposite, and pins the four of them that the
+ * caustic scenes cannot see:
+ *
+ * - **Fresnel.** A grazing camera spans the whole incidence range in one frame,
+ *   from near-normal at its feet to near-tangent at the horizon, so the
+ *   reflection/refraction crossover is laid out across the image. It also has a
+ *   sky bright enough to tell the two apart, which is what makes the F0 floor
+ *   at normal incidence visible at all.
+ * - **Horizon reflections.** Grazing is exactly where the sky reflection carries
+ *   the most detail, and where a directional clamp would flatten it into bands.
+ * - **Distance roughness.** The sun sits ahead of the camera, so its glitter
+ *   track runs from the near field out to the horizon - the full range over
+ *   which the wave detail fades out and the specular lobe has to widen to
+ *   compensate.
+ * - **Refraction scaling.** The bed is visible near the camera and lost to the
+ *   medium further out, covering both ends of the depth and distance ramps.
+ *
+ * Caustics are off on purpose: they would put the caustic pass into this
+ * baseline too, and then a failure here would no longer say which half broke.
+ */
+export const waterSurfaceGrazing: VisualScene = {
+  name: 'water-surface-grazing',
+  description:
+    'Open water at a grazing angle under a scattering sky, sun ahead of the camera. Pins surface shading rather than the medium: the Fresnel crossover across the frame, horizon sky reflections, the sun glitter track widening with distance, and the depth/distance-scaled refraction offset. Caustics off so this baseline stays attributable to the surface.',
+  frames: 3,
+  setup({ scene, camera }) {
+    bareScene(scene);
+    scene.env.sky.skyType = 'scatter';
+    scene.env.light.type = 'ibl';
+
+    // Ahead of the camera and low, which is what puts a glitter track on the
+    // water instead of a single highlight off to one side.
+    const light = new DirectionalLight(scene);
+    light.lookAt(new Vector3(0, 9, -40), Vector3.zero(), Vector3.axisPY());
+    light.color = new Vector4(1, 0.96, 0.88, 1);
+    light.castShadow = true;
+    light.shadow.applyQualityPreset('outdoor-large');
+
+    const bedDepth = 3;
+    const bed = new Mesh(scene, new PlaneShape({ size: 400 }), lambert(new Vector4(0.7, 0.66, 0.55, 1)));
+    bed.position.setXYZ(0, -bedDepth, 0);
+
+    const water = new Water(scene);
+    water.scale.setXYZ(200, 1, 200);
+    water.position.setXYZ(0, 0, 0);
+    const waves = new FBMWaveGenerator();
+    waves.numOctaves = 5;
+    waves.wind = new Vector2(0.3, 0.1);
+    waves.amplitude = 0.14;
+    waves.frequency = 5;
+    water.waveGenerator = waves;
+    water.material.absorption = new Vector3(0.35, 0.09, 0.05);
+    water.material.scattering = new Vector3(0.03, 0.05, 0.06);
+    water.causticsEnabled = false;
+
+    // Low over the surface, aimed just under the horizon.
+    placeCamera(camera, new Vector3(0, 2.2, 16), new Vector3(0, 1.1, -40));
+    camera.far = 600;
+  }
+};
+
+/**
  * A small pool over a large, deep, dark floor that lies entirely below the water
  * level, lit by a sun well off vertical.
  *
