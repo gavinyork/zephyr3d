@@ -17,6 +17,7 @@ import type { DrawContext } from './drawable';
 import type { WaveGenerator } from './wavegenerator';
 import type { Water } from '../scene/water';
 import type { PunctualLight } from '../scene/light';
+import type { Camera } from '../camera/camera';
 import { drawFullscreenQuad } from './fullscreenquad';
 import { fetchSampler } from '../utility/misc';
 import { ShaderHelper } from '../material/shader/helper';
@@ -33,6 +34,15 @@ const WATER_ETA = 1 / WATER_IOR;
  * (the surface turns into a mirror), so the pass simply switches off.
  */
 const MIN_SUN_ELEVATION = 0.15;
+/**
+ * Photons per covered map texel the automatic grid size solves for.
+ *
+ * Measured against a converged (16x denser) map: at 7.5 the map lands within 2%
+ * of it, at 0.84 it is 9% off, and the error halves for each doubling of the
+ * grid. Four buys most of that - about 4% - for a quarter of the photons a
+ * fully converged map would need.
+ */
+const PHOTONS_PER_TEXEL = 4;
 
 /**
  * CPU-side parameters describing the caustic map, uploaded to the light pass.
@@ -46,16 +56,7 @@ const MIN_SUN_ELEVATION = 0.15;
 export interface WaterCausticUniforms {
   /** (right.xyz, 1 / coverage radius) */
   frameX: Vector4;
-  /**
-   * (up.xyz, clip-space y sign for the splat).
-   *
-   * The engine flips y when it renders into an offscreen target on WebGPU
-   * (see `RenderPass.isAutoFlip`), so that every texture it produces samples
-   * the same way regardless of backend. The splat writes clip positions
-   * directly and has to apply that flip itself: -1 on WebGPU, 1 elsewhere.
-   * Receivers sample the map with the plain `ndc * 0.5 + 0.5` the shadow maps
-   * use and never read this component.
-   */
+  /** (up.xyz, unused) */
   frameY: Vector4;
   /** (center.xyz, water surface level) */
   center: Vector4;
@@ -96,6 +97,8 @@ export function createCausticSplatShader(waveGenerator: WaveGenerator): PBRender
     scope.causticCenter = pb.vec4().uniform(0);
     scope.causticLightDir = pb.vec4().uniform(0);
     scope.causticRegion = pb.vec4().uniform(0);
+    /** Map-NDC rectangle the photon grid is laid out over: (minX, minY, maxX, maxY). */
+    scope.causticGridBounds = pb.vec4().uniform(0);
     scope.causticSplatParams = pb.vec4().uniform(0);
     // FBM and Gerstner animate from camera.elapsedTime, which this pass has to
     // supply itself - it is not one of the engine's camera passes.
@@ -116,7 +119,14 @@ export function createCausticSplatShader(waveGenerator: WaveGenerator): PBRender
         this.$l.L = this.causticLightDir.xyz;
         this.$l.waterLevel = this.causticCenter.w;
         // Grid position on the orthographic slice through the map centre.
-        this.$l.ndc = pb.sub(pb.mul(this.$inputs.photonUV, 2), pb.vec2(1));
+        //
+        // The grid spans only the part of the slice the water can actually cast
+        // through, not the whole map. Spread over the whole map, a pool covering
+        // a tenth of it would have nine out of ten photons killed by the region
+        // test below, and the tenth that survived would leave most of the lit
+        // area with no photon at all - which reads as a caustic value of zero,
+        // and a caustic value of zero puts the sun out.
+        this.$l.ndc = pb.mix(this.causticGridBounds.xy, this.causticGridBounds.zw, this.$inputs.photonUV);
         this.$l.planePos = pb.add(
           this.causticCenter.xyz,
           pb.mul(this.causticFrameX.xyz, pb.mul(this.ndc.x, this.radius)),
@@ -156,9 +166,13 @@ export function createCausticSplatShader(waveGenerator: WaveGenerator): PBRender
           this.invRadius
         );
         this.$outputs.photonWeight = this.causticSplatParams.w;
-        // frameY.w carries the backend's offscreen y flip; without it the map
-        // comes out upside down on WebGPU relative to how receivers sample it.
-        this.$builtins.position = pb.vec4(this.hitNDC.x, pb.mul(this.hitNDC.y, this.causticFrameY.w), 0, 1);
+        // No per-backend y flip. A fragment written at clip y lands on the same
+        // texture row on both backends, so the map the receiver samples with
+        // `ndc * 0.5 + 0.5` is the one this writes at clip `ndc`. Flipping here
+        // for WebGPU mirrors the map against the footprint the receiver's region
+        // test admits, which leaves a crescent that the gate calls lit and the
+        // map calls empty - and an empty caustic puts the sun out entirely.
+        this.$builtins.position = pb.vec4(this.hitNDC, 0, 1);
         if (pb.getDevice().type !== 'webgpu') {
           // GLSL leaves gl_PointSize undefined unless it is written, and an
           // undefined size rasterises nothing at all - the map comes back empty.
@@ -231,6 +245,101 @@ export function createCausticBlurShader(): PBRenderOptions {
 }
 
 /**
+ * Shader for the temporal resolve.
+ *
+ * Reprojection is exact and matrix-free. Both frames parameterise the map as an
+ * orthographic slice perpendicular to the light, so a texel maps to a world
+ * point with two scaled axes, and that point maps into the previous frame with
+ * two dot products. Photons travel along the light and the slice is normal to
+ * it, so any point on a texel's ray reconstructs the same texel and the plane
+ * the point is taken on does not matter.
+ *
+ * The relation between map NDC and texture coordinate is the receiver's
+ * (`ndc * 0.5 + 0.5`, see `ShaderHelper.calculateWaterCaustic`), which is what
+ * makes this independent of the clip-space y flip the splat has to apply.
+ *
+ * @internal
+ */
+export function createCausticResolveShader(): PBRenderOptions {
+  return {
+    vertex(this: PBGlobalScope, pb: ProgramBuilder) {
+      this.$inputs.pos = pb.vec2().attrib('position');
+      this.$outputs.uv = pb.vec2();
+      pb.main(function () {
+        this.$builtins.position = pb.vec4(this.$inputs.pos, 0, 1);
+        this.$outputs.uv = pb.add(pb.mul(this.$inputs.pos, 0.5), pb.vec2(0.5));
+      });
+    },
+    fragment(this: PBGlobalScope, pb: ProgramBuilder) {
+      this.causticCurrent = pb.tex2D().uniform(0);
+      this.causticHistory = pb.tex2D().uniform(0);
+      this.causticFrameX = pb.vec4().uniform(0);
+      this.causticFrameY = pb.vec4().uniform(0);
+      this.causticCenter = pb.vec4().uniform(0);
+      this.causticPrevFrameX = pb.vec4().uniform(0);
+      this.causticPrevFrameY = pb.vec4().uniform(0);
+      this.causticPrevCenter = pb.vec4().uniform(0);
+      /** (blend weight, texel size, 0, 0) */
+      this.causticResolveParams = pb.vec4().uniform(0);
+      this.$outputs.outColor = pb.vec4();
+      pb.main(function () {
+        this.$l.texel = this.causticResolveParams.y;
+        this.$l.current = pb.textureSampleLevel(this.causticCurrent, this.$inputs.uv, 0).x;
+        // Range the current frame supports around this texel. The reprojected
+        // value is clamped into it, which is what lets a long blend coexist with
+        // an animated pattern: where the waves have moved on, the neighbourhood
+        // no longer covers the old value and the clamp pulls it back to
+        // something the current frame actually produced.
+        this.$l.mn = this.current;
+        this.$l.mx = this.current;
+        for (let dy = -1; dy <= 1; dy++) {
+          for (let dx = -1; dx <= 1; dx++) {
+            if (dx === 0 && dy === 0) {
+              continue;
+            }
+            this.$l.s = pb.textureSampleLevel(
+              this.causticCurrent,
+              pb.add(this.$inputs.uv, pb.mul(pb.vec2(dx, dy), this.texel)),
+              0
+            ).x;
+            this.mn = pb.min(this.mn, this.s);
+            this.mx = pb.max(this.mx, this.s);
+          }
+        }
+        // This texel's world point on the slice, then where the previous frame
+        // put that same point.
+        this.$l.ndc = pb.sub(pb.mul(this.$inputs.uv, 2), pb.vec2(1));
+        this.$l.radius = pb.div(1, this.causticFrameX.w);
+        this.$l.world = pb.add(
+          this.causticCenter.xyz,
+          pb.mul(this.causticFrameX.xyz, pb.mul(this.ndc.x, this.radius)),
+          pb.mul(this.causticFrameY.xyz, pb.mul(this.ndc.y, this.radius))
+        );
+        this.$l.rel = pb.sub(this.world, this.causticPrevCenter.xyz);
+        this.$l.prevNDC = pb.mul(
+          pb.vec2(pb.dot(this.rel, this.causticPrevFrameX.xyz), pb.dot(this.rel, this.causticPrevFrameY.xyz)),
+          this.causticPrevFrameX.w
+        );
+        this.$l.prevUV = pb.add(pb.mul(this.prevNDC, 0.5), pb.vec2(0.5));
+        // Ground the camera has just scrolled into has no history at all.
+        this.$l.inside = pb.and(
+          pb.all(pb.greaterThanEqual(this.prevUV, pb.vec2(0))),
+          pb.all(pb.lessThanEqual(this.prevUV, pb.vec2(1)))
+        );
+        this.$l.history = pb.textureSampleLevel(this.causticHistory, this.prevUV, 0).x;
+        this.$l.blend = pb.mul(this.causticResolveParams.x, pb.float(this.inside));
+        this.$outputs.outColor = pb.vec4(
+          pb.mix(this.current, pb.clamp(this.history, this.mn, this.mx), this.blend),
+          0,
+          0,
+          1
+        );
+      });
+    }
+  };
+}
+
+/**
  * Renders the water caustic map.
  *
  * One photon is emitted per texel of a uniform grid laid out on the same
@@ -248,6 +357,20 @@ export class WaterCausticsRenderer {
   private readonly _splatPrograms: Map<string, SplatProgramInfo>;
   private _blurProgram: Nullable<GPUProgram>;
   private _blurBindGroup: Nullable<BindGroup>;
+  private _resolveProgram: Nullable<GPUProgram>;
+  private _resolveBindGroup: Nullable<BindGroup>;
+  private _resolveStates: Nullable<RenderStateSet>;
+  /**
+   * Slice parameters the last map committed as history was built with, per
+   * camera.
+   *
+   * Per camera because the history textures are (the manager hangs off the
+   * camera), and this has to describe the exact map the resolve is about to
+   * reproject. One shared entry would make a second viewport reproject through
+   * the first one's slice.
+   */
+  private readonly _prevSlices: WeakMap<Camera, { frameX: Vector4; frameY: Vector4; center: Vector4 }>;
+  private readonly _resolveParams: Vector4;
   private _photonLayout: Nullable<VertexLayout>;
   private _photonGridSize: number;
   private _photonCount: number;
@@ -260,10 +383,18 @@ export class WaterCausticsRenderer {
   private readonly _tmpCenter: Vector3;
   private readonly _splatParams: Vector4;
   private readonly _blurTexelSize: Vector4;
+  /** Map-NDC rectangle the photon grid covers, and the map fraction it is. */
+  private readonly _gridBounds: Vector4;
+  private _gridFraction: number;
   constructor() {
     this._splatPrograms = new Map();
     this._blurProgram = null;
     this._blurBindGroup = null;
+    this._resolveProgram = null;
+    this._resolveBindGroup = null;
+    this._resolveStates = null;
+    this._prevSlices = new WeakMap();
+    this._resolveParams = new Vector4();
     this._photonLayout = null;
     this._photonGridSize = 0;
     this._photonCount = 0;
@@ -284,6 +415,8 @@ export class WaterCausticsRenderer {
     this._tmpCenter = new Vector3();
     this._splatParams = new Vector4();
     this._blurTexelSize = new Vector4();
+    this._gridBounds = new Vector4(-1, -1, 1, 1);
+    this._gridFraction = 1;
   }
   /** Parameters of the map produced by the last successful {@link render}. */
   get uniforms(): WaterCausticUniforms {
@@ -320,9 +453,14 @@ export class WaterCausticsRenderer {
    * @param ctx - Draw context; supplies the device and the camera the map is centred on.
    * @param water - Water surface to refract through.
    * @param light - Directional light acting as the photon source.
-   * @param map - Accumulation target, also the final result.
-   * @param scratch - Ping-pong target for the blur; same size and format as `map`.
+   * @param map - Accumulation target; also the result when nothing resolves after it.
+   * @param scratch - Ping-pong target for the blur, and the temporal resolve's
+   * output. Same size and format as `map`.
+   * @param history - Previous frame's resolved map, or null when there is none
+   * to reproject. Ignored unless the material asks for temporal accumulation.
    * @param createFramebuffer - Wraps a target texture into a framebuffer.
+   * @returns The texture holding the finished map, which is `map` or `scratch`
+   * depending on whether the temporal resolve ran.
    */
   render(
     ctx: DrawContext,
@@ -330,13 +468,14 @@ export class WaterCausticsRenderer {
     light: PunctualLight,
     map: Texture2D,
     scratch: Texture2D,
+    history: Nullable<Texture2D>,
     createFramebuffer: (texture: Texture2D) => FrameBuffer
-  ): void {
+  ): Texture2D {
     const device = ctx.device;
     const material = water.material;
     const waveGenerator = material.waveGenerator!;
     this._updateUniforms(ctx, water, light, map.width);
-    const photonGrid = Math.max(8, Math.min(material.causticsPhotonResolution, 4096));
+    const photonGrid = this._resolvePhotonGrid(material.causticsPhotonResolution, map.width);
     this._updatePhotonLayout(device, photonGrid);
     const splat = this._getSplatProgram(device, waveGenerator);
     const bindGroup = splat.bindGroup;
@@ -345,9 +484,12 @@ export class WaterCausticsRenderer {
     bindGroup.setValue('causticCenter', this._uniforms.center);
     bindGroup.setValue('causticLightDir', this._uniforms.lightDir);
     bindGroup.setValue('causticRegion', this._uniforms.region);
+    bindGroup.setValue('causticGridBounds', this._gridBounds);
     // A photon grid denser than the map deposits more than one photon per texel;
-    // scale the deposit so a flat surface still integrates to exactly 1.
-    const photonWeight = (map.width * map.height) / (photonGrid * photonGrid);
+    // scale the deposit so a flat surface still integrates to exactly 1. The
+    // grid fraction is part of that: concentrating the same photons onto a
+    // smaller part of the map raises the density there by exactly its inverse.
+    const photonWeight = (this._gridFraction * map.width * map.height) / (photonGrid * photonGrid);
     this._splatParams.setXYZW(this._uniforms.frameX.w, material.causticsDepth, WATER_ETA, photonWeight);
     bindGroup.setValue('causticSplatParams', this._splatParams);
     ShaderHelper.setStandaloneCameraTime(bindGroup, ctx);
@@ -367,7 +509,12 @@ export class WaterCausticsRenderer {
     device.setBindGroup(0, bindGroup);
     device.setRenderStates(this._getSplatStates(device));
     device.setVertexLayout(this._photonLayout);
-    device.draw('point-list', 0, this._photonCount);
+    // An empty intersection means the water casts nowhere into this map. Every
+    // receiver it could light projects outside the map too, where the sampler's
+    // edge fade already returns neutral, so the cleared map is the right answer.
+    if (this._gridFraction > 0) {
+      device.draw('point-list', 0, this._photonCount);
+    }
     device.popDeviceStates();
 
     // Ping-pong between the two targets. The count is rounded up to an even
@@ -378,6 +525,112 @@ export class WaterCausticsRenderer {
       const dst = i % 2 === 0 ? scratch : map;
       this._blur(device, src, createFramebuffer(dst));
     }
+
+    // The blur always lands back in `map`, so `scratch` is free to take the
+    // resolve. Doing it the other way round would make the resolve read and
+    // write one texture.
+    const strength = material.causticsTemporalStrength;
+    if (strength <= 0) {
+      // Nothing is committed as history this frame, so the recorded slice has to
+      // be left alone: it must keep describing whichever map the history slot
+      // still holds, or re-enabling accumulation would reproject that map
+      // through the wrong frame.
+      return map;
+    }
+    const camera = ctx.camera;
+    const previous = this._prevSlices.get(camera);
+    // No history on the first frame, after a resize, or after the pass was off
+    // for a while. The current map stands on its own and becomes the history.
+    const resolved = history && previous ? scratch : map;
+    if (resolved === scratch) {
+      this._resolve(device, map, history!, previous!, strength, createFramebuffer(scratch));
+    }
+    this._rememberSlice(camera);
+    return resolved;
+  }
+  /**
+   * Photon grid edge length for this frame.
+   *
+   * Auto solves the grid for a fixed density in photons per covered map texel:
+   * the grid covers `gridFraction` of the map, so `grid^2` photons over
+   * `gridFraction * size^2` texels reach the target at
+   * `grid = size * sqrt(target * gridFraction)`. Fixing the grid instead leaves
+   * the density swinging with the water's footprint, which is what governs how
+   * far the map lands from converged.
+   *
+   * @param requested - Material setting; 0 asks for the automatic size.
+   * @param mapSize - Edge length of the caustic map.
+   * @internal
+   */
+  private _resolvePhotonGrid(requested: number, mapSize: number): number {
+    if (requested > 0) {
+      return Math.max(8, Math.min(requested, 4096));
+    }
+    const grid = Math.round(mapSize * Math.sqrt(PHOTONS_PER_TEXEL * this._gridFraction));
+    return Math.max(8, Math.min(grid, 4096));
+  }
+  /**
+   * Records the slice the map just produced was built with, for the next frame's
+   * reprojection.
+   * @internal
+   */
+  private _rememberSlice(camera: Camera): void {
+    let slice = this._prevSlices.get(camera);
+    if (!slice) {
+      slice = { frameX: new Vector4(), frameY: new Vector4(), center: new Vector4() };
+      this._prevSlices.set(camera, slice);
+    }
+    slice.frameX.set(this._uniforms.frameX);
+    slice.frameY.set(this._uniforms.frameY);
+    slice.center.set(this._uniforms.center);
+  }
+  /** @internal */
+  private _resolve(
+    device: AbstractDevice,
+    current: Texture2D,
+    history: Texture2D,
+    previous: { frameX: Vector4; frameY: Vector4; center: Vector4 },
+    strength: number,
+    dst: FrameBuffer
+  ): void {
+    const program = this._getResolveProgram(device);
+    const bindGroup = this._resolveBindGroup!;
+    device.pushDeviceStates();
+    device.setFramebuffer(dst);
+    device.setViewport(null);
+    device.setScissor(null);
+    device.setProgram(program);
+    bindGroup.setTexture('causticCurrent', current, fetchSampler('clamp_linear_nomip'));
+    bindGroup.setTexture('causticHistory', history, fetchSampler('clamp_linear_nomip'));
+    bindGroup.setValue('causticFrameX', this._uniforms.frameX);
+    bindGroup.setValue('causticFrameY', this._uniforms.frameY);
+    bindGroup.setValue('causticCenter', this._uniforms.center);
+    bindGroup.setValue('causticPrevFrameX', previous.frameX);
+    bindGroup.setValue('causticPrevFrameY', previous.frameY);
+    bindGroup.setValue('causticPrevCenter', previous.center);
+    this._resolveParams.setXYZW(strength, 1 / current.width, 0, 0);
+    bindGroup.setValue('causticResolveParams', this._resolveParams);
+    device.setBindGroup(0, bindGroup);
+    drawFullscreenQuad(this._getResolveStates(device));
+    device.popDeviceStates();
+  }
+  /** @internal */
+  private _getResolveProgram(device: AbstractDevice): GPUProgram {
+    if (!this._resolveProgram) {
+      this._resolveProgram = device.buildRenderProgram(createCausticResolveShader())!;
+      this._resolveProgram.name = '@Water_CausticResolve';
+      this._resolveBindGroup = device.createBindGroup(this._resolveProgram.bindGroupLayouts[0])!;
+    }
+    return this._resolveProgram;
+  }
+  /** @internal */
+  private _getResolveStates(device: AbstractDevice): RenderStateSet {
+    if (!this._resolveStates) {
+      this._resolveStates = device.createRenderStateSet();
+      this._resolveStates.useRasterizerState().setCullMode('none');
+      this._resolveStates.useDepthState().enableTest(false).enableWrite(false);
+    }
+    return this._resolveStates;
   }
   /** Releases the GPU objects owned by this renderer. */
   dispose(): void {
@@ -388,6 +641,11 @@ export class WaterCausticsRenderer {
     this._splatPrograms.clear();
     this._blurBindGroup?.dispose();
     this._blurBindGroup = null;
+    this._resolveProgram?.dispose();
+    this._resolveProgram = null;
+    this._resolveBindGroup?.dispose();
+    this._resolveBindGroup = null;
+    this._resolveStates = null;
     this._blurProgram?.dispose();
     this._blurProgram = null;
     this._photonLayout?.dispose();
@@ -447,15 +705,51 @@ export class WaterCausticsRenderer {
     );
     const u = this._uniforms;
     u.frameX.setXYZW(right.x, right.y, right.z, 1 / radius);
-    // Same rule as RenderPass.isAutoFlip: this pass always has a framebuffer
-    // bound, so only the backend decides.
-    u.frameY.setXYZW(up.x, up.y, up.z, ctx.device.type === 'webgpu' ? -1 : 1);
+    u.frameY.setXYZW(up.x, up.y, up.z, 0);
     u.center.setXYZW(center.x, center.y, center.z, waterLevel);
     u.lightDir.setXYZW(dir.x, dir.y, dir.z, 1 / Math.max(-dir.y, MIN_SUN_ELEVATION));
     u.params.setXYZW(material.causticsIntensity, material.causticsDepth, material.causticsDefocus, 0);
     const extinction = material.extinction;
     u.extinction.setXYZW(extinction.x, extinction.y, extinction.z, 0);
     u.region.set(material.region);
+
+    // Map-NDC bounds of the water region, so the photon grid can be laid out
+    // over just that. Projecting into the slice is invariant along the light and
+    // the slice is normal to it, so a point on the water plane and the photon it
+    // launches share a map position: the region's four corners bound the grid
+    // exactly. The projection is affine, so four corners are enough.
+    const region = material.region;
+    const dy = waterLevel - center.y;
+    let minX = Infinity;
+    let minY = Infinity;
+    let maxX = -Infinity;
+    let maxY = -Infinity;
+    for (const [x, z] of [
+      [region.x, region.y],
+      [region.z, region.y],
+      [region.x, region.w],
+      [region.z, region.w]
+    ]) {
+      const rx = x - center.x;
+      const rz = z - center.z;
+      const nx = (rx * right.x + dy * right.y + rz * right.z) / radius;
+      const ny = (rx * up.x + dy * up.y + rz * up.z) / radius;
+      minX = Math.min(minX, nx);
+      minY = Math.min(minY, ny);
+      maxX = Math.max(maxX, nx);
+      maxY = Math.max(maxY, ny);
+    }
+    // Clamp to the map: photons outside it are rasterised away, and the fraction
+    // has to describe what is left or the normalisation drifts.
+    minX = Math.max(-1, Math.min(1, minX));
+    minY = Math.max(-1, Math.min(1, minY));
+    maxX = Math.max(-1, Math.min(1, maxX));
+    maxY = Math.max(-1, Math.min(1, maxY));
+    this._gridBounds.setXYZW(minX, minY, maxX, maxY);
+    // Share of the map the grid covers, which is what keeps calm water at 1.0:
+    // the same photon count spread over a smaller area has to deposit
+    // proportionally less each.
+    this._gridFraction = Math.max(0, ((maxX - minX) * (maxY - minY)) / 4);
   }
   /** @internal */
   private _updatePhotonLayout(device: AbstractDevice, gridSize: number): void {

@@ -66,8 +66,9 @@ export class SceneCapturer {
     const camera = new PerspectiveCamera(scene, Math.PI / 3, 0.1, 100);
     scene.mainCamera = camera;
 
+    const sceneContext = { scene, camera, size: this._size, backend: this._backend };
     try {
-      await def.setup({ scene, camera, size: this._size, backend: this._backend });
+      await def.setup(sceneContext);
 
       // Bind the capture framebuffer from inside engine.render(): Application
       // .frame() unconditionally resets the framebuffer to null at the top of
@@ -124,6 +125,9 @@ export class SceneCapturer {
         // settle. Deliberately not requestAnimationFrame: headless pages must
         // not depend on compositor vsync.
         await new Promise<void>((resolve) => setTimeout(resolve, 0));
+        // Before the step, so frame 0 is still the state `setup` left behind and
+        // a scene without this hook behaves exactly as it did.
+        def.onFrame?.(sceneContext, i);
         if (!this._app.stepFrame()) {
           // beginFrame() refused - context lost, or a device still coming up.
           if (++stalls > 100) {

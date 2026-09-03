@@ -43,7 +43,14 @@ import type { RenderModule } from './render_module';
 import { RenderPipeline } from './render_pipeline';
 import type { FrameResourceRequirements } from './frame_resource_requirements';
 import { mergeFrameResourceRequirements } from './frame_resource_requirements';
-import type { RGExecuteContext, RGHandle, RGTextureAttachment, RGTextureHandle } from './types';
+import type {
+  RGExecuteContext,
+  RGHandle,
+  RGResolvedSize,
+  RGTextureAttachment,
+  RGTextureDesc,
+  RGTextureHandle
+} from './types';
 import { renderObjectColors } from '../gpu_picking';
 import type { Primitive } from '../primitive';
 import { BoxShape } from '../../shapes';
@@ -662,6 +669,16 @@ const WaterCausticsModule: RenderModule<FrameGraphContext> = {
     const material = source.water.material;
     const size = material.causticsResolution;
     const format = WaterCausticsRenderer.getMapFormat(ctx.device);
+    const history = fg.history;
+    const temporal = material.causticsTemporalStrength > 0;
+    const mapDesc: RGTextureDesc = { format, sizeMode: 'absolute', width: size, height: size };
+    const mapSize: RGResolvedSize = { width: size, height: size };
+    // Null on the first frame, after a resize, and whenever the map format
+    // changes; the renderer falls back to the current frame alone.
+    const previousHandle =
+      temporal && history
+        ? history.importPreviousIfCompatible(graph, RGHistoryResources.WATER_CAUSTICS, mapDesc, mapSize)
+        : null;
     const result = graph.addPass('WaterCaustics', (builder) => {
       // The wave textures the splat pass samples are updated by the scene, not by
       // the graph, so chain after the passes that have already run rather than
@@ -689,27 +706,49 @@ const WaterCausticsModule: RenderModule<FrameGraphContext> = {
         label: 'waterCausticsScratch',
         allocationKey: 'ForwardPlus.WaterCausticsScratch'
       });
+      if (previousHandle) {
+        builder.read(previousHandle);
+      }
       builder.setExecute((rgCtx) => {
         const map = rgCtx.getTexture<Texture2D>(mapHandle);
         const scratch = rgCtx.getTexture<Texture2D>(scratchHandle);
-        _waterCausticsRenderer.render(ctx, source.water, source.light, map, scratch, (texture: Texture2D) =>
-          rgCtx.createFramebuffer({
-            width: texture.width,
-            height: texture.height,
-            colorAttachments: texture,
-            depthAttachment: null
-          })
+        const previous = previousHandle ? rgCtx.getTexture<Texture2D>(previousHandle) : null;
+        const resolved = _waterCausticsRenderer.render(
+          ctx,
+          source.water,
+          source.light,
+          map,
+          scratch,
+          previous,
+          (texture: Texture2D) =>
+            rgCtx.createFramebuffer({
+              width: texture.width,
+              height: texture.height,
+              colorAttachments: texture,
+              depthAttachment: null
+            })
         );
+        if (temporal && history) {
+          // Commit whichever texture the renderer settled on, so the next frame
+          // reprojects the map that was actually shown rather than the
+          // pre-resolve one.
+          history.queueRetainedCommit(RGHistoryResources.WATER_CAUSTICS, mapDesc, mapSize, resolved);
+        }
         // Publish only after the map exists: the light pass keys its shader
         // variant on this flag and binds the texture in the same step.
         ctx.waterCaustics = true;
         ctx.waterCausticLight = source.light;
-        ctx.waterCausticTexture = map;
+        ctx.waterCausticTexture = resolved;
         ctx.waterCausticUniforms = _waterCausticsRenderer.uniforms;
       });
-      return { mapHandle };
+      return { mapHandle, scratchHandle };
     });
-    blackboard.set(FrameResources.WaterCaustics, result.mapHandle);
+    // Which target holds the result depends on whether the resolve ran. Both are
+    // declared by this pass, so either is a valid handle for consumers to read.
+    blackboard.set(
+      FrameResources.WaterCaustics,
+      temporal && previousHandle ? result.scratchHandle : result.mapHandle
+    );
   }
 };
 
