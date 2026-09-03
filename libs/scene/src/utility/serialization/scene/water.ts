@@ -344,6 +344,23 @@ export function getWaterClass(manager: ResourceManager): SerializableClass {
           }
         },
         {
+          name: 'CausticsWarp',
+          description:
+            'How strongly caustic map texels are concentrated near the camera; ignored while the map already fits the water within range',
+          type: 'float',
+          default: 1.5,
+          options: { minValue: 0, maxValue: 8 },
+          isHidden(this: Water) {
+            return !this.causticsEnabled;
+          },
+          get(this: Water, value) {
+            value.num[0] = this.causticsWarp;
+          },
+          set(this: Water, value) {
+            this.causticsWarp = value.num[0];
+          }
+        },
+        {
           name: 'MediumMode',
           description:
             'How the water medium attenuates light: physical coefficients, or the legacy ramp textures',

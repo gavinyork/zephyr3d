@@ -154,6 +154,17 @@ export class Water extends applyMixins(GraphNode, mixinDrawable) implements Draw
   set causticsFadeDistance(val: number) {
     this.material.causticsFadeDistance = val;
   }
+  /**
+   * How strongly caustic map texels are concentrated near the camera, 0 to
+   * spread them evenly. Ignored while the map already fits the water within
+   * {@link causticsRange}.
+   */
+  get causticsWarp() {
+    return this.material.causticsWarp;
+  }
+  set causticsWarp(val: number) {
+    this.material.causticsWarp = val;
+  }
   /** {@inheritDoc SceneNode.update} */
   update(frameId: number, elapsedInSeconds: number) {
     if (this.material.needUpdate()) {

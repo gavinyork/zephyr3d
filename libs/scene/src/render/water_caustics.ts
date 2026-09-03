@@ -73,6 +73,28 @@ const MAX_SLICE_ASPECT = 2;
 const SLICE_QUANTISE_STEPS = 4;
 /** Smallest half-extent in meters a fitted slice may shrink to. */
 const MIN_SLICE_EXTENT = 0.5;
+/**
+ * Divisions of the half-extent the slice centre snaps to under a warp.
+ *
+ * Texel snapping keeps an unwarped map from crawling because a whole-texel shift
+ * of the centre moves every world point by exactly one texel. Under a warp it
+ * does not: the shift is a different number of texels at each position, so the
+ * map has to be resampled every frame the centre moves, and resampling every
+ * frame is what the temporal accumulation is trying to avoid. Snapping coarsely
+ * instead holds the centre still for many frames at a time and pays for one
+ * resample when it does move, which the resolve's neighbourhood clamp absorbs.
+ */
+const WARPED_CENTER_SNAP_DIVISIONS = 8;
+
+/**
+ * Concentrates a map coordinate towards the centre. CPU twin of
+ * `ShaderHelper.warpCausticNDC`; see it for the reasoning.
+ *
+ * @internal
+ */
+function warpCausticNDC(ndc: number, strength: number): number {
+  return (ndc * (1 + strength)) / (1 + strength * Math.abs(ndc));
+}
 
 /**
  * Rounds a fitted half-extent up onto a discrete ladder below `range`.
@@ -113,7 +135,7 @@ export interface WaterCausticUniforms {
   lightDir: Vector4;
   /** (intensity, focal depth, defocus rate, edge fade start in map-radius units) */
   params: Vector4;
-  /** (sigma_t.xyz, 0) */
+  /** (sigma_t.xyz, warp strength) */
   extinction: Vector4;
   /** Water region in world XZ: (minX, minZ, maxX, maxZ) */
   region: Vector4;
@@ -177,7 +199,18 @@ export function createCausticSplatShader(waveGenerator: WaveGenerator): PBRender
         // test below, and the tenth that survived would leave most of the lit
         // area with no photon at all - which reads as a caustic value of zero,
         // and a caustic value of zero puts the sun out.
-        this.$l.ndc = pb.mix(this.causticGridBounds.xy, this.causticGridBounds.zw, this.$inputs.photonUV);
+        //
+        // Laid out in warped map space and unwarped to reach the plane, so the
+        // grid is uniform in texels rather than in meters. That is what keeps
+        // photon (i,j) on texel (i,j) for calm water under any warp strength,
+        // and with it the map's normalisation to 1.0 - a grid uniform in meters
+        // would pile up in the middle of the map, where the texels are small.
+        this.$l.warpedNDC = pb.mix(
+          this.causticGridBounds.xy,
+          this.causticGridBounds.zw,
+          this.$inputs.photonUV
+        );
+        this.$l.ndc = ShaderHelper.unwarpCausticNDC(this, this.warpedNDC, this.causticSplatParams.x);
         this.$l.planePos = pb.add(
           this.causticCenter.xyz,
           pb.mul(this.causticFrameX.xyz, pb.mul(this.ndc.x, this.radius.x)),
@@ -216,6 +249,8 @@ export function createCausticSplatShader(waveGenerator: WaveGenerator): PBRender
           pb.vec2(pb.dot(this.rel, this.causticFrameX.xyz), pb.dot(this.rel, this.causticFrameY.xyz)),
           this.invRadius
         );
+        // Into warped space, where the map's texels live.
+        this.$l.hitWarped = ShaderHelper.warpCausticNDC(this, this.hitNDC, this.causticSplatParams.x);
         this.$outputs.photonWeight = this.causticSplatParams.w;
         // No per-backend y flip. A fragment written at clip y lands on the same
         // texture row on both backends, so the map the receiver samples with
@@ -223,7 +258,7 @@ export function createCausticSplatShader(waveGenerator: WaveGenerator): PBRender
         // for WebGPU mirrors the map against the footprint the receiver's region
         // test admits, which leaves a crescent that the gate calls lit and the
         // map calls empty - and an empty caustic puts the sun out entirely.
-        this.$builtins.position = pb.vec4(this.hitNDC, 0, 1);
+        this.$builtins.position = pb.vec4(this.hitWarped, 0, 1);
         if (pb.getDevice().type !== 'webgpu') {
           // GLSL leaves gl_PointSize undefined unless it is written, and an
           // undefined size rasterises nothing at all - the map comes back empty.
@@ -330,7 +365,7 @@ export function createCausticResolveShader(): PBRenderOptions {
       this.causticPrevFrameX = pb.vec4().uniform(0);
       this.causticPrevFrameY = pb.vec4().uniform(0);
       this.causticPrevCenter = pb.vec4().uniform(0);
-      /** (blend weight, texel size, 0, 0) */
+      /** (blend weight, texel size, warp, previous frame's warp) */
       this.causticResolveParams = pb.vec4().uniform(0);
       this.$outputs.outColor = pb.vec4();
       pb.main(function () {
@@ -358,8 +393,11 @@ export function createCausticResolveShader(): PBRenderOptions {
           }
         }
         // This texel's world point on the slice, then where the previous frame
-        // put that same point.
-        this.$l.ndc = pb.sub(pb.mul(this.$inputs.uv, 2), pb.vec2(1));
+        // put that same point. Texels are laid out in warped space, so this
+        // leaves it to reach the world and re-enters it to land on the history:
+        // the two frames may differ in slice and in warp strength alike.
+        this.$l.warpedNDC = pb.sub(pb.mul(this.$inputs.uv, 2), pb.vec2(1));
+        this.$l.ndc = ShaderHelper.unwarpCausticNDC(this, this.warpedNDC, this.causticResolveParams.z);
         this.$l.radius = pb.div(pb.vec2(1), pb.vec2(this.causticFrameX.w, this.causticFrameY.w));
         this.$l.world = pb.add(
           this.causticCenter.xyz,
@@ -371,7 +409,8 @@ export function createCausticResolveShader(): PBRenderOptions {
           pb.vec2(pb.dot(this.rel, this.causticPrevFrameX.xyz), pb.dot(this.rel, this.causticPrevFrameY.xyz)),
           pb.vec2(this.causticPrevFrameX.w, this.causticPrevFrameY.w)
         );
-        this.$l.prevUV = pb.add(pb.mul(this.prevNDC, 0.5), pb.vec2(0.5));
+        this.$l.prevWarped = ShaderHelper.warpCausticNDC(this, this.prevNDC, this.causticResolveParams.w);
+        this.$l.prevUV = pb.add(pb.mul(this.prevWarped, 0.5), pb.vec2(0.5));
         // Ground the camera has just scrolled into has no history at all.
         this.$l.inside = pb.and(
           pb.all(pb.greaterThanEqual(this.prevUV, pb.vec2(0))),
@@ -420,7 +459,10 @@ export class WaterCausticsRenderer {
    * reproject. One shared entry would make a second viewport reproject through
    * the first one's slice.
    */
-  private readonly _prevSlices: WeakMap<Camera, { frameX: Vector4; frameY: Vector4; center: Vector4 }>;
+  private readonly _prevSlices: WeakMap<
+    Camera,
+    { frameX: Vector4; frameY: Vector4; center: Vector4; warp: number }
+  >;
   private readonly _resolveParams: Vector4;
   private _photonLayout: Nullable<VertexLayout>;
   private _photonGridSize: number;
@@ -437,6 +479,8 @@ export class WaterCausticsRenderer {
   /** Map-NDC rectangle the photon grid covers, and the map fraction it is. */
   private readonly _gridBounds: Vector4;
   private _gridFraction: number;
+  /** Warp strength the current slice was built with; 0 when the map is linear. */
+  private _warp: number;
   constructor() {
     this._splatPrograms = new Map();
     this._blurProgram = null;
@@ -468,6 +512,7 @@ export class WaterCausticsRenderer {
     this._blurTexelSize = new Vector4();
     this._gridBounds = new Vector4(-1, -1, 1, 1);
     this._gridFraction = 1;
+    this._warp = 0;
   }
   /** Parameters of the map produced by the last successful {@link render}. */
   get uniforms(): WaterCausticUniforms {
@@ -541,7 +586,7 @@ export class WaterCausticsRenderer {
     // grid fraction is part of that: concentrating the same photons onto a
     // smaller part of the map raises the density there by exactly its inverse.
     const photonWeight = (this._gridFraction * map.width * map.height) / (photonGrid * photonGrid);
-    this._splatParams.setXYZW(this._uniforms.frameX.w, material.causticsDepth, WATER_ETA, photonWeight);
+    this._splatParams.setXYZW(this._warp, material.causticsDepth, WATER_ETA, photonWeight);
     bindGroup.setValue('causticSplatParams', this._splatParams);
     ShaderHelper.setStandaloneCameraTime(bindGroup, ctx);
     waveGenerator.applyWaterBindGroup(bindGroup);
@@ -628,19 +673,20 @@ export class WaterCausticsRenderer {
   private _rememberSlice(camera: Camera): void {
     let slice = this._prevSlices.get(camera);
     if (!slice) {
-      slice = { frameX: new Vector4(), frameY: new Vector4(), center: new Vector4() };
+      slice = { frameX: new Vector4(), frameY: new Vector4(), center: new Vector4(), warp: 0 };
       this._prevSlices.set(camera, slice);
     }
     slice.frameX.set(this._uniforms.frameX);
     slice.frameY.set(this._uniforms.frameY);
     slice.center.set(this._uniforms.center);
+    slice.warp = this._warp;
   }
   /** @internal */
   private _resolve(
     device: AbstractDevice,
     current: Texture2D,
     history: Texture2D,
-    previous: { frameX: Vector4; frameY: Vector4; center: Vector4 },
+    previous: { frameX: Vector4; frameY: Vector4; center: Vector4; warp: number },
     strength: number,
     dst: FrameBuffer
   ): void {
@@ -659,7 +705,7 @@ export class WaterCausticsRenderer {
     bindGroup.setValue('causticPrevFrameX', previous.frameX);
     bindGroup.setValue('causticPrevFrameY', previous.frameY);
     bindGroup.setValue('causticPrevCenter', previous.center);
-    this._resolveParams.setXYZW(strength, 1 / current.width, 0, 0);
+    this._resolveParams.setXYZW(strength, 1 / current.width, this._warp, previous.warp);
     bindGroup.setValue('causticResolveParams', this._resolveParams);
     device.setBindGroup(0, bindGroup);
     drawFullscreenQuad(this._getResolveStates(device));
@@ -808,12 +854,22 @@ export class WaterCausticsRenderer {
     // covering it - sit on a fixed level and never change at all.
     halfR = Math.min(range, quantiseSliceExtent(halfR, range));
     halfU = Math.min(range, quantiseSliceExtent(halfU, range));
-    // Snap each in-plane component to whole texels of its own axis so the map
-    // does not crawl as the camera moves.
-    const texelR = (2 * halfR) / mapSize;
-    const texelU = (2 * halfU) / mapSize;
-    const centerR = Math.round(((loR + hiR) * 0.5) / texelR) * texelR;
-    const centerU = Math.round(((loU + hiU) * 0.5) / texelU) * texelU;
+    // Warping only pays where the range, not the water, is what bounds the map.
+    // A slice already fitted to a pool has every texel on water the camera can
+    // see, and concentrating them further would just blur its far side.
+    const rangeLimited =
+      regionMinR < cameraRight - range ||
+      regionMaxR > cameraRight + range ||
+      regionMinU < cameraUp - range ||
+      regionMaxU > cameraUp + range;
+    const warp = rangeLimited ? material.causticsWarp : 0;
+    // Snap the centre so the map does not crawl as the camera moves. Whole
+    // texels when the map is linear, which is exact; a coarse ladder under a
+    // warp, where no shift is exact and the goal is instead to shift rarely.
+    const snapR = warp > 0 ? halfR / WARPED_CENTER_SNAP_DIVISIONS : (2 * halfR) / mapSize;
+    const snapU = warp > 0 ? halfU / WARPED_CENTER_SNAP_DIVISIONS : (2 * halfU) / mapSize;
+    const centerR = Math.round(((loR + hiR) * 0.5) / snapR) * snapR;
+    const centerU = Math.round(((loU + hiU) * 0.5) / snapU) * snapU;
     center.setXYZ(
       right.x * centerR + up.x * centerU + dir.x * alongDir,
       right.y * centerR + up.y * centerU + dir.y * alongDir,
@@ -835,11 +891,6 @@ export class WaterCausticsRenderer {
     // the region, which reads neutral anyway - and at worst eats caustics from
     // the last few meters of a pool the map now fits exactly.
     const minHalf = Math.min(halfR, halfU);
-    const rangeLimited =
-      regionMinR < cameraRight - range ||
-      regionMaxR > cameraRight + range ||
-      regionMinU < cameraUp - range ||
-      regionMaxU > cameraUp + range;
     const fadeDistance = !rangeLimited
       ? 0
       : material.causticsFadeDistance > 0
@@ -853,8 +904,9 @@ export class WaterCausticsRenderer {
       1 - fadeFraction
     );
     const extinction = material.extinction;
-    u.extinction.setXYZW(extinction.x, extinction.y, extinction.z, 0);
+    u.extinction.setXYZW(extinction.x, extinction.y, extinction.z, warp);
     u.region.set(material.region);
+    this._warp = warp;
 
     // Map-NDC bounds of the water region, so the photon grid can be laid out
     // over just that. Projecting into the slice is invariant along the light and
@@ -863,10 +915,13 @@ export class WaterCausticsRenderer {
     // directly. Clamped to the map, because photons outside it are rasterised
     // away and the fraction has to describe what is left or the normalisation
     // drifts.
-    const minX = Math.max(-1, Math.min(1, (regionMinR - centerR) / halfR));
-    const maxX = Math.max(-1, Math.min(1, (regionMaxR - centerR) / halfR));
-    const minY = Math.max(-1, Math.min(1, (regionMinU - centerU) / halfU));
-    const maxY = Math.max(-1, Math.min(1, (regionMaxU - centerU) / halfU));
+    // Warped, because the grid is laid out in the space the map's texels live
+    // in. The warp is monotone and separable, so warping the interval's ends
+    // gives the warped interval exactly.
+    const minX = warpCausticNDC(Math.max(-1, Math.min(1, (regionMinR - centerR) / halfR)), warp);
+    const maxX = warpCausticNDC(Math.max(-1, Math.min(1, (regionMaxR - centerR) / halfR)), warp);
+    const minY = warpCausticNDC(Math.max(-1, Math.min(1, (regionMinU - centerU) / halfU)), warp);
+    const maxY = warpCausticNDC(Math.max(-1, Math.min(1, (regionMaxU - centerU) / halfU)), warp);
     this._gridBounds.setXYZW(minX, minY, maxX, maxY);
     // Share of the map the grid covers, which is what keeps calm water at 1.0:
     // the same photon count spread over a smaller area has to deposit
