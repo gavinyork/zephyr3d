@@ -120,6 +120,20 @@ describe('water caustics sampling shader', () => {
     expect(fragmentSource).toMatch(/dot\(/);
   });
 
+  test.each(DEVICE_TYPES)('projects with both half-extents on %s', (type) => {
+    // The slice is fitted to the water, so its two axes have independent
+    // half-extents and the map is square only in texels. Scaling both axes by
+    // frameX.w compiles and looks right on any square slice - every scene where
+    // the water fills the range - and silently stretches the pattern along one
+    // axis on every other one.
+    const fragmentSource = buildCausticSampler(type, createMockContext(true))![1];
+    expect(fragmentSource).toContain('frameY');
+    const body = fragmentSource.slice(fragmentSource.indexOf('Z_calculateWaterCaustic'));
+    // Both reciprocals reach the projection, not just frameX's.
+    expect(body).toMatch(/frameX\)?\.w/);
+    expect(body).toMatch(/frameY\)?\.w/);
+  });
+
   test('returns null rather than a neutral expression when inactive', () => {
     const pb = new ProgramBuilder(createMockDevice('webgpu'));
     let result: unknown = 'unset';
@@ -225,6 +239,16 @@ describe('water caustics splat shader', () => {
     expect(vertexSource).not.toMatch(implicitSample);
   });
 
+  test.each(DEVICE_TYPES)('lays the photon grid out with both half-extents on %s', (type) => {
+    const pb = new ProgramBuilder(createMockDevice(type));
+    const vertexSource = pb.buildRender(createCausticSplatShader(createStubWaveGenerator(false)))![0];
+    // Both the grid layout and the projection of the hit position have to use
+    // the slice's own extent per axis; sharing frameX's silently skews the
+    // photon grid against the map on any slice that is not square in meters.
+    expect(vertexSource).toMatch(/causticFrameX\)?\.w/);
+    expect(vertexSource).toMatch(/causticFrameY\)?\.w/);
+  });
+
   test.each(DEVICE_TYPES)('builds the blur program on %s', (type) => {
     const pb = new ProgramBuilder(createMockDevice(type));
     const ret = pb.buildRender(createCausticBlurShader());
@@ -241,15 +265,14 @@ describe('water caustics temporal resolve shader', () => {
     const fragmentSource = ret![1];
     // Reprojection needs both frames' slices; dropping either silently turns the
     // resolve into a plain blend that smears whenever the camera moves.
-    for (const uniform of [
-      'causticFrameX',
-      'causticPrevFrameX',
-      'causticPrevFrameY',
-      'causticPrevCenter'
-    ]) {
+    for (const uniform of ['causticFrameX', 'causticPrevFrameX', 'causticPrevFrameY', 'causticPrevCenter']) {
       expect(fragmentSource).toContain(uniform);
     }
     expect(fragmentSource).toContain('causticHistory');
+    // Both frames' second extents: reprojecting through frameX's alone puts the
+    // history a growing distance off along y on any non-square slice.
+    expect(fragmentSource).toMatch(/causticFrameY\)?\.w/);
+    expect(fragmentSource).toMatch(/causticPrevFrameY\)?\.w/);
   });
 
   test.each(DEVICE_TYPES)('bounds the history by the current neighbourhood on %s', (type) => {

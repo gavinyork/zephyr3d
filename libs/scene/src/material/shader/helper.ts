@@ -1499,17 +1499,25 @@ export class ShaderHelper {
       // Project into the map: frameX/frameY are orthonormal and perpendicular to
       // the light, so the same two dot products the splat pass used invert it.
       this.$l.rel = pb.sub(this.worldPos, this.cu.center.xyz);
+      // Per-axis inverse extents: the slice is fitted to the water, so it is
+      // only square in texels, not in meters.
       this.$l.mapNDC = pb.mul(
         pb.vec2(pb.dot(this.rel, this.cu.frameX.xyz), pb.dot(this.rel, this.cu.frameY.xyz)),
-        this.cu.frameX.w
+        pb.vec2(this.cu.frameX.w, this.cu.frameY.w)
       );
       this.$l.uv = pb.add(pb.mul(this.mapNDC, 0.5), pb.vec2(0.5));
-      // Fade the pattern out over the last tenth of the map so its border does
-      // not draw a visible rectangle on the sea bed.
-      this.$l.edge = pb.mul(
-        pb.smoothStep(0, 0.1, pb.min(this.uv.x, pb.sub(1, this.uv.x))),
-        pb.smoothStep(0, 0.1, pb.min(this.uv.y, pb.sub(1, this.uv.y)))
-      );
+      // Fade the pattern out towards the map border, over a band the CPU sized
+      // in meters and handed over as the distance the fade starts at.
+      //
+      // Distance is measured under an L4 norm rather than per-axis. A per-axis
+      // fade is a rectangle in light space, and the sun tilts that rectangle, so
+      // its border lands on the sea bed as straight lines - which the eye picks
+      // out of a caustic pattern however wide the gradient is. An L2 circle has
+      // no straight part anywhere but discards the 21% of the map outside its
+      // inscribed disc; L4 gives up 7% instead and still curves everywhere.
+      this.$l.ndcSq = pb.mul(this.mapNDC, this.mapNDC);
+      this.$l.edgeDist = pb.sqrt(pb.sqrt(pb.dot(this.ndcSq, this.ndcSq)));
+      this.$l.edge = pb.sub(1, pb.smoothStep(this.cu.params.w, 1, this.edgeDist));
       this.$l.pattern = pb.textureSampleLevel(this[UNIFORM_NAME_CAUSTIC_MAP], this.uv, 0).x;
       // Receivers away from the focal plane see a defocused, lower-contrast
       // pattern rather than a displaced one.
