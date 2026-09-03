@@ -21,7 +21,7 @@ import {
   shadowVsm
 } from './scenes/shadows';
 import { clusterManyLights, spotShadow } from './scenes/lighting';
-import { waterCausticsDeepBed, waterCausticsOff, waterCausticsOn } from './scenes/water';
+import { waterCausticsDeepBed, waterCausticsOff, waterCausticsOn, waterSurfaceGrazing } from './scenes/water';
 import { oitABuffer, oitDualDepth, oitWeighted } from './scenes/oit';
 import {
   postFxaa,
@@ -89,6 +89,7 @@ export const SCENES: VisualScene[] = [
   waterCausticsOff,
   waterCausticsOn,
   waterCausticsDeepBed,
+  waterSurfaceGrazing,
   // Transparency: one scene per OIT implementation.
   oitWeighted,
   oitABuffer,

@@ -32,6 +32,24 @@ import { getDevice } from '../app/api';
  */
 export type WaterMediumMode = 'physical' | 'ramp';
 
+/** Fresnel reflectance of water at normal incidence, for n = 1.333. */
+const WATER_F0 = 0.02;
+/** Specular roughness of water close enough that the waves are resolved. */
+const WATER_BASE_ROUGHNESS = 0.04;
+/**
+ * Specular roughness once the distance fade has flattened the waves away.
+ *
+ * The fade suppresses wave slope that used to break the sun's highlight into
+ * glitter. Left at the sharp near-field roughness the remaining mirror aliases
+ * badly; widening the lobe by the same amount the slope was cut turns it back
+ * into a stable band.
+ */
+const WATER_DISTANT_ROUGHNESS = 0.35;
+/** Water depth at which the refraction offset reaches its authored strength. */
+const REFRACT_REF_DEPTH = 4;
+/** Distance out to which the refraction offset keeps its authored strength. */
+const REFRACT_REF_DIST = 40;
+
 export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight) {
   private static readonly FEATURE_MEDIUM_MODE = this.defineFeature();
   private static readonly _absorptionGrad = new Interpolator(
@@ -508,20 +526,27 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
       }
     });
     pb.func('fresnel', [pb.vec3('normal'), pb.vec3('eyeVec')], function () {
-      this.$return(
-        pb.clamp(
-          pb.sub(pb.pow(pb.sub(1, pb.dot(this.normal, this.eyeVec)), 5), this.refractionStrength),
-          0,
-          1
-        )
-      );
+      // Schlick, including the F0 term the previous form dropped. Without it the
+      // reflectance fell to zero at normal incidence, so water viewed from
+      // directly above reflected no sky at all and read as flat paint.
+      this.$l.NoV = pb.clamp(pb.dot(this.normal, this.eyeVec), 0, 1);
+      this.$l.f = pb.add(WATER_F0, pb.mul(1 - WATER_F0, pb.pow(pb.sub(1, this.NoV), 5)));
+      // refractionStrength biases the surface towards pure refraction. Scaling
+      // rather than subtracting keeps the F0 floor intact at its default of 0
+      // and cannot drive the term negative.
+      this.$return(pb.clamp(pb.mul(this.f, pb.sub(1, this.refractionStrength)), 0, 1));
     });
     pb.func(
       'lightSpecular',
-      [pb.vec3('lightDir'), pb.vec3('eyeVecNorm'), pb.vec3('normal'), pb.vec3('lightColor')],
+      [
+        pb.vec3('lightDir'),
+        pb.vec3('eyeVecNorm'),
+        pb.vec3('normal'),
+        pb.vec3('lightColor'),
+        pb.float('roughness')
+      ],
       function () {
-        this.$l.roughness = pb.float(0.04);
-        this.$l.f0 = pb.vec3(0.02);
+        this.$l.f0 = pb.vec3(WATER_F0);
         this.$l.f90 = pb.vec3(1);
         this.$l.L = this.lightDir;
         this.$l.V = pb.neg(this.eyeVecNorm);
@@ -551,7 +576,11 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
         this.$l.normal = pb.normalize(
           pb.mul(this.worldNormal, pb.vec3(this.normalScale, 1, this.normalScale))
         );
-        this.$l.displacedTexCoord = pb.add(this.screenUV, pb.mul(this.normal.xz, this.displace));
+        // The slope the fade above discards is what used to break the sun's
+        // highlight into glitter. Hand that lost detail to the specular lobe
+        // instead of dropping it, or distant water becomes a mirror that
+        // aliases into a crawling speckle.
+        this.$l.roughness = pb.mix(WATER_DISTANT_ROUGHNESS, WATER_BASE_ROUGHNESS, this.normalScale);
         this.$l.wPos = ShaderHelper.samplePositionFromDepth(
           this,
           ShaderHelper.getLinearDepthTexture(this),
@@ -605,7 +634,12 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
           pb.normalize(pb.sub(this.worldPos, ShaderHelper.getCameraPosition(this))),
           this.normal
         );
-        this.refl.y = pb.max(this.refl.y, 0.1);
+        // A steep wave face can reflect downwards, where the sky bake holds
+        // nothing useful. Mirroring the ray back up stays continuous through
+        // the horizon; the old clamp collapsed every direction below y = 0.1
+        // onto one ring and wiped out the grazing-angle detail that is the most
+        // visible part of a water reflection.
+        this.refl.y = pb.abs(this.refl.y);
         this.reflectance = pb.mix(
           // Blended against the pre-exposed scene color, so the exposure-independent sky bake has
           // to be lifted into the same space.
@@ -613,7 +647,25 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
           pb.textureSampleLevel(ShaderHelper.getSceneColorTexture(this), this.hitInfo.xy, 0).rgb,
           this.hitInfo.w
         );
-        this.$l.refractUV = this.displacedTexCoord;
+        // Refraction offset. The authored strength is in pixels, and two factors
+        // keep it physical:
+        //  - depth, because the refracted ray only walks sideways while it is
+        //    under water, so a shallow bed must barely shift;
+        //  - distance, because the same world-space shift covers fewer pixels
+        //    further away, and a fixed pixel offset out there makes distant
+        //    water boil.
+        // Both saturate at 1, so the near and deep case keeps the authored look.
+        this.$l.refractScale = pb.mul(
+          pb.clamp(pb.div(this.depth, REFRACT_REF_DEPTH), 0, 1),
+          pb.clamp(pb.div(REFRACT_REF_DIST, pb.max(this.dist, 0.001)), 0, 1)
+        );
+        // Dividing by the render size componentwise keeps the offset square;
+        // the old form scaled both axes by the width and sheared on any target
+        // that was not 1:1.
+        this.$l.refractUV = pb.add(
+          this.screenUV,
+          pb.div(pb.mul(this.normal.xz, this.displace, this.refractScale), ShaderHelper.getRenderSize(this))
+        );
         this.$l.displacedPos = ShaderHelper.samplePositionFromDepth(
           this,
           ShaderHelper.getLinearDepthTexture(this),
@@ -659,7 +711,8 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
             this.lightDir,
             this.eyeVecNorm,
             this.normal,
-            pb.mul(colorIntensity.rgb, colorIntensity.a, this.lightAtten)
+            pb.mul(colorIntensity.rgb, colorIntensity.a, this.lightAtten),
+            this.roughness
           );
           if (shadow) {
             // Water is a horizontal clipmap, so +Y is the geometric normal. The
@@ -692,7 +745,8 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
     bindGroup.setValue('clipmapGridInfo', this._clipmapGridInfo);
     bindGroup.setValue('region', this._region);
     if (this.needFragmentColor(ctx)) {
-      bindGroup.setValue('displace', this._displace / ctx.renderWidth);
+      // In pixels; the shader divides by the render size on both axes.
+      bindGroup.setValue('displace', this._displace);
       bindGroup.setValue('refractionStrength', this._refractionStrength);
       bindGroup.setValue('ssrParams', this._ssrParams);
       if (this.mediumMode === 'ramp') {
