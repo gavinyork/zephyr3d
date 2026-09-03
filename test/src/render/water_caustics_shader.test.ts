@@ -134,6 +134,24 @@ describe('water caustics sampling shader', () => {
     expect(body).toMatch(/frameY\)?\.w/);
   });
 
+  test.each(DEVICE_TYPES)('warps the map lookup but not the edge fade on %s', (type) => {
+    const fragmentSource = buildCausticSampler(type, createMockContext(true))![1];
+    expect(fragmentSource).toContain('Z_warpCausticNDC');
+    // The texture lookup goes through the warp, because that is where the map's
+    // texels are. The edge fade does not: the warp fixes both ends of [-1, 1],
+    // so fading on the warped coordinate leaves the border in the same world
+    // place while silently rescaling the band leading up to it - and the CPU
+    // sized that band in meters. Both are two lines apart and read from the same
+    // two vectors, so this pins which one each of them takes.
+    const declOf = (name: string) =>
+      fragmentSource.match(new RegExp(`\\b${name}\\b\\s*(?::[^=]*)?=([^;]*);`))?.[1] ?? '';
+    const uvDecl = declOf('uv');
+    const fadeDecl = declOf('ndcSq');
+    expect(uvDecl).toContain('warpedNDC');
+    expect(fadeDecl).toContain('mapNDC');
+    expect(fadeDecl).not.toContain('warpedNDC');
+  });
+
   test('returns null rather than a neutral expression when inactive', () => {
     const pb = new ProgramBuilder(createMockDevice('webgpu'));
     let result: unknown = 'unset';
@@ -249,6 +267,17 @@ describe('water caustics splat shader', () => {
     expect(vertexSource).toMatch(/causticFrameY\)?\.w/);
   });
 
+  test.each(DEVICE_TYPES)('lays the photon grid out in warped space on %s', (type) => {
+    const pb = new ProgramBuilder(createMockDevice(type));
+    const vertexSource = pb.buildRender(createCausticSplatShader(createStubWaveGenerator(false)))![0];
+    // The grid is uniform in the space the map's texels live in and unwarped to
+    // reach the plane; the hit is warped back on the way out. Both directions
+    // have to be present, or calm water stops landing one photon per texel and
+    // the map's normalisation to 1.0 goes with it.
+    expect(vertexSource).toContain('Z_unwarpCausticNDC');
+    expect(vertexSource).toContain('Z_warpCausticNDC');
+  });
+
   test.each(DEVICE_TYPES)('builds the blur program on %s', (type) => {
     const pb = new ProgramBuilder(createMockDevice(type));
     const ret = pb.buildRender(createCausticBlurShader());
@@ -273,6 +302,11 @@ describe('water caustics temporal resolve shader', () => {
     // history a growing distance off along y on any non-square slice.
     expect(fragmentSource).toMatch(/causticFrameY\)?\.w/);
     expect(fragmentSource).toMatch(/causticPrevFrameY\)?\.w/);
+    // Leaves warped space to reach the world and re-enters it to land on the
+    // history, since the two frames can differ in warp strength as well as in
+    // slice. Using one strength for both drifts the history under any change.
+    expect(fragmentSource).toContain('Z_unwarpCausticNDC');
+    expect(fragmentSource).toContain('Z_warpCausticNDC');
   });
 
   test.each(DEVICE_TYPES)('bounds the history by the current neighbourhood on %s', (type) => {

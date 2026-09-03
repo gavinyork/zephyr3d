@@ -1415,6 +1415,74 @@ export class ShaderHelper {
    * @param pb - Program builder whose global scope receives the uniforms.
    * @internal
    */
+  /**
+   * Warps a linear caustic-map coordinate so texels concentrate near the centre.
+   *
+   * The map covers a fixed footprint, so its world texel size is the range
+   * divided by the resolution and a range large enough to light the scene is
+   * already too coarse to resolve a caustic cell. This trades the edge of the
+   * map, which is far from the camera, for the middle, which is not:
+   *
+   * ```
+   * warp(u)   = u (1 + k) / (1 + k |u|)
+   * unwarp(w) = w / ((1 + k) - k |w|)
+   * ```
+   *
+   * Texel density is `1 + k` times uniform at the centre and `1 / (1 + k)` times
+   * it at the border, and `k = 0` is exactly the identity, so the pass can apply
+   * this unconditionally. Both ends of `[-1, 1]` are fixed points, which is what
+   * lets the warp sit inside the existing parameterisation without moving the
+   * footprint the receiver gates on. The first derivative is continuous at the
+   * centre; the second flips sign there, which is not visible in a pattern this
+   * noisy.
+   *
+   * Applied per axis rather than radially: the photon grid, the map and the blur
+   * are all axis-aligned, so a separable warp keeps photon `(i,j)` on texel
+   * `(i,j)` for calm water and leaves the map's normalisation to 1.0 intact.
+   *
+   * @param scope - Current shader scope.
+   * @param ndc - Linear map coordinate in `[-1, 1]`.
+   * @param strength - Warp strength `k`; 0 is the identity.
+   * @returns The warped coordinate, also in `[-1, 1]`.
+   * @internal
+   */
+  static warpCausticNDC(scope: PBInsideFunctionScope, ndc: PBShaderExp, strength: PBShaderExp): PBShaderExp {
+    const pb = scope.$builder;
+    const funcName = 'Z_warpCausticNDC';
+    pb.func(funcName, [pb.vec2('ndc'), pb.float('k')], function () {
+      this.$return(
+        pb.div(pb.mul(this.ndc, pb.add(this.k, 1)), pb.add(pb.vec2(1), pb.mul(pb.abs(this.ndc), this.k)))
+      );
+    });
+    return pb.getGlobalScope()[funcName](ndc, strength) as PBShaderExp;
+  }
+  /**
+   * Inverse of {@link ShaderHelper.warpCausticNDC}.
+   *
+   * The denominator is `1` at the border and `1 + k` at the centre, so it stays
+   * positive for any input the passes feed it - all of which come from `[-1, 1]`.
+   *
+   * @param scope - Current shader scope.
+   * @param warped - Warped map coordinate in `[-1, 1]`.
+   * @param strength - Warp strength `k`; 0 is the identity.
+   * @returns The linear coordinate the warp came from.
+   * @internal
+   */
+  static unwarpCausticNDC(
+    scope: PBInsideFunctionScope,
+    warped: PBShaderExp,
+    strength: PBShaderExp
+  ): PBShaderExp {
+    const pb = scope.$builder;
+    const funcName = 'Z_unwarpCausticNDC';
+    pb.func(funcName, [pb.vec2('warped'), pb.float('k')], function () {
+      this.$return(
+        pb.div(this.warped, pb.sub(pb.vec2(pb.add(this.k, 1)), pb.mul(pb.abs(this.warped), this.k)))
+      );
+    });
+    return pb.getGlobalScope()[funcName](warped, strength) as PBShaderExp;
+  }
+  /** @internal */
   static declareWaterCausticUniforms(pb: ProgramBuilder) {
     const scope = pb.getGlobalScope();
     const causticStruct = pb.defineStruct([
@@ -1505,9 +1573,17 @@ export class ShaderHelper {
         pb.vec2(pb.dot(this.rel, this.cu.frameX.xyz), pb.dot(this.rel, this.cu.frameY.xyz)),
         pb.vec2(this.cu.frameX.w, this.cu.frameY.w)
       );
-      this.$l.uv = pb.add(pb.mul(this.mapNDC, 0.5), pb.vec2(0.5));
+      // Texels are concentrated towards the middle of the map, so the lookup
+      // goes through the same warp the splat laid the photons out under.
+      this.$l.warpedNDC = ShaderHelper.warpCausticNDC(this, this.mapNDC, this.cu.extinction.w);
+      this.$l.uv = pb.add(pb.mul(this.warpedNDC, 0.5), pb.vec2(0.5));
       // Fade the pattern out towards the map border, over a band the CPU sized
       // in meters and handed over as the distance the fade starts at.
+      //
+      // Measured on the linear coordinate, not the warped one. The warp fixes
+      // both ends of [-1, 1], so the border is in the same world place either
+      // way, but the band between them is not: warping it would make its world
+      // width depend on the warp strength, and the CPU sized it in meters.
       //
       // Distance is measured under an L4 norm rather than per-axis. A per-axis
       // fade is a rectangle in light space, and the sun tilts that rectangle, so

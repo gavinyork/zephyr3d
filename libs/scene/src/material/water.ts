@@ -99,6 +99,7 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
   private _causticsDepth: number;
   private _causticsRange: number;
   private _causticsFadeDistance: number;
+  private _causticsWarp: number;
   private _causticsDefocus: number;
   private _causticsResolution: number;
   private _causticsPhotonResolution: number;
@@ -136,8 +137,9 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
     this._causticsDepth = 4;
     this._causticsRange = 60;
     this._causticsFadeDistance = 0;
+    this._causticsWarp = 1.5;
     this._causticsDefocus = 0.12;
-    this._causticsResolution = 512;
+    this._causticsResolution = 1024;
     this._causticsPhotonResolution = 0;
     this._causticsBlurPasses = 2;
     this._causticsTemporalStrength = 0.85;
@@ -325,6 +327,28 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
   }
   set causticsFadeDistance(val: number) {
     this._causticsFadeDistance = Math.max(0, val);
+  }
+  /**
+   * How strongly caustic map texels are concentrated near the camera, 0 to
+   * spread them evenly.
+   *
+   * The map covers a fixed footprint, so a {@link causticsRange} large enough to
+   * light the scene is already too coarse to resolve a caustic cell anywhere in
+   * it. This spends the far edge of the map, which the defocus and the edge fade
+   * are attenuating anyway, on the part near the camera: texel density is
+   * `1 + causticsWarp` times uniform at the centre and `1 / (1 + causticsWarp)`
+   * times it at the border.
+   *
+   * Ignored while the map already fits the water within range, which is the case
+   * a bounded pool inside {@link causticsRange} always lands in. There the fit
+   * has spent the whole map on water the camera can see, and concentrating it
+   * further would only blur the far side of the pool.
+   */
+  get causticsWarp() {
+    return this._causticsWarp;
+  }
+  set causticsWarp(val: number) {
+    this._causticsWarp = Math.max(0, Math.min(8, val));
   }
   /** How fast the caustic contrast falls off per meter away from {@link causticsDepth}. */
   get causticsDefocus() {
