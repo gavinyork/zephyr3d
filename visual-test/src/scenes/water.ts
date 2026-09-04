@@ -178,6 +178,72 @@ export const waterCausticsOn = waterScene(
 );
 
 /**
+ * Two pools at different heights over one floor, both casting caustics.
+ *
+ * The renderer builds a single caustic map for the whole scene, so more than one
+ * body has to share it: they share the light-space slice and the texture, and
+ * what each keeps of its own is its footprint, its surface height and its
+ * medium. A receiver resolves which of them is above it before reading the map.
+ *
+ * The two pools are deliberately unlike each other. Different heights, because
+ * the surface height is what turns a world position into a depth and a light
+ * path, and one shared height would let a bug that ignores the per-body value
+ * pass. Different media, because the transmittance is per body too - the near
+ * pool is clear and the far one turbid, which is visible as a colour difference
+ * on the floor rather than only a brightness one.
+ *
+ * The sun is well off vertical so the entry-point offset is large: each pool
+ * lights a patch of floor sheared away from its own outline, and the two patches
+ * must not bleed into one another.
+ */
+export const waterCausticsTwoPools: VisualScene = {
+  name: 'water-caustics-two-pools',
+  description:
+    'Two pools at different heights and with different media over one floor. Pins multi-body caustics: a shared map and slice, per-body surface height, footprint and transmittance. A regression that keeps only one body leaves one pool unlit; one that shares a height or a medium across bodies puts the wrong depth or the wrong colour under one of them.',
+  frames: 3,
+  setup({ scene, camera }) {
+    bareScene(scene);
+    scene.env.light.type = 'constant';
+    scene.env.light.ambientColor = new Vector4(0.11, 0.14, 0.17, 1);
+
+    const light = new DirectionalLight(scene);
+    light.lookAt(new Vector3(-7, 9, 4), Vector3.zero(), Vector3.axisPY());
+    light.color = new Vector4(1, 0.97, 0.9, 1);
+    light.castShadow = true;
+    light.shadow.applyQualityPreset('outdoor-large');
+
+    const floorDepth = 5;
+    const floor = new Mesh(scene, new PlaneShape({ size: 120 }), lambert(new Vector4(0.62, 0.6, 0.5, 1)));
+    floor.position.setXYZ(0, -floorDepth, 0);
+
+    const pool = (x: number, level: number, half: number, absorption: Vector3, scattering: Vector3) => {
+      const water = new Water(scene);
+      water.scale.setXYZ(half, 1, half);
+      water.position.setXYZ(x, level, 0);
+      const waves = new FBMWaveGenerator();
+      waves.numOctaves = 5;
+      waves.wind = new Vector2(0.3, 0.1);
+      waves.amplitude = 0.1;
+      waves.frequency = 8;
+      water.waveGenerator = waves;
+      water.material.absorption = absorption;
+      water.material.scattering = scattering;
+      water.causticsEnabled = true;
+      water.causticsDepth = level + floorDepth;
+      water.causticsRange = 40;
+      return water;
+    };
+    // Near pool: clear, low. Far pool: turbid, raised, so neither its depth nor
+    // its colour can be inherited from the other.
+    pool(-9, 0, 6, new Vector3(0.1, 0.04, 0.03), new Vector3(0.02, 0.03, 0.04));
+    pool(9, 1.2, 6, new Vector3(0.18, 0.08, 0.05), new Vector3(0.07, 0.06, 0.07));
+
+    placeCamera(camera, new Vector3(2, 20, 22), new Vector3(0, -floorDepth, 0));
+    camera.far = 200;
+  }
+};
+
+/**
  * Steep waves seen nearly edge-on against a low sun, in scattering-heavy water.
  *
  * Every condition the forward-scattering term needs, at once, because it needs

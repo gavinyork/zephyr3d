@@ -99,6 +99,7 @@ const SCENE_NAMES = [
   'water-caustics-on',
   'water-caustics-deep-bed',
   'water-caustics-moving',
+  'water-caustics-two-pools',
   'water-surface-grazing',
   'water-subsurface-backlit',
   'water-foam-storm',
