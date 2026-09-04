@@ -739,6 +739,83 @@ describe('SkeletonRig and SkinBinding', () => {
     expect(outputs[4]).toBeCloseTo(0.5);
   });
 
+  test('retargets hips from reference pose onto bind height and ignores a static separate root track', () => {
+    const scene = new Scene();
+    const srcModel = appendNode(scene.rootNode, 'srcModel');
+    const dstModel = appendNode(scene.rootNode, 'dstModel');
+    const srcRoot = appendNode(srcModel, 'SrcRoot');
+    const dstRoot = appendNode(dstModel, 'DstRoot');
+    const srcJoints = buildHumanoid(srcRoot, 'Src');
+    const dstJoints = buildHumanoid(dstRoot, 'Dst');
+    const srcHips = srcJoints[0];
+    const dstHips = dstJoints[0];
+    srcRoot.position.setXYZ(0, 0.25, 0);
+    dstRoot.position.setXYZ(0, 3, 0);
+    srcHips.position.setXYZ(0, 1, 0);
+    dstHips.position.setXYZ(0, 2, 0);
+    setHumanoidLateralBindPose(srcJoints);
+    setHumanoidLateralBindPose(dstJoints);
+    srcHips.position.setXYZ(0, 1, 0);
+    dstHips.position.setXYZ(0, 2, 0);
+    scaleHumanoidLegs(dstJoints, 2);
+
+    const srcBindPose = bindPose(srcJoints);
+    const dstBindPose = bindPose(dstJoints);
+    const srcRetargetPose = bindPose(srcJoints);
+    const dstRetargetPose = bindPose(dstJoints);
+    srcRetargetPose[0].position.y = 1.5;
+    dstRetargetPose[0].position.y = 20;
+    for (let i = 14; i <= 21; i++) {
+      srcRetargetPose[i].position.scaleBy(10);
+      dstRetargetPose[i].position.scaleBy(0.1);
+    }
+    const srcRig = new SkeletonRig(srcJoints, srcBindPose, {
+      rootJoint: srcRoot,
+      retargetPose: srcRetargetPose
+    });
+    const dstRig = new SkeletonRig(dstJoints, dstBindPose, {
+      rootJoint: dstRoot,
+      retargetPose: dstRetargetPose
+    });
+    srcModel.animationSet.rigs.push(new DRef(srcRig));
+    dstModel.animationSet.rigs.push(new DRef(dstRig));
+
+    const srcClip = srcModel.animationSet.createAnimation('crouch')!;
+    srcClip.timeDuration = 1;
+    srcClip.addSkeleton(srcRig.persistentId);
+    srcClip.addTrack(
+      srcRoot,
+      new NodeTranslationTrack('linear', [
+        { time: 0, value: srcRoot.position.clone() },
+        { time: 1, value: srcRoot.position.clone() }
+      ])
+    );
+    srcClip.addTrack(
+      srcHips,
+      new NodeTranslationTrack('linear', [
+        { time: 0, value: new Vector3(0, 1.25, 0) },
+        { time: 1, value: new Vector3(0, 1.75, 0) }
+      ])
+    );
+
+    const copied = dstModel.animationSet.copyHumanoidAnimationFrom(
+      srcModel.animationSet as AnimationSet,
+      'crouch',
+      'crouch_copy'
+    );
+
+    expect(copied).toBeTruthy();
+    const rootTrack = copied!.tracks.get(dstRoot)!.find((track) => track instanceof NodeTranslationTrack);
+    const hipsTrack = copied!.tracks.get(dstHips)!.find((track) => track instanceof NodeTranslationTrack);
+    expect(rootTrack).toBeInstanceOf(NodeTranslationTrack);
+    expect(hipsTrack).toBeInstanceOf(NodeTranslationTrack);
+    const rootOutputs = (rootTrack as NodeTranslationTrack).interpolator.outputs as Float32Array;
+    const hipsOutputs = (hipsTrack as NodeTranslationTrack).interpolator.outputs as Float32Array;
+    expect(rootOutputs[1]).toBeCloseTo(3);
+    expect(hipsOutputs[1]).toBeCloseTo(1.5);
+    expect(hipsOutputs[4]).toBeCloseTo(2.5);
+  });
+
   test('retarget handles explicit humanoid root motion modes', () => {
     const scene = new Scene();
     const srcModel = appendNode(scene.rootNode, 'srcModel');
@@ -773,7 +850,7 @@ describe('SkeletonRig and SkinBinding', () => {
       srcRoot,
       new NodeTranslationTrack('linear', [
         { time: 0, value: new Vector3(0, 0.1, 0) },
-        { time: 1, value: new Vector3(0, 0.35, 0) }
+        { time: 1, value: new Vector3(0.25, 0.35, 0) }
       ])
     );
 
@@ -790,7 +867,21 @@ describe('SkeletonRig and SkinBinding', () => {
     expect(scaledTrack!.jointIndex).toBe(-1);
     const scaledOutputs = (scaledTrack as NodeTranslationTrack).interpolator.outputs as Float32Array;
     expect(scaledOutputs[1]).toBeCloseTo(1);
-    expect(scaledOutputs[4]).toBeCloseTo(1.5);
+    expect(scaledOutputs[3]).toBeCloseTo(0.5);
+    expect(scaledOutputs[4]).toBeCloseTo(1);
+
+    const unlocked = dstModel.animationSet.copyHumanoidAnimationFrom(
+      srcModel.animationSet as AnimationSet,
+      'walk',
+      'walk_unlocked',
+      { rootMotion: 'scaled', lockRootMotionAxes: {} }
+    );
+    expect(unlocked).toBeTruthy();
+    const unlockedTrack = unlocked!.tracks
+      .get(dstRoot)!
+      .find((track) => track instanceof NodeTranslationTrack);
+    const unlockedOutputs = (unlockedTrack as NodeTranslationTrack).interpolator.outputs as Float32Array;
+    expect(unlockedOutputs[4]).toBeCloseTo(1.5);
 
     const locked = dstModel.animationSet.copyHumanoidAnimationFrom(
       srcModel.animationSet as AnimationSet,

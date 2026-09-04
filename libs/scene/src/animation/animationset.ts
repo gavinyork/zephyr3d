@@ -475,6 +475,9 @@ export type HumanoidRootMotionMode = 'scaled' | 'copy' | 'locked' | 'none';
 export type HumanoidRootMotionScaleMode = 'legLength' | 'none' | number;
 
 /** @public */
+export type HumanoidHipsTranslationMode = 'scaled' | 'copy' | 'locked' | 'none';
+
+/** @public */
 export type HumanoidRetargetAxisLocks = {
   x?: boolean;
   y?: boolean;
@@ -502,11 +505,22 @@ export type CopyHumanoidAnimationOptions = {
   rootMotionScale?: HumanoidRootMotionScaleMode;
   /**
    * Axis locks applied after root motion retargeting. Locked axes stay at the destination bind pose.
+   * Y is locked by default when the rig has a separate root and hips joint.
    */
   lockRootMotionAxes?: HumanoidRetargetAxisLocks;
   /**
-   * Whether to preserve non-root humanoid translation tracks. These are skipped by default because
-   * retargeting humanoid joints should normally keep the destination skeleton lengths intact.
+   * How local hips translation should be handled when the rig has a separate root joint.
+   * Hips motion is measured from the source retarget pose and applied on top of the
+   * destination bind pose, so character height is never copied from the source asset.
+   */
+  hipsTranslation?: HumanoidHipsTranslationMode;
+  /**
+   * Scale used when `hipsTranslation` is `scaled`. Defaults to destination/source bind-pose leg length.
+   */
+  hipsTranslationScale?: HumanoidRootMotionScaleMode;
+  /**
+   * Whether to preserve humanoid translation tracks other than root and hips. These are skipped by
+   * default because retargeting humanoid joints should normally keep destination bone lengths intact.
    */
   jointTranslations?: 'skip' | 'preserve';
 };
@@ -559,18 +573,20 @@ function createJointRetargetRemap(
 ): JointRetargetRemap {
   const si = srcSkeleton.joints.indexOf(srcJoint);
   const di = dstSkeleton.joints.indexOf(dstJoint);
-  const srcBindPose = srcSkeleton.retargetPose[si];
-  const dstBindPose = dstSkeleton.retargetPose[di];
+  const srcReferencePose = srcSkeleton.retargetPose[si];
+  const dstReferencePose = dstSkeleton.retargetPose[di];
+  const srcBindPose = srcSkeleton.bindPose[si];
+  const dstBindPose = dstSkeleton.bindPose[di];
   const srcLen = srcBindPose.position.magnitude;
   const dstLen = dstBindPose.position.magnitude;
   return {
     dstNode: dstJoint,
     dstJointIndex: di,
     srcNode: srcJoint,
-    srcBindRotInv: Quaternion.inverse(srcBindPose.rotation),
-    dstBindRot: dstBindPose.rotation.clone(),
+    srcBindRotInv: Quaternion.inverse(srcReferencePose.rotation),
+    dstBindRot: dstReferencePose.rotation.clone(),
     rotationCorrection,
-    srcBindPos: srcBindPose.position.clone(),
+    srcBindPos: srcReferencePose.position.clone(),
     dstBindPos: dstBindPose.position.clone(),
     translationScale: translationScale ?? (srcLen > 1e-6 ? dstLen / srcLen : 1),
     translationRotation,
@@ -607,9 +623,9 @@ function createTranslationRetargetRemap(
   };
 }
 
-function getReferencePosition(skeleton: SkeletonRig, joint: SceneNode): Vector3 | null {
+function getBindPosition(skeleton: SkeletonRig, joint: SceneNode): Vector3 | null {
   const index = skeleton.joints.indexOf(joint);
-  return index >= 0 ? skeleton.retargetPose[index].position : null;
+  return index >= 0 ? skeleton.bindPose[index].position : null;
 }
 
 function getSkeletonLocalReferenceTransform(
@@ -620,9 +636,8 @@ function getSkeletonLocalReferenceTransform(
 ): BindTransform {
   let transform = cache.get(node);
   if (!transform) {
-    const bindPose = getRigReferencePoseForNode(skeleton, node);
-    const position = bindPose.position.clone();
-    const rotation = bindPose.rotation.clone();
+    const position = getRigBindPoseForNode(skeleton, node).position.clone();
+    const rotation = getRigReferencePoseForNode(skeleton, node).rotation.clone();
     const parent = node.parent;
     if (parent && jointSet.has(parent)) {
       const parentTransform = getSkeletonLocalReferenceTransform(skeleton, parent, jointSet, cache);
@@ -763,15 +778,24 @@ function getRigReferencePoseForNode(skeleton: SkeletonRig, node: SceneNode): Ske
   );
 }
 
-function getReferenceDistanceToAncestor(
-  skeleton: SkeletonRig,
-  joint: SceneNode,
-  ancestor: SceneNode
-): number {
+function getRigBindPoseForNode(skeleton: SkeletonRig, node: SceneNode): SkeletonBindPose {
+  return (
+    skeleton.getBindPoseForJoint(node) ??
+    (node === skeleton.rootJoint
+      ? skeleton.rootBindPose
+      : {
+          position: node.position,
+          rotation: node.rotation,
+          scale: node.scale
+        })
+  );
+}
+
+function getBindDistanceToAncestor(skeleton: SkeletonRig, joint: SceneNode, ancestor: SceneNode): number {
   let distance = 0;
   let node: SceneNode | null = joint;
   while (node && node !== ancestor) {
-    const bindPosition = getReferencePosition(skeleton, node);
+    const bindPosition = getBindPosition(skeleton, node);
     if (!bindPosition) {
       return 0;
     }
@@ -791,8 +815,8 @@ function getHumanoidLegLength(skeleton: SkeletonRig, side: 'left' | 'right'): nu
   const foot = side === 'left' ? body[HumanoidBodyRig.LeftFoot] : body[HumanoidBodyRig.RightFoot];
   const toes = side === 'left' ? body[HumanoidBodyRig.LeftToes] : body[HumanoidBodyRig.RightToes];
   return Math.max(
-    getReferenceDistanceToAncestor(skeleton, foot, hips),
-    getReferenceDistanceToAncestor(skeleton, toes, hips)
+    getBindDistanceToAncestor(skeleton, foot, hips),
+    getBindDistanceToAncestor(skeleton, toes, hips)
   );
 }
 
@@ -811,15 +835,38 @@ function findTranslationTrack(tracks: AnimationTrack[] | undefined): NodeTransla
     null) as NodeTranslationTrack | null;
 }
 
+function isTranslationTrackAnimated(track: NodeTranslationTrack): boolean {
+  const inputs = track.interpolator.inputs as Float32Array;
+  const outputs = track.interpolator.outputs as Float32Array;
+  const cubic = track.interpolator.mode === 'cubicspline';
+  const stride = cubic ? 9 : 3;
+  const valueOffset = cubic ? 3 : 0;
+  if (inputs.length < 2) {
+    return false;
+  }
+  const first = [outputs[valueOffset], outputs[valueOffset + 1], outputs[valueOffset + 2]];
+  let maxValue = Math.max(1, Math.abs(first[0]), Math.abs(first[1]), Math.abs(first[2]));
+  let maxDelta = 0;
+  for (let i = 1; i < inputs.length; i++) {
+    const base = i * stride + valueOffset;
+    for (let axis = 0; axis < 3; axis++) {
+      maxValue = Math.max(maxValue, Math.abs(outputs[base + axis]));
+      maxDelta = Math.max(maxDelta, Math.abs(outputs[base + axis] - first[axis]));
+    }
+  }
+  return maxDelta > maxValue * 1e-5;
+}
+
 function findAncestorTranslationTrack(
   clip: AnimationClip,
   node: SceneNode,
-  modelRoot: SceneNode
+  modelRoot: SceneNode,
+  animatedOnly = false
 ): { node: SceneNode; track: NodeTranslationTrack } | null {
   let current = node.parent;
   while (current) {
     const track = findTranslationTrack(clip.tracks.get(current));
-    if (track) {
+    if (track && (!animatedOnly || isTranslationTrackAnimated(track))) {
       return { node: current, track };
     }
     if (current === modelRoot) {
@@ -2225,6 +2272,7 @@ export class AnimationSet extends makeObservable(Disposable)<AnimationSetEventMa
     const destName =
       typeof targetNameOrOptions === 'string' ? targetNameOrOptions : (options.targetName ?? animationName);
     const rootMotion = options.rootMotion ?? 'scaled';
+    const hipsTranslation = options.hipsTranslation ?? 'scaled';
     const jointTranslations = options.jointTranslations ?? 'skip';
     const sourceClip = sourceSet.get(animationName);
     if (!sourceClip) {
@@ -2350,37 +2398,37 @@ export class AnimationSet extends makeObservable(Disposable)<AnimationSetEventMa
     const dstHipsNode = dstSkeleton.humanoidJointMapping!.body[HumanoidBodyRig.Hips];
     const srcRootNode = srcSkeleton.rootJoint ?? srcHipsNode;
     const dstRootNode = dstSkeleton.rootJoint ?? dstHipsNode;
+    const hasSeparateHips = srcRootNode !== srcHipsNode && dstRootNode !== dstHipsNode;
     const srcRootRot = computeParentChainRotation(srcRootNode, sourceSet.model, srcSkeleton);
     const dstRootRot = computeParentChainRotation(dstRootNode, this._model, dstSkeleton);
-    const srcRootTranslationTrack = findTranslationTrack(sourceClip.tracks.get(srcRootNode));
-    const srcAncestorTranslationTrackInfo = !srcRootTranslationTrack
-      ? findAncestorTranslationTrack(sourceClip, srcRootNode, sourceSet.model)
-      : null;
-    const srcFallbackHipsTranslationTrack =
-      !srcRootTranslationTrack && !srcAncestorTranslationTrackInfo && srcRootNode !== srcHipsNode
-        ? findTranslationTrack(sourceClip.tracks.get(srcHipsNode))
+    const rootTrackCandidate = findTranslationTrack(sourceClip.tracks.get(srcRootNode));
+    const srcRootTranslationTrack =
+      rootTrackCandidate && (!hasSeparateHips || isTranslationTrackAnimated(rootTrackCandidate))
+        ? rootTrackCandidate
         : null;
-    const srcMotionTrack =
-      srcRootTranslationTrack ?? srcAncestorTranslationTrackInfo?.track ?? srcFallbackHipsTranslationTrack;
+    const srcAncestorTranslationTrackInfo = !srcRootTranslationTrack
+      ? findAncestorTranslationTrack(sourceClip, srcRootNode, sourceSet.model, hasSeparateHips)
+      : null;
+    const srcMotionTrack = srcRootTranslationTrack ?? srcAncestorTranslationTrackInfo?.track ?? null;
     const srcMotionNode = srcRootTranslationTrack
       ? srcRootNode
       : srcAncestorTranslationTrackInfo
         ? srcAncestorTranslationTrackInfo.node
-        : srcFallbackHipsTranslationTrack
-          ? srcHipsNode
-          : null;
+        : null;
     const srcMotionParentRot = srcMotionNode
       ? computeParentChainRotation(srcMotionNode, sourceSet.model, srcSkeleton)
       : srcRootRot;
     const rootTranslationRotation = Quaternion.multiply(Quaternion.inverse(dstRootRot), srcMotionParentRot);
+    const resolveTranslationScale = (mode: HumanoidRootMotionScaleMode | undefined) =>
+      typeof mode === 'number'
+        ? mode
+        : mode === 'none'
+          ? 1
+          : getHumanoidRootMotionScale(srcSkeleton, dstSkeleton);
     const rootTranslationScale =
-      rootMotion === 'scaled'
-        ? typeof options.rootMotionScale === 'number'
-          ? options.rootMotionScale
-          : options.rootMotionScale === 'none'
-            ? 1
-            : getHumanoidRootMotionScale(srcSkeleton, dstSkeleton)
-        : 1;
+      rootMotion === 'scaled' ? resolveTranslationScale(options.rootMotionScale) : 1;
+    const hipsTranslationScale =
+      hipsTranslation === 'scaled' ? resolveTranslationScale(options.hipsTranslationScale) : 1;
     const jointRemaps: JointRetargetRemap[] = [];
     const jointRemapsByDstSkeleton = new Map<SkeletonRig, JointRetargetRemap[]>([[dstSkeleton, jointRemaps]]);
     const srcSignSkeletons = sourceSet._rigs.map((ref) => ref.get()).filter((sk): sk is SkeletonRig => !!sk);
@@ -2542,12 +2590,13 @@ export class AnimationSet extends makeObservable(Disposable)<AnimationSetEventMa
     }
 
     if (rootMotion !== 'none') {
-      const dstRootBindPose = getRigReferencePoseForNode(dstSkeleton, dstRootNode);
+      const dstRootBindPose = getRigBindPoseForNode(dstSkeleton, dstRootNode);
       let dstRootTrack: NodeTranslationTrack | null = null;
       if (rootMotion === 'locked') {
         dstRootTrack = createConstantTranslationTrack(dstRootBindPose.position);
       } else if (srcMotionTrack && srcMotionNode) {
         const srcMotionBindPose = getRigReferencePoseForNode(srcSkeleton, srcMotionNode);
+        const rootMotionAxisLocks = options.lockRootMotionAxes ?? (hasSeparateHips ? { y: true } : undefined);
         const rootRemap = createTranslationRetargetRemap(
           srcMotionNode,
           dstRootNode,
@@ -2557,16 +2606,52 @@ export class AnimationSet extends makeObservable(Disposable)<AnimationSetEventMa
           rootTranslationScale,
           rootTranslationRotation,
           humanoidRotationCorrection ?? undefined,
-          options.lockRootMotionAxes,
+          rootMotionAxisLocks,
           humanoidRotationCorrection ?? undefined
         );
         dstRootTrack = retargetTranslationTrack(srcMotionTrack, rootRemap);
+      } else {
+        dstRootTrack = createConstantTranslationTrack(dstRootBindPose.position);
       }
       if (dstRootTrack) {
         dstRootTrack.name = srcMotionTrack?.name ?? 'translation';
         dstRootTrack.target = dstRootNode.persistentId;
         dstRootTrack.jointIndex = dstSkeleton.joints.indexOf(dstRootNode);
         dstClip.addTrack(dstRootNode, dstRootTrack);
+      }
+    }
+
+    if (hasSeparateHips && hipsTranslation !== 'none') {
+      const srcHipsTrack =
+        findTranslationTrack(sourceClip.tracks.get(srcHipsNode)) ??
+        (srcSkeleton.hasRetargetPose
+          ? createConstantTranslationTrack(getRigBindPoseForNode(srcSkeleton, srcHipsNode).position)
+          : null);
+      const dstHipsBindPose = getRigBindPoseForNode(dstSkeleton, dstHipsNode);
+      let dstHipsTrack: NodeTranslationTrack | null = null;
+      if (hipsTranslation === 'locked') {
+        dstHipsTrack = createConstantTranslationTrack(dstHipsBindPose.position);
+      } else if (srcHipsTrack) {
+        const srcHipsReferencePose = getRigReferencePoseForNode(srcSkeleton, srcHipsNode);
+        const hipsRemap = createTranslationRetargetRemap(
+          srcHipsNode,
+          dstHipsNode,
+          srcHipsReferencePose.position,
+          dstHipsBindPose.position,
+          dstSkeleton.joints.indexOf(dstHipsNode),
+          hipsTranslationScale,
+          undefined,
+          humanoidRotationCorrection ?? undefined,
+          undefined,
+          humanoidRotationCorrection ?? undefined
+        );
+        dstHipsTrack = retargetTranslationTrack(srcHipsTrack, hipsRemap);
+      }
+      if (dstHipsTrack) {
+        dstHipsTrack.name = srcHipsTrack?.name ?? 'translation';
+        dstHipsTrack.target = dstHipsNode.persistentId;
+        dstHipsTrack.jointIndex = dstSkeleton.joints.indexOf(dstHipsNode);
+        dstClip.addTrack(dstHipsNode, dstHipsTrack);
       }
     }
 
@@ -2583,7 +2668,12 @@ export class AnimationSet extends makeObservable(Disposable)<AnimationSetEventMa
           if (srcTrack instanceof NodeRotationTrack || srcTrack instanceof NodeEulerRotationTrack) {
             continue;
           } else if (srcTrack instanceof NodeTranslationTrack) {
-            if (srcNode === srcRootNode || srcTrack === srcMotionTrack || jointTranslations !== 'preserve') {
+            if (
+              srcNode === srcRootNode ||
+              (hasSeparateHips && srcNode === srcHipsNode) ||
+              srcTrack === srcMotionTrack ||
+              jointTranslations !== 'preserve'
+            ) {
               continue;
             }
             dstTrack = retargetTranslationTrack(srcTrack, remap);
