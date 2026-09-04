@@ -4,6 +4,7 @@ import type {
   AbstractDevice,
   BindGroup,
   FrameBuffer,
+  GPUDataBuffer,
   GPUProgram,
   PBGlobalScope,
   PBRenderOptions,
@@ -21,7 +22,7 @@ import type { PunctualLight } from '../scene/light';
 import type { Camera } from '../camera/camera';
 import { drawFullscreenQuad } from './fullscreenquad';
 import { fetchSampler } from '../utility/misc';
-import { ShaderHelper } from '../material/shader/helper';
+import { MAX_CAUSTIC_WATERS, ShaderHelper } from '../material/shader/helper';
 
 /** Index of refraction of water relative to air. */
 const WATER_IOR = 1.333;
@@ -146,16 +147,30 @@ export interface WaterCausticUniforms {
   lightDir: Vector4;
   /** (intensity, focal depth, defocus rate, edge fade start in map-radius units) */
   params: Vector4;
-  /** (sigma_t.xyz, warp strength) */
+  /** (unused.xyz, warp strength). The medium moved to {@link waterMedia}. */
   extinction: Vector4;
-  /** Water region in world XZ: (minX, minZ, maxX, maxZ) */
-  region: Vector4;
+  /** Water bodies contributing to this map, at most {@link MAX_CAUSTIC_WATERS}. */
+  waterCount: number;
+  /** Per body, world XZ footprint: (minX, minZ, maxX, maxZ). */
+  waterRegions: Float32Array<ArrayBuffer>;
+  /** Per body, (sigma_t.xyz, surface height). */
+  waterMedia: Float32Array<ArrayBuffer>;
 }
+
+/** Shadow cascade reused as a light-space depth map of the scene. @internal */
+type SceneDepthBinding = {
+  texture: Texture2DArray;
+  layer: number;
+  size: number;
+  matrix: Matrix4x4;
+  matrixInv: Matrix4x4;
+};
 
 /** @internal */
 type SplatProgramInfo = {
   program: GPUProgram;
-  bindGroup: BindGroup;
+  /** One per water slot; see _getSplatBindGroup. */
+  bindGroups: BindGroup[];
 };
 
 /**
@@ -182,6 +197,8 @@ export function createCausticSplatShader(waveGenerator: WaveGenerator, sceneDept
     /** Map-NDC rectangle the photon grid is laid out over: (minX, minY, maxX, maxY). */
     scope.causticGridBounds = pb.vec4().uniform(0);
     scope.causticSplatParams = pb.vec4().uniform(0);
+    /** (grid size, 1 / grid size, 0, 0) */
+    scope.causticPhotonParams = pb.vec4().uniform(0);
     if (sceneDepth) {
       // The sun's own shadow cascade, reused as a light-space depth map of the
       // scene. Reusing it rather than rendering one costs no extra geometry
@@ -203,8 +220,10 @@ export function createCausticSplatShader(waveGenerator: WaveGenerator, sceneDept
   };
   return {
     vertex(this: PBGlobalScope, pb: ProgramBuilder) {
-      // Photon grid coordinate in [0, 1], one vertex per photon.
-      this.$inputs.photonUV = pb.vec2().attrib('position');
+      // Photon ordinal, one vertex per photon. The grid coordinate is derived
+      // from it here rather than stored, so the buffer outlives any one grid
+      // size - see _updatePhotonLayout.
+      this.$inputs.photonIndex = pb.float().attrib('position');
       this.$outputs.photonWeight = pb.float();
       setupUniforms(this);
       pb.main(function () {
@@ -230,11 +249,17 @@ export function createCausticSplatShader(waveGenerator: WaveGenerator, sceneDept
         // photon (i,j) on texel (i,j) for calm water under any warp strength,
         // and with it the map's normalisation to 1.0 - a grid uniform in meters
         // would pile up in the middle of the map, where the texels are small.
-        this.$l.warpedNDC = pb.mix(
-          this.causticGridBounds.xy,
-          this.causticGridBounds.zw,
-          this.$inputs.photonUV
+        // Ordinal to grid coordinate. The row is the quotient and the column the
+        // remainder, which reproduces the layout the buffer used to hold.
+        this.$l.gridSize = this.causticPhotonParams.x;
+        this.$l.invGrid = this.causticPhotonParams.y;
+        this.$l.photonRow = pb.floor(pb.mul(this.$inputs.photonIndex, this.invGrid));
+        this.$l.photonCol = pb.sub(this.$inputs.photonIndex, pb.mul(this.photonRow, this.gridSize));
+        this.$l.photonUV = pb.mul(
+          pb.add(pb.vec2(this.photonCol, this.photonRow), pb.vec2(0.5)),
+          this.invGrid
         );
+        this.$l.warpedNDC = pb.mix(this.causticGridBounds.xy, this.causticGridBounds.zw, this.photonUV);
         this.$l.ndc = ShaderHelper.unwarpCausticNDC(this, this.warpedNDC, this.causticSplatParams.x);
         this.$l.planePos = pb.add(
           this.causticCenter.xyz,
@@ -556,7 +581,10 @@ export class WaterCausticsRenderer {
   >;
   private readonly _resolveParams: Vector4;
   private _photonLayout: Nullable<VertexLayout>;
-  private _photonGridSize: number;
+  /** Photons the buffer can serve; it grows and is never rebuilt smaller. */
+  private _photonCapacity: number;
+  private _photonBuffer: Nullable<GPUDataBuffer>;
+  private readonly _photonParams: Vector4;
   private _photonCount: number;
   private _splatStates: Nullable<RenderStateSet>;
   private _blurStates: Nullable<RenderStateSet>;
@@ -572,6 +600,14 @@ export class WaterCausticsRenderer {
   private _gridFraction: number;
   /** Furthest the fitted slice reaches from the camera, for cascade selection. */
   private _sliceReach: number;
+  /** Slice frame and extents, kept for the per-body grid fit. */
+  private _sliceRight: Vector3;
+  private _sliceUp: Vector3;
+  private _sliceCenterR: number;
+  private _sliceCenterU: number;
+  private _sliceHalfR: number;
+  private _sliceHalfU: number;
+  private readonly _splatCenter: Vector4;
   private readonly _sceneMatrixT: Matrix4x4;
   private readonly _sceneMatrix: Matrix4x4;
   private readonly _sceneMatrixInv: Matrix4x4;
@@ -588,7 +624,9 @@ export class WaterCausticsRenderer {
     this._prevSlices = new WeakMap();
     this._resolveParams = new Vector4();
     this._photonLayout = null;
-    this._photonGridSize = 0;
+    this._photonCapacity = 0;
+    this._photonBuffer = null;
+    this._photonParams = new Vector4();
     this._photonCount = 0;
     this._splatStates = null;
     this._blurStates = null;
@@ -599,7 +637,9 @@ export class WaterCausticsRenderer {
       lightDir: new Vector4(),
       params: new Vector4(),
       extinction: new Vector4(),
-      region: new Vector4()
+      waterCount: 0,
+      waterRegions: new Float32Array(MAX_CAUSTIC_WATERS * 4),
+      waterMedia: new Float32Array(MAX_CAUSTIC_WATERS * 4)
     };
     this._tmpRight = new Vector3();
     this._tmpUp = new Vector3();
@@ -610,6 +650,13 @@ export class WaterCausticsRenderer {
     this._gridBounds = new Vector4(-1, -1, 1, 1);
     this._gridFraction = 1;
     this._sliceReach = 1;
+    this._sliceRight = new Vector3();
+    this._sliceUp = new Vector3();
+    this._sliceCenterR = 0;
+    this._sliceCenterU = 0;
+    this._sliceHalfR = 1;
+    this._sliceHalfU = 1;
+    this._splatCenter = new Vector4();
     this._sceneMatrixT = new Matrix4x4();
     this._sceneMatrix = new Matrix4x4();
     this._sceneMatrixInv = new Matrix4x4();
@@ -662,7 +709,7 @@ export class WaterCausticsRenderer {
    */
   render(
     ctx: DrawContext,
-    water: Water,
+    waters: readonly Water[],
     light: PunctualLight,
     map: Texture2D,
     scratch: Texture2D,
@@ -670,28 +717,78 @@ export class WaterCausticsRenderer {
     createFramebuffer: (texture: Texture2D) => FrameBuffer
   ): Texture2D {
     const device = ctx.device;
+    this._updateUniforms(ctx, waters, light, map.width);
+    const sceneDepth = this._anySceneDepth(waters) ? this._resolveSceneDepth(ctx, light) : null;
+
+    device.pushDeviceStates();
+    device.setFramebuffer(createFramebuffer(map));
+    // The viewport and scissor survive a framebuffer change, and this pass runs
+    // straight after the shadow maps, whose targets are a different size. Without
+    // this reset the photons rasterise against the shadow map's viewport and
+    // almost all of them land outside the caustic map.
+    device.setViewport(null);
+    device.setScissor(null);
+    device.clearFrameBuffer(Vector4.zero(), null, null);
+    device.setRenderStates(this._getSplatStates(device));
+
+    // One draw per water body, accumulating into the one map. They share the
+    // slice, so a receiver still resolves the pattern with a single lookup; what
+    // each body needs of its own is its footprint, its surface height and its
+    // own wave generator, all of which are per-draw state.
+    for (let i = 0; i < waters.length; i++) {
+      this._splatOne(device, ctx, waters[i], i, map, sceneDepth);
+    }
+    device.popDeviceStates();
+    return this._postProcess(device, waters[0].material, map, scratch, history, ctx, createFramebuffer);
+  }
+  /** @internal */
+  private _splatOne(
+    device: AbstractDevice,
+    ctx: DrawContext,
+    water: Water,
+    index: number,
+    map: Texture2D,
+    sceneDepth: Nullable<SceneDepthBinding>
+  ): void {
     const material = water.material;
     const waveGenerator = material.waveGenerator!;
-    this._updateUniforms(ctx, water, light, map.width);
+    // Photons are laid out over this body's own footprint, so the grid bounds
+    // and the fraction of the map they cover are per body, not per map.
+    this._updateGridBounds(water);
+    if (!(this._gridFraction > 0)) {
+      return;
+    }
     const photonGrid = this._resolvePhotonGrid(material.causticsPhotonResolution, map.width);
     this._updatePhotonLayout(device, photonGrid);
-    const sceneDepth = material.causticsSceneDepth ? this._resolveSceneDepth(ctx, light) : null;
-    const splat = this._getSplatProgram(device, waveGenerator, !!sceneDepth);
-    const bindGroup = splat.bindGroup;
-    if (sceneDepth) {
-      bindGroup.setValue('causticSceneMatrix', sceneDepth.matrix);
-      bindGroup.setValue('causticSceneMatrixInv', sceneDepth.matrixInv);
-      this._sceneDepthParams.setXYZW(sceneDepth.layer, sceneDepth.size, 0, 0);
+    // Scene-depth intersection is per material, but the program is per draw, so
+    // a body that has it off simply compiles the flat variant.
+    const useSceneDepth = !!sceneDepth && material.causticsSceneDepth;
+    const splat = this._getSplatProgram(device, waveGenerator, useSceneDepth);
+    // A bind group per slot: two bodies sharing a wave generator share the
+    // program, and writing one bind group twice before either draw resolves
+    // would leave both draws reading whichever set of values landed last.
+    const bindGroup = this._getSplatBindGroup(device, splat, index);
+    if (useSceneDepth) {
+      bindGroup.setValue('causticSceneMatrix', sceneDepth!.matrix);
+      bindGroup.setValue('causticSceneMatrixInv', sceneDepth!.matrixInv);
+      this._sceneDepthParams.setXYZW(sceneDepth!.layer, sceneDepth!.size, 0, 0);
       bindGroup.setValue('causticSceneParams', this._sceneDepthParams);
       // Point sampling: the stored value is a depth, and averaging two depths
       // across a silhouette names a surface that is not there.
-      bindGroup.setTexture('causticSceneDepth', sceneDepth.texture, fetchSampler('clamp_nearest_nomip'));
+      bindGroup.setTexture('causticSceneDepth', sceneDepth!.texture, fetchSampler('clamp_nearest_nomip'));
     }
     bindGroup.setValue('causticFrameX', this._uniforms.frameX);
     bindGroup.setValue('causticFrameY', this._uniforms.frameY);
-    bindGroup.setValue('causticCenter', this._uniforms.center);
+    // The slice centre is shared, but the water level in w is this body's.
+    this._splatCenter.setXYZW(
+      this._uniforms.center.x,
+      this._uniforms.center.y,
+      this._uniforms.center.z,
+      water.worldMatrix.m13
+    );
+    bindGroup.setValue('causticCenter', this._splatCenter);
     bindGroup.setValue('causticLightDir', this._uniforms.lightDir);
-    bindGroup.setValue('causticRegion', this._uniforms.region);
+    bindGroup.setValue('causticRegion', material.region);
     bindGroup.setValue('causticGridBounds', this._gridBounds);
     // A photon grid denser than the map deposits more than one photon per texel;
     // scale the deposit so a flat surface still integrates to exactly 1. The
@@ -700,31 +797,33 @@ export class WaterCausticsRenderer {
     const photonWeight = (this._gridFraction * map.width * map.height) / (photonGrid * photonGrid);
     this._splatParams.setXYZW(this._warp, material.causticsDepth, WATER_ETA, photonWeight);
     bindGroup.setValue('causticSplatParams', this._splatParams);
+    this._photonParams.setXYZW(photonGrid, 1 / photonGrid, 0, 0);
+    bindGroup.setValue('causticPhotonParams', this._photonParams);
     ShaderHelper.setStandaloneCameraTime(bindGroup, ctx);
     waveGenerator.applyWaterBindGroup(bindGroup);
-
-    device.pushDeviceStates();
-    const mapFramebuffer = createFramebuffer(map);
-    device.setFramebuffer(mapFramebuffer);
-    // The viewport and scissor survive a framebuffer change, and this pass runs
-    // straight after the shadow maps, whose targets are a different size. Without
-    // this reset the photons rasterise against the shadow map's viewport and
-    // almost all of them land outside the caustic map.
-    device.setViewport(null);
-    device.setScissor(null);
-    device.clearFrameBuffer(Vector4.zero(), null, null);
     device.setProgram(splat.program);
     device.setBindGroup(0, bindGroup);
-    device.setRenderStates(this._getSplatStates(device));
     device.setVertexLayout(this._photonLayout);
-    // An empty intersection means the water casts nowhere into this map. Every
-    // receiver it could light projects outside the map too, where the sampler's
-    // edge fade already returns neutral, so the cleared map is the right answer.
-    if (this._gridFraction > 0) {
-      device.draw('point-list', 0, this._photonCount);
-    }
-    device.popDeviceStates();
-
+    device.draw('point-list', 0, this._photonCount);
+  }
+  /**
+   * Blur and temporal resolve, which run once over the finished map rather than
+   * per water body.
+   *
+   * The settings come from one body's material because the map is one texture:
+   * there is no per-body meaning to how many times it is blurred. The largest
+   * body supplies them, which is the one the viewer is most likely under.
+   * @internal
+   */
+  private _postProcess(
+    device: AbstractDevice,
+    material: Water['material'],
+    map: Texture2D,
+    scratch: Texture2D,
+    history: Nullable<Texture2D>,
+    ctx: DrawContext,
+    createFramebuffer: (texture: Texture2D) => FrameBuffer
+  ): Texture2D {
     // Ping-pong between the two targets. The count is rounded up to an even
     // number by the material so the last pass always lands back in `map`.
     const blurPasses = Math.max(0, Math.min(material.causticsBlurPasses, 4));
@@ -898,7 +997,9 @@ export class WaterCausticsRenderer {
   /** Releases the GPU objects owned by this renderer. */
   dispose(): void {
     for (const info of this._splatPrograms.values()) {
-      info.bindGroup.dispose();
+      for (const bindGroup of info.bindGroups) {
+        bindGroup?.dispose();
+      }
       info.program.dispose();
     }
     this._splatPrograms.clear();
@@ -913,7 +1014,11 @@ export class WaterCausticsRenderer {
     this._blurProgram = null;
     this._photonLayout?.dispose();
     this._photonLayout = null;
-    this._photonGridSize = 0;
+    // Disposing the layout releases its vertex array object, not the buffer it
+    // was built over.
+    this._photonBuffer?.dispose();
+    this._photonBuffer = null;
+    this._photonCapacity = 0;
     this._photonCount = 0;
     this._splatStates = null;
     this._blurStates = null;
@@ -935,8 +1040,17 @@ export class WaterCausticsRenderer {
    * Recomputes the orthographic light-space slice the map covers.
    * @internal
    */
-  private _updateUniforms(ctx: DrawContext, water: Water, light: PunctualLight, mapSize: number): void {
-    const material = water.material;
+  private _updateUniforms(
+    ctx: DrawContext,
+    waters: readonly Water[],
+    light: PunctualLight,
+    mapSize: number
+  ): void {
+    // Slice-wide settings come from the first body, which the caller has sorted
+    // largest first. They describe the map, not the water, so one body has to
+    // win: a range or a warp per body would be asking one texture to have two
+    // resolutions.
+    const material = waters[0].material;
     const dir = this._tmpDir;
     dir.set(light.directionAndCutoff.xyz());
     dir.inplaceNormalize();
@@ -949,7 +1063,7 @@ export class WaterCausticsRenderer {
     this._tmpUp.inplaceNormalize();
     const right = this._tmpRight;
     const up = this._tmpUp;
-    const waterLevel = water.worldMatrix.m13;
+    const waterLevel = waters[0].worldMatrix.m13;
     const range = Math.max(1, material.causticsRange);
     const camera = ctx.camera.getWorldPosition();
     const center = this._tmpCenter.setXYZ(camera.x, waterLevel, camera.z);
@@ -963,23 +1077,32 @@ export class WaterCausticsRenderer {
     // parallelogram here, so its bounds come from the four corners; the map is a
     // box in these coordinates, which is why the fit is done against the AABB
     // rather than the parallelogram itself.
-    const region = material.region;
+    //
+    // Over every body at once, so the slice covers all of them. Bodies far
+    // apart make the union mostly empty, but `causticsRange` already bounds how
+    // much of that reaches the map: one far enough away to hurt is also far
+    // enough away to be clipped out below.
     let regionMinR = Infinity;
     let regionMaxR = -Infinity;
     let regionMinU = Infinity;
     let regionMaxU = -Infinity;
-    for (const [x, z] of [
-      [region.x, region.y],
-      [region.z, region.y],
-      [region.x, region.w],
-      [region.z, region.w]
-    ]) {
-      const r = x * right.x + waterLevel * right.y + z * right.z;
-      const v = x * up.x + waterLevel * up.y + z * up.z;
-      regionMinR = Math.min(regionMinR, r);
-      regionMaxR = Math.max(regionMaxR, r);
-      regionMinU = Math.min(regionMinU, v);
-      regionMaxU = Math.max(regionMaxU, v);
+    for (const body of waters) {
+      const region = body.material.region;
+      // Each body's own height, since the projection is taken on its surface.
+      const level = body.worldMatrix.m13;
+      for (const [x, z] of [
+        [region.x, region.y],
+        [region.z, region.y],
+        [region.x, region.w],
+        [region.z, region.w]
+      ]) {
+        const r = x * right.x + level * right.y + z * right.z;
+        const v = x * up.x + level * up.y + z * up.z;
+        regionMinR = Math.min(regionMinR, r);
+        regionMaxR = Math.max(regionMaxR, r);
+        regionMinU = Math.min(regionMinU, v);
+        regionMaxU = Math.max(regionMaxU, v);
+      }
     }
     // Fit the slice to what the water can actually cast into, instead of always
     // spending the map on a camera-centred square of `range`. A pool far smaller
@@ -1069,57 +1192,115 @@ export class WaterCausticsRenderer {
       material.causticsDefocus,
       1 - fadeFraction
     );
-    const extinction = material.extinction;
-    u.extinction.setXYZW(extinction.x, extinction.y, extinction.z, warp);
-    u.region.set(material.region);
+    u.extinction.setXYZW(0, 0, 0, warp);
     this._warp = warp;
+    // Retained for the per-body grid fit, which runs per draw rather than here.
+    this._sliceRight = right;
+    this._sliceUp = up;
+    this._sliceCenterR = centerR;
+    this._sliceCenterU = centerU;
+    this._sliceHalfR = halfR;
+    this._sliceHalfU = halfU;
+    // How far the slice reaches from the camera, which is what decides how
+    // coarse a shadow cascade has to be to contain it.
+    this._sliceReach = Math.hypot(halfR, halfU);
 
-    // Map-NDC bounds of the water region, so the photon grid can be laid out
-    // over just that. Projecting into the slice is invariant along the light and
-    // the slice is normal to it, so a point on the water plane and the photon it
-    // launches share a map position: the region's light-space bounds carry over
-    // directly. Clamped to the map, because photons outside it are rasterised
-    // away and the fraction has to describe what is left or the normalisation
-    // drifts.
-    // Warped, because the grid is laid out in the space the map's texels live
-    // in. The warp is monotone and separable, so warping the interval's ends
-    // gives the warped interval exactly.
-    const minX = warpCausticNDC(Math.max(-1, Math.min(1, (regionMinR - centerR) / halfR)), warp);
-    const maxX = warpCausticNDC(Math.max(-1, Math.min(1, (regionMaxR - centerR) / halfR)), warp);
-    const minY = warpCausticNDC(Math.max(-1, Math.min(1, (regionMinU - centerU) / halfU)), warp);
-    const maxY = warpCausticNDC(Math.max(-1, Math.min(1, (regionMaxU - centerU) / halfU)), warp);
+    // The per-body table the receiver searches. Footprint and surface height
+    // decide which body is above a given point; the medium is what attenuates
+    // the light once one is.
+    u.waterCount = Math.min(waters.length, MAX_CAUSTIC_WATERS);
+    for (let i = 0; i < u.waterCount; i++) {
+      const body = waters[i];
+      const region = body.material.region;
+      u.waterRegions[i * 4 + 0] = region.x;
+      u.waterRegions[i * 4 + 1] = region.y;
+      u.waterRegions[i * 4 + 2] = region.z;
+      u.waterRegions[i * 4 + 3] = region.w;
+      const ext = body.material.extinction;
+      u.waterMedia[i * 4 + 0] = ext.x;
+      u.waterMedia[i * 4 + 1] = ext.y;
+      u.waterMedia[i * 4 + 2] = ext.z;
+      u.waterMedia[i * 4 + 3] = body.worldMatrix.m13;
+    }
+  }
+  /**
+   * Map-NDC bounds of one body's footprint, so its photon grid covers just that.
+   *
+   * Projecting into the slice is invariant along the light and the slice is
+   * normal to it, so a point on the water plane and the photon it launches share
+   * a map position: the body's light-space bounds carry over directly. Clamped
+   * to the map, because photons outside it are rasterised away and the fraction
+   * has to describe what is left or the normalisation drifts. Warped, because
+   * the grid is laid out in the space the map's texels live in - the warp is
+   * monotone and separable, so warping the interval's ends gives the warped
+   * interval exactly.
+   * @internal
+   */
+  private _updateGridBounds(water: Water): void {
+    const region = water.material.region;
+    const level = water.worldMatrix.m13;
+    const right = this._sliceRight;
+    const up = this._sliceUp;
+    let minR = Infinity;
+    let maxR = -Infinity;
+    let minU = Infinity;
+    let maxU = -Infinity;
+    for (const [x, z] of [
+      [region.x, region.y],
+      [region.z, region.y],
+      [region.x, region.w],
+      [region.z, region.w]
+    ]) {
+      const r = x * right.x + level * right.y + z * right.z;
+      const v = x * up.x + level * up.y + z * up.z;
+      minR = Math.min(minR, r);
+      maxR = Math.max(maxR, r);
+      minU = Math.min(minU, v);
+      maxU = Math.max(maxU, v);
+    }
+    const warp = this._warp;
+    const clamp = (v: number) => Math.max(-1, Math.min(1, v));
+    const minX = warpCausticNDC(clamp((minR - this._sliceCenterR) / this._sliceHalfR), warp);
+    const maxX = warpCausticNDC(clamp((maxR - this._sliceCenterR) / this._sliceHalfR), warp);
+    const minY = warpCausticNDC(clamp((minU - this._sliceCenterU) / this._sliceHalfU), warp);
+    const maxY = warpCausticNDC(clamp((maxU - this._sliceCenterU) / this._sliceHalfU), warp);
     this._gridBounds.setXYZW(minX, minY, maxX, maxY);
     // Share of the map the grid covers, which is what keeps calm water at 1.0:
     // the same photon count spread over a smaller area has to deposit
     // proportionally less each.
     this._gridFraction = Math.max(0, ((maxX - minX) * (maxY - minY)) / 4);
-    // How far the slice reaches from the camera, which is what decides how
-    // coarse a shadow cascade has to be to contain it.
-    this._sliceReach = Math.hypot(halfR, halfU);
   }
   /** @internal */
   private _updatePhotonLayout(device: AbstractDevice, gridSize: number): void {
-    if (this._photonLayout && this._photonGridSize === gridSize) {
+    this._photonCount = gridSize * gridSize;
+    if (this._photonCapacity >= this._photonCount) {
       return;
     }
-    this._photonLayout?.dispose();
-    // One vertex per photon carrying its grid coordinate. WebGL2 refuses to draw
-    // without a bound vertex layout, so the grid is materialised rather than
-    // derived from the vertex index.
-    const coords = new Float32Array(gridSize * gridSize * 2);
-    const inv = 1 / gridSize;
-    for (let j = 0; j < gridSize; j++) {
-      for (let i = 0; i < gridSize; i++) {
-        const k = (j * gridSize + i) * 2;
-        coords[k] = (i + 0.5) * inv;
-        coords[k + 1] = (j + 0.5) * inv;
-      }
+    // Grow only, and never rebuild for a size change.
+    //
+    // The buffer holds each photon's ordinal, not its grid coordinate, and the
+    // shader divides that by the grid size to place it. Holding the coordinate
+    // instead ties the buffer's contents to one grid size, and the grid size is
+    // not stable: it is solved from the share of the map a body covers, which
+    // moves continuously as the camera does, and differs between bodies. Every
+    // change then meant a new buffer - once per body per frame with two pools
+    // in view - and VertexLayout.dispose() releases the vertex array object
+    // while leaving the buffer behind it alive, so each one leaked.
+    const capacity = Math.max(this._photonCount, this._photonCapacity * 2);
+    const indices = new Float32Array(capacity);
+    for (let i = 0; i < capacity; i++) {
+      indices[i] = i;
     }
-    this._photonLayout = device.createVertexLayout({
-      vertexBuffers: [{ buffer: device.createVertexBuffer('position_f32x2', coords)! }]
-    });
-    this._photonGridSize = gridSize;
-    this._photonCount = gridSize * gridSize;
+    // WebGL2 refuses to draw without a bound vertex layout, so the ordinal is
+    // materialised as an attribute rather than read from the vertex index.
+    const buffer = device.createVertexBuffer('position_f32', indices)!;
+    this._photonLayout?.dispose();
+    // The layout does not own what it was handed, so the old buffer has to go
+    // separately.
+    this._photonBuffer?.dispose();
+    this._photonBuffer = buffer;
+    this._photonLayout = device.createVertexLayout({ vertexBuffers: [{ buffer }] });
+    this._photonCapacity = capacity;
   }
   /** @internal */
   private _getSplatStates(device: AbstractDevice): RenderStateSet {
@@ -1158,9 +1339,34 @@ export class WaterCausticsRenderer {
     }
     const program = device.buildRenderProgram(createCausticSplatShader(waveGenerator, sceneDepth))!;
     program.name = `@Water_CausticSplat${sceneDepth ? '_SceneDepth' : ''}`;
-    info = { program, bindGroup: device.createBindGroup(program.bindGroupLayouts[0])! };
+    info = { program, bindGroups: [] };
     this._splatPrograms.set(key, info);
     return info;
+  }
+  /**
+   * The bind group for one water slot of a splat program.
+   *
+   * Allocated per slot rather than per program because several bodies can share
+   * a wave generator, and therefore a program. Their draws are queued before any
+   * of them executes, so writing one bind group twice would leave both draws
+   * reading whichever set of values was written last.
+   * @internal
+   */
+  private _getSplatBindGroup(device: AbstractDevice, info: SplatProgramInfo, slot: number): BindGroup {
+    let bindGroup = info.bindGroups[slot];
+    if (!bindGroup) {
+      bindGroup = device.createBindGroup(info.program.bindGroupLayouts[0])!;
+      info.bindGroups[slot] = bindGroup;
+    }
+    return bindGroup;
+  }
+  /**
+   * Whether any body asks for the scene-depth intersection, which decides
+   * whether the shadow cascade needs resolving at all.
+   * @internal
+   */
+  private _anySceneDepth(waters: readonly Water[]): boolean {
+    return waters.some((w) => w.material.causticsSceneDepth);
   }
   /** @internal */
   private _getBlurProgram(device: AbstractDevice): GPUProgram {

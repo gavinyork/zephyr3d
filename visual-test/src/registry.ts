@@ -26,6 +26,7 @@ import {
   waterCausticsMoving,
   waterCausticsOff,
   waterCausticsOn,
+  waterCausticsTwoPools,
   waterFoamStorm,
   waterSubsurfaceBacklit,
   waterSurfaceGrazing
@@ -98,6 +99,7 @@ export const SCENES: VisualScene[] = [
   waterCausticsOn,
   waterCausticsDeepBed,
   waterCausticsMoving,
+  waterCausticsTwoPools,
   waterSurfaceGrazing,
   waterSubsurfaceBacklit,
   waterFoamStorm,

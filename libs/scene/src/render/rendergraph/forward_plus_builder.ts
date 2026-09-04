@@ -28,7 +28,7 @@ import { buildHiZ } from '../hzb';
 import { CopyBlitter } from '../../blitter';
 import { fetchSampler } from '../../utility/misc';
 import { MaterialVaryingFlags } from '../../values';
-import { ShaderHelper } from '../../material/shader/helper';
+import { MAX_CAUSTIC_WATERS, ShaderHelper } from '../../material/shader/helper';
 import { AbstractPostEffect, PostEffectLayer } from '../../posteffect/posteffect';
 import { RenderGraph } from './rendergraph';
 import { RenderGraphExecutor } from './executor';
@@ -628,7 +628,7 @@ const ShadowMapsModule: RenderModule<FrameGraphContext> = {
 function selectWaterCausticSource(
   ctx: DrawContext,
   renderQueue: RenderQueue
-): Nullable<{ water: Water; light: PunctualLight }> {
+): Nullable<{ waters: Water[]; light: PunctualLight }> {
   if (ctx.device.type === 'webgl' || renderQueue.waters.length === 0) {
     return null;
   }
@@ -642,20 +642,23 @@ function selectWaterCausticSource(
   if (!light) {
     return null;
   }
-  let best: Nullable<Water> = null;
-  let bestArea = 0;
-  for (const water of renderQueue.waters) {
-    if (!WaterCausticsRenderer.canRender(water, light)) {
-      continue;
-    }
-    const region = water.material.region;
-    const area = Math.max(0, region.z - region.x) * Math.max(0, region.w - region.y);
-    if (!best || area > bestArea) {
-      best = water;
-      bestArea = area;
-    }
+  const waters = renderQueue.waters.filter((water) => WaterCausticsRenderer.canRender(water, light));
+  if (waters.length === 0) {
+    return null;
   }
-  return best ? { water: best, light } : null;
+  // Largest first, which decides both what survives the cap and which body's
+  // settings describe the shared map. Area is a stand-in for "the one the viewer
+  // is most likely to be over"; a camera-distance sort would swap the map's
+  // whole configuration as the viewer walks between two pools, and swapping it
+  // discards the temporal history every time.
+  waters.sort((a, b) => {
+    const ra = a.material.region;
+    const rb = b.material.region;
+    const areaA = Math.max(0, ra.z - ra.x) * Math.max(0, ra.w - ra.y);
+    const areaB = Math.max(0, rb.z - rb.x) * Math.max(0, rb.w - rb.y);
+    return areaB - areaA;
+  });
+  return { waters: waters.slice(0, MAX_CAUSTIC_WATERS), light };
 }
 
 /** @internal */
@@ -666,7 +669,8 @@ const WaterCausticsModule: RenderModule<FrameGraphContext> = {
   setup(fg: FrameGraphContext) {
     const { graph, ctx, renderQueue, ordering, blackboard } = fg;
     const source = selectWaterCausticSource(ctx, renderQueue)!;
-    const material = source.water.material;
+    // Map-wide settings come from the largest body; see selectWaterCausticSource.
+    const material = source.waters[0].material;
     const size = material.causticsResolution;
     const format = WaterCausticsRenderer.getMapFormat(ctx.device);
     const history = fg.history;
@@ -715,7 +719,7 @@ const WaterCausticsModule: RenderModule<FrameGraphContext> = {
         const previous = previousHandle ? rgCtx.getTexture<Texture2D>(previousHandle) : null;
         const resolved = _waterCausticsRenderer.render(
           ctx,
-          source.water,
+          source.waters,
           source.light,
           map,
           scratch,

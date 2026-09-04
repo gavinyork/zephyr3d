@@ -57,6 +57,16 @@ const UNIFORM_NAME_SHADOW_MAP = 'Z_UniformShadowMap';
 const UNIFORM_NAME_SHADOW_MASK = 'Z_UniformShadowMask';
 const UNIFORM_NAME_SHADOW_MASK_MODE = 'Z_UniformShadowMaskMode';
 const UNIFORM_NAME_CAUSTIC_MAP = 'Z_UniformCausticMap';
+/**
+ * Water bodies that can cast caustics into one map.
+ *
+ * They share the map and the slice, so this is not a limit on how much water a
+ * scene may hold - only on how many separate surfaces the receiver will test
+ * itself against, which it does per fragment. Four covers a lake with a couple
+ * of pools beside it; beyond that the renderer keeps the largest four, which
+ * are the ones a viewer is most likely to be standing over.
+ */
+export const MAX_CAUSTIC_WATERS = 4;
 const UNIFORM_NAME_CAUSTIC_PARAMS = 'Z_UniformCausticParams';
 const UNIFORM_NAME_LINEAR_DEPTH_MAP = 'Z_UniformLinearDepth';
 const UNIFORM_NAME_LINEAR_DEPTH_MAP_SIZE = 'Z_UniformLinearDepthSize';
@@ -1492,7 +1502,13 @@ export class ShaderHelper {
       pb.vec4('lightDir'),
       pb.vec4('params'),
       pb.vec4('extinction'),
-      pb.vec4('region')
+      // Per water body, because the slice is shared but the water is not: each
+      // has its own surface height, footprint and medium, and none of the three
+      // means anything until a receiver has resolved which water is above it.
+      pb.int('waterCount'),
+      pb.vec4[MAX_CAUSTIC_WATERS]('waterRegions'),
+      // (sigma_t.xyz, surface height)
+      pb.vec4[MAX_CAUSTIC_WATERS]('waterMedia')
     ]);
     scope[UNIFORM_NAME_CAUSTIC_PARAMS] = causticStruct().uniform(0);
     // The map is single mip and read bilinearly; clamping keeps receivers
@@ -1539,31 +1555,59 @@ export class ShaderHelper {
     const funcName = 'Z_calculateWaterCaustic';
     pb.func(funcName, [pb.vec3('worldPos'), pb.int('lightType'), pb.vec3('lightDirection')], function () {
       this.$l.cu = this[UNIFORM_NAME_CAUSTIC_PARAMS];
-      this.$l.depth = pb.sub(this.cu.center.w, this.worldPos.y);
-      // Length of the light path inside the water, straight down the sun ray.
-      this.$l.pathLength = pb.mul(this.depth, this.cu.lightDir.w);
-      // Where the sun ray that lights this point crossed the water plane. The
-      // splat pass clips photons by their entry point, so the receiver must ask
-      // the same question: a point under the water's footprint that the sun
-      // reaches from outside it saw no water at all, and a point beyond the
-      // footprint that the sun reaches through it did. Testing the point's own
-      // xz gets both wrong by the horizontal offset depth / tan(elevation).
-      this.$l.entryXZ = pb.sub(this.worldPos.xz, pb.mul(this.cu.lightDir.xz, this.pathLength));
-      // Not the caustic light, above the surface, or the ray never entered the
-      // water: nothing to attenuate.
+      // Only the one light the map was built for casts caustics.
       this.$if(
         pb.or(
           pb.notEqual(this.lightType, LIGHT_TYPE_DIRECTIONAL),
-          pb.lessThan(pb.dot(this.lightDirection, this.cu.lightDir.xyz), 0.999),
-          pb.lessThanEqual(this.depth, 0),
-          pb.any(pb.lessThan(this.entryXZ, this.cu.region.xy)),
-          pb.any(pb.greaterThan(this.entryXZ, this.cu.region.zw))
+          pb.lessThan(pb.dot(this.lightDirection, this.cu.lightDir.xyz), 0.999)
         ),
         function () {
           this.$return(pb.vec3(1));
         }
       );
-      this.$l.transmittance = pb.exp(pb.neg(pb.mul(this.cu.extinction.xyz, this.pathLength)));
+      // Find the water above this point. Several can qualify - a pool inside a
+      // lake, water on terraces - and the one that matters is the lowest of
+      // them, because that is the last surface the sun crossed on its way here.
+      this.$l.depth = pb.float(-1);
+      this.$l.medium = pb.vec3(0);
+      this.$for(pb.int('i'), 0, MAX_CAUSTIC_WATERS, function () {
+        this.$if(pb.greaterThanEqual(this.i, this.cu.waterCount), function () {
+          this.$break();
+        });
+        this.$l.slotMedium = this.cu.waterMedia.at(this.i);
+        this.$l.slotDepth = pb.sub(this.slotMedium.w, this.worldPos.y);
+        this.$if(pb.greaterThan(this.slotDepth, 0), function () {
+          // Where the sun ray that lights this point crossed that water plane.
+          // The splat pass clips photons by their entry point, so the receiver
+          // must ask the same question: a point under the footprint that the sun
+          // reaches from outside it saw no water at all, and a point beyond the
+          // footprint that the sun reaches through it did. Testing the point's
+          // own xz gets both wrong by the offset depth / tan(elevation).
+          this.$l.slotPath = pb.mul(this.slotDepth, this.cu.lightDir.w);
+          this.$l.slotEntry = pb.sub(this.worldPos.xz, pb.mul(this.cu.lightDir.xz, this.slotPath));
+          this.$l.slotRegion = this.cu.waterRegions.at(this.i);
+          this.$if(
+            pb.and(
+              pb.all(pb.greaterThanEqual(this.slotEntry, this.slotRegion.xy)),
+              pb.all(pb.lessThanEqual(this.slotEntry, this.slotRegion.zw))
+            ),
+            function () {
+              this.$if(
+                pb.or(pb.lessThan(this.depth, 0), pb.lessThan(this.slotDepth, this.depth)),
+                function () {
+                  this.depth = this.slotDepth;
+                  this.medium = this.slotMedium.xyz;
+                }
+              );
+            }
+          );
+        });
+      });
+      this.$if(pb.lessThanEqual(this.depth, 0), function () {
+        this.$return(pb.vec3(1));
+      });
+      this.$l.pathLength = pb.mul(this.depth, this.cu.lightDir.w);
+      this.$l.transmittance = pb.exp(pb.neg(pb.mul(this.medium, this.pathLength)));
       // Project into the map: frameX/frameY are orthonormal and perpendicular to
       // the light, so the same two dot products the splat pass used invert it.
       this.$l.rel = pb.sub(this.worldPos, this.cu.center.xyz);
@@ -1619,7 +1663,9 @@ export class ShaderHelper {
       lightDir: uniforms.lightDir,
       params: uniforms.params,
       extinction: uniforms.extinction,
-      region: uniforms.region
+      waterCount: uniforms.waterCount,
+      waterRegions: uniforms.waterRegions,
+      waterMedia: uniforms.waterMedia
     });
     bindGroup.setTexture(
       UNIFORM_NAME_CAUSTIC_MAP,
