@@ -185,7 +185,7 @@ describe('water caustics sampling shader', () => {
  * an explicit-LOD texture fetch, which is what the real ones do. Only the shader
  * side is implemented; the splat pass never touches anything else.
  */
-function createStubWaveGenerator(sampleTexture: boolean): WaveGenerator {
+export function createStubWaveGenerator(sampleTexture: boolean): WaveGenerator {
   return {
     getHash: () => `stub:${sampleTexture}`,
     setupUniforms(scope: PBGlobalScope, group: number) {
@@ -231,10 +231,43 @@ function createStubWaveGenerator(sampleTexture: boolean): WaveGenerator {
   } as unknown as WaveGenerator;
 }
 
+describe('water caustics splat shader, scene depth variant', () => {
+  // The variant that lands photons on the scene instead of on a plane. WebGPU
+  // only: it reads the shadow map with a texel fetch, which GLSL ES 3.0 does not
+  // allow on a shadow-sampler texture.
+  test('builds and reads the shadow cascade', () => {
+    const pb = new ProgramBuilder(createMockDevice('webgpu'));
+    const ret = pb.buildRender(createCausticSplatShader(createStubWaveGenerator(false), true));
+    expect(ret).not.toBeNull();
+    const [vertexSource] = ret!;
+    expect(vertexSource).toContain('causticSceneDepth');
+    expect(vertexSource).toContain('causticSceneMatrix');
+    expect(vertexSource).toContain('causticSceneMatrixInv');
+  });
+
+  test('the flat variant declares none of it, so nothing is bound that is not used', () => {
+    const pb = new ProgramBuilder(createMockDevice('webgpu'));
+    const [vertexSource] = pb.buildRender(createCausticSplatShader(createStubWaveGenerator(false), false))!;
+    expect(vertexSource).not.toContain('causticSceneDepth');
+    expect(vertexSource).not.toContain('causticSceneMatrix');
+  });
+
+  test('keeps the focal plane as the starting guess', () => {
+    // The iteration refines an intersection rather than replacing it, so the
+    // flat solve has to survive in the variant that refines it - that is what
+    // makes a sample outside the cascade degrade to the old behaviour instead
+    // of to nothing.
+    const pb = new ProgramBuilder(createMockDevice('webgpu'));
+    const [vertexSource] = pb.buildRender(createCausticSplatShader(createStubWaveGenerator(false), true))!;
+    expect(vertexSource).toContain('causticSplatParams');
+    expect(vertexSource).toContain('refract');
+  });
+});
+
 describe('water caustics splat shader', () => {
   test.each(DEVICE_TYPES)('builds the photon splat program on %s', (type) => {
     const pb = new ProgramBuilder(createMockDevice(type));
-    const ret = pb.buildRender(createCausticSplatShader(createStubWaveGenerator(false)));
+    const ret = pb.buildRender(createCausticSplatShader(createStubWaveGenerator(false), false));
     expect(ret).not.toBeNull();
     const [vertexSource, fragmentSource] = ret!;
     // The whole photon transform lives in the vertex stage.
@@ -247,7 +280,7 @@ describe('water caustics splat shader', () => {
 
   test.each(DEVICE_TYPES)('samples wave data from the vertex stage on %s', (type) => {
     const pb = new ProgramBuilder(createMockDevice(type));
-    const ret = pb.buildRender(createCausticSplatShader(createStubWaveGenerator(true)));
+    const ret = pb.buildRender(createCausticSplatShader(createStubWaveGenerator(true), false));
     expect(ret).not.toBeNull();
     const vertexSource = ret![0];
     expect(vertexSource).toContain('stubWaveTexture');
@@ -259,7 +292,7 @@ describe('water caustics splat shader', () => {
 
   test.each(DEVICE_TYPES)('lays the photon grid out with both half-extents on %s', (type) => {
     const pb = new ProgramBuilder(createMockDevice(type));
-    const vertexSource = pb.buildRender(createCausticSplatShader(createStubWaveGenerator(false)))![0];
+    const vertexSource = pb.buildRender(createCausticSplatShader(createStubWaveGenerator(false), false))![0];
     // Both the grid layout and the projection of the hit position have to use
     // the slice's own extent per axis; sharing frameX's silently skews the
     // photon grid against the map on any slice that is not square in meters.
@@ -269,7 +302,7 @@ describe('water caustics splat shader', () => {
 
   test.each(DEVICE_TYPES)('lays the photon grid out in warped space on %s', (type) => {
     const pb = new ProgramBuilder(createMockDevice(type));
-    const vertexSource = pb.buildRender(createCausticSplatShader(createStubWaveGenerator(false)))![0];
+    const vertexSource = pb.buildRender(createCausticSplatShader(createStubWaveGenerator(false), false))![0];
     // The grid is uniform in the space the map's texels live in and unwarped to
     // reach the plane; the hit is warped back on the way out. Both directions
     // have to be present, or calm water stops landing one photon per texel and

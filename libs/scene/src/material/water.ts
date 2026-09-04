@@ -100,6 +100,7 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
   private _causticsRange: number;
   private _causticsFadeDistance: number;
   private _causticsWarp: number;
+  private _causticsSceneDepth: boolean;
   private _causticsDefocus: number;
   private _causticsResolution: number;
   private _causticsPhotonResolution: number;
@@ -138,6 +139,7 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
     this._causticsRange = 60;
     this._causticsFadeDistance = 0;
     this._causticsWarp = 1.5;
+    this._causticsSceneDepth = true;
     this._causticsDefocus = 0.12;
     this._causticsResolution = 1024;
     this._causticsPhotonResolution = 0;
@@ -327,6 +329,28 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
   }
   set causticsFadeDistance(val: number) {
     this._causticsFadeDistance = Math.max(0, val);
+  }
+  /**
+   * Whether photons land on the scene instead of on a plane at
+   * {@link causticsDepth}.
+   *
+   * The plane is a single depth for the whole map, so a receiver that is not at
+   * that depth reads a pattern displaced sideways by the difference times the
+   * tangent of the refracted angle - invisible under a high sun, badly wrong
+   * under a low one, and wrong everywhere on a sea bed with relief. Resolving
+   * the real depth reuses the sun's shadow cascade, so it costs no extra
+   * geometry pass, and falls back to the plane wherever that cascade has
+   * nothing to say.
+   *
+   * {@link causticsDepth} still sets where the iteration starts and what the
+   * defocus is measured against, so it stays worth setting to the depth most of
+   * the receiving geometry sits at.
+   */
+  get causticsSceneDepth() {
+    return this._causticsSceneDepth;
+  }
+  set causticsSceneDepth(val: boolean) {
+    this._causticsSceneDepth = !!val;
   }
   /**
    * How strongly caustic map texels are concentrated near the camera, 0 to
