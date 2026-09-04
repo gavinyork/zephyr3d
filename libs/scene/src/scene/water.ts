@@ -133,6 +133,16 @@ export class Water extends applyMixins(GraphNode, mixinDrawable) implements Draw
     this.material.causticsDepth = val;
   }
   /**
+   * Whether caustics land on the scene rather than on a plane at
+   * {@link causticsDepth}. WebGL2 keeps the plane regardless.
+   */
+  get causticsSceneDepth() {
+    return this.material.causticsSceneDepth;
+  }
+  set causticsSceneDepth(val: boolean) {
+    this.material.causticsSceneDepth = val;
+  }
+  /**
    * Furthest distance in meters from the camera the caustic map reaches.
    *
    * A cap rather than a fixed extent: the map is fitted to the part of the water

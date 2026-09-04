@@ -344,6 +344,19 @@ export function getWaterClass(manager: ResourceManager): SerializableClass {
           }
         },
         {
+          name: 'CausticsSceneDepth',
+          description:
+            'Land caustics on the scene instead of on a plane at CausticsDepth. Reuses the sun shadow cascade, so it costs no extra geometry pass; WebGL2 keeps the plane, which its shadow map format cannot avoid.',
+          type: 'bool',
+          default: true,
+          get(this: Water, value) {
+            value.bool[0] = this.causticsSceneDepth;
+          },
+          set(this: Water, value) {
+            this.causticsSceneDepth = value.bool[0];
+          }
+        },
+        {
           name: 'CausticsWarp',
           description:
             'How strongly caustic map texels are concentrated near the camera; ignored while the map already fits the water within range',

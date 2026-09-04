@@ -1,5 +1,5 @@
 import type { Nullable } from '@zephyr3d/base';
-import { Vector3, Vector4 } from '@zephyr3d/base';
+import { Matrix4x4, REVERSE_Z, Vector3, Vector4 } from '@zephyr3d/base';
 import type {
   AbstractDevice,
   BindGroup,
@@ -10,6 +10,7 @@ import type {
   ProgramBuilder,
   RenderStateSet,
   Texture2D,
+  Texture2DArray,
   TextureFormat,
   VertexLayout
 } from '@zephyr3d/device';
@@ -34,6 +35,16 @@ const WATER_ETA = 1 / WATER_IOR;
  * (the surface turns into a mirror), so the pass simply switches off.
  */
 const MIN_SUN_ELEVATION = 0.15;
+/**
+ * Fixed-point steps taken to land a photon on the scene rather than on the
+ * focal plane.
+ *
+ * Two is enough for a receiver that is flat under the distance the guess moves,
+ * which is the common case; the third covers a slope steep enough that the
+ * first correction overshoots. Beyond that the sequence has either converged or
+ * is oscillating between two surfaces, and more steps do not settle it.
+ */
+const SCENE_DEPTH_ITERATIONS = 3;
 /**
  * Photons per covered map texel the automatic grid size solves for.
  *
@@ -160,7 +171,7 @@ type SplatProgramInfo = {
  * @param waveGenerator - Supplies the surface displacement and normal.
  * @internal
  */
-export function createCausticSplatShader(waveGenerator: WaveGenerator): PBRenderOptions {
+export function createCausticSplatShader(waveGenerator: WaveGenerator, sceneDepth: boolean): PBRenderOptions {
   const setupUniforms = (scope: PBGlobalScope) => {
     const pb = scope.$builder;
     scope.causticFrameX = pb.vec4().uniform(0);
@@ -171,6 +182,20 @@ export function createCausticSplatShader(waveGenerator: WaveGenerator): PBRender
     /** Map-NDC rectangle the photon grid is laid out over: (minX, minY, maxX, maxY). */
     scope.causticGridBounds = pb.vec4().uniform(0);
     scope.causticSplatParams = pb.vec4().uniform(0);
+    if (sceneDepth) {
+      // The sun's own shadow cascade, reused as a light-space depth map of the
+      // scene. Reusing it rather than rendering one costs no extra geometry
+      // pass, and it is already the right projection: orthographic, along the
+      // light, covering what the light reaches.
+      scope.causticSceneMatrix = pb.mat4().uniform(0);
+      scope.causticSceneMatrixInv = pb.mat4().uniform(0);
+      /** (cascade layer, 0, 0, 0) */
+      scope.causticSceneParams = pb.vec4().uniform(0);
+      // Sampled for its stored depth, not compared against a reference, so this
+      // takes an ordinary sampler rather than the comparison one the lighting
+      // pass binds to the same texture.
+      scope.causticSceneDepth = pb.tex2DArrayShadow().uniform(0);
+    }
     // FBM and Gerstner animate from camera.elapsedTime, which this pass has to
     // supply itself - it is not one of the engine's camera passes.
     ShaderHelper.declareStandaloneCameraTime(scope, 0);
@@ -239,9 +264,75 @@ export function createCausticSplatShader(waveGenerator: WaveGenerator): PBRender
         // Intersect the horizontal focal plane below the surface. The ray always
         // travels downwards here, but clamp anyway so a grazing ray cannot
         // produce an enormous or negative step.
+        this.$l.invDirY = pb.min(this.dir.y, -1e-4);
         this.$l.targetY = pb.sub(this.waterLevel, this.focalDepth);
-        this.$l.hitT = pb.div(pb.sub(this.targetY, this.surfacePos.y), pb.min(this.dir.y, -1e-4));
+        this.$l.hitT = pb.div(pb.sub(this.targetY, this.surfacePos.y), this.invDirY);
         this.$l.hitPos = pb.add(this.surfacePos, pb.mul(this.dir, pb.max(this.hitT, 0)));
+        if (sceneDepth) {
+          // Land the photon on the scene rather than on a plane through it.
+          //
+          // Fixed-point iteration, not a ray march: read the height of the scene
+          // under the current guess, re-intersect the ray with a horizontal
+          // plane at that height, repeat. Each step is one texture fetch and the
+          // sequence converges in two or three for any receiver that is smooth
+          // over the distance the guess moves - a sea bed, a slope, a pool
+          // floor. A march would need an order of magnitude more fetches to
+          // resolve the same hit, which the photon count here cannot afford:
+          // at the default density a full-coverage 1024 map launches four
+          // million of them.
+          //
+          // Where the assumption fails - a silhouette, an overhang - the
+          // iteration lands on one of the two surfaces rather than diverging,
+          // because every step is still a valid intersection of the ray with
+          // some horizontal plane. The result is a caustic on the wrong one of
+          // two surfaces that overlap in the light's view, which is the same
+          // thing a shadow map alone can say about that configuration.
+          this.$l.probe = this.hitPos;
+          this.$l.layer = pb.int(this.causticSceneParams.x);
+          for (let i = 0; i < SCENE_DEPTH_ITERATIONS; i++) {
+            this.$l[`clip${i}`] = pb.mul(this.causticSceneMatrix, pb.vec4(this.probe, 1));
+            this.$l[`ndc${i}`] = pb.div(this[`clip${i}`].xyz, this[`clip${i}`].w);
+            this.$l[`uv${i}`] = pb.add(pb.mul(this[`ndc${i}`].xy, 0.5), pb.vec2(0.5));
+            // Outside the cascade there is nothing to intersect against; keep
+            // whatever the previous step produced, which for the first step is
+            // the focal plane hit the flat path would have used.
+            this.$l[`inside${i}`] = pb.and(
+              pb.all(pb.greaterThanEqual(this[`uv${i}`], pb.vec2(0))),
+              pb.all(pb.lessThanEqual(this[`uv${i}`], pb.vec2(1)))
+            );
+            // texelFetch rather than a filtered sample: the value is a depth,
+            // and averaging two depths across a silhouette names a surface that
+            // is not there. WebGPU only - GLSL ES 3.0 forbids texelFetch on a
+            // shadow-sampler texture, which is what gates this whole path.
+            this.$l[`depth${i}`] = pb.textureArrayLoad(
+              this.causticSceneDepth,
+              pb.ivec2(pb.mul(this[`uv${i}`], this.causticSceneParams.y)),
+              this.layer,
+              pb.int(0)
+            );
+            // Back to a world position. The cascade is orthographic, so the
+            // stored depth and the sample's uv are enough to place the point.
+            this.$l[`sceneNDC${i}`] = pb.vec3(
+              this[`ndc${i}`].xy,
+              REVERSE_Z ? this[`depth${i}`] : pb.sub(pb.mul(this[`depth${i}`], 2), 1)
+            );
+            this.$l[`sceneClip${i}`] = pb.mul(this.causticSceneMatrixInv, pb.vec4(this[`sceneNDC${i}`], 1));
+            this.$l[`scenePos${i}`] = pb.div(this[`sceneClip${i}`].xyz, this[`sceneClip${i}`].w);
+            // Re-intersect at the height just read. Only accept it while it is
+            // below the surface: a scene point above the water is not something
+            // this photon passed through.
+            this.$l[`t${i}`] = pb.div(pb.sub(this[`scenePos${i}`].y, this.surfacePos.y), this.invDirY);
+            this.$l[`next${i}`] = pb.add(this.surfacePos, pb.mul(this.dir, pb.max(this[`t${i}`], 0)));
+            // mix rather than select: the builder has no vec3 select, and a float
+            // gate is the form the resolve shader already uses for this.
+            this.probe = pb.mix(
+              this.probe,
+              this[`next${i}`],
+              pb.float(pb.and(this[`inside${i}`], pb.lessThan(this[`scenePos${i}`].y, this.waterLevel)))
+            );
+          }
+          this.hitPos = this.probe;
+        }
         // Project the hit back into the map. frameX/frameY are perpendicular to
         // L and to each other, so this is just two dot products.
         this.$l.rel = pb.sub(this.hitPos, this.causticCenter.xyz);
@@ -479,6 +570,12 @@ export class WaterCausticsRenderer {
   /** Map-NDC rectangle the photon grid covers, and the map fraction it is. */
   private readonly _gridBounds: Vector4;
   private _gridFraction: number;
+  /** Furthest the fitted slice reaches from the camera, for cascade selection. */
+  private _sliceReach: number;
+  private readonly _sceneMatrixT: Matrix4x4;
+  private readonly _sceneMatrix: Matrix4x4;
+  private readonly _sceneMatrixInv: Matrix4x4;
+  private readonly _sceneDepthParams: Vector4;
   /** Warp strength the current slice was built with; 0 when the map is linear. */
   private _warp: number;
   constructor() {
@@ -512,6 +609,11 @@ export class WaterCausticsRenderer {
     this._blurTexelSize = new Vector4();
     this._gridBounds = new Vector4(-1, -1, 1, 1);
     this._gridFraction = 1;
+    this._sliceReach = 1;
+    this._sceneMatrixT = new Matrix4x4();
+    this._sceneMatrix = new Matrix4x4();
+    this._sceneMatrixInv = new Matrix4x4();
+    this._sceneDepthParams = new Vector4();
     this._warp = 0;
   }
   /** Parameters of the map produced by the last successful {@link render}. */
@@ -573,8 +675,18 @@ export class WaterCausticsRenderer {
     this._updateUniforms(ctx, water, light, map.width);
     const photonGrid = this._resolvePhotonGrid(material.causticsPhotonResolution, map.width);
     this._updatePhotonLayout(device, photonGrid);
-    const splat = this._getSplatProgram(device, waveGenerator);
+    const sceneDepth = material.causticsSceneDepth ? this._resolveSceneDepth(ctx, light) : null;
+    const splat = this._getSplatProgram(device, waveGenerator, !!sceneDepth);
     const bindGroup = splat.bindGroup;
+    if (sceneDepth) {
+      bindGroup.setValue('causticSceneMatrix', sceneDepth.matrix);
+      bindGroup.setValue('causticSceneMatrixInv', sceneDepth.matrixInv);
+      this._sceneDepthParams.setXYZW(sceneDepth.layer, sceneDepth.size, 0, 0);
+      bindGroup.setValue('causticSceneParams', this._sceneDepthParams);
+      // Point sampling: the stored value is a depth, and averaging two depths
+      // across a silhouette names a surface that is not there.
+      bindGroup.setTexture('causticSceneDepth', sceneDepth.texture, fetchSampler('clamp_nearest_nomip'));
+    }
     bindGroup.setValue('causticFrameX', this._uniforms.frameX);
     bindGroup.setValue('causticFrameY', this._uniforms.frameY);
     bindGroup.setValue('causticCenter', this._uniforms.center);
@@ -658,6 +770,60 @@ export class WaterCausticsRenderer {
    * @param mapSize - Edge length of the caustic map.
    * @internal
    */
+  private _resolveSceneDepth(
+    ctx: DrawContext,
+    light: PunctualLight
+  ): Nullable<{
+    texture: Texture2DArray;
+    layer: number;
+    size: number;
+    matrix: Matrix4x4;
+    matrixInv: Matrix4x4;
+  }> {
+    // WebGPU only. Reading a raw depth out of the shadow map needs a texel
+    // fetch, and GLSL ES 3.0 does not allow one on a shadow-sampler texture -
+    // the alternative there is to bind the same texture through a second,
+    // non-comparison sampler, which is a wider change than this is worth. WebGL2
+    // keeps the focal plane, which is what it had before.
+    if (ctx.device.type !== 'webgpu') {
+      return null;
+    }
+    const params = ctx.shadowMapInfo?.get(light);
+    const shadowMap = params?.shadowMap;
+    // Only the cascaded native-depth path, which is what a shadow-casting
+    // directional light uses on every backend that runs this pass. A packed
+    // RGBA map stores an encoded distance rather than a sampled depth, and a
+    // non-array map has no cascade to select; both fall back to the plane.
+    if (!params || !shadowMap?.isTexture2DArray() || !shadowMap.isDepth()) {
+      return null;
+    }
+    // The cascade that covers the slice most tightly. The slice reaches at most
+    // `causticsRange` from the camera, so the smallest cascade whose split
+    // distance clears that resolves the scene best; falling off the end means
+    // the slice outruns the shadow map and the last cascade is all there is.
+    const count = Math.max(1, Math.min(params.numShadowCascades, 4));
+    const reach = Math.max(1, this._sliceReach);
+    let layer = count - 1;
+    for (let i = 0; i < count; i++) {
+      if (params.cascadeDistances[i] >= reach) {
+        layer = i;
+        break;
+      }
+    }
+    // shadowMatrices holds each cascade's view-projection transposed, four vec4
+    // rows per cascade, which is the layout the lighting pass dots against.
+    this._sceneMatrixT.set(params.shadowMatrices.subarray(layer * 16, layer * 16 + 16));
+    Matrix4x4.transpose(this._sceneMatrixT, this._sceneMatrix);
+    Matrix4x4.invert(this._sceneMatrix, this._sceneMatrixInv);
+    return {
+      texture: shadowMap as Texture2DArray,
+      layer,
+      size: shadowMap.width,
+      matrix: this._sceneMatrix,
+      matrixInv: this._sceneMatrixInv
+    };
+  }
+  /** @internal */
   private _resolvePhotonGrid(requested: number, mapSize: number): number {
     if (requested > 0) {
       return Math.max(8, Math.min(requested, 4096));
@@ -927,6 +1093,9 @@ export class WaterCausticsRenderer {
     // the same photon count spread over a smaller area has to deposit
     // proportionally less each.
     this._gridFraction = Math.max(0, ((maxX - minX) * (maxY - minY)) / 4);
+    // How far the slice reaches from the camera, which is what decides how
+    // coarse a shadow cascade has to be to contain it.
+    this._sliceReach = Math.hypot(halfR, halfU);
   }
   /** @internal */
   private _updatePhotonLayout(device: AbstractDevice, gridSize: number): void {
@@ -977,14 +1146,18 @@ export class WaterCausticsRenderer {
     return this._blurStates;
   }
   /** @internal */
-  private _getSplatProgram(device: AbstractDevice, waveGenerator: WaveGenerator): SplatProgramInfo {
-    const key = waveGenerator.getHash();
+  private _getSplatProgram(
+    device: AbstractDevice,
+    waveGenerator: WaveGenerator,
+    sceneDepth: boolean
+  ): SplatProgramInfo {
+    const key = `${waveGenerator.getHash()}:${sceneDepth ? 1 : 0}`;
     let info = this._splatPrograms.get(key);
     if (info) {
       return info;
     }
-    const program = device.buildRenderProgram(createCausticSplatShader(waveGenerator))!;
-    program.name = '@Water_CausticSplat';
+    const program = device.buildRenderProgram(createCausticSplatShader(waveGenerator, sceneDepth))!;
+    program.name = `@Water_CausticSplat${sceneDepth ? '_SceneDepth' : ''}`;
     info = { program, bindGroup: device.createBindGroup(program.bindGroupLayouts[0])! };
     this._splatPrograms.set(key, info);
     return info;
