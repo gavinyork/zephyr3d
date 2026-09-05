@@ -1026,11 +1026,24 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
     if (this._activePluginContributionShortcuts) {
       this._menubar.registerShortcuts(this);
       this._toolbar.registerShortcuts(this);
+      this.registerCoreShortcuts();
     }
     this._propGrid.refresh();
     if (this.controller.model.scene) {
       this.syncNodeProxyTree(this.controller.model.scene.rootNode);
     }
+  }
+  private registerCoreShortcuts() {
+    this.registerShortcut('Ctrl+D', () => {
+      return this.handleDuplicateShortcut();
+    });
+    this.registerShortcut('F2', () => {
+      return this.handleAssetRenameShortcut();
+    });
+  }
+  private unregisterCoreShortcuts() {
+    this.unregisterShortcut('Ctrl+D');
+    this.unregisterShortcut('F2');
   }
   private renderPluginDockPanels(location: 'left' | 'right') {
     const panels = this.editor.plugins.getPanels(location);
@@ -1641,12 +1654,7 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
     this._menubar.on('action', this.handleSceneAction, this);
     this._toolbar.registerShortcuts(this);
     this._activePluginContributionShortcuts = true;
-    this.registerShortcut('Ctrl+D', () => {
-      return this.handleDuplicateShortcut();
-    });
-    this.registerShortcut('F2', () => {
-      return this.handleAssetRenameShortcut();
-    });
+    this.registerCoreShortcuts();
     this._toolbar.on('action', this.handleSceneAction, this);
     this.editor.plugins.on('pluginContributionsChanged', this.refreshPluginContributions, this);
     // Plugins may have been loaded before SceneView activation. Refresh once
@@ -1686,6 +1694,7 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
     this._menubar.unregisterShortcuts(this);
     this._menubar.off('action', this.handleSceneAction, this);
     this._toolbar.unregisterShortcuts(this);
+    this.unregisterCoreShortcuts();
     this._activePluginContributionShortcuts = false;
     this._toolbar.off('action', this.handleSceneAction, this);
     this.editor.plugins.off('pluginContributionsChanged', this.refreshPluginContributions, this);
