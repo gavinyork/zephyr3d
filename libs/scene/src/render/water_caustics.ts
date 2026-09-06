@@ -98,6 +98,27 @@ const MIN_SLICE_EXTENT = 0.5;
  * resample when it does move, which the resolve's neighbourhood clamp absorbs.
  */
 const WARPED_CENTER_SNAP_DIVISIONS = 8;
+/**
+ * How far past the map border the photon grid is laid out, as a fraction of the
+ * half-extent, on the sides where the range - not the water - is what bounds it.
+ *
+ * The grid launches photons from rest-plane points and splats them where the
+ * displaced surface refracts them to. Horizontal displacement carries a photon
+ * across the border in either direction, so a grid cut exactly at the border
+ * loses the photons that would have arrived from outside while still losing the
+ * ones that leave. The border texels then hold a density no interior texel does,
+ * and the edge fade - which pulls the pattern to a flat 1.0 exactly at the
+ * border - turns that ring into a visible seam. Launching from a margin outside
+ * feeds the border from both sides instead.
+ *
+ * Only the launch area grows; `_gridFraction` scales both the per-photon weight
+ * and the solved grid size by it, so calm water still integrates to 1.0 and the
+ * density per texel is unchanged. The cost is photon count. The warp compresses
+ * everything past the border, so the growth is far less than the linear margin
+ * suggests - at the default warp of 1.5 this margin buys about 11% more photons,
+ * and widening it to 0.35 measured no further improvement.
+ */
+const GRID_BORDER_MARGIN = 0.15;
 
 /**
  * Concentrates a map coordinate towards the centre. CPU twin of
@@ -1561,11 +1582,18 @@ export class WaterCausticsRenderer {
       maxU = Math.max(maxU, v);
     }
     const warp = this._warp;
-    const clamp = (v: number) => Math.max(-1, Math.min(1, v));
-    const minX = warpCausticNDC(clamp((minR - this._sliceCenterR) / this._sliceHalfR), warp);
-    const maxX = warpCausticNDC(clamp((maxR - this._sliceCenterR) / this._sliceHalfR), warp);
-    const minY = warpCausticNDC(clamp((minU - this._sliceCenterU) / this._sliceHalfU), warp);
-    const maxY = warpCausticNDC(clamp((maxU - this._sliceCenterU) / this._sliceHalfU), warp);
+    // Clamped to the map plus a margin, but never past the water itself. Where
+    // the footprint ends inside the map the bound stays on the water, because a
+    // photon launched off the water is killed by the region test and would only
+    // dilute the weight the fraction below hands out. Where the water carries on
+    // past the border, the margin lets the displaced surface throw photons back
+    // in across it - see GRID_BORDER_MARGIN.
+    const m = 1 + GRID_BORDER_MARGIN;
+    const lo = (v: number) => Math.max(-m, Math.min(m, v));
+    const minX = warpCausticNDC(lo((minR - this._sliceCenterR) / this._sliceHalfR), warp);
+    const maxX = warpCausticNDC(lo((maxR - this._sliceCenterR) / this._sliceHalfR), warp);
+    const minY = warpCausticNDC(lo((minU - this._sliceCenterU) / this._sliceHalfU), warp);
+    const maxY = warpCausticNDC(lo((maxU - this._sliceCenterU) / this._sliceHalfU), warp);
     this._gridBounds.setXYZW(minX, minY, maxX, maxY);
     // Share of the map the grid covers, which is what keeps calm water at 1.0:
     // the same photon count spread over a smaller area has to deposit
