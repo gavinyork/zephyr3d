@@ -22,6 +22,7 @@ import {
 } from './scenes/shadows';
 import { clusterManyLights, spotShadow } from './scenes/lighting';
 import {
+  waterCausticsCrest,
   waterCausticsDeepBed,
   waterCausticsMoving,
   waterCausticsOff,
@@ -100,6 +101,7 @@ export const SCENES: VisualScene[] = [
   waterCausticsDeepBed,
   waterCausticsMoving,
   waterCausticsTwoPools,
+  waterCausticsCrest,
   waterSurfaceGrazing,
   waterSubsurfaceBacklit,
   waterFoamStorm,

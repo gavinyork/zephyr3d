@@ -20,6 +20,7 @@ import type { DrawContext } from '../../../libs/scene/src/render/drawable';
 import type { WaveGenerator } from '../../../libs/scene/src/render/wavegenerator';
 import {
   createCausticBlurShader,
+  createCausticHeightShader,
   createCausticResolveShader,
   createCausticSplatShader
 } from '../../../libs/scene/src/render/water_caustics';
@@ -91,6 +92,20 @@ describe('water caustics sampling shader', () => {
     // Beer-Lambert transmittance along the light path, and the map lookup.
     expect(fragmentSource).toContain('exp');
     expect(fragmentSource).toContain('Z_UniformCausticMap');
+  });
+
+  test.each(DEVICE_TYPES)('gates the depth on the displaced surface height on %s', (type) => {
+    const [, fragmentSource] = buildCausticSampler(type, createMockContext(true))!;
+    // The rest plane alone cuts caustics off along a flat line on any receiver
+    // under a crest; the height map is what lifts the gate to the real surface.
+    expect(fragmentSource).toContain('Z_UniformCausticHeightMap');
+    // Read with an explicit LOD: the receiver runs inside the light loop, where
+    // an implicit-derivative fetch would be undefined under divergent control.
+    const implicitSample =
+      type === 'webgpu'
+        ? /textureSample\(\s*Z_UniformCausticHeightMap/
+        : /texture\(\s*Z_UniformCausticHeightMap/;
+    expect(fragmentSource).not.toMatch(implicitSample);
   });
 
   test('produces no caustic code when the feature is off', () => {
@@ -230,6 +245,38 @@ export function createStubWaveGenerator(sampleTexture: boolean): WaveGenerator {
     }
   } as unknown as WaveGenerator;
 }
+
+describe('water caustics height map shader', () => {
+  test.each(DEVICE_TYPES)('builds the height program on %s', (type) => {
+    const pb = new ProgramBuilder(createMockDevice(type));
+    const ret = pb.buildRender(createCausticHeightShader(createStubWaveGenerator(false)));
+    expect(ret).not.toBeNull();
+    const [vertexSource, fragmentSource] = ret!;
+    // The surface is rasterised: the grid is laid out in the warped space the
+    // map's texels live in, unwarped to reach the slice, and the displaced
+    // point is warped back on the way out. Both directions have to be present.
+    expect(vertexSource).toContain('Z_unwarpCausticNDC');
+    expect(vertexSource).toContain('Z_warpCausticNDC');
+    expect(vertexSource).toMatch(/causticFrameX\)?\.w/);
+    expect(vertexSource).toMatch(/causticFrameY\)?\.w/);
+    // The displacement is evaluated by the body's own generator, per vertex.
+    expect(vertexSource).toContain('stubCalcPositionAndNormal');
+    // Outside the footprint the texel is left untouched rather than written as
+    // a flat surface; the receiver relies on the difference.
+    expect(fragmentSource).toContain('discard');
+    expect(fragmentSource).not.toContain('stubCalcPositionAndNormal');
+  });
+
+  test.each(DEVICE_TYPES)('evaluates the wave at an explicit LOD on %s', (type) => {
+    // The generators run in the vertex stage here, where an implicit-derivative
+    // fetch is illegal on both backends.
+    const pb = new ProgramBuilder(createMockDevice(type));
+    const [vertexSource] = pb.buildRender(createCausticHeightShader(createStubWaveGenerator(true)))!;
+    expect(vertexSource).toContain('stubWaveTexture');
+    const implicitSample = type === 'webgpu' ? /textureSample\(/ : /texture\(\s*stubWaveTexture/;
+    expect(vertexSource).not.toMatch(implicitSample);
+  });
+});
 
 describe('water caustics splat shader, scene depth variant', () => {
   // The variant that lands photons on the scene instead of on a plane. WebGPU
@@ -387,5 +434,8 @@ describe('water caustics uniform declaration', () => {
     expect(ret).not.toBeNull();
     expect(scope).not.toBeNull();
     expect(ret![1]).toContain('Z_UniformCausticParams');
+    // The height map is declared with the pattern map, so a bind group built
+    // for one always has a slot for the other.
+    expect(scope!.Z_UniformCausticHeightMap).toBeDefined();
   });
 });

@@ -710,12 +710,24 @@ const WaterCausticsModule: RenderModule<FrameGraphContext> = {
         label: 'waterCausticsScratch',
         allocationKey: 'ForwardPlus.WaterCausticsScratch'
       });
+      // The displaced surface height along each map ray, which the receiver
+      // gates its depth on. Same slice and size as the map so it shares the
+      // map's uv; four channels, one per water slot.
+      const heightHandle = builder.createTexture({
+        format: WaterCausticsRenderer.getHeightMapFormat(),
+        sizeMode: 'absolute',
+        width: size,
+        height: size,
+        label: 'waterCausticHeights',
+        allocationKey: 'ForwardPlus.WaterCausticHeights'
+      });
       if (previousHandle) {
         builder.read(previousHandle);
       }
       builder.setExecute((rgCtx) => {
         const map = rgCtx.getTexture<Texture2D>(mapHandle);
         const scratch = rgCtx.getTexture<Texture2D>(scratchHandle);
+        const heights = rgCtx.getTexture<Texture2D>(heightHandle);
         const previous = previousHandle ? rgCtx.getTexture<Texture2D>(previousHandle) : null;
         const resolved = _waterCausticsRenderer.render(
           ctx,
@@ -723,6 +735,7 @@ const WaterCausticsModule: RenderModule<FrameGraphContext> = {
           source.light,
           map,
           scratch,
+          heights,
           previous,
           (texture: Texture2D) =>
             rgCtx.createFramebuffer({
@@ -743,6 +756,7 @@ const WaterCausticsModule: RenderModule<FrameGraphContext> = {
         ctx.waterCaustics = true;
         ctx.waterCausticLight = source.light;
         ctx.waterCausticTexture = resolved;
+        ctx.waterCausticHeightTexture = heights;
         ctx.waterCausticUniforms = _waterCausticsRenderer.uniforms;
       });
       return { mapHandle, scratchHandle };
@@ -1743,6 +1757,7 @@ function buildForwardPlusGraphInternal(
   ctx.waterCaustics = false;
   ctx.waterCausticLight = null;
   ctx.waterCausticTexture = null;
+  ctx.waterCausticHeightTexture = null;
   ctx.waterCausticUniforms = null;
 
   const blackboard = new RGBlackboard();

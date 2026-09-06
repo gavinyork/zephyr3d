@@ -57,6 +57,18 @@ const UNIFORM_NAME_SHADOW_MAP = 'Z_UniformShadowMap';
 const UNIFORM_NAME_SHADOW_MASK = 'Z_UniformShadowMask';
 const UNIFORM_NAME_SHADOW_MASK_MODE = 'Z_UniformShadowMaskMode';
 const UNIFORM_NAME_CAUSTIC_MAP = 'Z_UniformCausticMap';
+const UNIFORM_NAME_CAUSTIC_HEIGHT_MAP = 'Z_UniformCausticHeightMap';
+/**
+ * Offset added to a surface height before it is stored in the caustic height
+ * map, so that a cleared texel - no surface on that ray - is distinguishable
+ * from a surface at the rest level. A ray with no water on it must read as
+ * dry, not as submerged under a flat surface: on the down-sun side of a
+ * footprint edge, a receiver below the rest level but above a trough would
+ * otherwise be lit through water that is not there. Eight keeps troughs down
+ * to seven metres positive and leaves half floats millimetre precision.
+ * @internal
+ */
+export const CAUSTIC_HEIGHT_BIAS = 8;
 /**
  * Water bodies that can cast caustics into one map.
  *
@@ -1517,6 +1529,12 @@ export class ShaderHelper {
       .tex2D()
       .uniform(0)
       .withSampler(getSamplerOptions('clamp_linear_nomip'));
+    // Displaced surface height per water slot, on the same slice as the map.
+    // Read with the map's uv, so it shares the map's sampling.
+    scope[UNIFORM_NAME_CAUSTIC_HEIGHT_MAP] = pb
+      .tex2D()
+      .uniform(0)
+      .withSampler(getSamplerOptions('clamp_linear_nomip'));
   }
   /**
    * Attenuation the water caustics apply to one light at a world position.
@@ -1565,49 +1583,6 @@ export class ShaderHelper {
           this.$return(pb.vec3(1));
         }
       );
-      // Find the water above this point. Several can qualify - a pool inside a
-      // lake, water on terraces - and the one that matters is the lowest of
-      // them, because that is the last surface the sun crossed on its way here.
-      this.$l.depth = pb.float(-1);
-      this.$l.medium = pb.vec3(0);
-      this.$for(pb.int('i'), 0, MAX_CAUSTIC_WATERS, function () {
-        this.$if(pb.greaterThanEqual(this.i, this.cu.waterCount), function () {
-          this.$break();
-        });
-        this.$l.slotMedium = this.cu.waterMedia.at(this.i);
-        this.$l.slotDepth = pb.sub(this.slotMedium.w, this.worldPos.y);
-        this.$if(pb.greaterThan(this.slotDepth, 0), function () {
-          // Where the sun ray that lights this point crossed that water plane.
-          // The splat pass clips photons by their entry point, so the receiver
-          // must ask the same question: a point under the footprint that the sun
-          // reaches from outside it saw no water at all, and a point beyond the
-          // footprint that the sun reaches through it did. Testing the point's
-          // own xz gets both wrong by the offset depth / tan(elevation).
-          this.$l.slotPath = pb.mul(this.slotDepth, this.cu.lightDir.w);
-          this.$l.slotEntry = pb.sub(this.worldPos.xz, pb.mul(this.cu.lightDir.xz, this.slotPath));
-          this.$l.slotRegion = this.cu.waterRegions.at(this.i);
-          this.$if(
-            pb.and(
-              pb.all(pb.greaterThanEqual(this.slotEntry, this.slotRegion.xy)),
-              pb.all(pb.lessThanEqual(this.slotEntry, this.slotRegion.zw))
-            ),
-            function () {
-              this.$if(
-                pb.or(pb.lessThan(this.depth, 0), pb.lessThan(this.slotDepth, this.depth)),
-                function () {
-                  this.depth = this.slotDepth;
-                  this.medium = this.slotMedium.xyz;
-                }
-              );
-            }
-          );
-        });
-      });
-      this.$if(pb.lessThanEqual(this.depth, 0), function () {
-        this.$return(pb.vec3(1));
-      });
-      this.$l.pathLength = pb.mul(this.depth, this.cu.lightDir.w);
-      this.$l.transmittance = pb.exp(pb.neg(pb.mul(this.medium, this.pathLength)));
       // Project into the map: frameX/frameY are orthonormal and perpendicular to
       // the light, so the same two dot products the splat pass used invert it.
       this.$l.rel = pb.sub(this.worldPos, this.cu.center.xyz);
@@ -1621,6 +1596,84 @@ export class ShaderHelper {
       // goes through the same warp the splat laid the photons out under.
       this.$l.warpedNDC = ShaderHelper.warpCausticNDC(this, this.mapNDC, this.cu.extinction.w);
       this.$l.uv = pb.add(pb.mul(this.warpedNDC, 0.5), pb.vec2(0.5));
+      // The displaced surface height of each water slot on this fragment's own
+      // sun ray, biased by CAUSTIC_HEIGHT_BIAS. The height map rasterises the
+      // displaced surface into the same light-space slice as the pattern, so
+      // the texel under this uv holds the surface the ray through this fragment
+      // passed through - no entry point has to be estimated. Beyond the map the
+      // sampler would repeat its border, which is some other ray's wave; the
+      // surface is taken as flat there.
+      this.$l.insideMap = pb.all(pb.lessThanEqual(pb.abs(this.mapNDC), pb.vec2(1)));
+      this.$l.waveHeights = pb.textureSampleLevel(this[UNIFORM_NAME_CAUSTIC_HEIGHT_MAP], this.uv, 0);
+      // Find the water above this point. Several can qualify - a pool inside a
+      // lake, water on terraces - and the one that matters is the lowest of
+      // them, because that is the last surface the sun crossed on its way here.
+      this.$l.depth = pb.float(-1);
+      this.$l.medium = pb.vec3(0);
+      this.$for(pb.int('i'), 0, MAX_CAUSTIC_WATERS, function () {
+        this.$if(pb.greaterThanEqual(this.i, this.cu.waterCount), function () {
+          this.$break();
+        });
+        this.$l.slotMedium = this.cu.waterMedia.at(this.i);
+        // Where the sun ray that lights this point crossed that water's rest
+        // plane, for the footprint test. The splat pass clips photons by that
+        // same crossing, so the receiver must ask the same question: a point
+        // under the footprint that the sun reaches from outside it saw no water
+        // at all, and a point beyond the footprint that the sun reaches through
+        // it did. Testing the point's own xz gets both wrong by the offset
+        // depth / tan(elevation). Only the footprint is decided here; the depth
+        // itself comes from the height map, which needs no crossing point.
+        this.$l.slotFlat = pb.sub(this.slotMedium.w, this.worldPos.y);
+        this.$l.slotPath = pb.mul(this.slotFlat, this.cu.lightDir.w);
+        this.$l.slotEntry = pb.sub(this.worldPos.xz, pb.mul(this.cu.lightDir.xz, this.slotPath));
+        this.$l.slotRegion = this.cu.waterRegions.at(this.i);
+        this.$if(
+          pb.and(
+            pb.all(pb.greaterThanEqual(this.slotEntry, this.slotRegion.xy)),
+            pb.all(pb.lessThanEqual(this.slotEntry, this.slotRegion.zw))
+          ),
+          function () {
+            // Depth under the *displaced* surface on this ray, which is what
+            // the splat refracted the photons through. Gating on the rest plane
+            // instead cut the caustics off at a flat line across any receiver
+            // that pokes above it under a crest. Slot i lives in channel i.
+            this.$l.slotMask = pb.vec4(
+              pb.float(pb.equal(this.i, 0)),
+              pb.float(pb.equal(this.i, 1)),
+              pb.float(pb.equal(this.i, 2)),
+              pb.float(pb.equal(this.i, 3))
+            );
+            this.$l.slotSample = pb.dot(this.waveHeights, this.slotMask);
+            // A cleared texel inside the map means this ray never meets that
+            // body's surface - it crosses the rest plane beyond the footprint,
+            // or the surface is on the far side of the receiver - and the
+            // receiver is dry as far as this body is concerned. Outside the map
+            // nothing is known and the surface is taken as flat.
+            this.$l.slotCovered = pb.or(pb.not(this.insideMap), pb.greaterThan(this.slotSample, 0.5));
+            this.$if(this.slotCovered, function () {
+              this.$l.slotWave = pb.mul(
+                pb.sub(this.slotSample, CAUSTIC_HEIGHT_BIAS),
+                pb.float(this.insideMap)
+              );
+              this.$l.slotDepth = pb.sub(pb.add(this.slotMedium.w, this.slotWave), this.worldPos.y);
+              this.$if(pb.greaterThan(this.slotDepth, 0), function () {
+                this.$if(
+                  pb.or(pb.lessThan(this.depth, 0), pb.lessThan(this.slotDepth, this.depth)),
+                  function () {
+                    this.depth = this.slotDepth;
+                    this.medium = this.slotMedium.xyz;
+                  }
+                );
+              });
+            });
+          }
+        );
+      });
+      this.$if(pb.lessThanEqual(this.depth, 0), function () {
+        this.$return(pb.vec3(1));
+      });
+      this.$l.pathLength = pb.mul(this.depth, this.cu.lightDir.w);
+      this.$l.transmittance = pb.exp(pb.neg(pb.mul(this.medium, this.pathLength)));
       // Fade the pattern out towards the map border, over a band the CPU sized
       // in meters and handed over as the distance the fade starts at.
       //
@@ -1670,6 +1723,11 @@ export class ShaderHelper {
     bindGroup.setTexture(
       UNIFORM_NAME_CAUSTIC_MAP,
       ctx.waterCausticTexture!,
+      fetchSampler('clamp_linear_nomip')
+    );
+    bindGroup.setTexture(
+      UNIFORM_NAME_CAUSTIC_HEIGHT_MAP,
+      ctx.waterCausticHeightTexture!,
       fetchSampler('clamp_linear_nomip')
     );
   }

@@ -4,6 +4,7 @@ import {
   DirectionalLight,
   FBMWaveGenerator,
   FFTWaveGenerator,
+  GerstnerWaveGenerator,
   LambertMaterial,
   Mesh,
   PlaneShape,
@@ -240,6 +241,69 @@ export const waterCausticsTwoPools: VisualScene = {
 
     placeCamera(camera, new Vector3(2, 20, 22), new Vector3(0, -floorDepth, 0));
     camera.far = 200;
+  }
+};
+
+/**
+ * A reef breaking the surface under a high swell.
+ *
+ * The caustic term used to measure depth against the rest plane, so anything
+ * above it - the top metre of this reef - read as dry even while a crest was
+ * rolling over it, and the caustics and the medium's tint stopped dead along a
+ * flat line at the rest level. The photon splat, meanwhile, refracted through
+ * the displaced surface, so the two ends of the light path disagreed.
+ *
+ * The swell is tall on purpose and the reef's top sits inside it: at the rest
+ * level the reef is half a wave height under the crests and half a wave height
+ * above the troughs. The correct picture follows the water line frame by frame,
+ * with the caustic web and the medium's colour reaching up the reef face as far
+ * as the crest does; the wrong one is a straight horizontal cut at the rest
+ * level, bright and untinted above it.
+ */
+export const waterCausticsCrest: VisualScene = {
+  name: 'water-caustics-crest',
+  description:
+    'A reef whose top rises above the rest level, under a swell taller than that rise. Pins that the caustic gate and the light-path depth follow the displaced surface, not the rest plane: the caustics and the medium tint must climb the reef face with the crest, with no flat cut at the rest level.',
+  frames: 3,
+  setup({ scene, camera }) {
+    bareScene(scene);
+    sun(scene);
+    seaBed(scene);
+
+    // A slab rising well above the rest level. Its side facing the camera and
+    // the sun is the receiver under test; the top is out of the water at every
+    // trough and under it at every crest.
+    const reef = new Mesh(scene, new BoxShape({ size: 1 }), lambert(new Vector4(0.7, 0.66, 0.58, 1)));
+    reef.scale.setXYZ(5, BED_DEPTH + 0.7, 2.4);
+    reef.position.setXYZ(0, (-BED_DEPTH + 0.7) / 2, 0);
+
+    const water = calmWater(scene, true);
+    // Replace the ripples with a swell tall enough to bury the reef top. FBM
+    // cannot do it: its base octave is scaled to tens of meters, so across a
+    // 5 m reef it is a constant offset rather than a crest. Gerstner waves of a
+    // few meters' length put a whole crest and trough over the reef, and their
+    // horizontal displacement also exercises the height lookup's assumption
+    // that the surface can be sampled by its rest-plane xz. Every parameter the
+    // shader reads is set explicitly, because the constructor draws the initial
+    // ones from Math.random().
+    const waves = new GerstnerWaveGenerator();
+    waves.numWaves = 2;
+    const wave = (i: number, angle: number, amplitude: number, length: number) => {
+      waves.setWaveDirection(i, angle);
+      waves.setWaveSteepness(i, 0.35);
+      waves.setWaveAmplitude(i, amplitude);
+      waves.setWaveLength(i, length);
+      waves.setOmniWave(i, false);
+    };
+    wave(0, 0.4, 0.65, 6.5);
+    wave(1, 2.1, 0.3, 3.4);
+    water.waveGenerator = waves;
+    // Focus at the reef top rather than the bed, which is what is under test.
+    water.causticsDepth = 0.5;
+
+    // Close and low, looking across the reef face from the lit side.
+    placeCamera(camera, new Vector3(1.5, 3.2, 7), new Vector3(0, -0.4, 0));
+    camera.far = FAR;
   }
 };
 

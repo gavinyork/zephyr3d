@@ -6,6 +6,7 @@ import type {
   FrameBuffer,
   GPUDataBuffer,
   GPUProgram,
+  IndexBuffer,
   PBGlobalScope,
   PBRenderOptions,
   ProgramBuilder,
@@ -22,7 +23,7 @@ import type { PunctualLight } from '../scene/light';
 import type { Camera } from '../camera/camera';
 import { drawFullscreenQuad } from './fullscreenquad';
 import { fetchSampler } from '../utility/misc';
-import { MAX_CAUSTIC_WATERS, ShaderHelper } from '../material/shader/helper';
+import { CAUSTIC_HEIGHT_BIAS, MAX_CAUSTIC_WATERS, ShaderHelper } from '../material/shader/helper';
 
 /** Index of refraction of water relative to air. */
 const WATER_IOR = 1.333;
@@ -166,6 +167,15 @@ type SceneDepthBinding = {
   matrixInv: Matrix4x4;
 };
 
+/**
+ * Vertices per side of the grid the height map rasterises the surface with.
+ *
+ * The grid is laid out in warped map space over the body's footprint, so each
+ * cell covers a few map texels at most; the height is linear across a cell,
+ * which is well inside what a wave of any visible wavelength needs.
+ */
+const HEIGHT_GRID_SIZE = 256;
+
 /** @internal */
 type SplatProgramInfo = {
   program: GPUProgram;
@@ -276,6 +286,15 @@ export function createCausticSplatShader(waveGenerator: WaveGenerator, sceneDept
         // Displaced surface point and the detail normal that bends the ray. Both
         // wave generators sample with an explicit LOD, which is what makes this
         // legal in a vertex shader.
+        //
+        // The photon is launched from the rest point and lands wherever the
+        // surface carried it: that is a true point of the displaced surface with
+        // its true normal, so the refraction is right. What it is not is uniform
+        // in world xz - the generators' horizontal displacement bunches the
+        // launch points by the surface Jacobian, which over-weights compressed
+        // crests by 1/J. Inverting the displacement per photon would fix that,
+        // but the inversion only converges where the surface does not fold, and
+        // a choppy FFT folds exactly at the crests it would matter for.
         this.$l.surfacePos = pb.vec3();
         this.$l.coarseNormal = pb.vec3();
         waveGenerator.calcVertexPositionAndNormal(this, this.surfaceXZ, this.surfacePos, this.coarseNormal);
@@ -344,8 +363,11 @@ export function createCausticSplatShader(waveGenerator: WaveGenerator, sceneDept
             this.$l[`sceneClip${i}`] = pb.mul(this.causticSceneMatrixInv, pb.vec4(this[`sceneNDC${i}`], 1));
             this.$l[`scenePos${i}`] = pb.div(this[`sceneClip${i}`].xyz, this[`sceneClip${i}`].w);
             // Re-intersect at the height just read. Only accept it while it is
-            // below the surface: a scene point above the water is not something
-            // this photon passed through.
+            // below the *displaced* surface at this photon's entry: a scene
+            // point above that is not something the photon passed through. The
+            // rest level is the wrong bar here - it would drop every photon
+            // landing on a receiver that pokes above the rest plane under a
+            // passing crest, and cut the caustics off along a flat line.
             this.$l[`t${i}`] = pb.div(pb.sub(this[`scenePos${i}`].y, this.surfacePos.y), this.invDirY);
             this.$l[`next${i}`] = pb.add(this.surfacePos, pb.mul(this.dir, pb.max(this[`t${i}`], 0)));
             // mix rather than select: the builder has no vec3 select, and a float
@@ -353,7 +375,7 @@ export function createCausticSplatShader(waveGenerator: WaveGenerator, sceneDept
             this.probe = pb.mix(
               this.probe,
               this[`next${i}`],
-              pb.float(pb.and(this[`inside${i}`], pb.lessThan(this[`scenePos${i}`].y, this.waterLevel)))
+              pb.float(pb.and(this[`inside${i}`], pb.lessThan(this[`scenePos${i}`].y, this.surfacePos.y)))
             );
           }
           this.hitPos = this.probe;
@@ -392,6 +414,139 @@ export function createCausticSplatShader(waveGenerator: WaveGenerator, sceneDept
       this.$outputs.outColor = pb.vec4();
       pb.main(function () {
         this.$outputs.outColor = pb.vec4(this.$inputs.photonWeight, 0, 0, 1);
+      });
+    }
+  };
+}
+
+/**
+ * Shader for the displaced surface height map.
+ *
+ * Rasterises the water surface itself into the light-space slice, one body per
+ * draw. A grid is laid out over the body's footprint in warped map space; each
+ * vertex sweeps its grid point along the light onto the rest plane, lets the
+ * wave generator carry it to where that bit of surface is, and projects the
+ * displaced point back into the map as its clip position. The triangles between
+ * the vertices then cover the map contiguously with the *displaced* surface -
+ * the same surface the water mesh renders from its displaced vertices - and the
+ * fragment writes its height above the rest plane, offset by
+ * `CAUSTIC_HEIGHT_BIAS`, into this body's channel - selected with a colour write
+ * mask, so where the surface overlaps itself in the light's view the last
+ * triangle wins rather than the two heights adding. The target is cleared
+ * first, and a texel the surface never reaches stays at zero, which the receiver
+ * reads as "no water on this ray".
+ *
+ * Rasterising is what makes the horizontal displacement a non-issue. Sampling
+ * the generator at the map position would return the surface that *started*
+ * there, offset by its own displacement; inverting that displacement by
+ * iteration only converges where the surface does not fold, and a choppy FFT
+ * folds at the crests. Drawing the surface forward has neither problem.
+ *
+ * It is also what makes the footprint edge right. A receiver below the rest
+ * level but above a trough, down-sun of the edge, has its sun ray cross the
+ * rest plane outside the footprint, where no surface is drawn: the texel stays
+ * empty and the receiver is dry. Storing a flat height there instead would put
+ * it under water that does not exist.
+ *
+ * The receiver looks this up with the very uv it uses for the caustic pattern:
+ * its fragment and the ray's crossing of the rest plane lie on one light ray,
+ * and the map's projection is invariant along the light, so no second
+ * projection is needed to find the wave that was above a fragment.
+ *
+ * Everything runs in the vertex stage; the generators sample with an explicit
+ * LOD, which is what makes that legal.
+ *
+ * @param waveGenerator - Supplies the surface displacement of this body.
+ * @internal
+ */
+export function createCausticHeightShader(waveGenerator: WaveGenerator): PBRenderOptions {
+  return {
+    vertex(this: PBGlobalScope, pb: ProgramBuilder) {
+      // Vertex ordinal; the grid coordinate is derived from it.
+      this.$inputs.vertexIndex = pb.float().attrib('position');
+      this.$outputs.height = pb.float();
+      this.$outputs.inside = pb.float();
+      this.causticFrameX = pb.vec4().uniform(0);
+      this.causticFrameY = pb.vec4().uniform(0);
+      /** (slice centre.xyz, this body's rest level) */
+      this.causticCenter = pb.vec4().uniform(0);
+      this.causticLightDir = pb.vec4().uniform(0);
+      this.causticRegion = pb.vec4().uniform(0);
+      /** Map-NDC rectangle the grid is laid out over: (minX, minY, maxX, maxY). */
+      this.causticGridBounds = pb.vec4().uniform(0);
+      /** (warp strength, grid size, 1 / (grid size + 1), 1 / grid size) */
+      this.causticHeightParams = pb.vec4().uniform(0);
+      ShaderHelper.declareStandaloneCameraTime(this, 0);
+      waveGenerator.setupUniforms(this, 0);
+      pb.main(function () {
+        this.$l.invRadius = pb.vec2(this.causticFrameX.w, this.causticFrameY.w);
+        this.$l.radius = pb.div(pb.vec2(1), this.invRadius);
+        this.$l.L = this.causticLightDir.xyz;
+        this.$l.waterLevel = this.causticCenter.w;
+        // Ordinal to grid coordinate, (gridSize + 1) vertices per side.
+        // Half a vertex up before the floor: the reciprocal is inexact, and an
+        // ordinal that is an exact multiple of the row length must not round
+        // down into the previous row.
+        this.$l.row = pb.floor(pb.mul(pb.add(this.$inputs.vertexIndex, 0.5), this.causticHeightParams.z));
+        this.$l.col = pb.sub(
+          this.$inputs.vertexIndex,
+          pb.mul(this.row, pb.add(this.causticHeightParams.y, 1))
+        );
+        this.$l.gridUV = pb.mul(pb.vec2(this.col, this.row), this.causticHeightParams.w);
+        // Grid point to the slice, through the warp the map's texels live under.
+        this.$l.warpedNDC = pb.mix(this.causticGridBounds.xy, this.causticGridBounds.zw, this.gridUV);
+        this.$l.ndc = ShaderHelper.unwarpCausticNDC(this, this.warpedNDC, this.causticHeightParams.x);
+        this.$l.planePos = pb.add(
+          this.causticCenter.xyz,
+          pb.mul(this.causticFrameX.xyz, pb.mul(this.ndc.x, this.radius.x)),
+          pb.mul(this.causticFrameY.xyz, pb.mul(this.ndc.y, this.radius.y))
+        );
+        // Along the light onto the rest plane: the rest point of this vertex.
+        this.$l.sweep = pb.div(pb.sub(this.waterLevel, this.planePos.y), this.L.y);
+        this.$l.surfaceXZ = pb.add(this.planePos, pb.mul(this.L, this.sweep));
+        // Outside the footprint there is no surface. Resolved per vertex and
+        // interpolated, which fades the edge over one grid cell.
+        this.$outputs.inside = pb.float(
+          pb.and(
+            pb.all(pb.greaterThanEqual(this.surfaceXZ.xz, this.causticRegion.xy)),
+            pb.all(pb.lessThanEqual(this.surfaceXZ.xz, this.causticRegion.zw))
+          )
+        );
+        // Where the surface carried this rest point, and how high it is there.
+        this.$l.surfacePos = pb.vec3();
+        this.$l.surfaceNormal = pb.vec3();
+        waveGenerator.calcVertexPositionAndNormal(this, this.surfaceXZ, this.surfacePos, this.surfaceNormal);
+        this.$outputs.height = pb.sub(this.surfacePos.y, this.waterLevel);
+        // The displaced point back into the map, exactly as the splat projects a
+        // photon hit: two dot products, then the warp.
+        this.$l.rel = pb.sub(this.surfacePos, this.causticCenter.xyz);
+        this.$l.hitNDC = pb.mul(
+          pb.vec2(pb.dot(this.rel, this.causticFrameX.xyz), pb.dot(this.rel, this.causticFrameY.xyz)),
+          this.invRadius
+        );
+        this.$l.hitWarped = ShaderHelper.warpCausticNDC(this, this.hitNDC, this.causticHeightParams.x);
+        // The receiver reads the map at `v = 0.5 + 0.5 * ndc.y`. On WebGL a
+        // fragment at clip y lands on that row; on WebGPU clip +1 is the first
+        // row, `v = 0.5 - 0.5 * y`, so the surface is drawn upside down to land
+        // where the receiver looks. The splat needs no such flip only because
+        // its map reaches the receiver through the blur and resolve quads,
+        // each of which flips it once more on WebGPU; this map goes straight.
+        this.$builtins.position =
+          pb.getDevice().type === 'webgpu'
+            ? pb.vec4(this.hitWarped.x, pb.neg(this.hitWarped.y), 0, 1)
+            : pb.vec4(this.hitWarped, 0, 1);
+      });
+    },
+    fragment(this: PBGlobalScope, pb: ProgramBuilder) {
+      this.$outputs.outColor = pb.vec4();
+      pb.main(function () {
+        // Outside the footprint nothing is written at all, so the texel keeps
+        // reading as "no surface" rather than as a surface at height zero.
+        this.$if(pb.lessThan(this.$inputs.inside, 0.5), function () {
+          pb.discard();
+        });
+        // Every channel; the colour mask keeps all but this body's.
+        this.$outputs.outColor = pb.vec4(pb.add(this.$inputs.height, CAUSTIC_HEIGHT_BIAS));
       });
     }
   };
@@ -561,6 +716,16 @@ export function createCausticResolveShader(): PBRenderOptions {
 export class WaterCausticsRenderer {
   /** Splat programs keyed by the wave generator's shader hash. */
   private readonly _splatPrograms: Map<string, SplatProgramInfo>;
+  /** Height-map programs keyed by the wave generator's shader hash. */
+  private readonly _heightPrograms: Map<string, SplatProgramInfo>;
+  /** One per water slot, differing only in which channel they let through. */
+  private readonly _heightStates: Nullable<RenderStateSet>[];
+  private readonly _heightParams: Vector4;
+  /** The surface grid the height map is rasterised with; built once. */
+  private _heightLayout: Nullable<VertexLayout>;
+  private _heightVertexBuffer: Nullable<GPUDataBuffer>;
+  private _heightIndexBuffer: Nullable<IndexBuffer>;
+  private _heightIndexCount: number;
   private _blurProgram: Nullable<GPUProgram>;
   private _blurBindGroup: Nullable<BindGroup>;
   private _resolveProgram: Nullable<GPUProgram>;
@@ -616,6 +781,13 @@ export class WaterCausticsRenderer {
   private _warp: number;
   constructor() {
     this._splatPrograms = new Map();
+    this._heightPrograms = new Map();
+    this._heightStates = [];
+    this._heightParams = new Vector4();
+    this._heightLayout = null;
+    this._heightVertexBuffer = null;
+    this._heightIndexBuffer = null;
+    this._heightIndexCount = 0;
     this._blurProgram = null;
     this._blurBindGroup = null;
     this._resolveProgram = null;
@@ -678,6 +850,15 @@ export class WaterCausticsRenderer {
     return info.renderable && info.filterable ? 'r16f' : 'rgba16f';
   }
   /**
+   * Storage format for the displaced surface height map.
+   *
+   * One channel per water slot, so it is always four wide; half floats carry a
+   * wave height to well under a millimetre at any plausible level.
+   */
+  static getHeightMapFormat(): TextureFormat {
+    return 'rgba16f';
+  }
+  /**
    * Whether caustics can be produced for this water surface and light.
    *
    * @param water - Water surface the photons are refracted through.
@@ -701,6 +882,9 @@ export class WaterCausticsRenderer {
    * @param map - Accumulation target; also the result when nothing resolves after it.
    * @param scratch - Ping-pong target for the blur, and the temporal resolve's
    * output. Same size and format as `map`.
+   * @param heights - Target for the displaced surface height map, in
+   * {@link getHeightMapFormat} and the same size as `map`. Filled by this call
+   * and read by the light pass alongside the map.
    * @param history - Previous frame's resolved map, or null when there is none
    * to reproject. Ignored unless the material asks for temporal accumulation.
    * @param createFramebuffer - Wraps a target texture into a framebuffer.
@@ -713,12 +897,26 @@ export class WaterCausticsRenderer {
     light: PunctualLight,
     map: Texture2D,
     scratch: Texture2D,
+    heights: Texture2D,
     history: Nullable<Texture2D>,
     createFramebuffer: (texture: Texture2D) => FrameBuffer
   ): Texture2D {
     const device = ctx.device;
     this._updateUniforms(ctx, waters, light, map.width);
     const sceneDepth = this._anySceneDepth(waters) ? this._resolveSceneDepth(ctx, light) : null;
+
+    // The height map first: it depends on the slice alone, and the receiver
+    // needs it whatever the splat produces.
+    device.pushDeviceStates();
+    device.setFramebuffer(createFramebuffer(heights));
+    device.setViewport(null);
+    device.setScissor(null);
+    device.clearFrameBuffer(Vector4.zero(), null, null);
+    this._ensureHeightGrid(device);
+    for (let i = 0; i < waters.length; i++) {
+      this._renderHeightsOne(device, ctx, waters[i], i);
+    }
+    device.popDeviceStates();
 
     device.pushDeviceStates();
     device.setFramebuffer(createFramebuffer(map));
@@ -740,6 +938,94 @@ export class WaterCausticsRenderer {
     }
     device.popDeviceStates();
     return this._postProcess(device, waters[0].material, map, scratch, history, ctx, createFramebuffer);
+  }
+  /**
+   * Writes one body's displaced surface height into its channel of the height
+   * map. Per body for the same reason the splat is: each has its own wave
+   * generator, rest level and footprint.
+   * @internal
+   */
+  private _renderHeightsOne(device: AbstractDevice, ctx: DrawContext, water: Water, index: number): void {
+    const material = water.material;
+    const waveGenerator = material.waveGenerator!;
+    // The grid covers this body's footprint, like the photon grid does; a body
+    // the map does not reach has nothing to draw.
+    this._updateGridBounds(water);
+    if (!(this._gridFraction > 0)) {
+      return;
+    }
+    const info = this._getHeightProgram(device, waveGenerator);
+    // A bind group per slot, for the same reason the splat keeps one: bodies
+    // sharing a generator share the program, and their draws resolve after
+    // both have written the values.
+    const bindGroup = this._getSplatBindGroup(device, info, index);
+    bindGroup.setValue('causticFrameX', this._uniforms.frameX);
+    bindGroup.setValue('causticFrameY', this._uniforms.frameY);
+    this._splatCenter.setXYZW(
+      this._uniforms.center.x,
+      this._uniforms.center.y,
+      this._uniforms.center.z,
+      water.worldMatrix.m13
+    );
+    bindGroup.setValue('causticCenter', this._splatCenter);
+    bindGroup.setValue('causticLightDir', this._uniforms.lightDir);
+    bindGroup.setValue('causticRegion', material.region);
+    bindGroup.setValue('causticGridBounds', this._gridBounds);
+    this._heightParams.setXYZW(
+      this._warp,
+      HEIGHT_GRID_SIZE,
+      1 / (HEIGHT_GRID_SIZE + 1),
+      1 / HEIGHT_GRID_SIZE
+    );
+    bindGroup.setValue('causticHeightParams', this._heightParams);
+    ShaderHelper.setStandaloneCameraTime(bindGroup, ctx);
+    waveGenerator.applyWaterBindGroup(bindGroup);
+    // Channel i for slot i, which is how the receiver picks it back out.
+    device.setRenderStates(this._getHeightStates(device, index));
+    device.setProgram(info.program);
+    device.setBindGroup(0, bindGroup);
+    device.setVertexLayout(this._heightLayout!);
+    device.draw('triangle-list', 0, this._heightIndexCount);
+  }
+  /**
+   * Builds the surface grid once: vertex ordinals, and the index list that
+   * stitches a (HEIGHT_GRID_SIZE + 1)^2 lattice of them into triangles.
+   * @internal
+   */
+  private _ensureHeightGrid(device: AbstractDevice): void {
+    if (this._heightLayout) {
+      return;
+    }
+    const side = HEIGHT_GRID_SIZE + 1;
+    const ordinals = new Float32Array(side * side);
+    for (let i = 0; i < ordinals.length; i++) {
+      ordinals[i] = i;
+    }
+    const indices = new Uint32Array(HEIGHT_GRID_SIZE * HEIGHT_GRID_SIZE * 6);
+    let n = 0;
+    for (let row = 0; row < HEIGHT_GRID_SIZE; row++) {
+      for (let col = 0; col < HEIGHT_GRID_SIZE; col++) {
+        const a = row * side + col;
+        const b = a + 1;
+        const c = a + side;
+        const d = c + 1;
+        indices[n++] = a;
+        indices[n++] = b;
+        indices[n++] = d;
+        indices[n++] = a;
+        indices[n++] = d;
+        indices[n++] = c;
+      }
+    }
+    const vertexBuffer = device.createVertexBuffer('position_f32', ordinals)!;
+    const indexBuffer = device.createIndexBuffer(indices);
+    this._heightVertexBuffer = vertexBuffer;
+    this._heightIndexBuffer = indexBuffer;
+    this._heightLayout = device.createVertexLayout({
+      vertexBuffers: [{ buffer: vertexBuffer }],
+      indexBuffer
+    });
+    this._heightIndexCount = indices.length;
   }
   /** @internal */
   private _splatOne(
@@ -1003,6 +1289,22 @@ export class WaterCausticsRenderer {
       info.program.dispose();
     }
     this._splatPrograms.clear();
+    for (const info of this._heightPrograms.values()) {
+      for (const bindGroup of info.bindGroups) {
+        bindGroup?.dispose();
+      }
+      info.program.dispose();
+    }
+    this._heightPrograms.clear();
+    this._heightStates.length = 0;
+    // The layout does not own its buffers; see _updatePhotonLayout.
+    this._heightLayout?.dispose();
+    this._heightLayout = null;
+    this._heightVertexBuffer?.dispose();
+    this._heightVertexBuffer = null;
+    this._heightIndexBuffer?.dispose();
+    this._heightIndexBuffer = null;
+    this._heightIndexCount = 0;
     this._blurBindGroup?.dispose();
     this._blurBindGroup = null;
     this._resolveProgram?.dispose();
@@ -1316,6 +1618,33 @@ export class WaterCausticsRenderer {
         .setBlendEquation('add', 'add');
     }
     return this._splatStates;
+  }
+  /** @internal */
+  private _getHeightStates(device: AbstractDevice, slot: number): RenderStateSet {
+    let states = this._heightStates[slot];
+    if (!states) {
+      states = device.createRenderStateSet();
+      states.useRasterizerState().setCullMode('none');
+      states.useDepthState().enableTest(false).enableWrite(false);
+      // Plain overwrite into this slot's channel only. Blending would add the
+      // heights wherever the surface overlaps itself in the light's view.
+      states.useColorState().setColorMask(slot === 0, slot === 1, slot === 2, slot === 3);
+      this._heightStates[slot] = states;
+    }
+    return states;
+  }
+  /** @internal */
+  private _getHeightProgram(device: AbstractDevice, waveGenerator: WaveGenerator): SplatProgramInfo {
+    const key = waveGenerator.getHash();
+    let info = this._heightPrograms.get(key);
+    if (info) {
+      return info;
+    }
+    const program = device.buildRenderProgram(createCausticHeightShader(waveGenerator))!;
+    program.name = '@Water_CausticHeight';
+    info = { program, bindGroups: [] };
+    this._heightPrograms.set(key, info);
+    return info;
   }
   /** @internal */
   private _getBlurStates(device: AbstractDevice): RenderStateSet {

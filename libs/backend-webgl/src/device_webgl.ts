@@ -500,7 +500,11 @@ export class WebGLDevice extends BaseDevice {
     const depthFlag = typeof clearDepth === 'number' ? gl.DEPTH_BUFFER_BIT : 0;
     const stencilFlag = typeof clearStencil === 'number' ? gl.STENCIL_BUFFER_BIT : 0;
     if (colorFlag || depthFlag || stencilFlag) {
+      // Clears honour the write masks, and the masks are whatever the last draw
+      // left behind. Reset them so a clear means the whole attachment, which is
+      // what WebGPU's load operation does regardless of any pipeline mask.
       WebGLDepthState.applyDefaults(this._context);
+      WebGLColorState.applyDefaults(this._context);
       if (isWebGL2(gl) && gl._currentFramebuffer) {
         if (depthFlag || stencilFlag) {
           const depthAttachment = gl._currentFramebuffer.getDepthAttachment();

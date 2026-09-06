@@ -100,6 +100,11 @@ export interface DrawContext {
   waterCausticLight?: Nullable<PunctualLight>;
   /** Caustic map produced by the WaterCaustics pass. */
   waterCausticTexture?: Nullable<Texture2D>;
+  /**
+   * Displaced water surface height per water slot, on the same slice as
+   * {@link DrawContext.waterCausticTexture}. Produced alongside the map.
+   */
+  waterCausticHeightTexture?: Nullable<Texture2D>;
   /** Parameters describing the projection of {@link DrawContext.waterCausticTexture}. */
   waterCausticUniforms?: Nullable<WaterCausticUniforms>;
   /** The scene currently being drawn. */
