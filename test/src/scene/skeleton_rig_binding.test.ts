@@ -1,9 +1,10 @@
-import { DRef, Matrix4x4, Quaternion, Vector3 } from '@zephyr3d/base';
+import { DRef, Matrix4x4, MemoryFS, Quaternion, Vector3 } from '@zephyr3d/base';
 import type { AnimationSet } from '@zephyr3d/scene';
 import {
   NodeRotationTrack,
   NodeScaleTrack,
   NodeTranslationTrack,
+  ResourceManager,
   Scene,
   SceneNode,
   SkeletonModifier,
@@ -195,6 +196,29 @@ function setHumanoidLateralBindPose(joints: SceneNode[], mirrored = false, forwa
 }
 
 describe('SkeletonRig and SkinBinding', () => {
+  test('round-trips an explicit retarget pose through scene serialization', async () => {
+    const scene = new Scene();
+    const model = appendNode(scene.rootNode, 'model');
+    const root = appendNode(model, 'root');
+    const joint = appendNode(root, 'joint');
+    const joints = [root, joint];
+    const referencePose = bindPose(joints);
+    referencePose[1].rotation.set(Quaternion.fromAxisAngle(Vector3.axisPZ(), Math.PI / 3));
+    model.animationSet.rigs.push(
+      new DRef(new SkeletonRig(joints, bindPose(joints), { retargetPose: referencePose }))
+    );
+
+    const manager = new ResourceManager(new MemoryFS());
+    const serialized = await manager.serializeObject(model);
+    const container = new SceneNode(scene);
+    container.remove();
+    const restored = (await manager.deserializeObject<SceneNode>(container, serialized))!;
+    const restoredRig = restored.animationSet.rigs[0].get()!;
+
+    expect(restoredRig.hasRetargetPose).toBe(true);
+    expect(restoredRig.retargetPose[1].rotation.z).toBeCloseTo(referencePose[1].rotation.z);
+  });
+
   test('updates shared rig modifiers once while preserving multiple skin bindings', () => {
     const scene = new Scene();
     const model = appendNode(scene.rootNode, 'model');
@@ -283,6 +307,59 @@ describe('SkeletonRig and SkinBinding', () => {
 
     expect(copied).toBeTruthy();
     expect(copied!.skeletons.has(dstRig.persistentId)).toBe(true);
+  });
+
+  test('retarget pose transfers a source base posture when static joint tracks are omitted', () => {
+    const scene = new Scene();
+    const srcModel = appendNode(scene.rootNode, 'srcModel');
+    const dstModel = appendNode(scene.rootNode, 'dstModel');
+    const srcRoot = appendNode(srcModel, 'SrcRoot');
+    const dstRoot = appendNode(dstModel, 'DstRoot');
+    const srcJoints = buildHumanoid(srcRoot, 'Src');
+    const dstJoints = buildHumanoid(dstRoot, 'Dst');
+
+    const leftArmDown = Quaternion.fromAxisAngle(Vector3.axisPZ(), -Math.PI / 2);
+    const rightArmDown = Quaternion.fromAxisAngle(Vector3.axisPZ(), Math.PI / 2);
+    srcJoints[7].rotation.set(leftArmDown);
+    srcJoints[11].rotation.set(rightArmDown);
+    const srcBindPose = bindPose(srcJoints);
+    const srcTPose = bindPose(srcJoints);
+    srcTPose[7].rotation.identity();
+    srcTPose[11].rotation.identity();
+
+    const srcRig = new SkeletonRig(srcJoints, srcBindPose, { retargetPose: srcTPose });
+    const dstRig = new SkeletonRig(dstJoints, bindPose(dstJoints));
+    srcModel.animationSet.rigs.push(new DRef(srcRig));
+    dstModel.animationSet.rigs.push(new DRef(dstRig));
+
+    const srcClip = srcModel.animationSet.createAnimation('idle')!;
+    srcClip.timeDuration = 1;
+    srcClip.addSkeleton(srcRig.persistentId);
+    srcClip.addTrack(
+      srcJoints[0],
+      new NodeRotationTrack('linear', [
+        { time: 0, value: Quaternion.identity() },
+        { time: 1, value: Quaternion.identity() }
+      ])
+    );
+
+    const copied = dstModel.animationSet.copyHumanoidAnimationFrom(
+      srcModel.animationSet as AnimationSet,
+      'idle',
+      'idle_copy'
+    );
+
+    expect(copied).toBeTruthy();
+    const leftTrack = copied!.tracks
+      .get(dstJoints[7])
+      ?.find((track) => track instanceof NodeRotationTrack) as NodeRotationTrack | undefined;
+    const rightTrack = copied!.tracks
+      .get(dstJoints[11])
+      ?.find((track) => track instanceof NodeRotationTrack) as NodeRotationTrack | undefined;
+    expect(leftTrack).toBeInstanceOf(NodeRotationTrack);
+    expect(rightTrack).toBeInstanceOf(NodeRotationTrack);
+    expect(leftTrack!.calculateState(dstJoints[7], 0).z).toBeCloseTo(leftArmDown.z);
+    expect(rightTrack!.calculateState(dstJoints[11], 0).z).toBeCloseTo(rightArmDown.z);
   });
 
   test('retarget skips humanoid rigs whose mapped joints are not part of the rig', () => {
@@ -662,6 +739,83 @@ describe('SkeletonRig and SkinBinding', () => {
     expect(outputs[4]).toBeCloseTo(0.5);
   });
 
+  test('retargets hips from reference pose onto bind height and ignores a static separate root track', () => {
+    const scene = new Scene();
+    const srcModel = appendNode(scene.rootNode, 'srcModel');
+    const dstModel = appendNode(scene.rootNode, 'dstModel');
+    const srcRoot = appendNode(srcModel, 'SrcRoot');
+    const dstRoot = appendNode(dstModel, 'DstRoot');
+    const srcJoints = buildHumanoid(srcRoot, 'Src');
+    const dstJoints = buildHumanoid(dstRoot, 'Dst');
+    const srcHips = srcJoints[0];
+    const dstHips = dstJoints[0];
+    srcRoot.position.setXYZ(0, 0.25, 0);
+    dstRoot.position.setXYZ(0, 3, 0);
+    srcHips.position.setXYZ(0, 1, 0);
+    dstHips.position.setXYZ(0, 2, 0);
+    setHumanoidLateralBindPose(srcJoints);
+    setHumanoidLateralBindPose(dstJoints);
+    srcHips.position.setXYZ(0, 1, 0);
+    dstHips.position.setXYZ(0, 2, 0);
+    scaleHumanoidLegs(dstJoints, 2);
+
+    const srcBindPose = bindPose(srcJoints);
+    const dstBindPose = bindPose(dstJoints);
+    const srcRetargetPose = bindPose(srcJoints);
+    const dstRetargetPose = bindPose(dstJoints);
+    srcRetargetPose[0].position.y = 1.5;
+    dstRetargetPose[0].position.y = 20;
+    for (let i = 14; i <= 21; i++) {
+      srcRetargetPose[i].position.scaleBy(10);
+      dstRetargetPose[i].position.scaleBy(0.1);
+    }
+    const srcRig = new SkeletonRig(srcJoints, srcBindPose, {
+      rootJoint: srcRoot,
+      retargetPose: srcRetargetPose
+    });
+    const dstRig = new SkeletonRig(dstJoints, dstBindPose, {
+      rootJoint: dstRoot,
+      retargetPose: dstRetargetPose
+    });
+    srcModel.animationSet.rigs.push(new DRef(srcRig));
+    dstModel.animationSet.rigs.push(new DRef(dstRig));
+
+    const srcClip = srcModel.animationSet.createAnimation('crouch')!;
+    srcClip.timeDuration = 1;
+    srcClip.addSkeleton(srcRig.persistentId);
+    srcClip.addTrack(
+      srcRoot,
+      new NodeTranslationTrack('linear', [
+        { time: 0, value: srcRoot.position.clone() },
+        { time: 1, value: srcRoot.position.clone() }
+      ])
+    );
+    srcClip.addTrack(
+      srcHips,
+      new NodeTranslationTrack('linear', [
+        { time: 0, value: new Vector3(0, 1.25, 0) },
+        { time: 1, value: new Vector3(0, 1.75, 0) }
+      ])
+    );
+
+    const copied = dstModel.animationSet.copyHumanoidAnimationFrom(
+      srcModel.animationSet as AnimationSet,
+      'crouch',
+      'crouch_copy'
+    );
+
+    expect(copied).toBeTruthy();
+    const rootTrack = copied!.tracks.get(dstRoot)!.find((track) => track instanceof NodeTranslationTrack);
+    const hipsTrack = copied!.tracks.get(dstHips)!.find((track) => track instanceof NodeTranslationTrack);
+    expect(rootTrack).toBeInstanceOf(NodeTranslationTrack);
+    expect(hipsTrack).toBeInstanceOf(NodeTranslationTrack);
+    const rootOutputs = (rootTrack as NodeTranslationTrack).interpolator.outputs as Float32Array;
+    const hipsOutputs = (hipsTrack as NodeTranslationTrack).interpolator.outputs as Float32Array;
+    expect(rootOutputs[1]).toBeCloseTo(3);
+    expect(hipsOutputs[1]).toBeCloseTo(1.5);
+    expect(hipsOutputs[4]).toBeCloseTo(2.5);
+  });
+
   test('retarget handles explicit humanoid root motion modes', () => {
     const scene = new Scene();
     const srcModel = appendNode(scene.rootNode, 'srcModel');
@@ -696,7 +850,7 @@ describe('SkeletonRig and SkinBinding', () => {
       srcRoot,
       new NodeTranslationTrack('linear', [
         { time: 0, value: new Vector3(0, 0.1, 0) },
-        { time: 1, value: new Vector3(0, 0.35, 0) }
+        { time: 1, value: new Vector3(0.25, 0.35, 0) }
       ])
     );
 
@@ -713,7 +867,21 @@ describe('SkeletonRig and SkinBinding', () => {
     expect(scaledTrack!.jointIndex).toBe(-1);
     const scaledOutputs = (scaledTrack as NodeTranslationTrack).interpolator.outputs as Float32Array;
     expect(scaledOutputs[1]).toBeCloseTo(1);
-    expect(scaledOutputs[4]).toBeCloseTo(1.5);
+    expect(scaledOutputs[3]).toBeCloseTo(0.5);
+    expect(scaledOutputs[4]).toBeCloseTo(1);
+
+    const unlocked = dstModel.animationSet.copyHumanoidAnimationFrom(
+      srcModel.animationSet as AnimationSet,
+      'walk',
+      'walk_unlocked',
+      { rootMotion: 'scaled', lockRootMotionAxes: {} }
+    );
+    expect(unlocked).toBeTruthy();
+    const unlockedTrack = unlocked!.tracks
+      .get(dstRoot)!
+      .find((track) => track instanceof NodeTranslationTrack);
+    const unlockedOutputs = (unlockedTrack as NodeTranslationTrack).interpolator.outputs as Float32Array;
+    expect(unlockedOutputs[4]).toBeCloseTo(1.5);
 
     const locked = dstModel.animationSet.copyHumanoidAnimationFrom(
       srcModel.animationSet as AnimationSet,

@@ -127,6 +127,7 @@ export class Editor {
   private _extraLibs: Record<string, Monaco.IDisposable>;
   private readonly _plugins: EditorPluginManager;
   private readonly _systemPluginRegistrations: Map<string, SystemPluginRecord>;
+  private _systemPluginsLoaded: boolean;
   private _projectVFS: VFS;
   private readonly _pendingScriptAssetChanges: Map<string, EditorProjectAssetChange>;
   private _scriptAssetChangeTimer: ReturnType<typeof setTimeout>;
@@ -141,6 +142,7 @@ export class Editor {
     this._extraLibs = {};
     this._plugins = new EditorPluginManager(this);
     this._systemPluginRegistrations = new Map();
+    this._systemPluginsLoaded = false;
     this._projectVFS = null;
     this._pendingScriptAssetChanges = new Map();
     this._scriptAssetChangeTimer = null;
@@ -489,7 +491,6 @@ export class Editor {
     await this.loadAssets();
     initLogView({ maxLines: 8000 });
     eventBus.on('action', this.onAction, this);
-    await this.loadSystemPlugins();
   }
   async loadAssets() {
     const vfs = new HttpFS(window.location.href.slice(0, window.location.href.lastIndexOf('/')));
@@ -849,6 +850,7 @@ export class Editor {
         const project = await ProjectService.openProject(uuid);
         const settings = await ProjectService.getCurrentProjectSettings();
         this._currentProject = project;
+        await this.loadSystemPlugins();
         this.notifyProjectOpened(project);
         let scene = settings.startupScene ?? project.lastEditScene ?? '';
         if (!scene) {
@@ -916,6 +918,7 @@ export class Editor {
         }
         const project = await ProjectService.openProject(uuid);
         this._currentProject = project;
+        await this.loadSystemPlugins();
         this.notifyProjectOpened(project);
         this._moduleManager.activate('Scene', '');
         return this._currentProject.uuid;
@@ -950,6 +953,8 @@ export class Editor {
         updateProgress(3, 5, 'Loading project settings...');
         const settings = await ProjectService.getCurrentProjectSettings();
         ProjectService.applyRuntimeSettings(settings);
+        updateProgress(3, 5, 'Loading editor plugins...');
+        await this.loadSystemPlugins();
         this.notifyProjectOpened(project);
         updateProgress(4, 5, 'Loading script type hints...');
         await this.loadDepTypes();
@@ -990,6 +995,8 @@ export class Editor {
           updateProgress(2, 5, 'Loading project settings...');
           const settings = await ProjectService.getCurrentProjectSettings();
           ProjectService.applyRuntimeSettings(settings);
+          updateProgress(2, 5, 'Loading editor plugins...');
+          await this.loadSystemPlugins();
           this.notifyProjectOpened(project);
           updateProgress(3, 5, 'Checking project dependencies...');
           await this.ensureProjectDependenciesInstalled(id as string, settings, (message) => {
@@ -1390,6 +1397,9 @@ export class Editor {
   }
 
   async loadSystemPlugins() {
+    if (this._systemPluginsLoaded) {
+      return;
+    }
     const plugins = await SystemPluginService.listPlugins();
     for (const plugin of plugins) {
       if (plugin.enabled) {
@@ -1398,6 +1408,7 @@ export class Editor {
         await this._plugins.deactivatePlugin(plugin.id);
       }
     }
+    this._systemPluginsLoaded = true;
   }
 
   private async tryLoadSystemPlugin(id: string, reactivate: boolean): Promise<string | null> {

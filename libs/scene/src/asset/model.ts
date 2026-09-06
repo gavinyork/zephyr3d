@@ -671,6 +671,8 @@ export class AssetSkeleton extends NamedObject {
   inverseBindMatrices: Matrix4x4[];
   /** Binding pose matrices of the joints */
   bindPose: { position: Vector3; rotation: Quaternion; scale: Vector3 }[];
+  /** Optional humanoid retarget reference pose, ordered like `joints`. */
+  retargetPose: Nullable<{ position: Vector3; rotation: Quaternion; scale: Vector3 }[]>;
   /** Explicit humanoid joint mapping, when supplied by the source asset. */
   humanoidJointMapping: Nullable<HumanoidJointMapping<AssetHierarchyNode>>;
   /**
@@ -684,6 +686,7 @@ export class AssetSkeleton extends NamedObject {
     this.joints = [];
     this.inverseBindMatrices = [];
     this.bindPose = [];
+    this.retargetPose = null;
     this.humanoidJointMapping = null;
   }
   /**
@@ -1730,7 +1733,9 @@ export class SharedModel extends Disposable {
             rig = new SkeletonRig(
               joints,
               sk.bindPose,
-              humanoidJointMapping ? { rootJoint, humanoidJointMapping } : { rootJoint }
+              humanoidJointMapping
+                ? { rootJoint, humanoidJointMapping, retargetPose: sk.retargetPose }
+                : { rootJoint, retargetPose: sk.retargetPose }
             );
             rigMap.set(rigKey, rig);
             group.animationSet.rigs.push(new DRef(rig));

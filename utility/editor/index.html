@@ -29,13 +29,43 @@
       canvas:focus {
         outline: none;
       }
+      #zephyr-loading {
+        position: fixed;
+        inset: 0;
+        display: grid;
+        place-items: center;
+        background: #1f1f1f;
+        color: #d8d8d8;
+        font: 14px 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        z-index: 10;
+      }
     </style>
     <script type="importmap">
 __ZEPHYR3D_IMPORT_MAP__
     </script>
   </head>
   <body>
+    <div id="zephyr-loading" role="status" aria-live="polite">Loading Zephyr3D Editor...</div>
     <canvas id="canvas"></canvas>
+    <script>
+      // Module parse/load failures happen before app.ts can install its
+      // renderer handlers; surface them instead of leaving the loading mask.
+      const showStartupError = (message) => {
+        const loading = document.getElementById('zephyr-loading');
+        if (loading) {
+          loading.textContent = `Editor startup failed: ${message}`;
+          loading.setAttribute('role', 'alert');
+        }
+      };
+      window.addEventListener('error', (event) => {
+        if (event.message) {
+          showStartupError(event.message);
+        }
+      });
+      window.addEventListener('unhandledrejection', (event) => {
+        showStartupError(event.reason?.message || String(event.reason || 'Unhandled promise rejection'));
+      });
+    </script>
     <script>
       // Select the engine depth convention before any engine module loads.
       const params = new URLSearchParams(location.search);

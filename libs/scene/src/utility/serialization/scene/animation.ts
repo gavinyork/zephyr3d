@@ -181,6 +181,31 @@ function decodeSkeletonBindPose(encoded: string): SkeletonBindPose {
   };
 }
 
+function encodeSkeletonPose(pose: SkeletonBindPose[]): string {
+  const values = pose.flatMap((transform) => [
+    ...transform.position,
+    ...transform.rotation,
+    ...transform.scale
+  ]);
+  return uint8ArrayToBase64(new Uint8Array(new Float32Array(values).buffer));
+}
+
+function decodeSkeletonPose(encoded: string, jointCount: number): SkeletonBindPose[] {
+  const data = new Float32Array(base64ToUint8Array(encoded).buffer);
+  if (data.length !== jointCount * 10) {
+    throw new Error('Invalid serialized skeleton pose');
+  }
+  const pose: SkeletonBindPose[] = [];
+  for (let i = 0; i < jointCount; i++) {
+    pose.push({
+      position: new Vector3(data[i * 10 + 0], data[i * 10 + 1], data[i * 10 + 2]),
+      rotation: new Quaternion(data[i * 10 + 3], data[i * 10 + 4], data[i * 10 + 5], data[i * 10 + 6]),
+      scale: new Vector3(data[i * 10 + 7], data[i * 10 + 8], data[i * 10 + 9])
+    });
+  }
+  return pose;
+}
+
 function vectorToArray(value: Vector3): number[] {
   return [value.x, value.y, value.z];
 }
@@ -2265,6 +2290,7 @@ export function getSkeletonClass(): SerializableClass {
         inverseBindMatrices: string;
         bindPoseMatrices: string;
         bindPose: string;
+        retargetPose?: string;
         id: string;
       }
     ) {
@@ -2283,6 +2309,9 @@ export function getSkeletonClass(): SerializableClass {
         base64ToUint8Array(init.bindPose ?? init.bindPoseMatrices).buffer
       );
       const rootBindPose = init.rootBindPose ? decodeSkeletonBindPose(init.rootBindPose) : undefined;
+      const retargetPose = init.retargetPose
+        ? decodeSkeletonPose(init.retargetPose, joints.length)
+        : undefined;
       const inverseBindMatrices: Matrix4x4[] = [];
       const bindPose: { rotation: Quaternion; scale: Vector3; position: Vector3 }[] = [];
       for (let i = 0; i < joints.length; i++) {
@@ -2328,7 +2357,8 @@ export function getSkeletonClass(): SerializableClass {
       if (!rig) {
         rig = new SkeletonRig(joints, bindPose, {
           rootJoint,
-          rootBindPose
+          rootBindPose,
+          retargetPose
         });
         ctx.animationSet.rigs.push(new DRef(rig));
       }
@@ -2352,6 +2382,7 @@ export function getSkeletonClass(): SerializableClass {
         rootBindPose: encodeSkeletonBindPose(obj.rig.rootBindPose),
         inverseBindMatrices: uint8ArrayToBase64(new Uint8Array(new Float32Array(inverseBindMatrices).buffer)),
         bindPose: uint8ArrayToBase64(new Uint8Array(new Float32Array(bindPose).buffer)),
+        retargetPose: obj.rig.hasRetargetPose ? encodeSkeletonPose(obj.rig.retargetPose) : undefined,
         id: obj.persistentId
       };
     },
@@ -2374,6 +2405,7 @@ export function getSkeletonRigClass(): SerializableClass {
         rootBindPose?: string;
         bindPoseMatrices: string;
         bindPose: string;
+        retargetPose?: string;
         id: string;
       }
     ) {
@@ -2423,9 +2455,13 @@ export function getSkeletonRigClass(): SerializableClass {
           });
         }
       }
+      const retargetPose = init.retargetPose
+        ? decodeSkeletonPose(init.retargetPose, joints.length)
+        : undefined;
       const rig = new SkeletonRig(joints, bindPose, {
         rootJoint,
-        rootBindPose
+        rootBindPose,
+        retargetPose
       });
       rig.persistentId = init.id;
       return {
@@ -2442,6 +2478,7 @@ export function getSkeletonRigClass(): SerializableClass {
         rootJoint: obj.rootJoint?.persistentId ?? '',
         rootBindPose: encodeSkeletonBindPose(obj.rootBindPose),
         bindPose: uint8ArrayToBase64(new Uint8Array(new Float32Array(bindPose).buffer)),
+        retargetPose: obj.hasRetargetPose ? encodeSkeletonPose(obj.retargetPose) : undefined,
         id: obj.persistentId
       };
     },

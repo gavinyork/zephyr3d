@@ -1,7 +1,17 @@
 import { ASSERT, PathUtils, type VFS } from '@zephyr3d/base';
 import type { AbstractModelImporter } from '@zephyr3d/loaders';
 import { FBXImporter, GLTFImporter, OBJImporter } from '@zephyr3d/loaders';
-import { type SceneNode, type ResourceManager, Scene, getEngine, SharedModel } from '@zephyr3d/scene';
+import {
+  type AssetHierarchyNode,
+  type AssetSkeleton,
+  type HumanoidJointMapping,
+  type SceneNode,
+  type ResourceManager,
+  Scene,
+  Skeleton,
+  getEngine,
+  SharedModel
+} from '@zephyr3d/scene';
 
 export type SaveOptions = {
   importMeshes: boolean;
@@ -22,6 +32,201 @@ type SharedModelWithPreprocessOptions = SharedModel & {
 };
 
 export class ResourceService {
+  private static normalizeSkeletonJointName(name: string) {
+    const normalized = name.trim();
+    const separator = Math.max(normalized.lastIndexOf(':'), normalized.lastIndexOf('|'));
+    return normalized.slice(separator + 1).toLowerCase();
+  }
+  private static getUniqueJointMap(skeleton: AssetSkeleton) {
+    const result = new Map<string, AssetHierarchyNode>();
+    const duplicates = new Set<string>();
+    for (const joint of skeleton.joints) {
+      const name = ResourceService.normalizeSkeletonJointName(joint.name);
+      if (result.has(name)) {
+        result.delete(name);
+        duplicates.add(name);
+      } else if (!duplicates.has(name)) {
+        result.set(name, joint);
+      }
+    }
+    return result;
+  }
+  private static getSkeletonCompatibility(target: AssetSkeleton, reference: AssetSkeleton) {
+    const targetJointSet = new Set(target.joints);
+    const referenceJointSet = new Set(reference.joints);
+    const referenceByName = ResourceService.getUniqueJointMap(reference);
+    let nameMatches = 0;
+    let hierarchyMatches = 0;
+    const findSkeletonParent = (
+      joint: AssetHierarchyNode,
+      jointSet: Set<AssetHierarchyNode>
+    ): AssetHierarchyNode | null => {
+      let parent = joint.parent;
+      while (parent && !jointSet.has(parent)) {
+        parent = parent.parent;
+      }
+      return parent;
+    };
+    for (const targetJoint of target.joints) {
+      const referenceJoint = referenceByName.get(
+        ResourceService.normalizeSkeletonJointName(targetJoint.name)
+      );
+      if (!referenceJoint) {
+        continue;
+      }
+      nameMatches++;
+      const targetParent = findSkeletonParent(targetJoint, targetJointSet);
+      const referenceParent = findSkeletonParent(referenceJoint, referenceJointSet);
+      if (
+        (!targetParent && !referenceParent) ||
+        (targetParent &&
+          referenceParent &&
+          ResourceService.normalizeSkeletonJointName(targetParent.name) ===
+            ResourceService.normalizeSkeletonJointName(referenceParent.name))
+      ) {
+        hierarchyMatches++;
+      }
+    }
+    return { nameMatches, hierarchyMatches };
+  }
+  private static getAssetHumanoidMapping(skeleton: AssetSkeleton) {
+    const mapping =
+      skeleton.humanoidJointMapping ??
+      (skeleton.root ? Skeleton.tryExtractHumanoidJoints(skeleton.root) : null);
+    if (mapping && !skeleton.humanoidJointMapping) {
+      skeleton.humanoidJointMapping = mapping;
+    }
+    return mapping;
+  }
+  private static flattenHumanoidMapping(mapping: HumanoidJointMapping<AssetHierarchyNode> | null) {
+    const result = new Map<string, AssetHierarchyNode>();
+    if (!mapping) {
+      return result;
+    }
+    const append = (prefix: string, joints?: Record<string, AssetHierarchyNode>) => {
+      if (joints) {
+        for (const key of Object.keys(joints)) {
+          result.set(`${prefix}:${key}`, joints[key]);
+        }
+      }
+    };
+    append('body', mapping.body);
+    append('leftHand', mapping.leftHand);
+    append('rightHand', mapping.rightHand);
+    return result;
+  }
+  private static cloneAssetPoseTransform(skeleton: AssetSkeleton, joint: AssetHierarchyNode) {
+    const index = skeleton.joints.indexOf(joint);
+    if (index < 0) {
+      return null;
+    }
+    const transform = skeleton.bindPose[index];
+    return {
+      position: transform.position.clone(),
+      rotation: transform.rotation.clone(),
+      scale: transform.scale.clone()
+    };
+  }
+  /** Load a single-file GLB/VRM as an external retarget reference. */
+  static async importRetargetPoseModel(file: File): Promise<SharedModel> {
+    if (!/\.(glb|vrm|vrma)$/i.test(file.name)) {
+      throw new Error('Retarget pose source must be a GLB, VRM, or VRMA file');
+    }
+    const model = new SharedModel();
+    try {
+      await new GLTFImporter().import(file, model, '', getEngine().resourceManager.VFS);
+      return model;
+    } catch (err) {
+      model.dispose();
+      throw err;
+    }
+  }
+  /** Apply reference skeleton local transforms to matching skeletons in an imported model. */
+  static applyRetargetPoseModel(model: SharedModel, referenceModel: SharedModel) {
+    let skeletonCount = 0;
+    let jointCount = 0;
+    for (const targetSkeleton of model.skeletons) {
+      const targetSemantic = ResourceService.flattenHumanoidMapping(
+        ResourceService.getAssetHumanoidMapping(targetSkeleton)
+      );
+      let bestReference: AssetSkeleton | null = null;
+      let bestScore = 0;
+      for (const referenceSkeleton of referenceModel.skeletons) {
+        const referenceSemantic = ResourceService.flattenHumanoidMapping(
+          ResourceService.getAssetHumanoidMapping(referenceSkeleton)
+        );
+        const semanticMatches = [...targetSemantic.keys()].filter((key) => referenceSemantic.has(key)).length;
+        const { nameMatches, hierarchyMatches } = ResourceService.getSkeletonCompatibility(
+          targetSkeleton,
+          referenceSkeleton
+        );
+        const minimumNameMatches = Math.max(
+          1,
+          Math.ceil(Math.min(targetSkeleton.joints.length, referenceSkeleton.joints.length) * 0.5)
+        );
+        const minimumHierarchyMatches = Math.ceil(nameMatches * 0.8);
+        if (nameMatches < minimumNameMatches || hierarchyMatches < minimumHierarchyMatches) {
+          continue;
+        }
+        const score = semanticMatches * 1000000 + hierarchyMatches * 1000 + nameMatches;
+        if (score > bestScore) {
+          bestScore = score;
+          bestReference = referenceSkeleton;
+        }
+      }
+      if (!bestReference) {
+        continue;
+      }
+
+      const pose = targetSkeleton.bindPose.map((transform) => ({
+        position: transform.position.clone(),
+        rotation: transform.rotation.clone(),
+        scale: transform.scale.clone()
+      }));
+      const matchedTargetIndices = new Set<number>();
+      const referenceByName = ResourceService.getUniqueJointMap(bestReference);
+      for (let i = 0; i < targetSkeleton.joints.length; i++) {
+        const referenceJoint = referenceByName.get(
+          ResourceService.normalizeSkeletonJointName(targetSkeleton.joints[i].name)
+        );
+        const transform = referenceJoint
+          ? ResourceService.cloneAssetPoseTransform(bestReference, referenceJoint)
+          : null;
+        if (transform) {
+          pose[i] = transform;
+          matchedTargetIndices.add(i);
+        }
+      }
+      const referenceSemantic = ResourceService.flattenHumanoidMapping(
+        ResourceService.getAssetHumanoidMapping(bestReference)
+      );
+      for (const [key, targetJoint] of targetSemantic) {
+        const referenceJoint = referenceSemantic.get(key);
+        const targetIndex = targetSkeleton.joints.indexOf(targetJoint);
+        const transform = referenceJoint
+          ? ResourceService.cloneAssetPoseTransform(bestReference, referenceJoint)
+          : null;
+        if (targetIndex >= 0 && transform) {
+          pose[targetIndex] = transform;
+          matchedTargetIndices.add(targetIndex);
+        }
+      }
+      if (matchedTargetIndices.size > 0) {
+        targetSkeleton.retargetPose = pose;
+        skeletonCount++;
+        jointCount += matchedTargetIndices.size;
+      }
+    }
+    if (skeletonCount === 0) {
+      throw new Error('The external pose GLB does not contain a skeleton matching this asset');
+    }
+    return { skeletonCount, jointCount };
+  }
+  static clearRetargetPose(model: SharedModel) {
+    for (const skeleton of model.skeletons) {
+      skeleton.retargetPose = null;
+    }
+  }
   private static modelHasMorphTargets(model: SharedModel) {
     return model.nodes.some((node) => node.mesh?.subMeshes?.some((subMesh) => subMesh.numTargets > 0));
   }

@@ -121,6 +121,11 @@ export type SkeletonRigOptions = {
   rootJoint?: Nullable<SceneNode>;
   rootBindPose?: SkeletonBindPose;
   humanoidJointMapping?: Nullable<HumanoidJointMapping<SceneNode>>;
+  /**
+   * Optional humanoid retarget reference pose, ordered like `joints`.
+   * When omitted, the rig bind pose is used as the retarget reference.
+   */
+  retargetPose?: Nullable<SkeletonBindPose[]>;
 };
 
 type HumanoidJointPattern = {
@@ -160,6 +165,8 @@ export class SkeletonRig extends Disposable {
   protected _joints: SceneNode[];
   protected _bindPoseByJoint: Map<SceneNode, SkeletonBindPose>;
   protected _bindPose: SkeletonBindPose[];
+  protected _retargetPoseByJoint: Nullable<Map<SceneNode, SkeletonBindPose>>;
+  protected _retargetPose: Nullable<SkeletonBindPose[]>;
   protected _rootJoint: Nullable<SceneNode>;
   protected _rootBindPose: SkeletonBindPose;
   protected _playing: boolean;
@@ -176,6 +183,13 @@ export class SkeletonRig extends Disposable {
     for (let i = 0; i < joints.length; i++) {
       this._bindPoseByJoint.set(joints[i], bindPose[i]);
     }
+    if (options?.retargetPose && options.retargetPose.length !== joints.length) {
+      throw new Error('SkeletonRig(): retarget pose must contain one transform per joint');
+    }
+    this._retargetPose = options?.retargetPose ?? null;
+    this._retargetPoseByJoint = this._retargetPose
+      ? new Map(joints.map((joint, index) => [joint, this._retargetPose![index]]))
+      : null;
     const skeletonRoot = this.findRootJoint(this._joints);
     this._rootJoint = options?.rootJoint ?? skeletonRoot;
     this._rootBindPose = options?.rootBindPose ?? this.getNodeBindPose(this._rootJoint);
@@ -237,6 +251,16 @@ export class SkeletonRig extends Disposable {
     return this._bindPose;
   }
 
+  /** Effective humanoid retarget reference pose. */
+  get retargetPose() {
+    return this._retargetPose ?? this._bindPose;
+  }
+
+  /** Whether this rig has a reference pose that is distinct from its bind pose. */
+  get hasRetargetPose() {
+    return !!this._retargetPose;
+  }
+
   get rootJoint(): Nullable<SceneNode> {
     return this._rootJoint;
   }
@@ -252,6 +276,10 @@ export class SkeletonRig extends Disposable {
 
   getBindPoseForJoint(joint: SceneNode) {
     return this._bindPoseByJoint.get(joint) ?? null;
+  }
+
+  getRetargetPoseForJoint(joint: SceneNode) {
+    return this._retargetPoseByJoint?.get(joint) ?? this.getBindPoseForJoint(joint);
   }
 
   get humanoidJointMapping(): Nullable<HumanoidJointMapping<SceneNode>> {
@@ -444,7 +472,8 @@ export class SkinBinding extends Disposable {
       this._rig = new SkeletonRig(rig.joints, bindPose, {
         rootJoint: rig.rootJoint,
         rootBindPose: rig.rootBindPose,
-        humanoidJointMapping: rig.humanoidJointMapping
+        humanoidJointMapping: rig.humanoidJointMapping,
+        retargetPose: rig.hasRetargetPose ? rig.retargetPose : null
       });
     }
     this.updateJointMatrices();
