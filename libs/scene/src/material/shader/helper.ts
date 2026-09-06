@@ -1604,6 +1604,24 @@ export class ShaderHelper {
       // sampler would repeat its border, which is some other ray's wave; the
       // surface is taken as flat there.
       this.$l.insideMap = pb.all(pb.lessThanEqual(pb.abs(this.mapNDC), pb.vec2(1)));
+      // How far this fragment is towards the map border, and how much the map is
+      // therefore trusted. Hoisted above the water loop because the wave height
+      // is faded by it too, not just the pattern.
+      //
+      // Measured on the linear coordinate, not the warped one. The warp fixes
+      // both ends of [-1, 1], so the border is in the same world place either
+      // way, but the band between them is not: warping it would make its world
+      // width depend on the warp strength, and the CPU sized it in meters.
+      //
+      // Distance is measured under an L4 norm rather than per-axis. A per-axis
+      // fade is a rectangle in light space, and the sun tilts that rectangle, so
+      // its border lands on the sea bed as straight lines - which the eye picks
+      // out of a caustic pattern however wide the gradient is. An L2 circle has
+      // no straight part anywhere but discards the 21% of the map outside its
+      // inscribed disc; L4 gives up 7% instead and still curves everywhere.
+      this.$l.ndcSq = pb.mul(this.mapNDC, this.mapNDC);
+      this.$l.edgeDist = pb.sqrt(pb.sqrt(pb.dot(this.ndcSq, this.ndcSq)));
+      this.$l.edge = pb.sub(1, pb.smoothStep(this.cu.params.w, 1, this.edgeDist));
       this.$l.waveHeights = pb.textureSampleLevel(this[UNIFORM_NAME_CAUSTIC_HEIGHT_MAP], this.uv, 0);
       // Find the water above this point. Several can qualify - a pool inside a
       // lake, water on terraces - and the one that matters is the lowest of
@@ -1651,9 +1669,18 @@ export class ShaderHelper {
             // nothing is known and the surface is taken as flat.
             this.$l.slotCovered = pb.or(pb.not(this.insideMap), pb.greaterThan(this.slotSample, 0.5));
             this.$if(this.slotCovered, function () {
+              // Faded into the rest plane over the same band the pattern fades
+              // on, rather than switched off at the border. Beyond the map the
+              // surface is taken as flat, and exp(-sigma * depth) is convex, so
+              // a hard switch makes the wavy side systematically brighter than
+              // the flat side - E[exp(-sigma*w)] > 1 - and the step lands as a
+              // mean brightness seam that grows with both the swell and the
+              // turbidity. Ramping the wave to zero puts the two sides on the
+              // same value at the border.
               this.$l.slotWave = pb.mul(
                 pb.sub(this.slotSample, CAUSTIC_HEIGHT_BIAS),
-                pb.float(this.insideMap)
+                pb.float(this.insideMap),
+                this.edge
               );
               this.$l.slotDepth = pb.sub(pb.add(this.slotMedium.w, this.slotWave), this.worldPos.y);
               this.$if(pb.greaterThan(this.slotDepth, 0), function () {
@@ -1674,23 +1701,6 @@ export class ShaderHelper {
       });
       this.$l.pathLength = pb.mul(this.depth, this.cu.lightDir.w);
       this.$l.transmittance = pb.exp(pb.neg(pb.mul(this.medium, this.pathLength)));
-      // Fade the pattern out towards the map border, over a band the CPU sized
-      // in meters and handed over as the distance the fade starts at.
-      //
-      // Measured on the linear coordinate, not the warped one. The warp fixes
-      // both ends of [-1, 1], so the border is in the same world place either
-      // way, but the band between them is not: warping it would make its world
-      // width depend on the warp strength, and the CPU sized it in meters.
-      //
-      // Distance is measured under an L4 norm rather than per-axis. A per-axis
-      // fade is a rectangle in light space, and the sun tilts that rectangle, so
-      // its border lands on the sea bed as straight lines - which the eye picks
-      // out of a caustic pattern however wide the gradient is. An L2 circle has
-      // no straight part anywhere but discards the 21% of the map outside its
-      // inscribed disc; L4 gives up 7% instead and still curves everywhere.
-      this.$l.ndcSq = pb.mul(this.mapNDC, this.mapNDC);
-      this.$l.edgeDist = pb.sqrt(pb.sqrt(pb.dot(this.ndcSq, this.ndcSq)));
-      this.$l.edge = pb.sub(1, pb.smoothStep(this.cu.params.w, 1, this.edgeDist));
       this.$l.pattern = pb.textureSampleLevel(this[UNIFORM_NAME_CAUSTIC_MAP], this.uv, 0).x;
       // Receivers away from the focal plane see a defocused, lower-contrast
       // pattern rather than a displaced one.
