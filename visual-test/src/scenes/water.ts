@@ -111,8 +111,10 @@ function calmWater(scene: Scene, causticsEnabled: boolean) {
   water.scale.setXYZ(22, 1, 22);
   water.position.setXYZ(0, 0, 0);
 
-  // FBM rather than FFT: its noise is analytic, so it is reproducible frame for
-  // frame on both backends. FFT seeds itself from a random noise texture.
+  // FBM rather than FFT, for the shape of the surface rather than for
+  // determinism - FFT is reproducible too, from PRNG(randomSeed). FBM's noise
+  // is analytic, so the ripple field is set directly by the four parameters
+  // below instead of by a spectrum.
   // Short, steep ripples. Caustics are driven by surface *curvature*, not wave
   // height: a long smooth swell refracts almost uniformly and produces a single
   // faint cusp line, where a higher-frequency surface focuses light into the
@@ -304,6 +306,92 @@ export const waterCausticsCrest: VisualScene = {
     // Close and low, looking across the reef face from the lit side.
     placeCamera(camera, new Vector3(1.5, 3.2, 7), new Vector3(0, -0.4, 0));
     camera.far = FAR;
+  }
+};
+
+/**
+ * Open water under a tall, choppy swell, with the caustic map bounded by
+ * `causticsRange` rather than by the water.
+ *
+ * The map border falls in open water here, which is the one configuration the
+ * other caustic scenes never produce: each of them either fits the map to a
+ * pool (`two-pools`, `deep-bed`, `moving`) or keeps the camera close enough
+ * that the water fills the range (`on`, `crest`). A seam at that border is
+ * therefore invisible to all of them, and two separate ones shipped because of
+ * it.
+ *
+ * Three properties have to hold at once for either seam to appear, which is why
+ * they are all set deliberately here:
+ *
+ * 1. **The range, not the water, bounds the map.** 100 m of water against a
+ *    20 m range, so the border is a free-standing arc across the sea bed rather
+ *    than the edge of a pool.
+ * 2. **Horizontal displacement.** Photons launch from rest-plane points and land
+ *    where the displaced surface refracts them, so displacement carries them
+ *    across the border in both directions. A grid cut exactly at the border only
+ *    loses the ones leaving, which piles up a bright rim just inside it.
+ * 3. **A turbid medium.** `exp(-sigma * depth)` is convex, so switching the
+ *    depth from the displaced surface to the rest plane at the border makes the
+ *    wavy side systematically brighter by `exp((sigma * sigma_w)^2 / 2)`. That
+ *    is under 5% in the clear water the other scenes use and about 2x here - the
+ *    difference between invisible and a hard line across the frame.
+ *
+ * FFT rather than Gerstner, because FFT is what shows this in practice and it is
+ * reproducible: its noise texture comes from `PRNG(randomSeed)` - mulberry32,
+ * seeded 0 by default - not from `Math.random`. Every parameter the spectrum
+ * depends on is set explicitly all the same.
+ */
+export const waterCausticsRangeBorder: VisualScene = {
+  name: 'water-caustics-range-border',
+  description:
+    'Turbid water under a tall choppy FFT swell, with causticsRange well inside the water so the map border falls in open sea. Pins that the border is seamless: the photon grid is launched from past it, and the wave height is faded into the rest plane across it. A regression in either leaves a hard arc - a bright rim from the clipped photon grid, or a mean brightness step from switching the depth to the rest plane under a convex transmittance.',
+  frames: 4,
+  setup({ scene, camera }) {
+    bareScene(scene);
+    scene.env.light.type = 'constant';
+    scene.env.light.ambientColor = new Vector4(0.1, 0.13, 0.16, 1);
+
+    const light = new DirectionalLight(scene);
+    light.lookAt(new Vector3(-4, 12, 3), Vector3.zero(), Vector3.axisPY());
+    light.color = new Vector4(1, 0.97, 0.9, 1);
+    light.castShadow = true;
+    light.shadow.applyQualityPreset('outdoor-large');
+
+    const bedDepth = 2.5;
+    const bed = new Mesh(scene, new PlaneShape({ size: 400 }), lambert(new Vector4(0.72, 0.69, 0.6, 1)));
+    bed.position.setXYZ(0, -bedDepth, 0);
+
+    const water = new Water(scene);
+    // Far larger than the range, so the map is cut by the range on every side.
+    water.scale.setXYZ(100, 1, 100);
+    water.position.setXYZ(0, 0, 0);
+
+    const waves = new FFTWaveGenerator();
+    waves.wind = new Vector2(12, 5);
+    waves.setWaveLength(0, 120);
+    waves.setWaveLength(1, 30);
+    waves.setWaveLength(2, 6);
+    waves.setWaveStrength(0, 0.9);
+    waves.setWaveStrength(1, 0.9);
+    waves.setWaveStrength(2, 0.9);
+    // The horizontal displacement itself - property 2 above.
+    waves.setWaveCroppiness(0, -1.5);
+    waves.setWaveCroppiness(1, -1.2);
+    waves.setWaveCroppiness(2, -0.5);
+    water.waveGenerator = waves;
+
+    // Turbid - property 3. Roughly twice the extinction the other caustic
+    // scenes use, which is what brings the convexity gap up to a visible level.
+    water.material.absorption = new Vector3(0.55, 0.14, 0.09);
+    water.material.scattering = new Vector3(0.04, 0.08, 0.11);
+
+    water.causticsEnabled = true;
+    water.causticsDepth = bedDepth;
+    water.causticsRange = 20;
+
+    // High and steep, so the whole border arc is in frame at once.
+    placeCamera(camera, new Vector3(0, 30, 30), new Vector3(0, -bedDepth, 0));
+    camera.far = 300;
   }
 };
 

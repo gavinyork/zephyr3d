@@ -172,13 +172,92 @@ FFT（默认 choppiness -1.5 / -1.2 / -0.5）和 Gerstner 是拉格朗日式生�
   静水位）；修复后跟随水面，残差约 0.1 m，与远处水面网格 LOD 变粗后线性插值削低波峰的量级一致
   （λ=4.5 m、A=0.4 m 时约 0.09 m）。此前的欧拉取样与不动点反演两版在 FFT 下均明显错位。
 
-## 7. 涉及文件
+## 7. 后续：CausticsRange 边界的两条接缝
+
+2026-09-07。位移门控落地后，用户在 FFT 大浪下报告贴图边界出现明显裂缝。这是**两个独立缺陷**
+叠在同一条线上，都只在"range 而非水域决定贴图边界"时出现——所有既有场景要么把贴图贴合到水池
+（two-pools / deep-bed / moving），要么相机足够近使水面填满 range（on / crest），所以六个场景
+一个都没覆盖到。
+
+### 7.1 光子网格被硬裁在边界（提交 `7ca95c15`）
+
+`_updateGridBounds` 把网格 clamp 到 `[-1, 1]`。光子从静水面网格点发射，落点由**位移后**的水面
+折射决定，水平位移会把光子双向带过边界——但"向外走"的光子存在，"本该从界外飘进来"的那些
+**从未被发射**。边界 texel 于是缺一半来源，形成一圈内部任何 texel 都没有的密度。
+
+实测原始 pattern 剖面：边界内侧约 165、内部约 140，确实有一圈亮环；而 edge fade 恰好在边界处
+把 pattern 拉平到 1.0，把这圈亮环变成可见接缝。
+
+**修复**：网格向外扩 `GRID_BORDER_MARGIN = 0.15`，且**只在被 range 限制的一侧**——被水域
+footprint 限制的一侧不扩，否则光子会被 region test 杀掉、白白稀释权重。`_gridFraction` 本就同时
+缩放每光子权重和 `_resolvePhotonGrid` 解出的网格尺寸，所以归一化与每 texel 密度都不变，只是光子
+数增加（默认 warp 1.5 下约 +11%）。接缝台阶从 +7.9 降到 +2.2（关掉 choppiness 的参考值 −1.5）。
+margin 加到 0.35 无进一步改善，故取 0.15。
+
+### 7.2 depth 在边界硬切换 + 透射率的凸性（提交 `211fae1f`）
+
+`depth` 跨越边界是硬切的：界内 `level + wave - y`（位移水面），界外 `level - y`（退回静水面）。
+而 `transmittance = exp(-σ·depth)` 是 depth 的**凸函数**，按 Jensen 不等式，界内逐像素波高抖动
+后的均值 `E[exp(-σ·w)] = exp((σ·σ_w)²/2) > 1`，界外是恒定值——界内系统性偏亮，且**红通道最严重**
+（σ_red 最大）。这解释了为什么只在浪大时出现、水越浑越明显、且呈现为一条笔直分界。
+
+浑浊水（absorption 0.55/0.14/0.09）下的量级：
+
+| 波高 σ_w | R | G | B |
+| --- | --- | --- | --- |
+| 0.5 m | 1.18× | 1.02 | 1.02 |
+| 1.0 m | 1.91× | 1.08 | 1.07 |
+| 1.5 m | 4.28× | 1.20 | 1.15 |
+
+**修复**：`slotWave` 按**已有的那条 edge fade** 衰减到 0，让 depth 在边界连续过渡到静水面值。
+顺带把 `edge` 的计算从水体循环之后提到循环之前（波高和 pattern 都要用它）。
+
+### 7.3 排查教训：弱介质会把 7.2 完全掩盖
+
+修 7.1 时，我用 `causticsIntensity = 0`（只留 Beer-Lambert）测跨界剖面，得到平坦结果，据此
+**错误地排除了** depth 路径。原因是当时复现场景的 absorption 只有 0.25、水深 3 m，把 7.2 的
+影响压到了 5% 以下。用户随后用浑浊水复现，同一路径放大了几十倍。
+
+**结论**：验证焦散边界行为时，介质强度和波高都必须取到目标场景的量级；清水浅池会让一整类
+缺陷测不出来。凸性效应的判据是 `exp((σ·σ_w)²/2)`，可以先算再决定场景参数。
+
+### 7.4 回归场景 `water-caustics-range-border`
+
+100 m 水域 / 20 m range，FFT 大浪含水平位移，浑浊介质，相机高俯视使整条边界弧在画面内。三个
+条件缺一不可（见 7.1–7.3）。
+
+**FFT 是确定性的**：噪声纹理来自 `PRNG(randomSeed)`（mulberry32，默认种子 0），不是
+`Math.random`。`water-caustics-off/on` 里"FFT seeds itself from a random noise texture"的注释
+是过时的，已一并订正。实测两后端各重跑两次均按近似严格容差通过。
+
+**反向验证**（把修复 revert 回去跑同一基线）：
+
+| 状态 | webgl2 差异 |
+| --- | --- |
+| 仅 revert 7.1 | 4.46% |
+| 仅 revert 7.2 | 5.19% |
+| 两个都 revert | 6.97% |
+
+预算是 0.05%，两个缺陷都能被单独钉住。
+
+### 7.5 基线影响
+
+重录了 `on` / `deep-bed` / `moving` / `crest` 四个场景 × 两后端共 8 张。逐张核对过 expected/
+actual/diff：各场景要钉住的性质均未破坏——`crest` 的礁石水线仍随波起伏（差异全在周围水面的
+焦散丝线上，礁石在贴图中心区 `edge = 1`，衰减不生效）；`deep-bed` / `moving` 的焦散块仍是沿
+太阳方向错切的水池轮廓。`off` 与 `two-pools` 两后端原样通过（footprint 限制，边界不由 range
+决定）。全量视觉回归 113 passed / 15 skipped / 0 failed。
+
+## 8. 涉及文件
 
 | 文件 | 改动 |
 | --- | --- |
+| `libs/scene/src/render/water_caustics.ts`（7 节） | 新增 `GRID_BORDER_MARGIN`，光子网格向 range 边界外扩 |
+| `libs/scene/src/material/shader/helper.ts`（7 节） | `edge` 提到水体循环之前；`slotWave` 按 `edge` 衰减 |
 | `libs/scene/src/render/water_caustics.ts` | 新增 `createCausticHeightShader`（光栅化位移水面）、`getHeightMapFormat`、高度网格缓冲、高度 pass 与程序缓存；`render()` 增加 `heights` 参数；splat 门控改用 `surfacePos.y` |
 | `libs/scene/src/material/shader/helper.ts` | 声明/绑定 `Z_UniformCausticHeightMap`；接收端按位移深度门控 |
 | `libs/scene/src/render/drawable.ts` | `DrawContext.waterCausticHeightTexture` |
 | `libs/scene/src/render/rendergraph/forward_plus_builder.ts` | 分配 `waterCausticHeights` 纹理，传入渲染器并发布/每帧清空 |
 | `test/src/render/water_caustics_shader.test.ts` | 新增测试 |
 | `visual-test/src/scenes/water.ts` 等 | 新增 `water-caustics-crest` 场景与基线 |
+| `visual-test/src/scenes/water.ts` 等（7 节） | 新增 `water-caustics-range-border` 场景与基线；订正 FFT 确定性注释 |
