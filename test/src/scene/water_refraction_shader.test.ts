@@ -60,6 +60,7 @@ function buildRefractionShader(deviceType: DeviceType) {
       const cameraStruct = pb.defineStruct([
         pb.mat4('viewMatrix'),
         pb.mat4('viewProjectionMatrix'),
+        pb.mat4('invViewProjectionMatrix'),
         pb.vec4('params'),
         pb.vec2('renderSize')
       ]);
@@ -78,6 +79,8 @@ function buildRefractionShader(deviceType: DeviceType) {
           pb.vec2(0.5),
           pb.float(-10),
           pb.float(0.2),
+          // The unrefracted scene point, used as the dominant ray direction.
+          pb.vec3(pb.add(this.$inputs.worldPos, pb.vec3(0, -2, 0))),
           pb.float(4)
         );
         this.$outputs.color = pb.vec4(this.info, 1);
@@ -97,7 +100,7 @@ describe(`Water refraction codegen (${Z_CONVENTION}-Z)`, () => {
       test('emits the refraction solve', () => {
         expect(fs).toBeTruthy();
         expect(fs).toContain('waterRefraction');
-        expect(fs).toContain('waterRefractProbe');
+        expect(fs).toContain('waterRefractMarch');
         expect(fs).toContain('waterRefractProjectUV');
       });
 
@@ -112,33 +115,65 @@ describe(`Water refraction codegen (${Z_CONVENTION}-Z)`, () => {
         expect(body('waterRefraction')).toContain('1.333');
       });
 
-      test('iterates the solve rather than trusting the first landing', () => {
-        // The first probe steps by the straight-line path length, which is wrong
-        // wherever the refracted ray reaches a differently distant part of the
-        // scene; the second re-solves from the depth the first one read.
+      test('marches the ray against the depth buffer instead of guessing a path', () => {
+        // The solve steps the refracted ray and reads the depth at each projected
+        // position, stopping at the first crossing. A fixed number of steps keeps
+        // the emitted shader identical across backends.
         const solve = body('waterRefraction');
-        expect(solve.match(/waterRefractProbe\(/g) ?? []).toHaveLength(2);
-        // A rejected probe halves the step instead of giving up, which is what
-        // keeps the surface continuous across the silhouette of anything sticking
-        // out of the water.
-        expect(solve).toMatch(/pathLen\s*=\s*pathLen\s*\*\s*0\.5/);
+        expect(solve).toContain('waterRefractMarch(');
+        const march = body('waterRefractMarch');
+        // A bounded loop, not an unbounded bisection that would differ per backend
+        // (WGSL emits `for (var i: f32 = ...)`, GLSL `for (float i = ...)`).
+        expect(march).toContain('for (');
+        expect(march).toMatch(/[i24]\s*<\s*24/);
+        // Stops at the first crossing rather than the last: a later crossing
+        // belongs to whatever is behind the object, which is what made the lower
+        // half of a submerged box sample the bed.
+        expect(march).toContain('break');
+        expect(march).toMatch(/mix\(tPrev/);
       });
 
       test('reads the depth texture through the helper that owns the convention', () => {
         // Decoding device depth is the only convention-dependent step, and it is
         // ShaderHelper.sampleLinearDepth's job. On WebGL1 that means the RGBA
-        // decode; elsewhere a straight red-channel fetch. Either way the probe
+        // decode; elsewhere a straight red-channel fetch. Either way the step
         // must not decode depth itself.
-        const probe = body('waterRefractProbe');
+        const step = body('waterRefractStep');
         if (deviceType === 'webgl') {
-          expect(probe).toContain('Z_decodeNormalizedFloatFromRGBA');
+          expect(step).toContain('Z_decodeNormalizedFloatFromRGBA');
         } else {
-          expect(probe).toMatch(/textureSampleLevel|textureLod/);
+          expect(step).toMatch(/textureSampleLevel|textureLod/);
         }
         // Whatever came back is treated as normalized linear depth and turned
         // into a view-space z, which is where the comparison happens.
-        expect(probe).toMatch(/-\s*linearDepth\s*\*/);
-        expect(probe).toMatch(/hitViewZ\s*<\s*surfaceViewZ/);
+        expect(step).toMatch(/-\s*linearDepth\s*\*/);
+        // The ray/surface comparison is a signed gap, so the march can tell front
+        // from behind and stop at the first crossing.
+        expect(step).toMatch(/rayViewZ\s*-\s*sceneViewZ|rayViewZ - sceneViewZ/);
+      });
+
+      test('a near scene is not sampled as a refraction target', () => {
+        // Something poking out of the water - a rock, a post, a crest - is nearer
+        // to the camera than the surface, so the refracted ray can never reach
+        // past it. The solve must not read its own colour as if it were behind
+        // the water. Two mechanisms protect this: the ray-march band test (a scene
+        // nearer than the surface leaves the gap negative and growing, never
+        // entering the band, so no crossing fires), and the final guard that
+        // reconstructs the scene point at the refracted UV and drops the offset
+        // when that point sits above the water plane.
+        const solve = body('waterRefraction');
+        // The guard reconstructs the hit point and keeps the straight-through
+        // sample when it is above the surface.
+        expect(solve).toMatch(/triangleY|refracted.*\.y|\.y\s*>\s*worldPos\.y|\.y > worldPos\.y/);
+        // The decoupled direction: the ray is the view line plus a wave-normal
+        // perturbation, formed by subtracting the flat refraction from the wave
+        // refraction. This keeps the sample on the object rather than wandering
+        // across its silhouette.
+        expect(solve).toMatch(/refractWave\s*-\s*refractFlat|refractWave - refractFlat/);
+        // The march uses a band around the surface, so a scene nearer than the
+        // water is not read as having been crossed.
+        const march = body('waterRefractMarch');
+        expect(march).toMatch(/abs\([^)]*\)|length\(/);
       });
 
       test('projects with clip xy only, so the depth convention cannot reach it', () => {
@@ -174,19 +209,23 @@ describe(`Water refraction codegen (${Z_CONVENTION}-Z)`, () => {
 
   test('the solve never consults the depth convention', () => {
     // Both conventions must emit the same source for the solve, because every
-    // comparison in it happens in view space and the one convention-dependent
-    // step is delegated. Pinning the expected text against a value computed from
-    // REVERSE_Z would pass vacuously, so this asserts the opposite: no constant
-    // that differs between conventions appears at all. The far plane it does read
-    // is a uniform under either.
+    // comparison in it happens in view space and the convention-dependent steps
+    // are delegated to ShaderHelper. Pinning the expected text against a value
+    // computed from REVERSE_Z would pass vacuously, so this asserts the opposite:
+    // no constant that differs between conventions appears at all. The far plane
+    // it does read is a uniform under either.
     const fs = buildRefractionShader('webgpu')[1];
     const at = fs.indexOf('fn waterRefraction(');
     const solve = fs.slice(at, fs.indexOf('\n}', at) + 2);
     expect(solve).toContain('params.y');
-    // Under standard-Z these helpers would have to appear somewhere in the path
-    // if the solve were doing its own depth handling.
-    expect(solve).not.toContain('zSamplePositionFromDepth');
+    // The solve touches neither the device-depth decode nor the reconstruction
+    // itself - it samples depth and world position through the helpers, so a
+    // convention change is invisible to this source. The decode lives in the
+    // helper (zSampleLinearDepth / Z_decodeNormalizedFloatFromRGBA) and the
+    // reconstruction in zSamplePositionFromDepth; both may be called, but no
+    // convention-dependent arithmetic appears inline.
     expect(solve).not.toMatch(/\* 2\.0\) - 1\.0/);
+    expect(solve).not.toMatch(/deviceDepthToClipZ|linearNormalizedToNonLinearDepth/);
     // Guard the premise itself: a run under either convention reaches this test,
     // and the suite is executed once per convention.
     expect([true, false]).toContain(REVERSE_Z);
