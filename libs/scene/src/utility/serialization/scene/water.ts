@@ -395,7 +395,7 @@ export function getWaterClass(manager: ResourceManager): SerializableClass {
         {
           name: 'Absorption',
           description: 'Absorption coefficient sigma_a of the water medium, per meter, per channel',
-          type: 'vec3',
+          type: 'rgb',
           default: [1.0, 0.25, 0.15],
           options: { animatable: true, minValue: 0, maxValue: 10 },
           isHidden(this: Water) {
@@ -411,9 +411,25 @@ export function getWaterClass(manager: ResourceManager): SerializableClass {
           }
         },
         {
+          name: 'AbsorptionScale',
+          description: 'Scale for the absorption coefficient',
+          type: 'float',
+          default: 1,
+          options: { animatable: true, minValue: 0, maxValue: 10 },
+          isHidden(this: Water) {
+            return this.material.mediumMode !== 'physical';
+          },
+          get(this: Water, value) {
+            value.num[0] = this.material.absorptionScale;
+          },
+          set(this: Water, value) {
+            this.material.absorptionScale = value.num[0];
+          }
+        },
+        {
           name: 'Scattering',
           description: 'Scattering coefficient sigma_s of the water medium, per meter, per channel',
-          type: 'vec3',
+          type: 'rgb',
           default: [0.05, 0.12, 0.18],
           options: { animatable: true, minValue: 0, maxValue: 10 },
           isHidden(this: Water) {
@@ -426,6 +442,22 @@ export function getWaterClass(manager: ResourceManager): SerializableClass {
           },
           set(this: Water, value) {
             this.material.scattering = new Vector3(value.num[0], value.num[1], value.num[2]);
+          }
+        },
+        {
+          name: 'ScatteringScale',
+          description: 'Scale for the scattering coefficient',
+          type: 'float',
+          default: 1,
+          options: { animatable: true, minValue: 0, maxValue: 10 },
+          isHidden(this: Water) {
+            return this.material.mediumMode !== 'physical';
+          },
+          get(this: Water, value) {
+            value.num[0] = this.material.scatteringScale;
+          },
+          set(this: Water, value) {
+            this.material.scatteringScale = value.num[0];
           }
         },
         {
@@ -445,16 +477,17 @@ export function getWaterClass(manager: ResourceManager): SerializableClass {
           }
         },
         {
-          name: 'RefractionStrength',
-          description: 'Strength of underwater refraction',
+          name: 'ReflectionStrength',
+          description:
+            'Scale on the Fresnel reflectance, 1 for the physical value. Lower it to trade the reflection away and show more of what is beneath the surface.',
           type: 'float',
-          default: 0,
+          default: 1,
           options: { animatable: true, minValue: 0, maxValue: 1 },
           get(this: Water, value) {
-            value.num[0] = this.material.refractionStrength;
+            value.num[0] = this.material.reflectionStrength;
           },
           set(this: Water, value) {
-            this.material.refractionStrength = value.num[0];
+            this.material.reflectionStrength = value.num[0];
           }
         },
         {
@@ -486,17 +519,17 @@ export function getWaterClass(manager: ResourceManager): SerializableClass {
           }
         },
         {
-          name: 'Displace',
+          name: 'RefractionScale',
           description:
-            'How far the wave normals push the refracted background, in pixels. Reached in deep water close to the camera; shallower or further away it scales down.',
+            'Artistic scale on the refracted view offset. 1 is physical: the view ray is bent by Snell’s law and followed to whatever is behind the water, so the incidence angle, the depth and the perspective are already accounted for. 0 disables refraction.',
           type: 'float',
-          default: 16,
-          options: { minValue: 1, maxValue: 256 },
+          default: 1,
+          options: { animatable: true, minValue: 0, maxValue: 4 },
           get(this: Water, value) {
-            value.num[0] = this.material.displace;
+            value.num[0] = this.material.refractionScale;
           },
           set(this: Water, value) {
-            this.material.displace = value.num[0];
+            this.material.refractionScale = value.num[0];
           }
         },
         {

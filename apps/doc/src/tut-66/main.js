@@ -76,8 +76,8 @@ myApp.ready().then(function () {
 
   // Water shading controls
   water.material.depthMulti = 0.1;
-  water.material.displace = 32;
-  water.material.refractionStrength = 0.2;
+  water.material.refractionScale = 1;
+  water.material.reflectionStrength = 0.8;
 
   // Create camera
   scene.mainCamera = new PerspectiveCamera(scene, Math.PI / 3, 1, 1000);

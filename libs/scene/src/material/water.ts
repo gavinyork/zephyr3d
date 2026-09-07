@@ -45,10 +45,31 @@ const WATER_BASE_ROUGHNESS = 0.04;
  * into a stable band.
  */
 const WATER_DISTANT_ROUGHNESS = 0.35;
-/** Water depth at which the refraction offset reaches its authored strength. */
-const REFRACT_REF_DEPTH = 4;
-/** Distance out to which the refraction offset keeps its authored strength. */
-const REFRACT_REF_DIST = 40;
+/** Index of refraction of water. Matches the caustics pass. */
+const WATER_IOR = 1.333;
+/** Ratio for a ray entering the water from air, as `refract` wants it. */
+const AIR_TO_WATER_ETA = 1 / WATER_IOR;
+/** Ratio for a ray leaving the water into air. */
+const WATER_TO_AIR_ETA = WATER_IOR;
+/**
+ * Cap on the refracted path length, as a multiple of the straight-line distance
+ * to what is behind the water.
+ *
+ * A guard rather than physics: the refracted ray only reaches a given depth if
+ * it travels away from the camera, and a nearly tangent one - a steep wave face
+ * seen from the side - approaches that limit and would produce an enormous step.
+ * Above water Snell bounds the true ratio near 1.5, so this leaves headroom.
+ */
+const REFRACT_MAX_PATH_RATIO = 4;
+/**
+ * Width in UV of the band the refraction offset fades out over at the screen
+ * border.
+ *
+ * Off-screen there is no scene colour to refract, and a clamped sample smears
+ * the border pixel across the water; sliding back to the unrefracted sample over
+ * a band keeps that continuous instead of banding at the edge.
+ */
+const REFRACT_EDGE_FADE = 0.06;
 /**
  * How far the surface normal bends the transmitted direction in the subsurface
  * term. Zero would make the glow a pure "looking at the sun through the water"
@@ -76,9 +97,9 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
   private static readonly _defaultAbsorptionRampTexture: DWeakRef<Texture2D> = new DWeakRef();
   private static readonly _waveUpdateState: WeakMap<WaveGenerator, number> = new WeakMap();
   private readonly _region: Vector4;
-  private _displace: number;
+  private _refractionScale: number;
   private _depthMulti: number;
-  private _refractionStrength: number;
+  private _reflectionStrength: number;
   private readonly _scatterRampTexture: DRef<Texture2D>;
   private readonly _absorptionRampTexture: DRef<Texture2D>;
   private readonly _waveGenerator: DRef<WaveGenerator>;
@@ -94,6 +115,10 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
   private readonly _extinction: Vector3;
   /** sigma_s / sigma_t, the single-scattering albedo. */
   private readonly _scatterAlbedo: Vector3;
+  /** Scale for the absorption coefficient. */
+  private _absorptionScale: number;
+  /** Scale for the scattering coefficient. */
+  private _scatteringScale: number;
   private _causticsEnabled: boolean;
   private _causticsIntensity: number;
   private _causticsDepth: number;
@@ -122,6 +147,8 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
     this._scattering = new Vector3(0.05, 0.12, 0.18);
     this._extinction = new Vector3();
     this._scatterAlbedo = new Vector3();
+    this._absorptionScale = 1;
+    this._scatteringScale = 1;
     this._updateMediumCoefficients();
     this._clipmapInfo = new Vector4();
     this._clipmapGridInfo = new Vector4();
@@ -130,9 +157,9 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
     this._ssrParams = new Vector4(1000, 160, 0.5, 2);
     this._scatterRampTexture = new DRef();
     this._absorptionRampTexture = new DRef();
-    this._displace = 16;
+    this._refractionScale = 1;
     this._depthMulti = 0.1;
-    this._refractionStrength = 0;
+    this._reflectionStrength = 1;
     this._causticsEnabled = true;
     this._causticsIntensity = 1;
     this._causticsDepth = 4;
@@ -241,6 +268,17 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
       this.uniformChanged();
     }
   }
+  /** Scale for the absorption coefficient. */
+  get absorptionScale() {
+    return this._absorptionScale;
+  }
+  set absorptionScale(val: number) {
+    if (val !== this._absorptionScale) {
+      this._absorptionScale = val;
+      this._updateMediumCoefficients();
+      this.uniformChanged();
+    }
+  }
   /** Scattering coefficient sigma_s in 1/m, per RGB channel. */
   get scattering() {
     return this._scattering;
@@ -248,6 +286,17 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
   set scattering(val: Vector3) {
     if (!val.equalsTo(this._scattering)) {
       this._scattering.set(val);
+      this._updateMediumCoefficients();
+      this.uniformChanged();
+    }
+  }
+  /** Scale for the scattering coefficient. */
+  get scatteringScale() {
+    return this._scatteringScale;
+  }
+  set scatteringScale(val: number) {
+    if (val !== this._scatteringScale) {
+      this._scatteringScale = val;
       this._updateMediumCoefficients();
       this.uniformChanged();
     }
@@ -524,16 +573,16 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
   /** @internal */
   private _updateMediumCoefficients() {
     this._extinction.setXYZ(
-      this._absorption.x + this._scattering.x,
-      this._absorption.y + this._scattering.y,
-      this._absorption.z + this._scattering.z
+      this._absorption.x * this._absorptionScale + this._scattering.x * this._scatteringScale,
+      this._absorption.y * this._absorptionScale + this._scattering.y * this._scatteringScale,
+      this._absorption.z * this._absorptionScale + this._scattering.z * this._scatteringScale
     );
     // A channel with no interaction at all transmits fully and scatters nothing;
     // the albedo of such a channel is arbitrary, so pick 0 rather than divide.
     this._scatterAlbedo.setXYZ(
-      this._extinction.x > 0 ? this._scattering.x / this._extinction.x : 0,
-      this._extinction.y > 0 ? this._scattering.y / this._extinction.y : 0,
-      this._extinction.z > 0 ? this._scattering.z / this._extinction.z : 0
+      this._extinction.x > 0 ? (this._scattering.x * this._scatteringScale) / this._extinction.x : 0,
+      this._extinction.y > 0 ? (this._scattering.y * this._scatteringScale) / this._extinction.y : 0,
+      this._extinction.z > 0 ? (this._scattering.z * this._scatteringScale) / this._extinction.z : 0
     );
   }
   get depthMulti() {
@@ -545,21 +594,45 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
       this.uniformChanged();
     }
   }
-  get displace() {
-    return this._displace;
+  /**
+   * Artistic scale on the refracted view offset. 1 is physical, 0 disables it.
+   *
+   * The offset itself is derived: the view ray is refracted at the surface by
+   * Snell's law, walked to whatever is behind the water, and the hit point is
+   * projected back to the screen. That already accounts for the incidence angle,
+   * the depth of the receiver and the perspective foreshortening, so this exists
+   * only to dial the result back for a stylised look - not to make it correct.
+   *
+   * Values above 1 exaggerate; the surface stays continuous, but the sample can
+   * wander far enough from the true hit point that the medium tint stops
+   * matching what is visible through it.
+   */
+  get refractionScale() {
+    return this._refractionScale;
   }
-  set displace(val) {
-    if (val !== this._displace) {
-      this._displace = val;
+  set refractionScale(val) {
+    const clamped = Math.max(0, val);
+    if (clamped !== this._refractionScale) {
+      this._refractionScale = clamped;
       this.uniformChanged();
     }
   }
-  get refractionStrength() {
-    return this._refractionStrength;
+  /**
+   * Scale on the Fresnel reflectance, 1 for the physical value.
+   *
+   * Below 1 the surface reflects less than it should and shows more of what is
+   * beneath it. Water reflects almost everything at a grazing angle, which is
+   * physically right but can bury a sea bed the shot is about; this is the knob
+   * that trades that reflection away. The F0 floor is scaled with it, so 0 gives
+   * a surface with no specular response at all.
+   */
+  get reflectionStrength() {
+    return this._reflectionStrength;
   }
-  set refractionStrength(val) {
-    if (val !== this._refractionStrength) {
-      this._refractionStrength = val;
+  set reflectionStrength(val) {
+    const clamped = Math.max(0, Math.min(1, val));
+    if (clamped !== this._reflectionStrength) {
+      this._reflectionStrength = clamped;
       this.uniformChanged();
     }
   }
@@ -651,8 +724,8 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
     this.waveGenerator?.setupUniforms(scope, 2);
     scope.region = pb.vec4().uniform(2);
     if (this.needFragmentColor()) {
-      scope.displace = pb.float().uniform(2);
-      scope.refractionStrength = pb.float().uniform(2);
+      scope.refractionScale = pb.float().uniform(2);
+      scope.reflectionStrength = pb.float().uniform(2);
       scope.ssrParams = pb.vec4().uniform(2);
       // (intensity, 1 / full-scatter crest height, 0, 0)
       scope.subsurfaceParams = pb.vec4().uniform(2);
@@ -729,6 +802,221 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
     });
     return scope.waterRoughness(worldPos) as PBShaderExp;
   }
+  /**
+   * Where to sample the scene behind the water, and how far the light travelled
+   * through the medium to get there.
+   *
+   * Refracts the view ray by Snell's law, follows it to whatever is behind the
+   * surface, and projects the landing point back to the screen. The incidence
+   * angle, the depth of the receiver and the perspective foreshortening all fall
+   * out of that, where the previous form pushed the screen UV along the world
+   * normal and approximated each of them with a separate factor - which also
+   * rotated the whole pattern with the camera, because a world direction was
+   * being used as a screen offset.
+   *
+   * Independent of the engine's depth convention. The projection only ever reads
+   * `clip.xy / clip.w`, and reverse-Z rewrites nothing but the z row of the
+   * projection matrix; every depth comparison happens in view space, which the
+   * convention does not touch. The one convention-dependent step, decoding the
+   * depth texture, lives behind {@link ShaderHelper.sampleLinearDepth}.
+   *
+   * @param scope - Current shader scope
+   * @param worldPos - Surface point being shaded
+   * @param normal - Wave normal at that point, pointing up out of the water
+   * @param eyeVecNorm - Normalized direction from the camera to the surface
+   * @param screenUV - Screen UV of the surface point
+   * @param surfaceViewZ - View-space z of the surface point
+   * @param straightDepth01 - Normalized linear depth of the scene behind it
+   * @param straightDist - Straight-line distance from the surface to that scene
+   * @returns `vec3(uv, pathLength)` - where to sample, and the medium path in meters
+   */
+  waterRefraction(
+    scope: PBInsideFunctionScope,
+    worldPos: PBShaderExp,
+    normal: PBShaderExp,
+    eyeVecNorm: PBShaderExp,
+    screenUV: PBShaderExp,
+    surfaceViewZ: PBShaderExp,
+    straightDepth01: PBShaderExp,
+    straightDist: PBShaderExp
+  ) {
+    const pb = scope.$builder;
+    // Screen UV of a world position, through the same matrix the surface itself
+    // was rasterised with.
+    //
+    // Only ever used as a difference of two such UVs, which is what makes the
+    // offset independent of the conventions baked into that matrix: the TAA
+    // jitter and the clip-space Y orientation cancel between the two ends. The
+    // 0.5/0.5 mapping is the inverse of the one
+    // ShaderHelper.samplePositionFromDepth unprojects with, so the forward and
+    // backward directions agree.
+    pb.func('waterRefractProjectUV', [pb.vec3('worldPos')], function () {
+      this.$l.h = pb.mul(ShaderHelper.getViewProjectionMatrix(this), pb.vec4(this.worldPos, 1));
+      this.$return(pb.add(pb.mul(pb.div(this.h.xy, pb.max(this.h.w, 1e-6)), 0.5), pb.vec2(0.5)));
+    });
+    // Where to sample the scene colour for a refracted ray that ended at
+    // `hitPos`, faded back to the straight-through sample at the screen border.
+    pb.func(
+      'waterRefractUV',
+      [pb.vec2('screenUV'), pb.vec2('uvBase'), pb.vec3('hitPos'), pb.float('scale')],
+      function () {
+        this.$l.uv = pb.add(
+          this.screenUV,
+          pb.mul(pb.sub(this.waterRefractProjectUV(this.hitPos), this.uvBase), this.scale)
+        );
+        // Off screen there is no scene colour to refract, and a clamped sample
+        // would smear one border pixel along the whole edge of the water. Fading
+        // the offset out over a band gets back to a legal sample continuously.
+        this.$l.edge = pb.min(
+          pb.min(this.uv.x, pb.sub(1, this.uv.x)),
+          pb.min(this.uv.y, pb.sub(1, this.uv.y))
+        );
+        this.$return(pb.mix(this.screenUV, this.uv, pb.clamp(pb.div(this.edge, REFRACT_EDGE_FADE), 0, 1)));
+      }
+    );
+    // One iteration of the refracted-ray solve.
+    //
+    // Walks `t` meters along the refracted ray, projects the landing point to
+    // the screen, and reads the depth there to recover the path length that
+    // point actually sits at. Also reports whether the landing is usable: it is
+    // not when it falls on the sky, which has no depth to solve against, nor
+    // when it falls on something nearer than the water, which cannot be behind
+    // it.
+    pb.func(
+      'waterRefractProbe',
+      [
+        pb.vec3('worldPos'),
+        pb.vec3('refractDir'),
+        pb.vec2('screenUV'),
+        pb.vec2('uvBase'),
+        pb.float('surfaceViewZ'),
+        pb.float('dirViewZ'),
+        pb.float('t')
+      ],
+      function () {
+        this.$l.uv = this.waterRefractUV(
+          this.screenUV,
+          this.uvBase,
+          pb.add(this.worldPos, pb.mul(this.refractDir, this.t)),
+          this.refractionScale
+        );
+        this.$l.linearDepth = ShaderHelper.sampleLinearDepth(
+          this,
+          ShaderHelper.getLinearDepthTexture(this),
+          this.uv,
+          0
+        );
+        // View-space z of whatever that pixel shows. Normalized linear depth means
+        // the same thing under either depth convention - only the mapping from
+        // device depth to it flips - and the comparison below is in view space,
+        // which reverse-Z does not touch.
+        this.$l.hitViewZ = pb.mul(pb.neg(this.linearDepth), ShaderHelper.getCameraParams(this).y);
+        this.$l.usable = pb.and(
+          pb.lessThan(this.linearDepth, 0.99999),
+          pb.lessThan(this.hitViewZ, this.surfaceViewZ)
+        );
+        // Path length along the ray that reaches that depth. Left unbounded here;
+        // the caller clamps it before feeding it back in.
+        this.$return(
+          pb.vec4(
+            this.uv,
+            pb.div(pb.sub(this.hitViewZ, this.surfaceViewZ), this.dirViewZ),
+            this.$choice(this.usable, pb.float(1), pb.float(0))
+          )
+        );
+      }
+    );
+    pb.func(
+      'waterRefraction',
+      [
+        pb.vec3('worldPos'),
+        pb.vec3('normal'),
+        pb.vec3('eyeVecNorm'),
+        pb.vec2('screenUV'),
+        pb.float('surfaceViewZ'),
+        pb.float('straightDepth01'),
+        pb.float('straightDist')
+      ],
+      function () {
+        // Both faces are handled: looking down at the water the ray enters the
+        // medium, looking up from inside it the ray leaves. The surface is drawn
+        // with cullMode 'none', so either can reach here, and the wave normal
+        // always points up. Facing it back towards the eye is what lets one
+        // refract call serve both, and the ratio has to be picked to match -
+        // without the flip, a wave face steeper than the view ray bends the wrong
+        // way, which is the grazing-angle case that reads as the surface tearing.
+        this.$l.underwater = pb.greaterThan(pb.dot(this.eyeVecNorm, this.normal), 0);
+        this.$l.faceNormal = this.$choice(this.underwater, pb.neg(this.normal), this.normal);
+        this.$l.eta = this.$choice(this.underwater, pb.float(WATER_TO_AIR_ETA), pb.float(AIR_TO_WATER_ETA));
+        this.$l.refractDir = pb.refract(this.eyeVecNorm, this.faceNormal, this.eta);
+        // Total internal reflection - only reachable from under the surface -
+        // leaves refract returning zero. There is nothing to see through the
+        // surface then, so fall back to the straight-through ray.
+        this.$if(pb.lessThan(pb.dot(this.refractDir, this.refractDir), 1e-6), function () {
+          this.refractDir = this.eyeVecNorm;
+        });
+        this.$l.refractDirView = pb.mul(ShaderHelper.getViewMatrix(this), pb.vec4(this.refractDir, 0)).xyz;
+        // The unrefracted hit gives both the starting path length and the cap.
+        // Distances are compared along the view axis rather than in world space,
+        // which is what lets a single solve serve a flat bed and a vertical wall
+        // alike.
+        this.$l.uvBase = this.waterRefractProjectUV(this.worldPos);
+        this.$l.straightViewZ = pb.neg(pb.mul(this.straightDepth01, ShaderHelper.getCameraParams(this).y));
+        // Away from the camera the ray must travel, so a tangent one is clamped
+        // rather than allowed to shoot off, and the straight-line distance bounds
+        // the refracted path to a sane multiple of itself.
+        this.$l.refractStepZ = pb.min(this.refractDirView.z, -1e-4);
+        this.$l.maxPath = pb.mul(this.straightDist, REFRACT_MAX_PATH_RATIO);
+        this.$l.pathLen = pb.clamp(
+          pb.div(pb.sub(this.straightViewZ, this.surfaceViewZ), this.refractStepZ),
+          0,
+          this.maxPath
+        );
+        this.$l.refractUV = this.screenUV;
+        this.$l.refractPath = this.straightDist;
+        // Two probes. The first lands using the straight-line path length, which
+        // is wrong wherever the refracted ray reaches a differently distant part
+        // of the scene; reading the depth there and re-solving corrects it, and a
+        // second probe confirms the correction rather than trusting it. Both are
+        // validated, and a rejected probe halves the step instead of dropping
+        // straight back to the unrefracted sample - halving keeps the surface
+        // continuous across the silhouette of anything sticking out of the water,
+        // where a hard fallback would leave a visible seam.
+        //
+        // The accepted path length is the one the sampled pixel reports rather
+        // than the step that landed on it: the colour being tinted came from that
+        // depth, and the two agree anyway once the solve has converged.
+        for (let i = 0; i < 2; i++) {
+          this.$l[`probe${i}`] = this.waterRefractProbe(
+            this.worldPos,
+            this.refractDir,
+            this.screenUV,
+            this.uvBase,
+            this.surfaceViewZ,
+            this.refractStepZ,
+            this.pathLen
+          );
+          this.$if(pb.greaterThan(this[`probe${i}`].w, 0), function () {
+            this.refractUV = this[`probe${i}`].xy;
+            this.refractPath = pb.clamp(this[`probe${i}`].z, 0, this.maxPath);
+            this.pathLen = this.refractPath;
+          }).$else(function () {
+            this.pathLen = pb.mul(this.pathLen, 0.5);
+          });
+        }
+        this.$return(pb.vec3(this.refractUV, this.refractPath));
+      }
+    );
+    return scope.waterRefraction(
+      worldPos,
+      normal,
+      eyeVecNorm,
+      screenUV,
+      surfaceViewZ,
+      straightDepth01,
+      straightDist
+    ) as PBShaderExp;
+  }
   waterShading(
     scope: PBInsideFunctionScope,
     worldPos: PBShaderExp,
@@ -778,10 +1066,9 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
       // directly above reflected no sky at all and read as flat paint.
       this.$l.NoV = pb.clamp(pb.dot(this.normal, this.eyeVec), 0, 1);
       this.$l.f = pb.add(WATER_F0, pb.mul(1 - WATER_F0, pb.pow(pb.sub(1, this.NoV), 5)));
-      // refractionStrength biases the surface towards pure refraction. Scaling
-      // rather than subtracting keeps the F0 floor intact at its default of 0
-      // and cannot drive the term negative.
-      this.$return(pb.clamp(pb.mul(this.f, pb.sub(1, this.refractionStrength)), 0, 1));
+      // reflectionStrength trades the reflection away for what is beneath the
+      // surface. Scaling keeps the term in [0,1] for any authored value.
+      this.$return(pb.clamp(pb.mul(this.f, this.reflectionStrength), 0, 1));
     });
     pb.func(
       'lightSpecular',
@@ -890,43 +1177,22 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
           pb.textureSampleLevel(ShaderHelper.getSceneColorTexture(this), this.hitInfo.xy, 0).rgb,
           this.hitInfo.w
         );
-        // Refraction offset. The authored strength is in pixels, and two factors
-        // keep it physical:
-        //  - depth, because the refracted ray only walks sideways while it is
-        //    under water, so a shallow bed must barely shift;
-        //  - distance, because the same world-space shift covers fewer pixels
-        //    further away, and a fixed pixel offset out there makes distant
-        //    water boil.
-        // Both saturate at 1, so the near and deep case keeps the authored look.
-        this.$l.refractScale = pb.mul(
-          pb.clamp(pb.div(this.depth, REFRACT_REF_DEPTH), 0, 1),
-          pb.clamp(pb.div(REFRACT_REF_DIST, pb.max(this.dist, 0.001)), 0, 1)
-        );
-        // Dividing by the render size componentwise keeps the offset square;
-        // the old form scaled both axes by the width and sheared on any target
-        // that was not 1:1.
-        this.$l.refractUV = pb.add(
-          this.screenUV,
-          pb.div(pb.mul(this.normal.xz, this.displace, this.refractScale), ShaderHelper.getRenderSize(this))
-        );
-        this.$l.displacedPos = ShaderHelper.samplePositionFromDepth(
+        this.$l.refractInfo = that.waterRefraction(
           this,
-          ShaderHelper.getLinearDepthTexture(this),
-          this.refractUV,
-          ShaderHelper.getInvProjectionMatrix(this),
-          ShaderHelper.getCameraParams(this).xy
+          this.worldPos,
+          this.normal,
+          this.eyeVecNorm,
+          this.screenUV,
+          this.viewPos.z,
+          this.wPos.w,
+          this.depth
         );
-        this.$if(
-          pb.or(
-            pb.greaterThanEqual(this.displacedPos.w, 0.99999),
-            pb.greaterThan(this.displacedPos.z, this.viewPos.z)
-          ),
-          function () {
-            this.refractUV = this.screenUV;
-          }
-        ).$else(function () {
-          this.depth = pb.length(pb.sub(this.displacedPos.xyz, this.viewPos));
-        });
+        this.$l.refractUV = this.refractInfo.xy;
+        // The medium is walked along the refracted path, not along the straight
+        // line to the bed. A refracted ray is bent towards the normal, so it
+        // reaches the same depth over a shorter distance than the view ray
+        // suggests, and at a grazing view the two differ by a lot.
+        this.depth = this.refractInfo.z;
         this.$l.refraction = pb.textureSampleLevel(
           ShaderHelper.getSceneColorTexture(this),
           this.refractUV,
@@ -1042,9 +1308,10 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
     bindGroup.setValue('clipmapGridInfo', this._clipmapGridInfo);
     bindGroup.setValue('region', this._region);
     if (this.needFragmentColor(ctx)) {
-      // In pixels; the shader divides by the render size on both axes.
-      bindGroup.setValue('displace', this._displace);
-      bindGroup.setValue('refractionStrength', this._refractionStrength);
+      // Dimensionless: the offset is derived in world space and projected, so
+      // there is nothing here for the render size to scale.
+      bindGroup.setValue('refractionScale', this._refractionScale);
+      bindGroup.setValue('reflectionStrength', this._reflectionStrength);
       bindGroup.setValue('ssrParams', this._ssrParams);
       this._subsurfaceParams.setXYZW(this._subsurfaceIntensity, this._subsurfaceSteepness, 0, 0);
       bindGroup.setValue('subsurfaceParams', this._subsurfaceParams);

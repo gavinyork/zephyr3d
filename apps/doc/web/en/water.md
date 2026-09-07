@@ -44,8 +44,8 @@ The water material is available through `water.material`.
 
 ```ts
 water.material.depthMulti = 0.08;
-water.material.displace = 0.35;
-water.material.refractionStrength = 0.25;
+water.material.refractionScale = 1;
+water.material.reflectionStrength = 0.8;
 water.TAAStrength = 0.4;
 ```
 
@@ -57,9 +57,11 @@ Important controls:
 | `animationSpeed` | Multiplier for wave time |
 | `wireframe` | Draw clipmap grid lines for debugging |
 | `TAAStrength` | Temporal smoothing used by the water material |
-| `material.depthMulti` | Depth falloff multiplier for water shading |
-| `material.displace` | Refraction displacement strength |
-| `material.refractionStrength` | How strongly scene color is refracted |
+| `material.depthMulti` | Depth falloff multiplier for water shading (ramp medium only) |
+| `material.refractionScale` | Artistic scale on the refracted offset; 1 is physical, 0 disables it |
+| `material.reflectionStrength` | Scale on the Fresnel reflectance; 1 is physical, lower shows more of what is underwater |
+
+Underwater refraction is not a normal-driven push of the screen UV: the view ray is bent by Snell's law, followed to whatever is behind the water, and the hit point is projected back to the screen. The incidence angle, the water depth and the perspective foreshortening all fall out of that, so `refractionScale` is a stylisation knob rather than a strength that has to be tuned - the default of 1 is already the physical amount.
 
 Because the material uses scene color and scene depth, water is rendered in the main scene pipeline. Keep transparent objects and post effects in mind when tuning the final look.
 

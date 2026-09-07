@@ -44,8 +44,8 @@ water.waveGenerator = waves;
 
 ```ts
 water.material.depthMulti = 0.08;
-water.material.displace = 0.35;
-water.material.refractionStrength = 0.25;
+water.material.refractionScale = 1;
+water.material.reflectionStrength = 0.8;
 water.TAAStrength = 0.4;
 ```
 
@@ -57,9 +57,11 @@ water.TAAStrength = 0.4;
 | `animationSpeed` | 波浪时间倍率 |
 | `wireframe` | 以线框方式显示 clipmap 网格，便于调试 |
 | `TAAStrength` | 水面材质使用的时间平滑强度 |
-| `material.depthMulti` | 水体着色的深度衰减倍率 |
-| `material.displace` | 折射扰动强度 |
-| `material.refractionStrength` | 场景颜色折射强度 |
+| `material.depthMulti` | 水体着色的深度衰减倍率（仅 ramp 介质模式） |
+| `material.refractionScale` | 折射偏移的艺术缩放，1 为物理值，0 关闭折射 |
+| `material.reflectionStrength` | Fresnel 反射率缩放，1 为物理值，调低可让水下内容更清晰 |
+
+水下折射不再是沿法线推屏幕 UV，而是按 Snell 定律折射视线、追踪到水下物体、再把命中点重投影回屏幕。入射角、水深和透视缩放都由此自然得出，因此 `refractionScale` 只是风格化开关，默认值 1 已是物理正确的强度。
 
 由于水面材质会使用场景颜色和场景深度，水面会参与主场景渲染流程。调试最终效果时，需要同时考虑透明物体和后处理。
 
