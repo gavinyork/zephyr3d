@@ -229,6 +229,34 @@ export class Water extends applyMixins(GraphNode, mixinDrawable) implements Draw
   set refractionBlur(val: number) {
     this.material.refractionBlur = val;
   }
+  /** Absorption coefficient sigma_a in 1/m, per RGB channel. */
+  get absorption() {
+    return this.material.absorption;
+  }
+  set absorption(val: Vector3) {
+    this.material.absorption = val;
+  }
+  /** Scale for the absorption coefficient. */
+  get absorptionScale() {
+    return this.material.absorptionScale;
+  }
+  set absorptionScale(val: number) {
+    this.material.absorptionScale = val;
+  }
+  /** Scattering coefficient sigma_s in 1/m, per RGB channel. */
+  get scattering() {
+    return this.material.scattering;
+  }
+  set scattering(val: Vector3) {
+    this.material.scattering = val;
+  }
+  /** Scale for the scattering coefficient. */
+  get scatteringScale() {
+    return this.material.scatteringScale;
+  }
+  set scatteringScale(val: number) {
+    this.material.scatteringScale = val;
+  }
   /**
    * Mean cosine of a single scattering event in the water, in `[0, 0.95]`.
    *
@@ -240,6 +268,73 @@ export class Water extends applyMixins(GraphNode, mixinDrawable) implements Draw
   }
   set scatterAnisotropy(val: number) {
     this.material.scatterAnisotropy = val;
+  }
+  /**
+   * Artistic scale on the refracted view offset. 1 is physical, 0 disables it.
+   *
+   * The offset itself is derived: the view ray is refracted at the surface by
+   * Snell's law, walked to whatever is behind the water, and the hit point is
+   * projected back to the screen. That already accounts for the incidence angle,
+   * the depth of the receiver and the perspective foreshortening, so this exists
+   * only to dial the result back for a stylised look - not to make it correct.
+   *
+   * Values above 1 exaggerate; the surface stays continuous, but the sample can
+   * wander far enough from the true hit point that the medium tint stops
+   * matching what is visible through it.
+   */
+  get refractionScale() {
+    return this.material.refractionScale;
+  }
+  set refractionScale(val) {
+    this.material.refractionScale = val;
+  }
+  /**
+   * Scale on the Fresnel reflectance, 1 for the physical value.
+   *
+   * Below 1 the surface reflects less than it should and shows more of what is
+   * beneath it. Water reflects almost everything at a grazing angle, which is
+   * physically right but can bury a sea bed the shot is about; this is the knob
+   * that trades that reflection away. The F0 floor is scaled with it, so 0 gives
+   * a surface with no specular response at all.
+   */
+  get reflectionStrength() {
+    return this.material.reflectionStrength;
+  }
+  set reflectionStrength(val) {
+    this.material.reflectionStrength = val;
+  }
+  /**
+   * How much of a folded texel reads as foam.
+   *
+   * The wave generator reports where the surface has folded over on itself,
+   * which is a measure of the fold rather than of area; this scales it into a
+   * coverage fraction. 0 disables foam.
+   */
+  get foamAmount() {
+    return this.material.foamAmount;
+  }
+  set foamAmount(val: number) {
+    this.material.foamAmount = val;
+  }
+  /**
+   * Falloff applied to foam coverage before it is scaled.
+   *
+   * Above 1 this pushes light folding towards no foam at all, so only a crest
+   * that has genuinely broken shows any - which is what keeps a windy sea from
+   * turning uniformly white.
+   */
+  get foamFalloff() {
+    return this.material.foamFalloff;
+  }
+  set foamFalloff(val: number) {
+    this.material.foamFalloff = val;
+  }
+  /** Diffuse albedo of the foam. */
+  get foamColor() {
+    return this.material.foamColor;
+  }
+  set foamColor(val: Vector3) {
+    this.material.foamColor = val;
   }
   /** {@inheritDoc SceneNode.update} */
   update(frameId: number, elapsedInSeconds: number) {
