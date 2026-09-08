@@ -216,6 +216,7 @@ function buildPoolScene() {
   water.animationSpeed = 1;
   water.causticsIntensity = 1;
   water.causticsRange = 30;
+  water.causticsDepth = 6;
   water.causticsFadeDistance = 6;
   water.absorptionScale = 2.5;
 
@@ -247,7 +248,7 @@ function buildPoolScene() {
   water.causticsSceneDepth = true;
 
   scene.mainCamera = new PerspectiveCamera(scene, Math.PI / 3, 0.1, 200);
-  scene.mainCamera.lookAt(new Vector3(0, 15, 34), new Vector3(0, -1, 0), Vector3.axisPY());
+  scene.mainCamera.lookAt(new Vector3(5, 12, 20), new Vector3(-2, -1, 3), Vector3.axisPY());
   scene.mainCamera.controller = new OrbitCameraController();
   scene.mainCamera.FXAA = true;
 
