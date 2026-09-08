@@ -29,6 +29,7 @@ import { CopyBlitter } from '../../blitter';
 import { fetchSampler } from '../../utility/misc';
 import { MaterialVaryingFlags } from '../../values';
 import { MAX_CAUSTIC_WATERS, ShaderHelper } from '../../material/shader/helper';
+import { REFRACT_BLUR_MAX_LOD } from '../../material/water';
 import { AbstractPostEffect, PostEffectLayer } from '../../posteffect/posteffect';
 import { RenderGraph } from './rendergraph';
 import { RenderGraphExecutor } from './executor';
@@ -286,6 +287,23 @@ function getSSSLightingTextureFormat(
 
 function getFullMipLevelCount(width: number, height: number): number {
   return Math.max(1, Math.floor(Math.log2(Math.max(1, width, height))) + 1);
+}
+
+/**
+ * Levels the scene colour copy is allocated with.
+ *
+ * Deep enough to serve the refraction blur, which clamps its own LOD, and no
+ * deeper: the coarsest levels of a full chain are averages of the whole frame,
+ * which is not a plausible answer for "what is behind this water", and every
+ * level costs bandwidth to generate on each grab. Capped against the full chain
+ * so a small render target stays legal.
+ *
+ * Derived from the water material's clamp rather than restated, so the two
+ * cannot drift: a level count one short of it would leave the sampler asking for
+ * a level that does not exist.
+ */
+function getSceneColorMipLevelCount(width: number, height: number): number {
+  return Math.min(REFRACT_BLUR_MAX_LOD + 1, getFullMipLevelCount(width, height));
 }
 
 function hasSurfaceMRT(ctx: DrawContext): boolean {
@@ -1112,9 +1130,28 @@ const SceneColorGrabModule: RenderModule<FrameGraphContext> = {
         // from recycling it while this pass is still sampling it.
         builder.read(waterCausticsHandle);
       }
+      // A few mip levels, because the refraction background is sampled at a LOD
+      // and not only at mip 0: water picks one from how deep and how turbid the
+      // column is, so a stone under clear shallows stays sharp while the same
+      // stone under metres of silt smears. With a single-level texture the
+      // sampler returned mip 0 whatever LOD was asked for, and the blur did
+      // nothing.
+      //
+      // Nothing here generates the chain - both backends do it when the
+      // framebuffer is unbound, for any colour attachment with more than one
+      // level (WebGL `framebuffer_webgl.ts` unbind, WebGPU `renderpass_webgpu.ts`
+      // end), and `generateMipmaps` defaults to true on colour attachments. The
+      // level count is the whole precondition.
+      //
+      // Not the full chain down to 1x1. The consumer clamps its LOD, and the
+      // coarsest levels of a full chain average across the whole frame - a
+      // sample from one stops being "what is behind the water" and becomes the
+      // mean of the image. Generating them would cost bandwidth every frame to
+      // produce levels nothing may read.
       const copyHandle = builder.createTexture({
         format: ctx.colorFormat!,
         label: 'sceneColorCopy',
+        mipLevels: getSceneColorMipLevelCount(ctx.renderWidth, ctx.renderHeight),
         allocationKey: 'ForwardPlus.SceneColorCopy'
       });
       // Isolate depth when SSR inserts transmission depth before LightPass.

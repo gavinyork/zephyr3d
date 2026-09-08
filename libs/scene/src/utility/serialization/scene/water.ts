@@ -534,6 +534,20 @@ export function getWaterClass(manager: ResourceManager): SerializableClass {
           }
         },
         {
+          name: 'RefractionBlur',
+          description:
+            'Scale on how much the medium blurs what is seen through it, 1 for the width the scattering coefficient and the path length imply. Turbid or deep water smudges the bottom; 0 keeps it sharp at any depth.',
+          type: 'float',
+          default: 1,
+          options: { animatable: true, minValue: 0, maxValue: 4 },
+          get(this: Water, value) {
+            value.num[0] = this.material.refractionBlur;
+          },
+          set(this: Water, value) {
+            this.material.refractionBlur = value.num[0];
+          }
+        },
+        {
           name: 'ScatterAnisotropy',
           description:
             'Mean cosine of a single scattering event. 0 scatters equally in all directions; higher brightens the water when looking towards the sun through it. Sea water measures near 0.9, but a turbid column blends towards isotropic on its own.',

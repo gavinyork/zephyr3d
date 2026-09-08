@@ -109,6 +109,59 @@ describe('water sun in-scattering shader', () => {
   });
 });
 
+describe('water refraction blur LOD', () => {
+  // Mirrors the constants in the water material.
+  const GEOMETRIC = 0.02;
+  const DENSITY = 1.5;
+  const MAX_LOD = 6;
+
+  /** The LOD the shader selects for a path length and a scattering coefficient. */
+  function lod(depth: number, scatterLuminance: number, scale = 1): number {
+    const density = scatterLuminance * DENSITY * scale;
+    return Math.min(Math.log2(1 + depth * (GEOMETRIC + density)), MAX_LOD);
+  }
+
+  test('is zero at the surface', () => {
+    // A path of no length must read the background exactly, or the water would
+    // blur what it is not in front of.
+    expect(lod(0, 0.4)).toBe(0);
+  });
+
+  test('rises with depth and with turbidity', () => {
+    expect(lod(4, 0.4)).toBeGreaterThan(lod(1, 0.4));
+    expect(lod(2, 0.4)).toBeGreaterThan(lod(2, 0.02));
+  });
+
+  test('doubles the filter width per level', () => {
+    // Log in the path length is the whole point: each mip is twice the footprint
+    // of the last, so a linear ramp would blow through the chain in the first
+    // metre. Doubling the optical depth must add roughly one level, not many.
+    const one = lod(1 / 0.62, 0.4);
+    const two = lod(2 / 0.62, 0.4);
+    const four = lod(4 / 0.62, 0.4);
+    expect(two - one).toBeLessThan(1.2);
+    expect(four - two).toBeLessThan(1.2);
+  });
+
+  test('clear shallow water stays essentially sharp', () => {
+    // The lagoon medium the caustics scenes use, under a couple of metres. If
+    // this ever reaches a full level, those scenes have lost their sea bed
+    // detail to a blur that should not be visible there.
+    expect(lod(2.5, 0.04)).toBeLessThan(0.5);
+  });
+
+  test('turbid deep water saturates but never exceeds the chain', () => {
+    // The allocation is sized from MAX_LOD, so a LOD past it would sample a
+    // level that does not exist.
+    expect(lod(60, 0.45)).toBeLessThanOrEqual(MAX_LOD);
+    expect(lod(1e6, 10)).toBeLessThanOrEqual(MAX_LOD);
+  });
+
+  test('the scale knob can switch it off', () => {
+    expect(lod(20, 0.45, 0)).toBeCloseTo(Math.log2(1 + 20 * GEOMETRIC), 12);
+  });
+});
+
 describe('water scattering phase function', () => {
   const MOLECULAR_FRACTION = 0.12;
 

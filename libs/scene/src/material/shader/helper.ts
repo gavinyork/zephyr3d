@@ -413,11 +413,21 @@ export class ShaderHelper {
         scope[UNIFORM_NAME_LINEAR_DEPTH_MAP_SIZE] = pb.vec2().uniform(0);
       }
       if (ctx.sceneColorTexture) {
-        // Scene color copy: single mip level
+        // Mip-filtered, because the refraction background is read at a LOD and
+        // not only at mip 0: the water picks one from how deep and how turbid
+        // the column it is looking through is. A `nomip` sampler pins mip 0
+        // whatever LOD the shader passes, so this and the copy's level count
+        // have to change together - and each backend only honours one of them.
+        // WebGPU binds the sampler declared here as a static binding the runtime
+        // cannot overwrite; WebGL falls back to the texture's own sampler, whose
+        // mip filter follows its level count.
+        //
+        // Every other reader of this texture passes an explicit LOD 0 (SSR hits,
+        // the sky blend), so none of them changes behaviour.
         scope[UNIFORM_NAME_SCENE_COLOR_MAP] = pb
           .tex2D()
           .uniform(0)
-          .withSampler(getSamplerOptions('clamp_linear_nomip'));
+          .withSampler(getSamplerOptions('clamp_linear'));
         scope[UNIFORM_NAME_SCENE_COLOR_MAP_SIZE] = pb.vec2().uniform(0);
       }
       if (ctx.HiZTexture) {

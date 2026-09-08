@@ -137,6 +137,35 @@ const MOLECULAR_SCATTER_FRACTION = 0.12;
  * sun actually above the horizon.
  */
 const MIN_SUN_SLOPE = 0.05;
+/**
+ * Blur per meter of path that even a non-scattering medium produces, in mip
+ * widths.
+ *
+ * The refracted image is gathered over the footprint a surface texel spans, and
+ * the wave normal varies across that footprint, so the background is slightly
+ * defocused by the geometry alone. Small: it keeps clear water from looking
+ * unnaturally crisp at depth without turning it into frosted glass.
+ */
+const REFRACT_BLUR_GEOMETRIC = 0.02;
+/**
+ * How strongly the scattering coefficient drives the refraction blur.
+ *
+ * Maps a scattering coefficient in 1/m onto mip widths per meter. Sized so the
+ * turbid end of plausible water - sigma_s near 0.4, the backlit scene's medium -
+ * reaches the top of the mip chain over a few meters, while the clear end stays
+ * essentially sharp.
+ */
+const REFRACT_BLUR_DENSITY = 1.5;
+/**
+ * Cap on the refraction blur LOD.
+ *
+ * The scene colour copy carries a full chain down to 1x1, and the coarsest few
+ * levels average across the whole screen: past this the sample stops being
+ * "what is behind the water" and becomes the average of the frame, which reads
+ * as the water glowing rather than clouding. Six levels is a 64x footprint,
+ * already far wider than any real forward-scattering kernel.
+ */
+export const REFRACT_BLUR_MAX_LOD = 6;
 
 export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight) {
   private static readonly FEATURE_MEDIUM_MODE = this.defineFeature();
@@ -196,6 +225,7 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
   private _sunScatteringIntensity: number;
   private _scatterAnisotropy: number;
   private readonly _sunScatterParams: Vector4;
+  private _refractionBlur: number;
   private _foamAmount: number;
   private _foamFalloff: number;
   private readonly _foamColor: Vector3;
@@ -249,6 +279,7 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
     this._sunScatteringIntensity = 1;
     this._scatterAnisotropy = DEFAULT_SCATTER_ANISOTROPY;
     this._sunScatterParams = new Vector4();
+    this._refractionBlur = 1;
     // Coverage from the generator is a folded-surface measure, not an area
     // fraction; these map it onto one. The falloff above 1 keeps light folding
     // - the shoulder of a wave about to break - from reading as foam.
@@ -621,6 +652,29 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
     }
   }
   /**
+   * Scale on how much the medium blurs what is seen through it. 0 keeps the
+   * background perfectly sharp at any depth.
+   *
+   * Scattering deflects the transmitted ray a little at every event, so the
+   * image reaching the surface is blurred by an amount that grows with the
+   * optical depth of the column. The width is derived from the scattering
+   * coefficient and the path length, so this is a stylisation knob rather than
+   * the magnitude itself: 1 is what the medium implies.
+   *
+   * Costs nothing on its own - it selects a mip of the refraction background
+   * that is generated regardless.
+   */
+  get refractionBlur() {
+    return this._refractionBlur;
+  }
+  set refractionBlur(val: number) {
+    const clamped = Math.max(0, val);
+    if (clamped !== this._refractionBlur) {
+      this._refractionBlur = clamped;
+      this.uniformChanged();
+    }
+  }
+  /**
    * Mean cosine of a single scattering event, in `[0, 0.95]`.
    *
    * 0 scatters equally in all directions; higher values push light forward, so
@@ -846,6 +900,10 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
       scope.foamColor = pb.vec3().uniform(2);
       // (intensity, anisotropy, 0, 0)
       scope.sunScatterParams = pb.vec4().uniform(2);
+      // Mip widths per meter of path the medium's scattering contributes to the
+      // refraction blur. Resolved on the CPU from the scattering coefficient,
+      // which is authored per channel while the blur is one LOD for all three.
+      scope.refractBlurDensity = pb.float().uniform(2);
       // Declared in both medium modes: the ramp only replaces the depth-driven
       // absorption and scattering, while the subsurface and sun-scattering
       // terms need the medium's hue and thickness regardless of how those two
@@ -1570,10 +1628,24 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
         // reaches the same depth over a shorter distance than the view ray
         // suggests, and at a grazing view the two differ by a lot.
         this.depth = this.refractInfo.z;
+        // How blurred what is behind the water reads. Scattering in the column
+        // deflects the transmitted ray by a small random angle at every event,
+        // so the image arriving at the surface is a convolution whose width
+        // grows with the optical depth - a stone under 20 cm of clear water is
+        // sharp, the same stone under 3 m of turbid water is a smudge. Sampling
+        // a coarser mip is the cheap stand-in for that convolution.
+        //
+        // Log in the path length because each mip is a doubling of the filter
+        // width, and driven by the *scattering* coefficient rather than the
+        // extinction: absorption removes light without redirecting it, so it
+        // darkens the background without blurring it.
+        this.$l.refractBlur = pb.log2(
+          pb.add(1, pb.mul(this.depth, pb.add(REFRACT_BLUR_GEOMETRIC, this.refractBlurDensity)))
+        );
         this.$l.refraction = pb.textureSampleLevel(
           ShaderHelper.getSceneColorTexture(this),
           this.refractUV,
-          0
+          pb.clamp(this.refractBlur, 0, REFRACT_BLUR_MAX_LOD)
         ).rgb;
         this.refraction = pb.mul(this.refraction, this.getAbsorption(this.depth));
         this.$l.fresnelTerm = this.fresnel(this.normal, pb.neg(this.eyeVecNorm));
@@ -1738,6 +1810,16 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
       bindGroup.setValue('mediumExtinction', this._extinction);
       this._sunScatterParams.setXYZW(this._sunScatteringIntensity, this._scatterAnisotropy, 0, 0);
       bindGroup.setValue('sunScatterParams', this._sunScatterParams);
+      // One LOD serves all three channels, so the per-channel scattering has to
+      // collapse to a scalar. Luminance-weighted rather than a plain mean: the
+      // blur is a perceptual effect and green carries most of what is seen.
+      bindGroup.setValue(
+        'refractBlurDensity',
+        (0.2126 * this._scattering.x + 0.7152 * this._scattering.y + 0.0722 * this._scattering.z) *
+          this._scatteringScale *
+          REFRACT_BLUR_DENSITY *
+          this._refractionBlur
+      );
       if (this.mediumMode === 'ramp') {
         bindGroup.setValue('depthMulti', this._depthMulti);
         bindGroup.setTexture(

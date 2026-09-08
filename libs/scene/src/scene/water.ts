@@ -189,6 +189,17 @@ export class Water extends applyMixins(GraphNode, mixinDrawable) implements Draw
     this.material.sunScatteringIntensity = val;
   }
   /**
+   * Scale on how much the medium blurs what is seen through it, 1 for the width
+   * the scattering coefficient and the path length imply. 0 keeps the background
+   * sharp at any depth.
+   */
+  get refractionBlur() {
+    return this.material.refractionBlur;
+  }
+  set refractionBlur(val: number) {
+    this.material.refractionBlur = val;
+  }
+  /**
    * Mean cosine of a single scattering event in the water, in `[0, 0.95]`.
    *
    * 0 scatters equally in all directions; higher brightens the water when
