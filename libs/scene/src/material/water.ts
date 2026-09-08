@@ -8,7 +8,7 @@ import type {
 } from '@zephyr3d/device';
 import { applyMaterialMixins, MeshMaterial } from './meshmaterial';
 import type { DrawContext, WaveGenerator } from '../render';
-import { MaterialVaryingFlags } from '../values';
+import { LIGHT_TYPE_DIRECTIONAL, MaterialVaryingFlags } from '../values';
 import { ShaderHelper } from './shader/helper';
 import type { Nullable } from '@zephyr3d/base';
 import { DRef, DWeakRef, Interpolator, Vector3, Vector4 } from '@zephyr3d/base';
@@ -94,6 +94,49 @@ const REFRACT_EDGE_FADE = 0.06;
 const SSS_DISTORTION = 0.25;
 /** Falloff of the subsurface lobe. Higher keeps the glow closer to the sun. */
 const SSS_POWER = 4;
+/**
+ * Mean cosine of one scattering event in the water body.
+ *
+ * Real sea water is strongly forward-scattering - measurements put it near 0.9 -
+ * but at that value almost nothing comes back towards a camera looking down at
+ * the water, which is the common case. The default gives up some of that peak
+ * for a term that reads from above; the multiple-scattering blend in
+ * {@link WaterMaterial.waterSunScattering} restores the isotropy a turbid
+ * medium genuinely has, so the two together stay closer to the truth than a
+ * single lobe of either width.
+ */
+export const DEFAULT_SCATTER_ANISOTROPY = 0.7;
+/**
+ * Share of the scattering that is molecular rather than particulate.
+ *
+ * Sets how much light comes back towards a camera looking down at the water: the
+ * particulate lobe is forward-peaked and returns almost nothing into the
+ * backward hemisphere, so this fraction is what the term is made of in the
+ * commonest camera setup there is. Measured sea water puts molecular scattering
+ * at a few percent of the total, but the number that matters here is its share
+ * of the *backscatter*, where it dominates - at the default anisotropy it
+ * supplies about nine tenths of what returns at 180 degrees.
+ *
+ * Not exposed: it trades one lobe against the other, which is what
+ * {@link WaterMaterial.scatterAnisotropy} already does in a way an author can
+ * reason about.
+ */
+const MOLECULAR_SCATTER_FRACTION = 0.12;
+/**
+ * Floor on how fast the refracted sun ray descends, used by the in-scattering
+ * integral.
+ *
+ * The integral divides the view path by how fast the sun's path to the same
+ * point deepens, and a sun on the horizon lights the column along an unbounded
+ * path - which single scattering cannot represent at all. Clamping caps the term
+ * instead of letting it diverge.
+ *
+ * Well below the elevation the caustics pass gives up at, deliberately: this
+ * only has to keep the arithmetic finite, and Snell already refracts a grazing
+ * sun to about 41 degrees below the surface, so the clamp is unreachable for any
+ * sun actually above the horizon.
+ */
+const MIN_SUN_SLOPE = 0.05;
 
 export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight) {
   private static readonly FEATURE_MEDIUM_MODE = this.defineFeature();
@@ -150,6 +193,9 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
   private _subsurfaceIntensity: number;
   private _subsurfaceSteepness: number;
   private readonly _subsurfaceParams: Vector4;
+  private _sunScatteringIntensity: number;
+  private _scatterAnisotropy: number;
+  private readonly _sunScatterParams: Vector4;
   private _foamAmount: number;
   private _foamFalloff: number;
   private readonly _foamColor: Vector3;
@@ -198,6 +244,11 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
     // and the troughs stay dark, while 20 turns the whole sea into a lamp.
     this._subsurfaceSteepness = 4;
     this._subsurfaceParams = new Vector4();
+    // Physical by default: the integral is derived, not fitted, so 1 is the
+    // value the medium coefficients already imply.
+    this._sunScatteringIntensity = 1;
+    this._scatterAnisotropy = DEFAULT_SCATTER_ANISOTROPY;
+    this._sunScatterParams = new Vector4();
     // Coverage from the generator is a folded-surface measure, not an area
     // fraction; these map it onto one. The falloff above 1 keeps light folding
     // - the shoulder of a wave about to break - from reading as foam.
@@ -545,6 +596,51 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
     }
   }
   /**
+   * Strength of the sunlight scattered out of the water column towards the eye,
+   * 1 for the value the medium coefficients imply. 0 disables the term.
+   *
+   * This is what gives the water body a direction-dependent colour: it is
+   * evaluated per light, so a shadow falling on the water darkens the water
+   * itself rather than only its specular, and a low sun tints the column the
+   * way it tints everything else. Without it the body is lit by the environment
+   * irradiance alone, which has no direction and cannot produce either.
+   *
+   * Unlike {@link subsurfaceIntensity} this is not an authored magnitude. The
+   * integral below it is closed-form single scattering through the same medium
+   * the absorption uses, so 1 is the physical answer and anything else is a
+   * deliberate exaggeration.
+   */
+  get sunScatteringIntensity() {
+    return this._sunScatteringIntensity;
+  }
+  set sunScatteringIntensity(val: number) {
+    const clamped = Math.max(0, val);
+    if (clamped !== this._sunScatteringIntensity) {
+      this._sunScatteringIntensity = clamped;
+      this.uniformChanged();
+    }
+  }
+  /**
+   * Mean cosine of a single scattering event, in `[0, 0.95]`.
+   *
+   * 0 scatters equally in all directions; higher values push light forward, so
+   * the water brightens when looking towards the sun through it and darkens
+   * when looking away. Sea water measures near 0.9, but the term this feeds
+   * blends towards isotropic as the column gets optically thick - which is what
+   * multiple scattering does - so the visible anisotropy is always less than
+   * this number alone suggests.
+   */
+  get scatterAnisotropy() {
+    return this._scatterAnisotropy;
+  }
+  set scatterAnisotropy(val: number) {
+    const clamped = Math.max(0, Math.min(0.95, val));
+    if (clamped !== this._scatterAnisotropy) {
+      this._scatterAnisotropy = clamped;
+      this.uniformChanged();
+    }
+  }
+  /**
    * How much of a folded texel reads as foam.
    *
    * The wave generator reports where the surface has folded over on itself,
@@ -748,16 +844,18 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
       // (coverage scale, coverage falloff, 0, 0)
       scope.foamShadingParams = pb.vec4().uniform(2);
       scope.foamColor = pb.vec3().uniform(2);
+      // (intensity, anisotropy, 0, 0)
+      scope.sunScatterParams = pb.vec4().uniform(2);
       // Declared in both medium modes: the ramp only replaces the depth-driven
-      // absorption and scattering, while the subsurface term needs the medium's
-      // hue regardless of how those two are authored.
+      // absorption and scattering, while the subsurface and sun-scattering
+      // terms need the medium's hue and thickness regardless of how those two
+      // are authored.
       scope.mediumAlbedo = pb.vec3().uniform(2);
+      scope.mediumExtinction = pb.vec3().uniform(2);
       if (this.mediumMode === 'ramp') {
         scope.depthMulti = pb.float().uniform(2);
         scope.scatterRampTex = pb.tex2D().uniform(2);
         scope.absorptionRampTex = pb.tex2D().uniform(2);
-      } else {
-        scope.mediumExtinction = pb.vec3().uniform(2);
       }
     }
     scope.$l.discardable = pb.or(
@@ -1138,6 +1236,157 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
       straightDist
     ) as PBShaderExp;
   }
+  /**
+   * Sunlight scattered out of the water column towards the eye.
+   *
+   * Closed-form single scattering, not a ray march. The medium is homogeneous
+   * and the two paths through it are straight lines of fixed slope, so the
+   * integral along the view ray has an elementary solution and costs one `exp`.
+   *
+   * Take `t` as distance along the refracted view ray from the surface, `d` as
+   * its total length in the water, and `vy`/`sy` as how fast the view and sun
+   * rays descend. A scattering event at `t` sits `t * vy` below the surface, so
+   * the sun reached it over `t * vy / sy` and the scattered light returns over
+   * `t`. Writing `r = vy / sy`:
+   *
+   * ```
+   * S = integral(0..d) sigma_s * p * E * exp(-sigma_t * t * (1 + r)) dt
+   *   = albedo * p * E * (1 - exp(-sigma_t * (1 + r) * d)) / (1 + r)
+   * ```
+   *
+   * `sigma_t` cancels out of everything but the exponent, which is what leaves
+   * the result finite for an unbounded column: looking straight down at deep
+   * water under an overhead sun gives `albedo * p * E / 2`, the textbook value.
+   *
+   * `E` is the sun's irradiance perpendicular to its own beam, which is what
+   * the light loop already carries - there is no `NoL` here, because the
+   * geometry the cosine would describe is already in `r`. Both directions are
+   * refracted through a flat surface first: Snell steepens the sun's descent,
+   * and using the above-water slope would overstate how much water the light
+   * crossed.
+   *
+   * Only the entry Fresnel is applied here. The exit transmission is common to
+   * every term leaving the medium and is applied once by the caller.
+   *
+   * Assumes the eye is above the surface; the caller gates on that. Seen from
+   * below, the column between eye and surface is not the one `depth` measures,
+   * and the geometry has to be rederived.
+   *
+   * @param scope - Current shader scope.
+   * @param lightEnergy - Sun irradiance perpendicular to the beam, after shadowing.
+   * @param lightDir - Unit vector from the surface towards the light.
+   * @param eyeVecNorm - Unit vector from the camera towards the surface.
+   * @param NoL - Cosine of the sun's incidence on the wave normal.
+   * @param depth - Refracted path length through the medium, in meters.
+   * @returns Radiance scattered towards the eye, before the exit Fresnel.
+   */
+  waterSunScattering(
+    scope: PBInsideFunctionScope,
+    lightEnergy: PBShaderExp,
+    lightDir: PBShaderExp,
+    eyeVecNorm: PBShaderExp,
+    NoL: PBShaderExp,
+    depth: PBShaderExp
+  ) {
+    const pb = scope.$builder;
+    // Phase function of the water body: a molecular lobe and a particulate one.
+    //
+    // Two lobes rather than one because they answer different questions and the
+    // common camera setup only ever asks the first. Looking down at water under
+    // a high sun, the light has to turn almost completely around to reach the
+    // eye, and a forward-scattering particulate lobe returns essentially nothing
+    // there - HG(0.7) gives 0.009/sr against an isotropic 0.080. Yet water
+    // plainly looks blue from above, and it does so because of molecular
+    // scattering, which is near-symmetric and hands back as much as it sends on.
+    // With the particulate lobe alone this whole term is invisible from above
+    // and only appears at grazing angles, which is not what it is modelling.
+    //
+    // Rayleigh carries the wavelength dependence - the 1/lambda^4 that makes
+    // clean water blue - but the medium's own albedo already carries a colour
+    // the author chose, so the split here is achromatic and only the shape
+    // differs. Weighted the way measured sea water divides: molecular scattering
+    // is a small share of the total but dominates the backward hemisphere.
+    //
+    // Both lobes are normalized to integrate to 1 over the sphere; the 1/4pi is
+    // part of that, and dropping it would make the term 4pi too bright.
+    pb.func('waterScatterPhase', [pb.float('cosTheta'), pb.float('g')], function () {
+      // Henyey-Greenstein: the particulate lobe, forward-peaked at g > 0.
+      this.$l.g2 = pb.mul(this.g, this.g);
+      this.$l.denom = pb.add(1, this.g2, pb.mul(-2, this.g, this.cosTheta));
+      this.$l.mie = pb.div(pb.sub(1, this.g2), pb.mul(4 * Math.PI, pb.pow(pb.max(this.denom, 1e-4), 1.5)));
+      // Rayleigh: symmetric about 90 degrees, so it returns light towards the
+      // eye as readily as it passes it on. 3/(16 pi) * (1 + cos^2).
+      this.$l.rayleigh = pb.mul(3 / (16 * Math.PI), pb.add(1, pb.mul(this.cosTheta, this.cosTheta)));
+      this.$return(
+        pb.add(
+          pb.mul(this.rayleigh, MOLECULAR_SCATTER_FRACTION),
+          pb.mul(this.mie, 1 - MOLECULAR_SCATTER_FRACTION)
+        )
+      );
+    });
+    pb.func(
+      'waterSunScattering',
+      [
+        pb.vec3('lightEnergy'),
+        pb.vec3('lightDir'),
+        pb.vec3('eyeVecNorm'),
+        pb.float('NoL'),
+        pb.float('depth')
+      ],
+      function () {
+        this.$l.up = pb.vec3(0, 1, 0);
+        // Both directions as they travel inside the water. The sun's incident
+        // direction is where it travels to, the opposite of `lightDir`.
+        this.$l.Lw = pb.refract(pb.neg(this.lightDir), this.up, AIR_TO_WATER_ETA);
+        this.$l.Vw = pb.refract(this.eyeVecNorm, this.up, AIR_TO_WATER_ETA);
+        // How fast each descends. The sun is floored rather than allowed to
+        // reach zero: a sun on the horizon lights the column over an unbounded
+        // path, which single scattering cannot represent, so cap it instead.
+        this.$l.sy = pb.max(pb.neg(this.Lw.y), MIN_SUN_SLOPE);
+        this.$l.vy = pb.max(pb.neg(this.Vw.y), 1e-3);
+        this.$l.r = pb.div(this.vy, this.sy);
+        this.$l.rr = pb.add(1, this.r);
+        // Angle between the sun's travel and the direction the light has to
+        // leave in to reach the eye, which is back along the view ray.
+        this.$l.cosTheta = pb.neg(pb.dot(this.Lw, this.Vw));
+        this.$l.hg = this.waterScatterPhase(this.cosTheta, this.sunScatterParams.y);
+        // Multiple scattering washes the lobe out. An optically thin column
+        // keeps the single-event anisotropy; a thick one has scattered the light
+        // enough times that the direction it entered by no longer matters, and
+        // an isotropic phase is the right end state. Weighted on luminance and
+        // shared across channels, because the phase itself does not depend on
+        // wavelength - only how far the light got does.
+        this.$l.lumWeights = pb.vec3(0.2126, 0.7152, 0.0722);
+        this.$l.extLum = pb.dot(this.mediumExtinction, this.lumWeights);
+        this.$l.albedoLum = pb.dot(this.mediumAlbedo, this.lumWeights);
+        this.$l.thickness = pb.mul(
+          this.albedoLum,
+          pb.sub(1, pb.exp(pb.neg(pb.mul(this.extLum, this.depth))))
+        );
+        this.$l.phase = pb.mix(
+          this.hg,
+          1 / (4 * Math.PI),
+          pb.smoothStep(0, 0.5, pb.clamp(this.thickness, 0, 1))
+        );
+        // The integral itself. Per channel, since sigma_t is.
+        this.$l.k = pb.mul(this.mediumExtinction, this.rr);
+        this.$l.integral = pb.div(pb.sub(pb.vec3(1), pb.exp(pb.neg(pb.mul(this.k, this.depth)))), this.rr);
+        // Entry Fresnel: what the surface let through on the way in. This is
+        // also what keeps the term off a backlit crest - at NoL <= 0 no light
+        // enters the top face at all, and the subsurface term owns that case.
+        this.$l.entry = pb.sub(1, pb.add(WATER_F0, pb.mul(1 - WATER_F0, pb.pow(pb.sub(1, this.NoL), 5))));
+        this.$return(
+          pb.mul(
+            this.mediumAlbedo,
+            this.lightEnergy,
+            this.integral,
+            pb.mul(this.phase, this.entry, this.sunScatterParams.x)
+          )
+        );
+      }
+    );
+    return scope.waterSunScattering(lightEnergy, lightDir, eyeVecNorm, NoL, depth) as PBShaderExp;
+  }
   waterShading(
     scope: PBInsideFunctionScope,
     worldPos: PBShaderExp,
@@ -1241,6 +1490,12 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
         );
         this.$l.eyeVec = pb.sub(this.worldPos.xyz, ShaderHelper.getCameraPosition(this));
         this.$l.eyeVecNorm = pb.normalize(this.eyeVec);
+        // Which face of the surface the camera is on. The wave normal always
+        // points up and the surface is drawn with cullMode 'none', so a ray
+        // agreeing with the normal is one travelling up from inside the water.
+        // Terms whose geometry is derived for an eye above the surface are
+        // gated on this.
+        this.$l.underwaterEye = pb.greaterThan(pb.dot(this.eyeVecNorm, this.normal), 0);
         this.$l.depth = pb.length(pb.sub(this.wPos.xyz, this.worldPos));
         this.$l.viewPos = pb.mul(ShaderHelper.getViewMatrix(this), pb.vec4(this.worldPos, 1)).xyz;
         this.incidentVec = pb.normalize(pb.sub(this.worldPos, ShaderHelper.getCameraPosition(this)));
@@ -1335,6 +1590,13 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
         // mirror underneath stops being visible at all.
         this.fresnelTerm = pb.mul(this.fresnelTerm, pb.sub(1, this.foam));
         this.$l.finalColor = pb.mix(this.refraction, this.reflectance, this.fresnelTerm);
+        // What anything leaving the water body keeps on its way out, and the
+        // share of the surface that is water rather than foam. The refraction
+        // above already carries the first factor - `mix` weights it by
+        // `1 - fresnelTerm` - and every scattering term below has to carry it
+        // too, or the body stays fully visible through a surface that has turned
+        // into a mirror at a grazing angle.
+        this.$l.bodyWeight = pb.mul(pb.sub(1, this.fresnelTerm), pb.sub(1, this.foam));
         that.forEachLight(this, function (type, posRange, dirCutoff, colorIntensity, extra, shadow) {
           this.$l.lightAtten = that.calculateLightAttenuation(
             this,
@@ -1379,6 +1641,39 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
               pb.mul(this.sssFacing, this.sssThickness, this.subsurfaceParams.x)
             )
           );
+          // Sunlight scattered back out of the water column. This is what gives
+          // the body a direction-dependent colour at all: the ambient term
+          // below is built from the environment irradiance, which has no
+          // direction, so without this a shadow on the water leaves the water
+          // itself unchanged and a low sun does not tint it.
+          //
+          // Directional only. The integral assumes the light arrives as a
+          // parallel beam of fixed slope, which is what lets the sun's path to
+          // a scattering event be written in closed form; a point light's
+          // distance falls off along the column and needs a different solution.
+          // Seen from below the surface the geometry differs too, and this
+          // keeps the term off that case rather than getting it wrong - the
+          // refraction and the ambient scattering still carry the water colour
+          // there.
+          this.$if(pb.and(pb.equal(type, LIGHT_TYPE_DIRECTIONAL), pb.not(this.underwaterEye)), function () {
+            // Weighted by what the surface transmits on the way out and by how
+            // much of it is still water rather than foam, like every other
+            // term that comes from inside the body.
+            this.lightContrib = pb.add(
+              this.lightContrib,
+              pb.mul(
+                that.waterSunScattering(
+                  this,
+                  this.lightEnergy,
+                  this.lightDir,
+                  this.eyeVecNorm,
+                  this.NoL,
+                  this.depth
+                ),
+                this.bodyWeight
+              )
+            );
+          });
           // Foam is a rough dielectric layer, so it takes the light the way any
           // matte surface does. Previously it replaced the water colour with a
           // flat white before the lights ran at all, which left a breaking crest
@@ -1398,14 +1693,11 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
         if (that.needCalculateEnvLight()) {
           this.$l.irradiance = that.getEnvLightIrradiance(this, this.normal);
           // Scattering from the water body itself, and from the foam sitting on
-          // it. The water term is weighted away under foam because that light
-          // came up through the water column, which the foam is covering.
-          this.$l.sss = pb.mul(
-            this.getScattering(this.depth),
-            this.irradiance,
-            pb.sub(1, this.foam),
-            1 / Math.PI
-          );
+          // it. The water term is weighted by `bodyWeight`, which is what the
+          // surface transmits on the way out times the share of it that is still
+          // water: this light came up through the column, so a surface that has
+          // turned into a mirror hides it and foam covers it.
+          this.$l.sss = pb.mul(this.getScattering(this.depth), this.irradiance, this.bodyWeight, 1 / Math.PI);
           this.finalColor = pb.add(this.finalColor, this.sss);
           this.finalColor = pb.add(
             this.finalColor,
@@ -1441,6 +1733,11 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
       bindGroup.setValue('foamShadingParams', this._foamParams);
       bindGroup.setValue('foamColor', this._foamColor);
       bindGroup.setValue('mediumAlbedo', this._scatterAlbedo);
+      // Needed in both medium modes: the sun-scattering integral is always
+      // physical, even where the ramp overrides the depth-driven absorption.
+      bindGroup.setValue('mediumExtinction', this._extinction);
+      this._sunScatterParams.setXYZW(this._sunScatteringIntensity, this._scatterAnisotropy, 0, 0);
+      bindGroup.setValue('sunScatterParams', this._sunScatterParams);
       if (this.mediumMode === 'ramp') {
         bindGroup.setValue('depthMulti', this._depthMulti);
         bindGroup.setTexture(
@@ -1453,8 +1750,6 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
           this._getAbsorptionRampTexture(ctx.device),
           fetchSampler('clamp_linear_nomip')
         );
-      } else {
-        bindGroup.setValue('mediumExtinction', this._extinction);
       }
     }
     if (this.waveGenerator) {

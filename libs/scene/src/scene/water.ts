@@ -175,6 +175,31 @@ export class Water extends applyMixins(GraphNode, mixinDrawable) implements Draw
   set causticsWarp(val: number) {
     this.material.causticsWarp = val;
   }
+  /**
+   * Strength of the sunlight scattered out of the water column towards the eye,
+   * 1 for the value the medium coefficients imply.
+   *
+   * This is what makes a shadow falling on the water darken the water itself,
+   * and a low sun tint it. 0 leaves the body lit by the environment alone.
+   */
+  get sunScatteringIntensity() {
+    return this.material.sunScatteringIntensity;
+  }
+  set sunScatteringIntensity(val: number) {
+    this.material.sunScatteringIntensity = val;
+  }
+  /**
+   * Mean cosine of a single scattering event in the water, in `[0, 0.95]`.
+   *
+   * 0 scatters equally in all directions; higher brightens the water when
+   * looking towards the sun through it.
+   */
+  get scatterAnisotropy() {
+    return this.material.scatterAnisotropy;
+  }
+  set scatterAnisotropy(val: number) {
+    this.material.scatterAnisotropy = val;
+  }
   /** {@inheritDoc SceneNode.update} */
   update(frameId: number, elapsedInSeconds: number) {
     if (this.material.needUpdate()) {

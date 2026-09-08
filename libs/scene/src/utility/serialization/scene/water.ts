@@ -7,6 +7,7 @@ import { defineProps, type SerializableClass } from '../types';
 import type { WaveGenerator } from '../../../render';
 import { FBMWaveGenerator, FFTWaveGenerator } from '../../../render';
 import type { WaterMediumMode } from '../../../material/water';
+import { DEFAULT_SCATTER_ANISOTROPY } from '../../../material/water';
 import type { Texture2D } from '@zephyr3d/device';
 import type { ResourceManager } from '../manager';
 
@@ -516,6 +517,34 @@ export function getWaterClass(manager: ResourceManager): SerializableClass {
           },
           set(this: Water, value) {
             this.material.subsurfaceSteepness = value.num[0];
+          }
+        },
+        {
+          name: 'SunScatteringIntensity',
+          description:
+            'Strength of the sunlight scattered out of the water column towards the eye, 1 for the value the medium coefficients imply. This is what makes a shadow on the water darken the water itself and a low sun tint it; 0 leaves the body lit by the environment alone.',
+          type: 'float',
+          default: 1,
+          options: { animatable: true, minValue: 0, maxValue: 4 },
+          get(this: Water, value) {
+            value.num[0] = this.material.sunScatteringIntensity;
+          },
+          set(this: Water, value) {
+            this.material.sunScatteringIntensity = value.num[0];
+          }
+        },
+        {
+          name: 'ScatterAnisotropy',
+          description:
+            'Mean cosine of a single scattering event. 0 scatters equally in all directions; higher brightens the water when looking towards the sun through it. Sea water measures near 0.9, but a turbid column blends towards isotropic on its own.',
+          type: 'float',
+          default: DEFAULT_SCATTER_ANISOTROPY,
+          options: { animatable: true, minValue: 0, maxValue: 0.95 },
+          get(this: Water, value) {
+            value.num[0] = this.material.scatterAnisotropy;
+          },
+          set(this: Water, value) {
+            this.material.scatterAnisotropy = value.num[0];
           }
         },
         {
