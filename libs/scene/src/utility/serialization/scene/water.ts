@@ -553,6 +553,23 @@ export function getWaterClass(manager: ResourceManager): SerializableClass {
           }
         },
         {
+          name: 'CheapRefractionDepth',
+          description:
+            'Depth in meters the cheap refraction mode assumes the water is. Sets how strong the distortion looks when RefractionMode is Offset; ignored by March. A constant rather than the measured distance to the bottom, because an offset scaled by that distance paints a second copy of any object breaking the surface.',
+          type: 'float',
+          default: 1,
+          options: { animatable: true, minValue: 0, maxValue: 20 },
+          isHidden(this: Water) {
+            return this.material.refractionMode !== 'offset';
+          },
+          get(this: Water, value) {
+            value.num[0] = this.material.cheapRefractionDepth;
+          },
+          set(this: Water, value) {
+            this.material.cheapRefractionDepth = value.num[0];
+          }
+        },
+        {
           name: 'RefractionBlur',
           description:
             'Scale on how much the medium blurs what is seen through it, 1 for the width the scattering coefficient and the path length imply. Turbid or deep water smudges the bottom; 0 keeps it sharp at any depth.',

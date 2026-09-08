@@ -205,6 +205,20 @@ export class Water extends applyMixins(GraphNode, mixinDrawable) implements Draw
     this.material.refractionMode = val;
   }
   /**
+   * Depth in meters the cheap refraction mode assumes the water is, used only
+   * when {@link refractionMode} is `offset`.
+   *
+   * Sets how strong the cheap distortion looks. A constant rather than the real
+   * distance to the bottom, because an offset scaled by that distance paints a
+   * second copy of anything breaking the surface.
+   */
+  get cheapRefractionDepth() {
+    return this.material.cheapRefractionDepth;
+  }
+  set cheapRefractionDepth(val: number) {
+    this.material.cheapRefractionDepth = val;
+  }
+  /**
    * Scale on how much the medium blurs what is seen through it, 1 for the width
    * the scattering coefficient and the path length imply. 0 keeps the background
    * sharp at any depth.

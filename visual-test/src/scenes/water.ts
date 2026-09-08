@@ -717,9 +717,15 @@ export const waterRefractionCheap: VisualScene = {
     const bed = new Mesh(scene, new PlaneShape({ size: 40 }), bedMaterial);
     bed.position.setXYZ(0, -bedDepth, 0);
 
-    // A silhouette under the water, which is where the cheap mode's error shows.
+    // A silhouette breaking the surface, which is where the cheap mode's error
+    // is worst. Partly emergent rather than wholly submerged on purpose: the
+    // distance from the water to what is behind it collapses to nearly nothing
+    // on the object and jumps to metres on the water beside it, so an offset
+    // scaled by that distance reaches from the water back onto the object and
+    // paints a second copy of it. A fully submerged box shows a milder form of
+    // the same thing, which is not the case worth pinning.
     const box = new Mesh(scene, new BoxShape({ size: 1.4 }), lambert(new Vector4(0.6, 0.3, 0.25, 1)));
-    box.position.setXYZ(2, -bedDepth + 0.7, -1);
+    box.position.setXYZ(2, -bedDepth + 1.3, -1);
 
     const water = new Water(scene);
     water.scale.setXYZ(20, 1, 20);

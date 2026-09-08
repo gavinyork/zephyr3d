@@ -251,6 +251,7 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
   private _scatterAnisotropy: number;
   private readonly _sunScatterParams: Vector4;
   private _refractionBlur: number;
+  private _cheapRefractionDepth: number;
   private _foamAmount: number;
   private _foamFalloff: number;
   private readonly _foamColor: Vector3;
@@ -305,6 +306,10 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
     this._scatterAnisotropy = DEFAULT_SCATTER_ANISOTROPY;
     this._sunScatterParams = new Vector4();
     this._refractionBlur = 1;
+    // A shallow-pool depth. Small enough that the offset stays plausible on the
+    // thin water the cheap mode is most likely to be used for, and small enough
+    // that it cannot reach across a large object's silhouette.
+    this._cheapRefractionDepth = 1;
     // Coverage from the generator is a folded-surface measure, not an area
     // fraction; these map it onto one. The falloff above 1 keeps light folding
     // - the shoulder of a wave about to break - from reading as foam.
@@ -699,6 +704,31 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
     }
   }
   /**
+   * Depth in meters the cheap refraction mode assumes the water is, in
+   * {@link refractionMode} `offset`. Ignored by `march`.
+   *
+   * The cheap mode has no idea how far away what it is looking at is - finding
+   * that out is the search it exists to skip - so it steps this far along the
+   * refracted direction instead. It sets how strong the distortion looks: raise
+   * it for water that should read as deep, lower it for a shallow film.
+   *
+   * Deliberately not the measured distance to the scene. That distance jumps
+   * across a submerged object's silhouette, and an offset proportional to it
+   * makes the pixels beyond the outline reach back onto the object and paint a
+   * second copy of it. A constant cannot do that, at the price of shallow and
+   * deep water distorting equally.
+   */
+  get cheapRefractionDepth() {
+    return this._cheapRefractionDepth;
+  }
+  set cheapRefractionDepth(val: number) {
+    const clamped = Math.max(0, val);
+    if (clamped !== this._cheapRefractionDepth) {
+      this._cheapRefractionDepth = clamped;
+      this.uniformChanged();
+    }
+  }
+  /**
    * Scale on how much the medium blurs what is seen through it. 0 keeps the
    * background perfectly sharp at any depth.
    *
@@ -938,6 +968,11 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
     scope.region = pb.vec4().uniform(2);
     if (this.needFragmentColor()) {
       scope.refractionScale = pb.float().uniform(2);
+      if (this.refractionMode === 'offset') {
+        // Only the cheap path has a fixed depth scale to step along; the march
+        // derives its own from the scene.
+        scope.cheapRefractionDepth = pb.float().uniform(2);
+      }
       scope.reflectionStrength = pb.float().uniform(2);
       scope.ssrParams = pb.vec4().uniform(2);
       // (intensity, 1 / full-scatter crest height, 0, 0)
@@ -1287,25 +1322,37 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
         this.$l.refractUV = this.screenUV;
         this.$l.refractPath = this.straightDist;
         if (!march) {
-          // Cheap mode: place the hit at the straight-line distance along the
-          // refracted direction and sample there, with no search.
+          // Cheap mode: step a fixed distance along the refracted direction and
+          // sample where that projects, with no search.
           //
-          // Everything above is shared, and it is what makes this a usable
-          // approximation rather than a guess: `refractDir` is already the view
-          // line plus a wave-normal perturbation, so on calm water this lands
-          // exactly where the march would - on the point behind the surface -
-          // and the wave tilt is what moves it away. What is given up is the
-          // search: the sample is at a *guessed* depth, so where the true hit is
-          // nearer or further the offset is wrong in proportion, and a submerged
-          // silhouette smears instead of holding still. The medium path stays
-          // the straight-line distance for the same reason.
+          // Everything above is shared, which is what makes this a usable
+          // approximation rather than a guess: `refractDir` is the view line plus
+          // a wave-normal perturbation, so with no waves this lands on the point
+          // behind the surface and the wave tilt is what moves it away.
+          //
+          // The step length is a *fixed* depth scale, deliberately not the
+          // distance to what is behind the water. Scaling the offset by that
+          // distance is the physically sensible thing and it is what this first
+          // did, but it doubles every submerged object: the distance jumps across
+          // an object's silhouette, so the pixels just outside it carry the much
+          // larger offset belonging to the floor behind, and that offset is big
+          // enough to land back on the object. Its colour then appears a second
+          // time, outside its own outline, while the object's own pixels barely
+          // move - two copies of one thing. The march never had this because it
+          // finds the real intersection, so its sample and the surface it shows
+          // agree by construction.
+          //
+          // What a fixed scale gives up is that shallow and deep water refract
+          // by the same amount. That is a wrong magnitude; a ghost is a wrong
+          // *topology*, and one object appearing twice reads as broken in a way
+          // that a slightly-too-strong offset never does.
           //
           // The edge fade inside waterRefractUV still applies, so the sample
           // cannot walk off screen.
           this.refractUV = this.waterRefractUV(
             this.screenUV,
             this.uvBase,
-            pb.add(this.worldPos, pb.mul(this.refractDir, this.straightDist)),
+            pb.add(this.worldPos, pb.mul(this.refractDir, this.cheapRefractionDepth)),
             this.refractionScale
           );
           this.$return(pb.vec3(this.refractUV, this.refractPath));
@@ -1877,6 +1924,9 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
       // Dimensionless: the offset is derived in world space and projected, so
       // there is nothing here for the render size to scale.
       bindGroup.setValue('refractionScale', this._refractionScale);
+      if (this.refractionMode === 'offset') {
+        bindGroup.setValue('cheapRefractionDepth', this._cheapRefractionDepth);
+      }
       bindGroup.setValue('reflectionStrength', this._reflectionStrength);
       bindGroup.setValue('ssrParams', this._ssrParams);
       this._subsurfaceParams.setXYZW(this._subsurfaceIntensity, this._subsurfaceSteepness, 0, 0);

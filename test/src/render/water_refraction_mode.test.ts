@@ -66,6 +66,12 @@ function buildRefraction(type: (typeof DEVICE_TYPES)[number], mode: WaterRefract
       // never touches it, which is the point of the test below.
       this.Z_UniformLinearDepth = pb.tex2D().uniform(0);
       this.refractionScale = pb.float().uniform(0);
+      // Declared only for the cheap mode, mirroring the material: the accurate
+      // path has no use for it, and declaring it in both would make the
+      // "absent from the march variant" assertion below vacuous.
+      if (mode === 'offset') {
+        this.cheapRefractionDepth = pb.float().uniform(0);
+      }
       this.worldPos = pb.vec3().uniform(0);
       this.normal = pb.vec3().uniform(0);
       this.eyeVecNorm = pb.vec3().uniform(0);
@@ -149,5 +155,40 @@ describe('water refraction modes', () => {
   test('march is the default', () => {
     // The cheap mode is opt-in: a scene that says nothing gets the correct one.
     expect(new WaterMaterial().refractionMode).toBe('march');
+  });
+
+  test.each(DEVICE_TYPES)('the cheap offset does not scale with scene depth on %s', (type) => {
+    // The regression this pins is a ghost, not a wrong magnitude. Scaling the
+    // offset by the distance to whatever is behind the water is the physically
+    // sensible choice, and it doubles every object that breaks the surface: that
+    // distance collapses on the object and jumps to metres on the water beside
+    // it, so the water pixels carry an offset large enough to reach back onto
+    // the object and paint a second copy of it.
+    //
+    // Checked on the source because the alternative is a rendered scene, and a
+    // displaced copy of an object is exactly what a pixel metric cannot tell
+    // apart from the object legitimately seen through moving water.
+    const [, cheap] = buildRefraction(type, 'offset')!;
+    const body = cheap.slice(cheap.indexOf('waterRefraction('));
+    // The fixed depth scale is what it steps along.
+    expect(cheap).toContain('cheapRefractionDepth');
+    // The straight-line distance is a parameter of the function, so it is still
+    // in scope and still returned as the medium path - it just must not appear in
+    // the expression that places the sample. `waterRefractUV` is the only call
+    // that consumes the stepped point, so the argument built for it is what
+    // matters: assert the fixed scale reaches it.
+    const call = body.indexOf('waterRefractUV(');
+    expect(call).toBeGreaterThan(-1);
+    const args = body.slice(call, body.indexOf(')', body.indexOf('waterRefractUV(') + 200) + 1);
+    expect(args).toContain('cheapRefractionDepth');
+  });
+
+  test('the cheap depth is a uniform only in the cheap mode', () => {
+    // The accurate path has no use for it, and an unused uniform in the bind
+    // group is a value the caller has to keep meaningful for nothing.
+    const [, cheap] = buildRefraction('webgpu', 'offset')!;
+    const [, accurate] = buildRefraction('webgpu', 'march')!;
+    expect(cheap).toContain('cheapRefractionDepth');
+    expect(accurate).not.toContain('cheapRefractionDepth');
   });
 });
