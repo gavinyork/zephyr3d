@@ -6,7 +6,7 @@ import { Water } from '../../../scene/water';
 import { defineProps, type SerializableClass } from '../types';
 import type { WaveGenerator } from '../../../render';
 import { FBMWaveGenerator, FFTWaveGenerator } from '../../../render';
-import type { WaterMediumMode } from '../../../material/water';
+import type { WaterMediumMode, WaterRefractionMode } from '../../../material/water';
 import { DEFAULT_SCATTER_ANISOTROPY } from '../../../material/water';
 import type { Texture2D } from '@zephyr3d/device';
 import type { ResourceManager } from '../manager';
@@ -391,6 +391,25 @@ export function getWaterClass(manager: ResourceManager): SerializableClass {
           },
           set(this: Water, value) {
             this.material.mediumMode = value.str[0] as WaterMediumMode;
+          }
+        },
+        {
+          name: 'RefractionMode',
+          description:
+            'How the refracted view sample is located. March walks the refracted ray against the scene depth and samples where it lands, which keeps the sample on the object behind the water; Offset skips the search and displaces the screen UV by the wave normal, which costs no depth fetches but samples the wrong point. Use Offset on hardware that cannot afford the search.',
+          type: 'string',
+          default: 'march',
+          options: {
+            enum: {
+              labels: ['March (accurate)', 'Offset (cheap)'],
+              values: ['march', 'offset']
+            }
+          },
+          get(this: Water, value) {
+            value.str[0] = this.material.refractionMode;
+          },
+          set(this: Water, value) {
+            this.material.refractionMode = value.str[0] as WaterRefractionMode;
           }
         },
         {

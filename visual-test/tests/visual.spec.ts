@@ -103,6 +103,7 @@ const SCENE_NAMES = [
   'water-caustics-crest',
   'water-caustics-range-border',
   'water-surface-grazing',
+  'water-refraction-cheap',
   'water-subsurface-backlit',
   'water-foam-storm',
   'oit-weighted',

@@ -32,6 +32,30 @@ import { getDevice } from '../app/api';
  */
 export type WaterMediumMode = 'physical' | 'ramp';
 
+/**
+ * How the refracted view sample is located.
+ *
+ * - `march`: walk the refracted ray against the scene depth buffer and sample at
+ *   the first crossing. Correct in the ways that matter visually - the offset
+ *   tracks the object behind the water rather than sliding across its
+ *   silhouette, and something poking through the surface is not bent - at the
+ *   cost of {@link REFRACT_MARCH_STEPS} depth fetches per water pixel.
+ * - `offset`: displace the screen UV by the refraction of the wave normal alone,
+ *   with no search. One projection and no depth fetches. The sample no longer
+ *   lands where the ray actually goes, so what is seen through the water is
+ *   displaced by roughly the right amount in roughly the right direction but is
+ *   not the right point; a submerged object's edge smears rather than staying
+ *   put, and the medium tint is walked over the straight-line distance rather
+ *   than the refracted path.
+ *
+ * This is the knob to reach for on a device that cannot afford the march at all.
+ * The two agree on calm water viewed from above and diverge with wave steepness
+ * and view angle.
+ *
+ * @public
+ */
+export type WaterRefractionMode = 'march' | 'offset';
+
 /** Fresnel reflectance of water at normal incidence, for n = 1.333. */
 const WATER_F0 = 0.02;
 /** Specular roughness of water close enough that the waves are resolved. */
@@ -169,6 +193,7 @@ export const REFRACT_BLUR_MAX_LOD = 6;
 
 export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight) {
   private static readonly FEATURE_MEDIUM_MODE = this.defineFeature();
+  private static readonly FEATURE_REFRACTION_MODE = this.defineFeature();
   private static readonly _absorptionGrad = new Interpolator(
     'linear',
     'vec3',
@@ -291,6 +316,7 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
     this._foamParams = new Vector4();
     this.cullMode = 'none';
     this.useFeature(WaterMaterial.FEATURE_MEDIUM_MODE, 'physical' as WaterMediumMode);
+    this.useFeature(WaterMaterial.FEATURE_REFRACTION_MODE, 'march' as WaterRefractionMode);
     //this.TAADisabled = true;
   }
   /** {@inheritDoc Material.onDispose} */
@@ -353,6 +379,27 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
   set mediumMode(val: WaterMediumMode) {
     if (val !== this.mediumMode) {
       this.useFeature(WaterMaterial.FEATURE_MEDIUM_MODE, val);
+    }
+  }
+  /**
+   * How the refracted view sample is located. Defaults to `march`.
+   *
+   * `offset` trades correctness for cost: it drops the depth-buffer search
+   * entirely, which is {@link REFRACT_MARCH_STEPS} texture fetches per water
+   * pixel, and displaces the screen UV by the wave normal instead. Set it on
+   * hardware that cannot afford the search - the water still refracts, it just
+   * refracts to the wrong place.
+   *
+   * A compile-time feature rather than a uniform, so the cheap variant contains
+   * no trace of the march: the loop, its fetches and the projection matrices it
+   * needs are all absent from the emitted shader.
+   */
+  get refractionMode(): WaterRefractionMode {
+    return this.featureUsed<WaterRefractionMode>(WaterMaterial.FEATURE_REFRACTION_MODE) ?? 'march';
+  }
+  set refractionMode(val: WaterRefractionMode) {
+    if (val !== this.refractionMode) {
+      this.useFeature(WaterMaterial.FEATURE_REFRACTION_MODE, val);
     }
   }
   /** Absorption coefficient sigma_a in 1/m, per RGB channel. */
@@ -1016,6 +1063,7 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
     straightDist: PBShaderExp
   ) {
     const pb = scope.$builder;
+    const march = this.refractionMode === 'march';
     // Screen UV of a world position, through the same matrix the surface itself
     // was rasterised with.
     //
@@ -1057,116 +1105,123 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
     // negative that it has passed through it. Nothing is decided here about a hit
     // - the march applies the thickness-band test, which is what lets a surface
     // sticking out of the water fall through instead of being sampled.
-    pb.func(
-      'waterRefractStep',
-      [
-        pb.vec3('worldPos'),
-        pb.vec3('refractDir'),
-        pb.vec2('screenUV'),
-        pb.vec2('uvBase'),
-        pb.float('rayViewZ'),
-        pb.float('cameraFar'),
-        pb.float('t')
-      ],
-      function () {
-        this.$l.uv = this.waterRefractUV(
-          this.screenUV,
-          this.uvBase,
-          pb.add(this.worldPos, pb.mul(this.refractDir, this.t)),
-          this.refractionScale
-        );
-        this.$l.linearDepth = ShaderHelper.sampleLinearDepth(
-          this,
-          ShaderHelper.getLinearDepthTexture(this),
-          this.uv,
-          0
-        );
-        // View-space z of whatever that pixel shows. Normalized linear depth means
-        // the same thing under either depth convention - only the mapping from
-        // device depth to it flips - and the comparison below is in view space,
-        // which reverse-Z does not touch.
-        this.$l.sceneViewZ = pb.mul(pb.neg(this.linearDepth), this.cameraFar);
-        // Ray depth minus scene depth. The march decides a hit by whether this
-        // gap has fallen inside a band around zero - the ray is neither still in
-        // front of the surface nor already out the other side. Sky sits at the far
-        // plane, so over empty water the gap stays large and positive and the
-        // march simply runs on.
-        this.$return(pb.vec3(this.uv, pb.sub(this.rayViewZ, this.sceneViewZ)));
-      }
-    );
-    // March the refracted ray and take the first crossing with the depth buffer.
     //
-    // Advances `t` along the refracted ray in fixed steps and, at each step,
-    // reads the scene depth where the ray projects and compares it against the
-    // ray's own depth. A hit is a step that lands inside a thickness band around
-    // the surface - the ray is neither clearly in front of the scene nor already
-    // out the far side. That two-sided test is what lets something poking out of
-    // the water fall through: its depth is *nearest* the camera, so the gap is
-    // negative from the first step and never enters the band, instead of being
-    // read as a crossing the way a one-sided clamp did. Stopping at the *first*
-    // hit keeps a submerged object solid - a later one belongs to whatever is
-    // behind it, and reading that is exactly how the lower half of a box used to
-    // vanish. Fixed count keeps the shader uniform (an unbounded bisection would
-    // diverge between backends).
-    pb.func(
-      'waterRefractMarch',
-      [
-        pb.vec3('worldPos'),
-        pb.vec3('refractDir'),
-        pb.vec2('screenUV'),
-        pb.vec2('uvBase'),
-        pb.float('surfaceViewZ'),
-        pb.float('refractStepZ'),
-        pb.float('cameraFar'),
-        pb.float('maxPath'),
-        pb.float('basePath')
-      ],
-      function () {
-        this.$l.step = pb.div(pb.sub(this.maxPath, 0.05), pb.float(REFRACT_MARCH_STEPS));
-        this.$l.tPrev = pb.float(0.05);
-        this.$l.gapPrev = pb.float(1);
-        this.$l.hitUV = this.screenUV;
-        this.$l.hitPath = this.basePath;
-        this.$for(pb.float('i'), 0, REFRACT_MARCH_STEPS, function () {
-          this.$l.t = pb.add(this.tPrev, this.step);
-          this.$l.rayViewZ = pb.add(this.surfaceViewZ, pb.mul(this.refractStepZ, this.t));
-          this.$l.s = this.waterRefractStep(
-            this.worldPos,
-            this.refractDir,
+    // Declared only in `march` mode. This and `waterRefractMarch` are the whole
+    // cost the cheap mode exists to avoid, so the emitted shader must not carry
+    // them at all - a dead function still forces the depth texture and the
+    // projection matrices into the bind group.
+    if (march) {
+      pb.func(
+        'waterRefractStep',
+        [
+          pb.vec3('worldPos'),
+          pb.vec3('refractDir'),
+          pb.vec2('screenUV'),
+          pb.vec2('uvBase'),
+          pb.float('rayViewZ'),
+          pb.float('cameraFar'),
+          pb.float('t')
+        ],
+        function () {
+          this.$l.uv = this.waterRefractUV(
             this.screenUV,
             this.uvBase,
-            this.rayViewZ,
-            this.cameraFar,
-            this.t
+            pb.add(this.worldPos, pb.mul(this.refractDir, this.t)),
+            this.refractionScale
           );
-          this.$l.gap = this.s.z;
-          this.$if(
-            pb.or(
-              pb.lessThan(pb.abs(this.gap), REFRACT_MARCH_THICKNESS),
-              pb.lessThan(pb.mul(this.gapPrev, this.gap), 0)
-            ),
-            function () {
-              // Within the band, or the gap flipped sign this step: the ray is at
-              // the surface. Interpolate down to the exact crossing so the sample
-              // sits on the object instead of a step behind it.
-              this.$l.k = pb.div(this.gapPrev, pb.sub(this.gapPrev, this.gap));
-              this.hitUV = this.s.xy;
-              this.hitPath = pb.mix(this.tPrev, this.t, this.k);
-              this.$break();
-            }
-          ).$else(function () {
-            // Still in front of the scene, or already past it. Either way keep the
-            // step and note the gap so the band can be interpolated precisely.
-            this.tPrev = this.t;
-            this.gapPrev = this.gap;
+          this.$l.linearDepth = ShaderHelper.sampleLinearDepth(
+            this,
+            ShaderHelper.getLinearDepthTexture(this),
+            this.uv,
+            0
+          );
+          // View-space z of whatever that pixel shows. Normalized linear depth means
+          // the same thing under either depth convention - only the mapping from
+          // device depth to it flips - and the comparison below is in view space,
+          // which reverse-Z does not touch.
+          this.$l.sceneViewZ = pb.mul(pb.neg(this.linearDepth), this.cameraFar);
+          // Ray depth minus scene depth. The march decides a hit by whether this
+          // gap has fallen inside a band around zero - the ray is neither still in
+          // front of the surface nor already out the other side. Sky sits at the far
+          // plane, so over empty water the gap stays large and positive and the
+          // march simply runs on.
+          this.$return(pb.vec3(this.uv, pb.sub(this.rayViewZ, this.sceneViewZ)));
+        }
+      );
+      // March the refracted ray and take the first crossing with the depth buffer.
+      //
+      // Advances `t` along the refracted ray in fixed steps and, at each step,
+      // reads the scene depth where the ray projects and compares it against the
+      // ray's own depth. A hit is a step that lands inside a thickness band around
+      // the surface - the ray is neither clearly in front of the scene nor already
+      // out the far side. That two-sided test is what lets something poking out of
+      // the water fall through: its depth is *nearest* the camera, so the gap is
+      // negative from the first step and never enters the band, instead of being
+      // read as a crossing the way a one-sided clamp did. Stopping at the *first*
+      // hit keeps a submerged object solid - a later one belongs to whatever is
+      // behind it, and reading that is exactly how the lower half of a box used to
+      // vanish. Fixed count keeps the shader uniform (an unbounded bisection would
+      // diverge between backends).
+      pb.func(
+        'waterRefractMarch',
+        [
+          pb.vec3('worldPos'),
+          pb.vec3('refractDir'),
+          pb.vec2('screenUV'),
+          pb.vec2('uvBase'),
+          pb.float('surfaceViewZ'),
+          pb.float('refractStepZ'),
+          pb.float('cameraFar'),
+          pb.float('maxPath'),
+          pb.float('basePath')
+        ],
+        function () {
+          this.$l.step = pb.div(pb.sub(this.maxPath, 0.05), pb.float(REFRACT_MARCH_STEPS));
+          this.$l.tPrev = pb.float(0.05);
+          this.$l.gapPrev = pb.float(1);
+          this.$l.hitUV = this.screenUV;
+          this.$l.hitPath = this.basePath;
+          this.$for(pb.float('i'), 0, REFRACT_MARCH_STEPS, function () {
+            this.$l.t = pb.add(this.tPrev, this.step);
+            this.$l.rayViewZ = pb.add(this.surfaceViewZ, pb.mul(this.refractStepZ, this.t));
+            this.$l.s = this.waterRefractStep(
+              this.worldPos,
+              this.refractDir,
+              this.screenUV,
+              this.uvBase,
+              this.rayViewZ,
+              this.cameraFar,
+              this.t
+            );
+            this.$l.gap = this.s.z;
+            this.$if(
+              pb.or(
+                pb.lessThan(pb.abs(this.gap), REFRACT_MARCH_THICKNESS),
+                pb.lessThan(pb.mul(this.gapPrev, this.gap), 0)
+              ),
+              function () {
+                // Within the band, or the gap flipped sign this step: the ray is at
+                // the surface. Interpolate down to the exact crossing so the sample
+                // sits on the object instead of a step behind it.
+                this.$l.k = pb.div(this.gapPrev, pb.sub(this.gapPrev, this.gap));
+                this.hitUV = this.s.xy;
+                this.hitPath = pb.mix(this.tPrev, this.t, this.k);
+                this.$break();
+              }
+            ).$else(function () {
+              // Still in front of the scene, or already past it. Either way keep the
+              // step and note the gap so the band can be interpolated precisely.
+              this.tPrev = this.t;
+              this.gapPrev = this.gap;
+            });
           });
-        });
-        // No hit on any step - the ray left the water onto the sky, or the capped
-        // path never reached the scene - leaves the straight-through sample at the
-        // straight-line path, which is what a ray over empty water should show.
-        this.$return(pb.vec3(this.hitUV, this.hitPath));
-      }
-    );
+          // No hit on any step - the ray left the water onto the sky, or the capped
+          // path never reached the scene - leaves the straight-through sample at the
+          // straight-line path, which is what a ray over empty water should show.
+          this.$return(pb.vec3(this.hitUV, this.hitPath));
+        }
+      );
+    }
     pb.func(
       'waterRefraction',
       [
@@ -1229,58 +1284,83 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
           this.refractDir = this.waterCrossDir;
         });
         this.refractDir = pb.normalize(this.refractDir);
-        this.$l.refractDirView = pb.mul(ShaderHelper.getViewMatrix(this), pb.vec4(this.refractDir, 0)).xyz;
-        // Away from the camera the ray must travel, so a tangent one is clamped
-        // rather than allowed to shoot off, and the straight-line distance bounds
-        // the refracted path to a sane multiple of itself.
-        this.$l.refractStepZ = pb.min(this.refractDirView.z, -1e-4);
-        this.$l.maxPath = pb.mul(this.straightDist, REFRACT_MAX_PATH_RATIO);
         this.$l.refractUV = this.screenUV;
         this.$l.refractPath = this.straightDist;
-        // March the refracted ray until it meets the scene, then sample there.
-        // Walking the ray in fixed steps and keeping the first depth crossing is
-        // what stops the sample from jumping across a scene discontinuity (a box
-        // edge against the bed), which the two-probe solve did: it guessed at a
-        // path length, read the depth where the guess landed, and re-solved from
-        // that - so a guess a few pixels off the object's silhouette snapped to
-        // whatever was behind it, tearing the refraction across the object.
-        this.$l.marchResult = this.waterRefractMarch(
-          this.worldPos,
-          this.refractDir,
-          this.screenUV,
-          this.uvBase,
-          this.surfaceViewZ,
-          this.refractStepZ,
-          ShaderHelper.getCameraParams(this).y,
-          this.maxPath,
-          this.straightDist
-        );
-        this.refractUV = this.marchResult.xy;
-        this.refractPath = pb.clamp(this.marchResult.z, 0, this.maxPath);
-        // Something sticking out of the water may occlude the refracted sample
-        // even though the march kept going: the hit point can read the object's
-        // own depth where it pokes through, which is exactly the "object above
-        // the waterline looks bent" artifact. Reconstruct the scene point at the
-        // refracted UV and, if it sits above the surface, drop back to the
-        // straight-through sample rather than refracting the object.
-        this.$l.sceneHit = ShaderHelper.samplePositionFromDepth(
-          this,
-          ShaderHelper.getLinearDepthTexture(this),
-          this.refractUV,
-          ShaderHelper.getInvViewProjectionMatrix(this),
-          ShaderHelper.getCameraParams(this).xy
-        );
-        // Only a *finite* scene point above the surface is an object poking
-        // through - the sky's reconstructed point also sits high, but there is
-        // nothing to reject then.
-        this.$if(
-          pb.and(pb.lessThan(this.sceneHit.w, 0.999), pb.greaterThan(this.sceneHit.y, this.worldPos.y)),
-          function () {
-            this.refractUV = this.screenUV;
-            this.refractPath = this.straightDist;
-          }
-        );
-        this.$return(pb.vec3(this.refractUV, this.refractPath));
+        if (!march) {
+          // Cheap mode: place the hit at the straight-line distance along the
+          // refracted direction and sample there, with no search.
+          //
+          // Everything above is shared, and it is what makes this a usable
+          // approximation rather than a guess: `refractDir` is already the view
+          // line plus a wave-normal perturbation, so on calm water this lands
+          // exactly where the march would - on the point behind the surface -
+          // and the wave tilt is what moves it away. What is given up is the
+          // search: the sample is at a *guessed* depth, so where the true hit is
+          // nearer or further the offset is wrong in proportion, and a submerged
+          // silhouette smears instead of holding still. The medium path stays
+          // the straight-line distance for the same reason.
+          //
+          // The edge fade inside waterRefractUV still applies, so the sample
+          // cannot walk off screen.
+          this.refractUV = this.waterRefractUV(
+            this.screenUV,
+            this.uvBase,
+            pb.add(this.worldPos, pb.mul(this.refractDir, this.straightDist)),
+            this.refractionScale
+          );
+          this.$return(pb.vec3(this.refractUV, this.refractPath));
+        } else {
+          this.$l.refractDirView = pb.mul(ShaderHelper.getViewMatrix(this), pb.vec4(this.refractDir, 0)).xyz;
+          // Away from the camera the ray must travel, so a tangent one is clamped
+          // rather than allowed to shoot off, and the straight-line distance bounds
+          // the refracted path to a sane multiple of itself.
+          this.$l.refractStepZ = pb.min(this.refractDirView.z, -1e-4);
+          this.$l.maxPath = pb.mul(this.straightDist, REFRACT_MAX_PATH_RATIO);
+          // March the refracted ray until it meets the scene, then sample there.
+          // Walking the ray in fixed steps and keeping the first depth crossing is
+          // what stops the sample from jumping across a scene discontinuity (a box
+          // edge against the bed), which the two-probe solve did: it guessed at a
+          // path length, read the depth where the guess landed, and re-solved from
+          // that - so a guess a few pixels off the object's silhouette snapped to
+          // whatever was behind it, tearing the refraction across the object.
+          this.$l.marchResult = this.waterRefractMarch(
+            this.worldPos,
+            this.refractDir,
+            this.screenUV,
+            this.uvBase,
+            this.surfaceViewZ,
+            this.refractStepZ,
+            ShaderHelper.getCameraParams(this).y,
+            this.maxPath,
+            this.straightDist
+          );
+          this.refractUV = this.marchResult.xy;
+          this.refractPath = pb.clamp(this.marchResult.z, 0, this.maxPath);
+          // Something sticking out of the water may occlude the refracted sample
+          // even though the march kept going: the hit point can read the object's
+          // own depth where it pokes through, which is exactly the "object above
+          // the waterline looks bent" artifact. Reconstruct the scene point at the
+          // refracted UV and, if it sits above the surface, drop back to the
+          // straight-through sample rather than refracting the object.
+          this.$l.sceneHit = ShaderHelper.samplePositionFromDepth(
+            this,
+            ShaderHelper.getLinearDepthTexture(this),
+            this.refractUV,
+            ShaderHelper.getInvViewProjectionMatrix(this),
+            ShaderHelper.getCameraParams(this).xy
+          );
+          // Only a *finite* scene point above the surface is an object poking
+          // through - the sky's reconstructed point also sits high, but there is
+          // nothing to reject then.
+          this.$if(
+            pb.and(pb.lessThan(this.sceneHit.w, 0.999), pb.greaterThan(this.sceneHit.y, this.worldPos.y)),
+            function () {
+              this.refractUV = this.screenUV;
+              this.refractPath = this.straightDist;
+            }
+          );
+          this.$return(pb.vec3(this.refractUV, this.refractPath));
+        }
       }
     );
     return scope.waterRefraction(

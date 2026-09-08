@@ -8,6 +8,7 @@ import type { Drawable, DrawContext, PickTarget, PrimitiveInstanceInfo, RenderQu
 import { Primitive } from '../render';
 import { Clipmap, FBMWaveGenerator } from '../render';
 import { WaterMaterial } from '../material/water';
+import type { WaterRefractionMode } from '../material/water';
 import type { AbstractDevice, BindGroup, FrameBuffer, GPUProgram, RenderStateSet } from '@zephyr3d/device';
 import { QUEUE_OPAQUE } from '../values';
 import { BoundingBox } from '../utility/bounding_volume';
@@ -187,6 +188,21 @@ export class Water extends applyMixins(GraphNode, mixinDrawable) implements Draw
   }
   set sunScatteringIntensity(val: number) {
     this.material.sunScatteringIntensity = val;
+  }
+  /**
+   * How the refracted view sample is located. Defaults to `march`.
+   *
+   * `offset` drops the depth-buffer search - a fixed number of texture fetches
+   * per water pixel - and displaces the screen UV by the wave normal instead.
+   * The water still refracts, but to the wrong point: a submerged silhouette
+   * smears rather than holding still. Set it on hardware that cannot afford the
+   * search.
+   */
+  get refractionMode() {
+    return this.material.refractionMode;
+  }
+  set refractionMode(val: WaterRefractionMode) {
+    this.material.refractionMode = val;
   }
   /**
    * Scale on how much the medium blurs what is seen through it, 1 for the width

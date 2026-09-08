@@ -12,7 +12,7 @@ import {
 } from '@zephyr3d/scene';
 import type { Scene } from '@zephyr3d/scene';
 import type { VisualScene } from '../types';
-import { bareScene, placeCamera } from './common';
+import { bareScene, placeCamera, proceduralTexture } from './common';
 
 // Steep and close. A shallow view angle makes the light path through the water
 // long enough that the medium swallows the sea bed, and the bed is the only
@@ -668,5 +668,76 @@ export const waterCausticsDeepBed: VisualScene = {
     deepBed(ctx.scene, true);
     placeCamera(ctx.camera, new Vector3(14, 22, 20), new Vector3(0, -DEEP_BED_DEPTH, 0));
     ctx.camera.far = 120;
+  }
+};
+
+/**
+ * The cheap refraction mode, over a bed with a hard edge to displace.
+ *
+ * `refractionMode = 'offset'` drops the depth-buffer search that locates where
+ * the refracted ray actually meets the scene - {@link REFRACT_MARCH_STEPS}
+ * fetches per water pixel - and displaces the screen UV by the wave normal
+ * instead. This scene exists to pin that the cheap path still refracts: a
+ * regression that reduces it to a straight-through sample leaves the checker
+ * under the water undistorted, which is the failure this cannot otherwise
+ * detect, because a wrong-but-plausible displacement looks like water either
+ * way.
+ *
+ * The bed is checkered rather than plain, and a box sits on it: the mode's
+ * characteristic error is that a submerged silhouette smears instead of holding
+ * still, so the frame has to contain a silhouette. Sharing the geometry with
+ * `water-caustics-*` would not do - those beds are flat and matte, and the
+ * difference between a searched and a guessed hit is invisible on a surface with
+ * no features to displace.
+ *
+ * Waves are steep on purpose. The two modes agree exactly on calm water viewed
+ * from above - `refractDir` is the view line plus a wave-normal perturbation, so
+ * with no perturbation the guessed hit *is* the true one - and diverge with
+ * steepness, so a calm scene here would pin nothing.
+ */
+export const waterRefractionCheap: VisualScene = {
+  name: 'water-refraction-cheap',
+  description:
+    'Steep water over a checkered bed with a submerged box, using the cheap offset refraction mode. Pins that the no-search path still displaces what is behind the water: a regression to a straight-through sample leaves the checker undistorted, and one that loses the border fade smears the frame edge along the waterline.',
+  frames: 3,
+  setup({ scene, camera }) {
+    bareScene(scene);
+    scene.env.light.type = 'constant';
+    scene.env.light.ambientColor = new Vector4(0.12, 0.15, 0.18, 1);
+    const light = new DirectionalLight(scene);
+    light.lookAt(new Vector3(-3, 10, 4), Vector3.zero(), Vector3.axisPY());
+    light.color = new Vector4(1, 0.97, 0.9, 1);
+    light.castShadow = true;
+    light.shadow.applyQualityPreset('character-small');
+
+    const bedDepth = 2.2;
+    // Checkered, so a displacement of the refracted sample is visible at all.
+    const bedMaterial = new LambertMaterial();
+    bedMaterial.albedoTexture = proceduralTexture();
+    const bed = new Mesh(scene, new PlaneShape({ size: 40 }), bedMaterial);
+    bed.position.setXYZ(0, -bedDepth, 0);
+
+    // A silhouette under the water, which is where the cheap mode's error shows.
+    const box = new Mesh(scene, new BoxShape({ size: 1.4 }), lambert(new Vector4(0.6, 0.3, 0.25, 1)));
+    box.position.setXYZ(2, -bedDepth + 0.7, -1);
+
+    const water = new Water(scene);
+    water.scale.setXYZ(20, 1, 20);
+    water.position.setXYZ(0, 0, 0);
+    const waves = new FBMWaveGenerator();
+    waves.numOctaves = 5;
+    waves.wind = new Vector2(0.5, 0.2);
+    // Steeper than the caustics scenes: the two modes are identical on flat
+    // water, so the wave slope is what this scene is actually testing.
+    waves.amplitude = 0.22;
+    waves.frequency = 6;
+    water.waveGenerator = waves;
+    water.material.absorption = new Vector3(0.22, 0.06, 0.04);
+    water.material.scattering = new Vector3(0.02, 0.04, 0.05);
+    water.material.refractionMode = 'offset';
+    water.causticsEnabled = false;
+
+    placeCamera(camera, new Vector3(0, 7, 9), new Vector3(0, -1.5, 0));
+    camera.far = 80;
   }
 };
