@@ -1431,6 +1431,14 @@ export class ShaderHelper {
    * the global bind group hash fold this in, so a program that declares the
    * caustic uniforms is always paired with a bind group that supplies them.
    *
+   * Deliberately a function of the draw context alone, with no material input.
+   * The caustic uniforms sit in the global bind group, whose layout is built
+   * once per {@link DrawContext.renderPassHash} and shared by every material in
+   * the pass, so the declarations have to be uniform across the pass. A material
+   * that must not receive caustics - water itself - opts out of the sampling
+   * instead, through `receivesWaterCaustics()`; the uniforms stay declared and
+   * simply go unread.
+   *
    * @param ctx - Current draw context.
    * @returns True when the caustic uniforms take part in this pass.
    * @internal

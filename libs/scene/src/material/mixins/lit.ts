@@ -24,6 +24,7 @@ export type IMixinLight = {
   normalFlipY: boolean;
   normalMapMode: 'tangent-space' | 'object-space';
   doubleSidedLighting: boolean;
+  receivesWaterCaustics(): boolean;
   needCalculateEnvLight(): boolean;
   getUniformNormalScale(scope: PBInsideFunctionScope): PBShaderExp;
   getEnvLightIrradiance(scope: PBInsideFunctionScope, normal: PBShaderExp): PBShaderExp;
@@ -566,6 +567,30 @@ export function mixinLight<T extends typeof MeshMaterial>(BaseCls: T) {
       }
       return ShaderHelper.calculateShadow(scope, worldPos, worldNormal, NoL, this.drawContext);
     }
+    /**
+     * Whether this material's fragments are lit through water and so pick up the
+     * water caustics.
+     *
+     * True for ordinary surfaces, which may sit under a water body. A water
+     * surface itself must override this to false: the caustic lookup decides
+     * whether a fragment is submerged by comparing its own height against the
+     * displaced surface height on its *sun ray*, and those are two different
+     * points on the water unless the sun is exactly overhead. Under a tilted sun
+     * every water fragment has some other part of the surface upstream of it, so
+     * a fragment in a trough is read as being under the crest up-sun of it and
+     * gets the caustic pattern - whose peaks are well above 1 - painted onto the
+     * water as bright blotches that swim with the waves.
+     *
+     * Only the sampling is gated, not the uniform declarations: the caustic
+     * uniforms live in the pass-wide global bind group, whose layout is built
+     * once per {@link DrawContext.renderPassHash} and shared by every material
+     * drawn in that pass, so it cannot vary per material.
+     *
+     * @returns True when the water caustics modulate this material's lighting.
+     */
+    receivesWaterCaustics(): boolean {
+      return true;
+    }
     private getClusterIndex(scope: PBInsideFunctionScope, fragCoord: PBShaderExp) {
       const pb = scope.$builder;
       const funcName = 'lm_getClusterIndex';
@@ -683,13 +708,9 @@ export function mixinLight<T extends typeof MeshMaterial>(BaseCls: T) {
       // matters because a shadow-casting sun goes through the clustered path
       // when the screen-space shadow mask is on and through a per-light additive
       // pass when it is off.
-      const caustic = ShaderHelper.calculateWaterCaustic(
-        scope,
-        worldPos.xyz,
-        type,
-        dirCutoff.xyz,
-        this.drawContext
-      );
+      const caustic = this.receivesWaterCaustics()
+        ? ShaderHelper.calculateWaterCaustic(scope, worldPos.xyz, type, dirCutoff.xyz, this.drawContext)
+        : null;
       return caustic ? pb.mul(caustic, attenuation) : attenuation;
     }
     calculateLightDirection(

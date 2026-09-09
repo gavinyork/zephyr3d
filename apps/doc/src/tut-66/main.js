@@ -115,17 +115,18 @@ function buildOceanScene() {
 
   const water = new Water(scene);
   water.scale.setXYZ(5000, 1, 5000);
-  water.position.setXYZ(0, 0, 0);
+  water.position.setXYZ(0, 2, 0);
   water.gridScale = 1;
-  water.animationSpeed = 1;
+  water.animationSpeed = 2;
+  //water.infinite = true;
 
   // FFT rather than FBM, so the surface genuinely folds - that is what feeds
   // both the foam and cresting here.
   const waves = new FFTWaveGenerator();
-  waves.wind = new Vector2(14, 5);
-  waves.setWaveLength(0, 120);
-  waves.setWaveLength(1, 30);
-  waves.setWaveLength(2, 6);
+  waves.wind = new Vector2(24, 5);
+  waves.setWaveLength(0, 400);
+  waves.setWaveLength(1, 100);
+  waves.setWaveLength(2, 16);
   waves.setWaveStrength(0, 0.7);
   waves.setWaveStrength(1, 0.8);
   waves.setWaveStrength(2, 0.9);
@@ -133,7 +134,7 @@ function buildOceanScene() {
   waves.setWaveCroppiness(1, -2);
   waves.setWaveCroppiness(2, -1.4);
   waves.foamWidth = 1.1;
-  waves.foamContrast = 2.5;
+  waves.foamContrast = 3;
   water.waveGenerator = waves;
 
   // Turbid open-ocean water: the bed fades with depth, so only the shallow

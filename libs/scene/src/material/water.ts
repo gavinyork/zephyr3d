@@ -981,6 +981,23 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
   supportLighting() {
     return true;
   }
+  /**
+   * {@inheritDoc IMixinLight.receivesWaterCaustics}
+   *
+   * Always false. Caustics belong on whatever the water is above, not on the
+   * water: the submersion test compares a fragment's own height against the
+   * displaced surface height sampled on that fragment's sun ray, and unless the
+   * sun is exactly overhead those are two points on the surface a distance
+   * `depth / tan(elevation)` apart. Every water fragment therefore has some
+   * other part of the same surface up-sun of it, and wherever that part rides a
+   * crest while the fragment sits in a trough the fragment reads as submerged
+   * and gets the caustic pattern applied to it. The pattern peaks well above 1,
+   * so it shows up as bright blotches drifting across the surface with the
+   * waves.
+   */
+  receivesWaterCaustics(): boolean {
+    return false;
+  }
   vertexShader(scope: PBFunctionScope) {
     super.vertexShader(scope);
     const pb = scope.$builder;
@@ -1884,23 +1901,27 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
           pb.normalize(pb.sub(this.worldPos, ShaderHelper.getCameraPosition(this))),
           this.normal
         );
-        // A steep wave face can reflect downwards, where the sky bake holds
-        // nothing useful. Mirroring the ray back up stays continuous through
-        // the horizon; the old clamp collapsed every direction below y = 0.1
-        // onto one ring and wiped out the grazing-angle detail that is the most
-        // visible part of a water reflection.
-        this.refl.y = pb.abs(this.refl.y);
-        // Grazing rays land on the bake's lower hemisphere, which the atmosphere
-        // deliberately renders nearly black - it is what is below the ground,
-        // not what a flat water surface reflects. An eye nearly at water level
-        // reflects the sky right at the horizon, i.e. the upper hemisphere's
-        // very edge, so the most horizontal reflection directions sample the
-        // black terminator and the far ocean reads as a dark band. Flooring the
-        // y and re-normalising keeps only those directions on the bright side of
-        // the seam; a reflection already pointing into the sky is untouched, so
-        // a normal sea is unchanged. A floor rather than a soft lift on purpose:
-        // the terminator is a hard feature of the bake, and smoothing over it
-        // nudges every grazing reflection rather than only the degenerate ones.
+        // Rays reflecting downwards, and grazing ones, land on the bake's lower
+        // hemisphere, which the atmosphere deliberately renders nearly black -
+        // it is what is below the ground, not what a flat water surface
+        // reflects. An eye nearly at water level reflects the sky right at the
+        // horizon, i.e. the upper hemisphere's very edge, so the most horizontal
+        // reflection directions sample the black terminator and the far ocean
+        // reads as a dark band. Flooring the y and re-normalising pins those
+        // directions just above the horizon, which is roughly what a grazing
+        // reflection does see; a reflection already pointing into the sky is
+        // untouched, so a normal sea is unchanged. A floor rather than a soft
+        // lift on purpose: the terminator is a hard feature of the bake, and
+        // smoothing over it nudges every grazing reflection rather than only the
+        // degenerate ones.
+        //
+        // Mirroring the downward rays instead (refl.y = abs(refl.y)) used to
+        // stand here in place of this floor, and briefly ahead of it. It is
+        // wrong on its own terms - a ray 30 degrees down becomes one 30 degrees
+        // up, sampling a patch of sky unrelated to what the wave face reflects,
+        // which reads as an over-bright reflection that jumps around with the
+        // face's tilt - and ahead of the floor it also mooted it, since the
+        // floor then only ever saw values that were already positive.
         this.refl.y = pb.max(this.refl.y, HORIZON_REFLECT_BIAS);
         this.refl = pb.normalize(this.refl);
         this.reflectance = pb.mix(
