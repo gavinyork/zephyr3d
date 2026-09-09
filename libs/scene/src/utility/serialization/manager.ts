@@ -11,6 +11,7 @@ import {
 import type { PropertyAccessor, PropertyType, PropertyValue, SerializableClass } from './types';
 import { getAABBClass } from './scene/misc';
 import { getGraphNodeClass, getSceneNodeClass } from './scene/node';
+import { getGPUClothComponentClass } from './scene/cloth';
 import { getBatchGroupClass } from './scene/batch';
 import { getCameraClass, getPerspectiveCameraClass, getOrthoCameraClass } from './scene/camera';
 import {
@@ -302,6 +303,7 @@ export class ResourceManager {
         getSkinBindingClass(),
         getJointDynamicsModifierClass(),
         getSpringModifierClass(),
+        getGPUClothComponentClass(),
         getAnimationClass(this),
         getPropTrackClass(this),
         getNodeRotationTrackClass(),

@@ -19,6 +19,7 @@ import {
   AnimationClip,
   JointDynamicsModifier,
   SpringModifier,
+  GPUClothComponent,
   NodeRotationTrack,
   NodeScaleTrack,
   NodeTranslationTrack
@@ -857,6 +858,44 @@ export function getSceneNodeClass(manager: ResourceManager): SerializableClass {
                   current++;
                 }
               }
+            }
+          }
+        },
+        {
+          name: 'GPUClothComponents',
+          description: 'GPU cloth simulations owned by this object',
+          type: 'object_array',
+          phase: 4,
+          readonly: true,
+          options: {
+            objectTypes: [GPUClothComponent]
+          },
+          isPersistent(this: SceneNode) {
+            return !this._prefabId || guessMimeType(this._prefabId) === mimeTypeOf('.zprefab');
+          },
+          getDefaultValue(this: SceneNode) {
+            return this.gpuClothComponents;
+          },
+          get(this: SceneNode, value) {
+            value.object = this.gpuClothComponents;
+          },
+          set(this: SceneNode, value) {
+            this.gpuClothComponents = (value.object as GPUClothComponent[]).filter(
+              (component) => component instanceof GPUClothComponent
+            );
+          },
+          add(this: SceneNode, value, index) {
+            const components = [...this.gpuClothComponents];
+            const component = value.object?.[0];
+            if (component instanceof GPUClothComponent) {
+              components.splice(index ?? components.length, 0, component);
+              this.gpuClothComponents = components;
+            }
+          },
+          delete(this: SceneNode, index) {
+            const component = this.gpuClothComponents[index];
+            if (component) {
+              this.removeGPUClothComponent(component);
             }
           }
         },
