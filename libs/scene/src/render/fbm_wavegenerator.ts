@@ -300,7 +300,7 @@ export class FBMWaveGenerator extends Disposable implements WaveGenerator {
     outAABB.maxPoint.setXYZ(maxX, y + maxHeight, maxZ);
   }
   /** {@inheritDoc WaveGenerator.calcFragmentNormal} */
-  calcFragmentNormal(scope: PBInsideFunctionScope, xz: PBShaderExp) {
+  calcFragmentNormal(scope: PBInsideFunctionScope, xz: PBShaderExp, _vertexNormal: PBShaderExp) {
     const pb = scope.$builder;
     const that = this;
     pb.func('calcFragmentNormal', [pb.vec2('xz')], function () {
@@ -320,8 +320,8 @@ export class FBMWaveGenerator extends Disposable implements WaveGenerator {
     return scope.calcFragmentNormal(xz) as PBShaderExp;
   }
   /** {@inheritDoc WaveGenerator.calcFragmentNormalAndFoam} */
-  calcFragmentNormalAndFoam(scope: PBInsideFunctionScope, xz: PBShaderExp) {
-    return scope.$builder.vec4(this.calcFragmentNormal(scope, xz), 0);
+  calcFragmentNormalAndFoam(scope: PBInsideFunctionScope, xz: PBShaderExp, _vertexNormal: PBShaderExp) {
+    return scope.$builder.vec4(this.calcFragmentNormal(scope, xz, _vertexNormal), 0);
   }
   /** {@inheritDoc WaveGenerator.setupUniforms} */
   setupUniforms(scope: PBGlobalScope, uniformGroup: number) {

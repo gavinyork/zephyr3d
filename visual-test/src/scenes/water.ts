@@ -536,6 +536,84 @@ export const waterFoamStorm: VisualScene = {
 };
 
 /**
+ * A Gerstner storm sea, close enough that the crests of several long waves
+ * coincide and fold.
+ *
+ * Where `water-foam-storm` gets foam from the FFT generator, this pins the
+ * Gerstner generator's own foam: the horizontal-displacement Jacobian, computed
+ * analytically per wave in the fragment shader, must produce the same folded-
+ * crest foam the FFT path does. Gerstner needs fewer waves to fold than FFT -
+ * each wave is a full finite-amplitude shape whose horizontal displacement
+ * sharpens its own crest - so four steep waves are enough, which is also what
+ * makes the baseline cheap while still exercising the Jacobian against a crest
+ * that actually overlaps.
+ *
+ * Steepness above 1.5 is deliberate: the generator divides each wave's
+ * horizontal displacement by `numWaves`, so the fold limit is on the *sum* of
+ * steepness, not a single wave - at 1.7+1.6+1.55+1.45 over four waves (~1.5x
+ * the count) the combined crest actually folds, and the determinant that gates
+ * the foam crosses the threshold. Below that a Gerstner wave never folds and
+ * the foam stays at zero. Foam must appear on the folded crests and nowhere on
+ * the open water between them.
+ */
+export const waterFoamGerstner: VisualScene = {
+  name: 'water-foam-gerstner',
+  description:
+    'A Gerstner storm sea of four steep waves. Pins the analytic Jacobian foam in the Gerstner generator: folded crests must be covered, open water between them not. A regression that leaves the foam channel at zero, or gates foam on the wrong sign of the determinant, shows up here as a bare storm.',
+  frames: 3,
+  setup({ scene, camera }) {
+    bareScene(scene);
+    scene.env.sky.skyType = 'scatter';
+    scene.env.light.type = 'ibl';
+
+    // Weak and high: an overcast day, where the ambient dominates, so the foam
+    // is lit mostly by the sky and the baseline pins the ambient path.
+    const light = new DirectionalLight(scene);
+    light.lookAt(new Vector3(-10, 16, 12), Vector3.zero(), Vector3.axisPY());
+    light.color = new Vector4(1, 0.98, 0.95, 1);
+    light.intensity = 6;
+    light.castShadow = true;
+    light.shadow.applyQualityPreset('outdoor-large');
+
+    const water = new Water(scene);
+    water.scale.setXYZ(200, 1, 200);
+    water.position.setXYZ(0, 0, 0);
+    const waves = new GerstnerWaveGenerator();
+    waves.numWaves = 4;
+    // All parameters set explicitly, because the constructor draws the initial
+    // ones from Math.random(). The first three angles are near each other so
+    // their crests coincide in space - the generator divides each wave's
+    // horizontal displacement by numWaves, so the fold limit is on the *sum* of
+    // steepness; 1.7+1.6+1.55+1.45 over four waves is ~1.5x the count, enough
+    // to fold. The fourth crosses them at a right angle so the foam breaks into
+    // patches where the crests interfere instead of running as one straight line.
+    const wave = (i: number, angle: number, amplitude: number, length: number, steepness: number) => {
+      waves.setWaveDirection(i, angle);
+      waves.setWaveSteepness(i, steepness);
+      waves.setWaveAmplitude(i, amplitude);
+      waves.setWaveLength(i, length);
+      waves.setOmniWave(i, false);
+    };
+    wave(0, 0.0, 0.42, 18, 1.7);
+    wave(1, 0.3, 0.3, 11, 1.6);
+    wave(2, -0.28, 0.24, 7, 1.55);
+    wave(3, 0.9, 0.18, 4.5, 1.45);
+    // Foam threshold tuned so only the *deepest* fold - the crest of the
+    // combined wave, not its whole flank - turns white; the contrast makes the
+    // white sit in tight patches along the crest rather than a broad sheet.
+    waves.foamWidth = 0.55;
+    waves.foamContrast = 3.2;
+    water.waveGenerator = waves;
+    water.material.absorption = new Vector3(0.4, 0.14, 0.09);
+    water.material.scattering = new Vector3(0.06, 0.12, 0.15);
+    water.causticsEnabled = false;
+
+    placeCamera(camera, new Vector3(0, 5, 14), new Vector3(0, 1.5, -20));
+    camera.far = 500;
+  }
+};
+
+/**
  * A small pool over a deep floor, with the camera sliding sideways as it
  * renders.
  *

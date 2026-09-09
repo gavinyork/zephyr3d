@@ -53,7 +53,13 @@ import {
 } from './scene/primitive';
 import { getSceneClass } from './scene/scene';
 import { getTerrainClass } from './scene/terrain';
-import { getWaterClass, getFFTWaveGeneratorClass, getFBMWaveGeneratorClass } from './scene/water';
+import {
+  getWaterClass,
+  getFFTWaveGeneratorClass,
+  getFBMWaveGeneratorClass,
+  getGerstnerWaveGeneratorClass,
+  getGerstnerWaveClass
+} from './scene/water';
 import { getHairNodeClass } from './scene/hair';
 import { getMSDFTextClass, getMSDFTextSpriteClass, getTextSpriteClass } from './scene/text';
 import {
@@ -324,6 +330,8 @@ export class ResourceManager {
         getTerrainClass(this),
         getFFTWaveGeneratorClass(),
         getFBMWaveGeneratorClass(),
+        getGerstnerWaveGeneratorClass(),
+        getGerstnerWaveClass(),
         getParticleNodeClass(),
         getPunctualLightClass(),
         getDirectionalLightClass(),

@@ -1,4 +1,4 @@
-import { Disposable, type AABB } from '@zephyr3d/base';
+import { Disposable, PRNG, type AABB } from '@zephyr3d/base';
 import type { WaveGenerator } from './wavegenerator';
 import type { BindGroup, PBGlobalScope, PBInsideFunctionScope, PBShaderExp } from '@zephyr3d/device';
 import { ShaderHelper } from '../material';
@@ -12,28 +12,34 @@ export class GerstnerWaveGenerator extends Disposable implements WaveGenerator {
   private _version: number;
   private _waveParams: Float32Array<ArrayBuffer>;
   private _numWaves: number;
+  private _rand: PRNG;
+  private readonly _foamParams: Float32Array<ArrayBuffer>;
   /**
    * Creates a new Gerstner wave generator.
    */
-  constructor() {
+  constructor(randomSeed = 0) {
     super();
     this._waveParams = new Float32Array(8 * MAX_GERSTNER_WAVE_COUNT);
+    this._rand = new PRNG(randomSeed);
     this.randomWave(0);
     this.randomWave(1);
     this.randomWave(2);
     this.randomWave(3);
     this._numWaves = 4;
     this._version = 0;
+    // Same defaults as the FFT generator, so switching between the two does not
+    // change the foam response out of the box.
+    this._foamParams = new Float32Array([1.2, 7.2]);
   }
   /** @internal */
-  static randomWaveData(array: Float32Array, offset: number) {
-    array[offset + 0] = Math.random() * Math.PI * 2;
-    array[offset + 1] = Math.random() * 0.5 + 0.5;
-    array[offset + 2] = Math.random() * 0.1;
-    array[offset + 3] = Math.random() * 10;
-    array[offset + 4] = Math.random() * 100 - 50;
+  static randomWaveData(rand: PRNG, array: Float32Array, offset: number) {
+    array[offset + 0] = rand.get() * Math.PI * 2;
+    array[offset + 1] = rand.get() * 0.5 + 0.5;
+    array[offset + 2] = rand.get() * 0.1;
+    array[offset + 3] = rand.get() * 10;
+    array[offset + 4] = rand.get() * 100 - 50;
     array[offset + 5] = 0;
-    array[offset + 6] = Math.random() * 100 - 50;
+    array[offset + 6] = rand.get() * 100 - 50;
     array[offset + 7] = 0;
   }
   /** @internal */
@@ -44,7 +50,11 @@ export class GerstnerWaveGenerator extends Disposable implements WaveGenerator {
     const other = new GerstnerWaveGenerator();
     other.numWaves = this.numWaves;
     other._waveParams.set(this._waveParams);
+    other._foamParams.set(this._foamParams);
     return other as this;
+  }
+  get rand() {
+    return this._rand;
   }
   get version() {
     return this._version;
@@ -68,21 +78,38 @@ export class GerstnerWaveGenerator extends Disposable implements WaveGenerator {
   }
   /** Delete wave at index */
   deleteWave(index: number) {
+    if (index < 0 || index >= this._numWaves) {
+      return;
+    }
     for (let i = index; i < this._numWaves - 1; i++) {
       for (let j = 0; j < 8; j++) {
         this._waveParams[i * 8 + j] = this._waveParams[(i + 1) * 8 + j];
       }
     }
     this._numWaves--;
+    this._version++;
   }
-  /** Delete wave at index */
+  /** Insert a wave slot at index, shifting the subsequent waves up */
   insertWave(index: number) {
-    for (let i = index; i < this._numWaves - 1; i++) {
+    // Bounded by the parameter buffer; the shader reads this many slots.
+    if (this._numWaves >= MAX_GERSTNER_WAVE_COUNT) {
+      return;
+    }
+    // Shift from the tail backwards so the gap opens at `index` without
+    // overwriting the slot that is about to move. Copying forward here would
+    // duplicate `waveParams[index]` into every later slot instead of moving
+    // them up. The new slot is filled with a random wave rather than left at
+    // zero: a zero wavelength makes `w = 2*PI / length` infinite and drives the
+    // vertex shader into NaN, which collapses the whole surface, so the slot
+    // has to be a valid wave even before the caller writes its parameters.
+    for (let i = this._numWaves - 1; i >= index; i--) {
       for (let j = 0; j < 8; j++) {
         this._waveParams[(i + 1) * 8 + j] = this._waveParams[i * 8 + j];
       }
     }
+    this.randomWave(index);
     this._numWaves++;
+    this._version++;
   }
   /**
    * Sets the angle of the wave direction in radians.
@@ -179,6 +206,26 @@ export class GerstnerWaveGenerator extends Disposable implements WaveGenerator {
       this._version++;
     }
   }
+  /** Gets the foam width. */
+  get foamWidth() {
+    return this._foamParams[0];
+  }
+  set foamWidth(val) {
+    if (val !== this._foamParams[0]) {
+      this._foamParams[0] = val;
+      this._version++;
+    }
+  }
+  /** Gets the foam contrast. */
+  get foamContrast() {
+    return this._foamParams[1];
+  }
+  set foamContrast(val) {
+    if (val !== this._foamParams[1]) {
+      this._foamParams[1] = val;
+      this._version++;
+    }
+  }
   /**
    * Gets the X coordinate of the wave origin if it is an omni-directional wave.
    * @param waveIndex - index of the wave to set.
@@ -210,7 +257,7 @@ export class GerstnerWaveGenerator extends Disposable implements WaveGenerator {
   }
   /** @internal */
   randomWave(i: number) {
-    GerstnerWaveGenerator.randomWaveData(this._waveParams, i * 8);
+    GerstnerWaveGenerator.randomWaveData(this._rand, this._waveParams, i * 8);
   }
   /** {@inheritDoc WaveGenerator.update} */
   update() {}
@@ -231,7 +278,7 @@ export class GerstnerWaveGenerator extends Disposable implements WaveGenerator {
     outAABB.maxPoint.setXYZ(maxX, y + maxHeight, maxZ);
   }
   /** {@inheritDoc WaveGenerator.calcFragmentNormal} */
-  calcFragmentNormal(scope: PBInsideFunctionScope, xz: PBShaderExp) {
+  calcFragmentNormal(scope: PBInsideFunctionScope, xz: PBShaderExp, _vertexNormal: PBShaderExp) {
     const pb = scope.$builder;
     const that = this;
     pb.func('calcFragmentNormal', [pb.vec2('xz')], function () {
@@ -244,14 +291,68 @@ export class GerstnerWaveGenerator extends Disposable implements WaveGenerator {
     return scope.calcFragmentNormal(xz) as PBShaderExp;
   }
   /** {@inheritDoc WaveGenerator.calcFragmentNormalAndFoam} */
-  calcFragmentNormalAndFoam(scope: PBInsideFunctionScope, xz: PBShaderExp) {
-    return scope.$builder.vec4(this.calcFragmentNormal(scope, xz), 0);
+  calcFragmentNormalAndFoam(scope: PBInsideFunctionScope, xz: PBShaderExp, _vertexNormal: PBShaderExp) {
+    const pb = scope.$builder;
+    const that = this;
+    pb.func('calcNormalAndFoam', [pb.vec2('xz')], function () {
+      this.$l.inPos = pb.vec3(this.xz.x, 0, this.xz.y);
+      this.$l.outPos = pb.vec3();
+      this.$l.outNormal = pb.vec3(0);
+      // Horizontal-gradient terms accumulated over the waves. The displacement
+      // derivative terms come out of gerstnerWave; summed, they feed det(I + J),
+      // the fold signal the foam is derived from - the same Jacobian the FFT
+      // generator uses, so both generators key foam off the same physics.
+      this.$l.dxdx = pb.float(0);
+      this.$l.dzdz = pb.float(0);
+      this.$l.dxdz = pb.float(0);
+      this.$for(
+        pb.float('i'),
+        0,
+        pb.getDevice().type === 'webgl' ? MAX_GERSTNER_WAVE_COUNT : this.numWaves,
+        function () {
+          if (pb.getDevice().type === 'webgl') {
+            this.$if(pb.greaterThanEqual(this.i, this.numWaves), function () {
+              this.$break();
+            });
+          }
+          this.$l.waveNormal = pb.vec3();
+          this.$l.waveDxdx = pb.float();
+          this.$l.waveDzdz = pb.float();
+          this.$l.waveDxdz = pb.float();
+          this.$l.wavePos = that.gerstnerWave(
+            this,
+            this.waveParams.at(pb.mul(this.i, 2)),
+            this.waveParams.at(pb.add(pb.mul(this.i, 2), 1)),
+            this.inPos,
+            this.waveNormal,
+            this.waveDxdx,
+            this.waveDzdz,
+            this.waveDxdz
+          );
+          this.outPos = pb.add(this.outPos, this.wavePos);
+          this.outNormal = pb.add(this.outNormal, this.waveNormal);
+          this.dxdx = pb.add(this.dxdx, this.waveDxdx);
+          this.dzdz = pb.add(this.dzdz, this.waveDzdz);
+          this.dxdz = pb.add(this.dxdz, this.waveDxdz);
+        }
+      );
+      // Jacobian determinant of the horizontal displacement, det(I + J). When the
+      // surface folds over the determinant drops below the foamParams.x threshold
+      // and the coverage ramps in. Mirrors the FFT generator's foam.
+      this.$l.val = pb.sub(pb.mul(pb.add(1, this.dxdx), pb.add(1, this.dzdz)), pb.mul(this.dxdz, this.dxdz));
+      this.$l.foam = pb.abs(
+        pb.pow(pb.neg(pb.min(0, pb.sub(this.val, this.foamParams.x))), this.foamParams.y)
+      );
+      this.$return(pb.vec4(this.outNormal, this.foam));
+    });
+    return scope.calcNormalAndFoam(xz) as PBShaderExp;
   }
   /** {@inheritDoc WaveGenerator.setupUniforms} */
   setupUniforms(scope: PBGlobalScope, uniformGroup: number) {
     const pb = scope.$builder;
     scope.numWaves = pb.float().uniform(uniformGroup);
     scope.waveParams = pb.vec4[MAX_GERSTNER_WAVE_COUNT * 2]().uniform(uniformGroup);
+    scope.foamParams = pb.vec2().uniform(uniformGroup);
   }
   /** @internal */
   private gerstnerWave(
@@ -259,12 +360,23 @@ export class GerstnerWaveGenerator extends Disposable implements WaveGenerator {
     waveParam: PBShaderExp,
     omniParam: PBShaderExp,
     inPos: PBShaderExp,
-    outNormal: PBShaderExp
+    outNormal: PBShaderExp,
+    outDxdx: PBShaderExp,
+    outDzdz: PBShaderExp,
+    outDxdz: PBShaderExp
   ) {
     const pb = scope.$builder;
     pb.func(
       'gerstnerWave',
-      [pb.vec4('waveParam'), pb.vec4('omniParam'), pb.vec3('inPos'), pb.vec3('outNormal').out()],
+      [
+        pb.vec4('waveParam'),
+        pb.vec4('omniParam'),
+        pb.vec3('inPos'),
+        pb.vec3('outNormal').out(),
+        pb.float('outDxdx').out(),
+        pb.float('outDzdz').out(),
+        pb.float('outDxdz').out()
+      ],
       function () {
         this.$l.amplitude = pb.max(this.waveParam.z, 0.01);
         this.$l.wavelength = this.waveParam.w;
@@ -294,10 +406,30 @@ export class GerstnerWaveGenerator extends Disposable implements WaveGenerator {
           pb.sub(1, pb.mul(this.qi, this.wa, this.sinCalc))
         );
         this.outNormal = pb.div(this.n.xzy, this.numWaves);
+        // Horizontal-gradient of the displacement, per wave. `waveXZ =
+        // windDir.xy * qi * amp * cos`, and the derivative of `cos(calc)` w.r.t.
+        // xz is `-w * sin(calc)`, so the gradient is the outer product of
+        // `windDir.xy` with itself scaled by `-qi * wa * sin`. The sign matters:
+        // at a crest (sin positive, cal near PI/2) the surface is compressed
+        // horizontally, which is what pushes `det(I + J)` down and fires the
+        // fold signal. Summed over waves and run through det(I + J), this is the
+        // same Jacobian criterion the FFT generator uses.
+        this.$l.jac = pb.neg(pb.mul(this.qi, this.wa, this.sinCalc));
+        this.outDxdx = pb.mul(this.jac, this.windDir.x, this.windDir.x);
+        this.outDzdz = pb.mul(this.jac, this.windDir.y, this.windDir.y);
+        this.outDxdz = pb.mul(this.jac, this.windDir.x, this.windDir.y);
         this.$return(pb.mul(this.wave, pb.clamp(pb.mul(this.amplitude, 10000), 0, 1)));
       }
     );
-    return scope.gerstnerWave(waveParam, omniParam, inPos, outNormal) as PBShaderExp;
+    return scope.gerstnerWave(
+      waveParam,
+      omniParam,
+      inPos,
+      outNormal,
+      outDxdx,
+      outDzdz,
+      outDxdz
+    ) as PBShaderExp;
   }
   /** @internal */
   private calcNormalAndPos(
@@ -325,12 +457,18 @@ export class GerstnerWaveGenerator extends Disposable implements WaveGenerator {
               });
             }
             this.$l.waveNormal = pb.vec3();
+            this.$l.waveDxdx = pb.float();
+            this.$l.waveDzdz = pb.float();
+            this.$l.waveDxdz = pb.float();
             this.$l.wavePos = that.gerstnerWave(
               this,
               this.waveParams.at(pb.mul(this.i, 2)),
               this.waveParams.at(pb.add(pb.mul(this.i, 2), 1)),
               this.inPos,
-              this.waveNormal
+              this.waveNormal,
+              this.waveDxdx,
+              this.waveDzdz,
+              this.waveDxdz
             );
             this.outPos = pb.add(this.outPos, this.wavePos);
             this.outNormal = pb.add(this.outNormal, this.waveNormal);
@@ -353,6 +491,7 @@ export class GerstnerWaveGenerator extends Disposable implements WaveGenerator {
   applyWaterBindGroup(bindGroup: BindGroup) {
     bindGroup.setValue('numWaves', this._numWaves);
     bindGroup.setValue('waveParams', this._waveParams);
+    bindGroup.setValue('foamParams', this._foamParams);
   }
   /** {@inheritDoc WaveGenerator.isOk} */
   isOk() {

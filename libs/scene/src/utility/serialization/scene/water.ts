@@ -5,7 +5,8 @@ import { GraphNode } from '../../../scene';
 import { Water } from '../../../scene/water';
 import { defineProps, type SerializableClass } from '../types';
 import type { WaveGenerator } from '../../../render';
-import { FBMWaveGenerator, FFTWaveGenerator } from '../../../render';
+import { FBMWaveGenerator, FFTWaveGenerator, GerstnerWaveGenerator } from '../../../render';
+import { MAX_GERSTNER_WAVE_COUNT } from '../../../values';
 import type { WaterMediumMode, WaterRefractionMode } from '../../../material/water';
 import { DEFAULT_SCATTER_ANISOTROPY } from '../../../material/water';
 import type { Texture2D } from '@zephyr3d/device';
@@ -195,6 +196,332 @@ export function getFFTWaveGeneratorClass(): SerializableClass {
 }
 
 /** @internal */
+export function getGerstnerWaveGeneratorClass(): SerializableClass {
+  return {
+    ctor: GerstnerWaveGenerator,
+    name: 'GerstnerWaveGenerator',
+    getProps() {
+      return defineProps([
+        {
+          name: 'NumWaves',
+          description: 'Number of independent Gerstner waves summed to form the surface',
+          type: 'int',
+          options: { minValue: 1, maxValue: MAX_GERSTNER_WAVE_COUNT },
+          get(this: GerstnerWaveGenerator, value) {
+            value.num[0] = this.numWaves;
+          },
+          set(this: GerstnerWaveGenerator, value) {
+            this.numWaves = value.num[0];
+          }
+        },
+        {
+          name: 'Waves',
+          description: 'Per-wave parameters, one entry per wave in NumWaves order',
+          type: 'object_array',
+          options: {
+            objectTypes: [GerstnerWave]
+          },
+          get(this: GerstnerWaveGenerator, value) {
+            value.object = [];
+            for (let i = 0; i < this.numWaves; i++) {
+              const wave = new GerstnerWave();
+              wave.bind(this, i);
+              value.object.push(wave);
+            }
+          },
+          set(this: GerstnerWaveGenerator, value) {
+            const waves = value.object as GerstnerWave[];
+            // The wave count is ground truth for how many slots the shader
+            // reads. NumWaves and Waves are applied concurrently during
+            // deserialization, so this setter must leave the generator in the
+            // state this array implies regardless of which one runs first.
+            this.numWaves = waves.length;
+            for (let i = 0; i < waves.length; i++) {
+              waves[i].applyTo(this, i);
+            }
+          },
+          add(this: GerstnerWaveGenerator, value, index) {
+            const wave = value?.object?.[0] as Nullable<GerstnerWave>;
+            const insertAt = index ?? this.numWaves;
+            this.insertWave(insertAt);
+            wave?.applyTo(this, insertAt);
+          },
+          delete(this: GerstnerWaveGenerator, index) {
+            this.deleteWave(index);
+          }
+        },
+        {
+          name: 'FoamWidth',
+          description: 'Width of foam bands generated on the wave crests',
+          type: 'float',
+          default: 1.2,
+          options: { animatable: true, minValue: 0, maxValue: 10 },
+          get(this: GerstnerWaveGenerator, value) {
+            value.num[0] = this.foamWidth;
+          },
+          set(this: GerstnerWaveGenerator, value) {
+            this.foamWidth = value.num[0];
+          }
+        },
+        {
+          name: 'FoamContrast',
+          description: 'Contrast of the foam pattern on Gerstner waves',
+          type: 'float',
+          default: 7.2,
+          options: { animatable: true, minValue: 0, maxValue: 10 },
+          get(this: GerstnerWaveGenerator, value) {
+            value.num[0] = this.foamContrast;
+          },
+          set(this: GerstnerWaveGenerator, value) {
+            this.foamContrast = value.num[0];
+          }
+        }
+      ]);
+    }
+  };
+}
+
+/**
+ * A single Gerstner wave, as the editor sees one entry of the
+ * `Waves` object array on a {@link GerstnerWaveGenerator}.
+ *
+ * It behaves as a live view while it is bound: the field setters write the new
+ * value straight through to the generator's wave buffer, which is what makes an
+ * edit in the property panel take effect on the water immediately. Without that
+ * the editor would only touch this object's own fields and the surface would
+ * keep the previous wave until something else bumped the generator's version.
+ *
+ * The binding is transient and scoped to one editor session: `_owner` and
+ * `_index` are set when the `Waves` getter builds the entry, and the editor
+ * rebuilds the whole array from that getter after every add/delete. A copy that
+ * survives a list mutation is never reused, so the cached index cannot drift
+ * onto a different wave - the same reason it is safe to write through with it.
+ */
+class GerstnerWave {
+  private _owner: Nullable<GerstnerWaveGenerator>;
+  private _index: number;
+  _direction: number;
+  _steepness: number;
+  _amplitude: number;
+  _length: number;
+  _omni: boolean;
+  _originX: number;
+  _originZ: number;
+  constructor() {
+    this._owner = null;
+    this._index = -1;
+    this._direction = 0;
+    this._steepness = 0;
+    this._amplitude = 0;
+    this._length = 1;
+    this._omni = false;
+    this._originX = 0;
+    this._originZ = 0;
+  }
+  /**
+   * Binds this entry to a slot of `owner`, so the field setters write through
+   * to the generator. Called by the `Waves` getter and by `add`; the index is
+   * the slot the entry currently represents.
+   * @internal
+   */
+  bind(owner: GerstnerWaveGenerator, index: number) {
+    this._owner = owner;
+    this._index = index;
+    this.loadFromOwner(owner, index);
+  }
+  /**
+   * Copies the values in slot `index` of `owner` into this object, refreshing
+   * the cached fields without writing back.
+   * @internal
+   */
+  loadFromOwner(owner: GerstnerWaveGenerator, index: number) {
+    this._direction = owner.getWaveDirection(index);
+    this._steepness = owner.getWaveSteepness(index);
+    this._amplitude = owner.getWaveAmplitude(index);
+    this._length = owner.getWaveLength(index);
+    this._omni = owner.isOmniWave(index);
+    this._originX = owner.getOriginX(index);
+    this._originZ = owner.getOriginZ(index);
+  }
+  /**
+   * Writes this object's values into slot `index` of `owner`, unconditionally.
+   *
+   * Used by the `Waves` setter for a serialised-in array, whose entries were
+   * constructed without an owner, and by `add` for a freshly created one. It is
+   * distinct from the write-through in the field setters, which fire on each
+   * individual edit.
+   * @internal
+   */
+  applyTo(owner: GerstnerWaveGenerator, index: number) {
+    owner.setWaveDirection(index, this._direction);
+    owner.setWaveSteepness(index, this._steepness);
+    owner.setWaveAmplitude(index, this._amplitude);
+    owner.setWaveLength(index, this._length);
+    owner.setOmniWave(index, this._omni);
+    owner.setOrigin(index, this._originX, this._originZ);
+    this._owner = owner;
+    this._index = index;
+  }
+  /** @internal */
+  private writethrough(
+    setter: (owner: GerstnerWaveGenerator, index: number, val: number) => void,
+    val: number
+  ) {
+    const owner = this._owner;
+    if (owner) {
+      setter(owner, this._index, val);
+    }
+  }
+  /** Gets the wave direction angle in radians. */
+  get direction() {
+    return this._direction;
+  }
+  set direction(val) {
+    this._direction = val;
+    this.writethrough((o, i, v) => o.setWaveDirection(i, v), val);
+  }
+  /** Gets the wave steepness. */
+  get steepness() {
+    return this._steepness;
+  }
+  set steepness(val) {
+    this._steepness = val;
+    this.writethrough((o, i, v) => o.setWaveSteepness(i, v), val);
+  }
+  /** Gets the wave amplitude. */
+  get amplitude() {
+    return this._amplitude;
+  }
+  set amplitude(val) {
+    this._amplitude = val;
+    this.writethrough((o, i, v) => o.setWaveAmplitude(i, v), val);
+  }
+  /** Gets the wave length in meters. */
+  get length() {
+    return this._length;
+  }
+  set length(val) {
+    this._length = val;
+    this.writethrough((o, i, v) => o.setWaveLength(i, v), val);
+  }
+  /** Gets whether the wave is omni-directional. */
+  get omni() {
+    return this._omni;
+  }
+  set omni(val) {
+    this._omni = val;
+    if (this._owner) {
+      this._owner.setOmniWave(this._index, val);
+    }
+  }
+  /** Gets the origin X of an omni-directional wave. */
+  get originX() {
+    return this._originX;
+  }
+  set originX(val) {
+    this._originX = val;
+    if (this._owner) {
+      this._owner.setOrigin(this._index, val, this._originZ);
+    }
+  }
+  /** Gets the origin Z of an omni-directional wave. */
+  get originZ() {
+    return this._originZ;
+  }
+  set originZ(val) {
+    this._originZ = val;
+    if (this._owner) {
+      this._owner.setOrigin(this._index, this._originX, val);
+    }
+  }
+}
+
+/** @internal */
+export function getGerstnerWaveClass(): SerializableClass {
+  return {
+    ctor: GerstnerWave,
+    name: 'GerstnerWave',
+    getProps() {
+      return defineProps([
+        {
+          name: 'Direction',
+          description: 'Wave direction angle in radians',
+          type: 'float',
+          options: { animatable: true, minValue: -3.14, maxValue: 3.14 },
+          get(this: GerstnerWave, value) {
+            value.num[0] = this.direction;
+          },
+          set(this: GerstnerWave, value) {
+            this.direction = value.num[0];
+          }
+        },
+        {
+          name: 'Steepness',
+          description: 'Wave steepness. The sum of steepness across waves sets how sharply crests fold',
+          type: 'float',
+          options: { animatable: true, minValue: 0, maxValue: 2 },
+          get(this: GerstnerWave, value) {
+            value.num[0] = this.steepness;
+          },
+          set(this: GerstnerWave, value) {
+            this.steepness = value.num[0];
+          }
+        },
+        {
+          name: 'Amplitude',
+          description: 'Wave height amplitude',
+          type: 'float',
+          options: { animatable: true, minValue: 0, maxValue: 5 },
+          get(this: GerstnerWave, value) {
+            value.num[0] = this.amplitude;
+          },
+          set(this: GerstnerWave, value) {
+            this.amplitude = value.num[0];
+          }
+        },
+        {
+          name: 'Length',
+          description: 'Wave length in meters',
+          type: 'float',
+          options: { animatable: true, minValue: 0, maxValue: 100 },
+          get(this: GerstnerWave, value) {
+            value.num[0] = this.length;
+          },
+          set(this: GerstnerWave, value) {
+            this.length = value.num[0];
+          }
+        },
+        {
+          name: 'Omni',
+          description: 'If true, radiates outward from an origin rather than travelling in one direction',
+          type: 'bool',
+          get(this: GerstnerWave, value) {
+            value.bool[0] = this.omni;
+          },
+          set(this: GerstnerWave, value) {
+            this.omni = value.bool[0];
+          }
+        },
+        {
+          name: 'Origin',
+          description: 'Origin of an omni-directional wave, ignored by directional waves',
+          type: 'vec2',
+          options: { animatable: true, minValue: -1000, maxValue: 1000 },
+          get(this: GerstnerWave, value) {
+            value.num[0] = this.originX;
+            value.num[1] = this.originZ;
+          },
+          set(this: GerstnerWave, value) {
+            this.originX = value.num[0];
+            this.originZ = value.num[1];
+          }
+        }
+      ]);
+    }
+  };
+}
+
+/** @internal */
 export function getWaterClass(manager: ResourceManager): SerializableClass {
   return {
     ctor: Water,
@@ -213,7 +540,7 @@ export function getWaterClass(manager: ResourceManager): SerializableClass {
           type: 'object',
           default: null,
           options: {
-            objectTypes: [FFTWaveGenerator, FBMWaveGenerator]
+            objectTypes: [FFTWaveGenerator, FBMWaveGenerator, GerstnerWaveGenerator]
           },
           isNullable() {
             return true;

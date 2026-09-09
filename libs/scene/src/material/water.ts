@@ -216,7 +216,19 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
   private readonly _scatterRampTexture: DRef<Texture2D>;
   private readonly _absorptionRampTexture: DRef<Texture2D>;
   private readonly _waveGenerator: DRef<WaveGenerator>;
-  private _waveVersion: number;
+  /**
+   * Per-bind-group wave uniform sync, keyed by the bind group object.
+   *
+   * The material owns one bind group per pass/render-variant hash, so a water
+   * surface drawn for two different cameras - or for both the main view and a
+   * reflection/planar capture - touches two distinct bind groups. A single
+   * `_waveVersion` on the material could not represent that: the first group
+   * wrote the wave uniforms and set the version, and the second group then saw
+   * the version as already current and skipped the upload, leaving it with the
+   * default (flat) wave data. Tracking the version per bind group makes each
+   * group upload exactly once per wave generator version instead.
+   */
+  private _waveVersionByBindGroup: WeakMap<BindGroup, number>;
   private readonly _clipmapInfo: Vector4;
   private readonly _clipmapGridInfo: Vector4;
   private readonly _ssrParams: Vector4;
@@ -271,7 +283,7 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
     this._clipmapInfo = new Vector4();
     this._clipmapGridInfo = new Vector4();
     this._waveGenerator = new DRef();
-    this._waveVersion = -1;
+    this._waveVersionByBindGroup = new WeakMap();
     this._ssrParams = new Vector4(1000, 160, 0.5, 2);
     this._scatterRampTexture = new DRef();
     this._absorptionRampTexture = new DRef();
@@ -348,7 +360,10 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
   set waveGenerator(waveGenerator: Nullable<WaveGenerator>) {
     if (this._waveGenerator.get() !== waveGenerator) {
       this._waveGenerator.set(waveGenerator);
-      this._waveVersion = -1;
+      // Reset every target: the bind groups are pooled and reused across
+      // frames, so an old entry for this group must not suppress the upload for
+      // a new generator.
+      this._waveVersionByBindGroup = new WeakMap();
       this.optionChanged(true);
     }
   }
@@ -1911,9 +1926,15 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
   applyUniforms(bindGroup: BindGroup, ctx: DrawContext, needUpdate: boolean, pass: number) {
     super.applyUniforms(bindGroup, ctx, needUpdate, pass);
     const waveGenerator = this._waveGenerator.get();
-    if (waveGenerator && this._waveVersion !== waveGenerator.version) {
+    // Synced per bind group, not per material. The material owns one bind group
+    // per pass/render-variant hash, so drawing for a second camera reuses a
+    // different group whose wave uniforms were never written - and a material-
+    // level version would skip the upload for it. WeakMap so a released group
+    // is garbage collected with its entry.
+    const lastWritten = this._waveVersionByBindGroup.get(bindGroup) ?? -1;
+    if (waveGenerator && lastWritten !== waveGenerator.version) {
       waveGenerator.applyWaterBindGroup(bindGroup);
-      this._waveVersion = waveGenerator.version;
+      this._waveVersionByBindGroup.set(bindGroup, waveGenerator.version);
     }
   }
   applyUniformValues(bindGroup: BindGroup, ctx: DrawContext, pass: number) {

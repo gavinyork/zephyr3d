@@ -106,6 +106,7 @@ const SCENE_NAMES = [
   'water-refraction-cheap',
   'water-subsurface-backlit',
   'water-foam-storm',
+  'water-foam-gerstner',
   'oit-weighted',
   'oit-abuffer',
   'oit-dual-depth',
