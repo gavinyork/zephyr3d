@@ -595,6 +595,36 @@ export function getWaterClass(manager: ResourceManager): SerializableClass {
           }
         },
         {
+          name: 'Infinite',
+          description:
+            'Draw the surface as an unbounded ocean reaching the horizon instead of a body of water ending at the node extent. Reaches the horizon without enlarging the camera far plane, so near-scene depth precision is unaffected. Leave off for ponds, lakes and pools, which have an edge.',
+          type: 'bool',
+          default: false,
+          get(this: Water, value) {
+            value.bool[0] = this.infinite;
+          },
+          set(this: Water, value) {
+            this.infinite = value.bool[0];
+          }
+        },
+        {
+          name: 'ViewDistance',
+          description:
+            'How far the surface is built out from the camera, in meters, or 0 to derive it from the true horizon distance for the camera height. Keep the sky AerialPerspectiveDistance at least this large, or the far water stops converging towards the sky colour and the hard band comes back.',
+          type: 'float',
+          default: 0,
+          options: { minValue: 0, maxValue: 100000 },
+          isHidden(this: Water) {
+            return !this.infinite;
+          },
+          get(this: Water, value) {
+            value.num[0] = this.viewDistance;
+          },
+          set(this: Water, value) {
+            this.viewDistance = value.num[0];
+          }
+        },
+        {
           name: 'CausticsEnabled',
           description: 'Whether the water projects caustics onto the geometry below it',
           type: 'bool',

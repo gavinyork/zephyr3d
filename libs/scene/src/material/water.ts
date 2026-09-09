@@ -102,6 +102,28 @@ const REFRACT_MARCH_STEPS = 24;
 /** Depth tolerance, in meters, for the march to treat a step as a hit. */
 const REFRACT_MARCH_THICKNESS = 0.05;
 /**
+ * Fraction of the far plane an infinite water surface is pulled in to.
+ *
+ * Vertices past the far plane are moved along their own view ray to this
+ * multiple of it, which leaves their screen position untouched and their depth
+ * inside the frustum. Short of 1 so the result is never the vertex the hardware
+ * clips, and never lands on the cleared depth value - which
+ * `ShaderHelper.isFarthestDepth` tests for by equality and would read as sky.
+ */
+const INFINITE_DEPTH_PULLIN = 0.99;
+/**
+ * Minimum reflection-direction y a water surface samples the sky bake with.
+ *
+ * The bake's lower hemisphere is deliberately near-black - it is what lies
+ * below the ground, not what a flat water surface reflects - and a grazing eye
+ * reflects the sky exactly at the boundary between the two. Flooring the
+ * reflection y keeps the degenerate, almost-horizontal directions on the bright
+ * upper side of that seam instead of reading the dark terminator. Re-normalised
+ * after the floor, so what changes is only the direction of the few pixels near
+ * the horizon; everything already pointing up keeps its natural reflection.
+ */
+const HORIZON_REFLECT_BIAS = 0.08;
+/**
  * Width in UV of the band the refraction offset fades out over at the screen
  * border.
  *
@@ -194,6 +216,7 @@ export const REFRACT_BLUR_MAX_LOD = 6;
 export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight) {
   private static readonly FEATURE_MEDIUM_MODE = this.defineFeature();
   private static readonly FEATURE_REFRACTION_MODE = this.defineFeature();
+  private static readonly FEATURE_INFINITE = this.defineFeature();
   private static readonly _absorptionGrad = new Interpolator(
     'linear',
     'vec3',
@@ -231,6 +254,7 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
   private _waveVersionByBindGroup: WeakMap<BindGroup, number>;
   private readonly _clipmapInfo: Vector4;
   private readonly _clipmapGridInfo: Vector4;
+  private _skirtDistance: number;
   private readonly _ssrParams: Vector4;
   /** Absorption coefficient sigma_a, per meter, per RGB channel. */
   private readonly _absorption: Vector3;
@@ -282,6 +306,7 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
     this._updateMediumCoefficients();
     this._clipmapInfo = new Vector4();
     this._clipmapGridInfo = new Vector4();
+    this._skirtDistance = 0;
     this._waveGenerator = new DRef();
     this._waveVersionByBindGroup = new WeakMap();
     this._ssrParams = new Vector4(1000, 160, 0.5, 2);
@@ -334,6 +359,7 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
     this.cullMode = 'none';
     this.useFeature(WaterMaterial.FEATURE_MEDIUM_MODE, 'physical' as WaterMediumMode);
     this.useFeature(WaterMaterial.FEATURE_REFRACTION_MODE, 'march' as WaterRefractionMode);
+    this.useFeature(WaterMaterial.FEATURE_INFINITE, false);
     //this.TAADisabled = true;
   }
   /** {@inheritDoc Material.onDispose} */
@@ -420,6 +446,28 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
   set refractionMode(val: WaterRefractionMode) {
     if (val !== this.refractionMode) {
       this.useFeature(WaterMaterial.FEATURE_REFRACTION_MODE, val);
+    }
+  }
+  /**
+   * Whether the surface reads as unbounded, reaching the horizon rather than
+   * ending at {@link region}.
+   *
+   * Two things change. The region test that discards fragments outside the
+   * rectangle is not emitted at all, so the surface has no edge; and the
+   * clipmap's outermost ring is treated as a horizon skirt, its outer vertices
+   * pushed far past the camera's far plane with their clip-space depth pinned
+   * to the far value so they survive clipping. That second part is what lets an
+   * ocean meet the sky under a far plane sized for the near scene.
+   *
+   * Off by default: a pond, a lake or a pool has an edge, and drawing one to
+   * the horizon would be wrong as well as wasteful.
+   */
+  get infinite(): boolean {
+    return this.featureUsed<boolean>(WaterMaterial.FEATURE_INFINITE) ?? false;
+  }
+  set infinite(val: boolean) {
+    if (!!val !== this.infinite) {
+      this.useFeature(WaterMaterial.FEATURE_INFINITE, !!val);
     }
   }
   /** Absorption coefficient sigma_a in 1/m, per RGB channel. */
@@ -917,6 +965,16 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
       this.uniformChanged();
     }
   }
+  /**
+   * How far from the camera the horizon skirt's outer edge is placed, in world
+   * units. Only read while {@link infinite} is on.
+   */
+  setSkirtDistance(distance: number) {
+    if (this._skirtDistance !== distance) {
+      this._skirtDistance = distance;
+      this.uniformChanged();
+    }
+  }
   supportInstancing() {
     return false;
   }
@@ -930,6 +988,9 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
     scope.$inputs.position = pb.vec3().attrib('position');
     scope.$inputs.clipmapInfo = pb.vec4().attrib('texCoord0');
     scope.clipmapGridInfo = pb.vec4().uniform(2);
+    if (this.infinite) {
+      scope.skirtDistance = pb.float().uniform(2);
+    }
 
     scope.$l.s = pb.sin(scope.$inputs.clipmapInfo.x);
     scope.$l.c = pb.cos(scope.$inputs.clipmapInfo.x);
@@ -961,26 +1022,96 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
     ).xyz; // pb.vec3(scope.clipmapPos.x, scope.level, scope.clipmapPos.y);
     scope.worldNormal = pb.vec3(0, 1, 0);
     scope.worldPos = scope.clipmapWorldPos;
-    this.waveGenerator?.calcVertexPositionAndNormal(
-      scope,
-      scope.clipmapWorldPos,
-      scope.worldPos,
-      scope.worldNormal
-    );
+    if (this.infinite) {
+      const that = this;
+      // The clipmap meshes all leave position.z at 0; the skirt ring sets it to
+      // 1 on its outer edge, which is the only geometry meant to leave the
+      // clipmap's footprint. Its inner edge is welded to the outermost tiles and
+      // is displaced with them, so the join stays closed.
+      scope.$l.skirt = pb.step(0.5, scope.$inputs.position.z);
+      scope
+        .$if(pb.greaterThan(scope.skirt, 0), function () {
+          // Radially outwards from the camera rather than outwards from the
+          // clipmap origin: the ring has to read as a horizon from where it is
+          // being looked at, and the clipmap is snapped to a grid the camera
+          // wanders within.
+          this.$l.camXZ = ShaderHelper.getCameraPosition(this).xz;
+          this.$l.outDir = pb.normalize(pb.sub(this.clipmapWorldPos.xz, this.camXZ));
+          this.$l.outXZ = pb.add(this.camXZ, pb.mul(this.outDir, this.skirtDistance));
+          // Flat, at the still-water level. A displaced vertex out here would be
+          // several kilometres from its neighbours, so any wave it sampled would
+          // read as a jagged silhouette rather than a swell.
+          this.worldPos = pb.vec3(this.outXZ.x, this.clipmapWorldPos.y, this.outXZ.y);
+        })
+        .$else(function () {
+          that.waveGenerator?.calcVertexPositionAndNormal(
+            this,
+            this.clipmapWorldPos,
+            this.worldPos,
+            this.worldNormal
+          );
+        });
+      scope.$outputs.skirt = scope.skirt;
+    } else {
+      this.waveGenerator?.calcVertexPositionAndNormal(
+        scope,
+        scope.clipmapWorldPos,
+        scope.worldPos,
+        scope.worldNormal
+      );
+    }
     scope.$outputs.worldPos = scope.worldPos;
     scope.$outputs.clipmapPos = scope.clipmapWorldPos;
     scope.$outputs.worldNormal = scope.worldNormal;
-    ShaderHelper.setClipSpacePosition(
-      scope,
-      pb.mul(ShaderHelper.getViewProjectionMatrix(scope), pb.vec4(scope.$outputs.worldPos, 1))
-    );
+    if (this.infinite) {
+      // Pulled in along the view ray rather than depth-clamped.
+      //
+      // The surface has to reach past the far plane - raising the camera pushes
+      // the horizon out with sqrt(2*R*h), so the tessellated water runs well
+      // beyond a far plane sized for the near scene - but the depth buffer
+      // cannot encode anything past it.
+      //
+      // Clamping the clip-space z was the obvious answer and is wrong at the
+      // seam: a triangle straddling the far plane gets one vertex clamped and
+      // another not, and the pair no longer describes the surface between them.
+      // That tore a black line across the frame at exactly the far distance.
+      //
+      // A perspective projection is invariant under scaling about the eye, so
+      // moving a vertex along its own view ray leaves its screen position
+      // untouched while bringing its depth back inside the frustum. Every
+      // vertex stays unclamped and unclipped, so there is no seam to tear: the
+      // rasterised coverage is identical to the unbounded surface.
+      //
+      // Shading keeps the true world position - it is what the waves, the
+      // distance fade and the fog are all keyed on - so only the depth written
+      // is affected, and only past the far plane.
+      scope.$l.camPos = ShaderHelper.getCameraPosition(scope).xyz;
+      scope.$l.viewVec = pb.sub(scope.$outputs.worldPos, scope.camPos);
+      scope.$l.viewDist = pb.max(pb.length(scope.viewVec), 1e-6);
+      // Just inside the far plane, so the vertex is never the one the hardware
+      // decides to clip and never lands on the cleared depth value.
+      scope.$l.maxDist = pb.mul(ShaderHelper.getCameraParams(scope).y, INFINITE_DEPTH_PULLIN);
+      scope.$l.pullIn = pb.min(pb.div(scope.maxDist, scope.viewDist), 1);
+      scope.$l.projPos = pb.add(scope.camPos, pb.mul(scope.viewVec, scope.pullIn));
+      ShaderHelper.setClipSpacePosition(
+        scope,
+        pb.mul(ShaderHelper.getViewProjectionMatrix(scope), pb.vec4(scope.projPos, 1))
+      );
+    } else {
+      ShaderHelper.setClipSpacePosition(
+        scope,
+        pb.mul(ShaderHelper.getViewProjectionMatrix(scope), pb.vec4(scope.$outputs.worldPos, 1))
+      );
+    }
     ShaderHelper.resolveMotionVector(scope, scope.$outputs.worldPos, scope.$outputs.worldPos);
   }
   fragmentShader(scope: PBFunctionScope) {
     super.fragmentShader(scope);
     const pb = scope.$builder;
     this.waveGenerator?.setupUniforms(scope, 2);
-    scope.region = pb.vec4().uniform(2);
+    if (!this.infinite) {
+      scope.region = pb.vec4().uniform(2);
+    }
     if (this.needFragmentColor()) {
       scope.refractionScale = pb.float().uniform(2);
       if (this.refractionMode === 'offset') {
@@ -1013,13 +1144,17 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
         scope.absorptionRampTex = pb.tex2D().uniform(2);
       }
     }
-    scope.$l.discardable = pb.or(
-      pb.any(pb.lessThan(scope.$inputs.worldPos.xz, scope.region.xy)),
-      pb.any(pb.greaterThan(scope.$inputs.worldPos.xz, scope.region.zw))
-    );
-    scope.$if(scope.discardable, function () {
-      pb.discard();
-    });
+    // An unbounded surface has no edge to clip against, so the test is not
+    // emitted at all rather than fed a region large enough to always pass.
+    if (!this.infinite) {
+      scope.$l.discardable = pb.or(
+        pb.any(pb.lessThan(scope.$inputs.worldPos.xz, scope.region.xy)),
+        pb.any(pb.greaterThan(scope.$inputs.worldPos.xz, scope.region.zw))
+      );
+      scope.$if(scope.discardable, function () {
+        pb.discard();
+      });
+    }
     if (this.needFragmentColor()) {
       scope.$l.normal = this.waveGenerator
         ? this.waveGenerator.calcFragmentNormalAndFoam(
@@ -1028,6 +1163,15 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
             scope.$inputs.worldNormal
           )
         : pb.vec4(scope.$inputs.worldNormal, 0);
+      if (this.infinite) {
+        // Flat and foamless across the horizon band. The skirt's world position
+        // was never displaced, so evaluating waves from it would paint detail
+        // the geometry does not have - and at kilometres per pixel that detail
+        // is under-sampled by orders of magnitude, which is exactly the crawling
+        // speckle the distance fade exists to avoid. The aerial perspective the
+        // screen-space fog pass applies is what should be visible here.
+        scope.normal = pb.mix(scope.normal, pb.vec4(0, 1, 0, 0), scope.$inputs.skirt);
+      }
       scope.$l.outColor = pb.vec4(
         this.waterShading(scope, scope.$inputs.worldPos, scope.normal.xyz, scope.normal.w),
         1
@@ -1746,6 +1890,19 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
         // onto one ring and wiped out the grazing-angle detail that is the most
         // visible part of a water reflection.
         this.refl.y = pb.abs(this.refl.y);
+        // Grazing rays land on the bake's lower hemisphere, which the atmosphere
+        // deliberately renders nearly black - it is what is below the ground,
+        // not what a flat water surface reflects. An eye nearly at water level
+        // reflects the sky right at the horizon, i.e. the upper hemisphere's
+        // very edge, so the most horizontal reflection directions sample the
+        // black terminator and the far ocean reads as a dark band. Flooring the
+        // y and re-normalising keeps only those directions on the bright side of
+        // the seam; a reflection already pointing into the sky is untouched, so
+        // a normal sea is unchanged. A floor rather than a soft lift on purpose:
+        // the terminator is a hard feature of the bake, and smoothing over it
+        // nudges every grazing reflection rather than only the degenerate ones.
+        this.refl.y = pb.max(this.refl.y, HORIZON_REFLECT_BIAS);
+        this.refl = pb.normalize(this.refl);
         this.reflectance = pb.mix(
           // Blended against the pre-exposed scene color, so the exposure-independent sky bake has
           // to be lifted into the same space.
@@ -1940,7 +2097,11 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
   applyUniformValues(bindGroup: BindGroup, ctx: DrawContext, pass: number) {
     super.applyUniformValues(bindGroup, ctx, pass);
     bindGroup.setValue('clipmapGridInfo', this._clipmapGridInfo);
-    bindGroup.setValue('region', this._region);
+    if (this.infinite) {
+      bindGroup.setValue('skirtDistance', this._skirtDistance);
+    } else {
+      bindGroup.setValue('region', this._region);
+    }
     if (this.needFragmentColor(ctx)) {
       // Dimensionless: the offset is derived in world space and projected, so
       // there is nothing here for the render size to scale.

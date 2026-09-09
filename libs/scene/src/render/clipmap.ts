@@ -3,7 +3,7 @@
  */
 
 import type { Nullable, Vector4 } from '@zephyr3d/base';
-import { AABB, ClipState, Disposable, Matrix4x4, Vector2, Vector3 } from '@zephyr3d/base';
+import { AABB, BoxSide, ClipState, Disposable, Matrix4x4, Vector2, Vector3 } from '@zephyr3d/base';
 import type { Camera } from '../camera';
 import { Primitive } from './primitive';
 import {
@@ -17,6 +17,11 @@ import {
 const tmpAABB = new AABB();
 const tmpV3 = new Vector3();
 const rotationValues = [0, Math.PI * 1.5, Math.PI * 0.5, Math.PI] as const;
+/**
+ * Frustum plane mask covering everything but the far plane, for a clipmap that
+ * reaches past it. @internal
+ */
+const ALL_PLANES_EXCEPT_FAR = 0b111111 & ~(1 << BoxSide.BACK);
 
 /** @internal */
 export type PrimitiveInstanceInfo = {
@@ -33,6 +38,21 @@ export interface ClipmapGatherContext {
   minMaxWorldPos: Vector4;
   userData: unknown;
   frustumCulling: boolean;
+  /**
+   * How far from the camera the clipmap should reach, in world units. Defaults
+   * to the camera far plane when omitted.
+   *
+   * Only the level count is derived from this, not the clip: a caller that
+   * pushes the outermost ring past the far plane in its own vertex shader needs
+   * the levels to exist before it can do so, and the far plane would otherwise
+   * cap them well short of the horizon.
+   */
+  viewDistance?: number;
+  /**
+   * Whether to emit the skirt ring around the outermost level. Off by default,
+   * so the terrain clipmap is unaffected.
+   */
+  skirt?: boolean;
   calcAABB(
     userData: unknown,
     minX: number,
@@ -90,6 +110,9 @@ export class Clipmap extends Disposable {
   private _seamMeshLines!: Primitive;
   private _seamMeshAABB!: AABB;
 
+  private _skirtMesh!: Primitive;
+  private _skirtMeshLines!: Primitive;
+
   private _wireframe: boolean;
 
   constructor(resolution: number, extraInstanceBuffers: VertexAttribFormat[], maxMipLevels = 64) {
@@ -124,6 +147,7 @@ export class Clipmap extends Disposable {
     this.generateSeamMesh();
     this.generateTileMesh();
     this.generateTrimMesh();
+    this.generateSkirtMesh();
   }
   get wireframe() {
     return this._wireframe;
@@ -142,6 +166,7 @@ export class Clipmap extends Disposable {
       this.generateSeamMesh();
       this.generateTileMesh();
       this.generateTrimMesh();
+      this.generateSkirtMesh();
     }
   }
   private allocInstanceBuffer() {
@@ -610,6 +635,122 @@ export class Clipmap extends Disposable {
     this._seamMeshLines.indexCount = indicesLines.length;
     this._seamMeshLines.primitiveType = 'line-list';
   }
+  /**
+   * Ring of quads welded to the outer boundary of the outermost level, whose
+   * outer edge the vertex shader is expected to push towards the horizon.
+   *
+   * The inner edge has to land on exactly the vertices the outermost tiles end
+   * on, or a displaced surface tears along the join: both sides evaluate the
+   * same wave function, so identical world positions are what keeps them
+   * identical. That boundary runs from `-2 * tileResolution` to
+   * `2 * tileResolution + 1` in the level's local units - the asymmetry is the
+   * `fillX`/`fillY` shift `gather` applies to the far tiles - which is
+   * `clipmapVertResolution` vertices a side, the same density the seam mesh
+   * uses.
+   *
+   * Outer vertices are flagged with `position.z = 1`. Every other clipmap mesh
+   * leaves z at 0 and the shader's clipmap matrix only reads xy, so the
+   * component is free to carry the flag without a second vertex stream.
+   */
+  generateSkirtMesh() {
+    const clipmapVertResolution = this._tileResolution * 4 + 2;
+    const lo = -2 * this._tileResolution;
+    const hi = 2 * this._tileResolution + 1;
+    // Unique positions around the perimeter: each side contributes all but its
+    // last vertex, which is the next side's first, so the loop closes without
+    // doubling the corners.
+    const perSide = clipmapVertResolution - 1;
+    const ringCount = perSide * 4;
+    const vertices = new Float32Array(ringCount * 2 * 3);
+    // Placeholder extent for the outer ring. The vertex shader relocates these
+    // vertices, so this only has to be outside the inner ring and finite.
+    const outerFactor = 8;
+    const centre = (lo + hi) * 0.5;
+    let n = 0;
+    const putRing = (index: number, x: number, y: number, outer: boolean) => {
+      const px = outer ? centre + (x - centre) * outerFactor : x;
+      const py = outer ? centre + (y - centre) * outerFactor : y;
+      const base = (index + (outer ? ringCount : 0)) * 3;
+      vertices[base + 0] = px;
+      vertices[base + 1] = py;
+      vertices[base + 2] = outer ? 1 : 0;
+    };
+    for (let i = 0; i < perSide; i++) {
+      putRing(n, lo + i, lo, false);
+      putRing(n, lo + i, lo, true);
+      n++;
+    }
+    for (let i = 0; i < perSide; i++) {
+      putRing(n, hi, lo + i, false);
+      putRing(n, hi, lo + i, true);
+      n++;
+    }
+    for (let i = 0; i < perSide; i++) {
+      putRing(n, hi - i, hi, false);
+      putRing(n, hi - i, hi, true);
+      n++;
+    }
+    for (let i = 0; i < perSide; i++) {
+      putRing(n, lo, hi - i, false);
+      putRing(n, lo, hi - i, true);
+      n++;
+    }
+    const indices = new Uint16Array(ringCount * 6);
+    n = 0;
+    for (let k = 0; k < ringCount; k++) {
+      const j = (k + 1) % ringCount;
+      indices[n++] = k;
+      indices[n++] = j;
+      indices[n++] = ringCount + j;
+      indices[n++] = k;
+      indices[n++] = ringCount + j;
+      indices[n++] = ringCount + k;
+    }
+    this._skirtMesh?.dispose();
+    this._skirtMesh = new Primitive();
+    this._skirtMesh.createAndSetVertexBuffer('position_f32x3', vertices);
+    this._skirtMesh.createAndSetVertexBuffer(
+      'tex0_f32x4',
+      this.allocNonInstanceBuffer(0, 0, 0, 0),
+      'instance'
+    );
+    this._nonInstanceDataPoolSize++;
+    for (const fmt of this._extraInstanceBuffers) {
+      this._skirtMesh.createAndSetVertexBuffer(fmt, this.allocNonInstanceBuffer(0, 0, 0, 0), 'instance');
+      this._nonInstanceDataPoolSize++;
+    }
+    this._skirtMesh.createAndSetIndexBuffer(indices);
+    this._skirtMesh.indexStart = 0;
+    this._skirtMesh.indexCount = indices.length;
+    this._skirtMesh.primitiveType = 'triangle-list';
+
+    const indicesLines = new Uint16Array(indices.length * 2);
+    for (let i = 0; i < indices.length / 3; i++) {
+      indicesLines[i * 6 + 0] = indices[i * 3 + 0];
+      indicesLines[i * 6 + 1] = indices[i * 3 + 1];
+      indicesLines[i * 6 + 2] = indices[i * 3 + 1];
+      indicesLines[i * 6 + 3] = indices[i * 3 + 2];
+      indicesLines[i * 6 + 4] = indices[i * 3 + 2];
+      indicesLines[i * 6 + 5] = indices[i * 3 + 0];
+    }
+    this._skirtMeshLines?.dispose();
+    this._skirtMeshLines = new Primitive();
+    this._skirtMeshLines.setVertexBuffer(this._skirtMesh.getVertexBuffer('position')!);
+    this._skirtMeshLines.createAndSetVertexBuffer(
+      'tex0_f32x4',
+      this.allocNonInstanceBuffer(0, 0, 0, 0),
+      'instance'
+    );
+    this._nonInstanceDataPoolSize++;
+    for (const fmt of this._extraInstanceBuffers) {
+      this._skirtMeshLines.createAndSetVertexBuffer(fmt, this.allocNonInstanceBuffer(0, 0, 0, 0), 'instance');
+      this._nonInstanceDataPoolSize++;
+    }
+    this._skirtMeshLines.createAndSetIndexBuffer(indicesLines);
+    this._skirtMeshLines.indexStart = 0;
+    this._skirtMeshLines.indexCount = indicesLines.length;
+    this._skirtMeshLines.primitiveType = 'line-list';
+  }
   private intervalsOverlap(a0: number, a1: number, b0: number, b1: number) {
     return a0 <= b1 && b0 <= a1;
   }
@@ -665,6 +806,16 @@ export class Clipmap extends Disposable {
     const minZ = (tmpAABB.minPoint.y * scale + offset.y) * gridScale;
     const maxZ = (tmpAABB.maxPoint.y * scale + offset.y) * gridScale;
     ctx.calcAABB(ctx.userData, minX, maxX, minZ, maxZ, tmpAABB, level);
+    if (ctx.skirt) {
+      // Every plane except the far one. A skirted clipmap deliberately reaches
+      // past the far plane and pins the depth of whatever lands beyond it, so
+      // culling against that plane here would throw away exactly the tiles the
+      // skirt is there to lead up to - leaving a gap between the last surviving
+      // tile and the ring, with the sky showing through it.
+      return (
+        tmpAABB.getClipStateWithFrustumMask(camera.frustum, ALL_PLANES_EXCEPT_FAR) !== ClipState.NOT_CLIPPED
+      );
+    }
     return tmpAABB.getClipStateWithFrustum(camera.frustum) !== ClipState.NOT_CLIPPED;
   }
   calcLevelAABB(camera: Camera, minMaxWorldPos: Vector4, gridScale: number) {
@@ -736,11 +887,16 @@ export class Clipmap extends Disposable {
     }
     return outAABB;
   }
-  private calcMipLevels(camera: Camera, minMaxWorldPos: Vector4, gridScale: number) {
+  private calcMipLevels(camera: Camera, minMaxWorldPos: Vector4, gridScale: number, viewDistance?: number) {
     camera.getWorldPosition(tmpV3);
     const distX = Math.max(Math.abs(tmpV3.x - minMaxWorldPos.x), Math.abs(tmpV3.x - minMaxWorldPos.z));
     const distY = Math.max(Math.abs(tmpV3.z - minMaxWorldPos.y), Math.abs(tmpV3.z - minMaxWorldPos.w));
-    const maxDist = Math.min(Math.max(distX, distY), camera.getFarPlane());
+    // The reach is the caller's when it supplies one; the far plane is only the
+    // default. An infinite water surface draws its horizon ring beyond the far
+    // plane and clamps the depth in the vertex shader, so capping the levels
+    // here would starve it of the very tiles it needs.
+    const maxReach = viewDistance && viewDistance > 0 ? viewDistance : camera.getFarPlane();
+    const maxDist = Math.min(Math.max(distX, distY), maxReach);
     return Math.min(
       Math.max(Math.ceil(Math.log2(maxDist / (this._tileResolution * gridScale))), 0) + 1,
       this._maxMipLevels
@@ -769,7 +925,12 @@ export class Clipmap extends Disposable {
     this._nonInstanceDataPoolSize = this._nonInstanceDataPool.length;
     this._nonInstanceMipLevelDataPoolSize = this._nonInstanceMipLevelDataPool.length;
     const renderData: PrimitiveInstanceInfo[] = [];
-    const mipLevels = this.calcMipLevels(context.camera, context.minMaxWorldPos, context.gridScale);
+    const mipLevels = this.calcMipLevels(
+      context.camera,
+      context.minMaxWorldPos,
+      context.gridScale,
+      context.viewDistance
+    );
     context.camera.getWorldPosition(tmpV3);
 
     const snappedPos = new Vector2();
@@ -843,18 +1004,25 @@ export class Clipmap extends Disposable {
           const fillY = y >= 2 ? scale : 0;
           offset.setXY(base.x + x * tileSize.x + fillX, base.y + y * tileSize.y + fillY);
           if (
-            this.intervalsOverlap(
+            // An unbounded surface has no rectangle to keep tiles inside of.
+            // Passing a very large one instead does not work: the clipmap's
+            // outermost level reaches 2 * tileResolution << (levels - 1), which
+            // at a raised camera is tens of kilometres and outgrows any sentinel
+            // rectangle - dropping the outer tiles and opening a band of sky
+            // between the last one drawn and the horizon skirt.
+            context.skirt ||
+            (this.intervalsOverlap(
               offset.x * context.gridScale,
               (offset.x + tileSize.x) * context.gridScale,
               context.minMaxWorldPos.x,
               context.minMaxWorldPos.z
             ) &&
-            this.intervalsOverlap(
-              offset.y * context.gridScale,
-              (offset.y + tileSize.y) * context.gridScale,
-              context.minMaxWorldPos.y,
-              context.minMaxWorldPos.w
-            )
+              this.intervalsOverlap(
+                offset.y * context.gridScale,
+                (offset.y + tileSize.y) * context.gridScale,
+                context.minMaxWorldPos.y,
+                context.minMaxWorldPos.w
+              ))
           ) {
             if (
               !context.frustumCulling ||
@@ -952,6 +1120,25 @@ export class Clipmap extends Disposable {
     if (seamPrimitives.numInstances > 0) {
       renderData.push(seamPrimitives);
     }
+    if (context.skirt) {
+      // Welded to the outer boundary of the outermost level, so it carries that
+      // level's scale and snapped origin. Never frustum-culled: the ring spans
+      // the whole horizon, and its outer edge is relocated by the vertex shader,
+      // so the AABB tested here would not describe where it actually lands.
+      const outerLevel = mipLevels - 1;
+      const outerScale = 1 << outerLevel;
+      snappedPos.setXY(
+        Math.floor(posX / outerScale) * outerScale,
+        Math.floor(posY / outerScale) * outerScale
+      );
+      renderData.push({
+        primitive: this._wireframe ? this._skirtMeshLines : this._skirtMesh,
+        numInstances: 1,
+        instanceDatas: this.allocNonInstanceBuffer(rotationValues[0], outerScale, snappedPos.x, snappedPos.y),
+        mipLevels: this.allocNonInstanceMipLevelBuffer(outerLevel),
+        maxMiplevel: outerLevel
+      });
+    }
     for (const info of renderData) {
       info.primitive
         .getVertexBuffer('texCoord0')!
@@ -972,5 +1159,7 @@ export class Clipmap extends Disposable {
     this._trimMeshLines.dispose();
     this._tileMesh.dispose();
     this._tileMeshLines.dispose();
+    this._skirtMesh.dispose();
+    this._skirtMeshLines.dispose();
   }
 }

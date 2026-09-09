@@ -391,7 +391,7 @@ export const waterCausticsRangeBorder: VisualScene = {
 
     // High and steep, so the whole border arc is in frame at once.
     placeCamera(camera, new Vector3(0, 30, 30), new Vector3(0, -bedDepth, 0));
-    camera.far = 300;
+    camera.far = 40000;
   }
 };
 
@@ -721,6 +721,176 @@ export const waterSurfaceGrazing: VisualScene = {
     camera.far = 600;
   }
 };
+
+/**
+ * An unbounded ocean under a scattering sky, with a far plane far too small to
+ * reach the horizon.
+ *
+ * The far plane is the point. At 300 m against a horizon some 5 km out, a
+ * bounded surface ends less than a tenth of the way there and leaves a hard
+ * edge with the sky above it - which is exactly the frame this feature exists
+ * to remove, and exactly what this baseline would show if the skirt regressed.
+ * A generous far plane would hide the whole mechanism: the surface would simply
+ * be drawn to the horizon and the depth pinning would never be exercised.
+ *
+ * Both halves have to hold at once for the frame to be right, and they fail
+ * differently:
+ *
+ * - **The skirt reaches past the far plane.** Its outer vertices are pushed to
+ *   ten times the view distance and their clip-space depth is pinned to the far
+ *   value, so they survive clipping. Lose the pinning and the ring is clipped
+ *   away, putting the hard edge back.
+ * - **The clipmap is sized by the view distance, not the far plane.** The level
+ *   count comes from the derived horizon distance; capped at the far plane
+ *   instead, the tessellated surface stops short and the skirt has to span the
+ *   gap, which reads as a visible band rather than a horizon.
+ *
+ * Grazing and low, because a horizon is only a horizon from near the surface -
+ * looking down at the water puts the join out of frame entirely. `scatter` sky
+ * with fog, because the aerial perspective is what actually dissolves the far
+ * water into the sky; the geometry alone would still meet it at a seam.
+ *
+ * Rendered as a pair, for the reason the caustics pair exists: on its own the
+ * unbounded baseline would go on matching if the skirt quietly stopped being
+ * drawn and the clipmap alone happened to cover the frame. The bounded control
+ * is a 60 m surface under the same camera, which ends well inside the frame and
+ * leaves the dark band between the water's edge and the sky. The two must
+ * differ across that band - measured at 4608 pixels over rows 251-259 at full
+ * channel range when this was written. If they ever converge, the feature has
+ * stopped doing anything.
+ */
+function infiniteHorizonScene(name: string, infinite: boolean, raised = false): VisualScene {
+  return {
+    name,
+    description: infinite
+      ? 'An unbounded ocean seen grazing under a scattering sky, with the camera far plane at 300 m against a ~5 km horizon. Pins the infinite water path: the horizon skirt survives past the far plane via depth pinning, and the clipmap is sized by the derived horizon distance rather than the far plane. Must differ from water-infinite-horizon-control along the horizon band; if the two converge, the skirt is gone.'
+      : 'The same camera and sky over a bounded 60 m surface. Pins what the bounded path legitimately produces: the water ends inside the frame, leaving a dark band between its edge and the sky. Exists so the unbounded baseline cannot pass by accident - it is the frame that appears if the horizon skirt regresses.',
+    frames: 3,
+    setup({ scene, camera }) {
+      bareScene(scene);
+      scene.env.sky.skyType = 'scatter';
+      scene.env.light.type = 'ibl';
+      // The engine default aerial-perspective distance (4000 m) is left alone
+      // on purpose. It is not scene state - see bareScene - and it already
+      // reaches far enough that the water has converged to the sky colour well
+      // before the skirt. Widening it here would rebuild a shared LUT and move
+      // every baseline that runs after this one.
+
+      const light = new DirectionalLight(scene);
+      light.lookAt(new Vector3(0, 9, -40), Vector3.zero(), Vector3.axisPY());
+      light.color = new Vector4(1, 0.96, 0.88, 1);
+
+      const water = new Water(scene);
+      water.position.setXYZ(0, 0, 0);
+      if (infinite) {
+        water.infinite = true;
+      } else {
+        water.scale.setXYZ(60, 1, 60);
+      }
+      const waves = new FBMWaveGenerator();
+      waves.numOctaves = 5;
+      waves.wind = new Vector2(0.3, 0.1);
+      waves.amplitude = 0.14;
+      waves.frequency = 5;
+      water.waveGenerator = waves;
+      water.material.absorption = new Vector3(0.35, 0.09, 0.05);
+      water.material.scattering = new Vector3(0.03, 0.05, 0.06);
+      water.causticsEnabled = false;
+
+      // Low over the surface, aimed just under the horizon.
+      if (raised) {
+        // 80 m up puts the horizon ~32 km out, which is what pushed the clipmap
+        // past the sentinel region rectangle and past the far plane at once.
+        placeCamera(camera, new Vector3(0, 80, 16), new Vector3(0, 60, -300));
+      } else {
+        placeCamera(camera, new Vector3(0, 2.2, 16), new Vector3(0, 1.1, -40));
+      }
+      // Deliberately far too small to reach the horizon.
+      camera.far = 300;
+    }
+  };
+}
+
+export const waterInfiniteHorizon: VisualScene = infiniteHorizonScene('water-infinite-horizon', true);
+
+/**
+ * The same unbounded ocean from 80 m up.
+ *
+ * Height is what makes this a separate baseline rather than a framing tweak.
+ * The view distance follows sqrt(2*R*h), so raising the camera from 2 m to 80 m
+ * takes the horizon from ~5 km to ~32 km and the clipmap's outermost level from
+ * 16 km to 65 km. Two limits only bite at that size, and both left a band of
+ * sky between the last drawn tile and the horizon ring:
+ *
+ * - The per-tile region test rejected anything outside the caller's rectangle,
+ *   and the "unbounded" rectangle was a large sentinel the clipmap outgrew.
+ * - A hard depth clamp at the far plane fogged the whole far ocean as if it sat
+ *   at 300 m, meeting the correctly-fogged water at a brightness step.
+ *
+ * The low-camera scene reaches neither, so it passed throughout.
+ */
+/**
+ * A large bounded sea with the far plane to match, sun well off the view axis.
+ *
+ * This pins a defect that has nothing to do with {@link WaterMaterial.infinite}:
+ * a grazing water ray reflects the sky bake at the exact boundary between its
+ * bright upper hemisphere and its near-black lower one, and the far ocean reads
+ * as a dark band instead of a reflection. It is only visible once the surface
+ * is large enough that the horizon sits inside the frame - a small pond never
+ * reaches the reflection angle that triggers it - which is why none of the
+ * earlier water baselines caught it.
+ *
+ * The camera is raised and the sun moved to the side so the band is not hidden
+ * by the sun's glitter track; with the sun ahead (see
+ * `water-infinite-horizon-raised`) the specular path washes the horizon out and
+ * the defect is invisible. No fog override and no `infinite`: this is the
+ * bounded, default-configuration surface, so it also guards that the fix is
+ * limited to the water shader and does not touch the deliberate fog-free
+ * environment bake.
+ */
+export const waterHorizonReflect: VisualScene = {
+  name: 'water-horizon-reflect',
+  description:
+    'A large bounded sea viewed from 80 m, sun off to the side, no infinite mode. Pins the grazing reflection hazard: far water must fade into the sky, not into the near-black lower hemisphere of the fog-free sky bake. A regression that reverts the horizon reflection lift puts the dark band back across the far ocean.',
+  frames: 3,
+  setup({ scene, camera }) {
+    bareScene(scene);
+    scene.env.sky.skyType = 'scatter';
+    scene.env.light.type = 'ibl';
+    const light = new DirectionalLight(scene);
+    // High and to the side, so no glitter track runs towards the camera and the
+    // far water is lit by the sky alone.
+    light.lookAt(new Vector3(-30, 25, 10), Vector3.zero(), Vector3.axisPY());
+    light.color = new Vector4(1, 0.96, 0.88, 1);
+    const water = new Water(scene);
+    water.position.setXYZ(0, 0, 0);
+    // Bounded, and large enough that the horizon is inside the frame.
+    water.scale.setXYZ(20000, 1, 20000);
+    const waves = new FBMWaveGenerator();
+    waves.numOctaves = 5;
+    waves.wind = new Vector2(0.3, 0.1);
+    waves.amplitude = 0.14;
+    waves.frequency = 5;
+    water.waveGenerator = waves;
+    water.material.absorption = new Vector3(0.35, 0.09, 0.05);
+    water.material.scattering = new Vector3(0.03, 0.05, 0.06);
+    water.causticsEnabled = false;
+    placeCamera(camera, new Vector3(0, 80, 16), new Vector3(0, 62, -300));
+    camera.far = 20000;
+  }
+};
+
+export const waterInfiniteHorizonRaised: VisualScene = infiniteHorizonScene(
+  'water-infinite-horizon-raised',
+  true,
+  true
+);
+
+/** The bounded control for {@link waterInfiniteHorizon}; see that scene's note. */
+export const waterInfiniteHorizonControl: VisualScene = infiniteHorizonScene(
+  'water-infinite-horizon-control',
+  false
+);
 
 /**
  * A small pool over a large, deep, dark floor that lies entirely below the water

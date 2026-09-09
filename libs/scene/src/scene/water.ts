@@ -15,6 +15,26 @@ import { BoundingBox } from '../utility/bounding_volume';
 import type { Camera } from '../camera';
 import { getDevice } from '../app/api';
 
+/** Mean earth radius in meters, for the horizon distance. @internal */
+const EARTH_RADIUS = 6371000;
+/** Floor on the eye height feeding the horizon distance, in meters. @internal */
+const MIN_HORIZON_EYE_HEIGHT = 0.1;
+/**
+ * How far past the tessellated surface the skirt's outer edge is placed, as a
+ * multiple of the view distance.
+ *
+ * Only has to be far enough that the ring reads as a horizon line rather than a
+ * visible band; it is depth-pinned to the far plane regardless of how far out
+ * it actually lands.
+ * @internal
+ */
+const SKIRT_DISTANCE_FACTOR = 10;
+/**
+ * Region rectangle standing in for "no bounds", matching the WaterMaterial
+ * default. @internal
+ */
+const WHOLE_DOMAIN = new Vector4(-99999, -99999, 99999, 99999);
+
 /**
  * Water scene node
  * @public
@@ -24,6 +44,7 @@ export class Water extends applyMixins(GraphNode, mixinDrawable) implements Draw
   private _clipmap: Clipmap;
   private _renderData: Nullable<PrimitiveInstanceInfo[]>;
   private _gridScale: number;
+  private _viewDistance: number;
   private _animationSpeed: number;
   private _timeStart: number;
   private _feedbackProgram: DRef<GPUProgram>;
@@ -42,6 +63,7 @@ export class Water extends applyMixins(GraphNode, mixinDrawable) implements Draw
     this._clipmap = new Clipmap(32, []);
     this._renderData = null;
     this._gridScale = 1;
+    this._viewDistance = 0;
     this._animationSpeed = 1;
     this._timeStart = 0;
     this._material = new DRef(new WaterMaterial());
@@ -91,6 +113,45 @@ export class Water extends applyMixins(GraphNode, mixinDrawable) implements Draw
     if (this.material.needUpdate()) {
       this.scene?.queueUpdateNode(this);
     }
+  }
+  /**
+   * Whether the surface reads as an unbounded ocean reaching the horizon,
+   * rather than a body of water ending at the node's extent.
+   *
+   * Off by default. A pond, a lake or a pool has an edge, and the region test
+   * that draws it is skipped entirely while this is on.
+   *
+   * The horizon is reached without touching the camera's far plane: the
+   * clipmap's outermost ring is drawn as a skirt whose outer vertices are
+   * pushed well past it with their depth pinned to the far value. A far plane
+   * sized for the near scene therefore keeps its depth precision.
+   */
+  get infinite() {
+    return this.material.infinite;
+  }
+  set infinite(val: boolean) {
+    if (!!val !== this.material.infinite) {
+      this.material.infinite = !!val;
+      this.invalidateWorldBoundingVolume(false);
+    }
+  }
+  /**
+   * How far the surface is built out from the camera while {@link infinite} is
+   * on, in meters. 0 derives it from the true horizon distance for the camera's
+   * height above the water.
+   *
+   * Raising it costs clipmap levels, which are logarithmic in the distance, so
+   * the geometry cost of a much larger value is small. What it really trades is
+   * against the sky's {@link SkyRenderer.aerialPerspectiveDistance}: build the
+   * water out further than the aerial perspective LUT reaches and the far water
+   * stops converging towards the sky colour, which puts back the hard band this
+   * setting exists to remove.
+   */
+  get viewDistance() {
+    return this._viewDistance;
+  }
+  set viewDistance(val: number) {
+    this._viewDistance = Math.max(0, val);
   }
   /** Animation speed of the water */
   get animationSpeed() {
@@ -352,12 +413,26 @@ export class Water extends applyMixins(GraphNode, mixinDrawable) implements Draw
     const mat = this._material.get();
     if (mat) {
       const that = this;
+      const infinite = mat.infinite;
+      let viewDistance = 0;
+      if (infinite) {
+        viewDistance = this._viewDistance > 0 ? this._viewDistance : this.horizonDistance(camera);
+        // The skirt's outer edge sits beyond where the surface is tessellated,
+        // so the band between them is what hides the last ring of geometry.
+        mat.setSkirtDistance(viewDistance * SKIRT_DISTANCE_FACTOR);
+      }
       this._renderData = this._clipmap.gather({
         camera,
-        minMaxWorldPos: mat.region,
+        // An unbounded surface is not clipped to the node's extent, and the
+        // region rectangle is what the clipmap would otherwise reject tiles
+        // against. The material's own default is already this whole-domain
+        // value; passing it keeps the two agreeing.
+        minMaxWorldPos: infinite ? WHOLE_DOMAIN : mat.region,
         gridScale: Math.max(0.01, this._gridScale),
         userData: this,
         frustumCulling: true,
+        viewDistance: infinite ? viewDistance : undefined,
+        skirt: infinite,
         calcAABB(userData: unknown, minX, maxX, minZ, maxZ, outAABB) {
           const p = that.worldMatrix.transformPointAffine(Vector3.zero());
           if (that.waveGenerator) {
@@ -370,6 +445,24 @@ export class Water extends applyMixins(GraphNode, mixinDrawable) implements Draw
       });
       this.scene?.queuePerCameraUpdateNode(this);
     }
+  }
+  /**
+   * Distance to the true horizon for the camera's height above this water, in
+   * meters.
+   *
+   * `sqrt(2 * R * h)` for earth's radius: about 5km from an eye 2m up, 25km
+   * from 50m. Using the real figure rather than a constant is what makes the
+   * horizon move correctly as the camera climbs, which is most of what sells
+   * the scale of an ocean.
+   * @internal
+   */
+  private horizonDistance(camera: Camera) {
+    const camPos = camera.getWorldPosition();
+    const waterLevel = this.worldMatrix.transformPointAffine(Vector3.zero()).y;
+    // A camera below the surface still needs a surface to look at; the floor
+    // also keeps the sqrt away from zero when the eye is exactly at water level.
+    const height = Math.max(camPos.y - waterLevel, MIN_HORIZON_EYE_HEIGHT);
+    return Math.sqrt(2 * EARTH_RADIUS * height);
   }
   /**
    * {@inheritDoc Drawable.getPickTarget }
@@ -447,6 +540,13 @@ export class Water extends applyMixins(GraphNode, mixinDrawable) implements Draw
     const p = this.worldMatrix.transformPointAffine(Vector3.zero());
     const mat = this._material?.get();
     if (mat) {
+      // An unbounded surface has no box to test. Null reaches the cull visitor
+      // as ClipState.CLIPPED, which keeps the node in the queue and defers the
+      // decision to the clipmap's per-tile culling - the only place that can
+      // decide it, since the surface is built around wherever the camera is.
+      if (mat.infinite) {
+        return null;
+      }
       const boundingBox = new BoundingBox();
       if (mat.waveGenerator) {
         mat.waveGenerator.calcClipmapTileAABB(
