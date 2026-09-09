@@ -1130,7 +1130,11 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
       executeCommand: <T>(command: unknown) => this._cmdManager.execute(command as Command<T>),
       executeUserCallback: <T>(execute: () => T | Promise<T>, undo: () => void | Promise<void>) =>
         this._cmdManager.execute(new CustomCommand(execute, undo)),
-      selectNode: (node) => this._sceneHierarchy.selectNode(node)
+      selectNode: (node) => this._sceneHierarchy.selectNode(node),
+      activateEditTool: (node) => {
+        this._sceneHierarchy.selectNode(node);
+        return this.handleEditNode(node, false);
+      }
     };
   }
 
@@ -2370,9 +2374,9 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
       eventBus.dispatchEvent('scene_changed');
     }
   }
-  private handleEditNode(node: SceneNode) {
+  private handleEditNode(node: SceneNode, toggle = true) {
     if (!node) {
-      return;
+      return false;
     }
     const currentTool = this._currentEditTool.get();
     if (!currentTool) {
@@ -2381,12 +2385,15 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
       if (tool) {
         this.editor.plugins.dispatchEvent('editToolActivated', tool, node);
       }
-      return;
+      return !!tool;
     }
     const currentTarget = currentTool.getTarget();
     const sameTarget =
       currentTarget === node || (currentTarget instanceof SceneNode && currentTarget.isParentOf(node));
     if (sameTarget) {
+      if (!toggle) {
+        return true;
+      }
       this.editor.plugins.dispatchEvent('editToolDeactivated', currentTool, currentTarget);
       this._currentEditTool.dispose();
     } else {
@@ -2396,7 +2403,9 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
       if (tool) {
         this.editor.plugins.dispatchEvent('editToolActivated', tool, node);
       }
+      return !!tool;
     }
+    return false;
   }
   public getSelectedSceneNodes() {
     return this._sceneHierarchy ? [...this._sceneHierarchy.selectedNodes] : [];
