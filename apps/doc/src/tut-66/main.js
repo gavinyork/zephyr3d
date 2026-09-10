@@ -205,6 +205,10 @@ function buildPoolScene() {
   const floorMaterial = new PBRMetallicRoughnessMaterial();
   floorMaterial.albedoColor = new Vector4(0.9, 0.95, 1, 1);
   floorMaterial.albedoTexture = makeCheckerTexture();
+  floorMaterial.albedoTextureSampler = getDevice().createSampler({
+    magFilter: 'nearest',
+    minFilter: 'nearest'
+  });
   floorMaterial.metallic = 0;
   floorMaterial.roughness = 0.1;
   const floor = new Mesh(scene, new PlaneShape({ size: HALF * 2 }), floorMaterial);
