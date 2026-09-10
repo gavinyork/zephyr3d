@@ -20,6 +20,23 @@ import { fetchSampler } from '../utility/misc';
 
 const NUM_SAMPLES = 7;
 const NUM_RINGS = 4;
+/**
+ * Hard cap on the tap pattern's screen-space radius, in pixels.
+ *
+ * @remarks
+ * Purely a performance guard, not a look control: the world-space radius is
+ * projected per pixel, and without a cap a surface close to the near plane
+ * would spread the taps across the whole screen, which destroys depth-texture
+ * cache locality for no visual gain. At 1080p this is about a quarter of the
+ * screen height, far wider than any sane occlusion radius projects to at a
+ * normal working distance.
+ */
+const MAX_TAP_RADIUS_PIXELS = 256;
+/**
+ * Mean of the falloff term over the fixed tap pattern, used to normalize the
+ * occlusion sum so {@link SAO.intensity} does not depend on the radius.
+ */
+const MEAN_TAP_FALLOFF = 0.748834;
 
 class DepthLimitAOBlurBlitter extends BilateralBlurBlitter {
   private _packed: boolean;
@@ -74,11 +91,9 @@ export class SAO extends AbstractPostEffect {
   private static _renderStateBlend: Nullable<RenderStateSet> = null;
   private static _bindgroup: Nullable<BindGroup> = null;
   private static _bindgroupPacked: Nullable<BindGroup> = null;
-  private _saoScale: number;
   private _saoBias: number;
   private _saoIntensity: number;
-  private _saoRadius: number;
-  private _saoMinResolution: number;
+  private _saoOcclusionRadius: number;
   private readonly _saoRandomSeed: number;
   private _saoBlurDepthCutoff: number;
   private readonly _blitterH: DepthLimitAOBlurBlitter;
@@ -91,11 +106,9 @@ export class SAO extends AbstractPostEffect {
     super();
     this._supported = true;
     this._layer = PostEffectLayer.opaque;
-    this._saoScale = 10;
-    this._saoBias = 1;
-    this._saoIntensity = 0.025;
-    this._saoRadius = 100;
-    this._saoMinResolution = 0;
+    this._saoBias = 0.05;
+    this._saoIntensity = 1;
+    this._saoOcclusionRadius = 0.5;
     this._saoRandomSeed = 0;
     this._saoBlurDepthCutoff = 2;
     this._blitterH = new DepthLimitAOBlurBlitter(false);
@@ -105,40 +118,32 @@ export class SAO extends AbstractPostEffect {
     this._blitterV.kernelRadius = 8;
     this._blitterV.stdDev = 10;
   }
-  /** Scale value */
-  get scale() {
-    return this._saoScale;
-  }
-  set scale(val) {
-    this._saoScale = val;
-  }
-  /** Bias value */
-  get bias() {
-    return this._saoBias;
-  }
-  set bias(val) {
-    this._saoBias = val;
-  }
-  /** Radius value */
-  get radius() {
-    return this._saoRadius;
-  }
-  set radius(val) {
-    this._saoRadius = val;
-  }
-  /** SAO intensity */
+  /**
+   * Strength of the occlusion term added by each tap.
+   */
   get intensity() {
     return this._saoIntensity;
   }
   set intensity(val) {
     this._saoIntensity = val;
   }
-  /** Minimum resolution */
-  get minResolution() {
-    return this._saoMinResolution;
+  /**
+   * Threshold below which a sample does not occlude, in the range 0..1.
+   */
+  get bias() {
+    return this._saoBias;
   }
-  set minResolution(val) {
-    this._saoMinResolution = val;
+  set bias(val) {
+    this._saoBias = val;
+  }
+  /**
+   * World-space occlusion radius in metres.
+   */
+  get occlusionRadius() {
+    return this._saoOcclusionRadius;
+  }
+  set occlusionRadius(val) {
+    this._saoOcclusionRadius = val;
   }
   /** Blur kernel size */
   get blurKernelSize() {
@@ -194,13 +199,11 @@ export class SAO extends AbstractPostEffect {
     const bindgroup = packed ? SAO._bindgroupPacked! : SAO._bindgroup!;
     bindgroup.setValue('flip', this.needFlip(device) ? 1 : 0);
     bindgroup.setTexture('depthTex', sceneDepthTexture, fetchSampler('clamp_nearest_nomip'));
-    bindgroup.setValue('scale', this._saoScale);
     bindgroup.setValue('invProj', Matrix4x4.invert(ctx.camera.getProjectionMatrix()));
     bindgroup.setValue('bias', this._saoBias);
     bindgroup.setValue('cameraNearFar', cameraNearFar);
     bindgroup.setValue('intensity', this._saoIntensity);
-    bindgroup.setValue('kernelRadius', this._saoRadius);
-    bindgroup.setValue('minResolution', this._saoMinResolution);
+    bindgroup.setValue('occlusionRadius', this._saoOcclusionRadius);
     bindgroup.setValue('size', new Vector2(viewport.width, viewport.height));
     bindgroup.setValue('randomSeed', this._saoRandomSeed);
     device.setRenderStates(SAO._renderState);
@@ -280,17 +283,14 @@ export class SAO extends AbstractPostEffect {
           },
           fragment(pb) {
             this.depthTex = pb.tex2D().sampleType('unfilterable-float').uniform(0);
-            this.scale = pb.float().uniform(0);
             this.invProj = pb.mat4().uniform(0);
             this.cameraNearFar = pb.vec2().uniform(0);
             this.intensity = pb.float().uniform(0);
             this.bias = pb.float().uniform(0);
-            this.kernelRadius = pb.float().uniform(0);
-            this.minResolution = pb.float().uniform(0);
+            this.occlusionRadius = pb.float().uniform(0);
             this.size = pb.vec2().uniform(0);
             this.randomSeed = pb.float().uniform(0);
-            this.$l.scaleDividedByCameraFar = pb.float();
-            this.$l.minResolutionMultipliedByCameraFar = pb.float();
+            this.$l.occlusionRadiusSq = pb.float();
             pb.func('rand', [pb.vec2('uv')], function () {
               this.$l.a = 12.9898;
               this.$l.b = 78.233;
@@ -326,37 +326,34 @@ export class SAO extends AbstractPostEffect {
               [pb.vec3('centerPos'), pb.vec3('centerNormal'), pb.vec3('samplePos')],
               function () {
                 this.$l.viewDelta = pb.sub(this.samplePos, this.centerPos);
-                this.$l.viewDistance = pb.length(this.viewDelta);
-                this.$l.scaledScreenDistance = pb.mul(this.scaleDividedByCameraFar, this.viewDistance);
+                this.$l.viewDistance = pb.max(pb.length(this.viewDelta), 1e-6);
                 this.$return(
                   pb.div(
                     pb.max(
                       0,
-                      pb.sub(
-                        pb.div(
-                          pb.sub(
-                            pb.dot(this.centerNormal, this.viewDelta),
-                            this.minResolutionMultipliedByCameraFar
-                          ),
-                          this.scaledScreenDistance
-                        ),
-                        this.bias
-                      )
+                      pb.sub(pb.div(pb.dot(this.centerNormal, this.viewDelta), this.viewDistance), this.bias)
                     ),
-                    pb.add(pb.mul(this.scaledScreenDistance, this.scaledScreenDistance), 1)
+                    pb.add(1, pb.div(pb.mul(this.viewDistance, this.viewDistance), this.occlusionRadiusSq))
                   )
                 );
               }
             );
             pb.func('getAO', [pb.vec3('vPos')], function () {
-              this.scaleDividedByCameraFar = pb.div(this.scale, this.cameraNearFar.y);
-              this.minResolutionMultipliedByCameraFar = pb.mul(this.minResolution, this.cameraNearFar.y);
               this.$l.centerViewNormal = pb.normalize(pb.cross(pb.dpdx(this.vPos), pb.dpdy(this.vPos)));
               this.$l.angle = pb.mul(
                 this.rand(pb.add(this.$inputs.uv, pb.vec2(this.randomSeed))),
                 Math.PI * 2
               );
-              this.$l.radius = pb.div(pb.vec2(pb.mul(this.kernelRadius, 1 / NUM_SAMPLES)), this.size);
+              this.$l.projScale = pb.div(pb.mul(this.size.y, 0.5), pb.max(this.invProj[1].y, 1e-6));
+              this.$l.viewDepth = pb.max(pb.neg(this.vPos.z), 1e-4);
+              this.$l.radiusPx = pb.clamp(
+                pb.div(pb.mul(this.occlusionRadius, this.projScale), this.viewDepth),
+                2,
+                MAX_TAP_RADIUS_PIXELS
+              );
+              this.$l.effectiveRadius = pb.div(pb.mul(this.radiusPx, this.viewDepth), this.projScale);
+              this.occlusionRadiusSq = pb.max(pb.mul(this.effectiveRadius, this.effectiveRadius), 1e-12);
+              this.$l.radius = pb.div(pb.vec2(pb.mul(this.radiusPx, 1 / NUM_SAMPLES)), this.size);
               this.$l.radiusStep = this.radius;
               this.$l.occlusionSum = pb.float(0);
               this.$l.weightSum = pb.float(0);
@@ -377,7 +374,9 @@ export class SAO extends AbstractPostEffect {
               this.$if(pb.equal(this.weightSum, 0), function () {
                 pb.discard();
               });
-              this.$return(pb.div(pb.mul(this.occlusionSum, this.intensity), this.weightSum));
+              this.$return(
+                pb.div(pb.mul(this.occlusionSum, this.intensity), pb.mul(this.weightSum, MEAN_TAP_FALLOFF))
+              );
             });
             pb.main(function () {
               this.$l.vPos = this.getPositionVS(this.$inputs.uv);

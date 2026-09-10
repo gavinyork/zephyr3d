@@ -1778,26 +1778,26 @@ export function getCameraClass(): SerializableClass {
           }
         },
         {
-          name: 'SSAOScale',
+          name: 'SSAOOcclusionRadius',
           type: 'float',
           phase: 0,
-          default: 10,
+          default: 0.25,
           options: {
-            label: 'Scale',
+            label: 'Occlusion Radius',
             group: 'PostProcessing/SSAO'
           },
           get(this: Camera, value) {
-            value.num[0] = this.SSAOScale;
+            value.num[0] = this.SSAOOcclusionRadius;
           },
           set(this: Camera, value) {
-            this.SSAOScale = value.num[0];
+            this.SSAOOcclusionRadius = value.num[0];
           }
         },
         {
           name: 'SSAOBias',
           type: 'float',
           phase: 0,
-          default: 1,
+          default: 0.05,
           options: {
             label: 'Bias',
             group: 'PostProcessing/SSAO'
@@ -1810,35 +1810,19 @@ export function getCameraClass(): SerializableClass {
           }
         },
         {
-          name: 'SSAORadius',
-          type: 'float',
-          phase: 0,
-          default: 100,
-          options: {
-            label: 'Radius',
-            group: 'PostProcessing/SSAO'
-          },
-          get(this: Camera, value) {
-            value.num[0] = this.SSAORadius;
-          },
-          set(this: Camera, value) {
-            this.SSAORadius = value.num[0];
-          }
-        },
-        {
           name: 'SSAOIntensity',
           type: 'float',
           phase: 0,
-          default: 2.5,
+          default: 1,
           options: {
             label: 'Intensity',
             group: 'PostProcessing/SSAO'
           },
           get(this: Camera, value) {
-            value.num[0] = this.SSAOIntensity * 100;
+            value.num[0] = this.SSAOIntensity;
           },
           set(this: Camera, value) {
-            this.SSAOIntensity = value.num[0] * 0.01;
+            this.SSAOIntensity = value.num[0];
           }
         }
       ]);

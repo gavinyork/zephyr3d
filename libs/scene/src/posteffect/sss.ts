@@ -1056,6 +1056,20 @@ export class SSS extends AbstractPostEffect {
               pb.add(pb.vec2(1.2), pb.mul(pb.vec2(2.4), this.radiusScale)),
               this.targetSize.xy
             );
+            // Depth differences are accumulated as a ratio to the center depth
+            // rather than raw. readDepth01 returns linear depth already divided
+            // by the far plane, so both terms carry the same normalization and
+            // it cancels: |dz|/z is a pure ratio, independent of the far plane,
+            // of the camera distance, and of the scale the model was built at.
+            //
+            // The raw difference this replaces was scaled by a fixed constant
+            // instead, which left sensitivity proportional to 1 / farPlane - an
+            // otherwise identical scene with far = 1000 got a tenth the response
+            // of one with far = 100. At ordinary far planes the interior
+            // collapsed to zero and only the silhouette survived, where the
+            // difference saturates no matter how it is scaled. That is what made
+            // automatic thin-region inference read as an outline.
+            this.$l.invCenterDepth = pb.div(1, pb.max(this.depth01, 1e-5));
             this.$l.depthAccum = pb.float(0);
             this.$l.normalAccum = pb.float(0);
             this.$l.sampleCount = pb.float(0);
@@ -1066,7 +1080,10 @@ export class SSS extends AbstractPostEffect {
                 pb.vec2(1)
               );
               this.$l.sampleDepth01 = this.readDepth01(this.sampleUV);
-              this.depthAccum = pb.add(this.depthAccum, pb.abs(pb.sub(this.sampleDepth01, this.depth01)));
+              this.depthAccum = pb.add(
+                this.depthAccum,
+                pb.mul(pb.abs(pb.sub(this.sampleDepth01, this.depth01)), this.invCenterDepth)
+              );
               this.$if(pb.notEqual(this.hasNormalTex, 0), function () {
                 this.normalAccum = pb.add(
                   this.normalAccum,
@@ -1083,8 +1100,22 @@ export class SSS extends AbstractPostEffect {
             sampleAt(-1, -1);
             this.$l.depthMean = pb.div(this.depthAccum, pb.max(this.sampleCount, 1));
             this.$l.normalMean = pb.div(this.normalAccum, pb.max(this.sampleCount, 1));
+            // Recalibrated for the relative gradient above; the old 52 applied to
+            // a raw normalized difference and is not comparable.
+            //
+            // For a surface turned by angle t from the view direction, the ratio
+            // over a k-pixel step is about tan(t) * k / (0.5 * height * P11), and
+            // the six-tap pattern averages roughly two thirds of that. At 1080p
+            // with a 40 degree vertical FOV this puts an ear rim or nostril wing
+            // (t around 80 degrees) near 0.5, keeps a flat cheek under 0.1, and
+            // still saturates on a silhouette.
+            //
+            // A residual dependence on vertical resolution and FOV remains,
+            // because pixelStep is expressed in pixels. That is bounded and
+            // predictable, unlike the far-plane scaling it replaces, so it is
+            // left alone rather than fixed by hand here.
             this.$l.depthThin = pb.clamp(
-              pb.mul(this.depthMean, pb.add(52, pb.mul(this.radiusScale, 18))),
+              pb.mul(this.depthMean, pb.add(80, pb.mul(this.radiusScale, 28))),
               0,
               1
             );

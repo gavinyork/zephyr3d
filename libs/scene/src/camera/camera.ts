@@ -451,11 +451,10 @@ export class Camera extends SceneNode {
   /** @internal SSAO post effect reference. */
   protected _postEffectSSAO: DRef<SAO>;
   /** @internal SSAO scale (sampling radius multiplier). */
-  protected _SSAOScale: number;
+  protected _SSAOOcclusionRadius: number;
   /** @internal SSAO bias (self-shadowing reduction). */
   protected _SSAOBias: number;
   /** @internal SSAO sample radius. */
-  protected _SSAORadius: number;
   /** @internal SSAO intensity. */
   protected _SSAOIntensity: number;
   /** @internal SSAO blur depth cutoff. */
@@ -630,10 +629,9 @@ export class Camera extends SceneNode {
     this._skinSSSScatterTint = new Vector4(1, 1, 1, 1);
     this._SSAO = false;
     this._postEffectSSAO = new DRef();
-    this._SSAOScale = 10;
-    this._SSAOBias = 1;
-    this._SSAOIntensity = 0.025;
-    this._SSAORadius = 100;
+    this._SSAOOcclusionRadius = 0.25;
+    this._SSAOBias = 0.05;
+    this._SSAOIntensity = 1;
     this._SSAOBlurDepthCutoff = 2;
     this._pickResult = null;
     this._commandBufferReuse = true;
@@ -1631,14 +1629,20 @@ export class Camera extends SceneNode {
   set SSAO(val) {
     this._postEffectSSAO.get()!.enabled = !!val;
   }
-  /** SSAO scale */
-  get SSAOScale() {
-    return this._SSAOScale;
+  /**
+   * SSAO occlusion radius, in world units (metres).
+   *
+   * @remarks
+   * Replaces the old `SSAOScale`, which was a far-plane-relative multiplier and
+   * carried no physical meaning.
+   */
+  get SSAOOcclusionRadius() {
+    return this._SSAOOcclusionRadius;
   }
-  set SSAOScale(val) {
-    this._SSAOScale = val;
-    if (this._postEffectSSAO.get()!) {
-      this._postEffectSSAO.get()!.scale = val;
+  set SSAOOcclusionRadius(val) {
+    this._SSAOOcclusionRadius = val;
+    if (this._postEffectSSAO.get()) {
+      this._postEffectSSAO.get()!.occlusionRadius = val;
     }
   }
   /** SSAO bias */
@@ -1649,16 +1653,6 @@ export class Camera extends SceneNode {
     this._SSAOBias = val;
     if (this._postEffectSSAO.get()) {
       this._postEffectSSAO.get()!.bias = val;
-    }
-  }
-  /** SSAO radius */
-  get SSAORadius() {
-    return this._SSAORadius;
-  }
-  set SSAORadius(val) {
-    this._SSAORadius = val;
-    if (this._postEffectSSAO.get()) {
-      this._postEffectSSAO.get()!.radius = val;
     }
   }
   /** SSAO intensity */
@@ -2142,9 +2136,8 @@ export class Camera extends SceneNode {
     if (!this._postEffectSSAO.get()) {
       const ssao = new SAO();
       ssao.enabled = false;
-      ssao.scale = this._SSAOScale;
+      ssao.occlusionRadius = this._SSAOOcclusionRadius;
       ssao.bias = this._SSAOBias;
-      ssao.radius = this._SSAORadius;
       ssao.intensity = this._SSAOIntensity;
       ssao.blurDepthCutoff = this._SSAOBlurDepthCutoff;
       this._postEffectSSAO.set(ssao);
