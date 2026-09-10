@@ -28,6 +28,8 @@ export type GPUClothColliderConfig = {
 export type GPUClothWrapTargetConfig = {
   meshId: string;
   bindingData: GPUClothWrapBindingData;
+  /** Sparse per-vertex wrap weights encoded as `vertexIndex:weight`. Missing vertices default to 1. */
+  targetWrapWeights?: string;
 };
 
 /** Persistent configuration for a GPU cloth component. */
@@ -132,7 +134,8 @@ export function normalizeGPUClothComponentConfig(
       .filter((entry) => !!entry?.meshId && !!entry.bindingData)
       .map((entry) => ({
         meshId: String(entry.meshId),
-        bindingData: cloneBindingData(entry.bindingData)
+        bindingData: cloneBindingData(entry.bindingData),
+        targetWrapWeights: String(entry.targetWrapWeights ?? '')
       })),
     colliders: (Array.isArray(source.colliders) ? source.colliders : []).map((entry) => ({
       type: entry?.type === 'capsule' || entry?.type === 'plane' ? entry.type : 'sphere',
@@ -166,6 +169,26 @@ function parsePinnedWeights(source: string, vertexCount: number) {
       continue;
     }
     result[parsedIndex] = 1 - clothWeight;
+  }
+  return result;
+}
+
+function parseTargetWrapWeights(source: string, vertexCount: number) {
+  if (!source.trim() || vertexCount <= 0) {
+    return undefined;
+  }
+  const result = new Float32Array(vertexCount);
+  result.fill(1);
+  for (const token of source.split(',')) {
+    const separator = token.indexOf(':');
+    if (separator < 0) {
+      continue;
+    }
+    const parsedIndex = Number(token.slice(0, separator).trim());
+    if (!Number.isInteger(parsedIndex) || parsedIndex < 0 || parsedIndex >= vertexCount) {
+      continue;
+    }
+    result[parsedIndex] = clamp(Number(token.slice(separator + 1).trim()), 0, 1, 1);
   }
   return result;
 }
@@ -316,7 +339,7 @@ export class GPUClothComponent extends Disposable {
       });
       const targets = this.resolveWrapTargets(host, simulationMesh, config.wrapTargets);
       if (targets.length > 0) {
-        system.setWrapTargetsFromBindingData(targets);
+        await system.setWrapTargetsFromBindingData(targets);
       }
     } catch (err) {
       system?.dispose();
@@ -372,7 +395,14 @@ export class GPUClothComponent extends Disposable {
     for (const config of configs) {
       const target = host.findNodeById<SceneNode>(config.meshId);
       if (isMesh(target) && target !== simulationMesh) {
-        result.push({ target, data: cloneBindingData(config.bindingData) });
+        result.push({
+          target,
+          data: cloneBindingData(config.bindingData),
+          targetWrapWeights: parseTargetWrapWeights(
+            config.targetWrapWeights ?? '',
+            target.primitive?.getNumVertices() ?? 0
+          )
+        });
       }
     }
     return result;

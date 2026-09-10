@@ -29,6 +29,7 @@ const CONFIG: GPUClothComponentConfig = {
   wrapTargets: [
     {
       meshId: 'render-mesh',
+      targetWrapWeights: '0:0, 1:0.5',
       bindingData: {
         version: 4,
         vertexCount: 2,
@@ -140,6 +141,50 @@ describe('GPUClothComponent serialization', () => {
 
     expect(system.dispose).toHaveBeenCalledTimes(1);
     expect(component.system).toBeNull();
+    createSpy.mockRestore();
+    scene.dispose();
+  });
+
+  it('expands sparse target wrap weights with wrapped vertices as the default', async () => {
+    const scene = new Scene();
+    const host = new SceneNode(scene);
+    const simulationMesh = new SceneNode(scene) as any;
+    simulationMesh.parent = host;
+    simulationMesh.isMesh = () => true;
+    simulationMesh.primitive = { getNumVertices: () => 4 };
+    const targetMesh = new SceneNode(scene) as any;
+    targetMesh.parent = host;
+    targetMesh.isMesh = () => true;
+    targetMesh.primitive = { getNumVertices: () => 3 };
+
+    const system = {
+      disabledReason: null,
+      dispose: jest.fn(),
+      setWrapTargetsFromBindingData: jest.fn().mockResolvedValue(undefined)
+    } as unknown as GPUClothSystem;
+    const createSpy = jest.spyOn(GPUClothSystem, 'createFromMesh').mockResolvedValue(system);
+    const component = host.addGPUClothComponent(
+      new GPUClothComponent({
+        ...CONFIG,
+        simulationMeshId: simulationMesh.persistentId,
+        wrapTargets: [
+          {
+            ...CONFIG.wrapTargets[0],
+            meshId: targetMesh.persistentId,
+            targetWrapWeights: '0:0, 1:0.5'
+          }
+        ],
+        colliders: []
+      })
+    );
+
+    await component.rebuild();
+
+    const targets = (system.setWrapTargetsFromBindingData as jest.Mock).mock.calls[0][0];
+    expect(targets[0].target).toBe(targetMesh);
+    expect([...targets[0].targetWrapWeights]).toEqual([0, 0.5, 1]);
+
+    host.removeGPUClothComponent(component);
     createSpy.mockRestore();
     scene.dispose();
   });

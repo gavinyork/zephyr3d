@@ -196,6 +196,35 @@ function setHumanoidLateralBindPose(joints: SceneNode[], mirrored = false, forwa
 }
 
 describe('SkeletonRig and SkinBinding', () => {
+  test('CPU skinning applies influences beyond the first four', () => {
+    const scene = new Scene();
+    const model = appendNode(scene.rootNode, 'model');
+    const joints = Array.from({ length: 6 }, (_, index) => {
+      const joint = appendNode(model, `joint-${index}`);
+      joint.position.setXYZ(index, 0, 0);
+      return joint;
+    });
+    const rig = new SkeletonRig(joints, bindPose(joints));
+    const binding = new SkinBinding(rig, inverseBind(joints));
+    const positions = new Float32Array([0, 0, 0]);
+    const blendIndices = new Float32Array([0, 1, 2, 3, 4, 5]);
+    const blendWeights = new Float32Array([0, 0, 0, 0, 0.25, 0.75]);
+
+    const skinned = (binding as any).skinPositionsToLocal(
+      positions,
+      blendIndices,
+      blendWeights,
+      Matrix4x4.identity(),
+      undefined,
+      6
+    );
+
+    expect(skinned[0]).toBeCloseTo(4.75);
+    expect(skinned[1]).toBeCloseTo(0);
+    expect(skinned[2]).toBeCloseTo(0);
+    scene.dispose();
+  });
+
   test('round-trips an explicit retarget pose through scene serialization', async () => {
     const scene = new Scene();
     const model = appendNode(scene.rootNode, 'model');

@@ -16,7 +16,7 @@ import {
   type Nullable
 } from '@zephyr3d/base';
 import { getDevice } from '../../app/api';
-import type { Primitive } from '../../render';
+import type { Primitive, SkinInfluenceData } from '../../render';
 import type { Scene } from '../../scene';
 import type { MeshUpdateCallback } from '../../scene/mesh';
 import { BoundingBox } from '../../utility/bounding_volume';
@@ -85,7 +85,22 @@ export type GPUClothWrapBindingData = {
 export type GPUClothWrapBindingTarget = {
   target: any;
   data: GPUClothWrapBindingData;
+  /** Per-target-vertex blend between target skinning (0) and cloth wrapping (1). */
+  targetWrapWeights?: Float32Array<ArrayBuffer>;
 };
+
+function normalizeTargetWrapWeights(source: ArrayLike<number> | undefined, vertexCount: number) {
+  const result = new Float32Array(vertexCount);
+  result.fill(1);
+  if (!source) {
+    return result;
+  }
+  const count = Math.min(vertexCount, source.length);
+  for (let i = 0; i < count; i++) {
+    result[i] = clamp(Number(source[i]) || 0, 0, 1);
+  }
+  return result;
+}
 
 function encodeTypedArrayBase64(view: ArrayBufferView) {
   return uint8ArrayToBase64(new Uint8Array(view.buffer, view.byteOffset, view.byteLength));
@@ -1247,10 +1262,50 @@ async function readSkinningDataFromPrimitive(primitive: Primitive) {
     if (!blendIndices || !blendWeights) {
       return null;
     }
-    return { blendIndices, blendWeights };
+    return { blendIndices, blendWeights, influenceCount: 4 };
   } catch {
     return null;
   }
+}
+
+type MeshSkinningSource = {
+  primitive: Nullable<Primitive>;
+  getSkinInfluenceData?: () => Nullable<SkinInfluenceData>;
+};
+
+async function readSkinningDataFromMesh(mesh: MeshSkinningSource) {
+  if (!mesh.primitive) {
+    return null;
+  }
+  const base = await readSkinningDataFromPrimitive(mesh.primitive);
+  if (!base) {
+    return null;
+  }
+  const extra = mesh.getSkinInfluenceData?.() ?? null;
+  const influenceCount = Math.max(4, Math.floor(Number(extra?.influenceCount) || 4));
+  if (!extra || influenceCount <= 4) {
+    return base;
+  }
+  const vertexCount = mesh.primitive.getNumVertices();
+  const pairCount = Math.ceil((influenceCount - 4) / 2);
+  if (extra.data.length < vertexCount * pairCount * 4) {
+    return base;
+  }
+  const blendIndices = new Float32Array(vertexCount * influenceCount);
+  const blendWeights = new Float32Array(vertexCount * influenceCount);
+  for (let vertex = 0; vertex < vertexCount; vertex++) {
+    const baseSource = vertex * 4;
+    const target = vertex * influenceCount;
+    blendIndices.set(base.blendIndices.subarray(baseSource, baseSource + 4), target);
+    blendWeights.set(base.blendWeights.subarray(baseSource, baseSource + 4), target);
+    for (let influence = 4; influence < influenceCount; influence++) {
+      const extraInfluence = influence - 4;
+      const source = (vertex * pairCount + (extraInfluence >> 1)) * 4 + (extraInfluence & 1) * 2;
+      blendIndices[target + influence] = Number(extra.data[source]) || 0;
+      blendWeights[target + influence] = Number(extra.data[source + 1]) || 0;
+    }
+  }
+  return { blendIndices, blendWeights, influenceCount };
 }
 
 function buildNonIndexedTriangles(primitive: Primitive, vertexCount: number) {
@@ -1294,11 +1349,15 @@ function createWrapDeformerProgram(device: AbstractDevice, workgroupSize: number
       this.sourceTriangleIndices = pb.uint[0]().storageBufferReadonly(0);
       this.sourceBarycentrics = pb.float[0]().storageBufferReadonly(0);
       this.targetLocalOffsets = pb.float[0]().storageBufferReadonly(0);
+      this.targetSkinPositions = pb.float[0]().storageBufferReadonly(0);
+      this.targetSkinNormals = pb.float[0]().storageBufferReadonly(0);
+      this.targetWrapWeights = pb.float[0]().storageBufferReadonly(0);
       this.targetPositions = pb.float[0]().storageBuffer(0);
       this.targetNormals = pb.float[0]().storageBuffer(0);
       this.vertexCount = pb.uint().uniform(0);
       this.sourceToTargetMatrix = pb.mat4().uniform(0);
       this.minDistance = pb.float().uniform(0);
+      this.hasTargetNormals = pb.float().uniform(0);
       pb.main(function () {
         this.$l.vertex = this.$builtins.globalInvocationId.x;
         this.$if(pb.lessThan(this.vertex, this.vertexCount), function () {
@@ -1405,6 +1464,32 @@ function createWrapDeformerProgram(device: AbstractDevice, workgroupSize: number
               pb.mul(this.normal, this.localOffset.z)
             )
           );
+          this.$l.wrapWeight = this.targetWrapWeights.at(this.vertex);
+          this.$l.skinPosition = pb.vec3(
+            this.targetSkinPositions.at(this.targetBase),
+            this.targetSkinPositions.at(pb.add(this.targetBase, 1)),
+            this.targetSkinPositions.at(pb.add(this.targetBase, 2))
+          );
+          this.deformedPosition = pb.add(
+            pb.mul(this.skinPosition, pb.sub(1, this.wrapWeight)),
+            pb.mul(this.deformedPosition, this.wrapWeight)
+          );
+          this.$l.skinNormal = pb.vec3(
+            this.targetSkinNormals.at(this.targetBase),
+            this.targetSkinNormals.at(pb.add(this.targetBase, 1)),
+            this.targetSkinNormals.at(pb.add(this.targetBase, 2))
+          );
+          this.$l.normalWeight = pb.max(this.wrapWeight, pb.sub(1, this.hasTargetNormals));
+          this.normal = pb.add(
+            pb.mul(this.skinNormal, pb.sub(1, this.normalWeight)),
+            pb.mul(this.normal, this.normalWeight)
+          );
+          this.normalLen = pb.length(this.normal);
+          this.$if(pb.greaterThan(this.normalLen, this.minDistance), function () {
+            this.normal = pb.div(this.normal, this.normalLen);
+          }).$else(function () {
+            this.normal = pb.vec3(0, 1, 0);
+          });
           this.targetPositions.setAt(this.targetBase, this.deformedPosition.x);
           this.targetPositions.setAt(pb.add(this.targetBase, 1), this.deformedPosition.y);
           this.targetPositions.setAt(pb.add(this.targetBase, 2), this.deformedPosition.z);
@@ -1453,6 +1538,9 @@ class GPUClothWrapBinding {
   private readonly _wrapTriangleIndexBuffer: GPUDataBuffer;
   private readonly _wrapBarycentricBuffer: GPUDataBuffer;
   private readonly _wrapLocalOffsetBuffer: GPUDataBuffer;
+  private readonly _targetSkinPositionBuffer: GPUDataBuffer;
+  private readonly _targetSkinNormalBuffer: GPUDataBuffer;
+  private readonly _targetWrapWeightBuffer: GPUDataBuffer;
   private readonly _program: GPUProgram;
   private readonly _bindGroup: BindGroup;
   private readonly _workgroupCount: number;
@@ -1463,6 +1551,13 @@ class GPUClothWrapBinding {
   private readonly _originalPositionBuffer: Nullable<StructuredBuffer>;
   private readonly _originalNormalBuffer: Nullable<StructuredBuffer>;
   private readonly _restoreSkinning: Nullable<boolean>;
+  private readonly _targetBasePositions: Float32Array<ArrayBuffer>;
+  private readonly _targetBaseNormals: Float32Array<ArrayBuffer>;
+  private readonly _targetBlendIndices: Nullable<Float32Array<ArrayBuffer>>;
+  private readonly _targetBlendWeights: Nullable<Float32Array<ArrayBuffer>>;
+  private readonly _targetSkinnedPositions: Float32Array<ArrayBuffer>;
+  private readonly _targetSkinnedNormals: Float32Array<ArrayBuffer>;
+  private readonly _hasPartialWrap: boolean;
 
   private constructor(
     device: AbstractDevice,
@@ -1472,6 +1567,9 @@ class GPUClothWrapBinding {
     wrapTriangleIndexBuffer: GPUDataBuffer,
     wrapBarycentricBuffer: GPUDataBuffer,
     wrapLocalOffsetBuffer: GPUDataBuffer,
+    targetSkinPositionBuffer: GPUDataBuffer,
+    targetSkinNormalBuffer: GPUDataBuffer,
+    targetWrapWeightBuffer: GPUDataBuffer,
     program: GPUProgram,
     bindGroup: BindGroup,
     positionBuffer: StructuredBuffer,
@@ -1480,7 +1578,12 @@ class GPUClothWrapBinding {
     originalNormalBuffer: Nullable<StructuredBuffer>,
     workgroupCount: number,
     maxOffsetDistance: number,
-    restoreSkinning: Nullable<boolean>
+    restoreSkinning: Nullable<boolean>,
+    targetBasePositions: Float32Array<ArrayBuffer>,
+    targetBaseNormals: Float32Array<ArrayBuffer>,
+    targetBlendIndices: Nullable<Float32Array<ArrayBuffer>>,
+    targetBlendWeights: Nullable<Float32Array<ArrayBuffer>>,
+    targetWrapWeights: Float32Array<ArrayBuffer>
   ) {
     this._device = device;
     this._source = source;
@@ -1489,6 +1592,9 @@ class GPUClothWrapBinding {
     this._wrapTriangleIndexBuffer = wrapTriangleIndexBuffer;
     this._wrapBarycentricBuffer = wrapBarycentricBuffer;
     this._wrapLocalOffsetBuffer = wrapLocalOffsetBuffer;
+    this._targetSkinPositionBuffer = targetSkinPositionBuffer;
+    this._targetSkinNormalBuffer = targetSkinNormalBuffer;
+    this._targetWrapWeightBuffer = targetWrapWeightBuffer;
     this._program = program;
     this._bindGroup = bindGroup;
     this._workgroupCount = workgroupCount;
@@ -1499,6 +1605,13 @@ class GPUClothWrapBinding {
     this._originalPositionBuffer = originalPositionBuffer;
     this._originalNormalBuffer = originalNormalBuffer;
     this._restoreSkinning = restoreSkinning;
+    this._targetBasePositions = targetBasePositions;
+    this._targetBaseNormals = targetBaseNormals;
+    this._targetBlendIndices = targetBlendIndices;
+    this._targetBlendWeights = targetBlendWeights;
+    this._targetSkinnedPositions = new Float32Array(targetBasePositions);
+    this._targetSkinnedNormals = new Float32Array(targetBaseNormals);
+    this._hasPartialWrap = targetWrapWeights.some((weight) => weight < 1 - 1e-6);
   }
 
   static async create(
@@ -1508,7 +1621,8 @@ class GPUClothWrapBinding {
     sourceRestPositions: Float32Array<ArrayBuffer>,
     sourceIndexData: Uint32Array<ArrayBuffer>,
     target: any,
-    workgroupSize: number
+    workgroupSize: number,
+    targetWrapWeights?: ArrayLike<number>
   ) {
     const data = await GPUClothWrapBinding.createBindingData(
       source,
@@ -1524,7 +1638,8 @@ class GPUClothWrapBinding {
       sourceIndexData,
       target,
       workgroupSize,
-      data
+      data,
+      targetWrapWeights
     );
   }
 
@@ -1665,7 +1780,7 @@ class GPUClothWrapBinding {
     };
   }
 
-  static createFromData(
+  static async createFromData(
     device: AbstractDevice,
     source: any,
     sourcePositionBuffer: StructuredBuffer,
@@ -1673,7 +1788,8 @@ class GPUClothWrapBinding {
     _sourceIndexData: Uint32Array<ArrayBuffer>,
     target: any,
     workgroupSize: number,
-    data: GPUClothWrapBindingData
+    data: GPUClothWrapBindingData,
+    targetWrapWeightSource?: ArrayLike<number>
   ) {
     if (!target?.primitive) {
       throw new Error('GPU cloth wrap failed: target mesh has no primitive.');
@@ -1683,7 +1799,15 @@ class GPUClothWrapBinding {
     if (!isWrapBindingDataCompatible(data, sourceRestPositions, vertexCount)) {
       throw new Error('GPU cloth wrap failed: binding cache is incompatible with current meshes.');
     }
+    const [targetBasePositions, targetBaseNormalsSource, targetSkinningData] = await Promise.all([
+      readPositionDataFromPrimitive(targetPrimitive),
+      readVertexAttributeDataFromPrimitive(targetPrimitive, 'normal', 3),
+      readSkinningDataFromMesh(target)
+    ]);
     const expectedElementCount = vertexCount * 3;
+    const hasTargetNormals = !!targetBaseNormalsSource;
+    const targetBaseNormals = targetBaseNormalsSource ?? new Float32Array(expectedElementCount);
+    const targetWrapWeights = normalizeTargetWrapWeights(targetWrapWeightSource, vertexCount);
     const influenceElementCount = vertexCount * data.influenceCount;
     const wrapSourceTriangleIndices = decodeTypedArrayFromBase64(
       Uint32Array,
@@ -1740,6 +1864,27 @@ class GPUClothWrapBinding {
       managed: false
     });
     wrapLocalOffsetBuffer.bufferSubData(0, wrapTargetLocalOffsets);
+    const targetSkinPositionBuffer = device.createBuffer(targetBasePositions.byteLength, {
+      usage: 'uniform',
+      storage: true,
+      dynamic: false,
+      managed: false
+    });
+    targetSkinPositionBuffer.bufferSubData(0, targetBasePositions);
+    const targetSkinNormalBuffer = device.createBuffer(targetBaseNormals.byteLength, {
+      usage: 'uniform',
+      storage: true,
+      dynamic: false,
+      managed: false
+    });
+    targetSkinNormalBuffer.bufferSubData(0, targetBaseNormals);
+    const targetWrapWeightBuffer = device.createBuffer(targetWrapWeights.byteLength, {
+      usage: 'uniform',
+      storage: true,
+      dynamic: false,
+      managed: false
+    });
+    targetWrapWeightBuffer.bufferSubData(0, targetWrapWeights);
     const program = createWrapDeformerProgram(device, workgroupSize);
     if (!program) {
       throw new Error('GPU cloth wrap failed: could not create compute program.');
@@ -1749,12 +1894,16 @@ class GPUClothWrapBinding {
     bindGroup.setBuffer('sourceTriangleIndices', wrapTriangleIndexBuffer);
     bindGroup.setBuffer('sourceBarycentrics', wrapBarycentricBuffer);
     bindGroup.setBuffer('targetLocalOffsets', wrapLocalOffsetBuffer);
+    bindGroup.setBuffer('targetSkinPositions', targetSkinPositionBuffer);
+    bindGroup.setBuffer('targetSkinNormals', targetSkinNormalBuffer);
+    bindGroup.setBuffer('targetWrapWeights', targetWrapWeightBuffer);
     bindGroup.setBuffer('targetPositions', positionBuffer);
     bindGroup.setBuffer('targetNormals', normalBuffer);
     const sourceToTargetBindMatrix = getWrapSourceToTargetMatrix(source, target);
     bindGroup.setValue('vertexCount', vertexCount);
     bindGroup.setValue('sourceToTargetMatrix', sourceToTargetBindMatrix);
     bindGroup.setValue('minDistance', 1e-5);
+    bindGroup.setValue('hasTargetNormals', hasTargetNormals ? 1 : 0);
 
     const originalPositionBuffer = targetPrimitive.getVertexBuffer('position');
     const originalNormalBuffer = targetPrimitive.getVertexBuffer('normal');
@@ -1781,6 +1930,9 @@ class GPUClothWrapBinding {
       wrapTriangleIndexBuffer,
       wrapBarycentricBuffer,
       wrapLocalOffsetBuffer,
+      targetSkinPositionBuffer,
+      targetSkinNormalBuffer,
+      targetWrapWeightBuffer,
       program,
       bindGroup,
       positionBuffer!,
@@ -1789,13 +1941,19 @@ class GPUClothWrapBinding {
       originalNormalBuffer,
       Math.max(1, Math.ceil(vertexCount / workgroupSize)),
       Math.max(0, Number(data.maxOffsetDistance) || 0),
-      restoreSkinning
+      restoreSkinning,
+      targetBasePositions,
+      targetBaseNormals,
+      targetSkinningData?.blendIndices ?? null,
+      targetSkinningData?.blendWeights ?? null,
+      targetWrapWeights
     );
     binding.update();
     return binding;
   }
 
   update() {
+    this.updateTargetSkinning();
     getWrapSourceToTargetMatrix(this._source, this._target, this._sourceToTargetMatrix);
     this._bindGroup.setValue('sourceToTargetMatrix', this._sourceToTargetMatrix);
     this._device.setProgram(this._program);
@@ -1810,6 +1968,9 @@ class GPUClothWrapBinding {
     this._wrapTriangleIndexBuffer.dispose();
     this._wrapBarycentricBuffer.dispose();
     this._wrapLocalOffsetBuffer.dispose();
+    this._targetSkinPositionBuffer.dispose();
+    this._targetSkinNormalBuffer.dispose();
+    this._targetWrapWeightBuffer.dispose();
     if (this._targetPrimitive) {
       this._targetPrimitive.removeVertexBuffer('position');
       if (this._originalPositionBuffer) {
@@ -1828,6 +1989,45 @@ class GPUClothWrapBinding {
       this._target.setAnimatedBoundingBox?.(null);
       this._target.suspendSkinning = this._restoreSkinning;
     }
+  }
+
+  private updateTargetSkinning() {
+    if (!this._hasPartialWrap) {
+      return;
+    }
+    const skeletonId = String(this._target?.skeletonName ?? '');
+    const skeleton =
+      skeletonId && typeof this._target?.findSkeletonById === 'function'
+        ? this._target.findSkeletonById(skeletonId)
+        : null;
+    if (
+      skeleton?.skinPositionsToLocal &&
+      this._targetBlendIndices &&
+      this._targetBlendWeights &&
+      this._target?.invWorldMatrix
+    ) {
+      skeleton.skinPositionsToLocal(
+        this._targetBasePositions,
+        this._targetBlendIndices,
+        this._targetBlendWeights,
+        this._target.invWorldMatrix,
+        this._targetSkinnedPositions
+      );
+      if (skeleton.skinDirectionsToLocal && this._targetBaseNormals.length > 0) {
+        skeleton.skinDirectionsToLocal(
+          this._targetBaseNormals,
+          this._targetBlendIndices,
+          this._targetBlendWeights,
+          this._target.invWorldMatrix,
+          this._targetSkinnedNormals
+        );
+      }
+    } else {
+      this._targetSkinnedPositions.set(this._targetBasePositions);
+      this._targetSkinnedNormals.set(this._targetBaseNormals);
+    }
+    this._targetSkinPositionBuffer.bufferSubData(0, this._targetSkinnedPositions);
+    this._targetSkinNormalBuffer.bufferSubData(0, this._targetSkinnedNormals);
   }
 
   private updateBoundingBox() {
@@ -2367,14 +2567,22 @@ export class GPUClothSystem {
   }
 
   static async createFromMesh(
-    mesh: { primitive: Nullable<Primitive>; scene?: Nullable<Scene> },
+    mesh: MeshSkinningSource & { scene?: Nullable<Scene> },
     options?: Omit<GPUClothSystemOptions, 'primitive' | 'positionData' | 'indexData' | 'scene'>
   ) {
     if (!mesh.primitive) {
       throw new Error('GPU cloth initialization failed: mesh has no primitive.');
     }
-    return GPUClothSystem.createFromPrimitive(mesh.primitive, {
+    const positionData = await readPositionDataFromPrimitive(mesh.primitive);
+    const skinningData = await readSkinningDataFromMesh(mesh);
+    const indexData = await readIndexDataFromPrimitive(mesh.primitive, (positionData.length / 3) >> 0);
+    return new GPUClothSystem({
       ...options,
+      primitive: mesh.primitive,
+      positionData,
+      indexData,
+      skinningBlendIndices: skinningData?.blendIndices ?? undefined,
+      skinningBlendWeights: skinningData?.blendWeights ?? undefined,
       collisionSpaceNode: mesh,
       scene: mesh.scene ?? null
     });
@@ -2412,7 +2620,7 @@ export class GPUClothSystem {
     }
   }
 
-  setWrapTargetsFromBindingData(targets: GPUClothWrapBindingTarget[]) {
+  async setWrapTargetsFromBindingData(targets: GPUClothWrapBindingTarget[]) {
     this.clearWrapTargets();
     if (
       !this.supported ||
@@ -2431,7 +2639,7 @@ export class GPUClothSystem {
       }
       seen.add(target);
       try {
-        const binding = GPUClothWrapBinding.createFromData(
+        const binding = await GPUClothWrapBinding.createFromData(
           this._device,
           this._collisionSpaceNode,
           this._positionBuffer,
@@ -2439,7 +2647,8 @@ export class GPUClothSystem {
           this._sourceIndexData,
           target,
           this._workgroupSize,
-          entry.data
+          entry.data,
+          entry.targetWrapWeights
         );
         this._wrapBindings.push(binding);
       } catch (err) {
