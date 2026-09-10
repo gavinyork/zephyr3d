@@ -150,6 +150,7 @@ export type EditorCommands = {
   executeUserCallback<T>(execute: () => T | Promise<T>, undo: () => void | Promise<void>): Promise<null | T>;
   selectNode(node: SceneNode): void;
   activateEditTool(node: SceneNode): boolean;
+  deactivateEditTool(): boolean;
 };
 
 export type EditorSceneContext = {

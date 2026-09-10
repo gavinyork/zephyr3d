@@ -1134,7 +1134,8 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
       activateEditTool: (node) => {
         this._sceneHierarchy.selectNode(node);
         return this.handleEditNode(node, false);
-      }
+      },
+      deactivateEditTool: () => this.deactivateEditTool()
     };
   }
 
@@ -2394,10 +2395,9 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
       if (!toggle) {
         return true;
       }
-      this.editor.plugins.dispatchEvent('editToolDeactivated', currentTool, currentTarget);
-      this._currentEditTool.dispose();
+      this.deactivateEditTool();
     } else {
-      this.editor.plugins.dispatchEvent('editToolDeactivated', currentTool, currentTarget);
+      this.deactivateEditTool();
       const tool = createEditTool(this.editor, node, this._editToolContext, this.createSceneContext());
       this._currentEditTool.set(tool);
       if (tool) {
@@ -2406,6 +2406,16 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
       return !!tool;
     }
     return false;
+  }
+  private deactivateEditTool() {
+    const currentTool = this._currentEditTool.get();
+    if (!currentTool) {
+      return false;
+    }
+    const currentTarget = currentTool.getTarget();
+    this.editor.plugins.dispatchEvent('editToolDeactivated', currentTool, currentTarget);
+    this._currentEditTool.dispose();
+    return true;
   }
   public getSelectedSceneNodes() {
     return this._sceneHierarchy ? [...this._sceneHierarchy.selectedNodes] : [];
