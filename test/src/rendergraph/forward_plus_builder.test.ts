@@ -73,6 +73,7 @@ function createMockDrawContext(overrides: Record<string, unknown> = {}) {
 
 interface MockRenderQueueOptions {
   needSceneColor: boolean;
+  needHiZNearest?: boolean;
   shadowedLights?: unknown[];
   waters?: unknown[];
 }
@@ -83,7 +84,10 @@ function createMockRenderQueue(options: MockRenderQueueOptions) {
     // Culled water surfaces; the WaterCaustics module reads this to decide
     // whether it has anything to build a map from.
     waters: options.waters ?? [],
-    needSceneColor: () => options.needSceneColor
+    needSceneColor: () => options.needSceneColor,
+    // Materials request the Hi-Z pyramid's nearest-depth channel through the
+    // queue; water's shoreline foam is the one that does.
+    needHiZNearest: () => options.needHiZNearest ?? false
   } as any;
 }
 
@@ -105,6 +109,7 @@ function createOptions(overrides: Partial<ForwardPlusOptions> = {}): ForwardPlus
     sss: false,
     skinSSS: false,
     fogPresents: false,
+    hiZNearest: false,
     ...overrides
   };
 }
@@ -301,6 +306,7 @@ describe('Forward+ render graph builder', () => {
     };
     const baseRenderQueue = {
       needSceneColor: () => true,
+      needHiZNearest: () => false,
       itemList: {
         opaque: { lit: [], unlit: [] }
       }
@@ -346,6 +352,7 @@ describe('Forward+ render graph builder', () => {
     const renderQueue = {
       needSceneColor: () => false,
       needSceneColorWithDepth: () => false,
+      needHiZNearest: () => false,
       itemList: {
         opaque: emptyBundle,
         transmission: { lit: [sssInfo], unlit: [] },
@@ -384,6 +391,7 @@ describe('Forward+ render graph builder', () => {
     const renderQueue = {
       needSceneColor: () => false,
       needSceneColorWithDepth: () => false,
+      needHiZNearest: () => false,
       itemList: {
         opaque: {
           lit: [{ materialList: new Set([{ skinSSS: true }]) }],
@@ -665,6 +673,7 @@ describe('Forward+ render graph builder', () => {
     const renderQueue = {
       needSceneColor: () => false,
       needSceneColorWithDepth: () => false,
+      needHiZNearest: () => false,
       itemList: { opaque: { lit: [], unlit: [] } }
     };
 

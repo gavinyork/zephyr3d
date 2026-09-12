@@ -929,6 +929,171 @@ export function getWaterClass(manager: ResourceManager): SerializableClass {
           }
         },
         {
+          name: 'FoamAmount',
+          description:
+            'Coverage of the foam on breaking wave crests, mapped from the folding the wave generator reports. 0 disables crest foam. Independent of ShoreFoamAmount.',
+          type: 'float',
+          default: 1,
+          options: { animatable: true, minValue: 0, maxValue: 4 },
+          get(this: Water, value) {
+            value.num[0] = this.material.foamAmount;
+          },
+          set(this: Water, value) {
+            this.material.foamAmount = value.num[0];
+          }
+        },
+        {
+          name: 'FoamFalloff',
+          description:
+            'Falloff applied to crest foam coverage. Above 1 pushes light folding towards no foam at all, so only a genuinely broken crest shows - which is what keeps a windy sea from turning uniformly white.',
+          type: 'float',
+          default: 1.5,
+          options: { animatable: true, minValue: 0.01, maxValue: 8 },
+          isHidden(this: Water) {
+            return this.material.foamAmount <= 0;
+          },
+          get(this: Water, value) {
+            value.num[0] = this.material.foamFalloff;
+          },
+          set(this: Water, value) {
+            this.material.foamFalloff = value.num[0];
+          }
+        },
+        {
+          name: 'FoamColor',
+          description:
+            'Diffuse albedo of the foam, shared by the crest foam and the shoreline foam. Slightly off-white and slightly blue - sea foam is water and air, and a pure white one reads as snow.',
+          type: 'rgb',
+          default: [0.92, 0.95, 0.97],
+          options: { animatable: true, minValue: 0, maxValue: 1 },
+          get(this: Water, value) {
+            value.num[0] = this.material.foamColor.x;
+            value.num[1] = this.material.foamColor.y;
+            value.num[2] = this.material.foamColor.z;
+          },
+          set(this: Water, value) {
+            this.material.foamColor = new Vector3(value.num[0], value.num[1], value.num[2]);
+          }
+        },
+        {
+          name: 'ShoreFoamAmount',
+          description:
+            'Coverage of the foam that collects where the water meets a surface - the waterline on a shelving bed, and the collar around a piling or a hull. 0 disables it, which also removes its cost. Independent of the crest foam the wave generator produces. Requires WebGL2 or WebGPU.',
+          type: 'float',
+          default: 0,
+          // Deliberately not animatable: crossing zero switches the whole
+          // feature in and out of the shader, so an animation curve driving this
+          // through zero rebuilds the program on the way past.
+          options: { minValue: 0, maxValue: 4 },
+          get(this: Water, value) {
+            value.num[0] = this.shoreFoamAmount;
+          },
+          set(this: Water, value) {
+            this.shoreFoamAmount = value.num[0];
+          }
+        },
+        {
+          name: 'ShoreFoamDepth',
+          description:
+            'How far the foam band reaches from the surface behind it, in meters. Over a bed this is a depth of water; against something vertical it is the horizontal distance to its side, and one value serves both. How wide that is on screen depends on the geometry: a thin line on a steep drop-off, a broad stretch on a flat shelf.',
+          type: 'float',
+          default: 0.5,
+          options: { animatable: true, minValue: 0.001, maxValue: 20 },
+          isHidden(this: Water) {
+            return this.shoreFoamAmount <= 0;
+          },
+          get(this: Water, value) {
+            value.num[0] = this.shoreFoamDepth;
+          },
+          set(this: Water, value) {
+            this.shoreFoamDepth = value.num[0];
+          }
+        },
+        {
+          name: 'ShoreFoamFalloff',
+          description:
+            'Falloff across the foam band. Above 1 pushes the coverage towards the contact line and keeps the outer edge thin and broken.',
+          type: 'float',
+          default: 1.5,
+          options: { animatable: true, minValue: 0.01, maxValue: 8 },
+          isHidden(this: Water) {
+            return this.shoreFoamAmount <= 0;
+          },
+          get(this: Water, value) {
+            value.num[0] = this.shoreFoamFalloff;
+          },
+          set(this: Water, value) {
+            this.shoreFoamFalloff = value.num[0];
+          }
+        },
+        {
+          name: 'ShoreFoamScale',
+          description:
+            'Size of the clumps the band breaks into, as cycles across the band rather than cycles per meter. Being relative to the band width, one value reads the same on a shoreline metres across and on a collar a handspan wide.',
+          type: 'float',
+          default: 2.5,
+          options: { animatable: true, minValue: 0, maxValue: 20 },
+          isHidden(this: Water) {
+            return this.shoreFoamAmount <= 0;
+          },
+          get(this: Water, value) {
+            value.num[0] = this.shoreFoamScale;
+          },
+          set(this: Water, value) {
+            this.shoreFoamScale = value.num[0];
+          }
+        },
+        {
+          name: 'ShoreFoamWashAmount',
+          description:
+            'How far the waterline runs up and back, as a fraction of ShoreFoamDepth. This is what makes the band read as surf rather than as a painted rim; 0 leaves it static. Above 1 the band closes completely at the bottom of the cycle, which looks like the foam blinking out.',
+          type: 'float',
+          default: 0.5,
+          options: { animatable: true, minValue: 0, maxValue: 2 },
+          isHidden(this: Water) {
+            return this.shoreFoamAmount <= 0;
+          },
+          get(this: Water, value) {
+            value.num[0] = this.shoreFoamWashAmount;
+          },
+          set(this: Water, value) {
+            this.shoreFoamWashAmount = value.num[0];
+          }
+        },
+        {
+          name: 'ShoreFoamWashSpeed',
+          description: 'Run-up cycles per second. Swell rather than wind waves, so well under 1.',
+          type: 'float',
+          default: 0.12,
+          options: { animatable: true, minValue: 0, maxValue: 2 },
+          isHidden(this: Water) {
+            return this.shoreFoamAmount <= 0;
+          },
+          get(this: Water, value) {
+            value.num[0] = this.shoreFoamWashSpeed;
+          },
+          set(this: Water, value) {
+            this.shoreFoamWashSpeed = value.num[0];
+          }
+        },
+        {
+          name: 'ShoreFoamWashScale',
+          description:
+            'Spatial frequency of the run-up phase, in cycles per meter. At 0 the whole waterline rises and falls in lockstep, which reads as the water level itself changing; a cycle every few tens of meters breaks a long shoreline into sections that run out of step with one another.',
+          type: 'float',
+          default: 0.03,
+          options: { animatable: true, minValue: 0, maxValue: 1 },
+          isHidden(this: Water) {
+            return this.shoreFoamAmount <= 0;
+          },
+          get(this: Water, value) {
+            value.num[0] = this.shoreFoamWashScale;
+          },
+          set(this: Water, value) {
+            this.shoreFoamWashScale = value.num[0];
+          }
+        },
+        {
           name: 'CheapRefractionDepth',
           description:
             'Depth in meters the cheap refraction mode assumes the water is. Sets how strong the distortion looks when RefractionMode is Offset; ignored by March. A constant rather than the measured distance to the bottom, because an offset scaled by that distance paints a second copy of any object breaking the surface.',

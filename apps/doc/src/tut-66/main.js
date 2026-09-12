@@ -60,7 +60,8 @@ const DEBUG_OUTPUTS = [
   ['specular', 'Specular'],
   ['depth', 'Depth'],
   ['refractUV', 'Refract UV'],
-  ['nan', 'NaN']
+  ['nan', 'NaN'],
+  ['waterDepth', 'Water Depth']
 ];
 
 myApp.ready().then(function () {
@@ -199,7 +200,7 @@ function buildOceanScene() {
   bedMaterial.albedoColor = new Vector4(0.76, 0.7, 0.5, 1);
   bedMaterial.roughness = 1;
   const bed = new Mesh(scene, new PlaneShape({ size: 5000 }), bedMaterial);
-  bed.position.setXYZ(0, -14, 0);
+  bed.position.setXYZ(0, -4, 0);
 
   const water = new Water(scene);
   water.scale.setXYZ(5000, 1, 5000);
@@ -211,7 +212,7 @@ function buildOceanScene() {
   // FFT rather than FBM, so the surface genuinely folds - that is what feeds
   // both the foam and cresting here.
   const waves = new FFTWaveGenerator();
-  waves.wind = new Vector2(20, 5);
+  waves.wind = new Vector2(10, 5);
   waves.setWaveLength(0, 400);
   waves.setWaveLength(1, 100);
   waves.setWaveLength(2, 16);
@@ -231,13 +232,18 @@ function buildOceanScene() {
   water.scattering = new Vector3(0.06, 0.12, 0.15);
   water.reflectionStrength = 0.8;
   water.refractionScale = 1;
+  water.refractionBlur = 4;
   water.sunScatteringIntensity = 0.4;
   water.foamAmount = 1;
   water.foamFalloff = 1.5;
+  water.shoreFoamAmount = 0.5;
+  water.shoreFoamDepth = 2.5;
+  water.shoreFoamWashAmount = 0;
   water.infinite = true;
 
   water.causticsEnabled = true;
-  water.causticsDepth = 16;
+  water.causticsIntensity = 1.5;
+  water.causticsDepth = 6;
   water.causticsRange = 40;
   water.causticsSceneDepth = true;
 
@@ -245,6 +251,7 @@ function buildOceanScene() {
   scene.mainCamera.lookAt(new Vector3(0, 18, 60), new Vector3(0, 0, 0), Vector3.axisPY());
   scene.mainCamera.controller = new OrbitCameraController();
   scene.mainCamera.TAA = true;
+  scene.mainCamera.HiZ = true;
 
   return scene;
 }

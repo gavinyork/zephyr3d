@@ -1,5 +1,5 @@
 import type { Nullable } from '@zephyr3d/base';
-import { DEPTH_CLEAR_VALUE, DEPTH_COMPARE_DEFAULT, REVERSE_Z, Vector4 } from '@zephyr3d/base';
+import { DEPTH_CLEAR_VALUE, DEPTH_COMPARE_DEFAULT, Vector4 } from '@zephyr3d/base';
 import type {
   AbstractDevice,
   BindGroup,
@@ -24,7 +24,7 @@ import { ShadowMapPass } from '../shadowmap_pass';
 import { DepthPass } from '../depthpass';
 import { ClusteredLight } from '../cluster_light';
 import { ShadowMaskRenderer } from '../shadow_mask_pass';
-import { buildHiZ } from '../hzb';
+import { buildHiZ, getHiZFormat } from '../hzb';
 import { CopyBlitter } from '../../blitter';
 import { fetchSampler } from '../../utility/misc';
 import { MaterialVaryingFlags } from '../../values';
@@ -344,6 +344,11 @@ export interface ForwardPlusOptions {
   motionVectors: boolean;
   /** Enable Hi-Z pyramid (for SSR ray tracing). */
   hiZ: boolean;
+  /**
+   * Add the nearest-depth channel to the Hi-Z pyramid (for proximity queries).
+   * Implies {@link ForwardPlusOptions.hiZ}.
+   */
+  hiZNearest: boolean;
   /** Produce opaque-scene world normals. */
   sceneNormal: boolean;
   /** Produce opaque-scene roughness data. */
@@ -391,10 +396,16 @@ export function deriveForwardPlusOptions(
   const skinSSS = camera.skinSSS && renderQueueHasActiveSkinSSS(renderQueue);
   const needSceneColor = renderQueue.needSceneColor();
   const needSceneColorWithDepth = renderQueue.needSceneColorWithDepth();
+  // Requested by materials rather than by a post effect, so it is resolved here
+  // instead of in resolveFrameResourceRequirements. WebGL1 has no Hi-Z at all,
+  // and a material asking for one there would turn a missing feature into a
+  // thrown frame; the material is expected to shade without it.
+  const needHiZNearest = (renderQueue.needHiZNearest() || camera.HiZNearest) && deviceType !== 'webgl';
   return {
     depthPrepass: true,
     motionVectors: false,
-    hiZ: false,
+    hiZ: needHiZNearest,
+    hiZNearest: needHiZNearest,
     sceneNormal: false,
     sceneRoughness: false,
     shadowMask: false,
@@ -418,7 +429,10 @@ function resolveFrameResourceRequirements(
 ): void {
   const deviceType = ctx.device.type;
   options.motionVectors ||= !!requirements.motionVector;
-  options.hiZ ||= !!requirements.hiZ;
+  options.hiZNearest ||= !!requirements.hiZNearest;
+  // The nearest channel lives on the same pyramid, so asking for it is asking
+  // for the pyramid.
+  options.hiZ ||= !!requirements.hiZ || options.hiZNearest;
   options.sceneNormal ||= !!requirements.sceneNormal;
   options.sceneRoughness ||= !!requirements.sceneRoughness;
   options.shadowMask ||= !!requirements.shadowMask;
@@ -991,7 +1005,7 @@ const HiZModule: RenderModule<FrameGraphContext> = {
   writes: [FrameResources.HiZ],
   prepare: ({ options }) => ({ enabled: options.hiZ }),
   setup(fg: FrameGraphContext) {
-    const { graph, ctx, frame, blackboard } = fg;
+    const { graph, ctx, frame, blackboard, options } = fg;
     const depthPassResult = requireBuildState(fg, 'depth', 'DepthPrepass', 'HiZ');
     const preLightTransmissionDepthToken = fg.state.preLightTransmissionDepthToken;
     //const hiZWidth = nextPowerOf2(ctx.renderWidth);
@@ -1004,11 +1018,14 @@ const HiZModule: RenderModule<FrameGraphContext> = {
         builder.read(preLightTransmissionDepthToken);
       }
       hiZHandle = builder.createTexture({
-        format: REVERSE_Z ? 'r16f' : 'r32f',
+        format: getHiZFormat(options.hiZNearest),
         label: 'hiZ',
         sizeMode: 'backbuffer-relative',
         mipLevels: getFullMipLevelCount(ctx.renderWidth, ctx.renderHeight),
-        allocationKey: 'ForwardPlus.HiZ'
+        // Keyed on the channel count: a one- and a two-channel pyramid are
+        // different textures, and pooling them under one key would hand a
+        // consumer a pyramid with no nearest channel in it.
+        allocationKey: `ForwardPlus.HiZ${options.hiZNearest ? '.MinMax' : ''}`
       });
       const hiZFramebufferHandle = builder.createFramebuffer({
         label: 'HiZFramebuffer',

@@ -271,6 +271,7 @@ export class Camera extends SceneNode {
   protected _commandBufferReuse: boolean;
   /** @internal Hi-Z acceleration enable (primarily for SSR). */
   protected _HiZ: boolean;
+  protected _HiZNearest: boolean;
   /** @internal Screen-space shadow mask enable (Forward+ deferred shadows). */
   protected _screenSpaceShadowMask: boolean;
   /** @internal If true, a float point backbuffer will be used. The default value is true */
@@ -530,6 +531,7 @@ export class Camera extends SceneNode {
     this._screenAdapter = new ScreenAdapter();
     this._adapted = false;
     this._HiZ = false;
+    this._HiZNearest = false;
     this._screenSpaceShadowMask = true;
     this._HDR = true;
     this._toneMap = true;
@@ -706,6 +708,25 @@ export class Camera extends SceneNode {
   }
   set HiZ(val) {
     this._HiZ = !!val;
+  }
+  /**
+   * Whether the Hi-Z pyramid carries its nearest-depth channel.
+   *
+   * The pyramid's own channel answers "what is the farthest thing in this screen
+   * region", which is what occlusion and ray marching want; this one answers
+   * "what is the nearest", which is what a proximity query wants. It doubles the
+   * pyramid's bandwidth, so it is off unless something asks for it.
+   *
+   * Materials that query it - water's shoreline foam - turn it on by themselves,
+   * the way a transmissive material turns on the scene colour copy, so this only
+   * has to be set to force the channel on for something the renderer cannot see
+   * coming. Ignored on WebGL1, which has no pyramid at all.
+   */
+  get HiZNearest() {
+    return this._HiZNearest;
+  }
+  set HiZNearest(val) {
+    this._HiZNearest = !!val;
   }
   /**
    * Whether the screen-space shadow mask is enabled.

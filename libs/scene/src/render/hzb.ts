@@ -6,21 +6,36 @@ import type {
   GPUProgram,
   PBInsideFunctionScope,
   PBShaderExp,
-  Texture2D
+  Texture2D,
+  TextureFormat
 } from '@zephyr3d/device';
 import { drawFullscreenQuad } from './fullscreenquad';
 import { CopyBlitter, type BlitType } from '../blitter';
 import { fetchSampler } from '../utility/misc';
 import { getDevice } from '../app/api';
 import type { Nullable } from '@zephyr3d/base';
-import { DEPTH_FARTHEST, DEPTH_REDUCE_FARTHER } from '@zephyr3d/base';
+import { DEPTH_FARTHEST, DEPTH_REDUCE_CLOSER, DEPTH_REDUCE_FARTHER, REVERSE_Z } from '@zephyr3d/base';
 
-let hzbProgram: Nullable<GPUProgram> = null;
+let hzbProgram: Nullable<GPUProgram>[] = [];
 let hzbBindGroupCache: WeakMap<BaseTexture, BindGroup[]> = new WeakMap();
-let blitter: Nullable<HiZInitBlitter> = null;
+let blitter: Nullable<HiZInitBlitter>[] = [];
 const srcSize = new Int32Array(2);
 
+/**
+ * Seeds mip 0 of the pyramid from the depth prepass.
+ *
+ * Both channels start from the same device depth: the pyramid only diverges
+ * once the reductions run, one keeping the farthest sample of each 2x2 and the
+ * other the nearest. `twoChannel` decides whether the nearest channel exists at
+ * all - it is a second full mip chain's worth of bandwidth, so a frame that only
+ * needs the occlusion pyramid does not carry it.
+ */
 class HiZInitBlitter extends CopyBlitter {
+  private readonly _twoChannel: boolean;
+  constructor(twoChannel: boolean) {
+    super();
+    this._twoChannel = twoChannel;
+  }
   /** @override */
   filter(
     scope: PBInsideFunctionScope,
@@ -31,7 +46,11 @@ class HiZInitBlitter extends CopyBlitter {
     sampleType: 'float' | 'int' | 'uint'
   ) {
     const depth = super.filter(scope, type, srcTex, srcUV, srcLayer, sampleType);
-    return scope.$builder.vec4(depth.x, 0, 0, 1);
+    return scope.$builder.vec4(depth.x, this._twoChannel ? depth.x : 0, 0, 1);
+  }
+  /** @override */
+  protected calcHash(): string {
+    return `${super.calcHash()}:${this._twoChannel ? 1 : 0}`;
   }
 }
 
@@ -214,7 +233,30 @@ float3 hi_z_trace(float3 p, float3 v, in uint camera, out uint iterations) {
 }
 */
 
-function buildHZBProgram(device: AbstractDevice) {
+/**
+ * Texture format for the Hi-Z pyramid.
+ *
+ * Half float under reverse-Z and full float otherwise, because reverse-Z spends
+ * float's relative precision where the depth is: a 16-bit mantissa there is
+ * worth a few centimetres at a hundred metres, while a linear-Z half float
+ * would quantise the near field into steps.
+ *
+ * `withNearest` adds the nearest-depth channel. It doubles the pyramid's
+ * bandwidth, so it is only requested by a frame that has a consumer for it.
+ */
+export function getHiZFormat(withNearest: boolean): TextureFormat {
+  if (withNearest) {
+    return REVERSE_Z ? 'rg16f' : 'rg32f';
+  }
+  return REVERSE_Z ? 'r16f' : 'r32f';
+}
+
+/** Whether a Hi-Z texture of this format carries the nearest-depth channel. */
+export function hasNearestChannel(format: TextureFormat): boolean {
+  return format === 'rg16f' || format === 'rg32f';
+}
+
+function buildHZBProgram(device: AbstractDevice, twoChannel: boolean) {
   const program = device.buildRenderProgram({
     label: 'HZBBuilder',
     vertex(pb) {
@@ -247,26 +289,40 @@ function buildHZBProgram(device: AbstractDevice) {
           );
         }
         // Furthest-depth reduction (max under standard Z, min under reverse Z).
+        // This is the conservative direction for occlusion: a cell reports the
+        // depth nothing behind it can be in front of.
         this.$l.maxDepth = pb[DEPTH_REDUCE_FARTHER](
           pb[DEPTH_REDUCE_FARTHER](this.d0.r, this.d1.r),
           pb[DEPTH_REDUCE_FARTHER](this.d2.r, this.d3.r)
         );
-        this.$outputs.color = pb.vec4(this.maxDepth, 0, 0, 1);
+        if (twoChannel) {
+          // Nearest-depth reduction, from the green channel. The opposite
+          // conservative direction, and the one a proximity query needs: a cell
+          // reports the closest surface anywhere inside it, so a query that
+          // covers the cell cannot miss geometry that is in there.
+          this.$l.minDepth = pb[DEPTH_REDUCE_CLOSER](
+            pb[DEPTH_REDUCE_CLOSER](this.d0.g, this.d1.g),
+            pb[DEPTH_REDUCE_CLOSER](this.d2.g, this.d3.g)
+          );
+          this.$outputs.color = pb.vec4(this.maxDepth, this.minDepth, 0, 1);
+        } else {
+          this.$outputs.color = pb.vec4(this.maxDepth, 0, 0, 1);
+        }
       });
     }
   })!;
-  program.name = '@HZB_Builder';
+  program.name = `@HZB_Builder${twoChannel ? '_MinMax' : ''}`;
   return program;
 }
 
-function getHiZBindGroup(tex: BaseTexture, mip: number) {
+function getHiZBindGroup(tex: BaseTexture, mip: number, program: GPUProgram) {
   let info = hzbBindGroupCache.get(tex);
   if (!info) {
     info = [];
     hzbBindGroupCache.set(tex, info);
   }
   if (!info[mip]) {
-    info[mip] = tex.device.createBindGroup(hzbProgram!.bindGroupLayouts[0]);
+    info[mip] = tex.device.createBindGroup(program.bindGroupLayouts[0]);
     srcSize[0] = Math.max(tex.width >> mip, 1);
     srcSize[1] = Math.max(tex.height >> mip, 1);
     info[mip].setValue('srcSize', srcSize);
@@ -284,7 +340,8 @@ function buildHiZLevel(
   device: AbstractDevice,
   miplevel: number,
   srcTexture: Texture2D,
-  dstTexture: Texture2D
+  dstTexture: Texture2D,
+  program: GPUProgram
 ) {
   const framebuffer = device.pool.fetchTemporalFramebuffer(
     false,
@@ -298,8 +355,8 @@ function buildHiZLevel(
     miplevel + 1
   );
   framebuffer.setColorAttachmentGenerateMipmaps(0, false);
-  device.setProgram(hzbProgram);
-  device.setBindGroup(0, getHiZBindGroup(srcTexture, miplevel));
+  device.setProgram(program);
+  device.setBindGroup(0, getHiZBindGroup(srcTexture, miplevel, program));
   device.setFramebuffer(framebuffer);
   drawFullscreenQuad();
   if (srcTexture !== dstTexture) {
@@ -308,18 +365,31 @@ function buildHiZLevel(
   device.pool.releaseFrameBuffer(framebuffer);
 }
 
+/**
+ * Builds the Hi-Z pyramid from the depth prepass.
+ *
+ * The target's channel count picks the variant: a one-channel target carries
+ * only the farthest-depth pyramid the occlusion tests want, a two-channel one
+ * adds the nearest-depth pyramid in green for proximity queries. Keyed off the
+ * texture rather than a flag so the pyramid and its consumer cannot disagree
+ * about what is in green.
+ */
 export function buildHiZ(sourceTex: Texture2D, HiZFrameBuffer: FrameBuffer) {
   const device = getDevice();
-  if (!hzbProgram) {
-    hzbProgram = buildHZBProgram(device);
-    blitter = new HiZInitBlitter();
+  const dstTex = HiZFrameBuffer.getColorAttachments()[0] as Texture2D;
+  const twoChannel = hasNearestChannel(dstTex.format);
+  const variant = twoChannel ? 1 : 0;
+  if (!hzbProgram[variant]) {
+    hzbProgram[variant] = buildHZBProgram(device, twoChannel);
+    blitter[variant] = new HiZInitBlitter(twoChannel);
   }
-  blitter!.blit(sourceTex, HiZFrameBuffer, fetchSampler('clamp_nearest'));
+  const program = hzbProgram[variant]!;
+  blitter[variant]!.blit(sourceTex, HiZFrameBuffer, fetchSampler('clamp_nearest'));
   device.pushDeviceStates();
   const srcTex = HiZFrameBuffer.getColorAttachments()[0] as Texture2D;
   if (device.type === 'webgpu') {
     for (let i = 0; i < srcTex.mipLevelCount - 1; i++) {
-      buildHiZLevel(device, i, srcTex, srcTex);
+      buildHiZLevel(device, i, srcTex, srcTex, program);
     }
   } else {
     const tmpFramebuffer = device.pool.fetchTemporalFramebuffer(
@@ -330,9 +400,9 @@ export function buildHiZ(sourceTex: Texture2D, HiZFrameBuffer: FrameBuffer) {
       null,
       true
     );
-    const dstTex = tmpFramebuffer.getColorAttachments()[0] as Texture2D;
+    const tmpTex = tmpFramebuffer.getColorAttachments()[0] as Texture2D;
     for (let i = 0; i < srcTex.mipLevelCount - 1; i++) {
-      buildHiZLevel(device, i, srcTex, dstTex);
+      buildHiZLevel(device, i, srcTex, tmpTex, program);
     }
     device.pool.releaseFrameBuffer(tmpFramebuffer);
   }

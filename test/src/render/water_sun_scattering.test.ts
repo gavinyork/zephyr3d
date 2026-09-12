@@ -54,6 +54,7 @@ function buildScatteringShader(type: (typeof DEVICE_TYPES)[number]) {
       this.lightDir = pb.vec3().uniform(0);
       this.eyeVecNorm = pb.vec3().uniform(0);
       this.geom = pb.vec2().uniform(0);
+      this.foam = pb.float().uniform(0);
       this.$outputs.color = pb.vec4();
       pb.main(function (this: PBInsideFunctionScope) {
         const scattered = material.waterSunScattering(
@@ -62,7 +63,8 @@ function buildScatteringShader(type: (typeof DEVICE_TYPES)[number]) {
           this.lightDir,
           this.eyeVecNorm,
           this.geom.x,
-          this.geom.y
+          this.geom.y,
+          this.foam
         ) as PBShaderExp;
         this.$outputs.color = pb.vec4(scattered, 1);
       });

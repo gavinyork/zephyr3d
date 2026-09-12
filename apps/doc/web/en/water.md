@@ -48,24 +48,20 @@ water.material.reflectionStrength = 0.8;
 water.TAAStrength = 0.4;
 ```
 
-Important controls:
-
 | Property | Meaning |
 | --- | --- |
-| `gridScale` | Clipmap grid spacing in world units |
+| `gridScale` | Clipmap grid spacing in world units. Use the largest value that still gives enough near-camera detail |
 | `animationSpeed` | Multiplier for wave time |
 | `wireframe` | Draw clipmap grid lines for debugging |
-| `TAAStrength` | Temporal smoothing used by the water material |
-| `material.refractionScale` | Artistic scale on the refracted offset; 1 is physical, 0 disables it |
-| `material.reflectionStrength` | Scale on the Fresnel reflectance; 1 is physical, lower shows more of what is underwater |
-
-Underwater refraction is not a normal-driven push of the screen UV: the view ray is bent by Snell's law, followed to whatever is behind the water, and the hit point is projected back to the screen. The incidence angle, the water depth and the perspective foreshortening all fall out of that, so `refractionScale` is a stylisation knob rather than a strength that has to be tuned - the default of 1 is already the physical amount.
+| `TAAStrength` | Temporal smoothing used by the water. Raise it when the surface shimmers or sparkles, lower it if you see trailing |
+| `material.refractionScale` | Artistic scale on the refracted offset. 1 is physical, 0 disables it, above 1 exaggerates |
+| `material.reflectionStrength` | Scale on the Fresnel reflectance. 1 is physical; water reflects almost everything at a grazing angle, so lowering this trades reflection away for visibility of what is underwater |
 
 Because the material uses scene color and scene depth, water is rendered in the main scene pipeline. Keep transparent objects and post effects in mind when tuning the final look.
 
 ## The Water Medium
 
-The water's color comes from two coefficients: **absorption** and **scattering**, both per-meter, per-RGB-channel physical coefficients (units 1/m).
+The water's color comes from two coefficients, **absorption** and **scattering**, both per-meter, per-RGB-channel physical coefficients (units 1/m).
 
 ```ts
 // Clear pool water: low absorption and low scattering, the floor stays visible.
@@ -77,19 +73,23 @@ water.material.scattering = new Vector3(0.01, 0.02, 0.03);
 // water.material.scattering = new Vector3(0.06, 0.12, 0.15);
 ```
 
-- **Absorption** (`absorption`) sets how fast light dies out in the body. Higher and deeper means less transmitted light and a darker body.
-- **Scattering** (`scattering`) sets how much light the body throws back toward the eye. Higher means a milkier, more opaque body - but also one that glows from within.
-- `absorptionScale` / `scatteringScale` are global multipliers for quick turbidity adjustment without touching the per-channel color.
-- `mediumMode` can be `physical` (default, Beer-Lambert) or `ramp` (the legacy gradient textures, kept only for scenes tuned against them).
+| Property | Meaning |
+| --- | --- |
+| `absorption` | How fast light dies out in the body. Higher, and deeper, means less transmitted light and a darker body |
+| `scattering` | How much light the body throws back toward the eye. Higher means a milkier, more opaque body - but also one that glows from within |
+| `absorptionScale` / `scatteringScale` | Global multipliers for quick turbidity adjustment without touching the per-channel color |
+| `mediumMode` | `physical` (default) or `ramp`. `ramp` is the legacy gradient-texture path, kept only for scenes tuned against it |
 
-The medium is **shared everywhere**: refraction, caustics, directional scattering and refraction blur all read the same `absorption` / `scattering` coefficients, so changing them affects all of those at once rather than one in isolation.
+These coefficients are **shared**: refraction, caustics, directional scattering and refraction blur all read the same values, so changing them affects all of those at once.
 
 ## Refraction
 
-Refraction makes what is underwater land in the right place. The material has a `refractionMode`:
+`refractionMode` decides how what is underwater is located.
 
-- **`march` (default)**: bends the view ray by Snell's law and marches it against the scene depth buffer in `REFRACT_MARCH_STEPS` steps, taking the first crossing. The hit point tracks the submerged object - it does not drift, and silhouettes do not tear. The cost is 24 depth-texture reads per water pixel.
-- **`offset` (cheap mode)**: no depth search - it displaces the screen UV by the wave normal alone. All the marching goes away, but the water refracts to the *wrong* point: a submerged silhouette smears instead of holding still. Reach for it on hardware that cannot afford the march.
+| Value | Effect and cost |
+| --- | --- |
+| `march` (default) | Submerged objects land in the right place: they do not drift and silhouettes do not tear. Costs around 24 depth-texture reads per water pixel |
+| `offset` | No depth search. The direction and magnitude of the refraction are roughly right but the landing point is not, so a submerged silhouette smears instead of holding still. Reach for it on hardware that cannot afford `march` |
 
 ```ts
 // Low-end: drop the depth search for performance.
@@ -97,7 +97,7 @@ water.material.refractionMode = 'offset';
 water.material.cheapRefractionDepth = 1;
 ```
 
-`cheapRefractionDepth` (meters) is only used by `offset`; it is the depth the cheap mode *assumes* the water is, which sets how strong the distortion looks. It is deliberately a constant rather than the measured distance to the bottom: scaling the offset by that distance would paint a second copy of anything breaking the surface.
+`cheapRefractionDepth` (meters) is used only by `offset`. It is the depth the cheap mode assumes the water is, which sets how strong the distortion looks. It is deliberately a constant rather than the real depth - scaling by the real distance paints a second copy of anything breaking the surface.
 
 ## Caustics
 
@@ -105,54 +105,95 @@ Caustics are the web of focused sunlight the surface casts onto submerged geomet
 
 ```ts
 water.causticsEnabled = true;
-water.causticsDepth = 4;      // Focal depth (meters); set it near the receiving surface (pool floor / sea bed)
-water.causticsRange = 60;     // Furthest the caustic map reaches (meters); the map is fitted to the water in range
-water.causticsIntensity = 1;  // Caustic contrast; 0 leaves the light unmodulated
+water.causticsDepth = 4;
+water.causticsRange = 60;
+water.causticsIntensity = 1;
 ```
 
-- `causticsDepth`: the depth where caustics are sharpest. Photons are splatted onto a horizontal plane at this depth; receivers away from it are progressively defocused rather than displaced, so set it to the depth that should show the sharpest pattern.
-- `causticsRange`: a cap on how far from the camera the map reaches, not a fixed extent - the map is fitted to the water within it, so water smaller than the range gets the whole map. Raise it to light more of the scene at the cost of resolution.
-- `causticsSceneDepth`: whether photons land on the scene instead of on the focal plane. Default `true`; on WebGPU it reuses the sun's shadow cascade as the scene-depth map, so it costs no extra geometry pass. On WebGL2 it degrades to the plane, where `causticsDepth` *is* the receiver depth. On either backend, set `causticsDepth` to the depth most receiving geometry sits at.
-- `causticsIntensity`: the contrast strength. `0` leaves the light unmodulated; `1` is the default physical amount.
-- `causticsFadeDistance`: width (meters) of the band the pattern fades out over at the map edge; `0` derives it from `causticsRange`.
-- If the water surface sits **above** the pool walls (say surface at y=4, floor at y=0), caustics shift by `depth / tan(sun elevation)`, which leaves a blank band between the caustic boundary and the wall shadows. Keeping the surface at the rim and letting the water region cover the full receiving area keeps the caustics and shadows aligned.
+| Property | Meaning |
+| --- | --- |
+| `causticsEnabled` | Master switch. Keep it `false` when you do not want caustics to skip the photon launch and temporal accumulation entirely |
+| `causticsDepth` | The depth (meters) where caustics are sharpest. Receivers away from it are progressively **defocused** rather than displaced, so set it to the depth most receiving geometry - pool floor, sea bed - sits at |
+| `causticsRange` | How far from the camera the caustic map reaches (meters). A cap rather than a fixed extent: the map is fitted to the water actually within it. Raise it to light more of the scene at the cost of resolution |
+| `causticsIntensity` | Caustic contrast. 0 leaves the light unmodulated, 1 is the default physical amount |
+| `causticsSceneDepth` | Land photons on the real scene instead of on a flat focal plane. Default `true`; free on WebGPU, degrades to the plane on WebGL2, where `causticsDepth` *is* the receiver depth |
+| `causticsFadeDistance` | Width (meters) of the band the pattern fades out over at the map edge. 0 derives it from `causticsRange` |
+
+If the water surface sits **above** the pool walls (say surface at y=4, floor at y=0), caustics shift by `depth / tan(sun elevation)`, leaving a blank band between the caustic boundary and the wall shadows. Keeping the surface at the rim, and letting the water region cover the full receiving area, keeps the two aligned.
 
 ## Directional Scattering
 
-Directional scattering gives the body a direction-dependent color: it is evaluated per light, so a shadow falling on the water darkens the water itself and a low sun tints the column the way it tints everything else. Without it the body is lit by the environment irradiance alone, which has no direction.
+Directional scattering gives the body a **direction-dependent** color: it is evaluated per light, so a shadow falling on the water darkens the water itself and a low sun tints it. Without it the body is lit by the environment alone and loses its sense of direction.
 
 ```ts
-water.material.sunScatteringIntensity = 1;  // 1 = the physical amount the medium implies; 0 disables it
-water.material.scatterAnisotropy = 0.7;     // Mean cosine of a single scattering event, [0, 0.95]
+water.material.sunScatteringIntensity = 1;
+water.material.scatterAnisotropy = 0.7;
 ```
 
-- `sunScatteringIntensity`: how strongly sunlight scattered out of the column reaches the eye. `1` is the physical value the medium coefficients imply; anything else is deliberate exaggeration.
-- `scatterAnisotropy`: the phase-function anisotropy. `0` scatters equally in all directions; `0.7` (default) is near measured sea water. It blends toward isotropic as the column gets optically thick (the effect of multiple scattering), so the visible anisotropy is always below this number.
+| Property | Meaning |
+| --- | --- |
+| `sunScatteringIntensity` | How strongly sunlight scattered out of the column reaches the eye. 1 is the physical value the medium coefficients imply, 0 disables it, higher is deliberate exaggeration |
+| `scatterAnisotropy` | Phase-function anisotropy, in [0, 0.95]. 0 scatters equally in all directions; 0.7 (default) is near measured sea water. Thicker water blends toward isotropic, so the **visible anisotropy is always below this number** |
 
 ## Refraction Blur
 
-As the optical depth grows, what you see through the water blurs: scattering deflects the transmitted ray by a small angle at every event, so the image arriving at the surface is a convolution whose width grows with the optical depth.
+The more turbid and the deeper the water, the more what you see through it blurs.
 
 ```ts
-water.material.refractionBlur = 1;  // 1 = the width the medium implies; 0 keeps the background sharp at any depth
+water.material.refractionBlur = 1;
 ```
 
-The width is derived from the scattering coefficient and the path length; `refractionBlur` is a stylisation factor rather than the magnitude itself. It costs nothing on its own - it just selects a mip of the refraction background, which is generated regardless. Clear pool water stays essentially sharp; turbid water is a smudge a few meters down. That difference is one of the main ways clear pools and open seas read apart.
+`refractionBlur` is a multiplier on that blur: 1 is the amount the medium coefficients imply, 0 keeps the background sharp at any depth. The width also follows the `scattering` coefficient and the path length, so changing the medium changes the blur. The effect is nearly free. Clear pool water stays essentially sharp while turbid water is a smudge a few meters down, which is one of the main ways the two read apart.
 
-## Foam
+## Crest Foam
 
-Foam renders surface folding - a breaking crest - as a diffuse white layer. The wave generator reports where the surface has folded over itself; the material maps that into a coverage fraction.
+Crest foam comes from the surface folding over at a breaking wave. The `waveGenerator` supplies the folding data and the material maps it into a coverage fraction.
 
 ```ts
-water.material.foamAmount = 1;      // 0 disables foam
-water.material.foamFalloff = 1.5;   // Above 1, light folding produces no foam; only a genuinely broken crest shows
+water.material.foamAmount = 1;
+water.material.foamFalloff = 1.5;
 water.material.foamColor = new Vector3(0.92, 0.95, 0.97);
 ```
 
-- `foamAmount`: scales the folding amount into a coverage fraction; 0 disables foam.
-- `foamFalloff`: a power applied to foam coverage before it is scaled. Above 1 it pushes light folding toward no foam at all, so only a crest that has genuinely broken shows - which is what keeps a windy sea from turning uniformly white.
-- `foamColor`: the diffuse albedo of the foam. Slightly off-white and slightly blue (water plus air); a pure white one reads as snow.
-- Foam is a **lit** surface: it suppresses the specular underneath it and the light coming up through the column, and responds to the sun and the ambient the way a matte surface does.
+| Property | Meaning |
+| --- | --- |
+| `foamAmount` | Scales the folding amount into a coverage fraction. 0 disables crest foam |
+| `foamFalloff` | A power applied to the coverage. Above 1 it pushes light folding toward no foam at all, so only a genuinely broken crest shows - which is what keeps a windy sea from turning uniformly white |
+| `foamColor` | Diffuse albedo of the foam, shared with shoreline foam. Slightly off-white and slightly blue (water plus air); a pure white one reads as snow |
+
+Foam is a **lit** surface: it suppresses the specular underneath it and the light coming up through the column, and responds to the sun and the ambient the way a matte surface does.
+
+## Shoreline Foam
+
+Shoreline foam is the white water that collects where the surface comes close to something solid: the waterline on a shelving bed, and the collar where a piling, a hull or a rock breaks the surface. It is independent of crest foam and switches on separately.
+
+It is **off by default** and needs WebGL2 or WebGPU; on WebGL1 the parameters have no effect.
+
+```ts
+water.shoreFoamAmount = 1;
+water.shoreFoamDepth = 0.5;
+water.shoreFoamWashAmount = 0.5;
+```
+
+| Property | Meaning |
+| --- | --- |
+| `shoreFoamAmount` | Coverage strength. 0 disables it (default), which also removes its cost |
+| `shoreFoamDepth` | How far the band reaches from the solid surface (meters). Over a bed that is a depth of water; against something vertical like a piling or a hull it is the horizontal distance to its side, and one value serves both. How wide that is on screen depends on the geometry: a thin line on a steep drop-off, a broad stretch on a flat shelf |
+| `shoreFoamFalloff` | Falloff across the band. Above 1 it pushes coverage toward the contact line and keeps the outer edge thin and broken |
+| `shoreFoamScale` | Size of the foam clumps, as **cycles across the band**. 2.5 puts a couple of clumps across it. Being relative to the band width rather than an absolute frequency, one value reads the same on a shoreline metres across and on a collar a handspan wide |
+| `shoreFoamWashAmount` | How far the waterline runs up and back, as a fraction of `shoreFoamDepth`. 0 leaves a static rim; this is what makes the band read as surf rather than as a decal. Above 1 the band closes completely at the bottom of the cycle, which looks like the foam blinking out |
+| `shoreFoamWashSpeed` | Run-up cycles per second. This is swell rather than wind waves, so well under 1 |
+| `shoreFoamWashScale` | Spatial frequency of the run-up phase (cycles per meter). At 0 the whole waterline rises and falls in lockstep, which reads as the water level itself changing; a cycle every few tens of meters breaks a long shoreline into sections that run out of step with one another |
+
+The color comes from `material.foamColor`, shared with crest foam.
+
+The effect is derived from what the camera can see, which sets its limits:
+
+- Foam near an object disappears once that object leaves the frame
+- An object hidden behind something in the foreground produces no foam
+- An object only a few pixels wide on screen - a cable, a railing - may produce no foam at all. Lowering `shoreFoamDepth` helps
+
+For debugging, set `water.debugOutput` to `'shoreFoam'` to view this layer on its own, or to `'waterDepth'` to view the distance it is keyed on.
 
 ## Wave Generators
 
@@ -234,6 +275,7 @@ Use the largest `gridScale` that still gives enough near-camera detail. Keep the
 
 - **Small decorative water**: `FBMWaveGenerator` is usually sufficient.
 - **Oceans / broad swells**: use `FFTWaveGenerator`, especially when you want foam or folded crests. It allocates several FFT textures and updates every frame; the GPU cost rises quickly with resolution.
-- **Low-end hardware**: set `refractionMode` to `offset` to drop the march's 24 depth reads per pixel.
-- **Caustics**: need a shadow-casting directional light. If you do not want them, keep `causticsEnabled = false` to skip the photon launch and temporal accumulation entirely.
+- **Low-end hardware**: set `refractionMode` to `offset` to drop the 24 depth reads per pixel.
+- **Caustics**: need a shadow-casting directional light. Keep `causticsEnabled = false` when you do not want them.
+- **Shoreline foam**: adds around a dozen depth samples per water pixel and a second channel to the scene's depth pyramid. Keep `shoreFoamAmount = 0` when you do not want it.
 - **Refraction blur / directional scattering**: nearly free, and they pull a lot of look from the medium coefficients.

@@ -170,6 +170,17 @@ export class AbstractPostEffect extends Disposable {
   requireHiZTexture(_ctx: DrawContext) {
     return false;
   }
+  /**
+   * Checks whether this post effect requires the Hi-Z pyramid's nearest-depth
+   * channel, which answers "how close is the nearest surface in this screen
+   * region" rather than the farthest-depth channel's occlusion question.
+   *
+   * Implies {@link AbstractPostEffect.requireHiZTexture}; an effect that needs
+   * the nearest channel does not have to request the pyramid separately.
+   */
+  requireHiZNearest(_ctx: DrawContext) {
+    return false;
+  }
   /** Checks whether this post effect requires opaque-scene world normals. */
   requireSceneNormalTexture(_ctx: DrawContext) {
     return false;
@@ -193,7 +204,8 @@ export class AbstractPostEffect extends Disposable {
   getFrameResourceRequirements(ctx: DrawContext): FrameResourceRequirements {
     return {
       motionVector: this.requireMotionVectorTexture(ctx),
-      hiZ: this.requireHiZTexture(ctx),
+      hiZ: this.requireHiZTexture(ctx) || this.requireHiZNearest(ctx),
+      hiZNearest: this.requireHiZNearest(ctx),
       sceneNormal: this.requireSceneNormalTexture(ctx),
       sceneRoughness: this.requireSceneRoughnessTexture(ctx),
       shadowMask: this.requireShadowMask(ctx)

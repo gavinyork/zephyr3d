@@ -46,8 +46,8 @@ myApp.ready().then(function () {
   scene.mainCamera = new PerspectiveCamera(scene, Math.PI / 3, 1, 600);
   scene.mainCamera.lookAt(new Vector3(0, 40, 60), Vector3.zero(), new Vector3(0, 1, 0));
   scene.mainCamera.controller = new OrbitCameraController();
-  scene.mainCamera.SSAOIntensity = 0.02;
-  scene.mainCamera.SSAORadius = 40;
+  scene.mainCamera.SSAOIntensity = 2;
+  scene.mainCamera.SSAOOcclusionRadius = 3.5;
 
   getInput().use(scene.mainCamera.handleEvent, scene.mainCamera);
 

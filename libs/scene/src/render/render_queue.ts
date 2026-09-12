@@ -210,6 +210,7 @@ export class RenderQueue extends Disposable {
   /** @internal */
   private _needSceneColor: boolean;
   private _needSceneDepth: boolean;
+  private _needHiZNearest: boolean;
   private _needSceneColorWithDepth: boolean;
   /** @internal */
   private _drawTransparent: boolean;
@@ -234,6 +235,7 @@ export class RenderQueue extends Disposable {
     this._instanceInfo = new Map();
     this._needSceneColor = false;
     this._needSceneDepth = false;
+    this._needHiZNearest = false;
     this._needSceneColorWithDepth = false;
     this._drawTransparent = false;
     this._objectColorMaps = [new Map()];
@@ -283,6 +285,18 @@ export class RenderQueue extends Disposable {
   /** @internal */
   needSceneDepth() {
     return this._needSceneDepth;
+  }
+  /**
+   * Whether any drawable needs the Hi-Z pyramid's nearest-depth channel.
+   *
+   * Materials request it the way they request the scene colour and depth, which
+   * is what lets a surface that queries the scene's proximity - water foam
+   * against a shoreline or a piling - turn the second channel on without the
+   * application having to know it exists.
+   * @internal
+   */
+  needHiZNearest() {
+    return this._needHiZNearest;
   }
   /** @internal */
   needSceneColorWithDepth() {
@@ -395,6 +409,7 @@ export class RenderQueue extends Disposable {
     this._itemList.transmission_trans.unlit.push(...newItemLists.transmission_trans.unlit);
     this._needSceneColor ||= queue._needSceneColor;
     this._needSceneDepth ||= queue._needSceneDepth;
+    this._needHiZNearest ||= queue._needHiZNearest;
     this._needSceneColorWithDepth ||= queue._needSceneColorWithDepth;
     this._drawTransparent ||= queue._drawTransparent;
     this._sunLight ||= queue._sunLight;
@@ -437,6 +452,7 @@ export class RenderQueue extends Disposable {
       const transmission = !!drawable.needSceneColor() || needDepth;
       this._needSceneColor ||= transmission;
       this._needSceneDepth ||= drawable.needSceneDepth();
+      this._needHiZNearest ||= !!drawable.needHiZNearest?.();
       this._needSceneColorWithDepth ||= transmission && needDepth;
       this._drawTransparent ||= trans;
       if (camera.getPickResultResolveFunc()) {
@@ -572,6 +588,7 @@ export class RenderQueue extends Disposable {
     this._waterList = [];
     this._needSceneColor = false;
     this._needSceneDepth = false;
+    this._needHiZNearest = false;
     this._needSceneColorWithDepth = false;
     this._drawTransparent = false;
   }
