@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Procedural buildings</title>
+    <style>
+      html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; background: #10131a; color: #edf2f7; font-family: ui-sans-serif, system-ui, sans-serif; }
+      canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+      #panel { position: absolute; top: 16px; left: 16px; z-index: 1; width: 268px; padding: 14px 16px; border: 1px solid rgba(255,255,255,.14); border-radius: 8px; background: rgba(18,22,29,.88); backdrop-filter: blur(8px); box-shadow: 0 8px 28px rgba(0,0,0,.3); }
+      h1 { margin: 0 0 6px; font-size: 16px; }
+      p { margin: 0 0 12px; color: #9fabba; font-size: 12px; line-height: 1.45; }
+      label { display: flex; align-items: center; gap: 9px; margin-top: 9px; font-size: 12.5px; }
+      label > span:first-child { flex: 0 0 78px; color: #c6d0dc; }
+      input[type="range"] { flex: 1; accent-color: #f0a33c; min-width: 0; }
+      input[type="number"] { flex: 1; min-width: 0; background: #0d1016; color: #edf2f7; border: 1px solid rgba(255,255,255,.16); border-radius: 4px; padding: 3px 6px; font: inherit; font-size: 12px; }
+      output { min-width: 26px; text-align: right; font-variant-numeric: tabular-nums; color: #f0a33c; }
+      button { width: 100%; margin-top: 13px; padding: 7px; border: 0; border-radius: 5px; background: #f0a33c; color: #1a1206; font: inherit; font-weight: 600; font-size: 13px; cursor: pointer; }
+      button:hover { background: #ffb454; }
+      #stats { margin-top: 11px; font-size: 11.5px; color: #7f8b99; font-variant-numeric: tabular-nums; line-height: 1.5; }
+    </style>
+  </head>
+  <body>
+    <canvas id="canvas"></canvas>
+    <section id="panel">
+      <h1>Procedural buildings</h1>
+      <p>Streets by wave function collapse, buildings by shape grammar. No mesh assets involved.</p>
+      <label><span>Seed</span><input id="seed" type="number" value="1" step="1" /></label>
+      <label><span>Block size</span><input id="grid" type="range" min="1" max="5" step="1" value="3" /><output id="grid-value">3</output></label>
+      <label><span>Max floors</span><input id="floors" type="range" min="3" max="40" step="1" value="24" /><output id="floors-value">24</output></label>
+      <button id="regenerate">Regenerate</button>
+      <div id="stats"></div>
+    </section>
+    <script type="module" src="js/main.js"></script>
+  </body>
+</html>

@@ -449,6 +449,16 @@
       "shouldPublish": true
     },
     {
+      "packageName": "@zephyr3d/modelgen",
+      "projectFolder": "libs/modelgen",
+      "shouldPublish": true
+    },
+    {
+      "packageName": "@zephyr3d/procgen",
+      "projectFolder": "libs/procgen",
+      "shouldPublish": true
+    },
+    {
       "packageName": "@zephyr3d/backend-webgl",
       "projectFolder": "libs/backend-webgl",
       "shouldPublish": true
@@ -518,6 +528,10 @@
     {
       "packageName": "@zephyr3d/outline-demo",
       "projectFolder": "apps/outline-demo"
+    },
+    {
+      "packageName": "@zephyr3d/procgen-demo",
+      "projectFolder": "apps/procgen-demo"
     }
   ]
 }

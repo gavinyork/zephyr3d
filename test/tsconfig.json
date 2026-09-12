@@ -18,9 +18,14 @@
     "types": ["jest", "node"],
     "baseUrl": ".",
     "paths": {
-      // Mirrors the jest moduleNameMapper entry so tests typecheck against the
-      // backend sources; the package itself is only ever consumed from source.
-      "@zephyr3d/backend-null": ["../libs/backend-null/src"]
+      // Mirrors the jest moduleNameMapper entries so tests typecheck against the
+      // same sources jest loads at runtime. Required for packages consumed from
+      // source, and for any package imported by one of them (their own folders
+      // have no node_modules to resolve through).
+      "@zephyr3d/backend-null": ["../libs/backend-null/src"],
+      "@zephyr3d/base": ["../libs/base/src"],
+      "@zephyr3d/modelgen": ["../libs/modelgen/src"],
+      "@zephyr3d/procgen": ["../libs/procgen/src"]
     }
   },
   "exclude": ["node_modules", "**/*.spec.ts", "**/*.d.ts", "common/temp", "**/common/temp"]

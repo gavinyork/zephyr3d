@@ -24,6 +24,8 @@ module.exports = {
     '^@zephyr3d/device$': '<rootDir>/../libs/device/src',
     '^@zephyr3d/scene$': '<rootDir>/../libs/scene/src',
     '^@zephyr3d/scene/(.*)$': '<rootDir>/../libs/scene/src/$1',
+    '^@zephyr3d/modelgen$': '<rootDir>/../libs/modelgen/src',
+    '^@zephyr3d/procgen$': '<rootDir>/../libs/procgen/src',
     // Resolve to sources so tests never depend on a built backend
     '^@zephyr3d/backend-null$': '<rootDir>/../libs/backend-null/src'
   }
