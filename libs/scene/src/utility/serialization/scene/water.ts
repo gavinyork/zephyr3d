@@ -7,8 +7,8 @@ import { defineProps, type SerializableClass } from '../types';
 import type { WaveGenerator } from '../../../render';
 import { FBMWaveGenerator, FFTWaveGenerator, GerstnerWaveGenerator } from '../../../render';
 import { MAX_GERSTNER_WAVE_COUNT } from '../../../values';
-import type { WaterMediumMode, WaterRefractionMode } from '../../../material/water';
-import { DEFAULT_SCATTER_ANISOTROPY } from '../../../material/water';
+import type { WaterDebugOutput, WaterMediumMode, WaterRefractionMode } from '../../../material/water';
+import { DEFAULT_SCATTER_ANISOTROPY, WATER_DEBUG_OUTPUTS } from '../../../material/water';
 import type { Texture2D } from '@zephyr3d/device';
 import type { ResourceManager } from '../manager';
 
@@ -767,6 +767,25 @@ export function getWaterClass(manager: ResourceManager): SerializableClass {
           },
           set(this: Water, value) {
             this.material.refractionMode = value.str[0] as WaterRefractionMode;
+          }
+        },
+        {
+          name: 'DebugOutput',
+          description:
+            'Debugging aid: replaces the water colour with one of the shading terms it is built from, so a broken term can be identified by eye',
+          type: 'string',
+          default: 'none',
+          options: {
+            enum: {
+              labels: WATER_DEBUG_OUTPUTS.map((e) => e.label),
+              values: WATER_DEBUG_OUTPUTS.map((e) => e.value)
+            }
+          },
+          get(this: Water, value) {
+            value.str[0] = this.debugOutput;
+          },
+          set(this: Water, value) {
+            this.debugOutput = value.str[0] as WaterDebugOutput;
           }
         },
         {

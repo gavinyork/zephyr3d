@@ -36,6 +36,33 @@ const myApp = new Application({
   canvas: document.querySelector('#my-canvas')
 });
 
+// Shading terms the water can display instead of its final colour, for
+// tracking down a broken one. Kept in step with WaterDebugOutput in
+// @zephyr3d/scene.
+const DEBUG_OUTPUTS = [
+  ['none', 'None'],
+  ['normal', 'Normal'],
+  ['diffuseNormal', 'Diffuse normal'],
+  ['viewFacing', 'View facing'],
+  ['frontFacing', 'Front facing'],
+  ['foam', 'Foam'],
+  ['fresnel', 'Fresnel'],
+  ['reflection', 'Reflection'],
+  ['refraction', 'Refraction'],
+  ['absorption', 'Absorption'],
+  ['scattering', 'Scattering'],
+  ['sunScattering', 'Sun scattering'],
+  ['sunPhase', 'Sun phase'],
+  ['sunIntegral', 'Sun integral'],
+  ['sunNoL', 'Sun NoL'],
+  ['shadow', 'Shadow'],
+  ['subsurface', 'Subsurface'],
+  ['specular', 'Specular'],
+  ['depth', 'Depth'],
+  ['refractUV', 'Refract UV'],
+  ['nan', 'NaN']
+];
+
 myApp.ready().then(function () {
   /** @type {DRef<Scene>} */
   const ocean = new DRef(buildOceanScene());
@@ -65,6 +92,67 @@ myApp.ready().then(function () {
     select.value = 'pool';
   }
   applyScene(select.value === 'pool' ? pool.get() : ocean.get());
+
+  /** @type {HTMLSelectElement} */
+  const debugSelect = document.querySelector('#debug-select');
+  for (const [value, label] of DEBUG_OUTPUTS) {
+    const option = document.createElement('option');
+    option.value = value;
+    option.textContent = label;
+    debugSelect.appendChild(option);
+  }
+  const applyDebug = function (value) {
+    for (const scene of [ocean.get(), pool.get()]) {
+      scene.rootNode.iterate(function (node) {
+        if (node instanceof Water && node.waveGenerator) {
+          node.material.debugOutput = value;
+        }
+        return false;
+      });
+    }
+  };
+  debugSelect.addEventListener('change', function () {
+    applyDebug(debugSelect.value);
+  });
+  const debugParam = new URLSearchParams(location.search).get('debug');
+  if (debugParam) {
+    debugSelect.value = debugParam;
+  }
+  applyDebug(debugSelect.value);
+
+  // Freeze the wave clock. animationSpeed scales the elapsed time the generator
+  // is driven by, so zero holds the surface still and the same instant can be
+  // compared across two debug views. The authored speed is remembered per node
+  // so unpausing restores it rather than hard-coding 1.
+  /** @type {HTMLInputElement} */
+  const pauseCheck = document.querySelector('#pause-check');
+  /** @type {WeakMap<Water, number>} */
+  const speedBeforePause = new WeakMap();
+  const applyPause = function (paused) {
+    for (const scene of [ocean.get(), pool.get()]) {
+      scene.rootNode.iterate(function (node) {
+        if (node instanceof Water) {
+          if (paused) {
+            if (!speedBeforePause.has(node)) {
+              speedBeforePause.set(node, node.animationSpeed);
+            }
+            node.animationSpeed = 0;
+          } else if (speedBeforePause.has(node)) {
+            node.animationSpeed = speedBeforePause.get(node);
+            speedBeforePause.delete(node);
+          }
+        }
+        return false;
+      });
+    }
+  };
+  pauseCheck.addEventListener('change', function () {
+    applyPause(pauseCheck.checked);
+  });
+  if (new URLSearchParams(location.search).get('pause') === '1') {
+    pauseCheck.checked = true;
+  }
+  applyPause(pauseCheck.checked);
 
   getInput().use(forwarder);
   myApp.run();
@@ -110,8 +198,8 @@ function buildOceanScene() {
   const bedMaterial = new PBRMetallicRoughnessMaterial();
   bedMaterial.albedoColor = new Vector4(0.76, 0.7, 0.5, 1);
   bedMaterial.roughness = 1;
-  const bed = new Mesh(scene, new PlaneShape({ size: 400 }), bedMaterial);
-  bed.position.setXYZ(0, -3, 0);
+  const bed = new Mesh(scene, new PlaneShape({ size: 5000 }), bedMaterial);
+  bed.position.setXYZ(0, -14, 0);
 
   const water = new Water(scene);
   water.scale.setXYZ(5000, 1, 5000);
@@ -123,7 +211,7 @@ function buildOceanScene() {
   // FFT rather than FBM, so the surface genuinely folds - that is what feeds
   // both the foam and cresting here.
   const waves = new FFTWaveGenerator();
-  waves.wind = new Vector2(24, 5);
+  waves.wind = new Vector2(20, 5);
   waves.setWaveLength(0, 400);
   waves.setWaveLength(1, 100);
   waves.setWaveLength(2, 16);
@@ -143,11 +231,13 @@ function buildOceanScene() {
   water.scattering = new Vector3(0.06, 0.12, 0.15);
   water.reflectionStrength = 0.8;
   water.refractionScale = 1;
+  water.sunScatteringIntensity = 0.4;
   water.foamAmount = 1;
   water.foamFalloff = 1.5;
+  water.infinite = true;
 
   water.causticsEnabled = true;
-  water.causticsDepth = 3;
+  water.causticsDepth = 16;
   water.causticsRange = 40;
   water.causticsSceneDepth = true;
 

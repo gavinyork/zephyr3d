@@ -8,7 +8,7 @@ import type { Drawable, DrawContext, PickTarget, PrimitiveInstanceInfo, RenderQu
 import { Primitive } from '../render';
 import { Clipmap, FBMWaveGenerator } from '../render';
 import { WaterMaterial } from '../material/water';
-import type { WaterRefractionMode } from '../material/water';
+import type { WaterDebugOutput, WaterRefractionMode } from '../material/water';
 import type { AbstractDevice, BindGroup, FrameBuffer, GPUProgram, RenderStateSet } from '@zephyr3d/device';
 import { QUEUE_OPAQUE } from '../values';
 import { BoundingBox } from '../utility/bounding_volume';
@@ -47,6 +47,10 @@ export class Water extends applyMixins(GraphNode, mixinDrawable) implements Draw
   private _viewDistance: number;
   private _animationSpeed: number;
   private _timeStart: number;
+  /** Wave clock, in seconds. Advanced by `animationSpeed` per frame. */
+  private _waveTime: number;
+  /** Elapsed time at the previous update, for the frame delta. */
+  private _lastUpdateTime: number;
   private _feedbackProgram: DRef<GPUProgram>;
   private _feedbackBindGroup: DRef<BindGroup>;
   private _feedbackPrimitive: DRef<Primitive>;
@@ -66,6 +70,8 @@ export class Water extends applyMixins(GraphNode, mixinDrawable) implements Draw
     this._viewDistance = 0;
     this._animationSpeed = 1;
     this._timeStart = 0;
+    this._waveTime = 0;
+    this._lastUpdateTime = 0;
     this._material = new DRef(new WaterMaterial());
     this._material.get()!.region = new Vector4(-1, -1, 1, 1);
     this._material.get()!.TAAStrength = 0.4;
@@ -153,7 +159,11 @@ export class Water extends applyMixins(GraphNode, mixinDrawable) implements Draw
   set viewDistance(val: number) {
     this._viewDistance = Math.max(0, val);
   }
-  /** Animation speed of the water */
+  /**
+   * Animation speed of the water. Zero freezes the surface where it is rather
+   * than resetting it: the wave phase is accumulated, and this scales the
+   * increment.
+   */
   get animationSpeed() {
     return this._animationSpeed;
   }
@@ -264,6 +274,17 @@ export class Water extends applyMixins(GraphNode, mixinDrawable) implements Draw
   }
   set refractionMode(val: WaterRefractionMode) {
     this.material.refractionMode = val;
+  }
+  /**
+   * Which intermediate shading term to display instead of the final colour.
+   * A debugging aid; leave it at `none` in production. See
+   * {@link WaterDebugOutput} for the available views.
+   */
+  get debugOutput() {
+    return this.material.debugOutput;
+  }
+  set debugOutput(val: WaterDebugOutput) {
+    this.material.debugOutput = val;
   }
   /**
    * Depth in meters the cheap refraction mode assumes the water is, used only
@@ -404,7 +425,16 @@ export class Water extends applyMixins(GraphNode, mixinDrawable) implements Draw
       if (this._timeStart === 0) {
         this._timeStart = elapsedInSeconds;
       }
-      this.material.update(frameId, (elapsedInSeconds - this._timeStart) * this._animationSpeed);
+      // A running clock rather than `elapsed * speed`: scaling the absolute
+      // elapsed time by the speed makes a speed of zero freeze the surface at
+      // the origin of the timeline instead of where it is, so pausing snapped
+      // the waves back to their first frame. Accumulating the delta keeps the
+      // phase where it was, and a speed of zero simply stops advancing it.
+      this._waveTime +=
+        Math.max(0, elapsedInSeconds - Math.max(this._timeStart, this._lastUpdateTime)) *
+        this._animationSpeed;
+      this._lastUpdateTime = elapsedInSeconds;
+      this.material.update(frameId, this._waveTime);
       this.invalidateWorldBoundingVolume(false);
     }
   }

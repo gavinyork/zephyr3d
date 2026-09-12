@@ -62,7 +62,11 @@ function getDefaultBuildParams(): OceanFieldBuildParams {
         strength: 0.4,
         croppiness: -1.5,
         minWave: 0,
-        maxWave: 100
+        // The whole patch. Capping this at 100 discarded every wavelength
+        // between 100 and 400 m, which is exactly where the Phillips peak
+        // moves once |wind| passes ~10 m/s - the wind then had nothing left
+        // to put energy into and the swell stopped growing.
+        maxWave: 400
       },
       {
         size: 100.0,
@@ -1049,7 +1053,6 @@ export class FFTWaveGenerator extends Disposable implements WaveGenerator {
     const nearestRepeatSampler = fetchSampler('repeat_nearest_nomip');
     device.setProgram(FFTWaveGenerator._globals!.programs.postfft2Program);
     device.setBindGroup(0, this._postfft2BindGroup!);
-    this._postfft2BindGroup!.setValue('N2', this._params.resolution * this._params.resolution);
     if (this._useComputeShader) {
       this._postfft2BindGroup!.setTexture('output', instanceData.dataTextures as Texture2DArray);
       this._postfft2BindGroup!.setTexture('ifft', this._ifftTextures as Texture2DArray, nearestRepeatSampler);
@@ -1085,7 +1088,6 @@ export class FFTWaveGenerator extends Disposable implements WaveGenerator {
     device.setProgram(FFTWaveGenerator._globals!.programs.postfft2Program4);
     device.setBindGroup(0, this._postfft2BindGroup4!);
     const ifftTextures = this._ifftTextures as Texture2D[];
-    this._postfft2BindGroup4!.setValue('N2', this._params.resolution * this._params.resolution);
     this._postfft2BindGroup4!.setTexture('ifft0', ifftTextures[0], nearestRepeatSampler);
     this._postfft2BindGroup4!.setTexture('ifft1', ifftTextures[1], nearestRepeatSampler);
     this._postfft2BindGroup4!.setTexture('ifft2', ifftTextures[2], nearestRepeatSampler);
@@ -1100,7 +1102,6 @@ export class FFTWaveGenerator extends Disposable implements WaveGenerator {
     device.setFramebuffer(instanceData.postIfft2Framebuffer2);
     device.setProgram(FFTWaveGenerator._globals!.programs.postfft2Program2);
     device.setBindGroup(0, this._postfft2BindGroup2!);
-    this._postfft2BindGroup2!.setValue('N2', this._params.resolution * this._params.resolution);
     this._postfft2BindGroup2!.setTexture('ifft4', ifftTextures[4], nearestRepeatSampler);
     this._postfft2BindGroup2!.setTexture('ifft5', ifftTextures[5], nearestRepeatSampler);
     if (device.type === 'webgl') {
@@ -1203,11 +1204,54 @@ export class FFTWaveGenerator extends Disposable implements WaveGenerator {
         pb.mul(this._sx_sz_dxdx_dzdz1.zw, this.croppinesses.y),
         pb.mul(this._sx_sz_dxdx_dzdz2.zw, this.croppinesses.z)
       );
-      this.$l.slope = pb.vec2(
-        pb.div(this.sx, pb.add(1.0, this.dxdx_dzdz.x)),
-        pb.div(this.sz, pb.add(1.0, this.dxdx_dzdz.y))
+      // The normal of the displaced surface. Writing the Jacobian of the
+      // horizontal displacement as [[A, C], [C, F]] with A = 1 + croppiness*d2x,
+      // F = 1 + croppiness*d2z, C = croppiness*dxdz and determinant
+      // J = A*F - C*C, the cross product of the two tangents is
+      //
+      //   N ~ ( -sx * F, J, -sz * A )
+      //
+      // The determinant never reaches the horizontal components: dividing the
+      // whole vector by A*F recovers the per-axis slope correction -sx/A, -sz/F,
+      // which is what this used to do, plus the J/(A*F) = 1 - C^2/(A*F) term on
+      // the y axis that the earlier form dropped. Putting J on the horizontal
+      // components instead (a form this briefly had) multiplies the whole normal
+      // by sign(J), so they jump as J crosses zero - a hard seam, not a fold.
+      //
+      // The y component takes the magnitude. J goes negative where the choppy
+      // displacement folds the sheet over on itself - the same condition the
+      // foam mask reads - and the cross-product normal there points down, into
+      // the water. That is geometrically true of the overturned sheet and
+      // geometrically useless to a renderer that lights the surface from above:
+      // a downward normal loses the sun, samples the sky's lower hemisphere for
+      // the irradiance and drives the view-facing term negative, which between
+      // them painted the fold black. The shading treats the water interface as
+      // upward-facing wherever it is, and the foam owns the folded band.
+      let dxdzSamples: PBShaderExp;
+      if (that._useComputeShader) {
+        dxdzSamples = pb.vec3(
+          pb.textureArraySampleLevel(this.dataTexture, this.uv0, 0, 0).w,
+          pb.textureArraySampleLevel(this.dataTexture, this.uv1, 2, 0).w,
+          pb.textureArraySampleLevel(this.dataTexture, this.uv2, 4, 0).w
+        );
+      } else {
+        dxdzSamples = pb.vec3(
+          pb.textureSampleLevel(this.dx_hy_dz_dxdz0, this.uv0, 0).w,
+          pb.textureSampleLevel(this.dx_hy_dz_dxdz1, this.uv1, 0).w,
+          pb.textureSampleLevel(this.dx_hy_dz_dxdz2, this.uv2, 0).w
+        );
+      }
+      this.$l.dxdz = pb.add(
+        pb.mul(dxdzSamples.x, this.croppinesses.x),
+        pb.mul(dxdzSamples.y, this.croppinesses.y),
+        pb.mul(dxdzSamples.z, this.croppinesses.z)
       );
-      this.$l.normal = pb.normalize(pb.vec3(pb.neg(this.slope.x), 1.0, pb.neg(this.slope.y)));
+      this.$l.jA = pb.add(1.0, this.dxdx_dzdz.x);
+      this.$l.jF = pb.add(1.0, this.dxdx_dzdz.y);
+      this.$l.jdet = pb.sub(pb.mul(this.jA, this.jF), pb.mul(this.dxdz, this.dxdz));
+      this.$l.normal = pb.normalize(
+        pb.vec3(pb.neg(pb.mul(this.sx, this.jF)), pb.abs(this.jdet), pb.neg(pb.mul(this.sz, this.jA)))
+      );
       this.$return(this.normal);
     });
     return scope.calcFragmentNormal(xz) as PBShaderExp;
@@ -1247,12 +1291,6 @@ export class FFTWaveGenerator extends Disposable implements WaveGenerator {
         pb.mul(this._sx_sz_dxdx_dzdz1.zw, this.croppinesses.y),
         pb.mul(this._sx_sz_dxdx_dzdz2.zw, this.croppinesses.z)
       );
-      this.$l.slope = pb.vec2(
-        pb.div(this.sx, pb.add(1.0, this.dxdx_dzdz.x)),
-        pb.div(this.sz, pb.add(1.0, this.dxdx_dzdz.y))
-      );
-      this.$l.normal = pb.normalize(pb.vec3(pb.neg(this.slope.x), 1.0, pb.neg(this.slope.y)));
-
       // foam
       this.$l.dxdx_dzdz0 = this._sx_sz_dxdx_dzdz0.zw;
       this.$l.dxdx_dzdz1 = this._sx_sz_dxdx_dzdz1.zw;
@@ -1271,7 +1309,21 @@ export class FFTWaveGenerator extends Disposable implements WaveGenerator {
         pb.mul(this.dxdz1, this.croppinesses.y),
         pb.mul(this.dxdz2, this.croppinesses.z)
       );
-      this.$l.val = this.det(this.jacobian(this.dxdx_dzdz.x, this.dxdz, this.dxdx_dzdz.y));
+      this.$l.jacobian4 = this.jacobian(this.dxdx_dzdz.x, this.dxdz, this.dxdx_dzdz.y);
+      this.$l.val = this.det(this.jacobian4);
+      // The normal of the displaced surface, from the same Jacobian the foam
+      // reads: N ~ (-sx*F, J, -sz*A), with A and F the diagonals the helper
+      // packs into x and w. Sharing the determinant keeps the shading normal and
+      // the foam mask describing the same fold, and taking its magnitude keeps
+      // the normal upward-facing there - see calcFragmentNormal for why the sign
+      // cannot be used and why the horizontals take A and F rather than J.
+      this.$l.normal = pb.normalize(
+        pb.vec3(
+          pb.neg(pb.mul(this.sx, this.jacobian4.w)),
+          pb.abs(this.val),
+          pb.neg(pb.mul(this.sz, this.jacobian4.x))
+        )
+      );
       this.$l.foam = pb.abs(
         pb.pow(pb.neg(pb.min(0, pb.sub(this.val, this.foamParams.x))), this.foamParams.y)
       );

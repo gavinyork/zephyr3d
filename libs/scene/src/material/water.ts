@@ -56,6 +56,90 @@ export type WaterMediumMode = 'physical' | 'ramp';
  */
 export type WaterRefractionMode = 'march' | 'offset';
 
+/**
+ * Debug view of the water shading, replacing the final colour with one of its
+ * intermediate terms so a broken one can be picked out by eye.
+ *
+ * - `none`: normal shading.
+ * - `normal`: wave normal, remapped to [0,1].
+ * - `diffuseNormal`: the normal the diffuse terms use, remapped to [0,1].
+ * - `viewFacing`: dot(wave normal, towards the eye), as grey. This is the term
+ *   Fresnel and the body weight turn on; 0.5 is a face square to the eye.
+ * - `frontFacing`: white where the rasterised triangle faces the eye. The wave
+ *   displacement folds the surface, and the mesh is drawn with no culling, so a
+ *   folded crest can be seen from behind - black here is the underside.
+ * - `foam`: foam coverage after the amount/falloff ramp, as grey.
+ * - `fresnel`: reflection weight after foam suppression, as grey.
+ * - `reflection`: what the surface reflects (SSR blended over the sky).
+ * - `refraction`: the scene sample behind the water, before the medium tint.
+ * - `absorption`: medium transmittance over the refracted path.
+ * - `scattering`: ambient in-scattering from the water body.
+ * - `sunScattering`: directional in-scattering from the lights.
+ * - `sunPhase`: the scattering phase function of it, as grey.
+ * - `sunIntegral`: the depth integral of it, as grey (1 is optically thick).
+ * - `sunNoL`: the diffuse incidence the sun's terms are weighted by, as grey.
+ * - `shadow`: the shadow factor the directional lights are attenuated by, as
+ *   grey. Shared by every direct term, so black here darkens them together.
+ * - `subsurface`: the backlit-crest translucency term.
+ * - `specular`: the specular lobe from the lights.
+ * - `depth`: refracted path length through the medium, metres / 10.
+ * - `refractUV`: the refracted sample's offset from the pixel, remapped so
+ *   no offset is mid grey.
+ * - `nan`: red where the final colour or the normal is NaN/inf, black elsewhere.
+ *
+ * A compile-time feature: each value is a separate shader variant, and the
+ * `none` variant carries no trace of the others.
+ *
+ * @public
+ */
+export type WaterDebugOutput =
+  | 'none'
+  | 'normal'
+  | 'diffuseNormal'
+  | 'viewFacing'
+  | 'frontFacing'
+  | 'foam'
+  | 'fresnel'
+  | 'reflection'
+  | 'refraction'
+  | 'absorption'
+  | 'scattering'
+  | 'sunScattering'
+  | 'sunPhase'
+  | 'sunIntegral'
+  | 'sunNoL'
+  | 'shadow'
+  | 'subsurface'
+  | 'specular'
+  | 'depth'
+  | 'refractUV'
+  | 'nan';
+
+/** Label/value pairs for {@link WaterDebugOutput}, for editor enumerations. */
+export const WATER_DEBUG_OUTPUTS = [
+  { label: 'None', value: 'none' },
+  { label: 'Normal', value: 'normal' },
+  { label: 'Diffuse normal', value: 'diffuseNormal' },
+  { label: 'View facing', value: 'viewFacing' },
+  { label: 'Front facing', value: 'frontFacing' },
+  { label: 'Foam', value: 'foam' },
+  { label: 'Fresnel', value: 'fresnel' },
+  { label: 'Reflection', value: 'reflection' },
+  { label: 'Refraction', value: 'refraction' },
+  { label: 'Absorption', value: 'absorption' },
+  { label: 'Scattering', value: 'scattering' },
+  { label: 'Sun scattering', value: 'sunScattering' },
+  { label: 'Sun phase', value: 'sunPhase' },
+  { label: 'Sun integral', value: 'sunIntegral' },
+  { label: 'Sun NoL', value: 'sunNoL' },
+  { label: 'Shadow', value: 'shadow' },
+  { label: 'Subsurface', value: 'subsurface' },
+  { label: 'Specular', value: 'specular' },
+  { label: 'Depth', value: 'depth' },
+  { label: 'Refract UV', value: 'refractUV' },
+  { label: 'NaN', value: 'nan' }
+] as const;
+
 /** Fresnel reflectance of water at normal incidence, for n = 1.333. */
 const WATER_F0 = 0.02;
 /** Specular roughness of water close enough that the waves are resolved. */
@@ -217,6 +301,7 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
   private static readonly FEATURE_MEDIUM_MODE = this.defineFeature();
   private static readonly FEATURE_REFRACTION_MODE = this.defineFeature();
   private static readonly FEATURE_INFINITE = this.defineFeature();
+  private static readonly FEATURE_DEBUG_OUTPUT = this.defineFeature();
   private static readonly _absorptionGrad = new Interpolator(
     'linear',
     'vec3',
@@ -360,6 +445,7 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
     this.useFeature(WaterMaterial.FEATURE_MEDIUM_MODE, 'physical' as WaterMediumMode);
     this.useFeature(WaterMaterial.FEATURE_REFRACTION_MODE, 'march' as WaterRefractionMode);
     this.useFeature(WaterMaterial.FEATURE_INFINITE, false);
+    this.useFeature(WaterMaterial.FEATURE_DEBUG_OUTPUT, 'none' as WaterDebugOutput);
     //this.TAADisabled = true;
   }
   /** {@inheritDoc Material.onDispose} */
@@ -446,6 +532,18 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
   set refractionMode(val: WaterRefractionMode) {
     if (val !== this.refractionMode) {
       this.useFeature(WaterMaterial.FEATURE_REFRACTION_MODE, val);
+    }
+  }
+  /**
+   * Which intermediate shading term to display instead of the final colour.
+   * Defaults to `none`. See {@link WaterDebugOutput}.
+   */
+  get debugOutput(): WaterDebugOutput {
+    return this.featureUsed<WaterDebugOutput>(WaterMaterial.FEATURE_DEBUG_OUTPUT) ?? 'none';
+  }
+  set debugOutput(val: WaterDebugOutput) {
+    if (val !== this.debugOutput) {
+      this.useFeature(WaterMaterial.FEATURE_DEBUG_OUTPUT, val);
     }
   }
   /**
@@ -1453,7 +1551,10 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
         // refract call serve both, and the ratio has to be picked to match -
         // without the flip, a wave face steeper than the view ray bends the wrong
         // way, which is the grazing-angle case that reads as the surface tearing.
-        this.$l.underwater = pb.greaterThan(pb.dot(this.eyeVecNorm, this.normal), 0);
+        // The same distinction as waterShading's: a wave normal flipped back
+        // towards the eye cannot tell an underside from an eye below the
+        // surface, and the fold makes the two disagree.
+        this.$l.underwater = pb.not(this.$builtins.frontFacing);
         this.$l.faceNormal = this.$choice(this.underwater, pb.neg(this.normal), this.normal);
         this.$l.eta = this.$choice(this.underwater, pb.float(WATER_TO_AIR_ETA), pb.float(AIR_TO_WATER_ETA));
         // The unrefracted hit. This is the view line through the surface to
@@ -1647,7 +1748,8 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
     lightDir: PBShaderExp,
     eyeVecNorm: PBShaderExp,
     NoL: PBShaderExp,
-    depth: PBShaderExp
+    depth: PBShaderExp,
+    foam: PBShaderExp
   ) {
     const pb = scope.$builder;
     // Phase function of the water body: a molecular lobe and a particulate one.
@@ -1692,7 +1794,8 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
         pb.vec3('lightDir'),
         pb.vec3('eyeVecNorm'),
         pb.float('NoL'),
-        pb.float('depth')
+        pb.float('depth'),
+        pb.float('foam')
       ],
       function () {
         this.$l.up = pb.vec3(0, 1, 0);
@@ -1736,6 +1839,18 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
         // also what keeps the term off a backlit crest - at NoL <= 0 no light
         // enters the top face at all, and the subsurface term owns that case.
         this.$l.entry = pb.sub(1, pb.add(WATER_F0, pb.mul(1 - WATER_F0, pb.pow(pb.sub(1, this.NoL), 5))));
+        // The entry share above is the flat-interface Fresnel one, and it goes
+        // to zero at grazing incidence: a mirror reflects the whole sun rather
+        // than passing it. That is right for the smooth water between the folds
+        // and wrong for a fold, which is not a mirror but a mass of bubbles - a
+        // strongly scattering layer. Blended towards full transmission by the
+        // foam coverage, so a breaking crest lights its own column instead of
+        // going dark exactly where it breaks. Weighted, not replaced: a thin
+        // scattering layer still attenuates.
+        this.$l.entry = pb.mix(this.entry, pb.float(1), this.foam);
+        // Kept for the debug views. Assigned on the caller's scope, so the
+        // variant that reads them gets the value the shading actually used
+        // rather than a second evaluation of the same expression.
         this.$return(
           pb.mul(
             this.mediumAlbedo,
@@ -1746,7 +1861,7 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
         );
       }
     );
-    return scope.waterSunScattering(lightEnergy, lightDir, eyeVecNorm, NoL, depth) as PBShaderExp;
+    return scope.waterSunScattering(lightEnergy, lightDir, eyeVecNorm, NoL, depth, foam) as PBShaderExp;
   }
   waterShading(
     scope: PBInsideFunctionScope,
@@ -1757,6 +1872,7 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
     const pb = scope.$builder;
     const that = this;
     const ramp = this.mediumMode === 'ramp';
+    const debugOutput = this.debugOutput;
     // Transmittance of the medium over `depth` meters of path.
     pb.func('getAbsorption', [pb.float('depth')], function () {
       if (ramp) {
@@ -1792,10 +1908,19 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
       }
     });
     pb.func('fresnel', [pb.vec3('normal'), pb.vec3('eyeVec')], function () {
-      // Schlick, including the F0 term the previous form dropped. Without it the
-      // reflectance fell to zero at normal incidence, so water viewed from
+      // Schlick, including the F0 term the previous form dropped. Without it
+      // the reflectance fell to zero at normal incidence, so water viewed from
       // directly above reflected no sky at all and read as flat paint.
-      this.$l.NoV = pb.clamp(pb.dot(this.normal, this.eyeVec), 0, 1);
+      //
+      // The magnitude of the cosine. The interface between the two media is the
+      // same curve seen from either side, and the cosine changes sign when the
+      // view direction crosses the normal - which a folded crest makes happen
+      // inside a single wave. Clamping at zero instead drops the reflectance to
+      // F0 on the far side of the crossing, which is the normal-incidence end of
+      // the curve: exactly where the geometry is at its most grazing, and a
+      // discontinuity across the crest that reads as a black band between bright
+      // water.
+      this.$l.NoV = pb.clamp(pb.abs(pb.dot(this.normal, this.eyeVec)), 0, 1);
       this.$l.f = pb.add(WATER_F0, pb.mul(1 - WATER_F0, pb.pow(pb.sub(1, this.NoV), 5)));
       // reflectionStrength trades the reflection away for what is beneath the
       // surface. Scaling keeps the term in [0,1] for any authored value.
@@ -1851,16 +1976,72 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
         );
         this.$l.eyeVec = pb.sub(this.worldPos.xyz, ShaderHelper.getCameraPosition(this));
         this.$l.eyeVecNorm = pb.normalize(this.eyeVec);
-        // Which face of the surface the camera is on. The wave normal always
-        // points up and the surface is drawn with cullMode 'none', so a ray
-        // agreeing with the normal is one travelling up from inside the water.
-        // Terms whose geometry is derived for an eye above the surface are
-        // gated on this.
-        this.$l.underwaterEye = pb.greaterThan(pb.dot(this.eyeVecNorm, this.normal), 0);
+        // The normal the mirror-like terms use - Fresnel, the reflection vector,
+        // the specular lobe - turned towards the eye where the surface has
+        // folded far enough to show its underside.
+        //
+        // Flipped on the sign of the cosine against the view direction, not on
+        // `frontFacing`. Both give the same answer per pixel, but the
+        // rasteriser's answer changes discontinuously along the triangle edge
+        // where the fold happens, so the flipped normal jumps by 2*N there and
+        // every term built on it steps with it - a seam exactly along the crest,
+        // which reads as a black line across bright water. The cosine crosses
+        // zero continuously, so this form has no such edge. (The `abs` in
+        // Fresnel is the same statement for that one term; this keeps the vector
+        // itself consistent for the reflection and the specular lobe, which need
+        // a direction and not just a weight.)
+        //
+        // The sign is the one that matters here: `eyeVecNorm` runs from the
+        // camera to the surface, i.e. it points down onto flat water, so a face
+        // turned towards the eye has a *negative* dot against it and the flip is
+        // the positive case. Testing it the other way turns the normal away from
+        // the eye on every ordinary pixel, which puts the sun behind the entire
+        // surface rather than behind the fold.
+        this.$l.shadingNormal = this.$choice(
+          pb.greaterThan(pb.dot(this.normal, this.eyeVecNorm), 0),
+          pb.neg(this.normal),
+          this.normal
+        );
+        // The normal the diffuse terms use, which is not the wave normal.
+        //
+        // A choppy displacement folds the surface onto itself where the
+        // horizontal Jacobian turns negative, and the cross-product normal
+        // there is genuinely close to horizontal - the wave face really has
+        // stood up. That is the right normal for the mirror: the specular lobe
+        // and the refraction go by the face's true orientation, which is what
+        // makes a breaking crest read as glass. It is the wrong normal for
+        // anything lit diffusely: a folded crest is a wall, the sun is nearly
+        // perpendicular to it, and a diffuse term built on the wall's normal
+        // loses the sun completely - which is what darkened the fold.
+        //
+        // Built on the eye-facing normal and then mixed towards up, so the two
+        // corrections compose instead of fighting. The weight rises with
+        // |normal.y|: at |y| = 1 the surface is flat and the wave normal is kept
+        // exactly, and as the face tips over the up vector takes it back. Taking
+        // |normal.y| itself as the weight is the obvious choice and is close to
+        // its own square over this range - the mix then collapses to
+        // `up + y^2 * (N - up)` and stays dominated by the wall normal exactly
+        // where it is least wanted - so the transition is moved up the range
+        // with a smoothstep.
+        this.$l.diffuseWeight = pb.smoothStep(0, 0.5, pb.abs(this.normal.y));
+        this.$l.diffuseNormal = pb.normalize(
+          pb.mix(pb.vec3(0, 1, 0), this.shadingNormal, this.diffuseWeight)
+        );
+        // Which face of the surface the camera is on. Taken from the
+        // rasteriser, not from the wave normal: the choppy displacement folds
+        // the sheet, so the pixels showing its underside also happen to have
+        // been given an upward normal, and a test built on the normal says the
+        // eye is above the surface at exactly the pixels where it is looking at
+        // the underside. Every term gated on this would be on the wrong side of
+        // the interface there. `frontFacing` answers the question that was
+        // meant: which face of the rasterised triangle is being shaded.
+        this.$l.frontFace = this.$builtins.frontFacing;
+        this.$l.backFace = pb.not(this.frontFace);
+        this.$l.underwaterEye = this.backFace;
         this.$l.depth = pb.length(pb.sub(this.wPos.xyz, this.worldPos));
         this.$l.viewPos = pb.mul(ShaderHelper.getViewMatrix(this), pb.vec4(this.worldPos, 1)).xyz;
         this.incidentVec = pb.normalize(pb.sub(this.worldPos, ShaderHelper.getCameraPosition(this)));
-        this.reflectVecW = pb.reflect(this.incidentVec, this.normal);
+        this.reflectVecW = pb.reflect(this.incidentVec, this.shadingNormal);
         this.$l.reflectance = pb.vec3();
         this.$l.hitInfo = pb.vec4(0);
         this.$if(pb.greaterThan(this.reflectVecW.y, 0), function () {
@@ -1899,7 +2080,7 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
         });
         this.$l.refl = pb.reflect(
           pb.normalize(pb.sub(this.worldPos, ShaderHelper.getCameraPosition(this))),
-          this.normal
+          this.shadingNormal
         );
         // Rays reflecting downwards, and grazing ones, land on the bake's lower
         // hemisphere, which the atmosphere deliberately renders nearly black -
@@ -1967,8 +2148,10 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
           this.refractUV,
           pb.clamp(this.refractBlur, 0, REFRACT_BLUR_MAX_LOD)
         ).rgb;
-        this.refraction = pb.mul(this.refraction, this.getAbsorption(this.depth));
-        this.$l.fresnelTerm = this.fresnel(this.normal, pb.neg(this.eyeVecNorm));
+        this.$l.refractionRaw = this.refraction;
+        this.$l.absorption = this.getAbsorption(this.depth);
+        this.refraction = pb.mul(this.refraction, this.absorption);
+        this.$l.fresnelTerm = this.fresnel(this.shadingNormal, pb.neg(this.eyeVecNorm));
         // Foam coverage. The generator reports where the surface has folded over
         // on itself; the ramp turns that into how much of the texel is actually
         // covered, so the two ends of a breaking crest can be tuned apart.
@@ -1982,6 +2165,14 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
         // mirror underneath stops being visible at all.
         this.fresnelTerm = pb.mul(this.fresnelTerm, pb.sub(1, this.foam));
         this.$l.finalColor = pb.mix(this.refraction, this.reflectance, this.fresnelTerm);
+        // Per-term accumulators for the debug views. Dead in the `none`
+        // variant and folded away by the compiler there.
+        this.$l.dbgSpecular = pb.vec3(0);
+        this.$l.dbgNoL = pb.float(0);
+        this.$l.dbgShadow = pb.vec3(1);
+        this.$l.dbgSubsurface = pb.vec3(0);
+        this.$l.dbgSunScatter = pb.vec3(0);
+        this.$l.dbgScatter = pb.vec3(0);
         // What anything leaving the water body keeps on its way out, and the
         // share of the surface that is water rather than foam. The refraction
         // above already carries the first factor - `mix` weights it by
@@ -1989,6 +2180,10 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
         // too, or the body stays fully visible through a surface that has turned
         // into a mirror at a grazing angle.
         this.$l.bodyWeight = pb.mul(pb.sub(1, this.fresnelTerm), pb.sub(1, this.foam));
+        // The sun-scattering debug views below rebuild that term's factors, and
+        // the light direction is only known inside this loop. Initialised so the
+        // views are well defined even with no directional light in the scene.
+        this.dbgLightDir = pb.vec3(0, 1, 0);
         that.forEachLight(this, function (type, posRange, dirCutoff, colorIntensity, extra, shadow) {
           this.$l.lightAtten = that.calculateLightAttenuation(
             this,
@@ -1999,15 +2194,24 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
             extra
           );
           this.$l.lightDir = that.calculateLightDirection(this, type, this.worldPos, posRange, dirCutoff);
+          // Left behind for the sun-scattering debug views, which rebuild that
+          // term's factors outside this loop. The light direction exists only
+          // here and those views are chosen at compile time, not per light.
+          this.dbgLightDir = this.lightDir;
           this.$l.NoL = pb.clamp(pb.dot(this.normal, this.lightDir), 0, 1);
+          // Diffuse incidence, off the diffuse normal. Used by the foam and the
+          // sun in-scattering below; NoL keeps the wave face for the mirror.
+          this.$l.NoLdiffuse = pb.clamp(pb.dot(this.diffuseNormal, this.lightDir), 0, 1);
+          this.dbgNoL = this.NoLdiffuse;
           this.$l.lightEnergy = pb.mul(colorIntensity.rgb, colorIntensity.a, this.lightAtten);
-          this.$l.lightContrib = this.lightSpecular(
+          this.$l.specularTerm = this.lightSpecular(
             this.lightDir,
             this.eyeVecNorm,
-            this.normal,
+            this.shadingNormal,
             this.lightEnergy,
             this.roughness
           );
+          this.$l.lightContrib = this.specularTerm;
           // Sunlight that entered the far side of a wave and scattered back out
           // towards the eye. This is what makes a backlit crest glow, and it has
           // to come from the light loop: the ambient scattering term below is
@@ -2017,22 +2221,26 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
           // Standard translucency approximation - the transmitted direction is
           // the light continuing through the surface, bent by the normal, and
           // the term peaks when the eye looks back along it.
-          this.$l.sssDir = pb.normalize(pb.add(pb.neg(this.lightDir), pb.mul(this.normal, SSS_DISTORTION)));
+          this.$l.sssDir = pb.normalize(
+            pb.add(pb.neg(this.lightDir), pb.mul(this.diffuseNormal, SSS_DISTORTION))
+          );
           this.$l.sssFacing = pb.pow(pb.clamp(pb.dot(pb.neg(this.eyeVecNorm), this.sssDir), 0, 1), SSS_POWER);
           // Crests glow and troughs do not: height above the undisplaced surface
           // stands in for how much lit water the ray passed through. The medium's
           // own albedo carries the hue, so this agrees with the colour the depth
           // terms produce; the magnitude is authored, because a real crest is far
           // too thin to scatter a visible amount on its own.
-          this.$l.sssThickness = pb.clamp(pb.mul(pb.sub(1, this.normal.y), this.subsurfaceParams.y), 0, 1);
-          this.lightContrib = pb.add(
-            this.lightContrib,
-            pb.mul(
-              this.lightEnergy,
-              this.mediumAlbedo,
-              pb.mul(this.sssFacing, this.sssThickness, this.subsurfaceParams.x)
-            )
+          this.$l.sssThickness = pb.clamp(
+            pb.mul(pb.sub(1, this.diffuseNormal.y), this.subsurfaceParams.y),
+            0,
+            1
           );
+          this.$l.subsurfaceTerm = pb.mul(
+            this.lightEnergy,
+            this.mediumAlbedo,
+            pb.mul(this.sssFacing, this.sssThickness, this.subsurfaceParams.x)
+          );
+          this.lightContrib = pb.add(this.lightContrib, this.subsurfaceTerm);
           // Sunlight scattered back out of the water column. This is what gives
           // the body a direction-dependent colour at all: the ambient term
           // below is built from the environment irradiance, which has no
@@ -2047,24 +2255,24 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
           // keeps the term off that case rather than getting it wrong - the
           // refraction and the ambient scattering still carry the water colour
           // there.
+          this.$l.sunScatterTerm = pb.vec3(0);
           this.$if(pb.and(pb.equal(type, LIGHT_TYPE_DIRECTIONAL), pb.not(this.underwaterEye)), function () {
             // Weighted by what the surface transmits on the way out and by how
             // much of it is still water rather than foam, like every other
             // term that comes from inside the body.
-            this.lightContrib = pb.add(
-              this.lightContrib,
-              pb.mul(
-                that.waterSunScattering(
-                  this,
-                  this.lightEnergy,
-                  this.lightDir,
-                  this.eyeVecNorm,
-                  this.NoL,
-                  this.depth
-                ),
-                this.bodyWeight
-              )
+            this.sunScatterTerm = pb.mul(
+              that.waterSunScattering(
+                this,
+                this.lightEnergy,
+                this.lightDir,
+                this.eyeVecNorm,
+                this.NoLdiffuse,
+                this.depth,
+                this.foam
+              ),
+              this.bodyWeight
             );
+            this.lightContrib = pb.add(this.lightContrib, this.sunScatterTerm);
           });
           // Foam is a rough dielectric layer, so it takes the light the way any
           // matte surface does. Previously it replaced the water colour with a
@@ -2072,18 +2280,23 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
           // reading the same at noon, at sunset and in shadow.
           this.lightContrib = pb.add(
             this.lightContrib,
-            pb.mul(this.lightEnergy, this.foamColor, this.foam, this.NoL, 1 / Math.PI)
+            pb.mul(this.lightEnergy, this.foamColor, this.foam, this.NoLdiffuse, 1 / Math.PI)
           );
+          this.$l.shadow = pb.vec3(1);
           if (shadow) {
             // Water is a horizontal clipmap, so +Y is the geometric normal. The
             // wave normal would jitter the shadow lookup per-pixel.
-            this.$l.shadow = pb.vec3(that.calculateShadow(this, this.worldPos, pb.vec3(0, 1, 0), this.NoL));
+            this.shadow = pb.vec3(that.calculateShadow(this, this.worldPos, pb.vec3(0, 1, 0), this.NoL));
+            this.dbgShadow = this.shadow;
             this.lightContrib = pb.mul(this.lightContrib, this.shadow);
           }
           this.finalColor = pb.add(this.finalColor, this.lightContrib);
+          this.dbgSpecular = pb.add(this.dbgSpecular, pb.mul(this.specularTerm, this.shadow));
+          this.dbgSubsurface = pb.add(this.dbgSubsurface, pb.mul(this.subsurfaceTerm, this.shadow));
+          this.dbgSunScatter = pb.add(this.dbgSunScatter, pb.mul(this.sunScatterTerm, this.shadow));
         });
         if (that.needCalculateEnvLight()) {
-          this.$l.irradiance = that.getEnvLightIrradiance(this, this.normal);
+          this.$l.irradiance = that.getEnvLightIrradiance(this, this.diffuseNormal);
           // Scattering from the water body itself, and from the foam sitting on
           // it. The water term is weighted by `bodyWeight`, which is what the
           // surface transmits on the way out times the share of it that is still
@@ -2091,12 +2304,130 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
           // turned into a mirror hides it and foam covers it.
           this.$l.sss = pb.mul(this.getScattering(this.depth), this.irradiance, this.bodyWeight, 1 / Math.PI);
           this.finalColor = pb.add(this.finalColor, this.sss);
+          this.dbgScatter = this.sss;
           this.finalColor = pb.add(
             this.finalColor,
             pb.mul(this.irradiance, this.foamColor, this.foam, 1 / Math.PI)
           );
         }
-        this.$return(this.finalColor);
+        switch (debugOutput) {
+          case 'normal':
+            this.$return(pb.add(pb.mul(this.normal, 0.5), pb.vec3(0.5)));
+            break;
+          case 'diffuseNormal':
+            this.$return(pb.add(pb.mul(this.diffuseNormal, 0.5), pb.vec3(0.5)));
+            break;
+          case 'frontFacing':
+            this.$return(this.$choice(this.$builtins.frontFacing, pb.vec3(1), pb.vec3(0)));
+            break;
+          case 'viewFacing': {
+            // Raw, not clamped: a negative value means the wave normal faces
+            // away from the eye at that pixel, which is the case the shading
+            // has to decide about.
+            this.$l.viewFacing = pb.dot(this.normal, pb.neg(this.eyeVecNorm));
+            this.$return(pb.vec3(this.viewFacing));
+            break;
+          }
+          case 'foam':
+            this.$return(pb.vec3(this.foam));
+            break;
+          case 'fresnel':
+            this.$return(pb.vec3(this.fresnelTerm));
+            break;
+          case 'reflection':
+            this.$return(this.reflectance);
+            break;
+          case 'refraction':
+            this.$return(this.refractionRaw);
+            break;
+          case 'absorption':
+            this.$return(this.absorption);
+            break;
+          case 'scattering':
+            this.$return(this.dbgScatter);
+            break;
+          case 'sunScattering':
+            this.$return(this.dbgSunScatter);
+            break;
+          case 'sunNoL':
+            this.$return(pb.vec3(pb.clamp(this.dbgNoL, 0, 1)));
+            break;
+          case 'shadow':
+            this.$return(this.dbgShadow);
+            break;
+          case 'sunPhase': {
+            // Recomputed from the same inputs rather than read back out of
+            // waterSunScattering: the value belongs to that function's scope, and
+            // the variant that wants it is the one that never calls it. The two
+            // expressions are kept adjacent so a change to one is a change to
+            // the other.
+            this.$l.dbgLw = pb.refract(pb.neg(this.dbgLightDir), pb.vec3(0, 1, 0), 1 / 1.333);
+            this.$l.dbgVw = pb.refract(this.eyeVecNorm, pb.vec3(0, 1, 0), 1 / 1.333);
+            this.$l.dbgCosTheta = pb.neg(pb.dot(this.dbgLw, this.dbgVw));
+            this.$l.dbgHg = this.waterScatterPhase(this.dbgCosTheta, this.sunScatterParams.y);
+            this.$l.dbgLumWeights = pb.vec3(0.2126, 0.7152, 0.0722);
+            this.$l.dbgThickness = pb.mul(
+              pb.dot(this.mediumAlbedo, this.dbgLumWeights),
+              pb.sub(1, pb.exp(pb.neg(pb.mul(pb.dot(this.mediumExtinction, this.dbgLumWeights), this.depth))))
+            );
+            this.$return(
+              pb.vec3(
+                pb.clamp(
+                  pb.mix(
+                    this.dbgHg,
+                    1 / (4 * Math.PI),
+                    pb.smoothStep(0, 0.5, pb.clamp(this.dbgThickness, 0, 1))
+                  ),
+                  0,
+                  1
+                )
+              )
+            );
+            break;
+          }
+          case 'sunIntegral': {
+            this.$l.dbgVy = pb.max(pb.neg(pb.refract(this.eyeVecNorm, pb.vec3(0, 1, 0), 1 / 1.333).y), 1e-3);
+            this.$l.dbgSy = pb.max(
+              pb.neg(pb.refract(pb.neg(this.dbgLightDir), pb.vec3(0, 1, 0), 1 / 1.333).y),
+              0.05
+            );
+            this.$l.dbgRr = pb.add(1, pb.div(this.dbgVy, this.dbgSy));
+            this.$l.dbgIntegral = pb.div(
+              pb.sub(
+                pb.vec3(1),
+                pb.exp(pb.neg(pb.mul(pb.mul(this.mediumExtinction, this.dbgRr), this.depth)))
+              ),
+              this.dbgRr
+            );
+            this.$return(pb.vec3(pb.clamp(pb.length(this.dbgIntegral), 0, 1)));
+            break;
+          }
+          case 'subsurface':
+            this.$return(this.dbgSubsurface);
+            break;
+          case 'specular':
+            this.$return(this.dbgSpecular);
+            break;
+          case 'depth':
+            this.$return(pb.vec3(pb.mul(this.depth, 0.1)));
+            break;
+          case 'refractUV':
+            this.$return(
+              pb.vec3(pb.add(pb.mul(pb.sub(this.refractUV, this.screenUV), 4), pb.vec2(0.5)), 0.5)
+            );
+            break;
+          case 'nan': {
+            // NaN is the only value that fails x == x. The normal is checked
+            // separately from the colour so a NaN that a clamp downstream
+            // swallowed still shows.
+            this.$l.sum = pb.add(pb.dot(this.finalColor, pb.vec3(1)), pb.dot(this.normal, pb.vec3(1)));
+            this.$l.bad = pb.or(pb.notEqual(this.sum, this.sum), pb.greaterThan(pb.abs(this.sum), 1e30));
+            this.$return(this.$choice(this.bad, pb.vec3(1, 0, 0), pb.vec3(0)));
+            break;
+          }
+          default:
+            this.$return(this.finalColor);
+        }
       }
     );
     return scope.waterShading(worldPos, worldNormal, foamFactor);

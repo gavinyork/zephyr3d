@@ -66,6 +66,10 @@
         font: inherit;
         cursor: pointer;
       }
+      #ui input[type='checkbox'] {
+        accent-color: #7fb2ff;
+        cursor: pointer;
+      }
       #ui .note {
         opacity: 0.7;
         white-space: normal;
@@ -81,6 +85,14 @@
           <option value="ocean">Ocean</option>
           <option value="pool">Pool</option>
         </select>
+      </label>
+      <label>
+        <span>Debug</span>
+        <select id="debug-select"></select>
+      </label>
+      <label>
+        <span>Pause</span>
+        <input id="pause-check" type="checkbox" />
       </label>
       <div class="note">Left drag: orbit. Wheel: zoom.</div>
     </div>

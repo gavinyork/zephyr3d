@@ -188,7 +188,6 @@ export function createProgramPostFFT2(
 ) {
   function getComputeFunc(useComputeShader: boolean, fmt: TextureFormat) {
     return function (this: PBGlobalScope, pb: ProgramBuilder) {
-      this.N2 = pb.float().uniform(0);
       if (useComputeShader) {
         this.output =
           fmt === 'rgba32f'
@@ -219,8 +218,10 @@ export function createProgramPostFFT2(
       pb.main(function () {
         this.$l.fragPos = getFragCoord(this, useComputeShader);
         this.$l.p = pb.float(pb.add(this.fragPos.x, this.fragPos.y));
-        this.$l.s = pb.sub(pb.mul(pb.sub(1, pb.mod(this.p, 2)), 2), 1);
-        this.$l.m = pb.mul(this.s, this.N2);
+        // (-1)^(x+y) undoes the spectrum being centred at resolution/2. The
+        // transform is left unnormalized (see the butterfly passes), so this
+        // is the only factor applied here.
+        this.$l.m = pb.sub(pb.mul(pb.sub(1, pb.mod(this.p, 2)), 2), 1);
         if (pb.getDevice().type === 'webgl') {
           this.$l.uv = pb.div(pb.vec2(this.fragPos), this.ifftTexSize);
           if (!limit || limit === 4) {
@@ -706,9 +707,6 @@ export function createProgramFFT2V(
           )
         );
       });
-      pb.func('scale', [Complex('a'), pb.float('v')], function () {
-        this.$return(Complex(pb.mul(this.a.re, this.v), pb.mul(this.a.im, this.v)));
-      });
       for (let x = 0; x <= 5; x++) {
         if (x < 4 && limit === 2) {
           continue;
@@ -756,10 +754,17 @@ export function createProgramFFT2V(
           this.$l.w = Complex(this.texelButt.r, this.texelButt.g);
           this.$l.a1 = Complex(this.texelA.x, this.texelA.y);
           this.$l.b1 = Complex(this.texelB.x, this.texelB.y);
-          this.$l.r1 = this.scale(this.add(this.a1, this.mul(this.b1, this.w)), 0.5);
+          // Unnormalized butterfly. Scaling each stage by 0.5 and multiplying
+          // N^2 back after the transform is a net no-op in exact arithmetic,
+          // but the intermediate textures are fp16: at N=256 the last stage
+          // held values 1/65536 of the final ones, which put every slope
+          // component into the subnormal range and left it 4-6 bits of
+          // precision (or flushed it to zero). Without the per-stage scale the
+          // intermediates stay at metre scale, where fp16 is fine.
+          this.$l.r1 = this.add(this.a1, this.mul(this.b1, this.w));
           this.$l.a2 = Complex(this.texelA.z, this.texelA.w);
           this.$l.b2 = Complex(this.texelB.z, this.texelB.w);
-          this.$l.r2 = this.scale(this.add(this.a2, this.mul(this.b2, this.w)), 0.5);
+          this.$l.r2 = this.add(this.a2, this.mul(this.b2, this.w));
           this.$return(pb.vec4(this.r1.re, this.r1.im, this.r2.re, this.r2.im));
         });
       }
@@ -898,9 +903,6 @@ export function createProgramFFT2H(
           )
         );
       });
-      pb.func('scale', [Complex('a'), pb.float('v')], function () {
-        this.$return(Complex(pb.mul(this.a.re, this.v), pb.mul(this.a.im, this.v)));
-      });
       for (let x = 0; x <= 5; x++) {
         if (x < 4 && limit === 2) {
           continue;
@@ -948,10 +950,17 @@ export function createProgramFFT2H(
           this.$l.w = Complex(this.texelButt.r, this.texelButt.g);
           this.$l.a1 = Complex(this.texelA.x, this.texelA.y);
           this.$l.b1 = Complex(this.texelB.x, this.texelB.y);
-          this.$l.r1 = this.scale(this.add(this.a1, this.mul(this.b1, this.w)), 0.5);
+          // Unnormalized butterfly. Scaling each stage by 0.5 and multiplying
+          // N^2 back after the transform is a net no-op in exact arithmetic,
+          // but the intermediate textures are fp16: at N=256 the last stage
+          // held values 1/65536 of the final ones, which put every slope
+          // component into the subnormal range and left it 4-6 bits of
+          // precision (or flushed it to zero). Without the per-stage scale the
+          // intermediates stay at metre scale, where fp16 is fine.
+          this.$l.r1 = this.add(this.a1, this.mul(this.b1, this.w));
           this.$l.a2 = Complex(this.texelA.z, this.texelA.w);
           this.$l.b2 = Complex(this.texelB.z, this.texelB.w);
-          this.$l.r2 = this.scale(this.add(this.a2, this.mul(this.b2, this.w)), 0.5);
+          this.$l.r2 = this.add(this.a2, this.mul(this.b2, this.w));
           this.$return(pb.vec4(this.r1.re, this.r1.im, this.r2.re, this.r2.im));
         });
       }
