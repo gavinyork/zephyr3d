@@ -1,0 +1,10 @@
+{
+  "changes": [
+    {
+      "packageName": "@zephyr3d/editor",
+      "comment": "Support retarget reference pose configuration for skeletons; fix humanoid retargeting of root and pelvis position; fix external retarget pose bone namespace matching.",
+      "type": "patch"
+    }
+  ],
+  "packageName": "@zephyr3d/editor"
+}

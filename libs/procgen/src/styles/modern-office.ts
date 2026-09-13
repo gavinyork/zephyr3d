@@ -265,9 +265,7 @@ function emitShaft(scope: Scope, ctx: Ctx, hasGroundFloor: boolean): void {
 
   if (hasGroundFloor && ctx.rng.chance(ctx.params.canopyChance)) {
     // sideFaces returns [+X, -X, +Z, -Z], which is the order the mask is defined in.
-    const candidates = sideFaces(scope).filter(
-      (_, index) => (ctx.params.entranceFaceMask >> index) & 1
-    );
+    const candidates = sideFaces(scope).filter((_, index) => (ctx.params.entranceFaceMask >> index) & 1);
     if (candidates.length > 0) {
       const face = ctx.rng.pick(candidates);
       const width = Math.min(face.size[0] * 0.42, 7);
@@ -275,9 +273,7 @@ function emitShaft(scope: Scope, ctx: Ctx, hasGroundFloor: boolean): void {
       const y = Math.min(groundFloorHeight, height) - 0.75;
       // Metal rather than trim, and thin: a thick pale slab reads as a floating shelf
       // instead of an entrance canopy.
-      ctx.emit(
-        panelFromFace(faceRect(face, x, y, width, 0.22), ctx.params.canopyDepth, { id: 'frame' })
-      );
+      ctx.emit(panelFromFace(faceRect(face, x, y, width, 0.22), ctx.params.canopyDepth, { id: 'frame' }));
     }
   }
 }
@@ -380,9 +376,7 @@ const rules: Record<string, (scope: Scope, ctx: Ctx) => void> = {
     // glazing) ends up coplanar with another surface.
     const emitPier = (rect: Scope) => {
       const front = offsetLocal(rect, 'z', preset.pierProud);
-      ctx.emit(
-        panelFromFace(front, -(preset.insetDepth + preset.pierProud * 2), { id: 'frame' })
-      );
+      ctx.emit(panelFromFace(front, -(preset.insetDepth + preset.pierProud * 2), { id: 'frame' }));
     };
 
     const corner = Math.min(preset.cornerPierWidth, face.size[0] * 0.5);

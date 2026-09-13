@@ -1,12 +1,5 @@
 import type { GeneratedModelSpec, Vec3 } from '@zephyr3d/modelgen';
-import {
-  getStyle,
-  listStyles,
-  registerStyle,
-  runGrammar,
-  toSpec,
-  type AnyRuleset
-} from './grammar';
+import { getStyle, listStyles, registerStyle, runGrammar, toSpec, type AnyRuleset } from './grammar';
 import { createScope } from './scope';
 import { modernOffice } from './styles/modern-office';
 
@@ -84,7 +77,8 @@ export interface GenerateBuildingOptions {
  */
 export function generateBuilding(options: GenerateBuildingOptions = {}): GeneratedModelSpec {
   ensureBuiltinStyles();
-  const ruleset = typeof options.style === 'object' ? options.style : getStyle(options.style ?? 'modern-office');
+  const ruleset =
+    typeof options.style === 'object' ? options.style : getStyle(options.style ?? 'modern-office');
 
   const params = { ...ruleset.defaultParams, ...(options.params ?? {}) };
   const footprint = options.footprint ?? [24, 18];

@@ -116,9 +116,9 @@ describe('procgen / wfc solver', () => {
 
   it('rejects a fixed cell naming an unknown tile', () => {
     const model = buildSocketModel(twoColour);
-    expect(() =>
-      solveWfc(model, { width: 3, height: 3, fixed: () => ['nope'] })
-    ).toThrow(/unknown tile id "nope"/);
+    expect(() => solveWfc(model, { width: 3, height: 3, fixed: () => ['nope'] })).toThrow(
+      /unknown tile id "nope"/
+    );
   });
 
   it('gives up with a clear message when the tile set is over-constrained', () => {

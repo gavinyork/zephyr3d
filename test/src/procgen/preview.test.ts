@@ -22,7 +22,10 @@ function toObj(spec: GeneratedModelSpec, name: string): string {
   const uvs = result.primitive.vertices.texCoord0.data;
   const indices = result.primitive.indices;
 
-  const lines: string[] = [`# ${name}`, `# ${result.vertexCount} vertices, ${result.indexCount / 3} triangles`];
+  const lines: string[] = [
+    `# ${name}`,
+    `# ${result.vertexCount} vertices, ${result.indexCount / 3} triangles`
+  ];
   for (let i = 0; i < positions.length; i += 3) {
     lines.push(`v ${positions[i].toFixed(5)} ${positions[i + 1].toFixed(5)} ${positions[i + 2].toFixed(5)}`);
   }

@@ -1,0 +1,10 @@
+{
+  "changes": [
+    {
+      "packageName": "@zephyr3d/loaders",
+      "comment": "Add an OBJ model importer",
+      "type": "patch"
+    }
+  ],
+  "packageName": "@zephyr3d/loaders"
+}

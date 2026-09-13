@@ -137,7 +137,7 @@ describe('procgen / grammar engine', () => {
         }
       }
     };
-    expect(runGrammar(nullable, { scope: createScope([1, 1, 1] ) })).toHaveLength(0);
+    expect(runGrammar(nullable, { scope: createScope([1, 1, 1]) })).toHaveLength(0);
   });
 
   it('carries a payload from a derivation to the symbol it derives', () => {
@@ -190,10 +190,7 @@ describe('procgen / style registry', () => {
 describe('procgen / modern office buildings', () => {
   it('derives the envelope height from the floor counts', () => {
     const params: ModernOfficeParams = { ...modernOffice.defaultParams, floors: 10 };
-    expect(modernOfficeHeight(params)).toBeNear(
-      params.groundFloorHeight + 9 * params.floorHeight,
-      1e-9
-    );
+    expect(modernOfficeHeight(params)).toBeNear(params.groundFloorHeight + 9 * params.floorHeight, 1e-9);
   });
 
   it('produces geometry that tessellates cleanly', () => {
@@ -445,7 +442,9 @@ describe('procgen / modern office buildings', () => {
   });
 
   it('survives extreme parameters without throwing', () => {
-    expect(() => tessellate(generateBuilding({ seed: 1, footprint: [3, 3], params: { floors: 1 } }))).not.toThrow();
+    expect(() =>
+      tessellate(generateBuilding({ seed: 1, footprint: [3, 3], params: { floors: 1 } }))
+    ).not.toThrow();
     expect(() =>
       tessellate(generateBuilding({ seed: 1, footprint: [80, 60], params: { floors: 40 } }))
     ).not.toThrow();

@@ -3042,4 +3042,3 @@ function distanceSq(a: Vec3, b: Vec3): number {
 function lengthSqVec3(v: Vec3): number {
   return v[0] * v[0] + v[1] * v[1] + v[2] * v[2];
 }
-

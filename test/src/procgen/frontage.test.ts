@@ -1,8 +1,4 @@
-import {
-  cityBlockGroundSpec,
-  generateCityBlock,
-  type CityBlockLayout
-} from '@zephyr3d/procgen';
+import { cityBlockGroundSpec, generateCityBlock, type CityBlockLayout } from '@zephyr3d/procgen';
 
 const FRONT = 2;
 const REAR = 6;
@@ -68,10 +64,7 @@ describe('procgen / street frontage', () => {
   it('keeps frontageMask in step with frontage', () => {
     for (const layout of layouts) {
       for (const parcel of layout.parcels) {
-        const expected = parcel.frontage.reduce(
-          (mask, on, index) => mask | (on ? 1 << index : 0),
-          0
-        );
+        const expected = parcel.frontage.reduce((mask, on, index) => mask | (on ? 1 << index : 0), 0);
         expect(parcel.frontageMask).toBe(expected);
       }
     }

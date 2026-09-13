@@ -101,7 +101,7 @@ export interface Ruleset<P extends object = Record<string, never>, D = unknown> 
  * A ruleset with its type parameters erased, for storage in heterogeneous collections.
  * @public
  */
-/* eslint-disable-next-line @typescript-eslint/no-explicit-any */
+
 export type AnyRuleset = Ruleset<any, any>;
 
 /**
@@ -119,7 +119,7 @@ export interface RunGrammarOptions<P extends object> {
   maxDepth?: number;
   /** Emitted node limit. Exceeding it throws. Default 50000. */
   maxNodes?: number;
-};
+}
 
 /**
  * Runs a ruleset and collects the geometry it emits.

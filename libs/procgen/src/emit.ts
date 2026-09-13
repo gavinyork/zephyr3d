@@ -97,11 +97,7 @@ export function boxFromScope(scope: Scope, options?: EmitOptions): ProceduralNod
  *
  * @public
  */
-export function panelFromFace(
-  face: Scope,
-  depth: number,
-  options?: EmitOptions
-): ProceduralNode | null {
+export function panelFromFace(face: Scope, depth: number, options?: EmitOptions): ProceduralNode | null {
   if (depth === 0) {
     return null;
   }

@@ -353,9 +353,7 @@ describe('modelgen / options and failure modes', () => {
   });
 
   it('aborts once the deadline has passed', () => {
-    expect(() =>
-      generatePrimitive({ nodes: [{ type: 'sphere' }] }, Date.now() - 1000)
-    ).toThrow(/timed out/);
+    expect(() => generatePrimitive({ nodes: [{ type: 'sphere' }] }, Date.now() - 1000)).toThrow(/timed out/);
   });
 });
 
