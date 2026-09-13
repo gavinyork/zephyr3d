@@ -1,0 +1,10 @@
+{
+  "changes": [
+    {
+      "packageName": "@zephyr3d/scene",
+      "comment": "Add foam support to the Gerstner wave generator and shoreline foam driven by a Hi-Z proximity query; fix foam not being affected by lights.",
+      "type": "patch"
+    }
+  ],
+  "packageName": "@zephyr3d/scene"
+}

@@ -1,0 +1,10 @@
+{
+  "changes": [
+    {
+      "packageName": "@zephyr3d/editor",
+      "comment": "Improve resource service handling and import option dialogs",
+      "type": "patch"
+    }
+  ],
+  "packageName": "@zephyr3d/editor"
+}
