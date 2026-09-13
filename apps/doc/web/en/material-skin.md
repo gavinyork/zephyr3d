@@ -124,17 +124,6 @@ different materials in the same image goes through a separate profile-slot path,
 assets).
 :::
 
-## Known limitations
-
-- **Precision fallback**: the scatterable term is written to an additional MRT. When the render graph
-  falls back to an 8-bit format, it is compressed and restored using `SKIN_SSS_LDR_ENCODE_RANGE`
-  (value 4). Precision loss is possible at extreme brightness.
-- **Defaults are not calibrated against real characters**: the current visual defaults
-  (`scatterStrength` 1.5, `scatterRadius` 0.02, and so on) follow the reference implementation and
-  usually need adjusting on an actual character.
-- Specular uses a normalized Blinn model rather than GGX. That is a stylistic choice and does not aim
-  to match PBR materials exactly.
-
 ## See also
 
 - [Custom Materials](en/user-material.md) — the general material system

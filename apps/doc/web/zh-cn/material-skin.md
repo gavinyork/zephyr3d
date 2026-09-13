@@ -117,14 +117,6 @@ camera.skinSSS = true;
 类的实例可以被多个材质共享（类似 Unreal 的 skin profile 资产）。
 :::
 
-## 已知限制
-
-- **精度回退**：可散射项写在一张附加的 MRT 里。当渲染图退回 8 位格式时，会按
-  `SKIN_SSS_LDR_ENCODE_RANGE`（值为 4）压缩再还原。极端亮度下可能出现精度损失。
-- **默认值未在真实角色上标定**：当前的视觉默认值（`scatterStrength` 1.5、
-  `scatterRadius` 0.02 等）是按参考实现给的，实际角色上通常需要调整。
-- 高光走的是归一化 Blinn 而不是 GGX，这是风格化取向，不追求与 PBR 材质完全一致。
-
 ## 相关
 
 - [自定义材质](zh-cn/user-material.md) —— 材质系统的通用机制

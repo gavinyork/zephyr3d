@@ -6,19 +6,6 @@ dark ring at the edge) are exactly the things a general PBR material cannot expr
 
 `EyeMaterial` shades the whole eyeball — sclera, limbus and iris — from **one mesh and one material**.
 
-## Why there is no separate cornea layer
-
-The common approach is a transparent cornea shell over the eyeball, but that brings in transparency
-sorting, OIT and depth conflicts.
-
-Instead the view ray is **refracted**: the corneal bulge is not expressed as geometry, but by refracting
-the view ray before looking up the iris texture, producing the parallax of an iris sitting below the
-surface. So there is no second transparent surface, no OIT, and no depth sorting.
-
-Refraction works in **tangent space** (per-fragment TBN) rather than object space, because after
-skinning the shader cannot reconstruct a fixed object-space gaze axis. The residual error from the
-sphere's curvature is small at the depths an iris actually sits.
-
 ## Asset requirements
 
 This approach needs no mask texture: the regions are derived **analytically from the UV distance to the
