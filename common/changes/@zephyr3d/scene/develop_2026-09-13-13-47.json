@@ -1,0 +1,10 @@
+{
+  "changes": [
+    {
+      "packageName": "@zephyr3d/scene",
+      "comment": "Support configuring a retarget reference pose for skeletons; fix humanoid retargeting of root and pelvis displacement; correct bone namespace matching for externally retargeted poses; extend animation set and skeleton serialization.",
+      "type": "patch"
+    }
+  ],
+  "packageName": "@zephyr3d/scene"
+}
