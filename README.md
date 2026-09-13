@@ -145,9 +145,7 @@ as node graphs in the editor.
 
 **Character rendering**
 Skin with subsurface scattering profiles, eye material with socket occlusion, and hair as both
-Kajiya-Kay and Marschner models with strand-level geometry expanded on the GPU. *(Guides for these
-are written but not yet on the live doc site — see `apps/doc/web/en/material-skin.md`,
-`material-hair.md` and `material-eye.md` in this repo.)*
+Kajiya-Kay and Marschner models with strand-level geometry expanded on the GPU.
 
 **[Shadows](https://zephyr3d.org/doc/en/shadow-intro.html)**
 PCF (several variants), PCSS, ESM, VSM, SSM and DOM shadows, with cascaded shadow maps and

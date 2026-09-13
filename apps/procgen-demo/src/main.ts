@@ -83,12 +83,7 @@ const materials: Record<MaterialGroup, PBRMetallicRoughnessMaterial[]> = (() => 
       const t = i / (TONE_VARIANTS - 1);
       const k = 1 + (hint.variation ?? 0) * (t * 2 - 1);
       const material = new PBRMetallicRoughnessMaterial();
-      material.albedoColor = new Vector4(
-        hint.albedo[0] * k,
-        hint.albedo[1] * k,
-        hint.albedo[2] * k,
-        1
-      );
+      material.albedoColor = new Vector4(hint.albedo[0] * k, hint.albedo[1] * k, hint.albedo[2] * k, 1);
       material.metallic = hint.metallic;
       material.roughness = hint.roughness;
       variants.push(material);

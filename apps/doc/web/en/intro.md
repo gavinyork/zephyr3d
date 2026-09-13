@@ -21,49 +21,76 @@ It serves both as a testing environment for the Device API and as a ready-to-use
 
 Current features include:
 
-- Scene management based on **Scene Graph**
-- **Clustered lighting**
-- **Physically Based Rendering (PBR)** and **Image-Based Lighting (IBL)**
-- **Shadow Mapping** (PCF, ESM, VSM, CSM)
-- **Skeletal and keyframe animation**
-- **GPU instancing**
-- **Terrain rendering**
-- **Atmospheric rendering**
-- **Water rendering**
-- **Post-processing** (Tonemap, Bloom, TAA, FXAA, SSAO, etc.)
-- **ImGui integration**
+**Rendering pipeline**
+
+Forward+ pipeline organized as a render graph with automatic resource pooling and history
+buffers for temporal effects. Clustered lighting, Hi-Z, depth prepass,
+[GPU picking](./picking.html),
+[geometry instancing](./instancing-intro.html), render bundles,
+[multi-view rendering](./multi-views.html).
+
+**Materials and lighting**
+
+PBR (metallic-roughness and specular-glossiness), [image-based
+lighting](./lighting-intro.html), physical lighting units,
+Lambert/Blinn/Unlit, MToon for stylized shading, and a [mixin-based
+system](./user-material.html) for custom materials.
+[Material blueprints](./material-blueprint.html) author materials
+as node graphs in the editor.
+
+**Character rendering**
+
+Skin with subsurface scattering profiles, eye material with socket occlusion, and hair as both
+Kajiya-Kay and Marschner models with strand-level geometry expanded on the GPU.
+
+**[Shadows](./shadow-intro.html)**
+
+PCF (several variants), PCSS, ESM, VSM, SSM and DOM shadows, with cascaded shadow maps and
+receiver bias control. Pick per light based on the quality/cost tradeoff you want.
+
+**[Post-processing](./posteffect-intro.html)**
+
+TAA, SSGI, SSR, SSAO, bloom, motion blur, FXAA, tonemapping, color grading, and separate
+subsurface-scattering passes for skin.
+
+**[Transparency](./oit.html)**
+
+Three order-independent transparency backends: A-buffer (WebGPU), dual depth peeling, and
+weighted blended.
+
+**Terrain, sky and water**
+
+[Clipmap terrain](./terrain-runtime.html) with runtime texturing and
+grass layers, [atmospheric sky](./sky.html), and
+[ocean water](./water.html) driven by FFT, Gerstner or FBM wave
+generators.
+
+**[Animation and simulation](./animation-intro.html)**
+
+Skeletal and keyframe animation with blending, masks and an action controller.
+[Inverse kinematics](./animation-ik.html) (CCD, FABRIK, two-bone),
+[joint dynamics](./animation-joint-dynamics.html), spring chains, GPU
+cloth, GPU hair simulation,
+[morph targets](./animation-morph-target.html) and geometry caches.
+
+**Asset pipeline**
+
+glTF/GLB, FBX, Alembic and hair curve
+[importers](./asset-loading.html), a
+[prefab system](./serialization.html), [virtual file
+system](./vfs.html), and
+[reference-counted resources](./lifetime.html).
+
 
 ## Editor
 
-The **Zephyr3D Editor** runs entirely in the browser — no installation required.  
-It enables the interactive development of 3D web applications with real-time visualization.
+The editor is itself built on the Scene and Device APIs. It covers scene editing, the content
+browser, node-graph material blueprints, terrain sculpting and texturing, animation editing,
+TypeScript scripting bound to scene entities, and a plugin API for custom tools and panels.
 
-### Main Features
-
-- **Project Management**
-  - Create, import, and export projects
-  - One-click web app publishing
-
-- **Scene Editing**
-  - Object placement
-  - Property editing
-  - Terrain editing
-
-- **Animation Editing**
-  - Create and edit keyframe animations and animation tracks for scene nodes
-
-- **Material Creation & Editing**
-  - Design custom materials using a node-based editor (Blueprint system)
-
-- **Scripting**
-  - Write TypeScript scripts directly within the editor and bind them to scene entities
-
-- **Asset Management**
-  - Import external GLTF/GLB models
-  - Prefab system support
-  - Store project assets in **IndexedDB**
-
----
+The **desktop build** (Electron) adds local project folders with persistent storage, an embedded
+MCP server so AI agents can drive the editor directly, and a built-in LLM assistant. API keys are
+stored locally, encrypted at rest.
 
 ## Where to start
 

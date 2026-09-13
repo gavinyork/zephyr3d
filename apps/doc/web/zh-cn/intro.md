@@ -16,56 +16,49 @@ Zephyr3d是一个面向浏览器的3D渲染框架，提供了两套API接口及�
 
   SceneAPI是建立在DeviceAPI基础上的一个上层渲染框架，既作为DeviceAPI的测试环境，也可直接用于图形开发。目前SceneAPI已实现的功能有：
 
-  - 基于SceneGraph的场景管理
-  - Clustered光照
-  - PBR/IBL
-  - ShadowMap(PCF/ESM/VSM/CSM)
-  - 骨骼动画及关键帧动画
-  - GPU实例渲染
-  - 地形渲染
-  - 大气渲染
-  - 水面渲染
-  - 后处理(Tonemap, Bloom, TAA, FXAA, SSAO等)
-  - ImGui绑定
+**渲染管线**
+
+Forward+ 管线以 render graph 组织，具备自动资源池化与用于时域效果的历史缓冲。支持 Clustered 光照、Hi-Z、深度预通道、[GPU拾取](./picking.html)、[几何体实例化](./instancing-intro.html)、render bundle 以及[多视图渲染](./multi-views.html)。
+
+**材质与光照**
+
+PBR（metallic-roughness 与 specular-glossiness 两套工作流）、[基于图像的光照](./lighting-intro.html)、物理光照单位、Lambert/Blinn/Unlit、用于风格化着色的 MToon，以及可用于自定义材质的[基于mixin的系统](./user-material.html)。[材质蓝图](./material-blueprint.html)可在编辑器中以节点图的方式编写材质。
+
+**角色渲染**
+
+带次表面散射 profile 的皮肤材质、带眼窝遮蔽的眼球材质，以及同时提供 Kajiya-Kay 与 Marschner 两种模型、并在 GPU 上展开发丝级几何的头发材质。
+
+**[阴影](./shadow-intro.html)**
+
+提供 PCF（多种变体）、PCSS、ESM、VSM、SSM 与 DOM 阴影，支持级联阴影贴图与接收端偏移（receiver bias）控制。可按光源逐个选择，以匹配你想要的质量/开销取舍。
+
+**[后处理](./posteffect-intro.html)**
+
+TAA、SSGI、SSR、SSAO、bloom、运动模糊、FXAA、色调映射、调色，以及用于皮肤的独立次表面散射通道。
+
+**[透明](./oit.html)**
+
+三种顺序无关透明（OIT）后端：A-buffer（WebGPU）、双向深度剥离（dual depth peeling）与加权混合（weighted blended）。
+
+**地形、天空与水体**
+
+[Clipmap地形](./terrain-runtime.html)，支持运行时纹理化与草地层；[大气天空](./sky.html)；以及由 FFT、Gerstner 或 FBM 波形生成器驱动的[海洋水体](./water.html)。
+
+**[动画与模拟](./animation-intro.html)**
+
+骨骼与关键帧动画，支持混合、遮罩与 action controller。[反向动力学](./animation-ik.html)（CCD、FABRIK、双骨骼）、[关节动力学](./animation-joint-dynamics.html)、弹簧链、GPU 布料、GPU 头发模拟、[Morph Target](./animation-morph-target.html)与几何缓存。
+
+**资产管线**
+
+glTF/GLB、FBX、Alembic 与发丝曲线[导入器](./asset-loading.html)，[预制体系统](./serialization.html)、[虚拟文件系统](./vfs.html)，以及[引用计数资源管理](./lifetime.html)。
 
 ---
 
 ## 编辑器
 
-Zephyr3d编辑器运行于浏览器中，无需下载安装，可用于交互式网页3D应用开发。
+编辑器本身即构建于 Scene 与 Device API 之上。它涵盖场景编辑、内容浏览器、节点图式材质蓝图、地形雕刻与纹理绘制、动画编辑、绑定到场景实体的 TypeScript 脚本，以及用于自定义工具与面板的插件 API。
 
-### 主要功能：
-
-- 项目管理
-
-  - 新建/导入/导出项目
-  - 一键发布Web应用
-
-- 场景编辑
-
-  - 物体摆放
-  - 属性编辑
-  - 地形编辑
-
-- 动画编辑
-
-  为场景节点创建和编辑关键帧动画和动画轨道
-
-- 创建/编辑材质
-
-  使用蓝图创建和编辑自定义材质
-
-- 脚本编写
-
-  编辑器内编写TS脚本并绑定到场景实体
-
-- 资产管理
-
-  - 导入外部GLTF/GLB模型
-  - 预制体系统
-  - 使用IndexedDB存储项目资产
-
----
+桌面端构建（Electron）在此基础上增加了带持久化存储的本地项目文件夹、内嵌的 MCP 服务器（使 AI agent 可以直接驱动编辑器），以及内置的 LLM 助手。API 密钥存储在本地，并以静态加密方式保存。
 
 ## 从哪里开始
 
