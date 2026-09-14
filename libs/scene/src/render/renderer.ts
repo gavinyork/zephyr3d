@@ -71,6 +71,8 @@ export class SceneRenderer {
           screenSpaceShadowMask: camera.screenSpaceShadowMask && device.type !== 'webgl',
           // Set by the WaterCaustics module once it has produced a map.
           waterCaustics: false,
+          // Resolved by executeForwardPlusGraph before the graph is built.
+          underwater: null,
           globalBindGroupAllocator,
           camera,
           compositor: camera.compositor,

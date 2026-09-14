@@ -271,7 +271,14 @@ export class LightPass extends RenderPass {
         ctx.oit = i === 0 || !items ? null : oit;
         const isolateTransparentABufferLightPasses =
           !!ctx.oit && ctx.queue === QUEUE_TRANSPARENT && ctx.oit.getType() === 'ab';
-        if ((ctx.queue === QUEUE_TRANSPARENT || this._transmission) && ctx.scene.env.sky.fogPresents) {
+        // Transparent geometry fogs itself, the screen-space pass over the opaque
+        // scene being unable to reach it. Suppressed while submerged for the same
+        // reason the screen-space one is: the medium is water, not air.
+        if (
+          (ctx.queue === QUEUE_TRANSPARENT || this._transmission) &&
+          ctx.scene.env.sky.fogPresents &&
+          !ctx.underwater
+        ) {
           ctx.materialFlags |= MaterialVaryingFlags.APPLY_FOG;
         }
         const numOitPasses = ctx.oit ? ctx.oit.begin(ctx) : 1;

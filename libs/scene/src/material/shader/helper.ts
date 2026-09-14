@@ -1587,8 +1587,36 @@ export class ShaderHelper {
     if (!this.usesWaterCaustics(ctx)) {
       return null;
     }
+    return this.sampleWaterCaustic(scope, worldPos, lightType, lightDirection);
+  }
+  /**
+   * {@link ShaderHelper.calculateWaterCaustic} without the pass gate.
+   *
+   * The gate asks whether the *light pass* has caustics, which is the right
+   * question for a material and the wrong one for a standalone full-screen pass
+   * that declared the same uniforms itself. Such a pass has already decided it
+   * has a map; this is the sampling half on its own.
+   *
+   * @param scope - Current shader scope.
+   * @param worldPos - World position of the shaded fragment.
+   * @param lightType - The light's type constant.
+   * @param lightDirection - Direction the light travels, i.e. `directionAndCutoff.xyz`.
+   * @param defocus - Whether to fade the pattern's contrast by how far the point
+   * is from the map's focal depth. True for a receiver surface, which is what
+   * that fade describes. False for a point inside the water column: see the
+   * comment on the term itself.
+   * @returns A `vec3` multiplier.
+   * @internal
+   */
+  static sampleWaterCaustic(
+    scope: PBInsideFunctionScope,
+    worldPos: PBShaderExp,
+    lightType: PBShaderExp,
+    lightDirection: PBShaderExp,
+    defocus = true
+  ): PBShaderExp {
     const pb = scope.$builder;
-    const funcName = 'Z_calculateWaterCaustic';
+    const funcName = defocus ? 'Z_calculateWaterCaustic' : 'Z_calculateWaterCausticVolume';
     pb.func(funcName, [pb.vec3('worldPos'), pb.int('lightType'), pb.vec3('lightDirection')], function () {
       this.$l.cu = this[UNIFORM_NAME_CAUSTIC_PARAMS];
       // Only the one light the map was built for casts caustics.
@@ -1720,12 +1748,25 @@ export class ShaderHelper {
       this.$l.pathLength = pb.mul(this.depth, this.cu.lightDir.w);
       this.$l.transmittance = pb.exp(pb.neg(pb.mul(this.medium, this.pathLength)));
       this.$l.pattern = pb.textureSampleLevel(this[UNIFORM_NAME_CAUSTIC_MAP], this.uv, 0).x;
-      // Receivers away from the focal plane see a defocused, lower-contrast
-      // pattern rather than a displaced one.
-      this.$l.defocus = pb.div(
-        1,
-        pb.add(1, pb.mul(pb.abs(pb.sub(this.depth, this.cu.params.y)), this.cu.params.z))
-      );
+      if (defocus) {
+        // Receivers away from the focal plane see a defocused, lower-contrast
+        // pattern rather than a displaced one.
+        this.$l.defocus = pb.div(
+          1,
+          pb.add(1, pb.mul(pb.abs(pb.sub(this.depth, this.cu.params.y)), this.cu.params.z))
+        );
+      } else {
+        // A point inside the water column is not a receiver, and has no depth of
+        // its own to be out of focus at - the volumetric march visits every
+        // depth along the ray. Charging it the receiver's fade makes the light
+        // shafts fade according to where the *sea bed* was told to be sharpest:
+        // the open-ocean preset focuses the map at 26m for its bed, which at the
+        // default defocus leaves a point 2m down at 26% contrast, and the shafts
+        // dissolve into grain. The shafts instead take the pattern as the map
+        // holds it and fade with the edge and the transmittance like everything
+        // else in the column.
+        this.$l.defocus = pb.float(1);
+      }
       this.$l.weight = pb.mul(this.cu.params.x, this.defocus, this.edge);
       this.$l.caustic = pb.add(1, pb.mul(pb.sub(this.pattern, 1), this.weight));
       // Soften the waterline so the transmittance does not switch on abruptly.

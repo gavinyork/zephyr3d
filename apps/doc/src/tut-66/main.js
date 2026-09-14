@@ -15,7 +15,8 @@ import {
   FFTWaveGenerator,
   getInput,
   getEngine,
-  getDevice
+  getDevice,
+  FPSCameraController
 } from '@zephyr3d/scene';
 import { backendWebGL2 } from '@zephyr3d/backend-webgl';
 import { backendWebGPU } from '@zephyr3d/backend-webgpu';
@@ -155,6 +156,66 @@ myApp.ready().then(function () {
   }
   applyPause(pauseCheck.checked);
 
+  // Drop the camera under the surface. Nothing switches the underwater look on
+  // beyond the camera being inside a water region - this only moves it there.
+  // Each scene keeps both placements so toggling returns to the authored view
+  // rather than to wherever the orbit controller had been dragged.
+  const VIEWPOINTS = new Map([
+    [
+      ocean.get(),
+      {
+        above: [new Vector3(0, 18, 60), new Vector3(0, 0, 0)],
+        below: [new Vector3(0, -0.6, 22), new Vector3(0, -2.5, 0)]
+      }
+    ],
+    [
+      pool.get(),
+      {
+        above: [new Vector3(5, 12, 20), new Vector3(-2, -1, 3)],
+        below: [new Vector3(4, 1.2, 9), new Vector3(-1, -1, 1)]
+      }
+    ]
+  ]);
+  /** @type {HTMLInputElement} */
+  const diveCheck = document.querySelector('#dive-check');
+  const applyDive = function (dived) {
+    for (const [scene, viewpoints] of VIEWPOINTS) {
+      const [eye, center] = dived ? viewpoints.below : viewpoints.above;
+      const camera = scene.mainCamera;
+      camera.lookAt(eye, center, Vector3.axisPY());
+      // The orbit controller caches the eye and the pivot it turns around, so a
+      // bare lookAt would be undone on its next update. A fresh one picks both
+      // up from the camera it is attached to.
+      camera.controller = new OrbitCameraController({ center });
+    }
+  };
+  diveCheck.addEventListener('change', function () {
+    applyDive(diveCheck.checked);
+  });
+  if (new URLSearchParams(location.search).get('dive') === '1') {
+    diveCheck.checked = true;
+  }
+  applyDive(diveCheck.checked);
+
+  // The shafts read the caustic map as the surface's transmittance, so they need
+  // caustics; the water switches them off by itself when no map exists.
+  /** @type {HTMLInputElement} */
+  const godRayCheck = document.querySelector('#godray-check');
+  const applyGodRays = function (enabled) {
+    for (const scene of [ocean.get(), pool.get()]) {
+      scene.rootNode.iterate(function (node) {
+        if (node instanceof Water) {
+          node.underwaterGodRays = enabled;
+        }
+        return false;
+      });
+    }
+  };
+  godRayCheck.addEventListener('change', function () {
+    applyGodRays(godRayCheck.checked);
+  });
+  applyGodRays(godRayCheck.checked);
+
   getInput().use(forwarder);
   myApp.run();
 });
@@ -200,19 +261,19 @@ function buildOceanScene() {
   bedMaterial.albedoColor = new Vector4(0.76, 0.7, 0.5, 1);
   bedMaterial.roughness = 1;
   const bed = new Mesh(scene, new PlaneShape({ size: 5000 }), bedMaterial);
-  bed.position.setXYZ(0, -4, 0);
+  bed.position.setXYZ(0, -24, 0);
 
   const water = new Water(scene);
   water.scale.setXYZ(5000, 1, 5000);
   water.position.setXYZ(0, 2, 0);
   water.gridScale = 1;
   water.animationSpeed = 2;
-  //water.infinite = true;
+  water.infinite = false;
 
   // FFT rather than FBM, so the surface genuinely folds - that is what feeds
   // both the foam and cresting here.
   const waves = new FFTWaveGenerator();
-  waves.wind = new Vector2(10, 5);
+  waves.wind = new Vector2(11, 1);
   waves.setWaveLength(0, 400);
   waves.setWaveLength(1, 100);
   waves.setWaveLength(2, 16);
@@ -239,17 +300,17 @@ function buildOceanScene() {
   water.shoreFoamAmount = 0.5;
   water.shoreFoamDepth = 2.5;
   water.shoreFoamWashAmount = 0;
-  water.infinite = true;
+  water.infinite = false;
 
   water.causticsEnabled = true;
   water.causticsIntensity = 1.5;
-  water.causticsDepth = 6;
-  water.causticsRange = 40;
+  water.causticsDepth = 26;
+  water.causticsRange = 80;
   water.causticsSceneDepth = true;
 
   scene.mainCamera = new PerspectiveCamera(scene, Math.PI / 3, 1, 1000);
   scene.mainCamera.lookAt(new Vector3(0, 18, 60), new Vector3(0, 0, 0), Vector3.axisPY());
-  scene.mainCamera.controller = new OrbitCameraController();
+  scene.mainCamera.controller = new FPSCameraController();
   scene.mainCamera.TAA = true;
   scene.mainCamera.HiZ = true;
 

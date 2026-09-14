@@ -37,6 +37,8 @@
         border-radius: 6px;
         background: rgba(15, 20, 28, 0.78);
         color: #f4f7fb;
+        /* Render the native dropdown popup and its scrollbar dark to match. */
+        color-scheme: dark;
         font:
           12px/1.25 system-ui,
           -apple-system,
@@ -61,10 +63,16 @@
         padding: 0 4px;
         border: 1px solid rgba(255, 255, 255, 0.2);
         border-radius: 4px;
-        background: rgba(255, 255, 255, 0.06);
+        /* Opaque: the popup list has nothing behind it, so a translucent
+           background composites onto white and hides the inherited light text. */
+        background: #222b36;
         color: inherit;
         font: inherit;
         cursor: pointer;
+      }
+      #ui option {
+        background: #1b2430;
+        color: #f4f7fb;
       }
       #ui select:disabled,
       #ui input:disabled {

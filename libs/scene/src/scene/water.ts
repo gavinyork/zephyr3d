@@ -7,6 +7,7 @@ import { mixinDrawable } from '../render/drawable_mixin';
 import type { Drawable, DrawContext, PickTarget, PrimitiveInstanceInfo, RenderQueue } from '../render';
 import { Primitive } from '../render';
 import { Clipmap, FBMWaveGenerator } from '../render';
+import { setWaterSubmergence } from '../render/underwater';
 import { WaterMaterial } from '../material/water';
 import type { WaterDebugOutput, WaterRefractionMode } from '../material/water';
 import type { AbstractDevice, BindGroup, FrameBuffer, GPUProgram, RenderStateSet } from '@zephyr3d/device';
@@ -58,6 +59,14 @@ export class Water extends applyMixins(GraphNode, mixinDrawable) implements Draw
   private _feedbackRenderStates: Nullable<RenderStateSet>;
   private readonly _material: DRef<WaterMaterial>;
   /**
+   * Whether each camera was inside this body of water on its previous update.
+   *
+   * The submerged test has a dead band around the surface, so it needs to know
+   * which way it is crossing; per camera, because two views of one ocean can be
+   * on opposite sides of it.
+   */
+  private readonly _submerged: WeakMap<Camera, boolean>;
+  /**
    * Creates an instance of Water node
    * @param scene - Scene object
    */
@@ -81,6 +90,7 @@ export class Water extends applyMixins(GraphNode, mixinDrawable) implements Draw
     this._feedbackPrimitive = new DRef();
     this._feedbackRenderTarget = new DRef();
     this._feedbackRenderStates = null;
+    this._submerged = new WeakMap();
     scene.queuePerCameraUpdateNode(this);
   }
   /** Disposes the water node */
@@ -246,6 +256,79 @@ export class Water extends applyMixins(GraphNode, mixinDrawable) implements Draw
   }
   set causticsWarp(val: number) {
     this.material.causticsWarp = val;
+  }
+  /**
+   * Whether a camera inside this body of water sees the water from the inside:
+   * the medium applied to the whole scene, the sky replaced by water, and the
+   * surface read from below with its Snell window.
+   *
+   * Uses the same medium coefficients the surface does ({@link absorption},
+   * {@link scattering} and their scales), so the volume and the surface never
+   * disagree. Atmospheric fog is suppressed while submerged - the medium the eye
+   * is looking through is water, not air.
+   *
+   * Only reaches opaque geometry, like the atmospheric fog it replaces;
+   * transparent surfaces are not tinted by the column in front of them.
+   */
+  get underwaterEnabled() {
+    return this.material.underwaterEnabled;
+  }
+  set underwaterEnabled(val: boolean) {
+    this.material.underwaterEnabled = val;
+  }
+  /**
+   * Scale on the downwelling sky light that fills the water column, 1 for the
+   * value the sky implies. This is what the water fades to in the distance, so
+   * it also sets how bright the underwater haze reads.
+   */
+  get underwaterAmbientIntensity() {
+    return this.material.underwaterAmbientIntensity;
+  }
+  set underwaterAmbientIntensity(val: number) {
+    this.material.underwaterAmbientIntensity = val;
+  }
+  /**
+   * Whether shafts of sunlight are marched through the water column.
+   *
+   * Reads the caustic map as the surface's transmittance, so the shafts carry
+   * the same pattern that lands on the sea bed. Needs {@link causticsEnabled}
+   * and everything it needs; switches itself off wherever the map is
+   * unavailable.
+   */
+  get underwaterGodRays() {
+    return this.material.underwaterGodRays;
+  }
+  set underwaterGodRays(val: boolean) {
+    this.material.underwaterGodRays = val;
+  }
+  /** Strength of the light shafts, 1 for the value the medium implies. */
+  get underwaterGodRayIntensity() {
+    return this.material.underwaterGodRayIntensity;
+  }
+  set underwaterGodRayIntensity(val: number) {
+    this.material.underwaterGodRayIntensity = val;
+  }
+  /**
+   * Samples taken along each view ray for the light shafts. Raise it when the
+   * shafts read as grain rather than as beams, which is what too few samples of
+   * a sharp caustic pattern look like.
+   */
+  get underwaterGodRaySteps() {
+    return this.material.underwaterGodRaySteps;
+  }
+  set underwaterGodRaySteps(val: number) {
+    this.material.underwaterGodRaySteps = val;
+  }
+  /**
+   * Half-width in meters of the dead band around the surface the submerged test
+   * uses, so a camera sitting at water level does not flip state every frame.
+   * The test is against the rest plane, not the displaced surface.
+   */
+  get underwaterHysteresis() {
+    return this.material.underwaterHysteresis;
+  }
+  set underwaterHysteresis(val: number) {
+    this.material.underwaterHysteresis = val;
   }
   /**
    * Strength of the sunlight scattered out of the water column towards the eye,
@@ -558,8 +641,47 @@ export class Water extends applyMixins(GraphNode, mixinDrawable) implements Draw
           }
         }
       });
+      this.updateSubmergence(camera, mat);
       this.scene?.queuePerCameraUpdateNode(this);
     }
+  }
+  /**
+   * Decide whether `camera` is inside this body of water and publish the result.
+   *
+   * Run from `updatePerCamera`, which the node re-queues every frame regardless
+   * of culling - the state has to survive the surface leaving the frustum, which
+   * is exactly what a camera on the sea bed looking down does to it.
+   *
+   * The test is against the rest plane rather than the displaced surface. Reading
+   * the real wave height means a GPU readback ({@link Water.getSurfacePoint}) and
+   * the frame or two of latency that comes with it; against that, the plane is
+   * wrong only while the eye is within a wave height of the surface, which is
+   * also the one case this feature deliberately does not try to render.
+   *
+   * A dead band of {@link WaterMaterial.underwaterHysteresis} around the plane
+   * keeps an eye parked at water level from flipping state every frame: crossing
+   * in has to reach below the band, crossing out has to reach above it.
+   * @internal
+   */
+  private updateSubmergence(camera: Camera, mat: WaterMaterial) {
+    const surfaceY = this.worldMatrix.transformPointAffine(Vector3.zero()).y;
+    let submerged = false;
+    if (!this.hidden && this.attached) {
+      const camPos = camera.getWorldPosition();
+      const region = mat.region;
+      // An unbounded surface has no edge to fall outside of; a bounded one is
+      // only entered from within its own footprint, so a camera beside a pool at
+      // the height of its water is not in it.
+      const inside =
+        mat.infinite ||
+        (camPos.x >= region.x && camPos.x <= region.z && camPos.z >= region.y && camPos.z <= region.w);
+      if (inside) {
+        const band = mat.underwaterHysteresis;
+        submerged = this._submerged.get(camera) ? camPos.y < surfaceY + band : camPos.y < surfaceY - band;
+      }
+    }
+    this._submerged.set(camera, submerged);
+    setWaterSubmergence(camera, this, submerged, surfaceY);
   }
   /**
    * Distance to the true horizon for the camera's height above this water, in

@@ -135,6 +135,37 @@ water.material.scatterAnisotropy = 0.7;
 | `sunScatteringIntensity` | How strongly sunlight scattered out of the column reaches the eye. 1 is the physical value the medium coefficients imply, 0 disables it, higher is deliberate exaggeration |
 | `scatterAnisotropy` | Phase-function anisotropy, in [0, 0.95]. 0 scatters equally in all directions; 0.7 (default) is near measured sea water. Thicker water blends toward isotropic, so the **visible anisotropy is always below this number** |
 
+## Underwater
+
+Move the camera below the surface and the water takes over the whole frame: the medium is applied to the scene, the sky is replaced by water, and the surface itself is read from below. Nothing needs enabling - the camera entering a water region is what switches it on.
+
+```ts
+water.underwaterEnabled = true;
+water.underwaterAmbientIntensity = 1;
+water.underwaterGodRays = true;
+```
+
+| Property | Meaning |
+| --- | --- |
+| `underwaterEnabled` | Master switch, default `true`. Turn it off for a water body the camera is never meant to enter |
+| `underwaterAmbientIntensity` | Scale on the downwelling sky light filling the column. This is what the water fades to in the distance, so it sets how bright the underwater haze reads |
+| `underwaterGodRays` | Shafts of sunlight through the column, default `true` |
+| `underwaterGodRayIntensity` | Shaft strength, 1 for the value the medium implies |
+| `underwaterGodRaySteps` | Samples per view ray, default 24. Raise it when the shafts read as grain rather than as beams |
+| `underwaterHysteresis` | Half-width (meters) of the dead band around the surface the submerged test uses |
+
+Three things follow from being submerged:
+
+- **The horizon is water, not sky.** A ray that never hits geometry is given the full extinction distance, so it converges to the medium colour. Atmospheric fog is suppressed for the frame - the medium in front of the camera is water, and the underwater pass owns it.
+- **The surface has a Snell window.** Looking up, everything above the water is compressed into a cone about 48.6° wide; outside it the surface is a total internal mirror showing the scene below. `reflectionStrength` still tunes the window's own reflection but does not weaken the mirror outside it, where physically nothing above the water is visible.
+- **The shafts share the caustic map.** They read it as the surface's transmittance, so a shaft lines up with the caustic cell it lands in. They therefore need `causticsEnabled` and everything it needs; without a map they switch off and the ambient medium remains.
+
+The medium uses the same `absorption` / `scattering` coefficients the surface does, so the view from below and the view from above never disagree about the colour of the water.
+
+> Like the atmospheric fog it replaces, the underwater medium reaches **opaque geometry only** - transparent surfaces are not tinted by the column in front of them.
+>
+> The submerged test is against the water's **rest plane**, not the displaced surface, so a camera within a wave height of the surface may disagree with what the waves are doing. A camera sitting exactly on the waterline picks one side rather than splitting the screen.
+
 ## Refraction Blur
 
 The more turbid and the deeper the water, the more what you see through it blurs.
@@ -279,3 +310,4 @@ Use the largest `gridScale` that still gives enough near-camera detail. Keep the
 - **Caustics**: need a shadow-casting directional light. Keep `causticsEnabled = false` when you do not want them.
 - **Shoreline foam**: adds around a dozen depth samples per water pixel and a second channel to the scene's depth pyramid. Keep `shoreFoamAmount = 0` when you do not want it.
 - **Refraction blur / directional scattering**: nearly free, and they pull a lot of look from the medium coefficients.
+- **Underwater**: costs nothing while the camera is above the surface - the pass is not built into the frame at all. Once submerged it is two full-screen draws, plus `underwaterGodRaySteps` caustic-map samples per pixel when the shafts are on. Lower the step count before turning the shafts off.

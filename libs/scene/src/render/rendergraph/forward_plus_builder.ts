@@ -57,6 +57,7 @@ import type { Primitive } from '../primitive';
 import { BoxShape } from '../../shapes';
 import type { Water } from '../../scene/water';
 import { WaterCausticsRenderer } from '../water_caustics';
+import { selectUnderwaterSource, UnderwaterRenderer } from '../underwater';
 
 const _scenePass = new LightPass();
 const _depthPass = new DepthPass();
@@ -64,6 +65,7 @@ const _shadowMapPass = new ShadowMapPass();
 const _clusters: ClusteredLight[] = [];
 const _shadowMaskRenderer = new ShadowMaskRenderer();
 const _waterCausticsRenderer = new WaterCausticsRenderer();
+const _underwaterRenderer = new UnderwaterRenderer();
 const _devicePoolAllocator = new DevicePoolAllocator();
 const _textureAffinityCaches = new WeakMap<
   Camera,
@@ -1527,6 +1529,63 @@ const SkyPassModule: RenderModule<FrameGraphContext> = {
 };
 
 /** @internal */
+const UnderwaterModule: RenderModule<FrameGraphContext> = {
+  type: 'Underwater',
+  reads: [{ resource: FrameResources.SceneColor, version: 'current' }],
+  writes: [FrameResources.SceneColor],
+  prepare: ({ ctx }) => ({ enabled: !!ctx.underwater }),
+  setup(fg: FrameGraphContext) {
+    const { graph, ctx, frame, blackboard } = fg;
+    const depthPassResult = requireBuildState(fg, 'depth', 'DepthPrepass', 'Underwater');
+    const lightPassResult = requireBuildState(fg, 'lightPass', 'LightPass', 'Underwater');
+    const sceneColorHandle = blackboard.expect(FrameResources.SceneColor);
+    const waterCausticsHandle = blackboard.get(FrameResources.WaterCaustics);
+    const state = ctx.underwater!;
+
+    // After the sky, before the transparent pass: the medium has to cover the
+    // sky - that is what the horizon fades into underwater - and the opaque
+    // scene is the only thing the depth buffer describes, so it is also the only
+    // thing this can reach. Transparent geometry is on its own, exactly as it is
+    // for atmospheric fog.
+    const underwaterColorHandle = graph.addPass('Underwater', (builder) => {
+      builder.read(sceneColorHandle);
+      builder.read(depthPassResult.depthFramebufferHandle);
+      if (lightPassResult.sceneColorFramebufferHandle) {
+        builder.read(lightPassResult.sceneColorFramebufferHandle);
+      }
+      if (waterCausticsHandle) {
+        // The light shafts sample the caustic map, which reaches the shader
+        // through ctx.waterCausticTexture rather than through a handle. Same
+        // lifetime argument as the shadow mask in CompositeTail: only a declared
+        // read stops the executor returning it to the pool after LightPass.
+        builder.read(waterCausticsHandle);
+      }
+      const out = builder.write(sceneColorHandle);
+      builder.setExecute((rgCtx) => {
+        const colorTexture = rgCtx.getTexture<Texture2D>(sceneColorHandle);
+        const depthTexture = frame.depthFramebuffer?.getDepthAttachment() as Nullable<Texture2D>;
+        if (!colorTexture || !depthTexture) {
+          return;
+        }
+        // Color only. The scene depth is sampled by this pass, which it cannot
+        // be while it is still attached to the bound framebuffer.
+        const colorFramebuffer = rgCtx.createFramebuffer({
+          width: colorTexture.width,
+          height: colorTexture.height,
+          colorAttachments: colorTexture,
+          depthAttachment: null
+        });
+        _underwaterRenderer.render(ctx, state, colorFramebuffer, depthTexture);
+      });
+      return out;
+    });
+
+    lightPassResult.sceneColorHandle = underwaterColorHandle;
+    blackboard.set(FrameResources.SceneColor, underwaterColorHandle);
+  }
+};
+
+/** @internal */
 const CompositeTailModule: RenderModule<FrameGraphContext> = {
   type: 'CompositeTail',
   writes: [FrameResources.SceneColor, FrameResources.LinearDepth, FrameResources.PresentedColor],
@@ -1742,6 +1801,7 @@ export const ForwardPlusModules = {
   SceneColorGrab: SceneColorGrabModule,
   LightPass: LightPassModule,
   SkyPass: SkyPassModule,
+  Underwater: UnderwaterModule,
   CompositeTail: CompositeTailModule
 } as const;
 
@@ -1760,6 +1820,7 @@ const DEFAULT_FORWARD_PLUS_MODULES: readonly RenderModule<FrameGraphContext>[] =
   SceneColorGrabModule,
   LightPassModule,
   SkyPassModule,
+  UnderwaterModule,
   CompositeTailModule
 ];
 
@@ -2431,7 +2492,11 @@ export function renderSkyScenePass(
     device.setViewport(null);
     device.setScissor(null);
     ctx.scene.env.sky.renderSky(ctx);
-    if (ctx.scene.env.sky.fogPresents) {
+    // Not while submerged: the medium between the eye and the scene is water,
+    // and the Underwater module composites it. The sky itself is still drawn -
+    // that pass then extinguishes it along with everything else at the far
+    // plane, which is what makes the horizon read as water rather than as air.
+    if (ctx.scene.env.sky.fogPresents && !ctx.underwater) {
       // Snapshot between sky and fog. Sky belongs in the copy - a ray that hits
       // the sky should read the sky - while fog does not, because the fog a
       // screen-space pass would sample lies along the camera ray rather than the
@@ -2526,8 +2591,18 @@ export function executeForwardPlusGraph(ctx: DrawContext): void {
   try {
     renderQueue = _scenePass.cullScene(ctx, ctx.camera);
 
+    // Before the options are derived, because being submerged changes them: the
+    // atmosphere is not the medium the camera is looking through, so its fog is
+    // suppressed for the frame.
+    ctx.underwater = selectUnderwaterSource(ctx);
+
     const options = deriveForwardPlusOptions(ctx.scene, ctx.camera, device.type, renderQueue);
     options.ssgi &&= supportsSSGIRenderTargets(ctx);
+    // Atmospheric fog describes a column of air, which is not what a submerged
+    // camera is looking through. The Underwater module owns the medium instead.
+    // Clearing the flag here also stops SkyPass reserving a fog-free snapshot
+    // for a frame that composites no fog.
+    options.fogPresents &&= !ctx.underwater;
     ctx.SSS = options.sss;
 
     historyManager = ctx.camera.getHistoryResourceManager();

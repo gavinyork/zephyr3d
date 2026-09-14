@@ -21,6 +21,7 @@ import type { MeshMaterial } from '../material';
 import type { GlobalBindGroupAllocator } from './globalbindgroup_allocator';
 import type { OIT } from './oit';
 import type { WaterCausticUniforms } from './water_caustics';
+import type { UnderwaterState } from './underwater';
 
 /**
  * Picking result target container.
@@ -107,6 +108,15 @@ export interface DrawContext {
   waterCausticHeightTexture?: Nullable<Texture2D>;
   /** Parameters describing the projection of {@link DrawContext.waterCausticTexture}. */
   waterCausticUniforms?: Nullable<WaterCausticUniforms>;
+  /**
+   * The body of water the camera is inside this frame, or null when it is above
+   * all of them.
+   *
+   * Resolved once per frame before the graph is built, because it gates work as
+   * early as the light pass: atmospheric fog is suppressed while submerged, the
+   * medium being water rather than air.
+   */
+  underwater: Nullable<UnderwaterState>;
   /** The scene currently being drawn. */
   readonly scene: Scene;
   /** The render pass to which this drawing task belongs. */

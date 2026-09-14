@@ -732,6 +732,102 @@ export function getWaterClass(manager: ResourceManager): SerializableClass {
           }
         },
         {
+          name: 'UnderwaterEnabled',
+          description:
+            'Whether a camera inside this water sees it from the inside: the medium over the whole scene, the sky replaced by water, and the surface read from below with its Snell window. Atmospheric fog is suppressed while submerged.',
+          type: 'bool',
+          default: true,
+          get(this: Water, value) {
+            value.bool[0] = this.underwaterEnabled;
+          },
+          set(this: Water, value) {
+            this.underwaterEnabled = value.bool[0];
+          }
+        },
+        {
+          name: 'UnderwaterAmbientIntensity',
+          description:
+            'Scale on the downwelling sky light filling the water column. This is what the water fades to in the distance, so it sets how bright the underwater haze reads.',
+          type: 'float',
+          default: 1,
+          options: { animatable: true, minValue: 0, maxValue: 5 },
+          isHidden(this: Water) {
+            return !this.underwaterEnabled;
+          },
+          get(this: Water, value) {
+            value.num[0] = this.underwaterAmbientIntensity;
+          },
+          set(this: Water, value) {
+            this.underwaterAmbientIntensity = value.num[0];
+          }
+        },
+        {
+          name: 'UnderwaterGodRays',
+          description:
+            'Whether shafts of sunlight are marched through the water column. Reads the caustic map as the surface transmittance, so the shafts carry the pattern that lands on the sea bed; needs CausticsEnabled.',
+          type: 'bool',
+          default: true,
+          isHidden(this: Water) {
+            return !this.underwaterEnabled;
+          },
+          get(this: Water, value) {
+            value.bool[0] = this.underwaterGodRays;
+          },
+          set(this: Water, value) {
+            this.underwaterGodRays = value.bool[0];
+          }
+        },
+        {
+          name: 'UnderwaterGodRayIntensity',
+          description: 'Strength of the light shafts, 1 for the value the medium implies',
+          type: 'float',
+          default: 1,
+          options: { animatable: true, minValue: 0, maxValue: 5 },
+          isHidden(this: Water) {
+            return !this.underwaterEnabled || !this.underwaterGodRays;
+          },
+          get(this: Water, value) {
+            value.num[0] = this.underwaterGodRayIntensity;
+          },
+          set(this: Water, value) {
+            this.underwaterGodRayIntensity = value.num[0];
+          }
+        },
+        {
+          name: 'UnderwaterGodRaySteps',
+          description:
+            'Samples taken along each view ray for the light shafts. Raise it when the shafts read as grain rather than as beams.',
+          type: 'int',
+          default: 24,
+          options: { minValue: 4, maxValue: 96 },
+          isHidden(this: Water) {
+            return !this.underwaterEnabled || !this.underwaterGodRays;
+          },
+          get(this: Water, value) {
+            value.num[0] = this.underwaterGodRaySteps;
+          },
+          set(this: Water, value) {
+            this.underwaterGodRaySteps = value.num[0];
+          }
+        },
+        {
+          name: 'UnderwaterHysteresis',
+          description:
+            'Half-width in meters of the dead band around the surface the submerged test uses, so a camera at water level does not flip state every frame',
+          type: 'float',
+          default: 0.05,
+          options: { minValue: 0, maxValue: 2 },
+          isHidden(this: Water) {
+            return !this.underwaterEnabled;
+          },
+          get(this: Water, value) {
+            value.num[0] = this.underwaterHysteresis;
+          },
+          set(this: Water, value) {
+            this.underwaterHysteresis = value.num[0];
+          }
+        },
+        {
           name: 'MediumMode',
           description:
             'How the water medium attenuates light: physical coefficients, or the legacy ramp textures',

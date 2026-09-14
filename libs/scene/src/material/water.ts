@@ -17,17 +17,15 @@ import { fetchSampler } from '../utility/misc';
 import { mixinLight } from './mixins/lit';
 import { distributionGGX, fresnelSchlick, visGGX } from '../shaders/pbr';
 import { interleavedGradientNoise, valueNoise } from '../shaders/noise';
+import { waterScatterPhase } from '../shaders/water_medium';
 import { getDevice } from '../app/api';
 
 /**
  * How the water medium converts a path length into transmittance and in-scattering.
  *
  * - `physical`: Beer-Lambert with authored absorption/scattering coefficients in 1/m.
- *   The same coefficients drive the caustic transmittance, so surface shading and
- *   underwater caustics agree by construction.
- * - `ramp`: the legacy artist-authored ramp textures indexed by `depth * depthMulti`.
- *   Kept as an override for scenes tuned against it; caustics still use the physical
- *   coefficients, so the two can disagree in this mode.
+ * - `ramp`: artist-authored ramp textures indexed by `depth * depthMulti`. Caustics
+ *   still use the physical coefficients, so the two can disagree in this mode.
  *
  * @public
  */
@@ -37,19 +35,12 @@ export type WaterMediumMode = 'physical' | 'ramp';
  * How the refracted view sample is located.
  *
  * - `march`: walk the refracted ray against the scene depth buffer and sample at
- *   the first crossing. Correct in the ways that matter visually - the offset
- *   tracks the object behind the water rather than sliding across its
- *   silhouette, and something poking through the surface is not bent - at the
- *   cost of {@link REFRACT_MARCH_STEPS} depth fetches per water pixel.
+ *   the first crossing, at the cost of {@link REFRACT_MARCH_STEPS} depth fetches
+ *   per water pixel.
  * - `offset`: displace the screen UV by the refraction of the wave normal alone,
- *   with no search. One projection and no depth fetches. The sample no longer
- *   lands where the ray actually goes, so what is seen through the water is
- *   displaced by roughly the right amount in roughly the right direction but is
- *   not the right point; a submerged object's edge smears rather than staying
- *   put, and the medium tint is walked over the straight-line distance rather
- *   than the refracted path.
+ *   with no search. Much cheaper, but the sample does not land where the ray
+ *   actually goes and the medium tint uses the straight-line distance.
  *
- * This is the knob to reach for on a device that cannot afford the march at all.
  * The two agree on calm water viewed from above and diverge with wave steepness
  * and view angle.
  *
@@ -59,23 +50,18 @@ export type WaterRefractionMode = 'march' | 'offset';
 
 /**
  * Debug view of the water shading, replacing the final colour with one of its
- * intermediate terms so a broken one can be picked out by eye.
+ * intermediate terms.
  *
  * - `none`: normal shading.
  * - `normal`: wave normal, remapped to [0,1].
  * - `diffuseNormal`: the normal the diffuse terms use, remapped to [0,1].
- * - `viewFacing`: dot(wave normal, towards the eye), as grey. This is the term
- *   Fresnel and the body weight turn on; 0.5 is a face square to the eye.
- * - `frontFacing`: white where the rasterised triangle faces the eye. The wave
- *   displacement folds the surface, and the mesh is drawn with no culling, so a
- *   folded crest can be seen from behind - black here is the underside.
- * - `foam`: foam coverage after the amount/falloff ramp, as grey. Both sources -
- *   the folded crests and the shoreline - as the shading sees them.
- * - `shoreFoam`: the shoreline contribution to it on its own, as grey.
- * - `waterDepth`: what that band is keyed on - the distance from the surface to
- *   the nearest solid around it - in metres / 10, as grey. Over a bed that is
- *   the depth of water; against a piling or a hull it is the horizontal distance
- *   to its side. A band in the wrong place is wrong here first.
+ * - `viewFacing`: dot(wave normal, towards the eye), as grey.
+ * - `frontFacing`: white where the rasterised triangle faces the eye, black on
+ *   the underside of a folded crest.
+ * - `foam`: foam coverage after the amount/falloff ramp, as grey. Both sources.
+ * - `shoreFoam`: the shoreline contribution on its own, as grey.
+ * - `waterDepth`: distance from the surface to the nearest solid around it, in
+ *   metres / 10, as grey.
  * - `fresnel`: reflection weight after foam suppression, as grey.
  * - `reflection`: what the surface reflects (SSR blended over the sky).
  * - `refraction`: the scene sample behind the water, before the medium tint.
@@ -85,8 +71,7 @@ export type WaterRefractionMode = 'march' | 'offset';
  * - `sunPhase`: the scattering phase function of it, as grey.
  * - `sunIntegral`: the depth integral of it, as grey (1 is optically thick).
  * - `sunNoL`: the diffuse incidence the sun's terms are weighted by, as grey.
- * - `shadow`: the shadow factor the directional lights are attenuated by, as
- *   grey. Shared by every direct term, so black here darkens them together.
+ * - `shadow`: the shadow factor the directional lights are attenuated by.
  * - `subsurface`: the backlit-crest translucency term.
  * - `specular`: the specular lobe from the lights.
  * - `depth`: refracted path length through the medium, metres / 10.
@@ -94,8 +79,8 @@ export type WaterRefractionMode = 'march' | 'offset';
  *   no offset is mid grey.
  * - `nan`: red where the final colour or the normal is NaN/inf, black elsewhere.
  *
- * A compile-time feature: each value is a separate shader variant, and the
- * `none` variant carries no trace of the others.
+ * Each value is a separate shader variant; the `none` variant carries no trace
+ * of the others.
  *
  * @public
  */
@@ -157,11 +142,8 @@ const WATER_F0 = 0.02;
 const WATER_BASE_ROUGHNESS = 0.04;
 /**
  * Specular roughness once the distance fade has flattened the waves away.
- *
- * The fade suppresses wave slope that used to break the sun's highlight into
- * glitter. Left at the sharp near-field roughness the remaining mirror aliases
- * badly; widening the lobe by the same amount the slope was cut turns it back
- * into a stable band.
+ * Widened by the same amount the slope was cut, so the remaining mirror does
+ * not alias.
  */
 const WATER_DISTANT_ROUGHNESS = 0.35;
 /** Index of refraction of water. Matches the caustics pass. */
@@ -172,26 +154,16 @@ const AIR_TO_WATER_ETA = 1 / WATER_IOR;
 const WATER_TO_AIR_ETA = WATER_IOR;
 /**
  * Cap on the refracted path length, as a multiple of the straight-line distance
- * to what is behind the water.
- *
- * A guard rather than physics: the refracted ray only reaches a given depth if
- * it travels away from the camera, and a nearly tangent one - a steep wave face
- * seen from the side - approaches that limit and would produce an enormous step.
- * Above water Snell bounds the true ratio near 1.5, so this leaves headroom.
+ * to what is behind the water. A guard against nearly tangent rays; Snell bounds
+ * the true ratio near 1.5 above water, so this leaves headroom.
  */
 const REFRACT_MAX_PATH_RATIO = 4;
 /**
  * Number of steps the refracted-ray march takes over {@link REFRACT_MAX_PATH_RATIO}.
  *
- * Each step reads the depth buffer at the projected ray position and compares it
- * against the ray's own depth, so the number of steps is what sets how finely a
- * scene discontinuity - a submerged box's far edge against the bed - is caught.
- * The two-probe solve this replaced jumped straight to a guessed path length and
- * could land either side of such an edge, so adjacent water pixels snapped
- * between the box and what is behind it, which reads as a tear across the box.
- * Fixed count keeps the shader uniform (an unbounded bisection would diverge
- * between backends): 24 steps resolve a crest-to-bed exchange to well under a
- * water pixel at typical camera distances.
+ * Sets how finely a scene discontinuity is caught. Fixed count keeps the shader
+ * uniform across backends; 24 steps resolve a crest-to-bed exchange to well
+ * under a water pixel at typical camera distances.
  */
 const REFRACT_MARCH_STEPS = 24;
 /** Depth tolerance, in meters, for the march to treat a step as a hit. */
@@ -199,47 +171,33 @@ const REFRACT_MARCH_THICKNESS = 0.05;
 /**
  * Fraction of the far plane an infinite water surface is pulled in to.
  *
- * Vertices past the far plane are moved along their own view ray to this
- * multiple of it, which leaves their screen position untouched and their depth
- * inside the frustum. Short of 1 so the result is never the vertex the hardware
- * clips, and never lands on the cleared depth value - which
- * `ShaderHelper.isFarthestDepth` tests for by equality and would read as sky.
+ * Short of 1 so the result is never the vertex the hardware clips, and never
+ * lands on the cleared depth value that `ShaderHelper.isFarthestDepth` tests for
+ * by equality.
  */
 const INFINITE_DEPTH_PULLIN = 0.99;
 /**
  * Minimum reflection-direction y a water surface samples the sky bake with.
  *
- * The bake's lower hemisphere is deliberately near-black - it is what lies
- * below the ground, not what a flat water surface reflects - and a grazing eye
- * reflects the sky exactly at the boundary between the two. Flooring the
- * reflection y keeps the degenerate, almost-horizontal directions on the bright
- * upper side of that seam instead of reading the dark terminator. Re-normalised
- * after the floor, so what changes is only the direction of the few pixels near
- * the horizon; everything already pointing up keeps its natural reflection.
+ * The bake's lower hemisphere is near-black, so grazing reflections would read
+ * the dark terminator. Re-normalised after the floor, so only the few pixels
+ * near the horizon change.
  */
 const HORIZON_REFLECT_BIAS = 0.08;
 /**
  * Width in UV of the band the refraction offset fades out over at the screen
- * border.
- *
- * Off-screen there is no scene colour to refract, and a clamped sample smears
- * the border pixel across the water; sliding back to the unrefracted sample over
- * a band keeps that continuous instead of banding at the edge.
+ * border. Off-screen there is no scene colour to refract, and a clamped sample
+ * smears the border pixel across the water.
  */
 const REFRACT_EDGE_FADE = 0.06;
 /**
  * Normalized linear depth at or above which what is behind the water is taken to
- * be the sky.
- *
- * Sky is left at the cleared far value, so a depth this close to 1 means the
- * sample is not a surface at all and the refraction can skip its march - there
- * is nothing to refract towards.
+ * be the sky, and the refraction can skip its march.
  */
 const SCENE_SKY_DEPTH01 = 0.999;
 /**
  * How far the surface normal bends the transmitted direction in the subsurface
- * term. Zero would make the glow a pure "looking at the sun through the water"
- * term with no shape to it; this is what lets the wave itself modulate it.
+ * term. This is what lets the wave itself modulate the glow.
  */
 const SSS_DISTORTION = 0.25;
 /** Falloff of the subsurface lobe. Higher keeps the glow closer to the sun. */
@@ -247,81 +205,44 @@ const SSS_POWER = 4;
 /**
  * Mean cosine of one scattering event in the water body.
  *
- * Real sea water is strongly forward-scattering - measurements put it near 0.9 -
- * but at that value almost nothing comes back towards a camera looking down at
- * the water, which is the common case. The default gives up some of that peak
- * for a term that reads from above; the multiple-scattering blend in
- * {@link WaterMaterial.waterSunScattering} restores the isotropy a turbid
- * medium genuinely has, so the two together stay closer to the truth than a
- * single lobe of either width.
+ * Real sea water measures near 0.9, but at that value almost nothing comes back
+ * towards a camera looking down at the water. The default gives up some of that
+ * peak for a term that reads from above; the multiple-scattering blend in
+ * {@link WaterMaterial.waterSunScattering} restores the isotropy.
  */
 export const DEFAULT_SCATTER_ANISOTROPY = 0.7;
 /**
- * Share of the scattering that is molecular rather than particulate.
- *
- * Sets how much light comes back towards a camera looking down at the water: the
- * particulate lobe is forward-peaked and returns almost nothing into the
- * backward hemisphere, so this fraction is what the term is made of in the
- * commonest camera setup there is. Measured sea water puts molecular scattering
- * at a few percent of the total, but the number that matters here is its share
- * of the *backscatter*, where it dominates - at the default anisotropy it
- * supplies about nine tenths of what returns at 180 degrees.
- *
- * Not exposed: it trades one lobe against the other, which is what
- * {@link WaterMaterial.scatterAnisotropy} already does in a way an author can
- * reason about.
- */
-const MOLECULAR_SCATTER_FRACTION = 0.12;
-/**
  * Floor on how fast the refracted sun ray descends, used by the in-scattering
- * integral.
- *
- * The integral divides the view path by how fast the sun's path to the same
- * point deepens, and a sun on the horizon lights the column along an unbounded
- * path - which single scattering cannot represent at all. Clamping caps the term
- * instead of letting it diverge.
- *
- * Well below the elevation the caustics pass gives up at, deliberately: this
- * only has to keep the arithmetic finite, and Snell already refracts a grazing
- * sun to about 41 degrees below the surface, so the clamp is unreachable for any
- * sun actually above the horizon.
+ * integral, so a sun on the horizon cannot make the term diverge. Snell refracts
+ * even a grazing sun to about 41 degrees below the surface, so it is unreachable
+ * for any sun actually above the horizon.
  */
 const MIN_SUN_SLOPE = 0.05;
 /**
  * Blur per meter of path that even a non-scattering medium produces, in mip
- * widths.
- *
- * The refracted image is gathered over the footprint a surface texel spans, and
- * the wave normal varies across that footprint, so the background is slightly
- * defocused by the geometry alone. Small: it keeps clear water from looking
- * unnaturally crisp at depth without turning it into frosted glass.
+ * widths. The wave normal varies across a texel's footprint, so the background
+ * is slightly defocused by the geometry alone.
  */
 const REFRACT_BLUR_GEOMETRIC = 0.02;
 /**
- * How strongly the scattering coefficient drives the refraction blur.
- *
- * Maps a scattering coefficient in 1/m onto mip widths per meter. Sized so the
- * turbid end of plausible water - sigma_s near 0.4, the backlit scene's medium -
- * reaches the top of the mip chain over a few meters, while the clear end stays
- * essentially sharp.
+ * How strongly the scattering coefficient drives the refraction blur, mapping
+ * 1/m onto mip widths per meter. Sized so sigma_s near 0.4 reaches the top of
+ * the mip chain over a few meters while clear water stays sharp.
  */
 const REFRACT_BLUR_DENSITY = 1.5;
 /**
  * Cap on the refraction blur LOD.
  *
- * The scene colour copy carries a full chain down to 1x1, and the coarsest few
- * levels average across the whole screen: past this the sample stops being
- * "what is behind the water" and becomes the average of the frame, which reads
- * as the water glowing rather than clouding. Six levels is a 64x footprint,
- * already far wider than any real forward-scattering kernel.
+ * Past this the sample stops being "what is behind the water" and becomes the
+ * average of the frame. Six levels is a 64x footprint, already far wider than
+ * any real forward-scattering kernel.
  */
 export const REFRACT_BLUR_MAX_LOD = 6;
 /**
  * Share of the shoreline ramp the foam pattern is allowed to eat into.
  *
- * The pattern raises the threshold the ramp has to clear rather than scaling the
- * result: scaling dims the whole band towards grey, a raised threshold breaks its
- * outer edge into clumps. Below 1 so the foam at the contact line survives it.
+ * The pattern raises the threshold the ramp has to clear, which breaks its outer
+ * edge into clumps. Below 1 so the foam at the contact line survives it.
  */
 const SHORE_FOAM_NOISE_BITE = 0.6;
 /** World-space drift of the foam pattern, m/s. Off-axis so it has no grain. */
@@ -331,37 +252,27 @@ const SHORE_FOAM_DRIFT_Z = -0.07;
 /** Frequency ratio between octaves. Not 2, which would align the lattices. */
 const SHORE_FOAM_OCTAVE_RATIO = 2.17;
 /**
- * Weight of each foam pattern octave, coarsest first.
- *
- * Three octaves span about five times in feature size, so one authored clump
- * size serves both a shoreline metres across and a collar a handspan wide -
- * whichever octave matches the band's width does the breaking up.
+ * Weight of each foam pattern octave, coarsest first. Three octaves span about
+ * five times in feature size, so one authored clump size serves both a wide
+ * shoreline and a narrow collar.
  */
 const SHORE_FOAM_OCTAVE_WEIGHTS = [0.5, 0.3, 0.2];
 /**
- * Width of the band's gradient, as a fraction of the distance it reaches.
- *
- * Runs inward from the reach, so 1 fades across the whole band and 0 makes it a
- * hard-edged slab. The pattern can only break up what is still in the gradient,
- * so a saturated core is a core that cannot be broken up.
+ * Width of the band's gradient, as a fraction of the distance it reaches,
+ * running inward from the reach. 1 fades across the whole band, 0 makes it a
+ * hard-edged slab. The pattern can only break up what is still in the gradient.
  */
 const SHORE_FOAM_EDGE_SOFTNESS = 0.85;
 /**
- * Hi-Z cells the proximity query's window spreads over its radius.
- *
- * Sets the pyramid level: higher picks a finer one, which locates surfaces more
- * precisely but stops covering the whole footprint, and geometry in the
- * uncovered corners is missed entirely.
+ * Hi-Z cells the proximity query's window spreads over its radius, which sets
+ * the pyramid level. Higher locates surfaces more precisely but stops covering
+ * the whole footprint, and geometry in the uncovered corners is missed.
  */
 const SHORE_QUERY_TAP_SPREAD = 1.5;
 /**
- * Softness of the proximity query's minimum, as a fraction of its radius.
- *
- * A hard minimum leaves the band in cell-shaped squares - it takes an extreme,
- * so one cell decides the answer and the answer steps whenever that cell
- * changes. The trade is bias: where cells of comparable distance pile up the
- * soft minimum reads slightly longer than the nearest of them, so the band sits
- * a little tighter than the authored reach.
+ * Softness of the proximity query's minimum, as a fraction of its radius. A hard
+ * minimum leaves the band in cell-shaped squares; the trade is that the band
+ * sits a little tighter than the authored reach.
  */
 const SHORE_QUERY_SOFTMIN = 0.25;
 /**
@@ -373,13 +284,9 @@ const SHORE_QUERY_MISS_REACH = 2;
 /** Advance of the dither's hash input per frame, for TAA to average over. */
 const SHORE_QUERY_DITHER_STRIDE = 5.588238;
 /**
- * How thick a cell's frustum block may be, in multiples of its own width.
- *
- * A cell spanning an object's edge has its far face on the background, possibly
- * at the far plane; unclamped, the block stretches down the view ray and grows
- * foam on water far behind the object. A cell lying on one surface is thinner
- * than this anyway - a cell width of depth over a cell width of screen is a 45
- * degree tilt.
+ * How thick a cell's frustum block may be, in multiples of its own width. A cell
+ * spanning an object's edge would otherwise stretch down the view ray and grow
+ * foam on water far behind the object.
  */
 const SHORE_QUERY_CELL_DEPTH_SPAN = 2;
 
@@ -415,13 +322,8 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
    * Per-bind-group wave uniform sync, keyed by the bind group object.
    *
    * The material owns one bind group per pass/render-variant hash, so a water
-   * surface drawn for two different cameras - or for both the main view and a
-   * reflection/planar capture - touches two distinct bind groups. A single
-   * `_waveVersion` on the material could not represent that: the first group
-   * wrote the wave uniforms and set the version, and the second group then saw
-   * the version as already current and skipped the upload, leaving it with the
-   * default (flat) wave data. Tracking the version per bind group makes each
-   * group upload exactly once per wave generator version instead.
+   * surface drawn for two different cameras touches two distinct bind groups
+   * and each must upload once per wave generator version.
    */
   private _waveVersionByBindGroup: WeakMap<BindGroup, number>;
   private readonly _clipmapInfo: Vector4;
@@ -452,6 +354,12 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
   private _causticsPhotonResolution: number;
   private _causticsBlurPasses: number;
   private _causticsTemporalStrength: number;
+  private _underwaterEnabled: boolean;
+  private _underwaterAmbientIntensity: number;
+  private _underwaterGodRays: boolean;
+  private _underwaterGodRayIntensity: number;
+  private _underwaterGodRaySteps: number;
+  private _underwaterHysteresis: number;
   private _subsurfaceIntensity: number;
   private _subsurfaceSteepness: number;
   private readonly _subsurfaceParams: Vector4;
@@ -476,8 +384,8 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
   constructor() {
     super();
     this._region = new Vector4(-99999, -99999, 99999, 99999);
-    // Defaults are fitted to the legacy absorption ramp at depthMulti = 0.1, so
-    // switching the medium to physical does not change the out-of-box look much.
+    // Fitted to the legacy absorption ramp at depthMulti = 0.1, so switching the
+    // medium to physical does not change the out-of-box look much.
     this._absorption = new Vector3(1.0, 0.25, 0.15);
     this._scattering = new Vector3(0.05, 0.12, 0.18);
     this._extinction = new Vector3();
@@ -508,55 +416,57 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
     this._causticsPhotonResolution = 0;
     this._causticsBlurPasses = 2;
     this._causticsTemporalStrength = 0.85;
+    this._underwaterEnabled = true;
+    this._underwaterAmbientIntensity = 1;
+    this._underwaterGodRays = true;
+    this._underwaterGodRayIntensity = 1;
+    this._underwaterGodRaySteps = 24;
+    // A few centimetres. Wide enough that floating-point noise on the camera
+    // height cannot flip the state, narrow enough that the transition still
+    // happens where the eye expects it.
+    this._underwaterHysteresis = 0.05;
     // Sized so a fully lit crest contributes about as much as the ambient
-    // scattering term already does, rather than to a picked-by-eye number. That
-    // term is albedo * irradiance / PI, and this one is albedo * sunEnergy *
-    // intensity at thickness 1, so an intensity near 1 puts the two on the same
-    // footing for a sun and sky of comparable strength.
+    // scattering term already does.
     this._subsurfaceIntensity = 1.5;
-    // Chosen against the backlit scene: at 4 the wave flanks carry the glow
-    // and the troughs stay dark, while 20 turns the whole sea into a lamp.
+    // At 4 the wave flanks carry the glow and the troughs stay dark; 20 turns
+    // the whole sea into a lamp.
     this._subsurfaceSteepness = 4;
     this._subsurfaceParams = new Vector4();
-    // Physical by default: the integral is derived, not fitted, so 1 is the
-    // value the medium coefficients already imply.
+    // The integral is derived, not fitted, so 1 is what the medium coefficients
+    // already imply.
     this._sunScatteringIntensity = 1;
     this._scatterAnisotropy = DEFAULT_SCATTER_ANISOTROPY;
     this._sunScatterParams = new Vector4();
     this._refractionBlur = 1;
-    // A shallow-pool depth. Small enough that the offset stays plausible on the
-    // thin water the cheap mode is most likely to be used for, and small enough
-    // that it cannot reach across a large object's silhouette.
+    // A shallow-pool depth: the offset stays plausible on thin water and cannot
+    // reach across a large object's silhouette.
     this._cheapRefractionDepth = 1;
     // Coverage from the generator is a folded-surface measure, not an area
     // fraction; these map it onto one. The falloff above 1 keeps light folding
-    // - the shoulder of a wave about to break - from reading as foam.
+    // from reading as foam.
     this._foamAmount = 1;
     this._foamFalloff = 1.5;
     // Slightly off-white and slightly blue: sea foam is water and air, and a
     // pure white one reads as snow.
     this._foamColor = new Vector3(0.92, 0.95, 0.97);
     this._foamParams = new Vector4();
-    // Off by default. The shoreline estimate reads the depth buffer, so unlike
-    // the crest foam it is not a property of the waves but of what happens to be
-    // behind the surface, and a body of water that was authored without it would
-    // otherwise grow a white rim wherever the bed comes close - including around
-    // every submerged object, which is a look an author has to ask for.
+    // Off by default. The shoreline estimate is a property of whatever happens
+    // to be behind the surface, so it would grow a white rim around every
+    // submerged object in a scene authored without it.
     this._shoreFoamAmount = 0;
-    // A waterline band of a foot or two. Deep enough that a wave passing over a
-    // gently shelving bed moves the band by a visible amount, shallow enough that
-    // it stays a band and not a white lagoon.
+    // A waterline band of a foot or two: a wave over a gently shelving bed moves
+    // it visibly, but it stays a band and not a white lagoon.
     this._shoreFoamDepth = 0.5;
     // Above 1, so coverage falls off towards the outer edge rather than filling
-    // the whole band - the same reason the crest foam's falloff sits above 1.
+    // the whole band.
     this._shoreFoamFalloff = 1.5;
     // A couple of clumps across the band's width, whatever that width is.
     this._shoreFoamScale = 2.5;
     // Half the band's depth, so the waterline visibly advances and retreats
     // without the band ever closing completely.
     this._shoreFoamWashAmount = 0.5;
-    // One wash every eight seconds or so. Sea swell is slower than wind waves,
-    // and the band is what a set of waves does, not what one wave does.
+    // One wash every eight seconds or so - the band is what a set of waves does,
+    // not what one wave does.
     this._shoreFoamWashSpeed = 0.12;
     // Wash phase decorrelates over ~30 m, so a long shoreline breaks in sections
     // instead of pulsing as one.
@@ -595,9 +505,8 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
   set waveGenerator(waveGenerator: Nullable<WaveGenerator>) {
     if (this._waveGenerator.get() !== waveGenerator) {
       this._waveGenerator.set(waveGenerator);
-      // Reset every target: the bind groups are pooled and reused across
-      // frames, so an old entry for this group must not suppress the upload for
-      // a new generator.
+      // Bind groups are pooled and reused across frames, so an old entry must
+      // not suppress the upload for a new generator.
       this._waveVersionByBindGroup = new WeakMap();
       this.optionChanged(true);
     }
@@ -639,15 +548,9 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
   /**
    * How the refracted view sample is located. Defaults to `march`.
    *
-   * `offset` trades correctness for cost: it drops the depth-buffer search
-   * entirely, which is {@link REFRACT_MARCH_STEPS} texture fetches per water
-   * pixel, and displaces the screen UV by the wave normal instead. Set it on
-   * hardware that cannot afford the search - the water still refracts, it just
-   * refracts to the wrong place.
-   *
-   * A compile-time feature rather than a uniform, so the cheap variant contains
-   * no trace of the march: the loop, its fetches and the projection matrices it
-   * needs are all absent from the emitted shader.
+   * Set `offset` on hardware that cannot afford the depth-buffer search - the
+   * water still refracts, it just refracts to the wrong place. A compile-time
+   * feature, so the cheap variant carries no trace of the march.
    */
   get refractionMode(): WaterRefractionMode {
     return this.featureUsed<WaterRefractionMode>(WaterMaterial.FEATURE_REFRACTION_MODE) ?? 'march';
@@ -671,17 +574,11 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
   }
   /**
    * Whether the surface reads as unbounded, reaching the horizon rather than
-   * ending at {@link region}.
+   * ending at {@link region}. Off by default.
    *
-   * Two things change. The region test that discards fragments outside the
-   * rectangle is not emitted at all, so the surface has no edge; and the
-   * clipmap's outermost ring is treated as a horizon skirt, its outer vertices
-   * pushed far past the camera's far plane with their clip-space depth pinned
-   * to the far value so they survive clipping. That second part is what lets an
-   * ocean meet the sky under a far plane sized for the near scene.
-   *
-   * Off by default: a pond, a lake or a pool has an edge, and drawing one to
-   * the horizon would be wrong as well as wasteful.
+   * The region test is not emitted at all, so the surface has no edge, and the
+   * clipmap's outermost ring becomes a horizon skirt that survives clipping past
+   * the camera's far plane. Use it for an ocean, not for a pond or a pool.
    */
   get infinite(): boolean {
     return this.featureUsed<boolean>(WaterMaterial.FEATURE_INFINITE) ?? false;
@@ -749,6 +646,78 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
     return this._scatterAlbedo;
   }
   /**
+   * Whether a camera inside this body of water sees the water from the inside:
+   * the medium applied to the whole scene, the sky replaced by water, and the
+   * surface read from below.
+   *
+   * The medium coefficients are the ones the surface already uses
+   * ({@link WaterMaterial.absorption}, {@link WaterMaterial.scattering} and
+   * their scales), so the volume and the surface never disagree.
+   */
+  get underwaterEnabled() {
+    return this._underwaterEnabled;
+  }
+  set underwaterEnabled(val: boolean) {
+    this._underwaterEnabled = !!val;
+  }
+  /**
+   * Scale on the downwelling sky radiance that lights the water column from
+   * inside, 1 for the value the sky implies.
+   *
+   * This is what the water fades to in the distance, so it is also what decides
+   * how bright the underwater "fog" reads.
+   */
+  get underwaterAmbientIntensity() {
+    return this._underwaterAmbientIntensity;
+  }
+  set underwaterAmbientIntensity(val: number) {
+    this._underwaterAmbientIntensity = Math.max(0, val);
+  }
+  /**
+   * Whether shafts of sunlight are marched through the water column.
+   *
+   * Reads the caustic map as the surface's transmittance, so the shafts carry
+   * the same focusing pattern that lands on the sea bed. Switches itself off
+   * wherever the caustic map is unavailable - WebGL1, no shadow-casting
+   * directional light, or a sun too close to the horizon.
+   */
+  get underwaterGodRays() {
+    return this._underwaterGodRays;
+  }
+  set underwaterGodRays(val: boolean) {
+    this._underwaterGodRays = !!val;
+  }
+  /** Strength of the light shafts, 1 for the value the medium implies. */
+  get underwaterGodRayIntensity() {
+    return this._underwaterGodRayIntensity;
+  }
+  set underwaterGodRayIntensity(val: number) {
+    this._underwaterGodRayIntensity = Math.max(0, val);
+  }
+  /**
+   * Samples taken along each view ray for the light shafts.
+   *
+   * The march is dithered, so a low count reads as noise rather than as banding;
+   * below about 8 the noise stops resolving into shafts at all.
+   */
+  get underwaterGodRaySteps() {
+    return this._underwaterGodRaySteps;
+  }
+  set underwaterGodRaySteps(val: number) {
+    this._underwaterGodRaySteps = Math.max(1, Math.floor(val));
+  }
+  /**
+   * Half-width in meters of the dead band around the surface the submerged test
+   * uses, so a camera sitting exactly at water level does not flip state every
+   * frame. The test is against the rest plane, not the displaced surface.
+   */
+  get underwaterHysteresis() {
+    return this._underwaterHysteresis;
+  }
+  set underwaterHysteresis(val: number) {
+    this._underwaterHysteresis = Math.max(0, val);
+  }
+  /**
    * Whether this water projects caustics onto the geometry below it.
    *
    * Requires a shadow-casting directional light and a non-WebGL1 device; the
@@ -770,9 +739,9 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
   /**
    * Depth in meters below the surface where the caustics are in focus.
    *
-   * Photons are splatted onto a horizontal plane at this depth. Receivers away
-   * from it are progressively defocused rather than displaced, so set this near
-   * the depth of the sea bed that should show the sharpest pattern.
+   * Receivers away from this depth are progressively defocused rather than
+   * displaced, so set it near the depth of the sea bed that should show the
+   * sharpest pattern.
    */
   get causticsDepth() {
     return this._causticsDepth;
@@ -784,9 +753,8 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
    * Furthest distance in meters from the camera the caustic map reaches.
    *
    * A cap rather than a fixed extent: the map is fitted to the part of the water
-   * within this distance, so water smaller than it spends the whole map on the
-   * water instead of on empty margin. Raise it to light more of the scene, at
-   * the cost of resolution wherever the water is large enough to fill it.
+   * within this distance. Raise it to light more of the scene, at the cost of
+   * resolution wherever the water is large enough to fill it.
    */
   get causticsRange() {
     return this._causticsRange;
@@ -798,14 +766,9 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
    * Width in meters of the band the pattern fades out over at the edge of the
    * map, or 0 to derive it from {@link causticsRange}.
    *
-   * The map covers a bounded area and the pattern has to reach the neutral 1.0
-   * outside it. Fading over a fixed fraction of the map ties that band to the
-   * range, which collapses it to almost nothing once the range is small - and a
-   * narrow band is exactly where the boundary starts reading as a hard line
-   * across the sea bed. Auto keeps the fraction but puts a floor under it in
-   * meters.
-   *
-   * Capped at 90% of the range, so a core of the map always survives.
+   * Too narrow a band makes the map boundary read as a hard line across the sea
+   * bed. Auto scales with the range but puts a floor under it in meters. Capped
+   * at 90% of the range, so a core of the map always survives.
    */
   get causticsFadeDistance() {
     return this._causticsFadeDistance;
@@ -817,17 +780,14 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
    * Whether photons land on the scene instead of on a plane at
    * {@link causticsDepth}.
    *
-   * The plane is a single depth for the whole map, so a receiver that is not at
-   * that depth reads a pattern displaced sideways by the difference times the
-   * tangent of the refracted angle - invisible under a high sun, badly wrong
-   * under a low one, and wrong everywhere on a sea bed with relief. Resolving
-   * the real depth reuses the sun's shadow cascade, so it costs no extra
-   * geometry pass, and falls back to the plane wherever that cascade has
-   * nothing to say.
+   * On by default. The plane displaces the pattern sideways on any receiver not
+   * at that depth, which is badly wrong under a low sun and on a sea bed with
+   * relief. Resolving the real depth reuses the sun's shadow cascade, so it
+   * costs no extra geometry pass, and falls back to the plane wherever that
+   * cascade has nothing to say.
    *
    * {@link causticsDepth} still sets where the iteration starts and what the
-   * defocus is measured against, so it stays worth setting to the depth most of
-   * the receiving geometry sits at.
+   * defocus is measured against.
    */
   get causticsSceneDepth() {
     return this._causticsSceneDepth;
@@ -839,17 +799,13 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
    * How strongly caustic map texels are concentrated near the camera, 0 to
    * spread them evenly.
    *
-   * The map covers a fixed footprint, so a {@link causticsRange} large enough to
-   * light the scene is already too coarse to resolve a caustic cell anywhere in
-   * it. This spends the far edge of the map, which the defocus and the edge fade
-   * are attenuating anyway, on the part near the camera: texel density is
-   * `1 + causticsWarp` times uniform at the centre and `1 / (1 + causticsWarp)`
-   * times it at the border.
+   * Texel density is `1 + causticsWarp` times uniform at the centre and
+   * `1 / (1 + causticsWarp)` times it at the border. Raise it when a
+   * {@link causticsRange} large enough to light the scene is too coarse to
+   * resolve a caustic cell.
    *
    * Ignored while the map already fits the water within range, which is the case
-   * a bounded pool inside {@link causticsRange} always lands in. There the fit
-   * has spent the whole map on water the camera can see, and concentrating it
-   * further would only blur the far side of the pool.
+   * a bounded pool inside {@link causticsRange} always lands in.
    */
   get causticsWarp() {
     return this._causticsWarp;
@@ -874,14 +830,9 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
   /**
    * Edge length of the photon grid, or 0 to size it from the map.
    *
-   * A fixed grid is the wrong shape of knob, because the density that actually
-   * governs quality is photons per map texel, and the grid only covers the part
-   * of the map the water casts into. The same 512 grid measured 7.5 photons per
-   * texel over a small pool and 0.84 over open water - within 2% of a converged
-   * map in the first case and 9% off it in the second. Auto solves for the
-   * density instead, which spends the budget where the error is.
-   *
-   * Set a value to pin the grid explicitly; the cost is the square of it.
+   * Auto solves for photons per map texel, which is the density that governs
+   * quality; a fixed grid over-spends on a small pool and under-spends on open
+   * water. Set a value to pin the grid explicitly; the cost is the square of it.
    */
   get causticsPhotonResolution() {
     return this._causticsPhotonResolution;
@@ -891,10 +842,8 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
     this._causticsPhotonResolution = n <= 0 ? 0 : Math.max(16, Math.min(4096, n));
   }
   /**
-   * Number of 2x2 blur iterations applied to the accumulated map.
-   *
-   * Rounded up to an even count: the blur ping-pongs between the map and a
-   * scratch target, and only an even number of passes ends back in the map.
+   * Number of 2x2 blur iterations applied to the accumulated map. Rounded up to
+   * an even count.
    */
   get causticsBlurPasses() {
     return this._causticsBlurPasses;
@@ -907,18 +856,11 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
    * Weight the previous frame's caustic map keeps in the current one, 0 to
    * disable.
    *
-   * The photon grid is a regular lattice, so as the waves move the photons slide
-   * across texel boundaries and the map scintillates: a still frame looks fine
-   * and a moving one crawls. Reprojecting the last map and blending it in
-   * averages that away, in effect multiplying the photon count without paying
-   * for the photons.
-   *
-   * The pattern itself is animated, so the blend cannot simply be long. The
-   * resolve clamps the reprojected value to the range its own 3x3 neighbourhood
-   * covers, which lets still regions accumulate over many frames while regions
-   * the waves have moved on from fall back to the current frame. Raising this
-   * past the default buys diminishing stability and starts to smear the
-   * animation in the regions the clamp does not catch.
+   * Averages away the scintillation a moving photon lattice produces, in effect
+   * multiplying the photon count for free. The resolve clamps the reprojected
+   * value to its own 3x3 neighbourhood, so still regions accumulate while moving
+   * ones fall back to the current frame. Raising this past the default buys
+   * diminishing stability and starts to smear the animation.
    */
   get causticsTemporalStrength() {
     return this._causticsTemporalStrength;
@@ -927,13 +869,12 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
     this._causticsTemporalStrength = Math.max(0, Math.min(0.95, val));
   }
   /**
-   * Strength of the sunlight scattered forward through a wave crest.
+   * Strength of the sunlight scattered forward through a wave crest, 0 to
+   * disable.
    *
-   * This is the term that makes a backlit crest glow. It is authored rather than
-   * derived because the geometric thickness of a crest is far too small to
-   * scatter a visible amount on its own; the medium's albedo still supplies the
-   * colour, so raising this brightens the glow without shifting its hue. Set to
-   * 0 to disable.
+   * This is the term that makes a backlit crest glow. Authored rather than
+   * derived; the medium's albedo supplies the colour, so raising this brightens
+   * the glow without shifting its hue.
    */
   get subsurfaceIntensity() {
     return this._subsurfaceIntensity;
@@ -950,8 +891,7 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
    * The glow is scaled by `(1 - normal.y) * subsurfaceSteepness`, clamped to 1,
    * so this is the reciprocal of the tilt at which it saturates. Unitless, and
    * larger than it looks like it should be: an ocean surface is nearly flat in
-   * these terms, with even a wind-driven flank only a few hundredths off
-   * vertical.
+   * these terms.
    */
   get subsurfaceSteepness() {
     return this._subsurfaceSteepness;
@@ -966,16 +906,11 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
    * Strength of the sunlight scattered out of the water column towards the eye,
    * 1 for the value the medium coefficients imply. 0 disables the term.
    *
-   * This is what gives the water body a direction-dependent colour: it is
-   * evaluated per light, so a shadow falling on the water darkens the water
-   * itself rather than only its specular, and a low sun tints the column the
-   * way it tints everything else. Without it the body is lit by the environment
-   * irradiance alone, which has no direction and cannot produce either.
-   *
-   * Unlike {@link subsurfaceIntensity} this is not an authored magnitude. The
-   * integral below it is closed-form single scattering through the same medium
-   * the absorption uses, so 1 is the physical answer and anything else is a
-   * deliberate exaggeration.
+   * This is what gives the water body a direction-dependent colour: a shadow
+   * falling on the water darkens the water itself, and a low sun tints the
+   * column. Unlike {@link subsurfaceIntensity} this is not an authored
+   * magnitude - 1 is the physical answer and anything else is a deliberate
+   * exaggeration.
    */
   get sunScatteringIntensity() {
     return this._sunScatteringIntensity;
@@ -991,16 +926,10 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
    * Depth in meters the cheap refraction mode assumes the water is, in
    * {@link refractionMode} `offset`. Ignored by `march`.
    *
-   * The cheap mode has no idea how far away what it is looking at is - finding
-   * that out is the search it exists to skip - so it steps this far along the
-   * refracted direction instead. It sets how strong the distortion looks: raise
-   * it for water that should read as deep, lower it for a shallow film.
-   *
-   * Deliberately not the measured distance to the scene. That distance jumps
-   * across a submerged object's silhouette, and an offset proportional to it
-   * makes the pixels beyond the outline reach back onto the object and paint a
-   * second copy of it. A constant cannot do that, at the price of shallow and
-   * deep water distorting equally.
+   * Sets how strong the distortion looks: raise it for water that should read as
+   * deep, lower it for a shallow film. A constant rather than the measured scene
+   * distance, which would double every submerged object across its silhouette;
+   * the price is that shallow and deep water distort equally.
    */
   get cheapRefractionDepth() {
     return this._cheapRefractionDepth;
@@ -1014,16 +943,11 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
   }
   /**
    * Scale on how much the medium blurs what is seen through it. 0 keeps the
-   * background perfectly sharp at any depth.
+   * background perfectly sharp at any depth, 1 is what the medium implies.
    *
-   * Scattering deflects the transmitted ray a little at every event, so the
-   * image reaching the surface is blurred by an amount that grows with the
-   * optical depth of the column. The width is derived from the scattering
-   * coefficient and the path length, so this is a stylisation knob rather than
-   * the magnitude itself: 1 is what the medium implies.
-   *
-   * Costs nothing on its own - it selects a mip of the refraction background
-   * that is generated regardless.
+   * The width is derived from the scattering coefficient and the path length, so
+   * this is a stylisation knob rather than the magnitude itself. Costs nothing -
+   * it selects a mip of a chain that is generated regardless.
    */
   get refractionBlur() {
     return this._refractionBlur;
@@ -1040,10 +964,9 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
    *
    * 0 scatters equally in all directions; higher values push light forward, so
    * the water brightens when looking towards the sun through it and darkens
-   * when looking away. Sea water measures near 0.9, but the term this feeds
-   * blends towards isotropic as the column gets optically thick - which is what
-   * multiple scattering does - so the visible anisotropy is always less than
-   * this number alone suggests.
+   * when looking away. The term blends towards isotropic as the column gets
+   * optically thick, so the visible anisotropy is always less than this number
+   * alone suggests.
    */
   get scatterAnisotropy() {
     return this._scatterAnisotropy;
@@ -1056,11 +979,8 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
     }
   }
   /**
-   * How much of a folded texel reads as foam.
-   *
-   * The wave generator reports where the surface has folded over on itself,
-   * which is a measure of the fold rather than of area; this scales it into a
-   * coverage fraction. 0 disables foam.
+   * How much of a folded texel reads as foam, 0 to disable. Scales the wave
+   * generator's fold measure into a coverage fraction.
    */
   get foamAmount() {
     return this._foamAmount;
@@ -1072,10 +992,8 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
     }
   }
   /**
-   * Falloff applied to foam coverage before it is scaled.
-   *
-   * Above 1 this pushes light folding towards no foam at all, so only a crest
-   * that has genuinely broken shows any - which is what keeps a windy sea from
+   * Falloff applied to foam coverage before it is scaled. Above 1 only a crest
+   * that has genuinely broken shows any foam, which keeps a windy sea from
    * turning uniformly white.
    */
   get foamFalloff() {
@@ -1100,11 +1018,9 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
   /**
    * Coverage of the foam that collects where the water meets a surface, 0 to disable.
    *
-   * A second, independent foam source. The crest foam comes from the wave
-   * generator folding the surface, which happens out at sea; this one is keyed
-   * on how far the surface is from the nearest solid around it, so it is the
-   * depth of water over a bed and the horizontal distance to a hull or a piling,
-   * without needing to be told which it is looking at. One band covers both the
+   * A second foam source independent of the crest foam, keyed on how far the
+   * surface is from the nearest solid around it - the depth of water over a bed,
+   * the horizontal distance to a hull or a piling. One band covers both the
    * shoreline and the contact line around anything standing in the water.
    *
    * Estimated in screen space, with the limits that implies: geometry that is
@@ -1121,10 +1037,9 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
   set shoreFoamAmount(val: number) {
     const clamped = Math.max(0, val);
     if (clamped !== this._shoreFoamAmount) {
-      // A compile-time feature, so a surface that does not ask for it carries
-      // none of the arithmetic and none of its uniforms: crossing zero rebuilds
-      // the shader, changing the value either side of it does not. Forced off on
-      // WebGL1, which has no Hi-Z pyramid for the query to read.
+      // A compile-time feature, so crossing zero rebuilds the shader while
+      // changing the value either side of it does not. Forced off on WebGL1,
+      // which has no Hi-Z pyramid for the query to read.
       const wasEnabled = this._shoreFoamAmount > 0;
       this._shoreFoamAmount = clamped;
       if (wasEnabled !== clamped > 0) {
@@ -1156,11 +1071,9 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
     }
   }
   /**
-   * Falloff applied across the band before it is scaled.
-   *
-   * Above 1 the coverage is pushed towards the near end, which keeps the outer
-   * edge of the band thin and broken instead of letting it wash evenly over the
-   * whole range.
+   * Falloff applied across the band before it is scaled. Above 1 the coverage is
+   * pushed towards the near end, keeping the outer edge thin and broken instead
+   * of washing evenly over the whole range.
    */
   get shoreFoamFalloff() {
     return this._shoreFoamFalloff;
@@ -1175,12 +1088,9 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
   /**
    * Size of the clumps the band's edge breaks into, as cycles across the band.
    *
-   * Relative to {@link shoreFoamDepth} rather than an absolute frequency,
-   * because the two things this band covers differ in scale by an order of
-   * magnitude - a shoreline is metres across, a collar around a piling is a
-   * handspan - and a value in cycles per metre that breaks up one is a
-   * featureless wash or a fine sizzle on the other. Tied to the width, one
-   * setting serves both, and widening the band widens its clumps with it.
+   * Relative to {@link shoreFoamDepth} rather than an absolute frequency, so one
+   * setting serves both a shoreline metres across and a collar around a piling,
+   * and widening the band widens its clumps with it.
    *
    * Evaluated in world space, so the pattern stays put as the camera moves.
    */
@@ -1198,11 +1108,9 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
    * How far the band's edge runs back and forth, as a fraction of
    * {@link shoreFoamDepth}.
    *
-   * This is what makes the band read as surf rather than as a painted rim: the
-   * distance the band reaches out to is modulated over time, so the foam advances
-   * up the bed and drains back down it. 0 leaves a static band. Above 1 the band
-   * closes completely at the bottom of the cycle, which looks like the foam
-   * blinking out rather than retreating.
+   * This is what makes the band read as surf rather than as a painted rim. 0
+   * leaves a static band. Above 1 the band closes completely at the bottom of
+   * the cycle, which looks like the foam blinking out rather than retreating.
    */
   get shoreFoamWashAmount() {
     return this._shoreFoamWashAmount;
@@ -1230,7 +1138,7 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
    *
    * Decorrelates the wash along the shore: at 0 the entire waterline advances
    * and retreats in lockstep, which reads as the water level itself rising and
-   * falling, while a cycle every few tens of meters breaks a long shoreline into
+   * falling; a cycle every few tens of meters breaks a long shoreline into
    * sections that run up out of step with one another.
    */
   get shoreFoamWashScale() {
@@ -1251,10 +1159,8 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
    * Whether this shader build can run the band: the feature is on *and* the
    * pyramid it queries is bound for this pass.
    *
-   * The second half is not redundant - a pass outside the main graph, a
-   * reflection or a capture, can shade water with no Hi-Z pass having run for
-   * it, and compiling a fetch against an unbound texture is a build failure
-   * rather than a missing effect.
+   * A pass outside the main graph can shade water with no Hi-Z pass having run
+   * for it, and compiling a fetch against an unbound texture is a build failure.
    * @internal
    */
   private _shoreFoamAvailable(scope: PBInsideFunctionScope | PBFunctionScope) {
@@ -1268,7 +1174,7 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
       this._absorption.z * this._absorptionScale + this._scattering.z * this._scatteringScale
     );
     // A channel with no interaction at all transmits fully and scatters nothing;
-    // the albedo of such a channel is arbitrary, so pick 0 rather than divide.
+    // its albedo is arbitrary, so pick 0 rather than divide.
     this._scatterAlbedo.setXYZ(
       this._extinction.x > 0 ? (this._scattering.x * this._scatteringScale) / this._extinction.x : 0,
       this._extinction.y > 0 ? (this._scattering.y * this._scatteringScale) / this._extinction.y : 0,
@@ -1287,15 +1193,11 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
   /**
    * Artistic scale on the refracted view offset. 1 is physical, 0 disables it.
    *
-   * The offset itself is derived: the view ray is refracted at the surface by
-   * Snell's law, walked to whatever is behind the water, and the hit point is
-   * projected back to the screen. That already accounts for the incidence angle,
-   * the depth of the receiver and the perspective foreshortening, so this exists
-   * only to dial the result back for a stylised look - not to make it correct.
-   *
-   * Values above 1 exaggerate; the surface stays continuous, but the sample can
-   * wander far enough from the true hit point that the medium tint stops
-   * matching what is visible through it.
+   * The offset is already derived from Snell's law and accounts for the
+   * incidence angle, the receiver depth and the perspective foreshortening, so
+   * this exists only to dial the result back for a stylised look. Values above 1
+   * exaggerate; the surface stays continuous, but the sample can wander far
+   * enough that the medium tint stops matching what is visible through it.
    */
   get refractionScale() {
     return this._refractionScale;
@@ -1311,10 +1213,9 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
    * Scale on the Fresnel reflectance, 1 for the physical value.
    *
    * Below 1 the surface reflects less than it should and shows more of what is
-   * beneath it. Water reflects almost everything at a grazing angle, which is
-   * physically right but can bury a sea bed the shot is about; this is the knob
-   * that trades that reflection away. The F0 floor is scaled with it, so 0 gives
-   * a surface with no specular response at all.
+   * beneath it - useful when a physically correct grazing reflection buries a
+   * sea bed the shot is about. The F0 floor is scaled with it, so 0 gives a
+   * surface with no specular response at all.
    */
   get reflectionStrength() {
     return this._reflectionStrength;
@@ -1333,8 +1234,8 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
     return true;
   }
   /**
-   * The shoreline foam reads the Hi-Z pyramid's nearest-depth channel, so asking
-   * for it here is what turns that channel on. WebGL1 has no pyramid at all.
+   * The shoreline foam reads the Hi-Z pyramid's nearest-depth channel. WebGL1
+   * has no pyramid at all.
    */
   needHiZNearest() {
     return this._shoreFoamEnabled && getDevice().type !== 'webgl';
@@ -1375,16 +1276,11 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
   /**
    * {@inheritDoc IMixinLight.receivesWaterCaustics}
    *
-   * Always false. Caustics belong on whatever the water is above, not on the
-   * water: the submersion test compares a fragment's own height against the
-   * displaced surface height sampled on that fragment's sun ray, and unless the
-   * sun is exactly overhead those are two points on the surface a distance
-   * `depth / tan(elevation)` apart. Every water fragment therefore has some
-   * other part of the same surface up-sun of it, and wherever that part rides a
-   * crest while the fragment sits in a trough the fragment reads as submerged
-   * and gets the caustic pattern applied to it. The pattern peaks well above 1,
-   * so it shows up as bright blotches drifting across the surface with the
-   * waves.
+   * Always false. Caustics belong on whatever the water is above: the submersion
+   * test compares a fragment's height against the surface height sampled on its
+   * sun ray, so unless the sun is overhead every water fragment has some other
+   * part of the same surface up-sun of it and reads as submerged wherever that
+   * part rides a crest.
    */
   receivesWaterCaustics(): boolean {
     return false;
@@ -1433,16 +1329,15 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
     if (this.infinite) {
       const that = this;
       // The clipmap meshes all leave position.z at 0; the skirt ring sets it to
-      // 1 on its outer edge, which is the only geometry meant to leave the
-      // clipmap's footprint. Its inner edge is welded to the outermost tiles and
+      // 1 on its outer edge. Its inner edge is welded to the outermost tiles and
       // is displaced with them, so the join stays closed.
       scope.$l.skirt = pb.step(0.5, scope.$inputs.position.z);
       scope
         .$if(pb.greaterThan(scope.skirt, 0), function () {
-          // Radially outwards from the camera rather than outwards from the
-          // clipmap origin: the ring has to read as a horizon from where it is
-          // being looked at, and the clipmap is snapped to a grid the camera
-          // wanders within.
+          // Radially outwards from the camera rather than from the clipmap
+          // origin: the ring has to read as a horizon from where it is being
+          // looked at, and the clipmap is snapped to a grid the camera wanders
+          // within.
           this.$l.camXZ = ShaderHelper.getCameraPosition(this).xz;
           this.$l.outDir = pb.normalize(pb.sub(this.clipmapWorldPos.xz, this.camXZ));
           this.$l.outXZ = pb.add(this.camXZ, pb.mul(this.outDir, this.skirtDistance));
@@ -1474,25 +1369,14 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
     if (this.infinite) {
       // Pulled in along the view ray rather than depth-clamped.
       //
-      // The surface has to reach past the far plane - raising the camera pushes
-      // the horizon out with sqrt(2*R*h), so the tessellated water runs well
-      // beyond a far plane sized for the near scene - but the depth buffer
-      // cannot encode anything past it.
+      // The surface has to reach past the far plane, but the depth buffer cannot
+      // encode anything past it. A perspective projection is invariant under
+      // scaling about the eye, so moving a vertex along its own view ray leaves
+      // its screen position untouched while bringing its depth back inside the
+      // frustum - every vertex stays unclipped, so there is no seam to tear.
       //
-      // Clamping the clip-space z was the obvious answer and is wrong at the
-      // seam: a triangle straddling the far plane gets one vertex clamped and
-      // another not, and the pair no longer describes the surface between them.
-      // That tore a black line across the frame at exactly the far distance.
-      //
-      // A perspective projection is invariant under scaling about the eye, so
-      // moving a vertex along its own view ray leaves its screen position
-      // untouched while bringing its depth back inside the frustum. Every
-      // vertex stays unclamped and unclipped, so there is no seam to tear: the
-      // rasterised coverage is identical to the unbounded surface.
-      //
-      // Shading keeps the true world position - it is what the waves, the
-      // distance fade and the fog are all keyed on - so only the depth written
-      // is affected, and only past the far plane.
+      // Shading keeps the true world position, so only the written depth is
+      // affected, and only past the far plane.
       scope.$l.camPos = ShaderHelper.getCameraPosition(scope).xyz;
       scope.$l.viewVec = pb.sub(scope.$outputs.worldPos, scope.camPos);
       scope.$l.viewDist = pb.max(pb.length(scope.viewVec), 1e-6);
@@ -1543,13 +1427,12 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
       // (intensity, anisotropy, 0, 0)
       scope.sunScatterParams = pb.vec4().uniform(2);
       // Mip widths per meter of path the medium's scattering contributes to the
-      // refraction blur. Resolved on the CPU from the scattering coefficient,
-      // which is authored per channel while the blur is one LOD for all three.
+      // refraction blur. Resolved on the CPU from the per-channel scattering
+      // coefficient, since the blur is one LOD for all three.
       scope.refractBlurDensity = pb.float().uniform(2);
       // Declared in both medium modes: the ramp only replaces the depth-driven
-      // absorption and scattering, while the subsurface and sun-scattering
-      // terms need the medium's hue and thickness regardless of how those two
-      // are authored.
+      // absorption and scattering, while the subsurface and sun-scattering terms
+      // need the medium's hue and thickness regardless.
       scope.mediumAlbedo = pb.vec3().uniform(2);
       scope.mediumExtinction = pb.vec3().uniform(2);
       if (this.mediumMode === 'ramp') {
@@ -1558,8 +1441,7 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
         scope.absorptionRampTex = pb.tex2D().uniform(2);
       }
     }
-    // An unbounded surface has no edge to clip against, so the test is not
-    // emitted at all rather than fed a region large enough to always pass.
+    // An unbounded surface has no edge to clip against.
     if (!this.infinite) {
       scope.$l.discardable = pb.or(
         pb.any(pb.lessThan(scope.$inputs.worldPos.xz, scope.region.xy)),
@@ -1581,9 +1463,8 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
         // Flat and foamless across the horizon band. The skirt's world position
         // was never displaced, so evaluating waves from it would paint detail
         // the geometry does not have - and at kilometres per pixel that detail
-        // is under-sampled by orders of magnitude, which is exactly the crawling
-        // speckle the distance fade exists to avoid. The aerial perspective the
-        // screen-space fog pass applies is what should be visible here.
+        // is under-sampled into crawling speckle. The screen-space fog pass is
+        // what should be visible here.
         scope.normal = pb.mix(scope.normal, pb.vec4(0, 1, 0, 0), scope.$inputs.skirt);
       }
       scope.$l.outColor = pb.vec4(
@@ -1594,9 +1475,8 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
         this.drawContext.materialFlags &
         (MaterialVaryingFlags.SCENE_STORE_ROUGHNESS | MaterialVaryingFlags.SCENE_STORE_NORMAL)
       ) {
-        // The real roughness, not a constant 1. Anything reading this buffer to
-        // reflect the water - SSR on another surface - would otherwise treat a
-        // near-mirror sea as fully diffuse.
+        // The real roughness, not a constant 1, so SSR on another surface does
+        // not treat a near-mirror sea as fully diffuse.
         scope.$l.outRoughness = pb.vec4(pb.vec3(this.waterRoughness(scope, scope.$inputs.worldPos)), 0);
         this.outputFragmentColor(
           scope,
@@ -1616,9 +1496,8 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
    * Specular roughness of the surface at a world position.
    *
    * Distance fades the wave normals flat, and this hands that lost slope to the
-   * specular lobe instead of dropping it - a distant mirror aliases into
-   * crawling speckle. Shared with the scene roughness buffer so a surface
-   * reflecting the water sees the same value the water shades itself with.
+   * specular lobe instead of dropping it. Shared with the scene roughness buffer
+   * so a surface reflecting the water sees the same value.
    */
   waterRoughness(scope: PBInsideFunctionScope, worldPos: PBShaderExp) {
     const pb = scope.$builder;
@@ -1637,16 +1516,11 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
    * depth: at each step it projects the current point back to the screen, reads
    * the depth there, and stops at the first point where the ray has passed into
    * the geometry that pixel shows. The incidence angle, the depth of the receiver
-   * and the perspective foreshortening all fall out of that, where the previous
-   * form pushed the screen UV along the world normal and approximated each of
-   * them with a separate factor - which also rotated the whole pattern with the
-   * camera, because a world direction was being used as a screen offset.
+   * and the perspective foreshortening all fall out of that.
    *
-   * Independent of the engine's depth convention. The projection only ever reads
-   * `clip.xy / clip.w`, and reverse-Z rewrites nothing but the z row of the
-   * projection matrix; every depth comparison happens in view space, which the
-   * convention does not touch. The one convention-dependent step, decoding the
-   * depth texture, lives behind {@link ShaderHelper.sampleLinearDepth}.
+   * Independent of the engine's depth convention: the projection only ever reads
+   * `clip.xy / clip.w`, every depth comparison happens in view space, and
+   * decoding the depth texture lives behind {@link ShaderHelper.sampleLinearDepth}.
    *
    * @param scope - Current shader scope
    * @param worldPos - Surface point being shaded
@@ -1678,9 +1552,7 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
     // Only ever used as a difference of two such UVs, which is what makes the
     // offset independent of the conventions baked into that matrix: the TAA
     // jitter and the clip-space Y orientation cancel between the two ends. The
-    // 0.5/0.5 mapping is the inverse of the one
-    // ShaderHelper.samplePositionFromDepth unprojects with, so the forward and
-    // backward directions agree.
+    // 0.5/0.5 mapping is the inverse of ShaderHelper.samplePositionFromDepth's.
     pb.func('waterRefractProjectUV', [pb.vec3('worldPos')], function () {
       this.$l.h = pb.mul(ShaderHelper.getViewProjectionMatrix(this), pb.vec4(this.worldPos, 1));
       this.$return(pb.add(pb.mul(pb.div(this.h.xy, pb.max(this.h.w, 1e-6)), 0.5), pb.vec2(0.5)));
@@ -1696,8 +1568,7 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
           pb.mul(pb.sub(this.waterRefractProjectUV(this.hitPos), this.uvBase), this.scale)
         );
         // Off screen there is no scene colour to refract, and a clamped sample
-        // would smear one border pixel along the whole edge of the water. Fading
-        // the offset out over a band gets back to a legal sample continuously.
+        // would smear one border pixel along the whole edge of the water.
         this.$l.edge = pb.min(
           pb.min(this.uv.x, pb.sub(1, this.uv.x)),
           pb.min(this.uv.y, pb.sub(1, this.uv.y))
@@ -1710,14 +1581,11 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
     // Projects the point `t` meters along the refracted ray to the screen, reads
     // the depth there, and reports the signed gap between the ray and that pixel
     // along the view axis: positive means the ray is still in front of the scene,
-    // negative that it has passed through it. Nothing is decided here about a hit
-    // - the march applies the thickness-band test, which is what lets a surface
-    // sticking out of the water fall through instead of being sampled.
+    // negative that it has passed through it. The hit test itself belongs to the
+    // march.
     //
-    // Declared only in `march` mode. This and `waterRefractMarch` are the whole
-    // cost the cheap mode exists to avoid, so the emitted shader must not carry
-    // them at all - a dead function still forces the depth texture and the
-    // projection matrices into the bind group.
+    // Declared only in `march` mode: a dead function still forces the depth
+    // texture and the projection matrices into the bind group.
     if (march) {
       pb.func(
         'waterRefractStep',
@@ -1743,33 +1611,23 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
             this.uv,
             0
           );
-          // View-space z of whatever that pixel shows. Normalized linear depth means
-          // the same thing under either depth convention - only the mapping from
-          // device depth to it flips - and the comparison below is in view space,
-          // which reverse-Z does not touch.
+          // View-space z of whatever that pixel shows. The comparison below is in
+          // view space, which the depth convention does not touch.
           this.$l.sceneViewZ = pb.mul(pb.neg(this.linearDepth), this.cameraFar);
-          // Ray depth minus scene depth. The march decides a hit by whether this
-          // gap has fallen inside a band around zero - the ray is neither still in
-          // front of the surface nor already out the other side. Sky sits at the far
-          // plane, so over empty water the gap stays large and positive and the
-          // march simply runs on.
+          // Ray depth minus scene depth. Sky sits at the far plane, so over empty
+          // water the gap stays large and positive and the march simply runs on.
           this.$return(pb.vec3(this.uv, pb.sub(this.rayViewZ, this.sceneViewZ)));
         }
       );
       // March the refracted ray and take the first crossing with the depth buffer.
       //
-      // Advances `t` along the refracted ray in fixed steps and, at each step,
-      // reads the scene depth where the ray projects and compares it against the
-      // ray's own depth. A hit is a step that lands inside a thickness band around
-      // the surface - the ray is neither clearly in front of the scene nor already
-      // out the far side. That two-sided test is what lets something poking out of
-      // the water fall through: its depth is *nearest* the camera, so the gap is
-      // negative from the first step and never enters the band, instead of being
-      // read as a crossing the way a one-sided clamp did. Stopping at the *first*
-      // hit keeps a submerged object solid - a later one belongs to whatever is
-      // behind it, and reading that is exactly how the lower half of a box used to
-      // vanish. Fixed count keeps the shader uniform (an unbounded bisection would
-      // diverge between backends).
+      // A hit is a step that lands inside a thickness band around the surface -
+      // the ray is neither clearly in front of the scene nor already out the far
+      // side. That two-sided test is what lets something poking out of the water
+      // fall through: its depth is *nearest* the camera, so the gap is negative
+      // from the first step and never enters the band. Stopping at the *first*
+      // hit keeps a submerged object solid; a later one belongs to whatever is
+      // behind it.
       pb.func(
         'waterRefractMarch',
         [
@@ -1817,14 +1675,11 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
                 this.$break();
               }
             ).$else(function () {
-              // Still in front of the scene, or already past it. Either way keep the
-              // step and note the gap so the band can be interpolated precisely.
               this.tPrev = this.t;
               this.gapPrev = this.gap;
             });
           });
-          // No hit on any step - the ray left the water onto the sky, or the capped
-          // path never reached the scene - leaves the straight-through sample at the
+          // No hit on any step leaves the straight-through sample at the
           // straight-line path, which is what a ray over empty water should show.
           this.$return(pb.vec3(this.hitUV, this.hitPath));
         }
@@ -1845,52 +1700,40 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
       function () {
         // Both faces are handled: looking down at the water the ray enters the
         // medium, looking up from inside it the ray leaves. The surface is drawn
-        // with cullMode 'none', so either can reach here, and the wave normal
-        // always points up. Facing it back towards the eye is what lets one
-        // refract call serve both, and the ratio has to be picked to match -
-        // without the flip, a wave face steeper than the view ray bends the wrong
-        // way, which is the grazing-angle case that reads as the surface tearing.
-        // The same distinction as waterShading's: a wave normal flipped back
-        // towards the eye cannot tell an underside from an eye below the
-        // surface, and the fold makes the two disagree.
+        // with cullMode 'none' and the wave normal always points up, so the
+        // normal is faced back towards the eye and the ratio picked to match.
+        // Taken from `frontFacing`, since a flipped wave normal cannot tell an
+        // underside from an eye below the surface.
         this.$l.underwater = pb.not(this.$builtins.frontFacing);
         this.$l.faceNormal = this.$choice(this.underwater, pb.neg(this.normal), this.normal);
         this.$l.eta = this.$choice(this.underwater, pb.float(WATER_TO_AIR_ETA), pb.float(AIR_TO_WATER_ETA));
-        // The unrefracted hit. This is the view line through the surface to
-        // whatever is behind it, and it carries the dominant displacement in the
-        // refracted direction below - it is what keeps the sample tracking the
-        // object rather than wandering across a silhouette.
+        // The unrefracted hit: the view line through the surface to whatever is
+        // behind it, which is what keeps the sample tracking the object rather
+        // than wandering across a silhouette.
         this.$l.uvBase = this.waterRefractProjectUV(this.worldPos);
-        // If what is behind the water is the sky (depth at the far plane), there
-        // is no surface to refract - the ray would march for the whole capped
-        // path and land on nothing. Unrefracted sky is the correct sample, so
-        // short-circuit before reconstructing a far-plane point and marching.
+        // Sky behind the water (depth at the far plane) has no surface to refract
+        // towards, so the unrefracted sample is the correct one.
         this.$if(pb.greaterThanEqual(this.straightDepth01, SCENE_SKY_DEPTH01), function () {
           this.$return(pb.vec3(this.screenUV, this.straightDist));
         });
         this.$l.waterCrossDir = pb.normalize(pb.sub(this.straightWorldPos, this.worldPos));
         // Refract the view ray twice - once through the wave normal, once through
-        // a flat surface of the same facing - and use only the difference.
-        // Subtracting the flat refraction discards the bulk bending a purely-
-        // refracted ray would add, which is what made the sample overshoot across
-        // object edges; adding the view-line direction re-anchors it to what is
-        // actually behind the water. The result is the view line plus a wave-
-        // normal perturbation, so on calm water the sample stays put and only the
-        // wave tilt moves it. The flat normal carries the same facing flip as the
-        // wave one so the two cancel exactly on calm water from either side.
+        // a flat surface of the same facing - and use only the difference, added
+        // to the view line. The result is the view line plus a wave-normal
+        // perturbation, so on calm water the sample stays put and only the wave
+        // tilt moves it. The flat normal carries the same facing flip as the wave
+        // one so the two cancel exactly on calm water from either side.
         this.$l.refractWave = pb.refract(this.eyeVecNorm, this.faceNormal, this.eta);
         this.$l.refractFlatNormal = pb.vec3(0, pb.sign(this.faceNormal.y), 0);
         this.$l.refractFlat = pb.refract(this.eyeVecNorm, this.refractFlatNormal, this.eta);
         // Total internal reflection - only reachable from under the surface -
-        // leaves refract returning zero. The perturbation then vanishes and the
-        // ray degenerates to the view line, which is the fallback it had before.
+        // leaves refract returning zero, so degenerate to the view line.
         this.$l.refractDir = pb.add(this.waterCrossDir, pb.sub(this.refractWave, this.refractFlat));
         this.$if(pb.lessThan(pb.length(pb.sub(this.refractWave, this.refractFlat)), 1e-4), function () {
           this.refractDir = this.waterCrossDir;
         });
-        // A degenerate view line (a pitch-black edge or a self-difference) would
-        // push the direction below and give a wrong sample; clamp it to stay on
-        // the line if the difference vanished.
+        // A degenerate view line would push the direction below; clamp it to stay
+        // on the line if the difference vanished.
         this.$if(pb.lessThan(pb.dot(this.refractDir, this.refractDir), 1e-6), function () {
           this.refractDir = this.waterCrossDir;
         });
@@ -1899,29 +1742,15 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
         this.$l.refractPath = this.straightDist;
         if (!march) {
           // Cheap mode: step a fixed distance along the refracted direction and
-          // sample where that projects, with no search.
-          //
-          // Everything above is shared, which is what makes this a usable
-          // approximation rather than a guess: `refractDir` is the view line plus
-          // a wave-normal perturbation, so with no waves this lands on the point
-          // behind the surface and the wave tilt is what moves it away.
+          // sample where that projects, with no search. `refractDir` is the view
+          // line plus a wave-normal perturbation, so with no waves this lands on
+          // the point behind the surface.
           //
           // The step length is a *fixed* depth scale, deliberately not the
-          // distance to what is behind the water. Scaling the offset by that
-          // distance is the physically sensible thing and it is what this first
-          // did, but it doubles every submerged object: the distance jumps across
-          // an object's silhouette, so the pixels just outside it carry the much
-          // larger offset belonging to the floor behind, and that offset is big
-          // enough to land back on the object. Its colour then appears a second
-          // time, outside its own outline, while the object's own pixels barely
-          // move - two copies of one thing. The march never had this because it
-          // finds the real intersection, so its sample and the surface it shows
-          // agree by construction.
-          //
-          // What a fixed scale gives up is that shallow and deep water refract
-          // by the same amount. That is a wrong magnitude; a ghost is a wrong
-          // *topology*, and one object appearing twice reads as broken in a way
-          // that a slightly-too-strong offset never does.
+          // distance to what is behind the water: that distance jumps across an
+          // object's silhouette, and the larger offset outside the outline lands
+          // back on the object and paints a second copy of it. The price is that
+          // shallow and deep water refract by the same amount.
           //
           // The edge fade inside waterRefractUV still applies, so the sample
           // cannot walk off screen.
@@ -1939,13 +1768,6 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
           // the refracted path to a sane multiple of itself.
           this.$l.refractStepZ = pb.min(this.refractDirView.z, -1e-4);
           this.$l.maxPath = pb.mul(this.straightDist, REFRACT_MAX_PATH_RATIO);
-          // March the refracted ray until it meets the scene, then sample there.
-          // Walking the ray in fixed steps and keeping the first depth crossing is
-          // what stops the sample from jumping across a scene discontinuity (a box
-          // edge against the bed), which the two-probe solve did: it guessed at a
-          // path length, read the depth where the guess landed, and re-solved from
-          // that - so a guess a few pixels off the object's silhouette snapped to
-          // whatever was behind it, tearing the refraction across the object.
           this.$l.marchResult = this.waterRefractMarch(
             this.worldPos,
             this.refractDir,
@@ -1960,9 +1782,7 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
           this.refractUV = this.marchResult.xy;
           this.refractPath = pb.clamp(this.marchResult.z, 0, this.maxPath);
           // Something sticking out of the water may occlude the refracted sample
-          // even though the march kept going: the hit point can read the object's
-          // own depth where it pokes through, which is exactly the "object above
-          // the waterline looks bent" artifact. Reconstruct the scene point at the
+          // even though the march kept going. Reconstruct the scene point at the
           // refracted UV and, if it sits above the surface, drop back to the
           // straight-through sample rather than refracting the object.
           this.$l.sceneHit = ShaderHelper.samplePositionFromDepth(
@@ -2015,23 +1835,18 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
    *   = albedo * p * E * (1 - exp(-sigma_t * (1 + r) * d)) / (1 + r)
    * ```
    *
-   * `sigma_t` cancels out of everything but the exponent, which is what leaves
-   * the result finite for an unbounded column: looking straight down at deep
-   * water under an overhead sun gives `albedo * p * E / 2`, the textbook value.
+   * `sigma_t` cancels out of everything but the exponent, which leaves the
+   * result finite for an unbounded column: looking straight down at deep water
+   * under an overhead sun gives `albedo * p * E / 2`, the textbook value.
    *
-   * `E` is the sun's irradiance perpendicular to its own beam, which is what
-   * the light loop already carries - there is no `NoL` here, because the
-   * geometry the cosine would describe is already in `r`. Both directions are
-   * refracted through a flat surface first: Snell steepens the sun's descent,
-   * and using the above-water slope would overstate how much water the light
-   * crossed.
+   * `E` is the sun's irradiance perpendicular to its own beam; there is no `NoL`
+   * here, because the geometry the cosine would describe is already in `r`. Both
+   * directions are refracted through a flat surface first.
    *
    * Only the entry Fresnel is applied here. The exit transmission is common to
    * every term leaving the medium and is applied once by the caller.
    *
-   * Assumes the eye is above the surface; the caller gates on that. Seen from
-   * below, the column between eye and surface is not the one `depth` measures,
-   * and the geometry has to be rederived.
+   * Assumes the eye is above the surface; the caller gates on that.
    *
    * @param scope - Current shader scope.
    * @param lightEnergy - Sun irradiance perpendicular to the beam, after shadowing.
@@ -2051,41 +1866,6 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
     foam: PBShaderExp
   ) {
     const pb = scope.$builder;
-    // Phase function of the water body: a molecular lobe and a particulate one.
-    //
-    // Two lobes rather than one because they answer different questions and the
-    // common camera setup only ever asks the first. Looking down at water under
-    // a high sun, the light has to turn almost completely around to reach the
-    // eye, and a forward-scattering particulate lobe returns essentially nothing
-    // there - HG(0.7) gives 0.009/sr against an isotropic 0.080. Yet water
-    // plainly looks blue from above, and it does so because of molecular
-    // scattering, which is near-symmetric and hands back as much as it sends on.
-    // With the particulate lobe alone this whole term is invisible from above
-    // and only appears at grazing angles, which is not what it is modelling.
-    //
-    // Rayleigh carries the wavelength dependence - the 1/lambda^4 that makes
-    // clean water blue - but the medium's own albedo already carries a colour
-    // the author chose, so the split here is achromatic and only the shape
-    // differs. Weighted the way measured sea water divides: molecular scattering
-    // is a small share of the total but dominates the backward hemisphere.
-    //
-    // Both lobes are normalized to integrate to 1 over the sphere; the 1/4pi is
-    // part of that, and dropping it would make the term 4pi too bright.
-    pb.func('waterScatterPhase', [pb.float('cosTheta'), pb.float('g')], function () {
-      // Henyey-Greenstein: the particulate lobe, forward-peaked at g > 0.
-      this.$l.g2 = pb.mul(this.g, this.g);
-      this.$l.denom = pb.add(1, this.g2, pb.mul(-2, this.g, this.cosTheta));
-      this.$l.mie = pb.div(pb.sub(1, this.g2), pb.mul(4 * Math.PI, pb.pow(pb.max(this.denom, 1e-4), 1.5)));
-      // Rayleigh: symmetric about 90 degrees, so it returns light towards the
-      // eye as readily as it passes it on. 3/(16 pi) * (1 + cos^2).
-      this.$l.rayleigh = pb.mul(3 / (16 * Math.PI), pb.add(1, pb.mul(this.cosTheta, this.cosTheta)));
-      this.$return(
-        pb.add(
-          pb.mul(this.rayleigh, MOLECULAR_SCATTER_FRACTION),
-          pb.mul(this.mie, 1 - MOLECULAR_SCATTER_FRACTION)
-        )
-      );
-    });
     pb.func(
       'waterSunScattering',
       [
@@ -2104,7 +1884,7 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
         this.$l.Vw = pb.refract(this.eyeVecNorm, this.up, AIR_TO_WATER_ETA);
         // How fast each descends. The sun is floored rather than allowed to
         // reach zero: a sun on the horizon lights the column over an unbounded
-        // path, which single scattering cannot represent, so cap it instead.
+        // path, which single scattering cannot represent.
         this.$l.sy = pb.max(pb.neg(this.Lw.y), MIN_SUN_SLOPE);
         this.$l.vy = pb.max(pb.neg(this.Vw.y), 1e-3);
         this.$l.r = pb.div(this.vy, this.sy);
@@ -2112,13 +1892,12 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
         // Angle between the sun's travel and the direction the light has to
         // leave in to reach the eye, which is back along the view ray.
         this.$l.cosTheta = pb.neg(pb.dot(this.Lw, this.Vw));
-        this.$l.hg = this.waterScatterPhase(this.cosTheta, this.sunScatterParams.y);
-        // Multiple scattering washes the lobe out. An optically thin column
-        // keeps the single-event anisotropy; a thick one has scattered the light
-        // enough times that the direction it entered by no longer matters, and
-        // an isotropic phase is the right end state. Weighted on luminance and
-        // shared across channels, because the phase itself does not depend on
-        // wavelength - only how far the light got does.
+        this.$l.hg = waterScatterPhase(this, this.cosTheta, this.sunScatterParams.y);
+        // Multiple scattering washes the lobe out: an optically thick column has
+        // scattered the light enough times that the direction it entered by no
+        // longer matters. Weighted on luminance and shared across channels,
+        // because the phase does not depend on wavelength - only how far the
+        // light got does.
         this.$l.lumWeights = pb.vec3(0.2126, 0.7152, 0.0722);
         this.$l.extLum = pb.dot(this.mediumExtinction, this.lumWeights);
         this.$l.albedoLum = pb.dot(this.mediumAlbedo, this.lumWeights);
@@ -2138,18 +1917,12 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
         // also what keeps the term off a backlit crest - at NoL <= 0 no light
         // enters the top face at all, and the subsurface term owns that case.
         this.$l.entry = pb.sub(1, pb.add(WATER_F0, pb.mul(1 - WATER_F0, pb.pow(pb.sub(1, this.NoL), 5))));
-        // The entry share above is the flat-interface Fresnel one, and it goes
-        // to zero at grazing incidence: a mirror reflects the whole sun rather
-        // than passing it. That is right for the smooth water between the folds
-        // and wrong for a fold, which is not a mirror but a mass of bubbles - a
-        // strongly scattering layer. Blended towards full transmission by the
-        // foam coverage, so a breaking crest lights its own column instead of
-        // going dark exactly where it breaks. Weighted, not replaced: a thin
+        // The flat-interface Fresnel goes to zero at grazing incidence, which is
+        // right for smooth water and wrong for a fold - a mass of bubbles, not a
+        // mirror. Blended towards full transmission by the foam coverage, so a
+        // breaking crest lights its own column. Weighted, not replaced: a thin
         // scattering layer still attenuates.
         this.$l.entry = pb.mix(this.entry, pb.float(1), this.foam);
-        // Kept for the debug views. Assigned on the caller's scope, so the
-        // variant that reads them gets the value the shading actually used
-        // rather than a second evaluation of the same expression.
         this.$return(
           pb.mul(
             this.mediumAlbedo,
@@ -2207,23 +1980,47 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
         );
       }
     });
-    pb.func('fresnel', [pb.vec3('normal'), pb.vec3('eyeVec')], function () {
-      // Schlick, including the F0 term the previous form dropped. Without it
-      // the reflectance fell to zero at normal incidence, so water viewed from
-      // directly above reflected no sky at all and read as flat paint.
-      //
-      // The magnitude of the cosine. The interface between the two media is the
-      // same curve seen from either side, and the cosine changes sign when the
-      // view direction crosses the normal - which a folded crest makes happen
-      // inside a single wave. Clamping at zero instead drops the reflectance to
-      // F0 on the far side of the crossing, which is the normal-incidence end of
-      // the curve: exactly where the geometry is at its most grazing, and a
-      // discontinuity across the crest that reads as a black band between bright
-      // water.
+    pb.func('fresnel', [pb.vec3('normal'), pb.vec3('eyeVec'), pb.bool('underwater')], function () {
+      // The magnitude of the cosine: it changes sign when the view direction
+      // crosses the normal, which a folded crest makes happen inside a single
+      // wave. Clamping at zero instead drops the reflectance to F0 exactly where
+      // the geometry is at its most grazing, giving a black band across the
+      // crest.
       this.$l.NoV = pb.clamp(pb.abs(pb.dot(this.normal, this.eyeVec)), 0, 1);
+      // Looking up at the underside, the interface behaves quite differently.
+      // Past the critical angle - about 48.6 degrees off vertical for n = 1.333 -
+      // Snell's law has no solution and nothing gets out at all: the surface is
+      // a perfect mirror there, and the circle of sky inside that angle is the
+      // Snell window.
+      this.$if(this.underwater, function () {
+        this.$l.sinT2 = pb.mul(WATER_TO_AIR_ETA * WATER_TO_AIR_ETA, pb.sub(1, pb.mul(this.NoV, this.NoV)));
+        // Total internal reflection, and deliberately not scaled by
+        // reflectionStrength. That knob exists to trade an above-water
+        // reflection away for a view of the sea bed beneath it; from below there
+        // is no transmitted ray to reveal, and dialling the mirror down there
+        // just bleeds the straight-through sample - the world above the water -
+        // across the whole surface outside the window, where physically nothing
+        // is visible at all.
+        this.$l.f = pb.float(1);
+        this.$if(pb.lessThan(this.sinT2, 1), function () {
+          // Schlick is written against the angle on the less dense side of the
+          // interface, so the transmitted cosine is what goes in rather than the
+          // incident one. F0 itself is unchanged: ((n1-n2)/(n1+n2))^2 is
+          // symmetric in the two media.
+          this.$l.cosT = pb.sqrt(pb.max(pb.sub(1, this.sinT2), 0));
+          this.f = pb.clamp(
+            pb.mul(
+              pb.add(WATER_F0, pb.mul(1 - WATER_F0, pb.pow(pb.sub(1, this.cosT), 5))),
+              this.reflectionStrength
+            ),
+            0,
+            1
+          );
+        });
+        this.$return(this.f);
+      });
       this.$l.f = pb.add(WATER_F0, pb.mul(1 - WATER_F0, pb.pow(pb.sub(1, this.NoV), 5)));
-      // reflectionStrength trades the reflection away for what is beneath the
-      // surface. Scaling keeps the term in [0,1] for any authored value.
+      // Scaling keeps the term in [0,1] for any authored reflectionStrength.
       this.$return(pb.clamp(pb.mul(this.f, this.reflectionStrength), 0, 1));
     });
     pb.func(
@@ -2258,10 +2055,8 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
     );
     if (shoreFoam) {
       // Three octaves of value noise over the world XZ plane, drifting slowly.
-      //
-      // World space rather than screen or surface space: the band it breaks up
-      // sits at a fixed place in the world, so a pattern keyed on anything else
-      // slides over it as the camera moves and reads as the foam swimming.
+      // World space rather than screen or surface space, so the pattern does not
+      // slide over the band as the camera moves.
       pb.func('waterShoreFoamPattern', [pb.vec2('xz'), pb.float('time')], function () {
         // Drift applied in meters before the frequency, so changing the clump
         // size does not change how fast they travel.
@@ -2291,19 +2086,16 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
       // Distance from the water surface to the nearest opaque surface anywhere
       // around it, through the Hi-Z pyramid's nearest-depth channel.
       //
-      // A *neighbourhood* query rather than a lookup along the view ray, which
-      // is the whole point. The ray answers "what is behind this pixel", and
-      // beside a piling that is the wrong question: the ray hits the piling's
-      // side just under the waterline, so a pixel far from the piling reads as
-      // touching it, while the pixels to its left and right - which are closer -
-      // see past it entirely. The geometry those pixels need is not on their ray
-      // at all, so no choice of metric along one ray can find it.
+      // A *neighbourhood* query rather than a lookup along the view ray. Beside
+      // a piling the ray hits its side just under the waterline, so a pixel far
+      // from the piling reads as touching it while the closer pixels to its left
+      // and right see past it entirely - the geometry those pixels need is not
+      // on their ray at all.
       //
       // The pyramid is what makes the neighbourhood affordable: one cell at the
       // right level summarises the whole footprint, so the sample count does not
-      // grow with the radius. The nearest-depth reduction is the direction that
-      // matters - a cell reports the closest surface anywhere inside it, so a
-      // cell the query covers cannot hide geometry from it.
+      // grow with the radius, and the nearest-depth reduction means a cell the
+      // query covers cannot hide geometry from it.
       //
       // Reports a distance past the band's reach when the neighbourhood is
       // empty, so the caller's ramp reads it as "outside the band" without a
@@ -2326,8 +2118,7 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
           // Level whose texel spans the query footprint divided by the tap
           // spread, so the 3x3 grid covers roughly the whole sphere. Floored to
           // an integer: the pyramid is sampled with a nearest mip filter, and a
-          // fractional level would jump between two levels along a continuous
-          // gradient, which shows up as a seam across the band.
+          // fractional level would show up as a seam across the band.
           this.$l.level = pb.clamp(
             pb.floor(pb.log2(pb.max(pb.div(this.pixelRadius, SHORE_QUERY_TAP_SPREAD), 1))),
             0,
@@ -2339,27 +2130,20 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
           // zero at the window's edge, and each is read as a point dithered
           // somewhere inside it.
           //
-          // The tent is what makes the window's own stepping invisible: crossing
-          // a cell border advances the base index and exchanges a column of
-          // cells, but the column leaving and the one arriving both have zero
-          // weight there. The pyramid is bound with a nearest sampler - SSR's
-          // traversal needs exact cell values - so this smoothing has to happen
-          // here rather than in the fetch.
+          // The tent makes the window's own stepping invisible: the column of
+          // cells leaving and the one arriving both have zero weight there. The
+          // pyramid is bound with a nearest sampler - SSR's traversal needs exact
+          // cell values - so this smoothing has to happen here.
           //
-          // The dither is what keeps the contours round. A cell is a box, and
-          // the distance to a box has square contours; at the levels this query
-          // picks a cell is most of the radius across, so the rounding on them is
-          // negligible and what is left is a grid of squares. Picking a point
-          // inside the cell is what the cell's own statement licenses - it says
-          // a surface is somewhere in this box - and measuring to a point brings
-          // the contours back.
+          // The dither keeps the contours round. A cell is a box, and the
+          // distance to a box has square contours; at these levels a cell is most
+          // of the radius across, so what is left is a grid of squares. Picking a
+          // point inside the cell is what the cell's own statement licenses.
           //
           // Hashed from the pixel *and* the frame counter, and applied to the
           // interpretation of the samples rather than to which samples are
-          // taken. The fetches therefore stay identical frame to frame while the
-          // guess moves, which is what lets TAA average the residual grain away;
-          // a hash of the pixel alone is stable, and TAA preserves stable detail
-          // rather than integrating it.
+          // taken: the fetches stay identical frame to frame while the guess
+          // moves, which is what lets TAA average the residual grain away.
           this.$l.dither = pb.mul(pb.float(ShaderHelper.getFramestamp(this)), SHORE_QUERY_DITHER_STRIDE);
           this.$l.gridCoord = pb.sub(pb.mul(this.screenUV, this.mipSize), pb.vec2(0.5));
           this.$l.gridBase = pb.floor(this.gridCoord);
@@ -2384,20 +2168,16 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
               );
               this.$l[`z${gx}${gy}`] = ShaderHelper.nonLinearDepthToLinear(this, this[`hiz${gx}${gy}`].g);
               this.$l[`zFar${gx}${gy}`] = ShaderHelper.nonLinearDepthToLinear(this, this[`hiz${gx}${gy}`].r);
-              // A cell does not say "there is a surface here". It says "some
-              // surface lies inside this screen rectangle, at a depth between
-              // near and far" - a frustum block. Collapsing that to the point on
-              // the centre ray at the near depth is wrong exactly where it
-              // matters: a cell straddling a silhouette reports the object's
-              // depth while the centre ray points past the object's edge, so the
-              // "surface" lands beside the object in empty space, nearer to the
-              // water than the object itself.
+              // A cell says "some surface lies inside this screen rectangle, at
+              // a depth between near and far" - a frustum block. Collapsing that
+              // to the point on the centre ray at the near depth puts a cell
+              // straddling a silhouette beside the object in empty space, nearer
+              // to the water than the object itself.
               //
-              // Laterally the point is dithered across the cell instead. Any
-              // spot in the cell is somewhere the surface could be, so this
-              // invents nothing. In depth it is clamped rather than dithered,
-              // because that end is known - the reduction guarantees a surface
-              // on the near face - and the span is clipped by
+              // Laterally the point is dithered across the cell instead, which
+              // invents nothing: any spot in the cell is somewhere the surface
+              // could be. In depth it is clamped, because the reduction
+              // guarantees a surface on the near face, and the span is clipped by
               // SHORE_QUERY_CELL_DEPTH_SPAN.
               this.$l[`cellW${gx}${gy}`] = pb.max(
                 pb.div(pb.mul(this.texelStep.x, 2, this[`z${gx}${gy}`]), this.projMatrix[0].x),
@@ -2416,8 +2196,7 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
               );
               this.$l[`dz${gx}${gy}`] = pb.add(this.viewPos.z, this[`zClamp${gx}${gy}`]);
               // Seeded per cell as well as per pixel: one offset shared by all
-              // sixteen would move the whole set together, which is the sampling
-              // grid shifting rather than each cell's guess being independent.
+              // sixteen would move the whole set together.
               this.$l[`jit${gx}${gy}`] = pb.sub(
                 pb.vec2(
                   interleavedGradientNoise(
@@ -2449,11 +2228,7 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
               this.$l[`d${gx}${gy}`] = pb.length(pb.vec3(this[`dxy${gx}${gy}`], this[`dz${gx}${gy}`]));
               // Tent weight, from the cell's offset to the pixel in cell units.
               // Zero at two cells out, which is the edge of the 4x4 window, so a
-              // cell entering or leaving the window does so from nothing. That is
-              // what makes the result continuous as the window steps, and it is
-              // the same weighting the bilinear taps applied - here it is applied
-              // once to all sixteen cells instead of nine times to overlapping
-              // quads.
+              // cell entering or leaving the window does so from nothing.
               this.$l[`w${gx}${gy}`] = pb.mul(
                 pb.max(pb.sub(1, pb.abs(pb.div(pb.sub(pb.float(gx - 1), this.gridFrac.x), 2))), 0),
                 pb.max(pb.sub(1, pb.abs(pb.div(pb.sub(pb.float(gy - 1), this.gridFrac.y), 2))), 0)
@@ -2468,16 +2243,12 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
               );
             }
           }
-          // Weighted soft minimum, not a hard one.
-          //
-          // A hard `min` takes an extreme and does no averaging, so one cell
-          // decides the answer outright and the answer steps on a cell boundary
-          // when that cell changes - the band comes out in squares, and the
-          // dither only puts grain on them because the mean is still the cell's.
-          // An average lets a cell losing its claim cost only its share, and
-          // lets the dither average down instead of riding on top. It still
-          // reads as a distance: below a few times `softK` it tracks the true
-          // minimum closely.
+          // Weighted soft minimum, not a hard one. A hard `min` lets one cell
+          // decide the answer outright, so the band comes out in squares that
+          // step on cell boundaries. Averaging lets a cell losing its claim cost
+          // only its share and lets the dither average down. It still reads as a
+          // distance: below a few times `softK` it tracks the true minimum
+          // closely.
           this.$return(pb.mul(pb.neg(this.softK), pb.log(pb.div(this.esum, this.wsum))));
         }
       );
@@ -2495,10 +2266,8 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
         );
         // Where the band currently reaches out to, modulated over time by the
         // run-up. The phase offset comes from a noise field over the world plane
-        // rather than from a direction: a linear phase needs an axis, the only
-        // meaningful axis is the shore's own, and the query does not know where
-        // the shore runs - a guessed one reads as a diagonal swell crossing the
-        // beach.
+        // rather than from a direction: the query does not know where the shore
+        // runs, and a guessed axis reads as a diagonal swell crossing the beach.
         this.$l.washOffset = valueNoise(this, pb.mul(this.worldPos.xz, this.shoreFoamWashParams.z));
         this.$l.wash = pb.sin(
           pb.mul(pb.add(pb.mul(this.time, this.shoreFoamWashParams.y), this.washOffset), 2 * Math.PI)
@@ -2509,10 +2278,9 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
         );
         this.$l.soft = pb.max(pb.mul(this.edge, SHORE_FOAM_EDGE_SOFTNESS), 1e-4);
         // The gradient runs *up to* the reach, not across it: `edge` is where the
-        // band ends, so coverage must be zero there and the fade has to happen
-        // inside it. Straddling `edge` puts a total miss - which reports the
-        // radius searched, i.e. the largest `edge` the run-up reaches - at the
-        // middle of the ramp, which is half coverage over the entire open sea.
+        // band ends, so coverage must be zero there. Straddling `edge` would put
+        // a total miss at the middle of the ramp, which is half coverage over the
+        // entire open sea.
         this.$l.ramp = pb.sub(1, pb.smoothStep(pb.sub(this.edge, this.soft), this.edge, this.surfaceDist));
         // Open water, which is almost every water pixel in almost every frame,
         // is done here and does not pay for the pattern.
@@ -2558,22 +2326,14 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
         // folded far enough to show its underside.
         //
         // Flipped on the sign of the cosine against the view direction, not on
-        // `frontFacing`. Both give the same answer per pixel, but the
-        // rasteriser's answer changes discontinuously along the triangle edge
-        // where the fold happens, so the flipped normal jumps by 2*N there and
-        // every term built on it steps with it - a seam exactly along the crest,
-        // which reads as a black line across bright water. The cosine crosses
-        // zero continuously, so this form has no such edge. (The `abs` in
-        // Fresnel is the same statement for that one term; this keeps the vector
-        // itself consistent for the reflection and the specular lobe, which need
-        // a direction and not just a weight.)
+        // `frontFacing`: the rasteriser's answer changes discontinuously along
+        // the triangle edge where the fold happens, so the flipped normal jumps
+        // by 2*N there and every term built on it steps with it. The cosine
+        // crosses zero continuously.
         //
-        // The sign is the one that matters here: `eyeVecNorm` runs from the
-        // camera to the surface, i.e. it points down onto flat water, so a face
-        // turned towards the eye has a *negative* dot against it and the flip is
-        // the positive case. Testing it the other way turns the normal away from
-        // the eye on every ordinary pixel, which puts the sun behind the entire
-        // surface rather than behind the fold.
+        // `eyeVecNorm` runs from the camera to the surface, so a face turned
+        // towards the eye has a *negative* dot against it and the flip is the
+        // positive case.
         this.$l.shadingNormal = this.$choice(
           pb.greaterThan(pb.dot(this.normal, this.eyeVecNorm), 0),
           pb.neg(this.normal),
@@ -2581,37 +2341,27 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
         );
         // The normal the diffuse terms use, which is not the wave normal.
         //
-        // A choppy displacement folds the surface onto itself where the
-        // horizontal Jacobian turns negative, and the cross-product normal
-        // there is genuinely close to horizontal - the wave face really has
-        // stood up. That is the right normal for the mirror: the specular lobe
-        // and the refraction go by the face's true orientation, which is what
-        // makes a breaking crest read as glass. It is the wrong normal for
-        // anything lit diffusely: a folded crest is a wall, the sun is nearly
-        // perpendicular to it, and a diffuse term built on the wall's normal
-        // loses the sun completely - which is what darkened the fold.
+        // Where a choppy displacement folds the surface the cross-product normal
+        // is genuinely close to horizontal. That is the right normal for the
+        // mirror - the specular lobe and the refraction go by the face's true
+        // orientation - and the wrong one for anything lit diffusely: the sun is
+        // nearly perpendicular to a folded wall, so a diffuse term built on it
+        // loses the sun completely.
         //
         // Built on the eye-facing normal and then mixed towards up, so the two
-        // corrections compose instead of fighting. The weight rises with
-        // |normal.y|: at |y| = 1 the surface is flat and the wave normal is kept
-        // exactly, and as the face tips over the up vector takes it back. Taking
-        // |normal.y| itself as the weight is the obvious choice and is close to
-        // its own square over this range - the mix then collapses to
-        // `up + y^2 * (N - up)` and stays dominated by the wall normal exactly
-        // where it is least wanted - so the transition is moved up the range
-        // with a smoothstep.
+        // corrections compose. The weight rises with |normal.y|: at |y| = 1 the
+        // wave normal is kept exactly, and as the face tips over the up vector
+        // takes it back. A smoothstep rather than |normal.y| itself, which would
+        // stay dominated by the wall normal exactly where it is least wanted.
         this.$l.diffuseWeight = pb.smoothStep(0, 0.5, pb.abs(this.normal.y));
         this.$l.diffuseNormal = pb.normalize(
           pb.mix(pb.vec3(0, 1, 0), this.shadingNormal, this.diffuseWeight)
         );
-        // Which face of the surface the camera is on. Taken from the
-        // rasteriser, not from the wave normal: the choppy displacement folds
-        // the sheet, so the pixels showing its underside also happen to have
-        // been given an upward normal, and a test built on the normal says the
-        // eye is above the surface at exactly the pixels where it is looking at
-        // the underside. Every term gated on this would be on the wrong side of
-        // the interface there. `frontFacing` answers the question that was
-        // meant: which face of the rasterised triangle is being shaded.
+        // Which face of the surface the camera is on. Taken from the rasteriser,
+        // not from the wave normal: the choppy displacement folds the sheet, so
+        // the pixels showing its underside also carry an upward normal, and a
+        // test built on the normal would put every term on the wrong side of the
+        // interface there.
         this.$l.frontFace = this.$builtins.frontFacing;
         this.$l.backFace = pb.not(this.frontFace);
         this.$l.underwaterEye = this.backFace;
@@ -2621,71 +2371,87 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
         this.reflectVecW = pb.reflect(this.incidentVec, this.shadingNormal);
         this.$l.reflectance = pb.vec3();
         this.$l.hitInfo = pb.vec4(0);
-        this.$if(pb.greaterThan(this.reflectVecW.y, 0), function () {
-          this.reflectVec = pb.mul(ShaderHelper.getViewMatrix(this), pb.vec4(this.reflectVecW, 0)).xyz;
-          this.hitInfo = ShaderHelper.getHiZDepthTexture(this)
-            ? screenSpaceRayTracing_HiZ(
-                this,
-                this.viewPos,
-                this.reflectVec,
-                ShaderHelper.getViewMatrix(this),
-                ShaderHelper.getProjectionMatrix(this),
-                ShaderHelper.getInvProjectionMatrix(this),
-                ShaderHelper.getCameraParams(this).xy,
-                pb.int(ShaderHelper.getHiZDepthTextureMipLevelCount(this)),
-                this.ssrParams.y,
-                this.ssrParams.x,
-                this.ssrParams.z,
-                pb.vec4(ShaderHelper.getRenderSize(this), ShaderHelper.getHiZDepthTextureSize(this)),
-                ShaderHelper.getHiZDepthTexture(this)
-              )
-            : screenSpaceRayTracing_Linear2D(
-                this,
-                this.viewPos,
-                this.reflectVec,
-                ShaderHelper.getViewMatrix(this),
-                ShaderHelper.getProjectionMatrix(this),
-                ShaderHelper.getInvProjectionMatrix(this),
-                ShaderHelper.getCameraParams(this).xy,
-                this.ssrParams.x,
-                this.ssrParams.y,
-                this.ssrParams.z,
-                this.ssrParams.w,
-                pb.vec4(ShaderHelper.getRenderSize(this), ShaderHelper.getLinearDepthTextureSize(this)),
-                ShaderHelper.getLinearDepthTexture(this)
-              );
-        });
+        // Which way a reflection has to go to have anything to hit. From above
+        // that is upwards, off the surface into the sky; from below it is
+        // downwards, back into the water. Testing for "up" regardless meant a
+        // submerged pixel never traced at all and fell through to the sky bake,
+        // which is the one thing that cannot be behind a surface seen from
+        // underneath.
+        this.$if(
+          this.$choice(
+            this.underwaterEye,
+            pb.lessThan(this.reflectVecW.y, 0),
+            pb.greaterThan(this.reflectVecW.y, 0)
+          ),
+          function () {
+            this.reflectVec = pb.mul(ShaderHelper.getViewMatrix(this), pb.vec4(this.reflectVecW, 0)).xyz;
+            this.hitInfo = ShaderHelper.getHiZDepthTexture(this)
+              ? screenSpaceRayTracing_HiZ(
+                  this,
+                  this.viewPos,
+                  this.reflectVec,
+                  ShaderHelper.getViewMatrix(this),
+                  ShaderHelper.getProjectionMatrix(this),
+                  ShaderHelper.getInvProjectionMatrix(this),
+                  ShaderHelper.getCameraParams(this).xy,
+                  pb.int(ShaderHelper.getHiZDepthTextureMipLevelCount(this)),
+                  this.ssrParams.y,
+                  this.ssrParams.x,
+                  this.ssrParams.z,
+                  pb.vec4(ShaderHelper.getRenderSize(this), ShaderHelper.getHiZDepthTextureSize(this)),
+                  ShaderHelper.getHiZDepthTexture(this)
+                )
+              : screenSpaceRayTracing_Linear2D(
+                  this,
+                  this.viewPos,
+                  this.reflectVec,
+                  ShaderHelper.getViewMatrix(this),
+                  ShaderHelper.getProjectionMatrix(this),
+                  ShaderHelper.getInvProjectionMatrix(this),
+                  ShaderHelper.getCameraParams(this).xy,
+                  this.ssrParams.x,
+                  this.ssrParams.y,
+                  this.ssrParams.z,
+                  this.ssrParams.w,
+                  pb.vec4(ShaderHelper.getRenderSize(this), ShaderHelper.getLinearDepthTextureSize(this)),
+                  ShaderHelper.getLinearDepthTexture(this)
+                );
+          }
+        );
         this.$l.refl = pb.reflect(
           pb.normalize(pb.sub(this.worldPos, ShaderHelper.getCameraPosition(this))),
           this.shadingNormal
         );
-        // Rays reflecting downwards, and grazing ones, land on the bake's lower
-        // hemisphere, which the atmosphere deliberately renders nearly black -
-        // it is what is below the ground, not what a flat water surface
-        // reflects. An eye nearly at water level reflects the sky right at the
-        // horizon, i.e. the upper hemisphere's very edge, so the most horizontal
-        // reflection directions sample the black terminator and the far ocean
-        // reads as a dark band. Flooring the y and re-normalising pins those
-        // directions just above the horizon, which is roughly what a grazing
-        // reflection does see; a reflection already pointing into the sky is
-        // untouched, so a normal sea is unchanged. A floor rather than a soft
-        // lift on purpose: the terminator is a hard feature of the bake, and
-        // smoothing over it nudges every grazing reflection rather than only the
-        // degenerate ones.
+        // What the mirror shows where the screen-space trace found nothing.
         //
-        // Mirroring the downward rays instead (refl.y = abs(refl.y)) used to
-        // stand here in place of this floor, and briefly ahead of it. It is
-        // wrong on its own terms - a ray 30 degrees down becomes one 30 degrees
-        // up, sampling a patch of sky unrelated to what the wave face reflects,
-        // which reads as an over-bright reflection that jumps around with the
-        // face's tilt - and ahead of the floor it also mooted it, since the
-        // floor then only ever saw values that were already positive.
-        this.refl.y = pb.max(this.refl.y, HORIZON_REFLECT_BIAS);
-        this.refl = pb.normalize(this.refl);
-        this.reflectance = pb.mix(
+        // From above that is the sky. Rays reflecting downwards, and grazing
+        // ones, land on the bake's lower hemisphere, which the atmosphere
+        // renders nearly black, so the far ocean reads as a dark band. Flooring
+        // the y and re-normalising pins those directions just above the horizon,
+        // which is roughly what a grazing reflection does see; a reflection
+        // already pointing into the sky is untouched. A floor rather than a soft
+        // lift, so only the degenerate directions are nudged.
+        //
+        // From below there is no sky in that direction at all - the ray is
+        // heading back down into the water - and what it eventually reaches is
+        // the water itself. That is the medium's asymptotic colour, the same
+        // limit the underwater pass converges to as the path length grows:
+        // albedo * (1 - exp(-sigma_t * d)) * ambient with the exponential gone.
+        // Sampling the sky bake there instead put a bright sky outside the Snell
+        // window, which is exactly where nothing above the surface is visible.
+        this.$l.reflMiss = pb.vec3();
+        this.$if(this.underwaterEye, function () {
+          this.$l.downwelling = ShaderHelper.sampleBakedSkyPreExposed(this, pb.vec3(0, 1, 0));
+          this.reflMiss = pb.mul(this.mediumAlbedo, this.downwelling);
+        }).$else(function () {
+          this.refl.y = pb.max(this.refl.y, HORIZON_REFLECT_BIAS);
+          this.refl = pb.normalize(this.refl);
           // Blended against the pre-exposed scene color, so the exposure-independent sky bake has
           // to be lifted into the same space.
-          ShaderHelper.sampleBakedSkyPreExposed(this, this.refl),
+          this.reflMiss = ShaderHelper.sampleBakedSkyPreExposed(this, this.refl);
+        });
+        this.reflectance = pb.mix(
+          this.reflMiss,
           pb.textureSampleLevel(ShaderHelper.getSceneColorTexture(this), this.hitInfo.xy, 0).rgb,
           this.hitInfo.w
         );
@@ -2702,23 +2468,27 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
         );
         this.$l.refractUV = this.refractInfo.xy;
         // The medium is walked along the refracted path, not along the straight
-        // line to the bed. A refracted ray is bent towards the normal, so it
-        // reaches the same depth over a shorter distance than the view ray
-        // suggests, and at a grazing view the two differ by a lot.
+        // line to the bed. A refracted ray reaches the same depth over a shorter
+        // distance, and at a grazing view the two differ by a lot.
         this.depth = this.refractInfo.z;
         // How blurred what is behind the water reads. Scattering in the column
-        // deflects the transmitted ray by a small random angle at every event,
-        // so the image arriving at the surface is a convolution whose width
-        // grows with the optical depth - a stone under 20 cm of clear water is
-        // sharp, the same stone under 3 m of turbid water is a smudge. Sampling
-        // a coarser mip is the cheap stand-in for that convolution.
+        // deflects the transmitted ray at every event, so the image arriving at
+        // the surface is a convolution whose width grows with the optical depth;
+        // sampling a coarser mip is the cheap stand-in for that.
         //
         // Log in the path length because each mip is a doubling of the filter
         // width, and driven by the *scattering* coefficient rather than the
         // extinction: absorption removes light without redirecting it, so it
         // darkens the background without blurring it.
+        //
+        // Zero from below. The ray leaving the underside travels through air to
+        // whatever it reaches, so there is no medium along it to blur or absorb
+        // with - what the eye already looked through to get here is the volume
+        // the Underwater pass owns, and charging the same column twice turned
+        // the world seen through the Snell window into a dark smear.
+        this.$l.mediumPath = this.$choice(this.underwaterEye, pb.float(0), this.depth);
         this.$l.refractBlur = pb.log2(
-          pb.add(1, pb.mul(this.depth, pb.add(REFRACT_BLUR_GEOMETRIC, this.refractBlurDensity)))
+          pb.add(1, pb.mul(this.mediumPath, pb.add(REFRACT_BLUR_GEOMETRIC, this.refractBlurDensity)))
         );
         this.$l.refraction = pb.textureSampleLevel(
           ShaderHelper.getSceneColorTexture(this),
@@ -2726,12 +2496,11 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
           pb.clamp(this.refractBlur, 0, REFRACT_BLUR_MAX_LOD)
         ).rgb;
         this.$l.refractionRaw = this.refraction;
-        this.$l.absorption = this.getAbsorption(this.depth);
+        this.$l.absorption = this.getAbsorption(this.mediumPath);
         this.refraction = pb.mul(this.refraction, this.absorption);
-        this.$l.fresnelTerm = this.fresnel(this.shadingNormal, pb.neg(this.eyeVecNorm));
+        this.$l.fresnelTerm = this.fresnel(this.shadingNormal, pb.neg(this.eyeVecNorm), this.underwaterEye);
         // Foam coverage. The generator reports where the surface has folded over
-        // on itself; the ramp turns that into how much of the texel is actually
-        // covered, so the two ends of a breaking crest can be tuned apart.
+        // on itself; the ramp turns that into how much of the texel is covered.
         this.$l.crestFoam = pb.clamp(
           pb.mul(pb.pow(pb.clamp(this.foamFactor, 0, 1), this.foamShadingParams.y), this.foamShadingParams.x),
           0,
@@ -2744,17 +2513,14 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
           : pb.vec2(0, 0);
         this.$l.shoreFoam = this.shoreFoamInfo.x;
         // Two independent coverages of the same texel, so they compose as
-        // overlapping area: a crest breaking over a sand bar is not whiter than
-        // either alone, only more completely covered. `max` would ignore the
-        // smaller source entirely and adding would run past 1.
+        // overlapping area: `max` would ignore the smaller source entirely and
+        // adding would run past 1.
         this.$l.foam = pb.sub(1, pb.mul(pb.sub(1, this.crestFoam), pb.sub(1, this.shoreFoam)));
-        // Foam suppresses the specular lobe rather than adding to it: it is a
-        // dense scattering layer sitting on the water, and where it is thick the
-        // mirror underneath stops being visible at all.
+        // Foam suppresses the specular lobe rather than adding to it: where it is
+        // thick the mirror underneath stops being visible at all.
         this.fresnelTerm = pb.mul(this.fresnelTerm, pb.sub(1, this.foam));
         this.$l.finalColor = pb.mix(this.refraction, this.reflectance, this.fresnelTerm);
-        // Per-term accumulators for the debug views. Dead in the `none`
-        // variant and folded away by the compiler there.
+        // Per-term accumulators for the debug views. Dead in the `none` variant.
         this.$l.dbgSpecular = pb.vec3(0);
         this.$l.dbgNoL = pb.float(0);
         this.$l.dbgShadow = pb.vec3(1);
@@ -2763,10 +2529,8 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
         this.$l.dbgScatter = pb.vec3(0);
         // What anything leaving the water body keeps on its way out, and the
         // share of the surface that is water rather than foam. The refraction
-        // above already carries the first factor - `mix` weights it by
-        // `1 - fresnelTerm` - and every scattering term below has to carry it
-        // too, or the body stays fully visible through a surface that has turned
-        // into a mirror at a grazing angle.
+        // above already carries the first factor via the `mix`; every scattering
+        // term below has to carry it too.
         this.$l.bodyWeight = pb.mul(pb.sub(1, this.fresnelTerm), pb.sub(1, this.foam));
         // The sun-scattering debug views below rebuild that term's factors, and
         // the light direction is only known inside this loop. Initialised so the
@@ -2783,8 +2547,7 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
           );
           this.$l.lightDir = that.calculateLightDirection(this, type, this.worldPos, posRange, dirCutoff);
           // Left behind for the sun-scattering debug views, which rebuild that
-          // term's factors outside this loop. The light direction exists only
-          // here and those views are chosen at compile time, not per light.
+          // term's factors outside this loop.
           this.dbgLightDir = this.lightDir;
           this.$l.NoL = pb.clamp(pb.dot(this.normal, this.lightDir), 0, 1);
           // Diffuse incidence, off the diffuse normal. Used by the foam and the
@@ -2801,10 +2564,9 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
           );
           this.$l.lightContrib = this.specularTerm;
           // Sunlight that entered the far side of a wave and scattered back out
-          // towards the eye. This is what makes a backlit crest glow, and it has
-          // to come from the light loop: the ambient scattering term below is
-          // built from the environment irradiance, which has no direction and so
-          // cannot produce it at all.
+          // towards the eye - what makes a backlit crest glow. It has to come
+          // from the light loop: the ambient scattering term below is built from
+          // the environment irradiance, which has no direction.
           //
           // Standard translucency approximation - the transmitted direction is
           // the light continuing through the surface, bent by the normal, and
@@ -2815,9 +2577,7 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
           this.$l.sssFacing = pb.pow(pb.clamp(pb.dot(pb.neg(this.eyeVecNorm), this.sssDir), 0, 1), SSS_POWER);
           // Crests glow and troughs do not: height above the undisplaced surface
           // stands in for how much lit water the ray passed through. The medium's
-          // own albedo carries the hue, so this agrees with the colour the depth
-          // terms produce; the magnitude is authored, because a real crest is far
-          // too thin to scatter a visible amount on its own.
+          // albedo carries the hue; the magnitude is authored.
           this.$l.sssThickness = pb.clamp(
             pb.mul(pb.sub(1, this.diffuseNormal.y), this.subsurfaceParams.y),
             0,
@@ -2829,20 +2589,14 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
             pb.mul(this.sssFacing, this.sssThickness, this.subsurfaceParams.x)
           );
           this.lightContrib = pb.add(this.lightContrib, this.subsurfaceTerm);
-          // Sunlight scattered back out of the water column. This is what gives
-          // the body a direction-dependent colour at all: the ambient term
-          // below is built from the environment irradiance, which has no
-          // direction, so without this a shadow on the water leaves the water
-          // itself unchanged and a low sun does not tint it.
+          // Sunlight scattered back out of the water column, which is what gives
+          // the body a direction-dependent colour at all.
           //
-          // Directional only. The integral assumes the light arrives as a
-          // parallel beam of fixed slope, which is what lets the sun's path to
-          // a scattering event be written in closed form; a point light's
-          // distance falls off along the column and needs a different solution.
-          // Seen from below the surface the geometry differs too, and this
-          // keeps the term off that case rather than getting it wrong - the
-          // refraction and the ambient scattering still carry the water colour
-          // there.
+          // Directional only, and only with the eye above the surface. The
+          // integral assumes a parallel beam of fixed slope; a point light's
+          // falloff along the column and the underwater geometry both need a
+          // different solution. The refraction and the ambient scattering still
+          // carry the water colour in those cases.
           this.$l.sunScatterTerm = pb.vec3(0);
           this.$if(pb.and(pb.equal(type, LIGHT_TYPE_DIRECTIONAL), pb.not(this.underwaterEye)), function () {
             // Weighted by what the surface transmits on the way out and by how
@@ -2863,9 +2617,7 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
             this.lightContrib = pb.add(this.lightContrib, this.sunScatterTerm);
           });
           // Foam is a rough dielectric layer, so it takes the light the way any
-          // matte surface does. Previously it replaced the water colour with a
-          // flat white before the lights ran at all, which left a breaking crest
-          // reading the same at noon, at sunset and in shadow.
+          // matte surface does.
           this.lightContrib = pb.add(
             this.lightContrib,
             pb.mul(this.lightEnergy, this.foamColor, this.foam, this.NoLdiffuse, 1 / Math.PI)
@@ -2886,11 +2638,20 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
         if (that.needCalculateEnvLight()) {
           this.$l.irradiance = that.getEnvLightIrradiance(this, this.diffuseNormal);
           // Scattering from the water body itself, and from the foam sitting on
-          // it. The water term is weighted by `bodyWeight`, which is what the
-          // surface transmits on the way out times the share of it that is still
-          // water: this light came up through the column, so a surface that has
-          // turned into a mirror hides it and foam covers it.
-          this.$l.sss = pb.mul(this.getScattering(this.depth), this.irradiance, this.bodyWeight, 1 / Math.PI);
+          // it. `bodyWeight` is what the surface transmits on the way out times
+          // the share of it that is still water.
+          //
+          // On the same path length the absorption uses, so this vanishes from
+          // below: the column the eye is already inside belongs to the
+          // Underwater pass, and adding the surface's own estimate of it on top
+          // paints the water colour twice. The foam term below is unconditional
+          // - a crest that has broken is white from underneath too.
+          this.$l.sss = pb.mul(
+            this.getScattering(this.mediumPath),
+            this.irradiance,
+            this.bodyWeight,
+            1 / Math.PI
+          );
           this.finalColor = pb.add(this.finalColor, this.sss);
           this.dbgScatter = this.sss;
           this.finalColor = pb.add(
@@ -2910,8 +2671,7 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
             break;
           case 'viewFacing': {
             // Raw, not clamped: a negative value means the wave normal faces
-            // away from the eye at that pixel, which is the case the shading
-            // has to decide about.
+            // away from the eye at that pixel.
             this.$l.viewFacing = pb.dot(this.normal, pb.neg(this.eyeVecNorm));
             this.$return(pb.vec3(this.viewFacing));
             break;
@@ -2923,12 +2683,9 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
             this.$return(pb.vec3(this.shoreFoam));
             break;
           case 'waterDepth':
-            // What the shoreline band is actually keyed on: the distance from
-            // the surface to the plane of whatever is behind it, metres / 10.
-            // Over a flat bed that is the depth of water; against a piling or a
-            // hull it is the horizontal distance to its side. With the band
-            // switched off there is no such estimate, so the plain height
-            // difference stands in.
+            // Distance from the surface to whatever is behind it, metres / 10.
+            // With the band switched off there is no such estimate, so the plain
+            // height difference stands in.
             this.$return(
               pb.vec3(
                 pb.mul(
@@ -2965,13 +2722,12 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
           case 'sunPhase': {
             // Recomputed from the same inputs rather than read back out of
             // waterSunScattering: the value belongs to that function's scope, and
-            // the variant that wants it is the one that never calls it. The two
-            // expressions are kept adjacent so a change to one is a change to
-            // the other.
+            // the variant that wants it is the one that never calls it. Keep the
+            // two expressions in step.
             this.$l.dbgLw = pb.refract(pb.neg(this.dbgLightDir), pb.vec3(0, 1, 0), 1 / 1.333);
             this.$l.dbgVw = pb.refract(this.eyeVecNorm, pb.vec3(0, 1, 0), 1 / 1.333);
             this.$l.dbgCosTheta = pb.neg(pb.dot(this.dbgLw, this.dbgVw));
-            this.$l.dbgHg = this.waterScatterPhase(this.dbgCosTheta, this.sunScatterParams.y);
+            this.$l.dbgHg = waterScatterPhase(this, this.dbgCosTheta, this.sunScatterParams.y);
             this.$l.dbgLumWeights = pb.vec3(0.2126, 0.7152, 0.0722);
             this.$l.dbgThickness = pb.mul(
               pb.dot(this.mediumAlbedo, this.dbgLumWeights),
@@ -3042,11 +2798,10 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
   applyUniforms(bindGroup: BindGroup, ctx: DrawContext, needUpdate: boolean, pass: number) {
     super.applyUniforms(bindGroup, ctx, needUpdate, pass);
     const waveGenerator = this._waveGenerator.get();
-    // Synced per bind group, not per material. The material owns one bind group
+    // Synced per bind group, not per material: the material owns one bind group
     // per pass/render-variant hash, so drawing for a second camera reuses a
-    // different group whose wave uniforms were never written - and a material-
-    // level version would skip the upload for it. WeakMap so a released group
-    // is garbage collected with its entry.
+    // different group whose wave uniforms were never written. WeakMap so a
+    // released group is garbage collected with its entry.
     const lastWritten = this._waveVersionByBindGroup.get(bindGroup) ?? -1;
     if (waveGenerator && lastWritten !== waveGenerator.version) {
       waveGenerator.applyWaterBindGroup(bindGroup);
@@ -3080,9 +2835,7 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
           this._shoreFoamAmount,
           this._shoreFoamDepth,
           this._shoreFoamFalloff,
-          // Cycles per metre, resolved from cycles per band width. The band is
-          // what sets the scale everything here is judged against, so the
-          // division belongs on this side rather than in the shader.
+          // Cycles per metre, resolved from cycles per band width.
           this._shoreFoamScale / this._shoreFoamDepth
         );
         bindGroup.setValue('shoreFoamParams', this._shoreFoamParams);
@@ -3092,8 +2845,7 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
           this._shoreFoamWashScale,
           // Query radius: the band's widest reach over the run-up cycle. Fixed
           // over the cycle because it sets the pyramid level the query samples,
-          // and a level moving with the wash would step the band's resolution
-          // once per cycle.
+          // and a level moving with the wash would step the band's resolution.
           this._shoreFoamDepth * (1 + this._shoreFoamWashAmount)
         );
         bindGroup.setValue('shoreFoamWashParams', this._shoreFoamWashParams);
