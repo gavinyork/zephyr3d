@@ -2,6 +2,18 @@
   "name": "@zephyr3d/backend-webgl",
   "entries": [
     {
+      "version": "0.1.18",
+      "tag": "@zephyr3d/backend-webgl_v0.1.18",
+      "date": "Mon, 14 Sep 2026 20:07:40 GMT",
+      "comments": {
+        "patch": [
+          {
+            "comment": "Reset color and depth write masks before a clear so a clear covers the whole attachment, matching WebGPU's load operation."
+          }
+        ]
+      }
+    },
+    {
       "version": "0.1.17",
       "tag": "@zephyr3d/backend-webgl_v0.1.17",
       "date": "Tue, 01 Sep 2026 07:54:12 GMT",

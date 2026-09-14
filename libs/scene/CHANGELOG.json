@@ -2,6 +2,39 @@
   "name": "@zephyr3d/scene",
   "entries": [
     {
+      "version": "0.9.27",
+      "tag": "@zephyr3d/scene_v0.9.27",
+      "date": "Mon, 14 Sep 2026 20:07:40 GMT",
+      "comments": {
+        "patch": [
+          {
+            "comment": "Fix motion blur to streak moving objects; make the blur length configurable at runtime and fix it vanishing at a biased shutter."
+          },
+          {
+            "comment": "Fix the SAO rendering equation."
+          },
+          {
+            "comment": "Support configuring a retarget reference pose for skeletons; fix humanoid retargeting of root and pelvis displacement; correct bone namespace matching for externally retargeted poses; extend animation set and skeleton serialization."
+          },
+          {
+            "comment": "Add underwater effect"
+          },
+          {
+            "comment": "Add a water caustics system"
+          },
+          {
+            "comment": "Add directional sun in-scattering to the water body; fix the surface Fresnel floor, refraction scaling, horizon reflections and distant highlight aliasing."
+          },
+          {
+            "comment": "Add foam support to the Gerstner wave generator and shoreline foam driven by a Hi-Z proximity query; fix foam not being affected by lights."
+          },
+          {
+            "comment": "Fix water shading on folded waves; add shading debug output views"
+          }
+        ]
+      }
+    },
+    {
       "version": "0.9.26",
       "tag": "@zephyr3d/scene_v0.9.26",
       "date": "Tue, 01 Sep 2026 07:54:12 GMT",

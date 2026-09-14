@@ -1,6 +1,13 @@
 # Change Log - @zephyr3d/backend-webgl
 
-This log was last generated on Tue, 01 Sep 2026 07:54:12 GMT and should not be manually modified.
+This log was last generated on Mon, 14 Sep 2026 20:07:40 GMT and should not be manually modified.
+
+## 0.1.18
+Mon, 14 Sep 2026 20:07:40 GMT
+
+### Patches
+
+- Reset color and depth write masks before a clear so a clear covers the whole attachment, matching WebGPU's load operation.
 
 ## 0.1.17
 Tue, 01 Sep 2026 07:54:12 GMT

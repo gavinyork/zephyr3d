@@ -2,6 +2,35 @@
   "name": "@zephyr3d/editor",
   "entries": [
     {
+      "version": "0.3.16",
+      "tag": "@zephyr3d/editor_v0.3.16",
+      "date": "Mon, 14 Sep 2026 20:07:40 GMT",
+      "comments": {
+        "patch": [
+          {
+            "comment": "Support retarget reference pose configuration for skeletons; fix humanoid retargeting of root and pelvis position; fix external retarget pose bone namespace matching."
+          },
+          {
+            "comment": "Fix the plugin menu not refreshing when a project is first opened."
+          },
+          {
+            "comment": "Improve resource service handling and import option dialogs"
+          }
+        ],
+        "dependency": [
+          {
+            "comment": "Updating dependency \"@zephyr3d/scene\" from `^0.9.26` to `0.9.27`"
+          },
+          {
+            "comment": "Updating dependency \"@zephyr3d/loaders\" from `^0.1.5` to `0.1.6`"
+          },
+          {
+            "comment": "Updating dependency \"@zephyr3d/backend-webgl\" from `^0.1.17` to `0.1.18`"
+          }
+        ]
+      }
+    },
+    {
       "version": "0.3.15",
       "tag": "@zephyr3d/editor_v0.3.15",
       "date": "Tue, 01 Sep 2026 07:54:12 GMT",

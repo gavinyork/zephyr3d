@@ -1,6 +1,6 @@
 {
   "name": "@zephyr3d/procgen",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Procedural scene generation (shape grammar + wave function collapse) for zephyr3d",
   "homepage": "https://github.com/gavinyork/zephyr3d#readme",
   "type": "module",
@@ -64,6 +64,6 @@
   },
   "dependencies": {
     "@zephyr3d/base": "workspace:^0.2.10",
-    "@zephyr3d/modelgen": "workspace:^0.1.0"
+    "@zephyr3d/modelgen": "workspace:^0.1.1"
   }
 }

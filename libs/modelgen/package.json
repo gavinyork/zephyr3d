@@ -1,6 +1,6 @@
 {
   "name": "@zephyr3d/modelgen",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Dependency-free procedural mesh generator for zephyr3d",
   "homepage": "https://github.com/gavinyork/zephyr3d#readme",
   "type": "module",

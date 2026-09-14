@@ -1,6 +1,13 @@
 # Change Log - @zephyr3d/loaders
 
-This log was last generated on Tue, 01 Sep 2026 07:54:12 GMT and should not be manually modified.
+This log was last generated on Mon, 14 Sep 2026 20:07:40 GMT and should not be manually modified.
+
+## 0.1.6
+Mon, 14 Sep 2026 20:07:40 GMT
+
+### Patches
+
+- Add an OBJ model importer
 
 ## 0.1.5
 Tue, 01 Sep 2026 07:54:12 GMT

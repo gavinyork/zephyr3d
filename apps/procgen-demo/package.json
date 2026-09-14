@@ -22,11 +22,11 @@
   },
   "dependencies": {
     "@webgpu/types": "^0.1.65",
-    "@zephyr3d/backend-webgl": "workspace:^0.1.17",
+    "@zephyr3d/backend-webgl": "workspace:^0.1.18",
     "@zephyr3d/base": "workspace:^0.2.10",
     "@zephyr3d/device": "workspace:^0.2.19",
-    "@zephyr3d/modelgen": "workspace:^0.1.0",
-    "@zephyr3d/procgen": "workspace:^0.1.0",
-    "@zephyr3d/scene": "workspace:^0.9.26"
+    "@zephyr3d/modelgen": "workspace:^0.1.1",
+    "@zephyr3d/procgen": "workspace:^0.1.1",
+    "@zephyr3d/scene": "workspace:^0.9.27"
   }
 }

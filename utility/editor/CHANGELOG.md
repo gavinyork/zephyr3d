@@ -1,6 +1,15 @@
 # Change Log - @zephyr3d/editor
 
-This log was last generated on Tue, 01 Sep 2026 07:54:12 GMT and should not be manually modified.
+This log was last generated on Mon, 14 Sep 2026 20:07:40 GMT and should not be manually modified.
+
+## 0.3.16
+Mon, 14 Sep 2026 20:07:40 GMT
+
+### Patches
+
+- Support retarget reference pose configuration for skeletons; fix humanoid retargeting of root and pelvis position; fix external retarget pose bone namespace matching.
+- Fix the plugin menu not refreshing when a project is first opened.
+- Improve resource service handling and import option dialogs
 
 ## 0.3.15
 Tue, 01 Sep 2026 07:54:12 GMT

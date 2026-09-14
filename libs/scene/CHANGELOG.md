@@ -1,6 +1,20 @@
 # Change Log - @zephyr3d/scene
 
-This log was last generated on Tue, 01 Sep 2026 07:54:12 GMT and should not be manually modified.
+This log was last generated on Mon, 14 Sep 2026 20:07:40 GMT and should not be manually modified.
+
+## 0.9.27
+Mon, 14 Sep 2026 20:07:40 GMT
+
+### Patches
+
+- Fix motion blur to streak moving objects; make the blur length configurable at runtime and fix it vanishing at a biased shutter.
+- Fix the SAO rendering equation.
+- Support configuring a retarget reference pose for skeletons; fix humanoid retargeting of root and pelvis displacement; correct bone namespace matching for externally retargeted poses; extend animation set and skeleton serialization.
+- Add underwater effect
+- Add a water caustics system
+- Add directional sun in-scattering to the water body; fix the surface Fresnel floor, refraction scaling, horizon reflections and distant highlight aliasing.
+- Add foam support to the Gerstner wave generator and shoreline foam driven by a Hi-Z proximity query; fix foam not being affected by lights.
+- Fix water shading on folded waves; add shading debug output views
 
 ## 0.9.26
 Tue, 01 Sep 2026 07:54:12 GMT
