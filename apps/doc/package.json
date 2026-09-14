@@ -19,7 +19,7 @@
     "build:vitepress": "cross-env DOC_BASE=/doc/ NODE_OPTIONS=--max_old_space_size=8192 vitepress build web",
     "build:vitepress:noapi": "cross-env DOC_BASE=/doc/ DOC_SKIP_API=1 NODE_OPTIONS=--max_old_space_size=8192 vitepress build web",
     "build:web": "npm run build:static && npm run build:showcase && npm run build:tutorials && npm run build:vitepress",
-    "build:site": "shx rm -rf dist web/api && shx rm -f .buildcache.tmp.json && npm run build:doc && npm run build:web",
+    "build:site": "shx rm -rf dist web/api && npm run clean:cache && npm run build:doc && npm run build:web",
     "clean:cache": "shx rm -f .buildcache.json .buildcache.tmp.json .libcache.json",
     "build:check": "tsc -p . --noEmit",
     "deploy": "npm run build:site && shx rm -rf ../homepage/doc && shx cp -R dist/web ../homepage/doc",
