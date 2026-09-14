@@ -359,6 +359,7 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
   private _underwaterGodRays: boolean;
   private _underwaterGodRayIntensity: number;
   private _underwaterGodRaySteps: number;
+  private _underwaterGodRayShadow: boolean;
   private _underwaterHysteresis: number;
   private _subsurfaceIntensity: number;
   private _subsurfaceSteepness: number;
@@ -421,6 +422,11 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
     this._underwaterGodRays = true;
     this._underwaterGodRayIntensity = 1;
     this._underwaterGodRaySteps = 24;
+    // Off by default: it is a shadow map lookup per march step on top of the
+    // caustic lookup already there, which roughly doubles the cost of the
+    // shafts. Worth turning on for a scene with something large standing in the
+    // water, where a shaft running through it unbroken is the obvious artefact.
+    this._underwaterGodRayShadow = false;
     // A few centimetres. Wide enough that floating-point noise on the camera
     // height cannot flip the state, narrow enough that the transition still
     // happens where the eye expects it.
@@ -705,6 +711,25 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
   }
   set underwaterGodRaySteps(val: number) {
     this._underwaterGodRaySteps = Math.max(1, Math.floor(val));
+  }
+  /**
+   * Whether geometry standing in the water breaks the light shafts.
+   *
+   * Off by default. The shafts are built from the caustic map, which knows what
+   * the *surface* did to the sunlight and nothing about what is under it, so
+   * without this a shaft runs straight through a piling or a hull. Turning it on
+   * samples the sun's shadow map once per march step, which roughly doubles what
+   * the shafts cost; the sea bed's own shadows are unaffected either way, since
+   * those come from the ordinary lighting path.
+   *
+   * Needs the caustic light to be casting shadows, which it already must be for
+   * the caustics themselves to exist.
+   */
+  get underwaterGodRayShadow() {
+    return this._underwaterGodRayShadow;
+  }
+  set underwaterGodRayShadow(val: boolean) {
+    this._underwaterGodRayShadow = !!val;
   }
   /**
    * Half-width in meters of the dead band around the surface the submerged test

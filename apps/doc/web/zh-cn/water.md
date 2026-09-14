@@ -152,6 +152,7 @@ water.underwaterGodRays = true;
 | `underwaterGodRays` | 穿过水体的阳光光柱，默认 `true` |
 | `underwaterGodRayIntensity` | 光柱强度，1 为介质隐含的物理值 |
 | `underwaterGodRaySteps` | 每条视线的采样数，默认 24。当光柱看起来像颗粒而不是光束时调大 |
+| `underwaterGodRayShadow` | 让立在水中的几何体遮断光柱。默认 `false`；每个 march 步额外一次 shadow map 采样 |
 | `underwaterHysteresis` | 入水判定在水面附近的迟滞带半宽（米） |
 
 进入水下会带来三点变化：
@@ -159,6 +160,13 @@ water.underwaterGodRays = true;
 - **地平线是水，不是天空。** 没有命中任何几何的视线会被赋予完整的消光距离，因此收敛到介质颜色。该帧的大气雾会被抑制——摄像机前方的介质是水，由水下 pass 负责。
 - **水面出现 Snell 窗。** 向上看时，水面之上的整个世界被压缩进一个约 48.6° 的圆锥内；锥外的水面是全内反射镜面，映出水下的场景。`reflectionStrength` 仍可调节窗内的反射，但不会削弱窗外的镜面——那里在物理上本就看不到水面之上的任何东西。
 - **光柱与焦散共用同一张贴图。** 光柱把焦散图当作水面的透射率来读取，因此光束会和它照到的焦散光斑对齐。这意味着光柱依赖 `causticsEnabled` 及其全部前提条件；没有焦散图时光柱自动关闭，环境介质仍然保留。
+
+由于焦散图只记录了**水面**对阳光做了什么，除非打开 `underwaterGodRayShadow`，否则光柱会直接穿过立在水中的物体。海床自身的阴影走的是常规光照路径，无论该开关与否都是正确的——所以它只在场景中有足够大的遮挡物（桥墩、船体、礁石拱门）、"光柱穿体而过"会明显穿帮时才需要打开。
+
+```ts
+// 让光柱被栈桥遮断。
+water.underwaterGodRayShadow = true;
+```
 
 介质使用的是水面着色所用的同一组 `absorption` / `scattering` 系数，因此水下视角与水上视角对水的颜色不会产生分歧。
 
@@ -310,4 +318,4 @@ boat.position.y = positions[0].y;
 - **焦散**：需要投射阴影的方向光。不需要时保持 `causticsEnabled = false`。
 - **近岸泡沫**：开启后每个水面像素增加十余次深度采样，并让场景的深度金字塔多一个通道。不需要时保持 `shoreFoamAmount = 0`。
 - **折射模糊 / 方向性散射**：几乎无额外成本，是与介质系数联动的高性价比效果。
-- **水下渲染**：摄像机在水面之上时零成本——该 pass 根本不会被构建进帧。入水后是两次全屏绘制；开启光柱时每像素额外增加 `underwaterGodRaySteps` 次焦散贴图采样。优先调小采样数，而不是直接关闭光柱。
+- **水下渲染**：摄像机在水面之上时零成本——该 pass 根本不会被构建进帧。入水后是两次全屏绘制；开启光柱时每像素额外增加 `underwaterGodRaySteps` 次焦散贴图采样，再打开 `underwaterGodRayShadow` 则再增加同样次数的 shadow map 采样。优先调小采样数，而不是直接关闭光柱。

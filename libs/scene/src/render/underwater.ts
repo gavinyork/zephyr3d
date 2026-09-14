@@ -11,6 +11,8 @@ import type {
 import type { Camera } from '../camera/camera';
 import type { WaterMaterial } from '../material/water';
 import { ShaderHelper } from '../material/shader/helper';
+import type { PunctualLight } from '../scene/light';
+import type { ShadowMapParams } from '../shadow/shadowmapper';
 import type { Water } from '../scene/water';
 import { waterScatterPhase } from '../shaders/water_medium';
 import { LIGHT_TYPE_DIRECTIONAL } from '../values';
@@ -132,6 +134,16 @@ export function selectUnderwaterSource(ctx: DrawContext): Nullable<UnderwaterSta
 const OPTICAL_DEPTH_CAP = 30;
 
 /**
+ * Global name of the shadow map the receiver helpers sample.
+ *
+ * Fixed by `ShaderHelper`, which declares it under this name for materials and
+ * reads it from the implementation's `computeShadow`; a standalone pass sampling
+ * shadows has to use the same one.
+ * @internal
+ */
+const SHADOW_MAP_UNIFORM = 'Z_UniformShadowMap';
+
+/**
  * Composites the water body a submerged camera is looking through.
  *
  * Two draws over the opaque scene, both in place on the scene color target:
@@ -172,6 +184,17 @@ export class UnderwaterRenderer {
   private readonly _albedo: Vector3;
   private readonly _sunDir: Vector3;
   private readonly _sunColor: Vector3;
+  /** Shadow receiver uniforms, only touched while the shafts are shadowed. */
+  private readonly _cameraPosition: Vector4;
+  private readonly _cameraParams: Vector4;
+  private readonly _implParams: Vector4;
+  private readonly _cameraForward: Vector4;
+  /**
+   * Scratch for the cascade matrices. Copied rather than passed through, because
+   * the uniform setter wants an array it owns the buffer type of; reused so the
+   * copy does not allocate every frame.
+   */
+  private _shadowMatrices: Nullable<Float32Array<ArrayBuffer>>;
   constructor() {
     this._extinctionProgram = null;
     this._extinctionBindGroup = null;
@@ -184,6 +207,11 @@ export class UnderwaterRenderer {
     this._albedo = new Vector3();
     this._sunDir = new Vector3();
     this._sunColor = new Vector3();
+    this._cameraPosition = new Vector4();
+    this._cameraParams = new Vector4();
+    this._implParams = new Vector4();
+    this._cameraForward = new Vector4();
+    this._shadowMatrices = null;
   }
   /**
    * Composite the medium over the opaque scene.
@@ -210,7 +238,13 @@ export class UnderwaterRenderer {
     const godRays =
       material.underwaterGodRays && !!ctx.waterCaustics && !!sun && material.underwaterGodRayIntensity > 0;
     const steps = godRays ? material.underwaterGodRaySteps : 0;
-    const { extinctionPass, inscatterPass } = this._prepare(device, steps);
+    // The caustic light is required to cast shadows for the map to exist at all,
+    // so its params are normally there; the lookup stays defensive because this
+    // runs a module later and nothing re-checks in between.
+    const shadowMapParams =
+      godRays && material.underwaterGodRayShadow ? (ctx.shadowMapInfo?.get(sun!) ?? null) : null;
+    const shadow = shadowMapParams?.shadowMap ? shadowMapParams : null;
+    const { extinctionPass, inscatterPass } = this._prepare(device, steps, shadow);
     const extinction = material.extinction;
     this._extinction.set(extinction);
     this._albedo.set(material.scatterAlbedo);
@@ -271,6 +305,9 @@ export class UnderwaterRenderer {
           // Same uniforms the lit materials bind, so the shafts and the caustics
           // on the sea bed are reading one map through one projection.
           ShaderHelper.setWaterCausticUniforms(bindGroup, ctx);
+          if (shadow) {
+            this._setShadowUniforms(bindGroup, ctx, sun!, shadow);
+          }
         }
         device.setProgram(pass.program);
         device.setBindGroup(0, bindGroup);
@@ -281,15 +318,77 @@ export class UnderwaterRenderer {
     }
   }
   /**
+   * Upload the shadow receiver uniforms the march samples.
+   *
+   * The names and the struct layouts are dictated by the helpers that read them
+   * (`ShaderHelper.calculateShadowSpaceVertex`, the shadow implementation's
+   * `computeShadow`), which expect the material light pass's globals. This is
+   * the same arrangement the shadow mask pass makes for the same reason - see
+   * `ShadowMaskRenderer.setUniforms`.
+   * @internal
+   */
+  private _setShadowUniforms(
+    bindGroup: BindGroup,
+    ctx: DrawContext,
+    light: PunctualLight,
+    shadowMapParams: ShadowMapParams
+  ): void {
+    const camera = ctx.camera;
+    const near = camera.getNearPlane();
+    const far = camera.getFarPlane();
+    const cameraPos = camera.getWorldPosition();
+    this._cameraPosition.setXYZW(cameraPos.x, cameraPos.y, cameraPos.z, 0);
+    this._cameraParams.setXYZW(near, far, 1, 1);
+    bindGroup.setValue('camera', {
+      position: this._cameraPosition,
+      params: this._cameraParams,
+      shadowDebugCascades: camera.shadowDebugCascades ? 1 : 0,
+      framestamp: ctx.device.frameInfo.frameCounter
+    });
+    shadowMapParams.impl!.getParams(this._implParams);
+    const matrices = shadowMapParams.shadowMatrices;
+    if (!this._shadowMatrices || this._shadowMatrices.length !== matrices.length) {
+      this._shadowMatrices = new Float32Array(matrices.length);
+    }
+    this._shadowMatrices.set(matrices);
+    bindGroup.setValue('light', {
+      sunDir: ctx.sunLight ? ctx.sunLight.directionAndCutoff.xyz().scaleBy(-1) : Vector3.axisPY(),
+      shadowCascades: shadowMapParams.numShadowCascades,
+      positionAndRange: light.positionAndRange,
+      directionAndCutoff: light.directionAndCutoff,
+      diffuseAndIntensity: ShaderHelper.getPreExposedColorIntensity(light, ctx),
+      extraParams: light.extraParams,
+      cascadeDistances: shadowMapParams.cascadeDistances,
+      depthBiasValues: shadowMapParams.depthBiasValues[0],
+      shadowCameraParams: shadowMapParams.cameraParams,
+      depthBiasScales: shadowMapParams.depthBiasScales,
+      implParams: this._implParams,
+      shadowMatrices: this._shadowMatrices,
+      shadowStrength: light.shadow.shadowStrength,
+      envLightStrength: ShaderHelper.getEnvLightLuminance(ctx),
+      envLightSpecularStrength: ctx.env?.light.specularStrength ?? 1
+    });
+    // Which way the camera looks, for the cascade split test. The march knows
+    // how far along its ray a sample is, and the splits are measured in view
+    // depth; using the radial distance instead would pick a coarser cascade
+    // towards the edges of a wide frustum and bend the cascade seam.
+    camera.worldMatrix.getRow(2, this._cameraForward);
+    this._cameraForward.scaleBy(-1);
+    bindGroup.setValue('cameraForward', this._cameraForward.xyz());
+    bindGroup.setTexture(SHADOW_MAP_UNIFORM, shadowMapParams.shadowMap!, shadowMapParams.shadowMapSampler);
+  }
+  /**
    * Build or fetch the two programs this frame needs.
    *
    * @param device - Rendering device.
    * @param steps - Ray-march steps for the shafts, 0 for the ambient-only variant.
+   * @param shadow - Shadow params for the caustic light when the shafts should be
+   * occluded by geometry, null when they should not.
    * @internal
    */
-  private _prepare(device: AbstractDevice, steps: number) {
+  private _prepare(device: AbstractDevice, steps: number, shadow: Nullable<ShadowMapParams>) {
     if (!this._extinctionProgram) {
-      this._extinctionProgram = UnderwaterRenderer._createProgram(device, false, 0);
+      this._extinctionProgram = UnderwaterRenderer._createProgram(device, false, 0, null);
       this._extinctionBindGroup = device.createBindGroup(this._extinctionProgram.bindGroupLayouts[0]);
       this._extinctionStates = device.createRenderStateSet();
       this._extinctionStates.useRasterizerState().setCullMode('none');
@@ -317,11 +416,13 @@ export class UnderwaterRenderer {
     }
     // The march is unrolled, so the step count is part of the program identity.
     // Authoring it as a uniform loop bound instead would cost a dynamic loop in
-    // every variant including the one with no shafts at all.
-    const key = String(steps);
+    // every variant including the one with no shafts at all. The shadow hash
+    // joins it because the receiver code is generated from the implementation,
+    // the cascade count and the shadow map's own type.
+    const key = `${steps}|${shadow ? shadow.shaderHash : ''}`;
     let inscatter = this._inscatterPrograms.get(key);
     if (!inscatter) {
-      const program = UnderwaterRenderer._createProgram(device, true, steps);
+      const program = UnderwaterRenderer._createProgram(device, true, steps, shadow);
       inscatter = { program, bindGroup: device.createBindGroup(program.bindGroupLayouts[0]) };
       this._inscatterPrograms.set(key, inscatter);
     }
@@ -342,10 +443,19 @@ export class UnderwaterRenderer {
    * @param device - Rendering device.
    * @param inscatter - Build the in-scattering half rather than the extinction one.
    * @param steps - Ray-march steps for the sun shafts; 0 leaves them out entirely.
+   * @param shadowMapParams - Shadow params when the shafts should be occluded by
+   * geometry, null when they should not.
    * @internal
    */
-  private static _createProgram(device: AbstractDevice, inscatter: boolean, steps: number): GPUProgram {
+  private static _createProgram(
+    device: AbstractDevice,
+    inscatter: boolean,
+    steps: number,
+    shadowMapParams: Nullable<ShadowMapParams>
+  ): GPUProgram {
     const godRays = inscatter && steps > 0;
+    const shadow = godRays ? shadowMapParams : null;
+    const numCascades = shadow?.numShadowCascades ?? 0;
     const program = device.buildRenderProgram({
       label: inscatter ? 'UnderwaterInscatter' : 'UnderwaterExtinction',
       vertex(pb) {
@@ -379,6 +489,124 @@ export class UnderwaterRenderer {
           // The same caustic uniforms every lit material declares, so the shafts
           // read the map through the exact projection the sea bed does.
           ShaderHelper.declareWaterCausticUniforms(pb);
+        }
+        if (shadow) {
+          // The shadow receiver helpers read the material light pass's globals by
+          // name, so a standalone pass has to reproduce them field for field.
+          // Same arrangement, and same reason, as ShadowMaskRenderer.
+          const cameraStruct = pb.defineStruct([
+            pb.vec4('position'),
+            pb.vec4('params'),
+            pb.float('shadowDebugCascades'),
+            // Read by the PCSS implementation's temporal jitter.
+            pb.int('framestamp')
+          ]);
+          const lightStruct = pb.defineStruct([
+            pb.vec3('sunDir'),
+            pb.int('shadowCascades'),
+            pb.vec4('positionAndRange'),
+            pb.vec4('directionAndCutoff'),
+            pb.vec4('diffuseAndIntensity'),
+            pb.vec4('extraParams'),
+            pb.vec4('cascadeDistances'),
+            pb.vec4('depthBiasValues'),
+            pb.vec4('shadowCameraParams'),
+            pb.vec4('depthBiasScales'),
+            pb.vec4('implParams'),
+            pb.vec4[16]('shadowMatrices'),
+            pb.float('shadowStrength'),
+            pb.float('envLightStrength'),
+            pb.float('envLightSpecularStrength')
+          ]);
+          this.camera = cameraStruct().uniform(0);
+          this.light = lightStruct().uniform(0);
+          this.cameraForward = pb.vec3().uniform(0);
+          const shadowMap = shadow.shadowMap!;
+          const shadowTex = shadowMap.isTextureCube()
+            ? shadowMap.isDepth()
+              ? pb.texCubeShadow()
+              : pb.texCube()
+            : shadowMap.isTexture2D()
+              ? shadowMap.isDepth()
+                ? pb.tex2DShadow()
+                : pb.tex2D()
+              : shadowMap.isDepth()
+                ? pb.tex2DArrayShadow()
+                : pb.tex2DArray();
+          if (
+            !shadowMap.isDepth() &&
+            !device.getDeviceCaps().textureCaps.getTextureFormatInfo(shadowMap.format).filterable
+          ) {
+            shadowTex.sampleType('unfilterable-float');
+          }
+          this[SHADOW_MAP_UNIFORM] = shadowTex.uniform(0);
+          // How much sun reaches a point inside the water column.
+          //
+          // No normal offset bias: that exists to stop a surface shadowing
+          // itself at grazing incidence, and a point floating in the medium has
+          // no surface to do it with. NoL is passed as 1 for the same reason -
+          // there is no receiver orientation, and 1 is the value that asks the
+          // depth bias for its smallest correction.
+          pb.func('zUnderwaterShadow', [pb.vec3('worldPos'), pb.float('viewDepth')], function () {
+            if (numCascades > 1) {
+              this.$l.comparison = pb.vec4(
+                pb.greaterThan(pb.vec4(this.viewDepth), this.light.cascadeDistances)
+              );
+              this.$l.cascadeFlags = pb.vec4(
+                pb.float(pb.greaterThan(this.light.shadowCascades, 0)),
+                pb.float(pb.greaterThan(this.light.shadowCascades, 1)),
+                pb.float(pb.greaterThan(this.light.shadowCascades, 2)),
+                pb.float(pb.greaterThan(this.light.shadowCascades, 3))
+              );
+              this.$l.split = pb.int(pb.dot(this.comparison, this.cascadeFlags));
+              if (device.type === 'webgl') {
+                // WebGL1 cannot index the matrix array dynamically.
+                this.$l.shadowVertex = pb.vec4();
+                this.$for(pb.int('cascade'), 0, 4, function () {
+                  this.$if(pb.equal(this.cascade, this.split), function () {
+                    this.shadowVertex = ShaderHelper.calculateShadowSpaceVertex(
+                      this,
+                      pb.vec4(this.worldPos, 1),
+                      this.cascade
+                    );
+                    this.$break();
+                  });
+                });
+              } else {
+                this.$l.shadowVertex = ShaderHelper.calculateShadowSpaceVertex(
+                  this,
+                  pb.vec4(this.worldPos, 1),
+                  this.split
+                );
+              }
+              this.$l.shadow = shadow.impl!.computeShadowCSM(
+                shadow,
+                this,
+                this.shadowVertex,
+                pb.float(1),
+                this.split
+              );
+            } else {
+              this.$l.shadowVertex = ShaderHelper.calculateShadowSpaceVertex(this, pb.vec4(this.worldPos, 1));
+              this.$l.shadow = shadow.impl!.computeShadow(shadow, this, this.shadowVertex, pb.float(1));
+            }
+            // Past the shadow distance there is no map left to read, so the
+            // shafts have to come back to unshadowed rather than to whatever the
+            // last cascade's border holds. Same fade the surfaces use, so a shaft
+            // and the sea bed under it stop being shadowed together.
+            this.$l.shadowDistance = this.light.shadowCameraParams.w;
+            this.shadow = pb.mix(
+              this.shadow,
+              1,
+              pb.smoothStep(
+                pb.mul(this.shadowDistance, 0.8),
+                this.shadowDistance,
+                pb.distance(this.camera.position.xyz, this.worldPos)
+              )
+            );
+            this.shadow = pb.mix(1, this.shadow, this.light.shadowStrength);
+            this.$return(pb.clamp(this.shadow, 0, 1));
+          });
         }
         this.$outputs.outColor = pb.vec4();
         pb.main(function () {
@@ -518,6 +746,15 @@ export class UnderwaterRenderer {
                   this.sunDirection,
                   false
                 );
+                if (shadow) {
+                  // What the caustic map cannot know: it describes what the
+                  // *surface* did to the sunlight and nothing about what stands
+                  // under it, so without this a shaft runs straight through a
+                  // piling. The sea bed's own shadow is unaffected either way -
+                  // that comes from the ordinary lighting path.
+                  this.$l.viewDepth = pb.dot(pb.sub(this.samplePos, this.cameraPosition), this.cameraForward);
+                  this.sunAtP = pb.mul(this.sunAtP, this.zUnderwaterShadow(this.samplePos, this.viewDepth));
+                }
                 // Transmittance back to the eye over the density the sample was
                 // drawn from. The constant factors of the pdf - sigmaPlace and
                 // cdfMax - are the same for every sample, so they cancel in the

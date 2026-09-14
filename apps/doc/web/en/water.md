@@ -152,6 +152,7 @@ water.underwaterGodRays = true;
 | `underwaterGodRays` | Shafts of sunlight through the column, default `true` |
 | `underwaterGodRayIntensity` | Shaft strength, 1 for the value the medium implies |
 | `underwaterGodRaySteps` | Samples per view ray, default 24. Raise it when the shafts read as grain rather than as beams |
+| `underwaterGodRayShadow` | Let geometry standing in the water break the shafts. Default `false`; costs a shadow map lookup per march step |
 | `underwaterHysteresis` | Half-width (meters) of the dead band around the surface the submerged test uses |
 
 Three things follow from being submerged:
@@ -159,6 +160,13 @@ Three things follow from being submerged:
 - **The horizon is water, not sky.** A ray that never hits geometry is given the full extinction distance, so it converges to the medium colour. Atmospheric fog is suppressed for the frame - the medium in front of the camera is water, and the underwater pass owns it.
 - **The surface has a Snell window.** Looking up, everything above the water is compressed into a cone about 48.6° wide; outside it the surface is a total internal mirror showing the scene below. `reflectionStrength` still tunes the window's own reflection but does not weaken the mirror outside it, where physically nothing above the water is visible.
 - **The shafts share the caustic map.** They read it as the surface's transmittance, so a shaft lines up with the caustic cell it lands in. They therefore need `causticsEnabled` and everything it needs; without a map they switch off and the ambient medium remains.
+
+Because the caustic map only records what the **surface** did to the sunlight, a shaft runs straight through anything standing in the water unless `underwaterGodRayShadow` is on. The sea bed's own shadows come from the ordinary lighting path and are correct either way, so the setting only matters in a scene with something large enough for an unbroken shaft through it to read as wrong - a piling, a hull, a rock arch.
+
+```ts
+// A shaft passing through the pier should be broken by it.
+water.underwaterGodRayShadow = true;
+```
 
 The medium uses the same `absorption` / `scattering` coefficients the surface does, so the view from below and the view from above never disagree about the colour of the water.
 
@@ -310,4 +318,4 @@ Use the largest `gridScale` that still gives enough near-camera detail. Keep the
 - **Caustics**: need a shadow-casting directional light. Keep `causticsEnabled = false` when you do not want them.
 - **Shoreline foam**: adds around a dozen depth samples per water pixel and a second channel to the scene's depth pyramid. Keep `shoreFoamAmount = 0` when you do not want it.
 - **Refraction blur / directional scattering**: nearly free, and they pull a lot of look from the medium coefficients.
-- **Underwater**: costs nothing while the camera is above the surface - the pass is not built into the frame at all. Once submerged it is two full-screen draws, plus `underwaterGodRaySteps` caustic-map samples per pixel when the shafts are on. Lower the step count before turning the shafts off.
+- **Underwater**: costs nothing while the camera is above the surface - the pass is not built into the frame at all. Once submerged it is two full-screen draws, plus `underwaterGodRaySteps` caustic-map samples per pixel when the shafts are on, and the same number of shadow map lookups again when `underwaterGodRayShadow` is. Lower the step count before turning the shafts off.

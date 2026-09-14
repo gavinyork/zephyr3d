@@ -1758,7 +1758,14 @@ export class ProgramBuilder {
       if (st) {
         st.getType().reset(structName, 'default', args);
         st.prefix = prefix;
-        return null;
+        const structType = this._structInfo[shaderType]?.structs[structName];
+        const structInstance = this.struct(structName, instanceName);
+        return [
+          structType,
+          structInstance,
+          structName,
+          this.struct(structName, AST.getBuiltinParamName(shaderType))
+        ];
       } else {
         const structType = this.internalDefineStructByType(
           this._shaderType,

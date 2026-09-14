@@ -216,6 +216,26 @@ myApp.ready().then(function () {
   });
   applyGodRays(godRayCheck.checked);
 
+  // The caustic map records what the surface did to the sunlight and nothing
+  // about what stands under it, so a shaft runs through the ocean scene's pillar
+  // unless the march samples the sun's shadow map too.
+  /** @type {HTMLInputElement} */
+  const godRayShadowCheck = document.querySelector('#godray-shadow-check');
+  const applyGodRayShadow = function (enabled) {
+    for (const scene of [ocean.get(), pool.get()]) {
+      scene.rootNode.iterate(function (node) {
+        if (node instanceof Water) {
+          node.underwaterGodRayShadow = enabled;
+        }
+        return false;
+      });
+    }
+  };
+  godRayShadowCheck.addEventListener('change', function () {
+    applyGodRayShadow(godRayShadowCheck.checked);
+  });
+  applyGodRayShadow(godRayShadowCheck.checked);
+
   getInput().use(forwarder);
   myApp.run();
 });

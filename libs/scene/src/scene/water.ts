@@ -320,6 +320,22 @@ export class Water extends applyMixins(GraphNode, mixinDrawable) implements Draw
     this.material.underwaterGodRaySteps = val;
   }
   /**
+   * Whether geometry standing in the water breaks the light shafts. Off by
+   * default.
+   *
+   * The shafts come from the caustic map, which describes what the *surface* did
+   * to the sunlight and knows nothing about what is under it, so without this a
+   * shaft runs straight through a piling or a hull. Costs a shadow map lookup
+   * per march step, roughly doubling what the shafts cost. The sea bed's own
+   * shadows are unaffected either way.
+   */
+  get underwaterGodRayShadow() {
+    return this.material.underwaterGodRayShadow;
+  }
+  set underwaterGodRayShadow(val: boolean) {
+    this.material.underwaterGodRayShadow = val;
+  }
+  /**
    * Half-width in meters of the dead band around the surface the submerged test
    * uses, so a camera sitting at water level does not flip state every frame.
    * The test is against the rest plane, not the displaced surface.

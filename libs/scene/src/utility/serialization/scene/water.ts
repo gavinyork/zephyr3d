@@ -811,6 +811,22 @@ export function getWaterClass(manager: ResourceManager): SerializableClass {
           }
         },
         {
+          name: 'UnderwaterGodRayShadow',
+          description:
+            'Whether geometry standing in the water breaks the light shafts. The shafts come from the caustic map, which knows only what the surface did to the sunlight, so without this a shaft runs straight through a piling. Costs a shadow map lookup per march step.',
+          type: 'bool',
+          default: false,
+          isHidden(this: Water) {
+            return !this.underwaterEnabled || !this.underwaterGodRays;
+          },
+          get(this: Water, value) {
+            value.bool[0] = this.underwaterGodRayShadow;
+          },
+          set(this: Water, value) {
+            this.underwaterGodRayShadow = value.bool[0];
+          }
+        },
+        {
           name: 'UnderwaterHysteresis',
           description:
             'Half-width in meters of the dead band around the surface the submerged test uses, so a camera at water level does not flip state every frame',
