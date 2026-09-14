@@ -15,8 +15,7 @@ import {
   FFTWaveGenerator,
   getInput,
   getEngine,
-  getDevice,
-  FPSCameraController
+  getDevice
 } from '@zephyr3d/scene';
 import { backendWebGL2 } from '@zephyr3d/backend-webgl';
 import { backendWebGPU } from '@zephyr3d/backend-webgpu';
@@ -122,82 +121,6 @@ myApp.ready().then(function () {
   }
   applyDebug(debugSelect.value);
 
-  // Freeze the wave clock. animationSpeed scales the elapsed time the generator
-  // is driven by, so zero holds the surface still and the same instant can be
-  // compared across two debug views. The authored speed is remembered per node
-  // so unpausing restores it rather than hard-coding 1.
-  /** @type {HTMLInputElement} */
-  const pauseCheck = document.querySelector('#pause-check');
-  /** @type {WeakMap<Water, number>} */
-  const speedBeforePause = new WeakMap();
-  const applyPause = function (paused) {
-    for (const scene of [ocean.get(), pool.get()]) {
-      scene.rootNode.iterate(function (node) {
-        if (node instanceof Water) {
-          if (paused) {
-            if (!speedBeforePause.has(node)) {
-              speedBeforePause.set(node, node.animationSpeed);
-            }
-            node.animationSpeed = 0;
-          } else if (speedBeforePause.has(node)) {
-            node.animationSpeed = speedBeforePause.get(node);
-            speedBeforePause.delete(node);
-          }
-        }
-        return false;
-      });
-    }
-  };
-  pauseCheck.addEventListener('change', function () {
-    applyPause(pauseCheck.checked);
-  });
-  if (new URLSearchParams(location.search).get('pause') === '1') {
-    pauseCheck.checked = true;
-  }
-  applyPause(pauseCheck.checked);
-
-  // Drop the camera under the surface. Nothing switches the underwater look on
-  // beyond the camera being inside a water region - this only moves it there.
-  // Each scene keeps both placements so toggling returns to the authored view
-  // rather than to wherever the orbit controller had been dragged.
-  const VIEWPOINTS = new Map([
-    [
-      ocean.get(),
-      {
-        above: [new Vector3(0, 18, 60), new Vector3(0, 0, 0)],
-        below: [new Vector3(0, -0.6, 22), new Vector3(0, -2.5, 0)]
-      }
-    ],
-    [
-      pool.get(),
-      {
-        above: [new Vector3(5, 12, 20), new Vector3(-2, -1, 3)],
-        below: [new Vector3(4, 1.2, 9), new Vector3(-1, -1, 1)]
-      }
-    ]
-  ]);
-  /** @type {HTMLInputElement} */
-  const diveCheck = document.querySelector('#dive-check');
-  const applyDive = function (dived) {
-    for (const [scene, viewpoints] of VIEWPOINTS) {
-      const [eye, center] = dived ? viewpoints.below : viewpoints.above;
-      const camera = scene.mainCamera;
-      camera.lookAt(eye, center, Vector3.axisPY());
-      // The orbit controller caches the eye and the pivot it turns around, so a
-      // bare lookAt would be undone on its next update. A fresh one picks both
-      // up from the camera it is attached to.
-      camera.controller = new OrbitCameraController({ center });
-    }
-  };
-  diveCheck.addEventListener('change', function () {
-    applyDive(diveCheck.checked);
-  });
-  if (new URLSearchParams(location.search).get('dive') === '1') {
-    diveCheck.checked = true;
-  }
-  applyDive(diveCheck.checked);
-
-  // The shafts read the caustic map as the surface's transmittance, so they need
   // caustics; the water switches them off by itself when no map exists.
   /** @type {HTMLInputElement} */
   const godRayCheck = document.querySelector('#godray-check');
@@ -281,7 +204,7 @@ function buildOceanScene() {
   bedMaterial.albedoColor = new Vector4(0.76, 0.7, 0.5, 1);
   bedMaterial.roughness = 1;
   const bed = new Mesh(scene, new PlaneShape({ size: 5000 }), bedMaterial);
-  bed.position.setXYZ(0, -24, 0);
+  bed.position.setXYZ(0, -8, 0);
 
   const water = new Water(scene);
   water.scale.setXYZ(5000, 1, 5000);
@@ -323,14 +246,14 @@ function buildOceanScene() {
   water.infinite = false;
 
   water.causticsEnabled = true;
-  water.causticsIntensity = 1.5;
-  water.causticsDepth = 26;
-  water.causticsRange = 80;
-  water.causticsSceneDepth = true;
+  water.causticsIntensity = 2;
+  water.causticsDepth = 10;
+  water.causticsRange = 60;
+  water.causticsFadeDistance = 20;
 
   scene.mainCamera = new PerspectiveCamera(scene, Math.PI / 3, 1, 1000);
   scene.mainCamera.lookAt(new Vector3(0, 18, 60), new Vector3(0, 0, 0), Vector3.axisPY());
-  scene.mainCamera.controller = new FPSCameraController();
+  scene.mainCamera.controller = new OrbitCameraController();
   scene.mainCamera.TAA = true;
   scene.mainCamera.HiZ = true;
 
@@ -397,7 +320,7 @@ function buildPoolScene() {
   water.position.setXYZ(0, 3, 0);
   water.gridScale = 1;
   water.animationSpeed = 1;
-  water.causticsIntensity = 1;
+  water.causticsIntensity = 1.5;
   water.causticsRange = 30;
   water.causticsDepth = 6;
   water.causticsFadeDistance = 6;

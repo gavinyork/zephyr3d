@@ -97,7 +97,7 @@ water.material.refractionMode = 'offset';
 water.material.cheapRefractionDepth = 1;
 ```
 
-`cheapRefractionDepth` (meters) is used only by `offset`. It is the depth the cheap mode assumes the water is, which sets how strong the distortion looks. It is deliberately a constant rather than the real depth - scaling by the real distance paints a second copy of anything breaking the surface.
+`cheapRefractionDepth` (meters) is used only by `offset`. It is the depth the cheap mode assumes the water is, which sets how strong the distortion looks.
 
 ## Caustics
 
@@ -118,8 +118,6 @@ water.causticsIntensity = 1;
 | `causticsIntensity` | Caustic contrast. 0 leaves the light unmodulated, 1 is the default physical amount |
 | `causticsSceneDepth` | Land photons on the real scene instead of on a flat focal plane. Default `true`; free on WebGPU, degrades to the plane on WebGL2, where `causticsDepth` *is* the receiver depth |
 | `causticsFadeDistance` | Width (meters) of the band the pattern fades out over at the map edge. 0 derives it from `causticsRange` |
-
-If the water surface sits **above** the pool walls (say surface at y=4, floor at y=0), caustics shift by `depth / tan(sun elevation)`, leaving a blank band between the caustic boundary and the wall shadows. Keeping the surface at the rim, and letting the water region cover the full receiving area, keeps the two aligned.
 
 ## Directional Scattering
 
@@ -155,24 +153,9 @@ water.underwaterGodRays = true;
 | `underwaterGodRayShadow` | Let geometry standing in the water break the shafts. Default `false`; costs a shadow map lookup per march step |
 | `underwaterHysteresis` | Half-width (meters) of the dead band around the surface the submerged test uses |
 
-Three things follow from being submerged:
-
-- **The horizon is water, not sky.** A ray that never hits geometry is given the full extinction distance, so it converges to the medium colour. Atmospheric fog is suppressed for the frame - the medium in front of the camera is water, and the underwater pass owns it.
-- **The surface has a Snell window.** Looking up, everything above the water is compressed into a cone about 48.6° wide; outside it the surface is a total internal mirror showing the scene below. `reflectionStrength` still tunes the window's own reflection but does not weaken the mirror outside it, where physically nothing above the water is visible.
-- **The shafts share the caustic map.** They read it as the surface's transmittance, so a shaft lines up with the caustic cell it lands in. They therefore need `causticsEnabled` and everything it needs; without a map they switch off and the ambient medium remains.
-
-Because the caustic map only records what the **surface** did to the sunlight, a shaft runs straight through anything standing in the water unless `underwaterGodRayShadow` is on. The sea bed's own shadows come from the ordinary lighting path and are correct either way, so the setting only matters in a scene with something large enough for an unbroken shaft through it to read as wrong - a piling, a hull, a rock arch.
-
-```ts
-// A shaft passing through the pier should be broken by it.
-water.underwaterGodRayShadow = true;
-```
-
-The medium uses the same `absorption` / `scattering` coefficients the surface does, so the view from below and the view from above never disagree about the colour of the water.
-
-> Like the atmospheric fog it replaces, the underwater medium reaches **opaque geometry only** - transparent surfaces are not tinted by the column in front of them.
+> Tthe underwater medium reaches **opaque geometry only**.
 >
-> The submerged test is against the water's **rest plane**, not the displaced surface, so a camera within a wave height of the surface may disagree with what the waves are doing. A camera sitting exactly on the waterline picks one side rather than splitting the screen.
+> The submerged test is against the water's **rest plane**, not the displaced surface, so a camera within a wave height of the surface may disagree with what the waves are doing. .
 
 ## Refraction Blur
 
@@ -231,8 +214,6 @@ The effect is derived from what the camera can see, which sets its limits:
 - Foam near an object disappears once that object leaves the frame
 - An object hidden behind something in the foreground produces no foam
 - An object only a few pixels wide on screen - a cable, a railing - may produce no foam at all. Lowering `shoreFoamDepth` helps
-
-For debugging, set `water.debugOutput` to `'shoreFoam'` to view this layer on its own, or to `'waterDepth'` to view the distance it is keyed on.
 
 ## Wave Generators
 
