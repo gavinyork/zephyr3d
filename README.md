@@ -343,10 +343,6 @@ behavior and the current limitation around oblique-clipped projections, are in
 Documentation is available in [English](https://zephyr3d.org/doc/en/intro.html) and
 [简体中文](https://zephyr3d.org/doc/zh-cn/intro.html).
 
-> The published doc site currently lags this branch: guides for the render graph, character
-> materials, SSGI, physical lighting and the getting-started walkthrough exist under
-> `apps/doc/web/{en,zh-cn}/` but are not yet deployed.
-
 ---
 
 ## Status
