@@ -132,12 +132,14 @@ Subsurface scattering is what makes a **backlit wave crest glow**: sunlight ente
 ```ts
 water.subsurfaceIntensity = 0.5;
 water.subsurfaceCrestHeight = 1.5;
+water.subsurfaceTint = new Vector3(0.86, 0.98, 0.71);
 ```
 
 | Property | Meaning |
 | --- | --- |
-| `subsurfaceIntensity` | Strength of the glow. 0 disables it. This is an authored magnitude, not a physical one; the medium's scattering albedo supplies the hue, so raising it brightens the glow without changing its color |
-| `subsurfaceCrestHeight` | Height above the still-water level, in meters, over which the glow ramps in. |
+| `subsurfaceIntensity` | Strength of the glow. 0 disables it. An authored magnitude that is not scaled by the light's intensity, so it stays put when the sun is brightened. Directional lights only |
+| `subsurfaceTint` | Color of the glow before the crest gate tints it with the medium's extinction. The default is a warm yellow-green: the gate removes red in the troughs, and the tint keeps some on the crests so they read as sunlight through water rather than as colored milk |
+| `subsurfaceCrestHeight` | Height above the still-water level, in meters, over which the lit wall of a crest thins by a factor of e. Crests are thin and glow; troughs see the full path through the medium and keep only a tinted trace |
 
 ## Underwater
 

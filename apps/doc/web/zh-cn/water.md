@@ -132,12 +132,14 @@ water.scatterAnisotropy = 0.7;
 ```ts
 water.subsurfaceIntensity = 0.5;
 water.subsurfaceCrestHeight = 1.5;
+water.subsurfaceTint = new Vector3(0.86, 0.98, 0.71);
 ```
 
 | 参数 | 含义 |
 | --- | --- |
-| `subsurfaceIntensity` | 发光强度，0 关闭。这是一个艺术量而非物理量；色相由介质的散射反照率提供，因此调高只会变亮，不会改变颜色 |
-| `subsurfaceCrestHeight` | 发光从静水面向上渐入的高度，单位米。|
+| `subsurfaceIntensity` | 发光强度，0 关闭。这是一个艺术量，不随光源强度缩放，调亮太阳不会改变它。仅对方向光生效 |
+| `subsurfaceTint` | 发光的基础颜色，之后还会被浪尖门控按介质消光系数染色。默认是偏暖的黄绿色：门控在波谷会吃掉红色分量，tint 在浪尖上把它补回来，让浪尖读作透过水的阳光而不是有色的奶 |
+| `subsurfaceCrestHeight` | 浪尖水墙随高度变薄的尺度，单位米：每升高此值，光穿过的路径缩短为 1/e。浪尖薄而透光；波谷要走完整的介质路径，只剩带色相的余光 |
 
 ## 水下渲染
 

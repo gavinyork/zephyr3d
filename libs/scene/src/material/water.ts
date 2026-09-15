@@ -66,8 +66,8 @@ export type WaterRefractionMode = 'march' | 'offset';
  * - `scattering`: ambient in-scattering from the water body.
  * - `sunScattering`: directional in-scattering from the lights.
  * - `subsurface`: the backlit-crest translucency term.
- * - `subsurfaceThickness`: the crest-height gate that term is scaled by, as
- *   grey. Independent of the lights, so it shows with none in the scene.
+ * - `subsurfaceThickness`: the crest gate that term is scaled by, bright on
+ *   crests and absorbed in troughs. Independent of the lights.
  * - `depth`: refracted path length through the medium, metres / 10.
  *   no offset is mid grey.
  *
@@ -118,6 +118,8 @@ const WATER_F0 = 0.02;
 const WATER_BASE_ROUGHNESS = 0.04;
 /** Specular roughness once distance has flattened the wave normals. */
 const WATER_DISTANT_ROUGHNESS = 0.35;
+/** Wrap of the foam's diffuse lighting, `(N.L + w) / (1 + w)`. At 0 a lee slope is unlit. */
+const FOAM_LIGHT_WRAP = 0.5;
 /** Index of refraction of water. Must match the caustics pass. */
 const WATER_IOR = 1.333;
 const AIR_TO_WATER_ETA = 1 / WATER_IOR;
@@ -145,7 +147,9 @@ const SSS_SUN_ALIGN_FLOOR = 0.15;
 const SSS_GRAZING_FLOOR = 0.1;
 /** Softplus width of the crest gate, as a fraction of the crest height. */
 const SSS_HEIGHT_SOFTNESS = 0.6;
-/** Extinction multiplier of the crest gate, applied over one crest height. */
+/** Floor on the crest gate's path length. */
+const SSS_CREST_PATH_FLOOR = 0.2;
+/** Extinction multiplier of the crest gate over a unit path. */
 const SSS_ABSORPTION_SCALE = 3;
 /**
  * Mean cosine of one scattering event. Real sea water is near 0.9, at which
@@ -254,6 +258,7 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
   private _underwaterHysteresis: number;
   private _subsurfaceIntensity: number;
   private _subsurfaceCrestHeight: number;
+  private readonly _subsurfaceTint: Vector3;
   private readonly _subsurfaceParams: Vector4;
   private _sunScatteringIntensity: number;
   private _scatterAnisotropy: number;
@@ -316,6 +321,7 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
     this._underwaterHysteresis = 0.05;
     this._subsurfaceIntensity = 0.5;
     this._subsurfaceCrestHeight = 1.5;
+    this._subsurfaceTint = new Vector3(0.86, 0.98, 0.71);
     this._subsurfaceParams = new Vector4();
     this._sunScatteringIntensity = 1;
     this._scatterAnisotropy = DEFAULT_SCATTER_ANISOTROPY;
@@ -646,8 +652,8 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
     this._causticsTemporalStrength = Math.max(0, Math.min(0.95, val));
   }
   /**
-   * Strength of the sunlight scattered through a backlit wave crest, 0 to
-   * disable. Authored magnitude; the medium albedo supplies the hue.
+   * Strength of the glow of a backlit wave crest, 0 to disable. Authored, not
+   * scaled by the light's intensity; {@link subsurfaceTint} supplies the hue.
    */
   get subsurfaceIntensity() {
     return this._subsurfaceIntensity;
@@ -659,9 +665,9 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
     }
   }
   /**
-   * Height above the still-water level, in meters, over which the subsurface
-   * gate applies the medium's extinction. Lower for a calm sea, higher so only
-   * the tallest crests glow.
+   * Height above the still-water level, in meters, over which the lit wall of
+   * a crest thins by a factor of `e`. Lower for a calm sea, higher so only the
+   * tallest crests glow.
    */
   get subsurfaceCrestHeight() {
     return this._subsurfaceCrestHeight;
@@ -671,6 +677,16 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
     const clamped = Math.max(0.001, val);
     if (clamped !== this._subsurfaceCrestHeight) {
       this._subsurfaceCrestHeight = clamped;
+      this.uniformChanged();
+    }
+  }
+  /** Colour of the crest glow, before the crest gate tints it with the medium's extinction. */
+  get subsurfaceTint() {
+    return this._subsurfaceTint;
+  }
+  set subsurfaceTint(val: Vector3) {
+    if (!val.equalsTo(this._subsurfaceTint)) {
+      this._subsurfaceTint.set(val);
       this.uniformChanged();
     }
   }
@@ -1060,8 +1076,12 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
       }
       scope.reflectionStrength = pb.float().uniform(2);
       scope.ssrParams = pb.vec4().uniform(2);
+      // Eye vs. rest plane from the CPU submersion test: 1 above, -1 below,
+      // 0 unknown (compare in the shader).
+      scope.eyeSide = pb.float().uniform(2);
       // (intensity, crest absorption height in m, 0, 0)
       scope.subsurfaceParams = pb.vec4().uniform(2);
+      scope.subsurfaceTint = pb.vec3().uniform(2);
       // (coverage scale, coverage falloff, 0, 0)
       scope.foamShadingParams = pb.vec4().uniform(2);
       scope.foamColor = pb.vec3().uniform(2);
@@ -1162,6 +1182,7 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
    * @param straightDepth01 - Normalized linear depth of the scene behind it
    * @param straightWorldPos - Unrefracted scene world position behind the surface
    * @param straightDist - Straight-line distance from the surface to that scene
+   * @param underwater - Whether the eye is below the surface
    * @returns `vec3(uv, pathLength)` - where to sample, and the medium path in meters
    */
   waterRefraction(
@@ -1173,7 +1194,8 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
     surfaceViewZ: PBShaderExp,
     straightDepth01: PBShaderExp,
     straightWorldPos: PBShaderExp,
-    straightDist: PBShaderExp
+    straightDist: PBShaderExp,
+    underwater: PBShaderExp
   ) {
     const pb = scope.$builder;
     const march = this.refractionMode === 'march';
@@ -1299,12 +1321,10 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
         pb.float('surfaceViewZ'),
         pb.float('straightDepth01'),
         pb.vec3('straightWorldPos'),
-        pb.float('straightDist')
+        pb.float('straightDist'),
+        pb.bool('underwater')
       ],
       function () {
-        // Face from the rasteriser: a flipped wave normal cannot tell an
-        // underside from an eye below the surface.
-        this.$l.underwater = pb.not(this.$builtins.frontFacing);
         this.$l.faceNormal = this.$choice(this.underwater, pb.neg(this.normal), this.normal);
         this.$l.eta = this.$choice(this.underwater, pb.float(WATER_TO_AIR_ETA), pb.float(AIR_TO_WATER_ETA));
         this.$l.uvBase = this.waterRefractProjectUV(this.worldPos);
@@ -1384,7 +1404,8 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
       surfaceViewZ,
       straightDepth01,
       straightWorldPos,
-      straightDist
+      straightDist,
+      underwater
     ) as PBShaderExp;
   }
   /**
@@ -1788,16 +1809,21 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
           pb.neg(this.normal),
           this.normal
         );
-        // Diffuse-term normal: a folded wall's normal is near horizontal and
-        // loses the sun, so it is mixed towards up as |normal.y| falls.
-        this.$l.diffuseWeight = pb.smoothStep(0, 0.5, pb.abs(this.normal.y));
-        this.$l.diffuseNormal = pb.normalize(
-          pb.mix(pb.vec3(0, 1, 0), this.shadingNormal, this.diffuseWeight)
+        // Diffuse-term normal, from the unflipped wave normal (the eye-facing
+        // flip would point it into the lower hemisphere on any steep back
+        // slope), mixed towards up as normal.y falls.
+        this.$l.diffuseWeight = pb.smoothStep(0, 0.5, this.normal.y);
+        this.$l.diffuseNormal = pb.normalize(pb.mix(pb.vec3(0, 1, 0), this.normal, this.diffuseWeight));
+        // Eye below the rest plane, not `!frontFacing`: a choppy fold (J < 0)
+        // flips the winding and would read as seen from below.
+        this.$l.restLevel = pb.sub(this.worldPos.y, this.crestHeight);
+        this.$l.underwaterEye = pb.or(
+          pb.lessThan(this.eyeSide, 0),
+          pb.and(
+            pb.equal(this.eyeSide, 0),
+            pb.lessThan(ShaderHelper.getCameraPosition(this).y, this.restLevel)
+          )
         );
-        // From the rasteriser: a folded underside still carries an upward wave normal.
-        this.$l.frontFace = this.$builtins.frontFacing;
-        this.$l.backFace = pb.not(this.frontFace);
-        this.$l.underwaterEye = this.backFace;
         this.$l.depth = pb.length(pb.sub(this.wPos.xyz, this.worldPos));
         this.$l.viewPos = pb.mul(ShaderHelper.getViewMatrix(this), pb.vec4(this.worldPos, 1)).xyz;
         this.incidentVec = pb.normalize(pb.sub(this.worldPos, ShaderHelper.getCameraPosition(this)));
@@ -1878,7 +1904,8 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
           this.viewPos.z,
           this.wPos.w,
           this.wPos.xyz,
-          this.depth
+          this.depth,
+          this.underwaterEye
         );
         this.$l.refractUV = this.refractInfo.xy;
         // Medium path is the refracted length, not the straight line.
@@ -1921,10 +1948,10 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
         // Exit transmission times the water (non-foam) share. The refraction
         // already carries it via the `mix`; every body term below must too.
         this.$l.bodyWeight = pb.mul(pb.sub(1, this.fresnelTerm), pb.sub(1, this.foam));
-        // Subsurface crest gate: exp(-sigma_t * scale * softplus(h / H)).
-        // Gated on the vertex displacement, not the normal tilt: tilt is zero
-        // at the crest and carries every ripple. Continuous at both ends, so
-        // troughs fade rather than cut off and tall crests do not plateau.
+        // Subsurface crest gate, after Ceto: the lit wall thins with height,
+        // path = max(floor, exp(-softplus(h / H))), gate = exp(-sigma_t *
+        // scale * path). On the vertex displacement, not the normal tilt,
+        // which is zero at the crest and carries every ripple.
         this.$l.sssT = pb.div(this.crestHeight, this.subsurfaceParams.y);
         // softplus in the overflow-safe form max(t,0) + w*log(1+exp(-|t|/w)).
         this.$l.sssRise = pb.add(
@@ -1934,8 +1961,9 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
             pb.log(pb.add(1, pb.exp(pb.div(pb.neg(pb.abs(this.sssT)), SSS_HEIGHT_SOFTNESS))))
           )
         );
+        this.$l.sssPath = pb.max(pb.exp(pb.neg(this.sssRise)), SSS_CREST_PATH_FLOOR);
         this.$l.sssThickness = pb.exp(
-          pb.neg(pb.mul(this.mediumExtinction, pb.mul(this.sssRise, SSS_ABSORPTION_SCALE)))
+          pb.neg(pb.mul(this.mediumExtinction, pb.mul(this.sssPath, SSS_ABSORPTION_SCALE)))
         );
         // For the debug views that rebuild the sun terms outside the loop.
         this.dbgLightDir = pb.vec3(0, 1, 0);
@@ -1952,6 +1980,12 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
           this.dbgLightDir = this.lightDir;
           this.$l.NoL = pb.clamp(pb.dot(this.normal, this.lightDir), 0, 1);
           this.$l.NoLdiffuse = pb.clamp(pb.dot(this.diffuseNormal, this.lightDir), 0, 1);
+          // From the raw cosine, so a lee slope below zero still wraps up.
+          this.$l.NoLfoam = pb.clamp(
+            pb.div(pb.add(pb.dot(this.diffuseNormal, this.lightDir), FOAM_LIGHT_WRAP), 1 + FOAM_LIGHT_WRAP),
+            0,
+            1
+          );
           this.$l.lightEnergy = pb.mul(colorIntensity.rgb, colorIntensity.a, this.lightAtten);
           this.$l.specularTerm = this.lightSpecular(
             this.lightDir,
@@ -1961,10 +1995,9 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
             this.roughness
           );
           this.$l.lightContrib = this.specularTerm;
-          // Backlit-crest subsurface, after Ceto: grazing view (squared) times
-          // sun alignment of the view ray mirrored in the still-water plane
-          // (fourth power) times a sun-above-horizon fade. Both cosines are
-          // floored so the glow survives looking away from the sun.
+          // Backlit-crest subsurface, after Ceto: grazing^2 * (view ray mirrored
+          // in the rest plane, against the sun)^4 * sun-above-horizon fade.
+          // Both cosines are floored.
           this.$l.sssToEye = pb.neg(this.eyeVecNorm);
           this.$l.sssGrazing = pb.sub(1, pb.clamp(this.sssToEye.y, 0, 1));
           this.sssGrazing = pb.mix(SSS_GRAZING_FLOOR, 1, pb.mul(this.sssGrazing, this.sssGrazing));
@@ -1974,12 +2007,17 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
           this.sssAlign = pb.mix(SSS_SUN_ALIGN_FLOOR, 1, pb.mul(this.sssAlign, this.sssAlign));
           this.$l.sssSunUp = pb.smoothStep(0, 0.1, this.lightDir.y);
           this.$l.sssFacing = pb.mul(this.sssGrazing, this.sssAlign, this.sssSunUp);
-          this.$l.subsurfaceTerm = pb.mul(
-            this.lightEnergy,
-            this.mediumAlbedo,
-            pb.mul(this.sssFacing, this.sssThickness, this.subsurfaceParams.x)
-          );
-          this.lightContrib = pb.add(this.lightContrib, this.subsurfaceTerm);
+          // Not scaled by the light, so directional only (no distance falloff).
+          // Leaves the body, so it carries `bodyWeight` like every body term.
+          this.$l.subsurfaceTerm = pb.vec3(0);
+          this.$if(pb.equal(type, LIGHT_TYPE_DIRECTIONAL), function () {
+            this.subsurfaceTerm = pb.mul(
+              this.subsurfaceTint,
+              pb.mul(this.sssFacing, this.sssThickness, this.subsurfaceParams.x),
+              this.bodyWeight
+            );
+            this.lightContrib = pb.add(this.lightContrib, this.subsurfaceTerm);
+          });
           // Directional only (the integral assumes a parallel beam) and from
           // above only.
           this.$l.sunScatterTerm = pb.vec3(0);
@@ -2001,7 +2039,7 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
           // Foam as a matte layer.
           this.lightContrib = pb.add(
             this.lightContrib,
-            pb.mul(this.lightEnergy, this.foamColor, this.foam, this.NoLdiffuse, 1 / Math.PI)
+            pb.mul(this.lightEnergy, this.foamColor, this.foam, this.NoLfoam, 1 / Math.PI)
           );
           this.$l.shadow = pb.vec3(1);
           if (shadow) {
@@ -2030,7 +2068,11 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
         }
         switch (debugOutput) {
           case 'normal':
-            this.$return(pb.add(pb.mul(this.normal, 0.5), pb.vec3(0.5)));
+            this.$if(pb.lessThan(this.diffuseNormal.y, 0.01), function () {
+              this.$return(pb.vec3(1, 0, 0));
+            }).$else(function () {
+              this.$return(pb.add(pb.mul(this.diffuseNormal, 0.5), pb.vec3(0.5)));
+            });
             break;
           case 'foam':
             this.$return(pb.vec3(this.foam));
@@ -2107,8 +2149,11 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
       }
       bindGroup.setValue('reflectionStrength', this._reflectionStrength);
       bindGroup.setValue('ssrParams', this._ssrParams);
+      const eyeUnder = ctx.underwater;
+      bindGroup.setValue('eyeSide', eyeUnder ? (eyeUnder.material === this ? -1 : 0) : 1);
       this._subsurfaceParams.setXYZW(this._subsurfaceIntensity, this._subsurfaceCrestHeight, 0, 0);
       bindGroup.setValue('subsurfaceParams', this._subsurfaceParams);
+      bindGroup.setValue('subsurfaceTint', this._subsurfaceTint);
       this._foamParams.setXYZW(this._foamAmount, this._foamFalloff, 0, 0);
       bindGroup.setValue('foamShadingParams', this._foamParams);
       bindGroup.setValue('foamColor', this._foamColor);

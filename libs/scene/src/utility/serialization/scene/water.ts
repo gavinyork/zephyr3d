@@ -1015,7 +1015,7 @@ export function getWaterClass(manager: ResourceManager): SerializableClass {
         {
           name: 'SubsurfaceCrestHeight',
           description:
-            'Height above the still-water level, in meters, over which the subsurface gate absorbs. The gate is a slab of the medium, so the crest picks up the same hue shift the water body does and its red goes first. The absorption ramps in through a soft knee around the still-water level, so troughs keep a faint glow instead of cutting off. Lower it for a calm sea whose crests barely rise, raise it so only the tallest waves light up.',
+            'Height above the still-water level, in meters, over which the lit wall of a crest thins by a factor of e. Crests are thin and glow; troughs see the full path through the medium and are absorbed, so they keep only a tinted trace. Lower it for a calm sea whose crests barely rise, raise it so only the tallest waves light up.',
           type: 'float',
           default: 1.5,
           options: { animatable: true, minValue: 0.001, maxValue: 10 },
@@ -1024,6 +1024,22 @@ export function getWaterClass(manager: ResourceManager): SerializableClass {
           },
           set(this: Water, value) {
             this.material.subsurfaceCrestHeight = value.num[0];
+          }
+        },
+        {
+          name: 'SubsurfaceTint',
+          description:
+            'Colour of the crest glow, before the crest gate tints it with the medium extinction. A warm yellow-green keeps some red on the crests where the troughs have lost it.',
+          type: 'rgb',
+          default: [0.86, 0.98, 0.71],
+          options: { animatable: true, minValue: 0, maxValue: 1 },
+          get(this: Water, value) {
+            value.num[0] = this.material.subsurfaceTint.x;
+            value.num[1] = this.material.subsurfaceTint.y;
+            value.num[2] = this.material.subsurfaceTint.z;
+          },
+          set(this: Water, value) {
+            this.material.subsurfaceTint = new Vector3(value.num[0], value.num[1], value.num[2]);
           }
         },
         {
