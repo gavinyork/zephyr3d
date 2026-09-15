@@ -10,6 +10,13 @@
 [![npm](https://img.shields.io/npm/v/@zephyr3d/scene?color=%235865f2&label=%40zephyr3d%2Fscene)](https://www.npmjs.com/package/@zephyr3d/scene)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blueviolet.svg)](https://opensource.org/licenses/MIT)
 
+<br/>
+
+[![Star this repo](https://img.shields.io/github/stars/gavinyork/zephyr3d?style=social&label=Star)](https://github.com/gavinyork/zephyr3d)
+&nbsp;
+[![Sponsor](https://img.shields.io/badge/Sponsor-%E2%9D%A4-ea4aaa?logo=githubsponsors&logoColor=white)](https://github.com/sponsors/gavinyork)
+[![Ko-fi](https://img.shields.io/badge/Ko--fi-Support-ff5e5b?logo=kofi&logoColor=white)](https://ko-fi.com/gavinyork2024)
+
 </div>
 
 ---
@@ -253,6 +260,37 @@ Editor documentation: [overview](https://zephyr3d.org/doc/en/editor/overview.htm
 
 ---
 
+## Support
+
+Zephyr3D is developed and maintained by one person in their free time — the engine, the editor,
+the documentation and the demos are all unpaid work. If any of it has been useful to you,
+sponsorship is what pays for hosting, CI and testing hardware, and buys focused blocks of time
+for new features, performance work and documentation.
+
+<div align="center">
+
+[![Sponsor on GitHub](https://img.shields.io/badge/GitHub_Sponsors-%E2%9D%A4_Sponsor-ea4aaa?style=for-the-badge&logo=githubsponsors&logoColor=white)](https://github.com/sponsors/gavinyork)
+&nbsp;
+[![Support on Ko-fi](https://img.shields.io/badge/Ko--fi-Buy_me_a_coffee-ff5e5b?style=for-the-badge&logo=kofi&logoColor=white)](https://ko-fi.com/gavinyork2024)
+
+</div>
+
+Ways to help that cost nothing, but matter just as much:
+
+- **Star the repo** — it is the main signal that keeps the project visible.
+- **Ask and answer in [Discussions](https://github.com/gavinyork/zephyr3d/discussions)** — real
+  usage questions shape the docs and the roadmap.
+- **Report what breaks**, with a minimal reproduction if you can. For a rendering engine, a
+  screenshot plus the backend and GPU you are on is worth a lot.
+- **Tell people** when a demo or a write-up helped — that reach is how a project like this finds
+  the people who end up sponsoring it.
+
+For **commercial use, integration help or a support arrangement**, open a thread in
+[Discussions](https://github.com/gavinyork/zephyr3d/discussions) or write to
+`gavinyork2024@outlook.com` so we can talk about what you need.
+
+---
+
 ## Packages
 
 The engine is split so you install only what you use. Packages are versioned independently.
@@ -321,20 +359,11 @@ It suits you if you are building custom tools or in-house editors, doing web ren
 or want to read a complete engine end to end. If you need long-term API stability guarantees
 today, that is not something a project at this stage can promise.
 
-Issues and pull requests are welcome.
-
----
-
-## Support
-
-Zephyr3D is developed in my free time. If the engine, the editor or the related write-ups have
-been useful to you, you can support the work here:
-
-**Ko-fi:** https://ko-fi.com/gavinyork2024
-
-Support covers hosting and testing tools, and buys focused time for new features, performance
-work, documentation and experimental rendering ideas. Trying Zephyr3D and sending feedback is
-just as appreciated.
+Questions and design discussions are best raised in
+[Discussions](https://github.com/gavinyork/zephyr3d/discussions); bugs and confirmed feature
+requests belong in the issue tracker. If you want to send a pull request, read
+[CONTRIBUTING.md](CONTRIBUTING.md) first — it explains where the project is and is not ready to
+take outside code.
 
 ---
 

@@ -1,0 +1,94 @@
+name: Bug report
+description: Something renders wrong, crashes, or does not behave as documented.
+title: '[Bug] '
+labels: ['bug']
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the report. Rendering bugs are hard to act on without context — the fields
+        below exist because each one has, at some point, been the whole answer.
+
+        Not sure this is a bug? Use [Discussions](https://github.com/gavinyork/zephyr3d/discussions)
+        instead.
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What you expected, and what you got instead.
+      placeholder: |
+        Expected: the reflection is visible on the water surface.
+        Actual: the reflection disappears entirely when the camera pitches up.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: backend
+    attributes:
+      label: Backend
+      description: |
+        The engine falls back silently when a capability is missing, so the backend that
+        actually ran is often not the one you asked for. If you are not sure, check
+        `getEngine().device.type` — or report it as "not sure" and say what you requested.
+      options:
+        - WebGPU
+        - WebGL2
+        - WebGL1
+        - Not sure / it varies
+    validations:
+      required: true
+
+  - type: input
+    id: gpu
+    attributes:
+      label: GPU, driver and browser
+      description: For example "RTX 4070, driver 560.94, Chrome 141" or "Apple M2, Safari 18.4".
+      placeholder: RTX 4070 / driver 560.94 / Chrome 141
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: Zephyr3D version
+      description: The `@zephyr3d/*` version you are on. APIs change between minor versions, so this matters.
+      placeholder: '@zephyr3d/scene 0.3.10'
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Minimal reproduction
+      description: |
+        A code snippet, a link to a branch or gist, or a scene file. Something someone else can
+        run without guessing is worth far more than a detailed description.
+      render: typescript
+    validations:
+      required: true
+
+  - type: textarea
+    id: screenshots
+    attributes:
+      label: Screenshots or video
+      description: Drag images in directly. For anything visual, this is often the fastest path to a fix.
+    validations:
+      required: false
+
+  - type: input
+    id: regression
+    attributes:
+      label: Did this work before?
+      description: If you know the version where it last worked, say so — it narrows the cause enormously.
+    validations:
+      required: false
+
+  - type: textarea
+    id: console
+    attributes:
+      label: Console output
+      description: Any errors, warnings or validation messages from the browser console.
+      render: shell
+    validations:
+      required: false
