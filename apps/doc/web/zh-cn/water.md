@@ -40,22 +40,14 @@ water.waveGenerator = waves;
 
 ## 材质控制
 
-水面材质可通过 `water.material` 访问。
-
-```ts
-water.material.refractionScale = 1;
-water.material.reflectionStrength = 0.8;
-water.TAAStrength = 0.4;
-```
-
 | 参数 | 含义 |
 | --- | --- |
 | `gridScale` | clipmap 网格间距，单位为世界坐标。在细节够用的前提下尽量取大 |
 | `animationSpeed` | 波浪时间倍率 |
 | `wireframe` | 以线框方式显示 clipmap 网格，便于调试 |
 | `TAAStrength` | 水面使用的时间平滑强度。画面有噪点或闪烁时调高，出现拖影时调低 |
-| `material.refractionScale` | 折射偏移的艺术缩放。1 为物理值，0 关闭折射，大于 1 为夸张 |
-| `material.reflectionStrength` | Fresnel 反射率缩放。1 为物理值；掠射角下水面几乎全反射，调低可以牺牲反射换取水下内容的可见度 |
+| `refractionScale` | 折射偏移的艺术缩放。1 为物理值，0 关闭折射，大于 1 为夸张 |
+| `reflectionStrength` | Fresnel 反射率缩放。1 为物理值；掠射角下水面几乎全反射，调低可以牺牲反射换取水下内容的可见度 |
 
 水面材质会使用场景颜色和场景深度，因此水面参与主场景渲染流程。调试最终效果时需要同时考虑透明物体和后处理。
 
@@ -124,14 +116,28 @@ water.causticsIntensity = 1;
 方向性散射让水体具有**方向相关**的颜色：它按光源计算，因此阴影落在水面上会同时压暗水体，低角度的太阳会为水体染色。关闭后水体只由环境光照亮，会失去方向感。
 
 ```ts
-water.material.sunScatteringIntensity = 1;
-water.material.scatterAnisotropy = 0.7;
+water.sunScatteringIntensity = 1;
+water.scatterAnisotropy = 0.7;
 ```
 
 | 参数 | 含义 |
 | --- | --- |
 | `sunScatteringIntensity` | 阳光从水体内部散射到眼睛的强度。1 是介质系数隐含的物理值，0 关闭，更大即为夸张 |
 | `scatterAnisotropy` | 单次散射的相位各向异性，取值 [0, 0.95]。0 为各方向均匀，0.7（默认）接近海水的前向散射。水体越厚会越向各向同性靠拢，因此**实际可见的各向异性总是小于这个值** |
+
+## 次表面散射
+
+次表面散射让**逆光的浪尖发亮**：阳光从浪的背面进入，穿过薄薄的水墙向观察者散射出来。
+
+```ts
+water.subsurfaceIntensity = 0.5;
+water.subsurfaceCrestHeight = 1.5;
+```
+
+| 参数 | 含义 |
+| --- | --- |
+| `subsurfaceIntensity` | 发光强度，0 关闭。这是一个艺术量而非物理量；色相由介质的散射反照率提供，因此调高只会变亮，不会改变颜色 |
+| `subsurfaceCrestHeight` | 发光从静水面向上渐入的高度，单位米。|
 
 ## 水下渲染
 

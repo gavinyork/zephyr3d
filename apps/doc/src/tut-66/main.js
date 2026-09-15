@@ -42,9 +42,6 @@ const myApp = new Application({
 const DEBUG_OUTPUTS = [
   ['none', 'None'],
   ['normal', 'Normal'],
-  ['diffuseNormal', 'Diffuse normal'],
-  ['viewFacing', 'View facing'],
-  ['frontFacing', 'Front facing'],
   ['foam', 'Foam'],
   ['fresnel', 'Fresnel'],
   ['reflection', 'Reflection'],
@@ -52,15 +49,8 @@ const DEBUG_OUTPUTS = [
   ['absorption', 'Absorption'],
   ['scattering', 'Scattering'],
   ['sunScattering', 'Sun scattering'],
-  ['sunPhase', 'Sun phase'],
-  ['sunIntegral', 'Sun integral'],
-  ['sunNoL', 'Sun NoL'],
-  ['shadow', 'Shadow'],
   ['subsurface', 'Subsurface'],
-  ['specular', 'Specular'],
   ['depth', 'Depth'],
-  ['refractUV', 'Refract UV'],
-  ['nan', 'NaN'],
   ['waterDepth', 'Water Depth']
 ];
 
@@ -168,12 +158,13 @@ function buildOceanScene() {
   const scene = new Scene();
 
   // A little constant ambient so foam and the bed keep detail under the sun.
-  scene.env.light.type = 'constant';
-  scene.env.light.ambientColor = new Vector4(0.12, 0.16, 0.22, 1);
+  //scene.env.light.type = 'constant';
+  //scene.env.light.ambientColor = new Vector4(0.12, 0.16, 0.22, 1);
 
   // The sun, off vertical enough that caustics and shadows land visibly.
   const sun = new DirectionalLight(scene);
   sun.rotation.fromEulerAngle(-Math.PI / 4, Math.PI / 4, 0);
+  sun.intensity = 8;
   sun.castShadow = true;
 
   const rockMaterial = new PBRMetallicRoughnessMaterial();
@@ -237,6 +228,8 @@ function buildOceanScene() {
   water.reflectionStrength = 0.8;
   water.refractionScale = 1;
   water.refractionBlur = 4;
+  water.subsurfaceIntensity = 0.5;
+  water.subsurfaceCrestHeight = 1.5;
   water.sunScatteringIntensity = 0.4;
   water.foamAmount = 1;
   water.foamFalloff = 1.5;
@@ -346,6 +339,8 @@ function buildPoolScene() {
   water.scattering = new Vector3(0.01, 0.02, 0.03);
   water.reflectionStrength = 0.5;
   water.refractionScale = 1;
+  water.subsurfaceIntensity = 0.5;
+  water.subsurfaceCrestHeight = 1.5;
   water.foamAmount = 0.3;
   water.foamFalloff = 1.8;
 

@@ -40,22 +40,14 @@ water.waveGenerator = waves;
 
 ## Material Controls
 
-The water material is available through `water.material`.
-
-```ts
-water.material.refractionScale = 1;
-water.material.reflectionStrength = 0.8;
-water.TAAStrength = 0.4;
-```
-
 | Property | Meaning |
 | --- | --- |
 | `gridScale` | Clipmap grid spacing in world units. Use the largest value that still gives enough near-camera detail |
 | `animationSpeed` | Multiplier for wave time |
 | `wireframe` | Draw clipmap grid lines for debugging |
 | `TAAStrength` | Temporal smoothing used by the water. Raise it when the surface shimmers or sparkles, lower it if you see trailing |
-| `material.refractionScale` | Artistic scale on the refracted offset. 1 is physical, 0 disables it, above 1 exaggerates |
-| `material.reflectionStrength` | Scale on the Fresnel reflectance. 1 is physical; water reflects almost everything at a grazing angle, so lowering this trades reflection away for visibility of what is underwater |
+| `refractionScale` | Artistic scale on the refracted offset. 1 is physical, 0 disables it, above 1 exaggerates |
+| `reflectionStrength` | Scale on the Fresnel reflectance. 1 is physical; water reflects almost everything at a grazing angle, so lowering this trades reflection away for visibility of what is underwater |
 
 Because the material uses scene color and scene depth, water is rendered in the main scene pipeline. Keep transparent objects and post effects in mind when tuning the final look.
 
@@ -65,12 +57,12 @@ The water's color comes from two coefficients, **absorption** and **scattering**
 
 ```ts
 // Clear pool water: low absorption and low scattering, the floor stays visible.
-water.material.absorption = new Vector3(0.08, 0.03, 0.02);
-water.material.scattering = new Vector3(0.01, 0.02, 0.03);
+water.absorption = new Vector3(0.08, 0.03, 0.02);
+water.scattering = new Vector3(0.01, 0.02, 0.03);
 
 // Turbid sea water: high scattering gives a milky blue body.
-// water.material.absorption = new Vector3(0.4, 0.14, 0.09);
-// water.material.scattering = new Vector3(0.06, 0.12, 0.15);
+// water.absorption = new Vector3(0.4, 0.14, 0.09);
+// water.scattering = new Vector3(0.06, 0.12, 0.15);
 ```
 
 | Property | Meaning |
@@ -93,8 +85,8 @@ These coefficients are **shared**: refraction, caustics, directional scattering 
 
 ```ts
 // Low-end: drop the depth search for performance.
-water.material.refractionMode = 'offset';
-water.material.cheapRefractionDepth = 1;
+water.refractionMode = 'offset';
+water.cheapRefractionDepth = 1;
 ```
 
 `cheapRefractionDepth` (meters) is used only by `offset`. It is the depth the cheap mode assumes the water is, which sets how strong the distortion looks.
@@ -124,14 +116,28 @@ water.causticsIntensity = 1;
 Directional scattering gives the body a **direction-dependent** color: it is evaluated per light, so a shadow falling on the water darkens the water itself and a low sun tints it. Without it the body is lit by the environment alone and loses its sense of direction.
 
 ```ts
-water.material.sunScatteringIntensity = 1;
-water.material.scatterAnisotropy = 0.7;
+water.sunScatteringIntensity = 1;
+water.scatterAnisotropy = 0.7;
 ```
 
 | Property | Meaning |
 | --- | --- |
 | `sunScatteringIntensity` | How strongly sunlight scattered out of the column reaches the eye. 1 is the physical value the medium coefficients imply, 0 disables it, higher is deliberate exaggeration |
 | `scatterAnisotropy` | Phase-function anisotropy, in [0, 0.95]. 0 scatters equally in all directions; 0.7 (default) is near measured sea water. Thicker water blends toward isotropic, so the **visible anisotropy is always below this number** |
+
+## Subsurface Scattering
+
+Subsurface scattering is what makes a **backlit wave crest glow**: sunlight enters the far side of the crest and scatters out through the thin wall of water towards the eye. 
+
+```ts
+water.subsurfaceIntensity = 0.5;
+water.subsurfaceCrestHeight = 1.5;
+```
+
+| Property | Meaning |
+| --- | --- |
+| `subsurfaceIntensity` | Strength of the glow. 0 disables it. This is an authored magnitude, not a physical one; the medium's scattering albedo supplies the hue, so raising it brightens the glow without changing its color |
+| `subsurfaceCrestHeight` | Height above the still-water level, in meters, over which the glow ramps in. |
 
 ## Underwater
 
