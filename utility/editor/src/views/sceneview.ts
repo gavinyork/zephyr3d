@@ -1026,11 +1026,24 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
     if (this._activePluginContributionShortcuts) {
       this._menubar.registerShortcuts(this);
       this._toolbar.registerShortcuts(this);
+      this.registerCoreShortcuts();
     }
     this._propGrid.refresh();
     if (this.controller.model.scene) {
       this.syncNodeProxyTree(this.controller.model.scene.rootNode);
     }
+  }
+  private registerCoreShortcuts() {
+    this.registerShortcut('Ctrl+D', () => {
+      return this.handleDuplicateShortcut();
+    });
+    this.registerShortcut('F2', () => {
+      return this.handleAssetRenameShortcut();
+    });
+  }
+  private unregisterCoreShortcuts() {
+    this.unregisterShortcut('Ctrl+D');
+    this.unregisterShortcut('F2');
   }
   private renderPluginDockPanels(location: 'left' | 'right') {
     const panels = this.editor.plugins.getPanels(location);
@@ -1117,7 +1130,12 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
       executeCommand: <T>(command: unknown) => this._cmdManager.execute(command as Command<T>),
       executeUserCallback: <T>(execute: () => T | Promise<T>, undo: () => void | Promise<void>) =>
         this._cmdManager.execute(new CustomCommand(execute, undo)),
-      selectNode: (node) => this._sceneHierarchy.selectNode(node)
+      selectNode: (node) => this._sceneHierarchy.selectNode(node),
+      activateEditTool: (node) => {
+        this._sceneHierarchy.selectNode(node);
+        return this.handleEditNode(node, false);
+      },
+      deactivateEditTool: () => this.deactivateEditTool()
     };
   }
 
@@ -1641,12 +1659,7 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
     this._menubar.on('action', this.handleSceneAction, this);
     this._toolbar.registerShortcuts(this);
     this._activePluginContributionShortcuts = true;
-    this.registerShortcut('Ctrl+D', () => {
-      return this.handleDuplicateShortcut();
-    });
-    this.registerShortcut('F2', () => {
-      return this.handleAssetRenameShortcut();
-    });
+    this.registerCoreShortcuts();
     this._toolbar.on('action', this.handleSceneAction, this);
     this.editor.plugins.on('pluginContributionsChanged', this.refreshPluginContributions, this);
     // Plugins may have been loaded before SceneView activation. Refresh once
@@ -1686,6 +1699,7 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
     this._menubar.unregisterShortcuts(this);
     this._menubar.off('action', this.handleSceneAction, this);
     this._toolbar.unregisterShortcuts(this);
+    this.unregisterCoreShortcuts();
     this._activePluginContributionShortcuts = false;
     this._toolbar.off('action', this.handleSceneAction, this);
     this.editor.plugins.off('pluginContributionsChanged', this.refreshPluginContributions, this);
@@ -2361,9 +2375,9 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
       eventBus.dispatchEvent('scene_changed');
     }
   }
-  private handleEditNode(node: SceneNode) {
+  private handleEditNode(node: SceneNode, toggle = true) {
     if (!node) {
-      return;
+      return false;
     }
     const currentTool = this._currentEditTool.get();
     if (!currentTool) {
@@ -2372,22 +2386,36 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
       if (tool) {
         this.editor.plugins.dispatchEvent('editToolActivated', tool, node);
       }
-      return;
+      return !!tool;
     }
     const currentTarget = currentTool.getTarget();
     const sameTarget =
       currentTarget === node || (currentTarget instanceof SceneNode && currentTarget.isParentOf(node));
     if (sameTarget) {
-      this.editor.plugins.dispatchEvent('editToolDeactivated', currentTool, currentTarget);
-      this._currentEditTool.dispose();
+      if (!toggle) {
+        return true;
+      }
+      this.deactivateEditTool();
     } else {
-      this.editor.plugins.dispatchEvent('editToolDeactivated', currentTool, currentTarget);
+      this.deactivateEditTool();
       const tool = createEditTool(this.editor, node, this._editToolContext, this.createSceneContext());
       this._currentEditTool.set(tool);
       if (tool) {
         this.editor.plugins.dispatchEvent('editToolActivated', tool, node);
       }
+      return !!tool;
     }
+    return false;
+  }
+  private deactivateEditTool() {
+    const currentTool = this._currentEditTool.get();
+    if (!currentTool) {
+      return false;
+    }
+    const currentTarget = currentTool.getTarget();
+    this.editor.plugins.dispatchEvent('editToolDeactivated', currentTool, currentTarget);
+    this._currentEditTool.dispose();
+    return true;
   }
   public getSelectedSceneNodes() {
     return this._sceneHierarchy ? [...this._sceneHierarchy.selectedNodes] : [];

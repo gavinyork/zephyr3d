@@ -916,6 +916,78 @@ export class SkinBinding extends Disposable {
     }
     return result;
   }
+  /**
+   * Skin packed direction vectors into mesh-local space for the current skeleton pose.
+   *
+   * Unlike positions, directions ignore matrix translation and are normalized after
+   * conversion through the mesh inverse world matrix.
+   *
+   * @internal
+   */
+  skinDirectionsToLocal(
+    directions: Float32Array<ArrayBuffer>,
+    blendIndices: ArrayLike<number>,
+    weights: ArrayLike<number>,
+    invWorldMatrix: Matrix4x4,
+    out?: Float32Array<ArrayBuffer>,
+    influenceCount?: number
+  ) {
+    const result = out && out.length === directions.length ? out : new Float32Array(directions.length);
+    const matrixOffset = this._jointOffsets[0] - 1;
+    const effectiveInfluenceCount = Math.max(
+      1,
+      influenceCount ??
+        Math.max(1, Math.floor(weights.length / Math.max(1, Math.floor(directions.length / 3))))
+    );
+    for (let i = 0; i + 2 < directions.length; i += 3) {
+      const vertexIndex = (i / 3) >> 0;
+      const x = directions[i];
+      const y = directions[i + 1];
+      const z = directions[i + 2];
+      let skinnedX = 0;
+      let skinnedY = 0;
+      let skinnedZ = 0;
+      let weightSum = 0;
+      const base = vertexIndex * effectiveInfluenceCount;
+      for (let j = 0; j < effectiveInfluenceCount; j++) {
+        const weight = Number(weights[base + j]) || 0;
+        if (weight <= 0) {
+          continue;
+        }
+        const jointIndex = (Number(blendIndices[base + j]) || 0) + matrixOffset;
+        const matrix = this._jointMatrices[jointIndex];
+        if (!matrix) {
+          continue;
+        }
+        skinnedX += (matrix[0] * x + matrix[4] * y + matrix[8] * z) * weight;
+        skinnedY += (matrix[1] * x + matrix[5] * y + matrix[9] * z) * weight;
+        skinnedZ += (matrix[2] * x + matrix[6] * y + matrix[10] * z) * weight;
+        weightSum += weight;
+      }
+      if (weightSum <= 1e-6) {
+        skinnedX = x;
+        skinnedY = y;
+        skinnedZ = z;
+      }
+      const localX =
+        invWorldMatrix[0] * skinnedX + invWorldMatrix[4] * skinnedY + invWorldMatrix[8] * skinnedZ;
+      const localY =
+        invWorldMatrix[1] * skinnedX + invWorldMatrix[5] * skinnedY + invWorldMatrix[9] * skinnedZ;
+      const localZ =
+        invWorldMatrix[2] * skinnedX + invWorldMatrix[6] * skinnedY + invWorldMatrix[10] * skinnedZ;
+      const length = Math.hypot(localX, localY, localZ);
+      if (length > 1e-8) {
+        result[i] = localX / length;
+        result[i + 1] = localY / length;
+        result[i + 2] = localZ / length;
+      } else {
+        result[i] = 0;
+        result[i + 1] = 1;
+        result[i + 2] = 0;
+      }
+    }
+    return result;
+  }
   private static normalizeHumanoidJointName(name: string) {
     return name
       .slice(name.lastIndexOf(':') + 1)
