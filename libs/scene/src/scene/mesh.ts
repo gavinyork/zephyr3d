@@ -278,6 +278,9 @@ export class Mesh extends MeshBase implements BatchDrawable {
   }
   /** @internal */
   set suspendSkinning(val) {
+    if (val && !this._suspendSkinning) {
+      this.setAnimatedBoundingBox(null);
+    }
     this._suspendSkinning = !!val;
   }
   /** Wether the mesh node casts shadows */
@@ -1049,7 +1052,6 @@ export class Mesh extends MeshBase implements BatchDrawable {
   private updateSkeletonState() {
     if (this._suspendSkinning) {
       this.setBoneMatrices(null);
-      this.setAnimatedBoundingBox(null);
       return;
     }
     const binding = this._skinBindingName && this.findSkinBindingById(this._skinBindingName);

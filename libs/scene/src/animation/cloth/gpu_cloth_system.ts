@@ -1530,6 +1530,36 @@ function getWrapSourceToTargetMatrix(source: any, target: any, out?: Matrix4x4) 
   return Matrix4x4.multiplyAffine(target.invWorldMatrix, source.worldMatrix, out);
 }
 
+/** @internal Conservative bounds for the blend of wrapped and skinned target vertices. */
+export function calculateGPUClothWrapBoundingBox(
+  sourceBBox: BoundingBox,
+  sourceToTargetMatrix: Matrix4x4,
+  skinPositions: Float32Array,
+  offsetDistances: Float32Array,
+  wrapWeights: Float32Array
+) {
+  const wrappedBox = sourceBBox.transform(sourceToTargetMatrix);
+  let minX = Number.POSITIVE_INFINITY;
+  let minY = Number.POSITIVE_INFINITY;
+  let minZ = Number.POSITIVE_INFINITY;
+  let maxX = Number.NEGATIVE_INFINITY;
+  let maxY = Number.NEGATIVE_INFINITY;
+  let maxZ = Number.NEGATIVE_INFINITY;
+  for (let vertex = 0; vertex < wrapWeights.length; vertex++) {
+    const base = vertex * 3;
+    const weight = wrapWeights[vertex];
+    const skinWeight = 1 - weight;
+    const radius = weight * offsetDistances[vertex] + 0.001;
+    minX = Math.min(minX, skinWeight * skinPositions[base] + weight * wrappedBox.minPoint.x - radius);
+    minY = Math.min(minY, skinWeight * skinPositions[base + 1] + weight * wrappedBox.minPoint.y - radius);
+    minZ = Math.min(minZ, skinWeight * skinPositions[base + 2] + weight * wrappedBox.minPoint.z - radius);
+    maxX = Math.max(maxX, skinWeight * skinPositions[base] + weight * wrappedBox.maxPoint.x + radius);
+    maxY = Math.max(maxY, skinWeight * skinPositions[base + 1] + weight * wrappedBox.maxPoint.y + radius);
+    maxZ = Math.max(maxZ, skinWeight * skinPositions[base + 2] + weight * wrappedBox.maxPoint.z + radius);
+  }
+  return new BoundingBox(new Vector3(minX, minY, minZ), new Vector3(maxX, maxY, maxZ));
+}
+
 class GPUClothWrapBinding {
   private readonly _device: AbstractDevice;
   private readonly _source: any;
@@ -1544,7 +1574,8 @@ class GPUClothWrapBinding {
   private readonly _program: GPUProgram;
   private readonly _bindGroup: BindGroup;
   private readonly _workgroupCount: number;
-  private readonly _maxOffsetDistance: number;
+  private readonly _targetOffsetDistances: Float32Array<ArrayBuffer>;
+  private readonly _targetWrapWeights: Float32Array<ArrayBuffer>;
   private readonly _sourceToTargetMatrix: Matrix4x4;
   private readonly _positionBuffer: StructuredBuffer;
   private readonly _normalBuffer: StructuredBuffer;
@@ -1577,7 +1608,7 @@ class GPUClothWrapBinding {
     originalPositionBuffer: Nullable<StructuredBuffer>,
     originalNormalBuffer: Nullable<StructuredBuffer>,
     workgroupCount: number,
-    maxOffsetDistance: number,
+    targetOffsetDistances: Float32Array<ArrayBuffer>,
     restoreSkinning: Nullable<boolean>,
     targetBasePositions: Float32Array<ArrayBuffer>,
     targetBaseNormals: Float32Array<ArrayBuffer>,
@@ -1598,7 +1629,8 @@ class GPUClothWrapBinding {
     this._program = program;
     this._bindGroup = bindGroup;
     this._workgroupCount = workgroupCount;
-    this._maxOffsetDistance = maxOffsetDistance;
+    this._targetOffsetDistances = targetOffsetDistances;
+    this._targetWrapWeights = targetWrapWeights;
     this._sourceToTargetMatrix = new Matrix4x4();
     this._positionBuffer = positionBuffer;
     this._normalBuffer = normalBuffer;
@@ -1824,6 +1856,15 @@ class GPUClothWrapBinding {
       data.targetLocalOffsets,
       expectedElementCount
     );
+    const targetOffsetDistances = new Float32Array(vertexCount);
+    for (let vertex = 0; vertex < vertexCount; vertex++) {
+      const base = vertex * 3;
+      targetOffsetDistances[vertex] = Math.hypot(
+        wrapTargetLocalOffsets[base],
+        wrapTargetLocalOffsets[base + 1],
+        wrapTargetLocalOffsets[base + 2]
+      );
+    }
     const positionBuffer = device.createVertexBuffer(
       'position_f32x3',
       new Float32Array(expectedElementCount),
@@ -1940,7 +1981,7 @@ class GPUClothWrapBinding {
       originalPositionBuffer,
       originalNormalBuffer,
       Math.max(1, Math.ceil(vertexCount / workgroupSize)),
-      Math.max(0, Number(data.maxOffsetDistance) || 0),
+      targetOffsetDistances,
       restoreSkinning,
       targetBasePositions,
       targetBaseNormals,
@@ -2038,51 +2079,14 @@ class GPUClothWrapBinding {
     if (!sourceBBox) {
       return;
     }
-    let minX = Number.POSITIVE_INFINITY;
-    let minY = Number.POSITIVE_INFINITY;
-    let minZ = Number.POSITIVE_INFINITY;
-    let maxX = Number.NEGATIVE_INFINITY;
-    let maxY = Number.NEGATIVE_INFINITY;
-    let maxZ = Number.NEGATIVE_INFINITY;
     getWrapSourceToTargetMatrix(this._source, this._target, this._sourceToTargetMatrix);
-    const corners = [
-      [sourceBBox.minPoint.x, sourceBBox.minPoint.y, sourceBBox.minPoint.z],
-      [sourceBBox.minPoint.x, sourceBBox.minPoint.y, sourceBBox.maxPoint.z],
-      [sourceBBox.minPoint.x, sourceBBox.maxPoint.y, sourceBBox.minPoint.z],
-      [sourceBBox.minPoint.x, sourceBBox.maxPoint.y, sourceBBox.maxPoint.z],
-      [sourceBBox.maxPoint.x, sourceBBox.minPoint.y, sourceBBox.minPoint.z],
-      [sourceBBox.maxPoint.x, sourceBBox.minPoint.y, sourceBBox.maxPoint.z],
-      [sourceBBox.maxPoint.x, sourceBBox.maxPoint.y, sourceBBox.minPoint.z],
-      [sourceBBox.maxPoint.x, sourceBBox.maxPoint.y, sourceBBox.maxPoint.z]
-    ];
-    for (const corner of corners) {
-      const x =
-        this._sourceToTargetMatrix[0] * corner[0] +
-        this._sourceToTargetMatrix[4] * corner[1] +
-        this._sourceToTargetMatrix[8] * corner[2] +
-        this._sourceToTargetMatrix[12];
-      const y =
-        this._sourceToTargetMatrix[1] * corner[0] +
-        this._sourceToTargetMatrix[5] * corner[1] +
-        this._sourceToTargetMatrix[9] * corner[2] +
-        this._sourceToTargetMatrix[13];
-      const z =
-        this._sourceToTargetMatrix[2] * corner[0] +
-        this._sourceToTargetMatrix[6] * corner[1] +
-        this._sourceToTargetMatrix[10] * corner[2] +
-        this._sourceToTargetMatrix[14];
-      minX = Math.min(minX, x);
-      minY = Math.min(minY, y);
-      minZ = Math.min(minZ, z);
-      maxX = Math.max(maxX, x);
-      maxY = Math.max(maxY, y);
-      maxZ = Math.max(maxZ, z);
-    }
-    const padding = Math.max(0.001, this._maxOffsetDistance);
     this._target?.setAnimatedBoundingBox?.(
-      new BoundingBox(
-        new Vector3(minX - padding, minY - padding, minZ - padding),
-        new Vector3(maxX + padding, maxY + padding, maxZ + padding)
+      calculateGPUClothWrapBoundingBox(
+        sourceBBox,
+        this._sourceToTargetMatrix,
+        this._targetSkinnedPositions,
+        this._targetOffsetDistances,
+        this._targetWrapWeights
       )
     );
   }
