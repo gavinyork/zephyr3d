@@ -11,6 +11,7 @@ import { Disposable, DRef, makeObservable, randomUUID } from '@zephyr3d/base';
 import { Matrix4x4, ObservableQuaternion, ObservableVector3, Vector3, Vector4 } from '@zephyr3d/base';
 import type { ParticleSystem } from './particlesys';
 import type { SkeletonRig, SkinBinding } from '../animation';
+import type { GPUClothComponent } from '../animation/cloth/gpu_cloth_component';
 import { AnimationSet } from '../animation/animationset';
 import type { SharedModel } from '../asset';
 import type { Water } from './water';
@@ -254,6 +255,8 @@ export class SceneNode
   private _disableCallback: number;
   /** @internal User-attached script entries (engine-defined). */
   private _scripts: ScriptAttachment[];
+  /** @internal Serialized GPU cloth components owned by this node. */
+  private _gpuClothComponents: GPUClothComponent[];
   /**
    * Construct a scene node.
    *
@@ -300,6 +303,7 @@ export class SceneNode
     this._tmpLocalMatrix = Matrix4x4.identity();
     this._tmpWorldMatrix = Matrix4x4.identity();
     this._scripts = [];
+    this._gpuClothComponents = [];
     this._metaData = null;
     this._parent = null;
     this.reparent(scene?.rootNode ?? null);
@@ -468,6 +472,43 @@ export class SceneNode
       }
     }
     this._scripts = this._scripts.filter((item) => item.script || item.config != null);
+  }
+  /** GPU cloth simulations owned by this node. */
+  get gpuClothComponents() {
+    return this._gpuClothComponents;
+  }
+  set gpuClothComponents(value: GPUClothComponent[]) {
+    const next = [...new Set((value ?? []).filter((component) => !!component && !component.disposed))];
+    for (const component of next) {
+      if (component.host && component.host !== this) {
+        throw new Error('GPU cloth component belongs to another scene node.');
+      }
+    }
+    for (const component of this._gpuClothComponents) {
+      if (!next.includes(component)) {
+        component.detach(this);
+        component.dispose();
+      }
+    }
+    this._gpuClothComponents = next;
+    for (const component of next) {
+      if (!component.host) {
+        component.attach(this);
+      }
+    }
+  }
+  /** Adds a GPU cloth component to this node. */
+  addGPUClothComponent(component: GPUClothComponent) {
+    this.gpuClothComponents = [...this._gpuClothComponents, component];
+    return component;
+  }
+  /** Removes and disposes a GPU cloth component from this node. */
+  removeGPUClothComponent(component: GPUClothComponent) {
+    if (!this._gpuClothComponents.includes(component)) {
+      return false;
+    }
+    this.gpuClothComponents = this._gpuClothComponents.filter((item) => item !== component);
+    return true;
   }
   /**
    * Display name of the node (for UI/debugging).
@@ -1112,6 +1153,10 @@ export class SceneNode
   /** Disposes the node */
   protected onDispose() {
     super.onDispose();
+    for (const component of this._gpuClothComponents.splice(0)) {
+      component.detach(this);
+      component.dispose();
+    }
     this.remove();
     this.removeChildren();
     this._animationSet.dispose();
@@ -1188,11 +1233,17 @@ export class SceneNode
     this.iterate((child) => {
       this.scene!.queueUpdateNode(child);
       child._onAttached();
+      for (const component of child._gpuClothComponents) {
+        component.hostAttached();
+      }
     });
   }
   /** @internal */
   protected _detached() {
     this.iterate((child) => {
+      for (const component of child._gpuClothComponents) {
+        component.hostDetached();
+      }
       child._onDetached();
     });
   }

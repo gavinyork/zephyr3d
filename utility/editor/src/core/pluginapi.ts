@@ -149,6 +149,8 @@ export type EditorCommands = {
   executeCommand<T>(command: unknown): Promise<T>;
   executeUserCallback<T>(execute: () => T | Promise<T>, undo: () => void | Promise<void>): Promise<null | T>;
   selectNode(node: SceneNode): void;
+  activateEditTool(node: SceneNode): boolean;
+  deactivateEditTool(): boolean;
 };
 
 export type EditorSceneContext = {
