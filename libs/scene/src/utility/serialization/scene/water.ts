@@ -1003,7 +1003,7 @@ export function getWaterClass(manager: ResourceManager): SerializableClass {
           description:
             'Strength of the sunlight scattered forward through a wave crest, which is what makes a backlit crest glow. Grazing views of a low sun show it; looking down at the water does not.',
           type: 'float',
-          default: 1.5,
+          default: 0.5,
           options: { animatable: true, minValue: 0, maxValue: 10 },
           get(this: Water, value) {
             value.num[0] = this.material.subsurfaceIntensity;
@@ -1013,17 +1013,17 @@ export function getWaterClass(manager: ResourceManager): SerializableClass {
           }
         },
         {
-          name: 'SubsurfaceSteepness',
+          name: 'SubsurfaceCrestHeight',
           description:
-            'How sharply surface tilt gates the subsurface glow. Higher makes gentle swell glow too; lower restricts it to steep wave flanks.',
+            'Height above the still-water level, in meters, over which the subsurface gate absorbs. The gate is a slab of the medium, so the crest picks up the same hue shift the water body does and its red goes first. The absorption ramps in through a soft knee around the still-water level, so troughs keep a faint glow instead of cutting off. Lower it for a calm sea whose crests barely rise, raise it so only the tallest waves light up.',
           type: 'float',
-          default: 60,
-          options: { animatable: true, minValue: 0, maxValue: 100 },
+          default: 1.5,
+          options: { animatable: true, minValue: 0.001, maxValue: 10 },
           get(this: Water, value) {
-            value.num[0] = this.material.subsurfaceSteepness;
+            value.num[0] = this.material.subsurfaceCrestHeight;
           },
           set(this: Water, value) {
-            this.material.subsurfaceSteepness = value.num[0];
+            this.material.subsurfaceCrestHeight = value.num[0];
           }
         },
         {

@@ -347,6 +347,38 @@ export class Water extends applyMixins(GraphNode, mixinDrawable) implements Draw
     this.material.underwaterHysteresis = val;
   }
   /**
+   * Strength of the sunlight scattered forward through a wave crest, 0 to
+   * disable.
+   *
+   * This is the term that makes a backlit crest glow. Authored rather than
+   * derived; the medium's albedo supplies the colour, so raising this brightens
+   * the glow without shifting its hue.
+   */
+  get subsurfaceIntensity() {
+    return this.material.subsurfaceIntensity;
+  }
+  set subsurfaceIntensity(val: number) {
+    this.material.subsurfaceIntensity = val;
+  }
+  /**
+   * Height above the still-water level, in meters, over which the subsurface
+   * gate absorbs.
+   *
+   * The glow is gated by the wave's vertical displacement, and the gate is a
+   * slab of the medium: at this height a crest has attenuated by `e` to the
+   * power of the medium's extinction, so red goes first and the crest picks up
+   * a green edge. The absorption ramps in through a soft knee around the
+   * still-water level, so a trough keeps a faint glow rather than cutting off,
+   * and it never saturates however tall the crest. Lower it for a calm sea
+   * whose crests barely rise; raise it so only the tallest waves glow.
+   */
+  get subsurfaceCrestHeight() {
+    return this.material.subsurfaceCrestHeight;
+  }
+  set subsurfaceCrestHeight(val: number) {
+    this.material.subsurfaceCrestHeight = val;
+  }
+  /**
    * Strength of the sunlight scattered out of the water column towards the eye,
    * 1 for the value the medium coefficients imply.
    *
