@@ -14,13 +14,13 @@ import {
   UnlitMaterial,
   Water,
   FFTWaveGenerator,
+  WaterSurfaceSampler,
+  FloatingBody,
   getInput,
   getEngine
 } from '@zephyr3d/scene';
 import { backendWebGL2 } from '@zephyr3d/backend-webgl';
 import { backendWebGPU } from '@zephyr3d/backend-webgpu';
-import { WaterSurfaceSampler } from './water-surface-sampler';
-import { BuoyantBody } from './buoyant-body';
 
 const params = new URLSearchParams(location.search);
 
@@ -394,7 +394,7 @@ function buildScene() {
       // Half submerged at rest, mass derived to match. A 3x3x3 lattice of probes
       // is enough to give a box this size a righting moment that feels right;
       // more only costs.
-      const body = new BuoyantBody({
+      const body = new FloatingBody({
         node,
         size: new Vector3(BOX_SIZE.sizeX, BOX_SIZE.sizeY, BOX_SIZE.sizeZ),
         submergedFraction: 0.1,

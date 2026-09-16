@@ -1,0 +1,10 @@
+{
+  "changes": [
+    {
+      "packageName": "@zephyr3d/scene",
+      "comment": "Add water interaction: a GPU height field layered over the wave generator with disturbers, obstacles and a foam trail; add WaterSurfaceSampler, BuoyancyVolume and FloatingBody",
+      "type": "patch"
+    }
+  ],
+  "packageName": "@zephyr3d/scene"
+}

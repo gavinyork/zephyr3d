@@ -9,8 +9,10 @@ import { Primitive } from '../render';
 import { Clipmap, FBMWaveGenerator } from '../render';
 import { setWaterSubmergence } from '../render/underwater';
 import { WaterMaterial } from '../material/water';
+import type { WaterInteraction } from '../render/water_interaction';
 import type { WaterDebugOutput, WaterRefractionMode } from '../material/water';
 import type { AbstractDevice, BindGroup, FrameBuffer, GPUProgram, RenderStateSet } from '@zephyr3d/device';
+import type { WaveGenerator } from '../render/wavegenerator';
 import { QUEUE_OPAQUE } from '../values';
 import { BoundingBox } from '../utility/bounding_volume';
 import type { Camera } from '../camera';
@@ -78,6 +80,8 @@ export class Water extends applyMixins(GraphNode, mixinDrawable) implements Draw
   /** Elapsed time at the previous update, for the frame delta. */
   private _lastUpdateTime: number;
   private _feedbackProgram: DRef<GPUProgram>;
+  /** Hash of the wave generator the feedback program was built for. */
+  private _feedbackHash: string;
   private _feedbackBindGroup: DRef<BindGroup>;
   private _feedbackPrimitive: DRef<Primitive>;
   private _feedbackRenderTarget: DRef<FrameBuffer>;
@@ -126,6 +130,7 @@ export class Water extends applyMixins(GraphNode, mixinDrawable) implements Draw
     this._material.get()!.TAAStrength = 0.4;
     this.waveGenerator = new FBMWaveGenerator();
     this._feedbackProgram = new DRef();
+    this._feedbackHash = '';
     this._feedbackBindGroup = new DRef();
     this._feedbackPrimitive = new DRef();
     this._feedbackRenderTarget = new DRef();
@@ -161,12 +166,35 @@ export class Water extends applyMixins(GraphNode, mixinDrawable) implements Draw
   get material() {
     return this._material.get()!;
   }
-  /** Wave generator object of the water */
+  /**
+   * Wave generator object of the water: the source of the ambient surface.
+   *
+   * While an {@link interaction} is attached the surface actually drawn is
+   * this generator plus the interaction field; this still returns the
+   * generator on its own.
+   */
   get waveGenerator() {
-    return this.material.waveGenerator;
+    return this.material.baseWaveGenerator;
   }
   set waveGenerator(waveGenerator) {
     this.material.waveGenerator = waveGenerator;
+    if (this.material.needUpdate()) {
+      this.scene?.queueUpdateNode(this);
+    }
+  }
+  /**
+   * Dynamic height field layered over the surface, driven by things touching
+   * the water, or null for none. See {@link WaterInteraction}.
+   *
+   * The field is stepped on this water's own clock, so {@link animationSpeed}
+   * scales it too; it is added everywhere the surface is evaluated, so
+   * {@link getSurfacePoint} and the caustics see it as well.
+   */
+  get interaction() {
+    return this.material.interaction;
+  }
+  set interaction(val: Nullable<WaterInteraction>) {
+    this.material.interaction = val;
     if (this.material.needUpdate()) {
       this.scene?.queueUpdateNode(this);
     }
@@ -704,6 +732,11 @@ export class Water extends applyMixins(GraphNode, mixinDrawable) implements Draw
         Math.max(0, elapsedInSeconds - Math.max(this._timeStart, this._lastUpdateTime)) *
         this._animationSpeed;
       this._lastUpdateTime = elapsedInSeconds;
+      const interaction = this.material.interaction;
+      if (interaction) {
+        interaction.resolveNodes(this.scene);
+        interaction.setWaterLevel(this.worldMatrix.m13);
+      }
       this.material.update(frameId, this._waveTime);
       this.invalidateWorldBoundingVolume(false);
     }
@@ -735,8 +768,8 @@ export class Water extends applyMixins(GraphNode, mixinDrawable) implements Draw
         skirt: infinite,
         calcAABB(userData: unknown, minX, maxX, minZ, maxZ, outAABB) {
           const p = that.worldMatrix.transformPointAffine(Vector3.zero());
-          if (that.waveGenerator) {
-            that.waveGenerator.calcClipmapTileAABB(minX, maxX, minZ, maxZ, p.y, outAABB);
+          if (mat.waveGenerator) {
+            mat.waveGenerator.calcClipmapTileAABB(minX, maxX, minZ, maxZ, p.y, outAABB);
           } else {
             outAABB.minPoint.setXYZ(minX, p.y, minZ);
             outAABB.maxPoint.setXYZ(maxX, p.y + 1, maxZ);
@@ -744,6 +777,10 @@ export class Water extends applyMixins(GraphNode, mixinDrawable) implements Draw
         }
       });
       this.updateSubmergence(camera, mat);
+      const interaction = mat.interaction;
+      if (interaction && interaction.followMode === 'camera') {
+        this.updateInteractionFocus(camera, interaction);
+      }
       this.scene?.queuePerCameraUpdateNode(this);
     }
   }
@@ -784,6 +821,39 @@ export class Water extends applyMixins(GraphNode, mixinDrawable) implements Draw
     }
     this._submerged.set(camera, submerged);
     setWaterSubmergence(camera, this, submerged, surfaceY);
+  }
+  /**
+   * Point the interaction window at the water the camera is looking at.
+   *
+   * Not at the camera itself: a camera looking down at the water from a
+   * distance has the water it sees well ahead of it, and a window centred on
+   * the camera would put that water at its edge, inside the sponge band. The
+   * focus is where the view direction meets the rest plane, no further ahead
+   * than half a window so that a view towards the horizon still covers the
+   * near water, and half a window ahead when the view does not meet the plane.
+   * @internal
+   */
+  private updateInteractionFocus(camera: Camera, interaction: WaterInteraction) {
+    const camPos = camera.getWorldPosition();
+    const m = camera.worldMatrix;
+    // The camera looks down its local -Z.
+    const fx = -m.m02;
+    const fy = -m.m12;
+    const fz = -m.m22;
+    const horizontal = Math.hypot(fx, fz);
+    const reach = interaction.windowSize * 0.5;
+    let ahead = reach;
+    if (fy < -1e-4) {
+      const t = (this.worldMatrix.m13 - camPos.y) / fy;
+      if (t > 0) {
+        ahead = Math.min(reach, t * horizontal);
+      }
+    }
+    if (horizontal < 1e-6) {
+      interaction.setFocus(camPos.x, camPos.z);
+    } else {
+      interaction.setFocus(camPos.x + (fx / horizontal) * ahead, camPos.z + (fz / horizontal) * ahead);
+    }
   }
   /**
    * Distance to the true horizon for the camera's height above this water, in
@@ -1024,8 +1094,18 @@ export class Water extends applyMixins(GraphNode, mixinDrawable) implements Draw
     try {
       await device.runNextFrameAsync(async () => {
         timing.recorded = device.frameInfo.frameCounter;
+        const waveGenerator = this.material.waveGenerator;
+        const feedbackHash = waveGenerator?.getHash() ?? '';
+        if (this._feedbackProgram.get() && this._feedbackHash !== feedbackHash) {
+          // The surface changed under the program (another generator, or an
+          // interaction field attached); a program built for the old one would
+          // answer for a surface that is no longer drawn.
+          this._feedbackBindGroup.dispose();
+          this._feedbackProgram.dispose();
+        }
         if (!this._feedbackProgram.get()) {
-          this._feedbackProgram.set(this._createFeedbackProgram(device));
+          this._feedbackHash = feedbackHash;
+          this._feedbackProgram.set(this._createFeedbackProgram(device, waveGenerator));
           this._feedbackBindGroup.set(
             device.createBindGroup(this._feedbackProgram.get()!.bindGroupLayouts[0])
           );
@@ -1072,7 +1152,7 @@ export class Water extends applyMixins(GraphNode, mixinDrawable) implements Draw
         primitive.indexCount = points.length;
         const bindGroup = this._feedbackBindGroup.get()!;
         bindGroup.setValue('textureWidth', this._feedbackRenderTarget.get()!.getWidth());
-        this.waveGenerator?.applyWaterBindGroup(bindGroup);
+        waveGenerator?.applyWaterBindGroup(bindGroup);
         device.pushDeviceStates();
         device.setProgram(this._feedbackProgram.get());
         device.setBindGroup(0, this._feedbackBindGroup.get()!);
@@ -1124,20 +1204,19 @@ export class Water extends applyMixins(GraphNode, mixinDrawable) implements Draw
     return hits;
   }
   /** @internal */
-  private _createFeedbackProgram(device: AbstractDevice) {
-    const that = this;
+  private _createFeedbackProgram(device: AbstractDevice, waveGenerator: Nullable<WaveGenerator>) {
     const program = device.buildRenderProgram({
       vertex(pb) {
         this.$inputs.position = pb.vec4().attrib('position');
         this.textureWidth = pb.float().uniform(0);
-        if (that.waveGenerator) {
-          that.waveGenerator.setupUniforms(this, 0);
+        if (waveGenerator) {
+          waveGenerator.setupUniforms(this, 0);
         }
         pb.main(function () {
-          if (that.waveGenerator) {
+          if (waveGenerator) {
             this.$l.worldPos = pb.vec3();
             this.$l.worldNorm = pb.vec3();
-            that.waveGenerator.calcVertexPositionAndNormal(
+            waveGenerator.calcVertexPositionAndNormal(
               this,
               this.$inputs.position.xyz,
               this.worldPos,
@@ -1163,16 +1242,13 @@ export class Water extends applyMixins(GraphNode, mixinDrawable) implements Draw
       fragment(pb) {
         this.$outputs.worldPos = pb.vec4();
         this.$outputs.worldNorm = pb.vec4();
-        if (that.waveGenerator) {
-          that.waveGenerator.setupUniforms(this, 0);
+        if (waveGenerator) {
+          waveGenerator.setupUniforms(this, 0);
         }
         pb.main(function () {
           this.$outputs.worldPos = pb.vec4(this.$inputs.worldPos, 1);
-          this.$outputs.worldNorm = that.waveGenerator
-            ? pb.vec4(
-                that.waveGenerator!.calcFragmentNormal(this, this.$inputs.xz, this.$inputs.worldNorm),
-                1
-              )
+          this.$outputs.worldNorm = waveGenerator
+            ? pb.vec4(waveGenerator.calcFragmentNormal(this, this.$inputs.xz, this.$inputs.worldNorm), 1)
             : pb.vec4(0, 1, 0, 1);
         });
       }

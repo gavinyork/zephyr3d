@@ -10,6 +10,7 @@ export * from './textsprite';
 export * from './msdftext';
 export * from './msdftextsprite';
 export * from './water';
+export * from './water_surface_sampler';
 export * from './hair';
 export * from './octree';
 export * from './scene_node';

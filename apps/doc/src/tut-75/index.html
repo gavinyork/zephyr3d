@@ -1,0 +1,204 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Zephyr3d Water Interaction</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+      }
+      canvas {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        z-index: 0;
+      }
+      #ui {
+        position: absolute;
+        top: 8px;
+        left: 8px;
+        z-index: 10;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        width: 232px;
+        padding: 8px;
+        border: 1px solid rgba(255, 255, 255, 0.14);
+        border-radius: 6px;
+        background: rgba(15, 20, 28, 0.78);
+        color: #f4f7fb;
+        color-scheme: dark;
+        font:
+          12px/1.25 system-ui,
+          -apple-system,
+          BlinkMacSystemFont,
+          'Segoe UI',
+          sans-serif;
+        backdrop-filter: blur(8px);
+      }
+      #ui label {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        white-space: nowrap;
+      }
+      #ui label > span {
+        min-width: 70px;
+      }
+      #ui select {
+        flex: 1;
+        min-width: 0;
+        min-height: 22px;
+        padding: 0 4px;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        border-radius: 4px;
+        background: #222b36;
+        color: inherit;
+        font: inherit;
+        cursor: pointer;
+      }
+      #ui option {
+        background: #1b2430;
+        color: #f4f7fb;
+      }
+      #ui input[type='checkbox'] {
+        accent-color: #7fb2ff;
+        cursor: pointer;
+      }
+      #ui input[type='range'] {
+        flex: 1;
+        min-width: 0;
+        accent-color: #7fb2ff;
+        cursor: pointer;
+      }
+      #ui em {
+        min-width: 48px;
+        text-align: right;
+        font-style: normal;
+        opacity: 0.85;
+      }
+      #status {
+        position: absolute;
+        right: 8px;
+        top: 8px;
+        z-index: 10;
+        padding: 8px;
+        border: 1px solid rgba(255, 255, 255, 0.14);
+        border-radius: 6px;
+        background: rgba(15, 20, 28, 0.78);
+        color: #f4f7fb;
+        font:
+          12px/1.4 ui-monospace,
+          SFMono-Regular,
+          Menlo,
+          Consolas,
+          monospace;
+        white-space: pre;
+        backdrop-filter: blur(8px);
+      }
+      #ui .note {
+        opacity: 0.7;
+        white-space: normal;
+      }
+    </style>
+  </head>
+  <body>
+    <canvas id="my-canvas" tabindex="0"></canvas>
+    <div id="ui" aria-label="Water interaction options">
+      <label>
+        <span>Interaction</span>
+        <input id="enabled-check" type="checkbox" checked />
+      </label>
+      <label>
+        <span>Debug view</span>
+        <select id="debug-select">
+          <option value="none" selected>None</option>
+          <option value="interaction">Interaction field</option>
+          <option value="normal">Normal</option>
+          <option value="foam">Foam</option>
+        </select>
+      </label>
+      <label>
+        <span>Resolution</span>
+        <select id="resolution-select">
+          <option value="256">256</option>
+          <option value="512" selected>512</option>
+          <option value="1024">1024</option>
+        </select>
+      </label>
+      <label>
+        <span>Window</span>
+        <input id="window-input" type="range" min="16" max="160" step="8" value="64" />
+        <em id="window-label">64m</em>
+      </label>
+      <label>
+        <span>Wave speed</span>
+        <input id="speed-input" type="range" min="0.2" max="4.5" step="0.1" value="1.5" />
+        <em id="speed-label">1.5m/s</em>
+      </label>
+      <label>
+        <span>Damping</span>
+        <input id="damping-input" type="range" min="0" max="4" step="0.1" value="1" />
+        <em id="damping-label">1.0/s</em>
+      </label>
+      <label>
+        <span>Foam</span>
+        <input id="foam-input" type="range" min="0" max="1" step="0.01" value="0.15" />
+        <em id="foam-label">0.15</em>
+      </label>
+      <label>
+        <span>Foam decay</span>
+        <input id="foamdecay-input" type="range" min="0.05" max="3" step="0.05" value="0.6" />
+        <em id="foamdecay-label">0.60/s</em>
+      </label>
+      <label>
+        <span>Impulse</span>
+        <input id="strength-input" type="range" min="0.05" max="0.5" step="0.01" value="0.25" />
+        <em id="strength-label">0.25m</em>
+      </label>
+      <label>
+        <span>Radius</span>
+        <input id="radius-input" type="range" min="0.3" max="4" step="0.1" value="1" />
+        <em id="radius-label">1.0m</em>
+      </label>
+      <label>
+        <span>Push</span>
+        <input id="push-input" type="range" min="0" max="0.5" step="0.01" value="0.15" />
+        <em id="push-label">0.15m</em>
+      </label>
+      <label>
+        <span>Pilings block</span>
+        <input id="block-check" type="checkbox" checked />
+      </label>
+      <label>
+        <span>Sea</span>
+        <input id="sea-input" type="range" min="0" max="1.5" step="0.05" value="0.6" />
+        <em id="sea-label">0.60</em>
+      </label>
+      <label>
+        <span>Anim speed</span>
+        <input id="anim-input" type="range" min="0" max="2" step="0.05" value="1" />
+        <em id="anim-label">1.00</em>
+      </label>
+      <div class="note">
+        Click the water to drop a stone. Hold Shift and move the pointer to drag something through
+        it. WASD or the arrow keys drive the boat; the buoy floats on the surface it reads back,
+        wake and stones included, and disturbs it in turn; ripples reflect off the pilings. The field follows the camera; the debug view dims everything outside its
+        window.
+      </div>
+      <div class="note">Left drag: orbit. Wheel: zoom.</div>
+    </div>
+    <div id="status">starting</div>
+    <script type="module" src="js/tut-75.js"></script>
+  </body>
+</html>

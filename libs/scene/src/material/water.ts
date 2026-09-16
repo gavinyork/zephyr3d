@@ -8,6 +8,8 @@ import type {
 } from '@zephyr3d/device';
 import { applyMaterialMixins, MeshMaterial } from './meshmaterial';
 import type { DrawContext, WaveGenerator } from '../render';
+import type { WaterInteraction } from '../render/water_interaction';
+import { InteractiveWaveGenerator } from '../render/water_interaction';
 import { LIGHT_TYPE_DIRECTIONAL, MaterialVaryingFlags } from '../values';
 import { ShaderHelper } from './shader/helper';
 import type { Nullable } from '@zephyr3d/base';
@@ -70,6 +72,9 @@ export type WaterRefractionMode = 'march' | 'offset';
  *   crests and absorbed in troughs. Independent of the lights.
  * - `depth`: refracted path length through the medium, metres / 10.
  *   no offset is mid grey.
+ * - `interaction`: the {@link WaterInteraction} field on its own, mid grey at
+ *   rest and reaching black and white at its amplitude clamp; dimmed outside
+ *   the field's window.
  *
  * Each value is a separate shader variant; the `none` variant carries no trace
  * of the others.
@@ -90,7 +95,8 @@ export type WaterDebugOutput =
   | 'sunScattering'
   | 'subsurface'
   | 'subsurfaceThickness'
-  | 'depth';
+  | 'depth'
+  | 'interaction';
 
 /** Label/value pairs for {@link WaterDebugOutput}, for editor enumerations. */
 export const WATER_DEBUG_OUTPUTS = [
@@ -109,7 +115,8 @@ export const WATER_DEBUG_OUTPUTS = [
   { label: 'Subsurface', value: 'subsurface' },
   { label: 'Subsurface thickness', value: 'subsurfaceThickness' },
   { label: 'Specular', value: 'specular' },
-  { label: 'Depth', value: 'depth' }
+  { label: 'Depth', value: 'depth' },
+  { label: 'Interaction', value: 'interaction' }
 ] as const;
 
 /** Fresnel reflectance of water at normal incidence, n = 1.333. */
@@ -214,6 +221,7 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
   private static readonly _defaultScatterRampTexture: DWeakRef<Texture2D> = new DWeakRef();
   private static readonly _defaultAbsorptionRampTexture: DWeakRef<Texture2D> = new DWeakRef();
   private static readonly _waveUpdateState: WeakMap<WaveGenerator, number> = new WeakMap();
+  private static readonly _interactionUpdateState: WeakMap<WaterInteraction, number> = new WeakMap();
   private readonly _region: Vector4;
   private _refractionScale: number;
   private _depthMulti: number;
@@ -221,6 +229,13 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
   private readonly _scatterRampTexture: DRef<Texture2D>;
   private readonly _absorptionRampTexture: DRef<Texture2D>;
   private readonly _waveGenerator: DRef<WaveGenerator>;
+  private readonly _interaction: DRef<WaterInteraction>;
+  /**
+   * The generator the shaders and every other consumer of the surface use: the
+   * base generator wrapped with the interaction field while one is attached,
+   * the base generator itself otherwise.
+   */
+  private _effectiveWaveGenerator: Nullable<WaveGenerator>;
   /** Wave uniform version last written, per bind group. */
   private _waveVersionByBindGroup: WeakMap<BindGroup, number>;
   private readonly _clipmapInfo: Vector4;
@@ -293,6 +308,8 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
     this._clipmapGridInfo = new Vector4();
     this._skirtDistance = 0;
     this._waveGenerator = new DRef();
+    this._interaction = new DRef();
+    this._effectiveWaveGenerator = null;
     this._waveVersionByBindGroup = new WeakMap();
     this._ssrParams = new Vector4(1000, 160, 0.5, 2);
     this._scatterRampTexture = new DRef();
@@ -352,6 +369,8 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
   protected onDispose() {
     super.onDispose();
     this._waveGenerator.dispose();
+    this._interaction.dispose();
+    this._effectiveWaveGenerator = null;
     this._scatterRampTexture.dispose();
     this._absorptionRampTexture.dispose();
   }
@@ -366,16 +385,56 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
       this.uniformChanged();
     }
   }
+  /**
+   * The wave generator the surface is evaluated with.
+   *
+   * While an {@link interaction} is attached this is a wrapper that layers the
+   * interaction field over {@link baseWaveGenerator}; every consumer of the
+   * surface (the shaders, the surface-point query, the caustics) goes through
+   * it and sees one displaced surface. Setting it sets the base generator.
+   */
   get waveGenerator() {
-    return this._waveGenerator.get();
+    return this._effectiveWaveGenerator;
   }
   set waveGenerator(waveGenerator: Nullable<WaveGenerator>) {
     if (this._waveGenerator.get() !== waveGenerator) {
       this._waveGenerator.set(waveGenerator);
-      // Bind groups are pooled; a stale version must not suppress the upload.
-      this._waveVersionByBindGroup = new WeakMap();
-      this.optionChanged(true);
+      this._rebuildEffectiveWaveGenerator();
     }
+  }
+  /** The generator supplying the ambient surface, without any interaction field. */
+  get baseWaveGenerator() {
+    return this._waveGenerator.get();
+  }
+  /**
+   * Dynamic height field layered over the surface, or null for none. See
+   * {@link WaterInteraction}.
+   *
+   * Ignored, with the base generator used on its own, on a device that cannot
+   * host the field.
+   */
+  get interaction() {
+    return this._interaction.get();
+  }
+  set interaction(val: Nullable<WaterInteraction>) {
+    if (this._interaction.get() !== val) {
+      this._interaction.set(val);
+      this._rebuildEffectiveWaveGenerator();
+    }
+  }
+  /** @internal */
+  private _rebuildEffectiveWaveGenerator() {
+    const base = this._waveGenerator.get();
+    const interaction = this._interaction.get();
+    if (base && interaction && interaction.isOk()) {
+      this._effectiveWaveGenerator = new InteractiveWaveGenerator(base, interaction);
+      interaction.ensureResources();
+    } else {
+      this._effectiveWaveGenerator = base;
+    }
+    // Bind groups are pooled; a stale version must not suppress the upload.
+    this._waveVersionByBindGroup = new WeakMap();
+    this.optionChanged(true);
   }
   get scatterRampTexture() {
     const tex = this._getScatterRampTexture(getDevice());
@@ -1129,10 +1188,40 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
       }
       // Vertical wave displacement, interpolated from the vertices. Zero on the skirt.
       scope.$l.crestHeight = pb.sub(scope.$inputs.worldPos.y, scope.$inputs.clipmapPos.y);
-      scope.$l.outColor = pb.vec4(
-        this.waterShading(scope, scope.$inputs.worldPos, scope.normal.xyz, scope.normal.w, scope.crestHeight),
-        1
-      );
+      if (this.debugOutput === 'interaction') {
+        // The field on its own, grey at rest, scaled so its amplitude clamp
+        // reaches black and white; dimmed outside the window so its reach shows.
+        if (this.waveGenerator instanceof InteractiveWaveGenerator) {
+          const interaction = this.waveGenerator.interaction;
+          scope.$l.wiDebugHeight = pb.div(
+            interaction.sampleHeight(scope, scope.$inputs.clipmapPos.xz),
+            scope.wiParams2.y
+          );
+          scope.$l.wiDebugMask = pb.mix(
+            pb.float(0.55),
+            pb.float(1),
+            interaction.windowMask(scope, scope.$inputs.clipmapPos.xz)
+          );
+        } else {
+          scope.$l.wiDebugHeight = pb.float(0);
+          scope.$l.wiDebugMask = pb.float(1);
+        }
+        scope.$l.outColor = pb.vec4(
+          pb.vec3(pb.mul(pb.add(0.5, pb.mul(scope.wiDebugHeight, 0.5)), scope.wiDebugMask)),
+          1
+        );
+      } else {
+        scope.$l.outColor = pb.vec4(
+          this.waterShading(
+            scope,
+            scope.$inputs.worldPos,
+            scope.normal.xyz,
+            scope.normal.w,
+            scope.crestHeight
+          ),
+          1
+        );
+      }
       if (
         this.drawContext.materialFlags &
         (MaterialVaryingFlags.SCENE_STORE_ROUGHNESS | MaterialVaryingFlags.SCENE_STORE_NORMAL)
@@ -2126,7 +2215,7 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
   }
   applyUniforms(bindGroup: BindGroup, ctx: DrawContext, needUpdate: boolean, pass: number) {
     super.applyUniforms(bindGroup, ctx, needUpdate, pass);
-    const waveGenerator = this._waveGenerator.get();
+    const waveGenerator = this._effectiveWaveGenerator;
     // Per bind group: the material owns one per pass/variant hash.
     const lastWritten = this._waveVersionByBindGroup.get(bindGroup) ?? -1;
     if (waveGenerator && lastWritten !== waveGenerator.version) {
@@ -2206,15 +2295,26 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
     }
   }
   needUpdate() {
-    return !!this._waveGenerator.get()?.needUpdate();
+    return !!this._waveGenerator.get()?.needUpdate() || !!this._interaction.get();
   }
   update(frameId: number, elapsed: number) {
+    // The base generator and the field are stepped separately, each guarded by
+    // its own per-frame mark, so a generator shared between two bodies of water
+    // is still stepped once even when each body wraps it with its own field.
     const waveGenerator = this._waveGenerator.get();
     if (waveGenerator) {
       const updateFrameId = WaterMaterial._waveUpdateState.get(waveGenerator);
       if (updateFrameId !== frameId) {
         waveGenerator.update(elapsed);
         WaterMaterial._waveUpdateState.set(waveGenerator, frameId);
+      }
+    }
+    const interaction = this._interaction.get();
+    if (interaction && this._effectiveWaveGenerator instanceof InteractiveWaveGenerator) {
+      const updateFrameId = WaterMaterial._interactionUpdateState.get(interaction);
+      if (updateFrameId !== frameId) {
+        interaction.update(elapsed);
+        WaterMaterial._interactionUpdateState.set(interaction, frameId);
       }
     }
   }

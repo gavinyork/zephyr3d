@@ -289,9 +289,73 @@ boat.position.y = positions[0].y;
 
 The method runs a GPU feedback pass on the next frame, so it is asynchronous. Batch multiple query points into one call instead of calling it once per object.
 
+## Water Interaction
+
+`WaterInteraction`: ripples from something dropped in, the wake behind a hull, the slap of a foot. It is a 2D wave equation integrated on the GPU over a square window of the surface.
+
+```ts
+import { WaterInteraction, WaterDisturber } from '@zephyr3d/scene';
+
+const interaction = new WaterInteraction();
+interaction.windowSize = 64;   // metres covered by the field
+interaction.resolution = 512;  // texels per side, 12.5 cm here
+interaction.waveSpeed = 1.5;   // m/s, clamped to what the grid can integrate stably
+interaction.damping = 1;       // 1/s
+water.interaction = interaction;
+
+// A stone: one impulse. Negative pushes the surface down.
+interaction.addImpulse(x, z, 1 /* radius, m */, -0.25 /* peak, m */);
+
+// Things in the water follow a node with a sphere, capsule or box footprint.
+const hull = new WaterDisturber(boatNode, 'box');
+hull.size = new Vector3(1.6, 1, 3.6);
+hull.strength = 0.15;
+interaction.addDisturber(hull);
+
+const piling = new WaterDisturber(pilingNode, 'capsule');
+piling.radius = 0.35;
+piling.halfLength = 6;
+piling.blocking = true; // waves stop at it and reflect
+interaction.addDisturber(piling);
+```
+
+A disturber injects the change in the water column its shape displaces since the previous frame. Something at rest leaves the water alone; something moving pushes water down ahead of itself and lets it up behind, which is what a wake is; something dropping in pushes down all over its footprint. A `blocking` disturber is also an obstacle: waves stop at its footprint and reflect off it.
+
+The window follows the water the camera is looking at by default (`followMode: 'camera'`), can follow a node (`'node'` with `followNode`) for a first-person view, or stay put (`'fixed'` with `center`) for a pool or a pond. A band inside the window edge absorbs outgoing waves so the edge never shows; the `interaction` debug output shows the field on its own and dims everything outside the window.
+
+Disturbances also lay down foam - where a shape moves, where a stone lands, along the steep fast crests of the field's own waves - which fades at `foamDecay` and is drawn with the same look as the crest and shoreline foam. `foamAmount` scales it; at its default of 0.15 a wake reads as a trail rather than a sheet.
+
+The field needs a filterable float or half-float render target; `interaction.isOk()` reports whether the device has one, and the water falls back to the wave generator alone when it does not. Tutorial `tut-75` drives a boat through the field and floats a buoy on the result.
+
+### Floating Objects
+
+`WaterSurfaceSampler` batches height queries over a fixed lattice and interpolates between them, so a whole scene of floating objects costs one surface query per batch. `BuoyancyVolume` turns a height function into a buoyant force and torque for a box-shaped hull, independent of what integrates them; `FloatingBody` is a small rigid body around it for applications without a physics library.
+
+```ts
+import { WaterSurfaceSampler, FloatingBody } from '@zephyr3d/scene';
+
+const sampler = new WaterSurfaceSampler(water, { spacing: 2, cols: 25, rows: 25, updateHz: 30 });
+const buoy = new FloatingBody({
+  node: buoyNode,
+  size: new Vector3(1.3, 1.3, 1.3),
+  mass: 200,
+  submergedFraction: 0.5
+});
+buoy.reset(10, 4, water.position.y);
+
+app.on('tick', (deltaMs) => {
+  const delta = deltaMs / 1000;
+  sampler.update(delta);
+  const level = water.position.y;
+  buoy.update(delta, (x, z) => sampler.sampleWorldYRaw(x, z) - level, level);
+});
+```
+
+A rigid body should read `sampleWorldYRaw`; the eased `sampleWorldY` is for objects placed directly at the surface height. With a physics library, call `BuoyancyVolume.computeForces()` from its step and apply the force and torque to the body instead.
+
 ## Serialization
 
-`Water` is registered with the serialization system, including its material-related water parameters and the built-in `FBMWaveGenerator` / `FFTWaveGenerator` settings. This means editor-created water nodes and saved scene water settings can be restored through `loadScene()` or `instantiatePrefab()`.
+`Water` is registered with the serialization system, including its material-related water parameters, the built-in `FBMWaveGenerator` / `FFTWaveGenerator` settings, and its `WaterInteraction` with the disturbers registered on it (each disturber records the persistent id of the node it follows and binds to it when the scene has loaded). This means editor-created water nodes and saved scene water settings can be restored through `loadScene()` or `instantiatePrefab()`.
 
 `GerstnerWaveGenerator` can be used at runtime, but it is not currently one of the registered wave-generator types for serialized water nodes.
 
