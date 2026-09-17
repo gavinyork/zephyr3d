@@ -604,6 +604,9 @@ export class WaterInteraction extends Disposable {
   private readonly _impulses: PendingImpulse[];
   private _textures: Nullable<[Texture2D, Texture2D]>;
   private _framebuffers: Nullable<[FrameBuffer, FrameBuffer]>;
+  // Independent history: impulses only, so rendered wakes cannot feed buoyancy.
+  private _externalTextures: Nullable<[Texture2D, Texture2D]> = null;
+  private _externalFramebuffers: Nullable<[FrameBuffer, FrameBuffer]> = null;
   private _current: number;
   private _originX: number;
   private _originZ: number;
@@ -1026,6 +1029,12 @@ export class WaterInteraction extends Disposable {
       device.setProgram(program);
       device.setBindGroup(0, bindGroup);
       drawFullscreenQuad();
+      // Same clock, window, impulses and obstacles, but no disturber sources.
+      bindGroup.setTexture('srcTex', this._externalTextures![this._current], nearest);
+      bindGroup.setValue('numDisturbers', 0);
+      device.setFramebuffer(this._externalFramebuffers![1 - this._current]);
+      device.setBindGroup(0, bindGroup);
+      drawFullscreenQuad();
       this._current = 1 - this._current;
     }
     device.popDeviceStates();
@@ -1106,13 +1115,17 @@ export class WaterInteraction extends Disposable {
    * Bind the current field and its placement.
    * @internal
    */
-  applyBindGroup(bindGroup: BindGroup) {
+  applyBindGroup(bindGroup: BindGroup, includeDisturbers = true) {
     const device = getDevice();
     this._ensureField(device);
     const texel = this.texelSize;
     this._sampleParams.setXYZW(this._originX, this._originZ, 1 / this._windowSize, texel);
     this._sampleParams2.setXYZW(0.5 - this._spongeWidth, this._maxAmplitude, 0, 0);
-    bindGroup.setTexture('wiHeightTex', this._textures![this._current], fetchSampler('clamp_linear_nomip'));
+    bindGroup.setTexture(
+      'wiHeightTex',
+      (includeDisturbers ? this._textures : this._externalTextures)![this._current],
+      fetchSampler('clamp_linear_nomip')
+    );
     bindGroup.setValue('wiParams', this._sampleParams);
     bindGroup.setValue('wiParams2', this._sampleParams2);
   }
@@ -1239,6 +1252,10 @@ export class WaterInteraction extends Disposable {
   }
   /** @internal */
   private _disposeField() {
+    this._externalFramebuffers?.forEach((fb) => fb.dispose());
+    this._externalFramebuffers = null;
+    this._externalTextures?.forEach((tex) => tex.dispose());
+    this._externalTextures = null;
     if (this._framebuffers) {
       this._framebuffers[0].dispose();
       this._framebuffers[1].dispose();
@@ -1280,7 +1297,20 @@ export class WaterInteraction extends Disposable {
     const fbA = device.createFrameBuffer([texA], null);
     const fbB = device.createFrameBuffer([texB], null);
     const fbO = device.createFrameBuffer([texO], null);
+    const externalA = device.createTexture2D(format, res, res, { mipmapping: false })!;
+    const externalB = device.createTexture2D(format, res, res, { mipmapping: false })!;
+    externalA.name = 'WaterInteractionExternalA';
+    externalB.name = 'WaterInteractionExternalB';
+    this._externalTextures = [externalA, externalB];
+    this._externalFramebuffers = [
+      device.createFrameBuffer([externalA], null),
+      device.createFrameBuffer([externalB], null)
+    ];
     device.pushDeviceStates();
+    for (const fb of this._externalFramebuffers) {
+      device.setFramebuffer(fb);
+      device.clearFrameBuffer(Vector4.zero(), null, null);
+    }
     device.setFramebuffer(fbA);
     device.clearFrameBuffer(Vector4.zero(), null, null);
     device.setFramebuffer(fbB);
@@ -1359,7 +1389,11 @@ export class WaterInteraction extends Disposable {
 export class InteractiveWaveGenerator extends Disposable implements WaveGenerator {
   private readonly _base: WaveGenerator;
   private readonly _interaction: WaterInteraction;
-  constructor(base: WaveGenerator, interaction: WaterInteraction) {
+  constructor(
+    base: WaveGenerator,
+    interaction: WaterInteraction,
+    private readonly _includeDisturbers = true
+  ) {
     super();
     this._base = base;
     this._interaction = interaction;
@@ -1373,7 +1407,11 @@ export class InteractiveWaveGenerator extends Disposable implements WaveGenerato
     return this._interaction;
   }
   clone() {
-    return new InteractiveWaveGenerator(this._base.clone(), this._interaction) as this;
+    return new InteractiveWaveGenerator(
+      this._base.clone(),
+      this._interaction,
+      this._includeDisturbers
+    ) as this;
   }
   get version() {
     return this._base.version + this._interaction.version;
@@ -1432,7 +1470,7 @@ export class InteractiveWaveGenerator extends Disposable implements WaveGenerato
   }
   applyWaterBindGroup(bindGroup: BindGroup) {
     this._base.applyWaterBindGroup(bindGroup);
-    this._interaction.applyBindGroup(bindGroup);
+    this._interaction.applyBindGroup(bindGroup, this._includeDisturbers);
   }
   calcClipmapTileAABB(minX: number, maxX: number, minZ: number, maxZ: number, y: number, outAABB: AABB) {
     this._base.calcClipmapTileAABB(minX, maxX, minZ, maxZ, y, outAABB);

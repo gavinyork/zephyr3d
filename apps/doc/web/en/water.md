@@ -355,6 +355,8 @@ A rigid body should read `sampleWorldYRaw`; the eased `sampleWorldY` is for obje
 
 <div class="showcase" case="tut-66"></div>
 
+Buoyancy sampling excludes all WaterDisturber wakes by default, retaining ambient waves and external addImpulse waves to prevent feedback oscillations. Rendering still includes all waves. Set WaterSurfaceSampler includeDisturbers: true for the complete visual surface. Water.getSurfacePoint queries the complete surface by default; pass false as its fourth argument to exclude wakes. Interaction maintains an additional texture pair and simulation pass for the external field.
+
 ## Serialization
 
 `Water` is registered with the serialization system, including its material-related water parameters, the built-in `FBMWaveGenerator` / `FFTWaveGenerator` settings, and its `WaterInteraction` with the disturbers registered on it (each disturber records the persistent id of the node it follows and binds to it when the scene has loaded). This means editor-created water nodes and saved scene water settings can be restored through `loadScene()` or `instantiatePrefab()`.

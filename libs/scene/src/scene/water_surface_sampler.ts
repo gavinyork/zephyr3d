@@ -13,7 +13,12 @@ export interface WaterSurfaceSource {
   /** Wave clock of the surface, in seconds. */
   readonly waveTime: number;
   /** Evaluate the displaced surface over world XZ positions. */
-  getSurfacePoint(points: Vector3[], outPos?: Vector3[], outNorm?: Vector3[]): Promise<void>;
+  getSurfacePoint(
+    points: Vector3[],
+    outPos?: Vector3[],
+    outNorm?: Vector3[],
+    includeDisturbers?: boolean
+  ): Promise<void>;
 }
 
 /**
@@ -21,6 +26,8 @@ export interface WaterSurfaceSource {
  * @public
  */
 export interface WaterSurfaceSamplerOptions {
+  /** Include moving disturbers' wakes. Defaults to false to prevent buoyancy feedback. */
+  includeDisturbers?: boolean;
   /** Lattice cell size in world metres. Defaults to 6. */
   spacing?: number;
   /** Lattice columns, along X. Defaults to 24. */
@@ -56,9 +63,11 @@ interface ExtraPoints {
  * it - re-deriving the spectrum, decoding the height textures, summing the
  * dominant waves - is a different function that has to be kept in step by
  * hand. {@link Water.getSurfacePoint} asks the material instead, so it is exact
- * by construction, and it includes whatever else displaces the surface, such as
- * a {@link WaterInteraction} field. What it costs is one point-list draw and one
- * readback per batch, which is why queries here are batched and throttled
+ * by construction. By default it includes ambient waves and external interaction
+ * impulses, but excludes disturber wakes to prevent buoyancy feeding itself.
+ * Set includeDisturbers for queries that need the complete rendered surface.
+ * What it costs is one point-list draw and one readback per batch, which is
+ * why queries here are batched and throttled
  * rather than issued per call.
  *
  * The queries are placed on a lattice at construction and never move. A frame
@@ -91,6 +100,7 @@ interface ExtraPoints {
  */
 export class WaterSurfaceSampler {
   private readonly _water: WaterSurfaceSource;
+  private readonly _includeDisturbers: boolean;
   private readonly _spacing: number;
   private readonly _cols: number;
   private readonly _rows: number;
@@ -125,6 +135,7 @@ export class WaterSurfaceSampler {
    */
   constructor(water: WaterSurfaceSource, options: WaterSurfaceSamplerOptions = {}) {
     this._water = water;
+    this._includeDisturbers = options.includeDisturbers ?? false;
     this._spacing = Math.max(0.01, options.spacing ?? 6);
     this._cols = Math.max(2, Math.floor(options.cols ?? 24));
     this._rows = Math.max(2, Math.floor(options.rows ?? 24));
@@ -294,7 +305,7 @@ export class WaterSurfaceSampler {
       this._totalPoints = this._batchInputs.length;
       // Only positions: the normal attachment would double the readback.
       this._water
-        .getSurfacePoint(this._batchInputs, this._batchOutputs)
+        .getSurfacePoint(this._batchInputs, this._batchOutputs, undefined, this._includeDisturbers)
         .then(() => this._acceptBatch())
         .catch((err) => {
           this._pending = false;

@@ -11,6 +11,9 @@
  * seconds in.
  */
 
+import * as api from '../../../libs/scene/src/app/api';
+import * as fullscreen from '../../../libs/scene/src/render/fullscreenquad';
+import * as misc from '../../../libs/scene/src/utility/misc';
 import type { AbstractDevice, PBGlobalScope, PBInsideFunctionScope, PBShaderExp } from '@zephyr3d/device';
 import { ProgramBuilder } from '@zephyr3d/device';
 import { AABB, Matrix4x4, Vector3 } from '@zephyr3d/base';
@@ -305,5 +308,72 @@ describe('water interaction parameters', () => {
     const interaction = new WaterInteraction();
     expect(interaction.followMode).toBe('camera');
     expect(interaction.followNode).toBeNull();
+  });
+});
+
+describe('external interaction history', () => {
+  test('keeps impulses but excludes disturbers across substeps and window movement', () => {
+    const values: Record<string, any> = {};
+    const draws: Record<string, any>[] = [];
+    const renderTextures = [{ id: 'render0' }, { id: 'render1' }];
+    const externalTextures = [{ id: 'external0' }, { id: 'external1' }];
+    const bindGroup = {
+      setValue: (name: string, value: any) => {
+        values[name] = value;
+      },
+      setTexture: (name: string, value: any) => {
+        values[name] = value;
+      }
+    };
+    const device = {
+      pushDeviceStates() {},
+      popDeviceStates() {},
+      setProgram() {},
+      setBindGroup() {},
+      setFramebuffer(fb: unknown) {
+        values.framebuffer = fb;
+      }
+    };
+    jest.spyOn(api, 'getDevice').mockReturnValue(device as any);
+    jest.spyOn(misc, 'fetchSampler').mockReturnValue({} as any);
+    jest.spyOn(fullscreen, 'drawFullscreenQuad').mockImplementation(() => {
+      draws.push({ ...values, shift: Array.from(values.shift) });
+    });
+    try {
+      const interaction = new WaterInteraction();
+      const field = interaction as any;
+      field._formatResolved = true;
+      field._format = 'rgba32f';
+      field._textures = renderTextures;
+      field._externalTextures = externalTextures;
+      field._framebuffers = ['render0', 'render1'];
+      field._externalFramebuffers = ['external0', 'external1'];
+      field._ensureField = () => {};
+      field._renderObstacles = () => {};
+      field._getProgram = () => ({});
+      field._bindGroup = bindGroup;
+      interaction.followMode = 'fixed';
+      const node = createStubNode(0, 0, 0);
+      interaction.addDisturber(new WaterDisturber(node));
+      interaction.update(0);
+      interaction.addImpulse(0, 0, 1, 0.2);
+      interaction.update(1 / 30);
+      expect(draws.map((d) => d.numDisturbers)).toEqual([1, 0, 0, 0]);
+      expect(draws.map((d) => d.numImpulses)).toEqual([1, 1, 0, 0]);
+      expect(draws.map((d) => d.srcTex.id)).toEqual(['render0', 'external0', 'render1', 'external1']);
+      expect(draws.map((d) => d.framebuffer)).toEqual(['render1', 'external1', 'render0', 'external0']);
+      draws.length = 0;
+      interaction.center.x += 4;
+      interaction.update(1 / 20);
+      expect(draws).toHaveLength(2);
+      expect(draws[0].shift).toEqual(draws[1].shift);
+      expect(draws[0].shift[0]).not.toBe(0);
+      interaction.applyBindGroup(bindGroup as any, false);
+      expect(values.wiHeightTex).toBe(externalTextures[1]);
+      interaction.applyBindGroup(bindGroup as any);
+      expect(values.wiHeightTex).toBe(renderTextures[1]);
+    } finally {
+      jest.restoreAllMocks();
+    }
   });
 });

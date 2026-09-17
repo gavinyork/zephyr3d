@@ -131,3 +131,25 @@ describe('WaterSurfaceSampler', () => {
     expect(sampler.batchSize).toBe(4);
   });
 });
+
+describe('buoyancy source isolation', () => {
+  test.each([false, true])('disturber sampling opt-in: %s', async (includeDisturbers) => {
+    const query = jest.fn(async (points: Vector3[], out?: Vector3[], _norm?: Vector3[], wakes = true) => {
+      points.forEach((p, i) => out?.[i].setXYZ(p.x, 2 + (wakes ? 10 : 0), p.z));
+    });
+    const water: WaterSurfaceSource = {
+      worldMatrix: { m03: 0, m13: 0, m23: 0 },
+      waveTime: 0,
+      getSurfacePoint: query
+    };
+    const sampler = new WaterSurfaceSampler(water, {
+      cols: 2,
+      rows: 2,
+      ...(includeDisturbers ? { includeDisturbers: true } : {})
+    });
+    sampler.update(1 / 30);
+    await flush();
+    expect(query.mock.calls[0][3]).toBe(includeDisturbers);
+    expect(sampler.sampleWorldYRaw(0, 0)).toBe(includeDisturbers ? 12 : 2);
+  });
+});

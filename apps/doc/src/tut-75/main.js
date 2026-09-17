@@ -79,15 +79,18 @@ myApp.ready().then(function () {
   buoyDisturber.strength = 0.15;
   interaction.addDisturber(buoyDisturber);
 
-  // Two-way coupling. The boat and the buoy float on the surface the material
-  // draws - the ambient sea plus the interaction field, read back through the
-  // water's own evaluation - and their motion disturbs that field in turn. A 2 m
-  // lattice resolves the boat's wake and a stone's outer rings, not capillary
-  // detail.
-  const sampler = new WaterSurfaceSampler(water, { spacing: 2, cols: 25, rows: 25, updateHz: 30 });
+  // Float on ambient waves and external impulses only. Disturber wakes remain
+  // visible, but cannot drive either floating body and sustain oscillation.
+  const sampler = new WaterSurfaceSampler(water, {
+    spacing: 2,
+    cols: 25,
+    rows: 25,
+    updateHz: 30,
+    includeDisturbers: false
+  });
   // The boat is not held at the waterline: buoyancy puts it there. The helm
   // only ever adds a thrust and a rudder torque, so the hull pitches over a
-  // swell, heels into a turn, and drops into the trough of its own wake.
+  // swell and heels into a turn.
   // Five probes along the length so the swell can pitch it; three across so it
   // can heel.
   const boatBody = new FloatingBody({
@@ -199,11 +202,6 @@ myApp.ready().then(function () {
   const cam = scene.mainCamera;
   const waterLevel = water.worldMatrix.m13;
   const waveHeightAt = (x, z) => sampler.sampleWorldYRaw(x, z) - waterLevel;
-  // The bodies here are disturbers as well as floats, so the surface they read
-  // is partly one they made. Damping them against the water rather than against
-  // the world is what pays for the waves they radiate and lets the whole thing
-  // come to rest.
-  const waveVelocityAt = (x, z) => sampler.sampleWorldVelocityY(x, z);
 
   /** World XZ under a screen position on the still-water plane, or null if the ray misses it. */
   const pickWater = (sx, sy) => {
@@ -302,11 +300,10 @@ myApp.ready().then(function () {
     }
     // A rudder needs way on: with no water running over it there is no turn.
     boatBody.externalTorque.y += turn * BOAT_TURN_ACCEL * boatInertiaY * Math.min(1, Math.abs(boatSpeed) / 2);
-    // The boat and the buoy ride whatever the surface is doing, wake and
-    // stones included.
+    // External waves drive buoyancy; the bodies' own wakes are rendering only.
     sampler.update(delta);
-    boatBody.update(delta, waveHeightAt, waterLevel, waveVelocityAt);
-    buoyBody.update(delta, waveHeightAt, waterLevel, waveVelocityAt);
+    boatBody.update(delta, waveHeightAt, waterLevel);
+    buoyBody.update(delta, waveHeightAt, waterLevel);
     // A dragged object pushes the water down a little at every position it
     // passes through; the wake is what the field makes of that trail.
     if (state.dragging) {

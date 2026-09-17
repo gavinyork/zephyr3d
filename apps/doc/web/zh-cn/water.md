@@ -355,6 +355,8 @@ app.on('tick', (deltaMs) => {
 
 <div class="showcase" case="tut-75"></div>
 
+浮力采样默认排除所有 `WaterDisturber` 产生的波，仅保留环境波和 `addImpulse` 外部交互波，避免漂浮物反馈造成持续振荡。渲染仍包含全部波动。需要完整视觉表面时，可设置 `WaterSurfaceSampler` 的 `includeDisturbers: true`；`Water.getSurfacePoint` 默认查询完整表面，第四个参数传 `false` 可排除物体造波。交互启用时额外维护一组波场纹理，并在每个模拟步增加一次波动更新。
+
 ## 序列化
 
 `Water` 已注册到序列化系统中，其中包含水面材质相关参数、内置 `FBMWaveGenerator` / `FFTWaveGenerator` 的设置，以及它的 `WaterInteraction` 和其上注册的扰动源（每个扰动源记录所跟随节点的持久 id，场景加载完成后再绑定）。因此，通过编辑器创建的水面节点和保存后的水面参数，可以通过 `loadScene()` 或 `instantiatePrefab()` 恢复。
