@@ -353,6 +353,8 @@ app.on('tick', (deltaMs) => {
 
 A rigid body should read `sampleWorldYRaw`; the eased `sampleWorldY` is for objects placed directly at the surface height. With a physics library, call `BuoyancyVolume.computeForces()` from its step and apply the force and torque to the body instead.
 
+<div class="showcase" case="tut-66"></div>
+
 ## Serialization
 
 `Water` is registered with the serialization system, including its material-related water parameters, the built-in `FBMWaveGenerator` / `FFTWaveGenerator` settings, and its `WaterInteraction` with the disturbers registered on it (each disturber records the persistent id of the node it follows and binds to it when the scene has loaded). This means editor-created water nodes and saved scene water settings can be restored through `loadScene()` or `instantiatePrefab()`.

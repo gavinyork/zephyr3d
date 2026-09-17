@@ -353,6 +353,8 @@ app.on('tick', (deltaMs) => {
 
 刚体应读取 `sampleWorldYRaw`；带缓动的 `sampleWorldY` 适合直接放在水面高度上的物体。如果使用物理库，则在其步进中调用 `BuoyancyVolume.computeForces()`，把力与力矩施加到刚体上。
 
+<div class="showcase" case="tut-75"></div>
+
 ## 序列化
 
 `Water` 已注册到序列化系统中，其中包含水面材质相关参数、内置 `FBMWaveGenerator` / `FFTWaveGenerator` 的设置，以及它的 `WaterInteraction` 和其上注册的扰动源（每个扰动源记录所跟随节点的持久 id，场景加载完成后再绑定）。因此，通过编辑器创建的水面节点和保存后的水面参数，可以通过 `loadScene()` 或 `instantiatePrefab()` 恢复。

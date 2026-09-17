@@ -1,5 +1,5 @@
 //
-import { DRef, Quaternion, Vector2, Vector3, Vector4 } from '@zephyr3d/base';
+import { Vector2, Vector3, Vector4 } from '@zephyr3d/base';
 import {
   Scene,
   Application,
@@ -24,12 +24,21 @@ import {
 import { backendWebGL2 } from '@zephyr3d/backend-webgl';
 import { backendWebGPU } from '@zephyr3d/backend-webgpu';
 
+//
 const params = new URLSearchParams(location.search);
 
 const BOAT_SIZE = { sizeX: 1.6, sizeY: 1, sizeZ: 3.6 };
+const BOAT_MASS = 1500;
+/** Thrust at full throttle, as an acceleration in m/s^2. Turned into a force by the mass. */
 const BOAT_ACCEL = 6;
-const BOAT_DRAG = 0.8;
-const BOAT_TURN_RATE = 1.2;
+/** Rudder authority at full helm and full way on, as an angular acceleration in rad/s^2. */
+const BOAT_TURN_ACCEL = 2.5;
+/**
+ * Sideways resistance of the hull, per second. A boat has a keel: it slides
+ * forward far more readily than it slides sideways, and without this the thrust
+ * would just skid it about like a puck.
+ */
+const BOAT_KEEL_DRAG = 4;
 const BUOY_RADIUS = 0.8;
 const PILING_RADIUS = 0.35;
 const PILING_HEIGHT = 12;
@@ -56,16 +65,12 @@ myApp.ready().then(function () {
   // The field is one object hung off the water. Everything that evaluates the
   // surface - the material, the height query, the caustics - sees it from here on.
   const interaction = new WaterInteraction();
+  interaction.windowSize = 120;
   water.interaction = interaction;
-  // The water holds the field by reference count and disposes it when detached,
-  // as it does its wave generator. This demo detaches and reattaches the same
-  // field from a checkbox, so it keeps a reference of its own.
-  const interactionRef = new DRef(interaction);
-  globalThis.waterInteractionRef = interactionRef;
 
   // Things in the water. The boat and the buoy move, so they push water about;
   // the pilings do not, so they only block and reflect.
-  const boatDisturber = new WaterDisturber(boat.node, 'box');
+  const boatDisturber = new WaterDisturber(boat, 'box');
   boatDisturber.size = new Vector3(BOAT_SIZE.sizeX, BOAT_SIZE.sizeY, BOAT_SIZE.sizeZ);
   boatDisturber.strength = 0.15;
   interaction.addDisturber(boatDisturber);
@@ -74,11 +79,36 @@ myApp.ready().then(function () {
   buoyDisturber.strength = 0.15;
   interaction.addDisturber(buoyDisturber);
 
-  // Two-way coupling. The buoy floats on the surface the material draws -
-  // the ambient sea plus the interaction field, read back through the water's
-  // own evaluation - and its motion disturbs that field in turn. A 2 m lattice
-  // resolves the boat's wake and a stone's outer rings, not capillary detail.
+  // Two-way coupling. The boat and the buoy float on the surface the material
+  // draws - the ambient sea plus the interaction field, read back through the
+  // water's own evaluation - and their motion disturbs that field in turn. A 2 m
+  // lattice resolves the boat's wake and a stone's outer rings, not capillary
+  // detail.
   const sampler = new WaterSurfaceSampler(water, { spacing: 2, cols: 25, rows: 25, updateHz: 30 });
+  // The boat is not held at the waterline: buoyancy puts it there. The helm
+  // only ever adds a thrust and a rudder torque, so the hull pitches over a
+  // swell, heels into a turn, and drops into the trough of its own wake.
+  // Five probes along the length so the swell can pitch it; three across so it
+  // can heel.
+  const boatBody = new FloatingBody({
+    node: boat,
+    size: new Vector3(BOAT_SIZE.sizeX, BOAT_SIZE.sizeY, BOAT_SIZE.sizeZ),
+    mass: BOAT_MASS,
+    // Riding high, as an empty hull does. Pushing this up sinks the boat deeper
+    // and makes it far wetter and slower to right itself.
+    submergedFraction: 0.35,
+    probeColumns: 3,
+    probeRows: 5,
+    probeLayers: 3,
+    // Well under the heave damping a small float wants: a boat should coast, and
+    // the keel term below is what stops it from sliding sideways.
+    linearDamping: 1.2,
+    angularDamping: 2.5
+  });
+  boatBody.reset(boat.position.x, boat.position.z, water.position.y, 0);
+  // Yaw inertia of the box hull, so the rudder can be specified as an angular
+  // acceleration instead of a torque that has to be retuned with the mass.
+  const boatInertiaY = (BOAT_MASS * (BOAT_SIZE.sizeX ** 2 + BOAT_SIZE.sizeZ ** 2)) / 12;
   const buoyBody = new FloatingBody({
     node: buoy,
     size: new Vector3(BUOY_RADIUS * 1.6, BUOY_RADIUS * 1.6, BUOY_RADIUS * 1.6),
@@ -88,7 +118,7 @@ myApp.ready().then(function () {
     angularDamping: 2
   });
   buoyBody.reset(buoy.position.x, buoy.position.z, water.position.y, 0);
-  const pilingDisturbers = pilings.map((p) => {
+  pilings.map((p) => {
     const d = new WaterDisturber(p, 'capsule');
     d.radius = PILING_RADIUS;
     d.halfLength = PILING_HEIGHT / 2;
@@ -128,19 +158,13 @@ myApp.ready().then(function () {
     boatDisturber,
     buoyDisturber,
     sampler,
+    boatBody,
     buoyBody,
     device: myApp.device
   };
 
   getEngine().setRenderable(scene, 0);
 
-  const status = document.querySelector('#status');
-  /** @type {HTMLInputElement} */
-  const enabledCheck = document.querySelector('#enabled-check');
-  /** @type {HTMLSelectElement} */
-  const debugSelect = document.querySelector('#debug-select');
-  /** @type {HTMLSelectElement} */
-  const resolutionSelect = document.querySelector('#resolution-select');
   const bindRange = (id, apply, format) => {
     /** @type {HTMLInputElement} */
     const input = document.querySelector(`#${id}-input`);
@@ -156,26 +180,6 @@ myApp.ready().then(function () {
     return update;
   };
 
-  enabledCheck.addEventListener('change', function () {
-    water.interaction = enabledCheck.checked ? interaction : null;
-  });
-  debugSelect.addEventListener('change', function () {
-    water.debugOutput = /** @type {import('@zephyr3d/scene').WaterDebugOutput} */ (debugSelect.value);
-  });
-  resolutionSelect.addEventListener('change', function () {
-    interaction.resolution = Number(resolutionSelect.value);
-    refreshSpeed();
-  });
-  bindRange(
-    'window',
-    (v) => (interaction.windowSize = v),
-    (v) => `${v}m`
-  );
-  const refreshSpeed = bindRange(
-    'speed',
-    (v) => (interaction.waveSpeed = v),
-    () => `${interaction.waveSpeed.toFixed(1)}m/s`
-  );
   bindRange(
     'damping',
     (v) => (interaction.damping = v),
@@ -191,49 +195,15 @@ myApp.ready().then(function () {
     (v) => (interaction.foamDecay = v),
     (v) => `${v.toFixed(2)}/s`
   );
-  bindRange(
-    'strength',
-    (v) => (state.strength = v),
-    (v) => `${v.toFixed(2)}m`
-  );
-  bindRange(
-    'radius',
-    (v) => (state.radius = v),
-    (v) => `${v.toFixed(1)}m`
-  );
-  bindRange(
-    'push',
-    (v) => {
-      boatDisturber.strength = v;
-      buoyDisturber.strength = v;
-    },
-    (v) => `${v.toFixed(2)}m`
-  );
-  /** @type {HTMLInputElement} */
-  const blockCheck = document.querySelector('#block-check');
-  blockCheck.addEventListener('change', function () {
-    for (const d of pilingDisturbers) {
-      d.blocking = blockCheck.checked;
-    }
-  });
-  bindRange(
-    'sea',
-    (v) => {
-      waves.setWaveStrength(0, 1.2 * v);
-      waves.setWaveStrength(1, 0.8 * v);
-      waves.setWaveStrength(2, 0.9 * v);
-    },
-    (v) => v.toFixed(2)
-  );
-  bindRange(
-    'anim',
-    (v) => (water.animationSpeed = v),
-    (v) => v.toFixed(2)
-  );
 
   const cam = scene.mainCamera;
   const waterLevel = water.worldMatrix.m13;
   const waveHeightAt = (x, z) => sampler.sampleWorldYRaw(x, z) - waterLevel;
+  // The bodies here are disturbers as well as floats, so the surface they read
+  // is partly one they made. Damping them against the water rather than against
+  // the world is what pays for the waves they radiate and lets the whole thing
+  // come to rest.
+  const waveVelocityAt = (x, z) => sampler.sampleWorldVelocityY(x, z);
 
   /** World XZ under a screen position on the still-water plane, or null if the ray misses it. */
   const pickWater = (sx, sy) => {
@@ -261,7 +231,7 @@ myApp.ready().then(function () {
     } else if (type === 'pointermove') {
       state.pointer.x = pev.offsetX;
       state.pointer.y = pev.offsetY;
-      state.dragging = pev.shiftKey;
+      state.dragging = pev.buttons === 2;
     } else if (type === 'pointerup' && pev.button === 0 && state.pressAt) {
       const moved = Math.hypot(pev.offsetX - state.pressAt.x, pev.offsetY - state.pressAt.y);
       state.pressAt = null;
@@ -277,6 +247,11 @@ myApp.ready().then(function () {
     }
     if (type === 'keydown') {
       state.keys.add(kev.key.toLowerCase());
+      // A force-driven hull can be rolled over by a big enough sea and has no
+      // way back on its own, so there is a way to set it upright again.
+      if (kev.key.toLowerCase() === 'r') {
+        boatBody.reset(boatBody.position.x, boatBody.position.z, waterLevel, 0);
+      }
     } else if (type === 'keyup') {
       state.keys.delete(kev.key.toLowerCase());
     }
@@ -287,24 +262,51 @@ myApp.ready().then(function () {
   };
   getInput().use(forwarder);
 
+  const boatForward = new Vector3();
+  const tmpForce = new Vector3();
+
   myApp.on('tick', function (deltaMs) {
     const delta = Math.min(0.1, deltaMs / 1000);
     state.time += delta;
-    // The boat is driven kinematically: thrust and turn, with drag, held at
-    // the still-water level. It is what disturbs the water, not what rides it.
+    // The boat is force driven, like the buoy: the helm only adds a thrust
+    // along the hull's own forward axis and a rudder torque about Y, and
+    // buoyancy is what holds it at the waterline. So it pitches over a swell,
+    // heels into a turn, and drops into the trough of its own wake.
     const keys = state.keys;
     const thrust =
       (keys.has('w') || keys.has('arrowup') ? 1 : 0) - (keys.has('s') || keys.has('arrowdown') ? 0.5 : 0);
     const turn =
       (keys.has('a') || keys.has('arrowleft') ? 1 : 0) - (keys.has('d') || keys.has('arrowright') ? 1 : 0);
-    boat.speed += (thrust * BOAT_ACCEL - boat.speed * BOAT_DRAG) * delta;
-    boat.yaw += turn * BOAT_TURN_RATE * delta * Math.min(1, Math.abs(boat.speed) / 2);
-    boat.node.position.x += Math.sin(boat.yaw) * boat.speed * delta;
-    boat.node.position.z += Math.cos(boat.yaw) * boat.speed * delta;
-    boat.node.rotation = Quaternion.fromEulerAngle(0, boat.yaw, 0, 'ZYX');
-    // The buoy rides whatever the surface is doing, wake and stones included.
+    // Local +Z is the bow. Taken from the body's orientation rather than a
+    // stored yaw, so the thrust tilts with the hull: a boat that has just
+    // launched off a crest is briefly pushing at the sky.
+    boatBody.rotation.transform(Vector3.axisPZ(), boatForward);
+    Vector3.scale(boatForward, thrust * BOAT_ACCEL * BOAT_MASS, tmpForce);
+    boatBody.externalForce.addBy(tmpForce);
+    // The heading, which is the bow flattened onto the water and renormalised.
+    // The keel works on the horizontal flow past the hull, so it has to be
+    // resolved against a horizontal axis: measured against the tilted bow
+    // instead, a hull that is pitching reads its own heave as headway and the
+    // sideways term turns into a push across the water.
+    const headingLength = Math.hypot(boatForward.x, boatForward.z);
+    let boatSpeed = 0;
+    if (headingLength > 1e-4) {
+      const hx = boatForward.x / headingLength;
+      const hz = boatForward.z / headingLength;
+      boatSpeed = boatBody.velocity.x * hx + boatBody.velocity.z * hz;
+      // The keel: whatever horizontal velocity is not along the heading,
+      // resisted hard. Heave is left to the buoyancy.
+      tmpForce.setXYZ(boatBody.velocity.x - hx * boatSpeed, 0, boatBody.velocity.z - hz * boatSpeed);
+      tmpForce.scaleBy(-BOAT_KEEL_DRAG * BOAT_MASS);
+      boatBody.externalForce.addBy(tmpForce);
+    }
+    // A rudder needs way on: with no water running over it there is no turn.
+    boatBody.externalTorque.y += turn * BOAT_TURN_ACCEL * boatInertiaY * Math.min(1, Math.abs(boatSpeed) / 2);
+    // The boat and the buoy ride whatever the surface is doing, wake and
+    // stones included.
     sampler.update(delta);
-    buoyBody.update(delta, waveHeightAt, waterLevel);
+    boatBody.update(delta, waveHeightAt, waterLevel, waveVelocityAt);
+    buoyBody.update(delta, waveHeightAt, waterLevel, waveVelocityAt);
     // A dragged object pushes the water down a little at every position it
     // passes through; the wake is what the field makes of that trail.
     if (state.dragging) {
@@ -319,18 +321,6 @@ myApp.ready().then(function () {
     } else {
       state.dragLast = null;
     }
-    status.textContent =
-      `waveTime ${water.waveTime.toFixed(2)}s  fps ${myApp.device.frameInfo.FPS.toFixed(0)}\n` +
-      `field ${interaction.resolution}x${interaction.resolution} over ${interaction.windowSize}m  ` +
-      `texel ${interaction.texelSize.toFixed(3)}m\n` +
-      `wave speed ${interaction.waveSpeed.toFixed(2)}m/s (max ${interaction.maxWaveSpeed.toFixed(2)})  ` +
-      `damping ${interaction.damping.toFixed(1)}/s\n` +
-      `window origin (${interaction.originX.toFixed(1)}, ${interaction.originZ.toFixed(1)})  ` +
-      `stones ${state.drops}${state.dragging ? '  dragging' : ''}\n` +
-      `boat speed ${boat.speed.toFixed(1)}m/s  disturbers ${interaction.disturbers.length}
-` +
-      `buoy y ${buoyBody.position.y.toFixed(2)}m  surface queries ${sampler.readCount} ` +
-      `(${sampler.batchFrames} frames/batch)`;
   });
 
   myApp.run();
@@ -341,7 +331,6 @@ function buildScene() {
 
   const sun = new DirectionalLight(scene);
   sun.rotation.fromEulerAngle(-Math.PI / 4, Math.PI / 4, 0);
-  sun.intensity = 8;
   sun.castShadow = true;
 
   const bedMaterial = new PBRMetallicRoughnessMaterial();
@@ -349,39 +338,46 @@ function buildScene() {
   bedMaterial.metallic = 0;
   bedMaterial.roughness = 1;
   const bed = new Mesh(scene, new PlaneShape({ size: 4000 }), bedMaterial);
-  bed.position.setXYZ(0, -5, 0);
+  bed.position.setXYZ(0, -3, 0);
 
   const water = new Water(scene);
+  water.scale.setXYZ(1000, 1, 1000);
   water.position.setXYZ(0, 0, 0);
+  water.infinite = true;
   water.gridScale = 1;
   water.animationSpeed = 1;
-  water.infinite = false;
-  water.scale.setXYZ(1000, 1, 1000);
-  // A gentle sea, so the ripples are not lost in it. The Sea slider scales it.
+  water.causticsIntensity = 1.5;
+  water.causticsRange = 60;
+  water.causticsDepth = 6;
+  water.causticsFadeDistance = 15;
+  water.absorptionScale = 2.5;
+
   const waves = new FFTWaveGenerator();
-  waves.wind = new Vector2(6, 0);
+  waves.wind = new Vector2(1, 1);
   waves.setWaveLength(0, 400);
   waves.setWaveLength(1, 100);
-  waves.setWaveLength(2, 16);
-  waves.setWaveStrength(0, 1.2 * 0.6);
-  waves.setWaveStrength(1, 0.8 * 0.6);
-  waves.setWaveStrength(2, 0.9 * 0.6);
-  waves.setWaveCroppiness(0, -2.2);
-  waves.setWaveCroppiness(1, -2);
-  waves.setWaveCroppiness(2, -1.4);
+  waves.setWaveLength(2, 15);
+  waves.setWaveStrength(0, 0.4);
+  waves.setWaveStrength(1, 0.4);
+  waves.setWaveStrength(2, 0.02);
+  waves.setWaveCroppiness(0, -1.5);
+  waves.setWaveCroppiness(1, -1.2);
+  waves.setWaveCroppiness(2, -0.5);
   water.waveGenerator = waves;
 
-  water.absorption = new Vector3(0.4, 0.14, 0.09);
-  water.scattering = new Vector3(0.06, 0.12, 0.15);
-  water.reflectionStrength = 0.8;
+  // Very clear water: the point is to see through it to the tiles.
+  water.absorption = new Vector3(0.08, 0.03, 0.02);
+  water.scattering = new Vector3(0.01, 0.02, 0.03);
+  water.reflectionStrength = 0.5;
   water.refractionScale = 1;
   water.subsurfaceIntensity = 0.5;
   water.subsurfaceCrestHeight = 1.5;
-  water.sunScatteringIntensity = 0.4;
-  water.foamAmount = 1;
-  water.foamFalloff = 1.5;
+  water.foamAmount = 0.3;
+  water.foamFalloff = 1.8;
+
   water.causticsEnabled = true;
-  water.causticsIntensity = 1.5;
+  water.causticsDepth = 3;
+  water.causticsSceneDepth = true;
 
   // Pilings standing in the water, so the eye has something fixed to judge the
   // ripples against and something for the ripples to reflect off.
@@ -404,16 +400,18 @@ function buildScene() {
     const pole = new Mesh(scene, poleShape, poleMaterial);
     pole.position.setXYZ(x, -PILING_HEIGHT / 3, z);
     pilings.push(pole);
+    sun.shadow.shadowRegion.addStaticCaster(pole);
   }
 
-  // A boat: a box sitting half in the water, driven from the keyboard.
+  // A boat: a box hull that floats on the water and is driven from the keyboard.
   const boatMaterial = new PBRMetallicRoughnessMaterial();
   boatMaterial.albedoColor = new Vector4(0.8, 0.3, 0.2, 1);
   boatMaterial.metallic = 0;
   boatMaterial.roughness = 0.6;
-  const boatNode = new Mesh(scene, new BoxShape(BOAT_SIZE), boatMaterial);
-  boatNode.position.setXYZ(0, 0, -10);
-  const boat = { node: boatNode, speed: 0, yaw: 0 };
+  const boat = new Mesh(scene, new BoxShape(BOAT_SIZE), boatMaterial);
+  boat.position.setXYZ(0, 0, -10);
+  sun.shadow.shadowRegion.addDynamicCaster(boat);
+  sun.shadow.shadowDistance = 100;
 
   // A buoy that bobs in and out of the water on its own.
   const buoyMaterial = new PBRMetallicRoughnessMaterial();
@@ -422,6 +420,7 @@ function buildScene() {
   buoyMaterial.roughness = 0.5;
   const buoy = new Mesh(scene, new SphereShape({ radius: BUOY_RADIUS }), buoyMaterial);
   buoy.position.setXYZ(10, 0, 4);
+  sun.shadow.shadowRegion.addDynamicCaster(buoy);
 
   scene.mainCamera = new PerspectiveCamera(scene, Math.PI / 3, 0.1, 2000);
   scene.mainCamera.lookAt(new Vector3(0, 12, 26), new Vector3(0, 0, 0), Vector3.axisPY());
