@@ -125,6 +125,12 @@ export class ShadowMapper extends Disposable {
   /** @internal */
   private static readonly _frustumCenter = new Vector3();
   /** @internal */
+  private static readonly _clipMin = new Vector3();
+  /** @internal */
+  private static readonly _clipMax = new Vector3();
+  /** @internal */
+  private static readonly _cameraPos = new Vector3();
+  /** @internal */
   private static readonly _lightCameras: WeakMap<Scene, Camera[]> = new WeakMap();
   /** @internal */
   private static readonly _shadowMapParams: ShadowMapParams[] = [];
@@ -941,11 +947,43 @@ export class ShadowMapper extends Disposable {
       Vector3.add(frustumMin, frustumMax, frustumCenter).scaleBy(0.5),
       frustumCenter
     );
-    // Clamp to the scene bounds first, then apply the filter border.
-    const sceneRadius = sceneAABB.diagonalLength * 0.5 * paddingScale;
-    if (sceneRadius < radius) {
-      radius = sceneRadius;
-      Vector3.add(sceneAABB.minPoint, sceneAABB.maxPoint, center).scaleBy(0.5);
+    // Clamp to the scene bounds, but only to the part of them that is within
+    // the shadow distance of the camera. Clipping first is what makes the two
+    // settings compose. The clamp replaces the centre as well as the radius, so
+    // without the clip a region is taken whole or not at all: one caster
+    // wandering off drags the region - and with it the shadow map - after it,
+    // however short the shadow distance is, until the region finally outgrows
+    // the frustum and the clamp stops applying altogether. Clipped, a caster
+    // beyond the shadow distance simply stops counting, which is what the
+    // shadow distance means.
+    //
+    // The clip volume is a box about the camera's position, not about the
+    // frustum, so the clipped extents - and the radius taken from them - do not
+    // depend on where the camera is looking. That is deliberate: a radius that
+    // changed with the view direction would make the shadow edges crawl as the
+    // camera turned.
+    const clipDistance = Math.min(this._shadowDistance, sceneCamera.getFarPlane());
+    const cameraPos = sceneCamera.getWorldPosition(ShadowMapper._cameraPos);
+    const clipMin = ShadowMapper._clipMin;
+    const clipMax = ShadowMapper._clipMax;
+    clipMin.setXYZ(
+      Math.max(sceneAABB.minPoint.x, cameraPos.x - clipDistance),
+      Math.max(sceneAABB.minPoint.y, cameraPos.y - clipDistance),
+      Math.max(sceneAABB.minPoint.z, cameraPos.z - clipDistance)
+    );
+    clipMax.setXYZ(
+      Math.min(sceneAABB.maxPoint.x, cameraPos.x + clipDistance),
+      Math.min(sceneAABB.maxPoint.y, cameraPos.y + clipDistance),
+      Math.min(sceneAABB.maxPoint.z, cameraPos.z + clipDistance)
+    );
+    // An empty intersection means nothing within the shadow distance casts a
+    // shadow. There is no tighter volume to move to, so the frustum stands.
+    if (clipMax.x >= clipMin.x && clipMax.y >= clipMin.y && clipMax.z >= clipMin.z) {
+      const sceneRadius = Vector3.distance(clipMin, clipMax) * 0.5 * paddingScale;
+      if (sceneRadius < radius) {
+        radius = sceneRadius;
+        Vector3.add(clipMin, clipMax, center).scaleBy(0.5);
+      }
     }
     target.setXYZ(
       center.x + this._light.directionAndCutoff.x,
