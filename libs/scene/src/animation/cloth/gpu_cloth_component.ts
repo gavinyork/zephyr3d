@@ -27,6 +27,7 @@ export type GPUClothColliderConfig = {
 /** Serialized wrap target used by {@link GPUClothComponent}. */
 export type GPUClothWrapTargetConfig = {
   meshId: string;
+  meshPath?: Array<{ name: string; sameNameIndex: number }>;
   bindingData: GPUClothWrapBindingData;
   /** Sparse per-vertex wrap weights encoded as `vertexIndex:weight`. Missing vertices default to 1. */
   targetWrapWeights?: string;
@@ -38,6 +39,7 @@ export type GPUClothComponentConfig = {
   sourceId?: string;
   enabled: boolean;
   simulationMeshId: string;
+  simulationMeshPath?: Array<{ name: string; sameNameIndex: number }>;
   gravity: [number, number, number];
   damping: number;
   dynamicFriction: number;
@@ -104,6 +106,36 @@ function cloneBindingData(value: GPUClothWrapBindingData): GPUClothWrapBindingDa
   };
 }
 
+function normalizeNodePath(value: unknown) {
+  return Array.isArray(value)
+    ? value
+        .filter((entry) => entry && typeof entry === 'object')
+        .map((entry: any) => ({
+          name: String(entry.name ?? ''),
+          sameNameIndex: Math.max(0, Math.floor(Number(entry.sameNameIndex) || 0))
+        }))
+    : [];
+}
+
+function resolveMeshByReference(
+  host: SceneNode,
+  id: string,
+  path: Array<{ name: string; sameNameIndex: number }> | undefined
+) {
+  const root = (typeof (host as any)?.getPrefabNode === 'function' && (host as any).getPrefabNode()) || host.scene?.rootNode || host;
+  if (Array.isArray(path)) {
+    let current: SceneNode | null = root;
+    for (const segment of normalizeNodePath(path)) {
+      const matches = current.children.filter((child) => child.name === segment.name);
+      current = matches[segment.sameNameIndex] ?? null;
+      if (!current) break;
+    }
+    if (isMesh(current)) return current;
+  }
+  const candidate = host.findNodeById<SceneNode>(id) ?? root.findNodeById<SceneNode>(id);
+  return isMesh(candidate) ? candidate : null;
+}
+
 /** Normalizes untrusted or older component data into the current schema. */
 export function normalizeGPUClothComponentConfig(
   value?: Partial<GPUClothComponentConfig> | null
@@ -114,6 +146,9 @@ export function normalizeGPUClothComponentConfig(
     sourceId: String(source.sourceId ?? ''),
     enabled: source.enabled !== false,
     simulationMeshId: String(source.simulationMeshId ?? ''),
+    ...(Array.isArray(source.simulationMeshPath)
+      ? { simulationMeshPath: normalizeNodePath(source.simulationMeshPath) }
+      : {}),
     gravity: vec3(source.gravity, DEFAULT_CONFIG.gravity),
     damping: clamp(source.damping, 0, 1, DEFAULT_CONFIG.damping),
     dynamicFriction: clamp(source.dynamicFriction, 0, 1, DEFAULT_CONFIG.dynamicFriction),
@@ -134,6 +169,9 @@ export function normalizeGPUClothComponentConfig(
       .filter((entry) => !!entry?.meshId && !!entry.bindingData)
       .map((entry) => ({
         meshId: String(entry.meshId),
+        ...(Array.isArray(entry.meshPath)
+          ? { meshPath: normalizeNodePath(entry.meshPath) }
+          : {}),
         bindingData: cloneBindingData(entry.bindingData),
         targetWrapWeights: String(entry.targetWrapWeights ?? '')
       })),
@@ -304,7 +342,7 @@ export class GPUClothComponent extends Disposable {
 
   private async createSystem(host: SceneNode, generation: number) {
     const config = this._config;
-    const simulationMesh = host.findNodeById<SceneNode>(config.simulationMeshId);
+    const simulationMesh = resolveMeshByReference(host, config.simulationMeshId, config.simulationMeshPath);
     if (!isMesh(simulationMesh)) {
       this._disabledReason = 'GPU cloth simulation mesh was not found.';
       return;
@@ -393,7 +431,7 @@ export class GPUClothComponent extends Disposable {
   private resolveWrapTargets(host: SceneNode, simulationMesh: Mesh, configs: GPUClothWrapTargetConfig[]) {
     const result: GPUClothWrapBindingTarget[] = [];
     for (const config of configs) {
-      const target = host.findNodeById<SceneNode>(config.meshId);
+      const target = resolveMeshByReference(host, config.meshId, config.meshPath);
       if (isMesh(target) && target !== simulationMesh) {
         result.push({
           target,

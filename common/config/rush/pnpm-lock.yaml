@@ -19,7 +19,7 @@ importers:
         specifier: ^0.1.65
         version: 0.1.69
       '@zephyr3d/backend-webgl':
-        specifier: workspace:^0.1.17
+        specifier: workspace:^0.1.18
         version: link:../../libs/backend-webgl
       '@zephyr3d/backend-webgpu':
         specifier: workspace:^0.1.21
@@ -31,10 +31,10 @@ importers:
         specifier: workspace:^0.2.19
         version: link:../../libs/device
       '@zephyr3d/loaders':
-        specifier: workspace:^0.1.5
+        specifier: workspace:^0.1.6
         version: link:../../libs/loaders
       '@zephyr3d/scene':
-        specifier: workspace:^0.9.26
+        specifier: workspace:^0.9.27
         version: link:../../libs/scene
     devDependencies:
       '@babel/core':
@@ -143,7 +143,7 @@ importers:
         specifier: ^0.1.65
         version: 0.1.69
       '@zephyr3d/backend-webgl':
-        specifier: workspace:^0.1.17
+        specifier: workspace:^0.1.18
         version: link:../../libs/backend-webgl
       '@zephyr3d/backend-webgpu':
         specifier: workspace:^0.1.21
@@ -261,7 +261,7 @@ importers:
         specifier: ^0.1.65
         version: 0.1.69
       '@zephyr3d/backend-webgl':
-        specifier: workspace:^0.1.17
+        specifier: workspace:^0.1.18
         version: link:../../libs/backend-webgl
       '@zephyr3d/backend-webgpu':
         specifier: workspace:^0.1.21
@@ -273,7 +273,7 @@ importers:
         specifier: workspace:^0.2.19
         version: link:../../libs/device
       '@zephyr3d/scene':
-        specifier: workspace:^0.9.26
+        specifier: workspace:^0.9.27
         version: link:../../libs/scene
     devDependencies:
       '@babel/core':
@@ -388,7 +388,7 @@ importers:
         specifier: ^0.1.65
         version: 0.1.69
       '@zephyr3d/backend-webgl':
-        specifier: workspace:^0.1.17
+        specifier: workspace:^0.1.18
         version: link:../../libs/backend-webgl
       '@zephyr3d/backend-webgpu':
         specifier: workspace:^0.1.21
@@ -403,10 +403,10 @@ importers:
         specifier: workspace:^0.2.8
         version: link:../../libs/imgui
       '@zephyr3d/loaders':
-        specifier: workspace:^0.1.5
+        specifier: workspace:^0.1.6
         version: link:../../libs/loaders
       '@zephyr3d/scene':
-        specifier: workspace:^0.9.26
+        specifier: workspace:^0.9.27
         version: link:../../libs/scene
       '@zip.js/zip.js':
         specifier: ^2.7.54
@@ -569,7 +569,7 @@ importers:
         specifier: ^0.1.65
         version: 0.1.69
       '@zephyr3d/backend-webgl':
-        specifier: workspace:^0.1.17
+        specifier: workspace:^0.1.18
         version: link:../../libs/backend-webgl
       '@zephyr3d/backend-webgpu':
         specifier: workspace:^0.1.21
@@ -584,7 +584,7 @@ importers:
         specifier: workspace:^0.2.8
         version: link:../../libs/imgui
       '@zephyr3d/scene':
-        specifier: workspace:^0.9.26
+        specifier: workspace:^0.9.27
         version: link:../../libs/scene
     devDependencies:
       '@babel/core':
@@ -693,7 +693,7 @@ importers:
         specifier: ^0.1.65
         version: 0.1.69
       '@zephyr3d/backend-webgl':
-        specifier: workspace:^0.1.17
+        specifier: workspace:^0.1.18
         version: link:../../libs/backend-webgl
       '@zephyr3d/backend-webgpu':
         specifier: workspace:^0.1.21
@@ -708,10 +708,10 @@ importers:
         specifier: workspace:^0.2.8
         version: link:../../libs/imgui
       '@zephyr3d/loaders':
-        specifier: workspace:^0.1.5
+        specifier: workspace:^0.1.6
         version: link:../../libs/loaders
       '@zephyr3d/scene':
-        specifier: workspace:^0.9.26
+        specifier: workspace:^0.9.27
         version: link:../../libs/scene
     devDependencies:
       '@babel/core':
@@ -820,7 +820,7 @@ importers:
         specifier: ^0.1.65
         version: 0.1.69
       '@zephyr3d/backend-webgl':
-        specifier: workspace:^0.1.17
+        specifier: workspace:^0.1.18
         version: link:../../libs/backend-webgl
       '@zephyr3d/backend-webgpu':
         specifier: workspace:^0.1.21
@@ -832,7 +832,7 @@ importers:
         specifier: workspace:^0.2.19
         version: link:../../libs/device
       '@zephyr3d/scene':
-        specifier: workspace:^0.9.26
+        specifier: workspace:^0.9.27
         version: link:../../libs/scene
     devDependencies:
       '@babel/core':
@@ -941,7 +941,7 @@ importers:
         specifier: ^0.1.65
         version: 0.1.69
       '@zephyr3d/backend-webgl':
-        specifier: workspace:^0.1.17
+        specifier: workspace:^0.1.18
         version: link:../../libs/backend-webgl
       '@zephyr3d/backend-webgpu':
         specifier: workspace:^0.1.21
@@ -953,7 +953,7 @@ importers:
         specifier: workspace:^0.2.19
         version: link:../../libs/device
       '@zephyr3d/scene':
-        specifier: workspace:^0.9.26
+        specifier: workspace:^0.9.27
         version: link:../../libs/scene
     devDependencies:
       '@babel/core':
@@ -1059,7 +1059,7 @@ importers:
         specifier: ^0.1.65
         version: 0.1.69
       '@zephyr3d/backend-webgl':
-        specifier: workspace:^0.1.17
+        specifier: workspace:^0.1.18
         version: link:../../libs/backend-webgl
       '@zephyr3d/base':
         specifier: workspace:^0.2.10
@@ -1068,7 +1068,7 @@ importers:
         specifier: workspace:^0.2.19
         version: link:../../libs/device
       '@zephyr3d/scene':
-        specifier: workspace:^0.9.26
+        specifier: workspace:^0.9.27
         version: link:../../libs/scene
     devDependencies:
       '@rollup/plugin-node-resolve':
@@ -1105,7 +1105,7 @@ importers:
         specifier: ^0.1.65
         version: 0.1.69
       '@zephyr3d/backend-webgl':
-        specifier: workspace:^0.1.17
+        specifier: workspace:^0.1.18
         version: link:../../libs/backend-webgl
       '@zephyr3d/base':
         specifier: workspace:^0.2.10
@@ -1114,13 +1114,13 @@ importers:
         specifier: workspace:^0.2.19
         version: link:../../libs/device
       '@zephyr3d/modelgen':
-        specifier: workspace:^0.1.0
+        specifier: workspace:^0.1.1
         version: link:../../libs/modelgen
       '@zephyr3d/procgen':
-        specifier: workspace:^0.1.0
+        specifier: workspace:^0.1.1
         version: link:../../libs/procgen
       '@zephyr3d/scene':
-        specifier: workspace:^0.9.26
+        specifier: workspace:^0.9.27
         version: link:../../libs/scene
     devDependencies:
       '@rollup/plugin-node-resolve':
@@ -1160,7 +1160,7 @@ importers:
         specifier: ^0.1.65
         version: 0.1.69
       '@zephyr3d/backend-webgl':
-        specifier: workspace:^0.1.17
+        specifier: workspace:^0.1.18
         version: link:../../libs/backend-webgl
       '@zephyr3d/backend-webgpu':
         specifier: workspace:^0.1.21
@@ -1172,7 +1172,7 @@ importers:
         specifier: workspace:^0.2.19
         version: link:../../libs/device
       '@zephyr3d/scene':
-        specifier: workspace:^0.9.26
+        specifier: workspace:^0.9.27
         version: link:../../libs/scene
     devDependencies:
       '@babel/core':
@@ -1281,7 +1281,7 @@ importers:
         specifier: ^0.1.65
         version: 0.1.69
       '@zephyr3d/backend-webgl':
-        specifier: workspace:^0.1.17
+        specifier: workspace:^0.1.18
         version: link:../../libs/backend-webgl
       '@zephyr3d/backend-webgpu':
         specifier: workspace:^0.1.21
@@ -1293,7 +1293,7 @@ importers:
         specifier: workspace:^0.2.19
         version: link:../../libs/device
       '@zephyr3d/scene':
-        specifier: workspace:^0.9.26
+        specifier: workspace:^0.9.27
         version: link:../../libs/scene
     devDependencies:
       '@babel/core':
@@ -2017,7 +2017,7 @@ importers:
         specifier: workspace:^0.2.19
         version: link:../device
       '@zephyr3d/scene':
-        specifier: workspace:^0.9.26
+        specifier: workspace:^0.9.27
         version: link:../scene
     devDependencies:
       '@babel/core':
@@ -2174,7 +2174,7 @@ importers:
         specifier: workspace:^0.2.10
         version: link:../base
       '@zephyr3d/modelgen':
-        specifier: workspace:^0.1.0
+        specifier: workspace:^0.1.1
         version: link:../modelgen
     devDependencies:
       '@eslint/js':
@@ -2359,7 +2359,7 @@ importers:
         specifier: workspace:^0.1.0
         version: link:../libs/backend-null
       '@zephyr3d/backend-webgl':
-        specifier: workspace:^0.1.17
+        specifier: workspace:^0.1.18
         version: link:../libs/backend-webgl
       '@zephyr3d/backend-webgpu':
         specifier: workspace:^0.1.21
@@ -2374,7 +2374,7 @@ importers:
         specifier: workspace:^0.2.8
         version: link:../libs/imgui
       '@zephyr3d/scene':
-        specifier: workspace:^0.9.26
+        specifier: workspace:^0.9.27
         version: link:../libs/scene
       '@zip.js/zip.js':
         specifier: ^2.7.54
@@ -2513,7 +2513,7 @@ importers:
         specifier: ^0.1.65
         version: 0.1.69
       '@zephyr3d/backend-webgl':
-        specifier: workspace:^0.1.17
+        specifier: workspace:^0.1.18
         version: link:../../libs/backend-webgl
       '@zephyr3d/backend-webgpu':
         specifier: workspace:^0.1.21
@@ -2528,10 +2528,10 @@ importers:
         specifier: workspace:^0.2.8
         version: link:../../libs/imgui
       '@zephyr3d/loaders':
-        specifier: workspace:^0.1.5
+        specifier: workspace:^0.1.6
         version: link:../../libs/loaders
       '@zephyr3d/scene':
-        specifier: workspace:^0.9.26
+        specifier: workspace:^0.9.27
         version: link:../../libs/scene
       '@zip.js/zip.js':
         specifier: ^2.7.54
@@ -2679,7 +2679,7 @@ importers:
   ../../visual-test:
     dependencies:
       '@zephyr3d/backend-webgl':
-        specifier: workspace:^0.1.17
+        specifier: workspace:^0.1.18
         version: link:../libs/backend-webgl
       '@zephyr3d/backend-webgpu':
         specifier: workspace:^0.1.21
@@ -2691,10 +2691,10 @@ importers:
         specifier: workspace:^0.2.19
         version: link:../libs/device
       '@zephyr3d/loaders':
-        specifier: workspace:^0.1.5
+        specifier: workspace:^0.1.6
         version: link:../libs/loaders
       '@zephyr3d/scene':
-        specifier: workspace:^0.9.26
+        specifier: workspace:^0.9.27
         version: link:../libs/scene
     devDependencies:
       '@eslint/js':
