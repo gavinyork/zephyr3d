@@ -900,6 +900,23 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
    * @param pass - Material pass index.
    * @returns True if the pass is transparent; otherwise false.
    */
+  /**
+   * Whether an opaque light pass keeps the alpha this material computed.
+   *
+   * @remarks
+   * Opaque geometry normally forces `SceneColor.a` to 1, since nothing reads it.
+   * A material that encodes data there for a later screen-space pass — as
+   * {@link SkinMaterial} does with its diffuse luminance — overrides this to opt
+   * out. Only affects opaque passes; transparent alpha handling is unchanged.
+   *
+   * @param ctx - The current draw context.
+   * @returns `true` to keep the computed alpha. Defaults to `false`.
+   */
+  protected preservesOpaqueAlpha(ctx: DrawContext): boolean {
+    void ctx;
+    return false;
+  }
+
   isTransparentPass(pass: number, ctx?: DrawContext) {
     return this.getEffectiveBlendMode(pass, ctx) !== 'none';
   }
@@ -1242,7 +1259,11 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
       this.$l.outColor = color ? this.color : pb.vec4();
       if (that.drawContext.renderPass!.type === RENDER_PASS_TYPE_LIGHT) {
         let output = true;
-        if (!that.isTransparentPass(that.pass, that.drawContext) && !that.alphaToCoverage) {
+        if (
+          !that.isTransparentPass(that.pass, that.drawContext) &&
+          !that.alphaToCoverage &&
+          !that.preservesOpaqueAlpha(that.drawContext)
+        ) {
           this.outColor.a = 1;
         } else if (that.isTransparentPass(that.pass, that.drawContext)) {
           const opacity =

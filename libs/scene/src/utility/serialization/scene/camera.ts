@@ -2,6 +2,7 @@ import { Vector4 } from '@zephyr3d/base';
 import { defineProps, type SerializableClass } from '../types';
 import { Camera, OrthoCamera, PerspectiveCamera } from '../../../camera';
 import type { CameraOITMode, SSGIQualityPreset, SSSDebugView, SSSQualityPreset } from '../../../camera';
+import type { SkinSSSDebugOutput } from '../../../posteffect/skinsss';
 import { SceneNode } from '../../../scene';
 import type { CameraProjectionMode, CameraSensorFit } from '../../physical';
 import {
@@ -1554,84 +1555,21 @@ export function getCameraClass(): SerializableClass {
           }
         },
         {
-          name: 'SkinSSSOpacity',
-          type: 'float',
-          phase: 0,
-          default: 0.18,
-          options: {
-            label: 'Opacity',
-            group: 'PostProcessing/SkinSSS',
-            minValue: 0,
-            maxValue: 1
-          },
-          get(this: Camera, value) {
-            value.num[0] = this.skinSSSOpacity;
-          },
-          set(this: Camera, value) {
-            this.skinSSSOpacity = value.num[0];
-          },
-          isValid(this: Camera) {
-            return this.skinSSS;
-          }
-        },
-        {
-          name: 'SkinSSSSampleStep',
-          type: 'float',
-          phase: 0,
-          default: 2,
-          options: {
-            label: 'SampleStep',
-            group: 'PostProcessing/SkinSSS',
-            minValue: 0.25,
-            maxValue: 8
-          },
-          get(this: Camera, value) {
-            value.num[0] = this.skinSSSSampleStep;
-          },
-          set(this: Camera, value) {
-            this.skinSSSSampleStep = value.num[0];
-          },
-          isValid(this: Camera) {
-            return this.skinSSS;
-          }
-        },
-        {
           name: 'SkinSSSScatterRadius',
           type: 'float',
           phase: 0,
-          default: 0.02,
+          default: 1,
           options: {
-            label: 'ScatterRadius',
+            label: 'ScatterRadiusScale',
             group: 'PostProcessing/SkinSSS',
             minValue: 0,
-            maxValue: 0.2
+            maxValue: 4
           },
           get(this: Camera, value) {
             value.num[0] = this.skinSSSScatterRadius;
           },
           set(this: Camera, value) {
             this.skinSSSScatterRadius = value.num[0];
-          },
-          isValid(this: Camera) {
-            return this.skinSSS;
-          }
-        },
-        {
-          name: 'SkinSSSSmoothness',
-          type: 'float',
-          phase: 0,
-          default: 0,
-          options: {
-            label: 'Smoothness',
-            group: 'PostProcessing/SkinSSS',
-            minValue: 0,
-            maxValue: 1
-          },
-          get(this: Camera, value) {
-            value.num[0] = this.skinSSSSmoothness;
-          },
-          set(this: Camera, value) {
-            this.skinSSSSmoothness = value.num[0];
           },
           isValid(this: Camera) {
             return this.skinSSS;
@@ -1653,48 +1591,6 @@ export function getCameraClass(): SerializableClass {
           },
           set(this: Camera, value) {
             this.skinSSSDepthScale = value.num[0];
-          },
-          isValid(this: Camera) {
-            return this.skinSSS;
-          }
-        },
-        {
-          name: 'SkinSSSColorBoost',
-          type: 'float',
-          phase: 0,
-          default: 1,
-          options: {
-            label: 'ColorBoost',
-            group: 'PostProcessing/SkinSSS',
-            minValue: 0,
-            maxValue: 4
-          },
-          get(this: Camera, value) {
-            value.num[0] = this.skinSSSColorBoost;
-          },
-          set(this: Camera, value) {
-            this.skinSSSColorBoost = value.num[0];
-          },
-          isValid(this: Camera) {
-            return this.skinSSS;
-          }
-        },
-        {
-          name: 'SkinSSSGlow',
-          type: 'float',
-          phase: 0,
-          default: 0,
-          options: {
-            label: 'Glow',
-            group: 'PostProcessing/SkinSSS',
-            minValue: 0,
-            maxValue: 4
-          },
-          get(this: Camera, value) {
-            value.num[0] = this.skinSSSGlow;
-          },
-          set(this: Camera, value) {
-            this.skinSSSGlow = value.num[0];
           },
           isValid(this: Camera) {
             return this.skinSSS;
@@ -1723,39 +1619,47 @@ export function getCameraClass(): SerializableClass {
           }
         },
         {
-          name: 'SkinSSSProfilePreset',
+          name: 'SkinSSSDebugOutput',
           type: 'string',
           phase: 0,
-          default: 'skin_default',
+          default: 'none',
           options: {
-            label: 'Profile',
+            label: 'DebugOutput',
             group: 'PostProcessing/SkinSSS',
             enum: {
               labels: [
-                'Skin',
-                'Skin (thin)',
-                'Skin (heavy makeup)',
-                'Wax',
-                'Wax (soft)',
-                'Jade',
-                'Jade (soft)'
+                'None',
+                'Diffusible',
+                'Diffuse Amount',
+                'Profile Id',
+                'Normal',
+                'Diffusion Distance',
+                'Sample Radius',
+                'Weight',
+                'Acceptance',
+                'Center Weight',
+                'Diffused'
               ],
               values: [
-                'skin_default',
-                'skin_thin',
-                'skin_heavy_makeup',
-                'wax_backlit',
-                'wax_soft',
-                'jade_backlit',
-                'jade_soft'
+                'none',
+                'diffusible',
+                'diffuseAmount',
+                'profileId',
+                'normal',
+                'diffusionDistance',
+                'sampleRadius',
+                'weight',
+                'acceptance',
+                'centerWeight',
+                'diffused'
               ]
             }
           },
           get(this: Camera, value) {
-            value.str[0] = this.skinSSSProfilePreset;
+            value.str[0] = this.skinSSSDebugOutput;
           },
           set(this: Camera, value) {
-            this.skinSSSProfilePreset = value.str[0] as any;
+            this.skinSSSDebugOutput = value.str[0] as SkinSSSDebugOutput;
           },
           isValid(this: Camera) {
             return this.skinSSS;

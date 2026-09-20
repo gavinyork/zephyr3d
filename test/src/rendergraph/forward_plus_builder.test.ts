@@ -450,7 +450,7 @@ describe('Forward+ render graph builder', () => {
     );
   });
 
-  test('declares SkinSSS MRT resource when enabled', () => {
+  test('declares the skin mask MRT resource when enabled', () => {
     const { graph, backbuffer } = buildForwardPlusGraphForTest(createOptions({ skinSSS: true }));
     const passNames = graph.compile([backbuffer]).orderedPasses.map((pass) => pass.name);
     const lightPassWrites = graph.passes
@@ -459,6 +459,10 @@ describe('Forward+ render graph builder', () => {
 
     expect(passNames).toContain('LightPass');
     expect(passNames).not.toContain('SSSProfile');
+    // Scattered color comes from SceneColor and the diffuse luminance in its
+    // alpha, but which pixels are skin cannot: every opaque material writes 1
+    // to that alpha. The mask needs its own channel, as UE5 does with its
+    // Subsurface.ProfileIdTexture.
     expect(lightPassWrites).toContain('skinSSS');
   });
 

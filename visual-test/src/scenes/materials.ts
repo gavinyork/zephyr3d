@@ -5,6 +5,7 @@ import {
   Mesh,
   PlaneShape,
   SkinMaterial,
+  SkinProfile,
   SphereShape,
   UnlitMaterial
 } from '@zephyr3d/scene';
@@ -98,12 +99,11 @@ export const skinSss: VisualScene = {
     placeCamera(camera, new Vector3(0, 0, 5.5));
 
     camera.skinSSS = true;
-    // Tap spacing has to keep up with the projected radius or the kernel is
-    // clamped short and the scene silently stops testing the far tail.
-    camera.skinSSSSampleStep = 5;
-    // The sphere is 1.5 units across on screen, so a human-scale 2 cm radius
-    // would be invisible here; this is scaled to the stand-in geometry.
-    camera.skinSSSScatterRadius = 0.35;
+    // The sphere is 1.5 units across, so the diffusion is scaled up from human
+    // skin to read at this size. The extent lives on the profile now; the camera
+    // value is only a multiplier on the sampling disc.
+    material.subsurfaceProfile = new SkinProfile('skin');
+    material.subsurfaceProfile.meanFreePathDistance = 0.35;
   }
 };
 
@@ -116,9 +116,9 @@ export const skinSss: VisualScene = {
  * thing from skin the presets offer - green travels furthest instead of red - so
  * a diff against `skin-sss` isolates exactly what the channel ratios contribute.
  *
- * The profile is a property of the pass rather than of a material, so the
- * contrast has to live across two scenes instead of across three spheres in one.
- * Per-material profiles are the profile-slot path used by `SSS`.
+ * The profile is a property of the material, so the contrast could live in one
+ * scene; it stays split across two so that a diff against `skin-sss` isolates
+ * exactly what the channel ratios contribute.
  *
  * This is the scene that fails if the channels ever collapse back to a shared
  * radius: it would converge on `skin-sss` and both would read as flat haze.
@@ -145,16 +145,16 @@ export const skinDiffusionJade: VisualScene = {
     material.albedoColor = new Vector4(0.85, 0.66, 0.58, 1);
     material.transmissionStrength = 0.6;
     material.diffuseWrap = 0.5;
+    // The profile lives on the material now, so the channel ratios are a
+    // per-mesh property rather than a property of the whole pass.
+    const jade = new SkinProfile('jade');
+    jade.meanFreePathDistance = 0.35;
+    material.subsurfaceProfile = jade;
     const head = new Mesh(scene, new SphereShape({ radius: 1.5 }), material);
     head.position.setXYZ(0, 0, 0);
     placeCamera(camera, new Vector3(0, 0, 5.5));
 
     camera.skinSSS = true;
-    // Tap spacing has to keep up with the projected radius or the kernel is
-    // clamped short and the scene silently stops testing the far tail.
-    camera.skinSSSSampleStep = 5;
-    camera.skinSSSScatterRadius = 0.35;
-    camera.skinSSSProfilePreset = 'jade_soft';
   }
 };
 

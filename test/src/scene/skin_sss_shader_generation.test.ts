@@ -39,18 +39,82 @@ describe('SkinSSS shader generation', () => {
     expect(recombine).toBeTruthy();
   });
 
-  test('Burley pass uses importance sampling with inverse CDF', () => {
+  test('Burley samples radii from the inverse CDF, in world units', () => {
     const { burley } = buildPrograms('webgpu');
-    expect(burley).toContain('burleyW');
-    expect(burley).toContain('xi_mapped');
-    expect(burley).toContain('invShape');
-    expect(burley).toContain('pdf');
-    expect(burley).not.toContain('blurDirection');
+    // Radii come straight out of RadiusRootFindByApproximation in world space and
+    // are unbounded. There is deliberately no normalized sampling disc: pinning
+    // the radii to one couples the kernel shape to the profile scale, which made
+    // the bleed vanish at small scales and flatten into a box average at large.
+    expect(burley).toContain('radiusRootApprox');
+    expect(burley).toContain('radiusMM');
+    expect(burley).toContain('burleyPdf');
+    expect(burley).not.toContain('maxRadiusPx');
+    expect(burley).not.toContain('worldRadius');
   });
 
-  test('Burley pass uses 3D distance for depth rejection', () => {
+  test('Burley converts world radii to UV without shaping the kernel', () => {
     const { burley } = buildPrograms('webgpu');
-    expect(burley).toContain('combinedDist');
+    // CalculateBurleyScale is pure unit conversion: world unit scale, the user
+    // multiplier, the projection and 1/depth. No albedo or mean free path.
+    const scaleLine = burley.split('\n').find((line) => line.includes('burleyScale:'));
+    expect(scaleLine).toBeDefined();
+    expect(scaleLine).toContain('viewScale');
+    expect(scaleLine).not.toContain('albedo');
+    expect(scaleLine).not.toContain('mfp');
+  });
+
+  test('Burley evaluates the per-channel diffusion profile', () => {
+    const { burley } = buildPrograms('webgpu');
+    // rR(r) per channel from the 3D scaling factor, divided by the sampling PDF.
+    expect(burley).toContain('diffusionProfile');
+    expect(burley).toContain('scalingFactor3D');
+    expect(burley).toContain('radiusSampledMM');
+  });
+
+  test('the R2 sequence is indexed by an integer, not a per-pixel fraction', () => {
+    const { burley } = buildPrograms('webgpu');
+    // Regression guard: R2Sequence is a low-discrepancy sequence over integer
+    // indices. Offsetting the index by a per-pixel fraction turns it into a phase
+    // sweep correlated with pixel position, which rendered as regular banding.
+    expect(burley).toContain('seedStart');
+    const seedLine = burley.split('\n').find((line) => line.includes('seedStart:'));
+    expect(seedLine).toBeDefined();
+    expect(seedLine).not.toContain('fract');
+    expect(seedLine).not.toContain('uv');
+  });
+
+  test('centre weight uses each channel own diffusion distance', () => {
+    const { burley } = buildPrograms('webgpu');
+    // Regression guard: substituting the representative (widest) channel here
+    // flattens the channel ratio, and because a smaller `d` concentrates more CDF
+    // mass inside one texel it actually inverts it — red ends up holding the most
+    // centre weight instead of the least, suppressing the channel that should
+    // travel furthest. It has to use the same per-channel `d` as the kernel.
+    const dLine = burley.split('\n').find((line) => line.includes('dPerChannel:'));
+    expect(dLine).toBeDefined();
+    expect(dLine).toContain('mfp.rgb');
+    expect(dLine).not.toContain('lForSampling');
+  });
+
+  test('the bleed factor averages only over accepted taps', () => {
+    const { burley } = buildPrograms('webgpu');
+    // Regression guard: dividing the accumulated bleed by the total sample count
+    // while the weighted mean is normalized by its own weight sum scales the
+    // result by an unrelated factor. Near the silhouette, where most taps miss
+    // the skin, that produced bright flickering specks.
+    expect(burley).toContain('acceptedCount');
+    const bleedLine = burley.split('\n').find((line) => line.includes('bleedAccum /'));
+    expect(bleedLine).toBeDefined();
+    expect(bleedLine).toContain('acceptedCount');
+  });
+
+  test('Burley reweights the centre sample by its CDF mass', () => {
+    const { burley } = buildPrograms('webgpu');
+    // The centre pixel accounts for the CDF up to a one-texel radius, so sampling
+    // covers only [cdf, 1] and the centre is lerped back in afterwards.
+    expect(burley).toContain('centerCdf');
+    expect(burley).toContain('centerWeight');
+    expect(burley).toContain('burleyCdf');
   });
 
   test('BVar pass is a passthrough (no velocity/shadow inputs yet)', () => {
@@ -61,11 +125,67 @@ describe('SkinSSS shader generation', () => {
     expect(bvar).not.toContain('thinness');
   });
 
-  test('Recombine uses diffusible replacement', () => {
+  test('Recombine separates specular from diffuse via SceneColor.a', () => {
     const { recombine } = buildPrograms('webgpu');
-    expect(recombine).toContain('redistributed');
-    expect(recombine).toContain('original');
+    // UE5 mechanism: SceneColor.a holds the diffuse luminance, so the diffusible
+    // fraction is that over the total luminance. The specular remainder must be
+    // carried through unscattered.
+    expect(recombine).toContain('diffAmt');
+    expect(recombine).toContain('diffOrig');
+    expect(recombine).toContain('specKeep');
     expect(recombine).toContain('diffused');
+  });
+
+  test('scattered color comes from SceneColor, not a color side buffer', () => {
+    const { recombine, burley } = buildPrograms('webgpu');
+    expect(recombine).not.toContain('skinTex');
+    expect(burley).not.toContain('skinTex');
+    expect(burley).toContain('sceneTex');
+  });
+
+  test('Burley weights taps by normal agreement', () => {
+    const { burley } = buildPrograms('webgpu');
+    // sqrt(saturate(dot(nTap, nCenter) * 0.5 + 0.5)) — without it scattered light
+    // crosses the nose wing, the lip seam and the silhouette.
+    expect(burley).toContain('normalWeight');
+    expect(burley).toContain('centerNormal');
+    expect(burley).toContain('tapNormal');
+  });
+
+  test('Burley reads scattering parameters from the per-pixel profile table', () => {
+    const { burley } = buildPrograms('webgpu');
+    expect(burley).toContain('profileTex');
+    expect(burley).toContain('readProfile');
+    expect(burley).toContain('centerId');
+  });
+
+  test('Burley draws sample radii from the representative channel', () => {
+    const { burley } = buildPrograms('webgpu');
+    // UE5 keeps one representative albedo and mean free path in the `w` of each
+    // row (GetComponentForScalingFactorEstimation / GetDiffuseMeanFreePathForSampling)
+    // and evaluates all three channel kernels at those radii.
+    expect(burley).toContain('aForSampling');
+    expect(burley).toContain('lForSampling');
+    expect(burley).toContain('albedo.w');
+    expect(burley).toContain('mfp.w');
+  });
+
+  test('Burley tints cross-profile taps instead of rejecting them', () => {
+    const { burley } = buildPrograms('webgpu');
+    // A face/lip or face/ear boundary should soften, not seam.
+    expect(burley).toContain('boundaryBleed');
+    expect(burley).toContain('sameProfile');
+    expect(burley).toContain('bleedAccum');
+  });
+
+  test('skin is identified by its own mask channel, never by SceneColor.a', () => {
+    const { burley, recombine } = buildPrograms('webgpu');
+    // Regression guard: every opaque material writes 1 to SceneColor.a, so
+    // gating on it made the diffusion treat the background and the eyes as skin
+    // and bleed scattered red onto them. Both passes must read maskTex instead.
+    expect(burley).toContain('maskTex');
+    expect(recombine).toContain('maskTex');
+    expect(recombine).toContain('centerMask');
   });
 
   test('Recombine applies transmission from BVar', () => {

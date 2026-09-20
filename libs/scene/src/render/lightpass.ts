@@ -19,7 +19,10 @@ const SURFACE_MRT_FLAGS =
 const ADDITIVE_LIGHT_PASS_OMIT_MRT_FLAGS =
   MaterialVaryingFlags.SCENE_STORE_ROUGHNESS |
   MaterialVaryingFlags.SSS_STORE_PROFILE |
-  MaterialVaryingFlags.SCENE_STORE_NORMAL;
+  MaterialVaryingFlags.SCENE_STORE_NORMAL |
+  // The skin mask is a surface property, not accumulated lighting: the base
+  // pass establishes it and additive light passes must leave it alone.
+  MaterialVaryingFlags.SKIN_SSS_STORE;
 
 /**
  * Forward render pass

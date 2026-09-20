@@ -24,6 +24,7 @@ import {
 import {
   getMeshMaterialClass,
   getSubsurfaceProfileClass,
+  getSkinProfileClass,
   getUnlitMaterialClass,
   getMToonMaterialClass,
   getLambertMaterialClass,
@@ -350,6 +351,7 @@ export class ResourceManager {
         getBatchGroupClass(),
         getSceneClass(this),
         getSubsurfaceProfileClass(),
+        getSkinProfileClass(),
         ...getMeshMaterialClass(),
         ...getPBRBluePrintMaterialClass(),
         ...getPBRBluePrintMaterialInstanceClass(),

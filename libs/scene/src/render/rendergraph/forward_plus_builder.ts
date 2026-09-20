@@ -1351,6 +1351,10 @@ const LightPassModule: RenderModule<FrameGraphContext> = {
       ) {
         writeSSSTransmission = false;
       }
+      // Skin scattering takes its color from SceneColor and the diffuse luminance
+      // in its alpha (UE5's separation mechanism), so no color side buffer is
+      // needed. It still needs to know which pixels are skin, which is what UE5
+      // keeps in its single-channel Subsurface.ProfileIdTexture.
       const writeSkinSSS = options.skinSSS;
       const sssLightingAttachmentCount =
         (writeSSSDiffuse ? 1 : 0) + (writeSSSTransmission ? 1 : 0) + (writeSkinSSS ? 1 : 0);
@@ -1862,6 +1866,7 @@ function buildForwardPlusGraphInternal(
   options.ssgi &&= supportsSSGIRenderTargets(ctx);
   ctx.SSS = !!options.sss;
   ctx.SSGI = !!options.ssgi;
+  ctx.skinSSS = !!options.skinSSS;
   ctx.SSGIIrradianceHistoryTexture = null;
   ctx.SSGISurfaceHistoryTexture = null;
   ctx.SkinSSSTexture = null;

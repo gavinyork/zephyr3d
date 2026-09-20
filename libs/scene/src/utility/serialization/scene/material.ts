@@ -15,6 +15,8 @@ import {
   EyeMaterial,
   SkinMaterial,
   SubsurfaceProfile,
+  SkinProfile,
+  type SkinProfilePreset,
   type MToonOutlineWidthMode,
   type SubsurfaceProfilePreset,
   SpriteBlueprintMaterial,
@@ -339,6 +341,199 @@ export function getSubsurfaceProfileClass(): SerializableClass {
           },
           set(this: SubsurfaceProfile, value) {
             this.specularDetailRadius = value.num[0];
+          }
+        }
+      ]);
+    }
+  };
+}
+
+/**
+ * Serialization for {@link SkinProfile}, the profile asset driving
+ * {@link SkinMaterial}'s subsurface scattering.
+ */
+export function getSkinProfileClass(): SerializableClass {
+  return {
+    ctor: SkinProfile,
+    name: 'SkinProfile',
+    getProps() {
+      return defineProps([
+        {
+          name: 'Preset',
+          type: 'string',
+          default: 'skin',
+          options: {
+            label: 'LookPreset',
+            enum: {
+              labels: ['Skin', 'Skin Pale', 'Skin Tan', 'Skin Dark', 'Wax', 'Jade', 'Marble'],
+              values: ['skin', 'skin_pale', 'skin_tan', 'skin_dark', 'wax', 'jade', 'marble']
+            }
+          },
+          get(this: SkinProfile, value) {
+            value.str[0] = this.preset;
+          },
+          set(this: SkinProfile, value) {
+            this.preset = value.str[0] as SkinProfilePreset;
+          }
+        },
+        {
+          name: 'SurfaceAlbedo',
+          description: 'Per-channel scattering albedo driving the Burley shaping term',
+          type: 'rgb',
+          default: [0.85, 0.63, 0.55],
+          options: { animatable: true, minValue: 0, maxValue: 1 },
+          get(this: SkinProfile, value) {
+            value.num[0] = this.surfaceAlbedo.x;
+            value.num[1] = this.surfaceAlbedo.y;
+            value.num[2] = this.surfaceAlbedo.z;
+          },
+          set(this: SkinProfile, value) {
+            this.surfaceAlbedo = new Vector3(value.num[0], value.num[1], value.num[2]);
+          }
+        },
+        {
+          name: 'MeanFreePath',
+          description: 'Per-channel diffuse mean free path ratio; red normally scatters furthest',
+          type: 'rgb',
+          default: [1, 0.28, 0.14],
+          options: { animatable: true, minValue: 0, maxValue: 1 },
+          get(this: SkinProfile, value) {
+            value.num[0] = this.meanFreePath.x;
+            value.num[1] = this.meanFreePath.y;
+            value.num[2] = this.meanFreePath.z;
+          },
+          set(this: SkinProfile, value) {
+            this.meanFreePath = new Vector3(value.num[0], value.num[1], value.num[2]);
+          }
+        },
+        {
+          name: 'MeanFreePathDistance',
+          description: 'Mean free path of the widest channel, in world units',
+          type: 'float',
+          default: 0.012,
+          options: { animatable: true, minValue: 0, maxValue: 1 },
+          get(this: SkinProfile, value) {
+            value.num[0] = this.meanFreePathDistance;
+          },
+          set(this: SkinProfile, value) {
+            this.meanFreePathDistance = value.num[0];
+          }
+        },
+        {
+          name: 'WorldUnitScale',
+          type: 'float',
+          default: 1,
+          options: { animatable: true, minValue: 0.01, maxValue: 100 },
+          get(this: SkinProfile, value) {
+            value.num[0] = this.worldUnitScale;
+          },
+          set(this: SkinProfile, value) {
+            this.worldUnitScale = value.num[0];
+          }
+        },
+        {
+          name: 'ScatterScale',
+          type: 'float',
+          default: 1,
+          options: { animatable: true, minValue: 0, maxValue: 8 },
+          get(this: SkinProfile, value) {
+            value.num[0] = this.scatterScale;
+          },
+          set(this: SkinProfile, value) {
+            this.scatterScale = value.num[0];
+          }
+        },
+        {
+          name: 'BoundaryColorBleed',
+          description: 'Tint applied to taps belonging to a different profile',
+          type: 'rgb',
+          default: [0.78, 0.44, 0.36],
+          options: { animatable: true, minValue: 0, maxValue: 1 },
+          get(this: SkinProfile, value) {
+            value.num[0] = this.boundaryColorBleed.x;
+            value.num[1] = this.boundaryColorBleed.y;
+            value.num[2] = this.boundaryColorBleed.z;
+          },
+          set(this: SkinProfile, value) {
+            this.boundaryColorBleed = new Vector3(value.num[0], value.num[1], value.num[2]);
+          }
+        },
+        {
+          name: 'TransmissionTint',
+          type: 'rgb',
+          default: [1, 0.42, 0.3],
+          options: { animatable: true, minValue: 0, maxValue: 1 },
+          get(this: SkinProfile, value) {
+            value.num[0] = this.transmissionTint.x;
+            value.num[1] = this.transmissionTint.y;
+            value.num[2] = this.transmissionTint.z;
+          },
+          set(this: SkinProfile, value) {
+            this.transmissionTint = new Vector3(value.num[0], value.num[1], value.num[2]);
+          }
+        },
+        {
+          name: 'ExtinctionScale',
+          type: 'float',
+          default: 1,
+          options: { animatable: true, minValue: 0, maxValue: 8 },
+          get(this: SkinProfile, value) {
+            value.num[0] = this.extinctionScale;
+          },
+          set(this: SkinProfile, value) {
+            this.extinctionScale = value.num[0];
+          }
+        },
+        {
+          name: 'NormalScale',
+          description: 'How much surface normal detail survives the diffusion',
+          type: 'float',
+          default: 0.08,
+          options: { animatable: true, minValue: 0, maxValue: 1 },
+          get(this: SkinProfile, value) {
+            value.num[0] = this.normalScale;
+          },
+          set(this: SkinProfile, value) {
+            this.normalScale = value.num[0];
+          }
+        },
+        {
+          name: 'Roughness0',
+          description: 'Roughness multiplier of the narrow specular lobe',
+          type: 'float',
+          default: 0.75,
+          options: { animatable: true, minValue: 0.01, maxValue: 4 },
+          get(this: SkinProfile, value) {
+            value.num[0] = this.roughness0;
+          },
+          set(this: SkinProfile, value) {
+            this.roughness0 = value.num[0];
+          }
+        },
+        {
+          name: 'Roughness1',
+          description: 'Roughness multiplier of the wide specular lobe',
+          type: 'float',
+          default: 1.3,
+          options: { animatable: true, minValue: 0.01, maxValue: 4 },
+          get(this: SkinProfile, value) {
+            value.num[0] = this.roughness1;
+          },
+          set(this: SkinProfile, value) {
+            this.roughness1 = value.num[0];
+          }
+        },
+        {
+          name: 'LobeMix',
+          description: 'Blend between the narrow and wide specular lobes',
+          type: 'float',
+          default: 0.15,
+          options: { animatable: true, minValue: 0, maxValue: 1 },
+          get(this: SkinProfile, value) {
+            value.num[0] = this.lobeMix;
+          },
+          set(this: SkinProfile, value) {
+            this.lobeMix = value.num[0];
           }
         }
       ]);
@@ -2677,51 +2872,22 @@ export function getSkinMaterialClass(manager: ResourceManager): SerializableClas
             }
           },
           {
-            name: 'DualLobeBlend',
-            description: 'Blend factor between narrow and wide specular lobes',
-            type: 'float',
-            default: 0.5,
-            options: { animatable: true, minValue: 0, maxValue: 1 },
+            name: 'SubsurfaceProfile',
+            description: 'Shared profile driving the subsurface scattering of this skin',
+            type: 'object',
+            phase: 0,
+            default: null,
+            options: {
+              objectTypes: [SkinProfile]
+            },
+            isNullable() {
+              return true;
+            },
             get(this: SkinMaterial, value) {
-              value.num[0] = this.dualLobeBlend;
+              value.object[0] = this.subsurfaceProfile;
             },
             set(this: SkinMaterial, value) {
-              this.dualLobeBlend = value.num[0];
-            },
-            getDefaultValue(this: SkinMaterial) {
-              return this.$isInstance ? this.coreMaterial.dualLobeBlend : 0.5;
-            }
-          },
-          {
-            name: 'NarrowLobeRoughnessMod',
-            description: 'Narrow lobe roughness modifier (0-1)',
-            type: 'float',
-            default: 0.5,
-            options: { animatable: true, minValue: 0, maxValue: 1 },
-            get(this: SkinMaterial, value) {
-              value.num[0] = this.narrowLobeRoughnessMod;
-            },
-            set(this: SkinMaterial, value) {
-              this.narrowLobeRoughnessMod = value.num[0];
-            },
-            getDefaultValue(this: SkinMaterial) {
-              return this.$isInstance ? this.coreMaterial.narrowLobeRoughnessMod : 0.5;
-            }
-          },
-          {
-            name: 'WideLobeRoughnessMod',
-            description: 'Wide lobe roughness modifier (0-1)',
-            type: 'float',
-            default: 0.7,
-            options: { animatable: true, minValue: 0, maxValue: 1 },
-            get(this: SkinMaterial, value) {
-              value.num[0] = this.wideLobeRoughnessMod;
-            },
-            set(this: SkinMaterial, value) {
-              this.wideLobeRoughnessMod = value.num[0];
-            },
-            getDefaultValue(this: SkinMaterial) {
-              return this.$isInstance ? this.coreMaterial.wideLobeRoughnessMod : 0.7;
+              this.subsurfaceProfile = (value.object[0] as SkinProfile) ?? null;
             }
           },
           {

@@ -31,9 +31,7 @@ import { TAA } from '../posteffect/taa';
 import { SSGI } from '../posteffect/ssgi';
 import { SSR } from '../posteffect/ssr';
 import { SSS } from '../posteffect/sss';
-import { SkinSSS } from '../posteffect/skinsss';
-import { SubsurfaceProfile } from '../material/subsurfaceprofile';
-import type { SubsurfaceProfilePreset } from '../material/subsurfaceprofile';
+import { SkinSSS, type SkinSSSDebugOutput } from '../posteffect/skinsss';
 import { Tonemap } from '../posteffect/tonemap';
 import { FXAA } from '../posteffect/fxaa';
 import { Bloom } from '../posteffect/bloom';
@@ -431,22 +429,12 @@ export class Camera extends SceneNode {
   protected _postEffectSkinSSS: DRef<SkinSSS>;
   /** @internal Skin SSS final blend strength. */
   protected _skinSSSStrength: number;
-  /** @internal Skin SSS mask opacity bias. */
-  protected _skinSSSOpacity: number;
-  /** @internal Skin SSS maximum blur tap spacing in pixels. */
-  protected _skinSSSSampleStep: number;
   /** @internal Skin SSS world-space scatter radius. */
   protected _skinSSSScatterRadius: number;
-  /** @internal Skin SSS smoothing ("beauty filter") amount. */
-  protected _skinSSSSmoothness: number;
   /** @internal Skin SSS depth rejection scale. */
   protected _skinSSSDepthScale: number;
-  /** @internal Skin SSS blurred multiplier boost. */
-  protected _skinSSSColorBoost: number;
-  protected _skinSSSGlow: number;
-  protected _skinSSSProfilePreset: SubsurfaceProfilePreset;
-  protected _skinSSSProfile: SubsurfaceProfile | null;
   protected readonly _skinSSSScatterTint: Vector4;
+  protected _skinSSSDebugOutput: SkinSSSDebugOutput;
   /** @internal SSAO enable flag (via post effect). */
   protected _SSAO: boolean;
   /** @internal SSAO post effect reference. */
@@ -619,16 +607,10 @@ export class Camera extends SceneNode {
     this._skinSSS = false;
     this._postEffectSkinSSS = new DRef();
     this._skinSSSStrength = 1;
-    this._skinSSSOpacity = 0.18;
-    this._skinSSSSampleStep = 2;
-    this._skinSSSScatterRadius = 0.02;
-    this._skinSSSSmoothness = 0;
+    this._skinSSSScatterRadius = 1;
     this._skinSSSDepthScale = 80;
-    this._skinSSSColorBoost = 1;
-    this._skinSSSGlow = 0;
-    this._skinSSSProfilePreset = 'skin_default';
-    this._skinSSSProfile = null;
     this._skinSSSScatterTint = new Vector4(1, 1, 1, 1);
+    this._skinSSSDebugOutput = 'none';
     this._SSAO = false;
     this._postEffectSSAO = new DRef();
     this._SSAOOcclusionRadius = 0.25;
@@ -1503,21 +1485,27 @@ export class Camera extends SceneNode {
       this._postEffectSkinSSS.get()!.strength = this._skinSSSStrength;
     }
   }
-  /** Bias subtracted from the blurred skin mask before compositing. */
-  get skinSSSOpacity() {
-    return this._skinSSSOpacity;
+  /**
+   * Intermediate Skin SSS quantity to visualize instead of the shaded result.
+   *
+   * @remarks
+   * `'none'` renders normally. Use this to tell an input problem from a kernel
+   * problem when the diffusion does not look right.
+   */
+  get skinSSSDebugOutput(): SkinSSSDebugOutput {
+    return this._skinSSSDebugOutput;
   }
-  set skinSSSOpacity(val) {
-    this._skinSSSOpacity = Math.max(0, Math.min(1, val ?? 0));
+  set skinSSSDebugOutput(val: SkinSSSDebugOutput) {
+    this._skinSSSDebugOutput = val ?? 'none';
+    if (this._postEffectSkinSSS.get()) {
+      this._postEffectSkinSSS.get()!.debugOutput = this._skinSSSDebugOutput;
+    }
   }
-  /** Maximum pixel spacing between blur taps. Caps the projected scatter radius for close-ups. */
-  get skinSSSSampleStep() {
-    return this._skinSSSSampleStep;
-  }
-  set skinSSSSampleStep(val) {
-    this._skinSSSSampleStep = Math.max(0.25, val ?? 0.25);
-  }
-  /** World-space scatter radius. The blur width shrinks with distance to keep this constant. */
+  /**
+   * Multiplier on the Skin SSS sampling disc, relative to the profile's scatter
+   * distance. The absolute world extent comes from the profile's
+   * `meanFreePathDistance`.
+   */
   get skinSSSScatterRadius() {
     return this._skinSSSScatterRadius;
   }
@@ -1526,13 +1514,6 @@ export class Camera extends SceneNode {
     if (this._postEffectSkinSSS.get()) {
       this._postEffectSkinSSS.get()!.scatterRadius = this._skinSSSScatterRadius;
     }
-  }
-  /** Skin smoothing ("beauty filter") amount for the dedicated Skin SSS post effect. */
-  get skinSSSSmoothness() {
-    return this._skinSSSSmoothness;
-  }
-  set skinSSSSmoothness(val) {
-    this._skinSSSSmoothness = Math.max(0, Math.min(1, val ?? 0));
   }
   /** Depth rejection scale. The reference shader uses 80. */
   get skinSSSDepthScale() {
@@ -1543,67 +1524,6 @@ export class Camera extends SceneNode {
     if (this._postEffectSkinSSS.get()) {
       this._postEffectSkinSSS.get()!.depthScale = this._skinSSSDepthScale;
     }
-  }
-  /** Multiplier applied to the blurred skin lighting multiplier before compositing. */
-  get skinSSSColorBoost() {
-    return this._skinSSSColorBoost;
-  }
-  set skinSSSColorBoost(val) {
-    this._skinSSSColorBoost = Math.max(0, val ?? 0);
-  }
-  /**
-   * Additive, deliberately non-conserving bleed for the Skin SSS post effect.
-   *
-   * @remarks
-   * 0 (the default) keeps the effect energy conserving: light added to the dark
-   * side of the terminator is light removed from the lit side. Raising it adds
-   * the diffused term again without subtracting anything, for skin that reads as
-   * lit from within; around 1 approximates the look the effect had before it
-   * conserved energy.
-   */
-  get skinSSSGlow() {
-    return this._skinSSSGlow;
-  }
-  set skinSSSGlow(val) {
-    this._skinSSSGlow = Math.max(0, val ?? 0);
-  }
-  /**
-   * Subsurface profile preset driving the Skin SSS per-channel scatter radii.
-   *
-   * @remarks
-   * The ratio between the red, green and blue radii is what gives a scattering
-   * surface its character - red travels furthest in skin, which is the
-   * red-to-yellow gradient at the terminator. Switching presets changes that
-   * ratio, so `wax` and `jade` are the same code path rather than special cases;
-   * {@link Camera.skinSSSScatterRadius} still sets how far the light reaches.
-   *
-   * Applies to the whole pass. Per-material profiles need the profile-slot path
-   * used by {@link SSS} instead.
-   */
-  get skinSSSProfilePreset(): SubsurfaceProfilePreset {
-    return this._skinSSSProfilePreset;
-  }
-  set skinSSSProfilePreset(val: SubsurfaceProfilePreset) {
-    this._skinSSSProfilePreset = val ?? 'skin_default';
-    if (this._skinSSSProfile) {
-      this._skinSSSProfile.preset = this._skinSSSProfilePreset;
-    }
-    if (this._postEffectSkinSSS.get()) {
-      this._postEffectSkinSSS.get()!.profile = this.getSkinSSSProfile();
-    }
-  }
-  /**
-   * The profile object backing {@link Camera.skinSSSProfilePreset}, created on
-   * first use so that cameras which never enable Skin SSS do not consume one of
-   * the 255 global profile slots.
-   * @internal
-   */
-  protected getSkinSSSProfile() {
-    if (!this._skinSSSProfile) {
-      this._skinSSSProfile = new SubsurfaceProfile();
-      this._skinSSSProfile.preset = this._skinSSSProfilePreset;
-    }
-    return this._skinSSSProfile;
   }
   /**
    * Tint applied to the light the Skin SSS post effect redistributes.
@@ -2128,8 +2048,8 @@ export class Camera extends SceneNode {
       skinSSS.enabled = false;
       skinSSS.strength = this._skinSSSStrength;
       skinSSS.scatterRadius = this._skinSSSScatterRadius;
-      skinSSS.profile = this.getSkinSSSProfile();
       skinSSS.scatterTint = this._skinSSSScatterTint;
+      skinSSS.debugOutput = this._skinSSSDebugOutput;
       this._postEffectSkinSSS.set(skinSSS);
       this._compositor.appendPostEffect(skinSSS);
     }

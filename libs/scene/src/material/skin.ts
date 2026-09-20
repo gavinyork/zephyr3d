@@ -1,5 +1,5 @@
-import type { BindGroup, PBFunctionScope } from '@zephyr3d/device';
-import type { Clonable } from '@zephyr3d/base';
+import type { BindGroup, PBFunctionScope, RenderStateSet } from '@zephyr3d/device';
+import { Vector3, type Clonable } from '@zephyr3d/base';
 import { MeshMaterial, applyMaterialMixins } from './meshmaterial';
 import { mixinLight } from './mixins/lit';
 import { mixinVertexColor } from './mixins/vertexcolor';
@@ -8,10 +8,17 @@ import { ShaderHelper } from './shader/helper';
 import type { DrawContext } from '../render';
 import { LIGHT_TYPE_POINT, MaterialVaryingFlags, RENDER_PASS_TYPE_LIGHT } from '../values';
 import { skinDiffuseBRDF, skinDualLobeSpecular } from '../shaders/skin_brdf';
+import { SkinProfile } from './skinprofile';
 
 /**
- * HDR range packed into the SkinSSS side buffer when the render graph falls
- * back to an 8-bit format.
+ * HDR range that used to be packed into the SkinSSS side buffer when the render
+ * graph fell back to an 8-bit format.
+ *
+ * @deprecated The skin scattering source is now recovered from `SceneColor` via
+ * the diffuse luminance stored in its alpha channel (matching UE5), so no side
+ * buffer and no LDR encoding is involved. Kept for source compatibility; it has
+ * no effect on rendering.
+ *
  * @public
  */
 export const SKIN_SSS_LDR_ENCODE_RANGE = 4;
@@ -21,9 +28,10 @@ export const SKIN_SSS_LDR_ENCODE_RANGE = 4;
  *
  * @remarks
  * Uses a pre-integrated curvature-dependent diffuse BRDF and dual-lobe GGX specular
- * driven by subsurface profile parameters. The specular luminance is written to
- * `SceneColor.a` so the {@link SkinSSS} post effect can precisely separate specular
- * from diffuse for Burley diffusion redistribution.
+ * driven by subsurface profile parameters. The **diffuse** luminance is written to
+ * `SceneColor.a` so the {@link SkinSSS} post effect can recover the diffusible
+ * fraction as `saturate(SceneColor.a / luma(SceneColor.rgb))` — the same spec/diff
+ * separation UE5 performs in its SSS Setup and Recombine passes.
  *
  * The optional `subsurfaceTexture` uses R as skin mask, G as curvature and B as
  * thickness for the back-lit transmission term.
@@ -41,26 +49,100 @@ export class SkinMaterial
   private _specularF0: number;
   private _transmissionStrength: number;
   private _transmissionPower: number;
-  private _dualLobeBlend: number;
-  private _narrowLobeMod: number;
-  private _wideLobeMod: number;
+  private _profile: SkinProfile | null;
+  private readonly _subsurfaceProfileChanged: () => void;
+  private readonly _lobeParams: Vector3;
 
   constructor() {
     super();
+    this._profile = null;
+    this._subsurfaceProfileChanged = () => this.uniformChanged();
+    this._lobeParams = new Vector3();
     this._roughness = 0.35;
     this._specularStrength = 1;
     this._specularF0 = 0.028;
     this._transmissionStrength = 0;
     this._transmissionPower = 4;
-    this._dualLobeBlend = 0.5;
-    this._narrowLobeMod = 0.5;
-    this._wideLobeMod = 0.7;
     this.useFeature(SkinMaterial.FEATURE_VERTEX_NORMAL, true);
   }
 
-  /** Marker used by the forward render graph to allocate the SkinSSS MRT. */
+  /**
+   * Marker used by the forward render graph to enable the SkinSSS post effect.
+   *
+   * @remarks
+   * This no longer allocates a side buffer: the scattering source is recovered
+   * from `SceneColor` and its diffuse-luminance alpha.
+   */
   get skinSSS() {
     return true;
+  }
+
+  /**
+   * Shared profile asset driving the screen-space diffusion.
+   *
+   * @remarks
+   * Assigning distinct profiles to different meshes — face, ears, lips — lets each
+   * diffuse with its own scattering parameters in a single pass, since the
+   * material writes the profile id per pixel.
+   *
+   * When `null`, the shared {@link SkinProfile.getDefault | default skin profile}
+   * is used for shading.
+   *
+   * @public
+   */
+  get subsurfaceProfile() {
+    return this._profile;
+  }
+  set subsurfaceProfile(val: SkinProfile | null) {
+    if (val !== this._profile) {
+      this._profile?.removeChangeListener(this._subsurfaceProfileChanged);
+      this._profile = val ?? null;
+      this._profile?.addChangeListener(this._subsurfaceProfileChanged);
+      this.uniformChanged();
+    }
+  }
+
+  /**
+   * The profile actually used for shading.
+   *
+   * @remarks
+   * Resolves {@link SkinMaterial.subsurfaceProfile} against the shared default,
+   * so this never returns `null`.
+   *
+   * @public
+   */
+  get effectiveProfile(): SkinProfile {
+    return this._profile ?? SkinProfile.getDefault();
+  }
+
+  /**
+   * Keeps the diffuse luminance written to `SceneColor.a` instead of letting the
+   * opaque path overwrite it with 1. {@link SkinSSS} needs it to separate the
+   * diffusible energy from the specular it must leave untouched.
+   */
+  protected preservesOpaqueAlpha(ctx: DrawContext): boolean {
+    return ctx.renderPass!.type === RENDER_PASS_TYPE_LIGHT;
+  }
+
+  /**
+   * Keeps `SceneColor.a` additive across the multi-pass light loop.
+   *
+   * @remarks
+   * The base implementation uses `zero/one` for alpha so that additive light
+   * passes preserve whatever the base pass wrote. That is wrong here: the alpha
+   * carries the diffuse luminance of the accumulated RGB, so it has to be summed
+   * alongside it — otherwise `SceneColor.a / luma(SceneColor.rgb)` under-reports
+   * the diffusible fraction as soon as a second light contributes, and the SSS
+   * passes would scatter only the first light's diffuse energy.
+   */
+  protected updateRenderStates(pass: number, stateSet: RenderStateSet, ctx: DrawContext) {
+    super.updateRenderStates(pass, stateSet, ctx);
+    if (ctx.lightBlending && ctx.renderPass!.type === RENDER_PASS_TYPE_LIGHT) {
+      const blendingState = stateSet.useBlendingState();
+      if (blendingState.enabled) {
+        blendingState.setBlendFuncAlpha('one', 'one');
+      }
+    }
   }
 
   clone() {
@@ -71,6 +153,7 @@ export class SkinMaterial
 
   copyFrom(other: this) {
     super.copyFrom(other);
+    this.subsurfaceProfile = other.subsurfaceProfile;
     this.vertexNormal = other.vertexNormal;
     this.vertexTangent = other.vertexTangent;
     this.roughness = other.roughness;
@@ -78,9 +161,6 @@ export class SkinMaterial
     this.specularF0 = other.specularF0;
     this.transmissionStrength = other.transmissionStrength;
     this.transmissionPower = other.transmissionPower;
-    this.dualLobeBlend = other.dualLobeBlend;
-    this.narrowLobeRoughnessMod = other.narrowLobeRoughnessMod;
-    this.wideLobeRoughnessMod = other.wideLobeRoughnessMod;
   }
 
   get vertexNormal() {
@@ -157,42 +237,6 @@ export class SkinMaterial
     }
   }
 
-  /** Blend factor between narrow and wide specular lobes (UE5 profile row 5.z). */
-  get dualLobeBlend() {
-    return this._dualLobeBlend;
-  }
-  set dualLobeBlend(val) {
-    const next = Math.max(0, Math.min(1, val ?? 0.5));
-    if (next !== this._dualLobeBlend) {
-      this._dualLobeBlend = next;
-      this.uniformChanged();
-    }
-  }
-
-  /** Narrow lobe roughness modifier (UE5 profile row 5.x). */
-  get narrowLobeRoughnessMod() {
-    return this._narrowLobeMod;
-  }
-  set narrowLobeRoughnessMod(val) {
-    const next = Math.max(0, Math.min(1, val ?? 0.5));
-    if (next !== this._narrowLobeMod) {
-      this._narrowLobeMod = next;
-      this.uniformChanged();
-    }
-  }
-
-  /** Wide lobe roughness modifier (UE5 profile row 5.y). */
-  get wideLobeRoughnessMod() {
-    return this._wideLobeMod;
-  }
-  set wideLobeRoughnessMod(val) {
-    const next = Math.max(0, Math.min(1, val ?? 0.7));
-    if (next !== this._wideLobeMod) {
-      this._wideLobeMod = next;
-      this.uniformChanged();
-    }
-  }
-
   vertexShader(scope: PBFunctionScope) {
     super.vertexShader(scope);
     const pb = scope.$builder;
@@ -228,13 +272,12 @@ export class SkinMaterial
         scope.zSkinRoughness = pb.float().uniform(2);
         scope.zSkinSpecularStrength = pb.float().uniform(2);
         scope.zSkinSpecularF0 = pb.float().uniform(2);
-        scope.zSkinNarrowLobeMod = pb.float().uniform(2);
-        scope.zSkinWideLobeMod = pb.float().uniform(2);
-        scope.zSkinDualLobeBlend = pb.float().uniform(2);
-        scope.zSkinScatterEncodeScale = pb.float().uniform(2);
+        scope.zSkinLobeParams = pb.vec3().uniform(2);
+        scope.zSkinProfileId = pb.float().uniform(2);
         if (this.subsurfaceTexture) {
           scope.zSkinTransmissionStrength = pb.float().uniform(2);
           scope.zSkinTransmissionPower = pb.float().uniform(2);
+          scope.zSkinTransmissionTint = pb.vec3().uniform(2);
         }
       }
       scope.$l.albedo = this.calculateAlbedoColor(scope);
@@ -330,7 +373,7 @@ export class SkinMaterial
             this.diffuseLighting,
             pb.mul(this.lightColor, this.shadowTerm, this.skinDiff, this.diffuseScale, 1 / Math.PI)
           );
-          // Back-lit transmission
+          // Back-lit transmission, tinted and attenuated by the profile.
           if (that.subsurfaceTexture) {
             this.$l.transmission = pb.mul(
               pb.pow(
@@ -342,7 +385,13 @@ export class SkinMaterial
             );
             this.transmissionLighting = pb.add(
               this.transmissionLighting,
-              pb.mul(this.lightColor, this.transmission, this.diffuseScale, 1 / Math.PI)
+              pb.mul(
+                this.lightColor,
+                this.zSkinTransmissionTint,
+                this.transmission,
+                this.diffuseScale,
+                1 / Math.PI
+              )
             );
           }
           // Dual-lobe GGX specular
@@ -355,9 +404,9 @@ export class SkinMaterial
             this.roughness,
             this.zSkinSpecularF0,
             this.skinMask,
-            this.zSkinNarrowLobeMod,
-            this.zSkinWideLobeMod,
-            this.zSkinDualLobeBlend
+            this.zSkinLobeParams.x,
+            this.zSkinLobeParams.y,
+            this.zSkinLobeParams.z
           );
           this.specularLighting = pb.add(
             this.specularLighting,
@@ -376,9 +425,30 @@ export class SkinMaterial
           pb.add(scope.diffuseLighting, scope.transmissionLighting)
         );
         scope.$l.litColor = pb.add(scope.diffusible, scope.specularLighting);
-        // SceneColor.a = specular luminance (UE5 mechanism for spec/diff separation)
-        scope.$l.specLum = pb.dot(scope.specularLighting, pb.vec3(0.2126, 0.7152, 0.0722));
-        scope.$l.skinSSS = pb.vec4(pb.mul(scope.diffusible, scope.zSkinScatterEncodeScale), scope.skinMask);
+        // SceneColor.a = diffuse luminance. This is UE5's spec/diff separation
+        // mechanism (verified in UEDigitalHuman.rdc, SSS::Setup lines 26-29 and
+        // SSS::Recombine lines 32-36): the SSS passes recover the diffusible
+        // fraction as `saturate(SceneColor.a / luma(SceneColor.rgb))`, so the
+        // alpha must carry the *diffuse* luminance, not the specular one.
+        scope.$l.diffLum = pb.dot(scope.diffusible, pb.vec3(0.2126, 0.7152, 0.0722));
+        // Surface data for the SSS passes: rgb = world normal, a = skin mask.
+        //
+        // SceneColor.a cannot serve as the mask, because every opaque material
+        // writes 1 there — gating on it makes the diffusion treat the background
+        // and the eyes as skin and bleed into them. This channel plays the role
+        // of UE5's Subsurface.ProfileIdTexture.
+        //
+        // The normal rides along so the diffusion can weight taps by how much
+        // the surface has turned away (UE5 PassOne_Burley lines 323-325). Keeping
+        // it here rather than reading SceneNormal makes scattering independent of
+        // whether the optional normal MRT is enabled this frame.
+        // a carries the profile id, scaled by the mask so that unmasked pixels
+        // read back as id 0 ("not skin"). The diffusion recovers both from this
+        // single channel, which is how UE5 drives several profiles from one pass.
+        scope.$l.skinSSSMask = pb.vec4(
+          pb.add(pb.mul(scope.normal, 0.5), pb.vec3(0.5)),
+          pb.mul(scope.zSkinProfileId, scope.skinMask)
+        );
         if (
           this.drawContext.materialFlags &
           (MaterialVaryingFlags.SCENE_STORE_ROUGHNESS | MaterialVaryingFlags.SCENE_STORE_NORMAL)
@@ -390,7 +460,7 @@ export class SkinMaterial
           this.outputFragmentColor(
             scope,
             scope.$inputs.worldPos,
-            pb.vec4(scope.litColor, scope.specLum),
+            pb.vec4(scope.litColor, scope.diffLum),
             scope.outRoughness,
             pb.vec4(pb.add(pb.mul(scope.normal, 0.5), pb.vec3(0.5)), 1),
             undefined,
@@ -398,13 +468,13 @@ export class SkinMaterial
             undefined,
             undefined,
             false,
-            scope.skinSSS
+            scope.skinSSSMask
           );
         } else {
           this.outputFragmentColor(
             scope,
             scope.$inputs.worldPos,
-            pb.vec4(scope.litColor, scope.specLum),
+            pb.vec4(scope.litColor, scope.diffLum),
             undefined,
             undefined,
             undefined,
@@ -412,7 +482,7 @@ export class SkinMaterial
             undefined,
             undefined,
             false,
-            scope.skinSSS
+            scope.skinSSSMask
           );
         }
       } else {
@@ -429,14 +499,13 @@ export class SkinMaterial
       bindGroup.setValue('zSkinRoughness', this._roughness);
       bindGroup.setValue('zSkinSpecularStrength', this._specularStrength);
       bindGroup.setValue('zSkinSpecularF0', this._specularF0);
-      bindGroup.setValue('zSkinNarrowLobeMod', this._narrowLobeMod);
-      bindGroup.setValue('zSkinWideLobeMod', this._wideLobeMod);
-      bindGroup.setValue('zSkinDualLobeBlend', this._dualLobeBlend);
-      const ldrSkinSSS = ctx.SkinSSSTexture && ctx.SkinSSSTexture.format === 'rgba8unorm';
-      bindGroup.setValue('zSkinScatterEncodeScale', ldrSkinSSS ? 1 / SKIN_SSS_LDR_ENCODE_RANGE : 1);
+      const profile = this.effectiveProfile;
+      bindGroup.setValue('zSkinLobeParams', this._lobeParams.setXYZ(profile.roughness0, profile.roughness1, profile.lobeMix));
+      bindGroup.setValue('zSkinProfileId', profile.encodedId);
       if (this.subsurfaceTexture) {
         bindGroup.setValue('zSkinTransmissionStrength', this._transmissionStrength);
         bindGroup.setValue('zSkinTransmissionPower', this._transmissionPower);
+        bindGroup.setValue('zSkinTransmissionTint', profile.transmissionTint);
       }
     }
   }
