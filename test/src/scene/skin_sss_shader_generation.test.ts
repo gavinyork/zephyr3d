@@ -25,85 +25,62 @@ function buildPrograms(type: 'webgl' | 'webgpu') {
   const ctx = createShaderContext(type);
   const effect = new SkinSSS() as any;
   return {
-    blur: effect.createBlurProgram(ctx).fragmentSource as string,
-    combine: effect.createCombineProgram(ctx).fragmentSource as string
+    burley: effect.createBurleyProgram(ctx).fragmentSource as string,
+    bvar: effect.createBVarProgram(ctx).fragmentSource as string,
+    recombine: effect.createRecombineProgram(ctx).fragmentSource as string
   };
 }
 
 describe('SkinSSS shader generation', () => {
-  test.each(['webgpu', 'webgl'] as const)('builds both %s passes', (type) => {
-    const { blur, combine } = buildPrograms(type);
-    expect(blur).toBeTruthy();
-    expect(combine).toBeTruthy();
-    // Pixels with no skin coverage skip the kernel entirely.
-    expect(blur).toContain('center');
-    expect(combine).toContain('centerSkin');
+  test.each(['webgpu', 'webgl'] as const)('builds all %s passes', (type) => {
+    const { burley, bvar, recombine } = buildPrograms(type);
+    expect(burley).toBeTruthy();
+    expect(bvar).toBeTruthy();
+    expect(recombine).toBeTruthy();
   });
 
-  test('diffuses each channel with its own radius', () => {
-    // A shared radius across RGB is what makes Gaussian SSS read as flat haze:
-    // red scatters several times further than blue in skin, and that difference
-    // is the red-to-yellow gradient at the terminator.
-    const { blur } = buildPrograms('webgpu');
-    expect(blur).toContain('channelRadius');
-    expect(blur).toContain('channelFalloff');
-    expect(blur).toMatch(/radiusPx\.x/);
-    expect(blur).toMatch(/radiusPx\.z/);
+  test('Burley pass uses importance sampling with inverse CDF', () => {
+    const { burley } = buildPrograms('webgpu');
+    expect(burley).toContain('burleyW');
+    expect(burley).toContain('xi_mapped');
+    expect(burley).toContain('invShape');
+    expect(burley).toContain('pdf');
+    expect(burley).not.toContain('blurDirection');
   });
 
-  test('uses a two-exponential Burley profile rather than a single Gaussian', () => {
-    const { blur } = buildPrograms('webgpu');
-    expect(blur).toContain('lib_burleyDiffusionWeight');
-    // Two exponentials: a sharp peak plus a long tail. One Gaussian can match
-    // one or the other, not both.
-    const kernel = blur.slice(blur.indexOf('fn lib_burleyDiffusionWeight'));
-    expect(kernel.slice(0, 400).match(/exp\(/g)?.length).toBeGreaterThanOrEqual(2);
-    // The old single-sigma Gaussian must be gone.
-    expect(blur).not.toContain('spatialWeight');
+  test('Burley pass uses 3D distance for depth rejection', () => {
+    const { burley } = buildPrograms('webgpu');
+    expect(burley).toContain('combinedDist');
   });
 
-  test('is separable, driven by a direction uniform', () => {
-    const { blur } = buildPrograms('webgpu');
-    expect(blur).toContain('blurDirection');
+  test('BVar pass is a passthrough (no velocity/shadow inputs yet)', () => {
+    const { bvar } = buildPrograms('webgpu');
+    expect(bvar).toContain('diffusedTex');
+    // Transmission = 0 when velocity buffer and shadow map are unavailable
+    expect(bvar).not.toContain('lumVariance');
+    expect(bvar).not.toContain('thinness');
   });
 
-  test('excludes non-skin taps from the weight denominator', () => {
-    // Counting them in the denominator drags the diffuse toward zero near every
-    // silhouette. Under the old additive composite that was mild darkening;
-    // now that the term is subtracted back out of the base color it would eat
-    // real light.
-    const { blur } = buildPrograms('webgpu');
-    expect(blur).toMatch(/weightSum = weightSum \+ \(tapWeight \* isSkin\)/);
-    // Coverage is the opposite measure - the skin fraction of the
-    // neighbourhood - so it must keep every tap in its own denominator.
-    expect(blur).toMatch(/coverageWeight = coverageWeight \+ tapWeight\.x/);
+  test('Recombine uses diffusible replacement', () => {
+    const { recombine } = buildPrograms('webgpu');
+    expect(recombine).toContain('redistributed');
+    expect(recombine).toContain('original');
+    expect(recombine).toContain('diffused');
   });
 
-  test('composites by subtracting the original diffuse before adding the diffused one', () => {
-    // This identity is what makes the pass energy conserving: the light that
-    // brightens the dark side of the terminator is light removed from the lit
-    // side, not light invented on top of a finished image.
-    const { combine } = buildPrograms('webgpu');
-    expect(combine).toMatch(/diffused - original/);
-    expect(combine).toContain('scatterTint');
-    expect(combine).toContain('strength');
+  test('Recombine applies transmission from BVar', () => {
+    const { recombine } = buildPrograms('webgpu');
+    expect(recombine).toContain('transmission');
+    expect(recombine).toContain('scatterTint');
   });
 
-  test('keeps the non-conserving glow as an explicit opt-in', () => {
-    const { combine } = buildPrograms('webgpu');
-    expect(combine).toMatch(/if \(\w*\.?glow > 0/);
-    expect(combine).toContain('encodeScale');
-    expect(combine).toContain('coverage');
+  test('no legacy uniforms remain', () => {
+    const { recombine } = buildPrograms('webgpu');
+    expect(recombine).not.toContain('smoothness');
   });
 
-  test('keeps the beauty filter gated by the skin mask', () => {
-    const { combine } = buildPrograms('webgpu');
-    expect(combine).toMatch(/if \(\w*\.?smoothness > 0/);
-    expect(combine).toContain('colorWeight');
-  });
-
-  test('clamps the composite against precision undershoot', () => {
-    const { combine } = buildPrograms('webgpu');
-    expect(combine).toMatch(/max\(result,\s*vec3<f32>\(0\.0\)\)/);
+  test('Recombine clamps against precision undershoot', () => {
+    const { recombine } = buildPrograms('webgpu');
+    expect(recombine).toMatch(/max\(result,\s*vec3<f32>\(0\.0\)\)/);
   });
 });

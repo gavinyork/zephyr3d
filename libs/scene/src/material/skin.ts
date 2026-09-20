@@ -1,6 +1,5 @@
 import type { BindGroup, PBFunctionScope } from '@zephyr3d/device';
-import type { Clonable, Immutable } from '@zephyr3d/base';
-import { Vector4 } from '@zephyr3d/base';
+import type { Clonable } from '@zephyr3d/base';
 import { MeshMaterial, applyMaterialMixins } from './meshmaterial';
 import { mixinLight } from './mixins/lit';
 import { mixinVertexColor } from './mixins/vertexcolor';
@@ -8,37 +7,26 @@ import { mixinTextureProps } from './mixins/texture';
 import { ShaderHelper } from './shader/helper';
 import type { DrawContext } from '../render';
 import { LIGHT_TYPE_POINT, MaterialVaryingFlags, RENDER_PASS_TYPE_LIGHT } from '../values';
+import { skinDiffuseBRDF, skinDualLobeSpecular } from '../shaders/skin_brdf';
 
 /**
  * HDR range packed into the SkinSSS side buffer when the render graph falls
- * back to an 8-bit format. The material divides the scatter irradiance by this
- * factor on write and {@link SkinSSS} multiplies it back after the blur.
+ * back to an 8-bit format.
  * @public
  */
 export const SKIN_SSS_LDR_ENCODE_RANGE = 4;
 
 /**
- * Stylized realtime skin material.
+ * Physically-based skin material aligned with UE5's SubsurfaceProfile shading model.
  *
  * @remarks
- * This material is designed for the {@link SkinSSS} post effect. It renders a regular lit color
- * and, when `camera.skinSSS` is enabled, writes the *diffusible* part of that color - the stylized
- * diffuse ramp plus back-lit transmission, without specular - into the `SkinSSSTexture` MRT.
+ * Uses a pre-integrated curvature-dependent diffuse BRDF and dual-lobe GGX specular
+ * driven by subsurface profile parameters. The specular luminance is written to
+ * `SceneColor.a` so the {@link SkinSSS} post effect can precisely separate specular
+ * from diffuse for Burley diffusion redistribution.
  *
- * The side buffer holds exactly the same term that is already in the lit color, untinted and
- * unscaled. {@link SkinSSS} subtracts it and adds back a channel-dependent diffused version, so
- * the redistribution is energy conserving by construction and disabling the effect leaves the
- * image unchanged. Scatter tint, strength and radius therefore live on the post effect, not here.
- *
- * Stylization is split from diffusion on purpose. {@link SkinMaterial.diffuseWrap},
- * {@link SkinMaterial.diffuseSoftness}, {@link SkinMaterial.shadowTint} and
- * {@link SkinMaterial.brightening} shape the direct lighting ramp; the post effect then diffuses
- * whatever ramp they produced. A stylized ramp stays stylized after scattering rather than being
- * averaged away.
- *
- * The optional `subsurfaceTexture` uses R as skin mask, G as local softness and B as thickness
- * for the back-lit transmission term (thin regions such as ears and nostrils glow when lit from
- * behind; enable it by setting {@link SkinMaterial.transmissionStrength}).
+ * The optional `subsurfaceTexture` uses R as skin mask, G as curvature and B as
+ * thickness for the back-lit transmission term.
  *
  * @public
  */
@@ -48,31 +36,25 @@ export class SkinMaterial
 {
   private static readonly FEATURE_VERTEX_NORMAL = this.defineFeature();
   private static readonly FEATURE_VERTEX_TANGENT = this.defineFeature();
-  private _shininess: number;
+  private _roughness: number;
   private _specularStrength: number;
-  private _diffuseWrap: number;
-  private _diffuseSoftness: number;
-  private _scatterWrap: number;
-  private _scatterStrength: number;
-  private readonly _scatterColor: Vector4;
+  private _specularF0: number;
   private _transmissionStrength: number;
   private _transmissionPower: number;
-  private readonly _shadowTint: Vector4;
-  private _brightening: number;
+  private _dualLobeBlend: number;
+  private _narrowLobeMod: number;
+  private _wideLobeMod: number;
 
   constructor() {
     super();
-    this._shininess = 72;
+    this._roughness = 0.35;
     this._specularStrength = 1;
-    this._diffuseWrap = 0.28;
-    this._diffuseSoftness = 0.45;
-    this._scatterWrap = 0.65;
-    this._scatterStrength = 1.5;
-    this._scatterColor = new Vector4(1, 0.42, 0.28, 1);
+    this._specularF0 = 0.028;
     this._transmissionStrength = 0;
     this._transmissionPower = 4;
-    this._shadowTint = new Vector4(0, 0, 0, 1);
-    this._brightening = 0;
+    this._dualLobeBlend = 0.5;
+    this._narrowLobeMod = 0.5;
+    this._wideLobeMod = 0.7;
     this.useFeature(SkinMaterial.FEATURE_VERTEX_NORMAL, true);
   }
 
@@ -91,20 +73,16 @@ export class SkinMaterial
     super.copyFrom(other);
     this.vertexNormal = other.vertexNormal;
     this.vertexTangent = other.vertexTangent;
-    this.shininess = other.shininess;
+    this.roughness = other.roughness;
     this.specularStrength = other.specularStrength;
-    this.diffuseWrap = other.diffuseWrap;
-    this.diffuseSoftness = other.diffuseSoftness;
-    this.scatterWrap = other.scatterWrap;
-    this.scatterStrength = other.scatterStrength;
-    this.scatterColor = other.scatterColor;
+    this.specularF0 = other.specularF0;
     this.transmissionStrength = other.transmissionStrength;
     this.transmissionPower = other.transmissionPower;
-    this.shadowTint = other.shadowTint;
-    this.brightening = other.brightening;
+    this.dualLobeBlend = other.dualLobeBlend;
+    this.narrowLobeRoughnessMod = other.narrowLobeRoughnessMod;
+    this.wideLobeRoughnessMod = other.wideLobeRoughnessMod;
   }
 
-  /** true if vertex normal attribute presents */
   get vertexNormal() {
     return this.featureUsed<boolean>(SkinMaterial.FEATURE_VERTEX_NORMAL);
   }
@@ -112,7 +90,6 @@ export class SkinMaterial
     this.useFeature(SkinMaterial.FEATURE_VERTEX_NORMAL, !!val);
   }
 
-  /** true if vertex tangent attribute presents */
   get vertexTangent() {
     return this.featureUsed<boolean>(SkinMaterial.FEATURE_VERTEX_TANGENT);
   }
@@ -120,19 +97,19 @@ export class SkinMaterial
     this.useFeature(SkinMaterial.FEATURE_VERTEX_TANGENT, !!val);
   }
 
-  /** Blinn specular exponent. Higher values produce smaller highlights. */
-  get shininess() {
-    return this._shininess;
+  /** GGX base roughness. 0.35 is typical for skin. */
+  get roughness() {
+    return this._roughness;
   }
-  set shininess(val) {
-    const next = Math.max(1, val ?? 1);
-    if (next !== this._shininess) {
-      this._shininess = next;
+  set roughness(val) {
+    const next = Math.max(0.045, Math.min(1, val ?? 0.35));
+    if (next !== this._roughness) {
+      this._roughness = next;
       this.uniformChanged();
     }
   }
 
-  /** Direct specular strength. Keep this restrained for soft skin. */
+  /** Specular strength multiplier. */
   get specularStrength() {
     return this._specularStrength;
   }
@@ -144,74 +121,19 @@ export class SkinMaterial
     }
   }
 
-  /** Wrap amount for visible diffuse lighting. */
-  get diffuseWrap() {
-    return this._diffuseWrap;
+  /** Fresnel F0 for the skin oil layer. 0.028 is the physical skin value. */
+  get specularF0() {
+    return this._specularF0;
   }
-  set diffuseWrap(val) {
-    const next = Math.max(0, val ?? 0);
-    if (next !== this._diffuseWrap) {
-      this._diffuseWrap = next;
+  set specularF0(val) {
+    const next = Math.max(0, Math.min(0.2, val ?? 0.028));
+    if (next !== this._specularF0) {
+      this._specularF0 = next;
       this.uniformChanged();
     }
   }
 
-  /** Blend from hard Lambert lighting to wrapped diffuse lighting. */
-  get diffuseSoftness() {
-    return this._diffuseSoftness;
-  }
-  set diffuseSoftness(val) {
-    const next = Math.max(0, Math.min(1, val ?? 0));
-    if (next !== this._diffuseSoftness) {
-      this._diffuseSoftness = next;
-      this.uniformChanged();
-    }
-  }
-
-  /**
-   * Wider wrap that used to shape the post-process scattering source.
-   *
-   * @deprecated No longer has any effect. The side buffer now carries the real
-   * diffuse term rather than a hand-built difference that was nonzero only near
-   * the terminator, so there is nothing for a second wrap to shape. Use
-   * {@link SkinSSS.scatterRadius} and the profile's channel radii to control how
-   * far light travels, and {@link SkinMaterial.diffuseWrap} to shape the ramp.
-   */
-  get scatterWrap() {
-    return this._scatterWrap;
-  }
-  set scatterWrap(val) {
-    const next = Math.max(0, val ?? 0);
-    if (next !== this._scatterWrap) {
-      this._scatterWrap = next;
-      this.uniformChanged();
-    }
-  }
-
-  /**
-   * Strength of the multiplier written into the SkinSSS side buffer.
-   *
-   * @deprecated No longer has any effect. Scaling the side buffer would break
-   * the identity that makes the diffusion energy conserving - it must equal the
-   * diffusible term already present in the lit color. Use
-   * {@link SkinSSS.strength} for the overall amount and {@link SkinSSS.glow} for
-   * an additive, non-conserving bleed on top.
-   */
-  get scatterStrength() {
-    return this._scatterStrength;
-  }
-  set scatterStrength(val) {
-    const next = Math.max(0, val ?? 0);
-    if (next !== this._scatterStrength) {
-      this._scatterStrength = next;
-      this.uniformChanged();
-    }
-  }
-
-  /**
-   * Strength of the back-lit transmission term. Requires a `subsurfaceTexture`
-   * with thickness in the B channel; 0 (the default) disables transmission.
-   */
+  /** Back-lit transmission strength (needs thickness in subsurface texture B). */
   get transmissionStrength() {
     return this._transmissionStrength;
   }
@@ -223,7 +145,7 @@ export class SkinMaterial
     }
   }
 
-  /** Exponent of the back-lit transmission falloff. Higher values tighten the glow. */
+  /** Exponent of the back-lit transmission falloff. */
   get transmissionPower() {
     return this._transmissionPower;
   }
@@ -235,48 +157,38 @@ export class SkinMaterial
     }
   }
 
-  /**
-   * Warm tint for the blurred skin lighting contribution.
-   *
-   * @deprecated No longer has any effect; moved to {@link SkinSSS.scatterTint}.
-   * Tinting here would tint the diffuse in the lit color too, which is what made
-   * the old look read as a red haze over the whole face. On the post effect the
-   * tint applies only to the light that actually moved, and per-channel scatter
-   * radii from the profile already produce the red bleed on their own.
-   */
-  get scatterColor(): Immutable<Vector4> {
-    return this._scatterColor;
+  /** Blend factor between narrow and wide specular lobes (UE5 profile row 5.z). */
+  get dualLobeBlend() {
+    return this._dualLobeBlend;
   }
-  set scatterColor(val: Immutable<Vector4>) {
-    if (!val.equalsTo(this._scatterColor)) {
-      this._scatterColor.set(val);
+  set dualLobeBlend(val) {
+    const next = Math.max(0, Math.min(1, val ?? 0.5));
+    if (next !== this._dualLobeBlend) {
+      this._dualLobeBlend = next;
       this.uniformChanged();
     }
   }
 
-  /**
-   * NPR-style shadow tint: the dark end of the diffuse ramp lifts toward this
-   * color instead of black (black, the default, reproduces plain wrapped
-   * lambert). A rosy/lavender tint gives the stylized beauty-shot shadow look.
-   */
-  get shadowTint(): Immutable<Vector4> {
-    return this._shadowTint;
+  /** Narrow lobe roughness modifier (UE5 profile row 5.x). */
+  get narrowLobeRoughnessMod() {
+    return this._narrowLobeMod;
   }
-  set shadowTint(val: Immutable<Vector4>) {
-    if (!val.equalsTo(this._shadowTint)) {
-      this._shadowTint.set(val);
+  set narrowLobeRoughnessMod(val) {
+    const next = Math.max(0, Math.min(1, val ?? 0.5));
+    if (next !== this._narrowLobeMod) {
+      this._narrowLobeMod = next;
       this.uniformChanged();
     }
   }
 
-  /** Whitening gain applied to the whole diffuse response. 0 (the default) is neutral. */
-  get brightening() {
-    return this._brightening;
+  /** Wide lobe roughness modifier (UE5 profile row 5.y). */
+  get wideLobeRoughnessMod() {
+    return this._wideLobeMod;
   }
-  set brightening(val) {
-    const next = Math.max(0, val ?? 0);
-    if (next !== this._brightening) {
-      this._brightening = next;
+  set wideLobeRoughnessMod(val) {
+    const next = Math.max(0, Math.min(1, val ?? 0.7));
+    if (next !== this._wideLobeMod) {
+      this._wideLobeMod = next;
       this.uniformChanged();
     }
   }
@@ -313,14 +225,12 @@ export class SkinMaterial
     const that = this;
     if (this.needFragmentColorInput()) {
       if (this.drawContext.renderPass!.type === RENDER_PASS_TYPE_LIGHT) {
-        scope.zSkinShininess = pb.float().uniform(2);
+        scope.zSkinRoughness = pb.float().uniform(2);
         scope.zSkinSpecularStrength = pb.float().uniform(2);
-        scope.zSkinDiffuseWrap = pb.float().uniform(2);
-        scope.zSkinDiffuseSoftness = pb.float().uniform(2);
-        scope.zSkinShadowTint = pb.vec4().uniform(2);
-        scope.zSkinBrightening = pb.float().uniform(2);
-        // Encodes HDR scatter irradiance into the SkinSSS buffer range when the
-        // render graph falls back to rgba8unorm (see getSSSLightingTextureFormat).
+        scope.zSkinSpecularF0 = pb.float().uniform(2);
+        scope.zSkinNarrowLobeMod = pb.float().uniform(2);
+        scope.zSkinWideLobeMod = pb.float().uniform(2);
+        scope.zSkinDualLobeBlend = pb.float().uniform(2);
         scope.zSkinScatterEncodeScale = pb.float().uniform(2);
         if (this.subsurfaceTexture) {
           scope.zSkinTransmissionStrength = pb.float().uniform(2);
@@ -333,9 +243,6 @@ export class SkinMaterial
       }
       if (this.drawContext.renderPass!.type === RENDER_PASS_TYPE_LIGHT) {
         const baseLightPass = !this.drawContext.lightBlending;
-        // TBN[2] is the pre-normal-map geometric normal, needed for shadow
-        // normal offset bias. Feeding the normal mapped shading normal instead
-        // would displace the shadow lookup along pore detail.
         scope.$l.normalInfo = this.calculateNormalAndTBN(
           scope,
           scope.$inputs.worldPos,
@@ -345,30 +252,34 @@ export class SkinMaterial
         );
         scope.$l.normal = scope.normalInfo.normal;
         scope.$l.viewVec = this.calculateViewVector(scope, scope.$inputs.worldPos);
-        scope.$l.roughness = pb.sqrt(pb.div(2, pb.add(scope.zSkinShininess, 2)));
+        scope.$l.roughness = scope.zSkinRoughness;
         scope.$l.skinMask = pb.float(1);
-        scope.$l.skinSoftness = pb.float(0);
         scope.$l.skinThickness = pb.float(0);
         if (this.subsurfaceTexture) {
           scope.$l.subsurfaceTexel = this.sampleSubsurfaceTexture(scope);
           scope.skinMask = pb.clamp(scope.subsurfaceTexel.r, 0, 1);
-          scope.skinSoftness = pb.clamp(scope.subsurfaceTexel.g, 0, 1);
           scope.skinThickness = pb.clamp(scope.subsurfaceTexel.b, 0, 1);
         }
         scope.$l.diffuseLighting = pb.vec3(0);
         scope.$l.transmissionLighting = pb.vec3(0);
         scope.$l.specularLighting = pb.vec3(0);
-        scope.$l.NoV = pb.clamp(pb.dot(scope.normal, scope.viewVec), 0, 1);
+        scope.$l.NoV = pb.clamp(pb.dot(scope.normal, scope.viewVec), 0.0001, 1);
+        // --- Environment lighting ---
         if (this.needCalculateEnvLight() && baseLightPass) {
           scope.$l.envDiffuse = this.getEnvLightIrradiance(scope, scope.normal);
           scope.diffuseLighting = pb.add(scope.diffuseLighting, scope.envDiffuse);
           scope.$l.reflectVec = this.calculateReflectionVector(scope, scope.normal, scope.viewVec);
-          scope.$l.envFresnel = pb.add(0.028, pb.mul(0.972, pb.pow(pb.sub(1, scope.NoV), 5)));
+          scope.$l.envF0 = pb.vec3(scope.zSkinSpecularF0);
+          scope.$l.envF90 = pb.vec3(pb.clamp(pb.sub(1, scope.roughness), scope.zSkinSpecularF0, 1));
+          scope.$l.envF = pb.add(
+            scope.envF0,
+            pb.mul(pb.sub(scope.envF90, scope.envF0), pb.pow(pb.sub(1, scope.NoV), 5))
+          );
           scope.specularLighting = pb.add(
             scope.specularLighting,
             pb.mul(
               this.getEnvLightRadiance(scope, scope.reflectVec, scope.roughness),
-              scope.envFresnel,
+              scope.envF,
               scope.zSkinSpecularStrength
             )
           );
@@ -400,64 +311,27 @@ export class SkinMaterial
             posRange,
             dirCutoff
           );
-          this.$l.rawNoL = pb.dot(this.normal, this.lightDir);
-          this.$l.NoL = pb.clamp(this.rawNoL, 0, 1);
-          this.$l.NoLWrap = pb.clamp(
-            pb.div(pb.add(this.rawNoL, this.zSkinDiffuseWrap), pb.add(1, this.zSkinDiffuseWrap)),
-            0,
-            1
-          );
-          // calculateShadow() samples with implicit derivatives (dpdx); WGSL
-          // requires the call to stay in uniform control flow, so never wrap
-          // it in a dynamic branch such as NoLWrap > 0.
-          //
-          // Diffuse and specular share this term unmodified. An earlier version
-          // faded it toward 1 around the terminator to hide shadow map acne
-          // there, but that released the shadow in the wrong band (only ~9% at
-          // NdotL = 0, by which point the acne is at its worst) and made cast
-          // shadows dissolve wherever a surface turned away from the light.
-          // Normal offset bias removes the acne at the source instead.
+          this.$l.rawNdotL = pb.dot(this.normal, this.lightDir);
+          this.$l.NoL = pb.clamp(this.rawNdotL, 0, 1);
+          this.$l.VdotL = pb.dot(this.viewVec, this.lightDir);
+          // Shadow: pre-integrated BRDF handles NdotL internally, so pass a
+          // fixed bias to keep normal-offset stable at the terminator.
           this.$l.shadowTerm = shadow
-            ? that.calculateShadow(
-                this,
-                this.$inputs.worldPos,
-                scope.normalInfo.TBN[2],
-                pb.max(this.NoL, 1e-5)
-              )
+            ? that.calculateShadow(this, this.$inputs.worldPos, scope.normalInfo.TBN[2], pb.float(0.5))
             : pb.float(1);
           this.$l.lightColor = pb.mul(colorIntensity.rgb, colorIntensity.a, this.lightAtten);
-          this.$l.diffuseLightColor = pb.mul(this.lightColor, this.shadowTerm);
           this.$l.halfVec = pb.normalize(pb.add(this.viewVec, this.lightDir));
           this.$l.NoH = pb.clamp(pb.dot(this.normal, this.halfVec), 0, 1);
           this.$l.LoH = pb.clamp(pb.dot(this.lightDir, this.halfVec), 0, 1);
-          this.$l.pointShininess = pb.max(
-            pb.div(this.zSkinShininess, pb.add(1, pb.mul(this.sourceRadiusFactor, 32))),
-            1
-          );
-          this.$l.softness = pb.clamp(
-            pb.add(this.zSkinDiffuseSoftness, pb.mul(this.skinSoftness, 0.35)),
-            0,
-            1
-          );
-          this.$l.NoLVis = pb.mix(this.NoL, this.NoLWrap, this.softness);
-          // NPR-style diffuse ramp: the dark end lifts toward the shadow tint
-          // instead of black. A black tint reproduces plain wrapped lambert.
-          this.$l.diffuseRamp = pb.mix(this.zSkinShadowTint.rgb, pb.vec3(1), this.NoLVis);
+          // Pre-integrated skin diffuse — Burley-like Fresnel modulation.
+          // No NdotL clamping: SSS allows light to scatter past the terminator.
+          this.$l.skinDiff = skinDiffuseBRDF(this, this.rawNdotL, this.NoV, this.VdotL, this.roughness);
           this.diffuseLighting = pb.add(
             this.diffuseLighting,
-            pb.mul(this.diffuseLightColor, this.diffuseRamp, this.diffuseScale, 1 / Math.PI)
+            pb.mul(this.lightColor, this.shadowTerm, this.skinDiff, this.diffuseScale, 1 / Math.PI)
           );
+          // Back-lit transmission
           if (that.subsurfaceTexture) {
-            // Back-lit transmission: thin regions (B channel of the subsurface
-            // texture) glow when the light faces the camera through the
-            // surface.
-            //
-            // This deliberately uses the unshadowed lightColor. A back-lit
-            // fragment is self-shadowed by definition - its own front face is
-            // the occluder - so multiplying by the shadow term would cancel
-            // exactly the case the term exists to model. The cost is that an
-            // external caster does not block the glow, which a shadow map
-            // cannot distinguish from self occlusion anyway.
             this.$l.transmission = pb.mul(
               pb.pow(
                 pb.clamp(pb.dot(pb.neg(this.lightDir), this.viewVec), 0, 1),
@@ -471,42 +345,39 @@ export class SkinMaterial
               pb.mul(this.lightColor, this.transmission, this.diffuseScale, 1 / Math.PI)
             );
           }
-          // Normalized Blinn with Schlick Fresnel (skin F0 = 0.028). Specular
-          // keeps the unfaded shadow term and hard NoL masking.
-          this.$l.specNormalization = pb.div(pb.add(this.pointShininess, 8), 8 * Math.PI);
-          this.$l.specFresnel = pb.add(0.028, pb.mul(0.972, pb.pow(pb.sub(1, this.LoH), 5)));
-          this.$l.specular = pb.mul(
-            this.lightColor,
-            this.shadowTerm,
-            pb.pow(this.NoH, this.pointShininess),
-            this.specNormalization,
-            this.specFresnel,
-            this.zSkinSpecularStrength,
-            this.specularScale,
-            this.NoL
+          // Dual-lobe GGX specular
+          this.$l.spec = skinDualLobeSpecular(
+            this,
+            this.NoH,
+            this.NoV,
+            this.NoL,
+            this.LoH,
+            this.roughness,
+            this.zSkinSpecularF0,
+            this.skinMask,
+            this.zSkinNarrowLobeMod,
+            this.zSkinWideLobeMod,
+            this.zSkinDualLobeBlend
           );
-          this.specularLighting = pb.add(this.specularLighting, this.specular);
+          this.specularLighting = pb.add(
+            this.specularLighting,
+            pb.mul(
+              this.lightColor,
+              this.shadowTerm,
+              this.spec,
+              this.zSkinSpecularStrength,
+              this.specularScale
+            )
+          );
         });
-        // Whitening: lift the whole diffuse response (direct and ambient).
-        scope.diffuseLighting = pb.mul(scope.diffuseLighting, pb.add(1, scope.zSkinBrightening));
-        // Everything that scatters through the surface: the stylized diffuse
-        // ramp plus back-lit transmission. Specular stays out - it reflects off
-        // the oil layer and never enters the skin.
+        // --- Assemble ---
         scope.$l.diffusible = pb.mul(
           scope.albedo.rgb,
           pb.add(scope.diffuseLighting, scope.transmissionLighting)
         );
         scope.$l.litColor = pb.add(scope.diffusible, scope.specularLighting);
-        // The SkinSSS side buffer carries exactly the diffusible term that is
-        // also in litColor - untinted and unscaled. That identity is what lets
-        // the post effect subtract it and add back a diffused version, which is
-        // energy conserving by construction and leaves the image untouched when
-        // the effect is disabled. Tinting or scaling here would break it; those
-        // controls live on SkinSSS instead.
-        //
-        // Base and additive light passes both write their own contribution; the
-        // additive blend (RGB one/one, alpha zero/one) accumulates RGB and keeps
-        // the mask written by the base pass in alpha.
+        // SceneColor.a = specular luminance (UE5 mechanism for spec/diff separation)
+        scope.$l.specLum = pb.dot(scope.specularLighting, pb.vec3(0.2126, 0.7152, 0.0722));
         scope.$l.skinSSS = pb.vec4(pb.mul(scope.diffusible, scope.zSkinScatterEncodeScale), scope.skinMask);
         if (
           this.drawContext.materialFlags &
@@ -519,7 +390,7 @@ export class SkinMaterial
           this.outputFragmentColor(
             scope,
             scope.$inputs.worldPos,
-            pb.vec4(scope.litColor, scope.albedo.a),
+            pb.vec4(scope.litColor, scope.specLum),
             scope.outRoughness,
             pb.vec4(pb.add(pb.mul(scope.normal, 0.5), pb.vec3(0.5)), 1),
             undefined,
@@ -533,7 +404,7 @@ export class SkinMaterial
           this.outputFragmentColor(
             scope,
             scope.$inputs.worldPos,
-            pb.vec4(scope.litColor, scope.albedo.a),
+            pb.vec4(scope.litColor, scope.specLum),
             undefined,
             undefined,
             undefined,
@@ -555,12 +426,12 @@ export class SkinMaterial
   applyUniformValues(bindGroup: BindGroup, ctx: DrawContext, pass: number) {
     super.applyUniformValues(bindGroup, ctx, pass);
     if (this.needFragmentColor(ctx) && ctx.renderPass!.type === RENDER_PASS_TYPE_LIGHT) {
-      bindGroup.setValue('zSkinShininess', this._shininess);
+      bindGroup.setValue('zSkinRoughness', this._roughness);
       bindGroup.setValue('zSkinSpecularStrength', this._specularStrength);
-      bindGroup.setValue('zSkinDiffuseWrap', this._diffuseWrap);
-      bindGroup.setValue('zSkinDiffuseSoftness', this._diffuseSoftness);
-      bindGroup.setValue('zSkinShadowTint', this._shadowTint);
-      bindGroup.setValue('zSkinBrightening', this._brightening);
+      bindGroup.setValue('zSkinSpecularF0', this._specularF0);
+      bindGroup.setValue('zSkinNarrowLobeMod', this._narrowLobeMod);
+      bindGroup.setValue('zSkinWideLobeMod', this._wideLobeMod);
+      bindGroup.setValue('zSkinDualLobeBlend', this._dualLobeBlend);
       const ldrSkinSSS = ctx.SkinSSSTexture && ctx.SkinSSSTexture.format === 'rgba8unorm';
       bindGroup.setValue('zSkinScatterEncodeScale', ldrSkinSSS ? 1 / SKIN_SSS_LDR_ENCODE_RANGE : 1);
       if (this.subsurfaceTexture) {

@@ -1509,9 +1509,6 @@ export class Camera extends SceneNode {
   }
   set skinSSSOpacity(val) {
     this._skinSSSOpacity = Math.max(0, Math.min(1, val ?? 0));
-    if (this._postEffectSkinSSS.get()) {
-      this._postEffectSkinSSS.get()!.opacity = this._skinSSSOpacity;
-    }
   }
   /** Maximum pixel spacing between blur taps. Caps the projected scatter radius for close-ups. */
   get skinSSSSampleStep() {
@@ -1519,9 +1516,6 @@ export class Camera extends SceneNode {
   }
   set skinSSSSampleStep(val) {
     this._skinSSSSampleStep = Math.max(0.25, val ?? 0.25);
-    if (this._postEffectSkinSSS.get()) {
-      this._postEffectSkinSSS.get()!.sampleStep = this._skinSSSSampleStep;
-    }
   }
   /** World-space scatter radius. The blur width shrinks with distance to keep this constant. */
   get skinSSSScatterRadius() {
@@ -1539,9 +1533,6 @@ export class Camera extends SceneNode {
   }
   set skinSSSSmoothness(val) {
     this._skinSSSSmoothness = Math.max(0, Math.min(1, val ?? 0));
-    if (this._postEffectSkinSSS.get()) {
-      this._postEffectSkinSSS.get()!.smoothness = this._skinSSSSmoothness;
-    }
   }
   /** Depth rejection scale. The reference shader uses 80. */
   get skinSSSDepthScale() {
@@ -1559,9 +1550,6 @@ export class Camera extends SceneNode {
   }
   set skinSSSColorBoost(val) {
     this._skinSSSColorBoost = Math.max(0, val ?? 0);
-    if (this._postEffectSkinSSS.get()) {
-      this._postEffectSkinSSS.get()!.colorBoost = this._skinSSSColorBoost;
-    }
   }
   /**
    * Additive, deliberately non-conserving bleed for the Skin SSS post effect.
@@ -1578,9 +1566,6 @@ export class Camera extends SceneNode {
   }
   set skinSSSGlow(val) {
     this._skinSSSGlow = Math.max(0, val ?? 0);
-    if (this._postEffectSkinSSS.get()) {
-      this._postEffectSkinSSS.get()!.glow = this._skinSSSGlow;
-    }
   }
   /**
    * Subsurface profile preset driving the Skin SSS per-channel scatter radii.
@@ -2142,13 +2127,7 @@ export class Camera extends SceneNode {
       const skinSSS = new SkinSSS();
       skinSSS.enabled = false;
       skinSSS.strength = this._skinSSSStrength;
-      skinSSS.opacity = this._skinSSSOpacity;
-      skinSSS.sampleStep = this._skinSSSSampleStep;
       skinSSS.scatterRadius = this._skinSSSScatterRadius;
-      skinSSS.smoothness = this._skinSSSSmoothness;
-      skinSSS.depthScale = this._skinSSSDepthScale;
-      skinSSS.colorBoost = this._skinSSSColorBoost;
-      skinSSS.glow = this._skinSSSGlow;
       skinSSS.profile = this.getSkinSSSProfile();
       skinSSS.scatterTint = this._skinSSSScatterTint;
       this._postEffectSkinSSS.set(skinSSS);

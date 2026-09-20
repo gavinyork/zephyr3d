@@ -2629,35 +2629,43 @@ export function getSkinMaterialClass(manager: ResourceManager): SerializableClas
       getProps() {
         return defineProps([
           {
-            name: 'Shininess',
-            description: 'Blinn specular exponent for skin highlights',
+            name: 'Roughness',
+            description: 'GGX base roughness for skin',
             type: 'float',
-            default: 72,
-            options: {
-              animatable: true,
-              minValue: 1,
-              maxValue: 2048
-            },
+            default: 0.35,
+            options: { animatable: true, minValue: 0.045, maxValue: 1 },
             get(this: SkinMaterial, value) {
-              value.num[0] = this.shininess;
+              value.num[0] = this.roughness;
             },
             set(this: SkinMaterial, value) {
-              this.shininess = value.num[0];
+              this.roughness = value.num[0];
             },
             getDefaultValue(this: SkinMaterial) {
-              return this.$isInstance ? this.coreMaterial.shininess : 72;
+              return this.$isInstance ? this.coreMaterial.roughness : 0.35;
+            }
+          },
+          {
+            name: 'SpecularF0',
+            description: 'Fresnel F0 for the skin oil layer',
+            type: 'float',
+            default: 0.028,
+            options: { animatable: true, minValue: 0, maxValue: 0.2 },
+            get(this: SkinMaterial, value) {
+              value.num[0] = this.specularF0;
+            },
+            set(this: SkinMaterial, value) {
+              this.specularF0 = value.num[0];
+            },
+            getDefaultValue(this: SkinMaterial) {
+              return this.$isInstance ? this.coreMaterial.specularF0 : 0.028;
             }
           },
           {
             name: 'SpecularStrength',
-            description: 'Direct specular strength for restrained skin highlights',
+            description: 'Direct specular strength multiplier',
             type: 'float',
             default: 1,
-            options: {
-              animatable: true,
-              minValue: 0,
-              maxValue: 4
-            },
+            options: { animatable: true, minValue: 0, maxValue: 4 },
             get(this: SkinMaterial, value) {
               value.num[0] = this.specularStrength;
             },
@@ -2669,163 +2677,59 @@ export function getSkinMaterialClass(manager: ResourceManager): SerializableClas
             }
           },
           {
-            name: 'DiffuseWrap',
-            description: 'Wrap amount for visible diffuse lighting',
+            name: 'DualLobeBlend',
+            description: 'Blend factor between narrow and wide specular lobes',
             type: 'float',
-            default: 0.28,
-            options: {
-              animatable: true,
-              minValue: 0,
-              maxValue: 2
-            },
+            default: 0.5,
+            options: { animatable: true, minValue: 0, maxValue: 1 },
             get(this: SkinMaterial, value) {
-              value.num[0] = this.diffuseWrap;
+              value.num[0] = this.dualLobeBlend;
             },
             set(this: SkinMaterial, value) {
-              this.diffuseWrap = value.num[0];
+              this.dualLobeBlend = value.num[0];
             },
             getDefaultValue(this: SkinMaterial) {
-              return this.$isInstance ? this.coreMaterial.diffuseWrap : 0.28;
+              return this.$isInstance ? this.coreMaterial.dualLobeBlend : 0.5;
             }
           },
           {
-            name: 'DiffuseSoftness',
-            description: 'Blend from hard Lambert lighting to wrapped diffuse lighting',
+            name: 'NarrowLobeRoughnessMod',
+            description: 'Narrow lobe roughness modifier (0-1)',
             type: 'float',
-            default: 0.45,
-            options: {
-              animatable: true,
-              minValue: 0,
-              maxValue: 1
-            },
+            default: 0.5,
+            options: { animatable: true, minValue: 0, maxValue: 1 },
             get(this: SkinMaterial, value) {
-              value.num[0] = this.diffuseSoftness;
+              value.num[0] = this.narrowLobeRoughnessMod;
             },
             set(this: SkinMaterial, value) {
-              this.diffuseSoftness = value.num[0];
+              this.narrowLobeRoughnessMod = value.num[0];
             },
             getDefaultValue(this: SkinMaterial) {
-              return this.$isInstance ? this.coreMaterial.diffuseSoftness : 0.45;
+              return this.$isInstance ? this.coreMaterial.narrowLobeRoughnessMod : 0.5;
             }
           },
           {
-            name: 'ScatterWrap',
-            description: 'Wide wrap amount written to the Skin SSS scattering source',
+            name: 'WideLobeRoughnessMod',
+            description: 'Wide lobe roughness modifier (0-1)',
             type: 'float',
-            default: 0.65,
-            options: {
-              animatable: true,
-              minValue: 0,
-              maxValue: 2
-            },
+            default: 0.7,
+            options: { animatable: true, minValue: 0, maxValue: 1 },
             get(this: SkinMaterial, value) {
-              value.num[0] = this.scatterWrap;
+              value.num[0] = this.wideLobeRoughnessMod;
             },
             set(this: SkinMaterial, value) {
-              this.scatterWrap = value.num[0];
+              this.wideLobeRoughnessMod = value.num[0];
             },
             getDefaultValue(this: SkinMaterial) {
-              return this.$isInstance ? this.coreMaterial.scatterWrap : 0.65;
-            }
-          },
-          {
-            name: 'ScatterStrength',
-            description: 'Strength of the scatter irradiance written to the Skin SSS side buffer',
-            type: 'float',
-            default: 1.5,
-            options: {
-              animatable: true,
-              minValue: 0,
-              maxValue: 4
-            },
-            get(this: SkinMaterial, value) {
-              value.num[0] = this.scatterStrength;
-            },
-            set(this: SkinMaterial, value) {
-              this.scatterStrength = value.num[0];
-            },
-            getDefaultValue(this: SkinMaterial) {
-              return this.$isInstance ? this.coreMaterial.scatterStrength : 1.5;
-            }
-          },
-          {
-            name: 'ScatterColor',
-            description: 'Warm tint for the blurred skin scattering contribution',
-            type: 'rgba',
-            default: [1, 0.42, 0.28, 1],
-            options: {
-              animatable: true,
-              minValue: 0,
-              maxValue: 1
-            },
-            get(this: SkinMaterial, value) {
-              value.num[0] = this.scatterColor.x;
-              value.num[1] = this.scatterColor.y;
-              value.num[2] = this.scatterColor.z;
-              value.num[3] = this.scatterColor.w;
-            },
-            set(this: SkinMaterial, value) {
-              this.scatterColor = new Vector4(value.num[0], value.num[1], value.num[2], value.num[3]);
-            },
-            getDefaultValue(this: SkinMaterial) {
-              const color = this.$isInstance ? this.coreMaterial.scatterColor : new Vector4(1, 0.42, 0.28, 1);
-              return [color.x, color.y, color.z, color.w];
-            }
-          },
-          {
-            name: 'ShadowTint',
-            description: 'NPR shadow tint the dark end of the diffuse ramp lifts toward (black is neutral)',
-            type: 'rgba',
-            default: [0, 0, 0, 1],
-            options: {
-              animatable: true,
-              minValue: 0,
-              maxValue: 1
-            },
-            get(this: SkinMaterial, value) {
-              value.num[0] = this.shadowTint.x;
-              value.num[1] = this.shadowTint.y;
-              value.num[2] = this.shadowTint.z;
-              value.num[3] = this.shadowTint.w;
-            },
-            set(this: SkinMaterial, value) {
-              this.shadowTint = new Vector4(value.num[0], value.num[1], value.num[2], value.num[3]);
-            },
-            getDefaultValue(this: SkinMaterial) {
-              const color = this.$isInstance ? this.coreMaterial.shadowTint : new Vector4(0, 0, 0, 1);
-              return [color.x, color.y, color.z, color.w];
-            }
-          },
-          {
-            name: 'Brightening',
-            description: 'Whitening gain applied to the whole diffuse response',
-            type: 'float',
-            default: 0,
-            options: {
-              animatable: true,
-              minValue: 0,
-              maxValue: 2
-            },
-            get(this: SkinMaterial, value) {
-              value.num[0] = this.brightening;
-            },
-            set(this: SkinMaterial, value) {
-              this.brightening = value.num[0];
-            },
-            getDefaultValue(this: SkinMaterial) {
-              return this.$isInstance ? this.coreMaterial.brightening : 0;
+              return this.$isInstance ? this.coreMaterial.wideLobeRoughnessMod : 0.7;
             }
           },
           {
             name: 'TransmissionStrength',
-            description: 'Back-lit transmission strength (needs thickness in subsurface texture B)',
+            description: 'Back-lit transmission strength',
             type: 'float',
             default: 0,
-            options: {
-              animatable: true,
-              minValue: 0,
-              maxValue: 4
-            },
+            options: { animatable: true, minValue: 0, maxValue: 4 },
             get(this: SkinMaterial, value) {
               value.num[0] = this.transmissionStrength;
             },
@@ -2841,11 +2745,7 @@ export function getSkinMaterialClass(manager: ResourceManager): SerializableClas
             description: 'Exponent of the back-lit transmission falloff',
             type: 'float',
             default: 4,
-            options: {
-              animatable: true,
-              minValue: 1,
-              maxValue: 16
-            },
+            options: { animatable: true, minValue: 1, maxValue: 16 },
             get(this: SkinMaterial, value) {
               value.num[0] = this.transmissionPower;
             },
