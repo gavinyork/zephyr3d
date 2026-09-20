@@ -81,7 +81,7 @@ const SKIN_PROFILE_TEMPLATES: Record<SkinProfilePreset, SkinProfileTemplate> = {
     normalScale: 0.08,
     roughness0: 0.75,
     roughness1: 1.3,
-    lobeMix: 0.15
+    lobeMix: 0.85
   },
   skin_pale: {
     surfaceAlbedo: [0.88, 0.68, 0.62],
@@ -95,7 +95,7 @@ const SKIN_PROFILE_TEMPLATES: Record<SkinProfilePreset, SkinProfileTemplate> = {
     normalScale: 0.08,
     roughness0: 0.72,
     roughness1: 1.25,
-    lobeMix: 0.16
+    lobeMix: 0.85
   },
   skin_tan: {
     surfaceAlbedo: [0.8, 0.56, 0.46],
@@ -109,7 +109,7 @@ const SKIN_PROFILE_TEMPLATES: Record<SkinProfilePreset, SkinProfileTemplate> = {
     normalScale: 0.08,
     roughness0: 0.76,
     roughness1: 1.32,
-    lobeMix: 0.15
+    lobeMix: 0.85
   },
   skin_dark: {
     surfaceAlbedo: [0.7, 0.45, 0.36],
@@ -123,7 +123,7 @@ const SKIN_PROFILE_TEMPLATES: Record<SkinProfilePreset, SkinProfileTemplate> = {
     normalScale: 0.08,
     roughness0: 0.78,
     roughness1: 1.35,
-    lobeMix: 0.14
+    lobeMix: 0.85
   },
   wax: {
     surfaceAlbedo: [0.92, 0.85, 0.72],
@@ -137,7 +137,7 @@ const SKIN_PROFILE_TEMPLATES: Record<SkinProfilePreset, SkinProfileTemplate> = {
     normalScale: 0.05,
     roughness0: 0.85,
     roughness1: 1.4,
-    lobeMix: 0.2
+    lobeMix: 0.8
   },
   jade: {
     surfaceAlbedo: [0.72, 0.9, 0.82],
@@ -149,9 +149,9 @@ const SKIN_PROFILE_TEMPLATES: Record<SkinProfilePreset, SkinProfileTemplate> = {
     transmissionTint: [0.68, 0.95, 0.88],
     extinctionScale: 0.85,
     normalScale: 0.05,
-    roughness0: 0.5,
+    roughness0: 0.6,
     roughness1: 1.1,
-    lobeMix: 0.25
+    lobeMix: 0.75
   },
   marble: {
     surfaceAlbedo: [0.93, 0.92, 0.9],
@@ -163,9 +163,9 @@ const SKIN_PROFILE_TEMPLATES: Record<SkinProfilePreset, SkinProfileTemplate> = {
     transmissionTint: [0.96, 0.95, 0.94],
     extinctionScale: 0.8,
     normalScale: 0.04,
-    roughness0: 0.45,
+    roughness0: 0.55,
     roughness1: 1.05,
-    lobeMix: 0.3
+    lobeMix: 0.7
   }
 };
 
@@ -228,7 +228,7 @@ export class SkinProfile {
     this._normalScale = 0.08;
     this._roughness0 = 0.75;
     this._roughness1 = 1.3;
-    this._lobeMix = 0.15;
+    this._lobeMix = 0.85;
     this._disposed = false;
     this._changeListeners = new Set();
     this._id = SkinProfile.allocateId(this);
@@ -477,24 +477,41 @@ export class SkinProfile {
     }
   }
 
-  /** Roughness multiplier of the narrow specular lobe. @public */
+  /**
+   * Multiplier on the material roughness for the narrow specular lobe.
+   *
+   * @remarks
+   * Scaled by 2 before it multiplies the material roughness, so 0.5 leaves the
+   * roughness as-is and 1 doubles it. Skin normally keeps the narrow lobe at or
+   * below the material value.
+   *
+   * @public
+   */
   get roughness0() {
     return this._roughness0;
   }
   set roughness0(val: number) {
-    const next = Math.max(0.01, val ?? 0.75);
+    const next = Math.min(2, Math.max(0.5, val ?? 0.75));
     if (next !== this._roughness0) {
       this._roughness0 = next;
       this.notifyChanged();
     }
   }
 
-  /** Roughness multiplier of the wide specular lobe. @public */
+  /**
+   * Multiplier on the material roughness for the wide specular lobe.
+   *
+   * @remarks
+   * Same scaling as {@link SkinProfile.roughness0}; 1 doubles the material
+   * roughness, which gives skin its broad sheen alongside the tighter highlight.
+   *
+   * @public
+   */
   get roughness1() {
     return this._roughness1;
   }
   set roughness1(val: number) {
-    const next = Math.max(0.01, val ?? 1.3);
+    const next = Math.min(2, Math.max(0.5, val ?? 1.3));
     if (next !== this._roughness1) {
       this._roughness1 = next;
       this.notifyChanged();
@@ -506,7 +523,7 @@ export class SkinProfile {
     return this._lobeMix;
   }
   set lobeMix(val: number) {
-    const next = Math.min(1, Math.max(0, val ?? 0.15));
+    const next = Math.min(0.9, Math.max(0.1, val ?? 0.85));
     if (next !== this._lobeMix) {
       this._lobeMix = next;
       this.notifyChanged();

@@ -7,7 +7,12 @@ import { mixinTextureProps } from './mixins/texture';
 import { ShaderHelper } from './shader/helper';
 import type { DrawContext } from '../render';
 import { LIGHT_TYPE_POINT, MaterialVaryingFlags, RENDER_PASS_TYPE_LIGHT } from '../values';
-import { skinDiffuseBRDF, skinDualLobeSpecular } from '../shaders/skin_brdf';
+import {
+  skinDiffuseBRDF,
+  skinDualLobeSpecular,
+  skinDualSpecularRoughness,
+  skinSpecularEnergyTerms
+} from '../shaders/skin_brdf';
 import { SkinProfile } from './skinprofile';
 
 /**
@@ -58,9 +63,9 @@ export class SkinMaterial
     this._profile = null;
     this._subsurfaceProfileChanged = () => this.uniformChanged();
     this._lobeParams = new Vector3();
-    this._roughness = 0.35;
+    this._roughness = 0.5;
     this._specularStrength = 1;
-    this._specularF0 = 0.028;
+    this._specularF0 = 0.04;
     this._transmissionStrength = 0;
     this._transmissionPower = 4;
     this.useFeature(SkinMaterial.FEATURE_VERTEX_NORMAL, true);
@@ -177,12 +182,19 @@ export class SkinMaterial
     this.useFeature(SkinMaterial.FEATURE_VERTEX_TANGENT, !!val);
   }
 
-  /** GGX base roughness. 0.35 is typical for skin. */
+  /**
+   * GGX base roughness the two specular lobes are derived from.
+   *
+   * @remarks
+   * Defaults to UE5's material default of 0.5. The profile then tightens the
+   * narrow lobe and broadens the wide one around this value, so it is the centre
+   * of the dual-lobe highlight rather than the roughness of either lobe.
+   */
   get roughness() {
     return this._roughness;
   }
   set roughness(val) {
-    const next = Math.max(0.045, Math.min(1, val ?? 0.35));
+    const next = Math.max(0.045, Math.min(1, val ?? 0.5));
     if (next !== this._roughness) {
       this._roughness = next;
       this.uniformChanged();
@@ -201,12 +213,22 @@ export class SkinMaterial
     }
   }
 
-  /** Fresnel F0 for the skin oil layer. 0.028 is the physical skin value. */
+  /**
+   * Fresnel reflectance at normal incidence.
+   *
+   * @remarks
+   * Defaults to 0.04, which is what UE5's default `Specular` of 0.5 produces
+   * through `F0 = 0.08 * Specular`.
+   *
+   * Note the subsurface profile's IOR (1.55 in UE5's skin preset) does not feed
+   * this: that value drives the refraction used by transmission, while the
+   * specular Fresnel stays on the dielectric `0.08 * Specular` mapping.
+   */
   get specularF0() {
     return this._specularF0;
   }
   set specularF0(val) {
-    const next = Math.max(0, Math.min(0.2, val ?? 0.028));
+    const next = Math.max(0, Math.min(0.2, val ?? 0.04));
     if (next !== this._specularF0) {
       this._specularF0 = next;
       this.uniformChanged();
@@ -307,6 +329,35 @@ export class SkinMaterial
         scope.$l.transmissionLighting = pb.vec3(0);
         scope.$l.specularLighting = pb.vec3(0);
         scope.$l.NoV = pb.clamp(pb.dot(scope.normal, scope.viewVec), 0.0001, 1);
+        // The lobe roughnesses depend only on the material and profile, so they
+        // are resolved once rather than per light. The skin mask stands in for
+        // UE5's per-pixel subsurface opacity, which is what fades the dual lobe
+        // out where the surface stops being skin.
+        scope.$l.lobeRoughness = skinDualSpecularRoughness(
+          scope,
+          scope.roughness,
+          scope.skinMask,
+          scope.zSkinLobeParams.x,
+          scope.zSkinLobeParams.y
+        );
+        // Multiple-scattering compensation. UE5 takes the average lobe roughness
+        // here rather than computing a term per lobe, and applies the result to
+        // both the direct and the ambient contribution.
+        scope.$l.avgLobeRoughness = pb.mix(
+          scope.lobeRoughness.x,
+          scope.lobeRoughness.y,
+          scope.zSkinLobeParams.z
+        );
+        scope.$l.energyTerms = skinSpecularEnergyTerms(
+          scope,
+          scope.avgLobeRoughness,
+          scope.NoV,
+          scope.zSkinSpecularF0
+        );
+        // x scales specular back up to unit albedo; 1 - y is the energy left for
+        // the diffuse underneath.
+        scope.$l.energyConservation = scope.energyTerms.x;
+        scope.$l.energyPreservation = pb.sub(1, scope.energyTerms.y);
         // --- Environment lighting ---
         if (this.needCalculateEnvLight() && baseLightPass) {
           scope.$l.envDiffuse = this.getEnvLightIrradiance(scope, scope.normal);
@@ -318,10 +369,13 @@ export class SkinMaterial
             scope.envF0,
             pb.mul(pb.sub(scope.envF90, scope.envF0), pb.pow(pb.sub(1, scope.NoV), 5))
           );
+          // Prefiltered radiance is a single lookup, so it takes the blended lobe
+          // roughness rather than the raw material value — otherwise the ambient
+          // highlight ignores the dual-lobe widening that direct light gets.
           scope.specularLighting = pb.add(
             scope.specularLighting,
             pb.mul(
-              this.getEnvLightRadiance(scope, scope.reflectVec, scope.roughness),
+              this.getEnvLightRadiance(scope, scope.reflectVec, scope.avgLobeRoughness),
               scope.envF,
               scope.zSkinSpecularStrength
             )
@@ -365,13 +419,14 @@ export class SkinMaterial
           this.$l.lightColor = pb.mul(colorIntensity.rgb, colorIntensity.a, this.lightAtten);
           this.$l.halfVec = pb.normalize(pb.add(this.viewVec, this.lightDir));
           this.$l.NoH = pb.clamp(pb.dot(this.normal, this.halfVec), 0, 1);
-          this.$l.LoH = pb.clamp(pb.dot(this.lightDir, this.halfVec), 0, 1);
-          // Pre-integrated skin diffuse — Burley-like Fresnel modulation.
-          // No NdotL clamping: SSS allows light to scatter past the terminator.
-          this.$l.skinDiff = skinDiffuseBRDF(this, this.rawNdotL, this.NoV, this.VdotL, this.roughness);
+          this.$l.VoH = pb.clamp(pb.dot(this.viewVec, this.halfVec), 0, 1);
+          // Burley diffuse with the NoL cosine, as UE5's SubsurfaceProfileBxDF
+          // evaluates it. The soft terminator is the screen-space diffusion's job;
+          // bending this term to fake it double-counts the effect.
+          this.$l.skinDiff = skinDiffuseBRDF(this, this.NoV, this.NoL, this.VoH, this.roughness);
           this.diffuseLighting = pb.add(
             this.diffuseLighting,
-            pb.mul(this.lightColor, this.shadowTerm, this.skinDiff, this.diffuseScale, 1 / Math.PI)
+            pb.mul(this.lightColor, this.shadowTerm, this.skinDiff, this.NoL, this.diffuseScale)
           );
           // Back-lit transmission, tinted and attenuated by the profile.
           if (that.subsurfaceTexture) {
@@ -394,19 +449,16 @@ export class SkinMaterial
               )
             );
           }
-          // Dual-lobe GGX specular
+          // Dual-lobe GGX specular, with the NoL cosine UE5 applies alongside it.
           this.$l.spec = skinDualLobeSpecular(
             this,
             this.NoH,
             this.NoV,
             this.NoL,
-            this.LoH,
-            this.roughness,
-            this.zSkinSpecularF0,
-            this.skinMask,
-            this.zSkinLobeParams.x,
-            this.zSkinLobeParams.y,
-            this.zSkinLobeParams.z
+            this.VoH,
+            this.lobeRoughness,
+            this.zSkinLobeParams.z,
+            this.zSkinSpecularF0
           );
           this.specularLighting = pb.add(
             this.specularLighting,
@@ -414,16 +466,27 @@ export class SkinMaterial
               this.lightColor,
               this.shadowTerm,
               this.spec,
+              this.NoL,
               this.zSkinSpecularStrength,
               this.specularScale
             )
           );
         });
         // --- Assemble ---
+        //
+        // UE5 applies the energy terms to the accumulated lighting rather than per
+        // light: the diffuse loses what the specular layer above it reflected, and
+        // the specular gains back the energy single-scattering GGX dropped. The
+        // transmission is left alone, since it enters from behind the surface and
+        // never passes through that specular layer.
         scope.$l.diffusible = pb.mul(
           scope.albedo.rgb,
-          pb.add(scope.diffuseLighting, scope.transmissionLighting)
+          pb.add(
+            pb.mul(scope.diffuseLighting, scope.energyPreservation),
+            scope.transmissionLighting
+          )
         );
+        scope.specularLighting = pb.mul(scope.specularLighting, scope.energyConservation);
         scope.$l.litColor = pb.add(scope.diffusible, scope.specularLighting);
         // SceneColor.a = diffuse luminance. This is UE5's spec/diff separation
         // mechanism (verified in UEDigitalHuman.rdc, SSS::Setup lines 26-29 and

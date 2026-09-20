@@ -499,10 +499,10 @@ export function getSkinProfileClass(): SerializableClass {
         },
         {
           name: 'Roughness0',
-          description: 'Roughness multiplier of the narrow specular lobe',
+          description: 'Multiplier on the material roughness for the narrow specular lobe',
           type: 'float',
-          default: 0.75,
-          options: { animatable: true, minValue: 0.01, maxValue: 4 },
+          default: 0.5,
+          options: { animatable: true, minValue: 0.01, maxValue: 1 },
           get(this: SkinProfile, value) {
             value.num[0] = this.roughness0;
           },
@@ -512,10 +512,10 @@ export function getSkinProfileClass(): SerializableClass {
         },
         {
           name: 'Roughness1',
-          description: 'Roughness multiplier of the wide specular lobe',
+          description: 'Multiplier on the material roughness for the wide specular lobe',
           type: 'float',
-          default: 1.3,
-          options: { animatable: true, minValue: 0.01, maxValue: 4 },
+          default: 1,
+          options: { animatable: true, minValue: 0.01, maxValue: 1 },
           get(this: SkinProfile, value) {
             value.num[0] = this.roughness1;
           },
@@ -2827,7 +2827,7 @@ export function getSkinMaterialClass(manager: ResourceManager): SerializableClas
             name: 'Roughness',
             description: 'GGX base roughness for skin',
             type: 'float',
-            default: 0.35,
+            default: 0.5,
             options: { animatable: true, minValue: 0.045, maxValue: 1 },
             get(this: SkinMaterial, value) {
               value.num[0] = this.roughness;
@@ -2836,14 +2836,14 @@ export function getSkinMaterialClass(manager: ResourceManager): SerializableClas
               this.roughness = value.num[0];
             },
             getDefaultValue(this: SkinMaterial) {
-              return this.$isInstance ? this.coreMaterial.roughness : 0.35;
+              return this.$isInstance ? this.coreMaterial.roughness : 0.5;
             }
           },
           {
             name: 'SpecularF0',
             description: 'Fresnel F0 for the skin oil layer',
             type: 'float',
-            default: 0.028,
+            default: 0.04,
             options: { animatable: true, minValue: 0, maxValue: 0.2 },
             get(this: SkinMaterial, value) {
               value.num[0] = this.specularF0;
@@ -2852,7 +2852,7 @@ export function getSkinMaterialClass(manager: ResourceManager): SerializableClas
               this.specularF0 = value.num[0];
             },
             getDefaultValue(this: SkinMaterial) {
-              return this.$isInstance ? this.coreMaterial.specularF0 : 0.028;
+              return this.$isInstance ? this.coreMaterial.specularF0 : 0.04;
             }
           },
           {
