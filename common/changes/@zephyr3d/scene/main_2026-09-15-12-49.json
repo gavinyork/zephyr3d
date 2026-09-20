@@ -1,0 +1,10 @@
+{
+  "changes": [
+    {
+      "packageName": "@zephyr3d/scene",
+      "comment": "Improve subsurface scattering for water.",
+      "type": "patch"
+    }
+  ],
+  "packageName": "@zephyr3d/scene"
+}

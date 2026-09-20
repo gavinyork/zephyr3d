@@ -2983,6 +2983,25 @@ export interface AbstractDevice extends IEventTarget<DeviceEventMap> {
   videoMemoryUsage: number;
   /** Get the current frame information */
   frameInfo: FrameInfo;
+  /**
+   * Upper bound on frames the CPU may run ahead of the GPU, or 0 for no bound.
+   *
+   * @remarks
+   * When the GPU is the bottleneck the browser lets the CPU keep submitting, and
+   * the queue of unfinished frames grows to several frames. Everything that
+   * waits on the GPU then pays for that whole queue: readbacks such as
+   * {@link BaseTexture.readPixels} resolve only after every frame ahead of them
+   * has finished, and so does the picture on screen. With a bound set, a frame
+   * whose turn comes while that many earlier frames are still unfinished is
+   * skipped, so the CPU falls in step with the GPU and readback and display
+   * latency drop to about the bound. Throughput is unchanged, because the GPU
+   * was already the limit. Two is a good value; one trades some GPU idle time
+   * for the lowest latency.
+   *
+   * Only WebGPU enforces this. WebGL has no way to learn when a frame's work
+   * finished without stalling, so it ignores the setting.
+   */
+  maxFramesInFlight: number;
   /** Check if the device is running a rendering loop by calling {@link AbstractDevice.runLoop} */
   isRendering: boolean;
   /** Get the canvas element for this device */

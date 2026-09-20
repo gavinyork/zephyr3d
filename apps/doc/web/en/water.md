@@ -40,22 +40,14 @@ water.waveGenerator = waves;
 
 ## Material Controls
 
-The water material is available through `water.material`.
-
-```ts
-water.material.refractionScale = 1;
-water.material.reflectionStrength = 0.8;
-water.TAAStrength = 0.4;
-```
-
 | Property | Meaning |
 | --- | --- |
 | `gridScale` | Clipmap grid spacing in world units. Use the largest value that still gives enough near-camera detail |
 | `animationSpeed` | Multiplier for wave time |
 | `wireframe` | Draw clipmap grid lines for debugging |
 | `TAAStrength` | Temporal smoothing used by the water. Raise it when the surface shimmers or sparkles, lower it if you see trailing |
-| `material.refractionScale` | Artistic scale on the refracted offset. 1 is physical, 0 disables it, above 1 exaggerates |
-| `material.reflectionStrength` | Scale on the Fresnel reflectance. 1 is physical; water reflects almost everything at a grazing angle, so lowering this trades reflection away for visibility of what is underwater |
+| `refractionScale` | Artistic scale on the refracted offset. 1 is physical, 0 disables it, above 1 exaggerates |
+| `reflectionStrength` | Scale on the Fresnel reflectance. 1 is physical; water reflects almost everything at a grazing angle, so lowering this trades reflection away for visibility of what is underwater |
 
 Because the material uses scene color and scene depth, water is rendered in the main scene pipeline. Keep transparent objects and post effects in mind when tuning the final look.
 
@@ -65,12 +57,12 @@ The water's color comes from two coefficients, **absorption** and **scattering**
 
 ```ts
 // Clear pool water: low absorption and low scattering, the floor stays visible.
-water.material.absorption = new Vector3(0.08, 0.03, 0.02);
-water.material.scattering = new Vector3(0.01, 0.02, 0.03);
+water.absorption = new Vector3(0.08, 0.03, 0.02);
+water.scattering = new Vector3(0.01, 0.02, 0.03);
 
 // Turbid sea water: high scattering gives a milky blue body.
-// water.material.absorption = new Vector3(0.4, 0.14, 0.09);
-// water.material.scattering = new Vector3(0.06, 0.12, 0.15);
+// water.absorption = new Vector3(0.4, 0.14, 0.09);
+// water.scattering = new Vector3(0.06, 0.12, 0.15);
 ```
 
 | Property | Meaning |
@@ -93,8 +85,8 @@ These coefficients are **shared**: refraction, caustics, directional scattering 
 
 ```ts
 // Low-end: drop the depth search for performance.
-water.material.refractionMode = 'offset';
-water.material.cheapRefractionDepth = 1;
+water.refractionMode = 'offset';
+water.cheapRefractionDepth = 1;
 ```
 
 `cheapRefractionDepth` (meters) is used only by `offset`. It is the depth the cheap mode assumes the water is, which sets how strong the distortion looks.
@@ -124,14 +116,30 @@ water.causticsIntensity = 1;
 Directional scattering gives the body a **direction-dependent** color: it is evaluated per light, so a shadow falling on the water darkens the water itself and a low sun tints it. Without it the body is lit by the environment alone and loses its sense of direction.
 
 ```ts
-water.material.sunScatteringIntensity = 1;
-water.material.scatterAnisotropy = 0.7;
+water.sunScatteringIntensity = 1;
+water.scatterAnisotropy = 0.7;
 ```
 
 | Property | Meaning |
 | --- | --- |
 | `sunScatteringIntensity` | How strongly sunlight scattered out of the column reaches the eye. 1 is the physical value the medium coefficients imply, 0 disables it, higher is deliberate exaggeration |
 | `scatterAnisotropy` | Phase-function anisotropy, in [0, 0.95]. 0 scatters equally in all directions; 0.7 (default) is near measured sea water. Thicker water blends toward isotropic, so the **visible anisotropy is always below this number** |
+
+## Subsurface Scattering
+
+Subsurface scattering is what makes a **backlit wave crest glow**: sunlight enters the far side of the crest and scatters out through the thin wall of water towards the eye. 
+
+```ts
+water.subsurfaceIntensity = 0.5;
+water.subsurfaceCrestHeight = 1.5;
+water.subsurfaceTint = new Vector3(0.86, 0.98, 0.71);
+```
+
+| Property | Meaning |
+| --- | --- |
+| `subsurfaceIntensity` | Strength of the glow. 0 disables it. An authored magnitude that is not scaled by the light's intensity, so it stays put when the sun is brightened. Directional lights only |
+| `subsurfaceTint` | Color of the glow before the crest gate tints it with the medium's extinction. The default is a warm yellow-green: the gate removes red in the troughs, and the tint keeps some on the crests so they read as sunlight through water rather than as colored milk |
+| `subsurfaceCrestHeight` | Height above the still-water level, in meters, over which the lit wall of a crest thins by a factor of e. Crests are thin and glow; troughs see the full path through the medium and keep only a tinted trace |
 
 ## Underwater
 
@@ -281,9 +289,77 @@ boat.position.y = positions[0].y;
 
 The method runs a GPU feedback pass on the next frame, so it is asynchronous. Batch multiple query points into one call instead of calling it once per object.
 
+## Water Interaction
+
+`WaterInteraction`: ripples from something dropped in, the wake behind a hull, the slap of a foot. It is a 2D wave equation integrated on the GPU over a square window of the surface.
+
+```ts
+import { WaterInteraction, WaterDisturber } from '@zephyr3d/scene';
+
+const interaction = new WaterInteraction();
+interaction.windowSize = 64;   // metres covered by the field
+interaction.resolution = 512;  // texels per side, 12.5 cm here
+interaction.waveSpeed = 1.5;   // m/s, clamped to what the grid can integrate stably
+interaction.damping = 1;       // 1/s
+water.interaction = interaction;
+
+// A stone: one impulse. Negative pushes the surface down.
+interaction.addImpulse(x, z, 1 /* radius, m */, -0.25 /* peak, m */);
+
+// Things in the water follow a node with a sphere, capsule or box footprint.
+const hull = new WaterDisturber(boatNode, 'box');
+hull.size = new Vector3(1.6, 1, 3.6);
+hull.strength = 0.15;
+interaction.addDisturber(hull);
+
+const piling = new WaterDisturber(pilingNode, 'capsule');
+piling.radius = 0.35;
+piling.halfLength = 6;
+piling.blocking = true; // waves stop at it and reflect
+interaction.addDisturber(piling);
+```
+
+A disturber injects the change in the water column its shape displaces since the previous frame. Something at rest leaves the water alone; something moving pushes water down ahead of itself and lets it up behind, which is what a wake is; something dropping in pushes down all over its footprint. A `blocking` disturber is also an obstacle: waves stop at its footprint and reflect off it.
+
+The window follows the water the camera is looking at by default (`followMode: 'camera'`), can follow a node (`'node'` with `followNode`) for a first-person view, or stay put (`'fixed'` with `center`) for a pool or a pond. A band inside the window edge absorbs outgoing waves so the edge never shows; the `interaction` debug output shows the field on its own and dims everything outside the window.
+
+Disturbances also lay down foam - where a shape moves, where a stone lands, along the steep fast crests of the field's own waves - which fades at `foamDecay` and is drawn with the same look as the crest and shoreline foam. `foamAmount` scales it; at its default of 0.15 a wake reads as a trail rather than a sheet.
+
+The field needs a filterable float or half-float render target; `interaction.isOk()` reports whether the device has one, and the water falls back to the wave generator alone when it does not. Tutorial `tut-75` drives a boat through the field and floats a buoy on the result.
+
+### Floating Objects
+
+`WaterSurfaceSampler` batches height queries over a fixed lattice and interpolates between them, so a whole scene of floating objects costs one surface query per batch. `BuoyancyVolume` turns a height function into a buoyant force and torque for a box-shaped hull, independent of what integrates them; `FloatingBody` is a small rigid body around it for applications without a physics library.
+
+```ts
+import { WaterSurfaceSampler, FloatingBody } from '@zephyr3d/scene';
+
+const sampler = new WaterSurfaceSampler(water, { spacing: 2, cols: 25, rows: 25, updateHz: 30 });
+const buoy = new FloatingBody({
+  node: buoyNode,
+  size: new Vector3(1.3, 1.3, 1.3),
+  mass: 200,
+  submergedFraction: 0.5
+});
+buoy.reset(10, 4, water.position.y);
+
+app.on('tick', (deltaMs) => {
+  const delta = deltaMs / 1000;
+  sampler.update(delta);
+  const level = water.position.y;
+  buoy.update(delta, (x, z) => sampler.sampleWorldYRaw(x, z) - level, level);
+});
+```
+
+A rigid body should read `sampleWorldYRaw`; the eased `sampleWorldY` is for objects placed directly at the surface height. With a physics library, call `BuoyancyVolume.computeForces()` from its step and apply the force and torque to the body instead.
+
+<div class="showcase" case="tut-66"></div>
+
+Buoyancy sampling excludes all WaterDisturber wakes by default, retaining ambient waves and external addImpulse waves to prevent feedback oscillations. Rendering still includes all waves. Set WaterSurfaceSampler includeDisturbers: true for the complete visual surface. Water.getSurfacePoint queries the complete surface by default; pass false as its fourth argument to exclude wakes. Interaction maintains an additional texture pair and simulation pass for the external field.
+
 ## Serialization
 
-`Water` is registered with the serialization system, including its material-related water parameters and the built-in `FBMWaveGenerator` / `FFTWaveGenerator` settings. This means editor-created water nodes and saved scene water settings can be restored through `loadScene()` or `instantiatePrefab()`.
+`Water` is registered with the serialization system, including its material-related water parameters, the built-in `FBMWaveGenerator` / `FFTWaveGenerator` settings, and its `WaterInteraction` with the disturbers registered on it (each disturber records the persistent id of the node it follows and binds to it when the scene has loaded). This means editor-created water nodes and saved scene water settings can be restored through `loadScene()` or `instantiatePrefab()`.
 
 `GerstnerWaveGenerator` can be used at runtime, but it is not currently one of the registered wave-generator types for serialized water nodes.
 

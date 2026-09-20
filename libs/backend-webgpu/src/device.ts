@@ -84,6 +84,8 @@ export class WebGPUDevice extends BaseDevice {
   private _reverseWindingOrder: boolean;
   private _autoFlushScheduled = false;
   private _canRender!: boolean;
+  /** Frames submitted whose onSubmittedWorkDone has not yet resolved. */
+  private _framesInFlight = 0;
   private _backBufferFormat!: GPUTextureFormat;
   private _depthFormat!: GPUTextureFormat;
   private _defaultMSAAColorTexture: Nullable<GPUTexture>;
@@ -903,10 +905,28 @@ export class WebGPUDevice extends BaseDevice {
     }
   }
   /** @internal */
+  protected shouldSkipFrame(): boolean {
+    return this._maxFramesInFlight > 0 && this._framesInFlight >= this._maxFramesInFlight;
+  }
   protected onEndFrame() {
     const frameTime = this._timestampQueries.endFrame();
     this._timestampQueries.autoCloseOpenScopes();
     this._commandQueue.endFrame();
+    // Track the frame until the GPU reports it finished. Only counted when a
+    // bound is set, so an unbounded device does not accumulate callbacks; the
+    // count is also what shouldSkipFrame compares against, so it must be
+    // advanced here, after the frame's submit, and never for a skipped frame.
+    if (this._maxFramesInFlight > 0) {
+      this._framesInFlight++;
+      void this._device.queue.onSubmittedWorkDone().then(
+        () => {
+          this._framesInFlight--;
+        },
+        () => {
+          this._framesInFlight--;
+        }
+      );
+    }
 
     void frameTime?.then((result) => {
       if (result.frameId >= this._latestGPUFrameId) {

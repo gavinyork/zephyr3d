@@ -414,7 +414,7 @@ export const waterCausticsRangeBorder: VisualScene = {
 export const waterSubsurfaceBacklit: VisualScene = {
   name: 'water-subsurface-backlit',
   description:
-    'Steep waves edge-on against a low sun in turbid water. Pins the directional subsurface term: sunlight scattered forward through a crest towards the eye. Distinct from the ambient scattering term in that it needs the sun, the view direction and the wave height together - a regression that drops any one of the three leaves this scene flat while every other water baseline still passes.',
+    'Steep waves edge-on against a low sun in turbid water. Pins the crest subsurface term: an authored glow gated on the wave crest height, the grazing view and the alignment of the mirrored view ray with the sun. A regression that drops any one of the three leaves this scene flat while every other water baseline still passes.',
   frames: 3,
   setup({ scene, camera }) {
     bareScene(scene);
@@ -427,23 +427,20 @@ export const waterSubsurfaceBacklit: VisualScene = {
     scene.env.light.type = 'constant';
     scene.env.light.ambientColor = new Vector4(0.05, 0.07, 0.09, 1);
 
-    // Just above the horizon, directly behind the water from the camera's point
-    // of view, so the refracted sun continues almost straight at the eye.
+    // Low but clear of the term's horizon fade, directly behind the water from
+    // the camera's point of view, so the mirrored view ray lines up with it.
     const light = new DirectionalLight(scene);
-    light.lookAt(new Vector3(0, 3, -60), Vector3.zero(), Vector3.axisPY());
+    light.lookAt(new Vector3(0, 10, -60), Vector3.zero(), Vector3.axisPY());
     light.color = new Vector4(1, 0.95, 0.85, 1);
     light.intensity = 4;
 
     const water = new Water(scene);
     water.scale.setXYZ(120, 1, 120);
     water.position.setXYZ(0, 0, 0);
-    // FFT rather than FBM, which every other water scene uses. FBM's base
-    // wavelength is fixed at 100 m, so at any sane amplitude its surface is
-    // flat to within a fraction of a degree - measured at 1e-4 off vertical -
-    // and a term gated on how steeply the surface tilts has nothing to work
-    // with. FFT's shortest cascade is metres across and genuinely steep. It is
-    // just as reproducible: its spectrum is seeded from randomSeed through a
-    // PRNG, not from anything ambient.
+    // FFT rather than FBM, which every other water scene uses: the term is
+    // gated on how far a crest rises above the rest plane, and FBM at any sane
+    // amplitude barely rises at all. It is just as reproducible: its spectrum
+    // is seeded from randomSeed through a PRNG, not from anything ambient.
     const waves = new FFTWaveGenerator();
     waves.wind = new Vector2(6, 2);
     waves.setWaveLength(0, 200);
@@ -459,6 +456,10 @@ export const waterSubsurfaceBacklit: VisualScene = {
     // back out instead of being swallowed.
     water.material.absorption = new Vector3(0.25, 0.12, 0.1);
     water.material.scattering = new Vector3(0.25, 0.45, 0.4);
+    // Sized to this sea: the crests here rise well under a metre, so the
+    // default crest height would leave the gate at its floor everywhere.
+    water.subsurfaceCrestHeight = 0.3;
+    water.subsurfaceIntensity = 1;
     water.causticsEnabled = false;
 
     // A moderate downward angle, not a grazing one. Grazing maximises the

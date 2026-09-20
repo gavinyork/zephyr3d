@@ -40,22 +40,14 @@ water.waveGenerator = waves;
 
 ## 材质控制
 
-水面材质可通过 `water.material` 访问。
-
-```ts
-water.material.refractionScale = 1;
-water.material.reflectionStrength = 0.8;
-water.TAAStrength = 0.4;
-```
-
 | 参数 | 含义 |
 | --- | --- |
 | `gridScale` | clipmap 网格间距，单位为世界坐标。在细节够用的前提下尽量取大 |
 | `animationSpeed` | 波浪时间倍率 |
 | `wireframe` | 以线框方式显示 clipmap 网格，便于调试 |
 | `TAAStrength` | 水面使用的时间平滑强度。画面有噪点或闪烁时调高，出现拖影时调低 |
-| `material.refractionScale` | 折射偏移的艺术缩放。1 为物理值，0 关闭折射，大于 1 为夸张 |
-| `material.reflectionStrength` | Fresnel 反射率缩放。1 为物理值；掠射角下水面几乎全反射，调低可以牺牲反射换取水下内容的可见度 |
+| `refractionScale` | 折射偏移的艺术缩放。1 为物理值，0 关闭折射，大于 1 为夸张 |
+| `reflectionStrength` | Fresnel 反射率缩放。1 为物理值；掠射角下水面几乎全反射，调低可以牺牲反射换取水下内容的可见度 |
 
 水面材质会使用场景颜色和场景深度，因此水面参与主场景渲染流程。调试最终效果时需要同时考虑透明物体和后处理。
 
@@ -124,14 +116,30 @@ water.causticsIntensity = 1;
 方向性散射让水体具有**方向相关**的颜色：它按光源计算，因此阴影落在水面上会同时压暗水体，低角度的太阳会为水体染色。关闭后水体只由环境光照亮，会失去方向感。
 
 ```ts
-water.material.sunScatteringIntensity = 1;
-water.material.scatterAnisotropy = 0.7;
+water.sunScatteringIntensity = 1;
+water.scatterAnisotropy = 0.7;
 ```
 
 | 参数 | 含义 |
 | --- | --- |
 | `sunScatteringIntensity` | 阳光从水体内部散射到眼睛的强度。1 是介质系数隐含的物理值，0 关闭，更大即为夸张 |
 | `scatterAnisotropy` | 单次散射的相位各向异性，取值 [0, 0.95]。0 为各方向均匀，0.7（默认）接近海水的前向散射。水体越厚会越向各向同性靠拢，因此**实际可见的各向异性总是小于这个值** |
+
+## 次表面散射
+
+次表面散射让**逆光的浪尖发亮**：阳光从浪的背面进入，穿过薄薄的水墙向观察者散射出来。
+
+```ts
+water.subsurfaceIntensity = 0.5;
+water.subsurfaceCrestHeight = 1.5;
+water.subsurfaceTint = new Vector3(0.86, 0.98, 0.71);
+```
+
+| 参数 | 含义 |
+| --- | --- |
+| `subsurfaceIntensity` | 发光强度，0 关闭。这是一个艺术量，不随光源强度缩放，调亮太阳不会改变它。仅对方向光生效 |
+| `subsurfaceTint` | 发光的基础颜色，之后还会被浪尖门控按介质消光系数染色。默认是偏暖的黄绿色：门控在波谷会吃掉红色分量，tint 在浪尖上把它补回来，让浪尖读作透过水的阳光而不是有色的奶 |
+| `subsurfaceCrestHeight` | 浪尖水墙随高度变薄的尺度，单位米：每升高此值，光穿过的路径缩短为 1/e。浪尖薄而透光；波谷要走完整的介质路径，只剩带色相的余光 |
 
 ## 水下渲染
 
@@ -281,9 +289,77 @@ boat.position.y = positions[0].y;
 
 这个方法会在下一帧运行一次 GPU feedback pass，因此是异步的。应把多个查询点合并到一次调用中，而不是每个对象单独调用一次。
 
+## 水体交互
+
+`WaterInteraction`：落物激起的波纹、船体后的尾迹、踏水的水花。它是在 GPU 上、在水面一块方形窗口内积分的二维波动方程。
+
+```ts
+import { WaterInteraction, WaterDisturber } from '@zephyr3d/scene';
+
+const interaction = new WaterInteraction();
+interaction.windowSize = 64;   // 场覆盖的米数
+interaction.resolution = 512;  // 每边纹素数，此处为 12.5 cm
+interaction.waveSpeed = 1.5;   // m/s，会被钳制到网格可稳定积分的范围
+interaction.damping = 1;       // 1/s
+water.interaction = interaction;
+
+// 落石：一次脉冲。负值把水面压下去。
+interaction.addImpulse(x, z, 1 /* 半径，米 */, -0.25 /* 峰值，米 */);
+
+// 水中的物体跟随节点，足迹为球、胶囊或盒。
+const hull = new WaterDisturber(boatNode, 'box');
+hull.size = new Vector3(1.6, 1, 3.6);
+hull.strength = 0.15;
+interaction.addDisturber(hull);
+
+const piling = new WaterDisturber(pilingNode, 'capsule');
+piling.radius = 0.35;
+piling.halfLength = 6;
+piling.blocking = true; // 波在此止步并反射
+interaction.addDisturber(piling);
+```
+
+扰动源注入的是其形状排开的水柱相对上一帧的变化量。静止的物体不扰动水面；移动的物体在前方压水、在后方回水，这就是尾迹；入水的物体则在整片足迹上压水。`blocking` 的扰动源同时是障碍：波在其足迹处止步并反射。
+
+窗口默认对准相机所看的那片水（`followMode: 'camera'`），也可以跟随某个节点（`'node'` 配合 `followNode`，适合第一人称）或固定不动（`'fixed'` 配合 `center`，适合泳池和小池塘）。窗口边缘内侧有一圈吸收带，向外传播的波在那里衰减，边缘不会露出来；调试输出 `interaction` 单独显示该场，并把窗口外压暗。
+
+扰动同时会留下泡沫：物体经过处、落石处、以及场自身陡而快的浪脊上。泡沫按 `foamDecay` 衰减，与波峰泡沫、近岸泡沫用同一套着色。`foamAmount` 控制总量，默认 0.15 时尾迹是一条白痕而不是一片白。
+
+该场需要可过滤的浮点或半浮点渲染目标；`interaction.isOk()` 报告设备是否支持，不支持时水面退回到只用波浪生成器。教程 `tut-75` 演示了开船穿过该场并让浮标浮在叠加后的表面上。
+
+### 漂浮物体
+
+`WaterSurfaceSampler` 在固定格点上批量查询高度并在格点间插值，整个场景的漂浮物每批只需一次水面查询。`BuoyancyVolume` 把高度函数转换成盒形船体受到的浮力与力矩，与具体的积分器无关；`FloatingBody` 是围绕它的一个小型刚体，供没有物理库的应用使用。
+
+```ts
+import { WaterSurfaceSampler, FloatingBody } from '@zephyr3d/scene';
+
+const sampler = new WaterSurfaceSampler(water, { spacing: 2, cols: 25, rows: 25, updateHz: 30 });
+const buoy = new FloatingBody({
+  node: buoyNode,
+  size: new Vector3(1.3, 1.3, 1.3),
+  mass: 200,
+  submergedFraction: 0.5
+});
+buoy.reset(10, 4, water.position.y);
+
+app.on('tick', (deltaMs) => {
+  const delta = deltaMs / 1000;
+  sampler.update(delta);
+  const level = water.position.y;
+  buoy.update(delta, (x, z) => sampler.sampleWorldYRaw(x, z) - level, level);
+});
+```
+
+刚体应读取 `sampleWorldYRaw`；带缓动的 `sampleWorldY` 适合直接放在水面高度上的物体。如果使用物理库，则在其步进中调用 `BuoyancyVolume.computeForces()`，把力与力矩施加到刚体上。
+
+<div class="showcase" case="tut-75"></div>
+
+浮力采样默认排除所有 `WaterDisturber` 产生的波，仅保留环境波和 `addImpulse` 外部交互波，避免漂浮物反馈造成持续振荡。渲染仍包含全部波动。需要完整视觉表面时，可设置 `WaterSurfaceSampler` 的 `includeDisturbers: true`；`Water.getSurfacePoint` 默认查询完整表面，第四个参数传 `false` 可排除物体造波。交互启用时额外维护一组波场纹理，并在每个模拟步增加一次波动更新。
+
 ## 序列化
 
-`Water` 已注册到序列化系统中，其中包含水面材质相关参数，以及内置 `FBMWaveGenerator` / `FFTWaveGenerator` 的设置。因此，通过编辑器创建的水面节点和保存后的水面参数，可以通过 `loadScene()` 或 `instantiatePrefab()` 恢复。
+`Water` 已注册到序列化系统中，其中包含水面材质相关参数、内置 `FBMWaveGenerator` / `FFTWaveGenerator` 的设置，以及它的 `WaterInteraction` 和其上注册的扰动源（每个扰动源记录所跟随节点的持久 id，场景加载完成后再绑定）。因此，通过编辑器创建的水面节点和保存后的水面参数，可以通过 `loadScene()` 或 `instantiatePrefab()` 恢复。
 
 `GerstnerWaveGenerator` 可以在运行时使用，但它目前不是序列化水面节点时已注册的 wave-generator 类型。
 

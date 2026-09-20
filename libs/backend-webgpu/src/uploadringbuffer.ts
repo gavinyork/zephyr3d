@@ -99,8 +99,11 @@ export class UploadRingBuffer {
         .mapAsync(GPUMapMode.WRITE)
         .then(() => {
           this._pendingMapBuffers.delete(buffer);
-          // The owner may have been disposed while mapAsync was pending.
+          // The owner may have been disposed while mapAsync was pending: the
+          // GPU buffer was kept alive until now so that the map could resolve
+          // instead of rejecting with a validation error. Release it here.
           if (buffer.destroyed) {
+            buffer.buffer.destroy();
             return;
           }
           buffer.offset = 0;
@@ -110,7 +113,13 @@ export class UploadRingBuffer {
         })
         .catch(() => {
           this._pendingMapBuffers.delete(buffer);
-          this.destroyBuffer(buffer);
+          if (buffer.destroyed) {
+            // Flagged by purge() while the map was pending; the GPU buffer is
+            // still alive and is ours to release.
+            buffer.buffer.destroy();
+          } else {
+            this.destroyBuffer(buffer);
+          }
         });
     }
     this._unmappedBufferList = [];
@@ -128,11 +137,14 @@ export class UploadRingBuffer {
       this.destroyBuffer(buffer);
     }
     this._unmappedBufferList = [];
-    // mapAsync() cannot be cancelled, but destroying these buffers makes the
-    // promise reject and prevents the completion callback from resurrecting
-    // them in _bufferList.
+    // mapAsync() cannot be cancelled, and destroying a buffer with a pending
+    // map makes the browser report a validation error ("Buffer was destroyed
+    // before mapping was resolved"). Flag these instead: the completion
+    // callback sees the flag, skips putting the buffer back in _bufferList and
+    // destroys it once the map has resolved.
     for (const buffer of this._pendingMapBuffers) {
-      this.destroyBuffer(buffer);
+      buffer.destroyed = true;
+      buffer.mappedRange = null;
     }
     this._pendingMapBuffers.clear();
   }

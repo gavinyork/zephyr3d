@@ -81,7 +81,8 @@ function buildRefractionShader(deviceType: DeviceType) {
           pb.float(0.2),
           // The unrefracted scene point, used as the dominant ray direction.
           pb.vec3(pb.add(this.$inputs.worldPos, pb.vec3(0, -2, 0))),
-          pb.float(4)
+          pb.float(4),
+          pb.bool(false)
         );
         this.$outputs.color = pb.vec4(this.info, 1);
       });

@@ -1,0 +1,10 @@
+{
+  "changes": [
+    {
+      "packageName": "@zephyr3d/scene",
+      "comment": "rework water subsurface scattering, fix foam lighting on lee slope.",
+      "type": "patch"
+    }
+  ],
+  "packageName": "@zephyr3d/scene"
+}

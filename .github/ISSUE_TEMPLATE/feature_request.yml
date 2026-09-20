@@ -1,0 +1,64 @@
+name: Feature request
+description: Propose a capability the engine does not have yet.
+title: '[Feature] '
+labels: ['enhancement']
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Zephyr3D is maintained by one person and is pre-1.0, so features land when they fit the
+        roadmap rather than in the order they are requested. Describing the underlying problem —
+        not just the API you have in mind — makes it much easier to find a version of this that
+        can actually be built.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: The problem
+      description: What are you trying to do that the engine makes hard or impossible today?
+      placeholder: |
+        I am building an architectural walkthrough and need per-room reflections, but SSR breaks
+        down on the flat floors...
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: What you would like to see
+      description: |
+        An API sketch, a reference to how another engine solves it, or a paper. Any of these help.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: backends
+    attributes:
+      label: Which backends would this need to work on?
+      description: |
+        Some features are only feasible on WebGPU (compute-dependent ones, for instance). If it
+        can only work on one backend, that is acceptable — it just has to be stated.
+      multiple: true
+      options:
+        - WebGPU
+        - WebGL2
+        - WebGL1
+        - Does not matter
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Workarounds you have tried
+      description: What you are doing instead right now, and why it is not good enough.
+    validations:
+      required: false
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Anything else
+      description: Links, papers, screenshots from other engines, or a sense of how many people need this.
+    validations:
+      required: false

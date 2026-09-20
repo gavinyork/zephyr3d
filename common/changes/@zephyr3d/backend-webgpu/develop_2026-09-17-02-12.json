@@ -1,0 +1,10 @@
+{
+  "changes": [
+    {
+      "packageName": "@zephyr3d/backend-webgpu",
+      "comment": "Defer destroying staging buffers with a pending mapAsync so disposing a buffer mid-frame no longer reports a validation error",
+      "type": "patch"
+    }
+  ],
+  "packageName": "@zephyr3d/backend-webgpu"
+}

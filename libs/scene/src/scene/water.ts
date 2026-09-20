@@ -9,8 +9,10 @@ import { Primitive } from '../render';
 import { Clipmap, FBMWaveGenerator } from '../render';
 import { setWaterSubmergence } from '../render/underwater';
 import { WaterMaterial } from '../material/water';
+import { InteractiveWaveGenerator, type WaterInteraction } from '../render/water_interaction';
 import type { WaterDebugOutput, WaterRefractionMode } from '../material/water';
 import type { AbstractDevice, BindGroup, FrameBuffer, GPUProgram, RenderStateSet } from '@zephyr3d/device';
+import type { WaveGenerator } from '../render/wavegenerator';
 import { QUEUE_OPAQUE } from '../values';
 import { BoundingBox } from '../utility/bounding_volume';
 import type { Camera } from '../camera';
@@ -37,6 +39,31 @@ const SKIRT_DISTANCE_FACTOR = 10;
 const WHOLE_DOMAIN = new Vector4(-99999, -99999, 99999, 99999);
 
 /**
+ * One evaluated point of a water surface, in world space.
+ *
+ * A flat record rather than the `Vector3`s the public entry point writes into,
+ * because the internal batch path allocates one of these per probe per frame and
+ * a probe set can be large. `nx`/`ny`/`nz` are only filled when the caller asked
+ * for normals; otherwise they stay at the straight-up default.
+ *
+ * @public
+ */
+export interface SurfacePointHit {
+  /** World X of the displaced surface. */
+  x: number;
+  /** World Y of the displaced surface. */
+  y: number;
+  /** World Z of the displaced surface. */
+  z: number;
+  /** X component of the surface normal. */
+  nx: number;
+  /** Y component of the surface normal. */
+  ny: number;
+  /** Z component of the surface normal. */
+  nz: number;
+}
+
+/**
  * Water scene node
  * @public
  */
@@ -53,10 +80,27 @@ export class Water extends applyMixins(GraphNode, mixinDrawable) implements Draw
   /** Elapsed time at the previous update, for the frame delta. */
   private _lastUpdateTime: number;
   private _feedbackProgram: DRef<GPUProgram>;
+  /** Hash of the wave generator the feedback program was built for. */
+  private _feedbackHash: string;
   private _feedbackBindGroup: DRef<BindGroup>;
   private _feedbackPrimitive: DRef<Primitive>;
   private _feedbackRenderTarget: DRef<FrameBuffer>;
   private _feedbackRenderStates: Nullable<RenderStateSet>;
+  /**
+   * Tail of the surface-query queue.
+   *
+   * The feedback pass reuses one vertex buffer and one render target, so two
+   * overlapping requests would interleave their writes. Each request awaits the
+   * previous tail and publishes its own, which serializes them in issue order.
+   */
+  private _feedbackQueue: Promise<void>;
+  /**
+   * Frame numbers of the stages of the most recent surface-point query, for
+   * latency diagnostics: when it was requested, when its render was recorded,
+   * and when the readback resolved. All are `device.frameInfo.frameCounter`.
+   * @public
+   */
+  lastFeedbackTiming = { issued: 0, recorded: 0, mapped: 0 };
   private readonly _material: DRef<WaterMaterial>;
   /**
    * Whether each camera was inside this body of water on its previous update.
@@ -86,10 +130,12 @@ export class Water extends applyMixins(GraphNode, mixinDrawable) implements Draw
     this._material.get()!.TAAStrength = 0.4;
     this.waveGenerator = new FBMWaveGenerator();
     this._feedbackProgram = new DRef();
+    this._feedbackHash = '';
     this._feedbackBindGroup = new DRef();
     this._feedbackPrimitive = new DRef();
     this._feedbackRenderTarget = new DRef();
     this._feedbackRenderStates = null;
+    this._feedbackQueue = Promise.resolve();
     this._submerged = new WeakMap();
     scene.queuePerCameraUpdateNode(this);
   }
@@ -120,12 +166,35 @@ export class Water extends applyMixins(GraphNode, mixinDrawable) implements Draw
   get material() {
     return this._material.get()!;
   }
-  /** Wave generator object of the water */
+  /**
+   * Wave generator object of the water: the source of the ambient surface.
+   *
+   * While an {@link interaction} is attached the surface actually drawn is
+   * this generator plus the interaction field; this still returns the
+   * generator on its own.
+   */
   get waveGenerator() {
-    return this.material.waveGenerator;
+    return this.material.baseWaveGenerator;
   }
   set waveGenerator(waveGenerator) {
     this.material.waveGenerator = waveGenerator;
+    if (this.material.needUpdate()) {
+      this.scene?.queueUpdateNode(this);
+    }
+  }
+  /**
+   * Dynamic height field layered over the surface, driven by things touching
+   * the water, or null for none. See {@link WaterInteraction}.
+   *
+   * The field is stepped on this water's own clock, so {@link animationSpeed}
+   * scales it too; it is added everywhere the surface is evaluated, so
+   * {@link getSurfacePoint} and the caustics see it as well.
+   */
+  get interaction() {
+    return this.material.interaction;
+  }
+  set interaction(val: Nullable<WaterInteraction>) {
+    this.material.interaction = val;
     if (this.material.needUpdate()) {
       this.scene?.queueUpdateNode(this);
     }
@@ -179,6 +248,20 @@ export class Water extends applyMixins(GraphNode, mixinDrawable) implements Draw
   }
   set animationSpeed(val) {
     this._animationSpeed = val;
+  }
+  /**
+   * The wave clock the surface is currently at, in seconds.
+   *
+   * This is the time the displaced surface was last evaluated with - the same
+   * value {@link WaterMaterial.update} is handed - and not the scene's elapsed
+   * time. Anything that samples the surface from the CPU has to use this clock
+   * to know which frame of the wave it is looking at, and to tell a stale
+   * sample from a current one; a caller comparing against `elapsedInSeconds`
+   * from {@link SceneNode.update} will agree only while
+   * {@link animationSpeed} is 1 and nothing has paused the water.
+   */
+  get waveTime() {
+    return this._waveTime;
   }
   /** TAA strength of the water */
   get TAAStrength() {
@@ -345,6 +428,37 @@ export class Water extends applyMixins(GraphNode, mixinDrawable) implements Draw
   }
   set underwaterHysteresis(val: number) {
     this.material.underwaterHysteresis = val;
+  }
+  /**
+   * Strength of the glow of a backlit wave crest, 0 to disable. Authored, not
+   * scaled by the light's intensity; {@link subsurfaceTint} supplies the hue.
+   */
+  get subsurfaceIntensity() {
+    return this.material.subsurfaceIntensity;
+  }
+  set subsurfaceIntensity(val: number) {
+    this.material.subsurfaceIntensity = val;
+  }
+  /**
+   * Height above the still-water level, in meters, over which the lit wall of
+   * a crest thins by a factor of `e`. Lower for a calm sea, higher so only the
+   * tallest crests glow.
+   */
+  get subsurfaceCrestHeight() {
+    return this.material.subsurfaceCrestHeight;
+  }
+  set subsurfaceCrestHeight(val: number) {
+    this.material.subsurfaceCrestHeight = val;
+  }
+  /**
+   * Colour of the crest glow, before the crest gate tints it with the medium's
+   * extinction.
+   */
+  get subsurfaceTint() {
+    return this.material.subsurfaceTint;
+  }
+  set subsurfaceTint(val: Vector3) {
+    this.material.subsurfaceTint = val;
   }
   /**
    * Strength of the sunlight scattered out of the water column towards the eye,
@@ -618,6 +732,11 @@ export class Water extends applyMixins(GraphNode, mixinDrawable) implements Draw
         Math.max(0, elapsedInSeconds - Math.max(this._timeStart, this._lastUpdateTime)) *
         this._animationSpeed;
       this._lastUpdateTime = elapsedInSeconds;
+      const interaction = this.material.interaction;
+      if (interaction) {
+        interaction.resolveNodes(this.scene);
+        interaction.setWaterLevel(this.worldMatrix.m13);
+      }
       this.material.update(frameId, this._waveTime);
       this.invalidateWorldBoundingVolume(false);
     }
@@ -649,8 +768,8 @@ export class Water extends applyMixins(GraphNode, mixinDrawable) implements Draw
         skirt: infinite,
         calcAABB(userData: unknown, minX, maxX, minZ, maxZ, outAABB) {
           const p = that.worldMatrix.transformPointAffine(Vector3.zero());
-          if (that.waveGenerator) {
-            that.waveGenerator.calcClipmapTileAABB(minX, maxX, minZ, maxZ, p.y, outAABB);
+          if (mat.waveGenerator) {
+            mat.waveGenerator.calcClipmapTileAABB(minX, maxX, minZ, maxZ, p.y, outAABB);
           } else {
             outAABB.minPoint.setXYZ(minX, p.y, minZ);
             outAABB.maxPoint.setXYZ(maxX, p.y + 1, maxZ);
@@ -658,6 +777,10 @@ export class Water extends applyMixins(GraphNode, mixinDrawable) implements Draw
         }
       });
       this.updateSubmergence(camera, mat);
+      const interaction = mat.interaction;
+      if (interaction && interaction.followMode === 'camera') {
+        this.updateInteractionFocus(camera, interaction);
+      }
       this.scene?.queuePerCameraUpdateNode(this);
     }
   }
@@ -698,6 +821,39 @@ export class Water extends applyMixins(GraphNode, mixinDrawable) implements Draw
     }
     this._submerged.set(camera, submerged);
     setWaterSubmergence(camera, this, submerged, surfaceY);
+  }
+  /**
+   * Point the interaction window at the water the camera is looking at.
+   *
+   * Not at the camera itself: a camera looking down at the water from a
+   * distance has the water it sees well ahead of it, and a window centred on
+   * the camera would put that water at its edge, inside the sponge band. The
+   * focus is where the view direction meets the rest plane, no further ahead
+   * than half a window so that a view towards the horizon still covers the
+   * near water, and half a window ahead when the view does not meet the plane.
+   * @internal
+   */
+  private updateInteractionFocus(camera: Camera, interaction: WaterInteraction) {
+    const camPos = camera.getWorldPosition();
+    const m = camera.worldMatrix;
+    // The camera looks down its local -Z.
+    const fx = -m.m02;
+    const fy = -m.m12;
+    const fz = -m.m22;
+    const horizontal = Math.hypot(fx, fz);
+    const reach = interaction.windowSize * 0.5;
+    let ahead = reach;
+    if (fy < -1e-4) {
+      const t = (this.worldMatrix.m13 - camPos.y) / fy;
+      if (t > 0) {
+        ahead = Math.min(reach, t * horizontal);
+      }
+    }
+    if (horizontal < 1e-6) {
+      interaction.setFocus(camPos.x, camPos.z);
+    } else {
+      interaction.setFocus(camPos.x + (fx / horizontal) * ahead, camPos.z + (fz / horizontal) * ahead);
+    }
   }
   /**
    * Distance to the true horizon for the camera's height above this water, in
@@ -870,101 +1026,218 @@ export class Water extends applyMixins(GraphNode, mixinDrawable) implements Draw
     }
   }
   /**
-   * Retreive the disturbed world position and normal at water surface
+   * Retrieve the disturbed world position and normal at water surface.
+   * Set includeDisturbers to false for buoyancy: retain ambient waves and
+   * external impulses, but exclude waves generated by moving disturbers.
    */
-  async getSurfacePoint(points: Vector3[], outPos?: Vector3[], outNorm?: Vector3[]) {
-    const device = getDevice();
-    if (!points || points.length === 0) {
+  async getSurfacePoint(
+    points: Vector3[],
+    outPos?: Vector3[],
+    outNorm?: Vector3[],
+    includeDisturbers = true
+  ) {
+    if (!outPos && !outNorm) {
       return;
     }
+    const hits = await this._evaluateSurfacePoints(points, !!outNorm, includeDisturbers);
+    if (!hits) {
+      return;
+    }
+    for (let i = 0; i < points.length; i++) {
+      outPos && outPos[i].setXYZ(hits[i].x, hits[i].y, hits[i].z);
+      outNorm && outNorm[i].setXYZ(hits[i].nx, hits[i].ny, hits[i].nz);
+    }
+  }
+  /**
+   * Evaluate the disturbed surface over a set of world XZ positions.
+   *
+   * This is the surface the material itself draws, evaluated by the same wave
+   * generator, so it is exact by construction - unlike a CPU-side reconstruction
+   * of the spectrum, which is a second implementation that has to be kept in
+   * step with the first. What it costs is one point-list draw plus one readback
+   * per call, all in a single batch, which makes it suitable for a handful of
+   * queries or for a fixed set of probes asked once a frame.
+   *
+   * Requests are serialized: the vertex buffer and the render target behind them
+   * are shared, so two overlapping calls in the same frame would overwrite each
+   * other's input. A caller that issues a second request while one is in flight
+   * waits for the first to finish rather than corrupting it.
+   *
+   * @param points - World XZ positions to evaluate. Y is ignored.
+   * @param withNormal - Whether to also read the surface normal back, which
+   * costs a second readback of the same size.
+   * @returns One hit per input point, or null if `points` was empty.
+   * @internal
+   */
+  private async _evaluateSurfacePoints(
+    points: Vector3[],
+    withNormal: boolean,
+    includeDisturbers = true
+  ): Promise<Nullable<SurfacePointHit[]>> {
+    const device = getDevice();
+    if (!points || points.length === 0) {
+      return null;
+    }
     points = points.map((v) => v.clone());
-    await device.runNextFrameAsync(async () => {
-      if (!this._feedbackProgram.get()) {
-        this._feedbackProgram.set(this._createFeedbackProgram(device));
-        this._feedbackBindGroup.set(device.createBindGroup(this._feedbackProgram.get()!.bindGroupLayouts[0]));
-      }
-      if (!this._feedbackPrimitive.get()) {
-        this._feedbackPrimitive.set(new Primitive());
-        this._feedbackPrimitive.get()!.primitiveType = 'point-list';
-      }
-      if (!this._feedbackRenderStates) {
-        this._feedbackRenderStates = device.createRenderStateSet();
-        this._feedbackRenderStates.useDepthState().enableTest(false).enableWrite(false);
-        this._feedbackRenderStates.useRasterizerState().setCullMode('none');
-      }
-      const primitive = this._feedbackPrimitive.get()!;
-      const vertices = new Float32Array(points.length * 4);
-      for (let i = 0; i < points.length; i++) {
-        vertices[i * 4 + 0] = points[i].x;
-        vertices[i * 4 + 1] = points[i].y;
-        vertices[i * 4 + 2] = points[i].z;
-        vertices[i * 4 + 3] = i;
-      }
-      let vb = primitive.getVertexBuffer('position');
-      if (!vb || vb.byteLength !== vertices.byteLength) {
-        vb = device.createVertexBuffer('position_f32x4', vertices, { dynamic: true })!;
-        primitive.setVertexBuffer(vb);
-      } else {
-        vb.bufferSubData(0, vertices);
-      }
-      const fb = this._feedbackRenderTarget.get();
-      if (!fb || fb.getColorAttachment(0).width < points.length) {
-        const rt0 = device.createTexture2D('rgba32f', points.length, 1, {
-          mipmapping: false
-        })!;
-        const rt1 = device.createTexture2D('rgba32f', points.length, 1, {
-          mipmapping: false
-        })!;
-        if (fb) {
-          fb.getColorAttachment(0).dispose();
-          fb.getColorAttachment(1).dispose();
-          this._feedbackRenderTarget.dispose();
+    const timing = { issued: device.frameInfo.frameCounter, recorded: 0, mapped: 0 };
+    // Take the queue's tail and replace it in the same synchronous step, and only
+    // then wait on the one taken. Waiting first and replacing after leaves a gap
+    // across the await: two callers arriving together both see the same already
+    // settled tail, both pass, and both go on to write the shared vertex buffer
+    // and render target while the other's draw is still in the command stream.
+    // The draw then reads a buffer the second caller has already resized - the
+    // "vertex range requires a larger buffer" error, and a black frame.
+    const previous = this._feedbackQueue;
+    let release: () => void = () => {};
+    this._feedbackQueue = new Promise<void>((resolve) => (release = resolve));
+    await previous;
+    const hits: SurfacePointHit[] = points.map(() => ({
+      x: 0,
+      y: 0,
+      z: 0,
+      nx: 0,
+      ny: 1,
+      nz: 0
+    }));
+    try {
+      await device.runNextFrameAsync(async () => {
+        timing.recorded = device.frameInfo.frameCounter;
+        const renderedGenerator = this.material.waveGenerator;
+        const waveGenerator =
+          !includeDisturbers && renderedGenerator instanceof InteractiveWaveGenerator
+            ? new InteractiveWaveGenerator(renderedGenerator.base, renderedGenerator.interaction, false)
+            : renderedGenerator;
+        const feedbackHash = waveGenerator?.getHash() ?? '';
+        if (this._feedbackProgram.get() && this._feedbackHash !== feedbackHash) {
+          // The surface changed under the program (another generator, or an
+          // interaction field attached); a program built for the old one would
+          // answer for a surface that is no longer drawn.
+          this._feedbackBindGroup.dispose();
+          this._feedbackProgram.dispose();
         }
-        this._feedbackRenderTarget.set(device.createFrameBuffer([rt0, rt1], null));
-      }
-      primitive.indexCount = points.length;
-      const bindGroup = this._feedbackBindGroup.get()!;
-      bindGroup.setValue('textureWidth', this._feedbackRenderTarget.get()!.getWidth());
-      this.waveGenerator!.applyWaterBindGroup(bindGroup);
-      device.pushDeviceStates();
-      device.setProgram(this._feedbackProgram.get());
-      device.setBindGroup(0, this._feedbackBindGroup.get()!);
-      device.setFramebuffer(this._feedbackRenderTarget.get());
-      this._feedbackPrimitive.get()!.draw();
-      device.popDeviceStates();
-      const pos = new Float32Array(points.length * 4);
-      const norm = new Float32Array(points.length * 4);
-      await Promise.all([
-        this._feedbackRenderTarget.get()!.getColorAttachment(0).readPixels(0, 0, points.length, 1, 0, 0, pos),
-        this._feedbackRenderTarget.get()!.getColorAttachment(1).readPixels(0, 0, points.length, 1, 0, 0, norm)
-      ]);
-      for (let i = 0; i < points.length; i++) {
-        if (outPos) {
-          outPos[i].setXYZ(pos[i * 4 + 0], pos[i * 4 + 1], pos[i * 4 + 2]);
+        if (!this._feedbackProgram.get()) {
+          this._feedbackHash = feedbackHash;
+          this._feedbackProgram.set(this._createFeedbackProgram(device, waveGenerator));
+          this._feedbackBindGroup.set(
+            device.createBindGroup(this._feedbackProgram.get()!.bindGroupLayouts[0])
+          );
         }
-        if (outNorm) {
-          outNorm[i].setXYZ(norm[i * 4 + 0], norm[i * 4 + 1], norm[i * 4 + 2]);
+        if (!this._feedbackPrimitive.get()) {
+          this._feedbackPrimitive.set(new Primitive());
+          this._feedbackPrimitive.get()!.primitiveType = 'point-list';
         }
-      }
-    });
+        if (!this._feedbackRenderStates) {
+          this._feedbackRenderStates = device.createRenderStateSet();
+          this._feedbackRenderStates.useDepthState().enableTest(false).enableWrite(false);
+          this._feedbackRenderStates.useRasterizerState().setCullMode('none');
+        }
+        const primitive = this._feedbackPrimitive.get()!;
+        const vertices = new Float32Array(points.length * 4);
+        for (let i = 0; i < points.length; i++) {
+          vertices[i * 4 + 0] = points[i].x;
+          vertices[i * 4 + 1] = points[i].y;
+          vertices[i * 4 + 2] = points[i].z;
+          vertices[i * 4 + 3] = i;
+        }
+        let vb = primitive.getVertexBuffer('position');
+        if (!vb || vb.byteLength !== vertices.byteLength) {
+          vb = device.createVertexBuffer('position_f32x4', vertices, { dynamic: true })!;
+          primitive.setVertexBuffer(vb);
+        } else {
+          vb.bufferSubData(0, vertices);
+        }
+        const fb = this._feedbackRenderTarget.get();
+        if (!fb || fb.getColorAttachment(0).width < points.length) {
+          const rt0 = device.createTexture2D('rgba32f', points.length, 1, {
+            mipmapping: false
+          })!;
+          const rt1 = device.createTexture2D('rgba32f', points.length, 1, {
+            mipmapping: false
+          })!;
+          if (fb) {
+            fb.getColorAttachment(0).dispose();
+            fb.getColorAttachment(1).dispose();
+            this._feedbackRenderTarget.dispose();
+          }
+          this._feedbackRenderTarget.set(device.createFrameBuffer([rt0, rt1], null));
+        }
+        primitive.indexCount = points.length;
+        const bindGroup = this._feedbackBindGroup.get()!;
+        bindGroup.setValue('textureWidth', this._feedbackRenderTarget.get()!.getWidth());
+        waveGenerator?.applyWaterBindGroup(bindGroup);
+        device.pushDeviceStates();
+        device.setProgram(this._feedbackProgram.get());
+        device.setBindGroup(0, this._feedbackBindGroup.get()!);
+        device.setFramebuffer(this._feedbackRenderTarget.get());
+        this._feedbackPrimitive.get()!.draw();
+        device.popDeviceStates();
+        const pos = new Float32Array(points.length * 4);
+        // The normal attachment is only read when it is wanted: it is the same
+        // size as the position one, so skipping it halves the readback for the
+        // callers that only need a height.
+        const norm = withNormal ? new Float32Array(points.length * 4) : null;
+        // Each readPixels records its texture-to-buffer copy synchronously, before
+        // its first await, so once both calls have been made the draw and both
+        // copies are in the command stream. Submitting right here, instead of
+        // letting them ride the end-of-frame submit, means the readback's mapAsync
+        // starts while this frame's main render is still being recorded, rather
+        // than queueing behind it on the GPU. This callback runs from beginFrame,
+        // ahead of the frame's own passes, so the submit carries nothing but the
+        // feedback work and costs the main render nothing. On WebGL flush() is a
+        // plain glFlush and the same ordering holds.
+        const readPos = this._feedbackRenderTarget
+          .get()!
+          .getColorAttachment(0)
+          .readPixels(0, 0, points.length, 1, 0, 0, pos);
+        const readNorm = norm
+          ? this._feedbackRenderTarget
+              .get()!
+              .getColorAttachment(1)
+              .readPixels(0, 0, points.length, 1, 0, 0, norm)
+          : Promise.resolve();
+        device.flush();
+        await Promise.all([readPos, readNorm]);
+        timing.mapped = device.frameInfo.frameCounter;
+        this.lastFeedbackTiming = timing;
+        for (let i = 0; i < points.length; i++) {
+          hits[i].x = pos[i * 4 + 0];
+          hits[i].y = pos[i * 4 + 1];
+          hits[i].z = pos[i * 4 + 2];
+          if (norm) {
+            hits[i].nx = norm[i * 4 + 0];
+            hits[i].ny = norm[i * 4 + 1];
+            hits[i].nz = norm[i * 4 + 2];
+          }
+        }
+      });
+    } finally {
+      release();
+    }
+    return hits;
   }
   /** @internal */
-  private _createFeedbackProgram(device: AbstractDevice) {
-    const that = this;
+  private _createFeedbackProgram(device: AbstractDevice, waveGenerator: Nullable<WaveGenerator>) {
     const program = device.buildRenderProgram({
       vertex(pb) {
         this.$inputs.position = pb.vec4().attrib('position');
         this.textureWidth = pb.float().uniform(0);
-        that.waveGenerator!.setupUniforms(this, 0);
+        if (waveGenerator) {
+          waveGenerator.setupUniforms(this, 0);
+        }
         pb.main(function () {
-          this.$l.worldPos = pb.vec3();
-          this.$l.worldNorm = pb.vec3();
-          that.waveGenerator!.calcVertexPositionAndNormal(
-            this,
-            this.$inputs.position.xyz,
-            this.worldPos,
-            this.worldNorm
-          );
+          if (waveGenerator) {
+            this.$l.worldPos = pb.vec3();
+            this.$l.worldNorm = pb.vec3();
+            waveGenerator.calcVertexPositionAndNormal(
+              this,
+              this.$inputs.position.xyz,
+              this.worldPos,
+              this.worldNorm
+            );
+          } else {
+            this.$l.worldPos = this.$inputs.position.xyz;
+            this.$l.worldNorm = pb.vec3(0, 1, 0);
+          }
           this.$outputs.worldPos = this.worldPos;
           this.$outputs.worldNorm = this.worldNorm;
           this.$outputs.xz = this.$inputs.position.xz;
@@ -981,13 +1254,14 @@ export class Water extends applyMixins(GraphNode, mixinDrawable) implements Draw
       fragment(pb) {
         this.$outputs.worldPos = pb.vec4();
         this.$outputs.worldNorm = pb.vec4();
-        that.waveGenerator!.setupUniforms(this, 0);
+        if (waveGenerator) {
+          waveGenerator.setupUniforms(this, 0);
+        }
         pb.main(function () {
           this.$outputs.worldPos = pb.vec4(this.$inputs.worldPos, 1);
-          this.$outputs.worldNorm = pb.vec4(
-            that.waveGenerator!.calcFragmentNormal(this, this.$inputs.xz, this.$inputs.worldNorm),
-            1
-          );
+          this.$outputs.worldNorm = waveGenerator
+            ? pb.vec4(waveGenerator.calcFragmentNormal(this, this.$inputs.xz, this.$inputs.worldNorm), 1)
+            : pb.vec4(0, 1, 0, 1);
         });
       }
     })!;

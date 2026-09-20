@@ -1,0 +1,14 @@
+blank_issues_enabled: false
+
+contact_links:
+  - name: Question or "how do I do X"
+    url: https://github.com/gavinyork/zephyr3d/discussions
+    about: Usage questions, design discussions and ideas belong in Discussions, not the issue tracker.
+
+  - name: Documentation
+    url: https://zephyr3d.org/doc/
+    about: Guides and API reference — English and 简体中文.
+
+  - name: Commercial use or integration help
+    url: https://github.com/gavinyork/zephyr3d/discussions
+    about: Using Zephyr3D in a product, or need a support arrangement? Start a thread here.
