@@ -9,7 +9,7 @@ import type { SceneNode } from '../../scene/scene_node';
  */
 export interface SpringCollider {
   /** Type of collider */
-  type: 'sphere' | 'capsule' | 'plane';
+  type: 'sphere' | 'capsule' | 'plane' | 'box';
   /** Associated scene node (optional, for dynamic colliders) */
   node?: Nullable<SceneNode>;
   /** Whether this collider is enabled */
@@ -73,6 +73,28 @@ export interface PlaneCollider extends SpringCollider {
   localPointOffset?: Vector3;
   /** Local normal direction (if node is set) */
   localNormal?: Vector3;
+}
+
+/**
+ * Oriented box collider for spring collision detection.
+ *
+ * The three axes are normalized world-space directions and halfExtents are
+ * measured along the corresponding axes.
+ *
+ * @public
+ */
+export interface BoxCollider extends SpringCollider {
+  type: 'box';
+  /** Center position in world space */
+  center: Vector3;
+  /** World-space half extents along each local axis */
+  halfExtents: Vector3;
+  /** Normalized world-space local X/Y/Z axes */
+  axes: [Vector3, Vector3, Vector3];
+  /** Local center offset from node */
+  localOffset?: Vector3;
+  /** Authoring-space half extents before node scaling */
+  localHalfExtents?: Vector3;
 }
 
 /**
@@ -207,6 +229,54 @@ export function createPlaneCollider(
 }
 
 /**
+ * Creates an oriented box collider.
+ * @param centerOrOffset - Center position in world space, or local offset if node is provided
+ * @param halfExtents - Local/world half extents of the box
+ * @param node - Optional scene node to attach to
+ *
+ * @public
+ */
+export function createBoxCollider(
+  centerOrOffset: Vector3,
+  halfExtents: Vector3,
+  node?: SceneNode
+): BoxCollider {
+  const localExtents = new Vector3(
+    Math.max(0.0001, Math.abs(halfExtents.x)),
+    Math.max(0.0001, Math.abs(halfExtents.y)),
+    Math.max(0.0001, Math.abs(halfExtents.z))
+  );
+  if (node) {
+    const worldMatrix = node.worldMatrix;
+    const center = worldMatrix.transformPointAffine(centerOrOffset, new Vector3());
+    const axes = createWorldAxes(worldMatrix);
+    const scales = getAxisScales(worldMatrix);
+    return {
+      type: 'box',
+      center,
+      halfExtents: new Vector3(
+        localExtents.x * scales.x,
+        localExtents.y * scales.y,
+        localExtents.z * scales.z
+      ),
+      axes,
+      localOffset: centerOrOffset.clone(),
+      localHalfExtents: localExtents,
+      node,
+      enabled: true
+    };
+  }
+  return {
+    type: 'box',
+    center: centerOrOffset.clone(),
+    halfExtents: localExtents,
+    axes: [Vector3.axisPX(), Vector3.axisPY(), Vector3.axisPZ()],
+    node: null,
+    enabled: true
+  };
+}
+
+/**
  * Resolves collision between a particle and a sphere collider
  * @returns true if collision occurred
  *
@@ -310,6 +380,44 @@ export function resolvePlaneCollision(particlePos: Vector3, collider: PlaneColli
 }
 
 /**
+ * Resolves collision between a particle and an oriented box collider.
+ * @returns true if collision occurred
+ *
+ * @public
+ */
+export function resolveBoxCollision(particlePos: Vector3, collider: BoxCollider): boolean {
+  const delta = Vector3.sub(particlePos, collider.center, new Vector3());
+  const local = new Vector3(
+    Vector3.dot(delta, collider.axes[0]),
+    Vector3.dot(delta, collider.axes[1]),
+    Vector3.dot(delta, collider.axes[2])
+  );
+  const penetration = new Vector3(
+    collider.halfExtents.x - Math.abs(local.x),
+    collider.halfExtents.y - Math.abs(local.y),
+    collider.halfExtents.z - Math.abs(local.z)
+  );
+  if (penetration.x < 0 || penetration.y < 0 || penetration.z < 0) {
+    return false;
+  }
+  let axis = 0;
+  let minPenetration = penetration.x;
+  if (penetration.y < minPenetration) {
+    axis = 1;
+    minPenetration = penetration.y;
+  }
+  if (penetration.z < minPenetration) {
+    axis = 2;
+    minPenetration = penetration.z;
+  }
+  const localAxis = axis === 0 ? local.x : axis === 1 ? local.y : local.z;
+  const sign = localAxis < 0 ? -1 : 1;
+  const correction = Vector3.scale(collider.axes[axis], minPenetration * sign, new Vector3());
+  Vector3.add(particlePos, correction, particlePos);
+  return true;
+}
+
+/**
  * Updates collider position from its associated node
  *
  * @public
@@ -384,7 +492,46 @@ export function updateColliderFromNode(collider: SpringCollider, runtimeNode?: N
       }
       break;
     }
+
+    case 'box': {
+      const box = collider as BoxCollider;
+      if (box.localOffset) {
+        worldMatrix.transformPointAffine(box.localOffset, box.center);
+      } else {
+        box.center.x = worldMatrix.m03;
+        box.center.y = worldMatrix.m13;
+        box.center.z = worldMatrix.m23;
+      }
+      const axes = createWorldAxes(worldMatrix);
+      box.axes[0].set(axes[0]);
+      box.axes[1].set(axes[1]);
+      box.axes[2].set(axes[2]);
+      if (box.localHalfExtents) {
+        const scales = getAxisScales(worldMatrix);
+        box.halfExtents.setXYZ(
+          box.localHalfExtents.x * scales.x,
+          box.localHalfExtents.y * scales.y,
+          box.localHalfExtents.z * scales.z
+        );
+      }
+      break;
+    }
   }
+}
+
+function createWorldAxes(worldMatrix: any): [Vector3, Vector3, Vector3] {
+  const x = worldMatrix.transformVectorAffine(Vector3.axisPX(), new Vector3()).inplaceNormalize();
+  const y = worldMatrix.transformVectorAffine(Vector3.axisPY(), new Vector3()).inplaceNormalize();
+  const z = worldMatrix.transformVectorAffine(Vector3.axisPZ(), new Vector3()).inplaceNormalize();
+  return [x, y, z];
+}
+
+function getAxisScales(worldMatrix: any) {
+  return {
+    x: Math.max(1e-6, worldMatrix.transformVectorAffine(Vector3.axisPX(), new Vector3()).magnitude),
+    y: Math.max(1e-6, worldMatrix.transformVectorAffine(Vector3.axisPY(), new Vector3()).magnitude),
+    z: Math.max(1e-6, worldMatrix.transformVectorAffine(Vector3.axisPZ(), new Vector3()).magnitude)
+  };
 }
 
 function getUniformScale(worldMatrix: any): number {

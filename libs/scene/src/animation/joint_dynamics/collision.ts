@@ -263,10 +263,54 @@ export function pushoutFromCollider(
   ptR: PointR,
   out?: CollisionResult
 ): CollisionResult {
+  if (colR.boxHalfExtents) {
+    return pushoutFromBox(colRW, colR.boxHalfExtents, ptR.pointRadius, point, out);
+  }
   if (colR.height <= EPSILON) {
     return pushoutFromSphere(colRW.positionCurrent, colRW.radius, ptR.pointRadius, point, out);
   }
   return pushoutFromCapsule(colR, colRW, point, ptR, out);
+}
+
+/** Pushes a point out of an oriented box collider. */
+export function pushoutFromBox(
+  colRW: ColliderRW,
+  halfExtents: Vector3,
+  pointRadius: number,
+  point: Vector3,
+  out?: CollisionResult
+): CollisionResult {
+  const delta = Vector3.sub(point, colRW.positionCurrent, _pushoutSphereDirection);
+  const local = new Vector3(
+    Vector3.dot(delta, colRW.boxAxes[0]),
+    Vector3.dot(delta, colRW.boxAxes[1]),
+    Vector3.dot(delta, colRW.boxAxes[2])
+  );
+  const target = new Vector3(
+    halfExtents.x + pointRadius,
+    halfExtents.y + pointRadius,
+    halfExtents.z + pointRadius
+  );
+  const penetration = new Vector3(target.x - Math.abs(local.x), target.y - Math.abs(local.y), target.z - Math.abs(local.z));
+  if (penetration.x < 0 || penetration.y < 0 || penetration.z < 0) {
+    return writeCollisionResult(out, false, point, !out);
+  }
+  let axis = 0;
+  let minPenetration = penetration.x;
+  if (penetration.y < minPenetration) {
+    axis = 1;
+    minPenetration = penetration.y;
+  }
+  if (penetration.z < minPenetration) {
+    axis = 2;
+    minPenetration = penetration.z;
+  }
+  const value = axis === 0 ? local.x : axis === 1 ? local.y : local.z;
+  const sign = value < 0 ? -1 : 1;
+  const result = point.clone();
+  const correction = Vector3.scale(colRW.boxAxes[axis], minPenetration * sign, new Vector3());
+  Vector3.add(result, correction, result);
+  return writeCollisionResult(out, true, result, !out);
 }
 
 /**
@@ -347,10 +391,51 @@ export function pushInFromCollider(
   point: Vector3,
   out?: CollisionResult
 ): CollisionResult {
+  if (colR.boxHalfExtents) {
+    return pushInFromBox(colRW, colR.boxHalfExtents, point, out);
+  }
   if (colR.height <= EPSILON) {
     return pushInFromSphere(colRW.positionCurrent, colRW.radius, point, out);
   }
   return pushInFromCapsule(colR, colRW, point, out);
+}
+
+/** Pulls a point back inside an oriented box collider. */
+export function pushInFromBox(
+  colRW: ColliderRW,
+  halfExtents: Vector3,
+  point: Vector3,
+  out?: CollisionResult
+): CollisionResult {
+  const delta = Vector3.sub(point, colRW.positionCurrent, _pushInSphereDirection);
+  const local = new Vector3(
+    Vector3.dot(delta, colRW.boxAxes[0]),
+    Vector3.dot(delta, colRW.boxAxes[1]),
+    Vector3.dot(delta, colRW.boxAxes[2])
+  );
+  const excess = new Vector3(
+    Math.abs(local.x) - halfExtents.x,
+    Math.abs(local.y) - halfExtents.y,
+    Math.abs(local.z) - halfExtents.z
+  );
+  if (excess.x <= 0 && excess.y <= 0 && excess.z <= 0) {
+    return writeCollisionResult(out, false, point, !out);
+  }
+  let axis = 0;
+  let correctionDistance = excess.x;
+  if (excess.y > correctionDistance) {
+    axis = 1;
+    correctionDistance = excess.y;
+  }
+  if (excess.z > correctionDistance) {
+    axis = 2;
+    correctionDistance = excess.z;
+  }
+  const value = axis === 0 ? local.x : axis === 1 ? local.y : local.z;
+  const sign = value < 0 ? -1 : 1;
+  const correction = Vector3.scale(colRW.boxAxes[axis], -correctionDistance * sign, new Vector3());
+  const result = Vector3.add(point, correction, new Vector3());
+  return writeCollisionResult(out, true, result, !out);
 }
 
 /**
@@ -487,10 +572,53 @@ export function collisionDetection(
   point2: Vector3,
   out?: LineCollisionResult
 ): LineCollisionResult {
+  if (colR.boxHalfExtents) {
+    return collisionDetectionBox(colRW, colR.boxHalfExtents, point1, point2, out);
+  }
   if (colR.height <= EPSILON) {
     return collisionDetectionSphere(colRW.positionCurrent, colRW.radius, point1, point2, out);
   }
   return collisionDetectionCapsule(colR, colRW, point1, point2, out);
+}
+
+function collisionDetectionBox(
+  colRW: ColliderRW,
+  halfExtents: Vector3,
+  point1: Vector3,
+  point2: Vector3,
+  out?: LineCollisionResult
+): LineCollisionResult {
+  const p1 = Vector3.sub(point1, colRW.positionCurrent, new Vector3());
+  const p2 = Vector3.sub(point2, colRW.positionCurrent, new Vector3());
+  const a = new Vector3(Vector3.dot(p1, colRW.boxAxes[0]), Vector3.dot(p1, colRW.boxAxes[1]), Vector3.dot(p1, colRW.boxAxes[2]));
+  const b = new Vector3(Vector3.dot(p2, colRW.boxAxes[0]), Vector3.dot(p2, colRW.boxAxes[1]), Vector3.dot(p2, colRW.boxAxes[2]));
+  const d = Vector3.sub(b, a, new Vector3());
+  let enter = 0;
+  let exit = 1;
+  const mins = [-halfExtents.x, -halfExtents.y, -halfExtents.z];
+  const maxs = [halfExtents.x, halfExtents.y, halfExtents.z];
+  const av = [a.x, a.y, a.z];
+  const dv = [d.x, d.y, d.z];
+  for (let axis = 0; axis < 3; axis++) {
+    if (Math.abs(dv[axis]) <= EPSILON) {
+      if (av[axis] < mins[axis] || av[axis] > maxs[axis]) {
+        return writeLineCollisionResult(out, false, point1, colRW.positionCurrent, 0, !out);
+      }
+      continue;
+    }
+    const inv = 1 / dv[axis];
+    let t0 = (mins[axis] - av[axis]) * inv;
+    let t1 = (maxs[axis] - av[axis]) * inv;
+    if (t0 > t1) [t0, t1] = [t1, t0];
+    enter = Math.max(enter, t0);
+    exit = Math.min(exit, t1);
+    if (enter > exit) {
+      return writeLineCollisionResult(out, false, point1, colRW.positionCurrent, 0, !out);
+    }
+  }
+  const t = Math.max(0, Math.min(1, enter));
+  const hitPoint = Vector3.add(point1, Vector3.scale(Vector3.sub(point2, point1, new Vector3()), t, new Vector3()), new Vector3());
+  return writeLineCollisionResult(out, true, hitPoint, hitPoint, 0, !out);
 }
 
 /**

@@ -22,6 +22,7 @@ import type { MeshUpdateCallback } from '../../scene/mesh';
 import { BoundingBox } from '../../utility/bounding_volume';
 import type {
   CapsuleCollider,
+  BoxCollider,
   PlaneCollider,
   SphereCollider,
   SpringCollider
@@ -665,6 +666,7 @@ function createIntegrateProgram(device: AbstractDevice, workgroupSize: number) {
       this.sphereData = pb.float[0]().storageBufferReadonly(0);
       this.capsuleData = pb.float[0]().storageBufferReadonly(0);
       this.planeData = pb.float[0]().storageBufferReadonly(0);
+      this.boxData = pb.float[0]().storageBufferReadonly(0);
       this.vertexCount = pb.uint().uniform(0);
       this.deltaTime = pb.float().uniform(0);
       this.damping = pb.float().uniform(0);
@@ -672,6 +674,7 @@ function createIntegrateProgram(device: AbstractDevice, workgroupSize: number) {
       this.sphereCount = pb.uint().uniform(0);
       this.capsuleCount = pb.uint().uniform(0);
       this.planeCount = pb.uint().uniform(0);
+      this.boxCount = pb.uint().uniform(0);
       this.dynamicFriction = pb.float().uniform(0);
       this.staticFriction = pb.float().uniform(0);
       this.minDistance = pb.float().uniform(0);
@@ -897,6 +900,65 @@ function createIntegrateProgram(device: AbstractDevice, workgroupSize: number) {
             });
           });
 
+          this.$for(pb.uint('b'), 0, this.boxCount, function () {
+            this.$l.boxBase = pb.mul(this.b, 16);
+            this.$l.boxCenter = pb.vec3(
+              this.boxData.at(this.boxBase),
+              this.boxData.at(pb.add(this.boxBase, 1)),
+              this.boxData.at(pb.add(this.boxBase, 2))
+            );
+            this.$l.boxHalf = pb.vec3(
+              this.boxData.at(pb.add(this.boxBase, 3)),
+              this.boxData.at(pb.add(this.boxBase, 4)),
+              this.boxData.at(pb.add(this.boxBase, 5))
+            );
+            this.$l.boxAxisX = pb.vec3(
+              this.boxData.at(pb.add(this.boxBase, 6)),
+              this.boxData.at(pb.add(this.boxBase, 7)),
+              this.boxData.at(pb.add(this.boxBase, 8))
+            );
+            this.$l.boxAxisY = pb.vec3(
+              this.boxData.at(pb.add(this.boxBase, 9)),
+              this.boxData.at(pb.add(this.boxBase, 10)),
+              this.boxData.at(pb.add(this.boxBase, 11))
+            );
+            this.$l.boxAxisZ = pb.vec3(
+              this.boxData.at(pb.add(this.boxBase, 12)),
+              this.boxData.at(pb.add(this.boxBase, 13)),
+              this.boxData.at(pb.add(this.boxBase, 14))
+            );
+            this.$l.boxRel = pb.sub(this.next, this.boxCenter);
+            this.$l.boxLocal = pb.vec3(
+              pb.dot(this.boxRel, this.boxAxisX),
+              pb.dot(this.boxRel, this.boxAxisY),
+              pb.dot(this.boxRel, this.boxAxisZ)
+            );
+            this.$l.boxPen = pb.sub(this.boxHalf, pb.abs(this.boxLocal));
+            this.$if(
+              pb.and(
+                pb.and(pb.greaterThan(this.boxPen.x, 0), pb.greaterThan(this.boxPen.y, 0)),
+                pb.greaterThan(this.boxPen.z, 0)
+              ),
+              function () {
+                this.$l.boxAxis = this.boxAxisX;
+                this.$l.boxDepth = this.boxPen.x;
+                this.$l.boxSign = pb.select(pb.float(1), pb.float(-1), pb.greaterThanEqual(this.boxLocal.x, 0));
+                this.$if(pb.lessThan(this.boxPen.y, this.boxDepth), function () {
+                  this.boxAxis = this.boxAxisY;
+                  this.boxDepth = this.boxPen.y;
+                  this.boxSign = pb.select(pb.float(1), pb.float(-1), pb.greaterThanEqual(this.boxLocal.y, 0));
+                });
+                this.$if(pb.lessThan(this.boxPen.z, this.boxDepth), function () {
+                  this.boxAxis = this.boxAxisZ;
+                  this.boxDepth = this.boxPen.z;
+                  this.boxSign = pb.select(pb.float(1), pb.float(-1), pb.greaterThanEqual(this.boxLocal.z, 0));
+                });
+                this.$l.boxSign = this.boxSign;
+                this.next = pb.add(this.next, pb.mul(this.boxAxis, pb.mul(this.boxSign, this.boxDepth)));
+              }
+            );
+          });
+
           this.next = pb.add(pb.mul(this.next, this.freeWeight), pb.mul(this.rest, this.pinWeight));
           this.$l.prevOut = pb.add(pb.mul(this.current, this.freeWeight), pb.mul(this.rest, this.pinWeight));
           this.prevPositions.setAt(this.base, this.prevOut.x);
@@ -927,6 +989,7 @@ function createConstraintProgram(device: AbstractDevice, workgroupSize: number) 
       this.sphereData = pb.float[0]().storageBufferReadonly(0);
       this.capsuleData = pb.float[0]().storageBufferReadonly(0);
       this.planeData = pb.float[0]().storageBufferReadonly(0);
+      this.boxData = pb.float[0]().storageBufferReadonly(0);
       this.vertexCount = pb.uint().uniform(0);
       this.maxNeighbors = pb.uint().uniform(0);
       this.stiffness = pb.float().uniform(0);
@@ -934,6 +997,7 @@ function createConstraintProgram(device: AbstractDevice, workgroupSize: number) 
       this.sphereCount = pb.uint().uniform(0);
       this.capsuleCount = pb.uint().uniform(0);
       this.planeCount = pb.uint().uniform(0);
+      this.boxCount = pb.uint().uniform(0);
       this.dynamicFriction = pb.float().uniform(0);
       this.staticFriction = pb.float().uniform(0);
       this.minDistance = pb.float().uniform(0);
@@ -1064,6 +1128,64 @@ function createConstraintProgram(device: AbstractDevice, workgroupSize: number) 
               this.$if(pb.lessThan(this.planeDistance, 0), function () {
                 this.corrected = pb.sub(this.corrected, pb.mul(this.planeNormal, this.planeDistance));
               });
+            });
+            this.$for(pb.uint('b'), 0, this.boxCount, function () {
+              this.$l.boxBase = pb.mul(this.b, 16);
+              this.$l.boxCenter = pb.vec3(
+                this.boxData.at(this.boxBase),
+                this.boxData.at(pb.add(this.boxBase, 1)),
+                this.boxData.at(pb.add(this.boxBase, 2))
+              );
+              this.$l.boxHalf = pb.vec3(
+                this.boxData.at(pb.add(this.boxBase, 3)),
+                this.boxData.at(pb.add(this.boxBase, 4)),
+                this.boxData.at(pb.add(this.boxBase, 5))
+              );
+              this.$l.boxAxisX = pb.vec3(
+                this.boxData.at(pb.add(this.boxBase, 6)),
+                this.boxData.at(pb.add(this.boxBase, 7)),
+                this.boxData.at(pb.add(this.boxBase, 8))
+              );
+              this.$l.boxAxisY = pb.vec3(
+                this.boxData.at(pb.add(this.boxBase, 9)),
+                this.boxData.at(pb.add(this.boxBase, 10)),
+                this.boxData.at(pb.add(this.boxBase, 11))
+              );
+              this.$l.boxAxisZ = pb.vec3(
+                this.boxData.at(pb.add(this.boxBase, 12)),
+                this.boxData.at(pb.add(this.boxBase, 13)),
+                this.boxData.at(pb.add(this.boxBase, 14))
+              );
+              this.$l.boxRel = pb.sub(this.corrected, this.boxCenter);
+              this.$l.boxLocal = pb.vec3(
+                pb.dot(this.boxRel, this.boxAxisX),
+                pb.dot(this.boxRel, this.boxAxisY),
+                pb.dot(this.boxRel, this.boxAxisZ)
+              );
+              this.$l.boxPen = pb.sub(this.boxHalf, pb.abs(this.boxLocal));
+              this.$if(
+                pb.and(
+                  pb.and(pb.greaterThan(this.boxPen.x, 0), pb.greaterThan(this.boxPen.y, 0)),
+                  pb.greaterThan(this.boxPen.z, 0)
+                ),
+                function () {
+                  this.$l.boxAxis = this.boxAxisX;
+                  this.$l.boxDepth = this.boxPen.x;
+                  this.$l.boxSign = pb.select(pb.float(1), pb.float(-1), pb.greaterThanEqual(this.boxLocal.x, 0));
+                  this.$if(pb.lessThan(this.boxPen.y, this.boxDepth), function () {
+                    this.boxAxis = this.boxAxisY;
+                    this.boxDepth = this.boxPen.y;
+                    this.boxSign = pb.select(pb.float(1), pb.float(-1), pb.greaterThanEqual(this.boxLocal.y, 0));
+                  });
+                  this.$if(pb.lessThan(this.boxPen.z, this.boxDepth), function () {
+                    this.boxAxis = this.boxAxisZ;
+                    this.boxDepth = this.boxPen.z;
+                    this.boxSign = pb.select(pb.float(1), pb.float(-1), pb.greaterThanEqual(this.boxLocal.z, 0));
+                  });
+                  this.$l.boxSign = this.boxSign;
+                  this.corrected = pb.add(this.corrected, pb.mul(this.boxAxis, pb.mul(this.boxSign, this.boxDepth)));
+                }
+              );
             });
             this.positions.setAt(this.base, this.corrected.x);
             this.positions.setAt(pb.add(this.base, 1), this.corrected.y);
@@ -2160,9 +2282,11 @@ export class GPUClothSystem {
   private _sphereColliderBuffer: Nullable<GPUDataBuffer>;
   private _capsuleColliderBuffer: Nullable<GPUDataBuffer>;
   private _planeColliderBuffer: Nullable<GPUDataBuffer>;
+  private _boxColliderBuffer: Nullable<GPUDataBuffer>;
   private _sphereColliderData: Float32Array<ArrayBuffer>;
   private _capsuleColliderData: Float32Array<ArrayBuffer>;
   private _planeColliderData: Float32Array<ArrayBuffer>;
+  private _boxColliderData: Float32Array<ArrayBuffer>;
   private _triangleIndexBuffer: Nullable<GPUDataBuffer>;
   private _triangleNormalBuffer: Nullable<GPUDataBuffer>;
   private _vertexTriangleAdjacencyBuffer: Nullable<GPUDataBuffer>;
@@ -2236,6 +2360,7 @@ export class GPUClothSystem {
     this._sphereColliderBuffer = null;
     this._capsuleColliderBuffer = null;
     this._planeColliderBuffer = null;
+    this._boxColliderBuffer = null;
     this._sphereColliderData = new Float32Array(
       getInitialColliderBufferFloatCount(this._colliders, 'sphere', 4)
     );
@@ -2244,6 +2369,9 @@ export class GPUClothSystem {
     );
     this._planeColliderData = new Float32Array(
       getInitialColliderBufferFloatCount(this._colliders, 'plane', 8)
+    );
+    this._boxColliderData = new Float32Array(
+      getInitialColliderBufferFloatCount(this._colliders, 'box', 16)
     );
     this._triangleIndexBuffer = null;
     this._triangleNormalBuffer = null;
@@ -2437,6 +2565,14 @@ export class GPUClothSystem {
       });
       this._planeColliderBuffer.bufferSubData(0, this._planeColliderData);
 
+      this._boxColliderBuffer = this._device.createBuffer(this._boxColliderData.byteLength, {
+        usage: 'uniform',
+        storage: true,
+        dynamic: false,
+        managed: false
+      });
+      this._boxColliderBuffer.bufferSubData(0, this._boxColliderData);
+
       this._integrateProgram = createIntegrateProgram(this._device, workgroupSize);
       this._constraintProgram = createConstraintProgram(this._device, workgroupSize);
       if (!this._integrateProgram || !this._constraintProgram) {
@@ -2453,12 +2589,14 @@ export class GPUClothSystem {
       this._integrateBindGroup.setBuffer('sphereData', this._sphereColliderBuffer);
       this._integrateBindGroup.setBuffer('capsuleData', this._capsuleColliderBuffer);
       this._integrateBindGroup.setBuffer('planeData', this._planeColliderBuffer);
+      this._integrateBindGroup.setBuffer('boxData', this._boxColliderBuffer);
       this._integrateBindGroup.setValue('vertexCount', vertexCount);
       this._integrateBindGroup.setValue('damping', this._damping);
       this._integrateBindGroup.setValue('gravity', this._gravity);
       this._integrateBindGroup.setValue('sphereCount', 0);
       this._integrateBindGroup.setValue('capsuleCount', 0);
       this._integrateBindGroup.setValue('planeCount', 0);
+      this._integrateBindGroup.setValue('boxCount', 0);
       this._integrateBindGroup.setValue('dynamicFriction', this._dynamicFriction);
       this._integrateBindGroup.setValue('staticFriction', this._staticFriction);
       this._integrateBindGroup.setValue('minDistance', 1e-5);
@@ -2472,6 +2610,7 @@ export class GPUClothSystem {
       this._constraintBindGroup.setBuffer('sphereData', this._sphereColliderBuffer);
       this._constraintBindGroup.setBuffer('capsuleData', this._capsuleColliderBuffer);
       this._constraintBindGroup.setBuffer('planeData', this._planeColliderBuffer);
+      this._constraintBindGroup.setBuffer('boxData', this._boxColliderBuffer);
       this._constraintBindGroup.setValue('vertexCount', vertexCount);
       this._constraintBindGroup.setValue('maxNeighbors', this._maxNeighbors);
       this._constraintBindGroup.setValue('stiffness', this._stiffness);
@@ -2479,6 +2618,7 @@ export class GPUClothSystem {
       this._constraintBindGroup.setValue('sphereCount', 0);
       this._constraintBindGroup.setValue('capsuleCount', 0);
       this._constraintBindGroup.setValue('planeCount', 0);
+      this._constraintBindGroup.setValue('boxCount', 0);
       this._constraintBindGroup.setValue('dynamicFriction', this._dynamicFriction);
       this._constraintBindGroup.setValue('staticFriction', this._staticFriction);
       this._constraintBindGroup.setValue('minDistance', 1e-5);
@@ -2907,6 +3047,8 @@ export class GPUClothSystem {
     this._capsuleColliderBuffer = null;
     this._planeColliderBuffer?.dispose();
     this._planeColliderBuffer = null;
+    this._boxColliderBuffer?.dispose();
+    this._boxColliderBuffer = null;
     releaseObject(this._originalPositionBuffer);
     this._originalPositionBuffer = null;
     releaseObject(this._originalNormalBuffer);
@@ -2992,6 +3134,7 @@ export class GPUClothSystem {
     const spheres: { collider: SphereCollider; center: Vector3 }[] = [];
     const capsules: { collider: CapsuleCollider; start: Vector3; end: Vector3 }[] = [];
     const planes: { collider: PlaneCollider; point: Vector3; normal: Vector3 }[] = [];
+    const boxes: { collider: BoxCollider }[] = [];
     const blend = this.getTemporalBlendFactor(deltaTime, DEFAULT_COLLIDER_SMOOTHING_TIME);
     for (const collider of this._colliders) {
       if (!collider?.enabled) {
@@ -3022,6 +3165,8 @@ export class GPUClothSystem {
           point: smoothed.point,
           normal: smoothed.normal
         });
+      } else if (collider.type === 'box') {
+        boxes.push({ collider: collider as BoxCollider });
       }
     }
 
@@ -3069,6 +3214,31 @@ export class GPUClothSystem {
       planeData[base + 5] = normal.y;
       planeData[base + 6] = normal.z;
       planeData[base + 7] = 0;
+    }
+    const boxData = new Float32Array(Math.max(1, boxes.length) * 16);
+    for (let i = 0; i < boxes.length; i++) {
+      const base = i * 16;
+      const box = boxes[i].collider;
+      const center = this.toCollisionSpacePoint(box.center);
+      const axisX = this.toCollisionSpaceVector(box.axes[0]);
+      const axisY = this.toCollisionSpaceVector(box.axes[1]);
+      const axisZ = this.toCollisionSpaceVector(box.axes[2]);
+      boxData[base] = center.x;
+      boxData[base + 1] = center.y;
+      boxData[base + 2] = center.z;
+      boxData[base + 3] = this.toCollisionSpaceRadius(box.halfExtents.x);
+      boxData[base + 4] = this.toCollisionSpaceRadius(box.halfExtents.y);
+      boxData[base + 5] = this.toCollisionSpaceRadius(box.halfExtents.z);
+      boxData[base + 6] = axisX.x;
+      boxData[base + 7] = axisX.y;
+      boxData[base + 8] = axisX.z;
+      boxData[base + 9] = axisY.x;
+      boxData[base + 10] = axisY.y;
+      boxData[base + 11] = axisY.z;
+      boxData[base + 12] = axisZ.x;
+      boxData[base + 13] = axisZ.y;
+      boxData[base + 14] = axisZ.z;
+      boxData[base + 15] = 0;
     }
 
     if (!this._sphereColliderBuffer || this._sphereColliderBuffer.byteLength < sphereData.byteLength) {
@@ -3122,12 +3292,30 @@ export class GPUClothSystem {
     }
     this._planeColliderBuffer.bufferSubData(0, planeData);
 
+    if (!this._boxColliderBuffer || this._boxColliderBuffer.byteLength < boxData.byteLength) {
+      if (this._boxColliderBuffer) {
+        this._device.flush();
+        this._boxColliderBuffer.dispose();
+      }
+      this._boxColliderBuffer = this._device.createBuffer(boxData.byteLength, {
+        usage: 'uniform',
+        storage: true,
+        dynamic: false,
+        managed: false
+      });
+      this._integrateBindGroup.setBuffer('boxData', this._boxColliderBuffer);
+      this._constraintBindGroup?.setBuffer('boxData', this._boxColliderBuffer);
+    }
+    this._boxColliderBuffer.bufferSubData(0, boxData);
+
     this._integrateBindGroup.setValue('sphereCount', spheres.length);
     this._integrateBindGroup.setValue('capsuleCount', capsules.length);
     this._integrateBindGroup.setValue('planeCount', planes.length);
+    this._integrateBindGroup.setValue('boxCount', boxes.length);
     this._constraintBindGroup?.setValue('sphereCount', spheres.length);
     this._constraintBindGroup?.setValue('capsuleCount', capsules.length);
     this._constraintBindGroup?.setValue('planeCount', planes.length);
+    this._constraintBindGroup?.setValue('boxCount', boxes.length);
   }
 
   private getSubstepPoseFollow() {

@@ -175,6 +175,8 @@ export interface Constraint {
  * @public
  */
 export interface ColliderR {
+  /** Optional oriented box half extents in the collider's local space. */
+  boxHalfExtents?: Vector3;
   /** Base radius of the collider sphere (or capsule head) */
   radius: number;
   /** Scale factor for capsule tail radius relative to head (1.0 = uniform) */
@@ -196,6 +198,10 @@ export interface ColliderR {
  * @public
  */
 export interface ColliderRW {
+  /** Normalized world-space box axes when this is a box collider. */
+  boxAxes: [Vector3, Vector3, Vector3];
+  /** World-space box half extents when this is a box collider. */
+  boxHalfExtents: Vector3;
   /** Current interpolated head position (for this substep) */
   positionCurrent: Vector3;
   /** Current interpolated capsule direction vector (head→tail) */

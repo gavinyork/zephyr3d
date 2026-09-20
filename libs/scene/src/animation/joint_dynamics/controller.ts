@@ -1410,6 +1410,8 @@ export class JointDynamicsSystemController {
       worldScale: scale.clone(),
       localBoundsMin: Vector3.zero(),
       localBoundsMax: Vector3.zero(),
+      boxAxes: [Vector3.axisPX(), Vector3.axisPY(), Vector3.axisPZ()],
+      boxHalfExtents: Vector3.zero(),
       radius: 0,
       height: 0,
       enabled: 1

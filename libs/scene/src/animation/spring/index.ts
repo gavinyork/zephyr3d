@@ -20,13 +20,15 @@ export type {
   SpringPoseReinitializeOptions
 } from './multi_chain_spring_system';
 
-export type { SpringCollider, SphereCollider, CapsuleCollider, PlaneCollider } from './spring_collider';
+export type { SpringCollider, SphereCollider, CapsuleCollider, PlaneCollider, BoxCollider } from './spring_collider';
 export {
   createSphereCollider,
   createCapsuleCollider,
   createPlaneCollider,
+  createBoxCollider,
   resolveSphereCollision,
   resolveCapsuleCollision,
   resolvePlaneCollision,
+  resolveBoxCollision,
   updateColliderFromNode
 } from './spring_collider';

@@ -485,6 +485,27 @@ export class JointDynamicsSystem {
     );
   }
 
+  /** Add an oriented box collider driven by a scene node transform. */
+  addBoxCollider(
+    halfExtents: Vector3,
+    transform?: SceneNode,
+    friction?: number,
+    inversed?: boolean
+  ): JointDynamicsColliderHandle {
+    return this.addCollider(
+      {
+        boxHalfExtents: halfExtents.clone(),
+        forceType: ColliderForce.Off,
+        friction: friction ?? 0,
+        height: 0,
+        isInverseCollider: inversed ?? false,
+        radius: halfExtents.magnitude,
+        radiusTailScale: 1
+      },
+      transform
+    );
+  }
+
   /**
    * Enable or disable a collider by stable handle.
    *

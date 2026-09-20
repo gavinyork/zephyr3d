@@ -9,7 +9,9 @@ import {
   resolveSphereCollision,
   resolveCapsuleCollision,
   resolvePlaneCollision,
+  resolveBoxCollision,
   type CapsuleCollider,
+  type BoxCollider,
   type PlaneCollider,
   type SphereCollider,
   updateColliderFromNode
@@ -638,6 +640,7 @@ export class MultiChainSpringSystem {
     const spheres: SphereCollider[] = [];
     const capsules: CapsuleCollider[] = [];
     const planes: PlaneCollider[] = [];
+    const boxes: BoxCollider[] = [];
 
     for (const collider of this._colliders) {
       const colliderNode = this.resolveRuntimeNode(collider.node);
@@ -676,6 +679,10 @@ export class MultiChainSpringSystem {
           });
           break;
         }
+        case 'box': {
+          boxes.push(collider as BoxCollider);
+          break;
+        }
       }
     }
 
@@ -694,6 +701,9 @@ export class MultiChainSpringSystem {
         }
         for (const collider of planes) {
           collided = resolvePlaneCollision(particle.position, collider) || collided;
+        }
+        for (const collider of boxes) {
+          collided = resolveBoxCollision(particle.position, collider) || collided;
         }
         if (collided) {
           Vector3.add(

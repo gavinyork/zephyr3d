@@ -6,7 +6,9 @@ import {
   resolveSphereCollision,
   resolveCapsuleCollision,
   resolvePlaneCollision,
+  resolveBoxCollision,
   type CapsuleCollider,
+  type BoxCollider,
   type PlaneCollider,
   type SphereCollider,
   updateColliderFromNode
@@ -615,6 +617,7 @@ export class SpringSystem {
     const spheres: { particleCollider: SphereCollider; collider: SphereCollider }[] = [];
     const capsules: { particleCollider: CapsuleCollider; collider: CapsuleCollider }[] = [];
     const planes: { particleCollider: PlaneCollider; collider: PlaneCollider }[] = [];
+    const boxes: { particleCollider: BoxCollider; collider: BoxCollider }[] = [];
     for (const collider of this._colliders) {
       if (collider.node) {
         updateColliderFromNode(collider);
@@ -660,6 +663,11 @@ export class SpringSystem {
           });
           break;
         }
+        case 'box': {
+          const source = collider as BoxCollider;
+          boxes.push({ particleCollider: source, collider: source });
+          break;
+        }
       }
     }
 
@@ -677,6 +685,9 @@ export class SpringSystem {
       }
       for (const collider of planes) {
         resolvePlaneCollision(particle.position, collider.collider);
+      }
+      for (const collider of boxes) {
+        resolveBoxCollision(particle.position, collider.collider);
       }
     }
   }

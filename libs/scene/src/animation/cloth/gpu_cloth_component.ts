@@ -3,6 +3,7 @@ import type { Mesh } from '../../scene/mesh';
 import type { SceneNode } from '../../scene/scene_node';
 import {
   createCapsuleCollider,
+  createBoxCollider,
   createPlaneCollider,
   createSphereCollider,
   type SpringCollider
@@ -15,12 +16,13 @@ import {
 
 /** Serialized collider used by {@link GPUClothComponent}. */
 export type GPUClothColliderConfig = {
-  type: 'sphere' | 'capsule' | 'plane';
+  type: 'sphere' | 'capsule' | 'plane' | 'box';
   enabled?: boolean;
   nodeId?: string;
   offset?: [number, number, number];
   endOffset?: [number, number, number];
   radius?: number;
+  size?: [number, number, number];
   normal?: [number, number, number];
 };
 
@@ -122,11 +124,18 @@ function resolveMeshByReference(
   id: string,
   path: Array<{ name: string; sameNameIndex: number }> | undefined
 ) {
-  const root = (typeof (host as any)?.getPrefabNode === 'function' && (host as any).getPrefabNode()) || host.scene?.rootNode || host;
+  const root = ((typeof (host as any)?.getPrefabNode === 'function' && (host as any).getPrefabNode()) ||
+    host.scene?.rootNode ||
+    host) as SceneNode;
   if (Array.isArray(path)) {
     let current: SceneNode | null = root;
     for (const segment of normalizeNodePath(path)) {
-      const matches = current.children.filter((child) => child.name === segment.name);
+      if (!current) {
+        break;
+      }
+      const matches: SceneNode[] = current.children.filter(
+        (child) => child.name === segment.name
+      ) as SceneNode[];
       current = matches[segment.sameNameIndex] ?? null;
       if (!current) break;
     }
@@ -176,13 +185,17 @@ export function normalizeGPUClothComponentConfig(
         targetWrapWeights: String(entry.targetWrapWeights ?? '')
       })),
     colliders: (Array.isArray(source.colliders) ? source.colliders : []).map((entry) => ({
-      type: entry?.type === 'capsule' || entry?.type === 'plane' ? entry.type : 'sphere',
+      type:
+        entry?.type === 'capsule' || entry?.type === 'plane' || entry?.type === 'box'
+          ? entry.type
+          : 'sphere',
       enabled: entry?.enabled !== false,
       nodeId: String(entry?.nodeId ?? ''),
       offset: vec3(entry?.offset, [0, 0, 0]),
       endOffset: vec3(entry?.endOffset, [0, 0.2, 0]),
       radius: Math.max(0, finite(entry?.radius, 0.15)),
-      normal: vec3(entry?.normal, [0, 1, 0])
+      normal: vec3(entry?.normal, [0, 1, 0]),
+      size: vec3(entry?.size, [0.3, 0.3, 0.3])
     }))
   };
 }
@@ -413,6 +426,13 @@ export class GPUClothComponent extends Disposable {
         collider = createPlaneCollider(
           new Vector3(offset[0], offset[1], offset[2]),
           new Vector3(normal[0], normal[1], normal[2]),
+          node
+        );
+      } else if (config.type === 'box') {
+        const size = vec3(config.size, [0.3, 0.3, 0.3]);
+        collider = createBoxCollider(
+          new Vector3(offset[0], offset[1], offset[2]),
+          new Vector3(Math.max(0.0001, size[0] * 0.5), Math.max(0.0001, size[1] * 0.5), Math.max(0.0001, size[2] * 0.5)),
           node
         );
       } else {

@@ -23,10 +23,8 @@ import {
   type FlatPlane
 } from './types';
 import {
-  pushoutFromSphere,
-  pushoutFromCapsule,
-  pushInFromSphere,
-  pushInFromCapsule,
+  pushoutFromCollider,
+  pushInFromCollider,
   collisionDetection,
   checkSurfaceCollision,
   type CollisionResult,
@@ -258,6 +256,25 @@ function colliderUpdate(collidersR: readonly ColliderR[], collidersRW: ColliderR
     Vector3.lerp(colRW.positionPreviousTransform, colRW.positionCurrentTransform, stepDelta, curPos);
     Quaternion.slerp(colRW.directionPreviousTransform, colRW.directionCurrentTransform, stepDelta, curDir);
 
+    if (colR.boxHalfExtents) {
+      colRW.positionCurrent.set(curPos);
+      colRW.directionCurrent.setXYZ(0, 0, 0);
+      colRW.boxHalfExtents.setXYZ(
+        Math.abs(colR.boxHalfExtents.x * ws.x),
+        Math.abs(colR.boxHalfExtents.y * ws.y),
+        Math.abs(colR.boxHalfExtents.z * ws.z)
+      );
+      curDir.transform(Vector3.axisPX(), colRW.boxAxes[0]);
+      curDir.transform(Vector3.axisPY(), colRW.boxAxes[1]);
+      curDir.transform(Vector3.axisPZ(), colRW.boxAxes[2]);
+      colRW.boxAxes[0].inplaceNormalize();
+      colRW.boxAxes[1].inplaceNormalize();
+      colRW.boxAxes[2].inplaceNormalize();
+      colRW.boundsCenter.set(curPos);
+      colRW.boundsRadius = colRW.boxHalfExtents.magnitude;
+      continue;
+    }
+
     computeCapsule(curPos, curDir, colRW.height, colRW.positionCurrent, colRW.directionCurrent);
     if (colRW.height > EPSILON) {
       Vector3.scale(colRW.directionCurrent, 0.5, _computeCapsuleHalfDir);
@@ -435,15 +452,7 @@ function pointUpdatePass1(
           if (colRWci.enabled === 0 || colRci.isInverseCollider) {
             continue;
           }
-          const hRes =
-            colRci.height <= EPSILON
-              ? pushoutFromSphere(
-                  colRWci.positionCurrent,
-                  colRWci.radius,
-                  ptR.pointRadius,
-                  ptRW.positionCurrent
-                )
-              : pushoutFromCapsule(colRci, colRWci, ptRW.positionCurrent, ptR);
+          const hRes = pushoutFromCollider(colRci, colRWci, ptRW.positionCurrent, ptR);
           if (hRes.hit) {
             ptRW.positionCurrent.set(hRes.point);
           }
@@ -613,16 +622,7 @@ function fixedPointColliderPushout(
       if (colRW.enabled === 0 || colR.isInverseCollider) {
         continue;
       }
-      const res =
-        colR.height <= EPSILON
-          ? pushoutFromSphere(
-              colRW.positionCurrent,
-              colRW.radius,
-              ptR.pointRadius,
-              ptRW.positionCurrent,
-              _fixedPushResult
-            )
-          : pushoutFromCapsule(colR, colRW, ptRW.positionCurrent, ptR, _fixedPushResult);
+      const res = pushoutFromCollider(colR, colRW, ptRW.positionCurrent, ptR, _fixedPushResult);
       if (res.hit) {
         ptRW.positionCurrent.set(res.point);
       }
@@ -659,7 +659,31 @@ function postCollisionVelocityFix(
       let nx = 0,
         ny = 0,
         nz = 0;
-      if (colR.height <= EPSILON) {
+      if (colR.boxHalfExtents) {
+        const delta = Vector3.sub(ptRW.positionCurrent, colRW.positionCurrent, new Vector3());
+        nx = Vector3.dot(delta, colRW.boxAxes[0]);
+        ny = Vector3.dot(delta, colRW.boxAxes[1]);
+        nz = Vector3.dot(delta, colRW.boxAxes[2]);
+        const ax = Math.abs(nx) / Math.max(EPSILON, colRW.boxHalfExtents.x);
+        const ay = Math.abs(ny) / Math.max(EPSILON, colRW.boxHalfExtents.y);
+        const az = Math.abs(nz) / Math.max(EPSILON, colRW.boxHalfExtents.z);
+        if (ay > ax && ay >= az) {
+          const sign = ny < 0 ? -1 : 1;
+          nx = colRW.boxAxes[1].x * sign;
+          ny = colRW.boxAxes[1].y * sign;
+          nz = colRW.boxAxes[1].z * sign;
+        } else if (az > ax && az > ay) {
+          const sign = nz < 0 ? -1 : 1;
+          nx = colRW.boxAxes[2].x * sign;
+          ny = colRW.boxAxes[2].y * sign;
+          nz = colRW.boxAxes[2].z * sign;
+        } else {
+          const sign = nx < 0 ? -1 : 1;
+          nx = colRW.boxAxes[0].x * sign;
+          ny = colRW.boxAxes[0].y * sign;
+          nz = colRW.boxAxes[0].z * sign;
+        }
+      } else if (colR.height <= EPSILON) {
         nx = ptRW.positionCurrent.x - colRW.positionCurrent.x;
         ny = ptRW.positionCurrent.y - colRW.positionCurrent.y;
         nz = ptRW.positionCurrent.z - colRW.positionCurrent.z;
@@ -839,14 +863,14 @@ function constraintUpdate(
         if (colR.height > EPSILON) {
           if (colR.isInverseCollider) {
             if (ptRA.applyInvertCollision === 1 && canPointA) {
-              const res = pushInFromCapsule(colR, colRW, rwA.positionCurrent, pointResultA);
+              const res = pushInFromCollider(colR, colRW, rwA.positionCurrent, pointResultA);
               if (res.hit) {
                 rwA.positionCurrent.set(res.point);
                 friction = Math.max(friction, colR.friction * 0.25);
               }
             }
             if (ptRB.applyInvertCollision === 1 && canPointB) {
-              const res = pushInFromCapsule(colR, colRW, rwB.positionCurrent, pointResultB);
+              const res = pushInFromCollider(colR, colRW, rwB.positionCurrent, pointResultB);
               if (res.hit) {
                 rwB.positionCurrent.set(res.point);
                 friction = Math.max(friction, colR.friction * 0.25);
@@ -854,14 +878,14 @@ function constraintUpdate(
             }
           } else {
             if (canPointA) {
-              const res = pushoutFromCapsule(colR, colRW, rwA.positionCurrent, ptRA, pointResultA);
+              const res = pushoutFromCollider(colR, colRW, rwA.positionCurrent, ptRA, pointResultA);
               if (res.hit) {
                 rwA.positionCurrent.set(res.point);
                 friction = Math.max(friction, colR.friction * 0.25);
               }
             }
             if (canPointB) {
-              const res = pushoutFromCapsule(colR, colRW, rwB.positionCurrent, ptRB, pointResultB);
+              const res = pushoutFromCollider(colR, colRW, rwB.positionCurrent, ptRB, pointResultB);
               if (res.hit) {
                 rwB.positionCurrent.set(res.point);
                 friction = Math.max(friction, colR.friction * 0.25);
@@ -871,24 +895,14 @@ function constraintUpdate(
         } else {
           if (colR.isInverseCollider) {
             if (ptRA.applyInvertCollision === 1 && canPointA) {
-              const res = pushInFromSphere(
-                colRW.positionCurrent,
-                colRW.radius,
-                rwA.positionCurrent,
-                pointResultA
-              );
+              const res = pushInFromCollider(colR, colRW, rwA.positionCurrent, pointResultA);
               if (res.hit) {
                 rwA.positionCurrent.set(res.point);
                 friction = Math.max(friction, colR.friction * 0.25);
               }
             }
             if (ptRB.applyInvertCollision === 1 && canPointB) {
-              const res = pushInFromSphere(
-                colRW.positionCurrent,
-                colRW.radius,
-                rwB.positionCurrent,
-                pointResultB
-              );
+              const res = pushInFromCollider(colR, colRW, rwB.positionCurrent, pointResultB);
               if (res.hit) {
                 rwB.positionCurrent.set(res.point);
                 friction = Math.max(friction, colR.friction * 0.25);
@@ -896,26 +910,14 @@ function constraintUpdate(
             }
           } else {
             if (canPointA) {
-              const res = pushoutFromSphere(
-                colRW.positionCurrent,
-                colRW.radius,
-                ptRA.pointRadius,
-                rwA.positionCurrent,
-                pointResultA
-              );
+              const res = pushoutFromCollider(colR, colRW, rwA.positionCurrent, ptRA, pointResultA);
               if (res.hit) {
                 rwA.positionCurrent.set(res.point);
                 friction = Math.max(friction, colR.friction * 0.25);
               }
             }
             if (canPointB) {
-              const res = pushoutFromSphere(
-                colRW.positionCurrent,
-                colRW.radius,
-                ptRB.pointRadius,
-                rwB.positionCurrent,
-                pointResultB
-              );
+              const res = pushoutFromCollider(colR, colRW, rwB.positionCurrent, ptRB, pointResultB);
               if (res.hit) {
                 rwB.positionCurrent.set(res.point);
                 friction = Math.max(friction, colR.friction * 0.25);

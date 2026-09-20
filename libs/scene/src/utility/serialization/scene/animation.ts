@@ -13,6 +13,7 @@ import {
   SpringChain,
   SpringModifier,
   SpringSystem,
+  createBoxCollider,
   createCapsuleCollider,
   createPlaneCollider,
   createSphereCollider,
@@ -32,6 +33,7 @@ import type { ControllerConfig, ControllerConfigUpdate } from '../../../animatio
 import type { ColliderR, GrabberR, JointDynamicSystemConfig } from '../../../animation/joint_dynamics';
 import type {
   CapsuleCollider,
+  BoxCollider,
   InterChainConstraint,
   PlaneCollider,
   SphereCollider,
@@ -144,6 +146,16 @@ type SerializedSpringCollider =
       normal: number[];
       localPointOffset?: number[];
       localNormal?: number[];
+    }
+  | {
+      type: 'box';
+      node?: string;
+      enabled: boolean;
+      center: number[];
+      halfExtents: number[];
+      axes: number[][];
+      localOffset?: number[];
+      localHalfExtents?: number[];
     };
 
 type SerializedSpringSystemOptions = Omit<SpringSystemOptions, 'gravity' | 'wind'> & {
@@ -340,6 +352,19 @@ function serializeSpringCollider(collider: SpringCollider): SerializedSpringColl
         ...(plane.localNormal ? { localNormal: vectorToArray(plane.localNormal) } : {})
       };
     }
+    case 'box': {
+      const box = collider as BoxCollider;
+      return {
+        type: 'box',
+        ...(box.node ? { node: box.node.persistentId } : {}),
+        enabled: box.enabled,
+        center: vectorToArray(box.center),
+        halfExtents: vectorToArray(box.halfExtents),
+        axes: box.axes.map(vectorToArray),
+        ...(box.localOffset ? { localOffset: vectorToArray(box.localOffset) } : {}),
+        ...(box.localHalfExtents ? { localHalfExtents: vectorToArray(box.localHalfExtents) } : {})
+      };
+    }
   }
 }
 
@@ -399,6 +424,13 @@ function deserializeSpringCollider(ctx: SceneNode, data: SerializedSpringCollide
       collider = createPlaneCollider(
         node && data.localPointOffset ? vectorFromArray(data.localPointOffset) : vectorFromArray(data.point),
         node && data.localNormal ? vectorFromArray(data.localNormal) : vectorFromArray(data.normal),
+        node ?? undefined
+      );
+      break;
+    case 'box':
+      collider = createBoxCollider(
+        node && data.localOffset ? vectorFromArray(data.localOffset) : vectorFromArray(data.center),
+        node && data.localHalfExtents ? vectorFromArray(data.localHalfExtents) : vectorFromArray(data.halfExtents),
         node ?? undefined
       );
       break;
