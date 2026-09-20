@@ -36,15 +36,9 @@ const myApp = new Application({
   canvas: document.querySelector('#my-canvas')
 });
 
-// Shading terms the water can display instead of its final colour, for
-// tracking down a broken one. Kept in step with WaterDebugOutput in
-// @zephyr3d/scene.
 const DEBUG_OUTPUTS = [
   ['none', 'None'],
   ['normal', 'Normal'],
-  ['diffuseNormal', 'Diffuse normal'],
-  ['viewFacing', 'View facing'],
-  ['frontFacing', 'Front facing'],
   ['foam', 'Foam'],
   ['fresnel', 'Fresnel'],
   ['reflection', 'Reflection'],
@@ -52,15 +46,8 @@ const DEBUG_OUTPUTS = [
   ['absorption', 'Absorption'],
   ['scattering', 'Scattering'],
   ['sunScattering', 'Sun scattering'],
-  ['sunPhase', 'Sun phase'],
-  ['sunIntegral', 'Sun integral'],
-  ['sunNoL', 'Sun NoL'],
-  ['shadow', 'Shadow'],
   ['subsurface', 'Subsurface'],
-  ['specular', 'Specular'],
   ['depth', 'Depth'],
-  ['refractUV', 'Refract UV'],
-  ['nan', 'NaN'],
   ['waterDepth', 'Water Depth']
 ];
 
@@ -139,41 +126,16 @@ myApp.ready().then(function () {
   });
   applyGodRays(godRayCheck.checked);
 
-  // The caustic map records what the surface did to the sunlight and nothing
-  // about what stands under it, so a shaft runs through the ocean scene's pillar
-  // unless the march samples the sun's shadow map too.
-  /** @type {HTMLInputElement} */
-  const godRayShadowCheck = document.querySelector('#godray-shadow-check');
-  const applyGodRayShadow = function (enabled) {
-    for (const scene of [ocean.get(), pool.get()]) {
-      scene.rootNode.iterate(function (node) {
-        if (node instanceof Water) {
-          node.underwaterGodRayShadow = enabled;
-        }
-        return false;
-      });
-    }
-  };
-  godRayShadowCheck.addEventListener('change', function () {
-    applyGodRayShadow(godRayShadowCheck.checked);
-  });
-  applyGodRayShadow(godRayShadowCheck.checked);
-
   getInput().use(forwarder);
   myApp.run();
 });
 
-// Ocean: FFT waves with foam over a sand bed, caustics on the bed.
 function buildOceanScene() {
   const scene = new Scene();
 
-  // A little constant ambient so foam and the bed keep detail under the sun.
-  scene.env.light.type = 'constant';
-  scene.env.light.ambientColor = new Vector4(0.12, 0.16, 0.22, 1);
-
-  // The sun, off vertical enough that caustics and shadows land visibly.
   const sun = new DirectionalLight(scene);
   sun.rotation.fromEulerAngle(-Math.PI / 4, Math.PI / 4, 0);
+  sun.intensity = 8;
   sun.castShadow = true;
 
   const rockMaterial = new PBRMetallicRoughnessMaterial();
@@ -199,7 +161,6 @@ function buildOceanScene() {
   pillar.position.setXYZ(0, -8, 0);
   sun.shadow.shadowRegion.addStaticCaster(pillar);
 
-  // The sand bed. Its depth matches the caustic focal depth.
   const bedMaterial = new PBRMetallicRoughnessMaterial();
   bedMaterial.albedoColor = new Vector4(0.76, 0.7, 0.5, 1);
   bedMaterial.roughness = 1;
@@ -220,7 +181,7 @@ function buildOceanScene() {
   waves.setWaveLength(0, 400);
   waves.setWaveLength(1, 100);
   waves.setWaveLength(2, 16);
-  waves.setWaveStrength(0, 0.7);
+  waves.setWaveStrength(0, 1.2);
   waves.setWaveStrength(1, 0.8);
   waves.setWaveStrength(2, 0.9);
   waves.setWaveCroppiness(0, -2.2);
@@ -230,13 +191,13 @@ function buildOceanScene() {
   waves.foamContrast = 3;
   water.waveGenerator = waves;
 
-  // Turbid open-ocean water: the bed fades with depth, so only the shallow
-  // reaches carry a visible caustic web.
   water.absorption = new Vector3(0.4, 0.14, 0.09);
   water.scattering = new Vector3(0.06, 0.12, 0.15);
   water.reflectionStrength = 0.8;
   water.refractionScale = 1;
   water.refractionBlur = 4;
+  water.subsurfaceIntensity = 0.5;
+  water.subsurfaceCrestHeight = 1.5;
   water.sunScatteringIntensity = 0.4;
   water.foamAmount = 1;
   water.foamFalloff = 1.5;
@@ -251,7 +212,7 @@ function buildOceanScene() {
   water.causticsRange = 60;
   water.causticsFadeDistance = 20;
 
-  scene.mainCamera = new PerspectiveCamera(scene, Math.PI / 3, 1, 1000);
+  scene.mainCamera = new PerspectiveCamera(scene, Math.PI / 3, 0.1, 1000);
   scene.mainCamera.lookAt(new Vector3(0, 18, 60), new Vector3(0, 0, 0), Vector3.axisPY());
   scene.mainCamera.controller = new OrbitCameraController();
   scene.mainCamera.TAA = true;
@@ -267,13 +228,6 @@ function buildPoolScene() {
   sun.rotation.fromEulerAngle(-Math.PI / 5, Math.PI / 3, 0);
   sun.castShadow = true;
 
-  // A modest blue ambient so the pool interior and walls keep shape without
-  // washing out - the caustics and clear water are what this scene is about.
-  scene.env.light.type = 'constant';
-  scene.env.light.ambientColor = new Vector4(0.16, 0.2, 0.26, 1);
-
-  // Four thick walls form the pool. Each sits on the floor and rises above the
-  // waterline; the surface covers the interior.
   const wallMaterial = new PBRMetallicRoughnessMaterial();
   wallMaterial.albedoColor = new Vector4(0.62, 0.65, 0.7, 1);
   wallMaterial.metallic = 0;
@@ -301,8 +255,6 @@ function buildPoolScene() {
   sphere.position.setXYZ(3, -1, 4);
   sun.shadow.shadowRegion.addStaticCaster(sphere);
 
-  // The pool floor, textured so refraction and caustics have a pattern to
-  // distort.
   const floorMaterial = new PBRMetallicRoughnessMaterial();
   floorMaterial.albedoColor = new Vector4(0.9, 0.95, 1, 1);
   floorMaterial.albedoTexture = makeCheckerTexture();
@@ -326,8 +278,6 @@ function buildPoolScene() {
   water.causticsFadeDistance = 6;
   water.absorptionScale = 2.5;
 
-  // FFT, gentle in height but sharp in curvature, so the caustic web is lively
-  // without churning the pool.
   const waves = new FFTWaveGenerator();
   waves.wind = new Vector2(1, 1);
   waves.setWaveLength(0, 400);
@@ -346,6 +296,8 @@ function buildPoolScene() {
   water.scattering = new Vector3(0.01, 0.02, 0.03);
   water.reflectionStrength = 0.5;
   water.refractionScale = 1;
+  water.subsurfaceIntensity = 0.5;
+  water.subsurfaceCrestHeight = 1.5;
   water.foamAmount = 0.3;
   water.foamFalloff = 1.8;
 
@@ -361,8 +313,6 @@ function buildPoolScene() {
   return scene;
 }
 
-// A small tiled checkerboard; the tiles repeat across the floor via the plane's
-// UVs, so refraction and caustics have an unambiguous pattern to displace.
 function makeCheckerTexture() {
   const size = 64;
   const data = new Uint8Array(size * size * 4);

@@ -89,7 +89,8 @@ function buildRefraction(type: (typeof DEVICE_TYPES)[number], mode: WaterRefract
           this.geom.x,
           this.geom.y,
           this.straightWorldPos,
-          this.geom.z
+          this.geom.z,
+          pb.bool(false)
         ) as PBShaderExp;
         this.$outputs.color = pb.vec4(result, 1);
       });

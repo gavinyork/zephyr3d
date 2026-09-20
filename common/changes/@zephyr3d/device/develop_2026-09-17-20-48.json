@@ -1,0 +1,10 @@
+{
+  "changes": [
+    {
+      "packageName": "@zephyr3d/device",
+      "comment": "Add maxFramesInFlight property to device.",
+      "type": "patch"
+    }
+  ],
+  "packageName": "@zephyr3d/device"
+}

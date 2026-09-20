@@ -246,6 +246,7 @@ export abstract class BaseDevice extends Observable<DeviceEventMap> {
   protected _runLoopFunc: Nullable<(device: AbstractDevice) => void>;
   protected _backend: DeviceBackend;
   protected _beginFrameCounter: number;
+  protected _maxFramesInFlight: number;
   protected _programBuilder: ProgramBuilder;
   protected _poolMap: Map<string | symbol, Pool>;
   protected _defaultPoolKey: symbol;
@@ -302,6 +303,7 @@ export abstract class BaseDevice extends Observable<DeviceEventMap> {
     this._fpsCounter = { time: 0, frame: 0 };
     this._stateStack = [];
     this._beginFrameCounter = 0;
+    this._maxFramesInFlight = 0;
     this._poolMap = new Map();
     this._defaultPoolKey = Symbol('defaultPool');
     this._poolMap.set(this._defaultPoolKey, new Pool(this, this._defaultPoolKey));
@@ -491,6 +493,12 @@ export abstract class BaseDevice extends Observable<DeviceEventMap> {
   get frameInfo() {
     return this._frameInfo;
   }
+  get maxFramesInFlight() {
+    return this._maxFramesInFlight;
+  }
+  set maxFramesInFlight(value: number) {
+    this._maxFramesInFlight = Math.max(0, Math.floor(Number(value) || 0));
+  }
   get isRendering() {
     return this._runningLoop !== null;
   }
@@ -642,6 +650,11 @@ export abstract class BaseDevice extends Observable<DeviceEventMap> {
   }
   beginFrame() {
     if (this._beginFrameCounter === 0) {
+      // Asked before anything about the frame is touched: a skipped frame must
+      // leave no trace, not even the per-frame callbacks being drained.
+      if (this.shouldSkipFrame()) {
+        return false;
+      }
       for (const obj of this._disposeObjectList) {
         obj.destroy();
       }
@@ -665,6 +678,15 @@ export abstract class BaseDevice extends Observable<DeviceEventMap> {
   }
   inFrame() {
     return this._beginFrameCounter > 0;
+  }
+  /**
+   * Whether the frame about to begin should be dropped. Backends that can tell
+   * how many earlier frames the GPU has not finished use this to enforce
+   * {@link maxFramesInFlight}. The default never skips.
+   * @internal
+   */
+  protected shouldSkipFrame(): boolean {
+    return false;
   }
   getVertexAttribFormat(semantic: VertexSemantic, dataType: DataType, componentCount: number) {
     return getVertexAttribFormat(semantic, dataType, componentCount);

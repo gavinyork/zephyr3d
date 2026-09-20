@@ -59,7 +59,9 @@ import {
   getFFTWaveGeneratorClass,
   getFBMWaveGeneratorClass,
   getGerstnerWaveGeneratorClass,
-  getGerstnerWaveClass
+  getGerstnerWaveClass,
+  getWaterInteractionClass,
+  getWaterDisturberClass
 } from './scene/water';
 import { getHairNodeClass } from './scene/hair';
 import { getMSDFTextClass, getMSDFTextSpriteClass, getTextSpriteClass } from './scene/text';
@@ -334,6 +336,8 @@ export class ResourceManager {
         getFBMWaveGeneratorClass(),
         getGerstnerWaveGeneratorClass(),
         getGerstnerWaveClass(),
+        getWaterInteractionClass(),
+        getWaterDisturberClass(),
         getParticleNodeClass(),
         getPunctualLightClass(),
         getDirectionalLightClass(),

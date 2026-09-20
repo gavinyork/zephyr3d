@@ -166,10 +166,22 @@ export class CommandQueueImmediate {
     }
   }
   /**
-   * Resolve after the next `submit()`. Used by readbacks to guarantee the copy that
-   * fills a staging buffer has been submitted to the GPU before it is mapped.
+   * Resolve once everything recorded so far has been submitted. Used by readbacks
+   * to guarantee the copy that fills a staging buffer has reached the GPU before
+   * it is mapped.
+   *
+   * If nothing is pending the copy has already gone out with an earlier submit and
+   * this resolves at once. That case is the normal one for a readback issued from a
+   * frame-start callback: the caller records its copy, awaits, and the await's
+   * continuation only runs after the frame's end-of-frame submit, so by the time
+   * this is called the copy is long submitted. Waiting for the *next* submit here
+   * would mean waiting for the following frame's end, which costs a whole frame
+   * of readback latency for nothing.
    */
   onNextSubmit(): Promise<void> {
+    if (!this.hasActiveWork()) {
+      return Promise.resolve();
+    }
     return new Promise<void>((resolve) => {
       this._submitWaiters.push(resolve);
     });

@@ -6,6 +6,8 @@ import { Water } from '../../../scene/water';
 import { defineProps, type SerializableClass } from '../types';
 import type { WaveGenerator } from '../../../render';
 import { FBMWaveGenerator, FFTWaveGenerator, GerstnerWaveGenerator } from '../../../render';
+import type { WaterDisturberShape, WaterInteractionFollowMode } from '../../../render/water_interaction';
+import { WaterDisturber, WaterInteraction } from '../../../render/water_interaction';
 import { MAX_GERSTNER_WAVE_COUNT } from '../../../values';
 import type { WaterDebugOutput, WaterMediumMode, WaterRefractionMode } from '../../../material/water';
 import { DEFAULT_SCATTER_ANISOTROPY, WATER_DEBUG_OUTPUTS } from '../../../material/water';
@@ -557,6 +559,25 @@ export function getWaterClass(manager: ResourceManager): SerializableClass {
           }
         },
         {
+          name: 'Interaction',
+          description:
+            'Dynamic height field layered over the surface, driven by things moving through the water: ripples, wakes and a foam trail. Null for none.',
+          type: 'object',
+          default: null,
+          options: {
+            objectTypes: [WaterInteraction]
+          },
+          isNullable() {
+            return true;
+          },
+          get(this: Water, value) {
+            value.object[0] = this.interaction ?? null;
+          },
+          set(this: Water, value) {
+            this.interaction = (value.object[0] as Nullable<WaterInteraction>) ?? null;
+          }
+        },
+        {
           name: 'GridScale',
           description: 'Scale of the water simulation grid',
           type: 'float',
@@ -1003,7 +1024,7 @@ export function getWaterClass(manager: ResourceManager): SerializableClass {
           description:
             'Strength of the sunlight scattered forward through a wave crest, which is what makes a backlit crest glow. Grazing views of a low sun show it; looking down at the water does not.',
           type: 'float',
-          default: 1.5,
+          default: 0.5,
           options: { animatable: true, minValue: 0, maxValue: 10 },
           get(this: Water, value) {
             value.num[0] = this.material.subsurfaceIntensity;
@@ -1013,17 +1034,33 @@ export function getWaterClass(manager: ResourceManager): SerializableClass {
           }
         },
         {
-          name: 'SubsurfaceSteepness',
+          name: 'SubsurfaceCrestHeight',
           description:
-            'How sharply surface tilt gates the subsurface glow. Higher makes gentle swell glow too; lower restricts it to steep wave flanks.',
+            'Height above the still-water level, in meters, over which the lit wall of a crest thins by a factor of e. Crests are thin and glow; troughs see the full path through the medium and are absorbed, so they keep only a tinted trace. Lower it for a calm sea whose crests barely rise, raise it so only the tallest waves light up.',
           type: 'float',
-          default: 60,
-          options: { animatable: true, minValue: 0, maxValue: 100 },
+          default: 1.5,
+          options: { animatable: true, minValue: 0.001, maxValue: 10 },
           get(this: Water, value) {
-            value.num[0] = this.material.subsurfaceSteepness;
+            value.num[0] = this.material.subsurfaceCrestHeight;
           },
           set(this: Water, value) {
-            this.material.subsurfaceSteepness = value.num[0];
+            this.material.subsurfaceCrestHeight = value.num[0];
+          }
+        },
+        {
+          name: 'SubsurfaceTint',
+          description:
+            'Colour of the crest glow, before the crest gate tints it with the medium extinction. A warm yellow-green keeps some red on the crests where the troughs have lost it.',
+          type: 'rgb',
+          default: [0.86, 0.98, 0.71],
+          options: { animatable: true, minValue: 0, maxValue: 1 },
+          get(this: Water, value) {
+            value.num[0] = this.material.subsurfaceTint.x;
+            value.num[1] = this.material.subsurfaceTint.y;
+            value.num[2] = this.material.subsurfaceTint.z;
+          },
+          set(this: Water, value) {
+            this.material.subsurfaceTint = new Vector3(value.num[0], value.num[1], value.num[2]);
           }
         },
         {
@@ -1341,6 +1378,346 @@ export function getWaterClass(manager: ResourceManager): SerializableClass {
                 }
               }
             }
+          }
+        }
+      ]);
+    }
+  };
+}
+
+const WATER_INTERACTION_FOLLOW_MODES: { label: string; value: WaterInteractionFollowMode }[] = [
+  { label: 'Camera', value: 'camera' },
+  { label: 'Node', value: 'node' },
+  { label: 'Fixed', value: 'fixed' }
+];
+
+const WATER_DISTURBER_SHAPES: { label: string; value: WaterDisturberShape }[] = [
+  { label: 'Sphere', value: 'sphere' },
+  { label: 'Capsule', value: 'capsule' },
+  { label: 'Box', value: 'box' }
+];
+
+/** @internal */
+export function getWaterInteractionClass(): SerializableClass {
+  return {
+    ctor: WaterInteraction,
+    name: 'WaterInteraction',
+    getProps() {
+      return defineProps([
+        {
+          name: 'Resolution',
+          description: 'Texels along each side of the simulation window. Changing it discards the field.',
+          type: 'int',
+          default: 512,
+          options: { minValue: 64, maxValue: 2048 },
+          get(this: WaterInteraction, value) {
+            value.num[0] = this.resolution;
+          },
+          set(this: WaterInteraction, value) {
+            this.resolution = value.num[0];
+          }
+        },
+        {
+          name: 'WindowSize',
+          description: 'Side of the simulation window in metres. Changing it discards the field.',
+          type: 'float',
+          default: 64,
+          options: { minValue: 4, maxValue: 512 },
+          get(this: WaterInteraction, value) {
+            value.num[0] = this.windowSize;
+          },
+          set(this: WaterInteraction, value) {
+            this.windowSize = value.num[0];
+          }
+        },
+        {
+          name: 'WaveSpeed',
+          description:
+            'Speed disturbances spread at, in metres per second. Clamped to what the window can integrate stably.',
+          type: 'float',
+          default: 1.5,
+          options: { animatable: true, minValue: 0, maxValue: 10 },
+          get(this: WaterInteraction, value) {
+            value.num[0] = this.waveSpeed;
+          },
+          set(this: WaterInteraction, value) {
+            this.waveSpeed = value.num[0];
+          }
+        },
+        {
+          name: 'Damping',
+          description: 'Rate the field loses energy at, in 1/s',
+          type: 'float',
+          default: 1,
+          options: { animatable: true, minValue: 0, maxValue: 10 },
+          get(this: WaterInteraction, value) {
+            value.num[0] = this.damping;
+          },
+          set(this: WaterInteraction, value) {
+            this.damping = value.num[0];
+          }
+        },
+        {
+          name: 'MaxAmplitude',
+          description: 'Height in metres the field is clamped to either side of the rest level',
+          type: 'float',
+          default: 0.5,
+          options: { minValue: 0.01, maxValue: 5 },
+          get(this: WaterInteraction, value) {
+            value.num[0] = this.maxAmplitude;
+          },
+          set(this: WaterInteraction, value) {
+            this.maxAmplitude = value.num[0];
+          }
+        },
+        {
+          name: 'SpongeWidth',
+          description: 'Width of the absorbing band inside the window edge, as a fraction of the window',
+          type: 'float',
+          default: 0.1,
+          options: { minValue: 0.01, maxValue: 0.45 },
+          get(this: WaterInteraction, value) {
+            value.num[0] = this.spongeWidth;
+          },
+          set(this: WaterInteraction, value) {
+            this.spongeWidth = value.num[0];
+          }
+        },
+        {
+          name: 'FollowMode',
+          description: 'How the window is positioned: on the water the camera looks at, on a node, or fixed',
+          type: 'string',
+          default: 'camera',
+          options: {
+            enum: {
+              labels: WATER_INTERACTION_FOLLOW_MODES.map((e) => e.label),
+              values: WATER_INTERACTION_FOLLOW_MODES.map((e) => e.value)
+            }
+          },
+          get(this: WaterInteraction, value) {
+            value.str[0] = this.followMode;
+          },
+          set(this: WaterInteraction, value) {
+            this.followMode = value.str[0] as WaterInteractionFollowMode;
+          }
+        },
+        {
+          name: 'FollowNode',
+          description: 'Node the window follows while FollowMode is Node',
+          type: 'string',
+          default: '',
+          options: { sceneNode: { kind: 'node' } },
+          get(this: WaterInteraction, value) {
+            value.str[0] = this.followNode?.persistentId ?? this.followNodeId;
+          },
+          set(this: WaterInteraction, value) {
+            this.followNodeId = value.str[0] ?? '';
+            this.followNode = null;
+          }
+        },
+        {
+          name: 'Center',
+          description: 'World XZ the window is centred on while FollowMode is Fixed',
+          type: 'vec2',
+          default: [0, 0],
+          get(this: WaterInteraction, value) {
+            value.num[0] = this.center.x;
+            value.num[1] = this.center.y;
+          },
+          set(this: WaterInteraction, value) {
+            this.center = new Vector2(value.num[0], value.num[1]);
+          }
+        },
+        {
+          name: 'FoamAmount',
+          description: 'How much foam a disturbance throws, 0 to disable the foam trail',
+          type: 'float',
+          default: 0.15,
+          options: { animatable: true, minValue: 0, maxValue: 3 },
+          get(this: WaterInteraction, value) {
+            value.num[0] = this.foamAmount;
+          },
+          set(this: WaterInteraction, value) {
+            this.foamAmount = value.num[0];
+          }
+        },
+        {
+          name: 'FoamDecay',
+          description: 'Rate the foam trail fades at, in 1/s',
+          type: 'float',
+          default: 0.6,
+          options: { animatable: true, minValue: 0, maxValue: 5 },
+          get(this: WaterInteraction, value) {
+            value.num[0] = this.foamDecay;
+          },
+          set(this: WaterInteraction, value) {
+            this.foamDecay = value.num[0];
+          }
+        },
+        {
+          name: 'FoamThreshold',
+          description: 'How steep and fast a wave of the field has to be before it foams on its own',
+          type: 'float',
+          default: 0.02,
+          options: { minValue: 0.0001, maxValue: 0.5 },
+          get(this: WaterInteraction, value) {
+            value.num[0] = this.foamThreshold;
+          },
+          set(this: WaterInteraction, value) {
+            this.foamThreshold = value.num[0];
+          }
+        },
+        {
+          name: 'Disturbers',
+          description: 'Things that disturb the water by moving through it, each following a scene node',
+          type: 'object_array',
+          options: {
+            objectTypes: [WaterDisturber]
+          },
+          get(this: WaterInteraction, value) {
+            value.object = [...this.disturbers];
+          },
+          set(this: WaterInteraction, value) {
+            const next = (value.object as WaterDisturber[]).filter((d) => d instanceof WaterDisturber);
+            for (const d of [...this.disturbers]) {
+              if (!next.includes(d)) {
+                this.removeDisturber(d);
+              }
+            }
+            for (const d of next) {
+              this.addDisturber(d);
+            }
+          },
+          add(this: WaterInteraction, value) {
+            const d = value?.object?.[0];
+            this.addDisturber(d instanceof WaterDisturber ? d : new WaterDisturber());
+          },
+          delete(this: WaterInteraction, index) {
+            const d = this.disturbers[index];
+            if (d) {
+              this.removeDisturber(d);
+            }
+          }
+        }
+      ]);
+    }
+  };
+}
+
+/** @internal */
+export function getWaterDisturberClass(): SerializableClass {
+  return {
+    ctor: WaterDisturber,
+    name: 'WaterDisturber',
+    getProps() {
+      return defineProps([
+        {
+          name: 'Node',
+          description: 'Scene node the shape follows',
+          type: 'string',
+          default: '',
+          options: { sceneNode: { kind: 'node' } },
+          get(this: WaterDisturber, value) {
+            value.str[0] = this.node?.persistentId ?? this.nodeId;
+          },
+          set(this: WaterDisturber, value) {
+            this.nodeId = value.str[0] ?? '';
+            this.node = null;
+          }
+        },
+        {
+          name: 'Shape',
+          description: 'Footprint shape: a sphere or a capsule of Radius, or a box of Size',
+          type: 'string',
+          default: 'sphere',
+          options: {
+            enum: {
+              labels: WATER_DISTURBER_SHAPES.map((e) => e.label),
+              values: WATER_DISTURBER_SHAPES.map((e) => e.value)
+            }
+          },
+          get(this: WaterDisturber, value) {
+            value.str[0] = this.shape;
+          },
+          set(this: WaterDisturber, value) {
+            this.shape = value.str[0] as WaterDisturberShape;
+          }
+        },
+        {
+          name: 'Radius',
+          description: 'Radius in metres, for a sphere or a capsule',
+          type: 'float',
+          default: 0.5,
+          options: { minValue: 0.01, maxValue: 50 },
+          get(this: WaterDisturber, value) {
+            value.num[0] = this.radius;
+          },
+          set(this: WaterDisturber, value) {
+            this.radius = value.num[0];
+          }
+        },
+        {
+          name: 'HalfLength',
+          description: 'Half the segment length in metres, for a capsule, along the local Y axis',
+          type: 'float',
+          default: 0.5,
+          options: { minValue: 0, maxValue: 50 },
+          get(this: WaterDisturber, value) {
+            value.num[0] = this.halfLength;
+          },
+          set(this: WaterDisturber, value) {
+            this.halfLength = value.num[0];
+          }
+        },
+        {
+          name: 'Size',
+          description: 'Extents in metres along the local axes, for a box',
+          type: 'vec3',
+          default: [1, 1, 1],
+          get(this: WaterDisturber, value) {
+            value.num[0] = this.size.x;
+            value.num[1] = this.size.y;
+            value.num[2] = this.size.z;
+          },
+          set(this: WaterDisturber, value) {
+            this.size = new Vector3(value.num[0], value.num[1], value.num[2]);
+          }
+        },
+        {
+          name: 'Strength',
+          description: 'Water column the fully submerged shape displaces, in metres of surface height',
+          type: 'float',
+          default: 0.15,
+          options: { animatable: true, minValue: 0, maxValue: 2 },
+          get(this: WaterDisturber, value) {
+            value.num[0] = this.strength;
+          },
+          set(this: WaterDisturber, value) {
+            this.strength = value.num[0];
+          }
+        },
+        {
+          name: 'Blocking',
+          description: 'Whether waves stop at and reflect off the footprint',
+          type: 'bool',
+          default: false,
+          get(this: WaterDisturber, value) {
+            value.bool[0] = this.blocking;
+          },
+          set(this: WaterDisturber, value) {
+            this.blocking = value.bool[0];
+          }
+        },
+        {
+          name: 'Enabled',
+          description: 'Whether the disturber is taken into account',
+          type: 'bool',
+          default: true,
+          get(this: WaterDisturber, value) {
+            value.bool[0] = this.enabled;
+          },
+          set(this: WaterDisturber, value) {
+            this.enabled = value.bool[0];
           }
         }
       ]);
