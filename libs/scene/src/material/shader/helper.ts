@@ -56,6 +56,7 @@ const UNIFORM_NAME_SKYDISTANTLIGHT_LUT = 'Z_UniformSkyDistantLightLUT';
 const UNIFORM_NAME_SHADOW_MAP = 'Z_UniformShadowMap';
 const UNIFORM_NAME_SHADOW_MASK = 'Z_UniformShadowMask';
 const UNIFORM_NAME_SHADOW_MASK_MODE = 'Z_UniformShadowMaskMode';
+const UNIFORM_NAME_TRANSMISSION_THICKNESS = 'Z_UniformTransmissionThickness';
 const UNIFORM_NAME_CAUSTIC_MAP = 'Z_UniformCausticMap';
 const UNIFORM_NAME_CAUSTIC_HEIGHT_MAP = 'Z_UniformCausticHeightMap';
 /**
@@ -113,6 +114,7 @@ export class ShaderHelper {
   static defaultSunDir = Vector3.one().inplaceNormalize();
   /** @internal 1x1x1 fallback bound to the shadow-mask uniform when no mask exists this frame. */
   private static _dummyShadowMask: Nullable<Texture2DArray> = null;
+  private static _dummyTransmissionThickness: Nullable<Texture2DArray> = null;
   /** @internal */
   private static readonly SKIN_MATRIX_NAME = 'Z_SkinMatrix';
   private static readonly SKIN_PREV_MATRIX_NAME = 'Z_PrevSkinMatrix';
@@ -360,6 +362,12 @@ export class ShaderHelper {
           // instead lit inline by the per-light additive passes (transparent queue,
           // e.g. OIT hair, where the opaque-depth mask would be incorrect).
           scope[UNIFORM_NAME_SHADOW_MASK_MODE] = pb.int().uniform(0);
+        }
+        // Light-space thickness for subsurface transmission, packed exactly like
+        // the shadow mask. Presence is keyed into the bind group hash through
+        // ctx.transmissionThickness, so declared and bound layouts always agree.
+        if (ctx.transmissionThickness) {
+          scope[UNIFORM_NAME_TRANSMISSION_THICKNESS] = pb.tex2DArray().uniform(0);
         }
       }
       // Baked sky cube: rgba16f without mipmaps
@@ -1414,6 +1422,15 @@ export class ShaderHelper {
         fetchSampler('clamp_nearest')
       );
     }
+    if (ctx.transmissionThickness) {
+      // Falls back to a white dummy, not the shadow mask's zero one: 0 encodes
+      // maximum optical depth here, which would read as full transmission.
+      bindGroup.setTexture(
+        UNIFORM_NAME_TRANSMISSION_THICKNESS,
+        ctx.transmissionThicknessTexture ?? this.getDummyTransmissionThickness(ctx.device),
+        fetchSampler('clamp_nearest')
+      );
+    }
     bindGroup.setTexture(UNIFORM_NAME_BAKED_SKY_MAP, ctx.scene.env.sky.getBakedSkyTexture(ctx));
     if (this.usesWaterCaustics(ctx)) {
       this.setWaterCausticUniforms(bindGroup, ctx);
@@ -2125,6 +2142,36 @@ export class ShaderHelper {
     }
     return tex;
   }
+  /**
+   * Lazily-created 1x1x1 rgba8unorm array texture used as the transmission
+   * thickness binding fallback.
+   *
+   * @remarks
+   * Filled with 1, not left at the zero-initialised default. The thickness
+   * channel encodes `1 - opticalDepth / 5`, so 0 is *maximum* optical depth —
+   * the worst possible value to fall back to, and the opposite of what the real
+   * pass clears its unused channels to. {@link ShaderHelper.getDummyShadowMask}
+   * gets away with zeroes because 0 reads as "fully shadowed" there.
+   *
+   * On the default pipeline this is never sampled: `ctx.transmissionThickness`
+   * and the thickness module's `enabled` are computed from the same condition.
+   * A custom `camera.renderPipeline` that omits the module can break that tie,
+   * and this fallback is what keeps that from turning into full-strength
+   * transmission across the whole screen.
+   * @internal
+   */
+  static getDummyTransmissionThickness(device: AbstractDevice): Texture2DArray {
+    let tex = this._dummyTransmissionThickness;
+    if (!tex || tex.disposed) {
+      tex = device.createTexture2DArray('rgba8unorm', 1, 1, 1, {
+        mipmapping: false
+      })!;
+      tex.name = 'DummyTransmissionThickness';
+      tex.update(new Uint8Array([255, 255, 255, 255]), 0, 0, 0, 1, 1, 1);
+      this._dummyTransmissionThickness = tex;
+    }
+    return tex;
+  }
   /** @internal */
   static getClusteredLightIndexTexture(scope: PBInsideFunctionScope): PBShaderExp {
     return scope[UNIFORM_NAME_LIGHT_INDEX_TEXTURE];
@@ -2165,6 +2212,50 @@ export class ShaderHelper {
       this.$l.texel = pb.textureArraySampleLevel(this[UNIFORM_NAME_SHADOW_MASK], this.uv, this.layer, 0);
       // Select the light's channel via a dot with a one-hot mask (dynamic vector
       // component indexing is not portable across GLSL ES / WGSL).
+      this.$l.selector = pb.vec4(
+        pb.float(pb.equal(this.channel, 0)),
+        pb.float(pb.equal(this.channel, 1)),
+        pb.float(pb.equal(this.channel, 2)),
+        pb.float(pb.equal(this.channel, 3))
+      );
+      this.$return(pb.dot(this.texel, this.selector));
+    });
+    return pb.getGlobalScope()[funcName](lightIndex);
+  }
+  /**
+   * Encoded light-space thickness for a light, in `[0,1]` (1 = nothing in the way).
+   *
+   * @remarks
+   * Decodes to optical depth as `(1 - value) * 5`, matching UE5's
+   * `DecodeOpticalDepthFromShadowMask`. Lights without transmission enabled, and
+   * every light when the thickness pass did not run, leave their channel at the
+   * cleared 1.
+   *
+   * Shares the shadow mask's `ordinal = index - 1 → layer = ordinal >> 2,
+   * channel = ordinal & 3` packing, so a light is found in both textures with
+   * the same arithmetic.
+   *
+   * Only valid when `ctx.transmissionThickness` is on.
+   * @internal
+   */
+  static sampleTransmissionThickness(scope: PBInsideFunctionScope, lightIndex: PBShaderExp): PBShaderExp {
+    const pb = scope.$builder;
+    const that = this;
+    const funcName = 'Z_sampleTransmissionThickness';
+    pb.func(funcName, [pb.int('lightIndex')], function () {
+      this.$if(pb.greaterThan(this.lightIndex, that.getNumShadowLights(this)), function () {
+        this.$return(pb.float(1));
+      });
+      this.$l.ordinal = pb.sub(this.lightIndex, 1);
+      this.$l.layer = pb.div(this.ordinal, 4);
+      this.$l.channel = pb.sub(this.ordinal, pb.mul(this.layer, 4));
+      this.$l.uv = pb.div(pb.vec2(this.$builtins.fragCoord.xy), that.getRenderSize(this));
+      this.$l.texel = pb.textureArraySampleLevel(
+        this[UNIFORM_NAME_TRANSMISSION_THICKNESS],
+        this.uv,
+        this.layer,
+        0
+      );
       this.$l.selector = pb.vec4(
         pb.float(pb.equal(this.channel, 0)),
         pb.float(pb.equal(this.channel, 1)),

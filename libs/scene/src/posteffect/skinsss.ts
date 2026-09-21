@@ -4,6 +4,7 @@ import type { DrawContext } from '../render';
 import { ShaderHelper } from '../material';
 import { SkinProfile } from '../material/skinprofile';
 import { linearToGamma } from '../shaders/misc';
+import { hash21 } from '../shaders/noise';
 import { fetchSampler } from '../utility/misc';
 import { AbstractPostEffect, PostEffectLayer } from './posteffect';
 
@@ -40,7 +41,9 @@ export type SkinSSSDebugOutput =
   /** CDF mass attributed to the centre pixel. */
   | 'centerWeight'
   /** The diffused result on its own, before recombination. */
-  | 'diffused';
+  | 'diffused'
+  /** Light-space thickness from the transmission pass, for the lights in layer 0. */
+  | 'thickness';
 
 const SKIN_SSS_DEBUG_OUTPUTS: SkinSSSDebugOutput[] = [
   'none',
@@ -53,7 +56,8 @@ const SKIN_SSS_DEBUG_OUTPUTS: SkinSSSDebugOutput[] = [
   'weight',
   'acceptance',
   'centerWeight',
-  'diffused'
+  'diffused',
+  'thickness'
 ];
 
 /**
@@ -90,6 +94,7 @@ export class SkinSSS extends AbstractPostEffect {
   private _profile: SkinProfile | null;
   private _strength: number;
   private _debugOutput: SkinSSSDebugOutput;
+  private _debugExposure: number;
   private _depthScale: number;
   private _scatterRadius: number;
   private _sampleCount: number;
@@ -108,6 +113,7 @@ export class SkinSSS extends AbstractPostEffect {
     this._profile = null;
     this._strength = 1;
     this._debugOutput = 'none';
+    this._debugExposure = 1;
     this._depthScale = 80;
     this._scatterRadius = 1;
     this._sampleCount = DEFAULT_SAMPLE_COUNT;
@@ -179,6 +185,27 @@ export class SkinSSS extends AbstractPostEffect {
   }
 
   /**
+   * Multiplier applied to whatever {@link SkinSSS.debugOutput} renders.
+   *
+   * @remarks
+   * Defaults to 1. Several of the intermediates sit in a narrow band that reads
+   * as a flat tone at unit exposure — the light-space thickness in particular,
+   * whose optical depth floor of 0.4 and ceiling of 5 can compress a real
+   * variation into a few greys. Raising this is how you tell "no variation" from
+   * "variation too small to see", which are very different bugs.
+   *
+   * Has no effect unless a debug output is selected.
+   *
+   * @public
+   */
+  get debugExposure() {
+    return this._debugExposure;
+  }
+  set debugExposure(val: number) {
+    this._debugExposure = Math.max(0, val ?? 1);
+  }
+
+  /**
    * Intermediate quantity to render instead of the shaded result.
    *
    * @remarks
@@ -215,16 +242,23 @@ export class SkinSSS extends AbstractPostEffect {
       return;
     }
     const fallback = this._profile ?? SkinProfile.getDefault();
-    // Projection of a world-space length at unit depth into vertical UV. The
-    // kernel's radii are world millimetres, so this plus the profile's world unit
-    // scale and the 1/depth term is the whole world-to-UV conversion; UE5 folds
-    // the same factors into CalculateBurleyScale.
-    const projScale = 0.5 * ctx.camera.getProjectionMatrix().m11;
+    // Projection of a world-space length at unit depth into UV, per axis. The
+    // two axes need their own factor: `m00` is the horizontal projection scale
+    // and `m11` the vertical, and they differ by the aspect ratio. Driving both
+    // from `m11` — as this used to — stretches the sampling disc horizontally by
+    // exactly that ratio, so on a 16:9 view the scattering reached 1.78x further
+    // sideways than it did vertically.
+    //
+    // UE5 arrives at the same pair from the other end: its `SSSScaleX` is built
+    // from `ViewToClip.M[0][0]` (i.e. m00) and `CalculateBurleyScale` then scales
+    // the y component by `Extent.x / Extent.y` to bring it back to a circle in
+    // pixel space.
+    const projMatrix = ctx.camera.getProjectionMatrix();
     this._radiusParams.setXYZW(
-      // x: world length at unit depth, in UV
-      projScale,
-      // y: 1 for perspective (radius shrinks with distance), 0 for ortho
-      ctx.camera.isPerspective() ? 1 : 0,
+      // x: world length at unit depth, in horizontal UV
+      0.5 * projMatrix.m00,
+      // y: world length at unit depth, in vertical UV
+      0.5 * projMatrix.m11,
       // z: user multiplier on top of the profile's own scatter distance
       this._scatterRadius,
       // w: depth sensitivity for the bilateral term. UE5 has no equivalent knob —
@@ -268,10 +302,17 @@ export class SkinSSS extends AbstractPostEffect {
       bg.setValue('cameraNearFar', this._cameraNearFar);
       bg.setValue('targetSize', this._targetSize);
       bg.setValue('radiusParams', this._radiusParams);
+      bg.setValue('perspective', ctx.camera.isPerspective() ? 1 : 0);
       bg.setValue('profileParams', this._profileParams);
       bg.setTexture('profileTex', profileTable, fetchSampler('clamp_nearest_nomip'));
+      bg.setTexture(
+        'thicknessTex',
+        ctx.transmissionThicknessTexture ?? ShaderHelper.getDummyTransmissionThickness(device),
+        fetchSampler('clamp_nearest')
+      );
       bg.setValue('sampleCount', this._sampleCount);
       bg.setValue('debugMode', SKIN_SSS_DEBUG_OUTPUTS.indexOf(this._debugOutput));
+      bg.setValue('debugExposure', this._debugExposure);
       // Intermediate passes always render into a texture, so on WebGPU they flip
       // unconditionally. `needFlip` cannot be used here: it reports whatever
       // target happens to be bound at the time, and these values are set before
@@ -349,6 +390,10 @@ export class SkinSSS extends AbstractPostEffect {
   }
 
   private createBurleyProgram(ctx: DrawContext) {
+    // WebGL1 has no texture array sampling. This effect is WebGPU-only at
+    // runtime, but its programs are still built for WebGL by the shader
+    // generation tests, so the thickness debug view has to compile out there.
+    const hasTextureArrays = ctx.device.type !== 'webgl';
     const program = ctx.device.buildRenderProgram({
       vertex(pb) {
         SkinSSS.fullscreenVertex(pb);
@@ -360,10 +405,18 @@ export class SkinSSS extends AbstractPostEffect {
         this.cameraNearFar = pb.vec2().uniform(0);
         this.targetSize = pb.vec4().uniform(0);
         this.radiusParams = pb.vec4().uniform(0);
+        this.perspective = pb.int().uniform(0);
         this.profileParams = pb.vec4().uniform(0);
         this.profileTex = pb.tex2D().uniform(0);
+        // Always declared so the cached program has one layout; a 1x1 dummy is
+        // bound on frames without a transmission pass. Only the debug view reads
+        // it — shading takes its thickness through the material, per light.
+        if (hasTextureArrays) {
+          this.thicknessTex = pb.tex2DArray().uniform(0);
+        }
         this.sampleCount = pb.int().uniform(0);
         this.debugMode = pb.int().uniform(0);
+        this.debugExposure = pb.float().uniform(0);
         this.$outputs.outColor = pb.vec4();
         pb.func('readDepth01', [pb.vec2('uv')], function () {
           this.$return(ShaderHelper.sampleLinearDepth(this, this.depthTex, this.uv, 0));
@@ -392,9 +445,10 @@ export class SkinSSS extends AbstractPostEffect {
         });
         // --- Burley diffusion, transcribed from UE5's BurleyNormalizedSSSCommon.ush ---
         //
-        // Radii here are in millimetres of world space and are unbounded: the
-        // inverse CDF produces them directly, and `burleyScale` converts them to
-        // a UV offset. There is deliberately no "sampling disc" to normalize
+        // Radii here are in profile space (UE5's millimetres) and are unbounded:
+        // the inverse CDF produces them directly, and `burleyScale` carries them
+        // through the profile's world unit scale and the projection into a UV
+        // offset. There is deliberately no "sampling disc" to normalize
         // against — introducing one couples the kernel shape to the mean free
         // path, which is what made the diffusion vanish at small profile scales
         // and flatten into a box average at large ones.
@@ -501,27 +555,48 @@ export class SkinSSS extends AbstractPostEffect {
               this.$l.S3D = this.scalingFactor3D(this.albedo.rgb);
               this.$l.dForSampling = pb.div(this.lForSampling, pb.max(this.S, 1e-6));
 
-              // CalculateBurleyScale: world millimetres to UV. Radii stay in mm
-              // and are unbounded, so nothing here shapes the kernel — this is
-              // purely unit conversion, including the 1/depth perspective term
-              // and the cm-to-mm cast.
-              this.$l.viewScale = pb.max(pb.mix(pb.float(1), this.centerDepth, this.radiusParams.y), 1e-4);
+              // CalculateBurleyScale: profile space to UV. Radii stay in profile
+              // units and are unbounded, so nothing here shapes the kernel —
+              // this is purely unit conversion, including the 1/depth
+              // perspective term.
+              //
+              // Two components, not one: the horizontal and vertical projection
+              // scales differ by the aspect ratio, so a single factor turns the
+              // sampling disc into an ellipse. UE5 keeps the same pair, building
+              // x from m00 and correcting y by Extent.x/Extent.y.
+              this.$l.viewScale = pb.max(
+                pb.select(pb.float(1), this.centerDepth, pb.equal(this.perspective, 0)),
+                1e-4
+              );
+              // The profile's world unit scale is applied here and only here —
+              // the packed mean free path deliberately leaves it out, matching
+              // UE5, where the DMFP is `MeanFreePathColor x MeanFreePathDistance`
+              // alone and `CalculateBurleyScale` supplies the conversion. Applying
+              // it in both places made the diffusion scale with its square.
+              //
               // UE5 additionally casts cm to mm here, because its scene unit is
               // the centimetre and its profile distances are millimetres. This
-              // engine is metres throughout and the profile distances are in scene
-              // units, so radius and depth already share a space and no cast
-              // belongs in either this scale or the bilateral term below.
+              // engine is metres throughout and the profile distances are in
+              // profile units, so the world unit scale is the whole conversion
+              // and no extra cast belongs in either this scale or the bilateral
+              // term below.
               this.$l.burleyScale = pb.div(
-                pb.mul(this.worldUnitScale, this.radiusParams.z, this.radiusParams.x),
+                pb.mul(this.radiusParams.xy, this.worldUnitScale, this.radiusParams.z),
                 this.viewScale
               );
 
               // Centre-sample reweighting: the radius that falls within one texel
               // and the CDF mass it accounts for. Sampling then covers only
               // [cdf, 1], and the centre pixel is lerped back in at the end.
-              this.$l.centerRadiusMM = pb.div(
-                pb.mul(0.5, pb.add(this.targetSize.z, this.targetSize.w)),
-                pb.max(this.burleyScale, 1e-9)
+              //
+              // Averaged over the two axes, as UE5's CalculateCenterSampleRadiusInMM
+              // does, since the two now carry different scales.
+              this.$l.centerRadiusMM = pb.mul(
+                0.5,
+                pb.add(
+                  pb.div(this.targetSize.z, pb.max(this.burleyScale.x, 1e-9)),
+                  pb.div(this.targetSize.w, pb.max(this.burleyScale.y, 1e-9))
+                )
               );
               this.$l.centerCdf = this.burleyCdf(this.dForSampling, this.centerRadiusMM);
               // Per-channel diffusion distance, from each channel's own mean free
@@ -542,16 +617,24 @@ export class SkinSSS extends AbstractPostEffect {
               );
 
               // Integer sequence start, so the R2 set keeps its low-discrepancy
-              // spacing (a fractional, per-pixel offset turns it into a phase
-              // sweep and bands the image).
+              // spacing, rebased per pixel so that neighbours do not draw the
+              // identical 64 taps.
               //
-              // UE5 advances this by View.FrameNumber and leans on its variance
-              // history plus TAA to resolve what one frame leaves behind. This
-              // pass has no such history, so a per-frame seed would simply be
-              // visible as flicker: whichever taps happen to land on skin changes
-              // every frame. Holding it fixed trades that for a stable, slightly
-              // structured error, which is the better failure here.
-              this.$l.seedStart = pb.int(0);
+              // The rebase has to land on an integer: R2 is a sequence over
+              // integer indices, and offsetting the index by a per-pixel
+              // *fraction* turns it into a phase sweep correlated with pixel
+              // position, which rendered as regular banding. An integer offset
+              // keeps the spacing intact while decorrelating the pattern, which
+              // is exactly what UE5 does (`Rand3DPCG16(int3(pixel, seed)).x`,
+              // i.e. a 16-bit integer rebase).
+              //
+              // UE5 also advances the seed by View.FrameNumber and leans on its
+              // variance history plus TAA to resolve what one frame leaves
+              // behind. This pass has no such history, so a per-frame seed would
+              // simply be visible as flicker: whichever taps happen to land on
+              // skin would change every frame. Holding it fixed across frames
+              // trades that for a stable error.
+              this.$l.seedStart = pb.int(pb.mul(hash21(this, pb.mul(this.uv, this.targetSize.xy)), 65536));
               this.$l.radianceAccum = pb.vec3(0);
               this.$l.weightAccum = pb.vec3(0);
               this.$l.bleedAccum = pb.vec3(0);
@@ -661,12 +744,12 @@ export class SkinSSS extends AbstractPostEffect {
                   this.dbg = pb.mul(this.dPerChannel, 1000);
                 });
                 this.$if(pb.equal(this.debugMode, 6), function () {
-                  // Mean sample radius in pixels, 32 px mapped to white.
+                  // Mean vertical sample radius in pixels, 32 px mapped to white.
                   this.dbg = pb.vec3(
                     pb.div(
                       pb.mul(
                         pb.div(this.radiusSum, DEFAULT_SAMPLE_COUNT),
-                        this.burleyScale,
+                        this.burleyScale.y,
                         this.targetSize.y
                       ),
                       32
@@ -685,7 +768,28 @@ export class SkinSSS extends AbstractPostEffect {
                 this.$if(pb.equal(this.debugMode, 10), function () {
                   this.dbg = this.diffused;
                 });
-                this.$outputs.outColor = pb.vec4(this.dbg, this.centerId);
+                if (hasTextureArrays) {
+                  this.$if(pb.equal(this.debugMode, 11), function () {
+                    // Shown as optical depth (bright = thick), not as the stored
+                    // encoding. The encoding is 1 - opticalDepth/5 and the depth
+                    // has a floor of 0.4, so a surface with nothing in front of
+                    // it stores 0.92 — indistinguishable from the 1.0 a channel
+                    // keeps when no light wrote it. Blue calls out that "no data"
+                    // case so it cannot be mistaken for zero thickness.
+                    //
+                    // The minimum over layer 0's four channels shows whichever of
+                    // those lights sees the most material, which avoids plumbing a
+                    // specific light's ordinal in here.
+                    this.$l.th = pb.textureArraySampleLevel(this.thicknessTex, this.uv, 0, 0);
+                    this.$l.enc = pb.min(pb.min(this.th.r, this.th.g), pb.min(this.th.b, this.th.a));
+                    this.$if(pb.greaterThan(this.enc, 0.999), function () {
+                      this.dbg = pb.vec3(0, 0, 1);
+                    }).$else(function () {
+                      this.dbg = pb.vec3(pb.sub(1, this.enc));
+                    });
+                  });
+                }
+                this.$outputs.outColor = pb.vec4(pb.mul(this.dbg, this.debugExposure), this.centerId);
               });
             }
           );
@@ -697,12 +801,16 @@ export class SkinSSS extends AbstractPostEffect {
   }
 
   private createBVarProgram(ctx: DrawContext) {
-    // UE5's BVar pass computes transmission from temporal reprojection +
-    // shadow map sampling. Without a velocity buffer and shadow map access
-    // in the SSS post-effect, it outputs zero transmission — matching UE5's
-    // behavior when those inputs are unavailable. For now this is a simple
-    // passthrough; transmission comes from the material's back-lit term
-    // (transmissionStrength × thickness from subsurfaceTexture.b).
+    // Placeholder for UE5's variance pass. What UE5 runs between diffusion and
+    // recombination is `UpdateQualityVariance`: an exponentially-weighted
+    // luminance-residual history that drives the *adaptive sample count* of the
+    // next frame's diffusion (8 / 16 / 32 / 64 taps). It has nothing to do with
+    // transmission — UE5 evaluates that per light inside SubsurfaceProfileBxDF,
+    // from the shadow map's optical depth.
+    //
+    // Without a history buffer there is nothing to accumulate, so this is
+    // currently a straight copy and the diffusion always runs at full sample
+    // count. The pass is kept as the slot that history would occupy.
     const program = ctx.device.buildRenderProgram({
       vertex(pb) {
         SkinSSS.fullscreenVertex(pb);
@@ -715,7 +823,8 @@ export class SkinSSS extends AbstractPostEffect {
         this.$outputs.outColor = pb.vec4();
         pb.main(function () {
           this.$l.diffused = pb.textureSampleLevel(this.diffusedTex, this.$inputs.uv, 0);
-          // transmission = 0 (no velocity buffer / shadow map available)
+          // Alpha is the profile id the diffusion wrote; it is passed through
+          // unchanged rather than repurposed.
           this.$outputs.outColor = pb.vec4(this.diffused.rgb, this.diffused.a);
         });
       }
@@ -771,9 +880,18 @@ export class SkinSSS extends AbstractPostEffect {
               );
               this.$l.diffOrig = pb.mul(this.baseColor.rgb, this.diffAmt);
               this.$l.specKeep = pb.mul(this.baseColor.rgb, pb.sub(1, this.diffAmt));
-              this.$l.bvarData = pb.textureSampleLevel(this.bvarTex, this.uv, 0);
-              this.$l.transmission = this.bvarData.a;
-              this.$l.diffused = this.bvarData.rgb;
+              // The diffusion buffer's alpha carries the profile id, not a
+              // transmission term — nothing in this pipeline produces one. An
+              // earlier version read it as transmission and added
+              // `diffused * id/255` on top, which both invented energy out of
+              // nothing and made the amount depend on which table slot the
+              // profile happened to occupy.
+              //
+              // UE5's transmission does not come from the diffusion passes
+              // either: SubsurfaceProfileBxDF evaluates it per light from the
+              // shadow map's optical depth. The back-lit term on SkinMaterial
+              // stands in for it and is already part of SceneColor.
+              this.$l.diffused = pb.textureSampleLevel(this.bvarTex, this.uv, 0).rgb;
               this.result = pb.add(
                 pb.add(
                   pb.mul(pb.sub(this.diffused, this.diffOrig), this.scatterTint.rgb, this.strength),
@@ -781,13 +899,6 @@ export class SkinSSS extends AbstractPostEffect {
                 ),
                 this.specKeep
               );
-              // Transmission overlay
-              this.$if(pb.greaterThan(this.transmission, 0.001), function () {
-                this.result = pb.add(
-                  this.result,
-                  pb.mul(this.diffused, this.scatterTint.rgb, this.transmission, this.scatterTint.a, 0.5)
-                );
-              });
               this.result = pb.max(this.result, pb.vec3(0));
             }
           );

@@ -50,7 +50,6 @@ export class SkinMaterial
   private static readonly FEATURE_VERTEX_NORMAL = this.defineFeature();
   private static readonly FEATURE_VERTEX_TANGENT = this.defineFeature();
   private _roughness: number;
-  private _specularStrength: number;
   private _specularF0: number;
   private _transmissionStrength: number;
   private _transmissionPower: number;
@@ -64,7 +63,6 @@ export class SkinMaterial
     this._subsurfaceProfileChanged = () => this.uniformChanged();
     this._lobeParams = new Vector3();
     this._roughness = 0.5;
-    this._specularStrength = 1;
     this._specularF0 = 0.04;
     this._transmissionStrength = 0;
     this._transmissionPower = 4;
@@ -162,7 +160,6 @@ export class SkinMaterial
     this.vertexNormal = other.vertexNormal;
     this.vertexTangent = other.vertexTangent;
     this.roughness = other.roughness;
-    this.specularStrength = other.specularStrength;
     this.specularF0 = other.specularF0;
     this.transmissionStrength = other.transmissionStrength;
     this.transmissionPower = other.transmissionPower;
@@ -201,24 +198,18 @@ export class SkinMaterial
     }
   }
 
-  /** Specular strength multiplier. */
-  get specularStrength() {
-    return this._specularStrength;
-  }
-  set specularStrength(val) {
-    const next = Math.max(0, val ?? 0);
-    if (next !== this._specularStrength) {
-      this._specularStrength = next;
-      this.uniformChanged();
-    }
-  }
-
   /**
    * Fresnel reflectance at normal incidence.
    *
    * @remarks
    * Defaults to 0.04, which is what UE5's default `Specular` of 0.5 produces
-   * through `F0 = 0.08 * Specular`.
+   * through `F0 = 0.08 * Specular`. This is the only control over how strong the
+   * highlight is — UE5 exposes no separate specular gain on the subsurface
+   * profile path, and a post-multiplier is not a substitute for moving `F0`: it
+   * scales the grazing end of the Fresnel curve too, and it bypasses the energy
+   * terms, so the specular no longer pays for itself out of the diffuse.
+   *
+   * To port a UE5 material, use `specularF0 = 0.08 * Specular`.
    *
    * Note the subsurface profile's IOR (1.55 in UE5's skin preset) does not feed
    * this: that value drives the refraction used by transmission, while the
@@ -292,7 +283,6 @@ export class SkinMaterial
     if (this.needFragmentColorInput()) {
       if (this.drawContext.renderPass!.type === RENDER_PASS_TYPE_LIGHT) {
         scope.zSkinRoughness = pb.float().uniform(2);
-        scope.zSkinSpecularStrength = pb.float().uniform(2);
         scope.zSkinSpecularF0 = pb.float().uniform(2);
         scope.zSkinLobeParams = pb.vec3().uniform(2);
         scope.zSkinProfileId = pb.float().uniform(2);
@@ -328,6 +318,7 @@ export class SkinMaterial
         scope.$l.diffuseLighting = pb.vec3(0);
         scope.$l.transmissionLighting = pb.vec3(0);
         scope.$l.specularLighting = pb.vec3(0);
+        scope.$l.envSpecular = pb.vec3(0);
         scope.$l.NoV = pb.clamp(pb.dot(scope.normal, scope.viewVec), 0.0001, 1);
         // The lobe roughnesses depend only on the material and profile, so they
         // are resolved once rather than per light. The skin mask stands in for
@@ -363,22 +354,34 @@ export class SkinMaterial
           scope.$l.envDiffuse = this.getEnvLightIrradiance(scope, scope.normal);
           scope.diffuseLighting = pb.add(scope.diffuseLighting, scope.envDiffuse);
           scope.$l.reflectVec = this.calculateReflectionVector(scope, scope.normal, scope.viewVec);
-          scope.$l.envF0 = pb.vec3(scope.zSkinSpecularF0);
-          scope.$l.envF90 = pb.vec3(pb.clamp(pb.sub(1, scope.roughness), scope.zSkinSpecularF0, 1));
-          scope.$l.envF = pb.add(
-            scope.envF0,
-            pb.mul(pb.sub(scope.envF90, scope.envF0), pb.pow(pb.sub(1, scope.NoV), 5))
+          // UE5's ReflectionEnvironment, transcribed:
+          //
+          //   EnergyTerms = ComputeGGXSpecEnergyTerms(GBuffer.Roughness, NoV, SpecularColor)
+          //   Color.rgb   = GatherRadiance(R, GBuffer.Roughness) * EnergyTerms.E
+          //
+          // Two things follow from that, and this used to get both wrong.
+          //
+          // The roughness is the raw **material** value, not the blended lobe
+          // roughness. UE5 applies the dual lobe only in the direct BxDF; the
+          // reflection path never sees it. Feeding the lobe average here (0.609
+          // at the defaults, against a material 0.5) blurred the ambient
+          // highlight by a stop it should not have had.
+          //
+          // And the weight is the directional albedo `E`, which is the split-sum
+          // DFG with multiple-scattering compensation folded in — not a bare
+          // Fresnel. `skinSpecularEnergyTerms` already returns it as `.y`, so the
+          // same helper the direct path uses serves here, just evaluated at the
+          // material roughness. Since `E` already carries the multi-scatter gain,
+          // this term must not also be multiplied by the direct path's `W`.
+          scope.$l.envEnergyTerms = skinSpecularEnergyTerms(
+            scope,
+            scope.roughness,
+            scope.NoV,
+            scope.zSkinSpecularF0
           );
-          // Prefiltered radiance is a single lookup, so it takes the blended lobe
-          // roughness rather than the raw material value — otherwise the ambient
-          // highlight ignores the dual-lobe widening that direct light gets.
-          scope.specularLighting = pb.add(
-            scope.specularLighting,
-            pb.mul(
-              this.getEnvLightRadiance(scope, scope.reflectVec, scope.avgLobeRoughness),
-              scope.envF,
-              scope.zSkinSpecularStrength
-            )
+          scope.envSpecular = pb.mul(
+            this.getEnvLightRadiance(scope, scope.reflectVec, scope.roughness),
+            scope.envEnergyTerms.y
           );
         }
         this.forEachLight(scope, function (type, posRange, dirCutoff, colorIntensity, extra, shadow) {
@@ -462,14 +465,7 @@ export class SkinMaterial
           );
           this.specularLighting = pb.add(
             this.specularLighting,
-            pb.mul(
-              this.lightColor,
-              this.shadowTerm,
-              this.spec,
-              this.NoL,
-              this.zSkinSpecularStrength,
-              this.specularScale
-            )
+            pb.mul(this.lightColor, this.shadowTerm, this.spec, this.NoL, this.specularScale)
           );
         });
         // --- Assemble ---
@@ -479,6 +475,12 @@ export class SkinMaterial
         // the specular gains back the energy single-scattering GGX dropped. The
         // transmission is left alone, since it enters from behind the surface and
         // never passes through that specular layer.
+        //
+        // The environment specular stays outside that multiply. It was weighted
+        // by the directional albedo `E` when it was gathered, which already
+        // carries the multiple-scattering gain; applying `W` on top would count
+        // it twice. UE5 keeps the same split — `ComputeEnergyConservation` is
+        // applied in the BxDF, the reflection pass weights itself.
         scope.$l.diffusible = pb.mul(
           scope.albedo.rgb,
           pb.add(
@@ -486,7 +488,10 @@ export class SkinMaterial
             scope.transmissionLighting
           )
         );
-        scope.specularLighting = pb.mul(scope.specularLighting, scope.energyConservation);
+        scope.specularLighting = pb.add(
+          pb.mul(scope.specularLighting, scope.energyConservation),
+          scope.envSpecular
+        );
         scope.$l.litColor = pb.add(scope.diffusible, scope.specularLighting);
         // SceneColor.a = diffuse luminance. This is UE5's spec/diff separation
         // mechanism (verified in UEDigitalHuman.rdc, SSS::Setup lines 26-29 and
@@ -517,7 +522,7 @@ export class SkinMaterial
           (MaterialVaryingFlags.SCENE_STORE_ROUGHNESS | MaterialVaryingFlags.SCENE_STORE_NORMAL)
         ) {
           scope.$l.outRoughness = pb.vec4(
-            pb.mul(scope.albedo.rgb, pb.sub(1, scope.roughness), scope.zSkinSpecularStrength),
+            pb.mul(scope.albedo.rgb, pb.sub(1, scope.roughness)),
             pb.mul(scope.roughness, ShaderHelper.getCameraRoughnessFactor(scope))
           );
           this.outputFragmentColor(
@@ -560,7 +565,6 @@ export class SkinMaterial
     super.applyUniformValues(bindGroup, ctx, pass);
     if (this.needFragmentColor(ctx) && ctx.renderPass!.type === RENDER_PASS_TYPE_LIGHT) {
       bindGroup.setValue('zSkinRoughness', this._roughness);
-      bindGroup.setValue('zSkinSpecularStrength', this._specularStrength);
       bindGroup.setValue('zSkinSpecularF0', this._specularF0);
       const profile = this.effectiveProfile;
       bindGroup.setValue('zSkinLobeParams', this._lobeParams.setXYZ(profile.roughness0, profile.roughness1, profile.lobeMix));

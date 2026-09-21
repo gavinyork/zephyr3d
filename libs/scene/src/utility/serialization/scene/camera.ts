@@ -1638,7 +1638,8 @@ export function getCameraClass(): SerializableClass {
                 'Weight',
                 'Acceptance',
                 'Center Weight',
-                'Diffused'
+                'Diffused',
+                'Thickness'
               ],
               values: [
                 'none',
@@ -1651,7 +1652,8 @@ export function getCameraClass(): SerializableClass {
                 'weight',
                 'acceptance',
                 'centerWeight',
-                'diffused'
+                'diffused',
+                'thickness'
               ]
             }
           },

@@ -1,7 +1,7 @@
 import { RenderPass } from './renderpass';
 import { MaterialVaryingFlags, QUEUE_OPAQUE, QUEUE_TRANSPARENT, RENDER_PASS_TYPE_LIGHT } from '../values';
 import type { Nullable } from '@zephyr3d/base';
-import type { Texture2D } from '@zephyr3d/device';
+import type { BaseTexture } from '@zephyr3d/device';
 import { Vector4 } from '@zephyr3d/base';
 import type { RenderItemListBundle, RenderQueue } from './render_queue';
 import type { PunctualLight } from '../scene/light';
@@ -126,11 +126,12 @@ export class LightPass extends RenderPass {
       ctx.HiZTexture?.uid ?? 0
     }:${ctx.screenSpaceShadowMask ? 1 : 0}:${ctx.scene.lightingMode}:${
       ShaderHelper.usesWaterCaustics(ctx) ? 1 : 0
-    }`;
+    }:${ctx.transmissionThickness ? 1 : 0}`;
   }
   /** @internal */
   protected _getShaderVariantHash(ctx: DrawContext, camera: Camera) {
-    const textureVariant = (texture: Texture2D | null | undefined) => (texture ? `1:${texture.format}` : '0');
+    const textureVariant = (texture: BaseTexture | null | undefined) =>
+      texture ? `1:${texture.format}` : '0';
     return `LightPassShaderVariant:${this._shadowMapHash}:${ctx.currentShadowLight?.runtimeId ?? 0}:${
       ctx.lightBlending ? 1 : 0
     }:${camera.oit?.calculateHash() ?? ''}:${ctx.env!.getHash(
@@ -139,7 +140,7 @@ export class LightPass extends RenderPass {
       ctx.sceneColorTexture
     )}:${textureVariant(ctx.HiZTexture)}:${ctx.screenSpaceShadowMask ? 1 : 0}:${ctx.scene.lightingMode}:${
       ShaderHelper.usesWaterCaustics(ctx) ? 1 : 0
-    }`;
+    }:${ctx.transmissionThickness ? 1 : 0}:${textureVariant(ctx.transmissionThicknessTexture)}`;
   }
   /** @internal */
   protected renderLightPass(

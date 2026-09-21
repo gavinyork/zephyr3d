@@ -15,7 +15,6 @@ describe('Skin material serialization', () => {
 
     material.roughness = 0.4;
     material.specularF0 = 0.03;
-    material.specularStrength = 0.17;
     material.transmissionStrength = 0.8;
     material.transmissionPower = 6;
     material.albedoColor = new Vector4(0.8, 0.55, 0.48, 1);
@@ -31,7 +30,6 @@ describe('Skin material serialization', () => {
     expect(obj).toMatchObject({
       Roughness: 0.4,
       SpecularF0: 0.03,
-      SpecularStrength: 0.17,
       TransmissionStrength: 0.8,
       TransmissionPower: 6,
       vertexTangent: true,
@@ -40,7 +38,6 @@ describe('Skin material serialization', () => {
     expect(restored).toBeInstanceOf(SkinMaterial);
     expect(restored.roughness).toBeCloseTo(0.4);
     expect(restored.specularF0).toBeCloseTo(0.03);
-    expect(restored.specularStrength).toBeCloseTo(0.17);
     expect(restored.transmissionStrength).toBeCloseTo(0.8);
     expect(restored.transmissionPower).toBeCloseTo(6);
     expect(restored.albedoColor.x).toBeCloseTo(0.8);

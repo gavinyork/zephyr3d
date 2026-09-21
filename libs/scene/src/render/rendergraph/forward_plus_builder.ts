@@ -24,6 +24,8 @@ import { ShadowMapPass } from '../shadowmap_pass';
 import { DepthPass } from '../depthpass';
 import { ClusteredLight } from '../cluster_light';
 import { ShadowMaskRenderer } from '../shadow_mask_pass';
+import { TransmissionThicknessRenderer } from '../transmission_thickness_pass';
+import { SkinProfile } from '../../material/skinprofile';
 import { buildHiZ, getHiZFormat } from '../hzb';
 import { CopyBlitter } from '../../blitter';
 import { fetchSampler } from '../../utility/misc';
@@ -64,6 +66,7 @@ const _depthPass = new DepthPass();
 const _shadowMapPass = new ShadowMapPass();
 const _clusters: ClusteredLight[] = [];
 const _shadowMaskRenderer = new ShadowMaskRenderer();
+const _transmissionThicknessRenderer = new TransmissionThicknessRenderer();
 const _waterCausticsRenderer = new WaterCausticsRenderer();
 const _underwaterRenderer = new UnderwaterRenderer();
 const _devicePoolAllocator = new DevicePoolAllocator();
@@ -975,6 +978,73 @@ const ShadowMaskModule: RenderModule<FrameGraphContext> = {
 };
 
 /** @internal */
+const TransmissionThicknessModule: RenderModule<FrameGraphContext> = {
+  type: 'TransmissionThicknessPass',
+  writes: [FrameResources.TransmissionThickness],
+  prepare: ({ ctx, options, renderQueue }) => ({
+    // WebGPU only: the depth attachment is read with textureLoad, and the skin
+    // scattering this feeds is WebGPU-only to begin with.
+    enabled:
+      ctx.device.type === 'webgpu' &&
+      options.skinSSS &&
+      renderQueue.shadowedLights.some((light) => light.transmission)
+  }),
+  setup(fg: FrameGraphContext) {
+    const { graph, ctx, renderQueue, blackboard } = fg;
+    const depthPassResult = requireBuildState(fg, 'depth', 'DepthPrepass', 'TransmissionThicknessPass');
+    // The ordinal space is shared with the shadow mask so that a light's
+    // thickness and its shadow factor are found with the same arithmetic; that
+    // means the layer count follows the shadow light count, not the (smaller)
+    // transmission light count.
+    const numShadowLights = renderQueue.shadowedLights.length;
+    const numLayers = ShadowMaskRenderer.getLayerCount(numShadowLights);
+    const passResult = graph.addPass('TransmissionThicknessPass', (builder) => {
+      const depthHandle = blackboard.expect(FrameResources.LinearDepth);
+      builder.read(depthHandle);
+      builder.read(depthPassResult.depthFramebufferHandle);
+      const thicknessHandle = builder.createTexture({
+        format: 'rgba8unorm',
+        label: 'transmissionThickness',
+        arrayLayers: numLayers,
+        allocationKey: 'ForwardPlus.TransmissionThickness'
+      });
+      builder.setExecute((rgCtx) => {
+        const depthTex = rgCtx.getTexture<Texture2D>(depthHandle);
+        const thicknessTex = rgCtx.getTexture<Texture2DArray>(thicknessHandle);
+        // The thickness pass runs before the light pass, so there is no per-pixel
+        // profile id to read yet — UE5 gets one from its GBuffer, this pipeline
+        // has none at this point. Extinction and normal scale therefore come from
+        // the default profile for the whole frame; they describe the medium's
+        // absorption, which does not vary across one character's skin.
+        const profile = SkinProfile.getDefault();
+        _transmissionThicknessRenderer.render(
+          ctx,
+          depthTex,
+          renderQueue.shadowedLights,
+          // World units to optical depth. UE5's scene unit is the centimetre and
+          // this engine's is the metre, so the thickness is converted before the
+          // extinction is applied.
+          100 * profile.extinctionScale,
+          // UE5 shrinks by NormalScale * 0.5 in centimetres.
+          profile.normalScale * 0.5 * 0.01,
+          profile.normalScale * 0.5,
+          (layer: number) =>
+            rgCtx.createFramebuffer({
+              width: thicknessTex.width,
+              height: thicknessTex.height,
+              colorAttachments: thicknessTex,
+              depthAttachment: null,
+              attachmentLayer: layer
+            })
+        );
+      });
+      return { thicknessHandle };
+    });
+    blackboard.set(FrameResources.TransmissionThickness, passResult.thicknessHandle);
+  }
+};
+
+/** @internal */
 const TransmissionDepthForSSRModule: RenderModule<FrameGraphContext> = {
   type: 'TransmissionDepthForSSR',
   writes: [FrameResources.LinearDepth],
@@ -1063,6 +1133,7 @@ const SSSProfileModule: RenderModule<FrameGraphContext> = {
     const depthPassResult = requireBuildState(fg, 'depth', 'DepthPrepass', 'SSSProfile');
     const preLightTransmissionDepthToken = fg.state.preLightTransmissionDepthToken;
     const shadowMaskHandle = blackboard.get(FrameResources.ShadowMask);
+    const thicknessHandle = blackboard.get(FrameResources.TransmissionThickness);
     const waterCausticsHandle = blackboard.get(FrameResources.WaterCaustics);
     const renderDepthAttachment = fg.state.renderDepthAttachment;
     const sssProfileResult = graph.addPass('SSSProfile', (builder) => {
@@ -1073,6 +1144,9 @@ const SSSProfileModule: RenderModule<FrameGraphContext> = {
       }
       if (shadowMaskHandle) {
         builder.read(shadowMaskHandle);
+      }
+      if (thicknessHandle) {
+        builder.read(thicknessHandle);
       }
       if (waterCausticsHandle) {
         // Same reason as the shadow mask: the map reaches the shader through
@@ -1102,6 +1176,9 @@ const SSSProfileModule: RenderModule<FrameGraphContext> = {
 
       builder.setExecute((rgCtx) => {
         ctx.shadowMaskTexture = shadowMaskHandle ? rgCtx.getTexture<Texture2DArray>(shadowMaskHandle) : null;
+        ctx.transmissionThicknessTexture = thicknessHandle
+          ? rgCtx.getTexture<Texture2DArray>(thicknessHandle)
+          : null;
         renderForwardSSSProfile(
           frame,
           rgCtx.getFramebuffer(framebufferHandle),
@@ -1132,6 +1209,7 @@ const SceneColorGrabModule: RenderModule<FrameGraphContext> = {
     const depthPassResult = requireBuildState(fg, 'depth', 'DepthPrepass', 'SceneColorGrab');
     const preLightTransmissionDepthToken = fg.state.preLightTransmissionDepthToken;
     const shadowMaskHandle = blackboard.get(FrameResources.ShadowMask);
+    const thicknessHandle = blackboard.get(FrameResources.TransmissionThickness);
     const waterCausticsHandle = blackboard.get(FrameResources.WaterCaustics);
     const renderDepthAttachment = fg.state.renderDepthAttachment;
     const grabResult = graph.addPass('SceneColorGrab', (builder) => {
@@ -1142,6 +1220,9 @@ const SceneColorGrabModule: RenderModule<FrameGraphContext> = {
       }
       if (shadowMaskHandle) {
         builder.read(shadowMaskHandle);
+      }
+      if (thicknessHandle) {
+        builder.read(thicknessHandle);
       }
       if (waterCausticsHandle) {
         // Same reason as the shadow mask: the map reaches the shader through
@@ -1186,6 +1267,9 @@ const SceneColorGrabModule: RenderModule<FrameGraphContext> = {
         : undefined;
       builder.setExecute((rgCtx) => {
         ctx.shadowMaskTexture = shadowMaskHandle ? rgCtx.getTexture<Texture2DArray>(shadowMaskHandle) : null;
+        ctx.transmissionThicknessTexture = thicknessHandle
+          ? rgCtx.getTexture<Texture2DArray>(thicknessHandle)
+          : null;
         renderSceneColorGrab(frame, rgCtx, copyHandle, copyFramebufferHandle);
       });
       return { copyHandle, copyFramebufferHandle };
@@ -1210,6 +1294,7 @@ const LightPassModule: RenderModule<FrameGraphContext> = {
     const { graph, ctx, frame, blackboard, options, backbuffer } = fg;
     const depthPassResult = requireBuildState(fg, 'depth', 'DepthPrepass', 'LightPass');
     const shadowMaskHandle = blackboard.get(FrameResources.ShadowMask);
+    const thicknessHandle = blackboard.get(FrameResources.TransmissionThickness);
     const waterCausticsHandle = blackboard.get(FrameResources.WaterCaustics);
     const preLightTransmissionDepthToken = fg.state.preLightTransmissionDepthToken;
     const hiZHandle = blackboard.get(FrameResources.HiZ);
@@ -1290,6 +1375,9 @@ const LightPassModule: RenderModule<FrameGraphContext> = {
       builder.read(depthPassResult.depthFramebufferHandle);
       if (shadowMaskHandle) {
         builder.read(shadowMaskHandle);
+      }
+      if (thicknessHandle) {
+        builder.read(thicknessHandle);
       }
       if (waterCausticsHandle) {
         // Same reason as the shadow mask: the map reaches the shader through
@@ -1401,6 +1489,9 @@ const LightPassModule: RenderModule<FrameGraphContext> = {
           : null;
         // Legacy effects still read resolved MRT textures from DrawContext.
         ctx.shadowMaskTexture = shadowMaskHandle ? rgCtx.getTexture<Texture2DArray>(shadowMaskHandle) : null;
+        ctx.transmissionThicknessTexture = thicknessHandle
+          ? rgCtx.getTexture<Texture2DArray>(thicknessHandle)
+          : null;
         ctx.HiZTexture = hiZHandle ? rgCtx.getTexture<Texture2D>(hiZHandle) : null;
         ctx.SceneRoughnessTexture = sceneRoughnessHandle
           ? rgCtx.getTexture<Texture2D>(sceneRoughnessHandle)
@@ -1600,6 +1691,7 @@ const CompositeTailModule: RenderModule<FrameGraphContext> = {
     const hiZHandle = blackboard.get(FrameResources.HiZ);
     const sceneColorCopyHandle = blackboard.get(FrameResources.SceneColorCopy);
     const shadowMaskHandle = blackboard.get(FrameResources.ShadowMask);
+    const thicknessHandle = blackboard.get(FrameResources.TransmissionThickness);
     const waterCausticsHandle = blackboard.get(FrameResources.WaterCaustics);
     const lightPassResult = requireBuildState(fg, 'lightPass', 'LightPass', 'CompositeTail');
     const renderDepthAttachment = fg.state.renderDepthAttachment;
@@ -1673,6 +1765,12 @@ const CompositeTailModule: RenderModule<FrameGraphContext> = {
         // after LightPass while this pass is still sampling it.
         builder.read(shadowMaskHandle);
       }
+      if (thicknessHandle) {
+        // Same reasoning as the shadow mask above: the thickness texture is
+        // bound by the shared clustered-light bind group, so its lifetime has to
+        // reach this pass too.
+        builder.read(thicknessHandle);
+      }
       if (waterCausticsHandle) {
         // Same lifetime argument as the shadow mask above.
         builder.read(waterCausticsHandle);
@@ -1684,6 +1782,9 @@ const CompositeTailModule: RenderModule<FrameGraphContext> = {
         // is the same, but relying on the leftover would make this pass depend
         // on execution order instead of on its own declared inputs.
         ctx.shadowMaskTexture = shadowMaskHandle ? rgCtx.getTexture<Texture2DArray>(shadowMaskHandle) : null;
+        ctx.transmissionThicknessTexture = thicknessHandle
+          ? rgCtx.getTexture<Texture2DArray>(thicknessHandle)
+          : null;
         renderTransparentScenePass(
           frame,
           rgCtx,
@@ -1799,6 +1900,7 @@ export const ForwardPlusModules = {
   WaterCaustics: WaterCausticsModule,
   DepthPrepass: DepthPrepassModule,
   ShadowMask: ShadowMaskModule,
+  TransmissionThickness: TransmissionThicknessModule,
   TransmissionDepthForSSR: TransmissionDepthForSSRModule,
   HiZ: HiZModule,
   SSSProfile: SSSProfileModule,
@@ -1818,6 +1920,7 @@ const DEFAULT_FORWARD_PLUS_MODULES: readonly RenderModule<FrameGraphContext>[] =
   WaterCausticsModule,
   DepthPrepassModule,
   ShadowMaskModule,
+  TransmissionThicknessModule,
   TransmissionDepthForSSRModule,
   HiZModule,
   SSSProfileModule,
@@ -1872,6 +1975,7 @@ function buildForwardPlusGraphInternal(
   ctx.SkinSSSTexture = null;
   // ShadowMask sets this only when it produces a texture.
   ctx.shadowMaskTexture = null;
+  ctx.transmissionThicknessTexture = null;
   // WaterCaustics turns these on together once it has produced a map; they are
   // read by every light pass, so they must start cleared each frame.
   ctx.waterCaustics = false;
@@ -1916,6 +2020,13 @@ function buildForwardPlusGraphInternal(
   const requirements = ctx.compositor?.collectRequirements(ctx) ?? {};
   mergeFrameResourceRequirements(requirements, pipeline.collectRequirements(fg));
   resolveFrameResourceRequirements(ctx, options, requirements);
+  // Must agree with TransmissionThicknessModule.prepare: the flag decides
+  // whether the light pass declares and binds the thickness texture, so a
+  // mismatch would leave the shader layout disagreeing with the bind group.
+  ctx.transmissionThickness =
+    ctx.device.type === 'webgpu' &&
+    options.skinSSS &&
+    renderQueue.shadowedLights.some((light) => light.transmission);
 
   pipeline.build(fg);
   validateProducedFrameResources(blackboard, options, renderQueue);

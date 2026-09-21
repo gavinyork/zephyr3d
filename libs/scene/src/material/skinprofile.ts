@@ -61,21 +61,40 @@ interface SkinProfileTemplate {
  * Preset parameters.
  *
  * @remarks
- * The skin entries follow the albedo/mean-free-path pairs Burley's diffusion
- * model is normally fit with: a high, strongly red-shifted albedo, and a mean
- * free path an order of magnitude longer in red than in blue. That ratio is what
- * produces the red bleed through thin geometry such as ear rims and nostrils.
+ * `skin` reproduces UE5's `FSubsurfaceProfileStruct` defaults exactly, converted
+ * into this engine's metre-based scene units:
+ *
+ * | UE5 parameter        | UE5 default                     | here                        |
+ * | -------------------- | ------------------------------- | --------------------------- |
+ * | SurfaceAlbedo        | (0.91058, 0.338275, 0.2718)     | `surfaceAlbedo`, unchanged  |
+ * | MeanFreePathColor    | (1, 0.1983/2.229, 0.1607/2.229) | `meanFreePath`, unchanged   |
+ * | MeanFreePathDistance | 1.2 × 2.229 = 2.6748 cm         | `meanFreePathDistance` in m |
+ * | WorldUnitScale       | 0.1 cm                          | folded into the distance    |
+ * | BoundaryColorBleed   | white                           | white                       |
+ *
+ * The green and blue mean free paths are an order of magnitude shorter than red
+ * — roughly 1 : 0.089 : 0.072 — and the albedo is just as strongly red-shifted.
+ * Those two ratios together are what make the diffusion read as skin rather than
+ * as a neutral blur, so they are the first thing to check when the scattering
+ * looks washed out.
+ *
+ * UE5 only ships the one profile; the remaining presets are this engine's own
+ * and are pitched around the same regime so that they stay comparable.
+ *
+ * `boundaryColorBleed` is white throughout, as in UE5: it tints taps that belong
+ * to a *different* profile, so it is a seam treatment rather than a material
+ * colour, and anything darker quietly attenuates every profile boundary.
  *
  * @internal
  */
 const SKIN_PROFILE_TEMPLATES: Record<SkinProfilePreset, SkinProfileTemplate> = {
   skin: {
-    surfaceAlbedo: [0.85, 0.63, 0.55],
-    meanFreePath: [1.0, 0.28, 0.14],
-    meanFreePathDistance: 0.012,
+    surfaceAlbedo: [0.91058, 0.338275, 0.2718],
+    meanFreePath: [1.0, 0.0889636, 0.0720951],
+    meanFreePathDistance: 0.026748,
     worldUnitScale: 1,
     scatterScale: 1,
-    boundaryColorBleed: [0.78, 0.44, 0.36],
+    boundaryColorBleed: [1, 1, 1],
     transmissionTint: [1.0, 0.42, 0.3],
     extinctionScale: 1,
     normalScale: 0.08,
@@ -84,84 +103,84 @@ const SKIN_PROFILE_TEMPLATES: Record<SkinProfilePreset, SkinProfileTemplate> = {
     lobeMix: 0.85
   },
   skin_pale: {
-    surfaceAlbedo: [0.88, 0.68, 0.62],
-    meanFreePath: [1.0, 0.32, 0.18],
-    meanFreePathDistance: 0.014,
+    surfaceAlbedo: [0.93, 0.4, 0.33],
+    meanFreePath: [1.0, 0.1, 0.083],
+    meanFreePathDistance: 0.0294,
     worldUnitScale: 1,
-    scatterScale: 1.08,
-    boundaryColorBleed: [0.82, 0.5, 0.44],
+    scatterScale: 1,
+    boundaryColorBleed: [1, 1, 1],
     transmissionTint: [1.0, 0.48, 0.38],
-    extinctionScale: 0.92,
+    extinctionScale: 1,
     normalScale: 0.08,
     roughness0: 0.72,
     roughness1: 1.25,
     lobeMix: 0.85
   },
   skin_tan: {
-    surfaceAlbedo: [0.8, 0.56, 0.46],
-    meanFreePath: [1.0, 0.26, 0.12],
-    meanFreePathDistance: 0.011,
+    surfaceAlbedo: [0.88, 0.3, 0.235],
+    meanFreePath: [1.0, 0.082, 0.066],
+    meanFreePathDistance: 0.0254,
     worldUnitScale: 1,
-    scatterScale: 0.95,
-    boundaryColorBleed: [0.72, 0.4, 0.3],
+    scatterScale: 1,
+    boundaryColorBleed: [1, 1, 1],
     transmissionTint: [1.0, 0.38, 0.26],
-    extinctionScale: 1.08,
+    extinctionScale: 1,
     normalScale: 0.08,
     roughness0: 0.76,
     roughness1: 1.32,
     lobeMix: 0.85
   },
   skin_dark: {
-    surfaceAlbedo: [0.7, 0.45, 0.36],
-    meanFreePath: [1.0, 0.22, 0.1],
-    meanFreePathDistance: 0.009,
+    surfaceAlbedo: [0.8, 0.24, 0.185],
+    meanFreePath: [1.0, 0.072, 0.057],
+    meanFreePathDistance: 0.0227,
     worldUnitScale: 1,
-    scatterScale: 0.85,
-    boundaryColorBleed: [0.6, 0.32, 0.24],
+    scatterScale: 1,
+    boundaryColorBleed: [1, 1, 1],
     transmissionTint: [1.0, 0.3, 0.2],
-    extinctionScale: 1.2,
+    extinctionScale: 1,
     normalScale: 0.08,
     roughness0: 0.78,
     roughness1: 1.35,
     lobeMix: 0.85
   },
   wax: {
-    surfaceAlbedo: [0.92, 0.85, 0.72],
-    meanFreePath: [1.0, 0.82, 0.62],
+    surfaceAlbedo: [0.95, 0.9, 0.8],
+    meanFreePath: [1.0, 0.85, 0.68],
     meanFreePathDistance: 0.05,
     worldUnitScale: 1,
-    scatterScale: 1.4,
-    boundaryColorBleed: [0.9, 0.82, 0.7],
+    scatterScale: 1,
+    boundaryColorBleed: [1, 1, 1],
     transmissionTint: [1.0, 0.88, 0.74],
-    extinctionScale: 0.7,
+    extinctionScale: 1,
     normalScale: 0.05,
     roughness0: 0.85,
     roughness1: 1.4,
     lobeMix: 0.8
   },
   jade: {
-    surfaceAlbedo: [0.72, 0.9, 0.82],
+    surfaceAlbedo: [0.75, 0.93, 0.86],
     meanFreePath: [0.6, 1.0, 0.85],
-    meanFreePathDistance: 0.04,
+    meanFreePathDistance: 0.045,
     worldUnitScale: 1,
-    scatterScale: 1.25,
-    boundaryColorBleed: [0.66, 0.9, 0.84],
+    scatterScale: 1,
+    boundaryColorBleed: [1, 1, 1],
     transmissionTint: [0.68, 0.95, 0.88],
-    extinctionScale: 0.85,
+    extinctionScale: 1,
     normalScale: 0.05,
     roughness0: 0.6,
     roughness1: 1.1,
     lobeMix: 0.75
   },
   marble: {
-    surfaceAlbedo: [0.93, 0.92, 0.9],
-    meanFreePath: [1.0, 0.95, 0.9],
-    meanFreePathDistance: 0.03,
+    surfaceAlbedo: [0.95, 0.94, 0.92],
+    meanFreePath: [1.0, 0.96, 0.92],
+    meanFreePathDistance: 0.035,
     worldUnitScale: 1,
-    scatterScale: 1.15,
-    boundaryColorBleed: [0.92, 0.9, 0.88],
+    scatterScale: 1,
+    boundaryColorBleed: [1, 1, 1],
     transmissionTint: [0.96, 0.95, 0.94],
-    extinctionScale: 0.8,
+    extinctionScale: 1,
     normalScale: 0.04,
     roughness0: 0.55,
     roughness1: 1.05,
@@ -387,7 +406,7 @@ export class SkinProfile {
     }
   }
 
-  /** Mean free path of the widest channel, in world units. @public */
+  /** Mean free path of the widest channel, in profile space. @public */
   get meanFreePathDistance() {
     return this._meanFreePathDistance;
   }
@@ -399,7 +418,16 @@ export class SkinProfile {
     }
   }
 
-  /** Scales world units before diffusion, for scenes not authored in meters. @public */
+  /**
+   * Profile-space to world-unit conversion, for scenes not authored in metres.
+   *
+   * @remarks
+   * Applied once, when the diffusion converts a scatter radius into a screen
+   * offset — the same place UE5 applies it, in `CalculateBurleyScale`. It is
+   * deliberately absent from {@link SkinProfile.getScatterDistance}.
+   *
+   * @public
+   */
   get worldUnitScale() {
     return this._worldUnitScale;
   }
@@ -481,9 +509,10 @@ export class SkinProfile {
    * Multiplier on the material roughness for the narrow specular lobe.
    *
    * @remarks
-   * Scaled by 2 before it multiplies the material roughness, so 0.5 leaves the
-   * roughness as-is and 1 doubles it. Skin normally keeps the narrow lobe at or
-   * below the material value.
+   * Used directly as a multiplier, so 1 leaves the material roughness alone and
+   * skin's default 0.75 tightens the narrow lobe. The range 0.5..2 matches the
+   * one UE5 exposes; UE5 stores the value halved and doubles it again on read,
+   * which is purely its texture encoding and has no place here.
    *
    * @public
    */
@@ -502,8 +531,8 @@ export class SkinProfile {
    * Multiplier on the material roughness for the wide specular lobe.
    *
    * @remarks
-   * Same scaling as {@link SkinProfile.roughness0}; 1 doubles the material
-   * roughness, which gives skin its broad sheen alongside the tighter highlight.
+   * Same scaling as {@link SkinProfile.roughness0}; skin's default 1.3 broadens
+   * the second lobe, giving it a soft sheen alongside the tighter highlight.
    *
    * @public
    */
@@ -531,14 +560,25 @@ export class SkinProfile {
   }
 
   /**
-   * Per-channel diffusion distance in world units.
+   * Per-channel diffusion distance, in profile space.
    *
-   * @returns Mean free path scaled to world units and by the profile scaling.
+   * @remarks
+   * This is deliberately *not* scaled by {@link SkinProfile.worldUnitScale}.
+   * UE5 keeps the two apart the same way: the packed diffuse mean free path is
+   * `MeanFreePathColor × MeanFreePathDistance` alone, and `WorldUnitScale` only
+   * enters later, in `CalculateBurleyScale`, as the profile-space-to-world
+   * conversion. Folding it in here as well made the diffusion scale with the
+   * square of the world unit scale.
+   *
+   * The distance therefore has to be read together with the world unit scale to
+   * reach world units; {@link SkinProfile.worldUnitScale} is the factor.
+   *
+   * @returns Mean free path scaled by the profile's distance and scatter scale.
    *
    * @public
    */
   getScatterDistance(): Vector3 {
-    const s = this._meanFreePathDistance * this._worldUnitScale * this._scatterScale;
+    const s = this._meanFreePathDistance * this._scatterScale;
     return new Vector3(this._meanFreePath.x * s, this._meanFreePath.y * s, this._meanFreePath.z * s);
   }
 

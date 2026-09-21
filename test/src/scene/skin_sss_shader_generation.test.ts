@@ -71,16 +71,22 @@ describe('SkinSSS shader generation', () => {
     expect(burley).toContain('radiusSampledMM');
   });
 
-  test('the R2 sequence is indexed by an integer, not a per-pixel fraction', () => {
+  test('the R2 sequence start is a per-pixel integer, not a fraction', () => {
     const { burley } = buildPrograms('webgpu');
     // Regression guard: R2Sequence is a low-discrepancy sequence over integer
     // indices. Offsetting the index by a per-pixel fraction turns it into a phase
-    // sweep correlated with pixel position, which rendered as regular banding.
+    // sweep correlated with pixel position, which rendered as regular banding —
+    // so the rebase has to land on an integer. It does have to be per-pixel
+    // though: a constant start makes every pixel draw the identical 64 taps and
+    // the sampling error goes fully correlated across the image. UE5 does the
+    // same thing with `Rand3DPCG16(int3(pixel, seed)).x`.
     expect(burley).toContain('seedStart');
     const seedLine = burley.split('\n').find((line) => line.includes('seedStart:'));
     expect(seedLine).toBeDefined();
-    expect(seedLine).not.toContain('fract');
-    expect(seedLine).not.toContain('uv');
+    // i32(...) — an integer rebase, whatever the hash inside it looks like.
+    expect(seedLine).toMatch(/\bi32\b|\bint\b/);
+    // and it has to actually vary per pixel
+    expect(seedLine).toContain('Z_hash21');
   });
 
   test('centre weight uses each channel own diffusion distance', () => {
@@ -188,10 +194,16 @@ describe('SkinSSS shader generation', () => {
     expect(recombine).toContain('centerMask');
   });
 
-  test('Recombine applies transmission from BVar', () => {
+  test('Recombine does not read the diffusion alpha as a transmission term', () => {
     const { recombine } = buildPrograms('webgpu');
-    expect(recombine).toContain('transmission');
+    // Regression guard: the diffusion buffer's alpha carries the profile id.
+    // Reading it as transmission added `diffused * id/255` on top of every skin
+    // pixel — energy from nothing, scaled by which table slot the profile
+    // happened to occupy. UE5 gets transmission from the BxDF (shadow-map
+    // optical depth), never from the diffusion passes.
+    expect(recombine).not.toContain('transmission');
     expect(recombine).toContain('scatterTint');
+    expect(recombine).toContain('diffused');
   });
 
   test('no legacy uniforms remain', () => {

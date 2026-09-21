@@ -81,6 +81,21 @@ export interface DrawContext {
    */
   shadowMaskTexture?: Nullable<Texture2DArray>;
   /**
+   * Whether light-space thickness was produced this frame. Keyed into the light
+   * pass shader/bind group hashes, so the declared and bound global layouts
+   * always agree.
+   */
+  transmissionThickness?: boolean;
+  /**
+   * Screen-space light-space thickness, produced by the TransmissionThicknessPass
+   * for lights with `transmission` enabled. Uses exactly the same packing as
+   * {@link DrawContext.shadowMaskTexture} — four lights per RGBA8 layer, indexed
+   * by the same clustered-buffer ordinal — so a light's thickness is recovered
+   * with the same arithmetic as its shadow factor. Each channel holds
+   * `1 - opticalDepth / 5`, so 1 means nothing is in the way.
+   */
+  transmissionThicknessTexture?: Nullable<Texture2DArray>;
+  /**
    * Whether the current clustered light pass should sample the opaque shadow mask
    * for shadow-casting lights. True for the opaque queue; false for transparent
    * queues (e.g. OIT hair), where shadow lights are instead lit inline by the

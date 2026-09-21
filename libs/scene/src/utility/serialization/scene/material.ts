@@ -2841,7 +2841,7 @@ export function getSkinMaterialClass(manager: ResourceManager): SerializableClas
           },
           {
             name: 'SpecularF0',
-            description: 'Fresnel F0 for the skin oil layer',
+            description: 'Fresnel F0 for the skin oil layer. UE5: 0.08 * Specular',
             type: 'float',
             default: 0.04,
             options: { animatable: true, minValue: 0, maxValue: 0.2 },
@@ -2853,22 +2853,6 @@ export function getSkinMaterialClass(manager: ResourceManager): SerializableClas
             },
             getDefaultValue(this: SkinMaterial) {
               return this.$isInstance ? this.coreMaterial.specularF0 : 0.04;
-            }
-          },
-          {
-            name: 'SpecularStrength',
-            description: 'Direct specular strength multiplier',
-            type: 'float',
-            default: 1,
-            options: { animatable: true, minValue: 0, maxValue: 4 },
-            get(this: SkinMaterial, value) {
-              value.num[0] = this.specularStrength;
-            },
-            set(this: SkinMaterial, value) {
-              this.specularStrength = value.num[0];
-            },
-            getDefaultValue(this: SkinMaterial) {
-              return this.$isInstance ? this.coreMaterial.specularStrength : 1;
             }
           },
           {
