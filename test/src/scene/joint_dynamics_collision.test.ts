@@ -34,6 +34,8 @@ function makeCapsule(height: number, scaledHeight: number): { colR: ColliderR; c
     worldScale: new Vector3(2, 2, 2),
     localBoundsMin: Vector3.zero(),
     localBoundsMax: Vector3.zero(),
+    boxAxes: [Vector3.axisPX(), Vector3.axisPY(), Vector3.axisPZ()],
+    boxHalfExtents: Vector3.zero(),
     radius: colR.radius * 2,
     height: scaledHeight,
     enabled: 1

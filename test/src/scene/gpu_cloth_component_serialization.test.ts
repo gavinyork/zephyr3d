@@ -50,7 +50,8 @@ const CONFIG: GPUClothComponentConfig = {
       offset: [0.1, 0.2, 0.3],
       endOffset: [0.4, 0.5, 0.6],
       radius: 0.15,
-      normal: [0, 1, 0]
+      normal: [0, 1, 0],
+      size: [0.5, 0.6, 0.7]
     }
   ]
 };
