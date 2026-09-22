@@ -1,6 +1,17 @@
 import { Vector2, Vector3 } from '@zephyr3d/base';
-import type { BaseTexture, BindGroup, GPUProgram, RenderStateSet, Texture2D } from '@zephyr3d/device';
+import type {
+  BaseTexture,
+  BindGroup,
+  GPUProgram,
+  RenderStateSet,
+  Texture2D,
+  TextureSampler
+} from '@zephyr3d/device';
 import { Primitive, decodeNormalizedFloatFromRGBA, getDevice, linearToGamma } from '@zephyr3d/scene';
+
+const UV_SCALE_ONE = new Vector2(1, 1);
+const UV_SCALE_ZERO = new Vector2(0, 0);
+const UV_OFFSET_ZERO = new Vector2(0, 0);
 
 type SampleType = 'depth' | 'float' | 'unfilterable-float' | 'int' | 'uint';
 
@@ -53,9 +64,9 @@ export class TextureDrawer {
   static readonly ENCODE_NORMALIZED_FLOAT = 2;
 
   private readonly _rect: Primitive;
-  private readonly _point: Primitive;
   private readonly _dummyTexture: Texture2D;
   private readonly _renderStates: RenderStateSet;
+  private readonly _probeRenderStates: RenderStateSet;
   private _program2D: TextureViewProgramEncodes;
   private _programCube: TextureViewProgramEncodes;
   private _programVideo: TextureViewProgramEncodes;
@@ -89,18 +100,13 @@ export class TextureDrawer {
     this._rect.indexStart = 0;
     this._rect.indexCount = 6;
     this._rect.primitiveType = 'triangle-list';
-    const pt = device.createInterleavedVertexBuffer(
-      ['position_f32x2', 'tex0_f32x2'],
-      new Float32Array([0, 0, 0.5, 0.5])
-    );
-    this._point = new Primitive();
-    this._point.setVertexBuffer(pt);
-    this._point.indexStart = 0;
-    this._point.indexCount = 1;
-    this._point.primitiveType = 'point-list';
     this._renderStates = device.createRenderStateSet();
     this._renderStates.useRasterizerState().setCullMode('none');
     this._renderStates.useDepthState().enableTest(false).enableWrite(false);
+    // Blending must be off while probing, otherwise the raw sample value would be blended
+    this._probeRenderStates = device.createRenderStateSet();
+    this._probeRenderStates.useRasterizerState().setCullMode('none');
+    this._probeRenderStates.useDepthState().enableTest(false).enableWrite(false);
     this._dummyTexture = device.createTexture2D('rgba8unorm', 1, 1, {
       mipmapping: false
     });
@@ -127,74 +133,6 @@ export class TextureDrawer {
       }
     }
   }
-  drawPixel(tex: BaseTexture, x: number, y: number, flip: boolean, miplevel: number, faceOrLayer = 0) {
-    tex = tex ?? this._dummyTexture;
-    const device = getDevice();
-    const pos = this._point.getVertexBuffer('position');
-    const xval = 0; //2 * x - 1;
-    const yval = 0; //1 - 2 * y;
-    const uval = 0.5; //x;
-    const vval = 0.5; //y;
-    pos.bufferSubData(0, new Float32Array([xval, yval, uval, vval]));
-    const encode = TextureDrawer.ENCODE_NORMAL;
-    const sampler = device.createSampler({
-      magFilter: 'nearest',
-      minFilter: 'nearest',
-      mipFilter: tex.mipLevelCount > 1 ? 'nearest' : 'none',
-      addressU: 'clamp',
-      addressV: 'clamp'
-    });
-    const programinfo = tex.isTextureVideo()
-      ? this._programVideo[encode].normal
-      : tex.isTexture2D()
-        ? tex.isDepth()
-          ? this._program2D[encode].depth
-          : tex.isFilterable()
-            ? this._program2D[encode].normal
-            : tex.isIntegerFormat()
-              ? tex.isSignedFormat()
-                ? this._program2D[encode].int
-                : this._program2D[encode].uint
-              : this._program2D[encode].nonfilterable
-        : tex.isTextureCube()
-          ? tex.isDepth()
-            ? this._programCube[encode].depth
-            : tex.isFilterable()
-              ? this._programCube[encode].normal
-              : this._programCube[encode].nonfilterable
-          : tex.isTexture2DArray()
-            ? tex.isDepth()
-              ? this._program2DArray[encode].depth
-              : tex.isFilterable()
-                ? this._program2DArray[encode].normal
-                : tex.isIntegerFormat()
-                  ? tex.isSignedFormat()
-                    ? this._program2DArray[encode].int
-                    : this._program2DArray[encode].uint
-                  : this._program2DArray[encode].nonfilterable
-            : null;
-    if (!programinfo || tex.disposed) {
-      return;
-    }
-    programinfo.bindGroup.setTexture('tex', tex, sampler);
-    programinfo.bindGroup.setValue('texSize', new Vector2(tex.width, tex.height));
-    programinfo.bindGroup.setValue('linearOutput', 1);
-    programinfo.bindGroup.setValue('flip', flip ? -1 : 1);
-    programinfo.bindGroup.setValue('repeat', 1);
-    programinfo.bindGroup.setValue('colorScale', 1);
-    programinfo.bindGroup.setValue('mode', TextureDrawer.RGB);
-    programinfo.bindGroup.setValue('miplevel', miplevel);
-    if (tex.isTextureCube()) {
-      programinfo.bindGroup.setValue('up', TextureDrawer.faceDirections[faceOrLayer][0]);
-      programinfo.bindGroup.setValue('right', TextureDrawer.faceDirections[faceOrLayer][1]);
-      programinfo.bindGroup.setValue('front', TextureDrawer.faceDirections[faceOrLayer][2]);
-    } else if (tex.isTexture2DArray()) {
-      programinfo.bindGroup.setValue('layer', faceOrLayer);
-    }
-    device.setBindGroup(0, programinfo.bindGroup);
-    device.setProgram(programinfo.program);
-    this._point.draw();
-  }
   draw(
     tex: BaseTexture,
     repeat: number,
@@ -208,14 +146,69 @@ export class TextureDrawer {
   ) {
     tex = tex ?? this._dummyTexture;
     const device = getDevice();
-    const sampler = device.createSampler({
-      magFilter: linear ? 'linear' : 'nearest',
-      minFilter: linear ? 'linear' : 'nearest',
-      mipFilter: tex.mipLevelCount > 1 ? (linear ? 'linear' : 'nearest') : 'none',
-      addressU: repeat === 1 ? 'clamp' : 'repeat',
-      addressV: repeat === 1 ? 'clamp' : 'repeat'
-    });
-    const programinfo = tex.isTextureVideo()
+    const programinfo = this.getProgramInfo(tex, encode);
+    if (!programinfo || tex.disposed) {
+      return;
+    }
+    const sampler = this.createSampler(tex, linear, repeat);
+    device.setProgram(this._programBk);
+    device.setRenderStates(this._renderStates);
+    this._rect.draw();
+    this.setCommonUniforms(programinfo.bindGroup, tex, sampler, miplevel, faceOrLayer);
+    programinfo.bindGroup.setValue('linearOutput', gammaCorrect ? 0 : 1);
+    programinfo.bindGroup.setValue('flip', flip ? -1 : 1);
+    programinfo.bindGroup.setValue(
+      'uvScale',
+      tex.isTextureCube() ? UV_SCALE_ONE : new Vector2(repeat, repeat)
+    );
+    programinfo.bindGroup.setValue('uvOffset', UV_OFFSET_ZERO);
+    programinfo.bindGroup.setValue('colorScale', this._colorScale * this._colorScale);
+    programinfo.bindGroup.setValue('mode', mode);
+    programinfo.bindGroup.setValue('rawOutput', 0);
+    device.setBindGroup(0, programinfo.bindGroup);
+    device.setProgram(programinfo.program);
+    this._rect.draw();
+  }
+  /**
+   * Samples a single texel of given texture and writes the raw sampled value to the
+   * current frame buffer, bypassing every transform that {@link TextureDrawer.draw} applies
+   * for display purposes (channel mode, color scale, gamma and alpha premultiplication).
+   *
+   * @param tex - The texture to be sampled
+   * @param u - Horizontal texture coordinate of the texel to be sampled
+   * @param v - Vertical texture coordinate of the texel to be sampled
+   * @param miplevel - The mipmap level to be sampled
+   * @param faceOrLayer - The cube face or the array layer to be sampled
+   * @returns true if the texel was drawn, false if the texture cannot be sampled
+   */
+  drawPixel(tex: BaseTexture, u: number, v: number, miplevel: number, faceOrLayer = 0) {
+    const device = getDevice();
+    const programinfo = tex ? this.getProgramInfo(tex, TextureDrawer.ENCODE_NORMAL) : null;
+    if (!programinfo || tex.disposed) {
+      return false;
+    }
+    const sampler = this.createSampler(tex, false, 1);
+    this.setCommonUniforms(programinfo.bindGroup, tex, sampler, miplevel, faceOrLayer);
+    programinfo.bindGroup.setValue('linearOutput', 1);
+    programinfo.bindGroup.setValue('flip', 1);
+    // A zero scale makes the whole quad sample the very same texel, the cube shader
+    // takes the vertex position instead of the texture coordinate
+    programinfo.bindGroup.setValue('uvScale', UV_SCALE_ZERO);
+    programinfo.bindGroup.setValue(
+      'uvOffset',
+      tex.isTextureCube() ? new Vector2(u * 2 - 1, v * 2 - 1) : new Vector2(u, v)
+    );
+    programinfo.bindGroup.setValue('colorScale', 1);
+    programinfo.bindGroup.setValue('mode', TextureDrawer.RGBA);
+    programinfo.bindGroup.setValue('rawOutput', 1);
+    device.setBindGroup(0, programinfo.bindGroup);
+    device.setProgram(programinfo.program);
+    device.setRenderStates(this._probeRenderStates);
+    this._rect.draw();
+    return true;
+  }
+  private getProgramInfo(tex: BaseTexture, encode: number) {
+    return tex.isTextureVideo()
       ? this._programVideo[encode].normal
       : tex.isTexture2D()
         ? tex.isDepth()
@@ -244,30 +237,42 @@ export class TextureDrawer {
                     : this._program2DArray[encode].uint
                   : this._program2DArray[encode].nonfilterable
             : null;
-    if (!programinfo || tex.disposed) {
-      return;
-    }
-    device.setProgram(this._programBk);
-    device.setRenderStates(this._renderStates);
-    this._rect.draw();
-    programinfo.bindGroup.setTexture('tex', tex, sampler);
-    programinfo.bindGroup.setValue('texSize', new Vector2(tex.width, tex.height));
-    programinfo.bindGroup.setValue('linearOutput', gammaCorrect ? 0 : 1);
-    programinfo.bindGroup.setValue('flip', flip ? -1 : 1);
-    programinfo.bindGroup.setValue('repeat', repeat);
-    programinfo.bindGroup.setValue('colorScale', this._colorScale * this._colorScale);
-    programinfo.bindGroup.setValue('mode', mode);
-    programinfo.bindGroup.setValue('miplevel', miplevel);
+  }
+  private createSampler(tex: BaseTexture, linear: boolean, repeat: number) {
+    // Depth, integer and non-filterable textures are bound to a non-filtering sampler
+    // in the generated bind group layout, linear filtering is not an option for them
+    const filterable = tex.isFilterable() && !tex.isDepth() && !tex.isIntegerFormat();
+    const useLinear = linear && filterable;
+    return getDevice().createSampler({
+      magFilter: useLinear ? 'linear' : 'nearest',
+      minFilter: useLinear ? 'linear' : 'nearest',
+      mipFilter: tex.mipLevelCount > 1 ? (useLinear ? 'linear' : 'nearest') : 'none',
+      addressU: repeat === 1 ? 'clamp' : 'repeat',
+      addressV: repeat === 1 ? 'clamp' : 'repeat'
+    });
+  }
+  private setCommonUniforms(
+    bindGroup: BindGroup,
+    tex: BaseTexture,
+    sampler: TextureSampler,
+    miplevel: number,
+    faceOrLayer: number
+  ) {
+    bindGroup.setTexture('tex', tex, sampler);
+    // texSize is used to address individual texels of integer textures, so it must be
+    // the size of the mipmap level being sampled
+    bindGroup.setValue(
+      'texSize',
+      new Vector2(Math.max(1, tex.width >> miplevel), Math.max(1, tex.height >> miplevel))
+    );
+    bindGroup.setValue('miplevel', miplevel);
     if (tex.isTextureCube()) {
-      programinfo.bindGroup.setValue('up', TextureDrawer.faceDirections[faceOrLayer][0]);
-      programinfo.bindGroup.setValue('right', TextureDrawer.faceDirections[faceOrLayer][1]);
-      programinfo.bindGroup.setValue('front', TextureDrawer.faceDirections[faceOrLayer][2]);
+      bindGroup.setValue('up', TextureDrawer.faceDirections[faceOrLayer][0]);
+      bindGroup.setValue('right', TextureDrawer.faceDirections[faceOrLayer][1]);
+      bindGroup.setValue('front', TextureDrawer.faceDirections[faceOrLayer][2]);
     } else if (tex.isTexture2DArray()) {
-      programinfo.bindGroup.setValue('layer', faceOrLayer);
+      bindGroup.setValue('layer', faceOrLayer);
     }
-    device.setBindGroup(0, programinfo.bindGroup);
-    device.setProgram(programinfo.program);
-    this._rect.draw();
   }
   private create2DPrograms(encode: number): TextureViewProgram {
     const device = getDevice();
@@ -386,16 +391,19 @@ export class TextureDrawer {
         this.$inputs.uv = pb.vec2().attrib('texCoord0');
         this.$outputs.uv = pb.vec2();
         this.flip = pb.float().uniform(0);
-        this.repeat = pb.float().uniform(0);
+        this.uvScale = pb.vec2().uniform(0);
+        this.uvOffset = pb.vec2().uniform(0);
         pb.main(function () {
           this.$builtins.position = pb.mul(pb.vec4(this.$inputs.pos, 0, 1), pb.vec4(1, this.flip, 1, 1));
-          this.$outputs.uv = pb.mul(this.$inputs.uv, this.repeat);
+          this.$outputs.uv = pb.add(pb.mul(this.$inputs.uv, this.uvScale), this.uvOffset);
         });
       },
       fragment(pb) {
         switch (sampleType) {
           case 'depth':
-            this.tex = pb.tex2DShadow().uniform(0);
+            // Declared as a normal texture with depth sample type instead of a shadow
+            // texture, so that we read the depth value itself instead of a comparison result
+            this.tex = pb.tex2D().sampleType('depth').uniform(0);
             break;
           case 'float':
             this.tex = pb.tex2D().uniform(0);
@@ -417,6 +425,7 @@ export class TextureDrawer {
         this.mode = pb.int().uniform(0);
         this.miplevel = pb.float().uniform(0);
         this.colorScale = pb.float().uniform(0);
+        this.rawOutput = pb.int().uniform(0);
         this.$outputs.color = pb.vec4();
         pb.func('getCenter', [pb.vec2('coord'), pb.vec2('texelSize')], function () {
           this.$return(
@@ -475,20 +484,23 @@ export class TextureDrawer {
         }
         pb.main(function () {
           this.c =
-            sampleType === 'depth'
-              ? pb.textureSample(this.tex, this.$inputs.uv)
-              : sampleType === 'float' || sampleType === 'unfilterable-float'
-                ? /*this.linearFilter(this.$inputs.uv) */ pb.textureSampleLevel(
-                    this.tex,
-                    this.$inputs.uv,
-                    this.miplevel
-                  )
-                : pb.textureLoad(
-                    this.tex,
-                    pb.ivec2(pb.mul(this.$inputs.uv, this.texSize)),
-                    pb.int(this.miplevel)
-                  );
-          if (
+            sampleType === 'int' || sampleType === 'uint'
+              ? pb.textureLoad(
+                  this.tex,
+                  pb.ivec2(pb.mul(this.$inputs.uv, this.texSize)),
+                  pb.int(this.miplevel)
+                )
+              : /*this.linearFilter(this.$inputs.uv) */ pb.textureSampleLevel(
+                  this.tex,
+                  this.$inputs.uv,
+                  this.miplevel
+                );
+          this.$l.rawColor = sampleType === 'int' || sampleType === 'uint' ? pb.vec4(this.c) : this.c;
+          if (sampleType === 'depth') {
+            // Sampling a depth texture yields (depth, 0, 0, 1), display it as grayscale
+            this.rgb = pb.vec3(this.c.r);
+            this.a = pb.float(1);
+          } else if (
             (sampleType === 'float' || sampleType === 'unfilterable-float') &&
             encode === TextureDrawer.ENCODE_NORMALIZED_FLOAT
           ) {
@@ -527,6 +539,10 @@ export class TextureDrawer {
           }).$else(function () {
             this.$outputs.color = pb.vec4(pb.mul(linearToGamma(this, this.rgb), this.a), this.a);
           });
+          // Probing wants the value as it is stored in the texture
+          this.$if(pb.notEqual(this.rawOutput, 0), function () {
+            this.$outputs.color = this.rawColor;
+          });
         });
       }
     });
@@ -539,10 +555,11 @@ export class TextureDrawer {
         this.$inputs.uv = pb.vec2().attrib('texCoord0');
         this.$outputs.uv = pb.vec2();
         this.flip = pb.float().uniform(0);
-        this.repeat = pb.float().uniform(0);
+        this.uvScale = pb.vec2().uniform(0);
+        this.uvOffset = pb.vec2().uniform(0);
         pb.main(function () {
           this.$builtins.position = pb.mul(pb.vec4(this.$inputs.pos, 0, 1), pb.vec4(1, this.flip, 1, 1));
-          this.$outputs.uv = pb.mul(this.$inputs.uv, this.repeat);
+          this.$outputs.uv = pb.add(pb.mul(this.$inputs.uv, this.uvScale), this.uvOffset);
         });
       },
       fragment(pb) {
@@ -551,9 +568,11 @@ export class TextureDrawer {
         this.mode = pb.int().uniform(0);
         this.miplevel = pb.float().uniform(0);
         this.colorScale = pb.float().uniform(0);
+        this.rawOutput = pb.int().uniform(0);
         this.$outputs.color = pb.vec4();
         pb.main(function () {
           this.c = pb.textureSample(this.tex, this.$inputs.uv);
+          this.$l.rawColor = this.c;
           this.rgb = pb.vec3(this.c.rgb);
           this.$if(pb.equal(this.mode, TextureDrawer.R), function () {
             this.rgb = this.rgb.rrr;
@@ -573,6 +592,10 @@ export class TextureDrawer {
           }).$else(function () {
             this.$outputs.color = pb.vec4(linearToGamma(this, this.rgb), 1);
           });
+          // Probing wants the value as it is stored in the texture
+          this.$if(pb.notEqual(this.rawOutput, 0), function () {
+            this.$outputs.color = this.rawColor;
+          });
         });
       }
     });
@@ -586,13 +609,12 @@ export class TextureDrawer {
         this.right = pb.vec3().uniform(0);
         this.front = pb.vec3().uniform(0);
         this.flip = pb.float().uniform(0);
-        this.repeat = pb.float().uniform(0);
+        this.uvScale = pb.vec2().uniform(0);
+        this.uvOffset = pb.vec2().uniform(0);
         pb.main(function () {
           this.$builtins.position = pb.mul(pb.vec4(this.$inputs.pos, 0, 1), pb.vec4(1, this.flip, 1, 1));
-          this.$outputs.direction = pb.mul(
-            pb.mat3(this.up, this.right, this.front),
-            pb.vec3(this.$inputs.pos, 1)
-          );
+          this.$l.p = pb.add(pb.mul(this.$inputs.pos, this.uvScale), this.uvOffset);
+          this.$outputs.direction = pb.mul(pb.mat3(this.up, this.right, this.front), pb.vec3(this.p, 1));
           if (pb.getDevice().type === 'webgpu') {
             this.$builtins.position.y = pb.neg(this.$builtins.position.y);
           }
@@ -601,7 +623,9 @@ export class TextureDrawer {
       fragment(pb) {
         switch (sampleType) {
           case 'depth':
-            this.tex = pb.texCubeShadow().uniform(0);
+            // Declared as a normal texture with depth sample type instead of a shadow
+            // texture, so that we read the depth value itself instead of a comparison result
+            this.tex = pb.texCube().sampleType('depth').uniform(0);
             break;
           case 'float':
             this.tex = pb.texCube().uniform(0);
@@ -617,14 +641,17 @@ export class TextureDrawer {
         this.mode = pb.int().uniform(0);
         this.miplevel = pb.float().uniform(0);
         this.colorScale = pb.float().uniform(0);
+        this.rawOutput = pb.int().uniform(0);
         this.$outputs.color = pb.vec4();
         pb.main(function () {
           this.$l.n = this.$inputs.direction;
-          this.c =
-            sampleType === 'depth'
-              ? pb.textureSample(this.tex, this.n)
-              : pb.textureSampleLevel(this.tex, this.n, this.miplevel);
-          if (
+          this.c = pb.textureSampleLevel(this.tex, this.n, this.miplevel);
+          this.$l.rawColor = this.c;
+          if (sampleType === 'depth') {
+            // Sampling a depth texture yields (depth, 0, 0, 1), display it as grayscale
+            this.rgb = pb.vec3(this.c.r);
+            this.a = pb.float(1);
+          } else if (
             (sampleType === 'float' || sampleType === 'unfilterable-float') &&
             encode === TextureDrawer.ENCODE_NORMALIZED_FLOAT
           ) {
@@ -663,6 +690,10 @@ export class TextureDrawer {
           }).$else(function () {
             this.$outputs.color = pb.vec4(pb.mul(linearToGamma(this, this.rgb), this.a), this.a);
           });
+          // Probing wants the value as it is stored in the texture
+          this.$if(pb.notEqual(this.rawOutput, 0), function () {
+            this.$outputs.color = this.rawColor;
+          });
         });
       }
     });
@@ -675,16 +706,19 @@ export class TextureDrawer {
         this.$inputs.uv = pb.vec2().attrib('texCoord0');
         this.$outputs.uv = pb.vec2();
         this.flip = pb.float().uniform(0);
-        this.repeat = pb.float().uniform(0);
+        this.uvScale = pb.vec2().uniform(0);
+        this.uvOffset = pb.vec2().uniform(0);
         pb.main(function () {
           this.$builtins.position = pb.mul(pb.vec4(this.$inputs.pos, 0, 1), pb.vec4(1, this.flip, 1, 1));
-          this.$outputs.uv = pb.mul(this.$inputs.uv, this.repeat);
+          this.$outputs.uv = pb.add(pb.mul(this.$inputs.uv, this.uvScale), this.uvOffset);
         });
       },
       fragment(pb) {
         switch (sampleType) {
           case 'depth':
-            this.tex = pb.tex2DArrayShadow().uniform(0);
+            // Declared as a normal texture with depth sample type instead of a shadow
+            // texture, so that we read the depth value itself instead of a comparison result
+            this.tex = pb.tex2DArray().sampleType('depth').uniform(0);
             break;
           case 'float':
             this.tex = pb.tex2DArray().uniform(0);
@@ -707,20 +741,24 @@ export class TextureDrawer {
         this.miplevel = pb.float().uniform(0);
         this.colorScale = pb.float().uniform(0);
         this.layer = pb.int().uniform(0);
+        this.rawOutput = pb.int().uniform(0);
         this.$outputs.color = pb.vec4();
         pb.main(function () {
           this.c =
-            sampleType === 'depth'
-              ? pb.textureArraySample(this.tex, this.$inputs.uv, this.layer)
-              : sampleType === 'float' || sampleType === 'unfilterable-float'
-                ? pb.textureArraySampleLevel(this.tex, this.$inputs.uv, this.layer, this.miplevel)
-                : pb.textureArrayLoad(
-                    this.tex,
-                    pb.ivec2(pb.mul(this.texSize, this.$inputs.uv)),
-                    this.layer,
-                    pb.int(this.miplevel)
-                  );
-          if (
+            sampleType === 'int' || sampleType === 'uint'
+              ? pb.textureArrayLoad(
+                  this.tex,
+                  pb.ivec2(pb.mul(this.texSize, this.$inputs.uv)),
+                  this.layer,
+                  pb.int(this.miplevel)
+                )
+              : pb.textureArraySampleLevel(this.tex, this.$inputs.uv, this.layer, this.miplevel);
+          this.$l.rawColor = sampleType === 'int' || sampleType === 'uint' ? pb.vec4(this.c) : this.c;
+          if (sampleType === 'depth') {
+            // Sampling a depth texture yields (depth, 0, 0, 1), display it as grayscale
+            this.rgb = pb.vec3(this.c.r);
+            this.a = pb.float(1);
+          } else if (
             (sampleType === 'float' || sampleType === 'unfilterable-float') &&
             encode === TextureDrawer.ENCODE_NORMALIZED_FLOAT
           ) {
@@ -758,6 +796,10 @@ export class TextureDrawer {
             this.$outputs.color = pb.vec4(pb.mul(this.rgb, this.a), this.a);
           }).$else(function () {
             this.$outputs.color = pb.vec4(pb.mul(linearToGamma(this, this.rgb), this.a), this.a);
+          });
+          // Probing wants the value as it is stored in the texture
+          this.$if(pb.notEqual(this.rawOutput, 0), function () {
+            this.$outputs.color = this.rawColor;
           });
         });
       }
