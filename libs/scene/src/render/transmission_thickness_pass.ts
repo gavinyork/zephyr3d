@@ -28,6 +28,13 @@ const UNIFORM_NAME_SHADOW_DEPTH = 'Z_UniformShadowDepth';
  * `1 - opticalDepth / MAX`, so 1 means "no material in the way" and the clear
  * value of the mask doubles as "no transmission".
  *
+ * This, and the clamp floor and additive bias the optical depth is put through
+ * below, are in the profile's own space — UE5's millimetres, the same unit the
+ * scatter radii use — not in world units. A producer feeding `opticalDepthScale`
+ * has to convert. 5 is then "5 mm of skin is opaque", which is the right order
+ * of magnitude; read as centimetres it would hand 90% of the encoding to
+ * thicknesses that never transmit.
+ *
  * @internal
  */
 export const MAX_TRANSMISSION_OPTICAL_DEPTH = 5;
@@ -36,30 +43,78 @@ export const MAX_TRANSMISSION_OPTICAL_DEPTH = 5;
  * Poisson disc the light-space thickness is averaged over.
  *
  * @remarks
- * UE5 keeps a 63-entry table and selects a 16-sample window from it
- * (`TransmissionThickness.ush`, `PoissonMethod = 4` → `PoissonDisk[15..31]`).
- * Only the window is reproduced here since nothing else selects a different one.
+ * Eight points of a Vogel (golden-angle) spiral plus their antipodes, so the
+ * offsets sum to exactly zero and the radii spread from 0.25 to 0.97 of the
+ * search radius.
+ *
+ * The zero mean is the load-bearing property, not the even coverage. Averaging
+ * over a footprint the blocker's depth varies across only measures the depth at
+ * the footprint's centroid, so a kernel whose centroid is displaced reads the
+ * blocker at the wrong place - and the error is proportional to the depth
+ * gradient, which is `tan θ` for a surface tilted by `θ` out of the light's
+ * plane.
+ *
+ * This replaces a window of UE5's 63-entry table
+ * (`TransmissionThickness.ush`). That table is sorted by x, so *no* contiguous
+ * window of it is centred; the one transcribed here had all sixteen x negative
+ * and a centroid at (-0.56, +0.05), half a texel off centre. Measured by
+ * `transmission-thickness-slant` in the visual-test harness: 1 mm slabs tilted
+ * 30 and 45 degrees read 1.1 mm and 1.7 mm thicker than their true light-ray
+ * path, and the excess tracked `tan θ` as predicted. Flat slabs lit head-on have
+ * no gradient and were unaffected, which is why the defect survived review of
+ * the head-on case.
  *
  * @internal
  */
 const POISSON_DISC: number[][] = [
-  [-0.975402, -0.0711386],
-  [-0.920347, -0.41142],
-  [-0.883908, 0.217872],
-  [-0.884518, 0.568041],
-  [-0.811945, 0.90521],
-  [-0.792474, -0.779962],
-  [-0.614856, 0.386578],
-  [-0.580859, -0.208777],
-  [-0.53795, 0.716666],
-  [-0.515427, 0.0899991],
-  [-0.454634, -0.707938],
-  [-0.420942, 0.991272],
-  [-0.261147, 0.588488],
-  [-0.211219, 0.114841],
-  [-0.146336, -0.259194],
-  [-0.139439, -0.888668]
+  [0.25, 0.0],
+  [-0.31929, 0.292496],
+  [0.048872, -0.556877],
+  [0.402444, 0.524918],
+  [-0.738535, -0.130636],
+  [0.699605, -0.445031],
+  [-0.234004, 0.870484],
+  [-0.446271, -0.859268],
+  [-0.25, 0.0],
+  [0.31929, -0.292496],
+  [-0.048872, 0.556877],
+  [-0.402444, -0.524918],
+  [0.738535, 0.130636],
+  [-0.699605, 0.445031],
+  [0.234004, -0.870484],
+  [0.446271, 0.859268]
 ];
+
+/**
+ * Radius the disc is scaled to, in shadow map texels.
+ *
+ * @remarks
+ * Zero: a single tap at the receiver's own texel.
+ *
+ * Measured against `transmission-thickness-slant` at radii 0, 1 and 4 texels,
+ * the radius does not buy accuracy - a 2 mm slab tilted 20/35/50 degrees reads
+ * within 0.03/0.12/0.29 mm of its true light-ray path at every radius, and the
+ * differences between radii are inside that noise. What the radius does control
+ * is how far the silhouette softening reaches, and there the cost is real: a
+ * shadow texel is the scene extent over the map size, so a 1024 map fitted to a
+ * 3 m shadow region has 3 mm texels and a 4-texel radius averages over 12 mm -
+ * four times the thickness of the ear it is trying to measure. A thin feature is
+ * then averaged away with the space around it.
+ *
+ * Raise it only if real curved geometry turns out to need the smoothing, and
+ * expect to lose thin features in exchange. It is a build-time constant rather
+ * than a uniform so that a radius of zero emits one tap instead of sixteen
+ * identical ones.
+ * @internal
+ */
+const SEARCH_RADIUS_TEXELS = 0;
+
+/**
+ * The offsets actually sampled. A zero radius needs one tap, not sixteen copies
+ * of it.
+ * @internal
+ */
+const taps: number[][] = SEARCH_RADIUS_TEXELS > 0 ? POISSON_DISC : [[0, 0]];
 
 /**
  * Whether a light can contribute back-lit transmission this frame.
@@ -132,9 +187,14 @@ export class TransmissionThicknessRenderer {
    * @param depthTexture - Linear depth from the depth prepass.
    * @param lights - Shadow-casting lights in clustered-buffer order, i.e. exactly
    *   the array {@link ShadowMaskRenderer.render} is given, so that ordinals agree.
-   * @param opticalDepthScale - World units to optical depth, `100 × extinctionScale`.
-   * @param shrinkDistance - How far to pull the sample point back along the normal.
-   * @param normalScaleBias - UE5's additive `NormalScale × 0.5` inside the clamp.
+   * @param opticalDepthScale - World units to optical depth, `1000 × extinctionScale`
+   *   for a metre world unit and the profile's millimetre space.
+   * @param shrinkDistance - How far to pull the sample point back along the normal,
+   *   in world units.
+   * @param normalScaleBias - UE5's additive `NormalScale × 0.5` inside the clamp,
+   *   in optical depth. Pass `shrinkDistance × opticalDepthScale`: the shrink moves
+   *   the sample point towards the light, so it under-measures the thickness by
+   *   exactly itself, and adding it back here recovers it.
    * @param getLayerFramebuffer - Resolves the framebuffer for array layer `k`.
    */
   render(
@@ -423,14 +483,6 @@ export class TransmissionThicknessRenderer {
           this.$outputs.color = pb.vec4(1);
           this.$if(pb.lessThan(this.pos.w, 1), function () {
             this.$l.normal = this.zReconstructNormal(this.$inputs.uv, this.pos);
-            this.$l.lightDir =
-              lightType === LIGHT_TYPE_DIRECTIONAL
-                ? pb.neg(this.light.directionAndCutoff.xyz)
-                : pb.normalize(pb.sub(this.light.positionAndRange.xyz, this.pos.xyz));
-            this.$l.NoL = pb.float(1);
-            this.$if(pb.greaterThan(pb.dot(this.normal, this.normal), 0.5), function () {
-              this.NoL = pb.clamp(pb.dot(this.normal, this.lightDir), 0, 1);
-            });
             // UE5 pulls the sample point back along the normal before projecting
             // it. Without this the surface occludes itself and the thickness is
             // identically zero.
@@ -474,7 +526,9 @@ export class TransmissionThicknessRenderer {
             );
             this.$if(this.inside, function () {
               this.$l.size = this.light.shadowCameraParams.z;
-              this.$l.radius = pb.div(1, this.size);
+              if (SEARCH_RADIUS_TEXELS > 0) {
+                this.$l.radius = pb.div(SEARCH_RADIUS_TEXELS, this.size);
+              }
               if (ortho) {
                 // Row 2 of the (transposed) shadow matrix maps light-space Z into
                 // NDC, so its length is the NDC span over the projection's world
@@ -491,11 +545,11 @@ export class TransmissionThicknessRenderer {
                 this.$l.zRange = pb.div(REVERSE_Z ? 1 : 2, pb.max(pb.length(this.zRow.xyz), 1e-8));
               }
               this.$l.sum = pb.float(0);
-              for (let i = 0; i < POISSON_DISC.length; i++) {
-                this.$l[`c${i}`] = pb.add(
-                  this.sc.xy,
-                  pb.mul(pb.vec2(POISSON_DISC[i][0], POISSON_DISC[i][1]), this.radius)
-                );
+              for (let i = 0; i < taps.length; i++) {
+                this.$l[`c${i}`] =
+                  SEARCH_RADIUS_TEXELS > 0
+                    ? pb.add(this.sc.xy, pb.mul(pb.vec2(taps[i][0], taps[i][1]), this.radius))
+                    : this.sc.xy;
                 this.$l[`b${i}`] = isArray
                   ? this.zLoadShadowDepth(this[`c${i}`], this.size, this.split)
                   : this.zLoadShadowDepth(this[`c${i}`], this.size);
@@ -511,25 +565,57 @@ export class TransmissionThicknessRenderer {
                     ShaderHelper.nonLinearDepthToLinear(this, this[`b${i}`], this.light.shadowCameraParams)
                   );
                 }
-                // CalculateOpticalDepth, transcribed from TransmissionThickness.ush.
+                // CalculateOpticalDepth, after TransmissionThickness.ush.
+                //
+                // `t` is already the distance the light travels *through* the
+                // medium: both branches above measure blocker and receiver along
+                // the light ray, so it is the optical path and needs no angular
+                // correction. The transcription used to scale it by a saturated
+                // `NoL` taken from the camera-facing reconstructed normal, which
+                // broke it two ways at once, both visible in a shot taken from
+                // behind a backlit head:
+                //
+                //   NoL == 0 (everything the camera sees when the light is on the
+                //   far side): the whole measurement is multiplied away and every
+                //   pixel reports the bias alone, so a 3 mm ear and 150 mm of
+                //   skull encode to the same value and nothing ever saturates.
+                //
+                //   NoL slightly > 0 (a few degrees either side of the
+                //   terminator): `o` is the full skull thickness there, so it
+                //   amplifies the depth-reconstructed normal's noise by up to
+                //   `o` itself — the terminator came out as a band of rings.
+                //
+                // Dropping the factor collapses the select as well: with `z > 0`,
+                // the `o > 0` branch's `max` is the identity and both branches are
+                // `o + z`.
+                //
+                // Each tap contributes its own optical depth and nothing else:
+                // the floor, the ceiling and the additive bias are applied once
+                // to the average, below, not per tap. Clamping inside the loop
+                // makes the average a nonlinear function of the sampled depths,
+                // which defeats the whole point of a zero-mean kernel - a tilted
+                // blocker spreads the taps either side of the true value, and
+                // clipping one side keeps the average from cancelling back. A
+                // 2 mm slab at 50 degrees read 0.37 mm thin that way, because the
+                // taps past the ceiling lost more than the taps under the floor
+                // gained.
+                //
+                // `max(_, 0)` rather than `abs()`. A negative optical depth means
+                // the nearest surface to the light is *behind* the receiver, which
+                // no real blocker can be - the shadow map keeps the nearest. It
+                // means the tap found no material: either a texel no caster
+                // reached, holding the cleared far value, or a farther surface
+                // entirely. `abs()` turned exactly those taps into the largest
+                // possible thickness, which is what produced the bright fringe
+                // along every silhouette.
                 this.$l[`o${i}`] = pb.mul(this[`t${i}`], this.thicknessParams.x);
-                this.$l[`k${i}`] = pb.add(
-                  pb.clamp(
-                    pb.abs(
-                      pb.select(
-                        pb.add(this[`o${i}`], this.thicknessParams.z),
-                        pb.max(pb.add(pb.mul(this[`o${i}`], this.NoL), this.thicknessParams.z), pb.float(0)),
-                        pb.greaterThan(this[`o${i}`], 0)
-                      )
-                    ),
-                    0.15,
-                    MAX_TRANSMISSION_OPTICAL_DEPTH
-                  ),
-                  0.25
-                );
+                this.$l[`k${i}`] = pb.max(pb.add(this[`o${i}`], this.thicknessParams.z), 0);
                 this.sum = pb.add(this.sum, this[`k${i}`]);
               }
-              this.$l.opticalDepth = pb.div(this.sum, POISSON_DISC.length);
+              this.$l.opticalDepth = pb.add(
+                pb.clamp(pb.div(this.sum, taps.length), 0.15, MAX_TRANSMISSION_OPTICAL_DEPTH),
+                0.25
+              );
               // EncodeOpticalDepthToShadowMask
               this.$outputs.color = pb.vec4(
                 pb.sub(1, pb.div(this.opticalDepth, MAX_TRANSMISSION_OPTICAL_DEPTH))

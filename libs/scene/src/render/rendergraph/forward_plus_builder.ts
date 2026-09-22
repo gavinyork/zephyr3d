@@ -135,6 +135,57 @@ function renderQueueHasActiveSSS(renderQueue: RenderQueue): boolean {
   return false;
 }
 
+/**
+ * The skin profile the thickness pass measures against.
+ *
+ * @remarks
+ * The pass runs before the light pass, so there is no per-pixel profile id to
+ * read yet - UE5 takes one from its GBuffer, this pipeline has none at that
+ * point. It therefore needs a single profile for the whole frame, and this
+ * returns the first skin material's.
+ *
+ * That is a real limitation: a second character with a different profile shares
+ * the first one's absorption and unit scale. It is still an improvement on what
+ * it replaces - `SkinProfile.getDefault()`, a shared singleton nothing in the
+ * editor can reach, which made `worldUnitScale` and `extinctionScale` inert for
+ * transmission no matter what the material said.
+ *
+ * The limitation exists because the pass stores *optical depth* rather than
+ * geometry, which is deliberate: it is the format UE5's
+ * `DecodeOpticalDepthFromShadowMask` reads, and matching it keeps the consumer
+ * side aligned. Storing raw thickness and letting the material apply its own
+ * absorption would remove the limitation, but it would also diverge from the
+ * reference, so it is not the route to take.
+ *
+ * The aligned way to close it is the one UE5 itself uses: a per-pixel profile id.
+ * UE reads it from the GBuffer, which is available to it at shadow projection
+ * time; here nothing has written one yet, because the id this pipeline produces
+ * comes out of the light pass and that runs later. Carrying an id out of the
+ * depth prepass instead would do it, and the shader side is already built - the
+ * profile table's `ProfileColumn.Scaling` texel holds
+ * `(worldUnitScale, scatterScale, extinctionScale, normalScale)`, i.e. exactly
+ * what this function is standing in for, and skinsss.ts already samples that
+ * table. Until a scene actually mixes profiles, the first one is enough.
+ */
+function renderQueueSkinProfile(renderQueue: RenderQueue): SkinProfile {
+  const itemList = renderQueue.itemList;
+  if (itemList) {
+    const lists = [...itemList.opaque.lit, ...itemList.opaque.unlit];
+    for (const list of lists) {
+      for (const material of list.materialList) {
+        if (hasSkinSSSMaterialCore(material)) {
+          const profile = (getCoreMaterial(material) as { subsurfaceProfile?: SkinProfile | null } | null)
+            ?.subsurfaceProfile;
+          if (profile) {
+            return profile;
+          }
+        }
+      }
+    }
+  }
+  return SkinProfile.getDefault();
+}
+
 function renderQueueHasActiveSkinSSS(renderQueue: RenderQueue): boolean {
   const itemList = renderQueue.itemList;
   if (!itemList) {
@@ -1011,23 +1062,45 @@ const TransmissionThicknessModule: RenderModule<FrameGraphContext> = {
       builder.setExecute((rgCtx) => {
         const depthTex = rgCtx.getTexture<Texture2D>(depthHandle);
         const thicknessTex = rgCtx.getTexture<Texture2DArray>(thicknessHandle);
-        // The thickness pass runs before the light pass, so there is no per-pixel
-        // profile id to read yet — UE5 gets one from its GBuffer, this pipeline
-        // has none at this point. Extinction and normal scale therefore come from
-        // the default profile for the whole frame; they describe the medium's
-        // absorption, which does not vary across one character's skin.
-        const profile = SkinProfile.getDefault();
+        // One profile for the whole frame; see renderQueueSkinProfile for why,
+        // and for what it costs when two characters disagree.
+        const profile = renderQueueSkinProfile(renderQueue);
+        // Metres of geometry per millimetre of profile space. `worldUnitScale` is
+        // the profile's existing "how big is this asset" knob - the diffusion
+        // already scales its sampling disc by it (posteffect/skinsss.ts) and it is
+        // editable per material - and honouring it here is what lets the same
+        // profile drive a model authored at four times life size: the geometry is
+        // divided back down into the millimetres the profile's absorption is
+        // defined in, instead of reading four times thicker and going opaque.
+        const worldToProfile = 1000 / profile.worldUnitScale;
         _transmissionThicknessRenderer.render(
           ctx,
           depthTex,
           renderQueue.shadowedLights,
-          // World units to optical depth. UE5's scene unit is the centimetre and
-          // this engine's is the metre, so the thickness is converted before the
-          // extinction is applied.
-          100 * profile.extinctionScale,
-          // UE5 shrinks by NormalScale * 0.5 in centimetres.
-          profile.normalScale * 0.5 * 0.01,
-          profile.normalScale * 0.5,
+          // World units to optical depth. The optical depth lives in the same
+          // profile space the scatter radii do — UE5's millimetres, per
+          // `MAX_TRANSMISSION_PROFILE_DISTANCE`.
+          //
+          // This used to convert to centimetres, which put the whole physical
+          // range of skin transmission below the profile's own clamp floor: a
+          // 3 mm ear came out at optical depth 0.3 against a floor of 0.15 and an
+          // additive bias of 0.25, i.e. seven 8-bit levels away from "nothing in
+          // the way". The only thing that cleared the floor was a path crossing
+          // the whole skull.
+          worldToProfile * profile.extinctionScale,
+          // UE5 shrinks by NormalScale * 0.5 in centimetres, scaled with the
+          // asset: on a larger model the features it has to clear are larger too,
+          // and so is the shadow-map depth quantisation it exists to escape.
+          profile.normalScale * 0.5 * 0.01 * profile.worldUnitScale,
+          // The same shrink expressed as optical depth. The shrink moves the
+          // sample point towards the light, so it under-measures the thickness by
+          // exactly itself; adding it back inside the clamp is what recovers the
+          // real thickness - so this must be `shrinkDistance × opticalDepthScale`
+          // and nothing else. `worldUnitScale` cancels out of that product, which
+          // is why it does not appear here; `extinctionScale` does not, and
+          // leaving it out is what used to put a constant pedestal on every pixel
+          // as soon as a profile moved off the default extinction of 1.
+          profile.normalScale * 0.5 * 10 * profile.extinctionScale,
           (layer: number) =>
             rgCtx.createFramebuffer({
               width: thicknessTex.width,

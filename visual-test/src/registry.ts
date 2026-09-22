@@ -52,6 +52,11 @@ import {
 } from './scenes/post';
 import { eyeAngled, eyeFrontal, eyePupilDilated, eyeSocketOcclusion } from './scenes/eye';
 import {
+  transmissionThicknessLadder,
+  transmissionThicknessScale,
+  transmissionThicknessSlant
+} from './scenes/transmission-thickness';
+import {
   hairScatterOff,
   hairScatterOn,
   hairShadowDom,
@@ -136,6 +141,10 @@ export const SCENES: VisualScene[] = [
   skinSss,
   skinDiffusionJade,
   skinShadow,
+  // Light-space thickness. Computed rather than compared - see the scene file.
+  transmissionThicknessLadder,
+  transmissionThicknessScale,
+  transmissionThicknessSlant,
   hair,
   // Strand hair: the curve import paths, from container bytes to ribbons.
   hairStrandsHelix,
