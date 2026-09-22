@@ -53,6 +53,7 @@ export class TextureDrawer {
   static readonly ENCODE_NORMALIZED_FLOAT = 2;
 
   private readonly _rect: Primitive;
+  private readonly _point: Primitive;
   private readonly _dummyTexture: Texture2D;
   private readonly _renderStates: RenderStateSet;
   private _program2D: TextureViewProgramEncodes;
@@ -88,6 +89,15 @@ export class TextureDrawer {
     this._rect.indexStart = 0;
     this._rect.indexCount = 6;
     this._rect.primitiveType = 'triangle-list';
+    const pt = device.createInterleavedVertexBuffer(
+      ['position_f32x2', 'tex0_f32x2'],
+      new Float32Array([0, 0, 0.5, 0.5])
+    );
+    this._point = new Primitive();
+    this._point.setVertexBuffer(pt);
+    this._point.indexStart = 0;
+    this._point.indexCount = 1;
+    this._point.primitiveType = 'point-list';
     this._renderStates = device.createRenderStateSet();
     this._renderStates.useRasterizerState().setCullMode('none');
     this._renderStates.useDepthState().enableTest(false).enableWrite(false);
@@ -116,6 +126,74 @@ export class TextureDrawer {
         this._renderStates.defaultBlendingState();
       }
     }
+  }
+  drawPixel(tex: BaseTexture, x: number, y: number, flip: boolean, miplevel: number, faceOrLayer = 0) {
+    tex = tex ?? this._dummyTexture;
+    const device = getDevice();
+    const pos = this._point.getVertexBuffer('position');
+    const xval = 0; //2 * x - 1;
+    const yval = 0; //1 - 2 * y;
+    const uval = 0.5; //x;
+    const vval = 0.5; //y;
+    pos.bufferSubData(0, new Float32Array([xval, yval, uval, vval]));
+    const encode = TextureDrawer.ENCODE_NORMAL;
+    const sampler = device.createSampler({
+      magFilter: 'nearest',
+      minFilter: 'nearest',
+      mipFilter: tex.mipLevelCount > 1 ? 'nearest' : 'none',
+      addressU: 'clamp',
+      addressV: 'clamp'
+    });
+    const programinfo = tex.isTextureVideo()
+      ? this._programVideo[encode].normal
+      : tex.isTexture2D()
+        ? tex.isDepth()
+          ? this._program2D[encode].depth
+          : tex.isFilterable()
+            ? this._program2D[encode].normal
+            : tex.isIntegerFormat()
+              ? tex.isSignedFormat()
+                ? this._program2D[encode].int
+                : this._program2D[encode].uint
+              : this._program2D[encode].nonfilterable
+        : tex.isTextureCube()
+          ? tex.isDepth()
+            ? this._programCube[encode].depth
+            : tex.isFilterable()
+              ? this._programCube[encode].normal
+              : this._programCube[encode].nonfilterable
+          : tex.isTexture2DArray()
+            ? tex.isDepth()
+              ? this._program2DArray[encode].depth
+              : tex.isFilterable()
+                ? this._program2DArray[encode].normal
+                : tex.isIntegerFormat()
+                  ? tex.isSignedFormat()
+                    ? this._program2DArray[encode].int
+                    : this._program2DArray[encode].uint
+                  : this._program2DArray[encode].nonfilterable
+            : null;
+    if (!programinfo || tex.disposed) {
+      return;
+    }
+    programinfo.bindGroup.setTexture('tex', tex, sampler);
+    programinfo.bindGroup.setValue('texSize', new Vector2(tex.width, tex.height));
+    programinfo.bindGroup.setValue('linearOutput', 1);
+    programinfo.bindGroup.setValue('flip', flip ? -1 : 1);
+    programinfo.bindGroup.setValue('repeat', 1);
+    programinfo.bindGroup.setValue('colorScale', 1);
+    programinfo.bindGroup.setValue('mode', TextureDrawer.RGB);
+    programinfo.bindGroup.setValue('miplevel', miplevel);
+    if (tex.isTextureCube()) {
+      programinfo.bindGroup.setValue('up', TextureDrawer.faceDirections[faceOrLayer][0]);
+      programinfo.bindGroup.setValue('right', TextureDrawer.faceDirections[faceOrLayer][1]);
+      programinfo.bindGroup.setValue('front', TextureDrawer.faceDirections[faceOrLayer][2]);
+    } else if (tex.isTexture2DArray()) {
+      programinfo.bindGroup.setValue('layer', faceOrLayer);
+    }
+    device.setBindGroup(0, programinfo.bindGroup);
+    device.setProgram(programinfo.program);
+    this._point.draw();
   }
   draw(
     tex: BaseTexture,

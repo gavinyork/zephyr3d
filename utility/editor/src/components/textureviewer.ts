@@ -15,6 +15,9 @@ let textureLinear = false;
 let textureRepeat = 1;
 let textureGammaCorrect = false;
 let textureDrawMode = 0;
+let reading = false;
+let readColor = '';
+const readBuffer = new Uint8Array(16);
 const textureModes = [
   TextureDrawer.RGBA,
   TextureDrawer.RGB,
@@ -141,24 +144,44 @@ export function renderTextureViewer() {
     }
     getDevice().pushDeviceStates();
     getDevice().setFramebuffer(frameBuffer);
-    getDevice().clearFrameBuffer(new Vector4(0, 0, 0, 1), DEPTH_CLEAR_VALUE, 0);
-    textureDrawer.draw(
-      currentTexture,
-      textureRepeat,
-      textureGammaCorrect,
-      textureLinear,
-      textureFlip,
-      textureEncodes[textureDrawEncode],
-      textureModes[textureDrawMode],
-      currentTextureMipLevel,
-      currentTextureLayer
-    );
+    getDevice().clearFrameBuffer(new Vector4(1, 0, 1, 1), DEPTH_CLEAR_VALUE, 0);
+    if (true || ImGui.IsMouseDown(ImGui.MouseButton.Right)) {
+      textureDrawer.drawPixel(
+        currentTexture,
+        0.5 / currentTexture.width,
+        0.5 / currentTexture.height,
+        textureFlip,
+        currentTextureMipLevel,
+        currentTextureLayer
+      );
+    } else {
+      textureDrawer.draw(
+        currentTexture,
+        textureRepeat,
+        textureGammaCorrect,
+        textureLinear,
+        textureFlip,
+        textureEncodes[textureDrawEncode],
+        textureModes[textureDrawMode],
+        currentTextureMipLevel,
+        currentTextureLayer
+      );
+    }
     getDevice().popDeviceStates();
     const width = ImGui.GetContentRegionAvail().x;
     const height = currentTexture
       ? Math.floor((width / currentTexture.width) * currentTexture.height)
       : width;
     ImGui.Image(frameBuffer.getColorAttachments()[0] as Texture2D, new ImGui.ImVec2(width, height));
+    if (getDevice().type === 'webgpu' && ImGui.IsItemHovered()) {
+      ImGui.SetTooltip(readColor);
+      const mouse = ImGui.GetMousePos();
+      const itemMin = ImGui.GetItemRectMin();
+      const x = mouse.x - itemMin.x;
+      const y = mouse.y - itemMin.y;
+      if (!reading && x >= 0 && x < currentTexture.width && y >= 0 && y < currentTexture.height) {
+      }
+    }
     ImGui.End();
   }
 }
