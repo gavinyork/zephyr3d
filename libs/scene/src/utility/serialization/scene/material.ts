@@ -498,6 +498,33 @@ export function getSkinProfileClass(): SerializableClass {
           }
         },
         {
+          name: 'ScatteringDistribution',
+          description:
+            'Henyey-Greenstein asymmetry of transmitted light; positive throws it forward, away from the light',
+          type: 'float',
+          default: 0.93,
+          options: { animatable: true, minValue: -1, maxValue: 1 },
+          get(this: SkinProfile, value) {
+            value.num[0] = this.scatteringDistribution;
+          },
+          set(this: SkinProfile, value) {
+            this.scatteringDistribution = value.num[0];
+          }
+        },
+        {
+          name: 'IOR',
+          description: 'Index of refraction bending the view ray before the transmission phase function',
+          type: 'float',
+          default: 1.55,
+          options: { animatable: true, minValue: 1, maxValue: 3 },
+          get(this: SkinProfile, value) {
+            value.num[0] = this.ior;
+          },
+          set(this: SkinProfile, value) {
+            this.ior = value.num[0];
+          }
+        },
+        {
           name: 'Roughness0',
           description: 'Multiplier on the material roughness for the narrow specular lobe',
           type: 'float',
@@ -2876,9 +2903,10 @@ export function getSkinMaterialClass(manager: ResourceManager): SerializableClas
           },
           {
             name: 'TransmissionStrength',
-            description: 'Back-lit transmission strength',
+            description:
+              'Multiplier on back-lit transmission; needs a shadow-casting light with transmission enabled',
             type: 'float',
-            default: 0,
+            default: 1,
             options: { animatable: true, minValue: 0, maxValue: 4 },
             get(this: SkinMaterial, value) {
               value.num[0] = this.transmissionStrength;
@@ -2887,23 +2915,7 @@ export function getSkinMaterialClass(manager: ResourceManager): SerializableClas
               this.transmissionStrength = value.num[0];
             },
             getDefaultValue(this: SkinMaterial) {
-              return this.$isInstance ? this.coreMaterial.transmissionStrength : 0;
-            }
-          },
-          {
-            name: 'TransmissionPower',
-            description: 'Exponent of the back-lit transmission falloff',
-            type: 'float',
-            default: 4,
-            options: { animatable: true, minValue: 1, maxValue: 16 },
-            get(this: SkinMaterial, value) {
-              value.num[0] = this.transmissionPower;
-            },
-            set(this: SkinMaterial, value) {
-              this.transmissionPower = value.num[0];
-            },
-            getDefaultValue(this: SkinMaterial) {
-              return this.$isInstance ? this.coreMaterial.transmissionPower : 4;
+              return this.$isInstance ? this.coreMaterial.transmissionStrength : 1;
             }
           },
           ...getTextureProps<SkinMaterial>(manager, 'subsurfaceTexture', '2D', false, 1),

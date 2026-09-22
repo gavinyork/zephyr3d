@@ -54,7 +54,9 @@ import { eyeAngled, eyeFrontal, eyePupilDilated, eyeSocketOcclusion } from './sc
 import {
   transmissionThicknessLadder,
   transmissionThicknessScale,
-  transmissionThicknessSlant
+  transmissionThicknessSlant,
+  transmissionThicknessSphere,
+  transmissionThicknessSphereFine
 } from './scenes/transmission-thickness';
 import {
   hairScatterOff,
@@ -145,6 +147,8 @@ export const SCENES: VisualScene[] = [
   transmissionThicknessLadder,
   transmissionThicknessScale,
   transmissionThicknessSlant,
+  transmissionThicknessSphere,
+  transmissionThicknessSphereFine,
   hair,
   // Strand hair: the curve import paths, from container bytes to ribbons.
   hairStrandsHelix,

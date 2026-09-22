@@ -128,6 +128,8 @@ const SCENE_NAMES = [
   'transmission-thickness-ladder',
   'transmission-thickness-scale',
   'transmission-thickness-slant',
+  'transmission-thickness-sphere',
+  'transmission-thickness-sphere-fine',
   'hair',
   'hair-strands-helix',
   'hair-file-helix',

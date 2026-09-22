@@ -93,7 +93,6 @@ export const skinSss: VisualScene = {
     const material = new SkinMaterial();
     material.albedoColor = new Vector4(0.85, 0.66, 0.58, 1);
     material.transmissionStrength = 0.6;
-    material.diffuseWrap = 0.5;
     const head = new Mesh(scene, new SphereShape({ radius: 1.5 }), material);
     head.position.setXYZ(0, 0, 0);
     placeCamera(camera, new Vector3(0, 0, 5.5));
@@ -144,7 +143,6 @@ export const skinDiffusionJade: VisualScene = {
     const material = new SkinMaterial();
     material.albedoColor = new Vector4(0.85, 0.66, 0.58, 1);
     material.transmissionStrength = 0.6;
-    material.diffuseWrap = 0.5;
     // The profile lives on the material now, so the channel ratios are a
     // per-mesh property rather than a property of the whole pass.
     const jade = new SkinProfile('jade');
@@ -206,9 +204,16 @@ export const skinShadow: VisualScene = {
 
     const material = new SkinMaterial();
     material.albedoColor = new Vector4(0.85, 0.66, 0.58, 1);
-    material.scatterColor = new Vector4(0.75, 0.28, 0.2, 1);
-    material.scatterStrength = 0.8;
-    material.diffuseWrap = 0.5;
+    // No profile and no `camera.skinSSS` here, deliberately: this scene is about
+    // the shadow, and leaving the diffusion out keeps a change in it from moving
+    // a baseline that is supposed to pin a terminator.
+    //
+    // It used to set `scatterColor`, `scatterStrength` and `diffuseWrap`, which
+    // the UE5 rewrite removed from SkinMaterial - the assignments survived as
+    // dead code and the scene rendered with defaults regardless. Their successors
+    // are `SkinProfile.surfaceAlbedo`/`meanFreePath` and `camera.skinSSSStrength`,
+    // and the soft terminator the wrap used to fake is now the screen-space
+    // diffusion's job.
     const head = new Mesh(scene, new SphereShape({ radius: 1.5 }), material);
     head.position.setXYZ(0, 0, 0);
 

@@ -1,5 +1,6 @@
 import type { PBInsideFunctionScope, PBShaderExp } from '@zephyr3d/device';
 import { distributionGGX, fresnelSchlick, visGGX } from './pbr';
+import { SKIN_TRANSMISSION_NO_DATA_ENCODING, SkinProfile } from '../material/skinprofile';
 
 /**
  * Opacity below which the dual-lobe specular fades back to a single lobe.
@@ -290,4 +291,221 @@ export function skinDualLobeSpecular(
   return pb
     .getGlobalScope()
     [funcName](NoH, NoV, NoL, VoH, lobeRoughness, lobeMix, F0) as PBShaderExp;
+}
+
+/**
+ * Fetches one column of a profile row from the packed table.
+ *
+ * @remarks
+ * The table is `rgba32f`, which WebGPU classifies as `unfilterable-float`, so
+ * the bound sampler has to be non-filtering and this is an exact texel fetch
+ * despite going through `textureSampleLevel`. Anything that wants interpolation
+ * between columns — the transmission profile below — has to lerp two fetches by
+ * hand; binding a linear sampler instead is not an option.
+ *
+ * This emits the fetch inline rather than wrapping it in a shader function. A
+ * texture *can* be a function parameter, but on WebGPU its sampler has to travel
+ * alongside it as a second parameter (see `blueprint/material/ir.ts`), and a
+ * plain `textureSampleLevel` on the parameter alone compiles to nothing usable.
+ * Reading the uniform where it is declared sidesteps that entirely.
+ *
+ * @param scope - Shader scope.
+ * @param tex - The packed profile table, as declared in the caller's scope.
+ * @param texelSize - `vec2(1 / columns, 1 / rows)`.
+ * @param row - Precomputed `v` coordinate of the profile's row.
+ * @param column - Column to read, as a float.
+ * @returns The `vec4` stored at that column.
+ *
+ * @internal
+ */
+function readSkinProfileColumn(
+  scope: PBInsideFunctionScope,
+  tex: PBShaderExp,
+  texelSize: PBShaderExp,
+  row: PBShaderExp,
+  column: PBShaderExp
+): PBShaderExp {
+  const pb = scope.$builder;
+  return pb.textureSampleLevel(
+    tex,
+    pb.vec2(pb.mul(pb.add(column, 0.5), texelSize.x), row),
+    0
+  );
+}
+
+/**
+ * Back-lit subsurface transmission, after UE5's `SubsurfaceProfileBxDF`.
+ *
+ * @remarks
+ * Transcribed from `ShadingModels.ush:653-663`:
+ *
+ * ```
+ * ShadowOpticalDepth = DecodeOpticalDepthFromShadowMask(Shadow.TransmittanceOrOpticalThickness)
+ * Profile            = GetTransmissionProfile(ProfileId, ShadowOpticalDepth).rgb
+ * RefracV            = refract(V, -N, TransmissionParams.OneOverIOR)
+ * PhaseFunction      = ApproximateHG(dot(-L, RefracV), ScatteringDistribution)
+ * Transmission       = FalloffColor * Profile * (Falloff * PhaseFunction)
+ * ```
+ *
+ * Three things this deliberately does *not* do, each matching UE5:
+ *
+ * - **No `NoL`.** The light enters from behind; the surface facing the camera is
+ *   turned away from it, so a front-facing cosine would zero out exactly the
+ *   pixels this term exists for. UE5 notes the omission in a TODO and keeps it.
+ * - **No surface shadow.** The caller attenuates by the *transmission* shadow
+ *   instead, which is the encoded optical depth itself — see the caller.
+ * - **No surface albedo.** The baked profile carries only the falloff shape,
+ *   because UE5 passes white for `A` when baking it; the base colour is applied
+ *   where this joins the diffuse.
+ *
+ * `refract` is called with the view vector as the *incident* ray and a flipped
+ * normal, which is an odd way to phrase it — the incident ray conventionally
+ * points at the surface, and `V` points away from it. It is transcribed as
+ * written: the intent is a ray bent by the surface, and reversing it here would
+ * change which way the forward-scattering lobe leans.
+ *
+ * @param scope - Shader scope.
+ * @param profileTex - The packed profile table.
+ * @param profileTexelSize - `vec2(1 / columns, 1 / rows)` of that table.
+ * @param profileId - Normalized profile id.
+ * @param thickness - Encoded optical depth from the thickness pass, where 1
+ *   means "nothing in the way".
+ * @param normal - Shading normal.
+ * @param viewVec - Unit vector from the surface towards the eye.
+ * @param lightDir - Unit vector from the surface towards the light.
+ * @returns vec3 transmitted radiance; the caller applies light colour,
+ *   attenuation and the transmission shadow.
+ *
+ * @internal
+ */
+export function skinTransmission(
+  scope: PBInsideFunctionScope,
+  profileTex: PBShaderExp,
+  profileTexelSize: PBShaderExp,
+  profileId: PBShaderExp,
+  thickness: PBShaderExp,
+  normal: PBShaderExp,
+  viewVec: PBShaderExp,
+  lightDir: PBShaderExp
+): PBShaderExp {
+  const pb = scope.$builder;
+  const lutOffset = SkinProfile.transmissionLutOffset;
+  const lutSize = SkinProfile.transmissionLutSize;
+  const lastLutColumn = lutOffset + lutSize - 1;
+  // The table reads stay in the caller's scope; see readSkinProfileColumn for
+  // why they cannot move behind a function boundary. The locals are prefixed so
+  // that they do not collide with the caller's own.
+  //
+  // Rows are addressed by the profile id directly, as UE5 does with SSProfiles.
+  // The id arrives normalized because it rides in an 8-bit channel.
+  scope.$l.zSkinTrRow = pb.mul(
+    pb.add(pb.mul(pb.clamp(profileId, 0, 1), 255), 0.5),
+    profileTexelSize.y
+  );
+  // GetTransmissionProfile. The index is `opticalDepth / MAX * (size - 1)` and
+  // the decode is `opticalDepth = (1 - thickness) * MAX`, so the MAX cancels and
+  // the encoded thickness maps onto the table directly.
+  scope.$l.zSkinTrIndex = pb.mul(pb.clamp(pb.sub(1, thickness), 0, 1), lutSize - 1);
+  scope.$l.zSkinTrI0 = pb.floor(scope.zSkinTrIndex);
+  scope.$l.zSkinTrC0 = pb.add(scope.zSkinTrI0, lutOffset);
+  scope.$l.zSkinTrC1 = pb.min(pb.add(scope.zSkinTrC0, 1), lastLutColumn);
+  scope.$l.zSkinTrProfile = pb.mix(
+    readSkinProfileColumn(scope, profileTex, profileTexelSize, scope.zSkinTrRow, scope.zSkinTrC0)
+      .rgb,
+    readSkinProfileColumn(scope, profileTex, profileTexelSize, scope.zSkinTrRow, scope.zSkinTrC1)
+      .rgb,
+    pb.sub(scope.zSkinTrIndex, scope.zSkinTrI0)
+  );
+  // (extinctionScale, normalScale, scatteringDistribution, 1 / ior)
+  scope.$l.zSkinTrParams = readSkinProfileColumn(
+    scope,
+    profileTex,
+    profileTexelSize,
+    scope.zSkinTrRow,
+    pb.float(SkinProfile.transmissionParamColumn)
+  );
+  return skinTransmissionPhase(
+    scope,
+    scope.zSkinTrProfile,
+    scope.zSkinTrParams,
+    thickness,
+    normal,
+    viewVec,
+    lightDir
+  );
+}
+
+/**
+ * The part of the transmission BxDF that touches no textures.
+ *
+ * @remarks
+ * Split out so the math can live behind a shader function while the table reads
+ * stay inline at the call site, where the sampler is in scope.
+ *
+ * @param scope - Shader scope.
+ * @param profile - The interpolated transmission profile, `rgb`.
+ * @param params - `(extinctionScale, normalScale, scatteringDistribution, 1 / ior)`.
+ * @param thickness - The raw encoding, still needed to spot the "no data" sentinel.
+ * @param normal - Shading normal.
+ * @param viewVec - Unit vector from the surface towards the eye.
+ * @param lightDir - Unit vector from the surface towards the light.
+ * @returns vec3 transmitted radiance.
+ *
+ * @internal
+ */
+function skinTransmissionPhase(
+  scope: PBInsideFunctionScope,
+  profile: PBShaderExp,
+  params: PBShaderExp,
+  thickness: PBShaderExp,
+  normal: PBShaderExp,
+  viewVec: PBShaderExp,
+  lightDir: PBShaderExp
+): PBShaderExp {
+  const pb = scope.$builder;
+  const funcName = 'lib_skinTransmissionPhase';
+  pb.func(
+    funcName,
+    [
+      pb.vec3('profile'),
+      pb.vec4('params'),
+      pb.float('thickness'),
+      pb.vec3('normal'),
+      pb.vec3('viewVec'),
+      pb.vec3('lightDir')
+    ],
+    function () {
+      // "No data" comes through as an encoding the pass cannot produce, and it
+      // has to be rejected rather than decoded: it decodes to zero optical
+      // depth, which is the *most* transmissive entry of the profile. Lights
+      // that do not transmit, channels no light occupies and the dummy texture
+      // all arrive here, and letting any of them through lights the subject up
+      // from behind with a light that was never behind it.
+      //
+      // The threshold sits midway between the largest encoding the pass can
+      // write and the sentinel, a gap no real measurement lands in, so this is a
+      // clean partition and not a cutoff that clips thin geometry.
+      this.$if(
+        pb.greaterThan(this.thickness, 0.5 * (1 + SKIN_TRANSMISSION_NO_DATA_ENCODING)),
+        function () {
+          this.$return(pb.vec3(0));
+        }
+      );
+      this.$l.refracV = pb.refract(this.viewVec, pb.neg(this.normal), this.params.w);
+      this.$l.cosJ = pb.dot(pb.neg(this.lightDir), this.refracV);
+      // ApproximateHG. Note this is UE5's approximation, not the Henyey-
+      // Greenstein phase function itself: the real one raises the denominator to
+      // the 3/2, and the normalisation is `1 / 4pi` rather than the `0.5` used
+      // here. Transcribed as UE5 has it, since matching its look is the point.
+      this.$l.g = this.params.z;
+      this.$l.g2 = pb.mul(this.g, this.g);
+      this.$l.gcos = pb.sub(1, pb.mul(this.g, this.cosJ));
+      this.$l.gcos2 = pb.mul(this.gcos, this.gcos);
+      this.$l.phase = pb.div(pb.mul(0.5, pb.sub(1, this.g2)), pb.max(this.gcos2, 1e-5));
+      this.$return(pb.mul(this.profile, this.phase));
+    }
+  );
+  return pb
+    .getGlobalScope()
+    [funcName](profile, params, thickness, normal, viewVec, lightDir) as PBShaderExp;
 }

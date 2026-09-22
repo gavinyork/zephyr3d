@@ -755,7 +755,10 @@ export function mixinLight<T extends typeof MeshMaterial>(BaseCls: T) {
         scope.$scope(function () {
           const lightType = pb.int(extra.w);
           // The per-light additive path has no thickness texture: it is produced
-          // for the clustered queue only. 1 encodes "nothing in the way".
+          // for the clustered queue only. 1 is the "no data" sentinel the
+          // thickness pass can never write, so consumers read this as "this
+          // light contributes no transmission" rather than as zero thickness —
+          // which would be the *most* transmissive reading of the encoding.
           callback.call(this, lightType, posRange, dirCutoff, colorIntensity, extra, true, pb.float(1));
         });
       } else {

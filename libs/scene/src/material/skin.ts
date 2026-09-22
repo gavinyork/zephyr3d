@@ -1,5 +1,5 @@
 import type { BindGroup, PBFunctionScope, RenderStateSet } from '@zephyr3d/device';
-import { Vector3, type Clonable } from '@zephyr3d/base';
+import { Vector2, Vector3, type Clonable } from '@zephyr3d/base';
 import { MeshMaterial, applyMaterialMixins } from './meshmaterial';
 import { mixinLight } from './mixins/lit';
 import { mixinVertexColor } from './mixins/vertexcolor';
@@ -11,9 +11,11 @@ import {
   skinDiffuseBRDF,
   skinDualLobeSpecular,
   skinDualSpecularRoughness,
-  skinSpecularEnergyTerms
+  skinSpecularEnergyTerms,
+  skinTransmission
 } from '../shaders/skin_brdf';
 import { SkinProfile } from './skinprofile';
+import { fetchSampler } from '../utility/misc';
 
 /**
  * HDR range that used to be packed into the SkinSSS side buffer when the render
@@ -38,8 +40,11 @@ export const SKIN_SSS_LDR_ENCODE_RANGE = 4;
  * fraction as `saturate(SceneColor.a / luma(SceneColor.rgb))` — the same spec/diff
  * separation UE5 performs in its SSS Setup and Recombine passes.
  *
- * The optional `subsurfaceTexture` uses R as skin mask, G as curvature and B as
- * thickness for the back-lit transmission term.
+ * The optional `subsurfaceTexture` uses R as the skin mask, which gates both the
+ * screen-space diffusion and the dual specular lobe. Its other channels are
+ * unused: transmission thickness is measured against the light's shadow map by
+ * the transmission thickness pass rather than painted, and curvature is not part
+ * of this path.
  *
  * @public
  */
@@ -52,20 +57,20 @@ export class SkinMaterial
   private _roughness: number;
   private _specularF0: number;
   private _transmissionStrength: number;
-  private _transmissionPower: number;
   private _profile: SkinProfile | null;
   private readonly _subsurfaceProfileChanged: () => void;
   private readonly _lobeParams: Vector3;
+  private readonly _profileTexelSize: Vector2;
 
   constructor() {
     super();
     this._profile = null;
     this._subsurfaceProfileChanged = () => this.uniformChanged();
     this._lobeParams = new Vector3();
+    this._profileTexelSize = new Vector2();
     this._roughness = 0.5;
     this._specularF0 = 0.04;
-    this._transmissionStrength = 0;
-    this._transmissionPower = 4;
+    this._transmissionStrength = 1;
     this.useFeature(SkinMaterial.FEATURE_VERTEX_NORMAL, true);
   }
 
@@ -162,7 +167,6 @@ export class SkinMaterial
     this.roughness = other.roughness;
     this.specularF0 = other.specularF0;
     this.transmissionStrength = other.transmissionStrength;
-    this.transmissionPower = other.transmissionPower;
   }
 
   get vertexNormal() {
@@ -226,26 +230,28 @@ export class SkinMaterial
     }
   }
 
-  /** Back-lit transmission strength (needs thickness in subsurface texture B). */
+  /**
+   * Overall multiplier on the back-lit transmission.
+   *
+   * @remarks
+   * UE5 has no equivalent — its transmission is fully determined by the profile
+   * and the measured light-space thickness — so 1 is the faithful value and this
+   * exists only to dial the effect back, or push it past what the profile alone
+   * would give.
+   *
+   * Transmission additionally requires {@link PunctualLight.transmission} on at
+   * least one shadow-casting light, since the thickness it needs is measured
+   * against that light's shadow map. With no such light this has no effect.
+   *
+   * @public
+   */
   get transmissionStrength() {
     return this._transmissionStrength;
   }
   set transmissionStrength(val) {
-    const next = Math.max(0, val ?? 0);
+    const next = Math.max(0, val ?? 1);
     if (next !== this._transmissionStrength) {
       this._transmissionStrength = next;
-      this.uniformChanged();
-    }
-  }
-
-  /** Exponent of the back-lit transmission falloff. */
-  get transmissionPower() {
-    return this._transmissionPower;
-  }
-  set transmissionPower(val) {
-    const next = Math.max(1, val ?? 1);
-    if (next !== this._transmissionPower) {
-      this._transmissionPower = next;
       this.uniformChanged();
     }
   }
@@ -286,10 +292,16 @@ export class SkinMaterial
         scope.zSkinSpecularF0 = pb.float().uniform(2);
         scope.zSkinLobeParams = pb.vec3().uniform(2);
         scope.zSkinProfileId = pb.float().uniform(2);
-        if (this.subsurfaceTexture) {
+        // Transmission is compiled in only when the thickness it needs exists.
+        // The flag is part of the shader's cache key (render/lightpass.ts), and
+        // it also guards against the per-light additive path, which has no
+        // thickness texture and hands the BxDF a placeholder.
+        if (this.drawContext.transmissionThickness) {
           scope.zSkinTransmissionStrength = pb.float().uniform(2);
-          scope.zSkinTransmissionPower = pb.float().uniform(2);
-          scope.zSkinTransmissionTint = pb.vec3().uniform(2);
+          // rgba32f, so WebGPU will only accept a non-filtering sampler here;
+          // the transmission profile is interpolated by hand for that reason.
+          scope.zSkinProfileTex = pb.tex2D().sampleType('unfilterable-float').uniform(2);
+          scope.zSkinProfileTexelSize = pb.vec2().uniform(2);
         }
       }
       scope.$l.albedo = this.calculateAlbedoColor(scope);
@@ -309,11 +321,9 @@ export class SkinMaterial
         scope.$l.viewVec = this.calculateViewVector(scope, scope.$inputs.worldPos);
         scope.$l.roughness = scope.zSkinRoughness;
         scope.$l.skinMask = pb.float(1);
-        scope.$l.skinThickness = pb.float(0);
         if (this.subsurfaceTexture) {
           scope.$l.subsurfaceTexel = this.sampleSubsurfaceTexture(scope);
           scope.skinMask = pb.clamp(scope.subsurfaceTexel.r, 0, 1);
-          scope.skinThickness = pb.clamp(scope.subsurfaceTexel.b, 0, 1);
         }
         scope.$l.diffuseLighting = pb.vec3(0);
         scope.$l.transmissionLighting = pb.vec3(0);
@@ -384,7 +394,7 @@ export class SkinMaterial
             scope.envEnergyTerms.y
           );
         }
-        this.forEachLight(scope, function (type, posRange, dirCutoff, colorIntensity, extra, shadow) {
+        this.forEachLight(scope, function (type, posRange, dirCutoff, colorIntensity, extra, shadow, thickness) {
           this.$l.diffuseScale = pb.float(1);
           this.$l.specularScale = pb.float(1);
           this.$l.sourceRadiusFactor = pb.float(0);
@@ -431,24 +441,37 @@ export class SkinMaterial
             this.diffuseLighting,
             pb.mul(this.lightColor, this.shadowTerm, this.skinDiff, this.NoL, this.diffuseScale)
           );
-          // Back-lit transmission, tinted and attenuated by the profile.
-          if (that.subsurfaceTexture) {
-            this.$l.transmission = pb.mul(
-              pb.pow(
-                pb.clamp(pb.dot(pb.neg(this.lightDir), this.viewVec), 0, 1),
-                this.zSkinTransmissionPower
-              ),
-              this.skinThickness,
-              this.zSkinTransmissionStrength
+          // Back-lit transmission. UE5's SubsurfaceProfileBxDF, which attenuates
+          // it by the *transmission* shadow rather than the surface shadow —
+          // and in UE5 that transmission shadow is the encoded optical depth
+          // itself (GetShadowTerms takes `LightAttenuation.y`, the very channel
+          // CalculateEncodedOpticalDepth wrote, for both purposes). The same
+          // value therefore both indexes the profile and scales it, which is
+          // why `thickness` appears twice here.
+          //
+          // No surface shadow and no NoL: the light arrives from behind, so the
+          // camera-facing surface is shadowed and turned away from it by
+          // construction. Applying either would zero out exactly the pixels
+          // this term exists for.
+          if (that.drawContext.transmissionThickness) {
+            this.$l.transmission = skinTransmission(
+              this,
+              this.zSkinProfileTex,
+              this.zSkinProfileTexelSize,
+              this.zSkinProfileId,
+              thickness,
+              this.normal,
+              this.viewVec,
+              this.lightDir
             );
             this.transmissionLighting = pb.add(
               this.transmissionLighting,
               pb.mul(
                 this.lightColor,
-                this.zSkinTransmissionTint,
                 this.transmission,
-                this.diffuseScale,
-                1 / Math.PI
+                thickness,
+                this.zSkinTransmissionStrength,
+                this.diffuseScale
               )
             );
           }
@@ -481,6 +504,20 @@ export class SkinMaterial
         // carries the multiple-scattering gain; applying `W` on top would count
         // it twice. UE5 keeps the same split — `ComputeEnergyConservation` is
         // applied in the BxDF, the reflection pass weights itself.
+        //
+        // The albedo multiply covers the transmission as well as the diffuse,
+        // and has to. UE5's baked transmission profile carries only the shape of
+        // the falloff — `ComputeTransmissionProfileBurley` passes white for the
+        // surface albedo, and its comment says the recombine pass supplies the
+        // stored base colour instead. This engine applies the base colour here,
+        // in the base pass, and the recombine does not; putting the transmission
+        // inside this multiply is therefore the same thing said in a different
+        // place, not a second application of it.
+        //
+        // The transmission then rides into `diffLum` below and so is diffused
+        // along with the rest. That is deliberate: UE5 passes it as the
+        // `ScatterableLight` argument of `LightAccumulator_AddSplit`, the same
+        // slot the diffuse uses.
         scope.$l.diffusible = pb.mul(
           scope.albedo.rgb,
           pb.add(
@@ -569,10 +606,14 @@ export class SkinMaterial
       const profile = this.effectiveProfile;
       bindGroup.setValue('zSkinLobeParams', this._lobeParams.setXYZ(profile.roughness0, profile.roughness1, profile.lobeMix));
       bindGroup.setValue('zSkinProfileId', profile.encodedId);
-      if (this.subsurfaceTexture) {
+      if (ctx.transmissionThickness) {
         bindGroup.setValue('zSkinTransmissionStrength', this._transmissionStrength);
-        bindGroup.setValue('zSkinTransmissionPower', this._transmissionPower);
-        bindGroup.setValue('zSkinTransmissionTint', profile.transmissionTint);
+        const table = SkinProfile.getTable(ctx.device);
+        if (table) {
+          bindGroup.setTexture('zSkinProfileTex', table, fetchSampler('clamp_nearest_nomip'));
+          this._profileTexelSize.setXY(1 / SkinProfile.tableColumns, 1 / SkinProfile.tableRows);
+          bindGroup.setValue('zSkinProfileTexelSize', this._profileTexelSize);
+        }
       }
     }
   }

@@ -25,10 +25,29 @@ const CLAMP_FLOOR = 0.15;
 const BIAS = 0.25;
 /** Normal shrink, in millimetres: the default profile's normalScale * 0.5, in cm. */
 const SHRINK_MM = 0.4;
+/**
+ * Optical depth per millimetre of light-ray path, at unit extinction.
+ *
+ * `SKIN_OPTICAL_DEPTH_PER_WORLD_UNIT / 1000`, and it is the whole reason these
+ * scenes exist. It is not a free parameter: it is fixed by the baked
+ * transmission profile's own axis, so that a path of `t` mm indexes the entry
+ * baked for `t` mm. An earlier version of the pass had it ten times larger,
+ * which drove every path over 5 mm onto the profile's blacked-out last entry -
+ * the feature produced nothing anywhere, and no baseline could have said so.
+ */
+const OD_PER_MM = 5 / (50 * (31 / 32));
 
-/** What the debug channel should show for a measured light-ray path, in mm. */
+/**
+ * What the debug channel should show for a slab of the given thickness, in mm.
+ *
+ * The normal shrink and the bias that compensates it cancel exactly when the
+ * slab faces the light: the shrink removes `s` mm of path and the bias adds
+ * `s * OD_PER_MM` back, so the thickness enters undiminished. Tilt is what
+ * separates them, and the slant scene carries that case in its own `paths`.
+ */
 function expectedDebug(pathMm) {
-  const od = Math.min(Math.max(Math.abs(pathMm), CLAMP_FLOOR), MAX_OPTICAL_DEPTH) + BIAS;
+  const raw = Math.abs(pathMm) * OD_PER_MM;
+  const od = Math.min(Math.max(raw, CLAMP_FLOOR), MAX_OPTICAL_DEPTH) + BIAS;
   // dbg = 1 - encoded, encoded = 1 - od / MAX. Clipped by the 8-bit target.
   return Math.min(od / MAX_OPTICAL_DEPTH, 1);
 }
@@ -47,17 +66,25 @@ const SCENES = [
     tol: 0.01,
     // Slabs perpendicular to the light, so the path is the thickness itself.
     // Left to right, in millimetres.
-    labels: ['0.5mm', '1mm', '2mm', '3mm', '4mm', '5mm'],
-    paths: [0.5, 1, 2, 3, 4, 5]
+    labels: ['2mm', '5mm', '10mm', '20mm', '35mm', '50mm'],
+    paths: [2, 5, 10, 20, 35, 50]
   },
   {
     name: 'transmission-thickness-scale',
-    // 4x geometry with worldUnitScale 4. Identical expectations to the ladder by
-    // construction: the pass must measure in the profile's millimetres, so the
-    // asset's own scale must divide back out.
+    // 4x geometry with worldUnitScale 4, so every slab really is four times as
+    // thick and must read as such. `worldUnitScale` is deliberately absent from
+    // the optical depth - it divides both the baked profile's distance axis and
+    // the conversion of a path into profile space, so it cancels out of the
+    // lookup and UE5 likewise keeps it out of CalculateOpticalDepth.
+    //
+    // So the invariant this pins is no longer "reads the same" - that was the
+    // signature of the old, wrong arrangement, where the scale was divided out
+    // twice. What survives the asset's scale is the *profile entry* the BxDF
+    // ends up reading, and that is arithmetic rather than a rendering: see
+    // `skin_transmission_profile.test.ts`.
     tol: 0.01,
-    labels: ['0.5mm', '1mm', '2mm', '3mm', '4mm', '5mm'],
-    paths: [0.5, 1, 2, 3, 4, 5]
+    labels: ['8mm', '20mm', '40mm', '80mm', '140mm', '200mm'],
+    paths: [8, 20, 40, 80, 140, 200]
   },
   {
     // Tilt puts a depth gradient across the texel the blocker is sampled from,
@@ -76,14 +103,14 @@ const SCENES = [
     // measured fractions of 1.03 / 0.83 / 0.72 sit nowhere near the floor.
     slopeFloor: 0.5,
     name: 'transmission-thickness-slant',
-    // 2 mm slabs tilted off the light. The path is t / cos(theta), and the
+    // 10 mm slabs tilted off the light. The path is t / cos(theta), and the
     // shrink's contribution along the light ray is only shrink * cos(theta),
     // while the bias that compensates it is unconditional - hence the
     // + shrink * (1 - cos(theta)) residue.
     labels: ['0deg', '20deg', '35deg', '50deg'],
     paths: [0, 20, 35, 50].map((deg) => {
       const c = Math.cos((deg * Math.PI) / 180);
-      return 2 / c + SHRINK_MM * (1 - c);
+      return 10 / c + SHRINK_MM * (1 - c);
     })
   }
 ];

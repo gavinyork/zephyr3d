@@ -1,5 +1,5 @@
 import { Quaternion, Vector3, Vector4 } from '@zephyr3d/base';
-import { BoxShape, DirectionalLight, Mesh, SkinMaterial, SkinProfile } from '@zephyr3d/scene';
+import { BoxShape, DirectionalLight, Mesh, SkinMaterial, SkinProfile, SphereShape } from '@zephyr3d/scene';
 import type { PerspectiveCamera, Scene } from '@zephyr3d/scene';
 import type { VisualScene } from '../types';
 import { bareScene, placeCamera } from './common';
@@ -39,13 +39,16 @@ const SLAB_PITCH = 0.095;
 /**
  * Slab thicknesses, in metres.
  *
- * Chosen to straddle the encoding's ceiling: the optical depth is clamped to 5
- * and the profile space is millimetres, so 5 mm is where the encoding saturates
- * and 4 mm is the last step that still carries information. A ladder that
- * stopped short of the knee could not tell a correct scale from one that is
- * merely monotonic.
+ * Chosen to straddle both knees of the encoding. The optical depth is clamped to
+ * `[0.15, 5]` and accumulates at `SKIN_OPTICAL_DEPTH_PER_WORLD_UNIT`, so the
+ * floor is reached at 1.45 mm and the ceiling at 48.4 mm: the first rung sits
+ * just clear of the floor and the last just past the ceiling. A ladder that
+ * stopped short of either could not tell a correct scale from one that is merely
+ * monotonic - which is exactly how a tenfold error in that constant survived
+ * two rounds of review, with the old ladder's 0.5-to-5 mm span landing entirely
+ * inside the floor once the scale was corrected.
  */
-const LADDER_THICKNESSES = [0.0005, 0.001, 0.002, 0.003, 0.004, 0.005];
+const LADDER_THICKNESSES = [0.002, 0.005, 0.01, 0.02, 0.035, 0.05];
 
 /**
  * Slab tilts for the slant scene, in radians.
@@ -68,11 +71,13 @@ const SLANT_ANGLES = [0, (20 * Math.PI) / 180, (35 * Math.PI) / 180, (50 * Math.
 /**
  * Slab thickness for the slant scene, in metres.
  *
- * Thicker than the thinnest rung of the ladder on purpose: the spread the tilt
- * produces is a ratio, so a thicker slab spreads the same angles over more
- * 8-bit levels and the residual is measurable rather than inside quantisation.
+ * The spread the tilt produces is a ratio, so a thicker slab spreads the same
+ * angles over more 8-bit levels and the residual is measurable rather than
+ * inside quantisation. 10 mm puts the untilted rung near the middle of the
+ * encoding and the 50-degree one well short of its ceiling, so the whole rise
+ * stays on scale.
  */
-const SLANT_THICKNESS = 0.002;
+const SLANT_THICKNESS = 0.01;
 
 /**
  * Directional light behind the slabs, shining towards the camera.
@@ -272,5 +277,96 @@ export const transmissionThicknessSlant: VisualScene = {
     });
     placeCamera(camera, new Vector3(0, 0, 0.8));
     thicknessDebug(camera);
+  }
+};
+
+/**
+ * Sphere radius for the curved scenes, in metres.
+ *
+ * The chord through a sphere is at most `2R`, so this sets the top of the range
+ * the pass is asked to resolve. 25 mm puts that at 50 mm, which is where the
+ * optical depth saturates at unit extinction - so one sphere sweeps the encoding
+ * from its floor to its ceiling, and both knees are in frame.
+ */
+const SPHERE_RADIUS = 0.025;
+
+/**
+ * Light-space thickness over a sphere, where the answer is still arithmetic.
+ *
+ * The flat-slab scenes above cannot see the failure this one exists for. A slab
+ * has a blocker depth that is constant (ladder) or linear (slant) across the
+ * shadow map, and a zero-mean filter over a linear gradient returns the value at
+ * its centre however wide it is - so every filtering choice in the pass measures
+ * identically there, and all three scenes stayed green through artifacts that
+ * were plainly visible on a character.
+ *
+ * A sphere restores the missing dimension at no cost in tractability. For a
+ * surface point `P` on a sphere of radius `R` lit along `L`, the light ray
+ * `P + sL` meets the sphere again at `s = -2(P.L)`, so the path through the
+ * medium is
+ *
+ * ```
+ * t = 2R max(0, -cos(theta)),  cos(theta) = normalize(P).L
+ * ```
+ *
+ * exactly, with no approximation. It falls linearly to zero at the terminator,
+ * which makes that neighbourhood the cleanest possible test bed: the truth is a
+ * straight line, so anything the measurement adds there is artifact and can be
+ * separated from the signal by its frequency alone.
+ *
+ * Both parameters that govern the artifact are exposed, because the diagnosis
+ * turns on how the error responds to them rather than on its size: a
+ * resolution-bound error scales with the texel, an algorithmic one does not.
+ */
+function buildSphere(
+  scene: Scene,
+  camera: PerspectiveCamera,
+  shadowMapSize: number,
+  shadowDistance: number
+) {
+  bareScene(scene);
+  const light = new DirectionalLight(scene);
+  // Across the view, not along it: the terminator then runs down the middle of
+  // the sphere as the camera sees it, so a horizontal scanline crosses it at a
+  // right angle and samples the full ramp from lit to saturated.
+  light.lookAt(new Vector3(-2, 0, 0), Vector3.zero(), Vector3.axisPY());
+  light.color = new Vector4(1, 1, 1, 1);
+  light.castShadow = true;
+  light.transmission = true;
+  light.shadow.mode = 'pcf';
+  light.shadow.numShadowCascades = 1;
+  light.shadow.shadowMapSize = shadowMapSize;
+  light.shadow.shadowDistance = shadowDistance;
+  const mesh = new Mesh(
+    scene,
+    // Dense enough that facet edges are well under a shadow texel at every
+    // resolution tested, so tessellation cannot be mistaken for the artifact.
+    new SphereShape({ radius: SPHERE_RADIUS, verticalDetail: 128, horizonalDetail: 128 }),
+    slabMaterial(1)
+  );
+  mesh.position.setXYZ(0, 0, 0);
+  placeCamera(camera, new Vector3(0, 0, 0.16));
+  thicknessDebug(camera);
+}
+
+/** The curved case at a coarse shadow map: the artifact at its most visible. */
+export const transmissionThicknessSphere: VisualScene = {
+  name: 'transmission-thickness-sphere',
+  description:
+    'A 25 mm back-lit sphere as the light-space thickness debug channel, lit across the view so the terminator runs down the middle. The chord through a sphere is analytic, so the residual is separable from the signal.',
+  supports: (backend) => backend === 'webgpu',
+  setup({ scene, camera }) {
+    buildSphere(scene, camera, 1024, 2);
+  }
+};
+
+/** The same sphere with four times the light-space resolution. */
+export const transmissionThicknessSphereFine: VisualScene = {
+  name: 'transmission-thickness-sphere-fine',
+  description:
+    'The thickness sphere at 4096 rather than 1024. Pairs with transmission-thickness-sphere to separate a resolution-bound error from an algorithmic one: only the former shrinks with the texel.',
+  supports: (backend) => backend === 'webgpu',
+  setup({ scene, camera }) {
+    buildSphere(scene, camera, 4096, 2);
   }
 };

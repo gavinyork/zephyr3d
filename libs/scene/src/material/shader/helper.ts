@@ -2223,13 +2223,19 @@ export class ShaderHelper {
     return pb.getGlobalScope()[funcName](lightIndex);
   }
   /**
-   * Encoded light-space thickness for a light, in `[0,1]` (1 = nothing in the way).
+   * Encoded light-space thickness for a light.
    *
    * @remarks
    * Decodes to optical depth as `(1 - value) * 5`, matching UE5's
-   * `DecodeOpticalDepthFromShadowMask`. Lights without transmission enabled, and
-   * every light when the thickness pass did not run, leave their channel at the
-   * cleared 1.
+   * `DecodeOpticalDepthFromShadowMask`.
+   *
+   * A returned 1 is the "no data" sentinel, not a measurement: the pass clamps
+   * the optical depth away from zero before encoding and so tops out around
+   * 0.92, leaving 1 free to mean "no light wrote this". Lights without
+   * transmission enabled, channels no light occupies, and every light when the
+   * pass did not run all land there. Consumers must reject it rather than decode
+   * it, since it decodes to zero optical depth — the *strongest* entry of the
+   * transmission profile. See `SKIN_TRANSMISSION_NO_DATA_ENCODING`.
    *
    * Shares the shadow mask's `ordinal = index - 1 → layer = ordinal >> 2,
    * channel = ordinal & 3` packing, so a light is found in both textures with

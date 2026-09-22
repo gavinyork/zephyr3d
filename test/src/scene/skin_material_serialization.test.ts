@@ -16,7 +16,6 @@ describe('Skin material serialization', () => {
     material.roughness = 0.4;
     material.specularF0 = 0.03;
     material.transmissionStrength = 0.8;
-    material.transmissionPower = 6;
     material.albedoColor = new Vector4(0.8, 0.55, 0.48, 1);
     material.cullMode = 'none';
     material.vertexTangent = true;
@@ -31,7 +30,6 @@ describe('Skin material serialization', () => {
       Roughness: 0.4,
       SpecularF0: 0.03,
       TransmissionStrength: 0.8,
-      TransmissionPower: 6,
       vertexTangent: true,
       doubleSidedLighting: false
     });
@@ -39,11 +37,29 @@ describe('Skin material serialization', () => {
     expect(restored.roughness).toBeCloseTo(0.4);
     expect(restored.specularF0).toBeCloseTo(0.03);
     expect(restored.transmissionStrength).toBeCloseTo(0.8);
-    expect(restored.transmissionPower).toBeCloseTo(6);
     expect(restored.albedoColor.x).toBeCloseTo(0.8);
     expect(restored.cullMode).toBe('none');
     expect(restored.vertexTangent).toBe(true);
     expect(restored.doubleSidedLighting).toBe(false);
+  });
+
+  test('round-trips the transmission parameters of a profile', async () => {
+    const manager = new ResourceManager(new MemoryFS());
+    const profile = new SkinProfile('skin');
+    profile.scatteringDistribution = -0.4;
+    profile.ior = 1.32;
+    profile.extinctionScale = 2.5;
+    profile.transmissionTint = new Vector3(0.9, 0.3, 0.22);
+
+    const serialized = await manager.serializeObject(profile);
+    const restored = (await manager.deserializeObject<SkinProfile>(null, serialized))!;
+
+    expect(restored.scatteringDistribution).toBeCloseTo(-0.4);
+    expect(restored.ior).toBeCloseTo(1.32);
+    expect(restored.extinctionScale).toBeCloseTo(2.5);
+    expect(restored.transmissionTint.y).toBeCloseTo(0.3);
+    profile.dispose();
+    restored.dispose();
   });
 
   test('round-trips the material subsurface profile', async () => {

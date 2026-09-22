@@ -25,7 +25,7 @@ import { DepthPass } from '../depthpass';
 import { ClusteredLight } from '../cluster_light';
 import { ShadowMaskRenderer } from '../shadow_mask_pass';
 import { TransmissionThicknessRenderer } from '../transmission_thickness_pass';
-import { SkinProfile } from '../../material/skinprofile';
+import { SKIN_OPTICAL_DEPTH_PER_WORLD_UNIT, SkinProfile } from '../../material/skinprofile';
 import { buildHiZ, getHiZFormat } from '../hzb';
 import { CopyBlitter } from '../../blitter';
 import { fetchSampler } from '../../utility/misc';
@@ -1065,42 +1065,34 @@ const TransmissionThicknessModule: RenderModule<FrameGraphContext> = {
         // One profile for the whole frame; see renderQueueSkinProfile for why,
         // and for what it costs when two characters disagree.
         const profile = renderQueueSkinProfile(renderQueue);
-        // Metres of geometry per millimetre of profile space. `worldUnitScale` is
-        // the profile's existing "how big is this asset" knob - the diffusion
-        // already scales its sampling disc by it (posteffect/skinsss.ts) and it is
-        // editable per material - and honouring it here is what lets the same
-        // profile drive a model authored at four times life size: the geometry is
-        // divided back down into the millimetres the profile's absorption is
-        // defined in, instead of reading four times thicker and going opaque.
-        const worldToProfile = 1000 / profile.worldUnitScale;
+        // World units to optical depth. The factor is derived from the baked
+        // transmission profile's own axis rather than picked, because the two
+        // have to agree exactly: see SKIN_OPTICAL_DEPTH_PER_WORLD_UNIT, which
+        // also records what it looks like when they do not.
+        //
+        // `worldUnitScale` is deliberately absent. It scales the profile's
+        // distances and the table's axis together, so it cancels out of the
+        // optical depth; UE5 keeps it out of `CalculateOpticalDepth` for the
+        // same reason. It still does its job of letting one profile drive a
+        // model authored at four times life size — just on the table side.
+        const opticalDepthScale = SKIN_OPTICAL_DEPTH_PER_WORLD_UNIT * profile.extinctionScale;
+        // UE5 shrinks by NormalScale * 0.5 in centimetres, scaled with the
+        // asset: on a larger model the features it has to clear are larger too,
+        // and so is the shadow-map depth quantisation it exists to escape.
+        const shrinkDistance = profile.normalScale * 0.5 * 0.01 * profile.worldUnitScale;
         _transmissionThicknessRenderer.render(
           ctx,
           depthTex,
           renderQueue.shadowedLights,
-          // World units to optical depth. The optical depth lives in the same
-          // profile space the scatter radii do — UE5's millimetres, per
-          // `MAX_TRANSMISSION_PROFILE_DISTANCE`.
-          //
-          // This used to convert to centimetres, which put the whole physical
-          // range of skin transmission below the profile's own clamp floor: a
-          // 3 mm ear came out at optical depth 0.3 against a floor of 0.15 and an
-          // additive bias of 0.25, i.e. seven 8-bit levels away from "nothing in
-          // the way". The only thing that cleared the floor was a path crossing
-          // the whole skull.
-          worldToProfile * profile.extinctionScale,
-          // UE5 shrinks by NormalScale * 0.5 in centimetres, scaled with the
-          // asset: on a larger model the features it has to clear are larger too,
-          // and so is the shadow-map depth quantisation it exists to escape.
-          profile.normalScale * 0.5 * 0.01 * profile.worldUnitScale,
+          opticalDepthScale,
+          shrinkDistance,
           // The same shrink expressed as optical depth. The shrink moves the
           // sample point towards the light, so it under-measures the thickness by
           // exactly itself; adding it back inside the clamp is what recovers the
-          // real thickness - so this must be `shrinkDistance × opticalDepthScale`
-          // and nothing else. `worldUnitScale` cancels out of that product, which
-          // is why it does not appear here; `extinctionScale` does not, and
-          // leaving it out is what used to put a constant pedestal on every pixel
-          // as soon as a profile moved off the default extinction of 1.
-          profile.normalScale * 0.5 * 10 * profile.extinctionScale,
+          // real thickness - so this is written as the product rather than as an
+          // equivalent constant, to keep it from drifting away from the scale
+          // above the way it already has once.
+          shrinkDistance * opticalDepthScale,
           (layer: number) =>
             rgCtx.createFramebuffer({
               width: thicknessTex.width,
