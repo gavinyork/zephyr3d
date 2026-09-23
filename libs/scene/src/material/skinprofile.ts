@@ -180,8 +180,7 @@ const WORLD_UNITS_TO_PROFILE_MM = 1000;
  */
 export const SKIN_OPTICAL_DEPTH_PER_WORLD_UNIT =
   (WORLD_UNITS_TO_PROFILE_MM * SKIN_MAX_TRANSMISSION_OPTICAL_DEPTH) /
-  (TRANSMISSION_LUT_MAX_DISTANCE_MM *
-    ((SKIN_TRANSMISSION_LUT_SIZE - 1) / SKIN_TRANSMISSION_LUT_SIZE));
+  (TRANSMISSION_LUT_MAX_DISTANCE_MM * ((SKIN_TRANSMISSION_LUT_SIZE - 1) / SKIN_TRANSMISSION_LUT_SIZE));
 
 /**
  * Column indices within a packed profile row.
@@ -935,7 +934,11 @@ export class SkinProfile {
     this._preset = preset;
     this._surfaceAlbedo.setXYZ(t.surfaceAlbedo[0], t.surfaceAlbedo[1], t.surfaceAlbedo[2]);
     this._meanFreePath.setXYZ(t.meanFreePath[0], t.meanFreePath[1], t.meanFreePath[2]);
-    this._boundaryColorBleed.setXYZ(t.boundaryColorBleed[0], t.boundaryColorBleed[1], t.boundaryColorBleed[2]);
+    this._boundaryColorBleed.setXYZ(
+      t.boundaryColorBleed[0],
+      t.boundaryColorBleed[1],
+      t.boundaryColorBleed[2]
+    );
     this._transmissionTint.setXYZ(t.transmissionTint[0], t.transmissionTint[1], t.transmissionTint[2]);
     this._meanFreePathDistance = t.meanFreePathDistance;
     this._worldUnitScale = t.worldUnitScale;
@@ -1000,9 +1003,7 @@ export class SkinProfile {
       const widest = Math.max(d.x, d.y, d.z);
       const albedoForSampling =
         widest > 0
-          ? [p._surfaceAlbedo.x, p._surfaceAlbedo.y, p._surfaceAlbedo.z][
-              [d.x, d.y, d.z].indexOf(widest)
-            ]
+          ? [p._surfaceAlbedo.x, p._surfaceAlbedo.y, p._surfaceAlbedo.z][[d.x, d.y, d.z].indexOf(widest)]
           : p._surfaceAlbedo.x;
       write(ProfileColumn.Scaling, p._worldUnitScale, p._scatterScale, 0, 0);
       write(
@@ -1097,8 +1098,7 @@ export class SkinProfile {
       }
       // Note the divisor is the table size, not `size - 1`: the last entry is
       // blacked out anyway, so UE5 spends the axis on the entries that survive.
-      const distanceMM =
-        (i / SKIN_TRANSMISSION_LUT_SIZE) * TRANSMISSION_LUT_MAX_DISTANCE_MM * invUnitScale;
+      const distanceMM = (i / SKIN_TRANSMISSION_LUT_SIZE) * TRANSMISSION_LUT_MAX_DISTANCE_MM * invUnitScale;
       const r = distanceMM + offsetMM;
       for (let c = 0; c < 3; c++) {
         out[o + c] =

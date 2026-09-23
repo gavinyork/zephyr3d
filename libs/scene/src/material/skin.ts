@@ -413,103 +413,106 @@ export class SkinMaterial
             scope.envEnergyTerms.y
           );
         }
-        this.forEachLight(scope, function (type, posRange, dirCutoff, colorIntensity, extra, shadow, thickness) {
-          this.$l.diffuseScale = pb.float(1);
-          this.$l.specularScale = pb.float(1);
-          this.$l.sourceRadiusFactor = pb.float(0);
-          this.$if(pb.equal(type, LIGHT_TYPE_POINT), function () {
-            this.diffuseScale = extra.x;
-            this.specularScale = extra.y;
-            this.sourceRadiusFactor = pb.div(
-              extra.z,
-              pb.max(pb.distance(posRange.xyz, this.$inputs.worldPos), 0.0001)
-            );
-          });
-          this.$l.lightAtten = that.calculateLightAttenuation(
-            this,
-            type,
-            this.$inputs.worldPos,
-            posRange,
-            dirCutoff,
-            extra
-          );
-          this.$l.lightDir = that.calculateLightDirection(
-            this,
-            type,
-            this.$inputs.worldPos,
-            posRange,
-            dirCutoff
-          );
-          this.$l.rawNdotL = pb.dot(this.normal, this.lightDir);
-          this.$l.NoL = pb.clamp(this.rawNdotL, 0, 1);
-          this.$l.VdotL = pb.dot(this.viewVec, this.lightDir);
-          // Shadow: pre-integrated BRDF handles NdotL internally, so pass a
-          // fixed bias to keep normal-offset stable at the terminator.
-          this.$l.shadowTerm = shadow
-            ? that.calculateShadow(this, this.$inputs.worldPos, scope.normalInfo.TBN[2], pb.float(0.5))
-            : pb.float(1);
-          this.$l.lightColor = pb.mul(colorIntensity.rgb, colorIntensity.a, this.lightAtten);
-          this.$l.halfVec = pb.normalize(pb.add(this.viewVec, this.lightDir));
-          this.$l.NoH = pb.clamp(pb.dot(this.normal, this.halfVec), 0, 1);
-          this.$l.VoH = pb.clamp(pb.dot(this.viewVec, this.halfVec), 0, 1);
-          // Burley diffuse with the NoL cosine, as UE5's SubsurfaceProfileBxDF
-          // evaluates it. The soft terminator is the screen-space diffusion's job;
-          // bending this term to fake it double-counts the effect.
-          this.$l.skinDiff = skinDiffuseBRDF(this, this.NoV, this.NoL, this.VoH, this.roughness);
-          this.diffuseLighting = pb.add(
-            this.diffuseLighting,
-            pb.mul(this.lightColor, this.shadowTerm, this.skinDiff, this.NoL, this.diffuseScale)
-          );
-          // Back-lit transmission. UE5's SubsurfaceProfileBxDF, which attenuates
-          // it by the *transmission* shadow rather than the surface shadow —
-          // and in UE5 that transmission shadow is the encoded optical depth
-          // itself (GetShadowTerms takes `LightAttenuation.y`, the very channel
-          // CalculateEncodedOpticalDepth wrote, for both purposes). The same
-          // value therefore both indexes the profile and scales it, which is
-          // why `thickness` appears twice here.
-          //
-          // No surface shadow and no NoL: the light arrives from behind, so the
-          // camera-facing surface is shadowed and turned away from it by
-          // construction. Applying either would zero out exactly the pixels
-          // this term exists for.
-          if (that.drawContext.transmissionThickness) {
-            this.$l.transmission = skinTransmission(
+        this.forEachLight(
+          scope,
+          function (type, posRange, dirCutoff, colorIntensity, extra, shadow, thickness) {
+            this.$l.diffuseScale = pb.float(1);
+            this.$l.specularScale = pb.float(1);
+            this.$l.sourceRadiusFactor = pb.float(0);
+            this.$if(pb.equal(type, LIGHT_TYPE_POINT), function () {
+              this.diffuseScale = extra.x;
+              this.specularScale = extra.y;
+              this.sourceRadiusFactor = pb.div(
+                extra.z,
+                pb.max(pb.distance(posRange.xyz, this.$inputs.worldPos), 0.0001)
+              );
+            });
+            this.$l.lightAtten = that.calculateLightAttenuation(
               this,
-              this.zSkinProfileTex,
-              this.zSkinProfileTexelSize,
-              this.zSkinProfileId,
-              thickness,
-              this.normal,
-              this.viewVec,
-              this.lightDir
+              type,
+              this.$inputs.worldPos,
+              posRange,
+              dirCutoff,
+              extra
             );
-            this.transmissionLighting = pb.add(
-              this.transmissionLighting,
-              pb.mul(
-                this.lightColor,
-                this.transmission,
+            this.$l.lightDir = that.calculateLightDirection(
+              this,
+              type,
+              this.$inputs.worldPos,
+              posRange,
+              dirCutoff
+            );
+            this.$l.rawNdotL = pb.dot(this.normal, this.lightDir);
+            this.$l.NoL = pb.clamp(this.rawNdotL, 0, 1);
+            this.$l.VdotL = pb.dot(this.viewVec, this.lightDir);
+            // Shadow: pre-integrated BRDF handles NdotL internally, so pass a
+            // fixed bias to keep normal-offset stable at the terminator.
+            this.$l.shadowTerm = shadow
+              ? that.calculateShadow(this, this.$inputs.worldPos, scope.normalInfo.TBN[2], pb.float(0.5))
+              : pb.float(1);
+            this.$l.lightColor = pb.mul(colorIntensity.rgb, colorIntensity.a, this.lightAtten);
+            this.$l.halfVec = pb.normalize(pb.add(this.viewVec, this.lightDir));
+            this.$l.NoH = pb.clamp(pb.dot(this.normal, this.halfVec), 0, 1);
+            this.$l.VoH = pb.clamp(pb.dot(this.viewVec, this.halfVec), 0, 1);
+            // Burley diffuse with the NoL cosine, as UE5's SubsurfaceProfileBxDF
+            // evaluates it. The soft terminator is the screen-space diffusion's job;
+            // bending this term to fake it double-counts the effect.
+            this.$l.skinDiff = skinDiffuseBRDF(this, this.NoV, this.NoL, this.VoH, this.roughness);
+            this.diffuseLighting = pb.add(
+              this.diffuseLighting,
+              pb.mul(this.lightColor, this.shadowTerm, this.skinDiff, this.NoL, this.diffuseScale)
+            );
+            // Back-lit transmission. UE5's SubsurfaceProfileBxDF, which attenuates
+            // it by the *transmission* shadow rather than the surface shadow —
+            // and in UE5 that transmission shadow is the encoded optical depth
+            // itself (GetShadowTerms takes `LightAttenuation.y`, the very channel
+            // CalculateEncodedOpticalDepth wrote, for both purposes). The same
+            // value therefore both indexes the profile and scales it, which is
+            // why `thickness` appears twice here.
+            //
+            // No surface shadow and no NoL: the light arrives from behind, so the
+            // camera-facing surface is shadowed and turned away from it by
+            // construction. Applying either would zero out exactly the pixels
+            // this term exists for.
+            if (that.drawContext.transmissionThickness) {
+              this.$l.transmission = skinTransmission(
+                this,
+                this.zSkinProfileTex,
+                this.zSkinProfileTexelSize,
+                this.zSkinProfileId,
                 thickness,
-                this.zSkinTransmissionStrength,
-                this.diffuseScale
-              )
+                this.normal,
+                this.viewVec,
+                this.lightDir
+              );
+              this.transmissionLighting = pb.add(
+                this.transmissionLighting,
+                pb.mul(
+                  this.lightColor,
+                  this.transmission,
+                  thickness,
+                  this.zSkinTransmissionStrength,
+                  this.diffuseScale
+                )
+              );
+            }
+            // Dual-lobe GGX specular, with the NoL cosine UE5 applies alongside it.
+            this.$l.spec = skinDualLobeSpecular(
+              this,
+              this.NoH,
+              this.NoV,
+              this.NoL,
+              this.VoH,
+              this.lobeRoughness,
+              this.zSkinLobeParams.z,
+              this.zSkinSpecularF0
+            );
+            this.specularLighting = pb.add(
+              this.specularLighting,
+              pb.mul(this.lightColor, this.shadowTerm, this.spec, this.NoL, this.specularScale)
             );
           }
-          // Dual-lobe GGX specular, with the NoL cosine UE5 applies alongside it.
-          this.$l.spec = skinDualLobeSpecular(
-            this,
-            this.NoH,
-            this.NoV,
-            this.NoL,
-            this.VoH,
-            this.lobeRoughness,
-            this.zSkinLobeParams.z,
-            this.zSkinSpecularF0
-          );
-          this.specularLighting = pb.add(
-            this.specularLighting,
-            pb.mul(this.lightColor, this.shadowTerm, this.spec, this.NoL, this.specularScale)
-          );
-        });
+        );
         // --- Assemble ---
         //
         // UE5 applies the energy terms to the accumulated lighting rather than per
@@ -539,10 +542,7 @@ export class SkinMaterial
         // slot the diffuse uses.
         scope.$l.diffusible = pb.mul(
           scope.albedo.rgb,
-          pb.add(
-            pb.mul(scope.diffuseLighting, scope.energyPreservation),
-            scope.transmissionLighting
-          )
+          pb.add(pb.mul(scope.diffuseLighting, scope.energyPreservation), scope.transmissionLighting)
         );
         scope.specularLighting = pb.add(
           pb.mul(scope.specularLighting, scope.energyConservation),

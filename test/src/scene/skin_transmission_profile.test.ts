@@ -205,7 +205,8 @@ describe('Skin transmission profile', () => {
     const sample = (p: SkinProfile, metres: number) => {
       const lut = new Float32Array(size * 4);
       p.writeTransmissionProfile(lut);
-      const index = ((metres * SKIN_OPTICAL_DEPTH_PER_WORLD_UNIT) / SKIN_MAX_TRANSMISSION_OPTICAL_DEPTH) * (size - 1);
+      const index =
+        ((metres * SKIN_OPTICAL_DEPTH_PER_WORLD_UNIT) / SKIN_MAX_TRANSMISSION_OPTICAL_DEPTH) * (size - 1);
       const i0 = Math.min(Math.floor(index), size - 1);
       const i1 = Math.min(i0 + 1, size - 1);
       const f = index - i0;

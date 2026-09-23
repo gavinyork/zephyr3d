@@ -318,12 +318,7 @@ const SPHERE_RADIUS = 0.025;
  * turns on how the error responds to them rather than on its size: a
  * resolution-bound error scales with the texel, an algorithmic one does not.
  */
-function buildSphere(
-  scene: Scene,
-  camera: PerspectiveCamera,
-  shadowMapSize: number,
-  shadowDistance: number
-) {
+function buildSphere(scene: Scene, camera: PerspectiveCamera, shadowMapSize: number, shadowDistance: number) {
   bareScene(scene);
   const light = new DirectionalLight(scene);
   // Across the view, not along it: the terminator then runs down the middle of

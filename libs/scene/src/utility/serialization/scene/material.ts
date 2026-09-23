@@ -360,6 +360,8 @@ export function getSkinProfileClass(): SerializableClass {
       return defineProps([
         {
           name: 'Preset',
+          description:
+            'Starting look for the whole profile: skin tones, wax, jade or marble. Choosing a preset overwrites every other value here, so pick one first and fine-tune afterwards',
           type: 'string',
           default: 'skin',
           options: {
@@ -378,7 +380,8 @@ export function getSkinProfileClass(): SerializableClass {
         },
         {
           name: 'SurfaceAlbedo',
-          description: 'Per-channel scattering albedo driving the Burley shaping term',
+          description:
+            "Set this close to the skin's base color. It does not recolor the surface; it fine-tunes how soft or tight the scattered glow is in each color channel",
           type: 'rgb',
           default: [0.85, 0.63, 0.55],
           options: { animatable: true, minValue: 0, maxValue: 1 },
@@ -393,7 +396,8 @@ export function getSkinProfileClass(): SerializableClass {
         },
         {
           name: 'MeanFreePath',
-          description: 'Per-channel diffuse mean free path ratio; red normally scatters furthest',
+          description:
+            'Relative softness per color channel. The channel with the highest value bleeds furthest, which sets the color of the glow in shadow edges and around fine details; skin keeps red high, giving the warm red fringe at the light-to-shadow transition',
           type: 'rgb',
           default: [1, 0.28, 0.14],
           options: { animatable: true, minValue: 0, maxValue: 1 },
@@ -408,7 +412,8 @@ export function getSkinProfileClass(): SerializableClass {
         },
         {
           name: 'MeanFreePathDistance',
-          description: 'Mean free path of the widest channel, in world units',
+          description:
+            'Overall softness of the skin, in real-world metres (about 0.01 for human skin). Higher values blur lighting and surface detail more, giving a waxy, translucent look; lower values give a harder, more opaque, plastic-like surface',
           type: 'float',
           default: 0.012,
           options: { animatable: true, minValue: 0, maxValue: 1 },
@@ -421,6 +426,8 @@ export function getSkinProfileClass(): SerializableClass {
         },
         {
           name: 'WorldUnitScale',
+          description:
+            "Set this to the model's size relative to real life (1 for a life-size model in metres, 4 for a head modelled four times too large). If the skin looks too waxy or too hard only because of the model's scale, fix it here instead of changing the softness",
           type: 'float',
           default: 1,
           options: { animatable: true, minValue: 0.01, maxValue: 100 },
@@ -433,6 +440,8 @@ export function getSkinProfileClass(): SerializableClass {
         },
         {
           name: 'ScatterScale',
+          description:
+            'Quick overall softness knob on top of MeanFreePathDistance, affecting both the soft skin look and the glow through thin parts. Raise it for softer, more translucent skin; 0 removes the soft scattering look entirely',
           type: 'float',
           default: 1,
           options: { animatable: true, minValue: 0, maxValue: 8 },
@@ -445,7 +454,8 @@ export function getSkinProfileClass(): SerializableClass {
         },
         {
           name: 'BoundaryColorBleed',
-          description: 'Tint applied to taps belonging to a different profile',
+          description:
+            'Color used where this skin meets a different profile, e.g. face and lips. Values near white let the softness blend smoothly across the boundary; darker or more saturated values tint the transition and make the seam more visible',
           type: 'rgb',
           default: [0.78, 0.44, 0.36],
           options: { animatable: true, minValue: 0, maxValue: 1 },
@@ -460,6 +470,8 @@ export function getSkinProfileClass(): SerializableClass {
         },
         {
           name: 'TransmissionTint',
+          description:
+            'Color of the glow seen when light shines through thin parts such as ears, nostrils and fingers from behind. Warm reds and oranges for skin',
           type: 'rgb',
           default: [1, 0.42, 0.3],
           options: { animatable: true, minValue: 0, maxValue: 1 },
@@ -474,6 +486,8 @@ export function getSkinProfileClass(): SerializableClass {
         },
         {
           name: 'ExtinctionScale',
+          description:
+            'How opaque the material is to back-lighting. Higher values make only the thinnest edges glow; lower values let the glow reach thicker areas, making the object look more translucent overall',
           type: 'float',
           default: 1,
           options: { animatable: true, minValue: 0, maxValue: 8 },
@@ -486,7 +500,8 @@ export function getSkinProfileClass(): SerializableClass {
         },
         {
           name: 'NormalScale',
-          description: 'How much surface normal detail survives the diffusion',
+          description:
+            'Stability of the back-lit glow. Too low makes the glow through thin parts disappear or look blotchy; higher values give a cleaner, smoother glow but wash out small thin details. Does not affect front-lit skin',
           type: 'float',
           default: 0.08,
           options: { animatable: true, minValue: 0, maxValue: 1 },
@@ -500,7 +515,7 @@ export function getSkinProfileClass(): SerializableClass {
         {
           name: 'ScatteringDistribution',
           description:
-            'Henyey-Greenstein asymmetry of transmitted light; positive throws it forward, away from the light',
+            'How directional the back-lit glow is. Values near 1 make thin parts glow strongly only when looking almost straight towards the light; lower values spread the glow over a wider range of viewing angles',
           type: 'float',
           default: 0.93,
           options: { animatable: true, minValue: -1, maxValue: 1 },
@@ -513,7 +528,8 @@ export function getSkinProfileClass(): SerializableClass {
         },
         {
           name: 'IOR',
-          description: 'Index of refraction bending the view ray before the transmission phase function',
+          description:
+            'Changes how the back-lit glow depends on the viewing angle. Higher values make the glow follow the surface shape and the light more than the camera direction. Does not affect front-lit highlights',
           type: 'float',
           default: 1.55,
           options: { animatable: true, minValue: 1, maxValue: 3 },
@@ -526,7 +542,8 @@ export function getSkinProfileClass(): SerializableClass {
         },
         {
           name: 'Roughness0',
-          description: 'Multiplier on the material roughness for the narrow specular lobe',
+          description:
+            'Sharpness of the tight highlight layer, as a fraction of the material roughness. Lower values give a small, crisp, oily-looking highlight',
           type: 'float',
           default: 0.5,
           options: { animatable: true, minValue: 0.01, maxValue: 1 },
@@ -539,7 +556,8 @@ export function getSkinProfileClass(): SerializableClass {
         },
         {
           name: 'Roughness1',
-          description: 'Multiplier on the material roughness for the wide specular lobe',
+          description:
+            'Sharpness of the broad highlight layer, as a fraction of the material roughness. Lower values make the soft sheen smaller and brighter',
           type: 'float',
           default: 1,
           options: { animatable: true, minValue: 0.01, maxValue: 1 },
@@ -552,7 +570,8 @@ export function getSkinProfileClass(): SerializableClass {
         },
         {
           name: 'LobeMix',
-          description: 'Blend between the narrow and wide specular lobes',
+          description:
+            'Balance between the two highlight layers. 0 shows only the tight, crisp highlight; higher values add more of the broad, soft sheen for a more matte look',
           type: 'float',
           default: 0.15,
           options: { animatable: true, minValue: 0, maxValue: 1 },
@@ -709,6 +728,8 @@ function getPBRCommonProps(manager: ResourceManager): PropertyAccessor<PBRMateri
     },
     {
       name: 'RectSpecularScale',
+      description:
+        'Brightness of the highlights produced by rectangular area lights on this material; 1 is neutral, lower values dim the reflections of the light panels, higher values make them brighter',
       type: 'float',
       options: {
         label: 'RectSpecularScale',
@@ -1864,6 +1885,8 @@ export function getMeshMaterialClass(): SerializableClass[] {
           },
           {
             name: 'TransparentShadowCaster',
+            description:
+              'Lets a transparent (blended) material cast shadows. Areas more opaque than ShadowAlphaCutoff cast solid shadows, useful for foliage, hair cards or fabric; when off, transparent objects cast no shadow',
             type: 'bool',
             default: false,
             get(this: MeshMaterial, value) {
@@ -1878,6 +1901,8 @@ export function getMeshMaterialClass(): SerializableClass[] {
           },
           {
             name: 'ShadowAlphaCutoff',
+            description:
+              'Opacity above which a transparent material casts shadow. Lower values make fainter parts cast shadow too, giving fuller shadows; higher values keep only the most opaque parts, giving thinner shadows',
             type: 'float',
             default: 0.5,
             options: {

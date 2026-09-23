@@ -88,10 +88,7 @@ export function skinSpecularEnergyTerms(
     // F90 from micro-occlusion, as UE5 derives it when only F0 is supplied.
     this.$l.F90 = pb.clamp(pb.mul(50, this.F0), 0, 1);
     this.$l.W = pb.add(1, pb.mul(this.F0, pb.div(pb.sub(1, this.E), this.E)));
-    this.$l.A = pb.mul(
-      this.W,
-      pb.add(pb.mul(this.E, this.F0), pb.mul(this.Ef, pb.sub(this.F90, this.F0)))
-    );
+    this.$l.A = pb.mul(this.W, pb.add(pb.mul(this.E, this.F0), pb.mul(this.Ef, pb.sub(this.F90, this.F0))));
     this.$return(pb.vec2(this.W, pb.clamp(this.A, 0, 1)));
   });
   return pb.getGlobalScope()[funcName](roughness, NoV, F0) as PBShaderExp;
@@ -288,9 +285,7 @@ export function skinDualLobeSpecular(
       this.$return(pb.mul(this.F, pb.mul(this.D, this.Vis)));
     }
   );
-  return pb
-    .getGlobalScope()
-    [funcName](NoH, NoV, NoL, VoH, lobeRoughness, lobeMix, F0) as PBShaderExp;
+  return pb.getGlobalScope()[funcName](NoH, NoV, NoL, VoH, lobeRoughness, lobeMix, F0) as PBShaderExp;
 }
 
 /**
@@ -326,11 +321,7 @@ function readSkinProfileColumn(
   column: PBShaderExp
 ): PBShaderExp {
   const pb = scope.$builder;
-  return pb.textureSampleLevel(
-    tex,
-    pb.vec2(pb.mul(pb.add(column, 0.5), texelSize.x), row),
-    0
-  );
+  return pb.textureSampleLevel(tex, pb.vec2(pb.mul(pb.add(column, 0.5), texelSize.x), row), 0);
 }
 
 /**
@@ -398,10 +389,7 @@ export function skinTransmission(
   //
   // Rows are addressed by the profile id directly, as UE5 does with SSProfiles.
   // The id arrives normalized because it rides in an 8-bit channel.
-  scope.$l.zSkinTrRow = pb.mul(
-    pb.add(pb.mul(pb.clamp(profileId, 0, 1), 255), 0.5),
-    profileTexelSize.y
-  );
+  scope.$l.zSkinTrRow = pb.mul(pb.add(pb.mul(pb.clamp(profileId, 0, 1), 255), 0.5), profileTexelSize.y);
   // GetTransmissionProfile. The index is `opticalDepth / MAX * (size - 1)` and
   // the decode is `opticalDepth = (1 - thickness) * MAX`, so the MAX cancels and
   // the encoded thickness maps onto the table directly.
@@ -410,10 +398,8 @@ export function skinTransmission(
   scope.$l.zSkinTrC0 = pb.add(scope.zSkinTrI0, lutOffset);
   scope.$l.zSkinTrC1 = pb.min(pb.add(scope.zSkinTrC0, 1), lastLutColumn);
   scope.$l.zSkinTrProfile = pb.mix(
-    readSkinProfileColumn(scope, profileTex, profileTexelSize, scope.zSkinTrRow, scope.zSkinTrC0)
-      .rgb,
-    readSkinProfileColumn(scope, profileTex, profileTexelSize, scope.zSkinTrRow, scope.zSkinTrC1)
-      .rgb,
+    readSkinProfileColumn(scope, profileTex, profileTexelSize, scope.zSkinTrRow, scope.zSkinTrC0).rgb,
+    readSkinProfileColumn(scope, profileTex, profileTexelSize, scope.zSkinTrRow, scope.zSkinTrC1).rgb,
     pb.sub(scope.zSkinTrIndex, scope.zSkinTrI0)
   );
   // (extinctionScale, normalScale, scatteringDistribution, 1 / ior)
@@ -485,12 +471,9 @@ function skinTransmissionPhase(
       // The threshold sits midway between the largest encoding the pass can
       // write and the sentinel, a gap no real measurement lands in, so this is a
       // clean partition and not a cutoff that clips thin geometry.
-      this.$if(
-        pb.greaterThan(this.thickness, 0.5 * (1 + SKIN_TRANSMISSION_NO_DATA_ENCODING)),
-        function () {
-          this.$return(pb.vec3(0));
-        }
-      );
+      this.$if(pb.greaterThan(this.thickness, 0.5 * (1 + SKIN_TRANSMISSION_NO_DATA_ENCODING)), function () {
+        this.$return(pb.vec3(0));
+      });
       this.$l.refracV = pb.refract(this.viewVec, pb.neg(this.normal), this.params.w);
       this.$l.cosJ = pb.dot(pb.neg(this.lightDir), this.refracV);
       // ApproximateHG. Note this is UE5's approximation, not the Henyey-
@@ -505,7 +488,5 @@ function skinTransmissionPhase(
       this.$return(pb.mul(this.profile, this.phase));
     }
   );
-  return pb
-    .getGlobalScope()
-    [funcName](profile, params, thickness, normal, viewVec, lightDir) as PBShaderExp;
+  return pb.getGlobalScope()[funcName](profile, params, thickness, normal, viewVec, lightDir) as PBShaderExp;
 }
