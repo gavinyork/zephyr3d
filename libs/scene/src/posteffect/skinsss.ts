@@ -77,8 +77,11 @@ const DEFAULT_SAMPLE_COUNT = 64;
  * Pass 1 (Burley): Radial-disc Burley diffusion with Halton + inverse-CDF
  *   importance sampling, 3D bilateral distance, per-channel kernel.
  * Pass 2 (BVar): Luminance variance + depth gradient → transmission estimate.
- * Pass 3 (Recombine): Specular/diffuse separation via SceneColor.a, profile-
- *   boundary-weighted recombination, transmission overlay.
+ * Pass 3 (Recombine): Specular/diffuse separation via SceneColor.a, then the
+ *   diffused half summed back with the specular remainder.
+ *
+ * The pass exposes no scattering parameters of its own — every one of them
+ * belongs to the {@link SkinProfile} the material points at, as in UE5.
  *
  * WebGPU only.
  *
@@ -92,14 +95,10 @@ export class SkinSSS extends AbstractPostEffect {
   private _bvarBindGroup: BindGroup | null;
   private _recombineBindGroup: BindGroup | null;
   private _profile: SkinProfile | null;
-  private _strength: number;
   private _debugOutput: SkinSSSDebugOutput;
   private _debugExposure: number;
-  private _depthScale: number;
-  private _scatterRadius: number;
   private _sampleCount: number;
-  private readonly _scatterTint: Vector4;
-  private readonly _radiusParams: Vector4;
+  private readonly _projScale: Vector2;
   private readonly _profileParams: Vector4;
   private readonly _targetSize: Vector4;
   private readonly _cameraNearFar: Vector2;
@@ -111,14 +110,10 @@ export class SkinSSS extends AbstractPostEffect {
     this._bvarBindGroup = null;
     this._recombineBindGroup = null;
     this._profile = null;
-    this._strength = 1;
     this._debugOutput = 'none';
     this._debugExposure = 1;
-    this._depthScale = 80;
-    this._scatterRadius = 1;
     this._sampleCount = DEFAULT_SAMPLE_COUNT;
-    this._scatterTint = new Vector4(1, 1, 1, 1);
-    this._radiusParams = new Vector4();
+    this._projScale = new Vector2();
     this._profileParams = new Vector4();
     this._targetSize = new Vector4();
     this._cameraNearFar = new Vector2();
@@ -139,49 +134,11 @@ export class SkinSSS extends AbstractPostEffect {
   set profile(val: SkinProfile | null) {
     this._profile = val ?? null;
   }
-  get strength() {
-    return this._strength;
-  }
-  set strength(val) {
-    this._strength = Math.max(0, val ?? 0);
-  }
-  get scatterTint(): Vector4 {
-    return this._scatterTint;
-  }
-  set scatterTint(val: Vector4) {
-    this._scatterTint.set(val);
-  }
-  /**
-   * Multiplier on the sampling disc, relative to the profile's scatter distance.
-   *
-   * @remarks
-   * 1 (the default) sizes the disc to the profile's widest mean free path, which
-   * captures most of the kernel's energy. Lowering it crops the kernel's tail and
-   * costs the widest, faintest bleed; raising it spends taps on a region the
-   * kernel has already decayed through.
-   *
-   * The absolute world extent of the diffusion comes from the profile's
-   * `meanFreePathDistance`, not from here.
-   *
-   * @public
-   */
-  get scatterRadius() {
-    return this._scatterRadius;
-  }
-  set scatterRadius(val) {
-    this._scatterRadius = Math.max(0, val ?? 0);
-  }
   get sampleCount() {
     return this._sampleCount;
   }
   set sampleCount(val) {
     this._sampleCount = Math.max(8, Math.min(64, Math.round(val ?? DEFAULT_SAMPLE_COUNT)));
-  }
-  get depthScale() {
-    return this._depthScale;
-  }
-  set depthScale(val) {
-    this._depthScale = Math.max(0, val ?? 0);
   }
 
   /**
@@ -225,7 +182,7 @@ export class SkinSSS extends AbstractPostEffect {
   }
 
   apply(ctx: DrawContext, inputColorTexture: Texture2D, sceneDepthTexture: Texture2D, srgbOutput: boolean) {
-    if (!ctx.SkinSSSTexture || this._strength <= 0 || ctx.device.type !== 'webgpu') {
+    if (!ctx.SkinSSSTexture || ctx.device.type !== 'webgpu') {
       this.passThrough(ctx, inputColorTexture, srgbOutput);
       return;
     }
@@ -254,17 +211,11 @@ export class SkinSSS extends AbstractPostEffect {
     // the y component by `Extent.x / Extent.y` to bring it back to a circle in
     // pixel space.
     const projMatrix = ctx.camera.getProjectionMatrix();
-    this._radiusParams.setXYZW(
+    this._projScale.setXY(
       // x: world length at unit depth, in horizontal UV
       0.5 * projMatrix.m00,
       // y: world length at unit depth, in vertical UV
-      0.5 * projMatrix.m11,
-      // z: user multiplier on top of the profile's own scatter distance
-      this._scatterRadius,
-      // w: depth sensitivity for the bilateral term. UE5 has no equivalent knob —
-      // it compares depth against the radius one-to-one — so 1 is the faithful
-      // value and the serialized default maps onto it.
-      this._depthScale / 80
+      0.5 * projMatrix.m11
     );
     // Row of the fallback profile, used when a pixel's id is missing.
     this._profileParams.setXYZW(
@@ -301,7 +252,7 @@ export class SkinSSS extends AbstractPostEffect {
       bg.setTexture('depthTex', sceneDepthTexture, fetchSampler('clamp_nearest_nomip'));
       bg.setValue('cameraNearFar', this._cameraNearFar);
       bg.setValue('targetSize', this._targetSize);
-      bg.setValue('radiusParams', this._radiusParams);
+      bg.setValue('projScale', this._projScale);
       bg.setValue('perspective', ctx.camera.isPerspective() ? 1 : 0);
       bg.setValue('profileParams', this._profileParams);
       bg.setTexture('profileTex', profileTable, fetchSampler('clamp_nearest_nomip'));
@@ -364,8 +315,6 @@ export class SkinSSS extends AbstractPostEffect {
     rbg.setTexture('depthTex', sceneDepthTexture, fetchSampler('clamp_nearest_nomip'));
     rbg.setValue('cameraNearFar', this._cameraNearFar);
     rbg.setValue('targetSize', this._targetSize);
-    rbg.setValue('scatterTint', this._scatterTint);
-    rbg.setValue('strength', this._strength);
     rbg.setValue('debugMode', SKIN_SSS_DEBUG_OUTPUTS.indexOf(this._debugOutput));
     rbg.setValue('flip', this.needFlip(device) ? 1 : 0);
     rbg.setValue('srgbOut', srgbOutput ? 1 : 0);
@@ -404,7 +353,7 @@ export class SkinSSS extends AbstractPostEffect {
         this.maskTex = pb.tex2D().uniform(0);
         this.cameraNearFar = pb.vec2().uniform(0);
         this.targetSize = pb.vec4().uniform(0);
-        this.radiusParams = pb.vec4().uniform(0);
+        this.projScale = pb.vec2().uniform(0);
         this.perspective = pb.int().uniform(0);
         this.profileParams = pb.vec4().uniform(0);
         this.profileTex = pb.tex2D().uniform(0);
@@ -580,10 +529,7 @@ export class SkinSSS extends AbstractPostEffect {
               // profile units, so the world unit scale is the whole conversion
               // and no extra cast belongs in either this scale or the bilateral
               // term below.
-              this.$l.burleyScale = pb.div(
-                pb.mul(this.radiusParams.xy, this.worldUnitScale, this.radiusParams.z),
-                this.viewScale
-              );
+              this.$l.burleyScale = pb.div(pb.mul(this.projScale, this.worldUnitScale), this.viewScale);
 
               // Centre-sample reweighting: the radius that falls within one texel
               // and the CDF mass it accounts for. Sampling then covers only
@@ -662,11 +608,10 @@ export class SkinSSS extends AbstractPostEffect {
                 );
                 // Bilateral term: the depth difference carried into the same
                 // millimetre space as the radius, divided by the world unit scale
-                // so that a large scale does not over-penalize the sample.
-                this.$l.deltaDepth = pb.mul(
-                  pb.div(pb.sub(this.sampleDepth, this.centerDepth), this.worldUnitScale),
-                  this.radiusParams.w
-                );
+                // so that a large scale does not over-penalize the sample. UE5
+                // compares the two one-to-one, with no sensitivity knob in
+                // between.
+                this.$l.deltaDepth = pb.div(pb.sub(this.sampleDepth, this.centerDepth), this.worldUnitScale);
                 this.$l.radiusSampledMM = pb.sqrt(
                   pb.add(pb.mul(this.radiusMM, this.radiusMM), pb.mul(this.deltaDepth, this.deltaDepth))
                 );
@@ -845,8 +790,6 @@ export class SkinSSS extends AbstractPostEffect {
         this.depthTex = pb.tex2D().sampleType('unfilterable-float').uniform(0);
         this.cameraNearFar = pb.vec2().uniform(0);
         this.targetSize = pb.vec4().uniform(0);
-        this.scatterTint = pb.vec4().uniform(0);
-        this.strength = pb.float().uniform(0);
         this.debugMode = pb.int().uniform(0);
         this.srgbOut = pb.int().uniform(0);
         this.$outputs.outColor = pb.vec4();
@@ -870,15 +813,16 @@ export class SkinSSS extends AbstractPostEffect {
               // that must survive untouched, then swap the diffuse for the
               // diffused version.
               this.$l.lum = pb.dot(this.baseColor.rgb, pb.vec3(0.2126, 0.7152, 0.0722));
-              // Must match Burley's split exactly, or the two passes disagree
-              // about how much of the pixel was diffusible and the difference
-              // shows up as a brightness error.
+              // Must match Burley's split exactly. That pass diffused
+              // `baseColor.rgb * diffAmt` and this one keeps the remainder, so if
+              // the two disagree about how much of the pixel was diffusible the
+              // halves no longer add up to the original and the difference shows
+              // as a brightness error.
               this.$l.diffAmt = pb.select(
                 pb.clamp(pb.div(this.baseColor.a, pb.max(this.lum, 1e-4)), 0, 1),
                 pb.float(1),
                 pb.greaterThan(this.lum, 1e-4)
               );
-              this.$l.diffOrig = pb.mul(this.baseColor.rgb, this.diffAmt);
               this.$l.specKeep = pb.mul(this.baseColor.rgb, pb.sub(1, this.diffAmt));
               // The diffusion buffer's alpha carries the profile id, not a
               // transmission term — nothing in this pipeline produces one. An
@@ -892,14 +836,11 @@ export class SkinSSS extends AbstractPostEffect {
               // shadow map's optical depth. The back-lit term on SkinMaterial
               // stands in for it and is already part of SceneColor.
               this.$l.diffused = pb.textureSampleLevel(this.bvarTex, this.uv, 0).rgb;
-              this.result = pb.add(
-                pb.add(
-                  pb.mul(pb.sub(this.diffused, this.diffOrig), this.scatterTint.rgb, this.strength),
-                  this.diffOrig
-                ),
-                this.specKeep
-              );
-              this.result = pb.max(this.result, pb.vec3(0));
+              // Straight sum, as UE5 does it. There is deliberately no blend
+              // weight or tint here: how far and in what colour the light
+              // travels is entirely the profile's business, and a second knob on
+              // top of it would only let the two disagree.
+              this.result = pb.max(pb.add(this.diffused, this.specKeep), pb.vec3(0));
             }
           );
           // A debug channel must reach the screen unmodified, so recombination is

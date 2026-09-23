@@ -73,55 +73,60 @@ Transmission is off by default; to use it, raise `transmissionStrength` and supp
 
 ## Post-effect side: diffusion and compositing
 
-This group of camera properties controls the diffusion:
+The camera side is deliberately just a switch:
 
 | Property | Default | Purpose |
 | --- | --- | --- |
-| `skinSSS` | false | Enable |
-| `skinSSSStrength` | 1 | Final composite strength |
-| `skinSSSScatterRadius` | 0.02 | **World-space** scatter radius; blur width scales with distance to keep it constant |
-| `skinSSSSampleStep` | 2 | Maximum pixel spacing between blur taps, capping the projected radius for close-ups |
-| `skinSSSOpacity` | 0.18 | Bias subtracted from the blurred skin mask before compositing |
-| `skinSSSDepthScale` | 80 | Depth rejection scale, preventing bleeding across depth discontinuities |
-| `skinSSSColorBoost` | 1 | Extra multiplier on the blurred result |
-| `skinSSSSmoothness` | 0 | Skin smoothing ("beauty filter") amount |
-| `skinSSSScatterTint` | white | Tints the light being redistributed |
-| `skinSSSGlow` | 0 | Additive, deliberately non-conserving bleed |
-| `skinSSSProfilePreset` | `'skin'` | Scatter profile preset |
+| `skinSSS` | false | Enable the diffusion pass (WebGPU only) |
+| `skinSSSDebugOutput` | `'none'` | Render one intermediate of the diffusion instead of the shaded result |
 
-A few worth calling out:
+**There are no scattering knobs on the camera.** How far the light travels, how strongly and in what
+colour are all properties of the [`SkinProfile`](#scatter-profiles) the material points at, which the
+pass reads per pixel from the profile id the material writes. This mirrors UE5, where a subsurface
+profile asset is the only thing that shapes the diffusion, and it is what keeps the screen-space
+diffusion and the baked transmission profile from drifting apart — a pass-level radius multiplier
+would scale the first without touching the second.
 
-**`skinSSSScatterRadius` is in world space**, not pixels. That means scattering correctly shrinks as a
-character walks away, without you retuning by distance. `skinSSSSampleStep` then caps the kernel in
-pixels so it does not grow unbounded in close-ups.
-
-**`skinSSSGlow` breaks energy conservation on purpose.** At the default 0, light added on the dark side
-of the terminator is light removed from the lit side. Raising it only adds, making skin read as lit
-from within; around 1 approximates how the effect looked before it conserved energy.
-
-**`skinSSSScatterTint` multiplies only the difference term**, so a warm tint colours the terminator
-without washing out the whole surface.
-
-**`skinSSSSmoothness` depends on a correct mask**: smoothing samples weighted by the skin mask, so the
-R channel must exclude eyes, brows and lips or they get smoothed away too.
+`skinSSSDebugOutput` is the practical way to tell an input problem from a kernel problem: it can show
+the diffusible energy, the per-pixel profile id, the normal, the per-channel diffusion distance, the
+sample radius, the tap acceptance rate, the diffused result on its own, and the light-space
+thickness. Several intermediates sit in a narrow band, so pair it with the post effect's
+`debugExposure` when a channel reads as a flat tone.
 
 ## Scatter profiles
 
-`skinSSSProfilePreset` sets the **ratio** between the red, green and blue scatter radii — and that ratio
-is what gives a scattering surface its character. Red travels furthest in skin, which is exactly the
+A `SkinProfile` holds every scattering parameter, and materials reference one through
+`SkinMaterial.subsurfaceProfile`. Profiles are packed into a shared GPU table keyed by profile id, so
+a face, its ears and its lips can each carry their own profile and diffuse independently within a
+single screen-space pass.
+
+The parameters that matter most:
+
+| Property | Purpose |
+| --- | --- |
+| `surfaceAlbedo` | Per-channel scattering albedo; drives Burley's shaping term |
+| `meanFreePath` | Per-channel scatter **ratio** — what gives a surface its character |
+| `meanFreePathDistance` | Absolute scatter distance, in world units |
+| `worldUnitScale` | Profile-space to world-unit conversion, for scenes not authored in metres |
+| `scatterScale` | Overall multiplier on the diffusion width |
+| `transmissionTint` | Tint of the light transmitted through thin geometry |
+| `scatteringDistribution` | Henyey-Greenstein asymmetry of the transmitted light |
+| `roughness0` / `roughness1` / `lobeMix` | Dual-lobe specular |
+
+The `meanFreePath` **ratio** is what makes a scattering surface read as skin rather than as a neutral
+blur. Red travels roughly ten times further than blue in the `skin` preset, which is exactly the
 red-to-yellow gradient at the terminator. Changing the preset changes that ratio, which is why `wax`
 and `jade` run the same code path as skin rather than being special cases.
 
-Available presets: `skin`, `skin_thin`, `skin_default`, `skin_heavy_makeup`, `wax`, `wax_backlit`,
-`wax_soft`, `jade`, `jade_backlit`, `jade_soft`.
+Available presets: `skin`, `skin_pale`, `skin_tan`, `skin_dark`, `wax`, `jade`, `marble`.
 
-The absolute size is still controlled by `skinSSSScatterRadius`; the preset only sets proportions.
+The absolute size comes from `meanFreePathDistance` and `worldUnitScale`; the preset only sets
+proportions.
 
-::: tip This preset applies to the whole pass
-`camera.skinSSSProfilePreset` is a **whole-pass** setting — one per camera. Using different profiles for
-different materials in the same image goes through a separate profile-slot path, where
-`SubsurfaceProfile` instances can be shared between materials (similar to Unreal's skin profile
-assets).
+::: tip Scale matters
+The scatter distances are physical: `skin` has a mean free path of about 27 mm. On a metre-scale
+object the diffusion is correctly invisible. If scattering "has no effect", check the object's world
+size before reaching for the parameters.
 :::
 
 ## See also

@@ -427,13 +427,6 @@ export class Camera extends SceneNode {
   protected _skinSSS: boolean;
   /** @internal Skin SSS post effect reference. */
   protected _postEffectSkinSSS: DRef<SkinSSS>;
-  /** @internal Skin SSS final blend strength. */
-  protected _skinSSSStrength: number;
-  /** @internal Skin SSS world-space scatter radius. */
-  protected _skinSSSScatterRadius: number;
-  /** @internal Skin SSS depth rejection scale. */
-  protected _skinSSSDepthScale: number;
-  protected readonly _skinSSSScatterTint: Vector4;
   protected _skinSSSDebugOutput: SkinSSSDebugOutput;
   /** @internal SSAO enable flag (via post effect). */
   protected _SSAO: boolean;
@@ -606,10 +599,6 @@ export class Camera extends SceneNode {
     this._sssDebugView = 'none';
     this._skinSSS = false;
     this._postEffectSkinSSS = new DRef();
-    this._skinSSSStrength = 1;
-    this._skinSSSScatterRadius = 1;
-    this._skinSSSDepthScale = 80;
-    this._skinSSSScatterTint = new Vector4(1, 1, 1, 1);
     this._skinSSSDebugOutput = 'none';
     this._SSAO = false;
     this._postEffectSSAO = new DRef();
@@ -1475,16 +1464,6 @@ export class Camera extends SceneNode {
   set skinSSS(val) {
     this._postEffectSkinSSS.get()!.enabled = !!val;
   }
-  /** Final blend strength for the dedicated Skin SSS post effect. */
-  get skinSSSStrength() {
-    return this._skinSSSStrength;
-  }
-  set skinSSSStrength(val) {
-    this._skinSSSStrength = Math.max(0, val ?? 0);
-    if (this._postEffectSkinSSS.get()) {
-      this._postEffectSkinSSS.get()!.strength = this._skinSSSStrength;
-    }
-  }
   /**
    * Intermediate Skin SSS quantity to visualize instead of the shaded result.
    *
@@ -1499,47 +1478,6 @@ export class Camera extends SceneNode {
     this._skinSSSDebugOutput = val ?? 'none';
     if (this._postEffectSkinSSS.get()) {
       this._postEffectSkinSSS.get()!.debugOutput = this._skinSSSDebugOutput;
-    }
-  }
-  /**
-   * Multiplier on the Skin SSS sampling disc, relative to the profile's scatter
-   * distance. The absolute world extent comes from the profile's
-   * `meanFreePathDistance`.
-   */
-  get skinSSSScatterRadius() {
-    return this._skinSSSScatterRadius;
-  }
-  set skinSSSScatterRadius(val) {
-    this._skinSSSScatterRadius = Math.max(0, val ?? 0);
-    if (this._postEffectSkinSSS.get()) {
-      this._postEffectSkinSSS.get()!.scatterRadius = this._skinSSSScatterRadius;
-    }
-  }
-  /** Depth rejection scale. The reference shader uses 80. */
-  get skinSSSDepthScale() {
-    return this._skinSSSDepthScale;
-  }
-  set skinSSSDepthScale(val) {
-    this._skinSSSDepthScale = Math.max(0, val ?? 0);
-    if (this._postEffectSkinSSS.get()) {
-      this._postEffectSkinSSS.get()!.depthScale = this._skinSSSDepthScale;
-    }
-  }
-  /**
-   * Tint applied to the light the Skin SSS post effect redistributes.
-   *
-   * @remarks
-   * White (the default) leaves the effect energy conserving. Because it
-   * multiplies only the difference between the diffused and original diffuse, a
-   * warm tint colors the terminator without washing the whole surface.
-   */
-  get skinSSSScatterTint(): Vector4 {
-    return this._skinSSSScatterTint;
-  }
-  set skinSSSScatterTint(val: Vector4) {
-    this._skinSSSScatterTint.set(val);
-    if (this._postEffectSkinSSS.get()) {
-      this._postEffectSkinSSS.get()!.scatterTint = this._skinSSSScatterTint;
     }
   }
   /** @internal */
@@ -2046,9 +1984,6 @@ export class Camera extends SceneNode {
     if (!this._postEffectSkinSSS.get()) {
       const skinSSS = new SkinSSS();
       skinSSS.enabled = false;
-      skinSSS.strength = this._skinSSSStrength;
-      skinSSS.scatterRadius = this._skinSSSScatterRadius;
-      skinSSS.scatterTint = this._skinSSSScatterTint;
       skinSSS.debugOutput = this._skinSSSDebugOutput;
       this._postEffectSkinSSS.set(skinSSS);
       this._compositor.appendPostEffect(skinSSS);

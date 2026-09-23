@@ -211,8 +211,8 @@ export const skinShadow: VisualScene = {
     // It used to set `scatterColor`, `scatterStrength` and `diffuseWrap`, which
     // the UE5 rewrite removed from SkinMaterial - the assignments survived as
     // dead code and the scene rendered with defaults regardless. Their successors
-    // are `SkinProfile.surfaceAlbedo`/`meanFreePath` and `camera.skinSSSStrength`,
-    // and the soft terminator the wrap used to fake is now the screen-space
+    // are `SkinProfile.surfaceAlbedo`/`meanFreePath`/`meanFreePathDistance`, and
+    // the soft terminator the wrap used to fake is now the screen-space
     // diffusion's job.
     const head = new Mesh(scene, new SphereShape({ radius: 1.5 }), material);
     head.position.setXYZ(0, 0, 0);

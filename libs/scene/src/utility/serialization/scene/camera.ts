@@ -1,4 +1,3 @@
-import { Vector4 } from '@zephyr3d/base';
 import { defineProps, type SerializableClass } from '../types';
 import { Camera, OrthoCamera, PerspectiveCamera } from '../../../camera';
 import type { CameraOITMode, SSGIQualityPreset, SSSDebugView, SSSQualityPreset } from '../../../camera';
@@ -1531,91 +1530,6 @@ export function getCameraClass(): SerializableClass {
           },
           set(this: Camera, value) {
             this.skinSSS = value.bool[0];
-          }
-        },
-        {
-          name: 'SkinSSSStrength',
-          type: 'float',
-          phase: 0,
-          default: 1,
-          options: {
-            label: 'Strength',
-            group: 'PostProcessing/SkinSSS',
-            minValue: 0,
-            maxValue: 4
-          },
-          get(this: Camera, value) {
-            value.num[0] = this.skinSSSStrength;
-          },
-          set(this: Camera, value) {
-            this.skinSSSStrength = value.num[0];
-          },
-          isValid(this: Camera) {
-            return this.skinSSS;
-          }
-        },
-        {
-          name: 'SkinSSSScatterRadius',
-          type: 'float',
-          phase: 0,
-          default: 1,
-          options: {
-            label: 'ScatterRadiusScale',
-            group: 'PostProcessing/SkinSSS',
-            minValue: 0,
-            maxValue: 4
-          },
-          get(this: Camera, value) {
-            value.num[0] = this.skinSSSScatterRadius;
-          },
-          set(this: Camera, value) {
-            this.skinSSSScatterRadius = value.num[0];
-          },
-          isValid(this: Camera) {
-            return this.skinSSS;
-          }
-        },
-        {
-          name: 'SkinSSSDepthScale',
-          type: 'float',
-          phase: 0,
-          default: 80,
-          options: {
-            label: 'DepthScale',
-            group: 'PostProcessing/SkinSSS',
-            minValue: 0,
-            maxValue: 256
-          },
-          get(this: Camera, value) {
-            value.num[0] = this.skinSSSDepthScale;
-          },
-          set(this: Camera, value) {
-            this.skinSSSDepthScale = value.num[0];
-          },
-          isValid(this: Camera) {
-            return this.skinSSS;
-          }
-        },
-        {
-          name: 'SkinSSSScatterTint',
-          type: 'rgb',
-          phase: 0,
-          default: [1, 1, 1],
-          options: {
-            label: 'ScatterTint',
-            group: 'PostProcessing/SkinSSS'
-          },
-          get(this: Camera, value) {
-            const tint = this.skinSSSScatterTint;
-            value.num[0] = tint.x;
-            value.num[1] = tint.y;
-            value.num[2] = tint.z;
-          },
-          set(this: Camera, value) {
-            this.skinSSSScatterTint = new Vector4(value.num[0], value.num[1], value.num[2], 1);
-          },
-          isValid(this: Camera) {
-            return this.skinSSS;
           }
         },
         {

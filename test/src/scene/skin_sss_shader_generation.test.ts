@@ -137,7 +137,6 @@ describe('SkinSSS shader generation', () => {
     // fraction is that over the total luminance. The specular remainder must be
     // carried through unscattered.
     expect(recombine).toContain('diffAmt');
-    expect(recombine).toContain('diffOrig');
     expect(recombine).toContain('specKeep');
     expect(recombine).toContain('diffused');
   });
@@ -202,17 +201,25 @@ describe('SkinSSS shader generation', () => {
     // happened to occupy. UE5 gets transmission from the BxDF (shadow-map
     // optical depth), never from the diffusion passes.
     expect(recombine).not.toContain('transmission');
-    expect(recombine).toContain('scatterTint');
     expect(recombine).toContain('diffused');
   });
 
   test('no legacy uniforms remain', () => {
-    const { recombine } = buildPrograms('webgpu');
+    const { burley, recombine } = buildPrograms('webgpu');
     expect(recombine).not.toContain('smoothness');
+    // The post effect exposes no knobs of its own: how far, how strongly and in
+    // what colour the light scatters is entirely the SkinProfile's business, as
+    // it is in UE5. A second set of multipliers on top of the profile could only
+    // let the two disagree — `scatterRadius` in particular duplicated
+    // `SkinProfile.worldUnitScale` in the diffusion but not on the transmission
+    // LUT's distance axis, so turning it up silently decoupled the two.
+    expect(recombine).not.toContain('scatterTint');
+    expect(recombine).not.toContain('strength');
+    expect(burley).not.toContain('radiusParams');
   });
 
   test('Recombine clamps against precision undershoot', () => {
     const { recombine } = buildPrograms('webgpu');
-    expect(recombine).toMatch(/max\(result,\s*vec3<f32>\(0\.0\)\)/);
+    expect(recombine).toMatch(/result = max\(.*vec3<f32>\(0\.0\)\)/);
   });
 });

@@ -103,9 +103,6 @@ describe('Skin material serialization', () => {
     const camera = new Camera(scene);
 
     camera.skinSSS = true;
-    camera.skinSSSStrength = 1.2;
-    camera.skinSSSScatterRadius = 1.5;
-    camera.skinSSSDepthScale = 96;
     camera.skinSSSDebugOutput = 'sampleRadius';
 
     const serialized = await manager.serializeObject(camera);
@@ -113,13 +110,9 @@ describe('Skin material serialization', () => {
 
     expect(serialized.Object).toMatchObject({
       SkinSSSEnabled: true,
-      SkinSSSStrength: 1.2,
-      SkinSSSScatterRadius: 1.5,
-      SkinSSSDepthScale: 96,
       SkinSSSDebugOutput: 'sampleRadius'
     });
     expect(restored.skinSSS).toBe(true);
-    expect(restored.skinSSSStrength).toBeCloseTo(1.2);
     // The debug selection is held on the camera, not only forwarded to the post
     // effect, so it survives a round trip even though the effect is created lazily.
     expect(restored.skinSSSDebugOutput).toBe('sampleRadius');
