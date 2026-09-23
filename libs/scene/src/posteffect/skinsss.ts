@@ -182,13 +182,14 @@ export class SkinSSS extends AbstractPostEffect {
   }
 
   apply(ctx: DrawContext, inputColorTexture: Texture2D, sceneDepthTexture: Texture2D, srgbOutput: boolean) {
-    if (!ctx.SkinSSSTexture || ctx.device.type !== 'webgpu') {
+    if (!ctx.SkinSSSTexture || !ctx.SkinProfileIdTexture || ctx.device.type !== 'webgpu') {
       this.passThrough(ctx, inputColorTexture, srgbOutput);
       return;
     }
     const device = ctx.device;
     const outputFramebuffer = device.getFramebuffer();
     const maskTex = ctx.SkinSSSTexture;
+    const profileIdTex = ctx.SkinProfileIdTexture;
     const width = inputColorTexture.width;
     const height = inputColorTexture.height;
 
@@ -249,6 +250,9 @@ export class SkinSSS extends AbstractPostEffect {
       const bg = this._burleyBindGroup;
       bg.setTexture('sceneTex', inputColorTexture, fetchSampler('clamp_linear'));
       bg.setTexture('maskTex', maskTex, fetchSampler('clamp_linear'));
+      // Nearest only: the id is a table row, and an interpolated one addresses a
+      // profile neither neighbour has.
+      bg.setTexture('profileIdTex', profileIdTex, fetchSampler('clamp_nearest_nomip'));
       bg.setTexture('depthTex', sceneDepthTexture, fetchSampler('clamp_nearest_nomip'));
       bg.setValue('cameraNearFar', this._cameraNearFar);
       bg.setValue('targetSize', this._targetSize);
@@ -351,6 +355,7 @@ export class SkinSSS extends AbstractPostEffect {
         this.depthTex = pb.tex2D().sampleType('unfilterable-float').uniform(0);
         this.sceneTex = pb.tex2D().uniform(0);
         this.maskTex = pb.tex2D().uniform(0);
+        this.profileIdTex = pb.tex2D().uniform(0);
         this.cameraNearFar = pb.vec2().uniform(0);
         this.targetSize = pb.vec4().uniform(0);
         this.projScale = pb.vec2().uniform(0);
@@ -377,20 +382,37 @@ export class SkinSSS extends AbstractPostEffect {
         // The skin mask comes from its own channel, never from SceneColor.a:
         // opaque materials all write 1 there, so using it would classify the
         // background and the eyes as skin and bleed the scattered red into them.
+        //
+        // The alpha returned here is UE5's subsurface Opacity, a continuous 0..1
+        // scattering weight. It used to be the profile id scaled by that opacity,
+        // which only behaved for a binary mask.
         pb.func('readDiffusible', [pb.vec2('uv')], function () {
           this.$l.scene = pb.textureSampleLevel(this.sceneTex, this.uv, 0);
-          this.$l.mask = pb.textureSampleLevel(this.maskTex, this.uv, 0).a;
+          this.$l.opacity = pb.clamp(pb.textureSampleLevel(this.maskTex, this.uv, 0).a, 0, 1);
           this.$l.lum = pb.dot(this.scene.rgb, pb.vec3(0.2126, 0.7152, 0.0722));
           // Below the floor the ratio stops being meaningful and starts tracking
           // brightness instead, which biases the darkest pixels — the ones the
           // diffusion is most visible against. Treat those as fully diffusible:
           // a pixel that dark has no specular worth preserving.
+          //
+          // Note the argument order: `pb.select(x, y, cond)` is `cond ? y : x`,
+          // following WGSL's builtin, where the *false* value comes first. It
+          // reads like a ternary and is not one; every use of it in this file was
+          // inverted until it was checked against the generated code.
           this.$l.diffAmt = pb.select(
-            pb.clamp(pb.div(this.scene.a, pb.max(this.lum, 1e-4)), 0, 1),
             pb.float(1),
+            pb.clamp(pb.div(this.scene.a, pb.max(this.lum, 1e-4)), 0, 1),
             pb.greaterThan(this.lum, 1e-4)
           );
-          this.$return(pb.vec4(pb.mul(this.scene.rgb, this.diffAmt), this.mask));
+          this.$return(pb.vec4(pb.mul(this.scene.rgb, this.diffAmt), this.opacity));
+        });
+        // Per-pixel profile id, from the depth prepass rather than from the mask
+        // buffer. Keeping the two apart is what lets the opacity above be
+        // continuous: a single channel cannot carry a table row and a weight at
+        // once, and multiplying them made an opacity of 0.5 select a different
+        // profile instead of scattering at half strength.
+        pb.func('readProfileId', [pb.vec2('uv')], function () {
+          this.$return(pb.textureSampleLevel(this.profileIdTex, this.uv, 0).r);
         });
         // --- Burley diffusion, transcribed from UE5's BurleyNormalizedSSSCommon.ush ---
         //
@@ -481,14 +503,21 @@ export class SkinSSS extends AbstractPostEffect {
         pb.main(function () {
           this.$l.uv = this.$inputs.uv;
           this.$l.center = this.readDiffusible(this.uv);
+          this.$l.centerId = this.readProfileId(this.uv);
           this.$l.centerDepth01 = this.readDepth01(this.uv);
           this.$outputs.outColor = this.center;
+          // Both conditions matter and they are no longer the same test: a pixel
+          // can carry a profile with zero opacity (masked out) or — in a frame
+          // where the prepass and the light pass disagree about coverage — an
+          // opacity with no profile. Neither scatters.
           this.$if(
-            pb.and(pb.lessThan(this.centerDepth01, 1), pb.greaterThan(this.center.a, 1e-4)),
+            pb.and(
+              pb.lessThan(this.centerDepth01, 1),
+              pb.and(pb.greaterThan(this.center.a, 1e-4), pb.greaterThan(this.centerId, 0.5 / 255))
+            ),
             function () {
               this.$l.centerDepth = pb.max(pb.mul(this.centerDepth01, this.cameraNearFar.y), 1e-4);
               this.$l.centerNormal = this.readNormal(this.uv);
-              this.$l.centerId = this.center.a;
               this.$l.scaling = this.readProfile(this.centerId, 0);
               this.$l.albedo = this.readProfile(this.centerId, 1);
               this.$l.mfp = this.readProfile(this.centerId, 2);
@@ -513,8 +542,15 @@ export class SkinSSS extends AbstractPostEffect {
               // scales differ by the aspect ratio, so a single factor turns the
               // sampling disc into an ellipse. UE5 keeps the same pair, building
               // x from m00 and correcting y by Extent.x/Extent.y.
+              // Perspective divides the world-space radius by the view depth, so
+              // the disc keeps a constant world size as the subject recedes;
+              // orthographic has no such term and takes 1. Inverted, this made
+              // the radius scale *with* camera distance instead of against it —
+              // at a 4 m portrait distance the disc came out nearly 4x too wide,
+              // which is the kind of error that reads as "the profile needs a
+              // bigger mean free path" rather than as a bug.
               this.$l.viewScale = pb.max(
-                pb.select(pb.float(1), this.centerDepth, pb.equal(this.perspective, 0)),
+                pb.select(this.centerDepth, pb.float(1), pb.equal(this.perspective, 0)),
                 1e-4
               );
               // The profile's world unit scale is applied here and only here —
@@ -616,32 +652,65 @@ export class SkinSSS extends AbstractPostEffect {
                   pb.add(pb.mul(this.radiusMM, this.radiusMM), pb.mul(this.deltaDepth, this.deltaDepth))
                 );
                 this.$l.profile = this.diffusionProfile(this.mfp.rgb, this.S3D, this.radiusSampledMM);
-                this.$l.isSkin = pb.float(pb.greaterThan(this.tapSample.a, 1e-4));
-                this.$l.sampleWeight = pb.mul(pb.div(this.profile, this.pdf), this.isSkin, this.normalWeight);
+                this.$l.tapId = this.readProfileId(this.sampleUV);
+                // The tap's own opacity, UE5's Opacity semantics: 0 contributes
+                // nothing, 1 contributes fully, and the values between give the
+                // smooth transition a painted mask is for.
+                this.$l.tapOpacity = pb.select(
+                  pb.float(0),
+                  this.tapSample.a,
+                  pb.greaterThan(this.tapId, 0.5 / 255)
+                );
+                // A tap that is not skin falls back to the centre pixel rather
+                // than dropping out of the estimator. The two are very different
+                // things, and dropping was wrong in two ways at once.
+                //
+                // Variance: this is a self-normalized estimator, so a dropped tap
+                // leaves both sums. Beside a large non-skin region — an eye, a
+                // brow — most of the disc lands in it and the result is carried by
+                // whatever few taps survived. Since the per-pixel seed is fixed
+                // across frames, neighbouring pixels survive on *different* taps,
+                // which is spatial white noise: dark speckle that appears as soon
+                // as the disc grows past the hole, i.e. as soon as the mean free
+                // path distance is raised.
+                //
+                // Numerics: importance sampling is exact only for the channel the
+                // radii were drawn from, so `profile/pdf` is the constant 0.159
+                // for red while blue falls from 0.119 near the centre to 7.2e-9 in
+                // the tail. Drop the near taps and blue's `weightAccum` lands on
+                // the same order as the 1e-9 floor below, which then clamps it and
+                // pushes the channel to zero. Keeping every tap in the sum leaves
+                // it dominated by the near ones, where all three channels are
+                // within a factor of two of each other.
+                //
+                // The substitution says "the hole scatters like the pixel under
+                // consideration", which is the same assumption the centre-weighted
+                // blend at the end already makes, and it costs a slightly firmer
+                // edge where skin meets a hole.
+                this.$l.tapColor = pb.mix(this.center.rgb, this.tapSample.rgb, this.tapOpacity);
+                this.$l.sampleWeight = pb.mul(pb.div(this.profile, this.pdf), this.normalWeight);
                 // Taps from another profile are tinted rather than dropped, so a
-                // face/lip boundary softens instead of seaming.
+                // face/lip boundary softens instead of seaming. The comparison is
+                // against the prepass id now; 0.002 is still half a step of the
+                // 8-bit channel it rides in.
                 this.$l.sameProfile = pb.float(
                   pb.or(
-                    pb.lessThan(pb.abs(pb.sub(this.tapSample.a, this.centerId)), 0.002),
-                    pb.lessThan(this.tapSample.a, 1e-4)
+                    pb.lessThan(pb.abs(pb.sub(this.tapId, this.centerId)), 0.002),
+                    pb.lessThan(this.tapOpacity, 1e-4)
                   )
                 );
-                // Only taps that actually contributed may contribute a bleed
-                // factor. Counting rejected taps here leaves the bleed average
-                // near 1 while the weighted mean is carried by a handful of
-                // samples, so the result gets scaled by a factor unrelated to its
-                // own denominator — near the silhouette, where most taps miss the
-                // skin, that lands as bright specks that flicker as the sample set
-                // advances each frame.
+                // Only taps that actually landed on skin may contribute a bleed
+                // factor, and both sides of the ratio carry the same opacity, so
+                // the mean stays a tint in [bleed, 1] and never a gain. Taps that
+                // fell back to the centre are excluded: they carry the centre's
+                // own profile by construction, so counting them would dilute a
+                // real boundary tint towards white.
                 this.bleedAccum = pb.add(
                   this.bleedAccum,
-                  pb.mul(pb.mix(this.boundaryBleed, pb.vec3(1), this.sameProfile), this.isSkin)
+                  pb.mul(pb.mix(this.boundaryBleed, pb.vec3(1), this.sameProfile), this.tapOpacity)
                 );
-                this.acceptedCount = pb.add(this.acceptedCount, this.isSkin);
-                this.radianceAccum = pb.add(
-                  this.radianceAccum,
-                  pb.mul(this.sampleWeight, this.tapSample.rgb)
-                );
+                this.acceptedCount = pb.add(this.acceptedCount, this.tapOpacity);
+                this.radianceAccum = pb.add(this.radianceAccum, pb.mul(this.sampleWeight, this.tapColor));
                 this.weightAccum = pb.add(this.weightAccum, this.sampleWeight);
                 this.radiusSum = pb.add(this.radiusSum, this.radiusMM);
               });
@@ -650,16 +719,42 @@ export class SkinSSS extends AbstractPostEffect {
                 pb.div(this.radianceAccum, pb.max(this.weightAccum, pb.vec3(1e-9))),
                 1 / 0.99995
               );
-              // Mean bleed over the taps that were actually accepted, so this is
-              // a tint in [bleed, 1] and never a gain.
-              this.diffused = pb.mul(this.diffused, pb.div(this.bleedAccum, pb.max(this.acceptedCount, 1)));
+              // Mean bleed over the taps that landed on skin, so this is a tint in
+              // [bleed, 1] and never a gain.
+              //
+              // The guard is a branch rather than `max(acceptedCount, 1)`, which
+              // was only correct while the count was an integer. It is a sum of
+              // opacities now, so a neighbourhood that is half-masked accumulates
+              // 0.5 on both sides of the ratio and the old floor turned that into
+              // a 0.5x multiplier — darkening the pixel by exactly its own mask,
+              // on top of the fade that already applies below.
+              this.$l.bleedTint = pb.vec3(1);
+              this.$if(pb.greaterThan(this.acceptedCount, 1e-4), function () {
+                this.bleedTint = pb.div(this.bleedAccum, this.acceptedCount);
+              });
+              this.diffused = pb.mul(this.diffused, this.bleedTint);
               // Blend the centre pixel back in with the CDF mass it represents.
               this.diffused = pb.mix(this.diffused, this.center.rgb, this.centerWeight);
-              this.$if(pb.lessThanEqual(this.weightAccum.x, 0), function () {
-                this.diffused = this.center.rgb;
-              });
-              // Alpha carries the profile id through to Recombine unchanged.
-              this.$outputs.outColor = pb.vec4(pb.max(this.diffused, pb.vec3(0)), this.centerId);
+              // Per channel: importance sampling is exact only for the one the
+              // radii were drawn from, so the three weights differ by orders of
+              // magnitude and a single scalar test cannot speak for all of them.
+              // Built as a mask rather than a vector-conditioned select, which
+              // has no legal GLSL form - the ternary there takes a scalar only.
+              this.$l.weightValid = pb.vec3(
+                pb.float(pb.greaterThan(this.weightAccum.x, 0)),
+                pb.float(pb.greaterThan(this.weightAccum.y, 0)),
+                pb.float(pb.greaterThan(this.weightAccum.z, 0))
+              );
+              this.diffused = pb.mix(this.center.rgb, this.diffused, this.weightValid);
+              // The centre's own opacity fades the whole result back towards the
+              // unscattered pixel. Taps were already weighted by *their* opacity,
+              // which controls how much the neighbourhood contributes; this
+              // controls how much this pixel accepts. UE5 applies the same value
+              // at both ends, which is what makes a painted mask read as a
+              // gradient in scattering strength rather than as an edge.
+              this.diffused = pb.mix(this.center.rgb, this.diffused, this.center.a);
+              // Alpha is unused downstream; Recombine reads its own mask.
+              this.$outputs.outColor = pb.vec4(pb.max(this.diffused, pb.vec3(0)), this.center.a);
               this.$if(pb.notEqual(this.debugMode, 0), function () {
                 this.$l.dbg = pb.vec3(0);
                 this.$if(pb.equal(this.debugMode, 1), function () {
@@ -734,7 +829,7 @@ export class SkinSSS extends AbstractPostEffect {
                     });
                   });
                 }
-                this.$outputs.outColor = pb.vec4(pb.mul(this.dbg, this.debugExposure), this.centerId);
+                this.$outputs.outColor = pb.vec4(pb.mul(this.dbg, this.debugExposure), this.center.a);
               });
             }
           );
@@ -768,8 +863,8 @@ export class SkinSSS extends AbstractPostEffect {
         this.$outputs.outColor = pb.vec4();
         pb.main(function () {
           this.$l.diffused = pb.textureSampleLevel(this.diffusedTex, this.$inputs.uv, 0);
-          // Alpha is the profile id the diffusion wrote; it is passed through
-          // unchanged rather than repurposed.
+          // Alpha is the subsurface opacity the diffusion wrote; it is passed
+          // through unchanged rather than repurposed.
           this.$outputs.outColor = pb.vec4(this.diffused.rgb, this.diffused.a);
         });
       }
@@ -801,6 +896,9 @@ export class SkinSSS extends AbstractPostEffect {
           this.$l.baseColor = pb.textureSampleLevel(this.colorTex, this.uv, 0);
           this.$l.result = this.baseColor.rgb;
           this.$l.centerDepth01 = this.readDepth01(this.uv);
+          // Subsurface opacity. A plain gate is right here: how strongly the
+          // pixel scattered is already baked into the diffusion buffer, and
+          // weighting by the opacity a second time would count it twice.
           this.$l.centerMask = pb.textureSampleLevel(this.maskTex, this.uv, 0).a;
           this.$if(
             pb.and(
@@ -819,13 +917,13 @@ export class SkinSSS extends AbstractPostEffect {
               // halves no longer add up to the original and the difference shows
               // as a brightness error.
               this.$l.diffAmt = pb.select(
-                pb.clamp(pb.div(this.baseColor.a, pb.max(this.lum, 1e-4)), 0, 1),
                 pb.float(1),
+                pb.clamp(pb.div(this.baseColor.a, pb.max(this.lum, 1e-4)), 0, 1),
                 pb.greaterThan(this.lum, 1e-4)
               );
               this.$l.specKeep = pb.mul(this.baseColor.rgb, pb.sub(1, this.diffAmt));
-              // The diffusion buffer's alpha carries the profile id, not a
-              // transmission term — nothing in this pipeline produces one. An
+              // The diffusion buffer's alpha carries the subsurface opacity, not
+              // a transmission term — nothing in this pipeline produces one. An
               // earlier version read it as transmission and added
               // `diffused * id/255` on top, which both invented energy out of
               // nothing and made the amount depend on which table slot the

@@ -126,10 +126,10 @@ function backLight(scene: Scene, shadowMapSize: number, scale = 1) {
 function slabMaterial(worldUnitScale: number) {
   const material = new SkinMaterial();
   material.albedoColor = new Vector4(0.85, 0.66, 0.58, 1);
-  // The pass reads its extinction, normal scale and unit scale from the first
-  // skin material in the queue, so setting them here is what makes the scene's
-  // arithmetic and the pass's agree - explicitly, rather than by both happening
-  // to land on the shared default.
+  // The pass reads its extinction, normal scale and unit scale from the profile
+  // this material points at, per pixel, keyed by the id the depth prepass wrote.
+  // Setting them here is what makes the scene's arithmetic and the pass's agree -
+  // explicitly, rather than by both happening to land on the shared default.
   const profile = new SkinProfile('skin');
   profile.worldUnitScale = worldUnitScale;
   material.subsurfaceProfile = profile;

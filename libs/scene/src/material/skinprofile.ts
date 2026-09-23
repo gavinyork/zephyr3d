@@ -561,6 +561,19 @@ export class SkinProfile {
   }
 
   /**
+   * Column holding `(worldUnitScale, scatterScale, 0, 0)`.
+   *
+   * @remarks
+   * Read by the transmission thickness pass, which needs the world unit scale to
+   * size its normal shrink against the asset.
+   *
+   * @public
+   */
+  static get scalingParamColumn() {
+    return ProfileColumn.Scaling as number;
+  }
+
+  /**
    * Column holding `(extinctionScale, normalScale, scatteringDistribution,
    * 1 / ior)`.
    *

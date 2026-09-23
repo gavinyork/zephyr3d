@@ -193,6 +193,20 @@ describe('SkinSSS shader generation', () => {
     expect(recombine).toContain('centerMask');
   });
 
+  test('the profile id comes from the prepass, not from the mask alpha', () => {
+    const { burley } = buildPrograms('webgpu');
+    // The mask alpha is UE5's subsurface Opacity, a continuous 0..1 scattering
+    // weight. It used to be multiplied by the profile id and the product had to
+    // serve as both, which meant an opacity of 0.5 addressed a *different*
+    // profile's row rather than scattering at half strength. The id now rides in
+    // its own r8unorm target written by the depth prepass.
+    expect(burley).toContain('profileIdTex');
+    expect(burley).toContain('readProfileId');
+    // Both ends of the kernel weight by opacity: the tap decides how much the
+    // neighbourhood contributes, the centre how much this pixel accepts.
+    expect(burley).toContain('tapOpacity');
+  });
+
   test('Recombine does not read the diffusion alpha as a transmission term', () => {
     const { recombine } = buildPrograms('webgpu');
     // Regression guard: the diffusion buffer's alpha carries the profile id.
@@ -202,6 +216,25 @@ describe('SkinSSS shader generation', () => {
     // optical depth), never from the diffusion passes.
     expect(recombine).not.toContain('transmission');
     expect(recombine).toContain('diffused');
+  });
+
+  test('every select() has its branches the right way round', () => {
+    const { burley, recombine } = buildPrograms('webgpu');
+    // `pb.select(x, y, cond)` follows the WGSL builtin: the **false** value comes
+    // first, so it means `cond ? y : x`. It reads like a ternary and is not one,
+    // and a type checker cannot tell the two apart — every use of it in this file
+    // was inverted until the generated code was read back.
+    //
+    // What that cost: `tapOpacity` counted only the taps that landed where there
+    // was *no* profile, so the diffusion accepted eyes and brows and rejected
+    // skin, which zeroed the acceptance rate and quietly turned the whole pass
+    // into an identity. `viewScale` made the sampling disc scale *with* camera
+    // distance instead of against it. Both are checked here against the emitted
+    // text, because that is the only place the argument order is visible.
+    expect(burley).toContain('select(0.0,tapSample.a,tapId >');
+    expect(burley).toMatch(/select\(centerDepth,1\.0,.*perspective == 0\)/);
+    expect(burley).toMatch(/diffAmt: f32 = select\(1\.0,clamp\(scene\.a/);
+    expect(recombine).toMatch(/diffAmt: f32 = select\(1\.0,clamp\(baseColor\.a/);
   });
 
   test('no legacy uniforms remain', () => {

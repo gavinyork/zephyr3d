@@ -71,9 +71,13 @@ export class DepthPass extends RenderPass {
   }
   /** @internal */
   protected _getGlobalBindGroupHash(ctx: DrawContext) {
+    // Every flag that changes the fragment output count has to be in here. See
+    // the note in renderItems: a hash collision hands this pass another pass's
+    // program, and the failure mode is an output count mismatch rather than
+    // anything that points at the cache.
     return `${Number(this._renderBackface)}:${Number(this._encodeDepth)}:${Number(
       ctx.motionVectors
-    )}:${Number(this._motionVectorOnly)}`;
+    )}:${Number(this._motionVectorOnly)}:${Number(ctx.skinProfileId)}`;
   }
   /** @internal */
   protected renderItems(ctx: DrawContext, renderCamera: Camera, renderQueue: RenderQueue) {

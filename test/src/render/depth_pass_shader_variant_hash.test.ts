@@ -30,7 +30,7 @@ describe('DepthPass does not inherit a stale shader variant hash', () => {
     setCameraUniforms.mockRestore();
   });
 
-  function renderItemsWith(shaderVariantHash: string | null) {
+  function renderItemsWith(shaderVariantHash: string | null, overrides: Record<string, unknown> = {}) {
     const pass = new DepthPass();
     const ctx = {
       shaderVariantHash,
@@ -38,10 +38,12 @@ describe('DepthPass does not inherit a stale shader variant hash', () => {
       drawEnvLight: true,
       env: {},
       motionVectors: true,
+      skinProfileId: false,
       renderPass: pass,
       camera: { worldMatrixDet: 1 },
       device: { setBindGroup: () => {}, getFramebuffer: () => null },
-      globalBindGroupAllocator: { getGlobalBindGroup: () => ({ setValue: () => {} }) }
+      globalBindGroupAllocator: { getGlobalBindGroup: () => ({ setValue: () => {} }) },
+      ...overrides
     } as Record<string, unknown>;
     // renderItems is protected and returns early unless the queue has an item list; empty lists are
     // enough to reach the hash assignments and draw nothing.
@@ -62,5 +64,17 @@ describe('DepthPass does not inherit a stale shader variant hash', () => {
     const ctx = renderItemsWith('LightPass::stale');
     expect(typeof ctx.renderPassHash).toBe('string');
     expect(ctx.renderPassHash).not.toBe('LightPass::stale');
+  });
+
+  test('the skin profile id target changes the key', () => {
+    // Same failure mode as the motion vector case above, one attachment further
+    // along: with a per-pixel skin profile id the prepass framebuffer carries a
+    // third target and the program declares a third fragment output. If the two
+    // variants hashed alike, a frame that switched skin scattering on or off
+    // would be handed the other variant's program and WebGPU would reject the
+    // draw on output count.
+    const without = renderItemsWith(null, { skinProfileId: false });
+    const with_ = renderItemsWith(null, { skinProfileId: true });
+    expect(with_.renderPassHash).not.toBe(without.renderPassHash);
   });
 });

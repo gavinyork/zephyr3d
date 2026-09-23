@@ -62,6 +62,15 @@ export interface DrawContext {
   motionVectors: boolean;
   /** Motion vector texture target when motion vectors are active. */
   motionVectorTexture?: Nullable<Texture2D>;
+  /**
+   * Whether the depth prepass carries a per-pixel skin profile id this frame.
+   *
+   * @remarks
+   * The id has to come out of the prepass rather than the light pass because the
+   * transmission thickness pass consumes it and runs first. UE5 reads the same
+   * thing from its GBuffer at shadow projection time.
+   */
+  skinProfileId: boolean;
   /** Whether hierarchical depth (Hi-Z) is enabled for the current pass. */
   HiZ: boolean;
   /** Hi-Z (hierarchical Z) depth texture, when generated. */
@@ -215,6 +224,15 @@ export interface DrawContext {
    * diffuse luminance in its alpha channel, matching UE5. Always `null`.
    */
   SkinSSSTexture: Nullable<Texture2D>;
+  /**
+   * Per-pixel skin profile id written by the depth prepass, `0` where the pixel
+   * is not skin.
+   *
+   * @remarks
+   * Normalized as `id / 255`, matching {@link SkinProfile.encodedId}, and stored
+   * in an `r8unorm` target so the round trip is exact.
+   */
+  SkinProfileIdTexture: Nullable<Texture2D>;
   /** Skin screen-space scattering is active this frame. */
   skinSSS: boolean;
   /** SSR SDF proxy uniform buffer (pair of vec4: min.xyz / max.xyz for each box). */

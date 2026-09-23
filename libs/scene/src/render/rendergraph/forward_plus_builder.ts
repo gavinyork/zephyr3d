@@ -25,7 +25,6 @@ import { DepthPass } from '../depthpass';
 import { ClusteredLight } from '../cluster_light';
 import { ShadowMaskRenderer } from '../shadow_mask_pass';
 import { TransmissionThicknessRenderer } from '../transmission_thickness_pass';
-import { SKIN_OPTICAL_DEPTH_PER_WORLD_UNIT, SkinProfile } from '../../material/skinprofile';
 import { buildHiZ, getHiZFormat } from '../hzb';
 import { CopyBlitter } from '../../blitter';
 import { fetchSampler } from '../../utility/misc';
@@ -70,6 +69,14 @@ const _transmissionThicknessRenderer = new TransmissionThicknessRenderer();
 const _waterCausticsRenderer = new WaterCausticsRenderer();
 const _underwaterRenderer = new UnderwaterRenderer();
 const _devicePoolAllocator = new DevicePoolAllocator();
+/**
+ * Clear value for the depth prepass's skin profile id target.
+ *
+ * @remarks
+ * 0 is "not skin". It has to differ from the depth target's clear, which is the
+ * far plane rather than an id.
+ */
+const SKIN_PROFILE_ID_CLEAR = new Vector4(0, 0, 0, 0);
 const _textureAffinityCaches = new WeakMap<
   Camera,
   { device: AbstractDevice; cache: RGTextureAffinityCache<Texture2D> }
@@ -133,57 +140,6 @@ function renderQueueHasActiveSSS(renderQueue: RenderQueue): boolean {
     }
   }
   return false;
-}
-
-/**
- * The skin profile the thickness pass measures against.
- *
- * @remarks
- * The pass runs before the light pass, so there is no per-pixel profile id to
- * read yet - UE5 takes one from its GBuffer, this pipeline has none at that
- * point. It therefore needs a single profile for the whole frame, and this
- * returns the first skin material's.
- *
- * That is a real limitation: a second character with a different profile shares
- * the first one's absorption and unit scale. It is still an improvement on what
- * it replaces - `SkinProfile.getDefault()`, a shared singleton nothing in the
- * editor can reach, which made `worldUnitScale` and `extinctionScale` inert for
- * transmission no matter what the material said.
- *
- * The limitation exists because the pass stores *optical depth* rather than
- * geometry, which is deliberate: it is the format UE5's
- * `DecodeOpticalDepthFromShadowMask` reads, and matching it keeps the consumer
- * side aligned. Storing raw thickness and letting the material apply its own
- * absorption would remove the limitation, but it would also diverge from the
- * reference, so it is not the route to take.
- *
- * The aligned way to close it is the one UE5 itself uses: a per-pixel profile id.
- * UE reads it from the GBuffer, which is available to it at shadow projection
- * time; here nothing has written one yet, because the id this pipeline produces
- * comes out of the light pass and that runs later. Carrying an id out of the
- * depth prepass instead would do it, and the shader side is already built - the
- * profile table's `ProfileColumn.Scaling` texel holds
- * `(worldUnitScale, scatterScale, extinctionScale, normalScale)`, i.e. exactly
- * what this function is standing in for, and skinsss.ts already samples that
- * table. Until a scene actually mixes profiles, the first one is enough.
- */
-function renderQueueSkinProfile(renderQueue: RenderQueue): SkinProfile {
-  const itemList = renderQueue.itemList;
-  if (itemList) {
-    const lists = [...itemList.opaque.lit, ...itemList.opaque.unlit];
-    for (const list of lists) {
-      for (const material of list.materialList) {
-        if (hasSkinSSSMaterialCore(material)) {
-          const profile = (getCoreMaterial(material) as { subsurfaceProfile?: SkinProfile | null } | null)
-            ?.subsurfaceProfile;
-          if (profile) {
-            return profile;
-          }
-        }
-      }
-    }
-  }
-  return SkinProfile.getDefault();
 }
 
 function renderQueueHasActiveSkinSSS(renderQueue: RenderQueue): boolean {
@@ -398,6 +354,15 @@ export interface ForwardPlusOptions {
   depthPrepass: boolean;
   /** Enable motion vectors (requires TAA or motionBlur). */
   motionVectors: boolean;
+  /**
+   * Carry a per-pixel skin profile id out of the depth prepass.
+   *
+   * @remarks
+   * Implied by {@link ForwardPlusOptions.skinSSS}. The id has to be produced this
+   * early because the transmission thickness pass reads it and runs before the
+   * light pass.
+   */
+  skinProfileId: boolean;
   /** Enable Hi-Z pyramid (for SSR ray tracing). */
   hiZ: boolean;
   /**
@@ -474,6 +439,9 @@ export function deriveForwardPlusOptions(
     needsTransmissionDepthForSSR: !!ssr && needSceneColor && !needSceneColorWithDepth,
     sss: !!sss,
     skinSSS: !!skinSSS,
+    // Driven entirely by skinSSS: the id exists to serve the diffusion and the
+    // transmission thickness pass, and both are gated on the same condition.
+    skinProfileId: !!skinSSS,
     fogPresents: !!scene.env.sky?.fogPresents
   };
 }
@@ -525,6 +493,7 @@ function resolveFrameResourceRequirements(
   }
 
   ctx.motionVectors = options.motionVectors;
+  ctx.skinProfileId = options.skinProfileId;
   ctx.HiZ = options.hiZ;
   ctx.SSGI = options.ssgi;
   ctx.screenSpaceShadowMask = options.shadowMask;
@@ -861,7 +830,12 @@ const WaterCausticsModule: RenderModule<FrameGraphContext> = {
 /** @internal */
 const DepthPrepassModule: RenderModule<FrameGraphContext> = {
   type: 'DepthPrepass',
-  writes: [FrameResources.LinearDepth, FrameResources.MotionVector, FrameResources.SceneDepthAttachment],
+  writes: [
+    FrameResources.LinearDepth,
+    FrameResources.MotionVector,
+    FrameResources.SceneDepthAttachment,
+    FrameResources.SkinProfileId
+  ],
   prepare: () => ({ enabled: true }),
   setup(fg: FrameGraphContext) {
     const { graph, ctx, frame, ordering, blackboard, options } = fg;
@@ -889,6 +863,16 @@ const DepthPrepassModule: RenderModule<FrameGraphContext> = {
             allocationKey: 'ForwardPlus.MotionVector'
           })
         : undefined;
+      // r8unorm is exact for this: the material writes `SkinProfile.encodedId`,
+      // i.e. `id / 255`, and the table holds 256 rows, so every representable id
+      // survives the round trip. 0 means "not skin".
+      const skinProfileIdHandle = options.skinProfileId
+        ? builder.createTexture({
+            format: 'r8unorm',
+            label: 'skinProfileId',
+            allocationKey: 'ForwardPlus.SkinProfileId'
+          })
+        : undefined;
       const finalDepthAttachment = ctx.finalFramebuffer?.getDepthAttachment();
       const externalDepthAttachment = finalDepthAttachment?.isTexture2D()
         ? (finalDepthAttachment as Texture2D)
@@ -905,11 +889,21 @@ const DepthPrepassModule: RenderModule<FrameGraphContext> = {
           });
       const depthAttachmentOrFormat =
         externalDepthAttachmentHandle ?? graphDepthAttachmentHandle ?? ctx.depthFormat;
+      // Order matters and has to agree with the fragment output declaration
+      // order in MeshMaterial._createProgram: linear depth, then the motion
+      // vector, then the profile id.
+      const prepassColorAttachments = [depthHandle];
+      if (motionVectorHandle) {
+        prepassColorAttachments.push(motionVectorHandle);
+      }
+      if (skinProfileIdHandle) {
+        prepassColorAttachments.push(skinProfileIdHandle);
+      }
       const depthFramebufferHandle = builder.createFramebuffer({
         label: 'DepthPrepassFramebuffer',
         width: ctx.renderWidth,
         height: ctx.renderHeight,
-        colorAttachments: motionVectorHandle ? [depthHandle, motionVectorHandle] : depthHandle,
+        colorAttachments: prepassColorAttachments.length === 1 ? depthHandle : prepassColorAttachments,
         depthAttachment: depthAttachmentOrFormat,
         ignoreDepthStencil: false
       });
@@ -948,6 +942,7 @@ const DepthPrepassModule: RenderModule<FrameGraphContext> = {
       return {
         depthHandle,
         motionVectorHandle,
+        skinProfileIdHandle,
         graphDepthAttachmentHandle,
         externalDepthAttachmentHandle,
         externalDepthAttachment,
@@ -960,6 +955,9 @@ const DepthPrepassModule: RenderModule<FrameGraphContext> = {
     blackboard.set(FrameResources.LinearDepth, result.depthHandle);
     if (result.motionVectorHandle) {
       blackboard.set(FrameResources.MotionVector, result.motionVectorHandle);
+    }
+    if (result.skinProfileIdHandle) {
+      blackboard.set(FrameResources.SkinProfileId, result.skinProfileIdHandle);
     }
     blackboard.set(
       FrameResources.SceneDepthAttachment,
@@ -1051,7 +1049,9 @@ const TransmissionThicknessModule: RenderModule<FrameGraphContext> = {
     const numLayers = ShadowMaskRenderer.getLayerCount(numShadowLights);
     const passResult = graph.addPass('TransmissionThicknessPass', (builder) => {
       const depthHandle = blackboard.expect(FrameResources.LinearDepth);
+      const skinProfileIdHandle = blackboard.expect(FrameResources.SkinProfileId);
       builder.read(depthHandle);
+      builder.read(skinProfileIdHandle);
       builder.read(depthPassResult.depthFramebufferHandle);
       const thicknessHandle = builder.createTexture({
         format: 'rgba8unorm',
@@ -1062,37 +1062,16 @@ const TransmissionThicknessModule: RenderModule<FrameGraphContext> = {
       builder.setExecute((rgCtx) => {
         const depthTex = rgCtx.getTexture<Texture2D>(depthHandle);
         const thicknessTex = rgCtx.getTexture<Texture2DArray>(thicknessHandle);
-        // One profile for the whole frame; see renderQueueSkinProfile for why,
-        // and for what it costs when two characters disagree.
-        const profile = renderQueueSkinProfile(renderQueue);
-        // World units to optical depth. The factor is derived from the baked
-        // transmission profile's own axis rather than picked, because the two
-        // have to agree exactly: see SKIN_OPTICAL_DEPTH_PER_WORLD_UNIT, which
-        // also records what it looks like when they do not.
-        //
-        // `worldUnitScale` is deliberately absent. It scales the profile's
-        // distances and the table's axis together, so it cancels out of the
-        // optical depth; UE5 keeps it out of `CalculateOpticalDepth` for the
-        // same reason. It still does its job of letting one profile drive a
-        // model authored at four times life size — just on the table side.
-        const opticalDepthScale = SKIN_OPTICAL_DEPTH_PER_WORLD_UNIT * profile.extinctionScale;
-        // UE5 shrinks by NormalScale * 0.5 in centimetres, scaled with the
-        // asset: on a larger model the features it has to clear are larger too,
-        // and so is the shadow-map depth quantisation it exists to escape.
-        const shrinkDistance = profile.normalScale * 0.5 * 0.01 * profile.worldUnitScale;
+        // Absorption and unit scale are per-pixel, read from the profile table
+        // against the id the depth prepass wrote. This is the arrangement UE5
+        // has, where shadow projection reads the profile id straight out of the
+        // GBuffer; it replaces a frame-wide "first skin material wins" guess
+        // that gave a second character the first one's absorption.
         _transmissionThicknessRenderer.render(
           ctx,
           depthTex,
+          rgCtx.getTexture<Texture2D>(skinProfileIdHandle),
           renderQueue.shadowedLights,
-          opticalDepthScale,
-          shrinkDistance,
-          // The same shrink expressed as optical depth. The shrink moves the
-          // sample point towards the light, so it under-measures the thickness by
-          // exactly itself; adding it back inside the clamp is what recovers the
-          // real thickness - so this is written as the product rather than as an
-          // equivalent constant, to keep it from drifting away from the scale
-          // above the way it already has once.
-          shrinkDistance * opticalDepthScale,
           (layer: number) =>
             rgCtx.createFramebuffer({
               width: thicknessTex.width,
@@ -1365,6 +1344,7 @@ const LightPassModule: RenderModule<FrameGraphContext> = {
     const hiZHandle = blackboard.get(FrameResources.HiZ);
     const sssProfileHandle = blackboard.get(FrameResources.SSSProfile);
     const sssParamHandle = blackboard.get(FrameResources.SSSParam);
+    const skinProfileIdHandle = blackboard.get(FrameResources.SkinProfileId);
     const sceneColorCopyHandle = blackboard.get(FrameResources.SceneColorCopy);
     const useFinalFramebufferAsIntermediate = fg.state.useFinalFramebufferAsIntermediate;
     const renderDepthAttachment = fg.state.renderDepthAttachment;
@@ -1478,6 +1458,12 @@ const LightPassModule: RenderModule<FrameGraphContext> = {
       if (sssParamHandle) {
         builder.read(sssParamHandle);
       }
+      // The diffusion post effect reaches this through ctx.SkinProfileIdTexture,
+      // so the read has to be declared here or the executor is free to recycle
+      // the prepass target before the effect samples it.
+      if (skinProfileIdHandle) {
+        builder.read(skinProfileIdHandle);
+      }
       const surfaceAttachmentCount = Number(options.sceneRoughness) + Number(options.sceneNormal);
       // Surface MRT products are exposed through blackboard handles.
       const sceneRoughnessHandle = options.sceneRoughness
@@ -1569,6 +1555,9 @@ const LightPassModule: RenderModule<FrameGraphContext> = {
           ? rgCtx.getTexture<Texture2D>(sssTransmissionHandle)
           : null;
         ctx.SkinSSSTexture = skinSSSHandle ? rgCtx.getTexture<Texture2D>(skinSSSHandle) : null;
+        ctx.SkinProfileIdTexture = skinProfileIdHandle
+          ? rgCtx.getTexture<Texture2D>(skinProfileIdHandle)
+          : null;
         const renderLightPass = () =>
           renderOpaqueScenePass(frame, sceneColorTex, sceneColorCopyTex, rgCtx, sceneColorFramebufferHandle);
         if (historyManager && lightHistoryReadBindings.length > 0) {
@@ -1784,7 +1773,11 @@ const CompositeTailModule: RenderModule<FrameGraphContext> = {
       blackboard.get(FrameResources.SceneNormal),
       blackboard.get(FrameResources.SSSDiffuse),
       blackboard.get(FrameResources.SSSTransmission),
-      blackboard.get(FrameResources.SkinSSS)
+      blackboard.get(FrameResources.SkinSSS),
+      // The diffusion reaches this one through ctx.SkinProfileIdTexture. Without
+      // the dependency the allocator is free to hand the prepass target to a
+      // later pass, and the effect then samples whatever that pass left behind.
+      blackboard.get(FrameResources.SkinProfileId)
     ]) {
       if (handle) {
         opaqueChainDeps.push(handle);
@@ -2038,6 +2031,7 @@ function buildForwardPlusGraphInternal(
   ctx.SSGIIrradianceHistoryTexture = null;
   ctx.SSGISurfaceHistoryTexture = null;
   ctx.SkinSSSTexture = null;
+  ctx.SkinProfileIdTexture = null;
   // ShadowMask sets this only when it produces a texture.
   ctx.shadowMaskTexture = null;
   ctx.transmissionThicknessTexture = null;
@@ -2331,6 +2325,27 @@ function renderSceneDepth(
       : _depthPass.encodeDepth
         ? new Vector4(0, 0, 0, 1)
         : new Vector4(1, 1, 1, 1);
+    // That clear value is chosen for the linear depth target, where 1 is the far
+    // plane. The profile id target needs the opposite: 0 means "not skin", and
+    // every other value addresses a real row of the profile table. Clearing it
+    // alongside the depth made each background texel read as profile 255, so a
+    // sampling disc wide enough to reach past the silhouette accepted those taps
+    // and averaged the background into the skin instead of rejecting it — as
+    // dark speckle, since only the pixels whose sequence happened to draw a
+    // long radius reached that far.
+    //
+    // Assigning clearColor above resets the per-target list, so this has to come
+    // after it; that also means a frame without the target cannot inherit a
+    // stale list.
+    if (!transmission && ctx.skinProfileId) {
+      const attachmentCount = depthFramebuffer!.getColorAttachments().length;
+      if (attachmentCount > 1) {
+        // The id is appended last; see DepthPrepassModule.
+        const clearColors: Nullable<Vector4>[] = new Array(attachmentCount).fill(_depthPass.clearColor);
+        clearColors[attachmentCount - 1] = SKIN_PROFILE_ID_CLEAR;
+        _depthPass.clearColors = clearColors;
+      }
+    }
     _depthPass.clearDepth = transmission ? null : DEPTH_CLEAR_VALUE;
     _depthPass.clearStencil = null;
     _depthPass.transmission = transmission;

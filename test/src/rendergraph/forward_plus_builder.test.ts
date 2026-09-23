@@ -92,7 +92,7 @@ function createMockRenderQueue(options: MockRenderQueueOptions) {
 }
 
 function createOptions(overrides: Partial<ForwardPlusOptions> = {}): ForwardPlusOptions {
-  return {
+  const merged = {
     depthPrepass: true,
     motionVectors: false,
     hiZ: false,
@@ -108,9 +108,16 @@ function createOptions(overrides: Partial<ForwardPlusOptions> = {}): ForwardPlus
     needsTransmissionDepthForSSR: false,
     sss: false,
     skinSSS: false,
+    skinProfileId: false,
     fogPresents: false,
     hiZNearest: false,
     ...overrides
+  };
+  // deriveForwardPlusOptions derives this from skinSSS, so a test that turns
+  // skin scattering on gets the profile id target too unless it says otherwise.
+  return {
+    ...merged,
+    skinProfileId: overrides.skinProfileId ?? merged.skinSSS
   };
 }
 

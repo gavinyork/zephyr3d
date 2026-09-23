@@ -18,8 +18,10 @@ import { ndcToShadowCoord } from '../shaders/shadow';
 import { SHADOW_MASK_LIGHTS_PER_LAYER } from './shadow_mask_pass';
 import {
   SKIN_MAX_TRANSMISSION_OPTICAL_DEPTH,
+  SKIN_OPTICAL_DEPTH_PER_WORLD_UNIT,
   SKIN_TRANSMISSION_OPTICAL_DEPTH_BIAS,
-  SKIN_TRANSMISSION_OPTICAL_DEPTH_FLOOR
+  SKIN_TRANSMISSION_OPTICAL_DEPTH_FLOOR,
+  SkinProfile
 } from '../material/skinprofile';
 import { fetchSampler } from '../utility/misc';
 
@@ -191,7 +193,7 @@ export class TransmissionThicknessRenderer {
   private readonly _invRenderSize: Vector2;
   private readonly _cameraPosition: Vector4;
   private readonly _cameraParams: Vector4;
-  private readonly _thicknessParams: Vector4;
+  private readonly _profileTexelSize: Vector2;
 
   constructor() {
     this._programs = new Map();
@@ -201,33 +203,32 @@ export class TransmissionThicknessRenderer {
     this._invRenderSize = new Vector2();
     this._cameraPosition = new Vector4();
     this._cameraParams = new Vector4();
-    this._thicknessParams = new Vector4();
+    this._profileTexelSize = new Vector2();
   }
 
   /**
    * Render light-space thickness for every transmission-enabled light.
    *
+   * @remarks
+   * Absorption and unit scale are resolved per pixel from the profile table,
+   * keyed by the id the depth prepass wrote. UE5 arranges it the same way — its
+   * shadow projection reads the subsurface profile id straight out of the
+   * GBuffer — and it is what lets two characters with different profiles share
+   * one pass.
+   *
    * @param ctx - Draw context, carrying `shadowMapInfo` for the lights.
    * @param depthTexture - Linear depth from the depth prepass.
+   * @param profileIdTexture - Per-pixel skin profile id from the depth prepass,
+   *   `0` where the pixel is not skin.
    * @param lights - Shadow-casting lights in clustered-buffer order, i.e. exactly
    *   the array {@link ShadowMaskRenderer.render} is given, so that ordinals agree.
-   * @param opticalDepthScale - World units to optical depth, `1000 × extinctionScale`
-   *   for a metre world unit and the profile's millimetre space.
-   * @param shrinkDistance - How far to pull the sample point back along the normal,
-   *   in world units.
-   * @param normalScaleBias - UE5's additive `NormalScale × 0.5` inside the clamp,
-   *   in optical depth. Pass `shrinkDistance × opticalDepthScale`: the shrink moves
-   *   the sample point towards the light, so it under-measures the thickness by
-   *   exactly itself, and adding it back here recovers it.
    * @param getLayerFramebuffer - Resolves the framebuffer for array layer `k`.
    */
   render(
     ctx: DrawContext,
     depthTexture: Texture2D,
+    profileIdTexture: Texture2D,
     lights: PunctualLight[],
-    opticalDepthScale: number,
-    shrinkDistance: number,
-    normalScaleBias: number,
     getLayerFramebuffer: (layer: number) => FrameBuffer
   ): void {
     const device = ctx.device;
@@ -235,10 +236,14 @@ export class TransmissionThicknessRenderer {
     if (numLights === 0 || !ctx.shadowMapInfo) {
       return;
     }
+    const profileTable = SkinProfile.getTable(device);
+    if (!profileTable) {
+      return;
+    }
     const numLayers = Math.ceil(numLights / SHADOW_MASK_LIGHTS_PER_LAYER);
     const channelStates = this.getChannelStates(device);
     const savedShadowLight = ctx.currentShadowLight;
-    this._thicknessParams.setXYZW(opticalDepthScale, shrinkDistance, normalScaleBias, 0);
+    this._profileTexelSize.setXY(1 / SkinProfile.tableColumns, 1 / SkinProfile.tableRows);
 
     device.pushDeviceStates();
     for (let layer = 0; layer < numLayers; layer++) {
@@ -257,7 +262,14 @@ export class TransmissionThicknessRenderer {
           continue;
         }
         ctx.currentShadowLight = light;
-        this.renderLightChannel(ctx, depthTexture, shadowMapParams!, channelStates[channel]);
+        this.renderLightChannel(
+          ctx,
+          depthTexture,
+          profileIdTexture,
+          profileTable,
+          shadowMapParams!,
+          channelStates[channel]
+        );
       }
     }
     device.popDeviceStates();
@@ -267,6 +279,8 @@ export class TransmissionThicknessRenderer {
   private renderLightChannel(
     ctx: DrawContext,
     depthTexture: Texture2D,
+    profileIdTexture: Texture2D,
+    profileTable: Texture2D,
     shadowMapParams: ShadowMapParams,
     renderState: RenderStateSet
   ): void {
@@ -279,7 +293,7 @@ export class TransmissionThicknessRenderer {
       this._bindGroups.set(key, device.createBindGroup(program.bindGroupLayouts[0]));
     }
     const bindGroup = this._bindGroups.get(key)!;
-    this.setUniforms(bindGroup, ctx, depthTexture, shadowMapParams);
+    this.setUniforms(bindGroup, ctx, depthTexture, profileIdTexture, profileTable, shadowMapParams);
     device.setProgram(program);
     device.setBindGroup(0, bindGroup);
     drawFullscreenQuad(renderState);
@@ -310,6 +324,8 @@ export class TransmissionThicknessRenderer {
     bindGroup: BindGroup,
     ctx: DrawContext,
     depthTexture: Texture2D,
+    profileIdTexture: Texture2D,
+    profileTable: Texture2D,
     shadowMapParams: ShadowMapParams
   ): void {
     const camera = ctx.camera;
@@ -349,10 +365,14 @@ export class TransmissionThicknessRenderer {
     });
     bindGroup.setValue('invViewProjMatrix', camera.invViewProjectionMatrix);
     bindGroup.setValue('cameraNearFar', this._nearFar);
-    bindGroup.setValue('thicknessParams', this._thicknessParams);
+    bindGroup.setValue('profileTexelSize', this._profileTexelSize);
     this._invRenderSize.setXY(1 / depthTexture.width, 1 / depthTexture.height);
     bindGroup.setValue('invRenderSize', this._invRenderSize);
     bindGroup.setTexture('depthTex', depthTexture, fetchSampler('clamp_nearest_nomip'));
+    bindGroup.setTexture('profileIdTex', profileIdTexture, fetchSampler('clamp_nearest_nomip'));
+    // rgba32f, so WebGPU only accepts a non-filtering sampler; every read is a
+    // single texel anyway.
+    bindGroup.setTexture('profileTex', profileTable, fetchSampler('clamp_nearest_nomip'));
     // Sampled through textureLoad only, so no sampler is bound for it.
     bindGroup.setTexture(
       UNIFORM_NAME_SHADOW_DEPTH,
@@ -422,13 +442,21 @@ export class TransmissionThicknessRenderer {
           .uniform(0)
           .noSampler();
         this.depthTex = pb.tex2D().sampleType('unfilterable-float').uniform(0);
+        this.profileIdTex = pb.tex2D().uniform(0);
+        // rgba32f, hence unfilterable; every read here is a single texel.
+        this.profileTex = pb.tex2D().sampleType('unfilterable-float').uniform(0);
         this.invViewProjMatrix = pb.mat4().uniform(0);
         this.cameraNearFar = pb.vec2().uniform(0);
         this.invRenderSize = pb.vec2().uniform(0);
-        // x: world units to optical depth, y: normal shrink distance,
-        // z: UE5's additive NormalScale * 0.5, w: unused
-        this.thicknessParams = pb.vec4().uniform(0);
+        this.profileTexelSize = pb.vec2().uniform(0);
         this.$outputs.color = pb.vec4();
+        // One texel of a profile row, addressed exactly as skin_brdf.ts does:
+        // the row is the normalized id and the column is a parameter group.
+        pb.func('zReadProfile', [pb.float('id'), pb.float('column')], function () {
+          this.$l.u = pb.mul(pb.add(this.column, 0.5), this.profileTexelSize.x);
+          this.$l.v = pb.mul(pb.add(pb.mul(pb.clamp(this.id, 0, 1), 255), 0.5), this.profileTexelSize.y);
+          this.$return(pb.textureSampleLevel(this.profileTex, pb.vec2(this.u, this.v), 0));
+        });
         /**
          * Geometric normal from the depth prepass. Transcribed from
          * ShadowMaskRenderer: a fullscreen pass has no interpolated normal, and
@@ -515,6 +543,42 @@ export class TransmissionThicknessRenderer {
           );
           // 1 = no material in the way. Background pixels keep it.
           this.$outputs.color = pb.vec4(1);
+          // Only skin has a profile to measure against, and the id is the thing
+          // that says so. Leaving non-skin pixels at the sentinel is not just an
+          // optimization: profile row 0 is all zeros, so an extinction scale of 0
+          // would put the optical depth on its floor and the pixel would encode
+          // as the *thinnest* possible rather than as "no data".
+          this.$l.profileId = pb.textureSampleLevel(this.profileIdTex, this.$inputs.uv, 0).r;
+          this.$if(pb.lessThan(this.profileId, 0.5 / 255), function () {
+            this.$return();
+          });
+          // (extinctionScale, normalScale, scatteringDistribution, 1 / ior)
+          this.$l.trParams = this.zReadProfile(this.profileId, pb.float(SkinProfile.transmissionParamColumn));
+          // (worldUnitScale, scatterScale, 0, 0)
+          this.$l.scalingParams = this.zReadProfile(this.profileId, pb.float(SkinProfile.scalingParamColumn));
+          // World units to optical depth. The factor is derived from the baked
+          // transmission profile's own axis rather than picked, because the two
+          // have to agree exactly: see SKIN_OPTICAL_DEPTH_PER_WORLD_UNIT, which
+          // also records what it looks like when they do not.
+          //
+          // `worldUnitScale` is deliberately absent here. It scales the profile's
+          // distances and the table's axis together, so it cancels out of the
+          // optical depth; UE5 keeps it out of `CalculateOpticalDepth` for the
+          // same reason. It still does its job of letting one profile drive a
+          // model authored at four times life size — just on the table side, and
+          // in the shrink distance below.
+          this.$l.opticalDepthScale = pb.mul(SKIN_OPTICAL_DEPTH_PER_WORLD_UNIT, this.trParams.x);
+          // UE5 shrinks by NormalScale * 0.5 in centimetres, scaled with the
+          // asset: on a larger model the features it has to clear are larger too,
+          // and so is the shadow-map depth quantisation it exists to escape.
+          this.$l.shrinkDistance = pb.mul(this.trParams.y, 0.5 * 0.01, this.scalingParams.x);
+          // The same shrink expressed as optical depth. The shrink moves the
+          // sample point towards the light, so it under-measures the thickness by
+          // exactly itself; adding it back inside the clamp is what recovers the
+          // real thickness — so this stays written as the product rather than as
+          // an equivalent constant, to keep it from drifting away from the scale
+          // above the way it already has once.
+          this.$l.normalScaleBias = pb.mul(this.shrinkDistance, this.opticalDepthScale);
           this.$if(pb.lessThan(this.pos.w, 1), function () {
             this.$l.normal = this.zReconstructNormal(this.$inputs.uv, this.pos);
             this.$l.split = pb.int(0);
@@ -533,7 +597,7 @@ export class TransmissionThicknessRenderer {
             }
             // UE5 pulls the sample point back along the normal before projecting
             // it. Without this the surface occludes itself and the thickness is
-            // identically zero. `thicknessParams.z` adds the optical depth this
+            // identically zero. `normalScaleBias` adds the optical depth this
             // costs back inside the clamp.
             //
             // The shadow map's own normal offset — `ShaderHelper
@@ -547,7 +611,7 @@ export class TransmissionThicknessRenderer {
             // collapsed to two flat levels, saturated on one side of the
             // terminator and floored on the other, which is the feature failing
             // silently: the profile no longer varies with geometry at all.
-            this.$l.shrunk = pb.sub(this.pos.xyz, pb.mul(this.normal, this.thicknessParams.y));
+            this.$l.shrunk = pb.sub(this.pos.xyz, pb.mul(this.normal, this.shrinkDistance));
             this.$l.sv = ShaderHelper.calculateShadowSpaceVertex(
               this,
               pb.vec4(this.shrunk, 1),
@@ -664,9 +728,9 @@ export class TransmissionThicknessRenderer {
                 // entirely. `abs()` turned exactly those taps into the largest
                 // possible thickness, which is what produced the bright fringe
                 // along every silhouette.
-                this.$l[`o${i}`] = pb.mul(this[`t${i}`], this.thicknessParams.x);
+                this.$l[`o${i}`] = pb.mul(this[`t${i}`], this.opticalDepthScale);
                 this.$l[`k${i}`] = pb.clamp(
-                  pb.max(pb.add(this[`o${i}`], this.thicknessParams.z), 0),
+                  pb.max(pb.add(this[`o${i}`], this.normalScaleBias), 0),
                   SKIN_TRANSMISSION_OPTICAL_DEPTH_FLOOR,
                   MAX_TRANSMISSION_OPTICAL_DEPTH
                 );

@@ -99,10 +99,20 @@ export const skinSss: VisualScene = {
 
     camera.skinSSS = true;
     // The sphere is 1.5 units across, so the diffusion is scaled up from human
-    // skin to read at this size. The extent lives on the profile now; the camera
-    // value is only a multiplier on the sampling disc.
+    // skin to read at this size. The extent lives entirely on the profile.
+    //
+    // 1.4 rather than the 0.35 this used to carry. The diffusion converts a
+    // world radius to UV by dividing through the view depth, and that divide was
+    // inverted until recently - a perspective camera got 1 instead of the depth,
+    // so the disc came out scaled by the camera distance. At the 4.0 units this
+    // sphere's surface sits at, the old 0.35 therefore rendered as 25 px of
+    // scattering rather than the 6 px it asks for. The factor of four is put
+    // back here so the scene keeps the footprint its baseline was authored
+    // around; without it the two diffusion scenes land within 10% of each other
+    // and stop telling the per-channel radii apart, which is the whole point of
+    // the pair.
     material.subsurfaceProfile = new SkinProfile('skin');
-    material.subsurfaceProfile.meanFreePathDistance = 0.35;
+    material.subsurfaceProfile.meanFreePathDistance = 1.4;
   }
 };
 
@@ -145,8 +155,12 @@ export const skinDiffusionJade: VisualScene = {
     material.transmissionStrength = 0.6;
     // The profile lives on the material now, so the channel ratios are a
     // per-mesh property rather than a property of the whole pass.
+    //
+    // Kept equal to `skin-sss`'s distance, so that a diff between the two scenes
+    // isolates the channel ratios and nothing else. See the note there for why
+    // it is 1.4 rather than the 0.35 it used to be.
     const jade = new SkinProfile('jade');
-    jade.meanFreePathDistance = 0.35;
+    jade.meanFreePathDistance = 1.4;
     material.subsurfaceProfile = jade;
     const head = new Mesh(scene, new SphereShape({ radius: 1.5 }), material);
     head.position.setXYZ(0, 0, 0);

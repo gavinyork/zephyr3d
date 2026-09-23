@@ -1,4 +1,4 @@
-import type { BindGroup, PBFunctionScope, RenderStateSet } from '@zephyr3d/device';
+import type { BindGroup, PBFunctionScope, PBInsideFunctionScope, RenderStateSet } from '@zephyr3d/device';
 import { Vector2, Vector3, type Clonable } from '@zephyr3d/base';
 import { MeshMaterial, applyMaterialMixins } from './meshmaterial';
 import { mixinLight } from './mixins/lit';
@@ -6,7 +6,12 @@ import { mixinVertexColor } from './mixins/vertexcolor';
 import { mixinTextureProps } from './mixins/texture';
 import { ShaderHelper } from './shader/helper';
 import type { DrawContext } from '../render';
-import { LIGHT_TYPE_POINT, MaterialVaryingFlags, RENDER_PASS_TYPE_LIGHT } from '../values';
+import {
+  LIGHT_TYPE_POINT,
+  MaterialVaryingFlags,
+  RENDER_PASS_TYPE_DEPTH,
+  RENDER_PASS_TYPE_LIGHT
+} from '../values';
 import {
   skinDiffuseBRDF,
   skinDualLobeSpecular,
@@ -286,12 +291,26 @@ export class SkinMaterial
     super.fragmentShader(scope);
     const pb = scope.$builder;
     const that = this;
+    const lightPass = this.drawContext.renderPass!.type === RENDER_PASS_TYPE_LIGHT;
+    // The prepass writes the id into the target the thickness pass and the
+    // diffusion both read.
+    //
+    // Declared outside `needFragmentColorInput`, deliberately. That predicate is
+    // false in the prepass for an ordinary opaque material — it only turns true
+    // there for alpha-tested or alpha-to-coverage ones (MeshMaterial
+    // .needFragmentColor) — so a declaration inside it would silently leave the
+    // uniform undefined and the prepass would write id 0 for every skin pixel,
+    // turning the whole feature off with nothing to show for it.
+    const depthPassProfileId =
+      this.drawContext.renderPass!.type === RENDER_PASS_TYPE_DEPTH && this.drawContext.skinProfileId;
+    if (lightPass || depthPassProfileId) {
+      scope.zSkinProfileId = pb.float().uniform(2);
+    }
     if (this.needFragmentColorInput()) {
-      if (this.drawContext.renderPass!.type === RENDER_PASS_TYPE_LIGHT) {
+      if (lightPass) {
         scope.zSkinRoughness = pb.float().uniform(2);
         scope.zSkinSpecularF0 = pb.float().uniform(2);
         scope.zSkinLobeParams = pb.vec3().uniform(2);
-        scope.zSkinProfileId = pb.float().uniform(2);
         // Transmission is compiled in only when the thickness it needs exists.
         // The flag is part of the shader's cache key (render/lightpass.ts), and
         // it also guards against the per-light additive path, which has no
@@ -536,24 +555,27 @@ export class SkinMaterial
         // fraction as `saturate(SceneColor.a / luma(SceneColor.rgb))`, so the
         // alpha must carry the *diffuse* luminance, not the specular one.
         scope.$l.diffLum = pb.dot(scope.diffusible, pb.vec3(0.2126, 0.7152, 0.0722));
-        // Surface data for the SSS passes: rgb = world normal, a = skin mask.
+        // Surface data for the SSS passes: rgb = world normal, a = subsurface
+        // opacity.
         //
         // SceneColor.a cannot serve as the mask, because every opaque material
         // writes 1 there — gating on it makes the diffusion treat the background
-        // and the eyes as skin and bleed into them. This channel plays the role
-        // of UE5's Subsurface.ProfileIdTexture.
+        // and the eyes as skin and bleed into them.
         //
         // The normal rides along so the diffusion can weight taps by how much
         // the surface has turned away (UE5 PassOne_Burley lines 323-325). Keeping
         // it here rather than reading SceneNormal makes scattering independent of
         // whether the optional normal MRT is enabled this frame.
-        // a carries the profile id, scaled by the mask so that unmasked pixels
-        // read back as id 0 ("not skin"). The diffusion recovers both from this
-        // single channel, which is how UE5 drives several profiles from one pass.
-        scope.$l.skinSSSMask = pb.vec4(
-          pb.add(pb.mul(scope.normal, 0.5), pb.vec3(0.5)),
-          pb.mul(scope.zSkinProfileId, scope.skinMask)
-        );
+        //
+        // The alpha is UE5's Opacity input, unmodified: a continuous 0..1 mask
+        // where 0 is no scattering and 1 is full scattering. It used to be
+        // multiplied by the profile id and the product served as both, which only
+        // worked for a binary mask — the diffusion addresses the profile table by
+        // this value directly, so an opacity of 0.5 selected a *different*
+        // profile's row rather than scattering at half strength. The id now comes
+        // out of the depth prepass instead (ctx.SkinProfileIdTexture), which is
+        // also where the transmission thickness pass can reach it.
+        scope.$l.skinSSSMask = pb.vec4(pb.add(pb.mul(scope.normal, 0.5), pb.vec3(0.5)), scope.skinMask);
         if (
           this.drawContext.materialFlags &
           (MaterialVaryingFlags.SCENE_STORE_ROUGHNESS | MaterialVaryingFlags.SCENE_STORE_NORMAL)
@@ -598,22 +620,44 @@ export class SkinMaterial
     }
   }
 
+  /**
+   * The profile id the depth prepass writes for this material.
+   *
+   * @remarks
+   * Overrides {@link MeshMaterial.getDepthPassProfileId}. The uniform is declared
+   * in {@link SkinMaterial.fragmentShader} for the prepass as well as the light
+   * pass, and bound below.
+   */
+  protected getDepthPassProfileId(scope: PBInsideFunctionScope) {
+    return scope.zSkinProfileId;
+  }
+
   applyUniformValues(bindGroup: BindGroup, ctx: DrawContext, pass: number) {
     super.applyUniformValues(bindGroup, ctx, pass);
-    if (this.needFragmentColor(ctx) && ctx.renderPass!.type === RENDER_PASS_TYPE_LIGHT) {
-      bindGroup.setValue('zSkinRoughness', this._roughness);
-      bindGroup.setValue('zSkinSpecularF0', this._specularF0);
-      const profile = this.effectiveProfile;
-      bindGroup.setValue('zSkinLobeParams', this._lobeParams.setXYZ(profile.roughness0, profile.roughness1, profile.lobeMix));
-      bindGroup.setValue('zSkinProfileId', profile.encodedId);
-      if (ctx.transmissionThickness) {
-        bindGroup.setValue('zSkinTransmissionStrength', this._transmissionStrength);
-        const table = SkinProfile.getTable(ctx.device);
-        if (table) {
-          bindGroup.setTexture('zSkinProfileTex', table, fetchSampler('clamp_nearest_nomip'));
-          this._profileTexelSize.setXY(1 / SkinProfile.tableColumns, 1 / SkinProfile.tableRows);
-          bindGroup.setValue('zSkinProfileTexelSize', this._profileTexelSize);
-        }
+    const lightPass = ctx.renderPass!.type === RENDER_PASS_TYPE_LIGHT;
+    const depthPassProfileId = ctx.renderPass!.type === RENDER_PASS_TYPE_DEPTH && ctx.skinProfileId;
+    // Not gated on needFragmentColor: the prepass declares this uniform for
+    // every skin material, including the opaque ones that predicate excludes.
+    if (lightPass || depthPassProfileId) {
+      bindGroup.setValue('zSkinProfileId', this.effectiveProfile.encodedId);
+    }
+    if (!this.needFragmentColor(ctx) || !lightPass) {
+      return;
+    }
+    bindGroup.setValue('zSkinRoughness', this._roughness);
+    bindGroup.setValue('zSkinSpecularF0', this._specularF0);
+    const profile = this.effectiveProfile;
+    bindGroup.setValue(
+      'zSkinLobeParams',
+      this._lobeParams.setXYZ(profile.roughness0, profile.roughness1, profile.lobeMix)
+    );
+    if (ctx.transmissionThickness) {
+      bindGroup.setValue('zSkinTransmissionStrength', this._transmissionStrength);
+      const table = SkinProfile.getTable(ctx.device);
+      if (table) {
+        bindGroup.setTexture('zSkinProfileTex', table, fetchSampler('clamp_nearest_nomip'));
+        this._profileTexelSize.setXY(1 / SkinProfile.tableColumns, 1 / SkinProfile.tableRows);
+        bindGroup.setValue('zSkinProfileTexelSize', this._profileTexelSize);
       }
     }
   }

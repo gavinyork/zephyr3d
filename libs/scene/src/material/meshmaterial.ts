@@ -1119,6 +1119,12 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
             this.$outputs.zMotionVector = pb.vec4();
             this.zTAAStrength = pb.float().uniform(2);
           }
+          // Declared after the motion vector, because the declaration order is
+          // the MRT order and the prepass framebuffer appends this attachment
+          // last (render/rendergraph/forward_plus_builder.ts, DepthPrepassModule).
+          if (ctx.renderPass!.type === RENDER_PASS_TYPE_DEPTH && ctx.skinProfileId) {
+            this.$outputs.zSkinProfileId = pb.vec4();
+          }
           if (ctx.renderPass!.type === RENDER_PASS_TYPE_OBJECT_COLOR) {
             this.$outputs.zDistance = pb.vec4();
           }
@@ -1129,6 +1135,26 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
       }
     });
     return program;
+  }
+  /**
+   * Per-pixel subsurface profile id this material contributes to the depth prepass.
+   *
+   * @remarks
+   * Returning `null` (the default) means "not skin", which is what every material
+   * other than {@link SkinMaterial} wants. The value is the normalized id, i.e.
+   * `SkinProfile.encodedId`.
+   *
+   * This lives on the prepass rather than the light pass because the transmission
+   * thickness pass needs it and runs earlier; it is also what lets the skin mask
+   * buffer's alpha carry the subsurface opacity instead of being shared between
+   * the two.
+   *
+   * @param scope - Inside-function shader scope.
+   * @returns Normalized profile id expression, or `null` for non-skin materials.
+   */
+  protected getDepthPassProfileId(scope: PBInsideFunctionScope): Nullable<PBShaderExp> {
+    void scope;
+    return null;
   }
   /**
    * Centralized final color write and per-pass output composition.
@@ -1346,6 +1372,14 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
               this.$outputs.zMotionVector = pb.vec4(0, 0, 1, 1);
             }
           }
+        }
+        if (that.drawContext.skinProfileId) {
+          // Every material submitted to the prepass writes this attachment, so
+          // the ones that are not skin have to write the "no profile" id rather
+          // than leave it undefined - the target is shared and a stale texel
+          // would be read as a real profile row.
+          const profileId = that.getDepthPassProfileId(this);
+          this.$outputs.zSkinProfileId = pb.vec4(profileId ?? pb.float(0));
         }
       } else if (that.drawContext.renderPass!.type === RENDER_PASS_TYPE_OBJECT_COLOR) {
         if (color) {
