@@ -906,7 +906,7 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
    * @remarks
    * Opaque geometry normally forces `SceneColor.a` to 1, since nothing reads it.
    * A material that encodes data there for a later screen-space pass — as
-   * {@link SkinMaterial} does with its diffuse luminance — overrides this to opt
+   * {@link SSSMaterial} does with its diffuse luminance — overrides this to opt
    * out. Only affects opaque passes; transparent alpha handling is unchanged.
    *
    * @param ctx - The current draw context.
@@ -1141,7 +1141,7 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
    *
    * @remarks
    * `null` (the default) means "not skin", which is what every material other than
-   * {@link SkinMaterial} wants; otherwise the normalized `SkinProfile.encodedId`.
+   * {@link SSSMaterial} wants; otherwise the normalized `SkinProfile.encodedId`.
    *
    * It lives on the prepass rather than the light pass because the transmission
    * thickness pass needs it and runs earlier, and because that frees the skin mask

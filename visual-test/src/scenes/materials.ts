@@ -4,7 +4,7 @@ import {
   HairMaterial,
   Mesh,
   PlaneShape,
-  SkinMaterial,
+  SSSMaterial,
   SphereShape,
   UnlitMaterial
 } from '@zephyr3d/scene';
@@ -69,7 +69,7 @@ export const pbrMetalRoughGrid: VisualScene = {
 export const skinSss: VisualScene = {
   name: 'skin-sss',
   description:
-    'SkinMaterial sphere under a grazing key with SkinSSS enabled. Pins the diffuse wrap and the channel-dependent diffusion across a wide terminator.',
+    'SSSMaterial sphere under a grazing key with SkinSSS enabled. Pins the diffuse wrap and the channel-dependent diffusion across a wide terminator.',
   setup({ scene, camera }) {
     bareScene(scene);
     // Grazing key from the left, so the terminator runs down the middle of the
@@ -84,7 +84,7 @@ export const skinSss: VisualScene = {
     rim.lookAt(new Vector3(1.5, 1, -5), Vector3.zero(), Vector3.axisPY());
     rim.color = new Vector4(0.35, 0.22, 0.2, 1);
 
-    const material = new SkinMaterial();
+    const material = new SSSMaterial();
     material.albedoColor = new Vector4(0.85, 0.66, 0.58, 1);
     material.transmissionStrength = 0.6;
     const head = new Mesh(scene, new SphereShape({ radius: 1.5 }), material);
@@ -143,7 +143,7 @@ export const skinDiffusionJade: VisualScene = {
     rim.lookAt(new Vector3(1.5, 1, -5), Vector3.zero(), Vector3.axisPY());
     rim.color = new Vector4(0.35, 0.22, 0.2, 1);
 
-    const material = new SkinMaterial();
+    const material = new SSSMaterial();
     material.albedoColor = new Vector4(0.85, 0.66, 0.58, 1);
     material.transmissionStrength = 0.6;
     // The profile lives on the material now, so the channel ratios are a
@@ -164,11 +164,11 @@ export const skinDiffusionJade: VisualScene = {
  * Skin under a shadow-casting light, which `skin-sss` deliberately is not.
  *
  * That scene lights its sphere with `keyLight`, whose `castShadow` defaults to
- * false, so every shadow-dependent line in SkinMaterial is dead code there -
+ * false, so every shadow-dependent line in SSSMaterial is dead code there -
  * the material's whole shadow path went untested until this scene existed.
  *
  * The terminator is where skin shows shadow bugs that other materials hide.
- * SkinMaterial mixes a wrapped diffuse into the visible lighting, so the band
+ * SSSMaterial mixes a wrapped diffuse into the visible lighting, so the band
  * around NdotL = 0 still receives roughly 10% of full diffuse; a Lambert surface
  * multiplies the same band by a vanishing NdotL and swallows the evidence.
  * Grazing-angle self-shadow acne is therefore plainly visible here and nearly
@@ -192,7 +192,7 @@ export const skinDiffusionJade: VisualScene = {
 export const skinShadow: VisualScene = {
   name: 'skin-shadow',
   description:
-    'SkinMaterial sphere under a grazing shadow-casting light, with a spherical occluder casting across its lit side. Pins the self-shadow terminator and a cast shadow whose edge must stay elliptical; skin-sss cannot see either, since its light casts no shadow.',
+    'SSSMaterial sphere under a grazing shadow-casting light, with a spherical occluder casting across its lit side. Pins the self-shadow terminator and a cast shadow whose edge must stay elliptical; skin-sss cannot see either, since its light casts no shadow.',
   setup({ scene, camera }) {
     bareScene(scene);
     // A little ambient, so the shadowed side is readable rather than pure black
@@ -206,7 +206,7 @@ export const skinShadow: VisualScene = {
     light.shadow.mode = 'pcf';
     light.shadow.numShadowCascades = 1;
 
-    const material = new SkinMaterial();
+    const material = new SSSMaterial();
     material.albedoColor = new Vector4(0.85, 0.66, 0.58, 1);
     // The profile is left at its default, whose mean free path is sub-pixel on a
     // sphere this size, so the diffusion the engine now runs automatically cannot

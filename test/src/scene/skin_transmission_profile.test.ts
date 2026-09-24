@@ -1,5 +1,6 @@
-import { SkinMaterial, SkinProfile } from '@zephyr3d/scene';
+import { SSSMaterial } from '../../../libs/scene/src/material/skin';
 import {
+  SkinProfile,
   SKIN_MAX_TRANSMISSION_OPTICAL_DEPTH,
   SKIN_OPTICAL_DEPTH_PER_WORLD_UNIT
 } from '../../../libs/scene/src/material/skinprofile';
@@ -23,9 +24,9 @@ import { Vector3 } from '@zephyr3d/base';
  * the rows leaking. These tests only want a bag of parameters, so the materials
  * are kept alive for the file's duration and disposed together at the end.
  */
-const materials: SkinMaterial[] = [];
+const materials: SSSMaterial[] = [];
 function profile(preset: 'skin' = 'skin'): SkinProfile {
-  const material = new SkinMaterial();
+  const material = new SSSMaterial();
   material.subsurfaceProfile.preset = preset;
   materials.push(material);
   return material.subsurfaceProfile;

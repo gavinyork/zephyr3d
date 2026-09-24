@@ -830,7 +830,7 @@ export class SkinSSS extends AbstractPostEffect {
               // The diffusion buffer's alpha is the subsurface opacity, not a
               // transmission term - nothing in this pipeline produces one here.
               // UE5's transmission likewise comes from SubsurfaceProfileBxDF per
-              // light, and the back-lit term on SkinMaterial that stands in for
+              // light, and the back-lit term on SSSMaterial that stands in for
               // it is already part of SceneColor.
               this.$l.diffused = pb.textureSampleLevel(this.bvarTex, this.uv, 0).rgb;
               // Straight sum, as UE5 does it. No blend weight or tint: how far and

@@ -1,4 +1,4 @@
-import { SkinMaterial } from '@zephyr3d/scene';
+import { SSSMaterial } from '../../../libs/scene/src/material/skin';
 
 /**
  * These pin the direct-lighting BRDF against UE5's `SubsurfaceProfileBxDF`.
@@ -85,7 +85,7 @@ describe('Skin BRDF', () => {
     // doubles every lobe and saturates the wide one at moderate roughness, which
     // flattens the highlight away.
     for (const preset of ['skin', 'skin_pale', 'skin_tan', 'skin_dark'] as const) {
-      const mat = new SkinMaterial();
+      const mat = new SSSMaterial();
       const p = mat.subsurfaceProfile;
       p.preset = preset;
       expect(p.roughness0).toBeGreaterThanOrEqual(0.5);
@@ -153,7 +153,7 @@ describe('Skin BRDF', () => {
   });
 
   test('material defaults match UE5', () => {
-    const mat = new SkinMaterial();
+    const mat = new SSSMaterial();
     // UE5's material defaults: Roughness 0.5, Specular 0.5, and
     // F0 = DielectricSpecularToF0(Specular) = 0.08 * 0.5.
     expect(mat.roughness).toBeCloseTo(0.5, 6);
@@ -161,7 +161,7 @@ describe('Skin BRDF', () => {
   });
 
   test('default roughness keeps both lobes off the clamps', () => {
-    const mat = new SkinMaterial();
+    const mat = new SSSMaterial();
     const p = mat.subsurfaceProfile;
     const [narrow, wide] = lobes(mat.roughness, 1, p.roughness0, p.roughness1);
     expect(narrow).toBeGreaterThan(0.02);

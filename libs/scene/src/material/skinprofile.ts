@@ -378,7 +378,7 @@ const SKIN_PROFILE_TEMPLATES: Record<SkinProfilePreset, SkinProfileTemplate> = {
 };
 
 /**
- * Subsurface profile for {@link SkinMaterial}, holding the parameters UE5's
+ * Subsurface profile for {@link SSSMaterial}, holding the parameters UE5's
  * Burley diffusion is driven by.
  *
  * @remarks
@@ -421,7 +421,7 @@ export class SkinProfile {
   private readonly _changeListeners: Set<() => void>;
 
   /**
-   * Not constructible from outside. Use {@link SkinMaterial.subsurfaceProfile},
+   * Not constructible from outside. Use {@link SSSMaterial.subsurfaceProfile},
    * which owns one for the material's lifetime.
    *
    * @remarks
@@ -435,7 +435,7 @@ export class SkinProfile {
   private constructor(token: typeof CREATE_TOKEN, preset: SkinProfilePreset = 'skin') {
     if (token !== CREATE_TOKEN) {
       throw new Error(
-        'SkinProfile is not constructible directly; it is owned by the SkinMaterial that created it.'
+        'SkinProfile is not constructible directly; it is owned by the SSSMaterial that created it.'
       );
     }
     this._surfaceAlbedo = new Vector3();
@@ -486,7 +486,7 @@ export class SkinProfile {
    *
    * @remarks
    * The only way to obtain one. The caller takes on releasing its table row — in
-   * practice {@link SkinMaterial}, which disposes the profile with itself.
+   * practice {@link SSSMaterial}, which disposes the profile with itself.
    *
    * @param preset - Preset to start from. Defaults to `'skin'`.
    * @returns The new profile.
@@ -815,7 +815,7 @@ export class SkinProfile {
    * UE5's `IOR`, default 1.55 for skin, stored in the table as `1 / ior` since
    * that is the form `refract` takes. This drives transmission only — the
    * specular Fresnel stays on the dielectric `F0 = 0.08 * Specular` mapping, as
-   * {@link SkinMaterial.specularF0} notes.
+   * {@link SSSMaterial.specularF0} notes.
    *
    * @public
    */

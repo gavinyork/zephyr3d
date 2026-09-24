@@ -53,9 +53,9 @@ export const SKIN_SSS_LDR_ENCODE_RANGE = 4;
  *
  * @public
  */
-export class SkinMaterial
+export class SSSMaterial
   extends applyMaterialMixins(MeshMaterial, mixinLight, mixinVertexColor, mixinTextureProps('subsurface'))
-  implements Clonable<SkinMaterial>
+  implements Clonable<SSSMaterial>
 {
   private static readonly FEATURE_VERTEX_NORMAL = this.defineFeature();
   private static readonly FEATURE_VERTEX_TANGENT = this.defineFeature();
@@ -80,7 +80,7 @@ export class SkinMaterial
     this._roughness = 0.5;
     this._specularF0 = 0.04;
     this._transmissionStrength = 1;
-    this.useFeature(SkinMaterial.FEATURE_VERTEX_NORMAL, true);
+    this.useFeature(SSSMaterial.FEATURE_VERTEX_NORMAL, true);
   }
 
   /** Releases the profile's table row along with the material. */
@@ -155,7 +155,7 @@ export class SkinMaterial
   }
 
   clone() {
-    const other = new SkinMaterial();
+    const other = new SSSMaterial();
     other.copyFrom(this);
     return other;
   }
@@ -174,17 +174,17 @@ export class SkinMaterial
   }
 
   get vertexNormal() {
-    return this.featureUsed<boolean>(SkinMaterial.FEATURE_VERTEX_NORMAL);
+    return this.featureUsed<boolean>(SSSMaterial.FEATURE_VERTEX_NORMAL);
   }
   set vertexNormal(val) {
-    this.useFeature(SkinMaterial.FEATURE_VERTEX_NORMAL, !!val);
+    this.useFeature(SSSMaterial.FEATURE_VERTEX_NORMAL, !!val);
   }
 
   get vertexTangent() {
-    return this.featureUsed<boolean>(SkinMaterial.FEATURE_VERTEX_TANGENT);
+    return this.featureUsed<boolean>(SSSMaterial.FEATURE_VERTEX_TANGENT);
   }
   set vertexTangent(val) {
-    this.useFeature(SkinMaterial.FEATURE_VERTEX_TANGENT, !!val);
+    this.useFeature(SSSMaterial.FEATURE_VERTEX_TANGENT, !!val);
   }
 
   /**
@@ -590,7 +590,7 @@ export class SkinMaterial
    *
    * @remarks
    * Overrides {@link MeshMaterial.getDepthPassProfileId}. The uniform is declared
-   * in {@link SkinMaterial.fragmentShader} for the prepass as well as the light
+   * in {@link SSSMaterial.fragmentShader} for the prepass as well as the light
    * pass, and bound below.
    */
   protected getDepthPassProfileId(scope: PBInsideFunctionScope) {
