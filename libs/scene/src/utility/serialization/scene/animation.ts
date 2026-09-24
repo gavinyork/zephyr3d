@@ -430,7 +430,9 @@ function deserializeSpringCollider(ctx: SceneNode, data: SerializedSpringCollide
     case 'box':
       collider = createBoxCollider(
         node && data.localOffset ? vectorFromArray(data.localOffset) : vectorFromArray(data.center),
-        node && data.localHalfExtents ? vectorFromArray(data.localHalfExtents) : vectorFromArray(data.halfExtents),
+        node && data.localHalfExtents
+          ? vectorFromArray(data.localHalfExtents)
+          : vectorFromArray(data.halfExtents),
         node ?? undefined
       );
       break;
@@ -450,13 +452,17 @@ function getSpringSystemOptions(
     centrifugalScale: system.centrifugalScale,
     coriolisScale: system.coriolisScale,
     solver: system.solver,
+    motionModel: system.motionModel,
     poseFollow: system.poseFollow,
     poseFollowRoot: system.poseFollowRoot,
     poseFollowTip: system.poseFollowTip,
     poseFollowExponent: system.poseFollowExponent,
     maxPoseOffset: system.maxPoseOffset,
     maxPoseOffsetRoot: system.maxPoseOffsetRoot,
-    maxPoseOffsetTip: system.maxPoseOffsetTip
+    maxPoseOffsetTip: system.maxPoseOffsetTip,
+    angleLimitRoot: system.angleLimitRoot,
+    angleLimitTip: system.angleLimitTip,
+    constraintVelocityHistoryRetention: system.constraintVelocityHistoryRetention
   };
 }
 

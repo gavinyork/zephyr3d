@@ -105,13 +105,17 @@ describe('SpringModifier serialization', () => {
       centrifugalScale: 1.7,
       coriolisScale: 0.4,
       solver: 'xpbd',
+      motionModel: 'kawaii',
       poseFollow: 0.3,
       poseFollowRoot: 0.22,
       poseFollowTip: 0.08,
       poseFollowExponent: 2.1,
       maxPoseOffset: 0.5,
       maxPoseOffsetRoot: 0.25,
-      maxPoseOffsetTip: 0.7
+      maxPoseOffsetTip: 0.7,
+      angleLimitRoot: 15,
+      angleLimitTip: 35,
+      constraintVelocityHistoryRetention: 0.75
     });
     system.addChain(chainA);
     system.addChain(chainB);
@@ -159,11 +163,15 @@ describe('SpringModifier serialization', () => {
     expect(restoredSystem.centrifugalScale).toBeCloseTo(1.7);
     expect(restoredSystem.coriolisScale).toBeCloseTo(0.4);
     expect(restoredSystem.solver).toBe('xpbd');
+    expect(restoredSystem.motionModel).toBe('kawaii');
     expect(restoredSystem.poseFollowRoot).toBeCloseTo(0.22);
     expect(restoredSystem.poseFollowTip).toBeCloseTo(0.08);
     expect(restoredSystem.poseFollowExponent).toBeCloseTo(2.1);
     expect(restoredSystem.maxPoseOffsetRoot).toBeCloseTo(0.25);
     expect(restoredSystem.maxPoseOffsetTip).toBeCloseTo(0.7);
+    expect(restoredSystem.angleLimitRoot).toBeCloseTo(15);
+    expect(restoredSystem.angleLimitTip).toBeCloseTo(35);
+    expect(restoredSystem.constraintVelocityHistoryRetention).toBeCloseTo(0.75);
     expect(restoredSystem.chains).toHaveLength(2);
     expect(restoredSystem.chains[0].particles.map((particle) => particle.node?.name)).toEqual([
       'rootA',

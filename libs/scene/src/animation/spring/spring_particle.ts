@@ -19,7 +19,7 @@ export interface SpringParticle {
   originalRotation: Quaternion | null;
   /** Mass of the particle (affects inertia) */
   mass: number;
-  /** Damping coefficient [0-1] (0 = no damping, 1 = full damping) */
+  /** Velocity retention [0-1] (0 = fully damped, 1 = no damping) */
   damping: number;
   /** Whether this particle is fixed (anchor point) */
   fixed: boolean;

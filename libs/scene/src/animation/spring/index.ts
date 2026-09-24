@@ -10,6 +10,7 @@ export type { SpringConstraint } from './spring_constraint';
 export { createSpringConstraint } from './spring_constraint';
 
 export { SpringChain } from './spring_chain';
+export type { SpringMotionModel } from './spring_solver';
 export { SpringSystem } from './spring_system';
 export type { SpringSystemOptions } from './spring_system';
 
@@ -20,7 +21,13 @@ export type {
   SpringPoseReinitializeOptions
 } from './multi_chain_spring_system';
 
-export type { SpringCollider, SphereCollider, CapsuleCollider, PlaneCollider, BoxCollider } from './spring_collider';
+export type {
+  SpringCollider,
+  SphereCollider,
+  CapsuleCollider,
+  PlaneCollider,
+  BoxCollider
+} from './spring_collider';
 export {
   createSphereCollider,
   createCapsuleCollider,
