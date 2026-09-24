@@ -1,6 +1,6 @@
 import type { PBInsideFunctionScope, PBShaderExp } from '@zephyr3d/device';
 import { distributionGGX, fresnelSchlick, visGGX } from './pbr';
-import { SSS_TRANSMISSION_NO_DATA_ENCODING, SSSProfile } from '../material/sssprofile';
+import { SKIN_TRANSMISSION_NO_DATA_ENCODING, SkinProfile } from '../material/skinprofile';
 
 /**
  * Opacity below which the dual-lobe specular fades back to a single lobe.
@@ -286,7 +286,7 @@ export function skinDualLobeSpecular(
  *
  * @internal
  */
-function readSSSProfileColumn(
+function readSkinProfileColumn(
   scope: PBInsideFunctionScope,
   tex: PBShaderExp,
   texelSize: PBShaderExp,
@@ -349,37 +349,37 @@ export function skinTransmission(
   lightDir: PBShaderExp
 ): PBShaderExp {
   const pb = scope.$builder;
-  const lutOffset = SSSProfile.transmissionLutOffset;
-  const lutSize = SSSProfile.transmissionLutSize;
+  const lutOffset = SkinProfile.transmissionLutOffset;
+  const lutSize = SkinProfile.transmissionLutSize;
   const lastLutColumn = lutOffset + lutSize - 1;
-  // Table reads stay inline (see readSSSProfileColumn); the locals are prefixed
+  // Table reads stay inline (see readSkinProfileColumn); the locals are prefixed
   // so they cannot collide with the caller's. Rows are addressed by the profile
   // id, which arrives normalized because it rides in an 8-bit channel.
-  scope.$l.zSSSTrRow = pb.mul(pb.add(pb.mul(pb.clamp(profileId, 0, 1), 255), 0.5), profileTexelSize.y);
+  scope.$l.zSkinTrRow = pb.mul(pb.add(pb.mul(pb.clamp(profileId, 0, 1), 255), 0.5), profileTexelSize.y);
   // GetTransmissionProfile. The index is `opticalDepth / MAX * (size - 1)` and
   // the decode is `opticalDepth = (1 - thickness) * MAX`, so the MAX cancels and
   // the encoded thickness maps onto the table directly.
-  scope.$l.zSSSTrIndex = pb.mul(pb.clamp(pb.sub(1, thickness), 0, 1), lutSize - 1);
-  scope.$l.zSSSTrI0 = pb.floor(scope.zSSSTrIndex);
-  scope.$l.zSSSTrC0 = pb.add(scope.zSSSTrI0, lutOffset);
-  scope.$l.zSSSTrC1 = pb.min(pb.add(scope.zSSSTrC0, 1), lastLutColumn);
-  scope.$l.zSSSTrProfile = pb.mix(
-    readSSSProfileColumn(scope, profileTex, profileTexelSize, scope.zSSSTrRow, scope.zSSSTrC0).rgb,
-    readSSSProfileColumn(scope, profileTex, profileTexelSize, scope.zSSSTrRow, scope.zSSSTrC1).rgb,
-    pb.sub(scope.zSSSTrIndex, scope.zSSSTrI0)
+  scope.$l.zSkinTrIndex = pb.mul(pb.clamp(pb.sub(1, thickness), 0, 1), lutSize - 1);
+  scope.$l.zSkinTrI0 = pb.floor(scope.zSkinTrIndex);
+  scope.$l.zSkinTrC0 = pb.add(scope.zSkinTrI0, lutOffset);
+  scope.$l.zSkinTrC1 = pb.min(pb.add(scope.zSkinTrC0, 1), lastLutColumn);
+  scope.$l.zSkinTrProfile = pb.mix(
+    readSkinProfileColumn(scope, profileTex, profileTexelSize, scope.zSkinTrRow, scope.zSkinTrC0).rgb,
+    readSkinProfileColumn(scope, profileTex, profileTexelSize, scope.zSkinTrRow, scope.zSkinTrC1).rgb,
+    pb.sub(scope.zSkinTrIndex, scope.zSkinTrI0)
   );
   // (extinctionScale, normalScale, scatteringDistribution, 1 / ior)
-  scope.$l.zSSSTrParams = readSSSProfileColumn(
+  scope.$l.zSkinTrParams = readSkinProfileColumn(
     scope,
     profileTex,
     profileTexelSize,
-    scope.zSSSTrRow,
-    pb.float(SSSProfile.transmissionParamColumn)
+    scope.zSkinTrRow,
+    pb.float(SkinProfile.transmissionParamColumn)
   );
   return skinTransmissionPhase(
     scope,
-    scope.zSSSTrProfile,
-    scope.zSSSTrParams,
+    scope.zSkinTrProfile,
+    scope.zSkinTrParams,
     thickness,
     normal,
     viewVec,
@@ -432,7 +432,7 @@ function skinTransmissionPhase(
       // the subject from behind with a light that was never behind it. The
       // threshold sits in the gap between the largest encoding the pass can write
       // and the sentinel, so it clips no real measurement.
-      this.$if(pb.greaterThan(this.thickness, 0.5 * (1 + SSS_TRANSMISSION_NO_DATA_ENCODING)), function () {
+      this.$if(pb.greaterThan(this.thickness, 0.5 * (1 + SKIN_TRANSMISSION_NO_DATA_ENCODING)), function () {
         this.$return(pb.vec3(0));
       });
       this.$l.refracV = pb.refract(this.viewVec, pb.neg(this.normal), this.params.w);

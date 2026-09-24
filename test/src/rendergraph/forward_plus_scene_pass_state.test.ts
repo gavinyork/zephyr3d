@@ -56,7 +56,7 @@ function createMockFrame(needSceneColor: boolean, device: ReturnType<typeof crea
     materialFlags: 0,
     SSR: false,
     SSS: false,
-    SSSMaskTexture: null,
+    SkinSSSTexture: null,
     SSSDiffuseTexture: null,
     SSSTransmissionTexture: null,
     finalFramebuffer: null,

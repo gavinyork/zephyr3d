@@ -4,7 +4,7 @@ export * from './blinn';
 export * from './unlit';
 export * from './particle';
 export * from './subsurfaceprofile';
-export * from './sssprofile';
+export * from './skinprofile';
 export * from './skin';
 export * from './eye';
 export * from './material';

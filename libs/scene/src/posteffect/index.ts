@@ -5,7 +5,7 @@ export * from './tonemap';
 export * from './bloom';
 export * from './sao';
 export * from './sss';
-export * from './postsss';
+export * from './skinsss';
 export * from './fxaa';
 export * from './taa';
 export * from './ssgi';

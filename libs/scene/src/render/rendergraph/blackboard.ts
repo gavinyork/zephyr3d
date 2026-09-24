@@ -20,8 +20,8 @@ type FrameResourceMap = {
   readonly SSSParam: FrameResourceKey<RGTextureHandle>;
   readonly SSSDiffuse: FrameResourceKey<RGTextureHandle>;
   readonly SSSTransmission: FrameResourceKey<RGTextureHandle>;
-  readonly PostSSS: FrameResourceKey<RGTextureHandle>;
-  readonly SSSProfileId: FrameResourceKey<RGTextureHandle>;
+  readonly SkinSSS: FrameResourceKey<RGTextureHandle>;
+  readonly SkinProfileId: FrameResourceKey<RGTextureHandle>;
   readonly ShadowMask: FrameResourceKey<RGTextureHandle>;
   readonly TransmissionThickness: FrameResourceKey<RGTextureHandle>;
   readonly WaterCaustics: FrameResourceKey<RGTextureHandle>;
@@ -52,7 +52,7 @@ export const FrameResources = {
   SSSParam: 'sssParam',
   SSSDiffuse: 'sssDiffuse',
   SSSTransmission: 'sssTransmission',
-  PostSSS: 'postSSS',
+  SkinSSS: 'skinSSS',
   /**
    * Per-pixel skin profile id from the depth prepass.
    *
@@ -61,7 +61,7 @@ export const FrameResources = {
    * runs before the light pass, so an id written during shading would be out of
    * reach.
    */
-  SSSProfileId: 'sssProfileId',
+  SkinProfileId: 'skinProfileId',
   ShadowMask: 'shadowMask',
   /** Screen-space light-space thickness for subsurface transmission. */
   TransmissionThickness: 'transmissionThickness',

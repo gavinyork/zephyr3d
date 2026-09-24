@@ -19,11 +19,11 @@ import {
   skinSpecularEnergyTerms,
   skinTransmission
 } from '../shaders/skin_brdf';
-import { SSSProfile } from './sssprofile';
+import { SkinProfile } from './skinprofile';
 import { fetchSampler } from '../utility/misc';
 
 /**
- * HDR range that used to be packed into the PostSSS side buffer when the render
+ * HDR range that used to be packed into the SkinSSS side buffer when the render
  * graph fell back to an 8-bit format.
  *
  * @deprecated The skin scattering source is now recovered from `SceneColor` via
@@ -41,7 +41,7 @@ export const SKIN_SSS_LDR_ENCODE_RANGE = 4;
  * @remarks
  * Uses a pre-integrated curvature-dependent diffuse BRDF and dual-lobe GGX specular
  * driven by subsurface profile parameters. The **diffuse** luminance is written to
- * `SceneColor.a` so the {@link PostSSS} post effect can recover the diffusible
+ * `SceneColor.a` so the {@link SkinSSS} post effect can recover the diffusible
  * fraction as `saturate(SceneColor.a / luma(SceneColor.rgb))` — the same spec/diff
  * separation UE5 performs in its SSS Setup and Recombine passes.
  *
@@ -53,16 +53,16 @@ export const SKIN_SSS_LDR_ENCODE_RANGE = 4;
  *
  * @public
  */
-export class SSSMaterial
+export class SkinMaterial
   extends applyMaterialMixins(MeshMaterial, mixinLight, mixinVertexColor, mixinTextureProps('subsurface'))
-  implements Clonable<SSSMaterial>
+  implements Clonable<SkinMaterial>
 {
   private static readonly FEATURE_VERTEX_NORMAL = this.defineFeature();
   private static readonly FEATURE_VERTEX_TANGENT = this.defineFeature();
   private _roughness: number;
   private _specularF0: number;
   private _transmissionStrength: number;
-  private readonly _profile: SSSProfile;
+  private readonly _profile: SkinProfile;
   private readonly _subsurfaceProfileChanged: () => void;
   private readonly _lobeParams: Vector3;
   private readonly _profileTexelSize: Vector2;
@@ -73,14 +73,14 @@ export class SSSMaterial
     // Created here and released in onDispose: the profile holds a row of a
     // 256-entry GPU table, and tying its life to the material's is what keeps
     // those rows from accumulating.
-    this._profile = SSSProfile.createOwned();
+    this._profile = SkinProfile.createOwned();
     this._profile.addChangeListener(this._subsurfaceProfileChanged);
     this._lobeParams = new Vector3();
     this._profileTexelSize = new Vector2();
     this._roughness = 0.5;
     this._specularF0 = 0.04;
     this._transmissionStrength = 1;
-    this.useFeature(SSSMaterial.FEATURE_VERTEX_NORMAL, true);
+    this.useFeature(SkinMaterial.FEATURE_VERTEX_NORMAL, true);
   }
 
   /** Releases the profile's table row along with the material. */
@@ -91,13 +91,13 @@ export class SSSMaterial
   }
 
   /**
-   * Marker used by the forward render graph to enable the PostSSS post effect.
+   * Marker used by the forward render graph to enable the SkinSSS post effect.
    *
    * @remarks
    * This no longer allocates a side buffer: the scattering source is recovered
    * from `SceneColor` and its diffuse-luminance alpha.
    */
-  get postSSS() {
+  get skinSSS() {
     return true;
   }
 
@@ -116,17 +116,17 @@ export class SSSMaterial
    * Per-material ownership is what lets face, ears and lips scatter differently
    * in a single screen-space pass: the material writes its profile's id per pixel
    * and the diffusion looks the parameters up from there. Profiles are therefore
-   * not shared - to transfer a look, use {@link SSSProfile.copyFrom}.
+   * not shared - to transfer a look, use {@link SkinProfile.copyFrom}.
    *
    * @public
    */
-  get subsurfaceProfile(): SSSProfile {
+  get subsurfaceProfile(): SkinProfile {
     return this._profile;
   }
 
   /**
    * Keeps the diffuse luminance written to `SceneColor.a` instead of letting the
-   * opaque path overwrite it with 1. {@link PostSSS} needs it to separate the
+   * opaque path overwrite it with 1. {@link SkinSSS} needs it to separate the
    * diffusible energy from the specular it must leave untouched.
    */
   protected preservesOpaqueAlpha(ctx: DrawContext): boolean {
@@ -155,7 +155,7 @@ export class SSSMaterial
   }
 
   clone() {
-    const other = new SSSMaterial();
+    const other = new SkinMaterial();
     other.copyFrom(this);
     return other;
   }
@@ -174,17 +174,17 @@ export class SSSMaterial
   }
 
   get vertexNormal() {
-    return this.featureUsed<boolean>(SSSMaterial.FEATURE_VERTEX_NORMAL);
+    return this.featureUsed<boolean>(SkinMaterial.FEATURE_VERTEX_NORMAL);
   }
   set vertexNormal(val) {
-    this.useFeature(SSSMaterial.FEATURE_VERTEX_NORMAL, !!val);
+    this.useFeature(SkinMaterial.FEATURE_VERTEX_NORMAL, !!val);
   }
 
   get vertexTangent() {
-    return this.featureUsed<boolean>(SSSMaterial.FEATURE_VERTEX_TANGENT);
+    return this.featureUsed<boolean>(SkinMaterial.FEATURE_VERTEX_TANGENT);
   }
   set vertexTangent(val) {
-    this.useFeature(SSSMaterial.FEATURE_VERTEX_TANGENT, !!val);
+    this.useFeature(SkinMaterial.FEATURE_VERTEX_TANGENT, !!val);
   }
 
   /**
@@ -291,25 +291,25 @@ export class SSSMaterial
     // inside it would leave the uniform undefined and the prepass would write id
     // 0 for every skin pixel.
     const depthPassProfileId =
-      this.drawContext.renderPass!.type === RENDER_PASS_TYPE_DEPTH && this.drawContext.sssProfileId;
+      this.drawContext.renderPass!.type === RENDER_PASS_TYPE_DEPTH && this.drawContext.skinProfileId;
     if (lightPass || depthPassProfileId) {
-      scope.zSSSProfileId = pb.float().uniform(2);
+      scope.zSkinProfileId = pb.float().uniform(2);
     }
     if (this.needFragmentColorInput()) {
       if (lightPass) {
-        scope.zSSSRoughness = pb.float().uniform(2);
-        scope.zSSSSpecularF0 = pb.float().uniform(2);
-        scope.zSSSLobeParams = pb.vec3().uniform(2);
+        scope.zSkinRoughness = pb.float().uniform(2);
+        scope.zSkinSpecularF0 = pb.float().uniform(2);
+        scope.zSkinLobeParams = pb.vec3().uniform(2);
         // Transmission is compiled in only when the thickness it needs exists.
         // The flag is part of the shader's cache key (render/lightpass.ts), and
         // it also guards against the per-light additive path, which has no
         // thickness texture and hands the BxDF a placeholder.
         if (this.drawContext.transmissionThickness) {
-          scope.zSSSTransmissionStrength = pb.float().uniform(2);
+          scope.zSkinTransmissionStrength = pb.float().uniform(2);
           // rgba32f, so WebGPU will only accept a non-filtering sampler here;
           // the transmission profile is interpolated by hand for that reason.
-          scope.zSSSProfileTex = pb.tex2D().sampleType('unfilterable-float').uniform(2);
-          scope.zSSSProfileTexelSize = pb.vec2().uniform(2);
+          scope.zSkinProfileTex = pb.tex2D().sampleType('unfilterable-float').uniform(2);
+          scope.zSkinProfileTexelSize = pb.vec2().uniform(2);
         }
       }
       scope.$l.albedo = this.calculateAlbedoColor(scope);
@@ -327,7 +327,7 @@ export class SSSMaterial
         );
         scope.$l.normal = scope.normalInfo.normal;
         scope.$l.viewVec = this.calculateViewVector(scope, scope.$inputs.worldPos);
-        scope.$l.roughness = scope.zSSSRoughness;
+        scope.$l.roughness = scope.zSkinRoughness;
         scope.$l.skinMask = pb.float(1);
         if (this.subsurfaceTexture) {
           scope.$l.subsurfaceTexel = this.sampleSubsurfaceTexture(scope);
@@ -346,8 +346,8 @@ export class SSSMaterial
           scope,
           scope.roughness,
           scope.skinMask,
-          scope.zSSSLobeParams.x,
-          scope.zSSSLobeParams.y
+          scope.zSkinLobeParams.x,
+          scope.zSkinLobeParams.y
         );
         // Multiple-scattering compensation. UE5 takes the average lobe roughness
         // here rather than computing a term per lobe, and applies the result to
@@ -355,13 +355,13 @@ export class SSSMaterial
         scope.$l.avgLobeRoughness = pb.mix(
           scope.lobeRoughness.x,
           scope.lobeRoughness.y,
-          scope.zSSSLobeParams.z
+          scope.zSkinLobeParams.z
         );
         scope.$l.energyTerms = skinSpecularEnergyTerms(
           scope,
           scope.avgLobeRoughness,
           scope.NoV,
-          scope.zSSSSpecularF0
+          scope.zSkinSpecularF0
         );
         // x scales specular back up to unit albedo; 1 - y is the energy left for
         // the diffuse underneath.
@@ -386,7 +386,7 @@ export class SSSMaterial
             scope,
             scope.roughness,
             scope.NoV,
-            scope.zSSSSpecularF0
+            scope.zSkinSpecularF0
           );
           scope.envSpecular = pb.mul(
             this.getEnvLightRadiance(scope, scope.reflectVec, scope.roughness),
@@ -454,9 +454,9 @@ export class SSSMaterial
             if (that.drawContext.transmissionThickness) {
               this.$l.transmission = skinTransmission(
                 this,
-                this.zSSSProfileTex,
-                this.zSSSProfileTexelSize,
-                this.zSSSProfileId,
+                this.zSkinProfileTex,
+                this.zSkinProfileTexelSize,
+                this.zSkinProfileId,
                 thickness,
                 this.normal,
                 this.viewVec,
@@ -468,7 +468,7 @@ export class SSSMaterial
                   this.lightColor,
                   this.transmission,
                   thickness,
-                  this.zSSSTransmissionStrength,
+                  this.zSkinTransmissionStrength,
                   this.diffuseScale
                 )
               );
@@ -481,8 +481,8 @@ export class SSSMaterial
               this.NoL,
               this.VoH,
               this.lobeRoughness,
-              this.zSSSLobeParams.z,
-              this.zSSSSpecularF0
+              this.zSkinLobeParams.z,
+              this.zSkinSpecularF0
             );
             this.specularLighting = pb.add(
               this.specularLighting,
@@ -540,7 +540,7 @@ export class SSSMaterial
         // where 0 is no scattering and 1 is full. The profile id travels
         // separately, out of the depth prepass, since one channel cannot carry a
         // table row and a weight at once.
-        scope.$l.postSSSMask = pb.vec4(pb.add(pb.mul(scope.normal, 0.5), pb.vec3(0.5)), scope.skinMask);
+        scope.$l.skinSSSMask = pb.vec4(pb.add(pb.mul(scope.normal, 0.5), pb.vec3(0.5)), scope.skinMask);
         if (
           this.drawContext.materialFlags &
           (MaterialVaryingFlags.SCENE_STORE_ROUGHNESS | MaterialVaryingFlags.SCENE_STORE_NORMAL)
@@ -590,39 +590,39 @@ export class SSSMaterial
    *
    * @remarks
    * Overrides {@link MeshMaterial.getDepthPassProfileId}. The uniform is declared
-   * in {@link SSSMaterial.fragmentShader} for the prepass as well as the light
+   * in {@link SkinMaterial.fragmentShader} for the prepass as well as the light
    * pass, and bound below.
    */
   protected getDepthPassProfileId(scope: PBInsideFunctionScope) {
-    return scope.zSSSProfileId;
+    return scope.zSkinProfileId;
   }
 
   applyUniformValues(bindGroup: BindGroup, ctx: DrawContext, pass: number) {
     super.applyUniformValues(bindGroup, ctx, pass);
     const lightPass = ctx.renderPass!.type === RENDER_PASS_TYPE_LIGHT;
-    const depthPassProfileId = ctx.renderPass!.type === RENDER_PASS_TYPE_DEPTH && ctx.sssProfileId;
+    const depthPassProfileId = ctx.renderPass!.type === RENDER_PASS_TYPE_DEPTH && ctx.skinProfileId;
     // Not gated on needFragmentColor: the prepass declares this uniform for
     // every skin material, including the opaque ones that predicate excludes.
     if (lightPass || depthPassProfileId) {
-      bindGroup.setValue('zSSSProfileId', this._profile.encodedId);
+      bindGroup.setValue('zSkinProfileId', this._profile.encodedId);
     }
     if (!this.needFragmentColor(ctx) || !lightPass) {
       return;
     }
-    bindGroup.setValue('zSSSRoughness', this._roughness);
-    bindGroup.setValue('zSSSSpecularF0', this._specularF0);
+    bindGroup.setValue('zSkinRoughness', this._roughness);
+    bindGroup.setValue('zSkinSpecularF0', this._specularF0);
     const profile = this._profile;
     bindGroup.setValue(
-      'zSSSLobeParams',
+      'zSkinLobeParams',
       this._lobeParams.setXYZ(profile.roughness0, profile.roughness1, profile.lobeMix)
     );
     if (ctx.transmissionThickness) {
-      bindGroup.setValue('zSSSTransmissionStrength', this._transmissionStrength);
-      const table = SSSProfile.getTable(ctx.device);
+      bindGroup.setValue('zSkinTransmissionStrength', this._transmissionStrength);
+      const table = SkinProfile.getTable(ctx.device);
       if (table) {
-        bindGroup.setTexture('zSSSProfileTex', table, fetchSampler('clamp_nearest_nomip'));
-        this._profileTexelSize.setXY(1 / SSSProfile.tableColumns, 1 / SSSProfile.tableRows);
-        bindGroup.setValue('zSSSProfileTexelSize', this._profileTexelSize);
+        bindGroup.setTexture('zSkinProfileTex', table, fetchSampler('clamp_nearest_nomip'));
+        this._profileTexelSize.setXY(1 / SkinProfile.tableColumns, 1 / SkinProfile.tableRows);
+        bindGroup.setValue('zSkinProfileTexelSize', this._profileTexelSize);
       }
     }
   }

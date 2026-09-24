@@ -1,7 +1,7 @@
 import { defineProps, type SerializableClass } from '../types';
 import { Camera, OrthoCamera, PerspectiveCamera } from '../../../camera';
 import type { CameraOITMode, SSGIQualityPreset, SSSDebugView, SSSQualityPreset } from '../../../camera';
-import type { PostSSSDebugOutput } from '../../../posteffect/postsss';
+import type { SkinSSSDebugOutput } from '../../../posteffect/skinsss';
 import { SceneNode } from '../../../scene';
 import type { CameraProjectionMode, CameraSensorFit } from '../../physical';
 import {
@@ -180,7 +180,7 @@ export function getCameraClass(): SerializableClass {
           }
         },
         {
-          name: 'PostSSSDebugOutput',
+          name: 'SkinSSSDebugOutput',
           type: 'string',
           phase: 0,
           default: 'none',
@@ -219,10 +219,10 @@ export function getCameraClass(): SerializableClass {
             }
           },
           get(this: Camera, value) {
-            value.str[0] = this.postSSSDebugOutput;
+            value.str[0] = this.skinSSSDebugOutput;
           },
           set(this: Camera, value) {
-            this.postSSSDebugOutput = value.str[0] as PostSSSDebugOutput;
+            this.skinSSSDebugOutput = value.str[0] as SkinSSSDebugOutput;
           }
         },
         {

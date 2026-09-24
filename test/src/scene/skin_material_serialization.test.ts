@@ -1,10 +1,10 @@
 import { MemoryFS, Vector3, Vector4 } from '@zephyr3d/base';
-import { Camera, DualDepthPeelingOIT, ResourceManager, Scene, SSSMaterial } from '../../../libs/scene/src';
+import { Camera, DualDepthPeelingOIT, ResourceManager, Scene, SkinMaterial } from '../../../libs/scene/src';
 
 describe('Skin material serialization', () => {
-  test('round-trips SSSMaterial properties', async () => {
+  test('round-trips SkinMaterial properties', async () => {
     const manager = new ResourceManager(new MemoryFS());
-    const material = new SSSMaterial();
+    const material = new SkinMaterial();
 
     material.roughness = 0.4;
     material.specularF0 = 0.03;
@@ -15,9 +15,9 @@ describe('Skin material serialization', () => {
     material.doubleSidedLighting = false;
 
     const serialized = await manager.serializeObject(material);
-    const restored = (await manager.deserializeObject<SSSMaterial>(null, serialized))!;
+    const restored = (await manager.deserializeObject<SkinMaterial>(null, serialized))!;
 
-    expect(serialized.ClassName).toBe('SSSMaterial');
+    expect(serialized.ClassName).toBe('SkinMaterial');
     const obj = serialized.Object as Record<string, any>;
     expect(obj).toMatchObject({
       Roughness: 0.4,
@@ -26,7 +26,7 @@ describe('Skin material serialization', () => {
       vertexTangent: true,
       doubleSidedLighting: false
     });
-    expect(restored).toBeInstanceOf(SSSMaterial);
+    expect(restored).toBeInstanceOf(SkinMaterial);
     expect(restored.roughness).toBeCloseTo(0.4);
     expect(restored.specularF0).toBeCloseTo(0.03);
     expect(restored.transmissionStrength).toBeCloseTo(0.8);
@@ -38,7 +38,7 @@ describe('Skin material serialization', () => {
 
   test('round-trips the transmission parameters of a profile', async () => {
     const manager = new ResourceManager(new MemoryFS());
-    const material = new SSSMaterial();
+    const material = new SkinMaterial();
     const profile = material.subsurfaceProfile;
     profile.preset = 'skin';
     profile.scatteringDistribution = -0.4;
@@ -47,7 +47,7 @@ describe('Skin material serialization', () => {
     profile.transmissionTint = new Vector3(0.9, 0.3, 0.22);
 
     const serialized = await manager.serializeObject(material);
-    const restored = (await manager.deserializeObject<SSSMaterial>(null, serialized))!;
+    const restored = (await manager.deserializeObject<SkinMaterial>(null, serialized))!;
 
     expect(restored.subsurfaceProfile.scatteringDistribution).toBeCloseTo(-0.4);
     expect(restored.subsurfaceProfile.ior).toBeCloseTo(1.32);
@@ -59,7 +59,7 @@ describe('Skin material serialization', () => {
 
   test('round-trips the material subsurface profile', async () => {
     const manager = new ResourceManager(new MemoryFS());
-    const material = new SSSMaterial();
+    const material = new SkinMaterial();
     const profile = material.subsurfaceProfile;
     profile.preset = 'skin_dark';
     profile.meanFreePathDistance = 0.017;
@@ -67,7 +67,7 @@ describe('Skin material serialization', () => {
     profile.lobeMix = 0.22;
 
     const serialized = await manager.serializeObject(material);
-    const restored = (await manager.deserializeObject<SSSMaterial>(null, serialized))!;
+    const restored = (await manager.deserializeObject<SkinMaterial>(null, serialized))!;
 
     expect(restored.subsurfaceProfile.preset).toBe('skin_dark');
     expect(restored.subsurfaceProfile.meanFreePathDistance).toBeCloseTo(0.017);
@@ -84,12 +84,12 @@ describe('Skin material serialization', () => {
 
   test('deserializing writes into the material own profile instance', async () => {
     const manager = new ResourceManager(new MemoryFS());
-    const material = new SSSMaterial();
+    const material = new SkinMaterial();
     material.subsurfaceProfile.preset = 'jade';
     material.subsurfaceProfile.meanFreePathDistance = 0.031;
 
     const serialized = await manager.serializeObject(material);
-    const target = new SSSMaterial();
+    const target = new SkinMaterial();
     const targetProfile = target.subsurfaceProfile;
     const targetId = targetProfile.id;
     await manager.deserializeObjectProps(target, (serialized as any).Object);
@@ -106,10 +106,10 @@ describe('Skin material serialization', () => {
 
   test('a material with no saved profile keeps its own defaults', async () => {
     const manager = new ResourceManager(new MemoryFS());
-    const material = new SSSMaterial();
+    const material = new SkinMaterial();
 
     const serialized = await manager.serializeObject(material);
-    const restored = (await manager.deserializeObject<SSSMaterial>(null, serialized))!;
+    const restored = (await manager.deserializeObject<SkinMaterial>(null, serialized))!;
 
     // Profiles are no longer nullable, so a scene saved before they became
     // owned - where this field is absent or null - restores to the material's
@@ -120,23 +120,23 @@ describe('Skin material serialization', () => {
     restored.dispose();
   });
 
-  test('round-trips the camera PostSSS debug selection', async () => {
+  test('round-trips the camera SkinSSS debug selection', async () => {
     const manager = new ResourceManager(new MemoryFS());
     const scene = new Scene();
     const camera = new Camera(scene);
 
-    camera.postSSSDebugOutput = 'sampleRadius';
+    camera.skinSSSDebugOutput = 'sampleRadius';
 
     const serialized = await manager.serializeObject(camera);
     const restored = (await manager.deserializeObject<Camera>(scene.rootNode, serialized))!;
 
     // Whether the diffusion runs is derived from the render queue, so there is
     // no enable flag to save - only the debug selection.
-    expect(serialized.Object).toMatchObject({ PostSSSDebugOutput: 'sampleRadius' });
-    expect(serialized.Object).not.toHaveProperty('PostSSSEnabled');
+    expect(serialized.Object).toMatchObject({ SkinSSSDebugOutput: 'sampleRadius' });
+    expect(serialized.Object).not.toHaveProperty('SkinSSSEnabled');
     // The selection is held on the camera, not only forwarded to the post
     // effect, so it survives a round trip even though the effect is created lazily.
-    expect(restored.postSSSDebugOutput).toBe('sampleRadius');
+    expect(restored.skinSSSDebugOutput).toBe('sampleRadius');
   });
 
   test('round-trips camera dual depth peeling OIT mode', async () => {

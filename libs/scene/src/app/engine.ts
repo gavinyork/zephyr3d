@@ -25,7 +25,7 @@ import {
   UnlitMaterial
 } from '../material';
 import { StandardSpriteMaterial } from '../material/sprite_std';
-import { SSSMaterial } from '../material/skin';
+import { SkinMaterial } from '../material/skin';
 import { HairMaterial } from '../material/hair';
 import { ScreenAdapter } from './screen';
 import { MSDFTextAtlasManager } from '../text/runtime';
@@ -448,7 +448,7 @@ export class Engine {
       '/materials/pbr_metallic_roughness.zmtl': PBRMetallicRoughnessMaterial,
       '/materials/pbr_specular_glossiness.zmtl': PBRSpecularGlossinessMaterial,
       '/materials/sprite_std.zmtl': StandardSpriteMaterial,
-      '/materials/skin.zmtl': SSSMaterial,
+      '/materials/skin.zmtl': SkinMaterial,
       '/materials/hair.zmtl': HairMaterial,
       '/materials/eye.zmtl': EyeMaterial
     } as const;

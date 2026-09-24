@@ -17,12 +17,12 @@ import { LIGHT_TYPE_DIRECTIONAL, LIGHT_TYPE_POINT, LIGHT_TYPE_RECT, MAX_SHADOW_M
 import { ndcToShadowCoord } from '../shaders/shadow';
 import { SHADOW_MASK_LIGHTS_PER_LAYER } from './shadow_mask_pass';
 import {
-  SSS_MAX_TRANSMISSION_OPTICAL_DEPTH,
-  SSS_OPTICAL_DEPTH_PER_WORLD_UNIT,
-  SSS_TRANSMISSION_OPTICAL_DEPTH_BIAS,
-  SSS_TRANSMISSION_OPTICAL_DEPTH_FLOOR,
-  SSSProfile
-} from '../material/sssprofile';
+  SKIN_MAX_TRANSMISSION_OPTICAL_DEPTH,
+  SKIN_OPTICAL_DEPTH_PER_WORLD_UNIT,
+  SKIN_TRANSMISSION_OPTICAL_DEPTH_BIAS,
+  SKIN_TRANSMISSION_OPTICAL_DEPTH_FLOOR,
+  SkinProfile
+} from '../material/skinprofile';
 import { fetchSampler } from '../utility/misc';
 
 const UNIFORM_NAME_SHADOW_DEPTH = 'Z_UniformShadowDepth';
@@ -31,7 +31,7 @@ const UNIFORM_NAME_SHADOW_DEPTH = 'Z_UniformShadowDepth';
  * Largest optical depth the transmission profile is defined over.
  *
  * @remarks
- * Re-exported from {@link SSS_MAX_TRANSMISSION_OPTICAL_DEPTH}: the encoding this
+ * Re-exported from {@link SKIN_MAX_TRANSMISSION_OPTICAL_DEPTH}: the encoding this
  * pass writes (`1 - opticalDepth / MAX`) and the baked profile the BxDF indexes
  * with it must agree on the same number, and the profile owns the baking.
  *
@@ -40,7 +40,7 @@ const UNIFORM_NAME_SHADOW_DEPTH = 'Z_UniformShadowDepth';
  *
  * @internal
  */
-export const MAX_TRANSMISSION_OPTICAL_DEPTH = SSS_MAX_TRANSMISSION_OPTICAL_DEPTH;
+export const MAX_TRANSMISSION_OPTICAL_DEPTH = SKIN_MAX_TRANSMISSION_OPTICAL_DEPTH;
 
 /**
  * Poisson disc the light-space thickness is averaged over.
@@ -209,14 +209,14 @@ export class TransmissionThicknessRenderer {
     if (numLights === 0 || !ctx.shadowMapInfo) {
       return;
     }
-    const profileTable = SSSProfile.getTable(device);
+    const profileTable = SkinProfile.getTable(device);
     if (!profileTable) {
       return;
     }
     const numLayers = Math.ceil(numLights / SHADOW_MASK_LIGHTS_PER_LAYER);
     const channelStates = this.getChannelStates(device);
     const savedShadowLight = ctx.currentShadowLight;
-    this._profileTexelSize.setXY(1 / SSSProfile.tableColumns, 1 / SSSProfile.tableRows);
+    this._profileTexelSize.setXY(1 / SkinProfile.tableColumns, 1 / SkinProfile.tableRows);
 
     device.pushDeviceStates();
     for (let layer = 0; layer < numLayers; layer++) {
@@ -515,9 +515,9 @@ export class TransmissionThicknessRenderer {
             this.$return();
           });
           // (extinctionScale, normalScale, scatteringDistribution, 1 / ior)
-          this.$l.trParams = this.zReadProfile(this.profileId, pb.float(SSSProfile.transmissionParamColumn));
+          this.$l.trParams = this.zReadProfile(this.profileId, pb.float(SkinProfile.transmissionParamColumn));
           // (worldUnitScale, scatterScale, 0, 0)
-          this.$l.scalingParams = this.zReadProfile(this.profileId, pb.float(SSSProfile.scalingParamColumn));
+          this.$l.scalingParams = this.zReadProfile(this.profileId, pb.float(SkinProfile.scalingParamColumn));
           // World units to optical depth. The factor is derived from the baked
           // transmission profile's own axis rather than picked, because the two
           // have to agree exactly: see SKIN_OPTICAL_DEPTH_PER_WORLD_UNIT, which
@@ -529,7 +529,7 @@ export class TransmissionThicknessRenderer {
           // same reason. It still does its job of letting one profile drive a
           // model authored at four times life size — just on the table side, and
           // in the shrink distance below.
-          this.$l.opticalDepthScale = pb.mul(SSS_OPTICAL_DEPTH_PER_WORLD_UNIT, this.trParams.x);
+          this.$l.opticalDepthScale = pb.mul(SKIN_OPTICAL_DEPTH_PER_WORLD_UNIT, this.trParams.x);
           // UE5 shrinks by NormalScale * 0.5 in centimetres, scaled with the
           // asset: on a larger model the features it has to clear are larger too,
           // and so is the shadow-map depth quantisation it exists to escape.
@@ -656,7 +656,7 @@ export class TransmissionThicknessRenderer {
                 this.$l[`o${i}`] = pb.mul(this[`t${i}`], this.opticalDepthScale);
                 this.$l[`k${i}`] = pb.clamp(
                   pb.max(pb.add(this[`o${i}`], this.normalScaleBias), 0),
-                  SSS_TRANSMISSION_OPTICAL_DEPTH_FLOOR,
+                  SKIN_TRANSMISSION_OPTICAL_DEPTH_FLOOR,
                   MAX_TRANSMISSION_OPTICAL_DEPTH
                 );
                 this.sum = pb.add(this.sum, this[`k${i}`]);
@@ -665,7 +665,7 @@ export class TransmissionThicknessRenderer {
               // adding it once here are the same number.
               this.$l.opticalDepth = pb.add(
                 pb.div(this.sum, taps.length),
-                SSS_TRANSMISSION_OPTICAL_DEPTH_BIAS
+                SKIN_TRANSMISSION_OPTICAL_DEPTH_BIAS
               );
               // EncodeOpticalDepthToShadowMask
               this.$outputs.color = pb.vec4(

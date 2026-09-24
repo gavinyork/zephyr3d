@@ -1,4 +1,4 @@
-import type { FaceMode, Texture2D } from '@zephyr3d/device';
+﻿import type { FaceMode, Texture2D } from '@zephyr3d/device';
 import type { BlendMode } from '../../../material';
 import {
   BlinnMaterial,
@@ -13,10 +13,10 @@ import {
   PBRMetallicRoughnessMaterial,
   PBRSpecularGlossinessMaterial,
   EyeMaterial,
-  SSSMaterial,
+  SkinMaterial,
   SubsurfaceProfile,
-  SSSProfile,
-  type SSSProfilePreset,
+  SkinProfile,
+  type SkinProfilePreset,
   type MToonOutlineWidthMode,
   type SubsurfaceProfilePreset,
   SpriteBlueprintMaterial,
@@ -36,7 +36,7 @@ import { StandardSpriteMaterial } from '../../../material/sprite_std';
 import type { PBRReflectionMode } from '../../../material/mixins/lightmodel/pbrmetallicroughness';
 
 type PBRMaterial = PBRMetallicRoughnessMaterial | PBRSpecularGlossinessMaterial;
-type LitPropTypes = LambertMaterial | BlinnMaterial | SSSMaterial | HairMaterial | PBRMaterial;
+type LitPropTypes = LambertMaterial | BlinnMaterial | SkinMaterial | HairMaterial | PBRMaterial;
 type UnlitPropTypes = UnlitMaterial | LitPropTypes;
 
 function createBlueprintOutputHiddenPredicate(_outputs: readonly PBRBlueprintOutputName[]) {
@@ -349,16 +349,16 @@ export function getSubsurfaceProfileClass(): SerializableClass {
 }
 
 /**
- * Serialization for {@link SSSProfile}, the profile asset driving
- * {@link SSSMaterial}'s subsurface scattering.
+ * Serialization for {@link SkinProfile}, the profile asset driving
+ * {@link SkinMaterial}'s subsurface scattering.
  */
-export function getSSSProfileClass(): SerializableClass {
+export function getSkinProfileClass(): SerializableClass {
   return {
     // Not constructible from here by design; the cast is the price of declaring
     // the class at all. `createFunc` below is what actually supplies the
     // instance, so the constructor is never reached.
-    ctor: SSSProfile as unknown as GenericConstructor,
-    name: 'SSSProfile',
+    ctor: SkinProfile as unknown as GenericConstructor,
+    name: 'SkinProfile',
     /**
      * Hands back the owning material's profile instead of building one.
      *
@@ -369,8 +369,8 @@ export function getSSSProfileClass(): SerializableClass {
      * property's deserializer passes the object it is filling in.
      */
     createFunc(ctx: unknown) {
-      const material = ctx as SSSMaterial | null;
-      return material instanceof SSSMaterial
+      const material = ctx as SkinMaterial | null;
+      return material instanceof SkinMaterial
         ? { obj: material.subsurfaceProfile }
         : { obj: null, loadProps: false };
     },
@@ -389,11 +389,11 @@ export function getSSSProfileClass(): SerializableClass {
               values: ['skin', 'skin_pale', 'skin_tan', 'skin_dark', 'wax', 'jade', 'marble']
             }
           },
-          get(this: SSSProfile, value) {
+          get(this: SkinProfile, value) {
             value.str[0] = this.preset;
           },
-          set(this: SSSProfile, value) {
-            this.preset = value.str[0] as SSSProfilePreset;
+          set(this: SkinProfile, value) {
+            this.preset = value.str[0] as SkinProfilePreset;
           }
         },
         {
@@ -403,12 +403,12 @@ export function getSSSProfileClass(): SerializableClass {
           type: 'rgb',
           default: [0.91058, 0.338275, 0.2718],
           options: { animatable: true, minValue: 0, maxValue: 1 },
-          get(this: SSSProfile, value) {
+          get(this: SkinProfile, value) {
             value.num[0] = this.surfaceAlbedo.x;
             value.num[1] = this.surfaceAlbedo.y;
             value.num[2] = this.surfaceAlbedo.z;
           },
-          set(this: SSSProfile, value) {
+          set(this: SkinProfile, value) {
             this.surfaceAlbedo = new Vector3(value.num[0], value.num[1], value.num[2]);
           }
         },
@@ -419,12 +419,12 @@ export function getSSSProfileClass(): SerializableClass {
           type: 'rgb',
           default: [1, 0.0889636, 0.0720951],
           options: { animatable: true, minValue: 0, maxValue: 1 },
-          get(this: SSSProfile, value) {
+          get(this: SkinProfile, value) {
             value.num[0] = this.meanFreePath.x;
             value.num[1] = this.meanFreePath.y;
             value.num[2] = this.meanFreePath.z;
           },
-          set(this: SSSProfile, value) {
+          set(this: SkinProfile, value) {
             this.meanFreePath = new Vector3(value.num[0], value.num[1], value.num[2]);
           }
         },
@@ -435,10 +435,10 @@ export function getSSSProfileClass(): SerializableClass {
           type: 'float',
           default: 0.026748,
           options: { animatable: true, minValue: 0, maxValue: 1 },
-          get(this: SSSProfile, value) {
+          get(this: SkinProfile, value) {
             value.num[0] = this.meanFreePathDistance;
           },
-          set(this: SSSProfile, value) {
+          set(this: SkinProfile, value) {
             this.meanFreePathDistance = value.num[0];
           }
         },
@@ -449,10 +449,10 @@ export function getSSSProfileClass(): SerializableClass {
           type: 'float',
           default: 1,
           options: { animatable: true, minValue: 0.01, maxValue: 100 },
-          get(this: SSSProfile, value) {
+          get(this: SkinProfile, value) {
             value.num[0] = this.worldUnitScale;
           },
-          set(this: SSSProfile, value) {
+          set(this: SkinProfile, value) {
             this.worldUnitScale = value.num[0];
           }
         },
@@ -463,10 +463,10 @@ export function getSSSProfileClass(): SerializableClass {
           type: 'float',
           default: 1,
           options: { animatable: true, minValue: 0, maxValue: 8 },
-          get(this: SSSProfile, value) {
+          get(this: SkinProfile, value) {
             value.num[0] = this.scatterScale;
           },
-          set(this: SSSProfile, value) {
+          set(this: SkinProfile, value) {
             this.scatterScale = value.num[0];
           }
         },
@@ -477,12 +477,12 @@ export function getSSSProfileClass(): SerializableClass {
           type: 'rgb',
           default: [1, 1, 1],
           options: { animatable: true, minValue: 0, maxValue: 1 },
-          get(this: SSSProfile, value) {
+          get(this: SkinProfile, value) {
             value.num[0] = this.boundaryColorBleed.x;
             value.num[1] = this.boundaryColorBleed.y;
             value.num[2] = this.boundaryColorBleed.z;
           },
-          set(this: SSSProfile, value) {
+          set(this: SkinProfile, value) {
             this.boundaryColorBleed = new Vector3(value.num[0], value.num[1], value.num[2]);
           }
         },
@@ -493,12 +493,12 @@ export function getSSSProfileClass(): SerializableClass {
           type: 'rgb',
           default: [1, 0.42, 0.3],
           options: { animatable: true, minValue: 0, maxValue: 1 },
-          get(this: SSSProfile, value) {
+          get(this: SkinProfile, value) {
             value.num[0] = this.transmissionTint.x;
             value.num[1] = this.transmissionTint.y;
             value.num[2] = this.transmissionTint.z;
           },
-          set(this: SSSProfile, value) {
+          set(this: SkinProfile, value) {
             this.transmissionTint = new Vector3(value.num[0], value.num[1], value.num[2]);
           }
         },
@@ -509,10 +509,10 @@ export function getSSSProfileClass(): SerializableClass {
           type: 'float',
           default: 1,
           options: { animatable: true, minValue: 0, maxValue: 8 },
-          get(this: SSSProfile, value) {
+          get(this: SkinProfile, value) {
             value.num[0] = this.extinctionScale;
           },
-          set(this: SSSProfile, value) {
+          set(this: SkinProfile, value) {
             this.extinctionScale = value.num[0];
           }
         },
@@ -523,10 +523,10 @@ export function getSSSProfileClass(): SerializableClass {
           type: 'float',
           default: 0.08,
           options: { animatable: true, minValue: 0, maxValue: 1 },
-          get(this: SSSProfile, value) {
+          get(this: SkinProfile, value) {
             value.num[0] = this.normalScale;
           },
-          set(this: SSSProfile, value) {
+          set(this: SkinProfile, value) {
             this.normalScale = value.num[0];
           }
         },
@@ -537,10 +537,10 @@ export function getSSSProfileClass(): SerializableClass {
           type: 'float',
           default: 0.93,
           options: { animatable: true, minValue: -1, maxValue: 1 },
-          get(this: SSSProfile, value) {
+          get(this: SkinProfile, value) {
             value.num[0] = this.scatteringDistribution;
           },
-          set(this: SSSProfile, value) {
+          set(this: SkinProfile, value) {
             this.scatteringDistribution = value.num[0];
           }
         },
@@ -551,10 +551,10 @@ export function getSSSProfileClass(): SerializableClass {
           type: 'float',
           default: 1.55,
           options: { animatable: true, minValue: 1, maxValue: 3 },
-          get(this: SSSProfile, value) {
+          get(this: SkinProfile, value) {
             value.num[0] = this.ior;
           },
-          set(this: SSSProfile, value) {
+          set(this: SkinProfile, value) {
             this.ior = value.num[0];
           }
         },
@@ -565,10 +565,10 @@ export function getSSSProfileClass(): SerializableClass {
           type: 'float',
           default: 0.75,
           options: { animatable: true, minValue: 0.5, maxValue: 2 },
-          get(this: SSSProfile, value) {
+          get(this: SkinProfile, value) {
             value.num[0] = this.roughness0;
           },
-          set(this: SSSProfile, value) {
+          set(this: SkinProfile, value) {
             this.roughness0 = value.num[0];
           }
         },
@@ -579,10 +579,10 @@ export function getSSSProfileClass(): SerializableClass {
           type: 'float',
           default: 1.3,
           options: { animatable: true, minValue: 0.5, maxValue: 2 },
-          get(this: SSSProfile, value) {
+          get(this: SkinProfile, value) {
             value.num[0] = this.roughness1;
           },
-          set(this: SSSProfile, value) {
+          set(this: SkinProfile, value) {
             this.roughness1 = value.num[0];
           }
         },
@@ -593,10 +593,10 @@ export function getSSSProfileClass(): SerializableClass {
           type: 'float',
           default: 0.85,
           options: { animatable: true, minValue: 0.1, maxValue: 0.9 },
-          get(this: SSSProfile, value) {
+          get(this: SkinProfile, value) {
             value.num[0] = this.lobeMix;
           },
-          set(this: SSSProfile, value) {
+          set(this: SkinProfile, value) {
             this.lobeMix = value.num[0];
           }
         }
@@ -2885,12 +2885,12 @@ export function getHairStrandMaterialClass(): SerializableClass[] {
 }
 
 /** @internal */
-export function getSSSMaterialClass(manager: ResourceManager): SerializableClass[] {
+export function getSkinMaterialClass(manager: ResourceManager): SerializableClass[] {
   return [
     {
-      ctor: SSSMaterial,
+      ctor: SkinMaterial,
       parent: MeshMaterial,
-      name: 'SSSMaterial',
+      name: 'SkinMaterial',
       getProps() {
         return defineProps([
           {
@@ -2899,13 +2899,13 @@ export function getSSSMaterialClass(manager: ResourceManager): SerializableClass
             type: 'float',
             default: 0.5,
             options: { animatable: true, minValue: 0.045, maxValue: 1 },
-            get(this: SSSMaterial, value) {
+            get(this: SkinMaterial, value) {
               value.num[0] = this.roughness;
             },
-            set(this: SSSMaterial, value) {
+            set(this: SkinMaterial, value) {
               this.roughness = value.num[0];
             },
-            getDefaultValue(this: SSSMaterial) {
+            getDefaultValue(this: SkinMaterial) {
               return this.$isInstance ? this.coreMaterial.roughness : 0.5;
             }
           },
@@ -2915,13 +2915,13 @@ export function getSSSMaterialClass(manager: ResourceManager): SerializableClass
             type: 'float',
             default: 0.04,
             options: { animatable: true, minValue: 0, maxValue: 0.2 },
-            get(this: SSSMaterial, value) {
+            get(this: SkinMaterial, value) {
               value.num[0] = this.specularF0;
             },
-            set(this: SSSMaterial, value) {
+            set(this: SkinMaterial, value) {
               this.specularF0 = value.num[0];
             },
-            getDefaultValue(this: SSSMaterial) {
+            getDefaultValue(this: SkinMaterial) {
               return this.$isInstance ? this.coreMaterial.specularF0 : 0.04;
             }
           },
@@ -2932,9 +2932,9 @@ export function getSSSMaterialClass(manager: ResourceManager): SerializableClass
             phase: 0,
             default: null,
             options: {
-              objectTypes: [SSSProfile as unknown as GenericConstructor]
+              objectTypes: [SkinProfile as unknown as GenericConstructor]
             },
-            get(this: SSSMaterial, value) {
+            get(this: SkinMaterial, value) {
               value.object[0] = this.subsurfaceProfile;
             },
             // Deliberately empty rather than absent. The material owns its
@@ -2952,22 +2952,22 @@ export function getSSSMaterialClass(manager: ResourceManager): SerializableClass
             type: 'float',
             default: 1,
             options: { animatable: true, minValue: 0, maxValue: 4 },
-            get(this: SSSMaterial, value) {
+            get(this: SkinMaterial, value) {
               value.num[0] = this.transmissionStrength;
             },
-            set(this: SSSMaterial, value) {
+            set(this: SkinMaterial, value) {
               this.transmissionStrength = value.num[0];
             },
-            getDefaultValue(this: SSSMaterial) {
+            getDefaultValue(this: SkinMaterial) {
               return this.$isInstance ? this.coreMaterial.transmissionStrength : 1;
             }
           },
-          ...getTextureProps<SSSMaterial>(manager, 'subsurfaceTexture', '2D', false, 1),
+          ...getTextureProps<SkinMaterial>(manager, 'subsurfaceTexture', '2D', false, 1),
           ...getLitMaterialProps(manager)
         ]);
       }
     },
-    getMeshMaterialInstanceUniformsClass(SSSMaterial)
+    getMeshMaterialInstanceUniformsClass(SkinMaterial)
   ];
 }
 

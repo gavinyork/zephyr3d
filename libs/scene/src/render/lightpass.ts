@@ -93,7 +93,7 @@ export class LightPass extends RenderPass {
       attachments.push(ctx.SSSTransmissionTexture!);
     }
     if (materialFlags & MaterialVaryingFlags.SKIN_SSS_STORE) {
-      attachments.push(ctx.SSSMaskTexture!);
+      attachments.push(ctx.SkinSSSTexture!);
     }
     return attachments.length === 1 ? attachments[0] : attachments;
   }

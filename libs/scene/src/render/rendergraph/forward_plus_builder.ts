@@ -122,8 +122,8 @@ function hasSSSMaterialCore(material: unknown): boolean {
   return !!(getCoreMaterial(material) as { subsurfaceProfile?: unknown } | null)?.subsurfaceProfile;
 }
 
-function hasPostSSSMaterialCore(material: unknown): boolean {
-  return !!(getCoreMaterial(material) as { postSSS?: unknown } | null)?.postSSS;
+function hasSkinSSSMaterialCore(material: unknown): boolean {
+  return !!(getCoreMaterial(material) as { skinSSS?: unknown } | null)?.skinSSS;
 }
 
 function renderQueueHasActiveSSS(renderQueue: RenderQueue): boolean {
@@ -142,7 +142,7 @@ function renderQueueHasActiveSSS(renderQueue: RenderQueue): boolean {
   return false;
 }
 
-function renderQueueHasActivePostSSS(renderQueue: RenderQueue): boolean {
+function renderQueueHasActiveSkinSSS(renderQueue: RenderQueue): boolean {
   const itemList = renderQueue.itemList;
   if (!itemList) {
     return false;
@@ -150,7 +150,7 @@ function renderQueueHasActivePostSSS(renderQueue: RenderQueue): boolean {
   const lists = [...itemList.opaque.lit, ...itemList.opaque.unlit];
   for (const list of lists) {
     for (const material of list.materialList) {
-      if (hasPostSSSMaterialCore(material)) {
+      if (hasSkinSSSMaterialCore(material)) {
         return true;
       }
     }
@@ -343,7 +343,7 @@ function getLightPassColorAttachments(
     attachments.push(ctx.SSSTransmissionTexture!);
   }
   if (ctx.materialFlags & MaterialVaryingFlags.SKIN_SSS_STORE) {
-    attachments.push(ctx.SSSMaskTexture!);
+    attachments.push(ctx.SkinSSSTexture!);
   }
   return attachments.length === 1 ? attachments[0] : attachments;
 }
@@ -354,11 +354,21 @@ export interface ForwardPlusOptions {
   depthPrepass: boolean;
   /** Enable motion vectors (requires TAA or motionBlur). */
   motionVectors: boolean;
-  /** Carry a per-pixel skin profile id out of the depth prepass. */
-  sssProfileId: boolean;
+  /**
+   * Carry a per-pixel skin profile id out of the depth prepass.
+   *
+   * @remarks
+   * Implied by {@link ForwardPlusOptions.skinSSS}. The id has to be produced this
+   * early because the transmission thickness pass reads it and runs before the
+   * light pass.
+   */
+  skinProfileId: boolean;
   /** Enable Hi-Z pyramid (for SSR ray tracing). */
   hiZ: boolean;
-  /** Add the nearest-depth channel to the Hi-Z pyramid (for proximity queries). */
+  /**
+   * Add the nearest-depth channel to the Hi-Z pyramid (for proximity queries).
+   * Implies {@link ForwardPlusOptions.hiZ}.
+   */
   hiZNearest: boolean;
   /** Produce opaque-scene world normals. */
   sceneNormal: boolean;
@@ -383,7 +393,7 @@ export interface ForwardPlusOptions {
   /** Enable screen-space subsurface scattering. */
   sss: boolean;
   /** Enable the stylized skin-specific SSS pass. */
-  postSSS: boolean;
+  skinSSS: boolean;
   /** Whether height fog is composited over the opaque scene this frame. */
   fogPresents: boolean;
 }
@@ -406,7 +416,7 @@ export function deriveForwardPlusOptions(
   const sss = camera.SSS && renderQueueHasActiveSSS(renderQueue);
   // No camera switch for this one: a skin material always wants its diffusion,
   // and the queue already says whether the frame draws any.
-  const postSSS = renderQueueHasActivePostSSS(renderQueue);
+  const skinSSS = renderQueueHasActiveSkinSSS(renderQueue);
   const needSceneColor = renderQueue.needSceneColor();
   const needSceneColorWithDepth = renderQueue.needSceneColorWithDepth();
   // Requested by materials rather than by a post effect, so it is resolved here
@@ -430,10 +440,10 @@ export function deriveForwardPlusOptions(
     needSceneColorWithDepth,
     needsTransmissionDepthForSSR: !!ssr && needSceneColor && !needSceneColorWithDepth,
     sss: !!sss,
-    postSSS: !!postSSS,
-    // Driven entirely by postSSS: the id exists to serve the diffusion and the
+    skinSSS: !!skinSSS,
+    // Driven entirely by skinSSS: the id exists to serve the diffusion and the
     // transmission thickness pass, and both are gated on the same condition.
-    sssProfileId: !!postSSS,
+    skinProfileId: !!skinSSS,
     fogPresents: !!scene.env.sky?.fogPresents
   };
 }
@@ -485,7 +495,7 @@ function resolveFrameResourceRequirements(
   }
 
   ctx.motionVectors = options.motionVectors;
-  ctx.sssProfileId = options.sssProfileId;
+  ctx.skinProfileId = options.skinProfileId;
   ctx.HiZ = options.hiZ;
   ctx.SSGI = options.ssgi;
   ctx.screenSpaceShadowMask = options.shadowMask;
@@ -554,7 +564,7 @@ export interface LightPassResult {
   sceneNormalHandle?: RGHandle;
   sssDiffuseHandle?: RGHandle;
   sssTransmissionHandle?: RGHandle;
-  postSSSHandle?: RGHandle;
+  skinSSSHandle?: RGHandle;
 }
 
 /** Non-resource state shared while Forward+ modules build. @public */
@@ -826,7 +836,7 @@ const DepthPrepassModule: RenderModule<FrameGraphContext> = {
     FrameResources.LinearDepth,
     FrameResources.MotionVector,
     FrameResources.SceneDepthAttachment,
-    FrameResources.SSSProfileId
+    FrameResources.SkinProfileId
   ],
   prepare: () => ({ enabled: true }),
   setup(fg: FrameGraphContext) {
@@ -855,14 +865,14 @@ const DepthPrepassModule: RenderModule<FrameGraphContext> = {
             allocationKey: 'ForwardPlus.MotionVector'
           })
         : undefined;
-      // r8unorm is exact for this: the material writes `SSSProfile.encodedId`,
+      // r8unorm is exact for this: the material writes `SkinProfile.encodedId`,
       // i.e. `id / 255`, and the table holds 256 rows, so every representable id
       // survives the round trip. 0 means "not skin".
-      const sssProfileIdHandle = options.sssProfileId
+      const skinProfileIdHandle = options.skinProfileId
         ? builder.createTexture({
             format: 'r8unorm',
-            label: 'sssProfileId',
-            allocationKey: 'ForwardPlus.SSSProfileId'
+            label: 'skinProfileId',
+            allocationKey: 'ForwardPlus.SkinProfileId'
           })
         : undefined;
       const finalDepthAttachment = ctx.finalFramebuffer?.getDepthAttachment();
@@ -888,8 +898,8 @@ const DepthPrepassModule: RenderModule<FrameGraphContext> = {
       if (motionVectorHandle) {
         prepassColorAttachments.push(motionVectorHandle);
       }
-      if (sssProfileIdHandle) {
-        prepassColorAttachments.push(sssProfileIdHandle);
+      if (skinProfileIdHandle) {
+        prepassColorAttachments.push(skinProfileIdHandle);
       }
       const depthFramebufferHandle = builder.createFramebuffer({
         label: 'DepthPrepassFramebuffer',
@@ -934,7 +944,7 @@ const DepthPrepassModule: RenderModule<FrameGraphContext> = {
       return {
         depthHandle,
         motionVectorHandle,
-        sssProfileIdHandle: sssProfileIdHandle,
+        skinProfileIdHandle,
         graphDepthAttachmentHandle,
         externalDepthAttachmentHandle,
         externalDepthAttachment,
@@ -948,8 +958,8 @@ const DepthPrepassModule: RenderModule<FrameGraphContext> = {
     if (result.motionVectorHandle) {
       blackboard.set(FrameResources.MotionVector, result.motionVectorHandle);
     }
-    if (result.sssProfileIdHandle) {
-      blackboard.set(FrameResources.SSSProfileId, result.sssProfileIdHandle);
+    if (result.skinProfileIdHandle) {
+      blackboard.set(FrameResources.SkinProfileId, result.skinProfileIdHandle);
     }
     blackboard.set(
       FrameResources.SceneDepthAttachment,
@@ -1027,7 +1037,7 @@ const TransmissionThicknessModule: RenderModule<FrameGraphContext> = {
     // scattering this feeds is WebGPU-only to begin with.
     enabled:
       ctx.device.type === 'webgpu' &&
-      options.postSSS &&
+      options.skinSSS &&
       renderQueue.shadowedLights.some((light) => light.transmission)
   }),
   setup(fg: FrameGraphContext) {
@@ -1041,9 +1051,9 @@ const TransmissionThicknessModule: RenderModule<FrameGraphContext> = {
     const numLayers = ShadowMaskRenderer.getLayerCount(numShadowLights);
     const passResult = graph.addPass('TransmissionThicknessPass', (builder) => {
       const depthHandle = blackboard.expect(FrameResources.LinearDepth);
-      const sssProfileIdHandle = blackboard.expect(FrameResources.SSSProfileId);
+      const skinProfileIdHandle = blackboard.expect(FrameResources.SkinProfileId);
       builder.read(depthHandle);
-      builder.read(sssProfileIdHandle);
+      builder.read(skinProfileIdHandle);
       builder.read(depthPassResult.depthFramebufferHandle);
       const thicknessHandle = builder.createTexture({
         format: 'rgba8unorm',
@@ -1060,7 +1070,7 @@ const TransmissionThicknessModule: RenderModule<FrameGraphContext> = {
         _transmissionThicknessRenderer.render(
           ctx,
           depthTex,
-          rgCtx.getTexture<Texture2D>(sssProfileIdHandle),
+          rgCtx.getTexture<Texture2D>(skinProfileIdHandle),
           renderQueue.shadowedLights,
           (layer: number) =>
             rgCtx.createFramebuffer({
@@ -1321,7 +1331,7 @@ const LightPassModule: RenderModule<FrameGraphContext> = {
     FrameResources.SceneNormal,
     FrameResources.SSSDiffuse,
     FrameResources.SSSTransmission,
-    FrameResources.PostSSS
+    FrameResources.SkinSSS
   ],
   prepare: () => ({ enabled: true }),
   setup(fg: FrameGraphContext) {
@@ -1334,7 +1344,7 @@ const LightPassModule: RenderModule<FrameGraphContext> = {
     const hiZHandle = blackboard.get(FrameResources.HiZ);
     const sssProfileHandle = blackboard.get(FrameResources.SSSProfile);
     const sssParamHandle = blackboard.get(FrameResources.SSSParam);
-    const sssProfileIdHandle = blackboard.get(FrameResources.SSSProfileId);
+    const skinProfileIdHandle = blackboard.get(FrameResources.SkinProfileId);
     const sceneColorCopyHandle = blackboard.get(FrameResources.SceneColorCopy);
     const useFinalFramebufferAsIntermediate = fg.state.useFinalFramebufferAsIntermediate;
     const renderDepthAttachment = fg.state.renderDepthAttachment;
@@ -1448,10 +1458,10 @@ const LightPassModule: RenderModule<FrameGraphContext> = {
       if (sssParamHandle) {
         builder.read(sssParamHandle);
       }
-      // Reached through ctx.SSSProfileIdTexture, so the read must be declared or
+      // Reached through ctx.SkinProfileIdTexture, so the read must be declared or
       // the executor may recycle the prepass target before the effect samples it.
-      if (sssProfileIdHandle) {
-        builder.read(sssProfileIdHandle);
+      if (skinProfileIdHandle) {
+        builder.read(skinProfileIdHandle);
       }
       const surfaceAttachmentCount = Number(options.sceneRoughness) + Number(options.sceneNormal);
       // Surface MRT products are exposed through blackboard handles.
@@ -1483,9 +1493,9 @@ const LightPassModule: RenderModule<FrameGraphContext> = {
       // in its alpha (UE5's separation mechanism), so no color side buffer is
       // needed. It still needs to know which pixels are skin, which is what UE5
       // keeps in its single-channel Subsurface.ProfileIdTexture.
-      const writePostSSS = options.postSSS;
+      const writeSkinSSS = options.skinSSS;
       const sssLightingAttachmentCount =
-        (writeSSSDiffuse ? 1 : 0) + (writeSSSTransmission ? 1 : 0) + (writePostSSS ? 1 : 0);
+        (writeSSSDiffuse ? 1 : 0) + (writeSSSTransmission ? 1 : 0) + (writeSkinSSS ? 1 : 0);
       const sssLightingFormat = getSSSLightingTextureFormat(
         ctx,
         sssLightingAttachmentCount,
@@ -1505,11 +1515,11 @@ const LightPassModule: RenderModule<FrameGraphContext> = {
             allocationKey: 'ForwardPlus.SSSTransmission'
           })
         : undefined;
-      const postSSSHandle = writePostSSS
+      const skinSSSHandle = writeSkinSSS
         ? builder.createTexture({
             format: sssLightingFormat,
-            label: 'postSSS',
-            allocationKey: 'ForwardPlus.PostSSS'
+            label: 'skinSSS',
+            allocationKey: 'ForwardPlus.SkinSSS'
           })
         : undefined;
       const sceneColorFramebufferHandle = useFinalFramebufferAsIntermediate
@@ -1543,8 +1553,10 @@ const LightPassModule: RenderModule<FrameGraphContext> = {
         ctx.SSSTransmissionTexture = sssTransmissionHandle
           ? rgCtx.getTexture<Texture2D>(sssTransmissionHandle)
           : null;
-        ctx.SSSMaskTexture = postSSSHandle ? rgCtx.getTexture<Texture2D>(postSSSHandle) : null;
-        ctx.SSSProfileIdTexture = sssProfileIdHandle ? rgCtx.getTexture<Texture2D>(sssProfileIdHandle) : null;
+        ctx.SkinSSSTexture = skinSSSHandle ? rgCtx.getTexture<Texture2D>(skinSSSHandle) : null;
+        ctx.SkinProfileIdTexture = skinProfileIdHandle
+          ? rgCtx.getTexture<Texture2D>(skinProfileIdHandle)
+          : null;
         const renderLightPass = () =>
           renderOpaqueScenePass(frame, sceneColorTex, sceneColorCopyTex, rgCtx, sceneColorFramebufferHandle);
         if (historyManager && lightHistoryReadBindings.length > 0) {
@@ -1585,7 +1597,7 @@ const LightPassModule: RenderModule<FrameGraphContext> = {
         sceneNormalHandle,
         sssDiffuseHandle,
         sssTransmissionHandle,
-        postSSSHandle: postSSSHandle
+        skinSSSHandle
       };
     });
     const lightPassResult: LightPassResult = opaquePassResult;
@@ -1603,8 +1615,8 @@ const LightPassModule: RenderModule<FrameGraphContext> = {
     if (lightPassResult.sssTransmissionHandle) {
       blackboard.set(FrameResources.SSSTransmission, lightPassResult.sssTransmissionHandle);
     }
-    if (lightPassResult.postSSSHandle) {
-      blackboard.set(FrameResources.PostSSS, lightPassResult.postSSSHandle);
+    if (lightPassResult.skinSSSHandle) {
+      blackboard.set(FrameResources.SkinSSS, lightPassResult.skinSSSHandle);
     }
   }
 };
@@ -1760,10 +1772,10 @@ const CompositeTailModule: RenderModule<FrameGraphContext> = {
       blackboard.get(FrameResources.SceneNormal),
       blackboard.get(FrameResources.SSSDiffuse),
       blackboard.get(FrameResources.SSSTransmission),
-      blackboard.get(FrameResources.PostSSS),
-      // Reached through ctx.SSSProfileIdTexture: without the dependency the
+      blackboard.get(FrameResources.SkinSSS),
+      // Reached through ctx.SkinProfileIdTexture: without the dependency the
       // allocator may hand the prepass target to a later pass.
-      blackboard.get(FrameResources.SSSProfileId)
+      blackboard.get(FrameResources.SkinProfileId)
     ]) {
       if (handle) {
         opaqueChainDeps.push(handle);
@@ -2013,14 +2025,14 @@ function buildForwardPlusGraphInternal(
   options.ssgi &&= supportsSSGIRenderTargets(ctx);
   ctx.SSS = !!options.sss;
   ctx.SSGI = !!options.ssgi;
-  ctx.postSSS = !!options.postSSS;
+  ctx.skinSSS = !!options.skinSSS;
   // Before the compositor is consulted below: it collects requirements from,
   // and builds passes for, only the effects that are enabled at that moment.
-  ctx.camera?.setPostSSSActive(ctx.postSSS);
+  ctx.camera?.setSkinSSSActive(ctx.skinSSS);
   ctx.SSGIIrradianceHistoryTexture = null;
   ctx.SSGISurfaceHistoryTexture = null;
-  ctx.SSSMaskTexture = null;
-  ctx.SSSProfileIdTexture = null;
+  ctx.SkinSSSTexture = null;
+  ctx.SkinProfileIdTexture = null;
   // ShadowMask sets this only when it produces a texture.
   ctx.shadowMaskTexture = null;
   ctx.transmissionThicknessTexture = null;
@@ -2073,7 +2085,7 @@ function buildForwardPlusGraphInternal(
   // mismatch would leave the shader layout disagreeing with the bind group.
   ctx.transmissionThickness =
     ctx.device.type === 'webgpu' &&
-    options.postSSS &&
+    options.skinSSS &&
     renderQueue.shadowedLights.some((light) => light.transmission);
 
   pipeline.build(fg);
@@ -2326,7 +2338,7 @@ function renderSceneDepth(
     // Assigning clearColor above resets the per-target list, so this has to come
     // after it; that also means a frame without the target cannot inherit a
     // stale list.
-    if (!transmission && ctx.sssProfileId) {
+    if (!transmission && ctx.skinProfileId) {
       const attachmentCount = depthFramebuffer!.getColorAttachments().length;
       if (attachmentCount > 1) {
         // The id is appended last; see DepthPrepassModule.
@@ -2598,7 +2610,7 @@ export function renderOpaqueScenePass(
       ctx.materialFlags |= MaterialVaryingFlags.SSS_STORE_TRANSMISSION;
     }
   }
-  if (ctx.SSSMaskTexture) {
+  if (ctx.SkinSSSTexture) {
     ctx.materialFlags |= MaterialVaryingFlags.SKIN_SSS_STORE;
   }
 

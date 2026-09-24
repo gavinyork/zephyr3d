@@ -70,7 +70,7 @@ export interface DrawContext {
    * transmission thickness pass consumes it and runs first. UE5 reads the same
    * thing from its GBuffer at shadow projection time.
    */
-  sssProfileId: boolean;
+  skinProfileId: boolean;
   /** Whether hierarchical depth (Hi-Z) is enabled for the current pass. */
   HiZ: boolean;
   /** Hi-Z (hierarchical Z) depth texture, when generated. */
@@ -217,12 +217,24 @@ export interface DrawContext {
   SSSDiffuseTexture: Nullable<Texture2D>;
   /** SSS transmission-lighting texture used for thin-shell/backscatter contributions. */
   SSSTransmissionTexture: Nullable<Texture2D>;
-  /** Surface data the subsurface diffusion reads: `rgb` = world normal, `a` = subsurface opacity. */
-  SSSMaskTexture: Nullable<Texture2D>;
-  /** Per-pixel skin profile id written by the depth prepass, `0` where the pixel is not skin. */
-  SSSProfileIdTexture: Nullable<Texture2D>;
+  /**
+   * Skin-specific screen-space scattering source texture.
+   *
+   * @deprecated The skin scattering source now comes from `SceneColor` and the
+   * diffuse luminance in its alpha channel, matching UE5. Always `null`.
+   */
+  SkinSSSTexture: Nullable<Texture2D>;
+  /**
+   * Per-pixel skin profile id written by the depth prepass, `0` where the pixel
+   * is not skin.
+   *
+   * @remarks
+   * Normalized as `id / 255`, matching {@link SkinProfile.encodedId}, and stored
+   * in an `r8unorm` target so the round trip is exact.
+   */
+  SkinProfileIdTexture: Nullable<Texture2D>;
   /** Skin screen-space scattering is active this frame. */
-  postSSS: boolean;
+  skinSSS: boolean;
   /** SSR SDF proxy uniform buffer (pair of vec4: min.xyz / max.xyz for each box). */
   ssrSDFBoxBuffer: Nullable<GPUDataBuffer>;
   /** Number of valid SDF proxy boxes in `ssrSDFBoxBuffer`. */
