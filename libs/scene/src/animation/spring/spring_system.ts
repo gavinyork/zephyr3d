@@ -1,5 +1,6 @@
 import { Vector3, Quaternion } from '@zephyr3d/base';
 import type { SpringChain } from './spring_chain';
+import type { SpringParticle } from './spring_particle';
 import { IKUtils } from '../ik/ik_utils';
 import type { SpringCollider } from './spring_collider';
 import {
@@ -16,8 +17,12 @@ import {
 import { SpringNodePoseTracker } from './spring_node_pose_tracker';
 import {
   getIterationStrength,
-  getParentRelativePoseTarget,
+  getKawaiiPoseTarget,
+  getSpringPoseTopology,
+  INITIAL_COLLISION_PENETRATION_SLOP,
   interpolateSpringValue,
+  measureCollisionPenetration,
+  resolveInelasticCollision,
   solveAngleLimit,
   solveDistanceConstraint,
   type SpringMotionModel
@@ -94,6 +99,8 @@ export interface SpringSystemOptions {
   angleLimitTip?: number;
   /** Fraction of XPBD positional correction retained in Verlet history (default: 0.35). */
   constraintVelocityHistoryRetention?: number;
+  /** Preserve collider overlap present in the initialized pose while blocking deeper penetration. */
+  preserveInitialCollisionPenetration?: boolean;
 }
 
 const FIXED_SIMULATION_TIME_STEP = 1 / 60;
@@ -142,6 +149,8 @@ export class SpringSystem {
   private _angleLimitRoot: number;
   private _angleLimitTip: number;
   private _constraintVelocityHistoryRetention: number;
+  private _preserveInitialCollisionPenetration: boolean;
+  private _initialCollisionPenetration: WeakMap<SpringParticle, WeakMap<SpringCollider, number>>;
 
   constructor(chain: SpringChain, options?: SpringSystemOptions) {
     this._chain = chain;
@@ -174,6 +183,9 @@ export class SpringSystem {
       0,
       Math.min(1, options?.constraintVelocityHistoryRetention ?? 0.35)
     );
+    this._preserveInitialCollisionPenetration =
+      options?.preserveInitialCollisionPenetration ?? this._motionModel === 'kawaii';
+    this._initialCollisionPenetration = new WeakMap();
   }
 
   /**
@@ -310,6 +322,27 @@ export class SpringSystem {
             this.solveConstraintXPBD(constraint, dt);
           }
         }
+        if (this._colliders.some((collider) => collider.enabled)) {
+          for (const constraint of this._chain.constraints) {
+            constraint.lambda = 0;
+          }
+          const contactClosureIterations = Math.min(4, closureIterations);
+          for (let iteration = 0; iteration < contactClosureIterations; iteration++) {
+            const reverse = !!(iteration & 1);
+            for (
+              let constraintIndex = 0;
+              constraintIndex < this._chain.constraints.length;
+              constraintIndex++
+            ) {
+              const constraint =
+                this._chain.constraints[
+                  reverse ? this._chain.constraints.length - 1 - constraintIndex : constraintIndex
+                ];
+              this.solveConstraintXPBD(constraint, dt);
+            }
+            this.solveCollisions(0, 0);
+          }
+        }
       } else {
         for (const constraint of this._chain.constraints) {
           this.solveConstraint(constraint);
@@ -365,21 +398,19 @@ export class SpringSystem {
       return;
     }
 
-    const lastIndex = Math.max(1, this._chain.particles.length - 1);
+    const topology = getSpringPoseTopology(this._chain.particles);
     for (let i = 0; i < this._chain.particles.length; i++) {
       const particle = this._chain.particles[i];
       if (particle.fixed) {
         continue;
       }
 
-      const t = Math.pow(i / lastIndex, this._poseFollowExponent);
+      const t = Math.pow(topology[i].normalizedDistance, this._poseFollowExponent);
       const particlePoseFollow = this.lerp(this._poseFollowRoot, this._poseFollowTip, t);
       // Convert user-facing per-frame follow into per-iteration follow:
       // effective = 1 - (1 - follow)^iterations
       const iterationFollow = getIterationStrength(particlePoseFollow, totalIterations);
-      const poseTarget = parentRelative
-        ? getParentRelativePoseTarget(particle, i > 0 ? this._chain.particles[i - 1] : null)
-        : particle.animPosition;
+      const poseTarget = parentRelative ? getKawaiiPoseTarget(particle, topology[i]) : particle.animPosition;
       const toAnim = Vector3.sub(poseTarget, particle.position, new Vector3());
       const correction = Vector3.scale(toAnim, iterationFollow, new Vector3());
       Vector3.add(particle.position, correction, particle.position);
@@ -791,26 +822,73 @@ export class SpringSystem {
         continue; // Skip fixed particles
       }
 
-      const positionBeforeCollision = particle.position.clone();
-      let collided = false;
       for (const collider of spheres) {
-        collided = resolveSphereCollision(particle.position, collider.collider) || collided;
+        if (this._motionModel === 'kawaii') {
+          resolveInelasticCollision(
+            particle,
+            collider.collider,
+            resolveSphereCollision,
+            this.getInitialCollisionPenetration(
+              particle,
+              collider.particleCollider,
+              collider.collider,
+              resolveSphereCollision
+            )
+          );
+        } else {
+          resolveSphereCollision(particle.position, collider.collider);
+        }
       }
       for (const collider of capsules) {
-        collided = resolveCapsuleCollision(particle.position, collider.collider) || collided;
+        if (this._motionModel === 'kawaii') {
+          resolveInelasticCollision(
+            particle,
+            collider.collider,
+            resolveCapsuleCollision,
+            this.getInitialCollisionPenetration(
+              particle,
+              collider.particleCollider,
+              collider.collider,
+              resolveCapsuleCollision
+            )
+          );
+        } else {
+          resolveCapsuleCollision(particle.position, collider.collider);
+        }
       }
       for (const collider of planes) {
-        collided = resolvePlaneCollision(particle.position, collider.collider) || collided;
+        if (this._motionModel === 'kawaii') {
+          resolveInelasticCollision(
+            particle,
+            collider.collider,
+            resolvePlaneCollision,
+            this.getInitialCollisionPenetration(
+              particle,
+              collider.particleCollider,
+              collider.collider,
+              resolvePlaneCollision
+            )
+          );
+        } else {
+          resolvePlaneCollision(particle.position, collider.collider);
+        }
       }
       for (const collider of boxes) {
-        collided = resolveBoxCollision(particle.position, collider.collider) || collided;
-      }
-      if (collided && this._motionModel === 'kawaii') {
-        Vector3.add(
-          particle.prevPosition,
-          Vector3.sub(particle.position, positionBeforeCollision, new Vector3()),
-          particle.prevPosition
-        );
+        if (this._motionModel === 'kawaii') {
+          resolveInelasticCollision(
+            particle,
+            collider.collider,
+            resolveBoxCollision,
+            this.getInitialCollisionPenetration(
+              particle,
+              collider.particleCollider,
+              collider.collider,
+              resolveBoxCollision
+            )
+          );
+        } else {
+          resolveBoxCollision(particle.position, collider.collider);
+        }
       }
     }
   }
@@ -905,6 +983,7 @@ export class SpringSystem {
     this._smoothedCapsuleEndpoints = new WeakMap();
     this._smoothedPlaneData = new WeakMap();
     this._smoothedBoxData = new WeakMap();
+    this._initialCollisionPenetration = new WeakMap();
   }
 
   /**
@@ -1036,6 +1115,17 @@ export class SpringSystem {
     this._constraintVelocityHistoryRetention = Math.max(0, Math.min(1, Number(value) || 0));
   }
 
+  get preserveInitialCollisionPenetration(): boolean {
+    return this._preserveInitialCollisionPenetration;
+  }
+
+  set preserveInitialCollisionPenetration(value: boolean) {
+    if (this._preserveInitialCollisionPenetration !== value) {
+      this._preserveInitialCollisionPenetration = value;
+      this._initialCollisionPenetration = new WeakMap();
+    }
+  }
+
   /**
    * Gets pose preservation strength [0-1]
    */
@@ -1128,6 +1218,7 @@ export class SpringSystem {
     this._smoothedCapsuleEndpoints = new WeakMap();
     this._smoothedPlaneData = new WeakMap();
     this._smoothedBoxData = new WeakMap();
+    this._initialCollisionPenetration = new WeakMap();
   }
 
   /**
@@ -1141,6 +1232,7 @@ export class SpringSystem {
       this._smoothedCapsuleEndpoints = new WeakMap();
       this._smoothedPlaneData = new WeakMap();
       this._smoothedBoxData = new WeakMap();
+      this._initialCollisionPenetration = new WeakMap();
       return true;
     }
     return false;
@@ -1155,6 +1247,7 @@ export class SpringSystem {
     this._smoothedCapsuleEndpoints = new WeakMap();
     this._smoothedPlaneData = new WeakMap();
     this._smoothedBoxData = new WeakMap();
+    this._initialCollisionPenetration = new WeakMap();
   }
 
   /**
@@ -1162,6 +1255,30 @@ export class SpringSystem {
    */
   get colliders(): SpringCollider[] {
     return this._colliders;
+  }
+
+  private getInitialCollisionPenetration<TCollider extends SpringCollider>(
+    particle: SpringParticle,
+    sourceCollider: SpringCollider,
+    collider: TCollider,
+    resolveCollision: (position: Vector3, collider: TCollider) => boolean
+  ): number {
+    if (!this._preserveInitialCollisionPenetration) {
+      return 0;
+    }
+    let particlePenetrations = this._initialCollisionPenetration.get(particle);
+    if (!particlePenetrations) {
+      particlePenetrations = new WeakMap();
+      this._initialCollisionPenetration.set(particle, particlePenetrations);
+    }
+    let penetration = particlePenetrations.get(sourceCollider);
+    if (penetration === undefined) {
+      penetration =
+        measureCollisionPenetration(particle.animPosition, collider, resolveCollision) +
+        INITIAL_COLLISION_PENETRATION_SLOP;
+      particlePenetrations.set(sourceCollider, penetration);
+    }
+    return penetration;
   }
 
   private getTemporalBlendFactor(deltaTime: number, smoothingTime: number): number {

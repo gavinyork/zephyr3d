@@ -4,6 +4,8 @@ import {
   Scene,
   SceneNode,
   SpringChain,
+  SpringModifier,
+  createSphereCollider,
   createSpringConstraint,
   createSpringParticle
 } from '../../../libs/scene/src';
@@ -22,13 +24,68 @@ function appendNode(parent: SceneNode, name: string, position: Vector3) {
 }
 
 describe('Kawaii spring solver', () => {
+  it('holds the animated pose during startup and reinitializes before simulation', () => {
+    let reinitializeCount = 0;
+    let updateCount = 0;
+    let applyCount = 0;
+    const system = {
+      reinitializeFromCurrentPose: () => reinitializeCount++,
+      update: () => updateCount++,
+      applyToNodes: () => applyCount++,
+      reset: () => undefined
+    };
+    const modifier = new SpringModifier(system as any, 1, 0.1);
+
+    modifier.apply(null as any, 0.04);
+    modifier.apply(null as any, 0.04);
+    modifier.apply(null as any, 0.04);
+
+    expect(reinitializeCount).toBe(3);
+    expect(updateCount).toBe(0);
+    expect(applyCount).toBe(0);
+
+    modifier.apply(null as any, 1 / 60);
+    expect(updateCount).toBe(1);
+    expect(applyCount).toBe(1);
+
+    modifier.restartSimulation(0.01);
+    modifier.apply(null as any, 1 / 60);
+    expect(reinitializeCount).toBe(4);
+    expect(updateCount).toBe(1);
+  });
+
   it('uses Kawaii motion by default and retains an explicit legacy fallback', () => {
     const kawaii = new MultiChainSpringSystem();
     const legacy = new MultiChainSpringSystem({ motionModel: 'legacy' });
 
     expect(kawaii.motionModel).toBe('kawaii');
     expect(kawaii.constraintVelocityHistoryRetention).toBeCloseTo(0.35);
+    expect(kawaii.preserveInitialCollisionPenetration).toBe(true);
     expect(legacy.motionModel).toBe('legacy');
+  });
+
+  it('preserves authored collider overlap but blocks deeper penetration', () => {
+    const chain = new SpringChain();
+    const particle = createSpringParticle(new Vector3(0.75, 0, 0), { damping: 1 });
+    chain.addParticle(particle);
+    const system = new MultiChainSpringSystem({
+      gravity: Vector3.zero(),
+      enableInertialForces: false,
+      solver: 'xpbd',
+      poseFollowRoot: 0,
+      poseFollowTip: 0,
+      preserveInitialCollisionPenetration: true
+    });
+    system.addChain(chain);
+    const collider = createSphereCollider(Vector3.zero(), 1);
+    system.addCollider(collider);
+
+    system.update(1 / 60);
+    expect(particle.position.x).toBeCloseTo(0.75);
+
+    collider.radius = 1.2;
+    system.update(1 / 60);
+    expect(particle.position.x).toBeCloseTo(0.95);
   });
 
   it('settles a double-ended chain under gravity with the default XPBD history retention', () => {
@@ -82,6 +139,42 @@ describe('Kawaii spring solver', () => {
     expect(lateMotion).toBeLessThan(1e-5);
   });
 
+  it('settles against a collider by removing inward Verlet velocity', () => {
+    const chain = new SpringChain();
+    const fixed = createSpringParticle(new Vector3(0, 1, 0), { fixed: true, damping: 0.993 });
+    const dynamic = createSpringParticle(new Vector3(0.05, 0, 0), { damping: 0.993 });
+    chain.addParticle(fixed);
+    chain.addParticle(dynamic);
+    chain.addConstraint(createSpringConstraint(0, 1, 1, 0.82, 0));
+
+    const system = new MultiChainSpringSystem({
+      gravity: new Vector3(0, -9.8, 0),
+      enableInertialForces: false,
+      solver: 'xpbd',
+      iterations: 6,
+      poseFollowRoot: 0.251,
+      poseFollowTip: 0.05,
+      preserveInitialCollisionPenetration: false
+    });
+    system.addChain(chain);
+    const colliderCenter = new Vector3(0, -0.25, 0);
+    const colliderRadius = 0.35;
+    system.addCollider(createSphereCollider(colliderCenter, colliderRadius));
+
+    const previousPosition = dynamic.position.clone();
+    let lateMotion = 0;
+    for (let frame = 0; frame < 600; frame++) {
+      system.update(1 / 60);
+      if (frame >= 450) {
+        lateMotion = Math.max(lateMotion, Vector3.distance(dynamic.position, previousPosition));
+      }
+      previousPosition.set(dynamic.position);
+    }
+
+    expect(lateMotion).toBeLessThan(1e-5);
+    expect(Vector3.distance(dynamic.position, colliderCenter)).toBeGreaterThanOrEqual(colliderRadius - 1e-6);
+  });
+
   it('uses the simulated parent for the pose-preserving target', () => {
     const parent = createSpringParticle(new Vector3(4, -2, 0));
     parent.animPosition.setXYZ(1, 1, 0);
@@ -92,6 +185,33 @@ describe('Kawaii spring solver', () => {
 
     expect(target.x).toBeCloseTo(6);
     expect(target.y).toBeCloseTo(-1);
+  });
+
+  it('blends pose follow toward the nearest fixed endpoint', () => {
+    const chain = new SpringChain();
+    for (let i = 0; i < 5; i++) {
+      const particle = createSpringParticle(new Vector3(i, 0, 0), {
+        fixed: i === 0 || i === 4,
+        damping: 1
+      });
+      if (i === 1 || i === 3) {
+        particle.position.y = 1;
+        particle.prevPosition.y = 1;
+      }
+      chain.addParticle(particle);
+    }
+    const system = new MultiChainSpringSystem({
+      gravity: Vector3.zero(),
+      enableInertialForces: false,
+      poseFollowRoot: 0.8,
+      poseFollowTip: 0.1,
+      poseFollowExponent: 1
+    });
+    system.addChain(chain);
+
+    system.update(1 / 60);
+
+    expect(Math.abs(chain.particles[1].position.y - chain.particles[3].position.y)).toBeLessThan(0.02);
   });
 
   it('applies the full distance correction when the other endpoint is fixed', () => {

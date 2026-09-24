@@ -84,7 +84,8 @@ describe('MultiChainSpringSystem runtime rebind', () => {
       enableInertialForces: false,
       iterations: 1,
       poseFollowRoot: 0,
-      poseFollowTip: 0
+      poseFollowTip: 0,
+      preserveInitialCollisionPenetration: false
     });
     system.addChain(chain);
     system.addCollider(createSphereCollider(Vector3.zero(), 1));

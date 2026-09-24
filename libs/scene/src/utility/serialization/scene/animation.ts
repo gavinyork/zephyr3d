@@ -462,7 +462,8 @@ function getSpringSystemOptions(
     maxPoseOffsetTip: system.maxPoseOffsetTip,
     angleLimitRoot: system.angleLimitRoot,
     angleLimitTip: system.angleLimitTip,
-    constraintVelocityHistoryRetention: system.constraintVelocityHistoryRetention
+    constraintVelocityHistoryRetention: system.constraintVelocityHistoryRetention,
+    preserveInitialCollisionPenetration: system.preserveInitialCollisionPenetration
   };
 }
 

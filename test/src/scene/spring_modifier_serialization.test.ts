@@ -115,7 +115,8 @@ describe('SpringModifier serialization', () => {
       maxPoseOffsetTip: 0.7,
       angleLimitRoot: 15,
       angleLimitTip: 35,
-      constraintVelocityHistoryRetention: 0.75
+      constraintVelocityHistoryRetention: 0.75,
+      preserveInitialCollisionPenetration: false
     });
     system.addChain(chainA);
     system.addChain(chainB);
@@ -172,6 +173,7 @@ describe('SpringModifier serialization', () => {
     expect(restoredSystem.angleLimitRoot).toBeCloseTo(15);
     expect(restoredSystem.angleLimitTip).toBeCloseTo(35);
     expect(restoredSystem.constraintVelocityHistoryRetention).toBeCloseTo(0.75);
+    expect(restoredSystem.preserveInitialCollisionPenetration).toBe(false);
     expect(restoredSystem.chains).toHaveLength(2);
     expect(restoredSystem.chains[0].particles.map((particle) => particle.node?.name)).toEqual([
       'rootA',

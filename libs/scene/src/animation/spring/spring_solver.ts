@@ -5,6 +5,7 @@ import type { SpringParticle } from './spring_particle';
 export type SpringMotionModel = 'legacy' | 'kawaii';
 
 const EPSILON = 1e-6;
+export const INITIAL_COLLISION_PENETRATION_SLOP = 1e-4;
 
 export function clampSpringRatio(value: number): number {
   return Math.max(0, Math.min(1, Number(value) || 0));
@@ -44,6 +45,72 @@ export function getParentRelativePoseTarget(
   return Vector3.add(parent.position, result, result);
 }
 
+export interface SpringPoseTopologyEntry {
+  parent: SpringParticle | null;
+  nearestAnchor: SpringParticle | null;
+  normalizedDistance: number;
+}
+
+/** Builds a pose-follow direction and falloff measured from the nearest fixed particle. */
+export function getSpringPoseTopology(particles: readonly SpringParticle[]): SpringPoseTopologyEntry[] {
+  const fixedIndices: number[] = [];
+  for (let i = 0; i < particles.length; i++) {
+    if (particles[i].fixed) {
+      fixedIndices.push(i);
+    }
+  }
+
+  if (fixedIndices.length === 0) {
+    const lastIndex = Math.max(1, particles.length - 1);
+    return particles.map((_, index) => ({
+      parent: index > 0 ? particles[index - 1] : null,
+      nearestAnchor: null,
+      normalizedDistance: index / lastIndex
+    }));
+  }
+
+  const nearestFixedIndices = new Array<number>(particles.length);
+  const distances = new Array<number>(particles.length);
+  let maxDistance = 1;
+  for (let i = 0; i < particles.length; i++) {
+    let nearestFixedIndex = fixedIndices[0];
+    let nearestDistance = Math.abs(i - nearestFixedIndex);
+    for (let j = 1; j < fixedIndices.length; j++) {
+      const distance = Math.abs(i - fixedIndices[j]);
+      if (distance < nearestDistance) {
+        nearestFixedIndex = fixedIndices[j];
+        nearestDistance = distance;
+      }
+    }
+    nearestFixedIndices[i] = nearestFixedIndex;
+    distances[i] = nearestDistance;
+    maxDistance = Math.max(maxDistance, nearestDistance);
+  }
+
+  return particles.map((_, index) => {
+    const nearestFixedIndex = nearestFixedIndices[index];
+    return {
+      parent: index > 0 ? particles[index - 1] : null,
+      nearestAnchor: particles[nearestFixedIndex],
+      normalizedDistance: distances[index] / maxDistance
+    };
+  });
+}
+
+/** Returns the Kawaii target, blending hierarchy shape with the nearest fixed anchor. */
+export function getKawaiiPoseTarget(
+  particle: SpringParticle,
+  topology: SpringPoseTopologyEntry,
+  result = new Vector3()
+): Vector3 {
+  getParentRelativePoseTarget(particle, topology.parent, result);
+  if (!topology.nearestAnchor || topology.nearestAnchor === topology.parent) {
+    return result;
+  }
+  const anchorTarget = getParentRelativePoseTarget(particle, topology.nearestAnchor);
+  return Vector3.lerp(result, anchorTarget, 1 - topology.normalizedDistance, result);
+}
+
 /** Position-based distance projection with inverse-mass weighting. */
 export function solveDistanceConstraint(
   particleA: SpringParticle,
@@ -79,6 +146,57 @@ export function solveDistanceConstraint(
       particleB.position
     );
   }
+}
+
+/** Resolves a contact as an inelastic projection while preserving tangential Verlet velocity. */
+export function resolveInelasticCollision<TCollider>(
+  particle: SpringParticle,
+  collider: TCollider,
+  resolveCollision: (position: Vector3, collider: TCollider) => boolean,
+  allowedPenetration: number = 0
+): boolean {
+  const positionBeforeCollision = particle.position.clone();
+  const preservedDisplacement = Vector3.sub(positionBeforeCollision, particle.prevPosition, new Vector3());
+  if (!resolveCollision(particle.position, collider)) {
+    return false;
+  }
+
+  const correction = Vector3.sub(particle.position, positionBeforeCollision, new Vector3());
+  const correctionLength = correction.magnitude;
+  const excessPenetration = correctionLength - Math.max(0, allowedPenetration);
+  if (excessPenetration <= EPSILON) {
+    particle.position.set(positionBeforeCollision);
+    return false;
+  }
+
+  const outwardNormal = correction.scaleBy(1 / correctionLength);
+  Vector3.add(
+    positionBeforeCollision,
+    Vector3.scale(outwardNormal, excessPenetration, new Vector3()),
+    particle.position
+  );
+  if (correctionLength > EPSILON) {
+    const inwardDistance = Vector3.dot(preservedDisplacement, outwardNormal);
+    if (inwardDistance < 0) {
+      Vector3.sub(
+        preservedDisplacement,
+        Vector3.scale(outwardNormal, inwardDistance, new Vector3()),
+        preservedDisplacement
+      );
+    }
+  }
+  Vector3.sub(particle.position, preservedDisplacement, particle.prevPosition);
+  return true;
+}
+
+/** Returns how far a point is inside a collider according to its resolver. */
+export function measureCollisionPenetration<TCollider>(
+  position: Vector3,
+  collider: TCollider,
+  resolveCollision: (position: Vector3, collider: TCollider) => boolean
+): number {
+  const resolvedPosition = position.clone();
+  return resolveCollision(resolvedPosition, collider) ? Vector3.distance(position, resolvedPosition) : 0;
 }
 
 function getFallbackRotationAxis(direction: Vector3): Vector3 {

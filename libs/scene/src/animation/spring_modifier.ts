@@ -16,18 +16,23 @@ export class SpringModifier extends SkeletonModifier {
   private _springSystem: SpringSystem;
   private _weight: number;
   private _sourceId: string;
+  private _startupDelay: number;
+  private _startupDelayRemaining: number;
 
   /**
    * Create a spring post-processor.
    *
    * @param springSystem - The spring system to integrate
    * @param weight - Blend weight [0-1] (default: 1.0)
+   * @param startupDelay - Seconds spent following the animated pose before simulation starts (default: 0.1)
    */
-  constructor(springSystem: SpringSystem, weight: number = 1.0) {
+  constructor(springSystem: SpringSystem, weight: number = 1.0, startupDelay: number = 0.1) {
     super();
     this._weight = weight;
     this._springSystem = springSystem;
     this._sourceId = '';
+    this._startupDelay = Math.max(0, Number(startupDelay) || 0);
+    this._startupDelayRemaining = this._startupDelay;
   }
 
   /**
@@ -56,6 +61,14 @@ export class SpringModifier extends SkeletonModifier {
       return;
     }
 
+    if (this._startupDelayRemaining > 0 && this.reinitializeFromCurrentPose()) {
+      this._startupDelayRemaining = Math.max(
+        0,
+        this._startupDelayRemaining - Math.max(0, Number(deltaTime) || 0)
+      );
+      return;
+    }
+
     // Update spring physics simulation
     this._springSystem.update(deltaTime);
 
@@ -68,6 +81,20 @@ export class SpringModifier extends SkeletonModifier {
    */
   reset(): void {
     this._springSystem.reset();
+    this._startupDelayRemaining = this._startupDelay;
+  }
+
+  /** Restarts the pose-following startup window after a runtime hierarchy or binding change. */
+  restartSimulation(startupDelay: number = this._startupDelay): void {
+    this._startupDelayRemaining = Math.max(0, Number(startupDelay) || 0);
+  }
+
+  get startupDelay(): number {
+    return this._startupDelay;
+  }
+
+  set startupDelay(value: number) {
+    this._startupDelay = Math.max(0, Number(value) || 0);
   }
 
   /**
@@ -84,5 +111,23 @@ export class SpringModifier extends SkeletonModifier {
    */
   protected _setWeight(value: number): void {
     this._weight = Math.max(0, Math.min(1, value));
+  }
+
+  private reinitializeFromCurrentPose(): boolean {
+    const system = this._springSystem as SpringSystem & {
+      reinitializeFromCurrentPose?: (options?: {
+        recomputeAnchorOffsets?: boolean;
+        recalculateRestLengths?: boolean;
+      }) => void;
+    };
+    if (typeof system.reinitializeFromCurrentPose !== 'function') {
+      this._startupDelayRemaining = 0;
+      return false;
+    }
+    system.reinitializeFromCurrentPose({
+      recomputeAnchorOffsets: true,
+      recalculateRestLengths: true
+    });
+    return true;
   }
 }
