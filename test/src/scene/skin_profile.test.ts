@@ -1,7 +1,7 @@
 import { SSSMaterial } from '../../../libs/scene/src/material/skin';
-import { SkinProfile } from '../../../libs/scene/src/material/skinprofile';
+import { SSSProfile } from '../../../libs/scene/src/material/skinprofile';
 
-describe('SkinProfile', () => {
+describe('SSSProfile', () => {
   test('allocates distinct non-zero ids', () => {
     const a = new SSSMaterial();
     const b = new SSSMaterial();
@@ -16,12 +16,12 @@ describe('SkinProfile', () => {
     // The depth prepass clears its profile id target to 0, so every pixel no
     // skin material covered reads back as "not skin" and the diffusion rejects
     // it rather than addressing a row of the table.
-    expect(SkinProfile.getById(0)).toBeNull();
+    expect(SSSProfile.getById(0)).toBeNull();
     const mat = new SSSMaterial();
     const profile = mat.subsurfaceProfile;
-    expect(SkinProfile.getById(profile.id)).toBe(profile);
+    expect(SSSProfile.getById(profile.id)).toBe(profile);
     mat.dispose();
-    expect(SkinProfile.getById(profile.id)).toBeNull();
+    expect(SSSProfile.getById(profile.id)).toBeNull();
   });
 
   test('encodes the id for an 8-bit channel', () => {
@@ -131,20 +131,20 @@ describe('SkinProfile', () => {
     const mat = new SSSMaterial();
     const profile = mat.subsurfaceProfile;
     expect(profile).toBeTruthy();
-    expect(SkinProfile.getById(profile.id)).toBe(profile);
+    expect(SSSProfile.getById(profile.id)).toBe(profile);
     mat.dispose();
     // The row goes back to the pool, which is the whole point: profiles used to
     // be assignable objects nothing released, so the 256-row table filled up as
     // the editor loaded scenes and undid edits, and every profile allocated
     // after that failed to construct.
-    expect(SkinProfile.getById(profile.id)).toBeNull();
+    expect(SSSProfile.getById(profile.id)).toBeNull();
   });
 
   test('profiles are not constructible outside their material', () => {
     // A runtime guard rather than the `private` modifier alone: the editor ships
     // as prebuilt JavaScript and drives this class through serialization
     // metadata, where TypeScript's visibility rules do not apply.
-    expect(() => new (SkinProfile as unknown as new () => SkinProfile)()).toThrow();
+    expect(() => new (SSSProfile as unknown as new () => SSSProfile)()).toThrow();
   });
 
   test('table rows are recycled, so long editing sessions cannot exhaust them', () => {

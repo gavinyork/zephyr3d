@@ -111,7 +111,7 @@ function createOptions(overrides: Partial<ForwardPlusOptions> = {}): ForwardPlus
     needsTransmissionDepthForSSR: false,
     sss: false,
     skinSSS: false,
-    skinProfileId: false,
+    sssProfileId: false,
     fogPresents: false,
     hiZNearest: false,
     ...overrides
@@ -120,7 +120,7 @@ function createOptions(overrides: Partial<ForwardPlusOptions> = {}): ForwardPlus
   // skin scattering on gets the profile id target too unless it says otherwise.
   return {
     ...merged,
-    skinProfileId: overrides.skinProfileId ?? merged.skinSSS
+    sssProfileId: overrides.sssProfileId ?? merged.skinSSS
   };
 }
 

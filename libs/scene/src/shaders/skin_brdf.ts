@@ -1,6 +1,6 @@
 import type { PBInsideFunctionScope, PBShaderExp } from '@zephyr3d/device';
 import { distributionGGX, fresnelSchlick, visGGX } from './pbr';
-import { SKIN_TRANSMISSION_NO_DATA_ENCODING, SkinProfile } from '../material/skinprofile';
+import { SKIN_TRANSMISSION_NO_DATA_ENCODING, SSSProfile } from '../material/skinprofile';
 
 /**
  * Opacity below which the dual-lobe specular fades back to a single lobe.
@@ -286,7 +286,7 @@ export function skinDualLobeSpecular(
  *
  * @internal
  */
-function readSkinProfileColumn(
+function readSSSProfileColumn(
   scope: PBInsideFunctionScope,
   tex: PBShaderExp,
   texelSize: PBShaderExp,
@@ -349,10 +349,10 @@ export function skinTransmission(
   lightDir: PBShaderExp
 ): PBShaderExp {
   const pb = scope.$builder;
-  const lutOffset = SkinProfile.transmissionLutOffset;
-  const lutSize = SkinProfile.transmissionLutSize;
+  const lutOffset = SSSProfile.transmissionLutOffset;
+  const lutSize = SSSProfile.transmissionLutSize;
   const lastLutColumn = lutOffset + lutSize - 1;
-  // Table reads stay inline (see readSkinProfileColumn); the locals are prefixed
+  // Table reads stay inline (see readSSSProfileColumn); the locals are prefixed
   // so they cannot collide with the caller's. Rows are addressed by the profile
   // id, which arrives normalized because it rides in an 8-bit channel.
   scope.$l.zSkinTrRow = pb.mul(pb.add(pb.mul(pb.clamp(profileId, 0, 1), 255), 0.5), profileTexelSize.y);
@@ -364,17 +364,17 @@ export function skinTransmission(
   scope.$l.zSkinTrC0 = pb.add(scope.zSkinTrI0, lutOffset);
   scope.$l.zSkinTrC1 = pb.min(pb.add(scope.zSkinTrC0, 1), lastLutColumn);
   scope.$l.zSkinTrProfile = pb.mix(
-    readSkinProfileColumn(scope, profileTex, profileTexelSize, scope.zSkinTrRow, scope.zSkinTrC0).rgb,
-    readSkinProfileColumn(scope, profileTex, profileTexelSize, scope.zSkinTrRow, scope.zSkinTrC1).rgb,
+    readSSSProfileColumn(scope, profileTex, profileTexelSize, scope.zSkinTrRow, scope.zSkinTrC0).rgb,
+    readSSSProfileColumn(scope, profileTex, profileTexelSize, scope.zSkinTrRow, scope.zSkinTrC1).rgb,
     pb.sub(scope.zSkinTrIndex, scope.zSkinTrI0)
   );
   // (extinctionScale, normalScale, scatteringDistribution, 1 / ior)
-  scope.$l.zSkinTrParams = readSkinProfileColumn(
+  scope.$l.zSkinTrParams = readSSSProfileColumn(
     scope,
     profileTex,
     profileTexelSize,
     scope.zSkinTrRow,
-    pb.float(SkinProfile.transmissionParamColumn)
+    pb.float(SSSProfile.transmissionParamColumn)
   );
   return skinTransmissionPhase(
     scope,

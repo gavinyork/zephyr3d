@@ -19,7 +19,7 @@ import {
   skinSpecularEnergyTerms,
   skinTransmission
 } from '../shaders/skin_brdf';
-import { SkinProfile } from './skinprofile';
+import { SSSProfile } from './skinprofile';
 import { fetchSampler } from '../utility/misc';
 
 /**
@@ -62,7 +62,7 @@ export class SSSMaterial
   private _roughness: number;
   private _specularF0: number;
   private _transmissionStrength: number;
-  private readonly _profile: SkinProfile;
+  private readonly _profile: SSSProfile;
   private readonly _subsurfaceProfileChanged: () => void;
   private readonly _lobeParams: Vector3;
   private readonly _profileTexelSize: Vector2;
@@ -73,7 +73,7 @@ export class SSSMaterial
     // Created here and released in onDispose: the profile holds a row of a
     // 256-entry GPU table, and tying its life to the material's is what keeps
     // those rows from accumulating.
-    this._profile = SkinProfile.createOwned();
+    this._profile = SSSProfile.createOwned();
     this._profile.addChangeListener(this._subsurfaceProfileChanged);
     this._lobeParams = new Vector3();
     this._profileTexelSize = new Vector2();
@@ -116,11 +116,11 @@ export class SSSMaterial
    * Per-material ownership is what lets face, ears and lips scatter differently
    * in a single screen-space pass: the material writes its profile's id per pixel
    * and the diffusion looks the parameters up from there. Profiles are therefore
-   * not shared - to transfer a look, use {@link SkinProfile.copyFrom}.
+   * not shared - to transfer a look, use {@link SSSProfile.copyFrom}.
    *
    * @public
    */
-  get subsurfaceProfile(): SkinProfile {
+  get subsurfaceProfile(): SSSProfile {
     return this._profile;
   }
 
@@ -291,7 +291,7 @@ export class SSSMaterial
     // inside it would leave the uniform undefined and the prepass would write id
     // 0 for every SSS pixel.
     const depthPassProfileId =
-      this.drawContext.renderPass!.type === RENDER_PASS_TYPE_DEPTH && this.drawContext.skinProfileId;
+      this.drawContext.renderPass!.type === RENDER_PASS_TYPE_DEPTH && this.drawContext.sssProfileId;
     if (lightPass || depthPassProfileId) {
       scope.zSSSProfileId = pb.float().uniform(2);
     }
@@ -560,7 +560,7 @@ export class SSSMaterial
   applyUniformValues(bindGroup: BindGroup, ctx: DrawContext, pass: number) {
     super.applyUniformValues(bindGroup, ctx, pass);
     const lightPass = ctx.renderPass!.type === RENDER_PASS_TYPE_LIGHT;
-    const depthPassProfileId = ctx.renderPass!.type === RENDER_PASS_TYPE_DEPTH && ctx.skinProfileId;
+    const depthPassProfileId = ctx.renderPass!.type === RENDER_PASS_TYPE_DEPTH && ctx.sssProfileId;
     // Not gated on needFragmentColor: the prepass declares this uniform for
     // every SSS material, including the opaque ones that predicate excludes.
     if (lightPass || depthPassProfileId) {
@@ -578,10 +578,10 @@ export class SSSMaterial
     );
     if (ctx.transmissionThickness) {
       bindGroup.setValue('zSSSTransmissionStrength', this._transmissionStrength);
-      const table = SkinProfile.getTable(ctx.device);
+      const table = SSSProfile.getTable(ctx.device);
       if (table) {
         bindGroup.setTexture('zSSSProfileTex', table, fetchSampler('clamp_nearest_nomip'));
-        this._profileTexelSize.setXY(1 / SkinProfile.tableColumns, 1 / SkinProfile.tableRows);
+        this._profileTexelSize.setXY(1 / SSSProfile.tableColumns, 1 / SSSProfile.tableRows);
         bindGroup.setValue('zSSSProfileTexelSize', this._profileTexelSize);
       }
     }

@@ -21,7 +21,7 @@ import {
   SKIN_OPTICAL_DEPTH_PER_WORLD_UNIT,
   SKIN_TRANSMISSION_OPTICAL_DEPTH_BIAS,
   SKIN_TRANSMISSION_OPTICAL_DEPTH_FLOOR,
-  SkinProfile
+  SSSProfile
 } from '../material/skinprofile';
 import { fetchSampler } from '../utility/misc';
 
@@ -209,14 +209,14 @@ export class TransmissionThicknessRenderer {
     if (numLights === 0 || !ctx.shadowMapInfo) {
       return;
     }
-    const profileTable = SkinProfile.getTable(device);
+    const profileTable = SSSProfile.getTable(device);
     if (!profileTable) {
       return;
     }
     const numLayers = Math.ceil(numLights / SHADOW_MASK_LIGHTS_PER_LAYER);
     const channelStates = this.getChannelStates(device);
     const savedShadowLight = ctx.currentShadowLight;
-    this._profileTexelSize.setXY(1 / SkinProfile.tableColumns, 1 / SkinProfile.tableRows);
+    this._profileTexelSize.setXY(1 / SSSProfile.tableColumns, 1 / SSSProfile.tableRows);
 
     device.pushDeviceStates();
     for (let layer = 0; layer < numLayers; layer++) {
@@ -515,9 +515,9 @@ export class TransmissionThicknessRenderer {
             this.$return();
           });
           // (extinctionScale, normalScale, scatteringDistribution, 1 / ior)
-          this.$l.trParams = this.zReadProfile(this.profileId, pb.float(SkinProfile.transmissionParamColumn));
+          this.$l.trParams = this.zReadProfile(this.profileId, pb.float(SSSProfile.transmissionParamColumn));
           // (worldUnitScale, scatterScale, 0, 0)
-          this.$l.scalingParams = this.zReadProfile(this.profileId, pb.float(SkinProfile.scalingParamColumn));
+          this.$l.scalingParams = this.zReadProfile(this.profileId, pb.float(SSSProfile.scalingParamColumn));
           // World units to optical depth. The factor is derived from the baked
           // transmission profile's own axis rather than picked, because the two
           // have to agree exactly: see SKIN_OPTICAL_DEPTH_PER_WORLD_UNIT, which

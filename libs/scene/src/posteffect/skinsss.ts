@@ -2,7 +2,7 @@ import { DEPTH_FARTHEST, Vector2, Vector4 } from '@zephyr3d/base';
 import type { BindGroup, GPUProgram, Texture2D } from '@zephyr3d/device';
 import type { DrawContext } from '../render';
 import { ShaderHelper } from '../material';
-import { SkinProfile } from '../material/skinprofile';
+import { SSSProfile } from '../material/skinprofile';
 import { linearToGamma } from '../shaders/misc';
 import { hash21 } from '../shaders/noise';
 import { fetchSampler } from '../utility/misc';
@@ -78,7 +78,7 @@ const DEFAULT_SAMPLE_COUNT = 64;
  *   diffused half summed back with the specular remainder.
  *
  * The pass exposes no scattering parameters of its own — every one of them
- * belongs to the {@link SkinProfile} the material points at, as in UE5.
+ * belongs to the {@link SSSProfile} the material points at, as in UE5.
  *
  * WebGPU only.
  *
@@ -91,7 +91,7 @@ export class SkinSSS extends AbstractPostEffect {
   private _burleyBindGroup: BindGroup | null;
   private _bvarBindGroup: BindGroup | null;
   private _recombineBindGroup: BindGroup | null;
-  private _profile: SkinProfile | null;
+  private _profile: SSSProfile | null;
   private _debugOutput: SkinSSSDebugOutput;
   private _debugExposure: number;
   private _sampleCount: number;
@@ -125,10 +125,10 @@ export class SkinSSS extends AbstractPostEffect {
    *
    * @public
    */
-  get profile(): SkinProfile | null {
+  get profile(): SSSProfile | null {
     return this._profile;
   }
-  set profile(val: SkinProfile | null) {
+  set profile(val: SSSProfile | null) {
     this._profile = val ?? null;
   }
   get sampleCount() {
@@ -176,24 +176,24 @@ export class SkinSSS extends AbstractPostEffect {
   }
 
   apply(ctx: DrawContext, inputColorTexture: Texture2D, sceneDepthTexture: Texture2D, srgbOutput: boolean) {
-    if (!ctx.SkinSSSTexture || !ctx.SkinProfileIdTexture || ctx.device.type !== 'webgpu') {
+    if (!ctx.SSSMaskTexture || !ctx.SSSProfileIdTexture || ctx.device.type !== 'webgpu') {
       this.passThrough(ctx, inputColorTexture, srgbOutput);
       return;
     }
     const device = ctx.device;
     const outputFramebuffer = device.getFramebuffer();
-    const maskTex = ctx.SkinSSSTexture;
-    const profileIdTex = ctx.SkinProfileIdTexture;
+    const maskTex = ctx.SSSMaskTexture;
+    const profileIdTex = ctx.SSSProfileIdTexture;
     const width = inputColorTexture.width;
     const height = inputColorTexture.height;
 
     const scatterFormat = ctx.colorFormat;
-    const profileTable = SkinProfile.getTable(device);
+    const profileTable = SSSProfile.getTable(device);
     if (!profileTable) {
       this.passThrough(ctx, inputColorTexture, srgbOutput);
       return;
     }
-    const fallback = this._profile ?? SkinProfile.getDefault();
+    const fallback = this._profile ?? SSSProfile.getDefault();
     // Projection of a world-space length at unit depth into UV, per axis. Two
     // factors, not one: `m00` and `m11` differ by the aspect ratio, so a single
     // one turns the sampling disc into an ellipse. UE5 reaches the same pair by
@@ -208,9 +208,9 @@ export class SkinSSS extends AbstractPostEffect {
     // Row of the fallback profile, used when a pixel's id is missing.
     this._profileParams.setXYZW(
       fallback.encodedId,
-      1 / SkinProfile.tableColumns,
-      1 / SkinProfile.tableRows,
-      SkinProfile.tableRows
+      1 / SSSProfile.tableColumns,
+      1 / SSSProfile.tableRows,
+      SSSProfile.tableRows
     );
     this._targetSize.setXYZW(width, height, 1 / width, 1 / height);
     this._cameraNearFar.setXY(ctx.camera.getNearPlane(), ctx.camera.getFarPlane());

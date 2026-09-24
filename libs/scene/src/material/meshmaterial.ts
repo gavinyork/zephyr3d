@@ -1122,7 +1122,7 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
           // Declared after the motion vector, because the declaration order is
           // the MRT order and the prepass framebuffer appends this attachment
           // last (render/rendergraph/forward_plus_builder.ts, DepthPrepassModule).
-          if (ctx.renderPass!.type === RENDER_PASS_TYPE_DEPTH && ctx.skinProfileId) {
+          if (ctx.renderPass!.type === RENDER_PASS_TYPE_DEPTH && ctx.sssProfileId) {
             this.$outputs.zSSSProfileId = pb.vec4();
           }
           if (ctx.renderPass!.type === RENDER_PASS_TYPE_OBJECT_COLOR) {
@@ -1141,7 +1141,7 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
    *
    * @remarks
    * `null` (the default) means "not skin", which is what every material other than
-   * {@link SSSMaterial} wants; otherwise the normalized `SkinProfile.encodedId`.
+   * {@link SSSMaterial} wants; otherwise the normalized `SSSProfile.encodedId`.
    *
    * It lives on the prepass rather than the light pass because the transmission
    * thickness pass needs it and runs earlier, and because that frees the skin mask
@@ -1376,7 +1376,7 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
         // writing here regardless would give that pass one the framebuffer has no
         // target for. It is also right on its own terms - the profile id is a
         // prepass product and the prepass draws only opaque geometry.
-        if (that.drawContext.skinProfileId && !depthPass.motionVectorOnly) {
+        if (that.drawContext.sssProfileId && !depthPass.motionVectorOnly) {
           // Every material in the prepass writes this attachment, so non-skin ones
           // must write the "no profile" id: the target is shared, and a stale texel
           // would be read as a real profile row.

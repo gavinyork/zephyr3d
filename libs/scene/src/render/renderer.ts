@@ -66,8 +66,8 @@ export class SceneRenderer {
             device.type !== 'webgl' && (camera.TAA || camera.motionBlur || (SSR && camera.ssrTemporal)),
           // Resolved by deriveForwardPlusOptions, which knows whether the queue
           // actually holds skin materials.
-          skinProfileId: false,
-          SkinProfileIdTexture: null,
+          sssProfileId: false,
+          SSSProfileIdTexture: null,
           HiZ: camera.HiZ && device.type !== 'webgl',
           HiZTexture: null,
           // WebGL1 has no 2D array textures; degrade gracefully to the legacy
@@ -108,7 +108,7 @@ export class SceneRenderer {
           SSSParamTexture: null,
           SSSDiffuseTexture: null,
           SSSTransmissionTexture: null,
-          SkinSSSTexture: null,
+          SSSMaskTexture: null,
           skinSSS: false,
           ssrSDFBoxBuffer: null,
           ssrSDFBoxCount: 0,

@@ -1,6 +1,6 @@
 import { SSSMaterial } from '../../../libs/scene/src/material/skin';
 import {
-  SkinProfile,
+  SSSProfile,
   SKIN_MAX_TRANSMISSION_OPTICAL_DEPTH,
   SKIN_OPTICAL_DEPTH_PER_WORLD_UNIT
 } from '../../../libs/scene/src/material/skinprofile';
@@ -25,7 +25,7 @@ import { Vector3 } from '@zephyr3d/base';
  * are kept alive for the file's duration and disposed together at the end.
  */
 const materials: SSSMaterial[] = [];
-function profile(preset: 'skin' = 'skin'): SkinProfile {
+function profile(preset: 'skin' = 'skin'): SSSProfile {
   const material = new SSSMaterial();
   material.subsurfaceProfile.preset = preset;
   materials.push(material);
@@ -39,8 +39,8 @@ afterAll(() => {
   materials.length = 0;
 });
 
-function bake(p: SkinProfile): Float32Array {
-  const out = new Float32Array(SkinProfile.transmissionLutSize * 4);
+function bake(p: SSSProfile): Float32Array {
+  const out = new Float32Array(SSSProfile.transmissionLutSize * 4);
   p.writeTransmissionProfile(out);
   return out;
 }
@@ -54,7 +54,7 @@ describe('Skin transmission profile', () => {
   test('falls off monotonically with thickness', () => {
     const p = profile();
     const lut = bake(p);
-    for (let i = 1; i < SkinProfile.transmissionLutSize; i++) {
+    for (let i = 1; i < SSSProfile.transmissionLutSize; i++) {
       expect(red(lut, i)).toBeLessThan(red(lut, i - 1));
     }
   });
@@ -64,7 +64,7 @@ describe('Skin transmission profile', () => {
     // tone mapping, and anything thicker than the table would keep transmitting.
     const p = profile();
     const lut = bake(p);
-    const last = SkinProfile.transmissionLutSize - 1;
+    const last = SSSProfile.transmissionLutSize - 1;
     expect(red(lut, last)).toBe(0);
     expect(green(lut, last)).toBe(0);
     expect(blue(lut, last)).toBe(0);
@@ -83,7 +83,7 @@ describe('Skin transmission profile', () => {
     // thing that distinguishes differing rates from a constant tint: the ratio
     // has to keep opening up as the table goes deeper. A neutral falloff with a
     // red tint bolted on would pass the two checks above and fail this.
-    const live = SkinProfile.transmissionLutSize - 1;
+    const live = SSSProfile.transmissionLutSize - 1;
     for (let i = 1; i < live; i++) {
       expect(red(lut, i) / green(lut, i)).toBeGreaterThan(red(lut, i - 1) / green(lut, i - 1));
     }
@@ -120,7 +120,7 @@ describe('Skin transmission profile', () => {
     const lutBig = bake(big);
     // Entry i of the scaled profile stands for a quarter of the profile-space
     // distance, so it must have decayed less.
-    for (let i = 1; i < SkinProfile.transmissionLutSize - 1; i++) {
+    for (let i = 1; i < SSSProfile.transmissionLutSize - 1; i++) {
       expect(red(lutBig, i)).toBeGreaterThan(red(lutUnit, i));
     }
   });
@@ -132,7 +132,7 @@ describe('Skin transmission profile', () => {
     tinted.transmissionTint = new Vector3(1, 0.5, 0.25);
     const a = bake(plain);
     const b = bake(tinted);
-    for (let i = 0; i < SkinProfile.transmissionLutSize - 1; i++) {
+    for (let i = 0; i < SSSProfile.transmissionLutSize - 1; i++) {
       expect(red(b, i)).toBeCloseTo(red(a, i), 6);
       expect(green(b, i)).toBeCloseTo(green(a, i) * 0.5, 6);
       expect(blue(b, i)).toBeCloseTo(blue(a, i) * 0.25, 6);
@@ -173,7 +173,7 @@ describe('Skin transmission profile', () => {
     // feature does not look mis-tuned, it looks absent — a factor of ten put
     // every path over 5 mm onto the blacked-out last entry, so nothing
     // transmitted anywhere while the thickness debug view still looked sane.
-    const size = SkinProfile.transmissionLutSize;
+    const size = SSSProfile.transmissionLutSize;
     for (const metres of [0.002, 0.005, 0.01, 0.03]) {
       // What the thickness pass produces, at unit extinction.
       const opticalDepth = metres * SKIN_OPTICAL_DEPTH_PER_WORLD_UNIT;
@@ -190,7 +190,7 @@ describe('Skin transmission profile', () => {
     // At unit extinction the table has to span roughly a centimetre per unit of
     // optical depth, so skin millimetres land in the live part of the curve and
     // a path through a skull runs off the end.
-    const size = SkinProfile.transmissionLutSize;
+    const size = SSSProfile.transmissionLutSize;
     const indexFor = (metres: number) =>
       ((metres * SKIN_OPTICAL_DEPTH_PER_WORLD_UNIT) / SKIN_MAX_TRANSMISSION_OPTICAL_DEPTH) * (size - 1);
     // A 5 mm ear has to sit well inside the table, not against either end.
@@ -211,8 +211,8 @@ describe('Skin transmission profile', () => {
     // is four times that of the 1x one, which looks like a scale bug and was
     // once "fixed" by dividing it out a second time. What must actually match is
     // the entry the BxDF ends up reading, and that is this.
-    const size = SkinProfile.transmissionLutSize;
-    const sample = (p: SkinProfile, metres: number) => {
+    const size = SSSProfile.transmissionLutSize;
+    const sample = (p: SSSProfile, metres: number) => {
       const lut = new Float32Array(size * 4);
       p.writeTransmissionProfile(lut);
       const index =
@@ -250,9 +250,7 @@ describe('Skin transmission profile', () => {
     const p = profile();
     expect(Math.round(p.encodedId * 255)).toBe(p.id);
     // And the LUT has to sit past the scalar parameters, not overlap them.
-    expect(SkinProfile.transmissionLutOffset).toBeGreaterThan(SkinProfile.transmissionParamColumn);
-    expect(SkinProfile.tableColumns).toBe(
-      SkinProfile.transmissionLutOffset + SkinProfile.transmissionLutSize
-    );
+    expect(SSSProfile.transmissionLutOffset).toBeGreaterThan(SSSProfile.transmissionParamColumn);
+    expect(SSSProfile.tableColumns).toBe(SSSProfile.transmissionLutOffset + SSSProfile.transmissionLutSize);
   });
 });

@@ -16,7 +16,6 @@
     "sourceMap": true,
     "stripInternal": true,
     "types": ["jest", "node"],
-    "baseUrl": ".",
     "paths": {
       // Mirrors the jest moduleNameMapper entries so tests typecheck against the
       // same sources jest loads at runtime. Required for packages consumed from

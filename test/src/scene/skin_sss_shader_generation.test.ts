@@ -241,10 +241,10 @@ describe('SkinSSS shader generation', () => {
     const { burley, recombine } = buildPrograms('webgpu');
     expect(recombine).not.toContain('smoothness');
     // The post effect exposes no knobs of its own: how far, how strongly and in
-    // what colour the light scatters is entirely the SkinProfile's business, as
+    // what colour the light scatters is entirely the SSSProfile's business, as
     // it is in UE5. A second set of multipliers on top of the profile could only
     // let the two disagree — `scatterRadius` in particular duplicated
-    // `SkinProfile.worldUnitScale` in the diffusion but not on the transmission
+    // `SSSProfile.worldUnitScale` in the diffusion but not on the transmission
     // LUT's distance axis, so turning it up silently decoupled the two.
     expect(recombine).not.toContain('scatterTint');
     expect(recombine).not.toContain('strength');
