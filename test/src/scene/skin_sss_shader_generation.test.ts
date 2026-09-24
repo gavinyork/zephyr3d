@@ -1,5 +1,5 @@
 import { ProgramBuilder } from '../../../libs/device/src';
-import { SkinSSS } from '../../../libs/scene/src/posteffect/skinsss';
+import { PostSSS } from '../../../libs/scene/src/posteffect/postsss';
 
 function createShaderContext(type: 'webgl' | 'webgpu') {
   const device: any = {
@@ -8,7 +8,7 @@ function createShaderContext(type: 'webgl' | 'webgpu') {
       const builder = new ProgramBuilder(device);
       const result = builder.buildRender(options);
       if (!result) {
-        throw new Error(builder.lastError ?? 'SkinSSS shader generation failed');
+        throw new Error(builder.lastError ?? 'PostSSS shader generation failed');
       }
       return {
         bindGroupLayouts: result[2],
@@ -23,7 +23,7 @@ function createShaderContext(type: 'webgl' | 'webgpu') {
 
 function buildPrograms(type: 'webgl' | 'webgpu') {
   const ctx = createShaderContext(type);
-  const effect = new SkinSSS() as any;
+  const effect = new PostSSS() as any;
   return {
     burley: effect.createBurleyProgram(ctx).fragmentSource as string,
     bvar: effect.createBVarProgram(ctx).fragmentSource as string,
@@ -31,7 +31,7 @@ function buildPrograms(type: 'webgl' | 'webgpu') {
   };
 }
 
-describe('SkinSSS shader generation', () => {
+describe('PostSSS shader generation', () => {
   test.each(['webgpu', 'webgl'] as const)('builds all %s passes', (type) => {
     const { burley, bvar, recombine } = buildPrograms(type);
     expect(burley).toBeTruthy();
@@ -241,10 +241,10 @@ describe('SkinSSS shader generation', () => {
     const { burley, recombine } = buildPrograms('webgpu');
     expect(recombine).not.toContain('smoothness');
     // The post effect exposes no knobs of its own: how far, how strongly and in
-    // what colour the light scatters is entirely the SkinProfile's business, as
+    // what colour the light scatters is entirely the SSSProfile's business, as
     // it is in UE5. A second set of multipliers on top of the profile could only
     // let the two disagree — `scatterRadius` in particular duplicated
-    // `SkinProfile.worldUnitScale` in the diffusion but not on the transmission
+    // `SSSProfile.worldUnitScale` in the diffusion but not on the transmission
     // LUT's distance axis, so turning it up silently decoupled the two.
     expect(recombine).not.toContain('scatterTint');
     expect(recombine).not.toContain('strength');

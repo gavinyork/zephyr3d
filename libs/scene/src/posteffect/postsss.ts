@@ -2,7 +2,7 @@ import { DEPTH_FARTHEST, Vector2, Vector4 } from '@zephyr3d/base';
 import type { BindGroup, GPUProgram, Texture2D } from '@zephyr3d/device';
 import type { DrawContext } from '../render';
 import { ShaderHelper } from '../material';
-import { SkinProfile } from '../material/skinprofile';
+import { SSSProfile } from '../material/sssprofile';
 import { linearToGamma } from '../shaders/misc';
 import { hash21 } from '../shaders/noise';
 import { fetchSampler } from '../utility/misc';
@@ -17,7 +17,7 @@ import { AbstractPostEffect, PostEffectLayer } from './posteffect';
  *
  * @public
  */
-export type SkinSSSDebugOutput =
+export type PostSSSDebugOutput =
   | 'none'
   /** Scatterable energy recovered from SceneColor and its diffuse-luminance alpha. */
   | 'diffusible'
@@ -42,7 +42,7 @@ export type SkinSSSDebugOutput =
   /** Light-space thickness from the transmission pass, for the lights in layer 0. */
   | 'thickness';
 
-const SKIN_SSS_DEBUG_OUTPUTS: SkinSSSDebugOutput[] = [
+const SKIN_SSS_DEBUG_OUTPUTS: PostSSSDebugOutput[] = [
   'none',
   'diffusible',
   'diffuseAmount',
@@ -78,21 +78,21 @@ const DEFAULT_SAMPLE_COUNT = 64;
  *   diffused half summed back with the specular remainder.
  *
  * The pass exposes no scattering parameters of its own — every one of them
- * belongs to the {@link SkinProfile} the material points at, as in UE5.
+ * belongs to the {@link SSSProfile} the material points at, as in UE5.
  *
  * WebGPU only.
  *
  * @public
  */
-export class SkinSSS extends AbstractPostEffect {
+export class PostSSS extends AbstractPostEffect {
   private static _burleyProgram: GPUProgram | null = null;
   private static _bvarProgram: GPUProgram | null = null;
   private static _recombineProgram: GPUProgram | null = null;
   private _burleyBindGroup: BindGroup | null;
   private _bvarBindGroup: BindGroup | null;
   private _recombineBindGroup: BindGroup | null;
-  private _profile: SkinProfile | null;
-  private _debugOutput: SkinSSSDebugOutput;
+  private _profile: SSSProfile | null;
+  private _debugOutput: PostSSSDebugOutput;
   private _debugExposure: number;
   private _sampleCount: number;
   private readonly _projScale: Vector2;
@@ -125,10 +125,10 @@ export class SkinSSS extends AbstractPostEffect {
    *
    * @public
    */
-  get profile(): SkinProfile | null {
+  get profile(): SSSProfile | null {
     return this._profile;
   }
-  set profile(val: SkinProfile | null) {
+  set profile(val: SSSProfile | null) {
     this._profile = val ?? null;
   }
   get sampleCount() {
@@ -139,7 +139,7 @@ export class SkinSSS extends AbstractPostEffect {
   }
 
   /**
-   * Multiplier applied to whatever {@link SkinSSS.debugOutput} renders.
+   * Multiplier applied to whatever {@link PostSSS.debugOutput} renders.
    *
    * @remarks
    * Defaults to 1. Several intermediates sit in a narrow band that reads as a
@@ -160,14 +160,14 @@ export class SkinSSS extends AbstractPostEffect {
    * Intermediate quantity to render instead of the shaded result.
    *
    * @remarks
-   * Defaults to `'none'`. See {@link SkinSSSDebugOutput}.
+   * Defaults to `'none'`. See {@link PostSSSDebugOutput}.
    *
    * @public
    */
-  get debugOutput(): SkinSSSDebugOutput {
+  get debugOutput(): PostSSSDebugOutput {
     return this._debugOutput;
   }
-  set debugOutput(val: SkinSSSDebugOutput) {
+  set debugOutput(val: PostSSSDebugOutput) {
     this._debugOutput = SKIN_SSS_DEBUG_OUTPUTS.includes(val) ? val : 'none';
   }
 
@@ -176,24 +176,24 @@ export class SkinSSS extends AbstractPostEffect {
   }
 
   apply(ctx: DrawContext, inputColorTexture: Texture2D, sceneDepthTexture: Texture2D, srgbOutput: boolean) {
-    if (!ctx.SkinSSSTexture || !ctx.SkinProfileIdTexture || ctx.device.type !== 'webgpu') {
+    if (!ctx.SSSMaskTexture || !ctx.SSSProfileIdTexture || ctx.device.type !== 'webgpu') {
       this.passThrough(ctx, inputColorTexture, srgbOutput);
       return;
     }
     const device = ctx.device;
     const outputFramebuffer = device.getFramebuffer();
-    const maskTex = ctx.SkinSSSTexture;
-    const profileIdTex = ctx.SkinProfileIdTexture;
+    const maskTex = ctx.SSSMaskTexture;
+    const profileIdTex = ctx.SSSProfileIdTexture;
     const width = inputColorTexture.width;
     const height = inputColorTexture.height;
 
     const scatterFormat = ctx.colorFormat;
-    const profileTable = SkinProfile.getTable(device);
+    const profileTable = SSSProfile.getTable(device);
     if (!profileTable) {
       this.passThrough(ctx, inputColorTexture, srgbOutput);
       return;
     }
-    const fallback = this._profile ?? SkinProfile.getDefault();
+    const fallback = this._profile ?? SSSProfile.getDefault();
     // Projection of a world-space length at unit depth into UV, per axis. Two
     // factors, not one: `m00` and `m11` differ by the aspect ratio, so a single
     // one turns the sampling disc into an ellipse. UE5 reaches the same pair by
@@ -208,21 +208,21 @@ export class SkinSSS extends AbstractPostEffect {
     // Row of the fallback profile, used when a pixel's id is missing.
     this._profileParams.setXYZW(
       fallback.encodedId,
-      1 / SkinProfile.tableColumns,
-      1 / SkinProfile.tableRows,
-      SkinProfile.tableRows
+      1 / SSSProfile.tableColumns,
+      1 / SSSProfile.tableRows,
+      SSSProfile.tableRows
     );
     this._targetSize.setXYZW(width, height, 1 / width, 1 / height);
     this._cameraNearFar.setXY(ctx.camera.getNearPlane(), ctx.camera.getFarPlane());
 
-    if (!SkinSSS._burleyProgram) {
-      SkinSSS._burleyProgram = this.createBurleyProgram(ctx);
+    if (!PostSSS._burleyProgram) {
+      PostSSS._burleyProgram = this.createBurleyProgram(ctx);
     }
-    if (!SkinSSS._bvarProgram) {
-      SkinSSS._bvarProgram = this.createBVarProgram(ctx);
+    if (!PostSSS._bvarProgram) {
+      PostSSS._bvarProgram = this.createBVarProgram(ctx);
     }
-    if (!SkinSSS._recombineProgram) {
-      SkinSSS._recombineProgram = this.createRecombineProgram(ctx);
+    if (!PostSSS._recombineProgram) {
+      PostSSS._recombineProgram = this.createRecombineProgram(ctx);
     }
 
     const diffusedFB = device.pool.fetchTemporalFramebuffer(false, width, height, scatterFormat, null, false);
@@ -232,7 +232,7 @@ export class SkinSSS extends AbstractPostEffect {
     device.pushDeviceStates();
     try {
       if (!this._burleyBindGroup) {
-        this._burleyBindGroup = device.createBindGroup(SkinSSS._burleyProgram.bindGroupLayouts[0]);
+        this._burleyBindGroup = device.createBindGroup(PostSSS._burleyProgram.bindGroupLayouts[0]);
       }
       const bg = this._burleyBindGroup;
       bg.setTexture('sceneTex', inputColorTexture, fetchSampler('clamp_linear'));
@@ -259,7 +259,7 @@ export class SkinSSS extends AbstractPostEffect {
       // unconditionally. `needFlip` cannot be used: it reports whatever target is
       // bound at the time, and these values are set before the pass binds its own.
       bg.setValue('flip', device.type === 'webgpu' ? 1 : 0);
-      device.setProgram(SkinSSS._burleyProgram);
+      device.setProgram(PostSSS._burleyProgram);
       device.setBindGroup(0, bg);
       device.setFramebuffer(diffusedFB);
       this.drawFullscreenQuad();
@@ -271,7 +271,7 @@ export class SkinSSS extends AbstractPostEffect {
     device.pushDeviceStates();
     try {
       if (!this._bvarBindGroup) {
-        this._bvarBindGroup = device.createBindGroup(SkinSSS._bvarProgram.bindGroupLayouts[0]);
+        this._bvarBindGroup = device.createBindGroup(PostSSS._bvarProgram.bindGroupLayouts[0]);
       }
       const bg = this._bvarBindGroup;
       bg.setTexture(
@@ -283,7 +283,7 @@ export class SkinSSS extends AbstractPostEffect {
       bg.setValue('targetSize', this._targetSize);
       bg.setValue('cameraNearFar', this._cameraNearFar);
       bg.setValue('flip', device.type === 'webgpu' ? 1 : 0);
-      device.setProgram(SkinSSS._bvarProgram);
+      device.setProgram(PostSSS._bvarProgram);
       device.setBindGroup(0, bg);
       device.setFramebuffer(bvarFB);
       this.drawFullscreenQuad();
@@ -294,7 +294,7 @@ export class SkinSSS extends AbstractPostEffect {
     // --- Pass 3: Recombine ---
     device.setFramebuffer(outputFramebuffer);
     if (!this._recombineBindGroup) {
-      this._recombineBindGroup = device.createBindGroup(SkinSSS._recombineProgram.bindGroupLayouts[0]);
+      this._recombineBindGroup = device.createBindGroup(PostSSS._recombineProgram.bindGroupLayouts[0]);
     }
     const rbg = this._recombineBindGroup;
     rbg.setTexture('colorTex', inputColorTexture, fetchSampler('clamp_linear'));
@@ -306,7 +306,7 @@ export class SkinSSS extends AbstractPostEffect {
     rbg.setValue('debugMode', SKIN_SSS_DEBUG_OUTPUTS.indexOf(this._debugOutput));
     rbg.setValue('flip', this.needFlip(device) ? 1 : 0);
     rbg.setValue('srgbOut', srgbOutput ? 1 : 0);
-    device.setProgram(SkinSSS._recombineProgram);
+    device.setProgram(PostSSS._recombineProgram);
     device.setBindGroup(0, rbg);
     this.drawFullscreenQuad();
     device.pool.releaseFrameBuffer(diffusedFB);
@@ -333,7 +333,7 @@ export class SkinSSS extends AbstractPostEffect {
     const hasTextureArrays = ctx.device.type !== 'webgl';
     const program = ctx.device.buildRenderProgram({
       vertex(pb) {
-        SkinSSS.fullscreenVertex(pb);
+        PostSSS.fullscreenVertex(pb);
       },
       fragment(pb) {
         this.depthTex = pb.tex2D().sampleType('unfilterable-float').uniform(0);
@@ -760,7 +760,7 @@ export class SkinSSS extends AbstractPostEffect {
     // always runs at full sample count; the pass is the slot history would occupy.
     const program = ctx.device.buildRenderProgram({
       vertex(pb) {
-        SkinSSS.fullscreenVertex(pb);
+        PostSSS.fullscreenVertex(pb);
       },
       fragment(pb) {
         this.diffusedTex = pb.tex2D().uniform(0);
@@ -783,7 +783,7 @@ export class SkinSSS extends AbstractPostEffect {
   private createRecombineProgram(ctx: DrawContext) {
     const program = ctx.device.buildRenderProgram({
       vertex(pb) {
-        SkinSSS.fullscreenVertex(pb);
+        PostSSS.fullscreenVertex(pb);
       },
       fragment(pb) {
         this.colorTex = pb.tex2D().uniform(0);
@@ -830,7 +830,7 @@ export class SkinSSS extends AbstractPostEffect {
               // The diffusion buffer's alpha is the subsurface opacity, not a
               // transmission term - nothing in this pipeline produces one here.
               // UE5's transmission likewise comes from SubsurfaceProfileBxDF per
-              // light, and the back-lit term on SkinMaterial that stands in for
+              // light, and the back-lit term on SSSMaterial that stands in for
               // it is already part of SceneColor.
               this.$l.diffused = pb.textureSampleLevel(this.bvarTex, this.uv, 0).rgb;
               // Straight sum, as UE5 does it. No blend weight or tint: how far and

@@ -31,7 +31,7 @@ import { TAA } from '../posteffect/taa';
 import { SSGI } from '../posteffect/ssgi';
 import { SSR } from '../posteffect/ssr';
 import { SSS } from '../posteffect/sss';
-import { SkinSSS, type SkinSSSDebugOutput } from '../posteffect/skinsss';
+import { PostSSS, type PostSSSDebugOutput } from '../posteffect/postsss';
 import { Tonemap } from '../posteffect/tonemap';
 import { FXAA } from '../posteffect/fxaa';
 import { Bloom } from '../posteffect/bloom';
@@ -424,8 +424,8 @@ export class Camera extends SceneNode {
   /** @internal SSS debug visualization mode. */
   protected _sssDebugView: SSSDebugView;
   /** @internal Skin SSS post effect reference. */
-  protected _postEffectSkinSSS: DRef<SkinSSS>;
-  protected _skinSSSDebugOutput: SkinSSSDebugOutput;
+  protected _postEffectPostSSS: DRef<PostSSS>;
+  protected _postSSSDebugOutput: PostSSSDebugOutput;
   /** @internal SSAO enable flag (via post effect). */
   protected _SSAO: boolean;
   /** @internal SSAO post effect reference. */
@@ -595,8 +595,8 @@ export class Camera extends SceneNode {
     };
     this.updateSSSResolvedSettings();
     this._sssDebugView = 'none';
-    this._postEffectSkinSSS = new DRef();
-    this._skinSSSDebugOutput = 'none';
+    this._postEffectPostSSS = new DRef();
+    this._postSSSDebugOutput = 'none';
     this._SSAO = false;
     this._postEffectSSAO = new DRef();
     this._SSAOOcclusionRadius = 0.25;
@@ -1464,8 +1464,8 @@ export class Camera extends SceneNode {
    *
    * @internal
    */
-  setSkinSSSActive(active: boolean) {
-    const effect = this._postEffectSkinSSS.get();
+  setPostSSSActive(active: boolean) {
+    const effect = this._postEffectPostSSS.get();
     if (effect) {
       effect.enabled = active;
     }
@@ -1477,13 +1477,13 @@ export class Camera extends SceneNode {
    * `'none'` renders normally. Use this to tell an input problem from a kernel
    * problem when the diffusion does not look right.
    */
-  get skinSSSDebugOutput(): SkinSSSDebugOutput {
-    return this._skinSSSDebugOutput;
+  get postSSSDebugOutput(): PostSSSDebugOutput {
+    return this._postSSSDebugOutput;
   }
-  set skinSSSDebugOutput(val: SkinSSSDebugOutput) {
-    this._skinSSSDebugOutput = val ?? 'none';
-    if (this._postEffectSkinSSS.get()) {
-      this._postEffectSkinSSS.get()!.debugOutput = this._skinSSSDebugOutput;
+  set postSSSDebugOutput(val: PostSSSDebugOutput) {
+    this._postSSSDebugOutput = val ?? 'none';
+    if (this._postEffectPostSSS.get()) {
+      this._postEffectPostSSS.get()!.debugOutput = this._postSSSDebugOutput;
     }
   }
   /** @internal */
@@ -1987,12 +1987,12 @@ export class Camera extends SceneNode {
       this._postEffectSSS.set(sss);
       this._compositor.appendPostEffect(sss);
     }
-    if (!this._postEffectSkinSSS.get()) {
-      const skinSSS = new SkinSSS();
-      skinSSS.enabled = false;
-      skinSSS.debugOutput = this._skinSSSDebugOutput;
-      this._postEffectSkinSSS.set(skinSSS);
-      this._compositor.appendPostEffect(skinSSS);
+    if (!this._postEffectPostSSS.get()) {
+      const postSSS = new PostSSS();
+      postSSS.enabled = false;
+      postSSS.debugOutput = this._postSSSDebugOutput;
+      this._postEffectPostSSS.set(postSSS);
+      this._compositor.appendPostEffect(postSSS);
     }
     if (!this._postEffectSSAO.get()) {
       const ssao = new SAO();
@@ -2354,7 +2354,7 @@ export class Camera extends SceneNode {
     this._postEffectMotionBlur.dispose();
     this._postEffectSSAO.dispose();
     this._postEffectSSS.dispose();
-    this._postEffectSkinSSS.dispose();
+    this._postEffectPostSSS.dispose();
     this._postEffectSSGI.dispose();
     this._postEffectSSR.dispose();
     this._postEffectTAA.dispose();

@@ -24,7 +24,7 @@ import type { PBInsideFunctionScope, PBShaderExp } from '@zephyr3d/device';
  *
  * {@link SSS} in `posteffect/sss.ts` carries a more elaborate variant driven by
  * per-pixel profile slots and a LUT. This one is deliberately separate and much
- * smaller: {@link SkinSSS} has a single global profile in uniforms, so it needs
+ * smaller: {@link PostSSS} has a single global profile in uniforms, so it needs
  * no LUT plumbing. Unifying the two is worthwhile but would mean editing a
  * 2500-line shader that has no pixel-regression coverage.
  *

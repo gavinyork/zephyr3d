@@ -27,7 +27,7 @@ function fragmentOutputsOf(configure: (ctx: Record<string, unknown>, pass: Depth
     device,
     renderPass: pass,
     motionVectors: false,
-    skinProfileId: false,
+    sssProfileId: false,
     materialFlags: 0,
     queue: 0,
     renderPassHash: 'test',
@@ -48,17 +48,17 @@ describe('Depth prepass fragment outputs', () => {
   test('the ordinary prepass writes depth, motion vector and profile id', () => {
     const outputs = fragmentOutputsOf((ctx) => {
       ctx.motionVectors = true;
-      ctx.skinProfileId = true;
+      ctx.sssProfileId = true;
     });
     // Order is the MRT order the prepass framebuffer is built in, so it is part
     // of the contract rather than an implementation detail.
-    expect(outputs).toEqual(['zFragmentOutput', 'zMotionVector', 'zSkinProfileId']);
+    expect(outputs).toEqual(['zFragmentOutput', 'zMotionVector', 'zSSSProfileId']);
   });
 
   test('the transparent motion-vector pass writes the velocity alone', () => {
     const outputs = fragmentOutputsOf((ctx, pass) => {
       ctx.motionVectors = true;
-      ctx.skinProfileId = true;
+      ctx.sssProfileId = true;
       pass.motionVectorOnly = true;
     });
     // Its framebuffer carries one attachment. The profile id in particular has

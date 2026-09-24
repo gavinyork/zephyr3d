@@ -77,7 +77,7 @@ export class DepthPass extends RenderPass {
     // anything that points at the cache.
     return `${Number(this._renderBackface)}:${Number(this._encodeDepth)}:${Number(
       ctx.motionVectors
-    )}:${Number(this._motionVectorOnly)}:${Number(ctx.skinProfileId)}`;
+    )}:${Number(this._motionVectorOnly)}:${Number(ctx.sssProfileId)}`;
   }
   /** @internal */
   protected renderItems(ctx: DrawContext, renderCamera: Camera, renderQueue: RenderQueue) {

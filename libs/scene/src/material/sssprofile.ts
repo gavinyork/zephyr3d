@@ -10,7 +10,7 @@ import type { AbstractDevice, Texture2D } from '@zephyr3d/device';
  *
  * @internal
  */
-const SKIN_PROFILE_PARAM_COLUMNS = 6;
+const SSS_PROFILE_PARAM_COLUMNS = 6;
 
 /**
  * Number of texels the baked transmission profile occupies.
@@ -20,7 +20,7 @@ const SKIN_PROFILE_PARAM_COLUMNS = 6;
  *
  * @internal
  */
-const SKIN_TRANSMISSION_LUT_SIZE = 32;
+const SSS_TRANSMISSION_LUT_SIZE = 32;
 
 /**
  * Total columns per profile row: the scalar parameters followed by the baked
@@ -28,55 +28,42 @@ const SKIN_TRANSMISSION_LUT_SIZE = 32;
  *
  * @internal
  */
-const SKIN_PROFILE_COLUMNS = SKIN_PROFILE_PARAM_COLUMNS + SKIN_TRANSMISSION_LUT_SIZE;
+const SSS_PROFILE_COLUMNS = SSS_PROFILE_PARAM_COLUMNS + SSS_TRANSMISSION_LUT_SIZE;
 
 /** Maximum number of live skin profiles, matching the 8-bit profile id channel. @internal */
-const SKIN_PROFILE_CAPACITY = 256;
+const SSS_PROFILE_CAPACITY = 256;
 
 /**
- * Gate on {@link SkinProfile}'s constructor.
+ * Gate on {@link SSSProfile}'s constructor.
  *
  * @remarks
- * Module-private, so only {@link SkinProfile.createOwned} can pass it. See the
+ * Module-private, so only {@link SSSProfile.createOwned} can pass it. See the
  * constructor for why a `private` modifier alone is not enough.
  *
  * @internal
  */
-const CREATE_TOKEN = Symbol('SkinProfile.create');
+const CREATE_TOKEN = Symbol('SSSProfile.create');
 
 /**
  * Largest optical depth the transmission profile is defined over.
  *
- * @remarks
- * `SSSS_MAX_TRANSMISSION_PROFILE_DISTANCE` in UE5. It appears in two places that
- * have to agree, which is why it lives here rather than next to either of them:
- * the thickness pass encodes its optical depth as `1 - opticalDepth / MAX`, and
- * the transmission BxDF decodes that and divides by `MAX` again to index the
- * baked profile below.
- *
  * @internal
  */
-export const SKIN_MAX_TRANSMISSION_OPTICAL_DEPTH = 5;
+export const SSS_MAX_TRANSMISSION_OPTICAL_DEPTH = 5;
 
 /**
  * Floor the averaged optical depth is clamped to before encoding.
  *
- * @remarks
- * UE5's `clamp(..., 0.15, 5)` in `CalculateOpticalDepth`.
- *
  * @internal
  */
-export const SKIN_TRANSMISSION_OPTICAL_DEPTH_FLOOR = 0.15;
+export const SSS_TRANSMISSION_OPTICAL_DEPTH_FLOOR = 0.15;
 
 /**
  * Constant added to the optical depth after clamping.
  *
- * @remarks
- * UE5's trailing `+ 0.25` in `CalculateOpticalDepth`.
- *
  * @internal
  */
-export const SKIN_TRANSMISSION_OPTICAL_DEPTH_BIAS = 0.25;
+export const SSS_TRANSMISSION_OPTICAL_DEPTH_BIAS = 0.25;
 
 /**
  * Largest value the thickness pass can write, and with it the sentinel that
@@ -93,10 +80,10 @@ export const SKIN_TRANSMISSION_OPTICAL_DEPTH_BIAS = 0.25;
  *
  * @internal
  */
-export const SKIN_TRANSMISSION_NO_DATA_ENCODING =
+export const SSS_TRANSMISSION_NO_DATA_ENCODING =
   1 -
-  (SKIN_TRANSMISSION_OPTICAL_DEPTH_FLOOR + SKIN_TRANSMISSION_OPTICAL_DEPTH_BIAS) /
-    SKIN_MAX_TRANSMISSION_OPTICAL_DEPTH;
+  (SSS_TRANSMISSION_OPTICAL_DEPTH_FLOOR + SSS_TRANSMISSION_OPTICAL_DEPTH_BIAS) /
+    SSS_MAX_TRANSMISSION_OPTICAL_DEPTH;
 
 /**
  * Distance, in profile millimetres, the baked transmission profile spans.
@@ -105,14 +92,14 @@ export const SKIN_TRANSMISSION_NO_DATA_ENCODING =
  * `MaxTransmissionProfileDistance * CmToMm = 5 * 10` in
  * `ComputeTransmissionProfileBurley`.
  *
- * The 5 here and the one in {@link SKIN_MAX_TRANSMISSION_OPTICAL_DEPTH} are the
+ * The 5 here and the one in {@link SSS_MAX_TRANSMISSION_OPTICAL_DEPTH} are the
  * same number by construction: UE5's world unit is the centimetre, so an optical
  * depth of 1 at unit extinction *is* one centimetre, and this axis is that span
  * in the millimetres the mean free paths use. The shader indexes the table with
  * optical depth directly — self-consistent only once that is accounted for.
  *
  * The thickness pass must therefore be calibrated against this axis;
- * {@link SKIN_OPTICAL_DEPTH_PER_WORLD_UNIT} is that calibration, and changing
+ * {@link SSS_OPTICAL_DEPTH_PER_WORLD_UNIT} is that calibration, and changing
  * this constant without it slides the whole profile along the thickness axis.
  *
  * @internal
@@ -165,9 +152,9 @@ const WORLD_UNITS_TO_PROFILE_MM = 1000;
  *
  * @internal
  */
-export const SKIN_OPTICAL_DEPTH_PER_WORLD_UNIT =
-  (WORLD_UNITS_TO_PROFILE_MM * SKIN_MAX_TRANSMISSION_OPTICAL_DEPTH) /
-  (TRANSMISSION_LUT_MAX_DISTANCE_MM * ((SKIN_TRANSMISSION_LUT_SIZE - 1) / SKIN_TRANSMISSION_LUT_SIZE));
+export const SSS_OPTICAL_DEPTH_PER_WORLD_UNIT =
+  (WORLD_UNITS_TO_PROFILE_MM * SSS_MAX_TRANSMISSION_OPTICAL_DEPTH) /
+  (TRANSMISSION_LUT_MAX_DISTANCE_MM * ((SSS_TRANSMISSION_LUT_SIZE - 1) / SSS_TRANSMISSION_LUT_SIZE));
 
 /**
  * Column indices within a packed profile row.
@@ -202,7 +189,7 @@ const enum ProfileColumn {
  *
  * @remarks
  * `s = 3.5 + 100 (A - 0.33)^4`. The same curve the diffusion evaluates on the
- * GPU (`posteffect/skinsss.ts`, `scalingFactor`); the transmission profile is
+ * GPU (`posteffect/postsss.ts`, `scalingFactor`); the transmission profile is
  * baked on the CPU and needs its own copy.
  *
  * @internal
@@ -213,13 +200,13 @@ function searchLightDiffuseScalingFactor(albedo: number): number {
 }
 
 /**
- * Built-in {@link SkinProfile} presets.
+ * Built-in {@link SSSProfile} presets.
  *
  * @public
  */
-export type SkinProfilePreset = 'skin' | 'skin_pale' | 'skin_tan' | 'skin_dark' | 'wax' | 'jade' | 'marble';
+export type SSSProfilePreset = 'skin' | 'skin_pale' | 'skin_tan' | 'skin_dark' | 'wax' | 'jade' | 'marble';
 
-interface SkinProfileTemplate {
+interface SSSProfileTemplate {
   surfaceAlbedo: [number, number, number];
   meanFreePath: [number, number, number];
   meanFreePathDistance: number;
@@ -262,7 +249,7 @@ interface SkinProfileTemplate {
  *
  * @internal
  */
-const SKIN_PROFILE_TEMPLATES: Record<SkinProfilePreset, SkinProfileTemplate> = {
+const SSS_PROFILE_TEMPLATES: Record<SSSProfilePreset, SSSProfileTemplate> = {
   skin: {
     surfaceAlbedo: [0.91058, 0.338275, 0.2718],
     meanFreePath: [1.0, 0.0889636, 0.0720951],
@@ -378,11 +365,11 @@ const SKIN_PROFILE_TEMPLATES: Record<SkinProfilePreset, SkinProfileTemplate> = {
 };
 
 /**
- * Subsurface profile for {@link SkinMaterial}, holding the parameters UE5's
+ * Subsurface profile for {@link SSSMaterial}, holding the parameters UE5's
  * Burley diffusion is driven by.
  *
  * @remarks
- * Profiles are packed into a shared GPU table keyed by {@link SkinProfile.id},
+ * Profiles are packed into a shared GPU table keyed by {@link SSSProfile.id},
  * and materials write that id per pixel. This lets several profiles — face, ears,
  * lips — diffuse independently in a single screen-space pass, which is how UE5
  * drives its subsurface scattering.
@@ -393,20 +380,20 @@ const SKIN_PROFILE_TEMPLATES: Record<SkinProfilePreset, SkinProfileTemplate> = {
  *
  * @public
  */
-export class SkinProfile {
-  private static readonly _profiles: Array<SkinProfile | null> = new Array(SKIN_PROFILE_CAPACITY).fill(null);
+export class SSSProfile {
+  private static readonly _profiles: Array<SSSProfile | null> = new Array(SSS_PROFILE_CAPACITY).fill(null);
   private static _table: Texture2D | null = null;
-  /** Device {@link SkinProfile._table} belongs to, so a device swap can be spotted. */
+  /** Device {@link SSSProfile._table} belongs to, so a device swap can be spotted. */
   private static _tableDevice: AbstractDevice | null = null;
   private static _tableData: Float32Array<ArrayBuffer> | null = null;
   private static _tableDirty = true;
-  private static _defaultProfile: SkinProfile | null = null;
+  private static _defaultProfile: SSSProfile | null = null;
   private readonly _id: number;
   private readonly _surfaceAlbedo: Vector3;
   private readonly _meanFreePath: Vector3;
   private readonly _boundaryColorBleed: Vector3;
   private readonly _transmissionTint: Vector3;
-  private _preset: SkinProfilePreset;
+  private _preset: SSSProfilePreset;
   private _meanFreePathDistance: number;
   private _worldUnitScale: number;
   private _scatterScale: number;
@@ -421,21 +408,21 @@ export class SkinProfile {
   private readonly _changeListeners: Set<() => void>;
 
   /**
-   * Not constructible from outside. Use {@link SkinMaterial.subsurfaceProfile},
+   * Not constructible from outside. Use {@link SSSMaterial.subsurfaceProfile},
    * which owns one for the material's lifetime.
    *
    * @remarks
    * The token check is not redundant with `private`: profiles hold a row of a
-   * 256-entry GPU table that only {@link SkinProfile.dispose} returns, and the
+   * 256-entry GPU table that only {@link SSSProfile.dispose} returns, and the
    * editor ships as prebuilt JavaScript that drives this class through
    * serialization metadata, where TypeScript's visibility rules do not apply.
    *
    * @internal
    */
-  private constructor(token: typeof CREATE_TOKEN, preset: SkinProfilePreset = 'skin') {
+  private constructor(token: typeof CREATE_TOKEN, preset: SSSProfilePreset = 'skin') {
     if (token !== CREATE_TOKEN) {
       throw new Error(
-        'SkinProfile is not constructible directly; it is owned by the SkinMaterial that created it.'
+        'SSSProfile is not constructible directly; it is owned by the SSSMaterial that created it.'
       );
     }
     this._surfaceAlbedo = new Vector3();
@@ -455,7 +442,7 @@ export class SkinProfile {
     this._lobeMix = 0.85;
     this._disposed = false;
     this._changeListeners = new Set();
-    this._id = SkinProfile.allocateId(this);
+    this._id = SSSProfile.allocateId(this);
     this.applyPreset(preset);
   }
 
@@ -486,15 +473,15 @@ export class SkinProfile {
    *
    * @remarks
    * The only way to obtain one. The caller takes on releasing its table row — in
-   * practice {@link SkinMaterial}, which disposes the profile with itself.
+   * practice {@link SSSMaterial}, which disposes the profile with itself.
    *
    * @param preset - Preset to start from. Defaults to `'skin'`.
    * @returns The new profile.
    *
    * @internal
    */
-  static createOwned(preset: SkinProfilePreset = 'skin') {
-    return new SkinProfile(CREATE_TOKEN, preset);
+  static createOwned(preset: SSSProfilePreset = 'skin') {
+    return new SSSProfile(CREATE_TOKEN, preset);
   }
 
   /**
@@ -509,7 +496,7 @@ export class SkinProfile {
    */
   static getDefault() {
     if (!this._defaultProfile) {
-      this._defaultProfile = new SkinProfile(CREATE_TOKEN, 'skin');
+      this._defaultProfile = new SSSProfile(CREATE_TOKEN, 'skin');
     }
     return this._defaultProfile;
   }
@@ -523,7 +510,7 @@ export class SkinProfile {
    * @public
    */
   static getById(id: number) {
-    return id > 0 && id < SKIN_PROFILE_CAPACITY ? this._profiles[id] : null;
+    return id > 0 && id < SSS_PROFILE_CAPACITY ? this._profiles[id] : null;
   }
 
   /**
@@ -547,17 +534,17 @@ export class SkinProfile {
       this._tableData = null;
     }
     if (!this._table) {
-      this._table = device.createTexture2D('rgba32f', SKIN_PROFILE_COLUMNS, SKIN_PROFILE_CAPACITY, {
+      this._table = device.createTexture2D('rgba32f', SSS_PROFILE_COLUMNS, SSS_PROFILE_CAPACITY, {
         mipmapping: false,
         samplerOptions: { minFilter: 'nearest', magFilter: 'nearest', mipFilter: 'none' }
       });
       this._tableDevice = device;
-      this._tableData = new Float32Array(SKIN_PROFILE_COLUMNS * SKIN_PROFILE_CAPACITY * 4);
+      this._tableData = new Float32Array(SSS_PROFILE_COLUMNS * SSS_PROFILE_CAPACITY * 4);
       this._tableDirty = true;
     }
     if (this._tableDirty && this._table && this._tableData) {
       this.packTable(this._tableData);
-      this._table.update(this._tableData, 0, 0, SKIN_PROFILE_COLUMNS, SKIN_PROFILE_CAPACITY);
+      this._table.update(this._tableData, 0, 0, SSS_PROFILE_COLUMNS, SSS_PROFILE_CAPACITY);
       this._tableDirty = false;
     }
     return this._table;
@@ -565,7 +552,7 @@ export class SkinProfile {
 
   /** Number of parameter columns in the packed table. @public */
   static get tableColumns() {
-    return SKIN_PROFILE_COLUMNS;
+    return SSS_PROFILE_COLUMNS;
   }
 
   /**
@@ -578,7 +565,7 @@ export class SkinProfile {
    * @public
    */
   static get transmissionLutOffset() {
-    return SKIN_PROFILE_PARAM_COLUMNS;
+    return SSS_PROFILE_PARAM_COLUMNS;
   }
 
   /**
@@ -610,12 +597,12 @@ export class SkinProfile {
 
   /** Number of entries in the baked transmission profile. @public */
   static get transmissionLutSize() {
-    return SKIN_TRANSMISSION_LUT_SIZE;
+    return SSS_TRANSMISSION_LUT_SIZE;
   }
 
   /** Number of rows in the packed table. @public */
   static get tableRows() {
-    return SKIN_PROFILE_CAPACITY;
+    return SSS_PROFILE_CAPACITY;
   }
 
   /**
@@ -640,7 +627,7 @@ export class SkinProfile {
   get preset() {
     return this._preset;
   }
-  set preset(val: SkinProfilePreset) {
+  set preset(val: SSSProfilePreset) {
     if (val !== this._preset) {
       this.applyPreset(val);
     }
@@ -669,7 +656,7 @@ export class SkinProfile {
    * Per-channel diffuse mean free path, as a ratio.
    *
    * @remarks
-   * Scaled by {@link SkinProfile.meanFreePathDistance} to reach world units. The
+   * Scaled by {@link SSSProfile.meanFreePathDistance} to reach world units. The
    * red channel is normally much longer than blue, which is what makes thin
    * geometry such as an ear rim glow red.
    *
@@ -703,7 +690,7 @@ export class SkinProfile {
    * @remarks
    * Applied once, when the diffusion converts a scatter radius into a screen
    * offset — the same place UE5 applies it, in `CalculateBurleyScale`. It is
-   * deliberately absent from {@link SkinProfile.getScatterDistance}.
+   * deliberately absent from {@link SSSProfile.getScatterDistance}.
    *
    * @public
    */
@@ -815,7 +802,7 @@ export class SkinProfile {
    * UE5's `IOR`, default 1.55 for skin, stored in the table as `1 / ior` since
    * that is the form `refract` takes. This drives transmission only — the
    * specular Fresnel stays on the dielectric `F0 = 0.08 * Specular` mapping, as
-   * {@link SkinMaterial.specularF0} notes.
+   * {@link SSSMaterial.specularF0} notes.
    *
    * @public
    */
@@ -855,7 +842,7 @@ export class SkinProfile {
    * Multiplier on the material roughness for the wide specular lobe.
    *
    * @remarks
-   * Same scaling as {@link SkinProfile.roughness0}; skin's default 1.3 broadens
+   * Same scaling as {@link SSSProfile.roughness0}; skin's default 1.3 broadens
    * the second lobe, giving it a soft sheen alongside the tighter highlight.
    *
    * @public
@@ -887,7 +874,7 @@ export class SkinProfile {
    * Per-channel diffusion distance, in profile space.
    *
    * @remarks
-   * Deliberately *not* scaled by {@link SkinProfile.worldUnitScale}, which UE5
+   * Deliberately *not* scaled by {@link SSSProfile.worldUnitScale}, which UE5
    * applies later in `CalculateBurleyScale`; applying it in both places would
    * make the diffusion scale with its square. The result must therefore be read
    * together with that factor to reach world units.
@@ -912,7 +899,7 @@ export class SkinProfile {
    *
    * @public
    */
-  copyFrom(other: SkinProfile) {
+  copyFrom(other: SSSProfile) {
     this._preset = other._preset;
     this._surfaceAlbedo.set(other._surfaceAlbedo);
     this._meanFreePath.set(other._meanFreePath);
@@ -941,14 +928,14 @@ export class SkinProfile {
       return;
     }
     this._disposed = true;
-    if (SkinProfile._profiles[this._id] === this) {
-      SkinProfile._profiles[this._id] = null;
-      SkinProfile.markDirty();
+    if (SSSProfile._profiles[this._id] === this) {
+      SSSProfile._profiles[this._id] = null;
+      SSSProfile.markDirty();
     }
   }
 
-  private applyPreset(preset: SkinProfilePreset) {
-    const t = SKIN_PROFILE_TEMPLATES[preset] ?? SKIN_PROFILE_TEMPLATES.skin;
+  private applyPreset(preset: SSSProfilePreset) {
+    const t = SSS_PROFILE_TEMPLATES[preset] ?? SSS_PROFILE_TEMPLATES.skin;
     this._preset = preset;
     this._surfaceAlbedo.setXYZ(t.surfaceAlbedo[0], t.surfaceAlbedo[1], t.surfaceAlbedo[2]);
     this._meanFreePath.setXYZ(t.meanFreePath[0], t.meanFreePath[1], t.meanFreePath[2]);
@@ -971,15 +958,15 @@ export class SkinProfile {
     this.notifyChanged();
   }
 
-  private static allocateId(profile: SkinProfile) {
-    for (let i = 1; i < SKIN_PROFILE_CAPACITY; i++) {
+  private static allocateId(profile: SSSProfile) {
+    for (let i = 1; i < SSS_PROFILE_CAPACITY; i++) {
       if (!this._profiles[i]) {
         this._profiles[i] = profile;
         this.markDirty();
         return i;
       }
     }
-    throw new Error('SkinProfile limit exceeded');
+    throw new Error('SSSProfile limit exceeded');
   }
 
   private static markDirty() {
@@ -991,14 +978,14 @@ export class SkinProfile {
    * profile so they can refresh their uniforms.
    */
   private notifyChanged() {
-    SkinProfile.markDirty();
+    SSSProfile.markDirty();
     this._changeListeners.forEach((listener) => listener());
   }
 
   private static packTable(out: Float32Array<ArrayBuffer>) {
     out.fill(0);
-    const stride = SKIN_PROFILE_COLUMNS * 4;
-    for (let id = 1; id < SKIN_PROFILE_CAPACITY; id++) {
+    const stride = SSS_PROFILE_COLUMNS * 4;
+    for (let id = 1; id < SSS_PROFILE_CAPACITY; id++) {
       const p = this._profiles[id];
       if (!p) {
         continue;
@@ -1047,7 +1034,7 @@ export class SkinProfile {
       write(ProfileColumn.Specular, p._roughness0, p._roughness1, p._lobeMix, 0);
       // The LUT columns are consecutive within the row, so the baked profile
       // drops straight in after the scalar parameters.
-      p.writeTransmissionProfile(out, row + SKIN_PROFILE_PARAM_COLUMNS * 4);
+      p.writeTransmissionProfile(out, row + SSS_PROFILE_PARAM_COLUMNS * 4);
     }
   }
 
@@ -1093,12 +1080,12 @@ export class SkinProfile {
     ];
     const tint = [this._transmissionTint.x, this._transmissionTint.y, this._transmissionTint.z];
     const offsetMM = TRANSMISSION_LUT_RADIUS_OFFSET_MM * invUnitScale;
-    for (let i = 0; i < SKIN_TRANSMISSION_LUT_SIZE; i++) {
+    for (let i = 0; i < SSS_TRANSMISSION_LUT_SIZE; i++) {
       const o = offset + i * 4;
       // UE5's `bMakeLastPixelBlack`: 50 mm leaves a red tail still visible after
       // tone mapping, so forcing the last entry black is what makes anything
       // thicker than the table stop transmitting outright.
-      if (i === SKIN_TRANSMISSION_LUT_SIZE - 1) {
+      if (i === SSS_TRANSMISSION_LUT_SIZE - 1) {
         out[o] = 0;
         out[o + 1] = 0;
         out[o + 2] = 0;
@@ -1107,7 +1094,7 @@ export class SkinProfile {
       }
       // Note the divisor is the table size, not `size - 1`: the last entry is
       // blacked out anyway, so UE5 spends the axis on the entries that survive.
-      const distanceMM = (i / SKIN_TRANSMISSION_LUT_SIZE) * TRANSMISSION_LUT_MAX_DISTANCE_MM * invUnitScale;
+      const distanceMM = (i / SSS_TRANSMISSION_LUT_SIZE) * TRANSMISSION_LUT_MAX_DISTANCE_MM * invUnitScale;
       const r = distanceMM + offsetMM;
       for (let c = 0; c < 3; c++) {
         out[o + c] =

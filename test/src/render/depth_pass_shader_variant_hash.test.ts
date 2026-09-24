@@ -38,7 +38,7 @@ describe('DepthPass does not inherit a stale shader variant hash', () => {
       drawEnvLight: true,
       env: {},
       motionVectors: true,
-      skinProfileId: false,
+      sssProfileId: false,
       renderPass: pass,
       camera: { worldMatrixDet: 1 },
       device: { setBindGroup: () => {}, getFramebuffer: () => null },
@@ -73,8 +73,8 @@ describe('DepthPass does not inherit a stale shader variant hash', () => {
     // variants hashed alike, a frame that switched skin scattering on or off
     // would be handed the other variant's program and WebGPU would reject the
     // draw on output count.
-    const without = renderItemsWith(null, { skinProfileId: false });
-    const with_ = renderItemsWith(null, { skinProfileId: true });
+    const without = renderItemsWith(null, { sssProfileId: false });
+    const with_ = renderItemsWith(null, { sssProfileId: true });
     expect(with_.renderPassHash).not.toBe(without.renderPassHash);
   });
 });

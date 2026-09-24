@@ -1,5 +1,5 @@
 import { Quaternion, Vector3, Vector4 } from '@zephyr3d/base';
-import { BoxShape, DirectionalLight, Mesh, SkinMaterial, SphereShape } from '@zephyr3d/scene';
+import { BoxShape, DirectionalLight, Mesh, SSSMaterial, SphereShape } from '@zephyr3d/scene';
 import type { PerspectiveCamera, Scene } from '@zephyr3d/scene';
 import type { VisualScene } from '../types';
 import { bareScene, placeCamera } from './common';
@@ -112,7 +112,7 @@ function backLight(scene: Scene, shadowMapSize: number, scale = 1) {
  * result rather than tinting it.
  */
 function slabMaterial(worldUnitScale: number) {
-  const material = new SkinMaterial();
+  const material = new SSSMaterial();
   material.albedoColor = new Vector4(0.85, 0.66, 0.58, 1);
   // The pass reads extinction, normal scale and unit scale per pixel from this
   // profile, keyed by the id the depth prepass wrote. Set explicitly so the
@@ -160,7 +160,7 @@ function slab(scene: Scene, x: number, thickness: number, tilt: number, scale = 
  * is a picture rather than a number.
  */
 function thicknessDebug(camera: PerspectiveCamera) {
-  camera.skinSSSDebugOutput = 'thickness';
+  camera.postSSSDebugOutput = 'thickness';
   camera.toneMap = false;
 }
 
