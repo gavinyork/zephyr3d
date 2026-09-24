@@ -1,5 +1,5 @@
 import { ProgramBuilder } from '../../../libs/device/src';
-import { SkinSSS } from '../../../libs/scene/src/posteffect/skinsss';
+import { PostSSS } from '../../../libs/scene/src/posteffect/skinsss';
 
 function createShaderContext(type: 'webgl' | 'webgpu') {
   const device: any = {
@@ -8,7 +8,7 @@ function createShaderContext(type: 'webgl' | 'webgpu') {
       const builder = new ProgramBuilder(device);
       const result = builder.buildRender(options);
       if (!result) {
-        throw new Error(builder.lastError ?? 'SkinSSS shader generation failed');
+        throw new Error(builder.lastError ?? 'PostSSS shader generation failed');
       }
       return {
         bindGroupLayouts: result[2],
@@ -23,7 +23,7 @@ function createShaderContext(type: 'webgl' | 'webgpu') {
 
 function buildPrograms(type: 'webgl' | 'webgpu') {
   const ctx = createShaderContext(type);
-  const effect = new SkinSSS() as any;
+  const effect = new PostSSS() as any;
   return {
     burley: effect.createBurleyProgram(ctx).fragmentSource as string,
     bvar: effect.createBVarProgram(ctx).fragmentSource as string,
@@ -31,7 +31,7 @@ function buildPrograms(type: 'webgl' | 'webgpu') {
   };
 }
 
-describe('SkinSSS shader generation', () => {
+describe('PostSSS shader generation', () => {
   test.each(['webgpu', 'webgl'] as const)('builds all %s passes', (type) => {
     const { burley, bvar, recombine } = buildPrograms(type);
     expect(burley).toBeTruthy();

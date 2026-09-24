@@ -20,7 +20,7 @@ type FrameResourceMap = {
   readonly SSSParam: FrameResourceKey<RGTextureHandle>;
   readonly SSSDiffuse: FrameResourceKey<RGTextureHandle>;
   readonly SSSTransmission: FrameResourceKey<RGTextureHandle>;
-  readonly SkinSSS: FrameResourceKey<RGTextureHandle>;
+  readonly PostSSS: FrameResourceKey<RGTextureHandle>;
   readonly SSSProfileId: FrameResourceKey<RGTextureHandle>;
   readonly ShadowMask: FrameResourceKey<RGTextureHandle>;
   readonly TransmissionThickness: FrameResourceKey<RGTextureHandle>;
@@ -52,7 +52,7 @@ export const FrameResources = {
   SSSParam: 'sssParam',
   SSSDiffuse: 'sssDiffuse',
   SSSTransmission: 'sssTransmission',
-  SkinSSS: 'skinSSS',
+  PostSSS: 'postSSS',
   /**
    * Per-pixel skin profile id from the depth prepass.
    *

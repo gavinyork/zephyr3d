@@ -109,7 +109,7 @@ export class SceneRenderer {
           SSSDiffuseTexture: null,
           SSSTransmissionTexture: null,
           SSSMaskTexture: null,
-          skinSSS: false,
+          postSSS: false,
           ssrSDFBoxBuffer: null,
           ssrSDFBoxCount: 0,
           finalFramebuffer: device.getFramebuffer(),

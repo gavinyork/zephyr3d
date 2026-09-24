@@ -22,7 +22,7 @@ import { bareScene, placeCamera } from './common';
  *  - the slab is large compared to a shadow texel, so light-space lateral
  *    resolution never enters into it.
  *
- * What reaches the screen is `camera.skinSSSDebugOutput = 'thickness'`, which
+ * What reaches the screen is `camera.SSSDebugOutput = 'thickness'`, which
  * renders `1 - encoded` (bright = thick) and calls out "no light wrote this
  * channel" as pure blue so it cannot be mistaken for zero thickness. See
  * verify-transmission-thickness.mjs for the expected values and the arithmetic
@@ -160,7 +160,7 @@ function slab(scene: Scene, x: number, thickness: number, tilt: number, scale = 
  * is a picture rather than a number.
  */
 function thicknessDebug(camera: PerspectiveCamera) {
-  camera.skinSSSDebugOutput = 'thickness';
+  camera.SSSDebugOutput = 'thickness';
   camera.toneMap = false;
 }
 

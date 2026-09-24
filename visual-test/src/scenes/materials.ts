@@ -69,7 +69,7 @@ export const pbrMetalRoughGrid: VisualScene = {
 export const skinSss: VisualScene = {
   name: 'skin-sss',
   description:
-    'SSSMaterial sphere under a grazing key with SkinSSS enabled. Pins the diffuse wrap and the channel-dependent diffusion across a wide terminator.',
+    'SSSMaterial sphere under a grazing key with PostSSS enabled. Pins the diffuse wrap and the channel-dependent diffusion across a wide terminator.',
   setup({ scene, camera }) {
     bareScene(scene);
     // Grazing key from the left, so the terminator runs down the middle of the

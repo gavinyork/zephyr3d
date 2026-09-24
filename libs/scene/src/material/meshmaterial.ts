@@ -1113,7 +1113,7 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
             this.$outputs.zSSSTransmission = pb.vec4();
           }
           if (ctx.materialFlags & MaterialVaryingFlags.SKIN_SSS_STORE) {
-            this.$outputs.zSkinSSS = pb.vec4();
+            this.$outputs.zPostSSS = pb.vec4();
           }
           if (ctx.renderPass!.type === RENDER_PASS_TYPE_DEPTH && ctx.motionVectors) {
             this.$outputs.zMotionVector = pb.vec4();
@@ -1188,7 +1188,7 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
     sssDiffuse?: PBShaderExp,
     sssTransmission?: PBShaderExp,
     sssProfileEnabled = false,
-    skinSSS?: PBShaderExp
+    postSSS?: PBShaderExp
   ) {
     const pb = scope.$builder;
     const that = this;
@@ -1485,11 +1485,11 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
       scope.$outputs.zSSSTransmission = disableSSS ? pb.vec4(0) : (sssTransmission ?? pb.vec4(0));
     }
     if (that.drawContext.materialFlags & MaterialVaryingFlags.SKIN_SSS_STORE) {
-      const disableSkinSSS =
+      const disablePostSSS =
         that.drawContext.renderPass!.type !== RENDER_PASS_TYPE_LIGHT ||
         (that.isTransparentPass(that.pass, that.drawContext) && !that.alphaToCoverage) ||
         that.needSceneColor();
-      scope.$outputs.zSkinSSS = disableSkinSSS ? pb.vec4(0) : (skinSSS ?? pb.vec4(0));
+      scope.$outputs.zPostSSS = disablePostSSS ? pb.vec4(0) : (postSSS ?? pb.vec4(0));
     }
   }
 }

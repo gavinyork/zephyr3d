@@ -23,7 +23,7 @@ import { SSSProfile } from './skinprofile';
 import { fetchSampler } from '../utility/misc';
 
 /**
- * HDR range that used to be packed into the SkinSSS side buffer when the render
+ * HDR range that used to be packed into the PostSSS side buffer when the render
  * graph fell back to an 8-bit format.
  *
  * @deprecated The SSS scattering source is now recovered from `SceneColor` via
@@ -41,7 +41,7 @@ export const SKIN_SSS_LDR_ENCODE_RANGE = 4;
  * @remarks
  * Uses a pre-integrated curvature-dependent diffuse BRDF and dual-lobe GGX specular
  * driven by subsurface profile parameters. The **diffuse** luminance is written to
- * `SceneColor.a` so the {@link SkinSSS} post effect can recover the diffusible
+ * `SceneColor.a` so the {@link PostSSS} post effect can recover the diffusible
  * fraction as `saturate(SceneColor.a / luma(SceneColor.rgb))` — the same spec/diff
  * separation UE5 performs in its SSS Setup and Recombine passes.
  *
@@ -91,13 +91,13 @@ export class SSSMaterial
   }
 
   /**
-   * Marker used by the forward render graph to enable the SkinSSS post effect.
+   * Marker used by the forward render graph to enable the PostSSS post effect.
    *
    * @remarks
    * This no longer allocates a side buffer: the scattering source is recovered
    * from `SceneColor` and its diffuse-luminance alpha.
    */
-  get skinSSS() {
+  get postSSS() {
     return true;
   }
 
@@ -126,7 +126,7 @@ export class SSSMaterial
 
   /**
    * Keeps the diffuse luminance written to `SceneColor.a` instead of letting the
-   * opaque path overwrite it with 1. {@link SkinSSS} needs it to separate the
+   * opaque path overwrite it with 1. {@link PostSSS} needs it to separate the
    * diffusible energy from the specular it must leave untouched.
    */
   protected preservesOpaqueAlpha(ctx: DrawContext): boolean {
@@ -500,7 +500,7 @@ export class SSSMaterial
         );
         scope.$l.litColor = pb.add(scope.diffusible, scope.specularLighting);
         scope.$l.diffLum = pb.dot(scope.diffusible, pb.vec3(0.2126, 0.7152, 0.0722));
-        scope.$l.skinSSSMask = pb.vec4(pb.add(pb.mul(scope.normal, 0.5), pb.vec3(0.5)), scope.skinMask);
+        scope.$l.postSSSMask = pb.vec4(pb.add(pb.mul(scope.normal, 0.5), pb.vec3(0.5)), scope.skinMask);
         if (
           this.drawContext.materialFlags &
           (MaterialVaryingFlags.SCENE_STORE_ROUGHNESS | MaterialVaryingFlags.SCENE_STORE_NORMAL)
@@ -520,7 +520,7 @@ export class SSSMaterial
             undefined,
             undefined,
             false,
-            scope.skinSSSMask
+            scope.postSSSMask
           );
         } else {
           this.outputFragmentColor(
@@ -534,7 +534,7 @@ export class SSSMaterial
             undefined,
             undefined,
             false,
-            scope.skinSSSMask
+            scope.postSSSMask
           );
         }
       } else {

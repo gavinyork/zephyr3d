@@ -229,7 +229,7 @@ export interface DrawContext {
    */
   SSSProfileIdTexture: Nullable<Texture2D>;
   /** Skin screen-space scattering is active this frame. */
-  skinSSS: boolean;
+  postSSS: boolean;
   /** SSR SDF proxy uniform buffer (pair of vec4: min.xyz / max.xyz for each box). */
   ssrSDFBoxBuffer: Nullable<GPUDataBuffer>;
   /** Number of valid SDF proxy boxes in `ssrSDFBoxBuffer`. */

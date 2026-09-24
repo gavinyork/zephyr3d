@@ -67,7 +67,7 @@ function createMockDrawContext(overrides: Record<string, unknown> = {}) {
       sssTransmissionStrength: 1,
       // The builder switches the skin diffusion on from the render queue rather
       // than from a camera flag, so every context needs this to exist.
-      setSkinSSSActive: () => {},
+      setPostSSSActive: () => {},
       ...cameraOverrides
     },
     ...restOverrides
@@ -110,17 +110,17 @@ function createOptions(overrides: Partial<ForwardPlusOptions> = {}): ForwardPlus
     needSceneColorWithDepth: false,
     needsTransmissionDepthForSSR: false,
     sss: false,
-    skinSSS: false,
+    postSSS: false,
     sssProfileId: false,
     fogPresents: false,
     hiZNearest: false,
     ...overrides
   };
-  // deriveForwardPlusOptions derives this from skinSSS, so a test that turns
+  // deriveForwardPlusOptions derives this from postSSS, so a test that turns
   // skin scattering on gets the profile id target too unless it says otherwise.
   return {
     ...merged,
-    sssProfileId: overrides.sssProfileId ?? merged.skinSSS
+    sssProfileId: overrides.sssProfileId ?? merged.postSSS
   };
 }
 
@@ -306,7 +306,7 @@ describe('Forward+ render graph builder', () => {
     const camera = {
       SSR: true,
       SSS: false,
-      skinSSS: false,
+      postSSS: false,
       TAA: false,
       motionBlur: false,
       ssrTemporal: false,
@@ -349,7 +349,7 @@ describe('Forward+ render graph builder', () => {
     const camera = {
       SSR: false,
       SSS: true,
-      skinSSS: false,
+      postSSS: false,
       TAA: false,
       motionBlur: false,
       ssrTemporal: false,
@@ -376,7 +376,7 @@ describe('Forward+ render graph builder', () => {
     );
   });
 
-  test('derives SkinSSS only from opaque skin materials', () => {
+  test('derives PostSSS only from opaque skin materials', () => {
     const scene = {
       env: {
         light: {
@@ -405,7 +405,7 @@ describe('Forward+ render graph builder', () => {
       needHiZNearest: () => false,
       itemList: {
         opaque: {
-          lit: [{ materialList: new Set([{ skinSSS: true }]) }],
+          lit: [{ materialList: new Set([{ postSSS: true }]) }],
           unlit: []
         },
         transmission: emptyBundle,
@@ -414,24 +414,24 @@ describe('Forward+ render graph builder', () => {
       }
     };
 
-    expect(deriveForwardPlusOptions(scene as any, camera as any, 'webgpu', renderQueue as any).skinSSS).toBe(
+    expect(deriveForwardPlusOptions(scene as any, camera as any, 'webgpu', renderQueue as any).postSSS).toBe(
       true
     );
 
     renderQueue.itemList.opaque = emptyBundle;
     renderQueue.itemList.transmission = {
-      lit: [{ materialList: new Set([{ skinSSS: true }]) }],
+      lit: [{ materialList: new Set([{ postSSS: true }]) }],
       unlit: []
     };
 
-    expect(deriveForwardPlusOptions(scene as any, camera as any, 'webgpu', renderQueue as any).skinSSS).toBe(
+    expect(deriveForwardPlusOptions(scene as any, camera as any, 'webgpu', renderQueue as any).postSSS).toBe(
       false
     );
 
     // And a frame with no skin material at all leaves it off, which is what
     // keeps the effect from costing a blit in scenes that have no skin.
     renderQueue.itemList.transmission = emptyBundle;
-    expect(deriveForwardPlusOptions(scene as any, camera as any, 'webgpu', renderQueue as any).skinSSS).toBe(
+    expect(deriveForwardPlusOptions(scene as any, camera as any, 'webgpu', renderQueue as any).postSSS).toBe(
       false
     );
   });
@@ -469,7 +469,7 @@ describe('Forward+ render graph builder', () => {
   });
 
   test('declares the skin mask MRT resource when enabled', () => {
-    const { graph, backbuffer } = buildForwardPlusGraphForTest(createOptions({ skinSSS: true }));
+    const { graph, backbuffer } = buildForwardPlusGraphForTest(createOptions({ postSSS: true }));
     const passNames = graph.compile([backbuffer]).orderedPasses.map((pass) => pass.name);
     const lightPassWrites = graph.passes
       .find((pass) => pass.name === 'LightPass')
@@ -481,7 +481,7 @@ describe('Forward+ render graph builder', () => {
     // alpha, but which pixels are skin cannot: every opaque material writes 1
     // to that alpha. The mask needs its own channel, as UE5 does with its
     // Subsurface.ProfileIdTexture.
-    expect(lightPassWrites).toContain('skinSSS');
+    expect(lightPassWrites).toContain('postSSS');
   });
 
   test('keeps SSR surface MRT with scene-color materials and omits SSS transmission to reduce MRT count', () => {
@@ -688,7 +688,7 @@ describe('Forward+ render graph builder', () => {
       ssgiIntensity: 0.7,
       SSR: false,
       SSS: false,
-      skinSSS: false,
+      postSSS: false,
       ssrCalcThickness: false,
       getPickResultResolveFunc: () => null
     };
@@ -1501,7 +1501,7 @@ describe('Final framebuffer as intermediate (editor render-to-texture mode)', ()
   });
 
   test('opaque-layer effects disable final-framebuffer-as-intermediate mode', () => {
-    // Regression: with an opaque-layer effect (e.g. SkinSSS) in render-to-texture
+    // Regression: with an opaque-layer effect (e.g. PostSSS) in render-to-texture
     // mode, the scene was still rendered directly into the single-color final
     // framebuffer (breaking surface MRT stores) while the effect chain read the
     // backbuffer handle. The scene must go through the scene color texture.
@@ -1517,7 +1517,7 @@ describe('Final framebuffer as intermediate (editor render-to-texture mode)', ()
     const compositor = new Compositor();
     compositor.appendPostEffect(new OpaqueEffect());
     const { graph, backbuffer } = buildForwardPlusGraphForTest(
-      createOptions({ skinSSS: true }),
+      createOptions({ postSSS: true }),
       {},
       {
         compositor,

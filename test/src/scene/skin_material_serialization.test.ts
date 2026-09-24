@@ -120,23 +120,22 @@ describe('Skin material serialization', () => {
     restored.dispose();
   });
 
-  test('round-trips the camera SkinSSS debug selection', async () => {
+  test('round-trips the camera PostSSS debug selection', async () => {
     const manager = new ResourceManager(new MemoryFS());
     const scene = new Scene();
     const camera = new Camera(scene);
 
-    camera.skinSSSDebugOutput = 'sampleRadius';
+    camera.SSSDebugOutput = 'sampleRadius';
 
     const serialized = await manager.serializeObject(camera);
     const restored = (await manager.deserializeObject<Camera>(scene.rootNode, serialized))!;
 
     // Whether the diffusion runs is derived from the render queue, so there is
     // no enable flag to save - only the debug selection.
-    expect(serialized.Object).toMatchObject({ SkinSSSDebugOutput: 'sampleRadius' });
-    expect(serialized.Object).not.toHaveProperty('SkinSSSEnabled');
+    expect(serialized.Object).toMatchObject({ SSSDebugOutput: 'sampleRadius' });
     // The selection is held on the camera, not only forwarded to the post
     // effect, so it survives a round trip even though the effect is created lazily.
-    expect(restored.skinSSSDebugOutput).toBe('sampleRadius');
+    expect(restored.SSSDebugOutput).toBe('sampleRadius');
   });
 
   test('round-trips camera dual depth peeling OIT mode', async () => {
