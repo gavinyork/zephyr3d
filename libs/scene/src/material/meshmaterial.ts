@@ -1123,7 +1123,7 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
           // the MRT order and the prepass framebuffer appends this attachment
           // last (render/rendergraph/forward_plus_builder.ts, DepthPrepassModule).
           if (ctx.renderPass!.type === RENDER_PASS_TYPE_DEPTH && ctx.skinProfileId) {
-            this.$outputs.zSkinProfileId = pb.vec4();
+            this.$outputs.zSSSProfileId = pb.vec4();
           }
           if (ctx.renderPass!.type === RENDER_PASS_TYPE_OBJECT_COLOR) {
             this.$outputs.zDistance = pb.vec4();
@@ -1381,7 +1381,7 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
           // must write the "no profile" id: the target is shared, and a stale texel
           // would be read as a real profile row.
           const profileId = that.getDepthPassProfileId(this);
-          this.$outputs.zSkinProfileId = pb.vec4(profileId ?? pb.float(0));
+          this.$outputs.zSSSProfileId = pb.vec4(profileId ?? pb.float(0));
         }
       } else if (that.drawContext.renderPass!.type === RENDER_PASS_TYPE_OBJECT_COLOR) {
         if (color) {

@@ -52,7 +52,7 @@ describe('Depth prepass fragment outputs', () => {
     });
     // Order is the MRT order the prepass framebuffer is built in, so it is part
     // of the contract rather than an implementation detail.
-    expect(outputs).toEqual(['zFragmentOutput', 'zMotionVector', 'zSkinProfileId']);
+    expect(outputs).toEqual(['zFragmentOutput', 'zMotionVector', 'zSSSProfileId']);
   });
 
   test('the transparent motion-vector pass writes the velocity alone', () => {
