@@ -1,4 +1,4 @@
-import { SkinProfile } from '@zephyr3d/scene';
+import { SkinMaterial, SkinProfile } from '@zephyr3d/scene';
 import {
   SKIN_MAX_TRANSMISSION_OPTICAL_DEPTH,
   SKIN_OPTICAL_DEPTH_PER_WORLD_UNIT
@@ -14,6 +14,30 @@ import { Vector3 } from '@zephyr3d/base';
  * the falloff downstream would still be wrong. Earlier rounds of this work had
  * exactly that failure mode.
  */
+
+/**
+ * A profile to bake, via the material that owns it.
+ *
+ * Profiles are not constructible on their own: each one holds a row of a
+ * 256-entry GPU table that is released with its material, which is what stops
+ * the rows leaking. These tests only want a bag of parameters, so the materials
+ * are kept alive for the file's duration and disposed together at the end.
+ */
+const materials: SkinMaterial[] = [];
+function profile(preset: 'skin' = 'skin'): SkinProfile {
+  const material = new SkinMaterial();
+  material.subsurfaceProfile.preset = preset;
+  materials.push(material);
+  return material.subsurfaceProfile;
+}
+
+afterAll(() => {
+  for (const material of materials) {
+    material.dispose();
+  }
+  materials.length = 0;
+});
+
 function bake(p: SkinProfile): Float32Array {
   const out = new Float32Array(SkinProfile.transmissionLutSize * 4);
   p.writeTransmissionProfile(out);
@@ -27,32 +51,30 @@ const alpha = (lut: Float32Array, i: number) => lut[i * 4 + 3];
 
 describe('Skin transmission profile', () => {
   test('falls off monotonically with thickness', () => {
-    const p = new SkinProfile('skin');
+    const p = profile();
     const lut = bake(p);
     for (let i = 1; i < SkinProfile.transmissionLutSize; i++) {
       expect(red(lut, i)).toBeLessThan(red(lut, i - 1));
     }
-    p.dispose();
   });
 
   test('the last entry is forced black', () => {
     // UE5's bMakeLastPixelBlack. Without it the red tail is still visible after
     // tone mapping, and anything thicker than the table would keep transmitting.
-    const p = new SkinProfile('skin');
+    const p = profile();
     const lut = bake(p);
     const last = SkinProfile.transmissionLutSize - 1;
     expect(red(lut, last)).toBe(0);
     expect(green(lut, last)).toBe(0);
     expect(blue(lut, last)).toBe(0);
     expect(alpha(lut, last)).toBe(0);
-    p.dispose();
   });
 
   test('red survives thickness that green and blue do not', () => {
     // This is the whole reason a backlit ear reads red rather than grey: skin's
     // red mean free path is an order of magnitude longer than blue's, so the
     // three channels have to decay at visibly different rates.
-    const p = new SkinProfile('skin');
+    const p = profile();
     const lut = bake(p);
     expect(red(lut, 0)).toBeGreaterThan(green(lut, 0));
     expect(green(lut, 0)).toBeGreaterThan(blue(lut, 0));
@@ -67,7 +89,6 @@ describe('Skin transmission profile', () => {
     // And the spread has to be substantial by the middle of the table, not a
     // rounding difference.
     expect(red(lut, live >> 1) / green(lut, live >> 1)).toBeGreaterThan(100);
-    p.dispose();
   });
 
   test('a longer mean free path stretches the curve rather than scaling it', () => {
@@ -75,8 +96,8 @@ describe('Skin transmission profile', () => {
     // distance axis is fixed and the mean free path has to move where the curve
     // lands on it. Normalising the two against each other would leave the shape
     // identical and make the control inert.
-    const near = new SkinProfile('skin');
-    const far = new SkinProfile('skin');
+    const near = profile();
+    const far = profile();
     far.meanFreePathDistance = near.meanFreePathDistance * 4;
     const lutNear = bake(near);
     const lutFar = bake(far);
@@ -84,8 +105,6 @@ describe('Skin transmission profile', () => {
     // profile is still transmitting well past where the short one has died.
     const mid = 8;
     expect(red(lutFar, mid)).toBeGreaterThan(red(lutNear, mid) * 4);
-    near.dispose();
-    far.dispose();
   });
 
   test('world unit scale moves the distance axis, not the profile', () => {
@@ -93,8 +112,8 @@ describe('Skin transmission profile', () => {
     // four times the geometric thickness, which is the same relationship the
     // thickness pass encodes. Scaling the profile instead would make the same
     // material look different on a resized asset.
-    const unit = new SkinProfile('skin');
-    const big = new SkinProfile('skin');
+    const unit = profile();
+    const big = profile();
     big.worldUnitScale = 4;
     const lutUnit = bake(unit);
     const lutBig = bake(big);
@@ -103,14 +122,12 @@ describe('Skin transmission profile', () => {
     for (let i = 1; i < SkinProfile.transmissionLutSize - 1; i++) {
       expect(red(lutBig, i)).toBeGreaterThan(red(lutUnit, i));
     }
-    unit.dispose();
-    big.dispose();
   });
 
   test('the tint multiplies the profile and nothing else', () => {
-    const plain = new SkinProfile('skin');
+    const plain = profile();
     plain.transmissionTint = new Vector3(1, 1, 1);
-    const tinted = new SkinProfile('skin');
+    const tinted = profile();
     tinted.transmissionTint = new Vector3(1, 0.5, 0.25);
     const a = bake(plain);
     const b = bake(tinted);
@@ -121,37 +138,31 @@ describe('Skin transmission profile', () => {
       // The alpha is the separate extinction curve and the tint must not reach it.
       expect(alpha(b, i)).toBeCloseTo(alpha(a, i), 6);
     }
-    plain.dispose();
-    tinted.dispose();
   });
 
   test('surface albedo shapes the falloff', () => {
     // The scaling factor s = 3.5 + 100 (A - 0.33)^4 is minimised at 0.33, which
     // gives the slowest decay. Dropping albedo out of the bake — it is easy to,
     // since UE5 passes white for the profile's own `A` — would make this inert.
-    const wide = new SkinProfile('skin');
+    const wide = profile();
     wide.surfaceAlbedo = new Vector3(0.33, 0.33, 0.33);
-    const tight = new SkinProfile('skin');
+    const tight = profile();
     tight.surfaceAlbedo = new Vector3(0.95, 0.95, 0.95);
     const lutWide = bake(wide);
     const lutTight = bake(tight);
     expect(red(lutWide, 4)).toBeGreaterThan(red(lutTight, 4));
-    wide.dispose();
-    tight.dispose();
   });
 
   test('extinction scale drives the alpha curve alone', () => {
-    const slow = new SkinProfile('skin');
+    const slow = profile();
     slow.extinctionScale = 0.5;
-    const fast = new SkinProfile('skin');
+    const fast = profile();
     fast.extinctionScale = 2;
     const a = bake(slow);
     const b = bake(fast);
     expect(alpha(b, 4)).toBeLessThan(alpha(a, 4));
     // The rgb falloff is Burley's and must not follow it.
     expect(red(b, 4)).toBeCloseTo(red(a, 4), 6);
-    slow.dispose();
-    fast.dispose();
   });
 
   test('optical depth is calibrated against the table it indexes', () => {
@@ -161,7 +172,6 @@ describe('Skin transmission profile', () => {
     // feature does not look mis-tuned, it looks absent — a factor of ten put
     // every path over 5 mm onto the blacked-out last entry, so nothing
     // transmitted anywhere while the thickness debug view still looked sane.
-    const p = new SkinProfile('skin');
     const size = SkinProfile.transmissionLutSize;
     for (const metres of [0.002, 0.005, 0.01, 0.03]) {
       // What the thickness pass produces, at unit extinction.
@@ -172,7 +182,6 @@ describe('Skin transmission profile', () => {
       const bakedForMm = (index / size) * 50;
       expect(bakedForMm).toBeCloseTo(metres * 1000, 1);
     }
-    p.dispose();
   });
 
   test('a head-sized path saturates but a thin one does not', () => {
@@ -212,8 +221,8 @@ describe('Skin transmission profile', () => {
       const f = index - i0;
       return lut[i0 * 4] * (1 - f) + lut[i1 * 4] * f;
     };
-    const unit = new SkinProfile('skin');
-    const big = new SkinProfile('skin');
+    const unit = profile();
+    const big = profile();
     big.worldUnitScale = 4;
     // Only over paths both profiles can represent. The encoding saturates at a
     // fixed 48 mm of *world* path whatever the unit scale is, so the 4x asset
@@ -232,20 +241,17 @@ describe('Skin transmission profile', () => {
       // is put back into the optical depth, or taken out of the table's axis.
       expect(Math.abs(b - a) / Math.max(a, 1e-6)).toBeLessThan(0.12);
     }
-    unit.dispose();
-    big.dispose();
   });
 
   test('profile ids index the table rows the shader addresses', () => {
     // The shader recovers a row as `clamp(id, 0, 1) * 255`, so the encoded id
     // has to land back on the integer id the table was packed at.
-    const p = new SkinProfile('skin');
+    const p = profile();
     expect(Math.round(p.encodedId * 255)).toBe(p.id);
     // And the LUT has to sit past the scalar parameters, not overlap them.
     expect(SkinProfile.transmissionLutOffset).toBeGreaterThan(SkinProfile.transmissionParamColumn);
     expect(SkinProfile.tableColumns).toBe(
       SkinProfile.transmissionLutOffset + SkinProfile.transmissionLutSize
     );
-    p.dispose();
   });
 });

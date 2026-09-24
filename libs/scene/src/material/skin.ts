@@ -62,21 +62,34 @@ export class SkinMaterial
   private _roughness: number;
   private _specularF0: number;
   private _transmissionStrength: number;
-  private _profile: SkinProfile | null;
+  private readonly _profile: SkinProfile;
   private readonly _subsurfaceProfileChanged: () => void;
   private readonly _lobeParams: Vector3;
   private readonly _profileTexelSize: Vector2;
 
   constructor() {
     super();
-    this._profile = null;
     this._subsurfaceProfileChanged = () => this.uniformChanged();
+    // Created here and released in onDispose: the profile holds a row of a
+    // 256-entry GPU table, and tying its life to the material's is what keeps
+    // those rows from accumulating. They used to be assignable objects that
+    // nothing ever released, so every scene load - and every undo - stranded
+    // one more row until the table was full.
+    this._profile = SkinProfile.createOwned();
+    this._profile.addChangeListener(this._subsurfaceProfileChanged);
     this._lobeParams = new Vector3();
     this._profileTexelSize = new Vector2();
     this._roughness = 0.5;
     this._specularF0 = 0.04;
     this._transmissionStrength = 1;
     this.useFeature(SkinMaterial.FEATURE_VERTEX_NORMAL, true);
+  }
+
+  /** Releases the profile's table row along with the material. */
+  protected onDispose() {
+    super.onDispose();
+    this._profile.removeChangeListener(this._subsurfaceProfileChanged);
+    this._profile.dispose();
   }
 
   /**
@@ -91,41 +104,27 @@ export class SkinMaterial
   }
 
   /**
-   * Shared profile asset driving the screen-space diffusion.
+   * The profile driving this material's subsurface scattering.
    *
    * @remarks
-   * Assigning distinct profiles to different meshes — face, ears, lips — lets each
-   * diffuse with its own scattering parameters in a single pass, since the
-   * material writes the profile id per pixel.
+   * Read-only and never null: the material creates one in its constructor and
+   * owns it for life, so edit it in place rather than assigning a new one.
    *
-   * When `null`, the shared {@link SkinProfile.getDefault | default skin profile}
-   * is used for shading.
+   * ```ts
+   * material.subsurfaceProfile.preset = 'jade';
+   * material.subsurfaceProfile.meanFreePathDistance = 0.03;
+   * ```
+   *
+   * Giving each material its own profile is what lets face, ears and lips
+   * scatter differently in a single screen-space pass — the material writes its
+   * profile's id per pixel and the diffusion looks the parameters up from there.
+   * It also means profiles are not shared between materials: to transfer a look,
+   * use {@link SkinProfile.copyFrom}.
    *
    * @public
    */
-  get subsurfaceProfile() {
+  get subsurfaceProfile(): SkinProfile {
     return this._profile;
-  }
-  set subsurfaceProfile(val: SkinProfile | null) {
-    if (val !== this._profile) {
-      this._profile?.removeChangeListener(this._subsurfaceProfileChanged);
-      this._profile = val ?? null;
-      this._profile?.addChangeListener(this._subsurfaceProfileChanged);
-      this.uniformChanged();
-    }
-  }
-
-  /**
-   * The profile actually used for shading.
-   *
-   * @remarks
-   * Resolves {@link SkinMaterial.subsurfaceProfile} against the shared default,
-   * so this never returns `null`.
-   *
-   * @public
-   */
-  get effectiveProfile(): SkinProfile {
-    return this._profile ?? SkinProfile.getDefault();
   }
 
   /**
@@ -166,7 +165,10 @@ export class SkinMaterial
 
   copyFrom(other: this) {
     super.copyFrom(other);
-    this.subsurfaceProfile = other.subsurfaceProfile;
+    // The values, not the profile: a clone owns its own row of the table, so
+    // that disposing either material cannot pull the parameters out from under
+    // the other.
+    this._profile.copyFrom(other._profile);
     this.vertexNormal = other.vertexNormal;
     this.vertexTangent = other.vertexTangent;
     this.roughness = other.roughness;
@@ -639,14 +641,14 @@ export class SkinMaterial
     // Not gated on needFragmentColor: the prepass declares this uniform for
     // every skin material, including the opaque ones that predicate excludes.
     if (lightPass || depthPassProfileId) {
-      bindGroup.setValue('zSkinProfileId', this.effectiveProfile.encodedId);
+      bindGroup.setValue('zSkinProfileId', this._profile.encodedId);
     }
     if (!this.needFragmentColor(ctx) || !lightPass) {
       return;
     }
     bindGroup.setValue('zSkinRoughness', this._roughness);
     bindGroup.setValue('zSkinSpecularF0', this._specularF0);
-    const profile = this.effectiveProfile;
+    const profile = this._profile;
     bindGroup.setValue(
       'zSkinLobeParams',
       this._lobeParams.setXYZ(profile.roughness0, profile.roughness1, profile.lobeMix)

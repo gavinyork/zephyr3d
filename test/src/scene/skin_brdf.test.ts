@@ -1,4 +1,4 @@
-import { SkinMaterial, SkinProfile } from '@zephyr3d/scene';
+import { SkinMaterial } from '@zephyr3d/scene';
 
 /**
  * These pin the direct-lighting BRDF against UE5's `SubsurfaceProfileBxDF`.
@@ -85,7 +85,9 @@ describe('Skin BRDF', () => {
     // doubles every lobe and saturates the wide one at moderate roughness, which
     // flattens the highlight away.
     for (const preset of ['skin', 'skin_pale', 'skin_tan', 'skin_dark'] as const) {
-      const p = new SkinProfile(preset);
+      const mat = new SkinMaterial();
+      const p = mat.subsurfaceProfile;
+      p.preset = preset;
       expect(p.roughness0).toBeGreaterThanOrEqual(0.5);
       expect(p.roughness0).toBeLessThanOrEqual(2);
       expect(p.roughness1).toBeGreaterThanOrEqual(0.5);
@@ -95,7 +97,7 @@ describe('Skin BRDF', () => {
       const [narrow, wide] = lobes(0.35, 1, p.roughness0, p.roughness1);
       expect(narrow).toBeLessThan(wide);
       expect(wide).toBeLessThan(1);
-      p.dispose();
+      mat.dispose();
     }
   });
 
@@ -159,13 +161,13 @@ describe('Skin BRDF', () => {
   });
 
   test('default roughness keeps both lobes off the clamps', () => {
-    const p = new SkinProfile('skin');
     const mat = new SkinMaterial();
+    const p = mat.subsurfaceProfile;
     const [narrow, wide] = lobes(mat.roughness, 1, p.roughness0, p.roughness1);
     expect(narrow).toBeGreaterThan(0.02);
     expect(wide).toBeLessThan(1);
     // And the two stay distinguishable, which is the point of the dual lobe.
     expect(wide - narrow).toBeGreaterThan(0.1);
-    p.dispose();
+    mat.dispose();
   });
 });

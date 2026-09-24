@@ -1373,7 +1373,16 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
             }
           }
         }
-        if (that.drawContext.skinProfileId) {
+        // Not in the motion-vector-only pass, which has to match the single
+        // attachment its framebuffer carries. Assigning to `$outputs` declares
+        // the output implicitly, so writing here regardless gave that pass a
+        // second one the framebuffer had no target for, and every transparent
+        // material logged a fragment color output count mismatch on load.
+        //
+        // Skipping it is also the right answer on its own terms: the profile id
+        // is a prepass product and the prepass only draws opaque geometry, so
+        // subsurface scattering does not reach the transparent queue at all.
+        if (that.drawContext.skinProfileId && !depthPass.motionVectorOnly) {
           // Every material submitted to the prepass writes this attachment, so
           // the ones that are not skin have to write the "no profile" id rather
           // than leave it undefined - the target is shared and a stale texel

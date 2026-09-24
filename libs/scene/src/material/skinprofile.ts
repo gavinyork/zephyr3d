@@ -34,6 +34,17 @@ const SKIN_PROFILE_COLUMNS = SKIN_PROFILE_PARAM_COLUMNS + SKIN_TRANSMISSION_LUT_
 const SKIN_PROFILE_CAPACITY = 256;
 
 /**
+ * Gate on {@link SkinProfile}'s constructor.
+ *
+ * @remarks
+ * Module-private, so only {@link SkinProfile.createOwned} can pass it. See the
+ * constructor for why a `private` modifier alone is not enough.
+ *
+ * @internal
+ */
+const CREATE_TOKEN = Symbol('SkinProfile.create');
+
+/**
  * Largest optical depth the transmission profile is defined over.
  *
  * @remarks
@@ -415,6 +426,8 @@ const SKIN_PROFILE_TEMPLATES: Record<SkinProfilePreset, SkinProfileTemplate> = {
 export class SkinProfile {
   private static readonly _profiles: Array<SkinProfile | null> = new Array(SKIN_PROFILE_CAPACITY).fill(null);
   private static _table: Texture2D | null = null;
+  /** Device {@link SkinProfile._table} belongs to, so a device swap can be spotted. */
+  private static _tableDevice: AbstractDevice | null = null;
   private static _tableData: Float32Array<ArrayBuffer> | null = null;
   private static _tableDirty = true;
   private static _defaultProfile: SkinProfile | null = null;
@@ -438,13 +451,26 @@ export class SkinProfile {
   private readonly _changeListeners: Set<() => void>;
 
   /**
-   * Creates a profile initialized from a preset.
+   * Not constructible from outside. Use {@link SkinMaterial.subsurfaceProfile},
+   * which owns one for the material's lifetime.
    *
-   * @param preset - Preset to start from. Defaults to `'skin'`.
+   * @remarks
+   * The token check is not redundant with the `private` modifier. Profiles hold
+   * a row of a 256-entry GPU table and the only way a row comes back is
+   * {@link SkinProfile.dispose}, so an instance created by anything other than
+   * its owning material leaks that row permanently. TypeScript cannot enforce
+   * that on the editor, which ships as prebuilt JavaScript and drives this class
+   * through serialization metadata — hence a runtime guard, which fails at the
+   * first illegal construction rather than 256 of them later.
    *
-   * @public
+   * @internal
    */
-  constructor(preset: SkinProfilePreset = 'skin') {
+  private constructor(token: typeof CREATE_TOKEN, preset: SkinProfilePreset = 'skin') {
+    if (token !== CREATE_TOKEN) {
+      throw new Error(
+        'SkinProfile is not constructible directly; it is owned by the SkinMaterial that created it.'
+      );
+    }
     this._surfaceAlbedo = new Vector3();
     this._meanFreePath = new Vector3();
     this._boundaryColorBleed = new Vector3();
@@ -489,13 +515,36 @@ export class SkinProfile {
   }
 
   /**
+   * Creates a profile for a material to own.
+   *
+   * @remarks
+   * The only way to obtain a profile. Its table row is held until
+   * {@link SkinProfile.dispose}, so the caller is taking on that responsibility —
+   * in practice {@link SkinMaterial}, which creates one in its constructor and
+   * disposes it with itself.
+   *
+   * @param preset - Preset to start from. Defaults to `'skin'`.
+   * @returns The new profile.
+   *
+   * @internal
+   */
+  static createOwned(preset: SkinProfilePreset = 'skin') {
+    return new SkinProfile(CREATE_TOKEN, preset);
+  }
+
+  /**
    * The shared default skin profile.
+   *
+   * @remarks
+   * A fallback for consumers that have no material to ask — the diffusion post
+   * effect uses it for pixels whose id is not in the table. It holds one table
+   * row for the lifetime of the process, which is why it is created lazily.
    *
    * @public
    */
   static getDefault() {
     if (!this._defaultProfile) {
-      this._defaultProfile = new SkinProfile('skin');
+      this._defaultProfile = new SkinProfile(CREATE_TOKEN, 'skin');
     }
     return this._defaultProfile;
   }
@@ -525,11 +574,22 @@ export class SkinProfile {
    * @public
    */
   static getTable(device: AbstractDevice): Texture2D | null {
+    // The table outlives any one device: it is static, while the device can be
+    // recreated under it - a lost WebGPU device, or an editor rebuilding its
+    // renderer. A texture belonging to a dead device silently swallows every
+    // `update`, so the parameters would stop reaching the GPU while everything
+    // still looked wired up, and the last values uploaded before the swap would
+    // stay on screen until the page was reloaded.
+    if (this._table && (this._tableDevice !== device || this._table.disposed)) {
+      this._table = null;
+      this._tableData = null;
+    }
     if (!this._table) {
       this._table = device.createTexture2D('rgba32f', SKIN_PROFILE_COLUMNS, SKIN_PROFILE_CAPACITY, {
         mipmapping: false,
         samplerOptions: { minFilter: 'nearest', magFilter: 'nearest', mipFilter: 'none' }
       });
+      this._tableDevice = device;
       this._tableData = new Float32Array(SKIN_PROFILE_COLUMNS * SKIN_PROFILE_CAPACITY * 4);
       this._tableDirty = true;
     }
@@ -888,12 +948,21 @@ export class SkinProfile {
     return new Vector3(this._meanFreePath.x * s, this._meanFreePath.y * s, this._meanFreePath.z * s);
   }
 
-  clone() {
-    const other = new SkinProfile(this._preset);
-    other.copyFrom(this);
-    return other;
-  }
-
+  /**
+   * Overwrites every parameter from another profile.
+   *
+   * @remarks
+   * This is how a look is transferred, since profiles cannot be shared or
+   * cloned: each one belongs to one material. `SkinMaterial.copyFrom` uses it to
+   * give a clone its own profile carrying the same values.
+   *
+   * The table row is deliberately untouched — it identifies the profile, not its
+   * contents.
+   *
+   * @param other - Profile to copy the parameters from.
+   *
+   * @public
+   */
   copyFrom(other: SkinProfile) {
     this._preset = other._preset;
     this._surfaceAlbedo.set(other._surfaceAlbedo);

@@ -26,7 +26,7 @@ import {
 } from '../../../material';
 import type { PBRBlueprintOutputName } from '../../../material/pbrblueprint';
 import { defineProps, type PropertyAccessor, type SerializableClass } from '../types';
-import type { Nullable } from '@zephyr3d/base';
+import type { GenericConstructor, Nullable } from '@zephyr3d/base';
 import { Vector2, Vector3, Vector4 } from '@zephyr3d/base';
 import { getTextureProps } from './common';
 import type { ResourceManager } from '../manager';
@@ -354,8 +354,26 @@ export function getSubsurfaceProfileClass(): SerializableClass {
  */
 export function getSkinProfileClass(): SerializableClass {
   return {
-    ctor: SkinProfile,
+    // Not constructible from here by design; the cast is the price of declaring
+    // the class at all. `createFunc` below is what actually supplies the
+    // instance, so the constructor is never reached.
+    ctor: SkinProfile as unknown as GenericConstructor,
     name: 'SkinProfile',
+    /**
+     * Hands back the owning material's profile instead of building one.
+     *
+     * A profile holds a row of a 256-entry GPU table that is only freed when its
+     * material is disposed, so deserializing into a fresh instance - which is
+     * what the default path does for an object-typed property - stranded a row
+     * on every scene load and every undo. `ctx` is the owner, since the
+     * property's deserializer passes the object it is filling in.
+     */
+    createFunc(ctx: unknown) {
+      const material = ctx as SkinMaterial | null;
+      return material instanceof SkinMaterial
+        ? { obj: material.subsurfaceProfile }
+        : { obj: null, loadProps: false };
+    },
     getProps() {
       return defineProps([
         {
@@ -2909,22 +2927,23 @@ export function getSkinMaterialClass(manager: ResourceManager): SerializableClas
           },
           {
             name: 'SubsurfaceProfile',
-            description: 'Shared profile driving the subsurface scattering of this skin',
+            description: 'Profile driving the subsurface scattering of this skin',
             type: 'object',
             phase: 0,
             default: null,
             options: {
-              objectTypes: [SkinProfile]
-            },
-            isNullable() {
-              return true;
+              objectTypes: [SkinProfile as unknown as GenericConstructor]
             },
             get(this: SkinMaterial, value) {
               value.object[0] = this.subsurfaceProfile;
             },
-            set(this: SkinMaterial, value) {
-              this.subsurfaceProfile = (value.object[0] as SkinProfile) ?? null;
-            }
+            // Deliberately empty rather than absent. The material owns its
+            // profile and cannot be handed another one, but a property with no
+            // setter is skipped outright during deserialization, and the nested
+            // values would never be read back - `createFunc` on the profile
+            // class has already routed them into this material's own instance by
+            // the time this runs.
+            set() {}
           },
           {
             name: 'TransmissionStrength',

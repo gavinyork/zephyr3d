@@ -1,12 +1,5 @@
 import { MemoryFS, Vector3, Vector4 } from '@zephyr3d/base';
-import {
-  Camera,
-  DualDepthPeelingOIT,
-  ResourceManager,
-  Scene,
-  SkinMaterial,
-  SkinProfile
-} from '../../../libs/scene/src';
+import { Camera, DualDepthPeelingOIT, ResourceManager, Scene, SkinMaterial } from '../../../libs/scene/src';
 
 describe('Skin material serialization', () => {
   test('round-trips SkinMaterial properties', async () => {
@@ -45,56 +38,86 @@ describe('Skin material serialization', () => {
 
   test('round-trips the transmission parameters of a profile', async () => {
     const manager = new ResourceManager(new MemoryFS());
-    const profile = new SkinProfile('skin');
+    const material = new SkinMaterial();
+    const profile = material.subsurfaceProfile;
+    profile.preset = 'skin';
     profile.scatteringDistribution = -0.4;
     profile.ior = 1.32;
     profile.extinctionScale = 2.5;
     profile.transmissionTint = new Vector3(0.9, 0.3, 0.22);
 
-    const serialized = await manager.serializeObject(profile);
-    const restored = (await manager.deserializeObject<SkinProfile>(null, serialized))!;
+    const serialized = await manager.serializeObject(material);
+    const restored = (await manager.deserializeObject<SkinMaterial>(null, serialized))!;
 
-    expect(restored.scatteringDistribution).toBeCloseTo(-0.4);
-    expect(restored.ior).toBeCloseTo(1.32);
-    expect(restored.extinctionScale).toBeCloseTo(2.5);
-    expect(restored.transmissionTint.y).toBeCloseTo(0.3);
-    profile.dispose();
+    expect(restored.subsurfaceProfile.scatteringDistribution).toBeCloseTo(-0.4);
+    expect(restored.subsurfaceProfile.ior).toBeCloseTo(1.32);
+    expect(restored.subsurfaceProfile.extinctionScale).toBeCloseTo(2.5);
+    expect(restored.subsurfaceProfile.transmissionTint.y).toBeCloseTo(0.3);
+    material.dispose();
     restored.dispose();
   });
 
   test('round-trips the material subsurface profile', async () => {
     const manager = new ResourceManager(new MemoryFS());
     const material = new SkinMaterial();
-    const profile = new SkinProfile('skin_dark');
+    const profile = material.subsurfaceProfile;
+    profile.preset = 'skin_dark';
     profile.meanFreePathDistance = 0.017;
     profile.surfaceAlbedo = new Vector3(0.71, 0.46, 0.37);
     profile.lobeMix = 0.22;
-    material.subsurfaceProfile = profile;
 
     const serialized = await manager.serializeObject(material);
     const restored = (await manager.deserializeObject<SkinMaterial>(null, serialized))!;
 
-    expect(restored.subsurfaceProfile).toBeInstanceOf(SkinProfile);
-    expect(restored.subsurfaceProfile!.preset).toBe('skin_dark');
-    expect(restored.subsurfaceProfile!.meanFreePathDistance).toBeCloseTo(0.017);
-    expect(restored.subsurfaceProfile!.surfaceAlbedo.x).toBeCloseTo(0.71);
-    expect(restored.subsurfaceProfile!.lobeMix).toBeCloseTo(0.22);
-    // A deserialized profile takes its own table slot rather than aliasing the
-    // one it was saved from.
-    expect(restored.subsurfaceProfile!.id).not.toBe(profile.id);
-    profile.dispose();
-    restored.subsurfaceProfile!.dispose();
+    expect(restored.subsurfaceProfile.preset).toBe('skin_dark');
+    expect(restored.subsurfaceProfile.meanFreePathDistance).toBeCloseTo(0.017);
+    expect(restored.subsurfaceProfile.surfaceAlbedo.x).toBeCloseTo(0.71);
+    expect(restored.subsurfaceProfile.lobeMix).toBeCloseTo(0.22);
+    // The restored material keeps the profile it built in its constructor; the
+    // values are written into it rather than a fresh instance replacing it.
+    // Deserializing used to construct one per load, and since nothing released
+    // them the 256-row table filled up over an editing session.
+    expect(restored.subsurfaceProfile.id).not.toBe(profile.id);
+    material.dispose();
+    restored.dispose();
   });
 
-  test('a null profile falls back to the shared default', async () => {
+  test('deserializing writes into the material own profile instance', async () => {
     const manager = new ResourceManager(new MemoryFS());
     const material = new SkinMaterial();
-    expect(material.subsurfaceProfile).toBeNull();
+    material.subsurfaceProfile.preset = 'jade';
+    material.subsurfaceProfile.meanFreePathDistance = 0.031;
+
+    const serialized = await manager.serializeObject(material);
+    const target = new SkinMaterial();
+    const targetProfile = target.subsurfaceProfile;
+    const targetId = targetProfile.id;
+    await manager.deserializeObjectProps(target, (serialized as any).Object);
+
+    // Same object, same table row, new values - which is what keeps the id the
+    // depth prepass writes in agreement with the row the diffusion reads.
+    expect(target.subsurfaceProfile).toBe(targetProfile);
+    expect(target.subsurfaceProfile.id).toBe(targetId);
+    expect(target.subsurfaceProfile.preset).toBe('jade');
+    expect(target.subsurfaceProfile.meanFreePathDistance).toBeCloseTo(0.031);
+    material.dispose();
+    target.dispose();
+  });
+
+  test('a material with no saved profile keeps its own defaults', async () => {
+    const manager = new ResourceManager(new MemoryFS());
+    const material = new SkinMaterial();
 
     const serialized = await manager.serializeObject(material);
     const restored = (await manager.deserializeObject<SkinMaterial>(null, serialized))!;
 
-    expect(restored.subsurfaceProfile).toBeNull();
+    // Profiles are no longer nullable, so a scene saved before they became
+    // owned - where this field is absent or null - restores to the material's
+    // own default rather than to nothing.
+    expect(restored.subsurfaceProfile).toBeTruthy();
+    expect(restored.subsurfaceProfile.preset).toBe('skin');
+    material.dispose();
+    restored.dispose();
   });
 
   test('round-trips camera SkinSSS post-process settings', async () => {

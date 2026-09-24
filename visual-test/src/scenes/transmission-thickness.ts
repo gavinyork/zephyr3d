@@ -1,5 +1,5 @@
 import { Quaternion, Vector3, Vector4 } from '@zephyr3d/base';
-import { BoxShape, DirectionalLight, Mesh, SkinMaterial, SkinProfile, SphereShape } from '@zephyr3d/scene';
+import { BoxShape, DirectionalLight, Mesh, SkinMaterial, SphereShape } from '@zephyr3d/scene';
 import type { PerspectiveCamera, Scene } from '@zephyr3d/scene';
 import type { VisualScene } from '../types';
 import { bareScene, placeCamera } from './common';
@@ -130,9 +130,8 @@ function slabMaterial(worldUnitScale: number) {
   // this material points at, per pixel, keyed by the id the depth prepass wrote.
   // Setting them here is what makes the scene's arithmetic and the pass's agree -
   // explicitly, rather than by both happening to land on the shared default.
-  const profile = new SkinProfile('skin');
-  profile.worldUnitScale = worldUnitScale;
-  material.subsurfaceProfile = profile;
+  material.subsurfaceProfile.preset = 'skin';
+  material.subsurfaceProfile.worldUnitScale = worldUnitScale;
   return material;
 }
 

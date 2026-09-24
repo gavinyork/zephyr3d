@@ -5,7 +5,6 @@ import {
   Mesh,
   PlaneShape,
   SkinMaterial,
-  SkinProfile,
   SphereShape,
   UnlitMaterial
 } from '@zephyr3d/scene';
@@ -111,7 +110,7 @@ export const skinSss: VisualScene = {
     // around; without it the two diffusion scenes land within 10% of each other
     // and stop telling the per-channel radii apart, which is the whole point of
     // the pair.
-    material.subsurfaceProfile = new SkinProfile('skin');
+    material.subsurfaceProfile.preset = 'skin';
     material.subsurfaceProfile.meanFreePathDistance = 1.4;
   }
 };
@@ -159,9 +158,8 @@ export const skinDiffusionJade: VisualScene = {
     // Kept equal to `skin-sss`'s distance, so that a diff between the two scenes
     // isolates the channel ratios and nothing else. See the note there for why
     // it is 1.4 rather than the 0.35 it used to be.
-    const jade = new SkinProfile('jade');
-    jade.meanFreePathDistance = 1.4;
-    material.subsurfaceProfile = jade;
+    material.subsurfaceProfile.preset = 'jade';
+    material.subsurfaceProfile.meanFreePathDistance = 1.4;
     const head = new Mesh(scene, new SphereShape({ radius: 1.5 }), material);
     head.position.setXYZ(0, 0, 0);
     placeCamera(camera, new Vector3(0, 0, 5.5));

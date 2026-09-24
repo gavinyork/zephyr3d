@@ -2,38 +2,41 @@ import { SkinMaterial, SkinProfile } from '@zephyr3d/scene';
 
 describe('SkinProfile', () => {
   test('allocates distinct non-zero ids', () => {
-    const a = new SkinProfile();
-    const b = new SkinProfile();
-    expect(a.id).toBeGreaterThan(0);
-    expect(b.id).toBeGreaterThan(0);
-    expect(a.id).not.toBe(b.id);
+    const a = new SkinMaterial();
+    const b = new SkinMaterial();
+    expect(a.subsurfaceProfile.id).toBeGreaterThan(0);
+    expect(b.subsurfaceProfile.id).toBeGreaterThan(0);
+    expect(a.subsurfaceProfile.id).not.toBe(b.subsurfaceProfile.id);
     a.dispose();
     b.dispose();
   });
 
   test('id 0 is reserved for "not skin"', () => {
-    // The material multiplies the encoded id by the skin mask, so a masked-out
-    // pixel reads back as 0 and the diffusion must treat it as non-skin.
+    // The depth prepass clears its profile id target to 0, so every pixel no
+    // skin material covered reads back as "not skin" and the diffusion rejects
+    // it rather than addressing a row of the table.
     expect(SkinProfile.getById(0)).toBeNull();
-    const p = new SkinProfile();
-    expect(SkinProfile.getById(p.id)).toBe(p);
-    p.dispose();
-    expect(SkinProfile.getById(p.id)).toBeNull();
+    const mat = new SkinMaterial();
+    const profile = mat.subsurfaceProfile;
+    expect(SkinProfile.getById(profile.id)).toBe(profile);
+    mat.dispose();
+    expect(SkinProfile.getById(profile.id)).toBeNull();
   });
 
   test('encodes the id for an 8-bit channel', () => {
-    const p = new SkinProfile();
-    expect(p.encodedId).toBeCloseTo(p.id / 255, 6);
-    p.dispose();
+    const mat = new SkinMaterial();
+    expect(mat.subsurfaceProfile.encodedId).toBeCloseTo(mat.subsurfaceProfile.id / 255, 6);
+    mat.dispose();
   });
 
   test('presets set a red-dominant mean free path', () => {
-    const p = new SkinProfile('skin');
+    const mat = new SkinMaterial();
+    mat.subsurfaceProfile.preset = 'skin';
     // Red scatters furthest through skin; that ratio is what makes thin
     // geometry such as an ear rim glow red.
-    expect(p.meanFreePath.x).toBeGreaterThan(p.meanFreePath.y);
-    expect(p.meanFreePath.y).toBeGreaterThan(p.meanFreePath.z);
-    p.dispose();
+    expect(mat.subsurfaceProfile.meanFreePath.x).toBeGreaterThan(mat.subsurfaceProfile.meanFreePath.y);
+    expect(mat.subsurfaceProfile.meanFreePath.y).toBeGreaterThan(mat.subsurfaceProfile.meanFreePath.z);
+    mat.dispose();
   });
 
   test('kernel shape is scale invariant: mean free path moves extent, not falloff', () => {
@@ -76,13 +79,16 @@ describe('SkinProfile', () => {
     expect(atMin / away).toBeGreaterThan(2);
 
     // And the profile must actually expose albedo per channel for that to vary.
-    const p = new SkinProfile('skin');
-    expect(p.surfaceAlbedo.x).not.toBeCloseTo(p.surfaceAlbedo.z, 6);
-    p.dispose();
+    const mat = new SkinMaterial();
+    mat.subsurfaceProfile.preset = 'skin';
+    expect(mat.subsurfaceProfile.surfaceAlbedo.x).not.toBeCloseTo(mat.subsurfaceProfile.surfaceAlbedo.z, 6);
+    mat.dispose();
   });
 
   test('scatter distance scales with distance and scale factors', () => {
-    const p = new SkinProfile('skin');
+    const mat = new SkinMaterial();
+    const p = mat.subsurfaceProfile;
+    p.preset = 'skin';
     p.meanFreePathDistance = 0.02;
     p.worldUnitScale = 1;
     p.scatterScale = 1;
@@ -90,50 +96,87 @@ describe('SkinProfile', () => {
     p.scatterScale = 2;
     const scaled = p.getScatterDistance();
     expect(scaled.x).toBeCloseTo(base.x * 2, 6);
-    p.dispose();
+    mat.dispose();
   });
 
   test('preset changes are reflected in parameters', () => {
-    const p = new SkinProfile('skin');
+    const mat = new SkinMaterial();
+    const p = mat.subsurfaceProfile;
+    p.preset = 'skin';
     const skinAlbedo = p.surfaceAlbedo.x;
     p.preset = 'jade';
     expect(p.preset).toBe('jade');
     // Jade scatters green furthest, unlike skin.
     expect(p.meanFreePath.y).toBeGreaterThan(p.meanFreePath.x);
     expect(p.surfaceAlbedo.x).not.toBeCloseTo(skinAlbedo, 6);
-    p.dispose();
+    mat.dispose();
   });
 
-  test('clone copies parameters but takes its own id', () => {
-    const p = new SkinProfile('wax');
-    p.meanFreePathDistance = 0.033;
-    const c = p.clone();
-    expect(c.id).not.toBe(p.id);
-    expect(c.meanFreePathDistance).toBeCloseTo(0.033, 6);
-    expect(c.surfaceAlbedo.x).toBeCloseTo(p.surfaceAlbedo.x, 6);
-    p.dispose();
-    c.dispose();
-  });
-
-  test('material starts with no profile and falls back to the shared default', () => {
+  test('a preset switch keeps the same instance and the same table row', () => {
+    // The editor drives these through the serializer, which used to replace the
+    // object. Changing a look has to stay an edit of the material's own profile,
+    // or the id written into the depth prepass stops matching the row the
+    // diffusion reads.
     const mat = new SkinMaterial();
-    // Matches how PBRMetallicRoughnessMaterial exposes its own profile: the
-    // reference is nullable, and null means "use the default".
-    expect(mat.subsurfaceProfile).toBeNull();
-    expect(mat.effectiveProfile).toBe(SkinProfile.getDefault());
-    const custom = new SkinProfile('skin_dark');
-    mat.subsurfaceProfile = custom;
-    expect(mat.subsurfaceProfile).toBe(custom);
-    expect(mat.effectiveProfile).toBe(custom);
-    mat.subsurfaceProfile = null;
-    expect(mat.effectiveProfile).toBe(SkinProfile.getDefault());
-    custom.dispose();
+    const profile = mat.subsurfaceProfile;
+    const id = profile.id;
+    profile.preset = 'jade';
+    expect(mat.subsurfaceProfile).toBe(profile);
+    expect(profile.id).toBe(id);
+    mat.dispose();
   });
 
-  test('profile changes notify the materials using it', () => {
+  test('material owns a profile from construction and releases it on dispose', () => {
     const mat = new SkinMaterial();
-    const profile = new SkinProfile('skin');
-    mat.subsurfaceProfile = profile;
+    const profile = mat.subsurfaceProfile;
+    expect(profile).toBeTruthy();
+    expect(SkinProfile.getById(profile.id)).toBe(profile);
+    mat.dispose();
+    // The row goes back to the pool, which is the whole point: profiles used to
+    // be assignable objects nothing released, so the 256-row table filled up as
+    // the editor loaded scenes and undid edits, and every profile allocated
+    // after that failed to construct.
+    expect(SkinProfile.getById(profile.id)).toBeNull();
+  });
+
+  test('profiles are not constructible outside their material', () => {
+    // A runtime guard rather than the `private` modifier alone: the editor ships
+    // as prebuilt JavaScript and drives this class through serialization
+    // metadata, where TypeScript's visibility rules do not apply.
+    expect(() => new (SkinProfile as unknown as new () => SkinProfile)()).toThrow();
+  });
+
+  test('table rows are recycled, so long editing sessions cannot exhaust them', () => {
+    // Regression guard for the leak directly: the table holds 256 rows, so
+    // without recycling this loop throws partway through.
+    const ids = new Set<number>();
+    for (let i = 0; i < 300; i++) {
+      const mat = new SkinMaterial();
+      ids.add(mat.subsurfaceProfile.id);
+      mat.dispose();
+    }
+    // And they really are reused rather than merely available.
+    expect(ids.size).toBeLessThan(300);
+  });
+
+  test('copyFrom transfers the look without transferring the row', () => {
+    const src = new SkinMaterial();
+    const dst = new SkinMaterial();
+    src.subsurfaceProfile.preset = 'wax';
+    src.subsurfaceProfile.meanFreePathDistance = 0.033;
+    dst.subsurfaceProfile.copyFrom(src.subsurfaceProfile);
+    expect(dst.subsurfaceProfile.meanFreePathDistance).toBeCloseTo(0.033, 6);
+    expect(dst.subsurfaceProfile.surfaceAlbedo.x).toBeCloseTo(src.subsurfaceProfile.surfaceAlbedo.x, 6);
+    // Each material keeps its own row, so disposing one cannot pull the
+    // parameters out from under the other.
+    expect(dst.subsurfaceProfile.id).not.toBe(src.subsurfaceProfile.id);
+    src.dispose();
+    dst.dispose();
+  });
+
+  test('profile changes notify the material using it', () => {
+    const mat = new SkinMaterial();
+    const profile = mat.subsurfaceProfile;
     let notified = 0;
     const listener = () => notified++;
     profile.addChangeListener(listener);
@@ -142,13 +185,13 @@ describe('SkinProfile', () => {
     profile.removeChangeListener(listener);
     profile.meanFreePathDistance = 0.03;
     expect(notified).toBe(1);
-    profile.dispose();
+    mat.dispose();
   });
 
   test('does not disturb the legacy SubsurfaceProfile slots', async () => {
     const { SubsurfaceProfile } = await import('@zephyr3d/scene');
     const legacy = new SubsurfaceProfile();
-    const skin = new SkinProfile();
+    const skin = new SkinMaterial();
     // The two allocate from independent pools, so a skin profile must not
     // consume a legacy slot.
     const legacy2 = new SubsurfaceProfile();
