@@ -6,28 +6,20 @@ import { SKIN_TRANSMISSION_NO_DATA_ENCODING, SkinProfile } from '../material/ski
  * Opacity below which the dual-lobe specular fades back to a single lobe.
  *
  * @remarks
- * `SSSS_OPACITY_THRESHOLD_EPS` in UE5. The fade completes by the time opacity
- * reaches this value rather than at 0, which avoids a discontinuity on
- * nearly-opaque skin.
- *
- * Note there is no `SSSS_MAX_DUAL_SPECULAR_ROUGHNESS` factor here. In UE5 that
- * constant only undoes the profile texture's encoding — the authored value is
- * divided by 2 when packed and multiplied by 2 when read. The profile here
- * carries the authored multiplier directly, so applying it again would double
- * every lobe.
+ * `SSSS_OPACITY_THRESHOLD_EPS` in UE5. The profile stores the authored lobe
+ * multipliers directly, so UE5's `SSSS_MAX_DUAL_SPECULAR_ROUGHNESS` — which only
+ * undoes its texture encoding — has no counterpart here.
  *
  * @internal
  */
-
 const OPACITY_THRESHOLD_EPS = 0.1;
 
 /**
  * Multiple-scattering energy terms for a GGX specular lobe.
  *
  * @remarks
- * A single-scattering GGX lobe loses energy at high roughness, because light that
- * would have bounced again between microfacets is simply dropped. UE5 compensates
- * with a directional-albedo estimate (`ShadingEnergyConservation.ush`):
+ * UE5's analytic directional-albedo fit (`ShadingEnergyConservation.ush`,
+ * `USE_ENERGY_CONSERVATION == 2`), which needs no lookup texture:
  *
  * ```
  * E  = 1 - saturate(pow(r, c/r) * ((r*c + 0.0266916) / (0.466495 + c)))
@@ -36,13 +28,8 @@ const OPACITY_THRESHOLD_EPS = 0.1;
  * A  = W * (E*F0 + Ef*(F90 - F0))
  * ```
  *
- * `W` scales the specular lobe to restore the lost energy, and `A` is the share
- * of incoming light that lobe reflects — the diffuse below it is attenuated by
- * `1 - A` so the surface never reflects more than it receives.
- *
- * This is the `USE_ENERGY_CONSERVATION == 2` path, an analytic fit that needs no
- * lookup texture. UE5's default path samples a baked LUT instead; the fit exists
- * precisely so the terms can be had without binding one.
+ * `W` restores the energy single-scattering GGX drops; `A` is the share the lobe
+ * reflects, and the diffuse beneath is attenuated by `1 - A`.
  *
  * @param scope - Shader scope.
  * @param roughness - Roughness of the lobe being corrected.
@@ -107,12 +94,9 @@ export function skinSpecularEnergyTerms(
  * result = albedo / PI * FdV * FdL
  * ```
  *
- * The caller multiplies by `NoL` and the light colour, exactly as
- * `SubsurfaceProfileBxDF` does — the softness of skin at the terminator comes
- * from the screen-space diffusion, not from bending this term. An earlier
- * version of this function used a curvature-driven wrapped diffuse that skipped
- * the `NoL` clamp to fake that softness; it had no counterpart in UE5 and
- * double-counted what the diffusion already provides.
+ * The caller multiplies by `NoL` and the light colour, as
+ * `SubsurfaceProfileBxDF` does: the soft terminator is the screen-space
+ * diffusion's job, so bending this term would double-count it.
  *
  * @param scope - Shader scope.
  * @param NdotV - Clamped dot(normal, viewDir).
@@ -170,10 +154,9 @@ export function skinDiffuseBRDF(
  * LobeRoughness1 =     saturate(Roughness * scale_1)
  * ```
  *
- * The scaling is multiplicative on the material roughness: UE5 authors these in
- * 0.5..2.0, so 1.0 leaves the roughness alone, 0.75 tightens the narrow lobe and
- * 1.3 broadens the wide one. Only lobe 0 gets the 0.02 floor, which keeps the
- * tight highlight from collapsing into a fireflying delta.
+ * The scales are multiplicative on the material roughness, authored in 0.5..2.0.
+ * Only lobe 0 gets the 0.02 floor, which keeps the tight highlight from
+ * collapsing into a fireflying delta.
  *
  * @param scope - Shader scope.
  * @param roughness - Material roughness.
@@ -223,14 +206,9 @@ export function skinDualSpecularRoughness(
  * F   = F_Schlick(SpecularColor, VoH)
  * ```
  *
- * Two details are easy to get wrong. The lobe roughness enters as `Pow4`, since
- * UE's `alpha = Roughness^2` and `D_GGX` takes `alpha^2`; the helpers here square
- * their argument internally, so they are handed `roughness^2`. And visibility is
- * evaluated **once** from the blended average roughness rather than per lobe,
- * which UE notes approximates the two-lobe result closely.
- *
- * Area-light energy normalization per lobe is omitted: it is only meaningful for
- * area lights, which this material does not represent.
+ * Visibility is evaluated once from the blended average roughness rather than
+ * per lobe, which UE5 notes approximates the two-lobe result closely. UE5's
+ * per-lobe area-light normalization is omitted: this material has no area lights.
  *
  * @param scope - Shader scope.
  * @param NoH - dot(normal, halfVector).
@@ -268,8 +246,8 @@ export function skinDualLobeSpecular(
       pb.float('F0')
     ],
     function () {
-      // The helpers square what they are given, so `roughness^2` here yields
-      // UE's Pow4(roughness).
+      // The helpers square their argument, so `roughness^2` here yields UE5's
+      // Pow4(roughness).
       this.$l.a0 = pb.mul(this.lobeRoughness.x, this.lobeRoughness.x);
       this.$l.a1 = pb.mul(this.lobeRoughness.y, this.lobeRoughness.y);
       this.$l.avgRoughness = pb.mix(this.lobeRoughness.x, this.lobeRoughness.y, this.lobeMix);
@@ -279,7 +257,6 @@ export function skinDualLobeSpecular(
         distributionGGX(this, this.NoH, this.a1),
         this.lobeMix
       );
-      // One visibility term from the average roughness, as UE5 does.
       this.$l.Vis = visGGX(this, this.NoV, this.NoL, this.avgAlpha);
       this.$l.F = fresnelSchlick(this, this.VoH, pb.vec3(this.F0), pb.vec3(1));
       this.$return(pb.mul(this.F, pb.mul(this.D, this.Vis)));
@@ -292,17 +269,13 @@ export function skinDualLobeSpecular(
  * Fetches one column of a profile row from the packed table.
  *
  * @remarks
- * The table is `rgba32f`, which WebGPU classifies as `unfilterable-float`, so
- * the bound sampler has to be non-filtering and this is an exact texel fetch
- * despite going through `textureSampleLevel`. Anything that wants interpolation
- * between columns — the transmission profile below — has to lerp two fetches by
- * hand; binding a linear sampler instead is not an option.
+ * The table is `rgba32f`, hence `unfilterable-float` on WebGPU: the sampler must
+ * be non-filtering, so this is an exact texel fetch and anything wanting
+ * interpolation between columns has to lerp two fetches by hand.
  *
- * This emits the fetch inline rather than wrapping it in a shader function. A
- * texture *can* be a function parameter, but on WebGPU its sampler has to travel
- * alongside it as a second parameter (see `blueprint/material/ir.ts`), and a
- * plain `textureSampleLevel` on the parameter alone compiles to nothing usable.
- * Reading the uniform where it is declared sidesteps that entirely.
+ * Emitted inline rather than behind a shader function: on WebGPU a texture
+ * parameter needs its sampler passed alongside it, and `textureSampleLevel` on
+ * the parameter alone compiles to nothing usable.
  *
  * @param scope - Shader scope.
  * @param tex - The packed profile table, as declared in the caller's scope.
@@ -338,22 +311,18 @@ function readSkinProfileColumn(
  * Transmission       = FalloffColor * Profile * (Falloff * PhaseFunction)
  * ```
  *
- * Three things this deliberately does *not* do, each matching UE5:
+ * Three omissions, each matching UE5:
  *
- * - **No `NoL`.** The light enters from behind; the surface facing the camera is
- *   turned away from it, so a front-facing cosine would zero out exactly the
- *   pixels this term exists for. UE5 notes the omission in a TODO and keeps it.
- * - **No surface shadow.** The caller attenuates by the *transmission* shadow
- *   instead, which is the encoded optical depth itself — see the caller.
- * - **No surface albedo.** The baked profile carries only the falloff shape,
- *   because UE5 passes white for `A` when baking it; the base colour is applied
- *   where this joins the diffuse.
+ * - **No `NoL`.** The light enters from behind, so a front-facing cosine would
+ *   zero out exactly the pixels this term exists for.
+ * - **No surface shadow.** The caller attenuates by the transmission shadow,
+ *   which is the encoded optical depth itself.
+ * - **No surface albedo.** The baked profile carries only the falloff shape; the
+ *   base colour is applied where this joins the diffuse.
  *
- * `refract` is called with the view vector as the *incident* ray and a flipped
- * normal, which is an odd way to phrase it — the incident ray conventionally
- * points at the surface, and `V` points away from it. It is transcribed as
- * written: the intent is a ray bent by the surface, and reversing it here would
- * change which way the forward-scattering lobe leans.
+ * `refract` takes the view vector as the incident ray against a flipped normal,
+ * transcribed as UE5 writes it — reversing it would flip which way the
+ * forward-scattering lobe leans.
  *
  * @param scope - Shader scope.
  * @param profileTex - The packed profile table.
@@ -383,12 +352,9 @@ export function skinTransmission(
   const lutOffset = SkinProfile.transmissionLutOffset;
   const lutSize = SkinProfile.transmissionLutSize;
   const lastLutColumn = lutOffset + lutSize - 1;
-  // The table reads stay in the caller's scope; see readSkinProfileColumn for
-  // why they cannot move behind a function boundary. The locals are prefixed so
-  // that they do not collide with the caller's own.
-  //
-  // Rows are addressed by the profile id directly, as UE5 does with SSProfiles.
-  // The id arrives normalized because it rides in an 8-bit channel.
+  // Table reads stay inline (see readSkinProfileColumn); the locals are prefixed
+  // so they cannot collide with the caller's. Rows are addressed by the profile
+  // id, which arrives normalized because it rides in an 8-bit channel.
   scope.$l.zSkinTrRow = pb.mul(pb.add(pb.mul(pb.clamp(profileId, 0, 1), 255), 0.5), profileTexelSize.y);
   // GetTransmissionProfile. The index is `opticalDepth / MAX * (size - 1)` and
   // the decode is `opticalDepth = (1 - thickness) * MAX`, so the MAX cancels and
@@ -461,25 +427,18 @@ function skinTransmissionPhase(
       pb.vec3('lightDir')
     ],
     function () {
-      // "No data" comes through as an encoding the pass cannot produce, and it
-      // has to be rejected rather than decoded: it decodes to zero optical
-      // depth, which is the *most* transmissive entry of the profile. Lights
-      // that do not transmit, channels no light occupies and the dummy texture
-      // all arrive here, and letting any of them through lights the subject up
-      // from behind with a light that was never behind it.
-      //
-      // The threshold sits midway between the largest encoding the pass can
-      // write and the sentinel, a gap no real measurement lands in, so this is a
-      // clean partition and not a cutoff that clips thin geometry.
+      // "No data" must be rejected rather than decoded: it decodes to zero
+      // optical depth, the *most* transmissive entry, so letting it through lights
+      // the subject from behind with a light that was never behind it. The
+      // threshold sits in the gap between the largest encoding the pass can write
+      // and the sentinel, so it clips no real measurement.
       this.$if(pb.greaterThan(this.thickness, 0.5 * (1 + SKIN_TRANSMISSION_NO_DATA_ENCODING)), function () {
         this.$return(pb.vec3(0));
       });
       this.$l.refracV = pb.refract(this.viewVec, pb.neg(this.normal), this.params.w);
       this.$l.cosJ = pb.dot(pb.neg(this.lightDir), this.refracV);
-      // ApproximateHG. Note this is UE5's approximation, not the Henyey-
-      // Greenstein phase function itself: the real one raises the denominator to
-      // the 3/2, and the normalisation is `1 / 4pi` rather than the `0.5` used
-      // here. Transcribed as UE5 has it, since matching its look is the point.
+      // UE5's ApproximateHG, not Henyey-Greenstein itself: the real one raises
+      // the denominator to 3/2 and normalises by 1/4pi rather than 0.5.
       this.$l.g = this.params.z;
       this.$l.g2 = pb.mul(this.g, this.g);
       this.$l.gcos = pb.sub(1, pb.mul(this.g, this.cosJ));

@@ -401,7 +401,7 @@ export function getSkinProfileClass(): SerializableClass {
           description:
             "Set this close to the skin's base color. It does not recolor the surface; it fine-tunes how soft or tight the scattered glow is in each color channel",
           type: 'rgb',
-          default: [0.85, 0.63, 0.55],
+          default: [0.91058, 0.338275, 0.2718],
           options: { animatable: true, minValue: 0, maxValue: 1 },
           get(this: SkinProfile, value) {
             value.num[0] = this.surfaceAlbedo.x;
@@ -417,7 +417,7 @@ export function getSkinProfileClass(): SerializableClass {
           description:
             'Relative softness per color channel. The channel with the highest value bleeds furthest, which sets the color of the glow in shadow edges and around fine details; skin keeps red high, giving the warm red fringe at the light-to-shadow transition',
           type: 'rgb',
-          default: [1, 0.28, 0.14],
+          default: [1, 0.0889636, 0.0720951],
           options: { animatable: true, minValue: 0, maxValue: 1 },
           get(this: SkinProfile, value) {
             value.num[0] = this.meanFreePath.x;
@@ -433,7 +433,7 @@ export function getSkinProfileClass(): SerializableClass {
           description:
             'Overall softness of the skin, in real-world metres (about 0.01 for human skin). Higher values blur lighting and surface detail more, giving a waxy, translucent look; lower values give a harder, more opaque, plastic-like surface',
           type: 'float',
-          default: 0.012,
+          default: 0.026748,
           options: { animatable: true, minValue: 0, maxValue: 1 },
           get(this: SkinProfile, value) {
             value.num[0] = this.meanFreePathDistance;
@@ -475,7 +475,7 @@ export function getSkinProfileClass(): SerializableClass {
           description:
             'Color used where this skin meets a different profile, e.g. face and lips. Values near white let the softness blend smoothly across the boundary; darker or more saturated values tint the transition and make the seam more visible',
           type: 'rgb',
-          default: [0.78, 0.44, 0.36],
+          default: [1, 1, 1],
           options: { animatable: true, minValue: 0, maxValue: 1 },
           get(this: SkinProfile, value) {
             value.num[0] = this.boundaryColorBleed.x;
@@ -563,8 +563,8 @@ export function getSkinProfileClass(): SerializableClass {
           description:
             'Sharpness of the tight highlight layer, as a fraction of the material roughness. Lower values give a small, crisp, oily-looking highlight',
           type: 'float',
-          default: 0.5,
-          options: { animatable: true, minValue: 0.01, maxValue: 1 },
+          default: 0.75,
+          options: { animatable: true, minValue: 0.5, maxValue: 2 },
           get(this: SkinProfile, value) {
             value.num[0] = this.roughness0;
           },
@@ -577,8 +577,8 @@ export function getSkinProfileClass(): SerializableClass {
           description:
             'Sharpness of the broad highlight layer, as a fraction of the material roughness. Lower values make the soft sheen smaller and brighter',
           type: 'float',
-          default: 1,
-          options: { animatable: true, minValue: 0.01, maxValue: 1 },
+          default: 1.3,
+          options: { animatable: true, minValue: 0.5, maxValue: 2 },
           get(this: SkinProfile, value) {
             value.num[0] = this.roughness1;
           },
@@ -591,8 +591,8 @@ export function getSkinProfileClass(): SerializableClass {
           description:
             'Balance between the two highlight layers. 0 shows only the tight, crisp highlight; higher values add more of the broad, soft sheen for a more matte look',
           type: 'float',
-          default: 0.15,
-          options: { animatable: true, minValue: 0, maxValue: 1 },
+          default: 0.85,
+          options: { animatable: true, minValue: 0.1, maxValue: 0.9 },
           get(this: SkinProfile, value) {
             value.num[0] = this.lobeMix;
           },

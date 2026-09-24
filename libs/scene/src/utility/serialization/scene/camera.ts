@@ -180,6 +180,52 @@ export function getCameraClass(): SerializableClass {
           }
         },
         {
+          name: 'SkinSSSDebugOutput',
+          type: 'string',
+          phase: 0,
+          default: 'none',
+          options: {
+            label: 'SSSDebugOutput',
+            group: 'PostProcessing',
+            enum: {
+              labels: [
+                'None',
+                'Diffusible',
+                'Diffuse Amount',
+                'Profile Id',
+                'Normal',
+                'Diffusion Distance',
+                'Sample Radius',
+                'Weight',
+                'Acceptance',
+                'Center Weight',
+                'Diffused',
+                'Thickness'
+              ],
+              values: [
+                'none',
+                'diffusible',
+                'diffuseAmount',
+                'profileId',
+                'normal',
+                'diffusionDistance',
+                'sampleRadius',
+                'weight',
+                'acceptance',
+                'centerWeight',
+                'diffused',
+                'thickness'
+              ]
+            }
+          },
+          get(this: Camera, value) {
+            value.str[0] = this.skinSSSDebugOutput;
+          },
+          set(this: Camera, value) {
+            this.skinSSSDebugOutput = value.str[0] as SkinSSSDebugOutput;
+          }
+        },
+        {
           name: 'ToneMapEnabled',
           type: 'bool',
           phase: 0,
@@ -1514,71 +1560,6 @@ export function getCameraClass(): SerializableClass {
           },
           isValid(this: Camera) {
             return this.SSS;
-          }
-        },
-        {
-          name: 'SkinSSSEnabled',
-          type: 'bool',
-          phase: 0,
-          default: false,
-          options: {
-            label: 'Enabled',
-            group: 'PostProcessing/SkinSSS'
-          },
-          get(this: Camera, value) {
-            value.bool[0] = this.skinSSS;
-          },
-          set(this: Camera, value) {
-            this.skinSSS = value.bool[0];
-          }
-        },
-        {
-          name: 'SkinSSSDebugOutput',
-          type: 'string',
-          phase: 0,
-          default: 'none',
-          options: {
-            label: 'DebugOutput',
-            group: 'PostProcessing/SkinSSS',
-            enum: {
-              labels: [
-                'None',
-                'Diffusible',
-                'Diffuse Amount',
-                'Profile Id',
-                'Normal',
-                'Diffusion Distance',
-                'Sample Radius',
-                'Weight',
-                'Acceptance',
-                'Center Weight',
-                'Diffused',
-                'Thickness'
-              ],
-              values: [
-                'none',
-                'diffusible',
-                'diffuseAmount',
-                'profileId',
-                'normal',
-                'diffusionDistance',
-                'sampleRadius',
-                'weight',
-                'acceptance',
-                'centerWeight',
-                'diffused',
-                'thickness'
-              ]
-            }
-          },
-          get(this: Camera, value) {
-            value.str[0] = this.skinSSSDebugOutput;
-          },
-          set(this: Camera, value) {
-            this.skinSSSDebugOutput = value.str[0] as SkinSSSDebugOutput;
-          },
-          isValid(this: Camera) {
-            return this.skinSSS;
           }
         },
         {

@@ -1140,14 +1140,12 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
    * Per-pixel subsurface profile id this material contributes to the depth prepass.
    *
    * @remarks
-   * Returning `null` (the default) means "not skin", which is what every material
-   * other than {@link SkinMaterial} wants. The value is the normalized id, i.e.
-   * `SkinProfile.encodedId`.
+   * `null` (the default) means "not skin", which is what every material other than
+   * {@link SkinMaterial} wants; otherwise the normalized `SkinProfile.encodedId`.
    *
-   * This lives on the prepass rather than the light pass because the transmission
-   * thickness pass needs it and runs earlier; it is also what lets the skin mask
-   * buffer's alpha carry the subsurface opacity instead of being shared between
-   * the two.
+   * It lives on the prepass rather than the light pass because the transmission
+   * thickness pass needs it and runs earlier, and because that frees the skin mask
+   * buffer's alpha to carry the subsurface opacity.
    *
    * @param scope - Inside-function shader scope.
    * @returns Normalized profile id expression, or `null` for non-skin materials.
@@ -1373,19 +1371,14 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
             }
           }
         }
-        // Not in the motion-vector-only pass, which has to match the single
-        // attachment its framebuffer carries. Assigning to `$outputs` declares
-        // the output implicitly, so writing here regardless gave that pass a
-        // second one the framebuffer had no target for, and every transparent
-        // material logged a fragment color output count mismatch on load.
-        //
-        // Skipping it is also the right answer on its own terms: the profile id
-        // is a prepass product and the prepass only draws opaque geometry, so
-        // subsurface scattering does not reach the transparent queue at all.
+        // Not in the motion-vector-only pass, whose framebuffer carries a single
+        // attachment: assigning to `$outputs` declares the output implicitly, so
+        // writing here regardless would give that pass one the framebuffer has no
+        // target for. It is also right on its own terms - the profile id is a
+        // prepass product and the prepass draws only opaque geometry.
         if (that.drawContext.skinProfileId && !depthPass.motionVectorOnly) {
-          // Every material submitted to the prepass writes this attachment, so
-          // the ones that are not skin have to write the "no profile" id rather
-          // than leave it undefined - the target is shared and a stale texel
+          // Every material in the prepass writes this attachment, so non-skin ones
+          // must write the "no profile" id: the target is shared, and a stale texel
           // would be read as a real profile row.
           const profileId = that.getDepthPassProfileId(this);
           this.$outputs.zSkinProfileId = pb.vec4(profileId ?? pb.float(0));

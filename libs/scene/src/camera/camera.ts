@@ -423,8 +423,6 @@ export class Camera extends SceneNode {
   protected _sssResolvedSettings: SSSResolvedSettings;
   /** @internal SSS debug visualization mode. */
   protected _sssDebugView: SSSDebugView;
-  /** @internal Skin SSS enable flag (via post effect). */
-  protected _skinSSS: boolean;
   /** @internal Skin SSS post effect reference. */
   protected _postEffectSkinSSS: DRef<SkinSSS>;
   protected _skinSSSDebugOutput: SkinSSSDebugOutput;
@@ -597,7 +595,6 @@ export class Camera extends SceneNode {
     };
     this.updateSSSResolvedSettings();
     this._sssDebugView = 'none';
-    this._skinSSS = false;
     this._postEffectSkinSSS = new DRef();
     this._skinSSSDebugOutput = 'none';
     this._SSAO = false;
@@ -1457,12 +1454,21 @@ export class Camera extends SceneNode {
   set sssDebugView(val: SSSDebugView) {
     this._sssDebugView = val ?? 'none';
   }
-  /** Gets whether the dedicated Skin SSS post effect is enabled. */
-  get skinSSS() {
-    return this._postEffectSkinSSS.get()!.enabled;
-  }
-  set skinSSS(val) {
-    this._postEffectSkinSSS.get()!.enabled = !!val;
+  /**
+   * Switches the skin diffusion on or off for the coming frame.
+   *
+   * @remarks
+   * Driven by the render graph from whether the frame actually draws a skin
+   * material, not by the application: an effect with nothing to scatter would
+   * only cost a blit.
+   *
+   * @internal
+   */
+  setSkinSSSActive(active: boolean) {
+    const effect = this._postEffectSkinSSS.get();
+    if (effect) {
+      effect.enabled = active;
+    }
   }
   /**
    * Intermediate Skin SSS quantity to visualize instead of the shaded result.

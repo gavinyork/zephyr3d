@@ -83,17 +83,13 @@ export const SKIN_TRANSMISSION_OPTICAL_DEPTH_BIAS = 0.25;
  * separates a real measurement from "no light wrote this".
  *
  * @remarks
- * The encoding is `1 - opticalDepth / MAX` and the optical depth can never fall
- * below `FLOOR + BIAS`, so the pass tops out here — 0.92 at the defaults. The
- * cleared value of 1 is therefore unreachable and doubles as "no data": a light
- * that does not transmit, a channel no light occupies, or the dummy texture
- * bound when the pass did not run.
+ * The encoding is `1 - opticalDepth / MAX` and the optical depth never falls
+ * below `FLOOR + BIAS`, so the pass tops out at 0.92 and the cleared value of 1
+ * is unreachable — which makes it usable as "no data".
  *
- * That distinction matters more than it looks. An encoding of 1 decodes to zero
- * optical depth, which indexes the *first* entry of the transmission profile —
- * its strongest. Reading the sentinel as a measurement would light every
- * non-transmitting light's pixels at full transmission, which is the opposite of
- * the intent.
+ * The distinction matters because 1 decodes to zero optical depth, the profile's
+ * *strongest* entry: read as a measurement it would light every non-transmitting
+ * light's pixels at full transmission.
  *
  * @internal
  */
@@ -109,21 +105,15 @@ export const SKIN_TRANSMISSION_NO_DATA_ENCODING =
  * `MaxTransmissionProfileDistance * CmToMm = 5 * 10` in
  * `ComputeTransmissionProfileBurley`.
  *
- * The 5 here and the 5 in {@link SKIN_MAX_TRANSMISSION_OPTICAL_DEPTH} are the
- * same number wearing two hats, and that is not a coincidence but the whole
- * calibration: UE5's world unit is the centimetre, so an optical depth of 1 (at
- * unit extinction) *is* one centimetre of material, and the table's axis is that
- * same span written in the millimetres the mean free paths use. The shader then
- * indexes the table with the optical depth directly, which reads as a unit error
- * — UE5 says so itself, at `ShadingModels.ush:658` and again at
- * `SubstrateEvaluation.ush:954` — but is self-consistent once the centimetre is
- * accounted for.
+ * The 5 here and the one in {@link SKIN_MAX_TRANSMISSION_OPTICAL_DEPTH} are the
+ * same number by construction: UE5's world unit is the centimetre, so an optical
+ * depth of 1 at unit extinction *is* one centimetre, and this axis is that span
+ * in the millimetres the mean free paths use. The shader indexes the table with
+ * optical depth directly — self-consistent only once that is accounted for.
  *
- * What that means here is that the optical depth the thickness pass produces has
- * to be calibrated against this axis rather than against any unit of its own.
- * {@link SKIN_OPTICAL_DEPTH_PER_WORLD_UNIT} is that calibration; changing this
- * constant without it silently slides the whole profile along the thickness
- * axis.
+ * The thickness pass must therefore be calibrated against this axis;
+ * {@link SKIN_OPTICAL_DEPTH_PER_WORLD_UNIT} is that calibration, and changing
+ * this constant without it slides the whole profile along the thickness axis.
  *
  * @internal
  */
@@ -160,32 +150,18 @@ const WORLD_UNITS_TO_PROFILE_MM = 1000;
  * `extinctionScale`.
  *
  * @remarks
- * This is what ties the thickness pass to the baked profile, and it is derived
- * rather than chosen so that the two cannot drift.
+ * Derived rather than chosen, so the thickness pass and the baked profile cannot
+ * drift apart. The BxDF indexes entry `opticalDepth / MAX * (size - 1)` and entry
+ * `i` was baked for `i / size * LUT_MAX_MM` profile millimetres, so one unit of
+ * optical depth is `LUT_MAX_MM * (size - 1) / size / MAX` millimetres.
  *
- * Reading the chain backwards: the BxDF indexes entry
- * `opticalDepth / MAX * (size - 1)`, and entry `i` was baked for
- * `i / size * LUT_MAX_MM` profile millimetres. Composing them, one unit of
- * optical depth is `LUT_MAX_MM * (size - 1) / size / MAX` profile millimetres —
- * 9.69 mm at the current constants, which is UE5's centimetre less the 31/32
- * the index and the axis disagree by. Converting from world units then gives the
- * factor below, and `worldUnitScale` correctly does *not* appear: it divides
- * both the table's axis and the path's conversion into profile space, so it
- * cancels. UE5 likewise keeps `UnitScale` on the LUT axis only, never in
- * `CalculateOpticalDepth`.
+ * `worldUnitScale` deliberately does not appear: it divides both the table's axis
+ * and the path's conversion into profile space, so it cancels. UE5 likewise keeps
+ * it out of `CalculateOpticalDepth`.
  *
- * Getting this wrong does not look like a scale error, it looks like the feature
- * is missing. An earlier round had the pass produce optical depth in
- * *millimetres*, ten times this, which drove every path longer than 5 mm onto
- * the profile's deliberately blacked-out last entry; a head then measured as
- * uniformly opaque and transmitted nothing anywhere, while the thickness debug
- * view — which shows optical depth, not the profile — looked plausibly saturated.
- *
- * One deliberate 3% departure from UE5. Its index uses `size - 1` while its axis
- * uses `size`, so its optical depth of 1 means a centimetre but lands on the
- * entry baked for 9.69 mm; the `(size - 1) / size` above cancels that, and a
- * path of `t` metres here indexes exactly the entry baked for `t` millimetres.
- * Reproducing the slip would cost a visible nothing and hide a real invariant.
+ * The `(size - 1) / size` is a deliberate 3% departure from UE5, whose index and
+ * axis disagree by that factor. Correcting it makes a path of `t` metres index
+ * exactly the entry baked for `t` millimetres.
  *
  * @internal
  */
@@ -212,11 +188,9 @@ const enum ProfileColumn {
    * scatteringDistribution, 1 / ior)`.
    *
    * @remarks
-   * Field-for-field UE5's `SSSS_TRANSMISSION_OFFSET` column, which
-   * `GetTransmissionProfileParams` unpacks in exactly this order
-   * (`TransmissionCommon.ush:34-41`). The transmission *tint* is deliberately
-   * absent: UE5 bakes it into the profile below rather than storing it, and
-   * keeping a second copy here would let the two drift apart.
+   * UE5's `SSSS_TRANSMISSION_OFFSET` column, unpacked in this order by
+   * `GetTransmissionProfileParams`. The transmission tint is absent by design:
+   * it is baked into the profile, and a second copy here could drift from it.
    */
   Transmission = 4,
   /** Dual-lobe specular parameters. */
@@ -277,18 +251,14 @@ interface SkinProfileTemplate {
  * | WorldUnitScale       | 0.1 cm                          | folded into the distance    |
  * | BoundaryColorBleed   | white                           | white                       |
  *
- * The green and blue mean free paths are an order of magnitude shorter than red
- * — roughly 1 : 0.089 : 0.072 — and the albedo is just as strongly red-shifted.
- * Those two ratios together are what make the diffusion read as skin rather than
- * as a neutral blur, so they are the first thing to check when the scattering
- * looks washed out.
+ * The red-shifted mean free path (roughly 1 : 0.089 : 0.072) and the equally
+ * red-shifted albedo are together what make the diffusion read as skin rather
+ * than as a neutral blur — the first thing to check when scattering looks washed
+ * out. UE5 ships only `skin`; the rest are this engine's own, pitched around the
+ * same regime to stay comparable.
  *
- * UE5 only ships the one profile; the remaining presets are this engine's own
- * and are pitched around the same regime so that they stay comparable.
- *
- * `boundaryColorBleed` is white throughout, as in UE5: it tints taps that belong
- * to a *different* profile, so it is a seam treatment rather than a material
- * colour, and anything darker quietly attenuates every profile boundary.
+ * `boundaryColorBleed` is white throughout, as in UE5: it tints taps belonging to
+ * a *different* profile, so anything darker attenuates every profile boundary.
  *
  * @internal
  */
@@ -455,13 +425,10 @@ export class SkinProfile {
    * which owns one for the material's lifetime.
    *
    * @remarks
-   * The token check is not redundant with the `private` modifier. Profiles hold
-   * a row of a 256-entry GPU table and the only way a row comes back is
-   * {@link SkinProfile.dispose}, so an instance created by anything other than
-   * its owning material leaks that row permanently. TypeScript cannot enforce
-   * that on the editor, which ships as prebuilt JavaScript and drives this class
-   * through serialization metadata — hence a runtime guard, which fails at the
-   * first illegal construction rather than 256 of them later.
+   * The token check is not redundant with `private`: profiles hold a row of a
+   * 256-entry GPU table that only {@link SkinProfile.dispose} returns, and the
+   * editor ships as prebuilt JavaScript that drives this class through
+   * serialization metadata, where TypeScript's visibility rules do not apply.
    *
    * @internal
    */
@@ -518,10 +485,8 @@ export class SkinProfile {
    * Creates a profile for a material to own.
    *
    * @remarks
-   * The only way to obtain a profile. Its table row is held until
-   * {@link SkinProfile.dispose}, so the caller is taking on that responsibility —
-   * in practice {@link SkinMaterial}, which creates one in its constructor and
-   * disposes it with itself.
+   * The only way to obtain one. The caller takes on releasing its table row — in
+   * practice {@link SkinMaterial}, which disposes the profile with itself.
    *
    * @param preset - Preset to start from. Defaults to `'skin'`.
    * @returns The new profile.
@@ -536,9 +501,9 @@ export class SkinProfile {
    * The shared default skin profile.
    *
    * @remarks
-   * A fallback for consumers that have no material to ask — the diffusion post
-   * effect uses it for pixels whose id is not in the table. It holds one table
-   * row for the lifetime of the process, which is why it is created lazily.
+   * A fallback for consumers with no material to ask — the diffusion uses it for
+   * pixels whose id is not in the table. Created lazily, since it holds a table
+   * row for the lifetime of the process.
    *
    * @public
    */
@@ -574,12 +539,9 @@ export class SkinProfile {
    * @public
    */
   static getTable(device: AbstractDevice): Texture2D | null {
-    // The table outlives any one device: it is static, while the device can be
-    // recreated under it - a lost WebGPU device, or an editor rebuilding its
-    // renderer. A texture belonging to a dead device silently swallows every
-    // `update`, so the parameters would stop reaching the GPU while everything
-    // still looked wired up, and the last values uploaded before the swap would
-    // stay on screen until the page was reloaded.
+    // The table is static and outlives any one device. A texture belonging to a
+    // dead device silently swallows every `update`, which strands the last values
+    // uploaded before the swap on screen until the page is reloaded.
     if (this._table && (this._tableDevice !== device || this._table.disposed)) {
       this._table = null;
       this._tableData = null;
@@ -827,14 +789,11 @@ export class SkinProfile {
    *
    * @remarks
    * UE5's `ScatteringDistribution`, default 0.93 for skin. Positive values throw
-   * the transmitted light forward, away from the light, which is what makes a
-   * backlit ear read as a glow concentrated where the light shines through
-   * rather than as a uniform wash.
+   * the transmitted light forward, concentrating a backlit ear's glow where the
+   * light shines through rather than spreading it as a uniform wash.
    *
-   * Only the transmission BxDF uses this; the screen-space diffusion is
-   * isotropic and ignores it. UE5 stores the value remapped to `[0, 1]`
-   * (`EncodeScatteringDistribution`) because its profile texture is 8-bit per
-   * channel; the table here is `rgba32f` and stores it raw.
+   * Only the transmission BxDF uses this; the screen-space diffusion is isotropic
+   * and ignores it. Stored raw, unlike UE5's `[0, 1]` remap for an 8-bit texture.
    *
    * @public
    */
@@ -875,10 +834,9 @@ export class SkinProfile {
    * Multiplier on the material roughness for the narrow specular lobe.
    *
    * @remarks
-   * Used directly as a multiplier, so 1 leaves the material roughness alone and
-   * skin's default 0.75 tightens the narrow lobe. The range 0.5..2 matches the
-   * one UE5 exposes; UE5 stores the value halved and doubles it again on read,
-   * which is purely its texture encoding and has no place here.
+   * A direct multiplier, so 1 leaves the material roughness alone and skin's
+   * default 0.75 tightens the narrow lobe. The 0.5..2 range matches UE5's, whose
+   * halve-on-pack encoding has no counterpart here.
    *
    * @public
    */
@@ -929,15 +887,10 @@ export class SkinProfile {
    * Per-channel diffusion distance, in profile space.
    *
    * @remarks
-   * This is deliberately *not* scaled by {@link SkinProfile.worldUnitScale}.
-   * UE5 keeps the two apart the same way: the packed diffuse mean free path is
-   * `MeanFreePathColor × MeanFreePathDistance` alone, and `WorldUnitScale` only
-   * enters later, in `CalculateBurleyScale`, as the profile-space-to-world
-   * conversion. Folding it in here as well made the diffusion scale with the
-   * square of the world unit scale.
-   *
-   * The distance therefore has to be read together with the world unit scale to
-   * reach world units; {@link SkinProfile.worldUnitScale} is the factor.
+   * Deliberately *not* scaled by {@link SkinProfile.worldUnitScale}, which UE5
+   * applies later in `CalculateBurleyScale`; applying it in both places would
+   * make the diffusion scale with its square. The result must therefore be read
+   * together with that factor to reach world units.
    *
    * @returns Mean free path scaled by the profile's distance and scatter scale.
    *
@@ -952,12 +905,8 @@ export class SkinProfile {
    * Overwrites every parameter from another profile.
    *
    * @remarks
-   * This is how a look is transferred, since profiles cannot be shared or
-   * cloned: each one belongs to one material. `SkinMaterial.copyFrom` uses it to
-   * give a clone its own profile carrying the same values.
-   *
-   * The table row is deliberately untouched — it identifies the profile, not its
-   * contents.
+   * The only way to transfer a look, since profiles cannot be shared or cloned.
+   * The table row is untouched: it identifies the profile, not its contents.
    *
    * @param other - Profile to copy the parameters from.
    *
@@ -1062,12 +1011,10 @@ export class SkinProfile {
         out[o + 2] = z;
         out[o + 3] = w;
       };
-      // The diffusion draws its sample radii from a single representative
-      // channel, which UE5 keeps in the `w` of both rows
-      // (GetComponentForScalingFactorEstimation / GetDiffuseMeanFreePathForSampling);
-      // `xyz` is then used to evaluate the three channel kernels at those radii.
-      // The widest channel is the representative one, so that the sample
-      // distribution covers every channel's tail.
+      // The diffusion draws its radii from one representative channel, kept in
+      // the `w` of both rows as UE5 does, and evaluates all three kernels at
+      // those radii. The widest channel represents, so the sample distribution
+      // covers every channel's tail.
       const d = p.getScatterDistance();
       const widest = Math.max(d.x, d.y, d.z);
       const albedoForSampling =
@@ -1117,14 +1064,12 @@ export class SkinProfile {
    * ```
    *
    * evaluated per channel at its own `s` and `L`, times the transmission tint.
-   * UE5 passes white for `A`, so the surface albedo is deliberately absent: the
-   * profile carries only the *shape* of the falloff, and the base colour is
-   * applied later, where the transmission joins the diffuse
-   * (`SkinMaterial.fragmentShader`).
+   * The surface albedo is absent — UE5 passes white for `A` — so this carries
+   * only the *shape* of the falloff; the base colour is applied where the
+   * transmission joins the diffuse.
    *
-   * The alpha is `exp(-distance x extinctionScale)`, which UE5 keeps as a
-   * separate "SSSS shadow" curve; the BxDF reads `.rgb` only, but it is stored
-   * for fidelity and costs nothing.
+   * The alpha is `exp(-distance x extinctionScale)`, UE5's separate "SSSS shadow"
+   * curve. The BxDF reads `.rgb` only, but storing it costs nothing.
    *
    * @param out - Destination, `4 x transmissionLutSize` floats from `offset`.
    * @param offset - Index of the first float to write.
@@ -1132,12 +1077,8 @@ export class SkinProfile {
    * @public
    */
   writeTransmissionProfile(out: Float32Array, offset = 0) {
-    // The profile's distances live in profile space and the world unit scale is
-    // the conversion out of it, exactly as it is for the diffusion radii. It
-    // therefore applies to the *distance axis* of this table and not to the mean
-    // free paths, which UE5 likewise leaves unscaled (its
-    // `DiffuseMeanFreePathInMm` comes straight off the profile struct while only
-    // `DistanceInMm` carries `InvUnitScale`).
+    // The world unit scale applies to this table's *distance axis*, not to the
+    // mean free paths, which UE5 likewise leaves unscaled.
     const invUnitScale = 1 / Math.max(this._worldUnitScale, 1e-4);
     const d = this.getScatterDistance();
     const l = [
@@ -1154,10 +1095,9 @@ export class SkinProfile {
     const offsetMM = TRANSMISSION_LUT_RADIUS_OFFSET_MM * invUnitScale;
     for (let i = 0; i < SKIN_TRANSMISSION_LUT_SIZE; i++) {
       const o = offset + i * 4;
-      // 50 mm is not quite enough to cool the red channel to nothing, and the
-      // residual tail is still visible after tone mapping, so UE5 forces the
-      // last entry black (`bMakeLastPixelBlack`). That is what guarantees
-      // anything thicker than the table stops transmitting outright.
+      // UE5's `bMakeLastPixelBlack`: 50 mm leaves a red tail still visible after
+      // tone mapping, so forcing the last entry black is what makes anything
+      // thicker than the table stop transmitting outright.
       if (i === SKIN_TRANSMISSION_LUT_SIZE - 1) {
         out[o] = 0;
         out[o + 1] = 0;

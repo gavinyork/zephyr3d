@@ -65,6 +65,9 @@ function createMockDrawContext(overrides: Record<string, unknown> = {}) {
       sssStrength: 1,
       sssBlurScale: 1,
       sssTransmissionStrength: 1,
+      // The builder switches the skin diffusion on from the render queue rather
+      // than from a camera flag, so every context needs this to exist.
+      setSkinSSSActive: () => {},
       ...cameraOverrides
     },
     ...restOverrides
@@ -383,10 +386,11 @@ describe('Forward+ render graph builder', () => {
         }
       }
     };
+    // No camera switch is consulted: a skin material always wants its diffusion,
+    // so the queue alone decides.
     const camera = {
       SSR: false,
       SSS: false,
-      skinSSS: true,
       TAA: false,
       motionBlur: false,
       ssrTemporal: false,
@@ -420,6 +424,13 @@ describe('Forward+ render graph builder', () => {
       unlit: []
     };
 
+    expect(deriveForwardPlusOptions(scene as any, camera as any, 'webgpu', renderQueue as any).skinSSS).toBe(
+      false
+    );
+
+    // And a frame with no skin material at all leaves it off, which is what
+    // keeps the effect from costing a blit in scenes that have no skin.
+    renderQueue.itemList.transmission = emptyBundle;
     expect(deriveForwardPlusOptions(scene as any, camera as any, 'webgpu', renderQueue as any).skinSSS).toBe(
       false
     );

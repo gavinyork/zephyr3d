@@ -31,14 +31,12 @@ const UNIFORM_NAME_SHADOW_DEPTH = 'Z_UniformShadowDepth';
  * Largest optical depth the transmission profile is defined over.
  *
  * @remarks
- * Re-exported from {@link SKIN_MAX_TRANSMISSION_OPTICAL_DEPTH}, which is where
- * the constant belongs: the encoding this pass writes (`1 - opticalDepth / MAX`)
- * and the baked profile the BxDF indexes with it have to agree on the same
- * number, and the profile owns the baking.
+ * Re-exported from {@link SKIN_MAX_TRANSMISSION_OPTICAL_DEPTH}: the encoding this
+ * pass writes (`1 - opticalDepth / MAX`) and the baked profile the BxDF indexes
+ * with it must agree on the same number, and the profile owns the baking.
  *
- * The clamp floor and additive bias the optical depth is put through below are
- * in the same space — profile millimetres, the unit the scatter radii use, not
- * world units. A producer feeding `opticalDepthScale` has to convert.
+ * The clamp floor and additive bias below are in profile millimetres, not world
+ * units, so a producer feeding `opticalDepthScale` has to convert.
  *
  * @internal
  */
@@ -52,22 +50,13 @@ export const MAX_TRANSMISSION_OPTICAL_DEPTH = SKIN_MAX_TRANSMISSION_OPTICAL_DEPT
  * offsets sum to exactly zero and the radii spread from 0.25 to 0.97 of the
  * search radius.
  *
- * The zero mean is the load-bearing property, not the even coverage. Averaging
- * over a footprint the blocker's depth varies across only measures the depth at
- * the footprint's centroid, so a kernel whose centroid is displaced reads the
- * blocker at the wrong place - and the error is proportional to the depth
- * gradient, which is `tan θ` for a surface tilted by `θ` out of the light's
- * plane.
+ * The zero mean is the load-bearing property, not the even coverage: averaging
+ * over a footprint the blocker's depth varies across measures the depth at the
+ * footprint's centroid, so a displaced centroid reads the blocker at the wrong
+ * place, with an error proportional to `tan θ` for a surface tilted by `θ`.
  *
- * This replaces a window of UE5's 63-entry table
- * (`TransmissionThickness.ush`). That table is sorted by x, so *no* contiguous
- * window of it is centred; the one transcribed here had all sixteen x negative
- * and a centroid at (-0.56, +0.05), half a texel off centre. Measured by
- * `transmission-thickness-slant` in the visual-test harness: 1 mm slabs tilted
- * 30 and 45 degrees read 1.1 mm and 1.7 mm thicker than their true light-ray
- * path, and the excess tracked `tan θ` as predicted. Flat slabs lit head-on have
- * no gradient and were unaffected, which is why the defect survived review of
- * the head-on case.
+ * UE5's own 63-entry table (`TransmissionThickness.ush`) is sorted by x, so no
+ * contiguous window of it is centred - hence the purpose-built disc here.
  *
  * @internal
  */
@@ -98,39 +87,26 @@ const POISSON_DISC: number[][] = [
  * reciprocal of the map size, and the disc's entries span `[-1, 1]`, so its taps
  * cover the 2x2 texels around the sample.
  *
- * What this is for is the *light-space silhouette*, where the shadow map holds a
- * step: on one side of it the receiver is its own blocker and the path is
- * nothing, on the other the blocker is the lit face and the path climbs away
- * from zero. On a sphere that climb is exactly `2R|cos(theta)|`, a clean linear
- * ramp out of the terminator - so everything the measurement adds there is
- * artifact, and a quantised blocker adds a comb of texel-shaped teeth.
- * Averaging over a footprint is what softens it, and filtering the individual
- * tap is not a substitute: bilinear reconstructs within a texel, but the
- * boundary still runs along the texel grid, and measured on
- * `transmission-thickness-sphere` it is a net loss.
+ * This exists for the *light-space silhouette*, where the shadow map holds a step
+ * and a quantised blocker adds a comb of texel-shaped teeth. Averaging over a
+ * footprint softens it; filtering the individual tap is not a substitute, since
+ * bilinear reconstructs within a texel but the boundary still runs along the
+ * texel grid.
  *
- * It was previously zero, on the strength of a measurement against
- * `transmission-thickness-slant`: a tilted slab reads within a fraction of a
- * millimetre of its true light-ray path at every radius. That is a real result
- * and it is about the wrong quantity. Those slabs are flat, so the blocker depth
- * across them is linear, and a zero-mean kernel over a linear gradient returns
- * the value at its centre no matter how wide it is — the experiment could only
- * ever see the mean, and the artifact the filter exists for is a shape.
+ * Measured on `transmission-thickness-sphere` the disc is the largest single win
+ * in the pass - dropping it takes the residual from 5.6 to 21.9 levels. Widening
+ * it to two texels buys nothing (6.0) and costs thin features. Note a flat slab
+ * cannot measure any of this: a zero-mean kernel over a linear depth gradient
+ * returns the value at its centre at any radius.
  *
- * Measured on the sphere, the disc is by far the largest single win in the pass:
- * dropping it takes the residual from 5.6 to 21.9 levels. Widening it to two
- * texels buys nothing (6.0) and costs thin features, which is why this stays at
- * UE5's one.
+ * Not going past one texel matters: a 1024 map fitted to a 3 m region has 3 mm
+ * texels, and averaging over 2 of them is already the thickness of the ear being
+ * measured. If thin features wash out, the lever is the shadow map's resolution
+ * or fitted extent, not this.
  *
- * The cost the measurement did identify is real, though, and is the reason not
- * to go past UE5's one texel: a shadow texel is the scene extent over the map
- * size, so a 1024 map fitted to a 3 m region has 3 mm texels, and averaging over
- * 2 of them is already the thickness of the ear being measured. If thin features
- * wash out, the lever is the shadow map's resolution or its fitted extent, not
- * this.
+ * A build-time constant rather than a uniform so a radius of zero emits one tap
+ * instead of sixteen identical ones.
  *
- * It is a build-time constant rather than a uniform so that a radius of zero
- * emits one tap instead of sixteen identical ones.
  * @internal
  */
 const SEARCH_RADIUS_TEXELS = 1;
@@ -165,21 +141,18 @@ export function lightSupportsTransmission(light: PunctualLight, params: Nullable
  * Renders the screen-space light-space thickness used by subsurface transmission.
  *
  * @remarks
- * This is UE5's `CalculateEncodedOpticalDepth` (`TransmissionThickness.ush`),
- * moved into its own pass. UE5 folds the same computation into the shadow
- * projection and packs the result into the `LightAttenuation` mask's G/A
- * channels; this engine's mask spends one channel per light and has no room, so
- * the thickness gets its own `rgba8unorm` array with the *identical*
- * `ordinal → layer/channel` packing. Reusing the ordinal is what lets the
- * material recover a light's thickness from its clustered buffer index with the
- * same arithmetic {@link ShaderHelper.sampleShadowMask} already uses.
+ * UE5's `CalculateEncodedOpticalDepth` (`TransmissionThickness.ush`) moved into
+ * its own pass: UE5 packs the result into the `LightAttenuation` mask's G/A
+ * channels, but this engine's mask spends one channel per light, so the thickness
+ * gets its own `rgba8unorm` array with the *identical* `ordinal → layer/channel`
+ * packing. Reusing the ordinal lets the material recover a light's thickness with
+ * the same arithmetic {@link ShaderHelper.sampleShadowMask} uses.
  *
- * The depth is read from the shadow map's **depth attachment** rather than from
- * whatever colour encoding the shadow implementation chose. Every implementation
- * allocates one (`d32f`, or `d24s8` for ESM/VSM), both of which resolve to about
+ * The depth comes from the shadow map's **depth attachment**, not the shadow
+ * implementation's colour encoding: `d32f` and `d24s8` both resolve to about
  * 0.12 mm per step even across a 2 km cascade, whereas PCSS's preferred `r16f`
- * colour map would quantise a 2 cm ear into a fraction of one step. Reading the
- * depth attachment therefore makes this independent of the shadow mode.
+ * would quantise a 2 cm ear into a fraction of a step. That makes this pass
+ * independent of the shadow mode.
  *
  * WebGPU only.
  *
@@ -387,15 +360,10 @@ export class TransmissionThicknessRenderer {
     const depthAttachment = shadowMapParams.shadowMapFramebuffer!.getDepthAttachment()!;
     const isArray = depthAttachment.isTexture2DArray();
     // Orthographic shadow depth is linear, so the projection's Z extent converts
-    // a normalised depth difference straight into world units. Perspective
-    // projections have to be linearised instead.
-    //
-    // Rect lights are orthographic too (ShadowMapper.createLightCameraRect uses
-    // setOrtho over the rect's extent), not just directional ones. Running them
-    // through the perspective branch applies a hyperbolic remap to an already
-    // linear depth, which crushes the difference by roughly near/far — a 2 cm
-    // thickness came out around 0.4 mm, below the optical depth floor, so every
-    // pixel read as "nothing in the way".
+    // a normalised depth difference straight into world units; perspective has to
+    // be linearised instead. Rect lights are orthographic too, not just
+    // directional - running them through the perspective branch would apply a
+    // hyperbolic remap to an already linear depth.
     const ortho = lightType === LIGHT_TYPE_DIRECTIONAL || lightType === LIGHT_TYPE_RECT;
     const program = device.buildRenderProgram({
       label: 'TransmissionThickness',
@@ -510,15 +478,10 @@ export class TransmissionThicknessRenderer {
         // than the implementation's colour encoding, so this is the same device
         // depth `shadowCoord.z` carries regardless of shadow mode.
         //
-        // A plain fetch, as UE5 takes its disc taps. Bilinear reconstruction was
-        // tried here on the reasoning that a nearest tap holds the blocker depth
-        // constant across a texel and so turns a smooth surface into a staircase.
-        // It is measurably worse: on `transmission-thickness-sphere` it raises
-        // the residual from 5.6 to 7.5 levels at a 1024 map and from 3.2 to 4.2
-        // at 4096, at four times the fetches. Interpolating across a light-space
-        // silhouette blends a real blocker with the cleared far value and invents
-        // a depth no surface has, and there are more of those edges than there is
-        // smooth interior for it to help.
+        // A plain fetch, as UE5 takes its disc taps. Bilinear is measurably worse
+        // (residual 5.6 to 7.5 levels at a 1024 map, at four times the fetches):
+        // interpolating across a light-space silhouette blends a real blocker with
+        // the cleared far value and invents a depth no surface has.
         pb.func(
           'zLoadShadowDepth',
           [pb.vec2('coord'), pb.float('size'), ...(isArray ? [pb.int('layer')] : [])],
@@ -543,11 +506,10 @@ export class TransmissionThicknessRenderer {
           );
           // 1 = no material in the way. Background pixels keep it.
           this.$outputs.color = pb.vec4(1);
-          // Only skin has a profile to measure against, and the id is the thing
-          // that says so. Leaving non-skin pixels at the sentinel is not just an
-          // optimization: profile row 0 is all zeros, so an extinction scale of 0
-          // would put the optical depth on its floor and the pixel would encode
-          // as the *thinnest* possible rather than as "no data".
+          // Only skin has a profile to measure against. Leaving non-skin pixels at
+          // the sentinel is not just an optimization: row 0 is all zeros, so an
+          // extinction scale of 0 would put the optical depth on its floor and
+          // encode as the *thinnest* possible rather than as "no data".
           this.$l.profileId = pb.textureSampleLevel(this.profileIdTex, this.$inputs.uv, 0).r;
           this.$if(pb.lessThan(this.profileId, 0.5 / 255), function () {
             this.$return();
@@ -600,17 +562,11 @@ export class TransmissionThicknessRenderer {
             // identically zero. `normalScaleBias` adds the optical depth this
             // costs back inside the clamp.
             //
-            // The shadow map's own normal offset — `ShaderHelper
-            // .applyShadowNormalOffset`, `depthBiasValues.y x sin(theta)` — was
-            // tried here and must not be: it is calibrated for a *binary*
-            // comparison, where overshooting only costs peter-panning, whereas
-            // this is a continuous depth difference and the offset lands
-            // directly in the measured value. At `normalBias` 1.5 and a cascade
-            // covering 20 m through a 1024 map, a texel is 20 mm and the
-            // grazing-angle offset is 30 mm - a fifth of a head. The thickness
-            // collapsed to two flat levels, saturated on one side of the
-            // terminator and floored on the other, which is the feature failing
-            // silently: the profile no longer varies with geometry at all.
+            // Not the shadow map's own normal offset: that is calibrated for a
+            // *binary* comparison where overshooting only costs peter-panning,
+            // whereas this is a continuous depth difference and the offset lands
+            // directly in the measured value. At `normalBias` 1.5 over a 20 m
+            // cascade the grazing-angle offset is 30 mm - a fifth of a head.
             this.$l.shrunk = pb.sub(this.pos.xyz, pb.mul(this.normal, this.shrinkDistance));
             this.$l.sv = ShaderHelper.calculateShadowSpaceVertex(
               this,
@@ -618,15 +574,12 @@ export class TransmissionThicknessRenderer {
               numCascades > 1 ? this.split : 0
             );
             this.$l.sc = ndcToShadowCoord(this, pb.div(this.sv, this.sv.w));
-            // Both ends of the depth range have to be rejected, which is why
-            // shadowCoordDepthInRange is not reused here: it only guards the far
-            // side, because a receiver closer than the shadow near plane is
-            // simply unshadowed as far as shadowing is concerned. For thickness
-            // it means the opposite — the blocker was clipped out of the shadow
-            // map, so the texel holds the clear value and any difference taken
-            // against it is meaningless. Letting those through produced a
-            // uniform, geometry-independent thickness over anything that sat
-            // in front of the near plane.
+            // Both ends of the depth range must be rejected, which is why
+            // shadowCoordDepthInRange is not reused: it guards only the far side,
+            // since for shadowing a receiver in front of the near plane is simply
+            // unshadowed. For thickness it means the blocker was clipped out of
+            // the map, so the texel holds the clear value and any difference
+            // against it is meaningless.
             this.$l.inside = pb.all(
               pb.bvec4(
                 pb.all(pb.bvec2(pb.greaterThanEqual(this.sc.x, 0), pb.lessThanEqual(this.sc.x, 1))),
@@ -642,16 +595,15 @@ export class TransmissionThicknessRenderer {
               }
               if (ortho) {
                 // Row 2 of the (transposed) shadow matrix maps light-space Z into
-                // NDC, so its length is the NDC span over the projection's world
-                // Z extent. Taking it per cascade avoids needing a near/far pair,
-                // which shadowCameraParams only keeps for the last cascade
-                // rendered. This is the equivalent of UE5's
-                // ProjectionDepthBiasParameters.w (MaxSubjectZ - MinSubjectZ).
+                // NDC, so its length is the NDC span over the projection's world Z
+                // extent - UE5's ProjectionDepthBiasParameters.w. Taken per
+                // cascade, since shadowCameraParams only keeps a near/far pair for
+                // the last cascade rendered.
                 //
-                // The numerator is the NDC span itself: reverse-Z already hands
-                // ndcToShadowCoord a [0,1] z and it passes through untouched,
-                // while the standard convention produces [-1,1] and gets remapped
-                // by the same 0.5 that shrinks the difference measured below.
+                // The numerator is the NDC span itself: reverse-Z hands
+                // ndcToShadowCoord a [0,1] z that passes through untouched, while
+                // the standard convention produces [-1,1] and is remapped by the
+                // same 0.5 that shrinks the difference measured below.
                 this.$l.zRow = this.light.shadowMatrices.at(pb.add(pb.mul(this.split, 4), 2));
                 this.$l.zRange = pb.div(REVERSE_Z ? 1 : 2, pb.max(pb.length(this.zRow.xyz), 1e-8));
               }
@@ -679,26 +631,11 @@ export class TransmissionThicknessRenderer {
                 // CalculateOpticalDepth, after TransmissionThickness.ush.
                 //
                 // `t` is already the distance the light travels *through* the
-                // medium: both branches above measure blocker and receiver along
-                // the light ray, so it is the optical path and needs no angular
-                // correction. The transcription used to scale it by a saturated
-                // `NoL` taken from the camera-facing reconstructed normal, which
-                // broke it two ways at once, both visible in a shot taken from
-                // behind a backlit head:
-                //
-                //   NoL == 0 (everything the camera sees when the light is on the
-                //   far side): the whole measurement is multiplied away and every
-                //   pixel reports the bias alone, so a 3 mm ear and 150 mm of
-                //   skull encode to the same value and nothing ever saturates.
-                //
-                //   NoL slightly > 0 (a few degrees either side of the
-                //   terminator): `o` is the full skull thickness there, so it
-                //   amplifies the depth-reconstructed normal's noise by up to
-                //   `o` itself — the terminator came out as a band of rings.
-                //
-                // Dropping the factor collapses the select as well: with `z > 0`,
-                // the `o > 0` branch's `max` is the identity and both branches are
-                // `o + z`.
+                // medium - both branches above measure blocker and receiver along
+                // the light ray - so it is the optical path and takes no angular
+                // correction. In particular there is no `NoL` factor: the camera
+                // sees NoL == 0 wherever the light is on the far side, which is
+                // exactly where this term matters.
                 //
                 // Each tap is clamped on its own before it enters the average,
                 // as UE5 does. That makes the average a nonlinear function of
@@ -710,22 +647,10 @@ export class TransmissionThicknessRenderer {
                 // `transmission-thickness-sphere` it takes the residual from 5.9
                 // to 5.6 levels at a 1024 map and 3.5 to 3.2 at 4096.
                 //
-                // The clamp was moved out of the loop once, on the evidence that
-                // a 2 mm slab at 50 degrees then read 0.37 mm thin - the taps
-                // past the ceiling losing more than the taps under the floor
-                // gained. That measurement was taken while the optical depth
-                // scale was ten times too large, which put those slabs against
-                // the ceiling where nothing else would be. At the calibrated
-                // scale the ladder and slant scenes read identically either way,
-                // to the 8-bit level, so the bias it was avoiding does not exist
-                // in the range the pass actually works over.
-                //
                 // `max(_, 0)` rather than `abs()`. A negative optical depth means
-                // the nearest surface to the light is *behind* the receiver, which
-                // no real blocker can be - the shadow map keeps the nearest. It
-                // means the tap found no material: either a texel no caster
-                // reached, holding the cleared far value, or a farther surface
-                // entirely. `abs()` turned exactly those taps into the largest
+                // the tap found no material - a texel no caster reached, or a
+                // farther surface - since the shadow map keeps the nearest
+                // blocker. `abs()` would turn exactly those taps into the largest
                 // possible thickness, which is what produced the bright fringe
                 // along every silhouette.
                 this.$l[`o${i}`] = pb.mul(this[`t${i}`], this.opticalDepthScale);

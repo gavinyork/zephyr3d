@@ -72,9 +72,7 @@ export class SkinMaterial
     this._subsurfaceProfileChanged = () => this.uniformChanged();
     // Created here and released in onDispose: the profile holds a row of a
     // 256-entry GPU table, and tying its life to the material's is what keeps
-    // those rows from accumulating. They used to be assignable objects that
-    // nothing ever released, so every scene load - and every undo - stranded
-    // one more row until the table was full.
+    // those rows from accumulating.
     this._profile = SkinProfile.createOwned();
     this._profile.addChangeListener(this._subsurfaceProfileChanged);
     this._lobeParams = new Vector3();
@@ -115,11 +113,10 @@ export class SkinMaterial
    * material.subsurfaceProfile.meanFreePathDistance = 0.03;
    * ```
    *
-   * Giving each material its own profile is what lets face, ears and lips
-   * scatter differently in a single screen-space pass — the material writes its
-   * profile's id per pixel and the diffusion looks the parameters up from there.
-   * It also means profiles are not shared between materials: to transfer a look,
-   * use {@link SkinProfile.copyFrom}.
+   * Per-material ownership is what lets face, ears and lips scatter differently
+   * in a single screen-space pass: the material writes its profile's id per pixel
+   * and the diffusion looks the parameters up from there. Profiles are therefore
+   * not shared - to transfer a look, use {@link SkinProfile.copyFrom}.
    *
    * @public
    */
@@ -213,18 +210,14 @@ export class SkinMaterial
    * Fresnel reflectance at normal incidence.
    *
    * @remarks
-   * Defaults to 0.04, which is what UE5's default `Specular` of 0.5 produces
-   * through `F0 = 0.08 * Specular`. This is the only control over how strong the
-   * highlight is — UE5 exposes no separate specular gain on the subsurface
-   * profile path, and a post-multiplier is not a substitute for moving `F0`: it
-   * scales the grazing end of the Fresnel curve too, and it bypasses the energy
-   * terms, so the specular no longer pays for itself out of the diffuse.
+   * Defaults to 0.04, what UE5's default `Specular` of 0.5 gives through
+   * `F0 = 0.08 * Specular`; to port a UE5 material, use that conversion. This is
+   * the only control over highlight strength, since a post-multiplier would skew
+   * the grazing end of the Fresnel curve and bypass the energy terms, so the
+   * specular would stop paying for itself out of the diffuse.
    *
-   * To port a UE5 material, use `specularF0 = 0.08 * Specular`.
-   *
-   * Note the subsurface profile's IOR (1.55 in UE5's skin preset) does not feed
-   * this: that value drives the refraction used by transmission, while the
-   * specular Fresnel stays on the dielectric `0.08 * Specular` mapping.
+   * The profile's IOR does not feed this: that drives transmission's refraction,
+   * while the specular Fresnel stays on the dielectric mapping.
    */
   get specularF0() {
     return this._specularF0;
@@ -241,10 +234,9 @@ export class SkinMaterial
    * Overall multiplier on the back-lit transmission.
    *
    * @remarks
-   * UE5 has no equivalent — its transmission is fully determined by the profile
-   * and the measured light-space thickness — so 1 is the faithful value and this
-   * exists only to dial the effect back, or push it past what the profile alone
-   * would give.
+   * UE5 has no equivalent - its transmission is fully determined by the profile
+   * and the measured thickness - so 1 is the faithful value and this exists only
+   * to dial the effect back or push it further.
    *
    * Transmission additionally requires {@link PunctualLight.transmission} on at
    * least one shadow-casting light, since the thickness it needs is measured
@@ -294,15 +286,10 @@ export class SkinMaterial
     const pb = scope.$builder;
     const that = this;
     const lightPass = this.drawContext.renderPass!.type === RENDER_PASS_TYPE_LIGHT;
-    // The prepass writes the id into the target the thickness pass and the
-    // diffusion both read.
-    //
-    // Declared outside `needFragmentColorInput`, deliberately. That predicate is
-    // false in the prepass for an ordinary opaque material — it only turns true
-    // there for alpha-tested or alpha-to-coverage ones (MeshMaterial
-    // .needFragmentColor) — so a declaration inside it would silently leave the
-    // uniform undefined and the prepass would write id 0 for every skin pixel,
-    // turning the whole feature off with nothing to show for it.
+    // Declared outside `needFragmentColorInput` deliberately: that predicate is
+    // false in the prepass for an ordinary opaque material, so a declaration
+    // inside it would leave the uniform undefined and the prepass would write id
+    // 0 for every skin pixel.
     const depthPassProfileId =
       this.drawContext.renderPass!.type === RENDER_PASS_TYPE_DEPTH && this.drawContext.skinProfileId;
     if (lightPass || depthPassProfileId) {
@@ -385,25 +372,16 @@ export class SkinMaterial
           scope.$l.envDiffuse = this.getEnvLightIrradiance(scope, scope.normal);
           scope.diffuseLighting = pb.add(scope.diffuseLighting, scope.envDiffuse);
           scope.$l.reflectVec = this.calculateReflectionVector(scope, scope.normal, scope.viewVec);
-          // UE5's ReflectionEnvironment, transcribed:
+          // UE5's ReflectionEnvironment:
           //
           //   EnergyTerms = ComputeGGXSpecEnergyTerms(GBuffer.Roughness, NoV, SpecularColor)
           //   Color.rgb   = GatherRadiance(R, GBuffer.Roughness) * EnergyTerms.E
           //
-          // Two things follow from that, and this used to get both wrong.
-          //
-          // The roughness is the raw **material** value, not the blended lobe
-          // roughness. UE5 applies the dual lobe only in the direct BxDF; the
-          // reflection path never sees it. Feeding the lobe average here (0.609
-          // at the defaults, against a material 0.5) blurred the ambient
-          // highlight by a stop it should not have had.
-          //
-          // And the weight is the directional albedo `E`, which is the split-sum
-          // DFG with multiple-scattering compensation folded in — not a bare
-          // Fresnel. `skinSpecularEnergyTerms` already returns it as `.y`, so the
-          // same helper the direct path uses serves here, just evaluated at the
-          // material roughness. Since `E` already carries the multi-scatter gain,
-          // this term must not also be multiplied by the direct path's `W`.
+          // Two consequences. The roughness is the raw **material** value, since
+          // UE5 applies the dual lobe only in the direct BxDF. And the weight is
+          // the directional albedo `E` - the split-sum DFG with multiple-scattering
+          // folded in, not a bare Fresnel - which already carries the multi-scatter
+          // gain, so it must not also be multiplied by the direct path's `W`.
           scope.$l.envEnergyTerms = skinSpecularEnergyTerms(
             scope,
             scope.roughness,
@@ -464,13 +442,10 @@ export class SkinMaterial
               this.diffuseLighting,
               pb.mul(this.lightColor, this.shadowTerm, this.skinDiff, this.NoL, this.diffuseScale)
             );
-            // Back-lit transmission. UE5's SubsurfaceProfileBxDF, which attenuates
-            // it by the *transmission* shadow rather than the surface shadow —
-            // and in UE5 that transmission shadow is the encoded optical depth
-            // itself (GetShadowTerms takes `LightAttenuation.y`, the very channel
-            // CalculateEncodedOpticalDepth wrote, for both purposes). The same
-            // value therefore both indexes the profile and scales it, which is
-            // why `thickness` appears twice here.
+            // Back-lit transmission, after UE5's SubsurfaceProfileBxDF. UE5
+            // attenuates by the *transmission* shadow, which is the encoded
+            // optical depth itself - so the same value both indexes the profile
+            // and scales it, which is why `thickness` appears twice.
             //
             // No surface shadow and no NoL: the light arrives from behind, so the
             // camera-facing surface is shadowed and turned away from it by
@@ -523,20 +498,14 @@ export class SkinMaterial
         // transmission is left alone, since it enters from behind the surface and
         // never passes through that specular layer.
         //
-        // The environment specular stays outside that multiply. It was weighted
-        // by the directional albedo `E` when it was gathered, which already
-        // carries the multiple-scattering gain; applying `W` on top would count
-        // it twice. UE5 keeps the same split — `ComputeEnergyConservation` is
-        // applied in the BxDF, the reflection pass weights itself.
+        // The environment specular stays outside that multiply: it was already
+        // weighted by the directional albedo `E` when gathered, which carries the
+        // multiple-scattering gain, so applying `W` on top would count it twice.
+        // UE5 keeps the same split.
         //
-        // The albedo multiply covers the transmission as well as the diffuse,
-        // and has to. UE5's baked transmission profile carries only the shape of
-        // the falloff — `ComputeTransmissionProfileBurley` passes white for the
-        // surface albedo, and its comment says the recombine pass supplies the
-        // stored base colour instead. This engine applies the base colour here,
-        // in the base pass, and the recombine does not; putting the transmission
-        // inside this multiply is therefore the same thing said in a different
-        // place, not a second application of it.
+        // The albedo multiply has to cover the transmission as well, because the
+        // baked profile carries only the falloff shape - UE5 supplies the base
+        // colour in its recombine pass instead, and this engine supplies it here.
         //
         // The transmission then rides into `diffLum` below and so is diffused
         // along with the rest. That is deliberate: UE5 passes it as the
@@ -551,32 +520,26 @@ export class SkinMaterial
           scope.envSpecular
         );
         scope.$l.litColor = pb.add(scope.diffusible, scope.specularLighting);
-        // SceneColor.a = diffuse luminance. This is UE5's spec/diff separation
-        // mechanism (verified in UEDigitalHuman.rdc, SSS::Setup lines 26-29 and
-        // SSS::Recombine lines 32-36): the SSS passes recover the diffusible
-        // fraction as `saturate(SceneColor.a / luma(SceneColor.rgb))`, so the
-        // alpha must carry the *diffuse* luminance, not the specular one.
+        // SceneColor.a = diffuse luminance, UE5's spec/diff separation mechanism:
+        // the SSS passes recover the diffusible fraction as
+        // `saturate(SceneColor.a / luma(SceneColor.rgb))`, so the alpha must carry
+        // the *diffuse* luminance, not the total.
         scope.$l.diffLum = pb.dot(scope.diffusible, pb.vec3(0.2126, 0.7152, 0.0722));
         // Surface data for the SSS passes: rgb = world normal, a = subsurface
         // opacity.
         //
-        // SceneColor.a cannot serve as the mask, because every opaque material
-        // writes 1 there — gating on it makes the diffusion treat the background
-        // and the eyes as skin and bleed into them.
+        // SceneColor.a cannot serve as the mask: every opaque material writes 1
+        // there, so gating on it would make the diffusion treat the background and
+        // the eyes as skin.
         //
-        // The normal rides along so the diffusion can weight taps by how much
-        // the surface has turned away (UE5 PassOne_Burley lines 323-325). Keeping
-        // it here rather than reading SceneNormal makes scattering independent of
-        // whether the optional normal MRT is enabled this frame.
+        // The normal rides along so the diffusion can weight taps by how far the
+        // surface has turned away. Carrying it here rather than reading SceneNormal
+        // makes scattering independent of whether that optional MRT is enabled.
         //
-        // The alpha is UE5's Opacity input, unmodified: a continuous 0..1 mask
-        // where 0 is no scattering and 1 is full scattering. It used to be
-        // multiplied by the profile id and the product served as both, which only
-        // worked for a binary mask — the diffusion addresses the profile table by
-        // this value directly, so an opacity of 0.5 selected a *different*
-        // profile's row rather than scattering at half strength. The id now comes
-        // out of the depth prepass instead (ctx.SkinProfileIdTexture), which is
-        // also where the transmission thickness pass can reach it.
+        // The alpha is UE5's Opacity input unmodified - a continuous 0..1 mask
+        // where 0 is no scattering and 1 is full. The profile id travels
+        // separately, out of the depth prepass, since one channel cannot carry a
+        // table row and a weight at once.
         scope.$l.skinSSSMask = pb.vec4(pb.add(pb.mul(scope.normal, 0.5), pb.vec3(0.5)), scope.skinMask);
         if (
           this.drawContext.materialFlags &

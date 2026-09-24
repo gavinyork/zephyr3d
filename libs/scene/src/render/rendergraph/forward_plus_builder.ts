@@ -414,7 +414,9 @@ export function deriveForwardPlusOptions(
     !!scene.env.light.envLight?.hasRadiance() &&
     !!scene.env.light.envLight?.hasIrradiance();
   const sss = camera.SSS && renderQueueHasActiveSSS(renderQueue);
-  const skinSSS = camera.skinSSS && renderQueueHasActiveSkinSSS(renderQueue);
+  // No camera switch for this one: a skin material always wants its diffusion,
+  // and the queue already says whether the frame draws any.
+  const skinSSS = renderQueueHasActiveSkinSSS(renderQueue);
   const needSceneColor = renderQueue.needSceneColor();
   const needSceneColorWithDepth = renderQueue.needSceneColorWithDepth();
   // Requested by materials rather than by a post effect, so it is resolved here
@@ -1063,10 +1065,8 @@ const TransmissionThicknessModule: RenderModule<FrameGraphContext> = {
         const depthTex = rgCtx.getTexture<Texture2D>(depthHandle);
         const thicknessTex = rgCtx.getTexture<Texture2DArray>(thicknessHandle);
         // Absorption and unit scale are per-pixel, read from the profile table
-        // against the id the depth prepass wrote. This is the arrangement UE5
-        // has, where shadow projection reads the profile id straight out of the
-        // GBuffer; it replaces a frame-wide "first skin material wins" guess
-        // that gave a second character the first one's absorption.
+        // against the id the depth prepass wrote - the arrangement UE5 has, where
+        // shadow projection reads the profile id out of the GBuffer.
         _transmissionThicknessRenderer.render(
           ctx,
           depthTex,
@@ -1458,9 +1458,8 @@ const LightPassModule: RenderModule<FrameGraphContext> = {
       if (sssParamHandle) {
         builder.read(sssParamHandle);
       }
-      // The diffusion post effect reaches this through ctx.SkinProfileIdTexture,
-      // so the read has to be declared here or the executor is free to recycle
-      // the prepass target before the effect samples it.
+      // Reached through ctx.SkinProfileIdTexture, so the read must be declared or
+      // the executor may recycle the prepass target before the effect samples it.
       if (skinProfileIdHandle) {
         builder.read(skinProfileIdHandle);
       }
@@ -1774,9 +1773,8 @@ const CompositeTailModule: RenderModule<FrameGraphContext> = {
       blackboard.get(FrameResources.SSSDiffuse),
       blackboard.get(FrameResources.SSSTransmission),
       blackboard.get(FrameResources.SkinSSS),
-      // The diffusion reaches this one through ctx.SkinProfileIdTexture. Without
-      // the dependency the allocator is free to hand the prepass target to a
-      // later pass, and the effect then samples whatever that pass left behind.
+      // Reached through ctx.SkinProfileIdTexture: without the dependency the
+      // allocator may hand the prepass target to a later pass.
       blackboard.get(FrameResources.SkinProfileId)
     ]) {
       if (handle) {
@@ -2028,6 +2026,9 @@ function buildForwardPlusGraphInternal(
   ctx.SSS = !!options.sss;
   ctx.SSGI = !!options.ssgi;
   ctx.skinSSS = !!options.skinSSS;
+  // Before the compositor is consulted below: it collects requirements from,
+  // and builds passes for, only the effects that are enabled at that moment.
+  ctx.camera?.setSkinSSSActive(ctx.skinSSS);
   ctx.SSGIIrradianceHistoryTexture = null;
   ctx.SSGISurfaceHistoryTexture = null;
   ctx.SkinSSSTexture = null;

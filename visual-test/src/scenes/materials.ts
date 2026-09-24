@@ -60,11 +60,6 @@ export const pbrMetalRoughGrid: VisualScene = {
 /**
  * Subsurface skin, the material the digital-human work leans on hardest.
  *
- * `camera.skinSSS` has to be switched on explicitly - it defaults to false, and
- * without it this scene renders SkinMaterial's direct lighting only and the
- * entire SkinSSS pass is a no-op. That is what the scene did for its whole
- * history despite its name, so the diffusion went unpinned.
- *
  * Back-lit transmission is *not* covered here, and the scene should not claim to
  * be: the term is gated on `subsurfaceTexture`, whose B channel carries the
  * thickness it needs, and this scene sets no such texture. `transmissionStrength`
@@ -96,7 +91,6 @@ export const skinSss: VisualScene = {
     head.position.setXYZ(0, 0, 0);
     placeCamera(camera, new Vector3(0, 0, 5.5));
 
-    camera.skinSSS = true;
     // The sphere is 1.5 units across, so the diffusion is scaled up from human
     // skin to read at this size. The extent lives entirely on the profile.
     //
@@ -163,8 +157,6 @@ export const skinDiffusionJade: VisualScene = {
     const head = new Mesh(scene, new SphereShape({ radius: 1.5 }), material);
     head.position.setXYZ(0, 0, 0);
     placeCamera(camera, new Vector3(0, 0, 5.5));
-
-    camera.skinSSS = true;
   }
 };
 
@@ -216,16 +208,9 @@ export const skinShadow: VisualScene = {
 
     const material = new SkinMaterial();
     material.albedoColor = new Vector4(0.85, 0.66, 0.58, 1);
-    // No profile and no `camera.skinSSS` here, deliberately: this scene is about
-    // the shadow, and leaving the diffusion out keeps a change in it from moving
-    // a baseline that is supposed to pin a terminator.
-    //
-    // It used to set `scatterColor`, `scatterStrength` and `diffuseWrap`, which
-    // the UE5 rewrite removed from SkinMaterial - the assignments survived as
-    // dead code and the scene rendered with defaults regardless. Their successors
-    // are `SkinProfile.surfaceAlbedo`/`meanFreePath`/`meanFreePathDistance`, and
-    // the soft terminator the wrap used to fake is now the screen-space
-    // diffusion's job.
+    // The profile is left at its default, whose mean free path is sub-pixel on a
+    // sphere this size, so the diffusion the engine now runs automatically cannot
+    // move the terminator this baseline exists to pin.
     const head = new Mesh(scene, new SphereShape({ radius: 1.5 }), material);
     head.position.setXYZ(0, 0, 0);
 
