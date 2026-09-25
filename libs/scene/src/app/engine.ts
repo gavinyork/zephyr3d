@@ -448,7 +448,7 @@ export class Engine {
       '/materials/pbr_metallic_roughness.zmtl': PBRMetallicRoughnessMaterial,
       '/materials/pbr_specular_glossiness.zmtl': PBRSpecularGlossinessMaterial,
       '/materials/sprite_std.zmtl': StandardSpriteMaterial,
-      '/materials/skin.zmtl': SSSMaterial,
+      '/materials/sss.zmtl': SSSMaterial,
       '/materials/hair.zmtl': HairMaterial,
       '/materials/eye.zmtl': EyeMaterial
     } as const;
