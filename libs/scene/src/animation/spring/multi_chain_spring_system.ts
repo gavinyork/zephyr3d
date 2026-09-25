@@ -17,6 +17,20 @@ import {
   updateColliderFromNode
 } from './spring_collider';
 import { SpringNodePoseTracker } from './spring_node_pose_tracker';
+import {
+  DEFAULT_INITIAL_COLLISION_PENETRATION_RELEASE_TIME,
+  getIterationStrength,
+  getKawaiiPoseTarget,
+  getReleasedCollisionPenetration,
+  getSpringPoseTopology,
+  INITIAL_COLLISION_PENETRATION_SLOP,
+  interpolateSpringValue,
+  measureCollisionPenetration,
+  resolveInelasticCollision,
+  solveAngleLimit,
+  solveDistanceConstraint,
+  type SpringMotionModel
+} from './spring_solver';
 
 export interface InterChainConstraint {
   chainAIndex: number;
@@ -30,6 +44,8 @@ export interface InterChainConstraint {
 }
 
 export interface MultiChainSpringSystemOptions {
+  /** Integration behavior. `kawaii` preserves animated local shape while simulating (default: `kawaii`). */
+  motionModel?: SpringMotionModel;
   iterations?: number;
   gravity?: Vector3;
   wind?: Vector3;
@@ -44,6 +60,16 @@ export interface MultiChainSpringSystemOptions {
   maxPoseOffset?: number;
   maxPoseOffsetRoot?: number;
   maxPoseOffsetTip?: number;
+  /** Root angle limit in degrees. 0 disables angle limiting. */
+  angleLimitRoot?: number;
+  /** Tip angle limit in degrees. 0 disables angle limiting. */
+  angleLimitTip?: number;
+  /** Fraction of XPBD positional correction retained in Verlet history (default: 0.35). */
+  constraintVelocityHistoryRetention?: number;
+  /** Temporarily preserve collider overlap present in the initialized pose while blocking deeper penetration. */
+  preserveInitialCollisionPenetration?: boolean;
+  /** Seconds used to smoothly release preserved startup overlap (default: 0.25). */
+  initialCollisionPenetrationReleaseTime?: number;
 }
 
 /** Options used when rebuilding runtime spring state from the current node pose. */
@@ -86,10 +112,22 @@ export class MultiChainSpringSystem {
   private _smoothedSphereCenters: WeakMap<SphereCollider, Vector3>;
   private _smoothedCapsuleEndpoints: WeakMap<CapsuleCollider, { start: Vector3; end: Vector3 }>;
   private _smoothedPlaneData: WeakMap<PlaneCollider, { point: Vector3; normal: Vector3 }>;
+  private _smoothedBoxData: WeakMap<
+    BoxCollider,
+    { center: Vector3; halfExtents: Vector3; axes: [Vector3, Vector3, Vector3] }
+  >;
   private _runtimeNodeMap: ReadonlyMap<SceneNode, SceneNode> | null;
   private _runtimeAnchorOffsets: WeakMap<SpringParticle, Vector3>;
   private _runtimeRestLengths: WeakMap<object, number>;
   private _nodePoseTracker: SpringNodePoseTracker;
+  private _motionModel: SpringMotionModel;
+  private _angleLimitRoot: number;
+  private _angleLimitTip: number;
+  private _constraintVelocityHistoryRetention: number;
+  private _preserveInitialCollisionPenetration: boolean;
+  private _initialCollisionPenetrationReleaseTime: number;
+  private _initialCollisionPenetrationElapsed: number;
+  private _initialCollisionPenetration: WeakMap<SpringParticle, WeakMap<SpringCollider, number>>;
 
   constructor(options?: MultiChainSpringSystemOptions) {
     this._chains = [];
@@ -114,10 +152,26 @@ export class MultiChainSpringSystem {
     this._smoothedSphereCenters = new WeakMap();
     this._smoothedCapsuleEndpoints = new WeakMap();
     this._smoothedPlaneData = new WeakMap();
+    this._smoothedBoxData = new WeakMap();
     this._runtimeNodeMap = null;
     this._runtimeAnchorOffsets = new WeakMap();
     this._runtimeRestLengths = new WeakMap();
     this._nodePoseTracker = new SpringNodePoseTracker();
+    this._motionModel = options?.motionModel ?? 'kawaii';
+    this._angleLimitRoot = Math.max(0, options?.angleLimitRoot ?? 0);
+    this._angleLimitTip = Math.max(0, options?.angleLimitTip ?? this._angleLimitRoot);
+    this._constraintVelocityHistoryRetention = Math.max(
+      0,
+      Math.min(1, options?.constraintVelocityHistoryRetention ?? 0.35)
+    );
+    this._preserveInitialCollisionPenetration =
+      options?.preserveInitialCollisionPenetration ?? this._motionModel === 'kawaii';
+    this._initialCollisionPenetrationReleaseTime = Math.max(
+      0,
+      options?.initialCollisionPenetrationReleaseTime ?? DEFAULT_INITIAL_COLLISION_PENETRATION_RELEASE_TIME
+    );
+    this._initialCollisionPenetrationElapsed = 0;
+    this._initialCollisionPenetration = new WeakMap();
   }
 
   addChain(chain: SpringChain): number {
@@ -184,7 +238,7 @@ export class MultiChainSpringSystem {
     }
     this._timeAccumulator = Math.max(0, this._timeAccumulator - stepCount * FIXED_SIMULATION_TIME_STEP);
     for (let i = 0; i < stepCount; i++) {
-      this.simulateStep(FIXED_SIMULATION_TIME_STEP, i === 0 ? frameDt : 0);
+      this.simulateStep(FIXED_SIMULATION_TIME_STEP, i === 0 ? frameDt : 0, i, stepCount);
     }
   }
 
@@ -240,6 +294,9 @@ export class MultiChainSpringSystem {
     this._smoothedSphereCenters = new WeakMap();
     this._smoothedCapsuleEndpoints = new WeakMap();
     this._smoothedPlaneData = new WeakMap();
+    this._smoothedBoxData = new WeakMap();
+    this._initialCollisionPenetrationElapsed = 0;
+    this._initialCollisionPenetration = new WeakMap();
   }
 
   get chains(): SpringChain[] {
@@ -311,6 +368,69 @@ export class MultiChainSpringSystem {
     }
   }
 
+  get motionModel(): SpringMotionModel {
+    return this._motionModel;
+  }
+
+  set motionModel(value: SpringMotionModel) {
+    if (value !== 'legacy' && value !== 'kawaii') {
+      return;
+    }
+    if (this._motionModel !== value) {
+      this._motionModel = value;
+      this.reset();
+    }
+  }
+
+  get angleLimitRoot(): number {
+    return this._angleLimitRoot;
+  }
+
+  set angleLimitRoot(value: number) {
+    this._angleLimitRoot = Math.max(0, Number(value) || 0);
+  }
+
+  get angleLimitTip(): number {
+    return this._angleLimitTip;
+  }
+
+  set angleLimitTip(value: number) {
+    this._angleLimitTip = Math.max(0, Number(value) || 0);
+  }
+
+  get constraintVelocityHistoryRetention(): number {
+    return this._constraintVelocityHistoryRetention;
+  }
+
+  set constraintVelocityHistoryRetention(value: number) {
+    this._constraintVelocityHistoryRetention = Math.max(0, Math.min(1, Number(value) || 0));
+  }
+
+  get preserveInitialCollisionPenetration(): boolean {
+    return this._preserveInitialCollisionPenetration;
+  }
+
+  set preserveInitialCollisionPenetration(value: boolean) {
+    if (this._preserveInitialCollisionPenetration !== value) {
+      this._preserveInitialCollisionPenetration = value;
+      this._initialCollisionPenetrationElapsed = 0;
+      this._initialCollisionPenetration = new WeakMap();
+    }
+  }
+
+  get initialCollisionPenetrationReleaseTime(): number {
+    return this._initialCollisionPenetrationReleaseTime;
+  }
+
+  set initialCollisionPenetrationReleaseTime(value: number) {
+    const duration = Math.max(0, Number(value) || 0);
+    if (this._initialCollisionPenetrationReleaseTime !== duration) {
+      this._initialCollisionPenetrationReleaseTime = duration;
+      this._initialCollisionPenetrationElapsed = 0;
+      this._initialCollisionPenetration = new WeakMap();
+    }
+  }
+
   get poseFollow(): number {
     return this._poseFollow;
   }
@@ -378,6 +498,9 @@ export class MultiChainSpringSystem {
     this._smoothedSphereCenters = new WeakMap();
     this._smoothedCapsuleEndpoints = new WeakMap();
     this._smoothedPlaneData = new WeakMap();
+    this._smoothedBoxData = new WeakMap();
+    this._initialCollisionPenetrationElapsed = 0;
+    this._initialCollisionPenetration = new WeakMap();
   }
 
   removeCollider(collider: SpringCollider): boolean {
@@ -387,6 +510,9 @@ export class MultiChainSpringSystem {
       this._smoothedSphereCenters = new WeakMap();
       this._smoothedCapsuleEndpoints = new WeakMap();
       this._smoothedPlaneData = new WeakMap();
+      this._smoothedBoxData = new WeakMap();
+      this._initialCollisionPenetrationElapsed = 0;
+      this._initialCollisionPenetration = new WeakMap();
       return true;
     }
     return false;
@@ -397,6 +523,9 @@ export class MultiChainSpringSystem {
     this._smoothedSphereCenters = new WeakMap();
     this._smoothedCapsuleEndpoints = new WeakMap();
     this._smoothedPlaneData = new WeakMap();
+    this._smoothedBoxData = new WeakMap();
+    this._initialCollisionPenetrationElapsed = 0;
+    this._initialCollisionPenetration = new WeakMap();
   }
 
   get colliders(): SpringCollider[] {
@@ -490,7 +619,7 @@ export class MultiChainSpringSystem {
     this.clearRuntimeCaches();
   }
 
-  private simulateStep(dt: number, inputDeltaTime: number): void {
+  private simulateStep(dt: number, inputDeltaTime: number, stepIndex: number, stepCount: number): void {
     if (this._enableInertialForces) {
       for (const chain of this._chains) {
         for (const particle of chain.particles) {
@@ -499,7 +628,8 @@ export class MultiChainSpringSystem {
       }
     }
 
-    this.updateFixedParticles(inputDeltaTime);
+    const substepBlend = 1 / Math.max(1, stepCount - stepIndex);
+    this.updateFixedParticles(inputDeltaTime, substepBlend);
 
     let rotationCenter: Vector3 | null = null;
     let angularVelocity: Vector3 | null = null;
@@ -544,9 +674,16 @@ export class MultiChainSpringSystem {
       this.resetConstraintLambdas();
     }
 
+    if (this._motionModel === 'kawaii') {
+      this.solvePosePreservation(1, true);
+    }
+
     for (let iter = 0; iter < this._iterations; iter++) {
       for (const chain of this._chains) {
-        for (const constraint of chain.constraints) {
+        const reverse = this._motionModel === 'kawaii' && !!(iter & 1);
+        for (let constraintIndex = 0; constraintIndex < chain.constraints.length; constraintIndex++) {
+          const constraint =
+            chain.constraints[reverse ? chain.constraints.length - 1 - constraintIndex : constraintIndex];
           if (this._solver === 'xpbd') {
             this.solveConstraintXPBD(chain, constraint, dt);
           } else {
@@ -555,7 +692,12 @@ export class MultiChainSpringSystem {
         }
       }
 
-      for (const constraint of this._interChainConstraints) {
+      const reverse = this._motionModel === 'kawaii' && !!(iter & 1);
+      for (let constraintIndex = 0; constraintIndex < this._interChainConstraints.length; constraintIndex++) {
+        const constraint =
+          this._interChainConstraints[
+            reverse ? this._interChainConstraints.length - 1 - constraintIndex : constraintIndex
+          ];
         if (this._solver === 'xpbd') {
           this.solveInterChainConstraintXPBD(constraint, dt);
         } else {
@@ -563,13 +705,88 @@ export class MultiChainSpringSystem {
         }
       }
 
-      this.solvePosePreservation(this._iterations);
-      this.solveCollisions(inputDeltaTime);
+      if (this._motionModel === 'legacy') {
+        this.solvePosePreservation(this._iterations, false);
+        this.solveCollisions(inputDeltaTime);
+      }
     }
+
+    if (this._motionModel === 'kawaii') {
+      this.solveCollisions(inputDeltaTime, substepBlend);
+      this.solveAngleLimits();
+      if (this._solver === 'xpbd') {
+        this.solveCollisions(0, 0);
+        this.resetConstraintLambdas();
+        const closureIterations = Math.min(16, Math.max(4, this._iterations));
+        for (let iteration = 0; iteration < closureIterations; iteration++) {
+          const reverse = !!(iteration & 1);
+          for (const chain of this._chains) {
+            for (let constraintIndex = 0; constraintIndex < chain.constraints.length; constraintIndex++) {
+              const constraint =
+                chain.constraints[reverse ? chain.constraints.length - 1 - constraintIndex : constraintIndex];
+              this.solveConstraintXPBD(chain, constraint, dt);
+            }
+          }
+          for (
+            let constraintIndex = 0;
+            constraintIndex < this._interChainConstraints.length;
+            constraintIndex++
+          ) {
+            const constraint =
+              this._interChainConstraints[
+                reverse ? this._interChainConstraints.length - 1 - constraintIndex : constraintIndex
+              ];
+            this.solveInterChainConstraintXPBD(constraint, dt);
+          }
+        }
+        if (this._colliders.some((collider) => collider.enabled)) {
+          this.resetConstraintLambdas();
+          const contactClosureIterations = Math.min(4, closureIterations);
+          for (let iteration = 0; iteration < contactClosureIterations; iteration++) {
+            const reverse = !!(iteration & 1);
+            for (const chain of this._chains) {
+              for (let constraintIndex = 0; constraintIndex < chain.constraints.length; constraintIndex++) {
+                const constraint =
+                  chain.constraints[
+                    reverse ? chain.constraints.length - 1 - constraintIndex : constraintIndex
+                  ];
+                this.solveConstraintXPBD(chain, constraint, dt);
+              }
+            }
+            for (
+              let constraintIndex = 0;
+              constraintIndex < this._interChainConstraints.length;
+              constraintIndex++
+            ) {
+              const constraint =
+                this._interChainConstraints[
+                  reverse ? this._interChainConstraints.length - 1 - constraintIndex : constraintIndex
+                ];
+              this.solveInterChainConstraintXPBD(constraint, dt);
+            }
+            this.solveCollisions(0, 0);
+          }
+        }
+      } else {
+        for (const chain of this._chains) {
+          for (const constraint of chain.constraints) {
+            this.solveConstraint(chain, constraint);
+          }
+        }
+        for (const constraint of this._interChainConstraints) {
+          this.solveInterChainConstraint(constraint);
+        }
+        this.solveCollisions(0, 0);
+      }
+    }
+    this.advanceInitialCollisionPenetrationRelease(dt);
   }
 
-  private updateFixedParticles(deltaTime: number): void {
-    const blend = this.getTemporalBlendFactor(deltaTime, DEFAULT_PARTICLE_TARGET_SMOOTHING_TIME);
+  private updateFixedParticles(deltaTime: number, substepBlend: number): void {
+    const blend =
+      this._motionModel === 'kawaii'
+        ? substepBlend
+        : this.getTemporalBlendFactor(deltaTime, DEFAULT_PARTICLE_TARGET_SMOOTHING_TIME);
     for (const chain of this._chains) {
       for (const particle of chain.particles) {
         const sourceNode = this.resolveRuntimeNode(particle.anchorNode ?? particle.node);
@@ -599,48 +816,67 @@ export class MultiChainSpringSystem {
     }
   }
 
-  private solvePosePreservation(totalIterations: number): void {
+  private solvePosePreservation(totalIterations: number, parentRelative: boolean): void {
     if (this._poseFollowRoot <= 0 && this._poseFollowTip <= 0) {
       return;
     }
 
     for (const chain of this._chains) {
-      const lastIndex = Math.max(1, chain.particles.length - 1);
+      const topology = getSpringPoseTopology(chain.particles);
       for (let i = 0; i < chain.particles.length; i++) {
         const particle = chain.particles[i];
         if (particle.fixed) {
           continue;
         }
 
-        const t = Math.pow(i / lastIndex, this._poseFollowExponent);
+        const t = Math.pow(topology[i].normalizedDistance, this._poseFollowExponent);
         const particlePoseFollow = this.lerp(this._poseFollowRoot, this._poseFollowTip, t);
-        const iterationFollow =
-          totalIterations > 1
-            ? 1 - Math.pow(Math.max(0, 1 - particlePoseFollow), 1 / totalIterations)
-            : particlePoseFollow;
-        const toAnim = Vector3.sub(particle.animPosition, particle.position, new Vector3());
+        const iterationFollow = getIterationStrength(particlePoseFollow, totalIterations);
+        const poseTarget = parentRelative
+          ? getKawaiiPoseTarget(particle, topology[i])
+          : particle.animPosition;
+        const toAnim = Vector3.sub(poseTarget, particle.position, new Vector3());
         const correction = Vector3.scale(toAnim, iterationFollow, new Vector3());
         Vector3.add(particle.position, correction, particle.position);
 
         const particleMaxPoseOffset = this.lerp(this._maxPoseOffsetRoot, this._maxPoseOffsetTip, t);
         if (particleMaxPoseOffset > 0) {
-          const offset = Vector3.sub(particle.position, particle.animPosition, new Vector3());
+          const offset = Vector3.sub(particle.position, poseTarget, new Vector3());
           const offsetLen = offset.magnitude;
           if (offsetLen > particleMaxPoseOffset && offsetLen > 1e-6) {
             offset.scaleBy(particleMaxPoseOffset / offsetLen);
-            Vector3.add(particle.animPosition, offset, particle.position);
+            Vector3.add(poseTarget, offset, particle.position);
           }
         }
       }
     }
   }
 
-  private solveCollisions(deltaTime: number): void {
-    const blend = this.getTemporalBlendFactor(deltaTime, DEFAULT_COLLIDER_SMOOTHING_TIME);
-    const spheres: SphereCollider[] = [];
-    const capsules: CapsuleCollider[] = [];
-    const planes: PlaneCollider[] = [];
-    const boxes: BoxCollider[] = [];
+  private solveAngleLimits(): void {
+    if (this._angleLimitRoot <= 0 && this._angleLimitTip <= 0) {
+      return;
+    }
+    for (const chain of this._chains) {
+      const particles = chain.particles;
+      for (let i = 1; i < particles.length; i++) {
+        const limit = interpolateSpringValue(
+          this._angleLimitRoot,
+          this._angleLimitTip,
+          this._poseFollowExponent,
+          i,
+          particles.length
+        );
+        solveAngleLimit(particles[i - 1], particles[i], limit, this._solver === 'xpbd');
+      }
+    }
+  }
+
+  private solveCollisions(deltaTime: number, blendOverride?: number): void {
+    const blend = blendOverride ?? this.getTemporalBlendFactor(deltaTime, DEFAULT_COLLIDER_SMOOTHING_TIME);
+    const spheres: { source: SphereCollider; collider: SphereCollider }[] = [];
+    const capsules: { source: CapsuleCollider; collider: CapsuleCollider }[] = [];
+    const planes: { source: PlaneCollider; collider: PlaneCollider }[] = [];
+    const boxes: { source: BoxCollider; collider: BoxCollider }[] = [];
 
     for (const collider of this._colliders) {
       const colliderNode = this.resolveRuntimeNode(collider.node);
@@ -654,8 +890,8 @@ export class MultiChainSpringSystem {
         case 'sphere': {
           const source = collider as SphereCollider;
           spheres.push({
-            ...source,
-            center: this.getSmoothedSphereCenter(source, blend)
+            source,
+            collider: { ...source, center: this.getSmoothedSphereCenter(source, blend) }
           });
           break;
         }
@@ -663,9 +899,8 @@ export class MultiChainSpringSystem {
           const source = collider as CapsuleCollider;
           const endpoints = this.getSmoothedCapsuleEndpoints(source, blend);
           capsules.push({
-            ...source,
-            start: endpoints.start,
-            end: endpoints.end
+            source,
+            collider: { ...source, start: endpoints.start, end: endpoints.end }
           });
           break;
         }
@@ -673,14 +908,17 @@ export class MultiChainSpringSystem {
           const source = collider as PlaneCollider;
           const plane = this.getSmoothedPlaneData(source, blend);
           planes.push({
-            ...source,
-            point: plane.point,
-            normal: plane.normal
+            source,
+            collider: { ...source, point: plane.point, normal: plane.normal }
           });
           break;
         }
         case 'box': {
-          boxes.push(collider as BoxCollider);
+          const source = collider as BoxCollider;
+          boxes.push({
+            source,
+            collider: { ...source, ...this.getSmoothedBoxData(source, blend) }
+          });
           break;
         }
       }
@@ -691,26 +929,73 @@ export class MultiChainSpringSystem {
         if (particle.fixed) {
           continue;
         }
-        const positionBeforeCollision = particle.position.clone();
-        let collided = false;
         for (const collider of spheres) {
-          collided = resolveSphereCollision(particle.position, collider) || collided;
+          if (this._motionModel === 'kawaii') {
+            resolveInelasticCollision(
+              particle,
+              collider.collider,
+              resolveSphereCollision,
+              this.getInitialCollisionPenetration(
+                particle,
+                collider.source,
+                collider.collider,
+                resolveSphereCollision
+              )
+            );
+          } else {
+            resolveSphereCollision(particle.position, collider.collider, particle.collisionRadius);
+          }
         }
         for (const collider of capsules) {
-          collided = resolveCapsuleCollision(particle.position, collider) || collided;
+          if (this._motionModel === 'kawaii') {
+            resolveInelasticCollision(
+              particle,
+              collider.collider,
+              resolveCapsuleCollision,
+              this.getInitialCollisionPenetration(
+                particle,
+                collider.source,
+                collider.collider,
+                resolveCapsuleCollision
+              )
+            );
+          } else {
+            resolveCapsuleCollision(particle.position, collider.collider, particle.collisionRadius);
+          }
         }
         for (const collider of planes) {
-          collided = resolvePlaneCollision(particle.position, collider) || collided;
+          if (this._motionModel === 'kawaii') {
+            resolveInelasticCollision(
+              particle,
+              collider.collider,
+              resolvePlaneCollision,
+              this.getInitialCollisionPenetration(
+                particle,
+                collider.source,
+                collider.collider,
+                resolvePlaneCollision
+              )
+            );
+          } else {
+            resolvePlaneCollision(particle.position, collider.collider, particle.collisionRadius);
+          }
         }
         for (const collider of boxes) {
-          collided = resolveBoxCollision(particle.position, collider) || collided;
-        }
-        if (collided) {
-          Vector3.add(
-            particle.prevPosition,
-            Vector3.sub(particle.position, positionBeforeCollision, new Vector3()),
-            particle.prevPosition
-          );
+          if (this._motionModel === 'kawaii') {
+            resolveInelasticCollision(
+              particle,
+              collider.collider,
+              resolveBoxCollision,
+              this.getInitialCollisionPenetration(
+                particle,
+                collider.source,
+                collider.collider,
+                resolveBoxCollision
+              )
+            );
+          } else {
+            resolveBoxCollision(particle.position, collider.collider, particle.collisionRadius);
+          }
         }
       }
     }
@@ -862,6 +1147,10 @@ export class MultiChainSpringSystem {
   private solveConstraint(chain: SpringChain, constraint: SpringConstraint): void {
     const pA = chain.particles[constraint.particleA];
     const pB = chain.particles[constraint.particleB];
+    if (this._motionModel === 'kawaii') {
+      solveDistanceConstraint(pA, pB, this.getRuntimeRestLength(constraint), constraint.stiffness);
+      return;
+    }
     const delta = Vector3.sub(pB.position, pA.position, new Vector3());
     const currentLength = delta.magnitude;
     if (currentLength < 0.0001) {
@@ -882,6 +1171,10 @@ export class MultiChainSpringSystem {
     const chainB = this._chains[constraint.chainBIndex];
     const pA = chainA.particles[constraint.particleAIndex];
     const pB = chainB.particles[constraint.particleBIndex];
+    if (this._motionModel === 'kawaii') {
+      solveDistanceConstraint(pA, pB, this.getRuntimeRestLength(constraint), constraint.stiffness);
+      return;
+    }
     const delta = Vector3.sub(pB.position, pA.position, new Vector3());
     const currentLength = delta.magnitude;
     if (currentLength < 0.0001) {
@@ -917,10 +1210,26 @@ export class MultiChainSpringSystem {
     constraint.lambda += deltaLambda;
     const n = Vector3.scale(delta, 1.0 / currentLength, new Vector3());
     if (!pA.fixed) {
-      Vector3.add(pA.position, Vector3.scale(n, -wA * deltaLambda, new Vector3()), pA.position);
+      const correction = Vector3.scale(n, -wA * deltaLambda, new Vector3());
+      Vector3.add(pA.position, correction, pA.position);
+      if (this._motionModel === 'kawaii') {
+        Vector3.add(
+          pA.prevPosition,
+          Vector3.scale(correction, this._constraintVelocityHistoryRetention, new Vector3()),
+          pA.prevPosition
+        );
+      }
     }
     if (!pB.fixed) {
-      Vector3.add(pB.position, Vector3.scale(n, wB * deltaLambda, new Vector3()), pB.position);
+      const correction = Vector3.scale(n, wB * deltaLambda, new Vector3());
+      Vector3.add(pB.position, correction, pB.position);
+      if (this._motionModel === 'kawaii') {
+        Vector3.add(
+          pB.prevPosition,
+          Vector3.scale(correction, this._constraintVelocityHistoryRetention, new Vector3()),
+          pB.prevPosition
+        );
+      }
     }
   }
 
@@ -946,10 +1255,26 @@ export class MultiChainSpringSystem {
     constraint.lambda += deltaLambda;
     const n = Vector3.scale(delta, 1.0 / currentLength, new Vector3());
     if (!pA.fixed) {
-      Vector3.add(pA.position, Vector3.scale(n, -wA * deltaLambda, new Vector3()), pA.position);
+      const correction = Vector3.scale(n, -wA * deltaLambda, new Vector3());
+      Vector3.add(pA.position, correction, pA.position);
+      if (this._motionModel === 'kawaii') {
+        Vector3.add(
+          pA.prevPosition,
+          Vector3.scale(correction, this._constraintVelocityHistoryRetention, new Vector3()),
+          pA.prevPosition
+        );
+      }
     }
     if (!pB.fixed) {
-      Vector3.add(pB.position, Vector3.scale(n, wB * deltaLambda, new Vector3()), pB.position);
+      const correction = Vector3.scale(n, wB * deltaLambda, new Vector3());
+      Vector3.add(pB.position, correction, pB.position);
+      if (this._motionModel === 'kawaii') {
+        Vector3.add(
+          pB.prevPosition,
+          Vector3.scale(correction, this._constraintVelocityHistoryRetention, new Vector3()),
+          pB.prevPosition
+        );
+      }
     }
   }
 
@@ -1056,6 +1381,51 @@ export class MultiChainSpringSystem {
     this._smoothedSphereCenters = new WeakMap();
     this._smoothedCapsuleEndpoints = new WeakMap();
     this._smoothedPlaneData = new WeakMap();
+    this._smoothedBoxData = new WeakMap();
+    this._initialCollisionPenetrationElapsed = 0;
+    this._initialCollisionPenetration = new WeakMap();
+  }
+
+  private getInitialCollisionPenetration<TCollider extends SpringCollider>(
+    particle: SpringParticle,
+    sourceCollider: SpringCollider,
+    collider: TCollider,
+    resolveCollision: (position: Vector3, collider: TCollider) => boolean
+  ): number {
+    if (!this._preserveInitialCollisionPenetration) {
+      return 0;
+    }
+    let particlePenetrations = this._initialCollisionPenetration.get(particle);
+    if (!particlePenetrations) {
+      particlePenetrations = new WeakMap();
+      this._initialCollisionPenetration.set(particle, particlePenetrations);
+    }
+    let penetration = particlePenetrations.get(sourceCollider);
+    if (penetration === undefined) {
+      penetration =
+        measureCollisionPenetration(
+          particle.animPosition,
+          collider,
+          resolveCollision,
+          particle.collisionRadius
+        ) + INITIAL_COLLISION_PENETRATION_SLOP;
+      particlePenetrations.set(sourceCollider, penetration);
+    }
+    return getReleasedCollisionPenetration(
+      penetration,
+      this._initialCollisionPenetrationElapsed,
+      this._initialCollisionPenetrationReleaseTime
+    );
+  }
+
+  private advanceInitialCollisionPenetrationRelease(deltaTime: number): void {
+    if (!this._preserveInitialCollisionPenetration) {
+      return;
+    }
+    this._initialCollisionPenetrationElapsed = Math.min(
+      this._initialCollisionPenetrationReleaseTime,
+      this._initialCollisionPenetrationElapsed + Math.max(0, deltaTime)
+    );
   }
 
   private lerp(a: number, b: number, t: number): number {
@@ -1148,6 +1518,29 @@ export class MultiChainSpringSystem {
       cached.normal.z + (currentNormal.z - cached.normal.z) * blend
     );
     cached.normal.inplaceNormalize();
+    return cached;
+  }
+
+  private getSmoothedBoxData(
+    collider: BoxCollider,
+    blend: number
+  ): { center: Vector3; halfExtents: Vector3; axes: [Vector3, Vector3, Vector3] } {
+    const current = {
+      center: collider.center.clone(),
+      halfExtents: collider.halfExtents.clone(),
+      axes: collider.axes.map((axis) => axis.clone()) as [Vector3, Vector3, Vector3]
+    };
+    const cached = this._smoothedBoxData.get(collider);
+    if (!cached || blend >= 1) {
+      this._smoothedBoxData.set(collider, current);
+      return current;
+    }
+    Vector3.lerp(cached.center, current.center, blend, cached.center);
+    Vector3.lerp(cached.halfExtents, current.halfExtents, blend, cached.halfExtents);
+    for (let i = 0; i < 3; i++) {
+      Vector3.lerp(cached.axes[i], current.axes[i], blend, cached.axes[i]);
+      cached.axes[i].inplaceNormalize();
+    }
     return cached;
   }
 }

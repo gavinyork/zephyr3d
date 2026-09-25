@@ -35,12 +35,14 @@ export class SpringChain {
       mass?: number;
       damping?: number;
       stiffness?: number;
+      collisionRadius?: number;
     }
   ): SpringChain {
     const chain = new SpringChain();
     const mass = options?.mass ?? 1.0;
     const damping = options?.damping ?? 0.95;
     const stiffness = options?.stiffness ?? 0.8;
+    const collisionRadius = Math.max(0, Number(options?.collisionRadius) || 0);
 
     // Collect nodes from startNode to endNode
     const nodes: SceneNode[] = [];
@@ -72,6 +74,7 @@ export class SpringChain {
       const particle = createSpringParticle(worldPos, {
         mass,
         damping,
+        collisionRadius,
         fixed: i === 0, // First particle is fixed (anchor)
         node,
         originalRotation

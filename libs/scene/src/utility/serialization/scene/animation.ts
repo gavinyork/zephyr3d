@@ -101,6 +101,7 @@ type SerializedSpringParticle = {
   originalRotation?: number[];
   mass: number;
   damping: number;
+  collisionRadius?: number;
   fixed: boolean;
 };
 
@@ -250,6 +251,7 @@ function serializeSpringChain(chain: SpringChain): SerializedSpringChain {
         : {}),
       mass: particle.mass,
       damping: particle.damping,
+      ...(particle.collisionRadius > 0 ? { collisionRadius: particle.collisionRadius } : {}),
       fixed: particle.fixed
     })),
     constraints: chain.constraints.map((constraint) => ({
@@ -282,6 +284,7 @@ function deserializeSpringChain(ctx: SceneNode, data: SerializedSpringChain): Sp
       createSpringParticle(position, {
         mass: item.mass,
         damping: item.damping,
+        collisionRadius: item.collisionRadius,
         fixed: item.fixed,
         node: node ?? undefined,
         anchorNode: anchorNode ?? undefined,
@@ -452,13 +455,19 @@ function getSpringSystemOptions(
     centrifugalScale: system.centrifugalScale,
     coriolisScale: system.coriolisScale,
     solver: system.solver,
+    motionModel: system.motionModel,
     poseFollow: system.poseFollow,
     poseFollowRoot: system.poseFollowRoot,
     poseFollowTip: system.poseFollowTip,
     poseFollowExponent: system.poseFollowExponent,
     maxPoseOffset: system.maxPoseOffset,
     maxPoseOffsetRoot: system.maxPoseOffsetRoot,
-    maxPoseOffsetTip: system.maxPoseOffsetTip
+    maxPoseOffsetTip: system.maxPoseOffsetTip,
+    angleLimitRoot: system.angleLimitRoot,
+    angleLimitTip: system.angleLimitTip,
+    constraintVelocityHistoryRetention: system.constraintVelocityHistoryRetention,
+    preserveInitialCollisionPenetration: system.preserveInitialCollisionPenetration,
+    initialCollisionPenetrationReleaseTime: system.initialCollisionPenetrationReleaseTime
   };
 }
 
