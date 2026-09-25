@@ -1055,7 +1055,8 @@ export class EyeMaterial
           type,
           this.$inputs.worldPos,
           posRange,
-          dirCutoff
+          dirCutoff,
+          extra
         );
         this.$l.rawNoL = pb.dot(this.normal, this.lightDir);
         this.$l.NoL = pb.clamp(this.rawNoL, 0, 1);

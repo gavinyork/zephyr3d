@@ -14,6 +14,7 @@ import type { DrawContext } from '../../../render';
 import { getGGXLUT } from '../../../utility/textures/ggxlut';
 import { getSheenLUT } from '../../../utility/textures/sheenlut';
 import { getLTCAmpLUT, getLTCMatLUT } from '../../../utility/textures/ltclut';
+import { evaluateLTCRectLightTerms } from '../../../shaders/ltc_rect';
 import type { TextureMixinInstanceTypes } from '../texture';
 import { mixinTextureProps } from '../texture';
 import { ShaderHelper } from '../../shader/helper';
@@ -1338,166 +1339,6 @@ export function mixinPBRCommon<T extends typeof MeshMaterial>(BaseCls: T) {
       const pb = scope.$builder;
       const that = this;
       const funcName = 'Z_PBRRectLight';
-      const LUT_SIZE = 64;
-      const LUT_SCALE = (LUT_SIZE - 1) / LUT_SIZE;
-      const LUT_BIAS = 0.5 / LUT_SIZE;
-      pb.func('Z_LTCIntegrateEdgeVec', [pb.vec3('v1'), pb.vec3('v2')], function () {
-        this.$l.x = pb.dot(this.v1, this.v2);
-        this.$l.y = pb.abs(this.x);
-        this.$l.a = pb.add(0.8543985, pb.mul(pb.add(0.4965155, pb.mul(0.0145206, this.y)), this.y));
-        this.$l.b = pb.add(3.417594, pb.mul(pb.add(4.1616724, this.y), this.y));
-        this.$l.v = pb.div(this.a, this.b);
-        this.$l.thetaSinTheta = this.$choice(
-          pb.greaterThan(this.x, 0),
-          this.v,
-          pb.sub(pb.mul(0.5, pb.inverseSqrt(pb.max(pb.sub(1, pb.mul(this.x, this.x)), 1e-7))), this.v)
-        );
-        this.$return(pb.mul(pb.cross(this.v1, this.v2), this.thetaSinTheta));
-      });
-      pb.func('Z_LTCClipQuadToHorizon', [pb.vec3[5]('L').inout(), pb.int('n').out()], function () {
-        this.$l.config = pb.int(0);
-        this.$if(pb.greaterThan(this.L[0].z, 0), function () {
-          this.config = pb.add(this.config, 1);
-        });
-        this.$if(pb.greaterThan(this.L[1].z, 0), function () {
-          this.config = pb.add(this.config, 2);
-        });
-        this.$if(pb.greaterThan(this.L[2].z, 0), function () {
-          this.config = pb.add(this.config, 4);
-        });
-        this.$if(pb.greaterThan(this.L[3].z, 0), function () {
-          this.config = pb.add(this.config, 8);
-        });
-        this.n = 0;
-        this.$if(pb.equal(this.config, 0), function () {})
-          .$elseif(pb.equal(this.config, 1), function () {
-            this.n = 3;
-            this.L[1] = pb.add(pb.mul(pb.neg(this.L[1].z), this.L[0]), pb.mul(this.L[0].z, this.L[1]));
-            this.L[2] = pb.add(pb.mul(pb.neg(this.L[3].z), this.L[0]), pb.mul(this.L[0].z, this.L[3]));
-          })
-          .$elseif(pb.equal(this.config, 2), function () {
-            this.n = 3;
-            this.L[0] = pb.add(pb.mul(pb.neg(this.L[0].z), this.L[1]), pb.mul(this.L[1].z, this.L[0]));
-            this.L[2] = pb.add(pb.mul(pb.neg(this.L[2].z), this.L[1]), pb.mul(this.L[1].z, this.L[2]));
-          })
-          .$elseif(pb.equal(this.config, 3), function () {
-            this.n = 4;
-            this.L[2] = pb.add(pb.mul(pb.neg(this.L[2].z), this.L[1]), pb.mul(this.L[1].z, this.L[2]));
-            this.L[3] = pb.add(pb.mul(pb.neg(this.L[3].z), this.L[0]), pb.mul(this.L[0].z, this.L[3]));
-          })
-          .$elseif(pb.equal(this.config, 4), function () {
-            this.n = 3;
-            this.L[0] = pb.add(pb.mul(pb.neg(this.L[3].z), this.L[2]), pb.mul(this.L[2].z, this.L[3]));
-            this.L[1] = pb.add(pb.mul(pb.neg(this.L[1].z), this.L[2]), pb.mul(this.L[2].z, this.L[1]));
-          })
-          .$elseif(pb.equal(this.config, 6), function () {
-            this.n = 4;
-            this.L[0] = pb.add(pb.mul(pb.neg(this.L[0].z), this.L[1]), pb.mul(this.L[1].z, this.L[0]));
-            this.L[3] = pb.add(pb.mul(pb.neg(this.L[3].z), this.L[2]), pb.mul(this.L[2].z, this.L[3]));
-          })
-          .$elseif(pb.equal(this.config, 7), function () {
-            this.n = 5;
-            this.L[4] = pb.add(pb.mul(pb.neg(this.L[3].z), this.L[0]), pb.mul(this.L[0].z, this.L[3]));
-            this.L[3] = pb.add(pb.mul(pb.neg(this.L[3].z), this.L[2]), pb.mul(this.L[2].z, this.L[3]));
-          })
-          .$elseif(pb.equal(this.config, 8), function () {
-            this.n = 3;
-            this.L[0] = pb.add(pb.mul(pb.neg(this.L[0].z), this.L[3]), pb.mul(this.L[3].z, this.L[0]));
-            this.L[1] = pb.add(pb.mul(pb.neg(this.L[2].z), this.L[3]), pb.mul(this.L[3].z, this.L[2]));
-            this.L[2] = this.L[3];
-          })
-          .$elseif(pb.equal(this.config, 9), function () {
-            this.n = 4;
-            this.L[1] = pb.add(pb.mul(pb.neg(this.L[1].z), this.L[0]), pb.mul(this.L[0].z, this.L[1]));
-            this.L[2] = pb.add(pb.mul(pb.neg(this.L[2].z), this.L[3]), pb.mul(this.L[3].z, this.L[2]));
-          })
-          .$elseif(pb.equal(this.config, 11), function () {
-            this.n = 5;
-            this.L[4] = this.L[3];
-            this.L[3] = pb.add(pb.mul(pb.neg(this.L[2].z), this.L[3]), pb.mul(this.L[3].z, this.L[2]));
-            this.L[2] = pb.add(pb.mul(pb.neg(this.L[2].z), this.L[1]), pb.mul(this.L[1].z, this.L[2]));
-          })
-          .$elseif(pb.equal(this.config, 12), function () {
-            this.n = 4;
-            this.L[1] = pb.add(pb.mul(pb.neg(this.L[1].z), this.L[2]), pb.mul(this.L[2].z, this.L[1]));
-            this.L[0] = pb.add(pb.mul(pb.neg(this.L[0].z), this.L[3]), pb.mul(this.L[3].z, this.L[0]));
-          })
-          .$elseif(pb.equal(this.config, 13), function () {
-            this.n = 5;
-            this.L[4] = this.L[3];
-            this.L[3] = this.L[2];
-            this.L[2] = pb.add(pb.mul(pb.neg(this.L[1].z), this.L[2]), pb.mul(this.L[2].z, this.L[1]));
-            this.L[1] = pb.add(pb.mul(pb.neg(this.L[1].z), this.L[0]), pb.mul(this.L[0].z, this.L[1]));
-          })
-          .$elseif(pb.equal(this.config, 14), function () {
-            this.n = 5;
-            this.L[4] = pb.add(pb.mul(pb.neg(this.L[0].z), this.L[3]), pb.mul(this.L[3].z, this.L[0]));
-            this.L[0] = pb.add(pb.mul(pb.neg(this.L[0].z), this.L[1]), pb.mul(this.L[1].z, this.L[0]));
-          })
-          .$elseif(pb.equal(this.config, 15), function () {
-            this.n = 4;
-          });
-        this.$if(pb.equal(this.n, 3), function () {
-          this.L[3] = this.L[0];
-        });
-        this.$if(pb.equal(this.n, 4), function () {
-          this.L[4] = this.L[0];
-        });
-      });
-      pb.func(
-        'Z_LTCEvaluateRect',
-        [
-          pb.vec3('N'),
-          pb.vec3('V'),
-          pb.vec3('P'),
-          pb.mat3('Minv'),
-          pb.vec3('p0'),
-          pb.vec3('p1'),
-          pb.vec3('p2'),
-          pb.vec3('p3')
-        ],
-        function () {
-          this.$l.T1 = pb.normalize(pb.sub(this.V, pb.mul(this.N, pb.dot(this.V, this.N))));
-          this.$l.T2 = pb.cross(this.N, this.T1);
-          if (pb.getDevice().type === 'webgl') {
-            this.$l.ltcBasis = pb.mat3(
-              pb.vec3(this.T1.x, this.T2.x, this.N.x),
-              pb.vec3(this.T1.y, this.T2.y, this.N.y),
-              pb.vec3(this.T1.z, this.T2.z, this.N.z)
-            );
-            this.$l.ltcMatrix = pb.mul(this.Minv, this.ltcBasis);
-          } else {
-            this.$l.ltcMatrix = pb.mul(this.Minv, pb.transpose(pb.mat3(this.T1, this.T2, this.N)));
-          }
-          this.$l.L = pb.vec3[5]();
-          this.L[0] = pb.mul(this.ltcMatrix, pb.sub(this.p0, this.P));
-          this.L[1] = pb.mul(this.ltcMatrix, pb.sub(this.p1, this.P));
-          this.L[2] = pb.mul(this.ltcMatrix, pb.sub(this.p2, this.P));
-          this.L[3] = pb.mul(this.ltcMatrix, pb.sub(this.p3, this.P));
-          this.$l.n = pb.int(0);
-          this.Z_LTCClipQuadToHorizon(this.L, this.n);
-          this.$if(pb.equal(this.n, 0), function () {
-            this.$return(pb.vec3(0));
-          });
-          this.L[0] = pb.normalize(this.L[0]);
-          this.L[1] = pb.normalize(this.L[1]);
-          this.L[2] = pb.normalize(this.L[2]);
-          this.L[3] = pb.normalize(this.L[3]);
-          this.L[4] = pb.normalize(this.L[4]);
-          this.$l.sum = pb.float(0);
-          this.sum = pb.add(this.sum, this.Z_LTCIntegrateEdgeVec(this.L[0], this.L[1]).z);
-          this.sum = pb.add(this.sum, this.Z_LTCIntegrateEdgeVec(this.L[1], this.L[2]).z);
-          this.sum = pb.add(this.sum, this.Z_LTCIntegrateEdgeVec(this.L[2], this.L[3]).z);
-          this.$if(pb.greaterThanEqual(this.n, 4), function () {
-            this.sum = pb.add(this.sum, this.Z_LTCIntegrateEdgeVec(this.L[3], this.L[4]).z);
-          });
-          this.$if(pb.equal(this.n, 5), function () {
-            this.sum = pb.add(this.sum, this.Z_LTCIntegrateEdgeVec(this.L[4], this.L[0]).z);
-          });
-          this.sum = pb.max(0, this.sum);
-          this.$return(pb.vec3(this.sum));
-        }
-      );
       pb.func(
         funcName,
         [
@@ -1512,94 +1353,32 @@ export function mixinPBRCommon<T extends typeof MeshMaterial>(BaseCls: T) {
           pb.vec3('outColor').inout()
         ],
         function () {
-          this.$l.center = this.posRange.xyz;
-          this.$l.range = this.posRange.w;
-          this.$l.ax = this.axisX.xyz;
-          this.$l.ay = this.axisY.xyz;
-          this.$l.halfWidth = pb.length(this.ax);
-          this.$l.halfHeight = pb.length(this.ay);
-          this.$l.area = pb.mul(this.halfWidth, this.halfHeight, 4);
-          this.$l.lightNormal = pb.normalize(pb.cross(this.ax, this.ay));
-          this.lightNormal = pb.neg(this.lightNormal);
-          this.$if(pb.greaterThan(this.area, 0), function () {
-            this.$l.ex = this.ax;
-            this.$l.ey = this.ay;
-            this.$l.p0 = pb.sub(pb.sub(this.center, this.ex), this.ey);
-            this.$l.p1 = pb.add(pb.sub(this.center, this.ey), this.ex);
-            this.$l.p2 = pb.add(pb.add(this.center, this.ex), this.ey);
-            this.$l.p3 = pb.add(pb.sub(this.center, this.ex), this.ey);
-            this.$l.centerToPoint = pb.sub(this.center, this.worldPos);
-            this.$l.dist = pb.length(this.centerToPoint);
-            this.$l.L = pb.normalize(this.centerToPoint);
-            this.$l.NoV = pb.clamp(pb.dot(this.normal, this.viewVec), 0.0001, 1);
-            this.$l.NoL_light = pb.clamp(pb.dot(this.lightNormal, pb.neg(this.L)), 0, 1);
-            // Keep rect lights single-sided, but avoid applying an extra cosine falloff
-            // on top of the LTC integral, which makes the light look noticeably dimmer.
-            this.$if(pb.greaterThan(this.NoL_light, 1e-5), function () {
-              this.$l.falloff = pb.float(1);
-              this.$if(pb.greaterThan(this.range, 0), function () {
-                this.$l.fadeStart = pb.mul(this.range, 0.9);
-                this.falloff = pb.sub(1, pb.smoothStep(this.fadeStart, this.range, this.dist));
-              });
-              // Same floor as UE's rect-light path: below it the fitted LTC degenerates towards a
-              // singular matrix and the rect's edges alias in near-mirror reflections.
-              this.$l.ltcRoughness = pb.max(this.data.roughness, 0.02);
-              this.$l.uv = pb.clamp(
-                pb.add(
-                  pb.mul(pb.vec2(this.ltcRoughness, pb.sqrt(pb.max(pb.sub(1, this.NoV), 0))), LUT_SCALE),
-                  pb.vec2(LUT_BIAS)
-                ),
-                pb.vec2(0),
-                pb.vec2(1)
-              );
-              this.$l.t1 = pb.textureSampleLevel(this.zLTCMatLut, this.uv, 0);
-              this.$l.t2 = pb.textureSampleLevel(this.zLTCAmpLut, this.uv, 0);
-              this.$l.Minv = pb.mat3(
-                pb.vec3(this.t1.x, 0, this.t1.y),
-                pb.vec3(0, 1, 0),
-                pb.vec3(this.t1.z, 0, this.t1.w)
-              );
-              this.$l.spec = this.Z_LTCEvaluateRect(
-                this.normal,
-                this.viewVec,
-                this.worldPos,
-                this.Minv,
-                this.p0,
-                this.p1,
-                this.p2,
-                this.p3
-              );
-              this.$l.diff = this.Z_LTCEvaluateRect(
-                this.normal,
-                this.viewVec,
-                this.worldPos,
-                pb.mat3(pb.vec3(1, 0, 0), pb.vec3(0, 1, 0), pb.vec3(0, 0, 1)),
-                this.p0,
-                this.p1,
-                this.p2,
-                this.p3
-              );
-              this.$l.lightColor = pb.mul(this.colorIntensity.rgb, this.colorIntensity.a, this.falloff);
-              this.$l.baseF0 = this.data.f0.rgb;
-              this.$l.rectSpecularScale = that.getRectSpecularScale(this);
-              // Z_LTCEvaluateRect already returns the form factor: the fitted edge term in
-              // Z_LTCIntegrateEdgeVec is theta / (2*pi*sin(theta)), so the 1/(2*pi) of the polygon
-              // integral is built in (the same fit as UE's IntegrateEdge). Radiance is therefore
-              // luminance * albedo * formFactor for diffuse and luminance * LTC integral * Fresnel
-              // norm for specular, with no further normalization in either lighting mode.
-              this.$l.specularLtc = pb.mul(
-                this.spec,
-                pb.add(pb.mul(this.baseF0, this.t2.x), pb.mul(pb.sub(pb.vec3(1), this.baseF0), this.t2.y)),
-                this.data.specularWeight,
-                this.rectSpecularScale
-              );
-              this.$l.diffuseLtc = pb.mul(this.diff, this.data.diffuse.rgb);
-              this.outColor = pb.add(
-                this.outColor,
-                pb.mul(this.lightColor, pb.add(this.diffuseLtc, this.specularLtc))
-              );
-            });
-          });
+          // (specular integral, Fresnel norm, Fresnel bias, diffuse form factor),
+          // with the range window and one-sidedness already applied.
+          this.$l.terms = evaluateLTCRectLightTerms(
+            this,
+            this.worldPos,
+            this.normal,
+            this.viewVec,
+            this.data.roughness,
+            this.posRange,
+            this.axisX.xyz,
+            this.axisY.xyz
+          );
+          this.$l.lightColor = pb.mul(this.colorIntensity.rgb, this.colorIntensity.a);
+          this.$l.baseF0 = this.data.f0.rgb;
+          this.$l.rectSpecularScale = that.getRectSpecularScale(this);
+          this.$l.specularLtc = pb.mul(
+            this.terms.x,
+            pb.add(pb.mul(this.baseF0, this.terms.y), pb.mul(pb.sub(pb.vec3(1), this.baseF0), this.terms.z)),
+            this.data.specularWeight,
+            this.rectSpecularScale
+          );
+          this.$l.diffuseLtc = pb.mul(this.data.diffuse.rgb, this.terms.w);
+          this.outColor = pb.add(
+            this.outColor,
+            pb.mul(this.lightColor, pb.add(this.diffuseLtc, this.specularLtc))
+          );
         }
       );
       scope.$g[funcName](

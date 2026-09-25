@@ -514,7 +514,14 @@ export class MToonMaterial extends ToonMaterialBase {
             dirCutoff,
             extra
           );
-          this.$l.lightDir = that.calculateLightDirection(this, type, this.worldPos, posRange, dirCutoff);
+          this.$l.lightDir = that.calculateLightDirection(
+            this,
+            type,
+            this.worldPos,
+            posRange,
+            dirCutoff,
+            extra
+          );
           this.$l.lightColor = pb.mul(colorIntensity.rgb, colorIntensity.a, this.lightAtten);
           this.$l.NoL = pb.dot(this.normal, this.lightDir);
           this.$l.shiftedShading = pb.add(this.NoL, this.shadingShift);

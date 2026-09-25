@@ -2657,7 +2657,8 @@ export class ShaderHelper {
           shadowMapParams,
           this,
           this.shadowVertex,
-          this.NoL
+          this.NoL,
+          this.worldNormal
         );
         this.shadow = pb.clamp(this.shadow, 0, 1);
         this.$l.shadowDistance = that.getShadowCameraParams(scope).w;

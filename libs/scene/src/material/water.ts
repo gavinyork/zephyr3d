@@ -2065,7 +2065,14 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
             dirCutoff,
             extra
           );
-          this.$l.lightDir = that.calculateLightDirection(this, type, this.worldPos, posRange, dirCutoff);
+          this.$l.lightDir = that.calculateLightDirection(
+            this,
+            type,
+            this.worldPos,
+            posRange,
+            dirCutoff,
+            extra
+          );
           this.dbgLightDir = this.lightDir;
           this.$l.NoL = pb.clamp(pb.dot(this.normal, this.lightDir), 0, 1);
           this.$l.NoLdiffuse = pb.clamp(pb.dot(this.diffuseNormal, this.lightDir), 0, 1);

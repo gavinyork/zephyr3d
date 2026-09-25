@@ -452,7 +452,13 @@ export class ShadowMapper extends Disposable {
       }
     }
   }
-  /** Light radius for PCSS shadow, measured in shadow-map texels */
+  /**
+   * Light radius for PCSS shadow, measured in shadow-map texels.
+   *
+   * @remarks
+   * Ignored for rect lights, whose penumbra is derived from their actual size
+   * and the receiver's distance instead.
+   */
   get pcssLightRadius() {
     return this._pcssLightRadius;
   }
@@ -1205,6 +1211,14 @@ export class ShadowMapper extends Disposable {
     const shadowMapParams = ShadowMapper.fetchShadowMapParams();
     shadowMapParams.impl = this._impl;
     shadowMapParams.lightType = ShadowMapper.getShadowProjectionType(this.light);
+    if (this._impl instanceof PCSS) {
+      // A rect light's penumbra follows its size: the radius of the disc of
+      // equal area, in world units. Refreshed every frame so resizing the
+      // light is picked up without touching the shadow settings.
+      this._impl.physicalLightRadius = this._light.isRectLight()
+        ? Math.sqrt((this._light.width * this._light.height) / Math.PI)
+        : 0;
+    }
     shadowMapParams.numShadowCascades =
       shadowMapParams.lightType === LIGHT_TYPE_DIRECTIONAL && this._impl!.supportsCascades()
         ? (this._config.numCascades ?? 1)

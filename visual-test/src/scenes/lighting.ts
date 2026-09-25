@@ -1,5 +1,16 @@
 import { Vector3, Vector4 } from '@zephyr3d/base';
-import { BoxShape, Mesh, PlaneShape, PointLight, RectLight, SphereShape, SpotLight } from '@zephyr3d/scene';
+import {
+  BlinnMaterial,
+  BoxShape,
+  Mesh,
+  PBRBluePrintMaterial,
+  PlaneShape,
+  PointLight,
+  RectLight,
+  SSSMaterial,
+  SphereShape,
+  SpotLight
+} from '@zephyr3d/scene';
 import type { Scene } from '@zephyr3d/scene';
 import type { VisualScene } from '../types';
 import { bareScene, lambert, pbr, placeCamera } from './common';
@@ -240,5 +251,171 @@ export const rectLightShadow: VisualScene = {
     light.shadow.mode = 'pcf';
 
     placeCamera(camera, new Vector3(0, 4.5, 6.5), new Vector3(0, 0.3, 0));
+  }
+};
+
+/**
+ * The rect light on the materials that have no area-light integration of their
+ * own: Lambert, Blinn-Phong and skin, left to right.
+ *
+ * They light a rect through its vector form factor - one direction and an
+ * attenuation of pi times the form factor, which gives the rect's exact
+ * irradiance while it is above the surface's horizon. Before that they treated
+ * it as a point light at its centre: inverse-square falloff, luminance read as
+ * candela, and light in every direction. The sphere floating above the panel
+ * pins the last of those - rect lights are one-sided, so it must stay at the
+ * ambient level rather than light up from below.
+ */
+export const rectLightMaterials: VisualScene = {
+  name: 'rect-light-materials',
+  description:
+    'Rect light over Lambert, Blinn and skin spheres, with one sphere above the panel. Pins the form-factor path and one-sided emission.',
+  setup({ scene, camera }) {
+    bareScene(scene);
+    scene.env.light.type = 'constant';
+    scene.env.light.ambientColor = new Vector4(0.04, 0.04, 0.05, 1);
+    new Mesh(scene, new PlaneShape({ size: 10 }), lambert(new Vector4(0.6, 0.6, 0.6, 1)));
+    const blinn = new BlinnMaterial();
+    blinn.albedoColor = new Vector4(0.75, 0.75, 0.75, 1);
+    const skin = new SSSMaterial();
+    skin.albedoColor = new Vector4(0.85, 0.66, 0.58, 1);
+    const materials = [lambert(new Vector4(0.75, 0.75, 0.75, 1)), blinn, skin];
+    for (let i = 0; i < 3; i++) {
+      const sphere = new Mesh(scene, new SphereShape({ radius: 0.6 }), materials[i]);
+      sphere.position.setXYZ((i - 1) * 2, 0.6, 0);
+    }
+    const above = new Mesh(
+      scene,
+      new SphereShape({ radius: 0.35 }),
+      lambert(new Vector4(0.75, 0.75, 0.75, 1))
+    );
+    above.position.setXYZ(2.4, 2.9, -0.4);
+    overheadRectLight(scene, 8);
+    placeCamera(camera, new Vector3(0, 3.2, 6.5), new Vector3(0, 0.9, 0));
+  }
+};
+
+/**
+ * Blueprint PBR beside the metallic-roughness model under the same rect light.
+ *
+ * Both integrate the rect with the same LTC now, so the default blueprint -
+ * white metal at roughness 1 - must read like the metallic-roughness sphere
+ * next to it. It used to approximate the rect with four point lights at the
+ * corners of a 2x2 grid, which put a cluster of four highlights where the
+ * reflection of one panel belongs and missed its energy near the light.
+ */
+export const rectLightBlueprint: VisualScene = {
+  name: 'rect-light-blueprint',
+  description:
+    'Default blueprint PBR beside a matching metallic-roughness sphere under one rect light. Pins that both use the LTC integration.',
+  setup({ scene, camera }) {
+    bareScene(scene);
+    new Mesh(scene, new PlaneShape({ size: 10 }), lambert(new Vector4(0.5, 0.5, 0.5, 1)));
+    const materials = [new PBRBluePrintMaterial(), pbr(new Vector4(1, 1, 1, 1), 1, 1)];
+    for (let i = 0; i < 2; i++) {
+      const sphere = new Mesh(scene, new SphereShape({ radius: 0.6 }), materials[i]);
+      sphere.position.setXYZ((i - 0.5) * 2, 0.6, 0);
+    }
+    overheadRectLight(scene, 8);
+    placeCamera(camera, new Vector3(0, 3.2, 6.5), new Vector3(0, 0.6, 0));
+  }
+};
+
+/**
+ * PCSS under a small and a large rect light, which must soften differently.
+ *
+ * The penumbra is derived from the panel's own size - the radius of the disc of
+ * equal area - and the receiver's distance, so the large panel's shadows spread
+ * much wider and both harden towards the contact points. The PCSS light radius
+ * used to be one fixed size in texels whatever the light was.
+ */
+function rectLightPcssScene(width: number, height: number): VisualScene['setup'] {
+  return ({ scene, camera }) => {
+    bareScene(scene);
+    scene.env.light.type = 'constant';
+    scene.env.light.ambientColor = new Vector4(0.02, 0.02, 0.025, 1);
+    new Mesh(scene, new PlaneShape({ size: 12 }), pbr(new Vector4(0.6, 0.6, 0.6, 1), 0, 0.8));
+    const box = new Mesh(scene, new BoxShape({ size: 0.5 }), pbr(new Vector4(0.3, 0.5, 0.8, 1), 0, 0.6));
+    box.position.setXYZ(-0.9, 0.85, 0);
+    const post = new Mesh(
+      scene,
+      new BoxShape({ sizeX: 0.12, sizeY: 1.4, sizeZ: 0.12 }),
+      pbr(new Vector4(0.8, 0.35, 0.25, 1), 0, 0.6)
+    );
+    post.position.setXYZ(1, 0.7, 0);
+    const light = new RectLight(scene);
+    light.lookAt(new Vector3(0, 2.6, 0), new Vector3(0, 0, 0), Vector3.axisNZ());
+    light.width = width;
+    light.height = height;
+    light.range = 12;
+    light.intensity = (30 * 0.5) / (width * height);
+    light.castShadow = true;
+    light.shadow.applyQualityPreset('character-small');
+    light.shadow.mode = 'pcss';
+    light.shadow.pcssTemporalJitter = false;
+    // Room for the large panel's penumbra: the default 32-texel budget clamps
+    // both panels to the same width and hides the difference this pins.
+    light.shadow.pcssMaxFilterRadius = 160;
+    // And the most taps the filter allows, so a wide penumbra is a gradient
+    // rather than a stack of offset copies of the shadow.
+    light.shadow.pcssFilterSampleCount = 64;
+    light.shadow.pcssBlockerSampleCount = 64;
+    placeCamera(camera, new Vector3(0, 4.5, 6.5), new Vector3(0, 0.3, 0));
+  };
+}
+
+export const rectLightPcssSmall: VisualScene = {
+  name: 'rect-light-pcss-small',
+  description: 'PCSS under a 0.25 x 0.25 rect light. Pairs with rect-light-pcss-large: tight penumbrae.',
+  setup: rectLightPcssScene(0.25, 0.25)
+};
+
+export const rectLightPcssLarge: VisualScene = {
+  name: 'rect-light-pcss-large',
+  description:
+    'PCSS under a 1.5 x 1 rect light. Pairs with rect-light-pcss-small: wide penumbrae that harden at contact.',
+  setup: rectLightPcssScene(1.5, 1)
+};
+/**
+ * A head-sized sphere casting onto a wall behind it, under a rect light with
+ * the default PCSS settings.
+ *
+ * The penumbra must fade out smoothly into the lit wall. The cube-map PCSS
+ * compared every tap with the receiver's depth at the kernel's centre, and a
+ * cube stores distance from the light, which across a wide kernel varies over
+ * the wall itself - so the wall shadowed itself on one side of every kernel.
+ * The penumbra flattened into a plateau of false shadow that cut to fully lit,
+ * along a hard outline, wherever the blocker search stopped finding the
+ * sphere. Taps are now compared against the receiver's plane.
+ */
+export const rectLightPcssWall: VisualScene = {
+  name: 'rect-light-pcss-wall',
+  description:
+    'Sphere shadowing a wall under a rect light with default PCSS. Pins the receiver-plane depth that keeps the penumbra edge soft.',
+  setup({ scene, camera }) {
+    bareScene(scene);
+    scene.env.light.type = 'constant';
+    scene.env.light.ambientColor = new Vector4(0.02, 0.02, 0.025, 1);
+    const wall = new Mesh(
+      scene,
+      new BoxShape({ sizeX: 3, sizeY: 3, sizeZ: 0.05 }),
+      pbr(new Vector4(0.6, 0.6, 0.6, 1), 0, 0.8)
+    );
+    wall.position.setXYZ(0, 1.5, -0.6);
+    const head = new Mesh(
+      scene,
+      new SphereShape({ radius: 0.12 }),
+      pbr(new Vector4(0.8, 0.6, 0.5, 1), 0, 0.6)
+    );
+    head.position.setXYZ(0, 1.5, 0);
+    const light = new RectLight(scene);
+    light.lookAt(new Vector3(0, 1.5, 1.2), new Vector3(0, 1.5, 0), Vector3.axisPY());
+    light.width = 0.6;
+    light.height = 0.6;
+    light.range = 8;
+    light.intensity = 20;
+    light.castShadow = true;
+    light.shadow.mode = 'pcss';
+    placeCamera(camera, new Vector3(0.9, 1.6, 1.6), new Vector3(0, 1.4, -0.6));
   }
 };

@@ -190,11 +190,19 @@ export abstract class ShadowImpl {
     worldPos: PBShaderExp,
     alpha: Nullable<PBShaderExp>
   ): PBShaderExp;
+  /**
+   * Shadow factor for a receiver, 1 meaning fully lit.
+   *
+   * @param worldNormal - The receiver's geometric normal, when the caller has
+   *   one. Implementations filtering a wide kernel over a cube map use it to
+   *   compare each tap against the receiver's own plane.
+   */
   abstract computeShadow(
     shadowMapParams: ShadowMapParams,
     scope: PBInsideFunctionScope,
     shadowVertex: PBShaderExp,
-    NdotL: PBShaderExp
+    NdotL: PBShaderExp,
+    worldNormal?: PBShaderExp
   ): PBShaderExp;
   abstract computeShadowCSM(
     shadowMapParams: ShadowMapParams,

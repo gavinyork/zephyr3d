@@ -1154,7 +1154,14 @@ export class HairMaterial
               dirCutoff,
               extra
             );
-            this.$l.lightDir = that.calculateLightDirection(this, type, this.worldPos, posRange, dirCutoff);
+            this.$l.lightDir = that.calculateLightDirection(
+              this,
+              type,
+              this.worldPos,
+              posRange,
+              dirCutoff,
+              extra
+            );
             this.$l.NoL = pb.dot(this.normal, this.lightDir);
             this.$l.lightColor = pb.mul(colorIntensity.rgb, colorIntensity.a, this.lightAtten);
             // Wrap diffuse softens the terminator across thin cards.

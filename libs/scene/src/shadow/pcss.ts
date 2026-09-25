@@ -24,6 +24,7 @@ export class PCSS extends ShadowImpl {
   protected _filterSampleCount: number;
   protected _maxFilterRadius: number;
   protected _temporalJitter: boolean;
+  protected _physicalLightRadius: number;
   constructor(
     lightRadius?: number,
     blockerSampleCount?: number,
@@ -37,6 +38,23 @@ export class PCSS extends ShadowImpl {
     this._filterSampleCount = filterSampleCount ?? 32;
     this._maxFilterRadius = maxFilterRadius ?? 32;
     this._temporalJitter = temporalJitter ?? true;
+    this._physicalLightRadius = 0;
+  }
+  /**
+   * Source radius in world units, overriding {@link lightRadius} when positive.
+   *
+   * @remarks
+   * {@link lightRadius} is a fixed size in shadow map texels, so the penumbra it
+   * produces does not follow the light's actual size or the receiver's distance
+   * from it. A physical radius is converted per pixel instead (cube maps only,
+   * i.e. point and rect lights); the shadow mapper sets it from a rect light's
+   * size. It travels to the shader as a negative `lightRadius`.
+   */
+  get physicalLightRadius() {
+    return this._physicalLightRadius;
+  }
+  set physicalLightRadius(val) {
+    this._physicalLightRadius = Math.max(0, Number(val) || 0);
   }
   get lightRadius() {
     return this._lightRadius;
@@ -122,7 +140,12 @@ export class PCSS extends ShadowImpl {
   }
   getParams(out: Vector4) {
     out = out ?? new Vector4();
-    out.setXYZW(this._lightRadius, this._blockerSampleCount, this._filterSampleCount, this._maxFilterRadius);
+    out.setXYZW(
+      this._physicalLightRadius > 0 ? -this._physicalLightRadius : this._lightRadius,
+      this._blockerSampleCount,
+      this._filterSampleCount,
+      this._maxFilterRadius
+    );
     return out;
   }
   getShadowMapDepthFormat(_shadowMapParams: ShadowMapParams): TextureFormat {
@@ -189,100 +212,116 @@ export class PCSS extends ShadowImpl {
     shadowMapParams: ShadowMapParams,
     scope: PBInsideFunctionScope,
     shadowVertex: PBShaderExp,
-    NdotL: PBShaderExp
+    NdotL: PBShaderExp,
+    worldNormal?: PBShaderExp
   ) {
-    const funcNameComputeShadow = 'lib_computeShadow';
+    // Only the cube branch reads the normal, so only it gets the extra parameter.
+    const withNormal = !!worldNormal && shadowMapParams.lightType === LIGHT_TYPE_POINT;
+    const funcNameComputeShadow = withNormal ? 'lib_computeShadow_N' : 'lib_computeShadow';
     const pb = scope.$builder;
     const that = this;
-    pb.func(funcNameComputeShadow, [pb.vec4('shadowVertex'), pb.float('NdotL')], function () {
-      if (shadowMapParams.lightType === LIGHT_TYPE_POINT) {
-        this.$l.dir = pb.sub(this.shadowVertex.xyz, ShaderHelper.getLightPositionAndRangeForShadow(this).xyz);
-        this.$l.distance = pb.div(
-          pb.length(this.dir),
-          ShaderHelper.getLightPositionAndRangeForShadow(this).w
+    pb.func(
+      funcNameComputeShadow,
+      [pb.vec4('shadowVertex'), pb.float('NdotL'), ...(withNormal ? [pb.vec3('worldNormal')] : [])],
+      function () {
+        if (shadowMapParams.lightType === LIGHT_TYPE_POINT) {
+          this.$l.dir = pb.sub(
+            this.shadowVertex.xyz,
+            ShaderHelper.getLightPositionAndRangeForShadow(this).xyz
+          );
+          this.$l.distance = pb.div(
+            pb.length(this.dir),
+            ShaderHelper.getLightPositionAndRangeForShadow(this).w
+          );
+          this.$l.shadowBias = computeShadowBias(
+            shadowMapParams.lightType,
+            this,
+            this.distance,
+            this.NdotL,
+            true
+          );
+          this.$l.shadowCoord = pb.vec4(this.dir, pb.sub(this.distance, this.shadowBias));
+          this.$return(
+            filterShadowPCSS(
+              this,
+              shadowMapParams.lightType,
+              shadowMapParams.shadowMap!.format,
+              this.shadowCoord,
+              // The receiver's plane, so wide kernels compare each tap against the
+              // receiver's own depth there - see pointReceiverPlaneDepth. The
+              // geometric normal rather than screen derivatives: no uniform control
+              // flow requirement, and no mixing across silhouettes.
+              withNormal ? this.worldNormal : undefined,
+              undefined,
+              that._temporalJitter
+            )
+          );
+        }
+        this.$l.shadowCoord = pb.div(this.shadowVertex, this.shadowVertex.w);
+        this.$l.shadowCoord = ndcToShadowCoord(this, this.shadowCoord);
+        this.$l.inShadow = pb.all(
+          pb.bvec2(
+            pb.all(
+              pb.bvec4(
+                pb.greaterThanEqual(this.shadowCoord.x, 0),
+                pb.lessThanEqual(this.shadowCoord.x, 1),
+                pb.greaterThanEqual(this.shadowCoord.y, 0),
+                pb.lessThanEqual(this.shadowCoord.y, 1)
+              )
+            ),
+            shadowCoordDepthInRange(this, this.shadowCoord.z)
+          )
         );
-        this.$l.shadowBias = computeShadowBias(
-          shadowMapParams.lightType,
-          this,
-          this.distance,
-          this.NdotL,
-          true
-        );
-        this.$l.shadowCoord = pb.vec4(this.dir, pb.sub(this.distance, this.shadowBias));
-        this.$return(
-          filterShadowPCSS(
+        this.$l.shadow = pb.float(1);
+        if (shadowMapParams.lightType === LIGHT_TYPE_SPOT) {
+          this.$l.nearFar = ShaderHelper.getShadowCameraParams(this).xy;
+          this.shadowCoord.z = ShaderHelper.nonLinearDepthToLinearNormalized(
+            this,
+            this.shadowCoord.z,
+            this.nearFar
+          );
+        }
+        this.$l.receiverPlaneDepthBias = computeReceiverPlaneDepthBias(this, this.shadowCoord);
+        this.$if(this.inShadow, function () {
+          if (shadowMapParams.lightType === LIGHT_TYPE_SPOT) {
+            this.$l.shadowBias = computeShadowBias(
+              shadowMapParams.lightType,
+              this,
+              this.shadowCoord.z,
+              this.NdotL,
+              true
+            );
+          } else {
+            this.$l.shadowBias = computeShadowBias(
+              shadowMapParams.lightType,
+              this,
+              this.shadowCoord.z,
+              this.NdotL,
+              false
+            );
+          }
+          this.shadowCoord.z = applyShadowDepthBias(
+            this,
+            this.shadowCoord.z,
+            this.shadowBias,
+            shadowMapParams.lightType !== LIGHT_TYPE_SPOT
+          );
+          this.shadow = filterShadowPCSS(
             this,
             shadowMapParams.lightType,
             shadowMapParams.shadowMap!.format,
             this.shadowCoord,
-            undefined,
+            this.receiverPlaneDepthBias,
             undefined,
             that._temporalJitter
-          )
-        );
-      }
-      this.$l.shadowCoord = pb.div(this.shadowVertex, this.shadowVertex.w);
-      this.$l.shadowCoord = ndcToShadowCoord(this, this.shadowCoord);
-      this.$l.inShadow = pb.all(
-        pb.bvec2(
-          pb.all(
-            pb.bvec4(
-              pb.greaterThanEqual(this.shadowCoord.x, 0),
-              pb.lessThanEqual(this.shadowCoord.x, 1),
-              pb.greaterThanEqual(this.shadowCoord.y, 0),
-              pb.lessThanEqual(this.shadowCoord.y, 1)
-            )
-          ),
-          shadowCoordDepthInRange(this, this.shadowCoord.z)
-        )
-      );
-      this.$l.shadow = pb.float(1);
-      if (shadowMapParams.lightType === LIGHT_TYPE_SPOT) {
-        this.$l.nearFar = ShaderHelper.getShadowCameraParams(this).xy;
-        this.shadowCoord.z = ShaderHelper.nonLinearDepthToLinearNormalized(
-          this,
-          this.shadowCoord.z,
-          this.nearFar
-        );
-      }
-      this.$l.receiverPlaneDepthBias = computeReceiverPlaneDepthBias(this, this.shadowCoord);
-      this.$if(this.inShadow, function () {
-        if (shadowMapParams.lightType === LIGHT_TYPE_SPOT) {
-          this.$l.shadowBias = computeShadowBias(
-            shadowMapParams.lightType,
-            this,
-            this.shadowCoord.z,
-            this.NdotL,
-            true
           );
-        } else {
-          this.$l.shadowBias = computeShadowBias(
-            shadowMapParams.lightType,
-            this,
-            this.shadowCoord.z,
-            this.NdotL,
-            false
-          );
-        }
-        this.shadowCoord.z = applyShadowDepthBias(
-          this,
-          this.shadowCoord.z,
-          this.shadowBias,
-          shadowMapParams.lightType !== LIGHT_TYPE_SPOT
-        );
-        this.shadow = filterShadowPCSS(
-          this,
-          shadowMapParams.lightType,
-          shadowMapParams.shadowMap!.format,
-          this.shadowCoord,
-          this.receiverPlaneDepthBias,
-          undefined,
-          that._temporalJitter
-        );
-      });
-      this.$return(this.shadow);
-    });
-    return pb.getGlobalScope()[funcNameComputeShadow](shadowVertex, NdotL) as PBShaderExp;
+        });
+        this.$return(this.shadow);
+      }
+    );
+    return pb
+      .getGlobalScope()
+      [funcNameComputeShadow](shadowVertex, NdotL, ...(withNormal ? [worldNormal!] : [])) as PBShaderExp;
   }
   useNativeShadowMap(_shadowMapParams: ShadowMapParams) {
     return false;

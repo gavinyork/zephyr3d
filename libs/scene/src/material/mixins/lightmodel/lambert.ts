@@ -77,7 +77,14 @@ export function mixinLambert<T extends typeof MeshMaterial>(BaseCls: T) {
                 dirCutoff,
                 extra
               );
-              this.$l.lightDir = that.calculateLightDirection(this, type, this.worldPos, posRange, dirCutoff);
+              this.$l.lightDir = that.calculateLightDirection(
+                this,
+                type,
+                this.worldPos,
+                posRange,
+                dirCutoff,
+                extra
+              );
               this.$l.NoL = pb.clamp(pb.dot(this.normal, this.lightDir), 0, 1);
               this.$l.lightColor = pb.mul(
                 colorIntensity.rgb,

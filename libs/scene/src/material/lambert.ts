@@ -102,7 +102,8 @@ export class LambertMaterial
             type,
             scope.$inputs.worldPos,
             posRange,
-            dirCutoff
+            dirCutoff,
+            extra
           );
           this.$l.NoL = pb.clamp(pb.dot(this.normal, this.lightDir), 0, 1);
           this.$l.lightContrib = pb.mul(

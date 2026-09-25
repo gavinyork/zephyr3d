@@ -826,6 +826,52 @@ function findBlockerPCSS(
     ](texCoord, bounds, searchRadius, tapCount, transitionWidth, matrix, ...(cascade ? [cascade] : [])) as PBShaderExp;
 }
 
+/**
+ * Normalized radial depth of the receiver's plane along a cube tap direction.
+ *
+ * @remarks
+ * The cube counterpart of `computeReceiverPlaneDepthBias`. A cube map stores
+ * distance from the light, so across a filter kernel the receiver's own depth
+ * changes with direction - on any plane not facing the light head-on, and
+ * even on one that does, since radial distance to a plane grows off its
+ * normal. Comparing every tap against the centre's depth makes the receiver
+ * occlude itself on one side of the kernel, which at PCSS kernel sizes turns a
+ * wide penumbra into a flat plateau of false shadow that snaps to fully lit
+ * where the blocker search runs out.
+ *
+ * `plane` is the receiver's light-space plane as `(normal, dot(p, normal))` for
+ * the light-to-receiver vector `p`; a zero normal, a tap parallel to the plane
+ * or one that would meet it behind the light fall back to `centerDepth`.
+ * `depthParams` is `(1 / range, depth bias)`.
+ *
+ * @internal
+ */
+function pointReceiverPlaneDepth(
+  scope: PBInsideFunctionScope,
+  dir: PBShaderExp,
+  plane: PBShaderExp,
+  centerDepth: PBShaderExp,
+  depthParams: PBShaderExp
+) {
+  const pb = scope.$builder;
+  pb.func(
+    'lib_pointReceiverPlaneDepth',
+    [pb.vec3('dir'), pb.vec4('plane'), pb.float('centerDepth'), pb.vec2('depthParams')],
+    function () {
+      this.$l.denom = pb.dot(this.dir, this.plane.xyz);
+      this.$if(pb.lessThan(pb.abs(this.denom), 1e-8), function () {
+        this.$return(this.centerDepth);
+      });
+      this.$l.t = pb.div(this.plane.w, this.denom);
+      this.$if(pb.lessThanEqual(this.t, 0), function () {
+        this.$return(this.centerDepth);
+      });
+      this.$return(pb.sub(pb.mul(this.t, this.depthParams.x), this.depthParams.y));
+    }
+  );
+  return pb.getGlobalScope().lib_pointReceiverPlaneDepth(dir, plane, centerDepth, depthParams) as PBShaderExp;
+}
+
 function findPointBlockerPCSS(
   scope: PBInsideFunctionScope,
   shadowMapFormat: TextureFormat,
@@ -836,7 +882,9 @@ function findPointBlockerPCSS(
   transitionWidth: PBShaderExp,
   matrix: PBShaderExp,
   tangent: PBShaderExp,
-  bitangent: PBShaderExp
+  bitangent: PBShaderExp,
+  plane: PBShaderExp,
+  depthParams: PBShaderExp
 ) {
   const funcName = `lib_findPointBlockerPCSS_${shadowMapFormat}`;
   const pb = scope.$builder;
@@ -851,7 +899,9 @@ function findPointBlockerPCSS(
       pb.float('transitionWidth'),
       pb.mat2('matrix'),
       pb.vec3('tangent'),
-      pb.vec3('bitangent')
+      pb.vec3('bitangent'),
+      pb.vec4('plane'),
+      pb.vec2('depthParams')
     ],
     function () {
       this.$l.blockerDepthSum = pb.float(0);
@@ -879,7 +929,10 @@ function findPointBlockerPCSS(
           pb.smoothStep(
             pb.neg(this.transitionWidth),
             this.transitionWidth,
-            pb.sub(this.sampleDepth, this.compareDepth)
+            pb.sub(
+              this.sampleDepth,
+              pointReceiverPlaneDepth(this, this.sampleDir, this.plane, this.compareDepth, this.depthParams)
+            )
           )
         );
         this.blockerDepthSum = pb.add(this.blockerDepthSum, pb.mul(this.sampleDepth, this.blockerWeight));
@@ -901,7 +954,7 @@ function findPointBlockerPCSS(
     .getGlobalScope()
     [
       funcName
-    ](dir, compareDepth, searchRadius, tapCount, transitionWidth, matrix, tangent, bitangent) as PBShaderExp;
+    ](dir, compareDepth, searchRadius, tapCount, transitionWidth, matrix, tangent, bitangent, plane, depthParams) as PBShaderExp;
 }
 
 function chebyshevUpperBound(
@@ -1633,9 +1686,13 @@ export function filterShadowPCSS(
       this.$l.PCSSfilterSampleCount = ShaderHelper.getShadowImplParams(this).z;
       this.$l.PCSSlightRadius = ShaderHelper.getShadowImplParams(this).x;
       this.$l.PCSSmaxFilterRadius = ShaderHelper.getShadowImplParams(this).w;
+      // A negative light radius is a physical source radius in world units rather
+      // than a size in texels - see PCSS.physicalLightRadius. Only the cube
+      // branch below reads it that way; the search itself spans the whole filter
+      // budget either way.
       this.$l.PCSSsearchRadius = this.$choice(
-        pb.greaterThan(this.PCSSlightRadius, 0),
-        pb.max(this.PCSSlightRadius, this.PCSSmaxFilterRadius),
+        pb.notEqual(this.PCSSlightRadius, 0),
+        pb.max(pb.abs(this.PCSSlightRadius), this.PCSSmaxFilterRadius),
         0
       );
 
@@ -1660,6 +1717,21 @@ export function filterShadowPCSS(
         );
         this.$l.tangent = pb.normalize(pb.cross(this.up, this.sampleDir));
         this.$l.bitangent = pb.cross(this.sampleDir, this.tangent);
+        // For cube maps the receiver-plane slot carries the receiver's light-space
+        // plane normal rather than a depth gradient; see pointReceiverPlaneDepth.
+        this.$l.receiverPlane = pb.vec4(0);
+        this.$l.depthParams = pb.vec2(0);
+        if (receiverPlaneDepthBias) {
+          this.$l.invRange = pb.div(1, ShaderHelper.getLightPositionAndRangeForShadow(this).w);
+          this.receiverPlane = pb.vec4(
+            this.receiverPlaneDepthBias,
+            pb.dot(this.texCoord.xyz, this.receiverPlaneDepthBias)
+          );
+          this.depthParams = pb.vec2(
+            this.invRange,
+            pb.sub(pb.mul(pb.length(this.texCoord.xyz), this.invRange), this.lightDepth)
+          );
+        }
         this.$l.blocker = findPointBlockerPCSS(
           this,
           shadowMapFormat,
@@ -1670,7 +1742,9 @@ export function filterShadowPCSS(
           this.blockerTransitionWidth,
           this.matrix,
           this.tangent,
-          this.bitangent
+          this.bitangent,
+          this.receiverPlane,
+          this.depthParams
         );
         this.$if(pb.lessThanEqual(this.blocker.y, 0), function () {
           this.$return(pb.float(1));
@@ -1679,8 +1753,23 @@ export function filterShadowPCSS(
           pb.max(pb.sub(this.lightDepth, this.blocker.x), 0),
           pb.max(this.blocker.x, 0.0001)
         );
+        // With a physical source radius R, the penumbra at the receiver is
+        // R * (dr - db) / db wide, and seen from the light that is an angle of
+        // penumbra * R / dr - which is what an offset on the unit-length sample
+        // direction measures. So the light's size in texels follows the
+        // receiver's distance, instead of being one fixed texel count that
+        // over-blurs near the light and under-blurs far from it.
+        this.$l.receiverDistance = pb.max(
+          pb.mul(this.lightDepth, ShaderHelper.getLightPositionAndRangeForShadow(this).w),
+          0.0001
+        );
+        this.$l.lightRadiusTexels = this.$choice(
+          pb.lessThan(this.PCSSlightRadius, 0),
+          pb.div(pb.div(pb.neg(this.PCSSlightRadius), this.receiverDistance), this.shadowMapTexelSize),
+          this.PCSSlightRadius
+        );
         this.$l.filterRadius = pb.mul(
-          pb.clamp(pb.mul(this.penumbra, this.PCSSlightRadius), 0, pb.max(0, this.PCSSmaxFilterRadius)),
+          pb.clamp(pb.mul(this.penumbra, this.lightRadiusTexels), 0, pb.max(0, this.PCSSmaxFilterRadius)),
           this.shadowMapTexelSize
         );
         this.$l.shadow = pb.float(0);
@@ -1712,7 +1801,13 @@ export function filterShadowPCSS(
                 this,
                 shadowMapFormat,
                 this.samplePointDir,
-                this.lightDepth,
+                pointReceiverPlaneDepth(
+                  this,
+                  this.samplePointDir,
+                  this.receiverPlane,
+                  this.lightDepth,
+                  this.depthParams
+                ),
                 this.shadowMapTexelSize,
                 this.tangent,
                 this.bitangent

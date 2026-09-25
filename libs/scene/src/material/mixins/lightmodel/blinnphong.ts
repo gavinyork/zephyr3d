@@ -196,7 +196,14 @@ export function mixinBlinnPhong<T extends typeof MeshMaterial>(BaseCls: T) {
                 dirCutoff,
                 extra
               );
-              this.$l.lightDir = that.calculateLightDirection(this, type, this.worldPos, posRange, dirCutoff);
+              this.$l.lightDir = that.calculateLightDirection(
+                this,
+                type,
+                this.worldPos,
+                posRange,
+                dirCutoff,
+                extra
+              );
               this.$l.NoL = pb.dot(this.normal, this.lightDir);
               this.$l.halfVec = pb.normalize(pb.add(this.viewVec, this.lightDir));
               this.$l.NoH = pb.clamp(pb.dot(this.normal, this.halfVec), 0, 1);

@@ -11,6 +11,8 @@ import { ShaderHelper } from '../../shader/helper';
 import { LIGHT_TYPE_POINT, LIGHT_TYPE_RECT, MaterialVaryingFlags } from '../../../values';
 import type { DrawContext } from '../../../render';
 import { getGGXLUT } from '../../../utility/textures/ggxlut';
+import { getLTCAmpLUT, getLTCMatLUT } from '../../../utility/textures/ltclut';
+import { evaluateLTCRectLightTerms } from '../../../shaders/ltc_rect';
 
 const PBR_REFLECTION_MODE = {
   none: 0,
@@ -193,96 +195,53 @@ export function mixinPBRBluePrint<T extends typeof MeshMaterial>(BaseCls: T) {
           }
           that.forEachLight(this, function (type, posRange, dirCutoff, colorIntensity, extra, shadow) {
             this.$if(pb.equal(type, LIGHT_TYPE_RECT), function () {
-              this.$l.center = posRange.xyz;
-              this.$l.range = posRange.w;
-              this.$l.ax = dirCutoff.xyz;
-              this.$l.ay = extra.xyz;
-              this.$l.halfWidth = pb.length(this.ax);
-              this.$l.halfHeight = pb.length(this.ay);
-              this.$l.area = pb.mul(this.halfWidth, this.halfHeight, 4);
-              this.$l.lightNormal = pb.normalize(pb.cross(this.ax, this.ay));
-              this.lightNormal = pb.neg(this.lightNormal);
-              this.$if(pb.greaterThan(this.area, 0), function () {
-                this.$l.baseColor = pb.mul(colorIntensity.rgb, colorIntensity.a, this.area, 0.25);
-                // calculateShadow() samples with implicit derivatives (dpdx);
-                // WGSL requires uniform control flow, so sample once per light
-                // toward the rect center instead of inside the per-sample
-                // NoL_light branch.
-                this.$l.rectShadow = pb.float(1);
-                if (shadow) {
-                  this.$l.rectL = pb.normalize(pb.sub(this.center, this.worldPos));
-                  this.$l.rectNoL = pb.clamp(pb.dot(this.pbrData.normal, this.rectL), 0, 1);
-                  this.rectShadow = that.calculateShadow(
-                    this,
-                    this.worldPos,
-                    this.pbrData.TBN[2],
-                    pb.max(this.rectNoL, 1e-5)
-                  );
-                }
-                this.$l.samplePos = pb.vec3();
-                this.$l.Lvec = pb.vec3();
-                this.$l.L = pb.vec3();
-                this.$l.dist = pb.float();
-                this.$l.invDist2 = pb.float();
-                this.$l.NoL = pb.float();
-                this.$l.NoL_light = pb.float();
-                this.$l.falloff = pb.float();
-                this.$l.atten = pb.float();
-                this.$l.lightColor = pb.vec3();
-
-                const sample = (u: number, v: number) => {
-                  this.samplePos = pb.add(
-                    this.center,
-                    pb.add(pb.mul(this.ax, pb.sub(pb.mul(u, 2), 1)), pb.mul(this.ay, pb.sub(pb.mul(v, 2), 1)))
-                  );
-                  this.Lvec = pb.sub(this.samplePos, this.worldPos);
-                  this.dist = pb.length(this.Lvec);
-                  this.invDist2 = pb.div(1, pb.max(pb.mul(this.dist, this.dist), 0.0001));
-                  this.L = pb.normalize(this.Lvec);
-                  this.NoL = pb.clamp(pb.dot(this.pbrData.normal, this.L), 0, 1);
-                  this.NoL_light = pb.clamp(pb.dot(this.lightNormal, pb.neg(this.L)), 0, 1);
-                  this.$if(pb.greaterThan(this.NoL_light, 0), function () {
-                    this.falloff = pb.float(1);
-                    this.$if(pb.greaterThan(this.range, 0), function () {
-                      this.falloff = pb.max(0, pb.sub(1, pb.div(this.dist, this.range)));
-                      this.falloff = pb.mul(this.falloff, this.falloff);
-                    });
-                    this.atten = pb.mul(this.invDist2, this.NoL_light, this.falloff);
-                    this.lightColor = pb.mul(this.baseColor, this.atten, this.NoL, this.rectShadow);
-                    if (outSSSDiffuse) {
-                      that.directLighting(
-                        this,
-                        this.L,
-                        this.lightColor,
-                        this.viewVec,
-                        this.pbrData,
-                        pb.float(1),
-                        pb.float(1),
-                        pb.float(0),
-                        this.lightingColor,
-                        this.sssDiffuseColor
-                      );
-                    } else {
-                      that.directLighting(
-                        this,
-                        this.L,
-                        this.lightColor,
-                        this.viewVec,
-                        this.pbrData,
-                        pb.float(1),
-                        pb.float(1),
-                        pb.float(0),
-                        this.lightingColor
-                      );
-                    }
-                  });
-                };
-
-                sample(0.25, 0.25);
-                sample(0.75, 0.25);
-                sample(0.25, 0.75);
-                sample(0.75, 0.75);
+              // The same LTC integration the metallic-roughness model uses (see
+              // shaders/ltc_rect.ts), composed with this model's own F0/F90.
+              // Anisotropic and glint reflection fall back to the isotropic lobe;
+              // `none` keeps the diffuse only, as it does for other lights.
+              this.$l.rectColor = pb.mul(colorIntensity.rgb, colorIntensity.a);
+              if (shadow) {
+                // One lookup towards the centre, outside any divergent branch:
+                // calculateShadow() takes implicit derivatives.
+                this.$l.rectNoL = pb.clamp(
+                  pb.dot(this.pbrData.normal, pb.normalize(pb.sub(posRange.xyz, this.worldPos))),
+                  0,
+                  1
+                );
+                this.rectColor = pb.mul(
+                  this.rectColor,
+                  that.calculateShadow(this, this.worldPos, this.pbrData.TBN[2], pb.max(this.rectNoL, 1e-5))
+                );
+              }
+              this.$l.rectTerms = evaluateLTCRectLightTerms(
+                this,
+                this.worldPos,
+                this.pbrData.normal,
+                this.viewVec,
+                this.pbrData.roughness,
+                posRange,
+                dirCutoff.xyz,
+                extra.xyz
+              );
+              this.$l.rectSpecular = pb.mul(
+                this.rectTerms.x,
+                pb.add(
+                  pb.mul(this.pbrData.f0.rgb, this.rectTerms.y),
+                  pb.mul(pb.sub(this.pbrData.f90, this.pbrData.f0.rgb), this.rectTerms.z)
+                )
+              );
+              this.$if(pb.equal(this.zReflectionMode, PBR_REFLECTION_MODE.none), function () {
+                this.rectSpecular = pb.vec3(0);
               });
+              this.$l.rectDiffuse = pb.mul(this.rectColor, this.pbrData.diffuse.rgb, this.rectTerms.w);
+              this.lightingColor = pb.add(
+                this.lightingColor,
+                this.rectDiffuse,
+                pb.mul(this.rectColor, this.rectSpecular)
+              );
+              if (outSSSDiffuse) {
+                this.sssDiffuseColor = pb.add(this.sssDiffuseColor, this.rectDiffuse);
+              }
             }).$else(function () {
               this.$l.diffuse = pb.vec3();
               this.$l.specular = pb.vec3();
@@ -305,7 +264,14 @@ export function mixinPBRBluePrint<T extends typeof MeshMaterial>(BaseCls: T) {
                 dirCutoff,
                 extra
               );
-              this.$l.lightDir = that.calculateLightDirection(this, type, this.worldPos, posRange, dirCutoff);
+              this.$l.lightDir = that.calculateLightDirection(
+                this,
+                type,
+                this.worldPos,
+                posRange,
+                dirCutoff,
+                extra
+              );
               this.$l.NoL = pb.clamp(pb.dot(this.pbrData.normal, this.lightDir), 0, 1);
               this.$l.lightColor = pb.mul(colorIntensity.rgb, colorIntensity.a, this.lightAtten, this.NoL);
               if (shadow) {
@@ -369,6 +335,9 @@ export function mixinPBRBluePrint<T extends typeof MeshMaterial>(BaseCls: T) {
         if (this.drawContext.drawEnvLight) {
           scope.zGGXLut = pb.tex2D().uniform(2);
         }
+        // Rect light integration; read by shaders/ltc_rect.ts under these names.
+        scope.zLTCMatLut = pb.tex2D().uniform(2);
+        scope.zLTCAmpLut = pb.tex2D().uniform(2);
       }
     }
     calculateCommonData(
@@ -727,6 +696,8 @@ export function mixinPBRBluePrint<T extends typeof MeshMaterial>(BaseCls: T) {
         if (ctx.drawEnvLight) {
           bindGroup.setTexture('zGGXLut', getGGXLUT(1024));
         }
+        bindGroup.setTexture('zLTCMatLut', getLTCMatLUT());
+        bindGroup.setTexture('zLTCAmpLut', getLTCAmpLUT());
       }
     }
   } as unknown as T & { new (...args: any[]): IMixinPBRBluePrint };

@@ -966,6 +966,13 @@ export class SpotLight extends PunctualLight {
 
 /**
  * Rectangular area light
+ *
+ * @remarks
+ * Shadows render a cube map from the light's centre. Only the `pcss` shadow
+ * mode softens them by the light's size - the penumbra follows the panel's
+ * area and the blocker and receiver distances, hardening towards contact. The
+ * other modes filter with a fixed kernel that ignores the light's size.
+ *
  * @public
  */
 export class RectLight extends PunctualLight {

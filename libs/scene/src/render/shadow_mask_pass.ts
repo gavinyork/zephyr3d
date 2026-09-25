@@ -472,7 +472,8 @@ export class ShadowMaskRenderer {
                 shadowMapParams,
                 this,
                 this.shadowVertex,
-                this.NoL
+                this.NoL,
+                this.worldNormal
               );
               this.$l.shadowDistance = this.light.shadowCameraParams.w;
               this.shadow = pb.mix(
