@@ -696,7 +696,9 @@ function samplePointShadowPCFPCSS(
   compareDepth: PBShaderExp,
   texelSize: PBShaderExp,
   tangent: PBShaderExp,
-  bitangent: PBShaderExp
+  bitangent: PBShaderExp,
+  plane: PBShaderExp,
+  depthParams: PBShaderExp
 ) {
   const funcName = `lib_samplePointShadowPCFPCSS_${shadowMapFormat}`;
   const pb = scope.$builder;
@@ -707,7 +709,9 @@ function samplePointShadowPCFPCSS(
       pb.float('compareDepth'),
       pb.float('texelSize'),
       pb.vec3('tangent'),
-      pb.vec3('bitangent')
+      pb.vec3('bitangent'),
+      pb.vec4('plane'),
+      pb.vec2('depthParams')
     ],
     function () {
       this.$l.shadow = pb.float(0);
@@ -727,15 +731,25 @@ function samplePointShadowPCFPCSS(
           pb.add(this.dir, pb.add(pb.mul(this.tangent, this.offset.x), pb.mul(this.bitangent, this.offset.y)))
         );
         this.sampleDepth = samplePointShadowDepthPCSS(this, shadowMapFormat, this.sampleDir);
+        // Each sub-tap reads its own texel, so each is compared against the
+        // receiver there - see pointReceiverPlaneDepth.
         this.shadow = pb.add(
           this.shadow,
-          compareShadowDepthPCSS(this, this.sampleDepth, this.compareDepth, this.transitionWidth, false)
+          compareShadowDepthPCSS(
+            this,
+            this.sampleDepth,
+            pointReceiverPlaneDepth(this, this.sampleDir, this.plane, this.compareDepth, this.depthParams),
+            this.transitionWidth,
+            false
+          )
         );
       }
       this.$return(pb.mul(this.shadow, 0.25));
     }
   );
-  return pb.getGlobalScope()[funcName](dir, compareDepth, texelSize, tangent, bitangent) as PBShaderExp;
+  return pb
+    .getGlobalScope()
+    [funcName](dir, compareDepth, texelSize, tangent, bitangent, plane, depthParams) as PBShaderExp;
 }
 
 function findBlockerPCSS(
@@ -839,6 +853,10 @@ function findBlockerPCSS(
  * wide penumbra into a flat plateau of false shadow that snaps to fully lit
  * where the blocker search runs out.
  *
+ * Along the tap itself rather than at a texel centre, because the cube is
+ * sampled bilinearly: what a tap reads is the stored plane depths interpolated
+ * to its direction, which matches the plane there to second order.
+ *
  * `plane` is the receiver's light-space plane as `(normal, dot(p, normal))` for
  * the light-to-receiver vector `p`; a zero normal, a tap parallel to the plane
  * or one that would meet it behind the light fall back to `centerDepth`.
@@ -862,11 +880,13 @@ function pointReceiverPlaneDepth(
       this.$if(pb.lessThan(pb.abs(this.denom), 1e-8), function () {
         this.$return(this.centerDepth);
       });
+      // Where the ray meets the plane, as a distance along it. `dir` need not be
+      // unit length: the parameter scales inversely with it.
       this.$l.t = pb.div(this.plane.w, this.denom);
       this.$if(pb.lessThanEqual(this.t, 0), function () {
         this.$return(this.centerDepth);
       });
-      this.$return(pb.sub(pb.mul(this.t, this.depthParams.x), this.depthParams.y));
+      this.$return(pb.sub(pb.mul(this.t, pb.length(this.dir), this.depthParams.x), this.depthParams.y));
     }
   );
   return pb.getGlobalScope().lib_pointReceiverPlaneDepth(dir, plane, centerDepth, depthParams) as PBShaderExp;
@@ -1727,9 +1747,21 @@ export function filterShadowPCSS(
             this.receiverPlaneDepthBias,
             pb.dot(this.texCoord.xyz, this.receiverPlaneDepthBias)
           );
+          // The receiver's own bias, plus one shadow texel's footprint at the
+          // receiver. The point light's depth bias is sized to a texel at the near
+          // plane, a small fraction of one here; with the slope handled by the
+          // plane, what remains to cover is bilinear interpolation error and the
+          // storage format's rounding - half a float's relative precision is
+          // 2^-11, below a texel's angular size of 2 / size for any map up to
+          // 2048 - and without it the comparison flips texel by texel wherever
+          // the plane's depth barely changes, which is right under the light:
+          // rings of isolated black pixels there.
           this.depthParams = pb.vec2(
             this.invRange,
-            pb.sub(pb.mul(pb.length(this.texCoord.xyz), this.invRange), this.lightDepth)
+            pb.add(
+              pb.sub(pb.mul(pb.length(this.texCoord.xyz), this.invRange), this.lightDepth),
+              pb.mul(this.lightDepth, this.shadowMapTexelSize)
+            )
           );
         }
         this.$l.blocker = findPointBlockerPCSS(
@@ -1801,16 +1833,12 @@ export function filterShadowPCSS(
                 this,
                 shadowMapFormat,
                 this.samplePointDir,
-                pointReceiverPlaneDepth(
-                  this,
-                  this.samplePointDir,
-                  this.receiverPlane,
-                  this.lightDepth,
-                  this.depthParams
-                ),
+                this.lightDepth,
                 this.shadowMapTexelSize,
                 this.tangent,
-                this.bitangent
+                this.bitangent,
+                this.receiverPlane,
+                this.depthParams
               )
             );
           }
