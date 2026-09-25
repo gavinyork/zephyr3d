@@ -13,7 +13,7 @@ import type { PunctualLight } from '../scene/light';
 import type { ShadowMapParams } from '../shadow/shadowmapper';
 import { ShaderHelper } from '../material/shader/helper';
 import { drawFullscreenQuad } from './fullscreenquad';
-import { LIGHT_TYPE_DIRECTIONAL, LIGHT_TYPE_POINT, LIGHT_TYPE_RECT, MAX_SHADOW_MASK_LIGHTS } from '../values';
+import { LIGHT_TYPE_DIRECTIONAL, MAX_SHADOW_MASK_LIGHTS } from '../values';
 import { ndcToShadowCoord } from '../shaders/shadow';
 import { SHADOW_MASK_LIGHTS_PER_LAYER } from './shadow_mask_pass';
 import {
@@ -121,20 +121,10 @@ const taps: number[][] = SEARCH_RADIUS_TEXELS > 0 ? POISSON_DISC : [[0, 0]];
 /**
  * Whether a light can contribute back-lit transmission this frame.
  *
- * @remarks
- * Point lights are excluded because their shadow depth attachment is a cube
- * texture, and WGSL's `textureLoad` has no cube overload. They would need a
- * non-comparison sampler and `textureSampleLevel` instead; until then they
- * simply produce no transmission.
- *
  * @internal
  */
 export function lightSupportsTransmission(light: PunctualLight, params: Nullable<ShadowMapParams>): boolean {
-  return (
-    !!light.transmission &&
-    !!params?.shadowMapFramebuffer?.getDepthAttachment() &&
-    params.lightType !== LIGHT_TYPE_POINT
-  );
+  return !!light.transmission && !!params?.shadowMapFramebuffer?.getDepthAttachment();
 }
 
 /**
@@ -275,7 +265,7 @@ export class TransmissionThicknessRenderer {
   private getProgramKey(ctx: DrawContext, shadowMapParams: ShadowMapParams): string {
     const depth = shadowMapParams.shadowMapFramebuffer!.getDepthAttachment()!;
     return `${ctx.device.type}|${shadowMapParams.lightType}|${shadowMapParams.numShadowCascades}|${
-      depth.isTexture2DArray() ? 'array' : '2d'
+      depth.isTexture2DArray() ? 'array' : depth.isTextureCube() ? 'cube' : '2d'
     }`;
   }
 
@@ -346,11 +336,15 @@ export class TransmissionThicknessRenderer {
     // rgba32f, so WebGPU only accepts a non-filtering sampler; every read is a
     // single texel anyway.
     bindGroup.setTexture('profileTex', profileTable, fetchSampler('clamp_nearest_nomip'));
-    // Sampled through textureLoad only, so no sampler is bound for it.
-    bindGroup.setTexture(
-      UNIFORM_NAME_SHADOW_DEPTH,
-      shadowMapParams.shadowMapFramebuffer!.getDepthAttachment()!
-    );
+    const shadowDepth = shadowMapParams.shadowMapFramebuffer!.getDepthAttachment()!;
+    if (shadowDepth.isTextureCube()) {
+      // Point sampled, for the reason the 2D maps use textureLoad: see
+      // zLoadShadowDepth.
+      bindGroup.setTexture(UNIFORM_NAME_SHADOW_DEPTH, shadowDepth, fetchSampler('clamp_nearest_nomip'));
+    } else {
+      // Sampled through textureLoad only, so no sampler is bound for it.
+      bindGroup.setTexture(UNIFORM_NAME_SHADOW_DEPTH, shadowDepth);
+    }
   }
 
   private createProgram(ctx: DrawContext, shadowMapParams: ShadowMapParams): GPUProgram {
@@ -359,12 +353,16 @@ export class TransmissionThicknessRenderer {
     const lightType = shadowMapParams.lightType;
     const depthAttachment = shadowMapParams.shadowMapFramebuffer!.getDepthAttachment()!;
     const isArray = depthAttachment.isTexture2DArray();
+    // Point lights, and rect lights, which render the point light's cube (see
+    // ShadowMapper.getShadowProjectionType). WGSL's textureLoad has no cube
+    // overload, so this variant reads the depth with textureSampleLevel and a
+    // point sampler instead - UE5's TextureCubeSampleDepthLevel in the point-light
+    // CalculateEncodedOpticalDepth.
+    const cube = depthAttachment.isTextureCube();
     // Orthographic shadow depth is linear, so the projection's Z extent converts
     // a normalised depth difference straight into world units; perspective has to
-    // be linearised instead. Rect lights are orthographic too, not just
-    // directional - running them through the perspective branch would apply a
-    // hyperbolic remap to an already linear depth.
-    const ortho = lightType === LIGHT_TYPE_DIRECTIONAL || lightType === LIGHT_TYPE_RECT;
+    // be linearised instead.
+    const ortho = lightType === LIGHT_TYPE_DIRECTIONAL;
     const program = device.buildRenderProgram({
       label: 'TransmissionThickness',
       vertex(pb) {
@@ -406,9 +404,9 @@ export class TransmissionThicknessRenderer {
         ]);
         this.camera = cameraStruct().uniform(0);
         this.light = lightStruct().uniform(0);
-        this[UNIFORM_NAME_SHADOW_DEPTH] = (isArray ? pb.tex2DArrayShadow() : pb.tex2DShadow())
-          .uniform(0)
-          .noSampler();
+        this[UNIFORM_NAME_SHADOW_DEPTH] = cube
+          ? pb.texCubeShadow().uniform(0)
+          : (isArray ? pb.tex2DArrayShadow() : pb.tex2DShadow()).uniform(0).noSampler();
         this.depthTex = pb.tex2D().sampleType('unfilterable-float').uniform(0);
         this.profileIdTex = pb.tex2D().uniform(0);
         // rgba32f, hence unfilterable; every read here is a single texel.
@@ -481,21 +479,24 @@ export class TransmissionThicknessRenderer {
         // A plain fetch, as UE5 takes its disc taps. Bilinear is measurably worse
         // (residual 5.6 to 7.5 levels at a 1024 map, at four times the fetches):
         // interpolating across a light-space silhouette blends a real blocker with
-        // the cleared far value and invents a depth no surface has.
-        pb.func(
-          'zLoadShadowDepth',
-          [pb.vec2('coord'), pb.float('size'), ...(isArray ? [pb.int('layer')] : [])],
-          function () {
-            this.$l.texel = pb.ivec2(
-              pb.clamp(pb.mul(this.coord, this.size), pb.vec2(0), pb.sub(pb.vec2(this.size), pb.vec2(1)))
-            );
-            this.$return(
-              isArray
-                ? pb.textureArrayLoad(this[UNIFORM_NAME_SHADOW_DEPTH], this.texel, this.layer, 0)
-                : pb.textureLoad(this[UNIFORM_NAME_SHADOW_DEPTH], this.texel, 0)
-            );
-          }
-        );
+        // the cleared far value and invents a depth no surface has. The cube
+        // variant takes the same point taps through a nearest sampler instead.
+        if (!cube) {
+          pb.func(
+            'zLoadShadowDepth',
+            [pb.vec2('coord'), pb.float('size'), ...(isArray ? [pb.int('layer')] : [])],
+            function () {
+              this.$l.texel = pb.ivec2(
+                pb.clamp(pb.mul(this.coord, this.size), pb.vec2(0), pb.sub(pb.vec2(this.size), pb.vec2(1)))
+              );
+              this.$return(
+                isArray
+                  ? pb.textureArrayLoad(this[UNIFORM_NAME_SHADOW_DEPTH], this.texel, this.layer, 0)
+                  : pb.textureLoad(this[UNIFORM_NAME_SHADOW_DEPTH], this.texel, 0)
+              );
+            }
+          );
+        }
         pb.main(function () {
           this.$l.pos = ShaderHelper.samplePositionFromDepth(
             this,
@@ -568,29 +569,61 @@ export class TransmissionThicknessRenderer {
             // directly in the measured value. At `normalBias` 1.5 over a 20 m
             // cascade the grazing-angle offset is 30 mm - a fifth of a head.
             this.$l.shrunk = pb.sub(this.pos.xyz, pb.mul(this.normal, this.shrinkDistance));
-            this.$l.sv = ShaderHelper.calculateShadowSpaceVertex(
-              this,
-              pb.vec4(this.shrunk, 1),
-              numCascades > 1 ? this.split : 0
-            );
-            this.$l.sc = ndcToShadowCoord(this, pb.div(this.sv, this.sv.w));
-            // Both ends of the depth range must be rejected, which is why
-            // shadowCoordDepthInRange is not reused: it guards only the far side,
-            // since for shadowing a receiver in front of the near plane is simply
-            // unshadowed. For thickness it means the blocker was clipped out of
-            // the map, so the texel holds the clear value and any difference
-            // against it is meaningless.
-            this.$l.inside = pb.all(
-              pb.bvec4(
-                pb.all(pb.bvec2(pb.greaterThanEqual(this.sc.x, 0), pb.lessThanEqual(this.sc.x, 1))),
-                pb.all(pb.bvec2(pb.greaterThanEqual(this.sc.y, 0), pb.lessThanEqual(this.sc.y, 1))),
-                pb.greaterThanEqual(this.sc.z, 0),
-                pb.lessThanEqual(this.sc.z, 1)
-              )
-            );
+            if (cube) {
+              // Light to the shrunk point. Each face is a 90-degree perspective
+              // view, so a point's face-space depth is its largest axis
+              // component - the quantity the face depth buffers hold.
+              this.$l.lv = pb.sub(this.shrunk, this.light.positionAndRange.xyz);
+              this.$l.maxZ = pb.max(pb.max(pb.abs(this.lv.x), pb.abs(this.lv.y)), pb.abs(this.lv.z));
+              // Same rejection as the 2D maps below, against the faces' clip range.
+              this.$l.inside = pb.and(
+                pb.greaterThanEqual(this.maxZ, this.light.shadowCameraParams.x),
+                pb.lessThanEqual(this.maxZ, this.light.shadowCameraParams.y)
+              );
+            } else {
+              this.$l.sv = ShaderHelper.calculateShadowSpaceVertex(
+                this,
+                pb.vec4(this.shrunk, 1),
+                numCascades > 1 ? this.split : 0
+              );
+              this.$l.sc = ndcToShadowCoord(this, pb.div(this.sv, this.sv.w));
+              // Both ends of the depth range must be rejected, which is why
+              // shadowCoordDepthInRange is not reused: it guards only the far side,
+              // since for shadowing a receiver in front of the near plane is simply
+              // unshadowed. For thickness it means the blocker was clipped out of
+              // the map, so the texel holds the clear value and any difference
+              // against it is meaningless.
+              this.$l.inside = pb.all(
+                pb.bvec4(
+                  pb.all(pb.bvec2(pb.greaterThanEqual(this.sc.x, 0), pb.lessThanEqual(this.sc.x, 1))),
+                  pb.all(pb.bvec2(pb.greaterThanEqual(this.sc.y, 0), pb.lessThanEqual(this.sc.y, 1))),
+                  pb.greaterThanEqual(this.sc.z, 0),
+                  pb.lessThanEqual(this.sc.z, 1)
+                )
+              );
+            }
             this.$if(this.inside, function () {
               this.$l.size = this.light.shadowCameraParams.z;
-              if (SEARCH_RADIUS_TEXELS > 0) {
+              if (cube) {
+                this.$l.receiverDist = pb.length(this.lv);
+                this.$l.dir = pb.div(this.lv, this.receiverDist);
+                // The disc is laid out on the unit cube, where one face texel
+                // spans 2 / size, so it covers the same texels as in the 2D maps.
+                // Its plane is perpendicular to the ray rather than to the face,
+                // which differs only off the face's centre and only to second
+                // order.
+                this.$l.onCube = pb.div(this.lv, this.maxZ);
+                this.$l.helper = this.$choice(
+                  pb.lessThan(pb.abs(this.dir.y), 0.99),
+                  pb.vec3(0, 1, 0),
+                  pb.vec3(1, 0, 0)
+                );
+                this.$l.side = pb.normalize(pb.cross(this.helper, this.dir));
+                this.$l.up = pb.cross(this.dir, this.side);
+                if (SEARCH_RADIUS_TEXELS > 0) {
+                  this.$l.radius = pb.div(2 * SEARCH_RADIUS_TEXELS, this.size);
+                }
+              } else if (SEARCH_RADIUS_TEXELS > 0) {
                 this.$l.radius = pb.div(SEARCH_RADIUS_TEXELS, this.size);
               }
               if (ortho) {
@@ -609,24 +642,58 @@ export class TransmissionThicknessRenderer {
               }
               this.$l.sum = pb.float(0);
               for (let i = 0; i < taps.length; i++) {
-                this.$l[`c${i}`] =
-                  SEARCH_RADIUS_TEXELS > 0
-                    ? pb.add(this.sc.xy, pb.mul(pb.vec2(taps[i][0], taps[i][1]), this.radius))
-                    : this.sc.xy;
-                this.$l[`b${i}`] = isArray
-                  ? this.zLoadShadowDepth(this[`c${i}`], this.size, this.split)
-                  : this.zLoadShadowDepth(this[`c${i}`], this.size);
-                // Under reverse-Z a blocker sits at a larger depth value.
-                this.$l[`d${i}`] = REVERSE_Z
-                  ? pb.sub(this[`b${i}`], this.sc.z)
-                  : pb.sub(this.sc.z, this[`b${i}`]);
-                if (ortho) {
-                  this.$l[`t${i}`] = pb.mul(this[`d${i}`], this.zRange);
-                } else {
-                  this.$l[`t${i}`] = pb.sub(
-                    ShaderHelper.nonLinearDepthToLinear(this, this.sc.z, this.light.shadowCameraParams),
-                    ShaderHelper.nonLinearDepthToLinear(this, this[`b${i}`], this.light.shadowCameraParams)
+                if (cube) {
+                  this.$l[`u${i}`] =
+                    SEARCH_RADIUS_TEXELS > 0
+                      ? pb.add(
+                          this.onCube,
+                          pb.mul(
+                            pb.add(pb.mul(this.side, taps[i][0]), pb.mul(this.up, taps[i][1])),
+                            this.radius
+                          )
+                        )
+                      : this.onCube;
+                  this.$l[`b${i}`] = pb.textureSampleLevel(
+                    this[UNIFORM_NAME_SHADOW_DEPTH],
+                    this[`u${i}`],
+                    0
+                  ).x;
+                  // The blocker depth is along the axis of whichever face the tap
+                  // landed on, which near a seam is not the receiver's face, so
+                  // both ends are converted to distance along their own ray before
+                  // they are compared. UE5 subtracts the face depths directly and
+                  // is off wherever its disc straddles a seam.
+                  this.$l[`m${i}`] = pb.max(
+                    pb.max(pb.abs(this[`u${i}`].x), pb.abs(this[`u${i}`].y)),
+                    pb.abs(this[`u${i}`].z)
                   );
+                  this.$l[`t${i}`] = pb.sub(
+                    this.receiverDist,
+                    pb.mul(
+                      ShaderHelper.nonLinearDepthToLinear(this, this[`b${i}`], this.light.shadowCameraParams),
+                      pb.div(pb.length(this[`u${i}`]), this[`m${i}`])
+                    )
+                  );
+                } else {
+                  this.$l[`c${i}`] =
+                    SEARCH_RADIUS_TEXELS > 0
+                      ? pb.add(this.sc.xy, pb.mul(pb.vec2(taps[i][0], taps[i][1]), this.radius))
+                      : this.sc.xy;
+                  this.$l[`b${i}`] = isArray
+                    ? this.zLoadShadowDepth(this[`c${i}`], this.size, this.split)
+                    : this.zLoadShadowDepth(this[`c${i}`], this.size);
+                  // Under reverse-Z a blocker sits at a larger depth value.
+                  this.$l[`d${i}`] = REVERSE_Z
+                    ? pb.sub(this[`b${i}`], this.sc.z)
+                    : pb.sub(this.sc.z, this[`b${i}`]);
+                  if (ortho) {
+                    this.$l[`t${i}`] = pb.mul(this[`d${i}`], this.zRange);
+                  } else {
+                    this.$l[`t${i}`] = pb.sub(
+                      ShaderHelper.nonLinearDepthToLinear(this, this.sc.z, this.light.shadowCameraParams),
+                      ShaderHelper.nonLinearDepthToLinear(this, this[`b${i}`], this.light.shadowCameraParams)
+                    );
+                  }
                 }
                 // CalculateOpticalDepth, after TransmissionThickness.ush.
                 //

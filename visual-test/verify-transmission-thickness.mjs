@@ -58,7 +58,42 @@ function expectedDebug(pathMm) {
 // rung. No transfer inversion is needed or wanted - inverting one that is not
 // there would be the easiest way to turn a correct pass into a failing test.
 
+/**
+ * Paths for the ladder lit by a point or rect light on its axis, in millimetres.
+ *
+ * Mirrors the scene file: slabs at `SLAB_PITCH` spacing centred on the axis,
+ * light `BACK_LIGHT_DISTANCE` behind their front plane. The ray to slab `i` is off
+ * its normal by `atan(x / distance)`, so the path is `t / cos` of that plus the
+ * shrink residue the slant scene explains.
+ */
+function localLightLadderPaths() {
+  const pitch = 0.095;
+  const distance = 2;
+  const thicknesses = [2, 5, 10, 20, 35, 50];
+  const first = -0.5 * (thicknesses.length - 1) * pitch;
+  return thicknesses.map((t, i) => {
+    const c = Math.cos(Math.atan(Math.abs(first + i * pitch) / distance));
+    return t / c + SHRINK_MM * (1 - c);
+  });
+}
+
 const SCENES = [
+  {
+    // The cube-map branch of the pass. Same slabs as the directional ladder, and
+    // the same exact case: perpendicular faces to within 7 degrees.
+    name: 'transmission-thickness-ladder-point',
+    tol: 0.01,
+    labels: ['2mm', '5mm', '10mm', '20mm', '35mm', '50mm'],
+    paths: localLightLadderPaths()
+  },
+  {
+    // A rect light renders the point light's cube from its centre, so it must
+    // read exactly as the point-light ladder.
+    name: 'transmission-thickness-ladder-rect',
+    tol: 0.01,
+    labels: ['2mm', '5mm', '10mm', '20mm', '35mm', '50mm'],
+    paths: localLightLadderPaths()
+  },
   {
     name: 'transmission-thickness-ladder',
     // Zero depth slope across a texel, so this is the exact case: the tolerance

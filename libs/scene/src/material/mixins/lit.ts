@@ -91,7 +91,8 @@ export type IMixinLight = {
       colorIntensity: PBShaderExp,
       extra: PBShaderExp,
       shadow: boolean,
-      thickness: PBShaderExp
+      thickness: PBShaderExp,
+      unshadowedColorIntensity: PBShaderExp
     ) => void
   ): void;
 } & TextureMixinInstanceTypes<['normal']> &
@@ -728,6 +729,21 @@ export function mixinLight<T extends typeof MeshMaterial>(BaseCls: T) {
         pb.normalize(pb.sub(posRange.xyz, worldPos.xyz))
       );
     }
+    /**
+     * Invokes `callback` once per light affecting the fragment.
+     *
+     * @remarks
+     * On the clustered path with the screen-space shadow mask, `colorIntensity`
+     * arrives with the light's shadow already multiplied in, which is what every
+     * surface term wants. `unshadowedColorIntensity` is the same light before
+     * that: transmission is attenuated by the thickness it measures, not by the
+     * surface shadow - UE5's subsurface transmission reads the encoded optical
+     * depth as its shadow term instead - and a back-lit surface is by
+     * construction fully in its light's shadow, so the shadowed colour would
+     * zero exactly the pixels transmission exists for. On the per-light additive
+     * path the two are the same value; the callback applies that shadow itself
+     * (`shadow` is true).
+     */
     forEachLight(
       scope: PBInsideFunctionScope,
       callback: (
@@ -738,7 +754,8 @@ export function mixinLight<T extends typeof MeshMaterial>(BaseCls: T) {
         colorIntensity: PBShaderExp,
         extra: PBShaderExp,
         shadow: boolean,
-        thickness: PBShaderExp
+        thickness: PBShaderExp,
+        unshadowedColorIntensity: PBShaderExp
       ) => void
     ) {
       const pb = scope.$builder;
@@ -759,7 +776,17 @@ export function mixinLight<T extends typeof MeshMaterial>(BaseCls: T) {
           // thickness pass can never write, so consumers read this as "this
           // light contributes no transmission" rather than as zero thickness —
           // which would be the *most* transmissive reading of the encoding.
-          callback.call(this, lightType, posRange, dirCutoff, colorIntensity, extra, true, pb.float(1));
+          callback.call(
+            this,
+            lightType,
+            posRange,
+            dirCutoff,
+            colorIntensity,
+            extra,
+            true,
+            pb.float(1),
+            colorIntensity
+          );
         });
       } else {
         scope.$scope(function () {
@@ -808,6 +835,7 @@ export function mixinLight<T extends typeof MeshMaterial>(BaseCls: T) {
                       this.$l.directionCutoff = ShaderHelper.getLightDirectionAndCutoff(this, this.j);
                       this.$l.diffuseIntensity = ShaderHelper.getLightColorAndIntensity(this, this.j);
                       this.$l.extra = ShaderHelper.getLightExtra(this, this.j);
+                      this.$l.unshadowedIntensity = this.diffuseIntensity;
                       if (that.drawContext.screenSpaceShadowMask) {
                         this.$l.shadowMask = ShaderHelper.sampleShadowMask(this, this.j);
                         this.diffuseIntensity = pb.vec4(
@@ -829,7 +857,8 @@ export function mixinLight<T extends typeof MeshMaterial>(BaseCls: T) {
                           this.diffuseIntensity,
                           this.extra,
                           false,
-                          this.thickness
+                          this.thickness,
+                          this.unshadowedIntensity
                         );
                       });
                       this.$break();
@@ -847,6 +876,7 @@ export function mixinLight<T extends typeof MeshMaterial>(BaseCls: T) {
                   this.$l.directionCutoff = ShaderHelper.getLightDirectionAndCutoff(this, this.c);
                   this.$l.diffuseIntensity = ShaderHelper.getLightColorAndIntensity(this, this.c);
                   this.$l.extra = ShaderHelper.getLightExtra(this, this.c);
+                  this.$l.unshadowedIntensity = this.diffuseIntensity;
                   if (that.drawContext.screenSpaceShadowMask) {
                     // Shadow-casting lights (buffer index <= numShadowLights) attenuate
                     // by the pre-rendered screen-space shadow mask; others return 1.0.
@@ -870,7 +900,8 @@ export function mixinLight<T extends typeof MeshMaterial>(BaseCls: T) {
                       this.diffuseIntensity,
                       this.extra,
                       false,
-                      this.thickness
+                      this.thickness,
+                      this.unshadowedIntensity
                     );
                   });
                 });

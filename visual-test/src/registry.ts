@@ -25,6 +25,7 @@ import {
   rectLightDiffuse,
   rectLightGlossy,
   rectLightPhysical,
+  rectLightShadow,
   spotShadow
 } from './scenes/lighting';
 import {
@@ -62,7 +63,10 @@ import {
   transmissionThicknessScale,
   transmissionThicknessSlant,
   transmissionThicknessSphere,
-  transmissionThicknessSphereFine
+  transmissionThicknessSphereFine,
+  transmissionThicknessLadderPoint,
+  transmissionThicknessLadderRect,
+  transmissionRectBacklit
 } from './scenes/transmission-thickness';
 import {
   hairScatterOff,
@@ -118,6 +122,7 @@ export const SCENES: VisualScene[] = [
   rectLightDiffuse,
   rectLightGlossy,
   rectLightPhysical,
+  rectLightShadow,
   // Water: the medium, and the caustics it focuses onto what is under it.
   waterCausticsOff,
   waterCausticsOn,
@@ -158,6 +163,9 @@ export const SCENES: VisualScene[] = [
   transmissionThicknessSlant,
   transmissionThicknessSphere,
   transmissionThicknessSphereFine,
+  transmissionThicknessLadderPoint,
+  transmissionThicknessLadderRect,
+  transmissionRectBacklit,
   hair,
   // Strand hair: the curve import paths, from container bytes to ribbons.
   hairStrandsHelix,

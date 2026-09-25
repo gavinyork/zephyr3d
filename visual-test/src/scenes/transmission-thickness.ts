@@ -1,5 +1,13 @@
 import { Quaternion, Vector3, Vector4 } from '@zephyr3d/base';
-import { BoxShape, DirectionalLight, Mesh, SSSMaterial, SphereShape } from '@zephyr3d/scene';
+import {
+  BoxShape,
+  DirectionalLight,
+  Mesh,
+  PointLight,
+  RectLight,
+  SSSMaterial,
+  SphereShape
+} from '@zephyr3d/scene';
 import type { PerspectiveCamera, Scene } from '@zephyr3d/scene';
 import type { VisualScene } from '../types';
 import { bareScene, placeCamera } from './common';
@@ -72,6 +80,20 @@ const SLANT_ANGLES = [0, (20 * Math.PI) / 180, (35 * Math.PI) / 180, (50 * Math.
 const SLANT_THICKNESS = 0.01;
 
 /**
+ * Light behind the slabs. Directional for the original scenes; point and rect
+ * for the cube-map branch of the pass.
+ */
+type BackLightKind = 'directional' | 'point' | 'rect';
+
+/**
+ * How far behind the slabs' front plane the back light sits, in metres at 1x.
+ *
+ * For a point or rect light this is also what sets each slab's off-axis angle,
+ * so `verify-transmission-thickness.mjs` repeats it.
+ */
+const BACK_LIGHT_DISTANCE = 2;
+
+/**
  * Directional light behind the slabs, shining towards the camera.
  *
  * Exactly along +Z, so the slabs of the ladder scene sit perpendicular to it and
@@ -90,9 +112,14 @@ const SLANT_THICKNESS = 0.01;
  * exact on a 4096. That is the same limit that decides whether a real ear
  * resolves at all.
  */
-function backLight(scene: Scene, shadowMapSize: number, scale = 1) {
-  const light = new DirectionalLight(scene);
-  light.lookAt(new Vector3(0, 0, -2), Vector3.zero(), Vector3.axisPY());
+function backLight(scene: Scene, shadowMapSize: number, scale = 1, kind: BackLightKind = 'directional') {
+  const light =
+    kind === 'point'
+      ? new PointLight(scene)
+      : kind === 'rect'
+        ? new RectLight(scene)
+        : new DirectionalLight(scene);
+  light.lookAt(new Vector3(0, 0, -BACK_LIGHT_DISTANCE * scale), Vector3.zero(), Vector3.axisPY());
   light.color = new Vector4(1, 1, 1, 1);
   light.castShadow = true;
   light.transmission = true;
@@ -100,6 +127,13 @@ function backLight(scene: Scene, shadowMapSize: number, scale = 1) {
   light.shadow.numShadowCascades = 1;
   light.shadow.shadowMapSize = shadowMapSize;
   light.shadow.shadowDistance = 2 * scale;
+  if (kind !== 'directional') {
+    // The cube's far plane is the smaller of the range and the shadow distance,
+    // so both have to reach past the slabs from the light's position.
+    const local = light as PointLight | RectLight;
+    local.range = 3 * scale;
+    light.shadow.shadowDistance = 3 * scale;
+  }
   return light;
 }
 
@@ -210,6 +244,47 @@ export const transmissionThicknessScale: VisualScene = {
 };
 
 /**
+ * The ladder back-lit by a point light, whose shadow map is a cube.
+ *
+ * The thickness pass reads a cube through its own branch - `textureSampleLevel`
+ * on the depth cube rather than `textureLoad`, and a comparison of radial
+ * distances rather than of face depths - so it gets its own arithmetic check.
+ * The light sits on the axis `BACK_LIGHT_DISTANCE` behind the slabs, so each
+ * slab's ray is off the normal by `atan(x / distance)` - under 7 degrees at the
+ * outer rungs - and the path it takes is `t / cos` of that. The verifier carries
+ * the angle rather than pretending the rays are parallel.
+ */
+export const transmissionThicknessLadderPoint: VisualScene = {
+  name: 'transmission-thickness-ladder-point',
+  description:
+    'The thickness ladder back-lit by a point light. Pins the cube-map branch of the thickness pass against the same arithmetic.',
+  supports: (backend) => backend === 'webgpu',
+  setup({ scene, camera }) {
+    buildLadder(scene, camera, 1, 'point');
+  }
+};
+
+/**
+ * The ladder back-lit by a rect light.
+ *
+ * A rect light renders the point light's cube from its centre, as UE5 does, so
+ * the thickness is measured along the ray from the centre and must read exactly
+ * as the point-light ladder does. This scene exists for the plumbing rather than
+ * the maths: the rect light's shadow projection type has to route it into the
+ * cube branch, and it used to route transmission into an orthographic map that
+ * covered only the panel's footprint.
+ */
+export const transmissionThicknessLadderRect: VisualScene = {
+  name: 'transmission-thickness-ladder-rect',
+  description:
+    'The thickness ladder back-lit by a rect light. Must read as the point-light ladder; pins that rect lights measure thickness through the cube.',
+  supports: (backend) => backend === 'webgpu',
+  setup({ scene, camera }) {
+    buildLadder(scene, camera, 1, 'rect');
+  }
+};
+
+/**
  * Builds the ladder at a given asset scale, with the profile told about it.
  *
  * Everything scales: slab size, pitch, thickness and camera distance, so the
@@ -217,10 +292,15 @@ export const transmissionThicknessScale: VisualScene = {
  * shadow distance scales with it too (see backLight), which keeps the light-space
  * texel footprint proportional.
  */
-function buildLadder(scene: Scene, camera: PerspectiveCamera, scale: number) {
+function buildLadder(
+  scene: Scene,
+  camera: PerspectiveCamera,
+  scale: number,
+  kind: BackLightKind = 'directional'
+) {
   bareScene(scene);
   // Perpendicular to the light, so no depth slope and no resolution dependence.
-  backLight(scene, 1024, scale);
+  backLight(scene, 1024, scale, kind);
   const pitch = SLAB_PITCH * scale;
   const first = -0.5 * (LADDER_THICKNESSES.length - 1) * pitch;
   LADDER_THICKNESSES.forEach((thickness, i) => {
@@ -338,5 +418,63 @@ export const transmissionThicknessSphereFine: VisualScene = {
   supports: (backend) => backend === 'webgpu',
   setup({ scene, camera }) {
     buildSphere(scene, camera, 4096, 2);
+  }
+};
+
+/**
+ * What the thickness pass is for, seen through the shaded result rather than a
+ * debug channel: a rect light behind a thin and a thick skin plate.
+ *
+ * The 3 mm plate must glow the profile's red with the light passing through it;
+ * the 30 mm one must stay dark, since the profile has absorbed nearly everything
+ * by then. The light faces the camera from behind the plates, so none of that
+ * glow can be front lighting.
+ *
+ * It pins two fixes. Rect lights used to measure thickness against an
+ * orthographic map covering only the panel's footprint. And on the clustered
+ * path the light reached the material with its surface shadow already applied,
+ * which a back-lit surface is fully inside, so transmission was zero exactly
+ * where it should be strongest - both plates rendered black.
+ *
+ * The intensity keeps the thin plate's green and blue below saturation, so a
+ * change in the transmitted amount moves the pixels rather than hiding behind
+ * the clip. Red clips at the brightest spot at any readable exposure - the
+ * transmitted light is that saturated a red.
+ */
+export const transmissionRectBacklit: VisualScene = {
+  name: 'transmission-rect-backlit',
+  description:
+    'A rect light behind a 3 mm and a 30 mm skin plate, shaded normally. Pins rect-light transmission end to end.',
+  supports: (backend) => backend === 'webgpu',
+  setup({ scene, camera }) {
+    bareScene(scene);
+    scene.env.light.type = 'constant';
+    scene.env.light.ambientColor = new Vector4(0.03, 0.03, 0.035, 1);
+    const light = new RectLight(scene);
+    light.lookAt(new Vector3(0, 0, -0.6), Vector3.zero(), Vector3.axisPY());
+    light.width = 0.4;
+    light.height = 0.3;
+    light.range = 3;
+    light.intensity = 1;
+    light.castShadow = true;
+    light.transmission = true;
+    light.shadow.mode = 'pcf';
+    light.shadow.shadowMapSize = 1024;
+    light.shadow.shadowDistance = 3;
+    [0.003, 0.03].forEach((thickness, i) => {
+      const plate = new Mesh(
+        scene,
+        new BoxShape({ sizeX: 0.12, sizeY: 0.16, sizeZ: thickness, anchorZ: 1 }),
+        slabMaterial(1)
+      );
+      plate.position.setXYZ((i - 0.5) * 0.16, 0, 0);
+    });
+    placeCamera(camera, new Vector3(0, 0, 0.45));
+    // Transmission is composited by the screen-space subsurface pass, and the
+    // thickness is only read on the clustered path that the screen-space shadow
+    // mask puts shadow-casting lights on - the per-light additive pass has no
+    // thickness texture and reads as "no transmission".
+    camera.SSS = true;
+    camera.screenSpaceShadowMask = true;
   }
 };

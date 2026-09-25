@@ -1301,7 +1301,9 @@ export class ShaderHelper {
         viewMatrix: light.viewMatrix,
         depthBias: shadowMapParams.depthBiasValues[0],
         implParams: shadowMapParams.impl!.getParams(this._lightUniformShadow.implParams),
-        lightType: light.lightType
+        // The shadow projection, not the light's own type: a rect light renders a point light's
+        // cube, so its casters must write the point light's radial depth.
+        lightType: shadowMapParams.lightType
       });
       shadowMapParams.impl?.applyCasterUniforms(bindGroup, shadowMapParams);
     }

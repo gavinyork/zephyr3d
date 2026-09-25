@@ -4,6 +4,7 @@ import { defineProps, type SerializableClass } from '../types';
 import { AABB, degree2radian, radian2degree, Vector4 } from '@zephyr3d/base';
 import { SceneNode } from '../../../scene';
 import type { ShadowMode } from '../../../shadow';
+import { ShadowMapper } from '../../../shadow/shadowmapper';
 
 /** @internal */
 export function getPunctualLightClass(): SerializableClass {
@@ -237,7 +238,9 @@ export function getPunctualLightClass(): SerializableClass {
           description: 'Near clip distance for shadow camera',
           type: 'float',
           phase: 1,
-          default: 1,
+          getDefaultValue(this: PunctualLight) {
+            return ShadowMapper.getDefaultNearClip(this);
+          },
           options: {
             minValue: 0.01,
             maxValue: 10

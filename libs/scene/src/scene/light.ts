@@ -278,7 +278,8 @@ export class PunctualLight extends BaseLight {
    * single key or rim light.
    *
    * Requires {@link PunctualLight.castShadow}, since the thickness is derived
-   * from the shadow map. Point lights are not supported yet and are ignored.
+   * from the shadow map. WebGPU only. A rect light measures the thickness along
+   * the ray from its centre, as UE5 does, not over its whole area.
    *
    * @public
    */

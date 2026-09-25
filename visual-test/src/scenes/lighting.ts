@@ -1,5 +1,5 @@
 import { Vector3, Vector4 } from '@zephyr3d/base';
-import { Mesh, PlaneShape, PointLight, RectLight, SphereShape, SpotLight } from '@zephyr3d/scene';
+import { BoxShape, Mesh, PlaneShape, PointLight, RectLight, SphereShape, SpotLight } from '@zephyr3d/scene';
 import type { Scene } from '@zephyr3d/scene';
 import type { VisualScene } from '../types';
 import { bareScene, lambert, pbr, placeCamera } from './common';
@@ -197,5 +197,48 @@ export const rectLightPhysical: VisualScene = {
     }
     overheadRectLight(scene, 1).luminance = 2000;
     placeCamera(camera, new Vector3(0, 3.2, 6.5), new Vector3(0, 0.6, 0));
+  }
+};
+
+/**
+ * A shadow-casting rect light, with casters placed where an area light's
+ * shadows are hardest to get right.
+ *
+ * The panel is small and high, and both solids stand well outside the prism
+ * straight below it. A rect light lights a whole hemisphere, so its shadow map
+ * has to be a cube from the light's centre (UE5 renders the point light's cube
+ * for it): the shadows must then fall away from the light, radially, and lengthen
+ * with the offset. The earlier orthographic map covered only the panel's own
+ * footprint - these casters threw no shadow at all under it, and anything inside
+ * it was projected straight down.
+ */
+export const rectLightShadow: VisualScene = {
+  name: 'rect-light-shadow',
+  description: 'Shadow-casting rect light with casters off its axis. Pins the cube shadow projection.',
+  setup({ scene, camera }) {
+    bareScene(scene);
+    scene.env.light.type = 'constant';
+    scene.env.light.ambientColor = new Vector4(0.02, 0.02, 0.025, 1);
+    new Mesh(scene, new PlaneShape({ size: 12 }), pbr(new Vector4(0.6, 0.6, 0.6, 1), 0, 0.8));
+    const sphere = new Mesh(
+      scene,
+      new SphereShape({ radius: 0.5 }),
+      pbr(new Vector4(0.8, 0.35, 0.25, 1), 0, 0.6)
+    );
+    sphere.position.setXYZ(1.7, 0.5, 0.3);
+    const box = new Mesh(scene, new BoxShape({ size: 0.8 }), pbr(new Vector4(0.3, 0.5, 0.8, 1), 0, 0.6));
+    box.position.setXYZ(-1.6, 0.4, -0.6);
+
+    const light = new RectLight(scene);
+    light.lookAt(new Vector3(0, 2.6, 0), new Vector3(0, 0, 0), Vector3.axisNZ());
+    light.width = 1;
+    light.height = 0.5;
+    light.range = 12;
+    light.intensity = 30;
+    light.castShadow = true;
+    light.shadow.applyQualityPreset('character-small');
+    light.shadow.mode = 'pcf';
+
+    placeCamera(camera, new Vector3(0, 4.5, 6.5), new Vector3(0, 0.3, 0));
   }
 };

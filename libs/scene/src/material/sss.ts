@@ -395,7 +395,16 @@ export class SSSMaterial
         }
         this.forEachLight(
           scope,
-          function (type, posRange, dirCutoff, colorIntensity, extra, shadow, thickness) {
+          function (
+            type,
+            posRange,
+            dirCutoff,
+            colorIntensity,
+            extra,
+            shadow,
+            thickness,
+            unshadowedColorIntensity
+          ) {
             this.$l.diffuseScale = pb.float(1);
             this.$l.specularScale = pb.float(1);
             this.$l.sourceRadiusFactor = pb.float(0);
@@ -462,10 +471,17 @@ export class SSSMaterial
                 this.viewVec,
                 this.lightDir
               );
+              // The light before its surface shadow: see LitMaterial.forEachLight.
+              // `thickness` below is the transmission's own shadow term.
+              this.$l.transmissionLightColor = pb.mul(
+                unshadowedColorIntensity.rgb,
+                unshadowedColorIntensity.a,
+                this.lightAtten
+              );
               this.transmissionLighting = pb.add(
                 this.transmissionLighting,
                 pb.mul(
-                  this.lightColor,
+                  this.transmissionLightColor,
                   this.transmission,
                   thickness,
                   this.zSSSTransmissionStrength,
