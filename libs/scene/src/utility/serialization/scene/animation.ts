@@ -430,7 +430,9 @@ function deserializeSpringCollider(ctx: SceneNode, data: SerializedSpringCollide
     case 'box':
       collider = createBoxCollider(
         node && data.localOffset ? vectorFromArray(data.localOffset) : vectorFromArray(data.center),
-        node && data.localHalfExtents ? vectorFromArray(data.localHalfExtents) : vectorFromArray(data.halfExtents),
+        node && data.localHalfExtents
+          ? vectorFromArray(data.localHalfExtents)
+          : vectorFromArray(data.halfExtents),
         node ?? undefined
       );
       break;

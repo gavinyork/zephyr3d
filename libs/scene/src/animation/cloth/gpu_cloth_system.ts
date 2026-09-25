@@ -942,16 +942,28 @@ function createIntegrateProgram(device: AbstractDevice, workgroupSize: number) {
               function () {
                 this.$l.boxAxis = this.boxAxisX;
                 this.$l.boxDepth = this.boxPen.x;
-                this.$l.boxSign = pb.select(pb.float(1), pb.float(-1), pb.greaterThanEqual(this.boxLocal.x, 0));
+                this.$l.boxSign = pb.select(
+                  pb.float(1),
+                  pb.float(-1),
+                  pb.greaterThanEqual(this.boxLocal.x, 0)
+                );
                 this.$if(pb.lessThan(this.boxPen.y, this.boxDepth), function () {
                   this.boxAxis = this.boxAxisY;
                   this.boxDepth = this.boxPen.y;
-                  this.boxSign = pb.select(pb.float(1), pb.float(-1), pb.greaterThanEqual(this.boxLocal.y, 0));
+                  this.boxSign = pb.select(
+                    pb.float(1),
+                    pb.float(-1),
+                    pb.greaterThanEqual(this.boxLocal.y, 0)
+                  );
                 });
                 this.$if(pb.lessThan(this.boxPen.z, this.boxDepth), function () {
                   this.boxAxis = this.boxAxisZ;
                   this.boxDepth = this.boxPen.z;
-                  this.boxSign = pb.select(pb.float(1), pb.float(-1), pb.greaterThanEqual(this.boxLocal.z, 0));
+                  this.boxSign = pb.select(
+                    pb.float(1),
+                    pb.float(-1),
+                    pb.greaterThanEqual(this.boxLocal.z, 0)
+                  );
                 });
                 this.$l.boxSign = this.boxSign;
                 this.next = pb.add(this.next, pb.mul(this.boxAxis, pb.mul(this.boxSign, this.boxDepth)));
@@ -1171,19 +1183,34 @@ function createConstraintProgram(device: AbstractDevice, workgroupSize: number) 
                 function () {
                   this.$l.boxAxis = this.boxAxisX;
                   this.$l.boxDepth = this.boxPen.x;
-                  this.$l.boxSign = pb.select(pb.float(1), pb.float(-1), pb.greaterThanEqual(this.boxLocal.x, 0));
+                  this.$l.boxSign = pb.select(
+                    pb.float(1),
+                    pb.float(-1),
+                    pb.greaterThanEqual(this.boxLocal.x, 0)
+                  );
                   this.$if(pb.lessThan(this.boxPen.y, this.boxDepth), function () {
                     this.boxAxis = this.boxAxisY;
                     this.boxDepth = this.boxPen.y;
-                    this.boxSign = pb.select(pb.float(1), pb.float(-1), pb.greaterThanEqual(this.boxLocal.y, 0));
+                    this.boxSign = pb.select(
+                      pb.float(1),
+                      pb.float(-1),
+                      pb.greaterThanEqual(this.boxLocal.y, 0)
+                    );
                   });
                   this.$if(pb.lessThan(this.boxPen.z, this.boxDepth), function () {
                     this.boxAxis = this.boxAxisZ;
                     this.boxDepth = this.boxPen.z;
-                    this.boxSign = pb.select(pb.float(1), pb.float(-1), pb.greaterThanEqual(this.boxLocal.z, 0));
+                    this.boxSign = pb.select(
+                      pb.float(1),
+                      pb.float(-1),
+                      pb.greaterThanEqual(this.boxLocal.z, 0)
+                    );
                   });
                   this.$l.boxSign = this.boxSign;
-                  this.corrected = pb.add(this.corrected, pb.mul(this.boxAxis, pb.mul(this.boxSign, this.boxDepth)));
+                  this.corrected = pb.add(
+                    this.corrected,
+                    pb.mul(this.boxAxis, pb.mul(this.boxSign, this.boxDepth))
+                  );
                 }
               );
             });
@@ -2370,9 +2397,7 @@ export class GPUClothSystem {
     this._planeColliderData = new Float32Array(
       getInitialColliderBufferFloatCount(this._colliders, 'plane', 8)
     );
-    this._boxColliderData = new Float32Array(
-      getInitialColliderBufferFloatCount(this._colliders, 'box', 16)
-    );
+    this._boxColliderData = new Float32Array(getInitialColliderBufferFloatCount(this._colliders, 'box', 16));
     this._triangleIndexBuffer = null;
     this._triangleNormalBuffer = null;
     this._vertexTriangleAdjacencyBuffer = null;

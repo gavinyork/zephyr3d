@@ -137,9 +137,13 @@ function resolveMeshByReference(
         (child) => child.name === segment.name
       ) as SceneNode[];
       current = matches[segment.sameNameIndex] ?? null;
-      if (!current) break;
+      if (!current) {
+        break;
+      }
     }
-    if (isMesh(current)) return current;
+    if (isMesh(current)) {
+      return current;
+    }
   }
   const candidate = host.findNodeById<SceneNode>(id) ?? root.findNodeById<SceneNode>(id);
   return isMesh(candidate) ? candidate : null;
@@ -178,17 +182,13 @@ export function normalizeGPUClothComponentConfig(
       .filter((entry) => !!entry?.meshId && !!entry.bindingData)
       .map((entry) => ({
         meshId: String(entry.meshId),
-        ...(Array.isArray(entry.meshPath)
-          ? { meshPath: normalizeNodePath(entry.meshPath) }
-          : {}),
+        ...(Array.isArray(entry.meshPath) ? { meshPath: normalizeNodePath(entry.meshPath) } : {}),
         bindingData: cloneBindingData(entry.bindingData),
         targetWrapWeights: String(entry.targetWrapWeights ?? '')
       })),
     colliders: (Array.isArray(source.colliders) ? source.colliders : []).map((entry) => ({
       type:
-        entry?.type === 'capsule' || entry?.type === 'plane' || entry?.type === 'box'
-          ? entry.type
-          : 'sphere',
+        entry?.type === 'capsule' || entry?.type === 'plane' || entry?.type === 'box' ? entry.type : 'sphere',
       enabled: entry?.enabled !== false,
       nodeId: String(entry?.nodeId ?? ''),
       offset: vec3(entry?.offset, [0, 0, 0]),
@@ -432,7 +432,11 @@ export class GPUClothComponent extends Disposable {
         const size = vec3(config.size, [0.3, 0.3, 0.3]);
         collider = createBoxCollider(
           new Vector3(offset[0], offset[1], offset[2]),
-          new Vector3(Math.max(0.0001, size[0] * 0.5), Math.max(0.0001, size[1] * 0.5), Math.max(0.0001, size[2] * 0.5)),
+          new Vector3(
+            Math.max(0.0001, size[0] * 0.5),
+            Math.max(0.0001, size[1] * 0.5),
+            Math.max(0.0001, size[2] * 0.5)
+          ),
           node
         );
       } else {

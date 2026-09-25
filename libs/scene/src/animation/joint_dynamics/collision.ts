@@ -291,7 +291,11 @@ export function pushoutFromBox(
     halfExtents.y + pointRadius,
     halfExtents.z + pointRadius
   );
-  const penetration = new Vector3(target.x - Math.abs(local.x), target.y - Math.abs(local.y), target.z - Math.abs(local.z));
+  const penetration = new Vector3(
+    target.x - Math.abs(local.x),
+    target.y - Math.abs(local.y),
+    target.z - Math.abs(local.z)
+  );
   if (penetration.x < 0 || penetration.y < 0 || penetration.z < 0) {
     return writeCollisionResult(out, false, point, !out);
   }
@@ -590,8 +594,16 @@ function collisionDetectionBox(
 ): LineCollisionResult {
   const p1 = Vector3.sub(point1, colRW.positionCurrent, new Vector3());
   const p2 = Vector3.sub(point2, colRW.positionCurrent, new Vector3());
-  const a = new Vector3(Vector3.dot(p1, colRW.boxAxes[0]), Vector3.dot(p1, colRW.boxAxes[1]), Vector3.dot(p1, colRW.boxAxes[2]));
-  const b = new Vector3(Vector3.dot(p2, colRW.boxAxes[0]), Vector3.dot(p2, colRW.boxAxes[1]), Vector3.dot(p2, colRW.boxAxes[2]));
+  const a = new Vector3(
+    Vector3.dot(p1, colRW.boxAxes[0]),
+    Vector3.dot(p1, colRW.boxAxes[1]),
+    Vector3.dot(p1, colRW.boxAxes[2])
+  );
+  const b = new Vector3(
+    Vector3.dot(p2, colRW.boxAxes[0]),
+    Vector3.dot(p2, colRW.boxAxes[1]),
+    Vector3.dot(p2, colRW.boxAxes[2])
+  );
   const d = Vector3.sub(b, a, new Vector3());
   let enter = 0;
   let exit = 1;
@@ -609,7 +621,9 @@ function collisionDetectionBox(
     const inv = 1 / dv[axis];
     let t0 = (mins[axis] - av[axis]) * inv;
     let t1 = (maxs[axis] - av[axis]) * inv;
-    if (t0 > t1) [t0, t1] = [t1, t0];
+    if (t0 > t1) {
+      [t0, t1] = [t1, t0];
+    }
     enter = Math.max(enter, t0);
     exit = Math.min(exit, t1);
     if (enter > exit) {
@@ -617,7 +631,11 @@ function collisionDetectionBox(
     }
   }
   const t = Math.max(0, Math.min(1, enter));
-  const hitPoint = Vector3.add(point1, Vector3.scale(Vector3.sub(point2, point1, new Vector3()), t, new Vector3()), new Vector3());
+  const hitPoint = Vector3.add(
+    point1,
+    Vector3.scale(Vector3.sub(point2, point1, new Vector3()), t, new Vector3()),
+    new Vector3()
+  );
   return writeLineCollisionResult(out, true, hitPoint, hitPoint, 0, !out);
 }
 
