@@ -32,6 +32,8 @@ import {
   rectLightPcssWall,
   rectLightPhysical,
   rectLightShadow,
+  rectLightShadowDom,
+  pointLightShadowDom,
   spotShadow
 } from './scenes/lighting';
 import {
@@ -135,6 +137,8 @@ export const SCENES: VisualScene[] = [
   rectLightPcssLarge,
   rectLightPcssWall,
   rectLightAutoRange,
+  rectLightShadowDom,
+  pointLightShadowDom,
   // Water: the medium, and the caustics it focuses onto what is under it.
   waterCausticsOff,
   waterCausticsOn,

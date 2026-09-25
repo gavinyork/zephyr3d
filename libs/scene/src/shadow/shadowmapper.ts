@@ -92,6 +92,17 @@ export type ShadowMapParams = {
    * instead of recomputing shadows (e.g. the SSS combine pass).
    */
   maskOrdinal?: number;
+  /**
+   * The cube face being rendered, while a point-projection shadow map draws its
+   * casters. Lets an implementation that binds framebuffers of its own target
+   * the same face the shared one is on.
+   */
+  cubeFace?: CubeFace;
+  /**
+   * World distance that a normalized depth of 1 stands for in a point-projection
+   * shadow map, whose casters store radial distance over the light's range.
+   */
+  depthRange?: number;
 };
 
 /** @internal */
@@ -1109,6 +1120,8 @@ export class ShadowMapper extends Disposable {
       // Pooled objects retain last frame's ordinal; clear it so it is only set
       // again by ShadowMaskRenderer for lights actually written to the mask.
       params.maskOrdinal = undefined;
+      params.cubeFace = undefined;
+      params.depthRange = undefined;
       return params;
     } else {
       return {
@@ -1284,10 +1297,12 @@ export class ShadowMapper extends Disposable {
       );
       device.setFramebuffer(fb);
       shadowMapParams.shadowMatrices.set(Matrix4x4.transpose(shadowMapRenderCamera.viewMatrix));
+      shadowMapParams.depthRange = this._light.positionAndRange.w;
       for (const face of [CubeFace.PX, CubeFace.NX, CubeFace.PY, CubeFace.NY, CubeFace.PZ, CubeFace.NZ]) {
         shadowMapRenderCamera.lookAtCubeFace(face);
         fb.setColorAttachmentCubeFace(0, face);
         fb.setDepthAttachmentCubeFace(face);
+        shadowMapParams.cubeFace = face;
         renderGeometry(shadowMapRenderCamera);
       }
       shadowMapParams.shadowMatrices.set(Matrix4x4.identity());

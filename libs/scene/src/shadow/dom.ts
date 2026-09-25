@@ -6,6 +6,7 @@ import type {
   PBShaderExp,
   RenderStateSet,
   Texture2D,
+  TextureCube,
   TextureFormat
 } from '@zephyr3d/device';
 import { ShadowImpl } from './shadow_impl';
@@ -16,7 +17,7 @@ import { computeShadowBias } from './shader';
 import { ShaderHelper } from '../material/shader/helper';
 import { getDevice } from '../app/api';
 import { fetchSampler } from '../utility/misc';
-import { REVERSE_Z, Vector4, type Nullable } from '@zephyr3d/base';
+import { CubeFace, REVERSE_Z, Vector4, type Nullable } from '@zephyr3d/base';
 
 /**
  * Opacity layers, which is three rather than four because the fourth channel of
@@ -44,10 +45,16 @@ type DOMImplData = {
    * Frontmost caster depth, written by geometry pass 0 and sampled by pass 1.
    * Separate from the result texture on purpose: a texture cannot be a render
    * target and a sampled resource in the same pass.
+   *
+   * 2D even for a cube map: the shadow mapper draws both passes of one face
+   * before moving to the next, so one face's worth is all pass 1 ever reads.
    */
   frontDepth: Texture2D;
-  /** RGB = cumulative optical depth per layer, A = the depth those layers start at. */
-  result: Texture2D;
+  /**
+   * RGB = cumulative optical depth per layer, A = the depth those layers start
+   * at. A cube for point-projection lights (point and rect).
+   */
+  result: Texture2D | TextureCube;
   /** Targets {@link DOMImplData.frontDepth}, reusing the shared depth attachment. */
   depthFramebuffer: FrameBuffer;
   /** Targets {@link DOMImplData.result}. No depth attachment - pass 1 does not test. */
@@ -150,7 +157,8 @@ export class DOM extends ShadowImpl {
    * interior unshadowed.
    *
    * Exact for directional lights, whose orthographic projection makes device
-   * depth a linear function of world depth. Spot and point lights project
+   * depth a linear function of world depth, and for point and rect lights,
+   * whose cube maps store distance from the light. Spot lights project
    * perspectively, so there the value is only accurate near the middle of the
    * shadow camera's range - which is where hair lit by one usually sits.
    */
@@ -235,8 +243,22 @@ export class DOM extends ShadowImpl {
     // The light camera is finalised by the time the casters are drawn, so this is
     // where the world-to-device depth scale becomes known. It stays valid for the
     // lighting pass that follows, which reads the same converted params back.
-    const range = shadowMapParams.cameraParams.y - shadowMapParams.cameraParams.x;
+    // A cube map stores radial distance over the light's range instead, which is
+    // what the layer span must then be measured against.
+    const range = isCube(shadowMapParams)
+      ? (shadowMapParams.depthRange ?? 1)
+      : shadowMapParams.cameraParams.y - shadowMapParams.cameraParams.x;
     this._depthRange = range > 1e-6 ? range : 1;
+    if (isCube(shadowMapParams)) {
+      // These framebuffers are this implementation's own, so the face the shadow
+      // mapper selected on the shared one has to be selected on them too.
+      const face = shadowMapParams.cubeFace ?? CubeFace.PX;
+      if (pass === 0) {
+        implData.depthFramebuffer.setDepthAttachmentCubeFace(face);
+      } else {
+        implData.opacityFramebuffer.setColorAttachmentCubeFace(0, face);
+      }
+    }
     getDevice().setFramebuffer(pass === 0 ? implData.depthFramebuffer : implData.opacityFramebuffer);
   }
   setCasterRenderStates(_shadowMapParams: ShadowMapParams, stateSet: RenderStateSet) {
@@ -257,13 +279,14 @@ export class DOM extends ShadowImpl {
       .setBlendFuncAlpha('one', 'zero');
     stateSet.useDepthState().enableTest(false).enableWrite(false);
   }
-  getShadowMapClearColor(_shadowMapParams: ShadowMapParams) {
+  getShadowMapClearColor(shadowMapParams: ShadowMapParams) {
+    // Radial distance in a cube map is linear, so reverse-Z does not flip it.
+    const farthest = REVERSE_Z && !isCube(shadowMapParams) ? 0 : 1;
     if (this._geometryPass === 1) {
       // No hair over this texel means no absorption. Alpha carries z0, and the
-      // sentinel below makes an uncovered texel read as "nothing in front".
-      return new Vector4(0, 0, 0, REVERSE_Z ? 0 : 1);
+      // sentinel makes an uncovered texel read as "nothing in front".
+      return new Vector4(0, 0, 0, farthest);
     }
-    const farthest = REVERSE_Z ? 0 : 1;
     return new Vector4(farthest, farthest, farthest, 1);
   }
   getShadowMapColorFormat(_shadowMapParams: ShadowMapParams) {
@@ -324,7 +347,9 @@ export class DOM extends ShadowImpl {
     // and cleared at the end of each frame, so holding directly-created textures
     // in it leaks them at whatever rate the scene renders.
     const frontDepth = device.pool.fetchTemporalTexture2D(false, format, width, height, false);
-    const result = device.pool.fetchTemporalTexture2D(false, format, width, height, false);
+    const result = isCube(shadowMapParams)
+      ? device.pool.fetchTemporalTextureCube(false, format, width, false)
+      : device.pool.fetchTemporalTexture2D(false, format, width, height, false);
     // Pass 0 borrows the shadow map's own depth attachment, which is otherwise
     // unused - this implementation asks for no colour there - so the hardware
     // depth test resolves the frontmost strand for it. Pass 1 gets no depth,
@@ -390,10 +415,13 @@ export class DOM extends ShadowImpl {
     scope: PBInsideFunctionScope,
     depth: PBShaderExp,
     z0: PBShaderExp,
-    layerSpan: PBShaderExp
+    layerSpan: PBShaderExp,
+    radial: boolean
   ): PBShaderExp {
     const pb = scope.$builder;
-    const delta = REVERSE_Z ? pb.sub(z0, depth) : pb.sub(depth, z0);
+    // A cube map's radial distance grows away from the light whatever the depth
+    // convention.
+    const delta = REVERSE_Z && !radial ? pb.sub(z0, depth) : pb.sub(depth, z0);
     return pb.div(pb.max(delta, 0), layerSpan);
   }
   /**
@@ -417,7 +445,7 @@ export class DOM extends ShadowImpl {
     // two cases that matter - an opaque caster and a fully transparent one - are
     // the same value there.
     const hasAlpha = geometryPass === 1 && !!alpha;
-    const funcName = `lib_domCasterOutput_${geometryPass}_${hasAlpha ? 'a' : 'o'}`;
+    const funcName = `lib_domCasterOutput_${geometryPass}_${hasAlpha ? 'a' : 'o'}${isCube(shadowMapParams) ? '_c' : ''}`;
     const params = hasAlpha ? [pb.vec3('worldPos'), pb.float('alpha')] : [pb.vec3('worldPos')];
     pb.func(funcName, params, function () {
       this.$l.depth = that.casterDepth(shadowMapParams, this, this.worldPos);
@@ -432,7 +460,7 @@ export class DOM extends ShadowImpl {
         this.$l.layerSpan = ShaderHelper.getShadowImplParams(this).x;
         // Distance behind the frontmost strand, in layer-span units. A fragment at
         // or in front of z0 lands at zero and fills every layer.
-        this.$l.t = that.layerCoord(this, this.depth, this.z0, this.layerSpan);
+        this.$l.t = that.layerCoord(this, this.depth, this.z0, this.layerSpan, isCube(shadowMapParams));
         // Layer k's far boundary sits at (k+1)/3 of the span, and a fragment
         // contributes to every layer whose boundary lies behind it. The last
         // layer has no far boundary: it extends to the end of the caster volume,
@@ -493,9 +521,30 @@ export class DOM extends ShadowImpl {
     shadowVertex: PBShaderExp,
     NdotL: PBShaderExp
   ) {
-    const funcName = 'lib_computeShadowDOM';
     const pb = scope.$builder;
     const that = this;
+    if (isCube(shadowMapParams)) {
+      // The shadow matrix is the identity for a cube map, so the "shadow vertex"
+      // is the receiver's world position; its depth is the radial distance the
+      // casters stored, over the same range.
+      pb.func('lib_computeShadowDOMCube', [pb.vec4('shadowVertex'), pb.float('NdotL')], function () {
+        this.$l.posRange = ShaderHelper.getLightPositionAndRangeForShadow(this);
+        this.$l.dir = pb.sub(this.shadowVertex.xyz, this.posRange.xyz);
+        this.$l.depth = pb.div(pb.length(this.dir), this.posRange.w);
+        this.$l.shadow = pb.float(1);
+        this.$if(pb.lessThanEqual(this.depth, 1), function () {
+          // The kernel needs the bias for the same reason as the 2D map below.
+          if (that._filterSize > 1) {
+            this.$l.bias = computeShadowBias(shadowMapParams.lightType, this, this.depth, this.NdotL, true);
+            this.depth = applyShadowDepthBias(this, this.depth, this.bias, false);
+          }
+          this.shadow = that.transmittanceCube(this, this.dir, this.depth);
+        });
+        this.$return(this.shadow);
+      });
+      return pb.getGlobalScope().lib_computeShadowDOMCube(shadowVertex, NdotL) as PBShaderExp;
+    }
+    const funcName = 'lib_computeShadowDOM';
     pb.func(funcName, [pb.vec4('shadowVertex'), pb.float('NdotL')], function () {
       this.$l.shadowCoord = pb.div(this.shadowVertex.xyz, this.shadowVertex.w);
       this.$l.shadowCoord = ndcToShadowCoord3(this, this.shadowCoord.xyz);
@@ -591,6 +640,55 @@ export class DOM extends ShadowImpl {
     return pb.getGlobalScope()[funcName](shadowCoord) as PBShaderExp;
   }
   /**
+   * {@link DOM.transmittance} for a cube map: the same kernel, laid out on the
+   * face around the receiver's direction.
+   *
+   * @remarks
+   * The taps step one texel at a time on the unit cube, where a face texel spans
+   * `2 / size`, in a plane perpendicular to the ray - which matches the face's
+   * own grid at its centre and differs only to second order off it.
+   * @internal
+   */
+  private transmittanceCube(scope: PBInsideFunctionScope, dir: PBShaderExp, receiverDepth: PBShaderExp) {
+    const pb = scope.$builder;
+    const that = this;
+    const size = this._filterSize;
+    const funcName = `lib_domTransmittanceCube_${size}`;
+    pb.func(funcName, [pb.vec3('dir'), pb.float('receiverDepth')], function () {
+      if (size <= 1) {
+        this.$return(that.layerTransmittance(this, this.dir, this.receiverDepth, true));
+      } else {
+        this.$l.unitDir = pb.normalize(this.dir);
+        this.$l.onCube = pb.div(
+          this.unitDir,
+          pb.max(pb.max(pb.abs(this.unitDir.x), pb.abs(this.unitDir.y)), pb.abs(this.unitDir.z))
+        );
+        this.$l.helper = this.$choice(
+          pb.lessThan(pb.abs(this.unitDir.y), 0.99),
+          pb.vec3(0, 1, 0),
+          pb.vec3(1, 0, 0)
+        );
+        this.$l.side = pb.normalize(pb.cross(this.helper, this.unitDir));
+        this.$l.up = pb.cross(this.unitDir, this.side);
+        this.$l.texelSize = pb.div(2, ShaderHelper.getShadowCameraParams(this).z);
+        this.$l.sum = pb.float(0);
+        this.$l.tapDir = pb.vec3();
+        const radius = (size - 1) / 2;
+        for (let y = -radius; y <= radius; y++) {
+          for (let x = -radius; x <= radius; x++) {
+            this.tapDir = pb.add(
+              this.onCube,
+              pb.mul(pb.add(pb.mul(this.side, x), pb.mul(this.up, y)), this.texelSize)
+            );
+            this.sum = pb.add(this.sum, that.layerTransmittance(this, this.tapDir, this.receiverDepth, true));
+          }
+        }
+        this.$return(pb.div(this.sum, size * size));
+      }
+    });
+    return pb.getGlobalScope()[funcName](dir, receiverDepth) as PBShaderExp;
+  }
+  /**
    * Transmittance from a single shadow map texel.
    * @internal
    */
@@ -599,16 +697,29 @@ export class DOM extends ShadowImpl {
     uv: PBShaderExp,
     receiverDepth: PBShaderExp
   ): PBShaderExp {
+    return this.layerTransmittance(scope, uv, receiverDepth, false);
+  }
+  /**
+   * Transmittance from the texel at `coord` - a map UV, or for a cube map a
+   * direction from the light.
+   * @internal
+   */
+  private layerTransmittance(
+    scope: PBInsideFunctionScope,
+    coord: PBShaderExp,
+    receiverDepth: PBShaderExp,
+    radial: boolean
+  ): PBShaderExp {
     const pb = scope.$builder;
     const that = this;
-    const funcName = 'lib_domTap';
-    pb.func(funcName, [pb.vec2('uv'), pb.float('receiverDepth')], function () {
-      this.$l.texel = pb.textureSampleLevel(ShaderHelper.getShadowMap(this), this.uv, 0);
+    const funcName = radial ? 'lib_domTapCube' : 'lib_domTap';
+    pb.func(funcName, [radial ? pb.vec3('coord') : pb.vec2('coord'), pb.float('receiverDepth')], function () {
+      this.$l.texel = pb.textureSampleLevel(ShaderHelper.getShadowMap(this), this.coord, 0);
       this.$l.layers = this.texel.rgb;
       this.$l.z0 = this.texel.a;
       this.$l.layerSpan = ShaderHelper.getShadowImplParams(this).x;
       this.$l.density = ShaderHelper.getShadowImplParams(this).y;
-      this.$l.t = that.layerCoord(this, this.receiverDepth, this.z0, this.layerSpan);
+      this.$l.t = that.layerCoord(this, this.receiverDepth, this.z0, this.layerSpan, radial);
       // The layers are cumulative, so opacity at an arbitrary depth is a lerp
       // between the two bracketing layer values. Scaling t by the layer count puts
       // the integer part on the near layer and the fraction between the pair.
@@ -636,6 +747,11 @@ export class DOM extends ShadowImpl {
       // would have.
       this.$return(pb.exp(pb.neg(pb.mul(this.absorption, this.density))));
     });
-    return pb.getGlobalScope()[funcName](uv, receiverDepth) as PBShaderExp;
+    return pb.getGlobalScope()[funcName](coord, receiverDepth) as PBShaderExp;
   }
+}
+
+/** Whether the map is a point-projection cube (point and rect lights). @internal */
+function isCube(shadowMapParams: ShadowMapParams) {
+  return shadowMapParams.lightType === LIGHT_TYPE_POINT;
 }

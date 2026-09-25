@@ -11,7 +11,7 @@ import {
   SphereShape,
   SpotLight
 } from '@zephyr3d/scene';
-import type { Scene } from '@zephyr3d/scene';
+import type { Scene, ShadowMode } from '@zephyr3d/scene';
 import type { VisualScene } from '../types';
 import { bareScene, lambert, pbr, placeCamera } from './common';
 
@@ -223,10 +223,12 @@ export const rectLightPhysical: VisualScene = {
  * footprint - these casters threw no shadow at all under it, and anything inside
  * it was projected straight down.
  */
-export const rectLightShadow: VisualScene = {
-  name: 'rect-light-shadow',
-  description: 'Shadow-casting rect light with casters off its axis. Pins the cube shadow projection.',
-  setup({ scene, camera }) {
+/**
+ * The off-axis shadow stage shared by the rect-light shadow scenes, lit by a
+ * rect or point light at the same spot in the given shadow mode.
+ */
+function offAxisShadowStage(kind: 'rect' | 'point', mode: ShadowMode): VisualScene['setup'] {
+  return ({ scene, camera }) => {
     bareScene(scene);
     scene.env.light.type = 'constant';
     scene.env.light.ambientColor = new Vector4(0.02, 0.02, 0.025, 1);
@@ -240,18 +242,57 @@ export const rectLightShadow: VisualScene = {
     const box = new Mesh(scene, new BoxShape({ size: 0.8 }), pbr(new Vector4(0.3, 0.5, 0.8, 1), 0, 0.6));
     box.position.setXYZ(-1.6, 0.4, -0.6);
 
-    const light = new RectLight(scene);
-    light.lookAt(new Vector3(0, 2.6, 0), new Vector3(0, 0, 0), Vector3.axisNZ());
-    light.width = 1;
-    light.height = 0.5;
+    let light: RectLight | PointLight;
+    if (kind === 'rect') {
+      const rect = new RectLight(scene);
+      rect.lookAt(new Vector3(0, 2.6, 0), new Vector3(0, 0, 0), Vector3.axisNZ());
+      rect.width = 1;
+      rect.height = 0.5;
+      rect.intensity = 30;
+      light = rect;
+    } else {
+      const point = new PointLight(scene);
+      point.position.setXYZ(0, 2.6, 0);
+      point.intensity = 15;
+      light = point;
+    }
     light.range = 12;
-    light.intensity = 30;
     light.castShadow = true;
     light.shadow.applyQualityPreset('character-small');
-    light.shadow.mode = 'pcf';
+    light.shadow.mode = mode;
 
     placeCamera(camera, new Vector3(0, 4.5, 6.5), new Vector3(0, 0.3, 0));
-  }
+  };
+}
+
+export const rectLightShadow: VisualScene = {
+  name: 'rect-light-shadow',
+  description: 'Shadow-casting rect light with casters off its axis. Pins the cube shadow projection.',
+  setup: offAxisShadowStage('rect', 'pcf')
+};
+
+/**
+ * Deep opacity map shadows from a rect light, and from a point light below.
+ *
+ * Both render cube maps, which the deep opacity map could neither build nor
+ * read: its layers went into a 2D target while the shadow mapper selected cube
+ * faces on a framebuffer it never drew to, and the receiver projected through a
+ * 2D shadow coordinate. The casters are solid, so the shadows must come out as
+ * dark as the other modes' - which is also the check that the layers are
+ * measured from the right end of a radial depth that reverse-Z does not flip.
+ */
+export const rectLightShadowDom: VisualScene = {
+  name: 'rect-light-shadow-dom',
+  description: 'Rect light casting deep opacity map shadows. Pins the cube-map DOM caster and receiver.',
+  supports: (backend) => backend === 'webgpu',
+  setup: offAxisShadowStage('rect', 'dom')
+};
+
+export const pointLightShadowDom: VisualScene = {
+  name: 'point-light-shadow-dom',
+  description: 'Point light casting deep opacity map shadows. Pins the cube-map DOM caster and receiver.',
+  supports: (backend) => backend === 'webgpu',
+  setup: offAxisShadowStage('point', 'dom')
 };
 
 /**
