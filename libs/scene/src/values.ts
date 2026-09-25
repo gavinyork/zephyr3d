@@ -201,7 +201,8 @@ export const enum MaterialVaryingFlags {
   SSS_STORE_DIFFUSE = 1 << 6,
   SCENE_STORE_NORMAL = 1 << 7,
   SSS_STORE_TRANSMISSION = 1 << 8,
-  SKIN_SSS_STORE = 1 << 9
+  SKIN_SSS_STORE = 1 << 9,
+  SKIN_PROFILE_ID_STORE = 1 << 10
 }
 
 /**

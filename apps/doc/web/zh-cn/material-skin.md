@@ -70,51 +70,52 @@ camera.skinSSS = true;
 
 ## 后处理侧：扩散与合成
 
-相机上的这组属性控制扩散行为：
+相机侧只有一个开关：
 
 | 属性 | 默认值 | 作用 |
 | --- | --- | --- |
-| `skinSSS` | false | 开关 |
-| `skinSSSStrength` | 1 | 最终合成强度 |
-| `skinSSSScatterRadius` | 0.02 | **世界空间**散射半径，模糊宽度随距离缩放以保持它恒定 |
-| `skinSSSSampleStep` | 2 | 模糊采样的最大像素间距，用于给近景的投影半径设上限 |
-| `skinSSSOpacity` | 0.18 | 合成前从模糊后的皮肤遮罩里减掉的偏置 |
-| `skinSSSDepthScale` | 80 | 深度拒绝尺度，防止跨越深度断层的错误混合 |
-| `skinSSSColorBoost` | 1 | 模糊结果的额外倍数 |
-| `skinSSSSmoothness` | 0 | 磨皮（"美颜"）强度 |
-| `skinSSSScatterTint` | 白 | 给被重分配的光染色 |
-| `skinSSSGlow` | 0 | 非守恒的额外透光感 |
-| `skinSSSProfilePreset` | `'skin'` | 散射 profile 预设 |
+| `skinSSS` | false | 开启扩散 pass（仅 WebGPU） |
+| `skinSSSDebugOutput` | `'none'` | 输出扩散过程的某个中间量，替代最终着色结果 |
 
-几个值得单独说明的：
+**相机上没有任何散射参数。** 光走多远、多强、什么颜色，全部是材质所指向的
+[`SkinProfile`](#散射-profile) 的属性，由材质逐像素写出的 profile id 供 pass 查表读取。
+这与 UE5 一致——那里也只有 subsurface profile 资产能塑造扩散形状。这样做还能保证屏幕空间扩散
+和烘焙的透射 profile 不会走样：一个 pass 级的半径倍数只会缩放前者而不动后者。
 
-**`skinSSSScatterRadius` 是世界空间的**，不是像素。这意味着角色走远时散射范围会正确变小，
-不需要你按距离调参。`skinSSSSampleStep` 则给近景设一个像素上限，避免贴脸时模糊核过大。
-
-**`skinSSSGlow` 会破坏能量守恒**，这是有意的。默认 0 时，交界暗侧增加的光就是亮侧减少的光；
-调高它则只加不减，让皮肤看起来"从内部发光"。取 1 左右接近该效果在支持能量守恒之前的观感。
-
-**`skinSSSScatterTint` 只作用于差值项**，所以偏暖的色调会给明暗交界染色，而不会让整个
-表面泛色。
-
-**`skinSSSSmoothness` 要求遮罩正确**：磨皮按皮肤遮罩加权采样，所以 R 通道必须把五官抠掉，
-否则眉眼嘴会一起被磨平。
+`skinSSSDebugOutput` 是区分"输入有问题"和"核函数有问题"的实用手段，可以显示可扩散能量、
+逐像素 profile id、法线、逐通道扩散距离、采样半径、采样接受率、单独的扩散结果，以及光源空间
+厚度。有几个中间量落在很窄的区间里，读起来是一片平色，这时配合后处理的 `debugExposure` 一起用。
 
 ## 散射 profile
 
-`skinSSSProfilePreset` 决定红、绿、蓝三个通道散射半径的**比例**——这个比例才是散射材质的性格
-所在。红光在皮肤里传得最远，这正是明暗交界处那条红黄渐变的来源。改预设就是改这个比例，
-所以 `wax`（蜡）和 `jade`（玉）与皮肤走的是同一套代码，而不是特例分支。
+`SkinProfile` 持有全部散射参数，材质通过 `SkinMaterial.subsurfaceProfile` 引用它。所有 profile
+被打包进一张以 profile id 为索引的共享 GPU 表，所以脸、耳朵、嘴唇可以各带一份 profile，在同一
+个屏幕空间 pass 里独立扩散。
 
-可选预设：`skin`、`skin_thin`、`skin_default`、`skin_heavy_makeup`、`wax`、`wax_backlit`、
-`wax_soft`、`jade`、`jade_backlit`、`jade_soft`。
+其中最关键的几个参数：
 
-半径的绝对大小仍由 `skinSSSScatterRadius` 控制，预设只管比例。
+| 属性 | 作用 |
+| --- | --- |
+| `surfaceAlbedo` | 逐通道散射反照率，驱动 Burley 的形状项 |
+| `meanFreePath` | 逐通道散射**比例**——决定材质性格的就是它 |
+| `meanFreePathDistance` | 散射的绝对距离，世界单位 |
+| `worldUnitScale` | profile 空间到世界单位的换算，供非米制场景使用 |
+| `scatterScale` | 扩散宽度的总体倍数 |
+| `transmissionTint` | 穿透薄处的透射光染色 |
+| `scatteringDistribution` | 透射光的 Henyey-Greenstein 各向异性 |
+| `roughness0` / `roughness1` / `lobeMix` | 双瓣高光 |
 
-::: tip 这个预设作用于整个 pass
-`camera.skinSSSProfilePreset` 是**整个渲染 pass** 的设置，一个相机只有一个。
-需要同一画面里不同材质用不同 profile，走的是另一条 profile slot 路径，`SubsurfaceProfile`
-类的实例可以被多个材质共享（类似 Unreal 的 skin profile 资产）。
+让散射材质读起来像皮肤而不是一团中性模糊的，是 `meanFreePath` 的**比例**。在 `skin` 预设里红光
+传播距离大约是蓝光的十倍，这正是明暗交界处那条红黄渐变的来源。改预设就是改这个比例，所以
+`wax`（蜡）和 `jade`（玉）与皮肤走的是同一套代码，而不是特例分支。
+
+可选预设：`skin`、`skin_pale`、`skin_tan`、`skin_dark`、`wax`、`jade`、`marble`。
+
+绝对尺度由 `meanFreePathDistance` 和 `worldUnitScale` 决定，预设只管比例。
+
+::: tip 尺度是物理量
+散射距离是物理量：`skin` 的平均自由程约 27 毫米。在米级大小的物体上，扩散本来就看不见。
+如果觉得"散射没效果"，先查物体的世界尺寸，再去动参数。
 :::
 
 ## 相关

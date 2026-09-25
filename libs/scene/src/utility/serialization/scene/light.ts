@@ -51,6 +51,19 @@ export function getPunctualLightClass(): SerializableClass {
           }
         },
         {
+          name: 'Transmission',
+          description: 'If true, this light lights subsurface materials from behind. Requires CastShadow',
+          type: 'bool',
+          phase: 0,
+          default: false,
+          get(this: PunctualLight, value) {
+            value.bool[0] = this.transmission;
+          },
+          set(this: PunctualLight, value) {
+            this.transmission = value.bool[0];
+          }
+        },
+        {
           name: 'CastShadow',
           description: 'if true, the light cast shadows',
           type: 'bool',

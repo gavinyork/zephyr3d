@@ -1,7 +1,7 @@
 import { RenderPass } from './renderpass';
 import { MaterialVaryingFlags, QUEUE_OPAQUE, QUEUE_TRANSPARENT, RENDER_PASS_TYPE_LIGHT } from '../values';
 import type { Nullable } from '@zephyr3d/base';
-import type { Texture2D } from '@zephyr3d/device';
+import type { BaseTexture } from '@zephyr3d/device';
 import { Vector4 } from '@zephyr3d/base';
 import type { RenderItemListBundle, RenderQueue } from './render_queue';
 import type { PunctualLight } from '../scene/light';
@@ -19,7 +19,10 @@ const SURFACE_MRT_FLAGS =
 const ADDITIVE_LIGHT_PASS_OMIT_MRT_FLAGS =
   MaterialVaryingFlags.SCENE_STORE_ROUGHNESS |
   MaterialVaryingFlags.SSS_STORE_PROFILE |
-  MaterialVaryingFlags.SCENE_STORE_NORMAL;
+  MaterialVaryingFlags.SCENE_STORE_NORMAL |
+  // The skin mask is a surface property, not accumulated lighting: the base
+  // pass establishes it and additive light passes must leave it alone.
+  MaterialVaryingFlags.SKIN_SSS_STORE;
 
 /**
  * Forward render pass
@@ -90,7 +93,7 @@ export class LightPass extends RenderPass {
       attachments.push(ctx.SSSTransmissionTexture!);
     }
     if (materialFlags & MaterialVaryingFlags.SKIN_SSS_STORE) {
-      attachments.push(ctx.SkinSSSTexture!);
+      attachments.push(ctx.SSSMaskTexture!);
     }
     return attachments.length === 1 ? attachments[0] : attachments;
   }
@@ -123,11 +126,12 @@ export class LightPass extends RenderPass {
       ctx.HiZTexture?.uid ?? 0
     }:${ctx.screenSpaceShadowMask ? 1 : 0}:${ctx.scene.lightingMode}:${
       ShaderHelper.usesWaterCaustics(ctx) ? 1 : 0
-    }`;
+    }:${ctx.transmissionThickness ? 1 : 0}`;
   }
   /** @internal */
   protected _getShaderVariantHash(ctx: DrawContext, camera: Camera) {
-    const textureVariant = (texture: Texture2D | null | undefined) => (texture ? `1:${texture.format}` : '0');
+    const textureVariant = (texture: BaseTexture | null | undefined) =>
+      texture ? `1:${texture.format}` : '0';
     return `LightPassShaderVariant:${this._shadowMapHash}:${ctx.currentShadowLight?.runtimeId ?? 0}:${
       ctx.lightBlending ? 1 : 0
     }:${camera.oit?.calculateHash() ?? ''}:${ctx.env!.getHash(
@@ -136,7 +140,7 @@ export class LightPass extends RenderPass {
       ctx.sceneColorTexture
     )}:${textureVariant(ctx.HiZTexture)}:${ctx.screenSpaceShadowMask ? 1 : 0}:${ctx.scene.lightingMode}:${
       ShaderHelper.usesWaterCaustics(ctx) ? 1 : 0
-    }`;
+    }:${ctx.transmissionThickness ? 1 : 0}:${textureVariant(ctx.transmissionThicknessTexture)}`;
   }
   /** @internal */
   protected renderLightPass(

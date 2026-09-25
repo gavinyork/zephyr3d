@@ -62,6 +62,15 @@ export interface DrawContext {
   motionVectors: boolean;
   /** Motion vector texture target when motion vectors are active. */
   motionVectorTexture?: Nullable<Texture2D>;
+  /**
+   * Whether the depth prepass carries a per-pixel skin profile id this frame.
+   *
+   * @remarks
+   * The id has to come out of the prepass rather than the light pass because the
+   * transmission thickness pass consumes it and runs first. UE5 reads the same
+   * thing from its GBuffer at shadow projection time.
+   */
+  sssProfileId: boolean;
   /** Whether hierarchical depth (Hi-Z) is enabled for the current pass. */
   HiZ: boolean;
   /** Hi-Z (hierarchical Z) depth texture, when generated. */
@@ -80,6 +89,21 @@ export interface DrawContext {
    * (1..N) samples `layer = (i-1) >> 2`, `channel = (i-1) & 3`.
    */
   shadowMaskTexture?: Nullable<Texture2DArray>;
+  /**
+   * Whether light-space thickness was produced this frame. Keyed into the light
+   * pass shader/bind group hashes, so the declared and bound global layouts
+   * always agree.
+   */
+  transmissionThickness?: boolean;
+  /**
+   * Screen-space light-space thickness, produced by the TransmissionThicknessPass
+   * for lights with `transmission` enabled. Uses exactly the same packing as
+   * {@link DrawContext.shadowMaskTexture} — four lights per RGBA8 layer, indexed
+   * by the same clustered-buffer ordinal — so a light's thickness is recovered
+   * with the same arithmetic as its shadow factor. Each channel holds
+   * `1 - opticalDepth / 5`, so 1 means nothing is in the way.
+   */
+  transmissionThicknessTexture?: Nullable<Texture2DArray>;
   /**
    * Whether the current clustered light pass should sample the opaque shadow mask
    * for shadow-casting lights. True for the opaque queue; false for transparent
@@ -193,8 +217,19 @@ export interface DrawContext {
   SSSDiffuseTexture: Nullable<Texture2D>;
   /** SSS transmission-lighting texture used for thin-shell/backscatter contributions. */
   SSSTransmissionTexture: Nullable<Texture2D>;
-  /** Skin-specific screen-space scattering source texture. */
-  SkinSSSTexture: Nullable<Texture2D>;
+  /** SSS mask texture. */
+  SSSMaskTexture: Nullable<Texture2D>;
+  /**
+   * Per-pixel skin profile id written by the depth prepass, `0` where the pixel
+   * is not skin.
+   *
+   * @remarks
+   * Normalized as `id / 255`, matching {@link SSSProfile.encodedId}, and stored
+   * in an `r8unorm` target so the round trip is exact.
+   */
+  SSSProfileIdTexture: Nullable<Texture2D>;
+  /** Skin screen-space scattering is active this frame. */
+  postSSS: boolean;
   /** SSR SDF proxy uniform buffer (pair of vec4: min.xyz / max.xyz for each box). */
   ssrSDFBoxBuffer: Nullable<GPUDataBuffer>;
   /** Number of valid SDF proxy boxes in `ssrSDFBoxBuffer`. */

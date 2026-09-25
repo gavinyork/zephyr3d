@@ -194,6 +194,8 @@ export class PunctualLight extends BaseLight {
   /** @internal */
   protected _castShadow!: boolean;
   /** @internal */
+  protected _transmission!: boolean;
+  /** @internal */
   protected _shadowMapper!: ShadowMapper;
   /**
    * Creates an instance of punctual light
@@ -211,6 +213,9 @@ export class PunctualLight extends BaseLight {
     }
     if (this._castShadow == null) {
       this._castShadow = false;
+    }
+    if (this._transmission == null) {
+      this._transmission = false;
     }
     if (!this._shadowMapper) {
       this._shadowMapper = new ShadowMapper(this);
@@ -262,6 +267,37 @@ export class PunctualLight extends BaseLight {
   get shadow() {
     this.ensurePunctualState();
     return this._shadowMapper;
+  }
+  /**
+   * Whether this light contributes back-lit subsurface transmission.
+   *
+   * @remarks
+   * Off by default: each enabled light costs one extra fullscreen pass that
+   * measures light-space thickness against this light's shadow map, so only turn
+   * it on for the lights whose transmission is actually visible — typically a
+   * single key or rim light.
+   *
+   * Requires {@link PunctualLight.castShadow}, since the thickness is derived
+   * from the shadow map. Point lights are not supported yet and are ignored.
+   *
+   * @public
+   */
+  get transmission() {
+    this.ensurePunctualState();
+    return this._transmission;
+  }
+  set transmission(b) {
+    this.setTransmission(b);
+  }
+  /**
+   * Sets whether this light contributes back-lit subsurface transmission.
+   * @param b - true to enable transmission for this light
+   * @returns self
+   */
+  setTransmission(b: boolean): this {
+    this.ensurePunctualState();
+    this._transmission = !!b;
+    return this;
   }
   /**
    * {@inheritDoc BaseLight.isPunctualLight}

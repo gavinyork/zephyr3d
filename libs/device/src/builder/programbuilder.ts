@@ -3622,6 +3622,9 @@ export class PBGlobalScope extends PBScope {
           if (pb.shaderType === ShaderType.Fragment && pb.emulateDepthClamp) {
             this.$builtins.fragDepth = pb.clamp(this.$inputs.clamppedDepth, 0, 1);
           }
+          if (!isCompute) {
+            this.$defaultReturnVal = () => outputStruct![1];
+          }
           body?.call(this);
           //this.chMainStub();
           if (pb.shaderType === ShaderType.Vertex) {
@@ -3655,7 +3658,6 @@ export class PBGlobalScope extends PBScope {
               }
             }
           }
-
           if (!isCompute) {
             this.$return(outputStruct![1]);
           }
@@ -3845,6 +3847,9 @@ export class PBInsideFunctionScope extends PBScope {
    */
   $return(retval?: ExpValueType) {
     const functionScope = this.findOwnerFunction();
+    if (functionScope?.$defaultReturnVal) {
+      retval = functionScope!.$defaultReturnVal();
+    }
     const astFunc = functionScope!.$ast as AST.ASTFunction;
     let returnType: Nullable<PBTypeInfo> = null;
     const retValNonArray = getCurrentProgramBuilder()!.normalizeExpValue(retval!);
@@ -4061,6 +4066,8 @@ export class PBFunctionScope extends PBInsideFunctionScope {
   /** @internal */
   $typeinfo!: PBFunctionTypeInfo;
   /** @internal */
+  $defaultReturnVal: Nullable<() => PBShaderExp>;
+  /** @internal */
   constructor(
     parent: PBGlobalScope,
     params: PBShaderExp[],
@@ -4069,6 +4076,7 @@ export class PBFunctionScope extends PBInsideFunctionScope {
   ) {
     super(parent);
     this.$ast = ast;
+    this.$defaultReturnVal = null;
     for (const param of params) {
       if (this.$_variables[param.$str]) {
         throw new Error('Duplicate function parameter name is not allowed');

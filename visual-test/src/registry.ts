@@ -6,7 +6,7 @@ import {
   hairMarschner,
   pbrMetalRoughGrid,
   skinShadow,
-  skinSss,
+  sss,
   unlitTextured
 } from './scenes/materials';
 import { pbrIbl, skyAtmosphere } from './scenes/env';
@@ -51,6 +51,13 @@ import {
   taaMultiframe
 } from './scenes/post';
 import { eyeAngled, eyeFrontal, eyePupilDilated, eyeSocketOcclusion } from './scenes/eye';
+import {
+  transmissionThicknessLadder,
+  transmissionThicknessScale,
+  transmissionThicknessSlant,
+  transmissionThicknessSphere,
+  transmissionThicknessSphereFine
+} from './scenes/transmission-thickness';
 import {
   hairScatterOff,
   hairScatterOn,
@@ -133,9 +140,15 @@ export const SCENES: VisualScene[] = [
   postMotionBlurLong,
   taaMultiframe,
   // Digital-human materials.
-  skinSss,
+  sss,
   skinDiffusionJade,
   skinShadow,
+  // Light-space thickness. Computed rather than compared - see the scene file.
+  transmissionThicknessLadder,
+  transmissionThicknessScale,
+  transmissionThicknessSlant,
+  transmissionThicknessSphere,
+  transmissionThicknessSphereFine,
   hair,
   // Strand hair: the curve import paths, from container bytes to ribbons.
   hairStrandsHelix,

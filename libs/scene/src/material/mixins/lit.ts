@@ -90,7 +90,8 @@ export type IMixinLight = {
       dirCutoff: PBShaderExp,
       colorIntensity: PBShaderExp,
       extra: PBShaderExp,
-      shadow: boolean
+      shadow: boolean,
+      thickness: PBShaderExp
     ) => void
   ): void;
 } & TextureMixinInstanceTypes<['normal']> &
@@ -736,7 +737,8 @@ export function mixinLight<T extends typeof MeshMaterial>(BaseCls: T) {
         dirCutoff: PBShaderExp,
         colorIntensity: PBShaderExp,
         extra: PBShaderExp,
-        shadow: boolean
+        shadow: boolean,
+        thickness: PBShaderExp
       ) => void
     ) {
       const pb = scope.$builder;
@@ -752,7 +754,12 @@ export function mixinLight<T extends typeof MeshMaterial>(BaseCls: T) {
         const extra = scope.light.extraParams ?? pb.vec4(0);
         scope.$scope(function () {
           const lightType = pb.int(extra.w);
-          callback.call(this, lightType, posRange, dirCutoff, colorIntensity, extra, true);
+          // The per-light additive path has no thickness texture: it is produced
+          // for the clustered queue only. 1 is the "no data" sentinel the
+          // thickness pass can never write, so consumers read this as "this
+          // light contributes no transmission" rather than as zero thickness —
+          // which would be the *most* transmissive reading of the encoding.
+          callback.call(this, lightType, posRange, dirCutoff, colorIntensity, extra, true, pb.float(1));
         });
       } else {
         scope.$scope(function () {
@@ -808,6 +815,10 @@ export function mixinLight<T extends typeof MeshMaterial>(BaseCls: T) {
                           this.diffuseIntensity.w
                         );
                       }
+                      this.$l.thickness = pb.float(1);
+                      if (that.drawContext.transmissionThickness) {
+                        this.thickness = ShaderHelper.sampleTransmissionThickness(this, this.j);
+                      }
                       this.$l.lightType = pb.int(this.extra.w);
                       this.$scope(function () {
                         callback.call(
@@ -817,7 +828,8 @@ export function mixinLight<T extends typeof MeshMaterial>(BaseCls: T) {
                           this.directionCutoff,
                           this.diffuseIntensity,
                           this.extra,
-                          false
+                          false,
+                          this.thickness
                         );
                       });
                       this.$break();
@@ -844,6 +856,10 @@ export function mixinLight<T extends typeof MeshMaterial>(BaseCls: T) {
                       this.diffuseIntensity.w
                     );
                   }
+                  this.$l.thickness = pb.float(1);
+                  if (that.drawContext.transmissionThickness) {
+                    this.thickness = ShaderHelper.sampleTransmissionThickness(this, pb.int(this.c));
+                  }
                   this.$l.lightType = pb.int(this.extra.w);
                   this.$scope(function () {
                     callback.call(
@@ -853,7 +869,8 @@ export function mixinLight<T extends typeof MeshMaterial>(BaseCls: T) {
                       this.directionCutoff,
                       this.diffuseIntensity,
                       this.extra,
-                      false
+                      false,
+                      this.thickness
                     );
                   });
                 });

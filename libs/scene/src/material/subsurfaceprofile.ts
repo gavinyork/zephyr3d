@@ -222,7 +222,7 @@ export class SubsurfaceProfile {
     SubsurfaceProfile._maxProfiles + 1
   ).fill(null);
   private static _version = 0;
-  private static _defaultSkinProfile: SubsurfaceProfile | null = null;
+  private static _defaultSSSProfile: SubsurfaceProfile | null = null;
   private readonly _scatterRadius: Vector3;
   private readonly _falloffColor: Vector3;
   private readonly _meanFreePathColor: Vector3;
@@ -325,10 +325,10 @@ export class SubsurfaceProfile {
    * @public
    */
   static getDefaultSkinProfile() {
-    if (!this._defaultSkinProfile) {
-      this._defaultSkinProfile = new SubsurfaceProfile();
+    if (!this._defaultSSSProfile) {
+      this._defaultSSSProfile = new SubsurfaceProfile();
     }
-    return this._defaultSkinProfile;
+    return this._defaultSSSProfile;
   }
 
   /**

@@ -900,6 +900,23 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
    * @param pass - Material pass index.
    * @returns True if the pass is transparent; otherwise false.
    */
+  /**
+   * Whether an opaque light pass keeps the alpha this material computed.
+   *
+   * @remarks
+   * Opaque geometry normally forces `SceneColor.a` to 1, since nothing reads it.
+   * A material that encodes data there for a later screen-space pass — as
+   * {@link SSSMaterial} does with its diffuse luminance — overrides this to opt
+   * out. Only affects opaque passes; transparent alpha handling is unchanged.
+   *
+   * @param ctx - The current draw context.
+   * @returns `true` to keep the computed alpha. Defaults to `false`.
+   */
+  protected preservesOpaqueAlpha(ctx: DrawContext): boolean {
+    void ctx;
+    return false;
+  }
+
   isTransparentPass(pass: number, ctx?: DrawContext) {
     return this.getEffectiveBlendMode(pass, ctx) !== 'none';
   }
@@ -1096,11 +1113,17 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
             this.$outputs.zSSSTransmission = pb.vec4();
           }
           if (ctx.materialFlags & MaterialVaryingFlags.SKIN_SSS_STORE) {
-            this.$outputs.zSkinSSS = pb.vec4();
+            this.$outputs.zPostSSS = pb.vec4();
           }
           if (ctx.renderPass!.type === RENDER_PASS_TYPE_DEPTH && ctx.motionVectors) {
             this.$outputs.zMotionVector = pb.vec4();
             this.zTAAStrength = pb.float().uniform(2);
+          }
+          // Declared after the motion vector, because the declaration order is
+          // the MRT order and the prepass framebuffer appends this attachment
+          // last (render/rendergraph/forward_plus_builder.ts, DepthPrepassModule).
+          if (ctx.renderPass!.type === RENDER_PASS_TYPE_DEPTH && ctx.sssProfileId) {
+            this.$outputs.zSSSProfileId = pb.vec4();
           }
           if (ctx.renderPass!.type === RENDER_PASS_TYPE_OBJECT_COLOR) {
             this.$outputs.zDistance = pb.vec4();
@@ -1112,6 +1135,24 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
       }
     });
     return program;
+  }
+  /**
+   * Per-pixel subsurface profile id this material contributes to the depth prepass.
+   *
+   * @remarks
+   * `null` (the default) means "not skin", which is what every material other than
+   * {@link SSSMaterial} wants; otherwise the normalized `SSSProfile.encodedId`.
+   *
+   * It lives on the prepass rather than the light pass because the transmission
+   * thickness pass needs it and runs earlier, and because that frees the skin mask
+   * buffer's alpha to carry the subsurface opacity.
+   *
+   * @param scope - Inside-function shader scope.
+   * @returns Normalized profile id expression, or `null` for non-skin materials.
+   */
+  protected getDepthPassProfileId(scope: PBInsideFunctionScope): Nullable<PBShaderExp> {
+    void scope;
+    return null;
   }
   /**
    * Centralized final color write and per-pass output composition.
@@ -1147,7 +1188,7 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
     sssDiffuse?: PBShaderExp,
     sssTransmission?: PBShaderExp,
     sssProfileEnabled = false,
-    skinSSS?: PBShaderExp
+    postSSS?: PBShaderExp
   ) {
     const pb = scope.$builder;
     const that = this;
@@ -1242,7 +1283,11 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
       this.$l.outColor = color ? this.color : pb.vec4();
       if (that.drawContext.renderPass!.type === RENDER_PASS_TYPE_LIGHT) {
         let output = true;
-        if (!that.isTransparentPass(that.pass, that.drawContext) && !that.alphaToCoverage) {
+        if (
+          !that.isTransparentPass(that.pass, that.drawContext) &&
+          !that.alphaToCoverage &&
+          !that.preservesOpaqueAlpha(that.drawContext)
+        ) {
           this.outColor.a = 1;
         } else if (that.isTransparentPass(that.pass, that.drawContext)) {
           const opacity =
@@ -1325,6 +1370,18 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
               this.$outputs.zMotionVector = pb.vec4(0, 0, 1, 1);
             }
           }
+        }
+        // Not in the motion-vector-only pass, whose framebuffer carries a single
+        // attachment: assigning to `$outputs` declares the output implicitly, so
+        // writing here regardless would give that pass one the framebuffer has no
+        // target for. It is also right on its own terms - the profile id is a
+        // prepass product and the prepass draws only opaque geometry.
+        if (that.drawContext.sssProfileId && !depthPass.motionVectorOnly) {
+          // Every material in the prepass writes this attachment, so non-skin ones
+          // must write the "no profile" id: the target is shared, and a stale texel
+          // would be read as a real profile row.
+          const profileId = that.getDepthPassProfileId(this);
+          this.$outputs.zSSSProfileId = pb.vec4(profileId ?? pb.float(0));
         }
       } else if (that.drawContext.renderPass!.type === RENDER_PASS_TYPE_OBJECT_COLOR) {
         if (color) {
@@ -1428,11 +1485,11 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
       scope.$outputs.zSSSTransmission = disableSSS ? pb.vec4(0) : (sssTransmission ?? pb.vec4(0));
     }
     if (that.drawContext.materialFlags & MaterialVaryingFlags.SKIN_SSS_STORE) {
-      const disableSkinSSS =
+      const disablePostSSS =
         that.drawContext.renderPass!.type !== RENDER_PASS_TYPE_LIGHT ||
         (that.isTransparentPass(that.pass, that.drawContext) && !that.alphaToCoverage) ||
         that.needSceneColor();
-      scope.$outputs.zSkinSSS = disableSkinSSS ? pb.vec4(0) : (skinSSS ?? pb.vec4(0));
+      scope.$outputs.zPostSSS = disablePostSSS ? pb.vec4(0) : (postSSS ?? pb.vec4(0));
     }
   }
 }

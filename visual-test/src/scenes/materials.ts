@@ -4,7 +4,7 @@ import {
   HairMaterial,
   Mesh,
   PlaneShape,
-  SkinMaterial,
+  SSSMaterial,
   SphereShape,
   UnlitMaterial
 } from '@zephyr3d/scene';
@@ -60,21 +60,16 @@ export const pbrMetalRoughGrid: VisualScene = {
 /**
  * Subsurface skin, the material the digital-human work leans on hardest.
  *
- * `camera.skinSSS` has to be switched on explicitly - it defaults to false, and
- * without it this scene renders SkinMaterial's direct lighting only and the
- * entire SkinSSS pass is a no-op. That is what the scene did for its whole
- * history despite its name, so the diffusion went unpinned.
- *
  * Back-lit transmission is *not* covered here, and the scene should not claim to
  * be: the term is gated on `subsurfaceTexture`, whose B channel carries the
  * thickness it needs, and this scene sets no such texture. `transmissionStrength`
  * is left at a nonzero value only so a regression that ungates the term shows up
  * as a diff rather than silently doing nothing.
  */
-export const skinSss: VisualScene = {
-  name: 'skin-sss',
+export const sss: VisualScene = {
+  name: 'sss',
   description:
-    'SkinMaterial sphere under a grazing key with SkinSSS enabled. Pins the diffuse wrap and the channel-dependent diffusion across a wide terminator.',
+    'SSSMaterial sphere under a grazing key with PostSSS enabled. Pins the diffuse wrap and the channel-dependent diffusion across a wide terminator.',
   setup({ scene, camera }) {
     bareScene(scene);
     // Grazing key from the left, so the terminator runs down the middle of the
@@ -89,21 +84,28 @@ export const skinSss: VisualScene = {
     rim.lookAt(new Vector3(1.5, 1, -5), Vector3.zero(), Vector3.axisPY());
     rim.color = new Vector4(0.35, 0.22, 0.2, 1);
 
-    const material = new SkinMaterial();
+    const material = new SSSMaterial();
     material.albedoColor = new Vector4(0.85, 0.66, 0.58, 1);
     material.transmissionStrength = 0.6;
-    material.diffuseWrap = 0.5;
     const head = new Mesh(scene, new SphereShape({ radius: 1.5 }), material);
     head.position.setXYZ(0, 0, 0);
     placeCamera(camera, new Vector3(0, 0, 5.5));
 
-    camera.skinSSS = true;
-    // Tap spacing has to keep up with the projected radius or the kernel is
-    // clamped short and the scene silently stops testing the far tail.
-    camera.skinSSSSampleStep = 5;
-    // The sphere is 1.5 units across on screen, so a human-scale 2 cm radius
-    // would be invisible here; this is scaled to the stand-in geometry.
-    camera.skinSSSScatterRadius = 0.35;
+    // The sphere is 1.5 units across, so the diffusion is scaled up from human
+    // skin to read at this size. The extent lives entirely on the profile.
+    //
+    // 1.4 rather than the 0.35 this used to carry. The diffusion converts a
+    // world radius to UV by dividing through the view depth, and that divide was
+    // inverted until recently - a perspective camera got 1 instead of the depth,
+    // so the disc came out scaled by the camera distance. At the 4.0 units this
+    // sphere's surface sits at, the old 0.35 therefore rendered as 25 px of
+    // scattering rather than the 6 px it asks for. The factor of four is put
+    // back here so the scene keeps the footprint its baseline was authored
+    // around; without it the two diffusion scenes land within 10% of each other
+    // and stop telling the per-channel radii apart, which is the whole point of
+    // the pair.
+    material.subsurfaceProfile.preset = 'skin';
+    material.subsurfaceProfile.meanFreePathDistance = 1.4;
   }
 };
 
@@ -111,22 +113,22 @@ export const skinSss: VisualScene = {
  * The stylization range of the diffusion, and the evidence that grounding it in
  * a physical model did not cost any.
  *
- * Identical to `skin-sss` in geometry and lighting; the only difference is the
+ * Identical to `sss` in geometry and lighting; the only difference is the
  * subsurface profile driving the per-channel scatter radii. Jade is the furthest
  * thing from skin the presets offer - green travels furthest instead of red - so
- * a diff against `skin-sss` isolates exactly what the channel ratios contribute.
+ * a diff against `sss` isolates exactly what the channel ratios contribute.
  *
- * The profile is a property of the pass rather than of a material, so the
- * contrast has to live across two scenes instead of across three spheres in one.
- * Per-material profiles are the profile-slot path used by `SSS`.
+ * The profile is a property of the material, so the contrast could live in one
+ * scene; it stays split across two so that a diff against `sss` isolates
+ * exactly what the channel ratios contribute.
  *
  * This is the scene that fails if the channels ever collapse back to a shared
- * radius: it would converge on `skin-sss` and both would read as flat haze.
+ * radius: it would converge on `sss` and both would read as flat haze.
  */
 export const skinDiffusionJade: VisualScene = {
-  name: 'skin-diffusion-jade',
+  name: 'sss-diffusion-jade',
   description:
-    'The skin-sss setup diffused with the jade profile instead of skin. Pins the per-channel scatter radii and the stylization range the presets provide.',
+    'The sss setup diffused with the jade profile instead of skin. Pins the per-channel scatter radii and the stylization range the presets provide.',
   setup({ scene, camera }) {
     bareScene(scene);
     // Grazing key from the left, so the terminator runs down the middle of the
@@ -141,32 +143,32 @@ export const skinDiffusionJade: VisualScene = {
     rim.lookAt(new Vector3(1.5, 1, -5), Vector3.zero(), Vector3.axisPY());
     rim.color = new Vector4(0.35, 0.22, 0.2, 1);
 
-    const material = new SkinMaterial();
+    const material = new SSSMaterial();
     material.albedoColor = new Vector4(0.85, 0.66, 0.58, 1);
     material.transmissionStrength = 0.6;
-    material.diffuseWrap = 0.5;
+    // The profile lives on the material now, so the channel ratios are a
+    // per-mesh property rather than a property of the whole pass.
+    //
+    // Kept equal to `sss`'s distance, so that a diff between the two scenes
+    // isolates the channel ratios and nothing else. See the note there for why
+    // it is 1.4 rather than the 0.35 it used to be.
+    material.subsurfaceProfile.preset = 'jade';
+    material.subsurfaceProfile.meanFreePathDistance = 1.4;
     const head = new Mesh(scene, new SphereShape({ radius: 1.5 }), material);
     head.position.setXYZ(0, 0, 0);
     placeCamera(camera, new Vector3(0, 0, 5.5));
-
-    camera.skinSSS = true;
-    // Tap spacing has to keep up with the projected radius or the kernel is
-    // clamped short and the scene silently stops testing the far tail.
-    camera.skinSSSSampleStep = 5;
-    camera.skinSSSScatterRadius = 0.35;
-    camera.skinSSSProfilePreset = 'jade_soft';
   }
 };
 
 /**
- * Skin under a shadow-casting light, which `skin-sss` deliberately is not.
+ * Skin under a shadow-casting light, which `sss` deliberately is not.
  *
  * That scene lights its sphere with `keyLight`, whose `castShadow` defaults to
- * false, so every shadow-dependent line in SkinMaterial is dead code there -
+ * false, so every shadow-dependent line in SSSMaterial is dead code there -
  * the material's whole shadow path went untested until this scene existed.
  *
  * The terminator is where skin shows shadow bugs that other materials hide.
- * SkinMaterial mixes a wrapped diffuse into the visible lighting, so the band
+ * SSSMaterial mixes a wrapped diffuse into the visible lighting, so the band
  * around NdotL = 0 still receives roughly 10% of full diffuse; a Lambert surface
  * multiplies the same band by a vanishing NdotL and swallows the evidence.
  * Grazing-angle self-shadow acne is therefore plainly visible here and nearly
@@ -188,9 +190,9 @@ export const skinDiffusionJade: VisualScene = {
  *    defect by construction.
  */
 export const skinShadow: VisualScene = {
-  name: 'skin-shadow',
+  name: 'sss-shadow',
   description:
-    'SkinMaterial sphere under a grazing shadow-casting light, with a spherical occluder casting across its lit side. Pins the self-shadow terminator and a cast shadow whose edge must stay elliptical; skin-sss cannot see either, since its light casts no shadow.',
+    'SSSMaterial sphere under a grazing shadow-casting light, with a spherical occluder casting across its lit side. Pins the self-shadow terminator and a cast shadow whose edge must stay elliptical; sss cannot see either, since its light casts no shadow.',
   setup({ scene, camera }) {
     bareScene(scene);
     // A little ambient, so the shadowed side is readable rather than pure black
@@ -204,11 +206,11 @@ export const skinShadow: VisualScene = {
     light.shadow.mode = 'pcf';
     light.shadow.numShadowCascades = 1;
 
-    const material = new SkinMaterial();
+    const material = new SSSMaterial();
     material.albedoColor = new Vector4(0.85, 0.66, 0.58, 1);
-    material.scatterColor = new Vector4(0.75, 0.28, 0.2, 1);
-    material.scatterStrength = 0.8;
-    material.diffuseWrap = 0.5;
+    // The profile is left at its default, whose mean free path is sub-pixel on a
+    // sphere this size, so the diffusion the engine now runs automatically cannot
+    // move the terminator this baseline exists to pin.
     const head = new Mesh(scene, new SphereShape({ radius: 1.5 }), material);
     head.position.setXYZ(0, 0, 0);
 

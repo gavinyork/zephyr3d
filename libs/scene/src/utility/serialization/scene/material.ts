@@ -13,8 +13,10 @@ import {
   PBRMetallicRoughnessMaterial,
   PBRSpecularGlossinessMaterial,
   EyeMaterial,
-  SkinMaterial,
+  SSSMaterial,
   SubsurfaceProfile,
+  SSSProfile,
+  type SSSProfilePreset,
   type MToonOutlineWidthMode,
   type SubsurfaceProfilePreset,
   SpriteBlueprintMaterial,
@@ -24,7 +26,7 @@ import {
 } from '../../../material';
 import type { PBRBlueprintOutputName } from '../../../material/pbrblueprint';
 import { defineProps, type PropertyAccessor, type SerializableClass } from '../types';
-import type { Nullable } from '@zephyr3d/base';
+import type { GenericConstructor, Nullable } from '@zephyr3d/base';
 import { Vector2, Vector3, Vector4 } from '@zephyr3d/base';
 import { getTextureProps } from './common';
 import type { ResourceManager } from '../manager';
@@ -34,7 +36,7 @@ import { StandardSpriteMaterial } from '../../../material/sprite_std';
 import type { PBRReflectionMode } from '../../../material/mixins/lightmodel/pbrmetallicroughness';
 
 type PBRMaterial = PBRMetallicRoughnessMaterial | PBRSpecularGlossinessMaterial;
-type LitPropTypes = LambertMaterial | BlinnMaterial | SkinMaterial | HairMaterial | PBRMaterial;
+type LitPropTypes = LambertMaterial | BlinnMaterial | SSSMaterial | HairMaterial | PBRMaterial;
 type UnlitPropTypes = UnlitMaterial | LitPropTypes;
 
 function createBlueprintOutputHiddenPredicate(_outputs: readonly PBRBlueprintOutputName[]) {
@@ -346,6 +348,263 @@ export function getSubsurfaceProfileClass(): SerializableClass {
   };
 }
 
+/**
+ * Serialization for {@link SSSProfile}, the profile asset driving
+ * {@link SSSMaterial}'s subsurface scattering.
+ */
+export function getSSSProfileClass(): SerializableClass {
+  return {
+    // Not constructible from here by design; the cast is the price of declaring
+    // the class at all. `createFunc` below is what actually supplies the
+    // instance, so the constructor is never reached.
+    ctor: SSSProfile as unknown as GenericConstructor,
+    name: 'SSSProfile',
+    /**
+     * Hands back the owning material's profile instead of building one.
+     *
+     * A profile holds a row of a 256-entry GPU table that is only freed when its
+     * material is disposed, so deserializing into a fresh instance - which is
+     * what the default path does for an object-typed property - stranded a row
+     * on every scene load and every undo. `ctx` is the owner, since the
+     * property's deserializer passes the object it is filling in.
+     */
+    createFunc(ctx: unknown) {
+      const material = ctx as SSSMaterial | null;
+      return material instanceof SSSMaterial
+        ? { obj: material.subsurfaceProfile }
+        : { obj: null, loadProps: false };
+    },
+    getProps() {
+      return defineProps([
+        {
+          name: 'Preset',
+          description:
+            'Starting look for the whole profile: skin tones, wax, jade or marble. Choosing a preset overwrites every other value here, so pick one first and fine-tune afterwards',
+          type: 'string',
+          default: 'skin',
+          options: {
+            label: 'LookPreset',
+            enum: {
+              labels: ['Skin', 'Skin Pale', 'Skin Tan', 'Skin Dark', 'Wax', 'Jade', 'Marble'],
+              values: ['skin', 'skin_pale', 'skin_tan', 'skin_dark', 'wax', 'jade', 'marble']
+            }
+          },
+          get(this: SSSProfile, value) {
+            value.str[0] = this.preset;
+          },
+          set(this: SSSProfile, value) {
+            this.preset = value.str[0] as SSSProfilePreset;
+          }
+        },
+        {
+          name: 'SurfaceAlbedo',
+          description:
+            "Set this close to the skin's base color. It does not recolor the surface; it fine-tunes how soft or tight the scattered glow is in each color channel",
+          type: 'rgb',
+          default: [0.91058, 0.338275, 0.2718],
+          options: { animatable: true, minValue: 0, maxValue: 1 },
+          get(this: SSSProfile, value) {
+            value.num[0] = this.surfaceAlbedo.x;
+            value.num[1] = this.surfaceAlbedo.y;
+            value.num[2] = this.surfaceAlbedo.z;
+          },
+          set(this: SSSProfile, value) {
+            this.surfaceAlbedo = new Vector3(value.num[0], value.num[1], value.num[2]);
+          }
+        },
+        {
+          name: 'MeanFreePath',
+          description:
+            'Relative softness per color channel. The channel with the highest value bleeds furthest, which sets the color of the glow in shadow edges and around fine details; skin keeps red high, giving the warm red fringe at the light-to-shadow transition',
+          type: 'rgb',
+          default: [1, 0.0889636, 0.0720951],
+          options: { animatable: true, minValue: 0, maxValue: 1 },
+          get(this: SSSProfile, value) {
+            value.num[0] = this.meanFreePath.x;
+            value.num[1] = this.meanFreePath.y;
+            value.num[2] = this.meanFreePath.z;
+          },
+          set(this: SSSProfile, value) {
+            this.meanFreePath = new Vector3(value.num[0], value.num[1], value.num[2]);
+          }
+        },
+        {
+          name: 'MeanFreePathDistance',
+          description:
+            'Overall softness of the skin, in real-world metres (about 0.01 for human skin). Higher values blur lighting and surface detail more, giving a waxy, translucent look; lower values give a harder, more opaque, plastic-like surface',
+          type: 'float',
+          default: 0.026748,
+          options: { animatable: true, minValue: 0, maxValue: 1 },
+          get(this: SSSProfile, value) {
+            value.num[0] = this.meanFreePathDistance;
+          },
+          set(this: SSSProfile, value) {
+            this.meanFreePathDistance = value.num[0];
+          }
+        },
+        {
+          name: 'WorldUnitScale',
+          description:
+            "Set this to the model's size relative to real life (1 for a life-size model in metres, 4 for a head modelled four times too large). If the skin looks too waxy or too hard only because of the model's scale, fix it here instead of changing the softness",
+          type: 'float',
+          default: 1,
+          options: { animatable: true, minValue: 0.01, maxValue: 100 },
+          get(this: SSSProfile, value) {
+            value.num[0] = this.worldUnitScale;
+          },
+          set(this: SSSProfile, value) {
+            this.worldUnitScale = value.num[0];
+          }
+        },
+        {
+          name: 'ScatterScale',
+          description:
+            'Quick overall softness knob on top of MeanFreePathDistance, affecting both the soft skin look and the glow through thin parts. Raise it for softer, more translucent skin; 0 removes the soft scattering look entirely',
+          type: 'float',
+          default: 1,
+          options: { animatable: true, minValue: 0, maxValue: 8 },
+          get(this: SSSProfile, value) {
+            value.num[0] = this.scatterScale;
+          },
+          set(this: SSSProfile, value) {
+            this.scatterScale = value.num[0];
+          }
+        },
+        {
+          name: 'BoundaryColorBleed',
+          description:
+            'Color used where this skin meets a different profile, e.g. face and lips. Values near white let the softness blend smoothly across the boundary; darker or more saturated values tint the transition and make the seam more visible',
+          type: 'rgb',
+          default: [1, 1, 1],
+          options: { animatable: true, minValue: 0, maxValue: 1 },
+          get(this: SSSProfile, value) {
+            value.num[0] = this.boundaryColorBleed.x;
+            value.num[1] = this.boundaryColorBleed.y;
+            value.num[2] = this.boundaryColorBleed.z;
+          },
+          set(this: SSSProfile, value) {
+            this.boundaryColorBleed = new Vector3(value.num[0], value.num[1], value.num[2]);
+          }
+        },
+        {
+          name: 'TransmissionTint',
+          description:
+            'Color of the glow seen when light shines through thin parts such as ears, nostrils and fingers from behind. Warm reds and oranges for skin',
+          type: 'rgb',
+          default: [1, 0.42, 0.3],
+          options: { animatable: true, minValue: 0, maxValue: 1 },
+          get(this: SSSProfile, value) {
+            value.num[0] = this.transmissionTint.x;
+            value.num[1] = this.transmissionTint.y;
+            value.num[2] = this.transmissionTint.z;
+          },
+          set(this: SSSProfile, value) {
+            this.transmissionTint = new Vector3(value.num[0], value.num[1], value.num[2]);
+          }
+        },
+        {
+          name: 'ExtinctionScale',
+          description:
+            'How opaque the material is to back-lighting. Higher values make only the thinnest edges glow; lower values let the glow reach thicker areas, making the object look more translucent overall',
+          type: 'float',
+          default: 1,
+          options: { animatable: true, minValue: 0, maxValue: 8 },
+          get(this: SSSProfile, value) {
+            value.num[0] = this.extinctionScale;
+          },
+          set(this: SSSProfile, value) {
+            this.extinctionScale = value.num[0];
+          }
+        },
+        {
+          name: 'NormalScale',
+          description:
+            'Stability of the back-lit glow. Too low makes the glow through thin parts disappear or look blotchy; higher values give a cleaner, smoother glow but wash out small thin details. Does not affect front-lit skin',
+          type: 'float',
+          default: 0.08,
+          options: { animatable: true, minValue: 0, maxValue: 1 },
+          get(this: SSSProfile, value) {
+            value.num[0] = this.normalScale;
+          },
+          set(this: SSSProfile, value) {
+            this.normalScale = value.num[0];
+          }
+        },
+        {
+          name: 'ScatteringDistribution',
+          description:
+            'How directional the back-lit glow is. Values near 1 make thin parts glow strongly only when looking almost straight towards the light; lower values spread the glow over a wider range of viewing angles',
+          type: 'float',
+          default: 0.93,
+          options: { animatable: true, minValue: -1, maxValue: 1 },
+          get(this: SSSProfile, value) {
+            value.num[0] = this.scatteringDistribution;
+          },
+          set(this: SSSProfile, value) {
+            this.scatteringDistribution = value.num[0];
+          }
+        },
+        {
+          name: 'IOR',
+          description:
+            'Changes how the back-lit glow depends on the viewing angle. Higher values make the glow follow the surface shape and the light more than the camera direction. Does not affect front-lit highlights',
+          type: 'float',
+          default: 1.55,
+          options: { animatable: true, minValue: 1, maxValue: 3 },
+          get(this: SSSProfile, value) {
+            value.num[0] = this.ior;
+          },
+          set(this: SSSProfile, value) {
+            this.ior = value.num[0];
+          }
+        },
+        {
+          name: 'Roughness0',
+          description:
+            'Sharpness of the tight highlight layer, as a fraction of the material roughness. Lower values give a small, crisp, oily-looking highlight',
+          type: 'float',
+          default: 0.75,
+          options: { animatable: true, minValue: 0.5, maxValue: 2 },
+          get(this: SSSProfile, value) {
+            value.num[0] = this.roughness0;
+          },
+          set(this: SSSProfile, value) {
+            this.roughness0 = value.num[0];
+          }
+        },
+        {
+          name: 'Roughness1',
+          description:
+            'Sharpness of the broad highlight layer, as a fraction of the material roughness. Lower values make the soft sheen smaller and brighter',
+          type: 'float',
+          default: 1.3,
+          options: { animatable: true, minValue: 0.5, maxValue: 2 },
+          get(this: SSSProfile, value) {
+            value.num[0] = this.roughness1;
+          },
+          set(this: SSSProfile, value) {
+            this.roughness1 = value.num[0];
+          }
+        },
+        {
+          name: 'LobeMix',
+          description:
+            'Balance between the two highlight layers. 0 shows only the tight, crisp highlight; higher values add more of the broad, soft sheen for a more matte look',
+          type: 'float',
+          default: 0.85,
+          options: { animatable: true, minValue: 0.1, maxValue: 0.9 },
+          get(this: SSSProfile, value) {
+            value.num[0] = this.lobeMix;
+          },
+          set(this: SSSProfile, value) {
+            this.lobeMix = value.num[0];
+          }
+        }
+      ]);
+    }
+  };
+}
+
 function getPBRCommonProps(manager: ResourceManager): PropertyAccessor<PBRMaterial>[] {
   const supportsSSSThicknessAuthoring = function (this: PBRMaterial) {
     return (
@@ -487,6 +746,8 @@ function getPBRCommonProps(manager: ResourceManager): PropertyAccessor<PBRMateri
     },
     {
       name: 'RectSpecularScale',
+      description:
+        'Brightness of the highlights produced by rectangular area lights on this material; 1 is neutral, lower values dim the reflections of the light panels, higher values make them brighter',
       type: 'float',
       options: {
         label: 'RectSpecularScale',
@@ -1642,6 +1903,8 @@ export function getMeshMaterialClass(): SerializableClass[] {
           },
           {
             name: 'TransparentShadowCaster',
+            description:
+              'Lets a transparent (blended) material cast shadows. Areas more opaque than ShadowAlphaCutoff cast solid shadows, useful for foliage, hair cards or fabric; when off, transparent objects cast no shadow',
             type: 'bool',
             default: false,
             get(this: MeshMaterial, value) {
@@ -1656,6 +1919,8 @@ export function getMeshMaterialClass(): SerializableClass[] {
           },
           {
             name: 'ShadowAlphaCutoff',
+            description:
+              'Opacity above which a transparent material casts shadow. Lower values make fainter parts cast shadow too, giving fuller shadows; higher values keep only the most opaque parts, giving thinner shadows',
             type: 'float',
             default: 0.5,
             options: {
@@ -2623,245 +2888,86 @@ export function getHairStrandMaterialClass(): SerializableClass[] {
 export function getSkinMaterialClass(manager: ResourceManager): SerializableClass[] {
   return [
     {
-      ctor: SkinMaterial,
+      ctor: SSSMaterial,
       parent: MeshMaterial,
-      name: 'SkinMaterial',
+      name: 'SSSMaterial',
       getProps() {
         return defineProps([
           {
-            name: 'Shininess',
-            description: 'Blinn specular exponent for skin highlights',
+            name: 'Roughness',
+            description: 'GGX base roughness for skin',
             type: 'float',
-            default: 72,
-            options: {
-              animatable: true,
-              minValue: 1,
-              maxValue: 2048
+            default: 0.5,
+            options: { animatable: true, minValue: 0.045, maxValue: 1 },
+            get(this: SSSMaterial, value) {
+              value.num[0] = this.roughness;
             },
-            get(this: SkinMaterial, value) {
-              value.num[0] = this.shininess;
+            set(this: SSSMaterial, value) {
+              this.roughness = value.num[0];
             },
-            set(this: SkinMaterial, value) {
-              this.shininess = value.num[0];
-            },
-            getDefaultValue(this: SkinMaterial) {
-              return this.$isInstance ? this.coreMaterial.shininess : 72;
+            getDefaultValue(this: SSSMaterial) {
+              return this.$isInstance ? this.coreMaterial.roughness : 0.5;
             }
           },
           {
-            name: 'SpecularStrength',
-            description: 'Direct specular strength for restrained skin highlights',
+            name: 'SpecularF0',
+            description: 'Fresnel F0 for the skin oil layer. UE5: 0.08 * Specular',
             type: 'float',
-            default: 1,
-            options: {
-              animatable: true,
-              minValue: 0,
-              maxValue: 4
+            default: 0.04,
+            options: { animatable: true, minValue: 0, maxValue: 0.2 },
+            get(this: SSSMaterial, value) {
+              value.num[0] = this.specularF0;
             },
-            get(this: SkinMaterial, value) {
-              value.num[0] = this.specularStrength;
+            set(this: SSSMaterial, value) {
+              this.specularF0 = value.num[0];
             },
-            set(this: SkinMaterial, value) {
-              this.specularStrength = value.num[0];
-            },
-            getDefaultValue(this: SkinMaterial) {
-              return this.$isInstance ? this.coreMaterial.specularStrength : 1;
+            getDefaultValue(this: SSSMaterial) {
+              return this.$isInstance ? this.coreMaterial.specularF0 : 0.04;
             }
           },
           {
-            name: 'DiffuseWrap',
-            description: 'Wrap amount for visible diffuse lighting',
-            type: 'float',
-            default: 0.28,
+            name: 'SubsurfaceProfile',
+            description: 'Profile driving the subsurface scattering of this skin',
+            type: 'object',
+            phase: 0,
+            default: null,
             options: {
-              animatable: true,
-              minValue: 0,
-              maxValue: 2
+              objectTypes: [SSSProfile as unknown as GenericConstructor]
             },
-            get(this: SkinMaterial, value) {
-              value.num[0] = this.diffuseWrap;
+            get(this: SSSMaterial, value) {
+              value.object[0] = this.subsurfaceProfile;
             },
-            set(this: SkinMaterial, value) {
-              this.diffuseWrap = value.num[0];
-            },
-            getDefaultValue(this: SkinMaterial) {
-              return this.$isInstance ? this.coreMaterial.diffuseWrap : 0.28;
-            }
-          },
-          {
-            name: 'DiffuseSoftness',
-            description: 'Blend from hard Lambert lighting to wrapped diffuse lighting',
-            type: 'float',
-            default: 0.45,
-            options: {
-              animatable: true,
-              minValue: 0,
-              maxValue: 1
-            },
-            get(this: SkinMaterial, value) {
-              value.num[0] = this.diffuseSoftness;
-            },
-            set(this: SkinMaterial, value) {
-              this.diffuseSoftness = value.num[0];
-            },
-            getDefaultValue(this: SkinMaterial) {
-              return this.$isInstance ? this.coreMaterial.diffuseSoftness : 0.45;
-            }
-          },
-          {
-            name: 'ScatterWrap',
-            description: 'Wide wrap amount written to the Skin SSS scattering source',
-            type: 'float',
-            default: 0.65,
-            options: {
-              animatable: true,
-              minValue: 0,
-              maxValue: 2
-            },
-            get(this: SkinMaterial, value) {
-              value.num[0] = this.scatterWrap;
-            },
-            set(this: SkinMaterial, value) {
-              this.scatterWrap = value.num[0];
-            },
-            getDefaultValue(this: SkinMaterial) {
-              return this.$isInstance ? this.coreMaterial.scatterWrap : 0.65;
-            }
-          },
-          {
-            name: 'ScatterStrength',
-            description: 'Strength of the scatter irradiance written to the Skin SSS side buffer',
-            type: 'float',
-            default: 1.5,
-            options: {
-              animatable: true,
-              minValue: 0,
-              maxValue: 4
-            },
-            get(this: SkinMaterial, value) {
-              value.num[0] = this.scatterStrength;
-            },
-            set(this: SkinMaterial, value) {
-              this.scatterStrength = value.num[0];
-            },
-            getDefaultValue(this: SkinMaterial) {
-              return this.$isInstance ? this.coreMaterial.scatterStrength : 1.5;
-            }
-          },
-          {
-            name: 'ScatterColor',
-            description: 'Warm tint for the blurred skin scattering contribution',
-            type: 'rgba',
-            default: [1, 0.42, 0.28, 1],
-            options: {
-              animatable: true,
-              minValue: 0,
-              maxValue: 1
-            },
-            get(this: SkinMaterial, value) {
-              value.num[0] = this.scatterColor.x;
-              value.num[1] = this.scatterColor.y;
-              value.num[2] = this.scatterColor.z;
-              value.num[3] = this.scatterColor.w;
-            },
-            set(this: SkinMaterial, value) {
-              this.scatterColor = new Vector4(value.num[0], value.num[1], value.num[2], value.num[3]);
-            },
-            getDefaultValue(this: SkinMaterial) {
-              const color = this.$isInstance ? this.coreMaterial.scatterColor : new Vector4(1, 0.42, 0.28, 1);
-              return [color.x, color.y, color.z, color.w];
-            }
-          },
-          {
-            name: 'ShadowTint',
-            description: 'NPR shadow tint the dark end of the diffuse ramp lifts toward (black is neutral)',
-            type: 'rgba',
-            default: [0, 0, 0, 1],
-            options: {
-              animatable: true,
-              minValue: 0,
-              maxValue: 1
-            },
-            get(this: SkinMaterial, value) {
-              value.num[0] = this.shadowTint.x;
-              value.num[1] = this.shadowTint.y;
-              value.num[2] = this.shadowTint.z;
-              value.num[3] = this.shadowTint.w;
-            },
-            set(this: SkinMaterial, value) {
-              this.shadowTint = new Vector4(value.num[0], value.num[1], value.num[2], value.num[3]);
-            },
-            getDefaultValue(this: SkinMaterial) {
-              const color = this.$isInstance ? this.coreMaterial.shadowTint : new Vector4(0, 0, 0, 1);
-              return [color.x, color.y, color.z, color.w];
-            }
-          },
-          {
-            name: 'Brightening',
-            description: 'Whitening gain applied to the whole diffuse response',
-            type: 'float',
-            default: 0,
-            options: {
-              animatable: true,
-              minValue: 0,
-              maxValue: 2
-            },
-            get(this: SkinMaterial, value) {
-              value.num[0] = this.brightening;
-            },
-            set(this: SkinMaterial, value) {
-              this.brightening = value.num[0];
-            },
-            getDefaultValue(this: SkinMaterial) {
-              return this.$isInstance ? this.coreMaterial.brightening : 0;
-            }
+            // Deliberately empty rather than absent. The material owns its
+            // profile and cannot be handed another one, but a property with no
+            // setter is skipped outright during deserialization, and the nested
+            // values would never be read back - `createFunc` on the profile
+            // class has already routed them into this material's own instance by
+            // the time this runs.
+            set() {}
           },
           {
             name: 'TransmissionStrength',
-            description: 'Back-lit transmission strength (needs thickness in subsurface texture B)',
+            description:
+              'Multiplier on back-lit transmission; needs a shadow-casting light with transmission enabled',
             type: 'float',
-            default: 0,
-            options: {
-              animatable: true,
-              minValue: 0,
-              maxValue: 4
-            },
-            get(this: SkinMaterial, value) {
+            default: 1,
+            options: { animatable: true, minValue: 0, maxValue: 4 },
+            get(this: SSSMaterial, value) {
               value.num[0] = this.transmissionStrength;
             },
-            set(this: SkinMaterial, value) {
+            set(this: SSSMaterial, value) {
               this.transmissionStrength = value.num[0];
             },
-            getDefaultValue(this: SkinMaterial) {
-              return this.$isInstance ? this.coreMaterial.transmissionStrength : 0;
+            getDefaultValue(this: SSSMaterial) {
+              return this.$isInstance ? this.coreMaterial.transmissionStrength : 1;
             }
           },
-          {
-            name: 'TransmissionPower',
-            description: 'Exponent of the back-lit transmission falloff',
-            type: 'float',
-            default: 4,
-            options: {
-              animatable: true,
-              minValue: 1,
-              maxValue: 16
-            },
-            get(this: SkinMaterial, value) {
-              value.num[0] = this.transmissionPower;
-            },
-            set(this: SkinMaterial, value) {
-              this.transmissionPower = value.num[0];
-            },
-            getDefaultValue(this: SkinMaterial) {
-              return this.$isInstance ? this.coreMaterial.transmissionPower : 4;
-            }
-          },
-          ...getTextureProps<SkinMaterial>(manager, 'subsurfaceTexture', '2D', false, 1),
+          ...getTextureProps<SSSMaterial>(manager, 'subsurfaceTexture', '2D', false, 1),
           ...getLitMaterialProps(manager)
         ]);
       }
     },
-    getMeshMaterialInstanceUniformsClass(SkinMaterial)
+    getMeshMaterialInstanceUniformsClass(SSSMaterial)
   ];
 }
 
