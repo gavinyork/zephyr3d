@@ -22,6 +22,7 @@ import {
 } from './scenes/shadows';
 import {
   clusterManyLights,
+  rectLightAutoRange,
   rectLightBlueprint,
   rectLightDiffuse,
   rectLightGlossy,
@@ -133,6 +134,7 @@ export const SCENES: VisualScene[] = [
   rectLightPcssSmall,
   rectLightPcssLarge,
   rectLightPcssWall,
+  rectLightAutoRange,
   // Water: the medium, and the caustics it focuses onto what is under it.
   waterCausticsOff,
   waterCausticsOn,

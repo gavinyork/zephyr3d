@@ -996,7 +996,15 @@ export class RectLight extends PunctualLight {
     this._luminance = 100;
     this.invalidateBoundingVolume();
   }
-  /** The range of the light */
+  /**
+   * The range of the light, in world units.
+   *
+   * @remarks
+   * 0 derives it from the light's output, as for point lights: the distance at
+   * which the rect, seen as a point of intensity `luminance * area`, falls to
+   * the same illuminance cutoff. It is never shorter than the rect's diagonal,
+   * so a large dim panel still lights its own surroundings.
+   */
   get range() {
     return this._range;
   }
@@ -1054,6 +1062,9 @@ export class RectLight extends PunctualLight {
     if (luminance !== this._luminance) {
       this._luminance = luminance;
       this.invalidateUniforms();
+      if (this._range <= 0) {
+        this.invalidateBoundingVolume();
+      }
     }
   }
   /**
@@ -1088,6 +1099,19 @@ export class RectLight extends PunctualLight {
     return this;
   }
   /**
+   * {@inheritDoc BaseLight.setIntensity}
+   * @override
+   */
+  setIntensity(val: number) {
+    const changed = val !== this._intensity;
+    super.setIntensity(val);
+    // The automatic range follows the intensity, and with it the culling bounds.
+    if (changed && this._range <= 0) {
+      this.invalidateBoundingVolume();
+    }
+    return this;
+  }
+  /**
    * {@inheritDoc BaseLight.isRectLight}
    * @override
    */
@@ -1095,12 +1119,33 @@ export class RectLight extends PunctualLight {
     return true;
   }
   /**
+   * The range actually applied: {@link range}, or the automatic one when that
+   * is 0.
+   * @internal
+   */
+  protected resolveRange() {
+    if (this._range > 0) {
+      return this._range;
+    }
+    const physical = this.scene?.lightingMode === 'physical';
+    const metersPerUnit = this.scene?.metersPerUnit ?? 1;
+    // Far from the rect its irradiance is luminance * area / d^2 - an isotropic
+    // point of intensity luminance * area - so the point light's cutoff applies.
+    const range = physical
+      ? Math.sqrt(
+          Math.max(0, this._luminance * this._width * this._height * metersPerUnit * metersPerUnit) /
+            PHYSICAL_LIGHT_CUTOFF_LUX
+        ) / metersPerUnit
+      : 32 * Math.sqrt(Math.max(0.0001, this.intensity * this._width * this._height));
+    return Math.max(range, Math.hypot(this._width, this._height));
+  }
+  /**
    * Rect light supports shadow in current pipeline
    */
   /** @internal */
   computeBoundingVolume() {
     const bbox = new BoundingBox();
-    const r = this._range;
+    const r = this.positionAndRange.w;
     bbox.minPoint = new Vector3(-r, -r, -r);
     bbox.maxPoint = new Vector3(r, r, r);
     return bbox;
@@ -1116,7 +1161,7 @@ export class RectLight extends PunctualLight {
       .getRow(1)
       .inplaceNormalize()
       .scaleBy(this._height * 0.5);
-    this._positionRange = new Vector4(pos.x, pos.y, pos.z, this.range);
+    this._positionRange = new Vector4(pos.x, pos.y, pos.z, this.resolveRange());
     this._directionCutoff = new Vector4(axisX.x, axisX.y, axisX.z, 0);
     const physical = this.scene?.lightingMode === 'physical';
     this._diffuseIntensity = makeColorIntensity(this.color, physical ? this.luminance : this.intensity);

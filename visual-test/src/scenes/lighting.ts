@@ -419,3 +419,34 @@ export const rectLightPcssWall: VisualScene = {
     placeCamera(camera, new Vector3(0.9, 1.6, 1.6), new Vector3(0, 1.4, -0.6));
   }
 };
+
+/**
+ * A shadow-casting rect light left at range 0.
+ *
+ * 0 is the automatic range, as for point lights: derived from the light's
+ * output and never shorter than its diagonal. The shader used to read 0 as "no
+ * falloff" while the light's bounds collapsed to a point and its shadow camera's
+ * far plane to 0, so the light was culled and cast nothing - this scene rendered
+ * black.
+ */
+export const rectLightAutoRange: VisualScene = {
+  name: 'rect-light-auto-range',
+  description:
+    'Shadow-casting rect light at range 0. Pins the automatic range for lighting, culling and shadows.',
+  setup({ scene, camera }) {
+    bareScene(scene);
+    new Mesh(scene, new PlaneShape({ size: 10 }), pbr(new Vector4(0.6, 0.6, 0.6, 1), 0, 0.8));
+    const sphere = new Mesh(
+      scene,
+      new SphereShape({ radius: 0.5 }),
+      pbr(new Vector4(0.8, 0.35, 0.25, 1), 0, 0.6)
+    );
+    sphere.position.setXYZ(0.8, 0.5, 0.3);
+    const light = overheadRectLight(scene, 8);
+    light.range = 0;
+    light.castShadow = true;
+    light.shadow.applyQualityPreset('character-small');
+    light.shadow.mode = 'pcf';
+    placeCamera(camera, new Vector3(0, 3.2, 6.5), new Vector3(0, 0.6, 0));
+  }
+};

@@ -104,6 +104,7 @@ const SCENE_NAMES = [
   'rect-light-pcss-small',
   'rect-light-pcss-large',
   'rect-light-pcss-wall',
+  'rect-light-auto-range',
   'water-caustics-off',
   'water-caustics-on',
   'water-caustics-deep-bed',

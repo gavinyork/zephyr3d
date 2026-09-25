@@ -980,7 +980,7 @@ export function getRectLightClass(): SerializableClass {
         },
         {
           name: 'Range',
-          description: 'Light range in world unit',
+          description: 'How far the light reaches, in world units; 0 derives it from the brightness and size',
           type: 'float',
           default: 10,
           options: {
