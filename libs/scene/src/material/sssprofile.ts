@@ -202,7 +202,7 @@ const enum ProfileColumn {
  *
  * @remarks
  * `s = 3.5 + 100 (A - 0.33)^4`. The same curve the diffusion evaluates on the
- * GPU (`posteffect/skinsss.ts`, `scalingFactor`); the transmission profile is
+ * GPU (`posteffect/postsss.ts`, `scalingFactor`); the transmission profile is
  * baked on the CPU and needs its own copy.
  *
  * @internal

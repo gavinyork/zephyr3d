@@ -66,8 +66,8 @@ export const pbrMetalRoughGrid: VisualScene = {
  * is left at a nonzero value only so a regression that ungates the term shows up
  * as a diff rather than silently doing nothing.
  */
-export const skinSss: VisualScene = {
-  name: 'skin-sss',
+export const sss: VisualScene = {
+  name: 'sss',
   description:
     'SSSMaterial sphere under a grazing key with PostSSS enabled. Pins the diffuse wrap and the channel-dependent diffusion across a wide terminator.',
   setup({ scene, camera }) {
@@ -113,22 +113,22 @@ export const skinSss: VisualScene = {
  * The stylization range of the diffusion, and the evidence that grounding it in
  * a physical model did not cost any.
  *
- * Identical to `skin-sss` in geometry and lighting; the only difference is the
+ * Identical to `sss` in geometry and lighting; the only difference is the
  * subsurface profile driving the per-channel scatter radii. Jade is the furthest
  * thing from skin the presets offer - green travels furthest instead of red - so
- * a diff against `skin-sss` isolates exactly what the channel ratios contribute.
+ * a diff against `sss` isolates exactly what the channel ratios contribute.
  *
  * The profile is a property of the material, so the contrast could live in one
- * scene; it stays split across two so that a diff against `skin-sss` isolates
+ * scene; it stays split across two so that a diff against `sss` isolates
  * exactly what the channel ratios contribute.
  *
  * This is the scene that fails if the channels ever collapse back to a shared
- * radius: it would converge on `skin-sss` and both would read as flat haze.
+ * radius: it would converge on `sss` and both would read as flat haze.
  */
 export const skinDiffusionJade: VisualScene = {
-  name: 'skin-diffusion-jade',
+  name: 'sss-diffusion-jade',
   description:
-    'The skin-sss setup diffused with the jade profile instead of skin. Pins the per-channel scatter radii and the stylization range the presets provide.',
+    'The sss setup diffused with the jade profile instead of skin. Pins the per-channel scatter radii and the stylization range the presets provide.',
   setup({ scene, camera }) {
     bareScene(scene);
     // Grazing key from the left, so the terminator runs down the middle of the
@@ -149,7 +149,7 @@ export const skinDiffusionJade: VisualScene = {
     // The profile lives on the material now, so the channel ratios are a
     // per-mesh property rather than a property of the whole pass.
     //
-    // Kept equal to `skin-sss`'s distance, so that a diff between the two scenes
+    // Kept equal to `sss`'s distance, so that a diff between the two scenes
     // isolates the channel ratios and nothing else. See the note there for why
     // it is 1.4 rather than the 0.35 it used to be.
     material.subsurfaceProfile.preset = 'jade';
@@ -161,7 +161,7 @@ export const skinDiffusionJade: VisualScene = {
 };
 
 /**
- * Skin under a shadow-casting light, which `skin-sss` deliberately is not.
+ * Skin under a shadow-casting light, which `sss` deliberately is not.
  *
  * That scene lights its sphere with `keyLight`, whose `castShadow` defaults to
  * false, so every shadow-dependent line in SSSMaterial is dead code there -
@@ -190,9 +190,9 @@ export const skinDiffusionJade: VisualScene = {
  *    defect by construction.
  */
 export const skinShadow: VisualScene = {
-  name: 'skin-shadow',
+  name: 'sss-shadow',
   description:
-    'SSSMaterial sphere under a grazing shadow-casting light, with a spherical occluder casting across its lit side. Pins the self-shadow terminator and a cast shadow whose edge must stay elliptical; skin-sss cannot see either, since its light casts no shadow.',
+    'SSSMaterial sphere under a grazing shadow-casting light, with a spherical occluder casting across its lit side. Pins the self-shadow terminator and a cast shadow whose edge must stay elliptical; sss cannot see either, since its light casts no shadow.',
   setup({ scene, camera }) {
     bareScene(scene);
     // A little ambient, so the shadowed side is readable rather than pure black

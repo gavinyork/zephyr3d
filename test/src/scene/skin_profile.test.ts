@@ -1,5 +1,5 @@
-import { SSSMaterial } from '../../../libs/scene/src/material/skin';
-import { SSSProfile } from '../../../libs/scene/src/material/skinprofile';
+import { SSSMaterial } from '../../../libs/scene/src/material/sss';
+import { SSSProfile } from '../../../libs/scene/src/material/sssprofile';
 
 describe('SSSProfile', () => {
   test('allocates distinct non-zero ids', () => {

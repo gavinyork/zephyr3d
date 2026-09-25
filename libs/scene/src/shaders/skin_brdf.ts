@@ -1,6 +1,6 @@
 import type { PBInsideFunctionScope, PBShaderExp } from '@zephyr3d/device';
 import { distributionGGX, fresnelSchlick, visGGX } from './pbr';
-import { SKIN_TRANSMISSION_NO_DATA_ENCODING, SSSProfile } from '../material/skinprofile';
+import { SKIN_TRANSMISSION_NO_DATA_ENCODING, SSSProfile } from '../material/sssprofile';
 
 /**
  * Opacity below which the dual-lobe specular fades back to a single lobe.

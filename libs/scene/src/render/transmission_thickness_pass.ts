@@ -22,7 +22,7 @@ import {
   SKIN_TRANSMISSION_OPTICAL_DEPTH_BIAS,
   SKIN_TRANSMISSION_OPTICAL_DEPTH_FLOOR,
   SSSProfile
-} from '../material/skinprofile';
+} from '../material/sssprofile';
 import { fetchSampler } from '../utility/misc';
 
 const UNIFORM_NAME_SHADOW_DEPTH = 'Z_UniformShadowDepth';

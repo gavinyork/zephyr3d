@@ -1,9 +1,9 @@
-import { SSSMaterial } from '../../../libs/scene/src/material/skin';
+import { SSSMaterial } from '../../../libs/scene/src/material/sss';
 import {
   SSSProfile,
   SKIN_MAX_TRANSMISSION_OPTICAL_DEPTH,
   SKIN_OPTICAL_DEPTH_PER_WORLD_UNIT
-} from '../../../libs/scene/src/material/skinprofile';
+} from '../../../libs/scene/src/material/sssprofile';
 import { Vector3 } from '@zephyr3d/base';
 
 /**

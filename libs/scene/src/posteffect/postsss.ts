@@ -2,7 +2,7 @@ import { DEPTH_FARTHEST, Vector2, Vector4 } from '@zephyr3d/base';
 import type { BindGroup, GPUProgram, Texture2D } from '@zephyr3d/device';
 import type { DrawContext } from '../render';
 import { ShaderHelper } from '../material';
-import { SSSProfile } from '../material/skinprofile';
+import { SSSProfile } from '../material/sssprofile';
 import { linearToGamma } from '../shaders/misc';
 import { hash21 } from '../shaders/noise';
 import { fetchSampler } from '../utility/misc';

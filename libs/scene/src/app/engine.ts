@@ -25,7 +25,7 @@ import {
   UnlitMaterial
 } from '../material';
 import { StandardSpriteMaterial } from '../material/sprite_std';
-import { SSSMaterial } from '../material/skin';
+import { SSSMaterial } from '../material/sss';
 import { HairMaterial } from '../material/hair';
 import { ScreenAdapter } from './screen';
 import { MSDFTextAtlasManager } from '../text/runtime';

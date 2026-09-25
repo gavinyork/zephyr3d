@@ -1,5 +1,5 @@
 import { ProgramBuilder } from '../../../libs/device/src';
-import { PostSSS } from '../../../libs/scene/src/posteffect/skinsss';
+import { PostSSS } from '../../../libs/scene/src/posteffect/postsss';
 
 function createShaderContext(type: 'webgl' | 'webgpu') {
   const device: any = {

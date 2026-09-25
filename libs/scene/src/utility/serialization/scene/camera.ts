@@ -1,7 +1,7 @@
 import { defineProps, type SerializableClass } from '../types';
 import { Camera, OrthoCamera, PerspectiveCamera } from '../../../camera';
 import type { CameraOITMode, SSGIQualityPreset, SSSDebugView, SSSQualityPreset } from '../../../camera';
-import type { SSSDebugOutput } from '../../../posteffect/skinsss';
+import type { SSSDebugOutput } from '../../../posteffect/postsss';
 import { SceneNode } from '../../../scene';
 import type { CameraProjectionMode, CameraSensorFit } from '../../physical';
 import {

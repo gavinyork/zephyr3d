@@ -1,4 +1,4 @@
-import { SSSMaterial } from '../../../libs/scene/src/material/skin';
+import { SSSMaterial } from '../../../libs/scene/src/material/sss';
 
 /**
  * These pin the direct-lighting BRDF against UE5's `SubsurfaceProfileBxDF`.

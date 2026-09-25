@@ -19,7 +19,7 @@ import {
   skinSpecularEnergyTerms,
   skinTransmission
 } from '../shaders/skin_brdf';
-import { SSSProfile } from './skinprofile';
+import { SSSProfile } from './sssprofile';
 import { fetchSampler } from '../utility/misc';
 
 /**

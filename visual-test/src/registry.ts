@@ -6,7 +6,7 @@ import {
   hairMarschner,
   pbrMetalRoughGrid,
   skinShadow,
-  skinSss,
+  sss,
   unlitTextured
 } from './scenes/materials';
 import { pbrIbl, skyAtmosphere } from './scenes/env';
@@ -140,7 +140,7 @@ export const SCENES: VisualScene[] = [
   postMotionBlurLong,
   taaMultiframe,
   // Digital-human materials.
-  skinSss,
+  sss,
   skinDiffusionJade,
   skinShadow,
   // Light-space thickness. Computed rather than compared - see the scene file.

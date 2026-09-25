@@ -31,7 +31,7 @@ import { TAA } from '../posteffect/taa';
 import { SSGI } from '../posteffect/ssgi';
 import { SSR } from '../posteffect/ssr';
 import { SSS } from '../posteffect/sss';
-import { PostSSS, type SSSDebugOutput } from '../posteffect/skinsss';
+import { PostSSS, type SSSDebugOutput } from '../posteffect/postsss';
 import { Tonemap } from '../posteffect/tonemap';
 import { FXAA } from '../posteffect/fxaa';
 import { Bloom } from '../posteffect/bloom';
