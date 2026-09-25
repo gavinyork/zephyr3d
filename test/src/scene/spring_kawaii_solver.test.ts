@@ -5,9 +5,13 @@ import {
   SceneNode,
   SpringChain,
   SpringModifier,
+  SpringSystem,
+  createCapsuleCollider,
   createSphereCollider,
   createSpringConstraint,
-  createSpringParticle
+  createSpringParticle,
+  resolveCapsuleCollision,
+  resolveSphereCollision
 } from '../../../libs/scene/src';
 import {
   getParentRelativePoseTarget,
@@ -61,31 +65,61 @@ describe('Kawaii spring solver', () => {
     expect(kawaii.motionModel).toBe('kawaii');
     expect(kawaii.constraintVelocityHistoryRetention).toBeCloseTo(0.35);
     expect(kawaii.preserveInitialCollisionPenetration).toBe(true);
+    expect(kawaii.initialCollisionPenetrationReleaseTime).toBeCloseTo(0.25);
     expect(legacy.motionModel).toBe('legacy');
   });
 
-  it('preserves authored collider overlap but blocks deeper penetration', () => {
-    const chain = new SpringChain();
-    const particle = createSpringParticle(new Vector3(0.75, 0, 0), { damping: 1 });
-    chain.addParticle(particle);
-    const system = new MultiChainSpringSystem({
-      gravity: Vector3.zero(),
-      enableInertialForces: false,
-      solver: 'xpbd',
-      poseFollowRoot: 0,
-      poseFollowTip: 0,
-      preserveInitialCollisionPenetration: true
-    });
-    system.addChain(chain);
-    const collider = createSphereCollider(Vector3.zero(), 1);
-    system.addCollider(collider);
+  it.each(['single', 'multi'] as const)(
+    'smoothly releases authored collider overlap in the %s-chain system',
+    (systemType) => {
+      const chain = new SpringChain();
+      const particle = createSpringParticle(new Vector3(0.75, 0, 0), { damping: 1 });
+      chain.addParticle(particle);
+      const options = {
+        gravity: Vector3.zero(),
+        enableInertialForces: false,
+        solver: 'xpbd' as const,
+        poseFollowRoot: 0,
+        poseFollowTip: 0,
+        preserveInitialCollisionPenetration: true,
+        initialCollisionPenetrationReleaseTime: 0.1
+      };
+      const system =
+        systemType === 'single' ? new SpringSystem(chain, options) : new MultiChainSpringSystem(options);
+      if (system instanceof MultiChainSpringSystem) {
+        system.addChain(chain);
+      }
+      system.addCollider(createSphereCollider(Vector3.zero(), 1));
 
-    system.update(1 / 60);
-    expect(particle.position.x).toBeCloseTo(0.75);
+      system.update(1 / 60);
+      expect(particle.position.x).toBeCloseTo(0.75);
 
-    collider.radius = 1.2;
-    system.update(1 / 60);
-    expect(particle.position.x).toBeCloseTo(0.95);
+      for (let frame = 0; frame < 3; frame++) {
+        system.update(1 / 60);
+      }
+      expect(particle.position.x).toBeGreaterThan(0.8);
+      expect(particle.position.x).toBeLessThan(0.95);
+
+      for (let frame = 0; frame < 4; frame++) {
+        system.update(1 / 60);
+      }
+      expect(particle.position.x).toBeCloseTo(1);
+    }
+  );
+
+  it('resolves sphere and capsule collisions inside the former one-centimeter blind zone', () => {
+    const spherePosition = new Vector3(0.005, 0, 0);
+    expect(resolveSphereCollision(spherePosition, createSphereCollider(Vector3.zero(), 1))).toBe(true);
+    expect(spherePosition.x).toBeCloseTo(1);
+
+    const capsule = createCapsuleCollider(new Vector3(-1, 0, 0), new Vector3(1, 0, 0), 0.5);
+    const nearAxisPosition = new Vector3(0, 0.005, 0);
+    expect(resolveCapsuleCollision(nearAxisPosition, capsule)).toBe(true);
+    expect(nearAxisPosition.y).toBeCloseTo(0.5);
+
+    const onAxisPosition = Vector3.zero();
+    expect(resolveCapsuleCollision(onAxisPosition, capsule)).toBe(true);
+    expect(onAxisPosition.magnitude).toBeCloseTo(0.5);
   });
 
   it('settles a double-ended chain under gravity with the default XPBD history retention', () => {

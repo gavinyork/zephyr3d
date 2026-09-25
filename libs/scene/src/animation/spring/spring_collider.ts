@@ -2,6 +2,14 @@ import type { Nullable } from '@zephyr3d/base';
 import { Vector3 } from '@zephyr3d/base';
 import type { SceneNode } from '../../scene/scene_node';
 
+const COLLISION_DISTANCE_EPSILON_SQ = 1e-12;
+
+function getCapsuleAxisFallbackNormal(axis: Vector3, result: Vector3): Vector3 {
+  const reference = Math.abs(axis.z) < 0.9 ? Vector3.axisPZ() : Vector3.axisPX();
+  Vector3.sub(reference, Vector3.scale(axis, Vector3.dot(reference, axis), result), result);
+  return result.inplaceNormalize();
+}
+
 /**
  * Base interface for spring collision shapes
  *
@@ -287,13 +295,17 @@ export function resolveSphereCollision(particlePos: Vector3, collider: SphereCol
   const distSq = toParticle.magnitudeSq;
   const radiusSq = collider.radius * collider.radius;
 
-  if (distSq < radiusSq && distSq > 0.0001) {
+  if (distSq < radiusSq) {
     // Particle is inside sphere, push it out
-    const dist = Math.sqrt(distSq);
+    const dist = distSq > COLLISION_DISTANCE_EPSILON_SQ ? Math.sqrt(distSq) : 0;
     const penetration = collider.radius - dist;
 
     // Push particle to sphere surface
-    Vector3.normalize(toParticle, toParticle);
+    if (dist > 0) {
+      toParticle.scaleBy(1 / dist);
+    } else {
+      toParticle.setXYZ(0, 1, 0);
+    }
     toParticle.scaleBy(penetration);
     Vector3.add(particlePos, toParticle, particlePos);
 
@@ -320,10 +332,14 @@ export function resolveCapsuleCollision(particlePos: Vector3, collider: CapsuleC
     const distSq = toParticle.magnitudeSq;
     const radiusSq = collider.radius * collider.radius;
 
-    if (distSq < radiusSq && distSq > 0.0001) {
-      const dist = Math.sqrt(distSq);
+    if (distSq < radiusSq) {
+      const dist = distSq > COLLISION_DISTANCE_EPSILON_SQ ? Math.sqrt(distSq) : 0;
       const penetration = collider.radius - dist;
-      Vector3.normalize(toParticle, toParticle);
+      if (dist > 0) {
+        toParticle.scaleBy(1 / dist);
+      } else {
+        toParticle.setXYZ(0, 1, 0);
+      }
       toParticle.scaleBy(penetration);
       Vector3.add(particlePos, toParticle, particlePos);
       return true;
@@ -347,10 +363,14 @@ export function resolveCapsuleCollision(particlePos: Vector3, collider: CapsuleC
   const distSq = toParticleFromAxis.magnitudeSq;
   const radiusSq = collider.radius * collider.radius;
 
-  if (distSq < radiusSq && distSq > 0.0001) {
-    const dist = Math.sqrt(distSq);
+  if (distSq < radiusSq) {
+    const dist = distSq > COLLISION_DISTANCE_EPSILON_SQ ? Math.sqrt(distSq) : 0;
     const penetration = collider.radius - dist;
-    Vector3.normalize(toParticleFromAxis, toParticleFromAxis);
+    if (dist > 0) {
+      toParticleFromAxis.scaleBy(1 / dist);
+    } else {
+      getCapsuleAxisFallbackNormal(axis, toParticleFromAxis);
+    }
     toParticleFromAxis.scaleBy(penetration);
     Vector3.add(particlePos, toParticleFromAxis, particlePos);
     return true;

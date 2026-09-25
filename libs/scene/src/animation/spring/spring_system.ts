@@ -16,8 +16,10 @@ import {
 } from './spring_collider';
 import { SpringNodePoseTracker } from './spring_node_pose_tracker';
 import {
+  DEFAULT_INITIAL_COLLISION_PENETRATION_RELEASE_TIME,
   getIterationStrength,
   getKawaiiPoseTarget,
+  getReleasedCollisionPenetration,
   getSpringPoseTopology,
   INITIAL_COLLISION_PENETRATION_SLOP,
   interpolateSpringValue,
@@ -99,8 +101,10 @@ export interface SpringSystemOptions {
   angleLimitTip?: number;
   /** Fraction of XPBD positional correction retained in Verlet history (default: 0.35). */
   constraintVelocityHistoryRetention?: number;
-  /** Preserve collider overlap present in the initialized pose while blocking deeper penetration. */
+  /** Temporarily preserve collider overlap present in the initialized pose while blocking deeper penetration. */
   preserveInitialCollisionPenetration?: boolean;
+  /** Seconds used to smoothly release preserved startup overlap (default: 0.25). */
+  initialCollisionPenetrationReleaseTime?: number;
 }
 
 const FIXED_SIMULATION_TIME_STEP = 1 / 60;
@@ -150,6 +154,8 @@ export class SpringSystem {
   private _angleLimitTip: number;
   private _constraintVelocityHistoryRetention: number;
   private _preserveInitialCollisionPenetration: boolean;
+  private _initialCollisionPenetrationReleaseTime: number;
+  private _initialCollisionPenetrationElapsed: number;
   private _initialCollisionPenetration: WeakMap<SpringParticle, WeakMap<SpringCollider, number>>;
 
   constructor(chain: SpringChain, options?: SpringSystemOptions) {
@@ -185,6 +191,11 @@ export class SpringSystem {
     );
     this._preserveInitialCollisionPenetration =
       options?.preserveInitialCollisionPenetration ?? this._motionModel === 'kawaii';
+    this._initialCollisionPenetrationReleaseTime = Math.max(
+      0,
+      options?.initialCollisionPenetrationReleaseTime ?? DEFAULT_INITIAL_COLLISION_PENETRATION_RELEASE_TIME
+    );
+    this._initialCollisionPenetrationElapsed = 0;
     this._initialCollisionPenetration = new WeakMap();
   }
 
@@ -350,6 +361,7 @@ export class SpringSystem {
         this.solveCollisions(0, 0);
       }
     }
+    this.advanceInitialCollisionPenetrationRelease(dt);
   }
 
   /**
@@ -983,6 +995,7 @@ export class SpringSystem {
     this._smoothedCapsuleEndpoints = new WeakMap();
     this._smoothedPlaneData = new WeakMap();
     this._smoothedBoxData = new WeakMap();
+    this._initialCollisionPenetrationElapsed = 0;
     this._initialCollisionPenetration = new WeakMap();
   }
 
@@ -1122,6 +1135,20 @@ export class SpringSystem {
   set preserveInitialCollisionPenetration(value: boolean) {
     if (this._preserveInitialCollisionPenetration !== value) {
       this._preserveInitialCollisionPenetration = value;
+      this._initialCollisionPenetrationElapsed = 0;
+      this._initialCollisionPenetration = new WeakMap();
+    }
+  }
+
+  get initialCollisionPenetrationReleaseTime(): number {
+    return this._initialCollisionPenetrationReleaseTime;
+  }
+
+  set initialCollisionPenetrationReleaseTime(value: number) {
+    const duration = Math.max(0, Number(value) || 0);
+    if (this._initialCollisionPenetrationReleaseTime !== duration) {
+      this._initialCollisionPenetrationReleaseTime = duration;
+      this._initialCollisionPenetrationElapsed = 0;
       this._initialCollisionPenetration = new WeakMap();
     }
   }
@@ -1218,6 +1245,7 @@ export class SpringSystem {
     this._smoothedCapsuleEndpoints = new WeakMap();
     this._smoothedPlaneData = new WeakMap();
     this._smoothedBoxData = new WeakMap();
+    this._initialCollisionPenetrationElapsed = 0;
     this._initialCollisionPenetration = new WeakMap();
   }
 
@@ -1232,6 +1260,7 @@ export class SpringSystem {
       this._smoothedCapsuleEndpoints = new WeakMap();
       this._smoothedPlaneData = new WeakMap();
       this._smoothedBoxData = new WeakMap();
+      this._initialCollisionPenetrationElapsed = 0;
       this._initialCollisionPenetration = new WeakMap();
       return true;
     }
@@ -1247,6 +1276,7 @@ export class SpringSystem {
     this._smoothedCapsuleEndpoints = new WeakMap();
     this._smoothedPlaneData = new WeakMap();
     this._smoothedBoxData = new WeakMap();
+    this._initialCollisionPenetrationElapsed = 0;
     this._initialCollisionPenetration = new WeakMap();
   }
 
@@ -1278,7 +1308,21 @@ export class SpringSystem {
         INITIAL_COLLISION_PENETRATION_SLOP;
       particlePenetrations.set(sourceCollider, penetration);
     }
-    return penetration;
+    return getReleasedCollisionPenetration(
+      penetration,
+      this._initialCollisionPenetrationElapsed,
+      this._initialCollisionPenetrationReleaseTime
+    );
+  }
+
+  private advanceInitialCollisionPenetrationRelease(deltaTime: number): void {
+    if (!this._preserveInitialCollisionPenetration) {
+      return;
+    }
+    this._initialCollisionPenetrationElapsed = Math.min(
+      this._initialCollisionPenetrationReleaseTime,
+      this._initialCollisionPenetrationElapsed + Math.max(0, deltaTime)
+    );
   }
 
   private getTemporalBlendFactor(deltaTime: number, smoothingTime: number): number {

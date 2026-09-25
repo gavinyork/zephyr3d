@@ -6,6 +6,7 @@ export type SpringMotionModel = 'legacy' | 'kawaii';
 
 const EPSILON = 1e-6;
 export const INITIAL_COLLISION_PENETRATION_SLOP = 1e-4;
+export const DEFAULT_INITIAL_COLLISION_PENETRATION_RELEASE_TIME = 0.25;
 
 export function clampSpringRatio(value: number): number {
   return Math.max(0, Math.min(1, Number(value) || 0));
@@ -29,6 +30,20 @@ export function interpolateSpringValue(
 export function getIterationStrength(strength: number, iterations: number): number {
   const value = clampSpringRatio(strength);
   return iterations > 1 ? 1 - Math.pow(1 - value, 1 / iterations) : value;
+}
+
+/** Smoothly releases startup collider overlap so particles reach the real surface after `duration`. */
+export function getReleasedCollisionPenetration(
+  initialPenetration: number,
+  elapsed: number,
+  duration: number
+): number {
+  if (initialPenetration <= 0 || duration <= 0) {
+    return 0;
+  }
+  const t = Math.max(0, Math.min(1, elapsed / duration));
+  const progress = t * t * (3 - 2 * t);
+  return initialPenetration * (1 - progress);
 }
 
 /** Returns the Kawaii-style pose target relative to the simulated parent. */

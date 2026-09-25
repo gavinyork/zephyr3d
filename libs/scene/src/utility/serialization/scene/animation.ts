@@ -463,7 +463,8 @@ function getSpringSystemOptions(
     angleLimitRoot: system.angleLimitRoot,
     angleLimitTip: system.angleLimitTip,
     constraintVelocityHistoryRetention: system.constraintVelocityHistoryRetention,
-    preserveInitialCollisionPenetration: system.preserveInitialCollisionPenetration
+    preserveInitialCollisionPenetration: system.preserveInitialCollisionPenetration,
+    initialCollisionPenetrationReleaseTime: system.initialCollisionPenetrationReleaseTime
   };
 }
 
