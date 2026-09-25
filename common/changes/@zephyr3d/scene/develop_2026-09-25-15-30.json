@@ -1,0 +1,10 @@
+{
+  "changes": [
+    {
+      "packageName": "@zephyr3d/scene",
+      "comment": "Fix rect light LTC normalization and use float16 LTC LUT, add rect light visual tests",
+      "type": "patch"
+    }
+  ],
+  "packageName": "@zephyr3d/scene"
+}

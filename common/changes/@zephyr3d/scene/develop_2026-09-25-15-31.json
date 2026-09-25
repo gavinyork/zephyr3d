@@ -1,0 +1,10 @@
+{
+  "changes": [
+    {
+      "packageName": "@zephyr3d/scene",
+      "comment": "Render rect light shadows as cube maps, support point/rect light transmission, fix transmission zeroed by shadow mask",
+      "type": "patch"
+    }
+  ],
+  "packageName": "@zephyr3d/scene"
+}
