@@ -1,5 +1,6 @@
 import { Vector3, Vector4 } from '@zephyr3d/base';
-import { Mesh, PlaneShape, PointLight, SphereShape, SpotLight } from '@zephyr3d/scene';
+import { Mesh, PlaneShape, PointLight, RectLight, SphereShape, SpotLight } from '@zephyr3d/scene';
+import type { Scene } from '@zephyr3d/scene';
 import type { VisualScene } from '../types';
 import { bareScene, lambert, pbr, placeCamera } from './common';
 
@@ -81,5 +82,120 @@ export const spotShadow: VisualScene = {
 
     placeCamera(camera, new Vector3(0.5, 4.2, 8), new Vector3(0, 0.8, 0));
     camera.far = 40;
+  }
+};
+
+/**
+ * A 2 x 1 rect light hanging level over the stage, emitting straight down.
+ *
+ * Aimed with an up vector along -Z so the rect's width runs along world X, which
+ * keeps the light's footprint and its reflections axis-aligned in the frame.
+ */
+function overheadRectLight(scene: Scene, intensity: number) {
+  const light = new RectLight(scene);
+  light.lookAt(new Vector3(0, 2.2, -0.4), new Vector3(0, 0, -0.4), Vector3.axisNZ());
+  light.width = 2;
+  light.height = 1;
+  light.range = 12;
+  light.intensity = intensity;
+  light.color = new Vector4(1, 0.97, 0.92, 1);
+  return light;
+}
+
+/**
+ * Rough dielectrics under a rect light: the diffuse form factor.
+ *
+ * The LTC integral already returns the form factor, so a white Lambertian
+ * surface under the light reads `intensity * albedo * formFactor` and nothing
+ * else. Pins that normalization, the one-sided emission (nothing behind the
+ * light's plane may be lit - the upper back of the room stays black) and the
+ * horizon clipping on the spheres' terminators.
+ */
+export const rectLightDiffuse: VisualScene = {
+  name: 'rect-light-diffuse',
+  description: 'Rect light over rough surfaces. Pins the LTC diffuse form factor and one-sided emission.',
+  setup({ scene, camera }) {
+    bareScene(scene);
+    new Mesh(scene, new PlaneShape({ size: 10 }), pbr(new Vector4(0.6, 0.6, 0.6, 1), 0, 0.9));
+    for (let i = 0; i < 3; i++) {
+      const sphere = new Mesh(
+        scene,
+        new SphereShape({ radius: 0.6 }),
+        pbr(new Vector4(0.75, 0.75, 0.75, 1), 0, 0.9)
+      );
+      sphere.position.setXYZ((i - 1) * 2, 0.6, 0);
+    }
+    overheadRectLight(scene, 8);
+    placeCamera(camera, new Vector3(0, 3.2, 6.5), new Vector3(0, 0.6, 0));
+  }
+};
+
+/**
+ * Glossy surfaces under a rect light: the LTC specular lobe.
+ *
+ * The floor mirrors the light as a sharp-cornered rectangle and the metal
+ * spheres blur it from a perfect mirror to roughness 0.6. The mirror is the
+ * regime an 8-bit LUT destroyed - it quantized the inverse matrix's z scale to
+ * zero and the reflection vanished - so the left sphere pins the float LUT and
+ * the 0.02 roughness floor as much as the lobe shape.
+ */
+export const rectLightGlossy: VisualScene = {
+  name: 'rect-light-glossy',
+  description:
+    'Rect light over a glossy floor and metal spheres of rising roughness. Pins the LTC specular lobe.',
+  setup({ scene, camera }) {
+    bareScene(scene);
+    new Mesh(scene, new PlaneShape({ size: 10 }), pbr(new Vector4(0.08, 0.08, 0.09, 1), 0, 0.08));
+    const roughness = [0, 0.25, 0.6];
+    for (let i = 0; i < 3; i++) {
+      const sphere = new Mesh(
+        scene,
+        new SphereShape({ radius: 0.6 }),
+        pbr(new Vector4(0.95, 0.93, 0.88, 1), 1, roughness[i])
+      );
+      sphere.position.setXYZ((i - 1) * 2, 0.6, 0);
+    }
+    overheadRectLight(scene, 3);
+    placeCamera(camera, new Vector3(0, 3.2, 6.5), new Vector3(0, 0.6, 0));
+  }
+};
+
+/**
+ * The rect light under physical lighting, in real units.
+ *
+ * A 2000 cd/m² softbox (the same 2 x 1 panel as the legacy scenes) seen through
+ * an interior exposure of f/2.8, 1/30 s, ISO 100. Physical mode reads the light's
+ * `luminance` rather than its unitless `intensity` and scales the result by the
+ * camera exposure, so this pins that path end to end: a white Lambertian floor
+ * right under the panel reads `luminance * albedo * formFactor` before exposure,
+ * about 150 cd/m² here, which this exposure maps to roughly mid-grey. A
+ * normalization off by 2*pi - the bug this scene was added with - drops the
+ * whole frame to near black.
+ *
+ * Rough dielectric, glossy metal and mirror spheres share the frame, so diffuse
+ * and specular are pinned against each other as well as against the exposure.
+ */
+export const rectLightPhysical: VisualScene = {
+  name: 'rect-light-physical',
+  description:
+    'Rect light in physical units under a real exposure. Pins luminance and the LTC normalization.',
+  setup({ scene, camera }) {
+    bareScene(scene);
+    scene.lightingMode = 'physical';
+    camera.aperture = 2.8;
+    camera.shutterSpeed = 1 / 30;
+    camera.ISO = 100;
+    new Mesh(scene, new PlaneShape({ size: 10 }), pbr(new Vector4(0.6, 0.6, 0.6, 1), 0, 0.6));
+    const materials = [
+      pbr(new Vector4(0.75, 0.75, 0.75, 1), 0, 0.9),
+      pbr(new Vector4(0.95, 0.93, 0.88, 1), 1, 0.25),
+      pbr(new Vector4(0.95, 0.93, 0.88, 1), 1, 0)
+    ];
+    for (let i = 0; i < 3; i++) {
+      const sphere = new Mesh(scene, new SphereShape({ radius: 0.6 }), materials[i]);
+      sphere.position.setXYZ((i - 1) * 2, 0.6, 0);
+    }
+    overheadRectLight(scene, 1).luminance = 2000;
+    placeCamera(camera, new Vector3(0, 3.2, 6.5), new Vector3(0, 0.6, 0));
   }
 };

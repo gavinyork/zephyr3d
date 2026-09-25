@@ -338,9 +338,8 @@ export function mixinPBRCommon<T extends typeof MeshMaterial>(BaseCls: T) {
      * Artistic multiplier on the rect-light specular term.
      *
      * @remarks
-     * 1 is neutral. Physical lighting normalizes the LTC integral by `1/(2*pi)`, which is the
-     * reference implementation's factor, so the default needs no calibration fudge there. Legacy
-     * keeps its historical weighting, where existing scenes may have tuned this value.
+     * 1 is neutral and physically correct: the LTC integral is already normalized, so the default
+     * needs no calibration fudge in either lighting mode.
      */
     get rectSpecularScale() {
       return this._rectSpecularScale;
@@ -1338,10 +1337,7 @@ export function mixinPBRCommon<T extends typeof MeshMaterial>(BaseCls: T) {
     ) {
       const pb = scope.$builder;
       const that = this;
-      const physical = this.drawContext.scene.lightingMode === 'physical';
-      // The two modes normalize the LTC integral differently, so they must not share a cached
-      // function body under one name.
-      const funcName = physical ? 'Z_PBRRectLightPhysical' : 'Z_PBRRectLight';
+      const funcName = 'Z_PBRRectLight';
       const LUT_SIZE = 64;
       const LUT_SCALE = (LUT_SIZE - 1) / LUT_SIZE;
       const LUT_BIAS = 0.5 / LUT_SIZE;
@@ -1545,9 +1541,12 @@ export function mixinPBRCommon<T extends typeof MeshMaterial>(BaseCls: T) {
                 this.$l.fadeStart = pb.mul(this.range, 0.9);
                 this.falloff = pb.sub(1, pb.smoothStep(this.fadeStart, this.range, this.dist));
               });
+              // Same floor as UE's rect-light path: below it the fitted LTC degenerates towards a
+              // singular matrix and the rect's edges alias in near-mirror reflections.
+              this.$l.ltcRoughness = pb.max(this.data.roughness, 0.02);
               this.$l.uv = pb.clamp(
                 pb.add(
-                  pb.mul(pb.vec2(this.data.roughness, pb.sqrt(pb.max(pb.sub(1, this.NoV), 0))), LUT_SCALE),
+                  pb.mul(pb.vec2(this.ltcRoughness, pb.sqrt(pb.max(pb.sub(1, this.NoV), 0))), LUT_SCALE),
                   pb.vec2(LUT_BIAS)
                 ),
                 pb.vec2(0),
@@ -1583,23 +1582,18 @@ export function mixinPBRCommon<T extends typeof MeshMaterial>(BaseCls: T) {
               this.$l.lightColor = pb.mul(this.colorIntensity.rgb, this.colorIntensity.a, this.falloff);
               this.$l.baseF0 = this.data.f0.rgb;
               this.$l.rectSpecularScale = that.getRectSpecularScale(this);
-              // Z_LTCEvaluateRect returns the raw edge sum; the reference implementation normalizes
-              // it by 1/(2*pi). Physical applies that so the authored luminance (cd/m²) is
-              // reproduced and diffuse/specular keep their correct ratio -- previously diffuse was
-              // divided by pi and specular by nothing, leaving specular pi times too strong.
-              //
-              // Legacy deliberately keeps the historical (unnormalized) weighting: its rect
-              // intensity is unitless and existing scenes are calibrated against it.
-              const ltcNormalization = physical ? 1 / (2 * Math.PI) : 1;
-              const diffuseNormalization = physical ? 1 / (2 * Math.PI) : 1 / Math.PI;
+              // Z_LTCEvaluateRect already returns the form factor: the fitted edge term in
+              // Z_LTCIntegrateEdgeVec is theta / (2*pi*sin(theta)), so the 1/(2*pi) of the polygon
+              // integral is built in (the same fit as UE's IntegrateEdge). Radiance is therefore
+              // luminance * albedo * formFactor for diffuse and luminance * LTC integral * Fresnel
+              // norm for specular, with no further normalization in either lighting mode.
               this.$l.specularLtc = pb.mul(
                 this.spec,
                 pb.add(pb.mul(this.baseF0, this.t2.x), pb.mul(pb.sub(pb.vec3(1), this.baseF0), this.t2.y)),
                 this.data.specularWeight,
-                this.rectSpecularScale,
-                ltcNormalization
+                this.rectSpecularScale
               );
-              this.$l.diffuseLtc = pb.mul(this.diff, pb.mul(this.data.diffuse.rgb, diffuseNormalization));
+              this.$l.diffuseLtc = pb.mul(this.diff, this.data.diffuse.rgb);
               this.outColor = pb.add(
                 this.outColor,
                 pb.mul(this.lightColor, pb.add(this.diffuseLtc, this.specularLtc))

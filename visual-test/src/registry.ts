@@ -20,7 +20,13 @@ import {
   shadowPcss,
   shadowVsm
 } from './scenes/shadows';
-import { clusterManyLights, spotShadow } from './scenes/lighting';
+import {
+  clusterManyLights,
+  rectLightDiffuse,
+  rectLightGlossy,
+  rectLightPhysical,
+  spotShadow
+} from './scenes/lighting';
 import {
   waterCausticsCrest,
   waterCausticsDeepBed,
@@ -109,6 +115,9 @@ export const SCENES: VisualScene[] = [
   // Lighting paths.
   clusterManyLights,
   spotShadow,
+  rectLightDiffuse,
+  rectLightGlossy,
+  rectLightPhysical,
   // Water: the medium, and the caustics it focuses onto what is under it.
   waterCausticsOff,
   waterCausticsOn,
