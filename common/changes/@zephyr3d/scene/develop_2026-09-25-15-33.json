@@ -1,0 +1,10 @@
+{
+  "changes": [
+    {
+      "packageName": "@zephyr3d/scene",
+      "comment": "Support cube maps in deep opacity map shadows for point and rect lights",
+      "type": "patch"
+    }
+  ],
+  "packageName": "@zephyr3d/scene"
+}
