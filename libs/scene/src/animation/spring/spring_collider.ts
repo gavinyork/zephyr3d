@@ -290,15 +290,20 @@ export function createBoxCollider(
  *
  * @public
  */
-export function resolveSphereCollision(particlePos: Vector3, collider: SphereCollider): boolean {
+export function resolveSphereCollision(
+  particlePos: Vector3,
+  collider: SphereCollider,
+  particleRadius: number = 0
+): boolean {
   const toParticle = Vector3.sub(particlePos, collider.center, new Vector3());
   const distSq = toParticle.magnitudeSq;
-  const radiusSq = collider.radius * collider.radius;
+  const contactRadius = collider.radius + Math.max(0, particleRadius);
+  const radiusSq = contactRadius * contactRadius;
 
   if (distSq < radiusSq) {
     // Particle is inside sphere, push it out
     const dist = distSq > COLLISION_DISTANCE_EPSILON_SQ ? Math.sqrt(distSq) : 0;
-    const penetration = collider.radius - dist;
+    const penetration = contactRadius - dist;
 
     // Push particle to sphere surface
     if (dist > 0) {
@@ -321,7 +326,12 @@ export function resolveSphereCollision(particlePos: Vector3, collider: SphereCol
  *
  * @public
  */
-export function resolveCapsuleCollision(particlePos: Vector3, collider: CapsuleCollider): boolean {
+export function resolveCapsuleCollision(
+  particlePos: Vector3,
+  collider: CapsuleCollider,
+  particleRadius: number = 0
+): boolean {
+  const contactRadius = collider.radius + Math.max(0, particleRadius);
   // Find closest point on capsule axis
   const axis = Vector3.sub(collider.end, collider.start, new Vector3());
   const axisLength = axis.magnitude;
@@ -330,11 +340,11 @@ export function resolveCapsuleCollision(particlePos: Vector3, collider: CapsuleC
     // Degenerate capsule, treat as sphere
     const toParticle = Vector3.sub(particlePos, collider.start, new Vector3());
     const distSq = toParticle.magnitudeSq;
-    const radiusSq = collider.radius * collider.radius;
+    const radiusSq = contactRadius * contactRadius;
 
     if (distSq < radiusSq) {
       const dist = distSq > COLLISION_DISTANCE_EPSILON_SQ ? Math.sqrt(distSq) : 0;
-      const penetration = collider.radius - dist;
+      const penetration = contactRadius - dist;
       if (dist > 0) {
         toParticle.scaleBy(1 / dist);
       } else {
@@ -361,11 +371,11 @@ export function resolveCapsuleCollision(particlePos: Vector3, collider: CapsuleC
   // Check distance from closest point
   const toParticleFromAxis = Vector3.sub(particlePos, closestPoint, new Vector3());
   const distSq = toParticleFromAxis.magnitudeSq;
-  const radiusSq = collider.radius * collider.radius;
+  const radiusSq = contactRadius * contactRadius;
 
   if (distSq < radiusSq) {
     const dist = distSq > COLLISION_DISTANCE_EPSILON_SQ ? Math.sqrt(distSq) : 0;
-    const penetration = collider.radius - dist;
+    const penetration = contactRadius - dist;
     if (dist > 0) {
       toParticleFromAxis.scaleBy(1 / dist);
     } else {
@@ -385,13 +395,18 @@ export function resolveCapsuleCollision(particlePos: Vector3, collider: CapsuleC
  *
  * @public
  */
-export function resolvePlaneCollision(particlePos: Vector3, collider: PlaneCollider): boolean {
+export function resolvePlaneCollision(
+  particlePos: Vector3,
+  collider: PlaneCollider,
+  particleRadius: number = 0
+): boolean {
   const toParticle = Vector3.sub(particlePos, collider.point, new Vector3());
   const distance = Vector3.dot(toParticle, collider.normal);
+  const contactDistance = Math.max(0, particleRadius);
 
-  if (distance < 0) {
+  if (distance < contactDistance) {
     // Particle is below plane, push it up
-    const correction = Vector3.scale(collider.normal, -distance, new Vector3());
+    const correction = Vector3.scale(collider.normal, contactDistance - distance, new Vector3());
     Vector3.add(particlePos, correction, particlePos);
     return true;
   }
@@ -405,21 +420,58 @@ export function resolvePlaneCollision(particlePos: Vector3, collider: PlaneColli
  *
  * @public
  */
-export function resolveBoxCollision(particlePos: Vector3, collider: BoxCollider): boolean {
+export function resolveBoxCollision(
+  particlePos: Vector3,
+  collider: BoxCollider,
+  particleRadius: number = 0
+): boolean {
   const delta = Vector3.sub(particlePos, collider.center, new Vector3());
   const local = new Vector3(
     Vector3.dot(delta, collider.axes[0]),
     Vector3.dot(delta, collider.axes[1]),
     Vector3.dot(delta, collider.axes[2])
   );
-  const penetration = new Vector3(
-    collider.halfExtents.x - Math.abs(local.x),
-    collider.halfExtents.y - Math.abs(local.y),
-    collider.halfExtents.z - Math.abs(local.z)
-  );
-  if (penetration.x < 0 || penetration.y < 0 || penetration.z < 0) {
-    return false;
+  const radius = Math.max(0, particleRadius);
+  const inside =
+    Math.abs(local.x) <= collider.halfExtents.x &&
+    Math.abs(local.y) <= collider.halfExtents.y &&
+    Math.abs(local.z) <= collider.halfExtents.z;
+  if (!inside) {
+    if (radius <= 0) {
+      return false;
+    }
+    const closest = new Vector3(
+      Math.max(-collider.halfExtents.x, Math.min(collider.halfExtents.x, local.x)),
+      Math.max(-collider.halfExtents.y, Math.min(collider.halfExtents.y, local.y)),
+      Math.max(-collider.halfExtents.z, Math.min(collider.halfExtents.z, local.z))
+    );
+    const fromClosest = Vector3.sub(local, closest, new Vector3());
+    const distanceSq = fromClosest.magnitudeSq;
+    if (distanceSq >= radius * radius || distanceSq <= COLLISION_DISTANCE_EPSILON_SQ) {
+      return false;
+    }
+    const distance = Math.sqrt(distanceSq);
+    fromClosest.scaleBy((radius - distance) / distance);
+    Vector3.add(
+      particlePos,
+      Vector3.add(
+        Vector3.scale(collider.axes[0], fromClosest.x, new Vector3()),
+        Vector3.add(
+          Vector3.scale(collider.axes[1], fromClosest.y, new Vector3()),
+          Vector3.scale(collider.axes[2], fromClosest.z, new Vector3()),
+          new Vector3()
+        ),
+        new Vector3()
+      ),
+      particlePos
+    );
+    return true;
   }
+  const penetration = new Vector3(
+    collider.halfExtents.x - Math.abs(local.x) + radius,
+    collider.halfExtents.y - Math.abs(local.y) + radius,
+    collider.halfExtents.z - Math.abs(local.z) + radius
+  );
   let axis = 0;
   let minPenetration = penetration.x;
   if (penetration.y < minPenetration) {

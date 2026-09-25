@@ -101,6 +101,7 @@ type SerializedSpringParticle = {
   originalRotation?: number[];
   mass: number;
   damping: number;
+  collisionRadius?: number;
   fixed: boolean;
 };
 
@@ -250,6 +251,7 @@ function serializeSpringChain(chain: SpringChain): SerializedSpringChain {
         : {}),
       mass: particle.mass,
       damping: particle.damping,
+      ...(particle.collisionRadius > 0 ? { collisionRadius: particle.collisionRadius } : {}),
       fixed: particle.fixed
     })),
     constraints: chain.constraints.map((constraint) => ({
@@ -282,6 +284,7 @@ function deserializeSpringChain(ctx: SceneNode, data: SerializedSpringChain): Sp
       createSpringParticle(position, {
         mass: item.mass,
         damping: item.damping,
+        collisionRadius: item.collisionRadius,
         fixed: item.fixed,
         node: node ?? undefined,
         anchorNode: anchorNode ?? undefined,

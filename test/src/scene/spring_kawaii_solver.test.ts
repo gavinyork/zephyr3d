@@ -6,11 +6,15 @@ import {
   SpringChain,
   SpringModifier,
   SpringSystem,
+  createBoxCollider,
   createCapsuleCollider,
+  createPlaneCollider,
   createSphereCollider,
   createSpringConstraint,
   createSpringParticle,
+  resolveBoxCollision,
   resolveCapsuleCollision,
+  resolvePlaneCollision,
   resolveSphereCollision
 } from '../../../libs/scene/src';
 import {
@@ -120,6 +124,53 @@ describe('Kawaii spring solver', () => {
     const onAxisPosition = Vector3.zero();
     expect(resolveCapsuleCollision(onAxisPosition, capsule)).toBe(true);
     expect(onAxisPosition.magnitude).toBeCloseTo(0.5);
+  });
+
+  it('keeps particle collision radius outside every collider shape', () => {
+    const spherePosition = new Vector3(1.05, 0, 0);
+    expect(resolveSphereCollision(spherePosition, createSphereCollider(Vector3.zero(), 1), 0.1)).toBe(true);
+    expect(spherePosition.x).toBeCloseTo(1.1);
+
+    const capsulePosition = new Vector3(0, 0.55, 0);
+    const capsule = createCapsuleCollider(new Vector3(-1, 0, 0), new Vector3(1, 0, 0), 0.5);
+    expect(resolveCapsuleCollision(capsulePosition, capsule, 0.1)).toBe(true);
+    expect(capsulePosition.y).toBeCloseTo(0.6);
+
+    const planePosition = new Vector3(0, 0.05, 0);
+    expect(
+      resolvePlaneCollision(planePosition, createPlaneCollider(Vector3.zero(), Vector3.axisPY()), 0.1)
+    ).toBe(true);
+    expect(planePosition.y).toBeCloseTo(0.1);
+
+    const boxPosition = new Vector3(1.05, 1.05, 0);
+    expect(
+      resolveBoxCollision(boxPosition, createBoxCollider(Vector3.zero(), new Vector3(1, 1, 1)), 0.1)
+    ).toBe(true);
+    expect(Vector3.distance(boxPosition, new Vector3(1, 1, 0))).toBeCloseTo(0.1);
+  });
+
+  it('releases startup overlap to the collider plus particle radius', () => {
+    const chain = new SpringChain();
+    const particle = createSpringParticle(new Vector3(0.75, 0, 0), {
+      damping: 1,
+      collisionRadius: 0.1
+    });
+    chain.addParticle(particle);
+    const system = new MultiChainSpringSystem({
+      gravity: Vector3.zero(),
+      enableInertialForces: false,
+      poseFollowRoot: 0,
+      poseFollowTip: 0,
+      initialCollisionPenetrationReleaseTime: 0.1
+    });
+    system.addChain(chain);
+    system.addCollider(createSphereCollider(Vector3.zero(), 1));
+
+    for (let frame = 0; frame < 8; frame++) {
+      system.update(1 / 60);
+    }
+
+    expect(particle.position.x).toBeCloseTo(1.1);
   });
 
   it('settles a double-ended chain under gravity with the default XPBD history retention', () => {

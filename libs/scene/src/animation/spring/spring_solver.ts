@@ -167,12 +167,12 @@ export function solveDistanceConstraint(
 export function resolveInelasticCollision<TCollider>(
   particle: SpringParticle,
   collider: TCollider,
-  resolveCollision: (position: Vector3, collider: TCollider) => boolean,
+  resolveCollision: (position: Vector3, collider: TCollider, particleRadius?: number) => boolean,
   allowedPenetration: number = 0
 ): boolean {
   const positionBeforeCollision = particle.position.clone();
   const preservedDisplacement = Vector3.sub(positionBeforeCollision, particle.prevPosition, new Vector3());
-  if (!resolveCollision(particle.position, collider)) {
+  if (!resolveCollision(particle.position, collider, particle.collisionRadius)) {
     return false;
   }
 
@@ -208,10 +208,13 @@ export function resolveInelasticCollision<TCollider>(
 export function measureCollisionPenetration<TCollider>(
   position: Vector3,
   collider: TCollider,
-  resolveCollision: (position: Vector3, collider: TCollider) => boolean
+  resolveCollision: (position: Vector3, collider: TCollider, particleRadius?: number) => boolean,
+  particleRadius: number = 0
 ): number {
   const resolvedPosition = position.clone();
-  return resolveCollision(resolvedPosition, collider) ? Vector3.distance(position, resolvedPosition) : 0;
+  return resolveCollision(resolvedPosition, collider, particleRadius)
+    ? Vector3.distance(position, resolvedPosition)
+    : 0;
 }
 
 function getFallbackRotationAxis(direction: Vector3): Vector3 {

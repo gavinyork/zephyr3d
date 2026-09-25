@@ -85,7 +85,8 @@ describe('SpringModifier serialization', () => {
     const chainA = SpringChain.fromBoneChain(rootA, tipA, {
       mass: 1.25,
       damping: 0.87,
-      stiffness: 0.73
+      stiffness: 0.73,
+      collisionRadius: 0.012
     });
     chainA.particles[chainA.particles.length - 1].fixed = true;
     chainA.particles[chainA.particles.length - 1].anchorNode = endAnchor;
@@ -186,6 +187,7 @@ describe('SpringModifier serialization', () => {
     expect(restoredSystem.chains[0].particles[2].anchorOffset?.z).toBeCloseTo(0.3);
     expect(restoredSystem.chains[0].particles[1].mass).toBeCloseTo(1.25);
     expect(restoredSystem.chains[0].particles[1].damping).toBeCloseTo(0.87);
+    expect(restoredSystem.chains[0].particles[1].collisionRadius).toBeCloseTo(0.012);
     expect(restoredSystem.chains[0].constraints[0].stiffness).toBeCloseTo(0.73);
     expect(restoredSystem.chains[0].constraints[0].compliance).toBeCloseTo(0.0002);
     expect(restoredSystem.interChainConstraints).toHaveLength(1);

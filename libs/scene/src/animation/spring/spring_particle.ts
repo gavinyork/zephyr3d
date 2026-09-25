@@ -21,6 +21,8 @@ export interface SpringParticle {
   mass: number;
   /** Velocity retention [0-1] (0 = fully damped, 1 = no damping) */
   damping: number;
+  /** World-space collision radius around the particle center */
+  collisionRadius: number;
   /** Whether this particle is fixed (anchor point) */
   fixed: boolean;
   /** Associated scene node (optional) */
@@ -45,6 +47,7 @@ export function createSpringParticle(
   options?: {
     mass?: number;
     damping?: number;
+    collisionRadius?: number;
     fixed?: boolean;
     node?: SceneNode;
     anchorNode?: SceneNode;
@@ -60,6 +63,7 @@ export function createSpringParticle(
     originalRotation: options?.originalRotation?.clone() ?? null,
     mass: options?.mass ?? 1.0,
     damping: options?.damping ?? 0.95,
+    collisionRadius: Math.max(0, Number(options?.collisionRadius) || 0),
     fixed: options?.fixed ?? false,
     node: options?.node ?? null,
     anchorNode: options?.anchorNode ?? null,

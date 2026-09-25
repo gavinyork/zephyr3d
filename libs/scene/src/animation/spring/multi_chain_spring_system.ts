@@ -943,7 +943,7 @@ export class MultiChainSpringSystem {
               )
             );
           } else {
-            resolveSphereCollision(particle.position, collider.collider);
+            resolveSphereCollision(particle.position, collider.collider, particle.collisionRadius);
           }
         }
         for (const collider of capsules) {
@@ -960,7 +960,7 @@ export class MultiChainSpringSystem {
               )
             );
           } else {
-            resolveCapsuleCollision(particle.position, collider.collider);
+            resolveCapsuleCollision(particle.position, collider.collider, particle.collisionRadius);
           }
         }
         for (const collider of planes) {
@@ -977,7 +977,7 @@ export class MultiChainSpringSystem {
               )
             );
           } else {
-            resolvePlaneCollision(particle.position, collider.collider);
+            resolvePlaneCollision(particle.position, collider.collider, particle.collisionRadius);
           }
         }
         for (const collider of boxes) {
@@ -994,7 +994,7 @@ export class MultiChainSpringSystem {
               )
             );
           } else {
-            resolveBoxCollision(particle.position, collider.collider);
+            resolveBoxCollision(particle.position, collider.collider, particle.collisionRadius);
           }
         }
       }
@@ -1403,8 +1403,12 @@ export class MultiChainSpringSystem {
     let penetration = particlePenetrations.get(sourceCollider);
     if (penetration === undefined) {
       penetration =
-        measureCollisionPenetration(particle.animPosition, collider, resolveCollision) +
-        INITIAL_COLLISION_PENETRATION_SLOP;
+        measureCollisionPenetration(
+          particle.animPosition,
+          collider,
+          resolveCollision,
+          particle.collisionRadius
+        ) + INITIAL_COLLISION_PENETRATION_SLOP;
       particlePenetrations.set(sourceCollider, penetration);
     }
     return getReleasedCollisionPenetration(
