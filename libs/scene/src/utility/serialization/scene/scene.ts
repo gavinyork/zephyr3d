@@ -599,6 +599,42 @@ export function getSceneClass(manager: ResourceManager): SerializableClass {
           }
         },
         {
+          name: 'AerialPerspectiveViewDistanceScale',
+          description:
+            'Strength of the atmospheric haze on distant objects. Higher values make them fade into the sky color sooner; the sky itself does not change',
+          type: 'float',
+          phase: 1,
+          options: { animatable: true, minValue: 0, maxValue: 10 },
+          default: 1,
+          get(this: Scene, value) {
+            value.num[0] = this.env.sky.aerialPerspectiveViewDistanceScale;
+          },
+          set(this: Scene, value) {
+            this.env.sky.aerialPerspectiveViewDistanceScale = value.num[0];
+          },
+          isValid() {
+            return this.env.sky.skyType === 'scatter';
+          }
+        },
+        {
+          name: 'AerialPerspectiveStartDepth',
+          description:
+            'Distance from the camera, in meters, where the atmospheric haze starts. Anything nearer stays completely clear',
+          type: 'float',
+          phase: 1,
+          options: { animatable: true, minValue: 0, maxValue: 10000 },
+          default: 100,
+          get(this: Scene, value) {
+            value.num[0] = this.env.sky.aerialPerspectiveStartDepth;
+          },
+          set(this: Scene, value) {
+            this.env.sky.aerialPerspectiveStartDepth = value.num[0];
+          },
+          isValid() {
+            return this.env.sky.skyType === 'scatter';
+          }
+        },
+        {
           name: 'CameraHeightScale',
           description:
             'How many meters of atmosphere one world unit stands for. Larger values make the camera climb faster through the sky and distant objects haze sooner',

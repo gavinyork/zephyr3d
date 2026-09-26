@@ -411,6 +411,31 @@ export class SkyRenderer extends Disposable {
       this.invalidate();
     }
   }
+  /**
+   * Strength of the aerial perspective: scales the distance the atmosphere is integrated over
+   * between the camera and the scene, so distant objects get hazier (>1) or clearer (<1). The sky
+   * itself is unaffected (UE: AerialPespectiveViewDistanceScale).
+   */
+  get aerialPerspectiveViewDistanceScale() {
+    return this._atmosphereParams.apViewDistanceScale;
+  }
+  set aerialPerspectiveViewDistanceScale(val: number) {
+    val = Math.max(0, val);
+    if (val !== this._atmosphereParams.apViewDistanceScale) {
+      this._atmosphereParams.apViewDistanceScale = val;
+    }
+  }
+  /**
+   * Distance from the camera where aerial perspective starts, in the same units as
+   * {@link SkyRenderer.aerialPerspectiveDistance} (atmosphere meters). Nearer surfaces get no
+   * atmospheric haze (UE: AerialPerspectiveStartDepth, 0.1 km by default).
+   */
+  get aerialPerspectiveStartDepth() {
+    return this._atmosphereParams.apStartDepth;
+  }
+  set aerialPerspectiveStartDepth(val: number) {
+    this._atmosphereParams.apStartDepth = Math.max(0, val);
+  }
   /** Atmosphere exposure */
   get atmosphereExposure() {
     return this._atmosphereExposure;

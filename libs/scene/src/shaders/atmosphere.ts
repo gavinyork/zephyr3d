@@ -42,6 +42,17 @@ export type AtmosphereParams = {
   /** Albedo of the virtual planet ground (UE: GroundAlbedo) */
   groundAlbedo: Vector3;
   apDistance: number;
+  /**
+   * Scales the distances the aerial perspective integrates over, making distant objects hazier (>1)
+   * or clearer (<1). Does not affect the sky (UE: AerialPespectiveViewDistanceScale).
+   */
+  apViewDistanceScale: number;
+  /**
+   * Distance from the camera, in atmosphere meters, where aerial perspective starts; nearer
+   * surfaces get none. The LUT depth slices cover [apStartDepth, apStartDepth + apDistance]
+   * (UE: AerialPerspectiveStartDepth).
+   */
+  apStartDepth: number;
   cameraWorldMatrix: Matrix4x4;
   lightDir: Vector3;
   lightColor: Vector4;
@@ -74,6 +85,9 @@ export function getDefaultAtmosphereParams() {
     // UE default FColor(170, 170, 170), i.e. 0.4 linear
     groundAlbedo: new Vector3(0.401978, 0.401978, 0.401978),
     apDistance: 96000,
+    apViewDistanceScale: 1,
+    // UE default 0.1 km
+    apStartDepth: 100,
     cameraWorldMatrix: Matrix4x4.identity(),
     lightDir: new Vector3(1, 0, 0),
     lightColor: new Vector4(1, 1, 1, 10),
@@ -136,6 +150,8 @@ function checkParams(other?: Partial<AtmosphereParams>) {
       result.multiScattering ||
       result.skyView ||
       currentAtmosphereParams.apDistance !== other.apDistance ||
+      currentAtmosphereParams.apViewDistanceScale !== other.apViewDistanceScale ||
+      currentAtmosphereParams.apStartDepth !== other.apStartDepth ||
       currentAtmosphereParams.cameraAspect !== other.cameraAspect ||
       currentAtmosphereParams.cameraTanHalfFovy !== other.cameraTanHalfFovy ||
       !currentAtmosphereParams.cameraWorldMatrix.equalsTo(other.cameraWorldMatrix!);
@@ -159,6 +175,8 @@ function checkParams(other?: Partial<AtmosphereParams>) {
   }
   if (result.aerialPerspective) {
     currentAtmosphereParams.apDistance = other.apDistance!;
+    currentAtmosphereParams.apViewDistanceScale = other.apViewDistanceScale!;
+    currentAtmosphereParams.apStartDepth = other.apStartDepth!;
     currentAtmosphereParams.cameraAspect = other.cameraAspect!;
     currentAtmosphereParams.cameraTanHalfFovy = other.cameraTanHalfFovy!;
     currentAtmosphereParams.cameraWorldMatrix.set(other.cameraWorldMatrix!);
@@ -413,6 +431,8 @@ export function groundBounce(
  * @param withGround - Stop the ray at the planet ground.
  * @param groundLit - When the ray ends on the ground (not cut short by `maxDis`), add the sun light
  *   the ground reflects (UE: `Ground` parameter). Implies `withGround`.
+ * @param apScale - Scale the integrated segment lengths by `params.apViewDistanceScale`, for the
+ *   aerial perspective. The medium is still sampled at the true positions, as in UE.
  */
 export function getSkyView(
   scope: PBInsideFunctionScope,
@@ -423,11 +443,12 @@ export function getSkyView(
   texTransmittanceLut: PBShaderExp,
   texMultiScatteringLut: PBShaderExp,
   withGround = true,
-  groundLit = false
+  groundLit = false,
+  apScale = false
 ) {
   const pb = scope.$builder;
   const Params = getAtmosphereParamsStruct(pb);
-  const funcName = `z_getSkyView${withGround ? '_G' : ''}${groundLit ? '_L' : ''}`;
+  const funcName = `z_getSkyView${withGround ? '_G' : ''}${groundLit ? '_L' : ''}${apScale ? '_AP' : ''}`;
   pb.func(
     funcName,
     [Params('params'), pb.vec3('eyePos'), pb.vec3('viewDir'), pb.float('maxDis')],
@@ -482,7 +503,9 @@ export function getSkyView(
           ozoneAbsorption(this, this.params.ozoneCenter, this.params.ozoneWidth, this.h),
           mieAbsorption(this, this.params.mieScatteringHeight, this.h)
         );
-        this.$l.sampleTransmittance = pb.exp(pb.neg(pb.mul(this.extinction, this.ds)));
+        this.$l.sampleTransmittance = pb.exp(
+          pb.neg(pb.mul(this.extinction, this.ds, apScale ? this.params.apViewDistanceScale : 1))
+        );
         this.$l.t1 = transmittanceToSky(this, this.params, this.p, this.params.lightDir, texTransmittanceLut);
         this.$l.s = scattering(this, this.params, this.p, this.viewDir);
         // Multi-scattering is diffuse light left after single scattering: not planet shadowed.
@@ -1056,7 +1079,14 @@ export function aerialPerspective(
     funcName,
     [Params('params'), pb.vec2('uv'), pb.vec3('cameraPos'), pb.vec3('worldPos'), pb.vec3('dim')],
     function () {
-      this.$l.tDepth = pb.mul(pb.distance(this.worldPos, this.cameraPos), this.params.cameraHeightScale);
+      // Depth past the start depth (UE: max(0, length(WorldPositionRelativeToCamera) - StartDepth))
+      this.$l.tDepth = pb.max(
+        pb.sub(
+          pb.mul(pb.distance(this.worldPos, this.cameraPos), this.params.cameraHeightScale),
+          this.params.apStartDepth
+        ),
+        0
+      );
       this.$l.linearW = pb.clamp(pb.div(this.tDepth, this.params.apDistance), 0, 1);
       // Squared slice distribution
       this.$l.nonLinSlice = pb.mul(pb.sqrt(this.linearW), this.dim.z);
@@ -1124,7 +1154,8 @@ export function aerialPerspectiveLut(
       ).xyz
     );
     this.$l.eyePos = pb.vec3(0, pb.add(this.params.observerAltitude, this.params.plantRadius), 0);
-    this.$l.maxDis = pb.mul(this.w, this.w, this.params.apDistance);
+    // Slices start at the start depth (UE: RayStartWorldPos = CamPos + StartDepth * WorldDir).
+    this.$l.maxDis = pb.add(this.params.apStartDepth, pb.mul(this.w, this.w, this.params.apDistance));
     this.$l.voxelPos = pb.add(this.eyePos, pb.mul(this.viewDir, this.maxDis));
     this.$l.underGround = pb.lessThan(pb.length(this.voxelPos), this.params.plantRadius);
     this.$l.planetNearT = rayIntersectSphere(
@@ -1164,15 +1195,24 @@ export function aerialPerspectiveLut(
       this.maxDis = pb.length(this.V);
       this.viewDir = pb.div(this.V, this.maxDis);
     });
+    // Integrate from the start depth along the (possibly redirected) ray up to the froxel.
+    this.$l.rayStart = pb.add(this.eyePos, pb.mul(this.viewDir, this.params.apStartDepth));
+    this.$l.segment = pb.sub(this.maxDis, this.params.apStartDepth);
+    this.$if(pb.lessThanEqual(this.segment, 0), function () {
+      this.$return(pb.vec4(0, 0, 0, 1));
+    });
     this.$return(
       getSkyView(
         this,
         this.params,
-        this.eyePos,
+        this.rayStart,
         this.viewDir,
-        this.maxDis,
+        this.segment,
         texTransmittanceLut,
-        texMultiScatteringLut
+        texMultiScatteringLut,
+        true,
+        false,
+        true
       )
     );
   });
@@ -1336,6 +1376,8 @@ export function getAtmosphereParamsStruct(pb: ProgramBuilder) {
     pb.float('ozoneCenter'),
     pb.float('ozoneWidth'),
     pb.float('apDistance'),
+    pb.float('apViewDistanceScale'),
+    pb.float('apStartDepth'),
     pb.float('cameraHeightScale'),
     pb.float('observerAltitude'),
     pb.mat4('skyViewReferential')
