@@ -244,7 +244,9 @@ export class SkyRenderer extends Disposable {
     this._wind = new Vector2(0, 0);
     this._skyboxRotation = new Vector3(0, 0, 0);
     this._skyWorldMatrix = defaultSkyWorldMatrix;
-    this._lastSunDir = SkyRenderer._getSunDir(null);
+    // Copied: without a sun light _getSunDir returns the shared ShaderHelper.defaultSunDir, which
+    // update() would otherwise overwrite with the last scene's sun direction.
+    this._lastSunDir = new Vector3(SkyRenderer._getSunDir(null));
     this._lastSunColor = SkyRenderer._getSunColor(null);
     this._panoramaAsset = '';
     this._shProjector = new CubemapSHProjector(10000);
