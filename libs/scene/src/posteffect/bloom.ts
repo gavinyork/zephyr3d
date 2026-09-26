@@ -15,6 +15,23 @@ export class Bloom extends AbstractPostEffect {
   static readonly className = 'Bloom' as const;
   /** Largest finite IEEE-754 half-float value used by the HDR post-effect chain. */
   private static readonly HALF_FLOAT_MAX = 65504;
+  /**
+   * Per-level bloom weights under physical lighting, finest level first.
+   *
+   * @remarks
+   * UE's bloom is six Gaussians of growing width weighted by Bloom1..6Tint (0.3465, 0.138, 0.1176,
+   * 0.066, 0.066, 0.061) times Intensity 0.675: the total gain is about 0.54, and the wide kernels,
+   * which spread a highlight over a large part of the screen, get little of it. Each level of this
+   * pyramid is a Gaussian roughly twice as wide as the previous, the finest about UE's second one;
+   * UE's first (sub-pixel at this resolution) is folded into it. Levels past the table get nothing.
+   *
+   * An unweighted pyramid instead adds every level at full energy, a gain equal to the level count
+   * that is dominated by the widest level. That is harmless for display-referred content near 1, but
+   * a physical sun disk at the output clamp (32256) then blows out a blob half the screen wide.
+   */
+  private static readonly PHYSICAL_LEVEL_WEIGHTS = [0.3465 + 0.138, 0.1176, 0.066, 0.066, 0.061].map(
+    (w) => w * 0.675
+  );
   private static _programDownsampleH: Nullable<GPUProgram> = null;
   private static _programDownsampleV: Nullable<GPUProgram> = null;
   private static _programUpsample: Nullable<GPUProgram> = null;
@@ -138,6 +155,29 @@ export class Bloom extends AbstractPostEffect {
   set karisAverage(val) {
     this._karisAverage = !!val;
   }
+  /**
+   * Per-level weights for the given pyramid depth: UE's under physical lighting, 1 in legacy so its
+   * output stays unchanged. See {@link Bloom.PHYSICAL_LEVEL_WEIGHTS}.
+   */
+  private static _levelWeights(ctx: DrawContext, count: number) {
+    const physical = ctx.scene?.lightingMode === 'physical';
+    const weights: number[] = [];
+    for (let i = 0; i < count; i++) {
+      weights.push(physical ? (Bloom.PHYSICAL_LEVEL_WEIGHTS[i] ?? 0) : 1);
+    }
+    return weights;
+  }
+  /**
+   * Upsample source scale for level `i + 1` into level `i`.
+   *
+   * @remarks
+   * The chain accumulates acc[i] = L[i] + (w[i+1] / w[i]) * up(acc[i+1]), which equals
+   * sum(w[k] * L[k]) / w[i]; the final compose multiplies by w[0]. This weights every level with a
+   * single scalar per pass.
+   */
+  private static _upsampleScale(weights: number[], i: number) {
+    return weights[i] > 0 ? weights[i + 1] / weights[i] : 0;
+  }
   /** {@inheritDoc AbstractPostEffect.requireLinearDepthTexture} */
   requireLinearDepthTexture() {
     return false;
@@ -176,6 +216,7 @@ export class Bloom extends AbstractPostEffect {
       // Degenerate viewport: no pyramid possible, bloom contributes nothing.
       return s.input;
     }
+    const weights = Bloom._levelWeights(ctx, levels.length);
 
     // 1. Prefilter (threshold/knee) at half resolution.
     const prefilterHandle = graph.addPass('Bloom:Prefilter', (builder) => {
@@ -258,7 +299,12 @@ export class Bloom extends AbstractPostEffect {
           device.pushDeviceStates();
           try {
             this._prepare(device, rg.getTexture<Texture2D>(src));
-            this.upsampleInto(device, rg.getTexture<Texture2D>(src), rg.getTexture<Texture2D>(out));
+            this.upsampleInto(
+              device,
+              rg.getTexture<Texture2D>(src),
+              rg.getTexture<Texture2D>(out),
+              Bloom._upsampleScale(weights, i)
+            );
           } finally {
             device.popDeviceStates();
           }
@@ -287,7 +333,8 @@ export class Bloom extends AbstractPostEffect {
             device,
             rg.getTexture<Texture2D>(s.input),
             rg.getTexture<Texture2D>(bloomHandle),
-            output.srgbOutput
+            output.srgbOutput,
+            weights[0]
           );
         } finally {
           device.popDeviceStates();
@@ -307,9 +354,10 @@ export class Bloom extends AbstractPostEffect {
     const colorTex = device.pool.fetchTemporalTexture2D(false, inputColorTexture.format, w, h, false);
     this.prefilter(device, inputColorTexture, colorTex);
     this.downsample(device, colorTex, downsampleTextures);
-    this.upsample(device, downsampleTextures);
+    const weights = Bloom._levelWeights(ctx, downsampleTextures.length);
+    this.upsample(device, downsampleTextures, weights);
     device.popDeviceStates();
-    this.finalCompose(device, inputColorTexture, downsampleTextures[0], srgbOutput);
+    this.finalCompose(device, inputColorTexture, downsampleTextures[0], srgbOutput, weights[0]);
     for (const tex of downsampleTextures) {
       device.pool.releaseTexture(tex);
     }
@@ -337,12 +385,18 @@ export class Bloom extends AbstractPostEffect {
     this.drawFullscreenQuad();
   }
   /** @internal */
-  finalCompose(device: AbstractDevice, srcTexture: Texture2D, bloomTexture: Texture2D, srgbOutput: boolean) {
+  finalCompose(
+    device: AbstractDevice,
+    srcTexture: Texture2D,
+    bloomTexture: Texture2D,
+    srgbOutput: boolean,
+    levelWeight = 1
+  ) {
     device.setProgram(Bloom._programFinalCompose);
     device.setBindGroup(0, Bloom._bindgroupFinalCompose!);
     Bloom._bindgroupFinalCompose!.setTexture('srcTex', srcTexture);
     Bloom._bindgroupFinalCompose!.setTexture('bloomTex', bloomTexture);
-    Bloom._bindgroupFinalCompose!.setValue('intensity', this._intensity);
+    Bloom._bindgroupFinalCompose!.setValue('intensity', this._intensity * levelWeight);
     // Legacy lighting puts Bloom last in the chain (see Camera.syncPostProcessingMode), so this
     // pass may be the one writing the sRGB screen. Without this the whole frame is handed to the
     // display scene-linear and everything darkens the moment bloom is switched on.
@@ -354,15 +408,16 @@ export class Bloom extends AbstractPostEffect {
     this.drawFullscreenQuad();
   }
   /** @internal */
-  upsample(device: AbstractDevice, textures: Texture2D[]) {
+  upsample(device: AbstractDevice, textures: Texture2D[], weights?: number[]) {
     for (let i = textures.length - 2; i >= 0; i--) {
-      this.upsampleInto(device, textures[i + 1], textures[i]);
+      this.upsampleInto(device, textures[i + 1], textures[i], weights ? Bloom._upsampleScale(weights, i) : 1);
     }
   }
   /** @internal */
-  private upsampleInto(device: AbstractDevice, srcTexture: Texture2D, dstTexture: Texture2D) {
+  private upsampleInto(device: AbstractDevice, srcTexture: Texture2D, dstTexture: Texture2D, scale = 1) {
     device.setProgram(Bloom._programUpsample);
     device.setBindGroup(0, Bloom._bindgroupUpsample!);
+    Bloom._bindgroupUpsample!.setValue('scale', scale);
     Bloom._bindgroupUpsample!.setValue('flip', device.type === 'webgpu' ? 1 : 0);
     Bloom._bindgroupUpsample!.setTexture('tex', srcTexture);
     // Tent offsets are in source-texel units, so the filter widens with the level it reads
@@ -592,6 +647,7 @@ export class Bloom extends AbstractPostEffect {
           this.tex = pb.tex2D().uniform(0);
           this.invTexSize = pb.vec2().uniform(0);
           this.radius = pb.float().uniform(0);
+          this.scale = pb.float().uniform(0);
           this.$outputs.outColor = pb.vec4();
           pb.main(function () {
             // 3x3 tent filter, the upsample kernel from "Next Generation Post Processing in
@@ -622,7 +678,7 @@ export class Bloom extends AbstractPostEffect {
                 )
               );
             }
-            this.$outputs.outColor = pb.vec4(this.sum, 1);
+            this.$outputs.outColor = pb.vec4(pb.mul(this.sum, this.scale), 1);
           });
         }
       })!;

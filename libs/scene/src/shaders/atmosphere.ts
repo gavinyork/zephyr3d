@@ -261,13 +261,13 @@ export function mieCoefficient(
 export function miePhase(scope: PBInsideFunctionScope, fMieAnstropy: PBShaderExp, fCosTheta: PBShaderExp) {
   const pb = scope.$builder;
   const funcName = 'z_miePhase';
+  // Henyey-Greenstein, as UE (HenyeyGreensteinPhase(MiePhaseG, -cosTheta)). cosTheta is the cosine
+  // between the direction towards the light and the view direction, so forward scattering peaks
+  // when looking at the light.
   pb.func(funcName, [pb.float('g'), pb.float('cosTheta')], function () {
     this.$l.g2 = pb.mul(this.g, this.g);
-    this.$l.a = 3 / (8 * Math.PI);
-    this.$l.b = pb.div(pb.sub(1, this.g2), pb.add(2, this.g2));
-    this.$l.c = pb.add(1, pb.mul(this.cosTheta, this.cosTheta));
-    this.$l.d = pb.pow(pb.sub(pb.add(1, this.g2), pb.mul(this.g, this.cosTheta, 2)), 1.5);
-    this.$return(pb.div(pb.mul(this.a, this.b, this.c), this.d));
+    this.$l.denom = pb.sub(pb.add(1, this.g2), pb.mul(this.g, this.cosTheta, 2));
+    this.$return(pb.div(pb.sub(1, this.g2), pb.mul(4 * Math.PI, this.denom, pb.sqrt(this.denom))));
   });
   return scope[funcName](fMieAnstropy, fCosTheta);
 }
@@ -821,7 +821,18 @@ function sunBloom(
   return scope[funcName](f3ViewDir, f3LightDir, f4LightColorAndIntensity, fSunSolidAngle) as PBShaderExp;
 }
 
-/** @internal */
+/** @internal UE default sun angular diameter (DirectionalLight LightSourceAngle), as a half apex angle */
+export const SUN_DISK_HALF_APEX_ANGLE = (0.5 * 0.5357 * Math.PI) / 180;
+
+/**
+ * @internal
+ *
+ * Sky luminance along a view direction from the sky view LUT, plus the sun disk.
+ *
+ * @param fIncludeSunDisk - 0: no sun disk; 1: legacy stylized disk with glow; 2: physical disk as in
+ *   UE (GetLightDiskLuminance): illuminance over the disk's solid angle, attenuated by the atmosphere
+ *   along the view ray, soft outer edge. Bloom is left to post processing.
+ */
 export function skyBox(
   scope: PBInsideFunctionScope,
   stParams: PBShaderExp,
@@ -866,11 +877,44 @@ export function skyBox(
         texTransmittanceLut
       );
       this.sunColor = pb.mul(this.params.lightColor, pb.vec4(this.sunTransmittance, 1));
-      this.$if(pb.and(pb.notEqual(this.includeSunDisk, 0), pb.lessThan(this.groundDistance, 0)), function () {
+      this.$if(pb.and(pb.equal(this.includeSunDisk, 1), pb.lessThan(this.groundDistance, 0)), function () {
         this.rgb = pb.add(
           this.rgb,
           sunBloom(this, this.viewDir, this.params.lightDir, this.sunColor, this.sunSolidAngle)
         );
+      });
+      this.$if(pb.equal(this.includeSunDisk, 2), function () {
+        const cosHalfApex = Math.cos(SUN_DISK_HALF_APEX_ANGLE);
+        const solidAngle = 2 * Math.PI * (1 - cosHalfApex);
+        this.$l.viewDotLight = pb.dot(this.viewDir, this.params.lightDir);
+        this.$if(pb.greaterThan(this.viewDotLight, cosHalfApex), function () {
+          // Planet shadowed by transmittanceToSky
+          this.$l.transmittanceToLight = transmittanceToSky(
+            this,
+            this.params,
+            pb.vec3(
+              0,
+              pb.add(this.params.plantRadius, pb.mul(CAMERA_POS_Y, this.params.cameraHeightScale)),
+              0
+            ),
+            this.viewDir,
+            texTransmittanceLut
+          );
+          this.$l.softEdge = pb.clamp(
+            pb.div(pb.mul(pb.sub(this.viewDotLight, cosHalfApex), 2), 1 - cosHalfApex),
+            0,
+            1
+          );
+          this.rgb = pb.add(
+            this.rgb,
+            pb.mul(
+              this.transmittanceToLight,
+              this.params.lightColor.rgb,
+              pb.div(this.params.lightColor.a, solidAngle),
+              this.softEdge
+            )
+          );
+        });
       });
       this.$return(pb.vec4(this.rgb, 1));
     }

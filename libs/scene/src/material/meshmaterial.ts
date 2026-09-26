@@ -1296,6 +1296,8 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
               : this.zOpacity;
           this.outColor.a = pb.mul(this.outColor.a, opacity);
         }
+        // Whether outColor.rgb is premultiplied by coverage when fog is applied.
+        let premultiplied = true;
         if (that.isTransparentPass(that.pass, that.drawContext)) {
           if (this.zAlphaCutoff) {
             this.$if(pb.getGlobalScope()[alphaClipFuncName](this.outColor.a, this.zAlphaCutoff), function () {
@@ -1315,13 +1317,18 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
               pb.mul(this.outColor.rgb, this.outColor.a),
               that.featureUsed<BlendMode>(FEATURE_ALPHABLEND) === 'additive' ? 0 : this.outColor.a
             );
+          } else {
+            premultiplied = false;
           }
+          // Fog before handing the fragment to OIT, which otherwise consumes it unfogged.
+          ShaderHelper.applyFog(this, this.worldPos, this.outColor, that.drawContext, premultiplied);
           output =
             !that.drawContext.oit ||
             !that.drawContext.oit.outputFragmentColor(this, this.outColor, that.drawContext);
+        } else {
+          ShaderHelper.applyFog(this, this.worldPos, this.outColor, that.drawContext);
         }
         if (output) {
-          ShaderHelper.applyFog(this, this.worldPos, this.outColor, that.drawContext);
           this.$outputs.zFragmentOutput = ShaderHelper.encodeColorOutput(this, this.outColor);
         }
       } else if (that.drawContext.renderPass!.type === RENDER_PASS_TYPE_DEPTH) {

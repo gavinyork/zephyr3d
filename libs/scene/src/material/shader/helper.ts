@@ -2723,11 +2723,17 @@ export class ShaderHelper {
     });
     return pb.getGlobalScope()[funcName](worldPos, worldNormal, NoL);
   }
-  static applyFog(scope: PBInsideFunctionScope, worldPos: PBShaderExp, color: PBShaderExp, ctx: DrawContext) {
+  static applyFog(
+    scope: PBInsideFunctionScope,
+    worldPos: PBShaderExp,
+    color: PBShaderExp,
+    ctx: DrawContext,
+    premultiplied = true
+  ) {
     const pb = scope.$builder;
     const that = this;
     if (ctx.materialFlags & MaterialVaryingFlags.APPLY_FOG) {
-      const funcName = 'Z_applyFog';
+      const funcName = premultiplied ? 'Z_applyFog' : 'Z_applyFogStraight';
       pb.func(funcName, [pb.vec3('worldPos'), pb.vec4('color').inout()], function () {
         this.$l.uv = pb.div(pb.vec2(this.$builtins.fragCoord.xy), that.getRenderSize(this));
         this.$l.fogging = calculateFog(
@@ -2745,11 +2751,15 @@ export class ShaderHelper {
           this[UNIFORM_NAME_SKYDISTANTLIGHT_LUT],
           this[UNIFORM_NAME_FOG_SKYLIGHT_CUBEMAP]
         );
-        // color is premultiplied: attenuate it by the fog transmittance and add the in-scattering
-        // weighted by coverage. Additive light passes and additive blending (alpha 0) get
-        // attenuation only -- calculateFog already zeroes the in-scattering for the former.
+        // Premultiplied color: attenuate by the fog transmittance and add the in-scattering weighted
+        // by coverage. Additive light passes and additive blending (alpha 0) get attenuation only --
+        // calculateFog already zeroes the in-scattering for the former. Straight (non-premultiplied)
+        // color is scaled by coverage later, so the in-scattering is added unweighted.
         this.color = pb.vec4(
-          pb.add(pb.mul(this.color.rgb, this.fogging.a), pb.mul(this.fogging.rgb, this.color.a)),
+          pb.add(
+            pb.mul(this.color.rgb, this.fogging.a),
+            premultiplied ? pb.mul(this.fogging.rgb, this.color.a) : this.fogging.rgb
+          ),
           this.color.a
         );
       });

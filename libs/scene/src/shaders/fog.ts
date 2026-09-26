@@ -8,8 +8,12 @@ import {
 } from './atmosphere';
 import { Fog } from '../values';
 
-/** @internal */
-export const MAX_FOG_HEIGHT = 100;
+/**
+ * @internal
+ * How far above the fog height the observer is clamped for the fog density at the ray origin (UE:
+ * FogHeight + 65536 world units, i.e. 655.36 m).
+ */
+export const MAX_FOG_HEIGHT = 655.36;
 
 /** @internal */
 export type HeightFogParams = {

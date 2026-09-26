@@ -161,6 +161,8 @@ export class SkyRenderer extends Disposable {
   private readonly _atmosphereParams: AtmosphereParams;
   private _atmosphereExposure: number;
   private _lowerHemisphereIsBlack: boolean;
+  /** Latched in update(): physical lighting draws the UE sun disk instead of the legacy glow. */
+  private _physicalSunDisk: boolean;
   private _fogType: FogType;
   private readonly _heightFogParams: HeightFogParams;
   private _cloudy: number;
@@ -217,6 +219,7 @@ export class SkyRenderer extends Disposable {
     this._atmosphereParams = getDefaultAtmosphereParams();
     this._atmosphereExposure = 1;
     this._lowerHemisphereIsBlack = true;
+    this._physicalSunDisk = false;
     this._debugAerialPerspective = 0;
     this._fogType = 'height_fog';
     this._heightFogParams = getDefaultHeightFogParams();
@@ -768,6 +771,7 @@ export class SkyRenderer extends Disposable {
     //    take the plain camera pre-exposure.
     // Legacy leaves both at 1 so its authored colors are untouched.
     this._fogPreExposure = SkyRenderer.getBakeToPreExposedScale(ctx);
+    this._physicalSunDisk = ctx.scene.lightingMode === 'physical';
     // Sky light for height fog: radiance map samples times the same scale the IBL applies to them.
     const envLight = ctx.scene.env.light;
     const fogSkyLightMap = envLight.type === 'ibl' ? envLight.radianceMap : null;
@@ -1375,7 +1379,7 @@ export class SkyRenderer extends Disposable {
     bindgroup.setValue('worldMatrix', this._skyWorldMatrix);
     bindgroup.setValue('cameraPos', camera.getWorldPosition());
     bindgroup.setValue('srgbOut', device.getFramebuffer() ? 0 : 1);
-    bindgroup.setValue('includeSunDisk', includeSunDisk ? 1 : 0);
+    bindgroup.setValue('includeSunDisk', includeSunDisk ? (this._physicalSunDisk ? 2 : 1) : 0);
     bindgroup.setValue('lowerHemisphereBlack', lowerHemisphereBlack ? 1 : 0);
     bindgroup.setValue('luminanceScale', luminanceScale);
     bindgroup.setTexture('tLut', tLut, fetchSampler('clamp_linear_nomip'));
@@ -1846,7 +1850,9 @@ export class SkyRenderer extends Disposable {
             }
           );
           // 1 for legacy and for the IBL bake; the camera pre-exposure when drawn on screen.
-          this.color = pb.mul(this.color, this.luminanceScale);
+          // Clamped like UE's PrepareOutput: the physical sun disk can exceed half-float range, and
+          // half of the fp10 maximum leaves headroom for bloom and other additive effects.
+          this.color = pb.min(pb.mul(this.color, this.luminanceScale), pb.vec3(64512 * 0.5));
           this.$if(pb.equal(this.srgbOut, 0), function () {
             this.$outputs.outColor = pb.vec4(this.color, 1);
           }).$else(function () {
