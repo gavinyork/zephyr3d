@@ -1,0 +1,10 @@
+{
+  "changes": [
+    {
+      "packageName": "@zephyr3d/scene",
+      "comment": "Fix incorrect computation of atmosphere, aerial perspective and height fog.",
+      "type": "minor"
+    }
+  ],
+  "packageName": "@zephyr3d/scene"
+}
