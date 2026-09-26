@@ -2558,6 +2558,42 @@ export class ShaderHelper {
     return pb.add(worldPos, pb.mul(unitNormal, offset)) as PBShaderExp;
   }
   /**
+   * How far a rect light's shadow lookup can be trusted at a receiver, as a
+   * weight for `mix(1, shadow, weight)`.
+   *
+   * @remarks
+   * A rect light's shadow is a cube map rendered from its centre, but its
+   * lighting integrates the whole panel. Where the surface turns away from the
+   * centre the panel's far edge still lights it, while the centre already sees
+   * the receiver occlude itself - so the centre's shadow cuts a hard, texel
+   * stepped terminator through lit surface. The weight fades that lookup out as
+   * the centre sinks to the receiver's horizon.
+   *
+   * The band is a fixed, narrow cosine range rather than one scaled by the
+   * panel's size: the stepped edge only lives where the centre grazes the
+   * surface, and its width is set by shadow bias and texel footprint, not by
+   * the panel. A band as wide as the panel's angular radius also caught flat
+   * receivers - a floor seen low from a large upright panel - and faded their
+   * cast shadows, which have no terminator to hide.
+   *
+   * @param worldNormal - Geometric normal; the terminator follows the surface,
+   * not its normal map.
+   * @param posRange - Light position (xyz).
+   * @internal
+   */
+  static getRectLightShadowWeight(
+    scope: PBInsideFunctionScope,
+    worldPos: PBShaderExp,
+    worldNormal: PBShaderExp,
+    posRange: PBShaderExp
+  ): PBShaderExp {
+    const pb = scope.$builder;
+    const toCenter = pb.sub(posRange.xyz, worldPos);
+    const unitNormal = pb.mul(worldNormal, pb.div(1, pb.max(pb.length(worldNormal), 1e-6)));
+    const cosCenter = pb.div(pb.dot(unitNormal, toCenter), pb.max(pb.length(toCenter), 1e-6));
+    return pb.smoothStep(0, 0.01, cosCenter) as PBShaderExp;
+  }
+  /**
    * Calculates shadow of current fragment
    *
    * @param scope - Shader scope

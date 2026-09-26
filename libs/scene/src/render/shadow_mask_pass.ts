@@ -14,7 +14,7 @@ import type { PunctualLight } from '../scene/light';
 import type { ShadowMapParams } from '../shadow/shadowmapper';
 import { ShaderHelper } from '../material/shader/helper';
 import { drawFullscreenQuad } from './fullscreenquad';
-import { LIGHT_TYPE_DIRECTIONAL, MAX_SHADOW_MASK_LIGHTS } from '../values';
+import { LIGHT_TYPE_DIRECTIONAL, LIGHT_TYPE_RECT, MAX_SHADOW_MASK_LIGHTS } from '../values';
 import { fetchSampler } from '../utility/misc';
 
 const UNIFORM_NAME_SHADOW_MAP = 'Z_UniformShadowMap';
@@ -328,6 +328,11 @@ export class ShadowMaskRenderer {
          * Naive cross(dpdx, dpdy) spans depth discontinuities and produces a
          * wild normal along every silhouette. Taking the nearer neighbour on
          * each axis keeps the basis on one surface instead.
+         *
+         * Returns the normal in xyz and, in w, how far it can be trusted. The
+         * nearer-neighbour pick still fails where two surfaces meet at a
+         * continuous depth - a sphere resting on a floor - because either side
+         * is equally near, and the normal it builds belongs to neither surface.
          */
         pb.func('zReconstructNormal', [pb.vec2('uv'), pb.vec4('center')], function () {
           this.$l.dx = pb.vec2(this.invRenderSize.x, 0);
@@ -382,7 +387,7 @@ export class ShadowMaskRenderer {
           // Degenerate footprint (flat depth, or a pixel with no geometry):
           // report a zero normal, which yields a zero offset downstream.
           this.$if(pb.lessThan(this.len, 1e-12), function () {
-            this.$return(pb.vec3(0));
+            this.$return(pb.vec4(0));
           });
           this.n = pb.div(this.n, this.len);
           // The cross product's sign depends on which neighbours were picked, so
@@ -391,7 +396,25 @@ export class ShadowMaskRenderer {
           this.$if(pb.lessThan(pb.dot(this.n, this.toEye), 0), function () {
             this.n = pb.neg(this.n);
           });
-          this.$return(this.n);
+          // Trust: agreement between the normals built from opposite one-sided
+          // differences. A crease splits them by its dihedral angle, so the
+          // tessellation facets of a smooth mesh (a few degrees to a dozen) pass
+          // while a sphere-on-floor seam or a silhouette does not. Comparing
+          // depth slopes instead fails on facets facing the camera, where the
+          // slopes are near zero and any kink looks relatively huge.
+          const safeNormal = (a: PBShaderExp, b: PBShaderExp) => {
+            const c = pb.cross(a, b);
+            return pb.mul(c, pb.inverseSqrt(pb.max(pb.dot(c, c), 1e-24)));
+          };
+          this.$l.dR = pb.sub(this.right.xyz, this.center.xyz);
+          this.$l.dL = pb.sub(this.center.xyz, this.left.xyz);
+          this.$l.dU = pb.sub(this.up.xyz, this.center.xyz);
+          this.$l.dD = pb.sub(this.center.xyz, this.down.xyz);
+          this.$l.agreement = pb.min(
+            pb.dot(safeNormal(this.dR, this.dU), safeNormal(this.dL, this.dD)),
+            pb.dot(safeNormal(this.dR, this.dD), safeNormal(this.dL, this.dU))
+          );
+          this.$return(pb.vec4(this.n, pb.smoothStep(0.7, 0.9, this.agreement)));
         });
         // Explicit-depth cascade selection (fragCoord.z is invalid in a fullscreen
         // pass). Mirrors posteffect/sss.ts calculateTransmissionShadow.
@@ -501,7 +524,8 @@ export class ShadowMaskRenderer {
           // The normal is recovered from the depth prepass rather than
           // interpolated, because this pass is where the opaque queue's shadows
           // are decided and normal offset bias needs one.
-          this.$l.normal = this.zReconstructNormal(this.$inputs.uv, this.pos);
+          this.$l.normalInfo = this.zReconstructNormal(this.$inputs.uv, this.pos);
+          this.$l.normal = this.normalInfo.xyz;
           this.$l.lightDir =
             lightType === LIGHT_TYPE_DIRECTIONAL
               ? pb.neg(this.light.directionAndCutoff.xyz)
@@ -514,6 +538,36 @@ export class ShadowMaskRenderer {
             this.NoL = pb.clamp(pb.dot(this.normal, this.lightDir), 0, 1);
           });
           this.$l.factor = this.zShadowMaskFactor(this.pos.xyz, this.pos.w, this.NoL, this.normal);
+          if (lightType !== LIGHT_TYPE_DIRECTIONAL) {
+            // Rect lights shadow as point lights (see ShadowMapper), so tell them
+            // apart by the true type in extraParams.w. A degenerate (zero) normal
+            // keeps the plain lookup, as NoL does above, and so does one taken
+            // across a crease: at a sphere resting on a floor the reconstructed
+            // normal tilts away from the light and would drop the contact shadow.
+            // The terminator the fade hides lies on smooth surface anyway.
+            this.$if(
+              pb.and(
+                pb.equal(pb.int(this.light.extraParams.w), LIGHT_TYPE_RECT),
+                pb.greaterThan(pb.dot(this.normal, this.normal), 0.5)
+              ),
+              function () {
+                this.factor = pb.mix(
+                  1,
+                  this.factor,
+                  pb.mix(
+                    1,
+                    ShaderHelper.getRectLightShadowWeight(
+                      this,
+                      this.pos.xyz,
+                      this.normal,
+                      this.light.positionAndRange
+                    ),
+                    this.normalInfo.w
+                  )
+                );
+              }
+            );
+          }
           this.$outputs.color = pb.vec4(this.factor);
         });
       }

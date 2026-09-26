@@ -909,16 +909,23 @@ export class EnvConstantAmbient extends EnvironmentLighting {
   /**
    * {@inheritDoc EnvironmentLighting.getRadiance}
    * @override
+   *
+   * @remarks
+   * A uniform environment prefilters to itself at every roughness, so the
+   * radiance is the ambient color. It must not be absent: the diffuse IBL term
+   * is weighted by the energy the specular lobe takes, which approaches all of
+   * it at grazing angles, and without a specular term to hand it back every
+   * silhouette turns black.
    */
-  getRadiance(_scope: PBInsideFunctionScope, _refl: PBShaderExp, _roughness: PBShaderExp) {
-    return null;
+  getRadiance(scope: PBInsideFunctionScope, _refl: PBShaderExp, _roughness: PBShaderExp) {
+    return scope[EnvConstantAmbient.UNIFORM_NAME_CONSTANT_AMBIENT].rgb as PBShaderExp;
   }
   /**
    * {@inheritDoc EnvironmentLighting.getSheenRadiance}
    * @override
    */
-  getSheenRadiance(_scope: PBInsideFunctionScope, _refl: PBShaderExp, _roughness: PBShaderExp) {
-    return null;
+  getSheenRadiance(scope: PBInsideFunctionScope, refl: PBShaderExp, roughness: PBShaderExp) {
+    return this.getRadiance(scope, refl, roughness);
   }
   /**
    * {@inheritDoc EnvironmentLighting.getIrradiance}
@@ -932,14 +939,14 @@ export class EnvConstantAmbient extends EnvironmentLighting {
    * @override
    */
   hasRadiance() {
-    return false;
+    return true;
   }
   /**
    * {@inheritDoc EnvironmentLighting.hasSheenRadiance}
    * @override
    */
   hasSheenRadiance() {
-    return false;
+    return true;
   }
   /**
    * {@inheritDoc EnvironmentLighting.hasIrradiance}

@@ -575,6 +575,16 @@ export function mixinPBRMetallicRoughness<T extends typeof MeshMaterial>(BaseCls
                   this.TBN[2],
                   pb.max(this.rectNoL, 1e-5)
                 );
+                this.rectShadow = pb.mix(
+                  1,
+                  this.rectShadow,
+                  ShaderHelper.getRectLightShadowWeight(
+                    this,
+                    this.worldPos,
+                    this.TBN[2],
+                    posRange
+                  )
+                );
                 this.rectColorIntensity = pb.vec4(
                   colorIntensity.rgb,
                   pb.mul(colorIntensity.a, this.rectShadow)
