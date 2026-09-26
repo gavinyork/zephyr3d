@@ -1,6 +1,11 @@
 import { Vector3, Vector4 } from '@zephyr3d/base';
 import type { PBInsideFunctionScope, PBShaderExp, ProgramBuilder } from '@zephyr3d/device';
-import { aerialPerspective, getAtmosphereParamsStruct } from './atmosphere';
+import {
+  AP_LUT_DEPTH_SLICES,
+  AP_LUT_SLICE_SIZE,
+  aerialPerspective,
+  getAtmosphereParamsStruct
+} from './atmosphere';
 import { Fog } from '../values';
 
 /** @internal */
@@ -9,7 +14,7 @@ export const MAX_FOG_HEIGHT = 100;
 /** @internal */
 export type HeightFogParams = {
   parameter1: Vector4; // [rgb=fogColor a=heightFalloff]
-  parameter2: Vector4; // [r=density g=startHeight b=startDistance a=maxHeight]
+  parameter2: Vector4; // [r=density g=startHeight b=startDistance a=endDistance]
   parameter3: Vector4; // [r=maxOpacity g=atmosphereStrength b=rayOriginTerm a=dirInscatteringExponent]
   parameter4: Vector4; // [rgb=directionalInscatteringColor a=UNUSED]
   lightDir: Vector3;
@@ -20,6 +25,20 @@ export type HeightFogParams = {
    * are already pre-exposed on upload. 1 in legacy.
    */
   preExposure: number;
+  /**
+   * How much the in-scattering color is replaced by the environment radiance map sampled along the
+   * view ray (UE: SkyLightCaptureAffectsHeightFogStrength). 0 disables it.
+   */
+  skyLightStrength: number;
+  /** Roughness selecting the radiance map mip (UE: SkyLightCaptureAffectsHeightFogRoughness). */
+  skyLightRoughness: number;
+  /**
+   * Converts radiance map samples to pre-exposed radiance, 0 when no radiance map is available.
+   * Updated every frame by SkyRenderer.
+   */
+  skyLightScale: number;
+  /** Max LOD of the radiance map. Updated every frame by SkyRenderer. */
+  skyLightMaxLod: number;
 };
 
 /** @internal */
@@ -31,7 +50,11 @@ export function getDefaultHeightFogParams() {
     parameter4: new Vector4(0, 0, 0, 0),
     lightDir: new Vector3(0, 1, 0),
     lightColor: new Vector3(0, 0, 0),
-    preExposure: 1
+    preExposure: 1,
+    skyLightStrength: 0,
+    skyLightRoughness: 0.15,
+    skyLightScale: 0,
+    skyLightMaxLod: 0
   } as HeightFogParams;
 }
 
@@ -42,11 +65,13 @@ export function getHeightFogParamsStruct(pb: ProgramBuilder) {
     pb.vec4('parameter2'),
     pb.vec4('parameter3'),
     pb.vec4('parameter4'),
-    pb.float('dirInscatteringStartDistance'),
-    pb.vec3('dirInscatteringColor'),
     pb.vec3('lightDir'),
     pb.vec3('lightColor'),
-    pb.float('preExposure')
+    pb.float('preExposure'),
+    pb.float('skyLightStrength'),
+    pb.float('skyLightRoughness'),
+    pb.float('skyLightScale'),
+    pb.float('skyLightMaxLod')
   ]);
 }
 
@@ -62,7 +87,8 @@ export function calculateFog(
   worldPos: PBShaderExp,
   additive: PBShaderExp | number,
   apLut: PBShaderExp,
-  distantLightLut: PBShaderExp
+  distantLightLut: PBShaderExp,
+  skyLightCubemap: PBShaderExp
 ) {
   const pb = scope.$builder;
   const funcName = 'Z_calculateFog';
@@ -90,7 +116,8 @@ export function calculateFog(
           this.cameraPos,
           this.worldPos,
           this.isSky,
-          distantLightLut
+          distantLightLut,
+          skyLightCubemap
         );
       });
       this.$if(pb.and(pb.notEqual(this.withAerialPerspective, 0), pb.not(this.isSky)), function () {
@@ -100,7 +127,7 @@ export function calculateFog(
           this.atmosphereParams,
           this.cameraPos,
           this.worldPos,
-          pb.vec3(32),
+          pb.vec3(AP_LUT_SLICE_SIZE, AP_LUT_SLICE_SIZE, AP_LUT_DEPTH_SLICES),
           apLut
         );
         // rgb is inscattered radiance from the exposure-independent AP LUT, so it takes the camera
@@ -149,13 +176,20 @@ export function combineAerialPerspectiveFog(
   return scope[funcName](fogging, aerialPerspectiveFog);
 }
 
+/**
+ * Exponential height fog, following UE's GetExponentialHeightFog (HeightFogCommon.ush) with a single
+ * fog term and no inscattering cubemap.
+ *
+ * Returns the in-scattered radiance in rgb and the transmittance in a.
+ */
 export function calculateHeightFog(
   scope: PBInsideFunctionScope,
   params: PBShaderExp,
   cameraPos: PBShaderExp,
   worldPos: PBShaderExp,
   isSky: PBShaderExp | boolean,
-  skyDistantColorLut: PBShaderExp
+  skyDistantColorLut: PBShaderExp,
+  skyLightCubemap: PBShaderExp
 ) {
   const pb = scope.$builder;
   const funcName = 'Z_calcHeightFog';
@@ -164,53 +198,89 @@ export function calculateHeightFog(
     funcName,
     [Params('params'), pb.vec3('cameraPosition'), pb.vec3('worldPosition'), pb.bool('isSky')],
     function () {
-      this.$l.cameraPos = this.$choice(
+      this.$l.falloff = this.params.parameter1.w;
+      this.$l.density = this.params.parameter2.x;
+      this.$l.fogHeight = this.params.parameter2.y;
+      this.$l.startDistance = this.params.parameter2.z;
+      this.$l.endDistance = this.params.parameter2.w;
+      this.$l.maxOpacity = this.params.parameter3.x;
+      // Sky pixels have no depth: put them far away along the view ray.
+      this.$l.receiver = this.$choice(
         this.isSky,
-        this.cameraPosition,
-        pb.vec3(
-          this.cameraPosition.x,
-          pb.min(this.cameraPosition.y, pb.add(this.params.parameter2.y, MAX_FOG_HEIGHT)),
-          this.cameraPosition.z
-        )
-      );
-      this.$l.ray = pb.sub(this.worldPosition, this.cameraPos);
-      this.$l.d = pb.length(this.ray);
-      this.$l.rayNorm = pb.div(this.ray, this.d);
-      this.$l.origin = pb.add(this.cameraPos, pb.mul(this.rayNorm, this.params.parameter2.z));
-      this.$l.term = this.params.parameter3.z;
-      this.$l.worldPos = this.$choice(
-        this.isSky,
-        pb.add(this.cameraPosition, pb.mul(this.rayNorm, 1e8)),
+        pb.add(
+          this.cameraPosition,
+          pb.mul(pb.normalize(pb.sub(this.worldPosition, this.cameraPosition)), 1e8)
+        ),
         this.worldPosition
       );
-      this.$l.falloff = pb.clamp(
-        pb.mul(this.params.parameter1.w, pb.sub(this.worldPos.y, this.origin.y)),
-        -125,
-        126
+      // The density at the observer (rayOriginTerm, see SkyRenderer.update) is evaluated at a height
+      // clamped to MAX_FOG_HEIGHT above the fog, so the ray starts from that clamped observer.
+      this.$l.observerY = pb.min(this.cameraPosition.y, pb.add(this.fogHeight, MAX_FOG_HEIGHT));
+      this.$l.cameraToReceiver = pb.sub(this.receiver, this.cameraPosition);
+      // End distance: fog stops accumulating beyond this horizontal distance.
+      this.$l.lenXZSqr = pb.dot(this.cameraToReceiver.xz, this.cameraToReceiver.xz);
+      this.$if(
+        pb.and(
+          pb.greaterThan(this.endDistance, 0),
+          pb.greaterThan(this.lenXZSqr, pb.mul(this.endDistance, this.endDistance))
+        ),
+        function () {
+          this.cameraToReceiver = pb.mul(
+            this.cameraToReceiver,
+            pb.div(this.endDistance, pb.sqrt(pb.max(1, this.lenXZSqr)))
+          );
+        }
       );
-      this.$l.fading = this.$choice(this.isSky, pb.smoothStep(5e6, 0, this.worldPos.y), 0);
-      this.$l.factor = this.$choice(
-        pb.greaterThan(pb.abs(this.falloff), 0.01),
-        pb.div(pb.sub(1, pb.exp2(pb.neg(this.falloff))), this.falloff),
-        pb.sub(Math.log(2), pb.mul(0.5 * Math.log(2) * Math.log(2), this.falloff))
+      // Compensate for the clamped observer height.
+      this.cameraToReceiver.y = pb.add(
+        this.cameraToReceiver.y,
+        pb.sub(this.cameraPosition.y, this.observerY)
       );
-      this.$l.worldDistance = pb.dot(pb.sub(this.worldPos, this.origin), this.rayNorm);
-      this.$l.lineIntegral = pb.mul(
-        this.term,
-        this.factor,
-        pb.max(0, this.worldDistance) /*pb.distance(this.origin, this.worldPos)*/
+      this.$l.cameraToReceiverLength = pb.max(pb.length(this.cameraToReceiver), 1e-4);
+      this.$l.cameraToReceiverNorm = pb.div(this.cameraToReceiver, this.cameraToReceiverLength);
+      this.$l.rayOriginTerms = this.params.parameter3.z;
+      this.$l.rayLength = this.cameraToReceiverLength;
+      this.$l.rayDirectionY = this.cameraToReceiver.y;
+      // Start distance: integrate from the exclusion point, with the density re-evaluated at its height.
+      this.$if(pb.greaterThan(this.startDistance, 0), function () {
+        this.$l.excludeIntersectionTime = pb.div(this.startDistance, this.cameraToReceiverLength);
+        this.$l.cameraToExclusionY = pb.mul(this.excludeIntersectionTime, this.cameraToReceiver.y);
+        this.$l.exclusionY = pb.add(this.observerY, this.cameraToExclusionY);
+        this.rayLength = pb.mul(pb.sub(1, this.excludeIntersectionTime), this.cameraToReceiverLength);
+        this.rayDirectionY = pb.sub(this.cameraToReceiver.y, this.cameraToExclusionY);
+        this.$l.exponent = pb.max(-127, pb.mul(this.falloff, pb.sub(this.exclusionY, this.fogHeight)));
+        this.rayOriginTerms = pb.mul(this.density, pb.exp2(pb.neg(this.exponent)));
+      });
+      // Line integral of density * exp2(-falloff * y) along the ray, divided by the ray length.
+      this.$l.falloffTerm = pb.max(-127, pb.mul(this.falloff, this.rayDirectionY));
+      this.$l.lineIntegralShared = pb.mul(
+        this.rayOriginTerms,
+        this.$choice(
+          pb.greaterThan(pb.abs(this.falloffTerm), 0.01),
+          pb.div(pb.sub(1, pb.exp2(pb.neg(this.falloffTerm))), this.falloffTerm),
+          pb.sub(Math.log(2), pb.mul(0.5 * Math.log(2) * Math.log(2), this.falloffTerm))
+        )
       );
+      this.$l.lineIntegral = pb.mul(this.lineIntegralShared, this.rayLength);
+      // Ad hoc horizon blend for sky pixels: fully fogged below the horizon.
+      this.$l.fading = this.$choice(this.isSky, pb.smoothStep(5e6, 0, this.receiver.y), 0);
 
-      this.$l.directionalInscattering = pb.mul(
+      // Directional inscattering: a lobe around the light approximating in-scattering from the
+      // directional light off the haze. It has its own opacity, unaffected by maxOpacity.
+      this.$l.directionalLight = pb.mul(
         pb.add(this.params.parameter4.rgb, pb.mul(this.params.lightColor, this.params.parameter3.y)),
-        pb.pow(pb.clamp(pb.dot(this.rayNorm, this.params.lightDir), 0, 1), this.params.parameter3.w)
+        pb.pow(
+          pb.clamp(pb.dot(this.cameraToReceiverNorm, this.params.lightDir), 0, 1),
+          this.params.parameter3.w
+        )
       );
-      this.$l.fogFactor = pb.sub(1, pb.clamp(pb.exp2(pb.neg(this.lineIntegral)), 0, 1));
-      this.$l.distanceFactor = pb.clamp(pb.div(this.worldDistance, this.params.parameter2.w), 0, 1);
-      this.fogFactor = pb.mul(this.fogFactor, pb.sub(1, this.distanceFactor));
+      this.$l.dirFogOpacity = pb.sub(
+        1,
+        pb.clamp(pb.exp2(pb.neg(pb.mul(this.lineIntegralShared, pb.max(this.rayLength, 0)))), 0, 1)
+      );
       this.$l.directionalInscattering = pb.mul(
-        this.$l.directionalInscattering,
-        pb.max(this.fogFactor, this.fading)
+        this.directionalLight,
+        pb.max(this.dirFogOpacity, this.fading)
       );
 
       this.$l.fogColor = this.params.parameter1.rgb;
@@ -223,9 +293,55 @@ export function calculateHeightFog(
         );
         this.fogColor = pb.add(this.fogColor, pb.mul(this.skyContrib, this.params.parameter3.y));
       });
-      this.$l.fogFactor = pb.max(pb.min(this.fogFactor, this.params.parameter3.x), this.fading);
-      this.$l.fogColor = pb.add(pb.mul(this.fogColor, this.fogFactor), this.directionalInscattering);
-      this.$return(pb.vec4(this.fogColor, pb.sub(1, this.fogFactor)));
+      // Sky light capture affects height fog (UE: SUPPORTS_SKYLIGHTCAPTURE_AFFECTS_HEIGHTFOGINSCATTERING).
+      // A single view independent in-scattering color is the hemisphere average, darker than the
+      // horizon sky it covers; sampling the environment along the view ray instead makes distant fog
+      // take the color of the sky behind it. Lerped rather than added to not count the energy twice.
+      this.$l.skyLightStrength = this.$choice(
+        pb.greaterThan(this.params.skyLightScale, 0),
+        pb.clamp(this.params.skyLightStrength, 0, 1),
+        pb.float(0)
+      );
+      this.$if(pb.greaterThan(this.skyLightStrength, 0), function () {
+        // Mirror downward rays into the upper hemisphere. The environment below the horizon is the
+        // atmosphere seen against an unlit ground (nearly black), which would make distant fog below
+        // the horizon a dark band; the fog medium there is lit by the sky above it. Same convention
+        // as the physical distant-sky LUT bake (SkyRenderer._programDistantLight).
+        // Mirroring alone does not keep the lookup off the ground: at the horizon the filter footprint
+        // still straddles it and pulls the dark texels in. Lift the direction by one texel of the
+        // sampled mip (a cube face spans 90 degrees) so the footprint stays in the upper hemisphere.
+        this.$l.skyLightLod = pb.mul(
+          pb.clamp(this.params.skyLightRoughness, 0, 1),
+          this.params.skyLightMaxLod
+        );
+        this.$l.minElevation = pb.min(
+          pb.mul(Math.PI / 2, pb.exp2(pb.sub(this.skyLightLod, this.params.skyLightMaxLod))),
+          Math.PI / 2
+        );
+        this.$l.skyLightDir = pb.vec3(
+          this.cameraToReceiverNorm.x,
+          pb.max(pb.abs(this.cameraToReceiverNorm.y), pb.sin(this.minElevation)),
+          this.cameraToReceiverNorm.z
+        );
+        this.$l.skyLightInscattering = pb.mul(
+          pb.textureSampleLevel(skyLightCubemap, pb.normalize(this.skyLightDir), this.skyLightLod).rgb,
+          this.params.skyLightScale
+        );
+        this.directionalInscattering = pb.mul(this.directionalInscattering, pb.sub(1, this.skyLightStrength));
+        this.fogColor = pb.mix(this.fogColor, this.skyLightInscattering, this.skyLightStrength);
+      });
+      // UE: ExpFogFactor = max(saturate(exp2(-LineIntegral)), 1 - FogMaxOpacity)
+      this.$l.fogOpacity = pb.min(
+        pb.sub(1, pb.clamp(pb.exp2(pb.neg(this.lineIntegral)), 0, 1)),
+        this.maxOpacity
+      );
+      this.fogOpacity = pb.max(this.fogOpacity, this.fading);
+      this.$return(
+        pb.vec4(
+          pb.add(pb.mul(this.fogColor, this.fogOpacity), this.directionalInscattering),
+          pb.sub(1, this.fogOpacity)
+        )
+      );
     }
   );
   return scope[funcName](params, cameraPos, worldPos, isSky);

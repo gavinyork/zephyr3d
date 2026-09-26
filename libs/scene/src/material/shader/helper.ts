@@ -31,6 +31,7 @@ import type {
   StructuredBuffer,
   Texture2D,
   Texture2DArray,
+  TextureCube,
   PBGlobalScope,
   BindGroupLayout
 } from '@zephyr3d/device';
@@ -53,6 +54,7 @@ const UNIFORM_NAME_LIGHT_INDEX_TEXTURE = 'Z_UniformLightIndexTex';
 const UNIFORM_NAME_BAKED_SKY_MAP = 'Z_UniformBakedSky';
 const UNIFORM_NAME_AERIALPERSPECTIVE_LUT = 'Z_UniformAerialPerspectiveLUT';
 const UNIFORM_NAME_SKYDISTANTLIGHT_LUT = 'Z_UniformSkyDistantLightLUT';
+const UNIFORM_NAME_FOG_SKYLIGHT_CUBEMAP = 'Z_UniformFogSkyLightCubemap';
 const UNIFORM_NAME_SHADOW_MAP = 'Z_UniformShadowMap';
 const UNIFORM_NAME_SHADOW_MASK = 'Z_UniformShadowMask';
 const UNIFORM_NAME_SHADOW_MASK_MODE = 'Z_UniformShadowMaskMode';
@@ -311,6 +313,11 @@ export class ShaderHelper {
           .tex2D()
           .uniform(0)
           .withSampler(getSamplerOptions('clamp_linear_nomip'));
+        // Mipmapped radiance map, sampled at a roughness-selected LOD
+        scope[UNIFORM_NAME_FOG_SKYLIGHT_CUBEMAP] = pb
+          .texCube()
+          .uniform(0)
+          .withSampler(getSamplerOptions('clamp_linear'));
       }
       const lightStruct = ctx.currentShadowLight
         ? pb.defineStruct([
@@ -1317,7 +1324,8 @@ export class ShaderHelper {
     atmosphereParams: AtmosphereParams,
     heightFogParams: HeightFogParams,
     aerialPerspectiveLUT: Texture2D,
-    skyDistantLightLUT: Texture2D
+    skyDistantLightLUT: Texture2D,
+    skyLightCubemap: TextureCube
   ) {
     this._fogUniforms.withAerialPerspective = withAerialPerspective;
     this._fogUniforms.fogType = fogType;
@@ -1327,6 +1335,7 @@ export class ShaderHelper {
     bindGroup.setValue('fog', this._fogUniforms);
     bindGroup.setTexture(UNIFORM_NAME_AERIALPERSPECTIVE_LUT, aerialPerspectiveLUT);
     bindGroup.setTexture(UNIFORM_NAME_SKYDISTANTLIGHT_LUT, skyDistantLightLUT);
+    bindGroup.setTexture(UNIFORM_NAME_FOG_SKYLIGHT_CUBEMAP, skyLightCubemap);
   }
   /**
    * @internal
@@ -2720,9 +2729,6 @@ export class ShaderHelper {
     if (ctx.materialFlags & MaterialVaryingFlags.APPLY_FOG) {
       const funcName = 'Z_applyFog';
       pb.func(funcName, [pb.vec3('worldPos'), pb.vec4('color').inout()], function () {
-        this.$if(pb.notEqual(this.fog.additive, 0), function () {
-          this.$return();
-        });
         this.$l.uv = pb.div(pb.vec2(this.$builtins.fragCoord.xy), that.getRenderSize(this));
         this.$l.fogging = calculateFog(
           this,
@@ -2736,15 +2742,16 @@ export class ShaderHelper {
           this.worldPos,
           this.fog.additive,
           this[UNIFORM_NAME_AERIALPERSPECTIVE_LUT],
-          this[UNIFORM_NAME_SKYDISTANTLIGHT_LUT]
+          this[UNIFORM_NAME_SKYDISTANTLIGHT_LUT],
+          this[UNIFORM_NAME_FOG_SKYLIGHT_CUBEMAP]
         );
-        this.$l.foggingAlpha = pb.sub(1, pb.mul(pb.sub(1, this.fogging.a), this.color.a));
-        this.$l.foggingRGB = pb.mul(this.fogging.rgb, this.color.a);
+        // color is premultiplied: attenuate it by the fog transmittance and add the in-scattering
+        // weighted by coverage. Additive light passes and additive blending (alpha 0) get
+        // attenuation only -- calculateFog already zeroes the in-scattering for the former.
         this.color = pb.vec4(
-          pb.add(pb.mul(this.color.rgb, this.foggingAlpha), this.foggingRGB),
+          pb.add(pb.mul(this.color.rgb, this.fogging.a), pb.mul(this.fogging.rgb, this.color.a)),
           this.color.a
         );
-        //this.color = pb.vec4(pb.vec3(pb.mix(this.u0, this.u1, this.factor)), this.color.a);
       });
       scope[funcName](worldPos, color);
     }

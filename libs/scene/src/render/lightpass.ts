@@ -190,9 +190,10 @@ export class LightPass extends RenderPass {
         ctx.env!.sky.mappedFogType,
         baseLightPass ? 0 : 1,
         ctx.env!.sky.atmosphereParams,
-        ctx.env!.sky.heightFogParams,
+        ctx.env!.sky.getUploadHeightFogParams(),
         ctx.env!.sky.getAerialPerspectiveLUT(ctx),
-        ctx.env!.sky.getSkyDistantLightLUT(ctx)
+        ctx.env!.sky.getSkyDistantLightLUT(ctx),
+        ctx.env!.sky.getFogSkyLightCubemap(ctx)
       );
       flags.fogSet[ctx.renderPassHash] = 1;
     }

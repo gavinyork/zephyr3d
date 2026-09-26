@@ -459,7 +459,8 @@ export function getSceneClass(manager: ResourceManager): SerializableClass {
         },
         {
           name: 'HeightFogEndDistance',
-          description: 'Distance from the camera where height fog reaches full effect',
+          description:
+            'Horizontal distance beyond which height fog stops getting thicker. 0 lets it keep accumulating to any distance',
           type: 'float',
           default: 10000,
           options: {
@@ -546,12 +547,47 @@ export function getSceneClass(manager: ResourceManager): SerializableClass {
           }
         },
         {
+          name: 'HeightFogSkyLightStrength',
+          description:
+            'Makes distant fog take the color of the environment behind it instead of one flat color, removing the dark band at the horizon. Needs an IBL environment light',
+          type: 'float',
+          options: { group: 'HeightFog', label: 'SkyLightStrength', minValue: 0, maxValue: 1 },
+          default: 0,
+          isValid(this: Scene) {
+            return this.env.sky.fogType === 'height_fog';
+          },
+          get(this: Scene, value) {
+            value.num[0] = this.env.sky.heightFogSkyLightStrength;
+          },
+          set(this: Scene, value) {
+            this.env.sky.heightFogSkyLightStrength = value.num[0];
+          }
+        },
+        {
+          name: 'HeightFogSkyLightRoughness',
+          description:
+            'Blurriness of the environment seen through the fog. Higher values give a softer, more uniform fog color',
+          type: 'float',
+          options: { group: 'HeightFog', label: 'SkyLightRoughness', minValue: 0, maxValue: 1 },
+          default: 0.15,
+          isValid(this: Scene) {
+            return this.env.sky.fogType === 'height_fog';
+          },
+          get(this: Scene, value) {
+            value.num[0] = this.env.sky.heightFogSkyLightRoughness;
+          },
+          set(this: Scene, value) {
+            this.env.sky.heightFogSkyLightRoughness = value.num[0];
+          }
+        },
+        {
           name: 'AerialPerspectiveDistance',
-          description: 'Distance scale for aerial perspective in the scattering sky model',
+          description:
+            'How far the atmosphere keeps hazing distant objects toward the sky color. Beyond this distance the haze stops getting thicker',
           type: 'float',
           phase: 1,
-          options: { animatable: true, minValue: 1, maxValue: 50000 },
-          default: 1,
+          options: { animatable: true, minValue: 1, maxValue: 200000 },
+          default: 96000,
           get(this: Scene, value) {
             value.num[0] = this.env.sky.aerialPerspectiveDistance;
           },
@@ -574,6 +610,42 @@ export function getSceneClass(manager: ResourceManager): SerializableClass {
           },
           set(this: Scene, value) {
             this.env.sky.cameraHeightScale = value.num[0];
+          },
+          isValid() {
+            return this.env.sky.skyType === 'scatter';
+          }
+        },
+        {
+          name: 'GroundAlbedo',
+          description:
+            'Color of the ground seen below the horizon where no geometry covers the sky. It also reflects light back up and brightens the sky slightly',
+          type: 'rgb',
+          phase: 1,
+          default: [0.401978, 0.401978, 0.401978],
+          get(this: Scene, value) {
+            value.num[0] = this.env.sky.groundAlbedo.x;
+            value.num[1] = this.env.sky.groundAlbedo.y;
+            value.num[2] = this.env.sky.groundAlbedo.z;
+          },
+          set(this: Scene, value) {
+            this.env.sky.groundAlbedo = new Vector3(value.num[0], value.num[1], value.num[2]);
+          },
+          isValid() {
+            return this.env.sky.skyType === 'scatter';
+          }
+        },
+        {
+          name: 'LowerHemisphereIsBlack',
+          description:
+            'Keeps the ground below the horizon out of the environment lighting, so objects are not lit from below as if standing on an endless plain. The ground stays visible in the sky itself',
+          type: 'bool',
+          phase: 1,
+          default: true,
+          get(this: Scene, value) {
+            value.bool[0] = this.env.sky.lowerHemisphereIsBlack;
+          },
+          set(this: Scene, value) {
+            this.env.sky.lowerHemisphereIsBlack = value.bool[0];
           },
           isValid() {
             return this.env.sky.skyType === 'scatter';

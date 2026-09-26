@@ -34,11 +34,14 @@ export type AtmosphereParams = {
   mieAnstropy: number;
   ozoneCenter: number;
   ozoneWidth: number;
+  /** Albedo of the virtual planet ground (UE: GroundAlbedo) */
+  groundAlbedo: Vector3;
   apDistance: number;
   cameraWorldMatrix: Matrix4x4;
   lightDir: Vector3;
   lightColor: Vector4;
   cameraAspect: number;
+  cameraTanHalfFovy: number;
   cameraHeightScale: number;
 };
 
@@ -52,11 +55,14 @@ export function getDefaultAtmosphereParams() {
     mieAnstropy: 0.8,
     ozoneCenter: 25000,
     ozoneWidth: 15000,
-    apDistance: 4000,
+    // UE default FColor(170, 170, 170), i.e. 0.4 linear
+    groundAlbedo: new Vector3(0.401978, 0.401978, 0.401978),
+    apDistance: 96000,
     cameraWorldMatrix: Matrix4x4.identity(),
     lightDir: new Vector3(1, 0, 0),
     lightColor: new Vector4(1, 1, 1, 10),
     cameraAspect: 1,
+    cameraTanHalfFovy: 1,
     cameraHeightScale: 1
   } as AtmosphereParams;
 }
@@ -78,6 +84,7 @@ function checkParams(other?: Partial<AtmosphereParams>) {
       ...defaultAtmosphereParams,
       lightDir: new Vector3(defaultAtmosphereParams.lightDir),
       lightColor: new Vector4(defaultAtmosphereParams.lightColor),
+      groundAlbedo: new Vector3(defaultAtmosphereParams.groundAlbedo),
       cameraWorldMatrix: new Matrix4x4(defaultAtmosphereParams.cameraWorldMatrix)
     };
     result.transmittance = true;
@@ -92,21 +99,27 @@ function checkParams(other?: Partial<AtmosphereParams>) {
       currentAtmosphereParams.mieScatteringHeight !== other.mieScatteringHeight ||
       currentAtmosphereParams.ozoneCenter !== other.ozoneCenter ||
       currentAtmosphereParams.ozoneWidth !== other.ozoneWidth;
+    // The multi-scattering LUT uses an isotropic phase and a unit light, so it depends on the
+    // medium only (see integralMultiScattering).
     result.multiScattering =
-      result.transmittance || currentAtmosphereParams.mieAnstropy !== other.mieAnstropy;
+      result.transmittance || !currentAtmosphereParams.groundAlbedo.equalsTo(other.groundAlbedo!);
+    // The sky view LUT is a full lat-long sphere around a fixed observer: the camera orientation
+    // does not affect it.
     result.skyView =
       result.transmittance ||
       result.multiScattering ||
+      currentAtmosphereParams.mieAnstropy !== other.mieAnstropy ||
       currentAtmosphereParams.cameraHeightScale !== other.cameraHeightScale ||
       !currentAtmosphereParams.lightDir.equalsTo(other.lightDir!) ||
-      !currentAtmosphereParams.lightColor.equalsTo(other.lightColor!) ||
-      !currentAtmosphereParams.cameraWorldMatrix.equalsTo(other.cameraWorldMatrix!);
+      !currentAtmosphereParams.lightColor.equalsTo(other.lightColor!);
     result.aerialPerspective =
       result.transmittance ||
       result.multiScattering ||
       result.skyView ||
       currentAtmosphereParams.apDistance !== other.apDistance ||
-      currentAtmosphereParams.cameraAspect !== other.cameraAspect;
+      currentAtmosphereParams.cameraAspect !== other.cameraAspect ||
+      currentAtmosphereParams.cameraTanHalfFovy !== other.cameraTanHalfFovy ||
+      !currentAtmosphereParams.cameraWorldMatrix.equalsTo(other.cameraWorldMatrix!);
   }
   if (result.transmittance) {
     currentAtmosphereParams.plantRadius = other.plantRadius!;
@@ -117,17 +130,19 @@ function checkParams(other?: Partial<AtmosphereParams>) {
     currentAtmosphereParams.ozoneWidth = other.ozoneWidth!;
   }
   if (result.multiScattering) {
-    currentAtmosphereParams.mieAnstropy = other.mieAnstropy!;
+    currentAtmosphereParams.groundAlbedo.set(other.groundAlbedo!);
   }
   if (result.skyView) {
+    currentAtmosphereParams.mieAnstropy = other.mieAnstropy!;
     currentAtmosphereParams.cameraHeightScale = other.cameraHeightScale!;
     currentAtmosphereParams.lightDir.set(other.lightDir!);
     currentAtmosphereParams.lightColor.set(other.lightColor!);
-    currentAtmosphereParams.cameraWorldMatrix.set(other.cameraWorldMatrix!);
   }
   if (result.aerialPerspective) {
     currentAtmosphereParams.apDistance = other.apDistance!;
     currentAtmosphereParams.cameraAspect = other.cameraAspect!;
+    currentAtmosphereParams.cameraTanHalfFovy = other.cameraTanHalfFovy!;
+    currentAtmosphereParams.cameraWorldMatrix.set(other.cameraWorldMatrix!);
   }
   return result;
 }
@@ -176,6 +191,20 @@ export function transmittanceToSky(
     this.$l.bottomRadius = this.params.plantRadius;
     this.$l.topRadius = pb.add(this.params.plantRadius, this.params.atmosphereHeight);
     this.$l.upVector = pb.normalize(this.p);
+    // Planet shadow. The LUT only parameterizes zenith..horizon: a direction below the horizon
+    // would clamp to the horizon texel and keep the sun lit after it has set. Test the planet
+    // analytically instead, from a point lifted 1m to stay clear of float error on the sphere
+    // (UE: GetAtmosphereTransmittance / PLANET_RADIUS_OFFSET).
+    this.$l.tPlanet = rayIntersectSphere(
+      this,
+      pb.vec3(0),
+      this.bottomRadius,
+      pb.add(this.p, this.upVector),
+      this.dir
+    );
+    this.$if(pb.greaterThan(this.tPlanet, 0), function () {
+      this.$return(pb.vec3(0));
+    });
     this.$l.cosTheta = pb.dot(this.upVector, this.dir);
     this.$l.r = pb.length(this.p);
     this.$l.uv = transmittanceLutToUV(this, this.bottomRadius, this.topRadius, this.cosTheta, this.r);
@@ -194,7 +223,9 @@ export function rayleighCoefficient(
   const funcName = 'z_rayleighCoefficient';
   pb.func(funcName, [pb.float('rayleighScatteringHeight'), pb.float('h')], function () {
     this.$l.sigma = pb.mul(pb.vec3(RAYLEIGH_SIGMA[0], RAYLEIGH_SIGMA[1], RAYLEIGH_SIGMA[2]), 1e-6);
-    this.$l.rho_h = pb.exp(pb.neg(pb.div(this.h, this.rayleighScatteringHeight)));
+    // Height clamped at the ground as in UE (SampleAtmosphereMediumRGB): a ray that float error lets
+    // through the planet must not reach exp() overflow and turn into NaN.
+    this.$l.rho_h = pb.exp(pb.neg(pb.div(pb.max(this.h, 0), this.rayleighScatteringHeight)));
     this.$return(pb.mul(this.sigma, this.rho_h));
   });
   return scope[funcName](fRayleighScatteringHeight, fH);
@@ -220,7 +251,7 @@ export function mieCoefficient(
   const funcName = 'z_mieCoefficient';
   pb.func(funcName, [pb.float('mieScatteringHeight'), pb.float('h')], function () {
     this.$l.sigma = pb.mul(pb.vec3(MIE_SIGMA), 1e-6);
-    this.$l.rho_h = pb.exp(pb.neg(pb.div(this.h, this.mieScatteringHeight)));
+    this.$l.rho_h = pb.exp(pb.neg(pb.div(pb.max(this.h, 0), this.mieScatteringHeight)));
     this.$return(pb.mul(this.sigma, this.rho_h));
   });
   return scope[funcName](fMieScatteringHeight, fH);
@@ -251,7 +282,7 @@ export function mieAbsorption(
   const funcName = 'z_mieAbsorption';
   pb.func(funcName, [pb.float('mieScatteringHeight'), pb.float('h')], function () {
     this.$l.sigma = pb.mul(pb.vec3(MIE_ABSORPTION_SIGMA), 1e-6);
-    this.$l.rho_h = pb.exp(pb.neg(pb.div(this.h, this.mieScatteringHeight)));
+    this.$l.rho_h = pb.exp(pb.neg(pb.div(pb.max(this.h, 0), this.mieScatteringHeight)));
     this.$return(pb.mul(this.sigma, this.rho_h));
   });
   return scope[funcName](fMieScatteringHeight, fH);
@@ -277,7 +308,47 @@ export function ozoneAbsorption(
   return scope[funcName](fOzoneLevelCenterHeight, fOzoneLevelWidth, fH);
 }
 
-/** @internal */
+/**
+ * @internal
+ *
+ * Sun light reflected by the virtual planet ground at `groundPos`, per unit illuminance: a Lambertian
+ * surface of albedo `groundAlbedo` lit through the atmosphere (UE: the `Ground` branch of
+ * IntegrateSingleScatteredLuminance). Multiply by the throughput from the observer.
+ */
+export function groundBounce(
+  scope: PBInsideFunctionScope,
+  stParams: PBShaderExp,
+  f3GroundPos: PBShaderExp,
+  f3LightDir: PBShaderExp,
+  texTransmittanceLut: PBShaderExp
+) {
+  const pb = scope.$builder;
+  const Params = getAtmosphereParamsStruct(pb);
+  const funcName = 'z_groundBounce';
+  pb.func(funcName, [Params('params'), pb.vec3('groundPos'), pb.vec3('lightDir')], function () {
+    this.$l.up = pb.normalize(this.groundPos);
+    this.$l.NdotL = pb.clamp(pb.dot(this.up, this.lightDir), 0, 1);
+    this.$l.transmittanceToLight = transmittanceToSky(
+      this,
+      this.params,
+      this.groundPos,
+      this.lightDir,
+      texTransmittanceLut
+    );
+    this.$return(pb.mul(this.transmittanceToLight, this.params.groundAlbedo, this.NdotL, 1 / Math.PI));
+  });
+  return scope[funcName](stParams, f3GroundPos, f3LightDir) as PBShaderExp;
+}
+
+/**
+ * @internal
+ *
+ * Single scattering along a view ray, plus multiple scattering from the LUT.
+ *
+ * @param withGround - Stop the ray at the planet ground.
+ * @param groundLit - When the ray ends on the ground (not cut short by `maxDis`), add the sun light
+ *   the ground reflects (UE: `Ground` parameter). Implies `withGround`.
+ */
 export function getSkyView(
   scope: PBInsideFunctionScope,
   stParams: PBShaderExp,
@@ -286,11 +357,12 @@ export function getSkyView(
   fMaxDis: PBShaderExp,
   texTransmittanceLut: PBShaderExp,
   texMultiScatteringLut: PBShaderExp,
-  withGround = true
+  withGround = true,
+  groundLit = false
 ) {
   const pb = scope.$builder;
   const Params = getAtmosphereParamsStruct(pb);
-  const funcName = 'z_getSkyView';
+  const funcName = `z_getSkyView${withGround ? '_G' : ''}${groundLit ? '_L' : ''}`;
   pb.func(
     funcName,
     [Params('params'), pb.vec3('eyePos'), pb.vec3('viewDir'), pb.float('maxDis')],
@@ -305,21 +377,24 @@ export function getSkyView(
         this.viewDir
       );
       this.$if(pb.lessThan(this.dis, 0), function () {
-        this.$return(pb.vec3(0));
+        this.$return(pb.vec4(0, 0, 0, 1));
       });
-      if (withGround) {
+      this.$l.hitGround = pb.bool(false);
+      if (withGround || groundLit) {
         this.$l.d = rayIntersectSphere(this, pb.vec3(0), this.params.plantRadius, this.eyePos, this.viewDir);
-        this.$if(pb.greaterThan(this.d, 0), function () {
-          this.dis = pb.min(this.dis, this.d);
+        this.$if(pb.and(pb.greaterThan(this.d, 0), pb.lessThanEqual(this.d, this.dis)), function () {
+          this.dis = this.d;
+          this.hitGround = pb.bool(true);
         });
       }
-      this.$if(pb.greaterThanEqual(this.maxDis, 0), function () {
-        this.dis = pb.min(this.dis, this.maxDis);
+      this.$if(pb.and(pb.greaterThanEqual(this.maxDis, 0), pb.lessThan(this.maxDis, this.dis)), function () {
+        this.dis = this.maxDis;
+        this.hitGround = pb.bool(false);
       });
       this.$l.ds = pb.div(this.dis, N_SAMPLE);
       this.$l.p = pb.add(this.eyePos, pb.mul(this.viewDir, this.ds, 0.5));
       this.$l.sunLuminance = pb.mul(this.params.lightColor.rgb, this.params.lightColor.a);
-      this.$l.opticalDepth = pb.vec3(0);
+      this.$l.throughput = pb.vec3(1);
       this.$for(pb.int('i'), 0, N_SAMPLE, function () {
         this.$l.h = pb.sub(pb.length(this.p), this.params.plantRadius);
         this.$l.extinction = pb.add(
@@ -328,20 +403,37 @@ export function getSkyView(
           ozoneAbsorption(this, this.params.ozoneCenter, this.params.ozoneWidth, this.h),
           mieAbsorption(this, this.params.mieScatteringHeight, this.h)
         );
-        this.opticalDepth = pb.add(this.opticalDepth, pb.mul(this.extinction, this.ds));
+        this.$l.sampleTransmittance = pb.exp(pb.neg(pb.mul(this.extinction, this.ds)));
         this.$l.t1 = transmittanceToSky(this, this.params, this.p, this.params.lightDir, texTransmittanceLut);
         this.$l.s = scattering(this, this.params, this.p, this.viewDir);
-        this.$l.t2 = pb.exp(pb.neg(this.opticalDepth));
-
-        this.$l.inScattering = pb.mul(this.t1, this.s, this.t2, this.ds, this.sunLuminance);
-        this.color = pb.add(this.color, this.inScattering);
-
+        // Multi-scattering is diffuse light left after single scattering: not planet shadowed.
         this.$l.multiScattering = getMultiScattering(this, this.params, this.p, texMultiScatteringLut);
-        this.color = pb.add(this.color, pb.mul(this.multiScattering, this.t2, this.ds, this.sunLuminance));
-
+        this.$l.S = pb.mul(pb.add(pb.mul(this.t1, this.s), this.multiScattering), this.sunLuminance);
+        // Integrate the source term analytically over the segment instead of weighting it by the
+        // transmittance to the segment end, which darkens long (horizon) steps. See slide 28 of
+        // Frostbite's physically based unified volumetric rendering (UE: IntegrateSingleScatteredLuminance).
+        this.$l.Sint = pb.div(
+          pb.sub(this.S, pb.mul(this.S, this.sampleTransmittance)),
+          pb.max(this.extinction, pb.vec3(1e-12))
+        );
+        this.color = pb.add(this.color, pb.mul(this.throughput, this.Sint));
+        this.throughput = pb.mul(this.throughput, this.sampleTransmittance);
         this.p = pb.add(this.p, pb.mul(this.viewDir, this.ds));
       });
-      this.$return(this.color);
+      if (groundLit) {
+        this.$if(this.hitGround, function () {
+          this.$l.groundPos = pb.add(this.eyePos, pb.mul(this.viewDir, this.dis));
+          this.color = pb.add(
+            this.color,
+            pb.mul(
+              groundBounce(this, this.params, this.groundPos, this.params.lightDir, texTransmittanceLut),
+              this.throughput,
+              this.sunLuminance
+            )
+          );
+        });
+      }
+      this.$return(pb.vec4(this.color, pb.dot(this.throughput, pb.vec3(1 / 3))));
     }
   );
   return scope[funcName](stParams, f3EyePos, f3ViewDir, fMaxDis);
@@ -389,7 +481,6 @@ export function integralMultiScattering(
   const funcName = 'z_integralMultiScattering';
   pb.func(funcName, [Params('params'), pb.vec3('lightDir'), pb.vec3('samplePoint')], function () {
     const uniformPhase = 1 / (4 * Math.PI);
-    const sphereSolidAngle = (4 * Math.PI) / N_DIRECTION;
     this.$l.G_2 = pb.vec3(0);
     this.$l.f_ms = pb.vec3(0);
     this.$for(pb.int('i'), 0, N_DIRECTION, function () {
@@ -408,12 +499,13 @@ export function integralMultiScattering(
         this.samplePoint,
         this.viewDir
       );
-      this.$if(pb.greaterThan(this.d, 0), function () {
-        this.dis = pb.min(this.dis, this.d);
+      this.$l.hitGround = pb.and(pb.greaterThan(this.d, 0), pb.lessThanEqual(this.d, this.dis));
+      this.$if(this.hitGround, function () {
+        this.dis = this.d;
       });
       this.$l.ds = pb.div(this.dis, N_SAMPLE);
       this.$l.p = pb.add(this.samplePoint, pb.mul(this.viewDir, this.ds, 0.5));
-      this.$l.opticalDepth = pb.vec3(0);
+      this.$l.throughput = pb.vec3(1);
       this.$for(pb.int('j'), 0, N_SAMPLE, function () {
         this.$l.h = pb.sub(pb.length(this.p), this.params.plantRadius);
         this.$l.sigma_s = pb.add(
@@ -425,17 +517,37 @@ export function integralMultiScattering(
           mieAbsorption(this, this.params.mieScatteringHeight, this.h)
         );
         this.$l.sigma_t = pb.add(this.sigma_s, this.sigma_a);
-        this.opticalDepth = pb.add(this.opticalDepth, pb.mul(this.sigma_t, this.ds));
+        this.$l.sampleTransmittance = pb.exp(pb.neg(pb.mul(this.sigma_t, this.ds)));
         this.$l.t1 = transmittanceToSky(this, this.params, this.p, this.lightDir, texTransmittanceLut);
-        this.$l.s = scattering(this, this.params, this.p, this.viewDir);
-        this.$l.t2 = pb.exp(pb.neg(this.opticalDepth));
-        this.G_2 = pb.add(this.G_2, pb.mul(this.t1, this.s, this.t2, uniformPhase, this.ds));
-        this.f_ms = pb.add(this.f_ms, pb.mul(this.t2, this.sigma_s, uniformPhase, this.ds));
+        // Isotropic phase for the sun scattering event, as in UE (MieRayPhase = false): the LUT
+        // is a transfer function of the medium only and must not depend on the scene sun direction.
+        this.$l.S = pb.mul(this.t1, this.sigma_s, uniformPhase);
+        this.$l.Sint = pb.div(
+          pb.sub(this.S, pb.mul(this.S, this.sampleTransmittance)),
+          pb.max(this.sigma_t, pb.vec3(1e-12))
+        );
+        this.G_2 = pb.add(this.G_2, pb.mul(this.throughput, this.Sint));
+        // Unit uniform luminance over the sphere scattered with an isotropic phase (UE: MultiScatAs1).
+        this.f_ms = pb.add(this.f_ms, pb.mul(this.throughput, this.sigma_s, this.ds));
+        this.throughput = pb.mul(this.throughput, this.sampleTransmittance);
         this.p = pb.add(this.p, pb.mul(this.viewDir, this.ds));
       });
+      // Light bounced off the ground (UE: Ground = true for the multi-scattering LUT)
+      this.$if(this.hitGround, function () {
+        this.$l.groundPos = pb.add(this.samplePoint, pb.mul(this.viewDir, this.dis));
+        this.G_2 = pb.add(
+          this.G_2,
+          pb.mul(
+            groundBounce(this, this.params, this.groundPos, this.lightDir, texTransmittanceLut),
+            this.throughput
+          )
+        );
+      });
     });
-    this.G_2 = pb.mul(this.G_2, sphereSolidAngle);
-    this.f_ms = pb.mul(this.f_ms, sphereSolidAngle);
+    // G_2: (4pi / N) * sum(L) is the illuminance, times the isotropic phase 1 / (4pi) gives the
+    // in-scattered luminance, i.e. the plain average over the N directions.
+    this.G_2 = pb.div(this.G_2, N_DIRECTION);
+    this.f_ms = pb.div(this.f_ms, N_DIRECTION);
     this.$return(pb.div(this.G_2, pb.sub(pb.vec3(1), this.f_ms)));
   });
   return scope[funcName](stParams, f3LightDir, f3SamplePoint);
@@ -541,31 +653,108 @@ export function transmittanceLutToUV(
 }
 
 /** @internal */
-export function viewDirToUV(scope: PBInsideFunctionScope, f3ViewDir: PBShaderExp) {
+export const SKY_VIEW_LUT_WIDTH = 256;
+/** @internal */
+export const SKY_VIEW_LUT_HEIGHT = 128;
+
+/**
+ * Zenith angle of the horizon, and the angle from the horizon down to the nadir, seen from the
+ * sky view LUT observer.
+ */
+function skyViewHorizon(scope: PBInsideFunctionScope, stParams: PBShaderExp) {
   const pb = scope.$builder;
-  const funcName = 'z_viewDirToUV';
-  pb.func(funcName, [pb.vec3('viewDir')], function () {
-    this.$l.uv = pb.vec2(pb.atan2(this.viewDir.z, this.viewDir.x), pb.asin(this.viewDir.y));
-    this.uv = pb.div(this.uv, pb.vec2(2 * Math.PI, Math.PI));
-    this.uv = pb.add(this.uv, pb.vec2(0.5));
-    this.$return(this.uv);
+  const Params = getAtmosphereParamsStruct(pb);
+  const funcName = 'z_skyViewHorizon';
+  pb.func(funcName, [Params('params')], function () {
+    this.$l.altitude = pb.mul(CAMERA_POS_Y, this.params.cameraHeightScale);
+    this.$l.viewHeight = pb.add(this.params.plantRadius, this.altitude);
+    // sqrt(h^2 - R^2) written as sqrt(a * (2R + a)): at an altitude of meters against a radius of
+    // thousands of kilometers, h^2 - R^2 is pure fp32 cancellation.
+    this.$l.vHorizon = pb.sqrt(
+      pb.mul(this.altitude, pb.add(pb.mul(this.params.plantRadius, 2), this.altitude))
+    );
+    this.$l.beta = pb.acos(pb.clamp(pb.div(this.vHorizon, this.viewHeight), -1, 1));
+    this.$return(pb.vec2(pb.sub(Math.PI, this.beta), this.beta));
   });
-  return scope[funcName](f3ViewDir) as PBShaderExp;
+  return scope[funcName](stParams) as PBShaderExp;
 }
 
-/** @internal */
-export function uvToViewDir(scope: PBInsideFunctionScope, f2UV: PBShaderExp) {
+/**
+ * @internal
+ *
+ * Sky view LUT parameterization (UE: SkyViewLutParamsToUv). Latitude is split at the observer's
+ * horizon, which lands exactly on v = 0.5, with texels concentrated towards it on both sides: a
+ * uniform latitude mapping interpolates the dark below-horizon texels into the sky just above it.
+ * v = 0 is the zenith.
+ */
+export function viewDirToUV(scope: PBInsideFunctionScope, stParams: PBShaderExp, f3ViewDir: PBShaderExp) {
   const pb = scope.$builder;
-  const funcName = 'z_uvToViewDir';
-  pb.func(funcName, [pb.vec2('uv')], function () {
-    this.$l.theta = pb.mul(pb.sub(1, this.uv.y), Math.PI);
-    this.$l.phi = pb.mul(pb.sub(pb.mul(this.uv.x, 2), 1), Math.PI);
-    this.$l.x = pb.mul(pb.sin(this.theta), pb.cos(this.phi));
-    this.$l.z = pb.mul(pb.sin(this.theta), pb.sin(this.phi));
-    this.$l.y = pb.cos(this.theta);
-    this.$return(pb.vec3(this.x, this.y, this.z));
+  const Params = getAtmosphereParamsStruct(pb);
+  const funcName = 'z_viewDirToUV';
+  pb.func(funcName, [Params('params'), pb.vec3('viewDir')], function () {
+    this.$l.horizon = skyViewHorizon(this, this.params);
+    this.$l.zenithHorizonAngle = this.horizon.x;
+    this.$l.beta = this.horizon.y;
+    this.$l.viewZenithAngle = pb.acos(pb.clamp(this.viewDir.y, -1, 1));
+    this.$l.v = pb.float();
+    this.$if(pb.lessThan(this.viewZenithAngle, this.zenithHorizonAngle), function () {
+      this.$l.coord = pb.div(this.viewZenithAngle, this.zenithHorizonAngle);
+      this.v = pb.mul(pb.sub(1, pb.sqrt(pb.max(pb.sub(1, this.coord), 0))), 0.5);
+    }).$else(function () {
+      this.$l.coord = pb.div(pb.sub(this.viewZenithAngle, this.zenithHorizonAngle), this.beta);
+      this.v = pb.add(pb.mul(pb.sqrt(pb.max(this.coord, 0)), 0.5), 0.5);
+    });
+    this.$l.u = pb.add(pb.div(pb.atan2(this.viewDir.z, this.viewDir.x), 2 * Math.PI), 0.5);
+    // FromUnitToSubUvs: keep lookups inside the texel-center range.
+    this.$l.size = pb.vec2(SKY_VIEW_LUT_WIDTH, SKY_VIEW_LUT_HEIGHT);
+    this.$return(
+      pb.mul(
+        pb.add(pb.vec2(this.u, this.v), pb.div(pb.vec2(0.5), this.size)),
+        pb.div(this.size, pb.add(this.size, pb.vec2(1)))
+      )
+    );
   });
-  return scope[funcName](f2UV) as PBShaderExp;
+  return scope[funcName](stParams, f3ViewDir) as PBShaderExp;
+}
+
+/**
+ * @internal
+ *
+ * Inverse of {@link viewDirToUV} (UE: UvToSkyViewLutParams).
+ */
+export function uvToViewDir(scope: PBInsideFunctionScope, stParams: PBShaderExp, f2UV: PBShaderExp) {
+  const pb = scope.$builder;
+  const Params = getAtmosphereParamsStruct(pb);
+  const funcName = 'z_uvToViewDir';
+  pb.func(funcName, [Params('params'), pb.vec2('uv')], function () {
+    // FromSubUvsToUnit
+    this.$l.size = pb.vec2(SKY_VIEW_LUT_WIDTH, SKY_VIEW_LUT_HEIGHT);
+    this.$l.unit = pb.mul(
+      pb.sub(this.uv, pb.div(pb.vec2(0.5), this.size)),
+      pb.div(this.size, pb.sub(this.size, pb.vec2(1)))
+    );
+    this.$l.horizon = skyViewHorizon(this, this.params);
+    this.$l.zenithHorizonAngle = this.horizon.x;
+    this.$l.beta = this.horizon.y;
+    this.$l.viewZenithAngle = pb.float();
+    this.$if(pb.lessThan(this.unit.y, 0.5), function () {
+      this.$l.coord = pb.sub(1, pb.mul(this.unit.y, 2));
+      this.viewZenithAngle = pb.mul(this.zenithHorizonAngle, pb.sub(1, pb.mul(this.coord, this.coord)));
+    }).$else(function () {
+      this.$l.coord = pb.sub(pb.mul(this.unit.y, 2), 1);
+      this.viewZenithAngle = pb.add(this.zenithHorizonAngle, pb.mul(this.beta, this.coord, this.coord));
+    });
+    this.$l.phi = pb.mul(pb.sub(pb.mul(this.unit.x, 2), 1), Math.PI);
+    this.$l.sinTheta = pb.sin(this.viewZenithAngle);
+    this.$return(
+      pb.vec3(
+        pb.mul(this.sinTheta, pb.cos(this.phi)),
+        pb.cos(this.viewZenithAngle),
+        pb.mul(this.sinTheta, pb.sin(this.phi))
+      )
+    );
+  });
+  return scope[funcName](stParams, f2UV) as PBShaderExp;
 }
 
 /** @internal */
@@ -660,7 +849,7 @@ export function skyBox(
       this.$l.viewDir = pb.normalize(this.worldPos);
       this.rgb = pb.add(
         this.rgb,
-        pb.textureSampleLevel(texSkyViewLut, viewDirToUV(this, this.viewDir), 0).rgb
+        pb.textureSampleLevel(texSkyViewLut, viewDirToUV(this, this.params, this.viewDir), 0).rgb
       );
       this.$l.groundDistance = rayIntersectSphere(
         this,
@@ -696,6 +885,23 @@ export function skyBox(
 }
 
 /** @internal */
+export const AP_LUT_SLICE_SIZE = 32;
+/** @internal */
+export const AP_LUT_DEPTH_SLICES = 32;
+
+/**
+ * @internal
+ *
+ * Samples the aerial perspective LUT.
+ *
+ * @remarks
+ * Mirrors UE's GetAerialPerspectiveLuminanceTransmittance: luminance and transmittance both come
+ * from the same LUT entry and fade in together near the camera, depth slices follow a squared
+ * distribution over `apDistance` (atmosphere meters). World distances are converted to atmosphere
+ * meters by `cameraHeightScale`, the same scale the LUT observer height uses.
+ *
+ * The LUT is a 2D atlas: `dim.z` depth slices of `dim.x` x `dim.y` texels laid out side by side.
+ */
 export function aerialPerspective(
   scope: PBInsideFunctionScope,
   f2UV: PBShaderExp,
@@ -712,41 +918,41 @@ export function aerialPerspective(
     funcName,
     [Params('params'), pb.vec2('uv'), pb.vec3('cameraPos'), pb.vec3('worldPos'), pb.vec3('dim')],
     function () {
-      this.$l.V = pb.sub(this.worldPos, this.cameraPos);
-      this.$l.dis = pb.length(this.V);
-      this.$l.viewDir = pb.normalize(this.V);
-      this.$l.apDistance = pb.div(this.params.apDistance, this.params.cameraHeightScale);
-      this.$l.d0 = pb.clamp(pb.div(this.dis, this.apDistance), 0, 1);
-      this.$l.weight = pb.clamp(pb.mul(this.d0, 2), 0, 1);
-      this.$l.dz = pb.mul(this.d0, pb.sub(this.dim.z, 1));
-      this.$l.slice = pb.floor(this.dz);
-      this.$l.nextSlice = pb.min(pb.add(this.slice, 1), pb.sub(this.dim.z, 1));
-      this.$l.factor = pb.sub(this.dz, pb.floor(this.dz));
-      this.t = pb.div(this.uv, pb.vec2(this.dim.x, 1));
-      this.$l.uv1 = pb.add(this.t, pb.vec2(pb.div(this.slice, this.dim.z), 0));
-      this.$l.uv2 = pb.add(this.t, pb.vec2(pb.div(this.nextSlice, this.dim.z), 0));
+      this.$l.tDepth = pb.mul(pb.distance(this.worldPos, this.cameraPos), this.params.cameraHeightScale);
+      this.$l.linearW = pb.clamp(pb.div(this.tDepth, this.params.apDistance), 0, 1);
+      // Squared slice distribution
+      this.$l.nonLinSlice = pb.mul(pb.sqrt(this.linearW), this.dim.z);
+      // Fade luminance and opacity to 0 within the first half slice (UE: HalfSliceDepth). Squared to
+      // be linear in distance given the distribution above.
+      this.$l.weight = pb.clamp(pb.mul(this.nonLinSlice, this.nonLinSlice, 2), 0, 1);
+      // Slice k is stored at its texel center (k + 0.5), interpolate between the two nearest ones.
+      this.$l.sliceF = pb.clamp(pb.sub(this.nonLinSlice, 0.5), 0, pb.sub(this.dim.z, 1));
+      this.$l.slice0 = pb.floor(this.sliceF);
+      this.$l.slice1 = pb.min(pb.add(this.slice0, 1), pb.sub(this.dim.z, 1));
+      this.$l.factor = pb.sub(this.sliceF, this.slice0);
+      // Keep the horizontal footprint inside one slice of the atlas so bilinear filtering does not
+      // bleed across neighbouring slices at the left/right screen edges.
+      this.$l.halfTexel = pb.div(0.5, this.dim.x);
+      this.$l.u = pb.clamp(this.uv.x, this.halfTexel, pb.sub(1, this.halfTexel));
+      this.$l.uv1 = pb.vec2(pb.div(pb.add(this.slice0, this.u), this.dim.z), this.uv.y);
+      this.$l.uv2 = pb.vec2(pb.div(pb.add(this.slice1, this.u), this.dim.z), this.uv.y);
       this.$l.data1 = pb.textureSampleLevel(texAerialPerspectiveLut, this.uv1, 0);
       this.$l.data2 = pb.textureSampleLevel(texAerialPerspectiveLut, this.uv2, 0);
       this.$l.data = pb.mix(this.data1, this.data2, this.factor);
-      this.$l.inscattering = pb.mul(this.data.rgb, this.weight);
-      //this.$l.transmittance = pb.sub(1, pb.mul(this.weight, pb.sub(1, this.data.a)));
-      this.$l.planetTranslate = pb.vec3(0, this.params.plantRadius, 0);
-      this.$l.transmittance = pb.dot(
-        transmittance(
-          this,
-          this.params,
-          pb.add(this.cameraPos, this.planetTranslate),
-          pb.add(this.worldPos, this.planetTranslate)
-        ),
-        pb.vec3(1 / 3, 1 / 3, 1 / 3)
+      this.$return(
+        pb.vec4(pb.mul(this.data.rgb, this.weight), pb.sub(1, pb.mul(this.weight, pb.sub(1, this.data.a))))
       );
-      this.$return(pb.vec4(this.inscattering, this.transmittance));
     }
   );
   return scope[funcName](stParams, f2UV, f3CameraPos, f3WorldPos, f3Dim) as PBShaderExp;
 }
 
-/** @internal */
+/**
+ * @internal
+ *
+ * Renders one texel of the aerial perspective LUT atlas: rgb is the in-scattered luminance and a
+ * the mean transmittance from the observer to the froxel (UE: RenderCameraAerialPerspectiveVolumeCS).
+ */
 export function aerialPerspectiveLut(
   scope: PBInsideFunctionScope,
   stParams: PBShaderExp,
@@ -757,74 +963,23 @@ export function aerialPerspectiveLut(
 ) {
   const pb = scope.$builder;
   const Params = getAtmosphereParamsStruct(pb);
-  const funcNameFixVoxel = 'z_fixVoxel';
-  pb.func(
-    funcNameFixVoxel,
-    [
-      Params('params'),
-      pb.vec3('eyePos'),
-      pb.vec3('viewDir').inout(),
-      pb.float('maxDis'),
-      pb.float('adjustedMaxDis').inout()
-    ],
-    function () {
-      this.$l.voxelPos = pb.add(this.eyePos, pb.mul(this.viewDir, this.maxDis));
-      this.$l.voxelHeight = pb.length(this.voxelPos);
-      this.$l.underGround = pb.lessThan(this.voxelHeight, this.params.plantRadius);
-      this.$l.cameraToVoxel = pb.sub(this.voxelPos, this.eyePos);
-      this.$l.cameraToVoxelLen = pb.length(this.cameraToVoxel);
-      this.$l.cameraToVoxelDir = pb.div(this.cameraToVoxel, this.cameraToVoxelLen);
-      this.$l.planetNearT = rayIntersectSphere(
-        this,
-        pb.vec3(0),
-        this.params.plantRadius,
-        this.eyePos,
-        this.cameraToVoxelDir
-      );
-      this.$l.belowHorizon = pb.and(
-        pb.greaterThan(this.planetNearT, 0),
-        pb.greaterThan(this.cameraToVoxelLen, this.planetNearT)
-      );
-      this.$l.eyePos2 = this.eyePos;
-      this.$if(pb.or(this.underGround, this.belowHorizon), function () {
-        this.eyePos2 = pb.add(this.eyePos2, pb.mul(pb.normalize(this.eyePos2), 0.02));
-        this.$if(this.belowHorizon, function () {
-          this.$l.voxelWorldPosNorm = pb.normalize(this.voxelPos);
-          this.$l.camProjOnGround = pb.mul(pb.normalize(this.eyePos2), this.params.plantRadius);
-          this.$l.voxProjOnGround = pb.mul(this.voxelWorldPosNorm, this.params.plantRadius);
-          this.$l.voxelGroundToRayStart = pb.sub(this.eyePos2, this.voxProjOnGround);
-          this.$if(
-            pb.lessThan(pb.dot(pb.normalize(this.voxelGroundToRayStart), this.voxelWorldPosNorm), 0.0001),
-            function () {
-              this.$l.middlePoint = pb.mul(pb.add(this.camProjOnGround, this.voxProjOnGround), 0.5);
-              this.$l.middlePointOnGround = pb.mul(pb.normalize(this.middlePoint), this.params.plantRadius);
-              this.voxelPos = pb.add(this.eyePos2, pb.mul(pb.sub(this.middlePointOnGround, this.eyePos2), 2));
-            }
-          );
-        }).$else(function () {
-          this.voxelPos = pb.mul(pb.normalize(this.voxelPos), this.params.plantRadius);
-        });
-        this.$l.V = pb.sub(this.voxelPos, this.eyePos2);
-        this.adjustedMaxDis = pb.length(this.V);
-        this.viewDir = pb.div(this.V, this.adjustedMaxDis);
-      });
-      this.$return(this.eyePos2);
-    }
-  );
   const funcName = 'z_aerialPerspectiveLut';
   pb.func(funcName, [Params('params'), pb.vec2('uv'), pb.vec3('dim'), pb.float('cameraPosY')], function () {
-    this.$l.uvw = pb.vec3(this.uv, 0);
-    this.uvw.x = pb.mul(this.uvw.x, this.dim.x, this.dim.z);
-    this.uvw.z = pb.div(pb.floor(pb.div(this.uvw.x, this.dim.z)), this.dim.x);
-    this.uvw.x = pb.div(pb.mod(this.uvw.x, this.dim.z), this.dim.x);
-    this.uvw = pb.add(this.uvw, pb.div(pb.vec3(0.5), this.dim));
-    this.$l.slice = this.uvw.z; //pb.mul(this.uvw.z, this.uvw.z);
+    // uv arrives at the texel center of the dim.x * dim.z wide atlas.
+    this.$l.px = pb.floor(pb.mul(this.uv.x, this.dim.x, this.dim.z));
+    this.$l.slice = pb.floor(pb.div(this.px, this.dim.x));
+    this.$l.screenUV = pb.vec2(
+      pb.div(pb.add(pb.sub(this.px, pb.mul(this.slice, this.dim.x)), 0.5), this.dim.x),
+      this.uv.y
+    );
+    this.$l.w = pb.div(pb.add(this.slice, 0.5), this.dim.z);
+    this.$l.ndc = pb.sub(pb.mul(this.screenUV, 2), pb.vec2(1));
     this.$l.viewDir = pb.normalize(
       pb.mul(
         this.params.cameraWorldMatrix,
         pb.vec4(
-          pb.sub(pb.mul(this.uvw.x, 2), 1),
-          pb.div(pb.sub(pb.mul(this.uvw.y, 2), 1), this.params.cameraAspect),
+          pb.mul(this.ndc.x, this.params.cameraTanHalfFovy, this.params.cameraAspect),
+          pb.mul(this.ndc.y, this.params.cameraTanHalfFovy),
           -1,
           0
         )
@@ -835,25 +990,57 @@ export function aerialPerspectiveLut(
       pb.add(pb.mul(this.cameraPosY, this.params.cameraHeightScale), this.params.plantRadius),
       0
     );
-    this.$l.maxDis = pb.mul(this.slice, this.params.apDistance);
+    this.$l.maxDis = pb.mul(this.w, this.w, this.params.apDistance);
     this.$l.voxelPos = pb.add(this.eyePos, pb.mul(this.viewDir, this.maxDis));
-    this.$if(pb.lessThan(pb.length(this.voxelPos), this.params.plantRadius), function () {
-      this.voxelPos = pb.mul(pb.normalize(this.voxelPos), this.params.plantRadius);
-      this.maxDis = pb.length(pb.sub(this.eyePos, this.voxelPos));
-    });
-    this.$l.color = getSkyView(
+    this.$l.underGround = pb.lessThan(pb.length(this.voxelPos), this.params.plantRadius);
+    this.$l.planetNearT = rayIntersectSphere(
       this,
-      this.params,
+      pb.vec3(0),
+      this.params.plantRadius,
       this.eyePos,
-      this.viewDir,
-      this.maxDis,
-      texTransmittanceLut,
-      texMultiScatteringLut
+      this.viewDir
     );
-    this.$l.t1 = transmittanceToSky(this, this.params, this.eyePos, this.viewDir, texTransmittanceLut);
-    this.$l.t2 = transmittanceToSky(this, this.params, this.voxelPos, this.viewDir, texTransmittanceLut);
-    this.$l.t = pb.clamp(pb.div(this.t1, pb.max(this.t2, pb.vec3(0.0001))), pb.vec3(0), pb.vec3(1));
-    this.$return(pb.vec4(this.color, pb.dot(this.t, pb.vec3(1 / 3, 1 / 3, 1 / 3))));
+    this.$l.belowHorizon = pb.and(
+      pb.greaterThan(this.planetNearT, 0),
+      pb.greaterThan(this.maxDis, this.planetNearT)
+    );
+    // A froxel behind the ground would only integrate up to the ground hit, leaving surfaces seen
+    // from above (the observer sits just above the planet) without any aerial perspective. Instead
+    // integrate towards the ground point below the froxel, as UE does.
+    this.$if(pb.or(this.underGround, this.belowHorizon), function () {
+      this.$l.voxelPosNorm = pb.normalize(this.voxelPos);
+      this.$l.camProjOnGround = pb.mul(pb.normalize(this.eyePos), this.params.plantRadius);
+      this.$l.voxProjOnGround = pb.mul(this.voxelPosNorm, this.params.plantRadius);
+      this.$l.voxelGroundToRayStart = pb.sub(this.eyePos, this.voxProjOnGround);
+      this.$if(
+        pb.and(
+          this.belowHorizon,
+          pb.lessThan(pb.dot(pb.normalize(this.voxelGroundToRayStart), this.voxelPosNorm), 0.0001)
+        ),
+        function () {
+          // Behind the planet: evaluate the point mirrored through the horizon point.
+          this.$l.middlePoint = pb.mul(pb.add(this.camProjOnGround, this.voxProjOnGround), 0.5);
+          this.$l.middlePointOnGround = pb.mul(pb.normalize(this.middlePoint), this.params.plantRadius);
+          this.voxelPos = pb.add(this.eyePos, pb.mul(pb.sub(this.middlePointOnGround, this.eyePos), 2));
+        }
+      ).$elseif(this.underGround, function () {
+        this.voxelPos = this.voxProjOnGround;
+      });
+      this.$l.V = pb.sub(this.voxelPos, this.eyePos);
+      this.maxDis = pb.length(this.V);
+      this.viewDir = pb.div(this.V, this.maxDis);
+    });
+    this.$return(
+      getSkyView(
+        this,
+        this.params,
+        this.eyePos,
+        this.viewDir,
+        this.maxDis,
+        texTransmittanceLut,
+        texMultiScatteringLut
+      )
+    );
   });
   return scope[funcName](stParams, f2UV, f3VoxelDim, CAMERA_POS_Y) as PBShaderExp;
 }
@@ -870,7 +1057,7 @@ export function skyViewLut(
   const Params = getAtmosphereParamsStruct(pb);
   const funcName = 'v_skyViewLut';
   pb.func(funcName, [Params('params'), pb.vec2('uv'), pb.float('cameraPosY')], function () {
-    this.$l.viewDir = uvToViewDir(this, this.uv);
+    this.$l.viewDir = uvToViewDir(this, this.params, this.uv);
     this.$l.h = pb.add(this.params.plantRadius, pb.mul(this.cameraPosY, this.params.cameraHeightScale));
     this.$l.eyePos = pb.vec3(0, this.h, 0);
     this.$l.rgb = getSkyView(
@@ -880,8 +1067,10 @@ export function skyViewLut(
       this.viewDir,
       pb.float(-1),
       texTransmittanceLut,
-      texMultiScatteringLut
-    );
+      texMultiScatteringLut,
+      true,
+      true
+    ).rgb;
     this.$return(pb.vec4(this.rgb, 1));
   });
   return scope[funcName](stParams, f2UV, CAMERA_POS_Y) as PBShaderExp;
@@ -1003,6 +1192,8 @@ export function getAtmosphereParamsStruct(pb: ProgramBuilder) {
     pb.vec4('lightColor'),
     pb.vec3('lightDir'),
     pb.float('cameraAspect'),
+    pb.vec3('groundAlbedo'),
+    pb.float('cameraTanHalfFovy'),
     pb.float('plantRadius'),
     pb.float('atmosphereHeight'),
     pb.float('rayleighScatteringHeight'),
@@ -1192,7 +1383,7 @@ export function renderSkyViewLut(params: AtmosphereParams) {
     try {
       skyViewLutProgram = createSkyViewLutProgram(device);
       skyViewLutBindGroup = device.createBindGroup(skyViewLutProgram.bindGroupLayouts[0]);
-      skyViewLUT = device.createTexture2D('rgba16f', 256, 128, {
+      skyViewLUT = device.createTexture2D('rgba16f', SKY_VIEW_LUT_WIDTH, SKY_VIEW_LUT_HEIGHT, {
         mipmapping: false
       })!;
       skyViewLUT.name = 'DebugSkyViewLut';
@@ -1245,7 +1436,7 @@ export function createAPLutProgram(device: AbstractDevice) {
           this,
           this.params,
           this.$inputs.uv,
-          pb.vec3(32, 32, 32),
+          pb.vec3(AP_LUT_SLICE_SIZE, AP_LUT_SLICE_SIZE, AP_LUT_DEPTH_SLICES),
           this.transmittanceLut,
           this.multiScatteringLut
         );
@@ -1263,7 +1454,9 @@ export function renderAPLut(params: AtmosphereParams) {
     try {
       APLutProgram = createAPLutProgram(device);
       APLutBindGroup = device.createBindGroup(APLutProgram.bindGroupLayouts[0]);
-      ApLut = device.createTexture2D('rgba16f', 32 * 32, 32, { mipmapping: false })!;
+      ApLut = device.createTexture2D('rgba16f', AP_LUT_SLICE_SIZE * AP_LUT_DEPTH_SLICES, AP_LUT_SLICE_SIZE, {
+        mipmapping: false
+      })!;
       ApLut.name = 'DebugAPLut';
       APFramebuffer = device.createFrameBuffer([ApLut], null);
     } catch (err) {

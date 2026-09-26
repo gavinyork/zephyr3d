@@ -160,6 +160,7 @@ export class SkyRenderer extends Disposable {
   private readonly _radianceMapWidth: number;
   private readonly _atmosphereParams: AtmosphereParams;
   private _atmosphereExposure: number;
+  private _lowerHemisphereIsBlack: boolean;
   private _fogType: FogType;
   private readonly _heightFogParams: HeightFogParams;
   private _cloudy: number;
@@ -190,6 +191,8 @@ export class SkyRenderer extends Disposable {
    * exposure to the live one (1 in legacy).
    */
   private _fogPreExposure: number;
+  /** @internal Cubemap latched in update() for the height fog sky light term. */
+  private _fogSkyLightCubemap: Nullable<TextureCube>;
   /**
    * Creates an instance of SkyRenderer
    */
@@ -213,6 +216,7 @@ export class SkyRenderer extends Disposable {
     this._irradianceFrameBuffer = new DRef();
     this._atmosphereParams = getDefaultAtmosphereParams();
     this._atmosphereExposure = 1;
+    this._lowerHemisphereIsBlack = true;
     this._debugAerialPerspective = 0;
     this._fogType = 'height_fog';
     this._heightFogParams = getDefaultHeightFogParams();
@@ -235,6 +239,7 @@ export class SkyRenderer extends Disposable {
     this._format = null;
     this._fogLuminanceScale = 1;
     this._fogPreExposure = 1;
+    this._fogSkyLightCubemap = null;
   }
   /** @internal */
   getHash(_ctx: DrawContext) {
@@ -355,13 +360,35 @@ export class SkyRenderer extends Disposable {
       this.invalidate();
     }
   }
-  /** Aerial perspective density */
+  /**
+   * Distance covered by the aerial perspective LUT, in atmosphere meters (world distance times
+   * {@link SkyRenderer.cameraHeightScale}). Beyond it aerial perspective no longer increases.
+   */
   get aerialPerspectiveDistance() {
     return this._atmosphereParams.apDistance;
   }
   set aerialPerspectiveDistance(val) {
     if (val !== this._atmosphereParams.apDistance) {
       this._atmosphereParams.apDistance = val;
+      this.invalidate();
+    }
+  }
+  /**
+   * Whether the environment lighting baked from the scattering sky sees black below the horizon.
+   *
+   * @remarks
+   * The scattering sky shows a lit virtual planet ground below the horizon (see
+   * {@link SkyRenderer.groundAlbedo}). That ground is only a backdrop for sky left uncovered by
+   * scene geometry; as a light source it would light every object from below as if it stood on an
+   * infinite plain. Like UE's SkyLight `bLowerHemisphereIsBlack` (on by default), the IBL bake
+   * therefore replaces the lower hemisphere with black. Only affects the `scatter` sky type.
+   */
+  get lowerHemisphereIsBlack() {
+    return this._lowerHemisphereIsBlack;
+  }
+  set lowerHemisphereIsBlack(val: boolean) {
+    if (val !== this._lowerHemisphereIsBlack) {
+      this._lowerHemisphereIsBlack = val;
       this.invalidate();
     }
   }
@@ -372,6 +399,22 @@ export class SkyRenderer extends Disposable {
   set atmosphereExposure(val) {
     if (val !== this._atmosphereExposure) {
       this._atmosphereExposure = val;
+      this.invalidate();
+    }
+  }
+  /**
+   * Color of the virtual planet ground of the scattering sky (UE: GroundAlbedo).
+   *
+   * @remarks
+   * Shown below the horizon where no scene geometry covers the sky, lit by the sun through the
+   * atmosphere, and bounced back into the sky as part of multiple scattering.
+   */
+  get groundAlbedo(): Immutable<Vector3> {
+    return this._atmosphereParams.groundAlbedo;
+  }
+  set groundAlbedo(val: Immutable<Vector3>) {
+    if (!val.equalsTo(this._atmosphereParams.groundAlbedo)) {
+      this._atmosphereParams.groundAlbedo.set(val);
       this.invalidate();
     }
   }
@@ -484,6 +527,48 @@ export class SkyRenderer extends Disposable {
       this._heightFogParams.parameter4.set(val);
       this.invalidate();
     }
+  }
+  /**
+   * How much distant height fog takes the color of the environment behind it (0..1).
+   *
+   * @remarks
+   * Blends the fog in-scattering color, and fades the directional in-scattering, toward the
+   * environment light's radiance map sampled along the view ray (UE:
+   * SkyLightCaptureAffectsHeightFogStrength). Without it the fog uses one color for every direction,
+   * which is darker than the bright horizon sky and shows as a dark band there. Needs an IBL
+   * environment light; 0 disables it.
+   */
+  get heightFogSkyLightStrength() {
+    return this._heightFogParams.skyLightStrength;
+  }
+  set heightFogSkyLightStrength(val) {
+    if (val !== this._heightFogParams.skyLightStrength) {
+      this._heightFogParams.skyLightStrength = val;
+      this.invalidate();
+    }
+  }
+  /**
+   * Blurriness of the environment seen through the fog, as a roughness selecting the radiance map
+   * mip (UE: SkyLightCaptureAffectsHeightFogRoughness).
+   */
+  get heightFogSkyLightRoughness() {
+    return this._heightFogParams.skyLightRoughness;
+  }
+  set heightFogSkyLightRoughness(val) {
+    if (val !== this._heightFogParams.skyLightRoughness) {
+      this._heightFogParams.skyLightRoughness = val;
+      this.invalidate();
+    }
+  }
+  /**
+   * @internal
+   * Cubemap the height fog samples for {@link SkyRenderer.heightFogSkyLightStrength}: the scene's
+   * IBL radiance map, or the sky's own radiance map as a placeholder binding when there is none
+   * (the fog then sees a zero scale and skips it).
+   */
+  getFogSkyLightCubemap(ctx: DrawContext): TextureCube {
+    const light = ctx.scene.env.light;
+    return (light.type === 'ibl' && light.radianceMap) || this.radianceMap;
   }
   /**
    * Light density of the sky.
@@ -683,6 +768,16 @@ export class SkyRenderer extends Disposable {
     //    take the plain camera pre-exposure.
     // Legacy leaves both at 1 so its authored colors are untouched.
     this._fogPreExposure = SkyRenderer.getBakeToPreExposedScale(ctx);
+    // Sky light for height fog: radiance map samples times the same scale the IBL applies to them.
+    const envLight = ctx.scene.env.light;
+    const fogSkyLightMap = envLight.type === 'ibl' ? envLight.radianceMap : null;
+    // Same scale as ShaderHelper.getEnvLightLuminance(), which cannot be used here: it reads ctx.env,
+    // and update() runs before the render graph sets it.
+    this._heightFogParams.skyLightScale = fogSkyLightMap
+      ? SkyRenderer.getBakeToPreExposedScale(ctx) * (envLight.strength ?? 0)
+      : 0;
+    this._heightFogParams.skyLightMaxLod = fogSkyLightMap ? fogSkyLightMap.mipLevelCount - 1 : 0;
+    this._fogSkyLightCubemap = this.getFogSkyLightCubemap(ctx);
     this._fogLuminanceScale =
       ctx.scene.lightingMode === 'physical'
         ? ctx.scene.env.light.intensity * ShaderHelper.getPreExposure(ctx)
@@ -710,11 +805,10 @@ export class SkyRenderer extends Disposable {
     }
     if (this._bakedSkyboxDirty) {
       this._bakedSkyboxDirty = false;
-      // updateBakedSkyMap derives the IBL (specular prefilter + irradiance SH) from the fog-free
-      // cubemap internally, before compositing fog. The distant-light LUT is re-baked here against
-      // the fogged cubemap to preserve the pre-refactor fog shading appearance.
+      // updateBakedSkyMap derives both the IBL and the distant-sky LUT from the fog-free cubemap,
+      // before compositing fog. Deriving the distant-sky LUT from the fogged cubemap would feed the
+      // fog color back into its own ambient term (UE's distant sky light is atmosphere-only too).
       this.updateBakedSkyMap(ctx);
-      this.renderSkyDistantLut(ctx, this._bakedSkyboxTexture.get()!);
     }
     // Atmosphere extinction times cloud occlusion. The cloud term intentionally applies only to
     // the scene's directional light, not to the sky bake: the clouds in the cubemap are lit by
@@ -740,11 +834,14 @@ export class SkyRenderer extends Disposable {
         Math.min(126, -this._heightFogParams.parameter1.w * (cameraY - this._heightFogParams.parameter2.y))
       );
       this._heightFogParams.parameter3.z = this._heightFogParams.parameter2.x * Math.pow(2, p);
-      // The legacy directional fog term expects a display-relative 0..1 light color. It cannot be
-      // mixed directly with photometric illuminance; physical fog instead receives its radiance
-      // from the distant-sky integration below.
+      // Legacy keeps its display-relative 0..1 light color. Physical follows UE: the sun illuminance
+      // reaching the ground, scattered with an isotropic phase 1 / (4pi), turns into radiance, which
+      // is then pre-exposed like every other lit quantity.
       if (ctx.scene.lightingMode === 'physical') {
-        this._heightFogParams.lightColor.setXYZ(0, 0, 0);
+        const sunIlluminance = ctx.sunLight ? ctx.sunLight.intensity : 0;
+        this._heightFogParams.lightColor.set(
+          Vector3.scale(newSunLight, (sunIlluminance * ShaderHelper.getPreExposure(ctx)) / (4 * Math.PI))
+        );
       } else {
         this._heightFogParams.lightColor.set(newSunLight);
       }
@@ -766,6 +863,7 @@ export class SkyRenderer extends Disposable {
         ? SkyRenderer.PHYSICAL_ATMOSPHERE_LUMINANCE_SCALE * SkyRenderer.PHYSICAL_BAKE_EXPOSURE
         : 1);
     this._atmosphereParams.cameraAspect = ctx.camera.getAspect();
+    this._atmosphereParams.cameraTanHalfFovy = ctx.camera.isPerspective() ? ctx.camera.getTanHalfFovy() : 1;
     this._atmosphereParams.cameraWorldMatrix.set(ctx.camera.worldMatrix);
     renderAtmosphereLUTs(this._atmosphereParams);
   }
@@ -804,7 +902,13 @@ export class SkyRenderer extends Disposable {
       // Direct sunlight is represented by the scene's directional sun light. Keep the analytic
       // sun disk out of both diffuse and specular IBL to avoid baking that direct contribution a
       // second time. Atmospheric scattering and clouds remain in the cubemap.
-      this._renderSky(camera, false, false, this._getSkyBakeLuminanceScale(ctx));
+      this._renderSky(
+        camera,
+        false,
+        false,
+        this._getSkyBakeLuminanceScale(ctx),
+        this._lowerHemisphereIsBlack
+      );
     }
     device.popDeviceStates();
 
@@ -869,6 +973,11 @@ export class SkyRenderer extends Disposable {
       fetchSampler('clamp_nearest_nomip')
     );
     bindgroup.setTexture('apLut', getAerialPerspectiveLut(), fetchSampler('clamp_linear_nomip'));
+    bindgroup.setTexture(
+      'skyLightCubemap',
+      this._fogSkyLightCubemap ?? this.radianceMap,
+      fetchSampler('clamp_linear')
+    );
     bindgroup.setValue('rt', device.getFramebuffer() ? 1 : 0);
     bindgroup.setValue('invProjViewMatrix', camera.invViewProjectionMatrix);
     bindgroup.setValue('cameraNearFar', new Vector2(camera.getNearPlane(), camera.getFarPlane()));
@@ -877,7 +986,7 @@ export class SkyRenderer extends Disposable {
     bindgroup.setValue('withAerialPerspective', this.skyType === 'scatter' ? 1 : 0);
     bindgroup.setValue('fogType', this.mappedFogType);
     bindgroup.setValue('atmosphereParams', this._atmosphereParams);
-    bindgroup.setValue('heightFogParams', this._getUploadHeightFogParams());
+    bindgroup.setValue('heightFogParams', this.getUploadHeightFogParams());
     device.setProgram(fogProgram);
     device.setBindGroup(0, bindgroup);
     device.setVertexLayout(SkyRenderer._vertexLayout);
@@ -891,7 +1000,7 @@ export class SkyRenderer extends Disposable {
    * atmosphere-derived LUT samples. Legacy returns the stored params untouched so its upload stays
    * byte-identical. Stored authored values are never mutated.
    */
-  private _getUploadHeightFogParams() {
+  getUploadHeightFogParams() {
     const scale = this._fogLuminanceScale;
     const p = this._heightFogParams;
     if (scale === 1 && this._fogPreExposure === 1) {
@@ -1035,13 +1144,19 @@ export class SkyRenderer extends Disposable {
     }
   }
   /** @internal */
-  private _renderSky(camera: Camera, depthTest: boolean, includeSunDisk: boolean, luminanceScale = 1) {
+  private _renderSky(
+    camera: Camera,
+    depthTest: boolean,
+    includeSunDisk: boolean,
+    luminanceScale = 1,
+    lowerHemisphereBlack = false
+  ) {
     const device = getDevice();
     const savedRenderStates = device.getRenderStates();
     this._prepareSkyBox(device);
     if (this._skyType === 'scatter') {
       // The atmosphere LUTs already hold physical luminance, so only the caller's exposure applies.
-      this._drawScattering(camera, depthTest, includeSunDisk, luminanceScale);
+      this._drawScattering(camera, depthTest, includeSunDisk, luminanceScale, lowerHemisphereBlack);
     } else if (this._skyType === 'skybox' && this.skyboxTexture) {
       this._drawSkybox(camera, depthTest, luminanceScale);
     } else {
@@ -1184,12 +1299,12 @@ export class SkyRenderer extends Disposable {
     const OZONE_ABSORPTION_SIGMA = [0.65, 1.881, 0.085];
     function rayleighSc(params: AtmosphereParams, fH: number) {
       const sigma = new Vector3(RAYLEIGH_SIGMA[0] * 1e-6, RAYLEIGH_SIGMA[1] * 1e-6, RAYLEIGH_SIGMA[2] * 1e-6);
-      const rho_h = Math.exp(-fH / params.rayleighScatteringHeight);
+      const rho_h = Math.exp(-Math.max(fH, 0) / params.rayleighScatteringHeight);
       return Vector3.scale(sigma, rho_h);
     }
     function mieSc(params: AtmosphereParams, fH: number) {
       const sigma = new Vector3(MIE_SIGMA * 1e-6, MIE_SIGMA * 1e-6, MIE_SIGMA * 1e-6);
-      const rho_h = Math.exp(-(fH / params.mieScatteringHeight));
+      const rho_h = Math.exp(-Math.max(fH, 0) / params.mieScatteringHeight);
       return Vector3.scale(sigma, rho_h);
     }
     function mieAb(params: AtmosphereParams, fH: number) {
@@ -1198,7 +1313,7 @@ export class SkyRenderer extends Disposable {
         MIE_ABSORPTION_SIGMA * 1e-6,
         MIE_ABSORPTION_SIGMA * 1e-6
       );
-      const rho_h = Math.exp(-(fH / params.mieScatteringHeight));
+      const rho_h = Math.exp(-Math.max(fH, 0) / params.mieScatteringHeight);
       return Vector3.scale(sigma, rho_h);
     }
     function ozoneAb(params: AtmosphereParams, fH: number) {
@@ -1207,7 +1322,7 @@ export class SkyRenderer extends Disposable {
         OZONE_ABSORPTION_SIGMA[1] * 1e-6,
         OZONE_ABSORPTION_SIGMA[2] * 1e-6
       );
-      const rho_h = Math.max(0, 1 - (Math.abs(fH - params.ozoneCenter) * 0.5) / params.ozoneWidth);
+      const rho_h = Math.max(0, 1 - Math.abs(fH - params.ozoneCenter) / params.ozoneWidth);
       return Vector3.scale(sigma, rho_h);
     }
     const eyePos = new Vector3(
@@ -1242,7 +1357,8 @@ export class SkyRenderer extends Disposable {
     camera: Camera,
     depthTest: boolean,
     includeSunDisk: boolean,
-    luminanceScale: number
+    luminanceScale: number,
+    lowerHemisphereBlack: boolean
   ) {
     const device = getDevice();
     const tLut = getTransmittanceLut();
@@ -1260,6 +1376,7 @@ export class SkyRenderer extends Disposable {
     bindgroup.setValue('cameraPos', camera.getWorldPosition());
     bindgroup.setValue('srgbOut', device.getFramebuffer() ? 0 : 1);
     bindgroup.setValue('includeSunDisk', includeSunDisk ? 1 : 0);
+    bindgroup.setValue('lowerHemisphereBlack', lowerHemisphereBlack ? 1 : 0);
     bindgroup.setValue('luminanceScale', luminanceScale);
     bindgroup.setTexture('tLut', tLut, fetchSampler('clamp_linear_nomip'));
     bindgroup.setTexture('skyLut', skyLut, fetchSampler('clamp_linear_nomip'));
@@ -1540,6 +1657,7 @@ export class SkyRenderer extends Disposable {
         }
         this.apLut = pb.tex2D().uniform(0);
         this.skyDistantLightLut = pb.tex2D().uniform(0);
+        this.skyLightCubemap = pb.texCube().uniform(0);
         this.invProjViewMatrix = pb.mat4().uniform(0);
         this.cameraNearFar = pb.vec2().uniform(0);
         this.cameraPosition = pb.vec3().uniform(0);
@@ -1573,7 +1691,8 @@ export class SkyRenderer extends Disposable {
             this.worldPos,
             0,
             this.apLut,
-            this.skyDistantLightLut
+            this.skyDistantLightLut,
+            this.skyLightCubemap
           );
           this.$if(pb.equal(this.srgbOut, 0), function () {
             this.$outputs.outColor = this.color;
@@ -1634,6 +1753,7 @@ export class SkyRenderer extends Disposable {
         this.skyLut = pb.tex2D().uniform(0);
         this.params = getAtmosphereParamsStruct(pb)().uniform(0);
         this.includeSunDisk = pb.int().uniform(0);
+        this.lowerHemisphereBlack = pb.int().uniform(0);
         if (cloud) {
           this.cloudy = pb.float().uniform(0);
           this.cloudIntensity = pb.float().uniform(0);
@@ -1718,6 +1838,13 @@ export class SkyRenderer extends Disposable {
           } else {
             this.$l.color = this.skyColor;
           }
+          // UE ApplyLowerHemisphereColorPS: the IBL bake does not see the virtual ground.
+          this.$if(
+            pb.and(pb.notEqual(this.lowerHemisphereBlack, 0), pb.lessThan(this.rayDir.y, 0)),
+            function () {
+              this.color = pb.vec3(0);
+            }
+          );
           // 1 for legacy and for the IBL bake; the camera pre-exposure when drawn on screen.
           this.color = pb.mul(this.color, this.luminanceScale);
           this.$if(pb.equal(this.srgbOut, 0), function () {
