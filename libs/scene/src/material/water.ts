@@ -10,7 +10,7 @@ import { applyMaterialMixins, MeshMaterial } from './meshmaterial';
 import type { DrawContext, WaveGenerator } from '../render';
 import type { WaterInteraction } from '../render/water_interaction';
 import { InteractiveWaveGenerator } from '../render/water_interaction';
-import { LIGHT_TYPE_DIRECTIONAL, MaterialVaryingFlags } from '../values';
+import { LIGHT_TYPE_DIRECTIONAL, LIGHT_TYPE_RECT, MaterialVaryingFlags } from '../values';
 import { ShaderHelper } from './shader/helper';
 import type { Nullable } from '@zephyr3d/base';
 import { DRef, DWeakRef, Interpolator, Vector3, Vector4 } from '@zephyr3d/base';
@@ -21,6 +21,8 @@ import { distributionGGX, fresnelSchlick, visGGX } from '../shaders/pbr';
 import { interleavedGradientNoise, valueNoise } from '../shaders/noise';
 import { waterScatterPhase } from '../shaders/water_medium';
 import { getDevice } from '../app/api';
+import { evaluateLTCRectLightTerms } from '../shaders/ltc_rect';
+import { getLTCAmpLUT, getLTCMatLUT } from '../utility/textures/ltclut';
 
 /**
  * How the water medium converts a path length into transmittance and in-scattering.
@@ -1158,6 +1160,9 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
       // absorption and scattering.
       scope.mediumAlbedo = pb.vec3().uniform(2);
       scope.mediumExtinction = pb.vec3().uniform(2);
+      // Rect light specular (evaluateLTCRectLightTerms).
+      scope.zLTCMatLut = pb.tex2D().uniform(2);
+      scope.zLTCAmpLut = pb.tex2D().uniform(2);
       if (this.mediumMode === 'ramp') {
         scope.depthMulti = pb.float().uniform(2);
         scope.scatterRampTex = pb.tex2D().uniform(2);
@@ -2083,13 +2088,36 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
             1
           );
           this.$l.lightEnergy = pb.mul(colorIntensity.rgb, colorIntensity.a, this.lightAtten);
-          this.$l.specularTerm = this.lightSpecular(
-            this.lightDir,
-            this.eyeVecNorm,
-            this.shadingNormal,
-            this.lightEnergy,
-            this.roughness
-          );
+          this.$l.specularTerm = pb.vec3(0);
+          // A rect light's mirror image is the rect itself: integrate the GGX
+          // lobe over it with LTC, as the PBR materials do. One direction would
+          // shrink it to a point highlight on a surface this smooth.
+          this.$if(pb.equal(type, LIGHT_TYPE_RECT), function () {
+            this.$l.rectTerms = evaluateLTCRectLightTerms(
+              this,
+              this.worldPos,
+              this.shadingNormal,
+              pb.neg(this.eyeVecNorm),
+              this.roughness,
+              posRange,
+              dirCutoff.xyz,
+              extra.xyz
+            );
+            this.specularTerm = pb.mul(
+              colorIntensity.rgb,
+              colorIntensity.a,
+              this.rectTerms.x,
+              pb.add(pb.mul(this.rectTerms.y, WATER_F0), pb.mul(this.rectTerms.z, 1 - WATER_F0))
+            );
+          }).$else(function () {
+            this.specularTerm = this.lightSpecular(
+              this.lightDir,
+              this.eyeVecNorm,
+              this.shadingNormal,
+              this.lightEnergy,
+              this.roughness
+            );
+          });
           this.$l.lightContrib = this.specularTerm;
           // Backlit-crest subsurface, after Ceto: grazing^2 * (view ray mirrored
           // in the rest plane, against the sun)^4 * sun-above-horizon fade.
@@ -2273,6 +2301,8 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
       }
       bindGroup.setValue('mediumAlbedo', this._scatterAlbedo);
       bindGroup.setValue('mediumExtinction', this._extinction);
+      bindGroup.setTexture('zLTCMatLut', getLTCMatLUT());
+      bindGroup.setTexture('zLTCAmpLut', getLTCAmpLUT());
       this._sunScatterParams.setXYZW(this._sunScatteringIntensity, this._scatterAnisotropy, 0, 0);
       bindGroup.setValue('sunScatterParams', this._sunScatterParams);
       // Luminance-weighted scalar: one blur LOD serves all three channels.
