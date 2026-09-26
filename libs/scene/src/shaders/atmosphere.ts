@@ -22,8 +22,13 @@ const MIE_SIGMA = 3.996;
 const MIE_ABSORPTION_SIGMA = 4.4;
 const OZONE_ABSORPTION_SIGMA = [0.65, 1.881, 0.085];
 
-/** @internal */
-export const CAMERA_POS_Y = 1;
+/**
+ * @internal
+ * Lowest observer altitude above the ground, in meters (UE: PlanetRadiusOffset in
+ * FAtmosphereSetup::ComputeViewData). Keeps the sky visible when the camera is at or below the
+ * virtual planet surface.
+ */
+export const MIN_OBSERVER_ALTITUDE = 5;
 
 /** @internal */
 export type AtmosphereParams = {
@@ -42,7 +47,18 @@ export type AtmosphereParams = {
   lightColor: Vector4;
   cameraAspect: number;
   cameraTanHalfFovy: number;
+  /** Atmosphere meters per world unit */
   cameraHeightScale: number;
+  /**
+   * Observer altitude above the ground, in meters. Every atmosphere computation runs in the
+   * observer's local frame: planet center at the origin, observer at (0, R + altitude, 0).
+   */
+  observerAltitude: number;
+  /**
+   * World to observer-local rotation (UE: SkyViewLutReferential). Its Y row is the local up; at the
+   * world origin it is the identity. `lightDir` and `cameraWorldMatrix` are stored in this frame.
+   */
+  skyViewReferential: Matrix4x4;
 };
 
 /** @internal */
@@ -63,7 +79,9 @@ export function getDefaultAtmosphereParams() {
     lightColor: new Vector4(1, 1, 1, 10),
     cameraAspect: 1,
     cameraTanHalfFovy: 1,
-    cameraHeightScale: 1
+    cameraHeightScale: 1,
+    observerAltitude: MIN_OBSERVER_ALTITUDE,
+    skyViewReferential: Matrix4x4.identity()
   } as AtmosphereParams;
 }
 
@@ -85,7 +103,8 @@ function checkParams(other?: Partial<AtmosphereParams>) {
       lightDir: new Vector3(defaultAtmosphereParams.lightDir),
       lightColor: new Vector4(defaultAtmosphereParams.lightColor),
       groundAlbedo: new Vector3(defaultAtmosphereParams.groundAlbedo),
-      cameraWorldMatrix: new Matrix4x4(defaultAtmosphereParams.cameraWorldMatrix)
+      cameraWorldMatrix: new Matrix4x4(defaultAtmosphereParams.cameraWorldMatrix),
+      skyViewReferential: new Matrix4x4(defaultAtmosphereParams.skyViewReferential)
     };
     result.transmittance = true;
     result.multiScattering = true;
@@ -103,13 +122,13 @@ function checkParams(other?: Partial<AtmosphereParams>) {
     // medium only (see integralMultiScattering).
     result.multiScattering =
       result.transmittance || !currentAtmosphereParams.groundAlbedo.equalsTo(other.groundAlbedo!);
-    // The sky view LUT is a full lat-long sphere around a fixed observer: the camera orientation
-    // does not affect it.
+    // The sky view LUT is a full lat-long sphere around the observer in its local frame: the camera
+    // orientation does not affect it, its altitude and the local light direction do.
     result.skyView =
       result.transmittance ||
       result.multiScattering ||
       currentAtmosphereParams.mieAnstropy !== other.mieAnstropy ||
-      currentAtmosphereParams.cameraHeightScale !== other.cameraHeightScale ||
+      currentAtmosphereParams.observerAltitude !== other.observerAltitude ||
       !currentAtmosphereParams.lightDir.equalsTo(other.lightDir!) ||
       !currentAtmosphereParams.lightColor.equalsTo(other.lightColor!);
     result.aerialPerspective =
@@ -134,7 +153,7 @@ function checkParams(other?: Partial<AtmosphereParams>) {
   }
   if (result.skyView) {
     currentAtmosphereParams.mieAnstropy = other.mieAnstropy!;
-    currentAtmosphereParams.cameraHeightScale = other.cameraHeightScale!;
+    currentAtmosphereParams.observerAltitude = other.observerAltitude!;
     currentAtmosphereParams.lightDir.set(other.lightDir!);
     currentAtmosphereParams.lightColor.set(other.lightColor!);
   }
@@ -163,11 +182,11 @@ export function rayIntersectSphere(
     function () {
       this.$l.OS = pb.length(pb.sub(this.center, this.rayStart));
       this.$l.SH = pb.dot(pb.sub(this.center, this.rayStart), this.rayDir);
-      this.$l.OH = pb.sqrt(pb.sub(pb.mul(this.OS, this.OS), pb.mul(this.SH, this.SH)));
-      this.$l.PH = pb.sqrt(pb.sub(pb.mul(this.radius, this.radius), pb.mul(this.OH, this.OH)));
+      this.$l.OH = pb.sqrt(pb.max(pb.sub(pb.mul(this.OS, this.OS), pb.mul(this.SH, this.SH)), 0));
       this.$if(pb.greaterThan(this.OH, this.radius), function () {
         this.$return(pb.float(-1));
       });
+      this.$l.PH = pb.sqrt(pb.max(pb.sub(pb.mul(this.radius, this.radius), pb.mul(this.OH, this.OH)), 0));
       this.$l.t1 = pb.sub(this.SH, this.PH);
       this.$l.t2 = pb.add(this.SH, this.PH);
       this.$return(this.$choice(pb.lessThan(this.t1, 0), this.t2, this.t1));
@@ -176,16 +195,45 @@ export function rayIntersectSphere(
   return scope[funcName](f3Center, fRadius, f3RayStart, f3RayDir) as PBShaderExp;
 }
 
+/**
+ * @internal
+ *
+ * Far intersection of a ray with a sphere, -1 when missed. For a start inside the sphere this is
+ * where the ray leaves it: unlike {@link rayIntersectSphere} it cannot mistake a near root that float
+ * error nudged above 0 for the exit (UE: max(SolT.x, SolT.y) in IntegrateSingleScatteredLuminance).
+ */
+export function rayIntersectSphereFar(
+  scope: PBInsideFunctionScope,
+  fRadius: PBShaderExp,
+  f3RayStart: PBShaderExp,
+  f3RayDir: PBShaderExp
+) {
+  const pb = scope.$builder;
+  const funcName = 'z_rayIntersectSphereFar';
+  pb.func(funcName, [pb.float('radius'), pb.vec3('rayStart'), pb.vec3('rayDir')], function () {
+    this.$l.OS = pb.length(this.rayStart);
+    this.$l.SH = pb.neg(pb.dot(this.rayStart, this.rayDir));
+    this.$l.OH = pb.sqrt(pb.max(pb.sub(pb.mul(this.OS, this.OS), pb.mul(this.SH, this.SH)), 0));
+    this.$if(pb.greaterThan(this.OH, this.radius), function () {
+      this.$return(pb.float(-1));
+    });
+    this.$l.PH = pb.sqrt(pb.max(pb.sub(pb.mul(this.radius, this.radius), pb.mul(this.OH, this.OH)), 0));
+    this.$return(pb.add(this.SH, this.PH));
+  });
+  return scope[funcName](fRadius, f3RayStart, f3RayDir) as PBShaderExp;
+}
+
 /** @internal */
 export function transmittanceToSky(
   scope: PBInsideFunctionScope,
   stParams: PBShaderExp,
   f3Pos: PBShaderExp,
   f3Dir: PBShaderExp,
-  texLut: PBShaderExp
+  texLut: PBShaderExp,
+  planetShadow = true
 ) {
   const pb = scope.$builder;
-  const funcName = 'z_transmittanceToSky';
+  const funcName = planetShadow ? 'z_transmittanceToSky' : 'z_transmittanceToSkyNoShadow';
   const Params = getAtmosphereParamsStruct(pb);
   pb.func(funcName, [Params('params'), pb.vec3('p'), pb.vec3('dir')], function () {
     this.$l.bottomRadius = this.params.plantRadius;
@@ -195,18 +243,30 @@ export function transmittanceToSky(
     // would clamp to the horizon texel and keep the sun lit after it has set. Test the planet
     // analytically instead, from a point lifted 1m to stay clear of float error on the sphere
     // (UE: GetAtmosphereTransmittance / PLANET_RADIUS_OFFSET).
-    this.$l.tPlanet = rayIntersectSphere(
-      this,
-      pb.vec3(0),
-      this.bottomRadius,
-      pb.add(this.p, this.upVector),
-      this.dir
-    );
-    this.$if(pb.greaterThan(this.tPlanet, 0), function () {
-      this.$return(pb.vec3(0));
+    if (planetShadow) {
+      this.$l.tPlanet = rayIntersectSphere(
+        this,
+        pb.vec3(0),
+        this.bottomRadius,
+        pb.add(this.p, this.upVector),
+        this.dir
+      );
+      this.$if(pb.greaterThan(this.tPlanet, 0), function () {
+        this.$return(pb.vec3(0));
+      });
+    }
+    // Above the atmosphere the LUT has no entry: look it up from where the ray enters it.
+    this.$l.pos = this.p;
+    this.$if(pb.greaterThan(pb.length(this.p), this.topRadius), function () {
+      this.$l.tTop = rayIntersectSphere(this, pb.vec3(0), this.topRadius, this.p, this.dir);
+      this.$if(pb.lessThan(this.tTop, 0), function () {
+        this.$return(pb.vec3(1));
+      });
+      this.pos = pb.add(this.p, pb.mul(this.dir, this.tTop));
+      this.upVector = pb.normalize(this.pos);
     });
     this.$l.cosTheta = pb.dot(this.upVector, this.dir);
-    this.$l.r = pb.length(this.p);
+    this.$l.r = pb.min(pb.length(this.pos), this.topRadius);
     this.$l.uv = transmittanceLutToUV(this, this.bottomRadius, this.topRadius, this.cosTheta, this.r);
     this.$return(pb.textureSampleLevel(texLut, this.uv, 0).rgb);
   });
@@ -328,12 +388,17 @@ export function groundBounce(
   pb.func(funcName, [Params('params'), pb.vec3('groundPos'), pb.vec3('lightDir')], function () {
     this.$l.up = pb.normalize(this.groundPos);
     this.$l.NdotL = pb.clamp(pb.dot(this.up, this.lightDir), 0, 1);
+    // No planet shadow test: on a convex planet NdotL > 0 already means the sun is above the local
+    // horizon, and the test itself is unreliable here -- seen from space the ground point carries
+    // meters of float error, enough to drop the 1m-lifted start below the surface (UE's ground
+    // term likewise only reads the LUT).
     this.$l.transmittanceToLight = transmittanceToSky(
       this,
       this.params,
       this.groundPos,
       this.lightDir,
-      texTransmittanceLut
+      texTransmittanceLut,
+      false
     );
     this.$return(pb.mul(this.transmittanceToLight, this.params.groundAlbedo, this.NdotL, 1 / Math.PI));
   });
@@ -369,30 +434,44 @@ export function getSkyView(
     function () {
       const N_SAMPLE = 32;
       this.$l.color = pb.vec3(0);
-      this.$l.dis = rayIntersectSphere(
-        this,
-        pb.vec3(0),
-        pb.add(this.params.plantRadius, this.params.atmosphereHeight),
-        this.eyePos,
-        this.viewDir
-      );
+      this.$l.topRadius = pb.add(this.params.plantRadius, this.params.atmosphereHeight);
+      this.$l.eye = this.eyePos;
+      this.$l.maxDistance = this.maxDis;
+      this.$l.dis = rayIntersectSphere(this, pb.vec3(0), this.topRadius, this.eye, this.viewDir);
       this.$if(pb.lessThan(this.dis, 0), function () {
         this.$return(pb.vec4(0, 0, 0, 1));
       });
+      // Observer above the atmosphere: start at the point where the ray enters it, 1m inside so the
+      // exit intersection below does not degenerate (UE: MoveToTopAtmosphere).
+      this.$if(pb.greaterThan(pb.length(this.eye), this.topRadius), function () {
+        this.$l.tEnter = this.dis;
+        this.eye = pb.add(this.eye, pb.mul(this.viewDir, this.tEnter));
+        this.eye = pb.sub(this.eye, pb.normalize(this.eye));
+        this.$if(pb.greaterThanEqual(this.maxDistance, 0), function () {
+          this.maxDistance = pb.sub(this.maxDistance, this.tEnter);
+          this.$if(pb.lessThanEqual(this.maxDistance, 0), function () {
+            this.$return(pb.vec4(0, 0, 0, 1));
+          });
+        });
+        this.dis = pb.max(rayIntersectSphereFar(this, this.topRadius, this.eye, this.viewDir), 0);
+      });
       this.$l.hitGround = pb.bool(false);
       if (withGround || groundLit) {
-        this.$l.d = rayIntersectSphere(this, pb.vec3(0), this.params.plantRadius, this.eyePos, this.viewDir);
+        this.$l.d = rayIntersectSphere(this, pb.vec3(0), this.params.plantRadius, this.eye, this.viewDir);
         this.$if(pb.and(pb.greaterThan(this.d, 0), pb.lessThanEqual(this.d, this.dis)), function () {
           this.dis = this.d;
           this.hitGround = pb.bool(true);
         });
       }
-      this.$if(pb.and(pb.greaterThanEqual(this.maxDis, 0), pb.lessThan(this.maxDis, this.dis)), function () {
-        this.dis = this.maxDis;
-        this.hitGround = pb.bool(false);
-      });
+      this.$if(
+        pb.and(pb.greaterThanEqual(this.maxDistance, 0), pb.lessThan(this.maxDistance, this.dis)),
+        function () {
+          this.dis = this.maxDistance;
+          this.hitGround = pb.bool(false);
+        }
+      );
       this.$l.ds = pb.div(this.dis, N_SAMPLE);
-      this.$l.p = pb.add(this.eyePos, pb.mul(this.viewDir, this.ds, 0.5));
+      this.$l.p = pb.add(this.eye, pb.mul(this.viewDir, this.ds, 0.5));
       this.$l.sunLuminance = pb.mul(this.params.lightColor.rgb, this.params.lightColor.a);
       this.$l.throughput = pb.vec3(1);
       this.$for(pb.int('i'), 0, N_SAMPLE, function () {
@@ -422,7 +501,7 @@ export function getSkyView(
       });
       if (groundLit) {
         this.$if(this.hitGround, function () {
-          this.$l.groundPos = pb.add(this.eyePos, pb.mul(this.viewDir, this.dis));
+          this.$l.groundPos = pb.add(this.eye, pb.mul(this.viewDir, this.dis));
           this.color = pb.add(
             this.color,
             pb.mul(
@@ -641,7 +720,9 @@ export function transmittanceLutToUV(
         pb.mul(this.r, this.r, pb.sub(pb.mul(this.mu, this.mu), 1)),
         pb.mul(this.topRadius, this.topRadius)
       );
-      this.$l.d = pb.max(0, pb.sub(pb.sqrt(this.discriminant), pb.mul(this.mu, this.r)));
+      // r ~ topRadius (a ray entering from space) makes this top^2 - r^2 difference of two ~4e13 values,
+      // which float error can drive negative.
+      this.$l.d = pb.max(0, pb.sub(pb.sqrt(pb.max(this.discriminant, 0)), pb.mul(this.mu, this.r)));
       this.$l.d_min = pb.sub(this.topRadius, this.r);
       this.$l.d_max = pb.add(this.rho, this.H);
       this.$l.x_mu = pb.div(pb.sub(this.d, this.d_min), pb.sub(this.d_max, this.d_min));
@@ -666,7 +747,7 @@ function skyViewHorizon(scope: PBInsideFunctionScope, stParams: PBShaderExp) {
   const Params = getAtmosphereParamsStruct(pb);
   const funcName = 'z_skyViewHorizon';
   pb.func(funcName, [Params('params')], function () {
-    this.$l.altitude = pb.mul(CAMERA_POS_Y, this.params.cameraHeightScale);
+    this.$l.altitude = this.params.observerAltitude;
     this.$l.viewHeight = pb.add(this.params.plantRadius, this.altitude);
     // sqrt(h^2 - R^2) written as sqrt(a * (2R + a)): at an altitude of meters against a radius of
     // thousands of kilometers, h^2 - R^2 is pure fp32 cancellation.
@@ -827,7 +908,17 @@ export const SUN_DISK_HALF_APEX_ANGLE = (0.5 * 0.5357 * Math.PI) / 180;
 /**
  * @internal
  *
- * Sky luminance along a view direction from the sky view LUT, plus the sun disk.
+ * Sky luminance along a view direction, plus the sun disk.
+ *
+ * @remarks
+ * `f3LocalDir` is in the observer's local frame (see {@link AtmosphereParams.skyViewReferential}).
+ * Inside the atmosphere the luminance comes from the sky view LUT; above it the LUT, which is
+ * parameterized around a horizon inside the atmosphere, does not apply and the view ray is marched
+ * per pixel instead, starting where it enters the atmosphere (UE: the FastSky condition in
+ * RenderSkyAtmosphereRayMarchingPS). That path draws the planet as seen from space: the lit virtual
+ * ground behind the full atmosphere.
+ *
+ * `sunColor` receives the light color attenuated towards the observer.
  *
  * @param fIncludeSunDisk - 0: no sun disk; 1: legacy stylized disk with glow; 2: physical disk as in
  *   UE (GetLightDiskLuminance): illuminance over the disk's solid angle, attenuated by the atmosphere
@@ -837,11 +928,12 @@ export function skyBox(
   scope: PBInsideFunctionScope,
   stParams: PBShaderExp,
   f4SunColor: PBShaderExp,
-  f3SkyBoxWorldPos: PBShaderExp,
+  f3LocalDir: PBShaderExp,
   fSunSolidAngle: PBShaderExp,
   fIncludeSunDisk: PBShaderExp,
   texTransmittanceLut: PBShaderExp,
-  texSkyViewLut: PBShaderExp
+  texSkyViewLut: PBShaderExp,
+  texMultiScatteringLut: PBShaderExp
 ) {
   const pb = scope.$builder;
   const funcName = 'v_skybox';
@@ -851,28 +943,40 @@ export function skyBox(
     [
       Params('params'),
       pb.vec4('sunColor').out(),
-      pb.vec3('worldPos'),
+      pb.vec3('localDir'),
       pb.float('sunSolidAngle'),
       pb.int('includeSunDisk')
     ],
     function () {
+      this.$l.viewDir = pb.normalize(this.localDir);
+      this.$l.eyePos = pb.vec3(0, pb.add(this.params.plantRadius, this.params.observerAltitude), 0);
       this.$l.rgb = pb.vec3(0);
-      this.$l.viewDir = pb.normalize(this.worldPos);
-      this.rgb = pb.add(
-        this.rgb,
-        pb.textureSampleLevel(texSkyViewLut, viewDirToUV(this, this.params, this.viewDir), 0).rgb
-      );
+      this.$if(pb.lessThan(this.params.observerAltitude, this.params.atmosphereHeight), function () {
+        this.rgb = pb.textureSampleLevel(texSkyViewLut, viewDirToUV(this, this.params, this.viewDir), 0).rgb;
+      }).$else(function () {
+        this.rgb = getSkyView(
+          this,
+          this.params,
+          this.eyePos,
+          this.viewDir,
+          pb.float(-1),
+          texTransmittanceLut,
+          texMultiScatteringLut,
+          true,
+          true
+        ).rgb;
+      });
       this.$l.groundDistance = rayIntersectSphere(
         this,
         pb.vec3(0),
         this.params.plantRadius,
-        pb.vec3(0, pb.add(this.params.plantRadius, pb.mul(CAMERA_POS_Y, this.params.cameraHeightScale)), 0),
+        this.eyePos,
         this.viewDir
       );
       this.$l.sunTransmittance = transmittanceToSky(
         this,
         this.params,
-        pb.vec3(0, pb.add(this.params.cameraHeightScale, this.params.plantRadius), 0),
+        this.eyePos,
         this.params.lightDir,
         texTransmittanceLut
       );
@@ -892,11 +996,7 @@ export function skyBox(
           this.$l.transmittanceToLight = transmittanceToSky(
             this,
             this.params,
-            pb.vec3(
-              0,
-              pb.add(this.params.plantRadius, pb.mul(CAMERA_POS_Y, this.params.cameraHeightScale)),
-              0
-            ),
+            this.eyePos,
             this.viewDir,
             texTransmittanceLut
           );
@@ -919,13 +1019,7 @@ export function skyBox(
       this.$return(pb.vec4(this.rgb, 1));
     }
   );
-  return scope[funcName](
-    stParams,
-    f4SunColor,
-    f3SkyBoxWorldPos,
-    fSunSolidAngle,
-    fIncludeSunDisk
-  ) as PBShaderExp;
+  return scope[funcName](stParams, f4SunColor, f3LocalDir, fSunSolidAngle, fIncludeSunDisk) as PBShaderExp;
 }
 
 /** @internal */
@@ -1008,7 +1102,7 @@ export function aerialPerspectiveLut(
   const pb = scope.$builder;
   const Params = getAtmosphereParamsStruct(pb);
   const funcName = 'z_aerialPerspectiveLut';
-  pb.func(funcName, [Params('params'), pb.vec2('uv'), pb.vec3('dim'), pb.float('cameraPosY')], function () {
+  pb.func(funcName, [Params('params'), pb.vec2('uv'), pb.vec3('dim')], function () {
     // uv arrives at the texel center of the dim.x * dim.z wide atlas.
     this.$l.px = pb.floor(pb.mul(this.uv.x, this.dim.x, this.dim.z));
     this.$l.slice = pb.floor(pb.div(this.px, this.dim.x));
@@ -1029,11 +1123,7 @@ export function aerialPerspectiveLut(
         )
       ).xyz
     );
-    this.$l.eyePos = pb.vec3(
-      0,
-      pb.add(pb.mul(this.cameraPosY, this.params.cameraHeightScale), this.params.plantRadius),
-      0
-    );
+    this.$l.eyePos = pb.vec3(0, pb.add(this.params.observerAltitude, this.params.plantRadius), 0);
     this.$l.maxDis = pb.mul(this.w, this.w, this.params.apDistance);
     this.$l.voxelPos = pb.add(this.eyePos, pb.mul(this.viewDir, this.maxDis));
     this.$l.underGround = pb.lessThan(pb.length(this.voxelPos), this.params.plantRadius);
@@ -1086,7 +1176,7 @@ export function aerialPerspectiveLut(
       )
     );
   });
-  return scope[funcName](stParams, f2UV, f3VoxelDim, CAMERA_POS_Y) as PBShaderExp;
+  return scope[funcName](stParams, f2UV, f3VoxelDim) as PBShaderExp;
 }
 
 /** @internal */
@@ -1100,9 +1190,9 @@ export function skyViewLut(
   const pb = scope.$builder;
   const Params = getAtmosphereParamsStruct(pb);
   const funcName = 'v_skyViewLut';
-  pb.func(funcName, [Params('params'), pb.vec2('uv'), pb.float('cameraPosY')], function () {
+  pb.func(funcName, [Params('params'), pb.vec2('uv')], function () {
     this.$l.viewDir = uvToViewDir(this, this.params, this.uv);
-    this.$l.h = pb.add(this.params.plantRadius, pb.mul(this.cameraPosY, this.params.cameraHeightScale));
+    this.$l.h = pb.add(this.params.plantRadius, this.params.observerAltitude);
     this.$l.eyePos = pb.vec3(0, this.h, 0);
     this.$l.rgb = getSkyView(
       this,
@@ -1117,7 +1207,7 @@ export function skyViewLut(
     ).rgb;
     this.$return(pb.vec4(this.rgb, 1));
   });
-  return scope[funcName](stParams, f2UV, CAMERA_POS_Y) as PBShaderExp;
+  return scope[funcName](stParams, f2UV) as PBShaderExp;
 }
 
 /** @internal */
@@ -1246,7 +1336,9 @@ export function getAtmosphereParamsStruct(pb: ProgramBuilder) {
     pb.float('ozoneCenter'),
     pb.float('ozoneWidth'),
     pb.float('apDistance'),
-    pb.float('cameraHeightScale')
+    pb.float('cameraHeightScale'),
+    pb.float('observerAltitude'),
+    pb.mat4('skyViewReferential')
   ]);
 }
 

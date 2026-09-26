@@ -6,7 +6,11 @@ import {
   getAtmosphereParamsStruct,
   getSkyViewLut,
   getTransmittanceLut,
+  getMultiScatteringLut,
   renderAtmosphereLUTs,
+  rayIntersectSphere,
+  transmittanceToSky,
+  MIN_OBSERVER_ALTITUDE,
   skyBox,
   smoothNoise3D,
   createTransmittanceLutProgram,
@@ -163,6 +167,13 @@ export class SkyRenderer extends Disposable {
   private _lowerHemisphereIsBlack: boolean;
   /** Latched in update(): physical lighting draws the UE sun disk instead of the legacy glow. */
   private _physicalSunDisk: boolean;
+  /** Observer local up (planet center to observer) of the current frame, in world space. */
+  private readonly _observerUp: Vector3;
+  /** Observer altitude and local up the IBL was last baked at; altitude < 0 when never baked. */
+  private _bakedObserverAltitude: number;
+  private readonly _bakedObserverUp: Vector3;
+  private _rebakeAltitudeRatio: number;
+  private _rebakeAngle: number;
   private _fogType: FogType;
   private readonly _heightFogParams: HeightFogParams;
   private _cloudy: number;
@@ -220,6 +231,11 @@ export class SkyRenderer extends Disposable {
     this._atmosphereExposure = 1;
     this._lowerHemisphereIsBlack = true;
     this._physicalSunDisk = false;
+    this._observerUp = Vector3.axisPY();
+    this._bakedObserverAltitude = -1;
+    this._bakedObserverUp = Vector3.axisPY();
+    this._rebakeAltitudeRatio = 0.05;
+    this._rebakeAngle = 0.5;
     this._debugAerialPerspective = 0;
     this._fogType = 'height_fog';
     this._heightFogParams = getDefaultHeightFogParams();
@@ -421,7 +437,39 @@ export class SkyRenderer extends Disposable {
       this.invalidate();
     }
   }
-  /** Aerial perspective density */
+  /**
+   * Relative change of the observer altitude that re-bakes the environment lighting of the
+   * scattering sky, e.g. 0.05 re-bakes after climbing or descending 5% (and at least 10 m).
+   *
+   * @remarks
+   * The on-screen sky and aerial perspective follow the camera every frame; only the cached IBL
+   * bake, which is expensive, waits for this threshold or {@link SkyRenderer.atmosphereRebakeAngle}.
+   */
+  get atmosphereRebakeAltitudeRatio() {
+    return this._rebakeAltitudeRatio;
+  }
+  set atmosphereRebakeAltitudeRatio(val: number) {
+    this._rebakeAltitudeRatio = Math.max(0, val);
+  }
+  /**
+   * Angle in degrees the local vertical may turn, by travelling across the curved planet, before
+   * the environment lighting of the scattering sky is re-baked. 0.5 degrees is about 55 km on Earth.
+   */
+  get atmosphereRebakeAngle() {
+    return this._rebakeAngle;
+  }
+  set atmosphereRebakeAngle(val: number) {
+    this._rebakeAngle = Math.max(0, val);
+  }
+  /**
+   * Atmosphere meters per world unit.
+   *
+   * @remarks
+   * The planet top sits at the world origin with its center straight below (UE:
+   * PlanetTopAtAbsoluteWorldOrigin). The camera position, scaled by this factor, places the
+   * observer in the atmosphere: its altitude, and for large horizontal distances where on the
+   * curved planet it stands. Aerial perspective distances are scaled the same way.
+   */
   get cameraHeightScale() {
     return this._atmosphereParams.cameraHeightScale;
   }
@@ -807,6 +855,21 @@ export class SkyRenderer extends Disposable {
       this._lastSunColor.set(sunColor);
       this._bakedSkyboxDirty = true;
     }
+    // The scattering sky seen from the observer changes as the camera climbs or travels across the
+    // planet. Re-baking the IBL every frame would be far too expensive, so it waits for thresholds.
+    if (useScatter) {
+      const altitude = this._atmosphereParams.observerAltitude;
+      const baked = this._bakedObserverAltitude;
+      if (
+        baked < 0 ||
+        Math.abs(altitude - baked) > Math.max(10, this._rebakeAltitudeRatio * baked) ||
+        Vector3.dot(this._observerUp, this._bakedObserverUp) < Math.cos((this._rebakeAngle * Math.PI) / 180)
+      ) {
+        this._bakedObserverAltitude = altitude;
+        this._bakedObserverUp.set(this._observerUp);
+        this._bakedSkyboxDirty = true;
+      }
+    }
     if (this._bakedSkyboxDirty) {
       this._bakedSkyboxDirty = false;
       // updateBakedSkyMap derives both the IBL and the distant-sky LUT from the fog-free cubemap,
@@ -868,8 +931,47 @@ export class SkyRenderer extends Disposable {
         : 1);
     this._atmosphereParams.cameraAspect = ctx.camera.getAspect();
     this._atmosphereParams.cameraTanHalfFovy = ctx.camera.isPerspective() ? ctx.camera.getTanHalfFovy() : 1;
-    this._atmosphereParams.cameraWorldMatrix.set(ctx.camera.worldMatrix);
+    // Observer: the camera in planet-centered atmosphere meters, in double precision (UE:
+    // FAtmosphereSetup::ComputeViewData). Every atmosphere shader works in the observer's local
+    // frame, so directions are rotated into it here and the shaders only see the altitude.
+    const referential = this._updateObserver(ctx.camera.getWorldPosition());
+    Matrix4x4.multiply(referential, ctx.camera.worldMatrix, this._atmosphereParams.cameraWorldMatrix);
+    referential.transformVectorAffine(this._atmosphereParams.lightDir, this._atmosphereParams.lightDir);
     renderAtmosphereLUTs(this._atmosphereParams);
+  }
+  /**
+   * Places the observer for the camera at `cameraPos` and returns the world to observer-local
+   * rotation, also stored in the atmosphere params.
+   *
+   * @remarks
+   * Local +Y is the planet up at the observer. The horizontal axes follow a fixed world axis
+   * projected onto the local horizon rather than the camera forward UE uses, so the sky view LUT
+   * does not change when the camera only turns. At the world origin the rotation is the identity.
+   */
+  private _updateObserver(cameraPos: Immutable<Vector3>) {
+    const params = this._atmosphereParams;
+    const scale = params.cameraHeightScale;
+    const R = params.plantRadius;
+    const px = cameraPos.x * scale;
+    const py = R + cameraPos.y * scale;
+    const pz = cameraPos.z * scale;
+    const len = Math.hypot(px, py, pz);
+    params.observerAltitude = Math.max(len - R, MIN_OBSERVER_ALTITUDE);
+    const up = len > 0 ? new Vector3(px / len, py / len, pz / len) : Vector3.axisPY();
+    this._observerUp.set(up);
+    // Duff et al. would do, but projecting a fixed axis keeps the identity at the origin.
+    const ref = Math.abs(up.x) < 0.999 ? Vector3.axisPX() : Vector3.axisPZ();
+    const localX = Vector3.sub(ref, Vector3.scale(up, Vector3.dot(ref, up))).inplaceNormalize();
+    const localZ = Vector3.cross(localX, up).inplaceNormalize();
+    // Rows of the world to local rotation are the local axes. Matrix4x4 is column-major: its
+    // setColXYZW(i, ...) writes the strided elements transformVectorAffine and shader mat * vec
+    // treat as row i.
+    const m = params.skyViewReferential;
+    m.setColXYZW(0, localX.x, localX.y, localX.z, 0);
+    m.setColXYZW(1, up.x, up.y, up.z, 0);
+    m.setColXYZW(2, localZ.x, localZ.y, localZ.z, 0);
+    m.setColXYZW(3, 0, 0, 0, 1);
+    return m;
   }
   renderSkyDistantLut(ctx: DrawContext, skybox: TextureCube) {
     this._prepareSkyBox(ctx.device);
@@ -1329,11 +1431,8 @@ export class SkyRenderer extends Disposable {
       const rho_h = Math.max(0, 1 - Math.abs(fH - params.ozoneCenter) / params.ozoneWidth);
       return Vector3.scale(sigma, rho_h);
     }
-    const eyePos = new Vector3(
-      0,
-      this._atmosphereParams.plantRadius + this._atmosphereParams.cameraHeightScale,
-      0
-    );
+    // Ground level, as UE's GetTransmittanceAtGroundLevel: independent of the observer.
+    const eyePos = new Vector3(0, this._atmosphereParams.plantRadius + MIN_OBSERVER_ALTITUDE, 0);
     const lightDir = SkyRenderer._getSunDir(sunLight);
     const d = this._rayIntersectSphere(
       this._atmosphereParams.plantRadius + this._atmosphereParams.atmosphereHeight,
@@ -1384,6 +1483,7 @@ export class SkyRenderer extends Disposable {
     bindgroup.setValue('luminanceScale', luminanceScale);
     bindgroup.setTexture('tLut', tLut, fetchSampler('clamp_linear_nomip'));
     bindgroup.setTexture('skyLut', skyLut, fetchSampler('clamp_linear_nomip'));
+    bindgroup.setTexture('msLut', getMultiScatteringLut(), fetchSampler('clamp_linear_nomip'));
     bindgroup.setValue('cloudy', this._cloudy);
     bindgroup.setValue('cloudIntensity', this._cloudIntensity);
     bindgroup.setValue('time', device.frameInfo.elapsedOverall * 0.001);
@@ -1755,6 +1855,7 @@ export class SkyRenderer extends Disposable {
         this.$outputs.outColor = pb.vec4();
         this.tLut = pb.tex2D().uniform(0);
         this.skyLut = pb.tex2D().uniform(0);
+        this.msLut = pb.tex2D().uniform(0);
         this.params = getAtmosphereParamsStruct(pb)().uniform(0);
         this.includeSunDisk = pb.int().uniform(0);
         this.lowerHemisphereBlack = pb.int().uniform(0);
@@ -1766,77 +1867,113 @@ export class SkyRenderer extends Disposable {
         }
         this.srgbOut = pb.int().uniform(0);
         this.luminanceScale = pb.float().uniform(0);
-        pb.func('noise', [pb.vec3('p'), pb.float('t')], function () {
-          this.p2 = pb.mul(this.p, 0.25);
-          this.f = pb.mul(smoothNoise3D(this, this.p2), 0.5);
-          this.p2 = pb.mul(this.p2, 3.02);
-          this.p2.y = pb.sub(this.p2.y, pb.mul(this.t, 0.02));
-          this.f = pb.add(this.f, pb.mul(smoothNoise3D(this, this.p2), 0.25));
-          this.p2 = pb.mul(this.p2, 3.03);
-          this.p2.y = pb.add(this.p2.y, pb.mul(this.t, 0.01));
-          this.f = pb.add(this.f, pb.mul(smoothNoise3D(this, this.p2), 0.125));
-          this.p2 = pb.mul(this.p2, 3.02);
-          this.f = pb.add(this.f, pb.mul(smoothNoise3D(this, this.p2), 0.0625));
-          this.p2 = pb.mul(this.p2, 3.01);
-          this.f = pb.add(this.f, pb.mul(smoothNoise3D(this, this.p2), 0.03125));
-          this.p2 = pb.mul(this.p2, 3.01);
-          this.f = pb.add(this.f, pb.mul(smoothNoise3D(this, this.p2), 0.015625));
+        // Six-octave fbm. `footprint` is the pixel size in p units: an octave whose features get close
+        // to it is faded to its mean (0.5) instead of aliasing into speckles, e.g. seen from space.
+        pb.func('noise', [pb.vec3('p'), pb.float('t'), pb.float('footprint')], function () {
+          this.$l.p2 = pb.mul(this.p, 0.25);
+          this.$l.freq = pb.float(0.25);
+          this.$l.f = pb.float(0);
+          const octaves: { mul: number; weight: number; dt: number }[] = [
+            { mul: 1, weight: 0.5, dt: 0 },
+            { mul: 3.02, weight: 0.25, dt: -0.02 },
+            { mul: 3.03, weight: 0.125, dt: 0.01 },
+            { mul: 3.02, weight: 0.0625, dt: 0 },
+            { mul: 3.01, weight: 0.03125, dt: 0 },
+            { mul: 3.01, weight: 0.015625, dt: 0 }
+          ];
+          for (const o of octaves) {
+            if (o.mul !== 1) {
+              this.p2 = pb.mul(this.p2, o.mul);
+              this.freq = pb.mul(this.freq, o.mul);
+            }
+            if (o.dt !== 0) {
+              this.p2.y = pb.add(this.p2.y, pb.mul(this.t, o.dt));
+            }
+            this.$l.fade = pb.sub(1, pb.smoothStep(0.25, 0.75, pb.mul(this.footprint, this.freq)));
+            this.f = pb.add(this.f, pb.mul(pb.mix(0.5, smoothNoise3D(this, this.p2), this.fade), o.weight));
+          }
           this.$return(this.f);
         });
         pb.main(function () {
-          // Calculate sky color
+          // Everything below runs in the observer's local frame (up = +Y), see skyViewReferential.
+          this.$l.rayDir = pb.normalize(
+            pb.mul(this.params.skyViewReferential, pb.vec4(this.$inputs.worldDirection, 0)).xyz
+          );
+          this.$l.sunDir = this.params.lightDir;
+          // Angular size of a pixel, taken here in uniform control flow (WGSL requires it).
+          this.$l.pixelAngle = pb.length(pb.fwidth(this.rayDir));
           this.$l.sunColor = pb.vec4();
           this.$l.skyColor = skyBox(
             this,
             this.params,
             this.sunColor,
-            this.$inputs.worldDirection,
+            this.rayDir,
             pb.float(0.01),
             this.includeSunDisk,
             this.tLut,
-            this.skyLut
+            this.skyLut,
+            this.msLut
           ).rgb;
 
-          this.$l.rayDir = pb.normalize(this.$inputs.worldDirection);
-          this.$l.sunDir = this.params.lightDir;
-          // ad-hoc
-          this.$l.sunIntensity = pb.sqrt(pb.max(0, pb.mul(this.sunDir.y, this.rayDir.y)));
-
-          // compute cloud
+          // Procedural cloud layer: a spherical shell 3 km above the ground, so it is seen from
+          // below, from above and wrapped around the planet from space. Near the world origin the
+          // shell point matches the flat layer this used to be.
           if (cloud) {
-            this.$l.noiseValue = pb.float();
-            this.$if(pb.lessThanEqual(this.rayDir.y, 0), function () {
-              this.noiseValue = 0;
-            }).$else(function () {
-              this.$l.tMin = pb.div(3000, this.rayDir.y);
-              this.$l.cloudPoint = pb.mul(this.rayDir, this.tMin);
+            this.$l.eyePos = pb.vec3(0, pb.add(this.params.plantRadius, this.params.observerAltitude), 0);
+            this.$l.cloudRadius = pb.add(this.params.plantRadius, 3000);
+            this.$l.tCloud = rayIntersectSphere(this, pb.vec3(0), this.cloudRadius, this.eyePos, this.rayDir);
+            this.$l.tGround = rayIntersectSphere(
+              this,
+              pb.vec3(0),
+              this.params.plantRadius,
+              this.eyePos,
+              this.rayDir
+            );
+            // Below the shell the ray leaves through it unless the ground is in the way; above it the
+            // shell is always hit before the ground.
+            this.$l.hasCloud = pb.and(
+              pb.greaterThan(this.tCloud, 0),
+              pb.or(
+                pb.greaterThanEqual(this.params.observerAltitude, 3000),
+                pb.or(pb.lessThanEqual(this.tGround, 0), pb.lessThan(this.tCloud, this.tGround))
+              )
+            );
+            this.$l.noiseValue = pb.float(0);
+            this.$l.cloudColor = pb.vec3(0);
+            this.$l.vfactor = pb.float(0);
+            this.$if(this.hasCloud, function () {
+              this.$l.hitPos = pb.add(this.eyePos, pb.mul(this.rayDir, this.tCloud));
+              this.$l.hitUp = pb.normalize(this.hitPos);
+              // Anchor the clouds to the planet, not to the observer: back to the world-aligned planet
+              // frame (the transpose of the rotation), relative to the planet top at the world origin.
+              this.$l.planetHit = pb.mul(pb.vec4(this.hitPos, 0), this.params.skyViewReferential).xyz;
+              this.$l.cloudPoint = pb.sub(this.planetHit, pb.vec3(0, this.params.plantRadius, 0));
               this.speed = pb.mul(pb.vec3(this.velocity.x, 0, this.velocity.y), this.time);
               this.$l.noiseScale = pb.float(4e-4);
               this.noiseValue = this.noise(
                 pb.mul(pb.add(this.cloudPoint, this.speed), this.noiseScale),
-                this.time
+                this.time,
+                pb.mul(this.tCloud, this.pixelAngle, this.noiseScale)
               );
               this.noiseValue = pb.add(this.noiseValue, this.cloudy);
               this.noiseValue = pb.smoothStep(1, pb.add(1, this.cloudy), this.noiseValue);
+              // Ad hoc lighting, generalized from the flat layer: sun elevation at the cloud times
+              // the viewing obliquity, lit from either side. The sun reaches the cloud through the
+              // atmosphere above it (planet shadowed on the night side).
+              this.$l.cosView = pb.abs(pb.dot(this.rayDir, this.hitUp));
+              this.$l.sunIntensity = pb.sqrt(
+                pb.max(0, pb.mul(pb.dot(this.hitUp, this.sunDir), this.cosView))
+              );
+              this.$l.sunAtCloud = transmittanceToSky(this, this.params, this.hitPos, this.sunDir, this.tLut);
+              this.cloudColor = pb.mul(
+                this.params.lightColor.rgb,
+                this.sunAtCloud,
+                this.sunIntensity,
+                pb.mul(this.noiseValue, this.cloudIntensity)
+              );
+              // Fade out at grazing angles, where the layer aliases
+              this.vfactor = pb.clamp(pb.div(pb.sub(this.cosView, 0.01), pb.sub(0.03, 0.01)), 0, 1);
             });
-            // use sun color as cloud color
-            /*
-            this.$l.sunColor = pb.mul(
-              pb.textureSampleLevel(this.skyLut, viewDirToUV(this, this.sunDir), 0),
-              this.sunIntensity
-            );
-            */
-            this.$l.cloudColor = pb.mul(
-              this.sunColor.rgb,
-              this.sunIntensity,
-              pb.mul(this.noiseValue, this.cloudIntensity)
-            );
-          }
-
-          // Compute sky color
-          if (cloud) {
-            // blend
-            this.$l.vfactor = pb.clamp(pb.div(pb.sub(this.rayDir.y, 0.01), pb.sub(0.03, 0.01)), 0, 1);
             this.$l.factor = pb.clamp(pb.mul(this.noiseValue, this.vfactor), 0, 1);
             this.$l.color = pb.mix(this.skyColor, this.cloudColor, this.factor);
           } else {

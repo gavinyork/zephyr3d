@@ -4,7 +4,8 @@ import {
   AP_LUT_DEPTH_SLICES,
   AP_LUT_SLICE_SIZE,
   aerialPerspective,
-  getAtmosphereParamsStruct
+  getAtmosphereParamsStruct,
+  rayIntersectSphere
 } from './atmosphere';
 import { Fog } from '../values';
 
@@ -114,6 +115,45 @@ export function calculateFog(
     function () {
       this.$l.fogging = pb.vec4(0, 0, 0, 1);
       this.$if(pb.equal(this.fogType, Fog.FOG_TYPE_HEIGHT), function () {
+        // With the scattering sky, a sky pixel below the observer's horizon shows the virtual planet
+        // ground. Near the ground it is fogged as infinitely far, like every sky pixel (UE: sky
+        // pixels are at the far depth), so distant ground fades into the fog color. Seen from high
+        // up, that would bury the whole planet under opaque fog; there it is fogged up to the ground
+        // point instead, blending over the upper part of the atmosphere.
+        this.$l.skyGroundDistance = pb.float(-1);
+        this.$l.skyGroundBlend = pb.smoothStep(
+          pb.mul(this.atmosphereParams.atmosphereHeight, 0.1),
+          this.atmosphereParams.atmosphereHeight,
+          this.atmosphereParams.observerAltitude
+        );
+        this.$if(
+          pb.and(
+            pb.and(this.isSky, pb.notEqual(this.withAerialPerspective, 0)),
+            pb.greaterThan(this.skyGroundBlend, 0)
+          ),
+          function () {
+            this.$l.localDir = pb.normalize(
+              pb.mul(
+                this.atmosphereParams.skyViewReferential,
+                pb.vec4(pb.sub(this.worldPos, this.cameraPos), 0)
+              ).xyz
+            );
+            this.$l.tGround = rayIntersectSphere(
+              this,
+              pb.vec3(0),
+              this.atmosphereParams.plantRadius,
+              pb.vec3(
+                0,
+                pb.add(this.atmosphereParams.plantRadius, this.atmosphereParams.observerAltitude),
+                0
+              ),
+              this.localDir
+            );
+            this.$if(pb.greaterThan(this.tGround, 0), function () {
+              this.skyGroundDistance = pb.div(this.tGround, this.atmosphereParams.cameraHeightScale);
+            });
+          }
+        );
         this.fogging = calculateHeightFog(
           this,
           this.heightFogParams,
@@ -121,7 +161,9 @@ export function calculateFog(
           this.worldPos,
           this.isSky,
           distantLightLut,
-          skyLightCubemap
+          skyLightCubemap,
+          this.skyGroundDistance,
+          this.skyGroundBlend
         );
       });
       this.$if(pb.and(pb.notEqual(this.withAerialPerspective, 0), pb.not(this.isSky)), function () {
@@ -193,27 +235,41 @@ export function calculateHeightFog(
   worldPos: PBShaderExp,
   isSky: PBShaderExp | boolean,
   skyDistantColorLut: PBShaderExp,
-  skyLightCubemap: PBShaderExp
+  skyLightCubemap: PBShaderExp,
+  skyGroundDistance: PBShaderExp | number = -1,
+  skyGroundBlend: PBShaderExp | number = 0
 ) {
   const pb = scope.$builder;
   const funcName = 'Z_calcHeightFog';
   const Params = getHeightFogParamsStruct(pb);
   pb.func(
     funcName,
-    [Params('params'), pb.vec3('cameraPosition'), pb.vec3('worldPosition'), pb.bool('isSky')],
+    [
+      Params('params'),
+      pb.vec3('cameraPosition'),
+      pb.vec3('worldPosition'),
+      pb.bool('isSky'),
+      pb.float('skyGroundDistance'),
+      pb.float('skyGroundBlend')
+    ],
     function () {
+      // A sky pixel that sees the virtual planet ground (skyGroundDistance > 0) is fogged like a
+      // surface at that distance, with the forced horizon fog of sky pixels faded out by
+      // skyGroundBlend.
+      this.$l.skyHitsGround = pb.and(this.isSky, pb.greaterThan(this.skyGroundDistance, 0));
       this.$l.falloff = this.params.parameter1.w;
       this.$l.density = this.params.parameter2.x;
       this.$l.fogHeight = this.params.parameter2.y;
       this.$l.startDistance = this.params.parameter2.z;
       this.$l.endDistance = this.params.parameter2.w;
       this.$l.maxOpacity = this.params.parameter3.x;
-      // Sky pixels have no depth: put them far away along the view ray.
+      // Sky pixels have no depth: put them far away along the view ray, or on the virtual ground.
+      this.$l.skyDir = pb.normalize(pb.sub(this.worldPosition, this.cameraPosition));
       this.$l.receiver = this.$choice(
         this.isSky,
         pb.add(
           this.cameraPosition,
-          pb.mul(pb.normalize(pb.sub(this.worldPosition, this.cameraPosition)), 1e8)
+          pb.mul(this.skyDir, this.$choice(this.skyHitsGround, this.skyGroundDistance, pb.float(1e8)))
         ),
         this.worldPosition
       );
@@ -267,7 +323,11 @@ export function calculateHeightFog(
       );
       this.$l.lineIntegral = pb.mul(this.lineIntegralShared, this.rayLength);
       // Ad hoc horizon blend for sky pixels: fully fogged below the horizon.
-      this.$l.fading = this.$choice(this.isSky, pb.smoothStep(5e6, 0, this.receiver.y), 0);
+      this.$l.fading = this.$choice(
+        pb.and(this.isSky, pb.not(this.skyHitsGround)),
+        pb.smoothStep(5e6, 0, this.receiver.y),
+        this.$choice(this.skyHitsGround, pb.sub(1, pb.clamp(this.skyGroundBlend, 0, 1)), pb.float(0))
+      );
 
       // Directional inscattering: a lobe around the light approximating in-scattering from the
       // directional light off the haze. It has its own opacity, unaffected by maxOpacity.
@@ -348,5 +408,5 @@ export function calculateHeightFog(
       );
     }
   );
-  return scope[funcName](params, cameraPos, worldPos, isSky);
+  return scope[funcName](params, cameraPos, worldPos, isSky, skyGroundDistance, skyGroundBlend);
 }

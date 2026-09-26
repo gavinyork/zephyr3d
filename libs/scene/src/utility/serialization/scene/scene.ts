@@ -600,16 +600,53 @@ export function getSceneClass(manager: ResourceManager): SerializableClass {
         },
         {
           name: 'CameraHeightScale',
-          description: 'Scale factor applied to camera height in atmospheric scattering',
+          description:
+            'How many meters of atmosphere one world unit stands for. Larger values make the camera climb faster through the sky and distant objects haze sooner',
           type: 'float',
           phase: 1,
-          options: { animatable: true, minValue: 1, maxValue: 1000 },
+          options: { animatable: true, minValue: 0.001, maxValue: 1000 },
           default: 1,
           get(this: Scene, value) {
             value.num[0] = this.env.sky.cameraHeightScale;
           },
           set(this: Scene, value) {
             this.env.sky.cameraHeightScale = value.num[0];
+          },
+          isValid() {
+            return this.env.sky.skyType === 'scatter';
+          }
+        },
+        {
+          name: 'AtmosphereRebakeAltitudeRatio',
+          description:
+            'How much the camera must climb or descend, as a fraction of its altitude, before the environment lighting from the sky is updated. Smaller values follow the sky more closely while flying but cost more',
+          type: 'float',
+          phase: 1,
+          options: { minValue: 0, maxValue: 1 },
+          default: 0.05,
+          get(this: Scene, value) {
+            value.num[0] = this.env.sky.atmosphereRebakeAltitudeRatio;
+          },
+          set(this: Scene, value) {
+            this.env.sky.atmosphereRebakeAltitudeRatio = value.num[0];
+          },
+          isValid() {
+            return this.env.sky.skyType === 'scatter';
+          }
+        },
+        {
+          name: 'AtmosphereRebakeAngle',
+          description:
+            'How far, in degrees of planet curvature, the camera must travel before the environment lighting from the sky is updated. 0.5 degrees is about 55 km on Earth',
+          type: 'float',
+          phase: 1,
+          options: { minValue: 0, maxValue: 10 },
+          default: 0.5,
+          get(this: Scene, value) {
+            value.num[0] = this.env.sky.atmosphereRebakeAngle;
+          },
+          set(this: Scene, value) {
+            this.env.sky.atmosphereRebakeAngle = value.num[0];
           },
           isValid() {
             return this.env.sky.skyType === 'scatter';
