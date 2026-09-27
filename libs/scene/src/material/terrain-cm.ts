@@ -499,85 +499,52 @@ export class ClipmapTerrainMaterial extends applyMaterialMixins(
     );
     return scope.sampleHeightMap(uv, pos, levelStart, levelDiff);
   }
+  /**
+   * Terrain tangent frame at the fragment, differentiated from the height map itself.
+   *
+   * Per-vertex normals only see the mesh resolution and blur slopes: a one-texel peak gets an
+   * upward normal at its tip and half the real slope around it. Differentiating the bilinear
+   * height field per pixel gives the slopes the geometry actually has, and keeps height map
+   * detail on the coarse outer rings.
+   */
   calculateTerrainTBN(
     scope: PBInsideFunctionScope,
-    clipmapPos: PBShaderExp,
-    uv: PBShaderExp,
-    texSize: PBShaderExp,
-    scale: PBShaderExp,
-    levelStart: PBShaderExp,
-    levelDiff: PBShaderExp,
     tangent: PBShaderExp,
     bitangent: PBShaderExp,
     normal: PBShaderExp
   ) {
-    const that = this;
     const pb = scope.$builder;
-    pb.func(
-      'calcTerrainTBN',
-      [
-        pb.vec2('clipmapPos'),
-        pb.vec2('uv'),
-        pb.vec4('texSize'),
-        pb.vec3('scale'),
-        pb.vec4('levelStart'),
-        pb.vec4('levelDiff'),
-        pb.vec3('t').out(),
-        pb.vec3('b').out(),
-        pb.vec3('n').out()
-      ],
-      function () {
-        this.$l.texelSize = pb.mul(this.texSize.zw, pb.exp2(this.$inputs.miplevel));
-        // World-space distance between the two samples of each central difference. Derived
-        // from the region rather than assuming one height map texel spans scale.x units,
-        // which only holds when the height map resolution equals the terrain size.
-        this.$l.sampleDist = pb.mul(pb.sub(this.region.zw, this.region.xy), pb.mul(this.texelSize, 2));
-        this.$l.hL = that.sampleHeightMap(
-          this,
-          pb.sub(this.uv, pb.vec2(this.texelSize.x, 0)),
-          this.clipmapPos,
-          this.levelStart,
-          this.levelDiff
-        );
-        this.$l.hR = that.sampleHeightMap(
-          this,
-          pb.add(this.uv, pb.vec2(this.texelSize.x, 0)),
-          this.clipmapPos,
-          this.levelStart,
-          this.levelDiff
-        );
-        this.$l.hD = that.sampleHeightMap(
-          this,
-          pb.add(this.uv, pb.vec2(0, this.texelSize.y)),
-          this.clipmapPos,
-          this.levelStart,
-          this.levelDiff
-        );
-        this.$l.hU = that.sampleHeightMap(
-          this,
-          pb.sub(this.uv, pb.vec2(0, this.texelSize.y)),
-          this.clipmapPos,
-          this.levelStart,
-          this.levelDiff
-        );
-        this.$l.dHdU = pb.div(pb.mul(pb.sub(this.hR, this.hL), this.scale.y), this.sampleDist.x);
-        this.$l.dHdV = pb.div(pb.mul(pb.sub(this.hD, this.hU), this.scale.y), this.sampleDist.y);
-        this.t = pb.normalize(pb.vec3(1, this.dHdU, 0));
-        this.b = pb.normalize(pb.vec3(0, this.dHdV, 1));
-        this.n = pb.normalize(pb.cross(this.b, this.t));
+    const textureLod = this.drawContext.device.getDeviceCaps().shaderCaps.supportShaderTextureLod;
+    pb.func('calcTerrainTBN', [pb.vec3('t').out(), pb.vec3('b').out(), pb.vec3('n').out()], function () {
+      if (textureLod) {
+        // Differentiate on the mip whose texels match the pixel footprint, so distant terrain
+        // does not alias.
+        this.$l.texCoord = pb.mul(this.$inputs.uv, this.heightMapSize.xy);
+        this.$l.footprint = pb.max(pb.length(pb.dpdx(this.texCoord)), pb.length(pb.dpdy(this.texCoord)));
+        this.$l.lod = pb.max(pb.log2(pb.max(this.footprint, 0.0001)), 0);
+      } else {
+        this.$l.lod = pb.float(0);
       }
-    );
-    return scope.calcTerrainTBN(
-      clipmapPos,
-      uv,
-      texSize,
-      scale,
-      levelStart,
-      levelDiff,
-      tangent,
-      bitangent,
-      normal
-    ) as PBShaderExp;
+      // Half a texel either way: on a bilinear field that yields the full slope of each cell
+      // everywhere but within half a texel of a crest or foot.
+      this.$l.offset = pb.mul(this.heightMapSize.zw, pb.mul(pb.exp2(this.lod), 0.5));
+      const sample = (scope: PBInsideFunctionScope, uv: PBShaderExp) =>
+        textureLod
+          ? pb.textureSampleLevel(scope.heightMap, uv, scope.lod).r
+          : pb.textureSample(scope.heightMap, uv).r;
+      this.$l.hL = sample(this, pb.sub(this.$inputs.uv, pb.vec2(this.offset.x, 0)));
+      this.$l.hR = sample(this, pb.add(this.$inputs.uv, pb.vec2(this.offset.x, 0)));
+      this.$l.hU = sample(this, pb.sub(this.$inputs.uv, pb.vec2(0, this.offset.y)));
+      this.$l.hD = sample(this, pb.add(this.$inputs.uv, pb.vec2(0, this.offset.y)));
+      // World-space distance between the two samples of each difference
+      this.$l.sampleDist = pb.mul(pb.sub(this.region.zw, this.region.xy), pb.mul(this.offset, 2));
+      this.$l.dHdU = pb.div(pb.mul(pb.sub(this.hR, this.hL), this.terrainScale.y), this.sampleDist.x);
+      this.$l.dHdV = pb.div(pb.mul(pb.sub(this.hD, this.hU), this.terrainScale.y), this.sampleDist.y);
+      this.t = pb.normalize(pb.vec3(1, this.dHdU, 0));
+      this.b = pb.normalize(pb.vec3(0, this.dHdV, 1));
+      this.n = pb.normalize(pb.cross(this.b, this.t));
+    });
+    return scope.calcTerrainTBN(tangent, bitangent, normal) as PBShaderExp;
   }
   vertexShader(scope: PBFunctionScope) {
     super.vertexShader(scope);
@@ -699,28 +666,6 @@ export class ClipmapTerrainMaterial extends applyMaterialMixins(
       pb.vec3(0, pb.mul(scope.height, scope.terrainScale.y), 0)
     );
     scope.$outputs.clipmapPos = scope.clipmapWorldPos;
-    // The frame only feeds shading; depth-only and shadow passes skip its eight extra
-    // height fetches.
-    if (this.needFragmentColor()) {
-      scope.$l.t = pb.vec3();
-      scope.$l.b = pb.vec3();
-      scope.$l.n = pb.vec3();
-      this.calculateTerrainTBN(
-        scope,
-        scope.clipmapWorldPos.xz,
-        scope.$outputs.uv,
-        scope.heightMapSize,
-        scope.terrainScale,
-        scope.levelStart,
-        scope.levelDiff,
-        scope.t,
-        scope.b,
-        scope.n
-      );
-      scope.$outputs.worldTangent = scope.t;
-      scope.$outputs.worldBinormal = scope.b;
-      scope.$outputs.worldNormal = scope.n;
-    }
     ShaderHelper.setClipSpacePosition(
       scope,
       pb.mul(ShaderHelper.getViewProjectionMatrix(scope), pb.vec4(scope.$outputs.worldPos, 1))
@@ -733,6 +678,8 @@ export class ClipmapTerrainMaterial extends applyMaterialMixins(
     scope.region = pb.vec4().uniform(2);
     if (this.needFragmentColor()) {
       scope.heightMap = pb.tex2D().uniform(2);
+      scope.heightMapSize = pb.vec4().uniform(2);
+      scope.terrainScale = pb.vec3().uniform(2);
       const numDetailMaps = this.featureUsed<number>(ClipmapTerrainMaterial.FEATURE_DETAIL_MAP);
       if (numDetailMaps > 0) {
         scope.detailParams = pb.vec4[numDetailMaps]().uniform(2);
@@ -753,13 +700,16 @@ export class ClipmapTerrainMaterial extends applyMaterialMixins(
         scope.$l[`terrainSplatMask${i}`] = this.sampleSplatMask(scope, i);
       }
       scope.$l.albedo = this.calculateAlbedoColor(scope);
-      scope.$l.worldNormal = pb.normalize(scope.$inputs.worldNormal);
+      scope.$l.terrainT = pb.vec3();
+      scope.$l.terrainB = pb.vec3();
+      scope.$l.terrainN = pb.vec3();
+      this.calculateTerrainTBN(scope, scope.terrainT, scope.terrainB, scope.terrainN);
       scope.$l.normalInfo = this.calculateNormalAndTBN(
         scope,
         scope.$inputs.worldPos,
-        scope.$inputs.worldNormal,
-        scope.$inputs.worldTangent,
-        scope.$inputs.worldBinormal
+        scope.terrainN,
+        scope.terrainT,
+        scope.terrainB
       );
       if (this.featureUsed<number>(ClipmapTerrainMaterial.FEATURE_DETAIL_MAP) > 0) {
         scope.normalInfo.normal = this.calculateDetailNormal(scope, scope.normalInfo.TBN);
