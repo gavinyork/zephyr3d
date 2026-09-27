@@ -123,6 +123,10 @@ export class Clipmap extends Disposable {
 
   private _wireframe: boolean;
   private readonly _levelAABBs: AABB[];
+  private readonly _cullScratch: Map<
+    Primitive,
+    { instanceDatas: Float32Array<ArrayBuffer>; mipLevels: Float32Array<ArrayBuffer> }
+  >;
 
   constructor(resolution: number, extraInstanceBuffers: VertexAttribFormat[], maxMipLevels = 64) {
     super();
@@ -152,6 +156,7 @@ export class Clipmap extends Disposable {
     this._nonInstanceMipLevelDataPoolSize = 0;
     this._wireframe = false;
     this._levelAABBs = [];
+    this._cullScratch = new Map();
     this.generateCrossMesh();
     this.generateFillerMesh();
     this.generateSeamMesh();
@@ -171,6 +176,7 @@ export class Clipmap extends Disposable {
   set tileResolution(val: number) {
     if (val !== this._tileResolution) {
       this._tileResolution = val;
+      this._cullScratch.clear();
       this.generateCrossMesh();
       this.generateFillerMesh();
       this.generateSeamMesh();
@@ -826,6 +832,12 @@ export class Clipmap extends Disposable {
     const minZ = (tmpAABB.minPoint.y * scale + offset.y) * gridScale;
     const maxZ = (tmpAABB.maxPoint.y * scale + offset.y) * gridScale;
     ctx.calcAABB(ctx.userData, minX, maxX, minZ, maxZ, tmpAABB, level);
+    if (camera.clipMask) {
+      // Shadow cull cameras test only some planes: a directional cascade keeps casters at any
+      // depth along the light.
+      const mask = ctx.skirt ? camera.clipMask & ALL_PLANES_EXCEPT_FAR : camera.clipMask;
+      return tmpAABB.getClipStateWithFrustumMask(camera.frustum, mask) !== ClipState.NOT_CLIPPED;
+    }
     if (ctx.skirt) {
       // Every plane except the far one. A skirted clipmap deliberately reaches
       // past the far plane and pins the depth of whatever lands beyond it, so
@@ -1166,6 +1178,90 @@ export class Clipmap extends Disposable {
         .bufferSubData(0, info.instanceDatas, 0, info.numInstances * 4);
     }
     return renderData;
+  }
+  /**
+   * Keeps the instances of a set returned by {@link Clipmap.gather} that `context.camera` can
+   * see, and uploads them in place of the gathered ones.
+   *
+   * For passes that render the same clipmap from several cameras - a shadow map culls each
+   * cascade or cube face with its own - gather once without frustum culling, then call this
+   * before each draw. The source set is left untouched, so it can be culled again for the next
+   * camera; the returned set is only valid until the next call.
+   *
+   * Non-instanced meshes (the cross and the skirt) are always kept.
+   *
+   * @param renderData - A set returned by gather() for this clipmap in the current frame
+   * @param context - Gather context whose camera is the one to cull with
+   * @returns The culled set
+   */
+  cullInstances(renderData: PrimitiveInstanceInfo[], context: ClipmapGatherContext) {
+    const result: PrimitiveInstanceInfo[] = [];
+    for (const info of renderData) {
+      const meshAABB = this.getInstancedMeshAABB(info.primitive);
+      if (!meshAABB) {
+        result.push(info);
+        continue;
+      }
+      let scratch = this._cullScratch.get(info.primitive);
+      if (!scratch) {
+        scratch = {
+          instanceDatas: new Float32Array(info.instanceDatas.length),
+          mipLevels: new Float32Array(info.mipLevels.length)
+        };
+        this._cullScratch.set(info.primitive, scratch);
+      }
+      let numInstances = 0;
+      let maxMiplevel = 0;
+      for (let i = 0; i < info.numInstances; i++) {
+        const rotation = info.instanceDatas[i * 4 + 0];
+        const scale = info.instanceDatas[i * 4 + 1];
+        const level = info.mipLevels[i];
+        tmpOffset.setXY(info.instanceDatas[i * 4 + 2], info.instanceDatas[i * 4 + 3]);
+        if (
+          this.visible(
+            context,
+            meshAABB,
+            context.camera,
+            rotation,
+            tmpOffset,
+            scale,
+            context.gridScale,
+            level
+          )
+        ) {
+          scratch.instanceDatas.set(info.instanceDatas.subarray(i * 4, i * 4 + 4), numInstances * 4);
+          scratch.mipLevels[numInstances] = level;
+          maxMiplevel = Math.max(maxMiplevel, level);
+          numInstances++;
+        }
+      }
+      if (numInstances > 0) {
+        info.primitive
+          .getVertexBuffer('texCoord0')!
+          .bufferSubData(0, scratch.instanceDatas, 0, numInstances * 4);
+        result.push({
+          primitive: info.primitive,
+          numInstances,
+          instanceDatas: scratch.instanceDatas,
+          mipLevels: scratch.mipLevels,
+          maxMiplevel
+        });
+      }
+    }
+    return result;
+  }
+  /** Local bounds of the instanced mesh behind a primitive, null for the non-instanced ones */
+  private getInstancedMeshAABB(primitive: Primitive): Nullable<AABB> {
+    if (primitive === this._tileMesh || primitive === this._tileMeshLines) {
+      return this._tileMeshBBox;
+    } else if (primitive === this._fillerMesh || primitive === this._fillerMeshLines) {
+      return this._fillerMeshAABB;
+    } else if (primitive === this._trimMesh || primitive === this._trimMeshLines) {
+      return this._trimMeshAABB;
+    } else if (primitive === this._seamMesh || primitive === this._seamMeshLines) {
+      return this._seamMeshAABB;
+    }
+    return null;
   }
   /** Disposes the clipmap and release all meshes */
   protected onDispose() {

@@ -4,7 +4,14 @@ import type { PBInsideFunctionScope, PBShaderExp, Texture2D } from '@zephyr3d/de
 import type { Scene } from '../scene';
 import { GraphNode } from '../graph_node';
 import { mixinDrawable } from '../../render/drawable_mixin';
-import type { Drawable, DrawContext, PickTarget, PrimitiveInstanceInfo, RenderQueue } from '../../render';
+import type {
+  ClipmapGatherContext,
+  Drawable,
+  DrawContext,
+  PickTarget,
+  PrimitiveInstanceInfo,
+  RenderQueue
+} from '../../render';
 import { Clipmap } from '../../render';
 import { ClipmapTerrainMaterial } from '../../material/terrain-cm';
 import { BoundingBox } from '../../utility/bounding_volume';
@@ -74,6 +81,7 @@ export class ClipmapTerrain extends applyMixins(GraphNode, mixinDrawable) implem
   private _shadowClipmap: Clipmap;
   private _renderData: Nullable<PrimitiveInstanceInfo[]>;
   private _shadowRenderData: Nullable<PrimitiveInstanceInfo[]>;
+  private _shadowGatherContext: Nullable<ClipmapGatherContext>;
   private _gridScale: number;
   private _material: DRef<ClipmapTerrainMaterial>;
   private _grassRenderer: DRef<GrassRenderer>;
@@ -103,6 +111,7 @@ export class ClipmapTerrain extends applyMixins(GraphNode, mixinDrawable) implem
     this._shadowClipmap = new Clipmap(clipMapTileSize, ['tex1_f32'], MAX_TERRAIN_MIPMAP_LEVELS);
     this._renderData = null;
     this._shadowRenderData = null;
+    this._shadowGatherContext = null;
     this._grassRenderer = new DRef(new GrassRenderer(this));
     this._gridScale = 1;
     this._castShadow = true;
@@ -475,15 +484,19 @@ export class ClipmapTerrain extends applyMixins(GraphNode, mixinDrawable) implem
       frustumCulling: true,
       calcAABB
     });
-    this._shadowRenderData = this.castShadow
-      ? this._shadowClipmap.gather({
+    // Each shadow map camera (cascade, cube face) culls this set again in draw()
+    this._shadowGatherContext = this.castShadow
+      ? {
           camera: camera,
           minMaxWorldPos: mat.region,
           gridScale: this._gridScale,
           userData: this,
           frustumCulling: false,
           calcAABB
-        })
+        }
+      : null;
+    this._shadowRenderData = this._shadowGatherContext
+      ? this._shadowClipmap.gather(this._shadowGatherContext)
       : null;
     let maxMipLevel = 0;
     for (const renderData of [this._renderData, this._shadowRenderData]) {
@@ -548,7 +561,15 @@ export class ClipmapTerrain extends applyMixins(GraphNode, mixinDrawable) implem
       mat.setClipmapGridInfo(this._gridScale, this.worldMatrix.m03, this.worldMatrix.m23);
       mat.apply(ctx);
       const isShadowPass = ctx.renderPass!.type === RENDER_PASS_TYPE_SHADOWMAP;
-      const renderData = isShadowPass ? this._shadowRenderData : this._renderData;
+      let renderData = isShadowPass ? this._shadowRenderData : this._renderData;
+      const cullCamera = renderQueue?.cullCamera;
+      if (isShadowPass && renderData && cullCamera && this._shadowGatherContext) {
+        this._shadowGatherContext.camera = cullCamera;
+        renderData = this._shadowClipmap.cullInstances(renderData, this._shadowGatherContext);
+        for (const info of renderData) {
+          info.primitive.getVertexBuffer('texCoord1')!.bufferSubData(0, info.mipLevels, 0, info.numInstances);
+        }
+      }
       for (const info of renderData ?? []) {
         mat.draw(info.primitive, ctx, info.numInstances);
       }

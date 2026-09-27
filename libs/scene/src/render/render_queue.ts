@@ -216,6 +216,8 @@ export class RenderQueue extends Disposable {
   private _drawTransparent: boolean;
   /** @internal */
   private readonly _objectColorMaps: Map<number, Drawable>[];
+  /** @internal */
+  private _cullCamera: Nullable<Camera>;
   /**
    * Creates an instance of a render queue
    * @param renderPass - The render pass to which the render queue belongs
@@ -239,6 +241,18 @@ export class RenderQueue extends Disposable {
     this._needSceneColorWithDepth = false;
     this._drawTransparent = false;
     this._objectColorMaps = [new Map()];
+    this._cullCamera = null;
+  }
+  /**
+   * The camera this queue was culled with, set by {@link RenderQueue.end}.
+   *
+   * Differs from the draw context camera in shadow passes, which cull from the light. Drawables
+   * that cull their own sub-parts (clipmap terrain tiles) need it to keep only what the pass
+   * can see.
+   * @internal
+   */
+  get cullCamera() {
+    return this._cullCamera;
   }
   /** The sun light */
   get sunLight() {
@@ -594,6 +608,7 @@ export class RenderQueue extends Disposable {
   }
   /** @internal */
   end(camera: Camera, createRenderBundles?: boolean) {
+    this._cullCamera = camera;
     const frameCounter = getDevice().frameInfo.frameCounter;
     const itemList = this._itemList!;
     if (!this.itemList) {
@@ -744,6 +759,7 @@ export class RenderQueue extends Disposable {
     super.onDispose();
     this.reset();
     this._ref.valid = false;
+    this._cullCamera = null;
   }
 
   private drawableDistanceToCamera(drawable: Drawable, cameraPos: Vector3) {
