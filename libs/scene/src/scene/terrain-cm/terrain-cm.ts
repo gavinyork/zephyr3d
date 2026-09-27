@@ -182,6 +182,7 @@ export class ClipmapTerrain extends applyMixins(GraphNode, mixinDrawable) implem
     );
     this._tmpTexture = new DRef();
     this.updateRegion();
+    this.updateHeightPyramid();
     scene.queuePerCameraUpdateNode(this);
   }
   /**
@@ -320,6 +321,7 @@ export class ClipmapTerrain extends applyMixins(GraphNode, mixinDrawable) implem
     if (this.material && val) {
       this.material.heightMap = val;
       this.updateRegion();
+      this.updateHeightPyramid();
     }
   }
   /** The splat map texture */
@@ -466,9 +468,55 @@ export class ClipmapTerrain extends applyMixins(GraphNode, mixinDrawable) implem
    * ```
    */
   updateBoundingBox() {
+    const tmp = this.updateHeightPyramid();
+    if (!tmp) {
+      return;
+    }
+    const data = new Float32Array(4);
+    const serial = ++this._heightRangeSerial;
+    tmp
+      .readPixels(0, 0, 1, 1, 0, tmp.mipLevelCount - 1, data)
+      .then(() => {
+        // Loading sets the range synchronously right after a resize has started a read back of
+        // the empty height map; that stale result must not land on top of it.
+        if (serial !== this._heightRangeSerial) {
+          return;
+        }
+        // The reduction stores (max, min) in (r, g)
+        this._maxHeight = data[0];
+        this._minHeight = data[1];
+        this.invalidateWorldBoundingVolume(false);
+      })
+      .catch((_err) => {
+        console.error('Read pixels failed');
+      });
+  }
+  /**
+   * The min/max height pyramid of the height map: (max, min) in (r, g), mip 0 padded to a power
+   * of two by repeating the last row and column, so texel j of mip m covers height map texels
+   * [j * 2^m, (j + 1) * 2^m). Null until built.
+   * @internal
+   */
+  get heightPyramid() {
+    return this._tmpTexture.get() ?? null;
+  }
+  /**
+   * Tile resolution of the clipmap, in grid cells
+   * @internal
+   */
+  get clipmapTileResolution() {
+    return this._clipmap.tileResolution;
+  }
+  /**
+   * Rebuilds the min/max height pyramid from the current height map.
+   * Called when the height map is replaced and by {@link ClipmapTerrain.updateBoundingBox}; code
+   * that writes into the height map directly must call one of them afterwards.
+   * @internal
+   */
+  updateHeightPyramid() {
     const heightMap = this.heightMap;
     if (!heightMap) {
-      return;
+      return null;
     }
     const device = getDevice();
     const width = nextPowerOf2(heightMap.width);
@@ -487,24 +535,7 @@ export class ClipmapTerrain extends applyMixins(GraphNode, mixinDrawable) implem
     ClipmapTerrain._padBlitter.blit(heightMap, tmpFB, fetchSampler('clamp_nearest_nomip'));
     tmpFB.dispose();
     ClipmapTerrain._heightBoundingGenerator.render(tmp!);
-    const data = new Float32Array(4);
-    const serial = ++this._heightRangeSerial;
-    tmp!
-      .readPixels(0, 0, 1, 1, 0, tmp!.mipLevelCount - 1, data)
-      .then(() => {
-        // Loading sets the range synchronously right after a resize has started a read back of
-        // the empty height map; that stale result must not land on top of it.
-        if (serial !== this._heightRangeSerial) {
-          return;
-        }
-        // The reduction stores (max, min) in (r, g)
-        this._maxHeight = data[0];
-        this._minHeight = data[1];
-        this.invalidateWorldBoundingVolume(false);
-      })
-      .catch((_err) => {
-        console.error('Read pixels failed');
-      });
+    return tmp!;
   }
   /**
    * Sets the height range from height map data already on the CPU, e.g. when loading.

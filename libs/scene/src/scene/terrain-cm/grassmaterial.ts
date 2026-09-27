@@ -31,6 +31,8 @@ export class ClipmapGrassMaterial
   private readonly _textureSize: Vector2;
   /** @internal */
   private readonly _distanceFade: Vector2;
+  /** @internal */
+  private static readonly FEATURE_OCCLUSION_DEBUG = this.defineFeature();
   /**
    * Creates an instance of GrassMaterial class
    * @param terrain - Clipmap terrain object
@@ -48,6 +50,7 @@ export class ClipmapGrassMaterial
     this._heightMapSize = new Vector2(1 / terrain.heightMap!.width, 1 / terrain.heightMap!.height);
     this._textureSize = Vector2.one();
     this._distanceFade = new Vector2(0, 0);
+    this.useFeature(ClipmapGrassMaterial.FEATURE_OCCLUSION_DEBUG, false);
   }
   clone() {
     const other = new ClipmapGrassMaterial(this._terrain.get()!);
@@ -73,6 +76,17 @@ export class ClipmapGrassMaterial
       this._distanceFade.setXY(start, end);
       this.uniformChanged();
     }
+  }
+  /**
+   * Tints the blades the GPU placement pass flagged as hidden behind terrain red, instead of
+   * leaving them out. Debugging aid for the terrain occlusion culling.
+   * @internal
+   */
+  get occlusionDebug() {
+    return !!this.featureUsed<boolean>(ClipmapGrassMaterial.FEATURE_OCCLUSION_DEBUG);
+  }
+  set occlusionDebug(val: boolean) {
+    this.useFeature(ClipmapGrassMaterial.FEATURE_OCCLUSION_DEBUG, !!val);
   }
   setTextureSize(w: number, h: number) {
     this._textureSize.setXY(w, h);
@@ -164,7 +178,13 @@ export class ClipmapGrassMaterial
     scope.$l.heightSample = pb.textureSampleLevel(scope.terrainHeightMap, scope.uv, 0);
     scope.$l.height = pb.add(pb.mul(scope.heightSample.r, scope.terrainPosScale.y), scope.terrainPosScale.w);
     scope.$l.normal = scope.calcHeightMapNormal(scope.uv, scope.heightMapSize, scope.terrainPosScale.xyz);
-    scope.$l.axisX = pb.vec3(scope.$inputs.placement.z, 0, scope.$inputs.placement.w);
+    // The facing is a unit vector; the placement pass lengthens it to flag occluded blades
+    scope.$l.facingLength = pb.length(scope.$inputs.placement.zw);
+    scope.$l.facing = pb.div(scope.$inputs.placement.zw, scope.facingLength);
+    if (this.occlusionDebug) {
+      scope.$outputs.occludedFlag = pb.step(1.5, scope.facingLength);
+    }
+    scope.$l.axisX = pb.vec3(scope.facing.x, 0, scope.facing.y);
     scope.$l.axisZ = pb.cross(scope.axisX, scope.normal);
     scope.$l.axisX = pb.cross(scope.normal, scope.axisZ);
     scope.$l.rotPos = pb.mul(pb.mat3(scope.axisX, scope.normal, scope.axisZ), scope.$inputs.pos);
@@ -203,6 +223,12 @@ export class ClipmapGrassMaterial
         scope.albedo,
         pb.mul(that.getAlbedoTexCoord(scope), scope.albedoTextureSize)
       );
+      if (this.occlusionDebug) {
+        scope.albedo = pb.vec4(
+          pb.mix(scope.albedo.rgb, pb.vec3(1, 0, 0), scope.$inputs.occludedFlag),
+          scope.albedo.a
+        );
+      }
       scope.$l.litColor = pb.vec3(0);
       if (this.drawContext.renderPass!.type === RENDER_PASS_TYPE_LIGHT) {
         scope.$l.normalInfo = this.calculateNormalAndTBN(

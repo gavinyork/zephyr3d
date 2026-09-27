@@ -13,19 +13,27 @@ export class GrassBrush extends BaseTerrainBrush {
       new ImGui.ImVec2(
         0,
         60 +
-          4 * ImGui.GetFrameHeight() +
+          6 * ImGui.GetFrameHeight() +
           2 * ImGui.GetStyle().WindowPadding.y +
-          4 * ImGui.GetStyle().ItemSpacing.y
+          6 * ImGui.GetStyle().ItemSpacing.y
       ),
       true
     );
+    const grassRenderer = tool.terrain.grassRenderer;
+    const occlusion = [grassRenderer.occlusionCulling] as [boolean];
+    if (ImGui.Checkbox('Terrain Occlusion Culling', occlusion)) {
+      grassRenderer.occlusionCulling = occlusion[0];
+    }
+    const occlusionDebug = [grassRenderer.occlusionDebug] as [boolean];
+    if (ImGui.Checkbox('Show Occluded In Red', occlusionDebug)) {
+      grassRenderer.occlusionDebug = occlusionDebug[0];
+    }
     ImGui.Text('Grass Textures');
     ImGui.BeginChild('GrassTextureList', new ImGui.ImVec2(0, 60));
     tool.grassAlbedo.render(ImGui.GetContentRegionAvail());
     ImGui.EndChild();
     const layer = tool.grassAlbedo.selected;
     if (layer >= 0) {
-      const grassRenderer = tool.terrain.grassRenderer;
       const bladeSize = [grassRenderer.getBladeWidth(layer), grassRenderer.getBladeHeight(layer)] as [
         number,
         number

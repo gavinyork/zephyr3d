@@ -224,6 +224,8 @@ export class TerrainEditTool extends Disposable implements EditTool {
       this._terrain.get().updateBoundingBox();
       this._terrain.get().updateRegion();
     }
+    // The grass occlusion test reads a height pyramid only rebuilt above, once a stroke ends
+    this._terrain.get().grassRenderer.suspendOcclusionCulling = this._heightDirty;
     if (
       !this._heightMapCopy.get() ||
       this._heightMapCopy.get().width !== this._terrain.get().heightMap.width ||

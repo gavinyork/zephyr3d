@@ -7,7 +7,7 @@ import { Primitive } from '../../render';
 import { ClipmapGrassMaterial } from './grassmaterial';
 import type { ClipmapTerrain } from './terrain-cm';
 import { getDevice } from '../../app/api';
-import { GrassGpuPlacement, grassHash } from './grass_gpu';
+import { GrassGpuPlacement, GrassOcclusionMode, grassHash } from './grass_gpu';
 
 const INSTANCE_BYTES = 4 * 4;
 /** Number of placement cells along each axis of a grass tile */
@@ -518,7 +518,7 @@ export class GrassLayer extends Disposable {
    * Places the blades seen from a camera on the GPU path; nothing to do on the CPU one.
    * @internal
    */
-  updatePerCamera(camera: Camera, terrain: ClipmapTerrain) {
+  updatePerCamera(camera: Camera, terrain: ClipmapTerrain, occlusionMode: GrassOcclusionMode) {
     this._gpu?.generate(
       camera,
       terrain,
@@ -526,8 +526,13 @@ export class GrassLayer extends Disposable {
       this._cellsPerTexel,
       this._drawDistance,
       this._bladeWidth,
-      this._bladeHeight
+      this._bladeHeight,
+      occlusionMode
     );
+  }
+  /** @internal */
+  setOcclusionDebug(val: boolean) {
+    this._material.get()!.occlusionDebug = val;
   }
   /** @internal */
   draw(ctx: DrawContext, region: Vector4, minY: number, maxY: number) {
@@ -602,6 +607,9 @@ export class GrassLayer extends Disposable {
 export class GrassRenderer extends Disposable {
   private readonly _terrain: DWeakRef<ClipmapTerrain>;
   private _layers: GrassLayer[];
+  private _occlusionCulling: boolean;
+  private _occlusionDebug: boolean;
+  private _suspendOcclusionCulling: boolean;
   /**
    * Creates an instance of GrassRenderer
    * @param terrain - Clipmap terrain object
@@ -610,6 +618,44 @@ export class GrassRenderer extends Disposable {
     super();
     this._terrain = new DWeakRef(terrain);
     this._layers = [];
+    this._occlusionCulling = true;
+    this._occlusionDebug = false;
+    this._suspendOcclusionCulling = false;
+  }
+  /**
+   * Whether to skip grass hidden behind the terrain itself (WebGPU only).
+   *
+   * Tested against the terrain height field every frame, so it never culls grass that is
+   * visible, but it does not see occluders other than the terrain.
+   */
+  get occlusionCulling() {
+    return this._occlusionCulling;
+  }
+  set occlusionCulling(val: boolean) {
+    this._occlusionCulling = !!val;
+  }
+  /**
+   * Draws the grass the terrain occlusion culling would skip in red instead of skipping it
+   */
+  get occlusionDebug() {
+    return this._occlusionDebug;
+  }
+  set occlusionDebug(val: boolean) {
+    this._occlusionDebug = !!val;
+    for (const layer of this._layers) {
+      layer.setOcclusionDebug(this._occlusionDebug);
+    }
+  }
+  /**
+   * Pauses the terrain occlusion culling while the height map is being edited, since the
+   * height pyramid it relies on is only rebuilt afterwards.
+   * @internal
+   */
+  get suspendOcclusionCulling() {
+    return this._suspendOcclusionCulling;
+  }
+  set suspendOcclusionCulling(val: boolean) {
+    this._suspendOcclusionCulling = !!val;
   }
   /** @internal */
   updateMaterial() {
@@ -621,8 +667,14 @@ export class GrassRenderer extends Disposable {
   updatePerCamera(camera: Camera) {
     const terrain = this._terrain.get();
     if (terrain) {
+      const mode =
+        !this._occlusionCulling || this._suspendOcclusionCulling
+          ? GrassOcclusionMode.Off
+          : this._occlusionDebug
+            ? GrassOcclusionMode.Debug
+            : GrassOcclusionMode.Cull;
       for (const layer of this._layers) {
-        layer.updatePerCamera(camera, terrain);
+        layer.updatePerCamera(camera, terrain, mode);
       }
     }
   }
@@ -657,6 +709,7 @@ export class GrassRenderer extends Disposable {
       bladeHeight,
       albedoMap
     );
+    layer.setOcclusionDebug(this._occlusionDebug);
     this._layers.push(layer);
     return this._layers.length - 1;
   }
