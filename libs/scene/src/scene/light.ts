@@ -922,18 +922,17 @@ export class SpotLight extends PunctualLight {
     // In legacy mode `_cutoff` already stores the cosine of the cone half-angle (see the
     // constructor default and computeUniforms), so it must be used as-is. Physical mode keeps the
     // half-angle in radians instead, hence the conversion there.
-    // The lower clamp keeps the radius finite for half-angles at or beyond 90 degrees.
+    // Both setters keep the half-angle within 90 degrees, so the cosine is never negative.
     const cosCutoff = Math.min(
       1,
-      Math.max(
-        0.0001,
-        this.scene?.lightingMode === 'physical' ? Math.cos(this._outerConeAngle) : this._cutoff
-      )
+      Math.max(0, this.scene?.lightingMode === 'physical' ? Math.cos(this._outerConeAngle) : this._cutoff)
     );
     const range = this.positionAndRange.w;
-    const r = (range / cosCutoff) * Math.sqrt(1 - cosCutoff * cosCutoff);
-    bbox.minPoint = new Vector3(-r, -r, 0);
-    bbox.maxPoint = new Vector3(r, r, range);
+    // The lit region is the cone intersected with the range sphere. The light shines down its
+    // local -Z (computeUniforms negates the Z row), so that is the side the bounds extend into.
+    const r = range * Math.sqrt(1 - cosCutoff * cosCutoff);
+    bbox.minPoint = new Vector3(-r, -r, -range);
+    bbox.maxPoint = new Vector3(r, r, 0);
     return bbox;
   }
   /** @internal */
