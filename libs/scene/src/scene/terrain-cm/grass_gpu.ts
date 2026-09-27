@@ -21,6 +21,26 @@ const WORKGROUP_SIZE = 8;
  * when the draw distance is unlimited or the cells are tiny.
  */
 const MAX_WINDOW_CELLS = 2048;
+/**
+ * Width of the band, in density LOD hash units, over which a blade shrinks before the density
+ * LOD drops it. Hashes are scaled into [0, 1 - band) so that full density keeps every blade whole.
+ * @internal
+ */
+export const GRASS_LOD_FADE_BAND = 0.05;
+/** Fraction of the draw distance at which the density starts to fall */
+const GRASS_LOD_START = 0.25;
+/**
+ * Density LOD parameters shared by the grass material and the GPU placement: (distance at which
+ * the density starts to fall, fraction of blades kept at the draw distance). A fraction of 1
+ * disables it.
+ * @internal
+ */
+export function grassDensityLod(drawDistance: number, farDensity: number): [number, number] {
+  if (drawDistance <= 0 || farDensity >= 1) {
+    return [0, 1];
+  }
+  return [drawDistance * GRASS_LOD_START, Math.max(0.01, farDensity)];
+}
 /** Samples along the line of sight of the terrain occlusion test, one per workgroup thread */
 const OCCLUSION_SAMPLES = WORKGROUP_SIZE * WORKGROUP_SIZE;
 
@@ -61,7 +81,7 @@ export function grassHash(x: number, z: number, seed: number): number {
  * the camera every frame, keeps the blades inside the frustum and the draw distance, and appends
  * them to an instance buffer whose count lands in an indirect draw argument buffer.
  *
- * The output uses the instance format of the CPU path (u, v, sin, cos), so the grass material
+ * The output uses the instance format of the CPU path (u, v, facing angle, density LOD hash), so the grass material
  * is shared. Each dispatched thread emits at most one blade and the instance buffer holds one
  * per thread, so the output can never overflow.
  *
@@ -86,6 +106,7 @@ export class GrassGpuPlacement extends Disposable {
   private readonly _camera: Vector4;
   private readonly _occlusion: Vector4;
   private readonly _heightInfo: Vector4;
+  private readonly _densityLod: Vector4;
   private _capacity: number;
   /**
    * Whether the current device can run the GPU path
@@ -111,6 +132,7 @@ export class GrassGpuPlacement extends Disposable {
     this._camera = new Vector4();
     this._occlusion = new Vector4();
     this._heightInfo = new Vector4();
+    this._densityLod = new Vector4();
     this._capacity = 0;
   }
   setBaseVertexBuffer(baseVertexBuffer: StructuredBuffer) {
@@ -172,7 +194,8 @@ export class GrassGpuPlacement extends Disposable {
     drawDistance: number,
     bladeWidth: number,
     bladeHeight: number,
-    occlusionMode: GrassOcclusionMode
+    occlusionMode: GrassOcclusionMode,
+    farDensity: number
   ) {
     const density = this._densityTexture.get();
     const heightMap = terrain.heightMap;
@@ -207,8 +230,11 @@ export class GrassGpuPlacement extends Disposable {
     const bindGroup = this.getBindGroup();
     this._window.setXYZW(x0, z0, windowW, windowH);
     this._cells.setXYZW(cellsW, cellsH, density.width, density.height);
-    // Bounding sphere of a blade, centred halfway up
-    const radius = Math.sqrt(bladeWidth * bladeWidth * 0.25 + bladeHeight * bladeHeight * 0.25);
+    // Bounding sphere of a blade, centred halfway up; the density LOD widens distant blades
+    const lod = grassDensityLod(drawDistance, farDensity);
+    const maxWidth = bladeWidth / lod[1];
+    const radius = Math.sqrt(maxWidth * maxWidth * 0.25 + bladeHeight * bladeHeight * 0.25);
+    this._densityLod.setXYZW(lod[0], lod[1], 0, 0);
     this._params.setXYZW(seed * 4, drawDistance, radius, bladeHeight * 0.5);
     this._posScale.setXYZW(terrain.scale.x, terrain.scale.y, terrain.scale.z, terrain.worldMatrix.m13);
     this._camera.setXYZW(cameraPos.x, cameraPos.y, cameraPos.z, 0);
@@ -245,6 +271,7 @@ export class GrassGpuPlacement extends Disposable {
     bindGroup.setValue('cameraPos', this._camera);
     bindGroup.setValue('planes', planes);
     bindGroup.setValue('occlusion', this._occlusion);
+    bindGroup.setValue('densityLod', this._densityLod);
     bindGroup.setValue('heightInfo', this._heightInfo);
     // Any texture of the right sample type does when occlusion is off. Declared unfilterable
     // (read with textureLoad only), so the sampler bound with it must be a non-filtering one
@@ -329,6 +356,8 @@ export class GrassGpuPlacement extends Disposable {
           this.planes = pb.vec4[6]().uniform(0);
           // (mode, clipmap tile resolution, height epsilon, blade height)
           this.occlusion = pb.vec4().uniform(0);
+          // (density falloff start distance, density at the draw distance, unused, unused)
+          this.densityLod = pb.vec4().uniform(0);
           // (height map width, height map height, pyramid mip count, grid cell size)
           this.heightInfo = pb.vec4().uniform(0);
           this.heightPyramid = pb.tex2D().sampleType('unfilterable-float').uniform(0);
@@ -544,10 +573,25 @@ export class GrassGpuPlacement extends Disposable {
                       this.posScale.w
                     );
                     this.$l.base = pb.vec3(this.xz.x, this.height, this.xz.y);
+                    this.$l.dist = pb.distance(this.base, this.cameraPos.xyz);
                     this.$l.visible = pb.or(
                       pb.lessThanEqual(this.params.y, 0),
-                      pb.lessThanEqual(pb.distance(this.base, this.cameraPos.xyz), this.params.y)
+                      pb.lessThanEqual(this.dist, this.params.y)
                     );
+                    // Density LOD, see ClipmapGrassMaterial: drop the blades the material would
+                    // shrink to nothing
+                    this.$l.lodHash = this.grassHash(this.cx, this.cz, pb.add(this.seed, 4));
+                    this.$if(pb.greaterThan(this.params.y, 0), function () {
+                      this.$l.keep = pb.mix(
+                        1,
+                        this.densityLod.y,
+                        pb.smoothStep(this.densityLod.x, this.params.y, this.dist)
+                      );
+                      this.visible = pb.and(
+                        this.visible,
+                        pb.lessThan(pb.mul(this.lodHash, 1 - GRASS_LOD_FADE_BAND), this.keep)
+                      );
+                    });
                     this.$l.center = pb.add(this.base, pb.vec3(0, this.params.w, 0));
                     for (let i = 0; i < 6; i++) {
                       this.visible = pb.and(
@@ -563,15 +607,14 @@ export class GrassGpuPlacement extends Disposable {
                         this.grassHash(this.cx, this.cz, pb.add(this.seed, 3)),
                         Math.PI * 2
                       );
-                      // Occluded blades kept for debugging carry a lengthened facing
-                      this.$l.facingScale = pb.mix(1, 2, pb.float(pb.notEqual(this.occluded, 0)));
+                      // Occluded blades kept for debugging are flagged by adding 2 to the hash
                       this.$l.slot = pb.atomicAdd(this.args.at(1), 1);
                       this.instances.setAt(
                         this.slot,
                         pb.vec4(
                           this.uv,
-                          pb.mul(pb.sin(this.angle), this.facingScale),
-                          pb.mul(pb.cos(this.angle), this.facingScale)
+                          this.angle,
+                          pb.add(this.lodHash, pb.mul(pb.float(pb.notEqual(this.occluded, 0)), 2))
                         )
                       );
                     });

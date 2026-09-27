@@ -17,6 +17,8 @@ const DEFAULT_CELLS_PER_TEXEL = 2;
 const MAX_CELLS_PER_TEXEL = 8;
 /** Default distance from the camera beyond which grass is not drawn */
 const DEFAULT_DRAW_DISTANCE = 150;
+/** Default fraction of blades kept at the draw distance */
+const DEFAULT_FAR_DENSITY = 0.25;
 
 function distanceSqToAABB(x: number, y: number, z: number, aabb: AABB) {
   const dx = Math.max(aabb.minPoint.x - x, 0, x - aabb.maxPoint.x);
@@ -119,6 +121,7 @@ export class GrassLayer extends Disposable {
   private _tilesZ: number;
   private _numBlades: number;
   private _drawDistance: number;
+  private _farDensity: number;
   /** Set on WebGPU with indirect draw: blades are placed on the GPU instead of in CPU tiles */
   private readonly _gpu: Nullable<GrassGpuPlacement>;
   /**
@@ -155,11 +158,13 @@ export class GrassLayer extends Disposable {
     this._tilesZ = 0;
     this._numBlades = 0;
     this._drawDistance = 0;
+    this._farDensity = 1;
     this._gpu = GrassGpuPlacement.isSupported()
       ? new GrassGpuPlacement(this._baseVertexBuffer.get()!, GrassLayer._getIndexBuffer()!)
       : null;
     this._gpu?.setDensity(this._densityWidth, this._densityHeight, this._densityMap);
     this.drawDistance = DEFAULT_DRAW_DISTANCE;
+    this.farDensity = DEFAULT_FAR_DENSITY;
     this.updateTileGrid();
   }
   /**
@@ -174,6 +179,25 @@ export class GrassLayer extends Disposable {
     if (val !== this._drawDistance) {
       this._drawDistance = val;
       this._material.get()!.setDrawDistance(val);
+    }
+  }
+  /**
+   * Fraction of the blades of this layer still drawn at the draw distance, 1 to draw them all.
+   *
+   * From a quarter of the draw distance on, blades thin out towards this fraction, each leaving
+   * at its own fixed distance, and the remaining ones widen to keep the ground covered. Saves
+   * most of the distant grass geometry where blades are placed on the GPU (WebGPU); elsewhere
+   * the dropped blades are still drawn, only shrunk to nothing. Has no effect without a draw
+   * distance.
+   */
+  get farDensity() {
+    return this._farDensity;
+  }
+  set farDensity(val: number) {
+    val = Math.min(1, Math.max(0.01, Number(val) || 0));
+    if (val !== this._farDensity) {
+      this._farDensity = val;
+      this._material.get()!.setFarDensity(val);
     }
   }
   /** @internal */
@@ -410,8 +434,9 @@ export class GrassLayer extends Disposable {
           const angle = grassHash(cx, cz, seed + 3) * Math.PI * 2;
           data[count * 4 + 0] = u;
           data[count * 4 + 1] = v;
-          data[count * 4 + 2] = Math.sin(angle);
-          data[count * 4 + 3] = Math.cos(angle);
+          data[count * 4 + 2] = angle;
+          // Density LOD hash, see ClipmapGrassMaterial
+          data[count * 4 + 3] = grassHash(cx, cz, seed + 4);
           count++;
         }
       }
@@ -527,7 +552,8 @@ export class GrassLayer extends Disposable {
       this._drawDistance,
       this._bladeWidth,
       this._bladeHeight,
-      occlusionMode
+      occlusionMode,
+      this._farDensity
     );
   }
   /** @internal */
@@ -751,6 +777,27 @@ export class GrassRenderer extends Disposable {
     const grassLayer = this._layers[layer];
     if (grassLayer) {
       grassLayer.drawDistance = distance;
+    } else {
+      console.error(`Invalid grass layer: ${layer}`);
+    }
+  }
+  /**
+   * Gets the fraction of blades kept at the draw distance for the grass layer at given index
+   * @param layer - Index of the grass layer
+   * @returns Fraction of blades drawn at the draw distance, see GrassLayer.farDensity
+   */
+  getFarDensity(layer: number) {
+    return this._layers[layer]?.farDensity ?? 1;
+  }
+  /**
+   * Sets the fraction of blades kept at the draw distance for the grass layer at given index
+   * @param layer - Index of the grass layer
+   * @param farDensity - Fraction of blades drawn at the draw distance, see GrassLayer.farDensity
+   */
+  setFarDensity(layer: number, farDensity: number) {
+    const grassLayer = this._layers[layer];
+    if (grassLayer) {
+      grassLayer.farDensity = farDensity;
     } else {
       console.error(`Invalid grass layer: ${layer}`);
     }

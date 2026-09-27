@@ -12,6 +12,7 @@ import type { DrawContext } from '../../render';
 import { RENDER_PASS_TYPE_LIGHT } from '../../values';
 import type { ClipmapTerrain } from './terrain-cm';
 import { fetchSampler } from '../../utility/misc';
+import { GRASS_LOD_FADE_BAND, grassDensityLod } from './grass_gpu';
 
 /**
  * Terrain grass material
@@ -31,6 +32,12 @@ export class ClipmapGrassMaterial
   private readonly _textureSize: Vector2;
   /** @internal */
   private readonly _distanceFade: Vector2;
+  /** (density falloff start distance, density at the draw distance) @internal */
+  private readonly _densityLod: Vector2;
+  /** @internal */
+  private _drawDistance: number;
+  /** @internal */
+  private _farDensity: number;
   /** @internal */
   private static readonly FEATURE_OCCLUSION_DEBUG = this.defineFeature();
   /**
@@ -50,6 +57,9 @@ export class ClipmapGrassMaterial
     this._heightMapSize = new Vector2(1 / terrain.heightMap!.width, 1 / terrain.heightMap!.height);
     this._textureSize = Vector2.one();
     this._distanceFade = new Vector2(0, 0);
+    this._densityLod = new Vector2(0, 1);
+    this._drawDistance = 0;
+    this._farDensity = 1;
     this.useFeature(ClipmapGrassMaterial.FEATURE_OCCLUSION_DEBUG, false);
   }
   clone() {
@@ -63,6 +73,9 @@ export class ClipmapGrassMaterial
     this._heightMapSize.set(other._heightMapSize);
     this._textureSize.set(other._textureSize);
     this._distanceFade.set(other._distanceFade);
+    this._densityLod.set(other._densityLod);
+    this._drawDistance = other._drawDistance;
+    this._farDensity = other._farDensity;
   }
   /**
    * Sets the distance beyond which blades are not drawn. Blades shrink into the ground over
@@ -70,10 +83,31 @@ export class ClipmapGrassMaterial
    * @internal
    */
   setDrawDistance(distance: number) {
+    this._drawDistance = distance;
+    this.updateDistanceParams();
+  }
+  /**
+   * Sets the fraction of blades kept at the draw distance, see GrassLayer.farDensity
+   * @internal
+   */
+  setFarDensity(farDensity: number) {
+    this._farDensity = farDensity;
+    this.updateDistanceParams();
+  }
+  /** @internal */
+  private updateDistanceParams() {
+    const distance = this._drawDistance;
     const start = distance > 0 ? distance * 0.75 : 0;
     const end = distance > 0 ? distance : 0;
-    if (this._distanceFade.x !== start || this._distanceFade.y !== end) {
+    const lod = grassDensityLod(distance, this._farDensity);
+    if (
+      this._distanceFade.x !== start ||
+      this._distanceFade.y !== end ||
+      this._densityLod.x !== lod[0] ||
+      this._densityLod.y !== lod[1]
+    ) {
       this._distanceFade.setXY(start, end);
+      this._densityLod.setXY(lod[0], lod[1]);
       this.uniformChanged();
     }
   }
@@ -125,6 +159,7 @@ export class ClipmapGrassMaterial
     bindGroup.setValue('terrainRegion', terrain.worldRegion);
     bindGroup.setValue('terrainPosScale', this._terrainPosScale);
     bindGroup.setValue('distanceFade', this._distanceFade);
+    bindGroup.setValue('densityLod', this._densityLod);
     if (this.needFragmentColor(ctx)) {
       bindGroup.setValue('albedoTextureSize', this._textureSize);
     }
@@ -140,6 +175,7 @@ export class ClipmapGrassMaterial
     scope.terrainRegion = pb.vec4().uniform(2);
     scope.terrainPosScale = pb.vec4().uniform(2);
     scope.distanceFade = pb.vec2().uniform(2);
+    scope.densityLod = pb.vec2().uniform(2);
 
     pb.func('calcHeightMapNormal', [pb.vec2('uv'), pb.vec2('texelSize'), pb.vec3('scale')], function () {
       // World-space distance between the two samples of each central difference
@@ -178,30 +214,56 @@ export class ClipmapGrassMaterial
     scope.$l.heightSample = pb.textureSampleLevel(scope.terrainHeightMap, scope.uv, 0);
     scope.$l.height = pb.add(pb.mul(scope.heightSample.r, scope.terrainPosScale.y), scope.terrainPosScale.w);
     scope.$l.normal = scope.calcHeightMapNormal(scope.uv, scope.heightMapSize, scope.terrainPosScale.xyz);
-    // The facing is a unit vector; the placement pass lengthens it to flag occluded blades
-    scope.$l.facingLength = pb.length(scope.$inputs.placement.zw);
-    scope.$l.facing = pb.div(scope.$inputs.placement.zw, scope.facingLength);
+    // placement: (u, v, facing angle, density LOD hash); the GPU placement pass adds 2 to the
+    // hash of blades it flags as occluded
+    scope.$l.occluded = pb.step(1.5, scope.$inputs.placement.w);
     if (this.occlusionDebug) {
-      scope.$outputs.occludedFlag = pb.step(1.5, scope.facingLength);
+      scope.$outputs.occludedFlag = scope.occluded;
     }
-    scope.$l.axisX = pb.vec3(scope.facing.x, 0, scope.facing.y);
+    scope.$l.lodHash = pb.mul(
+      pb.sub(scope.$inputs.placement.w, pb.mul(scope.occluded, 2)),
+      1 - GRASS_LOD_FADE_BAND
+    );
+    scope.$l.axisX = pb.vec3(pb.sin(scope.$inputs.placement.z), 0, pb.cos(scope.$inputs.placement.z));
     scope.$l.axisZ = pb.cross(scope.axisX, scope.normal);
     scope.$l.axisX = pb.cross(scope.normal, scope.axisZ);
-    scope.$l.rotPos = pb.mul(pb.mat3(scope.axisX, scope.normal, scope.axisZ), scope.$inputs.pos);
     scope.$l.posXZ = pb.add(
       pb.mul(scope.$inputs.placement.xy, pb.sub(scope.terrainRegion.zw, scope.terrainRegion.xy)),
       scope.terrainRegion.xy
     );
+    // (width scale, overall scale)
+    scope.$l.bladeScale = pb.vec2(1);
     scope.$if(pb.greaterThan(scope.distanceFade.y, 0), function () {
       this.$l.bladeDist = pb.distance(
         ShaderHelper.getCameraPosition(this),
         pb.vec3(this.posXZ.x, this.height, this.posXZ.y)
       );
-      this.rotPos = pb.mul(
-        this.rotPos,
-        pb.sub(1, pb.smoothStep(this.distanceFade.x, this.distanceFade.y, this.bladeDist))
+      // Density LOD: the fraction of blades kept falls with distance and each blade leaves as
+      // it drops below its own hash, shrinking over a narrow band on the way. The survivors
+      // widen by the inverse of the fraction to keep the coverage. Mirrors the GPU placement
+      // pass, which skips the blades whose scale reaches zero here.
+      this.$l.keep = pb.mix(
+        1,
+        this.densityLod.y,
+        pb.smoothStep(this.densityLod.x, this.distanceFade.y, this.bladeDist)
+      );
+      this.bladeScale = pb.vec2(
+        pb.div(1, this.keep),
+        pb.mul(
+          pb.sub(1, pb.smoothStep(this.distanceFade.x, this.distanceFade.y, this.bladeDist)),
+          pb.clamp(pb.div(pb.sub(this.keep, this.lodHash), GRASS_LOD_FADE_BAND), 0, 1)
+        )
       );
     });
+    scope.$l.localPos = pb.mul(
+      pb.vec3(
+        pb.mul(scope.$inputs.pos.x, scope.bladeScale.x),
+        scope.$inputs.pos.y,
+        pb.mul(scope.$inputs.pos.z, scope.bladeScale.x)
+      ),
+      scope.bladeScale.y
+    );
+    scope.$l.rotPos = pb.mul(pb.mat3(scope.axisX, scope.normal, scope.axisZ), scope.localPos);
     scope.$outputs.zAlbedoTexCoord = scope.$inputs.albedoUV;
     scope.$outputs.worldPos = pb.add(scope.rotPos, pb.vec3(scope.posXZ.x, scope.height, scope.posXZ.y));
     ShaderHelper.setClipSpacePosition(

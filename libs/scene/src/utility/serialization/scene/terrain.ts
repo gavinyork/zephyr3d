@@ -224,8 +224,13 @@ export function getTerrainClass(manager: ResourceManager): SerializableClass {
             return false;
           },
           get(this: ClipmapTerrain, value) {
-            const data: { texture: string; bladeWidth: number; bladeHeight: number; drawDistance: number }[] =
-              [];
+            const data: {
+              texture: string;
+              bladeWidth: number;
+              bladeHeight: number;
+              drawDistance: number;
+              farDensity: number;
+            }[] = [];
             const numLayers = this.grassRenderer.numLayers;
             for (let i = 0; i < numLayers; i++) {
               const grassTexture = this.grassRenderer.getGrassTexture(i);
@@ -234,7 +239,8 @@ export function getTerrainClass(manager: ResourceManager): SerializableClass {
                 texture: assetId,
                 bladeWidth: this.grassRenderer.getBladeWidth(i),
                 bladeHeight: this.grassRenderer.getBladeHeight(i),
-                drawDistance: this.grassRenderer.getDrawDistance(i)
+                drawDistance: this.grassRenderer.getDrawDistance(i),
+                farDensity: this.grassRenderer.getFarDensity(i)
               });
             }
             value.object[0] = new JSONArray(null, data);
@@ -247,6 +253,7 @@ export function getTerrainClass(manager: ResourceManager): SerializableClass {
                 bladeWidth: number;
                 bladeHeight: number;
                 drawDistance?: number;
+                farDensity?: number;
               }[]) ?? [];
             for (let i = 0; i < data.length; i++) {
               const info = data[i];
@@ -272,6 +279,9 @@ export function getTerrainClass(manager: ResourceManager): SerializableClass {
               );
               if (info.drawDistance !== undefined) {
                 this.grassRenderer.setDrawDistance(layer, info.drawDistance);
+              }
+              if (info.farDensity !== undefined) {
+                this.grassRenderer.setFarDensity(layer, info.farDensity);
               }
             }
           }
