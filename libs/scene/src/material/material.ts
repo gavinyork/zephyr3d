@@ -1,4 +1,4 @@
-import type { AbstractDevice, BindGroup, GPUProgram, RenderStateSet } from '@zephyr3d/device';
+import type { AbstractDevice, BindGroup, GPUDataBuffer, GPUProgram, RenderStateSet } from '@zephyr3d/device';
 import { ProgramBuilder } from '@zephyr3d/device';
 import type { Primitive } from '../render/primitive';
 import type { DrawContext } from '../render/drawable';
@@ -435,6 +435,27 @@ export class Material extends Disposable implements Clonable<Material>, IDisposa
     for (let pass = 0; pass < numPasses; pass++) {
       this.bind(ctx.device, pass);
       this.drawPrimitive(pass, primitive, ctx, numInstances);
+    }
+  }
+  /**
+   * Draw a primitive in all passes with arguments read from a GPU buffer (WebGPU only).
+   *
+   * The indirect counterpart of {@link Material.draw}, see {@link Primitive.drawIndirect} for the
+   * buffer layout. The instance count comes from the buffer, so instanced shaders fed by
+   * `ctx.instanceData` do not apply; the vertex shader reads per-instance data from instance
+   * vertex buffers instead.
+   *
+   * @param primitive - Geometry to draw.
+   * @param ctx - Draw context.
+   * @param indirectBuffer - Buffer holding the draw arguments.
+   * @param indirectOffset - Byte offset of the arguments, a multiple of 4.
+   * @internal
+   */
+  drawIndirect(primitive: Primitive, ctx: DrawContext, indirectBuffer: GPUDataBuffer, indirectOffset = 0) {
+    const numPasses = this.getNumPassesForRender(ctx);
+    for (let pass = 0; pass < numPasses; pass++) {
+      this.bind(ctx.device, pass);
+      primitive.drawIndirect(indirectBuffer, indirectOffset);
     }
   }
   /**

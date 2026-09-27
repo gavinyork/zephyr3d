@@ -1,11 +1,13 @@
 import type { IndexBuffer, StructuredBuffer, Texture2D } from '@zephyr3d/device';
-import type { Vector4 } from '@zephyr3d/base';
+import type { Nullable, Vector4 } from '@zephyr3d/base';
 import { AABB, ClipState, nextPowerOf2, DRef, DWeakRef, Disposable, Vector3 } from '@zephyr3d/base';
 import type { DrawContext } from '../../render';
+import type { Camera } from '../../camera';
 import { Primitive } from '../../render';
 import { ClipmapGrassMaterial } from './grassmaterial';
 import type { ClipmapTerrain } from './terrain-cm';
 import { getDevice } from '../../app/api';
+import { GrassGpuPlacement, grassHash } from './grass_gpu';
 
 const INSTANCE_BYTES = 4 * 4;
 /** Number of placement cells along each axis of a grass tile */
@@ -15,19 +17,6 @@ const DEFAULT_CELLS_PER_TEXEL = 2;
 const MAX_CELLS_PER_TEXEL = 8;
 /** Default distance from the camera beyond which grass is not drawn */
 const DEFAULT_DRAW_DISTANCE = 150;
-
-/**
- * Deterministic 2D integer hash, returns a value in [0, 1).
- * Grass placement derives everything (jitter, survival threshold, rotation)
- * from this hash so that blade positions are stable across edits and reloads.
- */
-function hashCell(x: number, z: number, seed: number): number {
-  let h = (Math.imul(x, 0x27d4eb2d) ^ Math.imul(z, 0x165667b1) ^ Math.imul(seed, 0x9e3779b9)) | 0;
-  h = Math.imul(h ^ (h >>> 15), 0x85ebca6b);
-  h = Math.imul(h ^ (h >>> 13), 0xc2b2ae35);
-  h ^= h >>> 16;
-  return (h >>> 0) / 4294967296;
-}
 
 function distanceSqToAABB(x: number, y: number, z: number, aabb: AABB) {
   const dx = Math.max(aabb.minPoint.x - x, 0, x - aabb.maxPoint.x);
@@ -130,6 +119,8 @@ export class GrassLayer extends Disposable {
   private _tilesZ: number;
   private _numBlades: number;
   private _drawDistance: number;
+  /** Set on WebGPU with indirect draw: blades are placed on the GPU instead of in CPU tiles */
+  private readonly _gpu: Nullable<GrassGpuPlacement>;
   /**
    * Creates an instance of GrassLayer
    * @param terrain - Clipmap terrain object
@@ -164,6 +155,10 @@ export class GrassLayer extends Disposable {
     this._tilesZ = 0;
     this._numBlades = 0;
     this._drawDistance = 0;
+    this._gpu = GrassGpuPlacement.isSupported()
+      ? new GrassGpuPlacement(this._baseVertexBuffer.get()!, GrassLayer._getIndexBuffer()!)
+      : null;
+    this._gpu?.setDensity(this._densityWidth, this._densityHeight, this._densityMap);
     this.drawDistance = DEFAULT_DRAW_DISTANCE;
     this.updateTileGrid();
   }
@@ -202,7 +197,12 @@ export class GrassLayer extends Disposable {
   getAlbedoMap() {
     return this._material.get()!.albedoTexture;
   }
-  /** How many grass blades are currently generated in this layer */
+  /**
+   * How many grass blades are currently generated in this layer.
+   *
+   * Only counts the CPU placement path. Where blades are placed on the GPU (WebGPU) they are
+   * generated around the camera every frame and this stays 0.
+   */
   get numBlades() {
     return this._numBlades;
   }
@@ -263,6 +263,17 @@ export class GrassLayer extends Disposable {
    * @param maxTexelZ - Maximum z texel of the region (exclusive)
    */
   updateDensityRegion(minTexelX: number, minTexelZ: number, maxTexelX: number, maxTexelZ: number) {
+    if (this._gpu) {
+      this._gpu.updateDensityRegion(
+        this._densityMap,
+        this._densityWidth,
+        Math.max(0, minTexelX),
+        Math.max(0, minTexelZ),
+        Math.min(this._densityWidth, maxTexelX),
+        Math.min(this._densityHeight, maxTexelZ)
+      );
+      return;
+    }
     const k = this._cellsPerTexel;
     // expand by one texel to cover the bilinear sampling footprint
     const cx0 = Math.max(0, (minTexelX - 1) * k);
@@ -292,6 +303,10 @@ export class GrassLayer extends Disposable {
     this._tiles.clear();
     this._numBlades = 0;
     this.updateTileGrid();
+    if (this._gpu) {
+      this._gpu.setDensity(this._densityWidth, this._densityHeight, this._densityMap);
+      return;
+    }
     for (let tz = 0; tz < this._tilesZ; tz++) {
       for (let tx = 0; tx < this._tilesX; tx++) {
         this.generateTile(tx, tz);
@@ -325,6 +340,7 @@ export class GrassLayer extends Disposable {
       for (const tile of this._tiles.values()) {
         tile.setBaseVertexBuffer(this._baseVertexBuffer.get()!);
       }
+      this._gpu?.setBaseVertexBuffer(this._baseVertexBuffer.get()!);
     }
   }
   /** @internal */
@@ -388,10 +404,10 @@ export class GrassLayer extends Disposable {
     let count = 0;
     for (let cz = cz0; cz < cz1; cz++) {
       for (let cx = cx0; cx < cx1; cx++) {
-        const u = (cx + hashCell(cx, cz, seed)) / cw;
-        const v = (cz + hashCell(cx, cz, seed + 1)) / ch;
-        if (this.sampleDensity(u, v) > hashCell(cx, cz, seed + 2)) {
-          const angle = hashCell(cx, cz, seed + 3) * Math.PI * 2;
+        const u = (cx + grassHash(cx, cz, seed)) / cw;
+        const v = (cz + grassHash(cx, cz, seed + 1)) / ch;
+        if (this.sampleDensity(u, v) > grassHash(cx, cz, seed + 2)) {
+          const angle = grassHash(cx, cz, seed + 3) * Math.PI * 2;
           data[count * 4 + 0] = u;
           data[count * 4 + 1] = v;
           data[count * 4 + 2] = Math.sin(angle);
@@ -498,8 +514,32 @@ export class GrassLayer extends Disposable {
     ]);
     return device.createInterleavedVertexBuffer(['position_f32x3', 'tex0_f32x2'], vertices);
   }
+  /**
+   * Places the blades seen from a camera on the GPU path; nothing to do on the CPU one.
+   * @internal
+   */
+  updatePerCamera(camera: Camera, terrain: ClipmapTerrain) {
+    this._gpu?.generate(
+      camera,
+      terrain,
+      this._seed,
+      this._cellsPerTexel,
+      this._drawDistance,
+      this._bladeWidth,
+      this._bladeHeight
+    );
+  }
   /** @internal */
   draw(ctx: DrawContext, region: Vector4, minY: number, maxY: number) {
+    if (this._gpu) {
+      const material = this._material.get()!;
+      material.apply(ctx);
+      for (let pass = 0; pass < material.numPasses; pass++) {
+        material.bind(ctx.device, pass);
+        this._gpu.draw();
+      }
+      return;
+    }
     const visible = GrassLayer._visibleTiles;
     visible.length = 0;
     const camera = ctx.camera;
@@ -552,6 +592,7 @@ export class GrassLayer extends Disposable {
     }
     this._tiles.clear();
     this._baseVertexBuffer.dispose();
+    this._gpu?.dispose();
   }
 }
 /**
@@ -574,6 +615,15 @@ export class GrassRenderer extends Disposable {
   updateMaterial() {
     for (const layer of this._layers) {
       layer.updateMaterial();
+    }
+  }
+  /** @internal */
+  updatePerCamera(camera: Camera) {
+    const terrain = this._terrain.get();
+    if (terrain) {
+      for (const layer of this._layers) {
+        layer.updatePerCamera(camera, terrain);
+      }
     }
   }
   /** How many grass blades */

@@ -632,6 +632,8 @@ export class ClipmapTerrain extends applyMixins(GraphNode, mixinDrawable) implem
       tmpBuffer[i * 8 + 7] = 1 / (currentAABB.maxPoint.z - tmpBuffer[i * 8 + 3]);
     }
     mat.setLevelData(tmpBuffer, 8 * (maxMipLevel + 1));
+    // Grass placed on the GPU is generated around this camera, outside of any render pass
+    this.grassRenderer.updatePerCamera(camera);
 
     this.scene?.queuePerCameraUpdateNode(this);
   }

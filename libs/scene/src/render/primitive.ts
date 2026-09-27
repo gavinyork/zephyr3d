@@ -17,6 +17,7 @@ import {
   type IndexBuffer,
   type VertexSemantic,
   type VertexAttribFormat,
+  type GPUDataBuffer,
   PBPrimitiveType,
   matchVertexBuffer
 } from '@zephyr3d/device';
@@ -372,6 +373,35 @@ export class Primitive
     this.checkVertexLayout();
     if (this.indexCount > 0) {
       this._vertexLayout?.drawInstanced(this._primitiveType, this._indexStart, this.indexCount, numInstances);
+    }
+  }
+  /**
+   * Issue a draw whose arguments are read from a GPU buffer, typically written by a compute pass
+   * (WebGPU only, see `MiscCaps.supportDrawIndirect`).
+   *
+   * Uses `drawIndexedIndirect` when the primitive has an index buffer and `drawIndirect`
+   * otherwise. The buffer supplies the whole range and instance count, so `indexStart` and
+   * `indexCount` are ignored. It must be created with the 'indirect' usage and hold, at
+   * `indirectOffset`, five uint32 values (indexCount, instanceCount, firstIndex, baseVertex,
+   * firstInstance) for indexed primitives or four (vertexCount, instanceCount, firstVertex,
+   * firstInstance) otherwise. A non-zero firstInstance needs the 'indirect-first-instance'
+   * feature.
+   *
+   * Indirect draws cannot be captured into render bundles.
+   *
+   * @param indirectBuffer - Buffer holding the draw arguments.
+   * @param indirectOffset - Byte offset of the arguments, a multiple of 4.
+   */
+  drawIndirect(indirectBuffer: GPUDataBuffer, indirectOffset = 0) {
+    this.checkVertexLayout();
+    if (this._vertexLayout) {
+      const device = getDevice();
+      device.setVertexLayout(this._vertexLayout);
+      if (this.getIndexBuffer()) {
+        device.drawIndexedIndirect(this._primitiveType, indirectBuffer, indirectOffset);
+      } else {
+        device.drawIndirect(this._primitiveType, indirectBuffer, indirectOffset);
+      }
     }
   }
   /**
