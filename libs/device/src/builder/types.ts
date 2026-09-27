@@ -1478,6 +1478,14 @@ export class PBAtomicI32TypeInfo extends PBTypeInfo<null> {
   getSize() {
     return 4;
   }
+  /**
+   * Atomics are never constructed in WGSL, only declared (in storage or workgroup memory). The
+   * zero argument form is what such a declaration goes through, as for arrays.
+   * @internal
+   */
+  getConstructorOverloads(deviceType: string): PBFunctionTypeInfo[] {
+    return [new PBFunctionTypeInfo(this.toTypeName(deviceType), this, [])];
+  }
   /** @internal */
   protected genTypeId() {
     return `ATOMICI32`;
@@ -1532,6 +1540,14 @@ export class PBAtomicU32TypeInfo extends PBTypeInfo<null> {
   /** @internal */
   getSize() {
     return 4;
+  }
+  /**
+   * Atomics are never constructed in WGSL, only declared (in storage or workgroup memory). The
+   * zero argument form is what such a declaration goes through, as for arrays.
+   * @internal
+   */
+  getConstructorOverloads(deviceType: string): PBFunctionTypeInfo[] {
+    return [new PBFunctionTypeInfo(this.toTypeName(deviceType), this, [])];
   }
   /** @internal */
   protected genTypeId() {
