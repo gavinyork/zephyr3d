@@ -125,6 +125,14 @@ export class ClipmapTerrain extends applyMixins(GraphNode, mixinDrawable) implem
   private _shadowRenderData: Nullable<PrimitiveInstanceInfo[]>;
   private _shadowGatherContext: Nullable<ClipmapGatherContext>;
   private _gridScale: number;
+  /**
+   * World position of clipmap grid point (0, 0): the centre of the first height map texel.
+   * Texel i holds the height at the centre of cell i (the convention the height sampling,
+   * brushes and grass placement all share), so this is what puts the finest level's vertices
+   * on the samples instead of halfway between them.
+   */
+  private _gridOriginX: number;
+  private _gridOriginZ: number;
   private _material: DRef<ClipmapTerrainMaterial>;
   private _grassRenderer: DRef<GrassRenderer>;
   private _castShadow: boolean;
@@ -158,6 +166,8 @@ export class ClipmapTerrain extends applyMixins(GraphNode, mixinDrawable) implem
     this._shadowGatherContext = null;
     this._grassRenderer = new DRef(new GrassRenderer(this));
     this._gridScale = 1;
+    this._gridOriginX = 0;
+    this._gridOriginZ = 0;
     this._castShadow = true;
     this._sizeX = sizeX;
     this._sizeZ = sizeZ;
@@ -560,6 +570,8 @@ export class ClipmapTerrain extends applyMixins(GraphNode, mixinDrawable) implem
       camera: camera,
       minMaxWorldPos: mat.region,
       gridScale: this._gridScale,
+      gridOriginX: this._gridOriginX,
+      gridOriginZ: this._gridOriginZ,
       userData: this,
       frustumCulling: true,
       calcAABB
@@ -570,6 +582,8 @@ export class ClipmapTerrain extends applyMixins(GraphNode, mixinDrawable) implem
           camera: camera,
           minMaxWorldPos: mat.region,
           gridScale: this._gridScale,
+          gridOriginX: this._gridOriginX,
+          gridOriginZ: this._gridOriginZ,
           userData: this,
           frustumCulling: false,
           calcAABB
@@ -588,7 +602,13 @@ export class ClipmapTerrain extends applyMixins(GraphNode, mixinDrawable) implem
         }
       }
     }
-    const levelAABB = this._clipmap.calcLevelAABB(camera, mat.region, this._gridScale);
+    const levelAABB = this._clipmap.calcLevelAABB(
+      camera,
+      mat.region,
+      this._gridScale,
+      this._gridOriginX,
+      this._gridOriginZ
+    );
     const cameraPos = camera.getWorldPosition();
     const tmpBuffer = ClipmapTerrain._tmpBuffer;
 
@@ -625,10 +645,11 @@ export class ClipmapTerrain extends applyMixins(GraphNode, mixinDrawable) implem
       const z = Math.abs(this.scale.z);
       const px = this.position.x + (this.parent?.worldMatrix.m03 ?? 0);
       const pz = this.position.z + (this.parent?.worldMatrix.m23 ?? 0);
-      this._gridScale = Math.max(
-        (x * this._sizeX) / this.material.heightMap.width,
-        (z * this._sizeZ) / this.material.heightMap.height
-      );
+      const cellX = (x * this._sizeX) / this.material.heightMap.width;
+      const cellZ = (z * this._sizeZ) / this.material.heightMap.height;
+      this._gridScale = Math.max(cellX, cellZ);
+      this._gridOriginX = px + cellX * 0.5;
+      this._gridOriginZ = pz + cellZ * 0.5;
       this.material.update(new Vector4(px, pz, px + x * this._sizeX, pz + z * this._sizeZ), this.scale);
       this.grassRenderer.updateMaterial();
     }
@@ -638,7 +659,12 @@ export class ClipmapTerrain extends applyMixins(GraphNode, mixinDrawable) implem
     const mat = this._material?.get();
     if (mat) {
       this.bind(ctx, renderQueue);
-      mat.setClipmapGridInfo(this._gridScale, this.worldMatrix.m03, this.worldMatrix.m23);
+      // The shader places vertices at grid * gridScale - offset, then adds the world translation
+      mat.setClipmapGridInfo(
+        this._gridScale,
+        this.worldMatrix.m03 - this._gridOriginX,
+        this.worldMatrix.m23 - this._gridOriginZ
+      );
       mat.apply(ctx);
       const isShadowPass = ctx.renderPass!.type === RENDER_PASS_TYPE_SHADOWMAP;
       let renderData = isShadowPass ? this._shadowRenderData : this._renderData;

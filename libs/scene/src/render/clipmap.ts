@@ -43,6 +43,12 @@ export type PrimitiveInstanceInfo = {
 export interface ClipmapGatherContext {
   camera: Camera;
   gridScale: number;
+  /**
+   * World position of grid point (0, 0), defaults to the world origin. Lets a caller line the
+   * vertices up with its data, e.g. terrain texel centres.
+   */
+  gridOriginX?: number;
+  gridOriginZ?: number;
   minMaxWorldPos: Vector4;
   userData: unknown;
   frustumCulling: boolean;
@@ -123,6 +129,9 @@ export class Clipmap extends Disposable {
 
   private _wireframe: boolean;
   private readonly _levelAABBs: AABB[];
+  /** Grid origin of the gather/cull call in progress, see ClipmapGatherContext.gridOriginX */
+  private _originX: number;
+  private _originZ: number;
   private readonly _cullScratch: Map<
     Primitive,
     { instanceDatas: Float32Array<ArrayBuffer>; mipLevels: Float32Array<ArrayBuffer> }
@@ -156,6 +165,8 @@ export class Clipmap extends Disposable {
     this._nonInstanceMipLevelDataPoolSize = 0;
     this._wireframe = false;
     this._levelAABBs = [];
+    this._originX = 0;
+    this._originZ = 0;
     this._cullScratch = new Map();
     this.generateCrossMesh();
     this.generateFillerMesh();
@@ -794,10 +805,10 @@ export class Clipmap extends Disposable {
     } else {
       AABB.transform(aabb, Matrix4x4.rotationZ(rotation), tmpAABB);
     }
-    const minX = (tmpAABB.minPoint.x * scale + offset.x) * gridScale;
-    const maxX = (tmpAABB.maxPoint.x * scale + offset.x) * gridScale;
-    const minZ = (tmpAABB.minPoint.y * scale + offset.y) * gridScale;
-    const maxZ = (tmpAABB.maxPoint.y * scale + offset.y) * gridScale;
+    const minX = (tmpAABB.minPoint.x * scale + offset.x) * gridScale + this._originX;
+    const maxX = (tmpAABB.maxPoint.x * scale + offset.x) * gridScale + this._originX;
+    const minZ = (tmpAABB.minPoint.y * scale + offset.y) * gridScale + this._originZ;
+    const maxZ = (tmpAABB.maxPoint.y * scale + offset.y) * gridScale + this._originZ;
     if (minX < outAABB.minPoint.x) {
       outAABB.minPoint.x = minX;
     }
@@ -827,10 +838,10 @@ export class Clipmap extends Disposable {
     } else {
       AABB.transform(aabb, Matrix4x4.rotationZ(rotation), tmpAABB);
     }
-    const minX = (tmpAABB.minPoint.x * scale + offset.x) * gridScale;
-    const maxX = (tmpAABB.maxPoint.x * scale + offset.x) * gridScale;
-    const minZ = (tmpAABB.minPoint.y * scale + offset.y) * gridScale;
-    const maxZ = (tmpAABB.maxPoint.y * scale + offset.y) * gridScale;
+    const minX = (tmpAABB.minPoint.x * scale + offset.x) * gridScale + this._originX;
+    const maxX = (tmpAABB.maxPoint.x * scale + offset.x) * gridScale + this._originX;
+    const minZ = (tmpAABB.minPoint.y * scale + offset.y) * gridScale + this._originZ;
+    const maxZ = (tmpAABB.maxPoint.y * scale + offset.y) * gridScale + this._originZ;
     ctx.calcAABB(ctx.userData, minX, maxX, minZ, maxZ, tmpAABB, level);
     if (camera.clipMask) {
       // Shadow cull cameras test only some planes: a directional cascade keeps casters at any
@@ -850,7 +861,15 @@ export class Clipmap extends Disposable {
     }
     return tmpAABB.getClipStateWithFrustum(camera.frustum) !== ClipState.NOT_CLIPPED;
   }
-  calcLevelAABB(camera: Camera, minMaxWorldPos: Vector4, gridScale: number) {
+  calcLevelAABB(
+    camera: Camera,
+    minMaxWorldPos: Vector4,
+    gridScale: number,
+    gridOriginX = 0,
+    gridOriginZ = 0
+  ) {
+    this._originX = gridOriginX;
+    this._originZ = gridOriginZ;
     const mipLevels = this.calcMipLevels(camera, minMaxWorldPos, gridScale);
     camera.getWorldPosition(tmpV3);
 
@@ -859,8 +878,8 @@ export class Clipmap extends Disposable {
     const base = tmpBase;
     const offset = tmpOffset;
 
-    const posX = tmpV3.x / gridScale;
-    const posY = tmpV3.z / gridScale;
+    const posX = (tmpV3.x - gridOriginX) / gridScale;
+    const posY = (tmpV3.z - gridOriginZ) / gridScale;
 
     // Reused across calls: callers consume the result before the next one
     const outAABB = this._levelAABBs;
@@ -972,8 +991,10 @@ export class Clipmap extends Disposable {
     const base = tmpBase;
     const offset = tmpOffset;
 
-    const posX = tmpV3.x / context.gridScale;
-    const posY = tmpV3.z / context.gridScale;
+    this._originX = context.gridOriginX ?? 0;
+    this._originZ = context.gridOriginZ ?? 0;
+    const posX = (tmpV3.x - this._originX) / context.gridScale;
+    const posY = (tmpV3.z - this._originZ) / context.gridScale;
 
     // draw cross
     snappedPos.setXY(Math.floor(posX), Math.floor(posY));
@@ -1046,14 +1067,14 @@ export class Clipmap extends Disposable {
             // between the last one drawn and the horizon skirt.
             context.skirt ||
             (this.intervalsOverlap(
-              offset.x * context.gridScale,
-              (offset.x + tileSize.x) * context.gridScale,
+              offset.x * context.gridScale + this._originX,
+              (offset.x + tileSize.x) * context.gridScale + this._originX,
               context.minMaxWorldPos.x,
               context.minMaxWorldPos.z
             ) &&
               this.intervalsOverlap(
-                offset.y * context.gridScale,
-                (offset.y + tileSize.y) * context.gridScale,
+                offset.y * context.gridScale + this._originZ,
+                (offset.y + tileSize.y) * context.gridScale + this._originZ,
                 context.minMaxWorldPos.y,
                 context.minMaxWorldPos.w
               ))
@@ -1195,6 +1216,8 @@ export class Clipmap extends Disposable {
    * @returns The culled set
    */
   cullInstances(renderData: PrimitiveInstanceInfo[], context: ClipmapGatherContext) {
+    this._originX = context.gridOriginX ?? 0;
+    this._originZ = context.gridOriginZ ?? 0;
     const result: PrimitiveInstanceInfo[] = [];
     for (const info of renderData) {
       const meshAABB = this.getInstancedMeshAABB(info.primitive);
