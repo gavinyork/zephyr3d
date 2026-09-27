@@ -24,3 +24,4 @@ export * from './rendertarget';
 export * from './screenrendertarget';
 export * from './rendergraph';
 export * from './rendergraph/history_resource_manager';
+export * from './virtualtexture/virtual_texture';
