@@ -480,7 +480,8 @@ export function getTerrainClass(manager: ResourceManager): SerializableClass {
               }
               this.heightMap = heightMap;
               this.heightMapAssetId = value.str[0];
-              this.updateBoundingBox();
+              // Known right away from the loaded data, no GPU read back needed
+              this.setHeightRangeFromHalfData(new Uint16Array(data, 8, width * height));
             }
           }
         }

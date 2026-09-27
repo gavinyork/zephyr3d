@@ -1,6 +1,13 @@
 import type { AABB, Immutable, Matrix4x4, Nullable } from '@zephyr3d/base';
-import { Vector4, applyMixins, Vector3, DRef, randomUUID } from '@zephyr3d/base';
-import type { PBInsideFunctionScope, PBShaderExp, Texture2D } from '@zephyr3d/device';
+import { Vector4, applyMixins, Vector3, DRef, randomUUID, half2float, nextPowerOf2 } from '@zephyr3d/base';
+import type {
+  BaseTexture,
+  BindGroup,
+  PBGlobalScope,
+  PBInsideFunctionScope,
+  PBShaderExp,
+  Texture2D
+} from '@zephyr3d/device';
 import type { Scene } from '../scene';
 import { GraphNode } from '../graph_node';
 import { mixinDrawable } from '../../render/drawable_mixin';
@@ -42,6 +49,40 @@ class HeightMinMaxBlitter extends CopyBlitter {
   }
 }
 
+/**
+ * Copies the height map into the top-left of a power-of-two target, repeating the last row and
+ * column into the padding. The min/max reduction halves each level with a 2x2 footprint, which
+ * drops the last row or column of an odd sized level; padding with edge copies avoids that
+ * without affecting either extreme.
+ */
+class HeightPadBlitter extends CopyBlitter {
+  /** (dest width, dest height, source width, source height) */
+  readonly sizes = new Vector4();
+  setup(scope: PBGlobalScope, _type: BlitType) {
+    const pb = scope.$builder;
+    if (pb.shaderKind === 'fragment') {
+      scope.padSizes = pb.vec4().uniform(0);
+    }
+  }
+  setUniforms(bindGroup: BindGroup, _sourceTex: BaseTexture) {
+    bindGroup.setValue('padSizes', this.sizes);
+  }
+  filter(
+    scope: PBInsideFunctionScope,
+    type: BlitType,
+    srcTex: PBShaderExp,
+    srcUV: PBShaderExp,
+    srcLayer: PBShaderExp,
+    sampleType: 'float' | 'int' | 'uint'
+  ) {
+    const pb = scope.$builder;
+    const sizes = scope.padSizes as PBShaderExp;
+    const texel = pb.min(pb.floor(pb.mul(srcUV, sizes.xy)), pb.sub(sizes.zw, pb.vec2(1)));
+    const uv = pb.div(pb.add(texel, pb.vec2(0.5)), sizes.zw);
+    return this.readTexel(scope, type, srcTex, uv, srcLayer, sampleType).xxxx as PBShaderExp;
+  }
+}
+
 class HeightBoundingGenerator extends RenderMipmap {
   renderPixel(
     scope: PBInsideFunctionScope,
@@ -75,6 +116,7 @@ class HeightBoundingGenerator extends RenderMipmap {
 export class ClipmapTerrain extends applyMixins(GraphNode, mixinDrawable) implements Drawable {
   private static readonly _heightBoundingGenerator = new HeightBoundingGenerator();
   private static readonly _copyBlitter = new HeightMinMaxBlitter();
+  private static readonly _padBlitter = new HeightPadBlitter();
   private static readonly _tmpBuffer = new Float32Array(MAX_TERRAIN_MIPMAP_LEVELS * 2 * 4);
   private readonly _pickTarget: PickTarget;
   private _clipmap: Clipmap;
@@ -93,6 +135,8 @@ export class ClipmapTerrain extends applyMixins(GraphNode, mixinDrawable) implem
   private _grassAssetId: string;
   private _minHeight: number;
   private _maxHeight: number;
+  /** Bumped by every height range update, so a read back overtaken by a newer one is dropped */
+  private _heightRangeSerial: number;
   private _tmpTexture: DRef<Texture2D>;
   /**
    * Creates a new clipmap terrain instance.
@@ -122,6 +166,7 @@ export class ClipmapTerrain extends applyMixins(GraphNode, mixinDrawable) implem
     this._splatMapAssetId = `assets/.embedded.dir/${this.persistentId}-splatmap.bin`;
     this._minHeight = 0;
     this._maxHeight = 0;
+    this._heightRangeSerial = 0;
     this._material = new DRef(
       new ClipmapTerrainMaterial(this.createHeightMapTexture(this._sizeX, this._sizeZ))
     );
@@ -416,34 +461,69 @@ export class ClipmapTerrain extends applyMixins(GraphNode, mixinDrawable) implem
       return;
     }
     const device = getDevice();
+    const width = nextPowerOf2(heightMap.width);
+    const height = nextPowerOf2(heightMap.height);
     let tmp = this._tmpTexture.get();
-    if (tmp && (tmp.width !== heightMap.width || tmp.height !== heightMap.height)) {
+    if (tmp && (tmp.width !== width || tmp.height !== height)) {
       this._tmpTexture.dispose();
     }
     if (!this._tmpTexture.get()) {
-      tmp = getDevice().createTexture2D(
-        device.type === 'webgl' ? 'rgba32f' : 'rg32f',
-        heightMap.width,
-        heightMap.height
-      )!;
+      tmp = getDevice().createTexture2D(device.type === 'webgl' ? 'rgba32f' : 'rg32f', width, height)!;
       tmp.name = 'TerrainBoundingBoxTexture';
       this._tmpTexture.set(tmp);
     }
     const tmpFB = device.createFrameBuffer([tmp!], null);
-    ClipmapTerrain._copyBlitter.blit(heightMap, tmpFB, fetchSampler('clamp_nearest_nomip'));
+    ClipmapTerrain._padBlitter.sizes.setXYZW(width, height, heightMap.width, heightMap.height);
+    ClipmapTerrain._padBlitter.blit(heightMap, tmpFB, fetchSampler('clamp_nearest_nomip'));
     tmpFB.dispose();
     ClipmapTerrain._heightBoundingGenerator.render(tmp!);
     const data = new Float32Array(4);
+    const serial = ++this._heightRangeSerial;
     tmp!
       .readPixels(0, 0, 1, 1, 0, tmp!.mipLevelCount - 1, data)
       .then(() => {
-        this._minHeight = data[0];
-        this._maxHeight = data[1];
+        // Loading sets the range synchronously right after a resize has started a read back of
+        // the empty height map; that stale result must not land on top of it.
+        if (serial !== this._heightRangeSerial) {
+          return;
+        }
+        // The reduction stores (max, min) in (r, g)
+        this._maxHeight = data[0];
+        this._minHeight = data[1];
         this.invalidateWorldBoundingVolume(false);
       })
       .catch((_err) => {
         console.error('Read pixels failed');
       });
+  }
+  /**
+   * Sets the height range from height map data already on the CPU, e.g. when loading.
+   *
+   * {@link ClipmapTerrain.updateBoundingBox} reads the range back from the GPU, which lands a
+   * few frames later; until then the bounds would stay flat and cull the terrain wrongly.
+   *
+   * @param data - Half float heights, one per texel
+   * @param stride - Number of half floats per texel, the height being the first
+   * @internal
+   */
+  setHeightRangeFromHalfData(data: Uint16Array, stride = 1) {
+    let minHeight = Number.POSITIVE_INFINITY;
+    let maxHeight = Number.NEGATIVE_INFINITY;
+    for (let i = 0; i < data.length; i += stride) {
+      const h = half2float(data[i]);
+      if (h < minHeight) {
+        minHeight = h;
+      }
+      if (h > maxHeight) {
+        maxHeight = h;
+      }
+    }
+    if (minHeight <= maxHeight) {
+      this._heightRangeSerial++;
+      this._minHeight = minHeight;
+      this._maxHeight = maxHeight;
+      this.invalidateWorldBoundingVolume(false);
+    }
   }
   /** @internal */
   createHeightMapTexture(width: number, height: number) {

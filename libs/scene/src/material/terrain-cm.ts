@@ -30,6 +30,11 @@ type ClipmapTerrainDetailMapInfo = {
 };
 
 const MAX_DETAIL_MAPS = 8;
+/**
+ * WebGL1 has no uniform buffers, so the per-level data goes through a plain uniform array,
+ * sized to keep within the minimum vertex uniform budget: 16 levels, 2 vectors each.
+ */
+const WEBGL1_LEVEL_DATA_VECTORS = 32;
 
 /**
  * Terrain debug rendering mode
@@ -66,6 +71,8 @@ export class ClipmapTerrainMaterial extends applyMaterialMixins(
   private readonly _splatMapSize: number;
   private readonly _heightMapSize: Vector4;
   private readonly _levelDataBuffer: DRef<GPUDataBuffer>;
+  /** WebGL1 only, see WEBGL1_LEVEL_DATA_VECTORS */
+  private readonly _levelDataArray: Float32Array<ArrayBuffer>;
   constructor(heightMap: Texture2D) {
     super();
     this.metallic = 0;
@@ -77,9 +84,11 @@ export class ClipmapTerrainMaterial extends applyMaterialMixins(
     this._heightMap = new DRef(heightMap);
     this._detailMapSize = 256;
     this._splatMapSize = 512;
+    const webgl1 = getDevice().type === 'webgl';
     this._levelDataBuffer = new DRef(
-      getDevice().createBuffer(MAX_TERRAIN_MIPMAP_LEVELS * 4 * 2 * 4, { usage: 'uniform' })
+      webgl1 ? null : getDevice().createBuffer(MAX_TERRAIN_MIPMAP_LEVELS * 4 * 2 * 4, { usage: 'uniform' })
     );
+    this._levelDataArray = new Float32Array(webgl1 ? WEBGL1_LEVEL_DATA_VECTORS * 4 : 0);
     this._detailMapInfo = this.createDetailMapInfo();
     this._terrainScale = Vector3.one();
     this._heightMapSize = new Vector4(
@@ -102,7 +111,13 @@ export class ClipmapTerrainMaterial extends applyMaterialMixins(
   }
   /** @internal */
   setLevelData(data: Float32Array<ArrayBuffer>, length: number) {
-    this._levelDataBuffer.get()!.bufferSubData(0, data, 0, length);
+    const buffer = this._levelDataBuffer.get();
+    if (buffer) {
+      buffer.bufferSubData(0, data, 0, length);
+    } else {
+      this._levelDataArray.set(data.subarray(0, Math.min(length, this._levelDataArray.length)));
+      this.uniformChanged();
+    }
   }
   /** @internal */
   get region() {
@@ -571,7 +586,10 @@ export class ClipmapTerrainMaterial extends applyMaterialMixins(
     scope.$inputs.clipmapInfo = pb.vec4().attrib('texCoord0');
     scope.$inputs.miplevel = pb.float().attrib('texCoord1');
     scope.clipmapGridInfo = pb.vec4().uniform(2);
-    scope.levelData = pb.vec4[MAX_TERRAIN_MIPMAP_LEVELS * 2]().uniformBuffer(2);
+    scope.levelData =
+      this.drawContext.device.type === 'webgl'
+        ? pb.vec4[WEBGL1_LEVEL_DATA_VECTORS]().uniform(2)
+        : pb.vec4[MAX_TERRAIN_MIPMAP_LEVELS * 2]().uniformBuffer(2);
     scope.heightMap = pb.tex2D().uniform(2);
     scope.heightMapSize = pb.vec4().uniform(2);
     scope.region = pb.vec4().uniform(2);
@@ -657,7 +675,7 @@ export class ClipmapTerrainMaterial extends applyMaterialMixins(
       scope.$l.levelStart = pb.vec4();
       scope.$l.levelDiff = pb.vec4();
       scope.$l.index = pb.mul(pb.int(scope.$inputs.miplevel), 2);
-      scope.$for(pb.int('i'), 0, 32, function () {
+      scope.$for(pb.int('i'), 0, WEBGL1_LEVEL_DATA_VECTORS, function () {
         this.$if(pb.equal(this.i, this.index), function () {
           this.levelStart = this.levelData.at(this.i);
           this.levelDiff = this.levelData.at(pb.add(this.i, 1));
@@ -817,7 +835,12 @@ export class ClipmapTerrainMaterial extends applyMaterialMixins(
       fetchSampler(heightMap.mipLevelCount > 1 ? 'clamp_linear' : 'clamp_linear_nomip')
     );
     bindGroup.setValue('heightMapSize', this._heightMapSize);
-    bindGroup.setBuffer('levelData', this._levelDataBuffer.get()!);
+    const levelDataBuffer = this._levelDataBuffer.get();
+    if (levelDataBuffer) {
+      bindGroup.setBuffer('levelData', levelDataBuffer);
+    } else {
+      bindGroup.setValue('levelData', this._levelDataArray);
+    }
     if (this.needFragmentColor(ctx)) {
       if (this._detailMapInfo.numDetailMaps > 0) {
         bindGroup.setTexture('splatMap', this._detailMapInfo.splatMap.get()!);
