@@ -86,7 +86,10 @@ export class ClipmapGrassMaterial
     super.applyUniformValues(bindGroup, ctx, pass);
     const terrain = this._terrain.get()!;
     this._terrainPosScale.setXYZW(terrain.scale.x, terrain.scale.y, terrain.scale.z, terrain.worldMatrix.m13);
-    bindGroup.setTexture('terrainHeightMap', terrain.heightMap!, fetchSampler('clamp_linear_nomip'));
+    const heightMap = terrain.heightMap!;
+    // The height map can be resized or replaced after construction
+    this._heightMapSize.setXY(1 / heightMap.width, 1 / heightMap.height);
+    bindGroup.setTexture('terrainHeightMap', heightMap, fetchSampler('clamp_linear_nomip'));
     bindGroup.setValue('heightMapSize', this._heightMapSize);
     bindGroup.setValue('terrainRegion', terrain.worldRegion);
     bindGroup.setValue('terrainPosScale', this._terrainPosScale);
