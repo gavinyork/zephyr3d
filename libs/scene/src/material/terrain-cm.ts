@@ -457,47 +457,85 @@ export class ClipmapTerrainMaterial extends applyMaterialMixins(
     });
     return pb.getGlobalScope()[funcName](...this.splatMaskArgs(scope, numDetailMaps)) as PBShaderExp;
   }
+  /**
+   * Height of a clipmap vertex, blended towards the next coarser level across the outer part of
+   * its ring (the transition regions of Hoppe's GPU geometry clipmaps).
+   *
+   * The outer boundary of level L lies on grid lines of level L + 1, so its vertices already sit
+   * where the coarser ring's do; only their heights have to agree. hC is the height the coarser
+   * mesh has at the vertex: its own height where a coarse vertex coincides, the mean of the two
+   * coarse vertices around the edge midpoints, the mean of the four corners at cell centres
+   * (never on a boundary, only has to be continuous). With alpha reaching 1 before the boundary,
+   * boundary vertices lie exactly on the coarse edges and the rings meet without T-junction
+   * cracks. The inner boundary needs no blend: it is the finer level's outer one.
+   *
+   * @param uv - Height map coordinate of the vertex
+   * @param gridCoord - Global grid coordinate of the vertex, in grid cells
+   * @param pos - World XZ of the vertex
+   */
   sampleHeightMap(
     scope: PBInsideFunctionScope,
     uv: PBShaderExp,
+    gridCoord: PBShaderExp,
     pos: PBShaderExp,
     levelStart: PBShaderExp,
     levelDiff: PBShaderExp
   ) {
     const pb = scope.$builder;
-    const morphRange = 0.5;
+    // Blend over the outer 40% of the ring, fully coarse over its last 5% so boundary vertices
+    // are unaffected by rounding in the ring ratio.
+    const transitionStart = 0.6;
+    const transitionEnd = 0.95;
     pb.func(
       'sampleHeightMap',
-      [pb.vec2('uv'), pb.vec2('pos'), pb.vec4('levelStart'), pb.vec4('levelDiff')],
+      [pb.vec2('uv'), pb.vec2('gridCoord'), pb.vec2('pos'), pb.vec4('levelStart'), pb.vec4('levelDiff')],
       function () {
-        this.$l.h1 = pb.textureSampleLevel(this.heightMap, this.uv, this.$inputs.miplevel).r;
+        this.$l.h = pb.textureSampleLevel(this.heightMap, this.uv, this.$inputs.miplevel).r;
         this.$l.ratio = pb.mul(pb.sub(this.pos.xyxy, this.levelStart), this.levelDiff);
-        this.$l.maxVal = pb.clamp(
-          pb.max(pb.max(this.ratio.x, this.ratio.y), pb.max(this.ratio.z, this.ratio.w)),
+        this.$l.maxVal = pb.max(pb.max(this.ratio.x, this.ratio.y), pb.max(this.ratio.z, this.ratio.w));
+        this.$l.alpha = pb.clamp(
+          pb.div(pb.sub(this.maxVal, transitionStart), transitionEnd - transitionStart),
           0,
           1
         );
-        this.$l.morphFactor = pb.float(0);
-        this.$if(pb.greaterThan(this.maxVal, 1 - morphRange), function () {
-          this.$l.h2 = pb.textureSampleLevel(this.heightMap, this.uv, pb.add(this.$inputs.miplevel, 1)).r;
-          this.morphFactor = pb.div(pb.sub(this.maxVal, 1 - morphRange), morphRange * 2);
-          this.h1 = pb.mix(this.h1, this.h2, this.morphFactor);
+        this.$if(pb.greaterThan(this.alpha, 0), function () {
+          this.$l.levelScale = pb.exp2(this.$inputs.miplevel);
+          // Vertex index in this level; the coarser level's vertices are its even ones
+          this.$l.index = pb.div(this.gridCoord, this.levelScale);
+          this.$l.odd = pb.sub(this.index, pb.mul(pb.floor(pb.mul(this.index, 0.5)), 2));
+          // Height map distance to the neighbouring coarse vertices along the odd axes
+          this.$l.d = pb.div(
+            pb.mul(this.odd, pb.mul(this.levelScale, this.clipmapGridInfo.x)),
+            pb.sub(this.region.zw, this.region.xy)
+          );
+          this.$l.coarseLevel = pb.add(this.$inputs.miplevel, 1);
+          this.$l.hc = pb.mul(
+            pb.add(
+              pb.add(
+                pb.textureSampleLevel(this.heightMap, pb.sub(this.uv, this.d), this.coarseLevel).r,
+                pb.textureSampleLevel(this.heightMap, pb.add(this.uv, this.d), this.coarseLevel).r
+              ),
+              pb.add(
+                pb.textureSampleLevel(
+                  this.heightMap,
+                  pb.add(this.uv, pb.vec2(this.d.x, pb.neg(this.d.y))),
+                  this.coarseLevel
+                ).r,
+                pb.textureSampleLevel(
+                  this.heightMap,
+                  pb.add(this.uv, pb.vec2(pb.neg(this.d.x), this.d.y)),
+                  this.coarseLevel
+                ).r
+              )
+            ),
+            0.25
+          );
+          this.h = pb.mix(this.h, this.hc, this.alpha);
         });
-        this.$if(pb.lessThan(this.maxVal, morphRange), function () {
-          this.$l.h2 = pb.textureSampleLevel(
-            this.heightMap,
-            this.uv,
-            pb.max(pb.sub(this.$inputs.miplevel, 1), 0)
-          ).r;
-          // 0.5 at the inner edge (matching the finer level's outer edge), fading to 0 at the
-          // middle of the ring where the other branch takes over with the same value.
-          this.morphFactor = pb.mul(pb.sub(1, pb.div(this.maxVal, morphRange)), 0.5);
-          this.h1 = pb.mix(this.h1, this.h2, this.morphFactor);
-        });
-        this.$return(this.h1);
+        this.$return(this.h);
       }
     );
-    return scope.sampleHeightMap(uv, pos, levelStart, levelDiff);
+    return scope.sampleHeightMap(uv, gridCoord, pos, levelStart, levelDiff);
   }
   /**
    * Terrain tangent frame at the fragment, differentiated from the height map itself.
@@ -624,6 +662,18 @@ export class ClipmapTerrainMaterial extends applyMaterialMixins(
       ShaderHelper.getWorldMatrix(scope),
       pb.vec4(scope.clipmapPos.x, 0, scope.clipmapPos.y, 1)
     ).xyz;
+    // Heights are evaluated at the unclamped grid point: every level computes the same function
+    // of its own grid, which keeps the rings matching. Beyond the region the sampler clamps to
+    // the edge texels, the same heights the clamped position would get.
+    scope.$l.gridPos = scope.clipmapWorldPos.xz;
+    scope.$l.gridUV = pb.div(
+      pb.sub(scope.gridPos, scope.region.xy),
+      pb.sub(scope.region.zw, scope.region.xy)
+    );
+    // Global grid coordinate in cells, see ClipmapGatherContext.gridOriginX
+    scope.$l.gridCoord = pb.floor(
+      pb.add(pb.div(pb.add(scope.clipmapPos, scope.clipmapGridInfo.yz), scope.clipmapGridInfo.x), 0.5)
+    );
     // Keep the grid inside the terrain region instead of discarding fragments outside of it,
     // which would cost early-Z on the largest occluder in the scene. The clipmap grid is
     // axis-aligned, so clamping collapses triangles lying outside into zero-area ones and snaps
@@ -656,8 +706,9 @@ export class ClipmapTerrainMaterial extends applyMaterialMixins(
 
     scope.$l.height = this.sampleHeightMap(
       scope,
-      scope.$outputs.uv,
-      scope.clipmapWorldPos.xz,
+      scope.gridUV,
+      scope.gridCoord,
+      scope.gridPos,
       scope.levelStart,
       scope.levelDiff
     );
