@@ -279,8 +279,20 @@ class VirtualTexture extends Disposable {
 | 请求优先级 `count × (1 + level)`、按预算截断 | `Engine/Source/Runtime/Renderer/Private/VT/UniqueRequestList.h`：`SortRequests`；预算 `r.VT.MaxUploadsPerFrame` 见 `Engine/Source/Runtime/Engine/Private/VT/VirtualTextureScalability.cpp` |
 | 预取：未驻留时连带请求比驻留级细最多 2 级的祖先页 | `Engine/Source/Runtime/Renderer/Private/VT/VirtualTextureSystem.cpp`（`PrefetchLocal_vLevel = AllocatedLocal_vLevel - min(2, AllocatedLocal_vLevel)`） |
 
+| 空闲阈值：最近 N 帧内用过的页不算空闲（默认 15），应对稀疏/轮换标记 | `r.VT.PageFreeThreshold`，`Engine/Source/Runtime/Engine/Private/VT/VirtualTextureScalability.cpp`；使用处 `TexturePagePool.cpp` `AnyFreeAvailable` |
+| 驻留 mip 偏移：池使用率超上限时提高全局 mip 偏移，低于下限时回落；速率 0.2、上限 4 级、常驻页占比 > 0.65 时关闭 | `Engine/Source/Runtime/Renderer/Private/VT/VirtualTexturePhysicalSpace.cpp` `UpdateResidencyTracking`；偏移加在取整前见 `VirtualTextureCommon.ush` `TextureComputeVirtualMipLevel` |
+
 **与 UE 不同之处**
 - 请求用每帧清零的计数 buffer（UE VSM 用每帧清零的 `PageRequestFlags` 纹理，UE RVT 用 CPU 读回的反馈计数）。我们需要 GPU 上的计数来做 RVT 的优先级，所以合并成一个计数 buffer。
 - 预算内的 top-K 选择在 GPU 上用 log2 直方图门槛近似 UE 的 CPU 排序，同桶内不严格有序。
 - 页表用 storage buffer 而不是纹理（见"风险与待定事项"）。
+- 驻留 mip 偏移的下限默认 0.8（UE 上下限都是 0.95）。页要过空闲阈值才退出"在用"，上下限相等时偏移会追着自己刚造成的驻留率变化来回调整，阶段 1 示例中表现为级别边界上下游走。
+- Allocate 先占填充名额再弹出物理页，保证映射过的页一定被填充；UE VSM 的分配与渲染是分开的两步，不存在这个问题。
+
+## 实施记录
+
+- 阶段 0（`f5555b89`）：`computeIndirect`，示例 `examples/src/indirectdispatch`。
+- 阶段 1（`0ab89456`）：`libs/scene/src/render/virtualtexture/virtual_texture.ts`，示例 `examples/src/virtualtexture`，单元测试 `test/src/scene/virtual_texture.test.ts`。
+  - 调试辅助：`renderDebugTexture(level)` 页表可视化；`stats` 计数；`validate()` 读回检查 6 个不变量（丢失/重复/归属错误/共享/常驻缺失/完全未映射）。
+  - 验证中发现并修复：绑定时须按变量名走 `nameMap`（布局条目是 `zUBC_*` 块名）；初始 LRU 须写入第一次 update 读取的那份交替 buffer；JS 位运算常量须 `>>> 0`。
 
