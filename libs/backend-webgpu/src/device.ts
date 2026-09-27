@@ -1065,6 +1065,34 @@ export class WebGPUDevice extends BaseDevice {
       workgroupCountZ
     );
   }
+  protected _computeIndirect(indirectBuffer: GPUDataBuffer, indirectOffset: number) {
+    const buffer = indirectBuffer as unknown as WebGPUBuffer;
+    if (!(indirectBuffer.usage & GPUResourceUsageFlags.BF_INDIRECT)) {
+      console.error(`computeIndirect(): indirect buffer must be created with 'indirect' usage`);
+      return;
+    }
+    if (indirectOffset % 4 !== 0) {
+      console.error(`computeIndirect(): indirect offset must be a multiple of 4`);
+      return;
+    }
+    const requiredSize = indirectOffset + 12;
+    if (requiredSize > indirectBuffer.byteLength) {
+      console.error(
+        `computeIndirect(): indirect buffer too small, requires ${requiredSize} bytes but buffer is ${indirectBuffer.byteLength} bytes`
+      );
+      return;
+    }
+    if (!buffer.object) {
+      return;
+    }
+    this._commandQueue.computeIndirect(
+      this._currentProgram!,
+      this._currentBindGroups,
+      this._currentBindGroupOffsets,
+      buffer,
+      indirectOffset
+    );
+  }
   private configure() {
     this._backBufferFormat = navigator.gpu.getPreferredCanvasFormat();
     this._depthFormat = this._deviceCaps.framebufferCaps.supportDepth32floatStencil8

@@ -58,6 +58,7 @@ export class NullMiscCaps implements MiscCaps {
   supportTimestampQuery: boolean;
   supportClipControl: boolean;
   supportDrawIndirect: boolean;
+  supportDispatchIndirect: boolean;
   constructor(type: NullDeviceType, overrides?: Partial<MiscCaps>) {
     const webgl1 = type === 'webgl';
     this.supportOversizedViewport = type !== 'webgpu';
@@ -68,6 +69,7 @@ export class NullMiscCaps implements MiscCaps {
     this.supportTimestampQuery = false;
     this.supportClipControl = type === 'webgpu';
     this.supportDrawIndirect = type === 'webgpu';
+    this.supportDispatchIndirect = type === 'webgpu';
     Object.assign(this, overrides ?? {});
   }
 }

@@ -2,6 +2,7 @@ import type { WebGPUProgram } from './gpuprogram_webgpu';
 import type { WebGPUBindGroup } from './bindgroup_webgpu';
 import type { WebGPUDevice } from './device';
 import type { Nullable } from '@zephyr3d/base';
+import type { WebGPUBuffer } from './buffer_webgpu';
 
 const VALIDATION_FAILED = 1 << 0;
 
@@ -25,9 +26,34 @@ export class WebGPUComputePass {
     workgroupCountY: number,
     workgroupCountZ: number
   ) {
+    const pipeline = this.prepareDispatch(program, bindGroups, bindGroupOffsets);
+    if (pipeline) {
+      this._computePassEncoder!.setPipeline(pipeline);
+      this._computePassEncoder!.dispatchWorkgroups(workgroupCountX, workgroupCountY, workgroupCountZ);
+    }
+  }
+  computeIndirect(
+    program: WebGPUProgram,
+    bindGroups: WebGPUBindGroup[],
+    bindGroupOffsets: Nullable<Iterable<number>>[],
+    indirectBuffer: WebGPUBuffer,
+    indirectOffset: number
+  ) {
+    const pipeline = this.prepareDispatch(program, bindGroups, bindGroupOffsets);
+    if (pipeline) {
+      this._computePassEncoder!.setPipeline(pipeline);
+      this._computePassEncoder!.dispatchWorkgroupsIndirect(indirectBuffer.object!, indirectOffset);
+    }
+  }
+  /** Validates, begins the pass if needed and binds; returns the pipeline or null to skip */
+  private prepareDispatch(
+    program: WebGPUProgram,
+    bindGroups: WebGPUBindGroup[],
+    bindGroupOffsets: Nullable<Iterable<number>>[]
+  ) {
     const validation = this.validateCompute(program, bindGroups);
     if (validation & VALIDATION_FAILED) {
-      return;
+      return null;
     }
     if (this._device.commandQueue.hasDeferredMipmapsForBindGroups(bindGroups)) {
       this.end();
@@ -37,11 +63,7 @@ export class WebGPUComputePass {
       this.begin();
     }
     this.setBindGroupsForCompute(this._computePassEncoder!, program, bindGroups, bindGroupOffsets);
-    const pipeline = this._device.pipelineCache.fetchComputePipeline(program);
-    if (pipeline) {
-      this._computePassEncoder!.setPipeline(pipeline);
-      this._computePassEncoder!.dispatchWorkgroups(workgroupCountX, workgroupCountY, workgroupCountZ);
-    }
+    return this._device.pipelineCache.fetchComputePipeline(program) ?? null;
   }
   private setBindGroupsForCompute(
     computePassEncoder: GPUComputePassEncoder,

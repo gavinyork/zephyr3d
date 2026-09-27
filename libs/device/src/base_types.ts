@@ -2285,6 +2285,8 @@ export interface MiscCaps {
   supportClipControl: boolean;
   /** True if the device supports indirect draw calls (WebGPU only) */
   supportDrawIndirect: boolean;
+  /** True if the device supports indirect compute dispatches (WebGPU only) */
+  supportDispatchIndirect: boolean;
 }
 
 /**
@@ -3125,6 +3127,18 @@ export interface AbstractDevice extends IEventTarget<DeviceEventMap> {
    * @param workgroupCountZ - Z dimension of the grid of workgroups to be dispatch
    */
   compute(workgroupCountX: number, workgroupCountY: number, workgroupCountZ: number): void;
+  /**
+   * Dispatches a compute task, reading the workgroup counts from a GPU buffer
+   *
+   * @remarks
+   * Requires {@link MiscCaps.supportDispatchIndirect}. The buffer must be created with
+   * the 'indirect' usage and contain a tightly packed group of 3 uint32 values:
+   * workgroupCountX, workgroupCountY, workgroupCountZ.
+   *
+   * @param indirectBuffer - The buffer holding the dispatch arguments
+   * @param indirectOffset - Byte offset of the dispatch arguments within the buffer, must be a multiple of 4
+   */
+  computeIndirect(indirectBuffer: GPUDataBuffer, indirectOffset?: number): void;
   /**
    * Schedules a function to be executed at the beginning of the next frame
    *

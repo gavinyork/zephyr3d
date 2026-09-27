@@ -207,6 +207,19 @@ export class CommandQueueImmediate {
     const segment = this.getOrCreateCurrentSegment();
     segment.hasBodyCommands = true;
   }
+  computeIndirect(
+    program: WebGPUProgram,
+    bindGroups: WebGPUBindGroup[],
+    bindGroupOffsets: Nullable<Iterable<number>>[],
+    indirectBuffer: WebGPUBuffer,
+    indirectOffset: number
+  ) {
+    this._drawcallCounter++;
+    this.ensureComputeBodyReady();
+    this._computePass.computeIndirect(program, bindGroups, bindGroupOffsets, indirectBuffer, indirectOffset);
+    const segment = this.getOrCreateCurrentSegment();
+    segment.hasBodyCommands = true;
+  }
   draw(
     program: WebGPUProgram,
     vertexData: Nullable<WebGPUVertexLayout>,

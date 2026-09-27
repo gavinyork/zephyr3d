@@ -484,6 +484,7 @@ export abstract class BaseDevice extends Observable<DeviceEventMap> {
     workgroupCountY: number,
     workgroupCountZ: number
   ): void;
+  protected abstract _computeIndirect(indirectBuffer: GPUDataBuffer, indirectOffset: number): void;
   get backend() {
     return this._backend;
   }
@@ -778,6 +779,10 @@ export abstract class BaseDevice extends Observable<DeviceEventMap> {
   compute(workgroupCountX: number, workgroupCountY: number, workgroupCountZ: number) {
     this._frameInfo.computeCalls++;
     this._compute(workgroupCountX, workgroupCountY, workgroupCountZ);
+  }
+  computeIndirect(indirectBuffer: GPUDataBuffer, indirectOffset = 0) {
+    this._frameInfo.computeCalls++;
+    this._computeIndirect(indirectBuffer, indirectOffset);
   }
   runNextFrame(f: () => void) {
     if (f) {
