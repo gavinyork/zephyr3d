@@ -591,6 +591,16 @@ export class Clipmap extends Disposable {
       vertices[(clipmapVertResolution * 3 + i) * 3 + 1] = clipmapVertResolution - i;
       vertices[(clipmapVertResolution * 3 + i) * 3 + 2] = 0;
     }
+    // Seam triangles are collinear in XZ by design: each odd vertex is the midpoint between two
+    // coarse-level vertices. Flag those midpoints with position.z = -side (1..4) so a shader
+    // clamping the grid to a finite region can snap them onto their previous neighbour when
+    // the whole seam edge lies outside it; otherwise the flap they form stands up as a vertical
+    // curtain along the region border. Negative, so it never reads as the skirt flag.
+    for (let side = 0; side < 4; side++) {
+      for (let i = 1; i < clipmapVertResolution; i += 2) {
+        vertices[(clipmapVertResolution * side + i) * 3 + 2] = -(side + 1);
+      }
+    }
     const indices = new Uint16Array(clipmapVertResolution * 6);
     let n = 0;
     for (let i = 0; i < clipmapVertResolution * 4; i += 2) {

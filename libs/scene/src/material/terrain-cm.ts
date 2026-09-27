@@ -510,10 +510,7 @@ export class ClipmapTerrainMaterial extends applyMaterialMixins(
         // World-space distance between the two samples of each central difference. Derived
         // from the region rather than assuming one height map texel spans scale.x units,
         // which only holds when the height map resolution equals the terrain size.
-        this.$l.sampleDist = pb.mul(
-          pb.sub(this.region.zw, this.region.xy),
-          pb.mul(this.texelSize, 2)
-        );
+        this.$l.sampleDist = pb.mul(pb.sub(this.region.zw, this.region.xy), pb.mul(this.texelSize, 2));
         this.$l.hL = that.sampleHeightMap(
           this,
           pb.sub(this.uv, pb.vec2(this.texelSize.x, 0)),
@@ -596,12 +593,55 @@ export class ClipmapTerrainMaterial extends applyMaterialMixins(
       1
     );
 
-    scope.$l.clipmapPos = pb.mul(scope.clipmapMatrix, pb.vec4(scope.$inputs.position, 1)).xy;
+    scope.$l.localPos = scope.$inputs.position.xy;
+    // position.z = -side flags a seam midpoint (see Clipmap.generateSeamMesh). When the seam edge
+    // lies outside the region, clamping would line its flaps up along the border as vertical
+    // curtains, so the midpoint takes its neighbour's local position instead: both then run the
+    // exact same math below, land on the same point, and the flap degenerates.
+    scope.$l.seamSide = pb.neg(scope.$inputs.position.z);
+    scope.$if(pb.greaterThan(scope.seamSide, 0.5), function () {
+      this.$l.probeLocal = pb.mul(this.clipmapMatrix, pb.vec4(this.localPos, 0, 1)).xy;
+      this.$l.probe = pb.mul(
+        ShaderHelper.getWorldMatrix(this),
+        pb.vec4(this.probeLocal.x, 0, this.probeLocal.y, 1)
+      ).xz;
+      // Sides 1 and 3 run along local x (world x, seams are never rotated), so the border they
+      // can lie beyond is a z one; sides 2 and 4 run along z.
+      this.$l.alongX = pb.greaterThan(pb.mod(this.seamSide, 2), 0.5);
+      this.$l.outside = pb.or(
+        pb.and(
+          this.alongX,
+          pb.or(pb.lessThan(this.probe.y, this.region.y), pb.greaterThan(this.probe.y, this.region.w))
+        ),
+        pb.and(
+          pb.not(this.alongX),
+          pb.or(pb.lessThan(this.probe.x, this.region.x), pb.greaterThan(this.probe.x, this.region.z))
+        )
+      );
+      this.$if(this.outside, function () {
+        // The previous seam vertex sits one unit back along the side: -x, -y, +x, +y for sides 1..4
+        this.$l.dir = pb.sub(pb.mul(pb.float(pb.greaterThan(this.seamSide, 2.5)), 2), 1);
+        this.localPos = pb.add(
+          this.localPos,
+          pb.mul(pb.vec2(pb.float(this.alongX), pb.float(pb.not(this.alongX))), this.dir)
+        );
+      });
+    });
+    scope.$l.clipmapPos = pb.mul(scope.clipmapMatrix, pb.vec4(scope.localPos, 0, 1)).xy;
 
     scope.$l.clipmapWorldPos = pb.mul(
       ShaderHelper.getWorldMatrix(scope),
       pb.vec4(scope.clipmapPos.x, 0, scope.clipmapPos.y, 1)
     ).xyz;
+    // Keep the grid inside the terrain region instead of discarding fragments outside of it,
+    // which would cost early-Z on the largest occluder in the scene. The clipmap grid is
+    // axis-aligned, so clamping collapses triangles lying outside into zero-area ones and snaps
+    // the ones crossing the border exactly onto it.
+    scope.clipmapWorldPos = pb.vec3(
+      pb.clamp(scope.clipmapWorldPos.x, scope.region.x, scope.region.z),
+      scope.clipmapWorldPos.y,
+      pb.clamp(scope.clipmapWorldPos.z, scope.region.y, scope.region.w)
+    );
     scope.$outputs.uv = pb.div(
       pb.sub(scope.clipmapWorldPos.xz, scope.region.xy),
       pb.sub(scope.region.zw, scope.region.xy)
@@ -634,25 +674,29 @@ export class ClipmapTerrainMaterial extends applyMaterialMixins(
       scope.clipmapWorldPos,
       pb.vec3(0, pb.mul(scope.height, scope.terrainScale.y), 0)
     );
-    scope.$l.t = pb.vec3();
-    scope.$l.b = pb.vec3();
-    scope.$l.n = pb.vec3();
-    this.calculateTerrainTBN(
-      scope,
-      scope.clipmapWorldPos.xz,
-      scope.$outputs.uv,
-      scope.heightMapSize,
-      scope.terrainScale,
-      scope.levelStart,
-      scope.levelDiff,
-      scope.t,
-      scope.b,
-      scope.n
-    );
     scope.$outputs.clipmapPos = scope.clipmapWorldPos;
-    scope.$outputs.worldTangent = scope.t;
-    scope.$outputs.worldBinormal = scope.b;
-    scope.$outputs.worldNormal = scope.n;
+    // The frame only feeds shading; depth-only and shadow passes skip its eight extra
+    // height fetches.
+    if (this.needFragmentColor()) {
+      scope.$l.t = pb.vec3();
+      scope.$l.b = pb.vec3();
+      scope.$l.n = pb.vec3();
+      this.calculateTerrainTBN(
+        scope,
+        scope.clipmapWorldPos.xz,
+        scope.$outputs.uv,
+        scope.heightMapSize,
+        scope.terrainScale,
+        scope.levelStart,
+        scope.levelDiff,
+        scope.t,
+        scope.b,
+        scope.n
+      );
+      scope.$outputs.worldTangent = scope.t;
+      scope.$outputs.worldBinormal = scope.b;
+      scope.$outputs.worldNormal = scope.n;
+    }
     ShaderHelper.setClipSpacePosition(
       scope,
       pb.mul(ShaderHelper.getViewProjectionMatrix(scope), pb.vec4(scope.$outputs.worldPos, 1))
@@ -663,13 +707,6 @@ export class ClipmapTerrainMaterial extends applyMaterialMixins(
     super.fragmentShader(scope);
     const pb = scope.$builder;
     scope.region = pb.vec4().uniform(2);
-    scope.$l.discardable = pb.or(
-      pb.any(pb.lessThan(scope.$inputs.uv, pb.vec2(0))),
-      pb.any(pb.greaterThan(scope.$inputs.uv, pb.vec2(1)))
-    );
-    scope.$if(scope.discardable, function () {
-      pb.discard();
-    });
     if (this.needFragmentColor()) {
       scope.heightMap = pb.tex2D().uniform(2);
       const numDetailMaps = this.featureUsed<number>(ClipmapTerrainMaterial.FEATURE_DETAIL_MAP);

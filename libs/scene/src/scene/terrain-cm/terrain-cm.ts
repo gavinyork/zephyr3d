@@ -1,4 +1,4 @@
-import type { Immutable, Matrix4x4, Nullable } from '@zephyr3d/base';
+import type { AABB, Immutable, Matrix4x4, Nullable } from '@zephyr3d/base';
 import { Vector4, applyMixins, Vector3, DRef, randomUUID } from '@zephyr3d/base';
 import type { PBInsideFunctionScope, PBShaderExp, Texture2D } from '@zephyr3d/device';
 import type { Scene } from '../scene';
@@ -71,7 +71,9 @@ export class ClipmapTerrain extends applyMixins(GraphNode, mixinDrawable) implem
   private static readonly _tmpBuffer = new Float32Array(MAX_TERRAIN_MIPMAP_LEVELS * 2 * 4);
   private readonly _pickTarget: PickTarget;
   private _clipmap: Clipmap;
+  private _shadowClipmap: Clipmap;
   private _renderData: Nullable<PrimitiveInstanceInfo[]>;
+  private _shadowRenderData: Nullable<PrimitiveInstanceInfo[]>;
   private _gridScale: number;
   private _material: DRef<ClipmapTerrainMaterial>;
   private _grassRenderer: DRef<GrassRenderer>;
@@ -98,7 +100,9 @@ export class ClipmapTerrain extends applyMixins(GraphNode, mixinDrawable) implem
     super(scene);
     this._pickTarget = { node: this };
     this._clipmap = new Clipmap(clipMapTileSize, ['tex1_f32'], MAX_TERRAIN_MIPMAP_LEVELS);
+    this._shadowClipmap = new Clipmap(clipMapTileSize, ['tex1_f32'], MAX_TERRAIN_MIPMAP_LEVELS);
     this._renderData = null;
+    this._shadowRenderData = null;
     this._grassRenderer = new DRef(new GrassRenderer(this));
     this._gridScale = 1;
     this._castShadow = true;
@@ -268,6 +272,7 @@ export class ClipmapTerrain extends applyMixins(GraphNode, mixinDrawable) implem
   }
   set wireframe(val) {
     this._clipmap.wireframe = val;
+    this._shadowClipmap.wireframe = val;
   }
   /**
    * {@inheritDoc Drawable.getPickTarget }
@@ -446,26 +451,48 @@ export class ClipmapTerrain extends applyMixins(GraphNode, mixinDrawable) implem
     if (!mat) {
       return;
     }
-    const that = this;
-    const bv = this.getWorldBoundingVolume()!.toAABB();
+    const bv = this.getWorldBoundingVolume()?.toAABB() ?? null;
+    const originY = this.worldMatrix.m13;
+    const calcAABB = (
+      _userData: unknown,
+      minX: number,
+      maxX: number,
+      minZ: number,
+      maxZ: number,
+      outAABB: AABB
+    ) => {
+      outAABB.minPoint.setXYZ(minX, bv ? bv.minPoint.y : originY - 9999, minZ);
+      outAABB.maxPoint.setXYZ(maxX, bv ? bv.maxPoint.y : originY + 9999, maxZ);
+    };
+    // Passes rendered from this camera only need the tiles inside its frustum. Shadow passes
+    // render from the light and need casters outside of it too, so they get an unculled set
+    // built around the same camera (same levels, so the level data below serves both).
     this._renderData = this._clipmap.gather({
       camera: camera,
       minMaxWorldPos: mat.region,
       gridScale: this._gridScale,
       userData: this,
-      frustumCulling: !this.castShadow,
-      calcAABB(userData: unknown, minX, maxX, minZ, maxZ, outAABB) {
-        const p = that.worldMatrix.transformPointAffine(Vector3.zero());
-        outAABB.minPoint.setXYZ(minX, bv ? bv.minPoint.y : p.y - 9999, minZ);
-        outAABB.maxPoint.setXYZ(maxX, bv ? bv.maxPoint.y : p.y + 9999, maxZ);
-      }
+      frustumCulling: true,
+      calcAABB
     });
+    this._shadowRenderData = this.castShadow
+      ? this._shadowClipmap.gather({
+          camera: camera,
+          minMaxWorldPos: mat.region,
+          gridScale: this._gridScale,
+          userData: this,
+          frustumCulling: false,
+          calcAABB
+        })
+      : null;
     let maxMipLevel = 0;
-    for (const info of this._renderData) {
-      const buffer = info.primitive.getVertexBuffer('texCoord1')!;
-      buffer.bufferSubData(0, info.mipLevels, 0, info.numInstances);
-      if (info.maxMiplevel > maxMipLevel) {
-        maxMipLevel = info.maxMiplevel;
+    for (const renderData of [this._renderData, this._shadowRenderData]) {
+      for (const info of renderData ?? []) {
+        const buffer = info.primitive.getVertexBuffer('texCoord1')!;
+        buffer.bufferSubData(0, info.mipLevels, 0, info.numInstances);
+        if (info.maxMiplevel > maxMipLevel) {
+          maxMipLevel = info.maxMiplevel;
+        }
       }
     }
     const levelAABB = this._clipmap.calcLevelAABB(camera, mat.region, this._gridScale);
@@ -520,13 +547,12 @@ export class ClipmapTerrain extends applyMixins(GraphNode, mixinDrawable) implem
       this.bind(ctx, renderQueue);
       mat.setClipmapGridInfo(this._gridScale, this.worldMatrix.m03, this.worldMatrix.m23);
       mat.apply(ctx);
-      for (const info of this._renderData!) {
+      const isShadowPass = ctx.renderPass!.type === RENDER_PASS_TYPE_SHADOWMAP;
+      const renderData = isShadowPass ? this._shadowRenderData : this._renderData;
+      for (const info of renderData ?? []) {
         mat.draw(info.primitive, ctx, info.numInstances);
       }
-      if (
-        ctx.renderPass!.type !== RENDER_PASS_TYPE_OBJECT_COLOR &&
-        ctx.renderPass!.type !== RENDER_PASS_TYPE_SHADOWMAP
-      ) {
+      if (ctx.renderPass!.type !== RENDER_PASS_TYPE_OBJECT_COLOR && !isShadowPass) {
         this.grassRenderer.draw(ctx);
       }
     }
@@ -612,6 +638,7 @@ export class ClipmapTerrain extends applyMixins(GraphNode, mixinDrawable) implem
   protected onDispose() {
     super.onDispose();
     this._clipmap?.dispose();
+    this._shadowClipmap?.dispose();
     this._material?.dispose();
     this._grassRenderer?.dispose();
   }
