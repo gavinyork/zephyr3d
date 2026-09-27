@@ -224,7 +224,8 @@ export function getTerrainClass(manager: ResourceManager): SerializableClass {
             return false;
           },
           get(this: ClipmapTerrain, value) {
-            const data: { texture: string; bladeWidth: number; bladeHeight: number }[] = [];
+            const data: { texture: string; bladeWidth: number; bladeHeight: number; drawDistance: number }[] =
+              [];
             const numLayers = this.grassRenderer.numLayers;
             for (let i = 0; i < numLayers; i++) {
               const grassTexture = this.grassRenderer.getGrassTexture(i);
@@ -232,7 +233,8 @@ export function getTerrainClass(manager: ResourceManager): SerializableClass {
               data.push({
                 texture: assetId,
                 bladeWidth: this.grassRenderer.getBladeWidth(i),
-                bladeHeight: this.grassRenderer.getBladeHeight(i)
+                bladeHeight: this.grassRenderer.getBladeHeight(i),
+                drawDistance: this.grassRenderer.getDrawDistance(i)
               });
             }
             value.object[0] = new JSONArray(null, data);
@@ -244,6 +246,7 @@ export function getTerrainClass(manager: ResourceManager): SerializableClass {
                 texture: string;
                 bladeWidth: number;
                 bladeHeight: number;
+                drawDistance?: number;
               }[]) ?? [];
             for (let i = 0; i < data.length; i++) {
               const info = data[i];
@@ -262,7 +265,14 @@ export function getTerrainClass(manager: ResourceManager): SerializableClass {
                   texture = null;
                 }
               }
-              this.grassRenderer.addLayer(info.bladeWidth ?? 1, info.bladeHeight ?? 1, texture!);
+              const layer = this.grassRenderer.addLayer(
+                info.bladeWidth ?? 1,
+                info.bladeHeight ?? 1,
+                texture!
+              );
+              if (info.drawDistance !== undefined) {
+                this.grassRenderer.setDrawDistance(layer, info.drawDistance);
+              }
             }
           }
         },

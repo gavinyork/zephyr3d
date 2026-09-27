@@ -16,6 +16,14 @@ import {
 
 const tmpAABB = new AABB();
 const tmpV3 = new Vector3();
+// Scratch vectors for gather() and calcLevelAABB(), which run per camera every frame
+const tmpSnappedPos = new Vector2();
+const tmpTileSize = new Vector2();
+const tmpBase = new Vector2();
+const tmpOffset = new Vector2();
+const tmpNextSnappedPos = new Vector2();
+const tmpTileCentre = new Vector2();
+const tmpNextBase = new Vector2();
 const rotationValues = [0, Math.PI * 1.5, Math.PI * 0.5, Math.PI] as const;
 /**
  * Frustum plane mask covering everything but the far plane, for a clipmap that
@@ -114,6 +122,7 @@ export class Clipmap extends Disposable {
   private _skirtMeshLines!: Primitive;
 
   private _wireframe: boolean;
+  private readonly _levelAABBs: AABB[];
 
   constructor(resolution: number, extraInstanceBuffers: VertexAttribFormat[], maxMipLevels = 64) {
     super();
@@ -142,6 +151,7 @@ export class Clipmap extends Disposable {
     this._nonInstanceMipLevelDataPool = [];
     this._nonInstanceMipLevelDataPoolSize = 0;
     this._wireframe = false;
+    this._levelAABBs = [];
     this.generateCrossMesh();
     this.generateFillerMesh();
     this.generateSeamMesh();
@@ -832,19 +842,22 @@ export class Clipmap extends Disposable {
     const mipLevels = this.calcMipLevels(camera, minMaxWorldPos, gridScale);
     camera.getWorldPosition(tmpV3);
 
-    const snappedPos = new Vector2();
-    const tileSize = new Vector2();
-    const base = new Vector2();
-    const offset = new Vector2();
+    const snappedPos = tmpSnappedPos;
+    const tileSize = tmpTileSize;
+    const base = tmpBase;
+    const offset = tmpOffset;
 
     const posX = tmpV3.x / gridScale;
     const posY = tmpV3.z / gridScale;
 
-    const outAABB: AABB[] = [];
-    for (let i = 0; i < mipLevels; i++) {
-      const aabb = new AABB();
+    // Reused across calls: callers consume the result before the next one
+    const outAABB = this._levelAABBs;
+    while (outAABB.length < mipLevels) {
+      outAABB.push(new AABB());
+    }
+    outAABB.length = mipLevels;
+    for (const aabb of outAABB) {
       aabb.beginExtend();
-      outAABB.push(aabb);
     }
 
     snappedPos.setXY(Math.floor(posX), Math.floor(posY));
@@ -877,19 +890,18 @@ export class Clipmap extends Disposable {
       this.updateAABB(this._fillerMeshAABB, null, snappedPos, scale, gridScale, aabb);
 
       const nextScale = scale * 2;
-      const nextSnappedPos = new Vector2(
+      const nextSnappedPos = tmpNextSnappedPos.setXY(
         Math.floor(posX / nextScale) * nextScale,
         Math.floor(posY / nextScale) * nextScale
       );
       // draw trim
-      const tileCentre = new Vector2(snappedPos.x + scale * 0.5, snappedPos.y + scale * 0.5);
-      const d = new Vector2(posX - nextSnappedPos.x, posY - nextSnappedPos.y);
+      const tileCentre = tmpTileCentre.setXY(snappedPos.x + scale * 0.5, snappedPos.y + scale * 0.5);
       let r = 0;
-      r |= d.x >= scale ? 0 : 2;
-      r |= d.y >= scale ? 0 : 1;
+      r |= posX - nextSnappedPos.x >= scale ? 0 : 2;
+      r |= posY - nextSnappedPos.y >= scale ? 0 : 1;
       this.updateAABB(this._trimMeshAABB, rotationValues[r], tileCentre, scale, gridScale, aabb);
       // draw seam
-      const nextBase = new Vector2(
+      const nextBase = tmpNextBase.setXY(
         nextSnappedPos.x - (this._tileResolution << (l + 1)),
         nextSnappedPos.y - (this._tileResolution << (l + 1))
       );
@@ -943,10 +955,10 @@ export class Clipmap extends Disposable {
     );
     context.camera.getWorldPosition(tmpV3);
 
-    const snappedPos = new Vector2();
-    const tileSize = new Vector2();
-    const base = new Vector2();
-    const offset = new Vector2();
+    const snappedPos = tmpSnappedPos;
+    const tileSize = tmpTileSize;
+    const base = tmpBase;
+    const offset = tmpOffset;
 
     const posX = tmpV3.x / context.gridScale;
     const posY = tmpV3.z / context.gridScale;
@@ -1071,16 +1083,15 @@ export class Clipmap extends Disposable {
 
       if (l !== mipLevels - 1) {
         const nextScale = scale * 2;
-        const nextSnappedPos = new Vector2(
+        const nextSnappedPos = tmpNextSnappedPos.setXY(
           Math.floor(posX / nextScale) * nextScale,
           Math.floor(posY / nextScale) * nextScale
         );
         // draw trim
-        const tileCentre = new Vector2(snappedPos.x + scale * 0.5, snappedPos.y + scale * 0.5);
-        const d = new Vector2(posX - nextSnappedPos.x, posY - nextSnappedPos.y);
+        const tileCentre = tmpTileCentre.setXY(snappedPos.x + scale * 0.5, snappedPos.y + scale * 0.5);
         let r = 0;
-        r |= d.x >= scale ? 0 : 2;
-        r |= d.y >= scale ? 0 : 1;
+        r |= posX - nextSnappedPos.x >= scale ? 0 : 2;
+        r |= posY - nextSnappedPos.y >= scale ? 0 : 1;
         if (
           !context.frustumCulling ||
           this.visible(
@@ -1097,7 +1108,7 @@ export class Clipmap extends Disposable {
           this.addInstance(trimPrimitives, rotationValues[r], tileCentre.x, tileCentre.y, scale, l);
         }
         // draw seam
-        const nextBase = new Vector2(
+        const nextBase = tmpNextBase.setXY(
           nextSnappedPos.x - (this._tileResolution << (l + 1)),
           nextSnappedPos.y - (this._tileResolution << (l + 1))
         );

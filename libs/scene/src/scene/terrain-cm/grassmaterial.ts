@@ -29,6 +29,8 @@ export class ClipmapGrassMaterial
   private readonly _heightMapSize: Vector2;
   /** @internal */
   private readonly _textureSize: Vector2;
+  /** @internal */
+  private readonly _distanceFade: Vector2;
   /**
    * Creates an instance of GrassMaterial class
    * @param terrain - Clipmap terrain object
@@ -45,6 +47,7 @@ export class ClipmapGrassMaterial
     this._terrainPosScale = new Vector4();
     this._heightMapSize = new Vector2(1 / terrain.heightMap!.width, 1 / terrain.heightMap!.height);
     this._textureSize = Vector2.one();
+    this._distanceFade = new Vector2(0, 0);
   }
   clone() {
     const other = new ClipmapGrassMaterial(this._terrain.get()!);
@@ -56,6 +59,20 @@ export class ClipmapGrassMaterial
     this._terrainPosScale.set(other._terrainPosScale);
     this._heightMapSize.set(other._heightMapSize);
     this._textureSize.set(other._textureSize);
+    this._distanceFade.set(other._distanceFade);
+  }
+  /**
+   * Sets the distance beyond which blades are not drawn. Blades shrink into the ground over
+   * the last quarter of it so that they do not pop out. Zero or less disables the fade.
+   * @internal
+   */
+  setDrawDistance(distance: number) {
+    const start = distance > 0 ? distance * 0.75 : 0;
+    const end = distance > 0 ? distance : 0;
+    if (this._distanceFade.x !== start || this._distanceFade.y !== end) {
+      this._distanceFade.setXY(start, end);
+      this.uniformChanged();
+    }
   }
   setTextureSize(w: number, h: number) {
     this._textureSize.setXY(w, h);
@@ -93,6 +110,7 @@ export class ClipmapGrassMaterial
     bindGroup.setValue('heightMapSize', this._heightMapSize);
     bindGroup.setValue('terrainRegion', terrain.worldRegion);
     bindGroup.setValue('terrainPosScale', this._terrainPosScale);
+    bindGroup.setValue('distanceFade', this._distanceFade);
     if (this.needFragmentColor(ctx)) {
       bindGroup.setValue('albedoTextureSize', this._textureSize);
     }
@@ -107,8 +125,14 @@ export class ClipmapGrassMaterial
     scope.heightMapSize = pb.vec2().uniform(2);
     scope.terrainRegion = pb.vec4().uniform(2);
     scope.terrainPosScale = pb.vec4().uniform(2);
+    scope.distanceFade = pb.vec2().uniform(2);
 
     pb.func('calcHeightMapNormal', [pb.vec2('uv'), pb.vec2('texelSize'), pb.vec3('scale')], function () {
+      // World-space distance between the two samples of each central difference
+      this.$l.sampleDist = pb.mul(
+        pb.sub(this.terrainRegion.zw, this.terrainRegion.xy),
+        pb.mul(this.texelSize, 2)
+      );
       this.$l.hL = pb.textureSampleLevel(
         this.terrainHeightMap,
         pb.sub(this.uv, pb.vec2(this.texelSize.x, 0)),
@@ -129,8 +153,8 @@ export class ClipmapGrassMaterial
         pb.sub(this.uv, pb.vec2(0, this.texelSize.y)),
         0
       ).r;
-      this.$l.dHdU = pb.div(pb.mul(pb.sub(this.hR, this.hL), this.scale.y), pb.mul(this.scale.x, 2));
-      this.$l.dHdV = pb.div(pb.mul(pb.sub(this.hD, this.hU), this.scale.y), pb.mul(this.scale.z, 2));
+      this.$l.dHdU = pb.div(pb.mul(pb.sub(this.hR, this.hL), this.scale.y), this.sampleDist.x);
+      this.$l.dHdV = pb.div(pb.mul(pb.sub(this.hD, this.hU), this.scale.y), this.sampleDist.y);
       this.t = pb.normalize(pb.vec3(1, this.dHdU, 0));
       this.b = pb.normalize(pb.vec3(0, this.dHdV, 1));
       this.$return(pb.normalize(pb.cross(this.b, this.t)));
@@ -148,6 +172,16 @@ export class ClipmapGrassMaterial
       pb.mul(scope.$inputs.placement.xy, pb.sub(scope.terrainRegion.zw, scope.terrainRegion.xy)),
       scope.terrainRegion.xy
     );
+    scope.$if(pb.greaterThan(scope.distanceFade.y, 0), function () {
+      this.$l.bladeDist = pb.distance(
+        ShaderHelper.getCameraPosition(this),
+        pb.vec3(this.posXZ.x, this.height, this.posXZ.y)
+      );
+      this.rotPos = pb.mul(
+        this.rotPos,
+        pb.sub(1, pb.smoothStep(this.distanceFade.x, this.distanceFade.y, this.bladeDist))
+      );
+    });
     scope.$outputs.zAlbedoTexCoord = scope.$inputs.albedoUV;
     scope.$outputs.worldPos = pb.add(scope.rotPos, pb.vec3(scope.posXZ.x, scope.height, scope.posXZ.y));
     ShaderHelper.setClipSpacePosition(

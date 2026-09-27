@@ -13,9 +13,9 @@ export class GrassBrush extends BaseTerrainBrush {
       new ImGui.ImVec2(
         0,
         60 +
-          3 * ImGui.GetFrameHeight() +
+          4 * ImGui.GetFrameHeight() +
           2 * ImGui.GetStyle().WindowPadding.y +
-          3 * ImGui.GetStyle().ItemSpacing.y
+          4 * ImGui.GetStyle().ItemSpacing.y
       ),
       true
     );
@@ -38,6 +38,10 @@ export class GrassBrush extends BaseTerrainBrush {
         const density = [grassLayer.cellsPerTexel] as [number];
         if (ImGui.SliderInt('Density', density, 1, 4)) {
           grassLayer.cellsPerTexel = density[0];
+        }
+        const drawDistance = [grassLayer.drawDistance] as [number];
+        if (ImGui.SliderFloat('DrawDistance', drawDistance, 0, 1000)) {
+          grassLayer.drawDistance = drawDistance[0];
         }
       }
     }

@@ -1,6 +1,6 @@
 import type { IndexBuffer, StructuredBuffer, Texture2D } from '@zephyr3d/device';
 import type { Vector4 } from '@zephyr3d/base';
-import { AABB, ClipState, nextPowerOf2, DRef, DWeakRef, Disposable } from '@zephyr3d/base';
+import { AABB, ClipState, nextPowerOf2, DRef, DWeakRef, Disposable, Vector3 } from '@zephyr3d/base';
 import type { DrawContext } from '../../render';
 import { Primitive } from '../../render';
 import { ClipmapGrassMaterial } from './grassmaterial';
@@ -13,6 +13,8 @@ const TILE_CELLS = 64;
 /** Default number of placement cells per density map texel along each axis */
 const DEFAULT_CELLS_PER_TEXEL = 2;
 const MAX_CELLS_PER_TEXEL = 8;
+/** Default distance from the camera beyond which grass is not drawn */
+const DEFAULT_DRAW_DISTANCE = 150;
 
 /**
  * Deterministic 2D integer hash, returns a value in [0, 1).
@@ -25,6 +27,13 @@ function hashCell(x: number, z: number, seed: number): number {
   h = Math.imul(h ^ (h >>> 13), 0xc2b2ae35);
   h ^= h >>> 16;
   return (h >>> 0) / 4294967296;
+}
+
+function distanceSqToAABB(x: number, y: number, z: number, aabb: AABB) {
+  const dx = Math.max(aabb.minPoint.x - x, 0, x - aabb.maxPoint.x);
+  const dy = Math.max(aabb.minPoint.y - y, 0, y - aabb.maxPoint.y);
+  const dz = Math.max(aabb.minPoint.z - z, 0, z - aabb.maxPoint.z);
+  return dx * dx + dy * dy + dz * dz;
 }
 
 /**
@@ -104,6 +113,7 @@ export class GrassInstances extends Disposable {
 export class GrassLayer extends Disposable {
   private static readonly _indexBuffer: DRef<IndexBuffer> = new DRef();
   private static readonly _cullAABB = new AABB();
+  private static readonly _cameraPos = new Vector3();
   private static readonly _visibleTiles: GrassInstances[] = [];
   private static readonly _instanceData = new Float32Array(TILE_CELLS * TILE_CELLS * 4);
   private readonly _material: DRef<ClipmapGrassMaterial>;
@@ -119,6 +129,7 @@ export class GrassLayer extends Disposable {
   private _tilesX: number;
   private _tilesZ: number;
   private _numBlades: number;
+  private _drawDistance: number;
   /**
    * Creates an instance of GrassLayer
    * @param terrain - Clipmap terrain object
@@ -152,7 +163,23 @@ export class GrassLayer extends Disposable {
     this._tilesX = 0;
     this._tilesZ = 0;
     this._numBlades = 0;
+    this._drawDistance = 0;
+    this.drawDistance = DEFAULT_DRAW_DISTANCE;
     this.updateTileGrid();
+  }
+  /**
+   * Distance from the camera beyond which blades of this layer are not drawn. Blades shrink
+   * into the ground over the last quarter of it. Zero draws the layer at any distance.
+   */
+  get drawDistance() {
+    return this._drawDistance;
+  }
+  set drawDistance(val: number) {
+    val = Math.max(0, Number(val) || 0);
+    if (val !== this._drawDistance) {
+      this._drawDistance = val;
+      this._material.get()!.setDrawDistance(val);
+    }
   }
   /** @internal */
   updateMaterial() {
@@ -483,6 +510,8 @@ export class GrassLayer extends Disposable {
     const rz = region.y;
     const rw = region.z - region.x;
     const rh = region.w - region.y;
+    const cameraPos = camera.getWorldPosition(GrassLayer._cameraPos);
+    const maxDistSq = this._drawDistance > 0 ? this._drawDistance * this._drawDistance : Infinity;
     for (const [key, tile] of this._tiles) {
       const tx = key % this._tilesX;
       const tz = (key - tx) / this._tilesX;
@@ -492,6 +521,9 @@ export class GrassLayer extends Disposable {
       const v1 = Math.min(1, ((tz + 1) * TILE_CELLS) / cellsH);
       cullAABB.minPoint.setXYZ(rx + u0 * rw, minY, rz + v0 * rh);
       cullAABB.maxPoint.setXYZ(rx + u1 * rw, maxY, rz + v1 * rh);
+      if (distanceSqToAABB(cameraPos.x, cameraPos.y, cameraPos.z, cullAABB) > maxDistSq) {
+        continue;
+      }
       const clipState = camera.clipMask
         ? cullAABB.getClipStateWithFrustumMask(camera.frustum, camera.clipMask)
         : cullAABB.getClipStateWithFrustum(camera.frustum);
@@ -595,6 +627,27 @@ export class GrassRenderer extends Disposable {
     const grassLayer = this._layers[layer];
     if (grassLayer) {
       grassLayer.setAlbedoMap(texture);
+    } else {
+      console.error(`Invalid grass layer: ${layer}`);
+    }
+  }
+  /**
+   * Gets the draw distance of the grass layer at given index
+   * @param layer - Index of the grass layer
+   * @returns Distance from the camera beyond which the layer is not drawn, 0 for unlimited
+   */
+  getDrawDistance(layer: number) {
+    return this._layers[layer]?.drawDistance ?? 0;
+  }
+  /**
+   * Sets the draw distance of the grass layer at given index
+   * @param layer - Index of the grass layer
+   * @param distance - Distance from the camera beyond which the layer is not drawn, 0 for unlimited
+   */
+  setDrawDistance(layer: number, distance: number) {
+    const grassLayer = this._layers[layer];
+    if (grassLayer) {
+      grassLayer.drawDistance = distance;
     } else {
       console.error(`Invalid grass layer: ${layer}`);
     }

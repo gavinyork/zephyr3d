@@ -338,12 +338,9 @@ export class ClipmapTerrainMaterial extends applyMaterialMixins(
     const that = this;
     const pb = scope.$builder;
     const funcName = 'getTerrainNormal';
-    pb.func(funcName, [pb.mat3('TBN')], function () {
-      const numDetailMaps = that.featureUsed<number>(ClipmapTerrainMaterial.FEATURE_DETAIL_MAP);
+    const numDetailMaps = that.featureUsed<number>(ClipmapTerrainMaterial.FEATURE_DETAIL_MAP);
+    pb.func(funcName, [pb.mat3('TBN'), ...this.splatMaskParams(scope, numDetailMaps)], function () {
       this.$l.detailNormal = pb.vec3(0);
-      for (let i = 0; i < (numDetailMaps + 3) >> 2; i++) {
-        this.$l[`mask${i}`] = that.sampleSplatMask(this, i);
-      }
       for (let i = 0; i < numDetailMaps; i++) {
         const uv = pb.mul(this.$inputs.uv, this.detailParams[i].x);
         this.detailNormal = pb.add(
@@ -353,7 +350,19 @@ export class ClipmapTerrainMaterial extends applyMaterialMixins(
       }
       this.$return(pb.normalize(pb.mul(this.TBN, this.detailNormal)));
     });
-    return pb.getGlobalScope()[funcName](TBN);
+    return pb.getGlobalScope()[funcName](TBN, ...this.splatMaskArgs(scope, numDetailMaps));
+  }
+  /** Parameter declarations for passing the splat masks sampled in the main scope */
+  private splatMaskParams(scope: PBInsideFunctionScope, numDetailMaps: number) {
+    const pb = scope.$builder;
+    return Array.from({ length: (numDetailMaps + 3) >> 2 }, (_, i) => pb.vec4(`mask${i}`));
+  }
+  /** The splat masks sampled once in the main scope, see fragmentShader() */
+  private splatMaskArgs(scope: PBInsideFunctionScope, numDetailMaps: number) {
+    return Array.from(
+      { length: (numDetailMaps + 3) >> 2 },
+      (_, i) => scope[`terrainSplatMask${i}`] as PBShaderExp
+    );
   }
   getNormalTexCoord: (scope: PBInsideFunctionScope) => PBShaderExp = function (scope) {
     return scope.$inputs.uv;
@@ -394,8 +403,8 @@ export class ClipmapTerrainMaterial extends applyMaterialMixins(
     const that = this;
     const pb = scope.$builder;
     const funcName = 'getTerrainAlbedo';
-    pb.func(funcName, [], function () {
-      const numDetailMaps = that.featureUsed<number>(ClipmapTerrainMaterial.FEATURE_DETAIL_MAP);
+    const numDetailMaps = that.featureUsed<number>(ClipmapTerrainMaterial.FEATURE_DETAIL_MAP);
+    pb.func(funcName, this.splatMaskParams(scope, numDetailMaps), function () {
       if (numDetailMaps === 0) {
         this.$l.checkerPos = pb.mul(this.$inputs.uv, pb.sub(this.region.zw, this.region.xy));
         this.$l.ddx = pb.dpdx(this.checkerPos);
@@ -420,9 +429,6 @@ export class ClipmapTerrainMaterial extends applyMaterialMixins(
         this.$return(pb.vec4(this.checkerColor, 1));
       } else {
         this.$l.color = pb.vec3(0);
-        for (let i = 0; i < (numDetailMaps + 3) >> 2; i++) {
-          this.$l[`mask${i}`] = that.sampleSplatMask(this, i);
-        }
         for (let i = 0; i < numDetailMaps; i++) {
           const uv = pb.mul(this.$inputs.uv, this.detailParams[i].x);
           const sample =
@@ -434,7 +440,7 @@ export class ClipmapTerrainMaterial extends applyMaterialMixins(
         this.$return(pb.vec4(this.color, 1));
       }
     });
-    return pb.getGlobalScope()[funcName]() as PBShaderExp;
+    return pb.getGlobalScope()[funcName](...this.splatMaskArgs(scope, numDetailMaps)) as PBShaderExp;
   }
   sampleHeightMap(
     scope: PBInsideFunctionScope,
@@ -723,6 +729,10 @@ export class ClipmapTerrainMaterial extends applyMaterialMixins(
           scope.detailAlbedoMap = pb.tex2DArray().uniform(2);
           scope.detailNormalMap = pb.tex2DArray().uniform(2);
         }
+      }
+      // Sampled once here and shared by the albedo and detail normal blends
+      for (let i = 0; i < (numDetailMaps + 3) >> 2; i++) {
+        scope.$l[`terrainSplatMask${i}`] = this.sampleSplatMask(scope, i);
       }
       scope.$l.albedo = this.calculateAlbedoColor(scope);
       scope.$l.worldNormal = pb.normalize(scope.$inputs.worldNormal);
