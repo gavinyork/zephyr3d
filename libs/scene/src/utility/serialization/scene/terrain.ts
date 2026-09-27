@@ -325,7 +325,7 @@ export function getTerrainClass(manager: ResourceManager): SerializableClass {
                 try {
                   tex = await manager.fetchTexture<Texture2D>(info.albedo);
                 } catch (err) {
-                  console.error(`Load asset failed: ${value.str[0]}: ${err}`);
+                  console.error(`Load asset failed: ${info.albedo}: ${err}`);
                   tex = null;
                 }
                 if (tex?.isTexture2D()) {
@@ -341,11 +341,11 @@ export function getTerrainClass(manager: ResourceManager): SerializableClass {
                 try {
                   tex = await manager.fetchTexture<Texture2D>(info.normal);
                 } catch (err) {
-                  console.error(`Load asset failed: ${value.str[0]}: ${err}`);
+                  console.error(`Load asset failed: ${info.normal}: ${err}`);
                   tex = null;
                 }
                 if (tex?.isTexture2D()) {
-                  material.setDetailMap(i, tex);
+                  material.setDetailNormalMap(i, tex);
                 } else {
                   console.error('Invalid texture type');
                 }
