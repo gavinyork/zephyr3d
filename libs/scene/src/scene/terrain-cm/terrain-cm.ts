@@ -874,5 +874,6 @@ export class ClipmapTerrain extends applyMixins(GraphNode, mixinDrawable) implem
     this._shadowClipmap?.dispose();
     this._material?.dispose();
     this._grassRenderer?.dispose();
+    this._tmpTexture.dispose();
   }
 }

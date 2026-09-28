@@ -463,7 +463,8 @@ export class VirtualTexture extends Disposable {
   }
   /**
    * Builds a compute program filling the pages mapped by the last update. Each workgroup fills
-   * one page, border included, calling `fillTexel` once per texel.
+   * one page, border included, calling `fillTexel` once per texel. The program belongs to the
+   * caller, who disposes it.
    *
    * @param label - Program label
    * @param setup - Declares the owner's own bindings (group 0)
@@ -1459,6 +1460,9 @@ export class VirtualTexture extends Disposable {
     }
     for (const bindGroup of this._bindGroups.values()) {
       bindGroup.dispose();
+    }
+    for (const program of this._programs.values()) {
+      program.dispose();
     }
     this._debugTexture?.dispose();
   }

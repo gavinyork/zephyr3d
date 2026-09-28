@@ -1,13 +1,6 @@
 import type { Nullable } from '@zephyr3d/base';
 import { Disposable, Vector2, Vector4 } from '@zephyr3d/base';
-import type {
-  BindGroup,
-  GPUProgram,
-  PBInsideFunctionScope,
-  PBShaderExp,
-  Texture2D,
-  TextureSampler
-} from '@zephyr3d/device';
+import type { BindGroup, GPUProgram, PBInsideFunctionScope, PBShaderExp, Texture2D } from '@zephyr3d/device';
 import type { DrawContext, RenderQueue, VirtualTextureClient } from '../../render';
 import { VirtualTexture, virtualMipChain } from '../../render/virtualtexture/virtual_texture';
 import { ShaderHelper } from '../../material/shader/helper';
@@ -84,7 +77,6 @@ export class TerrainVirtualTexture extends Disposable implements VirtualTextureC
   private _fillLayers: number;
   private _markProgram: Nullable<GPUProgram>;
   private _markBindGroup: Nullable<BindGroup>;
-  private _depthSampler: Nullable<TextureSampler>;
   /** What the resident pages were filled from, see sync() */
   private _contentVersion: number;
   private readonly _contentParams: Float32Array<ArrayBuffer>;
@@ -104,7 +96,6 @@ export class TerrainVirtualTexture extends Disposable implements VirtualTextureC
     this._fillLayers = -1;
     this._markProgram = null;
     this._markBindGroup = null;
-    this._depthSampler = null;
     this._contentVersion = -1;
     this._contentParams = new Float32Array(8 * 4 + 5);
     this._fillParams = new Vector4();
@@ -118,7 +109,9 @@ export class TerrainVirtualTexture extends Disposable implements VirtualTextureC
     return this._options;
   }
   isActive(_ctx: DrawContext, _renderQueue: RenderQueue) {
-    return !!this._terrain.material?.virtualTextureUsed;
+    // A terrain taken out of the scene graph (but not disposed, e.g. an undoable delete) stays
+    // registered; it has nothing to mark or fill until it is attached again
+    return this._terrain.attached && !!this._terrain.material?.virtualTextureUsed;
   }
   /**
    * Marks the resident pages covering a world XZ rectangle for refilling
@@ -154,13 +147,6 @@ export class TerrainVirtualTexture extends Disposable implements VirtualTextureC
     if (!this._markProgram) {
       this._markProgram = this.createMarkProgram();
       this._markBindGroup = device.createBindGroup(this._markProgram.bindGroupLayouts[0]);
-      this._depthSampler = device.createSampler({
-        addressU: 'clamp',
-        addressV: 'clamp',
-        magFilter: 'nearest',
-        minFilter: 'nearest',
-        mipFilter: 'none'
-      });
     }
     const bindGroup = this._markBindGroup!;
     const region = this._terrain.worldRegion;
@@ -168,7 +154,8 @@ export class TerrainVirtualTexture extends Disposable implements VirtualTextureC
     const cell = Math.max((region.z - region.x) / heightMap.width, (region.w - region.y) / heightMap.height);
     const cameraPos = camera.getWorldPosition();
     this._vt.applyBindings(bindGroup);
-    bindGroup.setTexture('depthTex', linearDepth, this._depthSampler!);
+    // Unfilterable float: the sampler must not filter
+    bindGroup.setTexture('depthTex', linearDepth, fetchSampler('clamp_nearest_nomip'));
     bindGroup.setTexture('heightMap', heightMap, fetchSampler('clamp_linear_nomip'));
     bindGroup.setValue('invVP', camera.invViewProjectionMatrix);
     bindGroup.setValue('nearFar', new Vector2(camera.getNearPlane(), camera.getFarPlane()));
@@ -188,6 +175,7 @@ export class TerrainVirtualTexture extends Disposable implements VirtualTextureC
     const numLayers = material.numDetailMaps;
     if (!this._fillProgram || this._fillLayers !== numLayers) {
       this._fillBindGroup?.dispose();
+      this._fillProgram?.dispose();
       this._fillProgram = this.createFillProgram(numLayers);
       this._fillBindGroup = getDevice().createBindGroup(this._fillProgram.bindGroupLayouts[0]);
       this._fillLayers = numLayers;
@@ -261,12 +249,7 @@ export class TerrainVirtualTexture extends Disposable implements VirtualTextureC
   /** Recreates the virtual texture, e.g. after the options or the terrain aspect changed */
   rebuild() {
     this._vt.dispose();
-    this._markProgram = null;
-    this._markBindGroup?.dispose();
-    this._markBindGroup = null;
-    this._fillProgram = null;
-    this._fillBindGroup?.dispose();
-    this._fillBindGroup = null;
+    this.releasePrograms();
     this._contentVersion = -1;
     this._vt = this.createVirtualTexture();
     const material = this._terrain.material;
@@ -496,10 +479,20 @@ export class TerrainVirtualTexture extends Disposable implements VirtualTextureC
       }
     );
   }
+  /** The mark and fill programs bake in the layout of the virtual texture they were built for */
+  private releasePrograms() {
+    this._markBindGroup?.dispose();
+    this._markBindGroup = null;
+    this._markProgram?.dispose();
+    this._markProgram = null;
+    this._fillBindGroup?.dispose();
+    this._fillBindGroup = null;
+    this._fillProgram?.dispose();
+    this._fillProgram = null;
+  }
   protected onDispose() {
     super.onDispose();
     this._vt.dispose();
-    this._markBindGroup?.dispose();
-    this._fillBindGroup?.dispose();
+    this.releasePrograms();
   }
 }
