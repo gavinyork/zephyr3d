@@ -28,6 +28,15 @@ describe('VirtualTexture', () => {
     expect(() => virtualMipChain(1000, 128)).toThrow();
   });
 
+  test('non-square mip chain stops each axis at one page', () => {
+    const levels = virtualMipChain(32768, 8192, 128);
+    expect(levels.length).toBe(9);
+    expect(levels[0]).toEqual({ pagesX: 256, pagesY: 64 });
+    expect(levels[6]).toEqual({ pagesX: 4, pagesY: 1 });
+    expect(levels[8]).toEqual({ pagesX: 1, pagesY: 1 });
+    expect(() => virtualMipChain(32768, 64, 128)).toThrow();
+  });
+
   test('physical pool and pinned levels', async () => {
     const { vt } = await create();
     // 1024 / (128 + 2 * 4) = 7 slots per row

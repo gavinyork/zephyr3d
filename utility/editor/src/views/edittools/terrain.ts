@@ -485,6 +485,13 @@ export class TerrainEditTool extends Disposable implements EditTool {
 
     device.popDeviceStates();
     device.pool.releaseFrameBuffer(fb);
+    // The brush quad's corners lie brushSize from the hit point
+    terrain.invalidateRuntimeVirtualTexture(
+      hitPos.x - brushSize,
+      hitPos.y - brushSize,
+      hitPos.x + brushSize,
+      hitPos.y + brushSize
+    );
     eventBus.dispatchEvent('scene_changed');
   }
   applyHeightBrush(
@@ -516,6 +523,13 @@ export class TerrainEditTool extends Disposable implements EditTool {
 
     device.popDeviceStates();
     device.pool.releaseFrameBuffer(fb);
+    // The virtual texture holds world space normals, which follow the height map slopes
+    terrain.invalidateRuntimeVirtualTexture(
+      hitPos.x - brushSize,
+      hitPos.y - brushSize,
+      hitPos.x + brushSize,
+      hitPos.y + brushSize
+    );
 
     this._heightDirty = true;
     eventBus.dispatchEvent('scene_changed');

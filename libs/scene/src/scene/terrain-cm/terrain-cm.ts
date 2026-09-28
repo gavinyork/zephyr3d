@@ -35,6 +35,9 @@ import { RenderMipmap } from '../../utility/rendermipmap';
 import { GrassRenderer } from './grass';
 import type { Camera } from '../../camera';
 import { getDevice } from '../../app/api';
+import type { TerrainVirtualTextureOptions } from './terrain_rvt';
+import type { VirtualTexture } from '../../render/virtualtexture/virtual_texture';
+import { TerrainVirtualTexture } from './terrain_rvt';
 
 class HeightMinMaxBlitter extends CopyBlitter {
   filter(
@@ -146,6 +149,7 @@ export class ClipmapTerrain extends applyMixins(GraphNode, mixinDrawable) implem
   /** Bumped by every height range update, so a read back overtaken by a newer one is dropped */
   private _heightRangeSerial: number;
   private _tmpTexture: DRef<Texture2D>;
+  private _virtualTexture: Nullable<TerrainVirtualTexture>;
   /**
    * Creates a new clipmap terrain instance.
    *
@@ -181,6 +185,7 @@ export class ClipmapTerrain extends applyMixins(GraphNode, mixinDrawable) implem
       new ClipmapTerrainMaterial(this.createHeightMapTexture(this._sizeX, this._sizeZ))
     );
     this._tmpTexture = new DRef();
+    this._virtualTexture = null;
     this.updateRegion();
     this.updateHeightPyramid();
     scene.queuePerCameraUpdateNode(this);
@@ -285,6 +290,73 @@ export class ClipmapTerrain extends applyMixins(GraphNode, mixinDrawable) implem
       this._sizeZ = sizeZ;
       this.resizeHeightMap(this._sizeX, this._sizeZ);
     }
+  }
+  /**
+   * Whether the detail layers are blended into a runtime virtual texture (UE landscape RVT)
+   * instead of per pixel. Pages are blended once, as the camera needs them, so shading costs the
+   * same whatever the number of layers. WebGPU only, ignored elsewhere; has no effect without
+   * detail layers.
+   *
+   * Code writing into the splat map or the height map directly must call
+   * {@link ClipmapTerrain.invalidateRuntimeVirtualTexture} for the area it changed.
+   */
+  get runtimeVirtualTexture() {
+    return !!this._virtualTexture;
+  }
+  set runtimeVirtualTexture(val: boolean) {
+    if (!!val !== this.runtimeVirtualTexture) {
+      this.setRuntimeVirtualTexture(val ? {} : null);
+    }
+  }
+  /**
+   * Enables the runtime virtual texture with the given options, or disables it with null.
+   * See {@link ClipmapTerrain.runtimeVirtualTexture}.
+   */
+  setRuntimeVirtualTexture(options: Nullable<TerrainVirtualTextureOptions>) {
+    if (options && (getDevice().type !== 'webgpu' || !this.scene)) {
+      return;
+    }
+    if (this._virtualTexture && options) {
+      this._virtualTexture.setOptions(options);
+      return;
+    }
+    if (this._virtualTexture) {
+      this.scene?.removeVirtualTextureClient(this._virtualTexture);
+      this._virtualTexture.dispose();
+      this._virtualTexture = null;
+      if (this.material) {
+        this.material.virtualTexture = null;
+      }
+    }
+    if (options && this.material) {
+      this._virtualTexture = new TerrainVirtualTexture(this, options);
+      this.material.virtualTexture = this._virtualTexture.virtualTexture;
+      this.scene!.addVirtualTextureClient(this._virtualTexture);
+    }
+  }
+  /**
+   * Refills the runtime virtual texture over a world XZ rectangle, or everywhere without
+   * arguments. Needed after writing into the splat map or the height map directly (brushes);
+   * replacing textures or changing layer parameters through the material is picked up
+   * automatically.
+   */
+  invalidateRuntimeVirtualTexture(x0?: number, z0?: number, x1?: number, z1?: number) {
+    if (!this._virtualTexture) {
+      return;
+    }
+    if (x0 === undefined || z0 === undefined || x1 === undefined || z1 === undefined) {
+      this._virtualTexture.invalidate();
+    } else {
+      this._virtualTexture.invalidateWorldRegion(x0, z0, x1, z1);
+    }
+  }
+  /**
+   * The virtual texture behind {@link ClipmapTerrain.runtimeVirtualTexture}, null when disabled.
+   * For inspection: {@link VirtualTexture.stats}, {@link VirtualTexture.renderDebugTexture}.
+   * It is recreated when the terrain aspect or the options change.
+   */
+  get runtimeVirtualTextureData(): Nullable<VirtualTexture> {
+    return this._virtualTexture?.virtualTexture ?? null;
   }
   /** Wether the mesh node casts shadows */
   get castShadow() {
@@ -797,6 +869,7 @@ export class ClipmapTerrain extends applyMixins(GraphNode, mixinDrawable) implem
    */
   protected onDispose() {
     super.onDispose();
+    this.setRuntimeVirtualTexture(null);
     this._clipmap?.dispose();
     this._shadowClipmap?.dispose();
     this._material?.dispose();

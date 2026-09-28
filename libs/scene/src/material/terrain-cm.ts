@@ -18,6 +18,13 @@ import { fetchSampler } from '../utility/misc';
 import { mixinPBRMetallicRoughness } from './mixins/lightmodel/pbrmetallicroughness';
 import { CopyBlitter } from '../blitter';
 import { getDevice } from '../app/api';
+import type { VirtualTexture } from '../render/virtualtexture/virtual_texture';
+import {
+  blendTerrainAlbedo,
+  blendTerrainDetailNormal,
+  blendTerrainRoughness,
+  terrainSplatMaskCount
+} from './shader/terrain_blend';
 
 type ClipmapTerrainDetailMapInfo = {
   detailMap: DRef<Texture2DArray>;
@@ -41,13 +48,7 @@ const WEBGL1_LEVEL_DATA_VECTORS = 32;
  * @public
  */
 export type TerrainDebugMode =
-  | 'none'
-  | 'vertex_normal'
-  | 'detail_normal'
-  | 'tangent'
-  | 'uv'
-  | 'bitangent'
-  | 'albedo';
+  'none' | 'vertex_normal' | 'detail_normal' | 'tangent' | 'uv' | 'bitangent' | 'albedo';
 
 /**
  * Default material type of clipmap terrain
@@ -60,6 +61,7 @@ export class ClipmapTerrainMaterial extends applyMaterialMixins(
 ) {
   private static readonly FEATURE_DETAIL_MAP = this.defineFeature();
   private static readonly FEATURE_DEBUG_MODE = this.defineFeature();
+  private static readonly FEATURE_VIRTUAL_TEXTURE = this.defineFeature();
   private static readonly _defaultDetailMap: DRef<Texture2D> = new DRef();
   private static readonly _defaultNormalMap: DRef<Texture2D> = new DRef();
   private readonly _region: Vector4;
@@ -73,6 +75,8 @@ export class ClipmapTerrainMaterial extends applyMaterialMixins(
   private readonly _levelDataBuffer: DRef<GPUDataBuffer>;
   /** WebGL1 only, see WEBGL1_LEVEL_DATA_VECTORS */
   private readonly _levelDataArray: Float32Array<ArrayBuffer>;
+  private _virtualTexture: Nullable<VirtualTexture>;
+  private _contentVersion: number;
   constructor(heightMap: Texture2D) {
     super();
     this.metallic = 0;
@@ -99,6 +103,9 @@ export class ClipmapTerrainMaterial extends applyMaterialMixins(
     );
     this.useFeature(ClipmapTerrainMaterial.FEATURE_DETAIL_MAP, 0);
     this.useFeature(ClipmapTerrainMaterial.FEATURE_DEBUG_MODE, 'none');
+    this.useFeature(ClipmapTerrainMaterial.FEATURE_VIRTUAL_TEXTURE, '');
+    this._virtualTexture = null;
+    this._contentVersion = 0;
   }
   static get MAX_DETAIL_MAP_COUNT() {
     return MAX_DETAIL_MAPS;
@@ -108,6 +115,56 @@ export class ClipmapTerrainMaterial extends applyMaterialMixins(
   }
   set debugMode(mode) {
     this.useFeature(ClipmapTerrainMaterial.FEATURE_DEBUG_MODE, mode);
+  }
+  /**
+   * Bumped whenever a splat or detail texture is replaced. The detail parameters, the layer
+   * count and the roughness are uniforms, compared directly by the virtual texture owner.
+   * @internal
+   */
+  get contentVersion() {
+    return this._contentVersion;
+  }
+  /**
+   * The runtime virtual texture holding the blended layers, null to blend them per pixel.
+   * Only used on WebGPU with at least one detail layer.
+   * @internal
+   */
+  get virtualTexture() {
+    return this._virtualTexture;
+  }
+  set virtualTexture(vt: Nullable<VirtualTexture>) {
+    this._virtualTexture = vt;
+    this.updateVirtualTextureFeature();
+  }
+  /** Whether shading reads the runtime virtual texture instead of blending the layers @internal */
+  get virtualTextureUsed() {
+    return !!this.featureUsed<string>(ClipmapTerrainMaterial.FEATURE_VIRTUAL_TEXTURE);
+  }
+  /**
+   * The feature value is the layout of the virtual texture, which the shader bakes in (level
+   * count and sizes, page and atlas geometry), so a rebuilt texture gets its own program.
+   */
+  private updateVirtualTextureFeature() {
+    const vt = this._virtualTexture;
+    const used = !!vt && getDevice().type === 'webgpu' && this._detailMapInfo.numDetailMaps > 0;
+    this.useFeature(
+      ClipmapTerrainMaterial.FEATURE_VIRTUAL_TEXTURE,
+      used
+        ? `${vt.levels[0].pagesX}x${vt.levels[0].pagesY}:${vt.pageSize}:${vt.border}:${vt.atlasSize}`
+        : ''
+    );
+  }
+  /** @internal */
+  get detailMapParams() {
+    return this._detailMapInfo.detailMapParams;
+  }
+  /** @internal */
+  get detailMapArray() {
+    return this._detailMapInfo.detailMap.get();
+  }
+  /** @internal */
+  get detailNormalMapArray() {
+    return this._detailMapInfo.detailNormalMap?.get() ?? null;
   }
   /** @internal */
   setLevelData(data: Float32Array<ArrayBuffer>, length: number) {
@@ -188,6 +245,7 @@ export class ClipmapTerrainMaterial extends applyMaterialMixins(
       this._detailMapInfo.numDetailMaps = val;
     }
     this.useFeature(ClipmapTerrainMaterial.FEATURE_DETAIL_MAP, this._detailMapInfo.numDetailMaps);
+    this.updateVirtualTextureFeature();
   }
   getSplatMap() {
     return this._detailMapInfo.splatMap?.get() ?? null;
@@ -199,6 +257,7 @@ export class ClipmapTerrainMaterial extends applyMaterialMixins(
         return;
       }
       this._detailMapInfo.splatMap.set(tex);
+      this._contentVersion++;
       this.uniformChanged();
     }
   }
@@ -255,6 +314,7 @@ export class ClipmapTerrainMaterial extends applyMaterialMixins(
     this._detailMapInfo.detailMapList[index].set(
       albedoMap === ClipmapTerrainMaterial.getDefaultDetailMap() ? null : albedoMap
     );
+    this._contentVersion++;
     if (getDevice().type !== 'webgl') {
       const blitter = new CopyBlitter();
       const fb = getDevice().createFrameBuffer([this._detailMapInfo.detailMap!.get()!], null);
@@ -288,6 +348,7 @@ export class ClipmapTerrainMaterial extends applyMaterialMixins(
     this._detailMapInfo.detailNormalMapList[index].set(
       normalMap === ClipmapTerrainMaterial.getDefaultNormalMap() ? null : normalMap
     );
+    this._contentVersion++;
     if (getDevice().type !== 'webgl') {
       const blitter = new CopyBlitter();
       const fb = getDevice().createFrameBuffer([this._detailMapInfo.detailNormalMap!.get()!], null);
@@ -316,6 +377,7 @@ export class ClipmapTerrainMaterial extends applyMaterialMixins(
   set heightMap(val: Texture2D) {
     if (val !== this._heightMap.get()) {
       this._heightMap.set(val);
+      this._contentVersion++;
       this._heightMapSize.setXYZW(
         this.heightMap.width,
         this.heightMap.height,
@@ -340,14 +402,12 @@ export class ClipmapTerrainMaterial extends applyMaterialMixins(
   getMetallicRoughnessTexCoord: (scope: PBInsideFunctionScope) => PBShaderExp = function (scope) {
     return scope.$inputs.uv;
   };
+  /** Raw rgb of a detail normal map, see blendTerrainDetailNormal */
   sampleDetailNormalMap(scope: PBInsideFunctionScope, index: number, texCoord: PBShaderExp) {
     const pb = scope.$builder;
-    const sample =
-      this.drawContext.device.type === 'webgl'
-        ? pb.textureSample(scope[`detailNormalMap${index}`], texCoord).rgb
-        : pb.textureArraySample(scope.detailNormalMap, texCoord, index).rgb;
-    const normal = pb.sub(pb.mul(sample, 2), pb.vec3(1));
-    return pb.normalize(normal);
+    return this.drawContext.device.type === 'webgl'
+      ? pb.textureSample(scope[`detailNormalMap${index}`], texCoord).rgb
+      : pb.textureArraySample(scope.detailNormalMap, texCoord, index).rgb;
   }
   calculateDetailNormal(scope: PBInsideFunctionScope, TBN: PBShaderExp) {
     const that = this;
@@ -355,14 +415,14 @@ export class ClipmapTerrainMaterial extends applyMaterialMixins(
     const funcName = 'getTerrainNormal';
     const numDetailMaps = that.featureUsed<number>(ClipmapTerrainMaterial.FEATURE_DETAIL_MAP);
     pb.func(funcName, [pb.mat3('TBN'), ...this.splatMaskParams(scope, numDetailMaps)], function () {
-      this.$l.detailNormal = pb.vec3(0);
-      for (let i = 0; i < numDetailMaps; i++) {
-        const uv = pb.mul(this.$inputs.uv, this.detailParams[i].x);
-        this.detailNormal = pb.add(
-          this.detailNormal,
-          pb.mul(that.sampleDetailNormalMap(this, i, uv), this[`mask${i >> 2}`][i & 3])
-        );
-      }
+      this.$l.detailNormal = blendTerrainDetailNormal(
+        this,
+        numDetailMaps,
+        that.splatMaskLocals(this, numDetailMaps),
+        this.$inputs.uv,
+        this.detailParams,
+        (scope, i, uv) => that.sampleDetailNormalMap(scope, i, uv)
+      );
       this.$return(pb.normalize(pb.mul(this.TBN, this.detailNormal)));
     });
     return pb.getGlobalScope()[funcName](TBN, ...this.splatMaskArgs(scope, numDetailMaps));
@@ -370,12 +430,19 @@ export class ClipmapTerrainMaterial extends applyMaterialMixins(
   /** Parameter declarations for passing the splat masks sampled in the main scope */
   private splatMaskParams(scope: PBInsideFunctionScope, numDetailMaps: number) {
     const pb = scope.$builder;
-    return Array.from({ length: (numDetailMaps + 3) >> 2 }, (_, i) => pb.vec4(`mask${i}`));
+    return Array.from({ length: terrainSplatMaskCount(numDetailMaps) }, (_, i) => pb.vec4(`mask${i}`));
+  }
+  /** The splat mask parameters inside a function declared with splatMaskParams() */
+  private splatMaskLocals(scope: PBInsideFunctionScope, numDetailMaps: number) {
+    return Array.from(
+      { length: terrainSplatMaskCount(numDetailMaps) },
+      (_, i) => scope[`mask${i}`] as PBShaderExp
+    );
   }
   /** The splat masks sampled once in the main scope, see fragmentShader() */
   private splatMaskArgs(scope: PBInsideFunctionScope, numDetailMaps: number) {
     return Array.from(
-      { length: (numDetailMaps + 3) >> 2 },
+      { length: terrainSplatMaskCount(numDetailMaps) },
       (_, i) => scope[`terrainSplatMask${i}`] as PBShaderExp
     );
   }
@@ -395,22 +462,23 @@ export class ClipmapTerrainMaterial extends applyMaterialMixins(
     if (numDetailMaps === 0) {
       return base;
     }
+    if (this.virtualTextureUsed) {
+      // This runs inside PBRLight's own function, so the roughness read from the virtual texture
+      // comes in through albedo.a (see sampleVirtualTexture); nothing reads the terrain albedo
+      // alpha otherwise (opaque, no subsurface outputs). The page fill already blended in the
+      // material roughness.
+      return albedo.a;
+    }
     const that = this;
     const pb = scope.$builder;
     const funcName = 'getTerrainRoughness';
     pb.func(funcName, [pb.float('base')], function () {
-      this.$l.weightSum = pb.float(0);
-      this.$l.roughness = pb.float(0);
-      for (let i = 0; i < (numDetailMaps + 3) >> 2; i++) {
+      const masks: PBShaderExp[] = [];
+      for (let i = 0; i < terrainSplatMaskCount(numDetailMaps); i++) {
         this.$l[`mask${i}`] = that.sampleSplatMask(this, i);
+        masks.push(this[`mask${i}`]);
       }
-      for (let i = 0; i < numDetailMaps; i++) {
-        const w = this[`mask${i >> 2}`][i & 3];
-        this.weightSum = pb.add(this.weightSum, w);
-        this.roughness = pb.add(this.roughness, pb.mul(w, this.detailParams[i].y));
-      }
-      // Whatever the layers leave uncovered keeps the material roughness
-      this.$return(pb.add(this.roughness, pb.mul(pb.max(pb.sub(1, this.weightSum), 0), this.base)));
+      this.$return(blendTerrainRoughness(this, numDetailMaps, masks, this.detailParams, this.base));
     });
     return pb.getGlobalScope()[funcName](base) as PBShaderExp;
   }
@@ -443,19 +511,71 @@ export class ClipmapTerrainMaterial extends applyMaterialMixins(
         this.$l.checkerColor = pb.mix(pb.vec3(0.4), pb.vec3(1), pb.vec3(this.checker));
         this.$return(pb.vec4(this.checkerColor, 1));
       } else {
-        this.$l.color = pb.vec3(0);
-        for (let i = 0; i < numDetailMaps; i++) {
-          const uv = pb.mul(this.$inputs.uv, this.detailParams[i].x);
-          const sample =
+        this.$l.color = blendTerrainAlbedo(
+          this,
+          numDetailMaps,
+          that.splatMaskLocals(this, numDetailMaps),
+          this.$inputs.uv,
+          this.detailParams,
+          (scope, i, uv) =>
             that.drawContext.device.type === 'webgl'
-              ? pb.textureSample(this[`detailAlbedoMap${i}`], uv).rgb
-              : pb.textureArraySample(this.detailAlbedoMap, uv, i).rgb;
-          this.color = pb.add(this.color, pb.mul(sample, this[`mask${i >> 2}`][i & 3]));
-        }
+              ? pb.textureSample(scope[`detailAlbedoMap${i}`], uv)
+              : pb.textureArraySample(scope.detailAlbedoMap, uv, i)
+        );
         this.$return(pb.vec4(this.color, 1));
       }
     });
     return pb.getGlobalScope()[funcName](...this.splatMaskArgs(scope, numDetailMaps)) as PBShaderExp;
+  }
+  /**
+   * Reads the blended layers from the runtime virtual texture: (linear albedo, roughness) is
+   * returned, the world space normal written to `normal`.
+   *
+   * Layout of UE's BaseColor_Normal_Roughness runtime virtual texture, uncompressed
+   * (VirtualTextureMaterial.usf, VirtualTextureCommon.ush): plane 0 holds the sRGB encoded base
+   * color, plane 1 (normal.x, roughness, normal.z) of the world space normal, its up component
+   * rebuilt as positive. Trilinear filtering as UE's manual trilinear mode
+   * (VIRTUAL_TEXTURE_MANUAL_TRILINEAR_FILTERING, TextureVirtualSample): the next coarser level
+   * is blended in by the fractional level only when it is resident itself, otherwise the first
+   * sample is used alone.
+   */
+  sampleVirtualTexture(scope: PBInsideFunctionScope, normal: PBShaderExp) {
+    const pb = scope.$builder;
+    const vt = this._virtualTexture!;
+    const maxLevel = vt.levels.length - 1;
+    pb.func('zTerrainSampleRVT', [pb.vec3('normal').out()], function () {
+      this.$l.uv = this.$inputs.uv;
+      this.$l.level = vt.computeLevel(this, this.uv);
+      this.$l.level0 = pb.floor(this.level);
+      this.$l.level1 = pb.min(pb.add(this.level0, 1), maxLevel);
+      this.$l.loc0 = vt.resolve(this, pb.uint(this.level0), this.uv);
+      this.$l.loc1 = vt.resolve(this, pb.uint(this.level1), this.uv);
+      this.$l.t = pb.select(pb.float(0), pb.sub(this.level, this.level0), pb.equal(this.loc1.z, this.level1));
+      this.$l.baseColor = pb.mix(
+        pb.textureSampleLevel(this.zTerrainRVT0, this.loc0.xy, 0),
+        pb.textureSampleLevel(this.zTerrainRVT0, this.loc1.xy, 0),
+        this.t
+      );
+      this.$l.normalRoughness = pb.mix(
+        pb.textureSampleLevel(this.zTerrainRVT1, this.loc0.xy, 0),
+        pb.textureSampleLevel(this.zTerrainRVT1, this.loc1.xy, 0),
+        this.t
+      );
+      // VirtualTextureUnpackNormal
+      this.$l.nxz = pb.sub(pb.mul(this.normalRoughness.xz, 255 / 127), pb.vec2(1));
+      this.normal = pb.normalize(
+        pb.vec3(this.nxz.x, pb.sqrt(pb.clamp(pb.sub(1, pb.dot(this.nxz, this.nxz)), 0, 1)), this.nxz.y)
+      );
+      // sRGB decode (UE VirtualTextureUnpackBaseColorSRGB)
+      this.$l.c = this.baseColor.rgb;
+      this.$l.linear = pb.mix(
+        pb.pow(pb.div(pb.add(this.c, pb.vec3(0.055)), 1.055), pb.vec3(2.4)),
+        pb.div(this.c, 12.92),
+        pb.vec3(pb.lessThanEqual(this.c, pb.vec3(0.04045)))
+      );
+      this.$return(pb.vec4(this.linear, this.normalRoughness.y));
+    });
+    return scope.zTerrainSampleRVT(normal) as PBShaderExp;
   }
   /**
    * Height of a clipmap vertex, blended towards the next coarser level across the outer part of
@@ -727,7 +847,26 @@ export class ClipmapTerrainMaterial extends applyMaterialMixins(
     super.fragmentShader(scope);
     const pb = scope.$builder;
     scope.region = pb.vec4().uniform(2);
-    if (this.needFragmentColor()) {
+    if (this.needFragmentColor() && this.virtualTextureUsed) {
+      const globals = pb.getGlobalScope();
+      this._virtualTexture!.declareBindings(globals, 2, false);
+      globals.zTerrainRVT0 = pb.tex2D().uniform(2);
+      globals.zTerrainRVT1 = pb.tex2D().uniform(2);
+      scope.$l.terrainN = pb.vec3();
+      scope.$l.albedo = this.sampleVirtualTexture(scope, scope.terrainN);
+      // The normal read back already carries the height map slopes and the detail layers; the
+      // frame around it only orients anisotropic and clear coat terms
+      scope.$l.terrainT = pb.normalize(pb.sub(pb.vec3(1, 0, 0), pb.mul(scope.terrainN, scope.terrainN.x)));
+      scope.$l.terrainB = pb.cross(scope.terrainT, scope.terrainN);
+      scope.$l.normalInfo = this.calculateNormalAndTBN(
+        scope,
+        scope.$inputs.worldPos,
+        scope.terrainN,
+        scope.terrainT,
+        scope.terrainB
+      );
+      this.shadeTerrain(scope);
+    } else if (this.needFragmentColor()) {
       scope.heightMap = pb.tex2D().uniform(2);
       scope.heightMapSize = pb.vec4().uniform(2);
       scope.terrainScale = pb.vec3().uniform(2);
@@ -765,60 +904,65 @@ export class ClipmapTerrainMaterial extends applyMaterialMixins(
       if (this.featureUsed<number>(ClipmapTerrainMaterial.FEATURE_DETAIL_MAP) > 0) {
         scope.normalInfo.normal = this.calculateDetailNormal(scope, scope.normalInfo.TBN);
       }
-      scope.$l.viewVec = this.calculateViewVector(scope, scope.$inputs.worldPos);
-      const storeSceneData = !!(
-        this.drawContext.materialFlags &
-        (MaterialVaryingFlags.SCENE_STORE_ROUGHNESS | MaterialVaryingFlags.SCENE_STORE_NORMAL)
-      );
-      if (storeSceneData) {
-        // Filled by PBRLight with (specular color, roughness) for SSR/SSGI
-        scope.$l.outRoughness = pb.vec4();
-      }
-      scope.$l.litColor = this.PBRLight(
-        scope,
-        scope.$inputs.worldPos,
-        scope.normalInfo.normal,
-        scope.viewVec,
-        scope.albedo,
-        scope.normalInfo.TBN,
-        storeSceneData ? scope.outRoughness : undefined
-      );
-      switch (this.featureUsed<TerrainDebugMode>(ClipmapTerrainMaterial.FEATURE_DEBUG_MODE)) {
-        case 'albedo':
-          scope.$l.outColor = scope.albedo;
-          break;
-        case 'vertex_normal':
-          scope.$l.outColor = pb.vec4(pb.add(pb.mul(scope.normalInfo.TBN[2], 0.5), pb.vec3(0.5)), 1);
-          break;
-        case 'detail_normal':
-          scope.$l.outColor = pb.vec4(pb.add(pb.mul(scope.normalInfo.normal, 0.5), pb.vec3(0.5)), 1);
-          break;
-        case 'tangent':
-          scope.$l.outColor = pb.vec4(pb.add(pb.mul(scope.normalInfo.TBN[0], 0.5), pb.vec3(0.5)), 1);
-          break;
-        case 'bitangent':
-          scope.$l.outColor = pb.vec4(pb.add(pb.mul(scope.normalInfo.TBN[1], 0.5), pb.vec3(0.5)), 1);
-          break;
-        case 'uv':
-          scope.$l.outColor = pb.vec4(scope.$inputs.uv, 0, 1);
-          break;
-        default:
-          scope.$l.outColor = pb.vec4(scope.litColor, 1);
-          break;
-      }
-      if (storeSceneData) {
-        this.outputFragmentColor(
-          scope,
-          scope.$inputs.worldPos,
-          scope.outColor,
-          scope.outRoughness,
-          pb.vec4(pb.add(pb.mul(scope.normalInfo.normal, 0.5), pb.vec3(0.5)), 1)
-        );
-      } else {
-        this.outputFragmentColor(scope, scope.$inputs.worldPos, scope.outColor);
-      }
+      this.shadeTerrain(scope);
     } else {
       this.outputFragmentColor(scope, scope.$inputs.worldPos, null);
+    }
+  }
+  /** Lights the terrain from the albedo and normalInfo locals of the fragment shader */
+  private shadeTerrain(scope: PBFunctionScope) {
+    const pb = scope.$builder;
+    scope.$l.viewVec = this.calculateViewVector(scope, scope.$inputs.worldPos);
+    const storeSceneData = !!(
+      this.drawContext.materialFlags &
+      (MaterialVaryingFlags.SCENE_STORE_ROUGHNESS | MaterialVaryingFlags.SCENE_STORE_NORMAL)
+    );
+    if (storeSceneData) {
+      // Filled by PBRLight with (specular color, roughness) for SSR/SSGI
+      scope.$l.outRoughness = pb.vec4();
+    }
+    scope.$l.litColor = this.PBRLight(
+      scope,
+      scope.$inputs.worldPos,
+      scope.normalInfo.normal,
+      scope.viewVec,
+      scope.albedo,
+      scope.normalInfo.TBN,
+      storeSceneData ? scope.outRoughness : undefined
+    );
+    switch (this.featureUsed<TerrainDebugMode>(ClipmapTerrainMaterial.FEATURE_DEBUG_MODE)) {
+      case 'albedo':
+        scope.$l.outColor = pb.vec4(scope.albedo.rgb, 1);
+        break;
+      case 'vertex_normal':
+        scope.$l.outColor = pb.vec4(pb.add(pb.mul(scope.normalInfo.TBN[2], 0.5), pb.vec3(0.5)), 1);
+        break;
+      case 'detail_normal':
+        scope.$l.outColor = pb.vec4(pb.add(pb.mul(scope.normalInfo.normal, 0.5), pb.vec3(0.5)), 1);
+        break;
+      case 'tangent':
+        scope.$l.outColor = pb.vec4(pb.add(pb.mul(scope.normalInfo.TBN[0], 0.5), pb.vec3(0.5)), 1);
+        break;
+      case 'bitangent':
+        scope.$l.outColor = pb.vec4(pb.add(pb.mul(scope.normalInfo.TBN[1], 0.5), pb.vec3(0.5)), 1);
+        break;
+      case 'uv':
+        scope.$l.outColor = pb.vec4(scope.$inputs.uv, 0, 1);
+        break;
+      default:
+        scope.$l.outColor = pb.vec4(scope.litColor, 1);
+        break;
+    }
+    if (storeSceneData) {
+      this.outputFragmentColor(
+        scope,
+        scope.$inputs.worldPos,
+        scope.outColor,
+        scope.outRoughness,
+        pb.vec4(pb.add(pb.mul(scope.normalInfo.normal, 0.5), pb.vec3(0.5)), 1)
+      );
+    } else {
+      this.outputFragmentColor(scope, scope.$inputs.worldPos, scope.outColor);
     }
   }
   applyUniformValues(bindGroup: BindGroup, ctx: DrawContext, pass: number) {
@@ -842,7 +986,20 @@ export class ClipmapTerrainMaterial extends applyMaterialMixins(
     } else {
       bindGroup.setValue('levelData', this._levelDataArray);
     }
-    if (this.needFragmentColor(ctx)) {
+    if (this.needFragmentColor(ctx) && this.virtualTextureUsed) {
+      const vt = this._virtualTexture!;
+      vt.applyBindings(bindGroup, false);
+      bindGroup.setTexture(
+        'zTerrainRVT0',
+        vt.getPlaneTexture('baseColor')!,
+        fetchSampler('clamp_linear_nomip')
+      );
+      bindGroup.setTexture(
+        'zTerrainRVT1',
+        vt.getPlaneTexture('normalRoughness')!,
+        fetchSampler('clamp_linear_nomip')
+      );
+    } else if (this.needFragmentColor(ctx)) {
       if (this._detailMapInfo.numDetailMaps > 0) {
         bindGroup.setTexture('splatMap', this._detailMapInfo.splatMap.get()!);
         if (ctx.device.type === 'webgl') {

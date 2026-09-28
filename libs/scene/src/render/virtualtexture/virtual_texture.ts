@@ -38,13 +38,37 @@ export interface VirtualTextureLevel {
  * @param pageSize - Page size in texels, a power of two not larger than virtualSize
  * @public
  */
-export function virtualMipChain(virtualSize: number, pageSize: number): VirtualTextureLevel[] {
-  if (!isPowerOf2(virtualSize) || !isPowerOf2(pageSize) || pageSize > virtualSize) {
-    throw new Error('virtualMipChain(): sizes must be powers of two with pageSize <= virtualSize');
+export function virtualMipChain(virtualSize: number, pageSize: number): VirtualTextureLevel[];
+/**
+ * Levels of a mip chained virtual texture with a different width and height. Each level halves
+ * both axes, an axis stopping at one page, down to a single page (UE RVT: tile counts per axis
+ * from the volume aspect, RuntimeVirtualTexture.cpp GetProducerDescription).
+ * @param virtualWidth - Virtual texture width in texels, a power of two
+ * @param virtualHeight - Virtual texture height in texels, a power of two
+ * @param pageSize - Page size in texels, a power of two not larger than either size
+ * @public
+ */
+export function virtualMipChain(
+  virtualWidth: number,
+  virtualHeight: number,
+  pageSize: number
+): VirtualTextureLevel[];
+export function virtualMipChain(a: number, b: number, c?: number): VirtualTextureLevel[] {
+  const [width, height, pageSize] = c === undefined ? [a, a, b] : [a, b, c];
+  if (
+    !isPowerOf2(width) ||
+    !isPowerOf2(height) ||
+    !isPowerOf2(pageSize) ||
+    pageSize > Math.min(width, height)
+  ) {
+    throw new Error('virtualMipChain(): sizes must be powers of two with pageSize <= virtual size');
   }
   const levels: VirtualTextureLevel[] = [];
-  for (let pages = virtualSize / pageSize; pages >= 1; pages >>= 1) {
-    levels.push({ pagesX: pages, pagesY: pages });
+  for (let x = width / pageSize, y = height / pageSize; ; x = Math.max(1, x >> 1), y = Math.max(1, y >> 1)) {
+    levels.push({ pagesX: x, pagesY: y });
+    if (x === 1 && y === 1) {
+      break;
+    }
   }
   return levels;
 }
@@ -388,6 +412,7 @@ export class VirtualTexture extends Disposable {
   /**
    * Marks the resident pages overlapping a region, in normalized virtual coordinates, for
    * refilling. They keep their mapping and old content until refilled (UE VSM *_UNCACHED pages).
+   * A page counts with its border, so pages next to the region are refilled too.
    */
   invalidateRegion(u0: number, v0: number, u1: number, v1: number) {
     this._pendingRects.push([u0, v0, u1, v1]);
@@ -539,6 +564,16 @@ export class VirtualTexture extends Disposable {
     if (withRequests) {
       bindGroup.setBuffer('zVT_pageRequest', this._pageRequest);
     }
+  }
+  /**
+   * Size in texels of a level, as a vec2. Usable wherever the core bindings are declared,
+   * including the `fillTexel` callback of {@link VirtualTexture.createFillProgram}, where
+   * `texel / levelTexels(level)` is the virtual uv of the texel.
+   */
+  levelTexels(scope: PBInsideFunctionScope, level: PBShaderExp) {
+    const pb = scope.$builder;
+    const info = scope.zVT_params.at(pb.add(pb.uint(level), 4)) as PBShaderExp;
+    return pb.mul(pb.vec2(pb.float(info.y), pb.float(info.z)), this._pageSize) as PBShaderExp;
   }
   /** Mip level from the screen derivatives of a virtual uv, fragment shaders only */
   computeLevel(scope: PBInsideFunctionScope, uv: PBShaderExp) {
@@ -924,9 +959,19 @@ export class VirtualTexture extends Disposable {
                   pb.float(pb.sub(this.local, pb.mul(pb.div(this.local, this.info.y), this.info.y))),
                   pb.float(pb.div(this.local, this.info.y))
                 );
-                this.$l.lo = pb.div(this.page, pb.vec2(pb.float(this.info.y), pb.float(this.info.z)));
+                // The page with its border: a border texel is sampled when filtering across the
+                // page edge, so an edit next to a page changes it too. One more texel covers the
+                // bilinear footprint of the outermost border texel.
+                this.$l.margin = pb.div(
+                  pb.float(pb.add(this.zVT_params.at(2).z, 1)),
+                  pb.float(this.zVT_params.at(2).w)
+                );
+                this.$l.lo = pb.div(
+                  pb.sub(this.page, pb.vec2(this.margin)),
+                  pb.vec2(pb.float(this.info.y), pb.float(this.info.z))
+                );
                 this.$l.hi = pb.div(
-                  pb.add(this.page, pb.vec2(1)),
+                  pb.add(this.page, pb.vec2(pb.add(1, this.margin))),
                   pb.vec2(pb.float(this.info.y), pb.float(this.info.z))
                 );
                 this.$for(pb.uint('r'), 0, this.zVT_params.at(3).y, function () {

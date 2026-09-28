@@ -175,6 +175,21 @@ export function getTerrainClass(manager: ResourceManager): SerializableClass {
           }
         },
         {
+          name: 'RuntimeVirtualTexture',
+          description:
+            'Blends the detail layers once into a texture cache instead of every frame for every pixel. ' +
+            'Shading cost no longer grows with the number of layers; close up the ground can look a bit ' +
+            'softer while the finest detail streams in. WebGPU only',
+          type: 'bool',
+          default: false,
+          get(this: ClipmapTerrain, value) {
+            value.bool[0] = this.runtimeVirtualTexture;
+          },
+          set(this: ClipmapTerrain, value) {
+            this.runtimeVirtualTexture = value.bool[0];
+          }
+        },
+        {
           name: 'Wireframe',
           description: 'If true, the terrain will be rendered as wireframe',
           type: 'bool',
@@ -398,6 +413,7 @@ export function getTerrainClass(manager: ResourceManager): SerializableClass {
                 const content = new Uint8Array(data, 3 * 4 + i * width * height * 4, width * height * 4);
                 splatMap.update(content, 0, 0, i, width, height, 1);
               }
+              this.invalidateRuntimeVirtualTexture();
               this.splatMapAssetId = value.str[0];
             }
           }

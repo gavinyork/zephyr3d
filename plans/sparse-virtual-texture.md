@@ -263,7 +263,7 @@ class VirtualTexture extends Disposable {
 | 阶段 | 依赖本设计的部分 |
 |---|---|
 | 2 渲染图接入 | `update()` 的调用时机；多相机共用规则 |
-| 3 地形 RVT | 深度驱动标记（compute 读深度 → 世界 XZ → 地形 uv，按像素覆盖选级）；compute 填充模板；`resolve` + 三线性；splat 修改时 `invalidateRegion` |
+| 3 地形 RVT（见下文"阶段 3"） | 深度驱动标记（compute 读深度 → 世界 XZ → 地形 uv，按像素覆盖选级）；compute 填充模板；`resolve` + 三线性；splat 修改时 `invalidateRegion` |
 | VSM（以后） | `virtualClipmap`；buffer 平面 + atomicMin 深度；`allocBudget = Infinity`；自定义光栅化填充；不回退的精确查找；投影体移动时 `invalidateRegion` |
 
 ## 参考来源
@@ -306,6 +306,27 @@ class VirtualTexture extends Disposable {
 - 核心新增 `levelFromFootprint(duvdx, duvdy)`，供 compute 标记由重建的邻居 uv 算级（含驻留 mip 偏移）；`declareBindings` 新增 `requests` 参数，只读采样的材质可不声明请求 buffer。
 - **深度驱动标记的坑（阶段 3 地形同样适用）**：用相邻像素重建的 uv 差算足迹时，邻居落在使用方表面之外（轮廓、背景）绝不能当作 0 足迹——0 足迹会夹到第 0 级，轮廓一条线就横穿数百个第 0 级页，实测 199 个边缘像素占满 225 页的池，驻留 mip 偏移被顶到上限 4，全屏被迫变糊，且偏移压不回来（夹紧在 0 以下）。做法：每轴先取 +1 邻居、不在表面上则取 −1；一轴都没有就只用另一轴；两轴都没有则不标记（resolve 回退到已驻留祖先）。
 - 验证示例 `examples/src/virtualtexturescene`：场景 + 自定义 MeshMaterial 采样，compute 从深度重建平面 uv 标记（零延迟），画中画第二相机共用池。
+
+## 阶段 3：地形 RVT
+
+**UE 的做法**（出处相对 `Engine/`）
+- 材质类型 `BaseColor_Normal_Roughness`，两层。不压缩时都是 BGRA8：L0 = `LinearToSrgb(BaseColor)`（层本身线性，采样端手动 sRGB 解码），L1 = `(N.x, Roughness, N.y, 1)`，法线 z 恒正（`Shaders/Private/VirtualTextureMaterial.usf:140-145`、`VirtualTextureCommon.ush:1008-1018`、`Source/Runtime/Engine/Private/VT/RuntimeVirtualTexture.cpp:443-525`）。压缩时另有 BC 压缩 compute pass（`VirtualTextureCompress.usf`）。
+- 法线按世界空间存（Output 节点原样写入，`VirtualTextureMaterial.usf:103-114`），所以 Landscape 的高度编辑也会失效 RVT（`Source/Runtime/Landscape/Private/Landscape.cpp:5978` `DirtyRuntimeVirtualTextureForLandscapeArea`）。
+- 页内容由顶视正交光栅化材质得到，正交范围外扩 border，border 是真实渲染的（`Source/Runtime/Renderer/Private/VT/RuntimeVirtualTextureProducer.cpp:122-142`、`RuntimeVirtualTextureRender.cpp:2167-2268`）。
+- 世界 → uv 是纯 XY 平面投影（`VirtualTextureCommon.ush:906-926`）；宽高页数按体积长宽比取 2 的幂（`RuntimeVirtualTexture.cpp:336-351`）。
+- 选级：`ddx(world)·U/V` 的 footprint，`MipLevelAniso2D` 取大轴，加驻留偏移。三线性：桌面随机 mip 噪声 + TAA；移动端 `VIRTUAL_TEXTURE_MANUAL_TRILINEAR_FILTERING` 采两级插值，第二级无效时只用第一级（`VirtualTextureCommon.ush:296-324`、`:850-880`）。
+- 陡坡不做任何处理。
+
+**我们的实现**
+- `scene/terrain-cm/terrain_rvt.ts` `TerrainVirtualTexture`（VirtualTextureClient），`ClipmapTerrain.runtimeVirtualTexture` / `setRuntimeVirtualTexture(options)` 开关，WebGPU only，无细节层时不生效。
+- 平面：`baseColor`、`normalRoughness` 两张 rgba8unorm，布局照搬上述未压缩版本；up 分量是我们的 y（UE 的 z）。BC 压缩未做（WebGPU 不能 storage 写 BC，需压缩到 buffer 再拷贝）。
+- 虚拟尺寸：长边 `virtualSize`（默认 32768），短边按长宽比最近的 2 的幂；`virtualMipChain` 新增宽高不等的重载，每轴到 1 页为止。虚拟 uv = 地形 region uv。
+- 填充：compute，每 texel 调共享混合函数 `material/shader/terrain_blend.ts`（材质实时路径与填充共用，防分叉），再乘高度图 TBN 得世界法线。compute 无导数，各纹理按"该级一个 texel 的 footprint"取显式 LOD，等价于 UE 正交视图下硬件选的 mip；高度 TBN 同 `calculateTerrainTBN`。
+- 标记：由深度重建世界坐标 → region uv，沿用阶段 2 的邻居回退规则。**额外的"在地形上"判定**：重建的 y 与高度图差在 `max(2 个高度格, 0.02 × 视距)` 内才算，否则站在地形前的物体会按它们自己的 footprint 请求脚下的页。UE 不需要，它的反馈由地形自己的像素写出；容差是启发式（clipmap 网格只在顶点上与高度图一致，远处格子变大）。
+- 着色：`computeLevel` → 两级 `resolve` → 各采两平面，按 UE 手动三线性插值（第二级命中级不等于请求级时只用第一级）。roughness 经 `albedo.a` 传进 `PBRLight` 内的 `calculateRoughness`（地形不透明、无 SSS，alpha 无其他读者）。材质 feature 值编码 VT 布局（页数、页大小、border、图集），VT 重建后换新程序。
+- 失效：编辑器 splat/高度笔刷按 `hitPos ± brushSize` 调 `invalidateRuntimeVirtualTexture`；序列化加载 splat 全部失效；替换贴图/高度图（材质 `contentVersion`）、细节参数、层数、材质粗糙度、region 尺寸、高度缩放在每次标记前比对，变了就全部失效；长宽比变了重建 VT。
+- 核心修正：`invalidate` 判定按页 + border + 1 texel（双线性足迹），否则相邻页 border 残留旧内容形成缝。
+- 验证示例 `examples/src/terrainrvt`：程序化 512² 地形 4 层，R 切换、B 局部刷雪（局部失效）、页表叠加与统计。
 
 ## 实施记录
 
