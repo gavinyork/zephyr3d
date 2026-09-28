@@ -70,6 +70,11 @@ function createMockDrawContext(overrides: Record<string, unknown> = {}) {
       setPostSSSActive: () => {},
       ...cameraOverrides
     },
+    // The VirtualTextureUpdate module asks the scene for its virtual texture clients on every
+    // build, so every context needs this to exist.
+    scene: {
+      virtualTextureClients: []
+    },
     ...restOverrides
   } as any;
 }
@@ -1204,6 +1209,56 @@ describe('SceneColorGrab pass (P2)', () => {
     const lightPass = graph.passes.find((pass) => pass.name === 'LightPass');
 
     expect(lightPass?.reads.map((res) => res.name)).toContain('sceneColorCopy');
+  });
+});
+
+describe('VirtualTextureUpdate pass', () => {
+  const client = (active: boolean) => ({
+    virtualTexture: {},
+    isActive: () => active,
+    fill: () => {}
+  });
+
+  test('runs after the depth prepass and before the light pass when a client is active', () => {
+    const { graph, backbuffer } = buildForwardPlusGraphForTest(
+      createOptions(),
+      {},
+      {
+        scene: { virtualTextureClients: [client(true)] }
+      }
+    );
+    const passNames = graph.compile([backbuffer]).orderedPasses.map((pass) => pass.name);
+
+    expect(passNames).toContain('VirtualTextureUpdate');
+    expect(passNames.indexOf('DepthPrepass')).toBeLessThan(passNames.indexOf('VirtualTextureUpdate'));
+    expect(passNames.indexOf('VirtualTextureUpdate')).toBeLessThan(passNames.indexOf('LightPass'));
+  });
+
+  test('is left out when no client is active', () => {
+    const { graph, backbuffer } = buildForwardPlusGraphForTest(
+      createOptions(),
+      {},
+      {
+        scene: { virtualTextureClients: [client(false)] }
+      }
+    );
+    const passNames = graph.compile([backbuffer]).orderedPasses.map((pass) => pass.name);
+
+    expect(passNames).not.toContain('VirtualTextureUpdate');
+  });
+
+  test('is left out on WebGL, which has no compute', () => {
+    const { graph, backbuffer } = buildForwardPlusGraphForTest(
+      createOptions(),
+      {},
+      {
+        device: { type: 'webgl2' },
+        scene: { virtualTextureClients: [client(true)] }
+      }
+    );
+    const passNames = graph.compile([backbuffer]).orderedPasses.map((pass) => pass.name);
+
+    expect(passNames).not.toContain('VirtualTextureUpdate');
   });
 });
 

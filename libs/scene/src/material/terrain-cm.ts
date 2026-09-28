@@ -51,7 +51,13 @@ const WEBGL1_LEVEL_DATA_VECTORS = 32;
  * @public
  */
 export type TerrainDebugMode =
-  'none' | 'vertex_normal' | 'detail_normal' | 'tangent' | 'uv' | 'bitangent' | 'albedo';
+  | 'none'
+  | 'vertex_normal'
+  | 'detail_normal'
+  | 'tangent'
+  | 'uv'
+  | 'bitangent'
+  | 'albedo';
 
 /**
  * Default material type of clipmap terrain
