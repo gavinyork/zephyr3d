@@ -465,22 +465,28 @@ export class TerrainEditTool extends Disposable implements EditTool {
       false,
       0,
       0,
-      detailIndex >> 2
+      0
     );
     device.pushDeviceStates();
     device.setFramebuffer(fb);
 
     brush.detailIndex = detailIndex;
     brush.sourceSplatMap = this._splatMapCopy.get();
-    brush.brush(
-      brushTexture,
-      this._terrain.get().worldRegion,
-      this._terrain.get().scale,
-      hitPos,
-      brushSize,
-      angle,
-      Math.max(strength * 0.1, 0.01)
-    );
+    // Every splat layer is rewritten: the weights are normalized across all of them
+    const numSplatLayers = splatMap.isTexture2DArray() ? splatMap.depth : 1;
+    for (let layer = 0; layer < numSplatLayers; layer++) {
+      fb.setColorAttachmentLayer(0, layer);
+      brush.outputLayer = layer;
+      brush.brush(
+        brushTexture,
+        this._terrain.get().worldRegion,
+        this._terrain.get().scale,
+        hitPos,
+        brushSize,
+        angle,
+        Math.max(strength * 0.1, 0.01)
+      );
+    }
     brush.sourceSplatMap = null;
 
     device.popDeviceStates();

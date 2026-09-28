@@ -126,7 +126,8 @@ async function getTerrainSplatMapContent(terrain: ClipmapTerrain): Promise<Array
       buffer,
       3 * 4 + i * splatMap.width * splatMap.height * info.blockWidth * info.blockHeight * info.size
     );
-    await splatMap.readPixels(0, 0, splatMap.width, splatMap.height, 0, 0, layerData);
+    // Layer i holds the weights of detail layers 4i..4i+3
+    await splatMap.readPixels(0, 0, splatMap.width, splatMap.height, i, 0, layerData);
   }
   return buffer;
 }
