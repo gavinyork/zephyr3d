@@ -1,5 +1,5 @@
 import type { Nullable } from '@zephyr3d/base';
-import type { RGHandle, RGTextureHandle } from './types';
+import type { RGHandle, RGTextureHandle, RGTokenHandle } from './types';
 
 /** Typed key used to publish a frame resource. @public */
 export type FrameResourceKey<THandle extends RGHandle = RGHandle> = string & {
@@ -25,6 +25,7 @@ type FrameResourceMap = {
   readonly ShadowMask: FrameResourceKey<RGTextureHandle>;
   readonly TransmissionThickness: FrameResourceKey<RGTextureHandle>;
   readonly WaterCaustics: FrameResourceKey<RGTextureHandle>;
+  readonly VirtualTexture: FrameResourceKey<RGTokenHandle>;
   readonly PresentedColor: FrameResourceKey<RGTextureHandle>;
 };
 
@@ -67,6 +68,11 @@ export const FrameResources = {
   TransmissionThickness: 'transmissionThickness',
   /** Light-space caustic map projected onto whatever sits under the water. */
   WaterCaustics: 'waterCaustics',
+  /**
+   * Ordering token: the scene's virtual textures have been updated and filled for this camera.
+   * Passes that sample them read this token.
+   */
+  VirtualTexture: 'virtualTexture',
   /** Final presented color. The last registration becomes the graph sink. */
   PresentedColor: 'presentedColor'
 } as unknown as FrameResourceMap;

@@ -117,6 +117,12 @@ export type NullCommand =
       workgroupCount: [number, number, number];
     }
   | {
+      type: 'computeIndirect';
+      frame: number;
+      program: Nullable<GPUProgram>;
+      indirectOffset: number;
+    }
+  | {
       type: 'generateMipmaps';
       frame: number;
       texture: BaseTexture;

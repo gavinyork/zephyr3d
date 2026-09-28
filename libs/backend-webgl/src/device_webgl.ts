@@ -1272,6 +1272,10 @@ export class WebGLDevice extends BaseDevice {
     throw new Error('WebGL device does not support compute shader');
   }
   /** @internal */
+  protected _computeIndirect() {
+    throw new Error('WebGL device does not support compute shader');
+  }
+  /** @internal */
   private createInstancedArraysEXT() {
     const gl = this._context;
     if (isWebGL2(gl)) {

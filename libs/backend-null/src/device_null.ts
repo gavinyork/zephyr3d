@@ -792,6 +792,23 @@ export class NullDevice extends BaseDevice {
     });
   }
   /** @internal */
+  protected _computeIndirect(indirectBuffer: GPUDataBuffer, indirectOffset: number) {
+    if (!this._deviceCaps.miscCaps.supportDispatchIndirect) {
+      throw new Error(`${this._type} device does not support indirect compute`);
+    }
+    if (!indirectBuffer) {
+      this.reportError('computeIndirect() failed: indirect buffer is null');
+      return;
+    }
+    this._currentProgram?.use();
+    this.record({
+      type: 'computeIndirect',
+      frame: this._frameInfo.frameCounter,
+      program: this._currentProgram,
+      indirectOffset
+    });
+  }
+  /** @internal */
   protected _executeRenderBundle(renderBundle: RenderBundle): number {
     const entries = renderBundle as NullRenderBundleEntry[];
     for (const drawcall of entries) {

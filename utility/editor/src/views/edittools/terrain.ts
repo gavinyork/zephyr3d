@@ -465,26 +465,39 @@ export class TerrainEditTool extends Disposable implements EditTool {
       false,
       0,
       0,
-      detailIndex >> 2
+      0
     );
     device.pushDeviceStates();
     device.setFramebuffer(fb);
 
     brush.detailIndex = detailIndex;
     brush.sourceSplatMap = this._splatMapCopy.get();
-    brush.brush(
-      brushTexture,
-      this._terrain.get().worldRegion,
-      this._terrain.get().scale,
-      hitPos,
-      brushSize,
-      angle,
-      Math.max(strength * 0.1, 0.01)
-    );
+    // Every splat layer is rewritten: the weights are normalized across all of them
+    const numSplatLayers = splatMap.isTexture2DArray() ? splatMap.depth : 1;
+    for (let layer = 0; layer < numSplatLayers; layer++) {
+      fb.setColorAttachmentLayer(0, layer);
+      brush.outputLayer = layer;
+      brush.brush(
+        brushTexture,
+        this._terrain.get().worldRegion,
+        this._terrain.get().scale,
+        hitPos,
+        brushSize,
+        angle,
+        Math.max(strength * 0.1, 0.01)
+      );
+    }
     brush.sourceSplatMap = null;
 
     device.popDeviceStates();
     device.pool.releaseFrameBuffer(fb);
+    // The brush quad's corners lie brushSize from the hit point
+    terrain.invalidateRuntimeVirtualTexture(
+      hitPos.x - brushSize,
+      hitPos.y - brushSize,
+      hitPos.x + brushSize,
+      hitPos.y + brushSize
+    );
     eventBus.dispatchEvent('scene_changed');
   }
   applyHeightBrush(
@@ -516,6 +529,13 @@ export class TerrainEditTool extends Disposable implements EditTool {
 
     device.popDeviceStates();
     device.pool.releaseFrameBuffer(fb);
+    // The virtual texture holds world space normals, which follow the height map slopes
+    terrain.invalidateRuntimeVirtualTexture(
+      hitPos.x - brushSize,
+      hitPos.y - brushSize,
+      hitPos.x + brushSize,
+      hitPos.y + brushSize
+    );
 
     this._heightDirty = true;
     eventBus.dispatchEvent('scene_changed');
@@ -698,6 +718,7 @@ export class TerrainEditTool extends Disposable implements EditTool {
             .then(() => {
               URL.revokeObjectURL(url);
               this._terrain.get().updateBoundingBox();
+              this._terrain.get().invalidateRuntimeVirtualTexture();
             })
             .catch((err) => {
               Dialog.messageBox('Error', String(err));
@@ -723,6 +744,7 @@ export class TerrainEditTool extends Disposable implements EditTool {
                   )
                 );
                 this._terrain.get().updateBoundingBox();
+                this._terrain.get().invalidateRuntimeVirtualTexture();
                 eventBus.dispatchEvent('scene_changed');
                 URL.revokeObjectURL(url);
               })

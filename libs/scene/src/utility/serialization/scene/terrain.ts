@@ -126,7 +126,8 @@ async function getTerrainSplatMapContent(terrain: ClipmapTerrain): Promise<Array
       buffer,
       3 * 4 + i * splatMap.width * splatMap.height * info.blockWidth * info.blockHeight * info.size
     );
-    await splatMap.readPixels(0, 0, splatMap.width, splatMap.height, 0, 0, layerData);
+    // Layer i holds the weights of detail layers 4i..4i+3
+    await splatMap.readPixels(0, 0, splatMap.width, splatMap.height, i, 0, layerData);
   }
   return buffer;
 }
@@ -172,6 +173,21 @@ export function getTerrainClass(manager: ResourceManager): SerializableClass {
           },
           set(this: ClipmapTerrain, value) {
             this.castShadow = value.bool[0];
+          }
+        },
+        {
+          name: 'RuntimeVirtualTexture',
+          description:
+            'Blends the detail layers once into a texture cache instead of every frame for every pixel. ' +
+            'Shading cost no longer grows with the number of layers; close up the ground can look a bit ' +
+            'softer while the finest detail streams in. WebGPU only',
+          type: 'bool',
+          default: false,
+          get(this: ClipmapTerrain, value) {
+            value.bool[0] = this.runtimeVirtualTexture;
+          },
+          set(this: ClipmapTerrain, value) {
+            this.runtimeVirtualTexture = value.bool[0];
           }
         },
         {
@@ -299,14 +315,23 @@ export function getTerrainClass(manager: ResourceManager): SerializableClass {
             return false;
           },
           get(this: ClipmapTerrain, value) {
-            const data: { albedo: string; normal: string; roughness: number; uvscale: number }[] = [];
+            const data: {
+              albedo: string;
+              normal: string;
+              roughness: number;
+              uvscale: number;
+              hexTiling: boolean;
+              hexParams: [number, number, number];
+            }[] = [];
             const material = this.material!;
             for (let i = 0; i < material.numDetailMaps; i++) {
               data.push({
                 albedo: manager.getAssetId(material.getDetailMap(i)) ?? '',
                 normal: manager.getAssetId(material.getDetailNormalMap(i)) ?? '',
                 roughness: material.getDetailMapRoughness(i),
-                uvscale: material.getDetailMapUVScale(i)
+                uvscale: material.getDetailMapUVScale(i),
+                hexTiling: material.getDetailMapHexTiling(i),
+                hexParams: material.getDetailMapHexParams(i)
               });
             }
             value.object[0] = new JSONArray(null, data);
@@ -323,6 +348,8 @@ export function getTerrainClass(manager: ResourceManager): SerializableClass {
                 normal: string;
                 roughness: number;
                 uvscale: number;
+                hexTiling?: boolean;
+                hexParams?: [number, number, number];
               }[]) ?? [];
             const material = this.material!;
             material.numDetailMaps = data.length;
@@ -349,7 +376,9 @@ export function getTerrainClass(manager: ResourceManager): SerializableClass {
               } else {
                 let tex: Nullable<Texture2D>;
                 try {
-                  tex = await manager.fetchTexture<Texture2D>(info.normal);
+                  // Normal maps hold vectors, not colors: loaded as sRGB, 0.5 would decode to 0.21
+                  // and tilt every normal (the editor picks them with linearColorSpace too)
+                  tex = await manager.fetchTexture<Texture2D>(info.normal, { linearColorSpace: true });
                 } catch (err) {
                   console.error(`Load asset failed: ${info.normal}: ${err}`);
                   tex = null;
@@ -362,6 +391,10 @@ export function getTerrainClass(manager: ResourceManager): SerializableClass {
               }
               material.setDetailMapRoughness(i, info.roughness ?? 1);
               material.setDetailMapUVScale(i, info.uvscale ?? 100);
+              if (info.hexParams) {
+                material.setDetailMapHexParams(i, info.hexParams[0], info.hexParams[1], info.hexParams[2]);
+              }
+              material.setDetailMapHexTiling(i, !!info.hexTiling);
             }
           }
         },
@@ -398,6 +431,7 @@ export function getTerrainClass(manager: ResourceManager): SerializableClass {
                 const content = new Uint8Array(data, 3 * 4 + i * width * height * 4, width * height * 4);
                 splatMap.update(content, 0, 0, i, width, height, 1);
               }
+              this.invalidateRuntimeVirtualTexture();
               this.splatMapAssetId = value.str[0];
             }
           }

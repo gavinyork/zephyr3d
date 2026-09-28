@@ -48,6 +48,7 @@ import { mergeFrameResourceRequirements } from './frame_resource_requirements';
 import type {
   RGExecuteContext,
   RGHandle,
+  RGPassBuilder,
   RGResolvedSize,
   RGTextureAttachment,
   RGTextureDesc,
@@ -1028,6 +1029,65 @@ const ShadowMaskModule: RenderModule<FrameGraphContext> = {
   }
 };
 
+/** Orders a pass drawing scene materials after this camera's virtual texture update. @internal */
+function readVirtualTextureToken(builder: RGPassBuilder, blackboard: RGBlackboard) {
+  const token = blackboard.get(FrameResources.VirtualTexture);
+  if (token) {
+    builder.read(token);
+  }
+}
+
+/** Scene virtual texture clients active for this camera's frame. @internal */
+function activeVirtualTextureClients(ctx: DrawContext, renderQueue: RenderQueue) {
+  if (ctx.device.type !== 'webgpu') {
+    return [];
+  }
+  return ctx.scene.virtualTextureClients.filter((c) => c.isActive?.(ctx, renderQueue) ?? true);
+}
+
+/**
+ * Updates the scene's virtual textures for this camera: mark from the depth prepass, map, fill.
+ *
+ * Follows UE VSM, which marks pages from the current frame's depth after the prepass and manages
+ * and renders them before the lights (DeferredShadingRenderer.cpp, BeginMarkVirtualShadowMapPages
+ * then RenderShadowDepthMaps). Every camera runs it; the stamp is the device frame counter, which
+ * like UE's SceneFrameNumber is shared by every render of the frame, so one camera's pages are
+ * never aged or given away by another camera's update in the same frame.
+ * @internal
+ */
+const VirtualTextureModule: RenderModule<FrameGraphContext> = {
+  type: 'VirtualTextureUpdate',
+  reads: [{ resource: FrameResources.LinearDepth }],
+  writes: [FrameResources.VirtualTexture],
+  prepare: ({ ctx, renderQueue }) => ({
+    enabled: activeVirtualTextureClients(ctx, renderQueue).length > 0
+  }),
+  setup(fg: FrameGraphContext) {
+    const { graph, ctx, renderQueue, blackboard } = fg;
+    const clients = activeVirtualTextureClients(ctx, renderQueue);
+    const token = graph.addPass('VirtualTextureUpdate', (builder) => {
+      const depthHandle = blackboard.expect(FrameResources.LinearDepth);
+      builder.read(depthHandle);
+      // Page tables and pools are scene state the graph does not track
+      builder.sideEffect();
+      const token = builder.createToken('VirtualTextureDone');
+      builder.setExecute((rgCtx) => {
+        const depthTex = rgCtx.getTexture<Texture2D>(depthHandle);
+        const stamp = ctx.device.frameInfo.frameCounter;
+        for (const client of clients) {
+          client.markFromDepth?.(ctx, depthTex);
+        }
+        for (const client of clients) {
+          client.virtualTexture.update(stamp);
+          client.fill(ctx);
+        }
+      });
+      return token;
+    });
+    blackboard.set(FrameResources.VirtualTexture, token);
+  }
+};
+
 /** @internal */
 const TransmissionThicknessModule: RenderModule<FrameGraphContext> = {
   type: 'TransmissionThicknessPass',
@@ -1182,6 +1242,7 @@ const SSSProfileModule: RenderModule<FrameGraphContext> = {
     const renderDepthAttachment = fg.state.renderDepthAttachment;
     const sssProfileResult = graph.addPass('SSSProfile', (builder) => {
       builder.read(blackboard.expect(FrameResources.LinearDepth));
+      readVirtualTextureToken(builder, blackboard);
       builder.read(depthPassResult.depthFramebufferHandle);
       if (preLightTransmissionDepthToken) {
         builder.read(preLightTransmissionDepthToken);
@@ -1258,6 +1319,7 @@ const SceneColorGrabModule: RenderModule<FrameGraphContext> = {
     const renderDepthAttachment = fg.state.renderDepthAttachment;
     const grabResult = graph.addPass('SceneColorGrab', (builder) => {
       builder.read(blackboard.expect(FrameResources.LinearDepth));
+      readVirtualTextureToken(builder, blackboard);
       builder.read(depthPassResult.depthFramebufferHandle);
       if (preLightTransmissionDepthToken) {
         builder.read(preLightTransmissionDepthToken);
@@ -1417,6 +1479,7 @@ const LightPassModule: RenderModule<FrameGraphContext> = {
 
     const opaquePassResult = graph.addPass('LightPass', (builder) => {
       builder.read(blackboard.expect(FrameResources.LinearDepth));
+      readVirtualTextureToken(builder, blackboard);
       builder.read(depthPassResult.depthFramebufferHandle);
       if (shadowMaskHandle) {
         builder.read(shadowMaskHandle);
@@ -1798,6 +1861,7 @@ const CompositeTailModule: RenderModule<FrameGraphContext> = {
     // Transparent geometry writes a new version of the opaque-chain output.
     const sceneColorHandle = graph.addPass('TransparentPass', (builder) => {
       builder.read(blackboard.expect(FrameResources.LinearDepth));
+      readVirtualTextureToken(builder, blackboard);
       builder.read(depthPassResult.depthFramebufferHandle);
       if (hiZHandle) {
         // Transparent materials may ray-march HiZ.
@@ -1953,6 +2017,7 @@ export const ForwardPlusModules = {
   ShadowMaps: ShadowMapsModule,
   WaterCaustics: WaterCausticsModule,
   DepthPrepass: DepthPrepassModule,
+  VirtualTextureUpdate: VirtualTextureModule,
   ShadowMask: ShadowMaskModule,
   TransmissionThickness: TransmissionThicknessModule,
   TransmissionDepthForSSR: TransmissionDepthForSSRModule,
@@ -1973,6 +2038,7 @@ const DEFAULT_FORWARD_PLUS_MODULES: readonly RenderModule<FrameGraphContext>[] =
   ShadowMapsModule,
   WaterCausticsModule,
   DepthPrepassModule,
+  VirtualTextureModule,
   ShadowMaskModule,
   TransmissionThicknessModule,
   TransmissionDepthForSSRModule,
