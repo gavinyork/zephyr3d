@@ -212,13 +212,13 @@ export function mixinPBRBluePrint<T extends typeof MeshMaterial>(BaseCls: T) {
                   this.rectColor,
                   pb.mix(
                     1,
-                    that.calculateShadow(this, this.worldPos, this.pbrData.TBN[2], pb.max(this.rectNoL, 1e-5)),
-                    ShaderHelper.getRectLightShadowWeight(
+                    that.calculateShadow(
                       this,
                       this.worldPos,
                       this.pbrData.TBN[2],
-                      posRange
-                    )
+                      pb.max(this.rectNoL, 1e-5)
+                    ),
+                    ShaderHelper.getRectLightShadowWeight(this, this.worldPos, this.pbrData.TBN[2], posRange)
                   )
                 );
               }
