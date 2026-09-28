@@ -601,17 +601,29 @@ export function mixinLight<T extends typeof MeshMaterial>(BaseCls: T) {
       pb.func(funcName, [pb.vec3('fragCoord')], function () {
         const clusterParams = ShaderHelper.getClusterParams(this);
         const countParams = ShaderHelper.getCountParams(this);
+        // Depth at (or jittered past) the far plane would land in slice countParams.z, one past
+        // the last row of the index texture, so clamp both ends. Clamped as float before the int
+        // conversion because GLSL ES 1.0 has no integer clamp.
         this.$l.zTile = pb.int(
-          pb.max(
+          pb.clamp(
             pb.add(
               pb.mul(pb.log2(ShaderHelper.nonLinearDepthToLinear(this, this.fragCoord.z)), clusterParams.z),
               clusterParams.w
             ),
-            0
+            0,
+            pb.sub(pb.float(countParams.z), 1)
           )
         );
-        this.$l.f = pb.vec2(this.fragCoord.x, pb.sub(clusterParams.y, pb.add(this.fragCoord.y, 1)));
-        this.$l.xyTile = pb.ivec2(pb.div(this.f, pb.div(clusterParams.xy, pb.vec2(countParams.xy))));
+        // fragCoord holds pixel centers (n + 0.5); flipping to the top-down tile space of the
+        // index pass is H - fragCoord.y, with no extra -1 that would shift tile rows by a pixel.
+        this.$l.f = pb.vec2(this.fragCoord.x, pb.sub(clusterParams.y, this.fragCoord.y));
+        this.$l.xyTile = pb.ivec2(
+          pb.clamp(
+            pb.div(this.f, pb.div(clusterParams.xy, pb.vec2(countParams.xy))),
+            pb.vec2(0),
+            pb.sub(pb.vec2(countParams.xy), pb.vec2(1))
+          )
+        );
         this.$return(pb.ivec3(this.xyTile, this.zTile));
       });
       return pb.getGlobalScope()[funcName](fragCoord);
@@ -981,15 +993,23 @@ export function mixinLight<T extends typeof MeshMaterial>(BaseCls: T) {
             );
           }
           if (pb.getDevice().type === 'webgl') {
+            // The index pass packs slots front to back (first light in the high half of .r) and
+            // leaves the unused tail zero, so decode in that order and stop at the first zero.
+            this.$l.done = false;
             this.$for(pb.int('i'), 0, 4, function () {
-              this.$l.k = this.samp.at(this.i);
+              this.$if(this.done, function () {
+                this.$break();
+              });
+              this.$l.packed = this.samp.at(this.i);
               this.$l.lights = pb.int[2]();
-              this.$l.lights[0] = pb.int(pb.mod(this.k, 256));
-              this.$l.lights[1] = pb.int(pb.div(this.k, 256));
+              this.$l.lights[0] = pb.int(pb.div(this.packed, 256));
+              this.$l.lights[1] = pb.int(pb.mod(this.packed, 256));
               this.$for(pb.int('k'), 0, 2, function () {
                 this.$l.li = this.lights.at(this.k);
                 this.$if(pb.greaterThan(this.li, 0), function () {
-                  this.$for(pb.int('j'), 1, 256, function () {
+                  // GLSL ES 1.0 only indexes uniform arrays with loop indices, hence the search;
+                  // indices never exceed the WebGL1 light capacity.
+                  this.$for(pb.int('j'), 1, ShaderHelper.getMaxClusterLights() + 1, function () {
                     this.$if(pb.equal(this.j, this.li), function () {
                       this.$l.positionRange = ShaderHelper.getLightPositionAndRange(this, this.j);
                       this.$l.directionCutoff = ShaderHelper.getLightDirectionAndCutoff(this, this.j);
@@ -1024,46 +1044,55 @@ export function mixinLight<T extends typeof MeshMaterial>(BaseCls: T) {
                       this.$break();
                     });
                   });
+                }).$else(function () {
+                  this.done = true;
+                  this.$break();
                 });
               });
             });
           } else {
-            this.$for(pb.uint('i'), 0, 4, function () {
-              this.$for(pb.uint('k'), 0, 4, function () {
-                this.$l.c = pb.compAnd(pb.sar(this.samp.at(this.i), pb.mul(this.k, 8)), 0xff);
-                this.$if(pb.greaterThan(this.c, 0), function () {
-                  this.$l.positionRange = ShaderHelper.getLightPositionAndRange(this, this.c);
-                  this.$l.directionCutoff = ShaderHelper.getLightDirectionAndCutoff(this, this.c);
-                  this.$l.diffuseIntensity = ShaderHelper.getLightColorAndIntensity(this, this.c);
-                  this.$l.extra = ShaderHelper.getLightExtra(this, this.c);
-                  this.$l.unshadowedIntensity = this.diffuseIntensity;
-                  if (that.drawContext.screenSpaceShadowMask) {
-                    // Shadow-casting lights (buffer index <= numShadowLights) attenuate
-                    // by the pre-rendered screen-space shadow mask; others return 1.0.
-                    this.$l.shadowMask = ShaderHelper.sampleShadowMask(this, pb.int(this.c));
-                    this.diffuseIntensity = pb.vec4(
-                      pb.mul(this.diffuseIntensity.rgb, this.shadowMask),
-                      this.diffuseIntensity.w
-                    );
-                  }
-                  this.$l.thickness = pb.float(1);
-                  if (that.drawContext.transmissionThickness) {
-                    this.thickness = ShaderHelper.sampleTransmissionThickness(this, pb.int(this.c));
-                  }
-                  this.$l.lightType = pb.int(this.extra.w);
-                  this.$scope(function () {
-                    callback.call(
-                      this,
-                      this.lightType,
-                      this.positionRange,
-                      this.directionCutoff,
-                      this.diffuseIntensity,
-                      this.extra,
-                      false,
-                      this.thickness,
-                      this.unshadowedIntensity
-                    );
-                  });
+            // Slots are packed front to back (slot 0 in the top byte of .r) with a zero tail, so
+            // walk them in that order and stop at the first empty one.
+            this.$for(pb.uint('n'), 0, 16, function () {
+              this.$l.c = pb.compAnd(
+                pb.sar(this.samp.at(pb.div(this.n, 4)), pb.sub(24, pb.mul(pb.compAnd(this.n, 3), 8))),
+                0xff
+              );
+              this.$if(pb.equal(this.c, 0), function () {
+                this.$break();
+              });
+              this.$scope(function () {
+                this.$l.positionRange = ShaderHelper.getLightPositionAndRange(this, this.c);
+                this.$l.directionCutoff = ShaderHelper.getLightDirectionAndCutoff(this, this.c);
+                this.$l.diffuseIntensity = ShaderHelper.getLightColorAndIntensity(this, this.c);
+                this.$l.extra = ShaderHelper.getLightExtra(this, this.c);
+                this.$l.unshadowedIntensity = this.diffuseIntensity;
+                if (that.drawContext.screenSpaceShadowMask) {
+                  // Shadow-casting lights (buffer index <= numShadowLights) attenuate
+                  // by the pre-rendered screen-space shadow mask; others return 1.0.
+                  this.$l.shadowMask = ShaderHelper.sampleShadowMask(this, pb.int(this.c));
+                  this.diffuseIntensity = pb.vec4(
+                    pb.mul(this.diffuseIntensity.rgb, this.shadowMask),
+                    this.diffuseIntensity.w
+                  );
+                }
+                this.$l.thickness = pb.float(1);
+                if (that.drawContext.transmissionThickness) {
+                  this.thickness = ShaderHelper.sampleTransmissionThickness(this, pb.int(this.c));
+                }
+                this.$l.lightType = pb.int(this.extra.w);
+                this.$scope(function () {
+                  callback.call(
+                    this,
+                    this.lightType,
+                    this.positionRange,
+                    this.directionCutoff,
+                    this.diffuseIntensity,
+                    this.extra,
+                    false,
+                    this.thickness,
+                    this.unshadowedIntensity
+                  );
                 });
               });
             });

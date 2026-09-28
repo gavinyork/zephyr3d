@@ -231,7 +231,7 @@ export class ClusteredLight {
             this.$for(pb.int('i'), 0, 8, function () {
               this.lightIndices.setAt(this.i, 0);
             });
-            this.$for(pb.int('i'), 1, 256, function () {
+            this.$for(pb.int('i'), 1, ShaderHelper.getMaxClusterLights() + 1, function () {
               this.$if(pb.equal(this.i, this.countParam.w), function () {
                 this.$break();
               });
