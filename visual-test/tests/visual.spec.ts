@@ -94,6 +94,7 @@ const SCENE_NAMES = [
   'shadow-defaults',
   'shadow-normal-offset',
   'cluster-many-lights',
+  'cluster-many-lights-ortho',
   'spot-shadow',
   'rect-light-diffuse',
   'rect-light-glossy',

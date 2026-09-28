@@ -22,6 +22,7 @@ import {
 } from './scenes/shadows';
 import {
   clusterManyLights,
+  clusterManyLightsOrtho,
   rectLightAutoRange,
   rectLightBlueprint,
   rectLightDiffuse,
@@ -126,6 +127,7 @@ export const SCENES: VisualScene[] = [
   shadowNormalOffset,
   // Lighting paths.
   clusterManyLights,
+  clusterManyLightsOrtho,
   spotShadow,
   rectLightDiffuse,
   rectLightGlossy,

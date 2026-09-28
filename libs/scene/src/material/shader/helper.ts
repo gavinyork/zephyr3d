@@ -344,6 +344,9 @@ export class ShaderHelper {
             pb.vec4('clusterParams'),
             pb.ivec4('countParams'),
             pb.ivec2('lightIndexTexSize'),
+            // Nonzero when the clusters were sliced for an orthographic camera
+            // (linear depth slices instead of exponential).
+            pb.int('clusterOrtho'),
             // Number of shadow-casting lights at the head of the clustered light
             // buffer (indices 1..N). Only present on the screen-space shadow mask
             // path (part of the global bind group hash), so the declared and bound
@@ -1418,6 +1421,7 @@ export class ShaderHelper {
       envLightStrength,
       envLightSpecularStrength: ctx.env!.light.specularStrength ?? 1,
       lightIndexTexSize: new Int32Array([lightIndexTexture.width, lightIndexTexture.height]),
+      clusterOrtho: ctx.clusteredLight?.orthographic ? 1 : 0,
       ...(ctx.screenSpaceShadowMask ? { numShadowLights: ctx.clusteredLight?.numShadowLights ?? 0 } : {})
     });
     bindGroup.setBuffer(UNIFORM_NAME_LIGHT_BUFFER, lightBuffer);
@@ -2107,6 +2111,14 @@ export class ShaderHelper {
   /** @internal */
   static getCountParams(scope: PBInsideFunctionScope): PBShaderExp {
     return scope.light.countParams;
+  }
+  /**
+   * Nonzero when the clusters were sliced for an orthographic camera: depth slices
+   * are then linear in view depth rather than exponential.
+   * @internal
+   */
+  static getClusterOrthographic(scope: PBInsideFunctionScope): PBShaderExp {
+    return scope.light.clusterOrtho;
   }
   /**
    * Number of shadow-casting lights at the head of the clustered light buffer.

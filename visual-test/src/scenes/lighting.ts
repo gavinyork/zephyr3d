@@ -3,6 +3,7 @@ import {
   BlinnMaterial,
   BoxShape,
   Mesh,
+  OrthoCamera,
   PBRBluePrintMaterial,
   PlaneShape,
   PointLight,
@@ -24,44 +25,74 @@ import { bareScene, lambert, pbr, placeCamera } from './common';
  * boundaries, and the lights are given short ranges so each one's footprint has a
  * visible edge where a misassignment shows up as a hard discontinuity.
  */
+function clusterLightStage(scene: Scene) {
+  bareScene(scene);
+
+  new Mesh(scene, new PlaneShape({ size: 24 }), lambert(new Vector4(0.5, 0.52, 0.55, 1)));
+
+  // A few solids so the lights also have vertical surfaces to fall on.
+  for (let i = 0; i < 5; i++) {
+    const sphere = new Mesh(
+      scene,
+      new SphereShape({ radius: 0.6 }),
+      pbr(new Vector4(0.8, 0.8, 0.82, 1), 0, 0.4)
+    );
+    sphere.position.setXYZ((i - 2) * 2.2, 0.6, -1.5);
+  }
+
+  const COLS = 6;
+  const ROWS = 4;
+  for (let r = 0; r < ROWS; r++) {
+    for (let c = 0; c < COLS; c++) {
+      const light = new PointLight(scene);
+      light.position.setXYZ((c - (COLS - 1) / 2) * 2.1, 1.1, (r - (ROWS - 1) / 2) * 2.4);
+      light.range = 2.6;
+      light.intensity = 6;
+      // Deterministic colour cycle - no randomness anywhere in this harness.
+      const t = (r * COLS + c) / (ROWS * COLS);
+      light.color = new Vector4(
+        0.5 + 0.5 * Math.sin(t * 6.283),
+        0.5 + 0.5 * Math.sin(t * 6.283 + 2.09),
+        0.5 + 0.5 * Math.sin(t * 6.283 + 4.19),
+        1
+      );
+    }
+  }
+}
+
 export const clusterManyLights: VisualScene = {
   name: 'cluster-many-lights',
   description: '24 short-range point lights on a lattice. Pins clustered-forward light assignment.',
   setup({ scene, camera }) {
-    bareScene(scene);
-
-    new Mesh(scene, new PlaneShape({ size: 24 }), lambert(new Vector4(0.5, 0.52, 0.55, 1)));
-
-    // A few solids so the lights also have vertical surfaces to fall on.
-    for (let i = 0; i < 5; i++) {
-      const sphere = new Mesh(
-        scene,
-        new SphereShape({ radius: 0.6 }),
-        pbr(new Vector4(0.8, 0.8, 0.82, 1), 0, 0.4)
-      );
-      sphere.position.setXYZ((i - 2) * 2.2, 0.6, -1.5);
-    }
-
-    const COLS = 6;
-    const ROWS = 4;
-    for (let r = 0; r < ROWS; r++) {
-      for (let c = 0; c < COLS; c++) {
-        const light = new PointLight(scene);
-        light.position.setXYZ((c - (COLS - 1) / 2) * 2.1, 1.1, (r - (ROWS - 1) / 2) * 2.4);
-        light.range = 2.6;
-        light.intensity = 6;
-        // Deterministic colour cycle - no randomness anywhere in this harness.
-        const t = (r * COLS + c) / (ROWS * COLS);
-        light.color = new Vector4(
-          0.5 + 0.5 * Math.sin(t * 6.283),
-          0.5 + 0.5 * Math.sin(t * 6.283 + 2.09),
-          0.5 + 0.5 * Math.sin(t * 6.283 + 4.19),
-          1
-        );
-      }
-    }
-
+    clusterLightStage(scene);
     placeCamera(camera, new Vector3(0, 6.5, 9.5), new Vector3(0, 0.5, 0));
+  }
+};
+
+/**
+ * The same lattice through an orthographic camera.
+ *
+ * Cluster bounds used to be built by casting rays from the eye through each tile's
+ * corners and the depth slice by inverting a perspective depth, both of which are
+ * wrong when view rays are parallel: the tiles' bounds skewed further off the
+ * further they lay from the near plane, and each light's footprint broke up along
+ * cluster edges or went missing. Orthographic clusters are boxes, sliced linearly
+ * in depth. Every footprint must come out a smooth round pool, as in
+ * cluster-many-lights.
+ */
+export const clusterManyLightsOrtho: VisualScene = {
+  name: 'cluster-many-lights-ortho',
+  description:
+    'The cluster-many-lights lattice under an orthographic camera. Pins box-shaped clusters and linear depth slices.',
+  setup({ scene }) {
+    clusterLightStage(scene);
+    // Frames the lattice (x within +-5.25, z within +-3.6) from the same viewpoint as
+    // the perspective scene. The capture target is square, so the extents are too.
+    const ortho = new OrthoCamera(scene, -6.5, 6.5, -6.5, 6.5, 1, 30);
+    const eye = new Vector3(0, 6.5, 9.5);
+    ortho.position.set(eye);
+    ortho.lookAt(eye, new Vector3(0, 0.5, 0), Vector3.axisPY());
+    scene.mainCamera = ortho;
   }
 };
 

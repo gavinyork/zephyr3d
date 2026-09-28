@@ -1,4 +1,5 @@
 import type { BindGroup, PBFunctionScope, PBInsideFunctionScope, PBShaderExp } from '@zephyr3d/device';
+import { REVERSE_Z } from '@zephyr3d/base';
 import {
   LIGHT_TYPE_DIRECTIONAL,
   LIGHT_TYPE_POINT,
@@ -601,15 +602,24 @@ export function mixinLight<T extends typeof MeshMaterial>(BaseCls: T) {
       pb.func(funcName, [pb.vec3('fragCoord')], function () {
         const clusterParams = ShaderHelper.getClusterParams(this);
         const countParams = ShaderHelper.getCountParams(this);
+        // Slice = t * scale + bias, with t = log2(view depth) for perspective (exponential
+        // slices) and the view depth itself for orthographic (linear slices), matching the
+        // index pass. Orthographic device depth is linear between near and far.
+        this.$l.sliceDepth = pb.float();
+        this.$if(pb.notEqual(ShaderHelper.getClusterOrthographic(this), 0), function () {
+          const nearFar = ShaderHelper.getCameraParams(this);
+          this.sliceDepth = REVERSE_Z
+            ? pb.mix(nearFar.y, nearFar.x, this.fragCoord.z)
+            : pb.mix(nearFar.x, nearFar.y, this.fragCoord.z);
+        }).$else(function () {
+          this.sliceDepth = pb.log2(ShaderHelper.nonLinearDepthToLinear(this, this.fragCoord.z));
+        });
         // Depth at (or jittered past) the far plane would land in slice countParams.z, one past
         // the last row of the index texture, so clamp both ends. Clamped as float before the int
         // conversion because GLSL ES 1.0 has no integer clamp.
         this.$l.zTile = pb.int(
           pb.clamp(
-            pb.add(
-              pb.mul(pb.log2(ShaderHelper.nonLinearDepthToLinear(this, this.fragCoord.z)), clusterParams.z),
-              clusterParams.w
-            ),
+            pb.add(pb.mul(this.sliceDepth, clusterParams.z), clusterParams.w),
             0,
             pb.sub(pb.float(countParams.z), 1)
           )

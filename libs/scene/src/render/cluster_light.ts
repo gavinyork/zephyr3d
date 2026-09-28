@@ -1,4 +1,4 @@
-import type { Nullable } from '@zephyr3d/base';
+import type { Nullable, Vector3 } from '@zephyr3d/base';
 import { DEPTH_CLEAR_VALUE, Vector4 } from '@zephyr3d/base';
 import { MAX_SHADOW_MASK_LIGHTS } from '../values';
 import type {
@@ -36,6 +36,9 @@ export class ClusteredLight {
   private _countParam: Int32Array<ArrayBuffer>;
   private readonly _clusterParam: Vector4;
   private _numShadowLights: number;
+  private _orthographic: boolean;
+  /** Scratch list of the lights competing for the slots after the mask-backed ones. */
+  private readonly _rest: PunctualLight[];
   constructor() {
     this._tileCountX = 16;
     this._tileCountY = 16;
@@ -52,6 +55,8 @@ export class ClusteredLight {
     this._countParam = new Int32Array(4);
     this._clusterParam = new Vector4();
     this._numShadowLights = 0;
+    this._orthographic = false;
+    this._rest = [];
   }
   get lightBuffer() {
     return this._lightBuffer;
@@ -63,6 +68,13 @@ export class ClusteredLight {
    */
   get numShadowLights() {
     return this._numShadowLights;
+  }
+  /**
+   * Whether the clusters were built for an orthographic camera, which slices depth linearly
+   * rather than exponentially. The lit shader reads it to compute the matching slice.
+   */
+  get orthographic() {
+    return this._orthographic;
   }
   get clusterParam() {
     return this._clusterParam;
@@ -114,6 +126,7 @@ export class ClusteredLight {
         this.viewMatrix = pb.mat4().uniform(0);
         this.sizeParam = pb.vec4().uniform(0);
         this.countParam = pb.ivec4().uniform(0);
+        this.orthoProj = pb.int().uniform(0);
         this[ShaderHelper.getLightBufferUniformName()] =
           pb.vec4[(ShaderHelper.getMaxClusterLights() + 1) * 4]().uniformBuffer(0);
         pb.func('lineIntersectionToZPlane', [pb.vec3('a'), pb.vec3('b'), pb.float('zDistance')], function () {
@@ -198,33 +211,48 @@ export class ClusteredLight {
           );
           this.$l.maxPoint_vS = this.screenToView(this.maxPoint_sS).xyz;
           this.$l.minPoint_vS = this.screenToView(this.minPoint_sS).xyz;
-          this.$l.tileNear = pb.mul(
-            pb.neg(this.sizeParam.z),
-            pb.pow(
-              pb.div(this.sizeParam.w, this.sizeParam.z),
-              pb.div(pb.float(this.zIndex), pb.float(this.countParam.z))
-            )
-          );
-          this.$l.tileFar = pb.mul(
-            pb.neg(this.sizeParam.z),
-            pb.pow(
-              pb.div(this.sizeParam.w, this.sizeParam.z),
-              pb.div(pb.add(pb.float(this.zIndex), 1), pb.float(this.countParam.z))
-            )
-          );
-          this.$l.eyePos = pb.vec3(0);
-          this.$l.minPointNear = this.lineIntersectionToZPlane(this.eyePos, this.minPoint_vS, this.tileNear);
-          this.$l.minPointFar = this.lineIntersectionToZPlane(this.eyePos, this.minPoint_vS, this.tileFar);
-          this.$l.maxPointNear = this.lineIntersectionToZPlane(this.eyePos, this.maxPoint_vS, this.tileNear);
-          this.$l.maxPointFar = this.lineIntersectionToZPlane(this.eyePos, this.maxPoint_vS, this.tileFar);
-          this.$l.aabbMin = pb.min(
-            pb.min(this.minPointNear, this.minPointFar),
-            pb.min(this.maxPointNear, this.maxPointFar)
-          );
-          this.$l.aabbMax = pb.max(
-            pb.max(this.minPointNear, this.minPointFar),
-            pb.max(this.maxPointNear, this.maxPointFar)
-          );
+          this.$l.sliceNear = pb.div(pb.float(this.zIndex), pb.float(this.countParam.z));
+          this.$l.sliceFar = pb.div(pb.add(pb.float(this.zIndex), 1), pb.float(this.countParam.z));
+          this.$l.aabbMin = pb.vec3();
+          this.$l.aabbMax = pb.vec3();
+          this.$if(pb.notEqual(this.orthoProj, 0), function () {
+            // Orthographic: view rays are parallel, so a tile's view-space x/y extent does not
+            // depend on depth, and slices are linear because near may be zero or negative.
+            this.$l.tileNear = pb.neg(pb.mix(this.sizeParam.z, this.sizeParam.w, this.sliceNear));
+            this.$l.tileFar = pb.neg(pb.mix(this.sizeParam.z, this.sizeParam.w, this.sliceFar));
+            this.aabbMin = pb.vec3(pb.min(this.minPoint_vS.xy, this.maxPoint_vS.xy), this.tileFar);
+            this.aabbMax = pb.vec3(pb.max(this.minPoint_vS.xy, this.maxPoint_vS.xy), this.tileNear);
+          }).$else(function () {
+            this.$l.tileNear = pb.mul(
+              pb.neg(this.sizeParam.z),
+              pb.pow(pb.div(this.sizeParam.w, this.sizeParam.z), this.sliceNear)
+            );
+            this.$l.tileFar = pb.mul(
+              pb.neg(this.sizeParam.z),
+              pb.pow(pb.div(this.sizeParam.w, this.sizeParam.z), this.sliceFar)
+            );
+            this.$l.eyePos = pb.vec3(0);
+            this.$l.minPointNear = this.lineIntersectionToZPlane(
+              this.eyePos,
+              this.minPoint_vS,
+              this.tileNear
+            );
+            this.$l.minPointFar = this.lineIntersectionToZPlane(this.eyePos, this.minPoint_vS, this.tileFar);
+            this.$l.maxPointNear = this.lineIntersectionToZPlane(
+              this.eyePos,
+              this.maxPoint_vS,
+              this.tileNear
+            );
+            this.$l.maxPointFar = this.lineIntersectionToZPlane(this.eyePos, this.maxPoint_vS, this.tileFar);
+            this.aabbMin = pb.min(
+              pb.min(this.minPointNear, this.minPointFar),
+              pb.min(this.maxPointNear, this.maxPointFar)
+            );
+            this.aabbMax = pb.max(
+              pb.max(this.minPointNear, this.minPointFar),
+              pb.max(this.maxPointNear, this.maxPointFar)
+            );
+          });
           this.$l.n = pb.int(0);
           if (webgl1) {
             this.$l.lightIndices = pb.float[8]();
@@ -356,7 +384,13 @@ export class ClusteredLight {
     screenSpaceShadowMask = camera.screenSpaceShadowMask,
     preExposure = 1
   ) {
-    const numLights = this.getVisibleLights(renderQueue, this._lights, screenSpaceShadowMask, preExposure);
+    const numLights = this.getVisibleLights(
+      camera,
+      renderQueue,
+      this._lights,
+      screenSpaceShadowMask,
+      preExposure
+    );
     const device = getDevice();
     if (!this._lightIndexTexture) {
       this.createLightIndexTexture(device);
@@ -373,13 +407,23 @@ export class ClusteredLight {
     const viewport = device.getViewport();
     const vw = device.screenXToDevice(viewport.width);
     const vh = device.screenYToDevice(viewport.height);
-    const scale = this._tileCountZ / Math.log2(camera.getFarPlane() / camera.getNearPlane());
-    const bias = -(
-      (this._tileCountZ * Math.log2(camera.getNearPlane())) /
-      Math.log2(camera.getFarPlane() / camera.getNearPlane())
-    );
+    const near = camera.getNearPlane();
+    const far = camera.getFarPlane();
+    // The lit shader computes slice = t * scale + bias, where t is log2(view depth) for
+    // perspective (exponential slices) and the view depth itself for orthographic (linear
+    // slices: an orthographic near plane may be zero or negative, where log2 is undefined).
+    this._orthographic = !camera.isPerspective();
+    let scale: number;
+    let bias: number;
+    if (this._orthographic) {
+      scale = this._tileCountZ / (far - near);
+      bias = -near * scale;
+    } else {
+      scale = this._tileCountZ / Math.log2(far / near);
+      bias = -Math.log2(near) * scale;
+    }
     this._clusterParam.setXYZW(vw, vh, scale, bias);
-    this._sizeParam.setXYZW(vw, vh, camera.getNearPlane(), camera.getFarPlane());
+    this._sizeParam.setXYZW(vw, vh, near, far);
     this._countParam[0] = this._tileCountX;
     this._countParam[1] = this._tileCountY;
     this._countParam[2] = this._tileCountZ;
@@ -398,6 +442,7 @@ export class ClusteredLight {
       this._bindGroup!.setValue('viewMatrix', camera.viewMatrix);
       this._bindGroup!.setValue('sizeParam', this._sizeParam);
       this._bindGroup!.setValue('countParam', this._countParam);
+      this._bindGroup!.setValue('orthoProj', this._orthographic ? 1 : 0);
       this._bindGroup!.setBuffer(ShaderHelper.getLightBufferUniformName(), this._lightBuffer!);
       device.setProgram(this._lightIndexProgram);
       device.setVertexLayout(this._lightIndexVertexLayout);
@@ -411,7 +456,48 @@ export class ClusteredLight {
     }
     device.popDeviceStates();
   }
+  /**
+   * Orders `lights` by estimated contribution at the camera, most important first.
+   *
+   * @remarks
+   * Both caps drop lights by buffer index - the global one truncates the tail, and
+   * a full cluster keeps its lowest 16 indices - so without this whichever lights the
+   * scene traversal happened to reach last are the ones that vanish. The score is
+   * `luminance * range^2 / (range^2 + d^2)`, with `d` the camera's distance to the
+   * light's sphere of influence: 0 from anywhere inside it, falling off with distance
+   * beyond it, and larger for lights that reach further. Directional lights have no
+   * range and light everything, so they always rank first.
+   */
+  private prioritize(lights: PunctualLight[], eye: Vector3) {
+    if (lights.length < 2) {
+      return;
+    }
+    const candidates = lights.map((light) => {
+      const posRange = light.positionAndRange;
+      const range = posRange.w;
+      let score: number;
+      if (light.isDirectionLight() || range <= 0) {
+        score = Infinity;
+      } else {
+        const color = light.diffuseAndIntensity;
+        const dx = posRange.x - eye.x;
+        const dy = posRange.y - eye.y;
+        const dz = posRange.z - eye.z;
+        const d = Math.max(Math.sqrt(dx * dx + dy * dy + dz * dz) - range, 0);
+        const range2 = range * range;
+        score = (Math.max(color.x, color.y, color.z) * color.w * range2) / (range2 + d * d);
+      }
+      return { light, score };
+    });
+    // Stable, so equally important lights keep their traversal order frame to frame.
+    // Compared rather than subtracted: two directional lights would give Infinity - Infinity.
+    candidates.sort((a, b) => (a.score > b.score ? -1 : a.score < b.score ? 1 : 0));
+    for (let i = 0; i < lights.length; i++) {
+      lights[i] = candidates[i].light;
+    }
+  }
   private getVisibleLights(
+    camera: Camera,
     renderQueue: RenderQueue,
     lights: Float32Array,
     useShadowMask: boolean,
@@ -448,34 +534,36 @@ export class ClusteredLight {
       }
       slot = numShadow;
     }
-    // Unshadowed lights fill the region after the mask-backed shadow lights.
-    const numUnshadowed = Math.min(
-      renderQueue.unshadowedLights.length,
-      ShaderHelper.getMaxClusterLights() - slot
-    );
-    for (let j = 0; j < numUnshadowed; j++) {
-      writeLight(renderQueue.unshadowedLights[j], slot + j + 1);
+    // Everything without a mask slot fills the region after the mask-backed shadow
+    // lights: the unshadowed lights, plus shadow-casting lights beyond the mask
+    // capacity (MAX_SHADOW_MASK_LIGHTS). Rather than dropping the latter silently they
+    // are still lit here - without a mask sample, i.e. degraded to no shadow. Both
+    // compete for the remaining slots on equal terms, most important first.
+    const rest = this._rest;
+    rest.length = 0;
+    for (const light of renderQueue.unshadowedLights) {
+      rest.push(light);
     }
-    slot += numUnshadowed;
-    // Shadow-casting lights beyond the mask capacity (MAX_SHADOW_MASK_LIGHTS) have
-    // no mask slot. Rather than dropping them silently, place them past index N so
-    // they are still lit — without a mask sample, i.e. degraded to no shadow.
-    if (useShadowMask && renderQueue.shadowedLights.length > numShadow) {
-      const overflow = renderQueue.shadowedLights.length - numShadow;
-      const numOverflow = Math.min(overflow, ShaderHelper.getMaxClusterLights() - slot);
-      for (let k = 0; k < numOverflow; k++) {
-        writeLight(renderQueue.shadowedLights[numShadow + k], slot + k + 1);
-      }
-      slot += numOverflow;
-      if (!ClusteredLight._warnedShadowMaskOverflow) {
-        ClusteredLight._warnedShadowMaskOverflow = true;
-        console.warn(
-          `ClusteredLight: ${renderQueue.shadowedLights.length} shadow-casting lights exceed the ` +
-            `screen-space shadow mask capacity (${MAX_SHADOW_MASK_LIGHTS}); ${overflow} light(s) are ` +
-            `lit without shadows${numOverflow < overflow ? `, and ${overflow - numOverflow} dropped` : ''}.`
-        );
-      }
+    const overflow = useShadowMask ? renderQueue.shadowedLights.length - numShadow : 0;
+    for (let k = 0; k < overflow; k++) {
+      rest.push(renderQueue.shadowedLights[numShadow + k]);
     }
+    this.prioritize(rest, camera.getWorldPosition());
+    const numRest = Math.min(rest.length, ShaderHelper.getMaxClusterLights() - slot);
+    for (let j = 0; j < numRest; j++) {
+      writeLight(rest[j], slot + j + 1);
+    }
+    slot += numRest;
+    if (overflow > 0 && !ClusteredLight._warnedShadowMaskOverflow) {
+      ClusteredLight._warnedShadowMaskOverflow = true;
+      const dropped = rest.length - numRest;
+      console.warn(
+        `ClusteredLight: ${renderQueue.shadowedLights.length} shadow-casting lights exceed the ` +
+          `screen-space shadow mask capacity (${MAX_SHADOW_MASK_LIGHTS}); ${overflow} light(s) are ` +
+          `lit without shadows${dropped > 0 ? `, and the ${dropped} least important light(s) dropped` : ''}.`
+      );
+    }
+    rest.length = 0;
     this._numShadowLights = numShadow;
     return slot;
   }
