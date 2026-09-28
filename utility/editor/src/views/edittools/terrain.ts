@@ -712,6 +712,7 @@ export class TerrainEditTool extends Disposable implements EditTool {
             .then(() => {
               URL.revokeObjectURL(url);
               this._terrain.get().updateBoundingBox();
+              this._terrain.get().invalidateRuntimeVirtualTexture();
             })
             .catch((err) => {
               Dialog.messageBox('Error', String(err));
@@ -737,6 +738,7 @@ export class TerrainEditTool extends Disposable implements EditTool {
                   )
                 );
                 this._terrain.get().updateBoundingBox();
+                this._terrain.get().invalidateRuntimeVirtualTexture();
                 eventBus.dispatchEvent('scene_changed');
                 URL.revokeObjectURL(url);
               })

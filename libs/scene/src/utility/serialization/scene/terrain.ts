@@ -364,7 +364,9 @@ export function getTerrainClass(manager: ResourceManager): SerializableClass {
               } else {
                 let tex: Nullable<Texture2D>;
                 try {
-                  tex = await manager.fetchTexture<Texture2D>(info.normal);
+                  // Normal maps hold vectors, not colors: loaded as sRGB, 0.5 would decode to 0.21
+                  // and tilt every normal (the editor picks them with linearColorSpace too)
+                  tex = await manager.fetchTexture<Texture2D>(info.normal, { linearColorSpace: true });
                 } catch (err) {
                   console.error(`Load asset failed: ${info.normal}: ${err}`);
                   tex = null;
