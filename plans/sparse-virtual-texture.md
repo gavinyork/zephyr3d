@@ -329,6 +329,19 @@ class VirtualTexture extends Disposable {
 - 核心修正：`invalidate` 判定按页 + border + 1 texel（双线性足迹），否则相邻页 border 残留旧内容形成缝。
 - 验证示例 `examples/src/terrainrvt`：程序化 512² 地形 4 层，R 切换、B 局部刷雪（局部失效）、页表叠加与统计。
 
+## 阶段 4b：反平铺（六边形平铺）
+
+**依据**：UE 5.8 引擎 HLSL 里没有反平铺；唯一的文本实现是引擎自带 MaterialX 库对 Mikkelsen 2022《Practical Real-Time Hex-Tiling》（JCGT 11(2)）的实现（`Engine/Binaries/ThirdParty/MaterialX/libraries/stdlib/genglsl/lib/mx_hextile.glsl`、`mx_hextiledimage.glsl`、`mx_hextilednormalmap.glsl`，参数默认值见 `stdlib_defs.mtlx` `ND_hextiledimage_color3`）。UE 导入 MaterialX 时映射到同名节点图（`Plugins/Interchange/.../MaterialXSurfaceShaderAbstract.cpp:1435-1457`）。
+
+**实现**（`material/shader/terrain_blend.ts`，实时路径与 RVT 填充共用）
+- 坐标：照搬 `mx_hextile_coord`——斜切到单纯形网格、三顶点重心权重、`mx_hextile_hash`、每格随机旋转（0~360°×amount）/缩放（0.5~2 按 amount 插值）/偏移（0~1）。
+- 采样：`textureGrad`，梯度随每个样本旋转缩放（`ddxN = ddx·rm/scale`），mip 按连续坐标选，格边界 UV 跳变不影响。RVT 填充用"该级一个 texel 的 uv 步长"作梯度，与正交顶视下硬件导数等价；填充因此统一改为 grad 采样。
+- 颜色：`pow(重心, 7)` × 亮度权重 `mix(1, luma, contrast)` 后归一化；falloff 固定 0.5（不做 Schlick gain）。亮度系数用 Rec.709（MaterialX `lumacoeffs` 枚举之一，与我们的线性工作空间一致，MaterialX 默认 ACEScg）。
+- 法线：`pow(重心, 7)` 归一化，表面梯度混合（Mikkelsen 2020，`mx_gradient_blend_3_normals`），切线空间 N=(0,0,1) 下化简为 `normalize(Σ w·n.xy/|n.z|, 1)`。**与 MaterialX 的差异**：每个样本的法线 xy 转 `-r`（坐标按 `R(r)` 采样，内容在表面上转 `-r`，法线随之）；MaterialX 的 `mx_axis_rotation_matrix` 按行书写罗德里格斯矩阵却交给列主序的 GLSL `mat3`，实际转了 `+r`。
+- 参数：每层开关 + (rotation, scale, contrast)，默认 (1, 1, 0.5) 同 MaterialX；材质 feature 为逐层位掩码，只有开启的层付 3 倍采样；WebGL1 无 grad 采样，不启用。RVT 开启时开销只在填充 kernel。
+- 序列化 `DetailMaps` 增加 `hexTiling`、`hexParams`（旧场景缺省为关闭）；编辑器纹理刷子面板增加开关与三个滑条；RVT `sync` 比对掩码与参数，变化即全部失效。
+- 验证：`examples/src/terrainrvt` 按 H 切换全部层。
+
 ## 实施记录
 
 - 阶段 0（`f5555b89`）：`computeIndirect`，示例 `examples/src/indirectdispatch`。

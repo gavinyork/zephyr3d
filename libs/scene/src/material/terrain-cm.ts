@@ -25,6 +25,7 @@ import {
   blendTerrainRoughness,
   terrainSplatMaskCount
 } from './shader/terrain_blend';
+import type { TerrainHexTiling, TerrainUVGrad } from './shader/terrain_blend';
 
 type ClipmapTerrainDetailMapInfo = {
   detailMap: DRef<Texture2DArray>;
@@ -33,6 +34,8 @@ type ClipmapTerrainDetailMapInfo = {
   detailNormalMapList: DRef<Texture2D>[];
   splatMap: DRef<Texture2DArray | Texture2D>;
   detailMapParams: Float32Array<ArrayBuffer>;
+  /** Per layer hex tiling (rotation amount, scale amount, contrast, enabled) */
+  detailHexParams: Float32Array<ArrayBuffer>;
   numDetailMaps: number;
 };
 
@@ -62,6 +65,8 @@ export class ClipmapTerrainMaterial extends applyMaterialMixins(
   private static readonly FEATURE_DETAIL_MAP = this.defineFeature();
   private static readonly FEATURE_DEBUG_MODE = this.defineFeature();
   private static readonly FEATURE_VIRTUAL_TEXTURE = this.defineFeature();
+  /** Bit i: detail layer i uses hex tiling */
+  private static readonly FEATURE_HEX_TILING = this.defineFeature();
   private static readonly _defaultDetailMap: DRef<Texture2D> = new DRef();
   private static readonly _defaultNormalMap: DRef<Texture2D> = new DRef();
   private readonly _region: Vector4;
@@ -104,6 +109,7 @@ export class ClipmapTerrainMaterial extends applyMaterialMixins(
     this.useFeature(ClipmapTerrainMaterial.FEATURE_DETAIL_MAP, 0);
     this.useFeature(ClipmapTerrainMaterial.FEATURE_DEBUG_MODE, 'none');
     this.useFeature(ClipmapTerrainMaterial.FEATURE_VIRTUAL_TEXTURE, '');
+    this.useFeature(ClipmapTerrainMaterial.FEATURE_HEX_TILING, 0);
     this._virtualTexture = null;
     this._contentVersion = 0;
   }
@@ -149,14 +155,78 @@ export class ClipmapTerrainMaterial extends applyMaterialMixins(
     const used = !!vt && getDevice().type === 'webgpu' && this._detailMapInfo.numDetailMaps > 0;
     this.useFeature(
       ClipmapTerrainMaterial.FEATURE_VIRTUAL_TEXTURE,
-      used
-        ? `${vt.levels[0].pagesX}x${vt.levels[0].pagesY}:${vt.pageSize}:${vt.border}:${vt.atlasSize}`
-        : ''
+      used ? `${vt.levels[0].pagesX}x${vt.levels[0].pagesY}:${vt.pageSize}:${vt.border}:${vt.atlasSize}` : ''
     );
   }
   /** @internal */
   get detailMapParams() {
     return this._detailMapInfo.detailMapParams;
+  }
+  /** @internal */
+  get detailHexParams() {
+    return this._detailMapInfo.detailHexParams;
+  }
+  /** Bit i set: detail layer i is hex tiled. Always 0 on WebGL1 (no gradient sampling) @internal */
+  get hexTilingMask() {
+    return this.featureUsed<number>(ClipmapTerrainMaterial.FEATURE_HEX_TILING);
+  }
+  private updateHexTilingFeature() {
+    let mask = 0;
+    if (getDevice().type !== 'webgl') {
+      for (let i = 0; i < this._detailMapInfo.numDetailMaps; i++) {
+        if (this._detailMapInfo.detailHexParams[i * 4 + 3] !== 0) {
+          mask |= 1 << i;
+        }
+      }
+    }
+    this.useFeature(ClipmapTerrainMaterial.FEATURE_HEX_TILING, mask);
+  }
+  /**
+   * Whether a detail layer is hex tiled to break up its repetition (Mikkelsen, Practical
+   * Real-Time Hex-Tiling, 2022). Costs three texture samples per layer instead of one, only
+   * when the layers are blended: once per page with the runtime virtual texture. Not available
+   * on WebGL1.
+   */
+  getDetailMapHexTiling(index: number) {
+    if (index >= this._detailMapInfo.numDetailMaps || index < 0 || !Number.isInteger(index)) {
+      console.error('Invalid detail map index');
+      return false;
+    }
+    return this._detailMapInfo.detailHexParams[index * 4 + 3] !== 0;
+  }
+  setDetailMapHexTiling(index: number, enabled: boolean) {
+    if (index >= this._detailMapInfo.numDetailMaps || index < 0 || !Number.isInteger(index)) {
+      console.error('Invalid detail map index');
+      return;
+    }
+    this._detailMapInfo.detailHexParams[index * 4 + 3] = enabled ? 1 : 0;
+    this.updateHexTilingFeature();
+  }
+  /**
+   * Hex tiling parameters of a detail layer as [rotation, scale, contrast], MaterialX
+   * hextiledimage inputs:
+   * - rotation: 0 to 1, how much each tile is turned at random, 1 for any angle
+   * - scale: 0 to 1, how much each tile is resized at random, 1 for 0.5 to 2 times
+   * - contrast: 0 to 1, how much brighter tiles win at the seams between tiles
+   */
+  getDetailMapHexParams(index: number): [number, number, number] {
+    if (index >= this._detailMapInfo.numDetailMaps || index < 0 || !Number.isInteger(index)) {
+      console.error('Invalid detail map index');
+      return [1, 1, 0.5];
+    }
+    const p = this._detailMapInfo.detailHexParams;
+    return [p[index * 4], p[index * 4 + 1], p[index * 4 + 2]];
+  }
+  setDetailMapHexParams(index: number, rotation: number, scale: number, contrast: number) {
+    if (index >= this._detailMapInfo.numDetailMaps || index < 0 || !Number.isInteger(index)) {
+      console.error('Invalid detail map index');
+      return;
+    }
+    const p = this._detailMapInfo.detailHexParams;
+    p[index * 4] = rotation;
+    p[index * 4 + 1] = scale;
+    p[index * 4 + 2] = contrast;
+    this.uniformChanged();
   }
   /** @internal */
   get detailMapArray() {
@@ -230,6 +300,7 @@ export class ClipmapTerrainMaterial extends applyMaterialMixins(
         this.setDetailNormalMap(i, defaultNormalMap);
         this.setDetailMapUVScale(i, 80);
         this.setDetailMapRoughness(i, 1);
+        this._detailMapInfo.detailHexParams.set([1, 1, 0.5, 0], i * 4);
         this._detailMapInfo.detailMapList[i].dispose();
         this._detailMapInfo.detailNormalMapList[i].dispose();
       }
@@ -239,6 +310,7 @@ export class ClipmapTerrainMaterial extends applyMaterialMixins(
         this.setDetailNormalMap(i, defaultNormalMap);
         this.setDetailMapUVScale(i, 80);
         this.setDetailMapRoughness(i, 1);
+        this._detailMapInfo.detailHexParams.set([1, 1, 0.5, 0], i * 4);
         this._detailMapInfo.detailMapList[i].dispose();
         this._detailMapInfo.detailNormalMapList[i].dispose();
       }
@@ -246,6 +318,7 @@ export class ClipmapTerrainMaterial extends applyMaterialMixins(
     }
     this.useFeature(ClipmapTerrainMaterial.FEATURE_DETAIL_MAP, this._detailMapInfo.numDetailMaps);
     this.updateVirtualTextureFeature();
+    this.updateHexTilingFeature();
   }
   getSplatMap() {
     return this._detailMapInfo.splatMap?.get() ?? null;
@@ -403,11 +476,34 @@ export class ClipmapTerrainMaterial extends applyMaterialMixins(
     return scope.$inputs.uv;
   };
   /** Raw rgb of a detail normal map, see blendTerrainDetailNormal */
-  sampleDetailNormalMap(scope: PBInsideFunctionScope, index: number, texCoord: PBShaderExp) {
+  sampleDetailNormalMap(
+    scope: PBInsideFunctionScope,
+    index: number,
+    texCoord: PBShaderExp,
+    ddx: PBShaderExp | null = null,
+    ddy: PBShaderExp | null = null
+  ) {
     const pb = scope.$builder;
     return this.drawContext.device.type === 'webgl'
       ? pb.textureSample(scope[`detailNormalMap${index}`], texCoord).rgb
-      : pb.textureArraySample(scope.detailNormalMap, texCoord, index).rgb;
+      : ddx && ddy
+        ? pb.textureArraySampleGrad(scope.detailNormalMap, texCoord, index, ddx, ddy).rgb
+        : pb.textureArraySample(scope.detailNormalMap, texCoord, index).rgb;
+  }
+  /**
+   * Gradients of the terrain uv and the hex tiled layers, for the blend functions; null when no
+   * layer is hex tiled, so the others keep sampling with implicit derivatives.
+   */
+  private hexTilingInputs(scope: PBInsideFunctionScope): [TerrainUVGrad | null, TerrainHexTiling | null] {
+    const mask = this.hexTilingMask;
+    if (!mask) {
+      return [null, null];
+    }
+    const pb = scope.$builder;
+    return [
+      { ddx: pb.dpdx(scope.$inputs.uv), ddy: pb.dpdy(scope.$inputs.uv) },
+      { mask, params: scope.detailHexParams }
+    ];
   }
   calculateDetailNormal(scope: PBInsideFunctionScope, TBN: PBShaderExp) {
     const that = this;
@@ -421,7 +517,8 @@ export class ClipmapTerrainMaterial extends applyMaterialMixins(
         that.splatMaskLocals(this, numDetailMaps),
         this.$inputs.uv,
         this.detailParams,
-        (scope, i, uv) => that.sampleDetailNormalMap(scope, i, uv)
+        (scope, i, uv, ddx, ddy) => that.sampleDetailNormalMap(scope, i, uv, ddx, ddy),
+        ...that.hexTilingInputs(this)
       );
       this.$return(pb.normalize(pb.mul(this.TBN, this.detailNormal)));
     });
@@ -517,10 +614,13 @@ export class ClipmapTerrainMaterial extends applyMaterialMixins(
           that.splatMaskLocals(this, numDetailMaps),
           this.$inputs.uv,
           this.detailParams,
-          (scope, i, uv) =>
+          (scope, i, uv, ddx, ddy) =>
             that.drawContext.device.type === 'webgl'
               ? pb.textureSample(scope[`detailAlbedoMap${i}`], uv)
-              : pb.textureArraySample(scope.detailAlbedoMap, uv, i)
+              : ddx && ddy
+                ? pb.textureArraySampleGrad(scope.detailAlbedoMap, uv, i, ddx, ddy)
+                : pb.textureArraySample(scope.detailAlbedoMap, uv, i),
+          ...that.hexTilingInputs(this)
         );
         this.$return(pb.vec4(this.color, 1));
       }
@@ -873,6 +973,9 @@ export class ClipmapTerrainMaterial extends applyMaterialMixins(
       const numDetailMaps = this.featureUsed<number>(ClipmapTerrainMaterial.FEATURE_DETAIL_MAP);
       if (numDetailMaps > 0) {
         scope.detailParams = pb.vec4[numDetailMaps]().uniform(2);
+        if (this.hexTilingMask) {
+          scope.detailHexParams = pb.vec4[numDetailMaps]().uniform(2);
+        }
         if (this.drawContext.device.type === 'webgl') {
           scope.splatMap = pb.tex2D().uniform(2);
           for (let i = 0; i < numDetailMaps; i++) {
@@ -1029,6 +1132,9 @@ export class ClipmapTerrainMaterial extends applyMaterialMixins(
           );
         }
         bindGroup.setValue('detailParams', this._detailMapInfo.detailMapParams);
+        if (this.hexTilingMask) {
+          bindGroup.setValue('detailHexParams', this._detailMapInfo.detailHexParams);
+        }
       }
     }
   }
@@ -1081,6 +1187,7 @@ export class ClipmapTerrainMaterial extends applyMaterialMixins(
       detailNormalMapList: [],
       splatMap: new DRef(splatMap),
       detailMapParams: new Float32Array(MAX_DETAIL_MAPS * 4),
+      detailHexParams: new Float32Array(MAX_DETAIL_MAPS * 4),
       numDetailMaps: 0
     };
   }

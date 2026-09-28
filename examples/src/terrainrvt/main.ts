@@ -21,9 +21,10 @@ import {
  * texture on, the layers are blended once per page into a 32768^2 virtual texture and the
  * terrain shades from it; off, they are blended per pixel as before.
  *
- * Controls: WASD/QE and drag fly the camera, R toggles the runtime virtual texture, B paints a
- * blob of snow at the ground point under the screen centre (a local invalidation), I invalidates
- * everything, V toggles the page table view, [ and ] pick its level.
+ * Controls: WASD/QE and drag fly the camera, R toggles the runtime virtual texture, H toggles hex
+ * tiling on every layer, B paints a blob of snow at the ground point under the screen centre (a
+ * local invalidation), I invalidates everything, V toggles the page table view, [ and ] pick its
+ * level.
  *
  * Expected:
  * - toggling R changes nothing but sharpness: same colors, lighting and relief (the page fill
@@ -34,6 +35,10 @@ import {
  *   striped areas;
  * - B turns a patch white in both modes; with the virtual texture only that patch refreshes
  *   ("refilled" jumps once), neighbouring pages do not blink;
+ * - H (hex tiling, Mikkelsen 2022): looking over a wide stretch of the same layer, the grid of
+ *   repeated texture features disappears; up close the texture looks like itself, with soft
+ *   seams between the hexagonal tiles; bumps catch the light from the same side on every tile;
+ *   with R the virtual texture and the live path look the same;
  * - objects standing on the terrain are absent here, so "loads" should drop to 0 when the
  *   camera stops; "check" counts all stay 0.
  */
@@ -306,6 +311,11 @@ window.addEventListener('keydown', (e) => {
     debugLevel = debugLevel + 1;
   } else if (e.key === 'r' || e.key === 'R') {
     terrain.runtimeVirtualTexture = !terrain.runtimeVirtualTexture;
+  } else if (e.key === 'h' || e.key === 'H') {
+    const enable = !material.getDetailMapHexTiling(0);
+    for (let i = 0; i < layers.length; i++) {
+      material.setDetailMapHexTiling(i, enable);
+    }
   } else if (e.key === 'v' || e.key === 'V') {
     showPageTable = !showPageTable;
   } else if (e.key === 'b' || e.key === 'B') {
@@ -326,8 +336,8 @@ getEngine().setRenderable(() => {
 
   const vt = terrain.runtimeVirtualTextureData;
   const lines = [
-    `Device: ${device.type}  FPS: ${device.frameInfo.FPS.toFixed(1)}  GPU: ${device.frameInfo.elapsedTimeGPU.toFixed(2)} ms  runtime virtual texture: ${vt ? 'ON' : 'OFF'}`,
-    'WASD/QE + drag: fly  R: toggle virtual texture  B: paint snow  I: invalidate  V: page table  [ ]: level'
+    `Device: ${device.type}  FPS: ${device.frameInfo.FPS.toFixed(1)}  GPU: ${device.frameInfo.elapsedTimeGPU.toFixed(2)} ms  runtime virtual texture: ${vt ? 'ON' : 'OFF'}  hex tiling: ${material.getDetailMapHexTiling(0) ? 'ON' : 'OFF'}`,
+    'WASD/QE + drag: fly  R: toggle virtual texture  H: toggle hex tiling  B: paint snow  I: invalidate  V: page table  [ ]: level'
   ];
   let bad = false;
   if (vt) {

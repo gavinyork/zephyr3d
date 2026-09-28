@@ -315,14 +315,23 @@ export function getTerrainClass(manager: ResourceManager): SerializableClass {
             return false;
           },
           get(this: ClipmapTerrain, value) {
-            const data: { albedo: string; normal: string; roughness: number; uvscale: number }[] = [];
+            const data: {
+              albedo: string;
+              normal: string;
+              roughness: number;
+              uvscale: number;
+              hexTiling: boolean;
+              hexParams: [number, number, number];
+            }[] = [];
             const material = this.material!;
             for (let i = 0; i < material.numDetailMaps; i++) {
               data.push({
                 albedo: manager.getAssetId(material.getDetailMap(i)) ?? '',
                 normal: manager.getAssetId(material.getDetailNormalMap(i)) ?? '',
                 roughness: material.getDetailMapRoughness(i),
-                uvscale: material.getDetailMapUVScale(i)
+                uvscale: material.getDetailMapUVScale(i),
+                hexTiling: material.getDetailMapHexTiling(i),
+                hexParams: material.getDetailMapHexParams(i)
               });
             }
             value.object[0] = new JSONArray(null, data);
@@ -339,6 +348,8 @@ export function getTerrainClass(manager: ResourceManager): SerializableClass {
                 normal: string;
                 roughness: number;
                 uvscale: number;
+                hexTiling?: boolean;
+                hexParams?: [number, number, number];
               }[]) ?? [];
             const material = this.material!;
             material.numDetailMaps = data.length;
@@ -380,6 +391,10 @@ export function getTerrainClass(manager: ResourceManager): SerializableClass {
               }
               material.setDetailMapRoughness(i, info.roughness ?? 1);
               material.setDetailMapUVScale(i, info.uvscale ?? 100);
+              if (info.hexParams) {
+                material.setDetailMapHexParams(i, info.hexParams[0], info.hexParams[1], info.hexParams[2]);
+              }
+              material.setDetailMapHexTiling(i, !!info.hexTiling);
             }
           }
         },

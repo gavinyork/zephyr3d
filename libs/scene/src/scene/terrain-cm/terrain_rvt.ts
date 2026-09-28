@@ -74,7 +74,8 @@ export class TerrainVirtualTexture extends Disposable implements VirtualTextureC
   private _vt: VirtualTexture;
   private _fillProgram: Nullable<GPUProgram>;
   private _fillBindGroup: Nullable<BindGroup>;
-  private _fillLayers: number;
+  /** (layer count, hex tiling mask) the fill program was built for */
+  private _fillKey: string;
   private _markProgram: Nullable<GPUProgram>;
   private _markBindGroup: Nullable<BindGroup>;
   /** What the resident pages were filled from, see sync() */
@@ -93,11 +94,11 @@ export class TerrainVirtualTexture extends Disposable implements VirtualTextureC
     };
     this._fillProgram = null;
     this._fillBindGroup = null;
-    this._fillLayers = -1;
+    this._fillKey = '';
     this._markProgram = null;
     this._markBindGroup = null;
     this._contentVersion = -1;
-    this._contentParams = new Float32Array(8 * 4 + 5);
+    this._contentParams = new Float32Array(8 * 4 + 8 * 4 + 6);
     this._fillParams = new Vector4();
     this._fillSizes = new Vector4();
     this._vt = this.createVirtualTexture();
@@ -173,12 +174,14 @@ export class TerrainVirtualTexture extends Disposable implements VirtualTextureC
   fill(_ctx: DrawContext) {
     const material = this._terrain.material!;
     const numLayers = material.numDetailMaps;
-    if (!this._fillProgram || this._fillLayers !== numLayers) {
+    const hexMask = material.hexTilingMask;
+    const key = `${numLayers}:${hexMask}`;
+    if (!this._fillProgram || this._fillKey !== key) {
       this._fillBindGroup?.dispose();
       this._fillProgram?.dispose();
-      this._fillProgram = this.createFillProgram(numLayers);
+      this._fillProgram = this.createFillProgram(numLayers, hexMask);
       this._fillBindGroup = getDevice().createBindGroup(this._fillProgram.bindGroupLayouts[0]);
-      this._fillLayers = numLayers;
+      this._fillKey = key;
     }
     const bindGroup = this._fillBindGroup!;
     const region = this._terrain.worldRegion;
@@ -200,6 +203,9 @@ export class TerrainVirtualTexture extends Disposable implements VirtualTextureC
     bindGroup.setTexture('detailAlbedoMap', material.detailMapArray!, fetchSampler('repeat_linear'));
     bindGroup.setTexture('detailNormalMap', material.detailNormalMapArray!, fetchSampler('repeat_linear'));
     bindGroup.setValue('detailParams', material.detailMapParams.subarray(0, numLayers * 4));
+    if (hexMask) {
+      bindGroup.setValue('detailHexParams', material.detailHexParams.subarray(0, numLayers * 4));
+    }
     bindGroup.setTexture(
       'heightMap',
       heightMap,
@@ -226,15 +232,17 @@ export class TerrainVirtualTexture extends Disposable implements VirtualTextureC
     const params = this._contentParams;
     const current = new Float32Array(params.length);
     current.set(material.detailMapParams.subarray(0, 32));
+    current.set(material.detailHexParams.subarray(0, 32), 32);
     current.set(
       [
+        material.hexTilingMask,
         material.numDetailMaps,
         material.roughness,
         region.z - region.x,
         region.w - region.y,
         material.terrainScale.y
       ],
-      32
+      64
     );
     let changed = this._contentVersion !== material.contentVersion;
     for (let i = 0; i < params.length && !changed; i++) {
@@ -391,16 +399,19 @@ export class TerrainVirtualTexture extends Disposable implements VirtualTextureC
    * sampled at the LOD of one texel of the page's level, and the height map tangent frame of
    * ClipmapTerrainMaterial.calculateTerrainTBN on the same footprint.
    */
-  private createFillProgram(numLayers: number) {
+  private createFillProgram(numLayers: number, hexMask: number) {
     const vt = this._vt;
     return vt.createFillProgram(
-      `TerrainVirtualTextureFill${numLayers}`,
+      `TerrainVirtualTextureFill${numLayers}_${hexMask}`,
       (scope) => {
         const pb = scope.$builder;
         scope.splatMap = pb.tex2DArray().uniform(0);
         scope.detailAlbedoMap = pb.tex2DArray().uniform(0);
         scope.detailNormalMap = pb.tex2DArray().uniform(0);
         scope.detailParams = pb.vec4[numLayers]().uniform(0);
+        if (hexMask) {
+          scope.detailHexParams = pb.vec4[numLayers]().uniform(0);
+        }
         scope.heightMap = pb.tex2D().uniform(0);
         // (region width, region depth, height scale, material roughness)
         scope.fillParams = pb.vec4().uniform(0);
@@ -419,15 +430,22 @@ export class TerrainVirtualTexture extends Disposable implements VirtualTextureC
           scope.$l[`mask${i}`] = pb.textureArraySampleLevel(scope.splatMap, scope.uv, i, scope.splatLod);
           masks.push(scope[`mask${i}`]);
         }
-        const detailLod = (s: PBInsideFunctionScope, i: number) =>
-          pb.max(pb.log2(pb.mul(s.footprint, s.detailParams.at(i).x, s.fillSizes.w)), 0);
+        // The uv step to the next texel of the level stands for the screen derivatives: the
+        // gradients pick the mip the orthographic top view would get (and turn with the hex tiles)
+        const grad = {
+          ddx: pb.vec2(pb.div(1, scope.levelTexels.x), 0),
+          ddy: pb.vec2(0, pb.div(1, scope.levelTexels.y))
+        };
+        const hex = hexMask ? { mask: hexMask, params: scope.detailHexParams as PBShaderExp } : null;
         scope.$l.albedo = blendTerrainAlbedo(
           scope,
           numLayers,
           masks,
           scope.uv,
           scope.detailParams,
-          (s, i, uv) => pb.textureArraySampleLevel(s.detailAlbedoMap, uv, i, detailLod(s, i))
+          (s, i, uv, ddx, ddy) => pb.textureArraySampleGrad(s.detailAlbedoMap, uv, i, ddx!, ddy!),
+          grad,
+          hex
         );
         scope.$l.detailNormal = blendTerrainDetailNormal(
           scope,
@@ -435,7 +453,9 @@ export class TerrainVirtualTexture extends Disposable implements VirtualTextureC
           masks,
           scope.uv,
           scope.detailParams,
-          (s, i, uv) => pb.textureArraySampleLevel(s.detailNormalMap, uv, i, detailLod(s, i))
+          (s, i, uv, ddx, ddy) => pb.textureArraySampleGrad(s.detailNormalMap, uv, i, ddx!, ddy!),
+          grad,
+          hex
         );
         scope.$l.roughness = blendTerrainRoughness(
           scope,

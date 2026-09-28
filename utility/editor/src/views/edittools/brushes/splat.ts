@@ -50,9 +50,9 @@ export class TerrainTextureBrush extends BaseTerrainBrush {
       new ImGui.ImVec2(
         0,
         60 * 2 +
-          3 * ImGui.GetFrameHeight() +
+          7 * ImGui.GetFrameHeight() +
           2 * ImGui.GetStyle().WindowPadding.y +
-          3 * ImGui.GetStyle().ItemSpacing.y
+          7 * ImGui.GetStyle().ItemSpacing.y
       ),
       true
     );
@@ -74,8 +74,30 @@ export class TerrainTextureBrush extends BaseTerrainBrush {
       if (ImGui.DragFloat('UVScale', uvScale, 1, 0, 1000, undefined)) {
         tool.terrain.material.setDetailMapUVScale(tool.detailAlbedo.selected, uvScale[0]);
       }
+      this.renderHexTiling(tool, tool.detailAlbedo.selected);
     }
     ImGui.EndChild();
+  }
+  /** Hex tiling of the selected layer: breaks up the visible repetition of the texture */
+  private renderHexTiling(tool: TerrainEditTool, index: number) {
+    const material = tool.terrain.material;
+    const enabled = [material.getDetailMapHexTiling(index)] as [boolean];
+    if (ImGui.Checkbox('Hex Tiling', enabled)) {
+      material.setDetailMapHexTiling(index, enabled[0]);
+    }
+    if (!enabled[0]) {
+      return;
+    }
+    const [rotation, scale, contrast] = material.getDetailMapHexParams(index);
+    const r = [rotation] as [number];
+    const s = [scale] as [number];
+    const c = [contrast] as [number];
+    let changed = ImGui.SliderFloat('Tile Rotation', r, 0, 1);
+    changed = ImGui.SliderFloat('Tile Scale', s, 0, 1) || changed;
+    changed = ImGui.SliderFloat('Seam Contrast', c, 0, 1) || changed;
+    if (changed) {
+      material.setDetailMapHexParams(index, r[0], s[0], c[0]);
+    }
   }
   protected brushFragment(
     scope: PBInsideFunctionScope,
