@@ -18,7 +18,7 @@ import {
   terrainSplatMaskCount
 } from '../../material/shader/terrain_blend';
 import { fetchSampler } from '../../utility/misc';
-import { getDevice } from '../../app/api';
+import { getApp, getDevice } from '../../app/api';
 import type { ClipmapTerrain } from './terrain-cm';
 
 /**
@@ -36,7 +36,11 @@ export interface TerrainVirtualTextureOptions {
   pageSize?: number;
   /** Physical atlas size in texels, default 4096 (961 pages, two rgba8 planes, 128 MB) */
   atlasSize?: number;
-  /** Pages filled per update, default 16 */
+  /**
+   * Pages filled per update. Default 16, 64 in the editor, where brushes invalidate whole areas
+   * every frame and the pages have to keep up with the edits (UE r.VT.MaxUploadsPerFrameInEditor,
+   * 16 times the game budget there).
+   */
   allocBudget?: number;
 }
 
@@ -93,7 +97,7 @@ export class TerrainVirtualTexture extends Disposable implements VirtualTextureC
       virtualSize: options?.virtualSize ?? 32768,
       pageSize: options?.pageSize ?? 128,
       atlasSize: options?.atlasSize ?? 4096,
-      allocBudget: options?.allocBudget ?? 16
+      allocBudget: options?.allocBudget ?? (getApp()?.editorMode === 'editor' ? 64 : 16)
     };
     this._fillProgram = null;
     this._fillBindGroup = null;

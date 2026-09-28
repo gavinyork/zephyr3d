@@ -411,8 +411,10 @@ export class VirtualTexture extends Disposable {
   }
   /**
    * Marks the resident pages overlapping a region, in normalized virtual coordinates, for
-   * refilling. They keep their mapping and old content until refilled (UE VSM *_UNCACHED pages).
-   * A page counts with its border, so pages next to the region are refilled too.
+   * refilling. Pages in use (requested within freeThreshold, or pinned) keep their mapping and
+   * old content until refilled, ahead of new allocations (UE VSM *_UNCACHED pages); cached pages
+   * no longer in use are unmapped. A page counts with its border, so pages next to the region
+   * are refilled too.
    */
   invalidateRegion(u0: number, v0: number, u1: number, v1: number) {
     this._pendingRects.push([u0, v0, u1, v1]);
@@ -1024,8 +1026,18 @@ export class VirtualTexture extends Disposable {
                   pb.or(this.requestedNow, pb.notEqual(pb.compAnd(this.flags, META_PINNED), 0)),
                   pb.lessThanEqual(this.age, this.zVT_params.at(3).w)
                 );
+                // A cached page no longer in use keeps its mapping until maxPageAge, unless it was
+                // invalidated: then it is unmapped rather than left stale, where it could show as
+                // the fallback of a finer page (UE TexturePagePool.cpp EvictPages: dirty pages used
+                // within r.VT.RVT.DirtyPagesKeptMappedFrames or locked are refilled, others evicted)
                 this.$if(
-                  pb.or(this.requested, pb.lessThanEqual(this.age, this.zVT_params.at(0).w)),
+                  pb.or(
+                    this.requested,
+                    pb.and(
+                      pb.lessThanEqual(this.age, this.zVT_params.at(0).w),
+                      pb.equal(pb.compAnd(this.flags, META_DIRTY), 0)
+                    )
+                  ),
                   function () {
                     this.next = this.flags;
                     this.zVT_pageTable.setAt(this.owner, pb.compOr(pb.uint(PT_MAPPED), this.p));

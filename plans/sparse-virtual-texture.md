@@ -168,7 +168,7 @@ invalidate(): void;                                      // 全部失效
 invalidateRegion(u0: number, v0: number, u1: number, v1: number): void;  // 按归一化虚拟坐标，覆盖所有级
 ```
 
-- 语义对应 UE VSM 的 `VSM_FLAG_*_UNCACHED`：被失效的物理页**保持映射**，只打上脏标记；下次被请求时在 ② 中原地重填，在此之前继续显示旧内容，不会出现空洞。
+- 语义对应 UE VSM 的 `VSM_FLAG_*_UNCACHED`：被失效的物理页打上脏标记。**在用的页**（本帧请求、常驻、或 `freeThreshold` 帧内请求过）**保持映射**，在 ② 中原地重填，在此之前继续显示旧内容，不会出现空洞；**已不在用的缓存页直接取消映射**，免得作为更细页的回退祖先显示旧内容。与 UE RVT 一致：`TexturePagePool.cpp` `EvictPages` 对锁定页和 `r.VT.RVT.DirtyPagesKeptMappedFrames`（8）帧内用过的页原地重填，其余逐出。
 - CPU 端把矩形放进队列，下一次 update 开头用一个 compute 按物理页检查 `(owner, level)` 是否落在矩形内并置脏。
 - 脏页的重填占用 fillList 名额，但优先于新分配（UE VSM 中已缓存页的重新渲染同样不受分配预算影响）。
 - RVT：splat 或细节贴图修改时按修改区域调用。VSM：投影体移动时按其光源空间包围盒调用。
@@ -324,6 +324,7 @@ class VirtualTexture extends Disposable {
 - 填充：compute，每 texel 调共享混合函数 `material/shader/terrain_blend.ts`（材质实时路径与填充共用，防分叉），再乘高度图 TBN 得世界法线。compute 无导数，各纹理按"该级一个 texel 的 footprint"取显式 LOD，等价于 UE 正交视图下硬件选的 mip；高度 TBN 同 `calculateTerrainTBN`。
 - 标记：由深度重建世界坐标 → region uv，沿用阶段 2 的邻居回退规则。**额外的"在地形上"判定**：重建的 y 与高度图差在 `max(2 个高度格, 0.02 × 视距)` 内才算，否则站在地形前的物体会按它们自己的 footprint 请求脚下的页。UE 不需要，它的反馈由地形自己的像素写出；容差是启发式（clipmap 网格只在顶点上与高度图一致，远处格子变大）。
 - 着色：`computeLevel` → 两级 `resolve` → 各采两平面，按 UE 手动三线性插值（第二级命中级不等于请求级时只用第一级）。roughness 经 `albedo.a` 传进 `PBRLight` 内的 `calculateRoughness`（地形不透明、无 SSS，alpha 无其他读者）。材质 feature 值编码 VT 布局（页数、页大小、border、图集），VT 重建后换新程序。
+- 填充预算：游戏 16，编辑器（`getApp().editorMode === 'editor'`）64，对应 UE `r.VT.MaxUploadsPerFrame`（2）与 `r.VT.MaxUploadsPerFrameInEditor`（32）的 16 倍关系（`Engine/Private/VT/VirtualTextureScalability.cpp`）。原因：页密（32768 铺 512 单位时一页 2 单位），笔刷每帧重新失效上百页，16 页的预算下刷的过程中世界法线一直落后于几何，出现明暗错误、停笔后才恢复（编辑器实测）。脏页重填本来就排在新分配之前（UE 同样先处理 `MappedTilesToProduce`，`VirtualTextureSystem.cpp:2177`）。
 - 失效：编辑器 splat/高度笔刷按 `hitPos ± brushSize` 调 `invalidateRuntimeVirtualTexture`；序列化加载 splat 全部失效；替换贴图/高度图（材质 `contentVersion`）、细节参数、层数、材质粗糙度、region 尺寸、高度缩放在每次标记前比对，变了就全部失效；长宽比变了重建 VT。
 - 核心修正：`invalidate` 判定按页 + border + 1 texel（双线性足迹），否则相邻页 border 残留旧内容形成缝。
 - 验证示例 `examples/src/terrainrvt`：程序化 512² 地形 4 层，R 切换、B 局部刷雪（局部失效）、页表叠加与统计。
