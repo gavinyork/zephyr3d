@@ -1,6 +1,6 @@
 import type { Nullable } from '@zephyr3d/base';
 import { DEPTH_CLEAR_VALUE, Vector4 } from '@zephyr3d/base';
-import type { FrameBufferClearColors } from '@zephyr3d/device';
+import type { FrameBufferClearColors, TextureFormat } from '@zephyr3d/device';
 import type { WebGPUProgram } from './gpuprogram_webgpu';
 import type { WebGPUBaseTexture } from './basetexture_webgpu';
 import type { WebGPUBindGroup } from './bindgroup_webgpu';
@@ -154,36 +154,139 @@ export class WebGPUClearQuad {
   }
 }
 
+/**
+ * Formats whose mip chain can be built by the compute path, mapped to the storage texture
+ * format used for the destination level. Everything else (sRGB, bgra8, rg16f, rg11b10...)
+ * cannot be bound as a storage texture in core WebGPU and falls back to the raster path.
+ */
+const computeMipmapStorageFormats: Partial<
+  Record<
+    TextureFormat,
+    'rgba8unorm' | 'rgba8snorm' | 'rgba16float' | 'r32float' | 'rg32float' | 'rgba32float'
+  >
+> = {
+  rgba8unorm: 'rgba8unorm',
+  rgba8snorm: 'rgba8snorm',
+  rgba16f: 'rgba16float',
+  r32f: 'r32float',
+  rg32f: 'rg32float',
+  rgba32f: 'rgba32float'
+};
+
+const COMPUTE_MIPMAP_GROUP_SIZE = 8;
+
 export class WebGPUMipmapGenerator {
   static _frameBufferInfo: Nullable<FrameBufferInfo> = null;
   static _mipmapGenerationProgram: Nullable<WebGPUProgram> = null;
   static _mipmapGenerationStateSet: Nullable<WebGPURenderStateSet> = null;
+  static _computeMipmapPrograms: Partial<Record<TextureFormat, WebGPUProgram>> = {};
   static getMipmapGenerationBindGroupLayout(device: WebGPUDevice) {
     if (!this._mipmapGenerationProgram) {
       this.initMipmapGeneration(device);
     }
     return this._mipmapGenerationProgram!.bindGroupLayouts[0];
   }
+  /**
+   * Whether mipmaps of the given format can be generated with a compute shader. Mirrors UE's
+   * FGenerateMips AutoDetect: the format must support typed storage writes, and it must be
+   * filterable since each destination texel is a bilinear fetch of the previous level.
+   */
+  static supportsComputeMipmap(device: WebGPUDevice, format: TextureFormat) {
+    return (
+      !!computeMipmapStorageFormats[format] &&
+      !!device.getDeviceCaps().textureCaps.getTextureFormatInfo(format)?.filterable
+    );
+  }
+  static getComputeMipmapBindGroupLayout(device: WebGPUDevice, format: TextureFormat) {
+    return this.getComputeMipmapProgram(device, format).bindGroupLayouts[0];
+  }
   static generateMipmap(device: WebGPUDevice, tex: WebGPUBaseTexture, cmdEncoder?: GPUCommandEncoder) {
-    if (!tex.isRenderable()) {
+    const useCompute = tex.canGenerateMipmapWithCompute();
+    if (!useCompute && !tex.isRenderable()) {
       return;
-    }
-    if (!this._mipmapGenerationProgram) {
-      this.initMipmapGeneration(device);
     }
     const encoder = cmdEncoder ?? device.device.createCommandEncoder();
     const miplevels = tex.mipLevelCount;
     const numLayers = tex.isTextureCube() ? 6 : tex.isTexture2DArray() ? tex.depth : 1;
     tex.setMipmapDirty(false);
-    for (let face = 0; face < numLayers; face++) {
-      for (let level = 1; level < miplevels; level++) {
-        const view = tex.getView(level, face, 1);
-        this.generateMiplevel(device, encoder, tex, view, tex.gpuFormat!, level, face);
+    if (useCompute) {
+      this.generateMipmapCompute(device, encoder, tex, numLayers);
+    } else {
+      if (!this._mipmapGenerationProgram) {
+        this.initMipmapGeneration(device);
+      }
+      for (let face = 0; face < numLayers; face++) {
+        for (let level = 1; level < miplevels; level++) {
+          const view = tex.getView(level, face, 1);
+          this.generateMiplevel(device, encoder, tex, view, tex.gpuFormat!, level, face);
+        }
       }
     }
     if (!cmdEncoder) {
       device.device.queue.submit([encoder.finish()]);
     }
+  }
+  /**
+   * Compute counterpart of the raster path, after UE's FGenerateMips::ExecuteCompute: one
+   * 8x8 dispatch per level and slice. Unlike the raster path, the whole chain is recorded
+   * into a single compute pass, so there is no per-level render pass begin/clear/end. Levels
+   * are the outer loop so the slices of one level carry no dependency on each other.
+   */
+  private static generateMipmapCompute(
+    device: WebGPUDevice,
+    encoder: GPUCommandEncoder,
+    tex: WebGPUBaseTexture,
+    numLayers: number
+  ) {
+    const program = this.getComputeMipmapProgram(device, tex.format);
+    const pipeline = device.pipelineCache.fetchComputePipeline(program);
+    if (!pipeline) {
+      return;
+    }
+    const pass = encoder.beginComputePass({ label: 'MipmapGeneration' });
+    pass.setPipeline(pipeline);
+    for (let level = 1; level < tex.mipLevelCount; level++) {
+      const groupsX = Math.ceil(Math.max(tex.width >> level, 1) / COMPUTE_MIPMAP_GROUP_SIZE);
+      const groupsY = Math.ceil(Math.max(tex.height >> level, 1) / COMPUTE_MIPMAP_GROUP_SIZE);
+      for (let face = 0; face < numLayers; face++) {
+        const bindGroup = tex.getMipmapComputeBindGroup(level, face).bindGroup;
+        if (bindGroup) {
+          pass.setBindGroup(0, bindGroup);
+          pass.dispatchWorkgroups(groupsX, groupsY, 1);
+        }
+      }
+    }
+    pass.end();
+  }
+  private static getComputeMipmapProgram(device: WebGPUDevice, format: TextureFormat) {
+    let program = this._computeMipmapPrograms[format];
+    if (!program) {
+      const storageFormat = computeMipmapStorageFormats[format]!;
+      program = device.buildComputeProgram({
+        label: `MipmapGenerationCS-${storageFormat}`,
+        workgroupSize: [COMPUTE_MIPMAP_GROUP_SIZE, COMPUTE_MIPMAP_GROUP_SIZE, 1],
+        compute(pb) {
+          this.srcTex = pb.tex2D().uniform(0);
+          this.dstTex = pb.texStorage2D[storageFormat]().storage(0);
+          pb.main(function () {
+            this.dstSize = pb.textureDimensions(this.dstTex);
+            this.$if(pb.all(pb.lessThan(this.$builtins.globalInvocationId.xy, this.dstSize)), function () {
+              this.uv = pb.div(
+                pb.add(pb.vec2(this.$builtins.globalInvocationId.xy), pb.vec2(0.5, 0.5)),
+                pb.vec2(this.dstSize)
+              );
+              pb.textureStore(
+                this.dstTex,
+                this.$builtins.globalInvocationId.xy,
+                pb.textureSampleLevel(this.srcTex, this.uv, 0)
+              );
+            });
+          });
+        }
+      }) as WebGPUProgram;
+      this._computeMipmapPrograms[format] = program;
+    }
+    return program;
   }
   static generateMipmapsForBindGroups(device: WebGPUDevice, bindGroups: WebGPUBindGroup[]) {
     for (const bindGroup of bindGroups) {

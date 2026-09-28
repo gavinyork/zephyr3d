@@ -51,6 +51,8 @@ export abstract class WebGPUBaseTexture<
   protected _samplerOptions: Nullable<RequireOptionals<SamplerOptions>>;
   protected _ringBuffer: UploadRingBuffer;
   protected _mipBindGroups: WebGPUBindGroup[][];
+  protected _mipComputeBindGroups: WebGPUBindGroup[][];
+  protected _computeMipmap: boolean;
   protected _pendingUploads: (UploadTexture | UploadImage)[];
   constructor(device: WebGPUDevice, target: TextureType) {
     super(device);
@@ -68,6 +70,8 @@ export abstract class WebGPUBaseTexture<
     this._memCost = 0;
     this._mipmapDirty = false;
     this._mipBindGroups = [];
+    this._mipComputeBindGroups = [];
+    this._computeMipmap = false;
     this._views = [];
     this._defaultView = null;
     this._ringBuffer = new UploadRingBuffer(device);
@@ -171,6 +175,12 @@ export abstract class WebGPUBaseTexture<
         }
       }
       this._mipBindGroups = [];
+      for (const face of this._mipComputeBindGroups) {
+        for (const level of face) {
+          level?.dispose();
+        }
+      }
+      this._mipComputeBindGroups = [];
     }
   }
   restore() {
@@ -201,6 +211,10 @@ export abstract class WebGPUBaseTexture<
   }
   isRenderable() {
     return this._renderable;
+  }
+  /** Whether this texture's mip chain is built by the compute path (see WebGPUMipmapGenerator) */
+  canGenerateMipmapWithCompute() {
+    return this._computeMipmap;
   }
   getView(level?: number, face?: number, mipCount?: number) {
     level = Number(level) || 0;
@@ -407,6 +421,12 @@ export abstract class WebGPUBaseTexture<
         this._gpuFormat = textureFormatMap[this._format];
         const params = (this.getTextureCaps() as WebGPUTextureCaps).getTextureFormatInfo(this._format);
         this._renderable = params.renderable && !(this._flags & GPUResourceUsageFlags.TF_WRITABLE);
+        // Mip chains of storage-capable formats are generated in a compute pass, which needs
+        // the texture to be bindable as a storage texture.
+        this._computeMipmap =
+          this._mipLevelCount > 1 &&
+          !this.isTexture3D() &&
+          WebGPUMipmapGenerator.supportsComputeMipmap(this._device, this._format);
         this._object = this._device.gpuCreateTexture({
           size: {
             width: this._width,
@@ -422,7 +442,9 @@ export abstract class WebGPUBaseTexture<
             GPUTextureUsage.COPY_DST |
             GPUTextureUsage.COPY_SRC |
             (this._renderable && !this.isTexture3D() ? GPUTextureUsage.RENDER_ATTACHMENT : 0) |
-            (this._flags & GPUResourceUsageFlags.TF_WRITABLE ? GPUTextureUsage.STORAGE_BINDING : 0)
+            (this._flags & GPUResourceUsageFlags.TF_WRITABLE || this._computeMipmap
+              ? GPUTextureUsage.STORAGE_BINDING
+              : 0)
         }) as any;
         this._defaultView = this._device.gpuCreateTextureView(this._object as GPUTexture, {
           dimension: this.isTextureCube()
@@ -690,6 +712,24 @@ export abstract class WebGPUBaseTexture<
         WebGPUMipmapGenerator.getMipmapGenerationBindGroupLayout(this._device)
       ) as WebGPUBindGroup;
       levelGroup.setTextureView('tex', this, level - 1, face, 1);
+      levelGroups[level] = levelGroup;
+    }
+    return levelGroup;
+  }
+  getMipmapComputeBindGroup(level: number, face: number) {
+    const faceGroups = this._mipComputeBindGroups;
+    let levelGroups = faceGroups[face];
+    if (!levelGroups) {
+      levelGroups = [];
+      faceGroups[face] = levelGroups;
+    }
+    let levelGroup = levelGroups[level];
+    if (!levelGroup) {
+      levelGroup = this._device.createBindGroup(
+        WebGPUMipmapGenerator.getComputeMipmapBindGroupLayout(this._device, this.format)
+      ) as WebGPUBindGroup;
+      levelGroup.setTextureView('srcTex', this, level - 1, face, 1);
+      levelGroup.setTextureView('dstTex', this, level, face, 1);
       levelGroups[level] = levelGroup;
     }
     return levelGroup;
