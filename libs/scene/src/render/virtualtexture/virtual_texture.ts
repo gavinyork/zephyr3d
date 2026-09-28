@@ -523,12 +523,12 @@ export class VirtualTexture extends Disposable {
    * Declares the bindings used by {@link VirtualTexture.request}, {@link VirtualTexture.resolve}
    * and {@link VirtualTexture.computeLevel} in a render program.
    */
-  declareBindings(scope: PBGlobalScope, group: number) {
+  declareBindings(scope: PBGlobalScope, group: number, requests = scope.$builder.shaderKind !== 'vertex') {
     const pb = scope.$builder;
     this.declareParams(pb, scope, group);
     scope.zVT_pageTable = pb.uint[0]().storageBufferReadonly(group);
     scope.zVT_state = pb.vec4[0]().storageBufferReadonly(group);
-    if (pb.shaderKind === 'fragment') {
+    if (requests) {
       scope.zVT_pageRequest = pb.atomic_uint[0]().storageBuffer(group);
     }
   }
@@ -543,11 +543,19 @@ export class VirtualTexture extends Disposable {
   /** Mip level from the screen derivatives of a virtual uv, fragment shaders only */
   computeLevel(scope: PBInsideFunctionScope, uv: PBShaderExp) {
     const pb = scope.$builder;
+    return this.levelFromFootprint(scope, pb.dpdx(uv), pb.dpdy(uv));
+  }
+  /**
+   * Mip level from the change of the virtual uv across one pixel in x and in y, for marking in
+   * compute shaders where there are no screen derivatives (e.g. from reconstructed neighbours).
+   * Includes the residency mip bias, like {@link VirtualTexture.computeLevel}.
+   */
+  levelFromFootprint(scope: PBInsideFunctionScope, duvdx: PBShaderExp, duvdy: PBShaderExp) {
+    const pb = scope.$builder;
     const size = [this._levels[0].pagesX * this._pageSize, this._levels[0].pagesY * this._pageSize];
-    pb.func('zVT_computeLevel', [pb.vec2('uv')], function () {
-      this.$l.t = pb.mul(this.uv, pb.vec2(size[0], size[1]));
-      this.$l.dx = pb.dpdx(this.t);
-      this.$l.dy = pb.dpdy(this.t);
+    pb.func('zVT_levelFromFootprint', [pb.vec2('duvdx'), pb.vec2('duvdy')], function () {
+      this.$l.dx = pb.mul(this.duvdx, pb.vec2(size[0], size[1]));
+      this.$l.dy = pb.mul(this.duvdy, pb.vec2(size[0], size[1]));
       this.$l.d = pb.max(pb.dot(this.dx, this.dx), pb.dot(this.dy, this.dy));
       // UE TextureComputeVirtualMipLevel: the residency bias joins before the level is floored
       this.$return(
@@ -558,7 +566,7 @@ export class VirtualTexture extends Disposable {
         )
       );
     });
-    return pb.getGlobalScope().zVT_computeLevel(uv) as PBShaderExp;
+    return pb.getGlobalScope().zVT_levelFromFootprint(duvdx, duvdy) as PBShaderExp;
   }
   /**
    * Requests the page covering `uv` at `level`. With `prefetch`, also requests the ancestor at

@@ -289,6 +289,24 @@ class VirtualTexture extends Disposable {
 - 驻留 mip 偏移的下限默认 0.8（UE 上下限都是 0.95）。页要过空闲阈值才退出"在用"，上下限相等时偏移会追着自己刚造成的驻留率变化来回调整，阶段 1 示例中表现为级别边界上下游走。
 - Allocate 先占填充名额再弹出物理页，保证映射过的页一定被填充；UE VSM 的分配与渲染是分开的两步，不存在这个问题。
 
+## 阶段 2：渲染图接入
+
+**UE 的做法**（出处均相对 `Engine/Source/Runtime/Renderer/Private/`）
+- VSM：每次渲染（一个 ViewFamily）完整跑一遍"标记 → 物理页管理 → 渲染页"。标记读本帧 prepass 深度与 GBuffer，在 base pass 后、灯光前（`DeferredShadingRenderer.cpp:3270` `BeginMarkVirtualShadowMapPages`；`VirtualShadowMaps/VirtualShadowMapArray.cpp:2516`）；随后 `RenderShadowDepthMaps`（`:3291`）内 `BuildPageAllocations` 派发 UpdatePhysicalPages / AllocateNewPageMappings（`VirtualShadowMapArray.cpp:3227`、`:3306`、`:3362`），都在 `RenderLights`（`:3467`）之前。
+- 物理页池挂在 FScene 上，所有 ViewFamily 和场景捕获共用（`RendererScene.cpp:7300` `GetVirtualShadowMapCache`）。
+- 页老化用 `SceneFrameNumber`，一个引擎帧只由第一个 family 递增一次（`SceneRendering.cpp:5419-5426`，场景捕获 `SceneCaptureRendering.cpp:709` 取同一值）；着色器 `PhysicalPageRequestedAge = SceneFrameNumber - LastRequestedSceneFrameNumber`（`VirtualShadowMapPhysicalPageManagement.usf:285`）。同一帧的多次渲染不会把页老化两次。
+- UE RVT 的 `FVirtualTextureSystem::Frame` 每次渲染 +1（`VT/VirtualTextureSystem.cpp:2634`），无防护，且依赖 CPU 读回（一帧延迟）——不照搬。
+
+**我们的实现**
+- `VirtualTextureClient`（`render/virtualtexture/virtual_texture_client.ts`）：`virtualTexture`、可选 `isActive`、可选 `markFromDepth(ctx, linearDepth)`（compute）、`fill(ctx)`。使用方通过 `Scene.addVirtualTextureClient` 登记，池归使用方所有，所有相机共用（对应 UE FScene 上的 cache manager）。
+- Forward+ 模块 `VirtualTextureUpdate`：`DepthPrepass` 之后、`ShadowMask` 之前；读 `LinearDepth`，写出 token `FrameResources.VirtualTexture`；`SSSProfile`、`SceneColorGrab`、`LightPass`、`TransparentPass` 读该 token 保证顺序。仅 WebGPU，本帧无活跃使用方时不参与构建。执行顺序：全部使用方 `markFromDepth` → 各自 `update(frameCounter)` → `fill`。
+- **每相机各跑一次**，帧戳 = `device.frameInfo.frameCounter`（等价 SceneFrameNumber）。`updatePhysical` 中 `age ≤ freeThreshold` 算在用，同帧 age = 0，前一个相机请求过的页在后一个相机的 update 中进入 REQUESTED，不会被分配拿走——与 UE"不老化两次"等价。每次 update 各有自己的 `allocBudget`（UE 也是逐次渲染各自预算）。
+- 片元着色器标记仍兼容（下一次 update 取走，一个相机或一帧的延迟）。
+- 嵌套渲染（例如 LightPass 内触发的反射相机）会在主相机 update 与着色之间再跑一次 update：主相机的页帧龄为 0，映射保持在原物理页，主相机后续 resolve 仍然有效。
+- 核心新增 `levelFromFootprint(duvdx, duvdy)`，供 compute 标记由重建的邻居 uv 算级（含驻留 mip 偏移）；`declareBindings` 新增 `requests` 参数，只读采样的材质可不声明请求 buffer。
+- **深度驱动标记的坑（阶段 3 地形同样适用）**：用相邻像素重建的 uv 差算足迹时，邻居落在使用方表面之外（轮廓、背景）绝不能当作 0 足迹——0 足迹会夹到第 0 级，轮廓一条线就横穿数百个第 0 级页，实测 199 个边缘像素占满 225 页的池，驻留 mip 偏移被顶到上限 4，全屏被迫变糊，且偏移压不回来（夹紧在 0 以下）。做法：每轴先取 +1 邻居、不在表面上则取 −1；一轴都没有就只用另一轴；两轴都没有则不标记（resolve 回退到已驻留祖先）。
+- 验证示例 `examples/src/virtualtexturescene`：场景 + 自定义 MeshMaterial 采样，compute 从深度重建平面 uv 标记（零延迟），画中画第二相机共用池。
+
 ## 实施记录
 
 - 阶段 0（`f5555b89`）：`computeIndirect`，示例 `examples/src/indirectdispatch`。

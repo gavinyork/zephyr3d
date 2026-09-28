@@ -18,6 +18,7 @@ import {
   ScriptAttachment
 } from './script_attachment';
 import type { LightingMode } from '../utility/physical';
+import type { VirtualTextureClient } from '../render/virtualtexture/virtual_texture_client';
 
 /**
  * Represents a renderable world that manages scene graph, spatial indexing, and environment.
@@ -82,6 +83,8 @@ export class Scene
   protected _metersPerUnit: number;
   /** @internal User-attached script entries (engine-defined). */
   private _scripts: ScriptAttachment[];
+  /** @internal Virtual texture users updated by every camera rendering this scene. */
+  private _virtualTextureClients: VirtualTextureClient[];
   /**
    * Creates an instance of Scene.
    *
@@ -111,7 +114,28 @@ export class Scene
     this._lightingMode = 'legacy';
     this._metersPerUnit = 1;
     this._scripts = [];
+    this._virtualTextureClients = [];
     this._mainCamera = new DRef();
+  }
+  /** Virtual texture users updated by every camera rendering this scene. */
+  get virtualTextureClients(): readonly VirtualTextureClient[] {
+    return this._virtualTextureClients;
+  }
+  /**
+   * Registers a virtual texture user. Every camera rendering the scene then updates and fills
+   * its pages between the depth prepass and the light pass. WebGPU only.
+   */
+  addVirtualTextureClient(client: VirtualTextureClient) {
+    if (!this._virtualTextureClients.includes(client)) {
+      this._virtualTextureClients.push(client);
+    }
+  }
+  /** Unregisters a virtual texture user. The client keeps ownership of its texture. */
+  removeVirtualTextureClient(client: VirtualTextureClient) {
+    const index = this._virtualTextureClients.indexOf(client);
+    if (index >= 0) {
+      this._virtualTextureClients.splice(index, 1);
+    }
   }
   /**
    * Gets the unique identifier of the scene.
