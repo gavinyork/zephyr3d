@@ -280,6 +280,31 @@ export class ClusteredLight {
             )
           );
         });
+        // Whether the sphere lies entirely outside one of the tile frustum's side planes
+        // (inward unit normals through the eye). The box of a far slice is much wider than
+        // the frustum it bounds, and this rejects the lights reaching only its corners.
+        pb.func(
+          'sphereOutsideTile',
+          [pb.vec4('sphere'), pb.vec3('left'), pb.vec3('right'), pb.vec3('bottom'), pb.vec3('top')],
+          function () {
+            this.$l.r = pb.neg(this.sphere.w);
+            this.$return(
+              pb.and(
+                pb.greaterThan(this.sphere.w, 0),
+                pb.or(
+                  pb.or(
+                    pb.lessThan(pb.dot(this.left, this.sphere.xyz), this.r),
+                    pb.lessThan(pb.dot(this.right, this.sphere.xyz), this.r)
+                  ),
+                  pb.or(
+                    pb.lessThan(pb.dot(this.bottom, this.sphere.xyz), this.r),
+                    pb.lessThan(pb.dot(this.top, this.sphere.xyz), this.r)
+                  )
+                )
+              )
+            );
+          }
+        );
         pb.main(function () {
           if (pb.getDevice().type !== 'webgpu') {
             this.$builtins.pointSize = 1;
@@ -321,6 +346,11 @@ export class ClusteredLight {
           this.$l.sliceFar = pb.div(pb.add(pb.float(this.zIndex), 1), pb.float(this.countParam.z));
           this.$l.aabbMin = pb.vec3();
           this.$l.aabbMax = pb.vec3();
+          // Zero normals never reject: an orthographic tile is exactly its box.
+          this.$l.planeLeft = pb.vec3(0);
+          this.$l.planeRight = pb.vec3(0);
+          this.$l.planeBottom = pb.vec3(0);
+          this.$l.planeTop = pb.vec3(0);
           this.$if(pb.notEqual(this.orthoProj, 0), function () {
             // Orthographic: view rays are parallel, so a tile's view-space x/y extent does not
             // depend on depth, and slices are linear because near may be zero or negative.
@@ -352,6 +382,14 @@ export class ClusteredLight {
               pb.max(this.minPointNear, this.minPointFar),
               pb.max(this.maxPointNear, this.maxPointFar)
             );
+            // Side planes through the eye and the tile edges at z = tileNear (< 0), with
+            // normals facing into the tile.
+            this.$l.lo = pb.min(this.minPointNear.xy, this.maxPointNear.xy);
+            this.$l.hi = pb.max(this.minPointNear.xy, this.maxPointNear.xy);
+            this.planeLeft = pb.normalize(pb.vec3(pb.neg(this.tileNear), 0, this.lo.x));
+            this.planeRight = pb.normalize(pb.vec3(this.tileNear, 0, pb.neg(this.hi.x)));
+            this.planeBottom = pb.normalize(pb.vec3(0, pb.neg(this.tileNear), this.lo.y));
+            this.planeTop = pb.normalize(pb.vec3(0, this.tileNear, pb.neg(this.hi.y)));
           });
           this.$l.n = pb.int(0);
           if (webgl1) {
@@ -369,18 +407,32 @@ export class ClusteredLight {
                 this.$continue();
               });
               this.$l.distSq = this.aabbDistSq(this.lightPos.xyz, this.aabbMin, this.aabbMax);
-              this.$if(this.sphereReachesAABB(this.lightPos, this.distSq), function () {
-                this.$for(pb.int('j'), 0, 8, function () {
-                  this.$if(pb.equal(this.j, this.n), function () {
-                    this.lightIndices.setAt(this.j, pb.float(this.i));
-                    this.n = pb.add(this.n, 1);
+              this.$if(
+                pb.and(
+                  this.sphereReachesAABB(this.lightPos, this.distSq),
+                  pb.not(
+                    this.sphereOutsideTile(
+                      this.lightPos,
+                      this.planeLeft,
+                      this.planeRight,
+                      this.planeBottom,
+                      this.planeTop
+                    )
+                  )
+                ),
+                function () {
+                  this.$for(pb.int('j'), 0, 8, function () {
+                    this.$if(pb.equal(this.j, this.n), function () {
+                      this.lightIndices.setAt(this.j, pb.float(this.i));
+                      this.n = pb.add(this.n, 1);
+                      this.$break();
+                    });
+                  });
+                  this.$if(pb.equal(this.n, 8), function () {
                     this.$break();
                   });
-                });
-                this.$if(pb.equal(this.n, 8), function () {
-                  this.$break();
-                });
-              });
+                }
+              );
             });
             this.$outputs.value.r = pb.add(pb.mul(this.lightIndices[0], 256), this.lightIndices[1]);
             this.$outputs.value.g = pb.add(pb.mul(this.lightIndices[2], 256), this.lightIndices[3]);
@@ -442,48 +494,62 @@ export class ClusteredLight {
                 this.$continue();
               });
               this.$l.distSq = this.aabbDistSq(this.lightPos.xyz, this.aabbMin, this.aabbMax);
-              this.$if(this.sphereReachesAABB(this.lightPos, this.distSq), function () {
-                // Brightness times the lit shader's range window at the nearest point of
-                // the cluster, over the squared distance to its center.
-                this.$l.score = pb.float(3.0e38);
-                this.$if(pb.greaterThan(this.lightPos.w, 0), function () {
-                  this.$l.brightness = this[UNIFORM_NAME_LIGHT_SPHERES].at(
-                    pb.add(pb.mul(this.i, sphereStride), 1)
-                  ).x;
-                  this.$l.f = pb.clamp(
-                    pb.sub(1, pb.div(this.distSq, pb.mul(this.lightPos.w, this.lightPos.w))),
-                    0,
-                    1
-                  );
-                  this.$l.toCenter = pb.sub(this.center, this.lightPos.xyz);
-                  this.score = pb.div(
-                    pb.mul(this.brightness, this.f, this.f),
-                    pb.max(pb.dot(this.toCenter, this.toCenter), pb.max(this.halfDiagSq, 1e-6))
-                  );
-                });
-                this.$if(pb.lessThan(this.n, 16), function () {
-                  this.lightIndex.setAt(this.n, this.i);
-                  this.lightScore.setAt(this.n, this.score);
-                  this.n = pb.add(this.n, 1);
-                })
-                  .$elseif(pb.greaterThan(this.score, this.minScore), function () {
-                    this.lightIndex.setAt(this.minSlot, this.i);
-                    this.lightScore.setAt(this.minSlot, this.score);
-                  })
-                  .$else(function () {
-                    this.$continue();
+              this.$if(
+                pb.and(
+                  this.sphereReachesAABB(this.lightPos, this.distSq),
+                  pb.not(
+                    this.sphereOutsideTile(
+                      this.lightPos,
+                      this.planeLeft,
+                      this.planeRight,
+                      this.planeBottom,
+                      this.planeTop
+                    )
+                  )
+                ),
+                function () {
+                  // Brightness times the lit shader's range window at the nearest point of
+                  // the cluster, over the squared distance to its center.
+                  this.$l.score = pb.float(3.0e38);
+                  this.$if(pb.greaterThan(this.lightPos.w, 0), function () {
+                    this.$l.brightness = this[UNIFORM_NAME_LIGHT_SPHERES].at(
+                      pb.add(pb.mul(this.i, sphereStride), 1)
+                    ).x;
+                    this.$l.f = pb.clamp(
+                      pb.sub(1, pb.div(this.distSq, pb.mul(this.lightPos.w, this.lightPos.w))),
+                      0,
+                      1
+                    );
+                    this.$l.toCenter = pb.sub(this.center, this.lightPos.xyz);
+                    this.score = pb.div(
+                      pb.mul(this.brightness, this.f, this.f),
+                      pb.max(pb.dot(this.toCenter, this.toCenter), pb.max(this.halfDiagSq, 1e-6))
+                    );
                   });
-                this.$if(pb.equal(this.n, 16), function () {
-                  this.minSlot = 0;
-                  this.minScore = this.lightScore[0];
-                  this.$for(pb.int('k'), 1, 16, function () {
-                    this.$if(pb.lessThan(this.lightScore.at(this.k), this.minScore), function () {
-                      this.minSlot = this.k;
-                      this.minScore = this.lightScore.at(this.k);
+                  this.$if(pb.lessThan(this.n, 16), function () {
+                    this.lightIndex.setAt(this.n, this.i);
+                    this.lightScore.setAt(this.n, this.score);
+                    this.n = pb.add(this.n, 1);
+                  })
+                    .$elseif(pb.greaterThan(this.score, this.minScore), function () {
+                      this.lightIndex.setAt(this.minSlot, this.i);
+                      this.lightScore.setAt(this.minSlot, this.score);
+                    })
+                    .$else(function () {
+                      this.$continue();
+                    });
+                  this.$if(pb.equal(this.n, 16), function () {
+                    this.minSlot = 0;
+                    this.minScore = this.lightScore[0];
+                    this.$for(pb.int('k'), 1, 16, function () {
+                      this.$if(pb.lessThan(this.lightScore.at(this.k), this.minScore), function () {
+                        this.minSlot = this.k;
+                        this.minScore = this.lightScore.at(this.k);
+                      });
                     });
                   });
-                });
-              });
+                }
+              );
             });
             this.$l.r = pb.add(
               pb.sal(this.lightIndex[0], 24),
