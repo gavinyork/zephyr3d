@@ -5,7 +5,7 @@ import { Vector4 } from '@zephyr3d/base';
 import type { GrassLayer } from '@zephyr3d/scene';
 
 /** Rows of the procedural blade settings, see renderBladeSettings() */
-const BLADE_SETTING_ROWS = 26;
+const BLADE_SETTING_ROWS = 27;
 
 export class GrassBrush extends BaseTerrainBrush {
   brush() {}
@@ -129,6 +129,7 @@ export class GrassBrush extends BaseTerrainBrush {
     };
     color('RootColor', layer.rootColor, (v) => (layer.rootColor = v));
     color('TipColor', layer.tipColor, (v) => (layer.tipColor = v));
+    color('TransmissionColor', layer.transmissionColor, (v) => (layer.transmissionColor = v));
   }
   protected brushFragment(): void {}
 }

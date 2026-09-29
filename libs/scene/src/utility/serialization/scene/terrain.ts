@@ -51,6 +51,7 @@ type GrassLayerData = {
     lodDistance?: number;
     rootColor?: [number, number, number];
     tipColor?: [number, number, number];
+    transmissionColor?: [number, number, number];
   };
 };
 
@@ -323,7 +324,12 @@ export function getTerrainClass(manager: ResourceManager): SerializableClass {
                   swaySpeed: layer.swaySpeed,
                   lodDistance: layer.lodDistance,
                   rootColor: [layer.rootColor.x, layer.rootColor.y, layer.rootColor.z],
-                  tipColor: [layer.tipColor.x, layer.tipColor.y, layer.tipColor.z]
+                  tipColor: [layer.tipColor.x, layer.tipColor.y, layer.tipColor.z],
+                  transmissionColor: [
+                    layer.transmissionColor.x,
+                    layer.transmissionColor.y,
+                    layer.transmissionColor.z
+                  ]
                 };
               }
               data.push(info);
@@ -398,6 +404,14 @@ export function getTerrainClass(manager: ResourceManager): SerializableClass {
                     blade.tipColor[0],
                     blade.tipColor[1],
                     blade.tipColor[2],
+                    1
+                  );
+                }
+                if (blade.transmissionColor) {
+                  grassLayer.transmissionColor = new Vector4(
+                    blade.transmissionColor[0],
+                    blade.transmissionColor[1],
+                    blade.transmissionColor[2],
                     1
                   );
                 }

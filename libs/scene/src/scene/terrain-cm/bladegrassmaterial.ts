@@ -125,6 +125,8 @@ export class ClipmapBladeGrassMaterial
   private readonly _rootColor: Vector4;
   /** @internal */
   private readonly _tipColor: Vector4;
+  /** Light let through from behind at the tip, see transmissionColor @internal */
+  private readonly _transmissionColor: Vector4;
   /** @internal */
   private readonly _distanceFade: Vector2;
   /** (low detail distance, first instance of the low detail list, unused, unused) @internal */
@@ -161,6 +163,7 @@ export class ClipmapBladeGrassMaterial
     this._windTime = new Vector2(0, 0);
     this._rootColor = new Vector4(0.06, 0.1, 0.02, 1);
     this._tipColor = new Vector4(0.35, 0.45, 0.12, 1);
+    this._transmissionColor = new Vector4(0.45, 0.55, 0.12, 1);
     this._distanceFade = new Vector2(0, 0);
     this._lod = new Vector4(0, 0, 0, 0);
     this._lodDistance = 0;
@@ -184,6 +187,7 @@ export class ClipmapBladeGrassMaterial
     this.colorMap = other.colorMap;
     this._rootColor.set(other._rootColor);
     this._tipColor.set(other._tipColor);
+    this._transmissionColor.set(other._transmissionColor);
     this._distanceFade.set(other._distanceFade);
     this._drawDistance = other._drawDistance;
     this._farDensity = other._farDensity;
@@ -408,6 +412,17 @@ export class ClipmapBladeGrassMaterial
     this._tipColor.set(val);
     this.uniformChanged();
   }
+  /**
+   * Color of the light the blades let through from behind - the subsurface color of UE5's
+   * two-sided foliage - at the tip. Black lets none through.
+   */
+  get transmissionColor(): Vector4 {
+    return this._transmissionColor;
+  }
+  set transmissionColor(val: Vector4) {
+    this._transmissionColor.set(val);
+    this.uniformChanged();
+  }
   /** @internal */
   setDrawDistance(distance: number) {
     this._drawDistance = distance;
@@ -459,6 +474,7 @@ export class ClipmapBladeGrassMaterial
     if (this.needFragmentColor(ctx)) {
       bindGroup.setValue('zRootColor', this._rootColor);
       bindGroup.setValue('zTipColor', this._tipColor);
+      bindGroup.setValue('zBladeTransmission', this._transmissionColor);
       bindGroup.setValue('zBladeRoundness', this._look.x);
       if (this._colorMap.get()) {
         bindGroup.setTexture('zColorMap', this._colorMap.get()!, fetchSampler('clamp_linear'));
@@ -756,6 +772,7 @@ export class ClipmapBladeGrassMaterial
     if (this.needFragmentColor()) {
       scope.zRootColor = pb.vec4().uniform(2);
       scope.zTipColor = pb.vec4().uniform(2);
+      scope.zBladeTransmission = pb.vec4().uniform(2);
       scope.zBladeRoundness = pb.float().uniform(2);
       if (this.featureUsed<boolean>(ClipmapBladeGrassMaterial.FEATURE_COLOR_MAP)) {
         scope.zColorMap = pb.tex2D().uniform(2);
@@ -813,6 +830,15 @@ export class ClipmapBladeGrassMaterial
     const pb = scope.$builder;
     const roughness = super.calculateRoughness(scope, albedo, normal);
     return pb.mix(roughness, pb.max(roughness, scope.$inputs.zBladeFar.y), scope.$inputs.zBladeFar.x);
+  }
+  /**
+   * Light through the blade from behind, see MeshMaterial.getSubsurfaceColor. Ghost of Tsushima's
+   * blades are thick and let little light through at the root and more toward the tip; here it
+   * grows linearly along the blade up to the transmission color.
+   */
+  getSubsurfaceColor(scope: PBInsideFunctionScope): Nullable<PBShaderExp> {
+    const pb = scope.$builder;
+    return pb.mul(scope.zBladeTransmission.rgb, scope.$inputs.zBladeT);
   }
   /** Ambient occlusion darkening toward the root, see MeshMaterial.getAmbientOcclusionFactor */
   getAmbientOcclusionFactor(scope: PBInsideFunctionScope): Nullable<PBShaderExp> {

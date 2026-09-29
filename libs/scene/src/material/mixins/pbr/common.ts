@@ -1740,6 +1740,16 @@ export function mixinPBRCommon<T extends typeof MeshMaterial>(BaseCls: T) {
               this.irradiance,
               this.diffuseOcclusion
             );
+            const subsurfaceColor = that.getSubsurfaceColor(this);
+            if (subsurfaceColor) {
+              // Light through the back face, as UE5's two-sided foliage without backface
+              // diffuse (DiffuseIndirectComposite.usf): the subsurface color over pi joins
+              // the diffuse color
+              this.iblDiffuse = pb.add(
+                this.iblDiffuse,
+                pb.mul(subsurfaceColor, this.irradiance, this.diffuseOcclusion, 1 / Math.PI)
+              );
+            }
             if (that.clearcoat) {
               this.$if(pb.greaterThan(this.data.ccFactor.x, 0), function () {
                 this.iblDiffuse = pb.mul(

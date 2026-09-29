@@ -597,6 +597,19 @@ export class GrassLayer extends Disposable {
     }
   }
   /**
+   * Color of the light the blades let through when lit from behind, strongest at the tips, so a
+   * field glows against a low sun. Black lets no light through. Blade layers only.
+   */
+  get transmissionColor(): Vector4 {
+    return this.bladeMaterial?.transmissionColor ?? Vector4.zero();
+  }
+  set transmissionColor(val: Vector4) {
+    const material = this.bladeMaterial;
+    if (material) {
+      material.transmissionColor = val;
+    }
+  }
+  /**
    * How many grass blades are currently generated in this layer.
    *
    * Only counts the CPU placement path. Where blades are placed on the GPU (WebGPU) they are

@@ -336,6 +336,23 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
     return null;
   }
   /**
+   * Fragment-stage hook for thin two-sided surfaces lit through from behind, such as leaves and
+   * grass blades: the subsurface color of UE5's two-sided foliage shading model.
+   *
+   * The PBR metallic-roughness lighting adds, for every punctual light, the transmission of UE5's
+   * TwoSidedBxDF (ShadingModels.ush): a wrapped diffuse from the back face times a GGX scatter
+   * lobe around the light direction, tinted by this color. The indirect lighting adds this color
+   * over pi to the diffuse color, as UE5 does without backface diffuse (DiffuseIndirectComposite.usf).
+   * Rect lights get no transmission. Called inside the lighting functions of the fragment shader,
+   * where varyings are readable.
+   *
+   * @param _scope - Current fragment shader scope
+   * @returns Subsurface color (vec3), or null for a surface that lets no light through
+   */
+  getSubsurfaceColor(_scope: PBInsideFunctionScope): Nullable<PBShaderExp> {
+    return null;
+  }
+  /**
    * Read an encoded per-instance uniform in shader code.
    *
    * Encoded index packs: vector index, component offset, and component count.
