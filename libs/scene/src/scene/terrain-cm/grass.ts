@@ -22,7 +22,9 @@ const DEFAULT_DRAW_DISTANCE = 150;
 /** Default fraction of blades kept at the draw distance */
 const DEFAULT_FAR_DENSITY = 0.25;
 /** Default shape and clumping of procedural blades, see GrassBladeShape */
-const DEFAULT_BLADE_SHAPE = [0.5, 0.3, 0.04, 0.2, 0.25, 0.2, 0.15, 0.1, 1.5, 0.3, 0.15, 0.3, 0.2, 0, 0, 0];
+const DEFAULT_BLADE_SHAPE = [
+  0.5, 0.3, 0.04, 0.2, 0.25, 0.2, 0.15, 0.1, 1.5, 0.3, 0.15, 0.3, 0.2, 0.5, 0.15, 0
+];
 
 function distanceSqToAABB(x: number, y: number, z: number, aabb: AABB) {
   const dx = Math.max(aabb.minPoint.x - x, 0, x - aabb.maxPoint.x);
@@ -508,6 +510,53 @@ export class GrassLayer extends Disposable {
       material.farRoughness = val;
     }
   }
+  /**
+   * How much the wind turns the blades to lean downwind, per unit of wind push: 0 keeps their own
+   * directions, higher values comb the field along the wind. Blade layers only.
+   */
+  get windFacing() {
+    return this._bladeShape[13];
+  }
+  set windFacing(val: number) {
+    this.setShape(13, Math.min(4, Math.max(0, val)));
+  }
+  /**
+   * How far the wind lays the blades over, per unit of wind push: 0 leaves them standing, higher
+   * values flatten them in strong gusts. Blade layers only.
+   */
+  get windLean() {
+    return this.bladeMaterial?.windLean ?? 0;
+  }
+  set windLean(val: number) {
+    const material = this.bladeMaterial;
+    if (material) {
+      material.windLean = val;
+    }
+  }
+  /**
+   * How far the blade tips bob in the wind, as a fraction of their height per unit of wind push.
+   * Blade layers only.
+   */
+  get swayAmplitude() {
+    return this.bladeMaterial?.swayAmplitude ?? 0;
+  }
+  set swayAmplitude(val: number) {
+    const material = this.bladeMaterial;
+    if (material) {
+      material.swayAmplitude = val;
+      this.setShape(14, material.swayAmplitude);
+    }
+  }
+  /** How fast the blades bob in the wind, in radians per second. Blade layers only. */
+  get swaySpeed() {
+    return this.bladeMaterial?.swaySpeed ?? 0;
+  }
+  set swaySpeed(val: number) {
+    const material = this.bladeMaterial;
+    if (material) {
+      material.swaySpeed = val;
+    }
+  }
   /** Color at the root of the blades. Blade layers only. */
   get rootColor(): Vector4 {
     return this.bladeMaterial?.rootColor ?? Vector4.one();
@@ -890,7 +939,8 @@ export class GrassLayer extends Disposable {
       this._bladeHeight,
       occlusionMode,
       this._farDensity,
-      this._bladeShape
+      this._bladeShape,
+      terrain.scene?.env.wind.shaderParams ?? null
     );
   }
   /** @internal */
@@ -910,7 +960,10 @@ export class GrassLayer extends Disposable {
           return;
         }
         material.setInstanceBuffer(instances);
-        material.prepareDraw(ctx.camera);
+        // From the scene, not ctx.env: the depth pass clears ctx.env, and the depth prepass and
+        // the light pass must build the blades from the same wind clock or the light pass's
+        // equal depth test rejects them
+        material.prepareDraw(ctx.camera, ctx.scene?.env.wind ?? null);
       }
       material.apply(ctx);
       for (let pass = 0; pass < material.numPasses; pass++) {

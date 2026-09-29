@@ -12,6 +12,7 @@ import type {
 import { applyMaterialMixins, MeshMaterial, mixinPBRMetallicRoughness, ShaderHelper } from '../../material';
 import type { DrawContext } from '../../render';
 import type { Camera } from '../../camera';
+import type { WindField } from '../wind';
 import { RENDER_PASS_TYPE_LIGHT } from '../../values';
 import type { ClipmapTerrain } from './terrain-cm';
 import { GRASS_LOD_FADE_BAND, grassDensityLod } from './grass_gpu';
@@ -66,7 +67,8 @@ export function createBladeIndices(): Uint16Array<ArrayBuffer> {
  *
  * Instance data is written by the GPU placement pass (GrassGpuPlacement), four vec4 per blade:
  * - (base position xyz, density LOD hash; +2 when flagged as occluded)
- * - (facing angle, previous facing angle, wind push, previous wind push)
+ * - (facing angle, previous facing angle, wind push, previous wind push); the placement pass
+ *   samples the scene wind for this frame and the last one and turns the facing downwind
  * - (clump facing angle, clump color, packed terrain normal, per-blade hash)
  * - (height, width, tilt, bend)
  *
@@ -88,6 +90,10 @@ export class ClipmapBladeGrassMaterial
   private readonly _look: Vector4;
   /** (far roughness, unused...) @internal */
   private readonly _look2: Vector4;
+  /** (wind lean, sway amplitude, sway speed, unused) @internal */
+  private readonly _wind: Vector4;
+  /** (wind clock, previous wind clock) @internal */
+  private readonly _windTime: Vector2;
   /** @internal */
   private readonly _rootColor: Vector4;
   /** @internal */
@@ -122,6 +128,8 @@ export class ClipmapBladeGrassMaterial
     this._shape = new Vector4(0.7, 1.5, 0.1, 0.5);
     this._look = new Vector4(0.5, 0.5, 15, 60);
     this._look2 = new Vector4(0.9, 0, 0, 0);
+    this._wind = new Vector4(0.5, 0.15, 2.5, 0);
+    this._windTime = new Vector2(0, 0);
     this._rootColor = new Vector4(0.06, 0.1, 0.02, 1);
     this._tipColor = new Vector4(0.35, 0.45, 0.12, 1);
     this._distanceFade = new Vector2(0, 0);
@@ -142,6 +150,7 @@ export class ClipmapBladeGrassMaterial
     this._shape.set(other._shape);
     this._look.set(other._look);
     this._look2.set(other._look2);
+    this._wind.set(other._wind);
     this.colorMap = other.colorMap;
     this._rootColor.set(other._rootColor);
     this._tipColor.set(other._tipColor);
@@ -167,7 +176,14 @@ export class ClipmapBladeGrassMaterial
    * motion vectors are computed against
    * @internal
    */
-  prepareDraw(camera: Camera) {
+  prepareDraw(camera: Camera, wind: Nullable<WindField>) {
+    const windParams = wind?.shaderParams;
+    const windTime = windParams ? windParams[13] : 0;
+    const prevWindTime = windParams ? windParams[16 + 13] : 0;
+    if (this._windTime.x !== windTime || this._windTime.y !== prevWindTime) {
+      this._windTime.setXY(windTime, prevWindTime);
+      this.uniformChanged();
+    }
     const prev = camera.prevPosition ?? camera.getWorldPosition(ClipmapBladeGrassMaterial._tmpPos);
     const p = this._prevCameraPos;
     if (p.x !== prev.x || p.y !== prev.y || p.z !== prev.z) {
@@ -294,6 +310,42 @@ export class ClipmapBladeGrassMaterial
       this.uniformChanged();
     }
   }
+  /**
+   * How far the wind lays the blades over toward lying flat, per unit of wind push. 0 leaves
+   * their lean alone.
+   */
+  get windLean() {
+    return this._wind.x;
+  }
+  set windLean(val: number) {
+    val = Math.min(4, Math.max(0, val));
+    if (val !== this._wind.x) {
+      this._wind.x = val;
+      this.uniformChanged();
+    }
+  }
+  /** How far the blade tips bob in the wind, as a fraction of the blade height per unit of push */
+  get swayAmplitude() {
+    return this._wind.y;
+  }
+  set swayAmplitude(val: number) {
+    val = Math.min(1, Math.max(0, val));
+    if (val !== this._wind.y) {
+      this._wind.y = val;
+      this.uniformChanged();
+    }
+  }
+  /** How fast the blades bob in the wind, in radians per second */
+  get swaySpeed() {
+    return this._wind.z;
+  }
+  set swaySpeed(val: number) {
+    val = Math.min(50, Math.max(0, val));
+    if (val !== this._wind.z) {
+      this._wind.z = val;
+      this.uniformChanged();
+    }
+  }
   /** Color at the root of the blades */
   get rootColor(): Vector4 {
     return this._rootColor;
@@ -350,6 +402,8 @@ export class ClipmapBladeGrassMaterial
     bindGroup.setValue('zBladeShape', this._shape);
     bindGroup.setValue('zBladeLook', this._look);
     bindGroup.setValue('zBladeLook2', this._look2);
+    bindGroup.setValue('zBladeWind', this._wind);
+    bindGroup.setValue('zWindTime', this._windTime);
     bindGroup.setValue('zDistanceFade', this._distanceFade);
     bindGroup.setValue('zDensityLod', this._densityLod);
     bindGroup.setValue('zPrevCameraPos', this._prevCameraPos);
@@ -366,9 +420,34 @@ export class ClipmapBladeGrassMaterial
    * Emits the world position of the current vertex of a blade as seen from a camera position.
    * Only the density LOD depends on the camera; everything else comes from the instance.
    */
-  private emitBladeVertex(scope: PBInsideFunctionScope, cameraPos: PBShaderExp, suffix: string) {
+  private emitBladeVertex(
+    scope: PBInsideFunctionScope,
+    cameraPos: PBShaderExp,
+    facingAngle: PBShaderExp,
+    windPush: PBShaderExp,
+    windTime: PBShaderExp,
+    suffix: string
+  ) {
     const pb = scope.$builder;
     const v = (name: string) => `${name}${suffix}`;
+    // Blade frame: facing on the ground plane (already turned downwind by the placement pass),
+    // width across it, tip leaning by the tilt, which the wind raises toward lying flat: the
+    // "general bias away from the wind" of the Ghost of Tsushima talks
+    scope.$l[v('facing')] = pb.vec3(pb.cos(facingAngle), 0, pb.sin(facingAngle));
+    scope.$l[v('widthDir')] = pb.vec3(pb.neg(scope[v('facing')].z), 0, scope[v('facing')].x);
+    scope.$l[v('tilt')] = pb.add(
+      scope.inst3.z,
+      pb.mul(pb.sub(1, scope.inst3.z), pb.clamp(pb.mul(windPush, scope.zBladeWind.x), 0, 0.95))
+    );
+    scope.$l[v('tiltAngle')] = pb.mul(scope[v('tilt')], Math.PI * 0.5);
+    scope.$l[v('tipDir')] = pb.add(
+      pb.mul(scope[v('facing')], pb.sin(scope[v('tiltAngle')])),
+      pb.vec3(0, pb.cos(scope[v('tiltAngle')]), 0)
+    );
+    scope.$l[v('bendDir')] = pb.add(
+      pb.mul(scope[v('facing')], pb.neg(pb.cos(scope[v('tiltAngle')]))),
+      pb.vec3(0, pb.sin(scope[v('tiltAngle')]), 0)
+    );
     // (width scale, overall scale), see ClipmapGrassMaterial
     scope.$l[v('bladeScale')] = pb.vec2(1);
     scope.$if(pb.greaterThan(scope.zDistanceFade.y, 0), function () {
@@ -397,10 +476,29 @@ export class ClipmapBladeGrassMaterial
     );
     // Cubic Bezier from the base: tip from tilt and facing, middle points pushed away from the
     // base-tip line by the bend (up and back when the blade leans forward)
-    scope.$l[v('p3')] = pb.mul(scope.tipDir, scope[v('h')]);
-    scope.$l[v('bendOffset')] = pb.mul(scope.bendDir, pb.mul(scope.inst3.w, scope[v('h')]));
+    scope.$l[v('p3')] = pb.mul(scope[v('tipDir')], scope[v('h')]);
+    scope.$l[v('bendOffset')] = pb.mul(scope[v('bendDir')], pb.mul(scope.inst3.w, scope[v('h')]));
     scope.$l[v('p1')] = pb.add(pb.mul(scope[v('p3')], 1 / 3), scope[v('bendOffset')]);
     scope.$l[v('p2')] = pb.add(pb.mul(scope[v('p3')], 2 / 3), scope[v('bendOffset')]);
+    // Sway: a sine bob of the upper control points, whose phase comes from the blade's hash and
+    // the position along the blade (Ghost of Tsushima), scaled by the wind push. Applying it to
+    // the last two control points with weights 2/3 and 1 follows cainrademan/Unity-Grass.
+    scope.$l[v('swayPhase')] = pb.add(
+      pb.mul(windTime, scope.zBladeWind.z),
+      pb.mul(scope.inst2.w, Math.PI * 2)
+    );
+    scope.$l[v('swayAmount')] = pb.mul(scope.zBladeWind.y, scope[v('h')], windPush);
+    scope[v('p2')] = pb.add(
+      scope[v('p2')],
+      pb.mul(
+        scope[v('bendDir')],
+        pb.mul(scope[v('swayAmount')], 2 / 3, pb.sin(pb.add(scope[v('swayPhase')], (Math.PI * 4) / 3)))
+      )
+    );
+    scope[v('p3')] = pb.add(
+      scope[v('p3')],
+      pb.mul(scope[v('bendDir')], pb.mul(scope[v('swayAmount')], pb.sin(scope[v('swayPhase')])))
+    );
     scope.$l[v('curve')] = pb.add(
       pb.mul(scope[v('p1')], pb.mul(3, scope.omt, scope.omt, scope.t)),
       pb.mul(scope[v('p2')], pb.mul(3, scope.omt, scope.t, scope.t)),
@@ -416,7 +514,7 @@ export class ClipmapBladeGrassMaterial
     // the one of the cainrademan/Unity-Grass reimplementation.
     scope.$l[v('centre')] = pb.add(scope.base, scope[v('curve')]);
     scope.$l[v('toCamera')] = pb.normalize(pb.sub(cameraPos, scope[v('centre')]));
-    scope.$l[v('flatNormal')] = pb.normalize(pb.cross(scope.widthDir, scope[v('tangent')]));
+    scope.$l[v('flatNormal')] = pb.normalize(pb.cross(scope[v('widthDir')], scope[v('tangent')]));
     scope.$l[v('edgeOn')] = pb.sub(
       1,
       pb.smoothStep(0, 0.3, pb.abs(pb.dot(scope[v('flatNormal')], scope[v('toCamera')])))
@@ -425,11 +523,11 @@ export class ClipmapBladeGrassMaterial
     // Keep the sides on the same side as the blade's own width, so the blade never folds over
     scope[v('across')] = pb.mul(
       scope[v('across')],
-      pb.sub(pb.mul(pb.step(0, pb.dot(scope[v('across')], scope.widthDir)), 2), 1)
+      pb.sub(pb.mul(pb.step(0, pb.dot(scope[v('across')], scope[v('widthDir')])), 2), 1)
     );
     scope.$l[v('worldPos')] = pb.add(
       scope[v('centre')],
-      pb.mul(scope.widthDir, pb.mul(scope.side, scope[v('halfWidth')])),
+      pb.mul(scope[v('widthDir')], pb.mul(scope.side, scope[v('halfWidth')])),
       pb.mul(
         scope[v('across')],
         pb.mul(scope.side, scope[v('halfWidth')], scope.zBladeLook.y, scope[v('edgeOn')])
@@ -446,6 +544,10 @@ export class ClipmapBladeGrassMaterial
     scope.zDistanceFade = pb.vec2().uniform(2);
     scope.zDensityLod = pb.vec2().uniform(2);
     scope.zPrevCameraPos = pb.vec4().uniform(2);
+    // (wind lean, sway amplitude, sway speed, unused)
+    scope.zBladeWind = pb.vec4().uniform(2);
+    // (wind clock, previous wind clock)
+    scope.zWindTime = pb.vec2().uniform(2);
     scope.$l.vid = pb.uint(scope.$builtins.vertexIndex);
     scope.$l.first = pb.mul(pb.uint(scope.$builtins.instanceIndex), BLADE_INSTANCE_VEC4);
     scope.$l.inst0 = scope.zBladeInstances.at(scope.first);
@@ -470,19 +572,15 @@ export class ClipmapBladeGrassMaterial
       pb.sub(pb.mul(pb.float(pb.compAnd(scope.vid, pb.uint(1))), 2), 1),
       pb.sub(1, pb.float(scope.isTip))
     );
-    // Blade frame: facing on the ground plane, width across it, tip direction leaning by the tilt
-    scope.$l.facing = pb.vec3(pb.cos(scope.inst1.x), 0, pb.sin(scope.inst1.x));
-    scope.$l.widthDir = pb.vec3(pb.neg(scope.facing.z), 0, scope.facing.x);
-    scope.$l.tiltAngle = pb.mul(scope.inst3.z, Math.PI * 0.5);
-    scope.$l.tipDir = pb.add(
-      pb.mul(scope.facing, pb.sin(scope.tiltAngle)),
-      pb.vec3(0, pb.cos(scope.tiltAngle), 0)
+    // Instance: (facing, previous facing, wind push, previous wind push)
+    this.emitBladeVertex(
+      scope,
+      ShaderHelper.getCameraPosition(scope),
+      scope.inst1.x,
+      scope.inst1.z,
+      scope.zWindTime.x,
+      ''
     );
-    scope.$l.bendDir = pb.add(
-      pb.mul(scope.facing, pb.neg(pb.cos(scope.tiltAngle))),
-      pb.vec3(0, pb.sin(scope.tiltAngle), 0)
-    );
-    this.emitBladeVertex(scope, ShaderHelper.getCameraPosition(scope), '');
     scope.$outputs.worldPos = scope.worldPos;
     scope.$outputs.worldNorm = scope.flatNormal;
     // For the rounded normals: which way is across the blade, and how far across this vertex is
@@ -525,9 +623,16 @@ export class ClipmapBladeGrassMaterial
       pb.mul(ShaderHelper.getViewProjectionMatrix(scope), pb.vec4(scope.worldPos, 1))
     );
     if (ShaderHelper.getPrevUnjitteredViewProjectionMatrix(scope)) {
-      // Where this vertex was last frame, for the motion vectors: the density LOD fade depends on
-      // the camera position, so it is replayed with last frame's camera
-      this.emitBladeVertex(scope, scope.zPrevCameraPos.xyz, 'Prev');
+      // Where this vertex was last frame, for the motion vectors: the blade is rebuilt from last
+      // frame's wind, wind clock and camera (for the density LOD fade and the thickening)
+      this.emitBladeVertex(
+        scope,
+        scope.zPrevCameraPos.xyz,
+        scope.inst1.y,
+        scope.inst1.w,
+        scope.zWindTime.y,
+        'Prev'
+      );
       ShaderHelper.resolveMotionVector(scope, scope.worldPos, scope.worldPosPrev);
     }
   }

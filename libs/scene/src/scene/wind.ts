@@ -11,6 +11,11 @@ const NOISE_PERIOD = 256;
  */
 const GUST_EVOLUTION = 0.35;
 const DETAIL_EVOLUTION = 0.7;
+/**
+ * Period of the wind clock, in seconds. Oscillations driven by it (grass sway) jump once per
+ * period, which keeps float precision of the phase good for the whole period.
+ */
+const CLOCK_PERIOD = 86400;
 /** Number of vec4 in the shader parameters of one frame, see WindField.shaderParams */
 const PARAMS_PER_FRAME = 4;
 
@@ -112,6 +117,7 @@ export class WindField {
   /** vec4[2 * PARAMS_PER_FRAME]: current frame then previous frame */
   private readonly _params: Float32Array<ArrayBuffer>;
   private _hasPrev: boolean;
+  private _time: number;
   /** @internal */
   constructor() {
     this._direction = 0;
@@ -125,6 +131,7 @@ export class WindField {
     this._detail = new Float64Array(3);
     this._params = new Float32Array(8 * PARAMS_PER_FRAME);
     this._hasPrev = false;
+    this._time = 0;
     this.writeParams(0);
   }
   /**
@@ -190,6 +197,10 @@ export class WindField {
     const a = (this._direction * Math.PI) / 180;
     return [Math.cos(a), Math.sin(a)];
   }
+  /** Wind clock in seconds, wrapping once a day; drives oscillations such as grass sway */
+  get time() {
+    return this._time;
+  }
   /**
    * Shader parameters, 8 vec4: the current frame in [0, 4) and the previous frame in [4, 8).
    * Pass either half to {@link WindField.shaderPush}.
@@ -214,6 +225,7 @@ export class WindField {
     };
     advance(this._gust, this._gustScale, GUST_EVOLUTION);
     advance(this._detail, this._detailScale, DETAIL_EVOLUTION);
+    this._time = (this._time + dt) % CLOCK_PERIOD;
     this.writeParams(0);
     if (!this._hasPrev) {
       // No previous frame yet: report no motion
@@ -260,9 +272,9 @@ export class WindField {
     p[o + 9] = this._detail[1];
     p[o + 10] = this._detail[2];
     p[o + 11] = 1 / this._detailScale;
-    // (detailStrength, unused...)
+    // (detailStrength, wind clock, unused, unused)
     p[o + 12] = this._detailStrength;
-    p[o + 13] = 0;
+    p[o + 13] = this._time;
     p[o + 14] = 0;
     p[o + 15] = 0;
   }

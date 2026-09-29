@@ -44,6 +44,10 @@ type GrassLayerData = {
     farNormalStart?: number;
     farNormalEnd?: number;
     farRoughness?: number;
+    windFacing?: number;
+    windLean?: number;
+    swayAmplitude?: number;
+    swaySpeed?: number;
     rootColor?: [number, number, number];
     tipColor?: [number, number, number];
   };
@@ -312,6 +316,10 @@ export function getTerrainClass(manager: ResourceManager): SerializableClass {
                   farNormalStart: layer.farNormalStart,
                   farNormalEnd: layer.farNormalEnd,
                   farRoughness: layer.farRoughness,
+                  windFacing: layer.windFacing,
+                  windLean: layer.windLean,
+                  swayAmplitude: layer.swayAmplitude,
+                  swaySpeed: layer.swaySpeed,
                   rootColor: [layer.rootColor.x, layer.rootColor.y, layer.rootColor.z],
                   tipColor: [layer.tipColor.x, layer.tipColor.y, layer.tipColor.z]
                 };
@@ -370,6 +378,10 @@ export function getTerrainClass(manager: ResourceManager): SerializableClass {
                 grassLayer.farNormalStart = blade.farNormalStart ?? grassLayer.farNormalStart;
                 grassLayer.farNormalEnd = blade.farNormalEnd ?? grassLayer.farNormalEnd;
                 grassLayer.farRoughness = blade.farRoughness ?? grassLayer.farRoughness;
+                grassLayer.windFacing = blade.windFacing ?? grassLayer.windFacing;
+                grassLayer.windLean = blade.windLean ?? grassLayer.windLean;
+                grassLayer.swayAmplitude = blade.swayAmplitude ?? grassLayer.swayAmplitude;
+                grassLayer.swaySpeed = blade.swaySpeed ?? grassLayer.swaySpeed;
                 if (blade.rootColor) {
                   grassLayer.rootColor = new Vector4(
                     blade.rootColor[0],

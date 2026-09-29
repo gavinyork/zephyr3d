@@ -5,7 +5,7 @@ import { Vector4 } from '@zephyr3d/base';
 import type { GrassLayer } from '@zephyr3d/scene';
 
 /** Rows of the procedural blade settings, see renderBladeSettings() */
-const BLADE_SETTING_ROWS = 22;
+const BLADE_SETTING_ROWS = 26;
 
 export class GrassBrush extends BaseTerrainBrush {
   brush() {}
@@ -109,6 +109,10 @@ export class GrassBrush extends BaseTerrainBrush {
     slider('FarNormalStart', layer.farNormalStart, 0, 500, (v) => (layer.farNormalStart = v));
     slider('FarNormalEnd', layer.farNormalEnd, 0, 500, (v) => (layer.farNormalEnd = v));
     slider('FarRoughness', layer.farRoughness, 0, 1, (v) => (layer.farRoughness = v));
+    slider('WindFacing', layer.windFacing, 0, 4, (v) => (layer.windFacing = v));
+    slider('WindLean', layer.windLean, 0, 4, (v) => (layer.windLean = v));
+    slider('SwayAmplitude', layer.swayAmplitude, 0, 1, (v) => (layer.swayAmplitude = v));
+    slider('SwaySpeed', layer.swaySpeed, 0, 20, (v) => (layer.swaySpeed = v));
     const color = (label: string, value: Vector4, set: (v: Vector4) => void) => {
       const c = [value.x, value.y, value.z] as [number, number, number];
       if (ImGui.ColorEdit3(label, c)) {

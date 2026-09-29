@@ -4,6 +4,7 @@ import type {
   GPUProgram,
   IndexBuffer,
   PBInsideFunctionScope,
+  PBShaderExp,
   StructuredBuffer,
   Texture2D
 } from '@zephyr3d/device';
@@ -14,6 +15,7 @@ import { Primitive } from '../../render';
 import { getDevice } from '../../app/api';
 import { fetchSampler } from '../../utility/misc';
 import type { ClipmapTerrain } from './terrain-cm';
+import { WindField } from '../wind';
 
 const WORKGROUP_SIZE = 8;
 /**
@@ -59,6 +61,8 @@ export const GRASS_BLADE_SHAPE_SIZE = 16;
  *   randomness absolute amounts, each applied as base + randomness * [-1, 1).
  * - [8, 13): clump size, clump height variation, pull toward the clump point, same direction
  *   within a clump, facing away from the clump point.
+ * - [13, 15): how far the wind turns the blades downwind per unit of push, sway amplitude (as a
+ *   fraction of the height, only used to pad the culling bounds).
  * @internal
  */
 export type GrassBladeShape = Float32Array<ArrayBuffer>;
@@ -123,6 +127,7 @@ export class GrassGpuPlacement extends Disposable {
   private readonly _shape1: Vector4;
   private readonly _clump0: Vector4;
   private readonly _clump1: Vector4;
+  private static readonly _calmWind = new Float32Array(32);
   private readonly _indexBuffer: DRef<IndexBuffer>;
   private readonly _args: Uint32Array<ArrayBuffer>;
   private readonly _window: Vector4;
@@ -233,7 +238,8 @@ export class GrassGpuPlacement extends Disposable {
     bladeHeight: number,
     occlusionMode: GrassOcclusionMode,
     farDensity: number,
-    bladeShape?: GrassBladeShape
+    bladeShape?: GrassBladeShape,
+    windParams?: Nullable<Float32Array<ArrayBuffer>>
   ) {
     const density = this._densityTexture.get();
     const heightMap = terrain.heightMap;
@@ -274,12 +280,13 @@ export class GrassGpuPlacement extends Disposable {
     if (this._kind === 'blade' && bladeShape) {
       // A blade reaches at most its tallest height from its base in any direction, plus half its
       // width widened by the density LOD
-      const maxHeight = bladeShape[0] * (1 + Math.abs(bladeShape[1]));
+      const maxHeight =
+        bladeShape[0] * (1 + Math.abs(bladeShape[1])) * (1 + Math.abs(bladeShape[9])) * (1 + bladeShape[14]);
       const maxWidth = (bladeShape[2] * (1 + Math.abs(bladeShape[3]))) / lod[1];
       this._shape0.setXYZW(bladeShape[0], bladeShape[1], bladeShape[2], bladeShape[3]);
       this._shape1.setXYZW(bladeShape[4], bladeShape[5], bladeShape[6], bladeShape[7]);
       this._clump0.setXYZW(1 / Math.max(1e-3, bladeShape[8]), bladeShape[9], bladeShape[10], bladeShape[11]);
-      this._clump1.setXYZW(bladeShape[12], 0, 0, 0);
+      this._clump1.setXYZW(bladeShape[12], bladeShape[13], 0, 0);
       this._params.setXYZW(seed * 4, drawDistance, maxHeight + maxWidth * 0.5, 0);
       bladeHeight = maxHeight;
     } else {
@@ -329,6 +336,7 @@ export class GrassGpuPlacement extends Disposable {
       bindGroup.setValue('shape1', this._shape1);
       bindGroup.setValue('clump0', this._clump0);
       bindGroup.setValue('clump1', this._clump1);
+      bindGroup.setValue('wind', windParams ?? GrassGpuPlacement._calmWind);
     }
     // Any texture of the right sample type does when occlusion is off. Declared unfilterable
     // (read with textureLoad only), so the sampler bound with it must be a non-filtering one
@@ -440,8 +448,10 @@ export class GrassGpuPlacement extends Disposable {
             this.shape1 = pb.vec4().uniform(0);
             // (1 / clump size, height variation, pull to the clump point, same direction)
             this.clump0 = pb.vec4().uniform(0);
-            // (face away from the clump point, unused...)
+            // (face away from the clump point, wind facing, unused, unused)
             this.clump1 = pb.vec4().uniform(0);
+            // Scene wind, current frame then previous frame, see WindField.shaderParams
+            this.wind = pb.vec4[8]().uniform(0);
           }
           this.heightPyramid = pb.tex2D().sampleType('unfilterable-float').uniform(0);
           this.occludedFlag = pb.atomic_uint().workgroup();
@@ -790,6 +800,51 @@ export class GrassGpuPlacement extends Disposable {
                           this.facing = this.clumpDir;
                         });
                         this.$l.facingAngle = pb.atan2(this.facing.y, this.facing.x);
+                        // Wind: sample the push for this frame and the last one, and turn the facing
+                        // downwind by it; the vertex shader rebuilds both frames for motion vectors
+                        this.$l.windPush = WindField.shaderPush(
+                          this,
+                          this.xz,
+                          this.wind.at(0),
+                          this.wind.at(1),
+                          this.wind.at(2),
+                          this.wind.at(3)
+                        );
+                        this.$l.windPushPrev = WindField.shaderPush(
+                          this,
+                          this.xz,
+                          this.wind.at(4),
+                          this.wind.at(5),
+                          this.wind.at(6),
+                          this.wind.at(7)
+                        );
+                        this.$l.facingNow = this.facingAngle;
+                        this.$l.facingPrev = this.facingAngle;
+                        this.$l.bladeDir = pb.vec2(pb.cos(this.facingAngle), pb.sin(this.facingAngle));
+                        const turn = (
+                          scope: PBInsideFunctionScope,
+                          out: string,
+                          push: string,
+                          dir: PBShaderExp
+                        ) => {
+                          scope.$if(
+                            pb.and(pb.greaterThan(scope[push], 0), pb.greaterThan(pb.dot(dir, dir), 1e-6)),
+                            function () {
+                              this[out] = pb.add(
+                                this.facingAngle,
+                                pb.mul(
+                                  pb.atan2(
+                                    pb.sub(pb.mul(this.bladeDir.x, dir.y), pb.mul(this.bladeDir.y, dir.x)),
+                                    pb.dot(this.bladeDir, dir)
+                                  ),
+                                  pb.clamp(pb.mul(this[push], this.clump1.y), 0, 1)
+                                )
+                              );
+                            }
+                          );
+                        };
+                        turn(this, 'facingNow', 'windPush', this.wind.at(0).xy);
+                        turn(this, 'facingPrev', 'windPushPrev', this.wind.at(4).xy);
                         // Terrain normal under the blade (central differences of the height map, as
                         // in ClipmapGrassMaterial), x and z quantized to 12 bits each and packed into
                         // an integer a float holds exactly. Distant blades shade toward it.
@@ -837,7 +892,7 @@ export class GrassGpuPlacement extends Disposable {
                         this.instances.setAt(this.first, pb.vec4(this.base, this.flaggedHash));
                         this.instances.setAt(
                           pb.add(this.first, 1),
-                          pb.vec4(this.facingAngle, this.facingAngle, 0, 0)
+                          pb.vec4(this.facingNow, this.facingPrev, this.windPush, this.windPushPrev)
                         );
                         this.instances.setAt(
                           pb.add(this.first, 2),
