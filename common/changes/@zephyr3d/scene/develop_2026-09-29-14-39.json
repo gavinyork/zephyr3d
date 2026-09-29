@@ -1,0 +1,10 @@
+{
+  "changes": [
+    {
+      "packageName": "@zephyr3d/scene",
+      "comment": "Terrain runtime virtual texture",
+      "type": "patch"
+    }
+  ],
+  "packageName": "@zephyr3d/scene"
+}
