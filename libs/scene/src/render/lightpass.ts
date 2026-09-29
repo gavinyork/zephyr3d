@@ -166,14 +166,7 @@ export class LightPass extends RenderPass {
       ShaderHelper.setLightUniformsShadow(bindGroup, ctx, lights[0]);
     } else {
       if (!flags.lightSet[ctx.renderPassHash]) {
-        ShaderHelper.setLightUniforms(
-          bindGroup,
-          ctx,
-          ctx.clusteredLight!.clusterParam,
-          ctx.clusteredLight!.countParam,
-          ctx.clusteredLight!.lightBuffer!,
-          ctx.clusteredLight!.lightIndexTexture!
-        );
+        ShaderHelper.setLightUniforms(bindGroup, ctx, ctx.clusteredLight!);
         flags.lightSet[ctx.renderPassHash] = 1;
       }
       // Bind the per-queue cluster shadow-mask mode every call (not cached with

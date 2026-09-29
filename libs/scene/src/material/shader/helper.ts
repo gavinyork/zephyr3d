@@ -9,6 +9,7 @@ import {
 } from '@zephyr3d/base';
 import type { Nullable } from '@zephyr3d/base';
 import type { DrawContext } from '../../render/drawable';
+import type { ClusteredLight } from '../../render/cluster_light';
 import {
   MaterialVaryingFlags,
   MAX_SKIN_EXTRA_INFLUENCE_PAIRS,
@@ -28,7 +29,6 @@ import type {
   BindGroup,
   PBShaderExp,
   PBInsideFunctionScope,
-  StructuredBuffer,
   Texture2D,
   Texture2DArray,
   TextureCube,
@@ -51,6 +51,8 @@ import { getShadowReceiverBiasFactor, getShadowReceiverNoL } from '../../shadow/
 
 const UNIFORM_NAME_LIGHT_BUFFER = 'Z_UniformLightBuffer';
 const UNIFORM_NAME_LIGHT_INDEX_TEXTURE = 'Z_UniformLightIndexTex';
+const UNIFORM_NAME_CLUSTER_GRID = 'Z_ClusterGrid';
+const UNIFORM_NAME_CLUSTER_LIGHT_LIST = 'Z_ClusterLightList';
 const UNIFORM_NAME_BAKED_SKY_MAP = 'Z_UniformBakedSky';
 const UNIFORM_NAME_AERIALPERSPECTIVE_LUT = 'Z_UniformAerialPerspectiveLUT';
 const UNIFORM_NAME_SKYDISTANTLIGHT_LUT = 'Z_UniformSkyDistantLightLUT';
@@ -117,7 +119,6 @@ export class ShaderHelper {
   /** @internal 1x1x1 fallback bound to the shadow-mask uniform when no mask exists this frame. */
   private static _dummyShadowMask: Nullable<Texture2DArray> = null;
   private static _dummyTransmissionThickness: Nullable<Texture2DArray> = null;
-  private static readonly _noGlobalLights = new Int32Array(4);
   /** @internal */
   private static readonly SKIN_MATRIX_NAME = 'Z_SkinMatrix';
   private static readonly SKIN_PREV_MATRIX_NAME = 'Z_PrevSkinMatrix';
@@ -359,11 +360,19 @@ export class ShaderHelper {
       scope.camera = cameraStruct().uniform(0);
       scope.light = lightStruct().uniform(0);
       if (useClusteredLighting) {
-        scope[UNIFORM_NAME_LIGHT_BUFFER] = pb.vec4[(this.getMaxClusterLights() + 1) * 4]().uniformBuffer(0);
-        // Non-WebGL1 devices fetch the light index texture with textureLoad
-        scope[UNIFORM_NAME_LIGHT_INDEX_TEXTURE] = (
-          pb.getDevice().type === 'webgl' ? pb.tex2D() : pb.utex2D().noSampler()
-        ).uniform(0);
+        if (this.usesClusterLightLists()) {
+          // Storage buffers sized to the frame's lights: no cap on the lights in total or
+          // per cluster. See ClusteredLight for the layout of the grid and the lists.
+          scope[UNIFORM_NAME_LIGHT_BUFFER] = pb.vec4[0]().storageBufferReadonly(0);
+          scope[UNIFORM_NAME_CLUSTER_GRID] = pb.uint[0]().storageBufferReadonly(0);
+          scope[UNIFORM_NAME_CLUSTER_LIGHT_LIST] = pb.uint[0]().storageBufferReadonly(0);
+        } else {
+          scope[UNIFORM_NAME_LIGHT_BUFFER] = pb.vec4[(this.getMaxClusterLights() + 1) * 4]().uniformBuffer(0);
+          // Non-WebGL1 devices fetch the light index texture with textureLoad
+          scope[UNIFORM_NAME_LIGHT_INDEX_TEXTURE] = (
+            pb.getDevice().type === 'webgl' ? pb.tex2D() : pb.utex2D().noSampler()
+          ).uniform(0);
+        }
         // Screen-space shadow mask array (rgba8unorm, 4 shadow lights per layer).
         // Sampled by clustered lights whose buffer index is <= numShadowLights.
         // Presence is keyed into the global bind group hash, so declared and bound
@@ -1408,37 +1417,34 @@ export class ShaderHelper {
       : strength;
   }
   /** @internal */
-  static setLightUniforms(
-    bindGroup: BindGroup,
-    ctx: DrawContext,
-    clusterParams: Float32Array<ArrayBuffer>,
-    countParams: Int32Array<ArrayBuffer>,
-    lightBuffer: StructuredBuffer,
-    lightIndexTexture: Texture2D
-  ) {
+  static setLightUniforms(bindGroup: BindGroup, ctx: DrawContext, clusteredLight: ClusteredLight) {
     const envLightStrength = this.getEnvLightLuminance(ctx);
+    const lightIndexTexture = clusteredLight.lightIndexTexture;
     bindGroup.setValue('light', {
       sunDir: ctx.sunLight ? ctx.sunLight.directionAndCutoff.xyz().scaleBy(-1) : this.defaultSunDir,
-      clusterParams: clusterParams,
-      countParams: countParams,
-      globalLights: ctx.clusteredLight?.globalLights ?? ShaderHelper._noGlobalLights,
+      clusterParams: clusteredLight.clusterParam,
+      countParams: clusteredLight.countParam,
+      globalLights: clusteredLight.globalLights,
       envLightStrength,
       envLightSpecularStrength: ctx.env!.light.specularStrength ?? 1,
-      lightIndexTexSize: new Int32Array([lightIndexTexture.width, lightIndexTexture.height]),
-      clusterOrtho: ctx.clusteredLight?.orthographic ? 1 : 0,
-      ...(ctx.screenSpaceShadowMask ? { numShadowLights: ctx.clusteredLight?.numShadowLights ?? 0 } : {})
+      lightIndexTexSize: clusteredLight.lightIndexTexSize,
+      clusterOrtho: clusteredLight.orthographic ? 1 : 0,
+      ...(ctx.screenSpaceShadowMask ? { numShadowLights: clusteredLight.numShadowLights } : {})
     });
-    bindGroup.setBuffer(UNIFORM_NAME_LIGHT_BUFFER, lightBuffer);
-    if (ctx.device.type === 'webgl') {
+    bindGroup.setBuffer(UNIFORM_NAME_LIGHT_BUFFER, clusteredLight.lightBuffer!);
+    if (this.usesClusterLightLists()) {
+      bindGroup.setBuffer(UNIFORM_NAME_CLUSTER_GRID, clusteredLight.clusterGridBuffer!);
+      bindGroup.setBuffer(UNIFORM_NAME_CLUSTER_LIGHT_LIST, clusteredLight.lightListBuffer!);
+    } else if (ctx.device.type === 'webgl') {
       // Sampled as a float texture: packed indices must not be filtered, and linear
       // filtering of float textures without OES_texture_float_linear reads all zero.
       bindGroup.setTexture(
         UNIFORM_NAME_LIGHT_INDEX_TEXTURE,
-        lightIndexTexture,
+        lightIndexTexture!,
         fetchSampler('clamp_nearest_nomip')
       );
     } else {
-      bindGroup.setTexture(UNIFORM_NAME_LIGHT_INDEX_TEXTURE, lightIndexTexture);
+      bindGroup.setTexture(UNIFORM_NAME_LIGHT_INDEX_TEXTURE, lightIndexTexture!);
     }
     if (ctx.screenSpaceShadowMask) {
       // The mask array is declared for the clustered light pass whenever the flag is
@@ -2220,6 +2226,30 @@ export class ShaderHelper {
   /** @internal */
   static getClusteredLightIndexTexture(scope: PBInsideFunctionScope): PBShaderExp {
     return scope[UNIFORM_NAME_LIGHT_INDEX_TEXTURE];
+  }
+  /**
+   * Whether clusters hold variable-length light lists in storage buffers (WebGPU),
+   * rather than 16 byte-sized slots in a texture.
+   * @internal
+   */
+  static usesClusterLightLists() {
+    return getDevice().type === 'webgpu';
+  }
+  /**
+   * Per cluster, the offset of its light list and the number of lights in it, two
+   * uints each. Only on {@link ShaderHelper.usesClusterLightLists}.
+   * @internal
+   */
+  static getClusterGrid(scope: PBInsideFunctionScope): PBShaderExp {
+    return scope[UNIFORM_NAME_CLUSTER_GRID];
+  }
+  /**
+   * Light buffer indices of every cluster's lights, one list after another. Only on
+   * {@link ShaderHelper.usesClusterLightLists}.
+   * @internal
+   */
+  static getClusterLightList(scope: PBInsideFunctionScope): PBShaderExp {
+    return scope[UNIFORM_NAME_CLUSTER_LIGHT_LIST];
   }
   /**
    * Clustered shadow factor for a light, in `[0,1]` (1 = fully lit).
@@ -3039,16 +3069,20 @@ export class ShaderHelper {
    * Capacity of the clustered light buffer, excluding the unused slot 0.
    *
    * @remarks
-   * Elsewhere the buffer is 4 vec4 per light in a uniform block, and 255 is the most a
-   * byte-sized cluster slot can address. WebGL1 has no uniform blocks, so the buffer is
-   * a plain uniform array competing with every other uniform of the lit fragment shader
-   * for MAX_FRAGMENT_UNIFORM_VECTORS - 221 or 256 on many GPUs, where 64 lights (260
-   * vectors) alone would fail to link. 128 vectors, or half the limit if that is smaller,
-   * are left to the other uniforms.
+   * On WebGPU the buffers are storage buffers grown to fit and light indices are 32
+   * bits, so this only bounds the CPU-side work. On WebGL2 the buffer is 4 vec4 per
+   * light in a uniform block, and 255 is the most a byte-sized cluster slot can address.
+   * WebGL1 has no uniform blocks, so the buffer is a plain uniform array competing with
+   * every other uniform of the lit fragment shader for MAX_FRAGMENT_UNIFORM_VECTORS -
+   * 221 or 256 on many GPUs, where 64 lights (260 vectors) alone would fail to link.
+   * 128 vectors, or half the limit if that is smaller, are left to the other uniforms.
    * @internal
    */
   static getMaxClusterLights() {
     const device = getDevice();
+    if (device.type === 'webgpu') {
+      return 65535;
+    }
     if (device.type !== 'webgl') {
       return 255;
     }

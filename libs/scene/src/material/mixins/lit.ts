@@ -1040,6 +1040,21 @@ export function mixinLight<T extends typeof MeshMaterial>(BaseCls: T) {
             pb.mul(this.cluster.y, countParams.x),
             pb.mul(this.cluster.z, countParams.x, countParams.y)
           );
+          if (ShaderHelper.usesClusterLightLists()) {
+            // The cluster's lights are list[offset .. offset + count), however many.
+            const grid = ShaderHelper.getClusterGrid(this);
+            const list = ShaderHelper.getClusterLightList(this);
+            this.$l.cell = pb.mul(pb.uint(this.clusterIndex), 2);
+            this.$l.listOffset = grid.at(this.cell);
+            this.$l.listCount = grid.at(pb.add(this.cell, 1));
+            this.$for(pb.uint('n'), 0, this.listCount, function () {
+              this.$l.c = list.at(pb.add(this.listOffset, this.n));
+              this.$scope(function () {
+                shadeLight.call(this, this.c);
+              });
+            });
+            return;
+          }
           this.$l.texSize = scope.light.lightIndexTexSize;
           if (pb.getDevice().type === 'webgl') {
             this.$l.texCoordX = pb.div(

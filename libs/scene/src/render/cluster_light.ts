@@ -5,6 +5,7 @@ import type {
   AbstractDevice,
   BindGroup,
   FrameBuffer,
+  GPUDataBuffer,
   GPUProgram,
   PBGlobalScope,
   PBInsideFunctionScope,
@@ -26,7 +27,7 @@ import { getDevice } from '../app/api';
 const UNIFORM_NAME_LIGHT_SPHERES = 'lightSpheres';
 /**
  * vec4s per light in the index pass's sphere buffer: the bounding sphere, then (except
- * on WebGL1, which keeps the first 8 lights of a cluster rather than the brightest) the
+ * on WebGL1, which keeps the first 8 lights of a cluster rather than the strongest) the
  * light's brightness in x.
  */
 function getSphereStride() {
@@ -46,11 +47,29 @@ const TILE_COUNT_Z = 32;
 const NEAR_SLICE_METERS = 1;
 /** Clusters per workgroup of the WebGPU index pass, and lights per shared batch. */
 const INDEX_GROUP_SIZE = 64;
+/**
+ * Average list length per cluster the WebGPU light list starts out sized for, once there
+ * are more lights than this (with fewer, every cluster fits all of them). It then grows
+ * to what the clusters asked for, read back from the GPU.
+ */
+const LIST_LIGHTS_PER_CLUSTER = 64;
+/** Bound on the entries of the WebGPU light list: 64 MB. */
+const MAX_LIST_ENTRIES = 1 << 24;
+/**
+ * Buckets of the per-cluster histogram of light scores that picks which lights a
+ * cluster keeps when its list is cut. Each spans a factor of 4 in score.
+ */
+const SCORE_BUCKETS = 32;
 
 /**
  * Declares the uniforms and helper functions shared by the index pass programs.
  */
-function declareIndexPassScope(pb: ProgramBuilder, scope: PBGlobalScope, sphereStride: number) {
+function declareIndexPassScope(
+  pb: ProgramBuilder,
+  scope: PBGlobalScope,
+  sphereStride: number,
+  storage: boolean
+) {
   (function (this: PBGlobalScope) {
     this.invProjMatrix = pb.mat4().uniform(0);
     this.sizeParam = pb.vec4().uniform(0);
@@ -59,8 +78,9 @@ function declareIndexPassScope(pb: ProgramBuilder, scope: PBGlobalScope, sphereS
     this.sliceParam = pb.vec4().uniform(0);
     // Already in view space: transformed once per light on the CPU rather than once
     // per light in each of the clusters. See writeLight for the layout.
-    this[UNIFORM_NAME_LIGHT_SPHERES] =
-      pb.vec4[(ShaderHelper.getMaxClusterLights() + 1) * sphereStride]().uniformBuffer(0);
+    this[UNIFORM_NAME_LIGHT_SPHERES] = storage
+      ? pb.vec4[0]().storageBufferReadonly(0)
+      : pb.vec4[(ShaderHelper.getMaxClusterLights() + 1) * sphereStride]().uniformBuffer(0);
     pb.func('lineIntersectionToZPlane', [pb.vec3('a'), pb.vec3('b'), pb.float('zDistance')], function () {
       this.$l.normal = pb.vec3(0, 0, 1);
       this.$l.ab = pb.sub(this.b, this.a);
@@ -253,6 +273,11 @@ function emitSelectionInit(this: PBInsideFunctionScope, pb: ProgramBuilder) {
   // than whichever happen to come first in the buffer.
   this.$l.minSlot = pb.int(0);
   this.$l.minScore = pb.float(0);
+  emitScoreSetup.call(this, pb);
+}
+
+/** Emits the locals emitLightScore needs. Needs the bounds from emitClusterBounds. */
+function emitScoreSetup(this: PBInsideFunctionScope, pb: ProgramBuilder) {
   // Half the cluster diagonal: the irradiance estimate is taken at the cluster
   // center but not closer than this, so a light inside the cluster stays finite.
   this.$l.halfDiagSq = pb.mul(
@@ -263,25 +288,39 @@ function emitSelectionInit(this: PBInsideFunctionScope, pb: ProgramBuilder) {
 }
 
 /**
+ * Emits the local `score` of the light in `lightPos`, which emitLightReaches found to
+ * reach the cluster: its brightness times the lit shader's range window at the nearest
+ * point of the cluster, over the squared distance to the cluster center. Unbounded
+ * lights score highest.
+ */
+function emitLightScore(this: PBInsideFunctionScope, pb: ProgramBuilder, brightness: PBShaderExp) {
+  this.$l.score = pb.float(3.0e38);
+  this.$if(pb.greaterThan(this.lightPos.w, 0), function () {
+    this.$l.f = pb.clamp(pb.sub(1, pb.div(this.distSq, pb.mul(this.lightPos.w, this.lightPos.w))), 0, 1);
+    this.$l.toCenter = pb.sub(this.center, this.lightPos.xyz);
+    this.score = pb.div(
+      pb.mul(brightness, this.f, this.f),
+      pb.max(pb.dot(this.toCenter, this.toCenter), pb.max(this.halfDiagSq, 1e-6))
+    );
+  });
+}
+
+/**
  * Emits the test of the light at buffer index `index` (a uint) with view-space bounding
  * sphere `sphere` and brightness `brightness` against the cluster, keeping it when it
  * reaches the cluster and is among its 16 strongest. Must be emitted inside a loop over
  * the lights: rejecting a light continues it.
  */
-function emitConsiderLight(
-  this: PBInsideFunctionScope,
-  pb: ProgramBuilder,
-  index: PBShaderExp,
-  sphere: PBShaderExp,
-  brightness: PBShaderExp
-) {
-  this.$l.lightPos = sphere;
-  // Negative radius: shaded through a global slot, never through the clusters.
-  this.$if(pb.lessThan(this.lightPos.w, 0), function () {
-    this.$continue();
-  });
+/**
+ * Emits whether the light whose view-space bounding sphere is in the local `lightPos`
+ * reaches the cluster, declaring the local `distSq` (its squared distance to the box).
+ * Needs the bounds from emitClusterBounds.
+ */
+function emitLightReaches(this: PBInsideFunctionScope, pb: ProgramBuilder): PBShaderExp {
   this.$l.distSq = this.aabbDistSq(this.lightPos.xyz, this.aabbMin, this.aabbMax);
-  this.$if(
+  // Negative radius: shaded through a global slot, never through the clusters.
+  return pb.and(
+    pb.greaterThanEqual(this.lightPos.w, 0),
     pb.and(
       this.sphereReachesAABB(this.lightPos, this.distSq),
       pb.not(
@@ -293,44 +332,43 @@ function emitConsiderLight(
           this.planeTop
         )
       )
-    ),
-    function () {
-      // Brightness times the lit shader's range window at the nearest point of
-      // the cluster, over the squared distance to its center.
-      this.$l.score = pb.float(3.0e38);
-      this.$if(pb.greaterThan(this.lightPos.w, 0), function () {
-        this.$l.brightness = brightness;
-        this.$l.f = pb.clamp(pb.sub(1, pb.div(this.distSq, pb.mul(this.lightPos.w, this.lightPos.w))), 0, 1);
-        this.$l.toCenter = pb.sub(this.center, this.lightPos.xyz);
-        this.score = pb.div(
-          pb.mul(this.brightness, this.f, this.f),
-          pb.max(pb.dot(this.toCenter, this.toCenter), pb.max(this.halfDiagSq, 1e-6))
-        );
-      });
-      this.$if(pb.lessThan(this.n, 16), function () {
-        this.lightIndex.setAt(this.n, index);
-        this.lightScore.setAt(this.n, this.score);
-        this.n = pb.add(this.n, 1);
-      })
-        .$elseif(pb.greaterThan(this.score, this.minScore), function () {
-          this.lightIndex.setAt(this.minSlot, index);
-          this.lightScore.setAt(this.minSlot, this.score);
-        })
-        .$else(function () {
-          this.$continue();
-        });
-      this.$if(pb.equal(this.n, 16), function () {
-        this.minSlot = 0;
-        this.minScore = this.lightScore[0];
-        this.$for(pb.int('k'), 1, 16, function () {
-          this.$if(pb.lessThan(this.lightScore.at(this.k), this.minScore), function () {
-            this.minSlot = this.k;
-            this.minScore = this.lightScore.at(this.k);
-          });
-        });
-      });
-    }
+    )
   );
+}
+
+function emitConsiderLight(
+  this: PBInsideFunctionScope,
+  pb: ProgramBuilder,
+  index: PBShaderExp,
+  sphere: PBShaderExp,
+  brightness: PBShaderExp
+) {
+  this.$l.lightPos = sphere;
+  this.$if(emitLightReaches.call(this, pb), function () {
+    emitLightScore.call(this, pb, brightness);
+    this.$if(pb.lessThan(this.n, 16), function () {
+      this.lightIndex.setAt(this.n, index);
+      this.lightScore.setAt(this.n, this.score);
+      this.n = pb.add(this.n, 1);
+    })
+      .$elseif(pb.greaterThan(this.score, this.minScore), function () {
+        this.lightIndex.setAt(this.minSlot, index);
+        this.lightScore.setAt(this.minSlot, this.score);
+      })
+      .$else(function () {
+        this.$continue();
+      });
+    this.$if(pb.equal(this.n, 16), function () {
+      this.minSlot = 0;
+      this.minScore = this.lightScore[0];
+      this.$for(pb.int('k'), 1, 16, function () {
+        this.$if(pb.lessThan(this.lightScore.at(this.k), this.minScore), function () {
+          this.minSlot = this.k;
+          this.minScore = this.lightScore.at(this.k);
+        });
+      });
+    });
+  });
 }
 
 /** Emits the packing of the selected light indices, one byte each, front to back. */
@@ -399,21 +437,43 @@ export class ClusteredLight {
   private _tileCountX: number;
   private _tileCountY: number;
   private readonly _tileCountZ: number;
-  private readonly _lights: Float32Array<ArrayBuffer>;
+  private _lights: Float32Array<ArrayBuffer>;
   /** View-space bounding sphere of each light in `_lights`, for culling. See writeLight. */
-  private readonly _lightSpheres: Float32Array<ArrayBuffer>;
+  private _lightSpheres: Float32Array<ArrayBuffer>;
   /** Buffer indices of the lights shaded outside the clusters, zero-terminated. */
   private readonly _globalLights: Int32Array<ArrayBuffer>;
   private _lightIndexTexture: Nullable<Texture2D>;
   private _lightIndexFramebuffer: Nullable<FrameBuffer>;
   private _lightIndexProgram: Nullable<GPUProgram>;
   private _bindGroup: Nullable<BindGroup>;
+  /** WebGPU only: the pass counting each cluster's lights ahead of the index pass. */
+  private _lightCountProgram: Nullable<GPUProgram>;
+  private _countBindGroup: Nullable<BindGroup>;
+  /** WebGPU only: list entries the clusters asked for, as last read back from the GPU. */
+  private _requestedListEntries: number;
+  private _readbackPending: boolean;
+  private readonly _readback: Uint8Array<ArrayBuffer>;
+  private _warnedListOverflow: boolean;
   private _lightIndexVertexLayout: Nullable<VertexLayout>;
   /** Not released by disposing the layout, so kept to be disposed along with it. */
   private _lightIndexVertexBuffer: Nullable<StructuredBuffer>;
   private _lightIndexRenderStates: Nullable<RenderStateSet>;
-  private _lightBuffer: Nullable<StructuredBuffer>;
-  private _lightSphereBuffer: Nullable<StructuredBuffer>;
+  private _lightBuffer: Nullable<GPUDataBuffer>;
+  private _lightSphereBuffer: Nullable<GPUDataBuffer>;
+  /** Lights the WebGPU storage buffers above hold, slot 0 included. */
+  private _storageLightCapacity: number;
+  /**
+   * WebGPU only: per cluster, the offset of its list in `_lightListBuffer` and its
+   * length, two uints each.
+   */
+  private _clusterGridBuffer: Nullable<GPUDataBuffer>;
+  /** WebGPU only: light buffer indices of every cluster's lights, one list after another. */
+  private _lightListBuffer: Nullable<GPUDataBuffer>;
+  private _lightListCapacity: number;
+  /** WebGPU only: the atomic allocating list room, zeroed before each build. */
+  private _listCounterBuffer: Nullable<GPUDataBuffer>;
+  private readonly _listCounterZero: Uint32Array<ArrayBuffer>;
+  private readonly _lightIndexTexSize: Int32Array<ArrayBuffer>;
   private readonly _sizeParam: Vector4;
   private _countParam: Int32Array<ArrayBuffer>;
   private readonly _clusterParam: Vector4;
@@ -427,15 +487,29 @@ export class ClusteredLight {
     this._tileCountX = 0;
     this._tileCountY = 0;
     this._tileCountZ = TILE_COUNT_Z;
-    this._lights = new Float32Array(16 * (ShaderHelper.getMaxClusterLights() + 1));
-    this._lightSpheres = new Float32Array(4 * getSphereStride() * (ShaderHelper.getMaxClusterLights() + 1));
+    // Grown to fit the frame's lights, see ensureLightArrayCapacity.
+    this._lights = new Float32Array(16 * 64);
+    this._lightSpheres = new Float32Array(4 * getSphereStride() * 64);
     this._globalLights = new Int32Array(MAX_GLOBAL_LIGHTS);
     this._lightIndexTexture = null;
     this._lightIndexFramebuffer = null;
     this._lightIndexProgram = null;
     this._lightBuffer = null;
     this._lightSphereBuffer = null;
+    this._storageLightCapacity = 0;
+    this._clusterGridBuffer = null;
+    this._lightListBuffer = null;
+    this._lightListCapacity = 0;
+    this._listCounterBuffer = null;
+    this._listCounterZero = new Uint32Array(4);
+    this._lightIndexTexSize = new Int32Array(2);
     this._bindGroup = null;
+    this._lightCountProgram = null;
+    this._countBindGroup = null;
+    this._requestedListEntries = 0;
+    this._readbackPending = false;
+    this._readback = new Uint8Array(16);
+    this._warnedListOverflow = false;
     this._lightIndexVertexLayout = null;
     this._lightIndexVertexBuffer = null;
     this._lightIndexRenderStates = null;
@@ -479,8 +553,20 @@ export class ClusteredLight {
   get countParam() {
     return this._countParam;
   }
+  /** The per-cluster light slots, except on WebGPU where the clusters hold lists. */
   get lightIndexTexture() {
     return this._lightIndexTexture;
+  }
+  get lightIndexTexSize() {
+    return this._lightIndexTexSize;
+  }
+  /** See {@link ShaderHelper.getClusterGrid}. WebGPU only. */
+  get clusterGridBuffer() {
+    return this._clusterGridBuffer;
+  }
+  /** See {@link ShaderHelper.getClusterLightList}. WebGPU only. */
+  get lightListBuffer() {
+    return this._lightListBuffer;
   }
   private createVertexLayout(device: AbstractDevice, textureWidth: number, textureHeight: number) {
     let vb: StructuredBuffer;
@@ -527,6 +613,11 @@ export class ClusteredLight {
     this._lightIndexVertexLayout = null;
     this._lightIndexVertexBuffer?.dispose();
     this._lightIndexVertexBuffer = null;
+    this._clusterGridBuffer?.dispose();
+    this._clusterGridBuffer = null;
+    this._lightListBuffer?.dispose();
+    this._lightListBuffer = null;
+    this._lightListCapacity = 0;
   }
   private createRenderState(device: AbstractDevice) {
     this._lightIndexRenderStates = device.createRenderStateSet();
@@ -537,66 +628,211 @@ export class ClusteredLight {
     const webgl1 = device.type === 'webgl';
     const sphereStride = getSphereStride();
     if (device.type === 'webgpu') {
+      // Declares what both passes use and returns the batched light loop: runs `body`
+      // for each light of each batch the workgroup loads, with the light's index in
+      // `lightId`, its sphere in `lightPos` and its brightness in `brightness`, for the
+      // threads where `test` holds. Also emits the cluster bounds and the locals below.
+      const setup = function (this: PBGlobalScope) {
+        declareIndexPassScope(pb0!, this, sphereStride, true);
+        this.clusterGrid = pb0!.uint[0]().storageBuffer(0);
+        this.listCounter = pb0!.atomic_uint[0]().storageBuffer(0);
+        // One batch of lights, loaded by the whole workgroup and then tested by each of
+        // its clusters, instead of every cluster reading every light on its own.
+        this.batchSpheres = pb0!.vec4[INDEX_GROUP_SIZE]().workgroup();
+        this.batchBrightness = pb0!.float[INDEX_GROUP_SIZE]().workgroup();
+      };
+      let pb0: Nullable<ProgramBuilder> = null;
+      const emitMainSetup = function (this: PBInsideFunctionScope, pb: ProgramBuilder) {
+        this.$l.numClusters = pb.mul(this.countParam.x, this.countParam.y, this.countParam.z);
+        this.$l.cluster = pb.int(this.$builtins.globalInvocationId.x);
+        // Threads past the last cluster still take part in loading the batches.
+        this.$l.valid = pb.lessThan(this.cluster, this.numClusters);
+        emitClusterBounds.call(this, pb, pb.min(this.cluster, pb.sub(this.numClusters, 1)));
+        this.$l.cell = pb.mul(pb.uint(pb.min(this.cluster, pb.sub(this.numClusters, 1))), 2);
+        this.$l.local = pb.uint(this.$builtins.localInvocationId.x);
+        this.$l.numLights = pb.uint(pb.sub(this.countParam.w, 1));
+        this.$l.numBatches = pb.div(pb.add(this.numLights, INDEX_GROUP_SIZE - 1), INDEX_GROUP_SIZE);
+      };
+      const forEachBatchedLight = function (
+        this: PBInsideFunctionScope,
+        pb: ProgramBuilder,
+        test: () => PBShaderExp,
+        body: (this: PBInsideFunctionScope) => void
+      ) {
+        this.$for(pb.uint('b'), 0, this.numBatches, function () {
+          this.$l.base = pb.add(pb.mul(this.b, INDEX_GROUP_SIZE), 1);
+          this.$l.li = pb.add(this.base, this.local);
+          this.$if(pb.lessThan(this.li, pb.uint(this.countParam.w)), function () {
+            this.batchSpheres.setAt(this.local, this[UNIFORM_NAME_LIGHT_SPHERES].at(pb.mul(this.li, 2)));
+            this.batchBrightness.setAt(
+              this.local,
+              this[UNIFORM_NAME_LIGHT_SPHERES].at(pb.add(pb.mul(this.li, 2), 1)).x
+            );
+          });
+          pb.workgroupBarrier();
+          this.$if(test.call(this), function () {
+            this.$l.batchCount = pb.min(pb.sub(pb.uint(this.countParam.w), this.base), INDEX_GROUP_SIZE);
+            this.$for(pb.uint('j'), 0, this.batchCount, function () {
+              this.$l.lightId = pb.add(this.base, this.j);
+              this.$l.lightPos = this.batchSpheres.at(this.j);
+              this.$l.brightness = this.batchBrightness.at(this.j);
+              body.call(this);
+            });
+          });
+          // The next batch overwrites the one still being read.
+          pb.workgroupBarrier();
+        });
+      };
+      // Count pass: how many lights reach each cluster, and in total. The total decides
+      // in the write pass whether the lists fit, which no single pass could know before
+      // every cluster had allocated its list.
+      this._lightCountProgram = device.buildComputeProgram({
+        label: 'ClusteredLightCount',
+        workgroupSize: [INDEX_GROUP_SIZE, 1, 1],
+        compute(pb) {
+          pb0 = pb;
+          setup.call(this);
+          pb.main(function () {
+            emitMainSetup.call(this, pb);
+            this.$l.listCount = pb.uint(0);
+            forEachBatchedLight.call(
+              this,
+              pb,
+              () => this.valid,
+              function () {
+                this.$if(emitLightReaches.call(this, pb), function () {
+                  this.listCount = pb.add(this.listCount, 1);
+                });
+              }
+            );
+            this.$if(this.valid, function () {
+              this.clusterGrid.setAt(pb.add(this.cell, 1), this.listCount);
+              pb.atomicAdd(this.listCounter.at(1), this.listCount);
+            });
+          });
+        }
+      })!;
+      this._lightCountProgram.name = '@ClusteredLight_Count';
+      this._countBindGroup = device.createBindGroup(this._lightCountProgram.bindGroupLayouts[0]);
+      // Write pass: allocates each cluster's list and fills it.
       this._lightIndexProgram = device.buildComputeProgram({
         label: 'ClusteredLightIndex',
         workgroupSize: [INDEX_GROUP_SIZE, 1, 1],
         compute(pb) {
-          declareIndexPassScope(pb, this, sphereStride);
-          this.indexTexWidth = pb.int().uniform(0);
-          this.lightIndexTex = pb.texStorage2D.rgba32uint().storage(0);
-          // One batch of lights, loaded by the whole workgroup and then tested by each of
-          // its clusters, instead of every cluster reading every light on its own.
-          this.batchSpheres = pb.vec4[INDEX_GROUP_SIZE]().workgroup();
-          this.batchBrightness = pb.float[INDEX_GROUP_SIZE]().workgroup();
+          pb0 = pb;
+          setup.call(this);
+          this.listCapacity = pb.uint().uniform(0);
+          this.lightList = pb.uint[0]().storageBuffer(0);
+          // The bucket of a score, higher for stronger lights.
+          pb.func('scoreBucket', [pb.float('score')], function () {
+            this.$return(
+              pb.uint(
+                pb.clamp(
+                  pb.add(pb.floor(pb.mul(pb.log2(pb.max(this.score, 1e-30)), 0.5)), SCORE_BUCKETS / 2),
+                  0,
+                  SCORE_BUCKETS - 1
+                )
+              )
+            );
+          });
           pb.main(function () {
-            this.$l.numClusters = pb.mul(this.countParam.x, this.countParam.y, this.countParam.z);
-            this.$l.cluster = pb.int(this.$builtins.globalInvocationId.x);
-            // Threads past the last cluster still take part in loading the batches.
-            this.$l.valid = pb.lessThan(this.cluster, this.numClusters);
-            emitClusterBounds.call(this, pb, pb.min(this.cluster, pb.sub(this.numClusters, 1)));
-            emitSelectionInit.call(this, pb);
-            this.$l.local = pb.uint(this.$builtins.localInvocationId.x);
-            this.$l.numLights = pb.uint(pb.sub(this.countParam.w, 1));
-            this.$l.numBatches = pb.div(pb.add(this.numLights, INDEX_GROUP_SIZE - 1), INDEX_GROUP_SIZE);
-            this.$for(pb.uint('b'), 0, this.numBatches, function () {
-              this.$l.base = pb.add(pb.mul(this.b, INDEX_GROUP_SIZE), 1);
-              this.$l.li = pb.add(this.base, this.local);
-              this.$if(pb.lessThan(this.li, pb.uint(this.countParam.w)), function () {
-                this.batchSpheres.setAt(
-                  this.local,
-                  this[UNIFORM_NAME_LIGHT_SPHERES].at(pb.mul(this.li, sphereStride))
-                );
-                this.batchBrightness.setAt(
-                  this.local,
-                  this[UNIFORM_NAME_LIGHT_SPHERES].at(pb.add(pb.mul(this.li, sphereStride), 1)).x
-                );
-              });
-              pb.workgroupBarrier();
-              this.$if(this.valid, function () {
-                this.$l.count = pb.min(pb.sub(pb.uint(this.countParam.w), this.base), INDEX_GROUP_SIZE);
-                this.$for(pb.uint('j'), 0, this.count, function () {
-                  emitConsiderLight.call(
-                    this,
-                    pb,
-                    pb.add(this.base, this.j),
-                    this.batchSpheres.at(this.j),
-                    this.batchBrightness.at(this.j)
-                  );
-                });
-              });
-              // The next batch overwrites the one still being read.
-              pb.workgroupBarrier();
-            });
+            emitMainSetup.call(this, pb);
+            emitScoreSetup.call(this, pb);
+            this.$l.need = pb.uint(0);
             this.$if(this.valid, function () {
-              this.$l.packed = emitPackSelection.call(this, pb);
-              pb.textureStore(
-                this.lightIndexTex,
-                pb.uvec2(
-                  pb.uint(pb.mod(this.cluster, this.indexTexWidth)),
-                  pb.uint(pb.div(this.cluster, this.indexTexWidth))
-                ),
-                this.packed
+              this.need = this.clusterGrid.at(pb.add(this.cell, 1));
+            });
+            // When the lists do not all fit, every cluster gives up the same share of its
+            // lights, so the sum fits and none is left empty. The margin absorbs the
+            // rounding of the float scale.
+            this.$l.total = pb.atomicLoad(this.listCounter.at(1));
+            this.$l.allowed = this.need;
+            this.$if(pb.greaterThan(this.total, this.listCapacity), function () {
+              this.allowed = pb.uint(
+                pb.floor(
+                  pb.mul(
+                    pb.float(this.need),
+                    pb.div(pb.float(this.listCapacity), pb.float(this.total)),
+                    0.999
+                  )
+                )
               );
+            });
+            this.$l.truncated = pb.lessThan(this.allowed, this.need);
+            // A cut list keeps the strongest lights for this cluster: the buckets above
+            // `cutBucket` whole, and of that bucket only the first `cutRoom`.
+            this.$l.hist = pb.uint[SCORE_BUCKETS]();
+            this.$for(pb.int('h'), 0, SCORE_BUCKETS, function () {
+              this.hist.setAt(this.h, 0);
+            });
+            forEachBatchedLight.call(
+              this,
+              pb,
+              () => pb.and(this.valid, this.truncated),
+              function () {
+                this.$if(emitLightReaches.call(this, pb), function () {
+                  emitLightScore.call(this, pb, this.brightness);
+                  this.$l.bucket = this.scoreBucket(this.score);
+                  this.hist.setAt(this.bucket, pb.add(this.hist.at(this.bucket), 1));
+                });
+              }
+            );
+            this.$l.cutBucket = pb.int(-1);
+            this.$l.cutRoom = pb.uint(0);
+            this.$if(this.truncated, function () {
+              this.$l.kept = pb.uint(0);
+              this.$for(pb.int('h'), SCORE_BUCKETS - 1, 0, false, true, function () {
+                this.$if(pb.greaterThan(pb.add(this.kept, this.hist.at(this.h)), this.allowed), function () {
+                  this.cutBucket = this.h;
+                  this.cutRoom = pb.sub(this.allowed, this.kept);
+                  this.$break();
+                });
+                this.kept = pb.add(this.kept, this.hist.at(this.h));
+              });
+            });
+            this.$l.listOffset = pb.uint(0);
+            this.$if(pb.and(this.valid, pb.greaterThan(this.allowed, 0)), function () {
+              this.listOffset = pb.atomicAdd(this.listCounter.at(0), this.allowed);
+              // Only rounding can leave the sum above the capacity; trim the last lists.
+              this.allowed = pb.select(
+                pb.uint(0),
+                pb.min(this.allowed, pb.sub(this.listCapacity, this.listOffset)),
+                pb.lessThan(this.listOffset, this.listCapacity)
+              );
+            });
+            this.$l.written = pb.uint(0);
+            forEachBatchedLight.call(
+              this,
+              pb,
+              () => pb.and(this.valid, pb.lessThan(this.written, this.allowed)),
+              function () {
+                this.$if(pb.greaterThanEqual(this.written, this.allowed), function () {
+                  this.$break();
+                });
+                this.$if(emitLightReaches.call(this, pb), function () {
+                  this.$l.keep = true;
+                  this.$if(this.truncated, function () {
+                    emitLightScore.call(this, pb, this.brightness);
+                    this.$l.bucket = pb.int(this.scoreBucket(this.score));
+                    this.keep = pb.greaterThan(this.bucket, this.cutBucket);
+                    this.$if(
+                      pb.and(pb.equal(this.bucket, this.cutBucket), pb.greaterThan(this.cutRoom, 0)),
+                      function () {
+                        this.keep = true;
+                        this.cutRoom = pb.sub(this.cutRoom, 1);
+                      }
+                    );
+                  });
+                  this.$if(this.keep, function () {
+                    this.lightList.setAt(pb.add(this.listOffset, this.written), this.lightId);
+                    this.written = pb.add(this.written, 1);
+                  });
+                });
+              }
+            );
+            this.$if(this.valid, function () {
+              this.clusterGrid.setAt(this.cell, this.listOffset);
+              this.clusterGrid.setAt(pb.add(this.cell, 1), this.written);
             });
           });
         }
@@ -606,7 +842,7 @@ export class ClusteredLight {
         vertex(pb) {
           this.$inputs.pos = (webgl1 ? pb.vec3() : pb.vec2()).attrib('position');
           this.$outputs.value = webgl1 ? pb.vec4() : pb.uvec4();
-          declareIndexPassScope(pb, this, sphereStride);
+          declareIndexPassScope(pb, this, sphereStride, false);
           pb.main(function () {
             this.$builtins.pointSize = 1;
             this.$builtins.position = pb.vec4(this.$inputs.pos.xy, 0, 1);
@@ -687,13 +923,97 @@ export class ClusteredLight {
     }
     this._lightIndexProgram.name = '@ClusteredLight_Index';
     this._bindGroup = device.createBindGroup(this._lightIndexProgram.bindGroupLayouts[0]);
-    this._lightSphereBuffer?.dispose();
-    const sphereBufferType = this._lightIndexProgram.getBindingInfo(UNIFORM_NAME_LIGHT_SPHERES)!.type;
-    this._lightSphereBuffer = device.createStructuredBuffer(sphereBufferType as PBStructTypeInfo, {
-      usage: 'uniform'
-    });
+    if (!ShaderHelper.usesClusterLightLists()) {
+      this._lightSphereBuffer?.dispose();
+      const sphereBufferType = this._lightIndexProgram.getBindingInfo(UNIFORM_NAME_LIGHT_SPHERES)!.type;
+      this._lightSphereBuffer = device.createStructuredBuffer(sphereBufferType as PBStructTypeInfo, {
+        usage: 'uniform'
+      });
+    }
   }
-  /** Creates the light buffer read by the lit shaders, laid out as ShaderHelper declares it. */
+  /**
+   * Grows the WebGPU light and sphere storage buffers to hold `count` entries (slot 0
+   * included). The contents are rewritten every frame, so nothing is copied.
+   */
+  private ensureStorageLightCapacity(device: AbstractDevice, count: number) {
+    if (this._storageLightCapacity >= count && this._lightBuffer && this._lightSphereBuffer) {
+      return;
+    }
+    const capacity = Math.max(64, 1 << Math.ceil(Math.log2(count)));
+    this._lightBuffer?.dispose();
+    this._lightSphereBuffer?.dispose();
+    this._lightBuffer = device.createBuffer(capacity * 64, { usage: 'uniform', storage: true })!;
+    this._lightSphereBuffer = device.createBuffer(capacity * 16 * getSphereStride(), {
+      usage: 'uniform',
+      storage: true
+    })!;
+    this._storageLightCapacity = capacity;
+  }
+  /**
+   * Makes the WebGPU cluster grid and light list buffers fit the current grid and
+   * `numLights` lights. The list grows but is not shrunk.
+   */
+  private ensureListBuffers(device: AbstractDevice, numLights: number) {
+    const numClusters = this._tileCountX * this._tileCountY * this._tileCountZ;
+    if (!this._clusterGridBuffer) {
+      this._clusterGridBuffer = device.createBuffer(numClusters * 8, { usage: 'uniform', storage: true })!;
+    }
+    const capacity = Math.min(
+      Math.max(
+        numClusters * Math.min(Math.max(numLights, 1), LIST_LIGHTS_PER_CLUSTER),
+        // With some headroom, as moving lights change what the clusters ask for.
+        Math.ceil(this._requestedListEntries * 1.25)
+      ),
+      MAX_LIST_ENTRIES
+    );
+    if (!this._lightListBuffer || this._lightListCapacity < capacity) {
+      this._lightListBuffer?.dispose();
+      this._lightListBuffer = device.createBuffer(capacity * 4, { usage: 'uniform', storage: true })!;
+      this._lightListCapacity = capacity;
+    }
+    if (!this._listCounterBuffer) {
+      this._listCounterBuffer = device.createBuffer(16, { usage: 'uniform', storage: true })!;
+    }
+  }
+  /**
+   * Reads back how many list entries the clusters asked for, so the next builds can
+   * size the list to fit. One read is in flight at a time.
+   */
+  private readBackListRequest() {
+    if (this._readbackPending) {
+      return;
+    }
+    this._readbackPending = true;
+    this._listCounterBuffer!.getBufferSubData(this._readback, 0, 16).then(
+      () => {
+        this._readbackPending = false;
+        const requested = new Uint32Array(this._readback.buffer, 0, 4)[1];
+        this._requestedListEntries = requested;
+        if (requested > MAX_LIST_ENTRIES && !this._warnedListOverflow) {
+          this._warnedListOverflow = true;
+          console.warn(
+            `ClusteredLight: the light clusters ask for ${requested} list entries, above the ` +
+              `${MAX_LIST_ENTRIES} budget; crowded clusters keep only their strongest lights. ` +
+              `Giving lights a finite range usually cuts this down by orders of magnitude.`
+          );
+        }
+      },
+      () => {
+        this._readbackPending = false;
+      }
+    );
+  }
+  /** Grows the CPU-side light arrays to hold `count` entries (slot 0 included). */
+  private ensureLightArrayCapacity(count: number) {
+    const stride = getSphereStride();
+    if (this._lights.length >= count * 16) {
+      return;
+    }
+    const capacity = 1 << Math.ceil(Math.log2(count));
+    this._lights = new Float32Array(capacity * 16);
+    this._lightSpheres = new Float32Array(capacity * 4 * stride);
+  }
+  /** Creates the uniform light buffer read by the lit shaders, laid out as ShaderHelper declares it. */
   private createLightBuffer(device: AbstractDevice) {
     const lightBufferType = new PBStructTypeInfo('ClusteredLightBuffer', 'std140', [
       {
@@ -714,17 +1034,17 @@ export class ClusteredLight {
       device.getDeviceCaps().textureCaps.maxTextureSize
     );
     const textureHeight = Math.ceil(numClusters / textureWidth);
-    // Written by the compute pass on WebGPU, rendered to elsewhere.
-    const compute = device.type === 'webgpu';
     this._lightIndexTexture = device.createTexture2D(
       device.type === 'webgl' ? 'rgba32f' : 'rgba32ui',
       textureWidth,
       textureHeight,
-      { mipmapping: false, writable: compute }
+      { mipmapping: false }
     )!;
     this._lightIndexTexture.name = 'ClusterLightIndex';
+    this._lightIndexTexSize[0] = textureWidth;
+    this._lightIndexTexSize[1] = textureHeight;
     this._lightIndexFramebuffer?.dispose();
-    this._lightIndexFramebuffer = compute ? null : device.createFrameBuffer([this._lightIndexTexture], null);
+    this._lightIndexFramebuffer = device.createFrameBuffer([this._lightIndexTexture], null);
   }
   /**
    * Builds the per-cluster light lists for a camera.
@@ -744,25 +1064,22 @@ export class ClusteredLight {
     screenSpaceShadowMask = camera.screenSpaceShadowMask,
     preExposure = 1
   ) {
-    const numLights = this.getVisibleLights(
-      camera,
-      renderQueue,
-      this._lights,
-      screenSpaceShadowMask,
-      preExposure
-    );
+    const numLights = this.getVisibleLights(camera, renderQueue, screenSpaceShadowMask, preExposure);
     const device = getDevice();
+    const compute = ShaderHelper.usesClusterLightLists();
     this.resizeGrid(width, height);
-    if (!this._lightIndexTexture) {
+    if (compute) {
+      this.ensureStorageLightCapacity(device, numLights + 1);
+      this.ensureListBuffers(device, numLights);
+    } else if (!this._lightIndexTexture) {
       this.createLightIndexTexture(device);
     }
     if (!this._lightIndexProgram) {
       this.createProgram(device);
     }
-    if (!this._lightBuffer) {
+    if (!compute && !this._lightBuffer) {
       this.createLightBuffer(device);
     }
-    const compute = device.type === 'webgpu';
     if (!compute && !this._lightIndexVertexLayout) {
       this.createVertexLayout(device, this._lightIndexTexture!.width, this._lightIndexTexture!.height);
     }
@@ -812,7 +1129,7 @@ export class ClusteredLight {
       device.setViewport(null);
       device.setScissor(null);
     }
-    // The compute pass writes every texel itself, empty lists included.
+    // The compute pass writes every cluster itself, empty ones included.
     if (compute || numLights > 0) {
       if (this._lightBuffer!.disposed) {
         this._lightBuffer!.reload();
@@ -836,10 +1153,28 @@ export class ClusteredLight {
       this._bindGroup!.setBuffer(UNIFORM_NAME_LIGHT_SPHERES, this._lightSphereBuffer!);
       device.setProgram(this._lightIndexProgram);
       if (compute) {
-        this._bindGroup!.setValue('indexTexWidth', this._lightIndexTexture!.width);
-        this._bindGroup!.setTexture('lightIndexTex', this._lightIndexTexture!);
+        const numGroups = Math.ceil(numClusters / INDEX_GROUP_SIZE);
+        this._listCounterBuffer!.bufferSubData(0, this._listCounterZero);
+        const countBindGroup = this._countBindGroup!;
+        countBindGroup.setValue('invProjMatrix', camera.getInvProjectionMatrix());
+        countBindGroup.setValue('sizeParam', this._sizeParam);
+        countBindGroup.setValue('countParam', this._countParam);
+        countBindGroup.setValue('orthoProj', this._orthographic ? 1 : 0);
+        countBindGroup.setValue('sliceParam', this._sliceParam);
+        countBindGroup.setBuffer(UNIFORM_NAME_LIGHT_SPHERES, this._lightSphereBuffer!);
+        countBindGroup.setBuffer('clusterGrid', this._clusterGridBuffer!);
+        countBindGroup.setBuffer('listCounter', this._listCounterBuffer!);
+        device.setProgram(this._lightCountProgram);
+        device.setBindGroup(0, countBindGroup);
+        device.compute(numGroups, 1, 1);
+        this._bindGroup!.setValue('listCapacity', this._lightListCapacity);
+        this._bindGroup!.setBuffer('clusterGrid', this._clusterGridBuffer!);
+        this._bindGroup!.setBuffer('lightList', this._lightListBuffer!);
+        this._bindGroup!.setBuffer('listCounter', this._listCounterBuffer!);
+        device.setProgram(this._lightIndexProgram);
         device.setBindGroup(0, this._bindGroup!);
-        device.compute(Math.ceil(numClusters / INDEX_GROUP_SIZE), 1, 1);
+        device.compute(numGroups, 1, 1);
+        this.readBackListRequest();
       } else {
         device.setVertexLayout(this._lightIndexVertexLayout);
         device.setBindGroup(0, this._bindGroup!);
@@ -896,10 +1231,16 @@ export class ClusteredLight {
   private getVisibleLights(
     camera: Camera,
     renderQueue: RenderQueue,
-    lights: Float32Array,
     useShadowMask: boolean,
     preExposure: number
   ) {
+    this.ensureLightArrayCapacity(
+      Math.min(
+        renderQueue.shadowedLights.length + renderQueue.unshadowedLights.length,
+        ShaderHelper.getMaxClusterLights()
+      ) + 1
+    );
+    const lights = this._lights;
     const view = camera.viewMatrix;
     const spheres = this._lightSpheres;
     const sphereStride = getSphereStride();
