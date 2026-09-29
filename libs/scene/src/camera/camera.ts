@@ -272,6 +272,8 @@ export class Camera extends SceneNode {
   protected _HiZNearest: boolean;
   /** @internal Screen-space shadow mask enable (Forward+ deferred shadows). */
   protected _screenSpaceShadowMask: boolean;
+  /** @internal */
+  protected _contactShadows: boolean;
   /** @internal If true, a float point backbuffer will be used. The default value is true */
   protected _HDR: boolean;
   /** @internal Tonemap enable flag (via post effect). */
@@ -512,6 +514,7 @@ export class Camera extends SceneNode {
     this._HiZ = false;
     this._HiZNearest = false;
     this._screenSpaceShadowMask = true;
+    this._contactShadows = true;
     this._HDR = true;
     this._toneMap = true;
     this._postEffectTonemap = new DRef();
@@ -709,6 +712,19 @@ export class Camera extends SceneNode {
   }
   set screenSpaceShadowMask(val) {
     this._screenSpaceShadowMask = !!val;
+  }
+  /**
+   * Whether lights with a non-zero {@link PunctualLight.contactShadowLength}
+   * trace contact shadows (UE5 `r.ContactShadows`).
+   *
+   * Contact shadows are traced inside the screen-space shadow mask, so they
+   * also require {@link Camera.screenSpaceShadowMask}.
+   */
+  get contactShadows() {
+    return this._contactShadows;
+  }
+  set contactShadows(val) {
+    this._contactShadows = !!val;
   }
   /**
    * Render path used by the scene renderer.

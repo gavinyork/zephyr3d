@@ -1,4 +1,4 @@
-import { DEPTH_FARTHEST, Vector2, Vector4 } from '@zephyr3d/base';
+import { DEPTH_FARTHEST, REVERSE_Z, Vector2, Vector4 } from '@zephyr3d/base';
 import type { Nullable } from '@zephyr3d/base';
 import type {
   AbstractDevice,
@@ -16,8 +16,18 @@ import { ShaderHelper } from '../material/shader/helper';
 import { drawFullscreenQuad } from './fullscreenquad';
 import { LIGHT_TYPE_DIRECTIONAL, LIGHT_TYPE_RECT, MAX_SHADOW_MASK_LIGHTS } from '../values';
 import { fetchSampler } from '../utility/misc';
+import { SSR_interleavedGradientNoise } from '../shaders/ssr';
 
 const UNIFORM_NAME_SHADOW_MAP = 'Z_UniformShadowMap';
+
+/**
+ * Contact shadow ray march, ported from UE5 `CastScreenSpaceShadowRay`
+ * (ScreenSpaceShadowRayCast.ush, non-Substrate branch) as called by
+ * `ApplyContactShadowWithShadowTerms` (DeferredLightingCommon.ush): 8 steps,
+ * compare tolerance scale 2.
+ */
+const CONTACT_SHADOW_STEPS = 8;
+const CONTACT_SHADOW_COMPARE_TOLERANCE_SCALE = 2;
 
 /**
  * Number of shadow-casting lights packed into a single RGBA8 mask array layer.
@@ -58,6 +68,9 @@ export class ShadowMaskRenderer {
   private readonly _invRenderSize: Vector2;
   private readonly _cameraPosition: Vector4;
   private readonly _cameraParams: Vector4;
+  private readonly _contactShadow: Vector4;
+  private readonly _contactScale: Vector2;
+  private readonly _projZColumn: Vector4;
 
   constructor() {
     this._programs = new Map();
@@ -67,6 +80,16 @@ export class ShadowMaskRenderer {
     this._invRenderSize = new Vector2();
     this._cameraPosition = new Vector4();
     this._cameraParams = new Vector4();
+    this._contactShadow = new Vector4();
+    this._contactScale = new Vector2();
+    this._projZColumn = new Vector4();
+  }
+
+  /** Whether this light traces contact shadows in the mask pass. */
+  private static hasContactShadow(ctx: DrawContext, light: PunctualLight): boolean {
+    return (
+      ctx.camera.contactShadows && light.contactShadowLength > 0 && light.contactShadowCastingIntensity > 0
+    );
   }
 
   /**
@@ -140,17 +163,18 @@ export class ShadowMaskRenderer {
     renderState: RenderStateSet
   ): void {
     const device = ctx.device;
-    const key = this.getProgramKey(ctx, shadowMapParams);
+    const contactShadow = ShadowMaskRenderer.hasContactShadow(ctx, light);
+    const key = this.getProgramKey(ctx, shadowMapParams, contactShadow);
     let program = this._programs.get(key) ?? null;
     let bindGroup = this._bindGroups.get(key) ?? null;
     if (!program) {
-      program = this.createProgram(ctx, shadowMapParams);
+      program = this.createProgram(ctx, shadowMapParams, contactShadow);
       bindGroup = device.createBindGroup(program.bindGroupLayouts[0]);
       this._programs.set(key, program);
       this._bindGroups.set(key, bindGroup);
     }
     bindGroup = this._bindGroups.get(key)!;
-    this.setUniforms(bindGroup, ctx, depthTexture, light, shadowMapParams);
+    this.setUniforms(bindGroup, ctx, depthTexture, light, shadowMapParams, contactShadow);
     device.setProgram(program);
     device.setBindGroup(0, bindGroup);
     drawFullscreenQuad(renderState);
@@ -160,8 +184,8 @@ export class ShadowMaskRenderer {
    * The program signature: distinct shadow implementations, cascade counts and
    * shadow map types must not share a compiled program.
    */
-  private getProgramKey(ctx: DrawContext, shadowMapParams: ShadowMapParams): string {
-    return `${ctx.device.type}|${shadowMapParams.shaderHash}`;
+  private getProgramKey(ctx: DrawContext, shadowMapParams: ShadowMapParams, contactShadow: boolean): string {
+    return `${ctx.device.type}|${shadowMapParams.shaderHash}|${contactShadow ? 1 : 0}`;
   }
 
   private getChannelStates(device: AbstractDevice): RenderStateSet[] {
@@ -183,7 +207,8 @@ export class ShadowMaskRenderer {
     ctx: DrawContext,
     depthTexture: Texture2D,
     light: PunctualLight,
-    shadowMapParams: ShadowMapParams
+    shadowMapParams: ShadowMapParams,
+    contactShadow: boolean
   ): void {
     const camera = ctx.camera;
     const near = camera.getNearPlane();
@@ -227,6 +252,31 @@ export class ShadowMaskRenderer {
     this._invRenderSize.setXY(1 / depthTexture.width, 1 / depthTexture.height);
     bindGroup.setValue('invRenderSize', this._invRenderSize);
     bindGroup.setValue('flip', this.needFlip(ctx.device) ? 1 : 0);
+    if (contactShadow) {
+      const proj = camera.getProjectionMatrix();
+      // UE5 ScreenRayLengthMultiplier.yw: a screen-relative length scales with
+      // tan(fovY/2) * depth under perspective and is used as-is under ortho.
+      // The factor 2 is UE's GetLightContactShadowParameters doubling
+      // screen-space lengths.
+      if (proj.isPerspective()) {
+        this._contactScale.setXY(2 / proj[5], 0);
+      } else {
+        this._contactScale.setXY(0, 2);
+      }
+      this._contactShadow.setXYZW(
+        light.contactShadowLength,
+        light.contactShadowLengthInWS ? 1 : 0,
+        light.contactShadowCastingIntensity,
+        ctx.device.frameInfo.frameCounter % 8
+      );
+      // Third column of the projection matrix: moves a clip-space point along
+      // the view axis without a separate view-to-clip transform.
+      this._projZColumn.setXYZW(proj[8], proj[9], proj[10], proj[11]);
+      bindGroup.setValue('contactShadow', this._contactShadow);
+      bindGroup.setValue('contactScale', this._contactScale);
+      bindGroup.setValue('projZColumn', this._projZColumn);
+      bindGroup.setValue('viewProjMatrix', camera.viewProjectionMatrix);
+    }
     bindGroup.setTexture('depthTex', depthTexture, fetchSampler('clamp_nearest_nomip'));
     bindGroup.setTexture(
       UNIFORM_NAME_SHADOW_MAP,
@@ -244,7 +294,11 @@ export class ShadowMaskRenderer {
     return false;
   }
 
-  private createProgram(ctx: DrawContext, shadowMapParams: ShadowMapParams): GPUProgram {
+  private createProgram(
+    ctx: DrawContext,
+    shadowMapParams: ShadowMapParams,
+    contactShadow: boolean
+  ): GPUProgram {
     const device = ctx.device;
     const numCascades = shadowMapParams.numShadowCascades;
     const lightType = shadowMapParams.lightType;
@@ -316,6 +370,14 @@ export class ShadowMaskRenderer {
         this.invViewProjMatrix = pb.mat4().uniform(0);
         this.cameraNearFar = pb.vec2().uniform(0);
         this.invRenderSize = pb.vec2().uniform(0);
+        if (contactShadow) {
+          // x: length, y: 1 if the length is in world units, z: intensity, w: frame index mod 8
+          this.contactShadow = pb.vec4().uniform(0);
+          // Screen-relative length multiplier as (depth scale, constant)
+          this.contactScale = pb.vec2().uniform(0);
+          this.projZColumn = pb.vec4().uniform(0);
+          this.viewProjMatrix = pb.mat4().uniform(0);
+        }
         this.$outputs.color = pb.vec4();
         /**
          * Geometric normal recovered from the depth prepass.
@@ -513,6 +575,79 @@ export class ShadowMaskRenderer {
             }
           }
         );
+        if (contactShadow) {
+          // NDC z to device depth, the space UE's depth comparisons run in.
+          const toDeviceZ = (z: PBShaderExp) => (REVERSE_Z ? z : pb.add(pb.mul(z, 0.5), 0.5));
+          /**
+           * Screen-space contact shadow, following UE5 CastScreenSpaceShadowRay
+           * and ApplyContactShadowWithShadowTerms. Returns the visibility
+           * factor to multiply into the shadow term.
+           */
+          pb.func(
+            'zContactShadow',
+            [pb.vec3('worldPos'), pb.float('startDepth'), pb.vec3('L'), pb.vec2('pixel')],
+            function () {
+              this.$l.sceneDepth = pb.mul(this.startDepth, this.cameraNearFar.y);
+              this.$l.screenScale = pb.add(pb.mul(this.contactScale.x, this.sceneDepth), this.contactScale.y);
+              this.$l.rayLength = pb.mul(
+                this.contactShadow.x,
+                pb.mix(this.screenScale, 1, this.contactShadow.y)
+              );
+              this.$l.rayStartClip = pb.mul(this.viewProjMatrix, pb.vec4(this.worldPos, 1));
+              this.$l.rayDirClip = pb.mul(this.viewProjMatrix, pb.vec4(pb.mul(this.L, this.rayLength), 0));
+              this.$l.rayEndClip = pb.add(this.rayStartClip, this.rayDirClip);
+              this.$l.rayStart = pb.div(this.rayStartClip.xyz, this.rayStartClip.w);
+              this.$l.rayEnd = pb.div(this.rayEndClip.xyz, this.rayEndClip.w);
+              this.$l.rayStep = pb.sub(this.rayEnd, this.rayStart);
+              // UE offsets by +RayLength along view Z; view space looks down -Z here.
+              this.$l.rayDepthClip = pb.add(
+                this.rayStartClip,
+                pb.mul(this.projZColumn, pb.neg(this.rayLength))
+              );
+              this.$l.rayDepth = pb.div(this.rayDepthClip.xyz, this.rayDepthClip.w);
+              this.$l.stepSize = pb.float(1 / CONTACT_SHADOW_STEPS);
+              this.$l.dither = SSR_interleavedGradientNoise(this, this.pixel, this.contactShadow.w);
+              this.$l.compareTolerance = pb.mul(
+                pb.abs(pb.sub(toDeviceZ(this.rayDepth.z), toDeviceZ(this.rayStart.z))),
+                this.stepSize,
+                CONTACT_SHADOW_COMPARE_TOLERANCE_SCALE
+              );
+              this.$l.sampleTime = pb.add(pb.mul(pb.sub(this.dither, 0.5), this.stepSize), this.stepSize);
+              this.$for(pb.int('i'), 0, CONTACT_SHADOW_STEPS, function () {
+                this.$l.samplePos = pb.add(this.rayStart, pb.mul(this.rayStep, this.sampleTime));
+                this.$l.sampleUV = pb.add(pb.mul(this.samplePos.xy, 0.5), pb.vec2(0.5));
+                this.$l.sampleDepth = ShaderHelper.sampleLinearDepth(this, this.depthTex, this.sampleUV, 0);
+                // Avoid self-intersection with the start pixel (exact comparison
+                // due to point sampling the depth buffer).
+                this.$if(pb.notEqual(this.sampleDepth, this.startDepth), function () {
+                  this.$l.sampleDeviceZ = ShaderHelper.linearNormalizedToNonLinearDepth(
+                    this,
+                    this.sampleDepth,
+                    this.cameraNearFar
+                  );
+                  this.$l.rayDeviceZ = toDeviceZ(this.samplePos.z);
+                  // UE's DepthDiff under reverse-Z: negative once the ray point
+                  // is behind the scene surface.
+                  this.$l.depthDiff = REVERSE_Z
+                    ? pb.sub(this.rayDeviceZ, this.sampleDeviceZ)
+                    : pb.sub(this.sampleDeviceZ, this.rayDeviceZ);
+                  this.$if(
+                    pb.lessThan(pb.abs(pb.add(this.depthDiff, this.compareTolerance)), this.compareTolerance),
+                    function () {
+                      // Off screen masking, check NDC position against NDC boundary [-1,1]
+                      this.$if(pb.all(pb.lessThan(pb.abs(this.samplePos.xy), pb.vec2(1))), function () {
+                        this.$return(pb.sub(1, this.contactShadow.z));
+                      });
+                      this.$return(pb.float(1));
+                    }
+                  );
+                });
+                this.sampleTime = pb.add(this.sampleTime, this.stepSize);
+              });
+              this.$return(pb.float(1));
+            }
+          );
+        }
         pb.main(function () {
           this.$l.pos = ShaderHelper.samplePositionFromDepth(
             this,
@@ -567,6 +702,16 @@ export class ShadowMaskRenderer {
                 );
               }
             );
+          }
+          if (contactShadow) {
+            // Multiplied on top of the shadow map term and not subject to the
+            // shadow distance fade, as UE5 applies it to SurfaceShadow.
+            this.$if(pb.lessThan(this.pos.w, 1), function () {
+              this.factor = pb.mul(
+                this.factor,
+                this.zContactShadow(this.pos.xyz, this.pos.w, this.lightDir, this.$builtins.fragCoord.xy)
+              );
+            });
           }
           this.$outputs.color = pb.vec4(this.factor);
         });

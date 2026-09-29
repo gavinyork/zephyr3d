@@ -296,6 +296,64 @@ export function getPunctualLightClass(): SerializableClass {
           }
         },
         {
+          name: 'ContactShadowLength',
+          description:
+            'Adds sharp, short shadows where objects touch or sit close to each other, such as feet on the ground or small surface details. Larger values stretch these shadows further from the contact point. 0 turns them off',
+          type: 'float',
+          phase: 1,
+          default: 0,
+          options: {
+            minValue: 0,
+            maxValue: 0.1
+          },
+          get(this: PunctualLight, value) {
+            value.num[0] = this.contactShadowLength;
+          },
+          set(this: PunctualLight, value) {
+            this.contactShadowLength = value.num[0];
+          },
+          isValid(this: PunctualLight) {
+            return !!this.castShadow;
+          }
+        },
+        {
+          name: 'ContactShadowLengthInWS',
+          description:
+            'If true, the contact shadow length is a fixed world-space distance, so nearby and distant objects get equally long contact shadows. If false, the length follows screen size and distant contact shadows reach further',
+          type: 'bool',
+          phase: 1,
+          default: false,
+          get(this: PunctualLight, value) {
+            value.bool[0] = this.contactShadowLengthInWS;
+          },
+          set(this: PunctualLight, value) {
+            this.contactShadowLengthInWS = value.bool[0];
+          },
+          isValid(this: PunctualLight) {
+            return !!this.castShadow;
+          }
+        },
+        {
+          name: 'ContactShadowIntensity',
+          description: 'Darkness of the contact shadows, 0 is invisible and 1 is fully dark',
+          type: 'float',
+          phase: 1,
+          default: 1,
+          options: {
+            minValue: 0,
+            maxValue: 1
+          },
+          get(this: PunctualLight, value) {
+            value.num[0] = this.contactShadowCastingIntensity;
+          },
+          set(this: PunctualLight, value) {
+            this.contactShadowCastingIntensity = value.num[0];
+          },
+          isValid(this: PunctualLight) {
+            return !!this.castShadow;
+          }
+        },
+        {
           name: 'DOMLayerDistance',
           description:
             'Depth spanned by the deep opacity map layers, in world units along the light. Set it to roughly the thickness of the hair',

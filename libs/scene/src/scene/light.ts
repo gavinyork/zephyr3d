@@ -196,6 +196,12 @@ export class PunctualLight extends BaseLight {
   /** @internal */
   protected _transmission!: boolean;
   /** @internal */
+  protected _contactShadowLength!: number;
+  /** @internal */
+  protected _contactShadowLengthInWS!: boolean;
+  /** @internal */
+  protected _contactShadowCastingIntensity!: number;
+  /** @internal */
   protected _shadowMapper!: ShadowMapper;
   /**
    * Creates an instance of punctual light
@@ -216,6 +222,16 @@ export class PunctualLight extends BaseLight {
     }
     if (this._transmission == null) {
       this._transmission = false;
+    }
+    // Defaults follow UE5 ULightComponent (LightComponent.cpp).
+    if (this._contactShadowLength == null) {
+      this._contactShadowLength = 0;
+    }
+    if (this._contactShadowLengthInWS == null) {
+      this._contactShadowLengthInWS = false;
+    }
+    if (this._contactShadowCastingIntensity == null) {
+      this._contactShadowCastingIntensity = 1;
     }
     if (!this._shadowMapper) {
       this._shadowMapper = new ShadowMapper(this);
@@ -299,6 +315,55 @@ export class PunctualLight extends BaseLight {
     this.ensurePunctualState();
     this._transmission = !!b;
     return this;
+  }
+  /**
+   * Length of the screen-space ray traced towards the light for sharp contact
+   * shadows. Zero disables them.
+   *
+   * @remarks
+   * Mirrors UE5's `ContactShadowLength`. By default the length is a fraction of
+   * the screen height, so the traced distance grows with view depth; set
+   * {@link PunctualLight.contactShadowLengthInWS} to measure it in world units
+   * instead. Only takes effect when the light casts shadows and the camera has
+   * the screen-space shadow mask enabled. The trace is dithered per frame and
+   * relies on TAA to resolve the noise.
+   *
+   * @public
+   */
+  get contactShadowLength() {
+    this.ensurePunctualState();
+    return this._contactShadowLength;
+  }
+  set contactShadowLength(val) {
+    this.ensurePunctualState();
+    this._contactShadowLength = Math.max(0, Number(val) || 0);
+  }
+  /**
+   * Whether {@link PunctualLight.contactShadowLength} is in world units rather
+   * than a fraction of the screen height.
+   *
+   * @public
+   */
+  get contactShadowLengthInWS() {
+    this.ensurePunctualState();
+    return this._contactShadowLengthInWS;
+  }
+  set contactShadowLengthInWS(val) {
+    this.ensurePunctualState();
+    this._contactShadowLengthInWS = !!val;
+  }
+  /**
+   * Darkness of contact shadows, 0 = none, 1 = fully shadowed.
+   *
+   * @public
+   */
+  get contactShadowCastingIntensity() {
+    this.ensurePunctualState();
+    return this._contactShadowCastingIntensity;
+  }
+  set contactShadowCastingIntensity(val) {
+    this.ensurePunctualState();
+    this._contactShadowCastingIntensity = Math.min(1, Math.max(0, Number(val) || 0));
   }
   /**
    * {@inheritDoc BaseLight.isPunctualLight}

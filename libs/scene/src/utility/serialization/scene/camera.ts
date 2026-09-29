@@ -123,6 +123,19 @@ export function getCameraClass(): SerializableClass {
           }
         },
         {
+          name: 'ContactShadows',
+          description:
+            'Adds sharp shadows where objects touch, for lights with a contact shadow length. Needs ScreenSpaceShadow',
+          type: 'bool',
+          default: true,
+          get(this: Camera, value) {
+            value.bool[0] = this.contactShadows;
+          },
+          set(this: Camera, value) {
+            this.contactShadows = value.bool[0];
+          }
+        },
+        {
           name: 'OITMode',
           type: 'string',
           default: 'none',
