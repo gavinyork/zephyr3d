@@ -3,6 +3,7 @@ import { Vector2, Vector3, Vector4, DWeakRef, DRef } from '@zephyr3d/base';
 import type {
   BindGroup,
   GPUDataBuffer,
+  Texture2D,
   PBFunctionScope,
   PBInsideFunctionScope,
   PBShaderExp,
@@ -14,6 +15,7 @@ import type { Camera } from '../../camera';
 import { RENDER_PASS_TYPE_LIGHT } from '../../values';
 import type { ClipmapTerrain } from './terrain-cm';
 import { GRASS_LOD_FADE_BAND, grassDensityLod } from './grass_gpu';
+import { fetchSampler } from '../../utility/misc';
 
 /** Vertices of a high detail blade: 7 pairs across the blade and one tip vertex */
 export const BLADE_VERTEX_PAIRS = 7;
@@ -47,6 +49,10 @@ export function createBladeIndices(): Uint16Array<ArrayBuffer> {
  * the base-tip line by the bend, and the vertex steps sideways by the tapered width. The normal is
  * the cross product of the curve derivative and the width direction.
  *
+ * Color follows the talk too: a gradient along the blade whose column is picked by the blade's
+ * clump (a color texture, or root and tip colors with a per-clump brightness), and an ambient
+ * occlusion that darkens toward the root, where the other blades hide the sky.
+ *
  * Instance data is written by the GPU placement pass (GrassGpuPlacement), four vec4 per blade:
  * - (base position xyz, density LOD hash; +2 when flagged as occluded)
  * - (facing angle, previous facing angle, wind push, previous wind push)
@@ -63,7 +69,9 @@ export class ClipmapBladeGrassMaterial
   private readonly _terrain: DWeakRef<ClipmapTerrain>;
   /** @internal */
   private readonly _instances: DRef<GPUDataBuffer>;
-  /** (taper, tip detail, unused, unused) @internal */
+  /** @internal */
+  private readonly _colorMap: DRef<Texture2D>;
+  /** (taper, tip detail, clump color variation, root occlusion) @internal */
   private readonly _shape: Vector4;
   /** @internal */
   private readonly _rootColor: Vector4;
@@ -83,6 +91,8 @@ export class ClipmapBladeGrassMaterial
   private static readonly _tmpPos = new Vector3();
   /** @internal */
   private static readonly FEATURE_OCCLUSION_DEBUG = this.defineFeature();
+  /** @internal */
+  private static readonly FEATURE_COLOR_MAP = this.defineFeature();
   constructor(terrain: ClipmapTerrain) {
     super();
     this.metallic = 0;
@@ -91,7 +101,8 @@ export class ClipmapBladeGrassMaterial
     this.specularFactor = new Vector4(1, 1, 1, 0.3);
     this._terrain = new DWeakRef(terrain);
     this._instances = new DRef();
-    this._shape = new Vector4(0.7, 1.5, 0, 0);
+    this._colorMap = new DRef();
+    this._shape = new Vector4(0.7, 1.5, 0.1, 0.5);
     this._rootColor = new Vector4(0.06, 0.1, 0.02, 1);
     this._tipColor = new Vector4(0.35, 0.45, 0.12, 1);
     this._distanceFade = new Vector2(0, 0);
@@ -100,6 +111,7 @@ export class ClipmapBladeGrassMaterial
     this._drawDistance = 0;
     this._farDensity = 1;
     this.useFeature(ClipmapBladeGrassMaterial.FEATURE_OCCLUSION_DEBUG, false);
+    this.useFeature(ClipmapBladeGrassMaterial.FEATURE_COLOR_MAP, false);
   }
   clone() {
     const other = new ClipmapBladeGrassMaterial(this._terrain.get()!);
@@ -109,6 +121,7 @@ export class ClipmapBladeGrassMaterial
   copyFrom(other: this) {
     super.copyFrom(other);
     this._shape.set(other._shape);
+    this.colorMap = other.colorMap;
     this._rootColor.set(other._rootColor);
     this._tipColor.set(other._tipColor);
     this._distanceFade.set(other._distanceFade);
@@ -160,6 +173,42 @@ export class ClipmapBladeGrassMaterial
     val = Math.min(4, Math.max(1, val));
     if (val !== this._shape.y) {
       this._shape.y = val;
+      this.uniformChanged();
+    }
+  }
+  /** How much the brightness changes from clump to clump, 0 for none */
+  get clumpColorVariation() {
+    return this._shape.z;
+  }
+  set clumpColorVariation(val: number) {
+    val = Math.min(1, Math.max(0, val));
+    if (val !== this._shape.z) {
+      this._shape.z = val;
+      this.uniformChanged();
+    }
+  }
+  /** How much the ambient light darkens toward the root, 0 for none, 1 for black at the root */
+  get rootOcclusion() {
+    return this._shape.w;
+  }
+  set rootOcclusion(val: number) {
+    val = Math.min(1, Math.max(0, val));
+    if (val !== this._shape.w) {
+      this._shape.w = val;
+      this.uniformChanged();
+    }
+  }
+  /**
+   * Optional color texture: V from the root (0) to the tip (1), U picked per clump. Replaces the
+   * root and tip colors.
+   */
+  get colorMap(): Nullable<Texture2D> {
+    return this._colorMap.get();
+  }
+  set colorMap(val: Nullable<Texture2D>) {
+    if (val !== this._colorMap.get()) {
+      this._colorMap.set(val);
+      this.useFeature(ClipmapBladeGrassMaterial.FEATURE_COLOR_MAP, !!val);
       this.uniformChanged();
     }
   }
@@ -223,6 +272,9 @@ export class ClipmapBladeGrassMaterial
     if (this.needFragmentColor(ctx)) {
       bindGroup.setValue('zRootColor', this._rootColor);
       bindGroup.setValue('zTipColor', this._tipColor);
+      if (this._colorMap.get()) {
+        bindGroup.setTexture('zColorMap', this._colorMap.get()!, fetchSampler('clamp_linear'));
+      }
     }
   }
   /**
@@ -292,6 +344,7 @@ export class ClipmapBladeGrassMaterial
     scope.$l.first = pb.mul(pb.uint(scope.$builtins.instanceIndex), BLADE_INSTANCE_VEC4);
     scope.$l.inst0 = scope.zBladeInstances.at(scope.first);
     scope.$l.inst1 = scope.zBladeInstances.at(pb.add(scope.first, 1));
+    scope.$l.inst2 = scope.zBladeInstances.at(pb.add(scope.first, 2));
     scope.$l.inst3 = scope.zBladeInstances.at(pb.add(scope.first, 3));
     scope.$l.base = scope.inst0.xyz;
     // The placement pass adds 2 to the hash of blades it flags as occluded
@@ -327,6 +380,13 @@ export class ClipmapBladeGrassMaterial
     scope.$outputs.worldPos = scope.worldPos;
     scope.$outputs.worldNorm = pb.normalize(pb.cross(scope.widthDir, scope.tangent));
     scope.$outputs.zBladeT = scope.t;
+    scope.$outputs.zBladeClumpColor = scope.inst2.y;
+    // Per-clump brightness, and ambient occlusion darkening toward the root
+    scope.$outputs.zBladeBrightness = pb.max(
+      0,
+      pb.add(1, pb.mul(scope.zBladeShape.z, pb.sub(pb.mul(scope.inst2.y, 2), 1)))
+    );
+    scope.$outputs.zBladeAO = pb.sub(1, pb.mul(scope.zBladeShape.w, pb.sub(1, scope.t)));
     ShaderHelper.setClipSpacePosition(
       scope,
       pb.mul(ShaderHelper.getViewProjectionMatrix(scope), pb.vec4(scope.worldPos, 1))
@@ -344,7 +404,18 @@ export class ClipmapBladeGrassMaterial
     if (this.needFragmentColor()) {
       scope.zRootColor = pb.vec4().uniform(2);
       scope.zTipColor = pb.vec4().uniform(2);
-      scope.$l.albedo = pb.mix(scope.zRootColor, scope.zTipColor, scope.$inputs.zBladeT);
+      if (this.featureUsed<boolean>(ClipmapBladeGrassMaterial.FEATURE_COLOR_MAP)) {
+        scope.zColorMap = pb.tex2D().uniform(2);
+        scope.$l.albedo = pb.textureSampleLevel(
+          scope.zColorMap,
+          pb.vec2(scope.$inputs.zBladeClumpColor, scope.$inputs.zBladeT),
+          0
+        );
+      } else {
+        scope.$l.albedo = pb.mix(scope.zRootColor, scope.zTipColor, scope.$inputs.zBladeT);
+      }
+      // Per-clump brightness: splashes of variation across the field
+      scope.albedo = pb.vec4(pb.mul(scope.albedo.rgb, scope.$inputs.zBladeBrightness), 1);
       if (this.occlusionDebug) {
         scope.albedo = pb.vec4(
           pb.mix(scope.albedo.rgb, pb.vec3(1, 0, 0), scope.$inputs.zOccludedFlag),
@@ -373,6 +444,10 @@ export class ClipmapBladeGrassMaterial
       this.outputFragmentColor(scope, scope.$inputs.worldPos, null);
     }
   }
+  /** Ambient occlusion darkening toward the root, see MeshMaterial.getAmbientOcclusionFactor */
+  getAmbientOcclusionFactor(scope: PBInsideFunctionScope): Nullable<PBShaderExp> {
+    return scope.$inputs.zBladeAO;
+  }
   protected updateRenderStates(pass: number, stateSet: RenderStateSet, ctx: DrawContext) {
     super.updateRenderStates(pass, stateSet, ctx);
     stateSet.useRasterizerState().setCullMode('none');
@@ -380,6 +455,7 @@ export class ClipmapBladeGrassMaterial
   protected onDispose() {
     super.onDispose();
     this._instances.dispose();
+    this._colorMap.dispose();
     this._terrain.dispose();
   }
 }

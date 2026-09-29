@@ -21,8 +21,8 @@ const MAX_CELLS_PER_TEXEL = 8;
 const DEFAULT_DRAW_DISTANCE = 150;
 /** Default fraction of blades kept at the draw distance */
 const DEFAULT_FAR_DENSITY = 0.25;
-/** Default shape of procedural blades, see GrassBladeShape */
-const DEFAULT_BLADE_SHAPE = [0.5, 0.3, 0.04, 0.2, 0.25, 0.2, 0.15, 0.1];
+/** Default shape and clumping of procedural blades, see GrassBladeShape */
+const DEFAULT_BLADE_SHAPE = [0.5, 0.3, 0.04, 0.2, 0.25, 0.2, 0.15, 0.1, 1.5, 0.3, 0.15, 0.3, 0.2, 0, 0, 0];
 
 function distanceSqToAABB(x: number, y: number, z: number, aabb: AABB) {
   const dx = Math.max(aabb.minPoint.x - x, 0, x - aabb.maxPoint.x);
@@ -154,7 +154,9 @@ export class GrassLayer extends Disposable {
     this._kind = kind;
     this._bladeShape = new Float32Array(DEFAULT_BLADE_SHAPE);
     if (kind === 'blade') {
-      this._material = new DRef(new ClipmapBladeGrassMaterial(terrain));
+      const material = new ClipmapBladeGrassMaterial(terrain);
+      material.colorMap = albedoMap ?? null;
+      this._material = new DRef(material);
     } else {
       const material = new ClipmapGrassMaterial(terrain);
       material.albedoTexture = albedoMap ?? null;
@@ -243,25 +245,28 @@ export class GrassLayer extends Disposable {
     this._material.get()!.uniformChanged();
   }
   /**
-   * Sets the albedo texture of grass blades in this layer. Card layers only.
+   * Sets the albedo texture of grass blades in this layer: the card texture of card layers, the
+   * color map of blade layers (see {@link GrassLayer.colorMap})
    * @param albedoMap - Albedo texture to set
    */
-  setAlbedoMap(albedoMap: Texture2D) {
+  setAlbedoMap(albedoMap: Nullable<Texture2D>) {
     const material = this._material.get()!;
     if (material instanceof ClipmapGrassMaterial) {
       material.albedoTexture = albedoMap;
       if (albedoMap) {
         material.setTextureSize(albedoMap.width, albedoMap.height);
       }
+    } else {
+      material.colorMap = albedoMap;
     }
   }
   /**
    * Gets the albedo texture of grass blades in this layer
-   * @returns - Albedo texture of grass blades in this layer, null for blade layers
+   * @returns - The card texture of card layers, the color map of blade layers
    */
   getAlbedoMap() {
     const material = this._material.get()!;
-    return material instanceof ClipmapGrassMaterial ? material.albedoTexture : null;
+    return material instanceof ClipmapGrassMaterial ? material.albedoTexture : material.colorMap;
   }
   /** @internal */
   private get bladeMaterial() {
@@ -324,6 +329,95 @@ export class GrassLayer extends Disposable {
   }
   set bendRandomness(val: number) {
     this.setShape(7, Math.min(1, Math.max(0, val)));
+  }
+  /**
+   * Typical size of a clump of blades, in world units. Blades of a clump share their height,
+   * direction and color, so the field breaks up into patches this big. Blade layers only.
+   */
+  get clumpSize() {
+    return this._bladeShape[8];
+  }
+  set clumpSize(val: number) {
+    this.setShape(8, Math.max(0.01, val));
+  }
+  /**
+   * How much the height changes from clump to clump: 0 keeps every patch the same height,
+   * higher values give taller and shorter patches. Blade layers only.
+   */
+  get clumpHeightVariation() {
+    return this._bladeShape[9];
+  }
+  set clumpHeightVariation(val: number) {
+    this.setShape(9, Math.min(1, Math.max(0, val)));
+  }
+  /**
+   * How much the blades of a clump gather toward its center: 0 spreads them evenly, 1 bunches
+   * them into tufts. Blade layers only.
+   */
+  get clumpPull() {
+    return this._bladeShape[10];
+  }
+  set clumpPull(val: number) {
+    this.setShape(10, Math.min(1, Math.max(0, val)));
+  }
+  /**
+   * How much the blades of a clump lean the same way: 0 lets each blade face its own random way,
+   * 1 combs the whole patch in one direction. Blade layers only.
+   */
+  get clumpSameDirection() {
+    return this._bladeShape[11];
+  }
+  set clumpSameDirection(val: number) {
+    this.setShape(11, Math.min(1, Math.max(0, val)));
+  }
+  /**
+   * How much the blades lean out from the center of their clump, so each patch splays open like a
+   * tuft. Blade layers only.
+   */
+  get clumpFaceAway() {
+    return this._bladeShape[12];
+  }
+  set clumpFaceAway(val: number) {
+    this.setShape(12, Math.min(1, Math.max(0, val)));
+  }
+  /**
+   * How much the brightness changes from clump to clump, giving the field a patchy look.
+   * Blade layers only.
+   */
+  get clumpColorVariation() {
+    return this.bladeMaterial?.clumpColorVariation ?? 0;
+  }
+  set clumpColorVariation(val: number) {
+    const material = this.bladeMaterial;
+    if (material) {
+      material.clumpColorVariation = val;
+    }
+  }
+  /**
+   * Optional color texture of the blades: V runs from the root (0) to the tip (1), U picks a
+   * column per clump. Replaces the root and tip colors when set. Blade layers only.
+   */
+  get colorMap(): Nullable<Texture2D> {
+    return this.bladeMaterial?.colorMap ?? null;
+  }
+  set colorMap(val: Nullable<Texture2D>) {
+    const material = this.bladeMaterial;
+    if (material) {
+      material.colorMap = val;
+    }
+  }
+  /**
+   * How much the ambient light darkens toward the root, where the neighboring blades hide the
+   * sky: 0 lights the whole blade evenly, 1 leaves the root black. Blade layers only.
+   */
+  get rootOcclusion() {
+    return this.bladeMaterial?.rootOcclusion ?? 0;
+  }
+  set rootOcclusion(val: number) {
+    const material = this.bladeMaterial;
+    if (material) {
+      material.rootOcclusion = val;
+    }
   }
   /**
    * How much the blades narrow toward the tip: 0 keeps them wide to the end, 1 narrows them evenly

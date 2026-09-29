@@ -1614,6 +1614,12 @@ export function mixinPBRCommon<T extends typeof MeshMaterial>(BaseCls: T) {
             this.$l.ambientOcclusion = pb.float(1);
             this.$l.occlusion = envLightStrength;
           }
+          const customOcclusion = that.getAmbientOcclusionFactor(this);
+          if (customOcclusion) {
+            this.$l.customOcclusion = customOcclusion;
+            this.ambientOcclusion = pb.mul(this.ambientOcclusion, this.customOcclusion);
+            this.occlusion = pb.mul(this.occlusion, this.customOcclusion);
+          }
           this.$l.diffuseOcclusion = useReprojectedSSGI ? this.ambientOcclusion : this.occlusion;
           this.$l.NoV = pb.clamp(pb.dot(this.normal, this.viewVec), 0.0001, 1);
           if (that.sheen) {

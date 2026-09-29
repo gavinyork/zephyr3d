@@ -5,7 +5,7 @@ import { Vector4 } from '@zephyr3d/base';
 import type { GrassLayer } from '@zephyr3d/scene';
 
 /** Rows of the procedural blade settings, see renderBladeSettings() */
-const BLADE_SETTING_ROWS = 10;
+const BLADE_SETTING_ROWS = 17;
 
 export class GrassBrush extends BaseTerrainBrush {
   brush() {}
@@ -94,6 +94,16 @@ export class GrassBrush extends BaseTerrainBrush {
     slider('BendRandomness', layer.bendRandomness, 0, 1, (v) => (layer.bendRandomness = v));
     slider('Taper', layer.taper, 0, 1, (v) => (layer.taper = v));
     slider('TipDetail', layer.tipDetail, 1, 4, (v) => (layer.tipDetail = v));
+    const clumpSize = [layer.clumpSize] as [number];
+    if (ImGui.DragFloat('ClumpSize', clumpSize, 0.01, 0.01, 100)) {
+      layer.clumpSize = clumpSize[0];
+    }
+    slider('ClumpHeightVariation', layer.clumpHeightVariation, 0, 1, (v) => (layer.clumpHeightVariation = v));
+    slider('ClumpPull', layer.clumpPull, 0, 1, (v) => (layer.clumpPull = v));
+    slider('ClumpSameDirection', layer.clumpSameDirection, 0, 1, (v) => (layer.clumpSameDirection = v));
+    slider('ClumpFaceAway', layer.clumpFaceAway, 0, 1, (v) => (layer.clumpFaceAway = v));
+    slider('ClumpColorVariation', layer.clumpColorVariation, 0, 1, (v) => (layer.clumpColorVariation = v));
+    slider('RootOcclusion', layer.rootOcclusion, 0, 1, (v) => (layer.rootOcclusion = v));
     const color = (label: string, value: Vector4, set: (v: Vector4) => void) => {
       const c = [value.x, value.y, value.z] as [number, number, number];
       if (ImGui.ColorEdit3(label, c)) {

@@ -50,11 +50,15 @@ export type GrassLayerKind = 'card' | 'blade';
 const INSTANCE_VEC4: Record<GrassLayerKind, number> = { card: 1, blade: 4 };
 /** Seed offset of the procedural blade hashes, clear of the card hashes of every layer */
 const BLADE_SEED_BASE = 65536;
+/** Number of floats in GrassBladeShape */
+export const GRASS_BLADE_SHAPE_SIZE = 16;
 /**
- * Procedural blade shape parameters sent to the placement pass:
- * (height, height randomness, width, width randomness, tilt, tilt randomness, bend, bend randomness).
- * Height and width randomness are fractions of the base value, tilt and bend randomness absolute
- * amounts, each applied as base + randomness * [-1, 1).
+ * Procedural blade parameters sent to the placement pass, 16 floats:
+ * - [0, 8): height, height randomness, width, width randomness, tilt, tilt randomness, bend,
+ *   bend randomness. Height and width randomness are fractions of the base value, tilt and bend
+ *   randomness absolute amounts, each applied as base + randomness * [-1, 1).
+ * - [8, 13): clump size, clump height variation, pull toward the clump point, same direction
+ *   within a clump, facing away from the clump point.
  * @internal
  */
 export type GrassBladeShape = Float32Array<ArrayBuffer>;
@@ -117,6 +121,8 @@ export class GrassGpuPlacement extends Disposable {
   private readonly _baseVertexBuffer: DRef<StructuredBuffer>;
   private readonly _shape0: Vector4;
   private readonly _shape1: Vector4;
+  private readonly _clump0: Vector4;
+  private readonly _clump1: Vector4;
   private readonly _indexBuffer: DRef<IndexBuffer>;
   private readonly _args: Uint32Array<ArrayBuffer>;
   private readonly _window: Vector4;
@@ -146,6 +152,8 @@ export class GrassGpuPlacement extends Disposable {
     this._kind = kind;
     this._shape0 = new Vector4();
     this._shape1 = new Vector4();
+    this._clump0 = new Vector4();
+    this._clump1 = new Vector4();
     this._densityTexture = new DRef();
     this._instanceBuffer = new DRef();
     this._argsBuffer = new DRef(getDevice().createBuffer(5 * 4, { usage: 'indirect', storage: true }));
@@ -270,6 +278,8 @@ export class GrassGpuPlacement extends Disposable {
       const maxWidth = (bladeShape[2] * (1 + Math.abs(bladeShape[3]))) / lod[1];
       this._shape0.setXYZW(bladeShape[0], bladeShape[1], bladeShape[2], bladeShape[3]);
       this._shape1.setXYZW(bladeShape[4], bladeShape[5], bladeShape[6], bladeShape[7]);
+      this._clump0.setXYZW(1 / Math.max(1e-3, bladeShape[8]), bladeShape[9], bladeShape[10], bladeShape[11]);
+      this._clump1.setXYZW(bladeShape[12], 0, 0, 0);
       this._params.setXYZW(seed * 4, drawDistance, maxHeight + maxWidth * 0.5, 0);
       bladeHeight = maxHeight;
     } else {
@@ -317,6 +327,8 @@ export class GrassGpuPlacement extends Disposable {
     if (this._kind === 'blade') {
       bindGroup.setValue('shape0', this._shape0);
       bindGroup.setValue('shape1', this._shape1);
+      bindGroup.setValue('clump0', this._clump0);
+      bindGroup.setValue('clump1', this._clump1);
     }
     // Any texture of the right sample type does when occlusion is off. Declared unfilterable
     // (read with textureLoad only), so the sampler bound with it must be a non-filtering one
@@ -426,6 +438,10 @@ export class GrassGpuPlacement extends Disposable {
             // See GrassBladeShape
             this.shape0 = pb.vec4().uniform(0);
             this.shape1 = pb.vec4().uniform(0);
+            // (1 / clump size, height variation, pull to the clump point, same direction)
+            this.clump0 = pb.vec4().uniform(0);
+            // (face away from the clump point, unused...)
+            this.clump1 = pb.vec4().uniform(0);
           }
           this.heightPyramid = pb.tex2D().sampleType('unfilterable-float').uniform(0);
           this.occludedFlag = pb.atomic_uint().workgroup();
@@ -631,10 +647,66 @@ export class GrassGpuPlacement extends Disposable {
                     this.grassHash(this.cx, this.cz, pb.add(this.seed, 2))
                   ),
                   function () {
-                    this.$l.xz = pb.add(
-                      this.region.xy,
-                      pb.mul(this.uv, pb.sub(this.region.zw, this.region.xy))
-                    );
+                    this.$l.regionSize = pb.sub(this.region.zw, this.region.xy);
+                    if (blade) {
+                      // Clumps, after "Procedural Grass in Ghost of Tsushima": a procedural
+                      // Voronoi over the nearest 3x3 points of a grid, each jittered by a hash;
+                      // the blade belongs to the clump of the nearest point
+                      this.$l.bseed = pb.add(pb.mul(this.seed, 16), pb.uint(BLADE_SEED_BASE));
+                      this.$l.cp = pb.mul(
+                        pb.add(this.region.xy, pb.mul(this.uv, this.regionSize)),
+                        this.clump0.x
+                      );
+                      this.$l.cellBase = pb.floor(this.cp);
+                      this.$l.bestDist = pb.float(1e9);
+                      this.$l.clumpPoint = this.cp;
+                      this.$l.clumpCell = pb.uvec2(0);
+                      this.$l.cellF = pb.vec2(0);
+                      this.$l.cellU = pb.uvec2(0);
+                      this.$l.point = pb.vec2(0);
+                      this.$l.pointDist = pb.float(0);
+                      for (let dz = -1; dz <= 1; dz++) {
+                        for (let dx = -1; dx <= 1; dx++) {
+                          this.cellF = pb.add(this.cellBase, pb.vec2(dx, dz));
+                          // Negative cells wrap to large unsigned values, all the hash needs
+                          this.cellU = pb.uvec2(pb.ivec2(this.cellF));
+                          this.point = pb.add(
+                            this.cellF,
+                            pb.vec2(
+                              this.grassHash(this.cellU.x, this.cellU.y, pb.add(this.bseed, 8)),
+                              this.grassHash(this.cellU.x, this.cellU.y, pb.add(this.bseed, 9))
+                            )
+                          );
+                          this.pointDist = pb.dot(pb.sub(this.point, this.cp), pb.sub(this.point, this.cp));
+                          this.$if(pb.lessThan(this.pointDist, this.bestDist), function () {
+                            this.bestDist = this.pointDist;
+                            this.clumpPoint = this.point;
+                            this.clumpCell = this.cellU;
+                          });
+                        }
+                      }
+                      this.$l.clumpCenter = pb.div(this.clumpPoint, this.clump0.x);
+                      this.$l.clumpAngle = pb.mul(
+                        this.grassHash(this.clumpCell.x, this.clumpCell.y, pb.add(this.bseed, 10)),
+                        Math.PI * 2
+                      );
+                      this.$l.clumpHeight = pb.sub(
+                        pb.mul(this.grassHash(this.clumpCell.x, this.clumpCell.y, pb.add(this.bseed, 11)), 2),
+                        1
+                      );
+                      this.$l.clumpColor = this.grassHash(
+                        this.clumpCell.x,
+                        this.clumpCell.y,
+                        pb.add(this.bseed, 12)
+                      );
+                      // Pull the blade toward its clump point before it is placed on the terrain
+                      this.uv = pb.mix(
+                        this.uv,
+                        pb.div(pb.sub(this.clumpCenter, this.region.xy), this.regionSize),
+                        this.clump0.z
+                      );
+                    }
+                    this.$l.xz = pb.add(this.region.xy, pb.mul(this.uv, this.regionSize));
                     this.$l.height = pb.add(
                       pb.mul(pb.textureSampleLevel(this.heightMap, this.uv, 0).r, this.posScale.y),
                       this.posScale.w
@@ -684,12 +756,12 @@ export class GrassGpuPlacement extends Disposable {
                         this.instances.setAt(this.slot, pb.vec4(this.uv, this.angle, this.flaggedHash));
                       } else {
                         // Layout: see ClipmapBladeGrassMaterial
-                        this.$l.bseed = pb.add(pb.mul(this.seed, 16), pb.uint(BLADE_SEED_BASE));
                         const signedHash = (scope: PBInsideFunctionScope, k: number) =>
                           pb.sub(pb.mul(scope.grassHash(scope.cx, scope.cz, pb.add(scope.bseed, k)), 2), 1);
                         this.$l.bladeHeight = pb.mul(
                           this.shape0.x,
-                          pb.max(0, pb.add(1, pb.mul(this.shape0.y, signedHash(this, 0))))
+                          pb.max(0, pb.add(1, pb.mul(this.shape0.y, signedHash(this, 0)))),
+                          pb.max(0, pb.add(1, pb.mul(this.clump0.y, this.clumpHeight)))
                         );
                         this.$l.bladeWidth = pb.mul(
                           this.shape0.z,
@@ -702,12 +774,31 @@ export class GrassGpuPlacement extends Disposable {
                         );
                         this.$l.bend = pb.add(this.shape1.z, pb.mul(this.shape1.w, signedHash(this, 3)));
                         this.$l.bladeHash = this.grassHash(this.cx, this.cz, pb.add(this.bseed, 4));
+                        // Facing: toward the clump's shared direction, then away from its point
+                        this.$l.clumpDir = pb.vec2(pb.cos(this.clumpAngle), pb.sin(this.clumpAngle));
+                        this.$l.facing = pb.mix(
+                          pb.vec2(pb.cos(this.angle), pb.sin(this.angle)),
+                          this.clumpDir,
+                          this.clump0.w
+                        );
+                        this.$l.away = pb.sub(this.xz, this.clumpCenter);
+                        this.$l.awayLen = pb.length(this.away);
+                        this.$if(pb.greaterThan(this.awayLen, 1e-5), function () {
+                          this.facing = pb.mix(this.facing, pb.div(this.away, this.awayLen), this.clump1.x);
+                        });
+                        this.$if(pb.lessThan(pb.dot(this.facing, this.facing), 1e-8), function () {
+                          this.facing = this.clumpDir;
+                        });
+                        this.$l.facingAngle = pb.atan2(this.facing.y, this.facing.x);
                         this.$l.first = pb.mul(this.slot, INSTANCE_VEC4.blade);
                         this.instances.setAt(this.first, pb.vec4(this.base, this.flaggedHash));
-                        this.instances.setAt(pb.add(this.first, 1), pb.vec4(this.angle, this.angle, 0, 0));
+                        this.instances.setAt(
+                          pb.add(this.first, 1),
+                          pb.vec4(this.facingAngle, this.facingAngle, 0, 0)
+                        );
                         this.instances.setAt(
                           pb.add(this.first, 2),
-                          pb.vec4(this.angle, 0, 0, this.bladeHash)
+                          pb.vec4(this.clumpAngle, this.clumpColor, 0, this.bladeHash)
                         );
                         this.instances.setAt(
                           pb.add(this.first, 3),

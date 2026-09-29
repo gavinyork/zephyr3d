@@ -322,6 +322,20 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
     return (offset << 2) | (numComponents - 1);
   }
   /**
+   * Fragment-stage hook for materials that know their own ambient occlusion without a texture,
+   * such as procedural grass darkening toward the root.
+   *
+   * Lit materials multiply it into the occlusion of the indirect (environment) lighting, on top of
+   * the occlusion texture when there is one. Called inside the lighting functions of the fragment
+   * shader, where varyings are readable.
+   *
+   * @param _scope - Current fragment shader scope
+   * @returns Occlusion factor in [0, 1] (float), or null for none
+   */
+  getAmbientOcclusionFactor(_scope: PBInsideFunctionScope): Nullable<PBShaderExp> {
+    return null;
+  }
+  /**
    * Read an encoded per-instance uniform in shader code.
    *
    * Encoded index packs: vector index, component offset, and component count.

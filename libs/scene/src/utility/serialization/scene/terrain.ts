@@ -32,6 +32,13 @@ type GrassLayerData = {
     bendRandomness?: number;
     taper?: number;
     tipDetail?: number;
+    clumpSize?: number;
+    clumpHeightVariation?: number;
+    clumpPull?: number;
+    clumpSameDirection?: number;
+    clumpFaceAway?: number;
+    clumpColorVariation?: number;
+    rootOcclusion?: number;
     rootColor?: [number, number, number];
     tipColor?: [number, number, number];
   };
@@ -288,6 +295,13 @@ export function getTerrainClass(manager: ResourceManager): SerializableClass {
                   bendRandomness: layer.bendRandomness,
                   taper: layer.taper,
                   tipDetail: layer.tipDetail,
+                  clumpSize: layer.clumpSize,
+                  clumpHeightVariation: layer.clumpHeightVariation,
+                  clumpPull: layer.clumpPull,
+                  clumpSameDirection: layer.clumpSameDirection,
+                  clumpFaceAway: layer.clumpFaceAway,
+                  clumpColorVariation: layer.clumpColorVariation,
+                  rootOcclusion: layer.rootOcclusion,
                   rootColor: [layer.rootColor.x, layer.rootColor.y, layer.rootColor.z],
                   tipColor: [layer.tipColor.x, layer.tipColor.y, layer.tipColor.z]
                 };
@@ -333,6 +347,14 @@ export function getTerrainClass(manager: ResourceManager): SerializableClass {
                 grassLayer.bendRandomness = blade.bendRandomness ?? grassLayer.bendRandomness;
                 grassLayer.taper = blade.taper ?? grassLayer.taper;
                 grassLayer.tipDetail = blade.tipDetail ?? grassLayer.tipDetail;
+                grassLayer.clumpSize = blade.clumpSize ?? grassLayer.clumpSize;
+                grassLayer.clumpHeightVariation =
+                  blade.clumpHeightVariation ?? grassLayer.clumpHeightVariation;
+                grassLayer.clumpPull = blade.clumpPull ?? grassLayer.clumpPull;
+                grassLayer.clumpSameDirection = blade.clumpSameDirection ?? grassLayer.clumpSameDirection;
+                grassLayer.clumpFaceAway = blade.clumpFaceAway ?? grassLayer.clumpFaceAway;
+                grassLayer.clumpColorVariation = blade.clumpColorVariation ?? grassLayer.clumpColorVariation;
+                grassLayer.rootOcclusion = blade.rootOcclusion ?? grassLayer.rootOcclusion;
                 if (blade.rootColor) {
                   grassLayer.rootColor = new Vector4(
                     blade.rootColor[0],
