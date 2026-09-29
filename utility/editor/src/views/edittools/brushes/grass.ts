@@ -5,7 +5,7 @@ import { Vector4 } from '@zephyr3d/base';
 import type { GrassLayer } from '@zephyr3d/scene';
 
 /** Rows of the procedural blade settings, see renderBladeSettings() */
-const BLADE_SETTING_ROWS = 17;
+const BLADE_SETTING_ROWS = 22;
 
 export class GrassBrush extends BaseTerrainBrush {
   brush() {}
@@ -104,6 +104,11 @@ export class GrassBrush extends BaseTerrainBrush {
     slider('ClumpFaceAway', layer.clumpFaceAway, 0, 1, (v) => (layer.clumpFaceAway = v));
     slider('ClumpColorVariation', layer.clumpColorVariation, 0, 1, (v) => (layer.clumpColorVariation = v));
     slider('RootOcclusion', layer.rootOcclusion, 0, 1, (v) => (layer.rootOcclusion = v));
+    slider('Roundness', layer.roundness, 0, 2, (v) => (layer.roundness = v));
+    slider('ViewThickening', layer.viewThickening, 0, 2, (v) => (layer.viewThickening = v));
+    slider('FarNormalStart', layer.farNormalStart, 0, 500, (v) => (layer.farNormalStart = v));
+    slider('FarNormalEnd', layer.farNormalEnd, 0, 500, (v) => (layer.farNormalEnd = v));
+    slider('FarRoughness', layer.farRoughness, 0, 1, (v) => (layer.farRoughness = v));
     const color = (label: string, value: Vector4, set: (v: Vector4) => void) => {
       const c = [value.x, value.y, value.z] as [number, number, number];
       if (ImGui.ColorEdit3(label, c)) {

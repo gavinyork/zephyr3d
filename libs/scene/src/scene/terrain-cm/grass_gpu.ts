@@ -790,6 +790,49 @@ export class GrassGpuPlacement extends Disposable {
                           this.facing = this.clumpDir;
                         });
                         this.$l.facingAngle = pb.atan2(this.facing.y, this.facing.x);
+                        // Terrain normal under the blade (central differences of the height map, as
+                        // in ClipmapGrassMaterial), x and z quantized to 12 bits each and packed into
+                        // an integer a float holds exactly. Distant blades shade toward it.
+                        this.$l.texel = pb.div(pb.vec2(1), this.heightInfo.xy);
+                        this.$l.sampleDist = pb.mul(this.regionSize, pb.mul(this.texel, 2));
+                        this.$l.hL = pb.textureSampleLevel(
+                          this.heightMap,
+                          pb.sub(this.uv, pb.vec2(this.texel.x, 0)),
+                          0
+                        ).r;
+                        this.$l.hR = pb.textureSampleLevel(
+                          this.heightMap,
+                          pb.add(this.uv, pb.vec2(this.texel.x, 0)),
+                          0
+                        ).r;
+                        this.$l.hU = pb.textureSampleLevel(
+                          this.heightMap,
+                          pb.sub(this.uv, pb.vec2(0, this.texel.y)),
+                          0
+                        ).r;
+                        this.$l.hD = pb.textureSampleLevel(
+                          this.heightMap,
+                          pb.add(this.uv, pb.vec2(0, this.texel.y)),
+                          0
+                        ).r;
+                        this.$l.terrainNormal = pb.normalize(
+                          pb.vec3(
+                            pb.neg(
+                              pb.div(pb.mul(pb.sub(this.hR, this.hL), this.posScale.y), this.sampleDist.x)
+                            ),
+                            1,
+                            pb.neg(
+                              pb.div(pb.mul(pb.sub(this.hD, this.hU), this.posScale.y), this.sampleDist.y)
+                            )
+                          )
+                        );
+                        this.$l.quantized = pb.floor(
+                          pb.add(
+                            pb.mul(pb.add(pb.mul(this.terrainNormal.xz, 0.5), pb.vec2(0.5)), 4095),
+                            pb.vec2(0.5)
+                          )
+                        );
+                        this.$l.packedNormal = pb.add(pb.mul(this.quantized.x, 4096), this.quantized.y);
                         this.$l.first = pb.mul(this.slot, INSTANCE_VEC4.blade);
                         this.instances.setAt(this.first, pb.vec4(this.base, this.flaggedHash));
                         this.instances.setAt(
@@ -798,7 +841,7 @@ export class GrassGpuPlacement extends Disposable {
                         );
                         this.instances.setAt(
                           pb.add(this.first, 2),
-                          pb.vec4(this.clumpAngle, this.clumpColor, 0, this.bladeHash)
+                          pb.vec4(this.clumpAngle, this.clumpColor, this.packedNormal, this.bladeHash)
                         );
                         this.instances.setAt(
                           pb.add(this.first, 3),

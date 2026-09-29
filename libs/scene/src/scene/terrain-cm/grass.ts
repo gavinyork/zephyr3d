@@ -445,6 +445,69 @@ export class GrassLayer extends Disposable {
       material.tipDetail = val;
     }
   }
+  /**
+   * How much the blade normals tilt outward across the width, so flat blades shade as if
+   * curved. 0 shades them flat. Blade layers only.
+   */
+  get roundness() {
+    return this.bladeMaterial?.roundness ?? 0;
+  }
+  set roundness(val: number) {
+    const material = this.bladeMaterial;
+    if (material) {
+      material.roundness = val;
+    }
+  }
+  /**
+   * How much blades seen edge-on widen toward the viewer, keeping fields full from low
+   * angles. 0 disables it. Blade layers only.
+   */
+  get viewThickening() {
+    return this.bladeMaterial?.viewThickening ?? 0;
+  }
+  set viewThickening(val: number) {
+    const material = this.bladeMaterial;
+    if (material) {
+      material.viewThickening = val;
+    }
+  }
+  /**
+   * Distance at which the blades start shading as one surface per clump, which calms the
+   * glitter of distant fields. Blade layers only.
+   */
+  get farNormalStart() {
+    return this.bladeMaterial?.farNormalStart ?? 0;
+  }
+  set farNormalStart(val: number) {
+    const material = this.bladeMaterial;
+    if (material) {
+      material.farNormalStart = val;
+    }
+  }
+  /**
+   * Distance beyond which the blades shade fully as one surface per clump. Blade layers only.
+   */
+  get farNormalEnd() {
+    return this.bladeMaterial?.farNormalEnd ?? 0;
+  }
+  set farNormalEnd(val: number) {
+    const material = this.bladeMaterial;
+    if (material) {
+      material.farNormalEnd = val;
+    }
+  }
+  /**
+   * How dull the highlights of distant blades get, reached at the far normal end distance. Blade layers only.
+   */
+  get farRoughness() {
+    return this.bladeMaterial?.farRoughness ?? 0;
+  }
+  set farRoughness(val: number) {
+    const material = this.bladeMaterial;
+    if (material) {
+      material.farRoughness = val;
+    }
+  }
   /** Color at the root of the blades. Blade layers only. */
   get rootColor(): Vector4 {
     return this.bladeMaterial?.rootColor ?? Vector4.one();

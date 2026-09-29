@@ -39,6 +39,11 @@ type GrassLayerData = {
     clumpFaceAway?: number;
     clumpColorVariation?: number;
     rootOcclusion?: number;
+    roundness?: number;
+    viewThickening?: number;
+    farNormalStart?: number;
+    farNormalEnd?: number;
+    farRoughness?: number;
     rootColor?: [number, number, number];
     tipColor?: [number, number, number];
   };
@@ -302,6 +307,11 @@ export function getTerrainClass(manager: ResourceManager): SerializableClass {
                   clumpFaceAway: layer.clumpFaceAway,
                   clumpColorVariation: layer.clumpColorVariation,
                   rootOcclusion: layer.rootOcclusion,
+                  roundness: layer.roundness,
+                  viewThickening: layer.viewThickening,
+                  farNormalStart: layer.farNormalStart,
+                  farNormalEnd: layer.farNormalEnd,
+                  farRoughness: layer.farRoughness,
                   rootColor: [layer.rootColor.x, layer.rootColor.y, layer.rootColor.z],
                   tipColor: [layer.tipColor.x, layer.tipColor.y, layer.tipColor.z]
                 };
@@ -355,6 +365,11 @@ export function getTerrainClass(manager: ResourceManager): SerializableClass {
                 grassLayer.clumpFaceAway = blade.clumpFaceAway ?? grassLayer.clumpFaceAway;
                 grassLayer.clumpColorVariation = blade.clumpColorVariation ?? grassLayer.clumpColorVariation;
                 grassLayer.rootOcclusion = blade.rootOcclusion ?? grassLayer.rootOcclusion;
+                grassLayer.roundness = blade.roundness ?? grassLayer.roundness;
+                grassLayer.viewThickening = blade.viewThickening ?? grassLayer.viewThickening;
+                grassLayer.farNormalStart = blade.farNormalStart ?? grassLayer.farNormalStart;
+                grassLayer.farNormalEnd = blade.farNormalEnd ?? grassLayer.farNormalEnd;
+                grassLayer.farRoughness = blade.farRoughness ?? grassLayer.farRoughness;
                 if (blade.rootColor) {
                   grassLayer.rootColor = new Vector4(
                     blade.rootColor[0],
