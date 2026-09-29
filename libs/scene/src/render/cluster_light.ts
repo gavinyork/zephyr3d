@@ -400,6 +400,50 @@ function emitPackSelection(this: PBInsideFunctionScope, pb: ProgramBuilder): PBS
   return pb.uvec4(this.r, this.g, this.b, this.a);
 }
 
+/**
+ * The strength a light is ranked by: its peak color channel times its intensity, times
+ * the area for rect lights, whose intensity is per unit area.
+ */
+function lightBrightness(light: PunctualLight) {
+  const c = light.diffuseAndIntensity;
+  const brightness = Math.max(c.x, c.y, c.z) * c.w;
+  return light.isRectLight() ? brightness * light.width * light.height : brightness;
+}
+
+/**
+ * Writes the world-space sphere bounding the region `light` lights into `out` (center,
+ * radius). The range sphere, except for spot lights: the smallest sphere around the cone
+ * sector they light (the cone clipped by the range sphere), which for a half-angle up to
+ * 45 degrees passes through the apex and the rim, and beyond that is centered on the
+ * rim's plane. Radius <= 0 for unbounded lights.
+ */
+function getLightBounds(light: PunctualLight, out: Float32Array) {
+  const posRange = light.positionAndRange;
+  out[0] = posRange.x;
+  out[1] = posRange.y;
+  out[2] = posRange.z;
+  out[3] = posRange.w;
+  if (posRange.w > 0 && light.isSpotLight()) {
+    const dirCutoff = light.directionAndCutoff;
+    const cosAngle = Math.min(dirCutoff.w, 1);
+    if (cosAngle > 0) {
+      const len = Math.hypot(dirCutoff.x, dirCutoff.y, dirCutoff.z) || 1;
+      let dist: number;
+      if (cosAngle >= Math.SQRT1_2) {
+        dist = posRange.w / (2 * cosAngle);
+        out[3] = dist;
+      } else {
+        dist = posRange.w * cosAngle;
+        out[3] = posRange.w * Math.sqrt(1 - cosAngle * cosAngle);
+      }
+      out[0] += (dirCutoff.x / len) * dist;
+      out[1] += (dirCutoff.y / len) * dist;
+      out[2] += (dirCutoff.z / len) * dist;
+    }
+  }
+}
+const _bounds = new Float32Array(4);
+
 export class ClusteredLight {
   /** Emit the shadow-mask overflow warning only once per session. */
   private static _warnedShadowMaskOverflow = false;
@@ -459,6 +503,8 @@ export class ClusteredLight {
   private _lightIndexVertexBuffer: Nullable<StructuredBuffer>;
   private _lightIndexRenderStates: Nullable<RenderStateSet>;
   private _lightBuffer: Nullable<GPUDataBuffer>;
+  /** WebGL1 only, in place of `_lightBuffer`: the lights as float texels, a row each. */
+  private _lightTexture: Nullable<Texture2D>;
   private _lightSphereBuffer: Nullable<GPUDataBuffer>;
   /** Lights the WebGPU storage buffers above hold, slot 0 included. */
   private _storageLightCapacity: number;
@@ -496,6 +542,7 @@ export class ClusteredLight {
     this._lightIndexProgram = null;
     this._lightBuffer = null;
     this._lightSphereBuffer = null;
+    this._lightTexture = null;
     this._storageLightCapacity = 0;
     this._clusterGridBuffer = null;
     this._lightListBuffer = null;
@@ -523,6 +570,10 @@ export class ClusteredLight {
   }
   get lightBuffer() {
     return this._lightBuffer;
+  }
+  /** See {@link ClusteredLight._lightTexture}. WebGL1 only. */
+  get lightTexture() {
+    return this._lightTexture;
   }
   /**
    * Number of shadow-casting lights placed at the head of the clustered light
@@ -1015,6 +1066,13 @@ export class ClusteredLight {
   }
   /** Creates the uniform light buffer read by the lit shaders, laid out as ShaderHelper declares it. */
   private createLightBuffer(device: AbstractDevice) {
+    if (device.type === 'webgl') {
+      this._lightTexture = device.createTexture2D('rgba32f', 4, ShaderHelper.getMaxClusterLights() + 1, {
+        mipmapping: false
+      })!;
+      this._lightTexture.name = 'ClusterLights';
+      return;
+    }
     const lightBufferType = new PBStructTypeInfo('ClusteredLightBuffer', 'std140', [
       {
         name: ShaderHelper.getLightBufferUniformName(),
@@ -1077,7 +1135,7 @@ export class ClusteredLight {
     if (!this._lightIndexProgram) {
       this.createProgram(device);
     }
-    if (!compute && !this._lightBuffer) {
+    if (!compute && !this._lightBuffer && !this._lightTexture) {
       this.createLightBuffer(device);
     }
     if (!compute && !this._lightIndexVertexLayout) {
@@ -1131,14 +1189,18 @@ export class ClusteredLight {
     }
     // The compute pass writes every cluster itself, empty ones included.
     if (compute || numLights > 0) {
-      if (this._lightBuffer!.disposed) {
-        this._lightBuffer!.reload();
-      }
       if (this._lightSphereBuffer!.disposed) {
         this._lightSphereBuffer!.reload();
       }
       // Slot 0 is never read, so upload only up to the last light.
-      this._lightBuffer!.bufferSubData(0, this._lights, 0, (numLights + 1) * 16);
+      if (this._lightTexture) {
+        this._lightTexture.update(this._lights.subarray(0, (numLights + 1) * 16), 0, 0, 4, numLights + 1);
+      } else {
+        if (this._lightBuffer!.disposed) {
+          this._lightBuffer!.reload();
+        }
+        this._lightBuffer!.bufferSubData(0, this._lights, 0, (numLights + 1) * 16);
+      }
       this._lightSphereBuffer!.bufferSubData(
         0,
         this._lightSpheres,
@@ -1195,29 +1257,31 @@ export class ClusteredLight {
    * Both caps drop lights by buffer index - the global one truncates the tail, and
    * a full cluster keeps its lowest 16 indices - so without this whichever lights the
    * scene traversal happened to reach last are the ones that vanish. The score is
-   * `luminance * range^2 / (range^2 + d^2)`, with `d` the camera's distance to the
-   * light's sphere of influence: 0 from anywhere inside it, falling off with distance
-   * beyond it, and larger for lights that reach further. Directional lights have no
-   * range and light everything, so they always rank first.
+   * `brightness * r^2 / (r^2 + d^2)`, with `r` the radius of the sphere bounding the
+   * lit region and `d` the camera's distance to it: 0 from anywhere inside it, falling
+   * off with distance beyond it, and larger for lights that reach further. The sphere is
+   * getLightBounds', so a spot light pointing away from the camera ranks by where it
+   * shines rather than where it stands, and the brightness is lightBrightness', so a
+   * rect light counts its whole area. Directional lights have no range and light
+   * everything, so they always rank first.
    */
   private prioritize(lights: PunctualLight[], eye: Vector3) {
     if (lights.length < 2) {
       return;
     }
     const candidates = lights.map((light) => {
-      const posRange = light.positionAndRange;
-      const range = posRange.w;
+      getLightBounds(light, _bounds);
+      const range = _bounds[3];
       let score: number;
       if (light.isDirectionLight() || range <= 0) {
         score = Infinity;
       } else {
-        const color = light.diffuseAndIntensity;
-        const dx = posRange.x - eye.x;
-        const dy = posRange.y - eye.y;
-        const dz = posRange.z - eye.z;
+        const dx = _bounds[0] - eye.x;
+        const dy = _bounds[1] - eye.y;
+        const dz = _bounds[2] - eye.z;
         const d = Math.max(Math.sqrt(dx * dx + dy * dy + dz * dz) - range, 0);
         const range2 = range * range;
-        score = (Math.max(color.x, color.y, color.z) * color.w * range2) / (range2 + d * d);
+        score = (lightBrightness(light) * range2) / (range2 + d * d);
       }
       return { light, score };
     });
@@ -1255,35 +1319,17 @@ export class ClusteredLight {
       lights.set(posRange, offset);
       // Culling sphere: radius < 0 = shaded through a global slot, skipped by the index
       // pass; 0 = unbounded, in every cluster; otherwise it bounds the lit region.
-      let x = posRange.x;
-      let y = posRange.y;
-      let z = posRange.z;
-      let radius = posRange.w;
+      getLightBounds(light, _bounds);
+      const x = _bounds[0];
+      const y = _bounds[1];
+      const z = _bounds[2];
+      let radius = _bounds[3];
       if (radius <= 0) {
         if (numGlobal < MAX_GLOBAL_LIGHTS) {
           globalLights[numGlobal++] = slot;
           radius = -1;
         } else {
           radius = 0;
-        }
-      } else if (light.isSpotLight()) {
-        // Smallest sphere around the cone sector the spot lights (the cone clipped by
-        // its range sphere): for a half-angle up to 45 degrees it passes through the
-        // apex and the rim, beyond that it is centered on the rim's plane.
-        const cosAngle = Math.min(dirCutoff.w, 1);
-        if (cosAngle > 0) {
-          const len = Math.hypot(dirCutoff.x, dirCutoff.y, dirCutoff.z) || 1;
-          let dist: number;
-          if (cosAngle >= Math.SQRT1_2) {
-            dist = radius / (2 * cosAngle);
-            radius = dist;
-          } else {
-            dist = radius * cosAngle;
-            radius = radius * Math.sqrt(1 - cosAngle * cosAngle);
-          }
-          x += (dirCutoff.x / len) * dist;
-          y += (dirCutoff.y / len) * dist;
-          z += (dirCutoff.z / len) * dist;
         }
       }
       // The view matrix is column-major.
@@ -1294,7 +1340,7 @@ export class ClusteredLight {
       spheres[s + 3] = radius;
       if (sphereStride > 1) {
         // Ranks the lights competing for a crowded cluster; same measure as prioritize().
-        spheres[s + 4] = Math.max(colorIntensity.x, colorIntensity.y, colorIntensity.z) * colorIntensity.w;
+        spheres[s + 4] = lightBrightness(light);
       }
       lights.set(dirCutoff, offset + 4);
       // Only the intensity carries the camera pre-exposure; the color stays as authored. The

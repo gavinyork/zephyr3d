@@ -367,7 +367,12 @@ export class ShaderHelper {
           scope[UNIFORM_NAME_CLUSTER_GRID] = pb.uint[0]().storageBufferReadonly(0);
           scope[UNIFORM_NAME_CLUSTER_LIGHT_LIST] = pb.uint[0]().storageBufferReadonly(0);
         } else {
-          scope[UNIFORM_NAME_LIGHT_BUFFER] = pb.vec4[(this.getMaxClusterLights() + 1) * 4]().uniformBuffer(0);
+          // WebGL1 has no uniform blocks and GLSL ES 1.0 indexes uniform arrays only with
+          // loop indices, so the lights live in a float texture there, one row each.
+          scope[UNIFORM_NAME_LIGHT_BUFFER] =
+            pb.getDevice().type === 'webgl'
+              ? pb.tex2D().uniform(0)
+              : pb.vec4[(this.getMaxClusterLights() + 1) * 4]().uniformBuffer(0);
           // Non-WebGL1 devices fetch the light index texture with textureLoad
           scope[UNIFORM_NAME_LIGHT_INDEX_TEXTURE] = (
             pb.getDevice().type === 'webgl' ? pb.tex2D() : pb.utex2D().noSampler()
@@ -1431,7 +1436,16 @@ export class ShaderHelper {
       clusterOrtho: clusteredLight.orthographic ? 1 : 0,
       ...(ctx.screenSpaceShadowMask ? { numShadowLights: clusteredLight.numShadowLights } : {})
     });
-    bindGroup.setBuffer(UNIFORM_NAME_LIGHT_BUFFER, clusteredLight.lightBuffer!);
+    if (ctx.device.type === 'webgl') {
+      // Float texels, which must not be filtered.
+      bindGroup.setTexture(
+        UNIFORM_NAME_LIGHT_BUFFER,
+        clusteredLight.lightTexture!,
+        fetchSampler('clamp_nearest_nomip')
+      );
+    } else {
+      bindGroup.setBuffer(UNIFORM_NAME_LIGHT_BUFFER, clusteredLight.lightBuffer!);
+    }
     if (this.usesClusterLightLists()) {
       bindGroup.setBuffer(UNIFORM_NAME_CLUSTER_GRID, clusteredLight.clusterGridBuffer!);
       bindGroup.setBuffer(UNIFORM_NAME_CLUSTER_LIGHT_LIST, clusteredLight.lightListBuffer!);
@@ -2511,25 +2525,44 @@ export class ShaderHelper {
     scope: PBInsideFunctionScope,
     lightIndex: PBShaderExp | number
   ): PBShaderExp {
-    return scope[UNIFORM_NAME_LIGHT_BUFFER].at(scope.$builder.mul(lightIndex, 4));
+    return this.getLightVector(scope, lightIndex, 0);
   }
   /** @internal */
   static getLightDirectionAndCutoff(
     scope: PBInsideFunctionScope,
     lightIndex: PBShaderExp | number
   ): PBShaderExp {
-    return scope[UNIFORM_NAME_LIGHT_BUFFER].at(scope.$builder.add(scope.$builder.mul(lightIndex, 4), 1));
+    return this.getLightVector(scope, lightIndex, 1);
   }
   /** @internal */
   static getLightColorAndIntensity(
     scope: PBInsideFunctionScope,
     lightIndex: PBShaderExp | number
   ): PBShaderExp {
-    return scope[UNIFORM_NAME_LIGHT_BUFFER].at(scope.$builder.add(scope.$builder.mul(lightIndex, 4), 2));
+    return this.getLightVector(scope, lightIndex, 2);
   }
   /** @internal */
   static getLightExtra(scope: PBInsideFunctionScope, lightIndex: PBShaderExp | number): PBShaderExp {
-    return scope[UNIFORM_NAME_LIGHT_BUFFER].at(scope.$builder.add(scope.$builder.mul(lightIndex, 4), 3));
+    return this.getLightVector(scope, lightIndex, 3);
+  }
+  /**
+   * Vector `k` of the 4 of a clustered light: from its texel on WebGL1 (row = light,
+   * column = vector), from the light buffer elsewhere.
+   */
+  private static getLightVector(scope: PBInsideFunctionScope, lightIndex: PBShaderExp | number, k: number) {
+    const pb = scope.$builder;
+    const buffer = scope[UNIFORM_NAME_LIGHT_BUFFER];
+    if (pb.getDevice().type === 'webgl') {
+      const rows = this.getMaxClusterLights() + 1;
+      return pb.textureSample(
+        buffer,
+        pb.vec2(
+          (k + 0.5) / 4,
+          pb.div(pb.add(typeof lightIndex === 'number' ? lightIndex : pb.float(lightIndex), 0.5), rows)
+        )
+      );
+    }
+    return buffer.at(pb.add(pb.mul(lightIndex, 4), k));
   }
   /**
    * Sets the clip space position in vertex shader
@@ -3072,10 +3105,9 @@ export class ShaderHelper {
    * On WebGPU the buffers are storage buffers grown to fit and light indices are 32
    * bits, so this only bounds the CPU-side work. On WebGL2 the buffer is 4 vec4 per
    * light in a uniform block, and 255 is the most a byte-sized cluster slot can address.
-   * WebGL1 has no uniform blocks, so the buffer is a plain uniform array competing with
-   * every other uniform of the lit fragment shader for MAX_FRAGMENT_UNIFORM_VECTORS -
-   * 221 or 256 on many GPUs, where 64 lights (260 vectors) alone would fail to link.
-   * 128 vectors, or half the limit if that is smaller, are left to the other uniforms.
+   * WebGL1 keeps the lights in a texture, but the index pass still reads their culling
+   * spheres (one vec4 each) from a plain uniform array of its vertex shader, bounded by
+   * MAX_VERTEX_UNIFORM_VECTORS - 128 at least; 16 vectors are left to its other uniforms.
    * @internal
    */
   static getMaxClusterLights() {
@@ -3086,8 +3118,7 @@ export class ShaderHelper {
     if (device.type !== 'webgl') {
       return 255;
     }
-    const maxVectors = device.getDeviceCaps().shaderCaps.maxFragmentUniformVectors;
-    const budget = maxVectors - Math.min(128, maxVectors >> 1);
-    return Math.max(1, Math.min(64, (budget >> 2) - 1));
+    const maxVectors = device.getDeviceCaps().shaderCaps.maxVertexUniformVectors;
+    return Math.max(1, Math.min(255, maxVectors - 16 - 1));
   }
 }

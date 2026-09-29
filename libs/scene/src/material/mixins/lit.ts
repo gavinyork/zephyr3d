@@ -1007,16 +1007,6 @@ export function mixinLight<T extends typeof MeshMaterial>(BaseCls: T) {
             );
           });
         };
-        // GLSL ES 1.0 only indexes uniform arrays with loop indices, hence the search;
-        // indices never exceed the WebGL1 light capacity.
-        const shadeLightWebGL1 = function (this: PBInsideFunctionScope, index: PBShaderExp) {
-          this.$for(pb.int('j'), 1, ShaderHelper.getMaxClusterLights() + 1, function () {
-            this.$if(pb.equal(this.j, index), function () {
-              shadeLight.call(this, this.j);
-              this.$break();
-            });
-          });
-        };
         scope.$scope(function () {
           // Lights that reach every fragment (directional) are kept out of the clusters.
           const globalLights = ShaderHelper.getGlobalLights(this);
@@ -1026,11 +1016,7 @@ export function mixinLight<T extends typeof MeshMaterial>(BaseCls: T) {
               this.$break();
             });
             this.$scope(function () {
-              if (pb.getDevice().type === 'webgl') {
-                shadeLightWebGL1.call(this, this.gi);
-              } else {
-                shadeLight.call(this, this.gi);
-              }
+              shadeLight.call(this, this.gi);
             });
           });
           const countParams = ShaderHelper.getCountParams(this);
@@ -1086,14 +1072,14 @@ export function mixinLight<T extends typeof MeshMaterial>(BaseCls: T) {
               this.$if(this.done, function () {
                 this.$break();
               });
-              this.$l.packed = this.samp.at(this.i);
+              this.$l.packedPair = this.samp.at(this.i);
               this.$l.lights = pb.int[2]();
-              this.$l.lights[0] = pb.int(pb.div(this.packed, 256));
-              this.$l.lights[1] = pb.int(pb.mod(this.packed, 256));
+              this.$l.lights[0] = pb.int(pb.div(this.packedPair, 256));
+              this.$l.lights[1] = pb.int(pb.mod(this.packedPair, 256));
               this.$for(pb.int('k'), 0, 2, function () {
                 this.$l.li = this.lights.at(this.k);
                 this.$if(pb.greaterThan(this.li, 0), function () {
-                  shadeLightWebGL1.call(this, this.li);
+                  shadeLight.call(this, this.li);
                 }).$else(function () {
                   this.done = true;
                   this.$break();

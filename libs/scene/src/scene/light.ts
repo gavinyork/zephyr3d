@@ -745,13 +745,11 @@ export class PointLight extends PunctualLight {
     // diffuse/specular scales still multiply the shaded result, so the auto-derived influence
     // radius has to account for them. SpotLight has no equivalent scales, hence no such factor.
     const physicalScale = Math.max(this._diffuseScale, this._specularScale);
-    const range =
-      this.range <= 0
-        ? physical
-          ? Math.sqrt(Math.max(0, this.luminousIntensity * physicalScale) / PHYSICAL_LIGHT_CUTOFF_LUX) /
-            metersPerUnit
-          : 32 * Math.sqrt(Math.max(0.0001, this.intensity * physicalScale))
-        : this.range;
+    const calculatedRange = physical
+      ? Math.sqrt(Math.max(0, this.luminousIntensity * physicalScale) / PHYSICAL_LIGHT_CUTOFF_LUX) /
+        metersPerUnit
+      : 32 * Math.sqrt(Math.max(0.0001, this.intensity * physicalScale));
+    const range = this.range <= 0 ? calculatedRange : Math.min(this.range, calculatedRange);
     const resolvedIntensity = physical
       ? this.luminousIntensity / (metersPerUnit * metersPerUnit)
       : this.intensity;
