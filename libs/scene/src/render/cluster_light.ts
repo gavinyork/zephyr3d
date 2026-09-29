@@ -529,6 +529,10 @@ export class ClusteredLight {
   private _orthographic: boolean;
   /** Scratch list of the lights competing for the slots after the mask-backed ones. */
   private readonly _rest: PunctualLight[];
+  /** Scratch for prioritize(). */
+  private _sortScores: Float64Array<ArrayBuffer>;
+  private _sortOrder: Uint32Array<ArrayBuffer>;
+  private readonly _sortScratch: PunctualLight[];
   constructor() {
     this._tileCountX = 0;
     this._tileCountY = 0;
@@ -567,6 +571,9 @@ export class ClusteredLight {
     this._numShadowLights = 0;
     this._orthographic = false;
     this._rest = [];
+    this._sortScores = new Float64Array(64);
+    this._sortOrder = new Uint32Array(64);
+    this._sortScratch = [];
   }
   get lightBuffer() {
     return this._lightBuffer;
@@ -1269,7 +1276,19 @@ export class ClusteredLight {
     if (lights.length < 2) {
       return;
     }
-    const candidates = lights.map((light) => {
+    // Scores and a permutation in reused typed arrays, so a frame allocates nothing.
+    const n = lights.length;
+    if (this._sortScores.length < n) {
+      const capacity = 1 << Math.ceil(Math.log2(n));
+      this._sortScores = new Float64Array(capacity);
+      this._sortOrder = new Uint32Array(capacity);
+    }
+    const scores = this._sortScores;
+    const order = this._sortOrder.subarray(0, n);
+    const sorted = this._sortScratch;
+    sorted.length = n;
+    for (let i = 0; i < n; i++) {
+      const light = lights[i];
       getLightBounds(light, _bounds);
       const range = _bounds[3];
       let score: number;
@@ -1283,15 +1302,26 @@ export class ClusteredLight {
         const range2 = range * range;
         score = (lightBrightness(light) * range2) / (range2 + d * d);
       }
-      return { light, score };
-    });
-    // Stable, so equally important lights keep their traversal order frame to frame.
-    // Compared rather than subtracted: two directional lights would give Infinity - Infinity.
-    candidates.sort((a, b) => (a.score > b.score ? -1 : a.score < b.score ? 1 : 0));
-    for (let i = 0; i < lights.length; i++) {
-      lights[i] = candidates[i].light;
+      scores[i] = score;
+      order[i] = i;
+      sorted[i] = light;
     }
+    order.sort(this._compareScores);
+    for (let i = 0; i < n; i++) {
+      lights[i] = sorted[order[i]];
+    }
+    sorted.length = 0;
   }
+  /**
+   * Orders buffer positions by descending score. Ties go to the lower position, which
+   * keeps equally important lights in traversal order frame to frame. Compared rather
+   * than subtracted: two directional lights would give Infinity - Infinity.
+   */
+  private readonly _compareScores = (a: number, b: number) => {
+    const sa = this._sortScores[a];
+    const sb = this._sortScores[b];
+    return sa > sb ? -1 : sa < sb ? 1 : a - b;
+  };
   private getVisibleLights(
     camera: Camera,
     renderQueue: RenderQueue,
