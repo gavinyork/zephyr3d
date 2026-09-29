@@ -119,7 +119,11 @@ export class WebGPUBuffer extends WebGPUObject<GPUBuffer> implements GPUDataBuff
         const copySizeInBytes = (readOffsetInBytes + sizeInBytes + 3) & ~3;
         sourceBuffer = this._device.createBuffer(copySizeInBytes, { usage: 'read' });
         this._device.copyBuffer(this, sourceBuffer, copyOffsetInBytes, 0, copySizeInBytes);
-        this._device.flush();
+        // Let the copy ride the next submit rather than flushing here: a flush in the
+        // middle of a frame splits it in two and leaves the GPU idle until the rest
+        // of the frame is submitted.
+        this._device.scheduleAutoFlush();
+        await this._device.commandQueue.onNextSubmit();
       } else {
         throw new Error('getBufferSubData() failed: buffer does not have BF_READ or BF_PACK_PIXEL flag set');
       }

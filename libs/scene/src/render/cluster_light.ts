@@ -518,6 +518,11 @@ export class ClusteredLight {
   private _lightListCapacity: number;
   /** WebGPU only: the atomic allocating list room, zeroed before each build. */
   private _listCounterBuffer: Nullable<GPUDataBuffer>;
+  /**
+   * WebGPU only: mappable copy of `_listCounterBuffer` for readBackListRequest, kept
+   * across reads instead of a staging buffer being made for each one.
+   */
+  private _listCounterReadBuffer: Nullable<GPUDataBuffer>;
   private readonly _listCounterZero: Uint32Array<ArrayBuffer>;
   private readonly _lightIndexTexSize: Int32Array<ArrayBuffer>;
   private readonly _sizeParam: Vector4;
@@ -552,6 +557,7 @@ export class ClusteredLight {
     this._lightListBuffer = null;
     this._lightListCapacity = 0;
     this._listCounterBuffer = null;
+    this._listCounterReadBuffer = null;
     this._listCounterZero = new Uint32Array(4);
     this._lightIndexTexSize = new Int32Array(2);
     this._bindGroup = null;
@@ -1032,6 +1038,9 @@ export class ClusteredLight {
     if (!this._listCounterBuffer) {
       this._listCounterBuffer = device.createBuffer(16, { usage: 'uniform', storage: true })!;
     }
+    if (!this._listCounterReadBuffer) {
+      this._listCounterReadBuffer = device.createBuffer(16, { usage: 'read' })!;
+    }
   }
   /**
    * Reads back how many list entries the clusters asked for, so the next builds can
@@ -1042,7 +1051,10 @@ export class ClusteredLight {
       return;
     }
     this._readbackPending = true;
-    this._listCounterBuffer!.getBufferSubData(this._readback, 0, 16).then(
+    // The read buffer is copied into only while no read is pending, so a copy never
+    // lands in it while it is being mapped.
+    getDevice().copyBuffer(this._listCounterBuffer!, this._listCounterReadBuffer!, 0, 0, 16);
+    this._listCounterReadBuffer!.getBufferSubData(this._readback, 0, 16).then(
       () => {
         this._readbackPending = false;
         const requested = new Uint32Array(this._readback.buffer, 0, 4)[1];
