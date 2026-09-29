@@ -367,7 +367,7 @@ class SceneRenderContextImpl implements SceneRenderContext {
     const ctx = this._ctx;
     ctx.screenSpaceShadowMask = false;
     ctx.transmissionThickness = false;
-    const clusteredLight = ClusteredLight.acquire();
+    const clusteredLight = ClusteredLight.acquire(target.getWidth(), target.getHeight());
     // Released after graph execution: the draws reading it may still be pending before.
     this._rgCtx.deferCleanup(() => ClusteredLight.release(clusteredLight));
     clusteredLight.calculateLightIndex(

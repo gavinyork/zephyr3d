@@ -620,7 +620,7 @@ const ClusterLightsModule: RenderModule<FrameGraphContext> = {
       ordering.emit(builder, 'ClusterLightsDone');
       builder.sideEffect();
       builder.setExecute(() => {
-        ctx.clusteredLight = ClusteredLight.acquire();
+        ctx.clusteredLight = ClusteredLight.acquire(ctx.renderWidth, ctx.renderHeight);
         // The light passes draw into targets of the render size (see renderOpaqueScenePass).
         ctx.clusteredLight.calculateLightIndex(
           ctx.camera,

@@ -28,6 +28,18 @@ const UNIFORM_NAME_LIGHT_SPHERES = 'lightSpheres';
 function getSphereStride() {
   return getDevice().type === 'webgl' ? 1 : 2;
 }
+/** Target size in pixels of a cluster tile on screen. */
+const TILE_SIZE_PX = 64;
+/** Bound on the tile count along each screen axis, which caps the index pass cost at high resolution. */
+const MAX_TILES_PER_AXIS = 64;
+/** Number of depth slices. */
+const TILE_COUNT_Z = 32;
+/**
+ * View depth in meters where the exponential slices of a perspective camera begin.
+ * Everything nearer shares slice 0: exponential slicing would otherwise spend a quarter
+ * of the slices on the first meter in front of a 0.1 m near plane, where little is lit.
+ */
+const NEAR_SLICE_METERS = 1;
 
 export class ClusteredLight {
   /** Emit the shadow-mask overflow warning only once per session. */
@@ -37,19 +49,34 @@ export class ClusteredLight {
   /**
    * Fetches an instance from the pool, creating one if it is empty.
    *
+   * @param width - Width in device pixels of the target it will be built for.
+   * @param height - Height in device pixels of that target.
+   *
    * @remarks
    * The GPU work reading an instance's buffers may still be pending when the render
    * code is done with it, so release it only after the render graph has executed.
    */
-  static acquire(): ClusteredLight {
+  static acquire(width: number, height: number): ClusteredLight {
+    // Prefer an instance already sized for this target, so alternating targets do not
+    // rebuild the index texture every frame.
+    const x = ClusteredLight.tileCount(width);
+    const y = ClusteredLight.tileCount(height);
+    const index = this._pool.findIndex((cl) => cl._tileCountX === x && cl._tileCountY === y);
+    if (index >= 0) {
+      return this._pool.splice(index, 1)[0];
+    }
     return this._pool.pop() ?? new ClusteredLight();
+  }
+  /** Tile count along a screen axis of `size` pixels. */
+  private static tileCount(size: number) {
+    return Math.min(Math.max(Math.ceil(size / TILE_SIZE_PX), 1), MAX_TILES_PER_AXIS);
   }
   /** Returns an instance obtained from {@link ClusteredLight.acquire} to the pool. */
   static release(cl: ClusteredLight) {
     this._pool.push(cl);
   }
-  private readonly _tileCountX: number;
-  private readonly _tileCountY: number;
+  private _tileCountX: number;
+  private _tileCountY: number;
   private readonly _tileCountZ: number;
   private readonly _lights: Float32Array<ArrayBuffer>;
   /** View-space bounding sphere of each light in `_lights`, for culling. See writeLight. */
@@ -61,20 +88,24 @@ export class ClusteredLight {
   private _lightIndexProgram: Nullable<GPUProgram>;
   private _bindGroup: Nullable<BindGroup>;
   private _lightIndexVertexLayout: Nullable<VertexLayout>;
+  /** Not released by disposing the layout, so kept to be disposed along with it. */
+  private _lightIndexVertexBuffer: Nullable<StructuredBuffer>;
   private _lightIndexRenderStates: Nullable<RenderStateSet>;
   private _lightBuffer: Nullable<StructuredBuffer>;
   private _lightSphereBuffer: Nullable<StructuredBuffer>;
   private readonly _sizeParam: Vector4;
   private _countParam: Int32Array<ArrayBuffer>;
   private readonly _clusterParam: Vector4;
+  /** Perspective depth slicing: split depth, first exponential slice, exponential slice count. */
+  private readonly _sliceParam: Vector4;
   private _numShadowLights: number;
   private _orthographic: boolean;
   /** Scratch list of the lights competing for the slots after the mask-backed ones. */
   private readonly _rest: PunctualLight[];
   constructor() {
-    this._tileCountX = 16;
-    this._tileCountY = 16;
-    this._tileCountZ = 32;
+    this._tileCountX = 0;
+    this._tileCountY = 0;
+    this._tileCountZ = TILE_COUNT_Z;
     this._lights = new Float32Array(16 * (ShaderHelper.getMaxClusterLights() + 1));
     this._lightSpheres = new Float32Array(4 * getSphereStride() * (ShaderHelper.getMaxClusterLights() + 1));
     this._globalLights = new Int32Array(MAX_GLOBAL_LIGHTS);
@@ -85,10 +116,12 @@ export class ClusteredLight {
     this._lightSphereBuffer = null;
     this._bindGroup = null;
     this._lightIndexVertexLayout = null;
+    this._lightIndexVertexBuffer = null;
     this._lightIndexRenderStates = null;
     this._sizeParam = new Vector4();
     this._countParam = new Int32Array(4);
     this._clusterParam = new Vector4();
+    this._sliceParam = new Vector4();
     this._numShadowLights = 0;
     this._orthographic = false;
     this._rest = [];
@@ -151,9 +184,28 @@ export class ClusteredLight {
       }
       vb = device.createVertexBuffer('position_f32x2', vertices)!;
     }
+    this._lightIndexVertexBuffer = vb;
     this._lightIndexVertexLayout = device.createVertexLayout({
       vertexBuffers: [{ buffer: vb }]
     });
+  }
+  /** Sizes the grid for a target, dropping the resources built for another grid. */
+  private resizeGrid(width: number, height: number) {
+    const x = ClusteredLight.tileCount(width);
+    const y = ClusteredLight.tileCount(height);
+    if (x === this._tileCountX && y === this._tileCountY) {
+      return;
+    }
+    this._tileCountX = x;
+    this._tileCountY = y;
+    this._lightIndexFramebuffer?.dispose();
+    this._lightIndexFramebuffer = null;
+    this._lightIndexTexture?.dispose();
+    this._lightIndexTexture = null;
+    this._lightIndexVertexLayout?.dispose();
+    this._lightIndexVertexLayout = null;
+    this._lightIndexVertexBuffer?.dispose();
+    this._lightIndexVertexBuffer = null;
   }
   private createRenderState(device: AbstractDevice) {
     this._lightIndexRenderStates = device.createRenderStateSet();
@@ -171,6 +223,7 @@ export class ClusteredLight {
         this.sizeParam = pb.vec4().uniform(0);
         this.countParam = pb.ivec4().uniform(0);
         this.orthoProj = pb.int().uniform(0);
+        this.sliceParam = pb.vec4().uniform(0);
         // Already in view space: transformed once per light on the CPU rather than once
         // per light in each of the clusters. See writeLight for the layout.
         this[UNIFORM_NAME_LIGHT_SPHERES] =
@@ -183,6 +236,22 @@ export class ClusteredLight {
             pb.dot(this.normal, this.ab)
           );
           this.$return(pb.add(this.a, pb.mul(this.t, this.ab)));
+        });
+        // View depth where perspective slice k begins: slices before the first exponential
+        // one form the near slice, which begins at the near plane.
+        pb.func('sliceDepth', [pb.float('k')], function () {
+          this.$if(pb.lessThan(this.k, this.sliceParam.y), function () {
+            this.$return(this.sizeParam.z);
+          });
+          this.$return(
+            pb.mul(
+              this.sliceParam.x,
+              pb.pow(
+                pb.div(this.sizeParam.w, this.sliceParam.x),
+                pb.div(pb.sub(this.k, this.sliceParam.y), this.sliceParam.z)
+              )
+            )
+          );
         });
         pb.func('clipToView', [pb.vec4('clip')], function () {
           this.$l.view = pb.mul(this.invProjMatrix, this.clip);
@@ -260,14 +329,8 @@ export class ClusteredLight {
             this.aabbMin = pb.vec3(pb.min(this.minPoint_vS.xy, this.maxPoint_vS.xy), this.tileFar);
             this.aabbMax = pb.vec3(pb.max(this.minPoint_vS.xy, this.maxPoint_vS.xy), this.tileNear);
           }).$else(function () {
-            this.$l.tileNear = pb.mul(
-              pb.neg(this.sizeParam.z),
-              pb.pow(pb.div(this.sizeParam.w, this.sizeParam.z), this.sliceNear)
-            );
-            this.$l.tileFar = pb.mul(
-              pb.neg(this.sizeParam.z),
-              pb.pow(pb.div(this.sizeParam.w, this.sizeParam.z), this.sliceFar)
-            );
+            this.$l.tileNear = pb.neg(this.sliceDepth(pb.float(this.zIndex)));
+            this.$l.tileFar = pb.neg(this.sliceDepth(pb.add(pb.float(this.zIndex), 1)));
             this.$l.eyePos = pb.vec3(0);
             this.$l.minPointNear = this.lineIntersectionToZPlane(
               this.eyePos,
@@ -479,14 +542,13 @@ export class ClusteredLight {
     this._lightBuffer = device.createStructuredBuffer(lightBufferType, { usage: 'uniform' });
   }
   private createLightIndexTexture(device: AbstractDevice) {
-    const exp = Math.log2(this._tileCountX * this._tileCountY * this._tileCountZ);
-    const a = (exp + 1) >>> 1;
-    const b = exp - a;
-    const textureWidth = 2 << (a - 1);
-    const textureHeight = 2 << (b - 1);
-    if (textureWidth * textureHeight !== this._tileCountX * this._tileCountY * this._tileCountZ) {
-      throw new Error('Internal error');
-    }
+    // One texel per cluster in row-major order; the tail of the last row is unused.
+    const numClusters = this._tileCountX * this._tileCountY * this._tileCountZ;
+    const textureWidth = Math.min(
+      1 << Math.ceil(Math.log2(Math.ceil(Math.sqrt(numClusters)))),
+      device.getDeviceCaps().textureCaps.maxTextureSize
+    );
+    const textureHeight = Math.ceil(numClusters / textureWidth);
     this._lightIndexTexture = device.createTexture2D(
       device.type === 'webgl' ? 'rgba32f' : 'rgba32ui',
       textureWidth,
@@ -523,6 +585,7 @@ export class ClusteredLight {
       preExposure
     );
     const device = getDevice();
+    this.resizeGrid(width, height);
     if (!this._lightIndexTexture) {
       this.createLightIndexTexture(device);
     }
@@ -552,8 +615,17 @@ export class ClusteredLight {
       scale = this._tileCountZ / (far - near);
       bias = -near * scale;
     } else {
-      scale = this._tileCountZ / Math.log2(far / near);
-      bias = -Math.log2(near) * scale;
+      // A near slice pays off only when it spans more than one regular exponential slice.
+      const split = NEAR_SLICE_METERS / (camera.scene?.metersPerUnit ?? 1);
+      const nearSlice = split > near * Math.pow(far / near, 1 / this._tileCountZ) && split < far;
+      const expStart = nearSlice ? split : near;
+      const firstExpSlice = nearSlice ? 1 : 0;
+      const numExpSlices = this._tileCountZ - firstExpSlice;
+      scale = numExpSlices / Math.log2(far / expStart);
+      // Depths before the split land below firstExpSlice, which the lit shader's clamp
+      // and integer conversion take to slice 0.
+      bias = firstExpSlice - Math.log2(expStart) * scale;
+      this._sliceParam.setXYZW(expStart, firstExpSlice, numExpSlices, 0);
     }
     this._clusterParam.setXYZW(vw, vh, scale, bias);
     this._sizeParam.setXYZW(vw, vh, near, far);
@@ -566,6 +638,9 @@ export class ClusteredLight {
     this._countParam[3] = numLights + 1;
     device.pushDeviceStates();
     device.setFramebuffer(this._lightIndexFramebuffer);
+    // setFramebuffer may no-op, so reset viewport and scissor explicitly.
+    device.setViewport(null);
+    device.setScissor(null);
     if (numLights > 0) {
       if (this._lightBuffer!.disposed) {
         this._lightBuffer!.reload();
@@ -585,6 +660,7 @@ export class ClusteredLight {
       this._bindGroup!.setValue('sizeParam', this._sizeParam);
       this._bindGroup!.setValue('countParam', this._countParam);
       this._bindGroup!.setValue('orthoProj', this._orthographic ? 1 : 0);
+      this._bindGroup!.setValue('sliceParam', this._sliceParam);
       this._bindGroup!.setBuffer(UNIFORM_NAME_LIGHT_SPHERES, this._lightSphereBuffer!);
       device.setProgram(this._lightIndexProgram);
       device.setVertexLayout(this._lightIndexVertexLayout);
