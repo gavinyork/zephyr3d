@@ -4,6 +4,7 @@ import { ClipmapTerrain } from '../../../scene/terrain-cm/terrain-cm';
 import type { TerrainDebugMode } from '../../../material';
 import type { Texture2D } from '@zephyr3d/device';
 import type { Nullable } from '@zephyr3d/base';
+import { Vector4 } from '@zephyr3d/base';
 import type { ResourceManager } from '../manager';
 import { JSONArray } from '../json';
 import { getDevice } from '../../../app/api';
@@ -12,6 +13,29 @@ import { getDevice } from '../../../app/api';
 // layer count, so any realistic legacy file can not collide with this magic.
 const GRASS_DATA_MAGIC = 0x53415247;
 const GRASS_DATA_VERSION = 1;
+
+/** One entry of the GrassMaps property */
+type GrassLayerData = {
+  texture: string;
+  bladeWidth: number;
+  bladeHeight: number;
+  drawDistance?: number;
+  farDensity?: number;
+  /** Absent in scenes saved before blade layers, which are all card layers */
+  kind?: 'card' | 'blade';
+  blade?: {
+    heightRandomness?: number;
+    widthRandomness?: number;
+    tilt?: number;
+    tiltRandomness?: number;
+    bend?: number;
+    bendRandomness?: number;
+    taper?: number;
+    tipDetail?: number;
+    rootColor?: [number, number, number];
+    tipColor?: [number, number, number];
+  };
+};
 
 function getTerrainGrassContent(terrain: ClipmapTerrain): ArrayBuffer {
   const grassRenderer = terrain.grassRenderer;
@@ -240,37 +264,41 @@ export function getTerrainClass(manager: ResourceManager): SerializableClass {
             return false;
           },
           get(this: ClipmapTerrain, value) {
-            const data: {
-              texture: string;
-              bladeWidth: number;
-              bladeHeight: number;
-              drawDistance: number;
-              farDensity: number;
-            }[] = [];
+            const data: GrassLayerData[] = [];
             const numLayers = this.grassRenderer.numLayers;
             for (let i = 0; i < numLayers; i++) {
               const grassTexture = this.grassRenderer.getGrassTexture(i);
               const assetId = grassTexture ? (manager.getAssetId(grassTexture) ?? '') : '';
-              data.push({
+              const layer = this.grassRenderer.getLayer(i);
+              const info: GrassLayerData = {
                 texture: assetId,
                 bladeWidth: this.grassRenderer.getBladeWidth(i),
                 bladeHeight: this.grassRenderer.getBladeHeight(i),
                 drawDistance: this.grassRenderer.getDrawDistance(i),
                 farDensity: this.grassRenderer.getFarDensity(i)
-              });
+              };
+              if (layer.kind === 'blade') {
+                info.kind = 'blade';
+                info.blade = {
+                  heightRandomness: layer.heightRandomness,
+                  widthRandomness: layer.widthRandomness,
+                  tilt: layer.tilt,
+                  tiltRandomness: layer.tiltRandomness,
+                  bend: layer.bend,
+                  bendRandomness: layer.bendRandomness,
+                  taper: layer.taper,
+                  tipDetail: layer.tipDetail,
+                  rootColor: [layer.rootColor.x, layer.rootColor.y, layer.rootColor.z],
+                  tipColor: [layer.tipColor.x, layer.tipColor.y, layer.tipColor.z]
+                };
+              }
+              data.push(info);
             }
             value.object[0] = new JSONArray(null, data);
           },
           async set(this: ClipmapTerrain, value) {
             const json = value.object[0] as JSONArray;
-            const data =
-              (json?.data as {
-                texture: string;
-                bladeWidth: number;
-                bladeHeight: number;
-                drawDistance?: number;
-                farDensity?: number;
-              }[]) ?? [];
+            const data = (json?.data as GrassLayerData[]) ?? [];
             for (let i = 0; i < data.length; i++) {
               const info = data[i];
               const assetId = info.texture;
@@ -291,8 +319,37 @@ export function getTerrainClass(manager: ResourceManager): SerializableClass {
               const layer = this.grassRenderer.addLayer(
                 info.bladeWidth ?? 1,
                 info.bladeHeight ?? 1,
-                texture!
+                texture,
+                info.kind === 'blade' ? 'blade' : 'card'
               );
+              const blade = info.blade;
+              if (info.kind === 'blade' && blade) {
+                const grassLayer = this.grassRenderer.getLayer(layer);
+                grassLayer.heightRandomness = blade.heightRandomness ?? grassLayer.heightRandomness;
+                grassLayer.widthRandomness = blade.widthRandomness ?? grassLayer.widthRandomness;
+                grassLayer.tilt = blade.tilt ?? grassLayer.tilt;
+                grassLayer.tiltRandomness = blade.tiltRandomness ?? grassLayer.tiltRandomness;
+                grassLayer.bend = blade.bend ?? grassLayer.bend;
+                grassLayer.bendRandomness = blade.bendRandomness ?? grassLayer.bendRandomness;
+                grassLayer.taper = blade.taper ?? grassLayer.taper;
+                grassLayer.tipDetail = blade.tipDetail ?? grassLayer.tipDetail;
+                if (blade.rootColor) {
+                  grassLayer.rootColor = new Vector4(
+                    blade.rootColor[0],
+                    blade.rootColor[1],
+                    blade.rootColor[2],
+                    1
+                  );
+                }
+                if (blade.tipColor) {
+                  grassLayer.tipColor = new Vector4(
+                    blade.tipColor[0],
+                    blade.tipColor[1],
+                    blade.tipColor[2],
+                    1
+                  );
+                }
+              }
               if (info.drawDistance !== undefined) {
                 this.grassRenderer.setDrawDistance(layer, info.drawDistance);
               }

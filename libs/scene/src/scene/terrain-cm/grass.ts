@@ -1,13 +1,15 @@
 import type { IndexBuffer, StructuredBuffer, Texture2D } from '@zephyr3d/device';
-import type { Nullable, Vector4 } from '@zephyr3d/base';
-import { AABB, ClipState, nextPowerOf2, DRef, DWeakRef, Disposable, Vector3 } from '@zephyr3d/base';
+import type { Nullable } from '@zephyr3d/base';
+import { AABB, ClipState, nextPowerOf2, DRef, DWeakRef, Disposable, Vector3, Vector4 } from '@zephyr3d/base';
 import type { DrawContext } from '../../render';
 import type { Camera } from '../../camera';
 import { Primitive } from '../../render';
 import { ClipmapGrassMaterial } from './grassmaterial';
 import type { ClipmapTerrain } from './terrain-cm';
 import { getDevice } from '../../app/api';
+import type { GrassBladeShape, GrassLayerKind } from './grass_gpu';
 import { GrassGpuPlacement, GrassOcclusionMode, grassHash } from './grass_gpu';
+import { ClipmapBladeGrassMaterial, createBladeIndices } from './bladegrassmaterial';
 
 const INSTANCE_BYTES = 4 * 4;
 /** Number of placement cells along each axis of a grass tile */
@@ -19,6 +21,8 @@ const MAX_CELLS_PER_TEXEL = 8;
 const DEFAULT_DRAW_DISTANCE = 150;
 /** Default fraction of blades kept at the draw distance */
 const DEFAULT_FAR_DENSITY = 0.25;
+/** Default shape of procedural blades, see GrassBladeShape */
+const DEFAULT_BLADE_SHAPE = [0.5, 0.3, 0.04, 0.2, 0.25, 0.2, 0.15, 0.1];
 
 function distanceSqToAABB(x: number, y: number, z: number, aabb: AABB) {
   const dx = Math.max(aabb.minPoint.x - x, 0, x - aabb.maxPoint.x);
@@ -103,11 +107,16 @@ export class GrassInstances extends Disposable {
  */
 export class GrassLayer extends Disposable {
   private static readonly _indexBuffer: DRef<IndexBuffer> = new DRef();
+  private static readonly _bladeIndexBuffer: DRef<IndexBuffer> = new DRef();
+  private static readonly _bladeVertexBuffer: DRef<StructuredBuffer> = new DRef();
+  private static _bladeWarningShown = false;
   private static readonly _cullAABB = new AABB();
   private static readonly _cameraPos = new Vector3();
   private static readonly _visibleTiles: GrassInstances[] = [];
   private static readonly _instanceData = new Float32Array(TILE_CELLS * TILE_CELLS * 4);
-  private readonly _material: DRef<ClipmapGrassMaterial>;
+  private readonly _kind: GrassLayerKind;
+  private readonly _material: DRef<ClipmapGrassMaterial | ClipmapBladeGrassMaterial>;
+  private readonly _bladeShape: GrassBladeShape;
   private readonly _seed: number;
   private _bladeWidth: number;
   private _bladeHeight: number;
@@ -130,20 +139,29 @@ export class GrassLayer extends Disposable {
    * @param seed - Seed for deterministic blade placement, usually the layer index
    * @param bladeWidth - Grass blade width
    * @param bladeHeight - Grass blade height
-   * @param albedoMap - Albedo texture for the blade
+   * @param albedoMap - Albedo texture for the blade, card layers only
+   * @param kind - Textured cards, or procedural blades (drawn on WebGPU only)
    */
   constructor(
     terrain: ClipmapTerrain,
     seed: number,
     bladeWidth: number,
     bladeHeight: number,
-    albedoMap?: Texture2D
+    albedoMap?: Nullable<Texture2D>,
+    kind: GrassLayerKind = 'card'
   ) {
     super();
-    this._material = new DRef(new ClipmapGrassMaterial(terrain));
-    this._material.get()!.albedoTexture = albedoMap ?? null;
-    if (albedoMap) {
-      this._material.get()!.setTextureSize(albedoMap.width, albedoMap.height);
+    this._kind = kind;
+    this._bladeShape = new Float32Array(DEFAULT_BLADE_SHAPE);
+    if (kind === 'blade') {
+      this._material = new DRef(new ClipmapBladeGrassMaterial(terrain));
+    } else {
+      const material = new ClipmapGrassMaterial(terrain);
+      material.albedoTexture = albedoMap ?? null;
+      if (albedoMap) {
+        material.setTextureSize(albedoMap.width, albedoMap.height);
+      }
+      this._material = new DRef(material);
     }
     this._seed = seed;
     this._bladeWidth = bladeWidth;
@@ -159,9 +177,25 @@ export class GrassLayer extends Disposable {
     this._numBlades = 0;
     this._drawDistance = 0;
     this._farDensity = 1;
-    this._gpu = GrassGpuPlacement.isSupported()
-      ? new GrassGpuPlacement(this._baseVertexBuffer.get()!, GrassLayer._getIndexBuffer()!)
-      : null;
+    if (!GrassGpuPlacement.isSupported()) {
+      this._gpu = null;
+      if (kind === 'blade' && !GrassLayer._bladeWarningShown) {
+        GrassLayer._bladeWarningShown = true;
+        console.warn('Procedural grass blades need WebGPU with indirect draw; blade layers are not drawn');
+      }
+    } else if (kind === 'blade') {
+      this._gpu = new GrassGpuPlacement(
+        'blade',
+        GrassLayer._getBladeVertexBuffer()!,
+        GrassLayer._getBladeIndexBuffer()!
+      );
+    } else {
+      this._gpu = new GrassGpuPlacement('card', this._baseVertexBuffer.get()!, GrassLayer._getIndexBuffer()!);
+    }
+    if (kind === 'blade') {
+      this._bladeShape[0] = bladeHeight;
+      this._bladeShape[2] = bladeWidth;
+    }
     this._gpu?.setDensity(this._densityWidth, this._densityHeight, this._densityMap);
     this.drawDistance = DEFAULT_DRAW_DISTANCE;
     this.farDensity = DEFAULT_FAR_DENSITY;
@@ -200,26 +234,142 @@ export class GrassLayer extends Disposable {
       this._material.get()!.setFarDensity(val);
     }
   }
+  /** Kind of the blades of this layer, fixed at creation */
+  get kind() {
+    return this._kind;
+  }
   /** @internal */
   updateMaterial() {
     this._material.get()!.uniformChanged();
   }
   /**
-   * Sets the albedo texture of grass blades in this layer
+   * Sets the albedo texture of grass blades in this layer. Card layers only.
    * @param albedoMap - Albedo texture to set
    */
   setAlbedoMap(albedoMap: Texture2D) {
-    this._material.get()!.albedoTexture = albedoMap;
-    if (albedoMap) {
-      this._material.get()!.setTextureSize(albedoMap.width, albedoMap.height);
+    const material = this._material.get()!;
+    if (material instanceof ClipmapGrassMaterial) {
+      material.albedoTexture = albedoMap;
+      if (albedoMap) {
+        material.setTextureSize(albedoMap.width, albedoMap.height);
+      }
     }
   }
   /**
    * Gets the albedo texture of grass blades in this layer
-   * @returns - Albedo texture of grass blades in this layer
+   * @returns - Albedo texture of grass blades in this layer, null for blade layers
    */
   getAlbedoMap() {
-    return this._material.get()!.albedoTexture;
+    const material = this._material.get()!;
+    return material instanceof ClipmapGrassMaterial ? material.albedoTexture : null;
+  }
+  /** @internal */
+  private get bladeMaterial() {
+    const material = this._material.get()!;
+    return material instanceof ClipmapBladeGrassMaterial ? material : null;
+  }
+  /** @internal */
+  private setShape(index: number, value: number) {
+    if (Number.isFinite(value)) {
+      this._bladeShape[index] = value;
+    }
+  }
+  /**
+   * How much blade heights vary around the layer's blade height, as a fraction of it.
+   * Blade layers only.
+   */
+  get heightRandomness() {
+    return this._bladeShape[1];
+  }
+  set heightRandomness(val: number) {
+    this.setShape(1, Math.min(1, Math.max(0, val)));
+  }
+  /** How much blade widths vary around the layer's blade width, as a fraction of it. Blade layers only. */
+  get widthRandomness() {
+    return this._bladeShape[3];
+  }
+  set widthRandomness(val: number) {
+    this.setShape(3, Math.min(1, Math.max(0, val)));
+  }
+  /**
+   * How far the blades lean over: 0 stands them upright, 1 lays their tips on the ground.
+   * Blade layers only.
+   */
+  get tilt() {
+    return this._bladeShape[4];
+  }
+  set tilt(val: number) {
+    this.setShape(4, Math.min(1, Math.max(0, val)));
+  }
+  /** How much the lean varies from blade to blade. Blade layers only. */
+  get tiltRandomness() {
+    return this._bladeShape[5];
+  }
+  set tiltRandomness(val: number) {
+    this.setShape(5, Math.min(1, Math.max(0, val)));
+  }
+  /**
+   * How much the blades arch: 0 keeps them straight, higher values bow the middle up so the tips
+   * droop. Blade layers only.
+   */
+  get bend() {
+    return this._bladeShape[6];
+  }
+  set bend(val: number) {
+    this.setShape(6, Math.min(1, Math.max(-1, val)));
+  }
+  /** How much the arch varies from blade to blade. Blade layers only. */
+  get bendRandomness() {
+    return this._bladeShape[7];
+  }
+  set bendRandomness(val: number) {
+    this.setShape(7, Math.min(1, Math.max(0, val)));
+  }
+  /**
+   * How much the blades narrow toward the tip: 0 keeps them wide to the end, 1 narrows them evenly
+   * to a point. Blade layers only.
+   */
+  get taper() {
+    return this.bladeMaterial?.taper ?? 0;
+  }
+  set taper(val: number) {
+    const material = this.bladeMaterial;
+    if (material) {
+      material.taper = val;
+    }
+  }
+  /**
+   * Spends more of each blade's vertices near the tip, where it curves most. 1 spaces them
+   * evenly; higher values give smoother drooping tips. Blade layers only.
+   */
+  get tipDetail() {
+    return this.bladeMaterial?.tipDetail ?? 1;
+  }
+  set tipDetail(val: number) {
+    const material = this.bladeMaterial;
+    if (material) {
+      material.tipDetail = val;
+    }
+  }
+  /** Color at the root of the blades. Blade layers only. */
+  get rootColor(): Vector4 {
+    return this.bladeMaterial?.rootColor ?? Vector4.one();
+  }
+  set rootColor(val: Vector4) {
+    const material = this.bladeMaterial;
+    if (material) {
+      material.rootColor = val;
+    }
+  }
+  /** Color at the tip of the blades. Blade layers only. */
+  get tipColor(): Vector4 {
+    return this.bladeMaterial?.tipColor ?? Vector4.one();
+  }
+  set tipColor(val: Vector4) {
+    const material = this.bladeMaterial;
+    if (material) {
+      material.tipColor = val;
+    }
   }
   /**
    * How many grass blades are currently generated in this layer.
@@ -287,6 +437,9 @@ export class GrassLayer extends Disposable {
    * @param maxTexelZ - Maximum z texel of the region (exclusive)
    */
   updateDensityRegion(minTexelX: number, minTexelZ: number, maxTexelX: number, maxTexelZ: number) {
+    if (this._kind === 'blade' && !this._gpu) {
+      return;
+    }
     if (this._gpu) {
       this._gpu.updateDensityRegion(
         this._densityMap,
@@ -331,6 +484,9 @@ export class GrassLayer extends Disposable {
       this._gpu.setDensity(this._densityWidth, this._densityHeight, this._densityMap);
       return;
     }
+    if (this._kind === 'blade') {
+      return;
+    }
     for (let tz = 0; tz < this._tilesZ; tz++) {
       for (let tx = 0; tx < this._tilesX; tx++) {
         this.generateTile(tx, tz);
@@ -360,6 +516,11 @@ export class GrassLayer extends Disposable {
     if (width !== this._bladeWidth || height !== this._bladeHeight) {
       this._bladeWidth = width;
       this._bladeHeight = height;
+      if (this._kind === 'blade') {
+        this._bladeShape[0] = height;
+        this._bladeShape[2] = width;
+        return;
+      }
       this._baseVertexBuffer.set(this.createBaseVertexBuffer(this._bladeWidth, this._bladeHeight));
       for (const tile of this._tiles.values()) {
         tile.setBaseVertexBuffer(this._baseVertexBuffer.get()!);
@@ -467,6 +628,24 @@ export class GrassLayer extends Disposable {
     return this._indexBuffer.get();
   }
   /** @internal */
+  private static _getBladeIndexBuffer() {
+    if (!this._bladeIndexBuffer.get()) {
+      this._bladeIndexBuffer.set(getDevice().createIndexBuffer(createBladeIndices()));
+    }
+    return this._bladeIndexBuffer.get();
+  }
+  /**
+   * Procedural blades read nothing from their vertex buffer, but a draw still needs a vertex
+   * layout, which one vertex establishes
+   * @internal
+   */
+  private static _getBladeVertexBuffer() {
+    if (!this._bladeVertexBuffer.get()) {
+      this._bladeVertexBuffer.set(getDevice().createVertexBuffer('position_f32x3', new Float32Array(3))!);
+    }
+    return this._bladeVertexBuffer.get();
+  }
+  /** @internal */
   private createBaseVertexBuffer(bladeWidth: number, bladeHeight: number) {
     const device = getDevice();
     const r = bladeWidth * 0.5;
@@ -553,7 +732,8 @@ export class GrassLayer extends Disposable {
       this._bladeWidth,
       this._bladeHeight,
       occlusionMode,
-      this._farDensity
+      this._farDensity,
+      this._bladeShape
     );
   }
   /** @internal */
@@ -562,8 +742,19 @@ export class GrassLayer extends Disposable {
   }
   /** @internal */
   draw(ctx: DrawContext, region: Vector4, minY: number, maxY: number) {
+    if (this._kind === 'blade' && !this._gpu) {
+      return;
+    }
     if (this._gpu) {
       const material = this._material.get()!;
+      if (material instanceof ClipmapBladeGrassMaterial) {
+        const instances = this._gpu.instanceBuffer;
+        if (!instances) {
+          return;
+        }
+        material.setInstanceBuffer(instances);
+        material.prepareDraw(ctx.camera);
+      }
       material.apply(ctx);
       for (let pass = 0; pass < material.numPasses; pass++) {
         material.bind(ctx.device, pass);
@@ -724,16 +915,23 @@ export class GrassRenderer extends Disposable {
    * Adds a grass layer
    * @param bladeWidth - Width of grass blades in this layer
    * @param bladeHeight - Height of grass blades in this layer
-   * @param albedoMap - Albedo texture of grass blades in this layer
+   * @param albedoMap - Albedo texture of grass blades in this layer, card layers only
+   * @param kind - Textured cards (default), or procedural blades drawn on WebGPU only
    * @returns Index of the added grass layer
    */
-  addLayer(bladeWidth: number, bladeHeight: number, albedoMap?: Texture2D) {
+  addLayer(
+    bladeWidth: number,
+    bladeHeight: number,
+    albedoMap?: Nullable<Texture2D>,
+    kind: GrassLayerKind = 'card'
+  ) {
     const layer = new GrassLayer(
       this._terrain.get()!,
       this._layers.length,
       bladeWidth,
       bladeHeight,
-      albedoMap
+      albedoMap,
+      kind
     );
     layer.setOcclusionDebug(this._occlusionDebug);
     this._layers.push(layer);

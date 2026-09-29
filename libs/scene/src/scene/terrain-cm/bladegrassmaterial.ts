@@ -1,0 +1,385 @@
+import type { Clonable, Nullable } from '@zephyr3d/base';
+import { Vector2, Vector3, Vector4, DWeakRef, DRef } from '@zephyr3d/base';
+import type {
+  BindGroup,
+  GPUDataBuffer,
+  PBFunctionScope,
+  PBInsideFunctionScope,
+  PBShaderExp,
+  RenderStateSet
+} from '@zephyr3d/device';
+import { applyMaterialMixins, MeshMaterial, mixinPBRMetallicRoughness, ShaderHelper } from '../../material';
+import type { DrawContext } from '../../render';
+import type { Camera } from '../../camera';
+import { RENDER_PASS_TYPE_LIGHT } from '../../values';
+import type { ClipmapTerrain } from './terrain-cm';
+import { GRASS_LOD_FADE_BAND, grassDensityLod } from './grass_gpu';
+
+/** Vertices of a high detail blade: 7 pairs across the blade and one tip vertex */
+export const BLADE_VERTEX_PAIRS = 7;
+/** @internal */
+export const BLADE_VERTEX_COUNT = BLADE_VERTEX_PAIRS * 2 + 1;
+/** Number of vec4 per blade instance, see GrassGpuPlacement */
+export const BLADE_INSTANCE_VEC4 = 4;
+
+/**
+ * Triangle list of a blade: quads between consecutive vertex pairs, closed by the tip.
+ * Vertex 2k is the left side of pair k, 2k + 1 the right side, the last vertex the tip.
+ * @internal
+ */
+export function createBladeIndices(): Uint16Array<ArrayBuffer> {
+  const indices: number[] = [];
+  for (let k = 0; k < BLADE_VERTEX_PAIRS - 1; k++) {
+    const a = 2 * k;
+    indices.push(a, a + 1, a + 3, a, a + 3, a + 2);
+  }
+  const last = 2 * (BLADE_VERTEX_PAIRS - 1);
+  indices.push(last, last + 1, BLADE_VERTEX_COUNT - 1);
+  return new Uint16Array(indices);
+}
+
+/**
+ * Terrain grass material for procedural blades.
+ *
+ * Each blade is a cubic Bezier curve built in the vertex shader from the vertex index and the
+ * blade's instance data, following "Procedural Grass in Ghost of Tsushima" (Wohllaib, GDC 2021):
+ * the tip is placed from the tilt and the facing, the middle control points are pushed away from
+ * the base-tip line by the bend, and the vertex steps sideways by the tapered width. The normal is
+ * the cross product of the curve derivative and the width direction.
+ *
+ * Instance data is written by the GPU placement pass (GrassGpuPlacement), four vec4 per blade:
+ * - (base position xyz, density LOD hash; +2 when flagged as occluded)
+ * - (facing angle, previous facing angle, wind push, previous wind push)
+ * - (clump facing angle, clump color, side curve, per-blade hash)
+ * - (height, width, tilt, bend)
+ *
+ * @internal
+ */
+export class ClipmapBladeGrassMaterial
+  extends applyMaterialMixins(MeshMaterial, mixinPBRMetallicRoughness)
+  implements Clonable<ClipmapBladeGrassMaterial>
+{
+  /** @internal */
+  private readonly _terrain: DWeakRef<ClipmapTerrain>;
+  /** @internal */
+  private readonly _instances: DRef<GPUDataBuffer>;
+  /** (taper, tip detail, unused, unused) @internal */
+  private readonly _shape: Vector4;
+  /** @internal */
+  private readonly _rootColor: Vector4;
+  /** @internal */
+  private readonly _tipColor: Vector4;
+  /** @internal */
+  private readonly _distanceFade: Vector2;
+  /** @internal */
+  private readonly _densityLod: Vector2;
+  /** @internal */
+  private readonly _prevCameraPos: Vector4;
+  /** @internal */
+  private _drawDistance: number;
+  /** @internal */
+  private _farDensity: number;
+  /** @internal */
+  private static readonly _tmpPos = new Vector3();
+  /** @internal */
+  private static readonly FEATURE_OCCLUSION_DEBUG = this.defineFeature();
+  constructor(terrain: ClipmapTerrain) {
+    super();
+    this.metallic = 0;
+    this.roughness = 0.6;
+    this.doubleSidedLighting = true;
+    this.specularFactor = new Vector4(1, 1, 1, 0.3);
+    this._terrain = new DWeakRef(terrain);
+    this._instances = new DRef();
+    this._shape = new Vector4(0.7, 1.5, 0, 0);
+    this._rootColor = new Vector4(0.06, 0.1, 0.02, 1);
+    this._tipColor = new Vector4(0.35, 0.45, 0.12, 1);
+    this._distanceFade = new Vector2(0, 0);
+    this._densityLod = new Vector2(0, 1);
+    this._prevCameraPos = new Vector4();
+    this._drawDistance = 0;
+    this._farDensity = 1;
+    this.useFeature(ClipmapBladeGrassMaterial.FEATURE_OCCLUSION_DEBUG, false);
+  }
+  clone() {
+    const other = new ClipmapBladeGrassMaterial(this._terrain.get()!);
+    other.copyFrom(this);
+    return other;
+  }
+  copyFrom(other: this) {
+    super.copyFrom(other);
+    this._shape.set(other._shape);
+    this._rootColor.set(other._rootColor);
+    this._tipColor.set(other._tipColor);
+    this._distanceFade.set(other._distanceFade);
+    this._densityLod.set(other._densityLod);
+    this._drawDistance = other._drawDistance;
+    this._farDensity = other._farDensity;
+  }
+  /**
+   * Sets the instance buffer written by the GPU placement pass
+   * @internal
+   */
+  setInstanceBuffer(buffer: Nullable<GPUDataBuffer>) {
+    // Bound uniforms are only re-applied after uniformChanged(), and the placement pass
+    // reallocates the buffer whenever its placement window grows
+    if (buffer !== this._instances.get()) {
+      this._instances.set(buffer);
+      this.uniformChanged();
+    }
+  }
+  /**
+   * Updates the per-frame values before drawing for a camera: the previous camera position the
+   * motion vectors are computed against
+   * @internal
+   */
+  prepareDraw(camera: Camera) {
+    const prev = camera.prevPosition ?? camera.getWorldPosition(ClipmapBladeGrassMaterial._tmpPos);
+    const p = this._prevCameraPos;
+    if (p.x !== prev.x || p.y !== prev.y || p.z !== prev.z) {
+      p.setXYZW(prev.x, prev.y, prev.z, 0);
+      this.uniformChanged();
+    }
+  }
+  /** How much the blade narrows toward the tip, 0 keeps it the same width up to the tip vertex */
+  get taper() {
+    return this._shape.x;
+  }
+  set taper(val: number) {
+    val = Math.min(1, Math.max(0, val));
+    if (val !== this._shape.x) {
+      this._shape.x = val;
+      this.uniformChanged();
+    }
+  }
+  /** Moves the vertices toward the tip, where the blade curves most. 1 spaces them evenly. */
+  get tipDetail() {
+    return this._shape.y;
+  }
+  set tipDetail(val: number) {
+    val = Math.min(4, Math.max(1, val));
+    if (val !== this._shape.y) {
+      this._shape.y = val;
+      this.uniformChanged();
+    }
+  }
+  /** Color at the root of the blades */
+  get rootColor(): Vector4 {
+    return this._rootColor;
+  }
+  set rootColor(val: Vector4) {
+    this._rootColor.set(val);
+    this.uniformChanged();
+  }
+  /** Color at the tip of the blades */
+  get tipColor(): Vector4 {
+    return this._tipColor;
+  }
+  set tipColor(val: Vector4) {
+    this._tipColor.set(val);
+    this.uniformChanged();
+  }
+  /** @internal */
+  setDrawDistance(distance: number) {
+    this._drawDistance = distance;
+    this.updateDistanceParams();
+  }
+  /** @internal */
+  setFarDensity(farDensity: number) {
+    this._farDensity = farDensity;
+    this.updateDistanceParams();
+  }
+  /** @internal */
+  private updateDistanceParams() {
+    const distance = this._drawDistance;
+    const lod = grassDensityLod(distance, this._farDensity);
+    this._distanceFade.setXY(distance > 0 ? distance * 0.75 : 0, distance > 0 ? distance : 0);
+    this._densityLod.setXY(lod[0], lod[1]);
+    this.uniformChanged();
+  }
+  /** @internal */
+  get occlusionDebug() {
+    return !!this.featureUsed<boolean>(ClipmapBladeGrassMaterial.FEATURE_OCCLUSION_DEBUG);
+  }
+  set occlusionDebug(val: boolean) {
+    this.useFeature(ClipmapBladeGrassMaterial.FEATURE_OCCLUSION_DEBUG, !!val);
+  }
+  isTransparentPass(_pass: number) {
+    return false;
+  }
+  supportLighting() {
+    return true;
+  }
+  supportInstancing() {
+    return false;
+  }
+  applyUniformValues(bindGroup: BindGroup, ctx: DrawContext, pass: number) {
+    super.applyUniformValues(bindGroup, ctx, pass);
+    bindGroup.setBuffer('zBladeInstances', this._instances.get()!);
+    bindGroup.setValue('zBladeShape', this._shape);
+    bindGroup.setValue('zDistanceFade', this._distanceFade);
+    bindGroup.setValue('zDensityLod', this._densityLod);
+    bindGroup.setValue('zPrevCameraPos', this._prevCameraPos);
+    if (this.needFragmentColor(ctx)) {
+      bindGroup.setValue('zRootColor', this._rootColor);
+      bindGroup.setValue('zTipColor', this._tipColor);
+    }
+  }
+  /**
+   * Emits the world position of the current vertex of a blade as seen from a camera position.
+   * Only the density LOD depends on the camera; everything else comes from the instance.
+   */
+  private emitBladeVertex(scope: PBInsideFunctionScope, cameraPos: PBShaderExp, suffix: string) {
+    const pb = scope.$builder;
+    const v = (name: string) => `${name}${suffix}`;
+    // (width scale, overall scale), see ClipmapGrassMaterial
+    scope.$l[v('bladeScale')] = pb.vec2(1);
+    scope.$if(pb.greaterThan(scope.zDistanceFade.y, 0), function () {
+      this.$l.bladeDist = pb.distance(cameraPos, this.base);
+      this.$l.keep = pb.mix(
+        1,
+        this.zDensityLod.y,
+        pb.smoothStep(this.zDensityLod.x, this.zDistanceFade.y, this.bladeDist)
+      );
+      this[v('bladeScale')] = pb.vec2(
+        pb.div(1, this.keep),
+        pb.mul(
+          pb.sub(1, pb.smoothStep(this.zDistanceFade.x, this.zDistanceFade.y, this.bladeDist)),
+          pb.clamp(pb.div(pb.sub(this.keep, this.lodHash), GRASS_LOD_FADE_BAND), 0, 1)
+        )
+      );
+    });
+    const s = scope[v('bladeScale')] as PBShaderExp;
+    scope.$l[v('h')] = pb.mul(scope.inst3.x, s.y);
+    scope.$l[v('halfWidth')] = pb.mul(
+      scope.inst3.y,
+      s.x,
+      s.y,
+      0.5,
+      pb.mix(1, pb.sub(1, scope.t), scope.zBladeShape.x)
+    );
+    // Cubic Bezier from the base: tip from tilt and facing, middle points pushed away from the
+    // base-tip line by the bend (up and back when the blade leans forward)
+    scope.$l[v('p3')] = pb.mul(scope.tipDir, scope[v('h')]);
+    scope.$l[v('bendOffset')] = pb.mul(scope.bendDir, pb.mul(scope.inst3.w, scope[v('h')]));
+    scope.$l[v('p1')] = pb.add(pb.mul(scope[v('p3')], 1 / 3), scope[v('bendOffset')]);
+    scope.$l[v('p2')] = pb.add(pb.mul(scope[v('p3')], 2 / 3), scope[v('bendOffset')]);
+    scope.$l[v('curve')] = pb.add(
+      pb.mul(scope[v('p1')], pb.mul(3, scope.omt, scope.omt, scope.t)),
+      pb.mul(scope[v('p2')], pb.mul(3, scope.omt, scope.t, scope.t)),
+      pb.mul(scope[v('p3')], pb.mul(scope.t, scope.t, scope.t))
+    );
+    scope.$l[v('tangent')] = pb.add(
+      pb.mul(scope[v('p1')], pb.mul(3, scope.omt, pb.sub(scope.omt, pb.mul(scope.t, 2)))),
+      pb.mul(scope[v('p2')], pb.mul(3, scope.t, pb.sub(pb.mul(scope.omt, 2), scope.t))),
+      pb.mul(scope[v('p3')], pb.mul(3, scope.t, scope.t))
+    );
+    scope.$l[v('worldPos')] = pb.add(
+      scope.base,
+      scope[v('curve')],
+      pb.mul(scope.widthDir, pb.mul(scope.side, scope[v('halfWidth')]))
+    );
+  }
+  vertexShader(scope: PBFunctionScope) {
+    super.vertexShader(scope);
+    const pb = scope.$builder;
+    scope.zBladeInstances = pb.vec4[0]().storageBufferReadonly(2);
+    scope.zBladeShape = pb.vec4().uniform(2);
+    scope.zDistanceFade = pb.vec2().uniform(2);
+    scope.zDensityLod = pb.vec2().uniform(2);
+    scope.zPrevCameraPos = pb.vec4().uniform(2);
+    scope.$l.vid = pb.uint(scope.$builtins.vertexIndex);
+    scope.$l.first = pb.mul(pb.uint(scope.$builtins.instanceIndex), BLADE_INSTANCE_VEC4);
+    scope.$l.inst0 = scope.zBladeInstances.at(scope.first);
+    scope.$l.inst1 = scope.zBladeInstances.at(pb.add(scope.first, 1));
+    scope.$l.inst3 = scope.zBladeInstances.at(pb.add(scope.first, 3));
+    scope.$l.base = scope.inst0.xyz;
+    // The placement pass adds 2 to the hash of blades it flags as occluded
+    scope.$l.occluded = pb.step(1.5, scope.inst0.w);
+    if (this.occlusionDebug) {
+      scope.$outputs.zOccludedFlag = scope.occluded;
+    }
+    scope.$l.lodHash = pb.mul(pb.sub(scope.inst0.w, pb.mul(scope.occluded, 2)), 1 - GRASS_LOD_FADE_BAND);
+    // Where the vertex lies along the blade and on which side. The pairs are spread toward the tip
+    // by the tip detail exponent, the tip vertex sits on the center line.
+    scope.$l.isTip = pb.greaterThanEqual(scope.vid, pb.uint(BLADE_VERTEX_COUNT - 1));
+    scope.$l.along = pb.div(pb.float(pb.sar(scope.vid, 1)), BLADE_VERTEX_PAIRS);
+    scope.along = pb.mix(scope.along, 1, pb.float(scope.isTip));
+    scope.$l.t = pb.sub(1, pb.pow(pb.sub(1, scope.along), scope.zBladeShape.y));
+    scope.$l.omt = pb.sub(1, scope.t);
+    scope.$l.side = pb.mul(
+      pb.sub(pb.mul(pb.float(pb.compAnd(scope.vid, pb.uint(1))), 2), 1),
+      pb.sub(1, pb.float(scope.isTip))
+    );
+    // Blade frame: facing on the ground plane, width across it, tip direction leaning by the tilt
+    scope.$l.facing = pb.vec3(pb.cos(scope.inst1.x), 0, pb.sin(scope.inst1.x));
+    scope.$l.widthDir = pb.vec3(pb.neg(scope.facing.z), 0, scope.facing.x);
+    scope.$l.tiltAngle = pb.mul(scope.inst3.z, Math.PI * 0.5);
+    scope.$l.tipDir = pb.add(
+      pb.mul(scope.facing, pb.sin(scope.tiltAngle)),
+      pb.vec3(0, pb.cos(scope.tiltAngle), 0)
+    );
+    scope.$l.bendDir = pb.add(
+      pb.mul(scope.facing, pb.neg(pb.cos(scope.tiltAngle))),
+      pb.vec3(0, pb.sin(scope.tiltAngle), 0)
+    );
+    this.emitBladeVertex(scope, ShaderHelper.getCameraPosition(scope), '');
+    scope.$outputs.worldPos = scope.worldPos;
+    scope.$outputs.worldNorm = pb.normalize(pb.cross(scope.widthDir, scope.tangent));
+    scope.$outputs.zBladeT = scope.t;
+    ShaderHelper.setClipSpacePosition(
+      scope,
+      pb.mul(ShaderHelper.getViewProjectionMatrix(scope), pb.vec4(scope.worldPos, 1))
+    );
+    if (ShaderHelper.getPrevUnjitteredViewProjectionMatrix(scope)) {
+      // Where this vertex was last frame, for the motion vectors: the density LOD fade depends on
+      // the camera position, so it is replayed with last frame's camera
+      this.emitBladeVertex(scope, scope.zPrevCameraPos.xyz, 'Prev');
+      ShaderHelper.resolveMotionVector(scope, scope.worldPos, scope.worldPosPrev);
+    }
+  }
+  fragmentShader(scope: PBFunctionScope) {
+    super.fragmentShader(scope);
+    const pb = scope.$builder;
+    if (this.needFragmentColor()) {
+      scope.zRootColor = pb.vec4().uniform(2);
+      scope.zTipColor = pb.vec4().uniform(2);
+      scope.$l.albedo = pb.mix(scope.zRootColor, scope.zTipColor, scope.$inputs.zBladeT);
+      if (this.occlusionDebug) {
+        scope.albedo = pb.vec4(
+          pb.mix(scope.albedo.rgb, pb.vec3(1, 0, 0), scope.$inputs.zOccludedFlag),
+          scope.albedo.a
+        );
+      }
+      scope.$l.litColor = pb.vec3(0);
+      if (this.drawContext.renderPass!.type === RENDER_PASS_TYPE_LIGHT) {
+        scope.$l.normalInfo = this.calculateNormalAndTBN(
+          scope,
+          scope.$inputs.worldPos,
+          scope.$inputs.worldNorm
+        );
+        scope.$l.viewVec = this.calculateViewVector(scope, scope.$inputs.worldPos);
+        scope.$l.litColor = this.PBRLight(
+          scope,
+          scope.$inputs.worldPos,
+          scope.normalInfo.normal,
+          scope.viewVec,
+          scope.albedo,
+          scope.normalInfo.TBN
+        );
+      }
+      this.outputFragmentColor(scope, scope.$inputs.worldPos, pb.vec4(scope.litColor, 1));
+    } else {
+      this.outputFragmentColor(scope, scope.$inputs.worldPos, null);
+    }
+  }
+  protected updateRenderStates(pass: number, stateSet: RenderStateSet, ctx: DrawContext) {
+    super.updateRenderStates(pass, stateSet, ctx);
+    stateSet.useRasterizerState().setCullMode('none');
+  }
+  protected onDispose() {
+    super.onDispose();
+    this._instances.dispose();
+    this._terrain.dispose();
+  }
+}

@@ -41,6 +41,23 @@ export function grassDensityLod(drawDistance: number, farDensity: number): [numb
   }
   return [drawDistance * GRASS_LOD_START, Math.max(0.01, farDensity)];
 }
+/**
+ * Kind of blades a grass layer draws: textured cards, or procedural Bezier blades (WebGPU only)
+ * @public
+ */
+export type GrassLayerKind = 'card' | 'blade';
+/** Vec4 per instance written by the placement pass for each layer kind */
+const INSTANCE_VEC4: Record<GrassLayerKind, number> = { card: 1, blade: 4 };
+/** Seed offset of the procedural blade hashes, clear of the card hashes of every layer */
+const BLADE_SEED_BASE = 65536;
+/**
+ * Procedural blade shape parameters sent to the placement pass:
+ * (height, height randomness, width, width randomness, tilt, tilt randomness, bend, bend randomness).
+ * Height and width randomness are fractions of the base value, tilt and bend randomness absolute
+ * amounts, each applied as base + randomness * [-1, 1).
+ * @internal
+ */
+export type GrassBladeShape = Float32Array<ArrayBuffer>;
 /** Samples along the line of sight of the terrain occlusion test, one per workgroup thread */
 const OCCLUSION_SAMPLES = WORKGROUP_SIZE * WORKGROUP_SIZE;
 
@@ -88,15 +105,18 @@ export function grassHash(x: number, z: number, seed: number): number {
  * @internal
  */
 export class GrassGpuPlacement extends Disposable {
-  private static _program: Nullable<GPUProgram> = null;
+  private static readonly _programs: Partial<Record<GrassLayerKind, GPUProgram>> = {};
   private static readonly _cameraPos = new Vector3();
   private static readonly _planes = new Float32Array(24);
   private readonly _densityTexture: DRef<Texture2D>;
-  private readonly _instanceBuffer: DRef<StructuredBuffer>;
+  private readonly _kind: GrassLayerKind;
+  private readonly _instanceBuffer: DRef<GPUDataBuffer>;
   private readonly _argsBuffer: DRef<GPUDataBuffer>;
   private readonly _bindGroup: DRef<BindGroup>;
   private readonly _primitive: DRef<Primitive>;
   private readonly _baseVertexBuffer: DRef<StructuredBuffer>;
+  private readonly _shape0: Vector4;
+  private readonly _shape1: Vector4;
   private readonly _indexBuffer: DRef<IndexBuffer>;
   private readonly _args: Uint32Array<ArrayBuffer>;
   private readonly _window: Vector4;
@@ -115,8 +135,17 @@ export class GrassGpuPlacement extends Disposable {
     const device = getDevice();
     return device.type === 'webgpu' && device.getDeviceCaps().miscCaps.supportDrawIndirect;
   }
-  constructor(baseVertexBuffer: StructuredBuffer, indexBuffer: IndexBuffer) {
+  /**
+   * @param kind - Kind of blades placed
+   * @param baseVertexBuffer - Vertex buffer of the drawn blade. Procedural blades read nothing
+   *   from it; a draw still needs a vertex layout.
+   * @param indexBuffer - Index buffer of the drawn blade
+   */
+  constructor(kind: GrassLayerKind, baseVertexBuffer: StructuredBuffer, indexBuffer: IndexBuffer) {
     super();
+    this._kind = kind;
+    this._shape0 = new Vector4();
+    this._shape1 = new Vector4();
     this._densityTexture = new DRef();
     this._instanceBuffer = new DRef();
     this._argsBuffer = new DRef(getDevice().createBuffer(5 * 4, { usage: 'indirect', storage: true }));
@@ -195,7 +224,8 @@ export class GrassGpuPlacement extends Disposable {
     bladeWidth: number,
     bladeHeight: number,
     occlusionMode: GrassOcclusionMode,
-    farDensity: number
+    farDensity: number,
+    bladeShape?: GrassBladeShape
   ) {
     const density = this._densityTexture.get();
     const heightMap = terrain.heightMap;
@@ -232,10 +262,21 @@ export class GrassGpuPlacement extends Disposable {
     this._cells.setXYZW(cellsW, cellsH, density.width, density.height);
     // Bounding sphere of a blade, centred halfway up; the density LOD widens distant blades
     const lod = grassDensityLod(drawDistance, farDensity);
-    const maxWidth = bladeWidth / lod[1];
-    const radius = Math.sqrt(maxWidth * maxWidth * 0.25 + bladeHeight * bladeHeight * 0.25);
     this._densityLod.setXYZW(lod[0], lod[1], 0, 0);
-    this._params.setXYZW(seed * 4, drawDistance, radius, bladeHeight * 0.5);
+    if (this._kind === 'blade' && bladeShape) {
+      // A blade reaches at most its tallest height from its base in any direction, plus half its
+      // width widened by the density LOD
+      const maxHeight = bladeShape[0] * (1 + Math.abs(bladeShape[1]));
+      const maxWidth = (bladeShape[2] * (1 + Math.abs(bladeShape[3]))) / lod[1];
+      this._shape0.setXYZW(bladeShape[0], bladeShape[1], bladeShape[2], bladeShape[3]);
+      this._shape1.setXYZW(bladeShape[4], bladeShape[5], bladeShape[6], bladeShape[7]);
+      this._params.setXYZW(seed * 4, drawDistance, maxHeight + maxWidth * 0.5, 0);
+      bladeHeight = maxHeight;
+    } else {
+      const maxWidth = bladeWidth / lod[1];
+      const radius = Math.sqrt(maxWidth * maxWidth * 0.25 + bladeHeight * bladeHeight * 0.25);
+      this._params.setXYZW(seed * 4, drawDistance, radius, bladeHeight * 0.5);
+    }
     this._posScale.setXYZW(terrain.scale.x, terrain.scale.y, terrain.scale.z, terrain.worldMatrix.m13);
     this._camera.setXYZW(cameraPos.x, cameraPos.y, cameraPos.z, 0);
     // Terrain occlusion needs the height pyramid, and heights that grow upwards
@@ -273,6 +314,10 @@ export class GrassGpuPlacement extends Disposable {
     bindGroup.setValue('occlusion', this._occlusion);
     bindGroup.setValue('densityLod', this._densityLod);
     bindGroup.setValue('heightInfo', this._heightInfo);
+    if (this._kind === 'blade') {
+      bindGroup.setValue('shape0', this._shape0);
+      bindGroup.setValue('shape1', this._shape1);
+    }
     // Any texture of the right sample type does when occlusion is off. Declared unfilterable
     // (read with textureLoad only), so the sampler bound with it must be a non-filtering one
     // whatever the texture's default is: rg32f counts as filterable where the device has
@@ -285,9 +330,13 @@ export class GrassGpuPlacement extends Disposable {
     bindGroup.setTexture('density', density);
     bindGroup.setTexture('heightMap', heightMap, fetchSampler('clamp_linear_nomip'));
     const device = getDevice();
-    device.setProgram(GrassGpuPlacement.getProgram());
+    device.setProgram(GrassGpuPlacement.getProgram(this._kind));
     device.setBindGroup(0, bindGroup);
     device.compute(Math.ceil(windowW / WORKGROUP_SIZE), Math.ceil(windowH / WORKGROUP_SIZE), 1);
+  }
+  /** Instance buffer written by the last generate() call */
+  get instanceBuffer() {
+    return this._instanceBuffer.get();
   }
   /** Draws the blades of the last generate() call; the material must be bound */
   draw() {
@@ -299,7 +348,9 @@ export class GrassGpuPlacement extends Disposable {
       }
       primitive = new Primitive();
       primitive.setVertexBuffer(this._baseVertexBuffer.get()!);
-      primitive.setVertexBuffer(instanceBuffer, 'instance');
+      if (this._kind === 'card') {
+        primitive.setVertexBuffer(instanceBuffer as StructuredBuffer, 'instance');
+      }
       primitive.setIndexBuffer(this._indexBuffer.get());
       primitive.primitiveType = 'triangle-list';
       primitive.indexStart = 0;
@@ -311,9 +362,18 @@ export class GrassGpuPlacement extends Disposable {
   private ensureCapacity(numInstances: number) {
     if (numInstances > this._capacity) {
       this._capacity = nextPowerOf2(numInstances);
-      const buffer = getDevice().createVertexBuffer('tex1_f32x4', new Float32Array(this._capacity * 4), {
-        storage: true
-      })!;
+      const device = getDevice();
+      const buffer =
+        this._kind === 'card'
+          ? device.createVertexBuffer('tex1_f32x4', new Float32Array(this._capacity * 4), {
+              storage: true
+            })!
+          : device.createBuffer(this._capacity * INSTANCE_VEC4.blade * 16, {
+              usage: 'uniform',
+              storage: true,
+              dynamic: false,
+              managed: false
+            });
       this._instanceBuffer.set(buffer);
       this._primitive.dispose();
       this._bindGroup.dispose();
@@ -322,7 +382,7 @@ export class GrassGpuPlacement extends Disposable {
   private getBindGroup() {
     let bindGroup = this._bindGroup.get();
     if (!bindGroup) {
-      bindGroup = getDevice().createBindGroup(GrassGpuPlacement.getProgram().bindGroupLayouts[0]);
+      bindGroup = getDevice().createBindGroup(GrassGpuPlacement.getProgram(this._kind).bindGroupLayouts[0]);
       bindGroup.setBuffer('instances', this._instanceBuffer.get()!);
       bindGroup.setBuffer('args', this._argsBuffer.get()!);
       this._bindGroup.set(bindGroup);
@@ -337,10 +397,12 @@ export class GrassGpuPlacement extends Disposable {
     }
     return this._dummyPyramid;
   }
-  private static getProgram() {
-    if (!this._program) {
-      this._program = getDevice().buildComputeProgram({
-        label: 'GrassPlacement',
+  private static getProgram(kind: GrassLayerKind) {
+    let program = this._programs[kind];
+    if (!program) {
+      const blade = kind === 'blade';
+      program = getDevice().buildComputeProgram({
+        label: blade ? 'GrassBladePlacement' : 'GrassPlacement',
         workgroupSize: [WORKGROUP_SIZE, WORKGROUP_SIZE, 1],
         compute(pb) {
           // (first cell x, first cell z, cells wide, cells high)
@@ -360,6 +422,11 @@ export class GrassGpuPlacement extends Disposable {
           this.densityLod = pb.vec4().uniform(0);
           // (height map width, height map height, pyramid mip count, grid cell size)
           this.heightInfo = pb.vec4().uniform(0);
+          if (blade) {
+            // See GrassBladeShape
+            this.shape0 = pb.vec4().uniform(0);
+            this.shape1 = pb.vec4().uniform(0);
+          }
           this.heightPyramid = pb.tex2D().sampleType('unfilterable-float').uniform(0);
           this.occludedFlag = pb.atomic_uint().workgroup();
           this.density = pb.tex2D().uniform(0);
@@ -609,14 +676,44 @@ export class GrassGpuPlacement extends Disposable {
                       );
                       // Occluded blades kept for debugging are flagged by adding 2 to the hash
                       this.$l.slot = pb.atomicAdd(this.args.at(1), 1);
-                      this.instances.setAt(
-                        this.slot,
-                        pb.vec4(
-                          this.uv,
-                          this.angle,
-                          pb.add(this.lodHash, pb.mul(pb.float(pb.notEqual(this.occluded, 0)), 2))
-                        )
+                      this.$l.flaggedHash = pb.add(
+                        this.lodHash,
+                        pb.mul(pb.float(pb.notEqual(this.occluded, 0)), 2)
                       );
+                      if (!blade) {
+                        this.instances.setAt(this.slot, pb.vec4(this.uv, this.angle, this.flaggedHash));
+                      } else {
+                        // Layout: see ClipmapBladeGrassMaterial
+                        this.$l.bseed = pb.add(pb.mul(this.seed, 16), pb.uint(BLADE_SEED_BASE));
+                        const signedHash = (scope: PBInsideFunctionScope, k: number) =>
+                          pb.sub(pb.mul(scope.grassHash(scope.cx, scope.cz, pb.add(scope.bseed, k)), 2), 1);
+                        this.$l.bladeHeight = pb.mul(
+                          this.shape0.x,
+                          pb.max(0, pb.add(1, pb.mul(this.shape0.y, signedHash(this, 0))))
+                        );
+                        this.$l.bladeWidth = pb.mul(
+                          this.shape0.z,
+                          pb.max(0, pb.add(1, pb.mul(this.shape0.w, signedHash(this, 1))))
+                        );
+                        this.$l.tilt = pb.clamp(
+                          pb.add(this.shape1.x, pb.mul(this.shape1.y, signedHash(this, 2))),
+                          0,
+                          1
+                        );
+                        this.$l.bend = pb.add(this.shape1.z, pb.mul(this.shape1.w, signedHash(this, 3)));
+                        this.$l.bladeHash = this.grassHash(this.cx, this.cz, pb.add(this.bseed, 4));
+                        this.$l.first = pb.mul(this.slot, INSTANCE_VEC4.blade);
+                        this.instances.setAt(this.first, pb.vec4(this.base, this.flaggedHash));
+                        this.instances.setAt(pb.add(this.first, 1), pb.vec4(this.angle, this.angle, 0, 0));
+                        this.instances.setAt(
+                          pb.add(this.first, 2),
+                          pb.vec4(this.angle, 0, 0, this.bladeHash)
+                        );
+                        this.instances.setAt(
+                          pb.add(this.first, 3),
+                          pb.vec4(this.bladeHeight, this.bladeWidth, this.tilt, this.bend)
+                        );
+                      }
                     });
                   }
                 );
@@ -625,8 +722,9 @@ export class GrassGpuPlacement extends Disposable {
           });
         }
       })!;
+      this._programs[kind] = program;
     }
-    return this._program;
+    return program;
   }
   protected onDispose() {
     super.onDispose();

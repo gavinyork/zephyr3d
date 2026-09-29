@@ -795,6 +795,14 @@ export class TerrainEditTool extends Disposable implements EditTool {
   getTarget(): any {
     return this._terrain.get();
   }
+  /** Adds a procedural blade grass layer and selects it */
+  addBladeGrassLayer() {
+    const grassRenderer = this._terrain.get().grassRenderer;
+    grassRenderer.addLayer(0.04, 0.5, null, 'blade');
+    this.refreshGrassTextures();
+    this._grassAlbedo.selected = grassRenderer.numLayers - 1;
+    eventBus.dispatchEvent('scene_changed');
+  }
   refreshGrassTextures() {
     const grassRenderer = this._terrain.get().grassRenderer;
     this._grassAlbedo.clear();
