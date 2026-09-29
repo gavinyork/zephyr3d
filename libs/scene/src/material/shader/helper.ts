@@ -1425,7 +1425,17 @@ export class ShaderHelper {
       ...(ctx.screenSpaceShadowMask ? { numShadowLights: ctx.clusteredLight?.numShadowLights ?? 0 } : {})
     });
     bindGroup.setBuffer(UNIFORM_NAME_LIGHT_BUFFER, lightBuffer);
-    bindGroup.setTexture(UNIFORM_NAME_LIGHT_INDEX_TEXTURE, lightIndexTexture);
+    if (ctx.device.type === 'webgl') {
+      // Sampled as a float texture: packed indices must not be filtered, and linear
+      // filtering of float textures without OES_texture_float_linear reads all zero.
+      bindGroup.setTexture(
+        UNIFORM_NAME_LIGHT_INDEX_TEXTURE,
+        lightIndexTexture,
+        fetchSampler('clamp_nearest_nomip')
+      );
+    } else {
+      bindGroup.setTexture(UNIFORM_NAME_LIGHT_INDEX_TEXTURE, lightIndexTexture);
+    }
     if (ctx.screenSpaceShadowMask) {
       // The mask array is declared for the clustered light pass whenever the flag is
       // on (keyed into the global bind group hash). When there are no shadow lights
@@ -3013,8 +3023,25 @@ export class ShaderHelper {
     });
     return pb.getGlobalScope()[funcName](outputColor);
   }
-  /** @internal */
+  /**
+   * Capacity of the clustered light buffer, excluding the unused slot 0.
+   *
+   * @remarks
+   * Elsewhere the buffer is 4 vec4 per light in a uniform block, and 255 is the most a
+   * byte-sized cluster slot can address. WebGL1 has no uniform blocks, so the buffer is
+   * a plain uniform array competing with every other uniform of the lit fragment shader
+   * for MAX_FRAGMENT_UNIFORM_VECTORS - 221 or 256 on many GPUs, where 64 lights (260
+   * vectors) alone would fail to link. 128 vectors, or half the limit if that is smaller,
+   * are left to the other uniforms.
+   * @internal
+   */
   static getMaxClusterLights() {
-    return getDevice().type === 'webgl' ? 64 : 255;
+    const device = getDevice();
+    if (device.type !== 'webgl') {
+      return 255;
+    }
+    const maxVectors = device.getDeviceCaps().shaderCaps.maxFragmentUniformVectors;
+    const budget = maxVectors - Math.min(128, maxVectors >> 1);
+    return Math.max(1, Math.min(64, (budget >> 2) - 1));
   }
 }

@@ -278,6 +278,8 @@ export class WebGLShaderCaps implements ShaderCaps {
   uniformBufferOffsetAlignment: number;
   maxStorageBufferSize: number;
   storageBufferOffsetAlignment: number;
+  maxVertexUniformVectors: number;
+  maxFragmentUniformVectors: number;
   constructor(gl: WebGLContext) {
     this._extFragDepth = null;
     this._extStandardDerivatives = null;
@@ -285,6 +287,9 @@ export class WebGLShaderCaps implements ShaderCaps {
     this.supportShaderF16 = false;
     this.maxStorageBufferSize = 0;
     this.storageBufferOffsetAlignment = 0;
+    // Spec minimums as fallbacks.
+    this.maxVertexUniformVectors = gl.getParameter(gl.MAX_VERTEX_UNIFORM_VECTORS) || 128;
+    this.maxFragmentUniformVectors = gl.getParameter(gl.MAX_FRAGMENT_UNIFORM_VECTORS) || 16;
     if (isWebGL2(gl)) {
       this.supportFragmentDepth = true;
       this.supportStandardDerivatives = true;

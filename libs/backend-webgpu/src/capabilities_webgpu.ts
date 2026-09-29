@@ -84,6 +84,8 @@ export class WebGPUShaderCaps implements ShaderCaps {
   uniformBufferOffsetAlignment: number;
   maxStorageBufferSize: number;
   storageBufferOffsetAlignment: number;
+  maxVertexUniformVectors: number;
+  maxFragmentUniformVectors: number;
   constructor(device: WebGPUDevice) {
     this.supportFragmentDepth = true;
     this.supportStandardDerivatives = true;
@@ -94,6 +96,9 @@ export class WebGPUShaderCaps implements ShaderCaps {
     this.uniformBufferOffsetAlignment = device.device.limits.minUniformBufferOffsetAlignment || 256;
     this.maxStorageBufferSize = device.device.limits.maxStorageBufferBindingSize || 128 * 1024 * 1024;
     this.storageBufferOffsetAlignment = device.device.limits.minStorageBufferOffsetAlignment || 256;
+    // No loose uniforms: what one uniform buffer binding holds.
+    this.maxVertexUniformVectors = this.maxUniformBufferSize >> 4;
+    this.maxFragmentUniformVectors = this.maxUniformBufferSize >> 4;
   }
 }
 export class WebGPUTextureCaps implements TextureCaps {

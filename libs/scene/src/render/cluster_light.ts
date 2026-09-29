@@ -6,17 +6,20 @@ import type {
   BindGroup,
   FrameBuffer,
   GPUProgram,
-  PBStructTypeInfo,
   RenderStateSet,
   StructuredBuffer,
   Texture2D,
   VertexLayout
 } from '@zephyr3d/device';
+import { PBArrayTypeInfo, PBPrimitiveType, PBPrimitiveTypeInfo, PBStructTypeInfo } from '@zephyr3d/device';
 import type { Camera } from '../camera/camera';
 import type { RenderQueue } from './render_queue';
 import type { PunctualLight } from '../scene/light';
 import { ShaderHelper } from '../material/shader/helper';
 import { getDevice } from '../app/api';
+
+/** Name of the index pass's per-light view-space bounding spheres. */
+const UNIFORM_NAME_LIGHT_SPHERES = 'lightSpheres';
 
 export class ClusteredLight {
   /** Emit the shadow-mask overflow warning only once per session. */
@@ -41,6 +44,8 @@ export class ClusteredLight {
   private readonly _tileCountY: number;
   private readonly _tileCountZ: number;
   private readonly _lights: Float32Array<ArrayBuffer>;
+  /** View-space position and range of each light in `_lights`, for culling. */
+  private readonly _lightSpheres: Float32Array<ArrayBuffer>;
   private _lightIndexTexture: Nullable<Texture2D>;
   private _lightIndexFramebuffer: Nullable<FrameBuffer>;
   private _lightIndexProgram: Nullable<GPUProgram>;
@@ -48,6 +53,7 @@ export class ClusteredLight {
   private _lightIndexVertexLayout: Nullable<VertexLayout>;
   private _lightIndexRenderStates: Nullable<RenderStateSet>;
   private _lightBuffer: Nullable<StructuredBuffer>;
+  private _lightSphereBuffer: Nullable<StructuredBuffer>;
   private readonly _sizeParam: Vector4;
   private _countParam: Int32Array<ArrayBuffer>;
   private readonly _clusterParam: Vector4;
@@ -60,10 +66,12 @@ export class ClusteredLight {
     this._tileCountY = 16;
     this._tileCountZ = 32;
     this._lights = new Float32Array(16 * (ShaderHelper.getMaxClusterLights() + 1));
+    this._lightSpheres = new Float32Array(4 * (ShaderHelper.getMaxClusterLights() + 1));
     this._lightIndexTexture = null;
     this._lightIndexFramebuffer = null;
     this._lightIndexProgram = null;
     this._lightBuffer = null;
+    this._lightSphereBuffer = null;
     this._bindGroup = null;
     this._lightIndexVertexLayout = null;
     this._lightIndexRenderStates = null;
@@ -103,9 +111,10 @@ export class ClusteredLight {
   }
   private createVertexLayout(device: AbstractDevice, textureWidth: number, textureHeight: number) {
     let vb: StructuredBuffer;
+    const numClusters = this._tileCountX * this._tileCountY * this._tileCountZ;
     if (device.type === 'webgl') {
-      const vertices = new Float32Array(this._tileCountX * this._tileCountY * this._tileCountZ * 3);
-      for (let i = 0; i < vertices.length; i++) {
+      const vertices = new Float32Array(numClusters * 3);
+      for (let i = 0; i < numClusters; i++) {
         const ix = i % textureWidth;
         const iy = Math.floor(i / textureWidth);
         vertices[i * 3 + 0] = (2 * (ix + 0.5)) / textureWidth - 1;
@@ -114,8 +123,8 @@ export class ClusteredLight {
       }
       vb = device.createVertexBuffer('position_f32x3', vertices)!;
     } else {
-      const vertices = new Float32Array(this._tileCountX * this._tileCountY * this._tileCountZ * 2);
-      for (let i = 0; i < vertices.length; i++) {
+      const vertices = new Float32Array(numClusters * 2);
+      for (let i = 0; i < numClusters; i++) {
         const ix = i % textureWidth;
         const iy = Math.floor(i / textureWidth);
         vertices[i * 2 + 0] = (2 * (ix + 0.5)) / textureWidth - 1;
@@ -139,12 +148,12 @@ export class ClusteredLight {
         this.$inputs.pos = (webgl1 ? pb.vec3() : pb.vec2()).attrib('position');
         this.$outputs.value = webgl1 ? pb.vec4() : pb.uvec4();
         this.invProjMatrix = pb.mat4().uniform(0);
-        this.viewMatrix = pb.mat4().uniform(0);
         this.sizeParam = pb.vec4().uniform(0);
         this.countParam = pb.ivec4().uniform(0);
         this.orthoProj = pb.int().uniform(0);
-        this[ShaderHelper.getLightBufferUniformName()] =
-          pb.vec4[(ShaderHelper.getMaxClusterLights() + 1) * 4]().uniformBuffer(0);
+        // Already in view space: transformed once per light on the CPU rather than once
+        // per light in each of the clusters.
+        this[UNIFORM_NAME_LIGHT_SPHERES] = pb.vec4[ShaderHelper.getMaxClusterLights() + 1]().uniformBuffer(0);
         pb.func('lineIntersectionToZPlane', [pb.vec3('a'), pb.vec3('b'), pb.float('zDistance')], function () {
           this.$l.normal = pb.vec3(0, 0, 1);
           this.$l.ab = pb.sub(this.b, this.a);
@@ -279,9 +288,7 @@ export class ClusteredLight {
               this.$if(pb.equal(this.i, this.countParam.w), function () {
                 this.$break();
               });
-              this.$l.light = this[ShaderHelper.getLightBufferUniformName()].at(pb.mul(this.i, 4));
-              this.$l.lightPos = pb.mul(this.viewMatrix, pb.vec4(this.light.xyz, 1));
-              this.$l.lightPos.w = this.light.w;
+              this.$l.lightPos = this[UNIFORM_NAME_LIGHT_SPHERES].at(this.i);
               this.$if(this.sphereIntersectsAABB(this.lightPos, this.aabbMin, this.aabbMax), function () {
                 this.$for(pb.int('j'), 0, 8, function () {
                   this.$if(pb.equal(this.j, this.n), function () {
@@ -319,9 +326,7 @@ export class ClusteredLight {
               pb.uint(0)
             ];
             this.$for(pb.uint('i'), 1, pb.uint(this.countParam.w), function () {
-              this.$l.light = this[ShaderHelper.getLightBufferUniformName()].at(pb.mul(this.i, 4));
-              this.$l.lightPos = pb.mul(this.viewMatrix, pb.vec4(this.light.xyz, 1));
-              this.$l.lightPos.w = this.light.w;
+              this.$l.lightPos = this[UNIFORM_NAME_LIGHT_SPHERES].at(this.i);
               this.$if(this.sphereIntersectsAABB(this.lightPos, this.aabbMin, this.aabbMax), function () {
                 this.lightIndex.setAt(this.n, this.i);
                 this.n = pb.add(this.n, 1);
@@ -367,13 +372,24 @@ export class ClusteredLight {
     })!;
     this._lightIndexProgram.name = '@ClusteredLight_Index';
     this._bindGroup = device.createBindGroup(this._lightIndexProgram.bindGroupLayouts[0]);
-    this._lightBuffer?.dispose();
-    const lightBufferType = this._lightIndexProgram.getBindingInfo(
-      ShaderHelper.getLightBufferUniformName()!
-    )!.type;
-    this._lightBuffer = device.createStructuredBuffer(lightBufferType as PBStructTypeInfo, {
+    this._lightSphereBuffer?.dispose();
+    const sphereBufferType = this._lightIndexProgram.getBindingInfo(UNIFORM_NAME_LIGHT_SPHERES)!.type;
+    this._lightSphereBuffer = device.createStructuredBuffer(sphereBufferType as PBStructTypeInfo, {
       usage: 'uniform'
     });
+  }
+  /** Creates the light buffer read by the lit shaders, laid out as ShaderHelper declares it. */
+  private createLightBuffer(device: AbstractDevice) {
+    const lightBufferType = new PBStructTypeInfo('ClusteredLightBuffer', 'std140', [
+      {
+        name: ShaderHelper.getLightBufferUniformName(),
+        type: new PBArrayTypeInfo(
+          new PBPrimitiveTypeInfo(PBPrimitiveType.F32VEC4),
+          (ShaderHelper.getMaxClusterLights() + 1) * 4
+        )
+      }
+    ]);
+    this._lightBuffer = device.createStructuredBuffer(lightBufferType, { usage: 'uniform' });
   }
   private createLightIndexTexture(device: AbstractDevice) {
     const exp = Math.log2(this._tileCountX * this._tileCountY * this._tileCountZ);
@@ -426,6 +442,9 @@ export class ClusteredLight {
     if (!this._lightIndexProgram) {
       this.createProgram(device);
     }
+    if (!this._lightBuffer) {
+      this.createLightBuffer(device);
+    }
     if (!this._lightIndexVertexLayout) {
       this.createVertexLayout(device, this._lightIndexTexture!.width, this._lightIndexTexture!.height);
     }
@@ -464,13 +483,17 @@ export class ClusteredLight {
       if (this._lightBuffer!.disposed) {
         this._lightBuffer!.reload();
       }
-      this._lightBuffer!.bufferSubData(0, this._lights);
+      if (this._lightSphereBuffer!.disposed) {
+        this._lightSphereBuffer!.reload();
+      }
+      // Slot 0 is never read, so upload only up to the last light.
+      this._lightBuffer!.bufferSubData(0, this._lights, 0, (numLights + 1) * 16);
+      this._lightSphereBuffer!.bufferSubData(0, this._lightSpheres, 0, (numLights + 1) * 4);
       this._bindGroup!.setValue('invProjMatrix', camera.getInvProjectionMatrix());
-      this._bindGroup!.setValue('viewMatrix', camera.viewMatrix);
       this._bindGroup!.setValue('sizeParam', this._sizeParam);
       this._bindGroup!.setValue('countParam', this._countParam);
       this._bindGroup!.setValue('orthoProj', this._orthographic ? 1 : 0);
-      this._bindGroup!.setBuffer(ShaderHelper.getLightBufferUniformName(), this._lightBuffer!);
+      this._bindGroup!.setBuffer(UNIFORM_NAME_LIGHT_SPHERES, this._lightSphereBuffer!);
       device.setProgram(this._lightIndexProgram);
       device.setVertexLayout(this._lightIndexVertexLayout);
       device.setBindGroup(0, this._bindGroup!);
@@ -530,10 +553,22 @@ export class ClusteredLight {
     useShadowMask: boolean,
     preExposure: number
   ) {
+    const view = camera.viewMatrix;
+    const spheres = this._lightSpheres;
     const writeLight = (light: PunctualLight, slot: number) => {
       const offset = slot * 16;
       const colorIntensity = light.diffuseAndIntensity;
-      lights.set(light.positionAndRange, offset);
+      const posRange = light.positionAndRange;
+      lights.set(posRange, offset);
+      // The view matrix is column-major.
+      const x = posRange.x;
+      const y = posRange.y;
+      const z = posRange.z;
+      const s = slot * 4;
+      spheres[s + 0] = view[0] * x + view[4] * y + view[8] * z + view[12];
+      spheres[s + 1] = view[1] * x + view[5] * y + view[9] * z + view[13];
+      spheres[s + 2] = view[2] * x + view[6] * y + view[10] * z + view[14];
+      spheres[s + 3] = posRange.w;
       lights.set(light.directionAndCutoff, offset + 4);
       // Only the intensity carries the camera pre-exposure; the color stays as authored. The
       // light's own cached vector must not be mutated because it is shared across cameras.

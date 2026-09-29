@@ -2312,6 +2312,26 @@ export interface ShaderCaps {
   maxStorageBufferSize: number;
   /** The storage buffer offset alignment */
   storageBufferOffsetAlignment: number;
+  /**
+   * The maximum number of vec4 uniform vectors in a vertex shader.
+   *
+   * @remarks
+   * On WebGL this is MAX_VERTEX_UNIFORM_VECTORS, which bounds plain uniforms only;
+   * uniform blocks are bounded by {@link ShaderCaps.maxUniformBufferSize} instead.
+   * WebGPU has no plain uniforms and reports the vec4 capacity of one uniform buffer
+   * binding.
+   */
+  maxVertexUniformVectors: number;
+  /**
+   * The maximum number of vec4 uniform vectors in a fragment shader.
+   *
+   * @remarks
+   * On WebGL this is MAX_FRAGMENT_UNIFORM_VECTORS, which bounds plain uniforms only;
+   * uniform blocks are bounded by {@link ShaderCaps.maxUniformBufferSize} instead.
+   * WebGPU has no plain uniforms and reports the vec4 capacity of one uniform buffer
+   * binding.
+   */
+  maxFragmentUniformVectors: number;
 }
 
 /**

@@ -88,6 +88,8 @@ export class NullShaderCaps implements ShaderCaps {
   uniformBufferOffsetAlignment: number;
   maxStorageBufferSize: number;
   storageBufferOffsetAlignment: number;
+  maxVertexUniformVectors: number;
+  maxFragmentUniformVectors: number;
   constructor(type: NullDeviceType, overrides?: Partial<ShaderCaps>) {
     const webgl1 = type === 'webgl';
     this.supportFragmentDepth = !webgl1;
@@ -99,6 +101,8 @@ export class NullShaderCaps implements ShaderCaps {
     this.uniformBufferOffsetAlignment = 256;
     this.maxStorageBufferSize = 128 * 1024 * 1024;
     this.storageBufferOffsetAlignment = 256;
+    this.maxVertexUniformVectors = type === 'webgpu' ? this.maxUniformBufferSize >> 4 : 256;
+    this.maxFragmentUniformVectors = type === 'webgpu' ? this.maxUniformBufferSize >> 4 : 1024;
     Object.assign(this, overrides ?? {});
   }
 }
