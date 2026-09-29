@@ -7,6 +7,8 @@ import type { DrawContext, Drawable } from '../drawable';
 import { RenderQueue, InstanceBindGroupAllocator } from '../render_queue';
 import { LightPass } from '../lightpass';
 import { DepthPass } from '../depthpass';
+import { ClusteredLight } from '../cluster_light';
+import { ShaderHelper } from '../../material/shader/helper';
 import type { RGExecuteContext } from './types';
 
 // The facade renders to a single color target.
@@ -41,6 +43,9 @@ type DrawContextState = Pick<
   | 'sunLight'
   | 'primaryDirectionalLight'
   | 'primaryTransmissionLight'
+  | 'clusteredLight'
+  | 'screenSpaceShadowMask'
+  | 'transmissionThickness'
 >;
 
 function snapshotDrawContext(ctx: DrawContext): DrawContextState {
@@ -62,7 +67,10 @@ function snapshotDrawContext(ctx: DrawContext): DrawContextState {
     depthPrepassAttachment: ctx.depthPrepassAttachment,
     sunLight: ctx.sunLight,
     primaryDirectionalLight: ctx.primaryDirectionalLight,
-    primaryTransmissionLight: ctx.primaryTransmissionLight
+    primaryTransmissionLight: ctx.primaryTransmissionLight,
+    clusteredLight: ctx.clusteredLight,
+    screenSpaceShadowMask: ctx.screenSpaceShadowMask,
+    transmissionThickness: ctx.transmissionThickness
   };
 }
 
@@ -320,6 +328,9 @@ class SceneRenderContextImpl implements SceneRenderContext {
       ctx.sunLight = queue.sunLight;
       ctx.primaryDirectionalLight = queue.primaryDirectionalLight;
       ctx.primaryTransmissionLight = queue.primaryTransmissionLight;
+      if (savedContext.clusteredLight) {
+        this._clusterLights(target, queue, camera);
+      }
       _sceneLightPass.transmission = false;
       _sceneLightPass.renderSky = false;
       _sceneLightPass.renderOpaque = renderOpaque;
@@ -339,6 +350,35 @@ class SceneRenderContextImpl implements SceneRenderContext {
       restoreDrawContext(ctx, savedContext);
       device.popDeviceStates();
     }
+  }
+
+  /**
+   * Replaces the frame's clusters with ones built for this render.
+   *
+   * @remarks
+   * The frame's clusters were built for the frame camera's view, the frame queue's
+   * lights and the render size, none of which need hold here. The screen-space shadow
+   * mask and transmission thickness go too: they were rendered from the frame camera
+   * and are indexed by that cluster buffer's ordinals, so shadow-casting lights fall
+   * back to the per-light additive path, as on transparent queues. The caller restores
+   * all three fields.
+   */
+  private _clusterLights(target: FrameBuffer, queue: RenderQueue, camera: Camera): void {
+    const ctx = this._ctx;
+    ctx.screenSpaceShadowMask = false;
+    ctx.transmissionThickness = false;
+    const clusteredLight = ClusteredLight.acquire();
+    // Released after graph execution: the draws reading it may still be pending before.
+    this._rgCtx.deferCleanup(() => ClusteredLight.release(clusteredLight));
+    clusteredLight.calculateLightIndex(
+      camera,
+      queue,
+      target.getWidth(),
+      target.getHeight(),
+      false,
+      ShaderHelper.getPreExposure(ctx)
+    );
+    ctx.clusteredLight = clusteredLight;
   }
 
   renderDepth(target: FrameBuffer, queue: RenderQueue, opts?: SceneRenderOptions): void {

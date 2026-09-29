@@ -21,6 +21,22 @@ import { getDevice } from '../app/api';
 export class ClusteredLight {
   /** Emit the shadow-mask overflow warning only once per session. */
   private static _warnedShadowMaskOverflow = false;
+  /** Instances returned by {@link ClusteredLight.release}, reused to keep their GPU resources. */
+  private static readonly _pool: ClusteredLight[] = [];
+  /**
+   * Fetches an instance from the pool, creating one if it is empty.
+   *
+   * @remarks
+   * The GPU work reading an instance's buffers may still be pending when the render
+   * code is done with it, so release it only after the render graph has executed.
+   */
+  static acquire(): ClusteredLight {
+    return this._pool.pop() ?? new ClusteredLight();
+  }
+  /** Returns an instance obtained from {@link ClusteredLight.acquire} to the pool. */
+  static release(cl: ClusteredLight) {
+    this._pool.push(cl);
+  }
   private readonly _tileCountX: number;
   private readonly _tileCountY: number;
   private readonly _tileCountZ: number;
@@ -378,9 +394,21 @@ export class ClusteredLight {
     this._lightIndexFramebuffer?.dispose();
     this._lightIndexFramebuffer = device.createFrameBuffer([this._lightIndexTexture], null);
   }
+  /**
+   * Builds the per-cluster light lists for a camera.
+   *
+   * @param width - Width in device pixels of the target the lit pass will draw into.
+   * @param height - Height in device pixels of that target.
+   *
+   * @remarks
+   * The lit shader maps `fragCoord` to a tile with `width`/`height`, so they must be the
+   * size of the target it actually renders to, not whatever viewport is current here.
+   */
   calculateLightIndex(
     camera: Camera,
     renderQueue: RenderQueue,
+    width: number,
+    height: number,
     screenSpaceShadowMask = camera.screenSpaceShadowMask,
     preExposure = 1
   ) {
@@ -404,9 +432,8 @@ export class ClusteredLight {
     if (!this._lightIndexRenderStates) {
       this.createRenderState(device);
     }
-    const viewport = device.getViewport();
-    const vw = device.screenXToDevice(viewport.width);
-    const vh = device.screenYToDevice(viewport.height);
+    const vw = width;
+    const vh = height;
     const near = camera.getNearPlane();
     const far = camera.getFarPlane();
     // The lit shader computes slice = t * scale + bias, where t is log2(view depth) for

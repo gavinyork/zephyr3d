@@ -64,7 +64,6 @@ import { selectUnderwaterSource, UnderwaterRenderer } from '../underwater';
 const _scenePass = new LightPass();
 const _depthPass = new DepthPass();
 const _shadowMapPass = new ShadowMapPass();
-const _clusters: ClusteredLight[] = [];
 const _shadowMaskRenderer = new ShadowMaskRenderer();
 const _transmissionThicknessRenderer = new TransmissionThicknessRenderer();
 const _waterCausticsRenderer = new WaterCausticsRenderer();
@@ -107,13 +106,6 @@ const SURFACE_MRT_FLAGS =
   MaterialVaryingFlags.SCENE_STORE_NORMAL |
   MaterialVaryingFlags.SSS_STORE_TRANSMISSION |
   MaterialVaryingFlags.SKIN_SSS_STORE;
-
-function getClusteredLight(): ClusteredLight {
-  return _clusters.length > 0 ? _clusters.pop()! : new ClusteredLight();
-}
-function freeClusteredLight(cl: ClusteredLight): void {
-  _clusters.push(cl);
-}
 
 function getCoreMaterial(material: unknown): unknown {
   return (material as { coreMaterial?: unknown } | null | undefined)?.coreMaterial ?? material ?? null;
@@ -628,10 +620,13 @@ const ClusterLightsModule: RenderModule<FrameGraphContext> = {
       ordering.emit(builder, 'ClusterLightsDone');
       builder.sideEffect();
       builder.setExecute(() => {
-        ctx.clusteredLight = getClusteredLight();
+        ctx.clusteredLight = ClusteredLight.acquire();
+        // The light passes draw into targets of the render size (see renderOpaqueScenePass).
         ctx.clusteredLight.calculateLightIndex(
           ctx.camera,
           renderQueue,
+          ctx.renderWidth,
+          ctx.renderHeight,
           ctx.screenSpaceShadowMask,
           ShaderHelper.getPreExposure(ctx)
         );
@@ -2274,7 +2269,7 @@ function disposeRenderQueue(frame: FrameState): void {
 
 function releaseClusteredLight(frame: FrameState): void {
   if (!frame.clusteredLightReleased && frame.ctx.clusteredLight) {
-    freeClusteredLight(frame.ctx.clusteredLight);
+    ClusteredLight.release(frame.ctx.clusteredLight);
     frame.ctx.clusteredLight = undefined;
     frame.clusteredLightReleased = true;
   }
