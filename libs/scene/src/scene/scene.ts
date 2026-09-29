@@ -487,6 +487,7 @@ export class Scene
     const frameInfo = getDevice().frameInfo;
     if (frameInfo.frameCounter !== this._updateFrame) {
       this._updateFrame = frameInfo.frameCounter;
+      this._env.wind.update(frameInfo.elapsedFrame * 0.001);
       this.updateEnvLight();
       this.dispatchEvent('update', this);
       this.mainCamera?.updateController();

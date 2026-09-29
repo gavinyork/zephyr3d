@@ -5,6 +5,7 @@ import type { DrawContext, EnvironmentLighting } from '../render';
 import { EnvShIBL } from '../render';
 import { EnvConstantAmbient, EnvHemisphericAmbient } from '../render';
 import { SkyRenderer } from '../render/sky';
+import { WindField } from './wind';
 import type { FrameBuffer, GPUDataBuffer, TextureCube } from '@zephyr3d/device';
 
 /**
@@ -277,11 +278,13 @@ export class EnvLightWrapper extends Disposable {
 export class Environment extends Disposable {
   private readonly _sky: SkyRenderer;
   private readonly _light: EnvLightWrapper;
+  private readonly _wind: WindField;
   /** @internal */
   constructor() {
     super();
     this._sky = new SkyRenderer();
     this._light = new EnvLightWrapper();
+    this._wind = new WindField();
     // The physical `intensity` only reaches the image through the cached sky bake, so changing it
     // has to re-bake; otherwise the cubemap keeps the value it was baked with.
     this._light.setBakeInvalidator(() => this._sky.invalidate());
@@ -293,6 +296,10 @@ export class Environment extends Disposable {
   /** The environment lighting renderer */
   get light() {
     return this._light;
+  }
+  /** The scene-wide wind */
+  get wind() {
+    return this._wind;
   }
   /** @internal */
   getHash(ctx: DrawContext) {

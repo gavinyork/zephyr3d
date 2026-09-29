@@ -849,6 +849,99 @@ export function getSceneClass(manager: ResourceManager): SerializableClass {
           }
         },
         {
+          name: 'WindFieldDirection',
+          description:
+            'Compass direction the wind blows toward, in degrees. Grass leans and gusts travel this way',
+          type: 'float',
+          default: 0,
+          options: { group: 'Wind', label: 'Direction', animatable: true, minValue: -180, maxValue: 180 },
+          get(this: Scene, value) {
+            value.num[0] = this.env.wind.direction;
+          },
+          set(this: Scene, value) {
+            this.env.wind.direction = value.num[0];
+          }
+        },
+        {
+          name: 'WindFieldStrength',
+          description: 'How hard the wind blows. 0 is still air; higher values bend grass further over',
+          type: 'float',
+          default: 0.3,
+          options: { group: 'Wind', label: 'Strength', animatable: true, minValue: 0, maxValue: 2 },
+          get(this: Scene, value) {
+            value.num[0] = this.env.wind.strength;
+          },
+          set(this: Scene, value) {
+            this.env.wind.strength = value.num[0];
+          }
+        },
+        {
+          name: 'WindFieldSpeed',
+          description: 'How fast the gusts sweep across the ground, in units per second',
+          type: 'float',
+          default: 4,
+          options: { group: 'Wind', label: 'GustSpeed', animatable: true, minValue: 0, maxValue: 50 },
+          get(this: Scene, value) {
+            value.num[0] = this.env.wind.speed;
+          },
+          set(this: Scene, value) {
+            this.env.wind.speed = value.num[0];
+          }
+        },
+        {
+          name: 'WindFieldGustStrength',
+          description:
+            'How strongly gusts come and go. 0 gives a steady wind; higher values make waves of stronger wind roll through fields',
+          type: 'float',
+          default: 0.6,
+          options: { group: 'Wind', label: 'GustStrength', animatable: true, minValue: 0, maxValue: 2 },
+          get(this: Scene, value) {
+            value.num[0] = this.env.wind.gustStrength;
+          },
+          set(this: Scene, value) {
+            this.env.wind.gustStrength = value.num[0];
+          }
+        },
+        {
+          name: 'WindFieldGustScale',
+          description: 'Size of a gust on the ground, in units. Larger values give broad, slow-looking waves',
+          type: 'float',
+          default: 30,
+          options: { group: 'Wind', label: 'GustSize', animatable: true, minValue: 0.1, maxValue: 500 },
+          get(this: Scene, value) {
+            value.num[0] = this.env.wind.gustScale;
+          },
+          set(this: Scene, value) {
+            this.env.wind.gustScale = value.num[0];
+          }
+        },
+        {
+          name: 'WindFieldDetailStrength',
+          description: 'Amount of small, fast flutter on top of the gusts',
+          type: 'float',
+          default: 0.25,
+          options: { group: 'Wind', label: 'TurbulenceStrength', animatable: true, minValue: 0, maxValue: 2 },
+          get(this: Scene, value) {
+            value.num[0] = this.env.wind.detailStrength;
+          },
+          set(this: Scene, value) {
+            this.env.wind.detailStrength = value.num[0];
+          }
+        },
+        {
+          name: 'WindFieldDetailScale',
+          description: 'Size of the small flutter patches, in units',
+          type: 'float',
+          default: 4,
+          options: { group: 'Wind', label: 'TurbulenceSize', animatable: true, minValue: 0.1, maxValue: 100 },
+          get(this: Scene, value) {
+            value.num[0] = this.env.wind.detailScale;
+          },
+          set(this: Scene, value) {
+            this.env.wind.detailScale = value.num[0];
+          }
+        },
+        {
           name: 'NodeHierarchy',
           description: 'Node tree of this scene',
           type: 'object',

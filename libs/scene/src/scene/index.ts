@@ -1,5 +1,6 @@
 export * from './scene';
 export * from './environment';
+export * from './wind';
 export * from './graph_node';
 export * from './light';
 export * from './mesh';
