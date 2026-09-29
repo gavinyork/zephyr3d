@@ -48,6 +48,7 @@ type GrassLayerData = {
     windLean?: number;
     swayAmplitude?: number;
     swaySpeed?: number;
+    lodDistance?: number;
     rootColor?: [number, number, number];
     tipColor?: [number, number, number];
   };
@@ -320,6 +321,7 @@ export function getTerrainClass(manager: ResourceManager): SerializableClass {
                   windLean: layer.windLean,
                   swayAmplitude: layer.swayAmplitude,
                   swaySpeed: layer.swaySpeed,
+                  lodDistance: layer.lodDistance,
                   rootColor: [layer.rootColor.x, layer.rootColor.y, layer.rootColor.z],
                   tipColor: [layer.tipColor.x, layer.tipColor.y, layer.tipColor.z]
                 };
@@ -382,6 +384,7 @@ export function getTerrainClass(manager: ResourceManager): SerializableClass {
                 grassLayer.windLean = blade.windLean ?? grassLayer.windLean;
                 grassLayer.swayAmplitude = blade.swayAmplitude ?? grassLayer.swayAmplitude;
                 grassLayer.swaySpeed = blade.swaySpeed ?? grassLayer.swaySpeed;
+                grassLayer.lodDistance = blade.lodDistance ?? grassLayer.lodDistance;
                 if (blade.rootColor) {
                   grassLayer.rootColor = new Vector4(
                     blade.rootColor[0],

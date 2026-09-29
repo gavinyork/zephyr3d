@@ -15,29 +15,46 @@ import type { Camera } from '../../camera';
 import type { WindField } from '../wind';
 import { RENDER_PASS_TYPE_LIGHT } from '../../values';
 import type { ClipmapTerrain } from './terrain-cm';
-import { GRASS_LOD_FADE_BAND, grassDensityLod } from './grass_gpu';
+import { GRASS_BLADE_LOD_BAND, grassBladeLodDistance } from './grass_gpu';
 import { fetchSampler } from '../../utility/misc';
 
-/** Vertices of a high detail blade: 7 pairs across the blade and one tip vertex */
-export const BLADE_VERTEX_PAIRS = 7;
-/** @internal */
-export const BLADE_VERTEX_COUNT = BLADE_VERTEX_PAIRS * 2 + 1;
+/**
+ * Vertex pairs across a blade at the high and the low detail level, each closed by one tip
+ * vertex: 15 and 7 vertices, as in "Procedural Grass in Ghost of Tsushima" (Wohllaib, GDC 2021)
+ */
+const BLADE_HIGH_PAIRS = 7;
+const BLADE_LOW_PAIRS = 3;
+/**
+ * First vertex index of the low detail level. The vertex index tells the vertex shader which
+ * level it draws, so both draws share one program and one set of uniforms.
+ */
+const BLADE_LOW_VERTEX_BASE = 16;
 /** Number of vec4 per blade instance, see GrassGpuPlacement */
 export const BLADE_INSTANCE_VEC4 = 4;
+/**
+ * Index counts of the high and the low detail level, which follow each other in the index buffer
+ * @internal
+ */
+export const BLADE_LOD_INDEX_COUNTS = [BLADE_HIGH_PAIRS, BLADE_LOW_PAIRS].map((pairs) => (pairs - 1) * 6 + 3);
 
 /**
- * Triangle list of a blade: quads between consecutive vertex pairs, closed by the tip.
- * Vertex 2k is the left side of pair k, 2k + 1 the right side, the last vertex the tip.
+ * Triangle lists of a blade at the high then the low detail level: quads between consecutive
+ * vertex pairs, closed by the tip. Vertex base + 2k is the left side of pair k, base + 2k + 1 the
+ * right side, base + 2 * pairs the tip.
  * @internal
  */
 export function createBladeIndices(): Uint16Array<ArrayBuffer> {
   const indices: number[] = [];
-  for (let k = 0; k < BLADE_VERTEX_PAIRS - 1; k++) {
-    const a = 2 * k;
-    indices.push(a, a + 1, a + 3, a, a + 3, a + 2);
-  }
-  const last = 2 * (BLADE_VERTEX_PAIRS - 1);
-  indices.push(last, last + 1, BLADE_VERTEX_COUNT - 1);
+  const level = (base: number, pairs: number) => {
+    for (let k = 0; k < pairs - 1; k++) {
+      const a = base + 2 * k;
+      indices.push(a, a + 1, a + 3, a, a + 3, a + 2);
+    }
+    const last = base + 2 * (pairs - 1);
+    indices.push(last, last + 1, base + 2 * pairs);
+  };
+  level(0, BLADE_HIGH_PAIRS);
+  level(BLADE_LOW_VERTEX_BASE, BLADE_LOW_PAIRS);
   return new Uint16Array(indices);
 }
 
@@ -65,8 +82,18 @@ export function createBladeIndices(): Uint16Array<ArrayBuffer> {
  * clump (a color texture, or root and tip colors with a per-clump brightness), and an ambient
  * occlusion that darkens toward the root, where the other blades hide the sky.
  *
+ * Two detail levels (see GrassGpuPlacement): near the switch distance, the three blades in four
+ * that give way shrink away while the fourth widens to four times its width - Outerra's
+ * procedural grass (outerra.blogspot.com, 2012) doubles the width for each halving of the blades
+ * to keep the ground as covered, and a quarter of the blades is two halvings - and morphs toward
+ * its low detail shape - the
+ * talk blends the high detail vertices toward the low detail shape; each vertex here moves onto
+ * the low detail outline the way CDLOD (Strugar, 2009) morphs terrain vertices onto the coarser
+ * grid - so the switch does not pop.
+ *
  * Instance data is written by the GPU placement pass (GrassGpuPlacement), four vec4 per blade:
- * - (base position xyz, density LOD hash; +2 when flagged as occluded)
+ * - (base position xyz, 1 for a blade that gives way to the low detail level; +2 when flagged as
+ *   occluded)
  * - (facing angle, previous facing angle, wind push, previous wind push); the placement pass
  *   samples the scene wind for this frame and the last one and turns the facing downwind
  * - (clump facing angle, clump color, packed terrain normal, per-blade hash)
@@ -100,8 +127,10 @@ export class ClipmapBladeGrassMaterial
   private readonly _tipColor: Vector4;
   /** @internal */
   private readonly _distanceFade: Vector2;
+  /** (low detail distance, first instance of the low detail list, unused, unused) @internal */
+  private readonly _lod: Vector4;
   /** @internal */
-  private readonly _densityLod: Vector2;
+  private _lodDistance: number;
   /** @internal */
   private readonly _prevCameraPos: Vector4;
   /** @internal */
@@ -133,7 +162,8 @@ export class ClipmapBladeGrassMaterial
     this._rootColor = new Vector4(0.06, 0.1, 0.02, 1);
     this._tipColor = new Vector4(0.35, 0.45, 0.12, 1);
     this._distanceFade = new Vector2(0, 0);
-    this._densityLod = new Vector2(0, 1);
+    this._lod = new Vector4(0, 0, 0, 0);
+    this._lodDistance = 0;
     this._prevCameraPos = new Vector4();
     this._drawDistance = 0;
     this._farDensity = 1;
@@ -155,20 +185,36 @@ export class ClipmapBladeGrassMaterial
     this._rootColor.set(other._rootColor);
     this._tipColor.set(other._tipColor);
     this._distanceFade.set(other._distanceFade);
-    this._densityLod.set(other._densityLod);
     this._drawDistance = other._drawDistance;
     this._farDensity = other._farDensity;
+    this._lodDistance = other._lodDistance;
+    this.updateDistanceParams();
   }
   /**
    * Sets the instance buffer written by the GPU placement pass
    * @internal
    */
-  setInstanceBuffer(buffer: Nullable<GPUDataBuffer>) {
+  setInstanceBuffer(buffer: Nullable<GPUDataBuffer>, lowListBase: number) {
     // Bound uniforms are only re-applied after uniformChanged(), and the placement pass
     // reallocates the buffer whenever its placement window grows
-    if (buffer !== this._instances.get()) {
+    if (buffer !== this._instances.get() || lowListBase !== this._lod.y) {
       this._instances.set(buffer);
+      this._lod.y = lowListBase;
       this.uniformChanged();
+    }
+  }
+  /**
+   * Distance at which the blades switch to the low detail level; 0 keeps them all at high detail
+   * @internal
+   */
+  get lodDistance() {
+    return this._lodDistance;
+  }
+  set lodDistance(val: number) {
+    val = Math.max(0, val);
+    if (val !== this._lodDistance) {
+      this._lodDistance = val;
+      this.updateDistanceParams();
     }
   }
   /**
@@ -367,17 +413,20 @@ export class ClipmapBladeGrassMaterial
     this._drawDistance = distance;
     this.updateDistanceParams();
   }
-  /** @internal */
+  /**
+   * Kept for the interface shared with the card material: blades thin out by their detail levels
+   * instead
+   * @internal
+   */
   setFarDensity(farDensity: number) {
     this._farDensity = farDensity;
-    this.updateDistanceParams();
   }
   /** @internal */
   private updateDistanceParams() {
     const distance = this._drawDistance;
-    const lod = grassDensityLod(distance, this._farDensity);
     this._distanceFade.setXY(distance > 0 ? distance * 0.75 : 0, distance > 0 ? distance : 0);
-    this._densityLod.setXY(lod[0], lod[1]);
+    // The same switch distance as the placement pass
+    this._lod.x = grassBladeLodDistance(this._lodDistance, distance);
     this.uniformChanged();
   }
   /** @internal */
@@ -405,7 +454,7 @@ export class ClipmapBladeGrassMaterial
     bindGroup.setValue('zBladeWind', this._wind);
     bindGroup.setValue('zWindTime', this._windTime);
     bindGroup.setValue('zDistanceFade', this._distanceFade);
-    bindGroup.setValue('zDensityLod', this._densityLod);
+    bindGroup.setValue('zBladeLod', this._lod);
     bindGroup.setValue('zPrevCameraPos', this._prevCameraPos);
     if (this.needFragmentColor(ctx)) {
       bindGroup.setValue('zRootColor', this._rootColor);
@@ -417,8 +466,9 @@ export class ClipmapBladeGrassMaterial
     }
   }
   /**
-   * Emits the world position of the current vertex of a blade as seen from a camera position.
-   * Only the density LOD depends on the camera; everything else comes from the instance.
+   * Emits the world position and flat normal of the current vertex of a blade as seen from a
+   * camera position, into `worldPos` and `flatNormal` suffixed by `suffix`. The camera position
+   * drives the detail level transition, the draw distance fade and the view-space thickening.
    */
   private emitBladeVertex(
     scope: PBInsideFunctionScope,
@@ -448,32 +498,32 @@ export class ClipmapBladeGrassMaterial
       pb.mul(scope[v('facing')], pb.neg(pb.cos(scope[v('tiltAngle')]))),
       pb.vec3(0, pb.sin(scope[v('tiltAngle')]), 0)
     );
-    // (width scale, overall scale), see ClipmapGrassMaterial
-    scope.$l[v('bladeScale')] = pb.vec2(1);
+    // Detail level transition over the last band before the switch distance: 0 before it, 1 at and
+    // past it, which is where every blade of the low detail list is
+    scope.$l[v('bladeDist')] = pb.distance(cameraPos, scope.base);
+    scope.$l[v('lodFade')] = pb.smoothStep(
+      pb.mul(scope.zBladeLod.x, 1 - GRASS_BLADE_LOD_BAND),
+      scope.zBladeLod.x,
+      scope[v('bladeDist')]
+    );
+    // (width scale, overall scale): the blades that stay widen to four times their width, the others
+    // shrink away; everything shrinks into the ground over the last quarter of the draw distance
+    scope.$l[v('bladeScale')] = pb.vec2(
+      pb.add(1, pb.mul(scope[v('lodFade')], 3)),
+      pb.sub(1, pb.mul(scope.extra, scope[v('lodFade')]))
+    );
     scope.$if(pb.greaterThan(scope.zDistanceFade.y, 0), function () {
-      this.$l.bladeDist = pb.distance(cameraPos, this.base);
-      this.$l.keep = pb.mix(
-        1,
-        this.zDensityLod.y,
-        pb.smoothStep(this.zDensityLod.x, this.zDistanceFade.y, this.bladeDist)
-      );
       this[v('bladeScale')] = pb.vec2(
-        pb.div(1, this.keep),
+        this[v('bladeScale')].x,
         pb.mul(
-          pb.sub(1, pb.smoothStep(this.zDistanceFade.x, this.zDistanceFade.y, this.bladeDist)),
-          pb.clamp(pb.div(pb.sub(this.keep, this.lodHash), GRASS_LOD_FADE_BAND), 0, 1)
+          this[v('bladeScale')].y,
+          pb.sub(1, pb.smoothStep(this.zDistanceFade.x, this.zDistanceFade.y, this[v('bladeDist')]))
         )
       );
     });
     const s = scope[v('bladeScale')] as PBShaderExp;
     scope.$l[v('h')] = pb.mul(scope.inst3.x, s.y);
-    scope.$l[v('halfWidth')] = pb.mul(
-      scope.inst3.y,
-      s.x,
-      s.y,
-      0.5,
-      pb.mix(1, pb.sub(1, scope.t), scope.zBladeShape.x)
-    );
+    scope.$l[v('widthScale')] = pb.mul(scope.inst3.y, s.x, s.y, 0.5);
     // Cubic Bezier from the base: tip from tilt and facing, middle points pushed away from the
     // base-tip line by the bend (up and back when the blade leans forward)
     scope.$l[v('p3')] = pb.mul(scope[v('tipDir')], scope[v('h')]);
@@ -499,40 +549,82 @@ export class ClipmapBladeGrassMaterial
       scope[v('p3')],
       pb.mul(scope[v('bendDir')], pb.mul(scope[v('swayAmount')], pb.sin(scope[v('swayPhase')])))
     );
-    scope.$l[v('curve')] = pb.add(
-      pb.mul(scope[v('p1')], pb.mul(3, scope.omt, scope.omt, scope.t)),
-      pb.mul(scope[v('p2')], pb.mul(3, scope.omt, scope.t, scope.t)),
-      pb.mul(scope[v('p3')], pb.mul(scope.t, scope.t, scope.t))
-    );
-    scope.$l[v('tangent')] = pb.add(
-      pb.mul(scope[v('p1')], pb.mul(3, scope.omt, pb.sub(scope.omt, pb.mul(scope.t, 2)))),
-      pb.mul(scope[v('p2')], pb.mul(3, scope.t, pb.sub(pb.mul(scope.omt, 2), scope.t))),
-      pb.mul(scope[v('p3')], pb.mul(3, scope.t, scope.t))
-    );
-    // View-space thickening: when the blade's normal is nearly orthogonal to the view vector the
-    // blade is seen edge-on, so its sides also step apart across the view. The response curve is
-    // the one of the cainrademan/Unity-Grass reimplementation.
-    scope.$l[v('centre')] = pb.add(scope.base, scope[v('curve')]);
-    scope.$l[v('toCamera')] = pb.normalize(pb.sub(cameraPos, scope[v('centre')]));
-    scope.$l[v('flatNormal')] = pb.normalize(pb.cross(scope[v('widthDir')], scope[v('tangent')]));
-    scope.$l[v('edgeOn')] = pb.sub(
-      1,
-      pb.smoothStep(0, 0.3, pb.abs(pb.dot(scope[v('flatNormal')], scope[v('toCamera')])))
-    );
-    scope.$l[v('across')] = pb.cross(scope[v('toCamera')], pb.normalize(scope[v('tangent')]));
-    // Keep the sides on the same side as the blade's own width, so the blade never folds over
-    scope[v('across')] = pb.mul(
-      scope[v('across')],
-      pb.sub(pb.mul(pb.step(0, pb.dot(scope[v('across')], scope[v('widthDir')])), 2), 1)
-    );
-    scope.$l[v('worldPos')] = pb.add(
-      scope[v('centre')],
-      pb.mul(scope[v('widthDir')], pb.mul(scope.side, scope[v('halfWidth')])),
-      pb.mul(
-        scope[v('across')],
-        pb.mul(scope.side, scope[v('halfWidth')], scope.zBladeLook.y, scope[v('edgeOn')])
-      )
-    );
+    // Point of the blade at curve parameter t on side `side` (-1, 1, 0 on the center line), into
+    // `${tag}Pos` and `${tag}Normal`
+    const point = (sc: PBInsideFunctionScope, t: PBShaderExp, side: PBShaderExp, tag: string) => {
+      sc.$l[`${tag}T`] = t;
+      sc.$l[`${tag}Omt`] = pb.sub(1, sc[`${tag}T`]);
+      const tt = sc[`${tag}T`] as PBShaderExp;
+      const omt = sc[`${tag}Omt`] as PBShaderExp;
+      sc.$l[`${tag}Curve`] = pb.add(
+        pb.mul(sc[v('p1')], pb.mul(3, omt, omt, tt)),
+        pb.mul(sc[v('p2')], pb.mul(3, omt, tt, tt)),
+        pb.mul(sc[v('p3')], pb.mul(tt, tt, tt))
+      );
+      sc.$l[`${tag}Tangent`] = pb.add(
+        pb.mul(sc[v('p1')], pb.mul(3, omt, pb.sub(omt, pb.mul(tt, 2)))),
+        pb.mul(sc[v('p2')], pb.mul(3, tt, pb.sub(pb.mul(omt, 2), tt))),
+        pb.mul(sc[v('p3')], pb.mul(3, tt, tt))
+      );
+      sc.$l[`${tag}HalfWidth`] = pb.mul(sc[v('widthScale')], pb.mix(1, omt, sc.zBladeShape.x));
+      // View-space thickening: when the blade's normal is nearly orthogonal to the view vector the
+      // blade is seen edge-on, so its sides also step apart across the view. The response curve
+      // is the one of the cainrademan/Unity-Grass reimplementation.
+      sc.$l[`${tag}Centre`] = pb.add(sc.base, sc[`${tag}Curve`]);
+      sc.$l[`${tag}ToCamera`] = pb.normalize(pb.sub(cameraPos, sc[`${tag}Centre`]));
+      sc.$l[`${tag}Normal`] = pb.normalize(pb.cross(sc[v('widthDir')], sc[`${tag}Tangent`]));
+      sc.$l[`${tag}EdgeOn`] = pb.sub(
+        1,
+        pb.smoothStep(0, 0.3, pb.abs(pb.dot(sc[`${tag}Normal`], sc[`${tag}ToCamera`])))
+      );
+      sc.$l[`${tag}Across`] = pb.cross(sc[`${tag}ToCamera`], pb.normalize(sc[`${tag}Tangent`]));
+      // Keep the sides on the same side as the blade's own width, so the blade never folds over
+      sc[`${tag}Across`] = pb.mul(
+        sc[`${tag}Across`],
+        pb.sub(pb.mul(pb.step(0, pb.dot(sc[`${tag}Across`], sc[v('widthDir')])), 2), 1)
+      );
+      sc.$l[`${tag}Pos`] = pb.add(
+        sc[`${tag}Centre`],
+        pb.mul(sc[v('widthDir')], pb.mul(side, sc[`${tag}HalfWidth`])),
+        pb.mul(sc[`${tag}Across`], pb.mul(side, sc[`${tag}HalfWidth`], sc.zBladeLook.y, sc[`${tag}EdgeOn`]))
+      );
+    };
+    point(scope, scope.t, scope.side, v('zv'));
+    scope.$l[v('worldPos')] = scope[`${v('zv')}Pos`];
+    scope.$l[v('flatNormal')] = scope[`${v('zv')}Normal`];
+    // Through the transition band the high detail vertices move onto the low detail outline: a
+    // vertex at `along` lands between the two low detail vertices around it, in proportion, as
+    // CDLOD (Strugar, 2009) morphs terrain vertices onto the coarser grid. The tip vertex is on
+    // both outlines already.
+    //
+    // Only this frame's vertex is morphed; last frame's takes the same morph offset. Morphing it
+    // again from last frame's inputs left the motion vectors NaN across the band with TAA on (the
+    // same code runs clean for this frame, the cause was not pinned down), and the offset changes
+    // little in a frame: the morph spans the last quarter of the switch distance.
+    if (suffix) {
+      scope[v('worldPos')] = pb.add(scope[v('worldPos')], scope.zMorphOffset);
+      return;
+    }
+    scope.$l.zMorphOffset = pb.vec3(0);
+    scope.$if(pb.and(pb.not(scope.isLow), pb.greaterThan(scope[v('lodFade')], 0)), function () {
+      this.$l[v('ma')] = pb.mul(this.along, BLADE_LOW_PAIRS);
+      this.$l[v('mj')] = pb.min(pb.floor(this[v('ma')]), BLADE_LOW_PAIRS - 1);
+      this.$l[v('mf')] = pb.sub(this[v('ma')], this[v('mj')]);
+      // Past the last low detail pair comes the tip, on the center line
+      this.$l[v('mSide')] = pb.mul(this.side, pb.step(this[v('mj')], BLADE_LOW_PAIRS - 2));
+      point(this, this.zAlongToT(pb.div(this[v('mj')], BLADE_LOW_PAIRS)), this.side, v('zm0'));
+      point(
+        this,
+        this.zAlongToT(pb.div(pb.add(this[v('mj')], 1), BLADE_LOW_PAIRS)),
+        this[v('mSide')],
+        v('zm1')
+      );
+      this.zMorphOffset = pb.mul(
+        pb.sub(pb.mix(this[`${v('zm0')}Pos`], this[`${v('zm1')}Pos`], this[v('mf')]), this[v('worldPos')]),
+        this[v('lodFade')]
+      );
+      this[v('worldPos')] = pb.add(this[v('worldPos')], this.zMorphOffset);
+    });
   }
   vertexShader(scope: PBFunctionScope) {
     super.vertexShader(scope);
@@ -542,14 +634,36 @@ export class ClipmapBladeGrassMaterial
     scope.zBladeLook = pb.vec4().uniform(2);
     scope.zBladeLook2 = pb.vec4().uniform(2);
     scope.zDistanceFade = pb.vec2().uniform(2);
-    scope.zDensityLod = pb.vec2().uniform(2);
+    // (low detail distance, first instance of the low detail list, unused, unused)
+    scope.zBladeLod = pb.vec4().uniform(2);
     scope.zPrevCameraPos = pb.vec4().uniform(2);
     // (wind lean, sway amplitude, sway speed, unused)
     scope.zBladeWind = pb.vec4().uniform(2);
     // (wind clock, previous wind clock)
     scope.zWindTime = pb.vec2().uniform(2);
-    scope.$l.vid = pb.uint(scope.$builtins.vertexIndex);
-    scope.$l.first = pb.mul(pb.uint(scope.$builtins.instanceIndex), BLADE_INSTANCE_VEC4);
+    // Position along the blade (0 at the root, 1 at the tip) to curve parameter: the vertices are
+    // spread toward the tip by the tip detail exponent
+    pb.func('zAlongToT', [pb.float('a')], function () {
+      this.$return(pb.sub(1, pb.pow(pb.sub(1, this.a), this.zBladeShape.y)));
+    });
+    // The vertex index tells the detail level: the low detail draw's indices start at
+    // BLADE_LOW_VERTEX_BASE, and its instances at the low detail list
+    scope.$l.isLow = pb.greaterThanEqual(
+      pb.uint(scope.$builtins.vertexIndex),
+      pb.uint(BLADE_LOW_VERTEX_BASE)
+    );
+    scope.$l.vid = pb.sub(
+      pb.uint(scope.$builtins.vertexIndex),
+      scope.$choice(scope.isLow, pb.uint(BLADE_LOW_VERTEX_BASE), pb.uint(0))
+    );
+    scope.$l.pairs = scope.$choice(scope.isLow, pb.float(BLADE_LOW_PAIRS), pb.float(BLADE_HIGH_PAIRS));
+    scope.$l.first = pb.mul(
+      pb.add(
+        pb.uint(scope.$builtins.instanceIndex),
+        scope.$choice(scope.isLow, pb.uint(scope.zBladeLod.y), pb.uint(0))
+      ),
+      BLADE_INSTANCE_VEC4
+    );
     scope.$l.inst0 = scope.zBladeInstances.at(scope.first);
     scope.$l.inst1 = scope.zBladeInstances.at(pb.add(scope.first, 1));
     scope.$l.inst2 = scope.zBladeInstances.at(pb.add(scope.first, 2));
@@ -560,14 +674,14 @@ export class ClipmapBladeGrassMaterial
     if (this.occlusionDebug) {
       scope.$outputs.zOccludedFlag = scope.occluded;
     }
-    scope.$l.lodHash = pb.mul(pb.sub(scope.inst0.w, pb.mul(scope.occluded, 2)), 1 - GRASS_LOD_FADE_BAND);
-    // Where the vertex lies along the blade and on which side. The pairs are spread toward the tip
-    // by the tip detail exponent, the tip vertex sits on the center line.
-    scope.$l.isTip = pb.greaterThanEqual(scope.vid, pb.uint(BLADE_VERTEX_COUNT - 1));
-    scope.$l.along = pb.div(pb.float(pb.sar(scope.vid, 1)), BLADE_VERTEX_PAIRS);
+    // 1 for a blade that gives way to the low detail level
+    scope.$l.extra = pb.sub(scope.inst0.w, pb.mul(scope.occluded, 2));
+    // Where the vertex lies along the blade and on which side; the tip vertex sits on the center
+    // line
+    scope.$l.isTip = pb.greaterThanEqual(scope.vid, pb.uint(pb.mul(scope.pairs, 2)));
+    scope.$l.along = pb.div(pb.float(pb.sar(scope.vid, 1)), scope.pairs);
     scope.along = pb.mix(scope.along, 1, pb.float(scope.isTip));
-    scope.$l.t = pb.sub(1, pb.pow(pb.sub(1, scope.along), scope.zBladeShape.y));
-    scope.$l.omt = pb.sub(1, scope.t);
+    scope.$l.t = scope.zAlongToT(scope.along);
     scope.$l.side = pb.mul(
       pb.sub(pb.mul(pb.float(pb.compAnd(scope.vid, pb.uint(1))), 2), 1),
       pb.sub(1, pb.float(scope.isTip))

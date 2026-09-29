@@ -70,9 +70,17 @@ export class GrassBrush extends BaseTerrainBrush {
         if (ImGui.SliderFloat('DrawDistance', drawDistance, 0, 1000)) {
           grassLayer.drawDistance = drawDistance[0];
         }
-        const farDensity = [grassLayer.farDensity] as [number];
-        if (ImGui.SliderFloat('FarDensity', farDensity, 0.01, 1)) {
-          grassLayer.farDensity = farDensity[0];
+        if (isBlade) {
+          // Blade layers thin out by their detail levels instead of the far density
+          const lodDistance = [grassLayer.lodDistance] as [number];
+          if (ImGui.SliderFloat('LodDistance', lodDistance, 0, 500)) {
+            grassLayer.lodDistance = lodDistance[0];
+          }
+        } else {
+          const farDensity = [grassLayer.farDensity] as [number];
+          if (ImGui.SliderFloat('FarDensity', farDensity, 0.01, 1)) {
+            grassLayer.farDensity = farDensity[0];
+          }
         }
       }
     }

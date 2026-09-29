@@ -9,7 +9,7 @@ import type { ClipmapTerrain } from './terrain-cm';
 import { getDevice } from '../../app/api';
 import type { GrassBladeShape, GrassLayerKind } from './grass_gpu';
 import { GrassGpuPlacement, GrassOcclusionMode, grassHash } from './grass_gpu';
-import { ClipmapBladeGrassMaterial, createBladeIndices } from './bladegrassmaterial';
+import { BLADE_LOD_INDEX_COUNTS, ClipmapBladeGrassMaterial, createBladeIndices } from './bladegrassmaterial';
 
 const INSTANCE_BYTES = 4 * 4;
 /** Number of placement cells along each axis of a grass tile */
@@ -23,7 +23,7 @@ const DEFAULT_DRAW_DISTANCE = 150;
 const DEFAULT_FAR_DENSITY = 0.25;
 /** Default shape and clumping of procedural blades, see GrassBladeShape */
 const DEFAULT_BLADE_SHAPE = [
-  0.5, 0.3, 0.04, 0.2, 0.25, 0.2, 0.15, 0.1, 1.5, 0.3, 0.15, 0.3, 0.2, 0.5, 0.15, 0
+  0.5, 0.3, 0.04, 0.2, 0.25, 0.2, 0.15, 0.1, 1.5, 0.3, 0.15, 0.3, 0.2, 0.5, 0.15, 30
 ];
 
 function distanceSqToAABB(x: number, y: number, z: number, aabb: AABB) {
@@ -191,7 +191,8 @@ export class GrassLayer extends Disposable {
       this._gpu = new GrassGpuPlacement(
         'blade',
         GrassLayer._getBladeVertexBuffer()!,
-        GrassLayer._getBladeIndexBuffer()!
+        GrassLayer._getBladeIndexBuffer()!,
+        BLADE_LOD_INDEX_COUNTS
       );
     } else {
       this._gpu = new GrassGpuPlacement('card', this._baseVertexBuffer.get()!, GrassLayer._getIndexBuffer()!);
@@ -199,6 +200,7 @@ export class GrassLayer extends Disposable {
     if (kind === 'blade') {
       this._bladeShape[0] = bladeHeight;
       this._bladeShape[2] = bladeWidth;
+      this.bladeMaterial!.lodDistance = this._bladeShape[15];
     }
     this._gpu?.setDensity(this._densityWidth, this._densityHeight, this._densityMap);
     this.drawDistance = DEFAULT_DRAW_DISTANCE;
@@ -226,7 +228,8 @@ export class GrassLayer extends Disposable {
    * at its own fixed distance, and the remaining ones widen to keep the ground covered. Saves
    * most of the distant grass geometry where blades are placed on the GPU (WebGPU); elsewhere
    * the dropped blades are still drawn, only shrunk to nothing. Has no effect without a draw
-   * distance.
+   * distance, nor on blade layers, which thin out by their detail levels (see
+   * {@link GrassLayer.lodDistance}).
    */
   get farDensity() {
     return this._farDensity;
@@ -545,6 +548,22 @@ export class GrassLayer extends Disposable {
     if (material) {
       material.swayAmplitude = val;
       this.setShape(14, material.swayAmplitude);
+    }
+  }
+  /**
+   * Distance from the camera at which blades switch to their low detail level: a quarter as many
+   * blades, each four times as wide and with fewer vertices, blending in over the last quarter of this
+   * distance. 0 keeps every blade at high detail up to the draw distance. Blade layers only.
+   */
+  get lodDistance() {
+    return this._bladeShape[15];
+  }
+  set lodDistance(val: number) {
+    val = Math.max(0, Number(val) || 0);
+    this.setShape(15, val);
+    const material = this.bladeMaterial;
+    if (material) {
+      material.lodDistance = val;
     }
   }
   /** How fast the blades bob in the wind, in radians per second. Blade layers only. */
@@ -959,7 +978,7 @@ export class GrassLayer extends Disposable {
         if (!instances) {
           return;
         }
-        material.setInstanceBuffer(instances);
+        material.setInstanceBuffer(instances, this._gpu.lowListBase);
         // From the scene, not ctx.env: the depth pass clears ctx.env, and the depth prepass and
         // the light pass must build the blades from the same wind clock or the light pass's
         // equal depth test rejects them
