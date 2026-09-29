@@ -1,6 +1,6 @@
 import type { Nullable, Vector3 } from '@zephyr3d/base';
 import { DEPTH_CLEAR_VALUE, Vector4 } from '@zephyr3d/base';
-import { MAX_SHADOW_MASK_LIGHTS } from '../values';
+import { MAX_GLOBAL_LIGHTS, MAX_SHADOW_MASK_LIGHTS } from '../values';
 import type {
   AbstractDevice,
   BindGroup,
@@ -20,6 +20,14 @@ import { getDevice } from '../app/api';
 
 /** Name of the index pass's per-light view-space bounding spheres. */
 const UNIFORM_NAME_LIGHT_SPHERES = 'lightSpheres';
+/**
+ * vec4s per light in the index pass's sphere buffer: the bounding sphere, then (except
+ * on WebGL1, which keeps the first 8 lights of a cluster rather than the brightest) the
+ * light's brightness in x.
+ */
+function getSphereStride() {
+  return getDevice().type === 'webgl' ? 1 : 2;
+}
 
 export class ClusteredLight {
   /** Emit the shadow-mask overflow warning only once per session. */
@@ -44,8 +52,10 @@ export class ClusteredLight {
   private readonly _tileCountY: number;
   private readonly _tileCountZ: number;
   private readonly _lights: Float32Array<ArrayBuffer>;
-  /** View-space position and range of each light in `_lights`, for culling. */
+  /** View-space bounding sphere of each light in `_lights`, for culling. See writeLight. */
   private readonly _lightSpheres: Float32Array<ArrayBuffer>;
+  /** Buffer indices of the lights shaded outside the clusters, zero-terminated. */
+  private readonly _globalLights: Int32Array<ArrayBuffer>;
   private _lightIndexTexture: Nullable<Texture2D>;
   private _lightIndexFramebuffer: Nullable<FrameBuffer>;
   private _lightIndexProgram: Nullable<GPUProgram>;
@@ -66,7 +76,8 @@ export class ClusteredLight {
     this._tileCountY = 16;
     this._tileCountZ = 32;
     this._lights = new Float32Array(16 * (ShaderHelper.getMaxClusterLights() + 1));
-    this._lightSpheres = new Float32Array(4 * (ShaderHelper.getMaxClusterLights() + 1));
+    this._lightSpheres = new Float32Array(4 * getSphereStride() * (ShaderHelper.getMaxClusterLights() + 1));
+    this._globalLights = new Int32Array(MAX_GLOBAL_LIGHTS);
     this._lightIndexTexture = null;
     this._lightIndexFramebuffer = null;
     this._lightIndexProgram = null;
@@ -99,6 +110,14 @@ export class ClusteredLight {
    */
   get orthographic() {
     return this._orthographic;
+  }
+  /**
+   * Buffer indices of the lights every fragment shades regardless of its cluster
+   * (directional lights, up to {@link MAX_GLOBAL_LIGHTS}), zero-terminated. Kept out of
+   * the clusters so they do not take one of the few slots in each.
+   */
+  get globalLights() {
+    return this._globalLights;
   }
   get clusterParam() {
     return this._clusterParam;
@@ -143,6 +162,7 @@ export class ClusteredLight {
   }
   private createProgram(device: AbstractDevice) {
     const webgl1 = device.type === 'webgl';
+    const sphereStride = getSphereStride();
     this._lightIndexProgram = device.buildRenderProgram({
       vertex(pb) {
         this.$inputs.pos = (webgl1 ? pb.vec3() : pb.vec2()).attrib('position');
@@ -152,8 +172,9 @@ export class ClusteredLight {
         this.countParam = pb.ivec4().uniform(0);
         this.orthoProj = pb.int().uniform(0);
         // Already in view space: transformed once per light on the CPU rather than once
-        // per light in each of the clusters.
-        this[UNIFORM_NAME_LIGHT_SPHERES] = pb.vec4[ShaderHelper.getMaxClusterLights() + 1]().uniformBuffer(0);
+        // per light in each of the clusters. See writeLight for the layout.
+        this[UNIFORM_NAME_LIGHT_SPHERES] =
+          pb.vec4[(ShaderHelper.getMaxClusterLights() + 1) * sphereStride]().uniformBuffer(0);
         pb.func('lineIntersectionToZPlane', [pb.vec3('a'), pb.vec3('b'), pb.float('zDistance')], function () {
           this.$l.normal = pb.vec3(0, 0, 1);
           this.$l.ab = pb.sub(this.b, this.a);
@@ -176,29 +197,20 @@ export class ClusteredLight {
           );
           this.$return(this.clipToView(this.clip));
         });
-        pb.func(
-          'sphereIntersectsAABB',
-          [pb.vec4('sphere'), pb.vec3('aabbMin'), pb.vec3('aabbMax')],
-          function () {
-            this.$l.dmin = pb.float(0);
-            this.$if(pb.lessThanEqual(this.sphere.w, 0), function () {
-              this.$return(true);
-            });
-            this.$for(pb.int('i'), 0, 3, function () {
-              this.$if(pb.lessThan(this.sphere.at(this.i), this.aabbMin.at(this.i)), function () {
-                this.$l.delta = pb.sub(this.sphere.at(this.i), this.aabbMin.at(this.i));
-                this.dmin = pb.add(this.dmin, pb.mul(this.delta, this.delta));
-              }).$elseif(pb.greaterThan(this.sphere.at(this.i), this.aabbMax.at(this.i)), function () {
-                this.$l.delta = pb.sub(this.sphere.at(this.i), this.aabbMax.at(this.i));
-                this.dmin = pb.add(this.dmin, pb.mul(this.delta, this.delta));
-              });
-            });
-            this.$if(pb.lessThanEqual(this.dmin, pb.mul(this.sphere.w, this.sphere.w)), function () {
-              this.$return(true);
-            });
-            this.$return(false);
-          }
-        );
+        // Squared distance from a point to the box, zero inside it.
+        pb.func('aabbDistSq', [pb.vec3('p'), pb.vec3('aabbMin'), pb.vec3('aabbMax')], function () {
+          this.$l.d = pb.max(pb.max(pb.sub(this.aabbMin, this.p), pb.sub(this.p, this.aabbMax)), pb.vec3(0));
+          this.$return(pb.dot(this.d, this.d));
+        });
+        // Radius 0 marks an unbounded light that no global slot took: it reaches every cluster.
+        pb.func('sphereReachesAABB', [pb.vec4('sphere'), pb.float('distSq')], function () {
+          this.$return(
+            pb.or(
+              pb.equal(this.sphere.w, 0),
+              pb.lessThanEqual(this.distSq, pb.mul(this.sphere.w, this.sphere.w))
+            )
+          );
+        });
         pb.main(function () {
           if (pb.getDevice().type !== 'webgpu') {
             this.$builtins.pointSize = 1;
@@ -289,7 +301,12 @@ export class ClusteredLight {
                 this.$break();
               });
               this.$l.lightPos = this[UNIFORM_NAME_LIGHT_SPHERES].at(this.i);
-              this.$if(this.sphereIntersectsAABB(this.lightPos, this.aabbMin, this.aabbMax), function () {
+              // Negative radius: shaded through a global slot, never through the clusters.
+              this.$if(pb.lessThan(this.lightPos.w, 0), function () {
+                this.$continue();
+              });
+              this.$l.distSq = this.aabbDistSq(this.lightPos.xyz, this.aabbMin, this.aabbMax);
+              this.$if(this.sphereReachesAABB(this.lightPos, this.distSq), function () {
                 this.$for(pb.int('j'), 0, 8, function () {
                   this.$if(pb.equal(this.j, this.n), function () {
                     this.lightIndices.setAt(this.j, pb.float(this.i));
@@ -325,13 +342,83 @@ export class ClusteredLight {
               pb.uint(0),
               pb.uint(0)
             ];
+            this.$l.lightScore = [
+              pb.float(0),
+              pb.float(0),
+              pb.float(0),
+              pb.float(0),
+              pb.float(0),
+              pb.float(0),
+              pb.float(0),
+              pb.float(0),
+              pb.float(0),
+              pb.float(0),
+              pb.float(0),
+              pb.float(0),
+              pb.float(0),
+              pb.float(0),
+              pb.float(0),
+              pb.float(0)
+            ];
+            // Once all slots are taken, the weakest one is replaced by any light scoring
+            // higher, so a crowded cluster keeps the lights that matter most to it rather
+            // than whichever happen to come first in the buffer.
+            this.$l.minSlot = pb.int(0);
+            this.$l.minScore = pb.float(0);
+            // Half the cluster diagonal: the irradiance estimate is taken at the cluster
+            // center but not closer than this, so a light inside the cluster stays finite.
+            this.$l.halfDiagSq = pb.mul(
+              pb.dot(pb.sub(this.aabbMax, this.aabbMin), pb.sub(this.aabbMax, this.aabbMin)),
+              0.25
+            );
+            this.$l.center = pb.mul(pb.add(this.aabbMin, this.aabbMax), 0.5);
             this.$for(pb.uint('i'), 1, pb.uint(this.countParam.w), function () {
-              this.$l.lightPos = this[UNIFORM_NAME_LIGHT_SPHERES].at(this.i);
-              this.$if(this.sphereIntersectsAABB(this.lightPos, this.aabbMin, this.aabbMax), function () {
-                this.lightIndex.setAt(this.n, this.i);
-                this.n = pb.add(this.n, 1);
+              this.$l.lightPos = this[UNIFORM_NAME_LIGHT_SPHERES].at(pb.mul(this.i, sphereStride));
+              // Negative radius: shaded through a global slot, never through the clusters.
+              this.$if(pb.lessThan(this.lightPos.w, 0), function () {
+                this.$continue();
+              });
+              this.$l.distSq = this.aabbDistSq(this.lightPos.xyz, this.aabbMin, this.aabbMax);
+              this.$if(this.sphereReachesAABB(this.lightPos, this.distSq), function () {
+                // Brightness times the lit shader's range window at the nearest point of
+                // the cluster, over the squared distance to its center.
+                this.$l.score = pb.float(3.0e38);
+                this.$if(pb.greaterThan(this.lightPos.w, 0), function () {
+                  this.$l.brightness = this[UNIFORM_NAME_LIGHT_SPHERES].at(
+                    pb.add(pb.mul(this.i, sphereStride), 1)
+                  ).x;
+                  this.$l.f = pb.clamp(
+                    pb.sub(1, pb.div(this.distSq, pb.mul(this.lightPos.w, this.lightPos.w))),
+                    0,
+                    1
+                  );
+                  this.$l.toCenter = pb.sub(this.center, this.lightPos.xyz);
+                  this.score = pb.div(
+                    pb.mul(this.brightness, this.f, this.f),
+                    pb.max(pb.dot(this.toCenter, this.toCenter), pb.max(this.halfDiagSq, 1e-6))
+                  );
+                });
+                this.$if(pb.lessThan(this.n, 16), function () {
+                  this.lightIndex.setAt(this.n, this.i);
+                  this.lightScore.setAt(this.n, this.score);
+                  this.n = pb.add(this.n, 1);
+                })
+                  .$elseif(pb.greaterThan(this.score, this.minScore), function () {
+                    this.lightIndex.setAt(this.minSlot, this.i);
+                    this.lightScore.setAt(this.minSlot, this.score);
+                  })
+                  .$else(function () {
+                    this.$continue();
+                  });
                 this.$if(pb.equal(this.n, 16), function () {
-                  this.$break();
+                  this.minSlot = 0;
+                  this.minScore = this.lightScore[0];
+                  this.$for(pb.int('k'), 1, 16, function () {
+                    this.$if(pb.lessThan(this.lightScore.at(this.k), this.minScore), function () {
+                      this.minSlot = this.k;
+                      this.minScore = this.lightScore.at(this.k);
+                    });
+                  });
                 });
               });
             });
@@ -488,7 +575,12 @@ export class ClusteredLight {
       }
       // Slot 0 is never read, so upload only up to the last light.
       this._lightBuffer!.bufferSubData(0, this._lights, 0, (numLights + 1) * 16);
-      this._lightSphereBuffer!.bufferSubData(0, this._lightSpheres, 0, (numLights + 1) * 4);
+      this._lightSphereBuffer!.bufferSubData(
+        0,
+        this._lightSpheres,
+        0,
+        (numLights + 1) * 4 * getSphereStride()
+      );
       this._bindGroup!.setValue('invProjMatrix', camera.getInvProjectionMatrix());
       this._bindGroup!.setValue('sizeParam', this._sizeParam);
       this._bindGroup!.setValue('countParam', this._countParam);
@@ -555,21 +647,60 @@ export class ClusteredLight {
   ) {
     const view = camera.viewMatrix;
     const spheres = this._lightSpheres;
+    const sphereStride = getSphereStride();
+    const globalLights = this._globalLights;
+    globalLights.fill(0);
+    let numGlobal = 0;
     const writeLight = (light: PunctualLight, slot: number) => {
       const offset = slot * 16;
       const colorIntensity = light.diffuseAndIntensity;
       const posRange = light.positionAndRange;
+      const dirCutoff = light.directionAndCutoff;
       lights.set(posRange, offset);
+      // Culling sphere: radius < 0 = shaded through a global slot, skipped by the index
+      // pass; 0 = unbounded, in every cluster; otherwise it bounds the lit region.
+      let x = posRange.x;
+      let y = posRange.y;
+      let z = posRange.z;
+      let radius = posRange.w;
+      if (radius <= 0) {
+        if (numGlobal < MAX_GLOBAL_LIGHTS) {
+          globalLights[numGlobal++] = slot;
+          radius = -1;
+        } else {
+          radius = 0;
+        }
+      } else if (light.isSpotLight()) {
+        // Smallest sphere around the cone sector the spot lights (the cone clipped by
+        // its range sphere): for a half-angle up to 45 degrees it passes through the
+        // apex and the rim, beyond that it is centered on the rim's plane.
+        const cosAngle = Math.min(dirCutoff.w, 1);
+        if (cosAngle > 0) {
+          const len = Math.hypot(dirCutoff.x, dirCutoff.y, dirCutoff.z) || 1;
+          let dist: number;
+          if (cosAngle >= Math.SQRT1_2) {
+            dist = radius / (2 * cosAngle);
+            radius = dist;
+          } else {
+            dist = radius * cosAngle;
+            radius = radius * Math.sqrt(1 - cosAngle * cosAngle);
+          }
+          x += (dirCutoff.x / len) * dist;
+          y += (dirCutoff.y / len) * dist;
+          z += (dirCutoff.z / len) * dist;
+        }
+      }
       // The view matrix is column-major.
-      const x = posRange.x;
-      const y = posRange.y;
-      const z = posRange.z;
-      const s = slot * 4;
+      const s = slot * 4 * sphereStride;
       spheres[s + 0] = view[0] * x + view[4] * y + view[8] * z + view[12];
       spheres[s + 1] = view[1] * x + view[5] * y + view[9] * z + view[13];
       spheres[s + 2] = view[2] * x + view[6] * y + view[10] * z + view[14];
-      spheres[s + 3] = posRange.w;
-      lights.set(light.directionAndCutoff, offset + 4);
+      spheres[s + 3] = radius;
+      if (sphereStride > 1) {
+        // Ranks the lights competing for a crowded cluster; same measure as prioritize().
+        spheres[s + 4] = Math.max(colorIntensity.x, colorIntensity.y, colorIntensity.z) * colorIntensity.w;
+      }
+      lights.set(dirCutoff, offset + 4);
       // Only the intensity carries the camera pre-exposure; the color stays as authored. The
       // light's own cached vector must not be mutated because it is shared across cameras.
       lights[offset + 8] = colorIntensity.x;

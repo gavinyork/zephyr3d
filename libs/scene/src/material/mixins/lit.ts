@@ -4,6 +4,7 @@ import {
   LIGHT_TYPE_DIRECTIONAL,
   LIGHT_TYPE_POINT,
   LIGHT_TYPE_RECT,
+  MAX_GLOBAL_LIGHTS,
   // LIGHT_TYPE_SPOT,
   RENDER_PASS_TYPE_LIGHT
 } from '../../values';
@@ -971,7 +972,67 @@ export function mixinLight<T extends typeof MeshMaterial>(BaseCls: T) {
           );
         });
       } else {
+        // Emits the shading of the light at buffer index `index` (an int or uint).
+        const shadeLight = function (this: PBInsideFunctionScope, index: PBShaderExp) {
+          this.$l.positionRange = ShaderHelper.getLightPositionAndRange(this, index);
+          this.$l.directionCutoff = ShaderHelper.getLightDirectionAndCutoff(this, index);
+          this.$l.diffuseIntensity = ShaderHelper.getLightColorAndIntensity(this, index);
+          this.$l.extra = ShaderHelper.getLightExtra(this, index);
+          this.$l.unshadowedIntensity = this.diffuseIntensity;
+          if (that.drawContext.screenSpaceShadowMask) {
+            // Shadow-casting lights (buffer index <= numShadowLights) attenuate
+            // by the pre-rendered screen-space shadow mask; others return 1.0.
+            this.$l.shadowMask = ShaderHelper.sampleShadowMask(this, pb.int(index));
+            this.diffuseIntensity = pb.vec4(
+              pb.mul(this.diffuseIntensity.rgb, this.shadowMask),
+              this.diffuseIntensity.w
+            );
+          }
+          this.$l.thickness = pb.float(1);
+          if (that.drawContext.transmissionThickness) {
+            this.thickness = ShaderHelper.sampleTransmissionThickness(this, pb.int(index));
+          }
+          this.$l.lightType = pb.int(this.extra.w);
+          this.$scope(function () {
+            callback.call(
+              this,
+              this.lightType,
+              this.positionRange,
+              this.directionCutoff,
+              this.diffuseIntensity,
+              this.extra,
+              false,
+              this.thickness,
+              this.unshadowedIntensity
+            );
+          });
+        };
+        // GLSL ES 1.0 only indexes uniform arrays with loop indices, hence the search;
+        // indices never exceed the WebGL1 light capacity.
+        const shadeLightWebGL1 = function (this: PBInsideFunctionScope, index: PBShaderExp) {
+          this.$for(pb.int('j'), 1, ShaderHelper.getMaxClusterLights() + 1, function () {
+            this.$if(pb.equal(this.j, index), function () {
+              shadeLight.call(this, this.j);
+              this.$break();
+            });
+          });
+        };
         scope.$scope(function () {
+          // Lights that reach every fragment (directional) are kept out of the clusters.
+          const globalLights = ShaderHelper.getGlobalLights(this);
+          this.$for(pb.int('g'), 0, MAX_GLOBAL_LIGHTS, function () {
+            this.$l.gi = globalLights.at(this.g);
+            this.$if(pb.equal(this.gi, 0), function () {
+              this.$break();
+            });
+            this.$scope(function () {
+              if (pb.getDevice().type === 'webgl') {
+                shadeLightWebGL1.call(this, this.gi);
+              } else {
+                shadeLight.call(this, this.gi);
+              }
+            });
+          });
           const countParams = ShaderHelper.getCountParams(this);
           this.$l.cluster = that.getClusterIndex(this, this.$builtins.fragCoord.xyz);
           this.$l.clusterIndex = pb.add(
@@ -1017,43 +1078,7 @@ export function mixinLight<T extends typeof MeshMaterial>(BaseCls: T) {
               this.$for(pb.int('k'), 0, 2, function () {
                 this.$l.li = this.lights.at(this.k);
                 this.$if(pb.greaterThan(this.li, 0), function () {
-                  // GLSL ES 1.0 only indexes uniform arrays with loop indices, hence the search;
-                  // indices never exceed the WebGL1 light capacity.
-                  this.$for(pb.int('j'), 1, ShaderHelper.getMaxClusterLights() + 1, function () {
-                    this.$if(pb.equal(this.j, this.li), function () {
-                      this.$l.positionRange = ShaderHelper.getLightPositionAndRange(this, this.j);
-                      this.$l.directionCutoff = ShaderHelper.getLightDirectionAndCutoff(this, this.j);
-                      this.$l.diffuseIntensity = ShaderHelper.getLightColorAndIntensity(this, this.j);
-                      this.$l.extra = ShaderHelper.getLightExtra(this, this.j);
-                      this.$l.unshadowedIntensity = this.diffuseIntensity;
-                      if (that.drawContext.screenSpaceShadowMask) {
-                        this.$l.shadowMask = ShaderHelper.sampleShadowMask(this, this.j);
-                        this.diffuseIntensity = pb.vec4(
-                          pb.mul(this.diffuseIntensity.rgb, this.shadowMask),
-                          this.diffuseIntensity.w
-                        );
-                      }
-                      this.$l.thickness = pb.float(1);
-                      if (that.drawContext.transmissionThickness) {
-                        this.thickness = ShaderHelper.sampleTransmissionThickness(this, this.j);
-                      }
-                      this.$l.lightType = pb.int(this.extra.w);
-                      this.$scope(function () {
-                        callback.call(
-                          this,
-                          this.lightType,
-                          this.positionRange,
-                          this.directionCutoff,
-                          this.diffuseIntensity,
-                          this.extra,
-                          false,
-                          this.thickness,
-                          this.unshadowedIntensity
-                        );
-                      });
-                      this.$break();
-                    });
-                  });
+                  shadeLightWebGL1.call(this, this.li);
                 }).$else(function () {
                   this.done = true;
                   this.$break();
@@ -1072,38 +1097,7 @@ export function mixinLight<T extends typeof MeshMaterial>(BaseCls: T) {
                 this.$break();
               });
               this.$scope(function () {
-                this.$l.positionRange = ShaderHelper.getLightPositionAndRange(this, this.c);
-                this.$l.directionCutoff = ShaderHelper.getLightDirectionAndCutoff(this, this.c);
-                this.$l.diffuseIntensity = ShaderHelper.getLightColorAndIntensity(this, this.c);
-                this.$l.extra = ShaderHelper.getLightExtra(this, this.c);
-                this.$l.unshadowedIntensity = this.diffuseIntensity;
-                if (that.drawContext.screenSpaceShadowMask) {
-                  // Shadow-casting lights (buffer index <= numShadowLights) attenuate
-                  // by the pre-rendered screen-space shadow mask; others return 1.0.
-                  this.$l.shadowMask = ShaderHelper.sampleShadowMask(this, pb.int(this.c));
-                  this.diffuseIntensity = pb.vec4(
-                    pb.mul(this.diffuseIntensity.rgb, this.shadowMask),
-                    this.diffuseIntensity.w
-                  );
-                }
-                this.$l.thickness = pb.float(1);
-                if (that.drawContext.transmissionThickness) {
-                  this.thickness = ShaderHelper.sampleTransmissionThickness(this, pb.int(this.c));
-                }
-                this.$l.lightType = pb.int(this.extra.w);
-                this.$scope(function () {
-                  callback.call(
-                    this,
-                    this.lightType,
-                    this.positionRange,
-                    this.directionCutoff,
-                    this.diffuseIntensity,
-                    this.extra,
-                    false,
-                    this.thickness,
-                    this.unshadowedIntensity
-                  );
-                });
+                shadeLight.call(this, this.c);
               });
             });
           }

@@ -117,6 +117,7 @@ export class ShaderHelper {
   /** @internal 1x1x1 fallback bound to the shadow-mask uniform when no mask exists this frame. */
   private static _dummyShadowMask: Nullable<Texture2DArray> = null;
   private static _dummyTransmissionThickness: Nullable<Texture2DArray> = null;
+  private static readonly _noGlobalLights = new Int32Array(4);
   /** @internal */
   private static readonly SKIN_MATRIX_NAME = 'Z_SkinMatrix';
   private static readonly SKIN_PREV_MATRIX_NAME = 'Z_PrevSkinMatrix';
@@ -343,6 +344,8 @@ export class ShaderHelper {
             pb.float('envLightSpecularStrength'),
             pb.vec4('clusterParams'),
             pb.ivec4('countParams'),
+            // Buffer indices of the lights shaded outside the clusters, zero-terminated.
+            pb.ivec4('globalLights'),
             pb.ivec2('lightIndexTexSize'),
             // Nonzero when the clusters were sliced for an orthographic camera
             // (linear depth slices instead of exponential).
@@ -1418,6 +1421,7 @@ export class ShaderHelper {
       sunDir: ctx.sunLight ? ctx.sunLight.directionAndCutoff.xyz().scaleBy(-1) : this.defaultSunDir,
       clusterParams: clusterParams,
       countParams: countParams,
+      globalLights: ctx.clusteredLight?.globalLights ?? ShaderHelper._noGlobalLights,
       envLightStrength,
       envLightSpecularStrength: ctx.env!.light.specularStrength ?? 1,
       lightIndexTexSize: new Int32Array([lightIndexTexture.width, lightIndexTexture.height]),
@@ -2121,6 +2125,14 @@ export class ShaderHelper {
   /** @internal */
   static getCountParams(scope: PBInsideFunctionScope): PBShaderExp {
     return scope.light.countParams;
+  }
+  /**
+   * Buffer indices of the clustered lights every fragment shades regardless of its
+   * cluster, zero-terminated.
+   * @internal
+   */
+  static getGlobalLights(scope: PBInsideFunctionScope): PBShaderExp {
+    return scope.light.globalLights;
   }
   /**
    * Nonzero when the clusters were sliced for an orthographic camera: depth slices

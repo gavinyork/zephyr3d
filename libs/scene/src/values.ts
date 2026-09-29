@@ -74,6 +74,13 @@ export const LIGHT_TYPE_RECT = 4;
 export const MAX_SHADOW_MASK_LIGHTS = 32;
 
 /**
+ * Max number of directional lights shaded outside the light clusters, so they do not
+ * take one of the few slots in each. Any beyond this are listed in every cluster.
+ * @internal
+ */
+export const MAX_GLOBAL_LIGHTS = 4;
+
+/**
  * Opaque render queue type
  * @public
  */
