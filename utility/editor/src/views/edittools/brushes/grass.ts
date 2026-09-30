@@ -6,6 +6,8 @@ import type { GrassLayer } from '@zephyr3d/scene';
 
 /** Rows of the procedural blade settings, see renderBladeSettings() */
 const BLADE_SETTING_ROWS = 27;
+/** Rows of the card settings, see renderCardSettings() */
+const CARD_SETTING_ROWS = 3;
 
 export class GrassBrush extends BaseTerrainBrush {
   brush() {}
@@ -15,7 +17,8 @@ export class GrassBrush extends BaseTerrainBrush {
   renderSettings(tool: TerrainEditTool): void {
     const grassRenderer = tool.terrain.grassRenderer;
     const selectedLayer = grassRenderer.getLayer(tool.grassAlbedo.selected);
-    const rows = 8 + (selectedLayer?.kind === 'blade' ? BLADE_SETTING_ROWS : 0);
+    const rows =
+      8 + (selectedLayer ? (selectedLayer.kind === 'blade' ? BLADE_SETTING_ROWS : CARD_SETTING_ROWS) : 0);
     ImGui.BeginChild(
       'GrassTexture',
       new ImGui.ImVec2(
@@ -61,6 +64,8 @@ export class GrassBrush extends BaseTerrainBrush {
       if (grassLayer) {
         if (isBlade) {
           this.renderBladeSettings(grassLayer);
+        } else {
+          this.renderCardSettings(grassLayer);
         }
         const density = [grassLayer.cellsPerTexel] as [number];
         if (ImGui.SliderInt('Density', density, 1, 4)) {
@@ -85,6 +90,18 @@ export class GrassBrush extends BaseTerrainBrush {
       }
     }
     ImGui.EndChild();
+  }
+  /** Wind response of a card layer, CARD_SETTING_ROWS rows */
+  private renderCardSettings(layer: GrassLayer) {
+    const slider = (label: string, value: number, min: number, max: number, set: (v: number) => void) => {
+      const v = [value] as [number];
+      if (ImGui.SliderFloat(label, v, min, max)) {
+        set(v[0]);
+      }
+    };
+    slider('WindLean', layer.windLean, 0, 4, (v) => (layer.windLean = v));
+    slider('SwayAmplitude', layer.swayAmplitude, 0, 1, (v) => (layer.swayAmplitude = v));
+    slider('SwaySpeed', layer.swaySpeed, 0, 20, (v) => (layer.swaySpeed = v));
   }
   /** Shape and color of a procedural blade layer, BLADE_SETTING_ROWS rows */
   private renderBladeSettings(layer: GrassLayer) {

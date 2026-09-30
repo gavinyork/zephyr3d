@@ -525,30 +525,22 @@ export class GrassLayer extends Disposable {
   }
   /**
    * How far the wind lays the blades over, per unit of wind push: 0 leaves them standing, higher
-   * values flatten them in strong gusts. Blade layers only.
+   * values flatten them in strong gusts.
    */
   get windLean() {
-    return this.bladeMaterial?.windLean ?? 0;
+    return this._material.get()!.windLean;
   }
   set windLean(val: number) {
-    const material = this.bladeMaterial;
-    if (material) {
-      material.windLean = val;
-    }
+    this._material.get()!.windLean = val;
   }
-  /**
-   * How far the blade tips bob in the wind, as a fraction of their height per unit of wind push.
-   * Blade layers only.
-   */
+  /** How far the blade tips bob in the wind, as a fraction of their height per unit of wind push */
   get swayAmplitude() {
-    return this.bladeMaterial?.swayAmplitude ?? 0;
+    return this._material.get()!.swayAmplitude;
   }
   set swayAmplitude(val: number) {
-    const material = this.bladeMaterial;
-    if (material) {
-      material.swayAmplitude = val;
-      this.setShape(14, material.swayAmplitude);
-    }
+    const material = this._material.get()!;
+    material.swayAmplitude = val;
+    this.setShape(14, material.swayAmplitude);
   }
   /**
    * Distance from the camera at which blades switch to their low detail level: a quarter as many
@@ -566,15 +558,12 @@ export class GrassLayer extends Disposable {
       material.lodDistance = val;
     }
   }
-  /** How fast the blades bob in the wind, in radians per second. Blade layers only. */
+  /** How fast the blades bob in the wind, in radians per second */
   get swaySpeed() {
-    return this.bladeMaterial?.swaySpeed ?? 0;
+    return this._material.get()!.swaySpeed;
   }
   set swaySpeed(val: number) {
-    const material = this.bladeMaterial;
-    if (material) {
-      material.swaySpeed = val;
-    }
+    this._material.get()!.swaySpeed = val;
   }
   /** Color at the root of the blades. Blade layers only. */
   get rootColor(): Vector4 {
@@ -984,6 +973,10 @@ export class GrassLayer extends Disposable {
     if (this._kind === 'blade' && !this._gpu) {
       return;
     }
+    // From the scene, not ctx.env: the depth pass clears ctx.env, and the depth prepass and the
+    // light pass must bend the grass by the same wind or the light pass's equal depth test
+    // rejects it
+    const wind = ctx.scene?.env.wind ?? null;
     if (this._gpu) {
       const material = this._material.get()!;
       if (material instanceof ClipmapBladeGrassMaterial) {
@@ -992,10 +985,9 @@ export class GrassLayer extends Disposable {
           return;
         }
         material.setInstanceBuffer(instances, this._gpu.lowListBase);
-        // From the scene, not ctx.env: the depth pass clears ctx.env, and the depth prepass and
-        // the light pass must build the blades from the same wind clock or the light pass's
-        // equal depth test rejects them
-        material.prepareDraw(ctx.camera, ctx.scene?.env.wind ?? null);
+        material.prepareDraw(ctx.camera, wind);
+      } else {
+        material.prepareDraw(wind);
       }
       material.apply(ctx);
       for (let pass = 0; pass < material.numPasses; pass++) {
@@ -1016,6 +1008,8 @@ export class GrassLayer extends Disposable {
     const rh = region.w - region.y;
     const cameraPos = camera.getWorldPosition(GrassLayer._cameraPos);
     const maxDistSq = this._drawDistance > 0 ? this._drawDistance * this._drawDistance : Infinity;
+    // The wind can lay the cards over by up to their height
+    const windPad = wind && wind.strength > 0 ? this._bladeHeight : 0;
     for (const [key, tile] of this._tiles) {
       const tx = key % this._tilesX;
       const tz = (key - tx) / this._tilesX;
@@ -1023,8 +1017,8 @@ export class GrassLayer extends Disposable {
       const v0 = (tz * TILE_CELLS) / cellsH;
       const u1 = Math.min(1, ((tx + 1) * TILE_CELLS) / cellsW);
       const v1 = Math.min(1, ((tz + 1) * TILE_CELLS) / cellsH);
-      cullAABB.minPoint.setXYZ(rx + u0 * rw, minY, rz + v0 * rh);
-      cullAABB.maxPoint.setXYZ(rx + u1 * rw, maxY, rz + v1 * rh);
+      cullAABB.minPoint.setXYZ(rx + u0 * rw - windPad, minY, rz + v0 * rh - windPad);
+      cullAABB.maxPoint.setXYZ(rx + u1 * rw + windPad, maxY, rz + v1 * rh + windPad);
       if (distanceSqToAABB(cameraPos.x, cameraPos.y, cameraPos.z, cullAABB) > maxDistSq) {
         continue;
       }
@@ -1038,9 +1032,11 @@ export class GrassLayer extends Disposable {
     if (visible.length === 0) {
       return;
     }
-    this._material.get()!.apply(ctx);
-    for (let pass = 0; pass < this._material.get()!.numPasses; pass++) {
-      this._material.get()!.bind(ctx.device, pass);
+    const material = this._material.get()! as ClipmapGrassMaterial;
+    material.prepareDraw(wind);
+    material.apply(ctx);
+    for (let pass = 0; pass < material.numPasses; pass++) {
+      material.bind(ctx.device, pass);
       for (const tile of visible) {
         tile.draw();
       }

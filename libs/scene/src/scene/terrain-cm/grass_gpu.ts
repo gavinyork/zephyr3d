@@ -364,7 +364,12 @@ export class GrassGpuPlacement extends Disposable {
       bladeHeight = maxHeight;
     } else {
       const maxWidth = bladeWidth / lod[1];
-      const radius = Math.sqrt(maxWidth * maxWidth * 0.25 + bladeHeight * bladeHeight * 0.25);
+      // The wind turns a card about its base, which takes its top up to 1.12 times its height
+      // from the centre of the card
+      const radius =
+        windParams && windParams[2] > 0
+          ? maxWidth * 0.5 + bladeHeight * 1.12
+          : Math.sqrt(maxWidth * maxWidth * 0.25 + bladeHeight * bladeHeight * 0.25);
       this._params.setXYZW(seed * 4, drawDistance, radius, bladeHeight * 0.5);
     }
     this._posScale.setXYZW(terrain.scale.x, terrain.scale.y, terrain.scale.z, terrain.worldMatrix.m13);

@@ -53,6 +53,11 @@ type GrassLayerData = {
     tipColor?: [number, number, number];
     transmissionColor?: [number, number, number];
   };
+  card?: {
+    windLean?: number;
+    swayAmplitude?: number;
+    swaySpeed?: number;
+  };
 };
 
 function getTerrainGrassContent(terrain: ClipmapTerrain): ArrayBuffer {
@@ -331,6 +336,12 @@ export function getTerrainClass(manager: ResourceManager): SerializableClass {
                     layer.transmissionColor.z
                   ]
                 };
+              } else {
+                info.card = {
+                  windLean: layer.windLean,
+                  swayAmplitude: layer.swayAmplitude,
+                  swaySpeed: layer.swaySpeed
+                };
               }
               data.push(info);
             }
@@ -363,6 +374,13 @@ export function getTerrainClass(manager: ResourceManager): SerializableClass {
                 info.kind === 'blade' ? 'blade' : 'card'
               );
               const blade = info.blade;
+              const card = info.card;
+              if (info.kind !== 'blade' && card) {
+                const grassLayer = this.grassRenderer.getLayer(layer);
+                grassLayer.windLean = card.windLean ?? grassLayer.windLean;
+                grassLayer.swayAmplitude = card.swayAmplitude ?? grassLayer.swayAmplitude;
+                grassLayer.swaySpeed = card.swaySpeed ?? grassLayer.swaySpeed;
+              }
               if (info.kind === 'blade' && blade) {
                 const grassLayer = this.grassRenderer.getLayer(layer);
                 grassLayer.heightRandomness = blade.heightRandomness ?? grassLayer.heightRandomness;
