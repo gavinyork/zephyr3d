@@ -197,67 +197,28 @@ export function temporalResolve(
     this.texPos3 = pb.div(this.texPos3, this.texSize);
     this.texPos12 = pb.div(this.texPos12, this.texSize);
     this.$l.result = pb.vec3(0);
-    this.result = pb.add(
-      this.result,
-      pb.mul(pb.textureSampleLevel(historyColorTex, this.texPos0, 0).rgb, this.w0.x, this.w0.y)
-    );
-    this.result = pb.add(
-      this.result,
-      pb.mul(
-        pb.textureSampleLevel(historyColorTex, pb.vec2(this.texPos12.x, this.texPos0.y), 0).rgb,
-        this.w12.x,
-        this.w0.y
-      )
-    );
-    this.result = pb.add(
-      this.result,
-      pb.mul(
-        pb.textureSampleLevel(historyColorTex, pb.vec2(this.texPos3.x, this.texPos0.y), 0).rgb,
-        this.w3.x,
-        this.w0.y
-      )
-    );
-    this.result = pb.add(
-      this.result,
-      pb.mul(
-        pb.textureSampleLevel(historyColorTex, pb.vec2(this.texPos0.x, this.texPos12.y), 0).rgb,
-        this.w0.x,
-        this.w12.y
-      )
-    );
-    this.result = pb.add(
-      this.result,
-      pb.mul(pb.textureSampleLevel(historyColorTex, this.texPos12, 0).rgb, this.w12.x, this.w12.y)
-    );
-    this.result = pb.add(
-      this.result,
-      pb.mul(
-        pb.textureSampleLevel(historyColorTex, pb.vec2(this.texPos3.x, this.texPos12.y), 0).rgb,
-        this.w3.x,
-        this.w12.y
-      )
-    );
-    this.result = pb.add(
-      this.result,
-      pb.mul(
-        pb.textureSampleLevel(historyColorTex, pb.vec2(this.texPos0.x, this.texPos3.y), 0).rgb,
-        this.w0.x,
-        this.w3.y
-      )
-    );
-    this.result = pb.add(
-      this.result,
-      pb.mul(
-        pb.textureSampleLevel(historyColorTex, pb.vec2(this.texPos12.x, this.texPos3.y), 0).rgb,
-        this.w12.x,
-        this.w3.y
-      )
-    );
-    this.result = pb.add(
-      this.result,
-      pb.mul(pb.textureSampleLevel(historyColorTex, this.texPos3, 0).rgb, this.w3.x, this.w3.y)
-    );
-    this.$return(pb.max(this.result, pb.vec3(0)));
+    this.$l.tapMin = pb.vec3(1e30);
+    this.$l.tapMax = pb.vec3(-1e30);
+    const rows: [string, string][] = [
+      ['texPos0', 'w0'],
+      ['texPos12', 'w12'],
+      ['texPos3', 'w3']
+    ];
+    for (const [py, wy] of rows) {
+      for (const [px, wx] of rows) {
+        this.$l.tap = pb.textureSampleLevel(historyColorTex, pb.vec2(this[px].x, this[py].y), 0).rgb;
+        this.result = pb.add(this.result, pb.mul(this.tap, this[wx].x, this[wy].y));
+        this.tapMin = pb.min(this.tapMin, this.tap);
+        this.tapMax = pb.max(this.tapMax, this.tap);
+      }
+    }
+    // Anti-ringing: Catmull-Rom's negative lobes scale with the contrast they straddle. Beside a
+    // texel at the sky's output clamp (the sun disk, ~32256) a lobe of -0.07 subtracts thousands
+    // from a sky pixel near 1; the result is floored to black, the clip box of a pixel whose
+    // neighbourhood mixes disk and sky reaches below zero and keeps it, and the low blend weight a
+    // large current/history difference gets holds it there -- dark specks around the disk while the
+    // camera moves. Bounding the filter by the texels it read keeps it from inventing values.
+    this.$return(pb.clamp(this.result, pb.max(this.tapMin, pb.vec3(0)), this.tapMax));
   });
   pb.func('temporalResolve', [pb.vec2('screenUV'), pb.vec2('texSize')], function () {
     this.$l.velocitySample = pb.textureSampleLevel(motionVectorTex, this.screenUV, 0);

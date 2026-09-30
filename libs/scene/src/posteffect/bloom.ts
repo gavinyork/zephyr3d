@@ -148,6 +148,13 @@ export class Bloom extends AbstractPostEffect {
    * NdotL ~ 1 changes frame to frame. The trade is a slightly dimmer, slightly tighter halo,
    * because the weighting deliberately holds the brightest samples back. Turn it off for a static
    * scene that wants maximum reach and has no high-frequency speculars to stabilize.
+   *
+   * Only applies under legacy lighting. Physical lighting follows UE, whose bloom downsample is a
+   * plain linear average and leaves fireflies to TAA (bloom reads the TAA-resolved frame). There the
+   * weighting misbehaves on the sun disk: a few pixels at the output clamp (32256), whose every
+   * 2x2 group that also holds sky collapses to about sky level. Only fully covered groups survive,
+   * so the halo's energy jumps with the disk's position on the pixel grid and flickers as the camera
+   * turns.
    */
   get karisAverage() {
     return this._karisAverage;
@@ -166,6 +173,10 @@ export class Bloom extends AbstractPostEffect {
       weights.push(physical ? (Bloom.PHYSICAL_LEVEL_WEIGHTS[i] ?? 0) : 1);
     }
     return weights;
+  }
+  /** Whether the prefilter uses the Karis average, see {@link Bloom.karisAverage}. */
+  private _useKarisAverage(ctx: DrawContext) {
+    return this._karisAverage && ctx.scene?.lightingMode !== 'physical';
   }
   /**
    * Upsample source scale for level `i + 1` into level `i`.
@@ -237,7 +248,7 @@ export class Bloom extends AbstractPostEffect {
         this._prepare(device, inputTexture);
         device.pushDeviceStates();
         try {
-          this.prefilter(device, inputTexture, rg.getTexture<Texture2D>(out));
+          this.prefilter(device, inputTexture, rg.getTexture<Texture2D>(out), this._useKarisAverage(ctx));
         } finally {
           device.popDeviceStates();
         }
@@ -352,7 +363,7 @@ export class Bloom extends AbstractPostEffect {
     const w = Math.max(inputColorTexture.width >> 1, 1);
     const h = Math.max(inputColorTexture.height >> 1, 1);
     const colorTex = device.pool.fetchTemporalTexture2D(false, inputColorTexture.format, w, h, false);
-    this.prefilter(device, inputColorTexture, colorTex);
+    this.prefilter(device, inputColorTexture, colorTex, this._useKarisAverage(ctx));
     this.downsample(device, colorTex, downsampleTextures);
     const weights = Bloom._levelWeights(ctx, downsampleTextures.length);
     this.upsample(device, downsampleTextures, weights);
@@ -364,7 +375,7 @@ export class Bloom extends AbstractPostEffect {
     device.pool.releaseTexture(colorTex);
   }
   /** @internal */
-  prefilter(device: AbstractDevice, srcTexture: Texture2D, rt: Texture2D) {
+  prefilter(device: AbstractDevice, srcTexture: Texture2D, rt: Texture2D, karis = this._karisAverage) {
     this._thresholdValue.x = this._threshold * this._threshold;
     this._thresholdValue.y = this._thresholdValue.x * this._thresholdKnee;
     this._thresholdValue.z = 2 * this._thresholdValue.y;
@@ -381,7 +392,7 @@ export class Bloom extends AbstractPostEffect {
     // Half-texel diagonals of the *source*, so each fetch lands on a 2x2 group boundary.
     this._invTexSize.setXY(1 / srcTexture.width, 1 / srcTexture.height);
     Bloom._bindgroupPrefilter!.setValue('invTexSize', this._invTexSize);
-    Bloom._bindgroupPrefilter!.setValue('karis', this._karisAverage ? 1 : 0);
+    Bloom._bindgroupPrefilter!.setValue('karis', karis ? 1 : 0);
     this.drawFullscreenQuad();
   }
   /** @internal */

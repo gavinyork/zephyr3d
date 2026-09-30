@@ -89,6 +89,11 @@ const fogTypeMap: Record<FogType, number> = {
 };
 
 const defaultSkyWorldMatrix = Matrix4x4.identity();
+/**
+ * Ceiling on the sky's on-screen output, as in UE's PrepareOutput: half the fp10 maximum. The physical
+ * sun disk exceeds half-float range, and the margin leaves headroom for bloom and other additive effects.
+ */
+const SKY_OUTPUT_MAX = 64512 * 0.5;
 
 /**
  * The sky renderer
@@ -1929,6 +1934,9 @@ export class SkyRenderer extends Disposable {
           this.$l.sunDir = this.params.lightDir;
           // Angular size of a pixel, taken here in uniform control flow (WGSL requires it).
           this.$l.pixelAngle = pb.length(pb.fwidth(this.rayDir));
+          // The sun disk's anti-aliasing wants the pixel pitch itself; the fwidth sum above runs up
+          // to twice that along diagonals, which is fine for fading noise but would blur the rim.
+          this.$l.sunPixelAngle = pb.max(pb.length(pb.dpdx(this.rayDir)), pb.length(pb.dpdy(this.rayDir)));
           this.$l.sunColor = pb.vec4();
           this.$l.skyColor = skyBox(
             this,
@@ -1937,6 +1945,8 @@ export class SkyRenderer extends Disposable {
             this.rayDir,
             pb.float(0.01),
             this.includeSunDisk,
+            this.sunPixelAngle,
+            pb.div(SKY_OUTPUT_MAX, pb.max(this.luminanceScale, 1e-8)),
             this.tLut,
             this.skyLut,
             this.msLut
@@ -2014,9 +2024,8 @@ export class SkyRenderer extends Disposable {
             }
           );
           // 1 for legacy and for the IBL bake; the camera pre-exposure when drawn on screen.
-          // Clamped like UE's PrepareOutput: the physical sun disk can exceed half-float range, and
-          // half of the fp10 maximum leaves headroom for bloom and other additive effects.
-          this.color = pb.min(pb.mul(this.color, this.luminanceScale), pb.vec3(64512 * 0.5));
+          // Clamped like UE's PrepareOutput, see SKY_OUTPUT_MAX.
+          this.color = pb.min(pb.mul(this.color, this.luminanceScale), pb.vec3(SKY_OUTPUT_MAX));
           this.$if(pb.equal(this.srgbOut, 0), function () {
             this.$outputs.outColor = pb.vec4(this.color, 1);
           }).$else(function () {

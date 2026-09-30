@@ -946,6 +946,9 @@ export const SUN_DISK_HALF_APEX_ANGLE = (0.5 * 0.5357 * Math.PI) / 180;
  * @param fIncludeSunDisk - 0: no sun disk; 1: legacy stylized disk with glow; 2: physical disk as in
  *   UE (GetLightDiskLuminance): illuminance over the disk's solid angle, attenuated by the atmosphere
  *   along the view ray, soft outer edge. Bloom is left to post processing.
+ * @param fPixelAngle - Angular size of a screen pixel in radians, for anti-aliasing the physical disk.
+ * @param fSunDiskMaxLuminance - Ceiling for the physical disk before its edge coverage is applied, in
+ *   the unscaled luminance this function returns (the output clamp divided by the luminance scale).
  */
 export function skyBox(
   scope: PBInsideFunctionScope,
@@ -954,6 +957,8 @@ export function skyBox(
   f3LocalDir: PBShaderExp,
   fSunSolidAngle: PBShaderExp,
   fIncludeSunDisk: PBShaderExp,
+  fPixelAngle: PBShaderExp,
+  fSunDiskMaxLuminance: PBShaderExp,
   texTransmittanceLut: PBShaderExp,
   texSkyViewLut: PBShaderExp,
   texMultiScatteringLut: PBShaderExp
@@ -968,7 +973,9 @@ export function skyBox(
       pb.vec4('sunColor').out(),
       pb.vec3('localDir'),
       pb.float('sunSolidAngle'),
-      pb.int('includeSunDisk')
+      pb.int('includeSunDisk'),
+      pb.float('pixelAngle'),
+      pb.float('sunDiskMaxLuminance')
     ],
     function () {
       this.$l.viewDir = pb.normalize(this.localDir);
@@ -1011,10 +1018,19 @@ export function skyBox(
         );
       });
       this.$if(pb.equal(this.includeSunDisk, 2), function () {
-        const cosHalfApex = Math.cos(SUN_DISK_HALF_APEX_ANGLE);
-        const solidAngle = 2 * Math.PI * (1 - cosHalfApex);
-        this.$l.viewDotLight = pb.dot(this.viewDir, this.params.lightDir);
-        this.$if(pb.greaterThan(this.viewDotLight, cosHalfApex), function () {
+        // The disk is a few pixels wide and, after pre-exposure, far above the output clamp, so UE's
+        // soft edge alone still leaves a hard binary rim: the number of lit pixels, and with it the
+        // energy bloom and TAA see, jumps as the disk slides across the pixel grid. The rim pixels
+        // also pair a clamped value with plain sky, the worst case for TAA's Reinhard-space blend.
+        // So the luminance is clamped first and the pixel's coverage of the disk applied after:
+        // edge pixels then vary smoothly with the sub-pixel position and the total stays ~ the area.
+        const halfApex = SUN_DISK_HALF_APEX_ANGLE;
+        const solidAngle = 2 * Math.PI * (1 - Math.cos(halfApex));
+        // Chord length: the angle to the disk center to well within float precision at this size,
+        // where acos of a dot product this close to 1 is not.
+        this.$l.theta = pb.distance(this.viewDir, this.params.lightDir);
+        this.$l.halfPixel = pb.mul(this.pixelAngle, 0.5);
+        this.$if(pb.lessThan(this.theta, pb.add(halfApex, this.halfPixel)), function () {
           // Planet shadowed by transmittanceToSky
           this.$l.transmittanceToLight = transmittanceToSky(
             this,
@@ -1023,26 +1039,39 @@ export function skyBox(
             this.viewDir,
             texTransmittanceLut
           );
-          this.$l.softEdge = pb.clamp(
-            pb.div(pb.mul(pb.sub(this.viewDotLight, cosHalfApex), 2), 1 - cosHalfApex),
+          // UE's 2 * (cos - cosHalfApex) / (1 - cosHalfApex) in small-angle form, taken at the point of
+          // the pixel nearest the disk center so it does not zero out the anti-aliased rim.
+          this.$l.edgeTheta = pb.div(pb.max(pb.sub(this.theta, this.halfPixel), 0), halfApex);
+          this.$l.softEdge = pb.clamp(pb.mul(pb.sub(1, pb.mul(this.edgeTheta, this.edgeTheta)), 2), 0, 1);
+          this.$l.coverage = pb.clamp(
+            pb.add(pb.div(pb.sub(halfApex, this.theta), pb.max(this.pixelAngle, 1e-6)), 0.5),
             0,
             1
           );
+          this.$l.diskLuminance = pb.mul(
+            this.transmittanceToLight,
+            this.params.lightColor.rgb,
+            pb.div(this.params.lightColor.a, solidAngle),
+            this.softEdge
+          );
           this.rgb = pb.add(
             this.rgb,
-            pb.mul(
-              this.transmittanceToLight,
-              this.params.lightColor.rgb,
-              pb.div(this.params.lightColor.a, solidAngle),
-              this.softEdge
-            )
+            pb.mul(pb.min(this.diskLuminance, pb.vec3(this.sunDiskMaxLuminance)), this.coverage)
           );
         });
       });
       this.$return(pb.vec4(this.rgb, 1));
     }
   );
-  return scope[funcName](stParams, f4SunColor, f3LocalDir, fSunSolidAngle, fIncludeSunDisk) as PBShaderExp;
+  return scope[funcName](
+    stParams,
+    f4SunColor,
+    f3LocalDir,
+    fSunSolidAngle,
+    fIncludeSunDisk,
+    fPixelAngle,
+    fSunDiskMaxLuminance
+  ) as PBShaderExp;
 }
 
 /** @internal */

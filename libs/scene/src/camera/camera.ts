@@ -898,7 +898,8 @@ export class Camera extends SceneNode {
    *
    * @remarks
    * See {@link Bloom.karisAverage}. On by default; costs a little halo reach in exchange for
-   * stability on high-frequency speculars.
+   * stability on high-frequency speculars. Legacy lighting only: physical lighting always averages
+   * linearly, as UE does.
    */
   get bloomKarisAverage() {
     return this._bloomKarisAverage;
