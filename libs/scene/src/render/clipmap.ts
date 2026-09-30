@@ -11,7 +11,8 @@ import {
   getVertexAttributeIndex,
   VERTEX_ATTRIB_POSITION,
   VERTEX_ATTRIB_TEXCOORD0,
-  type VertexAttribFormat
+  type VertexAttribFormat,
+  type BufferCreationOptions
 } from '@zephyr3d/device';
 
 const tmpAABB = new AABB();
@@ -29,6 +30,11 @@ const rotationValues = [0, Math.PI * 1.5, Math.PI * 0.5, Math.PI] as const;
  * Frustum plane mask covering everything but the far plane, for a clipmap that
  * reaches past it. @internal
  */
+/**
+ * Instance data is rewritten for every camera every frame: dynamic buffers keep their upload
+ * staging buffers for reuse instead of creating and destroying one per upload
+ */
+const INSTANCE_BUFFER_OPTIONS: BufferCreationOptions = { dynamic: true };
 const ALL_PLANES_EXCEPT_FAR = 0b111111 & ~(1 << BoxSide.BACK);
 
 /** @internal */
@@ -291,10 +297,20 @@ export class Clipmap extends Disposable {
       }
     }
     this._tileMesh.createAndSetVertexBuffer('position_f32x3', vertices);
-    this._tileMesh.createAndSetVertexBuffer('tex0_f32x4', this.allocInstanceBuffer(), 'instance');
+    this._tileMesh.createAndSetVertexBuffer(
+      'tex0_f32x4',
+      this.allocInstanceBuffer(),
+      'instance',
+      INSTANCE_BUFFER_OPTIONS
+    );
     this._instanceDataPoolSize++;
     for (const fmt of this._extraInstanceBuffers) {
-      this._tileMesh.createAndSetVertexBuffer(fmt, this.allocInstanceBuffer(), 'instance');
+      this._tileMesh.createAndSetVertexBuffer(
+        fmt,
+        this.allocInstanceBuffer(),
+        'instance',
+        INSTANCE_BUFFER_OPTIONS
+      );
       this._instanceDataPoolSize++;
     }
     this._tileMesh.createAndSetIndexBuffer(indices);
@@ -315,10 +331,20 @@ export class Clipmap extends Disposable {
     this._tileMeshLines?.dispose();
     this._tileMeshLines = new Primitive();
     this._tileMeshLines.setVertexBuffer(this._tileMesh.getVertexBuffer('position')!);
-    this._tileMeshLines.createAndSetVertexBuffer('tex0_f32x4', this.allocInstanceBuffer(), 'instance');
+    this._tileMeshLines.createAndSetVertexBuffer(
+      'tex0_f32x4',
+      this.allocInstanceBuffer(),
+      'instance',
+      INSTANCE_BUFFER_OPTIONS
+    );
     this._instanceDataPoolSize++;
     for (const fmt of this._extraInstanceBuffers) {
-      this._tileMeshLines.createAndSetVertexBuffer(fmt, this.allocInstanceBuffer(), 'instance');
+      this._tileMeshLines.createAndSetVertexBuffer(
+        fmt,
+        this.allocInstanceBuffer(),
+        'instance',
+        INSTANCE_BUFFER_OPTIONS
+      );
       this._instanceDataPoolSize++;
     }
     this._tileMeshLines.createAndSetIndexBuffer(indicesLines);
@@ -390,10 +416,20 @@ export class Clipmap extends Disposable {
       }
     }
     this._fillerMesh.createAndSetVertexBuffer('position_f32x3', vertices);
-    this._fillerMesh.createAndSetVertexBuffer('tex0_f32x4', this.allocInstanceBuffer(), 'instance');
+    this._fillerMesh.createAndSetVertexBuffer(
+      'tex0_f32x4',
+      this.allocInstanceBuffer(),
+      'instance',
+      INSTANCE_BUFFER_OPTIONS
+    );
     this._instanceDataPoolSize++;
     for (const fmt of this._extraInstanceBuffers) {
-      this._fillerMesh.createAndSetVertexBuffer(fmt, this.allocInstanceBuffer(), 'instance');
+      this._fillerMesh.createAndSetVertexBuffer(
+        fmt,
+        this.allocInstanceBuffer(),
+        'instance',
+        INSTANCE_BUFFER_OPTIONS
+      );
       this._instanceDataPoolSize++;
     }
     this._fillerMesh.createAndSetIndexBuffer(indices);
@@ -414,10 +450,20 @@ export class Clipmap extends Disposable {
     this._fillerMeshLines?.dispose();
     this._fillerMeshLines = new Primitive();
     this._fillerMeshLines.setVertexBuffer(this._fillerMesh.getVertexBuffer('position')!);
-    this._fillerMeshLines.createAndSetVertexBuffer('tex0_f32x4', this.allocInstanceBuffer(), 'instance');
+    this._fillerMeshLines.createAndSetVertexBuffer(
+      'tex0_f32x4',
+      this.allocInstanceBuffer(),
+      'instance',
+      INSTANCE_BUFFER_OPTIONS
+    );
     this._instanceDataPoolSize++;
     for (const fmt of this._extraInstanceBuffers) {
-      this._fillerMeshLines.createAndSetVertexBuffer(fmt, this.allocInstanceBuffer(), 'instance');
+      this._fillerMeshLines.createAndSetVertexBuffer(
+        fmt,
+        this.allocInstanceBuffer(),
+        'instance',
+        INSTANCE_BUFFER_OPTIONS
+      );
       this._instanceDataPoolSize++;
     }
     this._fillerMeshLines.createAndSetIndexBuffer(indicesLines);
@@ -468,10 +514,20 @@ export class Clipmap extends Disposable {
       indices[n++] = startOfHorizonal + (i + 0) * 2 + 1;
     }
     this._trimMesh.createAndSetVertexBuffer('position_f32x3', vertices);
-    this._trimMesh.createAndSetVertexBuffer('tex0_f32x4', this.allocInstanceBuffer(), 'instance');
+    this._trimMesh.createAndSetVertexBuffer(
+      'tex0_f32x4',
+      this.allocInstanceBuffer(),
+      'instance',
+      INSTANCE_BUFFER_OPTIONS
+    );
     this._instanceDataPoolSize++;
     for (const fmt of this._extraInstanceBuffers) {
-      this._trimMesh.createAndSetVertexBuffer(fmt, this.allocInstanceBuffer(), 'instance');
+      this._trimMesh.createAndSetVertexBuffer(
+        fmt,
+        this.allocInstanceBuffer(),
+        'instance',
+        INSTANCE_BUFFER_OPTIONS
+      );
       this._instanceDataPoolSize++;
     }
     this._trimMesh.createAndSetIndexBuffer(indices);
@@ -492,10 +548,20 @@ export class Clipmap extends Disposable {
     this._trimMeshLines?.dispose();
     this._trimMeshLines = new Primitive();
     this._trimMeshLines.setVertexBuffer(this._trimMesh.getVertexBuffer('position')!);
-    this._trimMeshLines.createAndSetVertexBuffer('tex0_f32x4', this.allocInstanceBuffer(), 'instance');
+    this._trimMeshLines.createAndSetVertexBuffer(
+      'tex0_f32x4',
+      this.allocInstanceBuffer(),
+      'instance',
+      INSTANCE_BUFFER_OPTIONS
+    );
     this._instanceDataPoolSize++;
     for (const fmt of this._extraInstanceBuffers) {
-      this._trimMeshLines.createAndSetVertexBuffer(fmt, this.allocInstanceBuffer(), 'instance');
+      this._trimMeshLines.createAndSetVertexBuffer(
+        fmt,
+        this.allocInstanceBuffer(),
+        'instance',
+        INSTANCE_BUFFER_OPTIONS
+      );
       this._instanceDataPoolSize++;
     }
     this._trimMeshLines.createAndSetIndexBuffer(indicesLines);
@@ -559,11 +625,17 @@ export class Clipmap extends Disposable {
     this._crossMesh.createAndSetVertexBuffer(
       'tex0_f32x4',
       this.allocNonInstanceBuffer(0, 0, 0, 0),
-      'instance'
+      'instance',
+      INSTANCE_BUFFER_OPTIONS
     );
     this._nonInstanceDataPoolSize++;
     for (const fmt of this._extraInstanceBuffers) {
-      this._crossMesh.createAndSetVertexBuffer(fmt, this.allocNonInstanceBuffer(0, 0, 0, 0), 'instance');
+      this._crossMesh.createAndSetVertexBuffer(
+        fmt,
+        this.allocNonInstanceBuffer(0, 0, 0, 0),
+        'instance',
+        INSTANCE_BUFFER_OPTIONS
+      );
       this._nonInstanceDataPoolSize++;
     }
     this._crossMesh.createAndSetIndexBuffer(indices);
@@ -587,11 +659,17 @@ export class Clipmap extends Disposable {
     this._crossMeshLines.createAndSetVertexBuffer(
       'tex0_f32x4',
       this.allocNonInstanceBuffer(0, 0, 0, 0),
-      'instance'
+      'instance',
+      INSTANCE_BUFFER_OPTIONS
     );
     this._nonInstanceDataPoolSize++;
     for (const fmt of this._extraInstanceBuffers) {
-      this._crossMeshLines.createAndSetVertexBuffer(fmt, this.allocNonInstanceBuffer(0, 0, 0, 0), 'instance');
+      this._crossMeshLines.createAndSetVertexBuffer(
+        fmt,
+        this.allocNonInstanceBuffer(0, 0, 0, 0),
+        'instance',
+        INSTANCE_BUFFER_OPTIONS
+      );
       this._nonInstanceDataPoolSize++;
     }
     this._crossMeshLines.createAndSetIndexBuffer(indicesLines);
@@ -637,10 +715,20 @@ export class Clipmap extends Disposable {
     }
     indices[indices.length - 1] = 0;
     this._seamMesh.createAndSetVertexBuffer('position_f32x3', vertices);
-    this._seamMesh.createAndSetVertexBuffer('tex0_f32x4', this.allocInstanceBuffer(), 'instance');
+    this._seamMesh.createAndSetVertexBuffer(
+      'tex0_f32x4',
+      this.allocInstanceBuffer(),
+      'instance',
+      INSTANCE_BUFFER_OPTIONS
+    );
     this._instanceDataPoolSize++;
     for (const fmt of this._extraInstanceBuffers) {
-      this._seamMesh.createAndSetVertexBuffer(fmt, this.allocInstanceBuffer(), 'instance');
+      this._seamMesh.createAndSetVertexBuffer(
+        fmt,
+        this.allocInstanceBuffer(),
+        'instance',
+        INSTANCE_BUFFER_OPTIONS
+      );
       this._instanceDataPoolSize++;
     }
     this._seamMesh.createAndSetIndexBuffer(indices);
@@ -661,10 +749,20 @@ export class Clipmap extends Disposable {
     this._seamMeshLines?.dispose();
     this._seamMeshLines = new Primitive();
     this._seamMeshLines.setVertexBuffer(this._seamMesh.getVertexBuffer('position')!);
-    this._seamMeshLines.createAndSetVertexBuffer('tex0_f32x4', this.allocInstanceBuffer(), 'instance');
+    this._seamMeshLines.createAndSetVertexBuffer(
+      'tex0_f32x4',
+      this.allocInstanceBuffer(),
+      'instance',
+      INSTANCE_BUFFER_OPTIONS
+    );
     this._instanceDataPoolSize++;
     for (const fmt of this._extraInstanceBuffers) {
-      this._seamMeshLines.createAndSetVertexBuffer(fmt, this.allocInstanceBuffer(), 'instance');
+      this._seamMeshLines.createAndSetVertexBuffer(
+        fmt,
+        this.allocInstanceBuffer(),
+        'instance',
+        INSTANCE_BUFFER_OPTIONS
+      );
       this._instanceDataPoolSize++;
     }
     this._seamMeshLines.createAndSetIndexBuffer(indicesLines);
@@ -749,11 +847,17 @@ export class Clipmap extends Disposable {
     this._skirtMesh.createAndSetVertexBuffer(
       'tex0_f32x4',
       this.allocNonInstanceBuffer(0, 0, 0, 0),
-      'instance'
+      'instance',
+      INSTANCE_BUFFER_OPTIONS
     );
     this._nonInstanceDataPoolSize++;
     for (const fmt of this._extraInstanceBuffers) {
-      this._skirtMesh.createAndSetVertexBuffer(fmt, this.allocNonInstanceBuffer(0, 0, 0, 0), 'instance');
+      this._skirtMesh.createAndSetVertexBuffer(
+        fmt,
+        this.allocNonInstanceBuffer(0, 0, 0, 0),
+        'instance',
+        INSTANCE_BUFFER_OPTIONS
+      );
       this._nonInstanceDataPoolSize++;
     }
     this._skirtMesh.createAndSetIndexBuffer(indices);
@@ -776,11 +880,17 @@ export class Clipmap extends Disposable {
     this._skirtMeshLines.createAndSetVertexBuffer(
       'tex0_f32x4',
       this.allocNonInstanceBuffer(0, 0, 0, 0),
-      'instance'
+      'instance',
+      INSTANCE_BUFFER_OPTIONS
     );
     this._nonInstanceDataPoolSize++;
     for (const fmt of this._extraInstanceBuffers) {
-      this._skirtMeshLines.createAndSetVertexBuffer(fmt, this.allocNonInstanceBuffer(0, 0, 0, 0), 'instance');
+      this._skirtMeshLines.createAndSetVertexBuffer(
+        fmt,
+        this.allocNonInstanceBuffer(0, 0, 0, 0),
+        'instance',
+        INSTANCE_BUFFER_OPTIONS
+      );
       this._nonInstanceDataPoolSize++;
     }
     this._skirtMeshLines.createAndSetIndexBuffer(indicesLines);

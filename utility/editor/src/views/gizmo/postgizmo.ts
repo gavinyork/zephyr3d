@@ -2522,8 +2522,18 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
     // ---- init resources ----
     if (!PostGizmoRenderer._aalinePrimitive) {
       PostGizmoRenderer._aalinePrimitive = new Primitive();
-      PostGizmoRenderer._aalinePrimitive.createAndSetVertexBuffer('position_f32x4', new Float32Array(4 * 4));
-      PostGizmoRenderer._aalinePrimitive.createAndSetVertexBuffer('tex0_f32x4', new Float32Array(4 * 4));
+      PostGizmoRenderer._aalinePrimitive.createAndSetVertexBuffer(
+        'position_f32x4',
+        new Float32Array(4 * 4),
+        'vertex',
+        { dynamic: true }
+      );
+      PostGizmoRenderer._aalinePrimitive.createAndSetVertexBuffer(
+        'tex0_f32x4',
+        new Float32Array(4 * 4),
+        'vertex',
+        { dynamic: true }
+      );
       PostGizmoRenderer._aalinePrimitive.createAndSetIndexBuffer(new Uint16Array([0, 1, 2, 3]));
       PostGizmoRenderer._aalinePrimitive.primitiveType = 'triangle-strip';
     }

@@ -18,6 +18,7 @@ import {
   type VertexSemantic,
   type VertexAttribFormat,
   type GPUDataBuffer,
+  type BufferCreationOptions,
   PBPrimitiveType,
   matchVertexBuffer
 } from '@zephyr3d/device';
@@ -275,17 +276,19 @@ export class Primitive
    * @param format - Vertex attribute format(s).
    * @param data - Typed array with vertex data.
    * @param stepMode - Optional step mode (e.g., 'vertex', 'instance').
+   * @param options - Optional buffer creation options, e.g. `dynamic` for data rewritten often.
    * @returns The created `StructuredBuffer`.
    */
   createAndSetVertexBuffer(
     format: VertexAttribFormat[] | VertexAttribFormat,
     data: TypedArray,
-    stepMode?: VertexStepMode
+    stepMode?: VertexStepMode,
+    options?: BufferCreationOptions
   ) {
     const device = getDevice();
     const buffer = Array.isArray(format)
-      ? device.createInterleavedVertexBuffer(format, data)!
-      : device.createVertexBuffer(format, data)!;
+      ? device.createInterleavedVertexBuffer(format, data, options)!
+      : device.createVertexBuffer(format, data, options)!;
     return this.setVertexBuffer(buffer, stepMode);
   }
   /**

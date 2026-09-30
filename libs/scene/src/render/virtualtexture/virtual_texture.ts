@@ -267,6 +267,11 @@ export class VirtualTexture extends Disposable {
   private readonly _dispatchArgs: GPUDataBuffer;
   /** Persistent across updates: (mip bias, upper bound or -1 when disabled, lower bound, locked page residency) */
   private readonly _state: GPUDataBuffer;
+  /**
+   * Readback copy of the counters, the list counts and the state, in that order. Kept rather
+   * than created per read: a single read is in flight at a time (see _statsPending).
+   */
+  private readonly _statsReadback: GPUDataBuffer;
   private readonly _programs: Map<string, GPUProgram>;
   private readonly _bindGroups: Map<string, BindGroup>;
   private _parity: number;
@@ -347,6 +352,7 @@ export class VirtualTexture extends Disposable {
     this._counters = storage(NUM_COUNTERS * 4);
     this._dispatchArgs = device.createBuffer(6 * 4, { usage: 'indirect', storage: true })!;
     this._state = storage(16);
+    this._statsReadback = device.createBuffer(NUM_COUNTERS * 4 + 32, { usage: 'read' })!;
     const upper = options.residencyUpperBound ?? 0.95;
     const lower = Math.min(upper, options.residencyLowerBound ?? 0.8);
     // x: mip bias, y: upper bound (negative when disabled), z: lower bound, w: locked residency
@@ -774,17 +780,16 @@ export class VirtualTexture extends Disposable {
   }
   private readStats() {
     this._statsPending = true;
-    const counters = new Uint8Array(NUM_COUNTERS * 4);
-    const lists = new Uint8Array(16);
-    const state = new Uint8Array(16);
-    Promise.all([
-      this._counters.getBufferSubData(counters),
-      this._listCounts.getBufferSubData(lists),
-      this._state.getBufferSubData(state)
-    ])
-      .then(() => {
-        const c = new Uint32Array(counters.buffer);
-        const l = new Int32Array(lists.buffer);
+    const countersBytes = NUM_COUNTERS * 4;
+    this._device.copyBuffer(this._counters, this._statsReadback, 0, 0, countersBytes);
+    this._device.copyBuffer(this._listCounts, this._statsReadback, 0, countersBytes, 16);
+    this._device.copyBuffer(this._state, this._statsReadback, 0, countersBytes + 16, 16);
+    this._statsReadback
+      .getBufferSubData()
+      .then((data) => {
+        const c = new Uint32Array(data.buffer, data.byteOffset, NUM_COUNTERS);
+        const l = new Int32Array(data.buffer, data.byteOffset + countersBytes, 4);
+        const state = new Float32Array(data.buffer, data.byteOffset + countersBytes + 16, 4);
         this._stats = {
           requested: c[C_STAT_REQUESTED],
           allocated: c[C_STAT_ALLOCATED],
@@ -795,7 +800,7 @@ export class VirtualTexture extends Disposable {
           dropped: c[C_STAT_DROPPED],
           available: Math.max(0, l[LIST_AVAILABLE]),
           lruSize: l[LIST_REQUESTED],
-          mipBias: new Float32Array(state.buffer)[0]
+          mipBias: state[0]
         };
       })
       .catch(() => {})
@@ -1454,7 +1459,8 @@ export class VirtualTexture extends Disposable {
       this._fillList,
       this._counters,
       this._dispatchArgs,
-      this._state
+      this._state,
+      this._statsReadback
     ]) {
       buffer.dispose();
     }

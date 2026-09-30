@@ -5,6 +5,8 @@ const TIMESTAMP_BYTES_PER_QUERY = 8;
 const TIMESTAMP_QUERIES_PER_SCOPE = 2;
 const TIMESTAMP_RESOLVE_STRIDE = 256;
 const MAX_RESOLVED_RESULT_HISTORY = 4096;
+/** Readback buffers kept for reuse once their results are read */
+const MAX_FREE_READBACK_BUFFERS = 8;
 
 export type TimestampQueryStatus =
   | 'pending'
@@ -56,10 +58,14 @@ type TimestampQueryRecord = {
   waiters: Array<(result: TimestampQueryResult) => void>;
 };
 
+type TimestampReadbackBuffer = {
+  buffer: GPUBuffer;
+  size: number;
+};
+
 type TimestampResolveBatch = {
   entries: TimestampResolveEntry[];
-  resolveBuffer: GPUBuffer;
-  readbackBuffer: GPUBuffer;
+  readbackBuffer: TimestampReadbackBuffer;
 };
 
 type TimestampResolveEntry = {
@@ -85,6 +91,14 @@ export class WebGPUTimestampQueryManager {
   private readonly _resolvedResults: TimestampQueryResult[];
   private _nextId: number;
   private _frameQueryId: number;
+  /**
+   * Resolve target shared by every batch: each batch resolves into it and copies it out within
+   * one command buffer, and the queue runs command buffers in order, so no two batches overlap
+   */
+  private _resolveBuffer: GPUBuffer | null;
+  private _resolveBufferSize: number;
+  /** Readback buffers whose results have been read, reused instead of created every frame */
+  private readonly _freeReadbackBuffers: TimestampReadbackBuffer[];
 
   constructor(device: WebGPUDevice) {
     this._device = device;
@@ -106,6 +120,9 @@ export class WebGPUTimestampQueryManager {
     this._resolvedResults = [];
     this._nextId = 0;
     this._frameQueryId = 0;
+    this._resolveBuffer = null;
+    this._resolveBufferSize = 0;
+    this._freeReadbackBuffers = [];
   }
 
   get supported() {
@@ -238,16 +255,8 @@ export class WebGPUTimestampQueryManager {
       };
     });
     const byteLength = entries.length * TIMESTAMP_RESOLVE_STRIDE;
-    const resolveBuffer = this._device.gpuCreateBuffer({
-      label: 'timestamp-query-resolve',
-      size: byteLength,
-      usage: GPUBufferUsage.QUERY_RESOLVE | GPUBufferUsage.COPY_SRC
-    });
-    const readbackBuffer = this._device.gpuCreateBuffer({
-      label: 'timestamp-query-readback',
-      size: byteLength,
-      usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ
-    });
+    const resolveBuffer = this.fetchResolveBuffer(byteLength);
+    const readbackBuffer = this.fetchReadbackBuffer(byteLength);
     const encoder = this._device.device.createCommandEncoder({ label: 'timestamp-query-resolve' });
     for (const entry of entries) {
       encoder.resolveQuerySet(
@@ -258,10 +267,9 @@ export class WebGPUTimestampQueryManager {
         entry.readbackOffset
       );
     }
-    encoder.copyBufferToBuffer(resolveBuffer, 0, readbackBuffer, 0, byteLength);
+    encoder.copyBufferToBuffer(resolveBuffer, 0, readbackBuffer.buffer, 0, byteLength);
     this._pendingSubmitBatches.push({
       entries,
-      resolveBuffer,
       readbackBuffer
     });
     return encoder.finish();
@@ -270,7 +278,7 @@ export class WebGPUTimestampQueryManager {
   onSubmitted(): void {
     const batches = this._pendingSubmitBatches.splice(0);
     for (const batch of batches) {
-      batch.readbackBuffer
+      batch.readbackBuffer.buffer
         .mapAsync(GPUMapMode.READ)
         .then(() => {
           this.completeBatch(batch);
@@ -336,7 +344,7 @@ export class WebGPUTimestampQueryManager {
   }
 
   private completeBatch(batch: TimestampResolveBatch): void {
-    const values = new BigUint64Array(batch.readbackBuffer.getMappedRange());
+    const values = new BigUint64Array(batch.readbackBuffer.buffer.getMappedRange());
     for (const entry of batch.entries) {
       const record = entry.record;
       const valueOffset = entry.readbackOffset / TIMESTAMP_BYTES_PER_QUERY;
@@ -359,9 +367,8 @@ export class WebGPUTimestampQueryManager {
       this.resolveWaiters(record);
       this.completeRecord(record, result);
     }
-    batch.readbackBuffer.unmap();
-    batch.readbackBuffer.destroy();
-    batch.resolveBuffer.destroy();
+    batch.readbackBuffer.buffer.unmap();
+    this.releaseReadbackBuffer(batch.readbackBuffer);
   }
 
   private failBatch(batch: TimestampResolveBatch, message: string): void {
@@ -383,8 +390,50 @@ export class WebGPUTimestampQueryManager {
       this.resolveWaiters(record);
       this.completeRecord(record, result);
     }
-    batch.readbackBuffer.destroy();
-    batch.resolveBuffer.destroy();
+    // A failed map leaves the buffer in an unknown state: do not reuse it
+    batch.readbackBuffer.buffer.destroy();
+  }
+
+  private fetchResolveBuffer(byteLength: number): GPUBuffer {
+    if (!this._resolveBuffer || this._resolveBufferSize < byteLength) {
+      // Command buffers already submitted keep the old one alive until they complete
+      this._resolveBuffer?.destroy();
+      this._resolveBufferSize = Math.max(byteLength, this._resolveBufferSize * 2);
+      this._resolveBuffer = this._device.gpuCreateBuffer({
+        label: 'timestamp-query-resolve',
+        size: this._resolveBufferSize,
+        usage: GPUBufferUsage.QUERY_RESOLVE | GPUBufferUsage.COPY_SRC
+      });
+    }
+    return this._resolveBuffer;
+  }
+
+  private fetchReadbackBuffer(byteLength: number): TimestampReadbackBuffer {
+    const index = this._freeReadbackBuffers.findIndex((b) => b.size >= byteLength);
+    if (index >= 0) {
+      return this._freeReadbackBuffers.splice(index, 1)[0];
+    }
+    // Rounded up so that the few sizes a frame needs share buffers
+    let size = TIMESTAMP_RESOLVE_STRIDE;
+    while (size < byteLength) {
+      size *= 2;
+    }
+    return {
+      buffer: this._device.gpuCreateBuffer({
+        label: 'timestamp-query-readback',
+        size,
+        usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ
+      }),
+      size
+    };
+  }
+
+  private releaseReadbackBuffer(readback: TimestampReadbackBuffer): void {
+    if (this._freeReadbackBuffers.length < MAX_FREE_READBACK_BUFFERS) {
+      this._freeReadbackBuffers.push(readback);
+    } else {
+      readback.buffer.destroy();
+    }
   }
 
   private freeQueryPair(startIndex: number): void {
