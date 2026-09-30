@@ -99,6 +99,11 @@ export type ShadowMapParams = {
    */
   cubeFace?: CubeFace;
   /**
+   * The cascade being rendered while a directional shadow map draws its casters, 0 for a shadow
+   * map without cascades. Lets a caster draw into some cascades only.
+   */
+  cascadeIndex?: number;
+  /**
    * World distance that a normalized depth of 1 stands for in a point-projection
    * shadow map, whose casters store radial distance over the light's range.
    */
@@ -1169,6 +1174,21 @@ export class ShadowMapper extends Disposable {
     camera.remove();
     cameras.push(camera);
   }
+  /**
+   * View distances bounding the cascades a directional light's shadow map will be rendered with
+   * for a camera, the same ones render() computes: cascade i covers [result[i], result[i + 1]].
+   * A shadow map without cascades has one, up to the shadow distance.
+   * @internal
+   */
+  getCascadeDistances(camera: Camera): number[] {
+    const numCascades =
+      this._light.isDirectionLight() && this._impl!.supportsCascades() ? (this._config.numCascades ?? 1) : 1;
+    const near = camera.getNearPlane();
+    const far = Math.min(this._shadowDistance, camera.getFarPlane());
+    return numCascades > 1
+      ? this.calcSplitDistances(near, far, numCascades).slice(0, numCascades + 1)
+      : [near, far];
+  }
   /** @internal */
   calcSplitDistances(nearPlane: number, farPlane: number, numCascades: number) {
     const result: number[] = [0, 0, 0, 0, 0];
@@ -1236,6 +1256,7 @@ export class ShadowMapper extends Disposable {
       shadowMapParams.lightType === LIGHT_TYPE_DIRECTIONAL && this._impl!.supportsCascades()
         ? (this._config.numCascades ?? 1)
         : 1;
+    shadowMapParams.cascadeIndex = 0;
     ctx.shadowMapInfo.set(this.light, shadowMapParams);
     const scene = ctx.scene;
     const camera = ctx.camera;
@@ -1403,6 +1424,7 @@ export class ShadowMapper extends Disposable {
           }
           device.setFramebuffer(fb);
           device.setScissor(scissor);
+          shadowMapParams.cascadeIndex = split;
           renderGeometry(shadowMapRenderCamera, shadowMapCullCamera);
           shadowMapParams.shadowMatrices.set(
             Matrix4x4.transpose(shadowMapRenderCamera.viewProjectionMatrix),

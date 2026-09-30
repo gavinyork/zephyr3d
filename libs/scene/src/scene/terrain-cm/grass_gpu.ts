@@ -84,6 +84,13 @@ const NO_LIMIT = 1e30;
 export function grassBladeLodDistance(lodDistance: number, drawDistance: number) {
   return lodDistance > 0 && (drawDistance <= 0 || lodDistance < drawDistance) ? lodDistance : NO_LIMIT;
 }
+/**
+ * Number of culling planes of the placement pass: the six of a view frustum, or up to the twelve
+ * of a shadow caster culling volume (see GrassRenderer). Unused ones are planes everything is
+ * inside of.
+ * @internal
+ */
+export const GRASS_CULL_PLANES = 12;
 /** Samples along the line of sight of the terrain occlusion test, one per workgroup thread */
 const OCCLUSION_SAMPLES = WORKGROUP_SIZE * WORKGROUP_SIZE;
 
@@ -117,6 +124,18 @@ export function grassHash(x: number, z: number, seed: number): number {
 }
 
 /**
+ * Output of one placement: the blade lists and their draw arguments, with the bind group and
+ * the primitive that read them
+ */
+type PlacementTarget = {
+  instanceBuffer: DRef<GPUDataBuffer>;
+  argsBuffer: DRef<GPUDataBuffer>;
+  bindGroup: DRef<BindGroup>;
+  primitive: DRef<Primitive>;
+  capacity: number;
+};
+
+/**
  * GPU placement and culling of the blades of one grass layer (WebGPU with indirect draw only).
  *
  * Blade placement is procedural - a hash per placement cell and a bilinear density lookup - so
@@ -138,18 +157,20 @@ export function grassHash(x: number, z: number, seed: number): number {
  * stays where it is. Both lists share the instance buffer, the low one from `lowListBase` on,
  * and each has its own indirect draw arguments.
  *
+ * Placements go to numbered targets, each with its own lists: target 0 holds the blades seen
+ * from the camera, the others the blades casting shadows into a shadow map. A shadow target is
+ * placed around the same camera, so it picks the same blades at the same detail levels, but
+ * culls them by the volume the shadow casters can be in instead of the view frustum.
+ *
  * @internal
  */
 export class GrassGpuPlacement extends Disposable {
   private static readonly _programs: Partial<Record<GrassLayerKind, GPUProgram>> = {};
   private static readonly _cameraPos = new Vector3();
-  private static readonly _planes = new Float32Array(24);
+  private static readonly _planes = new Float32Array(GRASS_CULL_PLANES * 4);
   private readonly _densityTexture: DRef<Texture2D>;
   private readonly _kind: GrassLayerKind;
-  private readonly _instanceBuffer: DRef<GPUDataBuffer>;
-  private readonly _argsBuffer: DRef<GPUDataBuffer>;
-  private readonly _bindGroup: DRef<BindGroup>;
-  private readonly _primitive: DRef<Primitive>;
+  private readonly _targets: PlacementTarget[];
   private readonly _baseVertexBuffer: DRef<StructuredBuffer>;
   private readonly _shape0: Vector4;
   private readonly _shape1: Vector4;
@@ -163,8 +184,11 @@ export class GrassGpuPlacement extends Disposable {
   private readonly _window: Vector4;
   /** Far window, in 2x2 blocks of cells (procedural blades only) */
   private readonly _window2: Vector4;
-  /** (low detail distance, first instance of the low detail list, unused, unused) */
+  /** (low detail distance, first instance of the low detail list, shadow fade start, 1 / fade length) */
   private readonly _lod: Vector4;
+  /** Camera forward axis and offset, see generate() */
+  private readonly _viewDepth: Vector4;
+  private static readonly _forward = new Vector3();
   private readonly _cells: Vector4;
   private readonly _params: Vector4;
   private readonly _posScale: Vector4;
@@ -172,7 +196,6 @@ export class GrassGpuPlacement extends Disposable {
   private readonly _occlusion: Vector4;
   private readonly _heightInfo: Vector4;
   private readonly _densityLod: Vector4;
-  private _capacity: number;
   /**
    * Whether the current device can run the GPU path
    */
@@ -202,18 +225,15 @@ export class GrassGpuPlacement extends Disposable {
     this._clump0 = new Vector4();
     this._clump1 = new Vector4();
     this._densityTexture = new DRef();
-    this._instanceBuffer = new DRef();
-    // Five draw arguments per detail level
-    const numArgs = this._lodIndexCounts.length * 5;
-    this._argsBuffer = new DRef(getDevice().createBuffer(numArgs * 4, { usage: 'indirect', storage: true }));
-    this._bindGroup = new DRef();
-    this._primitive = new DRef();
+    this._targets = [];
     this._baseVertexBuffer = new DRef(baseVertexBuffer);
     this._indexBuffer = new DRef(indexBuffer);
-    this._args = new Uint32Array(numArgs);
+    // Five draw arguments per detail level
+    this._args = new Uint32Array(this._lodIndexCounts.length * 5);
     this._window = new Vector4();
     this._window2 = new Vector4();
     this._lod = new Vector4();
+    this._viewDepth = new Vector4();
     this._cells = new Vector4();
     this._params = new Vector4();
     this._posScale = new Vector4();
@@ -221,12 +241,13 @@ export class GrassGpuPlacement extends Disposable {
     this._occlusion = new Vector4();
     this._heightInfo = new Vector4();
     this._densityLod = new Vector4();
-    this._capacity = 0;
   }
   setBaseVertexBuffer(baseVertexBuffer: StructuredBuffer) {
     if (baseVertexBuffer !== this._baseVertexBuffer.get()) {
       this._baseVertexBuffer.set(baseVertexBuffer);
-      this._primitive.dispose();
+      for (const target of this._targets) {
+        target.primitive.dispose();
+      }
     }
   }
   /**
@@ -241,7 +262,9 @@ export class GrassGpuPlacement extends Disposable {
       tex = getDevice().createTexture2D('r8unorm', width, height, { mipmapping: false })!;
       tex.name = 'GrassDensity';
       this._densityTexture.set(tex);
-      this._bindGroup.dispose();
+      for (const target of this._targets) {
+        target.bindGroup.dispose();
+      }
     }
     // Texture uploads take views of plain array buffers only
     const bytes =
@@ -273,6 +296,12 @@ export class GrassGpuPlacement extends Disposable {
   /**
    * Places and culls the blades seen from a camera. Runs a compute pass, so it must be called
    * outside of render passes, before the draws that consume the result.
+   * @param target - Target the blades are placed into, see draw()
+   * @param cullPlanes - GRASS_CULL_PLANES planes (a, b, c, d) the blades are culled by instead of
+   *   the camera's frustum, whose normals point inward
+   * @param shadowFade - Procedural blades only: (start, end) view depth over which the blades thin
+   *   out to none, each leaving at its own depth by a hash. Lets the blades casting shadows fade
+   *   out before the last cascade they are drawn into instead of stopping at its far split.
    */
   generate(
     camera: Camera,
@@ -285,8 +314,12 @@ export class GrassGpuPlacement extends Disposable {
     occlusionMode: GrassOcclusionMode,
     farDensity: number,
     bladeShape?: GrassBladeShape,
-    windParams?: Nullable<Float32Array<ArrayBuffer>>
+    windParams?: Nullable<Float32Array<ArrayBuffer>>,
+    target = 0,
+    cullPlanes?: Nullable<Float32Array<ArrayBuffer>>,
+    shadowFade?: Nullable<[number, number]>
   ) {
+    const placementTarget = this.getTarget(target);
     const density = this._densityTexture.get();
     const heightMap = terrain.heightMap;
     // Draw arguments of each detail level, whose indices follow each other: (index count,
@@ -296,7 +329,7 @@ export class GrassGpuPlacement extends Disposable {
       this._args.set([this._lodIndexCounts[i], 0, firstIndex, 0, 0], i * 5);
       firstIndex += this._lodIndexCounts[i];
     }
-    this._argsBuffer.get()!.bufferSubData(0, this._args);
+    placementTarget.argsBuffer.get()!.bufferSubData(0, this._args);
     if (!density || !heightMap) {
       return;
     }
@@ -341,11 +374,22 @@ export class GrassGpuPlacement extends Disposable {
       return;
     }
     // Each list holds at most one blade per thread of its layer
-    this.ensureCapacity(Math.max(nearCount, farCount));
-    const bindGroup = this.getBindGroup();
+    this.ensureCapacity(placementTarget, Math.max(nearCount, farCount));
+    const bindGroup = this.getBindGroup(placementTarget);
     this._window.setXYZW(near[0], near[1], near[2], near[3]);
     this._window2.setXYZW(far[0], far[1], far[2], far[3]);
-    this._lod.setXYZW(lodDistance, this._capacity, 0, 0);
+    // (fade start, 1 / fade length); a zero length leaves every blade in
+    const fadeLength = shadowFade ? shadowFade[1] - shadowFade[0] : 0;
+    this._lod.setXYZW(
+      lodDistance,
+      placementTarget.capacity,
+      shadowFade ? shadowFade[0] : 0,
+      fadeLength > 0 ? 1 / fadeLength : 0
+    );
+    // View depth of a point: dot(xyz, p) + w, along the camera's forward axis
+    const m = camera.worldMatrix;
+    const forward = GrassGpuPlacement._forward.setXYZ(-m.m02, -m.m12, -m.m22).inplaceNormalize();
+    this._viewDepth.setXYZW(forward.x, forward.y, forward.z, -Vector3.dot(forward, cameraPos));
     this._cells.setXYZW(cellsW, cellsH, density.width, density.height);
     // Bounding sphere of a blade, centred halfway up; the density LOD widens distant blades
     const lod = grassDensityLod(drawDistance, farDensity);
@@ -388,16 +432,20 @@ export class GrassGpuPlacement extends Disposable {
       Math.max((region.z - region.x) / heightMap.width, (region.w - region.y) / heightMap.height)
     );
     // Planes masked out by the camera become ones everything is inside of
-    const planes = GrassGpuPlacement._planes;
-    const frustumPlanes = camera.frustum.planes;
-    const mask = camera.clipMask || 0x3f;
-    for (let i = 0; i < 6; i++) {
-      const p = frustumPlanes[i];
-      const enabled = !!(mask & (1 << i));
-      planes[i * 4 + 0] = enabled ? p.a : 0;
-      planes[i * 4 + 1] = enabled ? p.b : 0;
-      planes[i * 4 + 2] = enabled ? p.c : 0;
-      planes[i * 4 + 3] = enabled ? p.d : 1e30;
+    let planes: Float32Array<ArrayBuffer> = GrassGpuPlacement._planes;
+    if (cullPlanes) {
+      planes = cullPlanes;
+    } else {
+      const frustumPlanes = camera.frustum.planes;
+      const mask = camera.clipMask || 0x3f;
+      for (let i = 0; i < GRASS_CULL_PLANES; i++) {
+        const p = frustumPlanes[i];
+        const enabled = i < 6 && !!(mask & (1 << i));
+        planes[i * 4 + 0] = enabled ? p.a : 0;
+        planes[i * 4 + 1] = enabled ? p.b : 0;
+        planes[i * 4 + 2] = enabled ? p.c : 0;
+        planes[i * 4 + 3] = enabled ? p.d : 1e30;
+      }
     }
     bindGroup.setValue('window', this._window);
     bindGroup.setValue('cells', this._cells);
@@ -412,6 +460,7 @@ export class GrassGpuPlacement extends Disposable {
     if (this._kind === 'blade') {
       bindGroup.setValue('window2', this._window2);
       bindGroup.setValue('lod', this._lod);
+      bindGroup.setValue('viewDepth', this._viewDepth);
       bindGroup.setValue('shape0', this._shape0);
       bindGroup.setValue('shape1', this._shape1);
       bindGroup.setValue('clump0', this._clump0);
@@ -470,22 +519,33 @@ export class GrassGpuPlacement extends Disposable {
     const z1 = Math.min(Math.ceil(cellsH / unit), Math.ceil(cz + rz));
     return [x0, z0, Math.max(0, x1 - x0), Math.max(0, z1 - z0)];
   }
-  /** Instance buffer written by the last generate() call */
-  get instanceBuffer() {
-    return this._instanceBuffer.get();
+  /**
+   * Instance buffer written by the last generate() call into a target
+   * @param target - The target
+   */
+  getInstanceBuffer(target = 0) {
+    return this._targets[target]?.instanceBuffer.get() ?? null;
   }
   /**
-   * First instance of the low detail list in the instance buffer (procedural blades only); the
-   * high detail list starts at 0
+   * First instance of the low detail list in the instance buffer of a target (procedural blades
+   * only); the high detail list starts at 0
+   * @param target - The target
    */
-  get lowListBase() {
-    return this._capacity;
+  getLowListBase(target = 0) {
+    return this._targets[target]?.capacity ?? 0;
   }
-  /** Draws the blades of the last generate() call; the material must be bound */
-  draw() {
-    let primitive = this._primitive.get();
+  /**
+   * Draws the blades of the last generate() call into a target; the material must be bound
+   * @param target - The target
+   */
+  draw(target = 0) {
+    const placementTarget = this._targets[target];
+    if (!placementTarget) {
+      return;
+    }
+    let primitive = placementTarget.primitive.get();
     if (!primitive) {
-      const instanceBuffer = this._instanceBuffer.get();
+      const instanceBuffer = placementTarget.instanceBuffer.get();
       if (!instanceBuffer) {
         return;
       }
@@ -498,41 +558,72 @@ export class GrassGpuPlacement extends Disposable {
       primitive.primitiveType = 'triangle-list';
       primitive.indexStart = 0;
       primitive.indexCount = this._indexBuffer.get()!.length;
-      this._primitive.set(primitive);
+      placementTarget.primitive.set(primitive);
     }
     // One draw per detail level; the arguments pick its range of the index buffer
     for (let i = 0; i < this._lodIndexCounts.length; i++) {
-      primitive.drawIndirect(this._argsBuffer.get()!, i * 20);
+      primitive.drawIndirect(placementTarget.argsBuffer.get()!, i * 20);
     }
   }
-  private ensureCapacity(numInstances: number) {
-    if (numInstances > this._capacity) {
-      this._capacity = nextPowerOf2(numInstances);
+  /**
+   * Releases the targets from a number on, which are no longer placed into
+   * @param count - Number of targets kept
+   */
+  trimTargets(count: number) {
+    while (this._targets.length > Math.max(1, count)) {
+      GrassGpuPlacement.disposeTarget(this._targets.pop()!);
+    }
+  }
+  private getTarget(index: number) {
+    while (this._targets.length <= index) {
+      this._targets.push({
+        instanceBuffer: new DRef(),
+        argsBuffer: new DRef(
+          // Dynamic: the arguments are reset every frame, and a dynamic buffer reuses its upload
+          // staging buffers instead of creating and destroying one per upload
+          getDevice().createBuffer(this._args.length * 4, { usage: 'indirect', storage: true, dynamic: true })
+        ),
+        bindGroup: new DRef(),
+        primitive: new DRef(),
+        capacity: 0
+      });
+    }
+    return this._targets[index];
+  }
+  private static disposeTarget(target: PlacementTarget) {
+    target.instanceBuffer.dispose();
+    target.argsBuffer.dispose();
+    target.bindGroup.dispose();
+    target.primitive.dispose();
+  }
+  private ensureCapacity(target: PlacementTarget, numInstances: number) {
+    if (numInstances > target.capacity) {
+      target.capacity = nextPowerOf2(numInstances);
       const device = getDevice();
       const buffer =
         this._kind === 'card'
-          ? device.createVertexBuffer('tex1_f32x4', new Float32Array(this._capacity * 4), {
+          ? device.createVertexBuffer('tex1_f32x4', new Float32Array(target.capacity * 4), {
               storage: true
             })!
           : // The high and the low detail lists, each of the capacity
-            device.createBuffer(this._capacity * 2 * INSTANCE_VEC4.blade * 16, {
+            device.createBuffer(target.capacity * 2 * INSTANCE_VEC4.blade * 16, {
               usage: 'uniform',
               storage: true,
               dynamic: false,
               managed: false
             });
-      this._instanceBuffer.set(buffer);
-      this._primitive.dispose();
-      this._bindGroup.dispose();
+      target.instanceBuffer.set(buffer);
+      target.primitive.dispose();
+      target.bindGroup.dispose();
     }
   }
-  private getBindGroup() {
-    let bindGroup = this._bindGroup.get();
+  private getBindGroup(target: PlacementTarget) {
+    let bindGroup = target.bindGroup.get();
     if (!bindGroup) {
       bindGroup = getDevice().createBindGroup(GrassGpuPlacement.getProgram(this._kind).bindGroupLayouts[0]);
-      bindGroup.setBuffer('instances', this._instanceBuffer.get()!);
-      bindGroup.setBuffer('args', this._argsBuffer.get()!);
-      this._bindGroup.set(bindGroup);
+      bindGroup.setBuffer('instances', target.instanceBuffer.get()!);
+      bindGroup.setBuffer('args', target.argsBuffer.get()!);
+      target.bindGroup.set(bindGroup);
     }
     return bindGroup;
   }
@@ -562,7 +653,7 @@ export class GrassGpuPlacement extends Disposable {
           // (terrain scale xyz, terrain origin y)
           this.posScale = pb.vec4().uniform(0);
           this.cameraPos = pb.vec4().uniform(0);
-          this.planes = pb.vec4[6]().uniform(0);
+          this.planes = pb.vec4[GRASS_CULL_PLANES]().uniform(0);
           // (mode, clipmap tile resolution, height epsilon, blade height)
           this.occlusion = pb.vec4().uniform(0);
           // (density falloff start distance, density at the draw distance, unused, unused)
@@ -572,8 +663,11 @@ export class GrassGpuPlacement extends Disposable {
           if (blade) {
             // Far window: (first block x, first block z, blocks wide, blocks high), 2x2 cells a block
             this.window2 = pb.vec4().uniform(0);
-            // (low detail distance, first instance of the low detail list, unused, unused)
+            // (low detail distance, first instance of the low detail list, shadow fade start depth,
+            // 1 / shadow fade length or 0 for no fade)
             this.lod = pb.vec4().uniform(0);
+            // (camera forward, -dot(forward, camera position)): view depth of a point
+            this.viewDepth = pb.vec4().uniform(0);
             // See GrassBladeShape
             this.shape0 = pb.vec4().uniform(0);
             this.shape1 = pb.vec4().uniform(0);
@@ -925,8 +1019,23 @@ export class GrassGpuPlacement extends Disposable {
                         );
                       });
                     }
+                    if (blade) {
+                      // Shadow caster fade: thin out to none over a band of view depth, each blade
+                      // leaving at its own depth like the density LOD
+                      this.$if(pb.greaterThan(this.lod.w, 0), function () {
+                        this.$l.viewZ = pb.add(pb.dot(this.viewDepth.xyz, this.base), this.viewDepth.w);
+                        this.$l.fadeKeep = pb.sub(
+                          1,
+                          pb.clamp(pb.mul(pb.sub(this.viewZ, this.lod.z), this.lod.w), 0, 1)
+                        );
+                        this.visible = pb.and(
+                          this.visible,
+                          pb.lessThan(this.grassHash(this.cx, this.cz, pb.add(this.bseed, 13)), this.fadeKeep)
+                        );
+                      });
+                    }
                     this.$l.center = pb.add(this.base, pb.vec3(0, this.params.w, 0));
-                    for (let i = 0; i < 6; i++) {
+                    for (let i = 0; i < GRASS_CULL_PLANES; i++) {
                       this.visible = pb.and(
                         this.visible,
                         pb.greaterThanEqual(
@@ -1115,10 +1224,10 @@ export class GrassGpuPlacement extends Disposable {
   protected onDispose() {
     super.onDispose();
     this._densityTexture.dispose();
-    this._instanceBuffer.dispose();
-    this._argsBuffer.dispose();
-    this._bindGroup.dispose();
-    this._primitive.dispose();
+    for (const target of this._targets) {
+      GrassGpuPlacement.disposeTarget(target);
+    }
+    this._targets.length = 0;
     this._baseVertexBuffer.dispose();
     this._indexBuffer.dispose();
   }

@@ -13,7 +13,7 @@ import { applyMaterialMixins, MeshMaterial, mixinPBRMetallicRoughness, ShaderHel
 import type { DrawContext } from '../../render';
 import type { Camera } from '../../camera';
 import type { WindField } from '../wind';
-import { RENDER_PASS_TYPE_LIGHT } from '../../values';
+import { RENDER_PASS_TYPE_LIGHT, RENDER_PASS_TYPE_SHADOWMAP } from '../../values';
 import type { ClipmapTerrain } from './terrain-cm';
 import { GRASS_BLADE_LOD_BAND, grassBladeLodDistance } from './grass_gpu';
 import { fetchSampler } from '../../utility/misc';
@@ -135,6 +135,12 @@ export class ClipmapBladeGrassMaterial
   private _lodDistance: number;
   /** @internal */
   private readonly _prevCameraPos: Vector4;
+  /**
+   * Position of the camera the blades were placed for. A shadow map pass renders from the
+   * light, but the blades must take the shape they have in that camera's view to cast the
+   * shadows of the blades seen. @internal
+   */
+  private readonly _viewCameraPos: Vector4;
   /** @internal */
   private _drawDistance: number;
   /** @internal */
@@ -168,6 +174,7 @@ export class ClipmapBladeGrassMaterial
     this._lod = new Vector4(0, 0, 0, 0);
     this._lodDistance = 0;
     this._prevCameraPos = new Vector4();
+    this._viewCameraPos = new Vector4();
     this._drawDistance = 0;
     this._farDensity = 1;
     this.useFeature(ClipmapBladeGrassMaterial.FEATURE_OCCLUSION_DEBUG, false);
@@ -222,11 +229,17 @@ export class ClipmapBladeGrassMaterial
     }
   }
   /**
-   * Updates the per-frame values before drawing for a camera: the previous camera position the
-   * motion vectors are computed against
+   * Updates the per-frame values before drawing for a camera: the camera position the blades are
+   * shaped for, and the previous one the motion vectors are computed against
    * @internal
    */
   prepareDraw(camera: Camera, wind: Nullable<WindField>) {
+    const pos = camera.getWorldPosition(ClipmapBladeGrassMaterial._tmpPos);
+    const c = this._viewCameraPos;
+    if (c.x !== pos.x || c.y !== pos.y || c.z !== pos.z) {
+      c.setXYZW(pos.x, pos.y, pos.z, 0);
+      this.uniformChanged();
+    }
     const windParams = wind?.shaderParams;
     const windTime = windParams ? windParams[13] : 0;
     const prevWindTime = windParams ? windParams[16 + 13] : 0;
@@ -471,6 +484,9 @@ export class ClipmapBladeGrassMaterial
     bindGroup.setValue('zDistanceFade', this._distanceFade);
     bindGroup.setValue('zBladeLod', this._lod);
     bindGroup.setValue('zPrevCameraPos', this._prevCameraPos);
+    if (ctx.renderPass!.type === RENDER_PASS_TYPE_SHADOWMAP) {
+      bindGroup.setValue('zViewCameraPos', this._viewCameraPos);
+    }
     if (this.needFragmentColor(ctx)) {
       bindGroup.setValue('zRootColor', this._rootColor);
       bindGroup.setValue('zTipColor', this._tipColor);
@@ -657,6 +673,13 @@ export class ClipmapBladeGrassMaterial
     scope.zBladeWind = pb.vec4().uniform(2);
     // (wind clock, previous wind clock)
     scope.zWindTime = pb.vec2().uniform(2);
+    // Shadow map passes render from the light: the blades are shaped for the camera they were
+    // placed for instead, see _viewCameraPos
+    const shadowPass = this.drawContext.renderPass!.type === RENDER_PASS_TYPE_SHADOWMAP;
+    if (shadowPass) {
+      scope.zViewCameraPos = pb.vec4().uniform(2);
+    }
+    scope.$l.zBladeViewPos = shadowPass ? scope.zViewCameraPos.xyz : ShaderHelper.getCameraPosition(scope);
     // Position along the blade (0 at the root, 1 at the tip) to curve parameter: the vertices are
     // spread toward the tip by the tip detail exponent
     pb.func('zAlongToT', [pb.float('a')], function () {
@@ -703,14 +726,7 @@ export class ClipmapBladeGrassMaterial
       pb.sub(1, pb.float(scope.isTip))
     );
     // Instance: (facing, previous facing, wind push, previous wind push)
-    this.emitBladeVertex(
-      scope,
-      ShaderHelper.getCameraPosition(scope),
-      scope.inst1.x,
-      scope.inst1.z,
-      scope.zWindTime.x,
-      ''
-    );
+    this.emitBladeVertex(scope, scope.zBladeViewPos, scope.inst1.x, scope.inst1.z, scope.zWindTime.x, '');
     scope.$outputs.worldPos = scope.worldPos;
     scope.$outputs.worldNorm = scope.flatNormal;
     // For the rounded normals: which way is across the blade, and how far across this vertex is
@@ -736,7 +752,7 @@ export class ClipmapBladeGrassMaterial
       pb.smoothStep(
         scope.zBladeLook.z,
         pb.max(scope.zBladeLook.w, pb.add(scope.zBladeLook.z, 1e-3)),
-        pb.distance(ShaderHelper.getCameraPosition(scope), scope.worldPos)
+        pb.distance(scope.zBladeViewPos, scope.worldPos)
       ),
       scope.zBladeLook2.x
     );

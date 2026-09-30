@@ -784,7 +784,8 @@ export class ClipmapTerrain extends applyMixins(GraphNode, mixinDrawable) implem
       for (const info of renderData ?? []) {
         mat.draw(info.primitive, ctx, info.numInstances);
       }
-      if (ctx.renderPass!.type !== RENDER_PASS_TYPE_OBJECT_COLOR && !isShadowPass) {
+      // In shadow map passes the grass renderer draws the blades that cast shadows only
+      if (ctx.renderPass!.type !== RENDER_PASS_TYPE_OBJECT_COLOR) {
         this.grassRenderer.draw(ctx);
       }
     }

@@ -1,14 +1,16 @@
 import type { IndexBuffer, StructuredBuffer, Texture2D } from '@zephyr3d/device';
 import type { Nullable } from '@zephyr3d/base';
 import { AABB, ClipState, nextPowerOf2, DRef, DWeakRef, Disposable, Vector3, Vector4 } from '@zephyr3d/base';
-import type { DrawContext } from '../../render';
+import type { DrawContext, ShadowMapPass } from '../../render';
 import type { Camera } from '../../camera';
 import { Primitive } from '../../render';
 import { ClipmapGrassMaterial } from './grassmaterial';
 import type { ClipmapTerrain } from './terrain-cm';
 import { getDevice } from '../../app/api';
 import type { GrassBladeShape, GrassLayerKind } from './grass_gpu';
-import { GrassGpuPlacement, GrassOcclusionMode, grassHash } from './grass_gpu';
+import { GRASS_CULL_PLANES, GrassGpuPlacement, GrassOcclusionMode, grassHash } from './grass_gpu';
+import { DirectionalLight } from '../light';
+import { RENDER_PASS_TYPE_SHADOWMAP } from '../../values';
 import { BLADE_LOD_INDEX_COUNTS, ClipmapBladeGrassMaterial, createBladeIndices } from './bladegrassmaterial';
 
 const INSTANCE_BYTES = 4 * 4;
@@ -21,6 +23,11 @@ const MAX_CELLS_PER_TEXEL = 8;
 const DEFAULT_DRAW_DISTANCE = 150;
 /** Default fraction of blades kept at the draw distance */
 const DEFAULT_FAR_DENSITY = 0.25;
+/**
+ * Number of the nearest cascades of the sun's shadow map procedural blades cast shadows into.
+ * Farther cascades have texels too coarse for single blades.
+ */
+const GRASS_SHADOW_CASCADES = 2;
 /** Default shape and clumping of procedural blades, see GrassBladeShape */
 const DEFAULT_BLADE_SHAPE = [
   0.5, 0.3, 0.04, 0.2, 0.25, 0.2, 0.15, 0.1, 1.5, 0.3, 0.15, 0.3, 0.2, 0.5, 0.15, 30
@@ -135,6 +142,8 @@ export class GrassLayer extends Disposable {
   private _farDensity: number;
   /** Set on WebGPU with indirect draw: blades are placed on the GPU instead of in CPU tiles */
   private readonly _gpu: Nullable<GrassGpuPlacement>;
+  /** Number of shadow maps the blades were placed for by the last updatePerCamera() call */
+  private _numShadowTargets: number;
   /**
    * Creates an instance of GrassLayer
    * @param terrain - Clipmap terrain object
@@ -181,6 +190,7 @@ export class GrassLayer extends Disposable {
     this._numBlades = 0;
     this._drawDistance = 0;
     this._farDensity = 1;
+    this._numShadowTargets = 0;
     if (!GrassGpuPlacement.isSupported()) {
       this._gpu = null;
       if (kind === 'blade' && !GrassLayer._bladeWarningShown) {
@@ -947,22 +957,64 @@ export class GrassLayer extends Disposable {
   }
   /**
    * Places the blades seen from a camera on the GPU path; nothing to do on the CPU one.
+   * @param shadowCullPlanes - For each shadow map the blades cast shadows into, the planes
+   *   bounding where its casters can be (see GrassRenderer); blade layers only
+   * @param shadowFade - View depths over which the shadow casting blades thin out
    * @internal
    */
-  updatePerCamera(camera: Camera, terrain: ClipmapTerrain, occlusionMode: GrassOcclusionMode) {
-    this._gpu?.generate(
-      camera,
-      terrain,
-      this._seed,
-      this._cellsPerTexel,
-      this._drawDistance,
-      this._bladeWidth,
-      this._bladeHeight,
-      occlusionMode,
-      this._farDensity,
-      this._bladeShape,
-      terrain.scene?.env.wind.shaderParams ?? null
-    );
+  updatePerCamera(
+    camera: Camera,
+    terrain: ClipmapTerrain,
+    occlusionMode: GrassOcclusionMode,
+    shadowCullPlanes: Float32Array<ArrayBuffer>[],
+    shadowFade: Nullable<[number, number]>
+  ) {
+    if (!this._gpu) {
+      return;
+    }
+    const wind = terrain.scene?.env.wind.shaderParams ?? null;
+    const place = (
+      target: number,
+      mode: GrassOcclusionMode,
+      planes: Nullable<Float32Array<ArrayBuffer>>,
+      fade: Nullable<[number, number]>
+    ) =>
+      this._gpu!.generate(
+        camera,
+        terrain,
+        this._seed,
+        this._cellsPerTexel,
+        this._drawDistance,
+        this._bladeWidth,
+        this._bladeHeight,
+        mode,
+        this._farDensity,
+        this._bladeShape,
+        wind,
+        target,
+        planes,
+        fade
+      );
+    place(0, occlusionMode, null, null);
+    // Target i + 1 holds the casters of shadow map i. Blades hidden behind the terrain from the
+    // camera still cast shadows, so these skip the occlusion culling.
+    const numShadowTargets = this._kind === 'blade' ? shadowCullPlanes.length : 0;
+    for (let i = 0; i < numShadowTargets; i++) {
+      place(i + 1, GrassOcclusionMode.Off, shadowCullPlanes[i], shadowFade);
+    }
+    this._gpu.trimTargets(numShadowTargets + 1);
+    this._numShadowTargets = numShadowTargets;
+  }
+  /**
+   * Draws the shadow casters of the shadow map the blades were placed for by the last
+   * updatePerCamera() call
+   * @param shadowMap - Index of the shadow map
+   * @internal
+   */
+  drawShadow(ctx: DrawContext, shadowMap: number) {
+    if (shadowMap < this._numShadowTargets) {
+      this.drawGpu(ctx, shadowMap + 1);
+    }
   }
   /** @internal */
   setOcclusionDebug(val: boolean) {
@@ -973,29 +1025,11 @@ export class GrassLayer extends Disposable {
     if (this._kind === 'blade' && !this._gpu) {
       return;
     }
-    // From the scene, not ctx.env: the depth pass clears ctx.env, and the depth prepass and the
-    // light pass must bend the grass by the same wind or the light pass's equal depth test
-    // rejects it
-    const wind = ctx.scene?.env.wind ?? null;
     if (this._gpu) {
-      const material = this._material.get()!;
-      if (material instanceof ClipmapBladeGrassMaterial) {
-        const instances = this._gpu.instanceBuffer;
-        if (!instances) {
-          return;
-        }
-        material.setInstanceBuffer(instances, this._gpu.lowListBase);
-        material.prepareDraw(ctx.camera, wind);
-      } else {
-        material.prepareDraw(wind);
-      }
-      material.apply(ctx);
-      for (let pass = 0; pass < material.numPasses; pass++) {
-        material.bind(ctx.device, pass);
-        this._gpu.draw();
-      }
+      this.drawGpu(ctx, 0);
       return;
     }
+    const wind = ctx.scene?.env.wind ?? null;
     const visible = GrassLayer._visibleTiles;
     visible.length = 0;
     const camera = ctx.camera;
@@ -1043,6 +1077,31 @@ export class GrassLayer extends Disposable {
     }
     visible.length = 0;
   }
+  /** Draws the blades placed on the GPU into a target, see GrassGpuPlacement */
+  private drawGpu(ctx: DrawContext, target: number) {
+    // From the scene, not ctx.env: the depth pass clears ctx.env, and the depth prepass and the
+    // light pass must bend the grass by the same wind or the light pass's equal depth test
+    // rejects it
+    const wind = ctx.scene?.env.wind ?? null;
+    const gpu = this._gpu!;
+    const material = this._material.get()!;
+    if (material instanceof ClipmapBladeGrassMaterial) {
+      const instances = gpu.getInstanceBuffer(target);
+      if (!instances) {
+        return;
+      }
+      material.setInstanceBuffer(instances, gpu.getLowListBase(target));
+      // The camera the blades were placed for, also in the shadow map passes
+      material.prepareDraw(ctx.camera, wind);
+    } else {
+      material.prepareDraw(wind);
+    }
+    material.apply(ctx);
+    for (let pass = 0; pass < material.numPasses; pass++) {
+      material.bind(ctx.device, pass);
+      gpu.draw(target);
+    }
+  }
   /** @internal */
   protected onDispose() {
     super.onDispose();
@@ -1060,11 +1119,29 @@ export class GrassLayer extends Disposable {
  * @public
  */
 export class GrassRenderer extends Disposable {
+  private static readonly _lightDir = new Vector3();
+  private static readonly _forward = new Vector3();
+  private static readonly _eye = new Vector3();
+  private static readonly _center = new Vector3();
+  private static readonly _tmp = new Vector3();
+  private static readonly _edge0 = new Vector3();
+  private static readonly _edge1 = new Vector3();
+  private static readonly _normal = new Vector3();
+  private static readonly _corners = Array.from({ length: 8 }, () => new Vector3());
+  private static readonly _faceDots = [0, 0, 0, 0, 0, 0];
+  private static readonly _facePlane = new Float32Array(4);
+  private static readonly _shadowCullPlanes: Float32Array<ArrayBuffer>[] = [];
   private readonly _terrain: DWeakRef<ClipmapTerrain>;
   private _layers: GrassLayer[];
   private _occlusionCulling: boolean;
   private _occlusionDebug: boolean;
   private _suspendOcclusionCulling: boolean;
+  private _castShadow: boolean;
+  private _shadowFadeFraction: number;
+  /** View depths over which the blades casting shadows thin out, see calcShadowCullPlanes */
+  private _shadowFade: Nullable<[number, number]>;
+  /** The light whose shadow map casters the blades were last placed for */
+  private readonly _shadowLight: DWeakRef<DirectionalLight>;
   /**
    * Creates an instance of GrassRenderer
    * @param terrain - Clipmap terrain object
@@ -1076,6 +1153,10 @@ export class GrassRenderer extends Disposable {
     this._occlusionCulling = true;
     this._occlusionDebug = false;
     this._suspendOcclusionCulling = false;
+    this._castShadow = true;
+    this._shadowFadeFraction = 0.5;
+    this._shadowFade = null;
+    this._shadowLight = new DWeakRef();
   }
   /**
    * Whether to skip grass hidden behind the terrain itself (WebGPU only).
@@ -1118,6 +1199,26 @@ export class GrassRenderer extends Disposable {
       layer.updateMaterial();
     }
   }
+  /**
+   * Whether procedural blades cast shadows from the sun into the nearest cascades of its shadow
+   * map (WebGPU only). Also needs the terrain to cast shadows.
+   */
+  get castShadow() {
+    return this._castShadow;
+  }
+  set castShadow(val: boolean) {
+    this._castShadow = !!val;
+  }
+  /**
+   * Fraction of the last shadow cascade the blades cast shadows into over which their shadows
+   * fade out toward its far end, blade by blade. 0 ends them on a line at the far end.
+   */
+  get shadowFadeFraction() {
+    return this._shadowFadeFraction;
+  }
+  set shadowFadeFraction(val: number) {
+    this._shadowFadeFraction = Math.min(1, Math.max(0, Number(val) || 0));
+  }
   /** @internal */
   updatePerCamera(camera: Camera) {
     const terrain = this._terrain.get();
@@ -1128,10 +1229,172 @@ export class GrassRenderer extends Disposable {
           : this._occlusionDebug
             ? GrassOcclusionMode.Debug
             : GrassOcclusionMode.Cull;
+      const shadowCullPlanes = this.calcShadowCullPlanes(camera, terrain);
       for (const layer of this._layers) {
-        layer.updatePerCamera(camera, terrain, mode);
+        layer.updatePerCamera(camera, terrain, mode, shadowCullPlanes, this._shadowFade);
       }
     }
+  }
+  /**
+   * Culling planes of the blades casting shadows into each of the nearest cascades of the sun's
+   * shadow map, and remembers the sun as the light the blades were placed for.
+   *
+   * A cascade's shadows fall on what the camera sees between the cascade's split distances, so its
+   * casters are the points from which the light reaches that slice of the view frustum: the slice
+   * swept along the light direction. Built as UE5's ComputeShadowCullingVolume
+   * (Engine/Source/Runtime/Engine/Private/Components/DirectionalLightComponent.cpp): the faces of
+   * the slice facing away from the light, plus a plane through each silhouette edge of the slice
+   * seen from the light, extruded along the light direction.
+   */
+  private calcShadowCullPlanes(camera: Camera, terrain: ClipmapTerrain): Float32Array<ArrayBuffer>[] {
+    this._shadowLight.set(null);
+    this._shadowFade = null;
+    const scene = terrain.scene;
+    const sun = scene ? DirectionalLight.getSunLight(scene) : null;
+    if (
+      !this._castShadow ||
+      !terrain.castShadow ||
+      !sun ||
+      !sun.castShadow ||
+      !GrassGpuPlacement.isSupported() ||
+      !this._layers.some((layer) => layer.kind === 'blade')
+    ) {
+      return [];
+    }
+    this._shadowLight.set(sun);
+    const distances = sun.shadow.getCascadeDistances(camera);
+    const numCascades = Math.min(GRASS_SHADOW_CASCADES, distances.length - 1);
+    // The blades thin out over the far part of the last cascade they cast shadows into, so the
+    // shadowed ground does not end on a line at its far split
+    const fadeEnd = distances[numCascades];
+    const fadeStart = fadeEnd - (fadeEnd - distances[numCascades - 1]) * this._shadowFadeFraction;
+    this._shadowFade = fadeEnd > fadeStart ? [fadeStart, fadeEnd] : null;
+    // Direction the light travels in
+    const lightDir = GrassRenderer._lightDir;
+    lightDir.set(sun.directionAndCutoff.xyz());
+    lightDir.inplaceNormalize();
+    const m = camera.worldMatrix;
+    // Camera forward, the view axis the split distances are measured along
+    const forward = GrassRenderer._forward.setXYZ(-m.m02, -m.m12, -m.m22).inplaceNormalize();
+    const eye = camera.getWorldPosition(GrassRenderer._eye);
+    const perspective = camera.isPerspective();
+    const nearCorners = camera.frustum.corners;
+    const corners = GrassRenderer._corners;
+    const center = GrassRenderer._center;
+    const tmp = GrassRenderer._tmp;
+    const result: Float32Array<ArrayBuffer>[] = [];
+    for (let i = 0; i < numCascades; i++) {
+      // Corners of the slice, indexed as the frustum corners: x << 2 | y << 1 | far. Each lies on
+      // the ray through the matching near plane corner, at the split distance along the view axis.
+      center.setXYZ(0, 0, 0);
+      for (let c = 0; c < 8; c++) {
+        const near = nearCorners[c & 6];
+        const d = distances[i + (c & 1)];
+        Vector3.sub(near, eye, tmp);
+        const depth = Vector3.dot(tmp, forward);
+        if (perspective) {
+          Vector3.add(eye, Vector3.scale(tmp, d / depth, tmp), corners[c]);
+        } else {
+          Vector3.add(near, Vector3.scale(forward, d - depth, tmp), corners[c]);
+        }
+        Vector3.add(center, corners[c], center);
+      }
+      center.scaleBy(1 / 8);
+      // Faces of the slice: the four corners sharing one bit, normals pointing inward
+      const faceDots = GrassRenderer._faceDots;
+      const planes = (GrassRenderer._shadowCullPlanes[i] ??= new Float32Array(GRASS_CULL_PLANES * 4));
+      let numPlanes = 0;
+      const addPlane = (a: Vector3, b: Vector3, c: Vector3) => {
+        if (numPlanes < GRASS_CULL_PLANES) {
+          if (GrassRenderer.planeThrough(a, b, c, center, planes, numPlanes * 4)) {
+            numPlanes++;
+          }
+        }
+      };
+      for (let face = 0; face < 6; face++) {
+        const bit = 1 << (face >> 1);
+        const side = face & 1 ? bit : 0;
+        const others = [0, 1, 2, 3].map((k) => {
+          // The two free bits of the face, in order
+          const free = [1, 2, 4].filter((b) => b !== bit);
+          return side | (k & 1 ? free[0] : 0) | (k & 2 ? free[1] : 0);
+        });
+        GrassRenderer.planeThrough(
+          corners[others[0]],
+          corners[others[1]],
+          corners[others[3]],
+          center,
+          GrassRenderer._facePlane,
+          0
+        );
+        const facePlane = GrassRenderer._facePlane;
+        faceDots[face] = facePlane[0] * lightDir.x + facePlane[1] * lightDir.y + facePlane[2] * lightDir.z;
+        // Faces the light travels away from, or along, bound the swept slice
+        if (faceDots[face] <= 0 && numPlanes < GRASS_CULL_PLANES) {
+          planes.set(facePlane, numPlanes * 4);
+          numPlanes++;
+        }
+      }
+      // Silhouette edges: shared by a face kept and a face dropped. Two faces are adjacent when
+      // they fix different corner bits; their edge is the two corners with both bits fixed.
+      for (let fa = 0; fa < 6; fa++) {
+        for (let fb = fa + 1; fb < 6; fb++) {
+          const bitA = 1 << (fa >> 1);
+          const bitB = 1 << (fb >> 1);
+          const keptA = faceDots[fa] <= 0;
+          const keptB = faceDots[fb] <= 0;
+          if (bitA === bitB || keptA === keptB) {
+            continue;
+          }
+          const fixed = (fa & 1 ? bitA : 0) | (fb & 1 ? bitB : 0);
+          const freeBit = 7 & ~bitA & ~bitB;
+          const a = corners[fixed];
+          const b = corners[fixed | freeBit];
+          // The third point extends the edge along the light, scaled by the edge length for
+          // precision as in UE
+          Vector3.add(a, Vector3.scale(lightDir, Vector3.distance(a, b), tmp), tmp);
+          addPlane(a, b, tmp);
+        }
+      }
+      // The rest are planes everything is inside of
+      for (let k = numPlanes; k < GRASS_CULL_PLANES; k++) {
+        planes.set([0, 0, 0, 1e30], k * 4);
+      }
+      result.push(planes);
+    }
+    return result;
+  }
+  /**
+   * Writes the plane through three points, normal turned toward an inside point, as (a, b, c, d)
+   * at an offset of an array
+   * @returns false if the points are degenerate
+   */
+  private static planeThrough(
+    p0: Vector3,
+    p1: Vector3,
+    p2: Vector3,
+    inside: Vector3,
+    out: Float32Array,
+    offset: number
+  ) {
+    const e0 = Vector3.sub(p1, p0, GrassRenderer._edge0);
+    const e1 = Vector3.sub(p2, p0, GrassRenderer._edge1);
+    const n = Vector3.cross(e0, e1, GrassRenderer._normal);
+    const len = n.magnitude;
+    if (len < 1e-12) {
+      return false;
+    }
+    n.scaleBy(1 / len);
+    let d = -Vector3.dot(n, p0);
+    if (Vector3.dot(n, inside) + d < 0) {
+      n.scaleBy(-1);
+      d = -d;
+    }
+    out[offset] = n.x;
+    out[offset + 1] = n.y;
+    out[offset + 2] = n.z;
+    out[offset + 3] = d;
+    return true;
   }
   /** How many grass blades */
   get numGrassBlades() {
@@ -1270,6 +1533,17 @@ export class GrassRenderer extends Disposable {
   }
   /** @internal */
   draw(ctx: DrawContext) {
+    if (ctx.renderPass!.type === RENDER_PASS_TYPE_SHADOWMAP) {
+      // Only into the cascades of the light the blades were placed for
+      const light = (ctx.renderPass as ShadowMapPass).light;
+      if (light && light === this._shadowLight.get()) {
+        const cascade = ctx.shadowMapInfo?.get(light)?.cascadeIndex ?? 0;
+        for (const layer of this._layers) {
+          layer.drawShadow(ctx, cascade);
+        }
+      }
+      return;
+    }
     const bv = this._terrain.get()!.getWorldBoundingVolume()!.toAABB();
     const minY = bv.minPoint.y;
     const maxY = bv.maxPoint.y;
@@ -1280,6 +1554,7 @@ export class GrassRenderer extends Disposable {
   protected onDispose() {
     super.onDispose();
     this._terrain.dispose();
+    this._shadowLight.dispose();
     for (const layer of this._layers) {
       layer.dispose();
     }
