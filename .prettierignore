@@ -127,3 +127,6 @@ shrinkwrap.json
 
 # markdown
 *.md
+
+# Vendored third-party builds
+libs/scene/src/asset/loaders/ktx2/basis/

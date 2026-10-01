@@ -20,6 +20,8 @@ module.exports = {
   setupFilesAfterEnv: ['<rootDir>/src/setup.ts'],
   snapshotResolver: '<rootDir>/snapshotResolver.js',
   moduleNameMapper: {
+    // Uses import.meta, which the CommonJS test build cannot compile
+    '^\./basis_location$': '<rootDir>/src/stubs/basis_location.ts',
     '^@zephyr3d/base$': '<rootDir>/../libs/base/src',
     '^@zephyr3d/device$': '<rootDir>/../libs/device/src',
     '^@zephyr3d/scene$': '<rootDir>/../libs/scene/src',

@@ -32,6 +32,7 @@ import type {
 import type { Scene } from '../scene/scene';
 import type { AbstractTextureLoader } from './loaders/loader';
 import { TGALoader } from './loaders/image/tga_Loader';
+import { KTX2Loader } from './loaders/ktx2/ktx2_loader';
 import { getDevice, getEngine } from '../app/api';
 import {
   Material,
@@ -223,7 +224,8 @@ export class AssetManager {
     new WebImageLoader(),
     new DDSLoader(),
     new HDRLoader(),
-    new TGALoader()
+    new TGALoader(),
+    new KTX2Loader()
   ];
   /** @internal */
   private _modelLoaders: Record<string, ModelLoader> = {};

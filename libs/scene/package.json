@@ -10,7 +10,9 @@
   "files": [
     "**/*.js",
     "**/*.d.ts",
-    "**/*.js.map"
+    "**/*.js.map",
+    "**/*.wasm",
+    "**/basis/LICENSE"
   ],
   "sideEffects": false,
   "repository": {

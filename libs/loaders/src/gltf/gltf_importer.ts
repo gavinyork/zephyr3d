@@ -2505,7 +2505,9 @@ export class GLTFImporter extends AbstractModelImporter {
             break;
         }
       }
-      const imageIndex: number = textureInfo.source!;
+      // KHR_texture_basisu points at a KTX2 image; `source`, when present, is a fallback
+      // for loaders without the extension. The KTX2 loader handles every device.
+      const imageIndex: number = textureInfo.extensions?.KHR_texture_basisu?.source ?? textureInfo.source!;
       mt.image = model.getImage(imageIndex);
       if (!mt.image) {
         const image = gltf.images![imageIndex];

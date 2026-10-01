@@ -82,6 +82,7 @@ const test = base.extend<{}, { harness: Harness }>({
 const SCENE_NAMES = [
   'sanity-orientation',
   'unlit-textured',
+  'ktx2-basis',
   'pbr-metalrough-grid',
   'pbr-ibl',
   'sky-atmosphere',

@@ -31,7 +31,17 @@ export default () => ({
       inlineSourcesContent: false
     }),
     copy({
-      targets: [{ src: ['index.html'], dest: destdir }]
+      targets: [
+        { src: ['index.html'], dest: destdir },
+        { src: 'assets/ktx2/*.ktx2', dest: path.join(destdir, 'assets', 'ktx2') },
+        // The harness is a single plain-Rollup bundle, which does not emit assets for
+        // `new URL(..., import.meta.url)`; the KTX2 loader resolves its transcoder
+        // relative to the bundle, so put the shipped copy there
+        {
+          src: 'node_modules/@zephyr3d/scene/dist/asset/loaders/ktx2/basis/*',
+          dest: path.join(destdir, 'js', 'basis')
+        }
+      ]
     })
   ]
 });

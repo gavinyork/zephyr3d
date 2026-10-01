@@ -1,6 +1,7 @@
 import { nodeResolve } from '@rollup/plugin-node-resolve';
 import { swc } from 'rollup-plugin-swc3';
 import dts from 'rollup-plugin-dts';
+import copy from 'rollup-plugin-copy';
 
 const externals = [/@zephyr3d\/base/, /@zephyr3d\/device/];
 
@@ -58,6 +59,12 @@ function getTargetES6() {
       swc({
         sourceMaps: true,
         inlineSourcesContent: false
+      }),
+      // The Basis transcoder is fetched at runtime relative to the KTX2 loader module
+      // (see basis_location.ts), so it must sit beside that module in dist
+      copy({
+        targets: [{ src: 'src/asset/loaders/ktx2/basis/*', dest: 'dist/asset/loaders/ktx2/basis' }],
+        hook: 'writeBundle'
       })
     ]
   };

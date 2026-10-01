@@ -19,6 +19,7 @@ export default [
       '.rush/**',
       'common/temp/**',
       '**/vendor/**',
+      'src/asset/loaders/ktx2/basis/**',
       'web/**',
       '**/node_modules/**'
     ]
