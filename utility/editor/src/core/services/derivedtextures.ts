@@ -92,7 +92,9 @@ export class DerivedTextureService {
     this._failed.clear();
     this._served.clear();
     this._done = 0;
-    getEngine().resourceManager.assetManager.textureSourceResolver = vfs ? (url) => this.resolve(url) : null;
+    getEngine().resourceManager.assetManager.assetSourceResolver = vfs
+      ? (url, kind) => (kind === 'texture' ? this.resolve(url) : Promise.resolve(null))
+      : null;
     if (vfs && !vfs.readOnly) {
       vfs.on('changed', this.handleVFSChanged, this);
       void this.scanProject(vfs);

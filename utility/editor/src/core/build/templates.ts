@@ -173,7 +173,7 @@ export default plugin;
 
 export function generateIndexTS(settings: ProjectSettings) {
   const rhiList = settings.preferredRHI?.map((val) => val.toLowerCase()) ?? [];
-  return `import { Application, createManifestTextureResolver, getEngine, readTextureManifest, setActiveMorphTargetLimit, setMorphTargetLimit, setSkinInfluenceLimit } from '@zephyr3d/scene';
+  return `import { Application, createManifestSourceResolver, getEngine, readAssetManifest, setActiveMorphTargetLimit, setMorphTargetLimit, setSkinInfluenceLimit } from '@zephyr3d/scene';
 import { HttpFS } from '@zephyr3d/base';
 import { FBXImporter, GLTFImporter, OBJImporter } from '@zephyr3d/loaders';
 import type { DeviceBackend } from '@zephyr3d/device';
@@ -230,10 +230,10 @@ const application = new Application({
   }
 });
 application.ready().then(async () => {
-  // Textures the build compressed are listed here; scenes keep their source paths
-  const textureManifest = await readTextureManifest(getEngine().VFS);
-  if (textureManifest) {
-    getEngine().resourceManager.assetManager.textureSourceResolver = createManifestTextureResolver(getEngine().VFS, textureManifest);
+  // Assets the build compressed are listed here; scenes keep their source paths
+  const assetManifest = await readAssetManifest(getEngine().VFS);
+  if (assetManifest) {
+    getEngine().resourceManager.assetManager.assetSourceResolver = createManifestSourceResolver(getEngine().VFS, assetManifest);
   }
   getEngine().resourceManager.setModelLoader('model/gltf+json', new GLTFImporter());
   getEngine().resourceManager.setModelLoader('model/gltf-binary', new GLTFImporter());
@@ -245,7 +245,7 @@ application.ready().then(async () => {
 `;
 }
 
-export const templateIndex = `import { Application, createManifestTextureResolver, getEngine, readTextureManifest, setActiveMorphTargetLimit, setMorphTargetLimit, setSkinInfluenceLimit } from '@zephyr3d/scene';
+export const templateIndex = `import { Application, createManifestSourceResolver, getEngine, readAssetManifest, setActiveMorphTargetLimit, setMorphTargetLimit, setSkinInfluenceLimit } from '@zephyr3d/scene';
 import { HttpFS } from '@zephyr3d/base';
 import { FBXImporter, GLTFImporter, OBJImporter } from '@zephyr3d/loaders';
 import type { DeviceBackend } from '@zephyr3d/device';
@@ -299,10 +299,10 @@ const application = new Application({
   }
 });
 application.ready().then(async () => {
-  // Textures the build compressed are listed here; scenes keep their source paths
-  const textureManifest = await readTextureManifest(getEngine().VFS);
-  if (textureManifest) {
-    getEngine().resourceManager.assetManager.textureSourceResolver = createManifestTextureResolver(getEngine().VFS, textureManifest);
+  // Assets the build compressed are listed here; scenes keep their source paths
+  const assetManifest = await readAssetManifest(getEngine().VFS);
+  if (assetManifest) {
+    getEngine().resourceManager.assetManager.assetSourceResolver = createManifestSourceResolver(getEngine().VFS, assetManifest);
   }
   getEngine().resourceManager.setModelLoader('model/gltf+json', new GLTFImporter());
   getEngine().resourceManager.setModelLoader('model/gltf-binary', new GLTFImporter());

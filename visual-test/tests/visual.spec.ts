@@ -85,6 +85,7 @@ const SCENE_NAMES = [
   'ktx2-basis',
   'gltf-compression',
   'quantized-vertices',
+  'zmsh-binary',
   'pbr-metalrough-grid',
   'pbr-ibl',
   'sky-atmosphere',

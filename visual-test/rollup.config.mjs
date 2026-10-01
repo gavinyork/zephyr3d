@@ -36,6 +36,7 @@ export default () => ({
         { src: 'assets/ktx2/*.ktx2', dest: path.join(destdir, 'assets', 'ktx2') },
         { src: 'assets/gltf/duck-draco/*', dest: path.join(destdir, 'assets', 'gltf', 'duck-draco') },
         { src: 'assets/gltf/duck-meshopt/*', dest: path.join(destdir, 'assets', 'gltf', 'duck-meshopt') },
+        { src: 'assets/zmsh/*.zmsh', dest: path.join(destdir, 'assets', 'zmsh') },
         // Same story for the Draco decoder, resolved relative to the glTF importer
         {
           src: 'node_modules/@zephyr3d/loaders/dist/gltf/draco/*',

@@ -1,4 +1,6 @@
 import type { DecoderModule } from 'draco3d';
+import { decodeZmshBinary, isZmshBinary, readZmshBinary } from './zmsh_binary';
+import { getMeshoptDecoder } from './meshopt_decoder';
 import type { HttpRequest, Nullable, ReadOptions, TypedArray, VFS, WriteOptions } from '@zephyr3d/base';
 import {
   isPowerOf2,
@@ -115,14 +117,21 @@ export type TextureFetchOptions<T extends BaseTexture> = BaseFetchOptions & {
  * @public
  */
 /**
- * Supplies the data a texture is actually loaded from, in place of the file at
- * its path. The editor answers with its compressed derived copy of a source
- * image; a build can answer from a manifest of shipped files. Returning null
- * loads the file at the path as usual.
+ * Kinds of asset an {@link AssetSourceResolver} is asked about.
  * @public
  */
-export type TextureSourceResolver = (
-  url: string
+export type AssetSourceKind = 'texture' | 'primitive';
+
+/**
+ * Supplies the data an asset is actually loaded from, in place of the file at
+ * its path. The editor answers with compressed derived copies of source images
+ * and meshes; a build answers from the manifest of the files it shipped.
+ * Returning null loads the file at the path as usual.
+ * @public
+ */
+export type AssetSourceResolver = (
+  url: string,
+  kind: AssetSourceKind
 ) => Promise<Nullable<{ data: ArrayBuffer; mimeType: string }>>;
 
 export type ModelFetchOptions = BaseFetchOptions & {
@@ -221,11 +230,25 @@ type AssetCacheKind =
  */
 export class AssetManager {
   /**
-   * Optional redirect consulted before a texture is read, see {@link TextureSourceResolver}.
-   * Scene objects keep the texture they already have; call invalidateAsset() on the
-   * path when the resolver's answer changes so later loads pick it up.
+   * Optional redirect consulted before a texture or primitive is read, see
+   * {@link AssetSourceResolver}. Scene objects keep what they already loaded; call
+   * invalidateAsset() on the path when the resolver's answer changes so later
+   * loads pick it up.
    */
-  textureSourceResolver: Nullable<TextureSourceResolver> = null;
+  assetSourceResolver: Nullable<AssetSourceResolver> = null;
+  /** @internal */
+  private async resolveAssetSource(url: string, kind: AssetSourceKind, vfs?: VFS) {
+    // An explicit VFS means the caller wants that file system's bytes, not a substitute
+    if (!this.assetSourceResolver || vfs) {
+      return null;
+    }
+    try {
+      return await this.assetSourceResolver(url, kind);
+    } catch (err) {
+      console.warn(`Asset source resolver failed for ${url}, loading the file itself: ${err}`);
+      return null;
+    }
+  }
   /** @internal */
   private static _builtinTextures: {
     [name: string]: BaseTexture;
@@ -880,8 +903,13 @@ export class AssetManager {
   }
   async loadPrimitive<T extends Primitive = Primitive>(url: string, vfs?: VFS): Promise<Nullable<T>> {
     try {
-      const data = (await this.readFileFromVFS(url, { encoding: 'utf8' }, vfs)) as string;
-      const content = JSON.parse(data) as { type: string; data: any };
+      const raw =
+        (await this.resolveAssetSource(url, 'primitive', vfs))?.data ??
+        ((await this.readFileFromVFS(url, { encoding: 'binary' }, vfs)) as ArrayBuffer);
+      if (isZmshBinary(raw)) {
+        return (await this.createPrimitiveFromZmshBinary(raw)) as T;
+      }
+      const content = JSON.parse(new TextDecoder().decode(raw)) as { type: string; data: any };
       ASSERT(
         content.type === 'Primitive' || content.type === 'Default',
         `Unsupported primitive type: ${content.type}`
@@ -939,6 +967,28 @@ export class AssetManager {
       console.error(`Load primitive failed: ${err}`);
       return null;
     }
+  }
+  /** @internal */
+  private async createPrimitiveFromZmshBinary(raw: ArrayBuffer) {
+    const meshopt = readZmshBinary(raw).header.encoding === 'meshopt';
+    const { header, vertexData, indexData } = decodeZmshBinary(
+      raw,
+      meshopt ? await getMeshoptDecoder() : null
+    );
+    const primitive = new Primitive();
+    header.attributes.forEach((a, i) => primitive.createAndSetVertexBuffer(a.format, vertexData[i]));
+    if (indexData) {
+      primitive.createAndSetIndexBuffer(indexData);
+    }
+    primitive.primitiveType = header.primitiveType;
+    primitive.indexCount = header.indexCount;
+    primitive.setBoundingVolume(
+      new BoundingBox(
+        new Vector3(header.boxMin[0], header.boxMin[1], header.boxMin[2]),
+        new Vector3(header.boxMax[0], header.boxMax[1], header.boxMax[2])
+      )
+    );
+    return primitive;
   }
   async reloadBluePrintMaterials(filter?: (m: PBRBluePrintMaterial) => boolean) {
     const promises: Promise<Nullable<Material>>[] = [];
@@ -1465,14 +1515,7 @@ export class AssetManager {
     texture?: Nullable<BaseTexture>,
     vfs?: VFS
   ) {
-    let redirected: Nullable<{ data: ArrayBuffer; mimeType: string }> = null;
-    if (this.textureSourceResolver && !vfs) {
-      try {
-        redirected = await this.textureSourceResolver(url);
-      } catch (err) {
-        console.warn(`Texture source resolver failed for ${url}, loading the file itself: ${err}`);
-      }
-    }
+    const redirected = await this.resolveAssetSource(url, 'texture', vfs);
     const data =
       redirected?.data ?? ((await this.readFileFromVFS(url, { encoding: 'binary' }, vfs)) as ArrayBuffer);
     mimeType = redirected?.mimeType ?? mimeType ?? this.vfs.guessMIMEType(url);

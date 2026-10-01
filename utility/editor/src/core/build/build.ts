@@ -6,8 +6,8 @@ import { formatString, type VFS } from '@zephyr3d/base';
 import { depsResolvePlugin } from './plugins/depresolve';
 import { ProjectService } from '../services/project';
 import { libDir, projectFileName, templateIndexHTML } from './templates';
-import { isAssetMetaPath, TEXTURE_MANIFEST_FILE } from '@zephyr3d/scene';
-import type { TextureManifest } from '@zephyr3d/scene';
+import { isAssetMetaPath, ASSET_MANIFEST_FILE } from '@zephyr3d/scene';
+import type { AssetManifest } from '@zephyr3d/scene';
 import { DerivedTextureService } from '../services/derivedtextures';
 import { isTextureSourcePath } from '../services/assetmeta';
 
@@ -238,7 +238,7 @@ export async function buildForEndUser(options: {
   });
   // .zmeta sidecars only steer the editor's asset pipeline and are not shipped
   const assetFiles = assetFileList.filter((path) => path.type === 'file' && !isAssetMetaPath(path.path));
-  const manifest: TextureManifest = { version: 1, textures: {} };
+  const manifest: AssetManifest = { version: 1, textures: {} };
   const textureReport: BuildTextureReport[] = [];
   for (let i = 0; i < assetFiles.length; i++) {
     const file = assetFiles[i];
@@ -265,7 +265,7 @@ export async function buildForEndUser(options: {
 
   onProgress?.('Writing runtime', assetFiles.length, assetFiles.length);
   if (Object.keys(manifest.textures).length > 0) {
-    await vfs.writeFile(vfs.join(distDir, TEXTURE_MANIFEST_FILE), JSON.stringify(manifest, null, 2), {
+    await vfs.writeFile(vfs.join(distDir, ASSET_MANIFEST_FILE), JSON.stringify(manifest, null, 2), {
       encoding: 'utf8',
       create: true
     });

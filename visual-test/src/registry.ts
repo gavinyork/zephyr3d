@@ -101,6 +101,7 @@ import {
 import { ktx2Basis } from './scenes/ktx2';
 import { gltfCompression } from './scenes/gltf-compression';
 import { quantizedVertices } from './scenes/quantized-vertices';
+import { zmshBinary } from './scenes/zmsh-binary';
 
 /**
  * Every scene, in a fixed order.
@@ -119,6 +120,7 @@ export const SCENES: VisualScene[] = [
   ktx2Basis,
   gltfCompression,
   quantizedVertices,
+  zmshBinary,
   pbrMetalRoughGrid,
   pbrIbl,
   skyAtmosphere,

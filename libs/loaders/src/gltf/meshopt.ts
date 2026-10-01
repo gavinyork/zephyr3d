@@ -1,21 +1,6 @@
-import { MeshoptDecoder } from 'meshoptimizer/decoder';
+import { getMeshoptDecoder } from '@zephyr3d/scene';
+import type { MeshoptDecoderModule } from '@zephyr3d/scene';
 import type { GLTFContent } from './gltf_importer';
-
-/**
- * The subset of meshoptimizer's MeshoptDecoder used here.
- * @internal
- */
-export interface MeshoptDecoderModule {
-  ready: Promise<void>;
-  decodeGltfBuffer(
-    target: Uint8Array,
-    count: number,
-    size: number,
-    source: Uint8Array,
-    mode: string,
-    filter?: string
-  ): void;
-}
 
 interface MeshoptCompression {
   buffer: number;
@@ -59,16 +44,11 @@ export function hasMeshoptBufferViews(gltf: GLTFContent) {
 }
 
 /**
- * Returns meshoptimizer's decoder once its WebAssembly module is ready.
- *
- * Imported statically rather than through a lazy `import()`: the decoder is
- * about 8 KB gzipped with the WebAssembly embedded, and a dynamic import would
- * force every downstream single-file Rollup build to change its output options.
+ * Returns meshoptimizer's decoder, the copy shipped with the scene package.
  * @internal
  */
-export async function loadMeshoptDecoder(): Promise<MeshoptDecoderModule> {
-  await MeshoptDecoder.ready;
-  return MeshoptDecoder;
+export function loadMeshoptDecoder(): Promise<MeshoptDecoderModule> {
+  return getMeshoptDecoder();
 }
 
 /**
