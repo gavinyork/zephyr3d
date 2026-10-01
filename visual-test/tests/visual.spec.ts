@@ -83,6 +83,7 @@ const SCENE_NAMES = [
   'sanity-orientation',
   'unlit-textured',
   'ktx2-basis',
+  'gltf-compression',
   'pbr-metalrough-grid',
   'pbr-ibl',
   'sky-atmosphere',

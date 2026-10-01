@@ -130,3 +130,4 @@ shrinkwrap.json
 
 # Vendored third-party builds
 libs/scene/src/asset/loaders/ktx2/basis/
+libs/loaders/src/gltf/draco/

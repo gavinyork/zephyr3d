@@ -1,6 +1,7 @@
 import { swc } from 'rollup-plugin-swc3';
 import { nodeResolve } from '@rollup/plugin-node-resolve';
 import dts from 'rollup-plugin-dts';
+import copy from 'rollup-plugin-copy';
 
 function getTargetDts() {
   return {
@@ -34,6 +35,12 @@ function getTargetES6() {
       swc({
         sourceMaps: true,
         inlineSourcesContent: false
+      }),
+      // The Draco decoder is fetched at runtime relative to the glTF importer module
+      // (see draco_location.ts), so it must sit beside that module in dist
+      copy({
+        targets: [{ src: 'src/gltf/draco/*', dest: 'dist/gltf/draco' }],
+        hook: 'writeBundle'
       })
       // terser()
     ]

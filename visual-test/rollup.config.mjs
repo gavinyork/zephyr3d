@@ -34,6 +34,13 @@ export default () => ({
       targets: [
         { src: ['index.html'], dest: destdir },
         { src: 'assets/ktx2/*.ktx2', dest: path.join(destdir, 'assets', 'ktx2') },
+        { src: 'assets/gltf/duck-draco/*', dest: path.join(destdir, 'assets', 'gltf', 'duck-draco') },
+        { src: 'assets/gltf/duck-meshopt/*', dest: path.join(destdir, 'assets', 'gltf', 'duck-meshopt') },
+        // Same story for the Draco decoder, resolved relative to the glTF importer
+        {
+          src: 'node_modules/@zephyr3d/loaders/dist/gltf/draco/*',
+          dest: path.join(destdir, 'js', 'draco')
+        },
         // The harness is a single plain-Rollup bundle, which does not emit assets for
         // `new URL(..., import.meta.url)`; the KTX2 loader resolves its transcoder
         // relative to the bundle, so put the shipped copy there

@@ -22,6 +22,9 @@ module.exports = {
   moduleNameMapper: {
     // Uses import.meta, which the CommonJS test build cannot compile
     '^\./basis_location$': '<rootDir>/src/stubs/basis_location.ts',
+    '^\./draco_location$': '<rootDir>/src/stubs/draco_location.ts',
+    // ESM-only entry, see the stub
+    '^meshoptimizer/decoder$': '<rootDir>/src/stubs/meshopt_decoder.ts',
     '^@zephyr3d/base$': '<rootDir>/../libs/base/src',
     '^@zephyr3d/device$': '<rootDir>/../libs/device/src',
     '^@zephyr3d/scene$': '<rootDir>/../libs/scene/src',

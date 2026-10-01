@@ -99,6 +99,7 @@ import {
   hairStrandsWidth
 } from './scenes/hair-strands';
 import { ktx2Basis } from './scenes/ktx2';
+import { gltfCompression } from './scenes/gltf-compression';
 
 /**
  * Every scene, in a fixed order.
@@ -115,6 +116,7 @@ export const SCENES: VisualScene[] = [
   // Core surface shading.
   unlitTextured,
   ktx2Basis,
+  gltfCompression,
   pbrMetalRoughGrid,
   pbrIbl,
   skyAtmosphere,

@@ -19,6 +19,7 @@ export default [
       '.rush/**',
       'common/temp/**',
       '**/vendor/**',
+      'src/gltf/draco/**',
       'web/**',
       '**/node_modules/**'
     ]

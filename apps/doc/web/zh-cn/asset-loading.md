@@ -31,7 +31,9 @@ const resourceManager = getEngine().resourceManager;
 
 ## 加载纹理
 
-使用 `fetchTexture()` 加载浏览器图片格式，以及引擎内置纹理加载器支持的 DDS、HDR、TGA 等格式。
+使用 `fetchTexture()` 加载浏览器图片格式，以及引擎内置纹理加载器支持的 DDS、HDR、TGA、KTX2 等格式。
+
+使用 Basis Universal 编码（ETC1S 或 UASTC）的 KTX2 文件会在 Web Worker 中转码为设备支持的最佳压缩格式：桌面 GPU 上为 BC7 或 BC1/BC3，移动端为 ETC2 或 ASTC，都不支持时退回未压缩的 RGBA8。转码器随 `@zephyr3d/scene` 发布，在首次加载 KTX2 纹理时才下载。Vite 和 webpack 5 会自动处理；使用其他打包工具时，请把 `@zephyr3d/scene/dist` 中 KTX2 加载器旁边的 `basis` 目录复制到输出目录，并将 `KTX2Loader.transcoderPath` 指向它。
 
 ```ts
 const baseColor = await getEngine().resourceManager.fetchTexture('/textures/rocks-albedo.png');
@@ -111,7 +113,7 @@ if (model) {
 }
 ```
 
-如果 glTF/GLB 模型使用 Draco 网格压缩，需要在加载模型前把 Draco decoder factory 暴露为 `window.DracoDecoderModule`。当前 GLTF importer 在遇到 `KHR_draco_mesh_compression` 时会检查这个全局对象。
+GLTF importer 无需额外配置即可读取压缩的几何与纹理：`KHR_draco_mesh_compression`、`EXT_meshopt_compression` / `KHR_meshopt_compression`、`KHR_mesh_quantization` 和 `KHR_texture_basisu`。Draco 解码器随 `@zephyr3d/loaders` 发布，在首次加载 Draco 模型时才下载；如需从其他位置提供，请设置 `GLTFImporter.dracoDecoderPath`。如果页面已经定义了全局的 `DracoDecoderModule`，会继续使用它。
 
 ## 共享模型数据
 

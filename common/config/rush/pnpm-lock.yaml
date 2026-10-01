@@ -2019,6 +2019,9 @@ importers:
       '@zephyr3d/scene':
         specifier: workspace:^0.9.27
         version: link:../scene
+      meshoptimizer:
+        specifier: ~1.3.0
+        version: 1.3.0
     devDependencies:
       '@babel/core':
         specifier: ^7.20.12
@@ -2452,6 +2455,9 @@ importers:
       globals:
         specifier: ^16.4.0
         version: 16.5.0
+      meshoptimizer:
+        specifier: ~1.3.0
+        version: 1.3.0
       prettier:
         specifier: ~3.6.2
         version: 3.6.2
@@ -6838,6 +6844,9 @@ packages:
   merge2@1.4.1:
     resolution: {integrity: sha512-8q7VEgMJW4J8tcfVPy8g09NcQwZdbwFEqhe/WZkoIzjn/3TGDwtOCYtXGxA3O8tPzpczCCDgv+P2P5y00ZJOOg==}
     engines: {node: '>= 8'}
+
+  meshoptimizer@1.3.0:
+    resolution: {integrity: sha512-2oZqMAcEEiCtXWUjIGtZ71oPx1B0ZxYGTqIKsXB1wzWFhleNsCFxQuUJzgCV706bRcwPWtMGf1odmQvAcqKkIw==}
 
   micromark-util-character@2.1.1:
     resolution: {integrity: sha512-wv8tdUTJ3thSFFFJKtpYKOYiGP2+v96Hvk4Tu8KpCAsTMs6yi+nVmGh1syvSCsaxz45J6Jbw+9DD6g97+NV67Q==}
@@ -13016,6 +13025,8 @@ snapshots:
   merge-stream@2.0.0: {}
 
   merge2@1.4.1: {}
+
+  meshoptimizer@1.3.0: {}
 
   micromark-util-character@2.1.1:
     dependencies:

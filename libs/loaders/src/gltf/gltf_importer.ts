@@ -51,6 +51,13 @@ import {
 } from '@zephyr3d/scene';
 import { ColliderForce, getDevice } from '@zephyr3d/scene';
 import { ComponentType, GLTFAccessor } from './helpers';
+import {
+  decodeMeshoptBufferViews,
+  hasMeshoptBufferViews,
+  isMeshoptFallbackBuffer,
+  loadMeshoptDecoder
+} from './meshopt';
+import { getDracoDecoderPath, loadDracoDecoder, setDracoDecoderPath } from './draco_loader';
 import type { VertexAttribFormat } from '@zephyr3d/device';
 import {
   type VertexSemantic,
@@ -226,21 +233,17 @@ export interface GLTFContent extends GlTf {
  * @public
  */
 export class GLTFImporter extends AbstractModelImporter {
-  /** @internal */
-  async initDraco3d(gltf: GLTFContent) {
-    return new Promise<void>((resolve) => {
-      const dracoDecoderModule = (window as any).DracoDecoderModule as draco3d.DracoDecoderModule;
-      if (dracoDecoderModule) {
-        dracoDecoderModule({
-          onModuleLoaded: (module: any) => {
-            gltf._dracoModule = module;
-            resolve();
-          }
-        });
-      } else {
-        resolve();
-      }
-    });
+  /**
+   * Directory URL holding draco_wasm_wrapper_gltf.js and draco_decoder_gltf.wasm,
+   * fetched the first time a Draco compressed model is loaded. null (the default)
+   * uses the copy shipped with this package. A `DracoDecoderModule` global, if the
+   * page defines one, takes precedence over both.
+   */
+  static get dracoDecoderPath(): string | null {
+    return getDracoDecoderPath();
+  }
+  static set dracoDecoderPath(path: string | null) {
+    setDracoDecoderPath(path);
   }
   async import(data: Blob, model: SharedModel, basePath: string, vfs?: VFS) {
     const buffer = await data.arrayBuffer();
@@ -276,13 +279,16 @@ export class GLTFImporter extends AbstractModelImporter {
   async loadJson(gltf: GLTFContent, model: SharedModel, basePath: string, vfs?: VFS) {
     vfs = vfs ?? getEngine().VFS;
     // check extensions
-    if (
-      !gltf._dracoModule &&
-      gltf.extensionsRequired &&
-      gltf.extensionsRequired.indexOf('KHR_draco_mesh_compression') >= 0
-    ) {
-      await this.initDraco3d(gltf);
-      ASSERT(!!gltf._dracoModule, 'Draco3d is required for loading model');
+    if (!gltf._dracoModule) {
+      if (gltf.extensionsRequired?.includes('KHR_draco_mesh_compression')) {
+        gltf._dracoModule = await loadDracoDecoder();
+      } else if (gltf.extensionsUsed?.includes('KHR_draco_mesh_compression')) {
+        // Optional: the primitives also carry uncompressed accessors to fall back to
+        gltf._dracoModule = await loadDracoDecoder().catch((err) => {
+          console.warn(`Draco decoder unavailable, using uncompressed fallback data: ${err}`);
+          return undefined;
+        });
+      }
     }
     gltf._accessors = [];
     gltf._nodes = [];
@@ -299,6 +305,11 @@ export class GLTFImporter extends AbstractModelImporter {
       const buffers = gltf.buffers;
       if (buffers) {
         for (const buffer of buffers) {
+          if (isMeshoptFallbackBuffer(buffer)) {
+            // Data-less stand-in for meshopt-compressed views, see decodeMeshoptBufferViews()
+            gltf._loadedBuffers.push(new ArrayBuffer(0));
+            continue;
+          }
           const uri =
             vfs.parseDataURI(buffer.uri!) || vfs.isAbsoluteURL(buffer.uri!)
               ? buffer.uri
@@ -308,6 +319,14 @@ export class GLTFImporter extends AbstractModelImporter {
           gltf._loadedBuffers.push(buf);
         }
       }
+    }
+    if (hasMeshoptBufferViews(gltf)) {
+      // A .glb only carries its BIN chunk; keep buffer indices aligned with gltf.buffers
+      // before decoded views are appended after them
+      while (gltf._loadedBuffers.length < (gltf.buffers?.length ?? 0)) {
+        gltf._loadedBuffers.push(new ArrayBuffer(0));
+      }
+      decodeMeshoptBufferViews(gltf, await loadMeshoptDecoder());
     }
     const accessors = gltf.accessors;
     if (accessors) {
@@ -1859,7 +1878,10 @@ export class GLTFImporter extends AbstractModelImporter {
                   // Keep each attribute array indexed by the morph target. A
                   // target may omit optional attributes such as NORMAL; using
                   // push() here would shift every following target's data.
-                  targets[t].data[targetIndex] = accessor.getNormalizedDeinterlacedView(gltf) as Float32Array;
+                  // KHR_mesh_quantization allows integer morph deltas; consumers expect floats
+                  const view = accessor.getNormalizedDeinterlacedView(gltf)!;
+                  targets[t].data[targetIndex] =
+                    view instanceof Float32Array ? view : Float32Array.from(view);
                   if (k === 'POSITION') {
                     const min = accessor.min
                       ? new Vector3(accessor.min[0], accessor.min[1], accessor.min[2])
@@ -2863,8 +2885,10 @@ export class GLTFImporter extends AbstractModelImporter {
           if (!primitive.indices) {
             primitive.indexCount = Math.floor(buffer.byteLength / 12);
           }
-          const data = accessor.getNormalizedDeinterlacedView(gltf);
-          subMeshData.rawPositions = data as Float32Array;
+          // The float copy made above: KHR_mesh_quantization positions may be plain
+          // (non-normalized) integers, whose view is not a Float32Array
+          const data = buffer as Float32Array;
+          subMeshData.rawPositions = data;
           const min = accessor.min;
           const max = accessor.max;
           if (min && max) {

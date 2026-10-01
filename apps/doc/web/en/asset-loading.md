@@ -31,7 +31,9 @@ The paths passed to resource methods are VFS paths. With `HttpFS`, `/assets/mode
 
 ## Loading Textures
 
-Use `fetchTexture()` for browser image formats and the built-in texture loaders registered by the engine, including DDS, HDR, and TGA.
+Use `fetchTexture()` for browser image formats and the built-in texture loaders registered by the engine, including DDS, HDR, TGA, and KTX2.
+
+KTX2 files encoded with Basis Universal (ETC1S or UASTC) are transcoded in web workers to the best compressed format the device supports: BC7 or BC1/BC3 on desktop GPUs, ETC2 or ASTC on mobile, with uncompressed RGBA8 as the last resort. The transcoder ships with `@zephyr3d/scene` and is downloaded the first time a KTX2 texture loads. Vite and webpack 5 pick it up automatically; with other bundlers, copy the `basis` directory that sits next to the KTX2 loader in `@zephyr3d/scene/dist` to your output and point `KTX2Loader.transcoderPath` at it.
 
 ```ts
 const baseColor = await getEngine().resourceManager.fetchTexture('/textures/rocks-albedo.png');
@@ -111,7 +113,7 @@ if (model) {
 }
 ```
 
-If a glTF/GLB file uses Draco mesh compression, make the Draco decoder factory available as `window.DracoDecoderModule` before loading the model. The current GLTF importer checks that global when it encounters `KHR_draco_mesh_compression`.
+The GLTF importer reads compressed geometry and textures without extra setup: `KHR_draco_mesh_compression`, `EXT_meshopt_compression` / `KHR_meshopt_compression`, `KHR_mesh_quantization`, and `KHR_texture_basisu`. The Draco decoder ships with `@zephyr3d/loaders` and is downloaded the first time a Draco model loads; set `GLTFImporter.dracoDecoderPath` to serve it from elsewhere. A page that already defines a `DracoDecoderModule` global keeps using it.
 
 ## Shared Model Data
 
