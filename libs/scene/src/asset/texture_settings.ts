@@ -86,10 +86,16 @@ export function isSRGBTextureUsage(usage: TextureUsage) {
 
 /**
  * Default settings for a usage.
+ *
+ * Compression is opt-in: a texture is only compressed when its settings say so,
+ * so updating the engine or editor never changes how an existing project ships.
  * @public
  */
-export function defaultTextureImportSettings(usage: TextureUsage): TextureImportSettings {
-  return { usage, compression: 'auto', quality: 'normal', maxSize: 0, mipmaps: usage !== 'ui' };
+export function defaultTextureImportSettings(
+  usage: TextureUsage,
+  compression: TextureCompression = 'none'
+): TextureImportSettings {
+  return { usage, compression, quality: 'normal', maxSize: 0, mipmaps: usage !== 'ui' };
 }
 
 /**
@@ -237,8 +243,9 @@ export function normalizeTextureImportSettings(
 
 /**
  * Reads the import settings of a texture. Without a `.zmeta` file (or with an
- * unreadable one) the settings are inferred from the path, so a texture that
- * was never touched in the editor still has well-defined settings.
+ * unreadable one) the texture is not compressed and its usage is inferred from
+ * the path, so a texture that was never touched in the editor still has
+ * well-defined settings that leave it exactly as it was.
  * @public
  */
 export async function readTextureImportSettings(vfs: VFS, path: string): Promise<TextureImportSettings> {

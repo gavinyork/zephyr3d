@@ -26,6 +26,7 @@ import type { ColliderR } from '../animation/joint_dynamics/types';
 import type { ControllerConfig } from '../animation/joint_dynamics/controller';
 import type { ResourceManager } from '../utility/serialization/manager';
 import type { TextureUsage } from './texture_settings';
+import { defaultMeshImportSettings, writeMeshImportSettings } from './mesh_settings';
 import {
   defaultTextureImportSettings,
   getAssetMetaPath,
@@ -870,6 +871,10 @@ export type SaveOptions = {
 type PreprocessOptions = {
   rebuildMaterial?: boolean;
   sourceMorphReferenceAssetPath?: string;
+  /** Mark newly imported textures for compression; off by default */
+  compressTextures?: boolean;
+  /** Mark newly imported meshes for vertex compression; off by default */
+  compressVertices?: boolean;
 };
 
 type SharedModelWithPreprocessOptions = SharedModel & {
@@ -986,6 +991,10 @@ export class SharedModel extends Disposable {
   }
   set activeScene(val: number) {
     this._activeScene = val;
+  }
+  /** Number of image slots the model references */
+  get imageCount() {
+    return this._imageList.length;
   }
   getImage(index: number) {
     return this._imageList[index];
@@ -1312,10 +1321,12 @@ export class SharedModel extends Disposable {
   /**
    * Gives every imported image a `.zmeta` describing what it is, taken from the
    * material slots that reference it. That is better information than the file
-   * name inference used for textures added any other way. An existing `.zmeta`
-   * is left alone, so re-importing keeps settings tuned in the editor.
+   * name inference used for textures added any other way, so it is recorded even
+   * when the import does not ask for compression: turning compression on later
+   * then starts from the right usage. An existing `.zmeta` is left alone, so
+   * re-importing keeps settings tuned in the editor.
    */
-  private async writeImportedTextureSettings(vfs: VFS) {
+  private async writeImportedTextureSettings(vfs: VFS, compress: boolean) {
     const usages = new Map<AssetImageInfo, TextureUsage>();
     const visit = (value: unknown, key: string, depth: number) => {
       if (!value || typeof value !== 'object' || depth > 4) {
@@ -1344,7 +1355,11 @@ export class SharedModel extends Disposable {
           continue;
         }
         const usage = usages.get(img) ?? inferTextureUsageFromPath(img.uri);
-        await writeTextureImportSettings(vfs, img.uri, defaultTextureImportSettings(usage));
+        await writeTextureImportSettings(
+          vfs,
+          img.uri,
+          defaultTextureImportSettings(usage, compress ? 'auto' : 'none')
+        );
       } catch (err) {
         console.warn(`Failed to write texture settings for ${img.uri}: ${err}`);
       }
@@ -1465,7 +1480,10 @@ export class SharedModel extends Disposable {
           img.mimeType = '';
         }
       }
-      await this.writeImportedTextureSettings(dstVFS);
+      await this.writeImportedTextureSettings(
+        dstVFS,
+        !!(this as SharedModelWithPreprocessOptions)._preprocessOptions?.compressTextures
+      );
     }
     const materialKeys = Object.keys(this._materialList);
     if (materialKeys.length > 0) {
@@ -1537,6 +1555,13 @@ export class SharedModel extends Disposable {
             `${destName}_mesh_${i}`
           ));
         await SharedModel.writePrimitive(dstVFS, info, path);
+        if (
+          (this as SharedModelWithPreprocessOptions)._preprocessOptions?.compressVertices &&
+          !(await dstVFS.exists(getAssetMetaPath(path)))
+        ) {
+          // Without a .zmeta a mesh ships uncompressed, so only an opt-in needs one
+          await writeMeshImportSettings(dstVFS, path, defaultMeshImportSettings('meshopt'));
+        }
         info.path = path;
       }
     }

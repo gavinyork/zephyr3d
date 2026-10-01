@@ -22,12 +22,18 @@ export type SaveOptions = {
   rebuildMaterial?: boolean;
   sourceReference?: boolean;
   sourceModelPath?: string;
+  /** Mark new textures for compression (writes their .zmeta); off by default */
+  compressTextures?: boolean;
+  /** Mark new meshes for vertex compression (writes their .zmeta); off by default */
+  compressVertices?: boolean;
 };
 
 type SharedModelWithPreprocessOptions = SharedModel & {
   _preprocessOptions?: {
     rebuildMaterial?: boolean;
     sourceMorphReferenceAssetPath?: string;
+    compressTextures?: boolean;
+    compressVertices?: boolean;
   };
 };
 
@@ -325,7 +331,9 @@ export class ResourceService {
     const modelWithOptions = model as SharedModelWithPreprocessOptions;
     modelWithOptions._preprocessOptions = {
       rebuildMaterial: saveOptions?.rebuildMaterial ?? true,
-      sourceMorphReferenceAssetPath: sourceMorphReferenceAssetPath ?? undefined
+      sourceMorphReferenceAssetPath: sourceMorphReferenceAssetPath ?? undefined,
+      compressTextures: !!saveOptions?.compressTextures,
+      compressVertices: !!saveOptions?.compressVertices
     };
     try {
       await model.preprocess(manager, name, path, srcVFS, getEngine().resourceManager.VFS);

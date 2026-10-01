@@ -50,15 +50,21 @@ describe('texture import settings', () => {
     expect(mergeTextureUsage('color', 'mask')).toBe('mask');
   });
 
+  test('compression is opt-in: defaults, missing and invalid settings all mean none', () => {
+    expect(defaultTextureImportSettings('color').compression).toBe('none');
+    expect(resolveTextureCompression(defaultTextureImportSettings('normal'))).toBe('none');
+    expect(normalizeTextureImportSettings({ usage: 'color' }, 'color').compression).toBe('none');
+  });
+
   test('auto compression follows the usage', () => {
-    expect(resolveTextureCompression(defaultTextureImportSettings('color'))).toBe('etc1s');
-    expect(resolveTextureCompression(defaultTextureImportSettings('normal'))).toBe('uastc');
-    expect(resolveTextureCompression(defaultTextureImportSettings('mask'))).toBe('uastc');
-    expect(resolveTextureCompression({ ...defaultTextureImportSettings('mask'), quality: 'low' })).toBe(
-      'etc1s'
-    );
-    expect(resolveTextureCompression(defaultTextureImportSettings('ui'))).toBe('none');
-    expect(resolveTextureCompression(defaultTextureImportSettings('hdr'))).toBe('none');
+    expect(resolveTextureCompression(defaultTextureImportSettings('color', 'auto'))).toBe('etc1s');
+    expect(resolveTextureCompression(defaultTextureImportSettings('normal', 'auto'))).toBe('uastc');
+    expect(resolveTextureCompression(defaultTextureImportSettings('mask', 'auto'))).toBe('uastc');
+    expect(
+      resolveTextureCompression({ ...defaultTextureImportSettings('mask', 'auto'), quality: 'low' })
+    ).toBe('etc1s');
+    expect(resolveTextureCompression(defaultTextureImportSettings('ui', 'auto'))).toBe('none');
+    expect(resolveTextureCompression(defaultTextureImportSettings('hdr', 'auto'))).toBe('none');
     expect(
       resolveTextureCompression({ ...defaultTextureImportSettings('color'), compression: 'uastc' })
     ).toBe('uastc');
@@ -78,7 +84,7 @@ describe('texture import settings', () => {
         { usage: 'normal', compression: 'zip', maxSize: -3, mipmaps: 'yes' },
         'color'
       )
-    ).toEqual({ usage: 'normal', compression: 'auto', quality: 'normal', maxSize: 0, mipmaps: true });
+    ).toEqual({ usage: 'normal', compression: 'none', quality: 'normal', maxSize: 0, mipmaps: true });
     expect(normalizeTextureImportSettings(null, 'mask')).toEqual(defaultTextureImportSettings('mask'));
   });
 

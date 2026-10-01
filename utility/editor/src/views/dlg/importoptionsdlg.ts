@@ -36,7 +36,10 @@ export class DlgImportOptions extends DialogRenderer<SaveOptions[]> {
       importMeshes: model.primitives.length > 0,
       importSkeletons: model.skeletons.length > 0,
       importAnimations: model.animations.length > 0,
-      importJointDynamics: model.jointDynamicsSpringBones.length > 0
+      importJointDynamics: model.jointDynamicsSpringBones.length > 0,
+      // Opt-in, so importing never changes how a project ships unless asked to
+      compressTextures: false,
+      compressVertices: false
     }));
     this._retargetPoseModes = models.map((model) =>
       model.skeletons.some((skeleton) => !!skeleton.retargetPose) ? 1 : 0
@@ -166,6 +169,44 @@ export class DlgImportOptions extends DialogRenderer<SaveOptions[]> {
     }
     if (!hasJointDynamics) {
       ImGui.PopStyleVar();
+    }
+
+    ImGui.Separator();
+    const model = this._models[this._current];
+    const hasImages = model.imageCount > 0;
+    if (!hasImages) {
+      ImGui.PushStyleVar(ImGui.StyleVar.Alpha, ImGui.GetStyle().Alpha * 0.5);
+    }
+    const compressTextures = [hasImages && !!this._options[this._current].compressTextures] as [boolean];
+    if (ImGui.Checkbox('Compress Textures', compressTextures)) {
+      if (hasImages) {
+        this._options[this._current].compressTextures = compressTextures[0];
+      }
+    }
+    if (!hasImages) {
+      ImGui.PopStyleVar();
+    }
+    if (ImGui.IsItemHovered()) {
+      ImGui.SetTooltip(
+        'Ship newly imported textures as KTX2. Textures that already have settings keep them.'
+      );
+    }
+    if (!hasMeshes) {
+      ImGui.PushStyleVar(ImGui.StyleVar.Alpha, ImGui.GetStyle().Alpha * 0.5);
+    }
+    const compressVertices = [hasMeshes && !!this._options[this._current].compressVertices] as [boolean];
+    if (ImGui.Checkbox('Compress Vertices', compressVertices)) {
+      if (hasMeshes) {
+        this._options[this._current].compressVertices = compressVertices[0];
+      }
+    }
+    if (!hasMeshes) {
+      ImGui.PopStyleVar();
+    }
+    if (ImGui.IsItemHovered()) {
+      ImGui.SetTooltip(
+        'Ship newly imported meshes with compressed, quantized vertex data. Meshes that already have settings keep them.'
+      );
     }
 
     ImGui.Separator();
