@@ -100,6 +100,7 @@ import {
 } from './scenes/hair-strands';
 import { ktx2Basis } from './scenes/ktx2';
 import { gltfCompression } from './scenes/gltf-compression';
+import { quantizedVertices } from './scenes/quantized-vertices';
 
 /**
  * Every scene, in a fixed order.
@@ -117,6 +118,7 @@ export const SCENES: VisualScene[] = [
   unlitTextured,
   ktx2Basis,
   gltfCompression,
+  quantizedVertices,
   pbrMetalRoughGrid,
   pbrIbl,
   skyAtmosphere,

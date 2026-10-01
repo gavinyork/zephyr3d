@@ -84,6 +84,7 @@ const SCENE_NAMES = [
   'unlit-textured',
   'ktx2-basis',
   'gltf-compression',
+  'quantized-vertices',
   'pbr-metalrough-grid',
   'pbr-ibl',
   'sky-atmosphere',

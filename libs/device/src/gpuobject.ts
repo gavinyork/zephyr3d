@@ -85,6 +85,8 @@ export type VertexAttribFormat =
   | 'position_u32x2'
   | 'position_u32x3'
   | 'position_u32x4'
+  | 'normal_i8normx4'
+  | 'normal_i16normx4'
   | 'normal_f16x4'
   | 'normal_f32x3'
   | 'normal_f32x4'
@@ -96,6 +98,8 @@ export type VertexAttribFormat =
   | 'diffuse_f32x4'
   | 'diffuse_u32x3'
   | 'diffuse_u32x4'
+  | 'tangent_i8normx4'
+  | 'tangent_i16normx4'
   | 'tangent_f16x4'
   | 'tangent_f32x3'
   | 'tangent_f32x4'
@@ -313,6 +317,8 @@ export type VertexAttribFormat =
   | 'blendweights_f32x2'
   | 'blendweights_f16x3'
   | 'blendweights_f32x3'
+  | 'blendweights_u8normx4'
+  | 'blendweights_u16normx4'
   | 'blendweights_f16x4'
   | 'blendweights_f32x4'
   | 'blendindices_f16x1'
@@ -359,6 +365,10 @@ const vertexAttribFormatMap = {
   position_u32x2: [VERTEX_ATTRIB_POSITION, PBPrimitiveType.U32VEC2, 8, 'u32', 2],
   position_u32x3: [VERTEX_ATTRIB_POSITION, PBPrimitiveType.U32VEC3, 12, 'u32', 3],
   position_u32x4: [VERTEX_ATTRIB_POSITION, PBPrimitiveType.U32VEC4, 16, 'u32', 4],
+  // Quantized unit vectors (glTF KHR_mesh_quantization, meshopt OCTAHEDRAL filter output);
+  // four components because 8/16-bit vertex formats come in pairs and quads only
+  normal_i8normx4: [VERTEX_ATTRIB_NORMAL, PBPrimitiveType.I8VEC4_NORM, 4, 'i8norm', 4],
+  normal_i16normx4: [VERTEX_ATTRIB_NORMAL, PBPrimitiveType.I16VEC4_NORM, 8, 'i16norm', 4],
   normal_f16x4: [VERTEX_ATTRIB_NORMAL, PBPrimitiveType.F16VEC4, 8, 'f16', 4],
   normal_f32x3: [VERTEX_ATTRIB_NORMAL, PBPrimitiveType.F32VEC3, 12, 'f32', 3],
   normal_f32x4: [VERTEX_ATTRIB_NORMAL, PBPrimitiveType.F32VEC4, 16, 'f32', 4],
@@ -370,6 +380,8 @@ const vertexAttribFormatMap = {
   diffuse_f32x4: [VERTEX_ATTRIB_DIFFUSE, PBPrimitiveType.F32VEC4, 16, 'f32', 4],
   diffuse_u32x3: [VERTEX_ATTRIB_DIFFUSE, PBPrimitiveType.U32VEC3, 12, 'u32', 3],
   diffuse_u32x4: [VERTEX_ATTRIB_DIFFUSE, PBPrimitiveType.U32VEC4, 16, 'u32', 4],
+  tangent_i8normx4: [VERTEX_ATTRIB_TANGENT, PBPrimitiveType.I8VEC4_NORM, 4, 'i8norm', 4],
+  tangent_i16normx4: [VERTEX_ATTRIB_TANGENT, PBPrimitiveType.I16VEC4_NORM, 8, 'i16norm', 4],
   tangent_f16x4: [VERTEX_ATTRIB_TANGENT, PBPrimitiveType.F16VEC4, 8, 'f16', 4],
   tangent_f32x3: [VERTEX_ATTRIB_TANGENT, PBPrimitiveType.F32VEC3, 12, 'f32', 3],
   tangent_f32x4: [VERTEX_ATTRIB_TANGENT, PBPrimitiveType.F32VEC4, 16, 'f32', 4],
@@ -587,6 +599,8 @@ const vertexAttribFormatMap = {
   blendweights_f32x2: [VERTEX_ATTRIB_BLEND_WEIGHT, PBPrimitiveType.F32VEC2, 8, 'f32', 2],
   blendweights_f16x3: [VERTEX_ATTRIB_BLEND_WEIGHT, PBPrimitiveType.F16VEC3, 6, 'f16', 3],
   blendweights_f32x3: [VERTEX_ATTRIB_BLEND_WEIGHT, PBPrimitiveType.F32VEC3, 12, 'f32', 3],
+  blendweights_u8normx4: [VERTEX_ATTRIB_BLEND_WEIGHT, PBPrimitiveType.U8VEC4_NORM, 4, 'u8norm', 4],
+  blendweights_u16normx4: [VERTEX_ATTRIB_BLEND_WEIGHT, PBPrimitiveType.U16VEC4_NORM, 8, 'u16norm', 4],
   blendweights_f16x4: [VERTEX_ATTRIB_BLEND_WEIGHT, PBPrimitiveType.F16VEC4, 8, 'f16', 4],
   blendweights_f32x4: [VERTEX_ATTRIB_BLEND_WEIGHT, PBPrimitiveType.F32VEC4, 16, 'f32', 4],
   blendindices_u16x1: [VERTEX_ATTRIB_BLEND_INDICES, PBPrimitiveType.U16, 2, 'u16', 1],
