@@ -128,25 +128,8 @@ const COMPRESSION_FORMAT_BC5 = 5 << COMPRESSED_FORMAT_SHIFT;
 const COMPRESSION_FORMAT_BC6H = 6 << COMPRESSED_FORMAT_SHIFT;
 const COMPRESSION_FORMAT_BC7 = 7 << COMPRESSED_FORMAT_SHIFT;
 const COMPRESSION_FORMAT_ASTC = 8 << COMPRESSED_FORMAT_SHIFT;
-/*
-const COMPRESSION_FORMAT_ETC2_RGB8 = 8 << COMPRESSED_FORMAT_SHIFT;
-const COMPRESSION_FORMAT_ETC2_RGB8_A1 = 9 << COMPRESSED_FORMAT_SHIFT;
-const COMPRESSION_FORMAT_ETC2_RGBA8 = 10 << COMPRESSED_FORMAT_SHIFT;
-const COMPRESSION_FORMAT_ASTC_4x4 = 11 << COMPRESSED_FORMAT_SHIFT;
-const COMPRESSION_FORMAT_ASTC_5x4 = 12 << COMPRESSED_FORMAT_SHIFT;
-const COMPRESSION_FORMAT_ASTC_5x5 = 13 << COMPRESSED_FORMAT_SHIFT;
-const COMPRESSION_FORMAT_ASTC_6x5 = 14 << COMPRESSED_FORMAT_SHIFT;
-const COMPRESSION_FORMAT_ASTC_6x6 = 15 << COMPRESSED_FORMAT_SHIFT;
-const COMPRESSION_FORMAT_ASTC_8x5 = 16 << COMPRESSED_FORMAT_SHIFT;
-const COMPRESSION_FORMAT_ASTC_8x6 = 17 << COMPRESSED_FORMAT_SHIFT;
-const COMPRESSION_FORMAT_ASTC_8x8 = 18 << COMPRESSED_FORMAT_SHIFT;
-const COMPRESSION_FORMAT_ASTC_10x5 = 19 << COMPRESSED_FORMAT_SHIFT;
-const COMPRESSION_FORMAT_ASTC_10x6 = 20 << COMPRESSED_FORMAT_SHIFT;
-const COMPRESSION_FORMAT_ASTC_10x8 = 21 << COMPRESSED_FORMAT_SHIFT;
-const COMPRESSION_FORMAT_ASTC_10x10 = 22 << COMPRESSED_FORMAT_SHIFT;
-const COMPRESSION_FORMAT_ASTC_12x10 = 23 << COMPRESSED_FORMAT_SHIFT;
-const COMPRESSION_FORMAT_ASTC_12x12 = 24 << COMPRESSED_FORMAT_SHIFT;
-*/
+const COMPRESSION_FORMAT_ETC2 = 9 << COMPRESSED_FORMAT_SHIFT;
+const COMPRESSION_FORMAT_EAC = 10 << COMPRESSED_FORMAT_SHIFT;
 const COMPRESSION_FORMAT_BITMASK = 0x1f << COMPRESSED_FORMAT_SHIFT;
 const RED_BITMASK = 1 << RED_SHIFT;
 const GREEN_BITMASK = 1 << GREEN_SHIFT;
@@ -259,6 +242,16 @@ export type TextureFormat =
   | 'bc7-srgb'
   | 'bc6h'
   | 'bc6h-signed'
+  | 'etc2-rgb8'
+  | 'etc2-rgb8-srgb'
+  | 'etc2-rgb8a1'
+  | 'etc2-rgb8a1-srgb'
+  | 'etc2-rgba8'
+  | 'etc2-rgba8-srgb'
+  | 'eac-r11'
+  | 'eac-r11-signed'
+  | 'eac-rg11'
+  | 'eac-rg11-signed'
   | 'astc-4x4'
   | 'astc-4x4-srgb'
   | 'astc-5x4'
@@ -1191,6 +1184,176 @@ const textureFormatMap: Record<TextureFormat, number> = {
     4,
     16
   ),
+  'etc2-rgb8': makeTextureFormat(
+    COMPRESSION_FORMAT_ETC2,
+    true,
+    true,
+    true,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    4,
+    4,
+    8
+  ),
+  'etc2-rgb8-srgb': makeTextureFormat(
+    COMPRESSION_FORMAT_ETC2,
+    true,
+    true,
+    true,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    true,
+    false,
+    4,
+    4,
+    8
+  ),
+  'etc2-rgb8a1': makeTextureFormat(
+    COMPRESSION_FORMAT_ETC2,
+    true,
+    true,
+    true,
+    true,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    4,
+    4,
+    8
+  ),
+  'etc2-rgb8a1-srgb': makeTextureFormat(
+    COMPRESSION_FORMAT_ETC2,
+    true,
+    true,
+    true,
+    true,
+    false,
+    false,
+    false,
+    false,
+    false,
+    true,
+    false,
+    4,
+    4,
+    8
+  ),
+  'etc2-rgba8': makeTextureFormat(
+    COMPRESSION_FORMAT_ETC2,
+    true,
+    true,
+    true,
+    true,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    4,
+    4,
+    16
+  ),
+  'etc2-rgba8-srgb': makeTextureFormat(
+    COMPRESSION_FORMAT_ETC2,
+    true,
+    true,
+    true,
+    true,
+    false,
+    false,
+    false,
+    false,
+    false,
+    true,
+    false,
+    4,
+    4,
+    16
+  ),
+  'eac-r11': makeTextureFormat(
+    COMPRESSION_FORMAT_EAC,
+    true,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    4,
+    4,
+    8
+  ),
+  'eac-r11-signed': makeTextureFormat(
+    COMPRESSION_FORMAT_EAC,
+    true,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    true,
+    false,
+    false,
+    4,
+    4,
+    8
+  ),
+  'eac-rg11': makeTextureFormat(
+    COMPRESSION_FORMAT_EAC,
+    true,
+    true,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    4,
+    4,
+    16
+  ),
+  'eac-rg11-signed': makeTextureFormat(
+    COMPRESSION_FORMAT_EAC,
+    true,
+    true,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    true,
+    false,
+    false,
+    4,
+    4,
+    16
+  ),
   'astc-4x4': makeTextureFormat(
     COMPRESSION_FORMAT_ASTC,
     true,
@@ -1689,6 +1852,12 @@ export function linearTextureFormatToSRGB(format: TextureFormat) {
       return 'dxt5-srgb';
     case 'bc7':
       return 'bc7-srgb';
+    case 'etc2-rgb8':
+      return 'etc2-rgb8-srgb';
+    case 'etc2-rgb8a1':
+      return 'etc2-rgb8a1-srgb';
+    case 'etc2-rgba8':
+      return 'etc2-rgba8-srgb';
     case 'astc-4x4':
       return 'astc-4x4-srgb';
     case 'astc-5x4':
@@ -2374,6 +2543,8 @@ export interface TextureCaps {
   supportRGTC: boolean;
   /** True if device supports astc texture format */
   supportASTC: boolean;
+  /** True if device supports etc2 and eac texture formats, including their sRGB and signed variants */
+  supportETC2: boolean;
   /** True if device supports dxt1_srgb, dxt3-srgb, dxt5-srgb texture format */
   supportS3TCSRGB: boolean;
   /** True if device supports depth texture */

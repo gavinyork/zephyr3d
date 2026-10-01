@@ -8,7 +8,9 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const root = path.join(__dirname, '..', 'dist');
+// Optional second argument overrides the root, e.g. `node tools/serve.mjs 4322 tools/probes`
+// for the standalone capability probes.
+const root = process.argv[3] ? path.resolve(process.argv[3]) : path.join(__dirname, '..', 'dist');
 const port = Number(process.argv[2] ?? 4321);
 
 const MIME = {
@@ -39,7 +41,7 @@ http
     }
     const rel = url === '/' ? 'index.html' : url.replace(/^\/+/, '');
     const file = path.join(root, rel);
-    // Contain traversal to dist/.
+    // Contain traversal to the root.
     if (!file.startsWith(root)) {
       res.writeHead(403).end('forbidden');
       return;

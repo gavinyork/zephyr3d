@@ -1,0 +1,354 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>probe:running</title>
+    <style>
+      body {
+        font:
+          13px/1.5 Consolas,
+          monospace;
+        margin: 16px;
+        background: #111;
+        color: #ddd;
+      }
+      .ok {
+        color: #6c6;
+      }
+      .bad {
+        color: #e66;
+      }
+      .na {
+        color: #888;
+      }
+      canvas {
+        display: none;
+      }
+    </style>
+  </head>
+  <body>
+    <h3>Compressed texture capability probe</h3>
+    <pre id="out"></pre>
+    <canvas id="glcanvas" width="4" height="4"></canvas>
+    <script>
+      // Reports which block-compressed formats the browser exposes on WebGL2 and
+      // WebGPU, and whether each one actually decodes. Exposure alone is not enough:
+      // an implementation can advertise a format and still sample garbage, so every
+      // exposed format uploads one hand-built 4x4 block that decodes to solid red and
+      // reads back the centre texel.
+      //
+      // Launch the same page under different Chrome configurations (native GPU,
+      // --use-angle=swiftshader, software WebGPU) to see which paths each one covers.
+      // The result is also published as window.__probeResult with title 'probe:done'
+      // so a script can collect it.
+
+      const out = document.getElementById('out');
+      const result = { userAgent: navigator.userAgent, webgl2: null, webgpu: null };
+      function log(text, cls) {
+        const span = document.createElement('span');
+        if (cls) {
+          span.className = cls;
+        }
+        span.textContent = text + '\n';
+        out.appendChild(span);
+      }
+
+      // ---- Test blocks: every block below decodes to (255, 0, 0) give or take a
+      // few units on G/B, so one tolerance check covers all of them.
+
+      // BC1: color0 == color1 == RGB565 red selects 3-color mode, all indices 0.
+      const BC1_RED = new Uint8Array([0x00, 0xf8, 0x00, 0xf8, 0, 0, 0, 0]);
+
+      // BC7 mode 6: endpoints R=127 A=127 with p-bit 1 expand to 255, G/B expand to 1.
+      // All indices 0 select endpoint 0.
+      function makeBC7Red() {
+        const bytes = new Uint8Array(16);
+        let bit = 0;
+        function put(value, count) {
+          for (let i = 0; i < count; i++, bit++) {
+            if ((value >> i) & 1) {
+              bytes[bit >> 3] |= 1 << (bit & 7);
+            }
+          }
+        }
+        put(1 << 6, 7); // mode 6
+        put(127, 7); // R0
+        put(127, 7); // R1
+        put(0, 7); // G0
+        put(0, 7); // G1
+        put(0, 7); // B0
+        put(0, 7); // B1
+        put(127, 7); // A0
+        put(127, 7); // A1
+        put(1, 1); // P0
+        put(1, 1); // P1
+        // the remaining 63 index bits stay 0
+        return bytes;
+      }
+      const BC7_RED = makeBC7Red();
+
+      // ETC2 RGB8, individual mode: base 0xF/0x0/0x0 expands to 255/0/0, codeword 0,
+      // all pixel indices 0 select modifier +2, so the result is (255, 2, 2).
+      const ETC2_RED = new Uint8Array([0xff, 0x00, 0x00, 0x00, 0, 0, 0, 0]);
+
+      // ASTC 4x4 LDR void-extent block: constant colour as four UNORM16 values.
+      const ASTC_RED = new Uint8Array([
+        0xfc, 0xfd, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x00, 0x00, 0x00, 0x00, 0xff, 0xff
+      ]);
+
+      function isRed(px) {
+        return px[0] >= 247 && px[1] <= 8 && px[2] <= 8;
+      }
+
+      // ---- WebGL2
+
+      const GL_FORMATS = [
+        {
+          name: 'BC1 (s3tc)',
+          ext: 'WEBGL_compressed_texture_s3tc',
+          enumName: 'COMPRESSED_RGB_S3TC_DXT1_EXT',
+          data: BC1_RED
+        },
+        {
+          name: 'BC7 (bptc)',
+          ext: 'EXT_texture_compression_bptc',
+          enumName: 'COMPRESSED_RGBA_BPTC_UNORM_EXT',
+          data: BC7_RED
+        },
+        {
+          name: 'ETC2 RGB8',
+          ext: 'WEBGL_compressed_texture_etc',
+          enumName: 'COMPRESSED_RGB8_ETC2',
+          data: ETC2_RED
+        },
+        {
+          name: 'ASTC 4x4',
+          ext: 'WEBGL_compressed_texture_astc',
+          enumName: 'COMPRESSED_RGBA_ASTC_4x4_KHR',
+          data: ASTC_RED
+        }
+      ];
+
+      function probeWebGL2() {
+        const gl = document.getElementById('glcanvas').getContext('webgl2', { antialias: false });
+        if (!gl) {
+          log('WebGL2: not available', 'bad');
+          return { available: false };
+        }
+        const info = { available: true, renderer: '', extensions: [], formats: {} };
+        const dbg = gl.getExtension('WEBGL_debug_renderer_info');
+        info.renderer = dbg ? gl.getParameter(dbg.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER);
+        info.extensions = (gl.getSupportedExtensions() || []).filter((e) => /compress/i.test(e));
+        log('WebGL2 renderer: ' + info.renderer);
+        log('  compression extensions: ' + (info.extensions.join(', ') || '(none)'));
+
+        const vs = `#version 300 es
+          void main() {
+            vec2 p = vec2(float((gl_VertexID << 1) & 2), float(gl_VertexID & 2));
+            gl_Position = vec4(p * 2.0 - 1.0, 0.0, 1.0);
+          }`;
+        const fs = `#version 300 es
+          precision highp float;
+          uniform highp sampler2D tex;
+          out vec4 color;
+          void main() { color = texelFetch(tex, ivec2(gl_FragCoord.xy), 0); }`;
+        function compile(type, src) {
+          const s = gl.createShader(type);
+          gl.shaderSource(s, src);
+          gl.compileShader(s);
+          return s;
+        }
+        const prog = gl.createProgram();
+        gl.attachShader(prog, compile(gl.VERTEX_SHADER, vs));
+        gl.attachShader(prog, compile(gl.FRAGMENT_SHADER, fs));
+        gl.linkProgram(prog);
+        gl.useProgram(prog);
+        gl.viewport(0, 0, 4, 4);
+
+        for (const f of GL_FORMATS) {
+          const ext = gl.getExtension(f.ext);
+          if (!ext) {
+            info.formats[f.name] = 'not exposed';
+            log(`  ${f.name.padEnd(12)} not exposed`, 'na');
+            continue;
+          }
+          while (gl.getError() !== gl.NO_ERROR);
+          const tex = gl.createTexture();
+          gl.bindTexture(gl.TEXTURE_2D, tex);
+          gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+          gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+          gl.compressedTexImage2D(gl.TEXTURE_2D, 0, ext[f.enumName], 4, 4, 0, f.data);
+          const uploadErr = gl.getError();
+          gl.drawArrays(gl.TRIANGLES, 0, 3);
+          const px = new Uint8Array(4);
+          gl.readPixels(2, 2, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, px);
+          gl.deleteTexture(tex);
+          const verdict =
+            uploadErr !== gl.NO_ERROR
+              ? `upload error 0x${uploadErr.toString(16)}`
+              : isRed(px)
+                ? 'decodes correctly'
+                : `wrong decode rgba(${px.join(',')})`;
+          info.formats[f.name] = verdict;
+          log(`  ${f.name.padEnd(12)} ${verdict}`, verdict === 'decodes correctly' ? 'ok' : 'bad');
+        }
+        return info;
+      }
+
+      // ---- WebGPU
+
+      const GPU_FORMATS = [
+        {
+          name: 'BC1',
+          feature: 'texture-compression-bc',
+          format: 'bc1-rgba-unorm',
+          data: BC1_RED,
+          blockBytes: 8
+        },
+        {
+          name: 'BC7',
+          feature: 'texture-compression-bc',
+          format: 'bc7-rgba-unorm',
+          data: BC7_RED,
+          blockBytes: 16
+        },
+        {
+          name: 'ETC2 RGB8',
+          feature: 'texture-compression-etc2',
+          format: 'etc2-rgb8unorm',
+          data: ETC2_RED,
+          blockBytes: 8
+        },
+        {
+          name: 'ASTC 4x4',
+          feature: 'texture-compression-astc',
+          format: 'astc-4x4-unorm',
+          data: ASTC_RED,
+          blockBytes: 16
+        }
+      ];
+      const GPU_FEATURES = ['texture-compression-bc', 'texture-compression-etc2', 'texture-compression-astc'];
+
+      async function probeWebGPU() {
+        if (!navigator.gpu) {
+          log('WebGPU: navigator.gpu not available', 'bad');
+          return { available: false };
+        }
+        const adapter = await navigator.gpu.requestAdapter();
+        if (!adapter) {
+          log('WebGPU: no adapter', 'bad');
+          return { available: false };
+        }
+        const ai = adapter.info || (adapter.requestAdapterInfo ? await adapter.requestAdapterInfo() : {});
+        const info = {
+          available: true,
+          adapter: [ai.vendor, ai.architecture, ai.device, ai.description].filter(Boolean).join(' / '),
+          features: GPU_FEATURES.filter((f) => adapter.features.has(f)),
+          formats: {}
+        };
+        log('WebGPU adapter: ' + (info.adapter || '(no info)'));
+        log('  compression features: ' + (info.features.join(', ') || '(none)'));
+        const device = await adapter.requestDevice({ requiredFeatures: info.features });
+
+        const module = device.createShaderModule({
+          code: `
+            @group(0) @binding(0) var tex: texture_2d<f32>;
+            @vertex fn vs(@builtin(vertex_index) i: u32) -> @builtin(position) vec4f {
+              let p = vec2f(f32((i << 1u) & 2u), f32(i & 2u));
+              return vec4f(p * 2.0 - 1.0, 0.0, 1.0);
+            }
+            @fragment fn fs(@builtin(position) pos: vec4f) -> @location(0) vec4f {
+              return textureLoad(tex, vec2i(pos.xy), 0);
+            }`
+        });
+        const pipeline = device.createRenderPipeline({
+          layout: 'auto',
+          vertex: { module, entryPoint: 'vs' },
+          fragment: { module, entryPoint: 'fs', targets: [{ format: 'rgba8unorm' }] }
+        });
+
+        for (const f of GPU_FORMATS) {
+          if (!info.features.includes(f.feature)) {
+            info.formats[f.name] = 'not exposed';
+            log(`  ${f.name.padEnd(12)} not exposed`, 'na');
+            continue;
+          }
+          device.pushErrorScope('validation');
+          const tex = device.createTexture({
+            size: [4, 4],
+            format: f.format,
+            usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST
+          });
+          device.queue.writeTexture(
+            { texture: tex },
+            f.data,
+            { bytesPerRow: f.blockBytes, rowsPerImage: 1 },
+            [4, 4]
+          );
+          const target = device.createTexture({
+            size: [4, 4],
+            format: 'rgba8unorm',
+            usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.COPY_SRC
+          });
+          const readback = device.createBuffer({
+            size: 256 * 4,
+            usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ
+          });
+          const bindGroup = device.createBindGroup({
+            layout: pipeline.getBindGroupLayout(0),
+            entries: [{ binding: 0, resource: tex.createView() }]
+          });
+          const encoder = device.createCommandEncoder();
+          const pass = encoder.beginRenderPass({
+            colorAttachments: [
+              { view: target.createView(), loadOp: 'clear', storeOp: 'store', clearValue: [0, 0, 0, 0] }
+            ]
+          });
+          pass.setPipeline(pipeline);
+          pass.setBindGroup(0, bindGroup);
+          pass.draw(3);
+          pass.end();
+          encoder.copyTextureToBuffer({ texture: target }, { buffer: readback, bytesPerRow: 256 }, [4, 4]);
+          device.queue.submit([encoder.finish()]);
+          const err = await device.popErrorScope();
+          let verdict;
+          if (err) {
+            verdict = 'validation error: ' + err.message;
+          } else {
+            await readback.mapAsync(GPUMapMode.READ);
+            const px = new Uint8Array(readback.getMappedRange()).slice(2 * 256 + 2 * 4, 2 * 256 + 2 * 4 + 4);
+            readback.unmap();
+            verdict = isRed(px) ? 'decodes correctly' : `wrong decode rgba(${px.join(',')})`;
+          }
+          tex.destroy();
+          target.destroy();
+          readback.destroy();
+          info.formats[f.name] = verdict;
+          log(`  ${f.name.padEnd(12)} ${verdict}`, verdict === 'decodes correctly' ? 'ok' : 'bad');
+        }
+        device.destroy();
+        return info;
+      }
+
+      (async () => {
+        log(navigator.userAgent, 'na');
+        log('');
+        try {
+          result.webgl2 = probeWebGL2();
+        } catch (e) {
+          log('WebGL2 probe failed: ' + e, 'bad');
+          result.webgl2 = { error: String(e) };
+        }
+        log('');
+        try {
+          result.webgpu = await probeWebGPU();
+        } catch (e) {
+          log('WebGPU probe failed: ' + e, 'bad');
+          result.webgpu = { error: String(e) };
+        }
+        window.__probeResult = result;
+        document.title = 'probe:done';
+      })();
+    </script>
+  </body>
+</html>

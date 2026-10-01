@@ -110,11 +110,13 @@ export class WebGPUTexture3D extends WebGPUBaseTexture implements Texture3D<GPUT
       levels.mipLevels === 1 && !(this._flags & GPUResourceUsageFlags.TF_NO_MIPMAP)
         ? this._calcMipLevelCount(levels.format, width, height, depth)
         : levels.mipLevels;
-    if (levels.isCompressed) {
-      if (!this.getTextureCaps().supportS3TCSRGB || !this.getTextureCaps().supportS3TC) {
-        console.error('Texture3D.loadLevels(): No s3tc compression format support');
-        return;
-      }
+    // Gate on the format itself: requiring S3TC rejected ETC2/ASTC data on exactly the
+    // mobile devices those formats exist for
+    if (levels.isCompressed && !this.getTextureCaps().getTextureFormatInfo(levels.format)) {
+      console.error(
+        `Texture3D.loadLevels(): Compressed texture format '${levels.format}' is not supported by this device`
+      );
+      return;
     }
     this.allocInternal(format, width, height, depth, mipLevelCount);
     if (!this._device.isContextLost()) {

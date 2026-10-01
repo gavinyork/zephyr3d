@@ -120,6 +120,7 @@ export class NullTextureCaps implements TextureCaps {
   supportBPTC: boolean;
   supportRGTC: boolean;
   supportASTC: boolean;
+  supportETC2: boolean;
   supportS3TCSRGB: boolean;
   supportDepthTexture: boolean;
   support3DTexture: boolean;
@@ -144,6 +145,7 @@ export class NullTextureCaps implements TextureCaps {
     this.supportBPTC = !webgl1;
     this.supportRGTC = !webgl1;
     this.supportASTC = true;
+    this.supportETC2 = true;
     this.supportS3TCSRGB = true;
     this.supportDepthTexture = true;
     this.support3DTexture = !webgl1;

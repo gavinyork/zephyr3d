@@ -112,6 +112,7 @@ export class WebGPUTextureCaps implements TextureCaps {
   supportBPTC: boolean;
   supportRGTC: boolean;
   supportASTC: boolean;
+  supportETC2: boolean;
   supportDepthTexture: boolean;
   support3DTexture: boolean;
   supportSRGBTexture: boolean;
@@ -143,6 +144,7 @@ export class WebGPUTextureCaps implements TextureCaps {
     this.supportBPTC = this.supportS3TC;
     this.supportRGTC = this.supportS3TC;
     this.supportASTC = device.device.features.has('texture-compression-astc');
+    this.supportETC2 = device.device.features.has('texture-compression-etc2');
     this.supportHalfFloatTexture = true;
     this.maxTextureSize = device.device.limits.maxTextureDimension2D;
     this.maxCubeTextureSize = device.device.limits.maxTextureDimension2D;
@@ -274,27 +276,53 @@ export class WebGPUTextureCaps implements TextureCaps {
         blockWidth: 4,
         blockHeight: 4
       };
+      this._textureFormatInfos['bc5'] = {
+        gpuSampleType: 'float',
+        filterable: true,
+        renderable: false,
+        compressed: true,
+        writable: false,
+        size: 16,
+        blockWidth: 4,
+        blockHeight: 4
+      };
+      this._textureFormatInfos['bc5-signed'] = {
+        gpuSampleType: 'float',
+        filterable: true,
+        renderable: false,
+        compressed: true,
+        writable: false,
+        size: 16,
+        blockWidth: 4,
+        blockHeight: 4
+      };
     }
-    this._textureFormatInfos['bc5'] = {
-      gpuSampleType: 'float',
-      filterable: true,
-      renderable: false,
-      compressed: true,
-      writable: false,
-      size: 16,
-      blockWidth: 4,
-      blockHeight: 4
-    };
-    this._textureFormatInfos['bc5-signed'] = {
-      gpuSampleType: 'float',
-      filterable: true,
-      renderable: false,
-      compressed: true,
-      writable: false,
-      size: 16,
-      blockWidth: 4,
-      blockHeight: 4
-    };
+    if (this.supportETC2) {
+      const etc: [TextureFormat, number][] = [
+        ['etc2-rgb8', 8],
+        ['etc2-rgb8-srgb', 8],
+        ['etc2-rgb8a1', 8],
+        ['etc2-rgb8a1-srgb', 8],
+        ['etc2-rgba8', 16],
+        ['etc2-rgba8-srgb', 16],
+        ['eac-r11', 8],
+        ['eac-r11-signed', 8],
+        ['eac-rg11', 16],
+        ['eac-rg11-signed', 16]
+      ];
+      for (const [format, size] of etc) {
+        this._textureFormatInfos[format] = {
+          gpuSampleType: 'float',
+          filterable: true,
+          renderable: false,
+          compressed: true,
+          writable: false,
+          size,
+          blockWidth: 4,
+          blockHeight: 4
+        };
+      }
+    }
     if (this.supportBPTC) {
       this._textureFormatInfos['bc6h'] = {
         gpuSampleType: 'float',
@@ -739,7 +767,9 @@ export class WebGPUTextureCaps implements TextureCaps {
       this._textureFormatInfos['rgba16f'].filterable;
   }
   calcMemoryUsage(format: TextureFormat, numPixels: number) {
-    return this._textureFormatInfos[format] ? this._textureFormatInfos[format].size * numPixels : 0;
+    const info = this._textureFormatInfos[format];
+    // size is bytes per block, which is a single texel for uncompressed formats
+    return info ? (numPixels * info.size) / (info.blockWidth * info.blockHeight) : 0;
   }
   getTextureFormatInfo(format: TextureFormat): Immutable<TextureFormatInfoWebGPU> {
     return this._textureFormatInfos[format];

@@ -228,11 +228,13 @@ export class WebGLTextureCube extends WebGLBaseTexture implements TextureCube<We
     const width = levels.width;
     const height = levels.height;
     const mipLevelCount = levels.mipLevels;
-    if (levels.isCompressed) {
-      if (!this.getTextureCaps().supportS3TCSRGB || !this.getTextureCaps().supportS3TC) {
-        console.warn('No s3tc compression format support');
-        return;
-      }
+    // Gate on the format itself: requiring S3TC rejected ETC2/ASTC data on exactly the
+    // mobile devices those formats exist for
+    if (levels.isCompressed && !this.getTextureCaps().getTextureFormatInfo(levels.format)) {
+      console.error(
+        `TextureCube.loadLevels(): Compressed texture format '${levels.format}' is not supported by this device`
+      );
+      return;
     }
     this.allocInternal(format, width, height, 1, mipLevelCount);
     if (!this._device.isContextLost()) {

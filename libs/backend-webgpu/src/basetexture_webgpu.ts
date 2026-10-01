@@ -275,7 +275,8 @@ export abstract class WebGPUBaseTexture<
               buffer: upload.mappedBuffer.buffer,
               offset: upload.mappedBuffer.offset,
               bytesPerRow: upload.bufferStride,
-              rowsPerImage: upload.uploadHeight
+              // Counted in block rows, see uploadRaw()
+              rowsPerImage: upload.uploadHeight / getTextureFormatBlockHeight(this._format!)
             },
             {
               texture: this._object as GPUTexture,
@@ -594,7 +595,8 @@ export abstract class WebGPUBaseTexture<
       };
       const dataLayout: GPUTexelCopyBufferLayout = {
         bytesPerRow: rowStride,
-        rowsPerImage: blockHeight * blocksPerCol
+        // Counted in block rows; texel rows would misplace every layer after the first
+        rowsPerImage: blocksPerCol
       };
       const size: GPUExtent3D = {
         width: blockWidth * blocksPerRow,
@@ -614,7 +616,7 @@ export abstract class WebGPUBaseTexture<
         dst.set(new Uint8Array(data));
       } else {
         for (let d = 0; d < depth; d++) {
-          const srcLayerOffset = d * rowStride * blocksPerRow;
+          const srcLayerOffset = d * rowStride * blocksPerCol;
           const dstLayerOffset = d * bufferStride * blocksPerCol;
           for (let i = 0; i < blocksPerCol; i++) {
             dst.set(

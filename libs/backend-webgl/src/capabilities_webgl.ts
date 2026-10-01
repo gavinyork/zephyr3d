@@ -320,6 +320,7 @@ export class WebGLTextureCaps implements TextureCaps {
   private readonly _extBPTC: Nullable<EXT_texture_compression_bptc>;
   private readonly _extRGTC: Nullable<EXT_texture_compression_rgtc>;
   private readonly _extASTC: Nullable<WEBGL_compressed_texture_astc>;
+  private readonly _extETC: Nullable<WEBGL_compressed_texture_etc>;
   private readonly _extTextureFilterAnisotropic: Nullable<EXT_texture_filter_anisotropic>;
   private readonly _extDepthTexture: Nullable<WEBGL_depth_texture>;
   private readonly _extSRGB: Nullable<EXT_sRGB>;
@@ -337,6 +338,7 @@ export class WebGLTextureCaps implements TextureCaps {
   supportBPTC: boolean;
   supportRGTC: boolean;
   supportASTC: boolean;
+  supportETC2: boolean;
   supportDepthTexture: boolean;
   support3DTexture: boolean;
   supportSRGBTexture: boolean;
@@ -416,6 +418,8 @@ export class WebGLTextureCaps implements TextureCaps {
     this.supportRGTC = !!this._extRGTC;
     this._extASTC = gl.getExtension('WEBGL_compressed_texture_astc');
     this.supportASTC = !!this._extASTC;
+    this._extETC = gl.getExtension('WEBGL_compressed_texture_etc');
+    this.supportETC2 = !!this._extETC;
     this.maxTextureSize = gl.getParameter(gl.MAX_TEXTURE_SIZE);
     this.maxCubeTextureSize = gl.getParameter(gl.MAX_CUBE_MAP_TEXTURE_SIZE);
     if (this._isWebGL2) {
@@ -481,6 +485,33 @@ export class WebGLTextureCaps implements TextureCaps {
           size: 16,
           blockWidth: w,
           blockHeight: h
+        };
+      }
+    }
+    if (this._extETC) {
+      const etc: [TextureFormat, number, number][] = [
+        ['etc2-rgb8', this._extETC.COMPRESSED_RGB8_ETC2, 8],
+        ['etc2-rgb8-srgb', this._extETC.COMPRESSED_SRGB8_ETC2, 8],
+        ['etc2-rgb8a1', this._extETC.COMPRESSED_RGB8_PUNCHTHROUGH_ALPHA1_ETC2, 8],
+        ['etc2-rgb8a1-srgb', this._extETC.COMPRESSED_SRGB8_PUNCHTHROUGH_ALPHA1_ETC2, 8],
+        ['etc2-rgba8', this._extETC.COMPRESSED_RGBA8_ETC2_EAC, 16],
+        ['etc2-rgba8-srgb', this._extETC.COMPRESSED_SRGB8_ALPHA8_ETC2_EAC, 16],
+        ['eac-r11', this._extETC.COMPRESSED_R11_EAC, 8],
+        ['eac-r11-signed', this._extETC.COMPRESSED_SIGNED_R11_EAC, 8],
+        ['eac-rg11', this._extETC.COMPRESSED_RG11_EAC, 16],
+        ['eac-rg11-signed', this._extETC.COMPRESSED_SIGNED_RG11_EAC, 16]
+      ];
+      for (const [format, glInternalFormat, size] of etc) {
+        this._textureFormatInfos[format] = {
+          glFormat: gl.NONE,
+          glInternalFormat,
+          glType: [gl.NONE],
+          filterable: true,
+          renderable: false,
+          compressed: true,
+          size,
+          blockWidth: 4,
+          blockHeight: 4
         };
       }
     }
@@ -1205,8 +1236,11 @@ export class WebGLTextureCaps implements TextureCaps {
       case 'rgba8i':
       case 'rgba8ui':
         return numPixels * 4;
-      default:
-        return 0;
+      default: {
+        // Block-compressed formats: bytes per block spread over the block's texels
+        const info = this._textureFormatInfos[format];
+        return info?.compressed ? (numPixels * info.size) / (info.blockWidth * info.blockHeight) : 0;
+      }
     }
   }
   getTextureFormatInfo(format: TextureFormat): Immutable<TextureFormatInfoWebGL> {
