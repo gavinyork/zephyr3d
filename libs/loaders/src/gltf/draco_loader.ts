@@ -27,6 +27,15 @@ function instantiate(factory: draco3d.DracoDecoderModule, wasmBinary?: ArrayBuff
   });
 }
 
+function assertWasm(data: ArrayBuffer, url: string) {
+  // A dev server or SPA host answering a missing file with index.html still
+  // returns 200; catch that here instead of as an opaque CompileError
+  const head = new Uint8Array(data, 0, Math.min(4, data.byteLength));
+  if (head.length < 4 || head[0] !== 0x00 || head[1] !== 0x61 || head[2] !== 0x73 || head[3] !== 0x6d) {
+    throw new Error(`${url} is not a WebAssembly file; is it deployed at that location?`);
+  }
+}
+
 async function fetchDecoder(): Promise<draco3d.DecoderModule> {
   // A page that already provides the decoder keeps working as before
   const globalFactory = (globalThis as { DracoDecoderModule?: draco3d.DracoDecoderModule })
@@ -47,6 +56,7 @@ async function fetchDecoder(): Promise<draco3d.DecoderModule> {
     );
   }
   const [source, wasm] = await Promise.all([jsResponse.text(), wasmResponse.arrayBuffer()]);
+  assertWasm(wasm, `${dir}draco_decoder_gltf.wasm`);
   // The wrapper is a classic script that declares a DracoDecoderModule factory.
   // Evaluating it in a function scope returns the factory without leaking a global.
   const factory = new Function(`${source}\nreturn DracoDecoderModule;`)() as draco3d.DracoDecoderModule;

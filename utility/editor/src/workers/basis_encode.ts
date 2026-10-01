@@ -81,6 +81,15 @@ function captureOutput(text: string) {
   }
 }
 
+function assertWasm(data: ArrayBuffer, url: string) {
+  // A dev server or SPA host answering a missing file with index.html still
+  // returns 200; catch that here instead of as an opaque CompileError
+  const head = new Uint8Array(data, 0, Math.min(4, data.byteLength));
+  if (head.length < 4 || head[0] !== 0x00 || head[1] !== 0x61 || head[2] !== 0x73 || head[3] !== 0x6d) {
+    throw new Error(`${url} is not a WebAssembly file; is it deployed at that location?`);
+  }
+}
+
 function initialize(scriptUrl: string, wasmUrl: string) {
   ready = (async () => {
     const [jsResponse, wasmResponse] = await Promise.all([fetch(scriptUrl), fetch(wasmUrl)]);
@@ -88,6 +97,7 @@ function initialize(scriptUrl: string, wasmUrl: string) {
       throw new Error(`Failed to load the Basis encoder (HTTP ${jsResponse.status}/${wasmResponse.status})`);
     }
     const [source, wasmBinary] = await Promise.all([jsResponse.text(), wasmResponse.arrayBuffer()]);
+    assertWasm(wasmBinary, wasmUrl);
     // A classic script declaring the BASIS factory; a module worker cannot importScripts() it
     const factory = new Function(`${source}\nreturn BASIS;`)() as (
       args: Record<string, unknown>

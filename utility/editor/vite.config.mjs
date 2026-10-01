@@ -1,5 +1,5 @@
 import fs from 'fs';
-import { dirname, resolve, sep } from 'path';
+import { dirname, extname, resolve, sep } from 'path';
 import { fileURLToPath } from 'url';
 import { defineConfig } from 'vite';
 import { viteStaticCopy } from 'vite-plugin-static-copy';
@@ -12,7 +12,10 @@ const packageJson = JSON.parse(fs.readFileSync(resolve(__dirname, 'package.json'
 const packageNames = ['base', 'device', 'scene', 'loaders', 'imgui', 'backend-webgl', 'backend-webgpu'];
 const runtimeSourcePackageNames = ['base', 'device', 'scene', 'loaders', 'backend-webgl', 'backend-webgpu'];
 const sourceAliases = Object.fromEntries(
-  runtimeSourcePackageNames.map((name) => [`@zephyr3d/${name}`, resolve(__dirname, `../../libs/${name}/src/index.ts`)])
+  runtimeSourcePackageNames.map((name) => [
+    `@zephyr3d/${name}`,
+    resolve(__dirname, `../../libs/${name}/src/index.ts`)
+  ])
 );
 const monacoSourceRoots = {
   base: resolve(__dirname, '../../libs/base/src'),
@@ -116,9 +119,15 @@ function createMonacoSourcePlugin(isDev) {
             fs.existsSync(target) &&
             fs.statSync(target).isFile()
           ) {
+            // Binary as well as script: the runtime decoders (basis/, draco/) live here too
+            const types = {
+              '.js': 'application/javascript; charset=utf-8',
+              '.wasm': 'application/wasm',
+              '.map': 'application/json'
+            };
             res.statusCode = 200;
-            res.setHeader('Content-Type', 'application/javascript; charset=utf-8');
-            res.end(fs.readFileSync(target, 'utf8'));
+            res.setHeader('Content-Type', types[extname(target).toLowerCase()] ?? 'application/octet-stream');
+            res.end(fs.readFileSync(target));
             return;
           }
           next();
@@ -180,14 +189,22 @@ const monacoPackages = [
 
 export default defineConfig(({ command }) => {
   const isDev = command === 'serve';
-  const plugins = [createMonacoSourcePlugin(isDev), createImportMapPlugin(isDev), createStaticCopyPlugin()].filter(
-    Boolean
-  );
+  const plugins = [
+    createMonacoSourcePlugin(isDev),
+    createImportMapPlugin(isDev),
+    createStaticCopyPlugin()
+  ].filter(Boolean);
 
   return {
     root: '.',
     publicDir: 'public',
     base: './',
+    optimizeDeps: {
+      // Locates its WebAssembly with new URL('bindings_wasm_bg.wasm', import.meta.url).
+      // Pre-bundling moves the module into node_modules/.vite/deps without the .wasm,
+      // and the dev server answers the miss with index.html.
+      exclude: ['@rollup/browser']
+    },
     build: {
       outDir: 'dist',
       assetsDir: 'assets',
