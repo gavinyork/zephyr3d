@@ -1,5 +1,5 @@
 import type { FileMetadata, GenericConstructor, Immutable, Nullable, VFS } from '@zephyr3d/base';
-import { DERIVED_CACHE_ROOT } from '../core/services/derivedtextures';
+import { DERIVED_CACHE_ROOT } from '../core/services/derivedassets';
 import {
   copyAssetMeta,
   deleteAssetMeta,
@@ -7,6 +7,7 @@ import {
   moveAssetMeta
 } from '../core/services/assetmeta';
 import { DlgTextureSettings } from '../views/dlg/texturesettingsdlg';
+import { DlgMeshSettings } from '../views/dlg/meshsettingsdlg';
 import type { TextureAddressMode, TextureFilterMode, TextureSampler } from '@zephyr3d/device';
 import UPNG from 'upng-js';
 import { DataTransferVFS, Disposable, guessMimeType, makeObservable, PathUtils } from '@zephyr3d/base';
@@ -513,6 +514,22 @@ export class ContentListView extends ListView<{}, FileInfo | DirectoryInfo> {
           )
         ) {
           void DlgTextureSettings.editTextureSettings(this.renderer.VFS, texturePaths);
+        }
+      }
+      const meshPaths = selectedItems.every(
+        (item) =>
+          !('subDir' in item) &&
+          item.meta.path.toLowerCase().endsWith('.zmsh') &&
+          !item.meta.path.startsWith('/assets/@builtins/')
+      )
+        ? selectedItems.map((item) => (item as FileInfo).meta.path)
+        : [];
+      if (meshPaths.length > 0 && !this.renderer.VFS.readOnly) {
+        ImGui.Separator();
+        if (
+          ImGui.MenuItem(`Mesh Settings${meshPaths.length > 1 ? ` (${meshPaths.length} meshes)` : ''}...`)
+        ) {
+          void DlgMeshSettings.editMeshSettings(this.renderer.VFS, meshPaths);
         }
       }
       ImGui.Separator();

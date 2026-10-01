@@ -1,5 +1,5 @@
 import { ImGui } from '@zephyr3d/imgui';
-import { DerivedTextureService } from '../core/services/derivedtextures';
+import { DerivedAssetService } from '../core/services/derivedassets';
 import { getFrameHeight } from '../views/misc';
 import { getDevice } from '@zephyr3d/scene';
 
@@ -19,7 +19,7 @@ export class StatusBar {
       if (this._statusText) {
         ImGui.Text(this._statusText);
       }
-      const pipelineStatus = DerivedTextureService.statusText;
+      const pipelineStatus = DerivedAssetService.statusText;
       if (pipelineStatus) {
         ImGui.Text(pipelineStatus);
       }

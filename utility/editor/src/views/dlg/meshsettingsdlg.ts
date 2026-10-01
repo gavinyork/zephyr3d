@@ -2,64 +2,42 @@ import { ImGui } from '@zephyr3d/imgui';
 import { DerivedAssetService } from '../../core/services/derivedassets';
 import type { DerivedAssetStatus } from '../../core/services/derivedassets';
 import type { VFS } from '@zephyr3d/base';
-import type {
-  TextureCompression,
-  TextureImportSettings,
-  TextureQuality,
-  TextureUsage
-} from '@zephyr3d/scene';
-import {
-  isSRGBTextureUsage,
-  readTextureImportSettings,
-  resolveTextureCompression,
-  writeTextureImportSettings
-} from '@zephyr3d/scene';
+import type { MeshCompression, MeshImportSettings } from '@zephyr3d/scene';
+import { readMeshImportSettings, writeMeshImportSettings } from '@zephyr3d/scene';
 import { DialogRenderer } from '../../components/modal';
 import { DlgMessage } from './messagedlg';
 
-const USAGES: { value: TextureUsage; label: string }[] = [
-  { value: 'color', label: 'Color (sRGB)' },
-  { value: 'normal', label: 'Normal Map' },
-  { value: 'mask', label: 'Mask / Linear Data' },
-  { value: 'hdr', label: 'HDR' },
-  { value: 'ui', label: 'UI (uncompressed)' }
+const COMPRESSIONS: { value: MeshCompression; label: string }[] = [
+  { value: 'none', label: 'None' },
+  { value: 'meshopt', label: 'meshopt (quantized)' }
 ];
-const COMPRESSIONS: { value: TextureCompression; label: string }[] = [
-  { value: 'auto', label: 'Auto (by usage)' },
-  { value: 'etc1s', label: 'ETC1S (smallest)' },
-  { value: 'uastc', label: 'UASTC (highest quality)' },
-  { value: 'none', label: 'None' }
+const NORMAL_BITS: { value: MeshImportSettings['normalBits']; label: string }[] = [
+  { value: 12, label: '12 bit (recommended)' },
+  { value: 8, label: '8 bit (smallest, visible on smooth surfaces)' },
+  { value: 16, label: '16 bit' },
+  { value: 0, label: 'Keep float' }
 ];
-const QUALITIES: { value: TextureQuality; label: string }[] = [
-  { value: 'low', label: 'Low' },
-  { value: 'normal', label: 'Normal' },
-  { value: 'high', label: 'High' }
-];
-const MAX_SIZES = [0, 4096, 2048, 1024, 512, 256, 128];
 
-type SettingKey = keyof TextureImportSettings;
+type SettingKey = keyof MeshImportSettings;
 
 /**
- * Edits the `.zmeta` import settings of one or more textures.
- *
- * With several textures selected the dialog shows the first one's settings and
- * writes back only the fields the user changed, so a batch edit of, say, the max
- * size leaves each texture's own usage alone.
+ * Edits the `.zmeta` import settings of one or more meshes (.zmsh). Like the
+ * texture settings dialog, a batch edit writes back only the fields changed.
  */
-export class DlgTextureSettings extends DialogRenderer<boolean> {
+export class DlgMeshSettings extends DialogRenderer<boolean> {
   private readonly _vfs: VFS;
   private readonly _paths: string[];
-  private _settings: TextureImportSettings[] | null;
-  private readonly _edited: Partial<TextureImportSettings>;
+  private _settings: MeshImportSettings[] | null;
+  private readonly _edited: Partial<MeshImportSettings>;
   private readonly _changed: Set<SettingKey>;
   private _saving: boolean;
   private _status: DerivedAssetStatus | null;
   private _statusTime: number;
-  static async editTextureSettings(vfs: VFS, paths: string[]) {
-    return new DlgTextureSettings(vfs, paths).showModal();
+  static async editMeshSettings(vfs: VFS, paths: string[]) {
+    return new DlgMeshSettings(vfs, paths).showModal();
   }
   constructor(vfs: VFS, paths: string[]) {
-    super(`Texture Settings##TextureSettingsDlg`, 420, 0);
+    super(`Mesh Settings##MeshSettingsDlg`, 420, 0);
     this._vfs = vfs;
     this._paths = paths;
     this._settings = null;
@@ -68,13 +46,13 @@ export class DlgTextureSettings extends DialogRenderer<boolean> {
     this._saving = false;
     this._status = null;
     this._statusTime = 0;
-    Promise.all(paths.map((path) => readTextureImportSettings(vfs, path))).then(
+    Promise.all(paths.map((path) => readMeshImportSettings(vfs, path))).then(
       (settings) => {
         this._settings = settings;
         Object.assign(this._edited, settings[0]);
       },
       (err) => {
-        DlgMessage.messageBox('Error', `Failed to read texture settings: ${err}`);
+        DlgMessage.messageBox('Error', `Failed to read mesh settings: ${err}`);
         this.close(false);
       }
     );
@@ -106,31 +84,15 @@ export class DlgTextureSettings extends DialogRenderer<boolean> {
     if (this._paths.length === 1) {
       ImGui.TextUnformatted(this._paths[0]);
     } else {
-      ImGui.TextUnformatted(`${this._paths.length} textures, showing ${this._paths[0]}`);
-      ImGui.TextDisabled('Only the fields you change are applied to every texture.');
+      ImGui.TextUnformatted(`${this._paths.length} meshes, showing ${this._paths[0]}`);
+      ImGui.TextDisabled('Only the fields you change are applied to every mesh.');
     }
     ImGui.Separator();
-    this.combo('Usage', 'usage', USAGES);
     this.combo('Compression', 'compression', COMPRESSIONS);
-    this.combo('Quality', 'quality', QUALITIES);
-    this.combo(
-      'Max Size',
-      'maxSize',
-      MAX_SIZES.map((size) => ({ value: size, label: size === 0 ? 'Source size' : `${size}` }))
-    );
-    const mipmaps = [!!this._edited.mipmaps] as [boolean];
-    if (ImGui.Checkbox('Generate Mipmaps', mipmaps)) {
-      this._edited.mipmaps = mipmaps[0];
-      this._changed.add('mipmaps');
+    if (this._edited.compression === 'meshopt') {
+      this.combo('Normal Precision', 'normalBits', NORMAL_BITS);
+      ImGui.TextDisabled('Positions, texture coordinates and vertex order are kept exactly.');
     }
-    ImGui.Separator();
-    const effective = this._edited as TextureImportSettings;
-    const encoding = resolveTextureCompression(effective);
-    ImGui.TextDisabled(
-      `Ships as: ${encoding === 'none' ? 'uncompressed' : encoding.toUpperCase()}, ${
-        isSRGBTextureUsage(effective.usage) ? 'sRGB' : 'linear'
-      }`
-    );
     this.renderStatus();
     ImGui.Separator();
     if (this._saving) {
@@ -145,7 +107,7 @@ export class DlgTextureSettings extends DialogRenderer<boolean> {
       this.close(false);
     }
   }
-  /** Derived copy state of the first texture, as saved; refreshed about once a second */
+  /** Derived copy state of the first mesh, as saved; refreshed about once a second */
   private renderStatus() {
     const now = performance.now();
     if (now - this._statusTime > 1000) {
@@ -175,7 +137,7 @@ export class DlgTextureSettings extends DialogRenderer<boolean> {
         ImGui.TextColored(new ImGui.ImVec4(0.9, 0.35, 0.3, 1), `Compression failed: ${status.error ?? ''}`);
         break;
       case 'uncompressed':
-        ImGui.TextDisabled('Compressed copy: none, the source image is used');
+        ImGui.TextDisabled('Compressed copy: none, the source mesh is used');
         break;
     }
   }
@@ -191,13 +153,13 @@ export class DlgTextureSettings extends DialogRenderer<boolean> {
         for (const key of this._changed) {
           (next as Record<string, unknown>)[key] = this._edited[key];
         }
-        await writeTextureImportSettings(this._vfs, this._paths[i], next);
+        await writeMeshImportSettings(this._vfs, this._paths[i], next);
         DerivedAssetService.request(this._paths[i]);
       }
       this.close(true);
     } catch (err) {
       this._saving = false;
-      DlgMessage.messageBox('Error', `Failed to save texture settings: ${err}`);
+      DlgMessage.messageBox('Error', `Failed to save mesh settings: ${err}`);
     }
   }
 }

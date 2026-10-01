@@ -6,10 +6,11 @@ import { formatString, type VFS } from '@zephyr3d/base';
 import { depsResolvePlugin } from './plugins/depresolve';
 import { ProjectService } from '../services/project';
 import { libDir, projectFileName, templateIndexHTML } from './templates';
-import { isAssetMetaPath, ASSET_MANIFEST_FILE } from '@zephyr3d/scene';
-import type { AssetManifest } from '@zephyr3d/scene';
-import { DerivedTextureService } from '../services/derivedtextures';
-import { isTextureSourcePath } from '../services/assetmeta';
+import { isAssetMetaPath, ASSET_MANIFEST_FILE, readZmshBinary } from '@zephyr3d/scene';
+import { getVertexFormatSize } from '@zephyr3d/device';
+import type { VertexAttribFormat } from '@zephyr3d/device';
+import type { AssetManifest, AssetSourceKind } from '@zephyr3d/scene';
+import { DerivedAssetService, getDerivedAssetKind } from '../services/derivedassets';
 
 function rewriteImports(code: string): string {
   const reStatic = /\b(?:import|export)\s+[^"']*?from\s+(['"])([^'"]+)\1/g;
@@ -144,15 +145,20 @@ export async function getImportMap(vfs: VFS, distDir: string, writeDependencies 
   return { imports: importMap };
 }
 
-/** Per-texture line of the build report */
-export interface BuildTextureReport {
+/** Per-asset line of the build report, for assets the pipeline may compress */
+export interface BuildAssetReport {
+  kind: AssetSourceKind;
   path: string;
   shipped: string;
   sourceBytes: number;
   shippedBytes: number;
+  /** Texture dimensions of a shipped KTX2, 0 otherwise */
   width: number;
   height: number;
-  /** Set when the texture had to ship uncompressed although settings asked for compression */
+  /** Vertex buffer bytes on the GPU of a mesh before and after compression, 0 for textures */
+  gpuBytesBefore?: number;
+  gpuBytesAfter?: number;
+  /** Set when the asset had to ship uncompressed although settings asked for compression */
   error?: string;
 }
 
@@ -162,33 +168,69 @@ function ktx2Dimensions(data: ArrayBuffer) {
   return data.byteLength >= 28 ? { width: view.getUint32(20, true), height: view.getUint32(24, true) } : null;
 }
 
+/** Vertex buffer sizes on the GPU of a source .zmsh and of its compressed copy */
+async function meshGpuBytes(vfs: VFS, sourcePath: string, derived: ArrayBuffer) {
+  try {
+    const { header } = readZmshBinary(derived);
+    const strideAfter = header.attributes.reduce((n, a) => n + getVertexFormatSize(a.format), 0);
+    const source = JSON.parse((await vfs.readFile(sourcePath, { encoding: 'utf8' })) as string);
+    const formats = Object.values(source.data.vertices as Record<string, { format: VertexAttribFormat }>);
+    const strideBefore = formats.reduce((n, v) => n + getVertexFormatSize(v.format), 0);
+    return {
+      gpuBytesBefore: header.vertexCount * strideBefore,
+      gpuBytesAfter: header.vertexCount * strideAfter
+    };
+  } catch {
+    return null;
+  }
+}
+
 /**
- * Ships a texture: its derived KTX2 under a content-hashed name next to where
- * the source was, or the source itself when it is not compressed. Returns the
- * shipped path, which goes into the manifest when it differs from the source.
+ * Ships a texture or mesh: its derived copy (KTX2, binary .zmsh) under a
+ * content-hashed name next to where the source was, or the source itself when
+ * it is not compressed. Returns the shipped path, which goes into the manifest
+ * when it differs from the source.
  */
-async function shipTexture(vfs: VFS, distDir: string, path: string, report: BuildTextureReport[]) {
+async function shipDerivedAsset(
+  vfs: VFS,
+  distDir: string,
+  path: string,
+  kind: AssetSourceKind,
+  report: BuildAssetReport[]
+) {
   const sourceBytes = (await vfs.stat(path)).size;
   let derived: string | null = null;
   let error: string | undefined;
   try {
-    derived = await DerivedTextureService.getDerivedFile(path);
+    derived = await DerivedAssetService.getDerivedFile(path);
   } catch (err) {
     error = String(err);
     console.warn(`Shipping ${path} uncompressed: ${error}`);
   }
   if (!derived) {
     await vfs.copyFile(path, vfs.join(distDir, path), { overwrite: true });
-    report.push({ path, shipped: path, sourceBytes, shippedBytes: sourceBytes, width: 0, height: 0, error });
+    report.push({
+      kind,
+      path,
+      shipped: path,
+      sourceBytes,
+      shippedBytes: sourceBytes,
+      width: 0,
+      height: 0,
+      error
+    });
     return path;
   }
   const data = (await vfs.readFile(derived, { encoding: 'binary' })) as ArrayBuffer;
   const hash = derived.slice(derived.lastIndexOf('/') + 1, derived.lastIndexOf('.')).slice(0, 8);
   const stem = path.slice(0, path.lastIndexOf('.'));
-  const shipped = `${stem}.${hash}.ktx2`;
+  const shipped = `${stem}.${hash}${derived.slice(derived.lastIndexOf('.'))}`;
   await vfs.writeFile(vfs.join(distDir, shipped), data, { encoding: 'binary', create: true });
-  const size = ktx2Dimensions(data);
+  const size = kind === 'texture' ? ktx2Dimensions(data) : null;
+  const gpu = kind === 'primitive' ? await meshGpuBytes(vfs, path, data) : null;
   report.push({
+    ...gpu,
+    kind,
     path,
     shipped,
     sourceBytes,
@@ -238,15 +280,16 @@ export async function buildForEndUser(options: {
   });
   // .zmeta sidecars only steer the editor's asset pipeline and are not shipped
   const assetFiles = assetFileList.filter((path) => path.type === 'file' && !isAssetMetaPath(path.path));
-  const manifest: AssetManifest = { version: 1, textures: {} };
-  const textureReport: BuildTextureReport[] = [];
+  const manifest: Required<AssetManifest> = { version: 1, textures: {}, primitives: {} };
+  const assetReport: BuildAssetReport[] = [];
   for (let i = 0; i < assetFiles.length; i++) {
     const file = assetFiles[i];
     onProgress?.(`Packaging ${file.path}`, i, assetFiles.length);
-    if (isTextureSourcePath(file.path) && !file.path.startsWith('/assets/@builtins/')) {
-      const shipped = await shipTexture(vfs, distDir, file.path, textureReport);
+    const kind = getDerivedAssetKind(file.path);
+    if (kind && !file.path.startsWith('/assets/@builtins/')) {
+      const shipped = await shipDerivedAsset(vfs, distDir, file.path, kind, assetReport);
       if (shipped !== file.path) {
-        manifest.textures[file.path] = shipped;
+        (kind === 'texture' ? manifest.textures : manifest.primitives)[file.path] = shipped;
       }
       continue;
     }
@@ -264,7 +307,7 @@ export async function buildForEndUser(options: {
   }
 
   onProgress?.('Writing runtime', assetFiles.length, assetFiles.length);
-  if (Object.keys(manifest.textures).length > 0) {
+  if (Object.keys(manifest.textures).length > 0 || Object.keys(manifest.primitives).length > 0) {
     await vfs.writeFile(vfs.join(distDir, ASSET_MANIFEST_FILE), JSON.stringify(manifest, null, 2), {
       encoding: 'utf8',
       create: true
@@ -294,5 +337,5 @@ export async function buildForEndUser(options: {
     create: true
   });
 
-  return { distDir, output, textureReport };
+  return { distDir, output, assetReport };
 }

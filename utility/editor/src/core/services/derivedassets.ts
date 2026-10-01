@@ -1,34 +1,44 @@
 import type { VFS } from '@zephyr3d/base';
-import type { TextureImportSettings } from '@zephyr3d/scene';
+import type { AssetSourceKind, MeshImportSettings, TextureImportSettings } from '@zephyr3d/scene';
 import {
   ASSET_META_EXTENSION,
   getEngine,
   isAssetMetaPath,
   isSRGBTextureUsage,
+  readMeshImportSettings,
   readTextureImportSettings,
   resolveTextureCompression
 } from '@zephyr3d/scene';
 import { isTextureSourcePath } from './assetmeta';
+import { encodeCompressedPrimitive, isCompressiblePrimitive } from './meshencoder';
 import type { EncodeRequest, EncodeResponse } from '../../workers/basis_encode';
 
 /**
- * Derived data cache for compressed textures, after UE's DDC and Unity's Library:
- * the editor never alters source images, it derives a KTX2 copy per source
+ * Derived data cache for compressed assets, after UE's DDC and Unity's Library:
+ * the editor never alters source files, it derives a compressed copy per source
  * content + settings + encoder and keeps it under /.cache, which can be deleted
- * at any time and is rebuilt on demand.
+ * at any time and is rebuilt on demand. Textures derive KTX2 through the Basis
+ * encoder, meshes a binary meshopt .zmsh.
  *
- * Bump ENCODER_ID with the vendored encoder and PIPELINE_VERSION with any change
- * to how settings map onto encoder options; either invalidates every entry.
+ * Bump an encoder id with its vendored encoder and the pipeline version with any
+ * change to how settings map onto encoder options; either invalidates every
+ * entry of that kind.
  */
-const ENCODER_ID = 'basisu-v2_50';
-const PIPELINE_VERSION = 1;
+const TEXTURE_ENCODER_ID = 'basisu-v2_50';
+const TEXTURE_PIPELINE_VERSION = 1;
+const MESH_ENCODER_ID = 'meshopt-1.3';
+const MESH_PIPELINE_VERSION = 1;
 
 export const DERIVED_CACHE_ROOT = '/.cache';
-const CACHE_DIR = '/.cache/derived/textures';
+const DERIVED_DIR = '/.cache/derived';
 const INDEX_PATH = '/.cache/derived/source-index.json';
-const MIME_KTX2 = 'image/ktx2';
 
-export interface DerivedTextureStatus {
+const KINDS = {
+  texture: { dir: `${DERIVED_DIR}/textures`, ext: '.ktx2', mimeType: 'image/ktx2' },
+  primitive: { dir: `${DERIVED_DIR}/meshes`, ext: '.zmsh', mimeType: 'application/octet-stream' }
+} as const;
+
+export interface DerivedAssetStatus {
   state: 'unavailable' | 'uncompressed' | 'pending' | 'ready' | 'failed';
   sourceSize?: number;
   derivedSize?: number;
@@ -53,13 +63,25 @@ async function sha1Hex(data: ArrayBuffer | string) {
   return Array.from(new Uint8Array(digest), (b) => b.toString(16).padStart(2, '0')).join('');
 }
 
-function settingsKey(settings: TextureImportSettings) {
+/** Which pipeline a source file goes through, or null if it is not a derived asset source */
+export function getDerivedAssetKind(path: string): AssetSourceKind | null {
+  if (isTextureSourcePath(path)) {
+    return 'texture';
+  }
+  return path.toLowerCase().endsWith('.zmsh') ? 'primitive' : null;
+}
+
+function textureSettingsKey(settings: TextureImportSettings) {
   // Fixed field order, so the key does not depend on how the settings object was built
   const { usage, compression, quality, maxSize, mipmaps } = settings;
   return JSON.stringify([usage, compression, quality, maxSize, mipmaps]);
 }
 
-export class DerivedTextureService {
+function meshSettingsKey(settings: MeshImportSettings) {
+  return JSON.stringify([settings.compression, settings.normalBits]);
+}
+
+export class DerivedAssetService {
   private static _vfs: VFS | null = null;
   private static _index: Record<string, SourceIndexEntry> = {};
   private static _indexLoaded: Promise<void> | null = null;
@@ -73,11 +95,13 @@ export class DerivedTextureService {
   private static _done = 0;
   private static _worker: Worker | null = null;
   private static readonly _pending = new Map<number, PendingEncode>();
-  /** Derived file last handed to the texture loader, per source path, this session */
+  /** Derived file last handed to the asset loader, per source path, this session */
   private static readonly _served = new Map<string, string>();
+  /** Content hash of .zmsh files found to hold nothing compressible (parametric shapes) */
+  private static readonly _notCompressible = new Map<string, string>();
   private static _nextId = 1;
 
-  /** Starts serving derived textures for a project; null stops it */
+  /** Starts serving derived assets for a project; null stops it */
   static attach(vfs: VFS | null) {
     if (vfs === this._vfs) {
       return;
@@ -91,9 +115,10 @@ export class DerivedTextureService {
     this._queued.clear();
     this._failed.clear();
     this._served.clear();
+    this._notCompressible.clear();
     this._done = 0;
     getEngine().resourceManager.assetManager.assetSourceResolver = vfs
-      ? (url, kind) => (kind === 'texture' ? this.resolve(url) : Promise.resolve(null))
+      ? (url, kind) => this.resolve(url, kind)
       : null;
     if (vfs && !vfs.readOnly) {
       vfs.on('changed', this.handleVFSChanged, this);
@@ -102,7 +127,7 @@ export class DerivedTextureService {
   }
 
   /**
-   * Queues every texture whose derived copy is missing, whether or not a scene
+   * Queues every asset whose derived copy is missing, whether or not a scene
    * uses it yet: a build needs them all. Unchanged sources cost one stat each,
    * since their content hash comes from the index.
    */
@@ -116,7 +141,7 @@ export class DerivedTextureService {
         recursive: true
       });
     } catch (err) {
-      console.warn(`Failed to scan project textures: ${err}`);
+      console.warn(`Failed to scan project assets: ${err}`);
       return;
     }
     for (const file of files) {
@@ -126,18 +151,18 @@ export class DerivedTextureService {
       if (
         file.type === 'file' &&
         !file.path.startsWith('/assets/@builtins/') &&
-        isTextureSourcePath(file.path)
+        getDerivedAssetKind(file.path)
       ) {
         try {
           await this.ensureDerived(file.path, false);
         } catch (err) {
-          console.warn(`Failed to check derived texture for ${file.path}: ${err}`);
+          console.warn(`Failed to check derived asset for ${file.path}: ${err}`);
         }
       }
     }
   }
 
-  /** Re-queues a texture when its source or its .zmeta sidecar changes */
+  /** Re-queues an asset when its source or its .zmeta sidecar changes */
   private static handleVFSChanged(
     type: 'created' | 'deleted' | 'moved' | 'modified',
     path: string,
@@ -147,7 +172,7 @@ export class DerivedTextureService {
       return;
     }
     const source = isAssetMetaPath(path) ? path.slice(0, -ASSET_META_EXTENSION.length) : path;
-    if (isTextureSourcePath(source)) {
+    if (getDerivedAssetKind(source)) {
       this.request(source);
     }
   }
@@ -155,18 +180,18 @@ export class DerivedTextureService {
   /** One-line progress for the status bar, empty when idle */
   static get statusText() {
     if (!this._running && this._queue.length === 0) {
-      return this._failed.size > 0 ? `Texture compression: ${this._failed.size} failed (see console)` : '';
+      return this._failed.size > 0 ? `Asset compression: ${this._failed.size} failed (see console)` : '';
     }
     const name = this._current.slice(this._current.lastIndexOf('/') + 1);
-    return `Compressing textures ${this._done + 1}/${this._done + this._queue.length + 1}: ${name}`;
+    return `Compressing assets ${this._done + 1}/${this._done + this._queue.length + 1}: ${name}`;
   }
 
   /**
-   * Where a texture stands in the pipeline, for display. `loaded` tells whether
+   * Where an asset stands in the pipeline, for display. `loaded` tells whether
    * the current derived copy is what the editor actually loaded this session,
    * which pixels alone cannot show: a good encode looks like its source.
    */
-  static async getStatus(path: string): Promise<DerivedTextureStatus> {
+  static async getStatus(path: string): Promise<DerivedAssetStatus> {
     const vfs = this._vfs;
     if (!vfs) {
       return { state: 'unavailable' };
@@ -187,41 +212,40 @@ export class DerivedTextureService {
   }
 
   /**
-   * Derived KTX2 for a texture, encoded now if missing. For builds, which need
-   * every texture rather than the ones a scene happened to load. Null when the
-   * texture ships uncompressed; throws when encoding fails.
+   * Derived copy of an asset, encoded now if missing. For builds, which need
+   * every asset rather than the ones a scene happened to load. Null when the
+   * asset ships as its source; throws when encoding fails.
    */
   static async getDerivedFile(path: string): Promise<string | null> {
     const vfs = this._vfs;
-    if (!vfs || !isTextureSourcePath(path)) {
+    if (!vfs || !getDerivedAssetKind(path)) {
       return null;
     }
-    const target = await this.getDerivedPath(vfs, path);
-    if (!target) {
-      return null;
-    }
-    if (!(await vfs.exists(target))) {
+    let target = await this.getDerivedPath(vfs, path);
+    if (target && !(await vfs.exists(target))) {
       await this.encodeOne(path);
-      if (!(await vfs.exists(target))) {
+      // Encoding may find the source has nothing to compress
+      target = await this.getDerivedPath(vfs, path);
+      if (target && !(await vfs.exists(target))) {
         throw new Error(`No compressed copy could be produced for ${path}`);
       }
     }
     return target;
   }
 
-  /** Re-encodes a texture now, e.g. after its settings changed */
+  /** Re-encodes an asset now, e.g. after its settings changed */
   static request(path: string) {
     this._failed.delete(path);
     void this.ensureDerived(path);
   }
 
   /**
-   * Texture source resolver: the derived KTX2 when it exists, otherwise null (load
+   * Asset source resolver: the derived copy when it exists, otherwise null (load
    * the source) after queueing the encode, so the next load gets the compressed copy.
    */
-  private static async resolve(url: string) {
+  private static async resolve(url: string, kind: AssetSourceKind) {
     const vfs = this._vfs;
-    if (!vfs || !url.startsWith('/assets/') || !isTextureSourcePath(url)) {
+    if (!vfs || !url.startsWith('/assets/') || getDerivedAssetKind(url) !== kind) {
       return null;
     }
     const target = await this.getDerivedPath(vfs, url);
@@ -231,7 +255,7 @@ export class DerivedTextureService {
     if (await vfs.exists(target)) {
       const data = (await vfs.readFile(target, { encoding: 'binary' })) as ArrayBuffer;
       this._served.set(url, target);
-      return { data, mimeType: MIME_KTX2 };
+      return { data, mimeType: KINDS[kind].mimeType };
     }
     if (!this._failed.has(url)) {
       this.enqueue(url);
@@ -241,7 +265,7 @@ export class DerivedTextureService {
 
   private static async ensureDerived(path: string, invalidate = true) {
     const vfs = this._vfs;
-    if (!vfs || !isTextureSourcePath(path)) {
+    if (!vfs || !getDerivedAssetKind(path)) {
       return;
     }
     const target = await this.getDerivedPath(vfs, path);
@@ -253,18 +277,32 @@ export class DerivedTextureService {
     }
   }
 
-  /** Cache path for the current source content and settings, or null if the texture ships uncompressed */
+  /** Cache path for the current source content and settings, or null if the asset ships as its source */
   private static async getDerivedPath(vfs: VFS, path: string) {
-    const settings = await readTextureImportSettings(vfs, path);
-    if (resolveTextureCompression(settings) === 'none') {
+    const kind = getDerivedAssetKind(path);
+    if (!kind) {
       return null;
+    }
+    let settingsKey: string;
+    if (kind === 'texture') {
+      const settings = await readTextureImportSettings(vfs, path);
+      if (resolveTextureCompression(settings) === 'none') {
+        return null;
+      }
+      settingsKey = `${textureSettingsKey(settings)}|${TEXTURE_ENCODER_ID}|${TEXTURE_PIPELINE_VERSION}`;
+    } else {
+      const settings = await readMeshImportSettings(vfs, path);
+      if (settings.compression === 'none') {
+        return null;
+      }
+      settingsKey = `${meshSettingsKey(settings)}|${MESH_ENCODER_ID}|${MESH_PIPELINE_VERSION}`;
     }
     const sourceHash = await this.getSourceHash(vfs, path);
-    if (!sourceHash) {
+    if (!sourceHash || this._notCompressible.get(path) === sourceHash) {
       return null;
     }
-    const key = await sha1Hex(`${sourceHash}|${settingsKey(settings)}|${ENCODER_ID}|${PIPELINE_VERSION}`);
-    return `${CACHE_DIR}/${key.slice(0, 2)}/${key}.ktx2`;
+    const key = await sha1Hex(`${sourceHash}|${settingsKey}`);
+    return `${KINDS[kind].dir}/${key.slice(0, 2)}/${key}${KINDS[kind].ext}`;
   }
 
   /** Content hash of a source, recomputed only when its size or modification time changed */
@@ -324,7 +362,7 @@ export class DerivedTextureService {
     this._indexDirty = false;
     const content = JSON.stringify(this._index);
     void vfs
-      .makeDirectory(CACHE_DIR, true)
+      .makeDirectory(DERIVED_DIR, true)
       .then(() => vfs.writeFile(INDEX_PATH, content, { encoding: 'utf8', create: true }))
       .catch((err) => console.warn(`Failed to save derived data index: ${err}`));
   }
@@ -351,7 +389,7 @@ export class DerivedTextureService {
           await this.encodeOne(path);
         } catch (err) {
           this._failed.set(path, String(err));
-          console.error(`Texture compression failed for ${path}: ${err}`);
+          console.error(`Asset compression failed for ${path}: ${err}`);
         } finally {
           this._queued.delete(path);
           this._done++;
@@ -369,11 +407,37 @@ export class DerivedTextureService {
     if (!vfs || vfs.readOnly) {
       return;
     }
+    const target = await this.getDerivedPath(vfs, path);
+    if (!target || (await vfs.exists(target))) {
+      return;
+    }
+    let data: ArrayBuffer;
+    if (getDerivedAssetKind(path) === 'texture') {
+      data = await this.encodeTexture(vfs, path);
+    } else {
+      const json = (await vfs.readFile(path, { encoding: 'utf8' })) as string;
+      if (!isCompressiblePrimitive(JSON.parse(json))) {
+        // A parametric shape: tiny, nothing to compress, ships as it is
+        this._notCompressible.set(path, (await this.getSourceHash(vfs, path)) ?? '');
+        return;
+      }
+      data = await encodeCompressedPrimitive(json, await readMeshImportSettings(vfs, path));
+    }
+    // The project may have been closed while encoding
+    if (this._vfs !== vfs) {
+      return;
+    }
+    await vfs.makeDirectory(target.slice(0, target.lastIndexOf('/')), true);
+    await vfs.writeFile(target, data, { encoding: 'binary', create: true });
+    // Later loads of this path now resolve to the compressed copy
+    getEngine().resourceManager.assetManager.invalidateAsset(path);
+  }
+
+  private static async encodeTexture(vfs: VFS, path: string) {
     const settings = await readTextureImportSettings(vfs, path);
     const encoding = resolveTextureCompression(settings);
-    const target = await this.getDerivedPath(vfs, path);
-    if (encoding === 'none' || !target || (await vfs.exists(target))) {
-      return;
+    if (encoding === 'none') {
+      throw new Error(`${path} is not set to be compressed`);
     }
     const source = (await vfs.readFile(path, { encoding: 'binary' })) as ArrayBuffer;
     const res = await this.runEncode({
@@ -388,14 +452,7 @@ export class DerivedTextureService {
       mipmaps: settings.mipmaps,
       maxSize: settings.maxSize
     });
-    // The project may have been closed while encoding
-    if (this._vfs !== vfs) {
-      return;
-    }
-    await vfs.makeDirectory(target.slice(0, target.lastIndexOf('/')), true);
-    await vfs.writeFile(target, res.data!, { encoding: 'binary', create: true });
-    // Later loads of this path now resolve to the compressed copy
-    getEngine().resourceManager.assetManager.invalidateAsset(path);
+    return res.data!;
   }
 
   private static runEncode(req: EncodeRequest) {

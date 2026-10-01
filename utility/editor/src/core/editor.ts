@@ -1,5 +1,5 @@
 import type * as Monaco from 'monaco-editor';
-import { DERIVED_CACHE_ROOT } from './services/derivedtextures';
+import { DERIVED_CACHE_ROOT } from './services/derivedassets';
 import { ImGui, imGuiCalcTextSize, imGuiEndFrame, imGuiInjectEvent, imGuiNewFrame } from '@zephyr3d/imgui';
 import { eventBus } from './eventbus';
 import { DialogRenderer } from '../components/modal';
@@ -27,7 +27,7 @@ import { Dialog } from '../views/dlg/dlg';
 import { ZipDownloader } from '../helpers/downloader';
 import { CodeEditor } from '../components/codeeditor';
 import { buildForEndUser } from './build/build';
-import type { BuildTextureReport } from './build/build';
+import type { BuildAssetReport } from './build/build';
 import { initLogView } from '../components/logview';
 import { loadTypes } from './build/loadtypes';
 import { ensureDependencies, installDeps } from './build/dep';
@@ -1068,9 +1068,9 @@ export class Editor {
     const progress = new DlgProgress('BuildProject##BuildProgress', 420);
     progress.showModal();
     progress.setMessage('Building...');
-    let textureReport: BuildTextureReport[];
+    let assetReport: BuildAssetReport[];
     try {
-      ({ textureReport } = await buildForEndUser({
+      ({ assetReport } = await buildForEndUser({
         input: '/src/index.ts',
         distDir: '/dist',
         onProgress: (message, current, total) => {
@@ -1081,7 +1081,7 @@ export class Editor {
     } finally {
       progress.close();
     }
-    const report = summarizeTextureReport(textureReport);
+    const report = summarizeAssetReport(assetReport);
     if (report) {
       console.info(`${report.summary}\n\n${report.details}`);
     }
@@ -1845,38 +1845,59 @@ function formatBytes(n: number) {
 }
 
 /**
- * Texture section of the build report. GPU memory is an estimate with a full mip
- * chain: 4 bytes per texel for the RGBA8 a source image becomes, 1 byte per texel
- * for the compressed formats a desktop or mobile GPU transcodes to (BC7, ASTC
- * 4x4, ETC2 RGBA8; opaque ETC1S on ETC2 devices takes half that).
+ * Compressed-asset section of the build report.
+ *
+ * Texture GPU memory is an estimate with a full mip chain: 4 bytes per texel for
+ * the RGBA8 a source image becomes, 1 byte per texel for the compressed formats
+ * a desktop or mobile GPU transcodes to (BC7, ASTC 4x4, ETC2 RGBA8; opaque ETC1S
+ * on ETC2 devices takes half that). Mesh GPU memory is exact for vertex buffers,
+ * from the vertex formats before and after quantization.
  */
-function summarizeTextureReport(report: BuildTextureReport[]) {
+function summarizeAssetReport(report: BuildAssetReport[]) {
   if (report.length === 0) {
     return null;
   }
-  const compressed = report.filter((t) => t.shipped !== t.path);
-  const failed = report.filter((t) => t.error);
-  const sum = (list: BuildTextureReport[], f: (t: BuildTextureReport) => number) =>
+  const sum = (list: BuildAssetReport[], f: (t: BuildAssetReport) => number) =>
     list.reduce((n, t) => n + f(t), 0);
-  const mipFactor = 4 / 3;
-  const gpuBefore = sum(compressed, (t) => t.width * t.height * 4 * mipFactor);
-  const gpuAfter = sum(compressed, (t) => t.width * t.height * mipFactor);
-  const lines = [
-    `Textures: ${compressed.length} compressed, ${report.length - compressed.length} shipped as source${
-      failed.length ? ` (${failed.length} failed to compress)` : ''
-    }`,
-    `Download: ${formatBytes(sum(report, (t) => t.sourceBytes))} -> ${formatBytes(sum(report, (t) => t.shippedBytes))}`
-  ];
-  if (compressed.length > 0) {
+  const lines: string[] = [];
+  for (const [kind, label] of [
+    ['texture', 'Textures'],
+    ['primitive', 'Meshes']
+  ] as const) {
+    const items = report.filter((t) => t.kind === kind);
+    if (items.length === 0) {
+      continue;
+    }
+    const compressed = items.filter((t) => t.shipped !== t.path);
+    const failed = items.filter((t) => t.error);
     lines.push(
-      `GPU memory of compressed textures (estimate): ${formatBytes(gpuBefore)} -> ${formatBytes(gpuAfter)}`
+      `${label}: ${compressed.length} compressed, ${items.length - compressed.length} shipped as source${
+        failed.length ? ` (${failed.length} failed to compress)` : ''
+      }`,
+      `  Download: ${formatBytes(sum(items, (t) => t.sourceBytes))} -> ${formatBytes(sum(items, (t) => t.shippedBytes))}`
     );
+    if (compressed.length > 0) {
+      const before =
+        kind === 'texture'
+          ? sum(compressed, (t) => (t.width * t.height * 16) / 3)
+          : sum(compressed, (t) => t.gpuBytesBefore ?? 0);
+      const after =
+        kind === 'texture'
+          ? sum(compressed, (t) => (t.width * t.height * 4) / 3)
+          : sum(compressed, (t) => t.gpuBytesAfter ?? 0);
+      const what = kind === 'texture' ? 'textures (estimate)' : 'meshes (vertex buffers)';
+      lines.push(`  GPU memory of compressed ${what}: ${formatBytes(before)} -> ${formatBytes(after)}`);
+    }
   }
   const details = report
     .map(
       (t) =>
         `${t.path}: ${formatBytes(t.sourceBytes)} -> ${formatBytes(t.shippedBytes)}${
-          t.shipped !== t.path ? ` (${t.width}x${t.height}, ${t.shipped})` : ' (source)'
+          t.shipped === t.path
+            ? ' (source)'
+            : t.kind === 'texture'
+              ? ` (${t.width}x${t.height}, ${t.shipped})`
+              : ` (${t.shipped})`
         }${t.error ? ` FAILED: ${t.error}` : ''}`
     )
     .join('\n');
