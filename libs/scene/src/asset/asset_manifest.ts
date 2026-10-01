@@ -55,7 +55,13 @@ export async function readAssetManifest(vfs: VFS, path = `/${ASSET_MANIFEST_FILE
     if (!(await vfs.exists(path))) {
       return null;
     }
-    const manifest = JSON.parse((await vfs.readFile(path, { encoding: 'utf8' })) as string) as AssetManifest;
+    const text = (await vfs.readFile(path, { encoding: 'utf8' })) as string;
+    // Hosts that answer missing files with an HTML page (SPA fallback) are the
+    // normal case for projects without a build manifest, not an error
+    if (!text.trimStart().startsWith('{')) {
+      return null;
+    }
+    const manifest = JSON.parse(text) as AssetManifest;
     return manifest?.version === 1 && manifest.textures ? manifest : null;
   } catch (err) {
     console.warn(`Ignoring unreadable asset manifest ${path}: ${err}`);

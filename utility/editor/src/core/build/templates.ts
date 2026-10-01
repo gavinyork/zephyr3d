@@ -173,7 +173,7 @@ export default plugin;
 
 export function generateIndexTS(settings: ProjectSettings) {
   const rhiList = settings.preferredRHI?.map((val) => val.toLowerCase()) ?? [];
-  return `import { Application, createManifestSourceResolver, getEngine, readAssetManifest, setActiveMorphTargetLimit, setMorphTargetLimit, setSkinInfluenceLimit } from '@zephyr3d/scene';
+  return `import { Application, getEngine, setActiveMorphTargetLimit, setMorphTargetLimit, setSkinInfluenceLimit } from '@zephyr3d/scene';
 import { HttpFS } from '@zephyr3d/base';
 import { FBXImporter, GLTFImporter, OBJImporter } from '@zephyr3d/loaders';
 import type { DeviceBackend } from '@zephyr3d/device';
@@ -230,11 +230,6 @@ const application = new Application({
   }
 });
 application.ready().then(async () => {
-  // Assets the build compressed are listed here; scenes keep their source paths
-  const assetManifest = await readAssetManifest(getEngine().VFS);
-  if (assetManifest) {
-    getEngine().resourceManager.assetManager.assetSourceResolver = createManifestSourceResolver(getEngine().VFS, assetManifest);
-  }
   getEngine().resourceManager.setModelLoader('model/gltf+json', new GLTFImporter());
   getEngine().resourceManager.setModelLoader('model/gltf-binary', new GLTFImporter());
   getEngine().resourceManager.setModelLoader('model/fbx', new FBXImporter());
@@ -245,7 +240,7 @@ application.ready().then(async () => {
 `;
 }
 
-export const templateIndex = `import { Application, createManifestSourceResolver, getEngine, readAssetManifest, setActiveMorphTargetLimit, setMorphTargetLimit, setSkinInfluenceLimit } from '@zephyr3d/scene';
+export const templateIndex = `import { Application, getEngine, setActiveMorphTargetLimit, setMorphTargetLimit, setSkinInfluenceLimit } from '@zephyr3d/scene';
 import { HttpFS } from '@zephyr3d/base';
 import { FBXImporter, GLTFImporter, OBJImporter } from '@zephyr3d/loaders';
 import type { DeviceBackend } from '@zephyr3d/device';
@@ -299,11 +294,6 @@ const application = new Application({
   }
 });
 application.ready().then(async () => {
-  // Assets the build compressed are listed here; scenes keep their source paths
-  const assetManifest = await readAssetManifest(getEngine().VFS);
-  if (assetManifest) {
-    getEngine().resourceManager.assetManager.assetSourceResolver = createManifestSourceResolver(getEngine().VFS, assetManifest);
-  }
   getEngine().resourceManager.setModelLoader('model/gltf+json', new GLTFImporter());
   getEngine().resourceManager.setModelLoader('model/gltf-binary', new GLTFImporter());
   getEngine().resourceManager.setModelLoader('model/fbx', new FBXImporter());

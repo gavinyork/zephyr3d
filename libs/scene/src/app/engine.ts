@@ -29,6 +29,12 @@ import { SSSMaterial } from '../material/sss';
 import { HairMaterial } from '../material/hair';
 import { ScreenAdapter } from './screen';
 import { MSDFTextAtlasManager } from '../text/runtime';
+import type { AssetSourceResolver } from '../asset/assetmanager';
+import {
+  ASSET_MANIFEST_FILE,
+  createManifestSourceResolver,
+  readAssetManifest
+} from '../asset/asset_manifest';
 
 /**
  * Interface for objects that can be rendered.
@@ -82,6 +88,8 @@ export class Engine {
   private _msdfTextAtlasManager: MSDFTextAtlasManager;
   private _enabled: boolean;
   private _screen: ScreenAdapter;
+  /** Resolver this engine installed from a build's asset manifest */
+  private _manifestResolver: Nullable<AssetSourceResolver> = null;
   protected _activeRenderables: {
     renderable: Nullable<RenderFunc> | DRef<IRenderable>;
     hook: Nullable<IRenderHook>;
@@ -123,7 +131,42 @@ export class Engine {
       this._resourceManager.VFS = vfs;
       this._scriptingSystem.registry.VFS = vfs;
       this.ensureBuiltinVFS();
+      // A manifest belongs to the file system it was read from
+      const assetManager = this._resourceManager.assetManager;
+      if (this._manifestResolver && assetManager.assetSourceResolver === this._manifestResolver) {
+        assetManager.assetSourceResolver = null;
+        this._manifestResolver = null;
+        void this.loadAssetManifest();
+      }
     }
+  }
+  /**
+   * Reads the asset manifest of a build (`/asset-manifest.json`, written by the
+   * editor's build) from the engine's VFS and routes the assets it lists to the
+   * compressed copies shipped for them, so code loading `/assets/rock.png` gets
+   * `/assets/rock.<hash>.ktx2`. Called by {@link Engine.init}, so a project using
+   * the editor's asset pipeline with its own code needs no setup; call it again
+   * with another path for a manifest kept elsewhere.
+   *
+   * A resolver installed by someone else (the editor installs its own) is left
+   * in place.
+   *
+   * @param path - VFS path of the manifest
+   * @returns true if a manifest was found and is now in use
+   */
+  async loadAssetManifest(path = `/${ASSET_MANIFEST_FILE}`) {
+    const vfs = this.VFS;
+    const manifest = await readAssetManifest(vfs, path);
+    const assetManager = this._resourceManager.assetManager;
+    if (
+      vfs !== this.VFS ||
+      (assetManager.assetSourceResolver && assetManager.assetSourceResolver !== this._manifestResolver)
+    ) {
+      return false;
+    }
+    this._manifestResolver = manifest ? createManifestSourceResolver(vfs, manifest) : null;
+    assetManager.assetSourceResolver = this._manifestResolver;
+    return !!manifest;
   }
   /**
    * Exposes the instance of {@link ResourceManager}.
@@ -195,6 +238,7 @@ export class Engine {
   /** @internal */
   async init() {
     await this.ensureBuiltinVFS();
+    await this.loadAssetManifest();
   }
   /**
    * Detaches all scripts from all hosts, if enabled.
