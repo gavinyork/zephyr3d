@@ -63,12 +63,14 @@ material.normalTexture = normal;
 
 ```ts
 const material = await getEngine().resourceManager.fetchMaterial('/assets/ground.zmtl');
-const primitive = await getEngine().resourceManager.fetchPrimitive('/assets/rock.zprim');
+const primitive = await getEngine().resourceManager.fetchPrimitive('/assets/rock.zmsh');
 const fontAsset = await getEngine().resourceManager.fetchFontAsset('/assets/Inter-Regular.ttf', {
   pageSize: 1024,
   glyphSize: 64
 });
 ```
+
+`fetchPrimitive()` 能读取两种形式的 `.zmsh`：编辑器写出的 JSON 形式，以及资产压缩生成的二进制、经 meshopt 压缩的形式。meshopt 解码器包含在 `@zephyr3d/scene` 中，无需额外配置。
 
 `fetchFontAsset()` 主要供 MSDF 文本节点使用。字体会按路径缓存；同一路径后续调用会复用第一次加载时的 atlas 设置。
 
@@ -166,6 +168,29 @@ const bytes = await getEngine().resourceManager.assetManager.fetchBinaryData('/d
 ```
 
 这些接口适合加载和引擎资源放在同一个 VFS 中的游戏数据或工具数据。
+
+## 编辑器压缩的资产
+
+编辑器可以发布纹理和网格的压缩副本（见[资产压缩](zh-cn/editor/asset-compression.md)）。构建会在输出根目录写入 `asset-manifest.json`，记录每个源路径对应的发布文件，例如 `/assets/rock.png` 对应 `/assets/rock.1a2b3c4d.ktx2`。
+
+引擎启动时会从自己的 VFS 读取这个映射表，并据此重定向资源加载，所以手写的代码不需要任何修改就能使用编辑器构建出的资产：
+
+```ts
+// 构建压缩了 rock.png 时，实际加载的是 /assets/rock.1a2b3c4d.ktx2
+const rock = await getEngine().resourceManager.fetchTexture('/assets/rock.png');
+```
+
+没有映射表时一切照旧，直接从源码运行的项目就是这种情况。如果映射表放在别的位置，可以显式加载：
+
+```ts
+await getEngine().loadAssetManifest('/game/asset-manifest.json');
+```
+
+给 `getEngine().VFS` 赋新值时，引擎会自动从新的文件系统重新读取映射表。
+
+映射表是通过资源重定向钩子 `assetManager.assetSourceResolver` 实现的，它负责提供纹理或图元实际加载的数据。你也可以为自己的打包方式安装自定义的重定向函数；引擎不会替换不是它自己安装的重定向函数。
+
+只有通过资源管理器的加载会被重定向。`fetchBinaryData()`、`fetch()` 以及直接读取 VFS，看到的都是构建产物中的实际文件，因此找不到被压缩资产的源文件。
 
 ## 缓存说明
 

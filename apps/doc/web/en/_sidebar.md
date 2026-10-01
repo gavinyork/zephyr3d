@@ -83,6 +83,7 @@
     - [Layout](en/editor/ui-layout.md)
     - [Scene Editing](en/editor/scene-editor.md)
     - [Content Browser](en/editor/content-browser.md)
+    - [Asset Compression](en/editor/asset-compression.md)
 
   - Material System
     - [Material Blueprint Basics](en/editor/material-blueprint.md)

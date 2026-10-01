@@ -83,6 +83,7 @@
     - [总体布局](zh-cn/editor/ui-layout.md)
     - [编辑场景](zh-cn/editor/scene-editor.md)
     - [资产管理](zh-cn/editor/content-browser.md)
+    - [资产压缩](zh-cn/editor/asset-compression.md)
 
   - 材质系统
     - [材质蓝图基础](zh-cn/editor/material-blueprint.md)

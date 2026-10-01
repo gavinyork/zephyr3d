@@ -27,6 +27,8 @@ You can import assets by dragging files directly from your operating system into
 
 > _Image placeholder: Content Browser UI_
 
+The model import dialog also offers **Compress Textures** and **Compress Vertices**, both off by default. They mark the imported textures and meshes for compressed shipping; see [Asset Compression](en/editor/asset-compression.md). Settings for assets already in the project are under **Texture Settings...** and **Mesh Settings...** in the right-click menu.
+
 ---
 
 ## Managing Third‑Party Libraries

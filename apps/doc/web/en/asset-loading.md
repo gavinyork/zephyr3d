@@ -63,12 +63,14 @@ Editor-authored resources can be loaded directly:
 
 ```ts
 const material = await getEngine().resourceManager.fetchMaterial('/assets/ground.zmtl');
-const primitive = await getEngine().resourceManager.fetchPrimitive('/assets/rock.zprim');
+const primitive = await getEngine().resourceManager.fetchPrimitive('/assets/rock.zmsh');
 const fontAsset = await getEngine().resourceManager.fetchFontAsset('/assets/Inter-Regular.ttf', {
   pageSize: 1024,
   glyphSize: 64
 });
 ```
+
+`fetchPrimitive()` reads both forms of `.zmsh`: the JSON form the editor writes, and the binary, meshopt-compressed form its asset compression produces. The meshopt decoder is part of `@zephyr3d/scene` and needs no setup.
 
 `fetchFontAsset()` is used by the MSDF text nodes. It caches the `FontAsset` by path; later calls with the same path reuse the first loaded atlas settings.
 
@@ -166,6 +168,29 @@ const bytes = await getEngine().resourceManager.assetManager.fetchBinaryData('/d
 ```
 
 Use these methods for game data or tool data that should live in the same VFS as engine assets.
+
+## Assets Compressed by the Editor
+
+The editor can ship compressed copies of textures and meshes (see [Asset Compression](en/editor/asset-compression.md)). A build lists them in `asset-manifest.json` at its root, mapping each source path to the file shipped for it, such as `/assets/rock.png` to `/assets/rock.1a2b3c4d.ktx2`.
+
+The engine reads that manifest from its VFS during startup and routes loads through it, so code written by hand works with editor-built assets unchanged:
+
+```ts
+// Loads /assets/rock.1a2b3c4d.ktx2 when the build compressed rock.png
+const rock = await getEngine().resourceManager.fetchTexture('/assets/rock.png');
+```
+
+Without a manifest nothing changes, which is the normal case for projects run from source. If you keep the manifest elsewhere, load it explicitly:
+
+```ts
+await getEngine().loadAssetManifest('/game/asset-manifest.json');
+```
+
+Assigning `getEngine().VFS` reloads the manifest from the new file system automatically.
+
+The manifest is implemented as an asset source resolver, `assetManager.assetSourceResolver`, which supplies the data a texture or primitive is actually loaded from. You can install your own resolver for other packaging schemes; the engine does not replace a resolver it did not install.
+
+Only loads through the resource manager are redirected. `fetchBinaryData()`, `fetch()` and direct VFS reads see the build's files as they are, so they will not find the source file of a compressed asset.
 
 ## Cache Notes
 
