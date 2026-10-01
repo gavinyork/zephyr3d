@@ -1,4 +1,11 @@
 import type { FileMetadata, GenericConstructor, Immutable, Nullable, VFS } from '@zephyr3d/base';
+import {
+  copyAssetMeta,
+  deleteAssetMeta,
+  isTextureSourcePath,
+  moveAssetMeta
+} from '../core/services/assetmeta';
+import { DlgTextureSettings } from '../views/dlg/texturesettingsdlg';
 import type { TextureAddressMode, TextureFilterMode, TextureSampler } from '@zephyr3d/device';
 import UPNG from 'upng-js';
 import { DataTransferVFS, Disposable, guessMimeType, makeObservable, PathUtils } from '@zephyr3d/base';
@@ -39,6 +46,7 @@ import {
   ConstantScalarNode,
   ConstantVec3Node,
   getEngine,
+  isAssetMetaPath,
   PBRBlockNode,
   PBRBluePrintMaterial,
   PBRMetallicRoughnessMaterial,
@@ -489,6 +497,21 @@ export class ContentListView extends ListView<{}, FileInfo | DirectoryInfo> {
         ImGui.Separator();
         if (ImGui.MenuItem('Rename')) {
           this.renderer.renameSelectedItem();
+        }
+      }
+      const texturePaths = selectedItems.every(
+        (item) => !('subDir' in item) && isTextureSourcePath(item.meta.path)
+      )
+        ? selectedItems.map((item) => (item as FileInfo).meta.path)
+        : [];
+      if (texturePaths.length > 0 && !this.renderer.VFS.readOnly) {
+        ImGui.Separator();
+        if (
+          ImGui.MenuItem(
+            `Texture Settings${texturePaths.length > 1 ? ` (${texturePaths.length} textures)` : ''}...`
+          )
+        ) {
+          void DlgTextureSettings.editTextureSettings(this.renderer.VFS, texturePaths);
         }
       }
       ImGui.Separator();
@@ -2157,7 +2180,8 @@ export class VFSRenderer extends makeObservable(Disposable)<{
       if (isDir) {
         return this._vfs.deleteDirectory(item.path, true);
       } else {
-        return this._vfs.deleteFile((item as FileInfo).meta.path);
+        const path = (item as FileInfo).meta.path;
+        return this._vfs.deleteFile(path).then(() => deleteAssetMeta(this._vfs, path));
       }
     });
 
@@ -2277,6 +2301,9 @@ export class VFSRenderer extends makeObservable(Disposable)<{
             try {
               await this.runWithVFSBatchUpdate(async () => {
                 await this._vfs.move(oldPath, newPath);
+                if (!isDir) {
+                  await moveAssetMeta(this._vfs, oldPath, newPath);
+                }
                 dlg.setProgress(1, affectsReferences ? 2 : 1);
                 this.applyPathRewriteRules(movedRules);
                 this.applyReferenceCandidatePathRewriteRules(movedRules);
@@ -2678,7 +2705,8 @@ export class VFSRenderer extends makeObservable(Disposable)<{
               dirInfo.parent = info;
             }
           }
-        } else if (entry.type === 'file') {
+        } else if (entry.type === 'file' && !isAssetMetaPath(entry.path)) {
+          // .zmeta sidecars belong to the asset beside them and are edited through it
           info.files.push({
             meta: entry,
             parent: info
@@ -3270,6 +3298,7 @@ export class VFSRenderer extends makeObservable(Disposable)<{
       }
     }
     await this.VFS.copyFile(src, dst, { overwrite: true });
+    await copyAssetMeta(this.VFS, src, dst);
   }
   async handleFileMoveOrCopy(targetDir: string, payload: { isDir: boolean; path: string }[]) {
     const copy = ImGui.GetIO().KeyCtrl;
@@ -3317,6 +3346,7 @@ export class VFSRenderer extends makeObservable(Disposable)<{
               await vfs.copyFile(asset.sourcePath, asset.targetPath, {
                 overwrite: false
               });
+              await copyAssetMeta(vfs, asset.sourcePath, asset.targetPath);
             }
           } else if (asset.isDirectory) {
             await vfs.move(asset.sourcePath, asset.targetPath);
@@ -3329,6 +3359,7 @@ export class VFSRenderer extends makeObservable(Disposable)<{
             await vfs.move(asset.sourcePath, asset.targetPath, {
               overwrite: false
             });
+            await moveAssetMeta(vfs, asset.sourcePath, asset.targetPath);
             movedRules.push({
               oldPath: asset.sourcePath,
               newPath: asset.targetPath,

@@ -25,6 +25,15 @@ import { BoundingBox } from '../utility/bounding_volume';
 import type { ColliderR } from '../animation/joint_dynamics/types';
 import type { ControllerConfig } from '../animation/joint_dynamics/controller';
 import type { ResourceManager } from '../utility/serialization/manager';
+import type { TextureUsage } from './texture_settings';
+import {
+  defaultTextureImportSettings,
+  getAssetMetaPath,
+  inferTextureUsageFromPath,
+  inferTextureUsageFromSlot,
+  mergeTextureUsage,
+  writeTextureImportSettings
+} from './texture_settings';
 import type { Scene } from '../scene/scene';
 import {
   SceneNode,
@@ -1300,6 +1309,47 @@ export class SharedModel extends Disposable {
   addAnimation(animation: AssetAnimationData) {
     this._animations.push(animation);
   }
+  /**
+   * Gives every imported image a `.zmeta` describing what it is, taken from the
+   * material slots that reference it. That is better information than the file
+   * name inference used for textures added any other way. An existing `.zmeta`
+   * is left alone, so re-importing keeps settings tuned in the editor.
+   */
+  private async writeImportedTextureSettings(vfs: VFS) {
+    const usages = new Map<AssetImageInfo, TextureUsage>();
+    const visit = (value: unknown, key: string, depth: number) => {
+      if (!value || typeof value !== 'object' || depth > 4) {
+        return;
+      }
+      const info = value as Partial<AssetTextureInfo>;
+      if (info.image && 'texCoord' in info) {
+        const usage = inferTextureUsageFromSlot(key, !!info.sRGB);
+        const current = usages.get(info.image);
+        usages.set(info.image, current ? mergeTextureUsage(current, usage) : usage);
+        return;
+      }
+      for (const [k, v] of Object.entries(value)) {
+        visit(v, k, depth + 1);
+      }
+    };
+    for (const material of Object.values(this._materialList)) {
+      visit(material, '', 0);
+    }
+    for (const img of this._imageList) {
+      if (!img?.uri) {
+        continue;
+      }
+      try {
+        if (await vfs.exists(getAssetMetaPath(img.uri))) {
+          continue;
+        }
+        const usage = usages.get(img) ?? inferTextureUsageFromPath(img.uri);
+        await writeTextureImportSettings(vfs, img.uri, defaultTextureImportSettings(usage));
+      } catch (err) {
+        console.warn(`Failed to write texture settings for ${img.uri}: ${err}`);
+      }
+    }
+  }
   static async writePrimitive(vfs: VFS, primitive: AssetPrimitiveInfo, path: string) {
     const data = {
       vertices: {} as Record<VertexSemantic, { format: VertexAttribFormat; data: string }>,
@@ -1415,6 +1465,7 @@ export class SharedModel extends Disposable {
           img.mimeType = '';
         }
       }
+      await this.writeImportedTextureSettings(dstVFS);
     }
     const materialKeys = Object.keys(this._materialList);
     if (materialKeys.length > 0) {

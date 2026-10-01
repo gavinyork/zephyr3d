@@ -6,6 +6,7 @@ import { formatString, type VFS } from '@zephyr3d/base';
 import { depsResolvePlugin } from './plugins/depresolve';
 import { ProjectService } from '../services/project';
 import { libDir, projectFileName, templateIndexHTML } from './templates';
+import { isAssetMetaPath } from '@zephyr3d/scene';
 
 function rewriteImports(code: string): string {
   const reStatic = /\b(?:import|export)\s+[^"']*?from\s+(['"])([^'"]+)\1/g;
@@ -151,7 +152,8 @@ export async function buildForEndUser(options: {
     includeFiles: true,
     recursive: true
   });
-  const assetFiles = assetFileList.filter((path) => path.type === 'file');
+  // .zmeta sidecars only steer the editor's asset pipeline and are not shipped
+  const assetFiles = assetFileList.filter((path) => path.type === 'file' && !isAssetMetaPath(path.path));
   for (const file of assetFiles) {
     const isTS = file.path.endsWith('.ts');
     let content = await vfs.readFile(file.path, { encoding: isTS ? 'utf8' : 'binary' });
