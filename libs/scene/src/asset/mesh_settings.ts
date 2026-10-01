@@ -14,19 +14,25 @@ export type MeshCompression = 'none' | 'meshopt';
  */
 export interface MeshImportSettings {
   compression: MeshCompression;
-  /** Bits per normal and tangent component when compressed: 8, 16, or 0 to keep them as floats */
-  normalBits: 0 | 8 | 16;
+  /**
+   * Precision of normals and tangents when compressed, or 0 to keep them as floats.
+   * 8 bits ships them as snorm8 (4 bytes, up to 0.8 degrees off, visible as a
+   * ragged terminator on smooth surfaces); 12 and 16 ship as snorm16 (8 bytes,
+   * 0.05 and 0.004 degrees), 12 encoding notably smaller than 16.
+   */
+  normalBits: 0 | 8 | 12 | 16;
 }
 
 const COMPRESSIONS: readonly MeshCompression[] = ['none', 'meshopt'];
-const NORMAL_BITS: readonly MeshImportSettings['normalBits'][] = [0, 8, 16];
+const NORMAL_BITS: readonly MeshImportSettings['normalBits'][] = [0, 8, 12, 16];
 
 /**
- * Default mesh settings. Like textures, compression is opt-in.
+ * Default mesh settings. Like textures, compression is opt-in. Normals default
+ * to 12 bits: 8-bit error shows on smooth surfaces near the light terminator.
  * @public
  */
 export function defaultMeshImportSettings(compression: MeshCompression = 'none'): MeshImportSettings {
-  return { compression, normalBits: 8 };
+  return { compression, normalBits: 12 };
 }
 
 /**
