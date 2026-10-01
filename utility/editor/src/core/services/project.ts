@@ -1,4 +1,5 @@
 import type { HttpDirectoryReader, Immutable, VFS } from '@zephyr3d/base';
+import { DerivedTextureService } from './derivedtextures';
 import { HttpFS, MemoryFS, PathUtils, randomUUID } from '@zephyr3d/base';
 import {
   DEFAULT_ACTIVE_MORPH_TARGET_LIMIT,
@@ -149,7 +150,12 @@ export class ProjectService {
     projectVFS = vfs;
     if (tryGetApp()) {
       getEngine().VFS = vfs;
+      this.attachDerivedData();
     }
+  }
+  /** Points the derived texture cache at the open project, also needed once the engine exists */
+  static attachDerivedData() {
+    DerivedTextureService.attach(projectVFS !== metaVFS ? projectVFS : null);
   }
   static get assetDir() {
     return '/assets';

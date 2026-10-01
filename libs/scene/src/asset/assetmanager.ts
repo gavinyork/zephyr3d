@@ -114,6 +114,17 @@ export type TextureFetchOptions<T extends BaseTexture> = BaseFetchOptions & {
  * Provides decoding and instancing hints used by supported model loaders.
  * @public
  */
+/**
+ * Supplies the data a texture is actually loaded from, in place of the file at
+ * its path. The editor answers with its compressed derived copy of a source
+ * image; a build can answer from a manifest of shipped files. Returning null
+ * loads the file at the path as usual.
+ * @public
+ */
+export type TextureSourceResolver = (
+  url: string
+) => Promise<Nullable<{ data: ArrayBuffer; mimeType: string }>>;
+
 export type ModelFetchOptions = BaseFetchOptions & {
   /**
    * Explicit MIME type hint for the model. If omitted, inferred from file extension via VFS.
@@ -209,6 +220,12 @@ type AssetCacheKind =
  * @public
  */
 export class AssetManager {
+  /**
+   * Optional redirect consulted before a texture is read, see {@link TextureSourceResolver}.
+   * Scene objects keep the texture they already have; call invalidateAsset() on the
+   * path when the resolver's answer changes so later loads pick it up.
+   */
+  textureSourceResolver: Nullable<TextureSourceResolver> = null;
   /** @internal */
   private static _builtinTextures: {
     [name: string]: BaseTexture;
@@ -1448,8 +1465,17 @@ export class AssetManager {
     texture?: Nullable<BaseTexture>,
     vfs?: VFS
   ) {
-    const data = (await this.readFileFromVFS(url, { encoding: 'binary' }, vfs)) as ArrayBuffer;
-    mimeType = mimeType ?? this.vfs.guessMIMEType(url);
+    let redirected: Nullable<{ data: ArrayBuffer; mimeType: string }> = null;
+    if (this.textureSourceResolver && !vfs) {
+      try {
+        redirected = await this.textureSourceResolver(url);
+      } catch (err) {
+        console.warn(`Texture source resolver failed for ${url}, loading the file itself: ${err}`);
+      }
+    }
+    const data =
+      redirected?.data ?? ((await this.readFileFromVFS(url, { encoding: 'binary' }, vfs)) as ArrayBuffer);
+    mimeType = redirected?.mimeType ?? mimeType ?? this.vfs.guessMIMEType(url);
     for (const loader of AssetManager._textureLoaders) {
       if (!loader.supportMIMEType(mimeType)) {
         continue;

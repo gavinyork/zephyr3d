@@ -173,6 +173,7 @@ function isEditableShortcutTarget(target: EventTarget | null) {
 }
 
 editorApp.ready().then(async () => {
+  ProjectService.attachDerivedData();
   getEngine().resourceManager.setModelLoader('model/gltf+json', new GLTFImporter());
   getEngine().resourceManager.setModelLoader('model/gltf-binary', new GLTFImporter());
   getEngine().resourceManager.setModelLoader('model/fbx', new FBXImporter());

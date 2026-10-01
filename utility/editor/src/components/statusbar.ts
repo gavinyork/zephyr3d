@@ -1,4 +1,5 @@
 import { ImGui } from '@zephyr3d/imgui';
+import { DerivedTextureService } from '../core/services/derivedtextures';
 import { getFrameHeight } from '../views/misc';
 import { getDevice } from '@zephyr3d/scene';
 
@@ -17,6 +18,10 @@ export class StatusBar {
     if (ImGui.BeginStatusBar()) {
       if (this._statusText) {
         ImGui.Text(this._statusText);
+      }
+      const pipelineStatus = DerivedTextureService.statusText;
+      if (pipelineStatus) {
+        ImGui.Text(pipelineStatus);
       }
       ImGui.Text(`Device: ${getDevice().type}`);
       ImGui.Text(`FPS: ${getDevice().frameInfo.FPS.toFixed(2)}`);

@@ -1,4 +1,5 @@
 import type { FileMetadata, GenericConstructor, Immutable, Nullable, VFS } from '@zephyr3d/base';
+import { DERIVED_CACHE_ROOT } from '../core/services/derivedtextures';
 import {
   copyAssetMeta,
   deleteAssetMeta,
@@ -2685,6 +2686,10 @@ export class VFSRenderer extends makeObservable(Disposable)<{
             });
 
       for (const entry of content) {
+        if (entry.type === 'directory' && entry.path === DERIVED_CACHE_ROOT) {
+          // Derived data: regenerated on demand, never edited by hand
+          continue;
+        }
         if (entry.type === 'directory') {
           info.hasChildrenHint = true;
           if (depth > 0) {

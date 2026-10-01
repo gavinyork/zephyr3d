@@ -1,4 +1,5 @@
 import type * as Monaco from 'monaco-editor';
+import { DERIVED_CACHE_ROOT } from './services/derivedtextures';
 import { ImGui, imGuiCalcTextSize, imGuiEndFrame, imGuiInjectEvent, imGuiNewFrame } from '@zephyr3d/imgui';
 import { eventBus } from './eventbus';
 import { DialogRenderer } from '../components/modal';
@@ -787,6 +788,7 @@ export class Editor {
       (path) =>
         path.type === 'file' &&
         !path.path.startsWith('/dist/') &&
+        !path.path.startsWith(`${DERIVED_CACHE_ROOT}/`) &&
         !path.path.startsWith('/assets/@builtins/') &&
         !path.path.startsWith(`/${libDir}/`) &&
         path.path !== `/${fileListFileName}`
@@ -795,6 +797,8 @@ export class Editor {
       (path) =>
         path.type === 'directory' &&
         path.path !== '/dist' &&
+        path.path !== DERIVED_CACHE_ROOT &&
+        !path.path.startsWith(`${DERIVED_CACHE_ROOT}/`) &&
         path.path !== '/assets/@builtins' &&
         path.path !== `/${libDir}` &&
         !path.path.startsWith('/dist/') &&

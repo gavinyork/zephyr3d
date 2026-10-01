@@ -1,4 +1,6 @@
 import { ImGui } from '@zephyr3d/imgui';
+import { DerivedTextureService } from '../../core/services/derivedtextures';
+import type { DerivedTextureStatus } from '../../core/services/derivedtextures';
 import type { VFS } from '@zephyr3d/base';
 import type {
   TextureCompression,
@@ -51,6 +53,8 @@ export class DlgTextureSettings extends DialogRenderer<boolean> {
   private readonly _edited: Partial<TextureImportSettings>;
   private readonly _changed: Set<SettingKey>;
   private _saving: boolean;
+  private _status: DerivedTextureStatus | null;
+  private _statusTime: number;
   static async editTextureSettings(vfs: VFS, paths: string[]) {
     return new DlgTextureSettings(vfs, paths).showModal();
   }
@@ -62,6 +66,8 @@ export class DlgTextureSettings extends DialogRenderer<boolean> {
     this._edited = {};
     this._changed = new Set();
     this._saving = false;
+    this._status = null;
+    this._statusTime = 0;
     Promise.all(paths.map((path) => readTextureImportSettings(vfs, path))).then(
       (settings) => {
         this._settings = settings;
@@ -125,6 +131,7 @@ export class DlgTextureSettings extends DialogRenderer<boolean> {
         isSRGBTextureUsage(effective.usage) ? 'sRGB' : 'linear'
       }`
     );
+    this.renderStatus();
     ImGui.Separator();
     if (this._saving) {
       ImGui.TextDisabled('Saving...');
@@ -136,6 +143,40 @@ export class DlgTextureSettings extends DialogRenderer<boolean> {
     ImGui.SameLine();
     if (ImGui.Button('Cancel')) {
       this.close(false);
+    }
+  }
+  /** Derived copy state of the first texture, as saved; refreshed about once a second */
+  private renderStatus() {
+    const now = performance.now();
+    if (now - this._statusTime > 1000) {
+      this._statusTime = now;
+      DerivedTextureService.getStatus(this._paths[0]).then(
+        (status) => (this._status = status),
+        () => (this._status = null)
+      );
+    }
+    const status = this._status;
+    if (!status) {
+      return;
+    }
+    const kb = (n = 0) => `${(n / 1024).toFixed(n < 10240 ? 1 : 0)} KB`;
+    switch (status.state) {
+      case 'ready':
+        ImGui.TextDisabled(
+          `Compressed copy: ${kb(status.sourceSize)} -> ${kb(status.derivedSize)}, ${
+            status.loaded ? 'in use in the editor' : 'not loaded yet (reopen the scene to use it)'
+          }`
+        );
+        break;
+      case 'pending':
+        ImGui.TextDisabled('Compressed copy: queued');
+        break;
+      case 'failed':
+        ImGui.TextColored(new ImGui.ImVec4(0.9, 0.35, 0.3, 1), `Compression failed: ${status.error ?? ''}`);
+        break;
+      case 'uncompressed':
+        ImGui.TextDisabled('Compressed copy: none, the source image is used');
+        break;
     }
   }
   private async save() {
@@ -151,6 +192,7 @@ export class DlgTextureSettings extends DialogRenderer<boolean> {
           (next as Record<string, unknown>)[key] = this._edited[key];
         }
         await writeTextureImportSettings(this._vfs, this._paths[i], next);
+        DerivedTextureService.request(this._paths[i]);
       }
       this.close(true);
     } catch (err) {
