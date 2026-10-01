@@ -27,6 +27,7 @@ import { Dialog } from '../views/dlg/dlg';
 import { ZipDownloader } from '../helpers/downloader';
 import { CodeEditor } from '../components/codeeditor';
 import { buildForEndUser } from './build/build';
+import type { BuildTextureReport } from './build/build';
 import { initLogView } from '../components/logview';
 import { loadTypes } from './build/loadtypes';
 import { ensureDependencies, installDeps } from './build/dep';
@@ -1064,10 +1065,26 @@ export class Editor {
       await ProjectService.VFS.makeDirectory('/dist', true);
     }
     await ensureDependencies();
-    await buildForEndUser({
-      input: '/src/index.ts',
-      distDir: '/dist'
-    });
+    const progress = new DlgProgress('BuildProject##BuildProgress', 420);
+    progress.showModal();
+    progress.setMessage('Building...');
+    let textureReport: BuildTextureReport[];
+    try {
+      ({ textureReport } = await buildForEndUser({
+        input: '/src/index.ts',
+        distDir: '/dist',
+        onProgress: (message, current, total) => {
+          progress.setMessage(message);
+          progress.setProgress(current, Math.max(total, 1));
+        }
+      }));
+    } finally {
+      progress.close();
+    }
+    const report = summarizeTextureReport(textureReport);
+    if (report) {
+      console.info(`${report.summary}\n\n${report.details}`);
+    }
     ProjectService.VFS.unmount('/src');
     srcVFS.close();
 
@@ -1093,6 +1110,12 @@ export class Editor {
     if (ProjectService.VFS.readOnly) {
       ProjectService.VFS.unmount('/dist');
       distVFS.close();
+    }
+    if (report) {
+      await DlgMessage.messageBox(
+        'Build Report',
+        `${report.summary}\n\nPer-texture details are in the console.`
+      );
     }
   }
   private onAction(action: string, fileName: string, arg: string) {
@@ -1815,4 +1838,47 @@ export class Editor {
       ? SystemPluginService.VFS.join(SystemPluginService.packagesDir, pluginId)
       : SystemPluginService.packagesDir;
   }
+}
+
+function formatBytes(n: number) {
+  return n >= 1 << 20 ? `${(n / (1 << 20)).toFixed(1)} MB` : `${(n / 1024).toFixed(1)} KB`;
+}
+
+/**
+ * Texture section of the build report. GPU memory is an estimate with a full mip
+ * chain: 4 bytes per texel for the RGBA8 a source image becomes, 1 byte per texel
+ * for the compressed formats a desktop or mobile GPU transcodes to (BC7, ASTC
+ * 4x4, ETC2 RGBA8; opaque ETC1S on ETC2 devices takes half that).
+ */
+function summarizeTextureReport(report: BuildTextureReport[]) {
+  if (report.length === 0) {
+    return null;
+  }
+  const compressed = report.filter((t) => t.shipped !== t.path);
+  const failed = report.filter((t) => t.error);
+  const sum = (list: BuildTextureReport[], f: (t: BuildTextureReport) => number) =>
+    list.reduce((n, t) => n + f(t), 0);
+  const mipFactor = 4 / 3;
+  const gpuBefore = sum(compressed, (t) => t.width * t.height * 4 * mipFactor);
+  const gpuAfter = sum(compressed, (t) => t.width * t.height * mipFactor);
+  const lines = [
+    `Textures: ${compressed.length} compressed, ${report.length - compressed.length} shipped as source${
+      failed.length ? ` (${failed.length} failed to compress)` : ''
+    }`,
+    `Download: ${formatBytes(sum(report, (t) => t.sourceBytes))} -> ${formatBytes(sum(report, (t) => t.shippedBytes))}`
+  ];
+  if (compressed.length > 0) {
+    lines.push(
+      `GPU memory of compressed textures (estimate): ${formatBytes(gpuBefore)} -> ${formatBytes(gpuAfter)}`
+    );
+  }
+  const details = report
+    .map(
+      (t) =>
+        `${t.path}: ${formatBytes(t.sourceBytes)} -> ${formatBytes(t.shippedBytes)}${
+          t.shipped !== t.path ? ` (${t.width}x${t.height}, ${t.shipped})` : ' (source)'
+        }${t.error ? ` FAILED: ${t.error}` : ''}`
+    )
+    .join('\n');
+  return { summary: lines.join('\n'), details };
 }

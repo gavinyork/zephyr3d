@@ -184,6 +184,29 @@ export class DerivedTextureService {
     return { state: 'pending', sourceSize };
   }
 
+  /**
+   * Derived KTX2 for a texture, encoded now if missing. For builds, which need
+   * every texture rather than the ones a scene happened to load. Null when the
+   * texture ships uncompressed; throws when encoding fails.
+   */
+  static async getDerivedFile(path: string): Promise<string | null> {
+    const vfs = this._vfs;
+    if (!vfs || !isTextureSourcePath(path)) {
+      return null;
+    }
+    const target = await this.getDerivedPath(vfs, path);
+    if (!target) {
+      return null;
+    }
+    if (!(await vfs.exists(target))) {
+      await this.encodeOne(path);
+      if (!(await vfs.exists(target))) {
+        throw new Error(`No compressed copy could be produced for ${path}`);
+      }
+    }
+    return target;
+  }
+
   /** Re-encodes a texture now, e.g. after its settings changed */
   static request(path: string) {
     this._failed.delete(path);
@@ -407,7 +430,8 @@ export class DerivedTextureService {
         this._worker?.terminate();
         this._worker = null;
       };
-      const base = new URL('/vendor/basis-encoder/', location.href);
+      // Relative to the page: the editor may be served from a sub-path (vite base './')
+      const base = new URL('vendor/basis-encoder/', document.baseURI);
       worker.postMessage({
         type: 'init',
         scriptUrl: new URL('basis_encoder.js', base).href,
