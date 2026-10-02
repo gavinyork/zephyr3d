@@ -5,12 +5,13 @@ import {
   getEngine,
   isAssetMetaPath,
   isSRGBTextureUsage,
+  meshNeedsDerivedCopy,
   readMeshImportSettings,
   readTextureImportSettings,
   resolveTextureCompression
 } from '@zephyr3d/scene';
 import { isTextureSourcePath } from './assetmeta';
-import { encodeCompressedPrimitive, isCompressiblePrimitive } from './meshencoder';
+import { encodeDerivedPrimitive, isCompressiblePrimitive } from './meshencoder';
 import type { EncodeRequest, EncodeResponse } from '../../workers/basis_encode';
 
 /**
@@ -78,7 +79,13 @@ function textureSettingsKey(settings: TextureImportSettings) {
 }
 
 function meshSettingsKey(settings: MeshImportSettings) {
-  return JSON.stringify([settings.compression, settings.normalBits]);
+  const key: unknown[] = [settings.compression, settings.normalBits];
+  // Level settings join the key only when levels are made, so copies cached before levels of
+  // detail existed keep their key
+  if (settings.lodCount > 1) {
+    key.push(settings.lodCount, settings.lodReduction, settings.lodPixelError);
+  }
+  return JSON.stringify(key);
 }
 
 export class DerivedAssetService {
@@ -292,7 +299,7 @@ export class DerivedAssetService {
       settingsKey = `${textureSettingsKey(settings)}|${TEXTURE_ENCODER_ID}|${TEXTURE_PIPELINE_VERSION}`;
     } else {
       const settings = await readMeshImportSettings(vfs, path);
-      if (settings.compression === 'none') {
+      if (!meshNeedsDerivedCopy(settings)) {
         return null;
       }
       settingsKey = `${meshSettingsKey(settings)}|${MESH_ENCODER_ID}|${MESH_PIPELINE_VERSION}`;
@@ -421,7 +428,7 @@ export class DerivedAssetService {
         this._notCompressible.set(path, (await this.getSourceHash(vfs, path)) ?? '');
         return;
       }
-      data = await encodeCompressedPrimitive(json, await readMeshImportSettings(vfs, path));
+      data = await encodeDerivedPrimitive(json, await readMeshImportSettings(vfs, path));
     }
     // The project may have been closed while encoding
     if (this._vfs !== vfs) {

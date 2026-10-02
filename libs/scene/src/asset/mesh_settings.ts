@@ -21,7 +21,22 @@ export interface MeshImportSettings {
    * 0.05 and 0.004 degrees), 12 encoding notably smaller than 16.
    */
   normalBits: 0 | 8 | 12 | 16;
+  /**
+   * Number of levels of detail, the source mesh being the first; 1 generates none. Coarser levels
+   * are simplified from the source and stored as extra index ranges over the same vertices.
+   */
+  lodCount: number;
+  /** Fraction of the source triangles each level keeps over the previous one, UE PercentTriangles per step */
+  lodReduction: number;
+  /**
+   * Pixel error the automatic switch distances allow, UE ReductionSettings.PixelError: a level is
+   * used once its simplification error projects to fewer pixels on a 1920 wide, 90 degree view
+   */
+  lodPixelError: number;
 }
+
+/** Most levels of detail a mesh can have, UE MAX_STATIC_MESH_LODS */
+export const MAX_MESH_LODS = 8;
 
 const COMPRESSIONS: readonly MeshCompression[] = ['none', 'meshopt'];
 const NORMAL_BITS: readonly MeshImportSettings['normalBits'][] = [0, 8, 12, 16];
@@ -32,7 +47,16 @@ const NORMAL_BITS: readonly MeshImportSettings['normalBits'][] = [0, 8, 12, 16];
  * @public
  */
 export function defaultMeshImportSettings(compression: MeshCompression = 'none'): MeshImportSettings {
-  return { compression, normalBits: 12 };
+  return { compression, normalBits: 12, lodCount: 1, lodReduction: 0.5, lodPixelError: 8 };
+}
+
+/**
+ * Whether a mesh with these settings ships a derived copy instead of its source: when compressed
+ * or when it has levels of detail.
+ * @public
+ */
+export function meshNeedsDerivedCopy(settings: MeshImportSettings) {
+  return settings.compression !== 'none' || settings.lodCount > 1;
 }
 
 /**
@@ -48,7 +72,16 @@ export function normalizeMeshImportSettings(value: unknown): MeshImportSettings 
       : defaults.compression,
     normalBits: NORMAL_BITS.includes(v.normalBits as MeshImportSettings['normalBits'])
       ? (v.normalBits as MeshImportSettings['normalBits'])
-      : defaults.normalBits
+      : defaults.normalBits,
+    lodCount: Number.isInteger(v.lodCount)
+      ? Math.min(Math.max(v.lodCount as number, 1), MAX_MESH_LODS)
+      : defaults.lodCount,
+    lodReduction:
+      typeof v.lodReduction === 'number' && v.lodReduction > 0 && v.lodReduction < 1
+        ? v.lodReduction
+        : defaults.lodReduction,
+    lodPixelError:
+      typeof v.lodPixelError === 'number' && v.lodPixelError > 0 ? v.lodPixelError : defaults.lodPixelError
   };
 }
 

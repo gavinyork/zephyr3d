@@ -37,7 +37,7 @@ export type StreamPlan =
   | { kind: 'weights'; format: string; data: Uint8Array; byteStride: 4 };
 
 /** Bytes per component and count of the formats a JSON .zmsh may hold */
-function describeFormat(format: string) {
+export function describeFormat(format: string) {
   const m = /_(u8norm|i8norm|u16norm|i16norm|u16|i16|u32|i32|f16|f32)x?(\d)?$/.exec(format);
   if (!m) {
     return null;
@@ -62,7 +62,7 @@ function halfToFloat(h: number) {
 }
 
 /** Reads a float stream (f32 or f16) as `count` components per vertex, or null for other types */
-function readFloats(stream: SourceStream, vertexCount: number) {
+export function readFloats(stream: SourceStream, vertexCount: number) {
   const fmt = describeFormat(stream.format);
   if (!fmt || (fmt.type !== 'f32' && fmt.type !== 'f16')) {
     return null;

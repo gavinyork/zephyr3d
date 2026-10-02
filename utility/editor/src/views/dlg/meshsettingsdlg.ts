@@ -3,7 +3,7 @@ import { DerivedAssetService } from '../../core/services/derivedassets';
 import type { DerivedAssetStatus } from '../../core/services/derivedassets';
 import type { VFS } from '@zephyr3d/base';
 import type { MeshCompression, MeshImportSettings } from '@zephyr3d/scene';
-import { readMeshImportSettings, writeMeshImportSettings } from '@zephyr3d/scene';
+import { MAX_MESH_LODS, readMeshImportSettings, writeMeshImportSettings } from '@zephyr3d/scene';
 import { DialogRenderer } from '../../components/modal';
 import { DlgMessage } from './messagedlg';
 
@@ -76,6 +76,26 @@ export class DlgMeshSettings extends DialogRenderer<boolean> {
       this._changed.add(key);
     }
   }
+  private sliderInt(label: string, key: 'lodCount', min: number, max: number) {
+    const value = [this._edited[key] ?? min] as [number];
+    if (ImGui.SliderInt(label, value, min, max)) {
+      this._edited[key] = value[0];
+      this._changed.add(key);
+    }
+  }
+  private sliderFloat(
+    label: string,
+    key: 'lodReduction' | 'lodPixelError',
+    min: number,
+    max: number,
+    format: string
+  ) {
+    const value = [this._edited[key] ?? min] as [number];
+    if (ImGui.SliderFloat(label, value, min, max, format)) {
+      this._edited[key] = value[0];
+      this._changed.add(key);
+    }
+  }
   doRender(): void {
     if (!this._settings) {
       ImGui.Text('Loading...');
@@ -92,6 +112,15 @@ export class DlgMeshSettings extends DialogRenderer<boolean> {
     if (this._edited.compression === 'meshopt') {
       this.combo('Normal Precision', 'normalBits', NORMAL_BITS);
       ImGui.TextDisabled('Positions, texture coordinates and vertex order are kept exactly.');
+    }
+    ImGui.Separator();
+    this.sliderInt('Levels of Detail', 'lodCount', 1, MAX_MESH_LODS);
+    if ((this._edited.lodCount ?? 1) > 1) {
+      this.sliderFloat('Triangles Per Level', 'lodReduction', 0.1, 0.9, '%.2f');
+      this.sliderFloat('Pixel Error', 'lodPixelError', 1, 32, '%.1f');
+      ImGui.TextDisabled("Each level keeps that fraction of the previous level's triangles.");
+      ImGui.TextDisabled('A level shows once its error looks smaller than Pixel Error on screen;');
+      ImGui.TextDisabled('higher values switch to simpler levels closer to the camera.');
     }
     this.renderStatus();
     ImGui.Separator();
@@ -125,19 +154,19 @@ export class DlgMeshSettings extends DialogRenderer<boolean> {
     switch (status.state) {
       case 'ready':
         ImGui.TextDisabled(
-          `Compressed copy: ${kb(status.sourceSize)} -> ${kb(status.derivedSize)}, ${
+          `Derived copy: ${kb(status.sourceSize)} -> ${kb(status.derivedSize)}, ${
             status.loaded ? 'in use in the editor' : 'not loaded yet (reopen the scene to use it)'
           }`
         );
         break;
       case 'pending':
-        ImGui.TextDisabled('Compressed copy: queued');
+        ImGui.TextDisabled('Derived copy: queued');
         break;
       case 'failed':
-        ImGui.TextColored(new ImGui.ImVec4(0.9, 0.35, 0.3, 1), `Compression failed: ${status.error ?? ''}`);
+        ImGui.TextColored(new ImGui.ImVec4(0.9, 0.35, 0.3, 1), `Processing failed: ${status.error ?? ''}`);
         break;
       case 'uncompressed':
-        ImGui.TextDisabled('Compressed copy: none, the source mesh is used');
+        ImGui.TextDisabled('Derived copy: none, the source mesh is used');
         break;
     }
   }

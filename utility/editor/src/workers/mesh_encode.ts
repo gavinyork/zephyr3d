@@ -1,10 +1,14 @@
 // Encodes mesh streams for the derived mesh cache: applies the meshopt filters
 // the quantization plan asks for, then meshopt-encodes every stream with the
-// KHR_meshopt_compression bitstream (version 1). The main thread assembles the
-// .zmsh container, which keeps engine code out of this worker.
+// KHR_meshopt_compression bitstream (version 1). Also simplifies meshes into their
+// level of detail chain. The main thread assembles the .zmsh container, which
+// keeps engine code out of this worker.
 import { MeshoptEncoder } from 'meshoptimizer/encoder';
+import { MeshoptSimplifier } from 'meshoptimizer/simplifier';
 import { planMeshStreams } from '../helpers/meshquantize';
 import type { MeshNormalBits, SourceStream } from '../helpers/meshquantize';
+import { buildLodChain } from '../helpers/meshlod';
+import type { MeshLodLevel, MeshLodSettings, MeshSimplifier } from '../helpers/meshlod';
 
 export interface MeshEncodeRequest {
   type: 'encode';
@@ -15,6 +19,26 @@ export interface MeshEncodeRequest {
   indexCount: number;
   triangles: boolean;
   normalBits: MeshNormalBits;
+}
+
+export interface MeshLodRequest {
+  type: 'lod';
+  id: number;
+  indices: Uint32Array;
+  /** 3 floats per vertex */
+  positions: Float32Array;
+  /** 3 floats per vertex, or null */
+  normals: Float32Array | null;
+  sphereRadius: number;
+  settings: MeshLodSettings;
+}
+
+export interface MeshLodResponse {
+  type: 'lod-result' | 'error';
+  id: number;
+  indices?: Uint32Array;
+  levels?: MeshLodLevel[];
+  message?: string;
 }
 
 export interface MeshEncodeResponse {
@@ -64,8 +88,33 @@ async function encode(req: MeshEncodeRequest): Promise<MeshEncodeResponse> {
   return { type: 'result', id: req.id, vertexCount, attributes, streams, indices, indexMode };
 }
 
-self.onmessage = (e: MessageEvent<MeshEncodeRequest>) => {
+async function lod(req: MeshLodRequest): Promise<MeshLodResponse> {
+  await MeshoptSimplifier.ready;
+  const { indices, levels } = buildLodChain(
+    MeshoptSimplifier as unknown as MeshSimplifier,
+    req.indices,
+    req.positions,
+    req.normals,
+    req.sphereRadius,
+    req.settings
+  );
+  return { type: 'lod-result', id: req.id, indices, levels };
+}
+
+self.onmessage = (e: MessageEvent<MeshEncodeRequest | MeshLodRequest>) => {
   const req = e.data;
+  if (req.type === 'lod') {
+    lod(req).then(
+      (res) => (self as unknown as Worker).postMessage(res, [res.indices!.buffer]),
+      (err) =>
+        (self as unknown as Worker).postMessage({
+          type: 'error',
+          id: req.id,
+          message: String(err?.message ?? err)
+        } as MeshLodResponse)
+    );
+    return;
+  }
   encode(req).then(
     (res) =>
       (self as unknown as Worker).postMessage(res, [
