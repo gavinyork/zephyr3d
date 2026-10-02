@@ -118,7 +118,8 @@ export class InstanceCuller {
     this._lastParent = null;
     const used = new Set<CullGroup>();
     const batchData = new Map<CullGroup, number[]>();
-    if (items.length > this._argsCapacity) {
+    // Also allocated with no batches, the arguments of a group whose meshes are not batched yet
+    if (!this._args.get() || items.length > this._argsCapacity) {
       this._argsCapacity = Math.max(items.length, this._argsCapacity * 2, 16);
       this._args.set(
         device.createBuffer(this._argsCapacity * ARGS_U32 * 4, { usage: 'indirect', storage: true })

@@ -109,7 +109,12 @@ import {
   skinGpuAnimation,
   skinInstancedCpu
 } from './scenes/skinning';
-import { batchInstanceCulling, batchInstanceCullingOff } from './scenes/instance-culling';
+import {
+  batchInstanceCulling,
+  batchInstanceCullingGrowing,
+  batchInstanceCullingGrowingOff,
+  batchInstanceCullingOff
+} from './scenes/instance-culling';
 
 /**
  * Every scene, in a fixed order.
@@ -237,7 +242,9 @@ export const SCENES: VisualScene[] = [
   batchInstanceCulling,
   batchInstanceCullingOff,
   skinBatchInstanceCulling,
-  skinBatchInstanceCullingOff
+  skinBatchInstanceCullingOff,
+  batchInstanceCullingGrowing,
+  batchInstanceCullingGrowingOff
 ];
 
 export function findScene(name: string): VisualScene | undefined {

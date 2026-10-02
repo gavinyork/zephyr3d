@@ -181,7 +181,9 @@ const SCENE_NAMES = [
   'batch-instance-culling',
   'batch-instance-culling-off',
   'skin-batch-instance-culling',
-  'skin-batch-instance-culling-off'
+  'skin-batch-instance-culling-off',
+  'batch-instance-culling-growing',
+  'batch-instance-culling-growing-off'
 ];
 
 test('scene registry matches the harness page', async ({ harness }) => {
