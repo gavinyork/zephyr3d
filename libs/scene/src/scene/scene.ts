@@ -1,5 +1,5 @@
 import type { Matrix4x4, Nullable } from '@zephyr3d/base';
-import { Vector3, Vector4, Ray, DRef, DWeakRef, makeObservable, Disposable } from '@zephyr3d/base';
+import { Vector3, Vector4, Ray, DRef, makeObservable, Disposable } from '@zephyr3d/base';
 import { SceneNode } from './scene_node';
 import { Octree } from './octree';
 import { RaycastVisitor } from './raycast_visitor';
@@ -12,6 +12,7 @@ import type { Compositor } from '../posteffect';
 import type { Metadata } from 'draco3d';
 import { getDevice } from '../app/api';
 import { SkinPaletteAtlas } from '../animation/skin_palette_atlas';
+import { UpdateQueue } from './update_queue';
 import { AnimationBankTrack } from '../animation/animation_bank';
 import type { IRenderable } from '../app';
 import {
@@ -69,12 +70,15 @@ export class Scene
   protected _updateFrame: number;
   /** @internal Unique scene ID. */
   protected _id: number;
-  /** @internal One-shot per-frame update queue (runs before render). */
-  protected _nodeUpdateQueue: DWeakRef<SceneNode>[];
+  /**
+   * @internal One-shot per-frame update queue (runs before render). Thousands of nodes may
+   * re-queue themselves every frame, so duplicates are told by a stamp on the node
+   */
+  protected _nodeUpdateQueue: UpdateQueue<SceneNode>;
   /** @internal */
-  protected _drawableUpdateQueue: Drawable[];
+  protected _drawableUpdateQueue: UpdateQueue<Drawable>;
   /** @internal One-shot per-frame-per-camera update queue. */
-  protected _perCameraUpdateQueue: DWeakRef<SceneNode>[];
+  protected _perCameraUpdateQueue: UpdateQueue<SceneNode>;
   /** @internal Main camera reference. */
   protected _mainCamera: DRef<Camera>;
   /** @internal Arbitrary metadata loaded with the scene (optional). */
@@ -104,9 +108,19 @@ export class Scene
     this._name = name ?? '';
     this._octree = new Octree(this, 8, 8);
     this._nodePlaceList = new Set();
-    this._nodeUpdateQueue = [];
-    this._drawableUpdateQueue = [];
-    this._perCameraUpdateQueue = [];
+    this._nodeUpdateQueue = new UpdateQueue(
+      (node) => node._updateQueueStamp,
+      (node, stamp) => (node._updateQueueStamp = stamp)
+    );
+    // Drawables made without mixinDrawable get the field on first use
+    this._drawableUpdateQueue = new UpdateQueue(
+      (drawable) => (drawable as { _drawableQueueStamp?: number })._drawableQueueStamp,
+      (drawable, stamp) => ((drawable as { _drawableQueueStamp?: number })._drawableQueueStamp = stamp)
+    );
+    this._perCameraUpdateQueue = new UpdateQueue(
+      (node) => node._perCameraQueueStamp,
+      (node, stamp) => (node._perCameraQueueStamp = stamp)
+    );
     this._env = new Environment();
     this._updateFrame = -1;
     this._rootNode = new DRef();
@@ -390,8 +404,9 @@ export class Scene
    * - Duplicate scheduling within the same frame is prevented.
    */
   queueUpdateNode(node: SceneNode) {
-    if (node && this._nodeUpdateQueue.findIndex((val) => val.get() === node) < 0) {
-      this._nodeUpdateQueue.push(new DWeakRef(node));
+    // Only nodes of this scene, so a node waits in one update queue at most, as its stamp assumes
+    if (node && node.scene === this) {
+      this._nodeUpdateQueue.add(node);
     }
   }
   /**
@@ -405,8 +420,8 @@ export class Scene
    * - Duplicate scheduling within the same frame is prevented.
    */
   queueUpdateDrawable(drawable: Drawable) {
-    if (drawable && this._drawableUpdateQueue.indexOf(drawable) < 0) {
-      this._drawableUpdateQueue.push(drawable);
+    if (drawable && drawable.getNode()?.scene === this) {
+      this._drawableUpdateQueue.add(drawable);
     }
   }
   /**
@@ -422,8 +437,8 @@ export class Scene
    * - Duplicate scheduling within the same frame is prevented.
    */
   queuePerCameraUpdateNode(node: SceneNode) {
-    if (node && this._perCameraUpdateQueue.findIndex((val) => val.get() === node) < 0) {
-      this._perCameraUpdateQueue.push(new DWeakRef(node));
+    if (node && node.scene === this) {
+      this._perCameraUpdateQueue.add(node);
     }
   }
   /**
@@ -493,25 +508,20 @@ export class Scene
       this.updateEnvLight();
       this.dispatchEvent('update', this);
       this.mainCamera?.updateController();
-      if (this._nodeUpdateQueue.length > 0) {
+      if (this._nodeUpdateQueue.size > 0) {
         const elapsedInSeconds = frameInfo.elapsedOverall * 0.001;
         const deltaInSeconds = frameInfo.elapsedFrame * 0.001;
-        const queue = this._nodeUpdateQueue;
-        this._nodeUpdateQueue = [];
-        while (queue.length > 0) {
-          const ref = queue.shift()!;
-          const node = ref.get();
-          if (node?.attached) {
+        // Nodes queued while draining are updated next frame
+        for (const node of this._nodeUpdateQueue.take()) {
+          if (!node.disposed && node.attached) {
             node.update(frameInfo.frameCounter, elapsedInSeconds, deltaInSeconds);
           }
-          ref.dispose();
         }
       }
-      if (this._drawableUpdateQueue.length > 0) {
-        for (const drawable of this._drawableUpdateQueue) {
+      if (this._drawableUpdateQueue.size > 0) {
+        for (const drawable of this._drawableUpdateQueue.take()) {
           drawable.updateState();
         }
-        this._drawableUpdateQueue = [];
       }
       this.updateNodePlacement(this._octree, this._nodePlaceList);
     }
@@ -529,16 +539,14 @@ export class Scene
    * @param camera - The camera being updated for.
    */
   frameUpdatePerCamera(camera: Camera) {
-    if (this._perCameraUpdateQueue.length > 0) {
+    if (this._perCameraUpdateQueue.size > 0) {
       const frameInfo = getDevice().frameInfo;
       const elapsedInSeconds = frameInfo.elapsedOverall * 0.001;
       const deltaInSeconds = frameInfo.elapsedFrame * 0.001;
-      const queue = this._perCameraUpdateQueue;
-      this._perCameraUpdateQueue = [];
-      while (queue.length > 0) {
-        const ref = queue.shift()!;
-        ref.get()?.updatePerCamera(camera, elapsedInSeconds, deltaInSeconds);
-        ref.dispose();
+      for (const node of this._perCameraUpdateQueue.take()) {
+        if (!node.disposed) {
+          node.updatePerCamera(camera, elapsedInSeconds, deltaInSeconds);
+        }
       }
     }
     this.updateNodePlacement(this._octree, this._nodePlaceList);
@@ -585,6 +593,9 @@ export class Scene
    *
    */
   protected onDispose() {
+    this._nodeUpdateQueue.clear();
+    this._drawableUpdateQueue.clear();
+    this._perCameraUpdateQueue.clear();
     this._env.dispose();
     this._rootNode.dispose();
     this._mainCamera.dispose();

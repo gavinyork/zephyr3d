@@ -107,8 +107,11 @@ export function mixinDrawable<
     private readonly _drawableId: number;
     private _objectColor: Nullable<Vector4>;
     private _nodeTransformTag: number;
+    /** Stamp of the scene drawable update queue this drawable is waiting in, see UpdateQueue */
+    _drawableQueueStamp: number;
     constructor(...args: any[]) {
       super(...args);
+      this._drawableQueueStamp = 0;
       this._drawableId = ++_drawableId;
       this._objectColor = null;
       this._mdRenderQueueRef = [];
