@@ -1173,6 +1173,11 @@ export class Mesh extends MeshBase implements BatchDrawable {
     const solid = this.primitive;
     if (ownMaterial && solid) {
       const coloration = this.getLodColorationMaterial(ctx);
+      // Render passes apply the materials of their item lists before drawing, which the
+      // coloration material is not part of
+      if (coloration && !coloration.apply(ctx)) {
+        return;
+      }
       const material = coloration ?? ownMaterial;
       const wireframe = this.getWireframe(ctx, solid);
       const primitive = wireframe ?? solid;
