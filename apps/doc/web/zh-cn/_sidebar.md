@@ -11,6 +11,7 @@
   - 基本框架
     - [基本框架](zh-cn/scene-basic.md)
     - [网格及材质](zh-cn/mesh-material.md)
+    - [细节层次（LOD）](zh-cn/mesh-lod.md)
     - [场景图及节点](zh-cn/scene-graph.md)
     - [资源加载](zh-cn/asset-loading.md)
     - [文本渲染](zh-cn/text-rendering.md)

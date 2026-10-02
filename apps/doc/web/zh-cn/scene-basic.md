@@ -160,6 +160,8 @@ getInput().use(function(evt, type) {
   **只设 `controller` 而不注册这一行，控制器收不到输入，相机不会响应鼠标。** 第二个参数是
   调用 `handleEvent` 时的 `this`。
 
+滚轮缩放与编辑器相机一致：每滚动一格（100 像素）沿视线移动 `zoomSpeed` 个单位，默认 5，按住 Ctrl 加速 10 倍、按住 Shift 减速到十分之一；相机最近停在距 `center` 0.01 处，不会穿过中心。
+
 以下是运行效果, 尝试用鼠标左键控制摄像机的观察角度：
 
 <div class="showcase" case="tut-4"></div>

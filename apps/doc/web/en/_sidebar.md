@@ -11,6 +11,7 @@
   - Basic Framework
     - [Basic Framework](en/scene-basic.md)
     - [Meshes and Materials](en/mesh-material.md)
+    - [Levels of Detail (LOD)](en/mesh-lod.md)
     - [Scene Graph And Nodes](en/scene-graph.md)
     - [Asset Loading](en/asset-loading.md)
     - [Text Rendering](en/text-rendering.md)

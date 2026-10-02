@@ -76,6 +76,27 @@ Parametric shapes created in the editor's primitive editor are tiny and are alwa
 
 ---
 
+## Levels of Detail (LOD)
+
+The mesh settings dialog can also generate levels of detail, simplified versions a mesh switches to farther from the camera. They are independent of compression: levels of detail without compression are fine, the derived copy then holds the uncompressed vertex data plus the indices of every level. How levels are chosen at runtime is covered in [Levels of Detail (LOD)](en/mesh-lod.md).
+
+| Setting | Meaning |
+| --- | --- |
+| **Levels of Detail** | Number of levels, the source mesh included, up to 8. Default 1: no levels are generated |
+| **Triangles Per Level** | Fraction of the previous level's triangles each level keeps, default 0.5, like Percent Triangles in UE's reduction settings |
+| **Pixel Error** | Pixel error the automatic switch distances allow, default 8, as UE's reduction PixelError. Higher values switch to simpler levels closer to the camera |
+
+How the levels are made:
+
+- Every level is simplified straight from the source mesh to its triangle target (the source count times the fraction for level 1, times its square for level 2, and so on) with [meshoptimizer](https://github.com/zeux/meshoptimizer). Simplification takes normals into account and keeps texture seams.
+- Simplification only writes new indices; **the vertex buffers and vertex order are unchanged**, so skinned meshes and meshes with morph targets can have levels too. The bone count is not reduced.
+- When simplifying further removes no more triangles, no further levels are made, so a mesh may end up with fewer levels than asked for.
+- Each level's switch distance comes from its simplification error, computed as UE's automatic LOD screen sizes: a level is used once its error projects to fewer than Pixel Error pixels on a 1920 pixel wide view with a 90 degree field of view.
+
+Only triangle list meshes get levels of detail; meshes of other topologies ignore these settings.
+
+---
+
 ## Where Settings Are Stored
 
 Settings live in a `.zmeta` file next to the asset: `rock.png` has `rock.png.zmeta`.
@@ -96,7 +117,7 @@ Compression runs in the background:
 - The status bar shows progress, such as `Compressing assets 3/12: rock.png`. Failures are counted there and explained in the console.
 - The editor itself loads the compressed copies, so what you see in the viewport is what players get.
 
-The bottom line of the settings dialogs shows where an asset stands, for example:
+The bottom line of the settings dialogs shows where an asset stands (the mesh settings dialog says `Derived copy`, as the copy may only add levels of detail), for example:
 
 ```
 Compressed copy: 2048.0 KB -> 683 KB, in use in the editor
@@ -112,7 +133,7 @@ Compressed copies are cached under `/.cache/derived` in the project, keyed by th
 
 **Build Project** ships the compressed copy of each asset set for compression, and the source file of everything else; see [Build & Deployment](en/editor/build-deploy.md). Scenes and scripts keep referencing source paths such as `/assets/rock.png`. The build lists which shipped file serves each of them in `asset-manifest.json`, and the engine reads that file at startup.
 
-If your scripts read an image or mesh file directly, for example with `fetch()` or `VFS.readFile()`, rather than loading it through the resource manager, set that asset's compression to **None**: the source file of a compressed asset is not in the build.
+If your scripts read an image or mesh file directly, for example with `fetch()` or `VFS.readFile()`, rather than loading it through the resource manager, set that asset's compression to **None**, and for a mesh its levels of detail to 1: the source file of an asset with a derived copy is not in the build.
 
 ---
 

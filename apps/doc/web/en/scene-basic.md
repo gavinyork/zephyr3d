@@ -181,6 +181,8 @@ Only two lines differ from the previous section (lines 22 and 24):
   input, and the camera will not respond to the mouse.** The second argument is the `this` value
   used when calling `handleEvent`.
 
+The mouse wheel zooms like the editor camera: each notch (100 pixels of scroll) moves the camera `zoomSpeed` units along the view direction, 5 by default, ten times as far with Ctrl held and a tenth with Shift. The camera stops 0.01 units from `center` rather than passing through it.
+
 Now, try dragging the left mouse button — you can rotate the camera around the scene’s target point.
 
 <div class="showcase" case="tut-4"></div>
