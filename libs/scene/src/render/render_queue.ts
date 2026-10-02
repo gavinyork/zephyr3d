@@ -589,6 +589,53 @@ export class RenderQueue extends Disposable {
       }
     }
   }
+  /**
+   * Give every drawable of the queue its object color and register it for GPU picking.
+   *
+   * @remarks
+   * {@link push} does this for queues culled in a frame that picks. A queue built once and kept
+   * across frames (BatchGroup) was usually built in a frame that did not, so it is done again
+   * whenever a frame picks.
+   *
+   * @internal
+   */
+  registerObjectColors() {
+    const map = this._objectColorMaps[0];
+    const register = (drawable: Drawable) => {
+      const material = drawable.getMaterial();
+      if (material) {
+        material.objectColor = drawable.getObjectColor();
+      }
+      map.set(drawable.getDrawableId(), drawable);
+    };
+    for (const drawable of this._instanceInfo.keys()) {
+      register(drawable);
+    }
+    const itemList = this._itemList;
+    if (itemList) {
+      for (const bundle of [
+        itemList.opaque,
+        itemList.transmission,
+        itemList.transparent,
+        itemList.transmission_trans
+      ]) {
+        for (const info of [...bundle.lit, ...bundle.unlit]) {
+          if (info.renderQueue === this) {
+            for (const list of [
+              info.itemList,
+              info.skinItemList,
+              info.morphItemList,
+              info.skinAndMorphItemList
+            ]) {
+              for (const item of list) {
+                register(item.drawable);
+              }
+            }
+          }
+        }
+      }
+    }
+  }
   /** @internal */
   getDrawableByColor(c: Uint8Array<ArrayBuffer>, map?: Map<number, Drawable>[]) {
     const id = (c[0] << 24) + (c[1] << 16) + (c[2] << 8) + c[3];

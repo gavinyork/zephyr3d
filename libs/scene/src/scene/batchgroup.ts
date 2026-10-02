@@ -216,6 +216,10 @@ export class BatchGroup extends GraphNode {
       queueInfo.queue.end(cullVisitor.camera, true);
       cullVisitor.frustumCulling = frustumCulling;
       cullVisitor.renderQueue = renderQueue;
+    } else if (cullVisitor.camera?.getPickResultResolveFunc()) {
+      // The queue is kept across frames and was built in one that did not pick, so its drawables
+      // have neither their object colors nor a place in the picking lookup
+      queueInfo.queue.registerObjectColors();
     }
     cullVisitor.pushRenderQueue(queueInfo.queue);
   }
