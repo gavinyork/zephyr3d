@@ -14,6 +14,7 @@ import {
   radian2degree
 } from '@zephyr3d/base';
 import { GraphNode } from '../../../scene';
+import type { Mesh } from '../../../scene/mesh';
 import type { ResourceManager } from '../manager';
 import {
   AnimationClip,
@@ -130,6 +131,18 @@ async function clearGeometryCacheBinding(node: SceneNode) {
 }
 
 /** @internal */
+/** Meshes with a material in the subtree of a node, the node included */
+function getSubtreeMeshes(node: SceneNode): Mesh[] {
+  const meshes: Mesh[] = [];
+  node.iterate((child) => {
+    if (child.isMesh() && child.material) {
+      meshes.push(child);
+    }
+    return false;
+  });
+  return meshes;
+}
+
 export function getSceneNodeClass(manager: ResourceManager): SerializableClass {
   return {
     ctor: SceneNode,
@@ -402,6 +415,36 @@ export function getSceneNodeClass(manager: ResourceManager): SerializableClass {
           },
           set(this: SceneNode, value) {
             this.showState = value.str[0] as SceneNodeVisible;
+          }
+        },
+        {
+          name: 'GeometryInstanceSubtree',
+          options: {
+            label: 'Geometry Instance (Subtree)'
+          },
+          description:
+            'Turns geometry instancing on or off for every mesh under this node at once, so copies of this model placed in the scene are drawn together in fewer draw calls. Checked when all of those meshes already use it',
+          type: 'bool',
+          isPersistent() {
+            return false;
+          },
+          isHidden(this: SceneNode) {
+            return !getSubtreeMeshes(this).some((mesh) => mesh !== this);
+          },
+          get(this: SceneNode, value) {
+            const meshes = getSubtreeMeshes(this);
+            value.bool[0] = meshes.length > 0 && meshes.every((mesh) => mesh.material!.$isInstance);
+          },
+          set(this: SceneNode, value) {
+            // Only meshes in the other state are switched, so existing instances keep their uniforms
+            for (const mesh of getSubtreeMeshes(this)) {
+              const material = mesh.material!;
+              if (value.bool[0] && !material.$isInstance) {
+                mesh.material = material.createInstance();
+              } else if (!value.bool[0] && material.$isInstance) {
+                mesh.material = material.coreMaterial;
+              }
+            }
           }
         },
         {
