@@ -112,6 +112,8 @@ export interface RenderQueueItem {
   sortDistance: number;
   instanceColor?: Vector4;
   instanceData: Nullable<InstanceData>;
+  /** Level of detail of the drawable's primitive, chosen when it was culled */
+  lod?: number;
 }
 
 /**
@@ -130,6 +132,8 @@ export interface RenderItemListInfo {
   instanceItemList: RenderQueueItem[];
   instanceRenderBundle?: RenderBundleWrapper;
   instanceList: Record<string, BatchDrawable[]>;
+  /** Level of detail of each instance list, by the same key */
+  instanceLods: Record<string, number>;
   materialList: Set<Material>;
   renderQueue: RenderQueue;
 }
@@ -448,8 +452,9 @@ export class RenderQueue extends Disposable {
    * Push an item to the render queue
    * @param camera - The camera for drawing the item
    * @param drawable - The object to be drawn
+   * @param lod - Level of detail to draw the drawable's primitive at, default 0
    */
-  push(camera: Camera, drawable: Drawable) {
+  push(camera: Camera, drawable: Drawable, lod = 0) {
     if (drawable) {
       drawable.pushRenderQueueRef(this._ref);
       if (!this._itemList) {
@@ -474,26 +479,30 @@ export class RenderQueue extends Disposable {
         this._objectColorMaps[0].set(drawable.getDrawableId(), drawable);
       }
       if (drawable.isBatchable()) {
-        const instanceList = trans
+        const info = trans
           ? transmission
             ? unlit
-              ? this._itemList.transmission_trans.unlit[0].instanceList
-              : this._itemList.transmission_trans.lit[0].instanceList
+              ? this._itemList.transmission_trans.unlit[0]
+              : this._itemList.transmission_trans.lit[0]
             : unlit
-              ? this._itemList.transparent.unlit[0].instanceList
-              : this._itemList.transparent.lit[0].instanceList
+              ? this._itemList.transparent.unlit[0]
+              : this._itemList.transparent.lit[0]
           : transmission
             ? unlit
-              ? this._itemList.transmission.unlit[0].instanceList
-              : this._itemList.transmission.lit[0].instanceList
+              ? this._itemList.transmission.unlit[0]
+              : this._itemList.transmission.lit[0]
             : unlit
-              ? this._itemList.opaque.unlit[0].instanceList
-              : this._itemList.opaque.lit[0].instanceList;
-        const hash = drawable.getInstanceId(this._renderPass);
+              ? this._itemList.opaque.unlit[0]
+              : this._itemList.opaque.lit[0];
+        const instanceList = info.instanceList;
+        // Levels of detail of one primitive draw different index ranges, each its own batch
+        const id = drawable.getInstanceId(this._renderPass);
+        const hash = lod > 0 ? `${id}:lod${lod}` : id;
         let drawableList = instanceList[hash];
         if (!drawableList) {
           drawableList = [];
           instanceList[hash] = drawableList;
+          info.instanceLods[hash] = lod;
         }
         drawableList.push(drawable);
       } else {
@@ -527,7 +536,8 @@ export class RenderQueue extends Disposable {
         this.binaryInsert(queue, {
           drawable,
           sortDistance: drawable.getSortDistance(camera),
-          instanceData: null
+          instanceData: null,
+          lod
         });
         if (material) {
           list.materialList.add(material.coreMaterial);
@@ -650,7 +660,8 @@ export class RenderQueue extends Disposable {
                   offset: bindGroup.offset,
                   numInstances: 0,
                   stride
-                }
+                },
+                lod: info.instanceLods[x] ?? 0
               };
               this.binaryInsert(info.instanceItemList, item);
               drawable.applyInstanceOffsetAndStride(this, stride, bindGroup.offset);
@@ -668,6 +679,7 @@ export class RenderQueue extends Disposable {
           }
         }
         info.instanceList = {};
+        info.instanceLods = {};
         if (createRenderBundles) {
           if (info.itemList.length > 0) {
             info.renderBundle = new RenderBundleWrapper();
@@ -775,6 +787,7 @@ export class RenderQueue extends Disposable {
       instanceItemList: [],
       materialList: new Set(),
       instanceList: {},
+      instanceLods: {},
       renderQueue: this
     } as RenderItemListInfo;
   }

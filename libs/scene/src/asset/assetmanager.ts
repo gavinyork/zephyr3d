@@ -981,7 +981,13 @@ export class AssetManager {
       primitive.createAndSetIndexBuffer(indexData);
     }
     primitive.primitiveType = header.primitiveType;
-    primitive.indexCount = header.indexCount;
+    if (header.lods && header.lods.length > 0) {
+      primitive.indexStart = header.lods[0].indexStart;
+      primitive.indexCount = header.lods[0].indexCount;
+      primitive.lods = header.lods.slice(1);
+    } else {
+      primitive.indexCount = header.indexCount;
+    }
     primitive.setBoundingVolume(
       new BoundingBox(
         new Vector3(header.boxMin[0], header.boxMin[1], header.boxMin[2]),

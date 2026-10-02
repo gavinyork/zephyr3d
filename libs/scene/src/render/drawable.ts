@@ -173,6 +173,11 @@ export interface DrawContext {
   readonly colorFormat: TextureFormat;
   /** Instance data buffer/metadata for the current drawing task (instanced rendering). */
   instanceData?: Nullable<InstanceData>;
+  /**
+   * Level of detail of the current drawing task's primitive, chosen when it was culled. Set per
+   * render queue item, 0 elsewhere.
+   */
+  primitiveLod?: number;
   /** Compositor used to apply post-processing effects at the end of the frame/pass. */
   compositor?: Nullable<Compositor>;
   /** @internal Map of punctual lights to their shadow map parameters for this pass. */

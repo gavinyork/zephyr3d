@@ -112,6 +112,20 @@ export function getCameraClass(): SerializableClass {
           }
         },
         {
+          name: 'LodDistanceScale',
+          description:
+            'Above 1 meshes with levels of detail switch to their simpler levels closer to the camera, below 1 they keep the detailed levels farther away',
+          type: 'float',
+          options: { minValue: 0, maxValue: 8 },
+          default: 1,
+          get(this: Camera, value) {
+            value.num[0] = this.lodDistanceScale;
+          },
+          set(this: Camera, value) {
+            this.lodDistanceScale = value.num[0];
+          }
+        },
+        {
           name: 'ScreenSpaceShadow',
           type: 'bool',
           default: true,

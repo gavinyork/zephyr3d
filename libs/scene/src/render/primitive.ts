@@ -27,6 +27,28 @@ import { RenderBundleWrapper } from './renderbundle_wrapper';
 import { getDevice } from '../app/api';
 
 /**
+ * A coarser level of detail of a {@link Primitive}: a range of its index buffer drawing the same
+ * vertices with fewer triangles (UE static mesh LODs built from one vertex buffer).
+ * @public
+ */
+export interface PrimitiveLod {
+  /** First index of the level */
+  indexStart: number;
+  /** Number of indices of the level */
+  indexCount: number;
+  /**
+   * Projected bounds size below which the level is used, UE's LOD ScreenSize: the diameter of the
+   * bounding sphere over the half screen extent (see computeBoundsScreenSize)
+   */
+  screenSize: number;
+  /**
+   * Added to screenSize when switching back to a finer level, so the level does not flip at the
+   * threshold every frame (UE skeletal mesh LODHysteresis)
+   */
+  hysteresis: number;
+}
+
+/**
  * Holds vertex/index data and draw parameters for a mesh geometry.
  *
  * Responsibilities:
@@ -71,6 +93,8 @@ export class Primitive
   protected _bbox: Nullable<BoundingVolume>;
   /** @internal Change tag increments when draw-affecting state changes. */
   private _changeTag: number;
+  /** @internal Levels of detail after the first, finest to coarsest */
+  protected _lods: PrimitiveLod[];
   /**
    * Create an empty primitive.
    *
@@ -92,6 +116,7 @@ export class Primitive
     this._id = ++Primitive._nextId;
     this._changeTag = 0;
     this._bbox = null;
+    this._lods = [];
   }
   /**
    * Unique runtime identifier of this primitive.
@@ -141,6 +166,7 @@ export class Primitive
     this.primitiveType = other.primitiveType;
     this.indexStart = other.indexStart;
     this.indexCount = other.indexCount;
+    this.lods = other.lods;
   }
   /**
    * Primitive topology.
@@ -181,6 +207,24 @@ export class Primitive
       this._changeTag++;
       RenderBundleWrapper.primitiveChanged(this);
     }
+  }
+  /**
+   * Levels of detail after the first, finest to coarsest, each a range of the index buffer.
+   * Level 0 is the draw range given by indexStart and indexCount. Empty by default.
+   */
+  get lods(): readonly Readonly<PrimitiveLod>[] {
+    return this._lods;
+  }
+  set lods(val: readonly Readonly<PrimitiveLod>[]) {
+    this._lods = (val ?? []).map((lod) => ({ ...lod }));
+    this._changeTag++;
+    RenderBundleWrapper.primitiveChanged(this);
+  }
+  /**
+   * Number of levels of detail, the first one included
+   */
+  get lodCount() {
+    return this._lods.length + 1;
   }
   /**
    * Query total vertex count from the position buffer, if present.
@@ -358,11 +402,14 @@ export class Primitive
    * Issue a non-instanced draw for the current topology and range.
    *
    * Preconditions: A valid vertex layout and `indexCount > 0`.
+   *
+   * @param lod - Level of detail to draw, clamped to the available levels. Default 0.
    */
-  draw() {
+  draw(lod = 0) {
     this.checkVertexLayout();
-    if (this.indexCount > 0) {
-      this._vertexLayout?.draw(this._primitiveType, this._indexStart, this.indexCount);
+    const [start, count] = this.getLodRange(lod);
+    if (count > 0) {
+      this._vertexLayout?.draw(this._primitiveType, start, count);
     }
   }
   /**
@@ -371,12 +418,22 @@ export class Primitive
    * Preconditions: A valid vertex layout and `indexCount > 0`.
    *
    * @param numInstances - Number of instances to draw.
+   * @param lod - Level of detail to draw, clamped to the available levels. Default 0.
    */
-  drawInstanced(numInstances: number) {
+  drawInstanced(numInstances: number, lod = 0) {
     this.checkVertexLayout();
-    if (this.indexCount > 0) {
-      this._vertexLayout?.drawInstanced(this._primitiveType, this._indexStart, this.indexCount, numInstances);
+    const [start, count] = this.getLodRange(lod);
+    if (count > 0) {
+      this._vertexLayout?.drawInstanced(this._primitiveType, start, count, numInstances);
     }
+  }
+  /** @internal Draw range of a level of detail as [indexStart, indexCount] */
+  private getLodRange(lod: number): [number, number] {
+    if (lod > 0 && this._lods.length > 0) {
+      const level = this._lods[Math.min(lod, this._lods.length) - 1];
+      return [level.indexStart, level.indexCount];
+    }
+    return [this._indexStart, this.indexCount];
   }
   /**
    * Issue a draw whose arguments are read from a GPU buffer, typically written by a compute pass

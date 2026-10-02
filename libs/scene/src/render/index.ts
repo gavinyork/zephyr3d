@@ -9,6 +9,7 @@ export * from './sky';
 export * from './clipmap';
 export * from './envlight';
 export * from './primitive';
+export * from './lod';
 export * from './cull_visitor';
 export * from './oit';
 export * from './weightedblended_oit';

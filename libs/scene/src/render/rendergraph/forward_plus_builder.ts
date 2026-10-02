@@ -174,6 +174,7 @@ function cloneActualSSSListInfo(source: RenderItemListInfo, _targetQueue: Render
     instanceItemList: filterActualSSSItemList(source.instanceItemList),
     materialList: filterActualSSSMaterialList(source.materialList),
     instanceList: {},
+    instanceLods: {},
     renderQueue: source.renderQueue
   };
 }

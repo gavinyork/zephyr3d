@@ -1,5 +1,5 @@
 import type { Nullable } from '@zephyr3d/base';
-import { applyMixins, castObservable, DRef } from '@zephyr3d/base';
+import { applyMixins, castObservable, DRef, Vector3 } from '@zephyr3d/base';
 import { GraphNode } from './graph_node';
 import type { MeshMaterial } from '../material';
 import { LambertMaterial, ShaderHelper } from '../material';
@@ -37,6 +37,10 @@ import type { SceneNode } from './scene_node';
 import { getDevice } from '../app/api';
 import type { SkinnedBoundingBox } from '../animation';
 import { calculateMorphBoundingBox } from '../animation/morphtarget';
+import type { Camera } from '../camera/camera';
+import { computeAABBScreenRadiusSquared, selectLod } from '../render/lod';
+
+const tmpLodCenter = new Vector3();
 
 /**
  * Callback invoked after a mesh finishes its per-frame update.
@@ -190,6 +194,12 @@ export class Mesh extends MeshBase implements BatchDrawable {
   protected _primitiveChangeTag: Nullable<number>;
   /** @internal */
   protected _postUpdateCallbacks: Set<MeshUpdateCallback>;
+  /** @internal */
+  protected _forcedLod: number;
+  /** @internal */
+  protected _minLod: number;
+  /** @internal Level of detail last selected for each camera, for the hysteresis */
+  protected _lodByCamera: Nullable<WeakMap<Camera, number>>;
   /**
    * Creates an instance of mesh node
    * @param scene - The scene to which the mesh node belongs
@@ -225,6 +235,9 @@ export class Mesh extends MeshBase implements BatchDrawable {
     this._materialChangeTag = null;
     this._primitiveChangeTag = null;
     this._postUpdateCallbacks = new Set();
+    this._forcedLod = -1;
+    this._minLod = 0;
+    this._lodByCamera = null;
   }
   /**
    * Returns the batch instance ID for the current render pass.
@@ -289,6 +302,60 @@ export class Mesh extends MeshBase implements BatchDrawable {
   }
   set castShadow(b) {
     this._castShadow = b;
+  }
+  /**
+   * Level of detail to always draw, or -1 to select it by the projected size (UE ForcedLodModel,
+   * counted from 0 here). Clamped to the levels of the primitive.
+   */
+  get forcedLod() {
+    return this._forcedLod;
+  }
+  set forcedLod(val: number) {
+    this._forcedLod = Math.max(-1, Math.floor(val));
+  }
+  /**
+   * Finest level of detail drawn when selecting by the projected size (UE MinLOD). Clamped to the
+   * levels of the primitive.
+   */
+  get minLod() {
+    return this._minLod;
+  }
+  set minLod(val: number) {
+    this._minLod = Math.max(0, Math.floor(val));
+  }
+  /**
+   * Selects the level of detail of the primitive for a view: forced, or picked from the projected
+   * size of the world bounds (UE ComputeStaticMeshLOD with skeletal mesh hysteresis, see
+   * {@link selectLod}). Always 0 for a primitive without levels.
+   *
+   * @param camera - The view's camera
+   * @returns The level of detail, 0 being the finest
+   */
+  selectLod(camera: Camera) {
+    const lods = this._primitive.get()?.lods;
+    if (!lods || lods.length === 0) {
+      return 0;
+    }
+    if (this._forcedLod >= 0) {
+      return Math.min(this._forcedLod, lods.length);
+    }
+    const bv = this.getWorldBoundingVolume();
+    if (!bv) {
+      return Math.min(this._minLod, lods.length);
+    }
+    const screenRadiusSquared = computeAABBScreenRadiusSquared(bv.toAABB(), camera, tmpLodCenter);
+    if (!this._lodByCamera) {
+      this._lodByCamera = new WeakMap();
+    }
+    const lod = selectLod(
+      lods,
+      screenRadiusSquared,
+      camera.lodDistanceScale,
+      this._lodByCamera.get(camera) ?? 0,
+      this._minLod
+    );
+    this._lodByCamera.set(camera, lod);
+    return lod;
   }
   /** Primitive of the mesh */
   get primitive() {
@@ -1075,6 +1142,11 @@ export class Mesh extends MeshBase implements BatchDrawable {
     const primitive = this.primitive;
     if (material && primitive) {
       if (this._useRenderBundle && !ctx.instanceData && hash) {
+        // Each level of detail records its own draw range
+        const lod = ctx.primitiveLod ?? 0;
+        if (lod > 0) {
+          hash = `${hash}:lod${lod}`;
+        }
         if (
           this._primitiveChangeTag !== primitive.changeTag ||
           this._materialChangeTag !== material.changeTag

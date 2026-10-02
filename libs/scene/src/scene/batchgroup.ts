@@ -2,6 +2,7 @@ import { GraphNode } from './graph_node';
 import type { CullVisitor, RenderPass } from '../render';
 import { RenderQueue, InstanceBindGroupAllocator } from '../render';
 import type { Scene } from './scene';
+import type { Mesh } from './mesh';
 import { BoundingBox, type BoundingVolume } from '../utility/bounding_volume';
 import { Matrix4x4 } from '@zephyr3d/base';
 
@@ -17,10 +18,15 @@ export class BatchGroup extends GraphNode {
     {
       queue: RenderQueue;
       tag: number;
+      /** Levels of detail of _lodMeshes the queue was built with */
+      lods: number[];
     }
   >;
   private readonly _bindGroupAllocator: InstanceBindGroupAllocator;
   private _changeTag: number;
+  /** Child meshes whose primitive has levels of detail, collected at _lodMeshesTag */
+  private _lodMeshes: Mesh[];
+  private _lodMeshesTag: number;
   private _staticBV: boolean;
   /**
    * Creates an instance of mesh node
@@ -30,6 +36,8 @@ export class BatchGroup extends GraphNode {
     super(scene);
     this._renderQueueMap = new Map();
     this._changeTag = 0;
+    this._lodMeshes = [];
+    this._lodMeshesTag = -1;
     this._bindGroupAllocator = new InstanceBindGroupAllocator();
     this._staticBV = false;
     const bvCallback = () => {
@@ -148,11 +156,15 @@ export class BatchGroup extends GraphNode {
     if (!queueInfo) {
       queueInfo = {
         queue: new RenderQueue(cullVisitor.renderPass, this._bindGroupAllocator),
-        tag: -1
+        tag: -1,
+        lods: []
       };
       this._renderQueueMap.set(cullVisitor.renderPass, queueInfo);
     }
-    if (queueInfo.tag !== this._changeTag) {
+    // The cached queue holds each child at the level of detail it was built with, so a child
+    // switching level rebuilds it; levels switch rarely thanks to the hysteresis
+    const lodsChanged = this.updateLods(cullVisitor, queueInfo.lods);
+    if (queueInfo.tag !== this._changeTag || lodsChanged) {
       queueInfo.tag = this._changeTag;
       queueInfo.queue.reset();
       const frustumCulling = cullVisitor.frustumCulling;
@@ -169,5 +181,27 @@ export class BatchGroup extends GraphNode {
       cullVisitor.renderQueue = renderQueue;
     }
     cullVisitor.pushRenderQueue(queueInfo.queue);
+  }
+  /** Selects the levels of detail of the child meshes having some, true if any differs from lods */
+  private updateLods(cullVisitor: CullVisitor, lods: number[]) {
+    if (this._lodMeshesTag !== this._changeTag) {
+      this._lodMeshesTag = this._changeTag;
+      this._lodMeshes = [];
+      this.iterate((node) => {
+        if (node.isMesh() && (node.primitive?.lodCount ?? 1) > 1) {
+          this._lodMeshes.push(node);
+        }
+      });
+    }
+    let changed = lods.length !== this._lodMeshes.length;
+    lods.length = this._lodMeshes.length;
+    for (let i = 0; i < this._lodMeshes.length; i++) {
+      const lod = this._lodMeshes[i].selectLod(cullVisitor.lodCamera);
+      if (lods[i] !== lod) {
+        lods[i] = lod;
+        changed = true;
+      }
+    }
+    return changed;
   }
 }

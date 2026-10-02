@@ -179,6 +179,34 @@ export function getMeshClass(manager: ResourceManager): SerializableClass {
           }
         },
         {
+          name: 'ForcedLod',
+          description:
+            'Always draws this level of detail, 0 being the most detailed; -1 lets the distance to the camera choose. Only for meshes with levels of detail',
+          type: 'int',
+          options: { minValue: -1 },
+          default: -1,
+          get(this: Mesh, value) {
+            value.num[0] = this.forcedLod;
+          },
+          set(this: Mesh, value) {
+            this.forcedLod = value.num[0];
+          }
+        },
+        {
+          name: 'MinLod',
+          description:
+            'Most detailed level of detail drawn when the distance chooses, 0 being the most detailed. Raise it to keep a mesh simpler up close',
+          type: 'int',
+          options: { minValue: 0 },
+          default: 0,
+          get(this: Mesh, value) {
+            value.num[0] = this.minLod;
+          },
+          set(this: Mesh, value) {
+            this.minLod = value.num[0];
+          }
+        },
+        {
           name: 'SkinnedBoundingInfo',
           description: 'Serialized skinned bounding data for the mesh',
           type: 'string',

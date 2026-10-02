@@ -33,15 +33,18 @@ export class CullVisitor implements Visitor<SceneNode | OctreeNode> {
   private readonly _isGPUPicking: boolean;
   /** @internal */
   private readonly _isShadowMapping: boolean;
+  /** @internal */
+  private _lodCamera: Camera;
   /**
    * Creates an instance of CullVisitor
    * @param renderPass - Render pass for the culling task
    * @param camera - Camera that will be used for culling
    * @param rendeQueue - RenderQueue
-   * @param viewPoint - Camera position of the primary render pass
+   * @param lodCamera - Camera whose view selects the levels of detail, the culling camera by default
    */
-  constructor(renderPass: RenderPass, camera: Camera, renderQueue: RenderQueue) {
+  constructor(renderPass: RenderPass, camera: Camera, renderQueue: RenderQueue, lodCamera?: Camera) {
     this._camera = camera;
+    this._lodCamera = lodCamera ?? camera;
     this._renderQueue = renderQueue;
     this._skipClipTest = false;
     this._renderPass = renderPass;
@@ -54,6 +57,16 @@ export class CullVisitor implements Visitor<SceneNode | OctreeNode> {
   }
   set camera(camera: Camera) {
     this._camera = camera || null;
+  }
+  /**
+   * The camera whose view selects the levels of detail: the view being rendered, which for shadow
+   * maps is not the culling camera
+   */
+  get lodCamera() {
+    return this._lodCamera;
+  }
+  set lodCamera(camera: Camera) {
+    this._lodCamera = camera;
   }
   /** true if cull with frustum culling, otherwise false. default is true */
   get frustumCulling() {
@@ -78,8 +91,8 @@ export class CullVisitor implements Visitor<SceneNode | OctreeNode> {
     return this._camera?.frustum || null;
   }
   /** @internal */
-  push(camera: Camera, drawable: Drawable) {
-    this.renderQueue.push(camera, drawable);
+  push(camera: Camera, drawable: Drawable, lod = 0) {
+    this.renderQueue.push(camera, drawable, lod);
   }
   /** @internal */
   pushRenderQueue(renderQueue: RenderQueue) {
@@ -211,7 +224,7 @@ export class CullVisitor implements Visitor<SceneNode | OctreeNode> {
     ) {
       const clipState = this.getClipStateWithNode(node);
       if (clipState !== ClipState.NOT_CLIPPED) {
-        this.push(this._camera, node);
+        this.push(this._camera, node, node.selectLod(this._lodCamera));
         return true;
       }
     }

@@ -123,7 +123,9 @@ export abstract class RenderPass extends Disposable {
    */
   cullScene(ctx: DrawContext, cullCamera: Camera) {
     const renderQueue = new RenderQueue(this);
-    const cullVisitor = new CullVisitor(this, cullCamera, renderQueue);
+    // Levels of detail follow the view being rendered, shadow cascades included (UE: shadow
+    // depth views take the LOD of their main view)
+    const cullVisitor = new CullVisitor(this, cullCamera, renderQueue, ctx.camera);
     if (ctx.scene.octree) {
       ctx.scene.octree.getRootNode().traverse(cullVisitor);
     } else {
@@ -157,6 +159,7 @@ export abstract class RenderPass extends Disposable {
     }
     for (const item of items) {
       ctx.instanceData = item.instanceData;
+      ctx.primitiveLod = item.lod ?? 0;
       const reverse = reverseWinding !== item.drawable.getNode().worldMatrixDet < 0;
       if (reverse) {
         ctx.device.reverseVertexWindingOrder(!ctx.device.isWindingOrderReversed());
@@ -175,6 +178,7 @@ export abstract class RenderPass extends Disposable {
         ctx.device.reverseVertexWindingOrder(!ctx.device.isWindingOrderReversed());
       }
     }
+    ctx.primitiveLod = 0;
     if (renderBundle && ctx.camera.commandBufferReuse && !disableRenderBundles) {
       renderBundle.endRenderBundle(hash);
     }

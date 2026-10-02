@@ -544,18 +544,21 @@ export class Material extends Disposable implements Clonable<Material>, IDisposa
    * - Else uses `ctx.instanceData.numInstances` if available.
    * - Else issues a non-instanced draw.
    *
+   * The primitive is drawn at the level of detail in `ctx.primitiveLod`.
+   *
    * @param pass - Pass number.
    * @param primitive - Primitive to draw.
    * @param ctx - Draw context.
    * @param numInstances - Explicit instance count (0 = auto).
    */
   drawPrimitive(pass: number, primitive: Primitive, ctx: DrawContext, numInstances: number) {
+    const lod = ctx.primitiveLod ?? 0;
     if (numInstances > 0) {
-      primitive.drawInstanced(numInstances);
+      primitive.drawInstanced(numInstances, lod);
     } else if (ctx.instanceData) {
-      primitive.drawInstanced(ctx.instanceData.numInstances);
+      primitive.drawInstanced(ctx.instanceData.numInstances, lod);
     } else {
-      primitive.draw();
+      primitive.draw(lod);
     }
   }
   /**

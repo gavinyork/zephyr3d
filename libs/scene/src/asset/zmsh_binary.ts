@@ -30,6 +30,23 @@ export interface ZmshBinaryHeader {
   encoding: 'meshopt' | 'none';
   attributes: ZmshBinaryStream[];
   indices: ZmshBinaryIndexStream | null;
+  /**
+   * Levels of detail, finest first, each a range of the index stream drawing the shared vertices.
+   * Absent for a single level, which draws all indexCount indices. The screen size of the first
+   * level is not used.
+   */
+  lods?: ZmshBinaryLod[];
+}
+
+/**
+ * One level of detail of a binary `.zmsh`, see {@link PrimitiveLod}.
+ * @public
+ */
+export interface ZmshBinaryLod {
+  indexStart: number;
+  indexCount: number;
+  screenSize: number;
+  hysteresis: number;
 }
 
 /**

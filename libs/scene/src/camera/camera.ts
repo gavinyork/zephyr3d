@@ -267,6 +267,8 @@ export class Camera extends SceneNode {
   protected _renderPath: RenderPath;
   /** @internal Whether command buffers may be reused for optimization. */
   protected _commandBufferReuse: boolean;
+  /** @internal Scale of mesh level of detail screen sizes. */
+  protected _lodDistanceScale: number;
   /** @internal Hi-Z acceleration enable (primarily for SSR). */
   protected _HiZ: boolean;
   protected _HiZNearest: boolean;
@@ -608,6 +610,7 @@ export class Camera extends SceneNode {
     this._SSAOBlurDepthCutoff = 2;
     this._pickResult = null;
     this._commandBufferReuse = true;
+    this._lodDistanceScale = 1;
     this._jitteredVPMatrix = new Matrix4x4();
     this._jitteredInvVPMatrix = new Matrix4x4();
     this._jitterValue = new Vector2(0, 0);
@@ -1575,6 +1578,16 @@ export class Camera extends SceneNode {
   }
   set commandBufferReuse(val) {
     this._commandBufferReuse = !!val;
+  }
+  /**
+   * Scale of the mesh level of detail switch sizes in this view (UE r.StaticMeshLODDistanceScale):
+   * above 1 meshes switch to coarser levels closer to the camera, below 1 farther away. Default 1.
+   */
+  get lodDistanceScale() {
+    return this._lodDistanceScale;
+  }
+  set lodDistanceScale(val) {
+    this._lodDistanceScale = Math.max(0, Number(val) || 0);
   }
   /** Whether this camera is adapted to screen settins */
   get adapted() {
