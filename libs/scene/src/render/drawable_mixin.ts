@@ -198,7 +198,7 @@ export function mixinDrawable<
           if ((this as unknown as Drawable).getBoneMatrices()) {
             drawableBindGroup.setValue(
               ShaderHelper.getBoneInvBindMatrixUniformName(),
-              (this as unknown as Mesh).invWorldMatrix
+              (this as unknown as Mesh).getSkinSpaceMatrix()
             );
           }
           drawableBindGroupTransfromTags.set(drawableBindGroup, currentTag);
@@ -259,10 +259,16 @@ export function mixinDrawable<
         drawableBindGroup.setTexture(ShaderHelper.getBoneMatricesUniformName(), boneTexture);
         drawableBindGroup.setValue(
           ShaderHelper.getBoneInvBindMatrixUniformName(),
-          (this as unknown as Mesh).invWorldMatrix
+          (this as unknown as Mesh).getSkinSpaceMatrix()
         );
         boneTextureSize.setXY(boneTexture.width, boneTexture.height);
         drawableBindGroup.setValue(ShaderHelper.getBoneTextureSizeUniformName(), boneTextureSize);
+        if (!ctx.instanceData) {
+          drawableBindGroup.setValue(
+            ShaderHelper.getSkinPaletteBaseUniformName(),
+            (this as unknown as Mesh).getSkinPaletteBase()
+          );
+        }
         drawableBindGroup.setTexture(
           ShaderHelper.getSkinInfluenceDataUniformName(),
           skinData?.texture?.get() ?? getDefaultSkinInfluenceTexture()

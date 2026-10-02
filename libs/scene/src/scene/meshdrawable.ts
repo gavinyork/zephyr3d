@@ -1,4 +1,4 @@
-import type { Nullable } from '@zephyr3d/base';
+import type { Matrix4x4, Nullable } from '@zephyr3d/base';
 import { DWeakRef } from '@zephyr3d/base';
 import { applyMixins, Disposable, DRef } from '@zephyr3d/base';
 import type { MeshMaterial } from '../material';
@@ -56,6 +56,14 @@ export class ProxyDrawableBase<T extends Disposable & Drawable = Mesh> extends D
   }
   getSkinInfluenceData(): Nullable<SkinInfluenceData> {
     return this._host.get()?.getSkinInfluenceData() ?? null;
+  }
+  /** @internal */
+  getSkinPaletteBase(): number {
+    return (this._host.get() as unknown as Nullable<Partial<Mesh>>)?.getSkinPaletteBase?.() ?? 0;
+  }
+  /** @internal */
+  getSkinSpaceMatrix(): Nullable<Matrix4x4> {
+    return (this._host.get() as unknown as Nullable<Partial<Mesh>>)?.getSkinSpaceMatrix?.() ?? null;
   }
   getSortDistance(camera: Camera): number {
     return this._host.get()?.getSortDistance(camera) ?? 0;

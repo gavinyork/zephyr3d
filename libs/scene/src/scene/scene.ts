@@ -11,6 +11,7 @@ import { SceneRenderer } from '../render';
 import type { Compositor } from '../posteffect';
 import type { Metadata } from 'draco3d';
 import { getDevice } from '../app/api';
+import { SkinPaletteAtlas } from '../animation/skin_palette_atlas';
 import type { IRenderable } from '../app';
 import {
   normalizeScriptAttachmentConfig,
@@ -513,6 +514,8 @@ export class Scene
       }
       this.updateNodePlacement(this._octree, this._nodePlaceList);
     }
+    // Skin binding palettes written by animation updates are uploaded once all nodes are updated
+    SkinPaletteAtlas.flushPending();
   }
   /**
    * Performs per-camera scene updates for the current frame.
@@ -537,6 +540,7 @@ export class Scene
       }
     }
     this.updateNodePlacement(this._octree, this._nodePlaceList);
+    SkinPaletteAtlas.flushPending();
   }
   /**
    * Applies placement changes for nodes in `list` to the given `octree`.

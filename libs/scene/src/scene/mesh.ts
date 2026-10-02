@@ -1,5 +1,5 @@
 import type { Nullable } from '@zephyr3d/base';
-import { applyMixins, castObservable, DRef, Vector3, Vector4 } from '@zephyr3d/base';
+import { applyMixins, castObservable, DRef, DWeakRef, Matrix4x4, Vector3, Vector4 } from '@zephyr3d/base';
 import { GraphNode } from './graph_node';
 import type { MeshMaterial } from '../material';
 import { LambertMaterial, ShaderHelper } from '../material';
@@ -38,7 +38,7 @@ import { mixinDrawable } from '../render/drawable_mixin';
 import { RenderBundleWrapper } from '../render/renderbundle_wrapper';
 import type { SceneNode } from './scene_node';
 import { getDevice } from '../app/api';
-import type { SkinnedBoundingBox } from '../animation';
+import type { SkinBinding, SkinnedBoundingBox } from '../animation';
 import { calculateMorphBoundingBox } from '../animation/morphtarget';
 import type { Camera } from '../camera/camera';
 import { computeAABBScreenRadiusSquared, selectLod } from '../render/lod';
@@ -169,6 +169,10 @@ export class Mesh extends MeshBase implements BatchDrawable {
   protected _skinBindingName: string;
   /** @internal */
   protected _boneMatrices: DRef<Texture2D>;
+  /** @internal Skin binding resolved from _skinBindingName at the last skeleton state update */
+  protected _skinBinding: DWeakRef<SkinBinding>;
+  /** @internal */
+  protected readonly _skinSpaceMatrix: Matrix4x4;
   /** @internal */
   protected _skinInfluenceData: Nullable<SkinInfluenceData>;
   /** @internal */
@@ -229,6 +233,8 @@ export class Mesh extends MeshBase implements BatchDrawable {
     this._skinnedBoundingInfo = null;
     this._animatedBoundingBox = null;
     this._boneMatrices = new DRef();
+    this._skinBinding = new DWeakRef();
+    this._skinSpaceMatrix = new Matrix4x4();
     this._skinInfluenceData = null;
     this._morphData = null;
     this._morphInfo = null;
@@ -602,6 +608,32 @@ export class Mesh extends MeshBase implements BatchDrawable {
    */
   getSkinInfluenceData() {
     return this._skinInfluenceData;
+  }
+  /**
+   * Gets the slot index of the skinning palette header in the bone matrix texture.
+   *
+   * @internal
+   */
+  getSkinPaletteBase() {
+    return this._skinBinding.get()?.paletteBase ?? 0;
+  }
+  /**
+   * Gets the matrix transforming skinning palette output to the local space of this mesh.
+   *
+   * @remarks
+   * Palette matrices are relative to the reference node of the skin binding, so this is
+   * `inverse(worldMatrix) * referenceNode.worldMatrix`.
+   *
+   * @internal
+   */
+  getSkinSpaceMatrix() {
+    const reference = this._skinBinding.get()?.referenceNode;
+    if (reference) {
+      Matrix4x4.multiplyAffine(this.invWorldMatrix, reference.worldMatrix, this._skinSpaceMatrix);
+    } else {
+      this._skinSpaceMatrix.set(this.invWorldMatrix);
+    }
+    return this._skinSpaceMatrix;
   }
   /**
    * Gets the external morph source descriptor.
@@ -1153,6 +1185,7 @@ export class Mesh extends MeshBase implements BatchDrawable {
       return;
     }
     const binding = this._skinBindingName && this.findSkinBindingById(this._skinBindingName);
+    this._skinBinding.set(binding || null);
     if (binding) {
       this.setBoneMatrices(binding.jointTexture);
       binding.computeBoundingBox(this._skinnedBoundingInfo!, this.invWorldMatrix);
@@ -1289,6 +1322,7 @@ export class Mesh extends MeshBase implements BatchDrawable {
     this._primitive.dispose();
     this._material.dispose();
     this._boneMatrices.dispose();
+    this._skinBinding.dispose();
     this.setSkinInfluenceData(null);
     this.setMorphData(null);
     this.setRenderMorphInfo(null);

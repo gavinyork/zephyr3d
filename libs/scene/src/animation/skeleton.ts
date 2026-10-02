@@ -1,11 +1,11 @@
-import { DRef, randomUUID, DWeakRef } from '@zephyr3d/base';
+import { randomUUID, DWeakRef } from '@zephyr3d/base';
 import type { Nullable, TypedArray } from '@zephyr3d/base';
 import { Quaternion } from '@zephyr3d/base';
-import { Disposable, Matrix4x4, Vector3, nextPowerOf2 } from '@zephyr3d/base';
-import type { Texture2D } from '@zephyr3d/device';
+import { Disposable, Matrix4x4, Vector3 } from '@zephyr3d/base';
 import type { SceneNode } from '../scene/scene_node';
 import { BoundingBox } from '../utility/bounding_volume';
-import { getDevice } from '../app/api';
+import { SkinPaletteAtlas } from './skin_palette_atlas';
+import type { SkinPaletteBlock } from './skin_palette_atlas';
 import type { SkeletonModifier } from './skeleton_modifier';
 
 /**
@@ -102,6 +102,10 @@ export interface SkinnedBoundingBox {
 
 const tmpV0 = new Vector3();
 const tmpV1 = new Vector3();
+const tmpMatrix = new Matrix4x4();
+const tmpMatrix2 = new Matrix4x4();
+/** Palette header slot: absolute slot indices of the current and previous sets */
+const tmpHeader = new Float32Array(16);
 
 /**
  * Humanoid joint mapping
@@ -408,11 +412,14 @@ function sideJointPatterns(
  * - Applies skinning state to associated meshes each frame.
  * - Computes animated axis-aligned bounding boxes using representative skinned vertices.
  *
- * Joint matrix texture layout:
- * - Texture format: `rgba32f`.
- * - Stored as a 2-layered ring buffer: current and previous joint transforms to support
- *   temporal addressing if needed. Offsets are tracked in `_jointOffsets[0]` (current)
- *   and `_jointOffsets[1]` (previous).
+ * Joint matrix palette layout:
+ * - A block of slots in the shared {@link SkinPaletteAtlas}, one slot per 4x4 matrix.
+ * - Slot 0 is a header holding the absolute slot indices of the current and previous sets.
+ * - The rest is a 2-layered ring buffer: current and previous joint transforms to support
+ *   temporal addressing. Offsets relative to the block are tracked in `_jointOffsets[0]`
+ *   (current) and `_jointOffsets[1]` (previous).
+ * - Palette matrices are relative to {@link SkinBinding.referenceNode}, so they do not change
+ *   when the whole character moves and can be shared by instances of the same model.
  *
  * Usage:
  * - Construct with a rig, bind data, meshes and submesh bounding info.
@@ -437,9 +444,9 @@ export class SkinBinding extends Disposable {
   /** @internal */
   protected _jointOffsets!: Float32Array<ArrayBuffer>;
   /** @internal */
-  protected _jointMatrixArray!: Float32Array<ArrayBuffer>;
+  protected _paletteBlock: Nullable<SkinPaletteBlock>;
   /** @internal */
-  protected _jointTexture: DRef<Texture2D>;
+  protected _paletteData!: Float32Array<ArrayBuffer>;
   /** @internal */
   protected _playing: boolean;
   /** @internal */
@@ -463,7 +470,7 @@ export class SkinBinding extends Disposable {
     this._rig = rig;
     this._joints = joints ?? rig.joints;
     this._inverseBindMatrices = inverseBindMatrices;
-    this._jointTexture = new DRef();
+    this._paletteBlock = null;
     this._playing = false;
     this._lastUpdateTime = 0;
     if (bindPose && bindPose !== rig.bindPose) {
@@ -543,10 +550,31 @@ export class SkinBinding extends Disposable {
   /**
    * Texture containing joint matrices for GPU skinning.
    *
-   * Each matrix is stored in 4 texels (one row per texel, RGBA = 4 floats).
+   * This is the shared {@link SkinPaletteAtlas} texture; the palette of this binding starts at
+   * slot {@link SkinBinding.paletteBase}. Each matrix is stored in 4 texels (one row per texel,
+   * RGBA = 4 floats).
    */
   get jointTexture() {
-    return this._jointTexture.get()!;
+    return SkinPaletteAtlas.instance.texture;
+  }
+  /**
+   * Index of the header slot of this binding's palette in the joint texture.
+   *
+   * @internal
+   */
+  get paletteBase() {
+    return this._paletteBlock?.base ?? 0;
+  }
+  /**
+   * Node the palette matrices are relative to: the parent of the rig's root joint, or null
+   * for world space.
+   *
+   * @remarks
+   * A mesh skinned by this binding transforms palette output to its local space by
+   * `inverse(mesh.worldMatrix) * referenceNode.worldMatrix`.
+   */
+  get referenceNode(): Nullable<SceneNode> {
+    return this._rig.rootJoint?.parent ?? null;
   }
   /**
    * Get joint index by joint node
@@ -581,8 +609,8 @@ export class SkinBinding extends Disposable {
    * @internal
    */
   updateJointMatrices() {
-    if (!this._jointTexture.get()) {
-      this._createJointTexture();
+    if (!this._paletteBlock) {
+      this._createPalette();
     }
     if (this._jointOffsets[0] === 0) {
       this._jointOffsets[0] = 1;
@@ -598,6 +626,7 @@ export class SkinBinding extends Disposable {
         this._jointMatrices[i + this._jointOffsets[0] - 1]
       );
     }
+    this._writePalette();
   }
   /**
    * Reset skeleton to bind pose
@@ -608,15 +637,15 @@ export class SkinBinding extends Disposable {
     this._rig.computeBindPose();
   }
   /**
-   * Compute current joint matrices from the nodes and upload them to the joint texture.
+   * Compute current joint matrices from the nodes and write them to the joint texture.
+   *
+   * @remarks
+   * The joint texture is uploaded once per frame when the scene update completes.
    *
    * @internal
    */
   apply() {
     this.updateJointMatrices();
-    const tex = this.jointTexture;
-    this._syncJointMatrixArray();
-    tex.update(this._jointMatrixArray, 0, 0, tex.width, tex.height);
   }
   /**
    * Apply all enabled modifiers.
@@ -692,7 +721,10 @@ export class SkinBinding extends Disposable {
    */
   protected onDispose() {
     super.onDispose();
-    this._jointTexture.dispose();
+    if (this._paletteBlock) {
+      SkinPaletteAtlas.instance.free(this._paletteBlock);
+      this._paletteBlock = null;
+    }
     const m = SkinBinding._registry.get(this._id);
     if (m?.get() === this) {
       SkinBinding._registry.delete(this._id);
@@ -700,39 +732,44 @@ export class SkinBinding extends Disposable {
     }
   }
   /**
-   * Initialize joint texture and CPU-side matrix storage.
+   * Allocate the palette block and CPU-side matrix storage.
    *
    * Layout details:
-   * - Texture size is the next power-of-two able to contain all matrices plus two offset texels.
-   * - `_jointMatrixArray` holds:
-   *   - First 2 vec4s: ring buffer offsets `[current, previous, 0, 0]`.
-   *   - Followed by 2×N matrices (current and previous), each as 16 floats.
-   * - `_jointMatrices` is a view into `_jointMatrixArray` providing Matrix4x4 objects per slot.
+   * - The block holds a header slot followed by 2×N matrix slots (current and previous).
+   * - `_jointOffsets` holds the ring buffer offsets `[current, previous]` relative to the block.
+   * - `_jointMatrices` holds the world-space skinning matrices of both sets, which CPU-side
+   *   consumers (bounds, cloth) read.
    *
    * @internal
    */
-  private _createJointTexture() {
-    const textureWidth = nextPowerOf2(Math.max(4, Math.ceil(Math.sqrt((this.joints.length * 2 + 1) * 4))));
-    const device = getDevice();
-    this._jointTexture.set(
-      device.createTexture2D('rgba32f', textureWidth, textureWidth, {
-        mipmapping: false,
-        samplerOptions: {
-          magFilter: 'nearest',
-          minFilter: 'nearest'
-        }
-      })
-    );
-    this._jointMatrixArray = new Float32Array(textureWidth * textureWidth * 4);
-    this._jointOffsets = this._jointMatrixArray.subarray(0, 2) as Float32Array<ArrayBuffer>;
-    this._jointOffsets[0] = 0;
-    this._jointOffsets[1] = 0;
+  private _createPalette() {
+    this._paletteBlock = SkinPaletteAtlas.instance.allocate(this.joints.length * 2 + 1);
+    this._paletteData = new Float32Array(this.joints.length * 16);
+    this._jointOffsets = new Float32Array(2);
     this._jointMatrices = Array.from({ length: this.joints.length * 2 }).map(() => new Matrix4x4());
   }
-  private _syncJointMatrixArray() {
-    for (let i = 0; i < this._jointMatrices.length; i++) {
-      this._jointMatrixArray.set(this._jointMatrices[i], (i + 1) * 16);
+  /**
+   * Write the header and the current set of matrices to the palette, relative to the
+   * reference node.
+   */
+  private _writePalette() {
+    const atlas = SkinPaletteAtlas.instance;
+    const base = this._paletteBlock!.base;
+    const reference = this.referenceNode;
+    const invReference = reference ? Matrix4x4.invertAffine(reference.worldMatrix, tmpMatrix) : null;
+    const offset = this._jointOffsets[0] - 1;
+    for (let i = 0; i < this.joints.length; i++) {
+      const matrix = this._jointMatrices[i + offset];
+      if (invReference) {
+        this._paletteData.set(Matrix4x4.multiplyAffine(invReference, matrix, tmpMatrix2), i * 16);
+      } else {
+        this._paletteData.set(matrix, i * 16);
+      }
     }
+    atlas.writeSlots(base + this._jointOffsets[0], this._paletteData);
+    tmpHeader[0] = base + this._jointOffsets[0];
+    tmpHeader[1] = base + this._jointOffsets[1];
+    atlas.writeSlots(base, tmpHeader);
   }
   /**
    * Build representative skinned bounding data for a submesh.

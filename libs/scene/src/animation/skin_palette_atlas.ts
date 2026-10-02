@@ -1,4 +1,4 @@
-import { Disposable } from '@zephyr3d/base';
+import { DRef, Disposable } from '@zephyr3d/base';
 import type { Nullable } from '@zephyr3d/base';
 import type { Texture2D } from '@zephyr3d/device';
 import { getDevice } from '../app/api';
@@ -40,12 +40,14 @@ export interface SkinPaletteBlock {
  *
  * Writes go to a CPU-side mirror and the dirty rows are uploaded once per frame by {@link flush}.
  * Growing the atlas replaces its texture; {@link changeTag} tells consumers holding the old one.
+ * The old texture is only released, so a consumer still holding a reference keeps it alive until
+ * it switches over.
  *
  * @internal
  */
 export class SkinPaletteAtlas extends Disposable {
   private static _instance: Nullable<SkinPaletteAtlas> = null;
-  private _texture: Nullable<Texture2D>;
+  private readonly _texture: DRef<Texture2D>;
   private _data: Float32Array<ArrayBuffer>;
   private _height: number;
   /** Free slot ranges sorted by base, never adjacent to each other */
@@ -55,7 +57,7 @@ export class SkinPaletteAtlas extends Disposable {
   private _changeTag: number;
   private constructor() {
     super();
-    this._texture = null;
+    this._texture = new DRef();
     this._height = INITIAL_HEIGHT;
     this._data = new Float32Array(ATLAS_WIDTH * this._height * 4);
     this._freeList = [{ base: 0, count: this.slotCapacity }];
@@ -70,10 +72,17 @@ export class SkinPaletteAtlas extends Disposable {
     }
     return this._instance;
   }
+  /** Upload the pending writes of the atlas, if one has been created */
+  static flushPending() {
+    if (this._instance && !this._instance.disposed) {
+      this._instance.flush();
+    }
+  }
   /** Atlas texture, created on first use and replaced when the atlas grows */
   get texture() {
-    if (!this._texture) {
-      this._texture = getDevice().createTexture2D('rgba32f', ATLAS_WIDTH, this._height, {
+    let texture = this._texture.get();
+    if (!texture) {
+      texture = getDevice().createTexture2D('rgba32f', ATLAS_WIDTH, this._height, {
         mipmapping: false,
         samplerOptions: {
           magFilter: 'nearest',
@@ -81,9 +90,10 @@ export class SkinPaletteAtlas extends Disposable {
           mipFilter: 'none'
         }
       })!;
+      this._texture.set(texture);
       this.markDirtyRows(0, this._height - 1);
     }
-    return this._texture;
+    return texture;
   }
   /** Width of the atlas in texels */
   get width() {
@@ -194,8 +204,7 @@ export class SkinPaletteAtlas extends Disposable {
   /** @internal */
   protected onDispose() {
     super.onDispose();
-    this._texture?.dispose();
-    this._texture = null;
+    this._texture.dispose();
     if (SkinPaletteAtlas._instance === this) {
       SkinPaletteAtlas._instance = null;
     }
@@ -232,10 +241,7 @@ export class SkinPaletteAtlas extends Disposable {
     this._data = data;
     this._height = height;
     this.free({ base: oldCapacity, count: this.slotCapacity - oldCapacity });
-    if (this._texture) {
-      this._texture.dispose();
-      this._texture = null;
-    }
+    this._texture.set(null);
     this.markDirtyRows(0, height - 1);
     this._changeTag++;
   }
