@@ -20,6 +20,8 @@ export class BatchGroup extends GraphNode {
       tag: number;
       /** Levels of detail of _lodMeshes the queue was built with */
       lods: number[];
+      /** Whether the queue was built for a camera coloring levels of detail */
+      lodColoration: boolean;
     }
   >;
   private readonly _bindGroupAllocator: InstanceBindGroupAllocator;
@@ -157,15 +159,18 @@ export class BatchGroup extends GraphNode {
       queueInfo = {
         queue: new RenderQueue(cullVisitor.renderPass, this._bindGroupAllocator),
         tag: -1,
-        lods: []
+        lods: [],
+        lodColoration: false
       };
       this._renderQueueMap.set(cullVisitor.renderPass, queueInfo);
     }
     // The cached queue holds each child at the level of detail it was built with, so a child
     // switching level rebuilds it; levels switch rarely thanks to the hysteresis
     const lodsChanged = this.updateLods(cullVisitor, queueInfo.lods);
-    if (queueInfo.tag !== this._changeTag || lodsChanged) {
+    const lodColoration = !!cullVisitor.camera?.lodColoration;
+    if (queueInfo.tag !== this._changeTag || lodsChanged || queueInfo.lodColoration !== lodColoration) {
       queueInfo.tag = this._changeTag;
+      queueInfo.lodColoration = lodColoration;
       queueInfo.queue.reset();
       const frustumCulling = cullVisitor.frustumCulling;
       const renderQueue = cullVisitor.renderQueue;

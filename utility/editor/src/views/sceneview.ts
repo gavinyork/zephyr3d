@@ -152,6 +152,7 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
   private _postGizmoCaptured: boolean;
   private _showTextureViewer: boolean;
   private _wireframe: boolean;
+  private _lodColoration: boolean;
   private _showDeviceInfo: boolean;
   private _showProfiler: boolean;
   /** Latest resolved render graph GPU profile, shown in the Profiler window. */
@@ -210,6 +211,7 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
     this._postGizmoCaptured = false;
     this._showTextureViewer = false;
     this._wireframe = false;
+    this._lodColoration = false;
     this._showDeviceInfo = false;
     this._showProfiler = false;
     this._profileResult = null;
@@ -648,6 +650,14 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
                 return true;
               },
               checked: () => this._wireframe
+            },
+            {
+              label: 'LOD Coloration',
+              action: () => {
+                this._lodColoration = !this._lodColoration;
+                return true;
+              },
+              checked: () => this._lodColoration
             },
             {
               label: 'Texture viewer',
@@ -1280,6 +1290,7 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
       camera.scissor = camera.screenViewport;
       // Whichever camera views the scene shows the editor's wireframe setting
       camera.wireframe = this._wireframe;
+      camera.lodColoration = this._lodColoration;
       camera!.render(this.controller.model.scene);
 
       // Render selected camera

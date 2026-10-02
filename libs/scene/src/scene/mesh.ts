@@ -1,5 +1,5 @@
 import type { Nullable } from '@zephyr3d/base';
-import { applyMixins, castObservable, DRef, Vector3 } from '@zephyr3d/base';
+import { applyMixins, castObservable, DRef, Vector3, Vector4 } from '@zephyr3d/base';
 import { GraphNode } from './graph_node';
 import type { MeshMaterial } from '../material';
 import { LambertMaterial, ShaderHelper } from '../material';
@@ -30,6 +30,7 @@ import {
   MORPH_ATTRIBUTE_VECTOR_COUNT,
   MORPH_WEIGHTS_VECTOR_COUNT,
   QUEUE_OPAQUE,
+  RENDER_PASS_TYPE_LIGHT,
   RENDER_PASS_TYPE_OBJECT_COLOR,
   RENDER_PASS_TYPE_SHADOWMAP
 } from '../values';
@@ -43,6 +44,18 @@ import type { Camera } from '../camera/camera';
 import { computeAABBScreenRadiusSquared, selectLod } from '../render/lod';
 
 const tmpLodCenter = new Vector3();
+
+/** UE BaseEngine.ini LODColorationColors, levels 0 to 7 */
+const LOD_COLORATION_COLORS: [number, number, number][] = [
+  [1, 1, 1],
+  [1, 0, 0],
+  [0, 1, 0],
+  [0, 0, 1],
+  [1, 1, 0],
+  [1, 0, 1],
+  [0, 1, 1],
+  [0.5, 0, 0.5]
+];
 
 /**
  * Callback invoked after a mesh finishes its per-frame update.
@@ -1156,9 +1169,11 @@ export class Mesh extends MeshBase implements BatchDrawable {
    * {@inheritDoc Drawable.draw}
    */
   draw(ctx: DrawContext, renderQueue: Nullable<RenderQueue>, hash?: string) {
-    const material = this.material;
+    const ownMaterial = this.material;
     const solid = this.primitive;
-    if (material && solid) {
+    if (ownMaterial && solid) {
+      const coloration = this.getLodColorationMaterial(ctx);
+      const material = coloration ?? ownMaterial;
       const wireframe = this.getWireframe(ctx, solid);
       const primitive = wireframe ?? solid;
       if (this._useRenderBundle && !ctx.instanceData && hash) {
@@ -1170,10 +1185,16 @@ export class Mesh extends MeshBase implements BatchDrawable {
         if (wireframe) {
           hash = `${hash}:wire${wireframe.id}`;
         }
-        if (this._primitiveChangeTag !== solid.changeTag || this._materialChangeTag !== material.changeTag) {
+        if (coloration) {
+          hash = `${hash}:lodcolor`;
+        }
+        if (
+          this._primitiveChangeTag !== solid.changeTag ||
+          this._materialChangeTag !== ownMaterial.changeTag
+        ) {
           this._renderBundle = {};
           this._primitiveChangeTag = solid.changeTag;
-          this._materialChangeTag = material.changeTag;
+          this._materialChangeTag = ownMaterial.changeTag;
         }
         const renderBundle = this._renderBundle![hash];
         if (!renderBundle) {
@@ -1189,6 +1210,25 @@ export class Mesh extends MeshBase implements BatchDrawable {
         material.draw(primitive, ctx);
       }
     }
+  }
+  /**
+   * @internal The material shading the level of detail in its color (UE LOD Coloration, drawn with
+   * a colored default material) in the light pass of a camera showing it, null otherwise. Depth,
+   * shadow and picking passes keep the mesh's own material.
+   */
+  private getLodColorationMaterial(ctx: DrawContext) {
+    if (!ctx.camera?.lodColoration || ctx.renderPass?.type !== RENDER_PASS_TYPE_LIGHT) {
+      return null;
+    }
+    const lod = Math.min(ctx.primitiveLod ?? 0, LOD_COLORATION_COLORS.length - 1);
+    let material = Mesh._lodColorationMaterials[lod];
+    if (!material) {
+      material = new LambertMaterial();
+      const [r, g, b] = LOD_COLORATION_COLORS[lod];
+      material.albedoColor = new Vector4(r, g, b, 1);
+      Mesh._lodColorationMaterials[lod] = material;
+    }
+    return material;
   }
   /** @internal The edge primitive to draw instead of the triangles, null to draw them */
   private getWireframe(ctx: DrawContext, primitive: Primitive) {
@@ -1279,6 +1319,8 @@ export class Mesh extends MeshBase implements BatchDrawable {
   }
   /** @internal */
   private static _defaultMaterial: Nullable<MeshMaterial> = null;
+  /** @internal Materials of the LOD coloration view, by level */
+  private static readonly _lodColorationMaterials: LambertMaterial[] = [];
   /** @internal */
   private static _getDefaultMaterial() {
     if (!this._defaultMaterial) {

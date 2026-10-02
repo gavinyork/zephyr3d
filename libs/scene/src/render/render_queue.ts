@@ -478,7 +478,9 @@ export class RenderQueue extends Disposable {
         drawable.getMaterial()!.objectColor = drawable.getObjectColor();
         this._objectColorMaps[0].set(drawable.getDrawableId(), drawable);
       }
-      if (drawable.isBatchable()) {
+      // Meshes colored by level of detail draw with another material than the one whose instance
+      // data a batch would hold
+      if (drawable.isBatchable() && !camera.lodColoration) {
         const info = trans
           ? transmission
             ? unlit

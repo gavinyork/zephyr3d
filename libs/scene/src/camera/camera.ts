@@ -271,6 +271,8 @@ export class Camera extends SceneNode {
   protected _lodDistanceScale: number;
   /** @internal Whether meshes are drawn as wireframes in this view. */
   protected _wireframe: boolean;
+  /** @internal Whether meshes are colored by their level of detail in this view. */
+  protected _lodColoration: boolean;
   /** @internal Hi-Z acceleration enable (primarily for SSR). */
   protected _HiZ: boolean;
   protected _HiZNearest: boolean;
@@ -614,6 +616,7 @@ export class Camera extends SceneNode {
     this._commandBufferReuse = true;
     this._lodDistanceScale = 1;
     this._wireframe = false;
+    this._lodColoration = false;
     this._jitteredVPMatrix = new Matrix4x4();
     this._jitteredInvVPMatrix = new Matrix4x4();
     this._jitterValue = new Vector2(0, 0);
@@ -1601,6 +1604,18 @@ export class Camera extends SceneNode {
   }
   set wireframe(val) {
     this._wireframe = !!val;
+  }
+  /**
+   * Whether every mesh of this view is shaded in the color of the level of detail it is drawn at,
+   * UE's LOD Coloration view mode: white, red, green, blue, yellow, fuchsia, cyan and purple for
+   * levels 0 to 7. A debug view, not saved with the camera; meshes are not batched while it is on.
+   * Default false.
+   */
+  get lodColoration() {
+    return this._lodColoration;
+  }
+  set lodColoration(val) {
+    this._lodColoration = !!val;
   }
   /** Whether this camera is adapted to screen settins */
   get adapted() {
