@@ -18,7 +18,10 @@ export interface OrbitCameraControllerOptions {
   center: Vector3;
   /** damping value */
   damping?: number;
-  /** Zooming speed */
+  /**
+   * Zooming speed: world units the camera moves toward or away from the center per 100 pixels of
+   * wheel scroll (one mouse wheel notch), as the editor camera does. Default 5.
+   */
   zoomSpeed?: number;
   /** Rotating speed */
   rotateSpeed?: number;
@@ -100,7 +103,7 @@ export class OrbitCameraController extends BaseCameraController {
         damping: 1,
         rotateSpeed: 1,
         panSpeed: 1,
-        zoomSpeed: 1,
+        zoomSpeed: 5,
         controls: {
           rotate: {
             button: 0,
@@ -225,7 +228,20 @@ export class OrbitCameraController extends BaseCameraController {
    * @override
    */
   protected _onMouseWheel(evt: IControllerWheelEvent) {
-    this.zoom(evt.deltaY);
+    // Same scroll handling as the editor camera (EditorCameraController._onMouseWheel)
+    let px = evt.deltaY;
+    if (evt.deltaMode === 1) {
+      px *= 16;
+    } else if (evt.deltaMode === 2) {
+      px *= window.innerHeight;
+    }
+    if (evt.ctrlKey) {
+      px *= 10;
+    }
+    if (evt.shiftKey) {
+      px *= 0.1;
+    }
+    this.zoom(Math.max(-100, Math.min(100, px)));
     return true;
   }
   /**
@@ -251,12 +267,19 @@ export class OrbitCameraController extends BaseCameraController {
     }
     return false;
   }
-  private zoom(dy: number) {
-    const distance = Vector3.distance(this.eyePos, this.options.center);
-    let t = dy > 0 ? this.options.zoomSpeed : dy < 0 ? -this.options.zoomSpeed : 0;
-    t = Math.exp(t * 0.1);
-    if (t > 1 || distance > 0.01) {
-      this.eyePos.combineBy(this.options.center, t, 1 - t);
+  /**
+   * Moves the eye along the view direction by zoomSpeed per 100 pixels, away from the center for
+   * positive values; it stops short of the center instead of passing through it
+   */
+  private zoom(px: number) {
+    const center = this.options.center;
+    const distance = Vector3.distance(this.eyePos, center);
+    if (distance < 1e-6 || px === 0) {
+      return;
+    }
+    const newDistance = Math.max(0.01, distance + this.options.zoomSpeed * px * 0.01);
+    if (newDistance !== distance) {
+      this.eyePos.combineBy(center, newDistance / distance, 1 - newDistance / distance);
     }
   }
   private matchesControl(
