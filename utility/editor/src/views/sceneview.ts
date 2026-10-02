@@ -151,6 +151,7 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
   private _pickResult: Nullable<PickResult>;
   private _postGizmoCaptured: boolean;
   private _showTextureViewer: boolean;
+  private _wireframe: boolean;
   private _showDeviceInfo: boolean;
   private _showProfiler: boolean;
   /** Latest resolved render graph GPU profile, shown in the Profiler window. */
@@ -208,6 +209,7 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
     this._pickResult = null;
     this._postGizmoCaptured = false;
     this._showTextureViewer = false;
+    this._wireframe = false;
     this._showDeviceInfo = false;
     this._showProfiler = false;
     this._profileResult = null;
@@ -638,6 +640,14 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
                 return true;
               },
               checked: () => !!this._postGizmoRenderer!.drawGrid
+            },
+            {
+              label: 'Wireframe',
+              action: () => {
+                this._wireframe = !this._wireframe;
+                return true;
+              },
+              checked: () => this._wireframe
             },
             {
               label: 'Texture viewer',
@@ -1268,6 +1278,8 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
       ];
       camera.viewport = camera.screenViewport;
       camera.scissor = camera.screenViewport;
+      // Whichever camera views the scene shows the editor's wireframe setting
+      camera.wireframe = this._wireframe;
       camera!.render(this.controller.model.scene);
 
       // Render selected camera

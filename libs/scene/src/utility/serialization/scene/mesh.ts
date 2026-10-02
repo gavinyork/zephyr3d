@@ -179,6 +179,19 @@ export function getMeshClass(manager: ResourceManager): SerializableClass {
           }
         },
         {
+          name: 'Wireframe',
+          description:
+            'Shows the mesh as the edges of its triangles, at the level of detail in use, to inspect its geometry. Shadows stay solid',
+          type: 'bool',
+          default: false,
+          get(this: Mesh, value) {
+            value.bool[0] = this.wireframe;
+          },
+          set(this: Mesh, value) {
+            this.wireframe = value.bool[0];
+          }
+        },
+        {
           name: 'ForcedLod',
           description:
             'Always draws this level of detail, 0 being the most detailed; -1 lets the distance to the camera choose. Only for meshes with levels of detail',

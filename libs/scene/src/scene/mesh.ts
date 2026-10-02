@@ -29,7 +29,9 @@ import {
   getMorphTargetLimit,
   MORPH_ATTRIBUTE_VECTOR_COUNT,
   MORPH_WEIGHTS_VECTOR_COUNT,
-  QUEUE_OPAQUE
+  QUEUE_OPAQUE,
+  RENDER_PASS_TYPE_OBJECT_COLOR,
+  RENDER_PASS_TYPE_SHADOWMAP
 } from '../values';
 import { mixinDrawable } from '../render/drawable_mixin';
 import { RenderBundleWrapper } from '../render/renderbundle_wrapper';
@@ -200,6 +202,8 @@ export class Mesh extends MeshBase implements BatchDrawable {
   protected _minLod: number;
   /** @internal Level of detail last selected for each camera, for the hysteresis */
   protected _lodByCamera: Nullable<WeakMap<Camera, number>>;
+  /** @internal */
+  protected _wireframe: boolean;
   /**
    * Creates an instance of mesh node
    * @param scene - The scene to which the mesh node belongs
@@ -238,12 +242,14 @@ export class Mesh extends MeshBase implements BatchDrawable {
     this._forcedLod = -1;
     this._minLod = 0;
     this._lodByCamera = null;
+    this._wireframe = false;
   }
   /**
    * Returns the batch instance ID for the current render pass.
    */
   getInstanceId(_renderPass: RenderPass) {
-    return `${this._instanceHash}:${this.worldMatrixDet >= 0}`;
+    // A wireframe mesh draws another primitive, so it cannot share a batch with solid ones
+    return `${this._instanceHash}:${this.worldMatrixDet >= 0}${this._wireframe ? ':wire' : ''}`;
   }
   /**
    * Returns the packed instance-uniform buffer used for batching.
@@ -302,6 +308,18 @@ export class Mesh extends MeshBase implements BatchDrawable {
   }
   set castShadow(b) {
     this._castShadow = b;
+  }
+  /**
+   * Whether the mesh is drawn as the edges of its triangles, at the level of detail in use, to
+   * inspect its geometry. Shadows and picking still use the triangles. {@link Camera.wireframe}
+   * shows every mesh of a view this way. The edges appear a few frames after the primitive is
+   * set or changed, as they are read back from the GPU.
+   */
+  get wireframe() {
+    return this._wireframe;
+  }
+  set wireframe(val: boolean) {
+    this._wireframe = !!val;
   }
   /**
    * Level of detail to always draw, or -1 to select it by the projected size (UE ForcedLodModel,
@@ -1139,20 +1157,22 @@ export class Mesh extends MeshBase implements BatchDrawable {
    */
   draw(ctx: DrawContext, renderQueue: Nullable<RenderQueue>, hash?: string) {
     const material = this.material;
-    const primitive = this.primitive;
-    if (material && primitive) {
+    const solid = this.primitive;
+    if (material && solid) {
+      const wireframe = this.getWireframe(ctx, solid);
+      const primitive = wireframe ?? solid;
       if (this._useRenderBundle && !ctx.instanceData && hash) {
         // Each level of detail records its own draw range
         const lod = ctx.primitiveLod ?? 0;
         if (lod > 0) {
           hash = `${hash}:lod${lod}`;
         }
-        if (
-          this._primitiveChangeTag !== primitive.changeTag ||
-          this._materialChangeTag !== material.changeTag
-        ) {
+        if (wireframe) {
+          hash = `${hash}:wire${wireframe.id}`;
+        }
+        if (this._primitiveChangeTag !== solid.changeTag || this._materialChangeTag !== material.changeTag) {
           this._renderBundle = {};
-          this._primitiveChangeTag = primitive.changeTag;
+          this._primitiveChangeTag = solid.changeTag;
           this._materialChangeTag = material.changeTag;
         }
         const renderBundle = this._renderBundle![hash];
@@ -1169,6 +1189,18 @@ export class Mesh extends MeshBase implements BatchDrawable {
         material.draw(primitive, ctx);
       }
     }
+  }
+  /** @internal The edge primitive to draw instead of the triangles, null to draw them */
+  private getWireframe(ctx: DrawContext, primitive: Primitive) {
+    const passType = ctx.renderPass?.type;
+    if (
+      (this._wireframe || ctx.camera?.wireframe) &&
+      passType !== RENDER_PASS_TYPE_SHADOWMAP &&
+      passType !== RENDER_PASS_TYPE_OBJECT_COLOR
+    ) {
+      return primitive.getWireframe();
+    }
+    return null;
   }
   /**
    * {@inheritDoc Drawable.getMaterial}

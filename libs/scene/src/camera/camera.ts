@@ -269,6 +269,8 @@ export class Camera extends SceneNode {
   protected _commandBufferReuse: boolean;
   /** @internal Scale of mesh level of detail screen sizes. */
   protected _lodDistanceScale: number;
+  /** @internal Whether meshes are drawn as wireframes in this view. */
+  protected _wireframe: boolean;
   /** @internal Hi-Z acceleration enable (primarily for SSR). */
   protected _HiZ: boolean;
   protected _HiZNearest: boolean;
@@ -611,6 +613,7 @@ export class Camera extends SceneNode {
     this._pickResult = null;
     this._commandBufferReuse = true;
     this._lodDistanceScale = 1;
+    this._wireframe = false;
     this._jitteredVPMatrix = new Matrix4x4();
     this._jitteredInvVPMatrix = new Matrix4x4();
     this._jitterValue = new Vector2(0, 0);
@@ -1588,6 +1591,16 @@ export class Camera extends SceneNode {
   }
   set lodDistanceScale(val) {
     this._lodDistanceScale = Math.max(0, Number(val) || 0);
+  }
+  /**
+   * Whether every mesh of this view is drawn as the edges of its triangles, at the level of detail
+   * in use, see {@link Mesh.wireframe}. A debug view, not saved with the camera. Default false.
+   */
+  get wireframe() {
+    return this._wireframe;
+  }
+  set wireframe(val) {
+    this._wireframe = !!val;
   }
   /** Whether this camera is adapted to screen settins */
   get adapted() {

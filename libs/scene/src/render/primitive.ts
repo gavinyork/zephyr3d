@@ -95,6 +95,10 @@ export class Primitive
   private _changeTag: number;
   /** @internal Levels of detail after the first, finest to coarsest */
   protected _lods: PrimitiveLod[];
+  /** @internal Line list of the triangle edges, see getWireframe() */
+  private _wireframe: Nullable<Primitive>;
+  /** @internal Change tag the wireframe was built or is being built for, -1 for none */
+  private _wireframeTag: number;
   /**
    * Create an empty primitive.
    *
@@ -117,6 +121,8 @@ export class Primitive
     this._changeTag = 0;
     this._bbox = null;
     this._lods = [];
+    this._wireframe = null;
+    this._wireframeTag = -1;
   }
   /**
    * Unique runtime identifier of this primitive.
@@ -465,10 +471,101 @@ export class Primitive
     }
   }
   /**
+   * The triangle edges of this primitive as a line list over the same vertex buffers, for
+   * wireframe display: one range of the index buffer per level of detail, so it draws at the same
+   * levels. Built asynchronously from the index buffer, which is read back from the GPU; returns
+   * null until ready, after any change to this primitive, and for primitives that are not
+   * triangle lists.
+   */
+  getWireframe(): Nullable<Primitive> {
+    if (this._primitiveType !== 'triangle-list') {
+      return null;
+    }
+    if (this._wireframeTag !== this._changeTag) {
+      this._wireframeTag = this._changeTag;
+      this._wireframe?.dispose();
+      this._wireframe = null;
+      const tag = this._changeTag;
+      this.buildWireframe().then(
+        (wireframe) => {
+          // Superseded by a change made while reading back
+          if (this.disposed || this._wireframeTag !== tag) {
+            wireframe?.dispose();
+          } else {
+            this._wireframe = wireframe;
+          }
+        },
+        (err) => console.error(`Building the wireframe of a primitive failed: ${err}`)
+      );
+    }
+    return this._wireframe;
+  }
+  /** @internal */
+  private async buildWireframe() {
+    const numVertices = this.getNumVertices();
+    if (numVertices <= 0) {
+      return null;
+    }
+    const ib = this.getIndexBuffer();
+    let indices: ArrayLike<number>;
+    if (ib) {
+      const bytes = await ib.getBufferSubData();
+      indices =
+        ib.indexType.primitiveType === PBPrimitiveType.U16
+          ? new Uint16Array(bytes.buffer, bytes.byteOffset, bytes.byteLength >> 1)
+          : new Uint32Array(bytes.buffer, bytes.byteOffset, bytes.byteLength >> 2);
+    } else {
+      indices = Array.from({ length: numVertices }, (_, i) => i);
+    }
+    const ranges: [number, number][] = [
+      [this._indexStart, this.indexCount],
+      ...this._lods.map((lod): [number, number] => [lod.indexStart, lod.indexCount])
+    ];
+    // Each triangle edge once per level, whichever triangle lists it first
+    const lines: number[] = [];
+    const lineRanges: [number, number][] = [];
+    for (const [start, count] of ranges) {
+      const first = lines.length;
+      const seen = new Set<number>();
+      const end = Math.min(start + count, indices.length);
+      for (let i = start; i + 2 < end; i += 3) {
+        for (let e = 0; e < 3; e++) {
+          const a = indices[i + e];
+          const b = indices[i + ((e + 1) % 3)];
+          const key = a < b ? a * numVertices + b : b * numVertices + a;
+          if (!seen.has(key)) {
+            seen.add(key);
+            lines.push(a, b);
+          }
+        }
+      }
+      lineRanges.push([first, lines.length - first]);
+    }
+    const wireframe = new Primitive();
+    for (const info of this._vertexLayoutOptions.vertexBuffers) {
+      wireframe.setVertexBuffer(info.buffer, info.stepMode);
+    }
+    wireframe.createAndSetIndexBuffer(numVertices > 0xffff ? new Uint32Array(lines) : new Uint16Array(lines));
+    wireframe.primitiveType = 'line-list';
+    wireframe.indexStart = lineRanges[0][0];
+    wireframe.indexCount = lineRanges[0][1];
+    wireframe.lods = this._lods.map((lod, i) => ({
+      ...lod,
+      indexStart: lineRanges[i + 1][0],
+      indexCount: lineRanges[i + 1][1]
+    }));
+    if (this._bbox) {
+      wireframe.setBoundingVolume(this._bbox);
+    }
+    return wireframe;
+  }
+  /**
    * Dispose this primitive and release associated GPU resources.
    */
   protected onDispose() {
     super.onDispose();
+    this._wireframe?.dispose();
+    this._wireframe = null;
     this._vertexLayout?.dispose();
     this._vertexLayout = null;
     if (this._vertexLayoutOptions) {
