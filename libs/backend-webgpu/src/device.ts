@@ -1040,10 +1040,7 @@ export class WebGPUDevice extends BaseDevice {
     if (!object) {
       return;
     }
-    if (this._captureRenderBundle) {
-      console.error('Indirect draw calls can not be captured into a render bundle');
-      return;
-    }
+    const indirect = { buffer: object, offset: indirectOffset, indexed };
     this._commandQueue.drawIndirect(
       this._currentProgram!,
       this._currentVertexData!,
@@ -1051,8 +1048,22 @@ export class WebGPUDevice extends BaseDevice {
       this._currentBindGroups,
       this._currentBindGroupOffsets,
       primitiveType,
-      { buffer: object, offset: indirectOffset, indexed }
+      indirect
     );
+    if (this._captureRenderBundle) {
+      // Render bundles replay indirect draws reading the arguments as they are at execution
+      this._captureRenderBundle.dc++;
+      this._commandQueue.captureIndirect(
+        this._captureRenderBundle.encoder,
+        this._currentProgram!,
+        this._currentVertexData!,
+        this._currentStateSet!,
+        this._currentBindGroups,
+        this._currentBindGroupOffsets,
+        primitiveType,
+        indirect
+      );
+    }
   }
   /** @internal */
   protected _compute(workgroupCountX: number, workgroupCountY: number, workgroupCountZ: number) {
