@@ -7,6 +7,7 @@ import { BoundingBox } from '../utility/bounding_volume';
 import type { AnimationSet } from './animationset';
 import type { SkinBinding } from './skeleton';
 import { SkinPaletteAtlas } from './skin_palette_atlas';
+import { AnimationBankGpuEvaluator } from './animation_bank_gpu';
 import type { SkinPaletteBlock } from './skin_palette_atlas';
 
 /**
@@ -51,6 +52,11 @@ export interface AnimationBankTrackOptions {
   loop?: boolean;
   /** Whether the position advances with time, default true */
   autoPlay?: boolean;
+  /**
+   * Where the palette is evaluated: 'auto' on the GPU where supported (WebGPU), 'cpu' always on the
+   * CPU. Default 'auto'
+   */
+  evaluation?: 'auto' | 'cpu';
 }
 
 const tmpMatrix = new Matrix4x4();
@@ -123,6 +129,10 @@ export class AnimationBank extends Disposable {
   /** Baked clips */
   get entries(): readonly AnimationBankEntry[] {
     return this._entries;
+  }
+  /** Inverse bind matrices of the joints of the skin */
+  get inverseBindMatrices(): readonly Matrix4x4[] {
+    return this._inverseBindMatrices;
   }
   /**
    * Gets the index of a baked clip by name.
@@ -323,6 +333,9 @@ export class AnimationBank extends Disposable {
  * Tracks advance once per frame before the skin palette atlas is uploaded. The palette keeps
  * the previous pose as well, for motion vectors.
  *
+ * Where supported (WebGPU), palettes are evaluated in a compute pass, see
+ * {@link AnimationBankTrackOptions.evaluation}; elsewhere on the CPU. Both produce the same pose.
+ *
  * @public
  */
 export class AnimationBankTrack extends Disposable {
@@ -331,6 +344,12 @@ export class AnimationBankTrack extends Disposable {
   private readonly _bank: AnimationBank;
   private _entryIndex: number;
   private _position: number;
+  /** Position at the previous evaluation, for the previous pose of GPU evaluation */
+  private _previousPosition: number;
+  /** Position the palette was last evaluated at */
+  private _evaluatedPosition: number;
+  /** Whether the palette is evaluated on the GPU, into fixed current and previous sets */
+  private readonly _gpu: boolean;
   private _playRate: number;
   private _loop: boolean;
   private _autoPlay: boolean;
@@ -349,13 +368,24 @@ export class AnimationBankTrack extends Disposable {
     this._loop = options?.loop ?? true;
     this._autoPlay = options?.autoPlay ?? true;
     this._position = this.wrap(options?.position ?? 0);
+    this._previousPosition = this._position;
+    this._evaluatedPosition = this._position;
+    this._gpu = (options?.evaluation ?? 'auto') === 'auto' && AnimationBankGpuEvaluator.isSupported();
     this._block = SkinPaletteAtlas.instance.allocate(bank.jointCount * 2 + 1);
     this._offsets = [0, 0];
     this._dirty = true;
-    this._palette = new Float32Array(bank.jointCount * 16);
+    this._palette = new Float32Array(this._gpu ? 0 : bank.jointCount * 16);
     this._meshes = new Map();
     AnimationBankTrack._activeTracks.add(this);
-    this.evaluate();
+    if (this._gpu) {
+      // Fixed sets, both rewritten by every dispatch
+      this._offsets[0] = 1;
+      this._offsets[1] = 1 + bank.jointCount;
+      this.writeHeader();
+      AnimationBankGpuEvaluator.addTrack(this);
+    } else {
+      this.evaluate();
+    }
   }
   /**
    * Advance all tracks by the frame time, once per device frame.
@@ -416,6 +446,18 @@ export class AnimationBankTrack extends Disposable {
   get paletteBase() {
     return this._block?.base ?? 0;
   }
+  /** Whether the palette is evaluated on the GPU */
+  get gpuEvaluated() {
+    return this._gpu;
+  }
+  /** @internal */
+  get entryIndex() {
+    return this._entryIndex;
+  }
+  /** @internal Position of the previous pose */
+  get previousPosition() {
+    return this._previousPosition;
+  }
   /**
    * Play another clip of the bank, keeping the playback options.
    *
@@ -433,6 +475,9 @@ export class AnimationBankTrack extends Disposable {
     }
     this._entryIndex = index;
     this._position = this.wrap(position);
+    // The previous pose belonged to another clip, so the new one starts still
+    this._previousPosition = this._position;
+    this._evaluatedPosition = this._position;
     this._dirty = true;
     for (const mesh of this._meshes.keys()) {
       this.attachMesh(mesh);
@@ -484,7 +529,12 @@ export class AnimationBankTrack extends Disposable {
       this._position = this.wrap(this._position + this._playRate * deltaInSeconds);
       this._dirty = true;
     }
-    if (this._dirty) {
+    if (this._gpu) {
+      // Evaluated by the next dispatch; a still pose evaluates to the same matrices twice
+      this._previousPosition = this._evaluatedPosition;
+      this._evaluatedPosition = this._position;
+      this._dirty = false;
+    } else if (this._dirty) {
       this.evaluate();
     } else if (this._offsets[1] !== this._offsets[0]) {
       // A still pose: point the previous set at the current one so motion vectors become zero
@@ -499,6 +549,9 @@ export class AnimationBankTrack extends Disposable {
       this.detachMesh(mesh);
     }
     AnimationBankTrack._activeTracks.delete(this);
+    if (this._gpu) {
+      AnimationBankGpuEvaluator.removeTrack(this);
+    }
     this._bank.removeTrack(this);
     if (this._block) {
       SkinPaletteAtlas.instance.free(this._block);

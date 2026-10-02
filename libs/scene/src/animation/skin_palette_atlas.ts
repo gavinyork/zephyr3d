@@ -47,6 +47,7 @@ export interface SkinPaletteBlock {
  */
 export class SkinPaletteAtlas extends Disposable {
   private static _instance: Nullable<SkinPaletteAtlas> = null;
+  private static readonly _uploadListeners: ((uploaded: boolean) => void)[] = [];
   private readonly _texture: DRef<Texture2D>;
   private _data: Float32Array<ArrayBuffer>;
   private _height: number;
@@ -72,17 +73,33 @@ export class SkinPaletteAtlas extends Disposable {
     }
     return this._instance;
   }
-  /** Upload the pending writes of the atlas, if one has been created */
+  /** Upload the pending writes of the atlas, if one has been created, then notify upload listeners */
   static flushPending() {
     if (this._instance && !this._instance.disposed) {
-      this._instance.flush();
+      const uploaded = this._instance.flush();
+      for (const listener of this._uploadListeners) {
+        listener(uploaded);
+      }
     }
+  }
+  /**
+   * Register a callback run by every {@link flushPending}, told whether rows were uploaded.
+   *
+   * @remarks
+   * For writers of the atlas texture other than the CPU mirror, whose slots an upload of the mirror
+   * rows covering them overwrites.
+   */
+  static addUploadListener(listener: (uploaded: boolean) => void) {
+    this._uploadListeners.push(listener);
   }
   /** Atlas texture, created on first use and replaced when the atlas grows */
   get texture() {
     let texture = this._texture.get();
     if (!texture) {
-      texture = getDevice().createTexture2D('rgba32f', ATLAS_WIDTH, this._height, {
+      const device = getDevice();
+      texture = device.createTexture2D('rgba32f', ATLAS_WIDTH, this._height, {
+        // Animation bank tracks evaluate their palettes in compute passes on WebGPU
+        writable: device.type === 'webgpu',
         mipmapping: false,
         samplerOptions: {
           magFilter: 'nearest',
@@ -182,10 +199,12 @@ export class SkinPaletteAtlas extends Disposable {
   }
   /**
    * Upload the rows written since the last flush to the atlas texture.
+   *
+   * @returns Whether any rows were uploaded
    */
   flush() {
     if (this._dirtyRowMax < 0) {
-      return;
+      return false;
     }
     const texture = this.texture;
     const rowFloats = ATLAS_WIDTH * 4;
@@ -200,6 +219,7 @@ export class SkinPaletteAtlas extends Disposable {
     );
     this._dirtyRowMin = Number.MAX_SAFE_INTEGER;
     this._dirtyRowMax = -1;
+    return true;
   }
   /** @internal */
   protected onDispose() {
