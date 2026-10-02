@@ -131,6 +131,9 @@ export interface RenderItemListInfo {
   skinAndMorphRenderBundle?: RenderBundleWrapper;
   instanceItemList: RenderQueueItem[];
   instanceRenderBundle?: RenderBundleWrapper;
+  /** Batches of skinned meshes, each instance reading its own palette from the skin palette atlas */
+  skinInstanceItemList: RenderQueueItem[];
+  skinInstanceRenderBundle?: RenderBundleWrapper;
   instanceList: Record<string, BatchDrawable[]>;
   /** Level of detail of each instance list, by the same key */
   instanceLods: Record<string, number>;
@@ -595,6 +598,9 @@ export class RenderQueue extends Disposable {
               if (info.instanceRenderBundle) {
                 info.instanceRenderBundle.dispose();
               }
+              if (info.skinInstanceRenderBundle) {
+                info.skinInstanceRenderBundle.dispose();
+              }
             }
           }
         }
@@ -665,7 +671,10 @@ export class RenderQueue extends Disposable {
                 },
                 lod: info.instanceLods[x] ?? 0
               };
-              this.binaryInsert(info.instanceItemList, item);
+              this.binaryInsert(
+                drawable.getBoneMatrices() ? info.skinInstanceItemList : info.instanceItemList,
+                item
+              );
               drawable.applyInstanceOffsetAndStride(this, stride, bindGroup.offset);
             }
             const instanceInfo = { bindGroup, offset: bindGroup.offset };
@@ -697,6 +706,9 @@ export class RenderQueue extends Disposable {
           }
           if (info.instanceItemList.length > 0) {
             info.instanceRenderBundle = new RenderBundleWrapper();
+          }
+          if (info.skinInstanceItemList.length > 0) {
+            info.skinInstanceRenderBundle = new RenderBundleWrapper();
           }
         }
       }
@@ -787,6 +799,7 @@ export class RenderQueue extends Disposable {
       morphItemList: [],
       skinAndMorphItemList: [],
       instanceItemList: [],
+      skinInstanceItemList: [],
       materialList: new Set(),
       instanceList: {},
       instanceLods: {},

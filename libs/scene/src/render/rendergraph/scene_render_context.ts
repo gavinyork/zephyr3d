@@ -211,7 +211,8 @@ class SceneRenderContextImpl implements SceneRenderContext {
             info.skinItemList,
             info.morphItemList,
             info.skinAndMorphItemList,
-            info.instanceItemList
+            info.instanceItemList,
+            info.skinInstanceItemList
           ];
           for (const list of sources) {
             for (const item of list) {

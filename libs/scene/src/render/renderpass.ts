@@ -267,6 +267,19 @@ export abstract class RenderPass extends Disposable {
           hash
         );
       }
+      if (itemList.skinInstanceItemList.length > 0) {
+        ctx.materialFlags |= MaterialVaryingFlags.SKIN_ANIMATION | MaterialVaryingFlags.INSTANCING;
+        ctx.materialFlags &= ~MaterialVaryingFlags.MORPH_ANIMATION;
+        itemList.materialList.forEach((mat) => mat.apply(ctx));
+        this.internalDrawItemList(
+          ctx,
+          itemList.skinInstanceItemList,
+          itemList.renderQueue,
+          itemList.skinInstanceRenderBundle ?? null,
+          reverseWinding,
+          hash
+        );
+      }
     }
   }
   /**

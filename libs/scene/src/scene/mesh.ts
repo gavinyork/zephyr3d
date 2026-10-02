@@ -268,7 +268,23 @@ export class Mesh extends MeshBase implements BatchDrawable {
    */
   getInstanceId(_renderPass: RenderPass) {
     // A wireframe mesh draws another primitive, so it cannot share a batch with solid ones
-    return `${this._instanceHash}:${this.worldMatrixDet >= 0}${this._wireframe ? ':wire' : ''}`;
+    const id = `${this._instanceHash}:${this.worldMatrixDet >= 0}${this._wireframe ? ':wire' : ''}`;
+    return this._boneMatrices.get() ? `${id}:skin:${this.getSkinSpaceKey()}` : id;
+  }
+  /**
+   * Key of the skin space matrix, equal for meshes that may share one in a batch.
+   *
+   * @remarks
+   * A batch transforms the palettes of all its instances by the skin space matrix of its first
+   * mesh. Instances of one model share it up to rounding, so the key is quantized.
+   */
+  private getSkinSpaceKey() {
+    const m = this.getSkinSpaceMatrix();
+    let key = '';
+    for (let i = 0; i < 16; i++) {
+      key += `${Math.round(m[i] * 1e4)},`;
+    }
+    return key;
   }
   /**
    * Returns the packed instance-uniform buffer used for batching.
@@ -1092,8 +1108,9 @@ export class Mesh extends MeshBase implements BatchDrawable {
   isBatchable(): this is BatchDrawable {
     return (
       this._batchable &&
-      !this._boneMatrices.get() &&
       !this._morphData &&
+      // Extra skin influences are read from a texture of each mesh, which a batch cannot vary
+      !(this._boneMatrices.get() && (this._skinInfluenceData?.influenceCount ?? 4) > 4) &&
       (this._material.get()?.isBatchable() ?? false)
     );
   }
@@ -1185,7 +1202,13 @@ export class Mesh extends MeshBase implements BatchDrawable {
       return;
     }
     const binding = this._skinBindingName && this.findSkinBindingById(this._skinBindingName);
+    const paletteBase = this.getSkinPaletteBase();
     this._skinBinding.set(binding || null);
+    if (this.getSkinPaletteBase() !== paletteBase) {
+      // Instance data and drawable uniforms hold the palette base and are not rewritten every frame
+      this.applyTransformUniformsAll();
+      RenderBundleWrapper.drawableChanged(this);
+    }
     if (binding) {
       this.setBoneMatrices(binding.jointTexture);
       binding.computeBoundingBox(this._skinnedBoundingInfo!, this.invWorldMatrix);
