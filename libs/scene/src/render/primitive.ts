@@ -434,7 +434,7 @@ export class Primitive
     }
   }
   /** @internal Draw range of a level of detail as [indexStart, indexCount] */
-  private getLodRange(lod: number): [number, number] {
+  getLodRange(lod: number): [number, number] {
     if (lod > 0 && this._lods.length > 0) {
       const level = this._lods[Math.min(lod, this._lods.length) - 1];
       return [level.indexStart, level.indexCount];
@@ -453,7 +453,7 @@ export class Primitive
    * firstInstance) otherwise. A non-zero firstInstance needs the 'indirect-first-instance'
    * feature.
    *
-   * Indirect draws cannot be captured into render bundles.
+   * Render bundles capturing an indirect draw read the arguments when they are executed.
    *
    * @param indirectBuffer - Buffer holding the draw arguments.
    * @param indirectOffset - Byte offset of the arguments, a multiple of 4.

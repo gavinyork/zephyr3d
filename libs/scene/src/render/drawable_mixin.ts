@@ -277,7 +277,7 @@ export function mixinDrawable<
       const drawableBindGroup = this.getDrawableBindGroup(device, !!ctx.instanceData, renderQueue!);
       device.setBindGroup(1, drawableBindGroup);
       if (ctx.instanceData) {
-        device.setBindGroup(3, ctx.instanceData.bindGroup.bindGroup);
+        device.setBindGroup(3, ctx.instanceData.culled?.bindGroup ?? ctx.instanceData.bindGroup.bindGroup);
       }
       if (ctx.materialFlags & MaterialVaryingFlags.SKIN_ANIMATION) {
         const boneTexture = (this as unknown as Mesh).getBoneMatrices()!;

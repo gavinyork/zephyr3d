@@ -103,8 +103,11 @@ export abstract class RenderPass extends Disposable {
   /** @internal */
   protected drawScene(ctx: DrawContext, renderCamera: Camera, cullCamera: Camera, renderQueue?: RenderQueue) {
     const device = ctx.device;
-    this.clearFramebuffer();
     const rq = renderQueue ?? this.cullScene(ctx, cullCamera);
+    // Compute passes culling batched instances for this view run before the framebuffer is
+    // cleared, so they do not split the render pass
+    rq?.cullInstances();
+    this.clearFramebuffer();
     if (rq) {
       const windingReversed = device.isWindingOrderReversed();
       device.reverseVertexWindingOrder(this.isAutoFlip(ctx) ? !windingReversed : windingReversed);

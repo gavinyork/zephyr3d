@@ -12,6 +12,8 @@ import type { Material } from '../material';
 import { ShaderHelper } from '../material';
 import { RenderBundleWrapper } from './renderbundle_wrapper';
 import { getDevice } from '../app/api';
+import { InstanceCuller } from './instance_culling';
+import type { InstanceCullingDraw } from './instance_culling';
 
 /** @public */
 export type CachedBindGroup = {
@@ -101,6 +103,8 @@ export interface InstanceData {
   stride: number;
   offset: number;
   numInstances: number;
+  /** Indirect draw of the instances left after GPU culling, see {@link InstanceCuller} */
+  culled?: Nullable<InstanceCullingDraw>;
 }
 
 /**
@@ -225,11 +229,22 @@ export class RenderQueue extends Disposable {
   private readonly _objectColorMaps: Map<number, Drawable>[];
   /** @internal */
   private _cullCamera: Nullable<Camera>;
+  /** @internal Culls the instances of the batches on the GPU, see InstanceCuller */
+  private _instanceCuller: Nullable<InstanceCuller>;
+  /** @internal Queues pushed into this one, which may cull their instances for its view */
+  private readonly _childQueues: RenderQueue[];
   /**
    * Creates an instance of a render queue
    * @param renderPass - The render pass to which the render queue belongs
+   * @param bindGroupAllocator - Allocator of instance data, default the shared one
+   * @param instanceCulling - Whether the instances of the batches are frustum culled on the GPU
+   *   for each view the queue is pushed to, where supported. For queues built once and replayed
    */
-  constructor(renderPass: RenderPass, bindGroupAllocator?: InstanceBindGroupAllocator) {
+  constructor(
+    renderPass: RenderPass,
+    bindGroupAllocator?: InstanceBindGroupAllocator,
+    instanceCulling?: boolean
+  ) {
     super();
     this._bindGroupAllocator = bindGroupAllocator ?? defaultInstanceBindGroupAlloator;
     this._itemList = null;
@@ -249,6 +264,26 @@ export class RenderQueue extends Disposable {
     this._drawTransparent = false;
     this._objectColorMaps = [new Map()];
     this._cullCamera = null;
+    this._instanceCuller = instanceCulling && InstanceCuller.isSupported() ? new InstanceCuller() : null;
+    this._childQueues = [];
+  }
+  /**
+   * Cull the instances of the queues pushed into this one for its view, before drawing it.
+   *
+   * @internal
+   */
+  cullInstances() {
+    for (const child of this._childQueues) {
+      child._instanceCuller?.cull(this);
+    }
+  }
+  /**
+   * Have the bounds of a batched drawable updated for GPU instance culling.
+   *
+   * @internal
+   */
+  markInstanceBoundsDirty(drawable: Drawable) {
+    this._instanceCuller?.markBoundsDirty(drawable);
   }
   /**
    * The camera this queue was culled with, set by {@link RenderQueue.end}.
@@ -412,6 +447,9 @@ export class RenderQueue extends Disposable {
    * @param queue - The render queue to be pushed
    */
   pushRenderQueue(queue: RenderQueue) {
+    if (queue._instanceCuller) {
+      this._childQueues.push(queue);
+    }
     this._waterList.push(...queue._waterList);
     const newItemLists = queue._itemList;
     if (!newItemLists) {
@@ -610,6 +648,7 @@ export class RenderQueue extends Disposable {
     this._ref.valid = false;
     this._ref = { ref: this, valid: true };
     this._instanceInfo.clear();
+    this._childQueues.length = 0;
     this._objectColorMaps.length = 0;
     this._objectColorMaps.push(new Map());
     this._shadowedLightList = [];
@@ -713,6 +752,17 @@ export class RenderQueue extends Disposable {
         }
       }
     }
+    if (this._instanceCuller) {
+      const items: RenderQueueItem[] = [];
+      for (const list of lists) {
+        for (const info of list) {
+          if (info.renderQueue === this) {
+            items.push(...info.instanceItemList, ...info.skinInstanceItemList);
+          }
+        }
+      }
+      this._instanceCuller.rebuild(items, this._instanceInfo);
+    }
     return this;
   }
   binaryInsert(itemList: RenderQueueItem[], item: RenderQueueItem) {
@@ -786,6 +836,8 @@ export class RenderQueue extends Disposable {
     this.reset();
     this._ref.valid = false;
     this._cullCamera = null;
+    this._instanceCuller?.dispose();
+    this._instanceCuller = null;
   }
 
   private drawableDistanceToCamera(drawable: Drawable, cameraPos: Vector3) {

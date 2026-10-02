@@ -3,6 +3,7 @@ import type { CullVisitor, RenderPass } from '../render';
 import { RenderQueue, InstanceBindGroupAllocator } from '../render';
 import type { Scene } from './scene';
 import type { Mesh } from './mesh';
+import type { SceneNode } from './scene_node';
 import { BoundingBox, type BoundingVolume } from '../utility/bounding_volume';
 import { Matrix4x4 } from '@zephyr3d/base';
 
@@ -30,6 +31,7 @@ export class BatchGroup extends GraphNode {
   private _lodMeshes: Mesh[];
   private _lodMeshesTag: number;
   private _staticBV: boolean;
+  private _gpuInstanceCulling: boolean;
   /**
    * Creates an instance of mesh node
    * @param scene - The scene to which the mesh node belongs
@@ -42,13 +44,22 @@ export class BatchGroup extends GraphNode {
     this._lodMeshesTag = -1;
     this._bindGroupAllocator = new InstanceBindGroupAllocator();
     this._staticBV = false;
-    const bvCallback = () => {
+    this._gpuInstanceCulling = true;
+    const bvCallback = (node: SceneNode) => {
       if (!this._staticBV) {
         this.invalidateBoundingVolume();
       }
+      // Bounds of the child mesh, transformed or animated
+      if (node?.isMesh()) {
+        for (const { queue } of this._renderQueueMap.values()) {
+          queue.markInstanceBoundsDirty(node);
+        }
+      }
     };
     const primitiveCallback = () => {
-      bvCallback();
+      if (!this._staticBV) {
+        this.invalidateBoundingVolume();
+      }
       this.invalidate();
     };
     const materialCallback = () => {
@@ -91,6 +102,27 @@ export class BatchGroup extends GraphNode {
         }
       });
     });
+  }
+  /**
+   * Whether the instances of the child meshes are frustum culled on the GPU, for each view the
+   * group is drawn in (WebGPU only). Default true.
+   *
+   * @remarks
+   * The group draws its child meshes as batches recorded once, which the CPU only culls as a whole.
+   * With this on, each view also drops the meshes it does not see from the batches before drawing
+   * them, which cuts the vertex work of large groups seen in part, shadow cascades included.
+   */
+  get gpuInstanceCulling() {
+    return this._gpuInstanceCulling;
+  }
+  set gpuInstanceCulling(val: boolean) {
+    if (val !== this._gpuInstanceCulling) {
+      this._gpuInstanceCulling = val;
+      for (const { queue } of this._renderQueueMap.values()) {
+        queue.dispose();
+      }
+      this._renderQueueMap.clear();
+    }
   }
   /** Gets the batch group name. */
   getName() {
@@ -157,7 +189,7 @@ export class BatchGroup extends GraphNode {
     let queueInfo = this._renderQueueMap.get(cullVisitor.renderPass);
     if (!queueInfo) {
       queueInfo = {
-        queue: new RenderQueue(cullVisitor.renderPass, this._bindGroupAllocator),
+        queue: new RenderQueue(cullVisitor.renderPass, this._bindGroupAllocator, this._gpuInstanceCulling),
         tag: -1,
         lods: [],
         lodColoration: false

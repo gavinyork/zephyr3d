@@ -102,7 +102,14 @@ import { ktx2Basis } from './scenes/ktx2';
 import { gltfCompression } from './scenes/gltf-compression';
 import { quantizedVertices } from './scenes/quantized-vertices';
 import { zmshBinary } from './scenes/zmsh-binary';
-import { skinAnimationBank, skinGpuAnimation, skinInstancedCpu } from './scenes/skinning';
+import {
+  skinAnimationBank,
+  skinBatchInstanceCulling,
+  skinBatchInstanceCullingOff,
+  skinGpuAnimation,
+  skinInstancedCpu
+} from './scenes/skinning';
+import { batchInstanceCulling, batchInstanceCullingOff } from './scenes/instance-culling';
 
 /**
  * Every scene, in a fixed order.
@@ -226,7 +233,11 @@ export const SCENES: VisualScene[] = [
   eyeSocketOcclusion,
   skinInstancedCpu,
   skinAnimationBank,
-  skinGpuAnimation
+  skinGpuAnimation,
+  batchInstanceCulling,
+  batchInstanceCullingOff,
+  skinBatchInstanceCulling,
+  skinBatchInstanceCullingOff
 ];
 
 export function findScene(name: string): VisualScene | undefined {

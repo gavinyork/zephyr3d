@@ -5,6 +5,7 @@ export * from './lightpass';
 export * from './shadowmap_pass';
 export * from './depthpass';
 export * from './render_queue';
+export type { InstanceCullingDraw } from './instance_culling';
 export * from './sky';
 export * from './clipmap';
 export * from './envlight';

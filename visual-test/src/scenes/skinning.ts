@@ -1,6 +1,7 @@
 import { DRef, Matrix4x4, Quaternion, Vector3, Vector4 } from '@zephyr3d/base';
 import {
   AnimationBank,
+  BatchGroup,
   Mesh,
   NodeRotationTrack,
   NodeTranslationTrack,
@@ -280,5 +281,54 @@ export const skinGpuAnimation: VisualScene = {
       model.animationSet.play('sway')?.seek(phase);
     });
     placeSkinningCamera(scene, camera);
+  }
+};
+
+/** Tubes along a row much wider than the view, so most of them are out of it */
+const ROW_COUNT = 13;
+
+/**
+ * gpuAnimation tubes in a BatchGroup, a row much wider than the view. With culling
+ * on, each view draws only the tubes its frustum keeps, tested against the bounds
+ * the banks bake per clip: tubes must neither vanish nor be clipped while swaying.
+ */
+function skinBatchCulling(
+  scene: Scene,
+  camera: Parameters<VisualScene['setup']>[0]['camera'],
+  culling: boolean
+) {
+  skinningStage(scene);
+  const tube = tubePrimitive();
+  const core = pbr(new Vector4(1, 1, 1, 1), 0, 0.6);
+  const group = new BatchGroup(scene);
+  group.gpuInstanceCulling = culling;
+  for (let i = 0; i < ROW_COUNT; i++) {
+    const material = core.createInstance();
+    material.albedoColor = TINTS[i % TINTS.length];
+    const { model } = tubeModel(scene, tube, material, (i - (ROW_COUNT - 1) / 2) * SPACING);
+    model.parent = group;
+    model.animationSet.gpuAnimation = true;
+    model.animationSet.play('sway')?.seek(PHASES[i % PHASES.length]);
+  }
+  placeSkinningCamera(scene, camera);
+}
+
+export const skinBatchInstanceCulling: VisualScene = {
+  name: 'skin-batch-instance-culling',
+  description:
+    'A row of gpuAnimation tubes in a BatchGroup, most of them out of view, culled per instance on the GPU against the per clip bounds of the banks. Must match skin-batch-instance-culling-off.',
+  frames: FRAMES,
+  setup({ scene, camera }) {
+    skinBatchCulling(scene, camera, true);
+  }
+};
+
+export const skinBatchInstanceCullingOff: VisualScene = {
+  name: 'skin-batch-instance-culling-off',
+  description:
+    'skin-batch-instance-culling with GPU instance culling turned off: the reference it must match.',
+  frames: FRAMES,
+  setup({ scene, camera }) {
+    skinBatchCulling(scene, camera, false);
   }
 };
