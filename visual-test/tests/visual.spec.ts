@@ -176,7 +176,8 @@ const SCENE_NAMES = [
   'eye-pupil-dilated',
   'eye-socket-occlusion',
   'skin-instanced-cpu',
-  'skin-animation-bank'
+  'skin-animation-bank',
+  'skin-gpu-animation'
 ];
 
 test('scene registry matches the harness page', async ({ harness }) => {

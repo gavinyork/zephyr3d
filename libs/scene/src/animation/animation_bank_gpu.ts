@@ -22,6 +22,8 @@ interface BankResources {
   bindGroup: DRef<BindGroup>;
   /** Offset of the keys of each entry in the key buffer, in floats */
   entryOffsets: number[];
+  /** Version of the bank the buffers hold */
+  version: number;
 }
 
 /**
@@ -71,13 +73,15 @@ export class AnimationBankGpuEvaluator {
   static removeTrack(track: AnimationBankTrack) {
     const info = this._banks.get(track.bank);
     if (info?.tracks.delete(track) && info.tracks.size === 0) {
-      const res = info.res;
-      res.keys.dispose();
-      res.inverseBind.dispose();
-      res.jobs.dispose();
-      res.bindGroup.dispose();
+      this.releaseResources(info.res);
       this._banks.delete(track.bank);
     }
+  }
+  private static releaseResources(res: BankResources) {
+    res.keys.dispose();
+    res.inverseBind.dispose();
+    res.jobs.dispose();
+    res.bindGroup.dispose();
   }
   /**
    * Evaluate once per frame, and again whenever the atlas uploads rows from its CPU mirror,
@@ -88,6 +92,11 @@ export class AnimationBankGpuEvaluator {
     if (this._banks.size > 0 && (uploaded || frame !== this._dispatchFrame)) {
       this._dispatchFrame = frame;
       for (const [bank, info] of this._banks) {
+        if (info.res.version !== bank.version) {
+          // Clips were baked into the bank since its keys were uploaded
+          this.releaseResources(info.res);
+          info.res = this.createResources(bank);
+        }
         this.dispatch(bank, info.tracks, info.res);
       }
     }
@@ -167,7 +176,8 @@ export class AnimationBankGpuEvaluator {
       jobCapacity,
       jobData,
       bindGroup: new DRef(bindGroup),
-      entryOffsets
+      entryOffsets,
+      version: bank.version
     };
   }
   private static createStorageBuffer(bytes: number, dynamic: boolean) {

@@ -95,6 +95,7 @@ export class AnimationBank extends Disposable {
   private readonly _inverseBindMatrices: Matrix4x4[];
   private readonly _entries: AnimationBankEntry[];
   private readonly _tracks: Set<AnimationBankTrack>;
+  private _version: number;
   /**
    * Bake clips of an animation set into a bank for one skin.
    *
@@ -105,7 +106,8 @@ export class AnimationBank extends Disposable {
    *
    * @param animationSet - Animation set holding the clips
    * @param binding - Skin binding whose joints the clips animate
-   * @param clipNames - Names of the clips to bake, default all clips of the set
+   * @param clipNames - Names of the clips to bake, default all clips of the set. More can be added
+   *   later with {@link addClip}
    */
   constructor(animationSet: AnimationSet, binding: SkinBinding, clipNames?: string[]) {
     super();
@@ -114,13 +116,37 @@ export class AnimationBank extends Disposable {
     this._inverseBindMatrices = binding.inverseBindMatrices.map((m) => new Matrix4x4(new Float32Array(m)));
     this._entries = [];
     this._tracks = new Set();
+    this._version = 0;
     const names = clipNames ?? animationSet.getAnimationNames();
     for (const name of names) {
-      const entry = this.bakeClip(animationSet, binding, name);
-      if (entry) {
-        this._entries.push(entry);
-      }
+      this.addClip(animationSet, binding, name);
     }
+  }
+  /**
+   * Bake one more clip into the bank.
+   *
+   * @param animationSet - Animation set holding the clip
+   * @param binding - Skin binding the bank was baked for, or a compatible one
+   * @param name - Name of the clip
+   * @returns Index of the entry, the existing one if the clip has been baked already, or -1 if
+   *   the clip does not animate the joints of the skin
+   */
+  addClip(animationSet: AnimationSet, binding: SkinBinding, name: string) {
+    const index = this.getEntryIndex(name);
+    if (index >= 0) {
+      return index;
+    }
+    const entry = this.bakeClip(animationSet, binding, name);
+    if (!entry) {
+      return -1;
+    }
+    this._entries.push(entry);
+    this._version++;
+    return this._entries.length - 1;
+  }
+  /** Increased each time a clip is added */
+  get version() {
+    return this._version;
   }
   /** Number of joints of the skin */
   get jointCount() {
@@ -151,7 +177,10 @@ export class AnimationBank extends Disposable {
   isCompatible(binding: SkinBinding) {
     const joints = binding.joints;
     return (
-      joints.length === this._jointCount && joints.every((joint, i) => joint.name === this._jointNames[i])
+      joints.length === this._jointCount &&
+      joints.every((joint, i) => joint.name === this._jointNames[i]) &&
+      // Skins sharing a rig differ by their inverse bind matrices
+      binding.inverseBindMatrices.every((m, i) => m.equalsTo(this._inverseBindMatrices[i], 1e-4))
     );
   }
   /**
@@ -491,12 +520,13 @@ export class AnimationBankTrack extends Disposable {
    * attached meshes stop updating their own palettes until detached.
    *
    * @param node - Root of the model, typically an instance of the model the bank was baked from
+   * @param binding - If given, only meshes skinned by this binding are attached
    * @returns Number of meshes attached
    */
-  attach(node: SceneNode) {
+  attach(node: SceneNode, binding?: SkinBinding) {
     let count = 0;
     node.iterate((child) => {
-      if (child.isMesh() && this.attachMesh(child)) {
+      if (child.isMesh() && this.attachMesh(child, binding)) {
         count++;
       }
       return false;
@@ -558,9 +588,9 @@ export class AnimationBankTrack extends Disposable {
       this._block = null;
     }
   }
-  private attachMesh(mesh: Mesh) {
+  private attachMesh(mesh: Mesh, only?: SkinBinding) {
     const binding = mesh.findSkinBindingById(mesh.skinBindingName);
-    if (!binding || !this._bank.isCompatible(binding)) {
+    if (!binding || (only && binding !== only) || !this._bank.isCompatible(binding)) {
       return false;
     }
     const previous = mesh.getSkinPaletteOverride();

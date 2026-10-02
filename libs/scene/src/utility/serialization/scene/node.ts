@@ -635,6 +635,27 @@ export function getSceneNodeClass(manager: ResourceManager): SerializableClass {
           }
         },
         {
+          name: 'GPUAnimation',
+          options: {
+            label: 'GPU Animation'
+          },
+          description:
+            "Plays this model's skeletal animations from baked poses computed on the GPU, so many copies of it can animate together at little CPU cost. IK, joint dynamics, cloth, items attached to bones and blends between animations keep working by switching back to regular animation while they are in use",
+          type: 'bool',
+          default: false,
+          isHidden(this: SceneNode) {
+            return !(this._animationSet.get()?.skinBindings.length ?? 0);
+          },
+          get(this: SceneNode, value) {
+            value.bool[0] = this._animationSet.get()?.gpuAnimation ?? false;
+          },
+          set(this: SceneNode, value) {
+            if (value.bool[0] || this._animationSet.get()) {
+              this.animationSet.gpuAnimation = value.bool[0];
+            }
+          }
+        },
+        {
           name: 'Rigs',
           description: 'Shared skeleton rigs used by the node animations',
           type: 'object_array',

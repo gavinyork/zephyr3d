@@ -21,6 +21,7 @@ import type { SkeletonBindPose, SkeletonRig, SkinBinding } from './skeleton';
 import { HumanoidBodyRig } from './skeleton';
 import type { SkeletalAnimationMaskOptions } from './animationmask';
 import { createSkeletalMaskedAnimationClip } from './animationmask';
+import { GpuAnimationDriver } from './gpu_animation_driver';
 
 /**
  * How a new playback copies phase from an existing active playback.
@@ -1379,6 +1380,8 @@ export class AnimationSet extends makeObservable(Disposable)<AnimationSetEventMa
    * @internal
    */
   private readonly _timelineTickers: Set<(deltaInSeconds: number) => void>;
+  private _gpuAnimation: boolean;
+  private _gpuDriver: Nullable<GpuAnimationDriver>;
   /**
    * Create an AnimationSet controlling the provided model.
    *
@@ -1395,6 +1398,42 @@ export class AnimationSet extends makeObservable(Disposable)<AnimationSetEventMa
     this._skeletons = [];
     this._rigs = [];
     this._timelineTickers = new Set();
+    this._gpuAnimation = false;
+    this._gpuDriver = null;
+  }
+  /**
+   * Whether skeletal animation may be played from baked poses, evaluated on the GPU where
+   * supported. Default false.
+   *
+   * @remarks
+   * Playback, events and the playback API stay the same. While exactly one clip is active, animating
+   * only the joints of the model, the joint nodes are left alone and the skinned meshes are posed by
+   * {@link AnimationBankTrack}s instead: clips are baked once per model and shared by all its
+   * instances, the poses are evaluated in a compute pass on WebGPU, and the meshes stay batchable.
+   *
+   * Frames that do not meet those conditions are posed on the regular path, without a visible jump:
+   * cross fades and other blends of clips, skeleton modifiers such as IK and joint dynamics, GPU
+   * cloth, and nodes attached below joints (which follow the joint nodes). In the editor, outside
+   * of play mode, animation always takes the regular path.
+   *
+   * Since joint nodes are not moved while baked poses are played, code reading joint transforms sees
+   * them as they were when the baked poses took over.
+   */
+  get gpuAnimation() {
+    return this._gpuAnimation;
+  }
+  set gpuAnimation(val: boolean) {
+    if (val !== this._gpuAnimation) {
+      this._gpuAnimation = val;
+      if (!val) {
+        this._gpuDriver?.dispose();
+        this._gpuDriver = null;
+      }
+    }
+  }
+  /** Whether the skinned meshes are currently posed from baked poses, see {@link gpuAnimation} */
+  get isPlayingOnGpu() {
+    return !!this._gpuDriver?.active;
   }
   /**
    * Register a callback advanced by {@link update} using the same delta time as the animations.
@@ -1615,6 +1654,21 @@ export class AnimationSet extends makeObservable(Disposable)<AnimationSetEventMa
         }
       }
     });
+    if (this._gpuAnimation) {
+      let clip: Nullable<AnimationClip> = null;
+      let time = 0;
+      if (this._activeAnimations.size === 1) {
+        const [[k, v]] = this._activeAnimations;
+        clip = k;
+        time = v.currentTime;
+      }
+      this._gpuDriver ??= new GpuAnimationDriver(this);
+      if (this._gpuDriver.update(clip, time)) {
+        // Bank tracks pose the skinned meshes: no joint node to pose, no palette to write
+        this._timelineTickers.forEach((ticker) => ticker(deltaInSeconds));
+        return;
+      }
+    }
     // Update tracks
     this._activeTracks.forEach((v, k) => {
       v.forEach((alltracks) => {
@@ -2900,6 +2954,8 @@ export class AnimationSet extends makeObservable(Disposable)<AnimationSetEventMa
    */
   protected onDispose() {
     super.onDispose();
+    this._gpuDriver?.dispose();
+    this._gpuDriver = null;
     for (const k in this._animations) {
       this._animations[k]!.dispose();
     }

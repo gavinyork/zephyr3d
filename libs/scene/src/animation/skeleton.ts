@@ -447,6 +447,19 @@ export class SkinBinding extends Disposable {
   protected _paletteBlock: Nullable<SkinPaletteBlock>;
   /** @internal Number of meshes skinned by other palettes in place of this binding's */
   protected _paletteSuspendCount: number;
+  /** @internal Increased each time the pose relative to the reference node changes */
+  protected _paletteVersion: number;
+  /** @internal Whether both palette sets hold the current pose, so a still pose needs no write */
+  protected _paletteSettled: boolean;
+  /**
+   * @internal Joints and the nodes between them and the reference node, whose local transforms
+   * make up the pose
+   */
+  protected _poseNodes: Nullable<{ reference: Nullable<SceneNode>; nodes: SceneNode[] }>;
+  /** @internal Sum of the local transform tags of the pose nodes when the pose last changed */
+  protected _poseTag: number;
+  /** @internal Meshes waiting for the pose to change before updating again */
+  protected _sleepingMeshes: Set<SceneNode>;
   /** @internal */
   protected _paletteData!: Float32Array<ArrayBuffer>;
   /** @internal */
@@ -474,6 +487,11 @@ export class SkinBinding extends Disposable {
     this._inverseBindMatrices = inverseBindMatrices;
     this._paletteBlock = null;
     this._paletteSuspendCount = 0;
+    this._paletteVersion = 0;
+    this._paletteSettled = false;
+    this._poseNodes = null;
+    this._poseTag = -1;
+    this._sleepingMeshes = new Set();
     this._playing = false;
     this._lastUpdateTime = 0;
     if (bindPose && bindPose !== rig.bindPose) {
@@ -569,6 +587,23 @@ export class SkinBinding extends Disposable {
     return this._paletteBlock?.base ?? 0;
   }
   /**
+   * Increased each time the pose relative to the reference node changes, so skinned meshes
+   * recompute their bounds only then. A model moving as a whole keeps its pose.
+   *
+   * @internal
+   */
+  get paletteVersion() {
+    return this._paletteVersion;
+  }
+  /**
+   * Have a skinned mesh queued for update the next time the pose changes, instead of every frame.
+   *
+   * @internal
+   */
+  sleepUntilPoseChanges(mesh: SceneNode) {
+    this._sleepingMeshes.add(mesh);
+  }
+  /**
    * Node the palette matrices are relative to: the parent of the rig's root joint, or null
    * for world space.
    *
@@ -615,7 +650,8 @@ export class SkinBinding extends Disposable {
     if (!this._paletteBlock) {
       this._createPalette();
     }
-    if (this._jointOffsets[0] === 0) {
+    const first = this._jointOffsets[0] === 0;
+    if (first) {
       this._jointOffsets[0] = 1;
       this._jointOffsets[1] = 1;
     } else {
@@ -629,7 +665,24 @@ export class SkinBinding extends Disposable {
         this._jointMatrices[i + this._jointOffsets[0] - 1]
       );
     }
-    this._writePalette();
+    // CPU-side matrices are world space and always current; the palette and anything derived
+    // from the pose only change when the pose relative to the reference node does
+    const changed = this._poseChanged() || first;
+    if (changed) {
+      this._computePalette();
+      this._paletteSettled = false;
+      this._paletteVersion++;
+      for (const mesh of this._sleepingMeshes) {
+        mesh.scene?.queueUpdateNode(mesh);
+      }
+      this._sleepingMeshes.clear();
+    }
+    // The first still frame writes the pose once more so the previous set equals the current
+    // one; after that both sets hold it and the atlas is left alone
+    if (!this._paletteSettled) {
+      this._writePalette();
+      this._paletteSettled = !changed;
+    }
   }
   /**
    * Reset skeleton to bind pose
@@ -664,7 +717,14 @@ export class SkinBinding extends Disposable {
    * @internal
    */
   suspendPalette(suspend: boolean) {
+    const wasSuspended = this._paletteSuspendCount > 0;
     this._paletteSuspendCount = Math.max(0, this._paletteSuspendCount + (suspend ? 1 : -1));
+    if (wasSuspended && this._paletteSuspendCount === 0 && this._paletteBlock) {
+      // The previous set is as old as the suspension, so restart the history: the next update
+      // writes both sets, giving no motion for one frame rather than the motion since then
+      this._jointOffsets[0] = 0;
+      this._paletteSettled = false;
+    }
   }
   /**
    * Apply all enabled modifiers.
@@ -744,6 +804,7 @@ export class SkinBinding extends Disposable {
       SkinPaletteAtlas.instance.free(this._paletteBlock);
       this._paletteBlock = null;
     }
+    this._sleepingMeshes.clear();
     const m = SkinBinding._registry.get(this._id);
     if (m?.get() === this) {
       SkinBinding._registry.delete(this._id);
@@ -764,27 +825,61 @@ export class SkinBinding extends Disposable {
   private _createPalette() {
     this._paletteBlock = SkinPaletteAtlas.instance.allocate(this.joints.length * 2 + 1);
     this._paletteData = new Float32Array(this.joints.length * 16);
+    this._paletteSettled = false;
     this._jointOffsets = new Float32Array(2);
     this._jointMatrices = Array.from({ length: this.joints.length * 2 }).map(() => new Matrix4x4());
   }
   /**
-   * Write the header and the current set of matrices to the palette, relative to the
-   * reference node.
+   * Whether the pose may have changed since it last did: the local transform of a joint, or of a
+   * node between the joints and the reference node, has changed.
+   *
+   * @remarks
+   * Moving the whole model changes the world matrices of the joints but not the pose, so world
+   * matrices cannot tell; and comparing matrices taken back to the reference node trips over
+   * rounding far from the origin.
    */
-  private _writePalette() {
-    const atlas = SkinPaletteAtlas.instance;
-    const base = this._paletteBlock!.base;
+  private _poseChanged() {
+    const reference = this.referenceNode;
+    if (!this._poseNodes || this._poseNodes.reference !== reference) {
+      const nodes = new Set<SceneNode>();
+      for (const joint of this.joints) {
+        for (let node: Nullable<SceneNode> = joint; node && node !== reference; node = node.parent) {
+          if (nodes.has(node)) {
+            break;
+          }
+          nodes.add(node);
+        }
+      }
+      this._poseNodes = { reference, nodes: [...nodes] };
+      this._poseTag = -1;
+    }
+    let tag = 0;
+    for (const node of this._poseNodes.nodes) {
+      tag += node.localTransformTag;
+    }
+    if (tag !== this._poseTag) {
+      this._poseTag = tag;
+      return true;
+    }
+    return false;
+  }
+  /** Compute the current set of matrices relative to the reference node */
+  private _computePalette() {
     const reference = this.referenceNode;
     const invReference = reference ? Matrix4x4.invertAffine(reference.worldMatrix, tmpMatrix) : null;
     const offset = this._jointOffsets[0] - 1;
     for (let i = 0; i < this.joints.length; i++) {
-      const matrix = this._jointMatrices[i + offset];
-      if (invReference) {
-        this._paletteData.set(Matrix4x4.multiplyAffine(invReference, matrix, tmpMatrix2), i * 16);
-      } else {
-        this._paletteData.set(matrix, i * 16);
-      }
+      const world = this._jointMatrices[i + offset];
+      this._paletteData.set(
+        invReference ? Matrix4x4.multiplyAffine(invReference, world, tmpMatrix2) : world,
+        i * 16
+      );
     }
+  }
+  /** Write the header and the current set of matrices to the palette */
+  private _writePalette() {
+    const atlas = SkinPaletteAtlas.instance;
+    const base = this._paletteBlock!.base;
     atlas.writeSlots(base + this._jointOffsets[0], this._paletteData);
     tmpHeader[0] = base + this._jointOffsets[0];
     tmpHeader[1] = base + this._jointOffsets[1];

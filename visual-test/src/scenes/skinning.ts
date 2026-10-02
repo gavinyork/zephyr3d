@@ -259,3 +259,26 @@ export const skinAnimationBank: VisualScene = {
     placeSkinningCamera(scene, camera);
   }
 };
+
+/**
+ * {@link skinInstancedCpu} with {@link AnimationSet.gpuAnimation} turned on and
+ * nothing else changed: the regular playback API, posed from baked banks. Should
+ * match it up to the bank's 30Hz resampling.
+ */
+export const skinGpuAnimation: VisualScene = {
+  name: 'skin-gpu-animation',
+  description:
+    'The skin-instanced-cpu tubes played through AnimationSet.play with gpuAnimation on. Pins the automatic switch to baked banks behind the regular playback API.',
+  frames: FRAMES,
+  setup({ scene, camera }) {
+    skinningStage(scene);
+    const tube = tubePrimitive();
+    const materials = instanceMaterials();
+    PHASES.forEach((phase, i) => {
+      const { model } = tubeModel(scene, tube, materials[i], (i - (PHASES.length - 1) / 2) * SPACING);
+      model.animationSet.gpuAnimation = true;
+      model.animationSet.play('sway')?.seek(phase);
+    });
+    placeSkinningCamera(scene, camera);
+  }
+};

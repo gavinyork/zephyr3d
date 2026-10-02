@@ -246,6 +246,12 @@ export class SceneNode
 
   /** @internal Monotonically increasing tag for transform changes. */
   protected _transformTag: number;
+  /** @internal Increased each time the local transform changes */
+  protected _localTransformTag: number;
+  /** @internal Stamp of the scene update queue this node is waiting in, see UpdateQueue */
+  _updateQueueStamp: number;
+  /** @internal Stamp of the scene per-camera update queue this node is waiting in */
+  _perCameraQueueStamp: number;
   /** @internal Shared callback used by observables on transform mutation. */
   protected _transformChangeCallback: () => void;
 
@@ -299,6 +305,9 @@ export class SceneNode
     this._invWorldMatrix = null;
     this._localMatrix = null;
     this._transformTag = 0;
+    this._localTransformTag = 0;
+    this._updateQueueStamp = 0;
+    this._perCameraQueueStamp = 0;
     this._disableCallback = 0;
     this._tmpLocalMatrix = Matrix4x4.identity();
     this._tmpWorldMatrix = Matrix4x4.identity();
@@ -1200,6 +1209,9 @@ export class SceneNode
   }
   /** @internal */
   protected _onTransformChanged(invalidateLocal: boolean) {
+    if (invalidateLocal) {
+      this._localTransformTag++;
+    }
     if (this._disableCallback > 0) {
       return;
     }
@@ -1494,6 +1506,15 @@ export class SceneNode
   /** @internal */
   get transformTag() {
     return this._transformTag;
+  }
+  /**
+   * Increased each time the local transform changes, unlike {@link transformTag} which also
+   * follows the ancestors
+   *
+   * @internal
+   */
+  get localTransformTag() {
+    return this._localTransformTag;
   }
   /** @internal */
   private syncTransform() {

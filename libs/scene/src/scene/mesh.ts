@@ -187,6 +187,8 @@ export class Mesh extends MeshBase implements BatchDrawable {
   protected _skinBinding: DWeakRef<SkinBinding>;
   /** @internal */
   protected readonly _skinSpaceMatrix: Matrix4x4;
+  /** @internal Skin binding and palette version the skinned bounds were last computed for */
+  protected _skinnedBoundsVersion: { binding: Nullable<SkinBinding>; version: number };
   /** @internal Palette written by an animation bank track in place of the skin binding's */
   protected _skinPaletteOverride: Nullable<SkinPaletteOverride>;
   /** @internal */
@@ -252,6 +254,7 @@ export class Mesh extends MeshBase implements BatchDrawable {
     this._skinBinding = new DWeakRef();
     this._skinSpaceMatrix = new Matrix4x4();
     this._skinPaletteOverride = null;
+    this._skinnedBoundsVersion = { binding: null, version: -1 };
     this._skinInfluenceData = null;
     this._morphData = null;
     this._morphInfo = null;
@@ -351,6 +354,9 @@ export class Mesh extends MeshBase implements BatchDrawable {
   set suspendSkinning(val) {
     if (val && !this._suspendSkinning) {
       this.setAnimatedBoundingBox(null);
+    } else if (!val && this._suspendSkinning) {
+      // Skinned meshes sleep until their pose changes, so wake this one to pick skinning up again
+      this.scene?.queueUpdateNode(this);
     }
     this._suspendSkinning = !!val;
   }
@@ -1137,6 +1143,7 @@ export class Mesh extends MeshBase implements BatchDrawable {
   addPostUpdateCallback(callback: MeshUpdateCallback) {
     if (callback) {
       this._postUpdateCallbacks.add(callback);
+      this.scene?.queueUpdateNode(this);
     }
   }
   /** @internal */
@@ -1241,10 +1248,19 @@ export class Mesh extends MeshBase implements BatchDrawable {
   /** @internal */
   private updateSkeletonState() {
     if (this._suspendSkinning) {
+      if (this._skinnedBoundsVersion) {
+        this._skinnedBoundsVersion.binding = null;
+      }
       this.setBoneMatrices(null);
       return;
     }
-    const binding = this._skinBindingName && this.findSkinBindingById(this._skinBindingName);
+    // Looking a binding up walks the model, so the one found last time is kept while it matches
+    const cached = this._skinBinding.get();
+    const binding =
+      this._skinBindingName &&
+      (cached && !cached.disposed && cached.persistentId === this._skinBindingName
+        ? cached
+        : this.findSkinBindingById(this._skinBindingName));
     const paletteBase = this.getSkinPaletteBase();
     this._skinBinding.set(binding || null);
     if (this.getSkinPaletteBase() !== paletteBase) {
@@ -1254,17 +1270,29 @@ export class Mesh extends MeshBase implements BatchDrawable {
     }
     if (binding) {
       this.setBoneMatrices(binding.jointTexture);
-      if (!this._skinPaletteOverride) {
+      const bounds = this._skinnedBoundsVersion;
+      if (this._skinPaletteOverride) {
+        bounds.binding = null;
+        this.refreshAnimatedBoundingBox();
+      } else if (bounds.binding !== binding || bounds.version !== binding.paletteVersion) {
+        // Bounds follow the pose, which only changes with the joint matrices
+        bounds.binding = binding;
+        bounds.version = binding.paletteVersion;
         binding.computeBoundingBox(this._skinnedBoundingInfo!, this.invWorldMatrix);
+        this.refreshAnimatedBoundingBox();
       }
-      this.refreshAnimatedBoundingBox();
     } else {
+      this._skinnedBoundsVersion.binding = null;
       this.setBoneMatrices(null);
       this.refreshAnimatedBoundingBox();
     }
-    // Bounds of an overriding palette only change when the override is set again
-    if (this._skinBindingName && !this._skinPaletteOverride) {
+    // Bounds of an overriding palette only change when the override is set again, and bounds
+    // of the binding's palette when its pose does, which wakes the mesh up
+    if (this._postUpdateCallbacks.size > 0 || (this._skinBindingName && !binding)) {
+      // Post update callbacks (GPU cloth) run every frame, and the binding may not be loaded yet
       this.scene?.queueUpdateNode(this);
+    } else if (binding && !this._skinPaletteOverride) {
+      binding.sleepUntilPoseChanges(this);
     }
   }
   /**
