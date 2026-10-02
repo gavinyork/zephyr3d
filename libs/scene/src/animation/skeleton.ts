@@ -445,6 +445,8 @@ export class SkinBinding extends Disposable {
   protected _jointOffsets!: Float32Array<ArrayBuffer>;
   /** @internal */
   protected _paletteBlock: Nullable<SkinPaletteBlock>;
+  /** @internal Number of meshes skinned by other palettes in place of this binding's */
+  protected _paletteSuspendCount: number;
   /** @internal */
   protected _paletteData!: Float32Array<ArrayBuffer>;
   /** @internal */
@@ -471,6 +473,7 @@ export class SkinBinding extends Disposable {
     this._joints = joints ?? rig.joints;
     this._inverseBindMatrices = inverseBindMatrices;
     this._paletteBlock = null;
+    this._paletteSuspendCount = 0;
     this._playing = false;
     this._lastUpdateTime = 0;
     if (bindPose && bindPose !== rig.bindPose) {
@@ -645,7 +648,23 @@ export class SkinBinding extends Disposable {
    * @internal
    */
   apply() {
-    this.updateJointMatrices();
+    if (this._paletteSuspendCount === 0) {
+      this.updateJointMatrices();
+    }
+  }
+  /**
+   * Stop or resume updating the palette, while meshes are skinned by other palettes in place of
+   * this binding's.
+   *
+   * @remarks
+   * Calls are counted; the palette updates again once every suspension is resumed. CPU-side joint
+   * matrices are not updated while suspended either.
+   *
+   * @param suspend - true to suspend, false to resume
+   * @internal
+   */
+  suspendPalette(suspend: boolean) {
+    this._paletteSuspendCount = Math.max(0, this._paletteSuspendCount + (suspend ? 1 : -1));
   }
   /**
    * Apply all enabled modifiers.

@@ -65,6 +65,20 @@ const LOD_COLORATION_COLORS: [number, number, number][] = [
 export type MeshUpdateCallback = (frameId: number, elapsedInSeconds: number, deltaInSeconds: number) => void;
 
 /**
+ * A skinning palette that skins a mesh in place of its skin binding's.
+ *
+ * @internal
+ */
+export interface SkinPaletteOverride {
+  /** Slot index of the palette header in the skin palette atlas */
+  readonly paletteBase: number;
+  /** Bounds of the skinned mesh in its local space, or null to use the primitive's */
+  readonly boundingBox: Nullable<BoundingBox>;
+  /** Writer of the palette, told when another palette replaces it on the mesh */
+  readonly owner?: { detachMesh(mesh: Mesh): void };
+}
+
+/**
  * Bounding data used to update a mesh's local bounding box after morph target weights change.
  *
  * @public
@@ -173,6 +187,8 @@ export class Mesh extends MeshBase implements BatchDrawable {
   protected _skinBinding: DWeakRef<SkinBinding>;
   /** @internal */
   protected readonly _skinSpaceMatrix: Matrix4x4;
+  /** @internal Palette written by an animation bank track in place of the skin binding's */
+  protected _skinPaletteOverride: Nullable<SkinPaletteOverride>;
   /** @internal */
   protected _skinInfluenceData: Nullable<SkinInfluenceData>;
   /** @internal */
@@ -235,6 +251,7 @@ export class Mesh extends MeshBase implements BatchDrawable {
     this._boneMatrices = new DRef();
     this._skinBinding = new DWeakRef();
     this._skinSpaceMatrix = new Matrix4x4();
+    this._skinPaletteOverride = null;
     this._skinInfluenceData = null;
     this._morphData = null;
     this._morphInfo = null;
@@ -631,7 +648,30 @@ export class Mesh extends MeshBase implements BatchDrawable {
    * @internal
    */
   getSkinPaletteBase() {
-    return this._skinBinding.get()?.paletteBase ?? 0;
+    return this._skinPaletteOverride?.paletteBase ?? this._skinBinding.get()?.paletteBase ?? 0;
+  }
+  /**
+   * Gets the palette that skins this mesh in place of its skin binding's, if any.
+   *
+   * @internal
+   */
+  getSkinPaletteOverride() {
+    return this._skinPaletteOverride;
+  }
+  /**
+   * Skins this mesh by a palette written elsewhere instead of by its skin binding.
+   *
+   * @remarks
+   * The palette must be laid out like the binding's: same joints, relative to the same
+   * reference node. The mesh then neither reads the binding's palette nor computes its bounds
+   * from the binding's joints each frame; the override supplies its animated bounds.
+   *
+   * @param override - The palette and bounds, or null to skin by the binding again
+   * @internal
+   */
+  setSkinPaletteOverride(override: Nullable<SkinPaletteOverride>) {
+    this._skinPaletteOverride = override;
+    this.updateSkeletonState();
   }
   /**
    * Gets the matrix transforming skinning palette output to the local space of this mesh.
@@ -642,7 +682,7 @@ export class Mesh extends MeshBase implements BatchDrawable {
    *
    * @internal
    */
-  getSkinSpaceMatrix() {
+  getSkinSpaceMatrix(): Matrix4x4 {
     const reference = this._skinBinding.get()?.referenceNode;
     if (reference) {
       Matrix4x4.multiplyAffine(this.invWorldMatrix, reference.worldMatrix, this._skinSpaceMatrix);
@@ -950,10 +990,13 @@ export class Mesh extends MeshBase implements BatchDrawable {
   }
   /** @internal */
   resolveAnimatedBoundingBox(morphBoundingBox?: Nullable<BoundingBox>) {
-    const skinnedBoundingBox =
-      this._boneMatrices.get() && this._skinnedBoundingInfo?.boundingBox?.isValid()
-        ? this._skinnedBoundingInfo.boundingBox
-        : null;
+    const skinnedBoundingBox = !this._boneMatrices.get()
+      ? null
+      : this._skinPaletteOverride
+        ? this._skinPaletteOverride.boundingBox
+        : this._skinnedBoundingInfo?.boundingBox?.isValid()
+          ? this._skinnedBoundingInfo.boundingBox
+          : null;
     if (skinnedBoundingBox && morphBoundingBox) {
       // Skinning and morphing both active. The two boxes live in different
       // frames: the skinned box already reflects where the geometry actually
@@ -1211,14 +1254,17 @@ export class Mesh extends MeshBase implements BatchDrawable {
     }
     if (binding) {
       this.setBoneMatrices(binding.jointTexture);
-      binding.computeBoundingBox(this._skinnedBoundingInfo!, this.invWorldMatrix);
+      if (!this._skinPaletteOverride) {
+        binding.computeBoundingBox(this._skinnedBoundingInfo!, this.invWorldMatrix);
+      }
       this.refreshAnimatedBoundingBox();
     } else {
       this.setBoneMatrices(null);
       this.refreshAnimatedBoundingBox();
     }
-    if (this._skinBindingName) {
-      this.scene!.queueUpdateNode(this);
+    // Bounds of an overriding palette only change when the override is set again
+    if (this._skinBindingName && !this._skinPaletteOverride) {
+      this.scene?.queueUpdateNode(this);
     }
   }
   /**

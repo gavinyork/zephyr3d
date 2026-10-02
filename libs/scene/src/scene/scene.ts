@@ -12,6 +12,7 @@ import type { Compositor } from '../posteffect';
 import type { Metadata } from 'draco3d';
 import { getDevice } from '../app/api';
 import { SkinPaletteAtlas } from '../animation/skin_palette_atlas';
+import { AnimationBankTrack } from '../animation/animation_bank';
 import type { IRenderable } from '../app';
 import {
   normalizeScriptAttachmentConfig,
@@ -514,7 +515,8 @@ export class Scene
       }
       this.updateNodePlacement(this._octree, this._nodePlaceList);
     }
-    // Skin binding palettes written by animation updates are uploaded once all nodes are updated
+    // Palettes written by animation updates are uploaded once all nodes and bank tracks are updated
+    AnimationBankTrack.updateAll(getDevice().frameInfo.elapsedFrame * 0.001);
     SkinPaletteAtlas.flushPending();
   }
   /**
