@@ -83,8 +83,8 @@ The mesh settings dialog can also generate levels of detail, simplified versions
 | Setting | Meaning |
 | --- | --- |
 | **Levels of Detail** | Number of levels, the source mesh included, up to 8. Default 1: no levels are generated |
-| **Triangles Per Level** | Fraction of the previous level's triangles each level keeps, default 0.5, like Percent Triangles in UE's reduction settings |
-| **Pixel Error** | Pixel error the automatic switch distances allow, default 8, as UE's reduction PixelError. Higher values switch to simpler levels closer to the camera |
+| **Triangles Per Level** | Fraction of the previous level's triangles each level keeps, default 0.5 |
+| **Pixel Error** | Pixel error the automatic switch distances allow, default 8. Higher values switch to simpler levels closer to the camera |
 
 How the levels are made:
 
