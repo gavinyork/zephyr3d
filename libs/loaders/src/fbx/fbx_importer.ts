@@ -273,8 +273,11 @@ function quaternionFromDegrees(euler: [number, number, number], order: number) {
 }
 
 function quaternionFromDegreesXYZ(euler: [number, number, number]) {
+  // Pre/PostRotation are always evaluated in FBX eEulerXYZ regardless of RotationOrder
+  // (X applied first, R = Rz * Ry * Rx), which is the intrinsic 'ZYX' order here.
+  // Same as Blender's FBX importer: to_rot(pre_rot, 'XYZ').
   const r = toRadiansTuple(euler);
-  return Quaternion.fromEulerAngle(r[0], r[1], r[2], 'XYZ');
+  return Quaternion.fromEulerAngle(r[0], r[1], r[2], 'ZYX');
 }
 
 function matrixFromTRS(
