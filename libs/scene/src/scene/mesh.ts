@@ -40,6 +40,7 @@ import type { SceneNode } from './scene_node';
 import { getDevice } from '../app/api';
 import type { SkinBinding, SkinnedBoundingBox } from '../animation';
 import { calculateMorphBoundingBox } from '../animation/morphtarget';
+import { SkinPaletteAtlas } from '../animation/skin_palette_atlas';
 import type { Camera } from '../camera/camera';
 import { computeAABBScreenRadiusSquared, selectLod } from '../render/lod';
 
@@ -528,6 +529,7 @@ export class Mesh extends MeshBase implements BatchDrawable {
   setBoneMatrices(matrices: Nullable<Texture2D>) {
     if (this._boneMatrices.get() !== matrices) {
       this._boneMatrices.set(matrices);
+      Mesh._trackBoneMatrices(this, !!matrices);
       this._renderBundle = {};
       RenderBundleWrapper.drawableChanged(this);
     }
@@ -1422,6 +1424,7 @@ export class Mesh extends MeshBase implements BatchDrawable {
     this._primitive.dispose();
     this._material.dispose();
     this._boneMatrices.dispose();
+    Mesh._trackBoneMatrices(this, false);
     this._skinBinding.dispose();
     this.setSkinInfluenceData(null);
     this.setMorphData(null);
@@ -1458,6 +1461,31 @@ export class Mesh extends MeshBase implements BatchDrawable {
   }
   /** @internal */
   private static _defaultMaterial: Nullable<MeshMaterial> = null;
+  /** Meshes holding a joint texture, rebound when the skin palette atlas replaces it */
+  private static readonly _skinnedMeshes: Set<Mesh> = new Set();
+  private static _listeningAtlas = false;
+  /**
+   * Keep the joint textures of skinned meshes current when the atlas grows: a mesh only picks the
+   * texture up in update(), which a mesh posed by an animation bank track no longer runs
+   */
+  private static _trackBoneMatrices(mesh: Mesh, skinned: boolean) {
+    if (!skinned) {
+      this._skinnedMeshes.delete(mesh);
+      return;
+    }
+    this._skinnedMeshes.add(mesh);
+    if (!this._listeningAtlas) {
+      this._listeningAtlas = true;
+      SkinPaletteAtlas.addTextureReplacedListener(() => {
+        for (const m of this._skinnedMeshes) {
+          const binding = m._skinBinding.get();
+          if (binding && !binding.disposed) {
+            m.setBoneMatrices(binding.jointTexture);
+          }
+        }
+      });
+    }
+  }
   /** @internal Materials of the LOD coloration view, by level */
   private static readonly _lodColorationMaterials: LambertMaterial[] = [];
   /** @internal */

@@ -48,6 +48,7 @@ export interface SkinPaletteBlock {
 export class SkinPaletteAtlas extends Disposable {
   private static _instance: Nullable<SkinPaletteAtlas> = null;
   private static readonly _uploadListeners: ((uploaded: boolean) => void)[] = [];
+  private static readonly _replaceListeners: (() => void)[] = [];
   private readonly _texture: DRef<Texture2D>;
   private _data: Float32Array<ArrayBuffer>;
   private _height: number;
@@ -91,6 +92,16 @@ export class SkinPaletteAtlas extends Disposable {
    */
   static addUploadListener(listener: (uploaded: boolean) => void) {
     this._uploadListeners.push(listener);
+  }
+  /**
+   * Register a callback run each time the atlas grows and replaces its texture.
+   *
+   * @remarks
+   * For consumers holding the texture that are not refreshed every frame, such as skinned meshes
+   * sleeping while an animation bank track poses them.
+   */
+  static addTextureReplacedListener(listener: () => void) {
+    this._replaceListeners.push(listener);
   }
   /** Atlas texture, created on first use and replaced when the atlas grows */
   get texture() {
@@ -264,5 +275,8 @@ export class SkinPaletteAtlas extends Disposable {
     this._texture.set(null);
     this.markDirtyRows(0, height - 1);
     this._changeTag++;
+    for (const listener of SkinPaletteAtlas._replaceListeners) {
+      listener();
+    }
   }
 }
