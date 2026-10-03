@@ -646,8 +646,10 @@ export class SkinBinding extends Disposable {
    * @internal
    */
   updateJointMatrices() {
-    if (!this._paletteBlock) {
+    if (!this._jointOffsets) {
       this._createPalette();
+    } else if (!this._paletteBlock) {
+      this._paletteBlock = SkinPaletteAtlas.instance.allocate(this.joints.length * 2 + 1);
     }
     const first = this._jointOffsets[0] === 0;
     if (first) {
@@ -712,13 +714,21 @@ export class SkinBinding extends Disposable {
    * Calls are counted; the palette updates again once every suspension is resumed. CPU-side joint
    * matrices are not updated while suspended either.
    *
+   * The atlas block of the palette is released while suspended, since no mesh reads it, and
+   * allocated again on resume, at a new base: meshes pick it up as their palette overrides are
+   * cleared.
+   *
    * @param suspend - true to suspend, false to resume
    * @internal
    */
   suspendPalette(suspend: boolean) {
     const wasSuspended = this._paletteSuspendCount > 0;
     this._paletteSuspendCount = Math.max(0, this._paletteSuspendCount + (suspend ? 1 : -1));
-    if (wasSuspended && this._paletteSuspendCount === 0 && this._paletteBlock) {
+    if (!wasSuspended && this._paletteSuspendCount > 0 && this._paletteBlock) {
+      SkinPaletteAtlas.instance.free(this._paletteBlock);
+      this._paletteBlock = null;
+    } else if (wasSuspended && this._paletteSuspendCount === 0 && this._jointOffsets) {
+      this._paletteBlock = SkinPaletteAtlas.instance.allocate(this.joints.length * 2 + 1);
       // The previous set is as old as the suspension, so restart the history: the next update
       // writes both sets, giving no motion for one frame rather than the motion since then
       this._jointOffsets[0] = 0;

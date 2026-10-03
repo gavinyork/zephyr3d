@@ -192,6 +192,8 @@ export class Mesh extends MeshBase implements BatchDrawable {
   protected _skinnedBoundsVersion: { binding: Nullable<SkinBinding>; version: number };
   /** @internal Palette written by an animation bank track in place of the skin binding's */
   protected _skinPaletteOverride: Nullable<SkinPaletteOverride>;
+  /** Palette base last written to instance data and drawable uniforms */
+  private _appliedSkinPaletteBase: number;
   /** @internal */
   protected _skinInfluenceData: Nullable<SkinInfluenceData>;
   /** @internal */
@@ -255,6 +257,7 @@ export class Mesh extends MeshBase implements BatchDrawable {
     this._skinBinding = new DWeakRef();
     this._skinSpaceMatrix = new Matrix4x4();
     this._skinPaletteOverride = null;
+    this._appliedSkinPaletteBase = 0;
     this._skinnedBoundsVersion = { binding: null, version: -1 };
     this._skinInfluenceData = null;
     this._morphData = null;
@@ -1266,10 +1269,13 @@ export class Mesh extends MeshBase implements BatchDrawable {
       (cached && !cached.disposed && cached.persistentId === this._skinBindingName
         ? cached
         : this.findSkinBindingById(this._skinBindingName));
-    const paletteBase = this.getSkinPaletteBase();
     this._skinBinding.set(binding || null);
-    if (this.getSkinPaletteBase() !== paletteBase) {
-      // Instance data and drawable uniforms hold the palette base and are not rewritten every frame
+    const paletteBase = this.getSkinPaletteBase();
+    if (paletteBase !== this._appliedSkinPaletteBase) {
+      // Instance data and drawable uniforms hold the palette base and are not rewritten every
+      // frame; it changes with the binding, with palette overrides, and with a binding's palette
+      // being allocated again after a suspension
+      this._appliedSkinPaletteBase = paletteBase;
       this.applyTransformUniformsAll();
       RenderBundleWrapper.drawableChanged(this);
     }
