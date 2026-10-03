@@ -686,10 +686,13 @@ export class Mesh extends MeshBase implements BatchDrawable {
    * Palette matrices are relative to the reference node of the skin binding, so this is
    * `inverse(worldMatrix) * referenceNode.worldMatrix`.
    *
+   * @param binding - Skin binding the palette belongs to. Defaults to the binding last resolved
+   *   for this mesh, which is not resolved yet before the first update after deserialization,
+   *   since the children of a node are deserialized before its skin bindings
    * @internal
    */
-  getSkinSpaceMatrix(): Matrix4x4 {
-    const reference = this._skinBinding.get()?.referenceNode;
+  getSkinSpaceMatrix(binding?: Nullable<SkinBinding>): Matrix4x4 {
+    const reference = (binding ?? this._skinBinding.get())?.referenceNode;
     if (reference) {
       Matrix4x4.multiplyAffine(this.invWorldMatrix, reference.worldMatrix, this._skinSpaceMatrix);
     } else {
@@ -1278,7 +1281,7 @@ export class Mesh extends MeshBase implements BatchDrawable {
         // Bounds follow the pose, which only changes with the joint matrices
         bounds.binding = binding;
         bounds.version = binding.paletteVersion;
-        binding.computeBoundingBox(this._skinnedBoundingInfo!, this.invWorldMatrix);
+        binding.computeBoundingBox(this._skinnedBoundingInfo!, this.getSkinSpaceMatrix(binding));
         this.refreshAnimatedBoundingBox();
       }
     } else {

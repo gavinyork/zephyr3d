@@ -233,16 +233,17 @@ export class AnimationBank extends Disposable {
    *
    * @param entryIndex - Index of the baked clip
    * @param mesh - Mesh skinned by the bank
+   * @param binding - Skin binding of the mesh, whose reference node the keys are relative to
    * @returns Bounds in the local space of the mesh, or null if the mesh has no skinned bounding data
    * @internal
    */
-  computeBoundingBox(entryIndex: number, mesh: Mesh): Nullable<BoundingBox> {
+  computeBoundingBox(entryIndex: number, mesh: Mesh, binding: SkinBinding): Nullable<BoundingBox> {
     const info = mesh.skinnedBoundingInfo;
     if (!info) {
       return null;
     }
     const entry = this._entries[entryIndex];
-    const skinSpace = mesh.getSkinSpaceMatrix();
+    const skinSpace = mesh.getSkinSpaceMatrix(binding);
     const influenceCount = Math.max(1, info.influenceCount ?? 4);
     const n = this._jointCount;
     const box = new BoundingBox();
@@ -600,7 +601,7 @@ export class AnimationBankTrack extends Disposable {
     if (!this._meshes.has(mesh)) {
       binding.suspendPalette(true);
     }
-    const boundingBox = this._bank.computeBoundingBox(this._entryIndex, mesh);
+    const boundingBox = this._bank.computeBoundingBox(this._entryIndex, mesh, binding);
     this._meshes.set(mesh, boundingBox);
     mesh.setSkinPaletteOverride({ paletteBase: this.paletteBase, boundingBox, owner: this });
     return true;

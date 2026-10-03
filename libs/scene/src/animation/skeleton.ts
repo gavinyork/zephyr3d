@@ -101,7 +101,6 @@ export interface SkinnedBoundingBox {
 }
 
 const tmpV0 = new Vector3();
-const tmpV1 = new Vector3();
 const tmpMatrix = new Matrix4x4();
 const tmpMatrix2 = new Matrix4x4();
 /** Palette header slot: absolute slot indices of the current and previous sets */
@@ -759,36 +758,51 @@ export class SkinBinding extends Disposable {
    * Compute the animated bounding box for a single mesh using its representative vertices.
    *
    * For each representative vertex:
-   * - Blends the vertex by up to 4 joint matrices using provided weights.
-   * - Transforms to the mesh's local space using `invWorldMatrix`.
+   * - Blends the vertex by up to 4 palette matrices using provided weights.
+   * - Transforms to the mesh's local space using `skinSpaceMatrix`.
    * - Expands the bounding box.
    *
+   * @remarks
+   * Reads the palette, which is relative to {@link SkinBinding.referenceNode} and changes together
+   * with {@link SkinBinding.paletteVersion}, rather than the world-space joint matrices: those are
+   * a snapshot of when the joints were last updated, and the model may have moved since without
+   * changing the pose, so combining them with the current mesh transform offsets the bounds.
+   *
    * @param info - Precomputed bounding data (representative vertices, indices, weights).
-   * @param invWorldMatrix - Mesh inverse world matrix to convert to model/local space.
+   * @param skinSpaceMatrix - Matrix transforming palette output to the mesh's local space,
+   *   see {@link Mesh.getSkinSpaceMatrix}.
    * @internal
    */
-  computeBoundingBox(info: SkinnedBoundingBox, invWorldMatrix: Matrix4x4) {
+  computeBoundingBox(info: SkinnedBoundingBox, skinSpaceMatrix: Matrix4x4) {
     info.boundingBox.beginExtend();
+    const palette = this._paletteData;
+    if (!palette) {
+      return;
+    }
+    const numJoints = this.joints.length;
     const influenceCount = Math.max(1, info.influenceCount ?? 4);
     for (let i = 0; i < info.boundingVertices.length; i++) {
-      tmpV0.setXYZ(0, 0, 0);
+      const v = info.boundingVertices[i];
+      let x = 0;
+      let y = 0;
+      let z = 0;
       const base = i * influenceCount;
       for (let j = 0; j < influenceCount; j++) {
         const weight = Number(info.boundingVertexJointWeights[base + j]) || 0;
         if (weight <= 0) {
           continue;
         }
-        const matrix =
-          this._jointMatrices[
-            (Number(info.boundingVertexBlendIndices[base + j]) || 0) + this._jointOffsets[0] - 1
-          ];
-        if (!matrix) {
+        const joint = Number(info.boundingVertexBlendIndices[base + j]) || 0;
+        if (joint < 0 || joint >= numJoints) {
           continue;
         }
-        matrix.transformPointAffine(info.boundingVertices[i], tmpV1).scaleBy(weight);
-        tmpV0.addBy(tmpV1);
+        const m = joint * 16;
+        x += weight * (palette[m] * v.x + palette[m + 4] * v.y + palette[m + 8] * v.z + palette[m + 12]);
+        y += weight * (palette[m + 1] * v.x + palette[m + 5] * v.y + palette[m + 9] * v.z + palette[m + 13]);
+        z += weight * (palette[m + 2] * v.x + palette[m + 6] * v.y + palette[m + 10] * v.z + palette[m + 14]);
       }
-      invWorldMatrix.transformPointAffine(tmpV0, tmpV0);
+      tmpV0.setXYZ(x, y, z);
+      skinSpaceMatrix.transformPointAffine(tmpV0, tmpV0);
       info.boundingBox.extend(tmpV0);
     }
   }
