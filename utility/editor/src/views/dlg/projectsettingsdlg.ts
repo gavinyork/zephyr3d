@@ -13,7 +13,7 @@ import {
 import { ListView, ListViewData } from '../../components/listview';
 import { renderMultiSelectedCombo } from '../../components/multicombo';
 import { DialogRenderer } from '../../components/modal';
-import { libDir } from '../../core/build/templates';
+import { cssColorToRGB, DEFAULT_SPLASH_BACKGROUND, libDir, rgbToCSSColor } from '../../core/build/templates';
 import { type ProjectInfo, type ProjectSettings, ProjectService } from '../../core/services/project';
 import { DlgOpenFile } from './openfiledlg';
 import { customTextInput } from '../../components/textinput';
@@ -158,27 +158,34 @@ export class DlgProjectSettings extends DialogRenderer<ProjectSettings> {
       }
     }
 
-    const splashScreen = [this._settings.splashScreen ?? ''] as [string];
-    if (customTextInput('Splash Screen', splashScreen)) {
-      this._settings.splashScreen = splashScreen[0];
+    const splashImage = [this._settings.splashImage ?? ''] as [string];
+    if (customTextInput('Splash Image', splashImage)) {
+      this._settings.splashImage = splashImage[0];
     }
     if (ImGui.IsItemHovered()) {
-      ImGui.SetTooltip('Double click to select file');
+      ImGui.SetTooltip(
+        'Image shown on the loading screen until the startup scene is drawn.\nDouble click to select image'
+      );
       if (ImGui.IsMouseDoubleClicked(0)) {
         DlgOpenFile.openFile(
-          'Select Scene File',
+          'Select Image File',
           this._vfs,
           '/assets',
-          'Scene (*.zscn)|*.zscn',
+          'Image (*.jpg;*.png;*.webp;*.svg;*.gif)|*.jpg;*.png;*.webp;*.svg;*.gif',
           false,
           500,
           400
         ).then((value) => {
           if (value.length > 0) {
-            this._settings.splashScreen = value[0].meta.path;
+            this._settings.splashImage = value[0].meta.path;
           }
         });
       }
+    }
+
+    const splashBackground = cssColorToRGB(this._settings.splashBackground ?? DEFAULT_SPLASH_BACKGROUND);
+    if (ImGui.ColorEdit3('Splash Background', splashBackground)) {
+      this._settings.splashBackground = rgbToCSSColor(splashBackground);
     }
 
     const startupScene = [this._settings.startupScene ?? ''] as [string];

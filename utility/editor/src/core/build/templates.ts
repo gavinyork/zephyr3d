@@ -5,6 +5,33 @@ export const fileListFileName = 'filelist.json';
 export const libDir = 'libs';
 export const editorPluginModuleName = '@zephyr3d/editor/editor-plugin';
 
+/** Loading screen of a build's index.html */
+export const DEFAULT_SPLASH_BACKGROUND = '#000000';
+const SPLASH_ELEMENT_ID = 'zephyr-splash';
+const SPLASH_HIDDEN_CLASS = 'zephyr-splash-hidden';
+
+/** Parses a #rrggbb color into [r, g, b] in 0..1, black when malformed */
+export function cssColorToRGB(color: string): [number, number, number] {
+  const m = /^#([0-9a-f]{6})$/i.exec(color.trim());
+  const v = m ? parseInt(m[1], 16) : 0;
+  return [((v >> 16) & 255) / 255, ((v >> 8) & 255) / 255, (v & 255) / 255];
+}
+
+/** Formats [r, g, b] in 0..1 as #rrggbb */
+export function rgbToCSSColor(rgb: [number, number, number]) {
+  return `#${rgb
+    .map((c) =>
+      Math.round(Math.min(Math.max(c, 0), 1) * 255)
+        .toString(16)
+        .padStart(2, '0')
+    )
+    .join('')}`;
+}
+
+function escapeHTML(s: string) {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
 export const templateScript = `import type { IDisposable } from '@zephyr3d/base';
 import { RuntimeScript, scriptProp } from '@zephyr3d/scene';
 
@@ -234,11 +261,22 @@ application.ready().then(async () => {
   getEngine().resourceManager.setModelLoader('model/gltf-binary', new GLTFImporter());
   getEngine().resourceManager.setModelLoader('model/fbx', new FBXImporter());
   getEngine().resourceManager.setModelLoader('model/obj', new OBJImporter());
-  getEngine().startup('${settings.startupScene ?? ''}', '${settings.splashScreen ?? ''}', '${settings.startupScript ?? ''}');
   application.run();
+  await getEngine().startup(${JSON.stringify(settings.startupScene ?? '')}, ${JSON.stringify(settings.startupScript ?? '')});
+  // Keep the loading screen of index.html until the startup scene is on screen
+  await application.nextFrame();
+  ${splashHideCode}
 });
 `;
 }
+
+/** Fades out and removes the loading screen of index.html */
+const splashHideCode = `const splash = document.getElementById('${SPLASH_ELEMENT_ID}');
+  if (splash) {
+    splash.classList.add('${SPLASH_HIDDEN_CLASS}');
+    splash.addEventListener('transitionend', () => splash.remove(), { once: true });
+    setTimeout(() => splash.remove(), 1000);
+  }`;
 
 export const templateIndex = `import { Application, getEngine, setActiveMorphTargetLimit, setMorphTargetLimit, setSkinInfluenceLimit } from '@zephyr3d/scene';
 import { HttpFS } from '@zephyr3d/base';
@@ -298,17 +336,40 @@ application.ready().then(async () => {
   getEngine().resourceManager.setModelLoader('model/gltf-binary', new GLTFImporter());
   getEngine().resourceManager.setModelLoader('model/fbx', new FBXImporter());
   getEngine().resourceManager.setModelLoader('model/obj', new OBJImporter());
-  getEngine().startup(settings.startupScene ?? '', settings.splashScreen, settings.startupScript);
   application.run();
+  await getEngine().startup(settings.startupScene ?? '', settings.startupScript);
+  await application.nextFrame();
+  ${splashHideCode}
 });
 `;
 
-export const templateIndexHTML = `<!DOCTYPE html>
+/**
+ * Generates the index.html of a build.
+ *
+ * The page carries a loading screen (#zephyr-splash) drawn by the browser before
+ * any script loads, so downloading the engine modules and creating the device show
+ * feedback instead of a blank page; index.js removes it once the startup scene is
+ * drawn. Errors thrown while starting replace its spinner with the error message.
+ */
+export function generateIndexHTML(options: {
+  title: string;
+  /** Extra head markup, e.g. the favicon link */
+  head: string;
+  /** Page-relative URL of the splash image, empty for none */
+  splashImage: string;
+  /** CSS color of the loading screen */
+  splashBackground: string;
+}) {
+  const [r, g, b] = cssColorToRGB(options.splashBackground);
+  const lightBackground = 0.2126 * r + 0.7152 * g + 0.0722 * b > 0.5;
+  const foreground = lightBackground ? '#202020' : '#e0e0e0';
+  const image = options.splashImage ? `<img src="${escapeHTML(options.splashImage)}" alt="" />` : '';
+  return `<!DOCTYPE html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <title>%s</title>
-    %s
+    <title>${escapeHTML(options.title)}</title>
+    ${options.head}
     <style>
       * {
         margin: 0;
@@ -318,6 +379,7 @@ export const templateIndexHTML = `<!DOCTYPE html>
       body {
         width: 100vw;
         height: 100vh;
+        background: ${rgbToCSSColor([r, g, b])};
       }
       canvas {
         display: block;
@@ -334,10 +396,80 @@ export const templateIndexHTML = `<!DOCTYPE html>
       canvas:focus {
         outline: none;
       }
+      #${SPLASH_ELEMENT_ID} {
+        position: fixed;
+        inset: 0;
+        z-index: 10;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 24px;
+        background: ${rgbToCSSColor([r, g, b])};
+        color: ${foreground};
+        font: 14px system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+        transition: opacity 0.3s ease;
+      }
+      #${SPLASH_ELEMENT_ID}.${SPLASH_HIDDEN_CLASS} {
+        opacity: 0;
+        pointer-events: none;
+      }
+      #${SPLASH_ELEMENT_ID} img {
+        max-width: 60vw;
+        max-height: 50vh;
+        object-fit: contain;
+      }
+      #${SPLASH_ELEMENT_ID}-spinner {
+        width: 28px;
+        height: 28px;
+        box-sizing: border-box;
+        border: 3px solid currentColor;
+        border-right-color: transparent;
+        border-radius: 50%;
+        opacity: 0.6;
+        animation: ${SPLASH_ELEMENT_ID}-spin 0.9s linear infinite;
+      }
+      #${SPLASH_ELEMENT_ID}-message {
+        max-width: 80vw;
+        text-align: center;
+        white-space: pre-wrap;
+      }
+      @keyframes ${SPLASH_ELEMENT_ID}-spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
     </style>
   </head>
   <body>
     <canvas id="canvas"></canvas>
+    <div id="${SPLASH_ELEMENT_ID}" role="status" aria-live="polite">
+      ${image}
+      <div id="${SPLASH_ELEMENT_ID}-spinner"></div>
+      <div id="${SPLASH_ELEMENT_ID}-message"></div>
+    </div>
+    <script>
+      // Failures while starting (module loading, no supported device, startup
+      // scene or script) leave the loading screen up showing the error.
+      const showStartupError = (message) => {
+        const splash = document.getElementById('${SPLASH_ELEMENT_ID}');
+        if (splash) {
+          splash.classList.remove('${SPLASH_HIDDEN_CLASS}');
+          splash.setAttribute('role', 'alert');
+          document.getElementById('${SPLASH_ELEMENT_ID}-spinner')?.remove();
+          document.getElementById('${SPLASH_ELEMENT_ID}-message').textContent = \`Startup failed: \${message}\`;
+        }
+      };
+      window.addEventListener('error', (event) => {
+        if (event.message) {
+          showStartupError(event.message);
+        }
+      });
+      window.addEventListener('unhandledrejection', (event) => {
+        showStartupError(event.reason?.message || String(event.reason || 'Unhandled promise rejection'));
+      });
+    </script>
   </body>
 </html>
 `;
+}

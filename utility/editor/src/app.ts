@@ -263,11 +263,11 @@ editorApp.ready().then(async () => {
     // One-shot headless capture: await startup (scene graph + attached runtime
     // scripts ready), render exactly N deterministic frames via stepFrame(),
     // then report the capture back to the Electron main process. The run loop
-    // is intentionally never started. Splash screen is skipped for determinism.
+    // is intentionally never started.
     window.removeEventListener('error', onHeadlessBootError);
     window.removeEventListener('unhandledrejection', onHeadlessBootRejection);
     try {
-      await getEngine().startup(previewScene ?? settings!.startupScene, null, settings!.startupScript);
+      await getEngine().startup(previewScene ?? settings!.startupScene, settings!.startupScript);
       const result = await runHeadlessCapture(editorApp, {
         frames: headlessFrames,
         fixedDt: headlessFixedDt
@@ -279,12 +279,12 @@ editorApp.ready().then(async () => {
     }
     return;
   } else {
-    document.getElementById('zephyr-loading')?.remove();
-    getEngine().startup(
-      previewScene ?? settings!.startupScene,
-      settings!.splashScreen,
-      settings!.startupScript
-    );
+    // Keep the loading mask until the startup scene is on screen, as a build does;
+    // a failed startup leaves it up showing the error.
+    getEngine()
+      .startup(previewScene ?? settings!.startupScene, settings!.startupScript)
+      .then(() => editorApp.nextFrame())
+      .then(() => document.getElementById('zephyr-loading')?.remove());
   }
   if (headless) {
     // Persistent headless (hidden window): rAF never fires for windows that

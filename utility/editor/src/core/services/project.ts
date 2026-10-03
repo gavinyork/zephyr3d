@@ -31,8 +31,11 @@ export type ProjectSettings = {
   title?: string;
   favicon?: string;
   startupScene?: string;
-  splashScreen?: string;
   startupScript?: string;
+  /** Image shown on the HTML loading screen of a build, centered over splashBackground */
+  splashImage?: string;
+  /** CSS color of the HTML loading screen of a build */
+  splashBackground?: string;
   preferredRHI?: string[];
   enableMSAA?: boolean;
   renderScale?: number;

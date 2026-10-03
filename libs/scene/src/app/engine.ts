@@ -406,26 +406,18 @@ export class Engine {
     }
   }
   /**
-   * Starts the runtime by optionally showing a splash screen, running a startup script,
-   * and loading the startup scene.
+   * Starts the runtime by running a startup script and loading the startup scene.
+   *
+   * @remarks
+   * A loading screen covering the startup belongs to the page (an HTML overlay shown
+   * before any script loads): hide it once this resolves and
+   * {@link Application.nextFrame} reports the startup scene drawn.
    *
    * @param startupScene - Optional scene path rendered on layer `0` after startup completes.
-   * @param splashScreen - Optional scene path rendered on a temporary splash layer during startup.
    * @param startupScript - Optional startup script module path. A trailing `.ts` or `.js`
    * extension is removed before loading.
    */
-  async startup(
-    startupScene?: Nullable<string>,
-    splashScreen?: Nullable<string>,
-    startupScript?: Nullable<string>
-  ) {
-    const splashScreenLayer = 9999;
-    if (splashScreen) {
-      const splashScreenScene = await this.loadSceneFromFile(splashScreen);
-      if (splashScreenScene) {
-        this.setRenderable(splashScreenScene, splashScreenLayer);
-      }
-    }
+  async startup(startupScene?: Nullable<string>, startupScript?: Nullable<string>) {
     if (startupScript) {
       const path =
         startupScript.toLowerCase().endsWith('.ts') || startupScript.toLowerCase().endsWith('.js')
@@ -437,7 +429,6 @@ export class Engine {
       const scene = await this.loadSceneFromFile(startupScene);
       this.setRenderable(scene, 0);
     }
-    this.setRenderable(null, splashScreenLayer);
   }
   /**
    * Renders all active render layers.

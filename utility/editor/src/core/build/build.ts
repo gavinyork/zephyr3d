@@ -2,10 +2,10 @@ import type * as TS from 'typescript';
 import { rollup } from '@rollup/browser';
 import { vfsAndUrlPlugin } from './plugins/vfsurl';
 import { tsTranspilePlugin } from './plugins/tstranspile';
-import { formatString, type VFS } from '@zephyr3d/base';
+import type { VFS } from '@zephyr3d/base';
 import { depsResolvePlugin } from './plugins/depresolve';
 import { ProjectService } from '../services/project';
-import { libDir, projectFileName, templateIndexHTML } from './templates';
+import { DEFAULT_SPLASH_BACKGROUND, generateIndexHTML, libDir, projectFileName } from './templates';
 import { isAssetMetaPath, ASSET_MANIFEST_FILE, readZmshBinary } from '@zephyr3d/scene';
 import { getVertexFormatSize } from '@zephyr3d/device';
 import type { VertexAttribFormat } from '@zephyr3d/device';
@@ -241,6 +241,103 @@ async function shipDerivedAsset(
   return shipped;
 }
 
+/**
+ * Makes sure the splash image is in the build as the browser can show it. The
+ * asset pipeline may have shipped only a KTX2 copy of it, which an <img> can't
+ * display, so the source is copied to its own path when missing.
+ *
+ * @returns Page-relative URL of the image, empty when there is none
+ */
+async function shipSplashImage(vfs: VFS, distDir: string, path: string | undefined) {
+  if (!path) {
+    return '';
+  }
+  path = vfs.normalizePath(path);
+  if (!(await vfs.exists(path))) {
+    console.warn(`Splash image '${path}' not found, building without it`);
+    return '';
+  }
+  const shipped = vfs.join(distDir, path);
+  if (!(await vfs.exists(shipped))) {
+    await vfs.copyFile(path, shipped, { overwrite: true });
+  }
+  return encodeURI(`.${path}`);
+}
+
+/** Specifier of a static import (`import 'x'`, `import a from 'x'`) or re-export (`export * from 'x'`) */
+const STATIC_IMPORT_RE =
+  /^[ \t]*(?:import\s*(['"])([^'"\n]+)\1|(?:import|export)\b[^'";]*?\bfrom\s*(['"])([^'"\n]+)\3)/gm;
+
+/**
+ * Collects the static module graph of the build starting at index.js, as
+ * page-relative URLs. Without preloading, the browser only learns of a module
+ * after parsing the one importing it, so engine modules download one level of
+ * the graph at a time.
+ */
+async function collectStaticModules(vfs: VFS, distDir: string, imports: Record<string, string>) {
+  const urls: string[] = [];
+  const queue = ['./index.js'];
+  const seen = new Set(queue);
+  while (queue.length > 0) {
+    const url = queue.shift()!;
+    urls.push(url);
+    const path = vfs.normalizePath(vfs.join(distDir, url));
+    if (!/^\.\.?\//.test(url) || !(await vfs.exists(path))) {
+      continue;
+    }
+    const code = (await vfs.readFile(path, { encoding: 'utf8' })) as string;
+    for (const m of code.matchAll(STATIC_IMPORT_RE)) {
+      const spec = m[2] ?? m[4];
+      const dep = imports[spec]
+        ? imports[spec]
+        : spec.startsWith('./') || spec.startsWith('../')
+          ? `./${vfs.relative(vfs.normalizePath(vfs.join(vfs.dirname(path), spec)), distDir)}`
+          : null;
+      if (dep && !seen.has(dep)) {
+        seen.add(dep);
+        queue.push(dep);
+      }
+    }
+  }
+  return urls;
+}
+
+/**
+ * Head markup preloading the modules index.js needs, so they all download in
+ * parallel with the page. The rendering backend is imported dynamically once
+ * index.js runs; a small script preloads the one it is going to pick, using the
+ * same order (WebGPU, then WebGL) on the RHIs the project targets.
+ */
+async function generateModulePreloads(
+  vfs: VFS,
+  distDir: string,
+  imports: Record<string, string>,
+  preferredRHI: string[]
+) {
+  const links = (await collectStaticModules(vfs, distDir, imports)).map(
+    (url) => `<link rel="modulepreload" href="${encodeURI(url)}" />`
+  );
+  const rhi = preferredRHI.map((val) => val.toLowerCase());
+  const webgpu = rhi.includes('webgpu') ? imports['@zephyr3d/backend-webgpu'] : null;
+  const webgl = rhi.some((val) => val.startsWith('webgl')) ? imports['@zephyr3d/backend-webgl'] : null;
+  if (webgpu || webgl) {
+    links.push(`<script>
+  (() => {
+    const webgpu = ${JSON.stringify(webgpu ?? null)};
+    const webgl = ${JSON.stringify(webgl ?? null)};
+    const href = webgpu && navigator.gpu ? webgpu : webgl;
+    if (href) {
+      const link = document.createElement('link');
+      link.rel = 'modulepreload';
+      link.href = href;
+      document.head.appendChild(link);
+    }
+  })();
+</script>`);
+  }
+  return links.join('\n');
+}
+
 export async function buildForEndUser(options: {
   input: string | string[] | Record<string, string>;
   distDir?: string;
@@ -321,11 +418,19 @@ export async function buildForEndUser(options: {
   const favicon = settings.favicon
     ? `<link rel="icon" type="${vfs.guessMIMEType(settings.favicon)}" href=".${settings.favicon}" />`
     : '';
-  let htmlContent = formatString(templateIndexHTML, settings.title ?? info.name, favicon);
+  const splashImage = await shipSplashImage(vfs, distDir, settings.splashImage);
+  let htmlContent = generateIndexHTML({
+    title: settings.title ?? info.name,
+    head: favicon,
+    splashImage,
+    splashBackground: settings.splashBackground ?? DEFAULT_SPLASH_BACKGROUND
+  });
   htmlContent = htmlContent.replace('</body>', `  <script type="module" src="./index.js"></script>\n</body>`);
+  // Module preloads must follow the import map, which a module load freezes
+  const preloads = await generateModulePreloads(vfs, distDir, importMap.imports, settings.preferredRHI ?? []);
   htmlContent = htmlContent.replace(
     '</head>',
-    `<script type="importmap">\n${JSON.stringify(importMap, null, 2)}\n</script>\n</head>`
+    `<script type="importmap">\n${JSON.stringify(importMap, null, 2)}\n</script>\n${preloads}\n</head>`
   );
   await vfs.writeFile(vfs.join(distDir, 'index.html'), htmlContent, {
     encoding: 'utf8',

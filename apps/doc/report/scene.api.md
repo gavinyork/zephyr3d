@@ -601,6 +601,7 @@ export class Application extends Observable<appEventMap> {
     focus(): void;
     frame(): void;
     get inputManager(): InputManager;
+    nextFrame(): Promise<void>;
     get options(): RequireOptionals<AppOptions>;
     ready(): Promise<void>;
     run(): void;
@@ -3405,7 +3406,7 @@ export class Engine {
     get screen(): ScreenAdapter;
     get scriptingSystem(): ScriptingSystem;
     setRenderable(renderable: Nullable<IRenderable | RenderFunc>, layer?: number, hook?: IRenderHook): void;
-    startup(startupScene?: Nullable<string>, splashScreen?: Nullable<string>, startupScript?: Nullable<string>): Promise<void>;
+    startup(startupScene?: Nullable<string>, startupScript?: Nullable<string>): Promise<void>;
     update(deltaTime: number, elapsedTime: number): void;
     get VFS(): VFS;
     set VFS(vfs: VFS);

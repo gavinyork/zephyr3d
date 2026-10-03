@@ -38,13 +38,15 @@ The **Project Settings** panel mainly includes the following options:
   - If not set, the browser default icon or a system fallback will be used;
   - A square PNG/ICO/SVG is recommended.
 
-### 3. Splash Screen
+### 3. Splash Image / Splash Background (Loading Screen)
 
-- Purpose: Sets the splash screen shown when the application starts (for example, logo screen, loading page).
+- Purpose: Sets the loading screen shown while the application starts.
 - Required: **No (optional)**.
 - Notes:
-  - Suitable for showing project logo, version info, or loading hints;
-  - If not set, the application may directly enter the scene or use a default loading view.
+  - The loading screen is drawn by the web page itself and appears as soon as the page opens. It covers downloading the engine, creating the rendering device, running the startup script and loading the startup scene, and fades out once the first frame of the startup scene is on screen;
+  - It is shown whether or not it is configured: `Splash Background` is its color (black by default), `Splash Image` is an image centered on it (a logo, for example), with a loading indicator below;
+  - If startup fails (for example, the browser supports none of the selected rendering backends), the loading screen stays up and shows the error;
+  - The image ships in its original format, unaffected by texture compression settings. Prefer a small PNG/WebP/SVG: the smaller it is, the sooner it appears.
 
 ### 4. Startup Scene
 

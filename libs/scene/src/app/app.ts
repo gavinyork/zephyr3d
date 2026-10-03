@@ -144,6 +144,7 @@ export class Application extends Observable<appEventMap> {
   private readonly _engine: Engine;
   private readonly _editorMode: EditorMode;
   private _ready: boolean;
+  private _frameWaiters: (() => void)[];
   /**
    * Construct the Application singleton with the provided options.
    *
@@ -176,6 +177,7 @@ export class Application extends Observable<appEventMap> {
     this._editorMode = opt.runtimeOptions?.editorMode ?? 'none';
     this._device = null;
     this._ready = false;
+    this._frameWaiters = [];
   }
   /**
    * Editor mode
@@ -271,7 +273,30 @@ export class Application extends Observable<appEventMap> {
       this.dispatchEvent('tick', dt, elapsed);
       this._engine.update(dt * 0.001, elapsed * 0.001);
       this._engine.render();
+      if (this._frameWaiters.length > 0) {
+        // Resolution callbacks run as microtasks, after the caller's endFrame()
+        const waiters = this._frameWaiters;
+        this._frameWaiters = [];
+        waiters.forEach((resolve) => resolve());
+      }
     }
+  }
+  /**
+   * Waits for the next frame to be rendered.
+   *
+   * @remarks
+   * Resolves once the next call to {@link Application.frame} has rendered every
+   * active layer and the frame has been ended, so what was set up before calling
+   * this is on screen when the promise settles. Use it to hide a loading overlay
+   * only after the first frame of a scene has been drawn.
+   *
+   * Never resolves while no frame is rendered (run loop not started, or the
+   * device skips frames because the rendering context is lost).
+   */
+  nextFrame(): Promise<void> {
+    return new Promise((resolve) => {
+      this._frameWaiters.push(resolve);
+    });
   }
   /**
    * Advances exactly one frame outside the run loop.
