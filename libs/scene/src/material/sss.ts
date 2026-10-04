@@ -27,23 +27,22 @@ import { fetchSampler } from '../utility/misc';
  * graph fell back to an 8-bit format.
  *
  * @deprecated The SSS scattering source is now recovered from `SceneColor` via
- * the diffuse luminance stored in its alpha channel (matching UE5), so no side
- * buffer and no LDR encoding is involved. Kept for source compatibility; it has
- * no effect on rendering.
+ * the diffuse luminance stored in its alpha channel, so no side buffer and no
+ * LDR encoding is involved. Kept for source compatibility; it has no effect on
+ * rendering.
  *
  * @public
  */
 export const SKIN_SSS_LDR_ENCODE_RANGE = 4;
 
 /**
- * Physically-based SSS material aligned with UE5's SubsurfaceProfile shading model.
+ * Physically-based SSS material.
  *
  * @remarks
  * Uses a pre-integrated curvature-dependent diffuse BRDF and dual-lobe GGX specular
  * driven by subsurface profile parameters. The **diffuse** luminance is written to
  * `SceneColor.a` so the {@link PostSSS} post effect can recover the diffusible
- * fraction as `saturate(SceneColor.a / luma(SceneColor.rgb))` — the same spec/diff
- * separation UE5 performs in its SSS Setup and Recombine passes.
+ * fraction as `saturate(SceneColor.a / luma(SceneColor.rgb))`.
  *
  * The optional `subsurfaceTexture` uses R as the SSS mask, which gates both the
  * screen-space diffusion and the dual specular lobe. Its other channels are
@@ -187,14 +186,7 @@ export class SSSMaterial
     this.useFeature(SSSMaterial.FEATURE_VERTEX_TANGENT, !!val);
   }
 
-  /**
-   * GGX base roughness the two specular lobes are derived from.
-   *
-   * @remarks
-   * Defaults to UE5's material default of 0.5. The profile then tightens the
-   * narrow lobe and broadens the wide one around this value, so it is the centre
-   * of the dual-lobe highlight rather than the roughness of either lobe.
-   */
+  /** GGX base roughness the two specular lobes are derived from. */
   get roughness() {
     return this._roughness;
   }
@@ -206,19 +198,7 @@ export class SSSMaterial
     }
   }
 
-  /**
-   * Fresnel reflectance at normal incidence.
-   *
-   * @remarks
-   * Defaults to 0.04, what UE5's default `Specular` of 0.5 gives through
-   * `F0 = 0.08 * Specular`; to port a UE5 material, use that conversion. This is
-   * the only control over highlight strength, since a post-multiplier would skew
-   * the grazing end of the Fresnel curve and bypass the energy terms, so the
-   * specular would stop paying for itself out of the diffuse.
-   *
-   * The profile's IOR does not feed this: that drives transmission's refraction,
-   * while the specular Fresnel stays on the dielectric mapping.
-   */
+  /** Fresnel reflectance at normal incidence. */
   get specularF0() {
     return this._specularF0;
   }
@@ -230,20 +210,7 @@ export class SSSMaterial
     }
   }
 
-  /**
-   * Overall multiplier on the back-lit transmission.
-   *
-   * @remarks
-   * UE5 has no equivalent - its transmission is fully determined by the profile
-   * and the measured thickness - so 1 is the faithful value and this exists only
-   * to dial the effect back or push it further.
-   *
-   * Transmission additionally requires {@link PunctualLight.transmission} on at
-   * least one shadow-casting light, since the thickness it needs is measured
-   * against that light's shadow map. With no such light this has no effect.
-   *
-   * @public
-   */
+  /** Overall multiplier on the back-lit transmission. */
   get transmissionStrength() {
     return this._transmissionStrength;
   }
@@ -338,10 +305,6 @@ export class SSSMaterial
         scope.$l.specularLighting = pb.vec3(0);
         scope.$l.envSpecular = pb.vec3(0);
         scope.$l.NoV = pb.clamp(pb.dot(scope.normal, scope.viewVec), 0.0001, 1);
-        // The lobe roughnesses depend only on the material and profile, so they
-        // are resolved once rather than per light. The SSS mask stands in for
-        // UE5's per-pixel subsurface opacity, which is what fades the dual lobe
-        // out where the surface stops being SSS.
         scope.$l.lobeRoughness = skinDualSpecularRoughness(
           scope,
           scope.roughness,
@@ -349,9 +312,6 @@ export class SSSMaterial
           scope.zSSSLobeParams.x,
           scope.zSSSLobeParams.y
         );
-        // Multiple-scattering compensation. UE5 takes the average lobe roughness
-        // here rather than computing a term per lobe, and applies the result to
-        // both the direct and the ambient contribution.
         scope.$l.avgLobeRoughness = pb.mix(
           scope.lobeRoughness.x,
           scope.lobeRoughness.y,
@@ -372,16 +332,6 @@ export class SSSMaterial
           scope.$l.envDiffuse = this.getEnvLightIrradiance(scope, scope.normal);
           scope.diffuseLighting = pb.add(scope.diffuseLighting, scope.envDiffuse);
           scope.$l.reflectVec = this.calculateReflectionVector(scope, scope.normal, scope.viewVec);
-          // UE5's ReflectionEnvironment:
-          //
-          //   EnergyTerms = ComputeGGXSpecEnergyTerms(GBuffer.Roughness, NoV, SpecularColor)
-          //   Color.rgb   = GatherRadiance(R, GBuffer.Roughness) * EnergyTerms.E
-          //
-          // Two consequences. The roughness is the raw **material** value, since
-          // UE5 applies the dual lobe only in the direct BxDF. And the weight is
-          // the directional albedo `E` - the split-sum DFG with multiple-scattering
-          // folded in, not a bare Fresnel - which already carries the multi-scatter
-          // gain, so it must not also be multiplied by the direct path's `W`.
           scope.$l.envEnergyTerms = skinSpecularEnergyTerms(
             scope,
             scope.roughness,
@@ -444,23 +394,11 @@ export class SSSMaterial
             this.$l.halfVec = pb.normalize(pb.add(this.viewVec, this.lightDir));
             this.$l.NoH = pb.clamp(pb.dot(this.normal, this.halfVec), 0, 1);
             this.$l.VoH = pb.clamp(pb.dot(this.viewVec, this.halfVec), 0, 1);
-            // Burley diffuse with the NoL cosine, as UE5's SubsurfaceProfileBxDF
-            // evaluates it. The soft terminator is the screen-space diffusion's job;
-            // bending this term to fake it double-counts the effect.
             this.$l.skinDiff = skinDiffuseBRDF(this, this.NoV, this.NoL, this.VoH, this.roughness);
             this.diffuseLighting = pb.add(
               this.diffuseLighting,
               pb.mul(this.lightColor, this.shadowTerm, this.skinDiff, this.NoL, this.diffuseScale)
             );
-            // Back-lit transmission, after UE5's SubsurfaceProfileBxDF. UE5
-            // attenuates by the *transmission* shadow, which is the encoded
-            // optical depth itself - so the same value both indexes the profile
-            // and scales it, which is why `thickness` appears twice.
-            //
-            // No surface shadow and no NoL: the light arrives from behind, so the
-            // camera-facing surface is shadowed and turned away from it by
-            // construction. Applying either would zero out exactly the pixels
-            // this term exists for.
             if (that.drawContext.transmissionThickness) {
               this.$l.transmission = skinTransmission(
                 this,
@@ -472,8 +410,6 @@ export class SSSMaterial
                 this.viewVec,
                 this.lightDir
               );
-              // The light before its surface shadow: see LitMaterial.forEachLight.
-              // `thickness` below is the transmission's own shadow term.
               this.$l.transmissionLightColor = pb.mul(
                 unshadowedColorIntensity.rgb,
                 unshadowedColorIntensity.a,
@@ -490,7 +426,6 @@ export class SSSMaterial
                 )
               );
             }
-            // Dual-lobe GGX specular, with the NoL cosine UE5 applies alongside it.
             this.$l.spec = skinDualLobeSpecular(
               this,
               this.NoH,

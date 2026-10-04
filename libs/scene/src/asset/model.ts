@@ -1031,8 +1031,8 @@ export class SharedModel extends Disposable {
    * Generates levels of detail for the triangle meshes of the model, as the editor does for
    * imported meshes: every level is simplified from the source to a fraction of its triangles,
    * levels stop before one would have fewer than `lodMinTriangles`, and the switch sizes follow
-   * the simplification error (UE automatic LOD screen sizes). Levels only add indices: vertices,
-   * skins and morph targets are unchanged.
+   * the simplification error. Levels only add indices: vertices, skins and morph targets are
+   * unchanged.
    *
    * Call it after importing and before creating scene nodes from the model; meshes that already
    * have levels of detail are left as they are.

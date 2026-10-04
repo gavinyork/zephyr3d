@@ -2,34 +2,11 @@ import type { PBInsideFunctionScope, PBShaderExp } from '@zephyr3d/device';
 import { distributionGGX, fresnelSchlick, visGGX } from './pbr';
 import { SKIN_TRANSMISSION_NO_DATA_ENCODING, SSSProfile } from '../material/sssprofile';
 
-/**
- * Opacity below which the dual-lobe specular fades back to a single lobe.
- *
- * @remarks
- * `SSSS_OPACITY_THRESHOLD_EPS` in UE5. The profile stores the authored lobe
- * multipliers directly, so UE5's `SSSS_MAX_DUAL_SPECULAR_ROUGHNESS` — which only
- * undoes its texture encoding — has no counterpart here.
- *
- * @internal
- */
+/** Opacity below which the dual-lobe specular fades back to a single lobe. */
 const OPACITY_THRESHOLD_EPS = 0.1;
 
 /**
  * Multiple-scattering energy terms for a GGX specular lobe.
- *
- * @remarks
- * UE5's analytic directional-albedo fit (`ShadingEnergyConservation.ush`,
- * `USE_ENERGY_CONSERVATION == 2`), which needs no lookup texture:
- *
- * ```
- * E  = 1 - saturate(pow(r, c/r) * ((r*c + 0.0266916) / (0.466495 + c)))
- * Ef = Pow5(1 - c) * pow(2.36651 * pow(c, 4.7703*r) + 0.0387332, r)
- * W  = 1 + F0 * ((1 - E) / E)
- * A  = W * (E*F0 + Ef*(F90 - F0))
- * ```
- *
- * `W` restores the energy single-scattering GGX drops; `A` is the share the lobe
- * reflects, and the diffuse beneath is attenuated by `1 - A`.
  *
  * @param scope - Shader scope.
  * @param roughness - Roughness of the lobe being corrected.
@@ -72,7 +49,6 @@ export function skinSpecularEnergyTerms(
       this.pow5,
       pb.pow(pb.add(pb.mul(2.36651, pb.pow(this.c, pb.mul(4.7703, this.r))), 0.0387332), this.r)
     );
-    // F90 from micro-occlusion, as UE5 derives it when only F0 is supplied.
     this.$l.F90 = pb.clamp(pb.mul(50, this.F0), 0, 1);
     this.$l.W = pb.add(1, pb.mul(this.F0, pb.div(pb.sub(1, this.E), this.E)));
     this.$l.A = pb.mul(this.W, pb.add(pb.mul(this.E, this.F0), pb.mul(this.Ef, pb.sub(this.F90, this.F0))));
@@ -82,21 +58,7 @@ export function skinSpecularEnergyTerms(
 }
 
 /**
- * Burley diffuse BRDF, as UE5 evaluates it for the SubsurfaceProfile shading model.
- *
- * @remarks
- * Transcribed from `Diffuse_Burley` in UE5's `BRDF.ush`:
- *
- * ```
- * FD90 = 0.5 + 2 VoH^2 Roughness
- * FdV  = 1 + (FD90 - 1) (1 - NoV)^5
- * FdL  = 1 + (FD90 - 1) (1 - NoL)^5
- * result = albedo / PI * FdV * FdL
- * ```
- *
- * The caller multiplies by `NoL` and the light colour, as
- * `SubsurfaceProfileBxDF` does: the soft terminator is the screen-space
- * diffusion's job, so bending this term would double-count it.
+ * Burley diffuse BRDF.
  *
  * @param scope - Shader scope.
  * @param NdotV - Clamped dot(normal, viewDir).
@@ -145,19 +107,6 @@ export function skinDiffuseBRDF(
 /**
  * Resolves the two specular lobe roughnesses from the profile.
  *
- * @remarks
- * Transcribed from `GetSubsurfaceProfileDualSpecular` in UE5:
- *
- * ```
- * scale_n = lerp(1, Roughness_n, saturate((Opacity - EPS) * 10))
- * LobeRoughness0 = max(saturate(Roughness * scale_0), 0.02)
- * LobeRoughness1 =     saturate(Roughness * scale_1)
- * ```
- *
- * The scales are multiplicative on the material roughness, authored in 0.5..2.0.
- * Only lobe 0 gets the 0.02 floor, which keeps the tight highlight from
- * collapsing into a fireflying delta.
- *
  * @param scope - Shader scope.
  * @param roughness - Material roughness.
  * @param opacity - Subsurface opacity, used to fade the effect out.
@@ -197,19 +146,6 @@ export function skinDualSpecularRoughness(
 /**
  * Dual-lobe GGX specular for skin.
  *
- * @remarks
- * Transcribed from `DualSpecularGGX` in UE5's `ShadingModels.ush`:
- *
- * ```
- * D   = lerp(D_GGX(Pow4(r0), NoH), D_GGX(Pow4(r1), NoH), LobeMix)
- * Vis = Vis_SmithJointApprox(Pow4(AverageRoughness), NoV, NoL)
- * F   = F_Schlick(SpecularColor, VoH)
- * ```
- *
- * Visibility is evaluated once from the blended average roughness rather than
- * per lobe, which UE5 notes approximates the two-lobe result closely. UE5's
- * per-lobe area-light normalization is omitted: this material has no area lights.
- *
  * @param scope - Shader scope.
  * @param NoH - dot(normal, halfVector).
  * @param NoV - dot(normal, viewDir).
@@ -246,8 +182,6 @@ export function skinDualLobeSpecular(
       pb.float('F0')
     ],
     function () {
-      // The helpers square their argument, so `roughness^2` here yields UE5's
-      // Pow4(roughness).
       this.$l.a0 = pb.mul(this.lobeRoughness.x, this.lobeRoughness.x);
       this.$l.a1 = pb.mul(this.lobeRoughness.y, this.lobeRoughness.y);
       this.$l.avgRoughness = pb.mix(this.lobeRoughness.x, this.lobeRoughness.y, this.lobeMix);
@@ -298,31 +232,7 @@ function readSSSProfileColumn(
 }
 
 /**
- * Back-lit subsurface transmission, after UE5's `SubsurfaceProfileBxDF`.
- *
- * @remarks
- * Transcribed from `ShadingModels.ush:653-663`:
- *
- * ```
- * ShadowOpticalDepth = DecodeOpticalDepthFromShadowMask(Shadow.TransmittanceOrOpticalThickness)
- * Profile            = GetTransmissionProfile(ProfileId, ShadowOpticalDepth).rgb
- * RefracV            = refract(V, -N, TransmissionParams.OneOverIOR)
- * PhaseFunction      = ApproximateHG(dot(-L, RefracV), ScatteringDistribution)
- * Transmission       = FalloffColor * Profile * (Falloff * PhaseFunction)
- * ```
- *
- * Three omissions, each matching UE5:
- *
- * - **No `NoL`.** The light enters from behind, so a front-facing cosine would
- *   zero out exactly the pixels this term exists for.
- * - **No surface shadow.** The caller attenuates by the transmission shadow,
- *   which is the encoded optical depth itself.
- * - **No surface albedo.** The baked profile carries only the falloff shape; the
- *   base colour is applied where this joins the diffuse.
- *
- * `refract` takes the view vector as the incident ray against a flipped normal,
- * transcribed as UE5 writes it — reversing it would flip which way the
- * forward-scattering lobe leans.
+ * Back-lit subsurface transmission.
  *
  * @param scope - Shader scope.
  * @param profileTex - The packed profile table.
@@ -437,8 +347,6 @@ function skinTransmissionPhase(
       });
       this.$l.refracV = pb.refract(this.viewVec, pb.neg(this.normal), this.params.w);
       this.$l.cosJ = pb.dot(pb.neg(this.lightDir), this.refracV);
-      // UE5's ApproximateHG, not Henyey-Greenstein itself: the real one raises
-      // the denominator to 3/2 and normalises by 1/4pi rather than 0.5.
       this.$l.g = this.params.z;
       this.$l.g2 = pb.mul(this.g, this.g);
       this.$l.gcos = pb.sub(1, pb.mul(this.g, this.cosJ));

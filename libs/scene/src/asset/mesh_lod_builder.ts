@@ -1,13 +1,6 @@
 // Builds the level of detail chain of a mesh, for the editor's derived mesh cache and
 // for SharedModel.generateLods at runtime. Pure data work with the simplifier passed in,
 // no other engine module imported, so it also runs in the editor's encoding worker.
-//
-// Follows UE static mesh LODs: every level is reduced from the source mesh
-// (BaseReduceLodIndex 0) to a fraction of its triangles, and the switch sizes come
-// from the reduction error (StaticMesh.cpp, FStaticMeshRenderData::ResolveSectionInfo
-// with bAutoComputeLODScreenSize). Levels share the source vertices: meshoptimizer
-// simplification only writes a new index buffer, so skins and morph targets, which
-// address vertices by position in the buffer, stay valid.
 
 /**
  * The subset of meshoptimizer's MeshoptSimplifier the level of detail generation uses. The engine
@@ -48,7 +41,7 @@ export interface MeshLodSettings {
   lodMinTriangles: number;
   /** Fraction of the source triangles kept per level step */
   lodReduction: number;
-  /** UE ReductionSettings.PixelError */
+  /** Pixel error the automatic switch distances allow */
   lodPixelError: number;
 }
 
@@ -65,13 +58,9 @@ export interface MeshLodLevel {
   error: number;
 }
 
-/** Most levels including the source, the engine's MAX_MESH_LODS (UE MAX_STATIC_MESH_LODS) */
 const MAX_LEVELS = 8;
-/** UE StaticMesh.cpp Constants::LOD0ScreenSize */
 const LOD0_SCREEN_SIZE = 2;
-/** UE StaticMesh.cpp Constants::AutoComputeLODPowerBase, used when a level has no measured error */
 const AUTO_LOD_POWER_BASE = 0.75;
-/** UE FSkeletalMeshLODInfo::LODHysteresis given to generated levels (SkeletalMesh.cpp) */
 const LOD_HYSTERESIS = 0.02;
 /**
  * Weight of the vertex normals in the simplification error. The meshoptimizer README advises
@@ -81,21 +70,11 @@ const NORMAL_WEIGHT = 1;
 /** An error bound the simplifier never reaches, within float range */
 const NO_ERROR_LIMIT = 1e30;
 
-/**
- * UE CalculateViewDistance (StaticMesh.cpp): the view distance at which a deviation projects to
- * the allowed pixel error on a 1920 wide view with a 90 degree horizontal field of view.
- */
-export function calculateViewDistance(maxDeviation: number, pixelError: number) {
+function calculateViewDistance(maxDeviation: number, pixelError: number) {
   return (maxDeviation * 960) / Math.max(pixelError, Number.EPSILON);
 }
 
-/**
- * UE ComputeBoundsScreenSize (SceneManagement.cpp) for the projection UE builds the automatic
- * sizes with: FPerspectiveMatrix(PI / 4, 1920, 1080, 1), whose (0, 0) and (1, 1) are 1 and
- * 1920 / 1080. UE clamps the distance to 1 cm, here 0.01 mesh units.
- * @public
- */
-export function autoScreenSize(sphereRadius: number, viewDistance: number) {
+function autoScreenSize(sphereRadius: number, viewDistance: number) {
   const screenMultiple = Math.max(0.5, (0.5 * 1920) / 1080);
   const screenRadius = (screenMultiple * sphereRadius) / Math.max(0.01, viewDistance);
   return screenRadius * 2;
@@ -134,8 +113,6 @@ export function buildLodChain(
     if (target < minIndices) {
       break;
     }
-    // Reduced to the target count alone, UE's percent triangles criterion: the error bound is
-    // never reached. ErrorAbsolute returns the error in mesh units, UE's MaxDeviation.
     const flags = ['ErrorAbsolute', 'Prune'];
     const [lod, error] = normals
       ? simplifier.simplifyWithAttributes(
@@ -164,7 +141,6 @@ export function buildLodChain(
       error > 0
         ? autoScreenSize(sphereRadius, calculateViewDistance(error, settings.lodPixelError) + sphereRadius)
         : AUTO_LOD_POWER_BASE ** i;
-    // UE keeps automatic sizes decreasing from level to level
     if (screenSize > previous.screenSize) {
       screenSize = previous.screenSize / 2;
     }

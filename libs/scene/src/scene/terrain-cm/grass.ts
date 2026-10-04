@@ -1238,13 +1238,6 @@ export class GrassRenderer extends Disposable {
   /**
    * Culling planes of the blades casting shadows into each of the nearest cascades of the sun's
    * shadow map, and remembers the sun as the light the blades were placed for.
-   *
-   * A cascade's shadows fall on what the camera sees between the cascade's split distances, so its
-   * casters are the points from which the light reaches that slice of the view frustum: the slice
-   * swept along the light direction. Built as UE5's ComputeShadowCullingVolume
-   * (Engine/Source/Runtime/Engine/Private/Components/DirectionalLightComponent.cpp): the faces of
-   * the slice facing away from the light, plus a plane through each silhouette edge of the slice
-   * seen from the light, extruded along the light direction.
    */
   private calcShadowCullPlanes(camera: Camera, terrain: ClipmapTerrain): Float32Array<ArrayBuffer>[] {
     this._shadowLight.set(null);
@@ -1351,7 +1344,6 @@ export class GrassRenderer extends Disposable {
           const a = corners[fixed];
           const b = corners[fixed | freeBit];
           // The third point extends the edge along the light, scaled by the edge length for
-          // precision as in UE
           Vector3.add(a, Vector3.scale(lightDir, Vector3.distance(a, b), tmp), tmp);
           addPlane(a, b, tmp);
         }

@@ -4,14 +4,6 @@ import type { PBInsideFunctionScope, PBShaderExp } from '@zephyr3d/device';
  * Rect light integration with linearly transformed cosines, shared by every
  * material that shades rect lights as area lights.
  *
- * @remarks
- * After Heitz et al. 2016 and UE5's `RectLight.ush`. The fitted edge term
- * returns `theta / (2 pi sin theta)`, so an edge sum is already a form factor
- * and needs no further normalization.
- *
- * The LUTs are read from the global uniforms `zLTCMatLut` and `zLTCAmpLut`,
- * which the calling material declares and binds (see `getLTCMatLUT`).
- *
  * @internal
  */
 
@@ -189,17 +181,6 @@ export function defineLTCEdgeFunctions(scope: PBInsideFunctionScope) {
 /**
  * The terms a material needs to shade one rect light, as
  * `(specularIntegral, fresnelNorm, fresnelBias, diffuseFormFactor)`.
- *
- * @remarks
- * The specular reflectance is `specularIntegral * (F0 * fresnelNorm + (F90 - F0)
- * * fresnelBias)` - the Schlick split UE5's `GetRectLTC_GGX` uses, which with
- * `F90 = 1` is Heitz's `F0 * t2.x + (1 - F0) * t2.y` - and the diffuse is
- * `diffuseColor * diffuseFormFactor`, both times the light's luminance. The
- * light's range window and one-sidedness are already applied, so behind the
- * light, past its range or for a degenerate rect this returns zero.
- *
- * `roughness` is perceptual; it is floored at 0.02, as UE5's rect path does,
- * below which the fitted matrix degenerates towards singular.
  *
  * @internal
  */

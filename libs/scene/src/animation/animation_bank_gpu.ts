@@ -27,16 +27,14 @@ interface BankResources {
 }
 
 /**
- * Evaluates the palettes of animation bank tracks in a compute pass, following `BankEvaluateCS`
- * of UE (Shaders/Private/Skinning/AnimBankEval.usf).
+ * Evaluates the palettes of animation bank tracks in a compute pass
  *
  * @remarks
  * Each job poses every joint of one palette set at one time; a track runs two jobs per frame, its
  * current and its previous position, into fixed sets of its palette block. Unlike the
  * double-buffered sets of the CPU path, both are written each frame, which also makes the GPU
  * slots immune to rows of the atlas being re-uploaded from its CPU mirror: evaluation is
- * dispatched after every upload. UE does the same for the previous pose when it is not a copy of
- * the current one (`EPreviousBoneTransformUpdateMode::UpdatePrevious`).
+ * dispatched after every upload.
  *
  * WebGPU only, since it writes the atlas as a storage texture.
  *
@@ -208,7 +206,6 @@ export class AnimationBankGpuEvaluator {
               this.keys.at(pb.add(this.o, 5)),
               this.keys.at(pb.add(this.o, 6))
             );
-            // QuatNormalize of UE: identity for a degenerate quaternion
             this.$l.len2 = pb.dot(this.q, this.q);
             this.$return(
               pb.select(
@@ -234,7 +231,6 @@ export class AnimationBankGpuEvaluator {
               this.$l.frameCount = pb.int(this.desc.y);
               this.$l.playLength = this.desc.z;
               this.$l.time = this.desc.w;
-              // GetKeyIndicesFromTime of UE, the frame rate derived from the length
               this.$l.key0 = pb.int(0);
               this.$l.key1 = pb.int(0);
               this.$l.alpha = pb.float(0);
@@ -258,8 +254,6 @@ export class AnimationBankGpuEvaluator {
                 this.entry,
                 pb.mul(pb.add(pb.mul(pb.uint(this.key1), this.n), this.joint), pb.uint(KEY_FLOATS))
               );
-              // BlendBoneTransforms of UE: positions linearly, rotations by QuatSlerpApproximate,
-              // and scales linearly as BlendBoneTransformsWithScale
               this.$l.qa = this.loadRotation(this.a);
               this.$l.qb = this.loadRotation(this.b);
               this.qb = pb.select(this.qb, pb.neg(this.qb), pb.lessThan(pb.dot(this.qa, this.qb), 0));

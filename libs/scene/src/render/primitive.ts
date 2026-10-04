@@ -99,7 +99,7 @@ function getEdgePattern(strip: boolean) {
 
 /**
  * A coarser level of detail of a {@link Primitive}: a range of its index buffer drawing the same
- * vertices with fewer triangles (UE static mesh LODs built from one vertex buffer).
+ * vertices with fewer triangles.
  * @public
  */
 export interface PrimitiveLod {
@@ -107,14 +107,11 @@ export interface PrimitiveLod {
   indexStart: number;
   /** Number of indices of the level */
   indexCount: number;
-  /**
-   * Projected bounds size below which the level is used, UE's LOD ScreenSize: the diameter of the
-   * bounding sphere over the half screen extent (see computeBoundsScreenSize)
-   */
+  /** Projected bounds size below which the level is used */
   screenSize: number;
   /**
    * Added to screenSize when switching back to a finer level, so the level does not flip at the
-   * threshold every frame (UE skeletal mesh LODHysteresis)
+   * threshold every frame
    */
   hysteresis: number;
 }

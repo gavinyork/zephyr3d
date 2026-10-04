@@ -57,28 +57,11 @@ const SKIN_SSS_DEBUG_OUTPUTS: SSSDebugOutput[] = [
   'thickness'
 ];
 
-/**
- * Radial-disc sample count, matching UE5's `BURLEY_NUM_SAMPLES`.
- *
- * @remarks
- * UE5 drives the count from a variance history and resolves the remainder
- * temporally. Without that history every frame stands on its own, so the full
- * count is used throughout.
- */
+/** Radial-disc sample count. */
 const DEFAULT_SAMPLE_COUNT = 64;
 
 /**
- * Screen-space skin scattering — 3-pass pipeline aligned with UE5.
- *
- * @remarks
- * Pass 1 (Burley): Radial-disc Burley diffusion with Halton + inverse-CDF
- *   importance sampling, 3D bilateral distance, per-channel kernel.
- * Pass 2 (BVar): Luminance variance + depth gradient → transmission estimate.
- * Pass 3 (Recombine): Specular/diffuse separation via SceneColor.a, then the
- *   diffused half summed back with the specular remainder.
- *
- * The pass exposes no scattering parameters of its own — every one of them
- * belongs to the {@link SSSProfile} the material points at, as in UE5.
+ * Screen-space skin scattering.
  *
  * WebGPU only.
  *
@@ -194,10 +177,6 @@ export class PostSSS extends AbstractPostEffect {
       return;
     }
     const fallback = this._profile ?? SSSProfile.getDefault();
-    // Projection of a world-space length at unit depth into UV, per axis. Two
-    // factors, not one: `m00` and `m11` differ by the aspect ratio, so a single
-    // one turns the sampling disc into an ellipse. UE5 reaches the same pair by
-    // building x from m00 and correcting y by `Extent.x / Extent.y`.
     const projMatrix = ctx.camera.getProjectionMatrix();
     this._projScale.setXY(
       // x: world length at unit depth, in horizontal UV
@@ -359,23 +338,10 @@ export class PostSSS extends AbstractPostEffect {
         pb.func('readDepth01', [pb.vec2('uv')], function () {
           this.$return(ShaderHelper.sampleLinearDepth(this, this.depthTex, this.uv, 0));
         });
-        // UE5's spec/diff separation (SSS::Setup): SceneColor.a holds the diffuse
-        // luminance, so the diffusible fraction is its ratio to the total.
-        //
-        // The skin mask comes from its own channel, never SceneColor.a, which
-        // every opaque material writes 1 to. The alpha returned here is UE5's
-        // subsurface Opacity, a continuous 0..1 scattering weight.
         pb.func('readDiffusible', [pb.vec2('uv')], function () {
           this.$l.scene = pb.textureSampleLevel(this.sceneTex, this.uv, 0);
           this.$l.opacity = pb.clamp(pb.textureSampleLevel(this.maskTex, this.uv, 0).a, 0, 1);
           this.$l.lum = pb.dot(this.scene.rgb, pb.vec3(0.2126, 0.7152, 0.0722));
-          // Below the floor the ratio tracks brightness rather than the split, so
-          // treat those pixels as fully diffusible - one that dark has no specular
-          // worth preserving.
-          //
-          // `pb.select(x, y, cond)` is `cond ? y : x`, following WGSL's builtin
-          // where the *false* value comes first. It reads like a ternary and is
-          // not one.
           this.$l.diffAmt = pb.select(
             pb.float(1),
             pb.clamp(pb.div(this.scene.a, pb.max(this.lum, 1e-4)), 0, 1),
@@ -383,21 +349,9 @@ export class PostSSS extends AbstractPostEffect {
           );
           this.$return(pb.vec4(pb.mul(this.scene.rgb, this.diffAmt), this.opacity));
         });
-        // Per-pixel profile id, from the depth prepass rather than the mask
-        // buffer. Keeping them apart is what lets the opacity above be
-        // continuous: one channel cannot carry a table row and a weight at once.
         pb.func('readProfileId', [pb.vec2('uv')], function () {
           this.$return(pb.textureSampleLevel(this.profileIdTex, this.uv, 0).r);
         });
-        // --- Burley diffusion, transcribed from UE5's BurleyNormalizedSSSCommon.ush ---
-        //
-        // Radii are in profile space and unbounded: the inverse CDF produces them
-        // directly and `burleyScale` converts them to a UV offset. There is
-        // deliberately no sampling disc to normalize against - one would couple
-        // the kernel shape to the mean free path.
-
-        // GetSearchLightDiffuseScalingFactor: s = 3.5 + 100 (A - 0.33)^4.
-        // This is the default of UE5's three scaling-factor variants.
         pb.func('scalingFactor', [pb.float('a')], function () {
           this.$l.v = pb.sub(this.a, 0.33);
           this.$l.v2 = pb.mul(this.v, this.v);
@@ -449,16 +403,9 @@ export class PostSSS extends AbstractPostEffect {
             )
           );
         });
-        // R2Sequence: the low-discrepancy pair UE5 samples radius and angle with.
-        // The index must stay an integer - offsetting it by a per-pixel fraction
-        // turns the sequence into a phase sweep correlated with pixel position,
-        // which shows up as banding.
         pb.func('r2Sequence', [pb.int('i')], function () {
           this.$return(pb.fract(pb.mul(pb.vec2(0.7548776662466927, 0.5698402909980532), pb.float(this.i))));
         });
-        // Fetch one parameter column of a profile row. `id` is the normalized
-        // per-pixel profile id; rows are addressed by it directly, as UE5 does
-        // with its SSProfiles table.
         pb.func('readProfile', [pb.float('id'), pb.float('column')], function () {
           this.$l.u = pb.mul(pb.add(this.column, 0.5), this.profileParams.y);
           this.$l.v = pb.mul(pb.add(pb.mul(pb.clamp(this.id, 0, 1), 255), 0.5), this.profileParams.z);
@@ -492,36 +439,18 @@ export class PostSSS extends AbstractPostEffect {
               this.$l.boundaryBleed = this.readProfile(this.centerId, 3).rgb;
               this.$l.worldUnitScale = pb.max(this.scaling.x, 1e-3);
 
-              // UE5 draws the radius from one representative channel
-              // (SurfaceAlbedo.a / DiffuseMeanFreePath.a) and evaluates all three
-              // channel kernels at those radii.
               this.$l.aForSampling = this.albedo.w;
               this.$l.lForSampling = pb.max(this.mfp.w, 1e-6);
               this.$l.S = this.scalingFactor(this.aForSampling);
               this.$l.S3D = this.scalingFactor3D(this.albedo.rgb);
               this.$l.dForSampling = pb.div(this.lForSampling, pb.max(this.S, 1e-6));
 
-              // CalculateBurleyScale: profile space to UV. Purely unit conversion,
-              // including the 1/depth perspective term - nothing here shapes the
-              // kernel.
-              // Perspective divides the world radius by the view depth so the disc
-              // keeps a constant world size as the subject recedes; orthographic
-              // has no such term and takes 1.
               this.$l.viewScale = pb.max(
                 pb.select(this.centerDepth, pb.float(1), pb.equal(this.perspective, 0)),
                 1e-4
               );
-              // The world unit scale is applied here and only here; the packed
-              // mean free path leaves it out, as UE5 does. Applying it in both
-              // places would make the diffusion scale with its square. UE5's
-              // extra cm-to-mm cast has no counterpart in this metric engine.
               this.$l.burleyScale = pb.div(pb.mul(this.projScale, this.worldUnitScale), this.viewScale);
 
-              // Centre-sample reweighting: the radius within one texel and the CDF
-              // mass it accounts for. Sampling then covers only [cdf, 1] and the
-              // centre is lerped back in at the end. Averaged over the two axes,
-              // as UE5's CalculateCenterSampleRadiusInMM does, since they carry
-              // different scales.
               this.$l.centerRadiusMM = pb.mul(
                 0.5,
                 pb.add(
@@ -530,12 +459,6 @@ export class PostSSS extends AbstractPostEffect {
                 )
               );
               this.$l.centerCdf = this.burleyCdf(this.dForSampling, this.centerRadiusMM);
-              // Per-channel diffusion distance, the same `d` the kernel below is
-              // evaluated with. UE5's scalar DiffuseMeanFreePath works there
-              // because its `.a` and `.rgb` are related by construction; here `.a`
-              // is simply the widest channel, so substituting it would flatten the
-              // channel ratio - and invert it, since a smaller `d` concentrates
-              // more CDF mass inside one texel.
               this.$l.dPerChannel = pb.div(this.mfp.rgb, pb.max(this.S3D, pb.vec3(1e-6)));
               this.$l.centerWeight = pb.vec3(
                 this.burleyCdf(this.dPerChannel.x, this.centerRadiusMM),
@@ -543,13 +466,6 @@ export class PostSSS extends AbstractPostEffect {
                 this.burleyCdf(this.dPerChannel.z, this.centerRadiusMM)
               );
 
-              // Integer sequence start, rebased per pixel so neighbours do not
-              // draw the identical 64 taps. It must land on an integer to keep the
-              // low-discrepancy spacing, as UE5's 16-bit `Rand3DPCG16` rebase does.
-              //
-              // UE5 also advances the seed per frame and leans on TAA to resolve
-              // the remainder. Without that history a per-frame seed would read as
-              // flicker, so this is held fixed and trades it for a stable error.
               this.$l.seedStart = pb.int(pb.mul(hash21(this, pb.mul(this.uv, this.targetSize.xy)), 65536));
               this.$l.radianceAccum = pb.vec3(0);
               this.$l.weightAccum = pb.vec3(0);
@@ -558,8 +474,6 @@ export class PostSSS extends AbstractPostEffect {
               this.$l.radiusSum = pb.float(0);
               this.$for(pb.int('i'), 0, DEFAULT_SAMPLE_COUNT, function () {
                 this.$l.rand = this.r2Sequence(pb.add(this.seedStart, this.i));
-                // Restrict the radius draw to the range the centre sample does not
-                // already account for.
                 this.$l.xi = pb.add(this.centerCdf, pb.mul(this.rand.x, pb.sub(1, this.centerCdf)));
                 this.$l.radiusMM = pb.max(this.radiusRootApprox(this.dForSampling, this.xi), 1e-5);
                 this.$l.pdf = this.burleyPdf(this.radiusMM, this.lForSampling, this.S);
@@ -576,57 +490,25 @@ export class PostSSS extends AbstractPostEffect {
                 this.$l.normalWeight = pb.sqrt(
                   pb.clamp(pb.add(pb.mul(pb.dot(this.tapNormal, this.centerNormal), 0.5), 0.5), 0, 1)
                 );
-                // Bilateral term: the depth difference in the same millimetre
-                // space as the radius, so a large world unit scale does not
-                // over-penalize the sample. UE5 compares the two one-to-one.
                 this.$l.deltaDepth = pb.div(pb.sub(this.sampleDepth, this.centerDepth), this.worldUnitScale);
                 this.$l.radiusSampledMM = pb.sqrt(
                   pb.add(pb.mul(this.radiusMM, this.radiusMM), pb.mul(this.deltaDepth, this.deltaDepth))
                 );
                 this.$l.profile = this.diffusionProfile(this.mfp.rgb, this.S3D, this.radiusSampledMM);
                 this.$l.tapId = this.readProfileId(this.sampleUV);
-                // The tap's own opacity, UE5's Opacity semantics: 0 contributes
-                // nothing, 1 contributes fully, and the values between give the
-                // smooth transition a painted mask is for.
                 this.$l.tapOpacity = pb.select(
                   pb.float(0),
                   this.tapSample.a,
                   pb.greaterThan(this.tapId, 0.5 / 255)
                 );
-                // A tap that is not skin falls back to the centre pixel rather
-                // than dropping out of the estimator, for two reasons.
-                //
-                // Variance: this is self-normalized, so a dropped tap leaves both
-                // sums. Beside a large non-skin region most of the disc lands in
-                // it, and since the per-pixel seed is fixed, neighbouring pixels
-                // survive on different taps - spatial white noise.
-                //
-                // Numerics: importance sampling is exact only for the channel the
-                // radii were drawn from, so `profile/pdf` is constant for red
-                // while blue decays to ~7e-9 in the tail. Dropping the near taps
-                // leaves blue's `weightAccum` on the order of the 1e-9 floor
-                // below, which clamps it to zero.
-                //
-                // The substitution assumes the hole scatters like the pixel under
-                // consideration - the same assumption the centre-weighted blend
-                // already makes - and costs a slightly firmer edge at the hole.
                 this.$l.tapColor = pb.mix(this.center.rgb, this.tapSample.rgb, this.tapOpacity);
                 this.$l.sampleWeight = pb.mul(pb.div(this.profile, this.pdf), this.normalWeight);
-                // Taps from another profile are tinted rather than dropped, so a
-                // face/lip boundary softens instead of seaming. The comparison is
-                // against the prepass id now; 0.002 is still half a step of the
-                // 8-bit channel it rides in.
                 this.$l.sameProfile = pb.float(
                   pb.or(
                     pb.lessThan(pb.abs(pb.sub(this.tapId, this.centerId)), 0.002),
                     pb.lessThan(this.tapOpacity, 1e-4)
                   )
                 );
-                // Only taps that landed on skin contribute a bleed factor, and
-                // both sides of the ratio carry the same opacity, so the mean
-                // stays a tint in [bleed, 1]. Taps that fell back to the centre
-                // are excluded: they carry the centre's own profile, so counting
-                // them would dilute a real boundary tint towards white.
                 this.bleedAccum = pb.add(
                   this.bleedAccum,
                   pb.mul(pb.mix(this.boundaryBleed, pb.vec3(1), this.sameProfile), this.tapOpacity)
@@ -636,42 +518,23 @@ export class PostSSS extends AbstractPostEffect {
                 this.weightAccum = pb.add(this.weightAccum, this.sampleWeight);
                 this.radiusSum = pb.add(this.radiusSum, this.radiusMM);
               });
-              // Energy normalization, matching UE5's 1/0.99995 compensation.
               this.$l.diffused = pb.mul(
                 pb.div(this.radianceAccum, pb.max(this.weightAccum, pb.vec3(1e-9))),
                 1 / 0.99995
               );
-              // Mean bleed over the taps that landed on skin: a tint in [bleed, 1],
-              // never a gain. A branch rather than `max(acceptedCount, 1)`, which
-              // would only be correct for an integer count - this is a sum of
-              // opacities, so a half-masked neighbourhood would be darkened by
-              // exactly its own mask on top of the fade applied below.
               this.$l.bleedTint = pb.vec3(1);
               this.$if(pb.greaterThan(this.acceptedCount, 1e-4), function () {
                 this.bleedTint = pb.div(this.bleedAccum, this.acceptedCount);
               });
               this.diffused = pb.mul(this.diffused, this.bleedTint);
-              // Blend the centre pixel back in with the CDF mass it represents.
               this.diffused = pb.mix(this.diffused, this.center.rgb, this.centerWeight);
-              // Per channel: importance sampling is exact only for the one the
-              // radii were drawn from, so the three weights differ by orders of
-              // magnitude and a single scalar test cannot speak for all of them.
-              // Built as a mask rather than a vector-conditioned select, which
-              // has no legal GLSL form - the ternary there takes a scalar only.
               this.$l.weightValid = pb.vec3(
                 pb.float(pb.greaterThan(this.weightAccum.x, 0)),
                 pb.float(pb.greaterThan(this.weightAccum.y, 0)),
                 pb.float(pb.greaterThan(this.weightAccum.z, 0))
               );
               this.diffused = pb.mix(this.center.rgb, this.diffused, this.weightValid);
-              // The centre's own opacity fades the whole result back towards the
-              // unscattered pixel. Taps were already weighted by *their* opacity,
-              // which controls how much the neighbourhood contributes; this
-              // controls how much this pixel accepts. UE5 applies the same value
-              // at both ends, which is what makes a painted mask read as a
-              // gradient in scattering strength rather than as an edge.
               this.diffused = pb.mix(this.center.rgb, this.diffused, this.center.a);
-              // Alpha is unused downstream; Recombine reads its own mask.
               this.$outputs.outColor = pb.vec4(pb.max(this.diffused, pb.vec3(0)), this.center.a);
               this.$if(pb.notEqual(this.debugMode, 0), function () {
                 this.$l.dbg = pb.vec3(0);
@@ -728,11 +591,6 @@ export class PostSSS extends AbstractPostEffect {
                 });
                 if (hasTextureArrays) {
                   this.$if(pb.equal(this.debugMode, 11), function () {
-                    // Shown as optical depth (bright = thick), not the stored
-                    // encoding. An unobstructed surface stores 0.92, close enough
-                    // to the 1.0 of "no light wrote this" that blue calls the
-                    // latter out separately. The minimum over layer 0's four
-                    // channels shows whichever light sees the most material.
                     this.$l.th = pb.textureArraySampleLevel(this.thicknessTex, this.uv, 0, 0);
                     this.$l.enc = pb.min(pb.min(this.th.r, this.th.g), pb.min(this.th.b, this.th.a));
                     this.$if(pb.greaterThan(this.enc, 0.999), function () {
@@ -754,10 +612,6 @@ export class PostSSS extends AbstractPostEffect {
   }
 
   private createBVarProgram(ctx: DrawContext) {
-    // Placeholder for UE5's `UpdateQualityVariance`, a luminance-residual history
-    // that drives the next frame's adaptive sample count. Without a history buffer
-    // there is nothing to accumulate, so this is a straight copy and the diffusion
-    // always runs at full sample count; the pass is the slot history would occupy.
     const program = ctx.device.buildRenderProgram({
       vertex(pb) {
         PostSSS.fullscreenVertex(pb);
@@ -770,8 +624,6 @@ export class PostSSS extends AbstractPostEffect {
         this.$outputs.outColor = pb.vec4();
         pb.main(function () {
           this.$l.diffused = pb.textureSampleLevel(this.diffusedTex, this.$inputs.uv, 0);
-          // Alpha is the subsurface opacity the diffusion wrote; it is passed
-          // through unchanged rather than repurposed.
           this.$outputs.outColor = pb.vec4(this.diffused.rgb, this.diffused.a);
         });
       }
@@ -803,9 +655,6 @@ export class PostSSS extends AbstractPostEffect {
           this.$l.baseColor = pb.textureSampleLevel(this.colorTex, this.uv, 0);
           this.$l.result = this.baseColor.rgb;
           this.$l.centerDepth01 = this.readDepth01(this.uv);
-          // Subsurface opacity. A plain gate is right here: how strongly the
-          // pixel scattered is already baked into the diffusion buffer, and
-          // weighting by the opacity a second time would count it twice.
           this.$l.centerMask = pb.textureSampleLevel(this.maskTex, this.uv, 0).a;
           this.$if(
             pb.and(
@@ -813,34 +662,17 @@ export class PostSSS extends AbstractPostEffect {
               pb.and(pb.lessThan(this.centerDepth01, 1), pb.greaterThan(this.centerMask, 1e-4))
             ),
             function () {
-              // UE5 SSS::Recombine (lines 32-40): split the lit pixel into the
-              // diffuse part that was allowed to scatter and the specular part
-              // that must survive untouched, then swap the diffuse for the
-              // diffused version.
               this.$l.lum = pb.dot(this.baseColor.rgb, pb.vec3(0.2126, 0.7152, 0.0722));
-              // Must match Burley's split exactly: that pass diffused
-              // `baseColor.rgb * diffAmt` and this one keeps the remainder, so a
-              // disagreement leaves the halves not adding up to the original.
               this.$l.diffAmt = pb.select(
                 pb.float(1),
                 pb.clamp(pb.div(this.baseColor.a, pb.max(this.lum, 1e-4)), 0, 1),
                 pb.greaterThan(this.lum, 1e-4)
               );
               this.$l.specKeep = pb.mul(this.baseColor.rgb, pb.sub(1, this.diffAmt));
-              // The diffusion buffer's alpha is the subsurface opacity, not a
-              // transmission term - nothing in this pipeline produces one here.
-              // UE5's transmission likewise comes from SubsurfaceProfileBxDF per
-              // light, and the back-lit term on SSSMaterial that stands in for
-              // it is already part of SceneColor.
               this.$l.diffused = pb.textureSampleLevel(this.bvarTex, this.uv, 0).rgb;
-              // Straight sum, as UE5 does it. No blend weight or tint: how far and
-              // in what colour the light travels is the profile's business, and a
-              // second knob on top could only disagree with it.
               this.result = pb.max(pb.add(this.diffused, this.specKeep), pb.vec3(0));
             }
           );
-          // A debug channel must reach the screen unmodified, so recombination is
-          // skipped and the diffusion buffer is shown as it was written.
           this.$if(pb.notEqual(this.debugMode, 0), function () {
             this.result = pb.textureSampleLevel(this.bvarTex, this.uv, 0).rgb;
           });

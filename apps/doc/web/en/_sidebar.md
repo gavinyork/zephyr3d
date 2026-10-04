@@ -66,6 +66,8 @@
     - [Overview](en/oit.md)
   - Multi-view Rendering
     - [Overview](en/multi-views.md)
+  - Performance
+    - [Performance Optimization](en/performance.md)
   - Advanced Topics
     - [Depth Convention (Reverse-Z)](en/reverse-z.md)
     - [Render Graph and Custom Passes](en/rendergraph.md)

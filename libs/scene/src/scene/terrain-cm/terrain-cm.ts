@@ -292,10 +292,9 @@ export class ClipmapTerrain extends applyMixins(GraphNode, mixinDrawable) implem
     }
   }
   /**
-   * Whether the detail layers are blended into a runtime virtual texture (UE landscape RVT)
-   * instead of per pixel. Pages are blended once, as the camera needs them, so shading costs the
-   * same whatever the number of layers. WebGPU only, ignored elsewhere; has no effect without
-   * detail layers.
+   * Whether the detail layers are blended into a runtime virtual texture instead of per pixel.
+   * Pages are blended once, as the camera needs them, so shading costs the same whatever the
+   * number of layers. WebGPU only, ignored elsewhere; has no effect without detail layers.
    *
    * Code writing into the splat map or the height map directly must call
    * {@link ClipmapTerrain.invalidateRuntimeVirtualTexture} for the area it changed.

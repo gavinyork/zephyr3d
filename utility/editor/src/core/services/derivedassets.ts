@@ -15,17 +15,6 @@ import { isTextureSourcePath } from './assetmeta';
 import { encodeDerivedPrimitive, getPrimitiveTriangleCount, isCompressiblePrimitive } from './meshencoder';
 import type { EncodeRequest, EncodeResponse } from '../../workers/basis_encode';
 
-/**
- * Derived data cache for compressed assets, after UE's DDC and Unity's Library:
- * the editor never alters source files, it derives a compressed copy per source
- * content + settings + encoder and keeps it under /.cache, which can be deleted
- * at any time and is rebuilt on demand. Textures derive KTX2 through the Basis
- * encoder, meshes a binary meshopt .zmsh.
- *
- * Bump an encoder id with its vendored encoder and the pipeline version with any
- * change to how settings map onto encoder options; either invalidates every
- * entry of that kind.
- */
 const TEXTURE_ENCODER_ID = 'basisu-v2_50';
 const TEXTURE_PIPELINE_VERSION = 1;
 const MESH_ENCODER_ID = 'meshopt-1.3';

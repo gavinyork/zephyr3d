@@ -105,14 +105,6 @@ export class TerrainTextureBrush extends BaseTerrainBrush {
     strength: PBShaderExp,
     heightMapUV: PBShaderExp
   ) {
-    // Weight blended painting as UE landscape: the paint adds weight to the target layer and the
-    // others give way in proportion (LandscapeEditLayersWeightmaps.usf, PerformFinalWeightBlendingPS
-    // divides every weight by the sum). The sum is kept at what the texel had rather than forced
-    // to 1: identical to UE's normalization for weights summing to 1 (every terrain starts that
-    // way), while weights painted by the old brush, which normalized the vector length, keep their
-    // look where the brush does not reach instead of changing over the whole brush rectangle.
-    // The weights span every splat map layer, so the brush runs once per layer, each pass writing
-    // its own layer's 4 weights.
     const pb = scope.$builder;
     scope.$l.paintAmount = pb.clamp(pb.mul(strength, mask), 0, 1);
     scope.$l.weightSum = pb.float(0);
@@ -127,7 +119,6 @@ export class TerrainTextureBrush extends BaseTerrainBrush {
     scope.$if(pb.equal(scope.outputLayer, scope.targetLayer), function () {
       this.outputValue.setAt(this.channel, pb.add(this.outputValue.at(this.channel), this.paintAmount));
     });
-    // A texel without any weight gets the UE result, the painted layer alone
     scope.$l.keepSum = pb.select(pb.float(1), scope.weightSum, pb.greaterThan(scope.weightSum, 1e-5));
     return pb.mul(
       scope.outputValue,

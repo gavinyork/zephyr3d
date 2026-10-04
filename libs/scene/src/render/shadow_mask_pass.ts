@@ -19,13 +19,6 @@ import { fetchSampler } from '../utility/misc';
 import { SSR_interleavedGradientNoise } from '../shaders/ssr';
 
 const UNIFORM_NAME_SHADOW_MAP = 'Z_UniformShadowMap';
-
-/**
- * Contact shadow ray march, ported from UE5 `CastScreenSpaceShadowRay`
- * (ScreenSpaceShadowRayCast.ush, non-Substrate branch) as called by
- * `ApplyContactShadowWithShadowTerms` (DeferredLightingCommon.ush): 8 steps,
- * compare tolerance scale 2.
- */
 const CONTACT_SHADOW_STEPS = 8;
 const CONTACT_SHADOW_COMPARE_TOLERANCE_SCALE = 2;
 
@@ -254,10 +247,6 @@ export class ShadowMaskRenderer {
     bindGroup.setValue('flip', this.needFlip(ctx.device) ? 1 : 0);
     if (contactShadow) {
       const proj = camera.getProjectionMatrix();
-      // UE5 ScreenRayLengthMultiplier.yw: a screen-relative length scales with
-      // tan(fovY/2) * depth under perspective and is used as-is under ortho.
-      // The factor 2 is UE's GetLightContactShadowParameters doubling
-      // screen-space lengths.
       if (proj.isPerspective()) {
         this._contactScale.setXY(2 / proj[5], 0);
       } else {
@@ -576,13 +565,7 @@ export class ShadowMaskRenderer {
           }
         );
         if (contactShadow) {
-          // NDC z to device depth, the space UE's depth comparisons run in.
           const toDeviceZ = (z: PBShaderExp) => (REVERSE_Z ? z : pb.add(pb.mul(z, 0.5), 0.5));
-          /**
-           * Screen-space contact shadow, following UE5 CastScreenSpaceShadowRay
-           * and ApplyContactShadowWithShadowTerms. Returns the visibility
-           * factor to multiply into the shadow term.
-           */
           pb.func(
             'zContactShadow',
             [pb.vec3('worldPos'), pb.float('startDepth'), pb.vec3('L'), pb.vec2('pixel')],
@@ -599,7 +582,6 @@ export class ShadowMaskRenderer {
               this.$l.rayStart = pb.div(this.rayStartClip.xyz, this.rayStartClip.w);
               this.$l.rayEnd = pb.div(this.rayEndClip.xyz, this.rayEndClip.w);
               this.$l.rayStep = pb.sub(this.rayEnd, this.rayStart);
-              // UE offsets by +RayLength along view Z; view space looks down -Z here.
               this.$l.rayDepthClip = pb.add(
                 this.rayStartClip,
                 pb.mul(this.projZColumn, pb.neg(this.rayLength))
@@ -626,8 +608,6 @@ export class ShadowMaskRenderer {
                     this.cameraNearFar
                   );
                   this.$l.rayDeviceZ = toDeviceZ(this.samplePos.z);
-                  // UE's DepthDiff under reverse-Z: negative once the ray point
-                  // is behind the scene surface.
                   this.$l.depthDiff = REVERSE_Z
                     ? pb.sub(this.rayDeviceZ, this.sampleDeviceZ)
                     : pb.sub(this.sampleDeviceZ, this.rayDeviceZ);
@@ -704,8 +684,6 @@ export class ShadowMaskRenderer {
             );
           }
           if (contactShadow) {
-            // Multiplied on top of the shadow map term and not subject to the
-            // shadow distance fade, as UE5 applies it to SurfaceShadow.
             this.$if(pb.lessThan(this.pos.w, 1), function () {
               this.factor = pb.mul(
                 this.factor,

@@ -710,26 +710,6 @@ export function mixinLight<T extends typeof MeshMaterial>(BaseCls: T) {
      * A rect light reduced to one direction and one magnitude, for BxDFs that
      * have no area-light integration of their own.
      *
-     * @remarks
-     * The vector form factor `F` of the rect as seen from `worldPos`, after UE5's
-     * `RectIrradianceLambert`: `dot(F, N)` is the form factor for a surface of
-     * normal `N`, exactly so while the rect is above that surface's horizon. So a
-     * BxDF that shades an ordinary light as `color * attenuation * NoL` receives
-     * the rect's true irradiance when handed direction `F / |F|` and attenuation
-     * `pi * |F|` - `pi * luminance * formFactor` is the irradiance a Lambertian
-     * emitter of that luminance delivers. Below the horizon the clamped `NoL` the
-     * BxDF applies drops the clipped part of the rect rather than integrating it,
-     * which is where this is approximate; UE5 wraps the cosine there instead.
-     *
-     * The edge term is the same fit the LTC path integrates with (it returns
-     * `theta / (2 pi sin theta)`, so the sum is already the form factor), and the
-     * range window is the LTC path's too, so a rect light reads the same through
-     * either.
-     *
-     * Returns `(direction, formFactor)`. Behind the light's plane - rect lights
-     * are one-sided - and for a degenerate rect the form factor is 0 and the
-     * direction is towards the centre.
-     *
      * @internal
      */
     protected calculateRectLightVectorIrradiance(
@@ -912,21 +892,7 @@ export function mixinLight<T extends typeof MeshMaterial>(BaseCls: T) {
         .getGlobalScope()
         .Z_calculateLightDirection(type, worldPos.xyz, posRange, dirCutoff, extra) as PBShaderExp;
     }
-    /**
-     * Invokes `callback` once per light affecting the fragment.
-     *
-     * @remarks
-     * On the clustered path with the screen-space shadow mask, `colorIntensity`
-     * arrives with the light's shadow already multiplied in, which is what every
-     * surface term wants. `unshadowedColorIntensity` is the same light before
-     * that: transmission is attenuated by the thickness it measures, not by the
-     * surface shadow - UE5's subsurface transmission reads the encoded optical
-     * depth as its shadow term instead - and a back-lit surface is by
-     * construction fully in its light's shadow, so the shadowed colour would
-     * zero exactly the pixels transmission exists for. On the per-light additive
-     * path the two are the same value; the callback applies that shadow itself
-     * (`shadow` is true).
-     */
+    /** Invokes `callback` once per light affecting the fragment. */
     forEachLight(
       scope: PBInsideFunctionScope,
       callback: (

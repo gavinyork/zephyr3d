@@ -11,12 +11,11 @@ import type { VirtualTexture } from './virtual_texture';
  * {@link VirtualTextureClient.markFromDepth} for every active client, then
  * {@link VirtualTexture.update} with the device frame counter as stamp, then
  * {@link VirtualTextureClient.fill}. Pages marked from this camera's depth are mapped and filled
- * before it shades (UE VSM: mark from the current frame's depth, then manage physical pages,
- * then render pages, all before the lights).
+ * before it shades.
  *
- * Cameras share the client's pool. They share the stamp too, like UE's SceneFrameNumber: a page
- * requested by one camera has age 0 in the next camera's update, so it stays in use and cannot
- * be given away within the frame. Each update has its own fill budget.
+ * Cameras share the client's pool. They share the stamp too: a page requested by one camera has
+ * age 0 in the next camera's update, so it stays in use and cannot be given away within the frame.
+ * Each update has its own fill budget.
  *
  * Requests marked while shading (fragment shader marking) are taken by the next update, one
  * camera or one frame later.

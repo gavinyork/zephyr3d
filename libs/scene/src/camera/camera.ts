@@ -726,7 +726,7 @@ export class Camera extends SceneNode {
   }
   /**
    * Whether lights with a non-zero {@link PunctualLight.contactShadowLength}
-   * trace contact shadows (UE5 `r.ContactShadows`).
+   * trace contact shadows.
    *
    * Contact shadows are traced inside the screen-space shadow mask, so they
    * also require {@link Camera.screenSpaceShadowMask}.
@@ -910,7 +910,7 @@ export class Camera extends SceneNode {
    * @remarks
    * See {@link Bloom.karisAverage}. On by default; costs a little halo reach in exchange for
    * stability on high-frequency speculars. Legacy lighting only: physical lighting always averages
-   * linearly, as UE does.
+   * linearly.
    */
   get bloomKarisAverage() {
     return this._bloomKarisAverage;
@@ -1588,8 +1588,8 @@ export class Camera extends SceneNode {
     this._commandBufferReuse = !!val;
   }
   /**
-   * Scale of the mesh level of detail switch sizes in this view (UE r.StaticMeshLODDistanceScale):
-   * above 1 meshes switch to coarser levels closer to the camera, below 1 farther away. Default 1.
+   * Scale of the mesh level of detail switch sizes in this view: above 1 meshes switch to
+   * coarser levels closer to the camera, below 1 farther away. Default 1.
    */
   get lodDistanceScale() {
     return this._lodDistanceScale;
@@ -1613,9 +1613,8 @@ export class Camera extends SceneNode {
   }
   /**
    * Whether every mesh of this view is shaded in the color of the level of detail it is drawn at,
-   * UE's LOD Coloration view mode: white, red, green, blue, yellow, fuchsia, cyan and purple for
-   * levels 0 to 7. A debug view, not saved with the camera; meshes are not batched while it is on.
-   * Default false.
+   * white, red, green, blue, yellow, fuchsia, cyan and purple for levels 0 to 7. A debug view, not
+   * saved with the camera; meshes are not batched while it is on. Default false.
    */
   get lodColoration() {
     return DEBUG_VIEWS && this._lodColoration;

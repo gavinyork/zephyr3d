@@ -23,10 +23,83 @@
         height: 100%;
         z-index: 0;
       }
+      #ui {
+        position: absolute;
+        top: 8px;
+        left: 8px;
+        z-index: 10;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        width: 220px;
+        padding: 8px;
+        border: 1px solid rgba(255, 255, 255, 0.14);
+        border-radius: 6px;
+        background: rgba(15, 20, 28, 0.78);
+        color: #f4f7fb;
+        color-scheme: dark;
+        font:
+          12px/1.25 system-ui,
+          -apple-system,
+          BlinkMacSystemFont,
+          'Segoe UI',
+          sans-serif;
+        backdrop-filter: blur(8px);
+      }
+      #ui label {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        white-space: nowrap;
+      }
+      #ui label > span {
+        min-width: 40px;
+      }
+      #ui select,
+      #ui input[type='range'] {
+        flex: 1;
+        min-width: 0;
+      }
+      #ui select {
+        min-height: 22px;
+        padding: 0 4px;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        border-radius: 4px;
+        background: #222b36;
+        color: inherit;
+        font: inherit;
+        cursor: pointer;
+      }
+      #ui option {
+        background: #1b2430;
+        color: #f4f7fb;
+      }
+      #ui input[type='range'] {
+        accent-color: #7fb2ff;
+      }
+      #ui .note {
+        opacity: 0.7;
+        white-space: normal;
+      }
     </style>
   </head>
   <body>
     <canvas id="my-canvas"></canvas>
+    <div id="ui" aria-label="Terrain grass options">
+      <label>
+        <span>Grass</span>
+        <select id="grass-select">
+          <option value="blade">Geometry blades</option>
+          <option value="card">Texture cards</option>
+        </select>
+      </label>
+      <label>
+        <span>Wind</span>
+        <input id="wind-range" type="range" min="0" max="2" step="0.05" />
+      </label>
+      <div class="note" id="backend-note"></div>
+      <div class="note">Left drag: orbit. Wheel: zoom.</div>
+    </div>
     <script type="module" src="js/tut-69.js"></script>
   </body>
 </html>

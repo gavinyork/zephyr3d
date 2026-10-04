@@ -1045,13 +1045,6 @@ function activeVirtualTextureClients(ctx: DrawContext, renderQueue: RenderQueue)
 
 /**
  * Updates the scene's virtual textures for this camera: mark from the depth prepass, map, fill.
- *
- * Follows UE VSM, which marks pages from the current frame's depth after the prepass and manages
- * and renders them before the lights (DeferredShadingRenderer.cpp, BeginMarkVirtualShadowMapPages
- * then RenderShadowDepthMaps). Every camera runs it; the stamp is the device frame counter, which
- * like UE's SceneFrameNumber is shared by every render of the frame, so one camera's pages are
- * never aged or given away by another camera's update in the same frame.
- * @internal
  */
 const VirtualTextureModule: RenderModule<FrameGraphContext> = {
   type: 'VirtualTextureUpdate',
@@ -1122,9 +1115,6 @@ const TransmissionThicknessModule: RenderModule<FrameGraphContext> = {
       builder.setExecute((rgCtx) => {
         const depthTex = rgCtx.getTexture<Texture2D>(depthHandle);
         const thicknessTex = rgCtx.getTexture<Texture2DArray>(thicknessHandle);
-        // Absorption and unit scale are per-pixel, read from the profile table
-        // against the id the depth prepass wrote - the arrangement UE5 has, where
-        // shadow projection reads the profile id out of the GBuffer.
         _transmissionThicknessRenderer.render(
           ctx,
           depthTex,
@@ -1550,10 +1540,6 @@ const LightPassModule: RenderModule<FrameGraphContext> = {
       ) {
         writeSSSTransmission = false;
       }
-      // Skin scattering takes its color from SceneColor and the diffuse luminance
-      // in its alpha (UE5's separation mechanism), so no color side buffer is
-      // needed. It still needs to know which pixels are skin, which is what UE5
-      // keeps in its single-channel Subsurface.ProfileIdTexture.
       const writePostSSS = options.postSSS;
       const sssLightingAttachmentCount =
         (writeSSSDiffuse ? 1 : 0) + (writeSSSTransmission ? 1 : 0) + (writePostSSS ? 1 : 0);

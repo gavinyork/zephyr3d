@@ -2,7 +2,7 @@
 
 The farther a mesh is from the camera, the smaller it is on screen and the fewer of its triangles matter. Levels of detail (LOD) give a mesh several progressively simplified versions and pick one by how large the mesh appears on screen, cutting the vertex and triangle cost of distant objects.
 
-zephyr3d uses **discrete LOD chains**, like UE static meshes:
+zephyr3d uses **discrete LOD chains**:
 
 - Level 0 is the original mesh; each following level has fewer triangles.
 - **All levels share one vertex buffer**: a level is just a range of the index buffer. A mesh with levels of detail only adds a few index ranges, and skinning and morph targets work at every level.
@@ -28,7 +28,7 @@ Every level has a **switch size** (`screenSize`). The engine uses the coarsest l
 | --- | --- |
 | `Mesh.forcedLod` | Always use this level, 0 being the finest; -1 (default) chooses by screen size. Out of range values use the coarsest level |
 | `Mesh.minLod` | The finest level used when choosing by screen size, default 0. Raise it to keep a mesh simplified even up close |
-| `Camera.lodDistanceScale` | Scales every switch size in this view, like UE's `r.StaticMeshLODDistanceScale`. Above 1 meshes switch to simpler levels closer to the camera, below 1 they keep detailed levels farther away. Default 1 |
+| `Camera.lodDistanceScale` | Scales every switch size in this view. Above 1 meshes switch to simpler levels closer to the camera, below 1 they keep detailed levels farther away. Default 1 |
 
 `forcedLod` and `minLod` are saved with the scene and can be edited in the editor's property panel. `lodDistanceScale` suits a quality setting, for example 2 at low quality:
 
@@ -50,7 +50,7 @@ Two debug views help, on their own or together. Debug views are only available w
 
 
 - **Wireframe**: `camera.wireframe = true` draws everything in the view as the edges of its triangles: meshes, batch groups, particles, sprites, hair, terrain, water and grass. The wireframe follows the level in use, so moving the camera shows the triangle count change directly. Edges of indexed geometry are built from index data read back from the GPU and appear a few frames after it is turned on. Shadows and picking are unaffected.
-- **LOD coloration**: `camera.lodColoration = true` shades every mesh in the color of its current level, with UE's LOD Coloration colors:
+- **LOD coloration**: `camera.lodColoration = true` shades every mesh in the color of its current level:
 
 | LOD | 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -127,7 +127,7 @@ To measure a mesh by the same rule, `computeBoundsScreenSize(center, radius, cam
 ## Batching
 
 - Automatic instancing batches by primitive and material; the levels of one primitive form separate batches, each drawing its own index range.
-- `BatchGroup` caches its render queue. On WebGPU, when the device supports `indirect-first-instance` and `gpuInstanceCulling` is on (the default), the levels of batched meshes are selected on the GPU per instance, in the same compute pass that frustum culls them: the cache is not rebuilt when meshes switch levels. Shadow views select by the main camera as on the CPU. This path has no hysteresis, as UE static meshes, so a mesh sitting right at a switch distance may flip between levels as the camera moves. Elsewhere (WebGL, culling off, LOD coloration on, meshes that are not batched) each mesh chooses its level on the CPU, and the cache is rebuilt when one of them switches, which the hysteresis keeps rare.
+- `BatchGroup` caches its render queue. On WebGPU, when the device supports `indirect-first-instance` and `gpuInstanceCulling` is on (the default), the levels of batched meshes are selected on the GPU per instance, in the same compute pass that frustum culls them: the cache is not rebuilt when meshes switch levels. Shadow views select by the main camera as on the CPU. This path has no hysteresis, so a mesh sitting right at a switch distance may flip between levels as the camera moves. Elsewhere (WebGL, culling off, LOD coloration on, meshes that are not batched) each mesh chooses its level on the CPU, and the cache is rebuilt when one of them switches, which the hysteresis keeps rare.
 
 ---
 

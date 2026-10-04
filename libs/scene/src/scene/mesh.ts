@@ -45,7 +45,6 @@ import { computeAABBScreenRadiusSquared, selectLod } from '../render/lod';
 
 const tmpLodCenter = new Vector3();
 
-/** UE BaseEngine.ini LODColorationColors, levels 0 to 7 */
 const LOD_COLORATION_COLORS: [number, number, number][] = [
   [1, 1, 1],
   [1, 0, 0],
@@ -369,8 +368,8 @@ export class Mesh extends MeshBase implements BatchDrawable {
     this._castShadow = b;
   }
   /**
-   * Level of detail to always draw, or -1 to select it by the projected size (UE ForcedLodModel,
-   * counted from 0 here). Clamped to the levels of the primitive.
+   * Level of detail to always draw, or -1 to select it by the projected size.
+   * Clamped to the levels of the primitive.
    */
   get forcedLod() {
     return this._forcedLod;
@@ -383,8 +382,8 @@ export class Mesh extends MeshBase implements BatchDrawable {
     }
   }
   /**
-   * Finest level of detail drawn when selecting by the projected size (UE MinLOD). Clamped to the
-   * levels of the primitive.
+   * Finest level of detail drawn when selecting by the projected size.
+   * Clamped to the levels of the primitive.
    */
   get minLod() {
     return this._minLod;
@@ -398,8 +397,7 @@ export class Mesh extends MeshBase implements BatchDrawable {
   }
   /**
    * Selects the level of detail of the primitive for a view: forced, or picked from the projected
-   * size of the world bounds (UE ComputeStaticMeshLOD with skeletal mesh hysteresis, see
-   * {@link selectLod}). Always 0 for a primitive without levels.
+   * size of the world bounds. Always 0 for a primitive without levels.
    *
    * @param camera - The view's camera
    * @returns The level of detail, 0 being the finest
@@ -1349,9 +1347,10 @@ export class Mesh extends MeshBase implements BatchDrawable {
     }
   }
   /**
-   * @internal The material shading the level of detail in its color (UE LOD Coloration, drawn with
-   * a colored default material) in the light pass of a camera showing it, null otherwise. Depth,
-   * shadow and picking passes keep the mesh's own material.
+   * The material shading the level of detail in its color in the light pass
+   * of a camera showing it, null otherwise. Depth, shadow and picking passes keep the
+   * mesh's own material.
+   * @internal
    */
   private getLodColorationMaterial(ctx: DrawContext) {
     if (!ctx.camera?.lodColoration || ctx.renderPass?.type !== RENDER_PASS_TYPE_LIGHT) {

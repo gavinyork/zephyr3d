@@ -111,9 +111,9 @@ for (let i = 0; i < 100; i++) {
 ```
 
 > ⚠️ Notes  
-> - Objects inside a static batch can still change position, rotation, scale, or material instance properties.  
->   However, frequent changes will trigger batch rebuilding, severely impacting performance.  
-> - Static batching is recommended for large numbers of instances with low update frequency.
+> - Objects inside a static batch can change position, rotation, scale and material instance properties freely: the cached batch is updated in place.  
+> - Adding or removing objects, showing or hiding them, or giving them another primitive or material rebuilds the batch; avoid doing that every frame.  
+> - See [Performance Optimization](en/performance.md) for GPU culling and level of detail selection in batch groups.
 
 <div class="showcase" case="tut-45"></div>
 
@@ -161,7 +161,7 @@ and it can flexibly combine **dynamic** and **static** batching strategies for v
 | Feature | Use Case | Advantages | Considerations |
 |----------|-----------|------------|----------------|
 | **Dynamic Batching** | Moderate instance count, frequently moving objects | Automatic culling, flexible | High CPU cost when instances are numerous |
-| **Static Batching** | Large instance count, low update frequency | Cached batches, stable performance | Rebuilding occurs if transform or material changes frequently |
+| **Static Batching** | Large instance count, low update frequency | Cached batches, stable performance | Rebuilt when objects are added, removed, hidden or given another primitive or material |
 | **Transparent Instancing** | Multiple transparent objects sharing the same material | Supports OIT rendering with improved realism | No per‑distance sorting |
 
 > ✅ Recommendations:  

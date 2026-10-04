@@ -1,4 +1,4 @@
-import { Vector3 } from '@zephyr3d/base';
+import { Vector3, Vector4 } from '@zephyr3d/base';
 import {
   Scene,
   Application,
@@ -10,6 +10,7 @@ import {
   getEngine
 } from '@zephyr3d/scene';
 import { backendWebGL2 } from '@zephyr3d/backend-webgl';
+import { backendWebGPU } from '@zephyr3d/backend-webgpu';
 
 const TERRAIN_SIZE = 256;
 const TERRAIN_HEIGHT = 35;
@@ -112,12 +113,26 @@ function createGroundTexture(device) {
   return texture;
 }
 
+// Geometry grass blades need WebGPU; WebGL2 falls back to textured grass cards.
+// ?backend=webgl2 or ?backend=webgpu forces a backend.
+async function resolveBackend() {
+  const forced = new URLSearchParams(location.search).get('backend');
+  if (forced === 'webgl2') {
+    return backendWebGL2;
+  }
+  if (forced === 'webgpu') {
+    return backendWebGPU;
+  }
+  return (await backendWebGPU.supported()) ? backendWebGPU : backendWebGL2;
+}
+
 const myApp = new Application({
-  backend: backendWebGL2,
+  backend: await resolveBackend(),
   canvas: document.querySelector('#my-canvas')
 });
 
 myApp.ready().then(function () {
+  const webgpu = myApp.device.type === 'webgpu';
   const scene = new Scene();
   scene.env.sky.skyType = 'scatter';
   scene.env.light.strength = 0.5;
@@ -150,15 +165,12 @@ myApp.ready().then(function () {
   terrain.material.setDetailMap(0, createGroundTexture(myApp.device));
   terrain.material.setDetailMapUVScale(0, 60);
 
-  // Add a grass layer and author its distribution through the density map:
+  // Author the grass distribution once as a density map, one byte per texel:
   // grass grows on gentle slopes below a height limit. Blade instances are
   // derived from the density deterministically at runtime.
-  const grassLayer = terrain.grassRenderer.getLayer(
-    terrain.grassRenderer.addLayer(0.7, 0.9, createGrassBladeTexture(myApp.device))
-  );
-  const dw = grassLayer.densityMapWidth;
-  const dh = grassLayer.densityMapHeight;
-  const density = grassLayer.densityMap;
+  const dw = TERRAIN_SIZE;
+  const dh = TERRAIN_SIZE;
+  const density = new Uint8Array(dw * dh);
   for (let z = 0; z < dh; z++) {
     for (let x = 0; x < dw; x++) {
       const wx = ((x + 0.5) / dw) * TERRAIN_SIZE;
@@ -176,17 +188,86 @@ myApp.ready().then(function () {
       density[z * dw + x] = Math.round(255 * heightMask * slopeMask * patchMask);
     }
   }
-  grassLayer.updateDensityRegion(0, 0, dw, dh);
+  const empty = new Uint8Array(dw * dh);
+
+  // Textured grass cards: every backend
+  const cardLayer = terrain.grassRenderer.getLayer(
+    terrain.grassRenderer.addLayer(0.7, 0.9, createGrassBladeTexture(myApp.device))
+  );
+  // Procedural geometry blades: WebGPU only, no texture needed
+  const bladeLayer = webgpu
+    ? terrain.grassRenderer.getLayer(terrain.grassRenderer.addLayer(0.05, 0.6, null, 'blade'))
+    : null;
+  if (bladeLayer) {
+    bladeLayer.setBladeSize(0.08, 1.5);
+    bladeLayer.heightRandomness = 0.3;
+    bladeLayer.widthRandomness = 0.2;
+    bladeLayer.tilt = 0.25;
+    bladeLayer.tiltRandomness = 0.2;
+    bladeLayer.bend = 0.15;
+    bladeLayer.bendRandomness = 0.1;
+    bladeLayer.taper = 0.7;
+    bladeLayer.tipDetail = 1.5;
+    bladeLayer.rootColor = new Vector4(0.06, 0.12, 0.02, 1);
+    bladeLayer.tipColor = new Vector4(0.35, 0.45, 0.12, 1);
+    bladeLayer.transmissionColor = new Vector4(0.45, 0.55, 0.12, 1);
+    bladeLayer.clumpSize = 1.9;
+    bladeLayer.clumpSameDirection = 0.3;
+    bladeLayer.clumpHeightVariation = 0.48;
+    bladeLayer.clumpPull = 0.2;
+    bladeLayer.clumpFaceAway = 0.2;
+    bladeLayer.clumpColorVariation = 0.6;
+    bladeLayer.windFacing = 0.5;
+    bladeLayer.windLean = 0.5;
+    bladeLayer.swayAmplitude = 0.15;
+    bladeLayer.drawDistance = 150;
+    bladeLayer.lodDistance = 80;
+  }
+
+  // Shows one kind of grass: the other layer gets an empty density map.
+  // Blades are denser, up to 8 x 8 per density texel instead of 2 x 2
+  function showGrass(kind) {
+    const blades = kind === 'blade' && !!bladeLayer;
+    cardLayer.setDensityData(dw, dh, 2, blades ? empty : density);
+    bladeLayer?.setDensityData(dw, dh, 8, blades ? density : empty);
+  }
+  showGrass(webgpu ? 'blade' : 'card');
+
+  // Grass sways in the scene-wide wind
+  scene.env.wind.direction = 30;
+  scene.env.wind.strength = 0.5;
 
   // Create camera orbiting around the terrain center
   const centerHeight = heightAt(TERRAIN_SIZE / 2, TERRAIN_SIZE / 2) * TERRAIN_HEIGHT;
   const center = new Vector3(TERRAIN_SIZE / 2, centerHeight, TERRAIN_SIZE / 2);
-  scene.mainCamera = new PerspectiveCamera(scene, Math.PI / 3, 1, 1000);
-  scene.mainCamera.lookAt(new Vector3(center.x, centerHeight + 40, center.z + 90), center, Vector3.axisPY());
+  scene.mainCamera = new PerspectiveCamera(scene, Math.PI / 3, 0.1, 1000);
+  // Close to the ground, where the blades show; zoom out to see the meadows
+  scene.mainCamera.lookAt(new Vector3(center.x, centerHeight + 4, center.z + 12), center, Vector3.axisPY());
   scene.mainCamera.controller = new OrbitCameraController({ center });
-  scene.mainCamera.FXAA = true;
+  scene.mainCamera.TAA = true;
 
   getInput().use(scene.mainCamera.handleEvent, scene.mainCamera);
+
+  // UI
+  /** @type {HTMLSelectElement} */
+  const grassSelect = document.querySelector('#grass-select');
+  /** @type {HTMLInputElement} */
+  const windRange = document.querySelector('#wind-range');
+  /** @type {HTMLElement} */
+  const note = document.querySelector('#backend-note');
+  if (webgpu) {
+    grassSelect.value = 'blade';
+    note.textContent = 'WebGPU: geometry blades available.';
+  } else {
+    grassSelect.value = 'card';
+    grassSelect.disabled = true;
+    note.textContent = 'WebGL2: geometry blades need WebGPU, showing grass cards.';
+  }
+  grassSelect.addEventListener('change', () => showGrass(grassSelect.value));
+  windRange.value = String(scene.env.wind.strength);
+  windRange.addEventListener('input', () => {
+    scene.env.wind.strength = Number(windRange.value);
+  });
 
   getEngine().setRenderable(scene, 0);
 

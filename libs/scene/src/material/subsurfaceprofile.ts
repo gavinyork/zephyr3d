@@ -518,10 +518,6 @@ export class SubsurfaceProfile {
   /**
    * Mean free path color used to derive channel-dependent scatter radius.
    *
-   * @remarks
-   * This is a more UE-like authoring control that keeps the existing radius-
-   * based implementation, while letting tools expose a color + distance pair.
-   *
    * @public
    */
   get meanFreePathColor(): Immutable<Vector3> {

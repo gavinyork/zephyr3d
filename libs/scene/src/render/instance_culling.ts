@@ -419,11 +419,6 @@ export class InstanceCuller {
           // Visible instances per level, then where the next instance of each level goes
           this.levelCount = pb.uint[MAX_LODS]().workgroup();
           this.levelNext = pb.uint[MAX_LODS]().workgroup();
-          // AABB against the planes as AABB.getClipStateWithFrustum(): outside when its corner
-          // farthest along a plane's normal is behind it. No early return, which would make the
-          // control flow of the caller non-uniform for the workgroup barriers that follow
-          // 0 when culled, otherwise 1 + the level of detail, selected as Mesh.selectLod without
-          // the hysteresis: UE ComputeStaticMeshLOD on the sphere around the world bounds
           pb.func('classify', [pb.uint('base'), pb.uint('batchIndex')], function () {
             this.$l.slot = pb.div(this.base, MIN_INSTANCE_VEC4S);
             this.$l.center = this.bounds.at(pb.mul(this.slot, 2));

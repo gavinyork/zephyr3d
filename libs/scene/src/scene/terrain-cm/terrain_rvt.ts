@@ -21,8 +21,7 @@ import type { ClipmapTerrain } from './terrain-cm';
 export interface TerrainVirtualTextureOptions {
   /**
    * Virtual size in texels along the longer side of the terrain, a power of two. The shorter
-   * side gets the power of two closest to the terrain aspect (UE RVT TileCount x TileSize with
-   * per axis tile counts from the volume aspect). Default 32768.
+   * side gets the power of two closest to the terrain aspect. Default 32768.
    */
   virtualSize?: number;
   /** Page size in texels, default 128 */
@@ -31,39 +30,18 @@ export interface TerrainVirtualTextureOptions {
   atlasSize?: number;
   /**
    * Pages filled per update. Default 16, 64 in the editor, where brushes invalidate whole areas
-   * every frame and the pages have to keep up with the edits (UE r.VT.MaxUploadsPerFrameInEditor,
-   * 16 times the game budget there).
+   * every frame and the pages have to keep up with the edits.
    */
   allocBudget?: number;
 }
 
-/**
- * Marking only takes pixels whose depth lies on the terrain: within this fraction of the view
- * distance of the height map (plus TOLERANCE_MIN_CELLS height map cells). Objects in front of
- * the terrain would otherwise request pages under them at their own footprint. The clipmap mesh
- * only matches the height map at its vertices, and its cells grow with distance, hence the
- * distance scaled tolerance. UE needs none of this: its feedback is written by the terrain's own
- * pixels.
- */
 const TOLERANCE_DISTANCE_SCALE = 0.02;
 const TOLERANCE_MIN_CELLS = 2;
 const BORDER = 4;
 
 /**
  * The runtime virtual texture of a clipmap terrain: the detail layers blended once per page
- * instead of per pixel, following UE's landscape runtime virtual texture.
- *
- * - Content: UE's BaseColor_Normal_Roughness material type, uncompressed (RuntimeVirtualTexture.cpp
- *   GetLayerFormat, VirtualTextureMaterial.usf): plane 0 the sRGB encoded base color, plane 1
- *   (normal.x, roughness, normal.z) of the world space normal, its up component rebuilt positive.
- *   The normal includes the height map slopes, so height edits invalidate too (UE
- *   ULandscapeInfo::DirtyRuntimeVirtualTextureForLandscapeArea).
- * - Mapping: virtual uv is the terrain region uv, the world XZ projection (VirtualTextureWorldToUV).
- * - Fill: a compute pass evaluates the terrain blend per texel, border texels included; UE draws
- *   the landscape with an orthographic top view widened by the border
- *   (RuntimeVirtualTextureProducer.cpp, RuntimeVirtualTextureRender.cpp RenderPage). Textures are
- *   sampled at the LOD of the page texel footprint, what the hardware picks for that view.
- * - Marking: from this camera's depth, see markFromDepth.
+ * instead of per pixel.
  *
  * WebGPU only.
  * @internal
@@ -136,8 +114,7 @@ export class TerrainVirtualTexture extends Disposable implements VirtualTextureC
   /**
    * Marks the pages this camera sees on the terrain, one thread per depth pixel: the world
    * position is rebuilt from the depth and projected to the terrain uv, the level comes from the
-   * uv step to the neighbouring pixels (UE VirtualTextureWorldToUVDeriv + MipLevelAniso2D without
-   * anisotropy, the larger axis). A neighbour off the terrain is never taken as zero footprint,
+   * uv step to the neighbouring pixels. A neighbour off the terrain is never taken as zero footprint,
    * see plans/sparse-virtual-texture.md, phase 2.
    */
   markFromDepth(ctx: DrawContext, linearDepth: Texture2D) {

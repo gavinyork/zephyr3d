@@ -425,10 +425,7 @@ export class ClipmapBladeGrassMaterial
     this._tipColor.set(val);
     this.uniformChanged();
   }
-  /**
-   * Color of the light the blades let through from behind - the subsurface color of UE5's
-   * two-sided foliage - at the tip. Black lets none through.
-   */
+  /** Color of the light the blades let through from behind. */
   get transmissionColor(): Vector4 {
     return this._transmissionColor;
   }

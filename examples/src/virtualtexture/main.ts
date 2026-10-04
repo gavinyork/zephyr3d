@@ -16,16 +16,6 @@ import { VirtualTexture, virtualMipChain } from '@zephyr3d/scene';
  * L tints pixels by how many levels coarser than wanted they are, I invalidates everything.
  *
  * The "check" line re-reads the page table and page lists every second; every count must be 0.
- *
- * Expected:
- * - zooming in, finer levels appear two at a time (the prefetch), coarse to fine, and the
- *   screen never shows black and white stripes (no page mapped at all);
- * - zoomed in so far that the view needs more pages than the pool holds, the residency mip
- *   bias (UE bEnableResidencyMipMapBias) rises until demand fits and the view stops cycling;
- * - page edges and grid lines run straight across page borders (borders filter correctly);
- * - with the camera still, "allocated" drops to 0 and nothing flickers: pages in view are never
- *   evicted even though the pool is much smaller than the virtual texture;
- * - "lru" always equals the physical page count (no physical page is ever lost).
  */
 (async function () {
   const canvas = document.querySelector<HTMLCanvasElement>('#canvas');

@@ -887,15 +887,6 @@ export class ShadowMapper extends Disposable {
   /**
    * Default shadow camera near plane for a light, in world units.
    *
-   * @remarks
-   * Anything nearer the light than this is clipped out of the shadow map, so it
-   * neither casts a shadow nor contributes a transmission thickness. Point and
-   * rect lights are routinely placed right next to what they light - a lamp over
-   * a desk, a softbox beside a face - so a 1 m near plane silently lost exactly
-   * those casters. UE5 clamps its one-pass point light shadows at a comparable
-   * `MinLightW`. Spot lights keep 1, which suits their usual throw. Directional
-   * lights do not use it.
-   *
    * @internal
    */
   static getDefaultNearClip(light: PunctualLight) {
@@ -903,13 +894,6 @@ export class ShadowMapper extends Disposable {
   }
   /**
    * The projection a light's shadow map is rendered with, which is not always the light's own type.
-   *
-   * @remarks
-   * A rect light emits into a whole hemisphere, which no single frustum covers, so it renders a
-   * point light's cube map from its centre - UE5 does the same (`bOnePassPointLightShadow` in
-   * `FRectLightSceneProxy`). Everything downstream of the shadow map keys on this value, so the
-   * rect light inherits the cube path of every shadow implementation unchanged. Receivers behind
-   * the light's plane get no light at all, so the back half of the cube needs no masking.
    *
    * @internal
    */

@@ -538,8 +538,6 @@ export class SSR extends AbstractPostEffect {
     if (ctx.HiZTexture) {
       bindGroup.setTexture('hizTex', ctx.HiZTexture, nearestSampler);
       bindGroup.setValue('depthMipLevels', ctx.HiZTexture.mipLevelCount);
-      // Temporal jitter phase for the UE5-style fixed-step HZB march
-      // (UE View.StateFrameIndexMod8).
       bindGroup.setValue('ssrFrameIndex', device.frameInfo.frameCounter % 8);
       bindGroup.setValue(
         'targetSize',
@@ -1313,17 +1311,10 @@ export class SSR extends AbstractPostEffect {
               );
               this.$l.hitInfo = pb.vec4(0);
               if (ctx.HiZTexture) {
-                // UE5-style temporal jitter of the fixed-step march; the
-                // temporal resolve pass converges the resulting noise.
                 this.$l.ssrStepOffset = pb.sub(
                   SSR_interleavedGradientNoise(this, this.$builtins.fragCoord.xy, this.ssrFrameIndex),
                   0.5
                 );
-                // Nudge the ray origin off the surface along the normal so the
-                // grazing-angle march does not self-intersect the reflector's
-                // quantized depth staircase (regular stripe artifacts). Scales
-                // with view distance to track depth precision; same idea as the
-                // SSGI ray-origin bias.
                 this.$l.ssrRayOrigin = pb.add(
                   this.viewPos,
                   pb.mul(pb.normalize(this.viewNormal), pb.max(0.01, pb.mul(pb.neg(this.viewPos.z), 0.002)))

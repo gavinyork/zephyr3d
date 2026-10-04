@@ -1,36 +1,16 @@
 import { Vector3, type Immutable } from '@zephyr3d/base';
 import type { AbstractDevice, Texture2D } from '@zephyr3d/device';
 
-/**
- * Number of scalar parameter columns stored per profile row.
- *
- * @remarks
- * Mirrors the row layout UE5 uses in its `SSProfiles` texture, read back from
- * `UEDigitalHuman.rdc` (SSS::PassOne_Burley lines 143-157).
- *
- * @internal
- */
+/** Number of scalar parameter columns stored per profile row. */
 const SKIN_PROFILE_PARAM_COLUMNS = 6;
 
-/**
- * Number of texels the baked transmission profile occupies.
- *
- * @remarks
- * `BSSS_TRANSMISSION_PROFILE_SIZE` in UE5 (`SubsurfaceProfileCommon.ush:27`).
- *
- * @internal
- */
+/** Number of texels the baked transmission profile occupies. */
 const SKIN_TRANSMISSION_LUT_SIZE = 32;
 
-/**
- * Total columns per profile row: the scalar parameters followed by the baked
- * transmission profile, exactly as UE5 lays out an `SSProfiles` row.
- *
- * @internal
- */
+/** Total columns per profile row: the scalar parameters followed by the baked transmission profile. */
 const SKIN_PROFILE_COLUMNS = SKIN_PROFILE_PARAM_COLUMNS + SKIN_TRANSMISSION_LUT_SIZE;
 
-/** Maximum number of live skin profiles, matching the 8-bit profile id channel. @internal */
+/** Maximum number of live skin profiles, matching the 8-bit profile id channel. */
 const SKIN_PROFILE_CAPACITY = 256;
 
 /**
@@ -47,49 +27,27 @@ const CREATE_TOKEN = Symbol('SSSProfile.create');
 /**
  * Largest optical depth the transmission profile is defined over.
  *
- * @remarks
- * `SSSS_MAX_TRANSMISSION_PROFILE_DISTANCE` in UE5. It appears in two places that
- * have to agree, which is why it lives here rather than next to either of them:
- * the thickness pass encodes its optical depth as `1 - opticalDepth / MAX`, and
- * the transmission BxDF decodes that and divides by `MAX` again to index the
- * baked profile below.
- *
  * @internal
- */
+ **/
 export const SKIN_MAX_TRANSMISSION_OPTICAL_DEPTH = 5;
 
 /**
  * Floor the averaged optical depth is clamped to before encoding.
  *
- * @remarks
- * UE5's `clamp(..., 0.15, 5)` in `CalculateOpticalDepth`.
- *
  * @internal
- */
+ **/
 export const SKIN_TRANSMISSION_OPTICAL_DEPTH_FLOOR = 0.15;
 
 /**
  * Constant added to the optical depth after clamping.
  *
- * @remarks
- * UE5's trailing `+ 0.25` in `CalculateOpticalDepth`.
- *
  * @internal
- */
+ **/
 export const SKIN_TRANSMISSION_OPTICAL_DEPTH_BIAS = 0.25;
 
 /**
  * Largest value the thickness pass can write, and with it the sentinel that
  * separates a real measurement from "no light wrote this".
- *
- * @remarks
- * The encoding is `1 - opticalDepth / MAX` and the optical depth never falls
- * below `FLOOR + BIAS`, so the pass tops out at 0.92 and the cleared value of 1
- * is unreachable — which makes it usable as "no data".
- *
- * The distinction matters because 1 decodes to zero optical depth, the profile's
- * *strongest* entry: read as a measurement it would light every non-transmitting
- * light's pixels at full transmission.
  *
  * @internal
  */
@@ -101,31 +59,12 @@ export const SKIN_TRANSMISSION_NO_DATA_ENCODING =
 /**
  * Distance, in profile millimetres, the baked transmission profile spans.
  *
- * @remarks
- * `MaxTransmissionProfileDistance * CmToMm = 5 * 10` in
- * `ComputeTransmissionProfileBurley`.
- *
- * The 5 here and the one in {@link SKIN_MAX_TRANSMISSION_OPTICAL_DEPTH} are the
- * same number by construction: UE5's world unit is the centimetre, so an optical
- * depth of 1 at unit extinction *is* one centimetre, and this axis is that span
- * in the millimetres the mean free paths use. The shader indexes the table with
- * optical depth directly — self-consistent only once that is accounted for.
- *
- * The thickness pass must therefore be calibrated against this axis;
- * {@link SKIN_OPTICAL_DEPTH_PER_WORLD_UNIT} is that calibration, and changing
- * this constant without it slides the whole profile along the thickness axis.
- *
  * @internal
  */
 const TRANSMISSION_LUT_MAX_DISTANCE_MM = 50;
 
 /**
  * Radius the baked transmission profile is offset by, in profile millimetres.
- *
- * @remarks
- * `ProfileRadiusOffset` in `BurleyNormalizedSSS.cpp:22`, 0.06 cm, times the same
- * `CmToMm`. It keeps the zero-thickness entry off the singular `r = 0` end of
- * the diffusion profile.
  *
  * @internal
  */
@@ -135,12 +74,6 @@ const TRANSMISSION_LUT_RADIUS_OFFSET_MM = 0.6;
  * Profile-space millimetres per world unit, before the profile's own world unit
  * scale is applied.
  *
- * @remarks
- * This engine is metric throughout, so a world unit is a metre and the profile
- * distances are millimetres. UE5 instead carries a `BURLEY_CM_2_MM = 10` because
- * its world unit is the centimetre; that factor has no analogue here and must
- * not be transcribed (see the diffusion pass, which likewise omits it).
- *
  * @internal
  */
 const WORLD_UNITS_TO_PROFILE_MM = 1000;
@@ -148,20 +81,6 @@ const WORLD_UNITS_TO_PROFILE_MM = 1000;
 /**
  * Optical depth accumulated per world unit of light path, before the profile's
  * `extinctionScale`.
- *
- * @remarks
- * Derived rather than chosen, so the thickness pass and the baked profile cannot
- * drift apart. The BxDF indexes entry `opticalDepth / MAX * (size - 1)` and entry
- * `i` was baked for `i / size * LUT_MAX_MM` profile millimetres, so one unit of
- * optical depth is `LUT_MAX_MM * (size - 1) / size / MAX` millimetres.
- *
- * `worldUnitScale` deliberately does not appear: it divides both the table's axis
- * and the path's conversion into profile space, so it cancels. UE5 likewise keeps
- * it out of `CalculateOpticalDepth`.
- *
- * The `(size - 1) / size` is a deliberate 3% departure from UE5, whose index and
- * axis disagree by that factor. Correcting it makes a path of `t` metres index
- * exactly the entry baked for `t` millimetres.
  *
  * @internal
  */
@@ -186,11 +105,6 @@ const enum ProfileColumn {
   /**
    * Transmission parameters: `(extinctionScale, normalScale,
    * scatteringDistribution, 1 / ior)`.
-   *
-   * @remarks
-   * UE5's `SSSS_TRANSMISSION_OFFSET` column, unpacked in this order by
-   * `GetTransmissionProfileParams`. The transmission tint is absent by design:
-   * it is baked into the profile, and a second copy here could drift from it.
    */
   Transmission = 4,
   /** Dual-lobe specular parameters. */
@@ -238,27 +152,6 @@ interface SSSProfileTemplate {
 
 /**
  * Preset parameters.
- *
- * @remarks
- * `skin` reproduces UE5's `FSubsurfaceProfileStruct` defaults exactly, converted
- * into this engine's metre-based scene units:
- *
- * | UE5 parameter        | UE5 default                     | here                        |
- * | -------------------- | ------------------------------- | --------------------------- |
- * | SurfaceAlbedo        | (0.91058, 0.338275, 0.2718)     | `surfaceAlbedo`, unchanged  |
- * | MeanFreePathColor    | (1, 0.1983/2.229, 0.1607/2.229) | `meanFreePath`, unchanged   |
- * | MeanFreePathDistance | 1.2 × 2.229 = 2.6748 cm         | `meanFreePathDistance` in m |
- * | WorldUnitScale       | 0.1 cm                          | folded into the distance    |
- * | BoundaryColorBleed   | white                           | white                       |
- *
- * The red-shifted mean free path (roughly 1 : 0.089 : 0.072) and the equally
- * red-shifted albedo are together what make the diffusion read as skin rather
- * than as a neutral blur — the first thing to check when scattering looks washed
- * out. UE5 ships only `skin`; the rest are this engine's own, pitched around the
- * same regime to stay comparable.
- *
- * `boundaryColorBleed` is white throughout, as in UE5: it tints taps belonging to
- * a *different* profile, so anything darker attenuates every profile boundary.
  *
  * @internal
  */
@@ -378,18 +271,7 @@ const SKIN_PROFILE_TEMPLATES: Record<SSSProfilePreset, SSSProfileTemplate> = {
 };
 
 /**
- * Subsurface profile for {@link SSSMaterial}, holding the parameters UE5's
- * Burley diffusion is driven by.
- *
- * @remarks
- * Profiles are packed into a shared GPU table keyed by {@link SSSProfile.id},
- * and materials write that id per pixel. This lets several profiles — face, ears,
- * lips — diffuse independently in a single screen-space pass, which is how UE5
- * drives its subsurface scattering.
- *
- * This is a separate type from the older `SubsurfaceProfile`, which continues to
- * serve `PBRMetallicRoughnessMaterial` and the generic SSS post effect. The two
- * are independent and may be used side by side.
+ * Subsurface profile for {@link SSSMaterial}.
  *
  * @public
  */
@@ -571,10 +453,6 @@ export class SSSProfile {
   /**
    * Column the baked transmission profile starts at.
    *
-   * @remarks
-   * UE5's `BSSS_TRANSMISSION_PROFILE_OFFSET`. Entry `i` lives at column
-   * `transmissionLutOffset + i`.
-   *
    * @public
    */
   static get transmissionLutOffset() {
@@ -597,10 +475,6 @@ export class SSSProfile {
   /**
    * Column holding `(extinctionScale, normalScale, scatteringDistribution,
    * 1 / ior)`.
-   *
-   * @remarks
-   * UE5's `SSSS_TRANSMISSION_OFFSET`, unpacked by
-   * `GetTransmissionProfileParams`.
    *
    * @public
    */
@@ -700,11 +574,6 @@ export class SSSProfile {
   /**
    * Profile-space to world-unit conversion, for scenes not authored in metres.
    *
-   * @remarks
-   * Applied once, when the diffusion converts a scatter radius into a screen
-   * offset — the same place UE5 applies it, in `CalculateBurleyScale`. It is
-   * deliberately absent from {@link SSSProfile.getScatterDistance}.
-   *
    * @public
    */
   get worldUnitScale() {
@@ -787,14 +656,6 @@ export class SSSProfile {
   /**
    * Henyey-Greenstein asymmetry of the transmitted light, in `[-1, 1]`.
    *
-   * @remarks
-   * UE5's `ScatteringDistribution`, default 0.93 for skin. Positive values throw
-   * the transmitted light forward, concentrating a backlit ear's glow where the
-   * light shines through rather than spreading it as a uniform wash.
-   *
-   * Only the transmission BxDF uses this; the screen-space diffusion is isotropic
-   * and ignores it. Stored raw, unlike UE5's `[0, 1]` remap for an 8-bit texture.
-   *
    * @public
    */
   get scatteringDistribution() {
@@ -811,12 +672,6 @@ export class SSSProfile {
   /**
    * Index of refraction used to bend the view ray before the phase function.
    *
-   * @remarks
-   * UE5's `IOR`, default 1.55 for skin, stored in the table as `1 / ior` since
-   * that is the form `refract` takes. This drives transmission only — the
-   * specular Fresnel stays on the dielectric `F0 = 0.08 * Specular` mapping, as
-   * {@link SSSMaterial.specularF0} notes.
-   *
    * @public
    */
   get ior() {
@@ -832,11 +687,6 @@ export class SSSProfile {
 
   /**
    * Multiplier on the material roughness for the narrow specular lobe.
-   *
-   * @remarks
-   * A direct multiplier, so 1 leaves the material roughness alone and skin's
-   * default 0.75 tightens the narrow lobe. The 0.5..2 range matches UE5's, whose
-   * halve-on-pack encoding has no counterpart here.
    *
    * @public
    */
@@ -885,12 +735,6 @@ export class SSSProfile {
 
   /**
    * Per-channel diffusion distance, in profile space.
-   *
-   * @remarks
-   * Deliberately *not* scaled by {@link SSSProfile.worldUnitScale}, which UE5
-   * applies later in `CalculateBurleyScale`; applying it in both places would
-   * make the diffusion scale with its square. The result must therefore be read
-   * together with that factor to reach world units.
    *
    * @returns Mean free path scaled by the profile's distance and scatter scale.
    *
@@ -1011,10 +855,6 @@ export class SSSProfile {
         out[o + 2] = z;
         out[o + 3] = w;
       };
-      // The diffusion draws its radii from one representative channel, kept in
-      // the `w` of both rows as UE5 does, and evaluates all three kernels at
-      // those radii. The widest channel represents, so the sample distribution
-      // covers every channel's tail.
       const d = p.getScatterDistance();
       const widest = Math.max(d.x, d.y, d.z);
       const albedoForSampling =
@@ -1054,31 +894,12 @@ export class SSSProfile {
   /**
    * Bakes this profile's transmission table.
    *
-   * @remarks
-   * `ComputeTransmissionProfileBurley` (`BurleyNormalizedSSS.cpp:171`),
-   * transcribed. Each entry is the Burley diffusion profile integrated from that
-   * radius out to infinity,
-   *
-   * ```
-   * T(r) = 0.25 A (exp(-s r / L) + 3 exp(-s r / 3L))
-   * ```
-   *
-   * evaluated per channel at its own `s` and `L`, times the transmission tint.
-   * The surface albedo is absent — UE5 passes white for `A` — so this carries
-   * only the *shape* of the falloff; the base colour is applied where the
-   * transmission joins the diffuse.
-   *
-   * The alpha is `exp(-distance x extinctionScale)`, UE5's separate "SSSS shadow"
-   * curve. The BxDF reads `.rgb` only, but storing it costs nothing.
-   *
    * @param out - Destination, `4 x transmissionLutSize` floats from `offset`.
    * @param offset - Index of the first float to write.
    *
    * @public
    */
   writeTransmissionProfile(out: Float32Array, offset = 0) {
-    // The world unit scale applies to this table's *distance axis*, not to the
-    // mean free paths, which UE5 likewise leaves unscaled.
     const invUnitScale = 1 / Math.max(this._worldUnitScale, 1e-4);
     const d = this.getScatterDistance();
     const l = [
@@ -1095,9 +916,6 @@ export class SSSProfile {
     const offsetMM = TRANSMISSION_LUT_RADIUS_OFFSET_MM * invUnitScale;
     for (let i = 0; i < SKIN_TRANSMISSION_LUT_SIZE; i++) {
       const o = offset + i * 4;
-      // UE5's `bMakeLastPixelBlack`: 50 mm leaves a red tail still visible after
-      // tone mapping, so forcing the last entry black is what makes anything
-      // thicker than the table stop transmitting outright.
       if (i === SKIN_TRANSMISSION_LUT_SIZE - 1) {
         out[o] = 0;
         out[o + 1] = 0;
@@ -1105,8 +923,6 @@ export class SSSProfile {
         out[o + 3] = 0;
         break;
       }
-      // Note the divisor is the table size, not `size - 1`: the last entry is
-      // blacked out anyway, so UE5 spends the axis on the entries that survive.
       const distanceMM = (i / SKIN_TRANSMISSION_LUT_SIZE) * TRANSMISSION_LUT_MAX_DISTANCE_MM * invUnitScale;
       const r = distanceMM + offsetMM;
       for (let c = 0; c < 3; c++) {

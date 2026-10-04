@@ -14,16 +14,6 @@ import type {
 } from '@zephyr3d/device';
 
 /**
- * Sparse virtual texture core, WebGPU only. Design and sources: plans/sparse-virtual-texture.md.
- *
- * The page management follows UE 5.8 Virtual Shadow Maps
- * (Engine/Shaders/Private/VirtualShadowMaps/VirtualShadowMapPhysicalPageManagement.usf):
- * four physical page lists whose order is the LRU order, a page table rebuilt every update, and
- * unmapped pages pointing at their nearest resident ancestor (PropagateMappedMips). The load
- * priority and budget follow UE runtime virtual texturing (UniqueRequestList.h SortRequests).
- */
-
-/**
  * One level of the virtual space: an independent grid of pages
  * @public
  */
@@ -41,8 +31,7 @@ export interface VirtualTextureLevel {
 export function virtualMipChain(virtualSize: number, pageSize: number): VirtualTextureLevel[];
 /**
  * Levels of a mip chained virtual texture with a different width and height. Each level halves
- * both axes, an axis stopping at one page, down to a single page (UE RVT: tile counts per axis
- * from the volume aspect, RuntimeVirtualTexture.cpp GetProducerDescription).
+ * both axes, an axis stopping at one page, down to a single page.
  * @param virtualWidth - Virtual texture width in texels, a power of two
  * @param virtualHeight - Virtual texture height in texels, a power of two
  * @param pageSize - Page size in texels, a power of two not larger than either size
@@ -101,29 +90,24 @@ export interface VirtualTextureOptions {
   loadCapacity?: number;
   /** Maximum pages filled per update (new allocations plus refills), default 16 */
   allocBudget?: number;
-  /** Frames an unrequested page keeps its mapping, UE MaxPageAgeSinceLastRequest, default 1000 */
+  /** Frames an unrequested page keeps its mapping, default 1000 */
   maxPageAge?: number;
   /**
    * Frames a page requested lately stays in use even if not requested this update, so it is not
-   * handed to a new request. UE r.VT.PageFreeThreshold (default 15): marking does not have to
-   * hit every visible page every frame, sparse or rotating marking would otherwise thrash.
+   * handed to a new request. Default 15, zero to disable.
    */
   freeThreshold?: number;
   /**
    * Raise the requested mip level while the pool is oversubscribed, so demand settles at what
-   * the pool can hold instead of pages being evicted and requested again forever. UE pool option
-   * bEnableResidencyMipMapBias (off by default there too), see {@link VirtualTexture.mipBias}.
+   * the pool can hold instead of pages being evicted and requested again forever.
    */
   residencyMipBias?: boolean;
   /**
-   * Pool residency above which the mip bias rises, UE r.VT.Residency.UpperBound, default 0.95
+   * Pool residency above which the mip bias rises, default 0.95
    */
   residencyUpperBound?: number;
   /**
-   * Pool residency below which the mip bias falls, UE r.VT.Residency.LowerBound. UE ships both
-   * bounds at 0.95; a lower value leaves a dead band where the bias holds still, so it does not
-   * keep chasing the residency it just changed (pages leave the in-use set only after
-   * freeThreshold frames). Default 0.8.
+   * Pool residency below which the mip bias falls, Default 0.8.
    */
   residencyLowerBound?: number;
 }
@@ -181,7 +165,7 @@ const LIST_LRU = 0;
 const LIST_AVAILABLE = 1;
 const LIST_EMPTY = 2;
 const LIST_REQUESTED = 3;
-// Page table encoding, UE ShadowEncodePageTable (VirtualShadowMapPageAccessCommon.ush)
+// Page table encoding
 const PT_PHYS_MASK = 0xffff;
 const PT_LOD_SHIFT = 20;
 const PT_LOD_MASK = 0x3f;
@@ -207,8 +191,7 @@ const C_STAT_REFILLED = 43;
 const C_STAT_DROPPED = 44;
 const C_STAT_EXPIRED = 45;
 const NUM_COUNTERS = 64;
-// Residency mip bias, UE VirtualTexturePhysicalSpace.cpp UpdateResidencyTracking defaults:
-// r.VT.Residency.AdjustmentRate, MaxMipMapBias, LockedUpperBound. The bounds are options.
+// Residency mip bias
 const RESIDENCY_ADJUSTMENT_RATE = 0.2;
 const RESIDENCY_MAX_MIP_BIAS = 4;
 const RESIDENCY_LOCKED_UPPER_BOUND = 0.65;
@@ -314,8 +297,6 @@ export class VirtualTexture extends Disposable {
     this._allocBudget = Math.max(1, Math.min(options.allocBudget ?? 16, this._physicalPages));
     this._maxPageAge = options.maxPageAge ?? 1000;
     this._freeThreshold = Math.max(0, options.freeThreshold ?? 15);
-    // Coarsest levels always resident (UE RVT locked pages) so every lookup finds a page: as many
-    // as fit in an eighth of the pool, at least the coarsest one
     let pinnedFrom = this._levels.length - 1;
     let pinnedPages = this.levelPages(pinnedFrom);
     while (pinnedFrom > 0 && pinnedPages + this.levelPages(pinnedFrom - 1) <= this._physicalPages / 8) {
@@ -418,9 +399,8 @@ export class VirtualTexture extends Disposable {
   /**
    * Marks the resident pages overlapping a region, in normalized virtual coordinates, for
    * refilling. Pages in use (requested within freeThreshold, or pinned) keep their mapping and
-   * old content until refilled, ahead of new allocations (UE VSM *_UNCACHED pages); cached pages
-   * no longer in use are unmapped. A page counts with its border, so pages next to the region
-   * are refilled too.
+   * old content until refilled, ahead of new allocations; cached pages no longer in use are
+   * unmapped. A page counts with its border, so pages next to the region are refilled too.
    */
   invalidateRegion(u0: number, v0: number, u1: number, v1: number) {
     this._pendingRects.push([u0, v0, u1, v1]);
@@ -601,7 +581,6 @@ export class VirtualTexture extends Disposable {
       this.$l.dx = pb.mul(this.duvdx, pb.vec2(size[0], size[1]));
       this.$l.dy = pb.mul(this.duvdy, pb.vec2(size[0], size[1]));
       this.$l.d = pb.max(pb.dot(this.dx, this.dx), pb.dot(this.dy, this.dy));
-      // UE TextureComputeVirtualMipLevel: the residency bias joins before the level is floored
       this.$return(
         pb.clamp(
           pb.add(pb.mul(pb.log2(pb.max(this.d, 1e-8)), 0.5), this.zVT_state.at(0).x),
@@ -614,8 +593,7 @@ export class VirtualTexture extends Disposable {
   }
   /**
    * Requests the page covering `uv` at `level`. With `prefetch`, also requests the ancestor at
-   * most two levels finer than what is resident now (UE VirtualTextureSystem.cpp prefetch), so
-   * the texture refines gradually.
+   * most two levels finer than what is resident now, so the texture refines gradually.
    */
   request(scope: PBInsideFunctionScope, level: PBShaderExp, uv: PBShaderExp, prefetch = true) {
     const pb = scope.$builder;
@@ -893,7 +871,6 @@ export class VirtualTexture extends Disposable {
       this.$return(pb.add(this.info.x, pb.add(pb.mul(this.pc.y, this.info.y), this.pc.x)));
     });
   }
-  /** Appends to a physical page list, UE PushPhysicalPageList */
   private definePush(pb: ProgramBuilder) {
     pb.func('zVT_push', [pb.uint('list'), pb.uint('page')], function () {
       this.$l.offset = pb.atomicAdd(this.zVT_listCounts.at(this.list), 1);
@@ -930,7 +907,6 @@ export class VirtualTexture extends Disposable {
     const loadCount = (pb: ProgramBuilder, scope: PBInsideFunctionScope) =>
       pb.atomicAdd(scope.zVT_listCounts.at(LIST_AVAILABLE), 0);
     switch (base) {
-      // UE ClearPageTable + InitPageRectBounds: the page table is rebuilt every update
       case 'clear':
         return program([GROUP, 1, 1], (pb, scope) => {
           scope.zVT_pageTable = pb.uint[0]().storageBuffer(0);
@@ -999,8 +975,6 @@ export class VirtualTexture extends Disposable {
             });
           });
         });
-      // UE UpdatePhysicalPages: walk last update's REQUESTED list (the LRU order), keep the
-      // requested and young pages mapped, move requested ones to REQUESTED, free the rest
       case 'updatePhysical':
         return program([GROUP, 1, 1], (pb, scope) => {
           lists(pb, scope);
@@ -1032,10 +1006,6 @@ export class VirtualTexture extends Disposable {
                   pb.or(this.requestedNow, pb.notEqual(pb.compAnd(this.flags, META_PINNED), 0)),
                   pb.lessThanEqual(this.age, this.zVT_params.at(3).w)
                 );
-                // A cached page no longer in use keeps its mapping until maxPageAge, unless it was
-                // invalidated: then it is unmapped rather than left stale, where it could show as
-                // the fallback of a finer page (UE TexturePagePool.cpp EvictPages: dirty pages used
-                // within r.VT.RVT.DirtyPagesKeptMappedFrames or locked are refilled, others evicted)
                 this.$if(
                   pb.or(
                     this.requested,
@@ -1054,7 +1024,6 @@ export class VirtualTexture extends Disposable {
                         this.zVT_meta.setAt(pb.add(this.m, 2), this.zVT_params.at(0).z);
                         pb.atomicAdd(this.zVT_counters.at(C_STAT_REQUESTED), 1);
                       });
-                      // Refill in place, ahead of new allocations (UE VSM uncached pages)
                       this.$if(pb.notEqual(pb.compAnd(this.flags, META_DIRTY), 0), function () {
                         this.$l.slot = pb.atomicAdd(this.zVT_counters.at(C_FILL), 1);
                         this.$if(pb.lessThan(this.slot, this.zVT_params.at(1).y), function () {
@@ -1082,8 +1051,6 @@ export class VirtualTexture extends Disposable {
             });
           });
         });
-      // UE PackAvailablePages: order preserving compaction of the LRU list into AVAILABLE,
-      // one workgroup, prefix sums per chunk
       case 'pack':
         return program([PACK_GROUP, 1, 1], (pb, scope) => {
           lists(pb, scope);
@@ -1128,7 +1095,6 @@ export class VirtualTexture extends Disposable {
             });
           });
         });
-      // UE AppendPhysicalPageLists, copy pass then count pass
       case 'appendEmpty':
       case 'appendAvailable':
       case 'appendEmptyCount':
@@ -1158,8 +1124,6 @@ export class VirtualTexture extends Disposable {
           });
         });
       }
-      // Requests of unmapped pages become loads with the UE RVT priority count * (1 + level);
-      // pinned levels are always requested, at the top priority. Clears the requests.
       case 'gather':
         return program([GROUP, 1, 1], (pb, scope) => {
           scope.zVT_pageTable = pb.uint[0]().storageBufferReadonly(0);
@@ -1202,9 +1166,6 @@ export class VirtualTexture extends Disposable {
             });
           });
         });
-      // The budget cut. UE sorts the loads by priority on the CPU and keeps the first
-      // MaxUploadsPerFrame; here buckets above the cut are taken whole and the cut bucket in
-      // atomic order (see the design notes)
       case 'select':
         return program([1, 1, 1], (pb, scope) => {
           scope.zVT_counters = pb.atomic_uint[0]().storageBuffer(0);
@@ -1235,8 +1196,6 @@ export class VirtualTexture extends Disposable {
             this.zVT_dispatchArgs.setAt(2, pb.uint(1));
           });
         });
-      // UE AllocateNewPageMappings: pop from the end of AVAILABLE, unmap the page's previous
-      // owner, map the new one
       case 'allocate':
         return program([GROUP, 1, 1], (pb, scope) => {
           lists(pb, scope);
@@ -1314,8 +1273,6 @@ export class VirtualTexture extends Disposable {
           scope.zVT_listCounts = pb.atomic_int[0]().storageBuffer(0);
           scope.zVT_state = pb.vec4[0]().storageBuffer(0);
           pb.main(function () {
-            // UE UpdateResidencyTracking: pages used within the free threshold (here: the
-            // REQUESTED list, which also holds the pinned and the newly mapped pages) over the pool
             this.$l.state = this.zVT_state.at(0);
             this.$l.residency = pb.div(
               pb.float(pb.max(pb.atomicAdd(this.zVT_listCounts.at(LIST_REQUESTED), 0), 0)),
@@ -1352,8 +1309,6 @@ export class VirtualTexture extends Disposable {
             this.zVT_dispatchArgs.setAt(5, pb.uint(1));
           });
         });
-      // UE PropagateMappedMips (local light mip branch): unmapped pages point at their nearest
-      // resident ancestor, one thread per finest level page walking from the coarsest level down
       case 'propagate':
         return program([FILL_GROUP, FILL_GROUP, 1], (pb, scope) => {
           scope.zVT_pageTable = pb.uint[0]().storageBuffer(0);

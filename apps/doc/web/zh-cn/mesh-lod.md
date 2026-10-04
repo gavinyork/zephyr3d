@@ -2,7 +2,7 @@
 
 网格离相机越远，在屏幕上越小，用不着全部三角形。细节层次（Level of Detail，LOD）给网格准备几份逐级简化的版本，按网格在屏幕上的大小选用其中一份，以减少远处物体的顶点和三角形开销。
 
-zephyr3d 的 LOD 是**离散 LOD 链**，与 UE 静态网格的 LOD 相同：
+zephyr3d 的 LOD 是**离散 LOD 链**：
 
 - 第 0 级是原始网格，后面各级三角形逐级减少。
 - **各级共用同一份顶点缓冲**，每一级只是索引缓冲中的一段。所以带 LOD 的网格只多出几段索引，骨骼蒙皮和变形目标（Morph Target）在每一级都照常工作。
@@ -28,7 +28,7 @@ LOD 一般在编辑器里生成，见[资产压缩](zh-cn/editor/asset-compressi
 | --- | --- |
 | `Mesh.forcedLod` | 固定使用某一级，0 最精细；-1（默认）按屏幕尺寸选。超出范围时取最粗一级 |
 | `Mesh.minLod` | 按屏幕尺寸选级时允许的最精细一级，默认 0。调大后，网格在近处也保持简化版本 |
-| `Camera.lodDistanceScale` | 该视图下所有切换尺寸的缩放，对应 UE 的 `r.StaticMeshLODDistanceScale`。大于 1 时在更近处就换到简化版本，小于 1 时更远处仍保持精细版本。默认 1 |
+| `Camera.lodDistanceScale` | 该视图下所有切换尺寸的缩放。大于 1 时在更近处就换到简化版本，小于 1 时更远处仍保持精细版本。默认 1 |
 
 `forcedLod` 和 `minLod` 会随场景保存，在编辑器的属性面板里也能修改。`lodDistanceScale` 适合作为画质选项，例如低画质下设为 2：
 
@@ -50,7 +50,7 @@ camera.lodDistanceScale = lowQuality ? 2 : 1;
 
 
 - **线框**：`camera.wireframe = true` 把这个视图里的所有对象画成三角形的边，包括网格、BatchGroup、粒子、精灵、头发、地形、水体和草。线框跟随当前的 LOD，拉远拉近能直接看到三角形变少。带索引几何的线框需要从 GPU 读回索引后生成，打开后会晚几帧出现。阴影和拾取不受影响。
-- **LOD 着色**：`camera.lodColoration = true` 把每个网格按当前所在的级别着色，配色与 UE 的 LOD Coloration 相同：
+- **LOD 着色**：`camera.lodColoration = true` 把每个网格按当前所在的级别着色：
 
 | LOD | 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -127,7 +127,7 @@ primitive.lods = [
 ## 与合批的关系
 
 - 自动实例化按“图元 + 材质”合批，同一个图元的不同 LOD 分别合批，各画各的索引段。
-- `BatchGroup` 会缓存渲染队列。在 WebGPU 上，如果设备支持 `indirect-first-instance` 且 `gpuInstanceCulling` 开启（默认开启），合批网格的 LOD 在 GPU 上逐实例选取，与视锥剔除在同一个 compute pass 中完成，网格换级不会导致缓存重建。阴影视图和 CPU 路径一样按主相机选级。这条路径没有滞回（与 UE 静态网格相同），网格正好处在切换距离附近时，相机移动可能让它在两级之间来回切换。其他情况（WebGL、关闭剔除、开启 LOD 着色、不能合批的网格）仍由 CPU 为每个网格选级，有网格换级时缓存才重建；有滞回，这种情况很少发生。
+- `BatchGroup` 会缓存渲染队列。在 WebGPU 上，如果设备支持 `indirect-first-instance` 且 `gpuInstanceCulling` 开启（默认开启），合批网格的 LOD 在 GPU 上逐实例选取，与视锥剔除在同一个 compute pass 中完成，网格换级不会导致缓存重建。阴影视图和 CPU 路径一样按主相机选级。
 
 ---
 

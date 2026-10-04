@@ -187,8 +187,7 @@ export class WebGPUMipmapGenerator {
     return this._mipmapGenerationProgram!.bindGroupLayouts[0];
   }
   /**
-   * Whether mipmaps of the given format can be generated with a compute shader. Mirrors UE's
-   * FGenerateMips AutoDetect: the format must support typed storage writes, and it must be
+   * Whether mipmaps of the given format can be generated with a compute shader: the format must support typed storage writes, and it must be
    * filterable since each destination texel is a bilinear fetch of the previous level.
    */
   static supportsComputeMipmap(device: WebGPUDevice, format: TextureFormat) {
@@ -227,10 +226,10 @@ export class WebGPUMipmapGenerator {
     }
   }
   /**
-   * Compute counterpart of the raster path, after UE's FGenerateMips::ExecuteCompute: one
-   * 8x8 dispatch per level and slice. Unlike the raster path, the whole chain is recorded
-   * into a single compute pass, so there is no per-level render pass begin/clear/end. Levels
-   * are the outer loop so the slices of one level carry no dependency on each other.
+   * Compute counterpart of the raster path: one 8x8 dispatch per level and slice.
+   * Unlike the raster path, the whole chain is recorded into a single compute pass,
+   * so there is no per-level render pass begin/clear/end. Levels are the outer loop
+   * so the slices of one level carry no dependency on each other.
    */
   private static generateMipmapCompute(
     device: WebGPUDevice,

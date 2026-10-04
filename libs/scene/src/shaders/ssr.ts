@@ -555,7 +555,7 @@ export function screenSpaceRayTracing_Linear2D(
 }
 
 /**
- * UE5 Random.ush InterleavedGradientNoise. Used as the temporal jitter
+ * InterleavedGradientNoise. Used as the temporal jitter
  * (StepOffset) for the fixed-step HZB march below.
  */
 export function SSR_interleavedGradientNoise(
@@ -572,28 +572,7 @@ export function SSR_interleavedGradientNoise(
 }
 
 /**
- * Screen space ray intersection against the HZB, ported from UE5's
- * SSRTRayCast.ush (InitScreenSpaceRayFromWorldSpace + CastScreenSpaceRay):
- * a fixed-step linear march over the ray clipped/extended to the screen
- * border, sampling the furthest-depth pyramid at a mip level that grows with
- * roughness, with a slope-based CompareTolerance hit window and line-segment
- * hit refinement.
- *
- * Convention differences vs UE5:
- * - UE is reversed-Z (larger = closer); we use standard Z, so every depth
- *   difference is mirrored (`Diff = SampleDepth - SampleZ`).
- * - UE view space has +z forward; ours has -z forward.
- * - UE's HZB is a half-res pow2 pyramid and starts marching at its mip 1;
- *   ours is full-res at mip0. Under standard-Z the march starts at
- *   START_MIP = 0, because the coarse furthest-depth blocks quantize into a
- *   staircase that grazing rays periodically self-intersect, showing up as
- *   regular stripes TAA cannot converge. Under reverse-Z depth precision is
- *   nearly uniform, so the march starts at mip 1 like UE; rough reflections
- *   still climb the pyramid via the roughness mip ramp in both cases.
- *
- * `maxIterations` is the number of linear samples along the ray (UE NumSteps,
- * typically 8..64), no longer the traversal iteration cap of the previous
- * FidelityFX-style implementation.
+ * Screen space ray intersection against the HZB
  */
 export function screenSpaceRayTracing_HiZ(
   scope: PBInsideFunctionScope,
@@ -615,9 +594,6 @@ export function screenSpaceRayTracing_HiZ(
   stepOffset?: PBShaderExp | number
 ) {
   const pb = scope.$builder;
-  // The r32f pyramid stores the furthest depth (max reduction; mip0 is the
-  // raw depth). Matches UE5 marching against the FurthestHZBTexture (UE is
-  // reversed-Z, so its furthest pyramid is the min reduction instead).
   pb.func('SSR_loadDepth', [pb.vec2('uv'), pb.float('level')], function () {
     this.$return(pb.textureSampleLevel(HiZTexture, this.uv, this.level).r);
   });
@@ -630,9 +606,6 @@ export function screenSpaceRayTracing_HiZ(
     this.u = pb.div(this.u, this.u.w);
     this.$return(this.u.xyz);
   });
-  // Port of UE5 GetStepScreenFactorToClipAtScreenEdge. Returns the multiplier
-  // for rayStepNDC so the ray ends exactly at the screen border. A factor
-  // above 1 extends short rays to the border (UE bExtendRayToScreenBorder).
   pb.func('SSR_clipRayToScreenEdge', [pb.vec2('rayStartNDC'), pb.vec2('rayStepNDC')], function () {
     this.$l.rayStepInvFactor = pb.mul(0.5, pb.length(this.rayStepNDC));
     this.$l.absStep = pb.max(pb.abs(this.rayStepNDC), pb.vec2(1e-8));
@@ -651,9 +624,6 @@ export function screenSpaceRayTracing_HiZ(
     );
     this.$return(pb.div(pb.min(this.s.x, this.s.y), pb.max(this.rayStepInvFactor, 1e-8)));
   });
-  // Port of UE5 InitScreenSpaceRayFromWorldSpace, in view space (-z forward).
-  // Outputs the ray in "texture space": uv in [0,1], z = device depth in
-  // [0,1], the same mapping the HZB stores.
   pb.func(
     'SSR_initScreenSpaceRay',
     [
@@ -667,8 +637,6 @@ export function screenSpaceRayTracing_HiZ(
       pb.float('compareTolerance').out()
     ],
     function () {
-      // Rays heading towards the camera stop before reaching 5% of the
-      // surface view depth (UE: min(-0.95 * SceneDepth / ViewDirZ, TMax)).
       this.$l.rayLength = this.$choice(
         pb.greaterThan(this.rayDirection.z, 0),
         pb.min(this.maxDistance, pb.div(pb.mul(-0.95, this.viewPos.z), pb.max(this.rayDirection.z, 1e-6))),
@@ -680,8 +648,6 @@ export function screenSpaceRayTracing_HiZ(
       this.$l.startNDC = pb.div(this.startH.xyz, this.startH.w);
       this.$l.endNDC = pb.div(this.endH.xyz, this.endH.w);
       this.$l.stepNDC = pb.sub(this.endNDC, this.startNDC);
-      // Always extend/clip the ray to the screen border so NumSteps samples
-      // cover the whole visible segment.
       this.stepNDC = pb.mul(this.stepNDC, this.SSR_clipRayToScreenEdge(this.startNDC.xy, this.stepNDC.xy));
       if (REVERSE_Z) {
         // Reverse ZO canonical clip space: NDC z is already the device depth.
@@ -691,8 +657,7 @@ export function screenSpaceRayTracing_HiZ(
         this.rayStartTS = pb.add(pb.mul(this.startNDC, 0.5), pb.vec3(0.5));
         this.rayStepTS = pb.mul(this.stepNDC, 0.5);
       }
-      // Depth-only step (UE RayDepthScreen): project the point at rayLength
-      // straight along the view forward axis for the slope tolerance.
+      // Depth-only step: project the point at rayLength straight along the view forward axis for the slope tolerance.
       this.$l.depthH = pb.mul(
         this.projMatrix,
         pb.vec4(this.viewPos.xy, pb.sub(this.viewPos.z, this.rayLength), 1)
@@ -700,9 +665,6 @@ export function screenSpaceRayTracing_HiZ(
       this.$l.depthTSz = REVERSE_Z
         ? pb.div(this.depthH.z, this.depthH.w)
         : pb.add(pb.mul(pb.div(this.depthH.z, this.depthH.w), 0.5), 0.5);
-      // Under standard Z depth grows away from the camera, mirroring UE's
-      // reversed-Z expression (RayStartScreen.z - RayDepthScreen.z); under
-      // reverse-Z the UE orientation applies directly.
       this.compareTolerance = pb.max(
         pb.abs(this.rayStepTS.z),
         pb.mul(
@@ -712,14 +674,6 @@ export function screenSpaceRayTracing_HiZ(
       );
     }
   );
-  // Port of UE5 CastScreenSpaceRay: NumSteps uniform samples in batches of 4,
-  // mip level ramped by roughness, tolerance-window hit test, uncertainty
-  // tracking and line-segment hit refinement.
-  // Standard-Z keeps 0 instead of UE's StartMipLevel=1: coarse-mip depth
-  // staircases combined with the poor far-depth resolution near 1.0 cause
-  // grazing-angle stripe artifacts. Under reverse-Z depth precision is nearly
-  // uniform along the ray, so the march starts at mip 1 like UE for better
-  // texture cache behavior.
   const START_MIP = REVERSE_Z ? 1 : 0;
   pb.func(
     'SSR_castScreenSpaceRay',
@@ -765,7 +719,6 @@ export function screenSpaceRayTracing_HiZ(
           });
         }
         this.marchBase = pb.mul(this.i, 4);
-        // Two samples per mip step (UE: SamplesMip.xy = Level; Level += inc).
         this.$l.mip01 = pb.min(this.level, this.maxMipLevel);
         this.$l.mip23 = pb.min(pb.add(this.level, this.mipInc), this.maxMipLevel);
         this.level = pb.add(this.level, pb.mul(this.mipInc, 2));
@@ -773,9 +726,6 @@ export function screenSpaceRayTracing_HiZ(
           this.$l[`sampleT${j}`] = pb.add(this.marchBase, j + 1);
           this.$l[`sampleUV${j}`] = pb.add(this.rayUVz.xy, pb.mul(this.rayStepUVz.xy, this[`sampleT${j}`]));
           this.$l[`sampleZ${j}`] = pb.add(this.rayUVz.z, pb.mul(this.rayStepUVz.z, this[`sampleT${j}`]));
-          // Negative when the ray is behind the surface, hit window (-2T, 0).
-          // Under reverse-Z this is UE's original `SamplesZ - SampleDepth`;
-          // under standard Z the difference is mirrored.
           this[`diff${j}`] = REVERSE_Z
             ? pb.sub(
                 this[`sampleZ${j}`],
@@ -790,8 +740,6 @@ export function screenSpaceRayTracing_HiZ(
             this.compareTolerance
           );
           this.foundHit = pb.or(this.foundHit, this[`hit${j}`]);
-          // The ray went far behind geometry before any hit: its outcome
-          // cannot be resolved from the depth buffer (UE bUncertain).
           this.uncertain = pb.or(
             this.uncertain,
             pb.and(
@@ -806,8 +754,6 @@ export function screenSpaceRayTracing_HiZ(
         this.lastDiff = this.diff3;
       });
       this.$if(this.foundHit, function () {
-        // Locate the first hit sample of the batch, then refine with a line
-        // segment intersection (UE: TimeLerp = saturate(D0 / (D0 - D1))).
         this.$l.depthDiff0 = this.diff2;
         this.$l.depthDiff1 = this.diff3;
         this.$l.time0 = pb.float(3);
@@ -837,7 +783,6 @@ export function screenSpaceRayTracing_HiZ(
         this.hitUVz = pb.add(this.rayUVz, pb.mul(this.rayStepUVz, this.intersectTime));
         this.numIterations = this.intersectTime;
       }).$else(function () {
-        // No certain intersection - the march covered the whole clipped ray.
         this.hitUVz = pb.add(this.rayUVz, pb.mul(this.rayStepUVz, this.numSteps));
         this.numIterations = this.numSteps;
       });
@@ -869,7 +814,6 @@ export function screenSpaceRayTracing_HiZ(
       this.$l.rayStartTS = pb.vec3();
       this.$l.rayStepTS = pb.vec3();
       this.$l.compareTolerance = pb.float();
-      // UE uses SlopeCompareToleranceScale 4 for SSR and 2 for SSGI.
       this.SSR_initScreenSpaceRay(
         this.viewPos,
         this.rayDirection,
@@ -902,7 +846,6 @@ export function screenSpaceRayTracing_HiZ(
         this.$l.surfaceZ = this.SSR_loadDepth(this.hitUVz.xy, 0);
         this.$if(ShaderHelper.isFarthestDepth(this, this.surfaceZ), function () {
           if (giTraceOut) {
-            // The intersection resolved onto a sky texel, so the ray escaped.
             this.giTrace = pb.vec3(0, 1, 0);
           }
           this.$return(pb.vec4(0));
@@ -922,10 +865,6 @@ export function screenSpaceRayTracing_HiZ(
           normalTexture
         );
         if (giTraceOut) {
-          // Keep only the thickness term of validateHit: a hit far from the
-          // sampled surface may be a thin-object false positive, which is a
-          // genuine geometric doubt. The border, near-self and backface vetoes
-          // bound reflection artifacts and must not gate diffuse occlusion.
           this.$l.giSurfaceVS = invProjectPosition(
             this,
             pb.vec3(this.hitUVz.xy, this.surfaceZ),
@@ -940,10 +879,6 @@ export function screenSpaceRayTracing_HiZ(
       });
       if (giTraceOut) {
         hitBranch.$else(function () {
-          // The ray is always extended to the screen border, so a march that
-          // finished without ever going behind geometry is a proven escape.
-          // An uncertain march (went far behind geometry before any hit) is
-          // indeterminate, not unoccluded (UE bUncertain semantics).
           this.giTrace = pb.vec3(0, pb.float(pb.not(this.uncertain)), 0);
         });
       }
@@ -992,83 +927,3 @@ export function screenSpaceRayTracing_HiZ(
         )
   ) as PBShaderExp;
 }
-
-/*
-float2 cell(float2 ray, float2 cell_count, uint camera) {
-	return floor(ray.xy * cell_count);
-}
-
-float2 cell_count(float level) {
-	return input_texture2_size / (level == 0.0 ? 1.0 : exp2(level));
-}
-
-float3 intersect_cell_boundary(float3 pos, float3 dir, float2 cell_id, float2 cell_count, float2 cross_step, float2 cross_offset, uint camera) {
-	float2 cell_size = 1.0 / cell_count;
-	float2 planes = cell_id/cell_count + cell_size * cross_step;
-
-	float2 solutions = (planes - pos)/dir.xy;
-	float3 intersection_pos = pos + dir * min(solutions.x, solutions.y);
-
-	intersection_pos.xy += (solutions.x < solutions.y) ? float2(cross_offset.x, 0.0) : float2(0.0, cross_offset.y);
-
-	return intersection_pos;
-}
-
-bool crossed_cell_boundary(float2 cell_id_one, float2 cell_id_two) {
-	return (int)cell_id_one.x != (int)cell_id_two.x || (int)cell_id_one.y != (int)cell_id_two.y;
-}
-
-float minimum_depth_plane(float2 ray, float level, float2 cell_count, uint camera) {
-	return input_texture2.Load(int3(vr_stereo_to_mono(ray.xy, camera) * cell_count, level)).r;
-}
-
-float3 hi_z_trace(float3 p, float3 v, in uint camera, out uint iterations) {
-	float level = HIZ_START_LEVEL;
-	float3 v_z = v/v.z;
-	float2 hi_z_size = cell_count(level);
-	float3 ray = p;
-
-	float2 cross_step = float2(v.x >= 0.0 ? 1.0 : -1.0, v.y >= 0.0 ? 1.0 : -1.0);
-	float2 cross_offset = cross_step * 0.00001;
-	cross_step = saturate(cross_step);
-
-	float2 ray_cell = cell(ray.xy, hi_z_size.xy, camera);
-	ray = intersect_cell_boundary(ray, v, ray_cell, hi_z_size, cross_step, cross_offset, camera);
-
-	iterations = 0;
-	while(level >= HIZ_STOP_LEVEL && iterations < MAX_ITERATIONS) {
-		// get the cell number of the current ray
-		float2 current_cell_count = cell_count(level);
-		float2 old_cell_id = cell(ray.xy, current_cell_count, camera);
-
-		// get the minimum depth plane in which the current ray resides
-		float min_z = minimum_depth_plane(ray.xy, level, current_cell_count, camera);
-
-		// intersect only if ray depth is below the minimum depth plane
-		float3 tmp_ray = ray;
-		if(v.z > 0) {
-			float min_minus_ray = min_z - ray.z;
-			tmp_ray = min_minus_ray > 0 ? ray + v_z*min_minus_ray : tmp_ray;
-			float2 new_cell_id = cell(tmp_ray.xy, current_cell_count, camera);
-			if(crossed_cell_boundary(old_cell_id, new_cell_id)) {
-				tmp_ray = intersect_cell_boundary(ray, v, old_cell_id, current_cell_count, cross_step, cross_offset, camera);
-				level = min(HIZ_MAX_LEVEL, level + 2.0f);
-			}else{
-				if(level == 1 && abs(min_minus_ray) > 0.0001) {
-					tmp_ray = intersect_cell_boundary(ray, v, old_cell_id, current_cell_count, cross_step, cross_offset, camera);
-					level = 2;
-				}
-			}
-		} else if(ray.z < min_z) {
-			tmp_ray = intersect_cell_boundary(ray, v, old_cell_id, current_cell_count, cross_step, cross_offset, camera);
-			level = min(HIZ_MAX_LEVEL, level + 2.0f);
-		}
-
-		ray.xyz = tmp_ray.xyz;
-		--level;
-
-		++iterations;
-	}
-	return ray;
-}
-*/

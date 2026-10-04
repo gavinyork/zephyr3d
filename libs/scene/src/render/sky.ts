@@ -89,10 +89,6 @@ const fogTypeMap: Record<FogType, number> = {
 };
 
 const defaultSkyWorldMatrix = Matrix4x4.identity();
-/**
- * Ceiling on the sky's on-screen output, as in UE's PrepareOutput: half the fp10 maximum. The physical
- * sun disk exceeds half-float range, and the margin leaves headroom for bloom and other additive effects.
- */
 const SKY_OUTPUT_MAX = 64512 * 0.5;
 
 /**
@@ -170,7 +166,6 @@ export class SkyRenderer extends Disposable {
   private readonly _atmosphereParams: AtmosphereParams;
   private _atmosphereExposure: number;
   private _lowerHemisphereIsBlack: boolean;
-  /** Latched in update(): physical lighting draws the UE sun disk instead of the legacy glow. */
   private _physicalSunDisk: boolean;
   /** Observer local up (planet center to observer) of the current frame, in world space. */
   private readonly _observerUp: Vector3;
@@ -401,13 +396,6 @@ export class SkyRenderer extends Disposable {
   }
   /**
    * Whether the environment lighting baked from the scattering sky sees black below the horizon.
-   *
-   * @remarks
-   * The scattering sky shows a lit virtual planet ground below the horizon (see
-   * {@link SkyRenderer.groundAlbedo}). That ground is only a backdrop for sky left uncovered by
-   * scene geometry; as a light source it would light every object from below as if it stood on an
-   * infinite plain. Like UE's SkyLight `bLowerHemisphereIsBlack` (on by default), the IBL bake
-   * therefore replaces the lower hemisphere with black. Only affects the `scatter` sky type.
    */
   get lowerHemisphereIsBlack() {
     return this._lowerHemisphereIsBlack;
@@ -421,7 +409,7 @@ export class SkyRenderer extends Disposable {
   /**
    * Strength of the aerial perspective: scales the distance the atmosphere is integrated over
    * between the camera and the scene, so distant objects get hazier (>1) or clearer (<1). The sky
-   * itself is unaffected (UE: AerialPespectiveViewDistanceScale).
+   * itself is unaffected.
    */
   get aerialPerspectiveViewDistanceScale() {
     return this._atmosphereParams.apViewDistanceScale;
@@ -435,7 +423,7 @@ export class SkyRenderer extends Disposable {
   /**
    * Distance from the camera where aerial perspective starts, in the same units as
    * {@link SkyRenderer.aerialPerspectiveDistance} (atmosphere meters). Nearer surfaces get no
-   * atmospheric haze (UE: AerialPerspectiveStartDepth, 0.1 km by default).
+   * atmospheric haze.
    */
   get aerialPerspectiveStartDepth() {
     return this._atmosphereParams.apStartDepth;
@@ -454,7 +442,7 @@ export class SkyRenderer extends Disposable {
     }
   }
   /**
-   * Color of the virtual planet ground of the scattering sky (UE: GroundAlbedo).
+   * Color of the virtual planet ground of the scattering sky.
    *
    * @remarks
    * Shown below the horizon where no scene geometry covers the sky, lit by the sun through the
@@ -497,9 +485,9 @@ export class SkyRenderer extends Disposable {
    * Atmosphere meters per world unit.
    *
    * @remarks
-   * The planet top sits at the world origin with its center straight below (UE:
-   * PlanetTopAtAbsoluteWorldOrigin). The camera position, scaled by this factor, places the
-   * observer in the atmosphere: its altitude, and for large horizontal distances where on the
+   * The planet top sits at the world origin with its center straight below.
+   * The camera position, scaled by this factor, places the observer in the
+   * atmosphere: its altitude, and for large horizontal distances where on the
    * curved planet it stands. Aerial perspective distances are scaled the same way.
    */
   get cameraHeightScale() {
@@ -613,13 +601,6 @@ export class SkyRenderer extends Disposable {
   }
   /**
    * How much distant height fog takes the color of the environment behind it (0..1).
-   *
-   * @remarks
-   * Blends the fog in-scattering color, and fades the directional in-scattering, toward the
-   * environment light's radiance map sampled along the view ray (UE:
-   * SkyLightCaptureAffectsHeightFogStrength). Without it the fog uses one color for every direction,
-   * which is darker than the bright horizon sky and shows as a dark band there. Needs an IBL
-   * environment light; 0 disables it.
    */
   get heightFogSkyLightStrength() {
     return this._heightFogParams.skyLightStrength;
@@ -632,7 +613,7 @@ export class SkyRenderer extends Disposable {
   }
   /**
    * Blurriness of the environment seen through the fog, as a roughness selecting the radiance map
-   * mip (UE: SkyLightCaptureAffectsHeightFogRoughness).
+   * mip.
    */
   get heightFogSkyLightRoughness() {
     return this._heightFogParams.skyLightRoughness;
@@ -906,7 +887,7 @@ export class SkyRenderer extends Disposable {
       this._bakedSkyboxDirty = false;
       // updateBakedSkyMap derives both the IBL and the distant-sky LUT from the fog-free cubemap,
       // before compositing fog. Deriving the distant-sky LUT from the fogged cubemap would feed the
-      // fog color back into its own ambient term (UE's distant sky light is atmosphere-only too).
+      // fog color back into its own ambient term.
       this.updateBakedSkyMap(ctx);
     }
     // Atmosphere extinction times cloud occlusion. The cloud term intentionally applies only to
@@ -933,9 +914,6 @@ export class SkyRenderer extends Disposable {
         Math.min(126, -this._heightFogParams.parameter1.w * (cameraY - this._heightFogParams.parameter2.y))
       );
       this._heightFogParams.parameter3.z = this._heightFogParams.parameter2.x * Math.pow(2, p);
-      // Legacy keeps its display-relative 0..1 light color. Physical follows UE: the sun illuminance
-      // reaching the ground, scattered with an isotropic phase 1 / (4pi), turns into radiance, which
-      // is then pre-exposed like every other lit quantity.
       if (ctx.scene.lightingMode === 'physical') {
         const sunIlluminance = ctx.sunLight ? ctx.sunLight.intensity : 0;
         this._heightFogParams.lightColor.set(
@@ -951,11 +929,6 @@ export class SkyRenderer extends Disposable {
   renderAtmosphereLUTs(ctx: DrawContext) {
     this._atmosphereParams.lightDir.set(SkyRenderer._getSunDir(ctx.sunLight));
     this._atmosphereParams.lightColor.set(SkyRenderer._getSunColor(ctx.sunLight));
-    // Physical: the sun input is photometric (lux), normalized onto the model's authored reference
-    // and stored at the fixed PHYSICAL_BAKE_EXPOSURE rather than the live camera exposure. That
-    // keeps the cached IBL bake exposure-independent while staying inside the environment cubemap's
-    // limited float range -- raw luminance would overflow it to Inf. Consumers rescale to the live
-    // exposure via getBakeToPreExposedScale().
     this._atmosphereParams.lightColor.w *=
       this._atmosphereExposure *
       (ctx.scene.lightingMode === 'physical'
@@ -963,9 +936,6 @@ export class SkyRenderer extends Disposable {
         : 1);
     this._atmosphereParams.cameraAspect = ctx.camera.getAspect();
     this._atmosphereParams.cameraTanHalfFovy = ctx.camera.isPerspective() ? ctx.camera.getTanHalfFovy() : 1;
-    // Observer: the camera in planet-centered atmosphere meters, in double precision (UE:
-    // FAtmosphereSetup::ComputeViewData). Every atmosphere shader works in the observer's local
-    // frame, so directions are rotated into it here and the shaders only see the altitude.
     const referential = this._updateObserver(ctx.camera.getWorldPosition());
     Matrix4x4.multiply(referential, ctx.camera.worldMatrix, this._atmosphereParams.cameraWorldMatrix);
     referential.transformVectorAffine(this._atmosphereParams.lightDir, this._atmosphereParams.lightDir);
@@ -974,11 +944,6 @@ export class SkyRenderer extends Disposable {
   /**
    * Places the observer for the camera at `cameraPos` and returns the world to observer-local
    * rotation, also stored in the atmosphere params.
-   *
-   * @remarks
-   * Local +Y is the planet up at the observer. The horizontal axes follow a fixed world axis
-   * projected onto the local horizon rather than the camera forward UE uses, so the sky view LUT
-   * does not change when the camera only turns. At the world origin the rotation is the identity.
    */
   private _updateObserver(cameraPos: Immutable<Vector3>) {
     const params = this._atmosphereParams;
@@ -1463,7 +1428,6 @@ export class SkyRenderer extends Disposable {
       const rho_h = Math.max(0, 1 - Math.abs(fH - params.ozoneCenter) / params.ozoneWidth);
       return Vector3.scale(sigma, rho_h);
     }
-    // Ground level, as UE's GetTransmittanceAtGroundLevel: independent of the observer.
     const eyePos = new Vector3(0, this._atmosphereParams.plantRadius + MIN_OBSERVER_ALTITUDE, 0);
     const lightDir = SkyRenderer._getSunDir(sunLight);
     const d = this._rayIntersectSphere(
@@ -2016,15 +1980,12 @@ export class SkyRenderer extends Disposable {
           } else {
             this.$l.color = this.skyColor;
           }
-          // UE ApplyLowerHemisphereColorPS: the IBL bake does not see the virtual ground.
           this.$if(
             pb.and(pb.notEqual(this.lowerHemisphereBlack, 0), pb.lessThan(this.rayDir.y, 0)),
             function () {
               this.color = pb.vec3(0);
             }
           );
-          // 1 for legacy and for the IBL bake; the camera pre-exposure when drawn on screen.
-          // Clamped like UE's PrepareOutput, see SKY_OUTPUT_MAX.
           this.color = pb.min(pb.mul(this.color, this.luminanceScale), pb.vec3(SKY_OUTPUT_MAX));
           this.$if(pb.equal(this.srgbOut, 0), function () {
             this.$outputs.outColor = pb.vec4(this.color, 1);

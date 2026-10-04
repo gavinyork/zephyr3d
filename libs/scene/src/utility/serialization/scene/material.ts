@@ -2911,7 +2911,7 @@ export function getSkinMaterialClass(manager: ResourceManager): SerializableClas
           },
           {
             name: 'SpecularF0',
-            description: 'Fresnel F0 for the skin oil layer. UE5: 0.08 * Specular',
+            description: 'Fresnel F0 for the skin oil layer',
             type: 'float',
             default: 0.04,
             options: { animatable: true, minValue: 0, maxValue: 0.2 },

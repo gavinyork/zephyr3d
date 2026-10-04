@@ -127,8 +127,7 @@ export abstract class RenderPass extends Disposable {
    */
   cullScene(ctx: DrawContext, cullCamera: Camera) {
     const renderQueue = new RenderQueue(this);
-    // Levels of detail follow the view being rendered, shadow cascades included (UE: shadow
-    // depth views take the LOD of their main view)
+    // Levels of detail follow the view being rendered, shadow cascades included
     const cullVisitor = new CullVisitor(this, cullCamera, renderQueue, ctx.camera);
     if (ctx.scene.octree) {
       ctx.scene.octree.getRootNode().traverse(cullVisitor);

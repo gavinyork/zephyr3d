@@ -10,10 +10,7 @@ import { SkinPaletteAtlas } from './skin_palette_atlas';
 import { AnimationBankGpuEvaluator } from './animation_bank_gpu';
 import type { SkinPaletteBlock } from './skin_palette_atlas';
 
-/**
- * Rate clips are sampled at when baked into a bank, as `ANIM_BANK_SAMPLE_RATE` in UE
- * (Shaders/Shared/SkinningDefinitions.h)
- */
+/** Rate clips are sampled at when baked into a bank */
 export const ANIMATION_BANK_SAMPLE_RATE = 30;
 
 /** Floats in one baked joint key: position xyz, rotation quaternion xyzw, scale xyz */
@@ -73,16 +70,13 @@ const tmpHeader = new Float32Array(16);
  * scene nodes the clips were made for.
  *
  * @remarks
- * Follows the animation bank of UE (`UAnimBank`, Engine/Private/Animation/AnimBank.cpp): every clip
- * is sampled at {@link ANIMATION_BANK_SAMPLE_RATE} frames per second into joint poses relative to the
- * root of the skin, so that a pose is evaluated per joint without walking the joint hierarchy.
+ * Every clip is sampled at {@link ANIMATION_BANK_SAMPLE_RATE} frames per second into joint poses
+ * relative to the root of the skin, so that a pose is evaluated per joint without walking the
+ * joint hierarchy.
  *
  * A bank is played by {@link AnimationBankTrack}s. Each track owns one palette in the skin palette
  * atlas, and any number of instances of the model skin their meshes by it, so a crowd costs the
  * evaluation of its tracks rather than of its characters.
- *
- * Unlike UE, which keeps rotation and translation only, keys keep the joint scale as well, since
- * imported rigs often scale their joints.
  *
  * Meshes skinned by a track do not run IK, joint dynamics or any other skeleton modifier, and do
  * not blend clips.
@@ -203,11 +197,9 @@ export class AnimationBank extends Disposable {
    * Write the skinning palette of a pose to the skin palette atlas.
    *
    * @remarks
-   * Follows `SampleAnimBank` of UE (Renderer/Private/Skinning/AnimBankTransformProvider.cpp):
-   * the two keys around the position are blended, positions and scales linearly and rotations by
-   * normalized linear interpolation along the shorter arc (`BlendBoneTransformsWithScale` and
-   * `QuatSlerpApproximate` in Shaders/Private/BoneTransform.ush and Quaternion.ush), and the pose
-   * is followed by the inverse bind matrix.
+   * The two keys around the position are blended, positions and scales linearly and rotations by
+   * normalized linear interpolation along the shorter arc, and the pose is followed by the inverse
+   * bind matrix.
    *
    * @internal
    */
@@ -225,11 +217,6 @@ export class AnimationBank extends Disposable {
   }
   /**
    * Compute the bounds of a mesh over all frames of a baked clip.
-   *
-   * @remarks
-   * UE bounds a clip by the joint positions of its keys (`FAnimBankBuildAsyncCacheTask`). Here the
-   * representative vertices of the mesh, which bound it at runtime when skinned by its skin
-   * binding, are skinned by every frame instead, which fits the mesh more closely.
    *
    * @param entryIndex - Index of the baked clip
    * @param mesh - Mesh skinned by the bank
@@ -305,9 +292,6 @@ export class AnimationBank extends Disposable {
       };
     });
     const playLength = clip.timeDuration;
-    // UE samples round(length * rate) frames from time 0, which leaves out the pose at the end of
-    // the clip; one more frame is sampled here so the last key is the end pose, letting a looping
-    // track interpolate all the way back to the start
     const frameCount = Math.max(1, Math.round(playLength * ANIMATION_BANK_SAMPLE_RATE) + 1);
     const n = binding.joints.length;
     const keys = new Float32Array(frameCount * n * KEY_FLOATS);
@@ -550,9 +534,6 @@ export class AnimationBankTrack extends Disposable {
   /**
    * Advance the position by the frame time and write the new pose.
    *
-   * @remarks
-   * Follows `FAnimBankTrackPackedData::Update` and `Wrap` of UE (Engine/Private/Animation/AnimBank.cpp).
-   *
    * @internal
    */
   update(deltaInSeconds: number) {
@@ -643,7 +624,6 @@ export class AnimationBankTrack extends Disposable {
     tmpHeader[1] = base + this._offsets[1];
     SkinPaletteAtlas.instance.writeSlots(base, tmpHeader);
   }
-  /** As `GetAnimBankTrackLoopedPosition` of UE, or clamped when not looping */
   private wrap(position: number) {
     const length = this.playLength;
     if (this._loop) {
@@ -657,10 +637,6 @@ export class AnimationBankTrack extends Disposable {
   }
 }
 
-/**
- * Keys around a time and the weight of the second, as `FAnimationRuntime::GetKeyIndicesFromTime` of
- * UE (Engine/Private/Animation/AnimationRuntime.cpp) with the frame rate derived from the length.
- */
 function getKeyIndicesFromTime(time: number, numKeys: number, sequenceLength: number) {
   if (time <= 0 || numKeys === 1) {
     return { key0: 0, key1: 0, alpha: 0 };

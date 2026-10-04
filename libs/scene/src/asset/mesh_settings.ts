@@ -31,16 +31,16 @@ export interface MeshImportSettings {
    * least this many, up to {@link MAX_MESH_LODS} levels including the source.
    */
   lodMinTriangles: number;
-  /** Fraction of the source triangles each level keeps over the previous one, UE PercentTriangles per step */
+  /** Fraction of the source triangles each level keeps over the previous one */
   lodReduction: number;
   /**
-   * Pixel error the automatic switch distances allow, UE ReductionSettings.PixelError: a level is
-   * used once its simplification error projects to fewer pixels on a 1920 wide, 90 degree view
+   * Pixel error the automatic switch distances allow: a level is used once its
+   * simplification error projects to fewer pixels on a 1920 wide, 90 degree view
    */
   lodPixelError: number;
 }
 
-/** Most levels of detail a mesh can have, UE MAX_STATIC_MESH_LODS */
+/** Most levels of detail a mesh can have */
 export const MAX_MESH_LODS = 8;
 
 const COMPRESSIONS: readonly MeshCompression[] = ['none', 'meshopt'];

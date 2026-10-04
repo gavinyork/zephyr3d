@@ -15,20 +15,6 @@ export class Bloom extends AbstractPostEffect {
   static readonly className = 'Bloom' as const;
   /** Largest finite IEEE-754 half-float value used by the HDR post-effect chain. */
   private static readonly HALF_FLOAT_MAX = 65504;
-  /**
-   * Per-level bloom weights under physical lighting, finest level first.
-   *
-   * @remarks
-   * UE's bloom is six Gaussians of growing width weighted by Bloom1..6Tint (0.3465, 0.138, 0.1176,
-   * 0.066, 0.066, 0.061) times Intensity 0.675: the total gain is about 0.54, and the wide kernels,
-   * which spread a highlight over a large part of the screen, get little of it. Each level of this
-   * pyramid is a Gaussian roughly twice as wide as the previous, the finest about UE's second one;
-   * UE's first (sub-pixel at this resolution) is folded into it. Levels past the table get nothing.
-   *
-   * An unweighted pyramid instead adds every level at full energy, a gain equal to the level count
-   * that is dominated by the widest level. That is harmless for display-referred content near 1, but
-   * a physical sun disk at the output clamp (32256) then blows out a blob half the screen wide.
-   */
   private static readonly PHYSICAL_LEVEL_WEIGHTS = [0.3465 + 0.138, 0.1176, 0.066, 0.066, 0.061].map(
     (w) => w * 0.675
   );
@@ -149,12 +135,8 @@ export class Bloom extends AbstractPostEffect {
    * because the weighting deliberately holds the brightest samples back. Turn it off for a static
    * scene that wants maximum reach and has no high-frequency speculars to stabilize.
    *
-   * Only applies under legacy lighting. Physical lighting follows UE, whose bloom downsample is a
-   * plain linear average and leaves fireflies to TAA (bloom reads the TAA-resolved frame). There the
-   * weighting misbehaves on the sun disk: a few pixels at the output clamp (32256), whose every
-   * 2x2 group that also holds sky collapses to about sky level. Only fully covered groups survive,
-   * so the halo's energy jumps with the disk's position on the pixel grid and flickers as the camera
-   * turns.
+   * Only applies under legacy lighting. With physical lighting, bloom downsample is a
+   * plain linear average and leaves fireflies to TAA (bloom reads the TAA-resolved frame).
    */
   get karisAverage() {
     return this._karisAverage;
@@ -162,10 +144,6 @@ export class Bloom extends AbstractPostEffect {
   set karisAverage(val) {
     this._karisAverage = !!val;
   }
-  /**
-   * Per-level weights for the given pyramid depth: UE's under physical lighting, 1 in legacy so its
-   * output stays unchanged. See {@link Bloom.PHYSICAL_LEVEL_WEIGHTS}.
-   */
   private static _levelWeights(ctx: DrawContext, count: number) {
     const physical = ctx.scene?.lightingMode === 'physical';
     const weights: number[] = [];

@@ -636,14 +636,6 @@ export class ClipmapTerrainMaterial extends applyMaterialMixins(
   /**
    * Reads the blended layers from the runtime virtual texture: (linear albedo, roughness) is
    * returned, the world space normal written to `normal`.
-   *
-   * Layout of UE's BaseColor_Normal_Roughness runtime virtual texture, uncompressed
-   * (VirtualTextureMaterial.usf, VirtualTextureCommon.ush): plane 0 holds the sRGB encoded base
-   * color, plane 1 (normal.x, roughness, normal.z) of the world space normal, its up component
-   * rebuilt as positive. Trilinear filtering as UE's manual trilinear mode
-   * (VIRTUAL_TEXTURE_MANUAL_TRILINEAR_FILTERING, TextureVirtualSample): the next coarser level
-   * is blended in by the fractional level only when it is resident itself, otherwise the first
-   * sample is used alone.
    */
   sampleVirtualTexture(scope: PBInsideFunctionScope, normal: PBShaderExp) {
     const pb = scope.$builder;
@@ -672,7 +664,7 @@ export class ClipmapTerrainMaterial extends applyMaterialMixins(
       this.normal = pb.normalize(
         pb.vec3(this.nxz.x, pb.sqrt(pb.clamp(pb.sub(1, pb.dot(this.nxz, this.nxz)), 0, 1)), this.nxz.y)
       );
-      // sRGB decode (UE VirtualTextureUnpackBaseColorSRGB)
+      // sRGB decode
       this.$l.c = this.baseColor.rgb;
       this.$l.linear = pb.mix(
         pb.pow(pb.div(pb.add(this.c, pb.vec3(0.055)), 1.055), pb.vec3(2.4)),

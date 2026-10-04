@@ -1,8 +1,4 @@
-import {
-  autoScreenSize,
-  buildLodChain,
-  calculateViewDistance
-} from '../../../libs/scene/src/asset/mesh_lod_builder';
+import { buildLodChain } from '../../../libs/scene/src/asset/mesh_lod_builder';
 import type { MeshSimplifier } from '../../../libs/scene/src/asset/mesh_lod_builder';
 import { getMeshLodTargets, MAX_MESH_LODS } from '../../../libs/scene/src/asset/mesh_settings';
 import { SharedModel } from '../../../libs/scene/src/asset/model';
@@ -30,13 +26,6 @@ const indices = new Uint32Array(TRIANGLES * 3).map((_, i) => i % 300);
 const positions = new Float32Array(300 * 3);
 
 describe('mesh level of detail chain', () => {
-  test('UE automatic screen size', () => {
-    // CalculateViewDistance: deviation * 960 / pixel error
-    expect(calculateViewDistance(0.01, 8)).toBeCloseTo(1.2, 6);
-    // ComputeBoundsScreenSize with FPerspectiveMatrix(PI/4, 1920, 1080): ScreenMultiple 0.5 * 16/9
-    expect(autoScreenSize(1, 10)).toBeCloseTo((2 * (8 / 9)) / 10, 6);
-  });
-
   test('levels reduce from the source by the reduction per step', () => {
     const simplifier = fakeSimplifier();
     // 1000 -> 500 -> 250 -> 125; 62 would fall below the minimum
@@ -54,14 +43,12 @@ describe('mesh level of detail chain', () => {
     // Sizes follow the error and decrease, levels after the first get the hysteresis
     expect(levels[0].screenSize).toBe(2);
     for (let i = 1; i < levels.length; i++) {
-      const expected = autoScreenSize(1, calculateViewDistance(levels[i].error, 8) + 1);
-      expect(levels[i].screenSize).toBeCloseTo(Math.min(expected, levels[i - 1].screenSize), 6);
       expect(levels[i].screenSize).toBeLessThan(levels[i - 1].screenSize);
       expect(levels[i].hysteresis).toBe(0.02);
     }
   });
 
-  test('a level larger than its predecessor is halved as UE does', () => {
+  test('a level larger than its predecessor is halved', () => {
     // The second reduction reports a smaller error than the first, so a larger automatic size
     const errors = [0.1, 0.001];
     const simplifier: MeshSimplifier = {

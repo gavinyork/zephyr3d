@@ -66,6 +66,8 @@
     - [概述](zh-cn/oit.md)
   - 多视口渲染
     - [概述](zh-cn/multi-views.md)
+  - 性能
+    - [性能优化](zh-cn/performance.md)
   - 进阶内容
     - [深度约定（Reverse-Z）](zh-cn/reverse-z.md)
     - [渲染图与自定义 Pass](zh-cn/rendergraph.md)

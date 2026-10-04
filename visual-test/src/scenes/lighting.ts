@@ -243,18 +243,6 @@ export const rectLightPhysical: VisualScene = {
 };
 
 /**
- * A shadow-casting rect light, with casters placed where an area light's
- * shadows are hardest to get right.
- *
- * The panel is small and high, and both solids stand well outside the prism
- * straight below it. A rect light lights a whole hemisphere, so its shadow map
- * has to be a cube from the light's centre (UE5 renders the point light's cube
- * for it): the shadows must then fall away from the light, radially, and lengthen
- * with the offset. The earlier orthographic map covered only the panel's own
- * footprint - these casters threw no shadow at all under it, and anything inside
- * it was projected straight down.
- */
-/**
  * The off-axis shadow stage shared by the rect-light shadow scenes, lit by a
  * rect or point light at the same spot in the given shadow mode.
  */

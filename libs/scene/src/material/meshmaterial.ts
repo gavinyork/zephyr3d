@@ -337,14 +337,7 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
   }
   /**
    * Fragment-stage hook for thin two-sided surfaces lit through from behind, such as leaves and
-   * grass blades: the subsurface color of UE5's two-sided foliage shading model.
-   *
-   * The PBR metallic-roughness lighting adds, for every punctual light, the transmission of UE5's
-   * TwoSidedBxDF (ShadingModels.ush): a wrapped diffuse from the back face times a GGX scatter
-   * lobe around the light direction, tinted by this color. The indirect lighting adds this color
-   * over pi to the diffuse color, as UE5 does without backface diffuse (DiffuseIndirectComposite.usf).
-   * Rect lights get no transmission. Called inside the lighting functions of the fragment shader,
-   * where varyings are readable.
+   * grass blades.
    *
    * @param _scope - Current fragment shader scope
    * @returns Subsurface color (vec3), or null for a surface that lets no light through
@@ -1273,27 +1266,7 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
         that.featureUsed<boolean>(FEATURE_ALPHADITHER) &&
         !that.isTransparentPass(that.pass, that.drawContext)
       ) {
-        // Interleaved gradient noise rather than the fract(sin(dot(...)))
-        // hash it replaced. That hash feeds its dot product straight into
-        // sin(), and at 1080p the fragCoord term alone reaches ~1e5 - past
-        // the range where GPU sin() stays accurate - so it degraded into a
-        // fixed hatch pattern that TAA then faithfully preserved instead of
-        // averaging away. IGN wraps its accumulator in fract() before the
-        // magnifying multiply, so it stays well conditioned at any
-        // resolution, and it is what UE5 uses for exactly this job.
-        //
-        // The frame index is wrapped for the same reason: it is unbounded
-        // (device.frameInfo.frameCounter), and left raw it would walk the
-        // noise input back out of that well-conditioned range within a
-        // minute. 64 matches the wrap the eye material already applies.
         this.$l.frameId = pb.mod(pb.float(ShaderHelper.getFramestamp(this)), 64);
-        // Decorrelate overlapping layers by depth, for the same reason the
-        // shadow dither above does it: the noise is a function of the pixel,
-        // so without this every fragment stacked on one texel draws the same
-        // value and they all pass or all fail together. That collapses the
-        // visible coverage of N layers from 1-(1-a)^N down to a - on dense
-        // hair seen from far enough that each strand is thin, an order of
-        // magnitude too dark. The 131.37 scale matches the shadow path.
         this.$l.layerJitter = pb.fract(pb.mul(this.$builtins.fragCoord.z, 131.37));
         this.$l.phase = pb.add(
           this.$builtins.fragCoord.xy,

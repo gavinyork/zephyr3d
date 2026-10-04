@@ -10,9 +10,10 @@ import {
 import { Fog } from '../values';
 
 /**
- * @internal
- * How far above the fog height the observer is clamped for the fog density at the ray origin (UE:
+ * How far above the fog height the observer is clamped for the fog density at the ray origin (
  * FogHeight + 65536 world units, i.e. 655.36 m).
+ *
+ * @internal
  */
 export const MAX_FOG_HEIGHT = 655.36;
 
@@ -32,10 +33,10 @@ export type HeightFogParams = {
   preExposure: number;
   /**
    * How much the in-scattering color is replaced by the environment radiance map sampled along the
-   * view ray (UE: SkyLightCaptureAffectsHeightFogStrength). 0 disables it.
+   * view ray. 0 disables it.
    */
   skyLightStrength: number;
-  /** Roughness selecting the radiance map mip (UE: SkyLightCaptureAffectsHeightFogRoughness). */
+  /** Roughness selecting the radiance map mip. */
   skyLightRoughness: number;
   /**
    * Converts radiance map samples to pre-exposed radiance, 0 when no radiance map is available.
@@ -115,11 +116,6 @@ export function calculateFog(
     function () {
       this.$l.fogging = pb.vec4(0, 0, 0, 1);
       this.$if(pb.equal(this.fogType, Fog.FOG_TYPE_HEIGHT), function () {
-        // With the scattering sky, a sky pixel below the observer's horizon shows the virtual planet
-        // ground. Near the ground it is fogged as infinitely far, like every sky pixel (UE: sky
-        // pixels are at the far depth), so distant ground fades into the fog color. Seen from high
-        // up, that would bury the whole planet under opaque fog; there it is fogged up to the ground
-        // point instead, blending over the upper part of the atmosphere.
         this.$l.skyGroundDistance = pb.float(-1);
         this.$l.skyGroundBlend = pb.smoothStep(
           pb.mul(this.atmosphereParams.atmosphereHeight, 0.1),
@@ -223,8 +219,7 @@ export function combineAerialPerspectiveFog(
 }
 
 /**
- * Exponential height fog, following UE's GetExponentialHeightFog (HeightFogCommon.ush) with a single
- * fog term and no inscattering cubemap.
+ * Exponential height fog calculation.
  *
  * Returns the in-scattered radiance in rgb and the transmittance in a.
  */
@@ -357,23 +352,12 @@ export function calculateHeightFog(
         );
         this.fogColor = pb.add(this.fogColor, pb.mul(this.skyContrib, this.params.parameter3.y));
       });
-      // Sky light capture affects height fog (UE: SUPPORTS_SKYLIGHTCAPTURE_AFFECTS_HEIGHTFOGINSCATTERING).
-      // A single view independent in-scattering color is the hemisphere average, darker than the
-      // horizon sky it covers; sampling the environment along the view ray instead makes distant fog
-      // take the color of the sky behind it. Lerped rather than added to not count the energy twice.
       this.$l.skyLightStrength = this.$choice(
         pb.greaterThan(this.params.skyLightScale, 0),
         pb.clamp(this.params.skyLightStrength, 0, 1),
         pb.float(0)
       );
       this.$if(pb.greaterThan(this.skyLightStrength, 0), function () {
-        // Mirror downward rays into the upper hemisphere. The environment below the horizon is the
-        // atmosphere seen against an unlit ground (nearly black), which would make distant fog below
-        // the horizon a dark band; the fog medium there is lit by the sky above it. Same convention
-        // as the physical distant-sky LUT bake (SkyRenderer._programDistantLight).
-        // Mirroring alone does not keep the lookup off the ground: at the horizon the filter footprint
-        // still straddles it and pulls the dark texels in. Lift the direction by one texel of the
-        // sampled mip (a cube face spans 90 degrees) so the footprint stays in the upper hemisphere.
         this.$l.skyLightLod = pb.mul(
           pb.clamp(this.params.skyLightRoughness, 0, 1),
           this.params.skyLightMaxLod
@@ -394,7 +378,6 @@ export function calculateHeightFog(
         this.directionalInscattering = pb.mul(this.directionalInscattering, pb.sub(1, this.skyLightStrength));
         this.fogColor = pb.mix(this.fogColor, this.skyLightInscattering, this.skyLightStrength);
       });
-      // UE: ExpFogFactor = max(saturate(exp2(-LineIntegral)), 1 - FogMaxOpacity)
       this.$l.fogOpacity = pb.min(
         pb.sub(1, pb.clamp(pb.exp2(pb.neg(this.lineIntegral)), 0, 1)),
         this.maxOpacity

@@ -94,7 +94,7 @@ How the levels are made:
 - Simplification only writes new indices; **the vertex buffers and vertex order are unchanged**, so skinned meshes and meshes with morph targets can have levels too. The bone count is not reduced.
 - Levels are added while the next one keeps at least Min Triangles triangles, up to 8 levels including the source. A mesh with too few triangles gets no levels and ships its source as it is. The dialog shows the triangle count of each level the settings aim for.
 - When simplifying further removes no more triangles, or removes more than Min Triangles allows, no further levels are made, so a mesh may end up with fewer levels than the dialog estimates. Once the derived copy is ready, the dialog shows how many were made.
-- Each level's switch distance comes from its simplification error, computed as UE's automatic LOD screen sizes: a level is used once its error projects to fewer than Pixel Error pixels on a 1920 pixel wide view with a 90 degree field of view.
+- Each level's switch distance comes from its simplification error.
 
 Only triangle list meshes get levels of detail; meshes of other topologies ignore these settings.
 

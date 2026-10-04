@@ -23,10 +23,9 @@ const MIE_ABSORPTION_SIGMA = 4.4;
 const OZONE_ABSORPTION_SIGMA = [0.65, 1.881, 0.085];
 
 /**
+ * Lowest observer altitude above the ground, in meters. Keeps the sky visible
+ * when the camera is at or below the virtual planet surface.
  * @internal
- * Lowest observer altitude above the ground, in meters (UE: PlanetRadiusOffset in
- * FAtmosphereSetup::ComputeViewData). Keeps the sky visible when the camera is at or below the
- * virtual planet surface.
  */
 export const MIN_OBSERVER_ALTITUDE = 5;
 
@@ -39,18 +38,17 @@ export type AtmosphereParams = {
   mieAnstropy: number;
   ozoneCenter: number;
   ozoneWidth: number;
-  /** Albedo of the virtual planet ground (UE: GroundAlbedo) */
+  /** Albedo of the virtual planet ground */
   groundAlbedo: Vector3;
   apDistance: number;
   /**
    * Scales the distances the aerial perspective integrates over, making distant objects hazier (>1)
-   * or clearer (<1). Does not affect the sky (UE: AerialPespectiveViewDistanceScale).
+   * or clearer (<1). Does not affect the sky.
    */
   apViewDistanceScale: number;
   /**
    * Distance from the camera, in atmosphere meters, where aerial perspective starts; nearer
    * surfaces get none. The LUT depth slices cover [apStartDepth, apStartDepth + apDistance]
-   * (UE: AerialPerspectiveStartDepth).
    */
   apStartDepth: number;
   cameraWorldMatrix: Matrix4x4;
@@ -66,8 +64,8 @@ export type AtmosphereParams = {
    */
   observerAltitude: number;
   /**
-   * World to observer-local rotation (UE: SkyViewLutReferential). Its Y row is the local up; at the
-   * world origin it is the identity. `lightDir` and `cameraWorldMatrix` are stored in this frame.
+   * World to observer-local rotation. Its Y row is the local up; at the world origin it is the
+   * identity. `lightDir` and `cameraWorldMatrix` are stored in this frame.
    */
   skyViewReferential: Matrix4x4;
 };
@@ -82,11 +80,9 @@ export function getDefaultAtmosphereParams() {
     mieAnstropy: 0.8,
     ozoneCenter: 25000,
     ozoneWidth: 15000,
-    // UE default FColor(170, 170, 170), i.e. 0.4 linear
     groundAlbedo: new Vector3(0.401978, 0.401978, 0.401978),
     apDistance: 96000,
     apViewDistanceScale: 1,
-    // UE default 0.1 km
     apStartDepth: 100,
     cameraWorldMatrix: Matrix4x4.identity(),
     lightDir: new Vector3(1, 0, 0),
@@ -214,11 +210,10 @@ export function rayIntersectSphere(
 }
 
 /**
- * @internal
- *
  * Far intersection of a ray with a sphere, -1 when missed. For a start inside the sphere this is
  * where the ray leaves it: unlike {@link rayIntersectSphere} it cannot mistake a near root that float
- * error nudged above 0 for the exit (UE: max(SolT.x, SolT.y) in IntegrateSingleScatteredLuminance).
+ * error nudged above 0 for the exit in IntegrateSingleScatteredLuminance).
+ * @internal
  */
 export function rayIntersectSphereFar(
   scope: PBInsideFunctionScope,
@@ -260,7 +255,6 @@ export function transmittanceToSky(
     // Planet shadow. The LUT only parameterizes zenith..horizon: a direction below the horizon
     // would clamp to the horizon texel and keep the sun lit after it has set. Test the planet
     // analytically instead, from a point lifted 1m to stay clear of float error on the sphere
-    // (UE: GetAtmosphereTransmittance / PLANET_RADIUS_OFFSET).
     if (planetShadow) {
       this.$l.tPlanet = rayIntersectSphere(
         this,
@@ -301,8 +295,6 @@ export function rayleighCoefficient(
   const funcName = 'z_rayleighCoefficient';
   pb.func(funcName, [pb.float('rayleighScatteringHeight'), pb.float('h')], function () {
     this.$l.sigma = pb.mul(pb.vec3(RAYLEIGH_SIGMA[0], RAYLEIGH_SIGMA[1], RAYLEIGH_SIGMA[2]), 1e-6);
-    // Height clamped at the ground as in UE (SampleAtmosphereMediumRGB): a ray that float error lets
-    // through the planet must not reach exp() overflow and turn into NaN.
     this.$l.rho_h = pb.exp(pb.neg(pb.div(pb.max(this.h, 0), this.rayleighScatteringHeight)));
     this.$return(pb.mul(this.sigma, this.rho_h));
   });
@@ -339,9 +331,6 @@ export function mieCoefficient(
 export function miePhase(scope: PBInsideFunctionScope, fMieAnstropy: PBShaderExp, fCosTheta: PBShaderExp) {
   const pb = scope.$builder;
   const funcName = 'z_miePhase';
-  // Henyey-Greenstein, as UE (HenyeyGreensteinPhase(MiePhaseG, -cosTheta)). cosTheta is the cosine
-  // between the direction towards the light and the view direction, so forward scattering peaks
-  // when looking at the light.
   pb.func(funcName, [pb.float('g'), pb.float('cosTheta')], function () {
     this.$l.g2 = pb.mul(this.g, this.g);
     this.$l.denom = pb.sub(pb.add(1, this.g2), pb.mul(this.g, this.cosTheta, 2));
@@ -387,11 +376,9 @@ export function ozoneAbsorption(
 }
 
 /**
- * @internal
- *
  * Sun light reflected by the virtual planet ground at `groundPos`, per unit illuminance: a Lambertian
- * surface of albedo `groundAlbedo` lit through the atmosphere (UE: the `Ground` branch of
- * IntegrateSingleScatteredLuminance). Multiply by the throughput from the observer.
+ * surface of albedo `groundAlbedo` lit through the atmosphere. Multiply by the throughput from the observer.
+ * @internal
  */
 export function groundBounce(
   scope: PBInsideFunctionScope,
@@ -406,10 +393,6 @@ export function groundBounce(
   pb.func(funcName, [Params('params'), pb.vec3('groundPos'), pb.vec3('lightDir')], function () {
     this.$l.up = pb.normalize(this.groundPos);
     this.$l.NdotL = pb.clamp(pb.dot(this.up, this.lightDir), 0, 1);
-    // No planet shadow test: on a convex planet NdotL > 0 already means the sun is above the local
-    // horizon, and the test itself is unreliable here -- seen from space the ground point carries
-    // meters of float error, enough to drop the 1m-lifted start below the surface (UE's ground
-    // term likewise only reads the LUT).
     this.$l.transmittanceToLight = transmittanceToSky(
       this,
       this.params,
@@ -430,9 +413,9 @@ export function groundBounce(
  *
  * @param withGround - Stop the ray at the planet ground.
  * @param groundLit - When the ray ends on the ground (not cut short by `maxDis`), add the sun light
- *   the ground reflects (UE: `Ground` parameter). Implies `withGround`.
+ *   the ground reflects. Implies `withGround`.
  * @param apScale - Scale the integrated segment lengths by `params.apViewDistanceScale`, for the
- *   aerial perspective. The medium is still sampled at the true positions, as in UE.
+ *   aerial perspective. The medium is still sampled at the true positions.
  */
 export function getSkyView(
   scope: PBInsideFunctionScope,
@@ -462,8 +445,6 @@ export function getSkyView(
       this.$if(pb.lessThan(this.dis, 0), function () {
         this.$return(pb.vec4(0, 0, 0, 1));
       });
-      // Observer above the atmosphere: start at the point where the ray enters it, 1m inside so the
-      // exit intersection below does not degenerate (UE: MoveToTopAtmosphere).
       this.$if(pb.greaterThan(pb.length(this.eye), this.topRadius), function () {
         this.$l.tEnter = this.dis;
         this.eye = pb.add(this.eye, pb.mul(this.viewDir, this.tEnter));
@@ -512,8 +493,7 @@ export function getSkyView(
         this.$l.multiScattering = getMultiScattering(this, this.params, this.p, texMultiScatteringLut);
         this.$l.S = pb.mul(pb.add(pb.mul(this.t1, this.s), this.multiScattering), this.sunLuminance);
         // Integrate the source term analytically over the segment instead of weighting it by the
-        // transmittance to the segment end, which darkens long (horizon) steps. See slide 28 of
-        // Frostbite's physically based unified volumetric rendering (UE: IntegrateSingleScatteredLuminance).
+        // transmittance to the segment end, which darkens long (horizon) steps.
         this.$l.Sint = pb.div(
           pb.sub(this.S, pb.mul(this.S, this.sampleTransmittance)),
           pb.max(this.extinction, pb.vec3(1e-12))
@@ -621,20 +601,16 @@ export function integralMultiScattering(
         this.$l.sigma_t = pb.add(this.sigma_s, this.sigma_a);
         this.$l.sampleTransmittance = pb.exp(pb.neg(pb.mul(this.sigma_t, this.ds)));
         this.$l.t1 = transmittanceToSky(this, this.params, this.p, this.lightDir, texTransmittanceLut);
-        // Isotropic phase for the sun scattering event, as in UE (MieRayPhase = false): the LUT
-        // is a transfer function of the medium only and must not depend on the scene sun direction.
         this.$l.S = pb.mul(this.t1, this.sigma_s, uniformPhase);
         this.$l.Sint = pb.div(
           pb.sub(this.S, pb.mul(this.S, this.sampleTransmittance)),
           pb.max(this.sigma_t, pb.vec3(1e-12))
         );
         this.G_2 = pb.add(this.G_2, pb.mul(this.throughput, this.Sint));
-        // Unit uniform luminance over the sphere scattered with an isotropic phase (UE: MultiScatAs1).
         this.f_ms = pb.add(this.f_ms, pb.mul(this.throughput, this.sigma_s, this.ds));
         this.throughput = pb.mul(this.throughput, this.sampleTransmittance);
         this.p = pb.add(this.p, pb.mul(this.viewDir, this.ds));
       });
-      // Light bounced off the ground (UE: Ground = true for the multi-scattering LUT)
       this.$if(this.hitGround, function () {
         this.$l.groundPos = pb.add(this.samplePoint, pb.mul(this.viewDir, this.dis));
         this.G_2 = pb.add(
@@ -784,12 +760,11 @@ function skyViewHorizon(scope: PBInsideFunctionScope, stParams: PBShaderExp) {
 }
 
 /**
- * @internal
- *
- * Sky view LUT parameterization (UE: SkyViewLutParamsToUv). Latitude is split at the observer's
- * horizon, which lands exactly on v = 0.5, with texels concentrated towards it on both sides: a
+ * Sky view LUT parameterization. Latitude is split at the observer's horizon, which lands exactly on v = 0.5, with texels concentrated towards it on both sides: a
  * uniform latitude mapping interpolates the dark below-horizon texels into the sky just above it.
  * v = 0 is the zenith.
+ *
+ * @internal
  */
 export function viewDirToUV(scope: PBInsideFunctionScope, stParams: PBShaderExp, f3ViewDir: PBShaderExp) {
   const pb = scope.$builder;
@@ -822,9 +797,9 @@ export function viewDirToUV(scope: PBInsideFunctionScope, stParams: PBShaderExp,
 }
 
 /**
- * @internal
+ * Inverse of {@link viewDirToUV}.
  *
- * Inverse of {@link viewDirToUV} (UE: UvToSkyViewLutParams).
+ * @internal
  */
 export function uvToViewDir(scope: PBInsideFunctionScope, stParams: PBShaderExp, f2UV: PBShaderExp) {
   const pb = scope.$builder;
@@ -925,7 +900,11 @@ function sunBloom(
   return scope[funcName](f3ViewDir, f3LightDir, f4LightColorAndIntensity, fSunSolidAngle) as PBShaderExp;
 }
 
-/** @internal UE default sun angular diameter (DirectionalLight LightSourceAngle), as a half apex angle */
+/**
+ * Default sun angular diameter (DirectionalLight LightSourceAngle), as a half apex angle
+ *
+ * @internal
+ **/
 export const SUN_DISK_HALF_APEX_ANGLE = (0.5 * 0.5357 * Math.PI) / 180;
 
 /**
@@ -937,15 +916,12 @@ export const SUN_DISK_HALF_APEX_ANGLE = (0.5 * 0.5357 * Math.PI) / 180;
  * `f3LocalDir` is in the observer's local frame (see {@link AtmosphereParams.skyViewReferential}).
  * Inside the atmosphere the luminance comes from the sky view LUT; above it the LUT, which is
  * parameterized around a horizon inside the atmosphere, does not apply and the view ray is marched
- * per pixel instead, starting where it enters the atmosphere (UE: the FastSky condition in
- * RenderSkyAtmosphereRayMarchingPS). That path draws the planet as seen from space: the lit virtual
- * ground behind the full atmosphere.
+ * per pixel instead, starting where it enters the atmosphere. That path draws the planet as seen from
+ * space: the lit virtual ground behind the full atmosphere.
  *
  * `sunColor` receives the light color attenuated towards the observer.
  *
- * @param fIncludeSunDisk - 0: no sun disk; 1: legacy stylized disk with glow; 2: physical disk as in
- *   UE (GetLightDiskLuminance): illuminance over the disk's solid angle, attenuated by the atmosphere
- *   along the view ray, soft outer edge. Bloom is left to post processing.
+ * @param fIncludeSunDisk - 0: no sun disk; 1: legacy stylized disk with glow; 2: physical disk.
  * @param fPixelAngle - Angular size of a screen pixel in radians, for anti-aliasing the physical disk.
  * @param fSunDiskMaxLuminance - Ceiling for the physical disk before its edge coverage is applied, in
  *   the unscaled luminance this function returns (the output clamp divided by the luminance scale).
@@ -1018,20 +994,11 @@ export function skyBox(
         );
       });
       this.$if(pb.equal(this.includeSunDisk, 2), function () {
-        // The disk is a few pixels wide and, after pre-exposure, far above the output clamp, so UE's
-        // soft edge alone still leaves a hard binary rim: the number of lit pixels, and with it the
-        // energy bloom and TAA see, jumps as the disk slides across the pixel grid. The rim pixels
-        // also pair a clamped value with plain sky, the worst case for TAA's Reinhard-space blend.
-        // So the luminance is clamped first and the pixel's coverage of the disk applied after:
-        // edge pixels then vary smoothly with the sub-pixel position and the total stays ~ the area.
         const halfApex = SUN_DISK_HALF_APEX_ANGLE;
         const solidAngle = 2 * Math.PI * (1 - Math.cos(halfApex));
-        // Chord length: the angle to the disk center to well within float precision at this size,
-        // where acos of a dot product this close to 1 is not.
         this.$l.theta = pb.distance(this.viewDir, this.params.lightDir);
         this.$l.halfPixel = pb.mul(this.pixelAngle, 0.5);
         this.$if(pb.lessThan(this.theta, pb.add(halfApex, this.halfPixel)), function () {
-          // Planet shadowed by transmittanceToSky
           this.$l.transmittanceToLight = transmittanceToSky(
             this,
             this.params,
@@ -1039,8 +1006,6 @@ export function skyBox(
             this.viewDir,
             texTransmittanceLut
           );
-          // UE's 2 * (cos - cosHalfApex) / (1 - cosHalfApex) in small-angle form, taken at the point of
-          // the pixel nearest the disk center so it does not zero out the anti-aliased rim.
           this.$l.edgeTheta = pb.div(pb.max(pb.sub(this.theta, this.halfPixel), 0), halfApex);
           this.$l.softEdge = pb.clamp(pb.mul(pb.sub(1, pb.mul(this.edgeTheta, this.edgeTheta)), 2), 0, 1);
           this.$l.coverage = pb.clamp(
@@ -1080,17 +1045,8 @@ export const AP_LUT_SLICE_SIZE = 32;
 export const AP_LUT_DEPTH_SLICES = 32;
 
 /**
- * @internal
- *
  * Samples the aerial perspective LUT.
- *
- * @remarks
- * Mirrors UE's GetAerialPerspectiveLuminanceTransmittance: luminance and transmittance both come
- * from the same LUT entry and fade in together near the camera, depth slices follow a squared
- * distribution over `apDistance` (atmosphere meters). World distances are converted to atmosphere
- * meters by `cameraHeightScale`, the same scale the LUT observer height uses.
- *
- * The LUT is a 2D atlas: `dim.z` depth slices of `dim.x` x `dim.y` texels laid out side by side.
+ * @internal
  */
 export function aerialPerspective(
   scope: PBInsideFunctionScope,
@@ -1108,7 +1064,6 @@ export function aerialPerspective(
     funcName,
     [Params('params'), pb.vec2('uv'), pb.vec3('cameraPos'), pb.vec3('worldPos'), pb.vec3('dim')],
     function () {
-      // Depth past the start depth (UE: max(0, length(WorldPositionRelativeToCamera) - StartDepth))
       this.$l.tDepth = pb.max(
         pb.sub(
           pb.mul(pb.distance(this.worldPos, this.cameraPos), this.params.cameraHeightScale),
@@ -1117,18 +1072,12 @@ export function aerialPerspective(
         0
       );
       this.$l.linearW = pb.clamp(pb.div(this.tDepth, this.params.apDistance), 0, 1);
-      // Squared slice distribution
       this.$l.nonLinSlice = pb.mul(pb.sqrt(this.linearW), this.dim.z);
-      // Fade luminance and opacity to 0 within the first half slice (UE: HalfSliceDepth). Squared to
-      // be linear in distance given the distribution above.
       this.$l.weight = pb.clamp(pb.mul(this.nonLinSlice, this.nonLinSlice, 2), 0, 1);
-      // Slice k is stored at its texel center (k + 0.5), interpolate between the two nearest ones.
       this.$l.sliceF = pb.clamp(pb.sub(this.nonLinSlice, 0.5), 0, pb.sub(this.dim.z, 1));
       this.$l.slice0 = pb.floor(this.sliceF);
       this.$l.slice1 = pb.min(pb.add(this.slice0, 1), pb.sub(this.dim.z, 1));
       this.$l.factor = pb.sub(this.sliceF, this.slice0);
-      // Keep the horizontal footprint inside one slice of the atlas so bilinear filtering does not
-      // bleed across neighbouring slices at the left/right screen edges.
       this.$l.halfTexel = pb.div(0.5, this.dim.x);
       this.$l.u = pb.clamp(this.uv.x, this.halfTexel, pb.sub(1, this.halfTexel));
       this.$l.uv1 = pb.vec2(pb.div(pb.add(this.slice0, this.u), this.dim.z), this.uv.y);
@@ -1148,7 +1097,7 @@ export function aerialPerspective(
  * @internal
  *
  * Renders one texel of the aerial perspective LUT atlas: rgb is the in-scattered luminance and a
- * the mean transmittance from the observer to the froxel (UE: RenderCameraAerialPerspectiveVolumeCS).
+ * the mean transmittance from the observer to the froxel.
  */
 export function aerialPerspectiveLut(
   scope: PBInsideFunctionScope,
@@ -1183,7 +1132,7 @@ export function aerialPerspectiveLut(
       ).xyz
     );
     this.$l.eyePos = pb.vec3(0, pb.add(this.params.observerAltitude, this.params.plantRadius), 0);
-    // Slices start at the start depth (UE: RayStartWorldPos = CamPos + StartDepth * WorldDir).
+    // Slices start at the start depth (RayStartWorldPos = CamPos + StartDepth * WorldDir).
     this.$l.maxDis = pb.add(this.params.apStartDepth, pb.mul(this.w, this.w, this.params.apDistance));
     this.$l.voxelPos = pb.add(this.eyePos, pb.mul(this.viewDir, this.maxDis));
     this.$l.underGround = pb.lessThan(pb.length(this.voxelPos), this.params.plantRadius);
@@ -1200,7 +1149,7 @@ export function aerialPerspectiveLut(
     );
     // A froxel behind the ground would only integrate up to the ground hit, leaving surfaces seen
     // from above (the observer sits just above the planet) without any aerial perspective. Instead
-    // integrate towards the ground point below the froxel, as UE does.
+    // integrate towards the ground point below the froxel.
     this.$if(pb.or(this.underGround, this.belowHorizon), function () {
       this.$l.voxelPosNorm = pb.normalize(this.voxelPos);
       this.$l.camProjOnGround = pb.mul(pb.normalize(this.eyePos), this.params.plantRadius);

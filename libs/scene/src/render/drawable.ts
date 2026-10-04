@@ -62,14 +62,7 @@ export interface DrawContext {
   motionVectors: boolean;
   /** Motion vector texture target when motion vectors are active. */
   motionVectorTexture?: Nullable<Texture2D>;
-  /**
-   * Whether the depth prepass carries a per-pixel skin profile id this frame.
-   *
-   * @remarks
-   * The id has to come out of the prepass rather than the light pass because the
-   * transmission thickness pass consumes it and runs first. UE5 reads the same
-   * thing from its GBuffer at shadow projection time.
-   */
+  /** Whether the depth prepass carries a per-pixel skin profile id this frame. */
   sssProfileId: boolean;
   /** Whether hierarchical depth (Hi-Z) is enabled for the current pass. */
   HiZ: boolean;

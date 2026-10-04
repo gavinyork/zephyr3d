@@ -47,17 +47,6 @@ function useHex(hex: TerrainHexTiling | null, grad: TerrainUVGrad | null, layer:
   return !!hex && !!grad && (hex.mask & (1 << layer)) !== 0;
 }
 
-/**
- * Hex tiling coordinates: Morten S. Mikkelsen, Practical Real-Time Hex-Tiling, JCGT 11(2), 2022,
- * as implemented by MaterialX (mx_hextile.glsl mx_hextile_coord, shipped with UE 5.8 in
- * Engine/Binaries/ThirdParty/MaterialX/libraries/stdlib/genglsl/lib). The coordinate plane is
- * covered by hexagons one tile across; every pixel blends three samples, one per surrounding
- * hexagon centre, each with its own random rotation, scale and offset. MaterialX defaults: full
- * rotation range, scale range 0.5 to 2, offset range 0 to 1 at full amount.
- *
- * Writes into `prefix`-named locals of `scope`: C1..C3 (sample coordinates), W (barycentric
- * weights), R (rotations in radians), S (scales).
- */
 function terrainHexTile(
   scope: PBInsideFunctionScope,
   prefix: string,

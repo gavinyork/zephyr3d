@@ -223,7 +223,6 @@ export class PunctualLight extends BaseLight {
     if (this._transmission == null) {
       this._transmission = false;
     }
-    // Defaults follow UE5 ULightComponent (LightComponent.cpp).
     if (this._contactShadowLength == null) {
       this._contactShadowLength = 0;
     }
@@ -285,17 +284,7 @@ export class PunctualLight extends BaseLight {
     return this._shadowMapper;
   }
   /**
-   * Whether this light contributes back-lit subsurface transmission.
-   *
-   * @remarks
-   * Off by default: each enabled light costs one extra fullscreen pass that
-   * measures light-space thickness against this light's shadow map, so only turn
-   * it on for the lights whose transmission is actually visible — typically a
-   * single key or rim light.
-   *
-   * Requires {@link PunctualLight.castShadow}, since the thickness is derived
-   * from the shadow map. WebGPU only. A rect light measures the thickness along
-   * the ray from its centre, as UE5 does, not over its whole area.
+   * Whether this light contributes back-lit subsurface transmission. Off by default.
    *
    * @public
    */
@@ -319,14 +308,6 @@ export class PunctualLight extends BaseLight {
   /**
    * Length of the screen-space ray traced towards the light for sharp contact
    * shadows. Zero disables them.
-   *
-   * @remarks
-   * Mirrors UE5's `ContactShadowLength`. By default the length is a fraction of
-   * the screen height, so the traced distance grows with view depth; set
-   * {@link PunctualLight.contactShadowLengthInWS} to measure it in world units
-   * instead. Only takes effect when the light casts shadows and the camera has
-   * the screen-space shadow mask enabled. The trace is dithered per frame and
-   * relies on TAA to resolve the noise.
    *
    * @public
    */

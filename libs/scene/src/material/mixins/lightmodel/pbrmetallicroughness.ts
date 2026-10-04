@@ -635,10 +635,6 @@ export function mixinPBRMetallicRoughness<T extends typeof MeshMaterial>(BaseCls
               }
               const subsurfaceColor = that.getSubsurfaceColor(this);
               if (subsurfaceColor) {
-                // Transmission of UE5's TwoSidedBxDF (ShadingModels.ush): a wrapped diffuse
-                // from the back face (McAuley's energy-conserving wrap, 0.5) times a GGX
-                // scatter lobe of alpha 0.6 around the light direction, scaled by the light's
-                // diffuse scale (DeferredLightingCommon.ush) and shadowed like the surface
                 this.$l.ssWrapNoL = pb.clamp(
                   pb.div(pb.sub(0.5, pb.dot(this.normal, this.lightDir)), 2.25),
                   0,
