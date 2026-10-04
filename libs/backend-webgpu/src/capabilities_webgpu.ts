@@ -57,6 +57,7 @@ export class WebGPUMiscCaps implements MiscCaps {
   supportClipControl: boolean;
   supportDrawIndirect: boolean;
   supportDispatchIndirect: boolean;
+  supportIndirectFirstInstance: boolean;
   maxBindGroups: number;
   maxTexCoordIndex: number;
   supportTimestampQuery: boolean;
@@ -69,6 +70,7 @@ export class WebGPUMiscCaps implements MiscCaps {
     this.supportClipControl = true;
     this.supportDrawIndirect = true;
     this.supportDispatchIndirect = true;
+    this.supportIndirectFirstInstance = device.device.features.has('indirect-first-instance');
     this.maxBindGroups = 4;
     this.maxTexCoordIndex = 8;
     this.supportTimestampQuery = device.device.features.has('timestamp-query');

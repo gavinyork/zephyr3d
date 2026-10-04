@@ -134,7 +134,7 @@ export abstract class RenderPass extends Disposable {
     } else {
       ctx.scene.rootNode.traverse(cullVisitor);
     }
-    renderQueue.end(cullCamera);
+    renderQueue.end(cullCamera, false, ctx.camera);
     ctx.sunLight = renderQueue.sunLight;
     ctx.primaryDirectionalLight = renderQueue.primaryDirectionalLight;
     ctx.primaryTransmissionLight = renderQueue.primaryTransmissionLight;

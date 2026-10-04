@@ -2456,6 +2456,11 @@ export interface MiscCaps {
   supportDrawIndirect: boolean;
   /** True if the device supports indirect compute dispatches (WebGPU only) */
   supportDispatchIndirect: boolean;
+  /**
+   * True if indirect draws honor a non-zero firstInstance in their arguments (WebGPU feature
+   * indirect-first-instance)
+   */
+  supportIndirectFirstInstance: boolean;
 }
 
 /**

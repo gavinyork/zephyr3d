@@ -229,6 +229,8 @@ export class RenderQueue extends Disposable {
   private readonly _objectColorMaps: Map<number, Drawable>[];
   /** @internal */
   private _cullCamera: Nullable<Camera>;
+  /** @internal */
+  private _lodCamera: Nullable<Camera>;
   /** @internal Culls the instances of the batches on the GPU, see InstanceCuller */
   private _instanceCuller: Nullable<InstanceCuller>;
   /** @internal Queues pushed into this one, which may cull their instances for its view */
@@ -264,6 +266,7 @@ export class RenderQueue extends Disposable {
     this._drawTransparent = false;
     this._objectColorMaps = [new Map()];
     this._cullCamera = null;
+    this._lodCamera = null;
     this._instanceCuller = instanceCulling && InstanceCuller.isSupported() ? new InstanceCuller() : null;
     this._childQueues = [];
   }
@@ -295,6 +298,22 @@ export class RenderQueue extends Disposable {
    */
   get cullCamera() {
     return this._cullCamera;
+  }
+  /**
+   * The camera whose view selects the levels of detail, set by {@link RenderQueue.end}: the main
+   * camera in shadow passes, where it differs from the cull camera.
+   * @internal
+   */
+  get lodCamera() {
+    return this._lodCamera;
+  }
+  /**
+   * Whether the instances of the batches are culled on the GPU, which then also selects the
+   * levels of detail where the device allows
+   * @internal
+   */
+  get culledOnGpu() {
+    return !!this._instanceCuller;
   }
   /** The sun light */
   get sunLight() {
@@ -538,7 +557,11 @@ export class RenderQueue extends Disposable {
               ? this._itemList.opaque.unlit[0]
               : this._itemList.opaque.lit[0];
         const instanceList = info.instanceList;
-        // Levels of detail of one primitive draw different index ranges, each its own batch
+        // Levels of detail of one primitive draw different index ranges, each its own batch,
+        // unless GPU culling selects the level of every instance of the batch
+        if (this._instanceCuller && InstanceCuller.selectsLod(drawable)) {
+          lod = 0;
+        }
         const id = drawable.getInstanceId(this._renderPass);
         const hash = lod > 0 ? `${id}:lod${lod}` : id;
         let drawableList = instanceList[hash];
@@ -710,9 +733,16 @@ export class RenderQueue extends Disposable {
     this._needSceneColorWithDepth = false;
     this._drawTransparent = false;
   }
-  /** @internal */
-  end(camera: Camera, createRenderBundles?: boolean) {
+  /**
+   * Finish the queue after pushing its items.
+   * @param camera - The camera the queue was culled with
+   * @param createRenderBundles - Whether the batches are recorded into render bundles
+   * @param lodCamera - The camera whose view selected the levels of detail, the culling camera by default
+   * @internal
+   */
+  end(camera: Camera, createRenderBundles?: boolean, lodCamera?: Camera) {
     this._cullCamera = camera;
+    this._lodCamera = lodCamera ?? camera;
     const frameCounter = getDevice().frameInfo.frameCounter;
     const itemList = this._itemList!;
     if (!this.itemList) {
@@ -883,6 +913,7 @@ export class RenderQueue extends Disposable {
     this.reset();
     this._ref.valid = false;
     this._cullCamera = null;
+    this._lodCamera = null;
     this._instanceCuller?.dispose();
     this._instanceCuller = null;
   }
