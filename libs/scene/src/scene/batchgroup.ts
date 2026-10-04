@@ -95,6 +95,7 @@ export class BatchGroup extends GraphNode {
           child.on('primitive_changed', primitiveCallback);
           child.on('material_changed', materialCallback);
           child.on('lod_changed', lodCallback);
+          child.on('wireframe_changed', materialCallback);
           this.invalidate();
         }
       });
@@ -110,6 +111,7 @@ export class BatchGroup extends GraphNode {
           child.off('primitive_changed', primitiveCallback);
           child.off('material_changed', materialCallback);
           child.off('lod_changed', lodCallback);
+          child.off('wireframe_changed', materialCallback);
           this.invalidate();
         }
       });

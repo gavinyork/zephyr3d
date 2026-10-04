@@ -55,8 +55,24 @@ export interface InstanceCullingDraw {
    * following the first, 20 bytes apart; 1 when the level was chosen on the CPU
    */
   lodCount: number;
-  /** Primitive the arguments draw; any other (an edge primitive) draws unculled */
+  /** Primitive the arguments draw */
   primitive: Primitive;
+  /**
+   * Wireframe edges of the primitive once their arguments are filled in, null before: culling
+   * writes the same instance counts into the edge arguments, so wireframe draws keep the culling
+   * and the levels of detail. Any other primitive draws every instance.
+   */
+  edgePrimitive: Nullable<Primitive>;
+  /** Byte offset of the edge arguments of the first level, laid out as the solid ones */
+  edgeArgsOffset: number;
+}
+
+/** A batch whose wireframe draws may need edge arguments */
+interface EdgeDraw {
+  draw: InstanceCullingDraw;
+  drawable: Drawable;
+  /** Level chosen on the CPU, for a batch whose levels culling does not select */
+  lod: number;
 }
 
 /** Culling resources for the batches whose instance data lives in one instance bind group */
@@ -108,6 +124,8 @@ export class InstanceCuller {
   private readonly _groups: Map<CachedBindGroup, CullGroup>;
   private readonly _args: DRef<GPUDataBuffer>;
   private _argsCapacity: number;
+  /** Batches of the queue, for filling their edge arguments when drawn as wireframe */
+  private readonly _edgeDraws: EdgeDraw[];
   /** Bounds slot of each instance, by drawable */
   private readonly _slots: Map<Drawable, { group: CullGroup; slot: number }>;
   private _lastParent: Nullable<RenderQueue>;
@@ -117,6 +135,7 @@ export class InstanceCuller {
     this._args = new DRef();
     this._argsCapacity = 0;
     this._slots = new Map();
+    this._edgeDraws = [];
     this._lastParent = null;
     this._lastFrame = -1;
   }
@@ -151,6 +170,7 @@ export class InstanceCuller {
   ) {
     const device = getDevice();
     this._slots.clear();
+    this._edgeDraws.length = 0;
     this._lastParent = null;
     const used = new Set<CullGroup>();
     const batchData = new Map<CullGroup, number[]>();
@@ -161,15 +181,16 @@ export class InstanceCuller {
     // Also allocated with no batches, the arguments of a group whose meshes are not batched yet
     if (!this._args.get() || argsCount > this._argsCapacity) {
       this._argsCapacity = Math.max(argsCount, this._argsCapacity * 2, 16);
+      // Solid arguments, then the edge arguments of wireframe draws at the same index plus capacity
       this._args.set(
-        device.createBuffer(this._argsCapacity * ARGS_U32 * 4, { usage: 'indirect', storage: true })
+        device.createBuffer(this._argsCapacity * 2 * ARGS_U32 * 4, { usage: 'indirect', storage: true })
       );
       // Groups bind the arguments buffer, so they are rebound below
       for (const group of this._groups.values()) {
         group.computeBindGroup.dispose();
       }
     }
-    const args = new Uint32Array(this._argsCapacity * ARGS_U32);
+    const args = new Uint32Array(this._argsCapacity * 2 * ARGS_U32);
     let argsBase = 0;
     items.forEach((item, index) => {
       const data = item.instanceData!;
@@ -204,8 +225,11 @@ export class InstanceCuller {
         argsBuffer: this._args.get()!,
         argsOffset: base * ARGS_U32 * 4,
         lodCount,
-        primitive
+        primitive,
+        edgePrimitive: null,
+        edgeArgsOffset: (this._argsCapacity + base) * ARGS_U32 * 4
       };
+      this._edgeDraws.push({ draw: data.culled, drawable: item.drawable, lod: item.lod ?? 0 });
     });
     this._args.get()!.bufferSubData(0, args);
     for (const [group, batches] of batchData) {
@@ -258,6 +282,7 @@ export class InstanceCuller {
     this._lastFrame = frame;
     this.setPlanes(camera);
     this.setLodView(parent.lodCamera ?? camera);
+    this.updateEdgeArgs(parent.lodCamera ?? camera);
     const device = getDevice();
     const program = InstanceCuller.getProgram();
     for (const group of this._groups.values()) {
@@ -282,6 +307,7 @@ export class InstanceCuller {
         group.computeBindGroup.set(bindGroup);
       }
       InstanceCuller._params[0] = group.batchCount;
+      InstanceCuller._params[1] = this._argsCapacity;
       bindGroup.setValue('params', InstanceCuller._params);
       bindGroup.setValue('planes', InstanceCuller._planes);
       bindGroup.setValue('lodView', InstanceCuller._lodView);
@@ -313,6 +339,32 @@ export class InstanceCuller {
       planes[i * 4 + 1] = enabled ? p.b : 0;
       planes[i * 4 + 2] = enabled ? p.c : 0;
       planes[i * 4 + 3] = enabled ? p.d : 1e30;
+    }
+  }
+  /**
+   * Fill the index ranges of the edge arguments of the batches drawn as wireframe, once their
+   * edges are built. Culling then writes their instance counts as for the solid arguments.
+   */
+  private updateEdgeArgs(camera: Camera) {
+    for (const edge of this._edgeDraws) {
+      const node = edge.drawable.getNode();
+      if (!camera.wireframe && !(node.isMesh() && node.wireframe)) {
+        continue;
+      }
+      const draw = edge.draw;
+      // Starts building the edges, which arrive in a later frame
+      const edges = draw.primitive.getWireframe();
+      if (!edges || edges === draw.edgePrimitive) {
+        continue;
+      }
+      const args = new Uint32Array(draw.lodCount * ARGS_U32);
+      for (let level = 0; level < draw.lodCount; level++) {
+        const [first, count] = edges.getLodRange(draw.lodCount > 1 ? level : edge.lod);
+        args[level * ARGS_U32] = count;
+        args[level * ARGS_U32 + 2] = first;
+      }
+      draw.argsBuffer.bufferSubData(draw.edgeArgsOffset, args);
+      draw.edgePrimitive = edges;
     }
   }
   /** View position and projection scale the levels of detail are measured with, as computeBoundsScreenRadiusSquared */
@@ -388,7 +440,7 @@ export class InstanceCuller {
         label: 'InstanceCulling',
         workgroupSize: [WORKGROUP_SIZE, 1, 1],
         compute(pb) {
-          // (batch count, unused, unused, unused)
+          // (batch count, index of the edge arguments of the first draw, unused, unused)
           this.params = pb.vec4().uniform(0);
           this.planes = pb.vec4[6]().uniform(0);
           // Level of detail view: (position, 1 if perspective), (screen multiple, distance scale, 0, 0)
@@ -583,6 +635,10 @@ export class InstanceCuller {
                 this.$l.a = pb.mul(pb.add(this.argsBase, this.l), ARGS_U32);
                 this.args.setAt(pb.add(this.a, 1), this.levelCount.at(this.l));
                 this.args.setAt(pb.add(this.a, 4), this.start);
+                // The same instances for the wireframe edges
+                this.$l.e = pb.add(this.a, pb.mul(pb.uint(this.params.y), ARGS_U32));
+                this.args.setAt(pb.add(this.e, 1), this.levelCount.at(this.l));
+                this.args.setAt(pb.add(this.e, 4), this.start);
                 this.levelNext.setAt(this.l, this.start);
                 this.start = pb.add(this.start, this.levelCount.at(this.l));
               });

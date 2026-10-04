@@ -165,6 +165,8 @@ const MeshBase = castObservable(applyMixins(GraphNode, mixinDrawable))<{
   material_changed: [material: Nullable<MeshMaterial>];
   /** forcedLod or minLod changed */
   lod_changed: [mesh: Mesh];
+  /** wireframe changed, which moves the mesh to another batch */
+  wireframe_changed: [mesh: Mesh];
 }>();
 
 /**
@@ -383,7 +385,10 @@ export class Mesh extends MeshBase implements BatchDrawable {
     return this._wireframe;
   }
   set wireframe(val: boolean) {
-    this._wireframe = !!val;
+    if (!!val !== this._wireframe) {
+      this._wireframe = !!val;
+      this.dispatchEvent('wireframe_changed', this);
+    }
   }
   /**
    * Level of detail to always draw, or -1 to select it by the projected size (UE ForcedLodModel,

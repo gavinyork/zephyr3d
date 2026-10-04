@@ -562,9 +562,14 @@ export class Material extends Disposable implements Clonable<Material>, IDisposa
         for (let i = 0; i < culled.lodCount; i++) {
           primitive.drawIndirect(culled.argsBuffer, culled.argsOffset + i * 20);
         }
+      } else if (culled && culled.edgePrimitive === primitive) {
+        // Wireframe edges, culled and at the levels of the solid primitive
+        for (let i = 0; i < culled.lodCount; i++) {
+          primitive.drawIndirect(culled.argsBuffer, culled.edgeArgsOffset + i * 20);
+        }
       } else {
         if (culled) {
-          // Culled for another primitive (the solid one of a wireframe draw): draw all instances
+          // Culled for another primitive (edges not built yet): draw all instances
           ctx.device.setBindGroup(3, ctx.instanceData.bindGroup.bindGroup);
         }
         primitive.drawInstanced(ctx.instanceData.numInstances, lod);
