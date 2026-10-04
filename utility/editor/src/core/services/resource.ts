@@ -26,6 +26,14 @@ export type SaveOptions = {
   compressTextures?: boolean;
   /** Mark new meshes for vertex compression (writes their .zmeta); off by default */
   compressVertices?: boolean;
+  /** Give new meshes levels of detail (writes their .zmeta); off by default */
+  generateLods?: boolean;
+  /** Fewest triangles a generated level may have, when generateLods is set */
+  lodMinTriangles?: number;
+  /** Fraction of the previous level's triangles each level keeps, when generateLods is set */
+  lodReduction?: number;
+  /** Pixel error the automatic switch distances allow, when generateLods is set */
+  lodPixelError?: number;
 };
 
 type SharedModelWithPreprocessOptions = SharedModel & {
@@ -34,6 +42,10 @@ type SharedModelWithPreprocessOptions = SharedModel & {
     sourceMorphReferenceAssetPath?: string;
     compressTextures?: boolean;
     compressVertices?: boolean;
+    generateLods?: boolean;
+    lodMinTriangles?: number;
+    lodReduction?: number;
+    lodPixelError?: number;
   };
 };
 
@@ -333,7 +345,11 @@ export class ResourceService {
       rebuildMaterial: saveOptions?.rebuildMaterial ?? true,
       sourceMorphReferenceAssetPath: sourceMorphReferenceAssetPath ?? undefined,
       compressTextures: !!saveOptions?.compressTextures,
-      compressVertices: !!saveOptions?.compressVertices
+      compressVertices: !!saveOptions?.compressVertices,
+      generateLods: !!saveOptions?.generateLods,
+      lodMinTriangles: saveOptions?.lodMinTriangles,
+      lodReduction: saveOptions?.lodReduction,
+      lodPixelError: saveOptions?.lodPixelError
     };
     try {
       await model.preprocess(manager, name, path, srcVFS, getEngine().resourceManager.VFS);

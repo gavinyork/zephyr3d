@@ -1,5 +1,6 @@
 import { ImGui } from '@zephyr3d/imgui';
 import type { SharedModel } from '@zephyr3d/scene';
+import { defaultMeshImportSettings } from '@zephyr3d/scene';
 import { DialogRenderer } from '../../components/modal';
 import type { VFS } from '@zephyr3d/base';
 import { DlgSkeletonEditor } from './skeletoneditor';
@@ -39,7 +40,11 @@ export class DlgImportOptions extends DialogRenderer<SaveOptions[]> {
       importJointDynamics: model.jointDynamicsSpringBones.length > 0,
       // Opt-in, so importing never changes how a project ships unless asked to
       compressTextures: false,
-      compressVertices: false
+      compressVertices: false,
+      generateLods: false,
+      lodMinTriangles: defaultMeshImportSettings().lodMinTriangles,
+      lodReduction: defaultMeshImportSettings().lodReduction,
+      lodPixelError: defaultMeshImportSettings().lodPixelError
     }));
     this._retargetPoseModes = models.map((model) =>
       model.skeletons.some((skeleton) => !!skeleton.retargetPose) ? 1 : 0
@@ -207,6 +212,48 @@ export class DlgImportOptions extends DialogRenderer<SaveOptions[]> {
       ImGui.SetTooltip(
         'Ship newly imported meshes with compressed, quantized vertex data. Meshes that already have settings keep them.'
       );
+    }
+    if (!hasMeshes) {
+      ImGui.PushStyleVar(ImGui.StyleVar.Alpha, ImGui.GetStyle().Alpha * 0.5);
+    }
+    const generateLods = [hasMeshes && !!this._options[this._current].generateLods] as [boolean];
+    if (ImGui.Checkbox('Generate LODs', generateLods)) {
+      if (hasMeshes) {
+        this._options[this._current].generateLods = generateLods[0];
+      }
+    }
+    if (!hasMeshes) {
+      ImGui.PopStyleVar();
+    }
+    if (ImGui.IsItemHovered()) {
+      ImGui.SetTooltip(
+        'Give newly imported meshes simplified levels of detail. Meshes that already have settings keep them.'
+      );
+    }
+    if (hasMeshes && this._options[this._current].generateLods) {
+      const minTriangles = [this._options[this._current].lodMinTriangles ?? 1] as [number];
+      if (ImGui.InputInt('Min Triangles', minTriangles, 10, 100)) {
+        this._options[this._current].lodMinTriangles = Math.max(minTriangles[0], 1);
+      }
+      if (ImGui.IsItemHovered()) {
+        ImGui.SetTooltip('Fewest triangles a simplified level may have; meshes with fewer get no levels.');
+      }
+      const reduction = [this._options[this._current].lodReduction ?? 0.5] as [number];
+      if (ImGui.SliderFloat('Triangles Per Level', reduction, 0.1, 0.9, '%.2f')) {
+        this._options[this._current].lodReduction = reduction[0];
+      }
+      if (ImGui.IsItemHovered()) {
+        ImGui.SetTooltip("Fraction of the previous level's triangles each level keeps.");
+      }
+      const pixelError = [this._options[this._current].lodPixelError ?? 8] as [number];
+      if (ImGui.SliderFloat('Pixel Error', pixelError, 1, 32, '%.1f')) {
+        this._options[this._current].lodPixelError = pixelError[0];
+      }
+      if (ImGui.IsItemHovered()) {
+        ImGui.SetTooltip(
+          'A level shows once its error looks smaller than this many pixels on screen; higher values switch to simpler levels closer to the camera.'
+        );
+      }
     }
 
     ImGui.Separator();

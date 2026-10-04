@@ -10,12 +10,13 @@ Compression is **opt-in**. A texture or mesh is only compressed when its setting
 
 ### When Importing a Model
 
-The import dialog has two options, both **off by default**:
+The import dialog has three options, all **off by default**:
 
 | Option | Effect |
 | --- | --- |
 | **Compress Textures** | The model's textures are marked for compression |
 | **Compress Vertices** | The model's meshes are marked for compression |
+| **Generate LODs** | The model's meshes get [levels of detail](en/mesh-lod.md); **Min Triangles** (default 100) sets the fewest triangles a level may have, **Triangles Per Level** (default 0.5) the fraction each level keeps and **Pixel Error** (default 8) the switch distances, as in the mesh settings below. Set them here when a model has many meshes, rather than mesh by mesh afterwards |
 
 The options only affect assets created by this import. Textures and meshes that already have settings keep them, so re-importing a model never undoes settings you tuned by hand.
 
@@ -82,7 +83,8 @@ The mesh settings dialog can also generate levels of detail, simplified versions
 
 | Setting | Meaning |
 | --- | --- |
-| **Levels of Detail** | Number of levels, the source mesh included, up to 8. Default 1: no levels are generated |
+| **Generate LODs** | Generates levels of detail. Off by default |
+| **Min Triangles** | Fewest triangles a level may have, default 100. The number of levels follows from it |
 | **Triangles Per Level** | Fraction of the previous level's triangles each level keeps, default 0.5 |
 | **Pixel Error** | Pixel error the automatic switch distances allow, default 8. Higher values switch to simpler levels closer to the camera |
 
@@ -90,7 +92,8 @@ How the levels are made:
 
 - Every level is simplified straight from the source mesh to its triangle target (the source count times the fraction for level 1, times its square for level 2, and so on) with [meshoptimizer](https://github.com/zeux/meshoptimizer). Simplification takes normals into account and keeps texture seams.
 - Simplification only writes new indices; **the vertex buffers and vertex order are unchanged**, so skinned meshes and meshes with morph targets can have levels too. The bone count is not reduced.
-- When simplifying further removes no more triangles, no further levels are made, so a mesh may end up with fewer levels than asked for.
+- Levels are added while the next one keeps at least Min Triangles triangles, up to 8 levels including the source. A mesh with too few triangles gets no levels and ships its source as it is. The dialog shows the triangle count of each level the settings aim for.
+- When simplifying further removes no more triangles, or removes more than Min Triangles allows, no further levels are made, so a mesh may end up with fewer levels than the dialog estimates. Once the derived copy is ready, the dialog shows how many were made.
 - Each level's switch distance comes from its simplification error, computed as UE's automatic LOD screen sizes: a level is used once its error projects to fewer than Pixel Error pixels on a 1920 pixel wide view with a 90 degree field of view.
 
 Only triangle list meshes get levels of detail; meshes of other topologies ignore these settings.
@@ -133,7 +136,7 @@ Compressed copies are cached under `/.cache/derived` in the project, keyed by th
 
 **Build Project** ships the compressed copy of each asset set for compression, and the source file of everything else; see [Build & Deployment](en/editor/build-deploy.md). Scenes and scripts keep referencing source paths such as `/assets/rock.png`. The build lists which shipped file serves each of them in `asset-manifest.json`, and the engine reads that file at startup.
 
-If your scripts read an image or mesh file directly, for example with `fetch()` or `VFS.readFile()`, rather than loading it through the resource manager, set that asset's compression to **None**, and for a mesh its levels of detail to 1: the source file of an asset with a derived copy is not in the build.
+If your scripts read an image or mesh file directly, for example with `fetch()` or `VFS.readFile()`, rather than loading it through the resource manager, set that asset's compression to **None**, and for a mesh turn off Generate LODs: the source file of an asset with a derived copy is not in the build.
 
 ---
 

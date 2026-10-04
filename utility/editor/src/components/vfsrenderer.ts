@@ -1,5 +1,5 @@
 import type { FileMetadata, GenericConstructor, Immutable, Nullable, VFS } from '@zephyr3d/base';
-import { DERIVED_CACHE_ROOT } from '../core/services/derivedassets';
+import { DERIVED_CACHE_ROOT, DerivedAssetService } from '../core/services/derivedassets';
 import {
   copyAssetMeta,
   deleteAssetMeta,
@@ -2936,6 +2936,25 @@ export class VFSRenderer extends makeObservable(Disposable)<{
                   }
                 }
               });
+              // Levels of detail are made before the dialog closes, so the imported meshes load
+              // with them at once instead of after a scene reload
+              const lodMeshes = new Set<string>();
+              models.forEach((model, i) => {
+                if (saveOptions[i].generateLods) {
+                  for (const info of model.primitives) {
+                    if (info.path) {
+                      lodMeshes.add(info.path);
+                    }
+                  }
+                }
+              });
+              if (lodMeshes.size > 0) {
+                dlgProgressBar.setMessage('Generating levels of detail...');
+                dlgProgressBar.setProgress(0, lodMeshes.size);
+                await DerivedAssetService.deriveMeshesNow([...lodMeshes], (done, total) =>
+                  dlgProgressBar.setProgress(done, total)
+                );
+              }
               dlgProgressBar.close();
             }
           }

@@ -22,10 +22,15 @@ export interface MeshImportSettings {
    */
   normalBits: 0 | 8 | 12 | 16;
   /**
-   * Number of levels of detail, the source mesh being the first; 1 generates none. Coarser levels
-   * are simplified from the source and stored as extra index ranges over the same vertices.
+   * Generate levels of detail: coarser levels simplified from the source, stored as extra index
+   * ranges over the same vertices. How many follows from {@link MeshImportSettings.lodMinTriangles}.
    */
-  lodCount: number;
+  lodEnabled: boolean;
+  /**
+   * Fewest triangles a generated level may have. Levels are added while the next one keeps at
+   * least this many, up to {@link MAX_MESH_LODS} levels including the source.
+   */
+  lodMinTriangles: number;
   /** Fraction of the source triangles each level keeps over the previous one, UE PercentTriangles per step */
   lodReduction: number;
   /**
@@ -47,16 +52,49 @@ const NORMAL_BITS: readonly MeshImportSettings['normalBits'][] = [0, 8, 12, 16];
  * @public
  */
 export function defaultMeshImportSettings(compression: MeshCompression = 'none'): MeshImportSettings {
-  return { compression, normalBits: 12, lodCount: 1, lodReduction: 0.5, lodPixelError: 8 };
+  return {
+    compression,
+    normalBits: 12,
+    lodEnabled: false,
+    lodMinTriangles: 100,
+    lodReduction: 0.5,
+    lodPixelError: 8
+  };
+}
+
+/**
+ * Triangle count each level of detail aims for, the source first: level i keeps
+ * `lodReduction^i` of the source triangles, and levels stop before one would fall below
+ * `lodMinTriangles` or at {@link MAX_MESH_LODS}. Simplification may end the chain earlier when it
+ * cannot reach a target, so this is the most levels the settings can give.
+ * @public
+ */
+export function getMeshLodTargets(
+  triangles: number,
+  settings: Pick<MeshImportSettings, 'lodEnabled' | 'lodMinTriangles' | 'lodReduction'>
+) {
+  const targets = [triangles];
+  if (settings.lodEnabled) {
+    for (let i = 1; i < MAX_MESH_LODS; i++) {
+      const target = Math.floor(triangles * settings.lodReduction ** i);
+      if (target < settings.lodMinTriangles || target < 1) {
+        break;
+      }
+      targets.push(target);
+    }
+  }
+  return targets;
 }
 
 /**
  * Whether a mesh with these settings ships a derived copy instead of its source: when compressed
- * or when it has levels of detail.
+ * or when its source has enough triangles for a level of detail.
+ * @param settings - Mesh settings
+ * @param sourceTriangles - Triangles of the source mesh
  * @public
  */
-export function meshNeedsDerivedCopy(settings: MeshImportSettings) {
-  return settings.compression !== 'none' || settings.lodCount > 1;
+export function meshNeedsDerivedCopy(settings: MeshImportSettings, sourceTriangles: number) {
+  return settings.compression !== 'none' || getMeshLodTargets(sourceTriangles, settings).length > 1;
 }
 
 /**
@@ -73,9 +111,11 @@ export function normalizeMeshImportSettings(value: unknown): MeshImportSettings 
     normalBits: NORMAL_BITS.includes(v.normalBits as MeshImportSettings['normalBits'])
       ? (v.normalBits as MeshImportSettings['normalBits'])
       : defaults.normalBits,
-    lodCount: Number.isInteger(v.lodCount)
-      ? Math.min(Math.max(v.lodCount as number, 1), MAX_MESH_LODS)
-      : defaults.lodCount,
+    lodEnabled: typeof v.lodEnabled === 'boolean' ? v.lodEnabled : defaults.lodEnabled,
+    lodMinTriangles:
+      Number.isInteger(v.lodMinTriangles) && (v.lodMinTriangles as number) >= 1
+        ? (v.lodMinTriangles as number)
+        : defaults.lodMinTriangles,
     lodReduction:
       typeof v.lodReduction === 'number' && v.lodReduction > 0 && v.lodReduction < 1
         ? v.lodReduction

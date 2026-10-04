@@ -8,10 +8,11 @@ import {
   meshNeedsDerivedCopy,
   readMeshImportSettings,
   readTextureImportSettings,
+  readZmshBinary,
   resolveTextureCompression
 } from '@zephyr3d/scene';
 import { isTextureSourcePath } from './assetmeta';
-import { encodeDerivedPrimitive, isCompressiblePrimitive } from './meshencoder';
+import { encodeDerivedPrimitive, getPrimitiveTriangleCount, isCompressiblePrimitive } from './meshencoder';
 import type { EncodeRequest, EncodeResponse } from '../../workers/basis_encode';
 
 /**
@@ -45,12 +46,23 @@ export interface DerivedAssetStatus {
   derivedSize?: number;
   loaded?: boolean;
   error?: string;
+  /** Meshes: triangles of the source */
+  sourceTriangles?: number;
+  /** Meshes: levels of detail in the derived copy, the source included, once it is ready */
+  lodLevels?: number;
 }
 
 interface SourceIndexEntry {
   size: number;
   modified: number;
   hash: string;
+  /** Meshes: triangles of the source, measured when first needed */
+  triangles?: number;
+  /**
+   * Meshes: settings key that, when encoded, turned out to have nothing to derive (no level of
+   * detail could be made and no compression asked for), so the source ships as it is
+   */
+  sourceOnly?: string;
 }
 
 interface PendingEncode {
@@ -80,10 +92,10 @@ function textureSettingsKey(settings: TextureImportSettings) {
 
 function meshSettingsKey(settings: MeshImportSettings) {
   const key: unknown[] = [settings.compression, settings.normalBits];
-  // Level settings join the key only when levels are made, so copies cached before levels of
-  // detail existed keep their key
-  if (settings.lodCount > 1) {
-    key.push(settings.lodCount, settings.lodReduction, settings.lodPixelError);
+  // Level settings join the key only when levels are made, so compressed copies without levels
+  // keep their key
+  if (settings.lodEnabled) {
+    key.push(settings.lodMinTriangles, settings.lodReduction, settings.lodPixelError);
   }
   return JSON.stringify(key);
 }
@@ -106,6 +118,10 @@ export class DerivedAssetService {
   private static readonly _served = new Map<string, string>();
   /** Content hash of .zmsh files found to hold nothing compressible (parametric shapes) */
   private static readonly _notCompressible = new Map<string, string>();
+  /** Encodes running now, per source path, so a build or import waiting on one shares the queue's */
+  private static readonly _encoding = new Map<string, Promise<void>>();
+  /** Levels of detail per derived mesh file, read from its header for display */
+  private static readonly _derivedLevels = new Map<string, number>();
   private static _nextId = 1;
 
   /** Starts serving derived assets for a project; null stops it */
@@ -123,6 +139,7 @@ export class DerivedAssetService {
     this._failed.clear();
     this._served.clear();
     this._notCompressible.clear();
+    this._derivedLevels.clear();
     this._done = 0;
     getEngine().resourceManager.assetManager.assetSourceResolver = vfs
       ? (url, kind) => this.resolve(url, kind)
@@ -204,18 +221,59 @@ export class DerivedAssetService {
       return { state: 'unavailable' };
     }
     const sourceSize = (await vfs.stat(path).catch(() => null))?.size ?? 0;
+    const mesh = getDerivedAssetKind(path) === 'primitive';
+    const sourceTriangles = mesh ? ((await this.getSourceTriangles(vfs, path)) ?? undefined) : undefined;
     const target = await this.getDerivedPath(vfs, path);
     if (!target) {
-      return { state: 'uncompressed', sourceSize };
+      return { state: 'uncompressed', sourceSize, sourceTriangles };
     }
     if (await vfs.exists(target)) {
       const derivedSize = (await vfs.stat(target)).size;
-      return { state: 'ready', sourceSize, derivedSize, loaded: this._served.get(path) === target };
+      return {
+        state: 'ready',
+        sourceSize,
+        derivedSize,
+        loaded: this._served.get(path) === target,
+        sourceTriangles,
+        lodLevels: mesh ? await this.getDerivedLevels(vfs, target) : undefined
+      };
     }
     if (this._failed.has(path)) {
-      return { state: 'failed', sourceSize, error: this._failed.get(path) };
+      return { state: 'failed', sourceSize, error: this._failed.get(path), sourceTriangles };
     }
-    return { state: 'pending', sourceSize };
+    return { state: 'pending', sourceSize, sourceTriangles };
+  }
+
+  /** Levels of detail of a derived mesh file, the source included */
+  private static async getDerivedLevels(vfs: VFS, target: string) {
+    let levels = this._derivedLevels.get(target);
+    if (levels === undefined) {
+      try {
+        const data = (await vfs.readFile(target, { encoding: 'binary' })) as ArrayBuffer;
+        levels = readZmshBinary(data).header.lods?.length ?? 1;
+      } catch {
+        levels = 1;
+      }
+      this._derivedLevels.set(target, levels);
+    }
+    return levels;
+  }
+
+  /**
+   * Derived copies of meshes, made now where missing, so they load with their levels of detail
+   * right away rather than after the background queue. Failures are logged and skipped.
+   * @param onProgress - Called after each mesh with the count done
+   */
+  static async deriveMeshesNow(paths: string[], onProgress?: (done: number, total: number) => void) {
+    let done = 0;
+    for (const path of paths) {
+      try {
+        await this.getDerivedFile(path);
+      } catch (err) {
+        console.error(`Failed to process mesh ${path}: ${err}`);
+      }
+      onProgress?.(++done, paths.length);
+    }
   }
 
   /**
@@ -299,21 +357,37 @@ export class DerivedAssetService {
       settingsKey = `${textureSettingsKey(settings)}|${TEXTURE_ENCODER_ID}|${TEXTURE_PIPELINE_VERSION}`;
     } else {
       const settings = await readMeshImportSettings(vfs, path);
-      if (!meshNeedsDerivedCopy(settings)) {
+      // The source triangle count only matters for a level of detail chain alone
+      const triangles =
+        settings.compression === 'none' && settings.lodEnabled
+          ? ((await this.getSourceTriangles(vfs, path)) ?? 0)
+          : 0;
+      if (!meshNeedsDerivedCopy(settings, triangles)) {
         return null;
       }
       settingsKey = `${meshSettingsKey(settings)}|${MESH_ENCODER_ID}|${MESH_PIPELINE_VERSION}`;
     }
-    const sourceHash = await this.getSourceHash(vfs, path);
-    if (!sourceHash || this._notCompressible.get(path) === sourceHash) {
+    const entry = await this.getSourceEntry(vfs, path);
+    if (!entry || this._notCompressible.get(path) === entry.hash || entry.sourceOnly === settingsKey) {
       return null;
     }
-    const key = await sha1Hex(`${sourceHash}|${settingsKey}`);
+    const key = await sha1Hex(`${entry.hash}|${settingsKey}`);
     return `${KINDS[kind].dir}/${key.slice(0, 2)}/${key}${KINDS[kind].ext}`;
+  }
+
+  /** Settings key of a mesh as getDerivedPath builds it */
+  private static async getMeshSettingsKey(vfs: VFS, path: string) {
+    const settings = await readMeshImportSettings(vfs, path);
+    return `${meshSettingsKey(settings)}|${MESH_ENCODER_ID}|${MESH_PIPELINE_VERSION}`;
   }
 
   /** Content hash of a source, recomputed only when its size or modification time changed */
   private static async getSourceHash(vfs: VFS, path: string) {
+    return (await this.getSourceEntry(vfs, path))?.hash ?? null;
+  }
+
+  /** Index entry of a source, replaced when its size or modification time changed */
+  private static async getSourceEntry(vfs: VFS, path: string) {
     await this.loadIndex(vfs);
     let stat;
     try {
@@ -324,12 +398,34 @@ export class DerivedAssetService {
     const modified = stat.modified?.getTime?.() ?? 0;
     const entry = this._index[path];
     if (entry && entry.size === stat.size && entry.modified === modified) {
-      return entry.hash;
+      return entry;
     }
     const hash = await sha1Hex((await vfs.readFile(path, { encoding: 'binary' })) as ArrayBuffer);
-    this._index[path] = { size: stat.size, modified, hash };
+    const fresh: SourceIndexEntry = { size: stat.size, modified, hash };
+    this._index[path] = fresh;
     this.scheduleIndexSave();
-    return hash;
+    return fresh;
+  }
+
+  /** Triangles of a source mesh, kept in the index beside its hash */
+  private static async getSourceTriangles(vfs: VFS, path: string) {
+    const entry = await this.getSourceEntry(vfs, path);
+    if (!entry) {
+      return null;
+    }
+    if (entry.triangles === undefined) {
+      let triangles = 0;
+      try {
+        triangles = getPrimitiveTriangleCount(
+          JSON.parse((await vfs.readFile(path, { encoding: 'utf8' })) as string)
+        );
+      } catch {
+        // Unreadable sources fail later, when encoded
+      }
+      entry.triangles = triangles;
+      this.scheduleIndexSave();
+    }
+    return entry.triangles;
   }
 
   private static loadIndex(vfs: VFS) {
@@ -409,7 +505,16 @@ export class DerivedAssetService {
     }
   }
 
-  private static async encodeOne(path: string) {
+  private static encodeOne(path: string) {
+    let running = this._encoding.get(path);
+    if (!running) {
+      running = this.encodeNow(path).finally(() => this._encoding.delete(path));
+      this._encoding.set(path, running);
+    }
+    return running;
+  }
+
+  private static async encodeNow(path: string) {
     const vfs = this._vfs;
     if (!vfs || vfs.readOnly) {
       return;
@@ -428,7 +533,18 @@ export class DerivedAssetService {
         this._notCompressible.set(path, (await this.getSourceHash(vfs, path)) ?? '');
         return;
       }
-      data = await encodeDerivedPrimitive(json, await readMeshImportSettings(vfs, path));
+      const settingsKey = await this.getMeshSettingsKey(vfs, path);
+      const encoded = await encodeDerivedPrimitive(json, await readMeshImportSettings(vfs, path));
+      if (!encoded) {
+        // Simplification made no level the settings allow: the source ships as it is
+        const entry = await this.getSourceEntry(vfs, path);
+        if (entry && this._vfs === vfs) {
+          entry.sourceOnly = settingsKey;
+          this.scheduleIndexSave();
+        }
+        return;
+      }
+      data = encoded;
     }
     // The project may have been closed while encoding
     if (this._vfs !== vfs) {

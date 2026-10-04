@@ -875,6 +875,14 @@ type PreprocessOptions = {
   compressTextures?: boolean;
   /** Mark newly imported meshes for vertex compression; off by default */
   compressVertices?: boolean;
+  /** Give newly imported meshes levels of detail; off by default */
+  generateLods?: boolean;
+  /** Fewest triangles a generated level may have, when generateLods is set */
+  lodMinTriangles?: number;
+  /** Fraction of the previous level's triangles each level keeps, when generateLods is set */
+  lodReduction?: number;
+  /** Pixel error the automatic switch distances allow, when generateLods is set */
+  lodPixelError?: number;
 };
 
 type SharedModelWithPreprocessOptions = SharedModel & {
@@ -1555,12 +1563,30 @@ export class SharedModel extends Disposable {
             `${destName}_mesh_${i}`
           ));
         await SharedModel.writePrimitive(dstVFS, info, path);
+        const options = (this as SharedModelWithPreprocessOptions)._preprocessOptions;
         if (
-          (this as SharedModelWithPreprocessOptions)._preprocessOptions?.compressVertices &&
+          (options?.compressVertices || options?.generateLods) &&
           !(await dstVFS.exists(getAssetMetaPath(path)))
         ) {
-          // Without a .zmeta a mesh ships uncompressed, so only an opt-in needs one
-          await writeMeshImportSettings(dstVFS, path, defaultMeshImportSettings('meshopt'));
+          // Without a .zmeta a mesh ships as it is, so only an opt-in needs one
+          const settings = defaultMeshImportSettings(options.compressVertices ? 'meshopt' : 'none');
+          if (options.generateLods) {
+            settings.lodEnabled = true;
+            if (Number.isInteger(options.lodMinTriangles) && options.lodMinTriangles! >= 1) {
+              settings.lodMinTriangles = options.lodMinTriangles!;
+            }
+            if (
+              typeof options.lodReduction === 'number' &&
+              options.lodReduction > 0 &&
+              options.lodReduction < 1
+            ) {
+              settings.lodReduction = options.lodReduction;
+            }
+            if (typeof options.lodPixelError === 'number' && options.lodPixelError > 0) {
+              settings.lodPixelError = options.lodPixelError;
+            }
+          }
+          await writeMeshImportSettings(dstVFS, path, settings);
         }
         info.path = path;
       }
