@@ -25,6 +25,7 @@ module.exports = {
     '^\./draco_location$': '<rootDir>/src/stubs/draco_location.ts',
     // ESM-only entry, see the stub
     '^meshoptimizer/decoder$': '<rootDir>/src/stubs/meshopt_decoder.ts',
+    '^meshoptimizer/simplifier$': '<rootDir>/src/stubs/meshopt_simplifier.ts',
     '^@zephyr3d/base$': '<rootDir>/../libs/base/src',
     '^@zephyr3d/device$': '<rootDir>/../libs/device/src',
     '^@zephyr3d/scene$': '<rootDir>/../libs/scene/src',

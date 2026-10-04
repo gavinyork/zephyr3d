@@ -80,15 +80,28 @@ const model = await new GLTFImporter().loadModel('/models/tree.glb', undefined, 
 
 `generateLods: true` 使用编辑器的默认设置：每级至少 100 个三角形，每级保留上一级一半的三角形，Pixel Error 为 8。各项设置的含义与编辑器的网格设置相同（见[资产压缩](zh-cn/editor/asset-compression.md)）。
 
-已经加载成 `SharedModel` 的模型，可以在创建场景节点之前调用 `SharedModel.generateLods()` 生成 LOD。它需要传入 meshoptimizer 的精简器，可以用 `@zephyr3d/loaders` 的 `loadMeshoptSimplifier()` 获取：
+已经加载成 `SharedModel` 的模型，可以在创建场景节点之前调用 `SharedModel.generateLods()` 生成 LOD：
 
 ```ts
-import { loadMeshoptSimplifier } from '@zephyr3d/loaders';
-
-await model.generateLods(await loadMeshoptSimplifier(), { lodMinTriangles: 200 });
+await model.generateLods({ lodMinTriangles: 200 });
 ```
 
-生成在主线程进行，大模型会比较耗时；经过编辑器处理的模型直接带着 LOD 发布，没有这项开销。
+生成使用引擎自带的 meshoptimizer 精简器（`getMeshoptSimplifier()`），在主线程进行，大模型会比较耗时；经过编辑器处理的模型直接带着 LOD 发布，没有这项开销。
+
+### 参数化形状
+
+内置形状（`SphereShape`、`BoxShape`、`CylinderShape` 等）在创建选项中带上 `lod` 时，会自动生成 LOD：
+
+```ts
+const sphere = new SphereShape({
+  radius: 1,
+  verticalDetail: 32,
+  horizonalDetail: 64,
+  lod: { lodMinTriangles: 100, lodReduction: 0.5, lodPixelError: 8 }
+});
+```
+
+形状每次重建时都会重新生成 LOD，所以修改选项后 LOD 始终与之一致；保存时只存设置。编辑器里，形状资产的属性中会显示 **GenerateLODs**、**LODMinTriangles**、**LODReduction**、**LODPixelError** 四项。第一次使用时，要等精简器的 WebAssembly 模块加载完，LOD 会在形状创建后稍晚出现。
 
 ### 手动设置
 

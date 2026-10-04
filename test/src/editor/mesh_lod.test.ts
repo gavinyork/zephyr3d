@@ -155,7 +155,7 @@ describe('SharedModel.generateLods', () => {
     const model = new SharedModel();
     const info = triangleInfo(true);
     model.addPrimitive(info);
-    expect(await model.generateLods(fakeSimplifier(), { lodMinTriangles: 100, lodReduction: 0.5 })).toBe(1);
+    expect(await model.generateLods({ lodMinTriangles: 100, lodReduction: 0.5 }, fakeSimplifier())).toBe(1);
     // 1000 -> 500 -> 250 -> 125 triangles
     expect(info.indexCount).toBe(3000);
     expect(info.lods!.map((l) => [l.indexStart, l.indexCount])).toEqual([
@@ -173,7 +173,7 @@ describe('SharedModel.generateLods', () => {
     const model = new SharedModel();
     const info = triangleInfo(false);
     model.addPrimitive(info);
-    await model.generateLods(fakeSimplifier(), { lodMinTriangles: 400 });
+    await model.generateLods({ lodMinTriangles: 400 }, fakeSimplifier());
     expect(Array.from(info.indices!.subarray(0, 6))).toEqual([0, 1, 2, 3, 4, 5]);
     expect(info.lods!.length).toBe(1);
   });
@@ -184,7 +184,7 @@ describe('SharedModel.generateLods', () => {
     const small = triangleInfo(true);
     model.addPrimitive(lines);
     model.addPrimitive(small);
-    expect(await model.generateLods(fakeSimplifier(), { lodMinTriangles: 600 })).toBe(0);
+    expect(await model.generateLods({ lodMinTriangles: 600 }, fakeSimplifier())).toBe(0);
     expect(lines.lods).toBeUndefined();
     expect(small.lods).toBeUndefined();
     expect(small.indices!.length).toBe(3000);

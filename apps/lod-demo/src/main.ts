@@ -1,14 +1,13 @@
 // Levels of detail generated at load time, without the editor:
 // - a glTF model loaded through the resource manager with { generateLods: true }
-// - a procedural sphere simplified with buildLodChain and given its levels through Primitive.lods
+// - an engine sphere shape with LOD settings, which generates its levels whenever it is created
 // Move the camera away to see the levels switch; Wireframe and LOD Coloration show them.
 import { Vector3, Vector4 } from '@zephyr3d/base';
 import { backendWebGPU } from '@zephyr3d/backend-webgpu';
 import { backendWebGL2 } from '@zephyr3d/backend-webgl';
-import { GLTFImporter, loadMeshoptSimplifier } from '@zephyr3d/loaders';
+import { GLTFImporter } from '@zephyr3d/loaders';
 import {
   Application,
-  buildLodChain,
   DirectionalLight,
   getEngine,
   getInput,
@@ -16,9 +15,8 @@ import {
   OrbitCameraController,
   PBRMetallicRoughnessMaterial,
   PerspectiveCamera,
-  Primitive,
   Scene,
-  BoundingBox
+  SphereShape
 } from '@zephyr3d/scene';
 import type { SceneNode } from '@zephyr3d/scene';
 
@@ -60,68 +58,26 @@ async function loadModel(): Promise<SceneNode> {
   }
 }
 
-/** A UV sphere, simplified into levels of detail with the same builder SharedModel uses */
-async function createSphere(radius: number, segments: number, rings: number) {
-  const positions: number[] = [];
-  const normals: number[] = [];
-  const indices: number[] = [];
-  for (let r = 0; r <= rings; r++) {
-    const phi = (r / rings) * Math.PI;
-    for (let s = 0; s <= segments; s++) {
-      const theta = (s / segments) * Math.PI * 2;
-      const x = Math.sin(phi) * Math.cos(theta);
-      const y = Math.cos(phi);
-      const z = Math.sin(phi) * Math.sin(theta);
-      positions.push(x * radius, y * radius, z * radius);
-      normals.push(x, y, z);
-    }
-  }
-  for (let r = 0; r < rings; r++) {
-    for (let s = 0; s < segments; s++) {
-      const a = r * (segments + 1) + s;
-      const b = a + segments + 1;
-      // Counter-clockwise seen from outside
-      indices.push(a, a + 1, b, b, a + 1, b + 1);
-    }
-  }
-  const positionData = new Float32Array(positions);
-  const normalData = new Float32Array(normals);
-  const { indices: all, levels } = buildLodChain(
-    await loadMeshoptSimplifier(),
-    new Uint32Array(indices),
-    positionData,
-    normalData,
-    radius * Math.sqrt(3),
-    { lodMinTriangles: 100, lodReduction: 0.5, lodPixelError: 8 }
-  );
-  const primitive = new Primitive();
-  primitive.createAndSetVertexBuffer('position_f32x3', positionData);
-  primitive.createAndSetVertexBuffer('normal_f32x3', normalData);
-  primitive.createAndSetIndexBuffer(all);
-  primitive.primitiveType = 'triangle-list';
-  primitive.indexStart = 0;
-  primitive.indexCount = levels[0].indexCount;
-  primitive.lods = levels.slice(1).map(({ indexStart, indexCount, screenSize, hysteresis }) => ({
-    indexStart,
-    indexCount,
-    screenSize,
-    hysteresis
-  }));
-  primitive.setBoundingVolume(
-    new BoundingBox(new Vector3(-radius, -radius, -radius), new Vector3(radius, radius, radius))
-  );
+/** An engine sphere shape whose LOD settings make it generate levels of detail along with itself */
+function createSphere() {
+  const shape = new SphereShape({
+    radius: 1,
+    verticalDetail: 32,
+    horizonalDetail: 64,
+    lod: { lodMinTriangles: 100, lodReduction: 0.5, lodPixelError: 8 }
+  });
   const material = new PBRMetallicRoughnessMaterial();
   material.albedoColor = new Vector4(0.8, 0.55, 0.3, 1);
   material.metallic = 0.2;
   material.roughness = 0.5;
-  const mesh = new Mesh(scene, primitive, material);
+  const mesh = new Mesh(scene, shape, material);
   mesh.name = 'Sphere';
   return mesh;
 }
 
 const model = await loadModel();
 model.position.setXYZ(-1.5, 0, 0);
-const sphere = await createSphere(1, 64, 32);
+const sphere = createSphere();
 sphere.position.setXYZ(1.5, 0, 0);
 
 const meshes: Mesh[] = [sphere];

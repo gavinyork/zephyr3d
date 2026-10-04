@@ -1,17 +1,6 @@
-import type { SceneNode, Scene, ModelLoadOptions, MeshSimplifier } from '@zephyr3d/scene';
+import type { SceneNode, Scene, ModelLoadOptions } from '@zephyr3d/scene';
 import { getEngine, SharedModel } from '@zephyr3d/scene';
 import { PathUtils, type VFS } from '@zephyr3d/base';
-import { MeshoptSimplifier } from 'meshoptimizer/simplifier';
-
-/**
- * meshoptimizer's simplifier once its WebAssembly module is ready, for
- * {@link @zephyr3d/scene#SharedModel.generateLods}.
- * @public
- */
-export async function loadMeshoptSimplifier(): Promise<MeshSimplifier> {
-  await MeshoptSimplifier.ready;
-  return MeshoptSimplifier as unknown as MeshSimplifier;
-}
 
 /**
  * Generic model importer interface
@@ -35,10 +24,7 @@ export abstract class AbstractModelImporter {
     const model = new SharedModel();
     await this.import(blob, model, PathUtils.dirname(path), vfs);
     if (options?.generateLods) {
-      await model.generateLods(
-        await loadMeshoptSimplifier(),
-        options.generateLods === true ? undefined : options.generateLods
-      );
+      await model.generateLods(options.generateLods === true ? undefined : options.generateLods);
     }
     return model;
   }

@@ -9,7 +9,80 @@ import {
   TetrahedronShape,
   TorusShape
 } from '../../../shapes';
+import type { Shape } from '../../../shapes';
+import type { MeshLodSettings } from '../../../asset/mesh_lod_builder';
 import { defineProps, type SerializableClass } from '../types';
+
+const DEFAULT_LOD = { lodMinTriangles: 100, lodReduction: 0.5, lodPixelError: 8 };
+
+/** Level of detail settings shared by every shape, see ShapeCreationOptions.lod */
+function shapeLodProps() {
+  const lodHidden = function (this: Shape) {
+    return !this.options.lod;
+  };
+  const setLod = (shape: Shape, change: Partial<MeshLodSettings>) => {
+    shape.options = { ...shape.options, lod: { ...(shape.options.lod ?? DEFAULT_LOD), ...change } };
+  };
+  return defineProps([
+    {
+      name: 'GenerateLODs',
+      description:
+        'Switches to simpler versions of the shape farther from the camera, fewer triangles to draw for the same look',
+      type: 'bool',
+      default: false,
+      get(this: Shape, value) {
+        value.bool[0] = !!this.options.lod;
+      },
+      set(this: Shape, value) {
+        this.options = { ...this.options, lod: value.bool[0] ? { ...DEFAULT_LOD } : null };
+      }
+    },
+    {
+      name: 'LODMinTriangles',
+      description:
+        'Fewest triangles a simpler version may have; a lower value adds coarser versions for far away',
+      type: 'int',
+      default: DEFAULT_LOD.lodMinTriangles,
+      options: { minValue: 1 },
+      isHidden: lodHidden,
+      get(this: Shape, value) {
+        value.num[0] = this.options.lod?.lodMinTriangles ?? DEFAULT_LOD.lodMinTriangles;
+      },
+      set(this: Shape, value) {
+        setLod(this, { lodMinTriangles: Math.max(1, Math.round(value.num[0])) });
+      }
+    },
+    {
+      name: 'LODReduction',
+      description: 'Share of the triangles each simpler version keeps; lower values make each step coarser',
+      type: 'float',
+      default: DEFAULT_LOD.lodReduction,
+      options: { minValue: 0.1, maxValue: 0.9 },
+      isHidden: lodHidden,
+      get(this: Shape, value) {
+        value.num[0] = this.options.lod?.lodReduction ?? DEFAULT_LOD.lodReduction;
+      },
+      set(this: Shape, value) {
+        setLod(this, { lodReduction: Math.min(0.9, Math.max(0.1, value.num[0])) });
+      }
+    },
+    {
+      name: 'LODPixelError',
+      description:
+        'How many pixels a simpler version may look off by; higher values switch to them closer to the camera',
+      type: 'float',
+      default: DEFAULT_LOD.lodPixelError,
+      options: { minValue: 1, maxValue: 32 },
+      isHidden: lodHidden,
+      get(this: Shape, value) {
+        value.num[0] = this.options.lod?.lodPixelError ?? DEFAULT_LOD.lodPixelError;
+      },
+      set(this: Shape, value) {
+        setLod(this, { lodPixelError: Math.max(1, value.num[0]) });
+      }
+    }
+  ]);
+}
 
 /** @internal */
 export function getBoxShapeClass(): SerializableClass {
@@ -56,7 +129,8 @@ export function getBoxShapeClass(): SerializableClass {
               anchorZ: value.num[2]
             };
           }
-        }
+        },
+        ...shapeLodProps()
       ]);
     }
   };
@@ -159,7 +233,8 @@ export function getCapsuleShapeClass(): SerializableClass {
               anchor: value.num[0]
             };
           }
-        }
+        },
+        ...shapeLodProps()
       ]);
     }
   };
@@ -210,7 +285,8 @@ export function getBoxFrameShapeClass(): SerializableClass {
               anchorZ: value.num[2]
             };
           }
-        }
+        },
+        ...shapeLodProps()
       ]);
     }
   };
@@ -288,7 +364,8 @@ export function getTorusShapeClass(): SerializableClass {
           set(this: TorusShape, value) {
             this.options = { ...this.options, radialDetail: Math.max(3, Math.min(100, value.num[0])) };
           }
-        }
+        },
+        ...shapeLodProps()
       ]);
     }
   };
@@ -365,7 +442,8 @@ export function getPlaneShapeClass(): SerializableClass {
           set(this: PlaneShape, value) {
             this.options = { ...this.options, twoSided: value.bool[0] };
           }
-        }
+        },
+        ...shapeLodProps()
       ]);
     }
   };
@@ -479,7 +557,8 @@ export function getCylinderShapeClass(): SerializableClass {
           set(this: CylinderShape, value) {
             this.options = { ...this.options, bottomCap: value.bool[0] };
           }
-        }
+        },
+        ...shapeLodProps()
       ]);
     }
   };
@@ -542,7 +621,8 @@ export function getSphereShapeClass(): SerializableClass {
           set(this: SphereShape, value) {
             this.options = { ...this.options, eyeCompatible: value.bool[0] };
           }
-        }
+        },
+        ...shapeLodProps()
       ]);
     }
   };
@@ -589,7 +669,8 @@ export function getTetrahedronShapeClass(): SerializableClass {
           set(this: TetrahedronShape, value) {
             this.options = { ...this.options, sizeZ: value.num[0] };
           }
-        }
+        },
+        ...shapeLodProps()
       ]);
     }
   };

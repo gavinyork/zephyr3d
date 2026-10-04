@@ -2,6 +2,9 @@ import type { Clonable, DeepRequireOptionals, Nullable } from '@zephyr3d/base';
 import { Vector3, type Matrix4x4 } from '@zephyr3d/base';
 import { Primitive } from '../render/primitive';
 import { BoundingBox } from '../utility/bounding_volume';
+import { buildLodChain } from '../asset/mesh_lod_builder';
+import type { MeshLodSettings, MeshSimplifier } from '../asset/mesh_lod_builder';
+import { getMeshoptSimplifier, getMeshoptSimplifierIfReady } from '../asset/meshopt_simplifier';
 
 /**
  * Base class for creation options of any kind of shapes
@@ -16,6 +19,12 @@ export interface ShapeCreationOptions {
   needUV?: boolean;
   /** Transform matrix for the shape */
   transform?: Nullable<Matrix4x4>;
+  /**
+   * Levels of detail generated from the shape, as {@link SharedModel.generateLods} does for
+   * imported meshes, or null for none. Regenerated whenever the shape is, so they always match
+   * its options; only the settings are saved with it.
+   */
+  lod?: Nullable<MeshLodSettings>;
 }
 
 /**
@@ -30,9 +39,12 @@ export abstract class Shape<T extends ShapeCreationOptions = ShapeCreationOption
     needNormal: true,
     needTangent: true,
     needUV: true,
-    transform: null
+    transform: null,
+    lod: null
   };
   protected _options!: DeepRequireOptionals<T>;
+  /** @internal Counts creations, so levels of detail generated late only apply to the current one */
+  private _createCount = 0;
   /**
    * Creates an instance of shape
    * @param options - The creation options
@@ -154,7 +166,55 @@ export abstract class Shape<T extends ShapeCreationOptions = ShapeCreationOption
     this.createAndSetIndexBuffer(new Uint16Array(indices));
     this.setBoundingVolume(bbox);
     this.indexCount = indices.length;
+    // Levels of the previous creation do not match these indices, nor do levels still being made
+    this.lods = [];
+    this._createCount++;
+    const lod = this._options.lod;
+    if (lod && this.primitiveType === 'triangle-list' && indices.length >= 3) {
+      this.generateLods(lod, vertices, normals, indices, bbox);
+    }
     return true;
+  }
+  /** @internal Simplify the created shape into levels of detail, once the simplifier is ready */
+  private generateLods(
+    settings: MeshLodSettings,
+    vertices: number[],
+    normals: Nullable<number[]>,
+    indices: number[],
+    bbox: BoundingBox
+  ) {
+    const count = this._createCount;
+    const positionData = new Float32Array(vertices);
+    const normalData = normals ? new Float32Array(normals) : null;
+    const indexData = new Uint32Array(indices);
+    const extents = bbox.extents;
+    const radius = Math.hypot(extents.x, extents.y, extents.z);
+    const apply = (simplifier: MeshSimplifier) => {
+      // Superseded by another creation, or released, while the simplifier loaded
+      if (this.disposed || count !== this._createCount) {
+        return;
+      }
+      const chain = buildLodChain(simplifier, indexData, positionData, normalData, radius, settings);
+      if (chain.levels.length <= 1) {
+        return;
+      }
+      this.createAndSetIndexBuffer(
+        positionData.length / 3 <= 0x10000 ? Uint16Array.from(chain.indices) : chain.indices
+      );
+      this.indexCount = chain.levels[0].indexCount;
+      this.lods = chain.levels.slice(1).map(({ indexStart, indexCount, screenSize, hysteresis }) => ({
+        indexStart,
+        indexCount,
+        screenSize,
+        hysteresis
+      }));
+    };
+    const simplifier = getMeshoptSimplifierIfReady();
+    if (simplifier) {
+      apply(simplifier);
+    } else {
+      getMeshoptSimplifier().then(apply, (err) => console.error(`Shape levels of detail failed: ${err}`));
+    }
   }
   /** @internal */
   protected static _transform(

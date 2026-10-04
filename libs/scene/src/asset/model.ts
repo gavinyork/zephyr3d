@@ -28,6 +28,7 @@ import type { ResourceManager } from '../utility/serialization/manager';
 import type { TextureUsage } from './texture_settings';
 import { defaultMeshImportSettings, writeMeshImportSettings } from './mesh_settings';
 import { buildLodChain } from './mesh_lod_builder';
+import { getMeshoptSimplifier } from './meshopt_simplifier';
 import type { MeshLodSettings, MeshSimplifier } from './mesh_lod_builder';
 import type { PrimitiveLod } from '../render/primitive';
 import {
@@ -1036,12 +1037,11 @@ export class SharedModel extends Disposable {
    * Call it after importing and before creating scene nodes from the model; meshes that already
    * have levels of detail are left as they are.
    *
-   * @param simplifier - meshoptimizer's simplifier, ready; `loadMeshoptSimplifier()` of the
-   *   loaders package returns it
    * @param settings - Generation settings, by default those of {@link defaultMeshImportSettings}
+   * @param simplifier - Simplifier to use, meshoptimizer's by default (see {@link getMeshoptSimplifier})
    * @returns The number of meshes that got levels of detail
    */
-  async generateLods(simplifier: MeshSimplifier, settings?: Partial<MeshLodSettings>) {
+  async generateLods(settings?: Partial<MeshLodSettings>, simplifier?: MeshSimplifier) {
     if (this._primitiveMap.size > 0) {
       console.warn('SharedModel.generateLods(): scene nodes were already created from this model, skipped');
       return 0;
@@ -1052,6 +1052,7 @@ export class SharedModel extends Disposable {
       lodReduction: settings?.lodReduction ?? defaults.lodReduction,
       lodPixelError: settings?.lodPixelError ?? defaults.lodPixelError
     };
+    simplifier ??= await getMeshoptSimplifier();
     let count = 0;
     for (const info of this._primitiveList) {
       if (SharedModel.generatePrimitiveLods(info, simplifier, lodSettings)) {

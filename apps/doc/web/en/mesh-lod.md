@@ -80,15 +80,28 @@ const model = await new GLTFImporter().loadModel('/models/tree.glb', undefined, 
 
 `generateLods: true` uses the defaults of the editor: at least 100 triangles per level, half the triangles of the previous level, a pixel error of 8. The settings mean the same as in the editor's mesh settings (see [Asset Compression](en/editor/asset-compression.md)).
 
-A model already in memory as a `SharedModel` can be given levels with `SharedModel.generateLods()`, before creating scene nodes from it. It takes the meshoptimizer simplifier, which `loadMeshoptSimplifier()` of `@zephyr3d/loaders` returns:
+A model already in memory as a `SharedModel` can be given levels with `SharedModel.generateLods()`, before creating scene nodes from it:
 
 ```ts
-import { loadMeshoptSimplifier } from '@zephyr3d/loaders';
-
-await model.generateLods(await loadMeshoptSimplifier(), { lodMinTriangles: 200 });
+await model.generateLods({ lodMinTriangles: 200 });
 ```
 
-Generation runs on the main thread and takes time on large models; models processed in the editor ship their levels instead.
+Generation uses the meshoptimizer simplifier the engine ships (`getMeshoptSimplifier()`). It runs on the main thread and takes time on large models; models processed in the editor ship their levels instead.
+
+### Shapes
+
+Built-in shapes (`SphereShape`, `BoxShape`, `CylinderShape`, ...) generate levels of detail when their creation options include `lod`:
+
+```ts
+const sphere = new SphereShape({
+  radius: 1,
+  verticalDetail: 32,
+  horizonalDetail: 64,
+  lod: { lodMinTriangles: 100, lodReduction: 0.5, lodPixelError: 8 }
+});
+```
+
+The levels are regenerated whenever the shape is, so changing its options keeps them matching, and only the settings are saved with the shape. In the editor, shape assets show these settings as **GenerateLODs**, **LODMinTriangles**, **LODReduction** and **LODPixelError**. The first time, levels appear once the simplifier's WebAssembly module has loaded, a moment after the shape is created.
 
 ### Setting Levels by Hand
 
