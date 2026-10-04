@@ -101,6 +101,7 @@ const UNIFORM_NAME_INSTANCE_DATA_OFFSET = 'Z_UniformInstanceDataOffset';
 const UNIFORM_NAME_BONE_MATRICES = 'Z_UniformBoneMatrices';
 const UNIFORM_NAME_BONE_TEXTURE_SIZE = 'Z_UniformBoneTexSize';
 const UNIFORM_NAME_BONE_INV_BIND_MATRIX = 'Z_UniformBoneInvBindMatrix';
+const UNIFORM_NAME_SKIN_PALETTE_BASE = 'Z_UniformSkinPaletteBase';
 const UNIFORM_NAME_SKIN_INFLUENCE_DATA = 'Z_UniformSkinInfluenceData';
 const UNIFORM_NAME_SKIN_INFLUENCE_INFO = 'Z_UniformSkinInfluenceInfo';
 const UNIFORM_NAME_MORPH_DATA = 'Z_UniformMorphData';
@@ -181,6 +182,9 @@ export class ShaderHelper {
   }
   static getBoneInvBindMatrixUniformName() {
     return UNIFORM_NAME_BONE_INV_BIND_MATRIX;
+  }
+  static getSkinPaletteBaseUniformName() {
+    return UNIFORM_NAME_SKIN_PALETTE_BASE;
   }
   static getSkinInfluenceDataUniformName() {
     return UNIFORM_NAME_SKIN_INFLUENCE_DATA;
@@ -507,94 +511,10 @@ export class ShaderHelper {
     if (!this.hasSkinning(scope)) {
       return null;
     }
-    const pb = scope.$builder;
-    const isWebGL = pb.getDevice().type === 'webgl';
-    const supportsTextureLoad = !isWebGL;
-    const funcNameGetBoneMatrixFromTexture = 'Z_getBoneMatrixFromTexture';
-    pb.func(funcNameGetBoneMatrixFromTexture, [pb.int('boneIndex')], function () {
-      const boneTexture = this[UNIFORM_NAME_BONE_MATRICES];
-      this.$l.uvOffsets = pb.textureSampleLevel(
-        boneTexture,
-        pb.div(pb.vec2(0.5), this[UNIFORM_NAME_BONE_TEXTURE_SIZE]),
-        0
-      );
-      this.$l.currentOffset = pb.int(this.uvOffsets.x);
-      this.$l.w = this[UNIFORM_NAME_BONE_TEXTURE_SIZE].x;
-      this.$l.pixelIndex = pb.float(pb.mul(pb.add(this.boneIndex, this.currentOffset), 4));
-      this.$l.xIndex = pb.mod(this.pixelIndex, this.w);
-      this.$l.yIndex = pb.floor(pb.div(this.pixelIndex, this.w));
-      this.$l.u1 = pb.div(pb.add(this.xIndex, 0.5), this.w);
-      this.$l.u2 = pb.div(pb.add(this.xIndex, 1.5), this.w);
-      this.$l.u3 = pb.div(pb.add(this.xIndex, 2.5), this.w);
-      this.$l.u4 = pb.div(pb.add(this.xIndex, 3.5), this.w);
-      this.$l.v = pb.div(pb.add(this.yIndex, 0.5), this.w);
-      this.$l.row1 = pb.textureSampleLevel(boneTexture, pb.vec2(this.u1, this.v), 0);
-      this.$l.row2 = pb.textureSampleLevel(boneTexture, pb.vec2(this.u2, this.v), 0);
-      this.$l.row3 = pb.textureSampleLevel(boneTexture, pb.vec2(this.u3, this.v), 0);
-      this.$l.row4 = pb.textureSampleLevel(boneTexture, pb.vec2(this.u4, this.v), 0);
-      this.$return(pb.mat4(this.row1, this.row2, this.row3, this.row4));
-    });
-    const funcNameGetSkinningMatrix = 'Z_getSkinningMatrix';
-    pb.func(funcNameGetSkinningMatrix, [], function () {
-      const invBindMatrix = this[UNIFORM_NAME_BONE_INV_BIND_MATRIX];
-      const blendIndices = scope.$getVertexAttrib('blendIndices')!;
-      const blendWeights = scope.$getVertexAttrib('blendWeights')!;
-      this.$l.m0 = scope.$g[funcNameGetBoneMatrixFromTexture](pb.int(blendIndices[0]));
-      this.$l.m1 = scope.$g[funcNameGetBoneMatrixFromTexture](pb.int(blendIndices[1]));
-      this.$l.m2 = scope.$g[funcNameGetBoneMatrixFromTexture](pb.int(blendIndices[2]));
-      this.$l.m3 = scope.$g[funcNameGetBoneMatrixFromTexture](pb.int(blendIndices[3]));
-      this.$l.m = pb.add(
-        pb.mul(this.m0, blendWeights.x),
-        pb.mul(this.m1, blendWeights.y),
-        pb.mul(this.m2, blendWeights.z),
-        pb.mul(this.m3, blendWeights.w)
-      );
-      this.$l.skinInfo = this[UNIFORM_NAME_SKIN_INFLUENCE_INFO];
-      this.$if(pb.greaterThan(this.skinInfo.z, 4), function () {
-        this.$l.vertexIndex = isWebGL
-          ? pb.int(scope.$inputs.zFakeVertexID)
-          : pb.int(scope.$builtins.vertexIndex);
-        this.$l.texWidth = pb.int(this.skinInfo.x);
-        this.$l.pairCount = pb.int(this.skinInfo.w);
-        this.$for(pb.int('pairIndex'), 0, MAX_SKIN_EXTRA_INFLUENCE_PAIRS, function () {
-          this.$if(pb.greaterThanEqual(this.pairIndex, this.pairCount), function () {
-            this.$break();
-          });
-          this.$l.pixelIndex = pb.add(pb.mul(this.vertexIndex, this.pairCount), this.pairIndex);
-          this.$l.xIndex = pb.mod(this.pixelIndex, this.texWidth);
-          this.$l.yIndex = pb.div(this.pixelIndex, this.texWidth);
-          if (supportsTextureLoad) {
-            this.$l.extra = pb.textureLoad(
-              this[UNIFORM_NAME_SKIN_INFLUENCE_DATA],
-              pb.ivec2(this.xIndex, this.yIndex),
-              0
-            );
-          } else {
-            this.$l.u = pb.div(pb.add(pb.float(this.xIndex), 0.5), this.skinInfo.x);
-            this.$l.v = pb.div(pb.add(pb.float(this.yIndex), 0.5), this.skinInfo.y);
-            this.$l.extra = pb.textureSampleLevel(
-              this[UNIFORM_NAME_SKIN_INFLUENCE_DATA],
-              pb.vec2(this.u, this.v),
-              0
-            );
-          }
-          this.$if(pb.greaterThan(this.extra.y, 0), function () {
-            this.m = pb.add(
-              this.m,
-              pb.mul(scope.$g[funcNameGetBoneMatrixFromTexture](pb.int(this.extra.x)), this.extra.y)
-            );
-          });
-          this.$if(pb.greaterThan(this.extra.w, 0), function () {
-            this.m = pb.add(
-              this.m,
-              pb.mul(scope.$g[funcNameGetBoneMatrixFromTexture](pb.int(this.extra.z)), this.extra.w)
-            );
-          });
-        });
-      });
-      this.$return(pb.mul(invBindMatrix, this.m));
-    });
-    return scope.$g[funcNameGetSkinningMatrix]() as PBShaderExp;
+    if (!scope[this.SKIN_MATRIX_NAME]) {
+      this.prepareSkinAnimation(scope);
+    }
+    return scope[this.SKIN_MATRIX_NAME] as PBShaderExp;
   }
   static calculateMorphDelta(scope: PBInsideFunctionScope, attrib: number) {
     const pb = scope.$builder;
@@ -881,6 +801,7 @@ export class ShaderHelper {
     pb.func(funcNameGetBoneMatrixFromTexture, [pb.float('boneIndex'), pb.float('boneOffset')], function () {
       const boneTexture = this[UNIFORM_NAME_BONE_MATRICES];
       this.$l.w = this[UNIFORM_NAME_BONE_TEXTURE_SIZE].x;
+      this.$l.h = this[UNIFORM_NAME_BONE_TEXTURE_SIZE].y;
       this.$l.pixelIndex = pb.mul(pb.add(this.boneIndex, this.boneOffset), 4);
       this.$l.xIndex = pb.mod(this.pixelIndex, this.w);
       this.$l.yIndex = pb.floor(pb.div(this.pixelIndex, this.w));
@@ -888,7 +809,7 @@ export class ShaderHelper {
       this.$l.u2 = pb.div(pb.add(this.xIndex, 1.5), this.w);
       this.$l.u3 = pb.div(pb.add(this.xIndex, 2.5), this.w);
       this.$l.u4 = pb.div(pb.add(this.xIndex, 3.5), this.w);
-      this.$l.v = pb.div(pb.add(this.yIndex, 0.5), this.w);
+      this.$l.v = pb.div(pb.add(this.yIndex, 0.5), this.h);
       this.$l.row1 = pb.textureSampleLevel(boneTexture, pb.vec2(this.u1, this.v), 0);
       this.$l.row2 = pb.textureSampleLevel(boneTexture, pb.vec2(this.u2, this.v), 0);
       this.$l.row3 = pb.textureSampleLevel(boneTexture, pb.vec2(this.u3, this.v), 0);
@@ -956,10 +877,23 @@ export class ShaderHelper {
       this.$return(pb.mul(invBindMatrix, this.m));
     });
     const motionVector = !!this.getUnjitteredViewProjectionMatrix(scope);
+    // The palette header slot holds the slot indices of the current and previous matrix sets
     const boneTexture = scope[UNIFORM_NAME_BONE_MATRICES];
+    const paletteBase = scope[UNIFORM_NAME_SKIN_PALETTE_BASE] ?? this.getInstancedUniform(scope, 4).z;
+    const boneTextureSize = scope[UNIFORM_NAME_BONE_TEXTURE_SIZE];
+    scope.$l.Z_skinHeaderTexel = pb.mul(paletteBase, 4);
     scope.$l[that.SKIN_BONE_OFFSET] = pb.textureSampleLevel(
       boneTexture,
-      pb.div(pb.vec2(0.5), scope[UNIFORM_NAME_BONE_TEXTURE_SIZE]),
+      pb.div(
+        pb.add(
+          pb.vec2(
+            pb.mod(scope.Z_skinHeaderTexel, boneTextureSize.x),
+            pb.floor(pb.div(scope.Z_skinHeaderTexel, boneTextureSize.x))
+          ),
+          pb.vec2(0.5)
+        ),
+        boneTextureSize
+      ),
       0
     ).xy;
     scope.$l[that.SKIN_MATRIX_NAME] = scope[funcNameGetSkinningMatrix](scope[that.SKIN_BONE_OFFSET].x);
@@ -1245,6 +1179,9 @@ export class ShaderHelper {
       scope[UNIFORM_NAME_BONE_MATRICES] = pb.tex2D().uniform(1).sampleType('unfilterable-float');
       scope[UNIFORM_NAME_BONE_INV_BIND_MATRIX] = pb.mat4().uniform(1);
       scope[UNIFORM_NAME_BONE_TEXTURE_SIZE] = pb.vec2().uniform(1);
+      if (!instanced) {
+        scope[UNIFORM_NAME_SKIN_PALETTE_BASE] = pb.float().uniform(1);
+      }
       scope[UNIFORM_NAME_SKIN_INFLUENCE_DATA] = pb.tex2D().uniform(1).sampleType('unfilterable-float');
       scope[UNIFORM_NAME_SKIN_INFLUENCE_INFO] = pb.vec4().uniform(1);
     }

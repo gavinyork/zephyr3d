@@ -1,5 +1,5 @@
 import type { Nullable } from '@zephyr3d/base';
-import { applyMixins, castObservable, DRef, Vector3, Vector4 } from '@zephyr3d/base';
+import { applyMixins, castObservable, DRef, DWeakRef, Matrix4x4, Vector3, Vector4 } from '@zephyr3d/base';
 import { GraphNode } from './graph_node';
 import type { MeshMaterial } from '../material';
 import { LambertMaterial, ShaderHelper } from '../material';
@@ -38,8 +38,9 @@ import { mixinDrawable } from '../render/drawable_mixin';
 import { RenderBundleWrapper } from '../render/renderbundle_wrapper';
 import type { SceneNode } from './scene_node';
 import { getDevice } from '../app/api';
-import type { SkinnedBoundingBox } from '../animation';
+import type { SkinBinding, SkinnedBoundingBox } from '../animation';
 import { calculateMorphBoundingBox } from '../animation/morphtarget';
+import { SkinPaletteAtlas } from '../animation/skin_palette_atlas';
 import type { Camera } from '../camera/camera';
 import { computeAABBScreenRadiusSquared, selectLod } from '../render/lod';
 
@@ -63,6 +64,20 @@ const LOD_COLORATION_COLORS: [number, number, number][] = [
  * @public
  */
 export type MeshUpdateCallback = (frameId: number, elapsedInSeconds: number, deltaInSeconds: number) => void;
+
+/**
+ * A skinning palette that skins a mesh in place of its skin binding's.
+ *
+ * @internal
+ */
+export interface SkinPaletteOverride {
+  /** Slot index of the palette header in the skin palette atlas */
+  readonly paletteBase: number;
+  /** Bounds of the skinned mesh in its local space, or null to use the primitive's */
+  readonly boundingBox: Nullable<BoundingBox>;
+  /** Writer of the palette, told when another palette replaces it on the mesh */
+  readonly owner?: { detachMesh(mesh: Mesh): void };
+}
 
 /**
  * Bounding data used to update a mesh's local bounding box after morph target weights change.
@@ -169,6 +184,16 @@ export class Mesh extends MeshBase implements BatchDrawable {
   protected _skinBindingName: string;
   /** @internal */
   protected _boneMatrices: DRef<Texture2D>;
+  /** @internal Skin binding resolved from _skinBindingName at the last skeleton state update */
+  protected _skinBinding: DWeakRef<SkinBinding>;
+  /** @internal */
+  protected readonly _skinSpaceMatrix: Matrix4x4;
+  /** @internal Skin binding and palette version the skinned bounds were last computed for */
+  protected _skinnedBoundsVersion: { binding: Nullable<SkinBinding>; version: number };
+  /** @internal Palette written by an animation bank track in place of the skin binding's */
+  protected _skinPaletteOverride: Nullable<SkinPaletteOverride>;
+  /** Palette base last written to instance data and drawable uniforms */
+  private _appliedSkinPaletteBase: number;
   /** @internal */
   protected _skinInfluenceData: Nullable<SkinInfluenceData>;
   /** @internal */
@@ -229,6 +254,11 @@ export class Mesh extends MeshBase implements BatchDrawable {
     this._skinnedBoundingInfo = null;
     this._animatedBoundingBox = null;
     this._boneMatrices = new DRef();
+    this._skinBinding = new DWeakRef();
+    this._skinSpaceMatrix = new Matrix4x4();
+    this._skinPaletteOverride = null;
+    this._appliedSkinPaletteBase = 0;
+    this._skinnedBoundsVersion = { binding: null, version: -1 };
     this._skinInfluenceData = null;
     this._morphData = null;
     this._morphInfo = null;
@@ -262,7 +292,23 @@ export class Mesh extends MeshBase implements BatchDrawable {
    */
   getInstanceId(_renderPass: RenderPass) {
     // A wireframe mesh draws another primitive, so it cannot share a batch with solid ones
-    return `${this._instanceHash}:${this.worldMatrixDet >= 0}${this._wireframe ? ':wire' : ''}`;
+    const id = `${this._instanceHash}:${this.worldMatrixDet >= 0}${this._wireframe ? ':wire' : ''}`;
+    return this._boneMatrices.get() ? `${id}:skin:${this.getSkinSpaceKey()}` : id;
+  }
+  /**
+   * Key of the skin space matrix, equal for meshes that may share one in a batch.
+   *
+   * @remarks
+   * A batch transforms the palettes of all its instances by the skin space matrix of its first
+   * mesh. Instances of one model share it up to rounding, so the key is quantized.
+   */
+  private getSkinSpaceKey() {
+    const m = this.getSkinSpaceMatrix();
+    let key = '';
+    for (let i = 0; i < 16; i++) {
+      key += `${Math.round(m[i] * 1e4)},`;
+    }
+    return key;
   }
   /**
    * Returns the packed instance-uniform buffer used for batching.
@@ -312,6 +358,9 @@ export class Mesh extends MeshBase implements BatchDrawable {
   set suspendSkinning(val) {
     if (val && !this._suspendSkinning) {
       this.setAnimatedBoundingBox(null);
+    } else if (!val && this._suspendSkinning) {
+      // Skinned meshes sleep until their pose changes, so wake this one to pick skinning up again
+      this.scene?.queueUpdateNode(this);
     }
     this._suspendSkinning = !!val;
   }
@@ -483,6 +532,7 @@ export class Mesh extends MeshBase implements BatchDrawable {
   setBoneMatrices(matrices: Nullable<Texture2D>) {
     if (this._boneMatrices.get() !== matrices) {
       this._boneMatrices.set(matrices);
+      Mesh._trackBoneMatrices(this, !!matrices);
       this._renderBundle = {};
       RenderBundleWrapper.drawableChanged(this);
     }
@@ -602,6 +652,58 @@ export class Mesh extends MeshBase implements BatchDrawable {
    */
   getSkinInfluenceData() {
     return this._skinInfluenceData;
+  }
+  /**
+   * Gets the slot index of the skinning palette header in the bone matrix texture.
+   *
+   * @internal
+   */
+  getSkinPaletteBase() {
+    return this._skinPaletteOverride?.paletteBase ?? this._skinBinding.get()?.paletteBase ?? 0;
+  }
+  /**
+   * Gets the palette that skins this mesh in place of its skin binding's, if any.
+   *
+   * @internal
+   */
+  getSkinPaletteOverride() {
+    return this._skinPaletteOverride;
+  }
+  /**
+   * Skins this mesh by a palette written elsewhere instead of by its skin binding.
+   *
+   * @remarks
+   * The palette must be laid out like the binding's: same joints, relative to the same
+   * reference node. The mesh then neither reads the binding's palette nor computes its bounds
+   * from the binding's joints each frame; the override supplies its animated bounds.
+   *
+   * @param override - The palette and bounds, or null to skin by the binding again
+   * @internal
+   */
+  setSkinPaletteOverride(override: Nullable<SkinPaletteOverride>) {
+    this._skinPaletteOverride = override;
+    this.updateSkeletonState();
+  }
+  /**
+   * Gets the matrix transforming skinning palette output to the local space of this mesh.
+   *
+   * @remarks
+   * Palette matrices are relative to the reference node of the skin binding, so this is
+   * `inverse(worldMatrix) * referenceNode.worldMatrix`.
+   *
+   * @param binding - Skin binding the palette belongs to. Defaults to the binding last resolved
+   *   for this mesh, which is not resolved yet before the first update after deserialization,
+   *   since the children of a node are deserialized before its skin bindings
+   * @internal
+   */
+  getSkinSpaceMatrix(binding?: Nullable<SkinBinding>): Matrix4x4 {
+    const reference = (binding ?? this._skinBinding.get())?.referenceNode;
+    if (reference) {
+      Matrix4x4.multiplyAffine(this.invWorldMatrix, reference.worldMatrix, this._skinSpaceMatrix);
+    } else {
+      this._skinSpaceMatrix.set(this.invWorldMatrix);
+    }
+    return this._skinSpaceMatrix;
   }
   /**
    * Gets the external morph source descriptor.
@@ -902,10 +1004,13 @@ export class Mesh extends MeshBase implements BatchDrawable {
   }
   /** @internal */
   resolveAnimatedBoundingBox(morphBoundingBox?: Nullable<BoundingBox>) {
-    const skinnedBoundingBox =
-      this._boneMatrices.get() && this._skinnedBoundingInfo?.boundingBox?.isValid()
-        ? this._skinnedBoundingInfo.boundingBox
-        : null;
+    const skinnedBoundingBox = !this._boneMatrices.get()
+      ? null
+      : this._skinPaletteOverride
+        ? this._skinPaletteOverride.boundingBox
+        : this._skinnedBoundingInfo?.boundingBox?.isValid()
+          ? this._skinnedBoundingInfo.boundingBox
+          : null;
     if (skinnedBoundingBox && morphBoundingBox) {
       // Skinning and morphing both active. The two boxes live in different
       // frames: the skinned box already reflects where the geometry actually
@@ -1046,6 +1151,7 @@ export class Mesh extends MeshBase implements BatchDrawable {
   addPostUpdateCallback(callback: MeshUpdateCallback) {
     if (callback) {
       this._postUpdateCallbacks.add(callback);
+      this.scene?.queueUpdateNode(this);
     }
   }
   /** @internal */
@@ -1060,8 +1166,9 @@ export class Mesh extends MeshBase implements BatchDrawable {
   isBatchable(): this is BatchDrawable {
     return (
       this._batchable &&
-      !this._boneMatrices.get() &&
       !this._morphData &&
+      // Extra skin influences are read from a texture of each mesh, which a batch cannot vary
+      !(this._boneMatrices.get() && (this._skinInfluenceData?.influenceCount ?? 4) > 4) &&
       (this._material.get()?.isBatchable() ?? false)
     );
   }
@@ -1149,20 +1256,54 @@ export class Mesh extends MeshBase implements BatchDrawable {
   /** @internal */
   private updateSkeletonState() {
     if (this._suspendSkinning) {
+      if (this._skinnedBoundsVersion) {
+        this._skinnedBoundsVersion.binding = null;
+      }
       this.setBoneMatrices(null);
       return;
     }
-    const binding = this._skinBindingName && this.findSkinBindingById(this._skinBindingName);
+    // Looking a binding up walks the model, so the one found last time is kept while it matches
+    const cached = this._skinBinding.get();
+    const binding =
+      this._skinBindingName &&
+      (cached && !cached.disposed && cached.persistentId === this._skinBindingName
+        ? cached
+        : this.findSkinBindingById(this._skinBindingName));
+    this._skinBinding.set(binding || null);
+    const paletteBase = this.getSkinPaletteBase();
+    if (paletteBase !== this._appliedSkinPaletteBase) {
+      // Instance data and drawable uniforms hold the palette base and are not rewritten every
+      // frame; it changes with the binding, with palette overrides, and with a binding's palette
+      // being allocated again after a suspension
+      this._appliedSkinPaletteBase = paletteBase;
+      this.applyTransformUniformsAll();
+      RenderBundleWrapper.drawableChanged(this);
+    }
     if (binding) {
       this.setBoneMatrices(binding.jointTexture);
-      binding.computeBoundingBox(this._skinnedBoundingInfo!, this.invWorldMatrix);
-      this.refreshAnimatedBoundingBox();
+      const bounds = this._skinnedBoundsVersion;
+      if (this._skinPaletteOverride) {
+        bounds.binding = null;
+        this.refreshAnimatedBoundingBox();
+      } else if (bounds.binding !== binding || bounds.version !== binding.paletteVersion) {
+        // Bounds follow the pose, which only changes with the joint matrices
+        bounds.binding = binding;
+        bounds.version = binding.paletteVersion;
+        binding.computeBoundingBox(this._skinnedBoundingInfo!, this.getSkinSpaceMatrix(binding));
+        this.refreshAnimatedBoundingBox();
+      }
     } else {
+      this._skinnedBoundsVersion.binding = null;
       this.setBoneMatrices(null);
       this.refreshAnimatedBoundingBox();
     }
-    if (this._skinBindingName) {
-      this.scene!.queueUpdateNode(this);
+    // Bounds of an overriding palette only change when the override is set again, and bounds
+    // of the binding's palette when its pose does, which wakes the mesh up
+    if (this._postUpdateCallbacks.size > 0 || (this._skinBindingName && !binding)) {
+      // Post update callbacks (GPU cloth) run every frame, and the binding may not be loaded yet
+      this.scene?.queueUpdateNode(this);
+    } else if (binding && !this._skinPaletteOverride) {
+      binding.sleepUntilPoseChanges(this);
     }
   }
   /**
@@ -1289,6 +1430,8 @@ export class Mesh extends MeshBase implements BatchDrawable {
     this._primitive.dispose();
     this._material.dispose();
     this._boneMatrices.dispose();
+    Mesh._trackBoneMatrices(this, false);
+    this._skinBinding.dispose();
     this.setSkinInfluenceData(null);
     this.setMorphData(null);
     this.setRenderMorphInfo(null);
@@ -1324,6 +1467,31 @@ export class Mesh extends MeshBase implements BatchDrawable {
   }
   /** @internal */
   private static _defaultMaterial: Nullable<MeshMaterial> = null;
+  /** Meshes holding a joint texture, rebound when the skin palette atlas replaces it */
+  private static readonly _skinnedMeshes: Set<Mesh> = new Set();
+  private static _listeningAtlas = false;
+  /**
+   * Keep the joint textures of skinned meshes current when the atlas grows: a mesh only picks the
+   * texture up in update(), which a mesh posed by an animation bank track no longer runs
+   */
+  private static _trackBoneMatrices(mesh: Mesh, skinned: boolean) {
+    if (!skinned) {
+      this._skinnedMeshes.delete(mesh);
+      return;
+    }
+    this._skinnedMeshes.add(mesh);
+    if (!this._listeningAtlas) {
+      this._listeningAtlas = true;
+      SkinPaletteAtlas.addTextureReplacedListener(() => {
+        for (const m of this._skinnedMeshes) {
+          const binding = m._skinBinding.get();
+          if (binding && !binding.disposed) {
+            m.setBoneMatrices(binding.jointTexture);
+          }
+        }
+      });
+    }
+  }
   /** @internal Materials of the LOD coloration view, by level */
   private static readonly _lodColorationMaterials: LambertMaterial[] = [];
   /** @internal */

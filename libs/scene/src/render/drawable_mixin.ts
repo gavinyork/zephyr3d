@@ -15,6 +15,7 @@ export interface IMixinDrawable {
   pushRenderQueueRef(ref: RenderQueueRef): void;
   applyInstanceOffsetAndStride(renderQueue: RenderQueue, stride: number, offset: number): void;
   applyTransformUniforms(renderQueue: RenderQueue): void;
+  applyTransformUniformsAll(): void;
   applyMaterialUniforms(instanceInfo: DrawableInstanceInfo): void;
   applyMaterialUniformsAll(): void;
   getObjectColor(): Vector4;
@@ -29,6 +30,9 @@ let defaultSkinInfluenceTexture: Nullable<Texture2D> = null;
 
 const instanceBindGroupTransfromTags = new WeakMap<DrawableInstanceInfo, number>();
 const drawableBindGroupTransfromTags = new WeakMap<BindGroup, number>();
+/** Skin palette base last written to each instance data block or drawable bind group */
+const instanceSkinPaletteBases = new WeakMap<DrawableInstanceInfo, number>();
+const drawableSkinPaletteBases = new WeakMap<BindGroup, number>();
 
 const bindGroupCache: Record<string, BindGroup[]> = {};
 const usedBindGroups: WeakMap<BindGroup, string> = new WeakMap();
@@ -103,8 +107,11 @@ export function mixinDrawable<
     private readonly _drawableId: number;
     private _objectColor: Nullable<Vector4>;
     private _nodeTransformTag: number;
+    /** Stamp of the scene drawable update queue this drawable is waiting in, see UpdateQueue */
+    _drawableQueueStamp: number;
     constructor(...args: any[]) {
       super(...args);
+      this._drawableQueueStamp = 0;
       this._drawableId = ++_drawableId;
       this._objectColor = null;
       this._mdRenderQueueRef = [];
@@ -167,9 +174,14 @@ export function mixinDrawable<
     applyTransformUniforms(renderQueue: RenderQueue) {
       const instanceInfo = renderQueue.getInstanceInfo(this as unknown as Drawable);
       const currentTag = this.getNode().transformTag;
+      const paletteBase = (this as unknown as Drawable).getBoneMatrices()
+        ? (this as unknown as Mesh).getSkinPaletteBase()
+        : 0;
       if (instanceInfo) {
         const tag = instanceBindGroupTransfromTags.get(instanceInfo) ?? -1;
-        if (tag !== currentTag) {
+        if (tag !== currentTag || instanceSkinPaletteBases.get(instanceInfo) !== paletteBase) {
+          // The unused z of the framestamp vector carries the skin palette base of the instance
+          this._worldMatrixBuffer[18] = paletteBase;
           instanceInfo.bindGroup.bindGroup.setRawData(
             ShaderHelper.getInstanceDataUniformName(),
             instanceInfo.offset * 4,
@@ -178,9 +190,16 @@ export function mixinDrawable<
             36
           );
           instanceBindGroupTransfromTags.set(instanceInfo, currentTag);
+          instanceSkinPaletteBases.set(instanceInfo, paletteBase);
         }
       } else {
         const drawableBindGroup = this.getDrawableBindGroup(getDevice(), false, renderQueue);
+        if (drawableSkinPaletteBases.get(drawableBindGroup) !== paletteBase) {
+          if ((this as unknown as Drawable).getBoneMatrices()) {
+            drawableBindGroup.setValue(ShaderHelper.getSkinPaletteBaseUniformName(), paletteBase);
+          }
+          drawableSkinPaletteBases.set(drawableBindGroup, paletteBase);
+        }
         const tag = drawableBindGroupTransfromTags.get(drawableBindGroup) ?? -1;
         if (tag !== currentTag) {
           drawableBindGroup.setValue(
@@ -198,10 +217,17 @@ export function mixinDrawable<
           if ((this as unknown as Drawable).getBoneMatrices()) {
             drawableBindGroup.setValue(
               ShaderHelper.getBoneInvBindMatrixUniformName(),
-              (this as unknown as Mesh).invWorldMatrix
+              (this as unknown as Mesh).getSkinSpaceMatrix()
             );
           }
           drawableBindGroupTransfromTags.set(drawableBindGroup, currentTag);
+        }
+      }
+    }
+    applyTransformUniformsAll() {
+      for (const ref of this._mdRenderQueueRef) {
+        if (ref.valid && !ref.ref.disposed) {
+          this.applyTransformUniforms(ref.ref);
         }
       }
     }
@@ -251,7 +277,7 @@ export function mixinDrawable<
       const drawableBindGroup = this.getDrawableBindGroup(device, !!ctx.instanceData, renderQueue!);
       device.setBindGroup(1, drawableBindGroup);
       if (ctx.instanceData) {
-        device.setBindGroup(3, ctx.instanceData.bindGroup.bindGroup);
+        device.setBindGroup(3, ctx.instanceData.culled?.bindGroup ?? ctx.instanceData.bindGroup.bindGroup);
       }
       if (ctx.materialFlags & MaterialVaryingFlags.SKIN_ANIMATION) {
         const boneTexture = (this as unknown as Mesh).getBoneMatrices()!;
@@ -259,10 +285,16 @@ export function mixinDrawable<
         drawableBindGroup.setTexture(ShaderHelper.getBoneMatricesUniformName(), boneTexture);
         drawableBindGroup.setValue(
           ShaderHelper.getBoneInvBindMatrixUniformName(),
-          (this as unknown as Mesh).invWorldMatrix
+          (this as unknown as Mesh).getSkinSpaceMatrix()
         );
         boneTextureSize.setXY(boneTexture.width, boneTexture.height);
         drawableBindGroup.setValue(ShaderHelper.getBoneTextureSizeUniformName(), boneTextureSize);
+        if (!ctx.instanceData) {
+          drawableBindGroup.setValue(
+            ShaderHelper.getSkinPaletteBaseUniformName(),
+            (this as unknown as Mesh).getSkinPaletteBase()
+          );
+        }
         drawableBindGroup.setTexture(
           ShaderHelper.getSkinInfluenceDataUniformName(),
           skinData?.texture?.get() ?? getDefaultSkinInfluenceTexture()

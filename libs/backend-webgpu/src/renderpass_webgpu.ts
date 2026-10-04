@@ -551,6 +551,35 @@ export class WebGPURenderPass {
       renderBundleEncoder
     );
   }
+  captureIndirect(
+    renderBundleEncoder: GPURenderBundleEncoder,
+    program: WebGPUProgram,
+    vertexData: Nullable<WebGPUVertexLayout>,
+    stateSet: WebGPURenderStateSet,
+    bindGroups: WebGPUBindGroup[],
+    bindGroupOffsets: Nullable<Nullable<Iterable<number>>[]>,
+    primitiveType: PrimitiveType,
+    indirect: WebGPUIndirectDrawParams
+  ) {
+    const validation = this.validateDraw(program, bindGroups, stateSet, primitiveType, 0, 0, 1);
+    if (validation & VALIDATION_FAILED) {
+      return;
+    }
+    this.drawInternal(
+      this._renderPassEncoder!,
+      program,
+      vertexData,
+      stateSet,
+      bindGroups,
+      bindGroupOffsets,
+      primitiveType,
+      0,
+      0,
+      1,
+      renderBundleEncoder,
+      indirect
+    );
+  }
   private drawInternal(
     renderPassEncoder: GPURenderPassEncoder,
     program: WebGPUProgram,

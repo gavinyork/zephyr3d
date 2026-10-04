@@ -24,6 +24,7 @@ export * from './fixed_geometry_cache_track';
 export * from './geometry_cache_utils';
 export * from './pca_geometry_cache_track';
 export * from './skeleton';
+export * from './animation_bank';
 export * from './skeleton_modifier';
 export * from './ik_modifier';
 export * from './spring_modifier';

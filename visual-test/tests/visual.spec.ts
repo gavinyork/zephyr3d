@@ -174,7 +174,16 @@ const SCENE_NAMES = [
   'eye-frontal',
   'eye-angled',
   'eye-pupil-dilated',
-  'eye-socket-occlusion'
+  'eye-socket-occlusion',
+  'skin-instanced-cpu',
+  'skin-animation-bank',
+  'skin-gpu-animation',
+  'batch-instance-culling',
+  'batch-instance-culling-off',
+  'skin-batch-instance-culling',
+  'skin-batch-instance-culling-off',
+  'batch-instance-culling-growing',
+  'batch-instance-culling-growing-off'
 ];
 
 test('scene registry matches the harness page', async ({ harness }) => {

@@ -172,6 +172,7 @@ function cloneActualSSSListInfo(source: RenderItemListInfo, _targetQueue: Render
     morphItemList: filterActualSSSItemList(source.morphItemList),
     skinAndMorphItemList: filterActualSSSItemList(source.skinAndMorphItemList),
     instanceItemList: filterActualSSSItemList(source.instanceItemList),
+    skinInstanceItemList: filterActualSSSItemList(source.skinInstanceItemList),
     materialList: filterActualSSSMaterialList(source.materialList),
     instanceList: {},
     instanceLods: {},
@@ -196,7 +197,8 @@ function hasAnyActualSSSItems(renderItems: RenderItemListInfo[]): boolean {
       info.skinItemList.length > 0 ||
       info.morphItemList.length > 0 ||
       info.skinAndMorphItemList.length > 0 ||
-      info.instanceItemList.length > 0
+      info.instanceItemList.length > 0 ||
+      info.skinInstanceItemList.length > 0
   );
 }
 

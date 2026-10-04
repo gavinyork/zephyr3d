@@ -296,6 +296,28 @@ export class CommandQueueImmediate {
       numInstances
     );
   }
+  captureIndirect(
+    renderBundleEncoder: GPURenderBundleEncoder,
+    program: WebGPUProgram,
+    vertexData: Nullable<WebGPUVertexLayout>,
+    stateSet: WebGPURenderStateSet,
+    bindGroups: WebGPUBindGroup[],
+    bindGroupOffsets: Nullable<Nullable<Iterable<number>>[]>,
+    primitiveType: PrimitiveType,
+    indirect: WebGPUIndirectDrawParams
+  ) {
+    this.ensureRenderBodyReady();
+    this._renderPass.captureIndirect(
+      renderBundleEncoder,
+      program,
+      vertexData,
+      stateSet,
+      bindGroups,
+      bindGroupOffsets,
+      primitiveType,
+      indirect
+    );
+  }
   setViewport(vp: Nullable<Immutable<number[] | DeviceViewport>>) {
     this._renderPass.setViewport(vp);
   }

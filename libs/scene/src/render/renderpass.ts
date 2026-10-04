@@ -103,8 +103,11 @@ export abstract class RenderPass extends Disposable {
   /** @internal */
   protected drawScene(ctx: DrawContext, renderCamera: Camera, cullCamera: Camera, renderQueue?: RenderQueue) {
     const device = ctx.device;
-    this.clearFramebuffer();
     const rq = renderQueue ?? this.cullScene(ctx, cullCamera);
+    // Compute passes culling batched instances for this view run before the framebuffer is
+    // cleared, so they do not split the render pass
+    rq?.cullInstances();
+    this.clearFramebuffer();
     if (rq) {
       const windingReversed = device.isWindingOrderReversed();
       device.reverseVertexWindingOrder(this.isAutoFlip(ctx) ? !windingReversed : windingReversed);
@@ -263,6 +266,19 @@ export abstract class RenderPass extends Disposable {
           itemList.instanceItemList,
           itemList.renderQueue,
           itemList.instanceRenderBundle ?? null,
+          reverseWinding,
+          hash
+        );
+      }
+      if (itemList.skinInstanceItemList.length > 0) {
+        ctx.materialFlags |= MaterialVaryingFlags.SKIN_ANIMATION | MaterialVaryingFlags.INSTANCING;
+        ctx.materialFlags &= ~MaterialVaryingFlags.MORPH_ANIMATION;
+        itemList.materialList.forEach((mat) => mat.apply(ctx));
+        this.internalDrawItemList(
+          ctx,
+          itemList.skinInstanceItemList,
+          itemList.renderQueue,
+          itemList.skinInstanceRenderBundle ?? null,
           reverseWinding,
           hash
         );

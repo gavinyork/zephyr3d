@@ -556,7 +556,16 @@ export class Material extends Disposable implements Clonable<Material>, IDisposa
     if (numInstances > 0) {
       primitive.drawInstanced(numInstances, lod);
     } else if (ctx.instanceData) {
-      primitive.drawInstanced(ctx.instanceData.numInstances, lod);
+      const culled = ctx.instanceData.culled;
+      if (culled && culled.primitive === primitive) {
+        primitive.drawIndirect(culled.argsBuffer, culled.argsOffset);
+      } else {
+        if (culled) {
+          // Culled for another primitive (the solid one of a wireframe draw): draw all instances
+          ctx.device.setBindGroup(3, ctx.instanceData.bindGroup.bindGroup);
+        }
+        primitive.drawInstanced(ctx.instanceData.numInstances, lod);
+      }
     } else {
       primitive.draw(lod);
     }
