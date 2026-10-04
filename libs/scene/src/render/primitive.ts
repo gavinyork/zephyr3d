@@ -1,5 +1,6 @@
 import type { Nullable } from '@zephyr3d/base';
 import {
+  DEBUG_VIEWS,
   Disposable,
   makeObservable,
   releaseObject,
@@ -25,6 +26,76 @@ import {
 import type { BoundingVolume } from '../utility/bounding_volume';
 import { RenderBundleWrapper } from './renderbundle_wrapper';
 import { getDevice } from '../app/api';
+import { isWireframeActive } from './debug_views';
+
+/** @internal Triangles one edge pattern covers, more are drawn in chunks of it */
+const EDGE_PATTERN_TRIANGLES = 1 << 16;
+
+/** @internal Shared index pattern drawing the edges of non-indexed triangles */
+interface EdgePattern {
+  buffer: IndexBuffer;
+  triangles: number;
+}
+
+/** @internal Edges of a primitive, see Primitive.getEdges() */
+interface PrimitiveEdges {
+  /** Line list over the vertex buffers of the primitive */
+  primitive: Primitive;
+  /** Whether the primitive is a triangle strip */
+  strip: boolean;
+  /** Pattern indexing the vertices of a non-indexed primitive, null for an indexed one */
+  pattern: Nullable<EdgePattern>;
+  /** Indirect arguments of the chunks of a range beyond the pattern, for the range in key */
+  args: Nullable<{ key: string; buffer: GPUDataBuffer }>;
+}
+
+const edgePatterns: Nullable<EdgePattern>[] = [null, null];
+
+/** @internal Edge indices of a triangle list or strip of a given index count, 6 per triangle */
+function edgeIndexCount(count: number, strip: boolean) {
+  return (strip ? Math.max(count - 2, 0) : Math.floor(count / 3)) * 6;
+}
+
+/**
+ * @internal Write the 6 edge indices of every triangle: slot t, at 6t, holds triangle t of a list
+ * (indices 3t to 3t + 2) or of a strip (indices t to t + 2)
+ */
+function writeEdges(
+  out: Uint16Array | Uint32Array,
+  strip: boolean,
+  index: (i: number) => number,
+  count: number
+) {
+  const triangles = edgeIndexCount(count, strip) / 6;
+  for (let t = 0; t < triangles; t++) {
+    const i = strip ? t : t * 3;
+    const a = index(i);
+    const b = index(i + 1);
+    const c = index(i + 2);
+    out.set([a, b, b, c, c, a], t * 6);
+  }
+}
+
+/** @internal Triangles [first, count] drawn by a range [start, count] of indices or vertices */
+function edgeTriangles(start: number, count: number, strip: boolean): [number, number] {
+  return strip ? [start, Math.max(count - 2, 0)] : [Math.floor(start / 3), Math.floor(count / 3)];
+}
+
+/** @internal The edge pattern of non-indexed triangle lists or strips, created on first use */
+function getEdgePattern(strip: boolean) {
+  let pattern = edgePatterns[strip ? 1 : 0];
+  if (!pattern) {
+    const triangles = EDGE_PATTERN_TRIANGLES;
+    const data = new Uint32Array(triangles * 6);
+    writeEdges(data, strip, (i) => i, strip ? triangles + 2 : triangles * 3);
+    const buffer = getDevice().createIndexBuffer(data, { managed: true });
+    // Held for the lifetime of the module, the edge primitives only borrow it
+    retainObject(buffer);
+    pattern = { buffer, triangles };
+    edgePatterns[strip ? 1 : 0] = pattern;
+  }
+  return pattern;
+}
 
 /**
  * A coarser level of detail of a {@link Primitive}: a range of its index buffer drawing the same
@@ -95,10 +166,10 @@ export class Primitive
   private _changeTag: number;
   /** @internal Levels of detail after the first, finest to coarsest */
   protected _lods: PrimitiveLod[];
-  /** @internal Line list of the triangle edges, see getWireframe() */
-  private _wireframe: Nullable<Primitive>;
+  /** @internal Edges drawn in a wireframe view, see getEdges() */
+  private _edges: Nullable<PrimitiveEdges>;
   /** @internal Change tag the wireframe was built or is being built for, -1 for none */
-  private _wireframeTag: number;
+  private _edgesTag: number;
   /**
    * Create an empty primitive.
    *
@@ -121,8 +192,8 @@ export class Primitive
     this._changeTag = 0;
     this._bbox = null;
     this._lods = [];
-    this._wireframe = null;
-    this._wireframeTag = -1;
+    this._edges = null;
+    this._edgesTag = -1;
   }
   /**
    * Unique runtime identifier of this primitive.
@@ -414,6 +485,9 @@ export class Primitive
   draw(lod = 0) {
     this.checkVertexLayout();
     const [start, count] = this.getLodRange(lod);
+    if (DEBUG_VIEWS && isWireframeActive() && this.drawEdges(start, count, 0)) {
+      return;
+    }
     if (count > 0) {
       this._vertexLayout?.draw(this._primitiveType, start, count);
     }
@@ -429,6 +503,9 @@ export class Primitive
   drawInstanced(numInstances: number, lod = 0) {
     this.checkVertexLayout();
     const [start, count] = this.getLodRange(lod);
+    if (DEBUG_VIEWS && isWireframeActive() && this.drawEdges(start, count, numInstances)) {
+      return;
+    }
     if (count > 0) {
       this._vertexLayout?.drawInstanced(this._primitiveType, start, count, numInstances);
     }
@@ -457,9 +534,30 @@ export class Primitive
    *
    * @param indirectBuffer - Buffer holding the draw arguments.
    * @param indirectOffset - Byte offset of the arguments, a multiple of 4.
+   * @param edgeOffset - Byte offset of the arguments of the same draw for the edges of an indexed
+   *   triangle list in a wireframe view, twice the index count and first index; the triangles are
+   *   drawn in a wireframe view without them
+   * @param edgeBuffer - Buffer holding the edge arguments, indirectBuffer by default
    */
-  drawIndirect(indirectBuffer: GPUDataBuffer, indirectOffset = 0) {
+  drawIndirect(
+    indirectBuffer: GPUDataBuffer,
+    indirectOffset = 0,
+    edgeOffset = -1,
+    edgeBuffer?: GPUDataBuffer
+  ) {
     this.checkVertexLayout();
+    if (DEBUG_VIEWS && edgeOffset >= 0 && isWireframeActive()) {
+      const edges = this.getEdges();
+      if (edges && !edges.strip && !edges.pattern) {
+        edges.primitive.checkVertexLayout();
+        if (edges.primitive._vertexLayout) {
+          const device = getDevice();
+          device.setVertexLayout(edges.primitive._vertexLayout);
+          device.drawIndexedIndirect('line-list', edgeBuffer ?? indirectBuffer, edgeOffset);
+        }
+        return;
+      }
+    }
     if (this._vertexLayout) {
       const device = getDevice();
       device.setVertexLayout(this._vertexLayout);
@@ -471,101 +569,155 @@ export class Primitive
     }
   }
   /**
-   * The triangle edges of this primitive as a line list over the same vertex buffers, for
-   * wireframe display: one range of the index buffer per level of detail, so it draws at the same
-   * levels. Built asynchronously from the index buffer, which is read back from the GPU; returns
-   * null until ready, after any change to this primitive, and for primitives that are not
-   * triangle lists.
+   * @internal The edges this primitive draws in a wireframe view, see isWireframeActive(): null
+   * while they are read back from the GPU, and for primitives that are not triangles. Edges of
+   * indexed primitives are built from their indices; those of non-indexed ones index the
+   * vertices through a shared pattern, so shaders deriving geometry from the vertex index draw
+   * their edges unchanged.
    */
-  getWireframe(): Nullable<Primitive> {
-    if (this._primitiveType !== 'triangle-list') {
+  getEdges(): Nullable<PrimitiveEdges> {
+    if (
+      !DEBUG_VIEWS ||
+      (this._primitiveType !== 'triangle-list' && this._primitiveType !== 'triangle-strip')
+    ) {
       return null;
     }
-    if (this._wireframeTag !== this._changeTag) {
-      this._wireframeTag = this._changeTag;
-      this._wireframe?.dispose();
-      this._wireframe = null;
+    const strip = this._primitiveType === 'triangle-strip';
+    if (!this.getIndexBuffer()) {
+      const pattern = getEdgePattern(strip);
+      if (!this._edges || this._edgesTag !== this._changeTag || this._edges.pattern !== pattern) {
+        this._edgesTag = this._changeTag;
+        this._edges?.primitive.dispose();
+        this._edges = { primitive: this.createEdgePrimitive(pattern.buffer), strip, pattern, args: null };
+      }
+      return this._edges;
+    }
+    if (this._edgesTag !== this._changeTag) {
+      this._edgesTag = this._changeTag;
+      this._edges?.primitive.dispose();
+      this._edges = null;
       const tag = this._changeTag;
-      this.buildWireframe().then(
-        (wireframe) => {
+      this.buildEdges(strip).then(
+        (edges) => {
           // Superseded by a change made while reading back
-          if (this.disposed || this._wireframeTag !== tag) {
-            wireframe?.dispose();
+          if (this.disposed || this._edgesTag !== tag) {
+            edges?.primitive.dispose();
           } else {
-            this._wireframe = wireframe;
+            this._edges = edges;
           }
         },
         (err) => console.error(`Building the wireframe of a primitive failed: ${err}`)
       );
     }
-    return this._wireframe;
+    return this._edges;
   }
-  /** @internal */
-  private async buildWireframe() {
-    const numVertices = this.getNumVertices();
-    if (numVertices <= 0) {
+  /** @internal A line list over the vertex buffers of this primitive */
+  private createEdgePrimitive(indexBuffer: IndexBuffer) {
+    const primitive = new Primitive();
+    for (const info of this._vertexLayoutOptions.vertexBuffers) {
+      primitive.setVertexBuffer(info.buffer, info.stepMode);
+    }
+    primitive.setIndexBuffer(indexBuffer);
+    primitive.primitiveType = 'line-list';
+    return primitive;
+  }
+  /**
+   * @internal Edges of an indexed primitive from its indices read back: 6 per triangle, every
+   * edge of every triangle, so a range of a triangle list maps to twice its start and count
+   */
+  private async buildEdges(strip: boolean): Promise<Nullable<PrimitiveEdges>> {
+    const ib = this.getIndexBuffer()!;
+    const bytes = await ib.getBufferSubData();
+    const indices =
+      ib.indexType.primitiveType === PBPrimitiveType.U16
+        ? new Uint16Array(bytes.buffer, bytes.byteOffset, bytes.byteLength >> 1)
+        : new Uint32Array(bytes.buffer, bytes.byteOffset, bytes.byteLength >> 2);
+    const lines =
+      ib.indexType.primitiveType === PBPrimitiveType.U16
+        ? new Uint16Array(edgeIndexCount(indices.length, strip))
+        : new Uint32Array(edgeIndexCount(indices.length, strip));
+    writeEdges(lines, strip, (i) => indices[i], indices.length);
+    if (this.disposed) {
       return null;
     }
-    const ib = this.getIndexBuffer();
-    let indices: ArrayLike<number>;
-    if (ib) {
-      const bytes = await ib.getBufferSubData();
-      indices =
-        ib.indexType.primitiveType === PBPrimitiveType.U16
-          ? new Uint16Array(bytes.buffer, bytes.byteOffset, bytes.byteLength >> 1)
-          : new Uint32Array(bytes.buffer, bytes.byteOffset, bytes.byteLength >> 2);
-    } else {
-      indices = Array.from({ length: numVertices }, (_, i) => i);
+    const device = getDevice();
+    const buffer = device.createIndexBuffer(lines as Uint16Array<ArrayBuffer> | Uint32Array<ArrayBuffer>, {
+      managed: true
+    });
+    return { primitive: this.createEdgePrimitive(buffer), strip, pattern: null, args: null };
+  }
+  /**
+   * @internal Draw the edges of a range of this primitive in place of its triangles, false if
+   * they are not available
+   */
+  private drawEdges(start: number, count: number, numInstances: number) {
+    const edges = this.getEdges();
+    if (!edges) {
+      return false;
     }
-    const ranges: [number, number][] = [
-      [this._indexStart, this.indexCount],
-      ...this._lods.map((lod): [number, number] => [lod.indexStart, lod.indexCount])
-    ];
-    // Each triangle edge once per level, whichever triangle lists it first
-    const lines: number[] = [];
-    const lineRanges: [number, number][] = [];
-    for (const [start, count] of ranges) {
-      const first = lines.length;
-      const seen = new Set<number>();
-      const end = Math.min(start + count, indices.length);
-      for (let i = start; i + 2 < end; i += 3) {
-        for (let e = 0; e < 3; e++) {
-          const a = indices[i + e];
-          const b = indices[i + ((e + 1) % 3)];
-          const key = a < b ? a * numVertices + b : b * numVertices + a;
-          if (!seen.has(key)) {
-            seen.add(key);
-            lines.push(a, b);
-          }
-        }
+    const [first, triangles] = edgeTriangles(start, count, edges.strip);
+    if (triangles <= 0) {
+      return true;
+    }
+    const primitive = edges.primitive;
+    primitive.checkVertexLayout();
+    const layout = primitive._vertexLayout;
+    if (!layout) {
+      return true;
+    }
+    const pattern = edges.pattern;
+    if (!pattern || first + triangles <= pattern.triangles) {
+      // Index buffers hold 6 edge indices per triangle, slot t at 6t
+      if (numInstances > 0) {
+        layout.drawInstanced('line-list', first * 6, triangles * 6, numInstances);
+      } else {
+        layout.draw('line-list', first * 6, triangles * 6);
       }
-      lineRanges.push([first, lines.length - first]);
+      return true;
     }
-    const wireframe = new Primitive();
-    for (const info of this._vertexLayoutOptions.vertexBuffers) {
-      wireframe.setVertexBuffer(info.buffer, info.stepMode);
+    // Beyond the pattern: chunks of it, moved along the vertices by the base vertex of indirect draws
+    const device = getDevice();
+    if (!device.getDeviceCaps().miscCaps.supportDrawIndirect) {
+      return false;
     }
-    wireframe.createAndSetIndexBuffer(numVertices > 0xffff ? new Uint32Array(lines) : new Uint16Array(lines));
-    wireframe.primitiveType = 'line-list';
-    wireframe.indexStart = lineRanges[0][0];
-    wireframe.indexCount = lineRanges[0][1];
-    wireframe.lods = this._lods.map((lod, i) => ({
-      ...lod,
-      indexStart: lineRanges[i + 1][0],
-      indexCount: lineRanges[i + 1][1]
-    }));
-    if (this._bbox) {
-      wireframe.setBoundingVolume(this._bbox);
+    const chunk = pattern.triangles;
+    const chunks = Math.ceil(triangles / chunk);
+    const key = `${first}:${triangles}:${numInstances}`;
+    let args = edges.args;
+    if (!args || args.key !== key) {
+      const data = new Uint32Array(chunks * 5);
+      for (let i = 0; i < chunks; i++) {
+        const t = first + i * chunk;
+        data[i * 5] = Math.min(chunk, triangles - i * chunk) * 6;
+        data[i * 5 + 1] = Math.max(numInstances, 1);
+        // Triangle t starts at vertex 3t of a list, t of a strip
+        data[i * 5 + 3] = t * (edges.strip ? 1 : 3);
+      }
+      if (!args || args.buffer.byteLength < data.byteLength) {
+        args?.buffer.dispose();
+        args = {
+          key,
+          buffer: device.createBuffer(Math.max(data.byteLength, 320), { usage: 'indirect' })
+        };
+        edges.args = args;
+      }
+      args.key = key;
+      args.buffer.bufferSubData(0, data);
     }
-    return wireframe;
+    device.setVertexLayout(layout);
+    for (let i = 0; i < chunks; i++) {
+      device.drawIndexedIndirect('line-list', args.buffer, i * 20);
+    }
+    return true;
   }
   /**
    * Dispose this primitive and release associated GPU resources.
    */
   protected onDispose() {
     super.onDispose();
-    this._wireframe?.dispose();
-    this._wireframe = null;
+    this._edges?.primitive.dispose();
+    this._edges?.args?.buffer.dispose();
+    this._edges = null;
     this._vertexLayout?.dispose();
     this._vertexLayout = null;
     if (this._vertexLayoutOptions) {
