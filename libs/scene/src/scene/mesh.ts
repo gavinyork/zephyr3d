@@ -163,6 +163,10 @@ function createMorphInfoBuffer(data: Float32Array) {
 const MeshBase = castObservable(applyMixins(GraphNode, mixinDrawable))<{
   primitive_changed: [primitive: Nullable<Primitive>];
   material_changed: [material: Nullable<MeshMaterial>];
+  /** forcedLod or minLod changed */
+  lod_changed: [mesh: Mesh];
+  /** wireframe changed, which moves the mesh to another batch */
+  wireframe_changed: [mesh: Mesh];
 }>();
 
 /**
@@ -381,7 +385,10 @@ export class Mesh extends MeshBase implements BatchDrawable {
     return this._wireframe;
   }
   set wireframe(val: boolean) {
-    this._wireframe = !!val;
+    if (!!val !== this._wireframe) {
+      this._wireframe = !!val;
+      this.dispatchEvent('wireframe_changed', this);
+    }
   }
   /**
    * Level of detail to always draw, or -1 to select it by the projected size (UE ForcedLodModel,
@@ -391,7 +398,11 @@ export class Mesh extends MeshBase implements BatchDrawable {
     return this._forcedLod;
   }
   set forcedLod(val: number) {
-    this._forcedLod = Math.max(-1, Math.floor(val));
+    val = Math.max(-1, Math.floor(val));
+    if (val !== this._forcedLod) {
+      this._forcedLod = val;
+      this.dispatchEvent('lod_changed', this);
+    }
   }
   /**
    * Finest level of detail drawn when selecting by the projected size (UE MinLOD). Clamped to the
@@ -401,7 +412,11 @@ export class Mesh extends MeshBase implements BatchDrawable {
     return this._minLod;
   }
   set minLod(val: number) {
-    this._minLod = Math.max(0, Math.floor(val));
+    val = Math.max(0, Math.floor(val));
+    if (val !== this._minLod) {
+      this._minLod = val;
+      this.dispatchEvent('lod_changed', this);
+    }
   }
   /**
    * Selects the level of detail of the primitive for a view: forced, or picked from the projected

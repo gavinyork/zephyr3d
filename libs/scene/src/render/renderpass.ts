@@ -134,7 +134,7 @@ export abstract class RenderPass extends Disposable {
     } else {
       ctx.scene.rootNode.traverse(cullVisitor);
     }
-    renderQueue.end(cullCamera);
+    renderQueue.end(cullCamera, false, ctx.camera);
     ctx.sunLight = renderQueue.sunLight;
     ctx.primaryDirectionalLight = renderQueue.primaryDirectionalLight;
     ctx.primaryTransmissionLight = renderQueue.primaryTransmissionLight;
@@ -150,7 +150,15 @@ export abstract class RenderPass extends Disposable {
     hash: string
   ) {
     let recording = false;
-    const disableRenderBundles = this.shouldDisableRenderBundles(ctx);
+    // Wireframe meshes draw an edge primitive built asynchronously, so a bundle recorded before it
+    // is ready would keep drawing triangles; the bundle key does not know the camera setting either
+    const disableRenderBundles =
+      this.shouldDisableRenderBundles(ctx) ||
+      (ctx.camera?.wireframe ?? false) ||
+      items.some((item) => {
+        const node = item.drawable.getNode();
+        return node.isMesh() && node.wireframe;
+      });
     if (renderBundle && ctx.camera.commandBufferReuse && !disableRenderBundles) {
       const bundle = renderBundle.getRenderBundle(hash);
       if (bundle) {

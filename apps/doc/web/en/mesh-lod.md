@@ -79,7 +79,7 @@ To measure a mesh by the same rule, `computeBoundsScreenSize(center, radius, cam
 ## Batching
 
 - Automatic instancing batches by primitive and material; the levels of one primitive form separate batches, each drawing its own index range.
-- `BatchGroup` caches its render queue. Each mesh in the group with levels of detail chooses its own level, and the cache is only rebuilt when one of them switches, which the hysteresis keeps rare.
+- `BatchGroup` caches its render queue. On WebGPU, when the device supports `indirect-first-instance` and `gpuInstanceCulling` is on (the default), the levels of batched meshes are selected on the GPU per instance, in the same compute pass that frustum culls them: the cache is not rebuilt when meshes switch levels. Shadow views select by the main camera as on the CPU. This path has no hysteresis, as UE static meshes, so a mesh sitting right at a switch distance may flip between levels as the camera moves. Elsewhere (WebGL, culling off, LOD coloration on, meshes that are not batched) each mesh chooses its level on the CPU, and the cache is rebuilt when one of them switches, which the hysteresis keeps rare.
 
 ---
 

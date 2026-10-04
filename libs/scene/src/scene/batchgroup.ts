@@ -1,6 +1,7 @@
 import { GraphNode } from './graph_node';
 import type { CullVisitor, RenderPass } from '../render';
 import { RenderQueue, InstanceBindGroupAllocator } from '../render';
+import { InstanceCuller } from '../render/instance_culling';
 import type { Scene } from './scene';
 import type { Mesh } from './mesh';
 import type { SceneNode } from './scene_node';
@@ -30,6 +31,8 @@ export class BatchGroup extends GraphNode {
   /** Child meshes whose primitive has levels of detail, collected at _lodMeshesTag */
   private _lodMeshes: Mesh[];
   private _lodMeshesTag: number;
+  /** Whether _lodMeshes left out the meshes whose level GPU culling selects */
+  private _lodMeshesGpu: boolean;
   private _staticBV: boolean;
   private _gpuInstanceCulling: boolean;
   /**
@@ -42,6 +45,7 @@ export class BatchGroup extends GraphNode {
     this._changeTag = 0;
     this._lodMeshes = [];
     this._lodMeshesTag = -1;
+    this._lodMeshesGpu = false;
     this._bindGroupAllocator = new InstanceBindGroupAllocator();
     this._staticBV = false;
     this._gpuInstanceCulling = true;
@@ -65,6 +69,12 @@ export class BatchGroup extends GraphNode {
     const materialCallback = () => {
       this.invalidate();
     };
+    // Levels selected by GPU culling read the level limits of the mesh with its bounds
+    const lodCallback = (mesh: Mesh) => {
+      for (const { queue } of this._renderQueueMap.values()) {
+        queue.markInstanceBoundsDirty(mesh);
+      }
+    };
     this.on('visiblechanged', (node) => {
       node.iterate((child) => {
         if (child.isMesh()) {
@@ -84,6 +94,8 @@ export class BatchGroup extends GraphNode {
           child.on('bvchanged', bvCallback);
           child.on('primitive_changed', primitiveCallback);
           child.on('material_changed', materialCallback);
+          child.on('lod_changed', lodCallback);
+          child.on('wireframe_changed', materialCallback);
           this.invalidate();
         }
       });
@@ -98,6 +110,8 @@ export class BatchGroup extends GraphNode {
           child.off('bvchanged', bvCallback);
           child.off('primitive_changed', primitiveCallback);
           child.off('material_changed', materialCallback);
+          child.off('lod_changed', lodCallback);
+          child.off('wireframe_changed', materialCallback);
           this.invalidate();
         }
       });
@@ -198,8 +212,12 @@ export class BatchGroup extends GraphNode {
     }
     // The cached queue holds each child at the level of detail it was built with, so a child
     // switching level rebuilds it; levels switch rarely thanks to the hysteresis
-    const lodsChanged = this.updateLods(cullVisitor, queueInfo.lods);
     const lodColoration = !!cullVisitor.camera?.lodColoration;
+    const lodsChanged = this.updateLods(
+      cullVisitor,
+      queueInfo.lods,
+      queueInfo.queue.culledOnGpu && !lodColoration
+    );
     if (queueInfo.tag !== this._changeTag || lodsChanged || queueInfo.lodColoration !== lodColoration) {
       queueInfo.tag = this._changeTag;
       queueInfo.lodColoration = lodColoration;
@@ -213,7 +231,7 @@ export class BatchGroup extends GraphNode {
           cullVisitor.visit(node);
         }
       });
-      queueInfo.queue.end(cullVisitor.camera, true);
+      queueInfo.queue.end(cullVisitor.camera, true, cullVisitor.lodCamera);
       cullVisitor.frustumCulling = frustumCulling;
       cullVisitor.renderQueue = renderQueue;
     } else if (cullVisitor.camera?.getPickResultResolveFunc()) {
@@ -223,13 +241,21 @@ export class BatchGroup extends GraphNode {
     }
     cullVisitor.pushRenderQueue(queueInfo.queue);
   }
-  /** Selects the levels of detail of the child meshes having some, true if any differs from lods */
-  private updateLods(cullVisitor: CullVisitor, lods: number[]) {
-    if (this._lodMeshesTag !== this._changeTag) {
+  /**
+   * Selects the levels of detail of the child meshes having some, true if any differs from lods.
+   * Meshes whose level GPU instance culling selects are left out: their batch holds every level.
+   */
+  private updateLods(cullVisitor: CullVisitor, lods: number[], gpuLod: boolean) {
+    if (this._lodMeshesTag !== this._changeTag || this._lodMeshesGpu !== gpuLod) {
       this._lodMeshesTag = this._changeTag;
+      this._lodMeshesGpu = gpuLod;
       this._lodMeshes = [];
       this.iterate((node) => {
-        if (node.isMesh() && (node.primitive?.lodCount ?? 1) > 1) {
+        if (
+          node.isMesh() &&
+          (node.primitive?.lodCount ?? 1) > 1 &&
+          !(gpuLod && node.isBatchable() && InstanceCuller.selectsLod(node))
+        ) {
           this._lodMeshes.push(node);
         }
       });
