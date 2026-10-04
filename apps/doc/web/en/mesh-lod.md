@@ -49,7 +49,7 @@ Two debug views help, on their own or together. Debug views are only available w
 ```
 
 
-- **Wireframe**: `camera.wireframe = true` draws everything in the view as the edges of its triangles: meshes, batch groups, particles, sprites, hair, terrain, water and grass; `mesh.wireframe = true` does it for one mesh. The wireframe follows the level in use, so moving the camera shows the triangle count change directly. Edges of indexed geometry are built from index data read back from the GPU and appear a few frames after it is turned on. Shadows and picking are unaffected.
+- **Wireframe**: `camera.wireframe = true` draws everything in the view as the edges of its triangles: meshes, batch groups, particles, sprites, hair, terrain, water and grass. The wireframe follows the level in use, so moving the camera shows the triangle count change directly. Edges of indexed geometry are built from index data read back from the GPU and appear a few frames after it is turned on. Shadows and picking are unaffected.
 - **LOD coloration**: `camera.lodColoration = true` shades every mesh in the color of its current level, with UE's LOD Coloration colors:
 
 | LOD | 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 |

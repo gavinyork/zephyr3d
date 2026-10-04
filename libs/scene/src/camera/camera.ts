@@ -1598,8 +1598,9 @@ export class Camera extends SceneNode {
     this._lodDistanceScale = Math.max(0, Number(val) || 0);
   }
   /**
-   * Whether every mesh of this view is drawn as the edges of its triangles, at the level of detail
-   * in use, see {@link Mesh.wireframe}. A debug view, not saved with the camera. Default false.
+   * Whether everything in this view is drawn as the edges of its triangles, at the level of detail
+   * in use, to inspect geometry; shadows and picking keep the triangles. A debug view, see
+   * DEBUG_VIEWS, not saved with the camera. Default false.
    */
   get wireframe() {
     return DEBUG_VIEWS && this._wireframe;

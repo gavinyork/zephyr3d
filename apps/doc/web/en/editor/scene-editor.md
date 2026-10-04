@@ -82,7 +82,6 @@ When an object is selected in the scene, you can edit its properties in the **In
 
 Mesh nodes also have a few properties related to [levels of detail (LOD)](en/mesh-lod.md):
 
-- **Wireframe**: draws this mesh as the edges of its triangles
 - **ForcedLod**: always uses one level of detail; -1 chooses by distance
 - **MinLod**: the most detailed level used when choosing by distance
 

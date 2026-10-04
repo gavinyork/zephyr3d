@@ -155,14 +155,7 @@ export abstract class RenderPass extends Disposable {
     const wireframe = DEBUG_VIEWS && !!ctx.camera?.wireframe && isWireframePass(ctx);
     // Edges are built asynchronously, so a bundle recorded before they are ready would keep
     // drawing triangles; the bundle key does not know the camera setting either
-    const disableRenderBundles =
-      this.shouldDisableRenderBundles(ctx) ||
-      wireframe ||
-      (DEBUG_VIEWS &&
-        items.some((item) => {
-          const node = item.drawable.getNode();
-          return node.isMesh() && node.wireframe;
-        }));
+    const disableRenderBundles = this.shouldDisableRenderBundles(ctx) || wireframe;
     if (wireframe) {
       beginWireframe();
     }

@@ -49,7 +49,7 @@ camera.lodDistanceScale = lowQuality ? 2 : 1;
 ```
 
 
-- **线框**：`camera.wireframe = true` 把这个视图里的所有对象画成三角形的边，包括网格、BatchGroup、粒子、精灵、头发、地形、水体和草；`mesh.wireframe = true` 只作用于单个网格。线框跟随当前的 LOD，拉远拉近能直接看到三角形变少。带索引几何的线框需要从 GPU 读回索引后生成，打开后会晚几帧出现。阴影和拾取不受影响。
+- **线框**：`camera.wireframe = true` 把这个视图里的所有对象画成三角形的边，包括网格、BatchGroup、粒子、精灵、头发、地形、水体和草。线框跟随当前的 LOD，拉远拉近能直接看到三角形变少。带索引几何的线框需要从 GPU 读回索引后生成，打开后会晚几帧出现。阴影和拾取不受影响。
 - **LOD 着色**：`camera.lodColoration = true` 把每个网格按当前所在的级别着色，配色与 UE 的 LOD Coloration 相同：
 
 | LOD | 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 |
