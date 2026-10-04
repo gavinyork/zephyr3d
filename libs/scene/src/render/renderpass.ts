@@ -1,5 +1,5 @@
 import type { Immutable, Nullable } from '@zephyr3d/base';
-import { DEPTH_CLEAR_VALUE, Disposable, Vector4 } from '@zephyr3d/base';
+import { DEBUG_VIEWS, DEPTH_CLEAR_VALUE, Disposable, Vector4 } from '@zephyr3d/base';
 import { CullVisitor } from './cull_visitor';
 import type { RenderItemListInfo, RenderQueueItem } from './render_queue';
 import { RenderQueue } from './render_queue';
@@ -9,6 +9,7 @@ import { RenderBundleWrapper } from './renderbundle_wrapper';
 import { MaterialVaryingFlags, RENDER_PASS_TYPE_LIGHT } from '../values';
 import type { BindGroup, FrameBufferClearColors } from '@zephyr3d/device';
 import { getDevice } from '../app/api';
+import { beginWireframe, endWireframe, isWireframePass } from './debug_views';
 
 /**
  * Base class for any kind of render passes
@@ -150,15 +151,21 @@ export abstract class RenderPass extends Disposable {
     hash: string
   ) {
     let recording = false;
-    // Wireframe meshes draw an edge primitive built asynchronously, so a bundle recorded before it
-    // is ready would keep drawing triangles; the bundle key does not know the camera setting either
+    // A wireframe view draws everything as edges (debug views only)
+    const wireframe = DEBUG_VIEWS && !!ctx.camera?.wireframe && isWireframePass(ctx);
+    // Edges are built asynchronously, so a bundle recorded before they are ready would keep
+    // drawing triangles; the bundle key does not know the camera setting either
     const disableRenderBundles =
       this.shouldDisableRenderBundles(ctx) ||
-      (ctx.camera?.wireframe ?? false) ||
-      items.some((item) => {
-        const node = item.drawable.getNode();
-        return node.isMesh() && node.wireframe;
-      });
+      wireframe ||
+      (DEBUG_VIEWS &&
+        items.some((item) => {
+          const node = item.drawable.getNode();
+          return node.isMesh() && node.wireframe;
+        }));
+    if (wireframe) {
+      beginWireframe();
+    }
     if (renderBundle && ctx.camera.commandBufferReuse && !disableRenderBundles) {
       const bundle = renderBundle.getRenderBundle(hash);
       if (bundle) {
@@ -190,6 +197,9 @@ export abstract class RenderPass extends Disposable {
       }
     }
     ctx.primitiveLod = 0;
+    if (wireframe) {
+      endWireframe();
+    }
     if (renderBundle && ctx.camera.commandBufferReuse && !disableRenderBundles) {
       renderBundle.endRenderBundle(hash);
     }

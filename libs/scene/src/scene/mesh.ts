@@ -1,5 +1,21 @@
 import type { Nullable } from '@zephyr3d/base';
-import { applyMixins, castObservable, DRef, DWeakRef, Matrix4x4, Vector3, Vector4 } from '@zephyr3d/base';
+import {
+  applyMixins,
+  DEBUG_VIEWS,
+  castObservable,
+  DRef,
+  DWeakRef,
+  Matrix4x4,
+  Vector3,
+  Vector4
+} from '@zephyr3d/base';
+import {
+  beginWireframe,
+  checkDebugViews,
+  endWireframe,
+  isWireframeActive,
+  isWireframePass
+} from '../render/debug_views';
 import { GraphNode } from './graph_node';
 import type { MeshMaterial } from '../material';
 import { LambertMaterial, ShaderHelper } from '../material';
@@ -30,9 +46,7 @@ import {
   MORPH_ATTRIBUTE_VECTOR_COUNT,
   MORPH_WEIGHTS_VECTOR_COUNT,
   QUEUE_OPAQUE,
-  RENDER_PASS_TYPE_LIGHT,
-  RENDER_PASS_TYPE_OBJECT_COLOR,
-  RENDER_PASS_TYPE_SHADOWMAP
+  RENDER_PASS_TYPE_LIGHT
 } from '../values';
 import { mixinDrawable } from '../render/drawable_mixin';
 import { RenderBundleWrapper } from '../render/renderbundle_wrapper';
@@ -296,7 +310,7 @@ export class Mesh extends MeshBase implements BatchDrawable {
    */
   getInstanceId(_renderPass: RenderPass) {
     // A wireframe mesh draws another primitive, so it cannot share a batch with solid ones
-    const id = `${this._instanceHash}:${this.worldMatrixDet >= 0}${this._wireframe ? ':wire' : ''}`;
+    const id = `${this._instanceHash}:${this.worldMatrixDet >= 0}${this.wireframe ? ':wire' : ''}`;
     return this._boneMatrices.get() ? `${id}:skin:${this.getSkinSpaceKey()}` : id;
   }
   /**
@@ -382,9 +396,12 @@ export class Mesh extends MeshBase implements BatchDrawable {
    * set or changed, as they are read back from the GPU.
    */
   get wireframe() {
-    return this._wireframe;
+    return DEBUG_VIEWS && this._wireframe;
   }
   set wireframe(val: boolean) {
+    if (val) {
+      checkDebugViews('Mesh.wireframe');
+    }
     if (!!val !== this._wireframe) {
       this._wireframe = !!val;
       this.dispatchEvent('wireframe_changed', this);
@@ -1335,16 +1352,18 @@ export class Mesh extends MeshBase implements BatchDrawable {
         return;
       }
       const material = coloration ?? ownMaterial;
-      const wireframe = this.getWireframe(ctx, solid);
-      const primitive = wireframe ?? solid;
-      if (this._useRenderBundle && !ctx.instanceData && hash) {
+      const primitive = solid;
+      // A wireframe mesh draws the edges of its primitive, without render bundles: the edges are
+      // built asynchronously, a bundle recorded before would keep drawing the triangles
+      const wireframe = this.wireframe && isWireframePass(ctx);
+      if (wireframe) {
+        beginWireframe();
+      }
+      if (this._useRenderBundle && !ctx.instanceData && hash && !isWireframeActive()) {
         // Each level of detail records its own draw range
         const lod = ctx.primitiveLod ?? 0;
         if (lod > 0) {
           hash = `${hash}:lod${lod}`;
-        }
-        if (wireframe) {
-          hash = `${hash}:wire${wireframe.id}`;
         }
         if (coloration) {
           hash = `${hash}:lodcolor`;
@@ -1370,6 +1389,9 @@ export class Mesh extends MeshBase implements BatchDrawable {
         this.bind(ctx, renderQueue);
         material.draw(primitive, ctx);
       }
+      if (wireframe) {
+        endWireframe();
+      }
     }
   }
   /**
@@ -1390,18 +1412,6 @@ export class Mesh extends MeshBase implements BatchDrawable {
       Mesh._lodColorationMaterials[lod] = material;
     }
     return material;
-  }
-  /** @internal The edge primitive to draw instead of the triangles, null to draw them */
-  private getWireframe(ctx: DrawContext, primitive: Primitive) {
-    const passType = ctx.renderPass?.type;
-    if (
-      (this._wireframe || ctx.camera?.wireframe) &&
-      passType !== RENDER_PASS_TYPE_SHADOWMAP &&
-      passType !== RENDER_PASS_TYPE_OBJECT_COLOR
-    ) {
-      return primitive.getWireframe();
-    }
-    return null;
   }
   /**
    * {@inheritDoc Drawable.getMaterial}

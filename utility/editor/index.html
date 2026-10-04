@@ -67,6 +67,10 @@ __ZEPHYR3D_IMPORT_MAP__
       });
     </script>
     <script>
+      // Debug views (wireframe, level of detail coloration) are editor tools, off in shipped builds
+      globalThis.__ZEPHYR3D_DEBUG_VIEWS__ = true;
+    </script>
+    <script>
       // Select the engine depth convention before any engine module loads.
       const params = new URLSearchParams(location.search);
       if (params.has('standardZ')) {

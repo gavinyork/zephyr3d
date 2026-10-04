@@ -9,7 +9,7 @@ import type {
   Texture2D
 } from '@zephyr3d/device';
 import type { Nullable } from '@zephyr3d/base';
-import { Disposable, DRef, nextPowerOf2, Vector3, Vector4 } from '@zephyr3d/base';
+import { DEBUG_VIEWS, Disposable, DRef, nextPowerOf2, Vector3, Vector4 } from '@zephyr3d/base';
 import type { Camera } from '../../camera';
 import { Primitive } from '../../render';
 import { getDevice } from '../../app/api';
@@ -130,6 +130,8 @@ export function grassHash(x: number, z: number, seed: number): number {
 type PlacementTarget = {
   instanceBuffer: DRef<GPUDataBuffer>;
   argsBuffer: DRef<GPUDataBuffer>;
+  /** Arguments of the same draws for the wireframe edges, with debug views only */
+  edgeArgsBuffer: DRef<GPUDataBuffer>;
   bindGroup: DRef<BindGroup>;
   primitive: DRef<Primitive>;
   capacity: number;
@@ -228,8 +230,8 @@ export class GrassGpuPlacement extends Disposable {
     this._targets = [];
     this._baseVertexBuffer = new DRef(baseVertexBuffer);
     this._indexBuffer = new DRef(indexBuffer);
-    // Five draw arguments per detail level
-    this._args = new Uint32Array(this._lodIndexCounts.length * 5);
+    // Five draw arguments per detail level, then with debug views the same for the wireframe edges
+    this._args = new Uint32Array(this._lodIndexCounts.length * 5 * (DEBUG_VIEWS ? 2 : 1));
     this._window = new Vector4();
     this._window2 = new Vector4();
     this._lod = new Vector4();
@@ -324,12 +326,18 @@ export class GrassGpuPlacement extends Disposable {
     const heightMap = terrain.heightMap;
     // Draw arguments of each detail level, whose indices follow each other: (index count,
     // instance count, first index, base vertex, first instance)
+    const levels = this._lodIndexCounts.length;
     let firstIndex = 0;
-    for (let i = 0; i < this._lodIndexCounts.length; i++) {
+    for (let i = 0; i < levels; i++) {
       this._args.set([this._lodIndexCounts[i], 0, firstIndex, 0, 0], i * 5);
+      if (DEBUG_VIEWS) {
+        // Edge index buffers hold 6 indices per triangle, twice the triangle indices
+        this._args.set([this._lodIndexCounts[i] * 2, 0, firstIndex * 2, 0, 0], (levels + i) * 5);
+      }
       firstIndex += this._lodIndexCounts[i];
     }
-    placementTarget.argsBuffer.get()!.bufferSubData(0, this._args);
+    placementTarget.argsBuffer.get()!.bufferSubData(0, this._args.subarray(0, levels * 5));
+    placementTarget.edgeArgsBuffer.get()?.bufferSubData(0, this._args.subarray(levels * 5));
     if (!density || !heightMap) {
       return;
     }
@@ -487,6 +495,13 @@ export class GrassGpuPlacement extends Disposable {
       Math.ceil(Math.max(near[3], far[3]) / WORKGROUP_SIZE),
       farCount > 0 ? 2 : 1
     );
+    // The instance counts placement wrote, for drawing the edges in a wireframe view
+    const edgeArgs = placementTarget.edgeArgsBuffer.get();
+    if (edgeArgs) {
+      for (let i = 0; i < this._lodIndexCounts.length; i++) {
+        device.copyBuffer(placementTarget.argsBuffer.get()!, edgeArgs, (i * 5 + 1) * 4, (i * 5 + 1) * 4, 4);
+      }
+    }
   }
   /**
    * Window of placement units within a radius of a point, clipped to the grid and to
@@ -561,8 +576,14 @@ export class GrassGpuPlacement extends Disposable {
       placementTarget.primitive.set(primitive);
     }
     // One draw per detail level; the arguments pick its range of the index buffer
+    const edgeArgs = placementTarget.edgeArgsBuffer.get();
     for (let i = 0; i < this._lodIndexCounts.length; i++) {
-      primitive.drawIndirect(placementTarget.argsBuffer.get()!, i * 20);
+      primitive.drawIndirect(
+        placementTarget.argsBuffer.get()!,
+        i * 20,
+        edgeArgs ? i * 20 : -1,
+        edgeArgs ?? undefined
+      );
     }
   }
   /**
@@ -581,7 +602,16 @@ export class GrassGpuPlacement extends Disposable {
         argsBuffer: new DRef(
           // Dynamic: the arguments are reset every frame, and a dynamic buffer reuses its upload
           // staging buffers instead of creating and destroying one per upload
-          getDevice().createBuffer(this._args.length * 4, { usage: 'indirect', storage: true, dynamic: true })
+          getDevice().createBuffer(this._lodIndexCounts.length * 20, {
+            usage: 'indirect',
+            storage: true,
+            dynamic: true
+          })
+        ),
+        edgeArgsBuffer: new DRef(
+          DEBUG_VIEWS
+            ? getDevice().createBuffer(this._lodIndexCounts.length * 20, { usage: 'indirect', dynamic: true })
+            : null
         ),
         bindGroup: new DRef(),
         primitive: new DRef(),
@@ -593,6 +623,7 @@ export class GrassGpuPlacement extends Disposable {
   private static disposeTarget(target: PlacementTarget) {
     target.instanceBuffer.dispose();
     target.argsBuffer.dispose();
+    target.edgeArgsBuffer.dispose();
     target.bindGroup.dispose();
     target.primitive.dispose();
   }

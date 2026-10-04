@@ -1,5 +1,6 @@
 import type { CubeFace, Immutable, Nullable, Plane } from '@zephyr3d/base';
 import {
+  DEBUG_VIEWS,
   DEPTH_CLEAR_VALUE,
   REVERSE_Z,
   DRef,
@@ -49,6 +50,7 @@ import type { FrameGraphContext, RenderPipeline } from '../render';
 import { RGHistoryResources } from '../render/rendergraph/history_resources';
 import { calculateEV100, calculatePhysicalExposure } from '../utility/physical';
 import type { LightingMode } from '../utility/physical';
+import { checkDebugViews } from '../render/debug_views';
 
 /**
  * Result of a camera picking operation.
@@ -1600,9 +1602,12 @@ export class Camera extends SceneNode {
    * in use, see {@link Mesh.wireframe}. A debug view, not saved with the camera. Default false.
    */
   get wireframe() {
-    return this._wireframe;
+    return DEBUG_VIEWS && this._wireframe;
   }
   set wireframe(val) {
+    if (val) {
+      checkDebugViews('Camera.wireframe');
+    }
     this._wireframe = !!val;
   }
   /**
@@ -1612,9 +1617,12 @@ export class Camera extends SceneNode {
    * Default false.
    */
   get lodColoration() {
-    return this._lodColoration;
+    return DEBUG_VIEWS && this._lodColoration;
   }
   set lodColoration(val) {
+    if (val) {
+      checkDebugViews('Camera.lodColoration');
+    }
     this._lodColoration = !!val;
   }
   /** Whether this camera is adapted to screen settins */

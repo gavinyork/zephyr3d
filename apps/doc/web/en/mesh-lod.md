@@ -40,9 +40,16 @@ camera.lodDistanceScale = lowQuality ? 2 : 1;
 
 ## Seeing the Levels
 
-Two debug views help, on their own or together:
+Two debug views help, on their own or together. Debug views are only available when `globalThis.__ZEPHYR3D_DEBUG_VIEWS__ = true` is set before the engine loads (or `__ZEPHYR3D_DEBUG_VIEWS__` is defined as `true` at build time); the editor sets it, shipped applications do not, and the properties below then have no effect and log a warning once.
 
-- **Wireframe**: `camera.wireframe = true` draws every mesh of the view as the edges of its triangles; `mesh.wireframe = true` does it for one mesh. The wireframe follows the level in use, so moving the camera shows the triangle count change directly. It is built from index data read back from the GPU and appears a few frames after it is turned on. Shadows and picking are unaffected.
+```html
+<script>
+  globalThis.__ZEPHYR3D_DEBUG_VIEWS__ = true;
+</script>
+```
+
+
+- **Wireframe**: `camera.wireframe = true` draws everything in the view as the edges of its triangles: meshes, batch groups, particles, sprites, hair, terrain, water and grass; `mesh.wireframe = true` does it for one mesh. The wireframe follows the level in use, so moving the camera shows the triangle count change directly. Edges of indexed geometry are built from index data read back from the GPU and appear a few frames after it is turned on. Shadows and picking are unaffected.
 - **LOD coloration**: `camera.lodColoration = true` shades every mesh in the color of its current level, with UE's LOD Coloration colors:
 
 | LOD | 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 |

@@ -6,6 +6,7 @@
  */
 export * from './utils';
 export * from './zconvention';
+export * from './debugviews';
 export * from './diff';
 export * from './event';
 export * from './linkedlist';

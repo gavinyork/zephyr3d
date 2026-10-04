@@ -93,7 +93,7 @@ Mesh nodes also have a few properties related to [levels of detail (LOD)](en/mes
 The switches in the **View** menu only affect the editor viewport and are not saved with the scene:
 
 - **Grid**: shows the ground grid
-- **Wireframe**: draws every mesh in the viewport as the edges of its triangles, at each mesh's current level of detail. The edges are built from mesh data read back from the GPU and appear a few frames after turning it on
+- **Wireframe**: draws everything in the viewport as the edges of its triangles (meshes, particles, sprites, hair, terrain, water, grass), at the current level of detail. The edges of indexed geometry are built from data read back from the GPU and appear a few frames after turning it on
 - **LOD Coloration**: shades meshes by level of detail (white, red, green, blue, yellow, fuchsia, cyan and purple for levels 0 to 7); meshes without levels of detail are white
 
 ---
