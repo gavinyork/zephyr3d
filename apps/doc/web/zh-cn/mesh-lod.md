@@ -8,7 +8,7 @@ zephyr3d 的 LOD 是**离散 LOD 链**，与 UE 静态网格的 LOD 相同：
 - **各级共用同一份顶点缓冲**，每一级只是索引缓冲中的一段。所以带 LOD 的网格只多出几段索引，骨骼蒙皮和变形目标（Morph Target）在每一级都照常工作。
 - 每一帧、每个视图分别为网格选一级，级与级之间直接切换。
 
-LOD 一般在编辑器里生成，见[资产压缩](zh-cn/editor/asset-compression.md)中的“细节层次（LOD）”一节。生成后的网格无需任何代码，加载后自动按距离切换。
+LOD 一般在编辑器里生成，见[资产压缩](zh-cn/editor/asset-compression.md)中的“细节层次（LOD）”一节。生成后的网格无需任何代码，加载后自动按距离切换。不使用编辑器时，也可以在加载模型时生成，见[加载时生成](#加载时生成)。
 
 ---
 
@@ -64,7 +64,35 @@ camera.lodDistanceScale = lowQuality ? 2 : 1;
 
 ## 用代码设置 LOD
 
-不经过编辑器时，也可以自己准备索引并设置 [Primitive.lods](/doc/markdown/./scene.primitive.lods)。做法是把各级索引依次存进同一个索引缓冲，第 0 级的范围由 `indexStart`、`indexCount` 给出，后面各级写在 `lods` 中：
+### 加载时生成
+
+不经过编辑器时，用 `@zephyr3d/loaders` 的导入器（glTF、FBX、OBJ 等）加载的模型，可以在加载时生成 LOD，生成方式与编辑器相同：
+
+```ts
+// 通过资源管理器加载，导入器已用 setModelLoader() 注册
+const model = await getEngine().resourceManager.fetchModel('/models/tree.glb', scene, {
+  generateLods: true // 或 { lodMinTriangles: 200, lodReduction: 0.5, lodPixelError: 8 }
+});
+
+// 或直接使用导入器
+const model = await new GLTFImporter().loadModel('/models/tree.glb', undefined, { generateLods: true });
+```
+
+`generateLods: true` 使用编辑器的默认设置：每级至少 100 个三角形，每级保留上一级一半的三角形，Pixel Error 为 8。各项设置的含义与编辑器的网格设置相同（见[资产压缩](zh-cn/editor/asset-compression.md)）。
+
+已经加载成 `SharedModel` 的模型，可以在创建场景节点之前调用 `SharedModel.generateLods()` 生成 LOD。它需要传入 meshoptimizer 的精简器，可以用 `@zephyr3d/loaders` 的 `loadMeshoptSimplifier()` 获取：
+
+```ts
+import { loadMeshoptSimplifier } from '@zephyr3d/loaders';
+
+await model.generateLods(await loadMeshoptSimplifier(), { lodMinTriangles: 200 });
+```
+
+生成在主线程进行，大模型会比较耗时；经过编辑器处理的模型直接带着 LOD 发布，没有这项开销。
+
+### 手动设置
+
+如果 LOD 由其他工具生成，也可以自己准备索引并设置 [Primitive.lods](/doc/markdown/./scene.primitive.lods)。做法是把各级索引依次存进同一个索引缓冲，第 0 级的范围由 `indexStart`、`indexCount` 给出，后面各级写在 `lods` 中：
 
 ```ts
 // 索引缓冲依次存放：第 0 级 3000 个索引，第 1 级 1500 个，第 2 级 750 个
@@ -94,6 +122,6 @@ primitive.lods = [
 
 - 级与级之间直接切换，没有淡入淡出。
 - 只有三角形列表（`triangle-list`）网格能生成 LOD。
-- 只有经过编辑器派生管线的 `.zmsh` 才带 LOD。运行时直接加载的 glTF 不含 LOD，glTF 的 `MSFT_lod` 扩展暂不支持。
+- LOD 来自编辑器的派生管线，或在加载时用 `generateLods` 生成。glTF 的 `MSFT_lod` 扩展暂不支持。
 - 生成 LOD 时只考虑位置和法线，不考虑骨骼权重；关节处变形明显的蒙皮网格，低级别可能出现变形异常。骨骼数量不会减少。
 - 地形、水面、头发和粒子有各自的细节控制，不使用网格 LOD。

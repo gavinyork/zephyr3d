@@ -1,6 +1,6 @@
-// Builds the level of detail chain of a mesh for the derived mesh cache. Pure data
-// work with the simplifier passed in, so it runs in the encoding worker and in unit
-// tests alike.
+// Builds the level of detail chain of a mesh, for the editor's derived mesh cache and
+// for SharedModel.generateLods at runtime. Pure data work with the simplifier passed in,
+// no other engine module imported, so it also runs in the editor's encoding worker.
 //
 // Follows UE static mesh LODs: every level is reduced from the source mesh
 // (BaseReduceLodIndex 0) to a fraction of its triangles, and the switch sizes come
@@ -9,7 +9,12 @@
 // simplification only writes a new index buffer, so skins and morph targets, which
 // address vertices by position in the buffer, stay valid.
 
-/** The subset of meshoptimizer's MeshoptSimplifier used here */
+/**
+ * The subset of meshoptimizer's MeshoptSimplifier the level of detail generation uses. The engine
+ * does not ship the simplifier: pass meshoptimizer's, which `loadMeshoptSimplifier()` of the
+ * loaders package returns.
+ * @public
+ */
 export interface MeshSimplifier {
   simplify(
     indices: Uint32Array,
@@ -33,6 +38,11 @@ export interface MeshSimplifier {
   ): [Uint32Array, number];
 }
 
+/**
+ * How levels of detail are generated, see {@link MeshImportSettings} for the same settings of the
+ * editor.
+ * @public
+ */
 export interface MeshLodSettings {
   /** Fewest triangles a generated level may have; the level count follows from it */
   lodMinTriangles: number;
@@ -42,6 +52,10 @@ export interface MeshLodSettings {
   lodPixelError: number;
 }
 
+/**
+ * A generated level of detail.
+ * @public
+ */
 export interface MeshLodLevel {
   indexStart: number;
   indexCount: number;
@@ -79,6 +93,7 @@ export function calculateViewDistance(maxDeviation: number, pixelError: number) 
  * UE ComputeBoundsScreenSize (SceneManagement.cpp) for the projection UE builds the automatic
  * sizes with: FPerspectiveMatrix(PI / 4, 1920, 1080, 1), whose (0, 0) and (1, 1) are 1 and
  * 1920 / 1080. UE clamps the distance to 1 cm, here 0.01 mesh units.
+ * @public
  */
 export function autoScreenSize(sphereRadius: number, viewDistance: number) {
   const screenMultiple = Math.max(0.5, (0.5 * 1920) / 1080);
@@ -98,6 +113,7 @@ export function autoScreenSize(sphereRadius: number, viewDistance: number) {
  * @param normals - 3 floats per vertex, or null
  * @param sphereRadius - Radius of the sphere around the mesh bounds, as the runtime measures it
  * @param settings - Level settings
+ * @public
  */
 export function buildLodChain(
   simplifier: MeshSimplifier,

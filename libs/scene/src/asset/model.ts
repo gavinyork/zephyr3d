@@ -27,6 +27,9 @@ import type { ControllerConfig } from '../animation/joint_dynamics/controller';
 import type { ResourceManager } from '../utility/serialization/manager';
 import type { TextureUsage } from './texture_settings';
 import { defaultMeshImportSettings, writeMeshImportSettings } from './mesh_settings';
+import { buildLodChain } from './mesh_lod_builder';
+import type { MeshLodSettings, MeshSimplifier } from './mesh_lod_builder';
+import type { PrimitiveLod } from '../render/primitive';
 import {
   defaultTextureImportSettings,
   getAssetMetaPath,
@@ -152,12 +155,16 @@ export interface AssetVertexBufferInfo {
 export interface AssetPrimitiveInfo {
   name?: string;
   vertices: Record<VertexSemantic, { format: VertexAttribFormat; data: TypedArray }>;
+  /** Indices; with levels of detail, those of every level back to back, the first level first */
   indices: Nullable<Uint16Array<ArrayBuffer> | Uint32Array<ArrayBuffer>>;
+  /** Indices (or vertices, without indices) of the first level of detail */
   indexCount: number;
   type: PrimitiveType;
   boxMin: Vector3;
   boxMax: Vector3;
   path?: string;
+  /** Levels of detail after the first, ranges of indices, see {@link SharedModel.generateLods} */
+  lods?: PrimitiveLod[];
 }
 
 /**
@@ -1019,6 +1026,115 @@ export class SharedModel extends Disposable {
   addPrimitive(prim: AssetPrimitiveInfo) {
     this._primitiveList.push(prim);
   }
+  /**
+   * Generates levels of detail for the triangle meshes of the model, as the editor does for
+   * imported meshes: every level is simplified from the source to a fraction of its triangles,
+   * levels stop before one would have fewer than `lodMinTriangles`, and the switch sizes follow
+   * the simplification error (UE automatic LOD screen sizes). Levels only add indices: vertices,
+   * skins and morph targets are unchanged.
+   *
+   * Call it after importing and before creating scene nodes from the model; meshes that already
+   * have levels of detail are left as they are.
+   *
+   * @param simplifier - meshoptimizer's simplifier, ready; `loadMeshoptSimplifier()` of the
+   *   loaders package returns it
+   * @param settings - Generation settings, by default those of {@link defaultMeshImportSettings}
+   * @returns The number of meshes that got levels of detail
+   */
+  async generateLods(simplifier: MeshSimplifier, settings?: Partial<MeshLodSettings>) {
+    if (this._primitiveMap.size > 0) {
+      console.warn('SharedModel.generateLods(): scene nodes were already created from this model, skipped');
+      return 0;
+    }
+    const defaults = defaultMeshImportSettings();
+    const lodSettings: MeshLodSettings = {
+      lodMinTriangles: settings?.lodMinTriangles ?? defaults.lodMinTriangles,
+      lodReduction: settings?.lodReduction ?? defaults.lodReduction,
+      lodPixelError: settings?.lodPixelError ?? defaults.lodPixelError
+    };
+    let count = 0;
+    for (const info of this._primitiveList) {
+      if (SharedModel.generatePrimitiveLods(info, simplifier, lodSettings)) {
+        count++;
+      }
+    }
+    return count;
+  }
+  /** Gives one primitive its levels of detail, false if it gets none */
+  private static generatePrimitiveLods(
+    info: AssetPrimitiveInfo,
+    simplifier: MeshSimplifier,
+    settings: MeshLodSettings
+  ) {
+    if (info.type !== 'triangle-list' || (info.lods?.length ?? 0) > 0) {
+      return false;
+    }
+    const positions = SharedModel.readVec3(info, 'position');
+    if (!positions) {
+      return false;
+    }
+    const vertexCount = positions.length / 3;
+    const indexCount = info.indexCount;
+    let indices: Uint32Array<ArrayBuffer>;
+    if (info.indices) {
+      indices = Uint32Array.from(info.indices.subarray(0, indexCount));
+    } else {
+      // Not indexed: the vertices in order
+      indices = new Uint32Array(indexCount);
+      for (let i = 0; i < indexCount; i++) {
+        indices[i] = i;
+      }
+    }
+    if (indices.length < 3 || indices.length % 3 !== 0) {
+      return false;
+    }
+    // The sphere the runtime measures the projected size with, around the bounds box
+    const dx = (info.boxMax.x - info.boxMin.x) * 0.5;
+    const dy = (info.boxMax.y - info.boxMin.y) * 0.5;
+    const dz = (info.boxMax.z - info.boxMin.z) * 0.5;
+    const chain = buildLodChain(
+      simplifier,
+      indices,
+      positions,
+      SharedModel.readVec3(info, 'normal'),
+      Math.sqrt(dx * dx + dy * dy + dz * dz),
+      settings
+    );
+    if (chain.levels.length <= 1) {
+      return false;
+    }
+    info.indices = vertexCount <= 0x10000 ? Uint16Array.from(chain.indices) : chain.indices;
+    info.indexCount = chain.levels[0].indexCount;
+    info.lods = chain.levels.slice(1).map(({ indexStart, indexCount, screenSize, hysteresis }) => ({
+      indexStart,
+      indexCount,
+      screenSize,
+      hysteresis
+    }));
+    return true;
+  }
+  /** A float vertex attribute as 3 floats per vertex, null if missing or not float */
+  private static readVec3(info: AssetPrimitiveInfo, semantic: VertexSemantic) {
+    const attrib = info.vertices[semantic];
+    if (!attrib || !(attrib.data instanceof Float32Array)) {
+      return null;
+    }
+    const components = getVertexFormatComponentCount(attrib.format);
+    if (components < 3) {
+      return null;
+    }
+    const vertexCount = Math.floor(attrib.data.length / components);
+    if (components === 3) {
+      return attrib.data.slice(0, vertexCount * 3);
+    }
+    const out = new Float32Array(vertexCount * 3);
+    for (let i = 0; i < vertexCount; i++) {
+      out[i * 3] = attrib.data[i * components];
+      out[i * 3 + 1] = attrib.data[i * components + 1];
+      out[i * 3 + 2] = attrib.data[i * components + 2];
+    }
+    return out;
+  }
   private sanitizeResourceName(name: string, fallback: string) {
     let normalized = (name ?? '').trim();
     if (!normalized) {
@@ -1374,16 +1490,16 @@ export class SharedModel extends Disposable {
     }
   }
   static async writePrimitive(vfs: VFS, primitive: AssetPrimitiveInfo, path: string) {
+    // Only the first level: in the editor, levels of detail come from the mesh settings and are
+    // derived from the source, which stays as imported
+    const indices =
+      primitive.indices && (primitive.lods?.length ?? 0) > 0
+        ? primitive.indices.subarray(0, primitive.indexCount)
+        : primitive.indices;
     const data = {
       vertices: {} as Record<VertexSemantic, { format: VertexAttribFormat; data: string }>,
-      indices: primitive.indices
-        ? uint8ArrayToBase64(
-            new Uint8Array(
-              primitive.indices.buffer,
-              primitive.indices.byteOffset,
-              primitive.indices.byteLength
-            )
-          )
+      indices: indices
+        ? uint8ArrayToBase64(new Uint8Array(indices.buffer, indices.byteOffset, indices.byteLength))
         : null,
       indexType: primitive.indices ? (primitive.indices instanceof Uint16Array ? 'u16' : 'u32') : '',
       indexCount: primitive.indexCount,
@@ -2365,6 +2481,9 @@ export class SharedModel extends Disposable {
     }
     primitive.primitiveType = info.type;
     primitive.indexCount = info.indexCount;
+    if (info.lods) {
+      primitive.lods = info.lods;
+    }
     primitive.setBoundingVolume(new BoundingBox(info.boxMin, info.boxMax));
     return primitive;
   }
