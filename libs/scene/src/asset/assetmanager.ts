@@ -57,6 +57,7 @@ import { getDefaultTexture2D } from '../utility/blueprint/material/texture';
 import type { Skeleton } from '../animation';
 import { Primitive } from '../render';
 import { FontAsset } from '../text';
+import type { MeshLodSettings } from './mesh_lod_builder';
 
 /**
  * Base fetch options
@@ -169,6 +170,12 @@ export type ModelFetchOptions = BaseFetchOptions & {
    */
   loadJointDynamics?: boolean;
   /**
+   * Generate levels of detail for the meshes of the model as it loads, true for the default
+   * settings, see {@link SharedModel.generateLods}. Needs a model loader supporting it, as the
+   * importers of the loaders package do. Default off.
+   */
+  generateLods?: ModelLoadOptions['generateLods'];
+  /**
    * Optional post-process callback applied to the loaded SharedModel before creating nodes.
    * Use this to remap materials, merge meshes, or apply custom data transforms.
    */
@@ -198,7 +205,19 @@ export type ModelInfo = {
  * @public
  */
 export interface ModelLoader {
-  loadModel(path: string, vfs?: VFS): Promise<SharedModel>;
+  loadModel(path: string, vfs?: VFS, options?: ModelLoadOptions): Promise<SharedModel>;
+}
+
+/**
+ * Options a {@link ModelLoader} applies to the model it loads.
+ * @public
+ */
+export interface ModelLoadOptions {
+  /**
+   * Generate levels of detail for the meshes of the model, true for the default settings, see
+   * {@link SharedModel.generateLods}. Default off.
+   */
+  generateLods?: boolean | Partial<MeshLodSettings>;
 }
 
 type AssetCacheKind =
@@ -778,7 +797,8 @@ export class AssetManager {
    * @internal
    */
   async fetchModelData(url: string, options?: ModelFetchOptions) {
-    const hash = url;
+    // The same model with and without levels of detail are different models
+    const hash = options?.generateLods ? `${url}#lod:${JSON.stringify(options.generateLods)}` : url;
     let P = this._models[hash];
     if (P instanceof DWeakRef && P.get() && !P.get()!.disposed) {
       return P.get()!;
@@ -1626,7 +1646,11 @@ export class AssetManager {
     const mimeType = options?.mimeType || guessMimeType(url);
     const importer = this._modelLoaders[mimeType];
     if (importer) {
-      let model = await importer.loadModel(url, vfs);
+      let model = await importer.loadModel(
+        url,
+        vfs,
+        options?.generateLods ? { generateLods: options.generateLods } : undefined
+      );
       if (!model) {
         throw new Error(`Load asset failed: ${url}`);
       }

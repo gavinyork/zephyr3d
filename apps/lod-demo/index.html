@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Runtime LOD Demo</title>
+    <style>
+      html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; background: #16181d; color: #e9edf2; font-family: ui-sans-serif, system-ui, sans-serif; font-size: 13px; }
+      canvas { display: block; position: absolute; inset: 0; width: 100%; height: 100%; }
+      #ui { position: absolute; top: 12px; left: 12px; z-index: 10; display: flex; flex-direction: column; gap: 8px; padding: 10px; min-width: 260px; background: rgba(24,28,34,0.82); border: 1px solid rgba(255,255,255,0.12); border-radius: 6px; backdrop-filter: blur(8px); }
+      .row { display: flex; gap: 8px; align-items: center; }
+      button { min-height: 28px; padding: 0 10px; border: 1px solid rgba(255,255,255,0.16); border-radius: 4px; background: #2b3138; color: #eef2f7; cursor: pointer; font: inherit; }
+      button.active { background: #3d6f7f; border-color: #62a4b8; }
+      #status { white-space: pre; font-family: ui-monospace, monospace; line-height: 1.5; }
+    </style>
+  </head>
+  <body>
+    <div id="ui">
+      <div class="row">
+        <button id="btn-wire">Wireframe</button>
+        <button id="btn-color">LOD Coloration</button>
+      </div>
+      <div class="row">
+        <label for="scale">LOD distance scale</label>
+        <input id="scale" type="range" min="0.25" max="4" step="0.05" value="1" />
+        <span id="scale-value">1.00</span>
+      </div>
+      <div id="status">Loading...</div>
+    </div>
+    <canvas id="canvas"></canvas>
+    <script>
+      // Debug views (wireframe, LOD coloration) must be enabled before any engine module loads
+      globalThis.__ZEPHYR3D_DEBUG_VIEWS__ = true;
+      const params = new URLSearchParams(location.search);
+      if (params.has('standardZ')) {
+        globalThis.__ZEPHYR3D_REVERSE_Z__ = false;
+      }
+    </script>
+    <script type="module" src="js/main.js"></script>
+  </body>
+</html>

@@ -7,8 +7,8 @@ import { MeshoptEncoder } from 'meshoptimizer/encoder';
 import { MeshoptSimplifier } from 'meshoptimizer/simplifier';
 import { planMeshStreams } from '../helpers/meshquantize';
 import type { MeshNormalBits, SourceStream } from '../helpers/meshquantize';
-import { buildLodChain } from '../helpers/meshlod';
-import type { MeshLodLevel, MeshLodSettings, MeshSimplifier } from '../helpers/meshlod';
+import { buildLodChain } from '@zephyr3d/scene';
+import type { MeshLodLevel, MeshLodSettings, MeshSimplifier } from '@zephyr3d/scene';
 
 export interface MeshEncodeRequest {
   type: 'encode';

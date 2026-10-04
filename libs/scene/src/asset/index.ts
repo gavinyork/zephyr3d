@@ -4,6 +4,8 @@ export * from './loaders/zhair';
 export * from './loaders/ktx2';
 export * from './texture_settings';
 export * from './mesh_settings';
+export * from './mesh_lod_builder';
+export * from './meshopt_simplifier';
 export * from './asset_manifest';
 export * from './zmsh_binary';
 export * from './meshopt_decoder';

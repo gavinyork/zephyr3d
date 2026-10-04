@@ -8,7 +8,7 @@ zephyr3d uses **discrete LOD chains**, like UE static meshes:
 - **All levels share one vertex buffer**: a level is just a range of the index buffer. A mesh with levels of detail only adds a few index ranges, and skinning and morph targets work at every level.
 - A level is chosen per mesh, per view, every frame, and levels switch directly.
 
-Levels of detail are usually generated in the editor, see the "Levels of Detail (LOD)" section of [Asset Compression](en/editor/asset-compression.md). Generated meshes need no code: once loaded they switch by distance on their own.
+Levels of detail are usually generated in the editor, see the "Levels of Detail (LOD)" section of [Asset Compression](en/editor/asset-compression.md). Generated meshes need no code: once loaded they switch by distance on their own. Without the editor, models can generate them as they load, see [Generating when Loading](#generating-when-loading).
 
 ---
 
@@ -64,7 +64,48 @@ The editor's **View** menu has **Wireframe** and **LOD Coloration** entries for 
 
 ## Setting Levels from Code
 
-Without the editor, prepare the indices yourself and set [Primitive.lods](/doc/markdown/./scene.primitive.lods). Store the indices of every level back to back in one index buffer; `indexStart` and `indexCount` give the range of level 0, and `lods` the following levels:
+### Generating when Loading
+
+Without the editor, models loaded with the importers of `@zephyr3d/loaders` (glTF, FBX, OBJ, ...) can generate levels of detail as they load, the same way the editor does:
+
+```ts
+// Through the resource manager, with the importers registered by setModelLoader()
+const model = await getEngine().resourceManager.fetchModel('/models/tree.glb', scene, {
+  generateLods: true // or { lodMinTriangles: 200, lodReduction: 0.5, lodPixelError: 8 }
+});
+
+// Or with an importer directly
+const model = await new GLTFImporter().loadModel('/models/tree.glb', undefined, { generateLods: true });
+```
+
+`generateLods: true` uses the defaults of the editor: at least 100 triangles per level, half the triangles of the previous level, a pixel error of 8. The settings mean the same as in the editor's mesh settings (see [Asset Compression](en/editor/asset-compression.md)).
+
+A model already in memory as a `SharedModel` can be given levels with `SharedModel.generateLods()`, before creating scene nodes from it:
+
+```ts
+await model.generateLods({ lodMinTriangles: 200 });
+```
+
+Generation uses the meshoptimizer simplifier the engine ships (`getMeshoptSimplifier()`). It runs on the main thread and takes time on large models; models processed in the editor ship their levels instead.
+
+### Shapes
+
+Built-in shapes (`SphereShape`, `BoxShape`, `CylinderShape`, ...) generate levels of detail when their creation options include `lod`:
+
+```ts
+const sphere = new SphereShape({
+  radius: 1,
+  verticalDetail: 32,
+  horizonalDetail: 64,
+  lod: { lodMinTriangles: 100, lodReduction: 0.5, lodPixelError: 8 }
+});
+```
+
+The levels are regenerated whenever the shape is, so changing its options keeps them matching, and only the settings are saved with the shape. In the editor, shape assets show these settings as **GenerateLODs**, **LODMinTriangles**, **LODReduction** and **LODPixelError**. The first time, levels appear once the simplifier's WebAssembly module has loaded, a moment after the shape is created.
+
+### Setting Levels by Hand
+
+To use levels made elsewhere, prepare the indices yourself and set [Primitive.lods](/doc/markdown/./scene.primitive.lods). Store the indices of every level back to back in one index buffer; `indexStart` and `indexCount` give the range of level 0, and `lods` the following levels:
 
 ```ts
 // The index buffer holds level 0 (3000 indices), then level 1 (1500), then level 2 (750)
@@ -94,6 +135,6 @@ To measure a mesh by the same rule, `computeBoundsScreenSize(center, radius, cam
 
 - Levels switch directly, without a cross-fade.
 - Only triangle list (`triangle-list`) meshes can have levels of detail generated.
-- Only `.zmsh` meshes going through the editor's derived asset pipeline get levels of detail. glTF files loaded directly at runtime have none, and the glTF `MSFT_lod` extension is not supported.
+- Levels of detail come from the editor's derived asset pipeline, or are generated at load time with `generateLods`. The glTF `MSFT_lod` extension is not supported.
 - Generation considers positions and normals, not skin weights; skinned meshes that deform strongly at the joints may deform wrongly at coarse levels. The bone count is not reduced.
 - Terrain, water, hair and particles have their own detail controls and do not use mesh levels of detail.

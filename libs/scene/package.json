@@ -12,7 +12,8 @@
     "**/*.d.ts",
     "**/*.js.map",
     "**/*.wasm",
-    "**/basis/LICENSE"
+    "**/basis/LICENSE",
+    "**/meshoptimizer/LICENSE"
   ],
   "sideEffects": false,
   "repository": {

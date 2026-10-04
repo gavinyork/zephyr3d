@@ -2,9 +2,12 @@ import {
   autoScreenSize,
   buildLodChain,
   calculateViewDistance
-} from '../../../utility/editor/src/helpers/meshlod';
-import type { MeshSimplifier } from '../../../utility/editor/src/helpers/meshlod';
+} from '../../../libs/scene/src/asset/mesh_lod_builder';
+import type { MeshSimplifier } from '../../../libs/scene/src/asset/mesh_lod_builder';
 import { getMeshLodTargets, MAX_MESH_LODS } from '../../../libs/scene/src/asset/mesh_settings';
+import { SharedModel } from '../../../libs/scene/src/asset/model';
+import type { AssetPrimitiveInfo } from '../../../libs/scene/src/asset/model';
+import { Vector3 } from '../../../libs/base/src';
 
 // Stands in for meshoptimizer's simplifier, which is ESM only: keeps the first target indices and
 // reports an error growing as the triangle count shrinks
@@ -131,5 +134,59 @@ describe('mesh level of detail chain', () => {
     expect(getMeshLodTargets(TRIANGLES, { ...settings, lodMinTriangles: 1, lodReduction: 0.9 }).length).toBe(
       MAX_MESH_LODS
     );
+  });
+});
+
+describe('SharedModel.generateLods', () => {
+  function triangleInfo(indexed: boolean): AssetPrimitiveInfo {
+    const vertexCount = TRIANGLES * 3;
+    const positions = new Float32Array(vertexCount * 3).map((_, i) => i % 7);
+    return {
+      vertices: { position: { format: 'position_f32x3', data: positions } } as AssetPrimitiveInfo['vertices'],
+      indices: indexed ? new Uint32Array(vertexCount).map((_, i) => i) : null,
+      indexCount: vertexCount,
+      type: 'triangle-list',
+      boxMin: new Vector3(0, 0, 0),
+      boxMax: new Vector3(2, 2, 2)
+    };
+  }
+
+  test('levels are appended to the indices of the first level', async () => {
+    const model = new SharedModel();
+    const info = triangleInfo(true);
+    model.addPrimitive(info);
+    expect(await model.generateLods({ lodMinTriangles: 100, lodReduction: 0.5 }, fakeSimplifier())).toBe(1);
+    // 1000 -> 500 -> 250 -> 125 triangles
+    expect(info.indexCount).toBe(3000);
+    expect(info.lods!.map((l) => [l.indexStart, l.indexCount])).toEqual([
+      [3000, 1500],
+      [4500, 750],
+      [5250, 375]
+    ]);
+    expect(info.indices!.length).toBe(3000 + 1500 + 750 + 375);
+    // Fewer than 65536 vertices: 16 bit indices
+    expect(info.indices).toBeInstanceOf(Uint16Array);
+    expect(info.lods![0].screenSize).toBeLessThan(2);
+  });
+
+  test('a mesh without indices gets the vertices in order as its first level', async () => {
+    const model = new SharedModel();
+    const info = triangleInfo(false);
+    model.addPrimitive(info);
+    await model.generateLods({ lodMinTriangles: 400 }, fakeSimplifier());
+    expect(Array.from(info.indices!.subarray(0, 6))).toEqual([0, 1, 2, 3, 4, 5]);
+    expect(info.lods!.length).toBe(1);
+  });
+
+  test('meshes that are not triangle lists or too small are left alone', async () => {
+    const model = new SharedModel();
+    const lines = { ...triangleInfo(true), type: 'line-list' as const };
+    const small = triangleInfo(true);
+    model.addPrimitive(lines);
+    model.addPrimitive(small);
+    expect(await model.generateLods({ lodMinTriangles: 600 }, fakeSimplifier())).toBe(0);
+    expect(lines.lods).toBeUndefined();
+    expect(small.lods).toBeUndefined();
+    expect(small.indices!.length).toBe(3000);
   });
 });

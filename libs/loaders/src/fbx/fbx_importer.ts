@@ -12,11 +12,9 @@ import {
   AssetScene,
   AssetSkeleton,
   BoundingBox,
-  getEngine,
   getSkinInfluenceLimit,
   MORPH_TARGET_NORMAL,
   MORPH_TARGET_POSITION,
-  SharedModel,
   type AssetAnimationData,
   type AssetAnimationTrack,
   type AssetImageInfo,
@@ -25,7 +23,8 @@ import {
   type AssetPBRMaterialMR,
   type AssetPrimitiveInfo,
   type AssetSubMeshData,
-  type AssetTextureInfo
+  type AssetTextureInfo,
+  type SharedModel
 } from '@zephyr3d/scene';
 import { AbstractModelImporter } from '../importer';
 import { parseFbx } from './parser';
@@ -2376,18 +2375,5 @@ export class FBXImporter extends AbstractModelImporter {
     loadAnimations(model, ctx);
     model.scenes.push(scene);
     model.activeScene = 0;
-  }
-
-  async loadModel(path: string, vfs?: VFS): Promise<SharedModel> {
-    if (!vfs) {
-      vfs = getEngine().VFS;
-    }
-
-    const mimeType = vfs.guessMIMEType(path);
-    const data = (await vfs.readFile(path, { encoding: 'binary' })) as ArrayBuffer;
-    const blob = new Blob([data], { type: mimeType });
-    const model = new SharedModel();
-    await this.import(blob, model, PathUtils.dirname(path), vfs);
-    return model;
   }
 }

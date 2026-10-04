@@ -532,6 +532,10 @@
     {
       "packageName": "@zephyr3d/procgen-demo",
       "projectFolder": "apps/procgen-demo"
+    },
+    {
+      "packageName": "@zephyr3d/lod-demo",
+      "projectFolder": "apps/lod-demo"
     }
   ]
 }

@@ -63,7 +63,11 @@ function getTargetES6() {
       // The Basis transcoder is fetched at runtime relative to the KTX2 loader module
       // (see basis_location.ts), so it must sit beside that module in dist
       copy({
-        targets: [{ src: 'src/asset/loaders/ktx2/basis/*', dest: 'dist/asset/loaders/ktx2/basis' }],
+        targets: [
+          { src: 'src/asset/loaders/ktx2/basis/*', dest: 'dist/asset/loaders/ktx2/basis' },
+          // meshoptimizer's MIT license, beside the copies of its decoder and simplifier bundled in dist
+          { src: 'src/asset/meshoptimizer/LICENSE', dest: 'dist/node_modules/meshoptimizer' }
+        ],
         hook: 'writeBundle'
       })
     ]
