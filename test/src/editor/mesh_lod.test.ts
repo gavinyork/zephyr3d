@@ -4,6 +4,7 @@ import {
   calculateViewDistance
 } from '../../../utility/editor/src/helpers/meshlod';
 import type { MeshSimplifier } from '../../../utility/editor/src/helpers/meshlod';
+import { getMeshLodTargets, MAX_MESH_LODS } from '../../../libs/scene/src/asset/mesh_settings';
 
 // Stands in for meshoptimizer's simplifier, which is ESM only: keeps the first target indices and
 // reports an error growing as the triangle count shrinks
@@ -35,8 +36,9 @@ describe('mesh level of detail chain', () => {
 
   test('levels reduce from the source by the reduction per step', () => {
     const simplifier = fakeSimplifier();
+    // 1000 -> 500 -> 250 -> 125; 62 would fall below the minimum
     const { indices: all, levels } = buildLodChain(simplifier, indices, positions, null, 1, {
-      lodCount: 4,
+      lodMinTriangles: 100,
       lodReduction: 0.5,
       lodPixelError: 8
     });
@@ -66,20 +68,68 @@ describe('mesh level of detail chain', () => {
       }
     };
     const { levels } = buildLodChain(simplifier, indices, positions, null, 1, {
-      lodCount: 3,
+      lodMinTriangles: 250,
       lodReduction: 0.5,
       lodPixelError: 8
     });
+    expect(levels.length).toBe(3);
     expect(levels[2].screenSize).toBeCloseTo(levels[1].screenSize / 2, 9);
   });
 
   test('stops when simplification makes no progress', () => {
     // Cannot go below 1500 indices
     const { levels } = buildLodChain(fakeSimplifier(0.01, 1500), indices, positions, null, 1, {
-      lodCount: 5,
+      lodMinTriangles: 1,
       lodReduction: 0.5,
       lodPixelError: 8
     });
     expect(levels.map((l) => l.indexCount)).toEqual([3000, 1500]);
+  });
+
+  test('a level simplified below the minimum is dropped', () => {
+    // Pruning overshoots: every target comes back 20 triangles short
+    const simplifier: MeshSimplifier = {
+      simplify: (idx, _p, _s, target) => [idx.slice(0, target - 60), 0.01],
+      simplifyWithAttributes: () => {
+        throw new Error('no normals given');
+      }
+    };
+    // Targets 500 and 250 triangles; 250 comes back as 230, under the minimum of 240
+    const { levels } = buildLodChain(simplifier, indices, positions, null, 1, {
+      lodMinTriangles: 240,
+      lodReduction: 0.5,
+      lodPixelError: 8
+    });
+    expect(levels.map((l) => l.indexCount)).toEqual([3000, 1440]);
+  });
+
+  test('no level for a source at or below the minimum', () => {
+    const simplifier = fakeSimplifier();
+    const { levels } = buildLodChain(simplifier, indices, positions, null, 1, {
+      lodMinTriangles: 501,
+      lodReduction: 0.5,
+      lodPixelError: 8
+    });
+    expect(levels.length).toBe(1);
+    expect(simplifier.calls).toEqual([]);
+  });
+
+  test('the level count is capped at the engine maximum', () => {
+    const { levels } = buildLodChain(fakeSimplifier(), indices, positions, null, 1, {
+      lodMinTriangles: 1,
+      lodReduction: 0.9,
+      lodPixelError: 8
+    });
+    expect(levels.length).toBe(8);
+  });
+
+  test('the engine predicts the targets the chain aims for', () => {
+    const settings = { lodEnabled: true, lodMinTriangles: 100, lodReduction: 0.5 };
+    expect(getMeshLodTargets(TRIANGLES, settings)).toEqual([1000, 500, 250, 125]);
+    expect(getMeshLodTargets(TRIANGLES, { ...settings, lodEnabled: false })).toEqual([1000]);
+    expect(getMeshLodTargets(150, settings)).toEqual([150]);
+    expect(getMeshLodTargets(TRIANGLES, { ...settings, lodMinTriangles: 1, lodReduction: 0.9 }).length).toBe(
+      MAX_MESH_LODS
+    );
   });
 });

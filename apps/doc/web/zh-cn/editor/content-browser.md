@@ -27,7 +27,7 @@
 
 [图片占位：资产视图界面]
 
-导入模型的对话框中还有 **Compress Textures** 和 **Compress Vertices** 两个选项，默认不勾选。勾选后，导入的纹理和网格会以压缩形式发布，详见[资产压缩](zh-cn/editor/asset-compression.md)。项目中已有资产的压缩设置，可以通过右键菜单中的 **Texture Settings...** 和 **Mesh Settings...** 修改。
+导入模型的对话框中还有 **Compress Textures**、**Compress Vertices** 和 **Generate LODs** 三个选项，默认不勾选。勾选后，导入的纹理和网格会以压缩形式发布或生成 LOD，详见[资产压缩](zh-cn/editor/asset-compression.md)。项目中已有资产的压缩设置，可以通过右键菜单中的 **Texture Settings...** 和 **Mesh Settings...** 修改。
 
 ## 第三方库管理
 

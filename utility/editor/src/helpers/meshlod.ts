@@ -34,8 +34,8 @@ export interface MeshSimplifier {
 }
 
 export interface MeshLodSettings {
-  /** Levels including the source, 1 or more */
-  lodCount: number;
+  /** Fewest triangles a generated level may have; the level count follows from it */
+  lodMinTriangles: number;
   /** Fraction of the source triangles kept per level step */
   lodReduction: number;
   /** UE ReductionSettings.PixelError */
@@ -51,6 +51,8 @@ export interface MeshLodLevel {
   error: number;
 }
 
+/** Most levels including the source, the engine's MAX_MESH_LODS (UE MAX_STATIC_MESH_LODS) */
+const MAX_LEVELS = 8;
 /** UE StaticMesh.cpp Constants::LOD0ScreenSize */
 const LOD0_SCREEN_SIZE = 2;
 /** UE StaticMesh.cpp Constants::AutoComputeLODPowerBase, used when a level has no measured error */
@@ -86,8 +88,9 @@ export function autoScreenSize(sphereRadius: number, viewDistance: number) {
 
 /**
  * Simplifies a triangle list into a level of detail chain. Returns the indices of every level
- * back to back, the source first, and the level table; levels that would not remove triangles
- * are dropped, so the chain may be shorter than asked.
+ * back to back, the source first, and the level table. Levels are added while the next target
+ * keeps at least `lodMinTriangles` triangles, as getMeshLodTargets in the engine predicts; the
+ * chain ends early when simplification stops removing triangles or falls below that minimum.
  *
  * @param simplifier - meshoptimizer's simplifier, ready
  * @param indices - Source triangle list
@@ -109,9 +112,10 @@ export function buildLodChain(
     { indexStart: 0, indexCount: indices.length, screenSize: LOD0_SCREEN_SIZE, hysteresis: 0, error: 0 }
   ];
   let indexStart = indices.length;
-  for (let i = 1; i < settings.lodCount; i++) {
+  const minIndices = Math.max(settings.lodMinTriangles, 1) * 3;
+  for (let i = 1; i < MAX_LEVELS; i++) {
     const target = Math.floor((indices.length * settings.lodReduction ** i) / 3) * 3;
-    if (target < 3) {
+    if (target < minIndices) {
       break;
     }
     // Reduced to the target count alone, UE's percent triangles criterion: the error bound is
@@ -133,6 +137,10 @@ export function buildLodChain(
       : simplifier.simplify(indices, positions, 3, target, NO_ERROR_LIMIT, flags);
     // No progress over the previous level: nothing coarser can follow either
     if (lod.length === 0 || lod.length >= chains[chains.length - 1].length) {
+      break;
+    }
+    // Pruning disconnected parts can overshoot the target; every later target is smaller still
+    if (lod.length < minIndices) {
       break;
     }
     const previous = levels[levels.length - 1];

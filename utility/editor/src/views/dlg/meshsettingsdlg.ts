@@ -3,7 +3,7 @@ import { DerivedAssetService } from '../../core/services/derivedassets';
 import type { DerivedAssetStatus } from '../../core/services/derivedassets';
 import type { VFS } from '@zephyr3d/base';
 import type { MeshCompression, MeshImportSettings } from '@zephyr3d/scene';
-import { MAX_MESH_LODS, readMeshImportSettings, writeMeshImportSettings } from '@zephyr3d/scene';
+import { getMeshLodTargets, readMeshImportSettings, writeMeshImportSettings } from '@zephyr3d/scene';
 import { DialogRenderer } from '../../components/modal';
 import { DlgMessage } from './messagedlg';
 
@@ -76,10 +76,17 @@ export class DlgMeshSettings extends DialogRenderer<boolean> {
       this._changed.add(key);
     }
   }
-  private sliderInt(label: string, key: 'lodCount', min: number, max: number) {
-    const value = [this._edited[key] ?? min] as [number];
-    if (ImGui.SliderInt(label, value, min, max)) {
+  private checkbox(label: string, key: 'lodEnabled') {
+    const value = [!!this._edited[key]] as [boolean];
+    if (ImGui.Checkbox(label, value)) {
       this._edited[key] = value[0];
+      this._changed.add(key);
+    }
+  }
+  private inputInt(label: string, key: 'lodMinTriangles', min: number) {
+    const value = [this._edited[key] ?? min] as [number];
+    if (ImGui.InputInt(label, value, 10, 100)) {
+      this._edited[key] = Math.max(value[0], min);
       this._changed.add(key);
     }
   }
@@ -114,13 +121,16 @@ export class DlgMeshSettings extends DialogRenderer<boolean> {
       ImGui.TextDisabled('Positions, texture coordinates and vertex order are kept exactly.');
     }
     ImGui.Separator();
-    this.sliderInt('Levels of Detail', 'lodCount', 1, MAX_MESH_LODS);
-    if ((this._edited.lodCount ?? 1) > 1) {
+    this.checkbox('Generate LODs', 'lodEnabled');
+    if (this._edited.lodEnabled) {
+      this.inputInt('Min Triangles', 'lodMinTriangles', 1);
       this.sliderFloat('Triangles Per Level', 'lodReduction', 0.1, 0.9, '%.2f');
       this.sliderFloat('Pixel Error', 'lodPixelError', 1, 32, '%.1f');
-      ImGui.TextDisabled("Each level keeps that fraction of the previous level's triangles.");
+      ImGui.TextDisabled("Each level keeps that fraction of the previous level's triangles;");
+      ImGui.TextDisabled('levels stop before one would have fewer than Min Triangles.');
       ImGui.TextDisabled('A level shows once its error looks smaller than Pixel Error on screen;');
       ImGui.TextDisabled('higher values switch to simpler levels closer to the camera.');
+      this.renderLodEstimate();
     }
     this.renderStatus();
     ImGui.Separator();
@@ -134,6 +144,27 @@ export class DlgMeshSettings extends DialogRenderer<boolean> {
     ImGui.SameLine();
     if (ImGui.Button('Cancel')) {
       this.close(false);
+    }
+  }
+  /** Levels the edited settings would give the first mesh, from its source triangle count */
+  private renderLodEstimate() {
+    const triangles = this._status?.sourceTriangles;
+    if (triangles === undefined) {
+      return;
+    }
+    if (triangles === 0) {
+      ImGui.TextDisabled('Only triangle meshes get levels of detail.');
+      return;
+    }
+    const targets = getMeshLodTargets(triangles, {
+      lodEnabled: true,
+      lodMinTriangles: this._edited.lodMinTriangles ?? 1,
+      lodReduction: this._edited.lodReduction ?? 0.5
+    });
+    if (targets.length <= 1) {
+      ImGui.TextDisabled(`Source has ${triangles} triangles: too few for any level, none is made.`);
+    } else {
+      ImGui.TextDisabled(`Up to ${targets.length} levels, triangles: ${targets.join(', ')}`);
     }
   }
   /** Derived copy state of the first mesh, as saved; refreshed about once a second */
@@ -158,6 +189,9 @@ export class DlgMeshSettings extends DialogRenderer<boolean> {
             status.loaded ? 'in use in the editor' : 'not loaded yet (reopen the scene to use it)'
           }`
         );
+        if ((status.lodLevels ?? 1) > 1) {
+          ImGui.TextDisabled(`Levels of detail made: ${status.lodLevels}`);
+        }
         break;
       case 'pending':
         ImGui.TextDisabled('Derived copy: queued');

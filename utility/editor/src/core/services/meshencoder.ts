@@ -32,6 +32,20 @@ export function isCompressiblePrimitive(
   return c?.type === 'Primitive' && !!c.data?.vertices;
 }
 
+/** Triangles of a JSON .zmsh primitive, 0 for anything but a triangle list holding vertex buffers */
+export function getPrimitiveTriangleCount(content: unknown) {
+  if (!isCompressiblePrimitive(content) || content.data.type !== 'triangle-list') {
+    return 0;
+  }
+  const src = content.data;
+  if (src.indices && (src.indexType === 'u16' || src.indexType === 'u32')) {
+    return Math.floor(src.indexCount / 3);
+  }
+  const position = src.vertices.position;
+  const fmt = position && describeFormat(position.format);
+  return fmt ? Math.floor(base64ToUint8Array(position.data).byteLength / fmt.stride / 3) : 0;
+}
+
 let worker: Worker | null = null;
 let nextId = 1;
 type WorkerResponse = MeshEncodeResponse | MeshLodResponse;
@@ -117,7 +131,7 @@ function readVec3(streams: SourceStream[], semantic: string, vertexCount: number
  * settings ask for none, the mesh is not a triangle list or no coarser level could be made.
  */
 async function buildLods(src: PrimitiveSource, streams: SourceStream[], settings: MeshImportSettings) {
-  if (settings.lodCount <= 1 || src.type !== 'triangle-list') {
+  if (!settings.lodEnabled || src.type !== 'triangle-list') {
     return null;
   }
   const position = streams.find((s) => s.semantic === 'position');
@@ -141,7 +155,7 @@ async function buildLods(src: PrimitiveSource, streams: SourceStream[], settings
     normals: readVec3(streams, 'normal', vertexCount),
     sphereRadius: Math.sqrt(dx * dx + dy * dy + dz * dz),
     settings: {
-      lodCount: settings.lodCount,
+      lodMinTriangles: settings.lodMinTriangles,
       lodReduction: settings.lodReduction,
       lodPixelError: settings.lodPixelError
     }
@@ -163,8 +177,12 @@ async function buildLods(src: PrimitiveSource, streams: SourceStream[], settings
  * settings ask for: meshopt-compressed and quantized, and/or with a level of detail
  * chain. Vertex order is kept: morph target data, skins and geometry caches index
  * vertices by position in the buffer, and every level draws the same vertices.
+ * Returns null when there is nothing to derive: not compressed and no coarser level made.
  */
-export async function encodeDerivedPrimitive(json: string, settings: MeshImportSettings) {
+export async function encodeDerivedPrimitive(
+  json: string,
+  settings: MeshImportSettings
+): Promise<ArrayBuffer | null> {
   const content = JSON.parse(json);
   if (!isCompressiblePrimitive(content)) {
     throw new Error('Only primitives holding vertex buffers can be compressed');
@@ -177,6 +195,9 @@ export async function encodeDerivedPrimitive(json: string, settings: MeshImportS
     data: base64ToUint8Array(v.data).slice()
   }));
   const lods = await buildLods(src, streams, settings);
+  if (!lods && settings.compression !== 'meshopt') {
+    return null;
+  }
   let indexType: 'u16' | 'u32' | null =
     src.indices && (src.indexType === 'u16' || src.indexType === 'u32') ? src.indexType : null;
   let indices: Uint8Array | null = null;
