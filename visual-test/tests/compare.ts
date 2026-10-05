@@ -164,6 +164,39 @@ export function compareToBaseline(
   };
 }
 
+/** A capture that missed its digest, kept for later acceptance. */
+export interface CaptureRecord {
+  project: string;
+  convention: string;
+  scene: string;
+  platform: string;
+  digest: string;
+  size: number;
+  status: string;
+  /** False for a scene marked nondeterministic; `update-from-ci` skips those. */
+  deterministic?: boolean;
+  /** Environment the capture was rendered in, recorded with an accepted digest. */
+  environment?: { playwright?: string; chromium?: string; adapter?: string };
+  png: Buffer;
+}
+
+export function encodeCapturePng(rgba: Buffer, width: number, height: number): Buffer {
+  return encodePng(rgba, width, height);
+}
+
+/**
+ * Writes `<dir>/<project>.<convention>/<scene>.{json,png}`, overwriting any
+ * earlier capture of the scene. Read by tools/baselines.mjs (`accept`,
+ * `update-from-ci`); the JSON fields are that tool's input format.
+ */
+export function recordCapture(dir: string, record: CaptureRecord): void {
+  const sub = path.join(dir, `${record.project}.${record.convention}`);
+  fs.mkdirSync(sub, { recursive: true });
+  const { png, ...meta } = record;
+  fs.writeFileSync(path.join(sub, `${record.scene}.png`), png);
+  fs.writeFileSync(path.join(sub, `${record.scene}.json`), JSON.stringify(meta, null, 2) + '\n');
+}
+
 function diffImages(expected: Buffer, actual: Buffer, width: number, height: number, threshold: number) {
   const diff = new PNG({ width, height });
   const diffPixels = pixelmatch(expected, actual, diff.data, width, height, {

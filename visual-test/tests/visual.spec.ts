@@ -2,7 +2,7 @@ import { test as base, expect } from '@playwright/test';
 import type { Page } from '@playwright/test';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { compareToBaseline, judgeCapture, writeActualOnly } from './compare';
+import { compareToBaseline, encodeCapturePng, judgeCapture, recordCapture, writeActualOnly } from './compare';
 import { platformKey } from './digest';
 import { DigestFile, type DigestEnvironment } from './digest_file';
 import { HttpImageSource, ImageStore } from './image_store';
@@ -14,6 +14,8 @@ const PLAYWRIGHT_VERSION = (
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.join(__dirname, '..');
+/** Captures that missed their digest; uploaded by CI as the `visual-captures` artifact. */
+const CAPTURES_DIR = process.env.VISUAL_CAPTURES_DIR ?? path.join(ROOT, '.baseline-cache', 'captures');
 
 type BackendId = 'webgl2' | 'webgpu';
 
@@ -277,6 +279,22 @@ for (const sceneName of SCENE_NAMES) {
       });
       for (const a of judged.artifacts) {
         await testInfo.attach(a.name, { path: a.path, contentType: 'image/png' });
+      }
+      if (judged.status !== 'match' && judged.status !== 'baseline-written') {
+        // Kept so the capture can be accepted later without re-rendering:
+        // `baselines:accept` locally, `baselines:update-from-ci` from a CI run.
+        recordCapture(CAPTURES_DIR, {
+          project: testInfo.project.name,
+          convention: meta.convention,
+          scene: sceneName,
+          platform: platformKey(),
+          digest: judged.digest,
+          size: result.width,
+          status: judged.status,
+          deterministic: result.deterministic,
+          environment: harness.environment,
+          png: encodeCapturePng(rgba, result.width, result.height)
+        });
       }
       if (judged.digestsChanged) {
         harness.digests.setEnvironment(platformKey(), harness.environment);
