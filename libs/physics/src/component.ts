@@ -1,6 +1,36 @@
-import { Disposable, type Nullable } from '@zephyr3d/base';
+import { Disposable, makeObservable, type Nullable } from '@zephyr3d/base';
 import type { SceneNode, SceneNodeComponent } from '@zephyr3d/scene';
+import type { PhysicsContactEvent, PhysicsTriggerEvent } from './events';
 import { PhysicsWorld } from './world';
+
+/**
+ * Events of a physics object: a {@link RigidBody}, or a {@link Collider} with no
+ * rigid body above it.
+ *
+ * @remarks
+ * Raised once per pair of objects, however many of their colliders touch, and
+ * dispatched after the frame's simulation steps, when nodes are already in
+ * their new places. Changing physics components from a handler takes effect in
+ * the next frame.
+ *
+ * - `collisionenter` / `collisionexit`: two solid objects start or stop touching.
+ * - `collisionstay`: every frame while they keep touching.
+ * - `triggerenter` / `triggerexit`: an object enters or leaves a trigger. Both
+ *   the trigger and the object receive it.
+ *
+ * Objects resting asleep keep touching and raise no `collisionexit`.
+ *
+ * @public
+ */
+export type PhysicsEventMap = {
+  collisionenter: [event: PhysicsContactEvent];
+  collisionstay: [event: PhysicsContactEvent];
+  collisionexit: [event: PhysicsContactEvent];
+  triggerenter: [event: PhysicsTriggerEvent];
+  triggerexit: [event: PhysicsTriggerEvent];
+};
+
+let nextPhysicsId = 1;
 
 /**
  * Common lifecycle of the physics components: joins the scene's
@@ -8,11 +38,17 @@ import { PhysicsWorld } from './world';
  *
  * @public
  */
-export abstract class PhysicsComponent extends Disposable implements SceneNodeComponent {
+export abstract class PhysicsComponent
+  extends makeObservable(Disposable)<PhysicsEventMap>()
+  implements SceneNodeComponent
+{
+  /** Identifies the component in pair bookkeeping, in creation order. @internal */
+  readonly _physicsId: number;
   private _host: Nullable<SceneNode>;
   private _world: Nullable<PhysicsWorld>;
   constructor() {
     super();
+    this._physicsId = nextPhysicsId++;
     this._host = null;
     this._world = null;
   }
@@ -61,6 +97,10 @@ export abstract class PhysicsComponent extends Disposable implements SceneNodeCo
       }
       this._world = null;
     }
+  }
+  /** Whether anything listens to an event, to skip computing it otherwise. @internal */
+  _hasListeners(type: keyof PhysicsEventMap) {
+    return !!this._listeners?.[type]?.some((l) => !l.removed);
   }
   /** @internal */
   protected abstract _join(world: PhysicsWorld): void;

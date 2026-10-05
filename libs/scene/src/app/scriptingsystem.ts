@@ -481,6 +481,35 @@ export class ScriptingSystem {
   }
 
   /**
+   * Calls `onFixedUpdate(fixedDeltaTime)` on attached script instances.
+   *
+   * Driven by a physics world before each of its fixed steps; the scripting
+   * system itself never calls it. Exceptions are caught and logged like in
+   * {@link ScriptingSystem.update}.
+   *
+   * @param fixedDeltaTime - Length of the step in seconds.
+   * @param filter - Only hosts for which this returns true are called, e.g. the
+   *   hosts belonging to the scene being simulated.
+   */
+  fixedUpdate(fixedDeltaTime: number, filter?: (host: unknown) => boolean) {
+    if (this._hostScripts.size === 0) {
+      return;
+    }
+    for (const [host, list] of this._hostScripts) {
+      if (filter && !filter(host)) {
+        continue;
+      }
+      for (const s of list) {
+        try {
+          s.instance.onFixedUpdate?.(fixedDeltaTime);
+        } catch (err) {
+          console.error(`Error occured at onFixedUpdate() of module '${s.id}': ${err}`);
+        }
+      }
+    }
+  }
+
+  /**
    * Detaches all scripts from all hosts.
    *
    * Iteratively calls {@link ScriptingSystem.detachScript} on each host until no attachments remain.

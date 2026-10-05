@@ -19,12 +19,46 @@ export type ShapeDesc =
   | { type: 'capsule'; halfHeight: number; radius: number }
   | { type: 'cylinder'; halfHeight: number; radius: number };
 
-/** Surface response of a collider. @internal */
+/** Surface response and filtering of a collider. @internal */
 export interface ColliderMaterialDesc {
   friction: number;
   restitution: number;
   isTrigger: boolean;
+  /** Packed collision groups: membership in the high 16 bits, filter in the low 16. */
+  groups: number;
 }
+
+/** A collision or trigger pair starting or stopping, by collider key. @internal */
+export type CollisionCallback = (key1: number, key2: number, started: boolean) => void;
+
+/** Contact details between two touching colliders, in world space. @internal */
+export interface ContactInfo {
+  /** From the first collider towards the second. */
+  normal: Vector3;
+  points: Vector3[];
+  /** Total normal impulse over the last step. */
+  impulse: number;
+}
+
+/** @internal */
+export interface BackendRayHit {
+  key: number;
+  distance: number;
+  normal: Vector3;
+}
+
+/** @internal */
+export interface BackendShapeHit {
+  key: number;
+  distance: number;
+  /** On the hit collider, world space. */
+  point: Vector3;
+  /** Outward from the hit collider, world space. */
+  normal: Vector3;
+}
+
+/** Returns false to skip a collider in a query. @internal */
+export type QueryPredicate = (key: number) => boolean;
 
 /** @internal */
 export interface BodyDesc {
@@ -37,6 +71,9 @@ export interface BodyDesc {
   gravityScale: number;
   ccd: boolean;
   canSleep: boolean;
+  /** Axes along which the body may move and about which it may turn. */
+  translationAxes: [boolean, boolean, boolean];
+  rotationAxes: [boolean, boolean, boolean];
 }
 
 /**
@@ -60,7 +97,35 @@ export interface BackendWorld {
     material: ColliderMaterialDesc
   ): BackendCollider;
   removeCollider(collider: BackendCollider): void;
-  step(dt: number): void;
+  /** Stable id of a collider while it exists, used in events and query results. */
+  colliderKey(collider: BackendCollider): number;
+  setColliderGroups(collider: BackendCollider, groups: number): void;
+  /** Steps, reporting colliders that started or stopped touching. */
+  step(dt: number, onCollision?: CollisionCallback): void;
+  /** Contact details of a touching pair, or null if they no longer touch. */
+  contactInfo(c1: BackendCollider, c2: BackendCollider): ContactInfo | null;
+  castRay(
+    origin: Vector3,
+    direction: Vector3,
+    maxDistance: number,
+    filter: QueryPredicate
+  ): BackendRayHit | null;
+  castRayAll(
+    origin: Vector3,
+    direction: Vector3,
+    maxDistance: number,
+    filter: QueryPredicate
+  ): BackendRayHit[];
+  castShape(
+    shape: ShapeDesc,
+    position: Vector3,
+    rotation: Quaternion,
+    direction: Vector3,
+    maxDistance: number,
+    filter: QueryPredicate
+  ): BackendShapeHit | null;
+  overlapShape(shape: ShapeDesc, position: Vector3, rotation: Quaternion, filter: QueryPredicate): number[];
+  overlapPoint(point: Vector3, filter: QueryPredicate): number[];
   dispose(): void;
 }
 
@@ -72,6 +137,7 @@ export interface BackendBody {
   setGravityScale(scale: number): void;
   setCcd(enabled: boolean): void;
   setCanSleep(enabled: boolean): void;
+  setEnabledAxes(translation: [boolean, boolean, boolean], rotation: [boolean, boolean, boolean]): void;
   /** Teleports the body. */
   setPose(position: Vector3, rotation: Quaternion): void;
   /** Where a kinematic body should be at the end of the next step. */

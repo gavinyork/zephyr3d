@@ -281,6 +281,7 @@ export function applyRuntimeScriptConfig<T extends RuntimeScript<any>>(
  *   before any host is attached.
  * - onAttached(host): Called each time this instance is attached to a host.
  * - onUpdate(deltaTime, elapsedTime): Called every frame/tick while attached.
+ * - onFixedUpdate(fixedDeltaTime): Called before each physics step, when a physics world runs.
  * - onDetached(host): Called when detached from a host.
  * - onDestroy(): Called when the instance is no longer attached to any host
  *   and is about to be discarded.
@@ -330,6 +331,17 @@ export class RuntimeScript<T extends IDisposable | null> {
    * @param _elapsedTime - Total elapsed time since start in seconds.
    */
   onUpdate(_deltaTime: number, _elapsedTime: number) {}
+  /**
+   * Called before each fixed-length physics step, while a physics world is
+   * simulating the host's scene.
+   *
+   * A frame may take several steps or none, so use this rather than `onUpdate`
+   * for logic that must run at the simulation's rate - a force applied here acts
+   * on this step only. Without a physics world it is never called.
+   *
+   * @param _fixedDeltaTime - Length of the step in seconds.
+   */
+  onFixedUpdate(_fixedDeltaTime: number) {}
   /**
    * Called when the script is detached from a host.
    *
