@@ -265,7 +265,7 @@ git add visual-test/digests && git commit
 1. **README 中"软件光栅逐次可复现"的说法此前并不成立**。`pbr-ibl` 与所有水体场景每次运行都不同（水体最多 85k 像素差 1/255，`pbr-ibl` 最多 6/255），一直靠 0.02 的容忍度掩盖。根因：`CubemapSHProjector` 用 `Math.random()` 生成 10 000 个采样方向，天空光照的 SH 每次页面加载都不同。已改为固定种子的 `PRNG`，修复后上述场景逐字节稳定。
 2. **Windows 与 Linux 的 SwiftShader 输出逐字节一致**（`oit-abuffer` 除外）。按平台分组的格式仍保留，但目前各平台会记录相同的摘要，重刷基线在任一平台做一次即可，`update-from-ci` 只在将来出现平台分歧时才需要。
 3. **`oit-abuffer`（WebGPU）在 Windows 上不确定**：每次 2 个孤立像素变化，最大 43/255；Linux 上两次一致但与 Windows 不同。尝试按颜色给等深度片元定序未能消除，已回退；原因待查（怀疑分片渲染或节点写入的竞争）。处理：场景增加 `deterministic: false` 标记，跳过摘要判定、始终走容忍度比较，并在报告中单列。
-4. **残余风险**：SwiftShader 的 JIT 会按宿主 CPU 特性生成代码，GitHub runner 的 CPU 与本机不同。阶段 3 接入 CI 时需确认 CI 产出的摘要与本机一致；若不一致，按已定方案分平台记录（CI 用 `linux-x64`，本机 Linux 另记一个平台键，例如加上 CPU 特性后缀）。
+4. ~~残余风险：GitHub runner 的 CPU 与本机不同~~ **已排除**（阶段 3，PR #34）：GitHub `ubuntu-latest` 上两次运行，第一次只有 `oit-abuffer` 未命中摘要（容忍度内通过），第二次 185 个场景**全部命中**、未产生任何 captures。CI 输出与本机 WSL / Windows 逐字节一致。
 
 ---
 
@@ -286,7 +286,7 @@ git add visual-test/digests && git commit
 | 0 | ~~测量~~ **已完成**，见 7.3；顺带修复天空 SH 采样的随机性 | 一致性表见 7.3 |
 | 1 | `compare.ts` 增加摘要计算与两层判定（含按平台分组与 5.4 回退）；`ImageStore` 抽象 + 本地缓存实现；摘要文件读写 | 单元级测试覆盖第 5 节每条路径 |
 | 2 | 迁移：**用当前构建重新捕获**生成 `digests/*.json`（SH 修复后有 17 个场景的输出已不同于入库 PNG，但都在原容忍度内），并逐场景确认新捕获与旧 PNG 在原容忍度内一致；图片按摘要写入外部仓库 | 新旧流程对同一构建逐场景给出相同的通过/失败结果；故意引入 `sensitivity.mjs` 的条目，两边失败集合一致 |
-| 3 | 命令：`fetch` / `push` / `check` / `gc` / `accept` / `update-from-ci`；CI 增加 `baselines:check`、缓存、`captures.json` artifact | CI 绿；故意漏 push 时 `check` 报错；在 Windows 上改动渲染后能用 `update-from-ci` 补齐 Linux 摘要 |
+| 3 | **已完成**。命令：`fetch` / `push` / `check` / `gc` / `accept` / `update-from-ci`；CI 增加 `baselines:check`、缓存、`visual-captures` artifact（每场景一对 json+png，取代原计划的单个 `captures.json`） | CI 绿；故意漏 push 时 `check` 报错；在 Windows 上改动渲染后能用 `update-from-ci` 补齐 Linux 摘要 |
 | 4 | 删除 `baselines/*-swiftshader/`（工作区立即减少约 18 MB）；README 改写"Baselines"一节；固定 Playwright 版本 | 文档与流程一致 |
 | ~~5~~ | ~~主仓库历史瘦身（`git filter-repo` 移除历史中约 64 MB 基线 PNG）~~ | **暂不做**（已定）。阶段 4 之后历史不再增长，已有的 64 MB 留着 |
 
