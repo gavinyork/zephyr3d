@@ -9,7 +9,7 @@ import type {
 } from '@zephyr3d/device';
 import { Primitive } from '../render/primitive';
 import type { Nullable } from '@zephyr3d/base';
-import { Disposable, DRef, Vector4 } from '@zephyr3d/base';
+import { Disposable, DRef, PRNG, Vector4 } from '@zephyr3d/base';
 import { fetchSampler } from './misc';
 import { getDevice } from '../app/api';
 
@@ -144,11 +144,15 @@ export class CubemapSHProjector extends Disposable {
   private init(device: AbstractDevice) {
     if (!this._primitive.get()) {
       const samples = new Float32Array(this._numSamples * 4);
+      // Seeded so the projection is the same on every run: with Math.random()
+      // every page load drew different directions, which made all sky-lit
+      // lighting differ slightly from run to run.
+      const rand = new PRNG(0x5348);
       for (let i = 0; i < this._numSamples; i++) {
         let x1: number, x2: number, s: number;
         do {
-          x1 = Math.random() * 2 - 1;
-          x2 = Math.random() * 2 - 1;
+          x1 = rand.get() * 2 - 1;
+          x2 = rand.get() * 2 - 1;
           s = x1 * x1 + x2 * x2;
         } while (s >= 1);
         const sqrtS = Math.sqrt(1 - s);

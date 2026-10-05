@@ -2837,7 +2837,7 @@ importers:
         specifier: ~9.38.0
         version: 9.38.0
       '@playwright/test':
-        specifier: ~1.62.1
+        specifier: 1.62.1
         version: 1.62.1
       '@rollup/plugin-node-resolve':
         specifier: ~16.0.0

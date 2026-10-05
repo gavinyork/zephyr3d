@@ -20,10 +20,17 @@
     "lint-fix": "cross-env NODE_OPTIONS=--max_old_space_size=8192 eslint --fix \"src/**/*.ts\" \"tests/**/*.ts\" -f compact",
     "install-browser": "playwright install --with-deps chromium",
     "test": "npm run build && npm run test:only",
-    "test:only": "playwright test --project=webgl2-swiftshader --project=webgpu-swiftshader",
+    "test:only": "playwright test --project=unit --project=webgl2-swiftshader --project=webgpu-swiftshader",
+    "test:unit": "playwright test --project=unit",
     "test:gpu": "npm run build && playwright test --project=webgl2-gpu --project=webgpu-gpu",
     "test:update": "cross-env UPDATE_BASELINES=1 npm run test",
     "sensitivity": "node tools/sensitivity.mjs",
+    "baselines:fetch": "node tools/baselines.mjs fetch",
+    "baselines:push": "node tools/baselines.mjs push",
+    "baselines:check": "node tools/baselines.mjs check",
+    "baselines:gc": "node tools/baselines.mjs gc",
+    "baselines:accept": "node tools/baselines.mjs accept",
+    "baselines:update-from-ci": "node tools/baselines.mjs update-from-ci",
     "report": "playwright show-report"
   },
   "engines": {
@@ -32,7 +39,7 @@
   "devDependencies": {
     "meshoptimizer": "~1.3.0",
     "@eslint/js": "~9.38.0",
-    "@playwright/test": "~1.62.1",
+    "@playwright/test": "1.62.1",
     "@rollup/plugin-node-resolve": "~16.0.0",
     "@rollup/pluginutils": "~5.1.4",
     "@swc/core": "^1.3.62",

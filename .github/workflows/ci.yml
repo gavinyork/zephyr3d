@@ -77,10 +77,40 @@ jobs:
       - name: Install Chromium
         run: npm run install-browser --prefix ./visual-test
 
+      # Digests are committed, reference images live in a separate public store.
+      # A commit whose digests point at images nobody pushed would still gate
+      # correctly, but a failure in it could not show the expected image, so it
+      # is rejected here rather than discovered on the first red run.
+      - name: Check reference images are published
+        run: npm run baselines:check --prefix ./visual-test
+
+      # Reference images are only read when a capture misses its digest. Keyed on
+      # the digests so an unchanged set downloads nothing.
+      - name: Cache reference images
+        uses: actions/cache@v4
+        with:
+          path: visual-test/.baseline-cache/images
+          key: visual-baselines-${{ hashFiles('visual-test/digests/*.json') }}
+          restore-keys: visual-baselines-
+
       # test:only rather than test - the harness bundle was already built by the
       # rush step above, and rebuilding it here would just be slower.
       - name: Visual regression (SwiftShader gate)
         run: npm run test:only --prefix ./visual-test
+        env:
+          VISUAL_CAPTURES_DIR: ${{ github.workspace }}/visual-test/captures
+
+      # Every capture that missed its digest, with its digest and environment.
+      # Uploaded on success too: a tolerant match is a pass whose digest is stale.
+      # `npm run baselines:update-from-ci -- <run-id>` accepts them for linux-x64.
+      - name: Upload captures
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: visual-captures
+          path: visual-test/captures
+          if-no-files-found: ignore
+          retention-days: 14
 
       # Uploaded on failure only, and this is the whole point of the job: the
       # report embeds the expected/actual/diff PNGs per failing scene.

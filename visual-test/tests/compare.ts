@@ -2,6 +2,9 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { PNG } from 'pngjs';
 import pixelmatch from 'pixelmatch';
+import { CI_PLATFORM, computeDigest } from './digest';
+import type { DigestFile } from './digest_file';
+import type { ImageStore } from './image_store';
 
 /**
  * Default tolerance.
@@ -63,7 +66,7 @@ export function writeActualOnly(
 }
 
 /**
- * Compares a capture against its committed baseline.
+ * Compares a capture against its per-machine PNG baseline (the real-GPU projects).
  *
  * A missing baseline is a failure unless UPDATE_BASELINES is set. Silently
  * writing one on first run is the failure mode that matters most here: a
@@ -124,12 +127,7 @@ export function compareToBaseline(
     };
   }
 
-  const diff = new PNG({ width, height });
-  const diffPixels = pixelmatch(expected.data, rgba, diff.data, width, height, {
-    threshold,
-    includeAA: false
-  });
-  const diffRatio = diffPixels / totalPixels;
+  const { diff, diffPixels, diffRatio } = diffImages(expected.data, rgba, width, height, threshold);
 
   if (diffRatio <= maxDiffPixelRatio) {
     return {
@@ -164,6 +162,219 @@ export function compareToBaseline(
       `${diffPixels} px differ (${(diffRatio * 100).toFixed(4)}%), over the ${(maxDiffPixelRatio * 100).toFixed(4)}% budget\n` +
       `See the expected/actual/diff attachments on this test.`
   };
+}
+
+/** A capture that missed its digest, kept for later acceptance. */
+export interface CaptureRecord {
+  project: string;
+  convention: string;
+  scene: string;
+  platform: string;
+  digest: string;
+  size: number;
+  status: string;
+  /** False for a scene marked nondeterministic; `update-from-ci` skips those. */
+  deterministic?: boolean;
+  /** Environment the capture was rendered in, recorded with an accepted digest. */
+  environment?: { playwright?: string; chromium?: string; adapter?: string };
+  png: Buffer;
+}
+
+export function encodeCapturePng(rgba: Buffer, width: number, height: number): Buffer {
+  return encodePng(rgba, width, height);
+}
+
+/**
+ * Writes `<dir>/<project>.<convention>/<scene>.{json,png}`, overwriting any
+ * earlier capture of the scene. Read by tools/baselines.mjs (`accept`,
+ * `update-from-ci`); the JSON fields are that tool's input format.
+ */
+export function recordCapture(dir: string, record: CaptureRecord): void {
+  const sub = path.join(dir, `${record.project}.${record.convention}`);
+  fs.mkdirSync(sub, { recursive: true });
+  const { png, ...meta } = record;
+  fs.writeFileSync(path.join(sub, `${record.scene}.png`), png);
+  fs.writeFileSync(path.join(sub, `${record.scene}.json`), JSON.stringify(meta, null, 2) + '\n');
+}
+
+function diffImages(expected: Buffer, actual: Buffer, width: number, height: number, threshold: number) {
+  const diff = new PNG({ width, height });
+  const diffPixels = pixelmatch(expected, actual, diff.data, width, height, {
+    threshold,
+    includeAA: false
+  });
+  return { diff, diffPixels, diffRatio: diffPixels / (width * height) };
+}
+
+export type JudgeStatus =
+  | 'match'
+  | 'tolerant-match'
+  | 'mismatch'
+  | 'baseline-missing'
+  | 'reference-unavailable'
+  | 'baseline-written';
+
+export interface JudgeOptions {
+  scene: string;
+  /** Platform key the capture was taken on, see `platformKey()`. */
+  platform: string;
+  digests: DigestFile;
+  images: ImageStore;
+  tolerance?: CompareOptions;
+  /** False for a scene known to vary run to run; a digest miss is then expected. */
+  deterministic?: boolean;
+  /** UPDATE_BASELINES: accept the capture instead of failing. */
+  update: boolean;
+  artifactDir: string;
+}
+
+export interface JudgeOutcome {
+  status: JudgeStatus;
+  digest: string;
+  /** Image the capture was compared against, when a comparison happened. */
+  reference: { platform: string; digest: string } | null;
+  diffPixels: number;
+  diffRatio: number;
+  message: string;
+  /** True when the digest file was changed and needs saving. */
+  digestsChanged: boolean;
+  artifacts: { name: string; path: string }[];
+}
+
+/**
+ * Judges a capture against the committed digests.
+ *
+ * A digest the platform has accepted passes without reading any image. On a
+ * miss the capture is compared by tolerance against a reference image: the
+ * platform's own primary, or the CI platform's when this platform has none yet.
+ * That second tier keeps the semantics of the PNG baselines it replaces -
+ * anything within tolerance of the reference passed before and still passes -
+ * while a hit costs nothing. The image store is only consulted on a miss, and
+ * an image that cannot be found is reported as unavailable, not as a regression.
+ */
+export async function judgeCapture(
+  rgba: Buffer,
+  width: number,
+  height: number,
+  opts: JudgeOptions
+): Promise<JudgeOutcome> {
+  const threshold = opts.tolerance?.threshold ?? DEFAULT_TOLERANCE.threshold;
+  const maxDiffPixelRatio = opts.tolerance?.maxDiffPixelRatio ?? DEFAULT_TOLERANCE.maxDiffPixelRatio;
+  const digest = computeDigest(rgba, width, height);
+  const artifacts: JudgeOutcome['artifacts'] = [];
+  const outcome = (
+    status: JudgeStatus,
+    message: string,
+    extra: Partial<JudgeOutcome> = {}
+  ): JudgeOutcome => ({
+    status,
+    digest,
+    reference: null,
+    diffPixels: 0,
+    diffRatio: 0,
+    message,
+    digestsChanged: false,
+    artifacts,
+    ...extra
+  });
+  const accept = (message: string, extra: Partial<JudgeOutcome> = {}) => {
+    opts.digests.accept(opts.scene, opts.platform, digest, width, 'replace');
+    const imagePath = opts.images.put(digest, encodePng(rgba, width, height));
+    return outcome('baseline-written', `${message}\nimage: ${imagePath}`, { ...extra, digestsChanged: true });
+  };
+  const writeActual = () =>
+    writeArtifact(opts.artifactDir, 'actual.png', encodePng(rgba, width, height), artifacts);
+
+  const entry = opts.digests.get(opts.scene);
+  const own = entry && entry.size === width ? (entry.accepted[opts.platform] ?? []) : [];
+  if (own.includes(digest)) {
+    return outcome('match', `digest ${digest} accepted on ${opts.platform}`);
+  }
+
+  // Reference: this platform's primary, else the CI platform's, else any.
+  let reference: JudgeOutcome['reference'] = null;
+  if (entry) {
+    for (const platform of [opts.platform, CI_PLATFORM, ...Object.keys(entry.accepted).sort()]) {
+      const list = entry.accepted[platform];
+      if (list?.length) {
+        reference = { platform, digest: list[0] };
+        break;
+      }
+    }
+  }
+  if (!reference) {
+    if (opts.update) {
+      return accept(`baseline created for ${opts.scene} on ${opts.platform}`);
+    }
+    const actualPath = writeActual();
+    return outcome(
+      'baseline-missing',
+      `no digest recorded for ${opts.scene}\nInspect ${actualPath}, then run with UPDATE_BASELINES=1 to accept it.`
+    );
+  }
+
+  const refPng = await opts.images.get(reference.digest);
+  if (!refPng) {
+    if (opts.update) {
+      return accept(`baseline replaced for ${opts.scene} on ${opts.platform} (reference image unavailable)`, {
+        reference
+      });
+    }
+    writeActual();
+    return outcome(
+      'reference-unavailable',
+      `digest ${digest} is not accepted, and reference image ${reference.digest} (${reference.platform}) ` +
+        'is neither cached nor in the image store; run "npm run baselines:fetch" or check the store',
+      { reference }
+    );
+  }
+
+  const expected = PNG.sync.read(refPng);
+  if (expected.width !== width || expected.height !== height) {
+    if (opts.update) {
+      return accept(`baseline replaced for ${opts.scene}: capture size changed`, { reference });
+    }
+    writeActual();
+    return outcome(
+      'mismatch',
+      `reference is ${expected.width}x${expected.height} but capture is ${width}x${height}`,
+      { reference }
+    );
+  }
+
+  const { diff, diffPixels, diffRatio } = diffImages(expected.data, rgba, width, height, threshold);
+  const stats = { reference, diffPixels, diffRatio };
+  const summary = `${diffPixels} px differ (${(diffRatio * 100).toFixed(4)}%)`;
+  if (diffRatio <= maxDiffPixelRatio) {
+    // This platform has nothing of its own yet: an update records one, so later
+    // runs hit the digest instead of comparing every time.
+    if (opts.update && own.length === 0) {
+      return accept(`digest recorded for ${opts.scene} on ${opts.platform}`, stats);
+    }
+    const why =
+      opts.deterministic === false
+        ? 'scene is marked nondeterministic'
+        : own.length === 0
+          ? `no ${opts.platform} digest, compared against ${reference.platform}`
+          : 'digest not accepted';
+    return outcome(
+      'tolerant-match',
+      `${summary}, within ${(maxDiffPixelRatio * 100).toFixed(4)}% (${why})`,
+      stats
+    );
+  }
+  if (opts.update) {
+    return accept(`baseline replaced for ${opts.scene} on ${opts.platform} (${summary})`, stats);
+  }
+  writeArtifact(opts.artifactDir, 'expected.png', refPng, artifacts);
+  writeActual();
+  writeArtifact(opts.artifactDir, 'diff.png', PNG.sync.write(diff), artifacts);
+  return outcome(
+    'mismatch',
+    `${summary}, over the ${(maxDiffPixelRatio * 100).toFixed(4)}% budget, against the ` +
+      `${reference.platform} reference ${reference.digest}\nSee the expected/actual/diff attachments on this test.`,
+    stats
+  );
 }
 
 function writeArtifact(

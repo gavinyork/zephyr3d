@@ -26,7 +26,8 @@
       "@zephyr3d/modelgen": ["../libs/modelgen/src"],
       "@zephyr3d/procgen": ["../libs/procgen/src"],
       // ts-jest resolves like node10, which ignores package.json "exports"
-      "meshoptimizer/decoder": ["./node_modules/meshoptimizer/meshopt_decoder.d.ts"]
+      "meshoptimizer/decoder": ["./node_modules/meshoptimizer/meshopt_decoder.d.ts"],
+      "meshoptimizer/simplifier": ["./node_modules/meshoptimizer/meshopt_simplifier.d.ts"]
     }
   },
   "exclude": ["node_modules", "**/*.spec.ts", "**/*.d.ts", "common/temp", "**/common/temp"]
