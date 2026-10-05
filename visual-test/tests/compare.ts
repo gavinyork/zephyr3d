@@ -66,7 +66,7 @@ export function writeActualOnly(
 }
 
 /**
- * Compares a capture against its committed baseline.
+ * Compares a capture against its per-machine PNG baseline (the real-GPU projects).
  *
  * A missing baseline is a failure unless UPDATE_BASELINES is set. Silently
  * writing one on first run is the failure mode that matters most here: a

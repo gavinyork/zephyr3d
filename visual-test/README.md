@@ -1,7 +1,8 @@
 # `@zephyr3d/visual-test`
 
 Pixel regression harness. Renders a fixed set of scenes deterministically across
-RHI backends and compares the result against committed baselines.
+RHI backends and compares the result against committed baselines (pixel digests;
+reference images live in an external store, see "Baselines").
 
 It exists because the rest of the test suite runs in Node and can only check
 logic — maths, render-graph topology, shader codegen. None of it can tell you
@@ -31,24 +32,63 @@ First run on a machine needs the browser: `npm run install-browser`.
 
 ## Baselines
 
-Baselines live in `baselines/<project>/<convention>/<scene>.png`.
+The gating (`-swiftshader`) projects are pinned by **pixel digests**, committed in
+`digests/<project>.<convention>.json`. The reference images themselves live
+outside this repository, in the public store
+[`gavinyork/zephyr3d-visual-baselines`](https://github.com/gavinyork/zephyr3d-visual-baselines)
+(branch `images`, one PNG per digest). Design and rationale:
+`plans/visual-test-digest-baselines.md`. In short, committing PNGs made the
+history grow by the whole image set every time baselines were re-accepted, and
+a digest is a few dozen bytes.
 
-**Only the `-swiftshader` baselines are committed**, and only they gate CI. A
-software rasteriser is byte-reproducible run to run, which a real GPU driver is
-not required to be — and the two genuinely disagree: on a plain clear colour they
-differ by 1/255. So `baselines/*-gpu/` is git-ignored; generate your own on first
-run and get local regression detection from them.
+How a capture is judged:
+
+1. Its digest - SHA-256 of the row-normalised RGBA plus its size - is looked up
+   among the digests accepted for the scene **on this platform**
+   (`linux-x64`, `win32-x64`, ...). A hit passes without reading any image.
+2. On a miss it is compared, with the scene's tolerance, against a reference
+   image: this platform's primary digest, else the CI platform's (`linux-x64`).
+   Within tolerance it passes as a **tolerant match**, annotated in the report;
+   beyond it, it fails with expected/actual/diff attached. The reference is
+   fetched over HTTP into `.baseline-cache/` on first use, with no credentials.
+
+So a pass/fail decision never depends on the image store being reachable,
+except on a miss; and a lost image only costs diagnostics. A scene that keeps
+passing as a tolerant match has a stale digest - re-accept it.
+
+SwiftShader output is byte-identical on Windows, Linux (WSL) and the GitHub
+`ubuntu-latest` runner, so today every platform records the same digest. The one
+exception is `oit-abuffer`, which is marked `deterministic: false` and always
+goes through the tolerance comparison.
 
 A **missing baseline is a failure**, not a prompt to write one. Silently
 accepting whatever the code currently does is how a scene ends up permanently
 green while testing nothing. To accept a change deliberately:
 
 ```bash
-UPDATE_BASELINES=1 npm run test
+UPDATE_BASELINES=1 npm run test   # writes digests/, caches the new images
+# look at the images it lists under .baseline-cache/images/ before going on
+npm run baselines:push            # publish the images (needs push access)
+git add digests                   # then commit
 ```
 
-Then look at the resulting PNGs before committing them. A baseline you did not
-inspect is a baseline you cannot trust.
+A baseline you did not inspect is a baseline you cannot trust. CI runs
+`baselines:check` and fails a commit whose digests point at images nobody
+pushed.
+
+Other commands (`node tools/baselines.mjs` documents each):
+
+| Command | Use |
+|---|---|
+| `npm run baselines:fetch` | Download every referenced image, e.g. before working offline |
+| `npm run baselines:accept -- <scene> [--project <p>] [--append]` | Accept the last capture of a scene from a normal run, without re-rendering |
+| `npm run baselines:update-from-ci -- <run-id>` | Accept what a CI run rendered for `linux-x64` (its `visual-captures` artifact); for a platform you cannot run locally |
+| `npm run baselines:gc [-- --yes]` | Drop images no longer referenced by develop, main, tags or the working tree, and squash the store |
+
+The `-gpu` projects keep per-machine PNGs in `baselines/*-gpu/`, git-ignored: a
+real GPU differs from SwiftShader (by 1/255 on a plain clear colour) and from
+other GPUs, so these can never be a shared authority. Generate your own on first
+run (`UPDATE_BASELINES=1 npm run test:gpu`) for local regression detection.
 
 ## Adding a scene
 
@@ -57,7 +97,8 @@ inspect is a baseline you cannot trust.
 3. Add its name to `SCENE_NAMES` in `tests/visual.spec.ts`. The first test
    asserts the two lists match, so forgetting this fails loudly rather than
    leaving the scene silently untested.
-4. `UPDATE_BASELINES=1 npm run test`, inspect the PNGs, commit them.
+4. `UPDATE_BASELINES=1 npm run test`, inspect the images, `npm run baselines:push`,
+   commit `digests/`.
 
 Scenes must isolate one feature. Start from `bareScene()` — no sky, no
 environment light, no fog — and opt in to exactly what is under test. A shadow
@@ -65,10 +106,16 @@ baseline that also happens to pin the atmosphere model will move for reasons tha
 have nothing to do with shadows.
 
 Scenes must also be pure: no wall-clock time, no `Math.random()`, no unawaited
-asset loads. The harness pins the timestep and the frame count; it cannot pin
-those. (This is why terrain and water scenes are absent for now: `particlesys.ts`
-and `gerstner_wavegenerator.ts` call `Math.random()` directly. Seeding them via
-the existing `PRNG` in `@zephyr3d/base` is the prerequisite.)
+asset loads, and that includes the engine code they exercise. The harness pins
+the timestep and the frame count; it cannot pin those. Any randomness in the
+engine must come from the seeded `PRNG` in `@zephyr3d/base`. (`particlesys.ts`
+still calls `Math.random()` directly, which is why there are no particle scenes.)
+
+This is not hypothetical. Until the digests went in, every sky-lit scene -
+`pbr-ibl` and all water scenes - rendered differently on every run, by up to
+6/255 over tens of thousands of pixels: the sky's SH projection drew its sample
+directions from `Math.random()`. The old 0.02 tolerance hid it completely. An
+exact digest cannot be fooled that way, which is half of why it is worth having.
 
 ## How determinism is achieved
 
@@ -164,7 +211,7 @@ readback APIs suggest — `gl.readPixels` is documented bottom-up and WebGPU's
 `copyTextureToBuffer` top-down, so the obvious guess is that only WebGL needs
 flipping. Measured, that is wrong: the engine renders bottom-up into the
 offscreen framebuffer on both. `sanity-orientation` is the assertion — it is
-deliberately asymmetric in both axes so a flip is obvious in the committed PNG
+deliberately asymmetric in both axes so a flip is obvious in the reference image
 rather than silently baked in.
 
 **Chromium configuration.** `playwright.config.ts` pins `channel: 'chromium'` and
@@ -177,7 +224,9 @@ resolves to null, and WebGPU is only exposed in a secure context, which
 
 ```
 src/          in-page: engine bootstrap, capture, scene definitions
-tests/        Node side: Playwright specs and the pixelmatch comparison
-tools/        static server (dist/ over http://127.0.0.1)
-baselines/    committed SwiftShader baselines; *-gpu/ is git-ignored
+tests/        Node side: Playwright specs, digest judgement, pixelmatch comparison
+tools/        static server, sensitivity check, baselines.mjs (image store commands)
+digests/      committed SwiftShader digests, one file per project and convention
+baselines/    per-machine real-GPU PNGs (*-gpu/, git-ignored)
+.baseline-cache/  git-ignored: fetched reference images, pending uploads, captures
 ```

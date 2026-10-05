@@ -7,7 +7,7 @@ playwright-report/
 # 1/255 difference between SwiftShader and a real GPU on a plain clear colour,
 # so these can never be a shared authority. Each developer generates their own
 # on first run (UPDATE_BASELINES=1 npm run test:gpu) and gets local regression
-# detection from them. Only the -swiftshader baselines are committed.
+# detection from them. The -swiftshader projects use committed digests instead.
 baselines/*-gpu/
 
 # Reference images fetched by digest and images accepted locally but not yet

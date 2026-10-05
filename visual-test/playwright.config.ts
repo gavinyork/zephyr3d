@@ -19,9 +19,9 @@ const PORT = Number(process.env.HARNESS_PORT ?? 4321);
  *     a secure context, and `about:blank` has an opaque (null) origin, so
  *     `navigator.gpu` is not injected there at all.
  *
- * The `-swiftshader` projects pin a software rasteriser, which the spike
- * confirmed is byte-reproducible run-to-run; their baselines are committed and
- * gate CI. The `-gpu` projects run the same scenes on the real adapter: their
+ * The `-swiftshader` projects pin a software rasteriser, whose output is
+ * byte-identical run to run and across Windows, Linux and the CI runner; they
+ * are judged by committed pixel digests (see README "Baselines") and gate CI. The `-gpu` projects run the same scenes on the real adapter: their
  * output legitimately differs (the spike measured a 1/255 delta on a plain
  * clear colour), so their baselines are per-machine and git-ignored. They catch
  * regressions locally without ever being an authority.

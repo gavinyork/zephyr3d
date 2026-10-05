@@ -1,6 +1,6 @@
 # visual-test 基线改为"摘要入库、图片外置"
 
-状态：设计稿，三项决策已定（见第 11 节），待实施
+状态：阶段 0-4 已实施（PR #34），阶段 5 按决定不做
 范围：`visual-test/` 的基线存储与比对流程。场景、捕获、确定性机制不变。
 
 ---
@@ -287,7 +287,7 @@ git add visual-test/digests && git commit
 | 1 | `compare.ts` 增加摘要计算与两层判定（含按平台分组与 5.4 回退）；`ImageStore` 抽象 + 本地缓存实现；摘要文件读写 | 单元级测试覆盖第 5 节每条路径 |
 | 2 | 迁移：**用当前构建重新捕获**生成 `digests/*.json`（SH 修复后有 17 个场景的输出已不同于入库 PNG，但都在原容忍度内），并逐场景确认新捕获与旧 PNG 在原容忍度内一致；图片按摘要写入外部仓库 | 新旧流程对同一构建逐场景给出相同的通过/失败结果；故意引入 `sensitivity.mjs` 的条目，两边失败集合一致 |
 | 3 | **已完成**。命令：`fetch` / `push` / `check` / `gc` / `accept` / `update-from-ci`；CI 增加 `baselines:check`、缓存、`visual-captures` artifact（每场景一对 json+png，取代原计划的单个 `captures.json`） | CI 绿；故意漏 push 时 `check` 报错；在 Windows 上改动渲染后能用 `update-from-ci` 补齐 Linux 摘要 |
-| 4 | 删除 `baselines/*-swiftshader/`（工作区立即减少约 18 MB）；README 改写"Baselines"一节；固定 Playwright 版本 | 文档与流程一致 |
+| 4 | **已完成**。删除 `baselines/*-swiftshader/`（183 张、约 18 MB）；README 改写"Baselines"一节；固定 Playwright 版本（阶段 3 已做） | 文档与流程一致 |
 | ~~5~~ | ~~主仓库历史瘦身（`git filter-repo` 移除历史中约 64 MB 基线 PNG）~~ | **暂不做**（已定）。阶段 4 之后历史不再增长，已有的 64 MB 留着 |
 
 阶段 1-4 在一个功能分支内完成。
