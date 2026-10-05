@@ -33,12 +33,7 @@ const genMatrixTypeList = [
 ];
 
 function matchFunctionOverloadings(pb: ProgramBuilder, name: string, ...args: ExpValueType[]) {
-  const bit =
-    pb.getDevice().type === 'webgl'
-      ? MASK_WEBGL1
-      : pb.getDevice().type === 'webgl2'
-        ? MASK_WEBGL2
-        : MASK_WEBGPU;
+  const bit = pb.getDevice().type === 'webgl2' ? MASK_WEBGL2 : MASK_WEBGPU;
   // @ts-ignore 7053
   const overloadings = builtinFunctionsAll[name].overloads
     // @ts-ignore 7006
@@ -139,11 +134,9 @@ function binaryFunc(a: ASTExpression, b: ASTExpression, op: string, type: typein
   return exp;
 }
 
-const MASK_WEBGL1 = 1 << 0;
 const MASK_WEBGL2 = 1 << 1;
 const MASK_WEBGPU = 1 << 2;
-const MASK_WEBGL = MASK_WEBGL1 | MASK_WEBGL2;
-const MASK_ALL = MASK_WEBGL | MASK_WEBGPU;
+const MASK_ALL = MASK_WEBGL2 | MASK_WEBGPU;
 
 function genTypeF16ScalarVec(name: string) {
   return [
@@ -402,9 +395,6 @@ const builtinFunctionsAll = {
         argType.isPrimitiveType() &&
         (argType.scalarType === typeinfo.PBPrimitiveType.I32 ||
           argType.scalarType === typeinfo.PBPrimitiveType.U32);
-      if (pb.getDevice().type === 'webgl' && isIntegerType) {
-        throw new PBDeviceNotSupport('integer modulus');
-      }
       if (pb.getDevice().type === 'webgpu' || isIntegerType) {
         return binaryFunc(matchResult[1][0], matchResult[1][1], '%', matchResult[0].returnType!);
       } else {
@@ -426,7 +416,7 @@ const builtinFunctionsAll = {
   atan: { overloads: [...genType('atan', MASK_ALL, 0, [0]), ...genType('atan', MASK_WEBGPU, 4, [4])] },
   atan2: {
     overloads: [
-      ...genType('atan', MASK_WEBGL, 0, [0, 0]),
+      ...genType('atan', MASK_WEBGL2, 0, [0, 0]),
       ...genType('atan2', MASK_WEBGPU, 0, [0, 0]),
       ...genType('atan2', MASK_WEBGPU, 4, [4, 4])
     ]
@@ -460,7 +450,7 @@ const builtinFunctionsAll = {
   sqrt: { overloads: [...genType('sqrt', MASK_ALL, 0, [0]), ...genType('sqrt', MASK_WEBGPU, 4, [4])] },
   inverseSqrt: {
     overloads: [
-      ...genType('inversesqrt', MASK_WEBGL, 0, [0]),
+      ...genType('inversesqrt', MASK_WEBGL2, 0, [0]),
       ...genType('inverseSqrt', MASK_WEBGPU, 0, [0]),
       ...genType('inverseSqrt', MASK_WEBGPU, 4, [4])
     ]
@@ -593,7 +583,7 @@ const builtinFunctionsAll = {
   },
   faceForward: {
     overloads: [
-      ...genType('faceforward', MASK_WEBGL, 0, [0, 0, 0], true),
+      ...genType('faceforward', MASK_WEBGL2, 0, [0, 0, 0], true),
       ...genType('faceForward', MASK_WEBGPU, 0, [0, 0, 0], true),
       ...genType('faceForward', MASK_WEBGPU, 4, [4, 4, 4], true)
     ]
@@ -973,37 +963,12 @@ const builtinFunctionsAll = {
       ...genType('select', MASK_WEBGPU, 3, [3, 3, 3], true),
       ...genType('select', MASK_WEBGPU, 4, [4, 4, typeinfo.typeBool]),
       ...genType('select', MASK_WEBGPU, 4, [4, 4, 3], true),
-      ...genType('mix', MASK_WEBGL, 0, [0, 0, 3]),
-      ...genType('mix', MASK_WEBGL, 1, [1, 1, 3]),
-      ...genType('mix', MASK_WEBGL, 2, [2, 2, 3])
+      ...genType('mix', MASK_WEBGL2, 0, [0, 0, 3]),
+      ...genType('mix', MASK_WEBGL2, 1, [1, 1, 3]),
+      ...genType('mix', MASK_WEBGL2, 2, [2, 2, 3])
     ],
     normalizeFunc(pb: ProgramBuilder, name: string, ...args: ExpValueType[]) {
-      if (pb.getDevice().type === 'webgl') {
-        const cond = args[2];
-        let newCond: Nullable<number | PBShaderExp> = null;
-        if (typeof cond === 'boolean') {
-          newCond = cond ? 1 : 0;
-        } else if (typeof cond === 'number') {
-          newCond = cond;
-        } else if (cond instanceof PBShaderExp) {
-          const type = cond.$ast.getType();
-          if (type.typeId === typeinfo.typeBool.typeId) {
-            newCond = pb.float(cond);
-          } else if (type.typeId === typeinfo.typeBVec2.typeId) {
-            newCond = pb.vec2(cond);
-          } else if (type.typeId === typeinfo.typeBVec3.typeId) {
-            newCond = pb.vec3(cond);
-          } else if (type.typeId === typeinfo.typeBVec4.typeId) {
-            newCond = pb.vec4(cond);
-          }
-        }
-        if (newCond === null) {
-          throw new PBParamValueError('select', 'cond');
-        }
-        return callBuiltin(pb, 'mix', args[0], args[1], newCond);
-      } else {
-        return callBuiltin(pb, name, ...args);
-      }
+      return callBuiltin(pb, name, ...args);
     }
   },
   floatBitsToInt: {
@@ -1158,25 +1123,25 @@ const builtinFunctionsAll = {
       ...genType('unpackHalf2x16', MASK_WEBGL2, typeinfo.typeF32Vec2, [typeinfo.typeU32])
     ]
   },
-  matrixCompMult: { overloads: genMatrixType('matrixCompMult', MASK_WEBGL, null, [null, null]) },
+  matrixCompMult: { overloads: genMatrixType('matrixCompMult', MASK_WEBGL2, null, [null, null]) },
   dpdx: {
-    overloads: [...genType('dFdx', MASK_WEBGL, 0, [0]), ...genType('dpdx', MASK_WEBGPU, 0, [0])]
+    overloads: [...genType('dFdx', MASK_WEBGL2, 0, [0]), ...genType('dpdx', MASK_WEBGPU, 0, [0])]
   },
   dpdy: {
-    overloads: [...genType('dFdy', MASK_WEBGL, 0, [0]), ...genType('dpdy', MASK_WEBGPU, 0, [0])]
+    overloads: [...genType('dFdy', MASK_WEBGL2, 0, [0]), ...genType('dpdy', MASK_WEBGPU, 0, [0])]
   },
   fwidth: { overloads: genType('fwidth', MASK_ALL, 0, [0]) },
   dpdxCoarse: {
-    overloads: [...genType('dpdxCoarse', MASK_WEBGPU, 0, [0]), ...genType('dFdx', MASK_WEBGL, 0, [0])]
+    overloads: [...genType('dpdxCoarse', MASK_WEBGPU, 0, [0]), ...genType('dFdx', MASK_WEBGL2, 0, [0])]
   },
   dpdxFine: {
-    overloads: [...genType('dpdxFine', MASK_WEBGPU, 0, [0]), ...genType('dFdx', MASK_WEBGL, 0, [0])]
+    overloads: [...genType('dpdxFine', MASK_WEBGPU, 0, [0]), ...genType('dFdx', MASK_WEBGL2, 0, [0])]
   },
   dpdyCoarse: {
-    overloads: [...genType('dpdyCoarse', MASK_WEBGPU, 0, [0]), ...genType('dFdy', MASK_WEBGL, 0, [0])]
+    overloads: [...genType('dpdyCoarse', MASK_WEBGPU, 0, [0]), ...genType('dFdy', MASK_WEBGL2, 0, [0])]
   },
   dpdyFine: {
-    overloads: [...genType('dpdyFine', MASK_WEBGPU, 0, [0]), ...genType('dFdy', MASK_WEBGL, 0, [0])]
+    overloads: [...genType('dpdyFine', MASK_WEBGPU, 0, [0]), ...genType('dFdy', MASK_WEBGL2, 0, [0])]
   },
   // textureDimensions(tex: PBShaderExp, level?: number|PBShaderExp);
   textureDimensions: {
@@ -2598,24 +2563,6 @@ const builtinFunctionsAll = {
       ...genType('texture', MASK_WEBGL2, typeinfo.typeF32Vec4, [
         typeinfo.typeTexDepthCube,
         typeinfo.typeF32Vec3
-      ]),
-      ...genType('texture2D', MASK_WEBGL1, typeinfo.typeF32Vec4, [typeinfo.typeTex1D, typeinfo.typeF32Vec2]),
-      ...genType('texture2D', MASK_WEBGL1, typeinfo.typeF32Vec4, [typeinfo.typeTex2D, typeinfo.typeF32Vec2]),
-      ...genType('texture2D', MASK_WEBGL1, typeinfo.typeF32Vec4, [
-        typeinfo.typeTexExternal,
-        typeinfo.typeF32Vec2
-      ]),
-      ...genType('texture2D', MASK_WEBGL1, typeinfo.typeF32Vec4, [
-        typeinfo.typeTexDepth2D,
-        typeinfo.typeF32Vec2
-      ]),
-      ...genType('textureCube', MASK_WEBGL1, typeinfo.typeF32Vec4, [
-        typeinfo.typeTexCube,
-        typeinfo.typeF32Vec3
-      ]),
-      ...genType('textureCube', MASK_WEBGL1, typeinfo.typeF32Vec4, [
-        typeinfo.typeTexDepthCube,
-        typeinfo.typeF32Vec3
       ])
     ],
     normalizeFunc(pb: ProgramBuilder, name: string, ...args: ExpValueType[]) {
@@ -2771,16 +2718,6 @@ const builtinFunctionsAll = {
         typeinfo.typeF32
       ]),
       ...genType('texture', MASK_WEBGL2, typeinfo.typeF32Vec4, [
-        typeinfo.typeTexCube,
-        typeinfo.typeF32Vec3,
-        typeinfo.typeF32
-      ]),
-      ...genType('texture2D', MASK_WEBGL1, typeinfo.typeF32Vec4, [
-        typeinfo.typeTex2D,
-        typeinfo.typeF32Vec2,
-        typeinfo.typeF32
-      ]),
-      ...genType('textureCube', MASK_WEBGL1, typeinfo.typeF32Vec4, [
         typeinfo.typeTexCube,
         typeinfo.typeF32Vec3,
         typeinfo.typeF32
@@ -3010,31 +2947,6 @@ const builtinFunctionsAll = {
         typeinfo.typeTexDepthCube,
         typeinfo.typeF32Vec3,
         typeinfo.typeF32
-      ]),
-      ...genType('texture2DLodEXT', MASK_WEBGL1, typeinfo.typeF32Vec4, [
-        typeinfo.typeTex2D,
-        typeinfo.typeF32Vec2,
-        typeinfo.typeF32
-      ]),
-      ...genType('texture2DLodEXT', MASK_WEBGL1, typeinfo.typeF32Vec4, [
-        typeinfo.typeTexDepth2D,
-        typeinfo.typeF32Vec2,
-        typeinfo.typeF32
-      ]),
-      ...genType('texture2DLodEXT', MASK_WEBGL1, typeinfo.typeF32Vec4, [
-        typeinfo.typeTexExternal,
-        typeinfo.typeF32Vec2,
-        typeinfo.typeF32
-      ]),
-      ...genType('textureCubeLodEXT', MASK_WEBGL1, typeinfo.typeF32Vec4, [
-        typeinfo.typeTexCube,
-        typeinfo.typeF32Vec3,
-        typeinfo.typeF32
-      ]),
-      ...genType('textureCubeLodEXT', MASK_WEBGL1, typeinfo.typeF32Vec4, [
-        typeinfo.typeTexDepthCube,
-        typeinfo.typeF32Vec3,
-        typeinfo.typeF32
       ])
     ],
     normalizeFunc(pb: ProgramBuilder, name: string, ...args: ExpValueType[]) {
@@ -3045,10 +2957,6 @@ const builtinFunctionsAll = {
       const texType = tex.$ast.getType();
       if (!texType.isTextureType()) {
         throw new PBParamTypeError('textureSampleLevel', 'texture');
-      }
-      if (pb.getDevice().type === 'webgl' && pb.shaderKind === 'vertex') {
-        // WebGL1 does not support vertex texture lod
-        return pb.textureSample(tex, args[1] as any);
       }
       if (pb.getDevice().type === 'webgpu') {
         if (texType.isExternalTexture()) {
@@ -3280,18 +3188,6 @@ const builtinFunctionsAll = {
         typeinfo.typeF32Vec3
       ]),
       ...genType('textureGrad', MASK_WEBGL2, typeinfo.typeF32Vec4, [
-        typeinfo.typeTexCube,
-        typeinfo.typeF32Vec3,
-        typeinfo.typeF32Vec3,
-        typeinfo.typeF32Vec3
-      ]),
-      ...genType('texture2DGradEXT', MASK_WEBGL1, typeinfo.typeF32Vec4, [
-        typeinfo.typeTex2D,
-        typeinfo.typeF32Vec2,
-        typeinfo.typeF32Vec2,
-        typeinfo.typeF32Vec2
-      ]),
-      ...genType('textureCubeGradEXT', MASK_WEBGL1, typeinfo.typeF32Vec4, [
         typeinfo.typeTexCube,
         typeinfo.typeF32Vec3,
         typeinfo.typeF32Vec3,

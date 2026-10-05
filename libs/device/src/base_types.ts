@@ -3139,7 +3139,6 @@ export interface AbstractDevice extends IEventTarget<DeviceEventMap> {
    *
    * @remarks
    * This method reads the data asynchronously to prevent GPU stall.
-   * For WebGL1 devices, the GPU stall is still inevitable.
    *
    * @param index - color attachment index
    * @param x - x position of the reading area
@@ -3151,9 +3150,6 @@ export interface AbstractDevice extends IEventTarget<DeviceEventMap> {
   readPixels(index: number, x: number, y: number, w: number, h: number, buffer: TypedArray): Promise<void>;
   /**
    * Read pixel values from current frame buffer to a GPU buffer
-   *
-   * @remarks
-   * This method does not support WebGL1 device
    *
    * @param index - color attachment index
    * @param x - x position of the reading area

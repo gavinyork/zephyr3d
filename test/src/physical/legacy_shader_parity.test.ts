@@ -1,7 +1,7 @@
 import { ProgramBuilder } from '../../../libs/device/src';
 import { Bloom } from '../../../libs/scene/src/posteffect/bloom';
 
-function createDevice(type: 'webgl' | 'webgpu') {
+function createDevice(type: 'webgl2' | 'webgpu') {
   const device: any = {
     type,
     getDeviceCaps: () => ({
@@ -43,7 +43,7 @@ function createDevice(type: 'webgl' | 'webgpu') {
  * so the legacy-visible chain cannot silently regain a physical-only uniform.
  */
 describe('Bloom shader source after removing the pre-exposure compensation', () => {
-  for (const type of ['webgl', 'webgpu'] as const) {
+  for (const type of ['webgl2', 'webgpu'] as const) {
     test(`${type}: prefilter and compose carry no exposure uniforms`, () => {
       const device = createDevice(type);
       const bloom = new Bloom() as any;

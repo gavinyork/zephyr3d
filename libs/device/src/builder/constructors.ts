@@ -33,14 +33,6 @@ function vec_n(
   vecType: typeinfo.PBPrimitiveTypeInfo,
   ...args: (number | boolean | string | PBShaderExp)[]
 ) {
-  if (this.getDevice().type === 'webgl') {
-    if (vecType.scalarType === typeinfo.PBPrimitiveType.U32) {
-      throw new errors.PBDeviceNotSupport('unsigned integer type');
-    }
-    if (vecType.isMatrixType() && vecType.cols !== vecType.rows) {
-      throw new errors.PBDeviceNotSupport('non-square matrix type');
-    }
-  }
   if (vecType.isF16()) {
     if (!this.getDevice().getDeviceCaps().shaderCaps.supportShaderF16) {
       throw new errors.PBDeviceNotSupport('f16 shader type (requires WebGPU shader-f16 feature)');

@@ -879,9 +879,9 @@ export interface ProgramBuilder {
   not(x: boolean | PBShaderExp): PBShaderExp;
   /** return the negate of the given value */
   neg(x: number | PBShaderExp): PBShaderExp;
-  /** shift arithmetic left, not valid for WebGL1 device */
+  /** shift arithmetic left */
   sal(a: number | PBShaderExp, b: number | PBShaderExp): PBShaderExp;
-  /** shift arithmetic right, not valid for WebGL1 device */
+  /** shift arithmetic right */
   sar(a: number | PBShaderExp, b: number | PBShaderExp): PBShaderExp;
   /** Same as the arrayLength builtin function in WGSL, only valid for WebGPU device */
   arrayLength(x: PBShaderExp): PBShaderExp;
@@ -2055,6 +2055,9 @@ export class ProgramBuilder {
   /** @internal */
   private buildComputeSource(options: PBComputeOptions) {
     try {
+      if (this._device.type === 'webgl') {
+        throw new errors.PBDeviceNotSupport('WebGL1');
+      }
       this._lastError = null;
       this._shaderType = ShaderType.Compute;
       this._scopeStack = [];
@@ -2095,6 +2098,9 @@ export class ProgramBuilder {
   /** @internal */
   private buildRenderSource(options: PBRenderOptions) {
     try {
+      if (this._device.type === 'webgl') {
+        throw new errors.PBDeviceNotSupport('WebGL1');
+      }
       this._lastError = null;
 
       this._shaderType = ShaderType.Vertex;
@@ -2227,25 +2233,6 @@ export class ProgramBuilder {
       workgroupSize: null
     };
     switch (this._device.type) {
-      case 'webgl':
-        for (const u of this._uniforms) {
-          if (u.texture) {
-            const type = u.texture.exp.$ast.getType();
-            if (type.isTextureType() && type.isDepthTexture()) {
-              if (u.texture.autoBindSampler === 'comparison') {
-                throw new errors.PBDeviceNotSupport('depth texture comparison');
-              }
-              if (u.texture.autoBindSampler === 'sample') {
-                if (type.is2DTexture()) {
-                  context.typeReplacement.set(u.texture.exp, typeTex2D);
-                } else if (type.isCubeTexture()) {
-                  context.typeReplacement.set(u.texture.exp, typeTexCube);
-                }
-              }
-            }
-          }
-        }
-        return scope.$ast.toWebGL('', context);
       case 'webgl2':
         for (const u of this._uniforms) {
           if (u.texture) {
@@ -4017,9 +4004,6 @@ export class PBInsideFunctionScope extends PBScope {
    * @returns The scope that inside the do..while statement
    */
   $do(body: (this: PBDoWhileScope) => void): PBDoWhileScope {
-    if (this.$builder.getDevice().type === 'webgl') {
-      throw new Error(`No do-while() loop support for WebGL1.0 device`);
-    }
     const astDoWhile = new AST.ASTDoWhile(null);
     this.$ast.statements.push(astDoWhile);
     return new PBDoWhileScope(this, astDoWhile, body);
