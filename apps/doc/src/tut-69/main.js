@@ -65,26 +65,6 @@ function heightAt(x, z) {
   return Math.min(1, Math.max(0, h * h * (3 - 2 * h)));
 }
 
-// Procedural ground detail texture: green with brownish noise
-function createGroundTexture(device) {
-  const size = 64;
-  const data = new Uint8Array(size * size * 4);
-  for (let y = 0; y < size; y++) {
-    for (let x = 0; x < size; x++) {
-      const i = y * size + x;
-      // Low-frequency mottling plus per-texel grain
-      const t = 0.7 * valueNoise(x * 0.15, y * 0.15) + 0.3 * hash2(x, y);
-      data[i * 4 + 0] = 55 + t * 45;
-      data[i * 4 + 1] = 110 + t * 40;
-      data[i * 4 + 2] = 35 + t * 25;
-      data[i * 4 + 3] = 255;
-    }
-  }
-  const texture = device.createTexture2D('rgba8unorm', size, size);
-  texture.update(data, 0, 0, size, size);
-  return texture;
-}
-
 // Geometry grass blades need WebGPU; WebGL2 falls back to textured grass cards.
 // ?backend=webgl2 or ?backend=webgpu forces a backend.
 async function resolveBackend() {
