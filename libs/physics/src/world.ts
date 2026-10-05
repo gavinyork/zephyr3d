@@ -1,5 +1,6 @@
 import { Disposable, makeObservable, Quaternion, Vector3 } from '@zephyr3d/base';
 import type { Scene } from '@zephyr3d/scene';
+import type { ClipmapTerrain } from '@zephyr3d/scene';
 import { getDevice, SceneNode, tryGetApp } from '@zephyr3d/scene';
 import type {
   BackendBody,
@@ -15,6 +16,15 @@ import type { RigidBody } from './rigid_body';
 import type { Collider } from './collider';
 import type { PhysicsComponent, PhysicsEventMap } from './component';
 import { PhysicsContactEvent, PhysicsTriggerEvent, type PhysicsObject } from './events';
+import type { ColliderGeometry, GeometrySource, MeshGeometry, TerrainGeometry } from './geometry';
+import {
+  fetchGeometry,
+  geometryMatches,
+  geometrySource,
+  needsGeometry,
+  sameSource,
+  spansVolume
+} from './geometry';
 
 /** World pose of a node, scale dropped. */
 interface Pose {
@@ -44,6 +54,8 @@ interface BodyEntry {
   lastMatrix: Float32Array;
   /** A sleeping body has had its resting pose written and needs no more writes. */
   settled: boolean;
+  /** Left out of the simulation while one of its colliders waits for geometry. */
+  disabled: boolean;
 }
 
 /** @internal */
@@ -130,6 +142,8 @@ export type PhysicsWorldEventMap = {
 const LAYER_COUNT = 16;
 const ALL_LAYERS = 0xffff;
 const MAX_QUERY_DISTANCE = 1e9;
+const CONVEX_HULL_ERROR =
+  'Could not build a convex hull: it needs at least four points that are not all in one plane';
 
 const tmpPose = newPose();
 const tmpPose2 = newPose();
@@ -223,6 +237,16 @@ export class PhysicsWorld extends makeObservable(Disposable)<PhysicsWorldEventMa
   private readonly _startedThisFrame: Map<string, ObjectPair>;
   /** Object pairs touching at the end of the last frame that took a step. */
   private _lastPairs: Map<string, ObjectPair>;
+  /** Colliders waiting for their geometry, and which request is the latest. */
+  private readonly _pending: Map<Collider, { source: GeometrySource; generation: number }>;
+  private readonly _pendingPromises: Set<Promise<void>>;
+  /** Colliders whose geometry failed, and for which source, so it is not retried every frame. */
+  private readonly _failed: Map<Collider, GeometrySource | null>;
+  private _geometryGeneration: number;
+  private _enablementDirty: boolean;
+  private _waitForCollidersOnStart: boolean;
+  /** Whether a step has been taken; see waitForCollidersOnStart. */
+  private _started: boolean;
   /** @internal */
   _inFixedUpdate: boolean;
 
@@ -264,6 +288,13 @@ export class PhysicsWorld extends makeObservable(Disposable)<PhysicsWorldEventMa
     this._touchingByKey = new Map();
     this._startedThisFrame = new Map();
     this._lastPairs = new Map();
+    this._pending = new Map();
+    this._pendingPromises = new Set();
+    this._failed = new Map();
+    this._geometryGeneration = 0;
+    this._enablementDirty = false;
+    this._waitForCollidersOnStart = true;
+    this._started = false;
     this._inFixedUpdate = false;
     scene.on('afterupdate', this._onAfterUpdate, this);
     scene.on('dispose', this._onSceneDispose, this);
@@ -314,6 +345,42 @@ export class PhysicsWorld extends makeObservable(Disposable)<PhysicsWorldEventMa
     this._enabled = !!value;
   }
 
+  /**
+   * Whether the simulation waits to start until every collider has its
+   * geometry. Default true.
+   *
+   * @remarks
+   * `mesh`, `convex` and `terrain` colliders may have to read their geometry
+   * back from the GPU, which takes a few frames - how many depends on the
+   * machine. Starting without them would let things fall before the ground is
+   * there, differently on every run. With this on, the world takes no steps
+   * until the colliders present when it first had anything to simulate are all
+   * in; time does not run meanwhile. Colliders added after the simulation has
+   * started only hold back their own rigid body.
+   */
+  get waitForCollidersOnStart() {
+    return this._waitForCollidersOnStart;
+  }
+  set waitForCollidersOnStart(value: boolean) {
+    this._waitForCollidersOnStart = !!value;
+  }
+  /**
+   * Resolves once every collider waiting for its geometry has it (or failed to
+   * get it). Starts reading geometry for colliders added since the last update.
+   */
+  async whenReady(): Promise<void> {
+    for (;;) {
+      if (this.disposed || !this._ensureBackend()) {
+        return;
+      }
+      this._resolve();
+      if (this._pendingPromises.size === 0) {
+        return;
+      }
+      await Promise.allSettled([...this._pendingPromises]);
+    }
+  }
+
   // ------------------------------------------------------------------ layers
 
   /** Display names of the 16 collider layers, for tools. */
@@ -360,7 +427,16 @@ export class PhysicsWorld extends makeObservable(Disposable)<PhysicsWorldEventMa
     if (this.disposed || !this._ensureBackend()) {
       return;
     }
+    this._checkGeometry();
     this._resolve();
+    this._syncFromNodes();
+    if (this._enablementDirty) {
+      this._updateBodyEnablement();
+    }
+    if (!this._started && this._waitForCollidersOnStart && this._pending.size > 0) {
+      // Time stands still until the starting colliders are in.
+      return;
+    }
     const fixed = this._fixedTimeStep;
     this._accumulator += Math.max(0, dt);
     let steps = Math.floor(this._accumulator / fixed + 1e-9);
@@ -372,7 +448,9 @@ export class PhysicsWorld extends makeObservable(Disposable)<PhysicsWorldEventMa
     if (this._accumulator >= fixed) {
       this._accumulator %= fixed;
     }
-    this._syncFromNodes();
+    if (steps > 0) {
+      this._started = true;
+    }
     for (let i = 0; i < steps; i++) {
       this._setKinematicTargets((i + 1) / steps);
       this._fixedUpdate(fixed);
@@ -537,6 +615,10 @@ export class PhysicsWorld extends makeObservable(Disposable)<PhysicsWorldEventMa
   _unregisterCollider(component: Collider) {
     this._registeredColliders.delete(component);
     this._dirtyColliders.add(component);
+    this._pending.delete(component);
+    this._failed.delete(component);
+    this._enablementDirty = true;
+    component._setStatus(false);
   }
   /** A body's settings changed; it is rebuilt on the next update. @internal */
   _markBodyDirty(component: RigidBody) {
@@ -646,6 +728,7 @@ export class PhysicsWorld extends makeObservable(Disposable)<PhysicsWorldEventMa
         this._createCollider(component as Collider);
       }
     }
+    this._updateBodyEnablement();
   }
 
   private _createBody(component: RigidBody) {
@@ -671,7 +754,8 @@ export class PhysicsWorld extends makeObservable(Disposable)<PhysicsWorldEventMa
       curr: { position: pose.position.clone(), rotation: pose.rotation.clone() },
       kinematicFrom: { position: pose.position.clone(), rotation: pose.rotation.clone() },
       lastMatrix: new Float32Array(16),
-      settled: false
+      settled: false,
+      disabled: false
     };
     storeMatrix(entry.lastMatrix, host);
     component._applyPendingVelocities(body);
@@ -694,12 +778,59 @@ export class PhysicsWorld extends makeObservable(Disposable)<PhysicsWorldEventMa
   private _createCollider(component: Collider) {
     const backend = this._backend!;
     const host = component.host!;
+    let geometry: ColliderGeometry | null = null;
+    if (needsGeometry(component)) {
+      geometry = this._geometryFor(component);
+      if (!geometry) {
+        return;
+      }
+    }
     const owner = this._findOwner(host);
+    if (component.shape === 'terrain' && owner) {
+      this._fail(component, null, 'A terrain collider cannot belong to a rigid body');
+      return;
+    }
+    if (
+      component.shape === 'mesh' &&
+      owner?.component.motionType === 'dynamic' &&
+      !component._warnedDynamicMesh
+    ) {
+      component._warnedDynamicMesh = true;
+      console.warn(
+        `Collider on '${host.name}': a mesh collider on a dynamic rigid body has no volume and gets pushed into things; use 'convex' instead.`
+      );
+    }
     // The collider's world pose: its node, moved by its offset in node space.
     const colliderPose = readWorldPose(host, tmpPose, tmpScale);
     host.worldMatrix.transformPointAffine(component.offset, colliderPose.position);
-    const scale = tmpVec.setXYZ(Math.abs(tmpScale.x), Math.abs(tmpScale.y), Math.abs(tmpScale.z));
-    const shape = this._buildShape(component, scale);
+    let shape: ShapeDesc;
+    if (geometry?.kind === 'terrain') {
+      const built = this._terrainShape(
+        host as ClipmapTerrain,
+        geometry,
+        component.terrainResolution,
+        colliderPose
+      );
+      if (!built) {
+        this._fail(component, null, 'The terrain height map is too small for a collider');
+        return;
+      }
+      shape = built;
+    } else if (geometry) {
+      // Signed: a mirrored mesh stays mirrored.
+      shape = this._meshShape(component, geometry, tmpScale);
+      if (shape.type === 'trimesh' && shape.indices.length < 3) {
+        this._fail(component, null, 'A mesh collider needs triangles');
+        return;
+      }
+      if (shape.type === 'convex' && !spansVolume(shape.points)) {
+        this._fail(component, null, CONVEX_HULL_ERROR);
+        return;
+      }
+    } else {
+      const scale = tmpVec.setXYZ(Math.abs(tmpScale.x), Math.abs(tmpScale.y), Math.abs(tmpScale.z));
+      shape = this._buildShape(component, scale);
+    }
     const material = {
       friction: component.friction,
       restitution: component.restitution,
@@ -736,6 +867,13 @@ export class PhysicsWorld extends makeObservable(Disposable)<PhysicsWorldEventMa
       localRot = Quaternion.identity();
     }
     const collider = backend.createCollider(body, shape, localPos, localRot, material);
+    if (!collider) {
+      if (implicitBody) {
+        backend.removeBody(implicitBody);
+      }
+      this._fail(component, null, CONVEX_HULL_ERROR);
+      return;
+    }
     const lastMatrix = new Float32Array(16);
     storeMatrix(lastMatrix, host);
     const entry: ColliderEntry = {
@@ -748,8 +886,10 @@ export class PhysicsWorld extends makeObservable(Disposable)<PhysicsWorldEventMa
     };
     this._colliders.set(component, entry);
     this._byKey.set(entry.key, entry);
+    this._failed.delete(component);
     // A collider joining a body changes its inertia; wake it so it notices.
     owner?.body.wakeUp();
+    component._setStatus(true);
   }
 
   private _buildShape(component: Collider, scale: Vector3): ShapeDesc {
@@ -780,6 +920,172 @@ export class PhysicsWorld extends makeObservable(Disposable)<PhysicsWorldEventMa
             (component.size.z * scale.z) / 2
           )
         };
+    }
+  }
+
+  /** Triangles or hull points, scaled along each axis, around the collider's origin. */
+  private _meshShape(component: Collider, geometry: MeshGeometry, scale: Vector3): ShapeDesc {
+    const src = geometry.positions;
+    const points = new Float32Array(src.length);
+    for (let i = 0; i < src.length; i += 3) {
+      points[i] = src[i] * scale.x;
+      points[i + 1] = src[i + 1] * scale.y;
+      points[i + 2] = src[i + 2] * scale.z;
+    }
+    return component.shape === 'convex'
+      ? { type: 'convex', points }
+      : { type: 'trimesh', vertices: points, indices: geometry.indices };
+  }
+
+  /**
+   * A height field matching how the terrain is drawn: it spans from the node's
+   * position along +X and +Z, height samples sit at texel centres, and heights
+   * are scaled by the node's Y scale on top of its world height. Rotation is
+   * ignored, as by the terrain itself. Sets `pose` to the field's centre.
+   */
+  private _terrainShape(
+    terrain: ClipmapTerrain,
+    geometry: TerrainGeometry,
+    resolution: number,
+    pose: Pose
+  ): ShapeDesc | null {
+    const { width, height } = geometry;
+    const cols = Math.floor((width - 1) / resolution) + 1;
+    const rows = Math.floor((height - 1) / resolution) + 1;
+    if (cols < 2 || rows < 2) {
+      return null;
+    }
+    const heights = new Float32Array(rows * cols);
+    for (let x = 0; x < cols; x++) {
+      for (let z = 0; z < rows; z++) {
+        heights[x * rows + z] = geometry.heights[z * resolution * width + x * resolution];
+      }
+    }
+    // The same placement as ClipmapTerrain.updateRegion.
+    const scale = terrain.scale;
+    const cellX = (Math.abs(scale.x) * terrain.sizeX) / width;
+    const cellZ = (Math.abs(scale.z) * terrain.sizeZ) / height;
+    const px = terrain.position.x + (terrain.parent?.worldMatrix.m03 ?? 0);
+    const pz = terrain.position.z + (terrain.parent?.worldMatrix.m23 ?? 0);
+    const spanX = (cols - 1) * resolution * cellX;
+    const spanZ = (rows - 1) * resolution * cellZ;
+    pose.position.setXYZ(px + cellX * 0.5 + spanX / 2, terrain.worldMatrix.m13, pz + cellZ * 0.5 + spanZ / 2);
+    pose.rotation.identity();
+    return { type: 'heightfield', rows, cols, heights, scale: new Vector3(spanX, scale.y, spanZ) };
+  }
+
+  /**
+   * The geometry a collider should be built from, or null while it is being
+   * read or if it cannot be had.
+   */
+  private _geometryFor(component: Collider): ColliderGeometry | null {
+    let source: GeometrySource;
+    try {
+      source = geometrySource(component);
+    } catch (err) {
+      this._fail(component, null, err);
+      return null;
+    }
+    if (geometryMatches(component._geometry, source)) {
+      return component._geometry;
+    }
+    const pending = this._pending.get(component);
+    if (pending && sameSource(pending.source, source)) {
+      return null;
+    }
+    let result: ColliderGeometry | Promise<ColliderGeometry>;
+    try {
+      result = fetchGeometry(component, source);
+    } catch (err) {
+      this._fail(component, source, err);
+      return null;
+    }
+    if (!(result instanceof Promise)) {
+      this._pending.delete(component);
+      component._geometry = result;
+      return result;
+    }
+    const generation = ++this._geometryGeneration;
+    this._pending.set(component, { source, generation });
+    component._setStatus(false);
+    const latest = () => this._pending.get(component)?.generation === generation;
+    const promise: Promise<void> = result
+      .then(
+        (geometry) => {
+          if (latest()) {
+            this._pending.delete(component);
+            component._geometry = geometry;
+            if (!this.disposed && component.world === this) {
+              this._dirtyColliders.add(component);
+            }
+          }
+        },
+        (err) => {
+          if (latest()) {
+            this._pending.delete(component);
+            this._fail(component, source, err);
+          }
+        }
+      )
+      .finally(() => {
+        this._pendingPromises.delete(promise);
+      });
+    this._pendingPromises.add(promise);
+    return null;
+  }
+
+  private _fail(component: Collider, source: GeometrySource | null, err: unknown) {
+    const message = err instanceof Error ? err.message : String(err);
+    if (component.error !== message) {
+      console.error(`Collider on '${component.host?.name ?? ''}': ${message}`);
+    }
+    component._geometry = null;
+    component._setStatus(false, message);
+    this._failed.set(component, source);
+    this._enablementDirty = true;
+  }
+
+  /** Rebuilds colliders whose mesh or terrain changed since they were built. */
+  private _checkGeometry() {
+    for (const component of this._registeredColliders) {
+      if (!needsGeometry(component) || this._pending.has(component) || this._dirtyColliders.has(component)) {
+        continue;
+      }
+      let source: GeometrySource | null;
+      try {
+        source = geometrySource(component);
+      } catch {
+        source = null;
+      }
+      if (this._failed.has(component)) {
+        const failed = this._failed.get(component)!;
+        if (source === null || failed === null || sameSource(failed, source)) {
+          // Still failing for the same reason; a property change retries it.
+          continue;
+        }
+      } else if (source && geometryMatches(component._geometry, source)) {
+        continue;
+      }
+      this._dirtyColliders.add(component);
+    }
+  }
+
+  /** Keeps rigid bodies out of the simulation while any of their colliders waits. */
+  private _updateBodyEnablement() {
+    this._enablementDirty = false;
+    const blocked = new Set<BodyEntry>();
+    for (const component of this._pending.keys()) {
+      const owner = component.host ? this._findOwner(component.host) : null;
+      if (owner) {
+        blocked.add(owner);
+      }
+    }
+    for (const entry of this._bodies.values()) {
+      const disabled = blocked.has(entry);
+      if (disabled !== entry.disabled) {
+        entry.disabled = disabled;
+        entry.body.setEnabled(!disabled);
+      }
     }
   }
 
@@ -1127,6 +1433,8 @@ export class PhysicsWorld extends makeObservable(Disposable)<PhysicsWorldEventMa
     this._touchingByKey.clear();
     this._startedThisFrame.clear();
     this._lastPairs.clear();
+    this._pending.clear();
+    this._failed.clear();
     PhysicsWorld._worlds.delete(this._scene);
   }
 }

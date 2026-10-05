@@ -656,8 +656,11 @@ export function getTerrainClass(manager: ResourceManager): SerializableClass {
               heightMap.update(new Uint16Array(data, 8), 0, 0, width, height);
               this.heightMap = heightMap;
               this.heightMapAssetId = value.str[0];
+              const heights = new Uint16Array(data, 8, width * height);
               // Known right away from the loaded data, no GPU read back needed
-              this.setHeightRangeFromHalfData(new Uint16Array(data, 8, width * height));
+              this.setHeightRangeFromHalfData(heights);
+              // Kept for CPU-side users such as physics colliders.
+              this.setHeightData(heights, width, height);
             }
           }
         }

@@ -1,5 +1,6 @@
 import { Vector3 } from '@zephyr3d/base';
 import { PhysicsComponent } from './component';
+import type { ColliderGeometry } from './geometry';
 import type { PhysicsWorld } from './world';
 
 /**
@@ -10,10 +11,20 @@ import type { PhysicsWorld } from './world';
  * - `capsule`: a cylinder with hemispherical ends, along the node's Y axis;
  *   {@link Collider.height} is the total height, ends included.
  * - `cylinder`: along the node's Y axis, {@link Collider.height} tall.
+ * - `mesh`: the triangles of the node's mesh, exactly. For floors, buildings
+ *   and other things that do not move on their own: on a dynamic rigid body it
+ *   has no volume, so it gets pushed into things; use `convex` there.
+ * - `convex`: the convex hull of the node's mesh - the shape of the mesh
+ *   shrink-wrapped, hollows filled in. For dynamic objects: rocks, props.
+ * - `terrain`: the heights of the node's terrain. Static only.
+ *
+ * `mesh` and `convex` read the mesh back from the GPU, so they come into effect
+ * a few frames later (see {@link Collider.ready}), unless given their triangles
+ * with {@link Collider.setMeshData}.
  *
  * @public
  */
-export type ColliderShape = 'box' | 'sphere' | 'capsule' | 'cylinder';
+export type ColliderShape = 'box' | 'sphere' | 'capsule' | 'cylinder' | 'mesh' | 'convex' | 'terrain';
 
 /**
  * A collision shape on its node.
@@ -28,7 +39,8 @@ export type ColliderShape = 'box' | 'sphere' | 'capsule' | 'cylinder';
  *
  * Sizes are in the node's local units and scale with the node's world scale. A
  * sphere scales by the largest axis, and capsules and cylinders by the larger
- * of X and Z for their radius.
+ * of X and Z for their radius; `mesh` and `convex` scale exactly, along each
+ * axis.
  *
  * @public
  */
@@ -42,6 +54,16 @@ export class Collider extends PhysicsComponent {
   private _restitution: number;
   private _isTrigger: boolean;
   private _layer: number;
+  private _meshLod: number;
+  private _terrainResolution: number;
+  /** @internal */
+  _meshData: { positions: Float32Array; indices: Uint32Array } | null;
+  /** The geometry last built from, for shapes that need it. @internal */
+  _geometry: ColliderGeometry | null;
+  private _ready: boolean;
+  private _error: string;
+  /** Warned that a mesh collider is on a dynamic body. @internal */
+  _warnedDynamicMesh: boolean;
 
   constructor() {
     super();
@@ -54,6 +76,13 @@ export class Collider extends PhysicsComponent {
     this._restitution = 0;
     this._isTrigger = false;
     this._layer = 0;
+    this._meshLod = 0;
+    this._terrainResolution = 1;
+    this._meshData = null;
+    this._geometry = null;
+    this._ready = false;
+    this._error = '';
+    this._warnedDynamicMesh = false;
   }
 
   /** The shape. Default `'box'`. */
@@ -137,6 +166,81 @@ export class Collider extends PhysicsComponent {
     }
   }
 
+  /**
+   * Which level of detail of the mesh a `mesh` or `convex` collider is made
+   * from; 0 is full detail. A level past the mesh's lowest detail uses the
+   * lowest. Default 0.
+   */
+  get meshLod() {
+    return this._meshLod;
+  }
+  set meshLod(value: number) {
+    const lod = Math.max(0, Math.floor(value));
+    if (lod !== this._meshLod) {
+      this._meshLod = lod;
+      this._changed();
+    }
+  }
+  /**
+   * Spacing of a `terrain` collider's height samples, in height map texels: 1
+   * uses every texel, 2 every other one, and so on. Coarser is cheaper and
+   * smaller but follows the ground less closely. Default 1.
+   */
+  get terrainResolution() {
+    return this._terrainResolution;
+  }
+  set terrainResolution(value: number) {
+    const resolution = Math.max(1, Math.floor(value));
+    if (resolution !== this._terrainResolution) {
+      this._terrainResolution = resolution;
+      this._changed();
+    }
+  }
+  /**
+   * Gives a `mesh` or `convex` collider its triangles directly instead of
+   * reading them from the node's mesh, so it takes effect right away.
+   *
+   * @remarks
+   * For generated geometry, or collision geometry prepared in advance. Not
+   * saved with the scene.
+   *
+   * @param positions - Vertex positions in the node's local space, xyz each.
+   * @param indices - Three vertex indices per triangle. A `convex` collider
+   *   only uses the positions and may leave this out.
+   */
+  setMeshData(positions: Float32Array, indices?: Uint32Array) {
+    this._meshData = { positions, indices: indices ?? new Uint32Array(0) };
+    this._changed();
+  }
+  /** Goes back to reading the triangles from the node's mesh. */
+  clearMeshData() {
+    if (this._meshData) {
+      this._meshData = null;
+      this._changed();
+    }
+  }
+  /**
+   * Whether the collider is in the simulation. Basic shapes are as soon as
+   * their node is in a scene that is simulating; `mesh`, `convex` and `terrain`
+   * may have to wait for their geometry. Raises `ready` when it becomes true.
+   */
+  get ready() {
+    return this._ready;
+  }
+  /** Why the collider could not be built, or an empty string. */
+  get error() {
+    return this._error;
+  }
+
+  /** @internal */
+  _setStatus(ready: boolean, error = '') {
+    const becameReady = ready && !this._ready;
+    this._ready = ready;
+    this._error = error;
+    if (becameReady) {
+      this.dispatchEvent('ready');
+    }
+  }
   private _changed() {
     this.world?._markColliderDirty(this);
   }

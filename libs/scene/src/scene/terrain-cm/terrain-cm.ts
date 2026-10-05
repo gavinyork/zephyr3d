@@ -149,6 +149,8 @@ export class ClipmapTerrain extends applyMixins(GraphNode, mixinDrawable) implem
   private _maxHeight: number;
   /** Bumped by every height range update, so a read back overtaken by a newer one is dropped */
   private _heightRangeSerial: number;
+  private _heightData: Nullable<{ data: Uint16Array; width: number; height: number }>;
+  private _heightVersion: number;
   private _tmpTexture: DRef<Texture2D>;
   private _virtualTexture: Nullable<TerrainVirtualTexture>;
   /**
@@ -182,6 +184,8 @@ export class ClipmapTerrain extends applyMixins(GraphNode, mixinDrawable) implem
     this._minHeight = 0;
     this._maxHeight = 0;
     this._heightRangeSerial = 0;
+    this._heightData = null;
+    this._heightVersion = 0;
     this._material = new DRef(
       new ClipmapTerrainMaterial(this.createHeightMapTexture(this._sizeX, this._sizeZ))
     );
@@ -400,9 +404,42 @@ export class ClipmapTerrain extends applyMixins(GraphNode, mixinDrawable) implem
   set heightMap(val) {
     if (this.material && val) {
       this.material.heightMap = val;
+      this._heightData = null;
       this.updateRegion();
       this.updateHeightPyramid();
+      this._heightVersion++;
     }
+  }
+  /**
+   * Goes up whenever the heights change: a new height map, or edits to the
+   * current one once {@link ClipmapTerrain.updateBoundingBox} is called after
+   * them. Lets CPU-side users such as physics notice they are out of date.
+   */
+  get heightVersion() {
+    return this._heightVersion;
+  }
+  /**
+   * The heights as loaded from the height map asset, half floats row by row,
+   * while the height map is unchanged since loading; null otherwise.
+   *
+   * @remarks
+   * Lets CPU-side users such as physics read heights without a GPU read back.
+   * Dropped when the height map is replaced or edited.
+   */
+  get heightData(): Nullable<{
+    readonly data: Uint16Array;
+    readonly width: number;
+    readonly height: number;
+  }> {
+    return this._heightData;
+  }
+  /**
+   * Records the CPU copy of the heights just uploaded to the height map.
+   * @internal
+   */
+  setHeightData(data: Uint16Array, width: number, height: number) {
+    this._heightData = { data, width, height };
+    this._heightVersion++;
   }
   /** The splat map texture */
   get splatMap() {
@@ -548,6 +585,9 @@ export class ClipmapTerrain extends applyMixins(GraphNode, mixinDrawable) implem
    * ```
    */
   updateBoundingBox() {
+    // Called after the heights changed on the GPU: a CPU copy is stale now.
+    this._heightData = null;
+    this._heightVersion++;
     const tmp = this.updateHeightPyramid();
     if (!tmp) {
       return;
