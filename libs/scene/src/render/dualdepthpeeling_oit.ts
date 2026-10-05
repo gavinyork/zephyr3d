@@ -82,18 +82,17 @@ export class DualDepthPeelingOIT extends OIT {
   /**
    * Checks whether dual depth peeling can run with a capability snapshot.
    *
-   * @param deviceType - The device type.
+   * @param _deviceType - The device type. Unused: every supported backend
+   *   (WebGL2, WebGPU) has the required uniform buffers, so only the
+   *   capabilities decide.
    * @param caps - The device capabilities.
    * @returns True if dual depth peeling is supported.
    */
-  static supportDeviceCaps(deviceType: string, caps: DeviceCaps) {
+  static supportDeviceCaps(_deviceType: string, caps: DeviceCaps) {
     const framebufferCaps = caps.framebufferCaps;
     const textureCaps = caps.textureCaps;
-    const shaderCaps = caps.shaderCaps;
     const miscCaps = caps.miscCaps;
-    const webgl2OrBetter = deviceType !== 'webgl' || shaderCaps.maxUniformBufferSize > 0;
     return (
-      webgl2OrBetter &&
       framebufferCaps.maxDrawBuffers >= 3 &&
       framebufferCaps.supportPerTargetBlending &&
       framebufferCaps.maxColorAttachmentBytesPerSample >= COLOR_ATTACHMENT_BYTES_PER_SAMPLE &&

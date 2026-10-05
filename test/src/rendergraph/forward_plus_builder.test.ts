@@ -1798,32 +1798,6 @@ describe('Forward+ frame-resource requirements', () => {
     );
   });
 
-  test('reports an unavailable backend resource during graph build', () => {
-    expect(() =>
-      buildWithEffect(
-        new (class extends AbstractPostEffect {
-          requireHiZTexture() {
-            return true;
-          }
-        })(),
-        createOptions(),
-        { device: { type: 'webgl' } }
-      )
-    ).toThrow(/HiZ was requested/);
-  });
-
-  test('validates unsupported resources enabled directly through pipeline options', () => {
-    expect(() =>
-      buildForwardPlusGraphForTest(
-        createOptions({ motionVectors: true }),
-        {},
-        {
-          device: { type: 'webgl' }
-        }
-      )
-    ).toThrow(/MotionVector was requested/);
-  });
-
   test('reports a missing producer when a required module is removed', () => {
     const pipeline = createForwardPlusPipeline().remove('HiZ');
     const effect = new (class extends AbstractPostEffect {

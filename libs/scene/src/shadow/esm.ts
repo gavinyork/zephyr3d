@@ -317,7 +317,7 @@ export class ESM extends ShadowImpl {
     mipmapping?: boolean
   ) {
     const device = getDevice();
-    const useTextureArray = numCascades > 1 && device.type !== 'webgl';
+    const useTextureArray = numCascades > 1;
     const colorAttachments = colorFormat
       ? useTextureArray
         ? [
@@ -337,7 +337,7 @@ export class ESM extends ShadowImpl {
     const depthAttachment = depthFormat
       ? useTextureArray
         ? device.pool.fetchTemporalTexture2DArray(false, depthFormat, width, height, numCascades, false)
-        : device.type !== 'webgl' && lightType === LIGHT_TYPE_POINT
+        : lightType === LIGHT_TYPE_POINT
           ? device.pool.fetchTemporalTextureCube(false, depthFormat, width, false)
           : device.pool.fetchTemporalTexture2D(false, depthFormat, width, height, false)
       : null;
@@ -427,14 +427,10 @@ export class ESM extends ShadowImpl {
     const device = getDevice();
     return device.getDeviceCaps().textureCaps.supportFloatColorBuffer &&
       device.getDeviceCaps().textureCaps.supportLinearFloatTexture
-      ? device.type === 'webgl'
-        ? 'rgba32f'
-        : 'rg32f'
+      ? 'rg32f'
       : device.getDeviceCaps().textureCaps.supportHalfFloatColorBuffer &&
           device.getDeviceCaps().textureCaps.supportLinearHalfFloatTexture
-        ? device.type === 'webgl'
-          ? 'rgba16f'
-          : 'rg16f'
+        ? 'rg16f'
         : 'rgba8unorm';
   }
   getShadowMapDepthFormat(_shadowMapParams: ShadowMapParams) {

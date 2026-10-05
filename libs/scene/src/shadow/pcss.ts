@@ -125,13 +125,6 @@ export class PCSS extends ShadowImpl {
   }
   getShadowMapColorFormat(_shadowMapParams: ShadowMapParams): Nullable<TextureFormat> {
     const device = getDevice();
-    if (device.type === 'webgl') {
-      return device.getDeviceCaps().textureCaps.supportHalfFloatColorBuffer
-        ? 'rgba16f'
-        : device.getDeviceCaps().textureCaps.supportFloatColorBuffer
-          ? 'rgba32f'
-          : 'rgba8unorm';
-    }
     return device.getDeviceCaps().textureCaps.supportHalfFloatColorBuffer
       ? 'r16f'
       : device.getDeviceCaps().textureCaps.supportFloatColorBuffer

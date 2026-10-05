@@ -858,8 +858,7 @@ export class HairMaterial
    *
    * @remarks
    * Stands in for the exact longitudinal term, which involves a Bessel function
-   * and, in the energy-conserving formulation, `cosh` - and `cosh` is not
-   * available on WebGL1 in this shader builder. The Gaussian is the
+   * and, in the energy-conserving formulation, `cosh`. The Gaussian is the
    * approximation Marschner's own paper offers and is what real-time
    * implementations use.
    * @internal

@@ -49,9 +49,6 @@ export function SSR_fresnel(
 /** @internal */
 export function SSR_dither(scope: PBInsideFunctionScope, uv: PBShaderExp) {
   const pb = scope.$builder;
-  if (pb.getDevice().type === 'webgl') {
-    return pb.float(0);
-  }
   if (!pb.getGlobalScope().Z_dither) {
     pb.getGlobalScope().Z_dither = [
       pb.float(0),
@@ -378,12 +375,7 @@ export function screenSpaceRayTracing_Linear2D(
       this.$l.hitZ = pb.float();
       this.numIterations = 0;
       this.skippedIterations = pb.min(this.maxIterations, 1);
-      this.$for(pb.float('i'), 0, pb.getDevice().type === 'webgl' ? 1000 : this.maxIterations, function () {
-        if (pb.getDevice().type === 'webgl') {
-          this.$if(pb.greaterThanEqual(this.i, this.maxIterations), function () {
-            this.$break();
-          });
-        }
+      this.$for(pb.float('i'), 0, this.maxIterations, function () {
         this.$if(pb.and(this.intersected, pb.greaterThanEqual(this.i, this.skippedIterations)), function () {
           this.$break();
         });
@@ -712,12 +704,7 @@ export function screenSpaceRayTracing_HiZ(
       this.$l.hit2 = pb.bool(false);
       this.$l.hit3 = pb.bool(false);
       this.$l.numBatches = pb.ceil(pb.mul(this.numSteps, 0.25));
-      this.$for(pb.float('i'), 0, pb.getDevice().type === 'webgl' ? 64 : this.numBatches, function () {
-        if (pb.getDevice().type === 'webgl') {
-          this.$if(pb.greaterThanEqual(this.i, this.numBatches), function () {
-            this.$break();
-          });
-        }
+      this.$for(pb.float('i'), 0, this.numBatches, function () {
         this.marchBase = pb.mul(this.i, 4);
         this.$l.mip01 = pb.min(this.level, this.maxMipLevel);
         this.$l.mip23 = pb.min(pb.add(this.level, this.mipInc), this.maxMipLevel);

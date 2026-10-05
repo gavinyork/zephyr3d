@@ -40,11 +40,6 @@ type ClipmapTerrainDetailMapInfo = {
 };
 
 const MAX_DETAIL_MAPS = 8;
-/**
- * WebGL1 has no uniform buffers, so the per-level data goes through a plain uniform array,
- * sized to keep within the minimum vertex uniform budget: 16 levels, 2 vectors each.
- */
-const WEBGL1_LEVEL_DATA_VECTORS = 32;
 
 /**
  * Terrain debug rendering mode
@@ -84,8 +79,6 @@ export class ClipmapTerrainMaterial extends applyMaterialMixins(
   private readonly _splatMapSize: number;
   private readonly _heightMapSize: Vector4;
   private readonly _levelDataBuffer: DRef<GPUDataBuffer>;
-  /** WebGL1 only, see WEBGL1_LEVEL_DATA_VECTORS */
-  private readonly _levelDataArray: Float32Array<ArrayBuffer>;
   private _virtualTexture: Nullable<VirtualTexture>;
   private _contentVersion: number;
   constructor(heightMap: Texture2D) {
@@ -99,11 +92,9 @@ export class ClipmapTerrainMaterial extends applyMaterialMixins(
     this._heightMap = new DRef(heightMap);
     this._detailMapSize = 256;
     this._splatMapSize = 512;
-    const webgl1 = getDevice().type === 'webgl';
     this._levelDataBuffer = new DRef(
-      webgl1 ? null : getDevice().createBuffer(MAX_TERRAIN_MIPMAP_LEVELS * 4 * 2 * 4, { usage: 'uniform' })
+      getDevice().createBuffer(MAX_TERRAIN_MIPMAP_LEVELS * 4 * 2 * 4, { usage: 'uniform' })
     );
-    this._levelDataArray = new Float32Array(webgl1 ? WEBGL1_LEVEL_DATA_VECTORS * 4 : 0);
     this._detailMapInfo = this.createDetailMapInfo();
     this._terrainScale = Vector3.one();
     this._heightMapSize = new Vector4(
@@ -172,17 +163,15 @@ export class ClipmapTerrainMaterial extends applyMaterialMixins(
   get detailHexParams() {
     return this._detailMapInfo.detailHexParams;
   }
-  /** Bit i set: detail layer i is hex tiled. Always 0 on WebGL1 (no gradient sampling) @internal */
+  /** Bit i set: detail layer i is hex tiled. @internal */
   get hexTilingMask() {
     return this.featureUsed<number>(ClipmapTerrainMaterial.FEATURE_HEX_TILING);
   }
   private updateHexTilingFeature() {
     let mask = 0;
-    if (getDevice().type !== 'webgl') {
-      for (let i = 0; i < this._detailMapInfo.numDetailMaps; i++) {
-        if (this._detailMapInfo.detailHexParams[i * 4 + 3] !== 0) {
-          mask |= 1 << i;
-        }
+    for (let i = 0; i < this._detailMapInfo.numDetailMaps; i++) {
+      if (this._detailMapInfo.detailHexParams[i * 4 + 3] !== 0) {
+        mask |= 1 << i;
       }
     }
     this.useFeature(ClipmapTerrainMaterial.FEATURE_HEX_TILING, mask);
@@ -190,8 +179,7 @@ export class ClipmapTerrainMaterial extends applyMaterialMixins(
   /**
    * Whether a detail layer is hex tiled to break up its repetition (Mikkelsen, Practical
    * Real-Time Hex-Tiling, 2022). Costs three texture samples per layer instead of one, only
-   * when the layers are blended: once per page with the runtime virtual texture. Not available
-   * on WebGL1.
+   * when the layers are blended: once per page with the runtime virtual texture.
    */
   getDetailMapHexTiling(index: number) {
     if (index >= this._detailMapInfo.numDetailMaps || index < 0 || !Number.isInteger(index)) {
@@ -244,13 +232,7 @@ export class ClipmapTerrainMaterial extends applyMaterialMixins(
   }
   /** @internal */
   setLevelData(data: Float32Array<ArrayBuffer>, length: number) {
-    const buffer = this._levelDataBuffer.get();
-    if (buffer) {
-      buffer.bufferSubData(0, data, 0, length);
-    } else {
-      this._levelDataArray.set(data.subarray(0, Math.min(length, this._levelDataArray.length)));
-      this.uniformChanged();
-    }
+    this._levelDataBuffer.get()!.bufferSubData(0, data, 0, length);
   }
   /** @internal */
   get region() {
@@ -290,10 +272,6 @@ export class ClipmapTerrainMaterial extends applyMaterialMixins(
   set numDetailMaps(val: number) {
     if (val > MAX_DETAIL_MAPS || val < 0 || !Number.isInteger(val)) {
       console.error('Invalid number of detail maps');
-      return;
-    }
-    if (getDevice().type === 'webgl' && val > 4) {
-      console.error('Only 4 detail map layers is supported for WebGL1');
       return;
     }
     const n = this._detailMapInfo.numDetailMaps;
@@ -394,19 +372,17 @@ export class ClipmapTerrainMaterial extends applyMaterialMixins(
       albedoMap === ClipmapTerrainMaterial.getDefaultDetailMap() ? null : albedoMap
     );
     this._contentVersion++;
-    if (getDevice().type !== 'webgl') {
-      const blitter = new CopyBlitter();
-      const fb = getDevice().createFrameBuffer([this._detailMapInfo.detailMap!.get()!], null);
-      blitter.blit(
-        albedoMap!,
-        fb,
-        index,
-        albedoMap!.width === this._detailMapSize && albedoMap!.height === this._detailMapSize
-          ? fetchSampler('clamp_nearest_nomip')
-          : fetchSampler('clamp_linear_nomip')
-      );
-      fb.dispose();
-    }
+    const blitter = new CopyBlitter();
+    const fb = getDevice().createFrameBuffer([this._detailMapInfo.detailMap!.get()!], null);
+    blitter.blit(
+      albedoMap!,
+      fb,
+      index,
+      albedoMap!.width === this._detailMapSize && albedoMap!.height === this._detailMapSize
+        ? fetchSampler('clamp_nearest_nomip')
+        : fetchSampler('clamp_linear_nomip')
+    );
+    fb.dispose();
   }
   getDetailNormalMap(index: number) {
     if (index >= this._detailMapInfo.numDetailMaps || index < 0 || !Number.isInteger(index)) {
@@ -428,19 +404,17 @@ export class ClipmapTerrainMaterial extends applyMaterialMixins(
       normalMap === ClipmapTerrainMaterial.getDefaultNormalMap() ? null : normalMap
     );
     this._contentVersion++;
-    if (getDevice().type !== 'webgl') {
-      const blitter = new CopyBlitter();
-      const fb = getDevice().createFrameBuffer([this._detailMapInfo.detailNormalMap!.get()!], null);
-      blitter.blit(
-        normalMap!,
-        fb,
-        index,
-        normalMap!.width === this._detailMapSize && normalMap!.height === this._detailMapSize
-          ? fetchSampler('clamp_nearest_nomip')
-          : fetchSampler('clamp_linear_nomip')
-      );
-      fb.dispose();
-    }
+    const blitter = new CopyBlitter();
+    const fb = getDevice().createFrameBuffer([this._detailMapInfo.detailNormalMap!.get()!], null);
+    blitter.blit(
+      normalMap!,
+      fb,
+      index,
+      normalMap!.width === this._detailMapSize && normalMap!.height === this._detailMapSize
+        ? fetchSampler('clamp_nearest_nomip')
+        : fetchSampler('clamp_linear_nomip')
+    );
+    fb.dispose();
   }
   /** @internal */
   update(region: Vector4, terrainScale: Vector3) {
@@ -490,11 +464,9 @@ export class ClipmapTerrainMaterial extends applyMaterialMixins(
     ddy: PBShaderExp | null = null
   ) {
     const pb = scope.$builder;
-    return this.drawContext.device.type === 'webgl'
-      ? pb.textureSample(scope[`detailNormalMap${index}`], texCoord).rgb
-      : ddx && ddy
-        ? pb.textureArraySampleGrad(scope.detailNormalMap, texCoord, index, ddx, ddy).rgb
-        : pb.textureArraySample(scope.detailNormalMap, texCoord, index).rgb;
+    return ddx && ddy
+      ? pb.textureArraySampleGrad(scope.detailNormalMap, texCoord, index, ddx, ddy).rgb
+      : pb.textureArraySample(scope.detailNormalMap, texCoord, index).rgb;
   }
   /**
    * Gradients of the terrain uv and the hex tiled layers, for the blend functions; null when no
@@ -555,9 +527,7 @@ export class ClipmapTerrainMaterial extends applyMaterialMixins(
   /** Samples the splat weights of detail layers [4 * index, 4 * index + 3] */
   sampleSplatMask(scope: PBInsideFunctionScope, index: number) {
     const pb = scope.$builder;
-    return this.drawContext.device.type === 'webgl'
-      ? pb.textureSample(scope.splatMap, scope.$inputs.uv)
-      : pb.textureArraySample(scope.splatMap, scope.$inputs.uv, index);
+    return pb.textureArraySample(scope.splatMap, scope.$inputs.uv, index);
   }
   calculateRoughness(scope: PBInsideFunctionScope, albedo: PBShaderExp, normal: PBShaderExp) {
     const base = super.calculateRoughness(scope, albedo, normal);
@@ -621,11 +591,9 @@ export class ClipmapTerrainMaterial extends applyMaterialMixins(
           this.$inputs.uv,
           this.detailParams,
           (scope, i, uv, ddx, ddy) =>
-            that.drawContext.device.type === 'webgl'
-              ? pb.textureSample(scope[`detailAlbedoMap${i}`], uv)
-              : ddx && ddy
-                ? pb.textureArraySampleGrad(scope.detailAlbedoMap, uv, i, ddx, ddy)
-                : pb.textureArraySample(scope.detailAlbedoMap, uv, i),
+            ddx && ddy
+              ? pb.textureArraySampleGrad(scope.detailAlbedoMap, uv, i, ddx, ddy)
+              : pb.textureArraySample(scope.detailAlbedoMap, uv, i),
           ...that.hexTilingInputs(this)
         );
         this.$return(pb.vec4(this.color, 1));
@@ -809,10 +777,7 @@ export class ClipmapTerrainMaterial extends applyMaterialMixins(
     scope.$inputs.clipmapInfo = pb.vec4().attrib('texCoord0');
     scope.$inputs.miplevel = pb.float().attrib('texCoord1');
     scope.clipmapGridInfo = pb.vec4().uniform(2);
-    scope.levelData =
-      this.drawContext.device.type === 'webgl'
-        ? pb.vec4[WEBGL1_LEVEL_DATA_VECTORS]().uniform(2)
-        : pb.vec4[MAX_TERRAIN_MIPMAP_LEVELS * 2]().uniformBuffer(2);
+    scope.levelData = pb.vec4[MAX_TERRAIN_MIPMAP_LEVELS * 2]().uniformBuffer(2);
     scope.heightMap = pb.tex2D().uniform(2);
     scope.heightMapSize = pb.vec4().uniform(2);
     scope.region = pb.vec4().uniform(2);
@@ -906,21 +871,8 @@ export class ClipmapTerrainMaterial extends applyMaterialMixins(
       pb.sub(scope.region.zw, scope.region.xy)
     );
 
-    if (this.drawContext.device.type === 'webgl') {
-      scope.$l.levelStart = pb.vec4();
-      scope.$l.levelDiff = pb.vec4();
-      scope.$l.index = pb.mul(pb.int(scope.$inputs.miplevel), 2);
-      scope.$for(pb.int('i'), 0, WEBGL1_LEVEL_DATA_VECTORS, function () {
-        this.$if(pb.equal(this.i, this.index), function () {
-          this.levelStart = this.levelData.at(this.i);
-          this.levelDiff = this.levelData.at(pb.add(this.i, 1));
-          this.$break();
-        });
-      });
-    } else {
-      scope.$l.levelStart = scope.levelData.at(pb.mul(pb.int(scope.$inputs.miplevel), 2));
-      scope.$l.levelDiff = scope.levelData.at(pb.add(pb.mul(pb.int(scope.$inputs.miplevel), 2), 1));
-    }
+    scope.$l.levelStart = scope.levelData.at(pb.mul(pb.int(scope.$inputs.miplevel), 2));
+    scope.$l.levelDiff = scope.levelData.at(pb.add(pb.mul(pb.int(scope.$inputs.miplevel), 2), 1));
 
     scope.$l.height = this.sampleHeightMap(
       scope,
@@ -974,17 +926,9 @@ export class ClipmapTerrainMaterial extends applyMaterialMixins(
         if (this.hexTilingMask) {
           scope.detailHexParams = pb.vec4[numDetailMaps]().uniform(2);
         }
-        if (this.drawContext.device.type === 'webgl') {
-          scope.splatMap = pb.tex2D().uniform(2);
-          for (let i = 0; i < numDetailMaps; i++) {
-            scope[`detailAlbedoMap${i}`] = pb.tex2D().uniform(2);
-            scope[`detailNormalMap${i}`] = pb.tex2D().uniform(2);
-          }
-        } else {
-          scope.splatMap = pb.tex2DArray().uniform(2);
-          scope.detailAlbedoMap = pb.tex2DArray().uniform(2);
-          scope.detailNormalMap = pb.tex2DArray().uniform(2);
-        }
+        scope.splatMap = pb.tex2DArray().uniform(2);
+        scope.detailAlbedoMap = pb.tex2DArray().uniform(2);
+        scope.detailNormalMap = pb.tex2DArray().uniform(2);
       }
       // Sampled once here and shared by the albedo and detail normal blends
       for (let i = 0; i < (numDetailMaps + 3) >> 2; i++) {
@@ -1074,19 +1018,14 @@ export class ClipmapTerrainMaterial extends applyMaterialMixins(
     const heightMap = this._heightMap.get()!;
     // The vertex shader samples explicit mip levels per clipmap ring. WebGL ignores the LOD of
     // textureLod() under a non-mipmapped min filter, so the sampler has to be mipmapped whenever
-    // the texture has a mip chain (WebGL1 NPOT height maps have none).
+    // the texture has a mip chain.
     bindGroup.setTexture(
       'heightMap',
       heightMap,
       fetchSampler(heightMap.mipLevelCount > 1 ? 'clamp_linear' : 'clamp_linear_nomip')
     );
     bindGroup.setValue('heightMapSize', this._heightMapSize);
-    const levelDataBuffer = this._levelDataBuffer.get();
-    if (levelDataBuffer) {
-      bindGroup.setBuffer('levelData', levelDataBuffer);
-    } else {
-      bindGroup.setValue('levelData', this._levelDataArray);
-    }
+    bindGroup.setBuffer('levelData', this._levelDataBuffer.get()!);
     if (this.needFragmentColor(ctx) && this.virtualTextureUsed) {
       const vt = this._virtualTexture!;
       vt.applyBindings(bindGroup, false);
@@ -1103,32 +1042,16 @@ export class ClipmapTerrainMaterial extends applyMaterialMixins(
     } else if (this.needFragmentColor(ctx)) {
       if (this._detailMapInfo.numDetailMaps > 0) {
         bindGroup.setTexture('splatMap', this._detailMapInfo.splatMap.get()!);
-        if (ctx.device.type === 'webgl') {
-          for (let i = 0; i < this._detailMapInfo.numDetailMaps; i++) {
-            bindGroup.setTexture(
-              `detailAlbedoMap${i}`,
-              this._detailMapInfo.detailMapList[i]?.get() ?? ClipmapTerrainMaterial.getDefaultDetailMap()!,
-              fetchSampler('repeat_linear')
-            );
-            bindGroup.setTexture(
-              `detailNormalMap${i}`,
-              this._detailMapInfo.detailNormalMapList[i]?.get() ??
-                ClipmapTerrainMaterial.getDefaultNormalMap()!,
-              fetchSampler('repeat_linear')
-            );
-          }
-        } else {
-          bindGroup.setTexture(
-            'detailAlbedoMap',
-            this._detailMapInfo.detailMap.get()!,
-            fetchSampler('repeat_linear')
-          );
-          bindGroup.setTexture(
-            'detailNormalMap',
-            this._detailMapInfo.detailNormalMap!.get()!,
-            fetchSampler('repeat_linear')
-          );
-        }
+        bindGroup.setTexture(
+          'detailAlbedoMap',
+          this._detailMapInfo.detailMap.get()!,
+          fetchSampler('repeat_linear')
+        );
+        bindGroup.setTexture(
+          'detailNormalMap',
+          this._detailMapInfo.detailNormalMap!.get()!,
+          fetchSampler('repeat_linear')
+        );
         bindGroup.setValue('detailParams', this._detailMapInfo.detailMapParams);
         if (this.hexTilingMask) {
           bindGroup.setValue('detailHexParams', this._detailMapInfo.detailHexParams);
@@ -1138,41 +1061,42 @@ export class ClipmapTerrainMaterial extends applyMaterialMixins(
   }
   private createDetailMapInfo() {
     const device = getDevice();
-    const isWebGL1 = device.type === 'webgl';
-    const detailMap = isWebGL1
-      ? null
-      : device.createTexture2DArray('rgba8unorm', this._detailMapSize, this._detailMapSize, MAX_DETAIL_MAPS);
-    const detailNormalMap = isWebGL1
-      ? null
-      : device.createTexture2DArray('rgba8unorm', this._detailMapSize, this._detailMapSize, MAX_DETAIL_MAPS);
-    const splatMap = isWebGL1
-      ? device.createTexture2D('rgba8unorm', this._splatMapSize, this._splatMapSize)
-      : device.createTexture2DArray(
-          'rgba8unorm',
-          this._splatMapSize,
-          this._splatMapSize,
-          MAX_DETAIL_MAPS >> 2
-        );
+    const detailMap = device.createTexture2DArray(
+      'rgba8unorm',
+      this._detailMapSize,
+      this._detailMapSize,
+      MAX_DETAIL_MAPS
+    )!;
+    const detailNormalMap = device.createTexture2DArray(
+      'rgba8unorm',
+      this._detailMapSize,
+      this._detailMapSize,
+      MAX_DETAIL_MAPS
+    )!;
+    const splatMap = device.createTexture2DArray(
+      'rgba8unorm',
+      this._splatMapSize,
+      this._splatMapSize,
+      MAX_DETAIL_MAPS >> 2
+    )!;
     device.pushDeviceStates();
-    if (!isWebGL1) {
-      const fbDetail = device.createFrameBuffer([detailMap!], null);
-      device.setFramebuffer(fbDetail);
-      for (let i = 0; i < detailMap!.depth; i++) {
-        fbDetail.setColorAttachmentLayer(0, i);
-        device.clearFrameBuffer(Vector4.zero(), DEPTH_CLEAR_VALUE, 0);
-      }
-      fbDetail.dispose();
-      const fbNormal = device.createFrameBuffer([detailNormalMap!], null);
-      device.setFramebuffer(fbNormal);
-      for (let i = 0; i < detailNormalMap!.depth; i++) {
-        fbNormal.setColorAttachmentLayer(0, i);
-        device.clearFrameBuffer(new Vector4(0.5, 0.5, 1, 1), DEPTH_CLEAR_VALUE, 0);
-      }
-      fbNormal.dispose();
+    const fbDetail = device.createFrameBuffer([detailMap], null);
+    device.setFramebuffer(fbDetail);
+    for (let i = 0; i < detailMap.depth; i++) {
+      fbDetail.setColorAttachmentLayer(0, i);
+      device.clearFrameBuffer(Vector4.zero(), DEPTH_CLEAR_VALUE, 0);
     }
-    const fbSplat = device.createFrameBuffer([splatMap!], null);
+    fbDetail.dispose();
+    const fbNormal = device.createFrameBuffer([detailNormalMap], null);
+    device.setFramebuffer(fbNormal);
+    for (let i = 0; i < detailNormalMap.depth; i++) {
+      fbNormal.setColorAttachmentLayer(0, i);
+      device.clearFrameBuffer(new Vector4(0.5, 0.5, 1, 1), DEPTH_CLEAR_VALUE, 0);
+    }
+    fbNormal.dispose();
+    const fbSplat = device.createFrameBuffer([splatMap], null);
     device.setFramebuffer(fbSplat);
-    for (let i = 0; i < splatMap!.depth; i++) {
+    for (let i = 0; i < splatMap.depth; i++) {
       fbSplat.setColorAttachmentLayer(0, i);
       device.clearFrameBuffer(i === 0 ? new Vector4(1, 0, 0, 0) : Vector4.zero(), DEPTH_CLEAR_VALUE, 0);
     }

@@ -81,7 +81,7 @@ export class EnvLightWrapper extends Disposable {
       !!ctx?.SSGI &&
       !!ctx.SSGIIrradianceHistoryTexture &&
       !!ctx.SSGISurfaceHistoryTexture &&
-      (ctx.device.type === 'webgl' || !!ctx.motionVectorTexture);
+      !!ctx.motionVectorTexture;
     return !ctx || ctx.drawEnvLight
       ? `${this.type}:${this._envLight!.hasRadiance() ? '1' : '0'}:${
           this._envLight!.hasSheenRadiance() ? '1' : '0'

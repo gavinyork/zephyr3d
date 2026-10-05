@@ -37,7 +37,7 @@ import type {
 } from '@zephyr3d/device';
 import { ProgramBuilder } from '@zephyr3d/device';
 import type { PunctualLight } from '../../scene/light';
-import { decodeNormalizedFloatFromRGBA, linearToGamma } from '../../shaders/misc';
+import { linearToGamma } from '../../shaders/misc';
 import { fetchSampler, getSamplerOptions } from '../../utility/misc';
 import { PHYSICAL_BAKE_EXPOSURE } from '../../utility/physical';
 import type { AtmosphereParams } from '../../shaders';
@@ -371,16 +371,9 @@ export class ShaderHelper {
           scope[UNIFORM_NAME_CLUSTER_GRID] = pb.uint[0]().storageBufferReadonly(0);
           scope[UNIFORM_NAME_CLUSTER_LIGHT_LIST] = pb.uint[0]().storageBufferReadonly(0);
         } else {
-          // WebGL1 has no uniform blocks and GLSL ES 1.0 indexes uniform arrays only with
-          // loop indices, so the lights live in a float texture there, one row each.
-          scope[UNIFORM_NAME_LIGHT_BUFFER] =
-            pb.getDevice().type === 'webgl'
-              ? pb.tex2D().uniform(0)
-              : pb.vec4[(this.getMaxClusterLights() + 1) * 4]().uniformBuffer(0);
-          // Non-WebGL1 devices fetch the light index texture with textureLoad
-          scope[UNIFORM_NAME_LIGHT_INDEX_TEXTURE] = (
-            pb.getDevice().type === 'webgl' ? pb.tex2D() : pb.utex2D().noSampler()
-          ).uniform(0);
+          scope[UNIFORM_NAME_LIGHT_BUFFER] = pb.vec4[(this.getMaxClusterLights() + 1) * 4]().uniformBuffer(0);
+          // The light index texture is fetched with textureLoad
+          scope[UNIFORM_NAME_LIGHT_INDEX_TEXTURE] = pb.utex2D().noSampler().uniform(0);
         }
         // Screen-space shadow mask array (rgba8unorm, 4 shadow lights per layer).
         // Sampled by clustered lights whose buffer index is <= numShadowLights.
@@ -518,7 +511,6 @@ export class ShaderHelper {
   }
   static calculateMorphDelta(scope: PBInsideFunctionScope, attrib: number) {
     const pb = scope.$builder;
-    const isWebGL1 = pb.getDevice().type === 'webgl';
     if (pb.shaderKind !== 'vertex') {
       throw new Error(`ShaderHelper.calculateMorphDelta(): must be called at vertex stage`);
     }
@@ -528,9 +520,7 @@ export class ShaderHelper {
       this.$if(pb.lessThan(this.offset, 0), function () {
         this.$return(pb.vec4(0));
       });
-      this.$l.vertexIndex = isWebGL1
-        ? pb.int(scope.$inputs.zFakeVertexID)
-        : pb.int(scope.$builtins.vertexIndex);
+      this.$l.vertexIndex = pb.int(scope.$builtins.vertexIndex);
       const morphInfo = scope[that.getMorphInfoUniformName()];
       this.$l.metaData = pb.ivec4(morphInfo[0]);
       this.$l.texWidth = pb.float(this.metaData.x);
@@ -538,59 +528,29 @@ export class ShaderHelper {
       this.$l.numVertices = this.metaData.z;
       this.$l.numTargets = this.metaData.w;
       this.$l.value = pb.vec4(0);
-      if (isWebGL1) {
-        this.$for(pb.int('i'), 0, MORPH_WEIGHTS_VECTOR_COUNT, function () {
-          this.$for(pb.int('j'), 0, 4, function () {
-            this.$l.index = pb.add(pb.mul(this.i, 4), this.j);
-            this.$if(pb.greaterThanEqual(this.index, this.numTargets), function () {
-              this.$return(this.value);
-            });
-            this.$l.weight = morphInfo.at(pb.add(1, this.i)).at(this.j);
-            this.$if(pb.notEqual(this.weight, 0), function () {
-              this.$l.targetIndex = pb.int(
-                morphInfo.at(pb.add(1 + MORPH_WEIGHTS_VECTOR_COUNT, this.i)).at(this.j)
-              );
-              this.$l.pixelIndex = pb.float(
-                pb.add(this.offset, pb.mul(this.targetIndex, this.numVertices), this.vertexIndex)
-              );
-              this.$l.xIndex = pb.mod(this.pixelIndex, this.texWidth);
-              this.$l.yIndex = pb.floor(pb.div(this.pixelIndex, this.texWidth));
-              this.$l.u = pb.div(pb.add(this.xIndex, 0.5), this.texWidth);
-              this.$l.v = pb.div(pb.add(this.yIndex, 0.5), this.texHeight);
-              this.$l.morphValue = pb.textureSampleLevel(
-                this[that.getMorphDataUniformName()],
-                pb.vec2(this.u, this.v),
-                0
-              );
-              this.value = pb.add(this.value, pb.mul(this.morphValue, this.weight));
-            });
-          });
+      this.$for(pb.int('t'), 0, this.numTargets, function () {
+        this.$l.i = pb.sar(this.t, 2);
+        this.$l.j = pb.compAnd(this.t, 3);
+        this.$l.weight = morphInfo.at(pb.add(1, this.i)).at(this.j);
+        this.$if(pb.notEqual(this.weight, 0), function () {
+          this.$l.targetIndex = pb.int(
+            morphInfo.at(pb.add(1 + MORPH_WEIGHTS_VECTOR_COUNT, this.i)).at(this.j)
+          );
+          this.$l.pixelIndex = pb.float(
+            pb.add(this.offset, pb.mul(this.targetIndex, this.numVertices), this.vertexIndex)
+          );
+          this.$l.xIndex = pb.mod(this.pixelIndex, this.texWidth);
+          this.$l.yIndex = pb.floor(pb.div(this.pixelIndex, this.texWidth));
+          this.$l.u = pb.div(pb.add(this.xIndex, 0.5), this.texWidth);
+          this.$l.v = pb.div(pb.add(this.yIndex, 0.5), this.texHeight);
+          this.$l.morphValue = pb.textureSampleLevel(
+            this[that.getMorphDataUniformName()],
+            pb.vec2(this.u, this.v),
+            0
+          );
+          this.value = pb.add(this.value, pb.mul(this.morphValue, this.weight));
         });
-      } else {
-        this.$for(pb.int('t'), 0, this.numTargets, function () {
-          this.$l.i = pb.sar(this.t, 2);
-          this.$l.j = pb.compAnd(this.t, 3);
-          this.$l.weight = morphInfo.at(pb.add(1, this.i)).at(this.j);
-          this.$if(pb.notEqual(this.weight, 0), function () {
-            this.$l.targetIndex = pb.int(
-              morphInfo.at(pb.add(1 + MORPH_WEIGHTS_VECTOR_COUNT, this.i)).at(this.j)
-            );
-            this.$l.pixelIndex = pb.float(
-              pb.add(this.offset, pb.mul(this.targetIndex, this.numVertices), this.vertexIndex)
-            );
-            this.$l.xIndex = pb.mod(this.pixelIndex, this.texWidth);
-            this.$l.yIndex = pb.floor(pb.div(this.pixelIndex, this.texWidth));
-            this.$l.u = pb.div(pb.add(this.xIndex, 0.5), this.texWidth);
-            this.$l.v = pb.div(pb.add(this.yIndex, 0.5), this.texHeight);
-            this.$l.morphValue = pb.textureSampleLevel(
-              this[that.getMorphDataUniformName()],
-              pb.vec2(this.u, this.v),
-              0
-            );
-            this.value = pb.add(this.value, pb.mul(this.morphValue, this.weight));
-          });
-        });
-      }
+      });
       this.$return(this.value);
     });
     const pos = 1 + MORPH_WEIGHTS_VECTOR_COUNT * 2 + (attrib >> 2);
@@ -640,7 +600,6 @@ export class ShaderHelper {
     attrib: number
   ): PBShaderExp {
     const pb = scope.$builder;
-    const isWebGL1 = pb.getDevice().type === 'webgl';
     if (pb.shaderKind !== 'vertex') {
       throw new Error(`ShaderHelper.calculateMorphDirectionByDisplacement(): must be called at vertex stage`);
     }
@@ -648,9 +607,7 @@ export class ShaderHelper {
     const funcName = 'Z_calculateMorphDirectionByDisplacement';
     const normalizeName = this.defineNormalizeMorphedDirection(scope);
     pb.func(funcName, [pb.vec3('base'), pb.int('directionOffset'), pb.int('positionOffset')], function () {
-      this.$l.vertexIndex = isWebGL1
-        ? pb.int(scope.$inputs.zFakeVertexID)
-        : pb.int(scope.$builtins.vertexIndex);
+      this.$l.vertexIndex = pb.int(scope.$builtins.vertexIndex);
       const morphInfo = scope[that.getMorphInfoUniformName()];
       this.$l.metaData = pb.ivec4(morphInfo[0]);
       this.$l.texWidth = pb.float(this.metaData.x);
@@ -719,31 +676,13 @@ export class ShaderHelper {
         });
       };
 
-      if (isWebGL1) {
-        this.$for(pb.int('i'), 0, MORPH_WEIGHTS_VECTOR_COUNT, function () {
-          this.$for(pb.int('j'), 0, 4, function () {
-            this.$l.index = pb.add(pb.mul(this.i, 4), this.j);
-            this.$if(pb.greaterThanEqual(this.index, this.numTargets), function () {
-              this.$break();
-            });
-            this.$l.weight = morphInfo.at(pb.add(1, this.i)).at(this.j);
-            this.$l.targetIndex = pb.int(
-              morphInfo.at(pb.add(1 + MORPH_WEIGHTS_VECTOR_COUNT, this.i)).at(this.j)
-            );
-            accumulateTarget(this);
-          });
-        });
-      } else {
-        this.$for(pb.int('t'), 0, this.numTargets, function () {
-          this.$l.i = pb.sar(this.t, 2);
-          this.$l.j = pb.compAnd(this.t, 3);
-          this.$l.weight = morphInfo.at(pb.add(1, this.i)).at(this.j);
-          this.$l.targetIndex = pb.int(
-            morphInfo.at(pb.add(1 + MORPH_WEIGHTS_VECTOR_COUNT, this.i)).at(this.j)
-          );
-          accumulateTarget(this);
-        });
-      }
+      this.$for(pb.int('t'), 0, this.numTargets, function () {
+        this.$l.i = pb.sar(this.t, 2);
+        this.$l.j = pb.compAnd(this.t, 3);
+        this.$l.weight = morphInfo.at(pb.add(1, this.i)).at(this.j);
+        this.$l.targetIndex = pb.int(morphInfo.at(pb.add(1 + MORPH_WEIGHTS_VECTOR_COUNT, this.i)).at(this.j));
+        accumulateTarget(this);
+      });
 
       this.$l.fallback = scope.$g[normalizeName](this.base, this.directionDelta);
       this.$if(pb.lessThan(this.weightSum, 1e-6), function () {
@@ -795,8 +734,6 @@ export class ShaderHelper {
     }
     const that = this;
     const pb = scope.$builder;
-    const isWebGL = pb.getDevice().type === 'webgl';
-    const supportsTextureLoad = !isWebGL;
     const funcNameGetBoneMatrixFromTexture = 'Z_getBoneMatrixFromTexture';
     pb.func(funcNameGetBoneMatrixFromTexture, [pb.float('boneIndex'), pb.float('boneOffset')], function () {
       const boneTexture = this[UNIFORM_NAME_BONE_MATRICES];
@@ -833,9 +770,7 @@ export class ShaderHelper {
       );
       this.$l.skinInfo = this[UNIFORM_NAME_SKIN_INFLUENCE_INFO];
       this.$if(pb.greaterThan(this.skinInfo.z, 4), function () {
-        this.$l.vertexIndex = isWebGL
-          ? pb.int(scope.$inputs.zFakeVertexID)
-          : pb.int(scope.$builtins.vertexIndex);
+        this.$l.vertexIndex = pb.int(scope.$builtins.vertexIndex);
         this.$l.texWidth = pb.int(this.skinInfo.x);
         this.$l.pairCount = pb.int(this.skinInfo.w);
         this.$for(pb.int('pairIndex'), 0, MAX_SKIN_EXTRA_INFLUENCE_PAIRS, function () {
@@ -845,21 +780,11 @@ export class ShaderHelper {
           this.$l.pixelIndex = pb.add(pb.mul(this.vertexIndex, this.pairCount), this.pairIndex);
           this.$l.xIndex = pb.mod(this.pixelIndex, this.texWidth);
           this.$l.yIndex = pb.div(this.pixelIndex, this.texWidth);
-          if (supportsTextureLoad) {
-            this.$l.extra = pb.textureLoad(
-              this[UNIFORM_NAME_SKIN_INFLUENCE_DATA],
-              pb.ivec2(this.xIndex, this.yIndex),
-              0
-            );
-          } else {
-            this.$l.u = pb.div(pb.add(pb.float(this.xIndex), 0.5), this.skinInfo.x);
-            this.$l.v = pb.div(pb.add(pb.float(this.yIndex), 0.5), this.skinInfo.y);
-            this.$l.extra = pb.textureSampleLevel(
-              this[UNIFORM_NAME_SKIN_INFLUENCE_DATA],
-              pb.vec2(this.u, this.v),
-              0
-            );
-          }
+          this.$l.extra = pb.textureLoad(
+            this[UNIFORM_NAME_SKIN_INFLUENCE_DATA],
+            pb.ivec2(this.xIndex, this.yIndex),
+            0
+          );
           this.$if(pb.greaterThan(this.extra.y, 0), function () {
             this.m = pb.add(
               this.m,
@@ -1373,27 +1298,10 @@ export class ShaderHelper {
       clusterOrtho: clusteredLight.orthographic ? 1 : 0,
       ...(ctx.screenSpaceShadowMask ? { numShadowLights: clusteredLight.numShadowLights } : {})
     });
-    if (ctx.device.type === 'webgl') {
-      // Float texels, which must not be filtered.
-      bindGroup.setTexture(
-        UNIFORM_NAME_LIGHT_BUFFER,
-        clusteredLight.lightTexture!,
-        fetchSampler('clamp_nearest_nomip')
-      );
-    } else {
-      bindGroup.setBuffer(UNIFORM_NAME_LIGHT_BUFFER, clusteredLight.lightBuffer!);
-    }
+    bindGroup.setBuffer(UNIFORM_NAME_LIGHT_BUFFER, clusteredLight.lightBuffer!);
     if (this.usesClusterLightLists()) {
       bindGroup.setBuffer(UNIFORM_NAME_CLUSTER_GRID, clusteredLight.clusterGridBuffer!);
       bindGroup.setBuffer(UNIFORM_NAME_CLUSTER_LIGHT_LIST, clusteredLight.lightListBuffer!);
-    } else if (ctx.device.type === 'webgl') {
-      // Sampled as a float texture: packed indices must not be filtered, and linear
-      // filtering of float textures without OES_texture_float_linear reads all zero.
-      bindGroup.setTexture(
-        UNIFORM_NAME_LIGHT_INDEX_TEXTURE,
-        lightIndexTexture!,
-        fetchSampler('clamp_nearest_nomip')
-      );
     } else {
       bindGroup.setTexture(UNIFORM_NAME_LIGHT_INDEX_TEXTURE, lightIndexTexture!);
     }
@@ -2465,23 +2373,10 @@ export class ShaderHelper {
   static getLightExtra(scope: PBInsideFunctionScope, lightIndex: PBShaderExp | number): PBShaderExp {
     return this.getLightVector(scope, lightIndex, 3);
   }
-  /**
-   * Vector `k` of the 4 of a clustered light: from its texel on WebGL1 (row = light,
-   * column = vector), from the light buffer elsewhere.
-   */
+  /** Vector `k` of the 4 of a clustered light, read from the light buffer. */
   private static getLightVector(scope: PBInsideFunctionScope, lightIndex: PBShaderExp | number, k: number) {
     const pb = scope.$builder;
     const buffer = scope[UNIFORM_NAME_LIGHT_BUFFER];
-    if (pb.getDevice().type === 'webgl') {
-      const rows = this.getMaxClusterLights() + 1;
-      return pb.textureSample(
-        buffer,
-        pb.vec2(
-          (k + 0.5) / 4,
-          pb.div(pb.add(typeof lightIndex === 'number' ? lightIndex : pb.float(lightIndex), 0.5), rows)
-        )
-      );
-    }
     return buffer.at(pb.add(pb.mul(lightIndex, 4), k));
   }
   /**
@@ -2662,25 +2557,7 @@ export class ShaderHelper {
           this.NoL,
           that.getShadowCascadeBiasScale(this, this.split)
         );
-        if (ctx.device.type === 'webgl') {
-          this.$l.shadowVertex = pb.vec4();
-          this.$for(pb.int('cascade'), 0, 4, function () {
-            this.$if(pb.equal(this.cascade, this.split), function () {
-              this.shadowVertex = that.calculateShadowSpaceVertex(
-                this,
-                pb.vec4(this.biasedPos, 1),
-                this.cascade
-              );
-              this.$break();
-            });
-          });
-        } else {
-          this.$l.shadowVertex = that.calculateShadowSpaceVertex(
-            this,
-            pb.vec4(this.biasedPos, 1),
-            this.split
-          );
-        }
+        this.$l.shadowVertex = that.calculateShadowSpaceVertex(this, pb.vec4(this.biasedPos, 1), this.split);
         this.$l.shadow = shadowMapParams.impl!.computeShadowCSM(
           shadowMapParams,
           this,
@@ -2948,7 +2825,7 @@ export class ShaderHelper {
   ): PBShaderExp {
     const pb = scope.$builder;
     const depth = pb.textureSampleLevel(tex, uv, level);
-    return pb.getDevice().type === 'webgl' ? decodeNormalizedFloatFromRGBA(scope, depth) : depth.r;
+    return depth.r;
   }
   static samplePositionFromDepth(
     scope: PBInsideFunctionScope,
@@ -3025,20 +2902,10 @@ export class ShaderHelper {
    * On WebGPU the buffers are storage buffers grown to fit and light indices are 32
    * bits, so this only bounds the CPU-side work. On WebGL2 the buffer is 4 vec4 per
    * light in a uniform block, and 255 is the most a byte-sized cluster slot can address.
-   * WebGL1 keeps the lights in a texture, but the index pass still reads their culling
-   * spheres (one vec4 each) from a plain uniform array of its vertex shader, bounded by
-   * MAX_VERTEX_UNIFORM_VECTORS - 128 at least; 16 vectors are left to its other uniforms.
    * @internal
    */
   static getMaxClusterLights() {
     const device = getDevice();
-    if (device.type === 'webgpu') {
-      return 65535;
-    }
-    if (device.type !== 'webgl') {
-      return 255;
-    }
-    const maxVectors = device.getDeviceCaps().shaderCaps.maxVertexUniformVectors;
-    return Math.max(1, Math.min(255, maxVectors - 16 - 1));
+    return device.type === 'webgpu' ? 65535 : 255;
   }
 }

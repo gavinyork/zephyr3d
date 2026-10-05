@@ -13,7 +13,6 @@ import type {
 import { fetchSampler, getSamplerOptions } from '../utility/misc';
 import { getDevice } from '../app/api';
 import type { DrawContext } from './drawable';
-import { decodeNormalizedFloatFromRGBA } from '../shaders/misc';
 
 /**
  * Depth-proportional term of the SSGI history rejection tolerance.
@@ -295,12 +294,10 @@ export class EnvShIBL extends EnvironmentLighting {
         pb.getGlobalScope()[EnvShIBL.UNIFORM_NAME_IBL_IRRADIANCE_WINDOW] = pb.vec3().uniform(0);
       }
       if (EnvShIBL.hasSSGIHistory(ctx)) {
-        const irradianceSampler =
-          pb.getDevice().type === 'webgl' ? 'clamp_nearest_nomip' : 'clamp_linear_nomip';
         pb.getGlobalScope()[EnvShIBL.UNIFORM_NAME_SSGI_IRRADIANCE] = pb
           .tex2D()
           .uniform(0)
-          .withSampler(getSamplerOptions(irradianceSampler));
+          .withSampler(getSamplerOptions('clamp_linear_nomip'));
         pb.getGlobalScope()[EnvShIBL.UNIFORM_NAME_SSGI_SURFACE] = pb
           .tex2D()
           .uniform(0)
@@ -349,7 +346,7 @@ export class EnvShIBL extends EnvironmentLighting {
       bg.setTexture(
         EnvShIBL.UNIFORM_NAME_SSGI_IRRADIANCE,
         ctx!.SSGIIrradianceHistoryTexture!,
-        fetchSampler(ctx!.device.type === 'webgl' ? 'clamp_nearest_nomip' : 'clamp_linear_nomip')
+        fetchSampler('clamp_linear_nomip')
       );
       bg.setTexture(
         EnvShIBL.UNIFORM_NAME_SSGI_SURFACE,
@@ -611,12 +608,7 @@ export class EnvShIBL extends EnvironmentLighting {
         this.uv,
         0
       );
-      this.$l.currentDepth = pb.mul(
-        pb.getDevice().type === 'webgl'
-          ? decodeNormalizedFloatFromRGBA(this, this.currentDepthSample)
-          : this.currentDepthSample.r,
-        this.params.z
-      );
+      this.$l.currentDepth = pb.mul(this.currentDepthSample.r, this.params.z);
       // The surface history holds a Z measured in the *previous* frame's view
       // space, so the current Z cannot be compared against it directly: under
       // camera rotation a static, correctly reprojected point has
@@ -819,7 +811,7 @@ export class EnvShIBL extends EnvironmentLighting {
       ctx?.SSGI &&
       ctx.SSGIIrradianceHistoryTexture &&
       ctx.SSGISurfaceHistoryTexture &&
-      (ctx.device.type === 'webgl' || ctx.motionVectorTexture) &&
+      ctx.motionVectorTexture &&
       ctx.linearDepthTexture
     );
   }

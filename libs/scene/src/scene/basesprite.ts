@@ -17,7 +17,6 @@ import { QUEUE_OPAQUE } from '../values';
 import { mixinDrawable } from '../render/drawable_mixin';
 import { RenderBundleWrapper } from '../render/renderbundle_wrapper';
 import type { SceneNode } from './scene_node';
-import { getDevice } from '../app/api';
 import { SpriteMaterial } from '../material/sprite';
 
 /**
@@ -57,7 +56,7 @@ export class BaseSprite<M extends SpriteMaterial>
     this._material = new DRef();
     this._instanceHash = null;
     this._pickTarget = { node: this };
-    this._batchable = getDevice().type !== 'webgl';
+    this._batchable = true;
     this._anchor = new Vector2(0.5, 0.5);
     this._rotateAngle = 0;
     this._renderBundle = {};

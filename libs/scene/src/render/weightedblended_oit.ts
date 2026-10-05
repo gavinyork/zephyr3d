@@ -73,7 +73,7 @@ export class WeightedBlendedOIT extends OIT {
   setupFragmentOutput(scope: PBGlobalScope) {
     const pb = scope.$builder;
     scope.$outputs.outColor = pb.vec4();
-    scope.$outputs.outAlpha = pb.getDevice().type === 'webgl' ? pb.vec4() : pb.float();
+    scope.$outputs.outAlpha = pb.float();
   }
   /**
    * {@inheritDoc OIT.beginPass}
@@ -133,10 +133,7 @@ export class WeightedBlendedOIT extends OIT {
         this.color.a
       );
       this.$outputs[0] = pb.vec4(pb.mul(this.color.rgb, this.w), this.color.a);
-      this.$outputs[1] =
-        pb.getDevice().type === 'webgl'
-          ? pb.vec4(pb.mul(this.color.a, this.w))
-          : pb.mul(this.color.a, this.w);
+      this.$outputs[1] = pb.mul(this.color.a, this.w);
     });
     scope.Z_WBOIT_output(color);
     return true;
@@ -194,13 +191,7 @@ export class WeightedBlendedOIT extends OIT {
     const width = ctx.depthTexture!.width;
     const height = ctx.depthTexture!.height;
     const accumColor = device.pool.fetchTemporalTexture2D(false, 'rgba16f', width, height, false);
-    const accumAlpha = device.pool.fetchTemporalTexture2D(
-      false,
-      device.type === 'webgl' ? 'rgba16f' : 'r16f',
-      width,
-      height,
-      false
-    );
+    const accumAlpha = device.pool.fetchTemporalTexture2D(false, 'r16f', width, height, false);
     const fb = device.pool.createTemporalFramebuffer(true, [accumColor, accumAlpha], ctx.depthTexture);
     device.pool.releaseTexture(accumColor);
     device.pool.releaseTexture(accumAlpha);

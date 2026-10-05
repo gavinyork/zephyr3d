@@ -9,7 +9,6 @@ import type {
 } from '@zephyr3d/device';
 import type { BlitType } from './blitter';
 import { Blitter } from './blitter';
-import { decodeNormalizedFloatFromRGBA } from '../shaders/misc';
 import type { Nullable } from '@zephyr3d/base';
 import { Vector2 } from '@zephyr3d/base';
 import { fetchSampler } from '../utility/misc';
@@ -192,10 +191,7 @@ export class BilateralBlurBlitter extends Blitter {
     const pb = scope.$builder;
     pb.func('getLinearDepth', [pb.vec2('uv')], function () {
       this.$l.depthValue = pb.textureSample(this.depthTex, this.uv);
-      this.$l.depth01 =
-        pb.getDevice().type === 'webgl'
-          ? decodeNormalizedFloatFromRGBA(this, this.depthValue)
-          : this.depthValue.r;
+      this.$l.depth01 = this.depthValue.r;
       this.$return(pb.mul(this.depth01, this.cameraNearFar.y));
     });
     pb.func('getLogDepth', [pb.float('linearDepth')], function () {

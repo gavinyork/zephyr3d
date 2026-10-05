@@ -52,12 +52,12 @@ export class SSGI extends AbstractPostEffect {
 
   /** {@inheritDoc AbstractPostEffect.requireMotionVectorTexture} */
   requireMotionVectorTexture(ctx: DrawContext) {
-    return !!ctx.SSGI && ctx.device.type !== 'webgl';
+    return !!ctx.SSGI;
   }
 
   /** {@inheritDoc AbstractPostEffect.requireHiZTexture} */
   requireHiZTexture(ctx: DrawContext) {
-    return !!ctx.SSGI && ctx.device.type !== 'webgl';
+    return !!ctx.SSGI;
   }
 
   /** {@inheritDoc AbstractPostEffect.requireSceneNormalTexture} */
@@ -148,23 +148,19 @@ export class SSGI extends AbstractPostEffect {
       aoTraceDesc,
       traceSize
     );
-    // Reprojecting last frame's colour needs motion vectors, which the WebGL1
-    // backend does not produce. WebGL2 and WebGPU both do, so both take the
-    // multi-bounce path.
-    const previousSceneColorHandle =
-      ctx.device.type !== 'webgl'
-        ? history.importPreviousIfCompatible(
-            graph,
-            RGHistoryResources.SSGI_SCENE_COLOR,
-            {
-              format: s.colorFormat,
-              sizeMode: 'absolute',
-              width: s.width,
-              height: s.height
-            },
-            fullSize
-          )
-        : null;
+    // Reprojecting last frame's colour needs motion vectors, which both WebGL2
+    // and WebGPU produce, so both take the multi-bounce path.
+    const previousSceneColorHandle = history.importPreviousIfCompatible(
+      graph,
+      RGHistoryResources.SSGI_SCENE_COLOR,
+      {
+        format: s.colorFormat,
+        sizeMode: 'absolute',
+        width: s.width,
+        height: s.height
+      },
+      fullSize
+    );
     const canSampleSceneHistory = !!(previousSceneColorHandle && previousSurfaceHandle && motionHandle);
 
     const readFrameInputs = (builder: RGPassBuilder) => {
@@ -257,7 +253,6 @@ export class SSGI extends AbstractPostEffect {
     });
 
     const canTemporal = !!(
-      ctx.device.type !== 'webgl' &&
       ctx.camera.ssgiTemporal &&
       motionHandle &&
       previousIrradianceHandle &&
@@ -448,15 +443,13 @@ export class SSGI extends AbstractPostEffect {
           } else {
             this.passThrough(ctx, sceneColor, output.srgbOutput);
           }
-          if (ctx.device.type !== 'webgl') {
-            // Commit the same fog-free color the trace sampled, so next frame's
-            // reprojected history is on the same footing as this frame's fallback.
-            this.commitHistory(
-              history,
-              RGHistoryResources.SSGI_SCENE_COLOR,
-              rg.getTexture<Texture2D>(sampleColorHandle)
-            );
-          }
+          // Commit the same fog-free color the trace sampled, so next frame's
+          // reprojected history is on the same footing as this frame's fallback.
+          this.commitHistory(
+            history,
+            RGHistoryResources.SSGI_SCENE_COLOR,
+            rg.getTexture<Texture2D>(sampleColorHandle)
+          );
           this.commitHistory(history, RGHistoryResources.SSGI_IRRADIANCE, irradiance);
           this.commitHistory(history, RGHistoryResources.SSGI_SURFACE, surface);
           this.commitHistory(history, RGHistoryResources.SSGI_MOMENTS, moments);
@@ -515,9 +508,7 @@ export class SSGI extends AbstractPostEffect {
       program = this.createTraceProgram(ctx, !!hiZ, sampleHistory);
       SSGI._tracePrograms[programHash] = program;
     }
-    const colorSampler = fetchSampler(
-      ctx.device.type === 'webgl' ? 'clamp_nearest_nomip' : 'clamp_linear_nomip'
-    );
+    const colorSampler = fetchSampler('clamp_linear_nomip');
     let bindGroup = this._traceBindGroups[bindGroupHash];
     if (!bindGroup) {
       bindGroup = ctx.device.createBindGroup(program.bindGroupLayouts[0]);
@@ -616,9 +607,8 @@ export class SSGI extends AbstractPostEffect {
         );
         bindGroup.setTexture('previousSurfaceTex', previousSurface!, fetchSampler('clamp_nearest_nomip'));
         bindGroup.setTexture('previousMomentsTex', previousMoments!, fetchSampler('clamp_linear_nomip'));
-        // Linear is safe here: this branch never runs on WebGL1, and both
-        // WebGL2 and WebGPU filter r16f unconditionally. The read is at a
-        // reprojected UV.
+        // Linear is safe here: both WebGL2 and WebGPU filter r16f
+        // unconditionally. The read is at a reprojected UV.
         bindGroup.setTexture('previousAOTex', previousAO!, fetchSampler('clamp_linear_nomip'));
       }
       this._temporalBindGroups[hash] = bindGroup;
@@ -1238,7 +1228,7 @@ export class SSGI extends AbstractPostEffect {
             this.$l.variance = pb.max(0, pb.sub(this.momentXY.y, pb.mul(this.momentXY.x, this.momentXY.x)));
             this.moment = pb.vec4(this.momentXY, this.historyLength, this.variance);
           } else {
-            // The WebGL1 fallback has no motion-vector temporal resolve. Seed
+            // Without temporal history there is no accumulated variance. Seed
             // a-trous with spatial variance so its luminance weighting can
             // still remove Monte Carlo noise instead of treating it as an edge.
             this.$l.spatialLum = pb.float(0);
@@ -1522,8 +1512,8 @@ export class SSGI extends AbstractPostEffect {
           this.$l.color = pb.textureSampleLevel(this.colorTex, this.$inputs.uv, 0);
           this.$l.ao = pb.clamp(pb.textureSampleLevel(this.aoTex, this.$inputs.uv, 0).r, 0, 1);
           // mix() toward 1 rather than a plain multiply: intensity then doubles as
-          // the fallback for noisy or unresolved texels, which matters most on the
-          // WebGL1 path where there is no temporal accumulation to converge them.
+          // the fallback for noisy or unresolved texels, which matters most when
+          // there is no temporal accumulation to converge them.
           this.$l.shapedAO = pb.pow(this.ao, this.aoParams.y);
           this.$l.finalAO = pb.mix(pb.float(1), this.shapedAO, this.aoParams.x);
           this.$l.occludedColor = pb.mul(this.color.rgb, this.finalAO);

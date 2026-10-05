@@ -398,7 +398,7 @@ export interface ForwardPlusOptions {
 export function deriveForwardPlusOptions(
   scene: Scene,
   camera: Camera,
-  deviceType: string,
+  _deviceType: string,
   renderQueue: RenderQueue
 ): ForwardPlusOptions {
   const ssr = camera.SSR && scene.env.light.envLight && scene.env.light.envLight.hasRadiance();
@@ -416,10 +416,8 @@ export function deriveForwardPlusOptions(
   const needSceneColor = renderQueue.needSceneColor();
   const needSceneColorWithDepth = renderQueue.needSceneColorWithDepth();
   // Requested by materials rather than by a post effect, so it is resolved here
-  // instead of in resolveFrameResourceRequirements. WebGL1 has no Hi-Z at all,
-  // and a material asking for one there would turn a missing feature into a
-  // thrown frame; the material is expected to shade without it.
-  const needHiZNearest = (renderQueue.needHiZNearest() || camera.HiZNearest) && deviceType !== 'webgl';
+  // instead of in resolveFrameResourceRequirements.
+  const needHiZNearest = renderQueue.needHiZNearest() || camera.HiZNearest;
   return {
     depthPrepass: true,
     motionVectors: false,
@@ -449,7 +447,6 @@ function resolveFrameResourceRequirements(
   options: ForwardPlusOptions,
   requirements: FrameResourceRequirements
 ): void {
-  const deviceType = ctx.device.type;
   options.motionVectors ||= !!requirements.motionVector;
   options.hiZNearest ||= !!requirements.hiZNearest;
   // The nearest channel lives on the same pyramid, so asking for it is asking
@@ -458,16 +455,6 @@ function resolveFrameResourceRequirements(
   options.sceneNormal ||= !!requirements.sceneNormal;
   options.sceneRoughness ||= !!requirements.sceneRoughness;
   options.shadowMask ||= !!requirements.shadowMask;
-
-  if (options.motionVectors && deviceType === 'webgl') {
-    throw new Error('Forward+: MotionVector was requested but is not supported by the WebGL backend.');
-  }
-  if (options.hiZ && deviceType === 'webgl') {
-    throw new Error('Forward+: HiZ was requested but is not supported by the WebGL backend.');
-  }
-  if (options.shadowMask && deviceType === 'webgl') {
-    throw new Error('Forward+: ShadowMask was requested but is not supported by the WebGL backend.');
-  }
 
   const surfaceAttachmentCount = Number(options.sceneNormal) + Number(options.sceneRoughness);
   if (surfaceAttachmentCount > 0) {
@@ -687,7 +674,7 @@ function selectWaterCausticSource(
   ctx: DrawContext,
   renderQueue: RenderQueue
 ): Nullable<{ waters: Water[]; light: PunctualLight }> {
-  if (ctx.device.type === 'webgl' || renderQueue.waters.length === 0) {
+  if (renderQueue.waters.length === 0) {
     return null;
   }
   // The caustic light must own an additive shadow pass, because that is the pass
@@ -842,14 +829,7 @@ const DepthPrepassModule: RenderModule<FrameGraphContext> = {
     const { graph, ctx, frame, ordering, blackboard, options } = fg;
     const result = graph.addPass('DepthPrepass', (builder) => {
       ordering.chainInto(builder);
-      const format: TextureFormat =
-        ctx.device.type === 'webgl'
-          ? ctx.SSRCalcThickness
-            ? 'rgba16f'
-            : 'rgba8unorm'
-          : ctx.SSRCalcThickness
-            ? 'rg32f'
-            : 'r32f';
+      const format: TextureFormat = ctx.SSRCalcThickness ? 'rg32f' : 'r32f';
       const mvFormat: TextureFormat = 'rgba16f';
 
       const depthHandle = builder.createTexture({
@@ -984,10 +964,7 @@ const ShadowMaskModule: RenderModule<FrameGraphContext> = {
   prepare: ({ ctx, options, renderQueue }) => ({
     enabled: options.shadowMask && renderQueue.shadowedLights.length > 0,
     requirements: {
-      shadowMask:
-        ctx.device.type !== 'webgl' &&
-        ctx.camera.screenSpaceShadowMask &&
-        renderQueue.shadowedLights.length > 0
+      shadowMask: ctx.camera.screenSpaceShadowMask && renderQueue.shadowedLights.length > 0
     }
   }),
   setup(fg: FrameGraphContext) {
@@ -1083,13 +1060,10 @@ const VirtualTextureModule: RenderModule<FrameGraphContext> = {
 const TransmissionThicknessModule: RenderModule<FrameGraphContext> = {
   type: 'TransmissionThicknessPass',
   writes: [FrameResources.TransmissionThickness],
-  prepare: ({ ctx, options, renderQueue }) => ({
-    // WebGL2 included: transmission lights the subject directly in the base
-    // pass, so it does not depend on the WebGPU-only PostSSS diffusion.
-    enabled:
-      ctx.device.type !== 'webgl' &&
-      options.postSSS &&
-      renderQueue.shadowedLights.some((light) => light.transmission)
+  prepare: ({ options, renderQueue }) => ({
+    // Not gated on the device: transmission lights the subject directly in the
+    // base pass, so it does not depend on the WebGPU-only PostSSS diffusion.
+    enabled: options.postSSS && renderQueue.shadowedLights.some((light) => light.transmission)
   }),
   setup(fg: FrameGraphContext) {
     const { graph, ctx, renderQueue, blackboard } = fg;
@@ -2132,9 +2106,7 @@ function buildForwardPlusGraphInternal(
   // whether the light pass declares and binds the thickness texture, so a
   // mismatch would leave the shader layout disagreeing with the bind group.
   ctx.transmissionThickness =
-    ctx.device.type !== 'webgl' &&
-    options.postSSS &&
-    renderQueue.shadowedLights.some((light) => light.transmission);
+    options.postSSS && renderQueue.shadowedLights.some((light) => light.transmission);
 
   pipeline.build(fg);
   validateProducedFrameResources(blackboard, options, renderQueue);
@@ -2321,14 +2293,7 @@ function renderSceneDepth(
         ignoreDepthStencil: false
       });
     } else {
-      const format: TextureFormat =
-        ctx.device.type === 'webgl'
-          ? ctx.SSRCalcThickness
-            ? 'rgba16f'
-            : 'rgba8unorm'
-          : ctx.SSRCalcThickness
-            ? 'rg32f'
-            : 'r32f';
+      const format: TextureFormat = ctx.SSRCalcThickness ? 'rg32f' : 'r32f';
       const mvFormat: TextureFormat = 'rgba16f';
       if (!ctx.finalFramebuffer) {
         depthFramebuffer = rgCtx.createFramebuffer({

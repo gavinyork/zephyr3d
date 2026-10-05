@@ -292,20 +292,3 @@ export function linearToGamma(scope: PBInsideFunctionScope, color: PBShaderExp) 
   });
   return pb.getGlobalScope()[funcName](color) as PBShaderExp;
 }
-
-/** @internal */
-export function fetchNormalizedFloatForDevice(
-  scope: PBInsideFunctionScope,
-  tex: PBShaderExp,
-  uv: PBShaderExp,
-  level?: PBShaderExp | number
-) {
-  const pb = scope.$builder;
-  const texel =
-    level === undefined || level === null ? pb.textureSample(tex, uv) : pb.textureSampleLevel(tex, uv, level);
-  if (pb.getDevice().type === 'webgl') {
-    return decodeNormalizedFloatFromRGBA(scope, texel);
-  } else {
-    return texel;
-  }
-}

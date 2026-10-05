@@ -5,7 +5,6 @@ import { LIGHT_TYPE_DIRECTIONAL, LIGHT_TYPE_POINT, LIGHT_TYPE_SPOT } from '../va
 import { decode2HalfFromRGBA, decodeNormalizedFloatFromRGBA, encodeNormalizedFloatToRGBA } from './misc';
 import { ShaderHelper } from '../material/shader/helper';
 import { smoothNoise3D } from './noise';
-import { getDevice } from '../app/api';
 
 /**
  * Whether the shadow-space depth compared by a filter is the device depth
@@ -184,20 +183,6 @@ export function getProgressivePoissonDiscSample(
   index: PBShaderExp
 ): PBShaderExp {
   const pb = scope.$builder;
-  if (pb.getDevice().type === 'webgl') {
-    const funcName = 'lib_getProgressivePoissonDiscSampleWebGL1';
-    pb.func(funcName, [pb.int('index')], function () {
-      for (let i = 0; i < PCF_POISSON_DISC.length; i++) {
-        const sample = PCF_POISSON_DISC[(i * 19) % PCF_POISSON_DISC.length];
-        this.$if(pb.equal(this.index, i), function () {
-          this.$return(pb.vec2(sample[0], sample[1]));
-        });
-      }
-      this.$return(pb.vec2(PCF_POISSON_DISC[0][0], PCF_POISSON_DISC[0][1]));
-    });
-    return pb.getGlobalScope()[funcName](index) as PBShaderExp;
-  }
-
   if (!pb.getGlobalScope().PCSSpdSamples) {
     pb.getGlobalScope().PCSSpdSamples = PCF_POISSON_DISC.map((sample) => pb.vec2(sample[0], sample[1]));
   }
@@ -368,7 +353,7 @@ function sampleShadowMapPCF(
       const uv = pb.add(this.coords, this.offset);
       if (nativeShadowMap) {
         this.$return(
-          cascade && getDevice().type !== 'webgl'
+          cascade
             ? pb.textureArraySampleCompareLevel(
                 ShaderHelper.getShadowMap(this),
                 uv,
@@ -378,10 +363,9 @@ function sampleShadowMapPCF(
             : pb.textureSampleCompareLevel(ShaderHelper.getShadowMap(this), uv, sampleDepth)
         );
       } else {
-        this.$l.shadowTex =
-          cascade && getDevice().type !== 'webgl'
-            ? pb.textureArraySampleLevel(ShaderHelper.getShadowMap(this), uv, this.cascade, 0)
-            : pb.textureSampleLevel(ShaderHelper.getShadowMap(this), uv, 0);
+        this.$l.shadowTex = cascade
+          ? pb.textureArraySampleLevel(ShaderHelper.getShadowMap(this), uv, this.cascade, 0)
+          : pb.textureSampleLevel(ShaderHelper.getShadowMap(this), uv, 0);
         if (shadowMapFormat === 'rgba8unorm') {
           this.shadowTex.x = decodeNormalizedFloatFromRGBA(this, this.shadowTex);
         }
@@ -430,7 +414,7 @@ function sampleShadowMap(
       } else {
         if (nativeShadowMap) {
           this.$return(
-            cascade && getDevice().type !== 'webgl'
+            cascade
               ? pb.textureArraySampleCompareLevel(
                   ShaderHelper.getShadowMap(this),
                   this.coords,
@@ -440,10 +424,9 @@ function sampleShadowMap(
               : pb.textureSampleCompareLevel(ShaderHelper.getShadowMap(this), this.coords, this.z)
           );
         } else {
-          this.$l.shadowTex =
-            cascade && getDevice().type !== 'webgl'
-              ? pb.textureArraySampleLevel(ShaderHelper.getShadowMap(this), this.coords, this.cascade, 0)
-              : pb.textureSampleLevel(ShaderHelper.getShadowMap(this), this.coords, 0);
+          this.$l.shadowTex = cascade
+            ? pb.textureArraySampleLevel(ShaderHelper.getShadowMap(this), this.coords, this.cascade, 0)
+            : pb.textureSampleLevel(ShaderHelper.getShadowMap(this), this.coords, 0);
           if (shadowMapFormat === 'rgba8unorm') {
             this.shadowTex.x = decodeNormalizedFloatFromRGBA(this, this.shadowTex);
           }
@@ -556,10 +539,9 @@ function sampleShadowDepthPCSS(
           pb.add(this.bounds.xy, this.boundsPadding),
           pb.sub(this.bounds.zw, this.boundsPadding)
         );
-        this.$l.shadowTex =
-          cascade && getDevice().type !== 'webgl'
-            ? pb.textureArraySampleLevel(ShaderHelper.getShadowMap(this), this.sampleCoord, this.cascade, 0)
-            : pb.textureSampleLevel(ShaderHelper.getShadowMap(this), this.sampleCoord, 0);
+        this.$l.shadowTex = cascade
+          ? pb.textureArraySampleLevel(ShaderHelper.getShadowMap(this), this.sampleCoord, this.cascade, 0)
+          : pb.textureSampleLevel(ShaderHelper.getShadowMap(this), this.sampleCoord, 0);
         this.depth =
           shadowMapFormat === 'rgba8unorm'
             ? decodeNormalizedFloatFromRGBA(this, this.shadowTex)
@@ -768,7 +750,6 @@ function findBlockerPCSS(
     REVERSE_Z && deviceEncoded ? '_rev' : ''
   }`;
   const pb = scope.$builder;
-  const webgl1 = pb.getDevice().type === 'webgl';
   pb.func(
     funcName,
     [
@@ -787,12 +768,7 @@ function findBlockerPCSS(
       this.$l.sampleCoord = pb.vec2();
       this.$l.sampleDepth = pb.float();
       this.$l.blockerWeight = pb.float();
-      this.$for(pb.float('i'), 0, webgl1 ? PCF_POISSON_DISC.length : this.tapCount, function () {
-        if (webgl1) {
-          this.$if(pb.greaterThanEqual(this.i, this.tapCount), function () {
-            this.$break();
-          });
-        }
+      this.$for(pb.float('i'), 0, this.tapCount, function () {
         this.duv = pb.mul(
           pb.mul(this.matrix, getProgressivePoissonDiscSample(this, pb.int(this.i))),
           this.searchRadius
@@ -908,7 +884,6 @@ function findPointBlockerPCSS(
 ) {
   const funcName = `lib_findPointBlockerPCSS_${shadowMapFormat}`;
   const pb = scope.$builder;
-  const webgl1 = pb.getDevice().type === 'webgl';
   pb.func(
     funcName,
     [
@@ -930,12 +905,7 @@ function findPointBlockerPCSS(
       this.$l.sampleDir = pb.vec3();
       this.$l.sampleDepth = pb.float();
       this.$l.blockerWeight = pb.float();
-      this.$for(pb.float('i'), 0, webgl1 ? PCF_POISSON_DISC.length : this.tapCount, function () {
-        if (webgl1) {
-          this.$if(pb.greaterThanEqual(this.i, this.tapCount), function () {
-            this.$break();
-          });
-        }
+      this.$for(pb.float('i'), 0, this.tapCount, function () {
         this.duv = pb.mul(
           pb.mul(this.matrix, getProgressivePoissonDiscSample(this, pb.int(this.i))),
           this.searchRadius
@@ -1036,7 +1006,7 @@ export function filterShadowVSM(
           )
         );
       } else {
-        if (getDevice().type !== 'webgl' && cascade) {
+        if (cascade) {
           this.$l.shadowTex = pb.textureArraySampleLevel(
             ShaderHelper.getShadowMap(this),
             this.texCoord.xy,
@@ -1092,7 +1062,7 @@ export function filterShadowESM(
           this.shadowTex.x = decodeNormalizedFloatFromRGBA(this, this.shadowTex);
         }
       } else {
-        if (cascade && getDevice().type !== 'webgl') {
+        if (cascade) {
           this.$l.shadowTex = pb.textureArraySampleLevel(
             ShaderHelper.getShadowMap(this),
             this.shadowVertex.xy,
@@ -1693,7 +1663,6 @@ export function filterShadowPCSS(
 ) {
   const funcNameFilterShadowPCSS = `lib_filterShadowPCSS_${lightType}_${shadowMapFormat}_${receiverPlaneDepthBias ? 1 : 0}_${cascade ? 1 : 0}_${temporalJitter ? 1 : 0}_${numCascades}`;
   const pb = scope.$builder;
-  const webgl1 = pb.getDevice().type === 'webgl';
   pb.func(
     funcNameFilterShadowPCSS,
     [
@@ -1807,42 +1776,32 @@ export function filterShadowPCSS(
         this.$l.shadow = pb.float(0);
         this.$l.duv = pb.vec2();
         this.$l.samplePointDir = pb.vec3();
-        this.$for(
-          pb.float('i'),
-          0,
-          webgl1 ? PCF_POISSON_DISC.length : this.PCSSfilterSampleCount,
-          function () {
-            if (webgl1) {
-              this.$if(pb.greaterThanEqual(this.i, this.PCSSfilterSampleCount), function () {
-                this.$break();
-              });
-            }
-            this.duv = pb.mul(
-              pb.mul(this.matrix, getProgressivePoissonDiscSample(this, pb.int(this.i))),
-              this.filterRadius
-            );
-            this.samplePointDir = pb.normalize(
-              pb.add(
-                this.sampleDir,
-                pb.add(pb.mul(this.tangent, this.duv.x), pb.mul(this.bitangent, this.duv.y))
-              )
-            );
-            this.shadow = pb.add(
-              this.shadow,
-              samplePointShadowPCFPCSS(
-                this,
-                shadowMapFormat,
-                this.samplePointDir,
-                this.lightDepth,
-                this.shadowMapTexelSize,
-                this.tangent,
-                this.bitangent,
-                this.receiverPlane,
-                this.depthParams
-              )
-            );
-          }
-        );
+        this.$for(pb.float('i'), 0, this.PCSSfilterSampleCount, function () {
+          this.duv = pb.mul(
+            pb.mul(this.matrix, getProgressivePoissonDiscSample(this, pb.int(this.i))),
+            this.filterRadius
+          );
+          this.samplePointDir = pb.normalize(
+            pb.add(
+              this.sampleDir,
+              pb.add(pb.mul(this.tangent, this.duv.x), pb.mul(this.bitangent, this.duv.y))
+            )
+          );
+          this.shadow = pb.add(
+            this.shadow,
+            samplePointShadowPCFPCSS(
+              this,
+              shadowMapFormat,
+              this.samplePointDir,
+              this.lightDepth,
+              this.shadowMapTexelSize,
+              this.tangent,
+              this.bitangent,
+              this.receiverPlane,
+              this.depthParams
+            )
+          );
+        });
         this.shadow = pb.div(this.shadow, this.PCSSfilterSampleCount);
         this.$return(this.shadow);
         return;
@@ -1855,19 +1814,6 @@ export function filterShadowPCSS(
       // The scalar `.z` guard is gone (see computeReceiverPlaneDepthBias); the
       // per-tap plane gradient below is the part that was ever load bearing.
       this.$l.sampleBounds = pb.vec4(0, 0, 1, 1);
-      if (cascade && getDevice().type === 'webgl' && numCascades > 1) {
-        const numCols = numCascades > 1 ? 2 : 1;
-        const numRows = numCascades > 2 ? 2 : 1;
-        this.$l.cascadeIndex = pb.float(this.cascade);
-        this.$l.cascadeCol = pb.mod(this.cascadeIndex, 2);
-        this.$l.cascadeRow = pb.floor(pb.mul(this.cascadeIndex, 0.5));
-        this.sampleBounds = pb.vec4(
-          pb.mul(this.cascadeCol, 1 / numCols),
-          pb.mul(this.cascadeRow, 1 / numRows),
-          pb.mul(pb.add(this.cascadeCol, 1), 1 / numCols),
-          pb.mul(pb.add(this.cascadeRow, 1), 1 / numRows)
-        );
-      }
       this.$l.shadowMapTexelSize = pb.mul(
         pb.sub(this.sampleBounds.zw, this.sampleBounds.xy),
         getShadowMapTexelSize(this)
@@ -1917,12 +1863,7 @@ export function filterShadowPCSS(
       this.$l.duv = pb.vec2();
       this.$l.sampleCoord = pb.vec2();
       this.$l.compareDepth = pb.float();
-      this.$for(pb.float('i'), 0, webgl1 ? PCF_POISSON_DISC.length : this.PCSSfilterSampleCount, function () {
-        if (webgl1) {
-          this.$if(pb.greaterThanEqual(this.i, this.PCSSfilterSampleCount), function () {
-            this.$break();
-          });
-        }
+      this.$for(pb.float('i'), 0, this.PCSSfilterSampleCount, function () {
         this.duv = pb.mul(
           pb.mul(this.matrix, getProgressivePoissonDiscSample(this, pb.int(this.i))),
           this.filterRadius

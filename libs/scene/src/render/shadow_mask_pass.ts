@@ -492,25 +492,11 @@ export class ShadowMaskRenderer {
                 this.NoL,
                 ShaderHelper.getShadowCascadeBiasScale(this, this.split)
               );
-              if (device.type === 'webgl') {
-                this.$l.shadowVertex = pb.vec4();
-                this.$for(pb.int('cascade'), 0, 4, function () {
-                  this.$if(pb.equal(this.cascade, this.split), function () {
-                    this.shadowVertex = ShaderHelper.calculateShadowSpaceVertex(
-                      this,
-                      pb.vec4(this.biasedPos, 1),
-                      this.cascade
-                    );
-                    this.$break();
-                  });
-                });
-              } else {
-                this.$l.shadowVertex = ShaderHelper.calculateShadowSpaceVertex(
-                  this,
-                  pb.vec4(this.biasedPos, 1),
-                  this.split
-                );
-              }
+              this.$l.shadowVertex = ShaderHelper.calculateShadowSpaceVertex(
+                this,
+                pb.vec4(this.biasedPos, 1),
+                this.split
+              );
               this.$l.shadow = shadowMapParams.impl!.computeShadowCSM(
                 shadowMapParams,
                 this,

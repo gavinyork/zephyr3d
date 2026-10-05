@@ -702,7 +702,7 @@ export class Camera extends SceneNode {
    * Materials that query it - water's shoreline foam - turn it on by themselves,
    * the way a transmissive material turns on the scene colour copy, so this only
    * has to be set to force the channel on for something the renderer cannot see
-   * coming. Ignored on WebGL1, which has no pyramid at all.
+   * coming.
    */
   get HiZNearest() {
     return this._HiZNearest;
@@ -1250,7 +1250,7 @@ export class Camera extends SceneNode {
       this.invalidateSSGIHistory();
     }
   }
-  /** Whether SSGI temporal accumulation is enabled. Has no effect on WebGL1, which has no motion vectors. */
+  /** Whether SSGI temporal accumulation is enabled. */
   get ssgiTemporal() {
     return this._ssgiTemporal;
   }

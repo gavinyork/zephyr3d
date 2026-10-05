@@ -305,37 +305,27 @@ export class GerstnerWaveGenerator extends Disposable implements WaveGenerator {
       this.$l.dxdx = pb.float(0);
       this.$l.dzdz = pb.float(0);
       this.$l.dxdz = pb.float(0);
-      this.$for(
-        pb.float('i'),
-        0,
-        pb.getDevice().type === 'webgl' ? MAX_GERSTNER_WAVE_COUNT : this.numWaves,
-        function () {
-          if (pb.getDevice().type === 'webgl') {
-            this.$if(pb.greaterThanEqual(this.i, this.numWaves), function () {
-              this.$break();
-            });
-          }
-          this.$l.waveNormal = pb.vec3();
-          this.$l.waveDxdx = pb.float();
-          this.$l.waveDzdz = pb.float();
-          this.$l.waveDxdz = pb.float();
-          this.$l.wavePos = that.gerstnerWave(
-            this,
-            this.waveParams.at(pb.mul(this.i, 2)),
-            this.waveParams.at(pb.add(pb.mul(this.i, 2), 1)),
-            this.inPos,
-            this.waveNormal,
-            this.waveDxdx,
-            this.waveDzdz,
-            this.waveDxdz
-          );
-          this.outPos = pb.add(this.outPos, this.wavePos);
-          this.outNormal = pb.add(this.outNormal, this.waveNormal);
-          this.dxdx = pb.add(this.dxdx, this.waveDxdx);
-          this.dzdz = pb.add(this.dzdz, this.waveDzdz);
-          this.dxdz = pb.add(this.dxdz, this.waveDxdz);
-        }
-      );
+      this.$for(pb.float('i'), 0, this.numWaves, function () {
+        this.$l.waveNormal = pb.vec3();
+        this.$l.waveDxdx = pb.float();
+        this.$l.waveDzdz = pb.float();
+        this.$l.waveDxdz = pb.float();
+        this.$l.wavePos = that.gerstnerWave(
+          this,
+          this.waveParams.at(pb.mul(this.i, 2)),
+          this.waveParams.at(pb.add(pb.mul(this.i, 2), 1)),
+          this.inPos,
+          this.waveNormal,
+          this.waveDxdx,
+          this.waveDzdz,
+          this.waveDxdz
+        );
+        this.outPos = pb.add(this.outPos, this.wavePos);
+        this.outNormal = pb.add(this.outNormal, this.waveNormal);
+        this.dxdx = pb.add(this.dxdx, this.waveDxdx);
+        this.dzdz = pb.add(this.dzdz, this.waveDzdz);
+        this.dxdz = pb.add(this.dxdz, this.waveDxdz);
+      });
       // Jacobian determinant of the horizontal displacement, det(I + J). When the
       // surface folds over the determinant drops below the foamParams.x threshold
       // and the coverage ramps in. Mirrors the FFT generator's foam.
@@ -446,34 +436,24 @@ export class GerstnerWaveGenerator extends Disposable implements WaveGenerator {
       function () {
         this.outPos = this.inPos;
         this.outNormal = pb.vec3(0);
-        this.$for(
-          pb.float('i'),
-          0,
-          pb.getDevice().type === 'webgl' ? MAX_GERSTNER_WAVE_COUNT : this.numWaves,
-          function () {
-            if (pb.getDevice().type === 'webgl') {
-              this.$if(pb.greaterThanEqual(this.i, this.numWaves), function () {
-                this.$break();
-              });
-            }
-            this.$l.waveNormal = pb.vec3();
-            this.$l.waveDxdx = pb.float();
-            this.$l.waveDzdz = pb.float();
-            this.$l.waveDxdz = pb.float();
-            this.$l.wavePos = that.gerstnerWave(
-              this,
-              this.waveParams.at(pb.mul(this.i, 2)),
-              this.waveParams.at(pb.add(pb.mul(this.i, 2), 1)),
-              this.inPos,
-              this.waveNormal,
-              this.waveDxdx,
-              this.waveDzdz,
-              this.waveDxdz
-            );
-            this.outPos = pb.add(this.outPos, this.wavePos);
-            this.outNormal = pb.add(this.outNormal, this.waveNormal);
-          }
-        );
+        this.$for(pb.float('i'), 0, this.numWaves, function () {
+          this.$l.waveNormal = pb.vec3();
+          this.$l.waveDxdx = pb.float();
+          this.$l.waveDzdz = pb.float();
+          this.$l.waveDxdz = pb.float();
+          this.$l.wavePos = that.gerstnerWave(
+            this,
+            this.waveParams.at(pb.mul(this.i, 2)),
+            this.waveParams.at(pb.add(pb.mul(this.i, 2), 1)),
+            this.inPos,
+            this.waveNormal,
+            this.waveDxdx,
+            this.waveDzdz,
+            this.waveDxdz
+          );
+          this.outPos = pb.add(this.outPos, this.wavePos);
+          this.outNormal = pb.add(this.outNormal, this.waveNormal);
+        });
       }
     );
     scope.calcPositionAndNormal(inPos, outPos, outNormal);

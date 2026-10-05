@@ -270,7 +270,7 @@ export class Mesh extends MeshBase implements BatchDrawable {
     this._morphDirty = false;
     this._instanceHash = null;
     this._pickTarget = { node: this };
-    this._batchable = getDevice().type !== 'webgl';
+    this._batchable = true;
     this.primitive = primitive ?? null;
     this.material = material ?? Mesh._getDefaultMaterial();
     this._suspendSkinning = false;
@@ -449,12 +449,6 @@ export class Mesh extends MeshBase implements BatchDrawable {
       this.invalidateBoundingVolume();
       RenderBundleWrapper.drawableChanged(this);
       this._primitiveChangeTag = null;
-      if (this._morphData) {
-        this._ensureWebGLVertexIndexAttribute('morphing');
-      }
-      if (this._skinInfluenceData && this._skinInfluenceData.influenceCount > 4) {
-        this._ensureWebGLVertexIndexAttribute('skinning');
-      }
       this.dispatchEvent('primitive_changed', prim);
     }
   }
@@ -574,7 +568,6 @@ export class Mesh extends MeshBase implements BatchDrawable {
       }
       tex.update(data.data, 0, 0, data.width, data.height);
     }
-    this._ensureWebGLVertexIndexAttribute('skinning');
     this._renderBundle = {};
     RenderBundleWrapper.drawableChanged(this);
   }
@@ -617,7 +610,6 @@ export class Mesh extends MeshBase implements BatchDrawable {
         }
         tex.update(data.data, 0, 0, data.width, data.height);
       }
-      this._ensureWebGLVertexIndexAttribute('morphing');
       this._renderBundle = {};
       RenderBundleWrapper.drawableChanged(this);
       if (this._morphInfo && !this._morphSourceData) {
@@ -1422,26 +1414,6 @@ export class Mesh extends MeshBase implements BatchDrawable {
   /** @internal */
   private _onBoundingboxChange() {
     this.invalidateBoundingVolume();
-  }
-  /** @internal */
-  private _ensureWebGLVertexIndexAttribute(feature: 'morphing' | 'skinning') {
-    const primitive = this._primitive.get();
-    if (!primitive || getDevice().type !== 'webgl') {
-      return;
-    }
-    if (primitive.getVertexBuffer('texCoord7')) {
-      return;
-    }
-    const numVertices = primitive.getNumVertices();
-    if (numVertices <= 0) {
-      return;
-    }
-    const vertexIndices = new Float32Array(numVertices);
-    for (let i = 0; i < numVertices; i++) {
-      vertexIndices[i] = i;
-    }
-    primitive.createAndSetVertexBuffer('tex7_f32', vertexIndices);
-    console.info(`Injected texCoord7 vertex indices for WebGL ${feature} on mesh "${this.name ?? ''}"`);
   }
   /** @internal */
   private static _defaultMaterial: Nullable<MeshMaterial> = null;
