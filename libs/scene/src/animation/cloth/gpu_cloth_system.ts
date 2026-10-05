@@ -28,6 +28,7 @@ import type {
   SpringCollider
 } from '../spring/spring_collider';
 import { updateColliderFromNode } from '../spring/spring_collider';
+import { warnUnsupported } from '../../utility/unsupported';
 
 /**
  * Options used to construct a GPU cloth simulation system.
@@ -2436,6 +2437,9 @@ export class GPUClothSystem {
 
     if (!supported) {
       this._disabledReason = 'GPU cloth is disabled: current backend is not WebGPU.';
+      if (wantEnabled) {
+        warnUnsupported('GPU cloth (GPUClothComponent)', 'WebGPU', 'the cloth does not move');
+      }
       return;
     }
 

@@ -24,6 +24,7 @@ import type { Camera } from '../camera/camera';
 import { drawFullscreenQuad } from './fullscreenquad';
 import { fetchSampler } from '../utility/misc';
 import { CAUSTIC_HEIGHT_BIAS, MAX_CAUSTIC_WATERS, ShaderHelper } from '../material/shader/helper';
+import { warnUnsupported } from '../utility/unsupported';
 
 /** Index of refraction of water relative to air. */
 const WATER_IOR = 1.333;
@@ -1121,6 +1122,11 @@ export class WaterCausticsRenderer {
     // fetch, and GLSL ES 3.0 does not allow one on a shadow-sampler texture.
     // WebGL2 keeps the focal plane.
     if (ctx.device.type !== 'webgpu') {
+      warnUnsupported(
+        'Water caustics on scene depth (WaterMaterial.causticsSceneDepth)',
+        'WebGPU',
+        'caustics are projected onto the flat plane at causticsDepth'
+      );
       return null;
     }
     const params = ctx.shadowMapInfo?.get(light);

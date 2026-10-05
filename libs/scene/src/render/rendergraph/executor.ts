@@ -27,6 +27,7 @@ import type {
   TimestampQueryStatus
 } from '@zephyr3d/device';
 import { getDevice } from '../../app/api';
+import { warnUnsupported } from '../../utility/unsupported';
 
 interface RGPassAccessScope {
   passName: string;
@@ -404,6 +405,13 @@ export class RenderGraphExecutor<TTexture = BaseTexture> {
     }
     const device = this._getProfilingDevice();
     const supported = !!device?.getDeviceCaps().miscCaps.supportTimestampQuery;
+    if (!supported) {
+      warnUnsupported(
+        'Render graph GPU profiling',
+        'timestamp queries (WebGPU)',
+        "every scope reports status 'unsupported'"
+      );
+    }
     const rootResult: RGProfileScopeResult = {
       name: this._profilingOptions.label,
       type: 'graph',

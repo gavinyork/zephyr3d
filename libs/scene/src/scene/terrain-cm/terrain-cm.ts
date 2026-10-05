@@ -38,6 +38,7 @@ import { getDevice } from '../../app/api';
 import type { TerrainVirtualTextureOptions } from './terrain_rvt';
 import type { VirtualTexture } from '../../render/virtualtexture/virtual_texture';
 import { TerrainVirtualTexture } from './terrain_rvt';
+import { warnUnsupported } from '../../utility/unsupported';
 
 class HeightMinMaxBlitter extends CopyBlitter {
   filter(
@@ -312,7 +313,15 @@ export class ClipmapTerrain extends applyMixins(GraphNode, mixinDrawable) implem
    * See {@link ClipmapTerrain.runtimeVirtualTexture}.
    */
   setRuntimeVirtualTexture(options: Nullable<TerrainVirtualTextureOptions>) {
-    if (options && (getDevice().type !== 'webgpu' || !this.scene)) {
+    if (options && getDevice().type !== 'webgpu') {
+      warnUnsupported(
+        'Terrain runtime virtual texture (ClipmapTerrain.runtimeVirtualTexture)',
+        'WebGPU',
+        'the terrain is shaded directly every frame'
+      );
+      return;
+    }
+    if (options && !this.scene) {
       return;
     }
     if (this._virtualTexture && options) {

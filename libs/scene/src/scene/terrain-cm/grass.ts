@@ -12,6 +12,7 @@ import { GRASS_CULL_PLANES, GrassGpuPlacement, GrassOcclusionMode, grassHash } f
 import { DirectionalLight } from '../light';
 import { RENDER_PASS_TYPE_SHADOWMAP } from '../../values';
 import { BLADE_LOD_INDEX_COUNTS, ClipmapBladeGrassMaterial, createBladeIndices } from './bladegrassmaterial';
+import { warnUnsupported } from '../../utility/unsupported';
 
 const INSTANCE_BYTES = 4 * 4;
 /** Number of placement cells along each axis of a grass tile */
@@ -128,7 +129,6 @@ export class GrassLayer extends Disposable {
   private static readonly _indexBuffer: DRef<IndexBuffer> = new DRef();
   private static readonly _bladeIndexBuffer: DRef<IndexBuffer> = new DRef();
   private static readonly _bladeVertexBuffer: DRef<StructuredBuffer> = new DRef();
-  private static _bladeWarningShown = false;
   private static readonly _cullAABB = new AABB();
   private static readonly _cameraPos = new Vector3();
   private static readonly _visibleTiles: GrassInstances[] = [];
@@ -203,9 +203,12 @@ export class GrassLayer extends Disposable {
     this._numShadowTargets = 0;
     if (!GrassGpuPlacement.isSupported()) {
       this._gpu = null;
-      if (kind === 'blade' && !GrassLayer._bladeWarningShown) {
-        GrassLayer._bladeWarningShown = true;
-        console.warn('Procedural grass blades need WebGPU with indirect draw; blade layers are not drawn');
+      if (kind === 'blade') {
+        warnUnsupported(
+          "Procedural grass blades (grass layer kind 'blade')",
+          'WebGPU with indirect draw',
+          'blade layers are not drawn'
+        );
       }
     } else if (kind === 'blade') {
       this._gpu = new GrassGpuPlacement(

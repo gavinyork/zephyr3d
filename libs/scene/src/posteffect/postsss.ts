@@ -7,6 +7,7 @@ import { linearToGamma } from '../shaders/misc';
 import { hash21 } from '../shaders/noise';
 import { fetchSampler } from '../utility/misc';
 import { AbstractPostEffect, PostEffectLayer } from './posteffect';
+import { warnUnsupported } from '../utility/unsupported';
 
 /**
  * Intermediate quantity to visualize instead of the shaded result.
@@ -159,6 +160,13 @@ export class PostSSS extends AbstractPostEffect {
   }
 
   apply(ctx: DrawContext, inputColorTexture: Texture2D, sceneDepthTexture: Texture2D, srgbOutput: boolean) {
+    if (ctx.SSSMaskTexture && ctx.SSSProfileIdTexture && ctx.device.type !== 'webgpu') {
+      warnUnsupported(
+        'Screen-space subsurface diffusion (SSSMaterial)',
+        'WebGPU',
+        'skin is lit without diffusion, transmission still applies'
+      );
+    }
     if (!ctx.SSSMaskTexture || !ctx.SSSProfileIdTexture || ctx.device.type !== 'webgpu') {
       this.passThrough(ctx, inputColorTexture, srgbOutput);
       return;

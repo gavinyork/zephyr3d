@@ -15,6 +15,8 @@ import type { BatchGroup } from '../scene/batchgroup';
 import type { MSDFText, MSDFTextSprite, ParticleSystem, Sprite } from '../scene';
 import type { Water } from '../scene/water';
 import type { HairNode } from '../scene/hair';
+import { getDevice } from '../app/api';
+import { warnUnsupported } from '../utility/unsupported';
 
 /**
  * Node visitor for culling
@@ -239,6 +241,13 @@ export class CullVisitor implements Visitor<SceneNode | OctreeNode> {
    * @internal
    */
   visitHair(node: HairNode) {
+    if (getDevice().type !== 'webgpu') {
+      // Kept out of the queue entirely: the strand shader reads storage buffers
+      // from the vertex stage, so every pass that drew it would fail to build its
+      // program and log an error that does not say why.
+      warnUnsupported('Hair strands (Hair node)', 'WebGPU', 'hair is not drawn');
+      return false;
+    }
     if (
       !node.hidden &&
       (node.castShadow || !this._isShadowMapping) &&

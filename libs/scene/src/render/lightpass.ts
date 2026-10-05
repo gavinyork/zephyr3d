@@ -7,6 +7,8 @@ import type { RenderItemListBundle, RenderQueue } from './render_queue';
 import type { PunctualLight } from '../scene/light';
 import type { DrawContext } from './drawable';
 import { ShaderHelper } from '../material/shader/helper';
+import { warnUnsupported } from '../utility/unsupported';
+import { DualDepthPeelingOIT } from './dualdepthpeeling_oit';
 import type { Camera } from '../camera';
 
 const SURFACE_MRT_FLAGS =
@@ -231,10 +233,18 @@ export class LightPass extends RenderPass {
           ctx.device.getFramebuffer()!.getDepthAttachment()
         )
       : tmpFramebuffer;
-    const oit =
-      renderQueue.drawTransparent && camera.oit && camera.oit.supportDevice(ctx.device.type)
-        ? camera.oit
-        : null;
+    const oitSupported = !!camera.oit?.supportDevice(ctx.device.type);
+    if (renderQueue.drawTransparent && camera.oit && !oitSupported) {
+      const dualDepth = camera.oit.getType() === DualDepthPeelingOIT.type;
+      warnUnsupported(
+        `${dualDepth ? 'Dual depth peeling' : 'A-buffer'} OIT (Camera.oitMode)`,
+        dualDepth
+          ? 'per-target blending and float color blending (WebGPU, or WebGL2 with OES_draw_buffers_indexed and EXT_float_blend)'
+          : 'WebGPU',
+        'transparent objects fall back to sorted alpha blending'
+      );
+    }
+    const oit = renderQueue.drawTransparent && camera.oit && oitSupported ? camera.oit : null;
     // Sort only when this invocation actually draws the transparent queue.
     // The opaque pass (and the SSS-profile pass) run with _renderTransparent
     // === false; without this guard they would sort the transparent lists

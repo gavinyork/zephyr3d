@@ -47,6 +47,7 @@ import { BoundingBox } from '../utility/bounding_volume';
 import { QUEUE_OPAQUE } from '../values';
 import { getEngine } from '../app/api';
 import type { BlendMode } from '../material/meshmaterial';
+import { warnUnsupported } from '../utility/unsupported';
 
 /**
  * Hair scene node.
@@ -967,7 +968,15 @@ export class HairNode extends applyMixins(GraphNode, mixinDrawable) implements D
   private _createSimulation() {
     this._disposeSimulation();
     const data = this._strands.get();
-    if (!data || !this._source || !isHairSimulationSupported()) {
+    if (!data || !this._source) {
+      return;
+    }
+    if (!isHairSimulationSupported()) {
+      warnUnsupported(
+        'Hair strand dynamics (Hair.simulationEnabled)',
+        'WebGPU',
+        'strands stay in their rest pose'
+      );
       return;
     }
     const simulation = new GPUHairSimulation(data, this._source, this._simulationOptions);

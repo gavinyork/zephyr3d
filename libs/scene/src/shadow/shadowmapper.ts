@@ -38,6 +38,7 @@ import type { DrawContext } from '../render';
 import { LIGHT_TYPE_DIRECTIONAL, LIGHT_TYPE_NONE, LIGHT_TYPE_POINT } from '../values';
 import { getDevice } from '../app/api';
 import { ShadowRegion } from './shadow_region';
+import { warnUnsupported } from '../utility/unsupported';
 
 const tmpMatrix = new Matrix4x4();
 const tmpFrustum = new Frustum(Matrix4x4.identity());
@@ -1452,7 +1453,7 @@ export class ShadowMapper extends Disposable {
       // The strand geometry this mode exists to shadow is WebGPU only, so the
       // WebGL paths were never built. Falling back keeps a scene authored with it
       // renderable rather than failing to produce a shadow map at all.
-      console.warn(`ShadowMapper.setShadowMode(): 'dom' requires WebGPU, falling back to 'pcf'`);
+      warnUnsupported("Deep opacity map shadows (shadow mode 'dom')", 'WebGPU', "falling back to 'pcf'");
       this.applyMode('pcf');
       return;
     }

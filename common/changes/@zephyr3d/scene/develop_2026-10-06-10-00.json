@@ -1,0 +1,10 @@
+{
+  "changes": [
+    {
+      "packageName": "@zephyr3d/scene",
+      "comment": "Warn once when a WebGPU-only feature degrades on WebGL2; Hair nodes are skipped on WebGL2 instead of failing to build their shaders.",
+      "type": "patch"
+    }
+  ],
+  "packageName": "@zephyr3d/scene"
+}
