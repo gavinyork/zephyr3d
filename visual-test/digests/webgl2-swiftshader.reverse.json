@@ -266,6 +266,14 @@
       },
       "size": 512
     },
+    "physics-drop": {
+      "accepted": {
+        "win32-x64": [
+          "86fb1658dfbb7ab068332fcc48832bad"
+        ]
+      },
+      "size": 512
+    },
     "post-fxaa": {
       "accepted": {
         "linux-x64": [

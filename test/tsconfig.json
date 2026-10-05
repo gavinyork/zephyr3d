@@ -24,6 +24,7 @@
       "@zephyr3d/backend-null": ["../libs/backend-null/src"],
       "@zephyr3d/base": ["../libs/base/src"],
       "@zephyr3d/modelgen": ["../libs/modelgen/src"],
+      "@zephyr3d/physics": ["../libs/physics/src"],
       "@zephyr3d/procgen": ["../libs/procgen/src"],
       // ts-jest resolves like node10, which ignores package.json "exports"
       "meshoptimizer/decoder": ["./node_modules/meshoptimizer/meshopt_decoder.d.ts"],
