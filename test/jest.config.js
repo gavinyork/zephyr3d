@@ -23,6 +23,7 @@ module.exports = {
     // Uses import.meta, which the CommonJS test build cannot compile
     '^\./basis_location$': '<rootDir>/src/stubs/basis_location.ts',
     '^\./draco_location$': '<rootDir>/src/stubs/draco_location.ts',
+    '^\./rapier_location$': '<rootDir>/src/stubs/rapier_location.ts',
     // ESM-only entry, see the stub
     '^meshoptimizer/decoder$': '<rootDir>/src/stubs/meshopt_decoder.ts',
     '^meshoptimizer/simplifier$': '<rootDir>/src/stubs/meshopt_simplifier.ts',
@@ -32,6 +33,11 @@ module.exports = {
     '^@zephyr3d/scene/(.*)$': '<rootDir>/../libs/scene/src/$1',
     '^@zephyr3d/modelgen$': '<rootDir>/../libs/modelgen/src',
     '^@zephyr3d/procgen$': '<rootDir>/../libs/procgen/src',
+    '^@zephyr3d/physics$': '<rootDir>/../libs/physics/src',
+    // The bundler build imports its .wasm as a module; tests use the build with
+    // the module inlined, and inject it through initPhysics({ rapier })
+    '^@dimforge/rapier3d-simd$': '@dimforge/rapier3d-simd-compat',
+    '^@dimforge/rapier3d-simd/rapier_wasm3d_bg\.js$': '<rootDir>/src/stubs/rapier_glue.ts',
     // Resolve to sources so tests never depend on a built backend
     '^@zephyr3d/backend-null$': '<rootDir>/../libs/backend-null/src'
   }

@@ -1,0 +1,10 @@
+export { initPhysics } from './init';
+export { isPhysicsReady } from './rapier_state';
+export type { PhysicsInitOptions } from './init';
+export type { MotionType } from './backend/types';
+export { PhysicsWorld } from './world';
+export { PhysicsComponent } from './component';
+export { RigidBody } from './rigid_body';
+export { Collider } from './collider';
+export type { ColliderShape } from './collider';
+export { registerPhysicsClasses } from './serialization';
