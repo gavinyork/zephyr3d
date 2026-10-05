@@ -534,6 +534,20 @@ export class GrassLayer extends Disposable {
     }
   }
   /**
+   * Minimum width of a blade on screen, in pixels: distant blades are widened to it instead of
+   * thinning below a pixel, which makes them flicker. Larger values calm the flicker more but make
+   * distant fields look thicker. 0 disables it. Blade layers only.
+   */
+  get minScreenWidth() {
+    return this.bladeMaterial?.minScreenWidth ?? 0;
+  }
+  set minScreenWidth(val: number) {
+    const material = this.bladeMaterial;
+    if (material) {
+      material.minScreenWidth = val;
+    }
+  }
+  /**
    * How much the wind turns the blades to lean downwind, per unit of wind push: 0 keeps their own
    * directions, higher values comb the field along the wind. Blade layers only.
    */
@@ -1102,7 +1116,11 @@ export class GrassLayer extends Disposable {
       }
       material.setInstanceBuffer(instances, gpu.getLowListBase(target));
       // The camera the blades were placed for, also in the shadow map passes
-      material.prepareDraw(ctx.camera, wind);
+      material.prepareDraw(
+        ctx.camera,
+        wind,
+        ctx.renderPass!.type === RENDER_PASS_TYPE_SHADOWMAP ? 0 : ctx.renderHeight
+      );
     } else {
       material.prepareDraw(wind);
     }

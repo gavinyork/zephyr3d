@@ -145,6 +145,11 @@ export class ClipmapBladeGrassMaterial
   private _drawDistance: number;
   /** @internal */
   private _farDensity: number;
+  /**
+   * (world size of a pixel at distance 1, 1 for a perspective camera, minimum screen width in
+   * pixels, unused), see minScreenWidth @internal
+   */
+  private readonly _pixelSize: Vector4;
   /** @internal */
   private static readonly _tmpPos = new Vector3();
   /** @internal */
@@ -177,7 +182,7 @@ export class ClipmapBladeGrassMaterial
     this._viewCameraPos = new Vector4();
     this._drawDistance = 0;
     this._farDensity = 1;
-    this.TAAStrength = 0.7;
+    this._pixelSize = new Vector4(0, 1, 1, 0);
     this.useFeature(ClipmapBladeGrassMaterial.FEATURE_OCCLUSION_DEBUG, false);
     this.useFeature(ClipmapBladeGrassMaterial.FEATURE_COLOR_MAP, false);
   }
@@ -199,6 +204,7 @@ export class ClipmapBladeGrassMaterial
     this._distanceFade.set(other._distanceFade);
     this._drawDistance = other._drawDistance;
     this._farDensity = other._farDensity;
+    this._pixelSize.set(other._pixelSize);
     this._lodDistance = other._lodDistance;
     this.updateDistanceParams();
   }
@@ -234,7 +240,23 @@ export class ClipmapBladeGrassMaterial
    * shaped for, and the previous one the motion vectors are computed against
    * @internal
    */
-  prepareDraw(camera: Camera, wind: Nullable<WindField>) {
+  prepareDraw(camera: Camera, wind: Nullable<WindField>, renderHeight = 0) {
+    // The pixel size is that of the camera's own view: shadow map passes pass 0 and keep it, so the
+    // blades cast the shadows of the blades seen, like the camera position below
+    if (renderHeight > 0) {
+      const projection = camera.getProjectionMatrix();
+      // Row 1, column 1 is 1 / tan(fovY / 2) for a perspective projection and 2 / height for an
+      // orthographic one, so either way the world size of a pixel is 2 / (m11 * renderHeight), at
+      // distance 1 for a perspective camera
+      const size = 2 / (projection.m11 * renderHeight);
+      const perspective = projection.isPerspective() ? 1 : 0;
+      const ps = this._pixelSize;
+      if (ps.x !== size || ps.y !== perspective) {
+        ps.x = size;
+        ps.y = perspective;
+        this.uniformChanged();
+      }
+    }
     const pos = camera.getWorldPosition(ClipmapBladeGrassMaterial._tmpPos);
     const c = this._viewCameraPos;
     if (c.x !== pos.x || c.y !== pos.y || c.z !== pos.z) {
@@ -252,6 +274,22 @@ export class ClipmapBladeGrassMaterial
     const p = this._prevCameraPos;
     if (p.x !== prev.x || p.y !== prev.y || p.z !== prev.z) {
       p.setXYZW(prev.x, prev.y, prev.z, 0);
+      this.uniformChanged();
+    }
+  }
+  /**
+   * Minimum width of a blade on screen, in pixels: farther blades are widened to it so they stay
+   * at least this wide instead of thinning below a pixel and flickering. As r.HairStrands.RasterizationScale
+   * of UE's hair strands, where 0.5 is the default with temporal anti-aliasing and about 1.3 is
+   * suggested without; 0 disables it.
+   */
+  get minScreenWidth() {
+    return this._pixelSize.z;
+  }
+  set minScreenWidth(val: number) {
+    val = Math.min(4, Math.max(0, val));
+    if (val !== this._pixelSize.z) {
+      this._pixelSize.z = val;
       this.uniformChanged();
     }
   }
@@ -482,6 +520,7 @@ export class ClipmapBladeGrassMaterial
     bindGroup.setValue('zDistanceFade', this._distanceFade);
     bindGroup.setValue('zBladeLod', this._lod);
     bindGroup.setValue('zPrevCameraPos', this._prevCameraPos);
+    bindGroup.setValue('zBladePixel', this._pixelSize);
     if (ctx.renderPass!.type === RENDER_PASS_TYPE_SHADOWMAP) {
       bindGroup.setValue('zViewCameraPos', this._viewCameraPos);
     }
@@ -618,6 +657,37 @@ export class ClipmapBladeGrassMaterial
         pb.mul(sc[v('widthDir')], pb.mul(side, sc[`${tag}HalfWidth`])),
         pb.mul(sc[`${tag}Across`], pb.mul(side, sc[`${tag}HalfWidth`], sc.zBladeLook.y, sc[`${tag}EdgeOn`]))
       );
+      // Minimum screen width, as UE's hair strands (ComputeViewAlignedWorldPosition in
+      // HairStrandsVertexFactory.ush): a strand's half width is raised to at least
+      // RadiusAtDepth1 * distance, RadiusAtDepth1 being half the rasterization scale times the
+      // world size of a pixel at distance 1 (ComputeMinStrandRadiusAtDepth1, HairStrandsUtils.cpp),
+      // so it covers about a pixel instead of slipping between the samples. A blade is not
+      // camera-facing like a strand: its half width as seen is what its sides reach across the view,
+      // and only what is missing is added in that direction. The overall scale fades the minimum
+      // with the blade, so blades shrinking into the ground or away at the detail switch still go.
+      sc.$l[`${tag}AcrossLen`] = pb.length(sc[`${tag}Across`]);
+      sc.$l[`${tag}AcrossDir`] = pb.div(sc[`${tag}Across`], pb.max(sc[`${tag}AcrossLen`], 1e-4));
+      sc.$l[`${tag}SeenHalfWidth`] = pb.mul(
+        sc[`${tag}HalfWidth`],
+        pb.add(
+          pb.abs(pb.dot(sc[v('widthDir')], sc[`${tag}AcrossDir`])),
+          pb.mul(sc.zBladeLook.y, sc[`${tag}EdgeOn`], sc[`${tag}AcrossLen`])
+        )
+      );
+      sc.$l[`${tag}MinHalfWidth`] = pb.mul(
+        0.5,
+        sc.zBladePixel.z,
+        sc.zBladePixel.x,
+        pb.mix(1, pb.distance(cameraPos, sc[`${tag}Centre`]), sc.zBladePixel.y),
+        sc[v('bladeScale')].y
+      );
+      sc[`${tag}Pos`] = pb.add(
+        sc[`${tag}Pos`],
+        pb.mul(
+          sc[`${tag}AcrossDir`],
+          pb.mul(side, pb.max(pb.sub(sc[`${tag}MinHalfWidth`], sc[`${tag}SeenHalfWidth`]), 0))
+        )
+      );
     };
     point(scope, scope.t, scope.side, v('zv'));
     scope.$l[v('worldPos')] = scope[`${v('zv')}Pos`];
@@ -667,6 +737,8 @@ export class ClipmapBladeGrassMaterial
     // (low detail distance, first instance of the low detail list, unused, unused)
     scope.zBladeLod = pb.vec4().uniform(2);
     scope.zPrevCameraPos = pb.vec4().uniform(2);
+    // (pixel size at distance 1, perspective flag, minimum screen width in pixels, unused)
+    scope.zBladePixel = pb.vec4().uniform(2);
     // (wind lean, sway amplitude, sway speed, unused)
     scope.zBladeWind = pb.vec4().uniform(2);
     // (wind clock, previous wind clock)

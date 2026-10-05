@@ -119,52 +119,48 @@ export function temporalResolve(
     });
     this.$return(pb.add(this.p, this.r));
   });
-  pb.func(
-    'clipHistoryColor',
-    [pb.vec2('uv'), pb.vec3('historyColor'), pb.vec2('closestVelocity'), pb.vec2('texSize')],
-    function () {
-      let n = 1;
-      this.$l.colorAvg = pb.vec3(0);
-      this.$l.colorAvg2 = pb.vec3(0);
-      for (let i = -1; i <= 1; i++) {
-        for (let j = -1; j <= 1; j++) {
-          // The box is built in Reinhard space and `historyColor` arrives
-          // tonemapped to match. Gathering it in linear HDR instead makes a
-          // single specular texel of a few thousand, sitting next to neighbours
-          // near 1, blow the standard deviation up until the AABB contains any
-          // history at all -- the clip then stops constraining exactly the
-          // pixels that flicker, which is where it is needed most.
-          this.$l[`s${n}`] = this.reinhard(
-            pb.textureSampleLevel(currentColorTex, pb.add(this.uv, pb.div(pb.vec2(i, j), this.texSize)), 0)
-              .rgb
-          );
-          this.colorAvg = pb.add(this.colorAvg, this[`s${n}`]);
-          this.colorAvg2 = pb.add(this.colorAvg2, pb.mul(this[`s${n}`], this[`s${n}`]));
-          n++;
-        }
+  pb.func('clipHistoryColor', [pb.vec2('uv'), pb.vec3('historyColor'), pb.vec2('texSize')], function () {
+    let n = 1;
+    this.$l.colorAvg = pb.vec3(0);
+    this.$l.colorAvg2 = pb.vec3(0);
+    for (let i = -1; i <= 1; i++) {
+      for (let j = -1; j <= 1; j++) {
+        // The box is built in Reinhard space and `historyColor` arrives
+        // tonemapped to match. Gathering it in linear HDR instead makes a
+        // single specular texel of a few thousand, sitting next to neighbours
+        // near 1, blow the standard deviation up until the AABB contains any
+        // history at all -- the clip then stops constraining exactly the
+        // pixels that flicker, which is where it is needed most.
+        this.$l[`s${n}`] = this.reinhard(
+          pb.textureSampleLevel(currentColorTex, pb.add(this.uv, pb.div(pb.vec2(i, j), this.texSize)), 0).rgb
+        );
+        this.colorAvg = pb.add(this.colorAvg, this[`s${n}`]);
+        this.colorAvg2 = pb.add(this.colorAvg2, pb.mul(this[`s${n}`], this[`s${n}`]));
+        n++;
       }
-      this.colorAvg = pb.div(this.colorAvg, n - 1);
-      this.colorAvg2 = pb.div(this.colorAvg2, n - 1);
-      // Keep a non-zero floor: collapsing the box to the 3x3 mean while moving
-      // discards all sub-pixel detail and turns the output into a box-filtered
-      // jittered frame, which shimmers with the jitter phase.
-      this.$l.boxSize = pb.mix(2.5, 0.75, pb.smoothStep(0, 0.02, pb.length(this.closestVelocity)));
-      this.$l.dev = pb.mul(
-        pb.sqrt(pb.abs(pb.sub(this.colorAvg2, pb.mul(this.colorAvg, this.colorAvg)))),
-        this.boxSize
-      );
-      this.$l.colorMin = pb.sub(this.colorAvg, this.dev);
-      this.$l.colorMax = pb.add(this.colorAvg, this.dev);
-      this.$l.color = this.clipAABB(
-        this.colorMin,
-        this.colorMax,
-        pb.clamp(this.colorAvg, this.colorMin, this.colorMax),
-        this.historyColor
-      );
-      this.color = pb.clamp(this.color, pb.vec3(0), pb.vec3(TONEMAPPED_MAX));
-      this.$return(this.color);
     }
-  );
+    this.colorAvg = pb.div(this.colorAvg, n - 1);
+    this.colorAvg2 = pb.div(this.colorAvg2, n - 1);
+    // Variance box of 1.25 standard deviations, as UE's TemporalAA.usf
+    // (HISTORY_CLAMPING_BOX_VARIANCE). It used to widen to 2.5 below a velocity
+    // of 0.02 in UV, some 40 pixels: content moving a few pixels a frame, like
+    // foliage in the wind, kept the loose box, which in a high contrast
+    // neighbourhood (blades against the gaps between them) let almost any stale
+    // history through and left trails behind every moving blade. Not collapsed
+    // further while moving: a box shrunk to the 3x3 mean discards all sub-pixel
+    // detail and shimmers with the jitter phase.
+    this.$l.dev = pb.mul(pb.sqrt(pb.abs(pb.sub(this.colorAvg2, pb.mul(this.colorAvg, this.colorAvg)))), 1.25);
+    this.$l.colorMin = pb.sub(this.colorAvg, this.dev);
+    this.$l.colorMax = pb.add(this.colorAvg, this.dev);
+    this.$l.color = this.clipAABB(
+      this.colorMin,
+      this.colorMax,
+      pb.clamp(this.colorAvg, this.colorMin, this.colorMax),
+      this.historyColor
+    );
+    this.color = pb.clamp(this.color, pb.vec3(0), pb.vec3(TONEMAPPED_MAX));
+    this.$return(this.color);
+  });
   pb.func('getDisocclusionFactor', [pb.vec2('uv'), pb.vec2('velocity'), pb.vec2('texSize')], function () {
     this.$l.prevVelocitySample = pb.textureSampleLevel(prevMotionVectorTex, this.uv, 0);
     this.$l.prevVelocity = this.prevVelocitySample.xy;
@@ -241,12 +237,7 @@ export function temporalResolve(
     // Tonemap, then clip -- not the other way round. The neighbourhood box is
     // built in Reinhard space, so the history has to be in it as well; the
     // resolve stays there until the final reinhardInv below.
-    this.prevColor = this.clipHistoryColor(
-      this.screenUV,
-      this.reinhard(this.historyColor),
-      this.velocityClosest.xy,
-      this.texSize
-    );
+    this.prevColor = this.clipHistoryColor(this.screenUV, this.reinhard(this.historyColor), this.texSize);
     this.$l.screenFactor = this.$choice(
       pb.or(
         pb.any(pb.lessThan(this.reprojectedUV, pb.vec2(0))),
@@ -260,23 +251,40 @@ export function temporalResolve(
       this.velocityClosest.xy,
       this.texSize
     );
-    this.$l.alpha = pb.clamp(pb.add(this.blendFactor, this.screenFactor, this.disocclusionFactor), 0, 1);
-    //this.alpha = 0.1;
     // prevColor is already tonemapped (and clipped in that space) above.
     this.currentColor = this.reinhard(this.sampleColor);
     this.$l.currentLum = this.luminance(this.currentColor);
     this.$l.prevLum = this.luminance(this.prevColor);
-    // Luminance is in Reinhard space (always < 1), so a 1.001 floor makes the
-    // denominator constant and the ratio degenerates to an absolute difference,
-    // leaving dark-area flicker almost undamped. Use a smaller floor so the
-    // difference stays relative.
-    this.$l.diff = pb.div(
-      pb.abs(pb.sub(this.currentLum, this.prevLum)),
-      pb.max(this.currentLum, pb.max(this.prevLum, 0.2))
+    // Weight of the current frame, following the BlendFinal computation of UE's
+    // TemporalAA.usf. The base is the per-material strength from the motion
+    // vectors (a responsive material such as grass asks for more of the current
+    // frame, like UE's responsive AA stencil).
+    //
+    // Fast motion pulls the weight toward 0.2, where the history is blurred by
+    // resampling anyway. UE's Velocity is measured in 2/viewport units, twice the
+    // pixel distance, so its Velocity / 40 is pixels / 20 here.
+    this.$l.velocityPixels = pb.length(pb.mul(this.velocityClosest.xy, this.texSize));
+    this.$l.alpha = pb.max(
+      this.blendFactor,
+      pb.mix(this.blendFactor, 0.2, pb.clamp(pb.div(this.velocityPixels, 20), 0, 1))
     );
-    this.diff = pb.sub(1, this.diff);
-    this.diff = pb.mul(this.diff, this.diff);
-    this.alpha = pb.clamp(pb.mix(0, this.alpha, this.diff), 0.05, 1);
+    // Converges faster where current and history agree, so the small contribution
+    // never stalls. This replaces a weighting that went the other way, down to 5%
+    // of the current frame the more the two differed: a blade moving onto a pixel
+    // is exactly the case where they differ most, so the stale image was kept
+    // longest and the per-material strength was overridden. Flicker is damped by
+    // blending in Reinhard space instead, the 1 / (1 + luma) weighting UE's
+    // HdrWeight / WeightedLerpFactors apply to linear colors.
+    this.alpha = pb.max(
+      this.alpha,
+      pb.clamp(
+        pb.div(pb.mul(this.prevLum, 0.01), pb.max(pb.abs(pb.sub(this.currentLum, this.prevLum)), 1e-6)),
+        0,
+        1
+      )
+    );
+    // Pixels whose motion vectors carry no strength (the sky) keep a 5% floor
+    this.alpha = pb.clamp(pb.add(pb.max(this.alpha, 0.05), this.screenFactor, this.disocclusionFactor), 0, 1);
     this.$l.resolvedColor = pb.vec3();
     if (debug === TAA_DEBUG_CURRENT_COLOR) {
       this.resolvedColor = this.currentColor.rgb;

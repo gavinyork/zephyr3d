@@ -45,6 +45,7 @@ type GrassLayerData = {
     farNormalStart?: number;
     farNormalEnd?: number;
     farRoughness?: number;
+    minScreenWidth?: number;
     windFacing?: number;
     windLean?: number;
     swayAmplitude?: number;
@@ -324,6 +325,7 @@ export function getTerrainClass(manager: ResourceManager): SerializableClass {
                   farNormalStart: layer.farNormalStart,
                   farNormalEnd: layer.farNormalEnd,
                   farRoughness: layer.farRoughness,
+                  minScreenWidth: layer.minScreenWidth,
                   windFacing: layer.windFacing,
                   windLean: layer.windLean,
                   swayAmplitude: layer.swayAmplitude,
@@ -406,6 +408,7 @@ export function getTerrainClass(manager: ResourceManager): SerializableClass {
                 grassLayer.farNormalStart = blade.farNormalStart ?? grassLayer.farNormalStart;
                 grassLayer.farNormalEnd = blade.farNormalEnd ?? grassLayer.farNormalEnd;
                 grassLayer.farRoughness = blade.farRoughness ?? grassLayer.farRoughness;
+                grassLayer.minScreenWidth = blade.minScreenWidth ?? grassLayer.minScreenWidth;
                 grassLayer.windFacing = blade.windFacing ?? grassLayer.windFacing;
                 grassLayer.windLean = blade.windLean ?? grassLayer.windLean;
                 grassLayer.swayAmplitude = blade.swayAmplitude ?? grassLayer.swayAmplitude;

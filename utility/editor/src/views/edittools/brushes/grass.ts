@@ -5,7 +5,7 @@ import { Vector4 } from '@zephyr3d/base';
 import type { GrassLayer } from '@zephyr3d/scene';
 
 /** Rows of the procedural blade settings, see renderBladeSettings() */
-const BLADE_SETTING_ROWS = 27;
+const BLADE_SETTING_ROWS = 28;
 /** Rows of the card settings, see renderCardSettings() */
 const CARD_SETTING_ROWS = 3;
 
@@ -134,6 +134,7 @@ export class GrassBrush extends BaseTerrainBrush {
     slider('FarNormalStart', layer.farNormalStart, 0, 500, (v) => (layer.farNormalStart = v));
     slider('FarNormalEnd', layer.farNormalEnd, 0, 500, (v) => (layer.farNormalEnd = v));
     slider('FarRoughness', layer.farRoughness, 0, 1, (v) => (layer.farRoughness = v));
+    slider('MinScreenWidth', layer.minScreenWidth, 0, 4, (v) => (layer.minScreenWidth = v));
     slider('WindFacing', layer.windFacing, 0, 4, (v) => (layer.windFacing = v));
     slider('WindLean', layer.windLean, 0, 4, (v) => (layer.windLean = v));
     slider('SwayAmplitude', layer.swayAmplitude, 0, 1, (v) => (layer.swayAmplitude = v));

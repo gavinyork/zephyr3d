@@ -169,9 +169,12 @@ myApp.ready().then(async function () {
   const cardLayer = terrain.grassRenderer.getLayer(terrain.grassRenderer.addLayer(0.7, 0.9, grassTexture));
   cardLayer.drawDistance = 300;
   const bladeLayer = webgpu
-    ? terrain.grassRenderer.getLayer(terrain.grassRenderer.addLayer(0.04, 1.5, null, 'blade'))
+    ? terrain.grassRenderer.getLayer(terrain.grassRenderer.addLayer(0.08, 1.5, null, 'blade'))
     : null;
+
   if (bladeLayer) {
+    bladeLayer.minScreenWidth = 0.5;
+    bladeLayer.clumpColorVariation = 0.1;
     bladeLayer.drawDistance = 300;
   }
   // Shows one kind of grass: the other layer gets an empty density map.
@@ -194,7 +197,7 @@ myApp.ready().then(async function () {
   // Close to the ground, where the blades show; zoom out to see the meadows
   scene.mainCamera.lookAt(new Vector3(center.x, centerHeight + 4, center.z + 12), center, Vector3.axisPY());
   scene.mainCamera.controller = new OrbitCameraController({ center });
-  scene.mainCamera.FXAA = true;
+  scene.mainCamera.TAA = true;
 
   getInput().use(scene.mainCamera.handleEvent, scene.mainCamera);
 
