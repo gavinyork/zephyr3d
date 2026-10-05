@@ -1,0 +1,886 @@
+{
+  "environments": {
+    "linux-x64": {
+      "adapter": "webgl2 :: ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)",
+      "chromium": "151.0.7922.34",
+      "playwright": "1.62.1"
+    },
+    "win32-x64": {
+      "adapter": "webgl2 :: ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)",
+      "chromium": "151.0.7922.34",
+      "playwright": "1.62.1"
+    }
+  },
+  "format": 1,
+  "scenes": {
+    "batch-instance-culling": {
+      "accepted": {
+        "linux-x64": [
+          "7b4cbdf736629c35fdd679b939ec92ba"
+        ],
+        "win32-x64": [
+          "7b4cbdf736629c35fdd679b939ec92ba"
+        ]
+      },
+      "size": 512
+    },
+    "batch-instance-culling-growing": {
+      "accepted": {
+        "linux-x64": [
+          "73fffa5b7d6889871ba737e568b395ab"
+        ],
+        "win32-x64": [
+          "73fffa5b7d6889871ba737e568b395ab"
+        ]
+      },
+      "size": 512
+    },
+    "batch-instance-culling-growing-off": {
+      "accepted": {
+        "linux-x64": [
+          "73fffa5b7d6889871ba737e568b395ab"
+        ],
+        "win32-x64": [
+          "73fffa5b7d6889871ba737e568b395ab"
+        ]
+      },
+      "size": 512
+    },
+    "batch-instance-culling-off": {
+      "accepted": {
+        "linux-x64": [
+          "7b4cbdf736629c35fdd679b939ec92ba"
+        ],
+        "win32-x64": [
+          "7b4cbdf736629c35fdd679b939ec92ba"
+        ]
+      },
+      "size": 512
+    },
+    "cluster-many-lights": {
+      "accepted": {
+        "linux-x64": [
+          "c240d4a79a055286ed66a912f1082dce"
+        ],
+        "win32-x64": [
+          "c240d4a79a055286ed66a912f1082dce"
+        ]
+      },
+      "size": 512
+    },
+    "cluster-many-lights-ortho": {
+      "accepted": {
+        "linux-x64": [
+          "b3f63769a5840ee81a57f9d08a4d8a76"
+        ],
+        "win32-x64": [
+          "b3f63769a5840ee81a57f9d08a4d8a76"
+        ]
+      },
+      "size": 512
+    },
+    "eye-angled": {
+      "accepted": {
+        "linux-x64": [
+          "64dda2ead2895fe29efa29a847eade24"
+        ],
+        "win32-x64": [
+          "64dda2ead2895fe29efa29a847eade24"
+        ]
+      },
+      "size": 512
+    },
+    "eye-frontal": {
+      "accepted": {
+        "linux-x64": [
+          "c26b1c631aeaa396d4f7aa3d43a3cecf"
+        ],
+        "win32-x64": [
+          "c26b1c631aeaa396d4f7aa3d43a3cecf"
+        ]
+      },
+      "size": 512
+    },
+    "eye-pupil-dilated": {
+      "accepted": {
+        "linux-x64": [
+          "4146118ea487c2b61a91e2ff5989f821"
+        ],
+        "win32-x64": [
+          "4146118ea487c2b61a91e2ff5989f821"
+        ]
+      },
+      "size": 512
+    },
+    "eye-socket-occlusion": {
+      "accepted": {
+        "linux-x64": [
+          "902be23af4c0fb9557714a9c0490d315"
+        ],
+        "win32-x64": [
+          "902be23af4c0fb9557714a9c0490d315"
+        ]
+      },
+      "size": 512
+    },
+    "gltf-compression": {
+      "accepted": {
+        "linux-x64": [
+          "bf64017596f8850b5bc324487ec1b879"
+        ],
+        "win32-x64": [
+          "bf64017596f8850b5bc324487ec1b879"
+        ]
+      },
+      "size": 512
+    },
+    "hair": {
+      "accepted": {
+        "linux-x64": [
+          "645495d0844358a7d1e2a53794e07cf6"
+        ],
+        "win32-x64": [
+          "645495d0844358a7d1e2a53794e07cf6"
+        ]
+      },
+      "size": 512
+    },
+    "hair-file-helix": {
+      "accepted": {
+        "linux-x64": [
+          "06c425c808aab8122550c70ab3b765b2"
+        ],
+        "win32-x64": [
+          "06c425c808aab8122550c70ab3b765b2"
+        ]
+      },
+      "size": 512
+    },
+    "hair-marschner": {
+      "accepted": {
+        "linux-x64": [
+          "fce4d1307482eeb41c6540972f3d061a"
+        ],
+        "win32-x64": [
+          "fce4d1307482eeb41c6540972f3d061a"
+        ]
+      },
+      "size": 512
+    },
+    "hair-strands-fan": {
+      "accepted": {
+        "linux-x64": [
+          "7184649e7c3218b04dc56e3540b96ade"
+        ],
+        "win32-x64": [
+          "7184649e7c3218b04dc56e3540b96ade"
+        ]
+      },
+      "size": 512
+    },
+    "hair-strands-helix": {
+      "accepted": {
+        "linux-x64": [
+          "06c425c808aab8122550c70ab3b765b2"
+        ],
+        "win32-x64": [
+          "06c425c808aab8122550c70ab3b765b2"
+        ]
+      },
+      "size": 512
+    },
+    "hair-strands-width": {
+      "accepted": {
+        "linux-x64": [
+          "5e6ed34dc67ab8da1dfee84ff1090845"
+        ],
+        "win32-x64": [
+          "5e6ed34dc67ab8da1dfee84ff1090845"
+        ]
+      },
+      "size": 512
+    },
+    "ktx2-basis": {
+      "accepted": {
+        "linux-x64": [
+          "90bf92a791503b2eb35c3b469e15302d"
+        ],
+        "win32-x64": [
+          "90bf92a791503b2eb35c3b469e15302d"
+        ]
+      },
+      "size": 512
+    },
+    "oit-abuffer": {
+      "accepted": {
+        "linux-x64": [
+          "aaf0a9d735c2edc676389b4ab67b145a"
+        ],
+        "win32-x64": [
+          "aaf0a9d735c2edc676389b4ab67b145a"
+        ]
+      },
+      "size": 512
+    },
+    "oit-dual-depth": {
+      "accepted": {
+        "linux-x64": [
+          "1ca7223919e2fc615a33d2733a5e7230"
+        ],
+        "win32-x64": [
+          "1ca7223919e2fc615a33d2733a5e7230"
+        ]
+      },
+      "size": 512
+    },
+    "oit-weighted": {
+      "accepted": {
+        "linux-x64": [
+          "a01f429d68b32eab19e65f1f33bbd8d3"
+        ],
+        "win32-x64": [
+          "a01f429d68b32eab19e65f1f33bbd8d3"
+        ]
+      },
+      "size": 512
+    },
+    "pbr-ibl": {
+      "accepted": {
+        "linux-x64": [
+          "daf8b989e2ddf80fd60328aa5929cc4d"
+        ],
+        "win32-x64": [
+          "daf8b989e2ddf80fd60328aa5929cc4d"
+        ]
+      },
+      "size": 512
+    },
+    "pbr-metalrough-grid": {
+      "accepted": {
+        "linux-x64": [
+          "909453aba3b8c8833ef19a67172ea8f8"
+        ],
+        "win32-x64": [
+          "909453aba3b8c8833ef19a67172ea8f8"
+        ]
+      },
+      "size": 512
+    },
+    "post-fxaa": {
+      "accepted": {
+        "linux-x64": [
+          "ca4a0003a94467a62ec2eb501296897e"
+        ],
+        "win32-x64": [
+          "ca4a0003a94467a62ec2eb501296897e"
+        ]
+      },
+      "size": 512
+    },
+    "post-motionblur-camera": {
+      "accepted": {
+        "linux-x64": [
+          "dc1f5b8ee21a49abadbbfc258f720cf4"
+        ],
+        "win32-x64": [
+          "dc1f5b8ee21a49abadbbfc258f720cf4"
+        ]
+      },
+      "size": 512
+    },
+    "post-motionblur-long": {
+      "accepted": {
+        "linux-x64": [
+          "34937ffb1947f8806f29d5f1d8aaa038"
+        ],
+        "win32-x64": [
+          "34937ffb1947f8806f29d5f1d8aaa038"
+        ]
+      },
+      "size": 512
+    },
+    "post-motionblur-object": {
+      "accepted": {
+        "linux-x64": [
+          "399c90395e63ffc036dbb7c358242177"
+        ],
+        "win32-x64": [
+          "399c90395e63ffc036dbb7c358242177"
+        ]
+      },
+      "size": 512
+    },
+    "post-motionblur-rotation": {
+      "accepted": {
+        "linux-x64": [
+          "287249b0af1e2439a0349aa5cb6dda3b"
+        ],
+        "win32-x64": [
+          "287249b0af1e2439a0349aa5cb6dda3b"
+        ]
+      },
+      "size": 512
+    },
+    "post-motionblur-trailing": {
+      "accepted": {
+        "linux-x64": [
+          "f7b26958826b5aa58f103cf180f18b02"
+        ],
+        "win32-x64": [
+          "f7b26958826b5aa58f103cf180f18b02"
+        ]
+      },
+      "size": 512
+    },
+    "post-tonemap-bloom": {
+      "accepted": {
+        "linux-x64": [
+          "599aed9ce50eaaad411163f61698abb2"
+        ],
+        "win32-x64": [
+          "599aed9ce50eaaad411163f61698abb2"
+        ]
+      },
+      "size": 512
+    },
+    "quantized-vertices": {
+      "accepted": {
+        "linux-x64": [
+          "f37dddca1296292de71f4179ba986ed6"
+        ],
+        "win32-x64": [
+          "f37dddca1296292de71f4179ba986ed6"
+        ]
+      },
+      "size": 512
+    },
+    "rect-light-auto-range": {
+      "accepted": {
+        "linux-x64": [
+          "01467b33b80aaa113035aa1b50be8978"
+        ],
+        "win32-x64": [
+          "01467b33b80aaa113035aa1b50be8978"
+        ]
+      },
+      "size": 512
+    },
+    "rect-light-blueprint": {
+      "accepted": {
+        "linux-x64": [
+          "7905d85dfde0b33bfa546385b8af01a8"
+        ],
+        "win32-x64": [
+          "7905d85dfde0b33bfa546385b8af01a8"
+        ]
+      },
+      "size": 512
+    },
+    "rect-light-diffuse": {
+      "accepted": {
+        "linux-x64": [
+          "51110b32f76510b5ae853fdfddee2c0f"
+        ],
+        "win32-x64": [
+          "51110b32f76510b5ae853fdfddee2c0f"
+        ]
+      },
+      "size": 512
+    },
+    "rect-light-glossy": {
+      "accepted": {
+        "linux-x64": [
+          "57eb9bbde7146898a56447514bdea4f9"
+        ],
+        "win32-x64": [
+          "57eb9bbde7146898a56447514bdea4f9"
+        ]
+      },
+      "size": 512
+    },
+    "rect-light-materials": {
+      "accepted": {
+        "linux-x64": [
+          "2a2680dd467cb53f325f250ecac307c1"
+        ],
+        "win32-x64": [
+          "2a2680dd467cb53f325f250ecac307c1"
+        ]
+      },
+      "size": 512
+    },
+    "rect-light-pcss-large": {
+      "accepted": {
+        "linux-x64": [
+          "ea25cdf92b7699308ab0f9f59978ead1"
+        ],
+        "win32-x64": [
+          "ea25cdf92b7699308ab0f9f59978ead1"
+        ]
+      },
+      "size": 512
+    },
+    "rect-light-pcss-small": {
+      "accepted": {
+        "linux-x64": [
+          "c1ea05671561668b426303a3a7973aec"
+        ],
+        "win32-x64": [
+          "c1ea05671561668b426303a3a7973aec"
+        ]
+      },
+      "size": 512
+    },
+    "rect-light-pcss-wall": {
+      "accepted": {
+        "linux-x64": [
+          "83b0bd883a0095ce15b470d28e918d3f"
+        ],
+        "win32-x64": [
+          "83b0bd883a0095ce15b470d28e918d3f"
+        ]
+      },
+      "size": 512
+    },
+    "rect-light-physical": {
+      "accepted": {
+        "linux-x64": [
+          "3a0c1f16774b280a1eadf35cf5d49ecf"
+        ],
+        "win32-x64": [
+          "3a0c1f16774b280a1eadf35cf5d49ecf"
+        ]
+      },
+      "size": 512
+    },
+    "rect-light-shadow": {
+      "accepted": {
+        "linux-x64": [
+          "5f5ffc81f4c9fefa8b5077bbcff0291d"
+        ],
+        "win32-x64": [
+          "5f5ffc81f4c9fefa8b5077bbcff0291d"
+        ]
+      },
+      "size": 512
+    },
+    "sanity-orientation": {
+      "accepted": {
+        "linux-x64": [
+          "2643341ac39162e31d38aabc2e8fc25f"
+        ],
+        "win32-x64": [
+          "2643341ac39162e31d38aabc2e8fc25f"
+        ]
+      },
+      "size": 512
+    },
+    "shadow-csm": {
+      "accepted": {
+        "linux-x64": [
+          "d19891218654dbe4bc1811849761fea4"
+        ],
+        "win32-x64": [
+          "d19891218654dbe4bc1811849761fea4"
+        ]
+      },
+      "size": 512
+    },
+    "shadow-defaults": {
+      "accepted": {
+        "linux-x64": [
+          "d63e647a8f4d383a81d6e4ec9020ad6f"
+        ],
+        "win32-x64": [
+          "d63e647a8f4d383a81d6e4ec9020ad6f"
+        ]
+      },
+      "size": 512
+    },
+    "shadow-esm": {
+      "accepted": {
+        "linux-x64": [
+          "cce26174a8e79f87f7ff72be009d34d0"
+        ],
+        "win32-x64": [
+          "cce26174a8e79f87f7ff72be009d34d0"
+        ]
+      },
+      "size": 512
+    },
+    "shadow-hard": {
+      "accepted": {
+        "linux-x64": [
+          "4bec6c5568f396391b142f9fe4d3296d"
+        ],
+        "win32-x64": [
+          "4bec6c5568f396391b142f9fe4d3296d"
+        ]
+      },
+      "size": 512
+    },
+    "shadow-normal-offset": {
+      "accepted": {
+        "linux-x64": [
+          "97d8f555578ad595c077cfa55acf474c"
+        ],
+        "win32-x64": [
+          "97d8f555578ad595c077cfa55acf474c"
+        ]
+      },
+      "size": 512
+    },
+    "shadow-pcf": {
+      "accepted": {
+        "linux-x64": [
+          "66fe6e9ef95026f18e55f9b154657714"
+        ],
+        "win32-x64": [
+          "66fe6e9ef95026f18e55f9b154657714"
+        ]
+      },
+      "size": 512
+    },
+    "shadow-pcss": {
+      "accepted": {
+        "linux-x64": [
+          "1bea80739adae7ca63dd975b438a2d25"
+        ],
+        "win32-x64": [
+          "1bea80739adae7ca63dd975b438a2d25"
+        ]
+      },
+      "size": 512
+    },
+    "shadow-vsm": {
+      "accepted": {
+        "linux-x64": [
+          "2f79d8feec40dad8b68f44da50d9a07c"
+        ],
+        "win32-x64": [
+          "2f79d8feec40dad8b68f44da50d9a07c"
+        ]
+      },
+      "size": 512
+    },
+    "skin-animation-bank": {
+      "accepted": {
+        "linux-x64": [
+          "cdbdccbaf2b315bdbe9353eb1668ec04"
+        ],
+        "win32-x64": [
+          "cdbdccbaf2b315bdbe9353eb1668ec04"
+        ]
+      },
+      "size": 512
+    },
+    "skin-batch-instance-culling": {
+      "accepted": {
+        "linux-x64": [
+          "45ae67d38256b05f1811570cafd258f1"
+        ],
+        "win32-x64": [
+          "45ae67d38256b05f1811570cafd258f1"
+        ]
+      },
+      "size": 512
+    },
+    "skin-batch-instance-culling-off": {
+      "accepted": {
+        "linux-x64": [
+          "45ae67d38256b05f1811570cafd258f1"
+        ],
+        "win32-x64": [
+          "45ae67d38256b05f1811570cafd258f1"
+        ]
+      },
+      "size": 512
+    },
+    "skin-gpu-animation": {
+      "accepted": {
+        "linux-x64": [
+          "fa8870c90be2b327e0f8f48422dcdf45"
+        ],
+        "win32-x64": [
+          "fa8870c90be2b327e0f8f48422dcdf45"
+        ]
+      },
+      "size": 512
+    },
+    "skin-instanced-cpu": {
+      "accepted": {
+        "linux-x64": [
+          "9af938c670e2bd211660e6a874d6ccef"
+        ],
+        "win32-x64": [
+          "9af938c670e2bd211660e6a874d6ccef"
+        ]
+      },
+      "size": 512
+    },
+    "sky-atmosphere": {
+      "accepted": {
+        "linux-x64": [
+          "dbd4040f817698ca8a13f07dde1220fc"
+        ],
+        "win32-x64": [
+          "dbd4040f817698ca8a13f07dde1220fc"
+        ]
+      },
+      "size": 512
+    },
+    "spot-shadow": {
+      "accepted": {
+        "linux-x64": [
+          "7b4c28e2a3a9e7db75354f56af354988"
+        ],
+        "win32-x64": [
+          "7b4c28e2a3a9e7db75354f56af354988"
+        ]
+      },
+      "size": 512
+    },
+    "sss": {
+      "accepted": {
+        "linux-x64": [
+          "3ecab602d51e9140e6355e608c874287"
+        ],
+        "win32-x64": [
+          "3ecab602d51e9140e6355e608c874287"
+        ]
+      },
+      "size": 512
+    },
+    "sss-diffusion-jade": {
+      "accepted": {
+        "linux-x64": [
+          "164891dd49d9610616b4bdb0e280b205"
+        ],
+        "win32-x64": [
+          "164891dd49d9610616b4bdb0e280b205"
+        ]
+      },
+      "size": 512
+    },
+    "sss-shadow": {
+      "accepted": {
+        "linux-x64": [
+          "fb13c4a782bbf3fda67a47c2dbffb20e"
+        ],
+        "win32-x64": [
+          "fb13c4a782bbf3fda67a47c2dbffb20e"
+        ]
+      },
+      "size": 512
+    },
+    "taa-multiframe": {
+      "accepted": {
+        "linux-x64": [
+          "50ab288607748f468a5a08dda25c5bfe"
+        ],
+        "win32-x64": [
+          "50ab288607748f468a5a08dda25c5bfe"
+        ]
+      },
+      "size": 512
+    },
+    "unlit-textured": {
+      "accepted": {
+        "linux-x64": [
+          "be25def36c7205911d8a1169c95934e2"
+        ],
+        "win32-x64": [
+          "be25def36c7205911d8a1169c95934e2"
+        ]
+      },
+      "size": 512
+    },
+    "water-caustics-crest": {
+      "accepted": {
+        "linux-x64": [
+          "03bc7ca96c5ed91070ef1aa81f97c8d5"
+        ],
+        "win32-x64": [
+          "03bc7ca96c5ed91070ef1aa81f97c8d5"
+        ]
+      },
+      "size": 512
+    },
+    "water-caustics-deep-bed": {
+      "accepted": {
+        "linux-x64": [
+          "dc716081881ee78b2631cdc6e430573b"
+        ],
+        "win32-x64": [
+          "dc716081881ee78b2631cdc6e430573b"
+        ]
+      },
+      "size": 512
+    },
+    "water-caustics-moving": {
+      "accepted": {
+        "linux-x64": [
+          "521a13429446814382b56648510359bb"
+        ],
+        "win32-x64": [
+          "521a13429446814382b56648510359bb"
+        ]
+      },
+      "size": 512
+    },
+    "water-caustics-off": {
+      "accepted": {
+        "linux-x64": [
+          "abd3339616edfdec01052789846b1b47"
+        ],
+        "win32-x64": [
+          "abd3339616edfdec01052789846b1b47"
+        ]
+      },
+      "size": 512
+    },
+    "water-caustics-on": {
+      "accepted": {
+        "linux-x64": [
+          "463768ebf141416fc9a19d2c87e9c493"
+        ],
+        "win32-x64": [
+          "463768ebf141416fc9a19d2c87e9c493"
+        ]
+      },
+      "size": 512
+    },
+    "water-caustics-range-border": {
+      "accepted": {
+        "linux-x64": [
+          "a8c09dba90fe713e62dd5ed6088d6ed3"
+        ],
+        "win32-x64": [
+          "a8c09dba90fe713e62dd5ed6088d6ed3"
+        ]
+      },
+      "size": 512
+    },
+    "water-caustics-two-pools": {
+      "accepted": {
+        "linux-x64": [
+          "a0abe387a530c2b9c64cff4f6d4be805"
+        ],
+        "win32-x64": [
+          "a0abe387a530c2b9c64cff4f6d4be805"
+        ]
+      },
+      "size": 512
+    },
+    "water-foam-gerstner": {
+      "accepted": {
+        "linux-x64": [
+          "0fa03fbf4efe8c433c4c7a3447f35d14"
+        ],
+        "win32-x64": [
+          "0fa03fbf4efe8c433c4c7a3447f35d14"
+        ]
+      },
+      "size": 512
+    },
+    "water-foam-storm": {
+      "accepted": {
+        "linux-x64": [
+          "9c8636c8bcbebcd7ce74070089f092c4"
+        ],
+        "win32-x64": [
+          "9c8636c8bcbebcd7ce74070089f092c4"
+        ]
+      },
+      "size": 512
+    },
+    "water-horizon-reflect": {
+      "accepted": {
+        "linux-x64": [
+          "7be67c9eef8875039226212c249c78d4"
+        ],
+        "win32-x64": [
+          "7be67c9eef8875039226212c249c78d4"
+        ]
+      },
+      "size": 512
+    },
+    "water-infinite-horizon": {
+      "accepted": {
+        "linux-x64": [
+          "62375eef55c1cd71a8fad93dbe65dbb2"
+        ],
+        "win32-x64": [
+          "62375eef55c1cd71a8fad93dbe65dbb2"
+        ]
+      },
+      "size": 512
+    },
+    "water-infinite-horizon-control": {
+      "accepted": {
+        "linux-x64": [
+          "bfb6c8f7b7cc3ec4229a89c1770a1f11"
+        ],
+        "win32-x64": [
+          "bfb6c8f7b7cc3ec4229a89c1770a1f11"
+        ]
+      },
+      "size": 512
+    },
+    "water-infinite-horizon-raised": {
+      "accepted": {
+        "linux-x64": [
+          "2f8a922766123f0318d40820752b60d6"
+        ],
+        "win32-x64": [
+          "2f8a922766123f0318d40820752b60d6"
+        ]
+      },
+      "size": 512
+    },
+    "water-refraction-cheap": {
+      "accepted": {
+        "linux-x64": [
+          "62102c410f54bceac60be3e53d16aecd"
+        ],
+        "win32-x64": [
+          "62102c410f54bceac60be3e53d16aecd"
+        ]
+      },
+      "size": 512
+    },
+    "water-subsurface-backlit": {
+      "accepted": {
+        "linux-x64": [
+          "325c106401852519224bea8855374c6b"
+        ],
+        "win32-x64": [
+          "325c106401852519224bea8855374c6b"
+        ]
+      },
+      "size": 512
+    },
+    "water-surface-grazing": {
+      "accepted": {
+        "linux-x64": [
+          "e44e828d90e76807d87a113270ab29a2"
+        ],
+        "win32-x64": [
+          "e44e828d90e76807d87a113270ab29a2"
+        ]
+      },
+      "size": 512
+    },
+    "zmsh-binary": {
+      "accepted": {
+        "linux-x64": [
+          "77919a7479c7b1dd03f3fd8f01f40263"
+        ],
+        "win32-x64": [
+          "77919a7479c7b1dd03f3fd8f01f40263"
+        ]
+      },
+      "size": 512
+    }
+  }
+}
