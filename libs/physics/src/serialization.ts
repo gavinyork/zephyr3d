@@ -3,6 +3,8 @@ import type { SerializableClass, ResourceManager } from '@zephyr3d/scene';
 import { defineProps } from '@zephyr3d/scene';
 import { RigidBody } from './rigid_body';
 import { Collider, type ColliderShape } from './collider';
+import { Joint, type JointMotorMode, type JointType } from './joint';
+import { CharacterController } from './character';
 import type { MotionType } from './backend/types';
 
 function getRigidBodyClass(): SerializableClass {
@@ -404,6 +406,474 @@ function getColliderClass(): SerializableClass {
   };
 }
 
+function getJointClass(): SerializableClass {
+  return {
+    ctor: Joint,
+    name: 'Joint',
+    getProps() {
+      return defineProps([
+        {
+          name: 'Type',
+          description:
+            'What the two bodies may do: stay together, swing like a door, slide like a drawer, swivel like a shoulder, hang on a rope, or bounce on a spring',
+          type: 'string',
+          default: 'hinge',
+          options: {
+            enum: {
+              labels: ['Fixed', 'Hinge', 'Slider', 'Ball', 'Rope', 'Spring'],
+              values: ['fixed', 'hinge', 'slider', 'ball', 'rope', 'spring']
+            }
+          },
+          get(this: Joint, value) {
+            value.str[0] = this.type;
+          },
+          set(this: Joint, value) {
+            this.type = value.str[0] as JointType;
+          }
+        },
+        {
+          name: 'ConnectedBody',
+          description:
+            'The object at the other end of the joint; leave empty to fix it to a point in the world',
+          type: 'string',
+          default: '',
+          options: { sceneNode: { kind: 'node' } },
+          get(this: Joint, value) {
+            value.str[0] = this.connectedBodyId;
+          },
+          set(this: Joint, value) {
+            this.connectedBodyId = value.str[0] ?? '';
+          }
+        },
+        {
+          name: 'Anchor',
+          description: 'Moves the pivot away from this node, to where the two objects meet',
+          type: 'vec3',
+          default: [0, 0, 0],
+          get(this: Joint, value) {
+            value.num[0] = this.anchor.x;
+            value.num[1] = this.anchor.y;
+            value.num[2] = this.anchor.z;
+          },
+          set(this: Joint, value) {
+            this.anchor = new Vector3(value.num[0], value.num[1], value.num[2]);
+          }
+        },
+        {
+          name: 'ConnectedAnchor',
+          description:
+            'Where a rope or spring is tied at the other end: a point on the connected object, or in the world when there is none',
+          type: 'vec3',
+          default: [0, 0, 0],
+          get(this: Joint, value) {
+            value.num[0] = this.connectedAnchor.x;
+            value.num[1] = this.connectedAnchor.y;
+            value.num[2] = this.connectedAnchor.z;
+          },
+          set(this: Joint, value) {
+            this.connectedAnchor = new Vector3(value.num[0], value.num[1], value.num[2]);
+          },
+          isHidden(this: Joint) {
+            return this.type !== 'rope' && this.type !== 'spring';
+          }
+        },
+        {
+          name: 'Axis',
+          description: "Direction, in this node's space, a hinge turns about or a slider moves along",
+          type: 'vec3',
+          default: [0, 1, 0],
+          get(this: Joint, value) {
+            value.num[0] = this.axis.x;
+            value.num[1] = this.axis.y;
+            value.num[2] = this.axis.z;
+          },
+          set(this: Joint, value) {
+            this.axis = new Vector3(value.num[0], value.num[1], value.num[2]);
+          },
+          isHidden(this: Joint) {
+            return this.type !== 'hinge' && this.type !== 'slider';
+          }
+        },
+        {
+          name: 'CollideConnected',
+          description:
+            'Lets the two joined objects bump into each other; off so a door does not catch on its frame',
+          type: 'bool',
+          default: false,
+          get(this: Joint, value) {
+            value.bool[0] = this.collideConnected;
+          },
+          set(this: Joint, value) {
+            this.collideConnected = value.bool[0];
+          }
+        },
+        {
+          name: 'LimitsEnabled',
+          description: 'Stops the joint turning or sliding past set limits',
+          type: 'bool',
+          default: false,
+          get(this: Joint, value) {
+            value.bool[0] = this.limitsEnabled;
+          },
+          set(this: Joint, value) {
+            this.limitsEnabled = value.bool[0];
+          },
+          isHidden(this: Joint) {
+            return this.type !== 'hinge' && this.type !== 'slider' && this.type !== 'ball';
+          }
+        },
+        {
+          name: 'LowerLimit',
+          description: 'How far a hinge may turn one way (degrees) or a slider move back (metres)',
+          type: 'float',
+          default: -45,
+          get(this: Joint, value) {
+            value.num[0] = this.lowerLimit;
+          },
+          set(this: Joint, value) {
+            this.lowerLimit = value.num[0];
+          },
+          isHidden(this: Joint) {
+            return (this.type !== 'hinge' && this.type !== 'slider') || !this.limitsEnabled;
+          }
+        },
+        {
+          name: 'UpperLimit',
+          description: 'How far a hinge may turn the other way (degrees) or a slider move forward (metres)',
+          type: 'float',
+          default: 45,
+          get(this: Joint, value) {
+            value.num[0] = this.upperLimit;
+          },
+          set(this: Joint, value) {
+            this.upperLimit = value.num[0];
+          },
+          isHidden(this: Joint) {
+            return (this.type !== 'hinge' && this.type !== 'slider') || !this.limitsEnabled;
+          }
+        },
+        {
+          name: 'SwingLimit',
+          description: 'How far a ball joint may tilt away from its axis, in degrees',
+          type: 'float',
+          default: 45,
+          options: { minValue: 0, maxValue: 180 },
+          get(this: Joint, value) {
+            value.num[0] = this.swingLimit;
+          },
+          set(this: Joint, value) {
+            this.swingLimit = value.num[0];
+          },
+          isHidden(this: Joint) {
+            return this.type !== 'ball' || !this.limitsEnabled;
+          }
+        },
+        {
+          name: 'TwistLimit',
+          description: 'How far a ball joint may twist about its axis, in degrees',
+          type: 'float',
+          default: 45,
+          options: { minValue: 0, maxValue: 180 },
+          get(this: Joint, value) {
+            value.num[0] = this.twistLimit;
+          },
+          set(this: Joint, value) {
+            this.twistLimit = value.num[0];
+          },
+          isHidden(this: Joint) {
+            return this.type !== 'ball' || !this.limitsEnabled;
+          }
+        },
+        {
+          name: 'MotorMode',
+          description: 'Drives a hinge or slider: to a steady speed, or to a set angle or position',
+          type: 'string',
+          default: 'off',
+          options: {
+            enum: { labels: ['Off', 'Speed', 'Position'], values: ['off', 'velocity', 'position'] }
+          },
+          get(this: Joint, value) {
+            value.str[0] = this.motorMode;
+          },
+          set(this: Joint, value) {
+            this.motorMode = value.str[0] as JointMotorMode;
+          },
+          isHidden(this: Joint) {
+            return this.type !== 'hinge' && this.type !== 'slider';
+          }
+        },
+        {
+          name: 'MotorTarget',
+          description:
+            'Speed to turn or slide at, or angle or position to reach (degrees for hinges, metres for sliders)',
+          type: 'float',
+          default: 0,
+          get(this: Joint, value) {
+            value.num[0] = this.motorTarget;
+          },
+          set(this: Joint, value) {
+            this.motorTarget = value.num[0];
+          },
+          isHidden(this: Joint) {
+            return (this.type !== 'hinge' && this.type !== 'slider') || this.motorMode === 'off';
+          }
+        },
+        {
+          name: 'MotorStiffness',
+          description: 'How firmly a position motor pulls to its target',
+          type: 'float',
+          default: 1000,
+          options: { minValue: 0 },
+          get(this: Joint, value) {
+            value.num[0] = this.motorStiffness;
+          },
+          set(this: Joint, value) {
+            this.motorStiffness = value.num[0];
+          },
+          isHidden(this: Joint) {
+            return (this.type !== 'hinge' && this.type !== 'slider') || this.motorMode !== 'position';
+          }
+        },
+        {
+          name: 'MotorDamping',
+          description: 'How smoothly a motor settles; for a speed motor, how quickly it gets up to speed',
+          type: 'float',
+          default: 100,
+          options: { minValue: 0 },
+          get(this: Joint, value) {
+            value.num[0] = this.motorDamping;
+          },
+          set(this: Joint, value) {
+            this.motorDamping = value.num[0];
+          },
+          isHidden(this: Joint) {
+            return (this.type !== 'hinge' && this.type !== 'slider') || this.motorMode === 'off';
+          }
+        },
+        {
+          name: 'MotorMaxForce',
+          description: 'Strongest push the motor can give; 0 for no limit',
+          type: 'float',
+          default: 0,
+          options: { minValue: 0 },
+          get(this: Joint, value) {
+            value.num[0] = this.motorMaxForce;
+          },
+          set(this: Joint, value) {
+            this.motorMaxForce = value.num[0];
+          },
+          isHidden(this: Joint) {
+            return (this.type !== 'hinge' && this.type !== 'slider') || this.motorMode === 'off';
+          }
+        },
+        {
+          name: 'Length',
+          description: 'Longest a rope gets, or the length a spring settles at, in metres',
+          type: 'float',
+          default: 1,
+          options: { minValue: 0 },
+          get(this: Joint, value) {
+            value.num[0] = this.length;
+          },
+          set(this: Joint, value) {
+            this.length = value.num[0];
+          },
+          isHidden(this: Joint) {
+            return this.type !== 'rope' && this.type !== 'spring';
+          }
+        },
+        {
+          name: 'Stiffness',
+          description: 'How hard the spring pulls back when stretched',
+          type: 'float',
+          default: 100,
+          options: { minValue: 0 },
+          get(this: Joint, value) {
+            value.num[0] = this.stiffness;
+          },
+          set(this: Joint, value) {
+            this.stiffness = value.num[0];
+          },
+          isHidden(this: Joint) {
+            return this.type !== 'spring';
+          }
+        },
+        {
+          name: 'Damping',
+          description: 'How quickly the spring stops bouncing',
+          type: 'float',
+          default: 5,
+          options: { minValue: 0 },
+          get(this: Joint, value) {
+            value.num[0] = this.damping;
+          },
+          set(this: Joint, value) {
+            this.damping = value.num[0];
+          },
+          isHidden(this: Joint) {
+            return this.type !== 'spring';
+          }
+        }
+      ]);
+    }
+  };
+}
+
+function getCharacterControllerClass(): SerializableClass {
+  return {
+    ctor: CharacterController,
+    name: 'CharacterController',
+    getProps() {
+      return defineProps([
+        {
+          name: 'Height',
+          description: 'Height of the character, from its feet at this node',
+          type: 'float',
+          default: 1.8,
+          options: { minValue: 0 },
+          get(this: CharacterController, value) {
+            value.num[0] = this.height;
+          },
+          set(this: CharacterController, value) {
+            this.height = value.num[0];
+          }
+        },
+        {
+          name: 'Radius',
+          description: 'How wide the character is: radius of its body',
+          type: 'float',
+          default: 0.3,
+          options: { minValue: 0 },
+          get(this: CharacterController, value) {
+            value.num[0] = this.radius;
+          },
+          set(this: CharacterController, value) {
+            this.radius = value.num[0];
+          }
+        },
+        {
+          name: 'SkinWidth',
+          description:
+            'Small gap kept around the character; too small and it snags in corners, too large and it floats',
+          type: 'float',
+          default: 0.02,
+          options: { minValue: 0, maxValue: 0.5 },
+          get(this: CharacterController, value) {
+            value.num[0] = this.skinWidth;
+          },
+          set(this: CharacterController, value) {
+            this.skinWidth = value.num[0];
+          }
+        },
+        {
+          name: 'SlopeLimit',
+          description: 'Steepest slope it can walk up, in degrees',
+          type: 'float',
+          default: 45,
+          options: { minValue: 0, maxValue: 90 },
+          get(this: CharacterController, value) {
+            value.num[0] = this.slopeLimit;
+          },
+          set(this: CharacterController, value) {
+            this.slopeLimit = value.num[0];
+          }
+        },
+        {
+          name: 'SlideSlope',
+          description: 'Slopes steeper than this, in degrees, make it slide down',
+          type: 'float',
+          default: 30,
+          options: { minValue: 0, maxValue: 90 },
+          get(this: CharacterController, value) {
+            value.num[0] = this.slideSlope;
+          },
+          set(this: CharacterController, value) {
+            this.slideSlope = value.num[0];
+          }
+        },
+        {
+          name: 'StepHeight',
+          description: 'Highest step it walks up without jumping; 0 to never step up',
+          type: 'float',
+          default: 0.3,
+          options: { minValue: 0 },
+          get(this: CharacterController, value) {
+            value.num[0] = this.stepHeight;
+          },
+          set(this: CharacterController, value) {
+            this.stepHeight = value.num[0];
+          }
+        },
+        {
+          name: 'StepMinWidth',
+          description: 'Narrowest ledge it will step onto',
+          type: 'float',
+          default: 0.2,
+          options: { minValue: 0 },
+          get(this: CharacterController, value) {
+            value.num[0] = this.stepMinWidth;
+          },
+          set(this: CharacterController, value) {
+            this.stepMinWidth = value.num[0];
+          }
+        },
+        {
+          name: 'SnapToGround',
+          description:
+            'Keeps it on the ground walking down slopes and steps, up to this drop; 0 to let it leave the ground',
+          type: 'float',
+          default: 0.2,
+          options: { minValue: 0 },
+          get(this: CharacterController, value) {
+            value.num[0] = this.snapToGround;
+          },
+          set(this: CharacterController, value) {
+            this.snapToGround = value.num[0];
+          }
+        },
+        {
+          name: 'PushBodies',
+          description: 'Lets the character shove loose objects it walks into',
+          type: 'bool',
+          default: true,
+          get(this: CharacterController, value) {
+            value.bool[0] = this.pushBodies;
+          },
+          set(this: CharacterController, value) {
+            this.pushBodies = value.bool[0];
+          }
+        },
+        {
+          name: 'CharacterMass',
+          description: 'How heavy the character is when shoving objects, in kilograms',
+          type: 'float',
+          default: 70,
+          options: { minValue: 0 },
+          get(this: CharacterController, value) {
+            value.num[0] = this.characterMass;
+          },
+          set(this: CharacterController, value) {
+            this.characterMass = value.num[0];
+          }
+        },
+        {
+          name: 'Layer',
+          description: 'Collision layer 0-15 of the character',
+          type: 'int',
+          default: 0,
+          options: { minValue: 0, maxValue: 15 },
+          get(this: CharacterController, value) {
+            value.num[0] = this.layer;
+          },
+          set(this: CharacterController, value) {
+            this.layer = value.num[0];
+          }
+        }
+      ]);
+    }
+  };
+}
+
 /**
  * Registers the physics components with a serialization manager, so scenes
  * containing them can be saved and loaded.
@@ -413,4 +883,6 @@ function getColliderClass(): SerializableClass {
 export function registerPhysicsClasses(manager: ResourceManager) {
   manager.registerClass(getRigidBodyClass());
   manager.registerClass(getColliderClass());
+  manager.registerClass(getJointClass());
+  manager.registerClass(getCharacterControllerClass());
 }

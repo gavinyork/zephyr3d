@@ -111,6 +111,11 @@ export interface BackendWorld {
   /** Stable id of a collider while it exists, used in events and query results. */
   colliderKey(collider: BackendCollider): number;
   setColliderGroups(collider: BackendCollider, groups: number): void;
+  createJoint(desc: JointDesc, body1: BackendBody, body2: BackendBody): BackendJoint;
+  removeJoint(joint: BackendJoint): void;
+  createCharacter(settings: CharacterSettings): BackendCharacter;
+  /** Moves colliders of bodies teleported since the last step, for queries and characters. */
+  syncColliders(): void;
   /** Steps, reporting colliders that started or stopped touching. */
   step(dt: number, onCollision?: CollisionCallback): void;
   /** Contact details of a touching pair, or null if they no longer touch. */
@@ -170,3 +175,76 @@ export interface BackendBody {
 
 /** @internal */
 export type BackendCollider = object;
+
+/** Joint types the components use. @internal */
+export type JointKind = 'fixed' | 'hinge' | 'slider' | 'ball' | 'rope' | 'spring';
+
+/**
+ * A joint between two bodies. Anchors and frames are in each body's local
+ * space; a frame's X axis is the joint's hinge or slide axis, and a ball's
+ * twist axis.
+ *
+ * @internal
+ */
+export interface JointDesc {
+  type: JointKind;
+  anchor1: Vector3;
+  frame1: Quaternion;
+  anchor2: Vector3;
+  frame2: Quaternion;
+  /** Rope: longest distance. Spring: rest length. */
+  length: number;
+  stiffness: number;
+  damping: number;
+  collideConnected: boolean;
+}
+
+/** @internal */
+export type MotorMode = 'off' | 'velocity' | 'position';
+
+/** @internal */
+export interface BackendJoint {
+  setContactsEnabled(enabled: boolean): void;
+  /** Limits of a hinge (radians) or slider (metres). */
+  setLimits(min: number, max: number): void;
+  /** Limits of a ball joint, radians either side: twist about X, swing about Y and Z. */
+  setBallLimits(twist: number, swing: number): void;
+  setMotor(mode: MotorMode, target: number, stiffness: number, damping: number, maxForce: number): void;
+}
+
+/** Settings of a character controller. @internal */
+export interface CharacterSettings {
+  skinWidth: number;
+  /** Radians. */
+  slopeLimit: number;
+  /** Radians. */
+  slideSlope: number;
+  stepHeight: number;
+  stepMinWidth: number;
+  snapToGround: number;
+  pushBodies: boolean;
+  characterMass: number;
+}
+
+/** @internal */
+export interface CharacterHit {
+  key: number;
+  point: Vector3;
+  /** On the obstacle, pointing towards the character. */
+  normal: Vector3;
+}
+
+/** @internal */
+export interface CharacterMove {
+  movement: Vector3;
+  grounded: boolean;
+  hits: CharacterHit[];
+}
+
+/** @internal */
+export interface BackendCharacter {
+  configure(settings: CharacterSettings): void;
+  /** Works out how far a collider can go towards `desired`, sliding and stepping. */
+  move(collider: BackendCollider, desired: Vector3, filter: QueryPredicate): CharacterMove;
+  dispose(): void;
+}

@@ -2,6 +2,7 @@ import { Vector3 } from '@zephyr3d/base';
 import type { BackendBody, MotionType } from './backend/types';
 import { PhysicsComponent } from './component';
 import type { PhysicsWorld } from './world';
+import type { PhysicsObject } from './events';
 
 const zero = Vector3.zero();
 const tmpForce = new Vector3();
@@ -48,6 +49,8 @@ export class RigidBody extends PhysicsComponent {
   private _forceSet: boolean;
   private _pendingLinearVelocity: Vector3 | null;
   private _pendingAngularVelocity: Vector3 | null;
+  /** Raises this body's events on another object instead, for bodies a component owns. @internal */
+  _eventTarget: PhysicsObject | null;
 
   constructor() {
     super();
@@ -69,6 +72,7 @@ export class RigidBody extends PhysicsComponent {
     this._forceSet = false;
     this._pendingLinearVelocity = null;
     this._pendingAngularVelocity = null;
+    this._eventTarget = null;
   }
 
   /** How the body moves. Default `'dynamic'`. */

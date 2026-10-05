@@ -4,7 +4,9 @@ import type { ClipmapTerrain } from '@zephyr3d/scene';
 import { getDevice, SceneNode, tryGetApp } from '@zephyr3d/scene';
 import type {
   BackendBody,
+  BackendCharacter,
   BackendCollider,
+  BackendJoint,
   BackendRayHit,
   BackendWorld,
   QueryPredicate,
@@ -14,6 +16,8 @@ import { RapierWorld } from './backend/rapier';
 import { getRapier, isPhysicsReady } from './rapier_state';
 import type { RigidBody } from './rigid_body';
 import type { Collider } from './collider';
+import type { Joint } from './joint';
+import type { CharacterController, CharacterMoveResult } from './character';
 import type { PhysicsComponent, PhysicsEventMap } from './component';
 import { PhysicsContactEvent, PhysicsTriggerEvent, type PhysicsObject } from './events';
 import type { ColliderGeometry, GeometrySource, MeshGeometry, TerrainGeometry } from './geometry';
@@ -69,6 +73,34 @@ interface ColliderEntry {
   lastMatrix: Float32Array;
 }
 
+/** @internal */
+interface JointEntry {
+  component: Joint;
+  joint: BackendJoint;
+  /** The body the joint's node belongs to. */
+  owner: BodyEntry;
+  /** The connected body; null when connected to the world. */
+  other: BodyEntry | null;
+  /** Joint frame and anchor in each body's local space, for reading values back. */
+  ownerFrame: Quaternion;
+  otherFrame: Quaternion;
+  ownerAnchor: Vector3;
+  otherAnchor: Vector3;
+}
+
+/**
+ * A joint's frames, kept from its first creation so that rebuilding it (after
+ * a property change of one of its bodies, say) does not move its zero.
+ */
+interface JointFrames {
+  owner: RigidBody;
+  other: RigidBody | null;
+  ownerAnchor: Vector3;
+  ownerFrame: Quaternion;
+  otherAnchor: Vector3;
+  otherFrame: Quaternion;
+}
+
 /** Two physics objects in contact, through one pair of their colliders. */
 interface ObjectPair {
   key: string;
@@ -117,6 +149,8 @@ export interface PhysicsQueryHit {
   collider: Collider;
   /** The rigid body the collider belongs to, if any. */
   body: RigidBody | null;
+  /** The object the collider raises events on: its rigid body, character controller, or itself. */
+  object: PhysicsObject;
   /** The collider's node. */
   node: SceneNode;
   /** Where the hit is, in world space. */
@@ -168,6 +202,21 @@ function matrixEquals(m: Float32Array, node: SceneNode) {
 
 function storeMatrix(m: Float32Array, node: SceneNode) {
   m.set(node.worldMatrix);
+}
+
+/** Whether `node` is `root` or below it. */
+function isUnder(node: SceneNode | null, root: SceneNode) {
+  for (let n = node; n; n = n.parent) {
+    if (n === root) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/** Character controllers, told apart without importing the class (it imports this module). */
+function isCharacter(component: unknown): component is CharacterController {
+  return !!component && (component as CharacterController)._ownedBody !== undefined;
 }
 
 function queryShapeDesc(shape: PhysicsShape): ShapeDesc {
@@ -247,6 +296,15 @@ export class PhysicsWorld extends makeObservable(Disposable)<PhysicsWorldEventMa
   private _waitForCollidersOnStart: boolean;
   /** Whether a step has been taken; see waitForCollidersOnStart. */
   private _started: boolean;
+  private readonly _registeredJoints: Set<Joint>;
+  private readonly _dirtyJoints: Set<Joint>;
+  private readonly _joints: Map<Joint, JointEntry>;
+  private readonly _jointFrames: WeakMap<Joint, JointFrames>;
+  /** Joints that could not be created for a reason that may go away: retried every update. */
+  private readonly _retryJoints: Set<Joint>;
+  /** The static body joints connected to the world hang from. */
+  private _worldAnchor: BackendBody | null;
+  private readonly _characters: Map<CharacterController, BackendCharacter | null>;
   /** @internal */
   _inFixedUpdate: boolean;
 
@@ -295,6 +353,13 @@ export class PhysicsWorld extends makeObservable(Disposable)<PhysicsWorldEventMa
     this._enablementDirty = false;
     this._waitForCollidersOnStart = true;
     this._started = false;
+    this._registeredJoints = new Set();
+    this._dirtyJoints = new Set();
+    this._joints = new Map();
+    this._jointFrames = new WeakMap();
+    this._retryJoints = new Set();
+    this._worldAnchor = null;
+    this._characters = new Map();
     this._inFixedUpdate = false;
     scene.on('afterupdate', this._onAfterUpdate, this);
     scene.on('dispose', this._onSceneDispose, this);
@@ -428,6 +493,9 @@ export class PhysicsWorld extends makeObservable(Disposable)<PhysicsWorldEventMa
       return;
     }
     this._checkGeometry();
+    for (const joint of this._retryJoints) {
+      this._dirtyJoints.add(joint);
+    }
     this._resolve();
     this._syncFromNodes();
     if (this._enablementDirty) {
@@ -560,7 +628,8 @@ export class PhysicsWorld extends makeObservable(Disposable)<PhysicsWorldEventMa
     const entry = this._byKey.get(hit.key)!;
     return {
       collider: entry.component,
-      body: entry.owner?.component ?? null,
+      body: this._publicBody(entry),
+      object: this._objectOf(entry.component),
       node: entry.component.host!,
       point: hit.point,
       normal: hit.normal,
@@ -620,9 +689,185 @@ export class PhysicsWorld extends makeObservable(Disposable)<PhysicsWorldEventMa
     this._enablementDirty = true;
     component._setStatus(false);
   }
+  /** @internal */
+  _registerJoint(component: Joint) {
+    this._registeredJoints.add(component);
+    this._dirtyJoints.add(component);
+  }
+  /** @internal */
+  _unregisterJoint(component: Joint) {
+    this._registeredJoints.delete(component);
+    this._dirtyJoints.add(component);
+    this._retryJoints.delete(component);
+  }
+  /** A joint's settings changed; it is rebuilt from scratch on the next update. @internal */
+  _markJointDirty(component: Joint) {
+    this._jointFrames.delete(component);
+    this._dirtyJoints.add(component);
+  }
+  /** @internal */
+  _getBackendJoint(component: Joint) {
+    return this._joints.get(component)?.joint ?? null;
+  }
+  /** @internal */
+  _applyJointLimits(component: Joint) {
+    const joint = this._getBackendJoint(component);
+    if (!joint || !component.limitsEnabled) {
+      return;
+    }
+    const toRad = Math.PI / 180;
+    if (component.type === 'hinge') {
+      joint.setLimits(component.lowerLimit * toRad, component.upperLimit * toRad);
+    } else if (component.type === 'slider') {
+      joint.setLimits(component.lowerLimit, component.upperLimit);
+    } else if (component.type === 'ball') {
+      joint.setBallLimits(component.twistLimit * toRad, component.swingLimit * toRad);
+    }
+  }
+  /** @internal */
+  _applyJointMotor(component: Joint) {
+    const joint = this._getBackendJoint(component);
+    if (!joint) {
+      return;
+    }
+    // Hinges take degrees; Rapier radians.
+    const scale = component.type === 'hinge' ? Math.PI / 180 : 1;
+    joint.setMotor(
+      component.motorMode,
+      component.motorTarget * scale,
+      component.motorStiffness,
+      component.motorDamping,
+      component.motorMaxForce
+    );
+    this._joints.get(component)!.owner.body.wakeUp();
+    this._joints.get(component)!.other?.body.wakeUp();
+  }
+  /** A hinge's angle in degrees or a slider's position in metres, from the bodies' poses. @internal */
+  _jointValue(component: Joint) {
+    const entry = this._joints.get(component);
+    if (!entry) {
+      return 0;
+    }
+    // Measured like Rapier does: the owner's frame (second body) seen from the other's (first).
+    const q1 = entry.other ? entry.other.curr.rotation : Quaternion.identity();
+    const p1 = entry.other ? entry.other.curr.position : Vector3.zero();
+    const q2 = entry.owner.curr.rotation;
+    const p2 = entry.owner.curr.position;
+    const w1 = Quaternion.multiply(q1, entry.otherFrame, new Quaternion());
+    if (component.type === 'hinge') {
+      const w2 = Quaternion.multiply(q2, entry.ownerFrame, new Quaternion());
+      // A turn about X, twist only.
+      const rel = Quaternion.multiply(Quaternion.inverse(w1, new Quaternion()), w2, new Quaternion());
+      let angle = 2 * Math.atan2(rel.x, rel.w);
+      if (angle > Math.PI) {
+        angle -= 2 * Math.PI;
+      } else if (angle < -Math.PI) {
+        angle += 2 * Math.PI;
+      }
+      return (angle * 180) / Math.PI;
+    }
+    if (component.type === 'slider') {
+      const a1 = Vector3.add(p1, q1.transform(entry.otherAnchor, new Vector3()), new Vector3());
+      const a2 = Vector3.add(p2, q2.transform(entry.ownerAnchor, new Vector3()), new Vector3());
+      const axis = w1.transform(Vector3.axisPX(), new Vector3());
+      return Vector3.dot(Vector3.sub(a2, a1, new Vector3()), axis);
+    }
+    return 0;
+  }
+  /** @internal */
+  _registerCharacter(component: CharacterController) {
+    if (!this._characters.has(component)) {
+      this._characters.set(component, null);
+    }
+  }
+  /** @internal */
+  _unregisterCharacter(component: CharacterController) {
+    this._characters.get(component)?.dispose();
+    this._characters.delete(component);
+  }
+  /** @internal */
+  _configureCharacter(component: CharacterController) {
+    this._characters.get(component)?.configure(component._settings());
+  }
+  /**
+   * Moves a character as far as it can go towards `displacement`, and moves
+   * its node there. Null when it is not simulated yet.
+   *
+   * @internal
+   */
+  _moveCharacter(component: CharacterController, displacement: Vector3): CharacterMoveResult | null {
+    if (this.disposed || !this._ensureBackend() || !this._characters.has(component)) {
+      return null;
+    }
+    this._resolve();
+    const bodyEntry = this._bodies.get(component._ownedBody);
+    const colliderEntry = this._colliders.get(component._ownedCollider);
+    if (!bodyEntry || !colliderEntry) {
+      return null;
+    }
+    let controller = this._characters.get(component)!;
+    if (!controller) {
+      controller = this._backend!.createCharacter(component._settings());
+      this._characters.set(component, controller);
+    }
+    const host = component.host!;
+    const pose = readWorldPose(host, newPose());
+    if (!matrixEquals(bodyEntry.lastMatrix, host)) {
+      // Moved by something else since: start from where the node is.
+      this._teleport(bodyEntry, pose);
+    }
+    const ownKey = colliderEntry.key;
+    const layer = component.layer;
+    const result = controller.move(colliderEntry.collider, displacement, (key) => {
+      const entry = this._byKey.get(key);
+      return (
+        !!entry &&
+        key !== ownKey &&
+        entry.owner !== bodyEntry &&
+        this.getLayerCollision(layer, entry.component.layer)
+      );
+    });
+    pose.position.addBy(result.movement);
+    host.setWorldPose(pose.position, pose.rotation);
+    this._teleport(bodyEntry, pose);
+    let groundNormal: Vector3 | null = null;
+    const collisions = [];
+    for (const hit of result.hits) {
+      const entry = this._byKey.get(hit.key);
+      if (!entry) {
+        continue;
+      }
+      collisions.push({
+        collider: entry.component,
+        node: entry.component.host!,
+        point: hit.point,
+        normal: hit.normal
+      });
+      if (result.grounded && (!groundNormal || hit.normal.y > groundNormal.y)) {
+        groundNormal = hit.normal;
+      }
+    }
+    if (result.grounded && !groundNormal) {
+      groundNormal = Vector3.axisPY();
+    }
+    return { movement: result.movement, grounded: result.grounded, groundNormal, collisions };
+  }
   /** A body's settings changed; it is rebuilt on the next update. @internal */
   _markBodyDirty(component: RigidBody) {
     this._dirtyBodies.add(component);
+    // Joints on it, or whose ends may now resolve to a different body.
+    const root = component.host;
+    for (const joint of this._registeredJoints) {
+      const entry = this._joints.get(joint);
+      if (
+        entry?.owner.component === component ||
+        entry?.other?.component === component ||
+        (root && isUnder(joint.host, root)) ||
+        (root && isUnder(joint.connectedBody, root))
+      ) {
+        this._dirtyJoints.add(joint);
+      }
+    }
     // Colliders below may now belong to a different body.
     component.host?.iterate((node) => {
       for (const c of this._registeredColliders) {
@@ -684,10 +929,18 @@ export class PhysicsWorld extends makeObservable(Disposable)<PhysicsWorldEventMa
 
   /** Brings backend bodies and colliders in line with the components, in scene order. */
   private _resolve() {
-    if (this._dirtyBodies.size === 0 && this._dirtyColliders.size === 0) {
+    if (this._dirtyBodies.size === 0 && this._dirtyColliders.size === 0 && this._dirtyJoints.size === 0) {
       return;
     }
     const backend = this._backend!;
+    // Joints go first, while both their bodies still exist.
+    for (const j of this._dirtyJoints) {
+      const entry = this._joints.get(j);
+      if (entry) {
+        backend.removeJoint(entry.joint);
+        this._joints.delete(j);
+      }
+    }
     // Colliders first leave their bodies, so removing a body never takes a
     // collider that is about to be rebuilt with it.
     for (const c of this._dirtyColliders) {
@@ -706,18 +959,24 @@ export class PhysicsWorld extends makeObservable(Disposable)<PhysicsWorldEventMa
     const order: PhysicsComponent[] = [];
     this._scene.rootNode.iterate((node) => {
       for (const component of node.components) {
-        if (
-          (this._dirtyBodies.has(component as RigidBody) &&
-            this._registeredBodies.has(component as RigidBody)) ||
-          (this._dirtyColliders.has(component as Collider) &&
-            this._registeredColliders.has(component as Collider))
-        ) {
-          order.push(component as PhysicsComponent);
+        // A character controller's body and capsule are its own, not the node's.
+        const parts: unknown[] = isCharacter(component)
+          ? [component._ownedBody, component._ownedCollider]
+          : [component];
+        for (const part of parts) {
+          if (
+            (this._dirtyBodies.has(part as RigidBody) && this._registeredBodies.has(part as RigidBody)) ||
+            (this._dirtyColliders.has(part as Collider) && this._registeredColliders.has(part as Collider)) ||
+            (this._dirtyJoints.has(part as Joint) && this._registeredJoints.has(part as Joint))
+          ) {
+            order.push(part as PhysicsComponent);
+          }
         }
       }
     });
     this._dirtyBodies.clear();
     this._dirtyColliders.clear();
+    this._dirtyJoints.clear();
     for (const component of order) {
       if (this._registeredBodies.has(component as RigidBody)) {
         this._createBody(component as RigidBody);
@@ -728,7 +987,154 @@ export class PhysicsWorld extends makeObservable(Disposable)<PhysicsWorldEventMa
         this._createCollider(component as Collider);
       }
     }
+    for (const component of order) {
+      if (this._registeredJoints.has(component as Joint)) {
+        this._createJoint(component as Joint);
+      }
+    }
     this._updateBodyEnablement();
+  }
+
+  private _createJoint(component: Joint) {
+    this._retryJoints.delete(component);
+    const host = component.host!;
+    const owner = this._findOwner(host);
+    if (!owner) {
+      this._failJoint(component, 'A joint needs a rigid body on its node or on a node above it', true);
+      return;
+    }
+    let other: BodyEntry | null = null;
+    if (component.connectedBodyId) {
+      const node = component.connectedBody;
+      if (!node) {
+        this._failJoint(component, 'The connected node is not in the scene', true);
+        return;
+      }
+      other = this._findOwner(node);
+      if (!other) {
+        this._failJoint(component, 'The connected node has no rigid body on it or above it', true);
+        return;
+      }
+      if (other === owner) {
+        this._failJoint(component, 'Both ends of the joint are the same rigid body', false);
+        return;
+      }
+    }
+    let frames = this._jointFrames.get(component);
+    if (!frames || frames.owner !== owner.component || frames.other !== (other?.component ?? null)) {
+      frames = this._computeJointFrames(component, owner, other);
+      this._jointFrames.set(component, frames);
+    }
+    if (!other && !this._worldAnchor) {
+      this._worldAnchor = this._backend!.createBody({
+        motionType: 'static',
+        position: Vector3.zero(),
+        rotation: Quaternion.identity(),
+        mass: 0,
+        linearDamping: 0,
+        angularDamping: 0,
+        gravityScale: 1,
+        ccd: false,
+        canSleep: true,
+        translationAxes: [true, true, true],
+        rotationAxes: [true, true, true]
+      });
+    }
+    // Rapier measures the second body relative to the first, so the joint's own
+    // body goes second: its angle is how it turned relative to the other end.
+    const joint = this._backend!.createJoint(
+      {
+        type: component.type,
+        anchor1: frames.otherAnchor,
+        frame1: frames.otherFrame,
+        anchor2: frames.ownerAnchor,
+        frame2: frames.ownerFrame,
+        length: component.length,
+        stiffness: component.stiffness,
+        damping: component.damping,
+        collideConnected: component.collideConnected
+      },
+      other ? other.body : this._worldAnchor!,
+      owner.body
+    );
+    this._joints.set(component, {
+      component,
+      joint,
+      owner,
+      other,
+      ownerFrame: frames.ownerFrame,
+      otherFrame: frames.otherFrame,
+      ownerAnchor: frames.ownerAnchor,
+      otherAnchor: frames.otherAnchor
+    });
+    component._setError('');
+    this._applyJointLimits(component);
+    this._applyJointMotor(component);
+  }
+
+  /**
+   * The joint's frame - pivot at its node's origin moved by the anchor, X axis
+   * along its axis - in each body's local space, from where they all are now.
+   * A rope or spring is tied to the other body at the connected anchor instead.
+   */
+  private _computeJointFrames(component: Joint, owner: BodyEntry, other: BodyEntry | null): JointFrames {
+    const host = component.host!;
+    const nodePose = readWorldPose(host, newPose());
+    const pivot = host.worldMatrix.transformPointAffine(component.anchor, new Vector3());
+    const axis = component.axis.magnitude > 1e-9 ? Vector3.normalize(component.axis) : Vector3.axisPY();
+    const q = Quaternion.multiply(
+      nodePose.rotation,
+      Quaternion.unitVectorToUnitVector(Vector3.axisPX(), axis),
+      new Quaternion()
+    );
+    const twoPoint = component.type === 'rope' || component.type === 'spring';
+    const otherNode = other ? other.component.host! : null;
+    const otherPoint = !twoPoint
+      ? pivot
+      : otherNode
+        ? otherNode.worldMatrix.transformPointAffine(component.connectedAnchor, new Vector3())
+        : component.connectedAnchor.clone();
+    const local = (bodyPose: Pose | null, point: Vector3) => {
+      if (!bodyPose) {
+        // The world anchor sits at the origin, unrotated.
+        return { anchor: point.clone(), frame: q.clone() };
+      }
+      const inv = Quaternion.inverse(bodyPose.rotation, new Quaternion());
+      return {
+        anchor: inv.transform(Vector3.sub(point, bodyPose.position, new Vector3()), new Vector3()),
+        frame: Quaternion.multiply(inv, q, new Quaternion())
+      };
+    };
+    const lo = local(readWorldPose(owner.component.host!, newPose()), pivot);
+    const lt = local(other ? readWorldPose(other.component.host!, newPose()) : null, otherPoint);
+    return {
+      owner: owner.component,
+      other: other?.component ?? null,
+      ownerAnchor: lo.anchor,
+      ownerFrame: lo.frame,
+      otherAnchor: lt.anchor,
+      otherFrame: lt.frame
+    };
+  }
+
+  private _failJoint(component: Joint, message: string, retry: boolean) {
+    if (component.error !== message) {
+      console.error(`Joint on '${component.host?.name ?? ''}': ${message}`);
+    }
+    component._setError(message);
+    if (retry) {
+      this._retryJoints.add(component);
+    }
+  }
+
+  /** Puts a body where `pose` says, at once, with nothing interpolated or swept. */
+  private _teleport(entry: BodyEntry, pose: Pose) {
+    entry.body.setPose(pose.position, pose.rotation);
+    copyPose(entry.curr, pose);
+    copyPose(entry.prev, pose);
+    copyPose(entry.kinematicFrom, pose);
+    storeMatrix(entry.lastMatrix, entry.component.host!);
+    this._backend!.syncColliders();
   }
 
   private _createBody(component: RigidBody) {
@@ -766,7 +1172,8 @@ export class PhysicsWorld extends makeObservable(Disposable)<PhysicsWorldEventMa
   private _findOwner(node: SceneNode): BodyEntry | null {
     for (let n: SceneNode | null = node; n; n = n.parent) {
       for (const component of n.components) {
-        const entry = this._bodies.get(component as RigidBody);
+        const body = isCharacter(component) ? component._ownedBody : (component as RigidBody);
+        const entry = this._bodies.get(body);
         if (entry) {
           return entry;
         }
@@ -1255,7 +1662,14 @@ export class PhysicsWorld extends makeObservable(Disposable)<PhysicsWorldEventMa
 
   /** The object a collider raises events on: its rigid body, or itself. */
   private _objectOf(collider: Collider): PhysicsObject {
-    return this._colliders.get(collider)?.owner?.component ?? collider;
+    const owner = this._colliders.get(collider)?.owner?.component;
+    return owner ? (owner._eventTarget ?? owner) : collider;
+  }
+
+  /** The rigid body a user sees a collider belonging to: not one a component owns. */
+  private _publicBody(entry: ColliderEntry): RigidBody | null {
+    const owner = entry.owner?.component ?? null;
+    return owner && !owner._eventTarget ? owner : null;
   }
 
   private _objectPair(c1: Collider, c2: Collider): ObjectPair | null {
@@ -1393,7 +1807,10 @@ export class PhysicsWorld extends makeObservable(Disposable)<PhysicsWorldEventMa
       return (
         !!(mask & (1 << c.layer)) &&
         (triggers || !c.isTrigger) &&
-        (!exclude || (exclude !== c && exclude !== entry.owner?.component))
+        (!exclude ||
+          (exclude !== c &&
+            exclude !== entry.owner?.component &&
+            exclude !== entry.owner?.component._eventTarget))
       );
     };
   }
@@ -1402,7 +1819,8 @@ export class PhysicsWorld extends makeObservable(Disposable)<PhysicsWorldEventMa
     const entry = this._byKey.get(hit.key)!;
     return {
       collider: entry.component,
-      body: entry.owner?.component ?? null,
+      body: this._publicBody(entry),
+      object: this._objectOf(entry.component),
       node: entry.component.host!,
       point: Vector3.combine(origin, dir, 1, hit.distance, new Vector3()),
       normal: hit.normal,
@@ -1435,6 +1853,10 @@ export class PhysicsWorld extends makeObservable(Disposable)<PhysicsWorldEventMa
     this._lastPairs.clear();
     this._pending.clear();
     this._failed.clear();
+    this._joints.clear();
+    this._retryJoints.clear();
+    this._characters.clear();
+    this._worldAnchor = null;
     PhysicsWorld._worlds.delete(this._scene);
   }
 }

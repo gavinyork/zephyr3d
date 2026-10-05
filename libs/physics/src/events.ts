@@ -3,14 +3,15 @@ import type { SceneNode } from '@zephyr3d/scene';
 import type { ContactInfo } from './backend/types';
 import type { RigidBody } from './rigid_body';
 import type { Collider } from './collider';
+import type { CharacterController } from './character';
 
 /**
- * A rigid body, or a collider that has no rigid body above it: what physics
- * events are raised on and refer to.
+ * A rigid body, a collider that has no rigid body above it, or a character
+ * controller: what physics events are raised on and refer to.
  *
  * @public
  */
-export type PhysicsObject = RigidBody | Collider;
+export type PhysicsObject = RigidBody | Collider | CharacterController;
 
 /**
  * Passed with `collisionenter`, `collisionstay` and `collisionexit`.

@@ -11,4 +11,8 @@ export type { PhysicsObject } from './events';
 export { RigidBody } from './rigid_body';
 export { Collider } from './collider';
 export type { ColliderShape } from './collider';
+export { Joint } from './joint';
+export type { JointType, JointMotorMode } from './joint';
+export { CharacterController } from './character';
+export type { CharacterCollision, CharacterMoveResult } from './character';
 export { registerPhysicsClasses } from './serialization';

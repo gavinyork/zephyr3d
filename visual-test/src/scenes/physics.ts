@@ -2,13 +2,21 @@ import { Quaternion, Vector3, Vector4 } from '@zephyr3d/base';
 import {
   BoundingBox,
   BoxShape,
+  CapsuleShape,
   Mesh,
   PBRMetallicRoughnessMaterial,
   Primitive,
   SphereShape
 } from '@zephyr3d/scene';
 import type { Scene } from '@zephyr3d/scene';
-import { Collider, initPhysics, PhysicsWorld, RigidBody } from '@zephyr3d/physics';
+import {
+  CharacterController,
+  Collider,
+  initPhysics,
+  Joint,
+  PhysicsWorld,
+  RigidBody
+} from '@zephyr3d/physics';
 import type { VisualScene } from '../types';
 import { bareScene, placeCamera, shadowKeyLight } from './common';
 
@@ -198,5 +206,92 @@ export const physicsMeshGround: VisualScene = {
     await PhysicsWorld.get(scene).whenReady();
 
     placeCamera(camera, new Vector3(0, 5, 10), new Vector3(0, 0.5, 0));
+  }
+};
+
+/**
+ * A hinged door knocked open by a rolling ball, a chain of beads on ball joints
+ * swinging down from a fixed point, and a character walking up a flight of
+ * steps, captured mid-motion.
+ *
+ * Pins joints and the character controller in the real render path: hinge
+ * frames and pivots, ball joints chained to each other and to the world, and
+ * a character moved from the world's fixed update - stepping, standing on the
+ * steps, and its node written where the controller put it.
+ *
+ * Deterministic: everything is driven by fixed steps, including the character,
+ * whose walk is a pure function of the steps taken.
+ */
+export const physicsJoints: VisualScene = {
+  name: 'physics-joints',
+  description:
+    'Hinged door hit by a ball, a bead chain on ball joints, and a character climbing steps. Regresses joints and the character controller.',
+  frames: 75,
+  async setup({ scene, camera }) {
+    await initPhysics();
+    bareScene(scene);
+    shadowKeyLight(scene, 'pcf');
+    const grey = new Vector4(0.55, 0.55, 0.55, 1);
+    box(scene, grey, new Vector3(14, 0.5, 10), new Vector3(0, -0.25, 0), false);
+
+    // Door, hinged on its left edge at x = 1.
+    const door = box(
+      scene,
+      new Vector4(0.6, 0.4, 0.25, 1),
+      new Vector3(1.2, 2, 0.1),
+      new Vector3(1.6, 1.02, 0),
+      true
+    );
+    const hinge = new Mesh(scene, new BoxShape({ size: 0.05, sizeY: 2.1, sizeZ: 0.05 }), material(grey));
+    hinge.parent = door;
+    hinge.position.setXYZ(-0.62, 0, 0);
+    const joint = new Joint();
+    joint.type = 'hinge';
+    joint.limitsEnabled = true;
+    joint.lowerLimit = -100;
+    joint.upperLimit = 100;
+    hinge.addComponent(joint);
+    const knock = ball(scene, new Vector4(0.9, 0.35, 0.15, 1), 0.3, new Vector3(2.0, 0.3, 4));
+    knock.getComponent(RigidBody)!.mass = 8;
+    knock.getComponent(RigidBody)!.setLinearVelocity(new Vector3(0, 0, -6));
+
+    // Bead chain, laid out level from a fixed point and let go.
+    const beads = 7;
+    let prev: Mesh | null = null;
+    for (let i = 0; i < beads; i++) {
+      const bead = ball(
+        scene,
+        new Vector4(0.15, 0.45, 0.9, 1),
+        0.12,
+        new Vector3(-4 + (i + 1) * 0.3, 3.5, 0)
+      );
+      const link = new Joint();
+      link.type = 'ball';
+      link.anchor = new Vector3(-0.15, 0, 0);
+      link.connectedBody = prev;
+      bead.addComponent(link);
+      prev = bead;
+    }
+
+    // Character walking up three steps along -X, from the fixed update.
+    for (let i = 0; i < 3; i++) {
+      box(scene, grey, new Vector3(1, 0.2 * (i + 1), 2), new Vector3(-1 - i, 0.1 * (i + 1), 2.5), false);
+    }
+    const hero = new Mesh(
+      scene,
+      new CapsuleShape({ radius: 0.3, height: 1.2, anchor: 0 }),
+      material(new Vector4(0.3, 0.75, 0.35, 1))
+    );
+    hero.position.setXYZ(0.5, 0, 2.5);
+    const controller = new CharacterController();
+    hero.addComponent(controller);
+    let vy = 0;
+    const world = PhysicsWorld.get(scene);
+    world.on('fixedupdate', (dt) => {
+      vy = controller.isGrounded ? -1 : vy - 9.81 * dt;
+      controller.move(new Vector3(-1.6 * dt, vy * dt, 0));
+    });
+
+    placeCamera(camera, new Vector3(0, 4.5, 9), new Vector3(-0.5, 1, 0.5));
   }
 };
