@@ -337,6 +337,18 @@ export class Engine {
     }
   }
   /**
+   * Calls the `onFixedUpdate` hooks of scripts, if enabled. Driven by a physics
+   * world before each of its fixed steps.
+   *
+   * @param fixedDeltaTime - Length of the step in seconds.
+   * @param filter - Only scripts whose host passes are called.
+   */
+  fixedUpdate(fixedDeltaTime: number, filter?: (host: unknown) => boolean) {
+    if (this._enabled) {
+      this._scriptingSystem.fixedUpdate(fixedDeltaTime, filter);
+    }
+  }
+  /**
    * Loads a scene from a file path.
    *
    * Concurrent requests for the same normalized path share the same loading promise.

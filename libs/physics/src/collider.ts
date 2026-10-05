@@ -23,6 +23,9 @@ export type ColliderShape = 'box' | 'sphere' | 'capsule' | 'cylinder';
  * one it is a static obstacle - a floor, a wall - that never moves on its own
  * but follows its node if the node is moved.
  *
+ * Collision and trigger events are raised on the rigid body it belongs to, or
+ * on the collider itself when it has none; see {@link PhysicsEventMap}.
+ *
  * Sizes are in the node's local units and scale with the node's world scale. A
  * sphere scales by the largest axis, and capsules and cylinders by the larger
  * of X and Z for their radius.
@@ -38,6 +41,7 @@ export class Collider extends PhysicsComponent {
   private _friction: number;
   private _restitution: number;
   private _isTrigger: boolean;
+  private _layer: number;
 
   constructor() {
     super();
@@ -49,6 +53,7 @@ export class Collider extends PhysicsComponent {
     this._friction = 0.5;
     this._restitution = 0;
     this._isTrigger = false;
+    this._layer = 0;
   }
 
   /** The shape. Default `'box'`. */
@@ -114,6 +119,22 @@ export class Collider extends PhysicsComponent {
   set isTrigger(value: boolean) {
     this._isTrigger = !!value;
     this._changed();
+  }
+
+  /**
+   * Collision layer, 0 to 15. Which layers collide with each other is set on
+   * the world ({@link PhysicsWorld.setLayerCollision}); queries can be limited
+   * to some layers. Default 0.
+   */
+  get layer() {
+    return this._layer;
+  }
+  set layer(value: number) {
+    const layer = Math.min(15, Math.max(0, Math.floor(value)));
+    if (layer !== this._layer) {
+      this._layer = layer;
+      this.world?._updateColliderGroups(this);
+    }
   }
 
   private _changed() {

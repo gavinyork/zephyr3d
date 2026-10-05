@@ -120,6 +120,99 @@ function getRigidBodyClass(): SerializableClass {
           isHidden(this: RigidBody) {
             return this.motionType !== 'dynamic';
           }
+        },
+        {
+          name: 'LockTranslationX',
+          description: 'Stops the body sliding along the world X axis, e.g. to keep a 2.5D game on its plane',
+          type: 'bool',
+          default: false,
+          get(this: RigidBody, value) {
+            value.bool[0] = this.lockTranslationX;
+          },
+          set(this: RigidBody, value) {
+            this.lockTranslationX = value.bool[0];
+          },
+          isHidden(this: RigidBody) {
+            return this.motionType !== 'dynamic';
+          }
+        },
+        {
+          name: 'LockTranslationY',
+          description: 'Stops the body sliding along the world Y axis, e.g. to keep a 2.5D game on its plane',
+          type: 'bool',
+          default: false,
+          get(this: RigidBody, value) {
+            value.bool[0] = this.lockTranslationY;
+          },
+          set(this: RigidBody, value) {
+            this.lockTranslationY = value.bool[0];
+          },
+          isHidden(this: RigidBody) {
+            return this.motionType !== 'dynamic';
+          }
+        },
+        {
+          name: 'LockTranslationZ',
+          description: 'Stops the body sliding along the world Z axis, e.g. to keep a 2.5D game on its plane',
+          type: 'bool',
+          default: false,
+          get(this: RigidBody, value) {
+            value.bool[0] = this.lockTranslationZ;
+          },
+          set(this: RigidBody, value) {
+            this.lockTranslationZ = value.bool[0];
+          },
+          isHidden(this: RigidBody) {
+            return this.motionType !== 'dynamic';
+          }
+        },
+        {
+          name: 'LockRotationX',
+          description:
+            'Stops the body tipping or spinning about the world X axis, e.g. to keep a character upright',
+          type: 'bool',
+          default: false,
+          get(this: RigidBody, value) {
+            value.bool[0] = this.lockRotationX;
+          },
+          set(this: RigidBody, value) {
+            this.lockRotationX = value.bool[0];
+          },
+          isHidden(this: RigidBody) {
+            return this.motionType !== 'dynamic';
+          }
+        },
+        {
+          name: 'LockRotationY',
+          description:
+            'Stops the body tipping or spinning about the world Y axis, e.g. to keep a character upright',
+          type: 'bool',
+          default: false,
+          get(this: RigidBody, value) {
+            value.bool[0] = this.lockRotationY;
+          },
+          set(this: RigidBody, value) {
+            this.lockRotationY = value.bool[0];
+          },
+          isHidden(this: RigidBody) {
+            return this.motionType !== 'dynamic';
+          }
+        },
+        {
+          name: 'LockRotationZ',
+          description:
+            'Stops the body tipping or spinning about the world Z axis, e.g. to keep a character upright',
+          type: 'bool',
+          default: false,
+          get(this: RigidBody, value) {
+            value.bool[0] = this.lockRotationZ;
+          },
+          set(this: RigidBody, value) {
+            this.lockRotationZ = value.bool[0];
+          },
+          isHidden(this: RigidBody) {
+            return this.motionType !== 'dynamic';
+          }
         }
       ]);
     }
@@ -252,6 +345,20 @@ function getColliderClass(): SerializableClass {
           },
           set(this: Collider, value) {
             this.isTrigger = value.bool[0];
+          }
+        },
+        {
+          name: 'Layer',
+          description:
+            'Collision layer 0-15; the world decides which layers pass through each other, and queries can skip layers',
+          type: 'int',
+          default: 0,
+          options: { minValue: 0, maxValue: 15 },
+          get(this: Collider, value) {
+            value.num[0] = this.layer;
+          },
+          set(this: Collider, value) {
+            this.layer = value.num[0];
           }
         }
       ]);
