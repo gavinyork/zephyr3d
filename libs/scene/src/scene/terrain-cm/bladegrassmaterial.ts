@@ -162,12 +162,12 @@ export class ClipmapBladeGrassMaterial
     this._terrain = new DWeakRef(terrain);
     this._instances = new DRef();
     this._colorMap = new DRef();
-    this._shape = new Vector4(0.7, 1.5, 0.1, 0.5);
+    this._shape = new Vector4(0.7, 1.5, 0.6, 0.5);
     this._look = new Vector4(0.5, 0.5, 15, 60);
     this._look2 = new Vector4(0.9, 0, 0, 0);
     this._wind = new Vector4(0.5, 0.15, 2.5, 0);
     this._windTime = new Vector2(0, 0);
-    this._rootColor = new Vector4(0.06, 0.1, 0.02, 1);
+    this._rootColor = new Vector4(0.06, 0.12, 0.02, 1);
     this._tipColor = new Vector4(0.35, 0.45, 0.12, 1);
     this._transmissionColor = new Vector4(0.45, 0.55, 0.12, 1);
     this._distanceFade = new Vector2(0, 0);
@@ -177,6 +177,7 @@ export class ClipmapBladeGrassMaterial
     this._viewCameraPos = new Vector4();
     this._drawDistance = 0;
     this._farDensity = 1;
+    this.TAAStrength = 0.7;
     this.useFeature(ClipmapBladeGrassMaterial.FEATURE_OCCLUSION_DEBUG, false);
     this.useFeature(ClipmapBladeGrassMaterial.FEATURE_COLOR_MAP, false);
   }

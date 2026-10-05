@@ -8,5 +8,6 @@
  * @internal
  */
 export function defaultDracoDecoderPath() {
-  return new URL('./draco/', import.meta.url).href;
+  // Directories can not be emitted by bundlers: keep Vite from warning at build time
+  return new URL(/* @vite-ignore */ './draco/', import.meta.url).href;
 }

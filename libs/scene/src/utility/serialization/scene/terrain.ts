@@ -1,6 +1,7 @@
 import { GraphNode, type SceneNode } from '../../../scene';
 import { defineProps, type SerializableClass } from '../types';
 import { ClipmapTerrain } from '../../../scene/terrain-cm/terrain-cm';
+import { DEFAULT_BLADE_HEIGHT, DEFAULT_BLADE_WIDTH } from '../../../scene/terrain-cm/grass';
 import type { TerrainDebugMode } from '../../../material';
 import type { Texture2D } from '@zephyr3d/device';
 import type { Nullable } from '@zephyr3d/base';
@@ -367,11 +368,12 @@ export function getTerrainClass(manager: ResourceManager): SerializableClass {
                   texture = null;
                 }
               }
+              const isBlade = info.kind === 'blade';
               const layer = this.grassRenderer.addLayer(
-                info.bladeWidth ?? 1,
-                info.bladeHeight ?? 1,
+                info.bladeWidth ?? (isBlade ? DEFAULT_BLADE_WIDTH : 1),
+                info.bladeHeight ?? (isBlade ? DEFAULT_BLADE_HEIGHT : 1),
                 texture,
-                info.kind === 'blade' ? 'blade' : 'card'
+                isBlade ? 'blade' : 'card'
               );
               const blade = info.blade;
               const card = info.card;

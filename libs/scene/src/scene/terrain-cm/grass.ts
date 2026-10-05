@@ -30,8 +30,18 @@ const DEFAULT_FAR_DENSITY = 0.25;
 const GRASS_SHADOW_CASCADES = 2;
 /** Default shape and clumping of procedural blades, see GrassBladeShape */
 const DEFAULT_BLADE_SHAPE = [
-  0.5, 0.3, 0.04, 0.2, 0.25, 0.2, 0.15, 0.1, 1.5, 0.3, 0.15, 0.3, 0.2, 0.5, 0.15, 30
+  1.5, 0.3, 0.08, 0.2, 0.25, 0.2, 0.15, 0.1, 1.9, 0.48, 0.2, 0.3, 0.2, 0.5, 0.15, 80
 ];
+/**
+ * Default width of procedural blades
+ * @internal
+ */
+export const DEFAULT_BLADE_WIDTH = 0.08;
+/**
+ * Default height of procedural blades
+ * @internal
+ */
+export const DEFAULT_BLADE_HEIGHT = 1.5;
 
 function distanceSqToAABB(x: number, y: number, z: number, aabb: AABB) {
   const dx = Math.max(aabb.minPoint.x - x, 0, x - aabb.maxPoint.x);

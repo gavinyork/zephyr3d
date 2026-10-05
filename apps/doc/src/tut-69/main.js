@@ -1,4 +1,4 @@
-import { Vector3, Vector4 } from '@zephyr3d/base';
+import { Vector3 } from '@zephyr3d/base';
 import {
   Scene,
   Application,
@@ -65,34 +65,6 @@ function heightAt(x, z) {
   return Math.min(1, Math.max(0, h * h * (3 - 2 * h)));
 }
 
-// Procedural grass blade texture: a few tapered blades on transparent background
-function createGrassBladeTexture(device) {
-  const size = 64;
-  const data = new Uint8Array(size * size * 4);
-  const blades = [10, 24, 38, 52];
-  for (let y = 0; y < size; y++) {
-    // Row 0 is the top of the blade
-    const tipFrac = y / (size - 1); // 0 at tip, 1 at root
-    for (const cx of blades) {
-      const halfWidth = 1 + tipFrac * 3.5;
-      const sway = Math.sin(cx * 12.9898) * 6 * (1 - tipFrac);
-      for (let x = 0; x < size; x++) {
-        if (Math.abs(x - cx - sway) <= halfWidth) {
-          const i = (y * size + x) * 4;
-          const shade = 0.45 + 0.55 * (1 - tipFrac);
-          data[i + 0] = 60 * shade;
-          data[i + 1] = 160 * shade;
-          data[i + 2] = 40 * shade;
-          data[i + 3] = 255;
-        }
-      }
-    }
-  }
-  const texture = device.createTexture2D('rgba8unorm', size, size, { mipmapping: false });
-  texture.update(data, 0, 0, size, size);
-  return texture;
-}
-
 // Procedural ground detail texture: green with brownish noise
 function createGroundTexture(device) {
   const size = 64;
@@ -131,14 +103,14 @@ const myApp = new Application({
   canvas: document.querySelector('#my-canvas')
 });
 
-myApp.ready().then(function () {
+myApp.ready().then(async function () {
   const webgpu = myApp.device.type === 'webgpu';
   const scene = new Scene();
   scene.env.sky.skyType = 'scatter';
   scene.env.light.strength = 0.5;
 
   const sun = new DirectionalLight(scene);
-  sun.rotation.fromEulerAngle(-Math.PI / 4, Math.PI / 3, 0);
+  sun.rotation.fromEulerAngle(-Math.PI / 1.1, Math.PI / 3, 0);
   sun.castShadow = true;
 
   // Create a clipmap terrain covering TERRAIN_SIZE x TERRAIN_SIZE world units
@@ -161,13 +133,17 @@ myApp.ready().then(function () {
   terrain.updateBoundingBox();
 
   // Ground texture: the default splat map gives the first detail map full weight
+  /** @type {import('@zephyr3d/device').Texture2D} */
+  const groundTexture = await getEngine().resourceManager.fetchTexture(
+    'https://cdn.zephyr3d.org/misc/detail1.jpg'
+  );
   terrain.numDetailMaps = 1;
-  terrain.material.setDetailMap(0, createGroundTexture(myApp.device));
+  terrain.material.setDetailMap(0, groundTexture);
   terrain.material.setDetailMapUVScale(0, 60);
 
   // Author the grass distribution once as a density map, one byte per texel:
-  // grass grows on gentle slopes below a height limit. Blade instances are
-  // derived from the density deterministically at runtime.
+  // grass grows on gentle slopes and thins out on steep ones. Blade instances
+  // are derived from the density deterministically at runtime.
   const dw = TERRAIN_SIZE;
   const dh = TERRAIN_SIZE;
   const density = new Uint8Array(dw * dh);
@@ -175,55 +151,29 @@ myApp.ready().then(function () {
     for (let x = 0; x < dw; x++) {
       const wx = ((x + 0.5) / dw) * TERRAIN_SIZE;
       const wz = ((z + 0.5) / dh) * TERRAIN_SIZE;
-      const h = heightAt(wx, wz);
       // Slope from finite differences of the height function
       const slope =
         Math.abs(heightAt(wx + 1, wz) - heightAt(wx - 1, wz)) +
         Math.abs(heightAt(wx, wz + 1) - heightAt(wx, wz - 1));
-      const heightMask = Math.min(1, Math.max(0, (0.65 - h) * 6));
-      const slopeMask = Math.min(1, Math.max(0, (0.035 - slope) * 50));
-      // Independent patch noise breaks the meadows into organic clusters
-      const patch = fbm(wx * 0.06 + 91.7, wz * 0.06 + 33.1, 3);
-      const patchMask = Math.min(1, Math.max(0, (patch - 0.42) * 6));
-      density[z * dw + x] = Math.round(255 * heightMask * slopeMask * patchMask);
+      const slopeMask = Math.min(1, Math.max(0, (0.07 - slope) * 30));
+      density[z * dw + x] = Math.round(255 * slopeMask);
     }
   }
   const empty = new Uint8Array(dw * dh);
 
   // Textured grass cards: every backend
-  const cardLayer = terrain.grassRenderer.getLayer(
-    terrain.grassRenderer.addLayer(0.7, 0.9, createGrassBladeTexture(myApp.device))
+  /** @type {import('@zephyr3d/device').Texture2D} */
+  const grassTexture = await getEngine().resourceManager.fetchTexture(
+    'https://cdn.zephyr3d.org/misc/grass2.dds'
   );
-  // Procedural geometry blades: WebGPU only, no texture needed
+  const cardLayer = terrain.grassRenderer.getLayer(terrain.grassRenderer.addLayer(0.7, 0.9, grassTexture));
+  cardLayer.drawDistance = 300;
   const bladeLayer = webgpu
-    ? terrain.grassRenderer.getLayer(terrain.grassRenderer.addLayer(0.05, 0.6, null, 'blade'))
+    ? terrain.grassRenderer.getLayer(terrain.grassRenderer.addLayer(0.04, 1.5, null, 'blade'))
     : null;
   if (bladeLayer) {
-    bladeLayer.setBladeSize(0.08, 1.5);
-    bladeLayer.heightRandomness = 0.3;
-    bladeLayer.widthRandomness = 0.2;
-    bladeLayer.tilt = 0.25;
-    bladeLayer.tiltRandomness = 0.2;
-    bladeLayer.bend = 0.15;
-    bladeLayer.bendRandomness = 0.1;
-    bladeLayer.taper = 0.7;
-    bladeLayer.tipDetail = 1.5;
-    bladeLayer.rootColor = new Vector4(0.06, 0.12, 0.02, 1);
-    bladeLayer.tipColor = new Vector4(0.35, 0.45, 0.12, 1);
-    bladeLayer.transmissionColor = new Vector4(0.45, 0.55, 0.12, 1);
-    bladeLayer.clumpSize = 1.9;
-    bladeLayer.clumpSameDirection = 0.3;
-    bladeLayer.clumpHeightVariation = 0.48;
-    bladeLayer.clumpPull = 0.2;
-    bladeLayer.clumpFaceAway = 0.2;
-    bladeLayer.clumpColorVariation = 0.6;
-    bladeLayer.windFacing = 0.5;
-    bladeLayer.windLean = 0.5;
-    bladeLayer.swayAmplitude = 0.15;
-    bladeLayer.drawDistance = 150;
-    bladeLayer.lodDistance = 80;
+    bladeLayer.drawDistance = 300;
   }
-
   // Shows one kind of grass: the other layer gets an empty density map.
   // Blades are denser, up to 8 x 8 per density texel instead of 2 x 2
   function showGrass(kind) {
@@ -244,7 +194,7 @@ myApp.ready().then(function () {
   // Close to the ground, where the blades show; zoom out to see the meadows
   scene.mainCamera.lookAt(new Vector3(center.x, centerHeight + 4, center.z + 12), center, Vector3.axisPY());
   scene.mainCamera.controller = new OrbitCameraController({ center });
-  scene.mainCamera.TAA = true;
+  scene.mainCamera.FXAA = true;
 
   getInput().use(scene.mainCamera.handleEvent, scene.mainCamera);
 
