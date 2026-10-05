@@ -257,14 +257,14 @@ export class WebGLDevice extends BaseDevice {
     this._isRendering = false;
     this._captureRenderBundle = null;
     this._msaaSampleCount = options?.msaa ? 4 : 1;
-    const context: WebGLContext = this.canvas.getContext(backend === backend1 ? 'webgl' : 'webgl2', {
+    const context: WebGLContext = this.canvas.getContext('webgl2', {
       antialias: !!options?.msaa,
       depth: true,
       stencil: true,
       premultipliedAlpha: false
     }) as WebGLContext;
     if (!context) {
-      throw new Error('Invalid argument or no webgl support');
+      throw new Error('WebGL2 is not available: zephyr3d no longer supports WebGL1');
     }
     this._isWebGL2 = isWebGL2(context);
     this._adapterInfo = {
@@ -1451,8 +1451,8 @@ export class WebGLDevice extends BaseDevice {
   }
 }
 
-let webGL1Supported: Nullable<boolean> = null;
 let webGL2Supported: Nullable<boolean> = null;
+let webGL1DeprecationWarned = false;
 const factory = makeObservable(WebGLDevice)<DeviceEventMap>();
 
 async function createWebGLDevice(
@@ -1473,26 +1473,6 @@ async function createWebGLDevice(
 }
 
 /** @internal */
-export const backend1: DeviceBackend = {
-  typeName() {
-    return 'webgl';
-  },
-  async supported() {
-    if (webGL1Supported === null) {
-      const cvs = document.createElement('canvas');
-      const gl = cvs.getContext('webgl');
-      webGL1Supported = !!gl;
-      cvs.width = 0;
-      cvs.height = 0;
-    }
-    return webGL1Supported;
-  },
-  async createDevice(cvs, options?) {
-    return createWebGLDevice(this, cvs, options);
-  }
-};
-
-/** @internal */
 export const backend2: DeviceBackend = {
   typeName() {
     return 'webgl2';
@@ -1509,5 +1489,30 @@ export const backend2: DeviceBackend = {
   },
   async createDevice(cvs, options?) {
     return createWebGLDevice(this, cvs, options);
+  }
+};
+
+/**
+ * Deprecated WebGL1 backend, kept so existing code keeps working.
+ *
+ * @remarks
+ * WebGL1 is no longer supported. This backend is an alias of the WebGL2 backend: it reports
+ * `webgl2` as its type and creates WebGL2 devices.
+ *
+ * @internal
+ */
+export const backend1: DeviceBackend = {
+  typeName() {
+    return backend2.typeName();
+  },
+  async supported() {
+    return backend2.supported();
+  },
+  async createDevice(cvs, options?) {
+    if (!webGL1DeprecationWarned) {
+      webGL1DeprecationWarned = true;
+      console.warn('backendWebGL1 is deprecated and now creates a WebGL2 device; use backendWebGL2 instead');
+    }
+    return backend2.createDevice(cvs, options);
   }
 };

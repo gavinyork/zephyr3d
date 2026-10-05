@@ -111,9 +111,11 @@ if (project && !open) {
   if (deviceType) {
     rhiList = [deviceType];
   } else {
-    rhiList = ['webgpu', 'webgl2', 'webgl'];
+    rhiList = ['webgpu', 'webgl2'];
   }
 }
+// WebGL1 is no longer supported: a 'webgl' request falls back to WebGL2
+rhiList = rhiList.map((val) => (val === 'webgl' ? 'webgl2' : val));
 let backend: Nullable<DeviceBackend> = null;
 if (rhiList.includes('webgpu')) {
   backend = (await import('@zephyr3d/backend-webgpu')).backendWebGPU;
@@ -123,12 +125,6 @@ if (rhiList.includes('webgpu')) {
 }
 if (!backend && rhiList.includes('webgl2')) {
   backend = (await import('@zephyr3d/backend-webgl')).backendWebGL2;
-  if (!(await backend.supported())) {
-    backend = null;
-  }
-}
-if (!backend && rhiList.includes('webgl')) {
-  backend = (await import('@zephyr3d/backend-webgl')).backendWebGL1;
   if (!(await backend.supported())) {
     backend = null;
   }

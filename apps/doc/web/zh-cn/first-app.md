@@ -58,17 +58,14 @@ canvas 的 CSS 尺寸就是渲染分辨率的依据，引擎会自动跟随它�
 上例固定用了 WebGL2。实际项目通常希望优先使用 WebGPU，不支持时回退：
 
 ```javascript
-import { backendWebGL1, backendWebGL2 } from '@zephyr3d/backend-webgl';
+import { backendWebGL2 } from '@zephyr3d/backend-webgl';
 import { backendWebGPU } from '@zephyr3d/backend-webgpu';
 
 async function selectBackend() {
   if (await backendWebGPU.supported()) {
     return backendWebGPU;
   }
-  if (await backendWebGL2.supported()) {
-    return backendWebGL2;
-  }
-  return backendWebGL1;
+  return backendWebGL2;
 }
 
 const myApp = new Application({
@@ -76,6 +73,8 @@ const myApp = new Application({
   canvas: document.querySelector('#my-canvas')
 });
 ```
+
+zephyr3d 已不再支持 WebGL1，WebGL 后端最低要求 WebGL2。
 
 后端差异需要留意：WebGPU 支持计算着色器，WebGL 完全不支持；部分特性（如 ABuffer OIT、
 DOM 阴影）也只在 WebGPU 上可用。引擎在能力不足时通常会静默回退到替代实现，

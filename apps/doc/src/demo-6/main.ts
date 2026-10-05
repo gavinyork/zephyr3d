@@ -1,4 +1,4 @@
-import { backendWebGL1, backendWebGL2 } from '@zephyr3d/backend-webgl';
+import { backendWebGL2 } from '@zephyr3d/backend-webgl';
 import { backendWebGPU } from '@zephyr3d/backend-webgpu';
 import { Quaternion, Vector3, Vector4 } from '@zephyr3d/base';
 import type { DeviceBackend } from '@zephyr3d/device';
@@ -31,7 +31,7 @@ async function getBackend(): Promise<DeviceBackend> {
       console.warn('No WebGPU support, fall back to WebGL2');
     }
   }
-  return (await backendWebGL2.supported()) ? backendWebGL2 : backendWebGL1;
+  return backendWebGL2;
 }
 
 const showUI = !!getQueryString('ui');

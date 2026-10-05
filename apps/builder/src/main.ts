@@ -1,6 +1,6 @@
 import type { AbstractDevice, GPUProgram } from '@zephyr3d/device';
 import { ProgramBuilder } from '@zephyr3d/device';
-import { backendWebGL1, backendWebGL2 } from '@zephyr3d/backend-webgl';
+import { backendWebGL2 } from '@zephyr3d/backend-webgl';
 import { backendWebGPU } from '@zephyr3d/backend-webgpu';
 
 const defaultVS = `this.$inputs.pos = pb.vec3().attrib('position');
@@ -73,14 +73,6 @@ pb.main(function(){
   const fsgenerated = document.querySelector<HTMLTextAreaElement>('#fragmentshader-generated');
   const bg = document.querySelector<HTMLTextAreaElement>('#bindgroups');
   const devices: Record<string, AbstractDevice> = {};
-  if (await backendWebGL1.supported()) {
-    const cvs = document.createElement('canvas');
-    cvs.style.width = '1px';
-    cvs.style.height = '1px';
-    //cvs.style.display = 'none';
-    document.body.append(cvs);
-    devices.webgl = await backendWebGL1.createDevice(cvs);
-  }
   if (await backendWebGL2.supported()) {
     const cvs = document.createElement('canvas');
     cvs.style.width = '1px';

@@ -97,7 +97,7 @@ export type DesktopLlmSettings = {
 
 export type DesktopGlobalSettings = {
   mcp: DesktopMcpSettings | null;
-  defaultRHI: 'webgpu' | 'webgl2' | 'webgl';
+  defaultRHI: 'webgpu' | 'webgl2';
   llm: DesktopLlmSettings | null;
 };
 

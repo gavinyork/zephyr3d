@@ -236,10 +236,6 @@ export class DlgProjectSettings extends DialogRenderer<ProjectSettings> {
 
     const items = [
       {
-        text: 'WebGL',
-        selected: !!this._settings.preferredRHI?.includes('WebGL')
-      },
-      {
         text: 'WebGL2',
         selected: !!this._settings.preferredRHI?.includes('WebGL2')
       },

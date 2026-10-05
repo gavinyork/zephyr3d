@@ -4,8 +4,8 @@ import { EditorSettingsService, type EditorGlobalSettings } from '../../core/ser
 import { customTextInput, CustomInputTextFlags } from '../../components/textinput';
 
 export class DlgEditorSettings extends DialogRenderer<EditorGlobalSettings> {
-  private static readonly RHI_VALUES: EditorGlobalSettings['defaultRHI'][] = ['webgpu', 'webgl2', 'webgl'];
-  private static readonly RHI_LABELS = ['WebGPU', 'WebGL2', 'WebGL'];
+  private static readonly RHI_VALUES: EditorGlobalSettings['defaultRHI'][] = ['webgpu', 'webgl2'];
+  private static readonly RHI_LABELS = ['WebGPU', 'WebGL2'];
   private static readonly LLM_PROVIDER_VALUES: NonNullable<EditorGlobalSettings['llm']>['provider'][] = [
     'openai',
     'anthropic',

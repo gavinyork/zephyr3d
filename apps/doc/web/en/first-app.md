@@ -60,17 +60,14 @@ instances from anywhere, so you do not have to thread references through your co
 The example hard-codes WebGL2. Real projects usually prefer WebGPU and fall back:
 
 ```javascript
-import { backendWebGL1, backendWebGL2 } from '@zephyr3d/backend-webgl';
+import { backendWebGL2 } from '@zephyr3d/backend-webgl';
 import { backendWebGPU } from '@zephyr3d/backend-webgpu';
 
 async function selectBackend() {
   if (await backendWebGPU.supported()) {
     return backendWebGPU;
   }
-  if (await backendWebGL2.supported()) {
-    return backendWebGL2;
-  }
-  return backendWebGL1;
+  return backendWebGL2;
 }
 
 const myApp = new Application({
@@ -78,6 +75,8 @@ const myApp = new Application({
   canvas: document.querySelector('#my-canvas')
 });
 ```
+
+zephyr3d no longer supports WebGL1; the WebGL backend requires WebGL2.
 
 Backend differences matter: WebGPU supports compute shaders and WebGL does not at all, and some
 features (ABuffer OIT, DOM shadows) are WebGPU-only. The engine usually falls back silently to an

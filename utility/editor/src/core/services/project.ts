@@ -46,7 +46,7 @@ export type ProjectSettings = {
 };
 
 const defaultProjectSettings: Immutable<ProjectSettings> = {
-  preferredRHI: ['WebGL', 'WebGL2', 'WebGPU'],
+  preferredRHI: ['WebGL2', 'WebGPU'],
   enableMSAA: false,
   renderScale: 0,
   morphTargetLimit: DEFAULT_MORPH_TARGET_LIMIT,
@@ -67,6 +67,18 @@ function normalizeRenderScale(scale: number): number {
   return 1;
 }
 
+// WebGL1 is no longer supported, so a 'WebGL' target from an older project now means WebGL2.
+function normalizePreferredRHI(rhiList: readonly string[]): string[] {
+  const result: string[] = [];
+  for (const rhi of rhiList) {
+    const name = rhi.toLowerCase() === 'webgl' ? 'WebGL2' : rhi;
+    if (!result.includes(name)) {
+      result.push(name);
+    }
+  }
+  return result;
+}
+
 function normalizeProjectSettings(settings: ProjectSettings): ProjectSettings {
   const preferredRHI = settings?.preferredRHI ?? defaultProjectSettings.preferredRHI;
   const morphTargetLimit = normalizeMorphTargetLimit(settings?.morphTargetLimit);
@@ -78,7 +90,7 @@ function normalizeProjectSettings(settings: ProjectSettings): ProjectSettings {
   return {
     ...defaultProjectSettings,
     ...settings,
-    preferredRHI: preferredRHI ? [...preferredRHI] : undefined,
+    preferredRHI: preferredRHI ? normalizePreferredRHI(preferredRHI) : undefined,
     enableMSAA: !!settings?.enableMSAA,
     renderScale: normalizeRenderScale(settings?.renderScale),
     morphTargetLimit,
