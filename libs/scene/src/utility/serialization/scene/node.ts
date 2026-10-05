@@ -2,7 +2,7 @@ import { SceneNode } from '../../../scene/scene_node';
 import type { SceneNodeVisible, SerializedMorphTargetGroup } from '../../../scene/scene_node';
 import { Scene } from '../../../scene/scene';
 import { defineProps, type SerializableClass } from '../types';
-import type { DiffPatch, DiffValue } from '@zephyr3d/base';
+import type { DiffPatch, DiffValue, GenericConstructor } from '@zephyr3d/base';
 import {
   applyPatch,
   ASSERT,
@@ -27,6 +27,7 @@ import {
 } from '../../../animation';
 import { JSONArray, JSONData } from '../json';
 import { ScriptAttachment, normalizeScriptAttachmentConfig } from '../../../scene/script_attachment';
+import { getSceneNodeComponentTypes, type SceneNodeComponent } from '../../../scene/component';
 import { parseZABCBlob, attachZABCAnimationsToSceneNode } from '../../../asset/loaders/zabc/zabc_loader';
 import { restoreGeometryCacheMeshBinding } from '../../../animation/geometry_cache_utils';
 import {
@@ -43,6 +44,15 @@ const geometryCacheBindings = new WeakMap<
     animationNames: string[];
   }
 >();
+
+/** Components serialized by the generic `Components` property: all but GPU cloth. */
+function isGenericComponent(component: SceneNodeComponent) {
+  return !component.isGPUClothComponent?.();
+}
+
+function genericComponents(node: SceneNode) {
+  return node.components.filter(isGenericComponent);
+}
 
 function normalizeSerializedSceneNodeData(data: DiffValue): Record<string, unknown> {
   if (!data || typeof data !== 'object' || Array.isArray(data)) {
@@ -960,6 +970,46 @@ export function getSceneNodeClass(manager: ResourceManager): SerializableClass {
             const component = this.gpuClothComponents[index];
             if (component) {
               this.removeGPUClothComponent(component);
+            }
+          }
+        },
+        {
+          // Every component except GPU cloth, which keeps the property above so
+          // that existing scenes load unchanged. The types come from the live
+          // registry, so packages registered after this list was built (physics)
+          // still show up.
+          name: 'Components',
+          description: 'Behaviours attached to this object, such as physics bodies and colliders',
+          type: 'object_array',
+          phase: 4,
+          readonly: true,
+          options: {
+            objectTypes: getSceneNodeComponentTypes() as GenericConstructor[]
+          },
+          isPersistent(this: SceneNode) {
+            return !this._prefabId || guessMimeType(this._prefabId) === mimeTypeOf('.zprefab');
+          },
+          getDefaultValue(this: SceneNode) {
+            return genericComponents(this);
+          },
+          get(this: SceneNode, value) {
+            value.object = genericComponents(this);
+          },
+          set(this: SceneNode, value) {
+            this._setComponents((value.object ?? []) as SceneNodeComponent[], isGenericComponent);
+          },
+          add(this: SceneNode, value, index) {
+            const component = value.object?.[0] as SceneNodeComponent | undefined;
+            if (component) {
+              const components = genericComponents(this);
+              components.splice(index ?? components.length, 0, component);
+              this._setComponents(components, isGenericComponent);
+            }
+          },
+          delete(this: SceneNode, index) {
+            const component = genericComponents(this)[index];
+            if (component) {
+              this.removeComponent(component);
             }
           }
         },
