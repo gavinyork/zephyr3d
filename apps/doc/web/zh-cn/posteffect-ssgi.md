@@ -42,9 +42,7 @@ camera.SSGI = true;
 
 <div class="showcase" case="tut-68"></div>
 
-**后端差异：**
-- **WebGPU 和 WebGL2**：使用运动矢量、Hi-Z 加速、历史场景颜色和完整的时域过滤，质量更高
-- **WebGL1**：没有运动矢量也没有 Hi-Z，退化为线性光线步进 + 纯空间过滤、单次弹射，历史仅按同像素验证 —— 噪点更明显，间接光更弱
+**后端：** WebGPU 和 WebGL2 都使用运动矢量、Hi-Z 加速、历史场景颜色和完整的时域过滤。
 
 ---
 
@@ -83,7 +81,7 @@ camera.ssgiDenoisePasses = 2;
 | `ssgiSkyOcclusion` | `1` | 遮挡几何体阻挡环境光的程度。`1` 为完整的物理遮蔽；降低该值会减少变暗效果 |
 | `ssgiMaxDistance` | `32` | 视空间最大追踪距离。更大的值可以捕捉更远的光线反弹，但性能开销更高 |
 | `ssgiThickness` | `0.5` | 光线命中的深度相交厚度 |
-| `ssgiStride` | `1` | 线性光线步进的像素步长（仅 WebGL1） |
+| `ssgiStride` | `1` | 线性光线步进的像素步长，仅在没有 Hi-Z 金字塔时使用 |
 | `ssgiMaxRayIntensity` | `10` | 限制过亮采样以减少萤火虫瑕疵 |
 | `ssgiTemporal` | `true` | 是否启用时域累积以减少噪声 |
 | `ssgiTemporalWeight` | `0.94` | 历史稳定后时域过滤的最大历史帧权重 |

@@ -18,17 +18,27 @@ describe('NullDevice basics', () => {
     expect(gl2.getDeviceCaps().miscCaps.supportDrawIndirect).toBe(false);
     expect(gl2.getDeviceCaps().shaderCaps.supportShaderF16).toBe(false);
 
-    const gl1 = await createNullDevice({ type: 'webgl' });
-    expect(gl1.type).toBe('webgl');
-    expect(gl1.getDeviceCaps().miscCaps.support32BitIndex).toBe(false);
-    expect(gl1.getDeviceCaps().framebufferCaps.maxDrawBuffers).toBe(1);
-    expect(gl1.getDeviceCaps().textureCaps.support3DTexture).toBe(false);
-
     const webgpu = await createNullDevice({ type: 'webgpu' });
     expect(webgpu.type).toBe('webgpu');
     expect(webgpu.getDeviceCaps().miscCaps.supportDrawIndirect).toBe(true);
     expect(webgpu.getDeviceCaps().shaderCaps.supportShaderF16).toBe(true);
     expect(webgpu.clipSpaceZeroToOne).toBe(true);
+  });
+
+  test('the deprecated webgl type emulates WebGL2', async () => {
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    const legacy = await createNullDevice({ type: 'webgl' });
+    const gl2 = await createNullDevice({ type: 'webgl2' });
+    expect(legacy.type).toBe('webgl2');
+    expect(legacy.getDeviceCaps().miscCaps.support32BitIndex).toBe(true);
+    expect(legacy.getDeviceCaps().framebufferCaps.maxDrawBuffers).toBe(
+      gl2.getDeviceCaps().framebufferCaps.maxDrawBuffers
+    );
+    expect(legacy.getDeviceCaps().textureCaps.support3DTexture).toBe(true);
+    await createNullDevice({ type: 'webgl' });
+    // Warned once, not per device
+    expect(warn.mock.calls.filter((c) => String(c[0]).includes("'webgl'")).length).toBeLessThanOrEqual(1);
+    warn.mockRestore();
   });
 
   test('capability overrides win over the type defaults', async () => {
@@ -289,10 +299,10 @@ describe('NullDevice textures', () => {
     expect(Array.from(layer)).toEqual([5, 6, 7, 8]);
   });
 
-  test('3D textures are rejected when the device emulates webgl1', async () => {
-    const webgl1 = await createNullDevice({ type: 'webgl' });
+  test('3D textures are rejected when the device lacks 3D texture support', async () => {
+    const no3D = await createNullDevice({ caps: { textureCaps: { support3DTexture: false } } });
     const spy = jest.spyOn(console, 'error').mockImplementation(() => {});
-    expect(webgl1.createTexture3D('rgba8unorm', 4, 4, 4)).toBeNull();
+    expect(no3D.createTexture3D('rgba8unorm', 4, 4, 4)).toBeNull();
     spy.mockRestore();
   });
 
@@ -372,12 +382,13 @@ describe('NullDevice framebuffers', () => {
     expect(fb.getWidth()).toBe(4);
   });
 
-  test('multisampling is unavailable when emulating webgl1', async () => {
-    const webgl1 = await createNullDevice({ type: 'webgl' });
-    const color = webgl1.createTexture2D('rgba8unorm', 16, 16, { mipmapping: false })!;
-    // The sample count request is clamped instead of throwing, matching the webgl backend
-    const fb = webgl1.createFrameBuffer([color], null, { sampleCount: 4 });
-    expect(fb.getSampleCount()).toBe(1);
+  test('multisampling is available on the deprecated webgl type, which emulates WebGL2', async () => {
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    const legacy = await createNullDevice({ type: 'webgl' });
+    warn.mockRestore();
+    const color = legacy.createTexture2D('rgba8unorm', 16, 16, { mipmapping: false })!;
+    const fb = legacy.createFrameBuffer([color], null, { sampleCount: 4 });
+    expect(fb.getSampleCount()).toBe(4);
   });
 
   test('readPixels() reads the bound color attachment', async () => {

@@ -197,7 +197,7 @@ water.material.foamColor = new Vector3(0.92, 0.95, 0.97);
 
 近岸泡沫是水面靠近固体时聚集的白沫：浅滩的水线，以及桥墩、船体、礁石与水面相交处的一圈。它与波峰泡沫彼此独立，可以单独开关。
 
-**默认关闭**，且需要 WebGL2 或 WebGPU，在 WebGL1 上参数不生效。
+**默认关闭**。
 
 ```ts
 water.shoreFoamAmount = 1;

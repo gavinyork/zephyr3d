@@ -1,5 +1,4 @@
 import { WebGLGPUObject } from './gpuobject_webgl';
-import { isWebGL2 } from './utils';
 import { WebGLEnum } from './webgl_enum';
 import type { PBStructTypeInfo, GPUProgram, BindGroupLayout, ShaderKind } from '@zephyr3d/device';
 import { semanticList } from '@zephyr3d/device';
@@ -403,36 +402,34 @@ export class WebGLGPUProgram extends WebGLGPUObject<WebGLProgram> implements GPU
         }
       }
     }
-    if (isWebGL2(gl)) {
-      this._blockInfo = {};
-      const numBlocks = gl.getProgramParameter(this._object!, WebGLEnum.ACTIVE_UNIFORM_BLOCKS) as number;
-      for (let i = 0; i < numBlocks; i++) {
-        const name = gl.getActiveUniformBlockName(this._object!, i)!;
-        const index = gl.getUniformBlockIndex(this._object!, name);
-        const usedInVS = !!gl.getActiveUniformBlockParameter(
-          this._object!,
-          i,
-          WebGLEnum.UNIFORM_BLOCK_REFERENCED_BY_VERTEX_SHADER
-        );
-        const usedInFS = !!gl.getActiveUniformBlockParameter(
-          this._object!,
-          i,
-          WebGLEnum.UNIFORM_BLOCK_REFERENCED_BY_FRAGMENT_SHADER
-        );
-        const used = usedInVS || usedInFS;
-        const size = gl.getActiveUniformBlockParameter(
-          this._object!,
-          i,
-          WebGLEnum.UNIFORM_BLOCK_DATA_SIZE
-        ) as number;
-        const uniformIndices = gl.getActiveUniformBlockParameter(
-          this._object!,
-          i,
-          WebGLEnum.UNIFORM_BLOCK_ACTIVE_UNIFORM_INDICES
-        ) as Uint32Array<ArrayBuffer>;
-        this._blockInfo[name] = { index, used, size, uniformIndices };
-        gl.uniformBlockBinding(this._object!, index, index);
-      }
+    this._blockInfo = {};
+    const numBlocks = gl.getProgramParameter(this._object!, WebGLEnum.ACTIVE_UNIFORM_BLOCKS) as number;
+    for (let i = 0; i < numBlocks; i++) {
+      const name = gl.getActiveUniformBlockName(this._object!, i)!;
+      const index = gl.getUniformBlockIndex(this._object!, name);
+      const usedInVS = !!gl.getActiveUniformBlockParameter(
+        this._object!,
+        i,
+        WebGLEnum.UNIFORM_BLOCK_REFERENCED_BY_VERTEX_SHADER
+      );
+      const usedInFS = !!gl.getActiveUniformBlockParameter(
+        this._object!,
+        i,
+        WebGLEnum.UNIFORM_BLOCK_REFERENCED_BY_FRAGMENT_SHADER
+      );
+      const used = usedInVS || usedInFS;
+      const size = gl.getActiveUniformBlockParameter(
+        this._object!,
+        i,
+        WebGLEnum.UNIFORM_BLOCK_DATA_SIZE
+      ) as number;
+      const uniformIndices = gl.getActiveUniformBlockParameter(
+        this._object!,
+        i,
+        WebGLEnum.UNIFORM_BLOCK_ACTIVE_UNIFORM_INDICES
+      ) as Uint32Array<ArrayBuffer>;
+      this._blockInfo[name] = { index, used, size, uniformIndices };
+      gl.uniformBlockBinding(this._object!, index, index);
     }
     return uniformSetters;
   }
@@ -545,52 +542,6 @@ export class WebGLGPUProgram extends WebGLGPUObject<WebGLProgram> implements GPU
     return (texture: any) => {
       this._device.bindTexture(target, unit, texture[0], texture[1]);
     };
-    /*
-    const gl = this._device.context;
-    return isWebGL2(gl)
-      ? (texture: [WebGLBaseTexture, WebGLTextureSampler]) => {
-          const tex = texture?.[0].object ?? null;
-          const sampler = texture?.[1].object ?? null;
-          //gl.uniform1i(location, unit);
-          gl.activeTexture(this._device.context.TEXTURE0 + unit);
-          gl.bindTexture(target, tex);
-          gl.bindSampler(unit, sampler);
-        }
-      : (texture: [WebGLBaseTexture, WebGLTextureSampler]) => {
-          const tex = texture?.[0] ?? null;
-          const sampler = texture?.[1] ?? null;
-          //gl.uniform1i(location, unit);
-          gl.activeTexture(this._device.context.TEXTURE0 + unit);
-          gl.bindTexture(target, tex?.object ?? null);
-          if (tex && sampler && this._device.getCurrentSamplerForTexture(tex) !== sampler) {
-            const fallback = tex.isWebGL1Fallback;
-            this._device.setCurrentSamplerForTexture(tex, sampler);
-            gl.texParameteri(
-              target,
-              WebGLEnum.TEXTURE_WRAP_S,
-              textureWrappingMap[false && fallback ? 'clamp' : sampler.addressModeU]
-            );
-            gl.texParameteri(
-              target,
-              WebGLEnum.TEXTURE_WRAP_T,
-              textureWrappingMap[false && fallback ? 'clamp' : sampler.addressModeV]
-            );
-            gl.texParameteri(
-              target,
-              WebGLEnum.TEXTURE_MAG_FILTER,
-              textureMagFilterToWebGL(sampler.magFilter)
-            );
-            gl.texParameteri(
-              target,
-              WebGLEnum.TEXTURE_MIN_FILTER,
-              textureMinFilterToWebGL(sampler.minFilter, tex.isWebGL1Fallback ? 'none' : sampler.mipFilter)
-            );
-            if (this._device.getDeviceCaps().textureCaps.supportAnisotropicFiltering) {
-              gl.texParameterf(target, WebGLEnum.TEXTURE_MAX_ANISOTROPY, sampler.maxAnisotropy);
-            }
-          }
-        };
-    */
   }
   private getTypedArrayInfo(type: number) {
     let ctor: Nullable<TypedArrayConstructor<UniformBlockArray>> = null;

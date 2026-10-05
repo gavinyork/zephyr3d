@@ -161,7 +161,7 @@ void main() {
 
 我们支持以下Shader数据类型
 
-|类型|构造函数|WebGL/WebGL2|WebGPU|
+|类型|构造函数|WebGL2|WebGPU|
 |--|--|--|--|
 |float|```this.x = pb.float()```|```float x;```|```var x: f32;```|
 |vec2|```this.x = pb.vec2()```|```vec2 x;```|```var x: vec2<f32>;```|
@@ -214,7 +214,7 @@ void main() {
 vertex(pb){
   // 定义长度为2的vec4数组
   this.x = pb.vec4[2]();
-  // 定义并初始化（WebGL1设备不支持)
+  // 定义并初始化
   this.y = pb.vec4[2](pb.vec4(1), pb.vec4(2));
 }
 
@@ -289,22 +289,22 @@ vertex(pb){
 
 下表包含了我们目前支持的所有内置变量
 
-|内置变量|WebGL|WebGL2|WGSL|Stage|
-|--|--|--|--|--|
-|```$builtins.position```|gl_Position|gl_Position|$builtin(position)|vertex|
-|```$builtins.pointSize```|gl_PointSize|gl_PointSize|N/A|vertex|
-|```$builtins.fragCoord```|gl_FragCoord|gl_FragCoord|$builtin(position)|fragment|
-|```$builtins.frontFacing```|gl_FrontFacing|gl_FrontFacing|@builtin(front_facing)|fragment|
-|```$builtins.fragDepth```|gl_FragDepthEXT|gl_FragDepth|@builtin(frag_depth)|fragment|
-|```$builtins.vertexIndex```|N/A|gl_VertexID|@builtin(vertex_index)|vertex|
-|```$builtins.instanceIndex```|N/A|gl_InstanceID|@builtin(instance_index)|vertex|
-|```$builtins.localInvocationId```|N/A|N/A|@builtin(local_invocation_id)|compute|
-|```$builtins.globalInvocationId```|N/A|N/A|@builtin(global_invocation_id)|compute|
-|```$builtins.workGroupId```|N/A|N/A|@builtin(workgroup_id)|compute|
-|```$builtins.numWorkGroups```|N/A|N/A|@builtin(num_workgroups)|compute|
-|```$builtins.sampleMaskIn```|N/A|N/A|@builtin(sample_mask_in)|fragment|
-|```$builtins.sampleMaskOut```|N/A|N/A|@builtin(sample_mask_out)|fragment|
-|```$builtins.sampleIndex```|N/A|N/A|@builtin(sample_index)|fragment|
+|内置变量|WebGL2|WGSL|Stage|
+|--|--|--|--|
+|```$builtins.position```|gl_Position|$builtin(position)|vertex|
+|```$builtins.pointSize```|gl_PointSize|N/A|vertex|
+|```$builtins.fragCoord```|gl_FragCoord|$builtin(position)|fragment|
+|```$builtins.frontFacing```|gl_FrontFacing|@builtin(front_facing)|fragment|
+|```$builtins.fragDepth```|gl_FragDepth|@builtin(frag_depth)|fragment|
+|```$builtins.vertexIndex```|gl_VertexID|@builtin(vertex_index)|vertex|
+|```$builtins.instanceIndex```|gl_InstanceID|@builtin(instance_index)|vertex|
+|```$builtins.localInvocationId```|N/A|@builtin(local_invocation_id)|compute|
+|```$builtins.globalInvocationId```|N/A|@builtin(global_invocation_id)|compute|
+|```$builtins.workGroupId```|N/A|@builtin(workgroup_id)|compute|
+|```$builtins.numWorkGroups```|N/A|@builtin(num_workgroups)|compute|
+|```$builtins.sampleMaskIn```|N/A|@builtin(sample_mask_in)|fragment|
+|```$builtins.sampleMaskOut```|N/A|@builtin(sample_mask_out)|fragment|
+|```$builtins.sampleIndex```|N/A|@builtin(sample_index)|fragment|
 
 ## 输入输出作用域
 
@@ -419,7 +419,7 @@ vertex(pb){
 
 ## 循环
 
-我们支持简化的for循环，do-while循环(不支持WebGL1设备)，while循环(不支持WebGL1设备)
+我们支持简化的for循环，do-while循环，while循环
 
 - for循环
 

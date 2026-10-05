@@ -2,7 +2,6 @@ import type { GPUDataBuffer } from '@zephyr3d/device';
 import { GPUResourceUsageFlags } from '@zephyr3d/device';
 import { WebGLGPUObject } from './gpuobject_webgl';
 import { WebGLEnum } from './webgl_enum';
-import { isWebGL2 } from './utils';
 import type { Nullable, TypedArray } from '@zephyr3d/base';
 import type { WebGLDevice } from './device_webgl';
 
@@ -17,15 +16,7 @@ export class WebGLGPUBuffer extends WebGLGPUObject<WebGLBuffer> implements GPUDa
     if (usage & GPUResourceUsageFlags.BF_VERTEX && usage & GPUResourceUsageFlags.BF_INDEX) {
       throw new Error('buffer usage must not have Vertex and Index simultaneously');
     }
-    if (
-      !device.isWebGL2 &&
-      !(usage & GPUResourceUsageFlags.BF_VERTEX) &&
-      !(usage & GPUResourceUsageFlags.BF_INDEX) &&
-      !(usage & GPUResourceUsageFlags.BF_UNIFORM)
-    ) {
-      throw new Error('no Vertex or Index or Uniform usage set when creating buffer');
-    }
-    if (device.isWebGL2 && !(usage & ~GPUResourceUsageFlags.DYNAMIC)) {
+    if (!(usage & ~GPUResourceUsageFlags.DYNAMIC)) {
       throw new Error('buffer usage not set when creating buffer');
     }
     if (usage & GPUResourceUsageFlags.DYNAMIC && usage & GPUResourceUsageFlags.MANAGED) {
@@ -85,9 +76,6 @@ export class WebGLGPUBuffer extends WebGLGPUObject<WebGLBuffer> implements GPUDa
       if (this.disposed) {
         this.reload();
       }
-      if (!this._device.isWebGL2 && (srcPos !== 0 || srcLength !== data.length)) {
-        data = data.subarray(srcPos, srcPos + srcLength);
-      }
       this._device.vaoExt?.bindVertexArray(null);
       let target: number;
       if (this._usage & GPUResourceUsageFlags.BF_INDEX) {
@@ -107,17 +95,7 @@ export class WebGLGPUBuffer extends WebGLGPUObject<WebGLBuffer> implements GPUDa
         throw new Error(`Invalid buffer usage`);
       }
       this._device.context.bindBuffer(target, this._object);
-      if (this._device.isWebGL2) {
-        (this._device.context as WebGL2RenderingContext).bufferSubData(
-          target,
-          dstByteOffset,
-          data,
-          srcPos,
-          srcLength
-        );
-      } else {
-        this._device.context.bufferSubData(target, dstByteOffset, data);
-      }
+      this._device.context.bufferSubData(target, dstByteOffset, data, srcPos, srcLength);
     }
   }
   async getBufferSubData(
@@ -147,13 +125,11 @@ export class WebGLGPUBuffer extends WebGLGPUObject<WebGLBuffer> implements GPUDa
     if (this._systemMemoryBuffer) {
       dstBuffer.set(new Uint8Array(this._systemMemoryBuffer.buffer, offsetInBytes, sizeInBytes));
     } else {
-      const gl = this._device.context as WebGL2RenderingContext;
-      if (isWebGL2(gl)) {
-        const sync = gl.fenceSync(WebGLEnum.SYNC_GPU_COMMANDS_COMPLETE, 0);
-        if (sync) {
-          await this.clientWaitAsync(gl, sync, 0, 10);
-          gl.deleteSync(sync);
-        }
+      const gl = this._device.context;
+      const sync = gl.fenceSync(WebGLEnum.SYNC_GPU_COMMANDS_COMPLETE, 0);
+      if (sync) {
+        await this.clientWaitAsync(gl, sync, 0, 10);
+        gl.deleteSync(sync);
       }
       this._device.vaoExt?.bindVertexArray(null);
       let target: number;

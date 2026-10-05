@@ -162,7 +162,7 @@ void main() {
 
 We support the following Shader data types
 
-|type|constructor|WebGL/WebGL2|WebGPU|
+|type|constructor|WebGL2|WebGPU|
 |--|--|--|--|
 |float|```this.x = pb.float()```|```float x;```|```var x: f32;```|
 |vec2|```this.x = pb.vec2()```|```vec2 x;```|```var x: vec2<f32>;```|
@@ -215,7 +215,7 @@ For variables that are not texture types, we can also define array types.
 vertex(pb){
   // Define a vec4 array of length 2
   this.x = pb.vec4[2]();
-  // Define and initialize (not supported on WebGL1 device)
+  // Define and initialize
   this.y = pb.vec4[2](pb.vec4(1), pb.vec4(2));
 }
 
@@ -291,22 +291,22 @@ vertex(pb){
 
 The table below contains all the built-in variables we currently support.
 
-|Builtin variable|WebGL|WebGL2|WGSL|Stage|
-|--|--|--|--|--|
-|```$builtins.position```|gl_Position|gl_Position|$builtin(position)|vertex|
-|```$builtins.pointSize```|gl_PointSize|gl_PointSize|N/A|vertex|
-|```$builtins.fragCoord```|gl_FragCoord|gl_FragCoord|$builtin(position)|fragment|
-|```$builtins.frontFacing```|gl_FrontFacing|gl_FrontFacing|@builtin(front_facing)|fragment|
-|```$builtins.fragDepth```|gl_FragDepthEXT|gl_FragDepth|@builtin(frag_depth)|fragment|
-|```$builtins.vertexIndex```|N/A|gl_VertexID|@builtin(vertex_index)|vertex|
-|```$builtins.instanceIndex```|N/A|gl_InstanceID|@builtin(instance_index)|vertex|
-|```$builtins.localInvocationId```|N/A|N/A|@builtin(local_invocation_id)|compute|
-|```$builtins.globalInvocationId```|N/A|N/A|@builtin(global_invocation_id)|compute|
-|```$builtins.workGroupId```|N/A|N/A|@builtin(workgroup_id)|compute|
-|```$builtins.numWorkGroups```|N/A|N/A|@builtin(num_workgroups)|compute|
-|```$builtins.sampleMaskIn```|N/A|N/A|@builtin(sample_mask_in)|fragment|
-|```$builtins.sampleMaskOut```|N/A|N/A|@builtin(sample_mask_out)|fragment|
-|```$builtins.sampleIndex```|N/A|N/A|@builtin(sample_index)|fragment|
+|Builtin variable|WebGL2|WGSL|Stage|
+|--|--|--|--|
+|```$builtins.position```|gl_Position|$builtin(position)|vertex|
+|```$builtins.pointSize```|gl_PointSize|N/A|vertex|
+|```$builtins.fragCoord```|gl_FragCoord|$builtin(position)|fragment|
+|```$builtins.frontFacing```|gl_FrontFacing|@builtin(front_facing)|fragment|
+|```$builtins.fragDepth```|gl_FragDepth|@builtin(frag_depth)|fragment|
+|```$builtins.vertexIndex```|gl_VertexID|@builtin(vertex_index)|vertex|
+|```$builtins.instanceIndex```|gl_InstanceID|@builtin(instance_index)|vertex|
+|```$builtins.localInvocationId```|N/A|@builtin(local_invocation_id)|compute|
+|```$builtins.globalInvocationId```|N/A|@builtin(global_invocation_id)|compute|
+|```$builtins.workGroupId```|N/A|@builtin(workgroup_id)|compute|
+|```$builtins.numWorkGroups```|N/A|@builtin(num_workgroups)|compute|
+|```$builtins.sampleMaskIn```|N/A|@builtin(sample_mask_in)|fragment|
+|```$builtins.sampleMaskOut```|N/A|@builtin(sample_mask_out)|fragment|
+|```$builtins.sampleIndex```|N/A|@builtin(sample_index)|fragment|
 
 ## Input/Output scope
 
@@ -420,7 +420,7 @@ vertex(pb){
 
 ## Looping
 
-We support simplified for loops, do-while loops (not supported on WebGL1 devices), and while loops (not supported on WebGL1 devices).
+We support simplified for loops, do-while loops, and while loops.
 
 - FOR loop
 

@@ -42,9 +42,8 @@ export class WebGLStructuredBuffer extends WebGLGPUBuffer implements StructuredB
         `create structured buffer failed: invalid source size: ${source.byteLength}, should be ${layout.byteSize}`
       );
     }
-    const useSystemMemory = !device.isWebGL2 && (usage & GPUResourceUsageFlags.BF_UNIFORM) !== 0;
-    super(device, usage, source || layout.byteSize, useSystemMemory);
-    this._data = new StructuredBufferData(layout, useSystemMemory ? this.systemMemoryBuffer : this);
+    super(device, usage, source || layout.byteSize, false);
+    this._data = new StructuredBufferData(layout, this);
     this._structure = structure;
   }
   set(name: string, value: StructuredValue) {

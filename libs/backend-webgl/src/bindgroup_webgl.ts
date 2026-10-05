@@ -150,24 +150,19 @@ export class WebGLBindGroup extends WebGLGPUObject<unknown> implements BindGroup
     // no sampler uniform support for webgl
   }
   apply(program: WebGLGPUProgram, offsets?: Nullable<Iterable<number>>) {
-    const webgl2 = this._device.isWebGL2;
     const dynamicOffsets = offsets ?? this.getDynamicOffsets();
     for (let i = 0; i < this._layout.entries.length; i++) {
       const entry = this._layout.entries[i];
       const res = this._resources[entry.name];
       if (res instanceof WebGLGPUBuffer) {
-        if (webgl2) {
-          if (entry.buffer!.hasDynamicOffset) {
-            program.setBlock(
-              (entry.type as PBStructTypeInfo).structName!,
-              res,
-              (dynamicOffsets! as number[])[entry.buffer!.dynamicOffsetIndex]
-            );
-          } else {
-            program.setBlock((entry.type as PBStructTypeInfo).structName!, res, 0);
-          }
-        } else if (res instanceof WebGLStructuredBuffer) {
-          program.setUniform(entry.name, res.getUniformData().uniforms);
+        if (entry.buffer!.hasDynamicOffset) {
+          program.setBlock(
+            (entry.type as PBStructTypeInfo).structName!,
+            res,
+            (dynamicOffsets! as number[])[entry.buffer!.dynamicOffsetIndex]
+          );
+        } else {
+          program.setBlock((entry.type as PBStructTypeInfo).structName!, res, 0);
         }
       } else if (Array.isArray(res)) {
         if (res[0].isTextureVideo()) {

@@ -1228,7 +1228,7 @@ export class Camera extends SceneNode {
       this.invalidateSSGIHistory();
     }
   }
-  /** Pixel stride used by the WebGL linear ray marcher. */
+  /** Pixel stride of the linear ray marcher, used when no Hi-Z pyramid is available. */
   get ssgiStride() {
     return this._ssgiStride;
   }
