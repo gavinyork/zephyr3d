@@ -44,6 +44,13 @@ export class Scene
   extends makeObservable(Disposable)<{
     /** Dispatched once per frame before render-related work. */
     update: [Scene];
+    /**
+     * Dispatched once per frame after queued nodes have updated - animation, IK,
+     * joint dynamics and skinning included - and before nodes are placed in the
+     * octree. Node transforms set here are rendered this frame; a physics world
+     * steps here so that kinematic bodies follow this frame's animated pose.
+     */
+    afterupdate: [Scene];
     /** Dispatched immediately before rendering begins for a camera. */
     startrender: [Scene, Camera, Compositor];
     /** Dispatched immediately after rendering finishes for a camera. */
@@ -497,6 +504,7 @@ export class Scene
    * - Update environment light synchronization.
    * - Dispatch `update` event.
    * - Drain the one-shot node update queue and call `node.update(...)`.
+   * - Dispatch `afterupdate` event.
    * - Apply pending octree placement updates.
    *
    */
@@ -523,6 +531,7 @@ export class Scene
           drawable.updateState();
         }
       }
+      this.dispatchEvent('afterupdate', this);
       this.updateNodePlacement(this._octree, this._nodePlaceList);
     }
     // Palettes written by animation updates are uploaded once all nodes and bank tracks are updated
