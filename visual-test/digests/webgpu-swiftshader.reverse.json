@@ -434,7 +434,15 @@
     "physics-drop": {
       "accepted": {
         "win32-x64": [
-          "86fb1658dfbb7ab068332fcc48832bad"
+          "9d8b4ff0f1f9193f86ec1d73bb686d56"
+        ]
+      },
+      "size": 512
+    },
+    "physics-mesh-ground": {
+      "accepted": {
+        "win32-x64": [
+          "b452889922bd89d6a7aa7e70866d786e"
         ]
       },
       "size": 512

@@ -220,7 +220,8 @@ function getRigidBodyClass(): SerializableClass {
 }
 
 function getColliderClass(): SerializableClass {
-  const usesRadius = (c: Collider) => c.shape !== 'box';
+  const usesRadius = (c: Collider) => c.shape === 'sphere' || c.shape === 'capsule' || c.shape === 'cylinder';
+  const usesMesh = (c: Collider) => c.shape === 'mesh' || c.shape === 'convex';
   const usesHeight = (c: Collider) => c.shape === 'capsule' || c.shape === 'cylinder';
   return {
     ctor: Collider,
@@ -234,8 +235,8 @@ function getColliderClass(): SerializableClass {
           default: 'box',
           options: {
             enum: {
-              labels: ['Box', 'Sphere', 'Capsule', 'Cylinder'],
-              values: ['box', 'sphere', 'capsule', 'cylinder']
+              labels: ['Box', 'Sphere', 'Capsule', 'Cylinder', 'Mesh', 'Convex hull', 'Terrain'],
+              values: ['box', 'sphere', 'capsule', 'cylinder', 'mesh', 'convex', 'terrain']
             }
           },
           get(this: Collider, value) {
@@ -296,6 +297,40 @@ function getColliderClass(): SerializableClass {
           }
         },
         {
+          name: 'MeshLod',
+          description:
+            'Which level of detail of the mesh to collide with; higher levels are rougher but cheaper. 0 is the full mesh',
+          type: 'int',
+          default: 0,
+          options: { minValue: 0, maxValue: 16 },
+          get(this: Collider, value) {
+            value.num[0] = this.meshLod;
+          },
+          set(this: Collider, value) {
+            this.meshLod = value.num[0];
+          },
+          isHidden(this: Collider) {
+            return !usesMesh(this);
+          }
+        },
+        {
+          name: 'TerrainResolution',
+          description:
+            'Spacing of the ground samples in height map texels; larger values follow bumps less closely but use less memory',
+          type: 'int',
+          default: 1,
+          options: { minValue: 1, maxValue: 16 },
+          get(this: Collider, value) {
+            value.num[0] = this.terrainResolution;
+          },
+          set(this: Collider, value) {
+            this.terrainResolution = value.num[0];
+          },
+          isHidden(this: Collider) {
+            return this.shape !== 'terrain';
+          }
+        },
+        {
           name: 'Offset',
           description: "Moves the shape away from the object's origin, to line it up with the visible mesh",
           type: 'vec3',
@@ -307,6 +342,9 @@ function getColliderClass(): SerializableClass {
           },
           set(this: Collider, value) {
             this.offset = new Vector3(value.num[0], value.num[1], value.num[2]);
+          },
+          isHidden(this: Collider) {
+            return this.shape === 'terrain';
           }
         },
         {

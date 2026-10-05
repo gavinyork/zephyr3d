@@ -17,7 +17,17 @@ export type ShapeDesc =
   | { type: 'box'; halfExtents: Vector3 }
   | { type: 'sphere'; radius: number }
   | { type: 'capsule'; halfHeight: number; radius: number }
-  | { type: 'cylinder'; halfHeight: number; radius: number };
+  | { type: 'cylinder'; halfHeight: number; radius: number }
+  /** Triangles, vertices already scaled, xyz per vertex. */
+  | { type: 'trimesh'; vertices: Float32Array; indices: Uint32Array }
+  /** The convex hull of points, already scaled. */
+  | { type: 'convex'; points: Float32Array }
+  /**
+   * A height grid centred on the collider, `rows` samples along Z and `cols`
+   * along X; `heights[x * rows + z]`. `scale.x` and `scale.z` are the full
+   * extents, `scale.y` multiplies the heights.
+   */
+  | { type: 'heightfield'; rows: number; cols: number; heights: Float32Array; scale: Vector3 };
 
 /** Surface response and filtering of a collider. @internal */
 export interface ColliderMaterialDesc {
@@ -89,13 +99,14 @@ export interface BackendWorld {
   setGravity(gravity: Vector3): void;
   createBody(desc: BodyDesc): BackendBody;
   removeBody(body: BackendBody): void;
+  /** Null when the shape cannot be built, e.g. the convex hull of points in a plane. */
   createCollider(
     body: BackendBody,
     shape: ShapeDesc,
     position: Vector3,
     rotation: Quaternion,
     material: ColliderMaterialDesc
-  ): BackendCollider;
+  ): BackendCollider | null;
   removeCollider(collider: BackendCollider): void;
   /** Stable id of a collider while it exists, used in events and query results. */
   colliderKey(collider: BackendCollider): number;
@@ -137,6 +148,8 @@ export interface BackendBody {
   setGravityScale(scale: number): void;
   setCcd(enabled: boolean): void;
   setCanSleep(enabled: boolean): void;
+  /** A disabled body is left out of the simulation and of queries. */
+  setEnabled(enabled: boolean): void;
   setEnabledAxes(translation: [boolean, boolean, boolean], rotation: [boolean, boolean, boolean]): void;
   /** Teleports the body. */
   setPose(position: Vector3, rotation: Quaternion): void;

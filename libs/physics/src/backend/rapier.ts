@@ -37,6 +37,31 @@ function quat(q: Quaternion) {
   return { x: q.x, y: q.y, z: q.z, w: q.w };
 }
 
+/**
+ * Origins to cast a ray from so that it cannot slip between height field cells.
+ *
+ * @remarks
+ * Rapier misses a height field with a ray lying exactly in one of the planes
+ * between its cells, e.g. straight down from whole-number coordinates over a
+ * terrain with whole-number spacing (dimforge/rapier#165, still open in 0.21).
+ * A ray along such a plane is also cast moved off it on either side, by a
+ * distance far below anything visible but large enough to survive Rapier's
+ * single precision, and the nearest hit wins. Either side, because a ray along
+ * the outer edge of a field only hits from the inside. Distances along the ray
+ * are unaffected; hit points are worked out from the original origin.
+ */
+function rayOrigins(origin: Vector3, direction: Vector3) {
+  const o = { x: origin.x, y: origin.y, z: origin.z };
+  const alongX = Math.abs(direction.x) < 1e-6;
+  const alongZ = Math.abs(direction.z) < 1e-6;
+  if (!alongX && !alongZ) {
+    return [o];
+  }
+  const ex = alongX ? Math.max(1e-5, Math.abs(o.x) * 4e-7) : 0;
+  const ez = alongZ ? Math.max(1e-5, Math.abs(o.z) * 4e-7) : 0;
+  return [o, { x: o.x + ex, y: o.y, z: o.z + ez }, { x: o.x - ex, y: o.y, z: o.z - ez }];
+}
+
 class RapierBody implements BackendBody {
   constructor(
     private readonly R: RapierAPI,
@@ -67,6 +92,9 @@ class RapierBody implements BackendBody {
     if (!enabled) {
       this.body.wakeUp();
     }
+  }
+  setEnabled(enabled: boolean) {
+    this.body.setEnabled(enabled);
   }
   setEnabledAxes(translation: [boolean, boolean, boolean], rotation: [boolean, boolean, boolean]) {
     this.body.setEnabledTranslations(translation[0], translation[1], translation[2], true);
@@ -166,9 +194,9 @@ export class RapierWorld implements BackendWorld {
     position: Vector3,
     rotation: Quaternion,
     material: ColliderMaterialDesc
-  ): BackendCollider {
+  ): BackendCollider | null {
     const R = this.R;
-    let d: InstanceType<RapierAPI['ColliderDesc']>;
+    let d: InstanceType<RapierAPI['ColliderDesc']> | null;
     switch (shape.type) {
       case 'box':
         d = R.ColliderDesc.cuboid(shape.halfExtents.x, shape.halfExtents.y, shape.halfExtents.z);
@@ -182,6 +210,34 @@ export class RapierWorld implements BackendWorld {
       case 'cylinder':
         d = R.ColliderDesc.cylinder(shape.halfHeight, shape.radius);
         break;
+      case 'trimesh':
+        d = R.ColliderDesc.trimesh(
+          shape.vertices,
+          shape.indices,
+          R.TriMeshFlags.MERGE_DUPLICATE_VERTICES |
+            R.TriMeshFlags.DELETE_DEGENERATE_TRIANGLES |
+            R.TriMeshFlags.DELETE_DUPLICATE_TRIANGLES |
+            // Without it, a body sliding over a flat mesh catches on the edges
+            // between triangles and hops.
+            R.TriMeshFlags.FIX_INTERNAL_EDGES
+        );
+        break;
+      case 'convex':
+        d = R.ColliderDesc.convexHull(shape.points);
+        break;
+      case 'heightfield':
+        // Rapier counts cells, not samples.
+        d = R.ColliderDesc.heightfield(
+          shape.rows - 1,
+          shape.cols - 1,
+          shape.heights,
+          vec(shape.scale),
+          R.HeightFieldFlags.FIX_INTERNAL_EDGES
+        );
+        break;
+    }
+    if (!d) {
+      return null;
     }
     d.setTranslation(position.x, position.y, position.z)
       .setRotation(quat(rotation))
@@ -248,46 +304,57 @@ export class RapierWorld implements BackendWorld {
     return found ? { normal, points, impulse } : null;
   }
   castRay(origin: Vector3, direction: Vector3, maxDistance: number, filter: QueryPredicate) {
-    const hit = this._world.castRayAndGetNormal(
-      new this.R.Ray(vec(origin), vec(direction)),
-      maxDistance,
-      true,
-      undefined,
-      undefined,
-      undefined,
-      undefined,
-      (c) => filter(c.handle)
-    );
-    return hit
-      ? {
+    let best: BackendRayHit | null = null;
+    for (const o of rayOrigins(origin, direction)) {
+      const hit = this._world.castRayAndGetNormal(
+        new this.R.Ray(o, vec(direction)),
+        maxDistance,
+        true,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        (c) => filter(c.handle)
+      );
+      if (hit && (!best || hit.timeOfImpact < best.distance)) {
+        best = {
           key: hit.collider.handle,
           distance: hit.timeOfImpact,
           normal: new Vector3(hit.normal.x, hit.normal.y, hit.normal.z)
-        }
-      : null;
+        };
+      }
+    }
+    return best;
   }
   castRayAll(origin: Vector3, direction: Vector3, maxDistance: number, filter: QueryPredicate) {
-    const hits: BackendRayHit[] = [];
-    this._world.intersectionsWithRay(
-      new this.R.Ray(vec(origin), vec(direction)),
-      maxDistance,
-      true,
-      (hit) => {
-        hits.push({
-          key: hit.collider.handle,
-          distance: hit.timeOfImpact,
-          normal: new Vector3(hit.normal.x, hit.normal.y, hit.normal.z)
-        });
-        return true;
-      },
-      undefined,
-      undefined,
-      undefined,
-      undefined,
-      (c) => filter(c.handle)
-    );
+    // Nearest hit per collider, over every origin cast from.
+    const hits = new Map<number, BackendRayHit>();
+    for (const o of rayOrigins(origin, direction)) {
+      this._world.intersectionsWithRay(
+        new this.R.Ray(o, vec(direction)),
+        maxDistance,
+        true,
+        (hit) => {
+          const key = hit.collider.handle;
+          const prev = hits.get(key);
+          if (!prev || hit.timeOfImpact < prev.distance) {
+            hits.set(key, {
+              key,
+              distance: hit.timeOfImpact,
+              normal: new Vector3(hit.normal.x, hit.normal.y, hit.normal.z)
+            });
+          }
+          return true;
+        },
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        (c) => filter(c.handle)
+      );
+    }
     // Ties broken by key, so the order never depends on traversal order.
-    return hits.sort((a, b) => a.distance - b.distance || a.key - b.key);
+    return [...hits.values()].sort((a, b) => a.distance - b.distance || a.key - b.key);
   }
   castShape(
     shape: ShapeDesc,
@@ -369,6 +436,8 @@ export class RapierWorld implements BackendWorld {
         return new R.Capsule(shape.halfHeight, shape.radius);
       case 'cylinder':
         return new R.Cylinder(shape.halfHeight, shape.radius);
+      default:
+        throw new Error(`Shape type '${shape.type}' cannot be used in queries`);
     }
   }
 }

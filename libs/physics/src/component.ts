@@ -20,6 +20,8 @@ import { PhysicsWorld } from './world';
  *
  * Objects resting asleep keep touching and raise no `collisionexit`.
  *
+ * `ready` is raised on colliders only.
+ *
  * @public
  */
 export type PhysicsEventMap = {
@@ -28,6 +30,8 @@ export type PhysicsEventMap = {
   collisionexit: [event: PhysicsContactEvent];
   triggerenter: [event: PhysicsTriggerEvent];
   triggerexit: [event: PhysicsTriggerEvent];
+  /** A {@link Collider} has come into the simulation; see {@link Collider.ready}. */
+  ready: [];
 };
 
 let nextPhysicsId = 1;
