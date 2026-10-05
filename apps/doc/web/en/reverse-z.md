@@ -109,7 +109,6 @@ depends on the light type and cannot be applied uniformly.
 | --- | --- |
 | **WebGPU** | Full benefit, no extra requirements |
 | **WebGL2** | Full benefit with `EXT_clip_control` (Chromium 121+); without it a shader-side fallback keeps rendering correct but limits the precision gain |
-| **WebGL** | Functionally supported, but WebGL1 has no float depth format, so there is **no precision gain** |
 
 The engine detects `EXT_clip_control` at device creation and switches the clip depth range to `[0, 1]`.
 For debugging you can set `globalThis.__ZEPHYR3D_NO_CLIP_CONTROL__ = true` before creating the device to

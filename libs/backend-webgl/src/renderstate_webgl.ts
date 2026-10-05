@@ -7,7 +7,6 @@ import type {
   StencilState,
   RenderStateSet,
   CompareFunc,
-  WebGLContext,
   BlendEquation,
   BlendFunc,
   FaceMode,
@@ -39,7 +38,7 @@ export interface DrawBuffersIndexedEXT {
 export abstract class WebGLRenderState {
   protected static _defaultState: WebGLRenderState;
   protected static _currentState: Nullable<WebGLRenderState>;
-  apply(gl: WebGLContext, force?: boolean) {
+  apply(gl: WebGL2RenderingContext, force?: boolean) {
     const c: any = this.constructor;
     if (force || c._currentState !== this) {
       this._apply(gl);
@@ -49,7 +48,7 @@ export abstract class WebGLRenderState {
   static get defaultState() {
     return this._defaultState;
   }
-  static applyDefaults(gl: WebGLContext, force?: boolean) {
+  static applyDefaults(gl: WebGL2RenderingContext, force?: boolean) {
     if (force || this._currentState !== this._defaultState) {
       this._defaultState.apply(gl, force);
     }
@@ -57,7 +56,7 @@ export abstract class WebGLRenderState {
   static invalidateCurrentState() {
     this._currentState = null;
   }
-  protected abstract _apply(gl: WebGLContext): void;
+  protected abstract _apply(gl: WebGL2RenderingContext): void;
 }
 
 export class WebGLColorState extends WebGLRenderState implements ColorState {
@@ -81,7 +80,7 @@ export class WebGLColorState extends WebGLRenderState implements ColorState {
     this.alphaMask = a;
     return this;
   }
-  protected _apply(gl: WebGLContext) {
+  protected _apply(gl: WebGL2RenderingContext) {
     gl.colorMask(this.redMask, this.greenMask, this.blueMask, this.alphaMask);
   }
   applyTarget(ext: DrawBuffersIndexedEXT, targetIndex: number) {
@@ -186,7 +185,7 @@ export class WebGLBlendingState extends WebGLRenderState implements BlendingStat
     this.alphaEquation = alpha;
     return this;
   }
-  protected _apply(gl: WebGLContext) {
+  protected _apply(gl: WebGL2RenderingContext) {
     if (this.enabled) {
       gl.enable(WebGLEnum.BLEND);
       gl.blendEquationSeparate(this._rgbEquation, this._alphaEquation);
@@ -219,7 +218,7 @@ export class WebGLBlendingState extends WebGLRenderState implements BlendingStat
       ext.disablei(WebGLEnum.BLEND, targetIndex);
     }
   }
-  static applyAlphaToCoverage(gl: WebGLContext, enabled: boolean) {
+  static applyAlphaToCoverage(gl: WebGL2RenderingContext, enabled: boolean) {
     if (enabled) {
       gl.enable(WebGLEnum.SAMPLE_ALPHA_TO_COVERAGE);
     } else {
@@ -261,7 +260,7 @@ export class WebGLRasterizerState extends WebGLRenderState implements Rasterizer
     }
     return this;
   }
-  protected _apply(gl: WebGLContext) {
+  protected _apply(gl: WebGL2RenderingContext) {
     if (this.cullMode == 'none') {
       gl.disable(WebGLEnum.CULL_FACE);
     } else {
@@ -322,7 +321,7 @@ export class WebGLDepthState extends WebGLRenderState implements DepthState {
     this.depthBiasSlopeScale = value;
     return this;
   }
-  protected _apply(gl: WebGLContext) {
+  protected _apply(gl: WebGL2RenderingContext) {
     if (this.testEnabled) {
       gl.enable(WebGLEnum.DEPTH_TEST);
       gl.depthFunc(this._compareFunc);
@@ -461,7 +460,7 @@ export class WebGLStencilState extends WebGLRenderState implements StencilState 
     this.readMask = mask;
     return this;
   }
-  protected _apply(gl: WebGLContext) {
+  protected _apply(gl: WebGL2RenderingContext) {
     if (this.enabled) {
       gl.enable(WebGLEnum.STENCIL_TEST);
       gl.stencilMaskSeparate(WebGLEnum.FRONT, this.writeMask);
@@ -477,7 +476,7 @@ export class WebGLStencilState extends WebGLRenderState implements StencilState 
 }
 
 export class WebGLRenderStateSet implements RenderStateSet {
-  private readonly _gl: WebGLContext;
+  private readonly _gl: WebGL2RenderingContext;
   private _targetColorStates: Nullable<WebGLColorState>[];
   private _targetBlendingStates: Nullable<WebGLBlendingState>[];
   colorState: Nullable<WebGLColorState>;
@@ -485,7 +484,7 @@ export class WebGLRenderStateSet implements RenderStateSet {
   rasterizerState: Nullable<WebGLRasterizerState>;
   depthState: Nullable<WebGLDepthState>;
   stencilState: Nullable<WebGLStencilState>;
-  constructor(gl: WebGLContext) {
+  constructor(gl: WebGL2RenderingContext) {
     this._gl = gl;
     this._targetColorStates = [];
     this._targetBlendingStates = [];
@@ -604,9 +603,9 @@ export class WebGLRenderStateSet implements RenderStateSet {
   defaultStencilState() {
     this.stencilState = null;
   }
-  static applyDefaults(gl: WebGLContext, force?: boolean) {
+  static applyDefaults(gl: WebGL2RenderingContext, force?: boolean) {
     const targetCount = gl._currentFramebuffer?.getColorAttachments().length || 1;
-    const ext = (gl as WebGLContext & { _drawBuffersIndexedExt?: Nullable<DrawBuffersIndexedEXT> })
+    const ext = (gl as WebGL2RenderingContext & { _drawBuffersIndexedExt?: Nullable<DrawBuffersIndexedEXT> })
       ._drawBuffersIndexedExt;
     if (ext && targetCount > 1) {
       const colorState = WebGLColorState.defaultState as WebGLColorState;
@@ -626,9 +625,9 @@ export class WebGLRenderStateSet implements RenderStateSet {
     WebGLDepthState.applyDefaults(gl, force);
     WebGLStencilState.applyDefaults(gl, force);
   }
-  private applyColorStates(gl: WebGLContext, force?: boolean) {
+  private applyColorStates(gl: WebGL2RenderingContext, force?: boolean) {
     const targetCount = this.getColorTargetCount(gl);
-    const ext = (gl as WebGLContext & { _drawBuffersIndexedExt?: Nullable<DrawBuffersIndexedEXT> })
+    const ext = (gl as WebGL2RenderingContext & { _drawBuffersIndexedExt?: Nullable<DrawBuffersIndexedEXT> })
       ._drawBuffersIndexedExt;
     const hasTargetStates = this.hasTargetStates(this._targetColorStates);
     if (!hasTargetStates && targetCount === 1) {
@@ -652,9 +651,9 @@ export class WebGLRenderStateSet implements RenderStateSet {
     }
     WebGLColorState.invalidateCurrentState();
   }
-  private applyBlendingStates(gl: WebGLContext, force?: boolean) {
+  private applyBlendingStates(gl: WebGL2RenderingContext, force?: boolean) {
     const targetCount = this.getColorTargetCount(gl);
-    const ext = (gl as WebGLContext & { _drawBuffersIndexedExt?: Nullable<DrawBuffersIndexedEXT> })
+    const ext = (gl as WebGL2RenderingContext & { _drawBuffersIndexedExt?: Nullable<DrawBuffersIndexedEXT> })
       ._drawBuffersIndexedExt;
     const hasTargetStates = this.hasTargetStates(this._targetBlendingStates);
     if (!hasTargetStates && targetCount === 1) {
@@ -697,7 +696,7 @@ export class WebGLRenderStateSet implements RenderStateSet {
       this._targetBlendingStates.some((state) => !!state?.alphaToCoverageEnabled)
     );
   }
-  private getColorTargetCount(gl: WebGLContext) {
+  private getColorTargetCount(gl: WebGL2RenderingContext) {
     return gl._currentFramebuffer?.getColorAttachments().length || 1;
   }
   private hasTargetStates<T>(states: Nullable<T>[]) {

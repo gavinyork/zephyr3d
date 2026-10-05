@@ -197,7 +197,7 @@ Foam is a **lit** surface: it suppresses the specular underneath it and the ligh
 
 Shoreline foam is the white water that collects where the surface comes close to something solid: the waterline on a shelving bed, and the collar where a piling, a hull or a rock breaks the surface. It is independent of crest foam and switches on separately.
 
-It is **off by default** and needs WebGL2 or WebGPU; on WebGL1 the parameters have no effect.
+It is **off by default**.
 
 ```ts
 water.shoreFoamAmount = 1;

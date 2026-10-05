@@ -102,7 +102,6 @@ device.clearFrameBuffer(clearColor, 1, 0);
 | --- | --- |
 | **WebGPU** | 完整收益，无额外要求 |
 | **WebGL2** | 有 `EXT_clip_control`（Chromium 121+）时获得完整收益；没有时走 shader 端兜底，渲染正确但精度收益有限 |
-| **WebGL** | 功能上支持，但 WebGL1 没有浮点深度格式，**得不到精度收益** |
 
 引擎在设备创建时会自动检测 `EXT_clip_control` 并启用 `[0, 1]` 裁剪深度范围。
 调试时可以在创建设备前设置 `globalThis.__ZEPHYR3D_NO_CLIP_CONTROL__ = true` 强制走 shader

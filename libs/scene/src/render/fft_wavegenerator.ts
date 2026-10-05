@@ -184,9 +184,7 @@ export class FFTWaveGenerator extends Disposable implements WaveGenerator {
     super();
     const device = getDevice();
     const renderTargetFloat16 = device.getDeviceCaps().textureCaps.supportHalfFloatColorBuffer;
-    const maxDrawBuffers = /*device.type !== 'webgl' && */ renderTargetFloat16
-      ? device.getDeviceCaps().framebufferCaps.maxDrawBuffers
-      : 0;
+    const maxDrawBuffers = renderTargetFloat16 ? device.getDeviceCaps().framebufferCaps.maxDrawBuffers : 0;
     this._textureFormat = 'rgba16f';
     this._h0TextureFormat = 'rgba16f';
     this._dataTextureFormat = 'rgba16f';
@@ -468,28 +466,19 @@ export class FFTWaveGenerator extends Disposable implements WaveGenerator {
     const key = `${size}:${randomSeed}`;
     let tex = FFTWaveGenerator._globals!.noiseTextures.get(key);
     if (!tex) {
-      tex = device.createTexture2D(device.type === 'webgl' ? 'rgba32f' : 'rg32f', size, size, {
+      tex = device.createTexture2D('rg32f', size, size, {
         mipmapping: false
       })!;
       tex.name = `noiseTex${size}_${randomSeed}`;
-      tex.update(this.getNoise2d(size, randomSeed, device.type === 'webgl'), 0, 0, size, size);
+      tex.update(this.getNoise2d(size, randomSeed), 0, 0, size, size);
       FFTWaveGenerator._globals!.noiseTextures.set(key, tex);
     }
     return tex;
   }
   /** @internal */
-  private getNoise2d(size: number, randomSeed: number, rgba: boolean) {
+  private getNoise2d(size: number, randomSeed: number) {
     const rand = new PRNG(randomSeed);
-    if (rgba) {
-      const array = new Float32Array(size * size * 4);
-      for (let i = 0; i < size * size; i++) {
-        array[i * 4 + 0] = rand.get();
-        array[i * 4 + 1] = rand.get();
-      }
-      return array;
-    } else {
-      return Float32Array.from([...Array(size * size * 2)].map(() => rand.get()));
-    }
+    return Float32Array.from([...Array(size * size * 2)].map(() => rand.get()));
   }
   /** @internal */
   private reverseBits(v: number, width: number) {
@@ -732,9 +721,6 @@ export class FFTWaveGenerator extends Disposable implements WaveGenerator {
       this._hkBindGroup!.setTexture('h0Texture0', h0Textures[0], nearestRepeatSampler);
       this._hkBindGroup!.setTexture('h0Texture1', h0Textures[1], nearestRepeatSampler);
       this._hkBindGroup!.setTexture('h0Texture2', h0Textures[2], nearestRepeatSampler);
-      if (device.type === 'webgl') {
-        this._hkBindGroup!.setValue('h0TexSize', new Vector2(h0Textures[0].width, h0Textures[0].height));
-      }
       device.setFramebuffer(instanceData.spectrumFramebuffer);
       FFTWaveGenerator._globals!.quad.draw();
     }
@@ -752,9 +738,6 @@ export class FFTWaveGenerator extends Disposable implements WaveGenerator {
     this._hkBindGroup4!.setTexture('h0Texture0', h0Textures[0], nearestRepeatSampler);
     this._hkBindGroup4!.setTexture('h0Texture1', h0Textures[1], nearestRepeatSampler);
     this._hkBindGroup4!.setValue('t', time);
-    if (device.type === 'webgl') {
-      this._hkBindGroup4!.setValue('h0TexSize', new Vector2(h0Textures[0].width, h0Textures[0].height));
-    }
     device.setFramebuffer(instanceData.spectrumFramebuffer4);
     FFTWaveGenerator._globals!.quad.draw();
 
@@ -764,9 +747,6 @@ export class FFTWaveGenerator extends Disposable implements WaveGenerator {
     this._hkBindGroup2!.setValue('sizes', this._sizes);
     this._hkBindGroup2!.setTexture('h0Texture2', h0Textures[2], nearestRepeatSampler);
     this._hkBindGroup2!.setValue('t', time);
-    if (device.type === 'webgl') {
-      this._hkBindGroup2!.setValue('h0TexSize', new Vector2(h0Textures[0].width, h0Textures[0].height));
-    }
     device.setFramebuffer(instanceData.spectrumFramebuffer2);
     FFTWaveGenerator._globals!.quad.draw();
   }
@@ -817,17 +797,6 @@ export class FFTWaveGenerator extends Disposable implements WaveGenerator {
         this._fft2hBindGroup!.setTexture('spectrum3', pingPongTexture[3], nearestRepeatSampler);
         this._fft2hBindGroup!.setTexture('spectrum4', pingPongTexture[4], nearestRepeatSampler);
         this._fft2hBindGroup!.setTexture('spectrum5', pingPongTexture[5], nearestRepeatSampler);
-        if (device.type === 'webgl') {
-          this._fft2hBindGroup!.setValue(
-            'texSize',
-            new Vector4(
-              pingPongTexture[0].width,
-              pingPongTexture[0].height,
-              butterflyTex.width,
-              butterflyTex.height
-            )
-          );
-        }
         FFTWaveGenerator._globals!.quad.draw();
       }
       pingPong = 1 - pingPong; //(pingPong + 1) % 2;
@@ -859,17 +828,6 @@ export class FFTWaveGenerator extends Disposable implements WaveGenerator {
         this._fft2vBindGroup!.setTexture('spectrum3', pingPongTexture[3], nearestRepeatSampler);
         this._fft2vBindGroup!.setTexture('spectrum4', pingPongTexture[4], nearestRepeatSampler);
         this._fft2vBindGroup!.setTexture('spectrum5', pingPongTexture[5], nearestRepeatSampler);
-        if (device.type === 'webgl') {
-          this._fft2vBindGroup!.setValue(
-            'texSize',
-            new Vector4(
-              pingPongTexture[0].width,
-              pingPongTexture[0].height,
-              butterflyTex.width,
-              butterflyTex.height
-            )
-          );
-        }
         FFTWaveGenerator._globals!.quad.draw();
       }
       pingPong = 1 - pingPong;
@@ -953,17 +911,6 @@ export class FFTWaveGenerator extends Disposable implements WaveGenerator {
       fft2hBindGroup4.setTexture('spectrum1', pingPongTextures[pingPong][1], nearestRepeatSampler);
       fft2hBindGroup4.setTexture('spectrum2', pingPongTextures[pingPong][2], nearestRepeatSampler);
       fft2hBindGroup4.setTexture('spectrum3', pingPongTextures[pingPong][3], nearestRepeatSampler);
-      if (device.type === 'webgl') {
-        fft2hBindGroup4.setValue(
-          'texSize',
-          new Vector4(
-            pingPongTextures[pingPong][0].width,
-            pingPongTextures[pingPong][0].height,
-            butterflyTex.width,
-            butterflyTex.height
-          )
-        );
-      }
       FFTWaveGenerator._globals!.quad.draw();
       device.setFramebuffer(pingPongFramebuffers2[pingPong]);
       device.setProgram(FFTWaveGenerator._globals!.programs.fft2hProgram2);
@@ -973,17 +920,6 @@ export class FFTWaveGenerator extends Disposable implements WaveGenerator {
       fft2hBindGroup2.setValue('phase', phase);
       fft2hBindGroup2.setTexture('spectrum4', pingPongTextures[pingPong][4], nearestRepeatSampler);
       fft2hBindGroup2.setTexture('spectrum5', pingPongTextures[pingPong][5], nearestRepeatSampler);
-      if (device.type === 'webgl') {
-        fft2hBindGroup2.setValue(
-          'texSize',
-          new Vector4(
-            pingPongTextures[pingPong][0].width,
-            pingPongTextures[pingPong][0].height,
-            butterflyTex.width,
-            butterflyTex.height
-          )
-        );
-      }
       FFTWaveGenerator._globals!.quad.draw();
       pingPong = (pingPong + 1) % 2;
     }
@@ -1000,17 +936,6 @@ export class FFTWaveGenerator extends Disposable implements WaveGenerator {
       fft2vBindGroup4.setTexture('spectrum1', pingPongTextures[pingPong][1], nearestRepeatSampler);
       fft2vBindGroup4.setTexture('spectrum2', pingPongTextures[pingPong][2], nearestRepeatSampler);
       fft2vBindGroup4.setTexture('spectrum3', pingPongTextures[pingPong][3], nearestRepeatSampler);
-      if (device.type === 'webgl') {
-        fft2vBindGroup4.setValue(
-          'texSize',
-          new Vector4(
-            pingPongTextures[pingPong][0].width,
-            pingPongTextures[pingPong][0].height,
-            butterflyTex.width,
-            butterflyTex.height
-          )
-        );
-      }
       FFTWaveGenerator._globals!.quad.draw();
       device.setFramebuffer(pingPongFramebuffers2[pingPong]);
       device.setProgram(FFTWaveGenerator._globals!.programs.fft2vProgram2);
@@ -1020,17 +945,6 @@ export class FFTWaveGenerator extends Disposable implements WaveGenerator {
       fft2vBindGroup2.setValue('phase', phase);
       fft2vBindGroup2.setTexture('spectrum4', pingPongTextures[pingPong][4], nearestRepeatSampler);
       fft2vBindGroup2.setTexture('spectrum5', pingPongTextures[pingPong][5], nearestRepeatSampler);
-      if (device.type === 'webgl') {
-        fft2vBindGroup2.setValue(
-          'texSize',
-          new Vector4(
-            pingPongTextures[pingPong][0].width,
-            pingPongTextures[pingPong][0].height,
-            butterflyTex.width,
-            butterflyTex.height
-          )
-        );
-      }
       FFTWaveGenerator._globals!.quad.draw();
       pingPong = (pingPong + 1) % 2;
     }
@@ -1070,12 +984,6 @@ export class FFTWaveGenerator extends Disposable implements WaveGenerator {
       this._postfft2BindGroup!.setTexture('ifft3', ifftTextures[3], nearestRepeatSampler);
       this._postfft2BindGroup!.setTexture('ifft4', ifftTextures[4], nearestRepeatSampler);
       this._postfft2BindGroup!.setTexture('ifft5', ifftTextures[5], nearestRepeatSampler);
-      if (device.type === 'webgl') {
-        this._postfft2BindGroup!.setValue(
-          'ifftTexSize',
-          new Vector2(ifftTextures[0].width, ifftTextures[0].height)
-        );
-      }
       FFTWaveGenerator._globals!.quad.draw();
     }
   }
@@ -1092,24 +1000,12 @@ export class FFTWaveGenerator extends Disposable implements WaveGenerator {
     this._postfft2BindGroup4!.setTexture('ifft1', ifftTextures[1], nearestRepeatSampler);
     this._postfft2BindGroup4!.setTexture('ifft2', ifftTextures[2], nearestRepeatSampler);
     this._postfft2BindGroup4!.setTexture('ifft3', ifftTextures[3], nearestRepeatSampler);
-    if (device.type === 'webgl') {
-      this._postfft2BindGroup4!.setValue(
-        'ifftTexSize',
-        new Vector2(ifftTextures[0].width, ifftTextures[0].height)
-      );
-    }
     FFTWaveGenerator._globals!.quad.draw();
     device.setFramebuffer(instanceData.postIfft2Framebuffer2);
     device.setProgram(FFTWaveGenerator._globals!.programs.postfft2Program2);
     device.setBindGroup(0, this._postfft2BindGroup2!);
     this._postfft2BindGroup2!.setTexture('ifft4', ifftTextures[4], nearestRepeatSampler);
     this._postfft2BindGroup2!.setTexture('ifft5', ifftTextures[5], nearestRepeatSampler);
-    if (device.type === 'webgl') {
-      this._postfft2BindGroup2!.setValue(
-        'ifftTexSize',
-        new Vector2(ifftTextures[0].width, ifftTextures[0].height)
-      );
-    }
     FFTWaveGenerator._globals!.quad.draw();
   }
   /** {@inheritDoc WaveGenerator.setupUniforms} */

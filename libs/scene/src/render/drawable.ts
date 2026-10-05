@@ -314,9 +314,7 @@ export interface Drawable {
    * Whether the object queries the Hi-Z pyramid's nearest-depth channel.
    *
    * Turns that channel on for the frame, which doubles the pyramid's bandwidth,
-   * so only a drawable that actually samples it should say yes. Unavailable on
-   * WebGL1, where the request is dropped and the drawable has to shade without
-   * it.
+   * so only a drawable that actually samples it should say yes.
    *
    * Optional: almost nothing needs it, and requiring it would break every
    * external Drawable implementation for the sake of a `return false`.

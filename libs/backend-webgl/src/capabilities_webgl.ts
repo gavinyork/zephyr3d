@@ -1,7 +1,5 @@
 import { WebGLEnum } from './webgl_enum';
-import { isWebGL2 } from './utils';
 import type {
-  WebGLContext,
   TextureFormat,
   FramebufferCaps,
   MiscCaps,
@@ -173,11 +171,8 @@ export interface TextureFormatInfoWebGL extends TextureFormatInfo {
 }
 
 export class WebGLFramebufferCaps implements FramebufferCaps {
-  private readonly _isWebGL2: boolean;
-  private readonly _extDrawBuffers: Nullable<WEBGL_draw_buffers>;
   private readonly _extDrawBuffersIndexed: Nullable<unknown>;
   private readonly _extFloatBlending: Nullable<EXT_float_blend>;
-  private readonly _extRenderMipmap: Nullable<OES_fbo_render_mipmap>;
   maxDrawBuffers: number;
   supportPerTargetBlending: boolean;
   maxColorAttachmentBytesPerSample: number;
@@ -186,26 +181,20 @@ export class WebGLFramebufferCaps implements FramebufferCaps {
   supportFloatBlending: boolean;
   supportDepth32float: boolean;
   supportDepth32floatStencil8: boolean;
-  constructor(gl: WebGLContext) {
-    this._isWebGL2 = isWebGL2(gl);
-    this._extDrawBuffers = this._isWebGL2 ? null : gl.getExtension('WEBGL_draw_buffers');
+  constructor(gl: WebGL2RenderingContext) {
     this._extDrawBuffersIndexed = gl.getExtension('OES_draw_buffers_indexed');
     this._extFloatBlending = gl.getExtension('EXT_float_blend');
-    this._extRenderMipmap = this._isWebGL2 ? null : gl.getExtension('OES_fbo_render_mipmap');
-    this.maxDrawBuffers =
-      this._isWebGL2 || this._extDrawBuffers
-        ? Math.min(
-            gl.getParameter(WebGLEnum.MAX_COLOR_ATTACHMENTS),
-            gl.getParameter(WebGLEnum.MAX_DRAW_BUFFERS)
-          )
-        : 1;
+    this.maxDrawBuffers = Math.min(
+      gl.getParameter(WebGLEnum.MAX_COLOR_ATTACHMENTS),
+      gl.getParameter(WebGLEnum.MAX_DRAW_BUFFERS)
+    );
     this.maxColorAttachmentBytesPerSample = this.maxDrawBuffers * 16;
     this.supportPerTargetBlending = !!this._extDrawBuffersIndexed;
-    this.supportRenderMipmap = isWebGL2(gl) || !!this._extRenderMipmap;
-    this.supportMultisampledFramebuffer = isWebGL2(gl);
+    this.supportRenderMipmap = true;
+    this.supportMultisampledFramebuffer = true;
     this.supportFloatBlending = !!this._extFloatBlending;
-    this.supportDepth32float = this._isWebGL2;
-    this.supportDepth32floatStencil8 = this._isWebGL2;
+    this.supportDepth32float = true;
+    this.supportDepth32floatStencil8 = true;
   }
 }
 
@@ -222,9 +211,6 @@ export interface EXTClipControl {
 }
 
 export class WebGLMiscCaps implements MiscCaps {
-  private readonly _isWebGL2: boolean;
-  private readonly _extIndexUint32: Nullable<OES_element_index_uint>;
-  private readonly _extBlendMinMax: Nullable<EXT_blend_minmax>;
   private readonly _extClipControl: Nullable<EXTClipControl>;
   supportOversizedViewport: boolean;
   supportBlendMinMax: boolean;
@@ -237,22 +223,12 @@ export class WebGLMiscCaps implements MiscCaps {
   maxBindGroups: number;
   maxTexCoordIndex: number;
   supportTimestampQuery: boolean;
-  constructor(gl: WebGLContext) {
-    this._isWebGL2 = isWebGL2(gl);
-    this._extBlendMinMax = null;
-    this._extIndexUint32 = this._isWebGL2 ? gl.getExtension('OES_element_index_uint') : null;
-    if (this._isWebGL2) {
-      this.supportBlendMinMax = true;
-      this.support32BitIndex = true;
-    } else {
-      this._extBlendMinMax = gl.getExtension('EXT_blend_minmax');
-      this.supportBlendMinMax = !!this._extBlendMinMax;
-      this.support32BitIndex = !!this._extIndexUint32;
-    }
+  constructor(gl: WebGL2RenderingContext) {
+    this.supportBlendMinMax = true;
+    this.support32BitIndex = true;
     this.supportOversizedViewport = true;
     this.supportDepthClamp = false;
-    // Community approved extension, available on both WebGL1 and WebGL2
-    // contexts where implemented (Chromium 121+).
+    // Community approved extension, implemented in Chromium 121+.
     this._extClipControl = gl.getExtension('EXT_clip_control') as Nullable<EXTClipControl>;
     this.supportClipControl = !!this._extClipControl;
     this.supportDrawIndirect = false;
@@ -268,9 +244,6 @@ export class WebGLMiscCaps implements MiscCaps {
   }
 }
 export class WebGLShaderCaps implements ShaderCaps {
-  private readonly _extFragDepth: Nullable<EXT_frag_depth>;
-  private readonly _extStandardDerivatives: Nullable<OES_standard_derivatives>;
-  private readonly _extShaderTextureLod: Nullable<EXT_shader_texture_lod>;
   supportFragmentDepth: boolean;
   supportStandardDerivatives: boolean;
   supportShaderTextureLod: boolean;
@@ -282,41 +255,22 @@ export class WebGLShaderCaps implements ShaderCaps {
   storageBufferOffsetAlignment: number;
   maxVertexUniformVectors: number;
   maxFragmentUniformVectors: number;
-  constructor(gl: WebGLContext) {
-    this._extFragDepth = null;
-    this._extStandardDerivatives = null;
-    this._extShaderTextureLod = null;
+  constructor(gl: WebGL2RenderingContext) {
     this.supportShaderF16 = false;
     this.maxStorageBufferSize = 0;
     this.storageBufferOffsetAlignment = 0;
     // Spec minimums as fallbacks.
     this.maxVertexUniformVectors = gl.getParameter(gl.MAX_VERTEX_UNIFORM_VECTORS) || 128;
     this.maxFragmentUniformVectors = gl.getParameter(gl.MAX_FRAGMENT_UNIFORM_VECTORS) || 16;
-    if (isWebGL2(gl)) {
-      this.supportFragmentDepth = true;
-      this.supportStandardDerivatives = true;
-      this.supportShaderTextureLod = true;
-      this.supportHighPrecisionFloat = true;
-      this.maxUniformBufferSize = gl.getParameter(gl.MAX_UNIFORM_BLOCK_SIZE) || 16384;
-      this.uniformBufferOffsetAlignment = gl.getParameter(gl.UNIFORM_BUFFER_OFFSET_ALIGNMENT) || 256;
-    } else {
-      this._extFragDepth = gl.getExtension('EXT_frag_depth');
-      this.supportFragmentDepth = !!this._extFragDepth;
-      this._extStandardDerivatives = gl.getExtension('OES_standard_derivatives');
-      this.supportStandardDerivatives = !!this._extStandardDerivatives;
-      this._extShaderTextureLod = gl.getExtension('EXT_shader_texture_lod');
-      this.supportShaderTextureLod = !!this._extShaderTextureLod;
-      this.supportHighPrecisionFloat =
-        gl.getShaderPrecisionFormat &&
-        !!gl.getShaderPrecisionFormat(gl.VERTEX_SHADER, gl.HIGH_FLOAT)?.precision &&
-        !!gl.getShaderPrecisionFormat(gl.FRAGMENT_SHADER, gl.HIGH_FLOAT)?.precision;
-      this.maxUniformBufferSize = 0;
-      this.uniformBufferOffsetAlignment = 1;
-    }
+    this.supportFragmentDepth = true;
+    this.supportStandardDerivatives = true;
+    this.supportShaderTextureLod = true;
+    this.supportHighPrecisionFloat = true;
+    this.maxUniformBufferSize = gl.getParameter(gl.MAX_UNIFORM_BLOCK_SIZE) || 16384;
+    this.uniformBufferOffsetAlignment = gl.getParameter(gl.UNIFORM_BUFFER_OFFSET_ALIGNMENT) || 256;
   }
 }
 export class WebGLTextureCaps implements TextureCaps {
-  private readonly _isWebGL2: boolean;
   private readonly _extS3TC: Nullable<WEBGL_compressed_texture_s3tc>;
   private readonly _extS3TCSRGB: Nullable<WEBGL_compressed_texture_s3tc_srgb>;
   private readonly _extBPTC: Nullable<EXT_texture_compression_bptc>;
@@ -324,12 +278,7 @@ export class WebGLTextureCaps implements TextureCaps {
   private readonly _extASTC: Nullable<WEBGL_compressed_texture_astc>;
   private readonly _extETC: Nullable<WEBGL_compressed_texture_etc>;
   private readonly _extTextureFilterAnisotropic: Nullable<EXT_texture_filter_anisotropic>;
-  private readonly _extDepthTexture: Nullable<WEBGL_depth_texture>;
-  private readonly _extSRGB: Nullable<EXT_sRGB>;
-  private readonly _extTextureFloat: Nullable<OES_texture_float>;
   private readonly _extTextureFloatLinear: Nullable<OES_texture_float_linear>;
-  private readonly _extTextureHalfFloat: Nullable<OES_texture_half_float>;
-  private readonly _extTextureHalfFloatLinear: Nullable<OES_texture_half_float_linear>;
   private readonly _textureFormatInfos: Record<TextureFormat, TextureFormatInfoWebGL>;
   maxTextureSize: number;
   maxCubeTextureSize: number;
@@ -352,58 +301,29 @@ export class WebGLTextureCaps implements TextureCaps {
   supportFloatColorBuffer: boolean;
   supportHalfFloatColorBuffer: boolean;
   supportFloatBlending: boolean;
-  constructor(gl: WebGLContext) {
-    this._isWebGL2 = isWebGL2(gl);
+  constructor(gl: WebGL2RenderingContext) {
     this._extTextureFilterAnisotropic =
       gl.getExtension('EXT_texture_filter_anisotropic') ||
       gl.getExtension('MOZ_EXT_texture_filter_anisotropic') ||
       gl.getExtension('WEBKIT_EXT_texture_filter_anisotropic');
     this.supportAnisotropicFiltering = !!this._extTextureFilterAnisotropic;
-    if (this._isWebGL2) {
-      this._extDepthTexture = null;
-      this.supportDepthTexture = true;
-    } else {
-      this._extDepthTexture = gl.getExtension('WEBGL_depth_texture');
-      this.supportDepthTexture = !!this._extDepthTexture;
-    }
-    this.support3DTexture = this._isWebGL2;
-    this._extSRGB = this._isWebGL2 ? null : gl.getExtension('EXT_sRGB');
-    this.supportSRGBTexture = this._isWebGL2 || !!this._extSRGB;
-    if (this._isWebGL2) {
-      this._extTextureFloat = null;
-      this.supportFloatTexture = true;
-    } else {
-      this._extTextureFloat = gl.getExtension('OES_texture_float');
-      this.supportFloatTexture = !!this._extTextureFloat;
-    }
+    this.supportDepthTexture = true;
+    this.support3DTexture = true;
+    this.supportSRGBTexture = true;
+    this.supportFloatTexture = true;
     this._extTextureFloatLinear = gl.getExtension('OES_texture_float_linear');
     this.supportLinearFloatTexture = !!this._extTextureFloatLinear;
-    if (this._isWebGL2) {
-      this._extTextureHalfFloat = null;
-      this.supportHalfFloatTexture = true;
-      this._extTextureHalfFloatLinear = null;
-      this.supportLinearHalfFloatTexture = true;
+    this.supportHalfFloatTexture = true;
+    this.supportLinearHalfFloatTexture = true;
+    if (gl.getExtension('EXT_color_buffer_float')) {
+      this.supportHalfFloatColorBuffer = true;
+      this.supportFloatColorBuffer = true;
+    } else if (gl.getExtension('EXT_color_buffer_half_float')) {
+      this.supportHalfFloatColorBuffer = true;
+      this.supportFloatColorBuffer = false;
     } else {
-      this._extTextureHalfFloat = gl.getExtension('OES_texture_half_float');
-      this.supportHalfFloatTexture = !!this._extTextureHalfFloat;
-      this._extTextureHalfFloatLinear = gl.getExtension('OES_texture_half_float_linear');
-      this.supportLinearHalfFloatTexture = !!this._extTextureHalfFloatLinear;
-    }
-
-    if (this._isWebGL2) {
-      if (gl.getExtension('EXT_color_buffer_float')) {
-        this.supportHalfFloatColorBuffer = true;
-        this.supportFloatColorBuffer = true;
-      } else if (gl.getExtension('EXT_color_buffer_half_float')) {
-        this.supportHalfFloatColorBuffer = true;
-        this.supportFloatColorBuffer = false;
-      } else {
-        this.supportHalfFloatColorBuffer = false;
-        this.supportFloatColorBuffer = false;
-      }
-    } else {
-      this.supportFloatColorBuffer = !!gl.getExtension('WEBGL_color_buffer_float');
-      this.supportHalfFloatColorBuffer = !!gl.getExtension('EXT_color_buffer_half_float');
+      this.supportHalfFloatColorBuffer = false;
+      this.supportFloatColorBuffer = false;
     }
     this.supportFloatBlending = this.supportFloatColorBuffer && !!gl.getExtension('EXT_float_blend');
 
@@ -424,17 +344,12 @@ export class WebGLTextureCaps implements TextureCaps {
     this.supportETC2 = !!this._extETC;
     this.maxTextureSize = gl.getParameter(gl.MAX_TEXTURE_SIZE);
     this.maxCubeTextureSize = gl.getParameter(gl.MAX_CUBE_MAP_TEXTURE_SIZE);
-    if (this._isWebGL2) {
-      this.npo2Mipmapping = true;
-      this.npo2Repeating = true;
-    } else {
-      this.npo2Mipmapping = false;
-      this.npo2Repeating = false;
-    }
+    this.npo2Mipmapping = true;
+    this.npo2Repeating = true;
     this._textureFormatInfos = {
       rgba8unorm: {
         glFormat: gl.RGBA,
-        glInternalFormat: this._isWebGL2 ? (gl as WebGL2RenderingContext).RGBA8 : gl.RGBA,
+        glInternalFormat: gl.RGBA8,
         glType: [gl.UNSIGNED_BYTE, gl.UNSIGNED_SHORT_4_4_4_4, gl.UNSIGNED_SHORT_5_5_5_1],
         filterable: true,
         renderable: true,
@@ -679,484 +594,402 @@ export class WebGLTextureCaps implements TextureCaps {
         blockHeight: 4
       };
     }
-    if (isWebGL2(gl)) {
-      this._textureFormatInfos['r8unorm'] = {
-        glFormat: gl.RED,
-        glInternalFormat: gl.R8,
-        glType: [gl.UNSIGNED_BYTE],
-        filterable: true,
-        renderable: true,
-        compressed: false,
-        blockWidth: 1,
-        blockHeight: 1,
-        size: 1
-      };
-      this._textureFormatInfos['r8snorm'] = {
-        glFormat: gl.RED,
-        glInternalFormat: gl.R8_SNORM,
-        glType: [gl.BYTE],
-        filterable: true,
-        renderable: false,
-        compressed: false,
-        blockWidth: 1,
-        blockHeight: 1,
-        size: 1
-      };
-      this._textureFormatInfos['r16f'] = {
-        glFormat: gl.RED,
-        glInternalFormat: gl.R16F,
-        glType: [gl.HALF_FLOAT, gl.FLOAT],
-        filterable: this.supportLinearHalfFloatTexture,
-        renderable: this.supportHalfFloatColorBuffer,
-        compressed: false,
-        blockWidth: 1,
-        blockHeight: 1,
-        size: 2
-      };
-      this._textureFormatInfos['r32f'] = {
-        glFormat: gl.RED,
-        glInternalFormat: gl.R32F,
-        glType: [gl.FLOAT],
-        filterable: this.supportLinearFloatTexture,
-        renderable: this.supportFloatColorBuffer,
-        compressed: false,
-        blockWidth: 1,
-        blockHeight: 1,
-        size: 4
-      };
-      this._textureFormatInfos['r8ui'] = {
-        glFormat: gl.RED_INTEGER,
-        glInternalFormat: gl.R8UI,
-        glType: [gl.UNSIGNED_BYTE],
-        filterable: false,
-        renderable: true,
-        compressed: false,
-        blockWidth: 1,
-        blockHeight: 1,
-        size: 1
-      };
-      this._textureFormatInfos['r8i'] = {
-        glFormat: gl.RED_INTEGER,
-        glInternalFormat: gl.R8I,
-        glType: [gl.BYTE],
-        filterable: false,
-        renderable: true,
-        compressed: false,
-        blockWidth: 1,
-        blockHeight: 1,
-        size: 1
-      };
-      this._textureFormatInfos['r16ui'] = {
-        glFormat: gl.RED_INTEGER,
-        glInternalFormat: gl.R16UI,
-        glType: [gl.UNSIGNED_SHORT],
-        filterable: false,
-        renderable: true,
-        compressed: false,
-        blockWidth: 1,
-        blockHeight: 1,
-        size: 2
-      };
-      this._textureFormatInfos['r16i'] = {
-        glFormat: gl.RED_INTEGER,
-        glInternalFormat: gl.R16I,
-        glType: [gl.SHORT],
-        filterable: false,
-        renderable: true,
-        compressed: false,
-        blockWidth: 1,
-        blockHeight: 1,
-        size: 2
-      };
-      this._textureFormatInfos['r32ui'] = {
-        glFormat: gl.RED_INTEGER,
-        glInternalFormat: gl.R32UI,
-        glType: [gl.UNSIGNED_INT],
-        filterable: false,
-        renderable: true,
-        compressed: false,
-        blockWidth: 1,
-        blockHeight: 1,
-        size: 4
-      };
-      this._textureFormatInfos['r32i'] = {
-        glFormat: gl.RED_INTEGER,
-        glInternalFormat: gl.R32I,
-        glType: [gl.INT],
-        filterable: false,
-        renderable: true,
-        compressed: false,
-        blockWidth: 1,
-        blockHeight: 1,
-        size: 4
-      };
-      this._textureFormatInfos['rg8unorm'] = {
-        glFormat: gl.RG,
-        glInternalFormat: gl.RG8,
-        glType: [gl.UNSIGNED_BYTE],
-        filterable: true,
-        renderable: true,
-        compressed: false,
-        blockWidth: 1,
-        blockHeight: 1,
-        size: 2
-      };
-      this._textureFormatInfos['rg8snorm'] = {
-        glFormat: gl.RG,
-        glInternalFormat: gl.RG8_SNORM,
-        glType: [gl.BYTE],
-        filterable: true,
-        renderable: false,
-        compressed: false,
-        blockWidth: 1,
-        blockHeight: 1,
-        size: 2
-      };
-      this._textureFormatInfos['rg16f'] = {
-        glFormat: gl.RG,
-        glInternalFormat: gl.RG16F,
-        glType: [gl.HALF_FLOAT, gl.FLOAT],
-        filterable: this.supportLinearHalfFloatTexture,
-        renderable: this.supportHalfFloatColorBuffer,
-        compressed: false,
-        blockWidth: 1,
-        blockHeight: 1,
-        size: 4
-      };
-      this._textureFormatInfos['rg32f'] = {
-        glFormat: gl.RG,
-        glInternalFormat: gl.RG32F,
-        glType: [gl.FLOAT],
-        filterable: this.supportLinearFloatTexture,
-        renderable: this.supportFloatColorBuffer,
-        compressed: false,
-        blockWidth: 1,
-        blockHeight: 1,
-        size: 8
-      };
-      this._textureFormatInfos['rg8ui'] = {
-        glFormat: gl.RG,
-        glInternalFormat: gl.RG8UI,
-        glType: [gl.UNSIGNED_BYTE],
-        filterable: false,
-        renderable: true,
-        compressed: false,
-        blockWidth: 1,
-        blockHeight: 1,
-        size: 2
-      };
-      this._textureFormatInfos['rg8i'] = {
-        glFormat: gl.RG,
-        glInternalFormat: gl.RG8I,
-        glType: [gl.BYTE],
-        filterable: false,
-        renderable: true,
-        compressed: false,
-        blockWidth: 1,
-        blockHeight: 1,
-        size: 2
-      };
-      this._textureFormatInfos['rg16ui'] = {
-        glFormat: gl.RG,
-        glInternalFormat: gl.RG16UI,
-        glType: [gl.UNSIGNED_SHORT],
-        filterable: false,
-        renderable: true,
-        compressed: false,
-        blockWidth: 1,
-        blockHeight: 1,
-        size: 4
-      };
-      this._textureFormatInfos['rg16i'] = {
-        glFormat: gl.RG,
-        glInternalFormat: gl.RG16I,
-        glType: [gl.SHORT],
-        filterable: false,
-        renderable: true,
-        compressed: false,
-        blockWidth: 1,
-        blockHeight: 1,
-        size: 4
-      };
-      this._textureFormatInfos['rg32ui'] = {
-        glFormat: gl.RG,
-        glInternalFormat: gl.RG32UI,
-        glType: [gl.UNSIGNED_INT],
-        filterable: false,
-        renderable: true,
-        compressed: false,
-        blockWidth: 1,
-        blockHeight: 1,
-        size: 8
-      };
-      this._textureFormatInfos['rg32i'] = {
-        glFormat: gl.RG,
-        glInternalFormat: gl.RG32I,
-        glType: [gl.INT],
-        filterable: false,
-        renderable: true,
-        compressed: false,
-        blockWidth: 1,
-        blockHeight: 1,
-        size: 8
-      };
-      this._textureFormatInfos['rgba8unorm-srgb'] = {
-        glFormat: gl.RGBA,
-        glInternalFormat: gl.SRGB8_ALPHA8,
-        glType: [gl.UNSIGNED_BYTE],
-        filterable: true,
-        renderable: true,
-        compressed: false,
-        blockWidth: 1,
-        blockHeight: 1,
-        size: 4
-      };
-      this._textureFormatInfos['rgba8snorm'] = {
-        glFormat: gl.RGBA,
-        glInternalFormat: gl.RGBA8_SNORM,
-        glType: [gl.BYTE],
-        filterable: true,
-        renderable: false,
-        compressed: false,
-        blockWidth: 1,
-        blockHeight: 1,
-        size: 4
-      };
-      this._textureFormatInfos['rgba16f'] = {
-        glFormat: gl.RGBA,
-        glInternalFormat: gl.RGBA16F,
-        glType: [gl.HALF_FLOAT, gl.FLOAT],
-        filterable: this.supportLinearHalfFloatTexture,
-        renderable: this.supportHalfFloatColorBuffer,
-        compressed: false,
-        blockWidth: 1,
-        blockHeight: 1,
-        size: 8
-      };
-      this._textureFormatInfos['rgba32f'] = {
-        glFormat: gl.RGBA,
-        glInternalFormat: gl.RGBA32F,
-        glType: [gl.FLOAT],
-        filterable: this.supportLinearFloatTexture,
-        renderable: this.supportFloatColorBuffer,
-        compressed: false,
-        blockWidth: 1,
-        blockHeight: 1,
-        size: 16
-      };
-      this._textureFormatInfos['rgba8ui'] = {
-        glFormat: gl.RGBA_INTEGER,
-        glInternalFormat: gl.RGBA8UI,
-        glType: [gl.UNSIGNED_BYTE],
-        filterable: false,
-        renderable: true,
-        compressed: false,
-        blockWidth: 1,
-        blockHeight: 1,
-        size: 4
-      };
-      this._textureFormatInfos['rgba8i'] = {
-        glFormat: gl.RGBA_INTEGER,
-        glInternalFormat: gl.RGBA8I,
-        glType: [gl.BYTE],
-        filterable: false,
-        renderable: true,
-        compressed: false,
-        blockWidth: 1,
-        blockHeight: 1,
-        size: 4
-      };
-      this._textureFormatInfos['rgba16ui'] = {
-        glFormat: gl.RGBA_INTEGER,
-        glInternalFormat: gl.RGBA16UI,
-        glType: [gl.UNSIGNED_SHORT],
-        filterable: false,
-        renderable: true,
-        compressed: false,
-        blockWidth: 1,
-        blockHeight: 1,
-        size: 8
-      };
-      this._textureFormatInfos['rgba16i'] = {
-        glFormat: gl.RGBA_INTEGER,
-        glInternalFormat: gl.RGBA16I,
-        glType: [gl.SHORT],
-        filterable: false,
-        renderable: true,
-        compressed: false,
-        blockWidth: 1,
-        blockHeight: 1,
-        size: 8
-      };
-      this._textureFormatInfos['rgba32ui'] = {
-        glFormat: gl.RGBA_INTEGER,
-        glInternalFormat: gl.RGBA32UI,
-        glType: [gl.UNSIGNED_INT],
-        filterable: false,
-        renderable: true,
-        compressed: false,
-        blockWidth: 1,
-        blockHeight: 1,
-        size: 16
-      };
-      this._textureFormatInfos['rgba32i'] = {
-        glFormat: gl.RGBA_INTEGER,
-        glInternalFormat: gl.RGBA32I,
-        glType: [gl.INT],
-        filterable: false,
-        renderable: true,
-        compressed: false,
-        blockWidth: 1,
-        blockHeight: 1,
-        size: 16
-      };
-      this._textureFormatInfos['rg11b10uf'] = {
-        glFormat: gl.RGB,
-        glInternalFormat: gl.R11F_G11F_B10F,
-        glType: [gl.UNSIGNED_INT_10F_11F_11F_REV],
-        filterable: true,
-        renderable: false,
-        compressed: false,
-        blockWidth: 1,
-        blockHeight: 1,
-        size: 4
-      };
-      this._textureFormatInfos['d16'] = {
-        glFormat: gl.DEPTH_COMPONENT,
-        glInternalFormat: gl.DEPTH_COMPONENT16,
-        glType: [gl.UNSIGNED_SHORT, gl.UNSIGNED_INT],
-        filterable: false,
-        renderable: true,
-        compressed: false,
-        blockWidth: 1,
-        blockHeight: 1,
-        size: 2
-      };
-      this._textureFormatInfos['d24'] = {
-        glFormat: gl.DEPTH_COMPONENT,
-        glInternalFormat: gl.DEPTH_COMPONENT24,
-        glType: [gl.UNSIGNED_INT],
-        filterable: false,
-        renderable: true,
-        compressed: false,
-        blockWidth: 1,
-        blockHeight: 1,
-        size: 4
-      };
-      this._textureFormatInfos['d32f'] = {
-        glFormat: gl.DEPTH_COMPONENT,
-        glInternalFormat: gl.DEPTH_COMPONENT32F,
-        glType: [gl.FLOAT],
-        filterable: false,
-        renderable: true,
-        compressed: false,
-        blockWidth: 1,
-        blockHeight: 1,
-        size: 4
-      };
-      this._textureFormatInfos['d24s8'] = {
-        glFormat: gl.DEPTH_STENCIL,
-        glInternalFormat: gl.DEPTH24_STENCIL8,
-        glType: [gl.UNSIGNED_INT_24_8],
-        filterable: false,
-        renderable: true,
-        compressed: false,
-        blockWidth: 1,
-        blockHeight: 1,
-        size: 4
-      };
-      this._textureFormatInfos['d32fs8'] = {
-        glFormat: gl.DEPTH_STENCIL,
-        glInternalFormat: gl.DEPTH32F_STENCIL8,
-        glType: [gl.FLOAT_32_UNSIGNED_INT_24_8_REV],
-        filterable: false,
-        renderable: true,
-        compressed: false,
-        blockWidth: 1,
-        blockHeight: 1,
-        size: 8
-      };
-    } else {
-      if (this.supportFloatTexture) {
-        this._textureFormatInfos['rgba32f'] = {
-          glFormat: gl.RGBA,
-          glInternalFormat: gl.RGBA,
-          glType: [gl.FLOAT, gl.UNSIGNED_BYTE, gl.UNSIGNED_SHORT_4_4_4_4, gl.UNSIGNED_SHORT_5_5_5_1],
-          filterable: this.supportLinearFloatTexture,
-          renderable: this.supportFloatColorBuffer,
-          compressed: false,
-          blockWidth: 1,
-          blockHeight: 1,
-          size: 16
-        };
-      }
-      if (this.supportHalfFloatTexture) {
-        this._textureFormatInfos['rgba16f'] = {
-          glFormat: gl.RGBA,
-          glInternalFormat: gl.RGBA,
-          glType: [
-            WebGLEnum.HALF_FLOAT,
-            gl.UNSIGNED_BYTE,
-            gl.UNSIGNED_SHORT_4_4_4_4,
-            gl.UNSIGNED_SHORT_5_5_5_1
-          ],
-          filterable: this.supportLinearHalfFloatTexture,
-          renderable: this.supportHalfFloatColorBuffer,
-          compressed: false,
-          blockWidth: 1,
-          blockHeight: 1,
-          size: 8
-        };
-      }
-      if (this.supportSRGBTexture) {
-        this._textureFormatInfos['rgba8unorm-srgb'] = {
-          glFormat: WebGLEnum.SRGB_ALPHA,
-          glInternalFormat: WebGLEnum.SRGB_ALPHA,
-          glType: [gl.UNSIGNED_BYTE],
-          filterable: true,
-          renderable: false,
-          compressed: false,
-          blockWidth: 1,
-          blockHeight: 1,
-          size: 4
-        };
-      }
-      if (this.supportDepthTexture) {
-        this._textureFormatInfos['d16'] = {
-          glFormat: gl.DEPTH_COMPONENT,
-          glInternalFormat: gl.DEPTH_COMPONENT,
-          glType: [gl.UNSIGNED_SHORT],
-          filterable: false,
-          renderable: true,
-          compressed: false,
-          blockWidth: 1,
-          blockHeight: 1,
-          size: 2
-        };
-        this._textureFormatInfos['d24'] = {
-          glFormat: gl.DEPTH_COMPONENT,
-          glInternalFormat: gl.DEPTH_COMPONENT,
-          glType: [gl.UNSIGNED_INT],
-          filterable: false,
-          renderable: true,
-          compressed: false,
-          blockWidth: 1,
-          blockHeight: 1,
-          size: 4
-        };
-        this._textureFormatInfos['d24s8'] = {
-          glFormat: gl.DEPTH_STENCIL,
-          glInternalFormat: gl.DEPTH_STENCIL,
-          glType: [WebGLEnum.UNSIGNED_INT_24_8],
-          filterable: false,
-          renderable: true,
-          compressed: false,
-          blockWidth: 1,
-          blockHeight: 1,
-          size: 4
-        };
-      }
-    }
+    this._textureFormatInfos['r8unorm'] = {
+      glFormat: gl.RED,
+      glInternalFormat: gl.R8,
+      glType: [gl.UNSIGNED_BYTE],
+      filterable: true,
+      renderable: true,
+      compressed: false,
+      blockWidth: 1,
+      blockHeight: 1,
+      size: 1
+    };
+    this._textureFormatInfos['r8snorm'] = {
+      glFormat: gl.RED,
+      glInternalFormat: gl.R8_SNORM,
+      glType: [gl.BYTE],
+      filterable: true,
+      renderable: false,
+      compressed: false,
+      blockWidth: 1,
+      blockHeight: 1,
+      size: 1
+    };
+    this._textureFormatInfos['r16f'] = {
+      glFormat: gl.RED,
+      glInternalFormat: gl.R16F,
+      glType: [gl.HALF_FLOAT, gl.FLOAT],
+      filterable: this.supportLinearHalfFloatTexture,
+      renderable: this.supportHalfFloatColorBuffer,
+      compressed: false,
+      blockWidth: 1,
+      blockHeight: 1,
+      size: 2
+    };
+    this._textureFormatInfos['r32f'] = {
+      glFormat: gl.RED,
+      glInternalFormat: gl.R32F,
+      glType: [gl.FLOAT],
+      filterable: this.supportLinearFloatTexture,
+      renderable: this.supportFloatColorBuffer,
+      compressed: false,
+      blockWidth: 1,
+      blockHeight: 1,
+      size: 4
+    };
+    this._textureFormatInfos['r8ui'] = {
+      glFormat: gl.RED_INTEGER,
+      glInternalFormat: gl.R8UI,
+      glType: [gl.UNSIGNED_BYTE],
+      filterable: false,
+      renderable: true,
+      compressed: false,
+      blockWidth: 1,
+      blockHeight: 1,
+      size: 1
+    };
+    this._textureFormatInfos['r8i'] = {
+      glFormat: gl.RED_INTEGER,
+      glInternalFormat: gl.R8I,
+      glType: [gl.BYTE],
+      filterable: false,
+      renderable: true,
+      compressed: false,
+      blockWidth: 1,
+      blockHeight: 1,
+      size: 1
+    };
+    this._textureFormatInfos['r16ui'] = {
+      glFormat: gl.RED_INTEGER,
+      glInternalFormat: gl.R16UI,
+      glType: [gl.UNSIGNED_SHORT],
+      filterable: false,
+      renderable: true,
+      compressed: false,
+      blockWidth: 1,
+      blockHeight: 1,
+      size: 2
+    };
+    this._textureFormatInfos['r16i'] = {
+      glFormat: gl.RED_INTEGER,
+      glInternalFormat: gl.R16I,
+      glType: [gl.SHORT],
+      filterable: false,
+      renderable: true,
+      compressed: false,
+      blockWidth: 1,
+      blockHeight: 1,
+      size: 2
+    };
+    this._textureFormatInfos['r32ui'] = {
+      glFormat: gl.RED_INTEGER,
+      glInternalFormat: gl.R32UI,
+      glType: [gl.UNSIGNED_INT],
+      filterable: false,
+      renderable: true,
+      compressed: false,
+      blockWidth: 1,
+      blockHeight: 1,
+      size: 4
+    };
+    this._textureFormatInfos['r32i'] = {
+      glFormat: gl.RED_INTEGER,
+      glInternalFormat: gl.R32I,
+      glType: [gl.INT],
+      filterable: false,
+      renderable: true,
+      compressed: false,
+      blockWidth: 1,
+      blockHeight: 1,
+      size: 4
+    };
+    this._textureFormatInfos['rg8unorm'] = {
+      glFormat: gl.RG,
+      glInternalFormat: gl.RG8,
+      glType: [gl.UNSIGNED_BYTE],
+      filterable: true,
+      renderable: true,
+      compressed: false,
+      blockWidth: 1,
+      blockHeight: 1,
+      size: 2
+    };
+    this._textureFormatInfos['rg8snorm'] = {
+      glFormat: gl.RG,
+      glInternalFormat: gl.RG8_SNORM,
+      glType: [gl.BYTE],
+      filterable: true,
+      renderable: false,
+      compressed: false,
+      blockWidth: 1,
+      blockHeight: 1,
+      size: 2
+    };
+    this._textureFormatInfos['rg16f'] = {
+      glFormat: gl.RG,
+      glInternalFormat: gl.RG16F,
+      glType: [gl.HALF_FLOAT, gl.FLOAT],
+      filterable: this.supportLinearHalfFloatTexture,
+      renderable: this.supportHalfFloatColorBuffer,
+      compressed: false,
+      blockWidth: 1,
+      blockHeight: 1,
+      size: 4
+    };
+    this._textureFormatInfos['rg32f'] = {
+      glFormat: gl.RG,
+      glInternalFormat: gl.RG32F,
+      glType: [gl.FLOAT],
+      filterable: this.supportLinearFloatTexture,
+      renderable: this.supportFloatColorBuffer,
+      compressed: false,
+      blockWidth: 1,
+      blockHeight: 1,
+      size: 8
+    };
+    this._textureFormatInfos['rg8ui'] = {
+      glFormat: gl.RG,
+      glInternalFormat: gl.RG8UI,
+      glType: [gl.UNSIGNED_BYTE],
+      filterable: false,
+      renderable: true,
+      compressed: false,
+      blockWidth: 1,
+      blockHeight: 1,
+      size: 2
+    };
+    this._textureFormatInfos['rg8i'] = {
+      glFormat: gl.RG,
+      glInternalFormat: gl.RG8I,
+      glType: [gl.BYTE],
+      filterable: false,
+      renderable: true,
+      compressed: false,
+      blockWidth: 1,
+      blockHeight: 1,
+      size: 2
+    };
+    this._textureFormatInfos['rg16ui'] = {
+      glFormat: gl.RG,
+      glInternalFormat: gl.RG16UI,
+      glType: [gl.UNSIGNED_SHORT],
+      filterable: false,
+      renderable: true,
+      compressed: false,
+      blockWidth: 1,
+      blockHeight: 1,
+      size: 4
+    };
+    this._textureFormatInfos['rg16i'] = {
+      glFormat: gl.RG,
+      glInternalFormat: gl.RG16I,
+      glType: [gl.SHORT],
+      filterable: false,
+      renderable: true,
+      compressed: false,
+      blockWidth: 1,
+      blockHeight: 1,
+      size: 4
+    };
+    this._textureFormatInfos['rg32ui'] = {
+      glFormat: gl.RG,
+      glInternalFormat: gl.RG32UI,
+      glType: [gl.UNSIGNED_INT],
+      filterable: false,
+      renderable: true,
+      compressed: false,
+      blockWidth: 1,
+      blockHeight: 1,
+      size: 8
+    };
+    this._textureFormatInfos['rg32i'] = {
+      glFormat: gl.RG,
+      glInternalFormat: gl.RG32I,
+      glType: [gl.INT],
+      filterable: false,
+      renderable: true,
+      compressed: false,
+      blockWidth: 1,
+      blockHeight: 1,
+      size: 8
+    };
+    this._textureFormatInfos['rgba8unorm-srgb'] = {
+      glFormat: gl.RGBA,
+      glInternalFormat: gl.SRGB8_ALPHA8,
+      glType: [gl.UNSIGNED_BYTE],
+      filterable: true,
+      renderable: true,
+      compressed: false,
+      blockWidth: 1,
+      blockHeight: 1,
+      size: 4
+    };
+    this._textureFormatInfos['rgba8snorm'] = {
+      glFormat: gl.RGBA,
+      glInternalFormat: gl.RGBA8_SNORM,
+      glType: [gl.BYTE],
+      filterable: true,
+      renderable: false,
+      compressed: false,
+      blockWidth: 1,
+      blockHeight: 1,
+      size: 4
+    };
+    this._textureFormatInfos['rgba16f'] = {
+      glFormat: gl.RGBA,
+      glInternalFormat: gl.RGBA16F,
+      glType: [gl.HALF_FLOAT, gl.FLOAT],
+      filterable: this.supportLinearHalfFloatTexture,
+      renderable: this.supportHalfFloatColorBuffer,
+      compressed: false,
+      blockWidth: 1,
+      blockHeight: 1,
+      size: 8
+    };
+    this._textureFormatInfos['rgba32f'] = {
+      glFormat: gl.RGBA,
+      glInternalFormat: gl.RGBA32F,
+      glType: [gl.FLOAT],
+      filterable: this.supportLinearFloatTexture,
+      renderable: this.supportFloatColorBuffer,
+      compressed: false,
+      blockWidth: 1,
+      blockHeight: 1,
+      size: 16
+    };
+    this._textureFormatInfos['rgba8ui'] = {
+      glFormat: gl.RGBA_INTEGER,
+      glInternalFormat: gl.RGBA8UI,
+      glType: [gl.UNSIGNED_BYTE],
+      filterable: false,
+      renderable: true,
+      compressed: false,
+      blockWidth: 1,
+      blockHeight: 1,
+      size: 4
+    };
+    this._textureFormatInfos['rgba8i'] = {
+      glFormat: gl.RGBA_INTEGER,
+      glInternalFormat: gl.RGBA8I,
+      glType: [gl.BYTE],
+      filterable: false,
+      renderable: true,
+      compressed: false,
+      blockWidth: 1,
+      blockHeight: 1,
+      size: 4
+    };
+    this._textureFormatInfos['rgba16ui'] = {
+      glFormat: gl.RGBA_INTEGER,
+      glInternalFormat: gl.RGBA16UI,
+      glType: [gl.UNSIGNED_SHORT],
+      filterable: false,
+      renderable: true,
+      compressed: false,
+      blockWidth: 1,
+      blockHeight: 1,
+      size: 8
+    };
+    this._textureFormatInfos['rgba16i'] = {
+      glFormat: gl.RGBA_INTEGER,
+      glInternalFormat: gl.RGBA16I,
+      glType: [gl.SHORT],
+      filterable: false,
+      renderable: true,
+      compressed: false,
+      blockWidth: 1,
+      blockHeight: 1,
+      size: 8
+    };
+    this._textureFormatInfos['rgba32ui'] = {
+      glFormat: gl.RGBA_INTEGER,
+      glInternalFormat: gl.RGBA32UI,
+      glType: [gl.UNSIGNED_INT],
+      filterable: false,
+      renderable: true,
+      compressed: false,
+      blockWidth: 1,
+      blockHeight: 1,
+      size: 16
+    };
+    this._textureFormatInfos['rgba32i'] = {
+      glFormat: gl.RGBA_INTEGER,
+      glInternalFormat: gl.RGBA32I,
+      glType: [gl.INT],
+      filterable: false,
+      renderable: true,
+      compressed: false,
+      blockWidth: 1,
+      blockHeight: 1,
+      size: 16
+    };
+    this._textureFormatInfos['rg11b10uf'] = {
+      glFormat: gl.RGB,
+      glInternalFormat: gl.R11F_G11F_B10F,
+      glType: [gl.UNSIGNED_INT_10F_11F_11F_REV],
+      filterable: true,
+      renderable: false,
+      compressed: false,
+      blockWidth: 1,
+      blockHeight: 1,
+      size: 4
+    };
+    this._textureFormatInfos['d16'] = {
+      glFormat: gl.DEPTH_COMPONENT,
+      glInternalFormat: gl.DEPTH_COMPONENT16,
+      glType: [gl.UNSIGNED_SHORT, gl.UNSIGNED_INT],
+      filterable: false,
+      renderable: true,
+      compressed: false,
+      blockWidth: 1,
+      blockHeight: 1,
+      size: 2
+    };
+    this._textureFormatInfos['d24'] = {
+      glFormat: gl.DEPTH_COMPONENT,
+      glInternalFormat: gl.DEPTH_COMPONENT24,
+      glType: [gl.UNSIGNED_INT],
+      filterable: false,
+      renderable: true,
+      compressed: false,
+      blockWidth: 1,
+      blockHeight: 1,
+      size: 4
+    };
+    this._textureFormatInfos['d32f'] = {
+      glFormat: gl.DEPTH_COMPONENT,
+      glInternalFormat: gl.DEPTH_COMPONENT32F,
+      glType: [gl.FLOAT],
+      filterable: false,
+      renderable: true,
+      compressed: false,
+      blockWidth: 1,
+      blockHeight: 1,
+      size: 4
+    };
+    this._textureFormatInfos['d24s8'] = {
+      glFormat: gl.DEPTH_STENCIL,
+      glInternalFormat: gl.DEPTH24_STENCIL8,
+      glType: [gl.UNSIGNED_INT_24_8],
+      filterable: false,
+      renderable: true,
+      compressed: false,
+      blockWidth: 1,
+      blockHeight: 1,
+      size: 4
+    };
+    this._textureFormatInfos['d32fs8'] = {
+      glFormat: gl.DEPTH_STENCIL,
+      glInternalFormat: gl.DEPTH32F_STENCIL8,
+      glType: [gl.FLOAT_32_UNSIGNED_INT_24_8_REV],
+      filterable: false,
+      renderable: true,
+      compressed: false,
+      blockWidth: 1,
+      blockHeight: 1,
+      size: 8
+    };
   }
   calcMemoryUsage(format: TextureFormat, type: number, numPixels: number) {
     switch (format) {

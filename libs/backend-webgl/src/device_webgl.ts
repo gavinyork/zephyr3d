@@ -1,7 +1,6 @@
 import type { Vector4, TypedArray, Immutable, Nullable } from '@zephyr3d/base';
 import { DEPTH_CLEAR_VALUE, REVERSE_Z, makeObservable } from '@zephyr3d/base';
 import type {
-  WebGLContext,
   FrameBufferOptions,
   SamplerOptions,
   TextureSampler,
@@ -48,7 +47,7 @@ import {
   PBPrimitiveType,
   PBPrimitiveTypeInfo
 } from '@zephyr3d/device';
-import { isWebGL2, WebGLError } from './utils';
+import { WebGLError } from './utils';
 import { WebGLEnum } from './webgl_enum';
 import { WebGLTexture2D } from './texture2d_webgl';
 import { WebGLTexture2DArray } from './texture2darray_webgl';
@@ -72,24 +71,13 @@ import { GPUTimer } from './gpu_timer';
 import { WebGLTextureCaps, WebGLFramebufferCaps, WebGLMiscCaps, WebGLShaderCaps } from './capabilities_webgl';
 import { WebGLBindGroup } from './bindgroup_webgl';
 import { WebGLGPUProgram } from './gpuprogram_webgl';
-import {
-  primitiveTypeMap,
-  textureMagFilterToWebGL,
-  textureMinFilterToWebGL,
-  textureWrappingMap,
-  typeMap
-} from './constants_webgl';
+import { primitiveTypeMap, typeMap } from './constants_webgl';
 import { SamplerCache } from './sampler_cache';
 import { WebGLStructuredBuffer } from './structuredbuffer_webgl';
 import type { WebGLTextureSampler } from './sampler_webgl';
 import type { WebGLBaseTexture } from './basetexture_webgl';
 
 declare global {
-  interface WebGLRenderingContext {
-    _currentFramebuffer?: Nullable<WebGLFrameBuffer>;
-    _currentProgram?: Nullable<WebGLGPUProgram>;
-    _drawBuffersIndexedExt?: Nullable<DrawBuffersIndexedEXT>;
-  }
   interface WebGL2RenderingContext {
     _currentFramebuffer?: Nullable<WebGLFrameBuffer>;
     _currentProgram?: Nullable<WebGLGPUProgram>;
@@ -217,8 +205,7 @@ function clearWebGL2ColorAttachment(
 }
 
 export class WebGLDevice extends BaseDevice {
-  private readonly _context: WebGLContext;
-  private readonly _isWebGL2: boolean;
+  private readonly _context: WebGL2RenderingContext;
   private readonly _msaaSampleCount: number;
   private readonly _loseContextExtension: Nullable<WEBGL_lose_context>;
   private _contextLost: boolean;
@@ -226,9 +213,9 @@ export class WebGLDevice extends BaseDevice {
   private _isRendering: boolean;
   private _reverseWindingOrder: boolean;
   private _deviceCaps!: DeviceCaps;
-  private _vaoExt: Nullable<VertexArrayObjectEXT>;
-  private _instancedArraysExt: Nullable<InstancedArraysEXT>;
-  private _drawBuffersExt: Nullable<DrawBuffersEXT>;
+  private _vaoExt!: VertexArrayObjectEXT;
+  private _instancedArraysExt!: InstancedArraysEXT;
+  private _drawBuffersExt!: DrawBuffersEXT;
   private _drawBuffersIndexedExt: Nullable<DrawBuffersIndexedEXT>;
   private _currentProgram: Nullable<WebGLGPUProgram>;
   private _currentVertexData: Nullable<WebGLVertexLayout>;
@@ -238,7 +225,6 @@ export class WebGLDevice extends BaseDevice {
   private _currentViewport: DeviceViewport;
   private _currentScissorRect: DeviceViewport;
   private _samplerCache: SamplerCache;
-  private _textureSamplerMap: WeakMap<BaseTexture, Nullable<WebGLTextureSampler>>;
   private _captureRenderBundle: Nullable<WebGLRenderBundle>;
   private _deviceUniformBuffers: WebGLBuffer[];
   private _deviceUniformBufferOffsets: number[];
@@ -257,25 +243,21 @@ export class WebGLDevice extends BaseDevice {
     this._isRendering = false;
     this._captureRenderBundle = null;
     this._msaaSampleCount = options?.msaa ? 4 : 1;
-    const context: WebGLContext = this.canvas.getContext(backend === backend1 ? 'webgl' : 'webgl2', {
+    const context = this.canvas.getContext('webgl2', {
       antialias: !!options?.msaa,
       depth: true,
       stencil: true,
       premultipliedAlpha: false
-    }) as WebGLContext;
+    });
     if (!context) {
-      throw new Error('Invalid argument or no webgl support');
+      throw new Error('WebGL2 is not available: zephyr3d no longer supports WebGL1');
     }
-    this._isWebGL2 = isWebGL2(context);
     this._adapterInfo = {
       vendor: context.getParameter(context.VENDOR),
       renderer: context.getParameter(context.RENDERER),
       version: context.getParameter(context.VERSION)
     };
     this._contextLost = false;
-    this._vaoExt = null;
-    this._instancedArraysExt = null;
-    this._drawBuffersExt = null;
     this._drawBuffersIndexedExt = null;
     this._reverseWindingOrder = false;
     this._context = context;
@@ -308,7 +290,6 @@ export class WebGLDevice extends BaseDevice {
     };
     this._bindSamplers = [];
     this._samplerCache = new SamplerCache(this);
-    this._textureSamplerMap = new WeakMap();
     this._loseContextExtension = this._context.getExtension('WEBGL_lose_context');
     this._readFormats = {};
     this.canvas.addEventListener(
@@ -337,9 +318,6 @@ export class WebGLDevice extends BaseDevice {
   }
   getFrameBufferSampleCount() {
     return this.getFramebuffer()?.getSampleCount() ?? this._msaaSampleCount;
-  }
-  get isWebGL2() {
-    return this._isWebGL2;
   }
   get drawingBufferWidth() {
     return this.getDrawingBufferWidth();
@@ -407,26 +385,10 @@ export class WebGLDevice extends BaseDevice {
       gl.bindTexture(target, tex);
       this._bindTextures[target][layer] = tex;
     }
-    if (this._isWebGL2) {
-      const samp = sampler?.object ?? null;
-      if (samp && this._bindSamplers[layer] !== samp) {
-        (gl as WebGL2RenderingContext).bindSampler(layer, samp);
-        this._bindSamplers[layer] = samp;
-      }
-    } else if (texture && sampler && this._textureSamplerMap.get(texture) !== sampler) {
-      const fallback = texture.isWebGL1Fallback;
-      this._textureSamplerMap.set(texture, sampler);
-      gl.texParameteri(target, WebGLEnum.TEXTURE_WRAP_S, textureWrappingMap[sampler.addressModeU]);
-      gl.texParameteri(target, WebGLEnum.TEXTURE_WRAP_T, textureWrappingMap[sampler.addressModeV]);
-      gl.texParameteri(target, WebGLEnum.TEXTURE_MAG_FILTER, textureMagFilterToWebGL(sampler.magFilter));
-      gl.texParameteri(
-        target,
-        WebGLEnum.TEXTURE_MIN_FILTER,
-        textureMinFilterToWebGL(sampler.minFilter, fallback ? 'none' : sampler.mipFilter)
-      );
-      if (this.getDeviceCaps().textureCaps.supportAnisotropicFiltering) {
-        gl.texParameterf(target, WebGLEnum.TEXTURE_MAX_ANISOTROPY, sampler.maxAnisotropy);
-      }
+    const samp = sampler?.object ?? null;
+    if (samp && this._bindSamplers[layer] !== samp) {
+      gl.bindSampler(layer, samp);
+      this._bindSamplers[layer] = samp;
     }
   }
   bindUniformBuffer(index: number, buffer: WebGLGPUBuffer, offset: number) {
@@ -505,7 +467,7 @@ export class WebGLDevice extends BaseDevice {
       // what WebGPU's load operation does regardless of any pipeline mask.
       WebGLDepthState.applyDefaults(this._context);
       WebGLColorState.applyDefaults(this._context);
-      if (isWebGL2(gl) && gl._currentFramebuffer) {
+      if (gl._currentFramebuffer) {
         if (depthFlag || stencilFlag) {
           const depthAttachment = gl._currentFramebuffer.getDepthAttachment();
           if (depthAttachment) {
@@ -523,30 +485,7 @@ export class WebGLDevice extends BaseDevice {
         }
       } else {
         let clearFlag = depthFlag | stencilFlag;
-        const clearPerTarget =
-          colorFlag && Array.isArray(clearColor) && !!gl._currentFramebuffer && targetCount > 1;
-        if (clearPerTarget) {
-          const drawBuffersExt = this.drawBuffersExt;
-          if (drawBuffersExt) {
-            const drawBuffers = new Array<number>(targetCount).fill(WebGLEnum.NONE);
-            for (let i = 0; i < targetCount; i++) {
-              const color = getFrameBufferClearColor(clearColor, i);
-              if (color) {
-                drawBuffers[i] = WebGLEnum.COLOR_ATTACHMENT0 + i;
-                drawBuffersExt.drawBuffers(drawBuffers);
-                gl.clearColor(color[0], color[1], color[2], color[3]);
-                gl.clear(gl.COLOR_BUFFER_BIT);
-                drawBuffers[i] = WebGLEnum.NONE;
-              }
-            }
-            for (let i = 0; i < targetCount; i++) {
-              drawBuffers[i] = WebGLEnum.COLOR_ATTACHMENT0 + i;
-            }
-            drawBuffersExt.drawBuffers(drawBuffers);
-          } else {
-            console.error('clearFrameBuffer(): per-target color clear requires draw buffers support');
-          }
-        } else if (colorFlag) {
+        if (colorFlag) {
           const color = getFrameBufferClearColor(clearColor, 0);
           if (color) {
             gl.clearColor(color[0], color[1], color[2], color[3]);
@@ -723,10 +662,6 @@ export class WebGLDevice extends BaseDevice {
     depth: number,
     options?: TextureCreationOptions
   ) {
-    if (!this.isWebGL2) {
-      console.error('device does not support 3d texture');
-      return null;
-    }
     const tex = (options?.texture as WebGLTexture3D) ?? new WebGLTexture3D(this);
     if (!tex.isTexture3D()) {
       console.error('createTexture3D() failed: options.texture must be 3d texture');
@@ -780,20 +715,12 @@ export class WebGLDevice extends BaseDevice {
       );
       return;
     }
-    if (index > 0 && !this.isWebGL2) {
-      console.error(
-        'copyFramebufferToTexture2D(): Non-zero color attachment index requires WebGL2 or WebGPU device'
-      );
-      return;
-    }
     this.pushDeviceStates();
     // If src is current framebuffer, force mipmaps to be generated
     this.setFramebuffer(null);
     this.setFramebuffer(src);
     const gl = this._context;
-    if (this.isWebGL2) {
-      (gl as WebGL2RenderingContext).readBuffer(gl.COLOR_ATTACHMENT0 + index);
-    }
+    gl.readBuffer(gl.COLOR_ATTACHMENT0 + index);
     this.bindTexture(gl.TEXTURE_2D, 0, dst as WebGLTexture2D);
     gl.copyTexSubImage2D(gl.TEXTURE_2D, level, 0, 0, 0, 0, srcWidth, srcHeight);
     this.popDeviceStates();
@@ -830,7 +757,7 @@ export class WebGLDevice extends BaseDevice {
     return new WebGLBindGroup(this, layout);
   }
   createBuffer(sizeInBytes: number, options: BufferCreationOptions) {
-    return new WebGLGPUBuffer(this, this.parseBufferOptions(options), sizeInBytes, !this._isWebGL2);
+    return new WebGLGPUBuffer(this, this.parseBufferOptions(options), sizeInBytes, false);
   }
   copyBuffer(
     sourceBuffer: GPUDataBuffer<unknown>,
@@ -839,11 +766,7 @@ export class WebGLDevice extends BaseDevice {
     dstOffset: number,
     bytes: number
   ) {
-    if (!this.isWebGL2) {
-      console.error(`copyBuffer() is not supported for current device`);
-      return;
-    }
-    const gl = this._context as WebGL2RenderingContext;
+    const gl = this._context;
     gl.bindBuffer(gl.COPY_READ_BUFFER, sourceBuffer.object!);
     gl.bindBuffer(gl.COPY_WRITE_BUFFER, destBuffer.object!);
     gl.copyBufferSubData(gl.COPY_READ_BUFFER, gl.COPY_WRITE_BUFFER, srcOffset, dstOffset, bytes);
@@ -872,9 +795,6 @@ export class WebGLDevice extends BaseDevice {
     return new WebGLFrameBuffer(this, colorAttachments, depthAttachement, options);
   }
   setBindGroup(index: number, bindGroup: BindGroup, bindGroupOffsets?: Nullable<Iterable<number>>) {
-    if (bindGroupOffsets && !isWebGL2(this._context)) {
-      throw new Error(`setBindGroup(): no dynamic offset buffer support for WebGL1 device`);
-    }
     this._currentBindGroups[index] = bindGroup as WebGLBindGroup;
     this._currentBindGroupOffsets[index] = bindGroupOffsets || null;
   }
@@ -998,35 +918,22 @@ export class WebGLDevice extends BaseDevice {
     const glFormat = formatInfo.format;
     const glType = formatInfo.type;
     const pixelSize = getTextureFormatBlockSize(format);
-    if (
-      (glFormat !== WebGLEnum.RGBA ||
-        (glType !== WebGLEnum.UNSIGNED_BYTE &&
-          glType !== WebGLEnum.FLOAT &&
-          glType !== WebGLEnum.HALF_FLOAT)) &&
-      !isWebGL2(this.context)
-    ) {
-      throw new Error(`readPixels() failed: invalid format: ${format}`);
-    }
     const byteSize = w * h * pixelSize;
     if (buffer.byteLength < byteSize) {
       throw new Error(`readPixels() failed: destination buffer must have at least ${byteSize} bytes`);
     }
-    if (isWebGL2(this.context)) {
-      const stagingBuffer = this.createBuffer(byteSize, {
-        usage: 'pack-pixel',
-        managed: false
-      });
-      this.context.bindBuffer(WebGLEnum.PIXEL_PACK_BUFFER, stagingBuffer.object!);
-      this.context.readBuffer(fb ? WebGLEnum.COLOR_ATTACHMENT0 + index : WebGLEnum.COLOR_ATTACHMENT0);
-      //this.flush();
-      this.context.readPixels(x, y, w, h, glFormat, glType, 0);
-      this.context.bindBuffer(WebGLEnum.PIXEL_PACK_BUFFER, null);
-      const data = new Uint8Array(buffer.buffer, buffer.byteOffset, buffer.byteLength);
-      await stagingBuffer.getBufferSubData(data);
-      stagingBuffer.dispose();
-    } else {
-      this.context.readPixels(x, y, w, h, glFormat, glType, buffer);
-    }
+    const stagingBuffer = this.createBuffer(byteSize, {
+      usage: 'pack-pixel',
+      managed: false
+    });
+    this.context.bindBuffer(WebGLEnum.PIXEL_PACK_BUFFER, stagingBuffer.object!);
+    this.context.readBuffer(fb ? WebGLEnum.COLOR_ATTACHMENT0 + index : WebGLEnum.COLOR_ATTACHMENT0);
+    //this.flush();
+    this.context.readPixels(x, y, w, h, glFormat, glType, 0);
+    this.context.bindBuffer(WebGLEnum.PIXEL_PACK_BUFFER, null);
+    const data = new Uint8Array(buffer.buffer, buffer.byteOffset, buffer.byteLength);
+    await stagingBuffer.getBufferSubData(data);
+    stagingBuffer.dispose();
   }
   readPixelsToBuffer(index: number, x: number, y: number, w: number, h: number, buffer: GPUDataBuffer) {
     const fb = this.getFramebuffer();
@@ -1034,9 +941,6 @@ export class WebGLDevice extends BaseDevice {
     const format = colorAttachment ? colorAttachment.format : 'rgba8unorm';
     let glFormat: number = WebGLEnum.NONE;
     let glType: number = WebGLEnum.NONE;
-    if (!isWebGL2(this.context)) {
-      throw new Error('readPixels() failed: readPixels() requires webgl2 device');
-    }
     if (isCompressedTextureFormat(format) || hasDepthChannel(format)) {
       throw new Error(`readPixels() failed: invalid format: ${format}`);
     }
@@ -1205,7 +1109,7 @@ export class WebGLDevice extends BaseDevice {
   }
   /** @internal */
   protected _drawInstanced(primitiveType: PrimitiveType, first: number, count: number, numInstances: number) {
-    if (this.instancedArraysExt && this._currentVertexData) {
+    if (this._currentVertexData) {
       this._currentVertexData.bind();
       if (this._currentProgram) {
         if (!this._currentProgram.use()) {
@@ -1276,40 +1180,20 @@ export class WebGLDevice extends BaseDevice {
     throw new Error('WebGL device does not support compute shader');
   }
   /** @internal */
-  private createInstancedArraysEXT() {
+  private createInstancedArraysEXT(): InstancedArraysEXT {
     const gl = this._context;
-    if (isWebGL2(gl)) {
-      return {
-        vertexAttribDivisor: gl.vertexAttribDivisor.bind(gl),
-        drawArraysInstanced: gl.drawArraysInstanced.bind(gl),
-        drawElementsInstanced: gl.drawElementsInstanced.bind(gl)
-      };
-    } else {
-      const extInstancedArray: Nullable<ANGLE_instanced_arrays> = gl.getExtension('ANGLE_instanced_arrays');
-      return extInstancedArray
-        ? {
-            vertexAttribDivisor: extInstancedArray.vertexAttribDivisorANGLE.bind(extInstancedArray),
-            drawArraysInstanced: extInstancedArray.drawArraysInstancedANGLE.bind(extInstancedArray),
-            drawElementsInstanced: extInstancedArray.drawElementsInstancedANGLE.bind(extInstancedArray)
-          }
-        : null;
-    }
+    return {
+      vertexAttribDivisor: gl.vertexAttribDivisor.bind(gl),
+      drawArraysInstanced: gl.drawArraysInstanced.bind(gl),
+      drawElementsInstanced: gl.drawElementsInstanced.bind(gl)
+    };
   }
   /** @internal */
-  private createDrawBuffersEXT() {
+  private createDrawBuffersEXT(): DrawBuffersEXT {
     const gl = this._context;
-    if (isWebGL2(gl)) {
-      return {
-        drawBuffers: gl.drawBuffers.bind(gl)
-      };
-    } else {
-      const extDrawBuffers: Nullable<WEBGL_draw_buffers> = gl.getExtension('WEBGL_draw_buffers');
-      return extDrawBuffers
-        ? {
-            drawBuffers: extDrawBuffers.drawBuffersWEBGL.bind(extDrawBuffers)
-          }
-        : null;
-    }
+    return {
+      drawBuffers: gl.drawBuffers.bind(gl)
+    };
   }
   /** @internal */
   private createDrawBuffersIndexedEXT() {
@@ -1325,26 +1209,14 @@ export class WebGLDevice extends BaseDevice {
       : null;
   }
   /** @internal */
-  private createVertexArrayObjectEXT() {
+  private createVertexArrayObjectEXT(): VertexArrayObjectEXT {
     const gl = this._context;
-    if (isWebGL2(gl)) {
-      return {
-        createVertexArray: gl.createVertexArray.bind(gl),
-        bindVertexArray: gl.bindVertexArray.bind(gl),
-        deleteVertexArray: gl.deleteVertexArray.bind(gl),
-        isVertexArray: gl.isVertexArray.bind(gl)
-      };
-    } else {
-      const extVAO: Nullable<OES_vertex_array_object> = gl.getExtension('OES_vertex_array_object');
-      return extVAO
-        ? {
-            createVertexArray: extVAO.createVertexArrayOES.bind(extVAO),
-            bindVertexArray: extVAO.bindVertexArrayOES.bind(extVAO),
-            deleteVertexArray: extVAO.deleteVertexArrayOES.bind(extVAO),
-            isVertexArray: extVAO.isVertexArrayOES.bind(extVAO)
-          }
-        : null;
-    }
+    return {
+      createVertexArray: gl.createVertexArray.bind(gl) as () => VAOObject,
+      bindVertexArray: gl.bindVertexArray.bind(gl),
+      deleteVertexArray: gl.deleteVertexArray.bind(gl),
+      isVertexArray: gl.isVertexArray.bind(gl)
+    };
   }
   /** @internal */
   private handleContextLost() {
@@ -1356,7 +1228,6 @@ export class WebGLDevice extends BaseDevice {
   private handleContextRestored() {
     console.info('handle context restored');
     this.initContextState();
-    this._textureSamplerMap = new WeakMap();
     this._currentProgram = null;
     this._currentVertexData = null;
     this._currentStateSet = null;
@@ -1433,14 +1304,6 @@ export class WebGLDevice extends BaseDevice {
       // eat errors
     }
   }
-  /** @internal */
-  getCurrentSamplerForTexture(tex: BaseTexture) {
-    return this._textureSamplerMap.get(tex);
-  }
-  /** @internal */
-  setCurrentSamplerForTexture(tex: BaseTexture, sampler: Nullable<WebGLTextureSampler>) {
-    this._textureSamplerMap.set(tex, sampler);
-  }
   getError(throwError?: boolean) {
     const errcode = this._context.getError();
     const err = errcode === WebGLEnum.NO_ERROR ? null : new WebGLError(errcode);
@@ -1451,8 +1314,8 @@ export class WebGLDevice extends BaseDevice {
   }
 }
 
-let webGL1Supported: Nullable<boolean> = null;
 let webGL2Supported: Nullable<boolean> = null;
+let webGL1DeprecationWarned = false;
 const factory = makeObservable(WebGLDevice)<DeviceEventMap>();
 
 async function createWebGLDevice(
@@ -1473,26 +1336,6 @@ async function createWebGLDevice(
 }
 
 /** @internal */
-export const backend1: DeviceBackend = {
-  typeName() {
-    return 'webgl';
-  },
-  async supported() {
-    if (webGL1Supported === null) {
-      const cvs = document.createElement('canvas');
-      const gl = cvs.getContext('webgl');
-      webGL1Supported = !!gl;
-      cvs.width = 0;
-      cvs.height = 0;
-    }
-    return webGL1Supported;
-  },
-  async createDevice(cvs, options?) {
-    return createWebGLDevice(this, cvs, options);
-  }
-};
-
-/** @internal */
 export const backend2: DeviceBackend = {
   typeName() {
     return 'webgl2';
@@ -1509,5 +1352,30 @@ export const backend2: DeviceBackend = {
   },
   async createDevice(cvs, options?) {
     return createWebGLDevice(this, cvs, options);
+  }
+};
+
+/**
+ * Deprecated WebGL1 backend, kept so existing code keeps working.
+ *
+ * @remarks
+ * WebGL1 is no longer supported. This backend is an alias of the WebGL2 backend: it reports
+ * `webgl2` as its type and creates WebGL2 devices.
+ *
+ * @internal
+ */
+export const backend1: DeviceBackend = {
+  typeName() {
+    return backend2.typeName();
+  },
+  async supported() {
+    return backend2.supported();
+  },
+  async createDevice(cvs, options?) {
+    if (!webGL1DeprecationWarned) {
+      webGL1DeprecationWarned = true;
+      console.warn('backendWebGL1 is deprecated and now creates a WebGL2 device; use backendWebGL2 instead');
+    }
+    return backend2.createDevice(cvs, options);
   }
 };

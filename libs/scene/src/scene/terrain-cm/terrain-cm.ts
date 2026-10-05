@@ -597,7 +597,7 @@ export class ClipmapTerrain extends applyMixins(GraphNode, mixinDrawable) implem
       this._tmpTexture.dispose();
     }
     if (!this._tmpTexture.get()) {
-      tmp = getDevice().createTexture2D(device.type === 'webgl' ? 'rgba32f' : 'rg32f', width, height)!;
+      tmp = getDevice().createTexture2D('rg32f', width, height)!;
       tmp.name = 'TerrainBoundingBoxTexture';
       this._tmpTexture.set(tmp);
     }
@@ -639,7 +639,7 @@ export class ClipmapTerrain extends applyMixins(GraphNode, mixinDrawable) implem
   }
   /** @internal */
   createHeightMapTexture(width: number, height: number) {
-    return getDevice().createTexture2D(getDevice().type === 'webgl' ? 'rgba16f' : 'r16f', width, height)!;
+    return getDevice().createTexture2D('r16f', width, height)!;
   }
   /** @internal */
   protected _onTransformChanged(invalidateLocal: boolean) {
@@ -798,11 +798,7 @@ export class ClipmapTerrain extends applyMixins(GraphNode, mixinDrawable) implem
       sizeX = Math.min(Math.max(sizeX, 1), maxTextureSize) >> 0;
       sizeZ = Math.min(Math.max(sizeZ, 1), maxTextureSize) >> 0;
       if (sizeX !== oldHeightMap.width || sizeZ !== oldHeightMap.height) {
-        const newHeightMap = device.createTexture2D(
-          device.type === 'webgl' ? 'rgba16f' : 'r16f',
-          sizeX,
-          sizeZ
-        )!;
+        const newHeightMap = device.createTexture2D('r16f', sizeX, sizeZ)!;
         const fb = device.createFrameBuffer([newHeightMap], null);
         ClipmapTerrain._copyBlitter.blit(oldHeightMap, fb, fetchSampler('clamp_linear_nomip'));
         fb.dispose();

@@ -616,7 +616,7 @@ export function mixinPBRBluePrint<T extends typeof MeshMaterial>(BaseCls: T) {
             ctx.SSGI &&
             ctx.SSGIIrradianceHistoryTexture &&
             ctx.SSGISurfaceHistoryTexture &&
-            (ctx.device.type === 'webgl' || ctx.motionVectorTexture)
+            ctx.motionVectorTexture
               ? pb.float(1)
               : this.occlusion;
           this.$l.reflectionMode = this.zReflectionMode;

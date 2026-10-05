@@ -17,7 +17,7 @@ Batching is automatic: the render queue groups the visible meshes every frame. A
 - its material is a **material instance**, created with `material.createInstance()`; meshes using the material itself are drawn one by one;
 - it shares the **same primitive** and the **same core material** with the other meshes;
 - it has no morph targets, and if skinned, at most 4 bone influences per vertex;
-- the device is WebGL2 or WebGPU (WebGL1 has no instancing).
+- the device is WebGL2 or WebGPU.
 
 ### In the Editor
 

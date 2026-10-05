@@ -1,5 +1,5 @@
 /**
- * The WebGL/WebGL2 device backend for zephyr3d project
+ * The WebGL2 device backend for zephyr3d project
  *
  * @module backend-webgl
  * @packageDocumentation
@@ -8,6 +8,10 @@ import { backend1, backend2 } from './device_webgl';
 
 /**
  * The WebGL1 backend
+ *
+ * @deprecated WebGL1 is no longer supported. This is now an alias of {@link backendWebGL2} that
+ * creates WebGL2 devices; use {@link backendWebGL2} instead.
+ *
  * @public
  */
 export const backendWebGL1 = backend1;

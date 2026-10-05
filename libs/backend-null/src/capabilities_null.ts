@@ -32,13 +32,12 @@ export class NullFramebufferCaps implements FramebufferCaps {
   supportDepth32floatStencil8: boolean;
   maxColorAttachmentBytesPerSample: number;
   constructor(type: NullDeviceType, overrides?: Partial<FramebufferCaps>) {
-    const webgl1 = type === 'webgl';
-    this.maxDrawBuffers = webgl1 ? 1 : 8;
+    this.maxDrawBuffers = 8;
     this.supportPerTargetBlending = type === 'webgpu';
-    this.supportRenderMipmap = !webgl1;
-    this.supportMultisampledFramebuffer = !webgl1;
+    this.supportRenderMipmap = true;
+    this.supportMultisampledFramebuffer = true;
     this.supportFloatBlending = type === 'webgpu';
-    this.supportDepth32float = !webgl1;
+    this.supportDepth32float = true;
     this.supportDepth32floatStencil8 = type === 'webgpu';
     this.maxColorAttachmentBytesPerSample = 32;
     Object.assign(this, overrides ?? {});
@@ -61,10 +60,9 @@ export class NullMiscCaps implements MiscCaps {
   supportDispatchIndirect: boolean;
   supportIndirectFirstInstance: boolean;
   constructor(type: NullDeviceType, overrides?: Partial<MiscCaps>) {
-    const webgl1 = type === 'webgl';
     this.supportOversizedViewport = type !== 'webgpu';
-    this.supportBlendMinMax = !webgl1;
-    this.support32BitIndex = !webgl1;
+    this.supportBlendMinMax = true;
+    this.support32BitIndex = true;
     this.maxBindGroups = 4;
     this.maxTexCoordIndex = 8;
     this.supportTimestampQuery = false;
@@ -93,10 +91,9 @@ export class NullShaderCaps implements ShaderCaps {
   maxVertexUniformVectors: number;
   maxFragmentUniformVectors: number;
   constructor(type: NullDeviceType, overrides?: Partial<ShaderCaps>) {
-    const webgl1 = type === 'webgl';
-    this.supportFragmentDepth = !webgl1;
-    this.supportStandardDerivatives = !webgl1;
-    this.supportShaderTextureLod = !webgl1;
+    this.supportFragmentDepth = true;
+    this.supportStandardDerivatives = true;
+    this.supportShaderTextureLod = true;
     this.supportHighPrecisionFloat = true;
     this.supportShaderF16 = type === 'webgpu';
     this.maxUniformBufferSize = 65536;
@@ -138,22 +135,21 @@ export class NullTextureCaps implements TextureCaps {
   /** @internal */
   private readonly _formatInfos: Partial<Record<TextureFormat, TextureFormatInfo>>;
   constructor(type: NullDeviceType, overrides?: Partial<Omit<TextureCaps, 'getTextureFormatInfo'>>) {
-    const webgl1 = type === 'webgl';
     this.maxTextureSize = 8192;
     this.maxCubeTextureSize = 8192;
-    this.npo2Mipmapping = !webgl1;
-    this.npo2Repeating = !webgl1;
+    this.npo2Mipmapping = true;
+    this.npo2Repeating = true;
     this.supportS3TC = true;
-    this.supportBPTC = !webgl1;
-    this.supportRGTC = !webgl1;
+    this.supportBPTC = true;
+    this.supportRGTC = true;
     this.supportASTC = true;
     this.supportETC2 = true;
     this.supportS3TCSRGB = true;
     this.supportDepthTexture = true;
-    this.support3DTexture = !webgl1;
+    this.support3DTexture = true;
     this.supportSRGBTexture = true;
     this.supportFloatTexture = true;
-    this.supportLinearFloatTexture = !webgl1;
+    this.supportLinearFloatTexture = true;
     this.supportHalfFloatTexture = true;
     this.supportLinearHalfFloatTexture = true;
     this.supportAnisotropicFiltering = true;

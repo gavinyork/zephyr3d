@@ -122,8 +122,7 @@ correctly, so accuracy depends on the number of iterations you allow.
 ### Supported Platforms
 
 The device must provide multiple render targets (at least 3), per‑target blending, min/max blend
-equations and blendable floating‑point color buffers. **WebGL1 does not qualify**; WebGL2 depends on
-the implementation, and WebGPU generally supports it.
+equations and blendable floating‑point color buffers. WebGL2 depends on the implementation, and WebGPU generally supports it.
 
 When those capabilities are missing, `supportDevice()` returns false and transparent geometry
 **silently falls back to sorted alpha blending** without raising an error — so verify on your target

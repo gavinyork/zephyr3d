@@ -199,7 +199,8 @@ export default plugin;
 ] as const;
 
 export function generateIndexTS(settings: ProjectSettings) {
-  const rhiList = settings.preferredRHI?.map((val) => val.toLowerCase()) ?? [];
+  const rhiList =
+    settings.preferredRHI?.map((val) => (val.toLowerCase() === 'webgl' ? 'webgl2' : val.toLowerCase())) ?? [];
   return `import { Application, getEngine, setActiveMorphTargetLimit, setMorphTargetLimit, setSkinInfluenceLimit } from '@zephyr3d/scene';
 import { HttpFS } from '@zephyr3d/base';
 import { FBXImporter, GLTFImporter, OBJImporter } from '@zephyr3d/loaders';
@@ -217,15 +218,6 @@ if (!(await backend.supported())) {
 ${
   rhiList.includes('webgl2')
     ? `backend = backend || (await import('@zephyr3d/backend-webgl')).backendWebGL2;
-if (!(await backend.supported())) {
-  backend = null;
-}
-`
-    : ''
-}
-${
-  rhiList.includes('webgl')
-    ? `backend = backend || (await import('@zephyr3d/backend-webgl')).backendWebGL1;
 if (!(await backend.supported())) {
   backend = null;
 }
@@ -286,7 +278,7 @@ const VFS = new HttpFS('./');
 const settingsJson = await VFS.readFile('/${projectFileName}', { encoding: 'utf8' }) as string;
 const settings = JSON.parse(settingsJson);
 const renderScale = typeof settings.renderScale === 'number' && Number.isFinite(settings.renderScale) ? settings.renderScale : 1;
-const rhiList = settings.preferredRHI?.map((val) => val.toLowerCase()) ?? [];
+const rhiList = settings.preferredRHI?.map((val) => (val.toLowerCase() === 'webgl' ? 'webgl2' : val.toLowerCase())) ?? [];
 let backend: DeviceBackend = null;
 if (rhiList.includes('webgpu')) {
   backend = (await import('@zephyr3d/backend-webgpu')).backendWebGPU;
@@ -296,12 +288,6 @@ if (rhiList.includes('webgpu')) {
 }
 if (!backend && rhiList.includes('webgl2')) {
   backend = (await import('@zephyr3d/backend-webgl')).backendWebGL2;
-  if (!(await backend.supported())) {
-    backend = null;
-  }
-}
-if (!backend && rhiList.includes('webgl')) {
-  backend = (await import('@zephyr3d/backend-webgl')).backendWebGL1;
   if (!(await backend.supported())) {
     backend = null;
   }

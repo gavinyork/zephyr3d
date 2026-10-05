@@ -174,10 +174,12 @@ export class TerrainEditTool extends Disposable implements EditTool {
     this._heightDirty = false;
     this._brushMaskCache = new Map();
     const splatMap = this._terrain.get().material.getSplatMap();
-    const splatMapCopy =
-      getDevice().type === 'webgl'
-        ? getDevice().createTexture2D(splatMap.format, splatMap.width, splatMap.height)
-        : getDevice().createTexture2DArray(splatMap.format, splatMap.width, splatMap.height, splatMap.depth);
+    const splatMapCopy = getDevice().createTexture2DArray(
+      splatMap.format,
+      splatMap.width,
+      splatMap.height,
+      splatMap.depth
+    );
     splatMapCopy.name = 'SplatMapCopy';
     blitter.blit(splatMap, splatMapCopy, fetchSampler('clamp_nearest_nomip'));
     this._splatMapCopy = new DRef(splatMapCopy);

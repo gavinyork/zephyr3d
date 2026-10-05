@@ -23,7 +23,7 @@ const MCP_CONFIG_FILE = 'mcp-config.json';
 const EDITOR_GLOBAL_CONFIG_FILE = 'editor-config.json';
 const LLM_SECRETS_FILE = 'llm-secrets.json';
 const DEFAULT_EDITOR_RHI = 'webgpu';
-const SUPPORTED_EDITOR_RHIS = new Set(['webgpu', 'webgl2', 'webgl']);
+const SUPPORTED_EDITOR_RHIS = new Set(['webgpu', 'webgl2']);
 const ASSISTANT_STORAGE_DIR = 'assistant';
 const ASSISTANT_SESSIONS_FILE = 'sessions.json';
 const PORTABLE_USER_DATA_DIR = 'userdata';
@@ -218,7 +218,7 @@ const HEADLESS_USAGE = [
   '  --fixed-dt <ms>      fixed timestep in milliseconds; 0 = wall clock (default 16.6667)',
   '  --width <px>         content width (default 1280)',
   '  --height <px>        content height (default 720)',
-  '  --device <rhi>       webgpu | webgl2 | webgl',
+  '  --device <rhi>       webgpu | webgl2',
   '  --screenshot <path>  output PNG path (presence selects one-shot mode)',
   '  --timeout <ms>       whole-run watchdog (default 120000)',
   '',
@@ -620,7 +620,11 @@ async function saveMcpServiceConfig() {
 }
 
 function sanitizeEditorRHI(value) {
-  const normalized = typeof value === 'string' ? value.trim().toLowerCase() : '';
+  let normalized = typeof value === 'string' ? value.trim().toLowerCase() : '';
+  // WebGL1 is no longer supported; an old 'webgl' setting means WebGL2
+  if (normalized === 'webgl') {
+    normalized = 'webgl2';
+  }
   return SUPPORTED_EDITOR_RHIS.has(normalized) ? normalized : DEFAULT_EDITOR_RHI;
 }
 

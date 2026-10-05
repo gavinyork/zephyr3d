@@ -81,7 +81,7 @@ material.setDetailMapHexParams(0, 1, 0.5, 0.5);
 | scale | How much each tile is resized at random; 1 allows 0.5 to 2 times |
 | contrast | How much the brighter tile wins at seams; higher values give crisper transitions |
 
-Hex tiling takes three samples per layer instead of one. With the runtime virtual texture that cost is paid once per page rather than per pixel, so the two work well together. It is not available on WebGL1.
+Hex tiling takes three samples per layer instead of one. With the runtime virtual texture that cost is paid once per page rather than per pixel, so the two work well together.
 
 ---
 

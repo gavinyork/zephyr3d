@@ -95,53 +95,32 @@ function createPMREMProgram(type: DistributionType, numSamples: number) {
       this.NUM_SAMPLES_FLOAT_INVERSED = pb.float(1 / numSamples);
       this.K = pb.float(4);
       this.$outputs.outcolor = pb.vec4();
-      if (device.type === 'webgl') {
-        pb.func('radicalInverse_VdC', [pb.int('bits')], function () {
-          this.$l.rand = pb.float(0);
-          this.$l.denom = pb.float(1);
-          this.$l.invBase = pb.float(0.5);
-          this.$l.n = this.bits;
-          this.$for(pb.int('i'), 0, 32, function () {
-            this.denom = pb.mul(this.denom, 2);
-            this.rand = pb.add(this.rand, pb.div(pb.mod(pb.float(this.n), 2), this.denom));
-            this.n = pb.div(this.n, 2);
-            this.$if(pb.equal(this.n, 0), function () {
-              this.$break();
-            });
-          });
-          this.$return(this.rand);
-        });
-        pb.func('hammersley2d', [pb.int('i'), pb.int('N')], function () {
-          this.$return(pb.vec2(pb.div(pb.float(this.i), pb.float(this.N)), this.radicalInverse_VdC(this.i)));
-        });
-      } else {
-        pb.func('radicalInverse_VdC', [pb.uint('bits')], function () {
-          this.$l.n = this.bits;
-          this.n = pb.compOr(pb.sal(this.n, 16), pb.sar(this.n, 16));
-          this.n = pb.compOr(
-            pb.sal(pb.compAnd(this.n, 0x55555555), 1),
-            pb.sar(pb.compAnd(this.n, 0xaaaaaaaa), 1)
-          );
-          this.n = pb.compOr(
-            pb.sal(pb.compAnd(this.n, 0x33333333), 2),
-            pb.sar(pb.compAnd(this.n, 0xcccccccc), 2)
-          );
-          this.n = pb.compOr(
-            pb.sal(pb.compAnd(this.n, 0x0f0f0f0f), 4),
-            pb.sar(pb.compAnd(this.n, 0xf0f0f0f0), 4)
-          );
-          this.n = pb.compOr(
-            pb.sal(pb.compAnd(this.n, 0x00ff00ff), 8),
-            pb.sar(pb.compAnd(this.n, 0xff00ff00), 8)
-          );
-          this.$return(pb.mul(pb.float(this.n), 2.3283064365386963e-10));
-        });
-        pb.func('hammersley2d', [pb.int('i'), pb.int('N')], function () {
-          this.$return(
-            pb.vec2(pb.div(pb.float(this.i), pb.float(this.N)), this.radicalInverse_VdC(pb.uint(this.i)))
-          );
-        });
-      }
+      pb.func('radicalInverse_VdC', [pb.uint('bits')], function () {
+        this.$l.n = this.bits;
+        this.n = pb.compOr(pb.sal(this.n, 16), pb.sar(this.n, 16));
+        this.n = pb.compOr(
+          pb.sal(pb.compAnd(this.n, 0x55555555), 1),
+          pb.sar(pb.compAnd(this.n, 0xaaaaaaaa), 1)
+        );
+        this.n = pb.compOr(
+          pb.sal(pb.compAnd(this.n, 0x33333333), 2),
+          pb.sar(pb.compAnd(this.n, 0xcccccccc), 2)
+        );
+        this.n = pb.compOr(
+          pb.sal(pb.compAnd(this.n, 0x0f0f0f0f), 4),
+          pb.sar(pb.compAnd(this.n, 0xf0f0f0f0), 4)
+        );
+        this.n = pb.compOr(
+          pb.sal(pb.compAnd(this.n, 0x00ff00ff), 8),
+          pb.sar(pb.compAnd(this.n, 0xff00ff00), 8)
+        );
+        this.$return(pb.mul(pb.float(this.n), 2.3283064365386963e-10));
+      });
+      pb.func('hammersley2d', [pb.int('i'), pb.int('N')], function () {
+        this.$return(
+          pb.vec2(pb.div(pb.float(this.i), pb.float(this.N)), this.radicalInverse_VdC(pb.uint(this.i)))
+        );
+      });
       pb.func('log4', [pb.float('x')], function () {
         this.$return(pb.mul(pb.log2(this.x), 0.5));
       });

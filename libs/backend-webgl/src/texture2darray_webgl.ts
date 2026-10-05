@@ -14,9 +14,6 @@ import type { WebGLTextureCaps } from './capabilities_webgl';
 
 export class WebGLTexture2DArray extends WebGLBaseTexture implements Texture2DArray<WebGLTexture> {
   constructor(device: WebGLDevice) {
-    if (!device.isWebGL2) {
-      throw new Error('device does not support 2d texture array');
-    }
     super(device, '2darray');
   }
   isTexture2DArray(): this is Texture2DArray {

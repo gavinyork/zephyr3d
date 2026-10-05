@@ -223,8 +223,7 @@ const program = device.buildRenderProgram({
 });
 ```
 
-From this single source the engine emits WebGL1 GLSL (attributes/varyings, classic uniforms),
-WebGL2 GLSL (std140 UBOs, explicit outputs), WGSL, and the matching WebGPU bind group layouts
+From this single source the engine emits WebGL2 GLSL (std140 UBOs, explicit outputs), WGSL, and the matching WebGPU bind group layouts
 with computed buffer layouts. Bindings and shader code stay in sync, and you avoid hand-written
 variants that drift apart.
 
@@ -310,14 +309,12 @@ The engine is split so you install only what you use. Packages are versioned ind
 
 ## Backend differences
 
-The engine targets three graphics APIs and falls back silently when a capability is missing, so
+The engine targets two graphics APIs and falls back silently when a capability is missing, so
 test on your actual targets rather than assuming that error-free code means a feature is active.
 
 - **WebGPU** — the full feature set, including compute shaders. Required for A-buffer OIT, DOM
   shadows, GPU cloth and hair simulation, and terrain shading cache.
-- **WebGL2** — broad coverage, no compute shaders.
-- **WebGL1** — supported for compatibility, with reduced features (no float depth, limited
-  terrain layers, no instancing in some paths).
+- **WebGL2** — broad coverage, no compute shaders. WebGL1 is no longer supported.
 
 Zephyr3D also defaults to a **reverse-Z depth convention** for better far-distance precision,
 selected once at load time via the `__ZEPHYR3D_REVERSE_Z__` build-time define. If you write custom

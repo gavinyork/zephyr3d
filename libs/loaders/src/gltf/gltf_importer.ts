@@ -1834,25 +1834,6 @@ export class GLTFImporter extends AbstractModelImporter {
           }
           this._finalizeSkinData(gltf, attributes, primitive, subMeshData);
           if (p.targets) {
-            if (getDevice().type === 'webgl') {
-              // Emulate vertexID for WebGL1 device
-              if (attributes['TEXCOORD_7'] !== undefined) {
-                console.error(`Could not load morph target animation`);
-                p.targets = undefined;
-              } else {
-                const positionInfo = primitive.vertices['position'];
-                const numVertices = positionInfo
-                  ? (positionInfo.data.length / getVertexFormatComponentCount(positionInfo.format)) >> 0
-                  : 0;
-                const vertexIndices = new Float32Array(numVertices);
-                for (let i = 0; i < vertexIndices.length; i++) {
-                  vertexIndices[i] = i;
-                }
-                primitive.vertices['texCoord7'] = { format: 'tex7_f32', data: vertexIndices };
-              }
-            }
-          }
-          if (p.targets) {
             const targets: AssetSubMeshData['targets'] = {};
             const targetBox: AssetSubMeshData['targetBox'] = [];
             const targetMap = {

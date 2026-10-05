@@ -2,23 +2,12 @@ import type { DecoderModule } from 'draco3d';
 import { decodeZmshBinary, isZmshBinary, readZmshBinary } from './zmsh_binary';
 import { getMeshoptDecoder } from './meshopt_decoder';
 import type { HttpRequest, Nullable, ReadOptions, TypedArray, VFS, WriteOptions } from '@zephyr3d/base';
-import {
-  isPowerOf2,
-  nextPowerOf2,
-  DWeakRef,
-  DRef,
-  base64ToUint8Array,
-  Vector3,
-  ASSERT,
-  Vector4,
-  guessMimeType
-} from '@zephyr3d/base';
+import { DWeakRef, DRef, base64ToUint8Array, Vector3, ASSERT, Vector4, guessMimeType } from '@zephyr3d/base';
 import type { SharedModel } from './model';
 import { WebImageLoader } from './loaders/image/webimage_loader';
 import { DDSLoader } from './loaders/dds/dds_loader';
 import { HDRLoader } from './loaders/hdr/hdr';
 import type { SceneNode } from '../scene/scene_node';
-import { CopyBlitter } from '../blitter';
 import { getSheenLutLoader } from './builtin';
 import { BUILTIN_ASSET_TEXTURE_SHEEN_LUT } from '../values';
 import type { AnimationSet } from '../animation/animationset';
@@ -1558,8 +1547,7 @@ export class AssetManager {
     throw new Error(`Can not find loader for asset ${url}`);
   }
   /**
-   * Internal routine that executes the texture load using a specific loader and applies
-   * backend-specific compatibility steps (e.g., WebGL NPOT/sRGB rules).
+   * Internal routine that executes the texture load using a specific loader.
    *
    * @param loader - Concrete loader to use for decoding/creation.
    * @param mimeType - Texture MIME type.
@@ -1578,57 +1566,7 @@ export class AssetManager {
     samplerOptions?: SamplerOptions,
     texture?: Nullable<BaseTexture>
   ) {
-    const device = getDevice();
-    if (device.type !== 'webgl') {
-      return await loader.load(mimeType, data, srgb, samplerOptions, texture);
-    } else {
-      let tex = await loader.load(mimeType, data, srgb, samplerOptions);
-      if (tex) {
-        if (texture) {
-          const magFilter =
-            tex.width !== texture.width || tex.height !== texture.height ? 'linear' : 'nearest';
-          const minFilter = magFilter;
-          const mipFilter = 'none';
-          const sampler = device.createSampler({
-            addressU: 'clamp',
-            addressV: 'clamp',
-            magFilter,
-            minFilter,
-            mipFilter
-          });
-          const blitter = new CopyBlitter();
-          blitter.blit(tex as any, texture as any, sampler);
-          tex = texture;
-        } else {
-          const po2_w = isPowerOf2(tex.width);
-          const po2_h = isPowerOf2(tex.height);
-          const srgb = tex.isSRGBFormat();
-          if (srgb || !po2_w || !po2_h) {
-            const newWidth = po2_w ? tex.width : nextPowerOf2(tex.width);
-            const newHeight = po2_h ? tex.height : nextPowerOf2(tex.height);
-            const magFilter = newWidth !== tex.width || newHeight !== tex.height ? 'linear' : 'nearest';
-            const minFilter = magFilter;
-            const mipFilter = 'none';
-            const sampler = device.createSampler({
-              addressU: 'clamp',
-              addressV: 'clamp',
-              magFilter,
-              minFilter,
-              mipFilter
-            });
-            const destFormat = srgb ? 'rgba8unorm' : tex.format;
-            const blitter = new CopyBlitter();
-            const newTexture = tex.isTexture2D()
-              ? device.createTexture2D(destFormat, newWidth, newHeight)
-              : device.createCubeTexture(destFormat, newWidth);
-            blitter.blit(tex as any, newTexture as any, sampler);
-            tex.dispose();
-            tex = newTexture;
-          }
-        }
-      }
-      return tex;
-    }
+    return await loader.load(mimeType, data, srgb, samplerOptions, texture);
   }
   /**
    * Load a model via registered model loaders.

@@ -8,9 +8,6 @@ import type { WebGLTextureCaps } from './capabilities_webgl';
 
 export class WebGLTexture3D extends WebGLBaseTexture implements Texture3D<WebGLTexture> {
   constructor(device: WebGLDevice) {
-    if (!device.isWebGL2) {
-      throw new Error('device does not support 3D texture');
-    }
     super(device, '3d');
   }
   get depth() {

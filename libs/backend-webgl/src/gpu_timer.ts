@@ -1,4 +1,3 @@
-import { isWebGL2 } from './utils';
 import { WebGLEnum } from './webgl_enum';
 import type { ITimer } from '@zephyr3d/device';
 import type { WebGLDevice } from './device_webgl';
@@ -36,34 +35,18 @@ export class GPUTimer implements ITimer {
     this._timerQuery = null;
     this._gpuTime = null;
     const gl = this._device.context;
-    if (isWebGL2(gl)) {
-      const ext = gl.getExtension('EXT_disjoint_timer_query_webgl2');
-      if (ext) {
-        this._timerQuery = {
-          createQuery: gl.createQuery.bind(gl),
-          deleteQuery: gl.deleteQuery.bind(gl),
-          beginQuery: gl.beginQuery.bind(gl),
-          endQuery: gl.endQuery.bind(gl),
-          isQuery: gl.isQuery.bind(gl),
-          getQuery: gl.getQuery.bind(gl),
-          getQueryObject: gl.getQueryParameter.bind(gl),
-          queryCounter: ext.queryCounterEXT.bind(ext)
-        };
-      }
-    } else {
-      const ext = gl.getExtension('EXT_disjoint_timer_query');
-      if (ext) {
-        this._timerQuery = {
-          createQuery: ext.createQueryEXT.bind(ext),
-          deleteQuery: ext.deleteQueryEXT.bind(ext),
-          beginQuery: ext.beginQueryEXT.bind(ext),
-          endQuery: ext.endQueryEXT.bind(ext),
-          isQuery: ext.isQueryEXT.bind(ext),
-          getQuery: ext.getQueryEXT.bind(ext),
-          getQueryObject: ext.getQueryObjectEXT.bind(ext),
-          queryCounter: ext.queryCounterEXT.bind(ext)
-        };
-      }
+    const ext = gl.getExtension('EXT_disjoint_timer_query_webgl2');
+    if (ext) {
+      this._timerQuery = {
+        createQuery: gl.createQuery.bind(gl),
+        deleteQuery: gl.deleteQuery.bind(gl),
+        beginQuery: gl.beginQuery.bind(gl),
+        endQuery: gl.endQuery.bind(gl),
+        isQuery: gl.isQuery.bind(gl),
+        getQuery: gl.getQuery.bind(gl),
+        getQueryObject: gl.getQueryParameter.bind(gl),
+        queryCounter: ext.queryCounterEXT.bind(ext)
+      };
     }
     this._query = this._timerQuery ? this._timerQuery.createQuery() : null;
   }

@@ -23,6 +23,9 @@ import type {
  * code that never generates shaders, because shader generation is not supported
  * for that type.
  *
+ * `'webgl'` is deprecated: WebGL1 is no longer supported, and a null device
+ * created with it emulates WebGL2 and reports `'webgl2'`.
+ *
  * @public
  */
 export type NullDeviceType = 'webgl' | 'webgl2' | 'webgpu' | 'null';

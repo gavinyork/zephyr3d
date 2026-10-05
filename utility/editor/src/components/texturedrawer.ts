@@ -84,9 +84,7 @@ export class TextureDrawer {
       this._program2D[val] = this.create2DPrograms(val);
       this._programCube[val] = this.createCubePrograms(val);
       this._programVideo[val] = this.createVideoPrograms(val);
-      if (device.type !== 'webgl') {
-        this._program2DArray[val] = this.create2DArrayPrograms(val);
-      }
+      this._program2DArray[val] = this.create2DArrayPrograms(val);
     });
     this._programBk = this.createBkShader();
     const vb = device.createInterleavedVertexBuffer(
@@ -279,8 +277,8 @@ export class TextureDrawer {
     const normal = this.create2DProgram('float', encode);
     const nonfilterable = this.create2DProgram('unfilterable-float', encode);
     const depth = this.create2DProgram('depth', encode);
-    const int = device.type === 'webgl' ? null : this.create2DProgram('int', encode);
-    const uint = device.type === 'webgl' ? null : this.create2DProgram('uint', encode);
+    const int = this.create2DProgram('int', encode);
+    const uint = this.create2DProgram('uint', encode);
     return {
       normal: {
         program: normal,
@@ -358,8 +356,8 @@ export class TextureDrawer {
     const normal = this.create2DArrayProgram('float', encode);
     const nonfilterable = this.create2DArrayProgram('unfilterable-float', encode);
     const depth = this.create2DArrayProgram('depth', encode);
-    const int = device.type === 'webgl' ? null : this.create2DArrayProgram('int', encode);
-    const uint = device.type === 'webgl' ? null : this.create2DArrayProgram('uint', encode);
+    const int = this.create2DArrayProgram('int', encode);
+    const uint = this.create2DArrayProgram('uint', encode);
     return {
       normal: {
         program: normal,

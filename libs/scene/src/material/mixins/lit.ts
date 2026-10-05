@@ -508,7 +508,7 @@ export function mixinLight<T extends typeof MeshMaterial>(BaseCls: T) {
         ? ((this.drawContext.SSGI &&
           this.drawContext.SSGIIrradianceHistoryTexture &&
           this.drawContext.SSGISurfaceHistoryTexture &&
-          (this.drawContext.device.type === 'webgl' || this.drawContext.motionVectorTexture)
+          this.drawContext.motionVectorTexture
             ? this.drawContext.env!.light.envLight.getIrradiance(scope, normal, this.drawContext).rgb
             : scope.$builder.mul(
                 this.drawContext.env!.light.envLight.getIrradiance(scope, normal, this.drawContext).rgb,
@@ -1008,66 +1008,27 @@ export function mixinLight<T extends typeof MeshMaterial>(BaseCls: T) {
             return;
           }
           this.$l.texSize = scope.light.lightIndexTexSize;
-          if (pb.getDevice().type === 'webgl') {
-            this.$l.texCoordX = pb.div(
-              pb.add(pb.mod(pb.float(this.clusterIndex), pb.float(this.texSize.x)), 0.5),
-              pb.float(this.texSize.x)
+          this.$l.texCoordX = pb.mod(this.clusterIndex, this.texSize.x);
+          this.$l.texCoordY = pb.div(this.clusterIndex, this.texSize.x);
+          this.$l.samp = pb.textureLoad(
+            ShaderHelper.getClusteredLightIndexTexture(this),
+            pb.ivec2(this.texCoordX, this.texCoordY),
+            0
+          );
+          // Slots are packed front to back (slot 0 in the top byte of .r) with a zero tail, so
+          // walk them in that order and stop at the first empty one.
+          this.$for(pb.uint('n'), 0, 16, function () {
+            this.$l.c = pb.compAnd(
+              pb.sar(this.samp.at(pb.div(this.n, 4)), pb.sub(24, pb.mul(pb.compAnd(this.n, 3), 8))),
+              0xff
             );
-            this.$l.texCoordY = pb.div(
-              pb.add(pb.float(pb.div(this.clusterIndex, this.texSize.x)), 0.5),
-              pb.float(this.texSize.y)
-            );
-            this.$l.samp = pb.textureSample(
-              ShaderHelper.getClusteredLightIndexTexture(this),
-              pb.vec2(this.texCoordX, this.texCoordY)
-            );
-          } else {
-            this.$l.texCoordX = pb.mod(this.clusterIndex, this.texSize.x);
-            this.$l.texCoordY = pb.div(this.clusterIndex, this.texSize.x);
-            this.$l.samp = pb.textureLoad(
-              ShaderHelper.getClusteredLightIndexTexture(this),
-              pb.ivec2(this.texCoordX, this.texCoordY),
-              0
-            );
-          }
-          if (pb.getDevice().type === 'webgl') {
-            // The index pass packs slots front to back (first light in the high half of .r) and
-            // leaves the unused tail zero, so decode in that order and stop at the first zero.
-            this.$l.done = false;
-            this.$for(pb.int('i'), 0, 4, function () {
-              this.$if(this.done, function () {
-                this.$break();
-              });
-              this.$l.packedPair = this.samp.at(this.i);
-              this.$l.lights = pb.int[2]();
-              this.$l.lights[0] = pb.int(pb.div(this.packedPair, 256));
-              this.$l.lights[1] = pb.int(pb.mod(this.packedPair, 256));
-              this.$for(pb.int('k'), 0, 2, function () {
-                this.$l.li = this.lights.at(this.k);
-                this.$if(pb.greaterThan(this.li, 0), function () {
-                  shadeLight.call(this, this.li);
-                }).$else(function () {
-                  this.done = true;
-                  this.$break();
-                });
-              });
+            this.$if(pb.equal(this.c, 0), function () {
+              this.$break();
             });
-          } else {
-            // Slots are packed front to back (slot 0 in the top byte of .r) with a zero tail, so
-            // walk them in that order and stop at the first empty one.
-            this.$for(pb.uint('n'), 0, 16, function () {
-              this.$l.c = pb.compAnd(
-                pb.sar(this.samp.at(pb.div(this.n, 4)), pb.sub(24, pb.mul(pb.compAnd(this.n, 3), 8))),
-                0xff
-              );
-              this.$if(pb.equal(this.c, 0), function () {
-                this.$break();
-              });
-              this.$scope(function () {
-                shadeLight.call(this, this.c);
-              });
+            this.$scope(function () {
+              shadeLight.call(this, this.c);
             });
-          }
+          });
         });
       }
     }

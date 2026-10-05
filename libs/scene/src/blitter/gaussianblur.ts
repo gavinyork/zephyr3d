@@ -7,7 +7,6 @@ import type {
 } from '@zephyr3d/device';
 import type { BlitType } from './blitter';
 import { Blitter } from './blitter';
-import { decodeNormalizedFloatFromRGBA } from '../shaders/misc';
 import type { Nullable } from '@zephyr3d/base';
 
 /**
@@ -167,11 +166,7 @@ export class GaussianBlurBlitter extends Blitter {
     if (that._depthTex) {
       pb.func('getLinearDepth', [pb.vec2('uv')], function () {
         this.$l.depthValue = pb.textureSample(this.depthTex, this.uv);
-        if (pb.getDevice().type === 'webgl') {
-          this.$return(decodeNormalizedFloatFromRGBA(this, this.depthValue));
-        } else {
-          this.$return(this.depthValue.r);
-        }
+        this.$return(this.depthValue.r);
       });
     }
     scope.incrementalGaussian = pb.vec3();

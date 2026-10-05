@@ -1496,30 +1496,11 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
         this.texSize = pb.vec2().uniform(0);
         this.cameraNearFar = pb.vec2().uniform(0);
         const STEPS_LEN = 8;
-        function minInt(scope: PBInsideFunctionScope, a: PBShaderExp | number, b: PBShaderExp | number) {
-          if (pb.getDevice().type === 'webgl' && (typeof a !== 'number' || typeof b !== 'number')) {
-            pb.func('minInt', [pb.int('a'), pb.int('b')], function () {
-              this.$return(this.$choice(pb.lessThan(this.a, this.b), this.a, this.b));
-            });
-            return scope.minInt(a, b);
-          } else {
-            return pb.min(a, b);
-          }
+        function minInt(_scope: PBInsideFunctionScope, a: PBShaderExp | number, b: PBShaderExp | number) {
+          return pb.min(a, b);
         }
         function getStep(scope: PBInsideFunctionScope, i: PBShaderExp | number) {
-          if (pb.getDevice().type === 'webgl' && typeof i !== 'number') {
-            pb.func('getStep', [pb.int('i')], function () {
-              this.$for(pb.int('k'), 0, STEPS_LEN, function () {
-                this.$if(pb.equal(this.k, this.i), function () {
-                  this.$return(this.steps.at(this.k));
-                });
-              });
-              this.$return(pb.vec4(0));
-            });
-            return scope.getStep(i);
-          } else {
-            return scope.steps.at(i);
-          }
+          return scope.steps.at(i);
         }
         pb.func('linearStep', [pb.float('p0'), pb.float('p1'), pb.float('v')], function () {
           this.$return(pb.clamp(pb.div(pb.sub(this.v, this.p0), pb.abs(pb.sub(this.p1, this.p0))), 0, 1));

@@ -615,7 +615,7 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
   }
   /**
    * Whether this water projects caustics onto the geometry below it. Requires a
-   * shadow-casting directional light and a non-WebGL1 device.
+   * shadow-casting directional light.
    */
   get causticsEnabled() {
     return this._causticsEnabled;
@@ -837,7 +837,7 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
    *
    * Keyed on the distance to the nearest solid around the surface, estimated in
    * screen space from the Hi-Z pyramid: off-screen, occluded or sub-pixel
-   * geometry produces no foam. Unavailable on WebGL1.
+   * geometry produces no foam.
    */
   get shoreFoamAmount() {
     return this._shoreFoamAmount;
@@ -849,7 +849,7 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
       const wasEnabled = this._shoreFoamAmount > 0;
       this._shoreFoamAmount = clamped;
       if (wasEnabled !== clamped > 0) {
-        this.useFeature(WaterMaterial.FEATURE_SHORE_FOAM, clamped > 0 && getDevice().type !== 'webgl');
+        this.useFeature(WaterMaterial.FEATURE_SHORE_FOAM, clamped > 0);
       } else {
         this.uniformChanged();
       }
@@ -988,7 +988,7 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
     return true;
   }
   needHiZNearest() {
-    return this._shoreFoamEnabled && getDevice().type !== 'webgl';
+    return this._shoreFoamEnabled;
   }
   protected _createHash() {
     return `${super._createHash()}:${this.waveGenerator?.getHash() ?? ''}`;

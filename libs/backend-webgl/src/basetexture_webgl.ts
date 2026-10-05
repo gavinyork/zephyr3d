@@ -1,5 +1,5 @@
 import type { Immutable, Nullable, RequireOptionals, TypedArray } from '@zephyr3d/base';
-import { DEPTH_COMPARE_CLOSER, isPowerOf2 } from '@zephyr3d/base';
+import { DEPTH_COMPARE_CLOSER } from '@zephyr3d/base';
 import type {
   SamplerOptions,
   BaseTexture,
@@ -22,7 +22,6 @@ import {
 } from '@zephyr3d/device';
 import { WebGLGPUObject } from './gpuobject_webgl';
 import { cubeMapFaceMap, textureTargetMap } from './constants_webgl';
-import { isWebGL2 } from './utils';
 import { WebGLEnum } from './webgl_enum';
 import type { WebGLTextureCaps, TextureFormatInfoWebGL } from './capabilities_webgl';
 import type { WebGLDevice } from './device_webgl';
@@ -37,7 +36,6 @@ export abstract class WebGLBaseTexture extends WebGLGPUObject<WebGLTexture> {
   protected _format: Nullable<TextureFormat>;
   protected _mipLevelCount: number;
   protected _samplerOptions: Nullable<RequireOptionals<SamplerOptions>>;
-  protected _webgl1fallback: boolean;
   protected _readFrameBuffers: FrameBuffer[][];
   constructor(device: WebGLDevice, target?: TextureType) {
     super(device);
@@ -50,7 +48,6 @@ export abstract class WebGLBaseTexture extends WebGLGPUObject<WebGLTexture> {
     this._format = null;
     this._mipLevelCount = 0;
     this._samplerOptions = null;
-    this._webgl1fallback = false;
     this._readFrameBuffers = [];
   }
   get target() {
@@ -87,14 +84,8 @@ export abstract class WebGLBaseTexture extends WebGLGPUObject<WebGLTexture> {
       console.log('Set sampler options failed: Texture not initialized');
     }
   }
-  get isWebGL1Fallback() {
-    return this._webgl1fallback;
-  }
   isFilterable() {
     if (!this._format || !this.getTextureCaps().getTextureFormatInfo(this._format)?.filterable) {
-      return false;
-    }
-    if (!(this.device as WebGLDevice).isWebGL2 && !isPowerOf2(this._width) && !isPowerOf2(this._height)) {
       return false;
     }
     return true;
@@ -207,13 +198,6 @@ export abstract class WebGLBaseTexture extends WebGLGPUObject<WebGLTexture> {
     depth: number,
     numMipLevels: number
   ) {
-    if (!this._device.isWebGL2 && (!isPowerOf2(width) || !isPowerOf2(height))) {
-      numMipLevels = 1;
-      this._webgl1fallback = true;
-    } else {
-      this._webgl1fallback = false;
-    }
-    this._device.setCurrentSamplerForTexture(this, null);
     if (numMipLevels === 0) {
       numMipLevels = this._calcMipLevelCount(format, width, height, depth);
     } else if (numMipLevels !== 1) {
@@ -250,7 +234,7 @@ export abstract class WebGLBaseTexture extends WebGLGPUObject<WebGLTexture> {
         this._device.bindTexture(textureTargetMap[this._target], 0, this);
         //gl.bindTexture(textureTargetMap[this._target], this._object);
         const params = (this.getTextureCaps() as WebGLTextureCaps).getTextureFormatInfo(this._format);
-        if (isWebGL2(gl) && !this.isTextureVideo()) {
+        if (!this.isTextureVideo()) {
           if (!this.isTexture3D() && !this.isTexture2DArray()) {
             gl.texStorage2D(
               textureTargetMap[this._target],
@@ -360,9 +344,6 @@ export abstract class WebGLBaseTexture extends WebGLGPUObject<WebGLTexture> {
       return 1;
     }
     if (this._flags & GPUResourceUsageFlags.TF_NO_MIPMAP) {
-      return 1;
-    }
-    if (!this._device.isWebGL2 && (!isPowerOf2(width) || !isPowerOf2(height))) {
       return 1;
     }
     const params = (this.getTextureCaps() as WebGLTextureCaps).getTextureFormatInfo(format);

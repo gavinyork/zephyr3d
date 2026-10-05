@@ -28,7 +28,7 @@ export class SceneRenderer {
     scene.frameUpdate();
     scene.frameUpdatePerCamera(camera);
     if (camera && !device.isContextLost()) {
-      const defaultViewport = (!camera.TAA || device.type === 'webgl') && !camera.viewport && !camera.scissor;
+      const defaultViewport = !camera.TAA && !camera.viewport && !camera.scissor;
       const renderX = camera.viewport ? device.screenXToDevice(camera.viewport[0]) : 0;
       const renderY = camera.viewport ? device.screenYToDevice(camera.viewport[1]) : 0;
       const renderWidth = camera.viewport
@@ -62,17 +62,14 @@ export class SceneRenderer {
           renderWidth,
           renderHeight,
           oit: null,
-          motionVectors:
-            device.type !== 'webgl' && (camera.TAA || camera.motionBlur || (SSR && camera.ssrTemporal)),
+          motionVectors: camera.TAA || camera.motionBlur || (SSR && camera.ssrTemporal),
           // Resolved by deriveForwardPlusOptions, which knows whether the queue
           // actually holds skin materials.
           sssProfileId: false,
           SSSProfileIdTexture: null,
-          HiZ: camera.HiZ && device.type !== 'webgl',
+          HiZ: camera.HiZ,
           HiZTexture: null,
-          // WebGL1 has no 2D array textures; degrade gracefully to the legacy
-          // per-light additive shadow path (mirrors the HiZ gating above).
-          screenSpaceShadowMask: camera.screenSpaceShadowMask && device.type !== 'webgl',
+          screenSpaceShadowMask: camera.screenSpaceShadowMask,
           // Set by the WaterCaustics module once it has produced a map.
           waterCaustics: false,
           // Resolved by executeForwardPlusGraph before the graph is built.

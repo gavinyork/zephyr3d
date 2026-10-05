@@ -56,6 +56,20 @@ import type { NullCommand, NullDeviceOptions, NullDeviceType } from './types';
 const DEFAULT_WIDTH = 800;
 const DEFAULT_HEIGHT = 600;
 
+let webGL1DeprecationWarned = false;
+
+/** WebGL1 is no longer supported: a 'webgl' null device emulates WebGL2 instead. */
+function normalizeNullDeviceType(type: NullDeviceType | undefined): NullDeviceType {
+  if (type === 'webgl') {
+    if (!webGL1DeprecationWarned) {
+      webGL1DeprecationWarned = true;
+      console.warn("Null device type 'webgl' is deprecated and now emulates WebGL2; use 'webgl2' instead");
+    }
+    return 'webgl2';
+  }
+  return type ?? 'webgl2';
+}
+
 type NullRenderBundleEntry = {
   program: Nullable<GPUProgram>;
   bindGroups: BindGroup[];
@@ -130,13 +144,13 @@ export class NullDevice extends BaseDevice {
   private readonly _nextFrameCallbacks: Map<number, ReturnType<typeof setTimeout>>;
   constructor(backend: DeviceBackend, cvs: HTMLCanvasElement, options?: NullDeviceOptions) {
     super(cvs, backend, options?.dpr ?? 1);
-    this._type = options?.type ?? 'webgl2';
+    this._type = normalizeNullDeviceType(options?.type);
     this._deviceCaps = createNullDeviceCaps(this._type, options?.caps);
     this._clipSpaceZeroToOne =
       options?.clipSpaceZeroToOne ??
       (this._type === 'webgpu' || (REVERSE_Z && this._deviceCaps.miscCaps.supportClipControl));
     this._strict = !!options?.strict;
-    this._msaaSampleCount = options?.msaa && this._type !== 'webgl' ? 4 : 1;
+    this._msaaSampleCount = options?.msaa ? 4 : 1;
     this._samplerCache = new NullSamplerCache(this);
     this._commands = [];
     this._recordCommands = options?.recordCommands ?? true;

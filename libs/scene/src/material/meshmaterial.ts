@@ -25,7 +25,7 @@ import { ShaderHelper } from './shader/helper';
 import type { Clonable, Immutable, Nullable } from '@zephyr3d/base';
 import { Vector2, Vector3, Vector4, applyMixins, DRef } from '@zephyr3d/base';
 import { RenderBundleWrapper } from '../render/renderbundle_wrapper';
-import { getDevice, getEngine } from '../app/api';
+import { getEngine } from '../app/api';
 
 /**
  * Blending mode for mesh materials.
@@ -382,7 +382,7 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
   /**
    * Create a material instance (preferred for GPU instancing).
    *
-   * - On WebGL1 (or when instancing unsupported), falls back to cloning.
+   * - When instancing is unsupported, falls back to cloning.
    * - Otherwise, returns a proxy instance that shares GPU programs and
    *   stores per-instance uniforms in a compact Float32Array.
    *
@@ -395,8 +395,7 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
     if (this.$isInstance) {
       return this.coreMaterial.createInstance() as this;
     }
-    const isWebGL1 = getDevice().type === 'webgl';
-    if (isWebGL1 || !this.supportInstancing()) {
+    if (!this.supportInstancing()) {
       return this.clone() as this;
     }
     const instanceUniforms = this.getInstancedUniforms();
@@ -408,7 +407,7 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
     const that = this;
     const coreMaterial = new DRef(that);
     let disposed = false;
-    instance.isBatchable = () => true; //!isWebGL1 && that.supportInstancing();
+    instance.isBatchable = () => true;
     instance.dispose = () => {
       if (!disposed) {
         disposed = true;
@@ -1046,13 +1045,6 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
       scope.$inputs.zBlendWeights = pb.vec4().attrib('blendWeights');
       ShaderHelper.prepareSkinAnimation(scope);
     }
-    if (
-      this.drawContext.device.type === 'webgl' &&
-      this.drawContext.materialFlags &
-        (MaterialVaryingFlags.SKIN_ANIMATION | MaterialVaryingFlags.MORPH_ANIMATION)
-    ) {
-      scope.$inputs.zFakeVertexID = pb.float().attrib('texCoord7');
-    }
     if (this.drawContext.materialFlags & MaterialVaryingFlags.INSTANCING) {
       if (this.drawContext.renderPass!.type === RENDER_PASS_TYPE_OBJECT_COLOR) {
         scope.$outputs.zObjectColor = this.getInstancedUniform(scope, MeshMaterial.OBJECT_COLOR_UNIFORM);
@@ -1221,7 +1213,6 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
     pb.func(alphaClipFuncName, [pb.float('alpha'), pb.float('cutoff')], function () {
       const shadowMaskedCaster = that.useTransparentShadowCaster(that.drawContext, that.pass);
       const shadowAlphaClip =
-        pb.getDevice().type !== 'webgl' &&
         that.drawContext.renderPass!.type === RENDER_PASS_TYPE_SHADOWMAP &&
         (shadowMaskedCaster || !that.isTransparentPass(that.pass, that.drawContext));
       if (shadowAlphaClip) {
@@ -1401,18 +1392,10 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
           });
         }
         this.$outputs.zFragmentOutput = scope.$inputs.zObjectColor;
-        if (that.drawContext.device.type === 'webgl') {
-          this.$l.linearDepth = ShaderHelper.nonLinearDepthToLinearNormalized(
-            this,
-            this.$builtins.fragCoord.z
-          );
-          this.$outputs.zDistance = encodeNormalizedFloatToRGBA(this, this.linearDepth);
-        } else {
-          this.$outputs.zDistance = pb.vec4(
-            this.worldPos,
-            pb.distance(ShaderHelper.getCameraPosition(this), this.worldPos)
-          );
-        }
+        this.$outputs.zDistance = pb.vec4(
+          this.worldPos,
+          pb.distance(ShaderHelper.getCameraPosition(this), this.worldPos)
+        );
       } /*if (that.drawContext.renderPass.type === RENDER_PASS_TYPE_SHADOWMAP)*/ else {
         const shadowMapParams = that.drawContext.shadowMapInfo!.get(
           (that.drawContext.renderPass as ShadowMapPass).light!

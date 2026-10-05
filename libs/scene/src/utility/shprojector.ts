@@ -159,13 +159,6 @@ export class CubemapSHProjector extends Disposable {
       }
       const primitive = new Primitive();
       primitive.createAndSetVertexBuffer('position_f32x4', samples);
-      if (device.type === 'webgl') {
-        primitive.createAndSetVertexBuffer(
-          'tex0_f32',
-          new Float32Array([0, 1, 2, 3, 4, 5, 6, 7, 8]),
-          'instance'
-        );
-      }
       primitive.indexCount = this._numSamples;
       primitive.indexStart = 0;
       primitive.primitiveType = 'point-list';
@@ -209,17 +202,13 @@ export class CubemapSHProjector extends Disposable {
     const program = device.buildRenderProgram({
       vertex(pb) {
         this.$inputs.directionWeight = pb.vec4().attrib('position');
-        if (device.type === 'webgl') {
-          this.$inputs.instanceId = pb.float().attrib('texCoord0');
-        }
         pb.main(function () {
           this.$outputs.direction = this.$inputs.directionWeight.xyz;
           this.$outputs.weight = this.$inputs.directionWeight.w;
           if (pb.getDevice().type !== 'webgpu') {
             this.$builtins.pointSize = 1;
           }
-          this.$outputs.shIndex =
-            device.type === 'webgl' ? this.$inputs.instanceId : pb.int(this.$builtins.instanceIndex);
+          this.$outputs.shIndex = pb.int(this.$builtins.instanceIndex);
           this.$l.x = pb.mod(this.$outputs.shIndex, 3);
           this.$l.y = pb.div(this.$outputs.shIndex, 3);
           this.$l.ndcX = pb.sub(pb.div(pb.add(pb.float(this.x), 0.5), 1.5), 1);
@@ -304,13 +293,8 @@ export class CubemapSHProjector extends Disposable {
         });
         pb.main(function () {
           this.$l.radiance = pb.textureSampleLevel(this.cubemap, this.$inputs.direction, 0).rgb;
-          this.$l.bandFactor = this.cosineLobeBandFactor(
-            pb.getDevice().type === 'webgl' ? pb.int(this.$inputs.shIndex) : this.$inputs.shIndex
-          );
-          this.$l.sh = this.evalBasis(
-            this.$inputs.direction,
-            pb.getDevice().type === 'webgl' ? pb.int(this.$inputs.shIndex) : this.$inputs.shIndex
-          );
+          this.$l.bandFactor = this.cosineLobeBandFactor(this.$inputs.shIndex);
+          this.$l.sh = this.evalBasis(this.$inputs.direction, this.$inputs.shIndex);
           this.$outputs.color = pb.vec4(
             pb.mul(this.radiance, this.sh, this.$inputs.weight, this.bandFactor, this.scale),
             1

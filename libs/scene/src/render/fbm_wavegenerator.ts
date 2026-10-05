@@ -5,8 +5,6 @@ import type { BindGroup, PBGlobalScope, PBInsideFunctionScope, PBShaderExp } fro
 import { valueNoise } from '../shaders';
 import { ShaderHelper } from '../material';
 
-const MAX_NUM_OCTAVES = 16;
-
 /**
  * FBM wave generator.
  * @public
@@ -265,23 +263,13 @@ export class FBMWaveGenerator extends Disposable implements WaveGenerator {
         this.$l.a = pb.float(0);
         this.$l.b = pb.float(1);
         this.$l.c = pb.float(0);
-        this.$for(
-          pb.int('i'),
-          0,
-          pb.getDevice().type === 'webgl' ? MAX_NUM_OCTAVES : this.numOctaves,
-          function () {
-            if (pb.getDevice().type === 'webgl') {
-              this.$if(pb.greaterThanEqual(this.i, this.numOctaves), function () {
-                this.$break();
-              });
-            }
-            this.$l.n = pb.sub(valueNoise(this, this.p), 0.5);
-            this.a = pb.add(this.a, pb.mul(this.n, this.b));
-            this.c = pb.add(this.c, this.b);
-            this.b = pb.mul(this.b, this.gain);
-            this.p = pb.mul(this.m2, this.p, this.frequency);
-          }
-        );
+        this.$for(pb.int('i'), 0, this.numOctaves, function () {
+          this.$l.n = pb.sub(valueNoise(this, this.p), 0.5);
+          this.a = pb.add(this.a, pb.mul(this.n, this.b));
+          this.c = pb.add(this.c, this.b);
+          this.b = pb.mul(this.b, this.gain);
+          this.p = pb.mul(this.m2, this.p, this.frequency);
+        });
         this.$return(pb.div(this.a, this.c));
       }
     );

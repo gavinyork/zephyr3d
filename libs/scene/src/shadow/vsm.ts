@@ -276,7 +276,7 @@ export class VSM extends ShadowImpl {
     mipmapping?: boolean
   ) {
     const device = getDevice();
-    const useTextureArray = numCascades > 1 && device.type !== 'webgl';
+    const useTextureArray = numCascades > 1;
     const colorAttachments = colorFormat
       ? useTextureArray
         ? [
@@ -296,7 +296,7 @@ export class VSM extends ShadowImpl {
     const depthAttachment = depthFormat
       ? useTextureArray
         ? device.pool.fetchTemporalTexture2DArray(false, depthFormat, width, height, numCascades, false)
-        : device.type !== 'webgl' && lightType === LIGHT_TYPE_POINT
+        : lightType === LIGHT_TYPE_POINT
           ? device.pool.fetchTemporalTextureCube(false, depthFormat, width, false)
           : device.pool.fetchTemporalTexture2D(false, depthFormat, width, height, false)
       : null;

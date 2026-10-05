@@ -233,8 +233,7 @@ export class SAO extends AbstractPostEffect {
   }
   private _getIntermediateTextureFormat(device: AbstractDevice) {
     const texCaps = device.getDeviceCaps().textureCaps;
-    return device.type === 'webgl' ||
-      (!texCaps.supportHalfFloatColorBuffer && !texCaps.supportFloatColorBuffer)
+    return !texCaps.supportHalfFloatColorBuffer && !texCaps.supportFloatColorBuffer
       ? 'rgba8unorm'
       : texCaps.supportHalfFloatColorBuffer
         ? 'r16f'
@@ -301,11 +300,7 @@ export class SAO extends AbstractPostEffect {
             });
             pb.func('getPositionVS', [pb.vec2('uv')], function () {
               this.$l.depthValue = pb.textureSample(this.depthTex, this.uv);
-              if (device.type === 'webgl') {
-                this.$l.linearDepth = decodeNormalizedFloatFromRGBA(this, this.depthValue);
-              } else {
-                this.$l.linearDepth = this.depthValue.r;
-              }
+              this.$l.linearDepth = this.depthValue.r;
               this.$l.nonLinearDepth = ShaderHelper.linearNormalizedToNonLinearDepth(
                 this,
                 this.linearDepth,

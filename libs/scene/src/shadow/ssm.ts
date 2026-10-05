@@ -1,8 +1,7 @@
 import type { PBInsideFunctionScope, PBShaderExp } from '@zephyr3d/device';
 import { ShadowImpl } from './shadow_impl';
-import { decodeNormalizedFloatFromRGBA } from '../shaders/misc';
 import type { ShadowMapParams, ShadowMapType } from './shadowmapper';
-import { LIGHT_TYPE_POINT, LIGHT_TYPE_SPOT } from '../values';
+import { LIGHT_TYPE_POINT } from '../values';
 import {
   applyShadowDepthBias,
   computeShadowMapDepth,
@@ -11,8 +10,7 @@ import {
 } from '../shaders/shadow';
 import { ShaderHelper } from '../material/shader/helper';
 import { computeShadowBias, computeShadowBiasCSM } from './shader';
-import { getDevice } from '../app/api';
-import { REVERSE_Z, Vector4 } from '@zephyr3d/base';
+import { Vector4 } from '@zephyr3d/base';
 
 /** @internal */
 export class SSM extends ShadowImpl {
@@ -33,16 +31,11 @@ export class SSM extends ShadowImpl {
     return out ?? Vector4.zero();
   }
   getShadowMap(shadowMapParams: ShadowMapParams) {
-    return (
-      this.useNativeShadowMap(shadowMapParams)
-        ? shadowMapParams.shadowMapFramebuffer!.getDepthAttachment()
-        : shadowMapParams.shadowMapFramebuffer!.getColorAttachments()[0]
-    ) as ShadowMapType;
+    return shadowMapParams.shadowMapFramebuffer!.getDepthAttachment() as ShadowMapType;
   }
   doUpdateResources(shadowMapParams: ShadowMapParams) {
     shadowMapParams.shadowMap = this.getShadowMap(shadowMapParams);
-    shadowMapParams.shadowMapSampler =
-      shadowMapParams.shadowMap?.getDefaultSampler(this.useNativeShadowMap(shadowMapParams)) || null;
+    shadowMapParams.shadowMapSampler = shadowMapParams.shadowMap?.getDefaultSampler(true) || null;
   }
   postRenderShadowMap() {}
   getDepthScale() {
@@ -52,21 +45,8 @@ export class SSM extends ShadowImpl {
   getShaderHash() {
     return '';
   }
-  getShadowMapColorFormat(shadowMapParams: ShadowMapParams) {
-    if (this.useNativeShadowMap(shadowMapParams)) {
-      return null;
-    } else {
-      const device = getDevice();
-      if (device.type === 'webgl') {
-        return device.getDeviceCaps().textureCaps.supportFloatColorBuffer
-          ? 'rgba32f'
-          : device.getDeviceCaps().textureCaps.supportHalfFloatColorBuffer
-            ? 'rgba16f'
-            : 'rgba8unorm';
-      } else {
-        return 'r32f';
-      }
-    }
+  getShadowMapColorFormat(_shadowMapParams: ShadowMapParams) {
+    return null;
   }
   getShadowMapDepthFormat(_shadowMapParams: ShadowMapParams) {
     return this.preferredShadowMapDepthFormat();
@@ -87,12 +67,10 @@ export class SSM extends ShadowImpl {
   ) {
     const funcNameComputeShadowCSM = 'lib_computeShadowCSM';
     const pb = scope.$builder;
-    const that = this;
     pb.func(
       funcNameComputeShadowCSM,
       [pb.vec4('shadowVertex'), pb.float('NdotL'), pb.int('split')],
       function () {
-        const floatDepthTexture = shadowMapParams.shadowMap!.format !== 'rgba8unorm';
         this.$l.shadowCoord = pb.div(this.shadowVertex.xyz, this.shadowVertex.w);
         this.$l.shadowCoord = ndcToShadowCoord3(this, this.shadowCoord.xyz);
         this.$l.inShadow = pb.all(
@@ -112,42 +90,19 @@ export class SSM extends ShadowImpl {
         this.$if(this.inShadow, function () {
           this.$l.shadowBias = computeShadowBiasCSM(this, this.NdotL, this.split);
           this.shadowCoord.z = applyShadowDepthBias(this, this.shadowCoord.z, this.shadowBias, true);
-          if (that.useNativeShadowMap(shadowMapParams)) {
-            if (shadowMapParams.shadowMap!.isTexture2DArray()) {
-              this.shadow = pb.textureArraySampleCompareLevel(
-                ShaderHelper.getShadowMap(this),
-                this.shadowCoord.xy,
-                this.split,
-                this.shadowCoord.z
-              );
-            } else {
-              this.shadow = pb.textureSampleCompareLevel(
-                ShaderHelper.getShadowMap(this),
-                this.shadowCoord.xy,
-                this.shadowCoord.z
-              );
-            }
+          if (shadowMapParams.shadowMap!.isTexture2DArray()) {
+            this.shadow = pb.textureArraySampleCompareLevel(
+              ShaderHelper.getShadowMap(this),
+              this.shadowCoord.xy,
+              this.split,
+              this.shadowCoord.z
+            );
           } else {
-            if (shadowMapParams.shadowMap!.isTexture2DArray()) {
-              this.$l.shadowTex = pb.textureArraySampleLevel(
-                ShaderHelper.getShadowMap(this),
-                this.shadowCoord.xy,
-                this.split,
-                0
-              );
-            } else {
-              this.$l.shadowTex = pb.textureSampleLevel(
-                ShaderHelper.getShadowMap(this),
-                this.shadowCoord.xy,
-                0
-              );
-            }
-            if (!floatDepthTexture) {
-              this.shadowTex.x = decodeNormalizedFloatFromRGBA(this, this.shadowTex);
-            }
-            this.shadow = REVERSE_Z
-              ? pb.step(this.shadowTex.x, this.shadowCoord.z)
-              : pb.step(this.shadowCoord.z, this.shadowTex.x);
+            this.shadow = pb.textureSampleCompareLevel(
+              ShaderHelper.getShadowMap(this),
+              this.shadowCoord.xy,
+              this.shadowCoord.z
+            );
           }
         });
         this.$return(this.shadow);
@@ -163,48 +118,26 @@ export class SSM extends ShadowImpl {
   ) {
     const funcNameComputeShadow = 'lib_computeShadow';
     const pb = scope.$builder;
-    const that = this;
     pb.func(funcNameComputeShadow, [pb.vec4('shadowVertex'), pb.float('NdotL')], function () {
-      const floatDepthTexture = shadowMapParams.shadowMap!.format !== 'rgba8unorm';
       if (shadowMapParams.lightType === LIGHT_TYPE_POINT) {
         this.$l.dir = pb.sub(this.shadowVertex.xyz, ShaderHelper.getLightPositionAndRangeForShadow(this).xyz);
-        if (that.useNativeShadowMap(shadowMapParams)) {
-          this.$l.nearFar = ShaderHelper.getShadowCameraParams(this).xy;
-          this.$l.maxZ = pb.max(pb.max(pb.abs(this.dir.x), pb.abs(this.dir.y)), pb.abs(this.dir.z));
-          this.$l.distance = ShaderHelper.linearDepthToNonLinear(this, this.maxZ, this.nearFar);
-          this.$l.shadowBias = computeShadowBias(
-            shadowMapParams.lightType,
-            this,
-            pb.div(this.maxZ, ShaderHelper.getLightPositionAndRangeForShadow(this).w),
-            this.NdotL,
-            true
-          );
-          this.$return(
-            pb.textureSampleCompareLevel(
-              ShaderHelper.getShadowMap(this),
-              this.dir,
-              applyShadowDepthBias(this, this.distance, this.shadowBias, true)
-            )
-          );
-        } else {
-          this.$l.distance = pb.div(
-            pb.length(this.dir),
-            ShaderHelper.getLightPositionAndRangeForShadow(this).w
-          );
-          this.$l.shadowBias = computeShadowBias(
-            shadowMapParams.lightType,
-            this,
-            this.distance,
-            this.NdotL,
-            true
-          );
-          this.$l.shadowTex = pb.textureSampleLevel(ShaderHelper.getShadowMap(this), this.dir, 0);
-          if (!floatDepthTexture) {
-            this.shadowTex.x = decodeNormalizedFloatFromRGBA(this, this.shadowTex);
-          }
-          this.distance = pb.sub(this.distance, this.shadowBias);
-          this.$return(pb.step(this.distance, this.shadowTex.x));
-        }
+        this.$l.nearFar = ShaderHelper.getShadowCameraParams(this).xy;
+        this.$l.maxZ = pb.max(pb.max(pb.abs(this.dir.x), pb.abs(this.dir.y)), pb.abs(this.dir.z));
+        this.$l.distance = ShaderHelper.linearDepthToNonLinear(this, this.maxZ, this.nearFar);
+        this.$l.shadowBias = computeShadowBias(
+          shadowMapParams.lightType,
+          this,
+          pb.div(this.maxZ, ShaderHelper.getLightPositionAndRangeForShadow(this).w),
+          this.NdotL,
+          true
+        );
+        this.$return(
+          pb.textureSampleCompareLevel(
+            ShaderHelper.getShadowMap(this),
+            this.dir,
+            applyShadowDepthBias(this, this.distance, this.shadowBias, true)
+          )
+        );
       } else {
         this.$l.shadowCoord = pb.div(this.shadowVertex.xyz, this.shadowVertex.w);
         this.$l.shadowCoord = ndcToShadowCoord3(this, this.shadowCoord.xyz);
@@ -223,63 +156,19 @@ export class SSM extends ShadowImpl {
         );
         this.$l.shadow = pb.float(1);
         this.$if(this.inShadow, function () {
-          if (that.useNativeShadowMap(shadowMapParams)) {
-            this.$l.shadowBias = computeShadowBias(
-              shadowMapParams.lightType,
-              this,
-              this.shadowCoord.z,
-              this.NdotL,
-              false
-            );
-            this.shadowCoord.z = applyShadowDepthBias(this, this.shadowCoord.z, this.shadowBias, true);
-            this.shadow = pb.textureSampleCompareLevel(
-              ShaderHelper.getShadowMap(this),
-              this.shadowCoord.xy,
-              this.shadowCoord.z
-            );
-          } else {
-            if (shadowMapParams.lightType === LIGHT_TYPE_SPOT) {
-              this.$l.nearFar = ShaderHelper.getShadowCameraParams(this).xy;
-              this.shadowCoord.z = ShaderHelper.nonLinearDepthToLinearNormalized(
-                this,
-                this.shadowCoord.z,
-                this.nearFar
-              );
-              this.$l.shadowBias = computeShadowBias(
-                shadowMapParams.lightType,
-                this,
-                this.shadowCoord.z,
-                this.NdotL,
-                true
-              );
-            } else {
-              this.$l.shadowBias = computeShadowBias(
-                shadowMapParams.lightType,
-                this,
-                this.shadowCoord.z,
-                this.NdotL,
-                false
-              );
-            }
-            this.shadowCoord.z = applyShadowDepthBias(
-              this,
-              this.shadowCoord.z,
-              this.shadowBias,
-              shadowMapParams.lightType !== LIGHT_TYPE_SPOT
-            );
-            this.$l.shadowTex = pb.textureSampleLevel(
-              ShaderHelper.getShadowMap(this),
-              this.shadowCoord.xy,
-              0
-            );
-            if (!floatDepthTexture) {
-              this.shadowTex.x = decodeNormalizedFloatFromRGBA(this, this.shadowTex);
-            }
-            this.shadow =
-              REVERSE_Z && shadowMapParams.lightType !== LIGHT_TYPE_SPOT
-                ? pb.step(this.shadowTex.x, this.shadowCoord.z)
-                : pb.step(this.shadowCoord.z, this.shadowTex.x);
-          }
+          this.$l.shadowBias = computeShadowBias(
+            shadowMapParams.lightType,
+            this,
+            this.shadowCoord.z,
+            this.NdotL,
+            false
+          );
+          this.shadowCoord.z = applyShadowDepthBias(this, this.shadowCoord.z, this.shadowBias, true);
+          this.shadow = pb.textureSampleCompareLevel(
+            ShaderHelper.getShadowMap(this),
+            this.shadowCoord.xy,
+            this.shadowCoord.z
+          );
         });
         this.$return(this.shadow);
       }
@@ -287,6 +176,6 @@ export class SSM extends ShadowImpl {
     return pb.getGlobalScope()[funcNameComputeShadow](shadowVertex, NdotL) as PBShaderExp;
   }
   useNativeShadowMap(_shadowMapParams: ShadowMapParams) {
-    return getDevice().type !== 'webgl';
+    return true;
   }
 }

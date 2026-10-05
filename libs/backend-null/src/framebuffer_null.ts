@@ -64,7 +64,7 @@ export class NullFrameBuffer extends NullGPUObject<unknown> implements FrameBuff
             generateMipmaps: false
           }
         : null,
-      sampleCount: device.type === 'webgl' ? 1 : (opt?.sampleCount ?? 1),
+      sampleCount: opt?.sampleCount ?? 1,
       ignoreDepthStencil: opt?.ignoreDepthStencil ?? false
     };
     if (!this._options.colorAttachments && !this._options.depthAttachment) {

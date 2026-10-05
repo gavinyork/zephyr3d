@@ -306,10 +306,6 @@ export class PostSSS extends AbstractPostEffect {
   }
 
   private createBurleyProgram(ctx: DrawContext) {
-    // WebGL1 has no texture array sampling. This effect is WebGPU-only at
-    // runtime, but its programs are still built for WebGL by the shader
-    // generation tests, so the thickness debug view has to compile out there.
-    const hasTextureArrays = ctx.device.type !== 'webgl';
     const program = ctx.device.buildRenderProgram({
       vertex(pb) {
         PostSSS.fullscreenVertex(pb);
@@ -328,9 +324,7 @@ export class PostSSS extends AbstractPostEffect {
         // Always declared so the cached program has one layout; a 1x1 dummy is
         // bound on frames without a transmission pass. Only the debug view reads
         // it — shading takes its thickness through the material, per light.
-        if (hasTextureArrays) {
-          this.thicknessTex = pb.tex2DArray().uniform(0);
-        }
+        this.thicknessTex = pb.tex2DArray().uniform(0);
         this.sampleCount = pb.int().uniform(0);
         this.debugMode = pb.int().uniform(0);
         this.debugExposure = pb.float().uniform(0);
@@ -589,17 +583,15 @@ export class PostSSS extends AbstractPostEffect {
                 this.$if(pb.equal(this.debugMode, 10), function () {
                   this.dbg = this.diffused;
                 });
-                if (hasTextureArrays) {
-                  this.$if(pb.equal(this.debugMode, 11), function () {
-                    this.$l.th = pb.textureArraySampleLevel(this.thicknessTex, this.uv, 0, 0);
-                    this.$l.enc = pb.min(pb.min(this.th.r, this.th.g), pb.min(this.th.b, this.th.a));
-                    this.$if(pb.greaterThan(this.enc, 0.999), function () {
-                      this.dbg = pb.vec3(0, 0, 1);
-                    }).$else(function () {
-                      this.dbg = pb.vec3(pb.sub(1, this.enc));
-                    });
+                this.$if(pb.equal(this.debugMode, 11), function () {
+                  this.$l.th = pb.textureArraySampleLevel(this.thicknessTex, this.uv, 0, 0);
+                  this.$l.enc = pb.min(pb.min(this.th.r, this.th.g), pb.min(this.th.b, this.th.a));
+                  this.$if(pb.greaterThan(this.enc, 0.999), function () {
+                    this.dbg = pb.vec3(0, 0, 1);
+                  }).$else(function () {
+                    this.dbg = pb.vec3(pb.sub(1, this.enc));
                   });
-                }
+                });
                 this.$outputs.outColor = pb.vec4(pb.mul(this.dbg, this.debugExposure), this.center.a);
               });
             }

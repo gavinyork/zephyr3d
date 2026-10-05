@@ -1,6 +1,6 @@
 import { Application, getDevice, getEngine, Scene } from '@zephyr3d/scene';
 import { GLTFViewer } from './gltfviewer';
-import { backendWebGL2, backendWebGL1 } from '@zephyr3d/backend-webgl';
+import { backendWebGL2 } from '@zephyr3d/backend-webgl';
 import { backendWebGPU } from '@zephyr3d/backend-webgpu';
 import type { DeviceBackend } from '@zephyr3d/device';
 import { GLTFImporter } from '@zephyr3d/loaders';
@@ -10,7 +10,7 @@ function getQueryString(name: string) {
 }
 
 async function getBackend(): Promise<DeviceBackend> {
-  const type = getQueryString('dev') || 'webgl';
+  const type = getQueryString('dev') || 'webgl2';
   if (type === 'webgpu') {
     if (await backendWebGPU.supported()) {
       return backendWebGPU;
@@ -18,14 +18,7 @@ async function getBackend(): Promise<DeviceBackend> {
       console.warn('No WebGPU support, fall back to WebGL2');
     }
   }
-  if (type === 'webgl2') {
-    if (await backendWebGL2.supported()) {
-      return backendWebGL2;
-    } else {
-      console.warn('No WebGL2 support, fall back to WebGL1');
-    }
-  }
-  return backendWebGL1;
+  return backendWebGL2;
 }
 
 const gltfApp = new Application({

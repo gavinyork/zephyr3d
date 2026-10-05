@@ -315,13 +315,6 @@ export enum PBTextureType {
   TEX_EXTERNAL = BITFLAG_EXTERNAL
 }
 
-const textureTypeMapWebGL = {
-  [PBTextureType.TEX_1D]: 'highp sampler2D',
-  [PBTextureType.TEX_2D]: 'highp sampler2D',
-  [PBTextureType.TEX_CUBE]: 'highp samplerCube',
-  [PBTextureType.TEX_EXTERNAL]: 'highp sampler2D'
-};
-
 const textureTypeMapWebGL2 = {
   [PBTextureType.TEX_1D]: 'highp sampler2D',
   [PBTextureType.TEX_2D]: 'highp sampler2D',
@@ -1295,7 +1288,7 @@ export class PBArrayTypeInfo extends PBTypeInfo<ArrayTypeDetail> {
   getConstructorOverloads(deviceType: string) {
     const name = this.toTypeName(deviceType);
     const result: PBFunctionTypeInfo[] = [new PBFunctionTypeInfo(name, this, [])];
-    if (deviceType !== 'webgl' && this.isConstructible()) {
+    if (this.isConstructible()) {
       result.push(
         new PBFunctionTypeInfo(
           name,
@@ -1706,10 +1699,7 @@ export class PBTextureTypeInfo extends PBTypeInfo<TextureTypeDetail> {
       }
       return varName ? `${varName}: ${typename}` : typename;
     } else {
-      const typename =
-        deviceType === 'webgl'
-          ? textureTypeMapWebGL[this.textureType as keyof typeof textureTypeMapWebGL]
-          : textureTypeMapWebGL2[this.textureType as keyof typeof textureTypeMapWebGL2];
+      const typename = textureTypeMapWebGL2[this.textureType as keyof typeof textureTypeMapWebGL2];
       ASSERT(!!typename, 'unsupported texture type');
       return varName ? `${typename} ${varName}` : typename;
     }

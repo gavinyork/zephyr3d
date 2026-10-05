@@ -1209,25 +1209,11 @@ export class SSS extends AbstractPostEffect {
                   pb.float(pb.greaterThan(this.light.shadowCascades, 3))
                 );
                 this.$l.split = pb.int(pb.dot(this.comparison, this.cascadeFlags));
-                if (ctx.device.type === 'webgl') {
-                  this.$l.shadowVertex = pb.vec4();
-                  this.$for(pb.int('cascade'), 0, 4, function () {
-                    this.$if(pb.equal(this.cascade, this.split), function () {
-                      this.shadowVertex = ShaderHelper.calculateShadowSpaceVertex(
-                        this,
-                        pb.vec4(this.worldPos, 1),
-                        this.cascade
-                      );
-                      this.$break();
-                    });
-                  });
-                } else {
-                  this.$l.shadowVertex = ShaderHelper.calculateShadowSpaceVertex(
-                    this,
-                    pb.vec4(this.worldPos, 1),
-                    this.split
-                  );
-                }
+                this.$l.shadowVertex = ShaderHelper.calculateShadowSpaceVertex(
+                  this,
+                  pb.vec4(this.worldPos, 1),
+                  this.split
+                );
                 this.$l.shadow = shadowMapParams!.impl!.computeShadowCSM(
                   shadowMapParams!,
                   this,

@@ -212,9 +212,6 @@ export function createProgramPostFFT2(
           this.ifft5 = pb.tex2D().uniform(0);
         }
       }
-      if (pb.getDevice().type === 'webgl') {
-        this.ifftTexSize = pb.vec2().uniform(0);
-      }
       pb.main(function () {
         this.$l.fragPos = getFragCoord(this, useComputeShader);
         this.$l.p = pb.float(pb.add(this.fragPos.x, this.fragPos.y));
@@ -222,19 +219,7 @@ export function createProgramPostFFT2(
         // transform is left unnormalized (see the butterfly passes), so this
         // is the only factor applied here.
         this.$l.m = pb.sub(pb.mul(pb.sub(1, pb.mod(this.p, 2)), 2), 1);
-        if (pb.getDevice().type === 'webgl') {
-          this.$l.uv = pb.div(pb.vec2(this.fragPos), this.ifftTexSize);
-          if (!limit || limit === 4) {
-            this.$outputs.dx_hy_dz_dxdz0 = pb.mul(pb.textureSampleLevel(this.ifft0, this.uv, 0), this.m);
-            this.$outputs.sx_sz_dxdx_dzdz0 = pb.mul(pb.textureSampleLevel(this.ifft1, this.uv, 0), this.m);
-            this.$outputs.dx_hy_dz_dxdz1 = pb.mul(pb.textureSampleLevel(this.ifft2, this.uv, 0), this.m);
-            this.$outputs.sx_sz_dxdx_dzdz1 = pb.mul(pb.textureSampleLevel(this.ifft3, this.uv, 0), this.m);
-          }
-          if (!limit || limit === 2) {
-            this.$outputs.dx_hy_dz_dxdz2 = pb.mul(pb.textureSampleLevel(this.ifft4, this.uv, 0), this.m);
-            this.$outputs.sx_sz_dxdx_dzdz2 = pb.mul(pb.textureSampleLevel(this.ifft5, this.uv, 0), this.m);
-          }
-        } else if (useComputeShader) {
+        if (useComputeShader) {
           this.$l.uv = pb.ivec2(this.fragPos);
           for (let i = 0; i < 6; i++) {
             pb.textureArrayStore(
@@ -321,9 +306,6 @@ export function createProgramHk(
           this.h0Texture2 = pb.tex2D().uniform(0);
         }
       }
-      if (pb.getDevice().type === 'webgl') {
-        this.h0TexSize = pb.vec2().uniform(0);
-      }
       this.RATIO = pb.float(0.618033989036);
       this.g = pb.float(9.81);
       const Complex = pb.defineStruct([pb.float('re'), pb.float('im')], 'Complex');
@@ -388,13 +370,7 @@ export function createProgramHk(
           this.$l.kLen = pb.length(this.k);
           this.$if(pb.greaterThan(this.kLen, 1e-6), function () {
             this.$l.w = pb.sqrt(pb.mul(this.kLen, this.g));
-            if (pb.getDevice().type === 'webgl') {
-              this.$l.h0Texel = pb.textureSampleLevel(
-                this[`h0Texture${x}`],
-                pb.div(pb.vec2(this.fragCoord), this.h0TexSize),
-                0
-              );
-            } else if (useComputeShader) {
+            if (useComputeShader) {
               this.$l.h0Texel = pb.textureArrayLoad(this.h0Texture, this.fragCoord, x, 0);
             } else {
               this.$l.h0Texel = pb.textureLoad(this[`h0Texture${x}`], this.fragCoord, 0);
@@ -691,9 +667,6 @@ export function createProgramFFT2V(
         }
       }
       this.butterfly = pb.tex2D().sampleType('unfilterable-float').uniform(0);
-      if (pb.getDevice().type === 'webgl') {
-        this.texSize = pb.vec4().uniform(0);
-      }
       this.phase = pb.int().uniform(0);
       const Complex = pb.defineStruct([pb.float('re'), pb.float('im')], 'Complex');
       pb.func('add', [Complex('a'), Complex('b')], function () {
@@ -715,18 +688,7 @@ export function createProgramFFT2V(
           continue;
         }
         pb.func(`twiddle${x}`, [pb.vec4('texelButt'), pb.int('x')], function () {
-          if (pb.getDevice().type === 'webgl') {
-            this.$l.texelA = pb.textureSampleLevel(
-              this[`spectrum${x}`],
-              pb.div(pb.vec2(pb.float(this.x), this.texelButt.b), this.texSize.xy),
-              0
-            );
-            this.$l.texelB = pb.textureSampleLevel(
-              this[`spectrum${x}`],
-              pb.div(pb.vec2(pb.float(this.x), this.texelButt.a), this.texSize.xy),
-              0
-            );
-          } else if (useComputeShader) {
+          if (useComputeShader) {
             this.$l.texelA = pb.textureArrayLoad(
               this.spectrum,
               pb.ivec2(this.x, pb.int(this.texelButt.b)),
@@ -771,15 +733,7 @@ export function createProgramFFT2V(
       pb.main(function () {
         this.$l.x = pb.int(getFragCoord(this, useComputeShader).x);
         this.$l.y = pb.int(getFragCoord(this, useComputeShader).y);
-        if (pb.getDevice().type === 'webgl') {
-          this.$l.texelButt = pb.textureSampleLevel(
-            this.butterfly,
-            pb.div(pb.vec2(pb.float(this.phase), pb.float(this.y)), this.texSize.zw),
-            0
-          );
-        } else {
-          this.$l.texelButt = pb.textureLoad(this.butterfly, pb.ivec2(this.phase, this.y), 0);
-        }
+        this.$l.texelButt = pb.textureLoad(this.butterfly, pb.ivec2(this.phase, this.y), 0);
         if (useComputeShader) {
           pb.textureArrayStore(
             this.ifft,
@@ -888,9 +842,6 @@ export function createProgramFFT2H(
       }
       this.butterfly = pb.tex2D().sampleType('unfilterable-float').uniform(0);
       this.phase = pb.int().uniform(0);
-      if (pb.getDevice().type === 'webgl') {
-        this.texSize = pb.vec4().uniform(0);
-      }
       const Complex = pb.defineStruct([pb.float('re'), pb.float('im')], 'Complex');
       pb.func('add', [Complex('a'), Complex('b')], function () {
         this.$return(Complex(pb.add(this.a.re, this.b.re), pb.add(this.a.im, this.b.im)));
@@ -911,18 +862,7 @@ export function createProgramFFT2H(
           continue;
         }
         pb.func(`twiddle${x}`, [pb.vec4('texelButt'), pb.int('y')], function () {
-          if (pb.getDevice().type === 'webgl') {
-            this.$l.texelA = pb.textureSampleLevel(
-              this[`spectrum${x}`],
-              pb.div(pb.vec2(this.texelButt.b, pb.float(this.y)), this.texSize.xy),
-              0
-            );
-            this.$l.texelB = pb.textureSampleLevel(
-              this[`spectrum${x}`],
-              pb.div(pb.vec2(this.texelButt.a, pb.float(this.y)), this.texSize.xy),
-              0
-            );
-          } else if (useComputeShader) {
+          if (useComputeShader) {
             this.$l.texelA = pb.textureArrayLoad(
               this.spectrum,
               pb.ivec2(pb.int(this.texelButt.b), this.y),
@@ -967,15 +907,7 @@ export function createProgramFFT2H(
       pb.main(function () {
         this.$l.x = pb.int(getFragCoord(this, useComputeShader).x);
         this.$l.y = pb.int(getFragCoord(this, useComputeShader).y);
-        if (pb.getDevice().type === 'webgl') {
-          this.$l.texelButt = pb.textureSampleLevel(
-            this.butterfly,
-            pb.div(pb.vec2(pb.float(this.phase), pb.float(this.x)), this.texSize.zw),
-            0
-          );
-        } else {
-          this.$l.texelButt = pb.textureLoad(this.butterfly, pb.ivec2(this.phase, this.x), 0);
-        }
+        this.$l.texelButt = pb.textureLoad(this.butterfly, pb.ivec2(this.phase, this.x), 0);
         if (useComputeShader) {
           pb.textureArrayStore(
             this.ifft,

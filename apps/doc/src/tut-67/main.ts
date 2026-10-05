@@ -16,22 +16,17 @@ import {
   getInput,
   getEngine
 } from '@zephyr3d/scene';
-import { backendWebGL1, backendWebGL2 } from '@zephyr3d/backend-webgl';
+import { backendWebGL2 } from '@zephyr3d/backend-webgl';
 import { backendWebGPU } from '@zephyr3d/backend-webgpu';
 
 // Prefer WebGPU so that every OIT mode can be demonstrated: ABuffer OIT is
-// WebGPU-only, and dual depth peeling needs capabilities WebGL1 lacks.
-// Fall back to WebGL2, then WebGL1.
+// WebGPU-only. Fall back to WebGL2.
 async function selectBackend() {
   if (await backendWebGPU.supported()) {
     return backendWebGPU;
   }
   console.warn('No WebGPU support, fall back to WebGL2');
-  if (await backendWebGL2.supported()) {
-    return backendWebGL2;
-  }
-  console.warn('No WebGL2 support, fall back to WebGL');
-  return backendWebGL1;
+  return backendWebGL2;
 }
 
 const myApp = new Application({

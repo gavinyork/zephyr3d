@@ -1,5 +1,5 @@
 import type { Immutable, Nullable, RequireOptionals, TypedArray } from '@zephyr3d/base';
-import { DEPTH_COMPARE_CLOSER, isPowerOf2 } from '@zephyr3d/base';
+import { DEPTH_COMPARE_CLOSER } from '@zephyr3d/base';
 import type {
   BaseTexture,
   GPUDataBuffer,
@@ -106,9 +106,6 @@ export abstract class NullBaseTexture extends NullGPUObject<unknown> {
   }
   isFilterable() {
     if (!this._format || !this.getTextureCaps().getTextureFormatInfo(this._format)?.filterable) {
-      return false;
-    }
-    if (this._device.type === 'webgl' && !isPowerOf2(this._width) && !isPowerOf2(this._height)) {
       return false;
     }
     return true;
@@ -410,9 +407,6 @@ export abstract class NullBaseTexture extends NullGPUObject<unknown> {
       return 1;
     }
     if (this._flags & GPUResourceUsageFlags.TF_NO_MIPMAP) {
-      return 1;
-    }
-    if (this._device.type === 'webgl' && (!isPowerOf2(width) || !isPowerOf2(height))) {
       return 1;
     }
     if (!this.getTextureCaps().getTextureFormatInfo(format)?.renderable) {
