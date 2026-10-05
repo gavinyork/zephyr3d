@@ -7,11 +7,18 @@ import type {
   BackendRayHit,
   BackendShapeHit,
   BackendWorld,
+  BackendCharacter,
+  BackendJoint,
   BodyDesc,
+  CharacterMove,
+  CharacterSettings,
   ColliderMaterialDesc,
   CollisionCallback,
   ContactInfo,
+  JointDesc,
+  JointKind,
   MotionType,
+  MotorMode,
   QueryPredicate,
   ShapeDesc
 } from './types';
@@ -20,6 +27,16 @@ type RWorld = InstanceType<RapierAPI['World']>;
 type RBody = ReturnType<RWorld['createRigidBody']>;
 type RCollider = ReturnType<RWorld['createCollider']>;
 type RShape = InstanceType<RapierAPI['Shape']>;
+type RJoint = ReturnType<RWorld['createImpulseJoint']>;
+type RUnitJoint = InstanceType<RapierAPI['RevoluteImpulseJoint']>;
+type RController = ReturnType<RWorld['createCharacterController']>;
+
+/** Rapier's motors stop at this force by default: in effect unlimited. */
+const UNLIMITED_FORCE = 3.4e38;
+/** Joint axis numbers of Rapier's raw joint API. */
+const ANG_X = 3;
+const ANG_Y = 4;
+const ANG_Z = 5;
 
 function bodyType(R: RapierAPI, type: MotionType) {
   return type === 'dynamic'
@@ -152,6 +169,113 @@ class RapierBody implements BackendBody {
   }
 }
 
+class RapierJoint implements BackendJoint {
+  constructor(
+    readonly joint: RJoint,
+    private readonly _type: JointKind
+  ) {}
+  setContactsEnabled(enabled: boolean) {
+    this.joint.setContactsEnabled(enabled);
+  }
+  setLimits(min: number, max: number) {
+    if (this._type === 'hinge' || this._type === 'slider') {
+      (this.joint as RUnitJoint).setLimits(min, max);
+    }
+  }
+  setBallLimits(twist: number, swing: number) {
+    if (this._type !== 'ball') {
+      return;
+    }
+    // Not exposed on Rapier's spherical joint class, but supported per axis by
+    // the joint underneath.
+    const raw = (this.joint as unknown as { rawSet: { jointSetLimits: (...a: number[]) => void } }).rawSet;
+    const handle = this.joint.handle;
+    raw.jointSetLimits(handle, ANG_X, -twist, twist);
+    raw.jointSetLimits(handle, ANG_Y, -swing, swing);
+    raw.jointSetLimits(handle, ANG_Z, -swing, swing);
+  }
+  setMotor(mode: MotorMode, target: number, stiffness: number, damping: number, maxForce: number) {
+    if (this._type !== 'hinge' && this._type !== 'slider') {
+      return;
+    }
+    const joint = this.joint as RUnitJoint;
+    switch (mode) {
+      case 'velocity':
+        joint.configureMotorVelocity(target, damping);
+        break;
+      case 'position':
+        joint.configureMotorPosition(target, stiffness, damping);
+        break;
+      default:
+        // Zero gains are not enough: with force to spare, Rapier holds the
+        // axis rigidly in place. No force is what turns a motor off.
+        joint.configureMotor(0, 0, 0, 0);
+        joint.setMotorMaxForce(0);
+        return;
+    }
+    joint.setMotorMaxForce(maxForce > 0 ? maxForce : UNLIMITED_FORCE);
+  }
+}
+
+class RapierCharacter implements BackendCharacter {
+  private readonly _controller: RController;
+  constructor(
+    private readonly R: RapierAPI,
+    private readonly _world: RWorld,
+    settings: CharacterSettings
+  ) {
+    this._controller = _world.createCharacterController(settings.skinWidth);
+    this._controller.setUp({ x: 0, y: 1, z: 0 });
+    this._controller.setSlideEnabled(true);
+    this.configure(settings);
+  }
+  configure(s: CharacterSettings) {
+    const c = this._controller;
+    c.setOffset(s.skinWidth);
+    c.setMaxSlopeClimbAngle(s.slopeLimit);
+    c.setMinSlopeSlideAngle(s.slideSlope);
+    if (s.stepHeight > 0) {
+      c.enableAutostep(s.stepHeight, s.stepMinWidth, false);
+    } else {
+      c.disableAutostep();
+    }
+    if (s.snapToGround > 0) {
+      c.enableSnapToGround(s.snapToGround);
+    } else {
+      c.disableSnapToGround();
+    }
+    c.setApplyImpulsesToDynamicBodies(s.pushBodies);
+    c.setCharacterMass(s.characterMass);
+  }
+  move(collider: BackendCollider, desired: Vector3, filter: QueryPredicate): CharacterMove {
+    const c = this._controller;
+    c.computeColliderMovement(
+      collider as RCollider,
+      vec(desired),
+      // Triggers are walked through, not around.
+      this.R.QueryFilterFlags.EXCLUDE_SENSORS,
+      undefined,
+      (other) => filter(other.handle)
+    );
+    const m = c.computedMovement();
+    const hits = [];
+    for (let i = 0; i < c.numComputedCollisions(); i++) {
+      const hit = c.computedCollision(i);
+      if (hit?.collider) {
+        hits.push({
+          key: hit.collider.handle,
+          point: new Vector3(hit.witness1.x, hit.witness1.y, hit.witness1.z),
+          normal: new Vector3(hit.normal1.x, hit.normal1.y, hit.normal1.z)
+        });
+      }
+    }
+    return { movement: new Vector3(m.x, m.y, m.z), grounded: c.computedGrounded(), hits };
+  }
+  dispose() {
+    this._world.removeCharacterController(this._controller);
+  }
+}
+
 /** @internal */
 export class RapierWorld implements BackendWorld {
   private readonly _world: RWorld;
@@ -262,6 +386,62 @@ export class RapierWorld implements BackendWorld {
   }
   removeCollider(collider: BackendCollider) {
     this._world.removeCollider(collider as RCollider, true);
+  }
+  createJoint(desc: JointDesc, body1: BackendBody, body2: BackendBody): BackendJoint {
+    const R = this.R;
+    const a1 = vec(desc.anchor1);
+    const a2 = vec(desc.anchor2);
+    const x = { x: 1, y: 0, z: 0 };
+    let data: ReturnType<RapierAPI['JointData']['fixed']>;
+    switch (desc.type) {
+      case 'fixed':
+        data = R.JointData.fixed(a1, quat(desc.frame1), a2, quat(desc.frame2));
+        break;
+      case 'hinge':
+        data = R.JointData.revolute(a1, a2, x);
+        break;
+      case 'slider':
+        data = R.JointData.prismatic(a1, a2, x);
+        break;
+      case 'ball':
+        data = R.JointData.spherical(a1, a2);
+        break;
+      case 'rope':
+        data = R.JointData.rope(desc.length, a1, a2);
+        break;
+      case 'spring':
+        data = R.JointData.spring(desc.length, desc.stiffness, desc.damping, a1, a2);
+        break;
+    }
+    const joint = this._world.createImpulseJoint(
+      data,
+      (body1 as RapierBody).body,
+      (body2 as RapierBody).body,
+      true
+    );
+    if (desc.type === 'hinge' || desc.type === 'slider' || desc.type === 'ball') {
+      // Rapier derives these frames from the axis alone, separately for each
+      // body, so the two seldom agree about where angle 0 is. Both are set from
+      // the one world frame instead: the joint starts at 0 in the pose it was
+      // placed in.
+      joint.setLocalFrame1(a1, quat(desc.frame1));
+      joint.setLocalFrame2(a2, quat(desc.frame2));
+    }
+    joint.setContactsEnabled(desc.collideConnected);
+    return new RapierJoint(joint, desc.type);
+  }
+  removeJoint(joint: BackendJoint) {
+    const j = (joint as RapierJoint).joint;
+    // Removing either body has already taken the joint with it.
+    if (j.isValid()) {
+      this._world.removeImpulseJoint(j, true);
+    }
+  }
+  createCharacter(settings: CharacterSettings): BackendCharacter {
+    return new RapierCharacter(this.R, this._world, settings);
+  }
+  syncColliders() {
+    this._world.propagateModifiedBodyPositionsToColliders();
   }
   colliderKey(collider: BackendCollider) {
     return (collider as RCollider).handle;

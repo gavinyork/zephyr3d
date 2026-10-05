@@ -3,6 +3,8 @@ import { RAPIER_WASM_URL } from './rapier_location';
 import { registerSceneNodeComponentType } from '@zephyr3d/scene';
 import { RigidBody } from './rigid_body';
 import { Collider } from './collider';
+import { Joint } from './joint';
+import { CharacterController } from './character';
 import { isPhysicsReady, setRapier } from './rapier_state';
 
 /** Options of {@link initPhysics}. @public */
@@ -40,6 +42,8 @@ export function initPhysics(options?: PhysicsInitOptions): Promise<void> {
     loading = (async () => {
       registerSceneNodeComponentType(RigidBody);
       registerSceneNodeComponentType(Collider);
+      registerSceneNodeComponentType(Joint);
+      registerSceneNodeComponentType(CharacterController);
       if (options?.rapier) {
         setRapier(options.rapier as RapierAPI);
       } else {

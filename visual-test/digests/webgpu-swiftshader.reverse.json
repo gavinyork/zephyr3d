@@ -439,6 +439,14 @@
       },
       "size": 512
     },
+    "physics-joints": {
+      "accepted": {
+        "win32-x64": [
+          "747565277b1f4dffa5ce719cf2aa5f83"
+        ]
+      },
+      "size": 512
+    },
     "physics-mesh-ground": {
       "accepted": {
         "win32-x64": [

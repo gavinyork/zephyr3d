@@ -1,0 +1,10 @@
+{
+  "changes": [
+    {
+      "packageName": "@zephyr3d/physics",
+      "comment": "Add Joint (fixed, hinge, slider, ball, rope, spring, with limits and motors) and CharacterController components.",
+      "type": "none"
+    }
+  ],
+  "packageName": "@zephyr3d/physics"
+}
