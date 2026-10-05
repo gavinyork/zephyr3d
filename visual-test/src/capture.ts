@@ -152,7 +152,8 @@ export class SceneCapturer {
         height: this._size,
         rgbaBase64: toBase64(normalizeRowOrder(raw, this._size, this._backend)),
         frames,
-        tolerance: def.tolerance
+        tolerance: def.tolerance,
+        deterministic: def.deterministic
       };
     } finally {
       getEngine().setRenderable(null, 0);

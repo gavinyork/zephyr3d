@@ -2,7 +2,15 @@ import { test as base, expect } from '@playwright/test';
 import type { Page } from '@playwright/test';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { compareToBaseline, writeActualOnly } from './compare';
+import { compareToBaseline, judgeCapture, writeActualOnly } from './compare';
+import { platformKey } from './digest';
+import { DigestFile, type DigestEnvironment } from './digest_file';
+import { HttpImageSource, ImageStore } from './image_store';
+import { createRequire } from 'node:module';
+
+const PLAYWRIGHT_VERSION = (
+  createRequire(import.meta.url)('@playwright/test/package.json') as { version: string }
+).version;
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.join(__dirname, '..');
@@ -22,6 +30,10 @@ interface Harness {
   backend: BackendId;
   adapter: string;
   scenes: SceneInfo[];
+  /** Digest baselines; null on the real-GPU projects, which keep per-machine PNGs. */
+  digests: DigestFile | null;
+  images: ImageStore;
+  environment: DigestEnvironment;
 }
 
 /**
@@ -36,7 +48,11 @@ interface Harness {
 const test = base.extend<{}, { harness: Harness }>({
   harness: [
     async ({ browser }, use, workerInfo) => {
-      const meta = workerInfo.project.metadata as { backend: BackendId; convention: string };
+      const meta = workerInfo.project.metadata as {
+        backend: BackendId;
+        adapter: 'swiftshader' | 'gpu';
+        convention: string;
+      };
       const page = await browser.newPage({ viewport: { width: 600, height: 600 } });
 
       const consoleErrors: string[] = [];
@@ -60,7 +76,31 @@ const test = base.extend<{}, { harness: Harness }>({
       // is obvious rather than a mystery.
       console.log(`[${workerInfo.project.name}] adapter: ${info.adapter}, ${scenes.length} scene(s)`);
 
-      await use({ page, backend: meta.backend, adapter: info.adapter, scenes });
+      // Only the software rasteriser is reproducible enough to be pinned by
+      // digests; see README "Baselines".
+      const digests =
+        meta.adapter === 'swiftshader'
+          ? DigestFile.load(DigestFile.pathFor(ROOT, workerInfo.project.name, meta.convention))
+          : null;
+      const images = new ImageStore(path.join(ROOT, '.baseline-cache'), new HttpImageSource());
+      const environment: DigestEnvironment = {
+        playwright: PLAYWRIGHT_VERSION,
+        chromium: browser.version(),
+        adapter: info.adapter
+      };
+      const recorded = digests?.environment(platformKey());
+      if (
+        recorded &&
+        (recorded.playwright !== environment.playwright || recorded.chromium !== environment.chromium)
+      ) {
+        console.warn(
+          `[${workerInfo.project.name}] digests for ${platformKey()} were recorded with Playwright ` +
+            `${recorded.playwright} / Chromium ${recorded.chromium}, this run uses ${environment.playwright} / ` +
+            `${environment.chromium}: expect digest misses that are environment changes, not regressions`
+        );
+      }
+
+      await use({ page, backend: meta.backend, adapter: info.adapter, scenes, digests, images, environment });
 
       await page.close();
       if (consoleErrors.length) {
@@ -223,6 +263,34 @@ for (const sceneName of SCENE_NAMES) {
       }
     }
     expect(distinct.size, `scene "${sceneName}" produced a near-uniform image`).toBeGreaterThan(1);
+
+    if (harness.digests) {
+      const judged = await judgeCapture(rgba, result.width, result.height, {
+        scene: sceneName,
+        platform: platformKey(),
+        digests: harness.digests,
+        images: harness.images,
+        tolerance: result.tolerance,
+        deterministic: result.deterministic,
+        update: !!process.env.UPDATE_BASELINES,
+        artifactDir: testInfo.outputPath()
+      });
+      for (const a of judged.artifacts) {
+        await testInfo.attach(a.name, { path: a.path, contentType: 'image/png' });
+      }
+      if (judged.digestsChanged) {
+        harness.digests.setEnvironment(platformKey(), harness.environment);
+        harness.digests.save();
+      }
+      if (judged.status === 'baseline-written' || judged.status === 'tolerant-match') {
+        // Visible in the report: a tolerant match that persists means the
+        // digest is stale, which is the cue to re-accept the scene.
+        testInfo.annotations.push({ type: judged.status, description: judged.message });
+        return;
+      }
+      expect(judged.status, `${sceneName}: ${judged.message}`).toBe('match');
+      return;
+    }
 
     const baselinePath = path.join(
       ROOT,

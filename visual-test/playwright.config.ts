@@ -37,6 +37,7 @@ function project(name: string, backend: 'webgl2' | 'webgpu', adapter: 'swiftshad
   return {
     name,
     metadata: { backend, adapter, convention: 'reverse' as const },
+    testIgnore: '**/*.unit.spec.ts',
     use: {
       channel: 'chromium' as const,
       launchOptions: { args }
@@ -70,6 +71,8 @@ export default defineConfig({
     video: 'off'
   },
   projects: [
+    // Logic of the harness itself (digest judgement, digest files). No browser.
+    { name: 'unit', testMatch: '**/*.unit.spec.ts' },
     project('webgl2-swiftshader', 'webgl2', 'swiftshader', SWIFTSHADER_WEBGL),
     project('webgpu-swiftshader', 'webgpu', 'swiftshader', SWIFTSHADER_WEBGPU),
     project('webgl2-gpu', 'webgl2', 'gpu', []),

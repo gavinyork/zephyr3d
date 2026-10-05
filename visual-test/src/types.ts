@@ -58,6 +58,16 @@ export interface VisualScene {
    */
   onFrame?: (ctx: SceneContext, frame: number) => void;
   tolerance?: Tolerance;
+  /**
+   * Set to false for a scene whose output is known to vary from run to run.
+   *
+   * Such a scene can never be pinned by an exact pixel digest, so a digest miss
+   * is expected rather than suspicious: it is compared against its reference
+   * image by tolerance on every run and reported separately. Requires a comment
+   * in the scene saying why, and is not a substitute for fixing the
+   * nondeterminism.
+   */
+  deterministic?: boolean;
 }
 
 /** Result of a single scene capture, as handed back to the Playwright runner. */
@@ -69,4 +79,5 @@ export interface CaptureResult {
   rgbaBase64: string;
   frames: number;
   tolerance?: Tolerance;
+  deterministic?: boolean;
 }
