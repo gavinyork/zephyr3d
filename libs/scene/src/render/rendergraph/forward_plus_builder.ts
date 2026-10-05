@@ -1084,10 +1084,10 @@ const TransmissionThicknessModule: RenderModule<FrameGraphContext> = {
   type: 'TransmissionThicknessPass',
   writes: [FrameResources.TransmissionThickness],
   prepare: ({ ctx, options, renderQueue }) => ({
-    // WebGPU only: the depth attachment is read with textureLoad, and the skin
-    // scattering this feeds is WebGPU-only to begin with.
+    // WebGL2 included: transmission lights the subject directly in the base
+    // pass, so it does not depend on the WebGPU-only PostSSS diffusion.
     enabled:
-      ctx.device.type === 'webgpu' &&
+      ctx.device.type !== 'webgl' &&
       options.postSSS &&
       renderQueue.shadowedLights.some((light) => light.transmission)
   }),
@@ -2132,7 +2132,7 @@ function buildForwardPlusGraphInternal(
   // whether the light pass declares and binds the thickness texture, so a
   // mismatch would leave the shader layout disagreeing with the bind group.
   ctx.transmissionThickness =
-    ctx.device.type === 'webgpu' &&
+    ctx.device.type !== 'webgl' &&
     options.postSSS &&
     renderQueue.shadowedLights.some((light) => light.transmission);
 

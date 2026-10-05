@@ -79,7 +79,7 @@ export function lightSupportsTransmission(light: PunctualLight, params: Nullable
 /**
  * Renders the screen-space light-space thickness used by subsurface transmission.
  *
- * WebGPU only.
+ * WebGPU and WebGL2.
  *
  * @internal
  */
@@ -283,6 +283,11 @@ export class TransmissionThicknessRenderer {
     const isArray = depthAttachment.isTexture2DArray();
     const cube = depthAttachment.isTextureCube();
     const ortho = lightType === LIGHT_TYPE_DIRECTIONAL;
+    // WebGL2 has no depth texture type that allows a non-comparison read:
+    // texelFetch is undefined on sampler2DShadow and samplerCubeShadow always
+    // compares. A depth texture bound to a plain float sampler with compare
+    // mode off returns its depth in .r, so declare it that way there.
+    const webgpu = device.type === 'webgpu';
     const program = device.buildRenderProgram({
       label: 'TransmissionThickness',
       vertex(pb) {
@@ -324,9 +329,15 @@ export class TransmissionThicknessRenderer {
         ]);
         this.camera = cameraStruct().uniform(0);
         this.light = lightStruct().uniform(0);
-        this[UNIFORM_NAME_SHADOW_DEPTH] = cube
-          ? pb.texCubeShadow().uniform(0)
-          : (isArray ? pb.tex2DArrayShadow() : pb.tex2DShadow()).uniform(0).noSampler();
+        if (webgpu) {
+          this[UNIFORM_NAME_SHADOW_DEPTH] = cube
+            ? pb.texCubeShadow().uniform(0)
+            : (isArray ? pb.tex2DArrayShadow() : pb.tex2DShadow()).uniform(0).noSampler();
+        } else {
+          this[UNIFORM_NAME_SHADOW_DEPTH] = (cube ? pb.texCube() : isArray ? pb.tex2DArray() : pb.tex2D())
+            .sampleType('unfilterable-float')
+            .uniform(0);
+        }
         this.depthTex = pb.tex2D().sampleType('unfilterable-float').uniform(0);
         this.profileIdTex = pb.tex2D().uniform(0);
         // rgba32f, hence unfilterable; every read here is a single texel.
@@ -400,11 +411,10 @@ export class TransmissionThicknessRenderer {
               this.$l.texel = pb.ivec2(
                 pb.clamp(pb.mul(this.coord, this.size), pb.vec2(0), pb.sub(pb.vec2(this.size), pb.vec2(1)))
               );
-              this.$return(
-                isArray
-                  ? pb.textureArrayLoad(this[UNIFORM_NAME_SHADOW_DEPTH], this.texel, this.layer, 0)
-                  : pb.textureLoad(this[UNIFORM_NAME_SHADOW_DEPTH], this.texel, 0)
-              );
+              const depth = isArray
+                ? pb.textureArrayLoad(this[UNIFORM_NAME_SHADOW_DEPTH], this.texel, this.layer, 0)
+                : pb.textureLoad(this[UNIFORM_NAME_SHADOW_DEPTH], this.texel, 0);
+              this.$return(webgpu ? depth : depth.x);
             }
           );
         }
