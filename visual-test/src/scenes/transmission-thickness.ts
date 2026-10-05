@@ -32,9 +32,8 @@ import { bareScene, placeCamera } from './common';
  *
  * What reaches the screen is `camera.SSSDebugOutput = 'thickness'`, which
  * renders `1 - encoded` (bright = thick) and calls out "no light wrote this
- * channel" as pure blue so it cannot be mistaken for zero thickness. See
- * verify-transmission-thickness.mjs for the expected values and the arithmetic
- * behind them; the baselines here are only a second line of defence.
+ * channel" as pure blue so it cannot be mistaken for zero thickness. The
+ * expected values follow from the arithmetic above; the baselines pin them.
  */
 
 /** Slab edge length. Large next to a shadow texel, so nothing is resolution-bound. */
@@ -88,8 +87,7 @@ type BackLightKind = 'directional' | 'point' | 'rect';
 /**
  * How far behind the slabs' front plane the back light sits, in metres at 1x.
  *
- * For a point or rect light this is also what sets each slab's off-axis angle,
- * so `verify-transmission-thickness.mjs` repeats it.
+ * For a point or rect light this is also what sets each slab's off-axis angle.
  */
 const BACK_LIGHT_DISTANCE = 2;
 
