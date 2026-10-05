@@ -684,6 +684,17 @@
       },
       "size": 512
     },
+    "transmission-rect-backlit": {
+      "accepted": {
+        "linux-x64": [
+          "320d0d625eda88595824b7deb6c06bdf"
+        ],
+        "win32-x64": [
+          "320d0d625eda88595824b7deb6c06bdf"
+        ]
+      },
+      "size": 512
+    },
     "unlit-textured": {
       "accepted": {
         "linux-x64": [

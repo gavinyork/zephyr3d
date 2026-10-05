@@ -443,7 +443,6 @@ export const transmissionRectBacklit: VisualScene = {
   name: 'transmission-rect-backlit',
   description:
     'A rect light behind a 3 mm and a 30 mm skin plate, shaded normally. Pins rect-light transmission end to end.',
-  supports: (backend) => backend === 'webgpu',
   setup({ scene, camera }) {
     bareScene(scene);
     scene.env.light.type = 'constant';
