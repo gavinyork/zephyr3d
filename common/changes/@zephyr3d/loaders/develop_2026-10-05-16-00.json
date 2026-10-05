@@ -1,0 +1,20 @@
+{
+  "changes": [
+    {
+      "packageName": "@zephyr3d/loaders",
+      "comment": "Load KTX2 textures (KHR_texture_basisu) and meshopt, quantized and Draco-compressed glTF geometry.",
+      "type": "minor"
+    },
+    {
+      "packageName": "@zephyr3d/loaders",
+      "comment": "Generate levels of detail on load with the generateLods option.",
+      "type": "minor"
+    },
+    {
+      "packageName": "@zephyr3d/loaders",
+      "comment": "Fix the evaluation order of FBX PreRotation/PostRotation.",
+      "type": "patch"
+    }
+  ],
+  "packageName": "@zephyr3d/loaders"
+}

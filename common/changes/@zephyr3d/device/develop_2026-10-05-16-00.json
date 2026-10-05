@@ -1,0 +1,20 @@
+{
+  "changes": [
+    {
+      "packageName": "@zephyr3d/device",
+      "comment": "Drop WebGL1 support: the shader builder no longer generates GLSL ES 1.00, WebGL2 is the minimum.",
+      "type": "minor"
+    },
+    {
+      "packageName": "@zephyr3d/device",
+      "comment": "Add ETC2/EAC compressed texture formats and normalized integer vertex formats for normals, tangents and skin weights.",
+      "type": "minor"
+    },
+    {
+      "packageName": "@zephyr3d/device",
+      "comment": "Add the supportIndirectFirstInstance device capability.",
+      "type": "patch"
+    }
+  ],
+  "packageName": "@zephyr3d/device"
+}

@@ -1,0 +1,10 @@
+{
+  "changes": [
+    {
+      "packageName": "@zephyr3d/base",
+      "comment": "Add the DEBUG_VIEWS global flag that gates engine debug views.",
+      "type": "patch"
+    }
+  ],
+  "packageName": "@zephyr3d/base"
+}

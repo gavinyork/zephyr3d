@@ -1,0 +1,15 @@
+{
+  "changes": [
+    {
+      "packageName": "@zephyr3d/backend-webgl",
+      "comment": "Drop WebGL1 support: backendWebGL1 is a deprecated alias that creates WebGL2 devices.",
+      "type": "minor"
+    },
+    {
+      "packageName": "@zephyr3d/backend-webgl",
+      "comment": "Add ETC2/EAC compressed texture formats.",
+      "type": "minor"
+    }
+  ],
+  "packageName": "@zephyr3d/backend-webgl"
+}

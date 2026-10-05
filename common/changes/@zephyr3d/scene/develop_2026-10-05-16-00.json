@@ -1,0 +1,70 @@
+{
+  "changes": [
+    {
+      "packageName": "@zephyr3d/scene",
+      "comment": "Drop WebGL1 support, WebGL2 is the minimum.",
+      "type": "minor"
+    },
+    {
+      "packageName": "@zephyr3d/scene",
+      "comment": "SSS transmission now works on WebGL2.",
+      "type": "patch"
+    },
+    {
+      "packageName": "@zephyr3d/scene",
+      "comment": "Sky SH projection uses seeded sample directions, so sky lighting is identical on every run.",
+      "type": "patch"
+    },
+    {
+      "packageName": "@zephyr3d/scene",
+      "comment": "Add discrete mesh levels of detail selected by projected screen size, generated with meshoptimizer at runtime (SharedModel.generateLods, shape LOD settings) and selected on the GPU for BatchGroup instances.",
+      "type": "minor"
+    },
+    {
+      "packageName": "@zephyr3d/scene",
+      "comment": "Add GPU frustum culling of BatchGroup instances.",
+      "type": "minor"
+    },
+    {
+      "packageName": "@zephyr3d/scene",
+      "comment": "Add a shared skin palette atlas, instanced skinned meshes, animation banks evaluated in a compute pass and gpuAnimation playback; add a subtree geometry instancing property.",
+      "type": "minor"
+    },
+    {
+      "packageName": "@zephyr3d/scene",
+      "comment": "Load KTX2/Basis textures, meshopt-compressed and quantized geometry and binary .zmsh primitives; Engine.init loads the build asset manifest.",
+      "type": "minor"
+    },
+    {
+      "packageName": "@zephyr3d/scene",
+      "comment": "Add wireframe and LOD coloration debug views gated by DEBUG_VIEWS; remove the per-mesh wireframe property.",
+      "type": "minor"
+    },
+    {
+      "packageName": "@zephyr3d/scene",
+      "comment": "Add procedural Bezier blade grass with clumping, two detail levels, wind sway, two-sided foliage transmission and cascaded shadows; sway card grass in the wind.",
+      "type": "minor"
+    },
+    {
+      "packageName": "@zephyr3d/scene",
+      "comment": "Add a scene-wide wind field.",
+      "type": "minor"
+    },
+    {
+      "packageName": "@zephyr3d/scene",
+      "comment": "Add UE5-style screen-space contact shadows.",
+      "type": "minor"
+    },
+    {
+      "packageName": "@zephyr3d/scene",
+      "comment": "Light clustering: variable-length cluster light lists on WebGPU, spot cone and tile side plane culling, directional lights outside clusters, grid sized from the target resolution.",
+      "type": "patch"
+    },
+    {
+      "packageName": "@zephyr3d/scene",
+      "comment": "Fix sun bloom flicker, skinned mesh bounds, BatchGroup picking and orbit camera wheel zoom; reduce per-frame buffer allocation and TAA ghosting.",
+      "type": "patch"
+    }
+  ],
+  "packageName": "@zephyr3d/scene"
+}

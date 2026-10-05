@@ -1,0 +1,25 @@
+{
+  "changes": [
+    {
+      "packageName": "@zephyr3d/editor",
+      "comment": "Drop the WebGL1 target; projects targeting WebGL now use WebGL2.",
+      "type": "minor"
+    },
+    {
+      "packageName": "@zephyr3d/editor",
+      "comment": "Opt-in asset compression: per-texture .zmeta settings, KTX2 textures and meshopt meshes built in a background derived data cache and shipped through an asset manifest.",
+      "type": "minor"
+    },
+    {
+      "packageName": "@zephyr3d/editor",
+      "comment": "Generate mesh levels of detail by minimum triangle count at import; add wireframe and LOD coloration views to the View menu.",
+      "type": "minor"
+    },
+    {
+      "packageName": "@zephyr3d/editor",
+      "comment": "Builds show an HTML loading screen until the startup scene is drawn.",
+      "type": "minor"
+    }
+  ],
+  "packageName": "@zephyr3d/editor"
+}

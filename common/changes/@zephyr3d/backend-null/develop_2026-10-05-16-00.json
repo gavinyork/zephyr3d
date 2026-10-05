@@ -1,0 +1,15 @@
+{
+  "changes": [
+    {
+      "packageName": "@zephyr3d/backend-null",
+      "comment": "Device type \"webgl\" is deprecated and creates a \"webgl2\" null device.",
+      "type": "minor"
+    },
+    {
+      "packageName": "@zephyr3d/backend-null",
+      "comment": "Add ETC2/EAC texture formats and the supportIndirectFirstInstance capability.",
+      "type": "patch"
+    }
+  ],
+  "packageName": "@zephyr3d/backend-null"
+}

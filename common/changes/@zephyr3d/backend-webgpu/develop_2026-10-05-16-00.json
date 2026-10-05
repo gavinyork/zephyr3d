@@ -1,0 +1,15 @@
+{
+  "changes": [
+    {
+      "packageName": "@zephyr3d/backend-webgpu",
+      "comment": "Add ETC2/EAC compressed texture formats; render bundles capture indirect draws.",
+      "type": "minor"
+    },
+    {
+      "packageName": "@zephyr3d/backend-webgpu",
+      "comment": "Reuse per-frame upload and readback buffers and defer readback copies to the next submit.",
+      "type": "patch"
+    }
+  ],
+  "packageName": "@zephyr3d/backend-webgpu"
+}
