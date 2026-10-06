@@ -1,21 +1,10 @@
-export { initPhysics, registerPhysics } from './init';
-export { isPhysicsReady } from './rapier_state';
-export type { PhysicsInitOptions } from './init';
-export type { MotionType } from './backend/types';
-export { PhysicsWorld } from './world';
-export type { PhysicsShape, PhysicsQueryOptions, PhysicsQueryHit, PhysicsWorldEventMap } from './world';
-export { PhysicsComponent } from './component';
-export type { PhysicsEventMap } from './component';
-export { PhysicsContactEvent, PhysicsTriggerEvent } from './events';
-export type { PhysicsObject } from './events';
-export { RigidBody } from './rigid_body';
-export { Collider } from './collider';
-export type { ColliderShape } from './collider';
-export { Joint } from './joint';
-export type { JointType, JointMotorMode } from './joint';
-export { CharacterController } from './character';
-export type { CharacterCollision, CharacterMoveResult } from './character';
-export { Vehicle, Wheel } from './vehicle';
-export type { VehicleForward } from './vehicle';
-export { getColliderOutline, getColliderOutlineKey } from './outline';
-export type { ColliderOutline } from './outline';
+/**
+ * Rigid-body physics for zephyr3d: simulates the physics data on scene nodes
+ * (`node.physics`) with a physics engine loaded from an engine package, such
+ * as `@zephyr3d/physics-rapier`.
+ *
+ * @packageDocumentation
+ */
+export { initPhysics, getPhysicsEngine } from './init';
+export { PhysicsSimulation } from './simulation';
+export type * from './backend';

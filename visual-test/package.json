@@ -74,6 +74,7 @@
     "@zephyr3d/device": "workspace:^0.2.19",
     "@zephyr3d/loaders": "workspace:^0.1.6",
     "@zephyr3d/physics": "workspace:^0.1.0",
+    "@zephyr3d/physics-rapier": "workspace:^0.1.0",
     "@zephyr3d/scene": "workspace:^0.9.27"
   }
 }

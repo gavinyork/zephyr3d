@@ -1,7 +1,6 @@
 import { Disposable, Vector3, type Nullable } from '@zephyr3d/base';
 import type { Mesh } from '../../scene/mesh';
 import type { SceneNode } from '../../scene/scene_node';
-import type { SceneNodeComponent } from '../../scene/component';
 import {
   createCapsuleCollider,
   createBoxCollider,
@@ -250,7 +249,7 @@ function parseTargetWrapWeights(source: string, vertexCount: number) {
  *
  * The component stores only stable asset data. GPU buffers are rebuilt when its host enters a scene.
  */
-export class GPUClothComponent extends Disposable implements SceneNodeComponent {
+export class GPUClothComponent extends Disposable {
   private _config: GPUClothComponentConfig;
   private _host: Nullable<SceneNode>;
   private _system: Nullable<GPUClothSystem>;
@@ -292,11 +291,6 @@ export class GPUClothComponent extends Disposable implements SceneNodeComponent 
   }
 
   /** @internal */
-  isGPUClothComponent() {
-    return true;
-  }
-
-  /** Called by the host node when the component is added. See {@link SceneNodeComponent}. */
   attach(host: SceneNode) {
     if (this._host === host) {
       return;
@@ -312,7 +306,7 @@ export class GPUClothComponent extends Disposable implements SceneNodeComponent 
     }
   }
 
-  /** Called by the host node when the component is removed. See {@link SceneNodeComponent}. */
+  /** @internal */
   detach(host?: SceneNode) {
     if (!this._host || (host && this._host !== host)) {
       return;
@@ -323,14 +317,14 @@ export class GPUClothComponent extends Disposable implements SceneNodeComponent 
     this.releaseRuntime();
   }
 
-  /** Called when the host enters a scene. See {@link SceneNodeComponent}. */
+  /** @internal */
   hostAttached() {
     if (this._host?.attached) {
       void this.rebuild();
     }
   }
 
-  /** Called when the host leaves a scene. See {@link SceneNodeComponent}. */
+  /** @internal */
   hostDetached() {
     this.releaseRuntime();
   }

@@ -1,17 +1,8 @@
 import { Vector3 } from '@zephyr3d/base';
-import type { SceneNode } from '@zephyr3d/scene';
-import type { ContactInfo } from './backend/types';
-import type { RigidBody } from './rigid_body';
+import type { SceneNode } from '../scene/scene_node';
+import type { PhysicsContactInfo } from './types';
+import type { NodePhysics } from './node_physics';
 import type { Collider } from './collider';
-import type { CharacterController } from './character';
-
-/**
- * A rigid body, a collider that has no rigid body above it, or a character
- * controller: what physics events are raised on and refer to.
- *
- * @public
- */
-export type PhysicsObject = RigidBody | Collider | CharacterController;
 
 /**
  * Passed with `collisionenter`, `collisionstay` and `collisionexit`.
@@ -24,18 +15,17 @@ export type PhysicsObject = RigidBody | Collider | CharacterController;
  * @public
  */
 export class PhysicsContactEvent {
-  private _resolve: (() => ContactInfo | null) | null;
-  private _info: ContactInfo | null;
+  private _resolve: (() => PhysicsContactInfo | null) | null;
+  private _info: PhysicsContactInfo | null;
   private readonly _flip: boolean;
-  /** @internal */
   constructor(
-    /** The other object. */
-    readonly other: PhysicsObject,
+    /** The other physics object: the physics data of its node. */
+    readonly other: NodePhysics,
     /** One of this object's colliders that touches the other object. */
     readonly collider: Collider,
     /** The other object's collider it touches. */
     readonly otherCollider: Collider,
-    resolve: (() => ContactInfo | null) | null,
+    resolve: (() => PhysicsContactInfo | null) | null,
     flip: boolean
   ) {
     this._resolve = resolve;
@@ -44,7 +34,7 @@ export class PhysicsContactEvent {
   }
   /** The other object's node. */
   get otherNode(): SceneNode | null {
-    return this.other.host;
+    return this.other.node;
   }
   /**
    * Direction of the contact in world space, pointing from this object towards
@@ -64,7 +54,7 @@ export class PhysicsContactEvent {
   get impulse(): number {
     return this._get()?.impulse ?? 0;
   }
-  /** Ends the time contact details can be read. @internal */
+  /** Ends the time contact details can be read. */
   _expire() {
     this._resolve = null;
   }
@@ -87,10 +77,9 @@ export class PhysicsContactEvent {
  * @public
  */
 export class PhysicsTriggerEvent {
-  /** @internal */
   constructor(
     /** The other object: the trigger, or what entered it. */
-    readonly other: PhysicsObject,
+    readonly other: NodePhysics,
     /** This object's collider involved. */
     readonly collider: Collider,
     /** The other object's collider involved. */
@@ -98,6 +87,6 @@ export class PhysicsTriggerEvent {
   ) {}
   /** The other object's node. */
   get otherNode(): SceneNode | null {
-    return this.other.host;
+    return this.other.node;
   }
 }

@@ -1,6 +1,5 @@
 import { Vector3 } from '@zephyr3d/base';
-import { PhysicsComponent } from './component';
-import type { ColliderGeometry } from './geometry';
+import { PhysicsPart } from './part';
 import type { PhysicsWorld } from './world';
 
 /**
@@ -44,7 +43,7 @@ export type ColliderShape = 'box' | 'sphere' | 'capsule' | 'cylinder' | 'mesh' |
  *
  * @public
  */
-export class Collider extends PhysicsComponent {
+export class Collider extends PhysicsPart {
   private _shape: ColliderShape;
   private readonly _size: Vector3;
   private _radius: number;
@@ -56,13 +55,12 @@ export class Collider extends PhysicsComponent {
   private _layer: number;
   private _meshLod: number;
   private _terrainResolution: number;
-  /** @internal */
   _meshData: { positions: Float32Array; indices: Uint32Array } | null;
-  /** The geometry last built from, for shapes that need it. @internal */
-  _geometry: ColliderGeometry | null;
+  /** The geometry last built from, for shapes that need it. */
+  _geometry: unknown;
   private _ready: boolean;
   private _error: string;
-  /** Warned that a mesh collider is on a dynamic body. @internal */
+  /** Warned that a mesh collider is on a dynamic body. */
   _warnedDynamicMesh: boolean;
 
   constructor() {
@@ -232,7 +230,6 @@ export class Collider extends PhysicsComponent {
     return this._error;
   }
 
-  /** @internal */
   _setStatus(ready: boolean, error = '') {
     const becameReady = ready && !this._ready;
     this._ready = ready;

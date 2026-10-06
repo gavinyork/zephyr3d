@@ -75,6 +75,7 @@
     "@types/jest": "^30.0.0",
     "@types/node": "^22.12.0",
     "@rollup/plugin-commonjs": "~28.0.2",
-    "@zephyr3d/physics": "workspace:^0.1.0"
+    "@zephyr3d/physics": "workspace:^0.1.0",
+    "@zephyr3d/physics-rapier": "workspace:^0.1.0"
   }
 }

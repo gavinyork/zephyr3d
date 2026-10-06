@@ -1,6 +1,6 @@
 import { Vector3 } from '@zephyr3d/base';
-import type { SceneNode } from '@zephyr3d/scene';
-import { PhysicsComponent } from './component';
+import type { SceneNode } from '../scene/scene_node';
+import { PhysicsPart } from './part';
 import type { PhysicsWorld } from './world';
 
 /**
@@ -49,12 +49,12 @@ export type JointMotorMode = 'off' | 'velocity' | 'position';
  * The joint holds the bodies in the pose they have when it is created: a
  * hinge's angle is 0 there. Limits and motor targets are relative to it.
  *
- * Rapier, the physics engine, does not report the forces on joints, so joints
- * cannot break under load.
+ * Joints cannot break under load: physics implementations do not report the
+ * forces on them.
  *
  * @public
  */
-export class Joint extends PhysicsComponent {
+export class Joint extends PhysicsPart {
   private _type: JointType;
   private _connectedBodyId: string;
   private _connectedBody: SceneNode | null;
@@ -118,7 +118,7 @@ export class Joint extends PhysicsComponent {
    * be set before that node is loaded or added.
    */
   get connectedBody(): SceneNode | null {
-    const scene = this.host?.scene;
+    const scene = this.node?.scene;
     if (!this._connectedBodyId || !scene) {
       return this._connectedBody;
     }
@@ -179,7 +179,7 @@ export class Joint extends PhysicsComponent {
   }
   set collideConnected(value: boolean) {
     this._collideConnected = !!value;
-    this.world?._getBackendJoint(this)?.setContactsEnabled(this._collideConnected);
+    this.world?._getJointHandle(this)?.setContactsEnabled(this._collideConnected);
   }
   /** Whether a hinge, slider or ball joint is limited. Default false. */
   get limitsEnabled() {
@@ -188,7 +188,7 @@ export class Joint extends PhysicsComponent {
   set limitsEnabled(value: boolean) {
     if (!!value !== this._limitsEnabled) {
       this._limitsEnabled = !!value;
-      // Rapier has no way to turn limits off again but rebuilding.
+      // Limits can only be turned off again by rebuilding the joint.
       this._rebuild();
     }
   }
@@ -308,7 +308,6 @@ export class Joint extends PhysicsComponent {
     return this._error;
   }
 
-  /** @internal */
   _setError(error: string) {
     this._error = error;
   }

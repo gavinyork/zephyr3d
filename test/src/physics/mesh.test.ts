@@ -4,7 +4,11 @@ import { createNullDevice } from '@zephyr3d/backend-null';
 import { ClipmapTerrain, Mesh, Primitive, Scene, SceneNode } from '@zephyr3d/scene';
 import * as api from '../../../libs/scene/src/app/api';
 import * as RAPIER from '@dimforge/rapier3d-simd-compat';
-import { Collider, initPhysics, PhysicsWorld, RigidBody } from '@zephyr3d/physics';
+import { Collider, RigidBody } from '@zephyr3d/scene';
+import type { PhysicsSimulation } from '@zephyr3d/physics';
+import { initPhysics } from '@zephyr3d/physics';
+import { rapierPhysics } from '@zephyr3d/physics-rapier';
+import { addPhysics, getPhysics } from './helpers';
 
 const DT = 1 / 60;
 
@@ -12,19 +16,19 @@ let device: NullDevice;
 
 beforeAll(async () => {
   await RAPIER.init();
-  await initPhysics({ rapier: RAPIER });
+  await initPhysics(rapierPhysics, { rapier: RAPIER });
   device = await createNullDevice();
   jest.spyOn(api, 'getDevice').mockReturnValue(device as any);
 });
 
 function makeWorld(scene: Scene) {
-  const world = PhysicsWorld.get(scene);
+  const world = scene.physicsWorld as PhysicsSimulation;
   world.enabled = false;
   world.interpolation = false;
   return world;
 }
 
-function run(world: PhysicsWorld, seconds: number) {
+function run(world: PhysicsSimulation, seconds: number) {
   const frames = Math.round(seconds / DT);
   for (let i = 0; i < frames; i++) {
     world.update(DT);
@@ -63,17 +67,17 @@ function addMeshCollider(scene: Scene, positions: Float32Array, indices: Uint32A
   const collider = new Collider();
   collider.shape = shape as 'mesh';
   collider.setMeshData(positions, indices);
-  node.addComponent(collider);
+  addPhysics(node, collider);
   return node;
 }
 
 function addBody(scene: Scene, shape: 'box' | 'sphere', position: Vector3) {
   const node = new SceneNode(scene);
   node.position.set(position);
-  node.addComponent(new RigidBody());
+  addPhysics(node, new RigidBody());
   const collider = new Collider();
   collider.shape = shape;
-  node.addComponent(collider);
+  addPhysics(node, collider);
   return node;
 }
 
@@ -121,10 +125,10 @@ describe('mesh and convex colliders', () => {
     const scene = new Scene();
     const world = makeWorld(scene);
     const g = grid(20);
-    addMeshCollider(scene, g.positions, g.indices).getComponent(Collider)!.friction = 0;
+    getPhysics(addMeshCollider(scene, g.positions, g.indices), Collider)!.friction = 0;
     const box = addBody(scene, 'box', new Vector3(-8, 0.5, 0.3));
-    const body = box.getComponent(RigidBody)!;
-    box.getComponent(Collider)!.friction = 0;
+    const body = getPhysics(box, RigidBody)!;
+    getPhysics(box, Collider)!.friction = 0;
     run(world, 0.5);
     body.setLinearVelocity(new Vector3(6, 0, 0));
     let maxVy = 0;
@@ -142,11 +146,11 @@ describe('mesh and convex colliders', () => {
       const scene = new Scene();
       const world = makeWorld(scene);
       const node = new SceneNode(scene);
-      node.addComponent(new RigidBody());
+      addPhysics(node, new RigidBody());
       const collider = new Collider();
       collider.shape = 'mesh';
       collider.setMeshData(CUBE_POSITIONS, CUBE_INDICES);
-      node.addComponent(collider);
+      addPhysics(node, collider);
       world.update(DT);
       collider.friction = 0.2;
       world.update(DT);
@@ -163,16 +167,16 @@ describe('mesh and convex colliders', () => {
     addMeshCollider(scene, CUBE_POSITIONS, CUBE_INDICES).scale.setXYZ(20, 1, 20);
     const rock = new SceneNode(scene);
     rock.position.setXYZ(0, 3, 0);
-    rock.addComponent(new RigidBody());
+    addPhysics(rock, new RigidBody());
     const hull = new Collider();
     hull.shape = 'convex';
     // A square pyramid, base down.
     hull.setMeshData(new Float32Array([-1, 0, -1, 1, 0, -1, 1, 0, 1, -1, 0, 1, 0, 1, 0]));
-    rock.addComponent(hull);
+    addPhysics(rock, hull);
     run(world, 4);
     expect(hull.ready).toBe(true);
     expect(rock.getWorldPosition().y).toBeCloseTo(0.5, 2);
-    expect(rock.getComponent(RigidBody)!.isSleeping).toBe(true);
+    expect(getPhysics(rock, RigidBody)!.isSleeping).toBe(true);
   });
 
   it('reports a convex hull that cannot be built', () => {
@@ -187,7 +191,7 @@ describe('mesh and convex colliders', () => {
         'convex'
       );
       world.update(DT);
-      const collider = flat.getComponent(Collider)!;
+      const collider = getPhysics(flat, Collider)!;
       expect(collider.ready).toBe(false);
       expect(collider.error).toMatch(/convex hull/);
     } finally {
@@ -206,7 +210,7 @@ describe('mesh read back', () => {
       const c = new Collider();
       c.shape = 'mesh';
       c.meshLod = lod;
-      mesh.addComponent(c);
+      addPhysics(mesh, c);
       return c;
     });
     await world.whenReady();
@@ -232,7 +236,7 @@ describe('mesh read back', () => {
       mesh.position.setXYZ(i * 3, 0, 0);
       const c = new Collider();
       c.shape = 'convex';
-      mesh.addComponent(c);
+      addPhysics(mesh, c);
     }
     await world.whenReady();
     expect(read).toHaveBeenCalledTimes(1);
@@ -247,7 +251,7 @@ describe('mesh read back', () => {
       jest.spyOn(mesh, 'getMorphData').mockReturnValue({} as any);
       const c = new Collider();
       c.shape = 'mesh';
-      mesh.addComponent(c);
+      addPhysics(mesh, c);
       await world.whenReady();
       expect(c.ready).toBe(false);
       expect(c.error).toMatch(/morph/);
@@ -262,7 +266,7 @@ describe('mesh read back', () => {
     const mesh = new Mesh(scene, cubeWithLod());
     const c = new Collider();
     c.shape = 'mesh';
-    mesh.addComponent(c);
+    addPhysics(mesh, c);
     world.update(DT);
     c.meshLod = 1;
     await world.whenReady();
@@ -278,7 +282,7 @@ describe('mesh read back', () => {
     ground.position.setXYZ(0, -0.5, 0);
     const gc = new Collider();
     gc.shape = 'mesh';
-    ground.addComponent(gc);
+    addPhysics(ground, gc);
     const box = addBody(scene, 'box', new Vector3(0, 2, 0));
     for (let i = 0; i < 5; i++) {
       world.update(DT);
@@ -298,10 +302,10 @@ describe('mesh read back', () => {
     const free = addBody(scene, 'sphere', new Vector3(5, 10, 0));
     const rock = new Mesh(scene, cubeWithLod());
     rock.position.setXYZ(0, 10, 0);
-    rock.addComponent(new RigidBody());
+    addPhysics(rock, new RigidBody());
     const hull = new Collider();
     hull.shape = 'convex';
-    rock.addComponent(hull);
+    addPhysics(rock, hull);
     for (let i = 0; i < 10; i++) {
       world.update(DT);
     }
@@ -323,7 +327,7 @@ describe('mesh read back', () => {
       ground.position.setXYZ(0, -0.5, 0);
       const gc = new Collider();
       gc.shape = 'mesh';
-      ground.addComponent(gc);
+      addPhysics(ground, gc);
       const boxes = [0, 1, 2].map((i) => addBody(scene, 'box', new Vector3(i * 0.3, 1 + i * 1.2, 0)));
       // Frames go by while the floor is read back; how many must not matter.
       for (let i = 0; i < 3; i++) {
@@ -355,7 +359,7 @@ describe('terrain collider', () => {
     return terrain;
   }
 
-  function surfaceY(world: PhysicsWorld, x: number, z: number) {
+  function surfaceY(world: PhysicsSimulation, x: number, z: number) {
     return world.raycast(new Vector3(x, 1000, z), new Vector3(0, -1, 0))?.point.y ?? NaN;
   }
 
@@ -365,9 +369,9 @@ describe('terrain collider', () => {
     const terrain = planeTerrain(scene, 16);
     terrain.position.setXYZ(10, 1, -5);
     terrain.scale.setXYZ(2, 3, 2);
-    terrain.addComponent(Object.assign(new Collider(), { shape: 'terrain' }));
+    addPhysics(terrain, Object.assign(new Collider(), { shape: 'terrain' }));
     world.update(DT);
-    expect(terrain.getComponent(Collider)!.ready).toBe(true);
+    expect(getPhysics(terrain, Collider)!.ready).toBe(true);
     // Texel (i, j) is centred at position + (i + 0.5) * cell, cell = 2.
     for (const [i, j] of [
       [3, 7],
@@ -386,7 +390,7 @@ describe('terrain collider', () => {
     const terrain = planeTerrain(scene, 16);
     terrain.position.setXYZ(10, 1, -5);
     terrain.scale.setXYZ(2, 3, 2);
-    terrain.addComponent(Object.assign(new Collider(), { shape: 'terrain' }));
+    addPhysics(terrain, Object.assign(new Collider(), { shape: 'terrain' }));
     world.update(DT);
     // Sample columns and rows lie on whole numbers here; Rapier alone misses
     // straight-down rays along them (dimforge/rapier#165).
@@ -402,7 +406,7 @@ describe('terrain collider', () => {
     const world = makeWorld(scene);
     const terrain = planeTerrain(scene, 17);
     const collider = Object.assign(new Collider(), { shape: 'terrain' as const, terrainResolution: 2 });
-    terrain.addComponent(collider);
+    addPhysics(terrain, collider);
     world.update(DT);
     // A plane is the same at any resolution.
     expect(surfaceY(world, 4.5, 6.5)).toBeCloseTo(0.25 * 4 + 0.5 * 6, 3);
@@ -412,7 +416,7 @@ describe('terrain collider', () => {
     const scene = new Scene();
     const world = makeWorld(scene);
     const terrain = planeTerrain(scene, 8);
-    terrain.addComponent(Object.assign(new Collider(), { shape: 'terrain' }));
+    addPhysics(terrain, Object.assign(new Collider(), { shape: 'terrain' }));
     world.update(DT);
     (terrain as any).setHeightData(new Uint16Array(64).fill(float2half(5)), 8, 8);
     world.update(DT);
@@ -424,7 +428,7 @@ describe('terrain collider', () => {
     const scene = new Scene();
     const world = makeWorld(scene);
     const terrain = planeTerrain(scene, 32);
-    terrain.addComponent(Object.assign(new Collider(), { shape: 'terrain' }));
+    addPhysics(terrain, Object.assign(new Collider(), { shape: 'terrain' }));
     const ball = addBody(scene, 'sphere', new Vector3(16, 30, 16));
     run(world, 3);
     const p = ball.getWorldPosition();

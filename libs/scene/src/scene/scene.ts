@@ -22,6 +22,8 @@ import {
 } from './script_attachment';
 import type { LightingMode } from '../utility/physical';
 import type { ScenePhysicsSettings } from './physics_settings';
+import type { PhysicsWorld } from '../physics/world';
+import { getPhysicsWorldFactory } from '../physics/world';
 import type { VirtualTextureClient } from '../render/virtualtexture/virtual_texture_client';
 
 /**
@@ -93,6 +95,7 @@ export class Scene
   protected _metaData: Nullable<Metadata>;
   /** @internal Physics settings saved with the scene (optional). */
   protected _physicsSettings: Nullable<ScenePhysicsSettings>;
+  protected _physicsWorld: Nullable<PhysicsWorld>;
   /** @internal Lighting unit model used by this scene. */
   protected _lightingMode: LightingMode;
   /** @internal Number of physical meters represented by one scene unit. */
@@ -138,6 +141,7 @@ export class Scene
     this._rootNode.get()!.name = 'Root';
     this._metaData = null;
     this._physicsSettings = null;
+    this._physicsWorld = null;
     this._lightingMode = 'legacy';
     this._metersPerUnit = 1;
     this._scripts = [];
@@ -268,6 +272,51 @@ export class Scene
   }
   set physicsSettings(val: Nullable<ScenePhysicsSettings>) {
     this._physicsSettings = val ?? null;
+  }
+  /**
+   * The physics simulation of this scene, or null when no physics
+   * implementation is loaded.
+   *
+   * @remarks
+   * Created the first time it is needed - when a node with physics data
+   * ({@link SceneNode.physics}) enters the scene, or when this is read - by the
+   * implementation loaded with `initPhysics`. See {@link Scene.setPhysicsWorld}
+   * to give the scene one directly.
+   */
+  get physicsWorld(): Nullable<PhysicsWorld> {
+    if (!this._physicsWorld && !this.disposed) {
+      const factory = getPhysicsWorldFactory();
+      if (factory) {
+        this._physicsWorld = factory(this);
+      }
+    }
+    return this._physicsWorld;
+  }
+  /**
+   * Gives the scene a physics world, replacing and disposing the current one;
+   * null removes it until it is next needed.
+   *
+   * @remarks
+   * The physics data of the scene's nodes moves to the new world.
+   */
+  setPhysicsWorld(world: Nullable<PhysicsWorld>) {
+    const current = this._physicsWorld;
+    if (current === (world ?? null)) {
+      return;
+    }
+    if (world && world.scene !== this) {
+      throw new Error('The physics world belongs to another scene.');
+    }
+    this.rootNode.iterate((node) => {
+      node.physics?._hostDetached();
+    });
+    this._physicsWorld = world ?? null;
+    current?.dispose();
+    if (world) {
+      this.rootNode.iterate((node) => {
+        node.physics?._hostAttached();
+      });
+    }
   }
   /**
    * Attached script filename or identifier (engine-specific).
@@ -622,5 +671,7 @@ export class Scene
     this._env.dispose();
     this._rootNode.dispose();
     this._mainCamera.dispose();
+    this._physicsWorld?.dispose();
+    this._physicsWorld = null;
   }
 }

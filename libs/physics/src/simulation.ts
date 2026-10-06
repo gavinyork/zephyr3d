@@ -1,6 +1,30 @@
 import { Disposable, makeObservable, Quaternion, Vector3 } from '@zephyr3d/base';
-import type { Scene } from '@zephyr3d/scene';
-import { getDevice, SceneNode, ScenePhysicsSettings, tryGetApp } from '@zephyr3d/scene';
+import type {
+  CharacterController,
+  CharacterMoveResult,
+  Collider,
+  ColliderOutline,
+  Joint,
+  NodePhysics,
+  PhysicsEventMap,
+  PhysicsQueryHit,
+  PhysicsQueryOptions,
+  PhysicsShape,
+  PhysicsWorld,
+  PhysicsWorldEventMap,
+  RigidBody,
+  Scene,
+  Vehicle,
+  Wheel
+} from '@zephyr3d/scene';
+import {
+  getDevice,
+  PhysicsContactEvent,
+  PhysicsTriggerEvent,
+  SceneNode,
+  ScenePhysicsSettings,
+  tryGetApp
+} from '@zephyr3d/scene';
 import type {
   BackendBody,
   BackendCharacter,
@@ -9,21 +33,14 @@ import type {
   BackendRayHit,
   BackendVehicle,
   BackendWorld,
+  PhysicsBackend,
   QueryPredicate,
   ShapeDesc
-} from './backend/types';
-import { RapierWorld } from './backend/rapier';
-import { getRapier, isPhysicsReady } from './rapier_state';
-import type { RigidBody } from './rigid_body';
-import type { Collider } from './collider';
-import type { Joint } from './joint';
-import type { CharacterController, CharacterMoveResult } from './character';
-import type { Vehicle, Wheel } from './vehicle';
-import type { PhysicsComponent, PhysicsEventMap } from './component';
-import { PhysicsContactEvent, PhysicsTriggerEvent, type PhysicsObject } from './events';
+} from './backend';
 import type { ColliderGeometry, GeometrySource } from './geometry';
 import { buildColliderShape, CONVEX_HULL_ERROR } from './shapes';
 import { fetchGeometry, geometryMatches, geometrySource, needsGeometry, sameSource } from './geometry';
+import { getColliderOutline, getColliderOutlineKey } from './outline';
 
 /** A vehicle in the backend, and how its wheel nodes are placed. */
 interface VehicleEntry {
@@ -54,7 +71,7 @@ function copyPose(dst: Pose, src: Pose) {
   dst.rotation.set(src.rotation);
 }
 
-/** @internal */
+/** */
 interface BodyEntry {
   component: RigidBody;
   body: BackendBody;
@@ -71,7 +88,7 @@ interface BodyEntry {
   disabled: boolean;
 }
 
-/** @internal */
+/** */
 interface ColliderEntry {
   component: Collider;
   owner: BodyEntry | null;
@@ -82,7 +99,7 @@ interface ColliderEntry {
   lastMatrix: Float32Array;
 }
 
-/** @internal */
+/** */
 interface JointEntry {
   component: Joint;
   joint: BackendJoint;
@@ -114,73 +131,12 @@ interface JointFrames {
 interface ObjectPair {
   key: string;
   /** The object with the lower id; `colliderA` is one of its colliders. */
-  a: PhysicsObject;
-  b: PhysicsObject;
+  a: NodePhysics;
+  b: NodePhysics;
   colliderA: Collider;
   colliderB: Collider;
   trigger: boolean;
 }
-
-/**
- * A shape used by {@link PhysicsWorld} queries, in world units.
- *
- * Capsules and cylinders stand along the Y axis of the rotation they are
- * given; `height` is the total height, a capsule's rounded ends included.
- *
- * @public
- */
-export type PhysicsShape =
-  | { type: 'box'; size: Vector3 }
-  | { type: 'sphere'; radius: number }
-  | { type: 'capsule'; radius: number; height: number }
-  | { type: 'cylinder'; radius: number; height: number };
-
-/**
- * Narrows a {@link PhysicsWorld} query.
- *
- * @public
- */
-export interface PhysicsQueryOptions {
-  /** Bit `1 << layer` set for each collider layer to consider. Default: all layers. */
-  layerMask?: number;
-  /** Whether triggers can be hit. Default false. */
-  includeTriggers?: boolean;
-  /** An object to ignore, such as the one asking: a rigid body ignores all its colliders. */
-  exclude?: PhysicsObject | null;
-}
-
-/**
- * What a query hit.
- *
- * @public
- */
-export interface PhysicsQueryHit {
-  collider: Collider;
-  /** The rigid body the collider belongs to, if any. */
-  body: RigidBody | null;
-  /** The object the collider raises events on: its rigid body, character controller, or itself. */
-  object: PhysicsObject;
-  /** The collider's node. */
-  node: SceneNode;
-  /** Where the hit is, in world space. */
-  point: Vector3;
-  /** Surface direction at the hit, in world space, pointing out of the collider. */
-  normal: Vector3;
-  /** How far along the ray or cast the hit is. */
-  distance: number;
-}
-
-/**
- * Events of a {@link PhysicsWorld}.
- *
- * - `fixedupdate`: before each simulation step, with the step length in seconds.
- *   Forces applied from here act on that step only.
- *
- * @public
- */
-export type PhysicsWorldEventMap = {
-  fixedupdate: [fixedDeltaTime: number];
-};
 
 const LAYER_COUNT = 16;
 const ALL_LAYERS = 0xffff;
@@ -221,9 +177,28 @@ function isUnder(node: SceneNode | null, root: SceneNode) {
   return false;
 }
 
-/** Character controllers, told apart without importing the class (it imports this module). */
-function isCharacter(component: unknown): component is CharacterController {
-  return !!component && (component as CharacterController)._ownedBody !== undefined;
+/** Character controllers, told apart without importing the class. */
+function isCharacter(body: unknown): body is CharacterController {
+  return !!body && (body as CharacterController)._ownedBody !== undefined;
+}
+
+/** The rigid body standing for a node's body: a character's own body for a character. */
+function rigidBodyOf(physics: NodePhysics | null | undefined): RigidBody | null {
+  const body = physics?.body ?? null;
+  return isCharacter(body) ? body._ownedBody : body;
+}
+
+/** The parts of a node's physics in creation order; a character brings its body and capsule. */
+function partsOf(physics: NodePhysics) {
+  const parts: unknown[] = [];
+  for (const part of physics.parts) {
+    if (isCharacter(part)) {
+      parts.push(part._ownedBody, part._ownedCollider);
+    } else {
+      parts.push(part);
+    }
+  }
+  return parts;
 }
 
 function queryShapeDesc(shape: PhysicsShape): ShapeDesc {
@@ -247,16 +222,16 @@ function queryShapeDesc(shape: PhysicsShape): ShapeDesc {
 }
 
 /**
- * The physics simulation of one scene.
+ * The physics simulation of one scene: the {@link PhysicsWorld} that
+ * {@link initPhysics} gives scenes, as `scene.physicsWorld`.
  *
  * @remarks
- * Created on demand by the first physics component whose node enters the scene,
- * and stepped once per frame on the scene's `afterupdate` event: after animation,
+ * Created on demand by the scene, and stepped once per frame on the scene's `afterupdate` event: after animation,
  * so kinematic bodies follow this frame's pose, and before rendering, so moved
  * nodes are drawn where the simulation put them.
  *
- * The simulation advances in fixed steps of {@link PhysicsWorld.fixedTimeStep},
- * at most {@link PhysicsWorld.maxSubSteps} per frame; time beyond that is
+ * The simulation advances in fixed steps of {@link PhysicsSimulation.fixedTimeStep},
+ * at most {@link PhysicsSimulation.maxSubSteps} per frame; time beyond that is
  * dropped rather than carried over, so a long frame slows the simulation down
  * instead of making the next frames catch up in a burst. Rendered poses of
  * dynamic bodies are interpolated between the last two steps.
@@ -266,10 +241,13 @@ function queryShapeDesc(shape: PhysicsShape): ShapeDesc {
  *
  * @public
  */
-export class PhysicsWorld extends makeObservable(Disposable)<PhysicsWorldEventMap>() {
-  private static readonly _worlds = new WeakMap<Scene, PhysicsWorld>();
+export class PhysicsSimulation
+  extends makeObservable(Disposable)<PhysicsWorldEventMap>()
+  implements PhysicsWorld
+{
   private static _simulationEnabled = true;
   private readonly _scene: Scene;
+  private readonly _engine: PhysicsBackend;
   private _backend: BackendWorld | null;
   private readonly _gravity: Vector3;
   private _fixedTimeStep: number;
@@ -288,7 +266,7 @@ export class PhysicsWorld extends makeObservable(Disposable)<PhysicsWorldEventMa
   private readonly _layerMasks: number[];
   private readonly _layerNames: string[];
   /** Collider pairs touching now, by collider keys; the backend's view. */
-  private readonly _touching: Map<string, [Collider, Collider]>;
+  private readonly _touching: Map<string, [ColliderEntry, ColliderEntry]>;
   private readonly _touchingByKey: Map<number, Set<string>>;
   /** Object pairs that started touching during this frame's steps. */
   private readonly _startedThisFrame: Map<string, ObjectPair>;
@@ -320,7 +298,7 @@ export class PhysicsWorld extends makeObservable(Disposable)<PhysicsWorldEventMa
   private readonly _registeredWheels: Set<Wheel>;
   private readonly _vehicles: Map<Vehicle, VehicleEntry>;
   private _vehiclesDirty: boolean;
-  /** @internal */
+  /** Whether a fixed update is running, so forces act on one step only. */
   _inFixedUpdate: boolean;
 
   /**
@@ -328,33 +306,23 @@ export class PhysicsWorld extends makeObservable(Disposable)<PhysicsWorldEventMa
    *
    * @remarks
    * Turned off by tools that show scenes without running them, such as the
-   * editor. Worlds keep tracking their components meanwhile; calling
-   * {@link PhysicsWorld.update} directly still steps.
+   * editor. Worlds keep tracking their physics data meanwhile; calling
+   * {@link PhysicsSimulation.update} directly still steps.
    */
   static get simulationEnabled() {
-    return PhysicsWorld._simulationEnabled;
+    return PhysicsSimulation._simulationEnabled;
   }
   static set simulationEnabled(value: boolean) {
-    PhysicsWorld._simulationEnabled = !!value;
+    PhysicsSimulation._simulationEnabled = !!value;
   }
-  /** The world of a scene, created if it does not exist yet. */
-  static get(scene: Scene): PhysicsWorld {
-    let world = PhysicsWorld._worlds.get(scene);
-    if (!world || world.disposed) {
-      world = new PhysicsWorld(scene);
-      PhysicsWorld._worlds.set(scene, world);
-    }
-    return world;
-  }
-  /** The world of a scene, or null if none was created. */
-  static find(scene: Scene): PhysicsWorld | null {
-    const world = PhysicsWorld._worlds.get(scene);
-    return world && !world.disposed ? world : null;
-  }
-
-  private constructor(scene: Scene) {
+  /**
+   * @param scene - The scene to simulate.
+   * @param engine - The physics engine, loaded already.
+   */
+  constructor(scene: Scene, engine: PhysicsBackend) {
     super();
     this._scene = scene;
+    this._engine = engine;
     this._backend = null;
     this._gravity = new Vector3(0, -9.81, 0);
     this._fixedTimeStep = 1 / 60;
@@ -438,7 +406,7 @@ export class PhysicsWorld extends makeObservable(Disposable)<PhysicsWorldEventMa
   set interpolation(value: boolean) {
     this._interpolation = !!value;
   }
-  /** Whether this world steps on its own each frame; see also {@link PhysicsWorld.simulationEnabled}. Default true. */
+  /** Whether this world steps on its own each frame; see also {@link PhysicsSimulation.simulationEnabled}. Default true. */
   get enabled() {
     return this._enabled;
   }
@@ -485,7 +453,7 @@ export class PhysicsWorld extends makeObservable(Disposable)<PhysicsWorldEventMa
   // ------------------------------------------------------------------ layers
 
   /** Display names of the 16 collider layers, for tools. */
-  get layerNames(): string[] {
+  get layerNames(): readonly string[] {
     return this._layerNames;
   }
   /** Whether colliders on layers `a` and `b` collide. All layers collide by default. */
@@ -520,9 +488,8 @@ export class PhysicsWorld extends makeObservable(Disposable)<PhysicsWorldEventMa
    * Advances the simulation by `dt` seconds of frame time.
    *
    * @remarks
-   * Called automatically each frame while {@link PhysicsWorld.enabled}; call it
-   * yourself with `enabled` off to drive the simulation manually. Does nothing
-   * until {@link initPhysics} has completed.
+   * Called automatically each frame while {@link PhysicsSimulation.enabled};
+   * call it yourself with `enabled` off to drive the simulation manually.
    */
   update(dt: number) {
     if (this.disposed) {
@@ -616,7 +583,7 @@ export class PhysicsWorld extends makeObservable(Disposable)<PhysicsWorldEventMa
     );
     return hit ? this._rayHit(hit, origin, dir) : null;
   }
-  /** Every collider along a ray, nearest first. See {@link PhysicsWorld.raycast}. */
+  /** Every collider along a ray, nearest first. See {@link PhysicsSimulation.raycast}. */
   raycastAll(
     origin: Vector3,
     direction: Vector3,
@@ -671,8 +638,8 @@ export class PhysicsWorld extends makeObservable(Disposable)<PhysicsWorldEventMa
     return {
       collider: entry.component,
       body: this._publicBody(entry),
-      object: this._objectOf(entry.component),
-      node: entry.component.host!,
+      object: this._objectOf(entry),
+      node: entry.component.node!,
       point: hit.point,
       normal: hit.normal,
       distance: hit.distance
@@ -705,24 +672,29 @@ export class PhysicsWorld extends makeObservable(Disposable)<PhysicsWorldEventMa
     );
   }
 
+  /** See {@link PhysicsWorld.getColliderOutline}. */
+  getColliderOutline(target: Collider | CharacterController): Promise<ColliderOutline | null> {
+    return getColliderOutline(target, () => this._engine.createWorld());
+  }
+  /** See {@link PhysicsWorld.getColliderOutlineKey}. */
+  getColliderOutlineKey(target: Collider | CharacterController): string {
+    return getColliderOutlineKey(target);
+  }
+
   // ------------------------------------------------------------------ registration
 
-  /** @internal */
   _registerBody(component: RigidBody) {
     this._registeredBodies.add(component);
     this._markBodyDirty(component);
   }
-  /** @internal */
   _unregisterBody(component: RigidBody) {
     this._registeredBodies.delete(component);
     this._markBodyDirty(component);
   }
-  /** @internal */
   _registerCollider(component: Collider) {
     this._registeredColliders.add(component);
     this._dirtyColliders.add(component);
   }
-  /** @internal */
   _unregisterCollider(component: Collider) {
     this._registeredColliders.delete(component);
     this._dirtyColliders.add(component);
@@ -731,29 +703,25 @@ export class PhysicsWorld extends makeObservable(Disposable)<PhysicsWorldEventMa
     this._enablementDirty = true;
     component._setStatus(false);
   }
-  /** @internal */
   _registerJoint(component: Joint) {
     this._registeredJoints.add(component);
     this._dirtyJoints.add(component);
   }
-  /** @internal */
   _unregisterJoint(component: Joint) {
     this._registeredJoints.delete(component);
     this._dirtyJoints.add(component);
     this._retryJoints.delete(component);
   }
-  /** A joint's settings changed; it is rebuilt from scratch on the next update. @internal */
+  /** A joint's settings changed; it is rebuilt from scratch on the next update. */
   _markJointDirty(component: Joint) {
     this._jointFrames.delete(component);
     this._dirtyJoints.add(component);
   }
-  /** @internal */
-  _getBackendJoint(component: Joint) {
+  _getJointHandle(component: Joint) {
     return this._joints.get(component)?.joint ?? null;
   }
-  /** @internal */
   _applyJointLimits(component: Joint) {
-    const joint = this._getBackendJoint(component);
+    const joint = this._getJointHandle(component);
     if (!joint || !component.limitsEnabled) {
       return;
     }
@@ -766,9 +734,8 @@ export class PhysicsWorld extends makeObservable(Disposable)<PhysicsWorldEventMa
       joint.setBallLimits(component.twistLimit * toRad, component.swingLimit * toRad);
     }
   }
-  /** @internal */
   _applyJointMotor(component: Joint) {
-    const joint = this._getBackendJoint(component);
+    const joint = this._getJointHandle(component);
     if (!joint) {
       return;
     }
@@ -784,7 +751,7 @@ export class PhysicsWorld extends makeObservable(Disposable)<PhysicsWorldEventMa
     this._joints.get(component)!.owner.body.wakeUp();
     this._joints.get(component)!.other?.body.wakeUp();
   }
-  /** A hinge's angle in degrees or a slider's position in metres, from the bodies' poses. @internal */
+  /** A hinge's angle in degrees or a slider's position in metres, from the bodies' poses. */
   _jointValue(component: Joint) {
     const entry = this._joints.get(component);
     if (!entry) {
@@ -816,26 +783,21 @@ export class PhysicsWorld extends makeObservable(Disposable)<PhysicsWorldEventMa
     }
     return 0;
   }
-  /** @internal */
   _registerCharacter(component: CharacterController) {
     if (!this._characters.has(component)) {
       this._characters.set(component, null);
     }
   }
-  /** @internal */
   _unregisterCharacter(component: CharacterController) {
     this._characters.get(component)?.dispose();
     this._characters.delete(component);
   }
-  /** @internal */
   _configureCharacter(component: CharacterController) {
     this._characters.get(component)?.configure(component._settings());
   }
   /**
    * Moves a character as far as it can go towards `displacement`, and moves
    * its node there. Null when it is not simulated yet.
-   *
-   * @internal
    */
   _moveCharacter(component: CharacterController, displacement: Vector3): CharacterMoveResult | null {
     if (this.disposed || !this._ensureBackend() || !this._characters.has(component)) {
@@ -852,7 +814,7 @@ export class PhysicsWorld extends makeObservable(Disposable)<PhysicsWorldEventMa
       controller = this._backend!.createCharacter(component._settings());
       this._characters.set(component, controller);
     }
-    const host = component.host!;
+    const host = component.node!;
     const pose = readWorldPose(host, newPose());
     if (!matrixEquals(bodyEntry.lastMatrix, host)) {
       // Moved by something else since: start from where the node is.
@@ -881,7 +843,7 @@ export class PhysicsWorld extends makeObservable(Disposable)<PhysicsWorldEventMa
       }
       collisions.push({
         collider: entry.component,
-        node: entry.component.host!,
+        node: entry.component.node!,
         point: hit.point,
         normal: hit.normal
       });
@@ -894,32 +856,27 @@ export class PhysicsWorld extends makeObservable(Disposable)<PhysicsWorldEventMa
     }
     return { movement: result.movement, grounded: result.grounded, groundNormal, collisions };
   }
-  /** @internal */
   _registerVehicle(component: Vehicle) {
     this._registeredVehicles.add(component);
     this._vehiclesDirty = true;
   }
-  /** @internal */
   _unregisterVehicle(component: Vehicle) {
     this._registeredVehicles.delete(component);
     this._vehiclesDirty = true;
   }
-  /** @internal */
   _registerWheel(component: Wheel) {
     this._registeredWheels.add(component);
     this._vehiclesDirty = true;
   }
-  /** @internal */
   _unregisterWheel(component: Wheel) {
     this._registeredWheels.delete(component);
     this._restoreWheel(component);
     this._vehiclesDirty = true;
   }
-  /** A vehicle or wheel setting changed; vehicles are rebuilt on the next update. @internal */
+  /** A vehicle or wheel setting changed; vehicles are rebuilt on the next update. */
   _markVehiclesDirty() {
     this._vehiclesDirty = true;
   }
-  /** @internal */
   _vehicleSpeed(component: Vehicle) {
     const entry = this._vehicles.get(component);
     if (!entry) {
@@ -929,37 +886,35 @@ export class PhysicsWorld extends makeObservable(Disposable)<PhysicsWorldEventMa
     const front = entry.owner.body.getRotation(new Quaternion()).transform(entry.forward, new Vector3());
     return Vector3.dot(v, front);
   }
-  /** @internal */
   _vehicleWheels(component: Vehicle): readonly Wheel[] {
     return this._vehicles.get(component)?.wheels ?? [];
   }
-  /** @internal */
   _colliderNodeByKey(key: number) {
-    return key < 0 ? null : (this._byKey.get(key)?.component.host ?? null);
+    return key < 0 ? null : (this._byKey.get(key)?.component.node ?? null);
   }
 
-  /** A body's settings changed; it is rebuilt on the next update. @internal */
+  /** A body's settings changed; it is rebuilt on the next update. */
   _markBodyDirty(component: RigidBody) {
     this._dirtyBodies.add(component);
     // Vehicles hold their chassis body.
     this._vehiclesDirty = true;
     // Joints on it, or whose ends may now resolve to a different body.
-    const root = component.host;
+    const root = component.node;
     for (const joint of this._registeredJoints) {
       const entry = this._joints.get(joint);
       if (
         entry?.owner.component === component ||
         entry?.other?.component === component ||
-        (root && isUnder(joint.host, root)) ||
+        (root && isUnder(joint.node, root)) ||
         (root && isUnder(joint.connectedBody, root))
       ) {
         this._dirtyJoints.add(joint);
       }
     }
     // Colliders below may now belong to a different body.
-    component.host?.iterate((node) => {
+    component.node?.iterate((node) => {
       for (const c of this._registeredColliders) {
-        if (c.host === node) {
+        if (c.node === node) {
           this._dirtyColliders.add(c);
         }
       }
@@ -970,19 +925,18 @@ export class PhysicsWorld extends makeObservable(Disposable)<PhysicsWorldEventMa
       }
     }
   }
-  /** A collider's settings changed. @internal */
+  /** A collider's settings changed. */
   _markColliderDirty(component: Collider) {
     this._dirtyColliders.add(component);
   }
-  /** A collider's layer changed. @internal */
+  /** A collider's layer changed. */
   _updateColliderGroups(component: Collider) {
     const entry = this._colliders.get(component);
     if (entry) {
       this._applyGroups(entry);
     }
   }
-  /** @internal */
-  _getBackendBody(component: RigidBody): BackendBody | null {
+  _getBodyHandle(component: RigidBody): BackendBody | null {
     return this._bodies.get(component)?.body ?? null;
   }
 
@@ -990,10 +944,10 @@ export class PhysicsWorld extends makeObservable(Disposable)<PhysicsWorldEventMa
 
   private _ensureBackend() {
     if (!this._backend) {
-      if (!isPhysicsReady()) {
+      if (!this._engine.ready) {
         return false;
       }
-      this._backend = new RapierWorld(getRapier());
+      this._backend = this._engine.createWorld();
       this._backend.setGravity(this._gravity);
     }
     return true;
@@ -1056,22 +1010,19 @@ export class PhysicsWorld extends makeObservable(Disposable)<PhysicsWorldEventMa
         this._bodies.delete(b);
       }
     }
-    // Create in scene tree order, which does not depend on the order components
-    // were attached or loaded in: part of keeping the simulation reproducible.
-    const order: PhysicsComponent[] = [];
+    // Create in scene tree order, and in a fixed order on each node, which does
+    // not depend on the order parts were added or loaded in: part of keeping
+    // the simulation reproducible.
+    const order: unknown[] = [];
     this._scene.rootNode.iterate((node) => {
-      for (const component of node.components) {
-        // A character controller's body and capsule are its own, not the node's.
-        const parts: unknown[] = isCharacter(component)
-          ? [component._ownedBody, component._ownedCollider]
-          : [component];
-        for (const part of parts) {
+      if (node.physics) {
+        for (const part of partsOf(node.physics)) {
           if (
             (this._dirtyBodies.has(part as RigidBody) && this._registeredBodies.has(part as RigidBody)) ||
             (this._dirtyColliders.has(part as Collider) && this._registeredColliders.has(part as Collider)) ||
             (this._dirtyJoints.has(part as Joint) && this._registeredJoints.has(part as Joint))
           ) {
-            order.push(part as PhysicsComponent);
+            order.push(part);
           }
         }
       }
@@ -1105,10 +1056,9 @@ export class PhysicsWorld extends makeObservable(Disposable)<PhysicsWorldEventMa
     const claimed = new Set<Wheel>();
     const vehicles: Vehicle[] = [];
     this._scene.rootNode.iterate((node) => {
-      for (const component of node.components) {
-        if (this._registeredVehicles.has(component as Vehicle)) {
-          vehicles.push(component as Vehicle);
-        }
+      const vehicle = node.physics?.vehicle;
+      if (vehicle && this._registeredVehicles.has(vehicle)) {
+        vehicles.push(vehicle);
       }
     });
     for (const vehicle of vehicles) {
@@ -1123,14 +1073,9 @@ export class PhysicsWorld extends makeObservable(Disposable)<PhysicsWorldEventMa
   }
 
   private _createVehicle(component: Vehicle, claimed: Set<Wheel>) {
-    const host = component.host!;
-    let owner: BodyEntry | null = null;
-    for (const c of host.components) {
-      const entry = this._bodies.get(c as RigidBody);
-      if (entry) {
-        owner = entry;
-      }
-    }
+    const host = component.node!;
+    const body = host.physics?.body;
+    const owner = body && !isCharacter(body) ? (this._bodies.get(body) ?? null) : null;
     if (!owner || owner.component.motionType !== 'dynamic') {
       component._setError('A vehicle needs a dynamic RigidBody on its node');
       return;
@@ -1141,23 +1086,23 @@ export class PhysicsWorld extends makeObservable(Disposable)<PhysicsWorldEventMa
       if (node === host) {
         return false;
       }
-      for (const c of node.components) {
-        const wheel = c as Wheel;
-        if (!this._registeredWheels.has(wheel) || claimed.has(wheel)) {
-          continue;
-        }
-        if (this._findOwner(node) === owner) {
-          wheels.push(wheel);
-        }
+      const wheel = node.physics?.wheel;
+      if (
+        wheel &&
+        this._registeredWheels.has(wheel) &&
+        !claimed.has(wheel) &&
+        this._findOwner(node) === owner
+      ) {
+        wheels.push(wheel);
       }
       return false;
     });
     if (wheels.length === 0) {
-      component._setError('A vehicle needs Wheel components on nodes below it');
+      component._setError('A vehicle needs wheels on nodes below it');
       return;
     }
-    const body = readWorldPose(host, newPose());
-    const invBody = Quaternion.inverse(body.rotation, new Quaternion());
+    const bodyPose = readWorldPose(host, newPose());
+    const invBody = Quaternion.inverse(bodyPose.rotation, new Quaternion());
     const up = Vector3.axisPY();
     const forward = component._forwardVector();
     const axle = Vector3.cross(forward, up, new Vector3());
@@ -1168,7 +1113,7 @@ export class PhysicsWorld extends makeObservable(Disposable)<PhysicsWorldEventMa
     const descs = wheels.map((wheel) => {
       claimed.add(wheel);
       wheel._setError('');
-      const node = wheel.host!;
+      const node = wheel.node!;
       if (!wheel._rest || wheel._restNode !== node) {
         wheel._rest = { position: node.position.clone(), rotation: node.rotation.clone() };
         wheel._restNode = node;
@@ -1181,7 +1126,7 @@ export class PhysicsWorld extends makeObservable(Disposable)<PhysicsWorldEventMa
       const parentRot = new Quaternion();
       parent?.worldMatrix.decompose(null, parentRot, null);
       const worldRot = Quaternion.multiply(parentRot, wheel._rest.rotation, new Quaternion());
-      const centerCs = invBody.transform(Vector3.sub(center, body.position), new Vector3());
+      const centerCs = invBody.transform(Vector3.sub(center, bodyPose.position), new Vector3());
       const hard = new Vector3(centerCs.x, centerCs.y + wheel.suspensionRestLength, centerCs.z);
       hardPoints.push(hard);
       restRotations.push(Quaternion.multiply(invBody, worldRot, new Quaternion()));
@@ -1223,7 +1168,7 @@ export class PhysicsWorld extends makeObservable(Disposable)<PhysicsWorldEventMa
   /** Gives a wheel node back the pose it had before a vehicle moved it. */
   private _restoreWheel(wheel: Wheel) {
     const node = wheel._restNode;
-    if (wheel._rest && node && node === wheel.host) {
+    if (wheel._rest && node && node === wheel.node) {
       node.position.set(wheel._rest.position);
       node.rotation.set(wheel._rest.rotation);
     }
@@ -1277,7 +1222,7 @@ export class PhysicsWorld extends makeObservable(Disposable)<PhysicsWorldEventMa
     const rot = new Quaternion();
     const center = new Vector3();
     for (const entry of this._vehicles.values()) {
-      readWorldPose(entry.component.host!, pose);
+      readWorldPose(entry.component.node!, pose);
       entry.wheels.forEach((wheel, i) => {
         const s = wheel._state;
         const hard = entry.hardPoints[i];
@@ -1291,14 +1236,14 @@ export class PhysicsWorld extends makeObservable(Disposable)<PhysicsWorldEventMa
           new Vector3()
         );
         const worldRot = Quaternion.multiply(pose.rotation, rot, new Quaternion());
-        wheel.host!.setWorldPose(worldPos, worldRot);
+        wheel.node!.setWorldPose(worldPos, worldRot);
       });
     }
   }
 
   private _createJoint(component: Joint) {
     this._retryJoints.delete(component);
-    const host = component.host!;
+    const host = component.node!;
     const owner = this._findOwner(host);
     if (!owner) {
       this._failJoint(component, 'A joint needs a rigid body on its node or on a node above it', true);
@@ -1379,7 +1324,7 @@ export class PhysicsWorld extends makeObservable(Disposable)<PhysicsWorldEventMa
    * A rope or spring is tied to the other body at the connected anchor instead.
    */
   private _computeJointFrames(component: Joint, owner: BodyEntry, other: BodyEntry | null): JointFrames {
-    const host = component.host!;
+    const host = component.node!;
     const nodePose = readWorldPose(host, newPose());
     const pivot = host.worldMatrix.transformPointAffine(component.anchor, new Vector3());
     const axis = component.axis.magnitude > 1e-9 ? Vector3.normalize(component.axis) : Vector3.axisPY();
@@ -1389,7 +1334,7 @@ export class PhysicsWorld extends makeObservable(Disposable)<PhysicsWorldEventMa
       new Quaternion()
     );
     const twoPoint = component.type === 'rope' || component.type === 'spring';
-    const otherNode = other ? other.component.host! : null;
+    const otherNode = other ? other.component.node! : null;
     const otherPoint = !twoPoint
       ? pivot
       : otherNode
@@ -1406,8 +1351,8 @@ export class PhysicsWorld extends makeObservable(Disposable)<PhysicsWorldEventMa
         frame: Quaternion.multiply(inv, q, new Quaternion())
       };
     };
-    const lo = local(readWorldPose(owner.component.host!, newPose()), pivot);
-    const lt = local(other ? readWorldPose(other.component.host!, newPose()) : null, otherPoint);
+    const lo = local(readWorldPose(owner.component.node!, newPose()), pivot);
+    const lt = local(other ? readWorldPose(other.component.node!, newPose()) : null, otherPoint);
     return {
       owner: owner.component,
       other: other?.component ?? null,
@@ -1420,7 +1365,7 @@ export class PhysicsWorld extends makeObservable(Disposable)<PhysicsWorldEventMa
 
   private _failJoint(component: Joint, message: string, retry: boolean) {
     if (component.error !== message) {
-      console.error(`Joint on '${component.host?.name ?? ''}': ${message}`);
+      console.error(`Joint on '${component.node?.name ?? ''}': ${message}`);
     }
     component._setError(message);
     if (retry) {
@@ -1434,12 +1379,12 @@ export class PhysicsWorld extends makeObservable(Disposable)<PhysicsWorldEventMa
     copyPose(entry.curr, pose);
     copyPose(entry.prev, pose);
     copyPose(entry.kinematicFrom, pose);
-    storeMatrix(entry.lastMatrix, entry.component.host!);
+    storeMatrix(entry.lastMatrix, entry.component.node!);
     this._backend!.syncColliders();
   }
 
   private _createBody(component: RigidBody) {
-    const host = component.host!;
+    const host = component.node!;
     const pose = readWorldPose(host, newPose());
     const body = this._backend!.createBody({
       motionType: component.motionType,
@@ -1472,12 +1417,10 @@ export class PhysicsWorld extends makeObservable(Disposable)<PhysicsWorldEventMa
   /** The nearest registered rigid body at or above `node`. */
   private _findOwner(node: SceneNode): BodyEntry | null {
     for (let n: SceneNode | null = node; n; n = n.parent) {
-      for (const component of n.components) {
-        const body = isCharacter(component) ? component._ownedBody : (component as RigidBody);
-        const entry = this._bodies.get(body);
-        if (entry) {
-          return entry;
-        }
+      const body = rigidBodyOf(n.physics);
+      const entry = body ? this._bodies.get(body) : undefined;
+      if (entry) {
+        return entry;
       }
     }
     return null;
@@ -1485,7 +1428,7 @@ export class PhysicsWorld extends makeObservable(Disposable)<PhysicsWorldEventMa
 
   private _createCollider(component: Collider) {
     const backend = this._backend!;
-    const host = component.host!;
+    const host = component.node!;
     let geometry: ColliderGeometry | null = null;
     if (needsGeometry(component)) {
       geometry = this._geometryFor(component);
@@ -1527,7 +1470,7 @@ export class PhysicsWorld extends makeObservable(Disposable)<PhysicsWorldEventMa
     let localRot: Quaternion;
     if (owner) {
       // Relative to the owner's node: rotate the offset into the body's frame.
-      const bodyPose = readWorldPose(owner.component.host!, tmpPose2);
+      const bodyPose = readWorldPose(owner.component.node!, tmpPose2);
       const inv = Quaternion.inverse(bodyPose.rotation, tmpQuat);
       localPos = inv.transform(Vector3.sub(colliderPose.position, bodyPose.position), new Vector3());
       localRot = Quaternion.multiply(inv, colliderPose.rotation, new Quaternion());
@@ -1588,8 +1531,8 @@ export class PhysicsWorld extends makeObservable(Disposable)<PhysicsWorldEventMa
       this._fail(component, null, err);
       return null;
     }
-    if (geometryMatches(component._geometry, source)) {
-      return component._geometry;
+    if (geometryMatches(component._geometry as ColliderGeometry | null, source)) {
+      return component._geometry as ColliderGeometry;
     }
     const pending = this._pending.get(component);
     if (pending && sameSource(pending.source, source)) {
@@ -1639,7 +1582,7 @@ export class PhysicsWorld extends makeObservable(Disposable)<PhysicsWorldEventMa
   private _fail(component: Collider, source: GeometrySource | null, err: unknown) {
     const message = err instanceof Error ? err.message : String(err);
     if (component.error !== message) {
-      console.error(`Collider on '${component.host?.name ?? ''}': ${message}`);
+      console.error(`Collider on '${component.node?.name ?? ''}': ${message}`);
     }
     component._geometry = null;
     component._setStatus(false, message);
@@ -1665,7 +1608,7 @@ export class PhysicsWorld extends makeObservable(Disposable)<PhysicsWorldEventMa
           // Still failing for the same reason; a property change retries it.
           continue;
         }
-      } else if (source && geometryMatches(component._geometry, source)) {
+      } else if (source && geometryMatches(component._geometry as ColliderGeometry | null, source)) {
         continue;
       }
       this._dirtyColliders.add(component);
@@ -1677,7 +1620,7 @@ export class PhysicsWorld extends makeObservable(Disposable)<PhysicsWorldEventMa
     this._enablementDirty = false;
     const blocked = new Set<BodyEntry>();
     for (const component of this._pending.keys()) {
-      const owner = component.host ? this._findOwner(component.host) : null;
+      const owner = component.node ? this._findOwner(component.node) : null;
       if (owner) {
         blocked.add(owner);
       }
@@ -1718,7 +1661,7 @@ export class PhysicsWorld extends makeObservable(Disposable)<PhysicsWorldEventMa
   /** Picks up nodes moved by anything other than the simulation. */
   private _syncFromNodes() {
     for (const entry of this._bodies.values()) {
-      const host = entry.component.host!;
+      const host = entry.component.node!;
       if (entry.component.motionType === 'kinematic') {
         // Followed every step: see _setKinematicTargets.
         continue;
@@ -1732,7 +1675,7 @@ export class PhysicsWorld extends makeObservable(Disposable)<PhysicsWorldEventMa
       }
     }
     for (const entry of this._colliders.values()) {
-      if (entry.implicitBody && !matrixEquals(entry.lastMatrix, entry.component.host!)) {
+      if (entry.implicitBody && !matrixEquals(entry.lastMatrix, entry.component.node!)) {
         // A moved static collider: rebuild it, its scale may have changed too.
         this._dirtyColliders.add(entry.component);
       }
@@ -1763,7 +1706,7 @@ export class PhysicsWorld extends makeObservable(Disposable)<PhysicsWorldEventMa
       if (entry.component.motionType !== 'kinematic') {
         continue;
       }
-      const target = readWorldPose(entry.component.host!, tmpPose);
+      const target = readWorldPose(entry.component.node!, tmpPose);
       const from = entry.kinematicFrom;
       const p = Vector3.combine(from.position, target.position, 1 - t, t, tmpVec);
       const q = Quaternion.slerp(from.rotation, target.rotation, t, tmpQuat);
@@ -1795,7 +1738,7 @@ export class PhysicsWorld extends makeObservable(Disposable)<PhysicsWorldEventMa
       if (sleeping && entry.settled) {
         continue;
       }
-      const host = entry.component.host!;
+      const host = entry.component.node!;
       if (sleeping) {
         host.setWorldPose(entry.curr.position, entry.curr.rotation);
         entry.settled = true;
@@ -1824,7 +1767,7 @@ export class PhysicsWorld extends makeObservable(Disposable)<PhysicsWorldEventMa
       this._forgetPair(pk);
       return;
     }
-    this._touching.set(pk, [e1.component, e2.component]);
+    this._touching.set(pk, [e1, e2]);
     for (const key of [key1, key2]) {
       let set = this._touchingByKey.get(key);
       if (!set) {
@@ -1833,7 +1776,7 @@ export class PhysicsWorld extends makeObservable(Disposable)<PhysicsWorldEventMa
       }
       set.add(pk);
     }
-    const pair = this._objectPair(e1.component, e2.component);
+    const pair = this._objectPair(e1, e2);
     if (pair && !this._startedThisFrame.has(pair.key)) {
       this._startedThisFrame.set(pair.key, pair);
     }
@@ -1855,21 +1798,25 @@ export class PhysicsWorld extends makeObservable(Disposable)<PhysicsWorldEventMa
     }
   }
 
-  /** The object a collider raises events on: its rigid body, or itself. */
-  private _objectOf(collider: Collider): PhysicsObject {
-    const owner = this._colliders.get(collider)?.owner?.component;
-    return owner ? (owner._eventTarget ?? owner) : collider;
+  /**
+   * The object a collider raises events on: the physics data of its rigid
+   * body's node (a character's node for its capsule), or of its own node.
+   */
+  private _objectOf(entry: ColliderEntry): NodePhysics {
+    return (entry.owner ? entry.owner.component.node : entry.component.node)!.physics!;
   }
 
-  /** The rigid body a user sees a collider belonging to: not one a component owns. */
+  /** The rigid body a user sees a collider belonging to: not a character's own. */
   private _publicBody(entry: ColliderEntry): RigidBody | null {
     const owner = entry.owner?.component ?? null;
-    return owner && !owner._eventTarget ? owner : null;
+    return owner?.owner ? owner : null;
   }
 
-  private _objectPair(c1: Collider, c2: Collider): ObjectPair | null {
-    let a = this._objectOf(c1);
-    let b = this._objectOf(c2);
+  private _objectPair(e1: ColliderEntry, e2: ColliderEntry): ObjectPair | null {
+    const c1 = e1.component;
+    const c2 = e2.component;
+    let a = this._objectOf(e1);
+    let b = this._objectOf(e2);
     if (a === b) {
       return null;
     }
@@ -1892,8 +1839,8 @@ export class PhysicsWorld extends makeObservable(Disposable)<PhysicsWorldEventMa
   /** Compares this frame's touching objects with the last frame's and raises events. */
   private _dispatchContactEvents() {
     const current = new Map<string, ObjectPair>();
-    for (const [c1, c2] of this._touching.values()) {
-      const pair = this._objectPair(c1, c2);
+    for (const [e1, e2] of this._touching.values()) {
+      const pair = this._objectPair(e1, e2);
       if (pair && !current.has(pair.key)) {
         current.set(pair.key, pair);
       }
@@ -1937,8 +1884,8 @@ export class PhysicsWorld extends makeObservable(Disposable)<PhysicsWorldEventMa
   }
 
   private _dispatchTo(
-    self: PhysicsObject,
-    other: PhysicsObject,
+    self: NodePhysics,
+    other: NodePhysics,
     collider: Collider,
     otherCollider: Collider,
     type: keyof PhysicsEventMap,
@@ -1946,7 +1893,12 @@ export class PhysicsWorld extends makeObservable(Disposable)<PhysicsWorldEventMa
     flip: boolean
   ) {
     // Objects that left the world get nothing: their side of the contact is gone.
-    if (self.world !== this || !self._hasListeners(type)) {
+    if (
+      self.disposed ||
+      self.node?.scene !== this._scene ||
+      !self.node.attached ||
+      !self._hasListeners(type)
+    ) {
       return;
     }
     if (type === 'triggerenter' || type === 'triggerexit') {
@@ -2002,10 +1954,7 @@ export class PhysicsWorld extends makeObservable(Disposable)<PhysicsWorldEventMa
       return (
         !!(mask & (1 << c.layer)) &&
         (triggers || !c.isTrigger) &&
-        (!exclude ||
-          (exclude !== c &&
-            exclude !== entry.owner?.component &&
-            exclude !== entry.owner?.component._eventTarget))
+        (!exclude || exclude !== this._objectOf(entry))
       );
     };
   }
@@ -2015,8 +1964,8 @@ export class PhysicsWorld extends makeObservable(Disposable)<PhysicsWorldEventMa
     return {
       collider: entry.component,
       body: this._publicBody(entry),
-      object: this._objectOf(entry.component),
-      node: entry.component.host!,
+      object: this._objectOf(entry),
+      node: entry.component.node!,
       point: Vector3.combine(origin, dir, 1, hit.distance, new Vector3()),
       normal: hit.normal,
       distance: hit.distance
@@ -2053,7 +2002,7 @@ export class PhysicsWorld extends makeObservable(Disposable)<PhysicsWorldEventMa
   }
 
   private _onAfterUpdate() {
-    if (this._enabled && PhysicsWorld._simulationEnabled) {
+    if (this._enabled && PhysicsSimulation._simulationEnabled) {
       this.update(getDevice().frameInfo.elapsedFrame * 0.001);
     }
   }
@@ -2085,6 +2034,5 @@ export class PhysicsWorld extends makeObservable(Disposable)<PhysicsWorldEventMa
     }
     this._vehicles.clear();
     this._worldAnchor = null;
-    PhysicsWorld._worlds.delete(this._scene);
   }
 }

@@ -1,6 +1,6 @@
 import { Vector3 } from '@zephyr3d/base';
 import type { Quaternion } from '@zephyr3d/base';
-import type { RapierAPI } from '../rapier_loader';
+import type { RapierAPI } from './rapier_loader';
 import type {
   BackendBody,
   BackendCollider,
@@ -11,20 +11,18 @@ import type {
   BackendJoint,
   BodyDesc,
   CharacterMove,
-  CharacterSettings,
   ColliderMaterialDesc,
   CollisionCallback,
-  ContactInfo,
   JointDesc,
   JointKind,
-  MotionType,
   MotorMode,
   QueryPredicate,
   ShapeDesc,
   BackendVehicle,
   VehicleWheelDesc,
   VehicleWheelState
-} from './types';
+} from '@zephyr3d/physics';
+import type { CharacterSettings, MotionType, PhysicsContactInfo } from '@zephyr3d/scene';
 
 type RWorld = InstanceType<RapierAPI['World']>;
 type RBody = ReturnType<RWorld['createRigidBody']>;
@@ -528,7 +526,7 @@ export class RapierWorld implements BackendWorld {
       this._events.drainCollisionEvents(onCollision);
     }
   }
-  contactInfo(c1: BackendCollider, c2: BackendCollider): ContactInfo | null {
+  contactInfo(c1: BackendCollider, c2: BackendCollider): PhysicsContactInfo | null {
     const normal = new Vector3();
     const points: Vector3[] = [];
     let impulse = 0;

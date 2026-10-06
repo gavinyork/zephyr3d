@@ -1,8 +1,8 @@
 import { Vector3 } from '@zephyr3d/base';
-import type { BackendBody, MotionType } from './backend/types';
-import { PhysicsComponent } from './component';
+import type { MotionType } from './types';
+import type { PhysicsBodyHandle } from './world';
+import { PhysicsPart } from './part';
 import type { PhysicsWorld } from './world';
-import type { PhysicsObject } from './events';
 
 const zero = Vector3.zero();
 const tmpForce = new Vector3();
@@ -15,8 +15,8 @@ type Axes = [boolean, boolean, boolean];
  * all, depending on {@link RigidBody.motionType}.
  *
  * @remarks
- * The body's shape comes from the {@link Collider} components on the same node
- * and on descendant nodes that have no rigid body of their own; together they
+ * The body's shape comes from the colliders ({@link NodePhysics.colliders}) of
+ * the same node and of descendant nodes that have no rigid body of their own; together they
  * form one compound body. A body with no collider does not collide.
  *
  * The body turns about its node's origin, and the node's scale only affects the
@@ -27,7 +27,7 @@ type Axes = [boolean, boolean, boolean];
  *
  * @public
  */
-export class RigidBody extends PhysicsComponent {
+export class RigidBody extends PhysicsPart {
   private _motionType: MotionType;
   private _mass: number;
   private _linearDamping: number;
@@ -53,8 +53,6 @@ export class RigidBody extends PhysicsComponent {
   private readonly _initialAngularVelocity: Vector3;
   /** Whether the initial velocities were given to the body since it joined its world. */
   private _initialApplied: boolean;
-  /** Raises this body's events on another object instead, for bodies a component owns. @internal */
-  _eventTarget: PhysicsObject | null;
 
   constructor() {
     super();
@@ -79,7 +77,6 @@ export class RigidBody extends PhysicsComponent {
     this._initialLinearVelocity = new Vector3();
     this._initialAngularVelocity = new Vector3();
     this._initialApplied = false;
-    this._eventTarget = null;
   }
 
   /** How the body moves. Default `'dynamic'`. */
@@ -282,16 +279,13 @@ export class RigidBody extends PhysicsComponent {
     this._backend()?.wakeUp();
   }
 
-  /** @internal */
   _translationAxes(): Axes {
     return [!this._lockTranslation[0], !this._lockTranslation[1], !this._lockTranslation[2]];
   }
-  /** @internal */
   _rotationAxes(): Axes {
     return [!this._lockRotation[0], !this._lockRotation[1], !this._lockRotation[2]];
   }
-  /** @internal */
-  _applyPendingVelocities(body: BackendBody) {
+  _applyPendingVelocities(body: PhysicsBodyHandle) {
     if (!this._initialApplied) {
       this._initialApplied = true;
       if (this._motionType === 'dynamic') {
@@ -312,8 +306,8 @@ export class RigidBody extends PhysicsComponent {
       this._pendingAngularVelocity = null;
     }
   }
-  /** Hands the accumulated inputs to the body before a step. @internal */
-  _applyStepInputs(body: BackendBody) {
+  /** Hands the accumulated inputs to the body before a step. */
+  _applyStepInputs(body: PhysicsBodyHandle) {
     if (this._motionType !== 'dynamic') {
       this._stepForce.setXYZ(0, 0, 0);
       this._stepTorque.setXYZ(0, 0, 0);
@@ -336,8 +330,8 @@ export class RigidBody extends PhysicsComponent {
       this._torqueImpulse.setXYZ(0, 0, 0);
     }
   }
-  /** Clears the frame's forces once all its steps are taken. @internal */
-  _clearForces(body: BackendBody) {
+  /** Clears the frame's forces once all its steps are taken. */
+  _clearForces(body: PhysicsBodyHandle) {
     this._force.setXYZ(0, 0, 0);
     this._torque.setXYZ(0, 0, 0);
     if (this._forceSet) {
@@ -354,7 +348,7 @@ export class RigidBody extends PhysicsComponent {
     if (body) {
       body.setEnabledAxes(this._translationAxes(), this._rotationAxes());
     }
-    // Rapier's locks stop forces and contacts moving the body along an axis,
+    // Axis locks stop forces and contacts moving the body along an axis,
     // not velocity it already has; drop that too, so a lock means "still".
     if (value) {
       if (axes === this._lockTranslation) {
@@ -368,7 +362,7 @@ export class RigidBody extends PhysicsComponent {
     return new Vector3(locks[0] ? 0 : value.x, locks[1] ? 0 : value.y, locks[2] ? 0 : value.z);
   }
   private _backend() {
-    return this.world?._getBackendBody(this) ?? null;
+    return this.world?._getBodyHandle(this) ?? null;
   }
   protected _join(world: PhysicsWorld) {
     this._initialApplied = false;

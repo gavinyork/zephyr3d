@@ -1,18 +1,7 @@
 import type { Quaternion, Vector3 } from '@zephyr3d/base';
+import type { CharacterSettings, MotionType, PhysicsContactInfo } from '@zephyr3d/scene';
 
-/**
- * How a rigid body moves.
- *
- * - `dynamic`: moved by the simulation (gravity, contacts, forces).
- * - `kinematic`: moved by its node (animation, scripts); pushes dynamic bodies
- *   but is not pushed back.
- * - `static`: never moves; the cheapest kind, for floors and walls.
- *
- * @public
- */
-export type MotionType = 'dynamic' | 'kinematic' | 'static';
-
-/** A collision shape in body-relative units, already scaled. @internal */
+/** A collision shape in body-relative units, already scaled. @public */
 export type ShapeDesc =
   | { type: 'box'; halfExtents: Vector3 }
   | { type: 'sphere'; radius: number }
@@ -29,7 +18,7 @@ export type ShapeDesc =
    */
   | { type: 'heightfield'; rows: number; cols: number; heights: Float32Array; scale: Vector3 };
 
-/** Surface response and filtering of a collider. @internal */
+/** Surface response and filtering of a collider. @public */
 export interface ColliderMaterialDesc {
   friction: number;
   restitution: number;
@@ -38,26 +27,17 @@ export interface ColliderMaterialDesc {
   groups: number;
 }
 
-/** A collision or trigger pair starting or stopping, by collider key. @internal */
+/** A collision or trigger pair starting or stopping, by collider key. @public */
 export type CollisionCallback = (key1: number, key2: number, started: boolean) => void;
 
-/** Contact details between two touching colliders, in world space. @internal */
-export interface ContactInfo {
-  /** From the first collider towards the second. */
-  normal: Vector3;
-  points: Vector3[];
-  /** Total normal impulse over the last step. */
-  impulse: number;
-}
-
-/** @internal */
+/** @public */
 export interface BackendRayHit {
   key: number;
   distance: number;
   normal: Vector3;
 }
 
-/** @internal */
+/** @public */
 export interface BackendShapeHit {
   key: number;
   distance: number;
@@ -67,10 +47,10 @@ export interface BackendShapeHit {
   normal: Vector3;
 }
 
-/** Returns false to skip a collider in a query. @internal */
+/** Returns false to skip a collider in a query. @public */
 export type QueryPredicate = (key: number) => boolean;
 
-/** @internal */
+/** @public */
 export interface BodyDesc {
   motionType: MotionType;
   position: Vector3;
@@ -87,13 +67,16 @@ export interface BodyDesc {
 }
 
 /**
- * The operations the physics components need from an engine.
+ * One simulated world of a physics engine: the operations
+ * {@link PhysicsSimulation} needs from it.
  *
  * @remarks
- * Kept to what both Rapier and Jolt can provide, so a second backend can be
- * added without changing the components (see the design notes on determinism).
+ * Implemented by physics engine packages such as `@zephyr3d/physics-rapier`;
+ * applications do not use it. Kept to what common engines (Rapier, Jolt) can
+ * provide. For a simulation to be reproducible, an implementation must give
+ * the same results for the same calls in the same order.
  *
- * @internal
+ * @public
  */
 export interface BackendWorld {
   setGravity(gravity: Vector3): void;
@@ -130,7 +113,7 @@ export interface BackendWorld {
   /** Steps, reporting colliders that started or stopped touching. */
   step(dt: number, onCollision?: CollisionCallback): void;
   /** Contact details of a touching pair, or null if they no longer touch. */
-  contactInfo(c1: BackendCollider, c2: BackendCollider): ContactInfo | null;
+  contactInfo(c1: BackendCollider, c2: BackendCollider): PhysicsContactInfo | null;
   castRay(
     origin: Vector3,
     direction: Vector3,
@@ -156,7 +139,7 @@ export interface BackendWorld {
   dispose(): void;
 }
 
-/** @internal */
+/** @public */
 export interface BackendBody {
   setMotionType(type: MotionType): void;
   setMass(mass: number): void;
@@ -184,10 +167,10 @@ export interface BackendBody {
   wakeUp(): void;
 }
 
-/** @internal */
+/** @public */
 export type BackendCollider = object;
 
-/** Joint types the components use. @internal */
+/** Joint types. @public */
 export type JointKind = 'fixed' | 'hinge' | 'slider' | 'ball' | 'rope' | 'spring';
 
 /**
@@ -195,7 +178,7 @@ export type JointKind = 'fixed' | 'hinge' | 'slider' | 'ball' | 'rope' | 'spring
  * space; a frame's X axis is the joint's hinge or slide axis, and a ball's
  * twist axis.
  *
- * @internal
+ * @public
  */
 export interface JointDesc {
   type: JointKind;
@@ -210,10 +193,10 @@ export interface JointDesc {
   collideConnected: boolean;
 }
 
-/** @internal */
+/** @public */
 export type MotorMode = 'off' | 'velocity' | 'position';
 
-/** @internal */
+/** @public */
 export interface BackendJoint {
   setContactsEnabled(enabled: boolean): void;
   /** Limits of a hinge (radians) or slider (metres). */
@@ -223,21 +206,7 @@ export interface BackendJoint {
   setMotor(mode: MotorMode, target: number, stiffness: number, damping: number, maxForce: number): void;
 }
 
-/** Settings of a character controller. @internal */
-export interface CharacterSettings {
-  skinWidth: number;
-  /** Radians. */
-  slopeLimit: number;
-  /** Radians. */
-  slideSlope: number;
-  stepHeight: number;
-  stepMinWidth: number;
-  snapToGround: number;
-  pushBodies: boolean;
-  characterMass: number;
-}
-
-/** @internal */
+/** @public */
 export interface CharacterHit {
   key: number;
   point: Vector3;
@@ -245,14 +214,14 @@ export interface CharacterHit {
   normal: Vector3;
 }
 
-/** @internal */
+/** @public */
 export interface CharacterMove {
   movement: Vector3;
   grounded: boolean;
   hits: CharacterHit[];
 }
 
-/** @internal */
+/** @public */
 export interface BackendCharacter {
   configure(settings: CharacterSettings): void;
   /** Works out how far a collider can go towards `desired`, sliding and stepping. */
@@ -260,7 +229,7 @@ export interface BackendCharacter {
   dispose(): void;
 }
 
-/** One wheel of a ray cast vehicle. @internal */
+/** One wheel of a ray cast vehicle. @public */
 export interface VehicleWheelDesc {
   /** Where the suspension is attached, chassis space. */
   connection: Vector3;
@@ -281,7 +250,7 @@ export interface VehicleWheelDesc {
   sideFriction: number;
 }
 
-/** State of one wheel after the last vehicle update. @internal */
+/** State of one wheel after the last vehicle update. @public */
 export interface VehicleWheelState {
   suspensionLength: number;
   /** Accumulated roll, radians. */
@@ -296,7 +265,7 @@ export interface VehicleWheelState {
   suspensionForce: number;
 }
 
-/** @internal */
+/** @public */
 export interface BackendVehicle {
   /**
    * Inputs for the next update: force along the wheel's rolling direction
@@ -307,4 +276,27 @@ export interface BackendVehicle {
   update(dt: number, filter: QueryPredicate): void;
   wheelState(index: number, out: VehicleWheelState): VehicleWheelState;
   dispose(): void;
+}
+
+/**
+ * A physics engine, as {@link initPhysics} takes it: loads the engine and
+ * creates its worlds.
+ *
+ * @remarks
+ * Each engine package exports one, such as `rapierPhysics` from
+ * `@zephyr3d/physics-rapier`.
+ *
+ * @typeParam O - Options of {@link PhysicsBackend.init}.
+ *
+ * @public
+ */
+export interface PhysicsBackend<O = unknown> {
+  /** Name of the engine, for messages. */
+  readonly name: string;
+  /** Whether {@link PhysicsBackend.init} has completed. */
+  readonly ready: boolean;
+  /** Loads the engine. Called by {@link initPhysics}; safe to call more than once. */
+  init(options?: O): Promise<void>;
+  /** A new, empty world; only called once the engine is ready. */
+  createWorld(): BackendWorld;
 }
