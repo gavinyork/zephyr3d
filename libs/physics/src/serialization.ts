@@ -1,10 +1,11 @@
 import { Vector3 } from '@zephyr3d/base';
-import type { SerializableClass, ResourceManager } from '@zephyr3d/scene';
+import type { PropertyAccessor, PropertyValue, SerializableClass, ResourceManager } from '@zephyr3d/scene';
 import { defineProps } from '@zephyr3d/scene';
 import { RigidBody } from './rigid_body';
 import { Collider, type ColliderShape } from './collider';
 import { Joint, type JointMotorMode, type JointType } from './joint';
 import { CharacterController } from './character';
+import { Vehicle, Wheel, type VehicleForward } from './vehicle';
 import type { MotionType } from './backend/types';
 
 function getRigidBodyClass(): SerializableClass {
@@ -912,10 +913,192 @@ function getCharacterControllerClass(): SerializableClass {
   };
 }
 
+/** A number property backed by a same-named accessor. */
+function numberProp<T>(
+  name: string,
+  key: keyof T & string,
+  description: string,
+  defaultValue: number,
+  options: { minValue?: number; maxValue?: number } = {},
+  type: 'float' | 'int' = 'float'
+): PropertyAccessor<T> {
+  return {
+    name,
+    description,
+    type,
+    default: defaultValue,
+    options,
+    get(this: T, value: PropertyValue) {
+      value.num![0] = (this as Record<string, number>)[key];
+    },
+    set(this: T, value: PropertyValue) {
+      (this as Record<string, number>)[key] = value.num![0];
+    }
+  };
+}
+
+function getVehicleClass(): SerializableClass {
+  return {
+    ctor: Vehicle,
+    name: 'Vehicle',
+    getProps() {
+      return defineProps([
+        {
+          name: 'Forward',
+          description:
+            'Which way the front of the vehicle points in this node; wheels roll and steer accordingly',
+          type: 'string',
+          default: '+z',
+          options: {
+            enum: { labels: ['+Z', '-Z', '+X', '-X'], values: ['+z', '-z', '+x', '-x'] }
+          },
+          get(this: Vehicle, value) {
+            value.str[0] = this.forward;
+          },
+          set(this: Vehicle, value) {
+            this.forward = value.str[0] as VehicleForward;
+          }
+        },
+        numberProp<Vehicle>(
+          'MaxEngineForce',
+          'maxEngineForce',
+          "Push at full throttle in newtons; higher accelerates harder. Shared out by the wheels' Drive",
+          4000,
+          { minValue: 0 }
+        ),
+        numberProp<Vehicle>(
+          'MaxBrakeForce',
+          'maxBrakeForce',
+          'Braking force of each wheel at full brake, in newtons; higher stops sooner, too high locks the wheels',
+          3000,
+          { minValue: 0 }
+        ),
+        numberProp<Vehicle>(
+          'MaxHandbrakeForce',
+          'maxHandbrakeForce',
+          'Braking force of each wheel with the handbrake on, in newtons',
+          6000,
+          { minValue: 0 }
+        ),
+        numberProp<Vehicle>(
+          'MaxSteerAngle',
+          'maxSteerAngle',
+          'How far the wheels turn at full lock, in degrees; larger turns tighter',
+          30,
+          { minValue: 0, maxValue: 89 }
+        ),
+        numberProp<Vehicle>(
+          'Layer',
+          'layer',
+          'Collision layer of the wheels: they only find ground on layers this one collides with',
+          0,
+          { minValue: 0, maxValue: 15 },
+          'int'
+        )
+      ]);
+    }
+  };
+}
+
+function getWheelClass(): SerializableClass {
+  return {
+    ctor: Wheel,
+    name: 'Wheel',
+    getProps() {
+      return defineProps([
+        numberProp<Wheel>('Radius', 'radius', 'Radius of the wheel in metres', 0.4, { minValue: 0.01 }),
+        numberProp<Wheel>(
+          'SuspensionRestLength',
+          'suspensionRestLength',
+          'Length of the suspension at rest, in metres; the wheel is placed at its end',
+          0.3,
+          { minValue: 0 }
+        ),
+        numberProp<Wheel>(
+          'SuspensionStiffness',
+          'suspensionStiffness',
+          'Spring strength, per kilogram of vehicle; higher is firmer and sinks less under its weight',
+          30,
+          { minValue: 0 }
+        ),
+        numberProp<Wheel>(
+          'SuspensionCompression',
+          'suspensionCompression',
+          'Damping as the suspension compresses; higher absorbs bumps more stiffly',
+          2.2,
+          { minValue: 0 }
+        ),
+        numberProp<Wheel>(
+          'SuspensionRelaxation',
+          'suspensionRelaxation',
+          'Damping as the suspension extends again; higher stops the body bouncing sooner',
+          3.3,
+          { minValue: 0 }
+        ),
+        numberProp<Wheel>(
+          'MaxSuspensionTravel',
+          'maxSuspensionTravel',
+          'How far the wheel moves up or down from rest, in metres',
+          0.3,
+          { minValue: 0 }
+        ),
+        numberProp<Wheel>(
+          'MaxSuspensionForce',
+          'maxSuspensionForce',
+          'Strongest push of the suspension in newtons; too low and a heavy vehicle sags to the ground',
+          1e6,
+          { minValue: 0 }
+        ),
+        numberProp<Wheel>(
+          'FrictionSlip',
+          'frictionSlip',
+          'Grip of the tyre, like a friction coefficient; lower makes it spin and slide more easily',
+          1.5,
+          { minValue: 0 }
+        ),
+        numberProp<Wheel>(
+          'SideFriction',
+          'sideFriction',
+          'Scales the sideways grip; below 1 the vehicle drifts out in corners',
+          1,
+          { minValue: 0 }
+        ),
+        numberProp<Wheel>(
+          'Steer',
+          'steer',
+          'How much this wheel follows the steering: 1 for front wheels, -1 to steer against it, 0 fixed',
+          0,
+          { minValue: -1, maxValue: 1 }
+        ),
+        numberProp<Wheel>(
+          'Drive',
+          'drive',
+          'Share of the engine force this wheel gets, e.g. 0.5 on each rear wheel for rear wheel drive',
+          0,
+          { minValue: 0, maxValue: 1 }
+        ),
+        numberProp<Wheel>('Brake', 'brake', 'How much the brake pedal brakes this wheel', 1, {
+          minValue: 0,
+          maxValue: 1
+        }),
+        numberProp<Wheel>(
+          'Handbrake',
+          'handbrake',
+          'How much the handbrake brakes this wheel, usually 1 on rear wheels',
+          0,
+          { minValue: 0, maxValue: 1 }
+        )
+      ]);
+    }
+  };
+}
+
 /** Registers the physics components' serializable classes. @internal */
 export function registerPhysicsSerializableClasses(manager: ResourceManager) {
   manager.registerClass(getRigidBodyClass());
   manager.registerClass(getColliderClass());
   manager.registerClass(getJointClass());
   manager.registerClass(getCharacterControllerClass());
+  manager.registerClass(getVehicleClass());
+  manager.registerClass(getWheelClass());
 }

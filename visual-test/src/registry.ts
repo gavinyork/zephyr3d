@@ -115,7 +115,7 @@ import {
   batchInstanceCullingGrowingOff,
   batchInstanceCullingOff
 } from './scenes/instance-culling';
-import { physicsDrop, physicsJoints, physicsMeshGround } from './scenes/physics';
+import { physicsDrop, physicsJoints, physicsMeshGround, physicsVehicle } from './scenes/physics';
 
 /**
  * Every scene, in a fixed order.
@@ -249,7 +249,8 @@ export const SCENES: VisualScene[] = [
   // Physics.
   physicsDrop,
   physicsMeshGround,
-  physicsJoints
+  physicsJoints,
+  physicsVehicle
 ];
 
 export function findScene(name: string): VisualScene | undefined {

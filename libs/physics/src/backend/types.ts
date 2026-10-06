@@ -119,6 +119,12 @@ export interface BackendWorld {
   createJoint(desc: JointDesc, body1: BackendBody, body2: BackendBody): BackendJoint;
   removeJoint(joint: BackendJoint): void;
   createCharacter(settings: CharacterSettings): BackendCharacter;
+  /**
+   * A ray cast vehicle on a dynamic chassis body. Wheel vectors are in the
+   * chassis body's local space; `forwardAxis` is the chassis axis (0 X, 1 Y,
+   * 2 Z) its speed is measured along, up is always Y.
+   */
+  createVehicle(chassis: BackendBody, forwardAxis: number, wheels: VehicleWheelDesc[]): BackendVehicle;
   /** Moves colliders of bodies teleported since the last step, for queries and characters. */
   syncColliders(): void;
   /** Steps, reporting colliders that started or stopped touching. */
@@ -251,5 +257,54 @@ export interface BackendCharacter {
   configure(settings: CharacterSettings): void;
   /** Works out how far a collider can go towards `desired`, sliding and stepping. */
   move(collider: BackendCollider, desired: Vector3, filter: QueryPredicate): CharacterMove;
+  dispose(): void;
+}
+
+/** One wheel of a ray cast vehicle. @internal */
+export interface VehicleWheelDesc {
+  /** Where the suspension is attached, chassis space. */
+  connection: Vector3;
+  /** Direction the suspension extends in, chassis space (down). */
+  direction: Vector3;
+  /** Axle, chassis space; forward is `normal × axle`. */
+  axle: Vector3;
+  restLength: number;
+  radius: number;
+  /** Per unit of chassis mass, as Rapier counts them. */
+  stiffness: number;
+  compression: number;
+  relaxation: number;
+  maxTravel: number;
+  /** Newtons, not scaled by mass. */
+  maxForce: number;
+  frictionSlip: number;
+  sideFriction: number;
+}
+
+/** State of one wheel after the last vehicle update. @internal */
+export interface VehicleWheelState {
+  suspensionLength: number;
+  /** Accumulated roll, radians. */
+  rotation: number;
+  /** Radians. */
+  steering: number;
+  inContact: boolean;
+  contactPoint: Vector3;
+  contactNormal: Vector3;
+  /** Key of the collider under the wheel, or -1. */
+  groundKey: number;
+  suspensionForce: number;
+}
+
+/** @internal */
+export interface BackendVehicle {
+  /**
+   * Inputs for the next update: force along the wheel's rolling direction
+   * (N), the most braking impulse per step (N·s), steering angle (radians).
+   */
+  setWheelInput(index: number, engineForce: number, brakeImpulse: number, steering: number): void;
+  /** Casts the wheel rays and applies the wheels' impulses to the chassis; before a step. */
+  update(dt: number, filter: QueryPredicate): void;
+  wheelState(index: number, out: VehicleWheelState): VehicleWheelState;
   dispose(): void;
 }

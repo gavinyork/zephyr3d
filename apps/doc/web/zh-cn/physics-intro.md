@@ -100,4 +100,5 @@ scene.physicsSettings = settings;
 - [脚本控制](zh-cn/physics-scripting.md)：施力、碰撞事件、射线与形状查询
 - [关节](zh-cn/physics-joints.md)：门、链条、绳子、弹簧
 - [角色控制器](zh-cn/physics-character.md)
+- [载具](zh-cn/physics-vehicle.md)：带悬挂、转向和驱动方式的车辆
 - 在编辑器中使用：[编辑器中的物理](zh-cn/editor/physics.md)

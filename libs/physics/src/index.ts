@@ -15,5 +15,7 @@ export { Joint } from './joint';
 export type { JointType, JointMotorMode } from './joint';
 export { CharacterController } from './character';
 export type { CharacterCollision, CharacterMoveResult } from './character';
+export { Vehicle, Wheel } from './vehicle';
+export type { VehicleForward } from './vehicle';
 export { getColliderOutline, getColliderOutlineKey } from './outline';
 export type { ColliderOutline } from './outline';

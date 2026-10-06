@@ -5,6 +5,7 @@ import { RigidBody } from './rigid_body';
 import { Collider } from './collider';
 import { Joint } from './joint';
 import { CharacterController } from './character';
+import { Vehicle, Wheel } from './vehicle';
 import { isPhysicsReady, setRapier } from './rapier_state';
 import { registerPhysicsSerializableClasses } from './serialization';
 
@@ -50,6 +51,8 @@ export function registerPhysics(manager?: ResourceManager) {
   registerSceneNodeComponentType(Collider);
   registerSceneNodeComponentType(Joint);
   registerSceneNodeComponentType(CharacterController);
+  registerSceneNodeComponentType(Vehicle);
+  registerSceneNodeComponentType(Wheel);
   const target = manager ?? tryGetApp()?.engine?.resourceManager;
   if (target && !registeredManagers.has(target)) {
     registeredManagers.add(target);

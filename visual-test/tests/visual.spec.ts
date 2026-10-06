@@ -228,7 +228,8 @@ const SCENE_NAMES = [
   'batch-instance-culling-growing-off',
   'physics-drop',
   'physics-mesh-ground',
-  'physics-joints'
+  'physics-joints',
+  'physics-vehicle'
 ];
 
 test('scene registry matches the harness page', async ({ harness }) => {

@@ -290,6 +290,14 @@
       },
       "size": 512
     },
+    "physics-vehicle": {
+      "accepted": {
+        "win32-x64": [
+          "f64907d2204f027bc123d6990e66d7d9"
+        ]
+      },
+      "size": 512
+    },
     "post-fxaa": {
       "accepted": {
         "linux-x64": [
