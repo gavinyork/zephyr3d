@@ -13,12 +13,14 @@ Two places, with the same menu:
 - a node's context menu in the scene hierarchy → **Add Component → Physics**;
 - the **Add Component** button at the bottom of the property panel.
 
-Pick Rigid Body, Collider, Joint or Character Controller. Remove one with **Remove Component** in the context menu. Adding and removing can be undone.
+Pick Rigid Body, Collider, Joint, Character Controller, Vehicle or Wheel. Remove one with **Remove Component** in the context menu. Adding and removing can be undone.
 
 Conveniences:
 
 - **Adding a Collider** sizes and offsets its box to fit the node and its children, which is usually right as is.
 - **Adding a Rigid Body** to a node with no collider on it or below it adds a box collider around it too; a body without a shape would fall through everything.
+- **Adding a Vehicle** to a node with no rigid body adds a 1000 kg one (and a collider, as above).
+- **Adding a Wheel** sizes its radius to the node's bounds.
 - With several nodes selected, each gets a component of its own.
 
 Component properties are edited in the property panel; hover a property's name for what it does. Properties that only matter for some settings hide otherwise; mass and initial velocity, for example, only show on dynamic bodies.
@@ -44,6 +46,7 @@ Selecting a node draws the colliders on it and its children as outlines. Outline
 | Yellow | Trigger |
 | Cyan | A character controller's capsule |
 | Magenta | Joints: pivot cross, hinge or slider axis, line to the other end |
+| White | Wheels: the circle at rest, the suspension up to where it is attached, and its travel |
 
 - **View → Show All Colliders** draws every collider in the scene, the selected ones highlighted.
 - Mesh, convex and terrain shapes are read back from the GPU and appear a few frames after selecting.

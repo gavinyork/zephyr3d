@@ -100,4 +100,5 @@ Changes apply from the next frame. The scene's world can also be changed directl
 - [Scripting](en/physics-scripting.md): forces, collision events, ray and shape queries
 - [Joints](en/physics-joints.md): doors, chains, ropes, springs
 - [Character Controller](en/physics-character.md)
+- [Vehicles](en/physics-vehicle.md): cars with suspension, steering and drive layouts
 - In the editor: [Physics in the Editor](en/editor/physics.md)

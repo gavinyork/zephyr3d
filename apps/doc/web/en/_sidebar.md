@@ -44,6 +44,7 @@
     - [Scripting](en/physics-scripting.md)
     - [Joints](en/physics-joints.md)
     - [Character Controller](en/physics-character.md)
+    - [Vehicles](en/physics-vehicle.md)
   - PostProcessing
     - [Overview](en/posteffect-intro.md)
     - [Tonemapping](en/posteffect-tonemap.md)
