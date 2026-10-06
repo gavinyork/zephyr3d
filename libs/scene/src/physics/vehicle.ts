@@ -1,7 +1,7 @@
 import type { Quaternion } from '@zephyr3d/base';
 import { Vector3 } from '@zephyr3d/base';
-import type { SceneNode } from '@zephyr3d/scene';
-import { PhysicsComponent } from './component';
+import type { SceneNode } from '../scene/scene_node';
+import { PhysicsPart } from './part';
 import type { PhysicsWorld } from './world';
 
 /**
@@ -17,21 +17,21 @@ export type VehicleForward = '+z' | '-z' | '+x' | '-x';
  *
  * @remarks
  * The node needs a dynamic {@link RigidBody}, and colliders for the body. The
- * wheels are {@link Wheel} components on nodes below it, with no other rigid
+ * wheels are the {@link NodePhysics.wheel} of nodes below it, with no other rigid
  * body in between; each wheel node is placed where the wheel's centre is with
  * the suspension at rest. While simulating, the wheel nodes are moved up and
  * down with the suspension, turned with the steering and rolled with the
  * vehicle's motion.
  *
  * Up is the node's +Y; the front is {@link Vehicle.forward}. Wheels are rays
- * cast down from the body, as in Rapier's ray cast vehicle (a port of Bullet's):
+ * cast down from the body, as in Bullet's ray cast vehicle:
  * they find the ground, but do not collide - the body's colliders do.
  *
  * Inputs stay in effect until changed, and are applied every simulation step.
  *
  * @public
  */
-export class Vehicle extends PhysicsComponent {
+export class Vehicle extends PhysicsPart {
   private _maxEngineForce: number;
   private _maxBrakeForce: number;
   private _maxHandbrakeForce: number;
@@ -147,7 +147,7 @@ export class Vehicle extends PhysicsComponent {
     return this._error;
   }
 
-  /** The front direction in node space. @internal */
+  /** The front direction in node space. */
   _forwardVector(out = new Vector3()) {
     switch (this._forward) {
       case '-z':
@@ -160,11 +160,10 @@ export class Vehicle extends PhysicsComponent {
         return out.setXYZ(0, 0, 1);
     }
   }
-  /** Whether any input asks the vehicle to move. @internal */
+  /** Whether any input asks the vehicle to move. */
   _hasInput() {
     return this._throttle !== 0 || this._brake !== 0 || this._handbrake || this._steering !== 0;
   }
-  /** @internal */
   _setError(error: string) {
     this._error = error;
   }
@@ -195,7 +194,7 @@ export class Vehicle extends PhysicsComponent {
  *
  * @public
  */
-export class Wheel extends PhysicsComponent {
+export class Wheel extends PhysicsPart {
   private _radius: number;
   private _suspensionRestLength: number;
   private _suspensionStiffness: number;
@@ -213,7 +212,7 @@ export class Wheel extends PhysicsComponent {
   engineForce: number;
   brakeForce: number;
   steerAngle: number;
-  /** State after the last simulation step. @internal */
+  /** State after the last simulation step. */
   readonly _state: {
     suspensionLength: number;
     rotation: number;
@@ -224,9 +223,9 @@ export class Wheel extends PhysicsComponent {
     groundKey: number;
     suspensionForce: number;
   };
-  /** The node's local transform before the vehicle took it over. @internal */
+  /** The node's local transform before the vehicle took it over. */
   _rest: { position: Vector3; rotation: Quaternion } | null;
-  /** The node the vehicle last wrote to, to give the rest pose back to. @internal */
+  /** The node the vehicle last wrote to, to give the rest pose back to. */
   _restNode: SceneNode | null;
   private _error: string;
 
@@ -384,7 +383,6 @@ export class Wheel extends PhysicsComponent {
     return this._error;
   }
 
-  /** @internal */
   _setError(error: string) {
     this._error = error;
   }

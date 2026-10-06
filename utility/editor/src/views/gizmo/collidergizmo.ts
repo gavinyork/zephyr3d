@@ -1,18 +1,16 @@
-import type { Camera, Scene, SceneNode } from '@zephyr3d/scene';
+import type {
+  Camera,
+  Collider,
+  ColliderOutline,
+  Joint,
+  PhysicsWorld,
+  Scene,
+  SceneNode,
+  Wheel
+} from '@zephyr3d/scene';
+import { CharacterController, RigidBody } from '@zephyr3d/scene';
 import type { Nullable } from '@zephyr3d/base';
 import { Matrix4x4, Vector3, Vector4 } from '@zephyr3d/base';
-import {
-  CharacterController,
-  Collider,
-  Joint,
-  RigidBody,
-  Vehicle,
-  Wheel,
-  getColliderOutline,
-  getColliderOutlineKey,
-  isPhysicsReady,
-  type ColliderOutline
-} from '@zephyr3d/physics';
 import type { AALineBatch, LineGizmo, PostGizmoRenderer } from './postgizmo';
 import { PostGizmoRenderer as Renderer } from './postgizmo';
 
@@ -56,8 +54,8 @@ interface OutlineEntry {
 /**
  * Draws physics colliders, character capsules and joints in the scene view:
  * those on the selected nodes and below them, or everything in the scene.
- * Outlines come from the physics package, so they are the shapes the simulation
- * builds; they are rebuilt only when a collider's shape changes.
+ * Outlines come from the scene's physics world, so they are the shapes the
+ * simulation builds; they are rebuilt only when a collider's shape changes.
  */
 export class ColliderGizmo {
   private readonly _renderer: PostGizmoRenderer;
@@ -105,19 +103,27 @@ export class ColliderGizmo {
     const wheels: Wheel[] = [];
     const visit = (node: SceneNode, highlighted: boolean) => {
       node.iterate((child) => {
-        for (const component of child.components) {
-          if (component instanceof Collider || component instanceof CharacterController) {
-            targets.set(component, highlighted || targets.get(component) === true);
-          } else if (component instanceof Joint) {
-            joints.push(component);
-          } else if (component instanceof Wheel && !wheels.includes(component)) {
-            wheels.push(component);
-          }
+        const physics = child.physics;
+        if (!physics) {
+          return false;
+        }
+        const outlined: OutlineTarget[] = [...physics.colliders];
+        if (physics.body instanceof CharacterController) {
+          outlined.push(physics.body);
+        }
+        for (const target of outlined) {
+          targets.set(target, highlighted || targets.get(target) === true);
+        }
+        if (physics.joint && !joints.includes(physics.joint)) {
+          joints.push(physics.joint);
+        }
+        if (physics.wheel && !wheels.includes(physics.wheel)) {
+          wheels.push(physics.wheel);
         }
         return false;
       });
     };
-    if (scene && camera && isPhysicsReady()) {
+    if (scene && camera) {
       if (this._showAll) {
         visit(scene.rootNode, false);
       }
@@ -127,6 +133,14 @@ export class ColliderGizmo {
         }
       }
     }
+    // Outlines are built by the scene's physics world, asked for only when there
+    // is something to draw; without a physics engine there is none.
+    const world = targets.size > 0 || joints.length > 0 || wheels.length > 0 ? scene!.physicsWorld : null;
+    if (!world) {
+      targets.clear();
+      joints.length = 0;
+      wheels.length = 0;
+    }
     for (const [target, entry] of this._entries) {
       if (!targets.has(target)) {
         this.release(entry);
@@ -135,9 +149,9 @@ export class ColliderGizmo {
     }
     const vp = camera?.viewProjectionMatrix;
     for (const [target, highlighted] of targets) {
-      const entry = this.ensureOutline(target);
+      const entry = this.ensureOutline(world!, target);
       if (entry.batch && entry.outline && vp) {
-        const host = target.host!;
+        const host = target.node!;
         Matrix4x4.multiply(vp, host.worldMatrix, entry.batch.mvpMatrix).multiplyRight(
           entry.outline.transform
         );
@@ -158,17 +172,17 @@ export class ColliderGizmo {
     this._renderer.removeLineGizmo(this._jointGizmo);
     this._renderer.removeLineGizmo(this._wheelGizmo);
   }
-  private ensureOutline(target: OutlineTarget) {
+  private ensureOutline(world: PhysicsWorld, target: OutlineTarget) {
     let entry = this._entries.get(target);
     if (!entry) {
       entry = { key: '', outline: null, batch: null, pendingKey: null, error: null };
       this._entries.set(target, entry);
     }
-    const key = getColliderOutlineKey(target);
+    const key = world.getColliderOutlineKey(target);
     if (key !== entry.key && key !== entry.pendingKey) {
       entry.pendingKey = key;
       const current = entry;
-      getColliderOutline(target).then(
+      world.getColliderOutline(target).then(
         (outline) => {
           if (this._entries.get(target) !== current || current.pendingKey !== key) {
             return;
@@ -226,9 +240,9 @@ export class ColliderGizmo {
       return COLOR_TRIGGER;
     }
     // The rigid body the collider belongs to: on its node or the nearest above.
-    for (let node: Nullable<SceneNode> = target.host; node; node = node.parent) {
-      const body = node.getComponent(RigidBody);
-      if (body) {
+    for (let node: Nullable<SceneNode> = target.node; node; node = node.parent) {
+      const body = node.physics?.body;
+      if (body instanceof RigidBody) {
         return body.motionType === 'dynamic'
           ? COLOR_DYNAMIC
           : body.motionType === 'kinematic'
@@ -249,13 +263,13 @@ export class ColliderGizmo {
       const vp = camera.viewProjectionMatrix;
       const clip = (p: Vector3) => vp.transformPoint(p, new Vector4());
       for (const wheel of wheels) {
-        const node = wheel.host!;
+        const node = wheel.node!;
         // The vehicle's axes: its node's up and front, without scale.
         let vehicleNode: Nullable<SceneNode> = node.parent;
-        while (vehicleNode && !vehicleNode.getComponent(Vehicle)) {
+        while (vehicleNode && !vehicleNode.physics?.vehicle) {
           vehicleNode = vehicleNode.parent;
         }
-        const vehicle = vehicleNode?.getComponent(Vehicle) ?? null;
+        const vehicle = vehicleNode?.physics?.vehicle ?? null;
         const frame = (vehicleNode ?? node).worldMatrix;
         const up = frame.transformVectorAffine(Vector3.axisPY(), new Vector3()).inplaceNormalize();
         const front = frame
@@ -295,7 +309,7 @@ export class ColliderGizmo {
       const vp = camera.viewProjectionMatrix;
       const clip = (p: Vector3) => vp.transformPoint(p, new Vector4());
       for (const joint of joints) {
-        const host = joint.host!;
+        const host = joint.node!;
         const pivot = host.worldMatrix.transformPointAffine(joint.anchor, new Vector3());
         for (const axis of [Vector3.axisPX(), Vector3.axisPY(), Vector3.axisPZ()]) {
           const d = host.worldMatrix.transformVectorAffine(axis, new Vector3()).inplaceNormalize();

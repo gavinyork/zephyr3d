@@ -113,6 +113,7 @@ export class Editor {
     '@zephyr3d/device',
     '@zephyr3d/scene',
     '@zephyr3d/physics',
+    '@zephyr3d/physics-rapier',
     '@zephyr3d/imgui',
     '@zephyr3d/backend-webgl',
     '@zephyr3d/backend-webgpu',

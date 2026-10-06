@@ -3,18 +3,22 @@ import {
   Application,
   BoundingBox,
   BoxShape,
+  Collider,
   DirectionalLight,
   getEngine,
   getInput,
   Mesh,
+  NodePhysics,
   OrbitCameraController,
   PBRMetallicRoughnessMaterial,
   PerspectiveCamera,
   Primitive,
+  RigidBody,
   Scene,
   SphereShape
 } from '@zephyr3d/scene';
-import { Collider, initPhysics, PhysicsWorld, RigidBody } from '@zephyr3d/physics';
+import { initPhysics } from '@zephyr3d/physics';
+import { rapierPhysics } from '@zephyr3d/physics-rapier';
 import { backendWebGL2 } from '@zephyr3d/backend-webgl';
 import { backendWebGPU } from '@zephyr3d/backend-webgpu';
 
@@ -71,7 +75,7 @@ function rollingGround() {
 }
 
 myApp.ready().then(async function () {
-  await initPhysics();
+  await initPhysics(rapierPhysics);
 
   const scene = new Scene();
   const sun = new DirectionalLight(scene);
@@ -84,7 +88,7 @@ myApp.ready().then(async function () {
   const ground = new Mesh(scene, rollingGround(), material(0.5, 0.55, 0.45));
   const groundCollider = new Collider();
   groundCollider.shape = 'mesh';
-  ground.addComponent(groundCollider);
+  ground.physics = new NodePhysics({ colliders: [groundCollider] });
   // #endregion mesh
 
   // A trigger: detects what enters it, but nothing bumps into it.
@@ -96,18 +100,19 @@ myApp.ready().then(async function () {
   const trigger = new Collider();
   trigger.size = new Vector3(3, 2, 3);
   trigger.isTrigger = true;
-  zone.addComponent(trigger);
+  zone.physics = new NodePhysics({ colliders: [trigger] });
   const highlight = material(1, 0.2, 0.6);
   const original = new Map();
-  // Both the trigger and what entered it receive the events.
-  trigger.on('triggerenter', (ev) => {
+  // Events are raised on the physics data of the nodes involved: both the
+  // trigger's and that of what entered it.
+  zone.physics.on('triggerenter', (ev) => {
     const node = ev.otherNode;
     if (node instanceof Mesh && !original.has(node)) {
       original.set(node, node.material);
       node.material = highlight;
     }
   });
-  trigger.on('triggerexit', (ev) => {
+  zone.physics.on('triggerexit', (ev) => {
     // #endregion trigger
     const node = ev.otherNode;
     if (original.has(node)) {
@@ -129,11 +134,10 @@ myApp.ready().then(async function () {
       const rock = new Mesh(scene, rockShape, material(0.6, 0.55, 0.5));
       rock.position.setXYZ(-4 + (i % 4) * 2.2, 3 + Math.floor(i / 4), -1.5 + ((count + i) % 3) * 1.4);
       rock.scale.setXYZ(1, 0.7 + (i % 3) * 0.15, 1.3);
-      rock.addComponent(new RigidBody());
       const hull = new Collider();
       hull.shape = 'convex';
       hull.layer = LAYER_ROCKS;
-      rock.addComponent(hull);
+      rock.physics = new NodePhysics({ body: new RigidBody(), colliders: [hull] });
       // #endregion convex
       bodies.push(rock);
     }
@@ -141,18 +145,17 @@ myApp.ready().then(async function () {
     for (let i = 0; i < 4; i++) {
       const ghost = new Mesh(scene, ghostShape, material(0.95, 0.85, 0.3));
       ghost.position.setXYZ(-3 + i * 2, 5.5, -0.5 + (i % 2));
-      ghost.addComponent(new RigidBody());
       const box = new Collider();
       box.size = new Vector3(0.5, 0.5, 0.5);
       box.layer = LAYER_GHOSTS;
-      ghost.addComponent(box);
+      ghost.physics = new NodePhysics({ body: new RigidBody(), colliders: [box] });
       bodies.push(ghost);
     }
     count++;
   }
 
   // #region layers
-  const world = PhysicsWorld.get(scene);
+  const world = scene.physicsWorld;
   const passThrough = document.querySelector('#passthrough');
   passThrough.addEventListener('change', () => {
     world.setLayerCollision(LAYER_ROCKS, LAYER_GHOSTS, !passThrough.checked);

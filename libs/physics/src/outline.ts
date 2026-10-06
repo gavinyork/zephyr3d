@@ -1,28 +1,8 @@
 import { Matrix4x4, Quaternion, Vector3 } from '@zephyr3d/base';
-import type { ShapeDesc } from './backend/types';
-import { RapierWorld } from './backend/rapier';
-import type { Collider } from './collider';
-import type { CharacterController } from './character';
+import type { CharacterController, Collider, ColliderOutline } from '@zephyr3d/scene';
+import type { BackendWorld, ShapeDesc } from './backend';
 import { fetchGeometry, geometrySource, needsGeometry, type ColliderGeometry } from './geometry';
-import { getRapier, isPhysicsReady } from './rapier_state';
 import { buildColliderShape } from './shapes';
-
-/**
- * Lines tracing a collider's shape as the simulation builds it, for tools to
- * draw. See {@link getColliderOutline}.
- *
- * @public
- */
-export interface ColliderOutline {
-  /** Line segments, two points of three floats each per segment, in the collider's frame. */
-  segments: Float32Array;
-  /**
-   * From the collider's frame to its node's local space. Draw the segments with
-   * the node's world matrix times this; it stays valid while the node moves and
-   * turns, but not when it is scaled (the scale is part of the shape).
-   */
-  transform: Matrix4x4;
-}
 
 /** Lines per circle. */
 const CIRCLE_SEGMENTS = 48;
@@ -50,12 +30,10 @@ function objectId(object: object) {
  * outline: the collider's settings, its node's scale, and its geometry. Moving
  * or turning the node does not change it, except for terrain colliders, which
  * are placed by the terrain's position.
- *
- * @public
  */
 export function getColliderOutlineKey(target: Collider | CharacterController): string {
   const collider = colliderOf(target);
-  const host = collider.host;
+  const host = collider.node;
   if (!host) {
     return '';
   }
@@ -101,34 +79,25 @@ export function getColliderOutlineKey(target: Collider | CharacterController): s
 }
 
 /**
- * Traces a collider's shape as lines, exactly as the simulation builds it
- * (for a {@link CharacterController}, its capsule):
- * scaled by its node, convex hulls as the physics engine computes them, meshes
- * at the chosen level of detail, terrain at its sampling resolution.
- *
- * @remarks
- * Mesh and terrain colliders may have to read their geometry back from the
- * GPU, hence asynchronous. Convex hulls need the physics engine
- * ({@link initPhysics}); other shapes do not. A terrain is drawn as lines along
- * at most 256 rows and columns of samples, each through every sample on it, so
- * every line lies on the collision surface.
+ * Traces a collider's shape as lines, exactly as the simulation builds it (for
+ * a {@link CharacterController}, its capsule). Convex hulls and meshes are
+ * built by the engine, in a world from `createWorld`, to read its result back.
  *
  * @returns The outline, or null if the collider is not on a node in a scene.
  * @throws An error with a message for the user when the shape cannot be built.
- *
- * @public
  */
 export async function getColliderOutline(
-  target: Collider | CharacterController
+  target: Collider | CharacterController,
+  createWorld: () => BackendWorld
 ): Promise<ColliderOutline | null> {
   const collider = colliderOf(target);
-  if (!collider.host?.attached) {
+  if (!collider.node?.attached) {
     return null;
   }
   let geometry: ColliderGeometry | null = null;
   if (needsGeometry(collider)) {
     geometry = await fetchGeometry(collider, geometrySource(collider));
-    if (!collider.host?.attached) {
+    if (!collider.node?.attached) {
       return null;
     }
   }
@@ -137,11 +106,11 @@ export async function getColliderOutline(
     throw new Error(built.error);
   }
   const colliderWorld = new Matrix4x4().compose(Vector3.one(), built.rotation, built.position);
-  const transform = Matrix4x4.invertAffine(collider.host.worldMatrix).multiplyRight(colliderWorld);
-  return { segments: shapeSegments(built.shape), transform };
+  const transform = Matrix4x4.invertAffine(collider.node.worldMatrix).multiplyRight(colliderWorld);
+  return { segments: shapeSegments(built.shape, createWorld), transform };
 }
 
-function shapeSegments(shape: ShapeDesc): Float32Array {
+function shapeSegments(shape: ShapeDesc, createWorld: () => BackendWorld): Float32Array {
   const out: number[] = [];
   switch (shape.type) {
     case 'box': {
@@ -216,7 +185,7 @@ function shapeSegments(shape: ShapeDesc): Float32Array {
     }
     case 'trimesh':
     case 'convex':
-      return meshEdges(shape);
+      return meshEdges(shape, createWorld);
     case 'heightfield':
       return heightfieldLines(shape);
   }
@@ -242,11 +211,11 @@ function circle(out: number[], r: number, offset: number, axis: 'x' | 'y' | 'z')
  * Edges of a mesh or convex collider, from the triangles the physics engine
  * built: the hull it computed, with duplicate vertices merged.
  */
-function meshEdges(shape: ShapeDesc & { type: 'trimesh' | 'convex' }): Float32Array {
-  if (!isPhysicsReady()) {
-    throw new Error('The physics engine is not loaded');
-  }
-  const world = new RapierWorld(getRapier());
+function meshEdges(
+  shape: ShapeDesc & { type: 'trimesh' | 'convex' },
+  createWorld: () => BackendWorld
+): Float32Array {
+  const world = createWorld();
   try {
     const body = world.createBody({
       motionType: 'static',

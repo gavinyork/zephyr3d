@@ -1,0 +1,10 @@
+{
+  "changes": [
+    {
+      "packageName": "@zephyr3d/scene",
+      "comment": "Add physics data on scene nodes: SceneNode.physics (NodePhysics with RigidBody, Collider, Joint, CharacterController, Vehicle and Wheel, saved with scenes) and Scene.physicsWorld, which is provided by a physics package through setPhysicsWorldFactory. Also the afterupdate scene event and SceneNode.setWorldPose.",
+      "type": "minor"
+    }
+  ],
+  "packageName": "@zephyr3d/scene"
+}

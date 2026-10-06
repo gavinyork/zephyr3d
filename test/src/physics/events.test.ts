@@ -2,31 +2,27 @@ import { Quaternion, Vector3 } from '@zephyr3d/base';
 import { MemoryFS } from '@zephyr3d/base';
 import { ResourceManager, Scene, SceneNode } from '@zephyr3d/scene';
 import * as RAPIER from '@dimforge/rapier3d-simd-compat';
-import {
-  Collider,
-  initPhysics,
-  PhysicsWorld,
-  registerPhysics,
-  RigidBody,
-  type ColliderShape,
-  type PhysicsObject
-} from '@zephyr3d/physics';
+import { Collider, type ColliderShape, type NodePhysics, RigidBody } from '@zephyr3d/scene';
+import type { PhysicsSimulation } from '@zephyr3d/physics';
+import { initPhysics } from '@zephyr3d/physics';
+import { rapierPhysics } from '@zephyr3d/physics-rapier';
+import { addPhysics, getPhysics } from './helpers';
 
 const DT = 1 / 60;
 
 beforeAll(async () => {
   await RAPIER.init();
-  await initPhysics({ rapier: RAPIER });
+  await initPhysics(rapierPhysics, { rapier: RAPIER });
 });
 
 function makeWorld(scene: Scene) {
-  const world = PhysicsWorld.get(scene);
+  const world = scene.physicsWorld as PhysicsSimulation;
   world.enabled = false;
   world.interpolation = false;
   return world;
 }
 
-function run(world: PhysicsWorld, seconds: number) {
+function run(world: PhysicsSimulation, seconds: number) {
   const frames = Math.round(seconds / DT);
   for (let i = 0; i < frames; i++) {
     world.update(DT);
@@ -38,26 +34,26 @@ function addGround(scene: Scene, y = 0) {
   ground.position.setXYZ(0, y - 0.5, 0);
   const collider = new Collider();
   collider.size = new Vector3(40, 1, 40);
-  ground.addComponent(collider);
+  addPhysics(ground, collider);
   return ground;
 }
 
 function addBody(scene: Scene, shape: ColliderShape, position: Vector3) {
   const node = new SceneNode(scene);
   node.position.set(position);
-  node.addComponent(new RigidBody());
+  addPhysics(node, new RigidBody());
   const collider = new Collider();
   collider.shape = shape;
-  node.addComponent(collider);
+  addPhysics(node, collider);
   return node;
 }
 
-function nameOf(object: PhysicsObject | null) {
-  return object?.host?.name ?? '?';
+function nameOf(object: NodePhysics | null) {
+  return object?.node?.name ?? '?';
 }
 
 /** Records every physics event an object receives, as readable strings. */
-function record(object: PhysicsObject, log: string[]) {
+function record(object: NodePhysics, log: string[]) {
   const self = nameOf(object);
   object.on('collisionenter', (e) => void log.push(`${self} enter ${nameOf(e.other)}`));
   object.on('collisionstay', (e) => void log.push(`${self} stay ${nameOf(e.other)}`));
@@ -77,7 +73,7 @@ describe('physics layers', () => {
     const world = makeWorld(scene);
     addGround(scene);
     const box = addBody(scene, 'box', new Vector3(0, 2, 0));
-    box.getComponent(Collider)!.layer = 3;
+    getPhysics(box, Collider)!.layer = 3;
     world.setLayerCollision(0, 3, false);
     expect(world.getLayerCollision(3, 0)).toBe(false);
     run(world, 1.5);
@@ -89,7 +85,7 @@ describe('physics layers', () => {
     const world = makeWorld(scene);
     addGround(scene);
     const box = addBody(scene, 'box', new Vector3(0, 0.5, 0));
-    box.getComponent(Collider)!.layer = 2;
+    getPhysics(box, Collider)!.layer = 2;
     run(world, 3);
     expect(box.getWorldPosition().y).toBeCloseTo(0.5, 1);
     world.setLayerCollision(2, 0, false);
@@ -106,8 +102,8 @@ describe('physics events', () => {
     ground.name = 'ground';
     const box = addBody(scene, 'box', new Vector3(0, 1, 0));
     box.name = 'box';
-    const log = record(box.getComponent(RigidBody)!, []);
-    record(ground.getComponent(Collider)!, log);
+    const log = record(box.physics!, []);
+    record(ground.physics!, log);
     run(world, 1);
     expect(count(log, 'box enter ground')).toBe(1);
     expect(count(log, 'ground enter box')).toBe(1);
@@ -126,8 +122,8 @@ describe('physics events', () => {
     ground.name = 'ground';
     const box = addBody(scene, 'box', new Vector3(0, 0.6, 0));
     box.name = 'box';
-    const body = box.getComponent(RigidBody)!;
-    const log = record(body, []);
+    const body = getPhysics(box, RigidBody)!;
+    const log = record(box.physics!, []);
     run(world, 4);
     expect(body.isSleeping).toBe(true);
     const stays = count(log, 'box stay ground');
@@ -145,16 +141,16 @@ describe('physics events', () => {
     const node = new SceneNode(scene);
     node.name = 'dumbbell';
     node.position.setXYZ(0, 1, 0);
-    node.addComponent(new RigidBody());
+    addPhysics(node, new RigidBody());
     for (const x of [-1, 1]) {
       const part = new SceneNode(scene);
       part.parent = node;
       part.position.setXYZ(x, 0, 0);
       const c = new Collider();
       c.shape = 'sphere';
-      part.addComponent(c);
+      addPhysics(part, c);
     }
-    const log = record(node.getComponent(RigidBody)!, []);
+    const log = record(node.physics!, []);
     run(world, 2);
     expect(count(log, 'dumbbell enter ground')).toBe(1);
     expect(count(log, 'dumbbell exit ground')).toBe(0);
@@ -167,10 +163,10 @@ describe('physics events', () => {
     ground.name = 'ground';
     const box = addBody(scene, 'box', new Vector3(0, 0.6, 0));
     box.name = 'box';
-    const log = record(box.getComponent(RigidBody)!, []);
+    const log = record(box.physics!, []);
     run(world, 1);
-    ground.getComponent(Collider)!.friction = 0.9;
-    box.getComponent(Collider)!.restitution = 0.1;
+    getPhysics(ground, Collider)!.friction = 0.9;
+    getPhysics(box, Collider)!.restitution = 0.1;
     run(world, 0.5);
     expect(count(log, 'box enter ground')).toBe(1);
     expect(count(log, 'box exit ground')).toBe(0);
@@ -185,15 +181,15 @@ describe('physics events', () => {
     const wc = new Collider();
     wc.size = new Vector3(1, 4, 4);
     wc.restitution = 1;
-    wall.addComponent(wc);
+    addPhysics(wall, wc);
     const ball = addBody(scene, 'sphere', new Vector3(-1.05, 0, 0));
     ball.name = 'ball';
-    ball.getComponent(Collider)!.restitution = 1;
-    ball.getComponent(RigidBody)!.setLinearVelocity(new Vector3(6, 0, 0));
-    const log = record(ball.getComponent(RigidBody)!, []);
+    getPhysics(ball, Collider)!.restitution = 1;
+    getPhysics(ball, RigidBody)!.setLinearVelocity(new Vector3(6, 0, 0));
+    const log = record(ball.physics!, []);
     // One frame of four steps: hits the wall and bounces clear before it ends.
     world.update(4 * DT);
-    expect(ball.getComponent(RigidBody)!.getLinearVelocity().x).toBeLessThan(0);
+    expect(getPhysics(ball, RigidBody)!.getLinearVelocity().x).toBeLessThan(0);
     expect(log).toEqual(['ball enter wall', 'ball exit wall']);
   });
 
@@ -204,9 +200,8 @@ describe('physics events', () => {
     ground.name = 'ground';
     const box = addBody(scene, 'box', new Vector3(0, 0.6, 0));
     box.name = 'box';
-    const groundCollider = ground.getComponent(Collider)!;
-    const groundLog = record(groundCollider, []);
-    const boxLog = record(box.getComponent(RigidBody)!, []);
+    const groundLog = record(ground.physics!, []);
+    const boxLog = record(box.physics!, []);
     run(world, 1);
     box.remove();
     world.update(DT);
@@ -223,11 +218,11 @@ describe('physics events', () => {
     const zc = new Collider();
     zc.size = new Vector3(2, 1, 2);
     zc.isTrigger = true;
-    zone.addComponent(zc);
+    addPhysics(zone, zc);
     const ball = addBody(scene, 'sphere', new Vector3(0, 4, 0));
     ball.name = 'ball';
-    const log = record(ball.getComponent(RigidBody)!, []);
-    record(zc, log);
+    const log = record(ball.physics!, []);
+    record(zone.physics!, log);
     run(world, 1.5);
     expect(count(log, 'ball triggerenter zone')).toBe(1);
     expect(count(log, 'zone triggerenter ball')).toBe(1);
@@ -244,11 +239,11 @@ describe('physics events', () => {
     zone.name = 'zone';
     const zc = new Collider();
     zc.isTrigger = true;
-    zone.addComponent(zc);
+    addPhysics(zone, zc);
     const mover = addBody(scene, 'box', new Vector3(-3, 0, 0));
     mover.name = 'mover';
-    mover.getComponent(RigidBody)!.motionType = 'kinematic';
-    const log = record(zc, []);
+    getPhysics(mover, RigidBody)!.motionType = 'kinematic';
+    const log = record(zone.physics!, []);
     for (let i = 0; i < 60; i++) {
       mover.position.setXYZ(-3 + (i + 1) * 0.1, 0, 0);
       world.update(DT);
@@ -265,12 +260,12 @@ describe('physics events', () => {
     let groundNormal: Vector3 | null = null;
     let impulse = 0;
     let contacts = 0;
-    ball.getComponent(RigidBody)!.on('collisionenter', (e) => {
+    ball.physics!.on('collisionenter', (e) => {
       normal = e.normal.clone();
       impulse = e.impulse;
       contacts = e.contacts.length;
     });
-    ground.getComponent(Collider)!.on('collisionenter', (e) => {
+    ground.physics!.on('collisionenter', (e) => {
       groundNormal = e.normal.clone();
     });
     run(world, 1);
@@ -287,11 +282,11 @@ describe('physics events', () => {
       const ground = addGround(scene);
       ground.name = 'ground';
       const log: string[] = [];
-      record(ground.getComponent(Collider)!, log);
+      record(ground.physics!, log);
       for (let i = 0; i < 6; i++) {
         const box = addBody(scene, 'box', new Vector3((i % 3) * 0.4, 0.5 + i * 1.1, (i % 2) * 0.4));
         box.name = `box${i}`;
-        record(box.getComponent(RigidBody)!, log);
+        record(box.physics!, log);
       }
       run(world, 3);
       return log;
@@ -311,17 +306,17 @@ describe('physics queries', () => {
     const box = new SceneNode(scene);
     box.name = 'box';
     box.position.setXYZ(0, 2, 0);
-    box.addComponent(new RigidBody());
-    box.getComponent(RigidBody)!.motionType = 'static';
+    addPhysics(box, new RigidBody());
+    getPhysics(box, RigidBody)!.motionType = 'static';
     const bc = new Collider();
     bc.layer = 1;
-    box.addComponent(bc);
+    addPhysics(box, bc);
     const zone = new SceneNode(scene);
     zone.name = 'zone';
     zone.position.setXYZ(0, 4, 0);
     const zc = new Collider();
     zc.isTrigger = true;
-    zone.addComponent(zc);
+    addPhysics(zone, zc);
     // Queries see the world as of the last step.
     world.update(DT);
     return { scene, world, ground, box, zone };
@@ -331,7 +326,7 @@ describe('physics queries', () => {
     const { world, box } = stage();
     const hit = world.raycast(new Vector3(0, 10, 0), new Vector3(0, -2, 0))!;
     expect(hit.node).toBe(box);
-    expect(hit.body).toBe(box.getComponent(RigidBody));
+    expect(hit.body).toBe(getPhysics(box, RigidBody));
     expect(hit.distance).toBeCloseTo(7.5, 4);
     expect(hit.point.y).toBeCloseTo(2.5, 4);
     expect(hit.normal.y).toBeCloseTo(1, 4);
@@ -343,7 +338,7 @@ describe('physics queries', () => {
     const from = new Vector3(0, 10, 0);
     expect(world.raycast(from, down, Infinity, { layerMask: 1 << 0 })!.node).toBe(ground);
     expect(world.raycast(from, down, Infinity, { includeTriggers: true })!.node).toBe(zone);
-    expect(world.raycast(from, down, Infinity, { exclude: box.getComponent(RigidBody) })!.node).toBe(ground);
+    expect(world.raycast(from, down, Infinity, { exclude: box.physics })!.node).toBe(ground);
     expect(world.raycast(from, down, 5)).toBeNull();
   });
 
@@ -371,21 +366,21 @@ describe('physics queries', () => {
       new Vector3(0, 0, 0),
       Quaternion.identity()
     );
-    expect(overlapping.map((c) => c.host)).toEqual([ground]);
-    expect(world.overlapPoint(new Vector3(0.2, 2.1, 0)).map((c) => c.host)).toEqual([box]);
+    expect(overlapping.map((c) => c.node)).toEqual([ground]);
+    expect(world.overlapPoint(new Vector3(0.2, 2.1, 0)).map((c) => c.node)).toEqual([box]);
   });
 
   it('sees the world as of the last step', () => {
     const { scene, world, box } = stage();
     const added = new SceneNode(scene);
     added.position.setXYZ(10, 3, 0);
-    added.addComponent(new Collider());
+    addPhysics(added, new Collider());
     box.position.setXYZ(5, 2, 0);
     // Neither change is simulated yet.
     expect(world.overlapPoint(new Vector3(10, 3, 0)).length).toBe(0);
-    expect(world.overlapPoint(new Vector3(0, 2, 0)).map((c) => c.host)).toEqual([box]);
+    expect(world.overlapPoint(new Vector3(0, 2, 0)).map((c) => c.node)).toEqual([box]);
     world.update(DT);
-    expect(world.overlapPoint(new Vector3(10, 3, 0)).map((c) => c.host)).toEqual([added]);
+    expect(world.overlapPoint(new Vector3(10, 3, 0)).map((c) => c.node)).toEqual([added]);
     expect(world.overlapPoint(new Vector3(0, 2, 0)).length).toBe(0);
     expect(world.raycast(new Vector3(5, 10, 0), new Vector3(0, -1, 0))!.node).toBe(box);
   });
@@ -415,8 +410,8 @@ describe('physics fixed update', () => {
     const scene = new Scene();
     const world = makeWorld(scene);
     world.gravity = Vector3.zero();
-    const a = addBody(scene, 'sphere', new Vector3(-5, 0, 0)).getComponent(RigidBody)!;
-    const b = addBody(scene, 'sphere', new Vector3(5, 0, 0)).getComponent(RigidBody)!;
+    const a = getPhysics(addBody(scene, 'sphere', new Vector3(-5, 0, 0)), RigidBody)!;
+    const b = getPhysics(addBody(scene, 'sphere', new Vector3(5, 0, 0)), RigidBody)!;
     world.update(DT);
     let first = true;
     world.on('fixedupdate', () => {
@@ -441,7 +436,7 @@ describe('rigid body axis locks', () => {
     const world = makeWorld(scene);
     world.gravity = Vector3.zero();
     const node = addBody(scene, 'box', Vector3.zero());
-    const body = node.getComponent(RigidBody)!;
+    const body = getPhysics(node, RigidBody)!;
     body.lockTranslationX = true;
     body.lockRotationX = true;
     body.lockRotationY = true;
@@ -462,21 +457,20 @@ describe('rigid body axis locks', () => {
   it('round-trips layer and locks through serialization', async () => {
     const scene = new Scene();
     const manager = new ResourceManager(new MemoryFS());
-    registerPhysics(manager);
     const node = new SceneNode(scene);
     const body = new RigidBody();
     body.lockRotationX = true;
     body.lockTranslationZ = true;
-    node.addComponent(body);
+    addPhysics(node, body);
     const collider = new Collider();
     collider.layer = 7;
-    node.addComponent(collider);
+    addPhysics(node, collider);
     const serialized = await manager.serializeObject(node);
     const restored = (await manager.deserializeObject<SceneNode>(new SceneNode(scene), serialized))!;
-    const rb = restored.getComponent(RigidBody)!;
+    const rb = getPhysics(restored, RigidBody)!;
     expect(rb.lockRotationX).toBe(true);
     expect(rb.lockRotationY).toBe(false);
     expect(rb.lockTranslationZ).toBe(true);
-    expect(restored.getComponent(Collider)!.layer).toBe(7);
+    expect(getPhysics(restored, Collider)!.layer).toBe(7);
   });
 });

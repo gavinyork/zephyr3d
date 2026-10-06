@@ -1,7 +1,6 @@
 import { half2float } from '@zephyr3d/base';
-import type { Primitive, PrimitiveTriangles } from '@zephyr3d/scene';
+import type { Collider, Primitive, PrimitiveTriangles } from '@zephyr3d/scene';
 import { ClipmapTerrain, Mesh, readPrimitiveTriangles } from '@zephyr3d/scene';
-import type { Collider } from './collider';
 
 /** Triangles in the node's local space, for `mesh` and `convex` colliders. @internal */
 export interface MeshGeometry {
@@ -44,7 +43,7 @@ export function needsGeometry(collider: Collider) {
  * @internal
  */
 export function geometrySource(collider: Collider): GeometrySource {
-  const host = collider.host!;
+  const host = collider.node!;
   if (collider.shape === 'terrain') {
     if (!(host instanceof ClipmapTerrain)) {
       throw new Error('A terrain collider must be on a terrain node');

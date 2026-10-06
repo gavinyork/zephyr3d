@@ -1,0 +1,10 @@
+{
+  "changes": [
+    {
+      "packageName": "@zephyr3d/physics-rapier",
+      "comment": "New package: the Rapier physics engine for @zephyr3d/physics (rapierPhysics).",
+      "type": "none"
+    }
+  ],
+  "packageName": "@zephyr3d/physics-rapier"
+}

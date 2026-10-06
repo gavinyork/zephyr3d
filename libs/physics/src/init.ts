@@ -1,93 +1,60 @@
-import { loadRapier, type RapierAPI } from './rapier_loader';
-import { RAPIER_WASM_URL } from './rapier_location';
-import { registerSceneNodeComponentType, tryGetApp, type ResourceManager } from '@zephyr3d/scene';
-import { RigidBody } from './rigid_body';
-import { Collider } from './collider';
-import { Joint } from './joint';
-import { CharacterController } from './character';
-import { Vehicle, Wheel } from './vehicle';
-import { isPhysicsReady, setRapier } from './rapier_state';
-import { registerPhysicsSerializableClasses } from './serialization';
+import { setPhysicsWorldFactory } from '@zephyr3d/scene';
+import type { PhysicsBackend } from './backend';
+import { PhysicsSimulation } from './simulation';
 
-/** Options of {@link initPhysics}. @public */
-export interface PhysicsInitOptions {
-  /**
-   * URL of `rapier_wasm3d_bg.wasm`. Defaults to the copy shipped beside this
-   * package's modules.
-   */
-  wasmUrl?: string;
-  /**
-   * An already initialized Rapier module (`@dimforge/rapier3d-simd` or a
-   * compatible build). When given, nothing is fetched. Used by tests and by
-   * applications that load Rapier themselves.
-   */
-  rapier?: unknown;
-  /**
-   * Serialization manager to register the physics components with; see
-   * {@link registerPhysics}. Defaults to the running application's.
-   */
-  manager?: ResourceManager;
-}
-
-const registeredManagers = new WeakSet<ResourceManager>();
+let current: PhysicsBackend | null = null;
+let loading: { engine: PhysicsBackend; promise: Promise<void> } | null = null;
 
 /**
- * Makes the physics components known to the scene and to a serialization
- * manager, so scenes containing them can be loaded, saved and edited.
+ * Loads a physics engine and makes it simulate scenes: from then on, every
+ * scene gets a {@link PhysicsSimulation} as its `physicsWorld` the first time it
+ * needs one.
  *
  * @remarks
- * Does not load the physics engine: components can be created, edited and
- * saved, but nothing is simulated until {@link initPhysics} completes.
- * Synchronous and safe to call more than once. {@link initPhysics} calls it
- * too.
+ * Without it, physics data on nodes is kept, edited, saved and loaded, but not
+ * simulated. Safe to call more than once; later calls with the same engine wait
+ * for the first. Scenes that already have a world keep it.
  *
- * @param manager - The serialization manager. Defaults to the running
- *   application's; without one, only the component types are registered.
+ * ```ts
+ * import { initPhysics } from '@zephyr3d/physics';
+ * import { rapierPhysics } from '@zephyr3d/physics-rapier';
+ *
+ * await initPhysics(rapierPhysics);
+ * ```
+ *
+ * @param engine - The physics engine, from an engine package.
+ * @param options - Options of the engine's loading, such as where its
+ *   WebAssembly module is.
  *
  * @public
  */
-export function registerPhysics(manager?: ResourceManager) {
-  registerSceneNodeComponentType(RigidBody);
-  registerSceneNodeComponentType(Collider);
-  registerSceneNodeComponentType(Joint);
-  registerSceneNodeComponentType(CharacterController);
-  registerSceneNodeComponentType(Vehicle);
-  registerSceneNodeComponentType(Wheel);
-  const target = manager ?? tryGetApp()?.engine?.resourceManager;
-  if (target && !registeredManagers.has(target)) {
-    registeredManagers.add(target);
-    registerPhysicsSerializableClasses(target);
-  }
-}
-
-let loading: Promise<void> | null = null;
-
-/**
- * Loads the physics engine. Must complete before a {@link PhysicsWorld} steps.
- *
- * @remarks
- * Safe to call more than once; later calls wait for the first. Also calls
- * {@link registerPhysics}, so call it before loading scenes that contain
- * physics components.
- *
- * @public
- */
-export function initPhysics(options?: PhysicsInitOptions): Promise<void> {
-  registerPhysics(options?.manager);
-  if (isPhysicsReady()) {
+export function initPhysics<O>(engine: PhysicsBackend<O>, options?: O): Promise<void> {
+  if (current === engine && engine.ready) {
     return Promise.resolve();
   }
-  if (!loading) {
-    loading = (async () => {
-      if (options?.rapier) {
-        setRapier(options.rapier as RapierAPI);
-      } else {
-        setRapier(await loadRapier(options?.wasmUrl ?? RAPIER_WASM_URL));
-      }
-    })().catch((err) => {
-      loading = null;
-      throw err;
-    });
+  if (loading?.engine !== engine) {
+    const promise = engine
+      .init(options)
+      .then(() => {
+        current = engine;
+        setPhysicsWorldFactory((scene) => new PhysicsSimulation(scene, engine));
+      })
+      .catch((err) => {
+        if (loading?.promise === promise) {
+          loading = null;
+        }
+        throw err;
+      });
+    loading = { engine, promise };
   }
-  return loading;
+  return loading!.promise;
+}
+
+/**
+ * The physics engine {@link initPhysics} loaded, or null.
+ *
+ * @public
+ */
+export function getPhysicsEngine(): PhysicsBackend | null {
+  return current;
 }

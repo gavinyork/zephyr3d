@@ -19,7 +19,7 @@ import {
 import type { ParticleSystem } from './particlesys';
 import type { SkeletonRig, SkinBinding } from '../animation';
 import type { GPUClothComponent } from '../animation/cloth/gpu_cloth_component';
-import type { SceneNodeComponent, SceneNodeComponentType } from './component';
+import type { NodePhysics } from '../physics/node_physics';
 import { AnimationSet } from '../animation/animationset';
 import type { SharedModel } from '../asset';
 import type { Water } from './water';
@@ -272,8 +272,10 @@ export class SceneNode
   private _disableCallback: number;
   /** @internal User-attached script entries (engine-defined). */
   private _scripts: ScriptAttachment[];
-  /** @internal Components attached to this node, GPU cloth included. */
-  private _components: SceneNodeComponent[];
+  /** @internal Serialized GPU cloth components owned by this node. */
+  private _gpuClothComponents: GPUClothComponent[];
+  /** @internal Physics data of this node. */
+  private _physics: Nullable<NodePhysics>;
   /**
    * Construct a scene node.
    *
@@ -323,7 +325,8 @@ export class SceneNode
     this._tmpLocalMatrix = Matrix4x4.identity();
     this._tmpWorldMatrix = Matrix4x4.identity();
     this._scripts = [];
-    this._components = [];
+    this._gpuClothComponents = [];
+    this._physics = null;
     this._metaData = null;
     this._parent = null;
     this.reparent(scene?.rootNode ?? null);
@@ -493,92 +496,69 @@ export class SceneNode
     }
     this._scripts = this._scripts.filter((item) => item.script || item.config != null);
   }
-  /** Components attached to this node, in the order they were added. */
-  get components(): readonly SceneNodeComponent[] {
-    return this._components;
+  /** GPU cloth simulations owned by this node. */
+  get gpuClothComponents() {
+    return this._gpuClothComponents;
   }
-  /**
-   * Attaches a component to this node.
-   *
-   * @remarks
-   * Adding a component that is already on this node does nothing. A component
-   * attached to another node throws.
-   *
-   * @returns The component.
-   */
-  addComponent<T extends SceneNodeComponent>(component: T): T {
-    this._setComponents([...this._components, component], () => true);
-    return component;
-  }
-  /**
-   * Detaches and disposes a component.
-   *
-   * @returns False if the component was not attached to this node.
-   */
-  removeComponent(component: SceneNodeComponent) {
-    if (!this._components.includes(component)) {
-      return false;
-    }
-    this._setComponents(
-      this._components.filter((item) => item !== component),
-      () => true
-    );
-    return true;
-  }
-  /** The first attached component of the given type, or null. */
-  getComponent<T extends SceneNodeComponent>(type: SceneNodeComponentType<T>): Nullable<T> {
-    return (this._components.find((component) => component instanceof type) as T) ?? null;
-  }
-  /** All attached components of the given type. */
-  getComponents<T extends SceneNodeComponent>(type: SceneNodeComponentType<T>): T[] {
-    return this._components.filter((component) => component instanceof type) as T[];
-  }
-  /**
-   * Replaces the components that `owns` selects with `value`, leaving the others
-   * where they are.
-   *
-   * @remarks
-   * Removed components are detached and disposed; new ones are attached. Shared by
-   * the generic list and the GPU cloth accessors, which each manage one subset.
-   *
-   * @internal
-   */
-  _setComponents(value: SceneNodeComponent[], owns: (component: SceneNodeComponent) => boolean) {
+  set gpuClothComponents(value: GPUClothComponent[]) {
     const next = [...new Set((value ?? []).filter((component) => !!component && !component.disposed))];
     for (const component of next) {
       if (component.host && component.host !== this) {
-        throw new Error(
-          `${component.isGPUClothComponent?.() ? 'GPU cloth component' : 'Component'} belongs to another scene node.`
-        );
+        throw new Error('GPU cloth component belongs to another scene node.');
       }
     }
-    for (const component of this._components) {
-      if (owns(component) && !next.includes(component)) {
+    for (const component of this._gpuClothComponents) {
+      if (!next.includes(component)) {
         component.detach(this);
         component.dispose();
       }
     }
-    this._components = [...this._components.filter((component) => !owns(component)), ...next];
+    this._gpuClothComponents = next;
     for (const component of next) {
       if (!component.host) {
         component.attach(this);
       }
     }
   }
-  /** GPU cloth simulations owned by this node. */
-  get gpuClothComponents(): GPUClothComponent[] {
-    return this._components.filter((component) => component.isGPUClothComponent?.()) as GPUClothComponent[];
+  /**
+   * Physics data of this node - rigid body, colliders, joint, vehicle, wheel -
+   * or null.
+   *
+   * @remarks
+   * Simulated by the scene's physics world ({@link Scene.physicsWorld}) while
+   * the node is in a scene that has one; otherwise it is only kept, saved and
+   * loaded. Replacing it disposes the previous data.
+   */
+  get physics(): Nullable<NodePhysics> {
+    return this._physics;
   }
-  set gpuClothComponents(value: GPUClothComponent[]) {
-    this._setComponents(value, (component) => !!component.isGPUClothComponent?.());
+  set physics(value: Nullable<NodePhysics>) {
+    const current = this._physics;
+    if (current === (value ?? null)) {
+      return;
+    }
+    if (value?.node && value.node !== this) {
+      throw new Error('Physics data already belongs to another scene node.');
+    }
+    this._physics = value ?? null;
+    if (current) {
+      current._setNode(null);
+      current.dispose();
+    }
+    value?._setNode(this);
   }
   /** Adds a GPU cloth component to this node. */
   addGPUClothComponent(component: GPUClothComponent) {
-    return this.addComponent(component);
+    this.gpuClothComponents = [...this._gpuClothComponents, component];
+    return component;
   }
   /** Removes and disposes a GPU cloth component from this node. */
   removeGPUClothComponent(component: GPUClothComponent) {
-    return this.removeComponent(component);
+    if (!this._gpuClothComponents.includes(component)) {
+      return false;
+    }
+    this.gpuClothComponents = this._gpuClothComponents.filter((item) => item !== component);
+    return true;
   }
   /**
    * Display name of the node (for UI/debugging).
@@ -1223,10 +1203,11 @@ export class SceneNode
   /** Disposes the node */
   protected onDispose() {
     super.onDispose();
-    for (const component of this._components.splice(0)) {
+    for (const component of this._gpuClothComponents.splice(0)) {
       component.detach(this);
       component.dispose();
     }
+    this.physics = null;
     this.remove();
     this.removeChildren();
     this._animationSet.dispose();
@@ -1306,17 +1287,19 @@ export class SceneNode
     this.iterate((child) => {
       this.scene!.queueUpdateNode(child);
       child._onAttached();
-      for (const component of child._components) {
+      for (const component of child._gpuClothComponents) {
         component.hostAttached();
       }
+      child._physics?._hostAttached();
     });
   }
   /** @internal */
   protected _detached() {
     this.iterate((child) => {
-      for (const component of child._components) {
+      for (const component of child._gpuClothComponents) {
         component.hostDetached();
       }
+      child._physics?._hostDetached();
       child._onDetached();
     });
   }

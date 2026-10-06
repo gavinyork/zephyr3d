@@ -1,38 +1,25 @@
 import { Vector3 } from '@zephyr3d/base';
-import type { SceneNode } from '@zephyr3d/scene';
-import type { CharacterSettings } from './backend/types';
+import type { CharacterMoveResult } from './types';
 import { Collider } from './collider';
-import { PhysicsComponent } from './component';
+import { PhysicsPart } from './part';
 import { RigidBody } from './rigid_body';
 import type { PhysicsWorld } from './world';
 
 /**
- * Something a {@link CharacterController} ran into during a move.
+ * Settings of a character controller as a physics implementation takes them;
+ * angles in radians.
  *
  * @public
  */
-export interface CharacterCollision {
-  collider: Collider;
-  node: SceneNode;
-  /** Contact point on the obstacle, world space. */
-  point: Vector3;
-  /** Surface direction of the obstacle there, world space, pointing at the character. */
-  normal: Vector3;
-}
-
-/**
- * The outcome of {@link CharacterController.move}.
- *
- * @public
- */
-export interface CharacterMoveResult {
-  /** How far the character actually moved, world space. */
-  movement: Vector3;
-  /** Whether it ended standing on something. */
-  grounded: boolean;
-  /** Direction of the ground under it, or null when not grounded. */
-  groundNormal: Vector3 | null;
-  collisions: CharacterCollision[];
+export interface CharacterSettings {
+  skinWidth: number;
+  slopeLimit: number;
+  slideSlope: number;
+  stepHeight: number;
+  stepMinWidth: number;
+  snapToGround: number;
+  pushBodies: boolean;
+  characterMass: number;
 }
 
 /**
@@ -65,15 +52,16 @@ export interface CharacterMoveResult {
  * move sees other objects as the last simulation step left them.
  *
  * It pushes dynamic bodies it walks into, and raises trigger events like any
- * physics object. Rapier reports no contacts between it and static things, so
- * what it ran into comes from the move result instead.
+ * physics object. Contacts between it and static things may not be reported,
+ * depending on the physics implementation (`@zephyr3d/physics-rapier` reports
+ * none), so what it ran into comes from the move result instead.
  *
  * @public
  */
-export class CharacterController extends PhysicsComponent {
-  /** The kinematic body standing in for the character. @internal */
+export class CharacterController extends PhysicsPart {
+  /** The kinematic body standing in for the character. */
   readonly _ownedBody: RigidBody;
-  /** Its capsule. @internal */
+  /** Its capsule. */
   readonly _ownedCollider: Collider;
   private _height: number;
   private _radius: number;
@@ -104,7 +92,6 @@ export class CharacterController extends PhysicsComponent {
     this._groundNormal = null;
     this._ownedBody = new RigidBody();
     this._ownedBody.motionType = 'kinematic';
-    this._ownedBody._eventTarget = this;
     this._ownedCollider = new Collider();
     this._ownedCollider.shape = 'capsule';
     this._syncShape();
@@ -227,14 +214,13 @@ export class CharacterController extends PhysicsComponent {
       return result;
     }
     // Not simulated (no scene, or physics not loaded): nothing to collide with.
-    const host = this.host;
+    const host = this.node;
     if (host) {
       host.setWorldPose(Vector3.add(host.getWorldPosition(), displacement, new Vector3()));
     }
     return { movement: displacement.clone(), grounded: false, groundNormal: null, collisions: [] };
   }
 
-  /** @internal */
   _settings(): CharacterSettings {
     const toRad = Math.PI / 180;
     return {
@@ -249,27 +235,6 @@ export class CharacterController extends PhysicsComponent {
     };
   }
 
-  attach(host: SceneNode) {
-    super.attach(host);
-    this._ownedBody.attach(host);
-    this._ownedCollider.attach(host);
-  }
-  detach(host?: SceneNode) {
-    this._ownedCollider.detach(host);
-    this._ownedBody.detach(host);
-    super.detach(host);
-  }
-  hostAttached() {
-    super.hostAttached();
-    this._ownedBody.hostAttached();
-    this._ownedCollider.hostAttached();
-  }
-  hostDetached() {
-    this._ownedCollider.hostDetached();
-    this._ownedBody.hostDetached();
-    super.hostDetached();
-  }
-
   private _syncShape() {
     const c = this._ownedCollider;
     c.radius = this._radius;
@@ -282,8 +247,13 @@ export class CharacterController extends PhysicsComponent {
   }
   protected _join(world: PhysicsWorld) {
     world._registerCharacter(this);
+    // Its body and capsule join with it, on its node.
+    this._ownedBody._setOwnerNode(this.node);
+    this._ownedCollider._setOwnerNode(this.node);
   }
   protected _leave(world: PhysicsWorld) {
+    this._ownedCollider._setOwnerNode(null);
+    this._ownedBody._setOwnerNode(null);
     world._unregisterCharacter(this);
   }
 }

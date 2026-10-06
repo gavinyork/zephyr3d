@@ -454,6 +454,11 @@
       "shouldPublish": true
     },
     {
+      "packageName": "@zephyr3d/physics-rapier",
+      "projectFolder": "libs/physics-rapier",
+      "shouldPublish": true
+    },
+    {
       "packageName": "@zephyr3d/modelgen",
       "projectFolder": "libs/modelgen",
       "shouldPublish": true

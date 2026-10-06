@@ -11,6 +11,15 @@ import {
 import type { PropertyAccessor, PropertyType, PropertyValue, SerializableClass } from './types';
 import { getAABBClass } from './scene/misc';
 import { getScenePhysicsSettingsClass } from './scene/physics';
+import {
+  getCharacterControllerClass,
+  getColliderClass,
+  getJointClass,
+  getNodePhysicsClass,
+  getRigidBodyClass,
+  getVehicleClass,
+  getWheelClass
+} from './scene/node_physics';
 import { getGraphNodeClass, getSceneNodeClass } from './scene/node';
 import { getGPUClothComponentClass } from './scene/cloth';
 import { getBatchGroupClass } from './scene/batch';
@@ -307,6 +316,13 @@ export class ResourceManager {
         getScriptAttachmentClass(),
         getAABBClass(),
         getScenePhysicsSettingsClass(),
+        getNodePhysicsClass(),
+        getRigidBodyClass(),
+        getColliderClass(),
+        getJointClass(),
+        getCharacterControllerClass(),
+        getVehicleClass(),
+        getWheelClass(),
         getInterpolatorClass(),
         getInterpolatorScalarClass(),
         getSkeletonClass(),

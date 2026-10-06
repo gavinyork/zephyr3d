@@ -116,6 +116,7 @@
     "@zephyr3d/scene": "workspace:^0.9.27",
     "@zephyr3d/loaders": "workspace:^0.1.6",
     "@zephyr3d/physics": "workspace:^0.1.0",
+    "@zephyr3d/physics-rapier": "workspace:^0.1.0",
     "@zephyr3d/imgui": "workspace:^0.2.8",
     "@zephyr3d/backend-webgl": "workspace:^0.1.18",
     "@zephyr3d/backend-webgpu": "workspace:^0.1.21",

@@ -1,7 +1,7 @@
 import { Quaternion, Vector3 } from '@zephyr3d/base';
 import type { ClipmapTerrain } from '@zephyr3d/scene';
-import type { ShapeDesc } from './backend/types';
-import type { Collider } from './collider';
+import type { Collider } from '@zephyr3d/scene';
+import type { ShapeDesc } from './backend';
 import { spansVolume, type ColliderGeometry, type MeshGeometry, type TerrainGeometry } from './geometry';
 
 /** @internal */
@@ -30,7 +30,7 @@ export function buildColliderShape(
   component: Collider,
   geometry: ColliderGeometry | null
 ): ColliderShapeBuild | { error: string } {
-  const host = component.host!;
+  const host = component.node!;
   // The collider's world pose: its node, moved by its offset in node space.
   const position = new Vector3();
   const rotation = new Quaternion();

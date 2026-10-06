@@ -1,11 +1,14 @@
 import { MemoryFS, Vector3 } from '@zephyr3d/base';
 import { ResourceManager, Scene, ScenePhysicsSettings, SceneNode } from '@zephyr3d/scene';
 import * as RAPIER from '@dimforge/rapier3d-simd-compat';
-import { Collider, initPhysics, isPhysicsReady, PhysicsWorld, registerPhysics, RigidBody } from '@zephyr3d/physics';
+import { Collider, RigidBody } from '@zephyr3d/scene';
+import { PhysicsSimulation, initPhysics } from '@zephyr3d/physics';
+import { rapierPhysics } from '@zephyr3d/physics-rapier';
+import { addPhysics, getPhysics } from './helpers';
 
 const DT = 1 / 60;
 
-function run(world: PhysicsWorld, seconds: number) {
+function run(world: PhysicsSimulation, seconds: number) {
   const frames = Math.round(seconds / DT);
   for (let i = 0; i < frames; i++) {
     world.update(DT);
@@ -15,9 +18,7 @@ function run(world: PhysicsWorld, seconds: number) {
 describe('physics registration and scene settings', () => {
   it('registers the components without loading the engine', () => {
     const manager = new ResourceManager(new MemoryFS());
-    registerPhysics(manager);
-    registerPhysics(manager);
-    expect(isPhysicsReady()).toBe(false);
+    expect(rapierPhysics.ready).toBe(false);
     expect(manager.getClassByConstructor(RigidBody)?.name).toBe('RigidBody');
     expect(manager.getClassByConstructor(Collider)?.name).toBe('Collider');
   });
@@ -25,13 +26,13 @@ describe('physics registration and scene settings', () => {
   describe('with the engine loaded', () => {
     beforeAll(async () => {
       await RAPIER.init();
-      await initPhysics({ rapier: RAPIER });
+      await initPhysics(rapierPhysics, { rapier: RAPIER });
     });
 
     it('uses the defaults for a scene without settings', () => {
       const scene = new Scene();
       expect(scene.physicsSettings).toBeNull();
-      const world = PhysicsWorld.get(scene);
+      const world = scene.physicsWorld as PhysicsSimulation;
       expect(world.gravity.y).toBeCloseTo(-9.81, 5);
       expect(world.fixedTimeStep).toBeCloseTo(1 / 60, 8);
       expect(world.maxSubSteps).toBe(4);
@@ -46,7 +47,7 @@ describe('physics registration and scene settings', () => {
       settings.setLayerName(2, 'Debris');
       settings.setLayerCollision(1, 2, false);
       scene.physicsSettings = settings;
-      const world = PhysicsWorld.get(scene);
+      const world = scene.physicsWorld as PhysicsSimulation;
       world.enabled = false;
       expect(world.gravity.y).toBeCloseTo(-1, 5);
       expect(world.layerNames[2]).toBe('Debris');
@@ -55,14 +56,14 @@ describe('physics registration and scene settings', () => {
       // A falling body follows the scene's gravity, and a change to it.
       const node = new SceneNode(scene);
       node.position.setXYZ(0, 100, 0);
-      node.addComponent(new RigidBody());
-      node.addComponent(new Collider());
+      addPhysics(node, new RigidBody());
+      addPhysics(node, new Collider());
       world.interpolation = false;
       run(world, 1);
-      expect(node.getComponent(RigidBody)!.getLinearVelocity().y).toBeCloseTo(-1, 2);
+      expect(getPhysics(node, RigidBody)!.getLinearVelocity().y).toBeCloseTo(-1, 2);
       settings.gravity = new Vector3(0, -20, 0);
       run(world, 1);
-      expect(node.getComponent(RigidBody)!.getLinearVelocity().y).toBeCloseTo(-21, 1);
+      expect(getPhysics(node, RigidBody)!.getLinearVelocity().y).toBeCloseTo(-21, 1);
 
       // Changes made to the world directly last until the settings change.
       world.maxSubSteps = 9;
@@ -82,7 +83,6 @@ describe('physics registration and scene settings', () => {
 
     it('round-trips scene settings and loads a mismatched matrix symmetrically', async () => {
       const manager = new ResourceManager(new MemoryFS());
-      registerPhysics(manager);
       const scene = new Scene();
       const settings = new ScenePhysicsSettings();
       settings.gravity = new Vector3(1, -3, 0);
@@ -125,19 +125,19 @@ describe('physics registration and scene settings', () => {
 
     it('does not step on its own while simulation is disabled', () => {
       const scene = new Scene();
-      PhysicsWorld.get(scene);
+      scene.physicsWorld as PhysicsSimulation;
       const node = new SceneNode(scene);
       node.position.setXYZ(0, 10, 0);
-      node.addComponent(new RigidBody());
-      node.addComponent(new Collider());
-      PhysicsWorld.simulationEnabled = false;
+      addPhysics(node, new RigidBody());
+      addPhysics(node, new Collider());
+      PhysicsSimulation.simulationEnabled = false;
       try {
         for (let i = 0; i < 30; i++) {
           scene.dispatchEvent('afterupdate', scene);
         }
         expect(node.position.y).toBe(10);
       } finally {
-        PhysicsWorld.simulationEnabled = true;
+        PhysicsSimulation.simulationEnabled = true;
       }
     });
   });

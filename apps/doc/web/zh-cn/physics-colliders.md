@@ -1,6 +1,6 @@
 # 碰撞体
 
-`Collider` 决定物体在碰撞中是什么形状。形状越简单，模拟越快、越稳定，所以优先用能大致包住物体的基本形状，只在必要时用网格。
+`Collider` 决定物体在碰撞中是什么形状，节点的碰撞体在 `node.physics.colliders` 里。形状越简单，模拟越快、越稳定，所以优先用能大致包住物体的基本形状，只在必要时用网格。
 
 <div class="showcase" case="tut-77"></div>
 
@@ -48,7 +48,7 @@
 网格的三角形要从 GPU 读回，需要几帧，具体多少取决于机器。为了不让物体在地面就绪前掉下去，世界默认**等开场时的所有网格、凸包、地形碰撞体都就绪后才开始模拟**（`waitForCollidersOnStart`，可在场景设置中关闭）；等待期间时间不流逝。之后再加入的这类碰撞体只会让它自己所属的刚体等待。
 
 - `collider.ready` 为 true 表示已经进入模拟，变为 true 时触发 `ready` 事件。
-- `await PhysicsWorld.get(scene).whenReady()` 等待所有正在读取的碰撞体。
+- `await scene.physicsWorld.whenReady()` 等待所有正在读取的碰撞体。
 - 建不出来时（例如凸包的点全在一个平面上）`collider.error` 给出原因，控制台也会报告。
 
 ---
@@ -61,7 +61,7 @@
 const collider = new Collider();
 collider.shape = 'terrain';
 collider.terrainResolution = 2; // 每 2 个高度图像素采样一次
-terrain.addComponent(collider);
+terrain.physics = new NodePhysics({ colliders: [collider] });
 ```
 
 - `terrainResolution` 越大，碰撞面越粗糙、内存越少；1 时与高度图逐像素一致。
@@ -83,7 +83,7 @@ terrain.addComponent(collider);
 
 <<< @/../src/tut-77/main.js#trigger
 
-触发器和进入它的物体都会收到 `triggerenter` / `triggerexit`。事件的细节见 [脚本控制](zh-cn/physics-scripting.md#碰撞与触发事件)。
+双方都会在各自节点的物理数据上收到 `triggerenter` / `triggerexit`。事件的细节见 [脚本控制](zh-cn/physics-scripting.md#碰撞与触发事件)。
 
 ---
 

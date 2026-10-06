@@ -12,8 +12,7 @@ import type {
   MeshMaterial,
   BoundingBox,
   Primitive,
-  PropertyValue,
-  SceneNodeComponent
+  PropertyValue
 } from '@zephyr3d/scene';
 import {
   Mesh,
@@ -36,7 +35,7 @@ import {
   SphereShape,
   CapsuleShape,
   RenderGraphExecutor,
-  getSceneNodeComponentTypes
+  CharacterController
 } from '@zephyr3d/scene';
 import type { RGProfileResult, RGProfileScopeResult } from '@zephyr3d/scene';
 import { SceneNode } from '@zephyr3d/scene';
@@ -76,14 +75,13 @@ import {
   CustomCommand
 } from '../commands/scenecommands';
 import {
-  AddComponentCommand,
-  RemoveComponentCommand,
-  getAddableComponentTypes
-} from '../commands/componentcommands';
-import { drawAddComponentItems, type ComponentCtor } from './componentmenu';
+  ApplyPhysicsPresetCommand,
+  RemovePhysicsCommand,
+  type PhysicsPreset
+} from '../commands/physicscommands';
+import { drawPhysicsPresetItems } from './physicsmenu';
 import { DlgCollisionLayers } from './dlg/collisionlayersdlg';
 import { ColliderGizmo } from './gizmo/collidergizmo';
-import { CharacterController, Collider } from '@zephyr3d/physics';
 import { NodeProxy } from '../helpers/proxy';
 import { clearScriptPropertyAccessorCache } from '../helpers/scriptprops';
 import { getMorphTargetGroupPropertyAccessors } from '../helpers/morphtargetprops';
@@ -1284,7 +1282,7 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
               ImGui.SetScrollY(0);
             }
             this._propGrid.render();
-            this.renderAddComponentButton();
+            this.renderAddPhysicsButton();
             ImGui.Separator();
             this._scriptPanel.render();
             if (this._propGridScrollTopFrames > 0) {
@@ -1819,8 +1817,8 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
       this._sceneHierarchy.on('set_main_camera', this.handleSetMainCamera, this);
       this._sceneHierarchy.on('request_go_to_assets', this.handleGoToAssets, this);
       this._sceneHierarchy.on('request_add_child', this.handleAddChild, this);
-      this._sceneHierarchy.on('request_add_component', this.handleAddComponent, this);
-      this._sceneHierarchy.on('request_remove_component', this.handleRemoveComponent, this);
+      this._sceneHierarchy.on('request_physics_preset', this.handlePhysicsPreset, this);
+      this._sceneHierarchy.on('request_remove_physics', this.handleRemovePhysics, this);
       this._sceneHierarchy.on('request_save_prefab', this.handleSavePrefab, this);
       this.controller.model.scene.rootNode.on('nodeattached', this.handleNodeAttached, this);
       this.controller.model.scene.rootNode.on('noderemoved', this.handleNodeRemoved, this);
@@ -1856,8 +1854,8 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
       this._sceneHierarchy.off('set_main_camera', this.handleSetMainCamera, this);
       this._sceneHierarchy.off('request_go_to_assets', this.handleGoToAssets, this);
       this._sceneHierarchy.off('request_add_child', this.handleAddChild, this);
-      this._sceneHierarchy.off('request_add_component', this.handleAddComponent, this);
-      this._sceneHierarchy.off('request_remove_component', this.handleRemoveComponent, this);
+      this._sceneHierarchy.off('request_physics_preset', this.handlePhysicsPreset, this);
+      this._sceneHierarchy.off('request_remove_physics', this.handleRemovePhysics, this);
       this._sceneHierarchy.off('request_save_prefab', this.handleSavePrefab, this);
       this._sceneHierarchy = null;
     }
@@ -2595,9 +2593,9 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
     if (this._suspendMultiPropertySync || !(object instanceof SceneNode) || !prop?.set) {
       return;
     }
-    // Component lists hold instances that each belong to one node; copying the
-    // list would hand one instance to several nodes. Add Component adds one per node.
-    if (prop.name === 'Components' || prop.name === 'GPUClothComponents') {
+    // Physics data and cloth components belong to one node each; copying them
+    // would hand one instance to several nodes. Add Physics adds one per node.
+    if (prop.name === 'Physics' || prop.name === 'GPUClothComponents') {
       return;
     }
     if (this._propGrid.object !== object) {
@@ -3305,14 +3303,17 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
       return [];
     }
     const gizmo = this._colliderGizmo;
-    const errors = () =>
-      object.components
-        .map((component) =>
-          component instanceof Collider || component instanceof CharacterController
-            ? gizmo.getError(component)
-            : null
-        )
-        .filter((error) => !!error);
+    const errors = () => {
+      const physics = object.physics;
+      if (!physics) {
+        return [];
+      }
+      const targets = [
+        ...physics.colliders,
+        ...(physics.body instanceof CharacterController ? [physics.body] : [])
+      ];
+      return targets.map((target) => gizmo.getError(target)).filter((error) => !!error);
+    };
     if (errors().length === 0) {
       return [];
     }
@@ -3395,40 +3396,47 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
       eventBus.dispatchEvent('scene_changed');
     }
   }
-  /** "Add Component" under the inspected node's properties, opening the same menu as the hierarchy. */
-  private renderAddComponentButton() {
+  /** "Add Physics" under the inspected node's properties, offering the same presets as the hierarchy. */
+  private renderAddPhysicsButton() {
     const node = this._propGrid.object;
     if (!(node instanceof SceneNode) || node === this.controller.model.scene.rootNode) {
       return;
     }
-    const types = getAddableComponentTypes(getSceneNodeComponentTypes());
-    if (types.length === 0) {
-      return;
-    }
     ImGui.Separator();
-    if (ImGui.Button('Add Component##AddComponentButton', new ImGui.ImVec2(-1, 0))) {
-      ImGui.OpenPopup('##AddComponentPopup');
+    if (ImGui.Button('Add Physics##AddPhysicsButton', new ImGui.ImVec2(-1, 0))) {
+      ImGui.OpenPopup('##AddPhysicsPopup');
     }
-    if (ImGui.BeginPopup('##AddComponentPopup')) {
-      drawAddComponentItems(types, (ctor) => this.handleAddComponent(node, ctor));
+    if (ImGui.BeginPopup('##AddPhysicsPopup')) {
+      drawPhysicsPresetItems((preset) => this.handlePhysicsPreset(node, preset));
       ImGui.EndPopup();
     }
   }
-  /** Adds a component to a node, or to every selected node if it is one of them, each its own instance. */
-  private handleAddComponent(node: SceneNode, ctor: ComponentCtor) {
+  /** Targets of a node action: every selected node if the node is one of them. */
+  private physicsTargets(node: SceneNode) {
     const selected = this.getSelectedSceneNodes().filter(
       (n) => n !== this.controller.model.scene.rootNode && n !== this._multiTransformPivot
     );
-    const targets = selected.includes(node) ? selected : [node];
-    const commands = targets.map((target) => new AddComponentCommand(target, ctor));
-    const command = commands.length === 1 ? commands[0] : new CompositeCommand('Add component', commands);
+    return selected.includes(node) ? selected : [node];
+  }
+  /** Applies a physics preset to a node, or to every selected node, each its own data. */
+  private handlePhysicsPreset(node: SceneNode, preset: PhysicsPreset) {
+    const commands = this.physicsTargets(node).map((target) => new ApplyPhysicsPresetCommand(target, preset));
+    const command =
+      commands.length === 1 ? commands[0] : new CompositeCommand(`Add physics: ${preset.label}`, commands);
     void this._cmdManager.execute(command as Command<unknown>).then(() => {
       this._propGrid.refresh();
       eventBus.dispatchEvent('scene_changed');
     });
   }
-  private handleRemoveComponent(node: SceneNode, component: SceneNodeComponent) {
-    void this._cmdManager.execute(new RemoveComponentCommand(node, component)).then(() => {
+  private handleRemovePhysics(node: SceneNode) {
+    const commands = this.physicsTargets(node)
+      .filter((target) => !!target.physics)
+      .map((target) => new RemovePhysicsCommand(target));
+    if (commands.length === 0) {
+      return;
+    }
+    const command = commands.length === 1 ? commands[0] : new CompositeCommand('Remove physics', commands);
+    void this._cmdManager.execute(command as Command<unknown>).then(() => {
       this._propGrid.refresh();
       eventBus.dispatchEvent('scene_changed');
     });

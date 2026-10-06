@@ -83,16 +83,16 @@ function transpileTS(fileName: string, code: string) {
 const RUNTIME_DECODERS: Record<string, { dir: string; files: string[] }> = {
   scene: { dir: 'basis', files: ['basis_transcoder.js', 'basis_transcoder.wasm', 'LICENSE'] },
   loaders: { dir: 'draco', files: ['draco_wasm_wrapper_gltf.js', 'draco_decoder_gltf.wasm', 'LICENSE'] },
-  physics: { dir: 'rapier', files: ['rapier_wasm3d_bg.wasm', 'LICENSE'] }
+  'physics-rapier': { dir: 'rapier', files: ['rapier_wasm3d_bg.wasm', 'LICENSE'] }
 };
 
-// Physics components as they appear in saved scenes and prefabs
-const PHYSICS_CLASS_PATTERN = /"ClassName"\s*:\s*"(?:RigidBody|Collider|Joint|CharacterController)"/;
-const PHYSICS_IMPORT_PATTERN = /['"]@zephyr3d\/physics['"]/;
+// Physics data as it appears in saved scenes and prefabs
+const PHYSICS_CLASS_PATTERN = /"ClassName"\s*:\s*"NodePhysics"/;
+const PHYSICS_IMPORT_PATTERN = /['"]@zephyr3d\/physics(?:-rapier)?['"]/;
 
 /**
- * Whether a build has to ship the physics package: a scene or prefab holds a
- * physics component, or a script imports the package.
+ * Whether a build has to ship the physics packages: a scene or prefab holds
+ * physics data, or a script imports them.
  */
 export async function projectUsesPhysics(vfs: VFS) {
   const files = await vfs.glob('assets/**/*', {
@@ -150,7 +150,7 @@ export async function getImportMap(vfs: VFS, distDir: string, writeDependencies 
     'imgui',
     'backend-webgl',
     'backend-webgpu',
-    ...(withPhysics ? ['physics'] : [])
+    ...(withPhysics ? ['physics', 'physics-rapier'] : [])
   ]) {
     const path = vfs.join(depsDir, `@zephyr3d/${name}/index.js`);
     if (writeDependencies) {
@@ -378,7 +378,7 @@ export async function buildForEndUser(options: {
   alias?: Record<string, string>;
   sourcemap?: boolean | 'inline' | 'hidden';
   format?: 'es' | 'iife' | 'umd' | 'cjs';
-  /** Ship the physics package; see {@link projectUsesPhysics}. */
+  /** Ship the physics packages; see {@link projectUsesPhysics}. */
   physics?: boolean;
   onProgress?: (message: string, current: number, total: number) => void;
 }) {

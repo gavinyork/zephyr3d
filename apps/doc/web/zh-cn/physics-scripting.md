@@ -1,6 +1,6 @@
 # 脚本控制
 
-> 本页代码为片段示意，省略了 import 与应用初始化。完整可运行示例见页内嵌入的实例。物理相关的类都来自 `@zephyr3d/physics`，`Vector3` 来自 `@zephyr3d/base`。
+> 本页代码为片段示意，省略了 import 与应用初始化。完整可运行示例见页内嵌入的实例。物理相关的类都来自 `@zephyr3d/scene`，`Vector3` 来自 `@zephyr3d/base`。
 
 刚体放进场景后自己会动；要让游戏逻辑参与进来，就要施力、改速度、监听碰撞、查询"那里有什么"。本页讲这四件事，以及什么时候在哪一步做它们。
 
@@ -33,7 +33,7 @@
 
 <<< @/../src/tut-78/main.js#fixedupdate
 
-- `PhysicsWorld.get(scene).on('fixedupdate', (dt) => ...)`：每个物理步之前调用，`dt` 是步长。
+- `scene.physicsWorld.on('fixedupdate', (dt) => ...)`：每个物理步之前调用，`dt` 是步长。
 - 编辑器脚本里用 `RuntimeScript` 的 `onFixedUpdate(dt)` 钩子，效果相同。
 - **在这里施加的力只作用于这一步**；在 `onUpdate` 里施加的力作用于整帧。
 - 想让结果逐帧可复现（回放、联网），施力和移动角色都放在这里，而不是 `onUpdate`。
@@ -42,7 +42,7 @@
 
 ## 碰撞与触发事件
 
-事件挂在**物理对象**上：有刚体的就挂在 `RigidBody` 上，没有刚体的静态碰撞体就挂在 `Collider` 自己身上。
+事件挂在**物理对象**上，也就是节点的物理数据（`node.physics`）：有刚体或角色控制器的，挂在该节点上；静态碰撞体挂在它们所在的节点上。
 
 <<< @/../src/tut-78/main.js#events
 
@@ -53,10 +53,10 @@
 | `collisionexit` | 分开 |
 | `triggerenter` / `triggerexit` | 进入或离开触发器，双方都会收到 |
 
-- **每对物体一次**：一个由三个碰撞体组成的刚体撞到地面，只收到一次 `collisionenter`，不管有几个碰撞体同时接触。
-- 事件在这一帧所有物理步之后派发，此时节点已经在新位置。在回调里改物理组件，下一帧生效。
+- **每对物体一次**：一个由三个碰撞体组成的刚体撞到地面，只收到一次 `collisionenter`，不管有几个碰撞体同时接触。同一节点上的多个静态碰撞体也算一个物体。
+- 事件在这一帧所有物理步之后派发，此时节点已经在新位置。在回调里改物理数据，下一帧生效。
 - **睡眠不会触发 `collisionexit`**：静止堆叠的物体一直保持接触。
-- `PhysicsContactEvent` 提供 `other`（另一个物理对象）、`otherNode`、`normal`（从自己指向对方）、`contacts`（接触点）和 `impulse`（这一步的接触冲量，N·s）。用 `impulse` 区分撞击（大）和静止接触（小），例如播放碰撞声音。
+- `PhysicsContactEvent` 提供 `other`（另一个物体的 `NodePhysics`）、`otherNode`、`normal`（从自己指向对方）、`contacts`（接触点）和 `impulse`（这一步的接触冲量，N·s）。用 `impulse` 区分撞击（大）和静止接触（小），例如播放碰撞声音。
 - 接触细节在回调里读取；回调返回之后不再可用。
 
 ---
@@ -64,7 +64,7 @@
 ## 查询
 
 ```js
-const world = PhysicsWorld.get(scene);
+const world = scene.physicsWorld;
 ```
 
 <<< @/../src/tut-78/main.js#raycast
@@ -77,8 +77,8 @@ const world = PhysicsWorld.get(scene);
 | `overlap(shape, position, rotation, options?)` | 与形状重叠的碰撞体 |
 | `overlapPoint(point, options?)` | 包含该点的碰撞体 |
 
-- 命中结果（`PhysicsQueryHit`）有 `collider`、`body`、`node`、`point`、`normal`、`distance`。
-- `options.layerMask`：只看某些层（第 i 位对应第 i 层）；`includeTriggers`：是否命中触发器，默认否；`exclude`：忽略某个物理对象，例如自己。
+- 命中结果（`PhysicsQueryHit`）有 `collider`、`body`、`object`（接收其事件的 `NodePhysics`）、`node`、`point`、`normal`、`distance`。
+- `options.layerMask`：只看某些层（第 i 位对应第 i 层）；`includeTriggers`：是否命中触发器，默认否；`exclude`：忽略某个物理对象，例如自己的 `node.physics`。
 - `shapeCast` / `overlap` 的形状是 `{ type: 'box', size }`、`{ type: 'sphere', radius }`、`{ type: 'capsule', radius, height }` 或 `{ type: 'cylinder', radius, height }`。
 - **查询看到的是上一次物理步之后的世界**：本帧刚加入的碰撞体、刚被脚本挪动的节点，要到下一步之后才查得到。查询从不改变模拟。
 - 拾取（鼠标点选模型）仍用 `Scene.raycast` 或相机拾取；它们按渲染包围盒和像素工作，物理查询只看碰撞体。

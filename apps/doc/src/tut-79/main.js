@@ -2,18 +2,23 @@ import { Vector3, Vector4 } from '@zephyr3d/base';
 import {
   Application,
   BoxShape,
+  Collider,
   CylinderShape,
   DirectionalLight,
   getEngine,
   getInput,
+  Joint,
   Mesh,
+  NodePhysics,
   OrbitCameraController,
   PBRMetallicRoughnessMaterial,
   PerspectiveCamera,
+  RigidBody,
   Scene,
   SphereShape
 } from '@zephyr3d/scene';
-import { Collider, initPhysics, Joint, RigidBody } from '@zephyr3d/physics';
+import { initPhysics } from '@zephyr3d/physics';
+import { rapierPhysics } from '@zephyr3d/physics-rapier';
 import { backendWebGL2 } from '@zephyr3d/backend-webgl';
 import { backendWebGPU } from '@zephyr3d/backend-webgpu';
 
@@ -34,28 +39,24 @@ function material(r, g, b) {
 function box(scene, size, position, mat, dynamic) {
   const mesh = new Mesh(scene, new BoxShape({ size: size.x, sizeY: size.y, sizeZ: size.z }), mat);
   mesh.position.set(position);
-  if (dynamic) {
-    mesh.addComponent(new RigidBody());
-  }
   const collider = new Collider();
   collider.size = size;
-  mesh.addComponent(collider);
+  mesh.physics = new NodePhysics({ body: dynamic ? new RigidBody() : null, colliders: [collider] });
   return mesh;
 }
 
 function ball(scene, radius, position, mat) {
   const mesh = new Mesh(scene, new SphereShape({ radius }), mat);
   mesh.position.set(position);
-  mesh.addComponent(new RigidBody());
   const collider = new Collider();
   collider.shape = 'sphere';
   collider.radius = radius;
-  mesh.addComponent(collider);
+  mesh.physics = new NodePhysics({ body: new RigidBody(), colliders: [collider] });
   return mesh;
 }
 
 myApp.ready().then(async function () {
-  await initPhysics();
+  await initPhysics(rapierPhysics);
 
   const scene = new Scene();
   const sun = new DirectionalLight(scene);
@@ -88,7 +89,7 @@ myApp.ready().then(async function () {
   hinge.limitsEnabled = true;
   hinge.lowerLimit = -110;
   hinge.upperLimit = 110;
-  hingeNode.addComponent(hinge);
+  hingeNode.physics = new NodePhysics({ joint: hinge });
   // #endregion hinge
 
   const motor = document.querySelector('#motor');
@@ -126,7 +127,7 @@ myApp.ready().then(async function () {
     link.type = 'ball';
     link.anchor = new Vector3(-0.15, 0, 0);
     link.connectedBody = prev;
-    bead.addComponent(link);
+    bead.physics.joint = link;
     prev = bead;
   }
   // #endregion chain
@@ -140,7 +141,7 @@ myApp.ready().then(async function () {
   rope.type = 'rope';
   rope.connectedAnchor = new Vector3(3.5, 4, 0);
   rope.length = 2;
-  lamp.addComponent(rope);
+  lamp.physics.joint = rope;
 
   const weight = box(
     scene,
@@ -156,7 +157,7 @@ myApp.ready().then(async function () {
   spring.length = 1.2;
   spring.stiffness = 40;
   spring.damping = 0.5;
-  weight.addComponent(spring);
+  weight.physics.joint = spring;
   // #endregion rope
 
   // --- A ball to knock things with -----------------------------------------
@@ -164,7 +165,7 @@ myApp.ready().then(async function () {
   const thrown = [];
   document.querySelector('#throw').addEventListener('click', () => {
     const b = ball(scene, 0.3, new Vector3(-3.2, 0.3, 5), throwMaterial);
-    const body = b.getComponent(RigidBody);
+    const body = b.physics.body;
     body.mass = 8;
     body.setLinearVelocity(new Vector3(0, 0, -7));
     thrown.push(b);
@@ -175,8 +176,8 @@ myApp.ready().then(async function () {
     }
   });
   document.querySelector('#nudge').addEventListener('click', () => {
-    lamp.getComponent(RigidBody).applyImpulse(new Vector3(0, 0, 2));
-    weight.getComponent(RigidBody).applyImpulse(new Vector3(0, -3, 0));
+    lamp.physics.body.applyImpulse(new Vector3(0, 0, 2));
+    weight.physics.body.applyImpulse(new Vector3(0, -3, 0));
   });
 
   const angle = document.querySelector('#angle');

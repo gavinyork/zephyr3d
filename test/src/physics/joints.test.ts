@@ -1,25 +1,21 @@
 import { MemoryFS, Quaternion, Vector3 } from '@zephyr3d/base';
 import { ResourceManager, Scene, SceneNode } from '@zephyr3d/scene';
 import * as RAPIER from '@dimforge/rapier3d-simd-compat';
-import {
-  CharacterController,
-  Collider,
-  initPhysics,
-  Joint,
-  PhysicsWorld,
-  registerPhysics,
-  RigidBody
-} from '@zephyr3d/physics';
+import { CharacterController, Collider, Joint, RigidBody } from '@zephyr3d/scene';
+import type { PhysicsSimulation } from '@zephyr3d/physics';
+import { initPhysics } from '@zephyr3d/physics';
+import { rapierPhysics } from '@zephyr3d/physics-rapier';
+import { addPhysics, getPhysics } from './helpers';
 
 const DT = 1 / 60;
 
 beforeAll(async () => {
   await RAPIER.init();
-  await initPhysics({ rapier: RAPIER });
+  await initPhysics(rapierPhysics, { rapier: RAPIER });
 });
 
 function makeWorld(scene: Scene, gravity = true) {
-  const world = PhysicsWorld.get(scene);
+  const world = scene.physicsWorld as PhysicsSimulation;
   world.enabled = false;
   world.interpolation = false;
   if (!gravity) {
@@ -28,7 +24,7 @@ function makeWorld(scene: Scene, gravity = true) {
   return world;
 }
 
-function run(world: PhysicsWorld, seconds: number, each?: () => void) {
+function run(world: PhysicsSimulation, seconds: number, each?: () => void) {
   const frames = Math.round(seconds / DT);
   for (let i = 0; i < frames; i++) {
     world.update(DT);
@@ -46,21 +42,21 @@ function addBox(
   node.position.set(position);
   const body = new RigidBody();
   body.motionType = motion;
-  node.addComponent(body);
+  addPhysics(node, body);
   const c = new Collider();
   c.size = size;
-  node.addComponent(c);
+  addPhysics(node, c);
   return node;
 }
 
 function addBall(scene: Scene, position: Vector3, radius = 0.2) {
   const node = new SceneNode(scene);
   node.position.set(position);
-  node.addComponent(new RigidBody());
+  addPhysics(node, new RigidBody());
   const c = new Collider();
   c.shape = 'sphere';
   c.radius = radius;
-  node.addComponent(c);
+  addPhysics(node, c);
   return node;
 }
 
@@ -72,7 +68,7 @@ function addStatic(scene: Scene, position: Vector3, size: Vector3, rotation?: Qu
   }
   const c = new Collider();
   c.size = size;
-  node.addComponent(c);
+  addPhysics(node, c);
   return node;
 }
 
@@ -83,7 +79,7 @@ function addJoint(parent: SceneNode, local: Vector3, setup: (joint: Joint) => vo
   node.position.set(local);
   const joint = new Joint();
   setup(joint);
-  node.addComponent(joint);
+  addPhysics(node, joint);
   return joint;
 }
 
@@ -94,7 +90,7 @@ function door(scene: Scene, setup: (joint: Joint) => void) {
     j.type = 'hinge';
     setup(j);
   });
-  return { node, joint, body: node.getComponent(RigidBody)! };
+  return { node, joint, body: getPhysics(node, RigidBody)! };
 }
 
 describe('joints', () => {
@@ -202,7 +198,7 @@ describe('joints', () => {
       j.type = 'ball';
     });
     world.update(DT);
-    bob.getComponent(RigidBody)!.setLinearVelocity(new Vector3(3, 0, 1));
+    getPhysics(bob, RigidBody)!.setLinearVelocity(new Vector3(3, 0, 1));
     const pivot = new Vector3(0, 5, 0);
     let maxX = 0;
     run(world, 2, () => {
@@ -223,7 +219,7 @@ describe('joints', () => {
       j.swingLimit = 20;
     });
     world.update(DT);
-    bob.getComponent(RigidBody)!.setLinearVelocity(new Vector3(6, 0, 0));
+    getPhysics(bob, RigidBody)!.setLinearVelocity(new Vector3(6, 0, 0));
     let maxAngle = 0;
     run(world, 2, () => {
       const p = bob.getWorldPosition();
@@ -327,7 +323,6 @@ describe('joints', () => {
   it('round-trips joints and character controllers through serialization', async () => {
     const scene = new Scene();
     const manager = new ResourceManager(new MemoryFS());
-    registerPhysics(manager);
     const other = new SceneNode(scene);
     const node = new SceneNode(scene);
     const joint = new Joint();
@@ -338,17 +333,17 @@ describe('joints', () => {
     joint.upperLimit = 3;
     joint.motorMode = 'velocity';
     joint.motorTarget = 2;
-    node.addComponent(joint);
+    addPhysics(node, joint);
     const cc = new CharacterController();
     cc.height = 1.6;
     cc.stepHeight = 0.4;
     cc.pushBodies = false;
-    node.addComponent(cc);
+    addPhysics(node, cc);
     const restored = (await manager.deserializeObject<SceneNode>(
       new SceneNode(scene),
       await manager.serializeObject(node)
     ))!;
-    const rj = restored.getComponent(Joint)!;
+    const rj = getPhysics(restored, Joint)!;
     expect(rj.type).toBe('slider');
     expect(rj.connectedBodyId).toBe(other.persistentId);
     expect(rj.axis.x).toBe(1);
@@ -356,12 +351,12 @@ describe('joints', () => {
     expect(rj.upperLimit).toBe(3);
     expect(rj.motorMode).toBe('velocity');
     expect(rj.motorTarget).toBe(2);
-    const rc = restored.getComponent(CharacterController)!;
+    const rc = getPhysics(restored, CharacterController)!;
     expect(rc.height).toBeCloseTo(1.6);
     expect(rc.stepHeight).toBeCloseTo(0.4);
     expect(rc.pushBodies).toBe(false);
     // Its own body and capsule are not node components, so not saved.
-    expect(restored.getComponent(RigidBody)).toBeFalsy();
+    expect(getPhysics(restored, RigidBody)).toBeFalsy();
   });
 });
 
@@ -371,7 +366,7 @@ describe('character controller', () => {
     node.name = 'hero';
     node.position.set(position);
     const cc = new CharacterController();
-    node.addComponent(cc);
+    addPhysics(node, cc);
     return { node, cc };
   }
 
@@ -380,7 +375,7 @@ describe('character controller', () => {
    * update the way CharacterController's documentation shows.
    */
   function walk(
-    world: PhysicsWorld,
+    world: PhysicsSimulation,
     cc: CharacterController,
     velocity: Vector3,
     seconds: number,
@@ -517,12 +512,15 @@ describe('character controller', () => {
     const zc = new Collider();
     zc.size = new Vector3(1, 2, 2);
     zc.isTrigger = true;
-    zone.addComponent(zc);
+    addPhysics(zone, zc);
     const { cc } = addCharacter(scene, new Vector3(0, 0, 0));
     const log: string[] = [];
-    cc.on('triggerenter', (e) => void log.push(`enter ${e.otherNode?.name}`));
-    cc.on('triggerexit', (e) => void log.push(`exit ${e.otherNode?.name}`));
-    zc.on('triggerenter', (e) => void log.push(`zone sees ${e.other === cc ? 'controller' : 'other'}`));
+    cc.owner!.on('triggerenter', (e) => void log.push(`enter ${e.otherNode?.name}`));
+    cc.owner!.on('triggerexit', (e) => void log.push(`exit ${e.otherNode?.name}`));
+    zc.owner!.on(
+      'triggerenter',
+      (e) => void log.push(`zone sees ${e.other === cc.owner ? 'controller' : 'other'}`)
+    );
     walk(world, cc, new Vector3(2, 0, 0), 2.5);
     expect([...log].sort()).toEqual(['enter zone', 'exit zone', 'zone sees controller']);
     expect(log.indexOf('enter zone')).toBeLessThan(log.indexOf('exit zone'));

@@ -1,16 +1,11 @@
 import { MemoryFS, Quaternion, Vector3 } from '@zephyr3d/base';
 import { ResourceManager, Scene, SceneNode } from '@zephyr3d/scene';
 import * as RAPIER from '@dimforge/rapier3d-simd-compat';
-import {
-  Collider,
-  initPhysics,
-  PhysicsWorld,
-  registerPhysics,
-  RigidBody,
-  Vehicle,
-  Wheel,
-  type VehicleForward
-} from '@zephyr3d/physics';
+import { Collider, RigidBody, Vehicle, type VehicleForward, Wheel } from '@zephyr3d/scene';
+import type { PhysicsSimulation } from '@zephyr3d/physics';
+import { initPhysics } from '@zephyr3d/physics';
+import { rapierPhysics } from '@zephyr3d/physics-rapier';
+import { addPhysics, getPhysics, removePhysics } from './helpers';
 
 const DT = 1 / 60;
 const MASS = 1000;
@@ -18,17 +13,17 @@ const G = 9.81;
 
 beforeAll(async () => {
   await RAPIER.init();
-  await initPhysics({ rapier: RAPIER });
+  await initPhysics(rapierPhysics, { rapier: RAPIER });
 });
 
 function makeWorld(scene: Scene) {
-  const world = PhysicsWorld.get(scene);
+  const world = scene.physicsWorld as PhysicsSimulation;
   world.enabled = false;
   world.interpolation = false;
   return world;
 }
 
-function run(world: PhysicsWorld, seconds: number) {
+function run(world: PhysicsSimulation, seconds: number) {
   const frames = Math.round(seconds / DT);
   for (let i = 0; i < frames; i++) {
     world.update(DT);
@@ -40,7 +35,7 @@ function addGround(scene: Scene) {
   ground.position.setXYZ(0, -0.5, 0);
   const collider = new Collider();
   collider.size = new Vector3(400, 1, 400);
-  ground.addComponent(collider);
+  addPhysics(ground, collider);
   return ground;
 }
 
@@ -65,14 +60,14 @@ function addCar(scene: Scene, options: CarOptions = {}) {
   }
   const body = new RigidBody();
   body.mass = MASS;
-  car.addComponent(body);
+  addPhysics(car, body);
   const box = new Collider();
   box.size = forward === '+z' || forward === '-z' ? new Vector3(1.8, 0.6, 4) : new Vector3(4, 0.6, 1.8);
   box.offset = new Vector3(0, 0.3, 0);
-  car.addComponent(box);
+  addPhysics(car, box);
   const vehicle = new Vehicle();
   vehicle.forward = forward;
-  car.addComponent(vehicle);
+  addPhysics(car, vehicle);
   // Front is +1 along the forward axis.
   const f = forward === '+z' || forward === '+x' ? 1 : -1;
   const alongX = forward === '+x' || forward === '-x';
@@ -89,7 +84,7 @@ function addCar(scene: Scene, options: CarOptions = {}) {
       const drive = options.drive ?? 'rear';
       wheel.drive = drive === 'all' ? 0.25 : (drive === 'front') === front ? 0.5 : 0;
       wheel.handbrake = front ? 0 : 1;
-      node.addComponent(wheel);
+      addPhysics(node, wheel);
       wheels.push({ node, wheel, front });
     }
   }
@@ -130,7 +125,7 @@ describe('vehicle', () => {
       expect(wheel.contactPoint.y).toBeCloseTo(0, 2);
     }
     expect(wheels[0].node.position.x).toBeCloseTo(rest[0].x, 3);
-    car.removeComponent(car.getComponent(Vehicle)!);
+    removePhysics(car, getPhysics(car, Vehicle)!);
     world.update(DT);
     wheels.forEach(({ node }, i) => {
       expect(node.position.x).toBeCloseTo(rest[i].x, 6);
@@ -249,16 +244,16 @@ describe('vehicle', () => {
     const world = makeWorld(scene);
     const node = new SceneNode(scene);
     const vehicle = new Vehicle();
-    node.addComponent(vehicle);
+    addPhysics(node, vehicle);
     const orphan = new SceneNode(scene);
     const wheel = new Wheel();
-    orphan.addComponent(wheel);
+    addPhysics(orphan, wheel);
     world.update(DT);
     expect(vehicle.error).toMatch(/RigidBody/);
     expect(wheel.error).toMatch(/Vehicle/);
-    node.addComponent(new RigidBody());
+    addPhysics(node, new RigidBody());
     world.update(DT);
-    expect(vehicle.error).toMatch(/Wheel/);
+    expect(vehicle.error).toMatch(/wheels/);
   });
 
   it('keeps working after its body or wheels change', () => {
@@ -299,13 +294,12 @@ describe('vehicle', () => {
   it('round-trips through serialization', async () => {
     const scene = new Scene();
     const manager = new ResourceManager(new MemoryFS());
-    registerPhysics(manager);
     const node = new SceneNode(scene);
     const vehicle = new Vehicle();
     vehicle.forward = '-x';
     vehicle.maxEngineForce = 7000;
     vehicle.layer = 3;
-    node.addComponent(vehicle);
+    addPhysics(node, vehicle);
     const wheelNode = new SceneNode(scene);
     wheelNode.parent = node;
     const wheel = new Wheel();
@@ -313,16 +307,16 @@ describe('vehicle', () => {
     wheel.drive = 0.25;
     wheel.steer = -1;
     wheel.suspensionStiffness = 45;
-    wheelNode.addComponent(wheel);
+    addPhysics(wheelNode, wheel);
     const restored = (await manager.deserializeObject<SceneNode>(
       new SceneNode(scene),
       await manager.serializeObject(node)
     ))!;
-    const v = restored.getComponent(Vehicle)!;
+    const v = getPhysics(restored, Vehicle)!;
     expect(v.forward).toBe('-x');
     expect(v.maxEngineForce).toBe(7000);
     expect(v.layer).toBe(3);
-    const w = restored.children[0].getComponent(Wheel)!;
+    const w = getPhysics(restored.children[0], Wheel)!;
     expect(w.radius).toBeCloseTo(0.55);
     expect(w.drive).toBeCloseTo(0.25);
     expect(w.steer).toBe(-1);

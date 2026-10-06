@@ -8,11 +8,11 @@
 
 ## A Minimal Example
 
-The body is a dynamic rigid body with colliders, plus a `Vehicle`:
+The body is a dynamic rigid body with colliders, plus a `Vehicle` in the same node's physics data:
 
 <<< @/../src/tut-81/main.js#car
 
-Each wheel is a child node below the body, with a `Wheel`:
+Each wheel is a child node below the body, with a `Wheel` in its physics data:
 
 <<< @/../src/tut-81/main.js#wheels
 

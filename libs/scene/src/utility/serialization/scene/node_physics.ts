@@ -1,14 +1,16 @@
 import { Vector3 } from '@zephyr3d/base';
-import type { PropertyAccessor, PropertyValue, SerializableClass, ResourceManager } from '@zephyr3d/scene';
-import { defineProps } from '@zephyr3d/scene';
-import { RigidBody } from './rigid_body';
-import { Collider, type ColliderShape } from './collider';
-import { Joint, type JointMotorMode, type JointType } from './joint';
-import { CharacterController } from './character';
-import { Vehicle, Wheel, type VehicleForward } from './vehicle';
-import type { MotionType } from './backend/types';
+import type { PropertyAccessor, PropertyValue, SerializableClass } from '../types';
+import { defineProps } from '../types';
+import { RigidBody } from '../../../physics/rigid_body';
+import { Collider, type ColliderShape } from '../../../physics/collider';
+import { Joint, type JointMotorMode, type JointType } from '../../../physics/joint';
+import { CharacterController } from '../../../physics/character';
+import { Vehicle, Wheel, type VehicleForward } from '../../../physics/vehicle';
+import { NodePhysics } from '../../../physics/node_physics';
+import type { MotionType } from '../../../physics/types';
 
-function getRigidBodyClass(): SerializableClass {
+/** @internal */
+export function getRigidBodyClass(): SerializableClass {
   return {
     ctor: RigidBody,
     name: 'RigidBody',
@@ -260,7 +262,8 @@ function getRigidBodyClass(): SerializableClass {
   };
 }
 
-function getColliderClass(): SerializableClass {
+/** @internal */
+export function getColliderClass(): SerializableClass {
   const usesRadius = (c: Collider) => c.shape === 'sphere' || c.shape === 'capsule' || c.shape === 'cylinder';
   const usesMesh = (c: Collider) => c.shape === 'mesh' || c.shape === 'convex';
   const usesHeight = (c: Collider) => c.shape === 'capsule' || c.shape === 'cylinder';
@@ -445,7 +448,8 @@ function getColliderClass(): SerializableClass {
   };
 }
 
-function getJointClass(): SerializableClass {
+/** @internal */
+export function getJointClass(): SerializableClass {
   return {
     ctor: Joint,
     name: 'Joint',
@@ -758,7 +762,8 @@ function getJointClass(): SerializableClass {
   };
 }
 
-function getCharacterControllerClass(): SerializableClass {
+/** @internal */
+export function getCharacterControllerClass(): SerializableClass {
   return {
     ctor: CharacterController,
     name: 'CharacterController',
@@ -937,7 +942,8 @@ function numberProp<T>(
   };
 }
 
-function getVehicleClass(): SerializableClass {
+/** @internal */
+export function getVehicleClass(): SerializableClass {
   return {
     ctor: Vehicle,
     name: 'Vehicle',
@@ -1000,7 +1006,8 @@ function getVehicleClass(): SerializableClass {
   };
 }
 
-function getWheelClass(): SerializableClass {
+/** @internal */
+export function getWheelClass(): SerializableClass {
   return {
     ctor: Wheel,
     name: 'Wheel',
@@ -1093,12 +1100,116 @@ function getWheelClass(): SerializableClass {
   };
 }
 
-/** Registers the physics components' serializable classes. @internal */
-export function registerPhysicsSerializableClasses(manager: ResourceManager) {
-  manager.registerClass(getRigidBodyClass());
-  manager.registerClass(getColliderClass());
-  manager.registerClass(getJointClass());
-  manager.registerClass(getCharacterControllerClass());
-  manager.registerClass(getVehicleClass());
-  manager.registerClass(getWheelClass());
+/** @internal */
+export function getNodePhysicsClass(): SerializableClass {
+  return {
+    ctor: NodePhysics,
+    name: 'NodePhysics',
+    getProps() {
+      return defineProps([
+        {
+          name: 'Body',
+          description:
+            'Makes the object move physically: a rigid body that falls and collides, or a character controller that walks',
+          type: 'object',
+          default: null,
+          options: { objectTypes: [RigidBody, CharacterController] },
+          isNullable() {
+            return true;
+          },
+          get(this: NodePhysics, value) {
+            value.object[0] = this.body;
+          },
+          set(this: NodePhysics, value) {
+            const body = value?.object[0];
+            this.body = body instanceof RigidBody || body instanceof CharacterController ? body : null;
+          }
+        },
+        {
+          name: 'Colliders',
+          description: 'Shapes the object collides with; without a rigid body above them they never move',
+          type: 'object_array',
+          readonly: true,
+          options: { objectTypes: [Collider] },
+          getDefaultValue(this: NodePhysics) {
+            return this.colliders;
+          },
+          get(this: NodePhysics, value) {
+            value.object = [...this.colliders];
+          },
+          set(this: NodePhysics, value) {
+            this.colliders = ((value.object ?? []) as unknown[]).filter(
+              (c): c is Collider => c instanceof Collider
+            );
+          },
+          add(this: NodePhysics, value, index) {
+            const collider = value.object?.[0];
+            if (collider instanceof Collider) {
+              const colliders = [...this.colliders];
+              colliders.splice(index ?? colliders.length, 0, collider);
+              this.colliders = colliders;
+            }
+          },
+          delete(this: NodePhysics, index) {
+            const collider = this.colliders[index];
+            if (collider) {
+              this.removeCollider(collider);
+            }
+          }
+        },
+        {
+          name: 'Joint',
+          description: 'Links this object to another one, or to a point in the world, like a hinge or a rope',
+          type: 'object',
+          default: null,
+          options: { objectTypes: [Joint] },
+          isNullable() {
+            return true;
+          },
+          get(this: NodePhysics, value) {
+            value.object[0] = this.joint;
+          },
+          set(this: NodePhysics, value) {
+            const joint = value?.object[0];
+            this.joint = joint instanceof Joint ? joint : null;
+          }
+        },
+        {
+          name: 'Vehicle',
+          description:
+            'Drives the object as a wheeled vehicle; needs a dynamic rigid body and wheels below it',
+          type: 'object',
+          default: null,
+          options: { objectTypes: [Vehicle] },
+          isNullable() {
+            return true;
+          },
+          get(this: NodePhysics, value) {
+            value.object[0] = this.vehicle;
+          },
+          set(this: NodePhysics, value) {
+            const vehicle = value?.object[0];
+            this.vehicle = vehicle instanceof Vehicle ? vehicle : null;
+          }
+        },
+        {
+          name: 'Wheel',
+          description: 'Makes the object a wheel of the vehicle above it',
+          type: 'object',
+          default: null,
+          options: { objectTypes: [Wheel] },
+          isNullable() {
+            return true;
+          },
+          get(this: NodePhysics, value) {
+            value.object[0] = this.wheel;
+          },
+          set(this: NodePhysics, value) {
+            const wheel = value?.object[0];
+            this.wheel = wheel instanceof Wheel ? wheel : null;
+          }
+        }
+      ]);
+    }
+  };
 }

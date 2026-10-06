@@ -34,8 +34,9 @@ module.exports = {
     '^@zephyr3d/modelgen$': '<rootDir>/../libs/modelgen/src',
     '^@zephyr3d/procgen$': '<rootDir>/../libs/procgen/src',
     '^@zephyr3d/physics$': '<rootDir>/../libs/physics/src',
+    '^@zephyr3d/physics-rapier$': '<rootDir>/../libs/physics-rapier/src',
     // The bundler build imports its .wasm as a module; tests use the build with
-    // the module inlined, and inject it through initPhysics({ rapier })
+    // the module inlined, and inject it through initPhysics(rapierPhysics, { rapier })
     '^@dimforge/rapier3d-simd$': '@dimforge/rapier3d-simd-compat',
     '^@dimforge/rapier3d-simd/rapier_wasm3d_bg\.js$': '<rootDir>/src/stubs/rapier_glue.ts',
     // Resolve to sources so tests never depend on a built backend
