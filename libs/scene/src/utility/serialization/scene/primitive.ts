@@ -20,8 +20,13 @@ function shapeLodProps() {
   const lodHidden = function (this: Shape) {
     return !this.options.lod;
   };
+  // Tuning a level of detail setting does not turn levels of detail on: loading
+  // sets every property, the defaults of unsaved ones included, so a shape saved
+  // with GenerateLODs off would otherwise come back with them on.
   const setLod = (shape: Shape, change: Partial<MeshLodSettings>) => {
-    shape.options = { ...shape.options, lod: { ...(shape.options.lod ?? DEFAULT_LOD), ...change } };
+    if (shape.options.lod) {
+      shape.options = { ...shape.options, lod: { ...shape.options.lod, ...change } };
+    }
   };
   return defineProps([
     {

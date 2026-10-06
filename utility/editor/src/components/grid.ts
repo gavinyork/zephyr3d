@@ -190,8 +190,14 @@ class PropertyGroup {
         } else {
           for (let i = 0; i < tmpProperty.object.length; i++) {
             if (!value.isHidden || !value.isHidden.call(obj, i, tmpProperty.object[i])) {
-              const propGroup = group.addGroup(`${value.name}[${i}]`);
-              propGroup.setObject(tmpProperty.object[i], value, obj, i, tmpProperty.object.length);
+              // Lists of several types name each element's type, e.g. Components[0] · Collider
+              const element = tmpProperty.object[i];
+              const typeName =
+                value.options.objectTypes.length > 1 && element
+                  ? getEngine().resourceManager.getClassByConstructor(element.constructor)?.name
+                  : null;
+              const propGroup = group.addGroup(`${value.name}[${i}]${typeName ? ` · ${typeName}` : ''}`);
+              propGroup.setObject(element, value, obj, i, tmpProperty.object.length);
             }
           }
         }

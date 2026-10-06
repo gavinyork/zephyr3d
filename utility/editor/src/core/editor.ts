@@ -26,7 +26,7 @@ import { ProjectService } from './services/project';
 import { Dialog } from '../views/dlg/dlg';
 import { ZipDownloader } from '../helpers/downloader';
 import { CodeEditor } from '../components/codeeditor';
-import { buildForEndUser } from './build/build';
+import { buildForEndUser, projectUsesPhysics } from './build/build';
 import type { BuildAssetReport } from './build/build';
 import { initLogView } from '../components/logview';
 import { loadTypes } from './build/loadtypes';
@@ -112,6 +112,7 @@ export class Editor {
     '@zephyr3d/base',
     '@zephyr3d/device',
     '@zephyr3d/scene',
+    '@zephyr3d/physics',
     '@zephyr3d/imgui',
     '@zephyr3d/backend-webgl',
     '@zephyr3d/backend-webgpu',
@@ -1053,7 +1054,8 @@ export class Editor {
       );
       return;
     }
-    const srcIndexTS = generateIndexTS(settings);
+    const physics = await projectUsesPhysics(ProjectService.VFS);
+    const srcIndexTS = generateIndexTS(settings, physics);
     const srcVFS = new MemoryFS();
     const distVFS = new MemoryFS();
     srcVFS.writeFile('/index.ts', srcIndexTS, { encoding: 'utf8', create: true });
@@ -1073,6 +1075,7 @@ export class Editor {
       ({ assetReport } = await buildForEndUser({
         input: '/src/index.ts',
         distDir: '/dist',
+        physics,
         onProgress: (message, current, total) => {
           progress.setMessage(message);
           progress.setProgress(current, Math.max(total, 1));

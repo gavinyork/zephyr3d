@@ -11,7 +11,9 @@ import type {
   PropertyTrack,
   MeshMaterial,
   BoundingBox,
-  Primitive
+  Primitive,
+  PropertyValue,
+  SceneNodeComponent
 } from '@zephyr3d/scene';
 import {
   Mesh,
@@ -33,7 +35,8 @@ import {
   JointDynamicsModifier,
   SphereShape,
   CapsuleShape,
-  RenderGraphExecutor
+  RenderGraphExecutor,
+  getSceneNodeComponentTypes
 } from '@zephyr3d/scene';
 import type { RGProfileResult, RGProfileScopeResult } from '@zephyr3d/scene';
 import { SceneNode } from '@zephyr3d/scene';
@@ -72,6 +75,15 @@ import {
   NodeTransformCommand,
   CustomCommand
 } from '../commands/scenecommands';
+import {
+  AddComponentCommand,
+  RemoveComponentCommand,
+  getAddableComponentTypes
+} from '../commands/componentcommands';
+import { drawAddComponentItems, type ComponentCtor } from './componentmenu';
+import { DlgCollisionLayers } from './dlg/collisionlayersdlg';
+import { ColliderGizmo } from './gizmo/collidergizmo';
+import { CharacterController, Collider } from '@zephyr3d/physics';
 import { NodeProxy } from '../helpers/proxy';
 import { clearScriptPropertyAccessorCache } from '../helpers/scriptprops';
 import { getMorphTargetGroupPropertyAccessors } from '../helpers/morphtargetprops';
@@ -153,6 +165,10 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
   private _showTextureViewer: boolean;
   private _wireframe: boolean;
   private _lodColoration: boolean;
+  private _showAllColliders: boolean;
+  private _colliderGizmo: Nullable<ColliderGizmo>;
+  /** Whether the gizmo renderer was added to the compositor for the frame being drawn. */
+  private _gizmoEffectAppended: boolean;
   private _showDeviceInfo: boolean;
   private _showProfiler: boolean;
   /** Latest resolved render graph GPU profile, shown in the Profiler window. */
@@ -212,6 +228,9 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
     this._showTextureViewer = false;
     this._wireframe = false;
     this._lodColoration = false;
+    this._showAllColliders = false;
+    this._colliderGizmo = null;
+    this._gizmoEffectAppended = false;
     this._showDeviceInfo = false;
     this._showProfiler = false;
     this._profileResult = null;
@@ -291,6 +310,9 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
     );
     this._propGrid.setExtraPropertiesProvider('plugin-contributions', (object) =>
       this.editor.plugins.getPropertyAccessors(object)
+    );
+    this._propGrid.setExtraPropertiesProvider('collision-layers', (object) =>
+      this.getCollisionLayerAccessors(object)
     );
     this._postGizmoRenderer = null;
     this._leftDockPanel = null;
@@ -658,6 +680,17 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
                 return true;
               },
               checked: () => this._lodColoration
+            },
+            {
+              label: 'Show All Colliders',
+              action: () => {
+                this._showAllColliders = !this._showAllColliders;
+                if (this._colliderGizmo) {
+                  this._colliderGizmo.showAll = this._showAllColliders;
+                }
+                return true;
+              },
+              checked: () => this._showAllColliders
             },
             {
               label: 'Texture viewer',
@@ -1251,6 +1284,7 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
               ImGui.SetScrollY(0);
             }
             this._propGrid.render();
+            this.renderAddComponentButton();
             ImGui.Separator();
             this._scriptPanel.render();
             if (this._propGridScrollTopFrames > 0) {
@@ -1752,6 +1786,8 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
       this._proxy = new NodeProxy(this.controller.model.scene, this.editor.plugins);
       this._postGizmoRenderer = new PostGizmoRenderer(this.controller.model.scene.mainCamera!, null);
       this._postGizmoRenderer.mode = 'select';
+      this._colliderGizmo = new ColliderGizmo(this._postGizmoRenderer, () => this._propGrid.refresh());
+      this._colliderGizmo.showAll = this._showAllColliders;
       this.updateGizmoTransformSpace();
       this._leftDockPanel = new DockPannel(
         0,
@@ -1783,6 +1819,8 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
       this._sceneHierarchy.on('set_main_camera', this.handleSetMainCamera, this);
       this._sceneHierarchy.on('request_go_to_assets', this.handleGoToAssets, this);
       this._sceneHierarchy.on('request_add_child', this.handleAddChild, this);
+      this._sceneHierarchy.on('request_add_component', this.handleAddComponent, this);
+      this._sceneHierarchy.on('request_remove_component', this.handleRemoveComponent, this);
       this._sceneHierarchy.on('request_save_prefab', this.handleSavePrefab, this);
       this.controller.model.scene.rootNode.on('nodeattached', this.handleNodeAttached, this);
       this.controller.model.scene.rootNode.on('noderemoved', this.handleNodeRemoved, this);
@@ -1818,6 +1856,8 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
       this._sceneHierarchy.off('set_main_camera', this.handleSetMainCamera, this);
       this._sceneHierarchy.off('request_go_to_assets', this.handleGoToAssets, this);
       this._sceneHierarchy.off('request_add_child', this.handleAddChild, this);
+      this._sceneHierarchy.off('request_add_component', this.handleAddComponent, this);
+      this._sceneHierarchy.off('request_remove_component', this.handleRemoveComponent, this);
       this._sceneHierarchy.off('request_save_prefab', this.handleSavePrefab, this);
       this._sceneHierarchy = null;
     }
@@ -1834,6 +1874,8 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
       this._postGizmoRenderer.off('end_translate', this.handleEndTranslateNode, this);
       this._postGizmoRenderer.off('end_rotate', this.handleEndRotateNode, this);
       this._postGizmoRenderer.off('end_scale', this.handleEndScaleNode, this);
+      this._colliderGizmo?.dispose();
+      this._colliderGizmo = null;
       this._postGizmoRenderer.dispose();
       this._postGizmoRenderer = null;
     }
@@ -2127,6 +2169,11 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
     if (this._currentEditTool.get()) {
       this._currentEditTool.get()!.update(dt);
     }
+    this._colliderGizmo?.update(
+      this.controller.model.scene,
+      this.getSelectedSceneNodes(),
+      this.controller.model.scene?.mainCamera ?? null
+    );
     const inspectedObj = this._propGrid.currentObject;
     if (inspectedObj instanceof JointDynamicsModifier) {
       this.selectSpringBone(inspectedObj);
@@ -2546,6 +2593,11 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
   }
   private syncPropertyToMultiSelection(object: object, prop: PropertyAccessor) {
     if (this._suspendMultiPropertySync || !(object instanceof SceneNode) || !prop?.set) {
+      return;
+    }
+    // Component lists hold instances that each belong to one node; copying the
+    // list would hand one instance to several nodes. Add Component adds one per node.
+    if (prop.name === 'Components' || prop.name === 'GPUClothComponents') {
       return;
     }
     if (this._propGrid.object !== object) {
@@ -3247,6 +3299,140 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
       eventBus.dispatchEvent('scene_changed');
     });
   }
+  /** Why colliders on a node cannot be built, from the collider outlines. */
+  private getColliderErrorAccessors(object: unknown): PropertyAccessor[] {
+    if (!(object instanceof SceneNode) || !this._colliderGizmo) {
+      return [];
+    }
+    const gizmo = this._colliderGizmo;
+    const errors = () =>
+      object.components
+        .map((component) =>
+          component instanceof Collider || component instanceof CharacterController
+            ? gizmo.getError(component)
+            : null
+        )
+        .filter((error) => !!error);
+    if (errors().length === 0) {
+      return [];
+    }
+    return [
+      {
+        name: 'ColliderError',
+        description: 'The collider cannot be built and will not collide; fix its shape settings or geometry',
+        type: 'string',
+        readonly: true,
+        isPersistent() {
+          return false;
+        },
+        get(value: PropertyValue) {
+          value.str[0] = errors().join('; ');
+        }
+      }
+    ];
+  }
+  /** "Edit Collision Layers..." for a scene with physics settings. */
+  private getCollisionLayerAccessors(object: unknown): PropertyAccessor[] {
+    if (!(object instanceof Scene)) {
+      return this.getColliderErrorAccessors(object);
+    }
+    const scene = object;
+    return [
+      {
+        name: 'CollisionLayers',
+        description: 'Names the collision layers and picks which of them collide with each other',
+        type: 'command',
+        isPersistent() {
+          return false;
+        },
+        isHidden() {
+          return !scene.physicsSettings;
+        },
+        get(value: PropertyValue) {
+          value.str[0] = 'Edit Collision Layers...';
+        },
+        command: () => {
+          void this.editCollisionLayers(scene);
+          return false;
+        }
+      }
+    ];
+  }
+  private async editCollisionLayers(scene: Scene) {
+    const settings = scene.physicsSettings;
+    if (!settings) {
+      return;
+    }
+    const result = await DlgCollisionLayers.editCollisionLayers(settings);
+    if (!result || scene.physicsSettings !== settings) {
+      return;
+    }
+    const manager = getEngine().resourceManager;
+    const commands: PropertyEditCommand[] = [];
+    for (const [name, value] of [
+      ['LayerNames', result.layerNames],
+      ['LayerMatrix', result.layerMatrix]
+    ] as const) {
+      const prop = manager.getPropertyByName(`/ScenePhysicsSettings/${name}`);
+      if (!prop) {
+        continue;
+      }
+      const old = { num: [0, 0, 0, 0], str: [''], bool: [false], object: [] } as PropertySnapshot;
+      prop.get.call(settings, old);
+      if (old.str[0] !== value) {
+        commands.push(
+          new PropertyEditCommand(
+            settings,
+            prop,
+            this.clonePropertyValue(old),
+            this.clonePropertyValue({ ...old, str: [value] })
+          )
+        );
+      }
+    }
+    if (commands.length > 0) {
+      await this._cmdManager.execute(new CompositeCommand('Edit collision layers', commands));
+      eventBus.dispatchEvent('scene_changed');
+    }
+  }
+  /** "Add Component" under the inspected node's properties, opening the same menu as the hierarchy. */
+  private renderAddComponentButton() {
+    const node = this._propGrid.object;
+    if (!(node instanceof SceneNode) || node === this.controller.model.scene.rootNode) {
+      return;
+    }
+    const types = getAddableComponentTypes(getSceneNodeComponentTypes());
+    if (types.length === 0) {
+      return;
+    }
+    ImGui.Separator();
+    if (ImGui.Button('Add Component##AddComponentButton', new ImGui.ImVec2(-1, 0))) {
+      ImGui.OpenPopup('##AddComponentPopup');
+    }
+    if (ImGui.BeginPopup('##AddComponentPopup')) {
+      drawAddComponentItems(types, (ctor) => this.handleAddComponent(node, ctor));
+      ImGui.EndPopup();
+    }
+  }
+  /** Adds a component to a node, or to every selected node if it is one of them, each its own instance. */
+  private handleAddComponent(node: SceneNode, ctor: ComponentCtor) {
+    const selected = this.getSelectedSceneNodes().filter(
+      (n) => n !== this.controller.model.scene.rootNode && n !== this._multiTransformPivot
+    );
+    const targets = selected.includes(node) ? selected : [node];
+    const commands = targets.map((target) => new AddComponentCommand(target, ctor));
+    const command = commands.length === 1 ? commands[0] : new CompositeCommand('Add component', commands);
+    void this._cmdManager.execute(command as Command<unknown>).then(() => {
+      this._propGrid.refresh();
+      eventBus.dispatchEvent('scene_changed');
+    });
+  }
+  private handleRemoveComponent(node: SceneNode, component: SceneNodeComponent) {
+    void this._cmdManager.execute(new RemoveComponentCommand(node, component)).then(() => {
+      this._propGrid.refresh();
+      eventBus.dispatchEvent('scene_changed');
+    });
+  }
   private handleSavePrefab(node: SceneNode) {
     DlgSaveFile.saveFile(
       'Save Prefab',
@@ -3461,19 +3647,21 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
     if (
       this._postGizmoRenderer &&
       camera === this.controller.model.scene.mainCamera &&
-      (this._postGizmoRenderer.node || this._postGizmoRenderer.drawGrid)
+      (this._postGizmoRenderer.node || this._postGizmoRenderer.drawGrid || this._colliderGizmo?.active)
     ) {
       this._postGizmoRenderer.camera = camera;
       compositor.appendPostEffect(this._postGizmoRenderer);
+      this._gizmoEffectAppended = true;
     }
   }
   private handleEndRender(scene: Scene, camera: Camera, compositor: Compositor) {
     if (
       this._postGizmoRenderer &&
       camera === this.controller.model.scene.mainCamera &&
-      (this._postGizmoRenderer.node || this._postGizmoRenderer.drawGrid)
+      this._gizmoEffectAppended
     ) {
       compositor.removePostEffect(this._postGizmoRenderer);
+      this._gizmoEffectAppended = false;
     }
   }
   private handleSetMainCamera(camera: Camera) {

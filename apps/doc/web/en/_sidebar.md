@@ -38,6 +38,12 @@
     - [Animation Blending](en/animation-blending.md)
     - [Action Orchestration](en/animation-controller.md)
     - [Custom Animation](en/animation-custom.md)
+  - Physics
+    - [Rigid Body Physics](en/physics-intro.md)
+    - [Colliders](en/physics-colliders.md)
+    - [Scripting](en/physics-scripting.md)
+    - [Joints](en/physics-joints.md)
+    - [Character Controller](en/physics-character.md)
   - PostProcessing
     - [Overview](en/posteffect-intro.md)
     - [Tonemapping](en/posteffect-tonemap.md)
@@ -102,6 +108,9 @@
 
   - Terrain
     - [Terrain Tools](en/editor/terrain-tools.md)
+
+  - Physics
+    - [Physics in the Editor](en/editor/physics.md)
 
   - Animation
     - [Overview](en/editor/animation-overview.md)

@@ -124,6 +124,44 @@ function getRigidBodyClass(): SerializableClass {
           }
         },
         {
+          name: 'InitialLinearVelocity',
+          description:
+            'Speed and direction it is already moving in when the game starts, in m/s; e.g. a thrown ball',
+          type: 'vec3',
+          default: [0, 0, 0],
+          get(this: RigidBody, value) {
+            const v = this.initialLinearVelocity;
+            value.num[0] = v.x;
+            value.num[1] = v.y;
+            value.num[2] = v.z;
+          },
+          set(this: RigidBody, value) {
+            this.initialLinearVelocity = new Vector3(value.num[0], value.num[1], value.num[2]);
+          },
+          isHidden(this: RigidBody) {
+            return this.motionType !== 'dynamic';
+          }
+        },
+        {
+          name: 'InitialAngularVelocity',
+          description:
+            'Spin it already has when the game starts, in radians per second about each world axis; 6.28 is one turn a second',
+          type: 'vec3',
+          default: [0, 0, 0],
+          get(this: RigidBody, value) {
+            const v = this.initialAngularVelocity;
+            value.num[0] = v.x;
+            value.num[1] = v.y;
+            value.num[2] = v.z;
+          },
+          set(this: RigidBody, value) {
+            this.initialAngularVelocity = new Vector3(value.num[0], value.num[1], value.num[2]);
+          },
+          isHidden(this: RigidBody) {
+            return this.motionType !== 'dynamic';
+          }
+        },
+        {
           name: 'LockTranslationX',
           description: 'Stops the body sliding along the world X axis, e.g. to keep a 2.5D game on its plane',
           type: 'bool',
@@ -874,13 +912,8 @@ function getCharacterControllerClass(): SerializableClass {
   };
 }
 
-/**
- * Registers the physics components with a serialization manager, so scenes
- * containing them can be saved and loaded.
- *
- * @public
- */
-export function registerPhysicsClasses(manager: ResourceManager) {
+/** Registers the physics components' serializable classes. @internal */
+export function registerPhysicsSerializableClasses(manager: ResourceManager) {
   manager.registerClass(getRigidBodyClass());
   manager.registerClass(getColliderClass());
   manager.registerClass(getJointClass());

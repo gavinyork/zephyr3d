@@ -1,7 +1,6 @@
 import { Disposable, makeObservable, Quaternion, Vector3 } from '@zephyr3d/base';
 import type { Scene } from '@zephyr3d/scene';
-import type { ClipmapTerrain } from '@zephyr3d/scene';
-import { getDevice, SceneNode, tryGetApp } from '@zephyr3d/scene';
+import { getDevice, SceneNode, ScenePhysicsSettings, tryGetApp } from '@zephyr3d/scene';
 import type {
   BackendBody,
   BackendCharacter,
@@ -20,15 +19,9 @@ import type { Joint } from './joint';
 import type { CharacterController, CharacterMoveResult } from './character';
 import type { PhysicsComponent, PhysicsEventMap } from './component';
 import { PhysicsContactEvent, PhysicsTriggerEvent, type PhysicsObject } from './events';
-import type { ColliderGeometry, GeometrySource, MeshGeometry, TerrainGeometry } from './geometry';
-import {
-  fetchGeometry,
-  geometryMatches,
-  geometrySource,
-  needsGeometry,
-  sameSource,
-  spansVolume
-} from './geometry';
+import type { ColliderGeometry, GeometrySource } from './geometry';
+import { buildColliderShape, CONVEX_HULL_ERROR } from './shapes';
+import { fetchGeometry, geometryMatches, geometrySource, needsGeometry, sameSource } from './geometry';
 
 /** World pose of a node, scale dropped. */
 interface Pose {
@@ -176,8 +169,6 @@ export type PhysicsWorldEventMap = {
 const LAYER_COUNT = 16;
 const ALL_LAYERS = 0xffff;
 const MAX_QUERY_DISTANCE = 1e9;
-const CONVEX_HULL_ERROR =
-  'Could not build a convex hull: it needs at least four points that are not all in one plane';
 
 const tmpPose = newPose();
 const tmpPose2 = newPose();
@@ -261,6 +252,7 @@ function queryShapeDesc(shape: PhysicsShape): ShapeDesc {
  */
 export class PhysicsWorld extends makeObservable(Disposable)<PhysicsWorldEventMap>() {
   private static readonly _worlds = new WeakMap<Scene, PhysicsWorld>();
+  private static _simulationEnabled = true;
   private readonly _scene: Scene;
   private _backend: BackendWorld | null;
   private readonly _gravity: Vector3;
@@ -305,9 +297,26 @@ export class PhysicsWorld extends makeObservable(Disposable)<PhysicsWorldEventMa
   /** The static body joints connected to the world hang from. */
   private _worldAnchor: BackendBody | null;
   private readonly _characters: Map<CharacterController, BackendCharacter | null>;
+  /** The scene settings last applied, and their version then. */
+  private _appliedSettings: ScenePhysicsSettings | null;
+  private _appliedSettingsVersion: number;
   /** @internal */
   _inFixedUpdate: boolean;
 
+  /**
+   * Whether worlds step on their own each frame. Default true.
+   *
+   * @remarks
+   * Turned off by tools that show scenes without running them, such as the
+   * editor. Worlds keep tracking their components meanwhile; calling
+   * {@link PhysicsWorld.update} directly still steps.
+   */
+  static get simulationEnabled() {
+    return PhysicsWorld._simulationEnabled;
+  }
+  static set simulationEnabled(value: boolean) {
+    PhysicsWorld._simulationEnabled = !!value;
+  }
   /** The world of a scene, created if it does not exist yet. */
   static get(scene: Scene): PhysicsWorld {
     let world = PhysicsWorld._worlds.get(scene);
@@ -361,6 +370,9 @@ export class PhysicsWorld extends makeObservable(Disposable)<PhysicsWorldEventMa
     this._worldAnchor = null;
     this._characters = new Map();
     this._inFixedUpdate = false;
+    this._appliedSettings = null;
+    this._appliedSettingsVersion = -1;
+    this._applySceneSettings();
     scene.on('afterupdate', this._onAfterUpdate, this);
     scene.on('dispose', this._onSceneDispose, this);
   }
@@ -402,7 +414,7 @@ export class PhysicsWorld extends makeObservable(Disposable)<PhysicsWorldEventMa
   set interpolation(value: boolean) {
     this._interpolation = !!value;
   }
-  /** Whether the world steps on its own each frame. Default true. */
+  /** Whether this world steps on its own each frame; see also {@link PhysicsWorld.simulationEnabled}. Default true. */
   get enabled() {
     return this._enabled;
   }
@@ -489,7 +501,11 @@ export class PhysicsWorld extends makeObservable(Disposable)<PhysicsWorldEventMa
    * until {@link initPhysics} has completed.
    */
   update(dt: number) {
-    if (this.disposed || !this._ensureBackend()) {
+    if (this.disposed) {
+      return;
+    }
+    this._applySceneSettings();
+    if (!this._ensureBackend()) {
       return;
     }
     this._checkGeometry();
@@ -1207,37 +1223,13 @@ export class PhysicsWorld extends makeObservable(Disposable)<PhysicsWorldEventMa
         `Collider on '${host.name}': a mesh collider on a dynamic rigid body has no volume and gets pushed into things; use 'convex' instead.`
       );
     }
-    // The collider's world pose: its node, moved by its offset in node space.
-    const colliderPose = readWorldPose(host, tmpPose, tmpScale);
-    host.worldMatrix.transformPointAffine(component.offset, colliderPose.position);
-    let shape: ShapeDesc;
-    if (geometry?.kind === 'terrain') {
-      const built = this._terrainShape(
-        host as ClipmapTerrain,
-        geometry,
-        component.terrainResolution,
-        colliderPose
-      );
-      if (!built) {
-        this._fail(component, null, 'The terrain height map is too small for a collider');
-        return;
-      }
-      shape = built;
-    } else if (geometry) {
-      // Signed: a mirrored mesh stays mirrored.
-      shape = this._meshShape(component, geometry, tmpScale);
-      if (shape.type === 'trimesh' && shape.indices.length < 3) {
-        this._fail(component, null, 'A mesh collider needs triangles');
-        return;
-      }
-      if (shape.type === 'convex' && !spansVolume(shape.points)) {
-        this._fail(component, null, CONVEX_HULL_ERROR);
-        return;
-      }
-    } else {
-      const scale = tmpVec.setXYZ(Math.abs(tmpScale.x), Math.abs(tmpScale.y), Math.abs(tmpScale.z));
-      shape = this._buildShape(component, scale);
+    const built = buildColliderShape(component, geometry);
+    if ('error' in built) {
+      this._fail(component, null, built.error);
+      return;
     }
+    const { shape } = built;
+    const colliderPose: Pose = { position: built.position, rotation: built.rotation };
     const material = {
       friction: component.friction,
       restitution: component.restitution,
@@ -1297,88 +1289,6 @@ export class PhysicsWorld extends makeObservable(Disposable)<PhysicsWorldEventMa
     // A collider joining a body changes its inertia; wake it so it notices.
     owner?.body.wakeUp();
     component._setStatus(true);
-  }
-
-  private _buildShape(component: Collider, scale: Vector3): ShapeDesc {
-    const radial = Math.max(scale.x, scale.z);
-    switch (component.shape) {
-      case 'sphere':
-        return { type: 'sphere', radius: component.radius * Math.max(scale.x, scale.y, scale.z) };
-      case 'capsule': {
-        const radius = component.radius * radial;
-        return {
-          type: 'capsule',
-          radius,
-          halfHeight: Math.max(0, (component.height * scale.y) / 2 - radius)
-        };
-      }
-      case 'cylinder':
-        return {
-          type: 'cylinder',
-          radius: component.radius * radial,
-          halfHeight: (component.height * scale.y) / 2
-        };
-      default:
-        return {
-          type: 'box',
-          halfExtents: new Vector3(
-            (component.size.x * scale.x) / 2,
-            (component.size.y * scale.y) / 2,
-            (component.size.z * scale.z) / 2
-          )
-        };
-    }
-  }
-
-  /** Triangles or hull points, scaled along each axis, around the collider's origin. */
-  private _meshShape(component: Collider, geometry: MeshGeometry, scale: Vector3): ShapeDesc {
-    const src = geometry.positions;
-    const points = new Float32Array(src.length);
-    for (let i = 0; i < src.length; i += 3) {
-      points[i] = src[i] * scale.x;
-      points[i + 1] = src[i + 1] * scale.y;
-      points[i + 2] = src[i + 2] * scale.z;
-    }
-    return component.shape === 'convex'
-      ? { type: 'convex', points }
-      : { type: 'trimesh', vertices: points, indices: geometry.indices };
-  }
-
-  /**
-   * A height field matching how the terrain is drawn: it spans from the node's
-   * position along +X and +Z, height samples sit at texel centres, and heights
-   * are scaled by the node's Y scale on top of its world height. Rotation is
-   * ignored, as by the terrain itself. Sets `pose` to the field's centre.
-   */
-  private _terrainShape(
-    terrain: ClipmapTerrain,
-    geometry: TerrainGeometry,
-    resolution: number,
-    pose: Pose
-  ): ShapeDesc | null {
-    const { width, height } = geometry;
-    const cols = Math.floor((width - 1) / resolution) + 1;
-    const rows = Math.floor((height - 1) / resolution) + 1;
-    if (cols < 2 || rows < 2) {
-      return null;
-    }
-    const heights = new Float32Array(rows * cols);
-    for (let x = 0; x < cols; x++) {
-      for (let z = 0; z < rows; z++) {
-        heights[x * rows + z] = geometry.heights[z * resolution * width + x * resolution];
-      }
-    }
-    // The same placement as ClipmapTerrain.updateRegion.
-    const scale = terrain.scale;
-    const cellX = (Math.abs(scale.x) * terrain.sizeX) / width;
-    const cellZ = (Math.abs(scale.z) * terrain.sizeZ) / height;
-    const px = terrain.position.x + (terrain.parent?.worldMatrix.m03 ?? 0);
-    const pz = terrain.position.z + (terrain.parent?.worldMatrix.m23 ?? 0);
-    const spanX = (cols - 1) * resolution * cellX;
-    const spanZ = (rows - 1) * resolution * cellZ;
-    pose.position.setXYZ(px + cellX * 0.5 + spanX / 2, terrain.worldMatrix.m13, pz + cellZ * 0.5 + spanZ / 2);
-    pose.rotation.identity();
-    return { type: 'heightfield', rows, cols, heights, scale: new Vector3(spanX, scale.y, spanZ) };
   }
 
   /**
@@ -1828,8 +1738,37 @@ export class PhysicsWorld extends makeObservable(Disposable)<PhysicsWorldEventMa
     };
   }
 
+  /**
+   * Applies {@link Scene.physicsSettings} when they are set, replaced or
+   * changed; going back to none restores the defaults. Changes made to the world
+   * directly last until the scene settings change.
+   */
+  private _applySceneSettings() {
+    const settings = this._scene.physicsSettings;
+    if (
+      settings === this._appliedSettings &&
+      (!settings || settings.version === this._appliedSettingsVersion)
+    ) {
+      return;
+    }
+    this._appliedSettings = settings;
+    this._appliedSettingsVersion = settings?.version ?? -1;
+    const source = settings ?? new ScenePhysicsSettings();
+    this.gravity = source.gravity;
+    this.fixedTimeStep = source.fixedTimeStep;
+    this.maxSubSteps = source.maxSubSteps;
+    this.interpolation = source.interpolation;
+    this.waitForCollidersOnStart = source.waitForCollidersOnStart;
+    for (let a = 0; a < LAYER_COUNT; a++) {
+      this._layerNames[a] = source.getLayerName(a);
+      for (let b = a; b < LAYER_COUNT; b++) {
+        this.setLayerCollision(a, b, source.getLayerCollision(a, b));
+      }
+    }
+  }
+
   private _onAfterUpdate() {
-    if (this._enabled) {
+    if (this._enabled && PhysicsWorld._simulationEnabled) {
       this.update(getDevice().frameInfo.elapsedFrame * 0.001);
     }
   }

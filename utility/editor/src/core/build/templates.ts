@@ -198,14 +198,20 @@ export default plugin;
   }
 ] as const;
 
-export function generateIndexTS(settings: ProjectSettings) {
+/**
+ * Generates the entry module of a build.
+ *
+ * @param physics - Load the physics engine before the startup scene; set when
+ *   the project uses it (see projectUsesPhysics), so other builds do not ship it.
+ */
+export function generateIndexTS(settings: ProjectSettings, physics = false) {
   const rhiList =
     settings.preferredRHI?.map((val) => (val.toLowerCase() === 'webgl' ? 'webgl2' : val.toLowerCase())) ?? [];
   return `import { Application, getEngine, setActiveMorphTargetLimit, setMorphTargetLimit, setSkinInfluenceLimit } from '@zephyr3d/scene';
 import { HttpFS } from '@zephyr3d/base';
 import { FBXImporter, GLTFImporter, OBJImporter } from '@zephyr3d/loaders';
 import type { DeviceBackend } from '@zephyr3d/device';
-let backend: DeviceBackend = null;
+${physics ? `import { initPhysics } from '@zephyr3d/physics';\n` : ''}let backend: DeviceBackend = null;
 ${
   rhiList.includes('webgpu')
     ? `backend = backend || (await import('@zephyr3d/backend-webgpu')).backendWebGPU;
@@ -253,7 +259,7 @@ application.ready().then(async () => {
   getEngine().resourceManager.setModelLoader('model/gltf-binary', new GLTFImporter());
   getEngine().resourceManager.setModelLoader('model/fbx', new FBXImporter());
   getEngine().resourceManager.setModelLoader('model/obj', new OBJImporter());
-  application.run();
+  ${physics ? `// Before the startup scene: registers the physics components it may hold\n  await initPhysics();\n  ` : ''}application.run();
   await getEngine().startup(${JSON.stringify(settings.startupScene ?? '')}, ${JSON.stringify(settings.startupScript ?? '')});
   // Keep the loading screen of index.html until the startup scene is on screen
   await application.nextFrame();

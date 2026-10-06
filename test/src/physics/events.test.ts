@@ -6,7 +6,7 @@ import {
   Collider,
   initPhysics,
   PhysicsWorld,
-  registerPhysicsClasses,
+  registerPhysics,
   RigidBody,
   type ColliderShape,
   type PhysicsObject
@@ -462,7 +462,7 @@ describe('rigid body axis locks', () => {
   it('round-trips layer and locks through serialization', async () => {
     const scene = new Scene();
     const manager = new ResourceManager(new MemoryFS());
-    registerPhysicsClasses(manager);
+    registerPhysics(manager);
     const node = new SceneNode(scene);
     const body = new RigidBody();
     body.lockRotationX = true;

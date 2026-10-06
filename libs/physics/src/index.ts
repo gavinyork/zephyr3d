@@ -1,4 +1,4 @@
-export { initPhysics } from './init';
+export { initPhysics, registerPhysics } from './init';
 export { isPhysicsReady } from './rapier_state';
 export type { PhysicsInitOptions } from './init';
 export type { MotionType } from './backend/types';
@@ -15,4 +15,5 @@ export { Joint } from './joint';
 export type { JointType, JointMotorMode } from './joint';
 export { CharacterController } from './character';
 export type { CharacterCollision, CharacterMoveResult } from './character';
-export { registerPhysicsClasses } from './serialization';
+export { getColliderOutline, getColliderOutlineKey } from './outline';
+export type { ColliderOutline } from './outline';

@@ -7,7 +7,7 @@ const vendorRoot = path.join(projectRoot, 'dist', 'vendor', 'zephyr3d');
 const vendorRootNormalized = vendorRoot.replace(/\\/g, '/');
 const outputDir = path.join(projectRoot, 'dist', 'assistant');
 const outputPath = path.join(outputDir, 'zephyr-types-index.json');
-const packageNames = ['base', 'device', 'scene', 'imgui', 'backend-webgl', 'backend-webgpu'];
+const packageNames = ['base', 'device', 'scene', 'physics', 'imgui', 'backend-webgl', 'backend-webgpu'];
 
 function normalizeWhitespace(value) {
   return String(value || '')

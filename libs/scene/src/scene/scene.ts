@@ -21,6 +21,7 @@ import {
   ScriptAttachment
 } from './script_attachment';
 import type { LightingMode } from '../utility/physical';
+import type { ScenePhysicsSettings } from './physics_settings';
 import type { VirtualTextureClient } from '../render/virtualtexture/virtual_texture_client';
 
 /**
@@ -90,6 +91,8 @@ export class Scene
   protected _mainCamera: DRef<Camera>;
   /** @internal Arbitrary metadata loaded with the scene (optional). */
   protected _metaData: Nullable<Metadata>;
+  /** @internal Physics settings saved with the scene (optional). */
+  protected _physicsSettings: Nullable<ScenePhysicsSettings>;
   /** @internal Lighting unit model used by this scene. */
   protected _lightingMode: LightingMode;
   /** @internal Number of physical meters represented by one scene unit. */
@@ -134,6 +137,7 @@ export class Scene
     this._rootNode.set(new SceneNode(this));
     this._rootNode.get()!.name = 'Root';
     this._metaData = null;
+    this._physicsSettings = null;
     this._lightingMode = 'legacy';
     this._metersPerUnit = 1;
     this._scripts = [];
@@ -254,6 +258,16 @@ export class Scene
   }
   set metaData(val) {
     this._metaData = val;
+  }
+  /**
+   * Physics settings of the scene, or null to use the physics package's
+   * defaults. Only scenes simulated with a physics package need them.
+   */
+  get physicsSettings() {
+    return this._physicsSettings;
+  }
+  set physicsSettings(val: Nullable<ScenePhysicsSettings>) {
+    this._physicsSettings = val ?? null;
   }
   /**
    * Attached script filename or identifier (engine-specific).

@@ -10,7 +10,8 @@ import {
   SceneNode,
   Water
 } from '@zephyr3d/scene';
-import type { PropertyAccessor } from '@zephyr3d/scene';
+import type { PropertyAccessor, SceneNodeComponent } from '@zephyr3d/scene';
+import { drawComponentMenus, type ComponentCtor } from '../views/componentmenu';
 import { TreeViewData, TreeView } from './treeview';
 import { ImGui } from '@zephyr3d/imgui';
 import { convertEmojiString } from '../helpers/emoji';
@@ -93,6 +94,8 @@ export class SceneHierarchy extends TreeView<
     set_main_camera: [camea: Camera];
     request_go_to_assets: [node: SceneNode];
     request_add_child: [node: SceneNode, ctor: { new (scene: Scene): SceneNode }];
+    request_add_component: [node: SceneNode, ctor: ComponentCtor];
+    request_remove_component: [node: SceneNode, component: SceneNodeComponent];
     request_save_prefab: [node: SceneNode];
     draw_context_menu: [node: SceneNode, menuId: string];
   },
@@ -170,6 +173,14 @@ export class SceneHierarchy extends TreeView<
     }
     this.drawCreateNodeActions(node);
     ImGui.Separator();
+    if (node !== this._scene.rootNode) {
+      drawComponentMenus(
+        node,
+        (ctor) => this.dispatchEvent('request_add_component', node, ctor),
+        (component) => this.dispatchEvent('request_remove_component', node, component)
+      );
+      ImGui.Separator();
+    }
     if (ImGui.MenuItem('Create Prefab...')) {
       this.dispatchEvent('request_save_prefab', node);
     }

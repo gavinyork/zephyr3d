@@ -23,7 +23,7 @@ const ASSISTANT_TYPE_INDEX_PATH = path.resolve(
   'zephyr-types-index.json'
 );
 const ASSISTANT_TYPES_VENDOR_ROOT = path.resolve(__dirname, '..', 'dist', 'vendor', 'zephyr3d');
-const ASSISTANT_TYPE_PACKAGES = ['base', 'device', 'scene', 'imgui', 'backend-webgl', 'backend-webgpu'];
+const ASSISTANT_TYPE_PACKAGES = ['base', 'device', 'scene', 'physics', 'imgui', 'backend-webgl', 'backend-webgpu'];
 const MAX_TYPE_FILE_LINES = 240;
 let assistantTypeIndexPromise = null;
 

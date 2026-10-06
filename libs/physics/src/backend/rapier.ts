@@ -446,6 +446,15 @@ export class RapierWorld implements BackendWorld {
   colliderKey(collider: BackendCollider) {
     return (collider as RCollider).handle;
   }
+  colliderTriangles(collider: BackendCollider) {
+    const c = collider as RCollider;
+    const type = c.shape.type;
+    if (type !== this.R.ShapeType.TriMesh && type !== this.R.ShapeType.ConvexPolyhedron) {
+      return null;
+    }
+    const indices = c.indices();
+    return indices ? { vertices: c.vertices(), indices } : null;
+  }
   setColliderGroups(collider: BackendCollider, groups: number) {
     (collider as RCollider).setCollisionGroups(groups);
   }
