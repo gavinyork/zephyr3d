@@ -258,4 +258,64 @@ describe('physics', () => {
     expect(rc.isTrigger).toBe(true);
     expect(rc.world).toBe(PhysicsWorld.find(scene));
   });
+
+  it('starts with its initial velocity once, not again when rebuilt', () => {
+    const scene = new Scene();
+    const world = makeWorld(scene);
+    world.gravity = Vector3.zero();
+    const node = addBody(scene, 'sphere', new Vector3(0, 10, 0));
+    const body = node.getComponent(RigidBody)!;
+    body.initialLinearVelocity = new Vector3(3, 0, 0);
+    body.initialAngularVelocity = new Vector3(0, 2, 0);
+    world.update(DT);
+    expect(body.getLinearVelocity().x).toBeCloseTo(3, 4);
+    expect(body.getAngularVelocity().y).toBeCloseTo(2, 2);
+    body.setLinearVelocity(Vector3.zero());
+    // Rebuilt by a settings change: keeps going as it was, no fresh kick.
+    body.mass = 5;
+    world.update(DT);
+    expect(body.getLinearVelocity().x).toBeCloseTo(0, 4);
+    // Leaving and re-entering the scene starts it again.
+    node.parent = null;
+    world.update(DT);
+    node.parent = scene.rootNode;
+    world.update(DT);
+    expect(body.getLinearVelocity().x).toBeCloseTo(3, 4);
+  });
+
+  it('lets a script velocity win over the initial one, and ignores it on non-dynamic bodies', () => {
+    const scene = new Scene();
+    const world = makeWorld(scene);
+    world.gravity = Vector3.zero();
+    const a = addBody(scene, 'sphere', new Vector3(0, 10, 0)).getComponent(RigidBody)!;
+    a.initialLinearVelocity = new Vector3(3, 0, 0);
+    a.setLinearVelocity(new Vector3(0, 0, 1));
+    const b = addBody(scene, 'sphere', new Vector3(5, 10, 0)).getComponent(RigidBody)!;
+    b.motionType = 'kinematic';
+    b.initialLinearVelocity = new Vector3(3, 0, 0);
+    world.update(DT);
+    expect(a.getLinearVelocity().x).toBeCloseTo(0, 4);
+    expect(a.getLinearVelocity().z).toBeCloseTo(1, 4);
+    expect(b.host!.getWorldPosition().x).toBeCloseTo(5, 4);
+  });
+
+  it('round-trips the initial velocities', async () => {
+    const scene = new Scene();
+    const manager = new ResourceManager(new MemoryFS());
+    registerPhysics(manager);
+    const node = new SceneNode(scene);
+    const body = new RigidBody();
+    body.initialLinearVelocity = new Vector3(1, 2, 3);
+    body.initialAngularVelocity = new Vector3(0, -4, 0);
+    node.addComponent(body);
+    const restored = (await manager.deserializeObject<SceneNode>(
+      new SceneNode(scene),
+      await manager.serializeObject(node)
+    ))!;
+    const rb = restored.getComponent(RigidBody)!;
+    expect([rb.initialLinearVelocity.x, rb.initialLinearVelocity.y, rb.initialLinearVelocity.z]).toEqual([
+      1, 2, 3
+    ]);
+    expect(rb.initialAngularVelocity.y).toBe(-4);
+  });
 });

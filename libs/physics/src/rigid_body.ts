@@ -49,6 +49,10 @@ export class RigidBody extends PhysicsComponent {
   private _forceSet: boolean;
   private _pendingLinearVelocity: Vector3 | null;
   private _pendingAngularVelocity: Vector3 | null;
+  private readonly _initialLinearVelocity: Vector3;
+  private readonly _initialAngularVelocity: Vector3;
+  /** Whether the initial velocities were given to the body since it joined its world. */
+  private _initialApplied: boolean;
   /** Raises this body's events on another object instead, for bodies a component owns. @internal */
   _eventTarget: PhysicsObject | null;
 
@@ -72,6 +76,9 @@ export class RigidBody extends PhysicsComponent {
     this._forceSet = false;
     this._pendingLinearVelocity = null;
     this._pendingAngularVelocity = null;
+    this._initialLinearVelocity = new Vector3();
+    this._initialAngularVelocity = new Vector3();
+    this._initialApplied = false;
     this._eventTarget = null;
   }
 
@@ -181,6 +188,29 @@ export class RigidBody extends PhysicsComponent {
     this._setLock(this._lockRotation, 2, value);
   }
 
+  /**
+   * Velocity in m/s, world space, a dynamic body starts with when its node
+   * enters a simulated scene. Rebuilding the body later (changing its settings)
+   * does not apply it again; leaving and re-entering the scene does. A velocity
+   * set from a script before the body starts wins. Default (0, 0, 0).
+   */
+  get initialLinearVelocity(): Vector3 {
+    return this._initialLinearVelocity;
+  }
+  set initialLinearVelocity(value: Vector3) {
+    this._initialLinearVelocity.set(value);
+  }
+  /**
+   * Spin in rad/s a dynamic body starts with, as an axis scaled by speed in
+   * world space; see {@link RigidBody.initialLinearVelocity}. Default (0, 0, 0).
+   */
+  get initialAngularVelocity(): Vector3 {
+    return this._initialAngularVelocity;
+  }
+  set initialAngularVelocity(value: Vector3) {
+    this._initialAngularVelocity.set(value);
+  }
+
   /** Linear velocity in m/s. Returns zero before the body exists in a simulation. */
   getLinearVelocity(out = new Vector3()): Vector3 {
     const body = this._backend();
@@ -262,6 +292,17 @@ export class RigidBody extends PhysicsComponent {
   }
   /** @internal */
   _applyPendingVelocities(body: BackendBody) {
+    if (!this._initialApplied) {
+      this._initialApplied = true;
+      if (this._motionType === 'dynamic') {
+        if (!this._initialLinearVelocity.equalsTo(zero)) {
+          body.setLinearVelocity(this._mask(this._initialLinearVelocity, this._lockTranslation));
+        }
+        if (!this._initialAngularVelocity.equalsTo(zero)) {
+          body.setAngularVelocity(this._mask(this._initialAngularVelocity, this._lockRotation));
+        }
+      }
+    }
     if (this._pendingLinearVelocity) {
       body.setLinearVelocity(this._pendingLinearVelocity);
       this._pendingLinearVelocity = null;
@@ -330,6 +371,7 @@ export class RigidBody extends PhysicsComponent {
     return this.world?._getBackendBody(this) ?? null;
   }
   protected _join(world: PhysicsWorld) {
+    this._initialApplied = false;
     world._registerBody(this);
   }
   protected _leave(world: PhysicsWorld) {
