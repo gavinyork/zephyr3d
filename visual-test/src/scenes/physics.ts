@@ -3,6 +3,7 @@ import {
   BoundingBox,
   BoxShape,
   CapsuleShape,
+  CylinderShape,
   Mesh,
   PBRMetallicRoughnessMaterial,
   Primitive,
@@ -15,7 +16,9 @@ import {
   initPhysics,
   Joint,
   PhysicsWorld,
-  RigidBody
+  RigidBody,
+  Vehicle,
+  Wheel
 } from '@zephyr3d/physics';
 import type { VisualScene } from '../types';
 import { bareScene, placeCamera, shadowKeyLight } from './common';
@@ -293,5 +296,72 @@ export const physicsJoints: VisualScene = {
     });
 
     placeCamera(camera, new Vector3(0, 4.5, 9), new Vector3(-0.5, 1, 0.5));
+  }
+};
+
+/**
+ * A four wheeled car driven up a ramp from the world's fixed update, steering
+ * a little, captured on the ramp with its suspension loaded unevenly.
+ *
+ * Pins vehicles in the real render path: wheel rays finding a box ramp and the
+ * floor, suspension holding the body up, engine force moving it, and the wheel
+ * nodes written back - lowered onto the ground, steered and rolled - under an
+ * interpolated chassis.
+ *
+ * Deterministic: inputs are set once and everything runs in fixed steps.
+ */
+export const physicsVehicle: VisualScene = {
+  name: 'physics-vehicle',
+  description:
+    'A car with ray cast suspension driving up a ramp. Regresses vehicles, suspension and wheel write-back.',
+  frames: 100,
+  async setup({ scene, camera }) {
+    await initPhysics();
+    bareScene(scene);
+    shadowKeyLight(scene, 'pcf');
+    const grey = new Vector4(0.55, 0.55, 0.55, 1);
+    box(scene, grey, new Vector3(30, 0.5, 30), new Vector3(0, -0.25, 0), false);
+    const ramp = box(
+      scene,
+      new Vector4(0.4, 0.45, 0.55, 1),
+      new Vector3(4, 0.3, 6),
+      new Vector3(0.8, 0.45, 2.5),
+      false
+    );
+    ramp.rotation = Quaternion.fromAxisAngle(Vector3.axisPX(), -0.2);
+
+    const car = new Mesh(
+      scene,
+      new BoxShape({ size: 1.8, sizeY: 0.6, sizeZ: 4 }),
+      material(new Vector4(0.9, 0.35, 0.15, 1))
+    );
+    car.position.setXYZ(0, 0.75, -3.5);
+    const body = new RigidBody();
+    body.mass = 1000;
+    car.addComponent(body);
+    const shell = new Collider();
+    shell.size = new Vector3(1.8, 0.6, 4);
+    car.addComponent(shell);
+    const vehicle = new Vehicle();
+    car.addComponent(vehicle);
+    // A cylinder lies along Y; turned onto its side its axis is the axle.
+    const tyre = new CylinderShape({ topRadius: 0.4, bottomRadius: 0.4, height: 0.3, anchor: 0.5 });
+    const tyreMaterial = material(new Vector4(0.12, 0.12, 0.12, 1));
+    for (const front of [true, false]) {
+      for (const side of [-1, 1]) {
+        const node = new Mesh(scene, tyre, tyreMaterial);
+        node.parent = car;
+        node.position.setXYZ(side * 1.05, -0.35, front ? 1.3 : -1.3);
+        node.rotation = Quaternion.fromAxisAngle(Vector3.axisPZ(), Math.PI / 2);
+        const wheel = new Wheel();
+        wheel.steer = front ? 1 : 0;
+        wheel.drive = front ? 0 : 0.5;
+        node.addComponent(wheel);
+      }
+    }
+    vehicle.throttle = 0.8;
+    vehicle.steering = 0.15;
+
+    placeCamera(camera, new Vector3(7, 4, 6), new Vector3(0, 0.8, 0));
   }
 };

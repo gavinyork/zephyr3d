@@ -6,6 +6,8 @@ import {
   Collider,
   Joint,
   RigidBody,
+  Vehicle,
+  Wheel,
   getColliderOutline,
   getColliderOutlineKey,
   isPhysicsReady,
@@ -20,6 +22,21 @@ const COLOR_KINEMATIC = new Vector3(0.35, 0.6, 1);
 const COLOR_TRIGGER = new Vector3(1, 0.9, 0.2);
 const COLOR_CHARACTER = new Vector3(0.2, 0.95, 0.95);
 const COLOR_JOINT = new Vector4(1, 0.35, 0.85, 1);
+const COLOR_WHEEL = new Vector4(0.95, 0.95, 0.95, 1);
+function forwardVector(forward: string) {
+  switch (forward) {
+    case '-z':
+      return Vector3.axisNZ();
+    case '+x':
+      return Vector3.axisPX();
+    case '-x':
+      return Vector3.axisNX();
+    default:
+      return Vector3.axisPZ();
+  }
+}
+/** Segments per wheel circle. */
+const WHEEL_SEGMENTS = 32;
 /** Alpha of colliders that do not belong to a selected node. */
 const DIM_ALPHA = 0.45;
 /** Size of a joint's pivot cross and axis, in world units. */
@@ -46,6 +63,7 @@ export class ColliderGizmo {
   private readonly _renderer: PostGizmoRenderer;
   private readonly _entries: Map<OutlineTarget, OutlineEntry>;
   private readonly _jointGizmo: LineGizmo;
+  private readonly _wheelGizmo: LineGizmo;
   private _showAll: boolean;
   private readonly _onErrorChanged: Nullable<() => void>;
   /**
@@ -57,8 +75,10 @@ export class ColliderGizmo {
     this._onErrorChanged = onErrorChanged ?? null;
     this._entries = new Map();
     this._jointGizmo = { lines: [], width: 1.5, color: COLOR_JOINT };
+    this._wheelGizmo = { lines: [], width: 1.5, color: COLOR_WHEEL };
     this._showAll = false;
     renderer.addLineGizmo(this._jointGizmo);
+    renderer.addLineGizmo(this._wheelGizmo);
   }
   /** Draw the colliders of the whole scene, not only of the selection. */
   get showAll() {
@@ -69,7 +89,11 @@ export class ColliderGizmo {
   }
   /** Whether anything is drawn, so the gizmo renderer has to run. */
   get active() {
-    return this._renderer.hasAALineBatches || this._jointGizmo.lines.length > 0;
+    return (
+      this._renderer.hasAALineBatches ||
+      this._jointGizmo.lines.length > 0 ||
+      this._wheelGizmo.lines.length > 0
+    );
   }
   /** Why a collider has no outline, for the inspector; null if it has one or is not drawn. */
   getError(target: OutlineTarget) {
@@ -78,6 +102,7 @@ export class ColliderGizmo {
   update(scene: Nullable<Scene>, selected: SceneNode[], camera: Nullable<Camera>) {
     const targets = new Map<OutlineTarget, boolean>();
     const joints: Joint[] = [];
+    const wheels: Wheel[] = [];
     const visit = (node: SceneNode, highlighted: boolean) => {
       node.iterate((child) => {
         for (const component of child.components) {
@@ -85,6 +110,8 @@ export class ColliderGizmo {
             targets.set(component, highlighted || targets.get(component) === true);
           } else if (component instanceof Joint) {
             joints.push(component);
+          } else if (component instanceof Wheel && !wheels.includes(component)) {
+            wheels.push(component);
           }
         }
         return false;
@@ -121,6 +148,7 @@ export class ColliderGizmo {
       }
     }
     this.updateJoints(joints, camera);
+    this.updateWheels(wheels, camera);
   }
   dispose() {
     for (const entry of this._entries.values()) {
@@ -128,6 +156,7 @@ export class ColliderGizmo {
     }
     this._entries.clear();
     this._renderer.removeLineGizmo(this._jointGizmo);
+    this._renderer.removeLineGizmo(this._wheelGizmo);
   }
   private ensureOutline(target: OutlineTarget) {
     let entry = this._entries.get(target);
@@ -208,6 +237,56 @@ export class ColliderGizmo {
       }
     }
     return COLOR_STATIC;
+  }
+  /**
+   * Each wheel as its vehicle sees it at rest: a circle of its radius about the
+   * axle, through the wheel node's position, and its suspension from where it is
+   * attached down to the centre, with its travel marked.
+   */
+  private updateWheels(wheels: Wheel[], camera: Nullable<Camera>) {
+    const lines: Vector4[][] = [];
+    if (camera) {
+      const vp = camera.viewProjectionMatrix;
+      const clip = (p: Vector3) => vp.transformPoint(p, new Vector4());
+      for (const wheel of wheels) {
+        const node = wheel.host!;
+        // The vehicle's axes: its node's up and front, without scale.
+        let vehicleNode: Nullable<SceneNode> = node.parent;
+        while (vehicleNode && !vehicleNode.getComponent(Vehicle)) {
+          vehicleNode = vehicleNode.parent;
+        }
+        const vehicle = vehicleNode?.getComponent(Vehicle) ?? null;
+        const frame = (vehicleNode ?? node).worldMatrix;
+        const up = frame.transformVectorAffine(Vector3.axisPY(), new Vector3()).inplaceNormalize();
+        const front = frame
+          .transformVectorAffine(forwardVector(vehicle?.forward ?? '+z'), new Vector3())
+          .inplaceNormalize();
+        const center = node.getWorldPosition();
+        const top = Vector3.add(center, Vector3.scale(up, wheel.suspensionRestLength));
+        lines.push([clip(top), clip(center)]);
+        // Travel either side of rest.
+        const t = wheel.maxSuspensionTravel;
+        const tick = Vector3.scale(front, 0.05);
+        for (const d of [t, -t]) {
+          const p = Vector3.add(center, Vector3.scale(up, d));
+          lines.push([clip(Vector3.sub(p, tick)), clip(Vector3.add(p, tick))]);
+        }
+        const circle: Vector4[] = [];
+        for (let i = 0; i <= WHEEL_SEGMENTS; i++) {
+          const a = (i / WHEEL_SEGMENTS) * Math.PI * 2;
+          const p = Vector3.add(
+            center,
+            Vector3.add(
+              Vector3.scale(up, Math.cos(a) * wheel.radius),
+              Vector3.scale(front, Math.sin(a) * wheel.radius)
+            )
+          );
+          circle.push(clip(p));
+        }
+        lines.push(circle);
+      }
+    }
+    this._wheelGizmo.lines = lines;
   }
   /** Pivot crosses, hinge and slider axes, and lines to the connected end. */
   private updateJoints(joints: Joint[], camera: Nullable<Camera>) {

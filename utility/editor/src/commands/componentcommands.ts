@@ -2,7 +2,7 @@ import type { SceneNode, SceneNodeComponent, SceneNodeComponentType, Scene } fro
 import { getEngine } from '@zephyr3d/scene';
 import type { Nullable } from '@zephyr3d/base';
 import { AABB, Matrix4x4, Vector3 } from '@zephyr3d/base';
-import { Collider, PhysicsComponent, RigidBody } from '@zephyr3d/physics';
+import { Collider, PhysicsComponent, RigidBody, Vehicle, Wheel } from '@zephyr3d/physics';
 import { Command } from '../core/command';
 
 type ComponentCtor = new () => SceneNodeComponent;
@@ -60,6 +60,18 @@ function fitCollider(collider: Collider, node: SceneNode) {
   }
 }
 
+/** Sizes a new wheel to what its node shows: radius from the bounds' height. */
+function fitWheel(wheel: Wheel, node: SceneNode) {
+  const bounds = getSubtreeLocalBounds(node);
+  if (bounds) {
+    const size = Vector3.sub(bounds.maxPoint, bounds.minPoint);
+    const radius = Math.max(size.x, size.y, size.z) / 2;
+    if (radius > 0.01) {
+      wheel.radius = radius;
+    }
+  }
+}
+
 function hasColliderBelow(node: SceneNode) {
   let found = false;
   node.iterate((child) => {
@@ -88,8 +100,9 @@ export function getAddableComponentTypes(types: readonly SceneNodeComponentType[
 
 /**
  * Adds a component to a node, set up for the node where that helps: a collider
- * is fitted around the node's bounds, and a rigid body on a node with no
- * collider gets one, so it does not fall through everything.
+ * is fitted around the node's bounds, a rigid body on a node with no collider
+ * gets one, so it does not fall through everything, a vehicle gets the rigid
+ * body it needs, and a wheel takes its radius from its node.
  */
 export class AddComponentCommand extends Command<Nullable<SceneNodeComponent>> {
   private readonly _scene: Scene;
@@ -113,8 +126,18 @@ export class AddComponentCommand extends Command<Nullable<SceneNodeComponent>> {
     const component = new this._ctor();
     if (component instanceof Collider) {
       fitCollider(component, node);
+    } else if (component instanceof Wheel) {
+      fitWheel(component, node);
     }
-    const needsCollider = component instanceof RigidBody && !hasColliderBelow(node);
+    // A vehicle drives a dynamic rigid body on its node.
+    const needsBody = component instanceof Vehicle && !node.getComponent(RigidBody);
+    const needsCollider = (component instanceof RigidBody || needsBody) && !hasColliderBelow(node);
+    if (needsBody) {
+      const body = new RigidBody();
+      body.mass = 1000;
+      this._added.push({ path: this._path, index: node.components.length });
+      node.addComponent(body);
+    }
     this._added.push({ path: this._path, index: node.components.length });
     node.addComponent(component);
     if (needsCollider) {
