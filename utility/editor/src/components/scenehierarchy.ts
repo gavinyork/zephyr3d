@@ -10,8 +10,9 @@ import {
   SceneNode,
   Water
 } from '@zephyr3d/scene';
-import type { PropertyAccessor, SceneNodeComponent } from '@zephyr3d/scene';
-import { drawComponentMenus, type ComponentCtor } from '../views/componentmenu';
+import type { PropertyAccessor } from '@zephyr3d/scene';
+import { drawPhysicsMenus } from '../views/physicsmenu';
+import type { PhysicsPreset } from '../commands/physicscommands';
 import { TreeViewData, TreeView } from './treeview';
 import { ImGui } from '@zephyr3d/imgui';
 import { convertEmojiString } from '../helpers/emoji';
@@ -94,8 +95,8 @@ export class SceneHierarchy extends TreeView<
     set_main_camera: [camea: Camera];
     request_go_to_assets: [node: SceneNode];
     request_add_child: [node: SceneNode, ctor: { new (scene: Scene): SceneNode }];
-    request_add_component: [node: SceneNode, ctor: ComponentCtor];
-    request_remove_component: [node: SceneNode, component: SceneNodeComponent];
+    request_physics_preset: [node: SceneNode, preset: PhysicsPreset];
+    request_remove_physics: [node: SceneNode];
     request_save_prefab: [node: SceneNode];
     draw_context_menu: [node: SceneNode, menuId: string];
   },
@@ -174,10 +175,10 @@ export class SceneHierarchy extends TreeView<
     this.drawCreateNodeActions(node);
     ImGui.Separator();
     if (node !== this._scene.rootNode) {
-      drawComponentMenus(
+      drawPhysicsMenus(
         node,
-        (ctor) => this.dispatchEvent('request_add_component', node, ctor),
-        (component) => this.dispatchEvent('request_remove_component', node, component)
+        (preset) => this.dispatchEvent('request_physics_preset', node, preset),
+        () => this.dispatchEvent('request_remove_physics', node)
       );
       ImGui.Separator();
     }

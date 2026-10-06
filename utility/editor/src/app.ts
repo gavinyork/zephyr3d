@@ -20,7 +20,8 @@ import {
   HairFileImporter,
   OBJImporter
 } from '@zephyr3d/loaders';
-import { initPhysics, PhysicsWorld } from '@zephyr3d/physics';
+import { initPhysics, PhysicsSimulation } from '@zephyr3d/physics';
+import { rapierPhysics } from '@zephyr3d/physics-rapier';
 
 const searchParams = new URL(window.location.href).searchParams;
 const project = searchParams.get('project');
@@ -188,13 +189,12 @@ editorApp.ready().then(async () => {
     'model/hair',
     new HairFileImporter({ strandStride: 8, segmentsPerStrand: 12 })
   );
-  // Physics components must be known before a scene holding them loads. The
-  // edited scene is never simulated; the editor still loads the engine, to show
-  // colliders as the simulation builds them. Play and preview simulate.
+  // The edited scene is never simulated; the editor still loads the engine, to
+  // show colliders as the simulation builds them. Play and preview simulate.
   if (editorMode === 'editor') {
-    PhysicsWorld.simulationEnabled = false;
+    PhysicsSimulation.simulationEnabled = false;
   }
-  const physicsLoading = initPhysics().catch((err) => {
+  const physicsLoading = initPhysics(rapierPhysics).catch((err) => {
     console.error(`Physics is unavailable: ${err}`);
   });
   if (editorMode !== 'editor') {

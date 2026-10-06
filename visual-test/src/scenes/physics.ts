@@ -3,25 +3,32 @@ import {
   BoundingBox,
   BoxShape,
   CapsuleShape,
-  CylinderShape,
-  Mesh,
-  PBRMetallicRoughnessMaterial,
-  Primitive,
-  SphereShape
-} from '@zephyr3d/scene';
-import type { Scene } from '@zephyr3d/scene';
-import {
   CharacterController,
   Collider,
-  initPhysics,
+  CylinderShape,
   Joint,
-  PhysicsWorld,
+  Mesh,
+  NodePhysics,
+  PBRMetallicRoughnessMaterial,
+  Primitive,
   RigidBody,
+  SphereShape,
   Vehicle,
   Wheel
-} from '@zephyr3d/physics';
+} from '@zephyr3d/scene';
+import type { Scene, SceneNode } from '@zephyr3d/scene';
+import { initPhysics } from '@zephyr3d/physics';
+import { rapierPhysics } from '@zephyr3d/physics-rapier';
 import type { VisualScene } from '../types';
 import { bareScene, placeCamera, shadowKeyLight } from './common';
+
+/** The physics data of a node, created on first use. */
+function physicsOf(node: SceneNode) {
+  if (!node.physics) {
+    node.physics = new NodePhysics();
+  }
+  return node.physics;
+}
 
 function material(color: Vector4) {
   const m = new PBRMetallicRoughnessMaterial();
@@ -35,23 +42,23 @@ function box(scene: Scene, color: Vector4, size: Vector3, position: Vector3, dyn
   const mesh = new Mesh(scene, new BoxShape({ size: size.x, sizeY: size.y, sizeZ: size.z }), material(color));
   mesh.position.set(position);
   if (dynamic) {
-    mesh.addComponent(new RigidBody());
+    physicsOf(mesh).body = new RigidBody();
   }
   const collider = new Collider();
   collider.size = size;
-  mesh.addComponent(collider);
+  physicsOf(mesh).addCollider(collider);
   return mesh;
 }
 
 function ball(scene: Scene, color: Vector4, radius: number, position: Vector3) {
   const mesh = new Mesh(scene, new SphereShape({ radius }), material(color));
   mesh.position.set(position);
-  mesh.addComponent(new RigidBody());
+  physicsOf(mesh).body = new RigidBody();
   const collider = new Collider();
   collider.shape = 'sphere';
   collider.radius = radius;
   collider.restitution = 0.3;
-  mesh.addComponent(collider);
+  physicsOf(mesh).addCollider(collider);
   return mesh;
 }
 
@@ -59,7 +66,7 @@ function ball(scene: Scene, color: Vector4, radius: number, position: Vector3) {
  * Rigid bodies dropped onto a tilted slab and a floor, captured mid-motion.
  *
  * Pins the whole physics path end to end - WebAssembly loading from the
- * package's dist, component registration, fixed stepping driven by the
+ * package's dist, physics data on nodes, fixed stepping driven by the
  * harness's fixed frame time, and pose write-back into the render - not the
  * solver's numbers, which the unit tests cover. Captured while bodies are still
  * moving so that render-pose interpolation is in the image too.
@@ -74,7 +81,7 @@ export const physicsDrop: VisualScene = {
     'Boxes and balls falling onto a tilted slab and a floor. Regresses Rapier loading, stepping and pose write-back.',
   frames: 75,
   async setup({ scene, camera }) {
-    await initPhysics();
+    await initPhysics(rapierPhysics);
     bareScene(scene);
     // Shadows show whether a body rests on something or hovers above it.
     shadowKeyLight(scene, 'pcf');
@@ -169,7 +176,7 @@ export const physicsMeshGround: VisualScene = {
     'Convex rocks and crates on rolling mesh-collided ground. Regresses mesh read back, the start barrier, and mesh and convex contacts.',
   frames: 90,
   async setup({ scene, camera }) {
-    await initPhysics();
+    await initPhysics(rapierPhysics);
     bareScene(scene);
     // Shadows show whether a body rests on the ground or hovers above it.
     shadowKeyLight(scene, 'pcf');
@@ -177,7 +184,7 @@ export const physicsMeshGround: VisualScene = {
     const ground = new Mesh(scene, rollingGround(), material(new Vector4(0.5, 0.55, 0.45, 1)));
     const groundCollider = new Collider();
     groundCollider.shape = 'mesh';
-    ground.addComponent(groundCollider);
+    physicsOf(ground).addCollider(groundCollider);
 
     const colors = [
       new Vector4(0.9, 0.35, 0.15, 1),
@@ -191,22 +198,22 @@ export const physicsMeshGround: VisualScene = {
       const rock = new Mesh(scene, rockShape, material(colors[i % 4]));
       rock.position.setXYZ(-3 + (i % 4) * 1.7, 2.5 + Math.floor(i / 4) * 1.2, -1 + (i % 3) * 0.9);
       rock.scale.setXYZ(1, 0.7 + (i % 3) * 0.15, 1.2);
-      rock.addComponent(new RigidBody());
+      physicsOf(rock).body = new RigidBody();
       const hull = new Collider();
       hull.shape = 'convex';
-      rock.addComponent(hull);
+      physicsOf(rock).addCollider(hull);
     }
     const crateShape = new BoxShape({ size: 0.7 });
     for (let i = 0; i < 4; i++) {
       const crate = new Mesh(scene, crateShape, material(colors[(i + 1) % 4]));
       crate.position.setXYZ(-2.2 + i * 1.5, 4.5, 0.4);
       crate.rotation = Quaternion.fromAxisAngle(new Vector3(1, 0.5, 0).inplaceNormalize(), i * 0.6);
-      crate.addComponent(new RigidBody());
+      physicsOf(crate).body = new RigidBody();
       const hull = new Collider();
       hull.shape = 'convex';
-      crate.addComponent(hull);
+      physicsOf(crate).addCollider(hull);
     }
-    await PhysicsWorld.get(scene).whenReady();
+    await scene.physicsWorld!.whenReady();
 
     placeCamera(camera, new Vector3(0, 5, 10), new Vector3(0, 0.5, 0));
   }
@@ -231,7 +238,7 @@ export const physicsJoints: VisualScene = {
     'Hinged door hit by a ball, a bead chain on ball joints, and a character climbing steps. Regresses joints and the character controller.',
   frames: 75,
   async setup({ scene, camera }) {
-    await initPhysics();
+    await initPhysics(rapierPhysics);
     bareScene(scene);
     shadowKeyLight(scene, 'pcf');
     const grey = new Vector4(0.55, 0.55, 0.55, 1);
@@ -253,10 +260,11 @@ export const physicsJoints: VisualScene = {
     joint.limitsEnabled = true;
     joint.lowerLimit = -100;
     joint.upperLimit = 100;
-    hinge.addComponent(joint);
+    physicsOf(hinge).joint = joint;
     const knock = ball(scene, new Vector4(0.9, 0.35, 0.15, 1), 0.3, new Vector3(2.0, 0.3, 4));
-    knock.getComponent(RigidBody)!.mass = 8;
-    knock.getComponent(RigidBody)!.setLinearVelocity(new Vector3(0, 0, -6));
+    const knockBody = knock.physics!.body as RigidBody;
+    knockBody.mass = 8;
+    knockBody.setLinearVelocity(new Vector3(0, 0, -6));
 
     // Bead chain, laid out level from a fixed point and let go.
     const beads = 7;
@@ -272,7 +280,7 @@ export const physicsJoints: VisualScene = {
       link.type = 'ball';
       link.anchor = new Vector3(-0.15, 0, 0);
       link.connectedBody = prev;
-      bead.addComponent(link);
+      physicsOf(bead).joint = link;
       prev = bead;
     }
 
@@ -287,9 +295,9 @@ export const physicsJoints: VisualScene = {
     );
     hero.position.setXYZ(0.5, 0, 2.5);
     const controller = new CharacterController();
-    hero.addComponent(controller);
+    physicsOf(hero).body = controller;
     let vy = 0;
-    const world = PhysicsWorld.get(scene);
+    const world = scene.physicsWorld!;
     world.on('fixedupdate', (dt) => {
       vy = controller.isGrounded ? -1 : vy - 9.81 * dt;
       controller.move(new Vector3(-1.6 * dt, vy * dt, 0));
@@ -316,7 +324,7 @@ export const physicsVehicle: VisualScene = {
     'A car with ray cast suspension driving up a ramp. Regresses vehicles, suspension and wheel write-back.',
   frames: 100,
   async setup({ scene, camera }) {
-    await initPhysics();
+    await initPhysics(rapierPhysics);
     bareScene(scene);
     shadowKeyLight(scene, 'pcf');
     const grey = new Vector4(0.55, 0.55, 0.55, 1);
@@ -338,12 +346,12 @@ export const physicsVehicle: VisualScene = {
     car.position.setXYZ(0, 0.75, -3.5);
     const body = new RigidBody();
     body.mass = 1000;
-    car.addComponent(body);
+    physicsOf(car).body = body;
     const shell = new Collider();
     shell.size = new Vector3(1.8, 0.6, 4);
-    car.addComponent(shell);
+    physicsOf(car).addCollider(shell);
     const vehicle = new Vehicle();
-    car.addComponent(vehicle);
+    physicsOf(car).vehicle = vehicle;
     // A cylinder lies along Y; turned onto its side its axis is the axle.
     const tyre = new CylinderShape({ topRadius: 0.4, bottomRadius: 0.4, height: 0.3, anchor: 0.5 });
     const tyreMaterial = material(new Vector4(0.12, 0.12, 0.12, 1));
@@ -356,7 +364,7 @@ export const physicsVehicle: VisualScene = {
         const wheel = new Wheel();
         wheel.steer = front ? 1 : 0;
         wheel.drive = front ? 0 : 0.5;
-        node.addComponent(wheel);
+        physicsOf(node).wheel = wheel;
       }
     }
     vehicle.throttle = 0.8;

@@ -15,7 +15,7 @@ const destdir = path.join(__dirname, 'dist');
 const runtimeDecoders = {
   scene: 'asset/loaders/ktx2/basis',
   loaders: 'gltf/draco',
-  physics: 'rapier'
+  'physics-rapier': 'rapier'
 };
 
 function getTargetWeb(name) {
@@ -66,7 +66,15 @@ function getTargetWeb(name) {
 }
 
 export default (args) => {
-  return ['base', 'device', 'scene', 'loaders', 'physics', 'imgui', 'backend-webgl', 'backend-webgpu'].map(
-    (name) => getTargetWeb(name)
-  );
+  return [
+    'base',
+    'device',
+    'scene',
+    'loaders',
+    'physics',
+    'physics-rapier',
+    'imgui',
+    'backend-webgl',
+    'backend-webgpu'
+  ].map((name) => getTargetWeb(name));
 };

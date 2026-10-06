@@ -45,9 +45,9 @@ export default () => ({
         // The harness is a single plain-Rollup bundle, which does not emit assets for
         // `new URL(..., import.meta.url)`; the KTX2 loader resolves its transcoder
         // relative to the bundle, so put the shipped copy there
-        // Likewise the Rapier physics module, resolved relative to the physics package
+        // Likewise the Rapier physics module, resolved relative to the Rapier engine package
         {
-          src: 'node_modules/@zephyr3d/physics/dist/rapier/*',
+          src: 'node_modules/@zephyr3d/physics-rapier/dist/rapier/*',
           dest: path.join(destdir, 'js', 'rapier')
         },
         {
