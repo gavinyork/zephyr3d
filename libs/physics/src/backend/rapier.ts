@@ -20,7 +20,10 @@ import type {
   MotionType,
   MotorMode,
   QueryPredicate,
-  ShapeDesc
+  ShapeDesc,
+  BackendVehicle,
+  VehicleWheelDesc,
+  VehicleWheelState
 } from './types';
 
 type RWorld = InstanceType<RapierAPI['World']>;
@@ -30,6 +33,7 @@ type RShape = InstanceType<RapierAPI['Shape']>;
 type RJoint = ReturnType<RWorld['createImpulseJoint']>;
 type RUnitJoint = InstanceType<RapierAPI['RevoluteImpulseJoint']>;
 type RController = ReturnType<RWorld['createCharacterController']>;
+type RVehicle = ReturnType<RWorld['createVehicleController']>;
 
 /** Rapier's motors stop at this force by default: in effect unlimited. */
 const UNLIMITED_FORCE = 3.4e38;
@@ -214,6 +218,62 @@ class RapierJoint implements BackendJoint {
         return;
     }
     joint.setMotorMaxForce(maxForce > 0 ? maxForce : UNLIMITED_FORCE);
+  }
+}
+
+class RapierVehicle implements BackendVehicle {
+  private readonly _controller: RVehicle;
+  constructor(
+    private readonly R: RapierAPI,
+    private readonly _world: RWorld,
+    chassis: RapierBody,
+    forwardAxis: number,
+    wheels: VehicleWheelDesc[]
+  ) {
+    const c = _world.createVehicleController(chassis.body);
+    this._controller = c;
+    c.indexUpAxis = 1;
+    // The binding names this setter oddly; it sets the forward axis.
+    c.setIndexForwardAxis = forwardAxis;
+    wheels.forEach((w, i) => {
+      c.addWheel(vec(w.connection), vec(w.direction), vec(w.axle), w.restLength, w.radius);
+      c.setWheelSuspensionStiffness(i, w.stiffness);
+      c.setWheelSuspensionCompression(i, w.compression);
+      c.setWheelSuspensionRelaxation(i, w.relaxation);
+      c.setWheelMaxSuspensionTravel(i, w.maxTravel);
+      c.setWheelMaxSuspensionForce(i, w.maxForce);
+      c.setWheelFrictionSlip(i, w.frictionSlip);
+      c.setWheelSideFrictionStiffness(i, w.sideFriction);
+    });
+  }
+  setWheelInput(index: number, engineForce: number, brakeImpulse: number, steering: number) {
+    const c = this._controller;
+    c.setWheelEngineForce(index, engineForce);
+    c.setWheelBrake(index, brakeImpulse);
+    c.setWheelSteering(index, steering);
+  }
+  update(dt: number, filter: QueryPredicate) {
+    // Triggers are driven through, not over.
+    this._controller.updateVehicle(dt, this.R.QueryFilterFlags.EXCLUDE_SENSORS, undefined, (other) =>
+      filter(other.handle)
+    );
+  }
+  wheelState(index: number, out: VehicleWheelState) {
+    const c = this._controller;
+    out.suspensionLength = c.wheelSuspensionLength(index) ?? 0;
+    out.rotation = c.wheelRotation(index) ?? 0;
+    out.steering = c.wheelSteering(index) ?? 0;
+    out.inContact = c.wheelIsInContact(index);
+    const p = c.wheelContactPoint(index);
+    const n = c.wheelContactNormal(index);
+    out.contactPoint.setXYZ(p?.x ?? 0, p?.y ?? 0, p?.z ?? 0);
+    out.contactNormal.setXYZ(n?.x ?? 0, n?.y ?? 0, n?.z ?? 0);
+    out.groundKey = out.inContact ? (c.wheelGroundObject(index)?.handle ?? -1) : -1;
+    out.suspensionForce = c.wheelSuspensionForce(index) ?? 0;
+    return out;
+  }
+  dispose() {
+    this._world.removeVehicleController(this._controller);
   }
 }
 
@@ -439,6 +499,9 @@ export class RapierWorld implements BackendWorld {
   }
   createCharacter(settings: CharacterSettings): BackendCharacter {
     return new RapierCharacter(this.R, this._world, settings);
+  }
+  createVehicle(chassis: BackendBody, forwardAxis: number, wheels: VehicleWheelDesc[]): BackendVehicle {
+    return new RapierVehicle(this.R, this._world, chassis as RapierBody, forwardAxis, wheels);
   }
   syncColliders() {
     this._world.propagateModifiedBodyPositionsToColliders();

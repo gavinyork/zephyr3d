@@ -7,6 +7,7 @@ import type {
   BackendCollider,
   BackendJoint,
   BackendRayHit,
+  BackendVehicle,
   BackendWorld,
   QueryPredicate,
   ShapeDesc
@@ -17,11 +18,26 @@ import type { RigidBody } from './rigid_body';
 import type { Collider } from './collider';
 import type { Joint } from './joint';
 import type { CharacterController, CharacterMoveResult } from './character';
+import type { Vehicle, Wheel } from './vehicle';
 import type { PhysicsComponent, PhysicsEventMap } from './component';
 import { PhysicsContactEvent, PhysicsTriggerEvent, type PhysicsObject } from './events';
 import type { ColliderGeometry, GeometrySource } from './geometry';
 import { buildColliderShape, CONVEX_HULL_ERROR } from './shapes';
 import { fetchGeometry, geometryMatches, geometrySource, needsGeometry, sameSource } from './geometry';
+
+/** A vehicle in the backend, and how its wheel nodes are placed. */
+interface VehicleEntry {
+  component: Vehicle;
+  owner: BodyEntry;
+  vehicle: BackendVehicle;
+  wheels: Wheel[];
+  /** Per wheel, chassis space: suspension attachment, and rotation of the node at rest. */
+  hardPoints: Vector3[];
+  restRotations: Quaternion[];
+  /** Front, and the axis wheels roll about going forwards (up × front), chassis space. */
+  forward: Vector3;
+  spinAxis: Vector3;
+}
 
 /** World pose of a node, scale dropped. */
 interface Pose {
@@ -300,6 +316,10 @@ export class PhysicsWorld extends makeObservable(Disposable)<PhysicsWorldEventMa
   /** The scene settings last applied, and their version then. */
   private _appliedSettings: ScenePhysicsSettings | null;
   private _appliedSettingsVersion: number;
+  private readonly _registeredVehicles: Set<Vehicle>;
+  private readonly _registeredWheels: Set<Wheel>;
+  private readonly _vehicles: Map<Vehicle, VehicleEntry>;
+  private _vehiclesDirty: boolean;
   /** @internal */
   _inFixedUpdate: boolean;
 
@@ -370,6 +390,10 @@ export class PhysicsWorld extends makeObservable(Disposable)<PhysicsWorldEventMa
     this._worldAnchor = null;
     this._characters = new Map();
     this._inFixedUpdate = false;
+    this._registeredVehicles = new Set();
+    this._registeredWheels = new Set();
+    this._vehicles = new Map();
+    this._vehiclesDirty = false;
     this._appliedSettings = null;
     this._appliedSettingsVersion = -1;
     this._applySceneSettings();
@@ -541,6 +565,7 @@ export class PhysicsWorld extends makeObservable(Disposable)<PhysicsWorldEventMa
       for (const entry of this._bodies.values()) {
         entry.component._applyStepInputs(entry.body);
       }
+      this._updateVehicles(fixed);
       this._backend!.step(fixed, this._onCollision);
       this._captureDynamicPoses();
     }
@@ -550,6 +575,7 @@ export class PhysicsWorld extends makeObservable(Disposable)<PhysicsWorldEventMa
       }
     }
     this._writeBack(this._interpolation ? this._accumulator / fixed : 1);
+    this._writeWheels();
     // A frame without steps changes no contacts; diffing it would only see the
     // colliders rebuilt at its start as having let go.
     if (steps > 0) {
@@ -868,9 +894,55 @@ export class PhysicsWorld extends makeObservable(Disposable)<PhysicsWorldEventMa
     }
     return { movement: result.movement, grounded: result.grounded, groundNormal, collisions };
   }
+  /** @internal */
+  _registerVehicle(component: Vehicle) {
+    this._registeredVehicles.add(component);
+    this._vehiclesDirty = true;
+  }
+  /** @internal */
+  _unregisterVehicle(component: Vehicle) {
+    this._registeredVehicles.delete(component);
+    this._vehiclesDirty = true;
+  }
+  /** @internal */
+  _registerWheel(component: Wheel) {
+    this._registeredWheels.add(component);
+    this._vehiclesDirty = true;
+  }
+  /** @internal */
+  _unregisterWheel(component: Wheel) {
+    this._registeredWheels.delete(component);
+    this._restoreWheel(component);
+    this._vehiclesDirty = true;
+  }
+  /** A vehicle or wheel setting changed; vehicles are rebuilt on the next update. @internal */
+  _markVehiclesDirty() {
+    this._vehiclesDirty = true;
+  }
+  /** @internal */
+  _vehicleSpeed(component: Vehicle) {
+    const entry = this._vehicles.get(component);
+    if (!entry) {
+      return 0;
+    }
+    const v = entry.owner.body.getLinearVelocity(new Vector3());
+    const front = entry.owner.body.getRotation(new Quaternion()).transform(entry.forward, new Vector3());
+    return Vector3.dot(v, front);
+  }
+  /** @internal */
+  _vehicleWheels(component: Vehicle): readonly Wheel[] {
+    return this._vehicles.get(component)?.wheels ?? [];
+  }
+  /** @internal */
+  _colliderNodeByKey(key: number) {
+    return key < 0 ? null : (this._byKey.get(key)?.component.host ?? null);
+  }
+
   /** A body's settings changed; it is rebuilt on the next update. @internal */
   _markBodyDirty(component: RigidBody) {
     this._dirtyBodies.add(component);
+    // Vehicles hold their chassis body.
+    this._vehiclesDirty = true;
     // Joints on it, or whose ends may now resolve to a different body.
     const root = component.host;
     for (const joint of this._registeredJoints) {
@@ -945,10 +1017,24 @@ export class PhysicsWorld extends makeObservable(Disposable)<PhysicsWorldEventMa
 
   /** Brings backend bodies and colliders in line with the components, in scene order. */
   private _resolve() {
-    if (this._dirtyBodies.size === 0 && this._dirtyColliders.size === 0 && this._dirtyJoints.size === 0) {
+    if (
+      this._dirtyBodies.size === 0 &&
+      this._dirtyColliders.size === 0 &&
+      this._dirtyJoints.size === 0 &&
+      !this._vehiclesDirty
+    ) {
       return;
     }
     const backend = this._backend!;
+    const rebuildVehicles = this._vehiclesDirty;
+    if (rebuildVehicles) {
+      // Before their chassis bodies may go.
+      for (const entry of this._vehicles.values()) {
+        entry.vehicle.dispose();
+      }
+      this._vehicles.clear();
+      this._vehiclesDirty = false;
+    }
     // Joints go first, while both their bodies still exist.
     for (const j of this._dirtyJoints) {
       const entry = this._joints.get(j);
@@ -1008,7 +1094,206 @@ export class PhysicsWorld extends makeObservable(Disposable)<PhysicsWorldEventMa
         this._createJoint(component as Joint);
       }
     }
+    if (rebuildVehicles) {
+      this._createVehicles();
+    }
     this._updateBodyEnablement();
+  }
+
+  /** Builds every vehicle, in scene order, with the wheels below it. */
+  private _createVehicles() {
+    const claimed = new Set<Wheel>();
+    const vehicles: Vehicle[] = [];
+    this._scene.rootNode.iterate((node) => {
+      for (const component of node.components) {
+        if (this._registeredVehicles.has(component as Vehicle)) {
+          vehicles.push(component as Vehicle);
+        }
+      }
+    });
+    for (const vehicle of vehicles) {
+      this._createVehicle(vehicle, claimed);
+    }
+    for (const wheel of this._registeredWheels) {
+      if (!claimed.has(wheel)) {
+        wheel._setError('A wheel needs a Vehicle on a node above it, with no other rigid body in between');
+        this._restoreWheel(wheel);
+      }
+    }
+  }
+
+  private _createVehicle(component: Vehicle, claimed: Set<Wheel>) {
+    const host = component.host!;
+    let owner: BodyEntry | null = null;
+    for (const c of host.components) {
+      const entry = this._bodies.get(c as RigidBody);
+      if (entry) {
+        owner = entry;
+      }
+    }
+    if (!owner || owner.component.motionType !== 'dynamic') {
+      component._setError('A vehicle needs a dynamic RigidBody on its node');
+      return;
+    }
+    // Its wheels: below it, owned by its body, and not under a nearer vehicle.
+    const wheels: Wheel[] = [];
+    host.iterate((node) => {
+      if (node === host) {
+        return false;
+      }
+      for (const c of node.components) {
+        const wheel = c as Wheel;
+        if (!this._registeredWheels.has(wheel) || claimed.has(wheel)) {
+          continue;
+        }
+        if (this._findOwner(node) === owner) {
+          wheels.push(wheel);
+        }
+      }
+      return false;
+    });
+    if (wheels.length === 0) {
+      component._setError('A vehicle needs Wheel components on nodes below it');
+      return;
+    }
+    const body = readWorldPose(host, newPose());
+    const invBody = Quaternion.inverse(body.rotation, new Quaternion());
+    const up = Vector3.axisPY();
+    const forward = component._forwardVector();
+    const axle = Vector3.cross(forward, up, new Vector3());
+    const spinAxis = Vector3.cross(up, forward, new Vector3());
+    const down = new Vector3(0, -1, 0);
+    const hardPoints: Vector3[] = [];
+    const restRotations: Quaternion[] = [];
+    const descs = wheels.map((wheel) => {
+      claimed.add(wheel);
+      wheel._setError('');
+      const node = wheel.host!;
+      if (!wheel._rest || wheel._restNode !== node) {
+        wheel._rest = { position: node.position.clone(), rotation: node.rotation.clone() };
+        wheel._restNode = node;
+      }
+      // The wheel's rest pose in world space, then in the chassis body's space.
+      const parent = node.parent;
+      const center = parent
+        ? parent.worldMatrix.transformPointAffine(wheel._rest.position, new Vector3())
+        : wheel._rest.position.clone();
+      const parentRot = new Quaternion();
+      parent?.worldMatrix.decompose(null, parentRot, null);
+      const worldRot = Quaternion.multiply(parentRot, wheel._rest.rotation, new Quaternion());
+      const centerCs = invBody.transform(Vector3.sub(center, body.position), new Vector3());
+      const hard = new Vector3(centerCs.x, centerCs.y + wheel.suspensionRestLength, centerCs.z);
+      hardPoints.push(hard);
+      restRotations.push(Quaternion.multiply(invBody, worldRot, new Quaternion()));
+      wheel._state.suspensionLength = wheel.suspensionRestLength;
+      wheel._state.rotation = 0;
+      wheel._state.steering = 0;
+      wheel._state.inContact = false;
+      wheel._state.groundKey = -1;
+      return {
+        connection: hard,
+        direction: down,
+        axle,
+        restLength: wheel.suspensionRestLength,
+        radius: wheel.radius,
+        stiffness: wheel.suspensionStiffness,
+        compression: wheel.suspensionCompression,
+        relaxation: wheel.suspensionRelaxation,
+        maxTravel: wheel.maxSuspensionTravel,
+        maxForce: wheel.maxSuspensionForce,
+        frictionSlip: wheel.frictionSlip,
+        sideFriction: wheel.sideFriction
+      };
+    });
+    const forwardAxis = forward.x !== 0 ? 0 : 2;
+    const vehicle = this._backend!.createVehicle(owner.body, forwardAxis, descs);
+    component._setError('');
+    this._vehicles.set(component, {
+      component,
+      owner,
+      vehicle,
+      wheels,
+      hardPoints,
+      restRotations,
+      forward,
+      spinAxis
+    });
+  }
+
+  /** Gives a wheel node back the pose it had before a vehicle moved it. */
+  private _restoreWheel(wheel: Wheel) {
+    const node = wheel._restNode;
+    if (wheel._rest && node && node === wheel.host) {
+      node.position.set(wheel._rest.position);
+      node.rotation.set(wheel._rest.rotation);
+    }
+    wheel._rest = null;
+    wheel._restNode = null;
+  }
+
+  /** Hands the inputs to the wheels and lets them push the chassis, before a step. */
+  private _updateVehicles(dt: number) {
+    const toRad = Math.PI / 180;
+    for (const entry of this._vehicles.values()) {
+      if (entry.owner.disabled) {
+        continue;
+      }
+      const v = entry.component;
+      let active = v._hasInput();
+      entry.wheels.forEach((wheel, i) => {
+        const engine = v.throttle * v.maxEngineForce * wheel.drive + wheel.engineForce;
+        const brake =
+          v.brake * v.maxBrakeForce * wheel.brake +
+          (v.handbrake ? v.maxHandbrakeForce * wheel.handbrake : 0) +
+          wheel.brakeForce;
+        const steer = (v.steering * v.maxSteerAngle * wheel.steer + wheel.steerAngle) * toRad;
+        active ||= wheel.engineForce !== 0 || wheel.brakeForce !== 0 || wheel.steerAngle !== 0;
+        // Rapier takes the brake as the most impulse per step.
+        entry.vehicle.setWheelInput(i, engine, Math.max(0, brake) * dt, steer);
+      });
+      if (active) {
+        entry.owner.body.wakeUp();
+      } else if (entry.owner.body.isSleeping()) {
+        // A resting car stays as it was. Updating would push a body that does
+        // not move: the pushes pile up as velocity it never takes, which the
+        // dampers then read as motion and the suspension lets go.
+        continue;
+      }
+      const layer = v.layer;
+      entry.vehicle.update(dt, (key) => {
+        const c = this._byKey.get(key)?.component;
+        return !!c && !c.isTrigger && this.getLayerCollision(layer, c.layer);
+      });
+      entry.wheels.forEach((wheel, i) => entry.vehicle.wheelState(i, wheel._state));
+    }
+  }
+
+  /** Places the wheel nodes on the drawn chassis: suspension, steering and roll. */
+  private _writeWheels() {
+    const pose = newPose();
+    const up = Vector3.axisPY();
+    const steer = new Quaternion();
+    const spin = new Quaternion();
+    const rot = new Quaternion();
+    const center = new Vector3();
+    for (const entry of this._vehicles.values()) {
+      readWorldPose(entry.component.host!, pose);
+      entry.wheels.forEach((wheel, i) => {
+        const s = wheel._state;
+        const hard = entry.hardPoints[i];
+        center.setXYZ(hard.x, hard.y - s.suspensionLength, hard.z);
+        Quaternion.fromAxisAngle(up, s.steering, steer);
+        Quaternion.fromAxisAngle(entry.spinAxis, s.rotation, spin);
+        Quaternion.multiply(steer, spin, rot).multiplyRight(entry.restRotations[i]);
+        const worldPos = Vector3.add(
+          pose.position,
+          pose.rotation.transform(center, new Vector3()),
+          new Vector3()
+        );
+        const worldRot = Quaternion.multiply(pose.rotation, rot, new Quaternion());
+        wheel.host!.setWorldPose(worldPos, worldRot);
+      });
+    }
   }
 
   private _createJoint(component: Joint) {
@@ -1795,6 +2080,10 @@ export class PhysicsWorld extends makeObservable(Disposable)<PhysicsWorldEventMa
     this._joints.clear();
     this._retryJoints.clear();
     this._characters.clear();
+    for (const wheel of this._registeredWheels) {
+      this._restoreWheel(wheel);
+    }
+    this._vehicles.clear();
     this._worldAnchor = null;
     PhysicsWorld._worlds.delete(this._scene);
   }
