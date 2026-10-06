@@ -9,19 +9,35 @@ const __dirname = dirname(__filename);
 const repoRoot = resolve(__dirname, '..', '..');
 const sourceRoutePrefix = '/__zephyr_source__';
 const packageJson = JSON.parse(fs.readFileSync(resolve(__dirname, 'package.json'), 'utf8'));
-const packageNames = ['base', 'device', 'scene', 'loaders', 'imgui', 'backend-webgl', 'backend-webgpu'];
+const packageNames = [
+  'base',
+  'device',
+  'scene',
+  'loaders',
+  'physics',
+  'imgui',
+  'backend-webgl',
+  'backend-webgpu'
+];
 const runtimeSourcePackageNames = ['base', 'device', 'scene', 'loaders', 'backend-webgl', 'backend-webgpu'];
-const sourceAliases = Object.fromEntries(
-  runtimeSourcePackageNames.map((name) => [
-    `@zephyr3d/${name}`,
-    resolve(__dirname, `../../libs/${name}/src/index.ts`)
-  ])
-);
+// Physics runs from its build in development too: the Rapier WebAssembly is
+// located beside the module (dist/rapier/), and only the build has it. The alias
+// pins the editor's own import to the same file the import map gives scripts.
+const sourceAliases = {
+  ...Object.fromEntries(
+    runtimeSourcePackageNames.map((name) => [
+      `@zephyr3d/${name}`,
+      resolve(__dirname, `../../libs/${name}/src/index.ts`)
+    ])
+  ),
+  '@zephyr3d/physics': resolve(__dirname, '../../libs/physics/dist/index.js')
+};
 const monacoSourceRoots = {
   base: resolve(__dirname, '../../libs/base/src'),
   device: resolve(__dirname, '../../libs/device/src'),
   scene: resolve(__dirname, '../../libs/scene/src'),
   loaders: resolve(__dirname, '../../libs/loaders/src'),
+  physics: resolve(__dirname, '../../libs/physics/src'),
   imgui: resolve(__dirname, '../../libs/imgui/src'),
   'backend-webgl': resolve(__dirname, '../../libs/backend-webgl/src'),
   'backend-webgpu': resolve(__dirname, '../../libs/backend-webgpu/src'),
@@ -202,8 +218,9 @@ export default defineConfig(({ command }) => {
     optimizeDeps: {
       // Locates its WebAssembly with new URL('bindings_wasm_bg.wasm', import.meta.url).
       // Pre-bundling moves the module into node_modules/.vite/deps without the .wasm,
-      // and the dev server answers the miss with index.html.
-      exclude: ['@rollup/browser']
+      // and the dev server answers the miss with index.html. Physics finds Rapier's
+      // WebAssembly the same way.
+      exclude: ['@rollup/browser', '@zephyr3d/physics']
     },
     build: {
       outDir: 'dist',

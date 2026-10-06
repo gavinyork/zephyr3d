@@ -449,6 +449,11 @@
       "shouldPublish": true
     },
     {
+      "packageName": "@zephyr3d/physics",
+      "projectFolder": "libs/physics",
+      "shouldPublish": true
+    },
+    {
       "packageName": "@zephyr3d/modelgen",
       "projectFolder": "libs/modelgen",
       "shouldPublish": true

@@ -5,7 +5,6 @@ import type {
   GPUProgram,
   StructuredBuffer
 } from '@zephyr3d/device';
-import { PBPrimitiveType } from '@zephyr3d/device';
 import {
   Matrix4x4,
   base64ToUint8Array,
@@ -17,6 +16,7 @@ import {
 } from '@zephyr3d/base';
 import { getDevice } from '../../app/api';
 import type { Primitive, SkinInfluenceData } from '../../render';
+import { readPrimitiveAttribute, readPrimitiveIndices } from '../../render/primitive_readback';
 import type { Scene } from '../../scene';
 import type { MeshUpdateCallback } from '../../scene/mesh';
 import { BoundingBox } from '../../utility/bounding_volume';
@@ -197,69 +197,6 @@ function getInitialColliderBufferFloatCount(
 ) {
   const count = (colliders ?? []).reduce((total, collider) => total + (collider?.type === type ? 1 : 0), 0);
   return Math.max(1, count) * stride;
-}
-
-function getPrimitiveScalarByteSize(type: PBPrimitiveType) {
-  switch (type) {
-    case PBPrimitiveType.I16:
-    case PBPrimitiveType.I16_NORM:
-    case PBPrimitiveType.U16:
-    case PBPrimitiveType.U16_NORM:
-    case PBPrimitiveType.F16:
-      return 2;
-    case PBPrimitiveType.I32:
-    case PBPrimitiveType.I32_NORM:
-    case PBPrimitiveType.U32:
-    case PBPrimitiveType.U32_NORM:
-    case PBPrimitiveType.F32:
-      return 4;
-    default:
-      return 1;
-  }
-}
-
-function readPrimitiveScalar(
-  view: DataView,
-  byteOffset: number,
-  scalarType: PBPrimitiveType,
-  normalized: boolean
-) {
-  switch (scalarType) {
-    case PBPrimitiveType.I8:
-    case PBPrimitiveType.I8_NORM: {
-      const value = view.getInt8(byteOffset);
-      return normalized ? Math.max(-1, value / 127) : value;
-    }
-    case PBPrimitiveType.U8:
-    case PBPrimitiveType.U8_NORM: {
-      const value = view.getUint8(byteOffset);
-      return normalized ? value / 255 : value;
-    }
-    case PBPrimitiveType.I16:
-    case PBPrimitiveType.I16_NORM: {
-      const value = view.getInt16(byteOffset, true);
-      return normalized ? Math.max(-1, value / 32767) : value;
-    }
-    case PBPrimitiveType.U16:
-    case PBPrimitiveType.U16_NORM: {
-      const value = view.getUint16(byteOffset, true);
-      return normalized ? value / 65535 : value;
-    }
-    case PBPrimitiveType.I32:
-    case PBPrimitiveType.I32_NORM: {
-      const value = view.getInt32(byteOffset, true);
-      return normalized ? Math.max(-1, value / 2147483647) : value;
-    }
-    case PBPrimitiveType.U32:
-    case PBPrimitiveType.U32_NORM: {
-      const value = view.getUint32(byteOffset, true);
-      return normalized ? value / 4294967295 : value;
-    }
-    case PBPrimitiveType.F32:
-      return view.getFloat32(byteOffset, true);
-    default:
-      throw new Error(`Unsupported vertex scalar type: ${scalarType}`);
-  }
 }
 
 function distance3(positions: Float32Array<ArrayBuffer>, a: number, b: number) {
@@ -1357,50 +1294,11 @@ async function readVertexAttributeDataFromPrimitive(
   semantic: 'position' | 'normal' | 'blendIndices' | 'blendWeights',
   componentCount: number
 ) {
-  const info = primitive.getVertexBufferInfo(semantic);
-  if (!info || !info.type.isPrimitiveType() || info.type.cols < componentCount) {
-    return null;
+  try {
+    return await readPrimitiveAttribute(primitive, semantic, componentCount);
+  } catch (err) {
+    throw new Error(`GPU cloth initialization failed: ${err instanceof Error ? err.message : err}`);
   }
-  const vertexCount = primitive.getNumVertices();
-  if (vertexCount <= 0) {
-    return null;
-  }
-  const bytes = await info.buffer.getBufferSubData();
-  const result = new Float32Array(vertexCount * componentCount);
-  const scalarType = info.type.scalarType;
-  const normalized = info.type.normalized;
-  const componentByteSize = getPrimitiveScalarByteSize(scalarType);
-  const baseByteOffset = info.drawOffset + info.offset;
-  if (
-    scalarType === PBPrimitiveType.F32 &&
-    !normalized &&
-    baseByteOffset % 4 === 0 &&
-    info.stride % 4 === 0
-  ) {
-    const raw = new Float32Array(bytes.buffer, bytes.byteOffset, bytes.byteLength >> 2);
-    const stride = info.stride >> 2;
-    const srcOffset = baseByteOffset >> 2;
-    for (let i = 0; i < vertexCount; i++) {
-      const src = srcOffset + i * stride;
-      const dst = i * componentCount;
-      for (let c = 0; c < componentCount; c++) {
-        result[dst + c] = raw[src + c];
-      }
-    }
-    return result;
-  }
-  if (scalarType === PBPrimitiveType.F16) {
-    throw new Error(`GPU cloth initialization failed: unsupported ${semantic} attribute format.`);
-  }
-  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
-  for (let i = 0; i < vertexCount; i++) {
-    const src = baseByteOffset + i * info.stride;
-    const dst = i * componentCount;
-    for (let c = 0; c < componentCount; c++) {
-      result[dst + c] = readPrimitiveScalar(view, src + c * componentByteSize, scalarType, normalized);
-    }
-  }
-  return result;
 }
 
 async function readSkinningDataFromPrimitive(primitive: Primitive) {
@@ -1458,37 +1356,16 @@ async function readSkinningDataFromMesh(mesh: MeshSkinningSource) {
   return { blendIndices, blendWeights, influenceCount };
 }
 
-function buildNonIndexedTriangles(primitive: Primitive, vertexCount: number) {
-  if (primitive.primitiveType !== 'triangle-list') {
-    throw new Error('GPU cloth initialization failed: only triangle-list primitive is supported.');
+/**
+ * The primitive's full-detail triangles. With mesh LODs the index buffer holds
+ * every level in its own range; reading all of it would stack them together.
+ */
+async function readIndexDataFromPrimitive(primitive: Primitive) {
+  try {
+    return await readPrimitiveIndices(primitive);
+  } catch (err) {
+    throw new Error(`GPU cloth initialization failed: ${err instanceof Error ? err.message : err}`);
   }
-  const start = primitive.indexStart;
-  const count = primitive.indexCount;
-  if (count <= 0 || count % 3 !== 0 || start < 0 || start + count > vertexCount) {
-    throw new Error('GPU cloth initialization failed: invalid non-indexed triangle range.');
-  }
-  const indices = new Uint32Array(count);
-  for (let i = 0; i < count; i++) {
-    indices[i] = start + i;
-  }
-  return indices;
-}
-
-async function readIndexDataFromPrimitive(primitive: Primitive, vertexCount: number) {
-  const indexBuffer = primitive.getIndexBuffer();
-  if (!indexBuffer) {
-    return buildNonIndexedTriangles(primitive, vertexCount);
-  }
-  if (primitive.primitiveType !== 'triangle-list') {
-    throw new Error('GPU cloth initialization failed: only triangle-list primitive is supported.');
-  }
-  const bytes = await indexBuffer.getBufferSubData();
-  if (indexBuffer.indexType.primitiveType === PBPrimitiveType.U16) {
-    const src = new Uint16Array(bytes.buffer, bytes.byteOffset, bytes.byteLength >> 1);
-    return new Uint16Array(src);
-  }
-  const src = new Uint32Array(bytes.buffer, bytes.byteOffset, bytes.byteLength >> 2);
-  return new Uint32Array(src);
 }
 
 function createWrapDeformerProgram(device: AbstractDevice, workgroupSize: number) {
@@ -2256,9 +2133,7 @@ export async function createGPUClothWrapBindingData(
   }
   const sourcePrimitive = source.primitive as Primitive;
   const sourcePositions = await readPositionDataFromPrimitive(sourcePrimitive);
-  const sourceIndices = toUInt32Indices(
-    await readIndexDataFromPrimitive(sourcePrimitive, (sourcePositions.length / 3) >> 0)
-  );
+  const sourceIndices = toUInt32Indices(await readIndexDataFromPrimitive(sourcePrimitive));
   return GPUClothWrapBinding.createBindingData(source, sourcePositions, sourceIndices, target);
 }
 
@@ -2728,7 +2603,7 @@ export class GPUClothSystem {
   ) {
     const positionData = await readPositionDataFromPrimitive(primitive);
     const skinningData = await readSkinningDataFromPrimitive(primitive);
-    const indexData = await readIndexDataFromPrimitive(primitive, (positionData.length / 3) >> 0);
+    const indexData = await readIndexDataFromPrimitive(primitive);
     return new GPUClothSystem({
       ...options,
       primitive,
@@ -2748,7 +2623,7 @@ export class GPUClothSystem {
     }
     const positionData = await readPositionDataFromPrimitive(mesh.primitive);
     const skinningData = await readSkinningDataFromMesh(mesh);
-    const indexData = await readIndexDataFromPrimitive(mesh.primitive, (positionData.length / 3) >> 0);
+    const indexData = await readIndexDataFromPrimitive(mesh.primitive);
     return new GPUClothSystem({
       ...options,
       primitive: mesh.primitive,

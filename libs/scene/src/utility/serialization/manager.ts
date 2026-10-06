@@ -10,6 +10,7 @@ import {
 } from '@zephyr3d/base';
 import type { PropertyAccessor, PropertyType, PropertyValue, SerializableClass } from './types';
 import { getAABBClass } from './scene/misc';
+import { getScenePhysicsSettingsClass } from './scene/physics';
 import { getGraphNodeClass, getSceneNodeClass } from './scene/node';
 import { getGPUClothComponentClass } from './scene/cloth';
 import { getBatchGroupClass } from './scene/batch';
@@ -305,6 +306,7 @@ export class ResourceManager {
         getJSONArrayClass(),
         getScriptAttachmentClass(),
         getAABBClass(),
+        getScenePhysicsSettingsClass(),
         getInterpolatorClass(),
         getInterpolatorScalarClass(),
         getSkeletonClass(),

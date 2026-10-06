@@ -58,6 +58,20 @@ function getNoopTarget() {
   };
 }
 
+// Files a package fetches beside its own module at runtime (new URL(..., import.meta.url));
+// bundled into `tut/lib`, the module moves, so they have to move with it.
+const runtimeFiles = {
+  physics: ['rapier/rapier_wasm3d_bg.wasm', 'rapier/LICENSE']
+};
+
+function copyRuntimeFiles(packageName) {
+  for (const file of runtimeFiles[packageName] ?? []) {
+    const dest = path.join(engineBundleDir, file);
+    fs.mkdirSync(path.dirname(dest), { recursive: true });
+    fs.copyFileSync(path.join(enginePackageRoot, packageName, 'dist', file), dest);
+  }
+}
+
 function getLibTarget(packageName, onWritten) {
   const plugins = [nodeResolve(), commonjs()];
   if (codeCompress) {
@@ -73,7 +87,10 @@ function getLibTarget(packageName, onWritten) {
   }
   plugins.push({
     name: 'record-engine-digest',
-    writeBundle: () => onWritten(packageName)
+    writeBundle: () => {
+      copyRuntimeFiles(packageName);
+      onWritten(packageName);
+    }
   });
   return {
     input: path.join(enginePackageRoot, packageName, 'dist', 'index.js'),
@@ -105,6 +122,7 @@ export default () => {
     (name) =>
       watchMode ||
       !fs.existsSync(path.join(engineBundleDir, bundleName(name))) ||
+      (runtimeFiles[name] ?? []).some((file) => !fs.existsSync(path.join(engineBundleDir, file))) ||
       cache?.digests?.[name] !== digestEnginePackage(name)
   );
 

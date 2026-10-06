@@ -15,6 +15,8 @@ export * from './water_surface_sampler';
 export * from './hair';
 export * from './octree';
 export * from './scene_node';
+export * from './component';
+export * from './physics_settings';
 export * from './particlesys';
 export * from './batchgroup';
 export * from './scene';

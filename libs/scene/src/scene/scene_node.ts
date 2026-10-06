@@ -6,12 +6,20 @@ import type { PunctualLight, BaseLight } from './light';
 import type { BoundingVolume } from '../utility/bounding_volume';
 import type { BatchGroup } from './batchgroup';
 import type { Visitor } from './visitor';
-import type { IDisposable, Immutable, Nullable, Quaternion } from '@zephyr3d/base';
+import type { IDisposable, Immutable, Nullable } from '@zephyr3d/base';
 import { Disposable, DRef, makeObservable, randomUUID } from '@zephyr3d/base';
-import { Matrix4x4, ObservableQuaternion, ObservableVector3, Vector3, Vector4 } from '@zephyr3d/base';
+import {
+  Matrix4x4,
+  ObservableQuaternion,
+  ObservableVector3,
+  Quaternion,
+  Vector3,
+  Vector4
+} from '@zephyr3d/base';
 import type { ParticleSystem } from './particlesys';
 import type { SkeletonRig, SkinBinding } from '../animation';
 import type { GPUClothComponent } from '../animation/cloth/gpu_cloth_component';
+import type { SceneNodeComponent, SceneNodeComponentType } from './component';
 import { AnimationSet } from '../animation/animationset';
 import type { SharedModel } from '../asset';
 import type { Water } from './water';
@@ -27,6 +35,9 @@ import {
 } from './script_attachment';
 import type { MSDFTextSprite } from './msdftextsprite';
 import type { MSDFText } from './msdftext';
+
+/** Scratch for {@link SceneNode.setWorldPose}. */
+const tmpQuat = new Quaternion();
 
 /**
  * Iteration callback used by traversal helpers.
@@ -261,8 +272,8 @@ export class SceneNode
   private _disableCallback: number;
   /** @internal User-attached script entries (engine-defined). */
   private _scripts: ScriptAttachment[];
-  /** @internal Serialized GPU cloth components owned by this node. */
-  private _gpuClothComponents: GPUClothComponent[];
+  /** @internal Components attached to this node, GPU cloth included. */
+  private _components: SceneNodeComponent[];
   /**
    * Construct a scene node.
    *
@@ -312,7 +323,7 @@ export class SceneNode
     this._tmpLocalMatrix = Matrix4x4.identity();
     this._tmpWorldMatrix = Matrix4x4.identity();
     this._scripts = [];
-    this._gpuClothComponents = [];
+    this._components = [];
     this._metaData = null;
     this._parent = null;
     this.reparent(scene?.rootNode ?? null);
@@ -482,42 +493,92 @@ export class SceneNode
     }
     this._scripts = this._scripts.filter((item) => item.script || item.config != null);
   }
-  /** GPU cloth simulations owned by this node. */
-  get gpuClothComponents() {
-    return this._gpuClothComponents;
+  /** Components attached to this node, in the order they were added. */
+  get components(): readonly SceneNodeComponent[] {
+    return this._components;
   }
-  set gpuClothComponents(value: GPUClothComponent[]) {
+  /**
+   * Attaches a component to this node.
+   *
+   * @remarks
+   * Adding a component that is already on this node does nothing. A component
+   * attached to another node throws.
+   *
+   * @returns The component.
+   */
+  addComponent<T extends SceneNodeComponent>(component: T): T {
+    this._setComponents([...this._components, component], () => true);
+    return component;
+  }
+  /**
+   * Detaches and disposes a component.
+   *
+   * @returns False if the component was not attached to this node.
+   */
+  removeComponent(component: SceneNodeComponent) {
+    if (!this._components.includes(component)) {
+      return false;
+    }
+    this._setComponents(
+      this._components.filter((item) => item !== component),
+      () => true
+    );
+    return true;
+  }
+  /** The first attached component of the given type, or null. */
+  getComponent<T extends SceneNodeComponent>(type: SceneNodeComponentType<T>): Nullable<T> {
+    return (this._components.find((component) => component instanceof type) as T) ?? null;
+  }
+  /** All attached components of the given type. */
+  getComponents<T extends SceneNodeComponent>(type: SceneNodeComponentType<T>): T[] {
+    return this._components.filter((component) => component instanceof type) as T[];
+  }
+  /**
+   * Replaces the components that `owns` selects with `value`, leaving the others
+   * where they are.
+   *
+   * @remarks
+   * Removed components are detached and disposed; new ones are attached. Shared by
+   * the generic list and the GPU cloth accessors, which each manage one subset.
+   *
+   * @internal
+   */
+  _setComponents(value: SceneNodeComponent[], owns: (component: SceneNodeComponent) => boolean) {
     const next = [...new Set((value ?? []).filter((component) => !!component && !component.disposed))];
     for (const component of next) {
       if (component.host && component.host !== this) {
-        throw new Error('GPU cloth component belongs to another scene node.');
+        throw new Error(
+          `${component.isGPUClothComponent?.() ? 'GPU cloth component' : 'Component'} belongs to another scene node.`
+        );
       }
     }
-    for (const component of this._gpuClothComponents) {
-      if (!next.includes(component)) {
+    for (const component of this._components) {
+      if (owns(component) && !next.includes(component)) {
         component.detach(this);
         component.dispose();
       }
     }
-    this._gpuClothComponents = next;
+    this._components = [...this._components.filter((component) => !owns(component)), ...next];
     for (const component of next) {
       if (!component.host) {
         component.attach(this);
       }
     }
   }
+  /** GPU cloth simulations owned by this node. */
+  get gpuClothComponents(): GPUClothComponent[] {
+    return this._components.filter((component) => component.isGPUClothComponent?.()) as GPUClothComponent[];
+  }
+  set gpuClothComponents(value: GPUClothComponent[]) {
+    this._setComponents(value, (component) => !!component.isGPUClothComponent?.());
+  }
   /** Adds a GPU cloth component to this node. */
   addGPUClothComponent(component: GPUClothComponent) {
-    this.gpuClothComponents = [...this._gpuClothComponents, component];
-    return component;
+    return this.addComponent(component);
   }
   /** Removes and disposes a GPU cloth component from this node. */
   removeGPUClothComponent(component: GPUClothComponent) {
-    if (!this._gpuClothComponents.includes(component)) {
-      return false;
-    }
-    this.gpuClothComponents = this._gpuClothComponents.filter((item) => item !== component);
-    return true;
+    return this.removeComponent(component);
   }
   /**
    * Display name of the node (for UI/debugging).
@@ -1162,7 +1223,7 @@ export class SceneNode
   /** Disposes the node */
   protected onDispose() {
     super.onDispose();
-    for (const component of this._gpuClothComponents.splice(0)) {
+    for (const component of this._components.splice(0)) {
       component.detach(this);
       component.dispose();
     }
@@ -1245,7 +1306,7 @@ export class SceneNode
     this.iterate((child) => {
       this.scene!.queueUpdateNode(child);
       child._onAttached();
-      for (const component of child._gpuClothComponents) {
+      for (const component of child._components) {
         component.hostAttached();
       }
     });
@@ -1253,7 +1314,7 @@ export class SceneNode
   /** @internal */
   protected _detached() {
     this.iterate((child) => {
-      for (const component of child._gpuClothComponents) {
+      for (const component of child._components) {
         component.hostDetached();
       }
       child._onDetached();
@@ -1408,6 +1469,43 @@ export class SceneNode
   setLocalTransform(matrix: Matrix4x4) {
     this._disableCallback++;
     matrix.decompose(this._scaling, this._rotation, this._position);
+    this._disableCallback--;
+    this._onTransformChanged(true);
+    return this;
+  }
+  /**
+   * Sets the node's local transform so that its world position and rotation
+   * become the given ones.
+   *
+   * @remarks
+   * Used to write back poses computed in world space, by a physics engine for
+   * instance. Either argument may be omitted to keep that part. Local scale is
+   * kept. The rotation is exact only when no ancestor has a non-uniform scale,
+   * which would make the world rotation a shear. The transform-changed
+   * notification fires once.
+   *
+   * @param position - World position, or null to keep the current one.
+   * @param rotation - World rotation, or null to keep the current one.
+   * @returns self
+   */
+  setWorldPose(position: Nullable<Vector3>, rotation?: Nullable<Quaternion>) {
+    const parent = this._parent;
+    this._disableCallback++;
+    if (position) {
+      if (parent) {
+        parent.invWorldMatrix.transformPointAffine(position, this._position);
+      } else {
+        this._position.set(position);
+      }
+    }
+    if (rotation) {
+      if (parent) {
+        parent.worldMatrix.decompose(null, tmpQuat, null);
+        Quaternion.multiply(Quaternion.inverse(tmpQuat, tmpQuat), rotation, this._rotation);
+      } else {
+        this._rotation.set(rotation);
+      }
+    }
     this._disableCallback--;
     this._onTransformChanged(true);
     return this;

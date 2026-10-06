@@ -10,6 +10,7 @@ import type { Camera } from '../../../camera';
 import type { SceneNode } from '../../../scene';
 import { ScriptAttachment, normalizeScriptAttachmentConfig } from '../../../scene/script_attachment';
 import type { LightingMode } from '../../physical';
+import { ScenePhysicsSettings } from '../../../scene/physics_settings';
 
 /** @internal */
 export function getSceneClass(manager: ResourceManager): SerializableClass {
@@ -1099,6 +1100,24 @@ export function getSceneClass(manager: ResourceManager): SerializableClass {
           set(this: Scene, value) {
             const data = value?.object[0] as JSONArray | unknown[] | null | undefined;
             this.scriptConfigs = data instanceof JSONArray ? data.data : Array.isArray(data) ? data : [];
+          }
+        },
+        {
+          name: 'Physics',
+          description:
+            'Gravity, step rate and collision layers used when the scene is simulated with physics; leave empty for defaults',
+          type: 'object',
+          default: null,
+          options: { objectTypes: [ScenePhysicsSettings] },
+          isNullable() {
+            return true;
+          },
+          get(this: Scene, value) {
+            value.object[0] = this.physicsSettings;
+          },
+          set(this: Scene, value) {
+            const settings = value?.object[0];
+            this.physicsSettings = settings instanceof ScenePhysicsSettings ? settings : null;
           }
         },
         {

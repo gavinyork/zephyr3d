@@ -21,6 +21,7 @@ import {
   ScriptAttachment
 } from './script_attachment';
 import type { LightingMode } from '../utility/physical';
+import type { ScenePhysicsSettings } from './physics_settings';
 import type { VirtualTextureClient } from '../render/virtualtexture/virtual_texture_client';
 
 /**
@@ -44,6 +45,13 @@ export class Scene
   extends makeObservable(Disposable)<{
     /** Dispatched once per frame before render-related work. */
     update: [Scene];
+    /**
+     * Dispatched once per frame after queued nodes have updated - animation, IK,
+     * joint dynamics and skinning included - and before nodes are placed in the
+     * octree. Node transforms set here are rendered this frame; a physics world
+     * steps here so that kinematic bodies follow this frame's animated pose.
+     */
+    afterupdate: [Scene];
     /** Dispatched immediately before rendering begins for a camera. */
     startrender: [Scene, Camera, Compositor];
     /** Dispatched immediately after rendering finishes for a camera. */
@@ -83,6 +91,8 @@ export class Scene
   protected _mainCamera: DRef<Camera>;
   /** @internal Arbitrary metadata loaded with the scene (optional). */
   protected _metaData: Nullable<Metadata>;
+  /** @internal Physics settings saved with the scene (optional). */
+  protected _physicsSettings: Nullable<ScenePhysicsSettings>;
   /** @internal Lighting unit model used by this scene. */
   protected _lightingMode: LightingMode;
   /** @internal Number of physical meters represented by one scene unit. */
@@ -127,6 +137,7 @@ export class Scene
     this._rootNode.set(new SceneNode(this));
     this._rootNode.get()!.name = 'Root';
     this._metaData = null;
+    this._physicsSettings = null;
     this._lightingMode = 'legacy';
     this._metersPerUnit = 1;
     this._scripts = [];
@@ -247,6 +258,16 @@ export class Scene
   }
   set metaData(val) {
     this._metaData = val;
+  }
+  /**
+   * Physics settings of the scene, or null to use the physics package's
+   * defaults. Only scenes simulated with a physics package need them.
+   */
+  get physicsSettings() {
+    return this._physicsSettings;
+  }
+  set physicsSettings(val: Nullable<ScenePhysicsSettings>) {
+    this._physicsSettings = val ?? null;
   }
   /**
    * Attached script filename or identifier (engine-specific).
@@ -497,6 +518,7 @@ export class Scene
    * - Update environment light synchronization.
    * - Dispatch `update` event.
    * - Drain the one-shot node update queue and call `node.update(...)`.
+   * - Dispatch `afterupdate` event.
    * - Apply pending octree placement updates.
    *
    */
@@ -523,6 +545,7 @@ export class Scene
           drawable.updateState();
         }
       }
+      this.dispatchEvent('afterupdate', this);
       this.updateNodePlacement(this._octree, this._nodePlaceList);
     }
     // Palettes written by animation updates are uploaded once all nodes and bank tracks are updated

@@ -10,11 +10,12 @@ const __dirname = path.dirname(__filename);
 const destdir = path.join(__dirname, 'dist');
 
 // Decoders fetched at runtime relative to their package module (new URL('./basis/',
-// import.meta.url) and './draco/'). Bundling a package into one module file moves
-// that module, so its decoder directory has to move beside it.
+// import.meta.url), './draco/' and './rapier/'). Bundling a package into one module
+// file moves that module, so its decoder directory has to move beside it.
 const runtimeDecoders = {
   scene: 'asset/loaders/ktx2/basis',
-  loaders: 'gltf/draco'
+  loaders: 'gltf/draco',
+  physics: 'rapier'
 };
 
 function getTargetWeb(name) {
@@ -65,7 +66,7 @@ function getTargetWeb(name) {
 }
 
 export default (args) => {
-  return ['base', 'device', 'scene', 'loaders', 'imgui', 'backend-webgl', 'backend-webgpu'].map((name) =>
-    getTargetWeb(name)
+  return ['base', 'device', 'scene', 'loaders', 'physics', 'imgui', 'backend-webgl', 'backend-webgpu'].map(
+    (name) => getTargetWeb(name)
   );
 };

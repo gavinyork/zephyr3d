@@ -1,0 +1,10 @@
+{
+  "changes": [
+    {
+      "packageName": "@zephyr3d/scene",
+      "comment": "Add primitive triangle read back helpers and CPU access to loaded terrain heights; GPU cloth now reads only the full-detail triangles of meshes with LODs.",
+      "type": "minor"
+    }
+  ],
+  "packageName": "@zephyr3d/scene"
+}

@@ -38,6 +38,13 @@
     - [动画融合](zh-cn/animation-blending.md)
     - [动作编排](zh-cn/animation-controller.md)
     - [自定义动画](zh-cn/animation-custom.md)
+  - 物理
+    - [刚体物理](zh-cn/physics-intro.md)
+    - [碰撞体](zh-cn/physics-colliders.md)
+    - [脚本控制](zh-cn/physics-scripting.md)
+    - [关节](zh-cn/physics-joints.md)
+    - [角色控制器](zh-cn/physics-character.md)
+    - [载具](zh-cn/physics-vehicle.md)
   - 后处理
     - [概述](zh-cn/posteffect-intro.md)
     - [Tonemap](zh-cn/posteffect-tonemap.md)
@@ -102,6 +109,9 @@
 
   - 地形系统
     - [编辑地形](zh-cn/editor/terrain-tools.md)
+
+  - 物理
+    - [编辑器中的物理](zh-cn/editor/physics.md)
 
   - 动画系统
     - [概述](zh-cn/editor/animation-overview.md)

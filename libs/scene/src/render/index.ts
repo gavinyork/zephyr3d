@@ -10,6 +10,7 @@ export * from './sky';
 export * from './clipmap';
 export * from './envlight';
 export * from './primitive';
+export * from './primitive_readback';
 export * from './lod';
 export * from './cull_visitor';
 export * from './oit';
