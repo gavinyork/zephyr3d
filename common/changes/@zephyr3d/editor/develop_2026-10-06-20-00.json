@@ -1,0 +1,10 @@
+{
+  "changes": [
+    {
+      "packageName": "@zephyr3d/editor",
+      "comment": "Add rigid body physics: Add Component menus with undo, outlines of colliders, joints and wheels, scene physics settings with a collision layer editor, simulation in Play and Preview, and builds that ship the physics engine only when a project uses it.",
+      "type": "minor"
+    }
+  ],
+  "packageName": "@zephyr3d/editor"
+}

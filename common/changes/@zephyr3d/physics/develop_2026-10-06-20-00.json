@@ -1,0 +1,25 @@
+{
+  "changes": [
+    {
+      "packageName": "@zephyr3d/physics",
+      "comment": "Add registerPhysics to register the components without loading the engine, PhysicsWorld.simulationEnabled, and worlds that follow Scene.physicsSettings.",
+      "type": "none"
+    },
+    {
+      "packageName": "@zephyr3d/physics",
+      "comment": "Add getColliderOutline and getColliderOutlineKey: collider shapes as the simulation builds them, for tools to draw.",
+      "type": "none"
+    },
+    {
+      "packageName": "@zephyr3d/physics",
+      "comment": "Add initial linear and angular velocity to RigidBody.",
+      "type": "none"
+    },
+    {
+      "packageName": "@zephyr3d/physics",
+      "comment": "Add Vehicle and Wheel components: ray cast vehicles with suspension, steering, brakes and configurable drive.",
+      "type": "none"
+    }
+  ],
+  "packageName": "@zephyr3d/physics"
+}

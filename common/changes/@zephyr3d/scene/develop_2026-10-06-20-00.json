@@ -1,0 +1,15 @@
+{
+  "changes": [
+    {
+      "packageName": "@zephyr3d/scene",
+      "comment": "Add ScenePhysicsSettings: gravity, step rate and collision layers saved with a scene as its optional physicsSettings.",
+      "type": "minor"
+    },
+    {
+      "packageName": "@zephyr3d/scene",
+      "comment": "Fix shapes saved without level of detail settings coming back with levels of detail turned on.",
+      "type": "patch"
+    }
+  ],
+  "packageName": "@zephyr3d/scene"
+}
