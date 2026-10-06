@@ -874,13 +874,8 @@ function getCharacterControllerClass(): SerializableClass {
   };
 }
 
-/**
- * Registers the physics components with a serialization manager, so scenes
- * containing them can be saved and loaded.
- *
- * @public
- */
-export function registerPhysicsClasses(manager: ResourceManager) {
+/** Registers the physics components' serializable classes. @internal */
+export function registerPhysicsSerializableClasses(manager: ResourceManager) {
   manager.registerClass(getRigidBodyClass());
   manager.registerClass(getColliderClass());
   manager.registerClass(getJointClass());

@@ -82,8 +82,41 @@ function transpileTS(fileName: string, code: string) {
 // transcoder, Draco); the editor's build places them beside its module copies
 const RUNTIME_DECODERS: Record<string, { dir: string; files: string[] }> = {
   scene: { dir: 'basis', files: ['basis_transcoder.js', 'basis_transcoder.wasm', 'LICENSE'] },
-  loaders: { dir: 'draco', files: ['draco_wasm_wrapper_gltf.js', 'draco_decoder_gltf.wasm', 'LICENSE'] }
+  loaders: { dir: 'draco', files: ['draco_wasm_wrapper_gltf.js', 'draco_decoder_gltf.wasm', 'LICENSE'] },
+  physics: { dir: 'rapier', files: ['rapier_wasm3d_bg.wasm', 'LICENSE'] }
 };
+
+// Physics components as they appear in saved scenes and prefabs
+const PHYSICS_CLASS_PATTERN = /"ClassName"\s*:\s*"(?:RigidBody|Collider|Joint|CharacterController)"/;
+const PHYSICS_IMPORT_PATTERN = /['"]@zephyr3d\/physics['"]/;
+
+/**
+ * Whether a build has to ship the physics package: a scene or prefab holds a
+ * physics component, or a script imports the package.
+ */
+export async function projectUsesPhysics(vfs: VFS) {
+  const files = await vfs.glob('assets/**/*', {
+    includeHidden: true,
+    includeDirs: false,
+    includeFiles: true,
+    recursive: true
+  });
+  for (const file of files) {
+    if (file.type !== 'file' || file.path.startsWith('/assets/@builtins/')) {
+      continue;
+    }
+    const isData = file.path.endsWith('.zscn') || file.path.endsWith('.zprefab');
+    const isScript = /\.(?:ts|js|mjs)$/.test(file.path);
+    if (!isData && !isScript) {
+      continue;
+    }
+    const content = (await vfs.readFile(file.path, { encoding: 'utf8' })) as string;
+    if ((isData ? PHYSICS_CLASS_PATTERN : PHYSICS_IMPORT_PATTERN).test(content)) {
+      return true;
+    }
+  }
+  return false;
+}
 
 async function copyRuntimeDecoders(vfs: VFS, name: string, packageDir: string) {
   const decoders = RUNTIME_DECODERS[name];
@@ -102,7 +135,7 @@ async function copyRuntimeDecoders(vfs: VFS, name: string, packageDir: string) {
   }
 }
 
-export async function getImportMap(vfs: VFS, distDir: string, writeDependencies = true) {
+export async function getImportMap(vfs: VFS, distDir: string, writeDependencies = true, withPhysics = false) {
   const importMap: Record<string, string> = {};
   const depsDir = vfs.join(distDir, `${libDir}/deps`);
   if (writeDependencies) {
@@ -116,7 +149,8 @@ export async function getImportMap(vfs: VFS, distDir: string, writeDependencies 
     'loaders',
     'imgui',
     'backend-webgl',
-    'backend-webgpu'
+    'backend-webgpu',
+    ...(withPhysics ? ['physics'] : [])
   ]) {
     const path = vfs.join(depsDir, `@zephyr3d/${name}/index.js`);
     if (writeDependencies) {
@@ -344,9 +378,19 @@ export async function buildForEndUser(options: {
   alias?: Record<string, string>;
   sourcemap?: boolean | 'inline' | 'hidden';
   format?: 'es' | 'iife' | 'umd' | 'cjs';
+  /** Ship the physics package; see {@link projectUsesPhysics}. */
+  physics?: boolean;
   onProgress?: (message: string, current: number, total: number) => void;
 }) {
-  const { input, distDir = '/dist', alias = {}, sourcemap = false, format = 'es', onProgress } = options;
+  const {
+    input,
+    distDir = '/dist',
+    alias = {},
+    sourcemap = false,
+    format = 'es',
+    physics = false,
+    onProgress
+  } = options;
   const vfs = ProjectService.VFS;
 
   const bundle = await rollup({
@@ -411,7 +455,7 @@ export async function buildForEndUser(options: {
     });
   }
 
-  const importMap = await getImportMap(vfs, distDir);
+  const importMap = await getImportMap(vfs, distDir, true, physics);
 
   const settings = await ProjectService.getCurrentProjectSettings();
   const info = await ProjectService.getCurrentProjectInfo();

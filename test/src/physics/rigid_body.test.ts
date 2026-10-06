@@ -6,7 +6,7 @@ import {
   Collider,
   initPhysics,
   PhysicsWorld,
-  registerPhysicsClasses,
+  registerPhysics,
   RigidBody,
   type ColliderShape
 } from '@zephyr3d/physics';
@@ -226,7 +226,7 @@ describe('physics', () => {
   it('round-trips the components through serialization', async () => {
     const scene = new Scene();
     const manager = new ResourceManager(new MemoryFS());
-    registerPhysicsClasses(manager);
+    registerPhysics(manager);
     const node = new SceneNode(scene);
     const body = new RigidBody();
     body.motionType = 'kinematic';

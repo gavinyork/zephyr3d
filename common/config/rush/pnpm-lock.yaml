@@ -2766,6 +2766,9 @@ importers:
       '@zephyr3d/loaders':
         specifier: workspace:^0.1.6
         version: link:../../libs/loaders
+      '@zephyr3d/physics':
+        specifier: workspace:^0.1.0
+        version: link:../../libs/physics
       '@zephyr3d/scene':
         specifier: workspace:^0.9.27
         version: link:../../libs/scene

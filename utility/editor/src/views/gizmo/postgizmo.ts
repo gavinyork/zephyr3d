@@ -2,6 +2,8 @@ import type {
   BaseTexture,
   BindGroup,
   GPUProgram,
+  PBGlobalScope,
+  ProgramBuilder,
   PBInsideFunctionScope,
   PBShaderExp,
   RenderStateSet,
@@ -28,6 +30,55 @@ import { Matrix4x4, Quaternion, Vector2, Vector3, Vector4 } from '@zephyr3d/base
 import { calcHierarchyBoundingBoxWorld } from '../../helpers/misc';
 import { eventBus } from '../../core/eventbus';
 
+/**
+ * Fragment shader of the anti-aliased lines: coverage from the distance to the
+ * segment (endpoints in pixels, from the vertex shader), half strength where
+ * the scene is in front.
+ */
+function aaLineFragment(scope: PBGlobalScope, pb: ProgramBuilder) {
+  scope.pxWidth = pb.float().uniform(0);
+  scope.lineColor = pb.vec4().uniform(0);
+  scope.depthTex = pb.tex2D().sampleType('unfilterable-float').uniform(0);
+  scope.texSize = pb.vec2().uniform(0);
+  scope.$outputs.color = pb.vec4();
+
+  pb.func('sdSegment', [pb.vec2('p'), pb.vec2('a'), pb.vec2('b')], function () {
+    this.$l.ab = pb.sub(this.b, this.a);
+    this.$l.ap = pb.sub(this.p, this.a);
+    this.$l.t = pb.clamp(pb.div(pb.dot(this.ap, this.ab), pb.dot(this.ab, this.ab)), 0, 1);
+    this.$l.closest = pb.add(this.a, pb.mul(this.ab, this.t));
+    this.$return(pb.length(pb.sub(this.p, this.closest)));
+  });
+
+  pb.main(function () {
+    this.$l.P = this.$builtins.fragCoord.xy;
+    this.$l.dist = this.sdSegment(this.P, this.$inputs.AB.xy, this.$inputs.AB.zw);
+    this.$l.w = pb.fwidth(this.dist);
+    this.$l.alpha = pb.sub(
+      1,
+      pb.smoothStep(pb.sub(this.pxWidth, this.w), pb.add(this.pxWidth, this.w), this.dist)
+    );
+
+    this.$l.screenUV = pb.div(this.$builtins.fragCoord.xy, this.texSize);
+    this.$l.depth = this.$builtins.fragCoord.z;
+    this.$l.sceneDepthSample = pb.textureSampleLevel(this.depthTex, this.screenUV, 0);
+    this.$l.sceneDepth = this.sceneDepthSample.r;
+
+    this.$if(
+      // occluded when the fragment is farther than the scene depth
+      REVERSE_Z ? pb.lessThan(this.depth, this.sceneDepth) : pb.greaterThan(this.depth, this.sceneDepth),
+      function () {
+        this.alpha = pb.mul(this.alpha, 0.5);
+      }
+    );
+
+    this.$outputs.color = pb.vec4(
+      pb.mul(this.lineColor.rgb, this.alpha),
+      pb.mul(this.lineColor.a, this.alpha)
+    );
+  });
+}
+
 const tmpVecT = new Vector3();
 const tmpVecS = new Vector3();
 const tmpVecR = new Vector3();
@@ -47,6 +98,21 @@ const selectLineColor2D = new Vector4(0, 1, 1, 1);
 const selectLineWidth2D = 2;
 
 export type LineGizmo = { lines: Vector4[][]; width?: number; color?: Vector4 };
+/**
+ * Many anti-aliased lines drawn in one call, e.g. a collider's outline: the
+ * segments stay on the GPU and only the matrix changes per frame. Make the
+ * primitive with {@link PostGizmoRenderer.createAALineBatch}.
+ */
+export type AALineBatch = {
+  primitive: Primitive;
+  /** Number of segments. */
+  count: number;
+  /** From the segments' space to clip space. */
+  mvpMatrix: Matrix4x4;
+  width?: number;
+  color?: Vector4;
+  enabled: boolean;
+};
 export type ShapeGizmo = {
   shapes: { primitive: Primitive; mvpMatrix: Matrix4x4; enabled: boolean }[];
   color?: Vector4;
@@ -155,6 +221,8 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
   static _axises = [new Vector3(1, 0, 0), new Vector3(0, 1, 0), new Vector3(0, 0, 1)];
   static _primitives: Nullable<Partial<Record<GizmoMode, Primitive[]>>> = null;
   static _aalinePrimitive: Nullable<Primitive> = null;
+  static _aalineBatchProgram: Nullable<GPUProgram> = null;
+  static _aalineBatchBindGroup: Nullable<BindGroup> = null;
   static _aalinePositions: Float32Array<ArrayBuffer> = new Float32Array(4 * 4);
   static _aalineAB: Float32Array<ArrayBuffer> = new Float32Array(4 * 4);
   private _aabbForEdit: Nullable<AABB>;
@@ -185,6 +253,7 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
   private _transformSpace: TransformSpace;
   private _lineGizmos: LineGizmo[];
   private _shapeGizmos: ShapeGizmo[];
+  private _aaLineBatches: AALineBatch[];
   private readonly _screenSize: number;
   private _drawGrid: boolean;
   private readonly _scaleBox: AABB;
@@ -227,6 +296,7 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
     this._hitInfo = null;
     this._lineGizmos = [];
     this._shapeGizmos = [];
+    this._aaLineBatches = [];
     this._transformSpace = 'world';
     this._screenSize = 0.4;
     this._gridParams = new Vector4(10000, 500, 0, 0);
@@ -389,6 +459,42 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
       this._lineGizmos.splice(index, 1);
     }
   }
+  addAALineBatch(batch: AALineBatch) {
+    if (!this._aaLineBatches.includes(batch)) {
+      this._aaLineBatches.push(batch);
+    }
+  }
+  removeAALineBatch(batch: AALineBatch) {
+    const index = this._aaLineBatches.indexOf(batch);
+    if (index >= 0) {
+      this._aaLineBatches.splice(index, 1);
+    }
+  }
+  /** Whether any line batch is to be drawn, so the renderer has to run. */
+  get hasAALineBatches() {
+    return this._aaLineBatches.some((batch) => batch.enabled && batch.count > 0);
+  }
+  /**
+   * Makes the primitive of an {@link AALineBatch}: `segments` holds two points of
+   * three floats per segment. Dispose it when done.
+   */
+  static createAALineBatch(segments: Float32Array) {
+    const primitive = new Primitive();
+    // Quad corners: (end, side); the vertex shader places them around each segment.
+    primitive.createAndSetVertexBuffer('position_f32x2', new Float32Array([0, 1, 0, -1, 1, 1, 1, -1]));
+    const count = segments.length / 6;
+    const a = new Float32Array(count * 3);
+    const b = new Float32Array(count * 3);
+    for (let i = 0; i < count; i++) {
+      a.set(segments.subarray(i * 6, i * 6 + 3), i * 3);
+      b.set(segments.subarray(i * 6 + 3, i * 6 + 6), i * 3);
+    }
+    primitive.createAndSetVertexBuffer('tex0_f32x3', a, 'instance');
+    primitive.createAndSetVertexBuffer('tex1_f32x3', b, 'instance');
+    primitive.createAndSetIndexBuffer(new Uint16Array([0, 1, 2, 3]));
+    primitive.primitiveType = 'triangle-strip';
+    return primitive;
+  }
   removeShapeGizmo(shapeGizmo: ShapeGizmo) {
     const index = this._shapeGizmos.indexOf(shapeGizmo);
     if (index >= 0) {
@@ -485,6 +591,7 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
     this.renderSelectionOutlines(ctx, destFramebuffer!.getDepthAttachment()!);
     this.renderLineGizmos(ctx, destFramebuffer!.getDepthAttachment()!);
     this.renderShapeGizmos(ctx, destFramebuffer!.getDepthAttachment()!);
+    this.renderAALineBatches(ctx, destFramebuffer!.getDepthAttachment()!);
     PostGizmoRenderer._blendBlitter.renderStates = PostGizmoRenderer._blendRenderState;
     PostGizmoRenderer._blendBlitter.srgbOut = srgbOutput;
     PostGizmoRenderer._blendBlitter.blit(
@@ -2533,49 +2640,7 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
           });
         },
         fragment(pb) {
-          this.pxWidth = pb.float().uniform(0);
-          this.lineColor = pb.vec4().uniform(0);
-          this.depthTex = pb.tex2D().sampleType('unfilterable-float').uniform(0);
-          this.texSize = pb.vec2().uniform(0);
-          this.$outputs.color = pb.vec4();
-
-          pb.func('sdSegment', [pb.vec2('p'), pb.vec2('a'), pb.vec2('b')], function () {
-            this.$l.ab = pb.sub(this.b, this.a);
-            this.$l.ap = pb.sub(this.p, this.a);
-            this.$l.t = pb.clamp(pb.div(pb.dot(this.ap, this.ab), pb.dot(this.ab, this.ab)), 0, 1);
-            this.$l.closest = pb.add(this.a, pb.mul(this.ab, this.t));
-            this.$return(pb.length(pb.sub(this.p, this.closest)));
-          });
-
-          pb.main(function () {
-            this.$l.P = this.$builtins.fragCoord.xy;
-            this.$l.dist = this.sdSegment(this.P, this.$inputs.AB.xy, this.$inputs.AB.zw);
-            this.$l.w = pb.fwidth(this.dist);
-            this.$l.alpha = pb.sub(
-              1,
-              pb.smoothStep(pb.sub(this.pxWidth, this.w), pb.add(this.pxWidth, this.w), this.dist)
-            );
-
-            this.$l.screenUV = pb.div(this.$builtins.fragCoord.xy, this.texSize);
-            this.$l.depth = this.$builtins.fragCoord.z;
-            this.$l.sceneDepthSample = pb.textureSampleLevel(this.depthTex, this.screenUV, 0);
-            this.$l.sceneDepth = this.sceneDepthSample.r;
-
-            this.$if(
-              // occluded when the fragment is farther than the scene depth
-              REVERSE_Z
-                ? pb.lessThan(this.depth, this.sceneDepth)
-                : pb.greaterThan(this.depth, this.sceneDepth),
-              function () {
-                this.alpha = pb.mul(this.alpha, 0.5);
-              }
-            );
-
-            this.$outputs.color = pb.vec4(
-              pb.mul(this.lineColor.rgb, this.alpha),
-              pb.mul(this.lineColor.a, this.alpha)
-            );
-          });
+          aaLineFragment(this, pb);
         }
       });
 
@@ -2642,6 +2707,127 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
     device.setBindGroup(0, PostGizmoRenderer._aalineBindGroup);
     device.setRenderStates(PostGizmoRenderer._gizmoRenderState);
     PostGizmoRenderer._aalinePrimitive.draw();
+  }
+  /**
+   * Draws the line batches. Per segment it does what renderAALine does on the
+   * CPU - clip to w and depth, widen in screen space - in the vertex shader,
+   * and shades with the same fragment shader.
+   */
+  private renderAALineBatches(ctx: DrawContext, depthTex: BaseTexture) {
+    const batches = this._aaLineBatches.filter((batch) => batch.enabled && batch.count > 0);
+    if (batches.length === 0) {
+      return;
+    }
+    const device = ctx.device;
+    if (!PostGizmoRenderer._aalineBatchProgram) {
+      PostGizmoRenderer._aalineBatchProgram = device.buildRenderProgram({
+        vertex(pb) {
+          this.$inputs.corner = pb.vec2().attrib('position');
+          this.$inputs.a = pb.vec3().attrib('texCoord0');
+          this.$inputs.b = pb.vec3().attrib('texCoord1');
+          this.mvpMatrix = pb.mat4().uniform(0);
+          this.viewportSize = pb.vec2().uniform(0);
+          this.radius = pb.float().uniform(0);
+          this.$outputs.AB = pb.vec4();
+          pb.main(function () {
+            this.$l.A = pb.mul(this.mvpMatrix, pb.vec4(this.$inputs.a, 1));
+            this.$l.B = pb.mul(this.mvpMatrix, pb.vec4(this.$inputs.b, 1));
+            this.$l.D = pb.sub(this.B, this.A);
+            this.$l.t0 = pb.float(0);
+            this.$l.t1 = pb.float(1);
+            this.$l.valid = pb.float(1);
+            // Liang-Barsky on the segment's parameter: keep where p * t <= q.
+            const clip = (p: PBShaderExp, q: PBShaderExp) => {
+              this.$if(pb.lessThan(pb.abs(p), 1e-12), function () {
+                this.$if(pb.lessThan(q, 0), function () {
+                  this.valid = 0;
+                });
+              }).$else(function () {
+                this.$l.r = pb.div(q, p);
+                this.$if(pb.lessThan(p, 0), function () {
+                  this.$if(pb.greaterThan(this.r, this.t1), function () {
+                    this.valid = 0;
+                  }).$else(function () {
+                    this.t0 = pb.max(this.t0, this.r);
+                  });
+                }).$else(function () {
+                  this.$if(pb.lessThan(this.r, this.t0), function () {
+                    this.valid = 0;
+                  }).$else(function () {
+                    this.t1 = pb.min(this.t1, this.r);
+                  });
+                });
+              });
+            };
+            // w >= 1e-4, as renderAALine
+            clip(pb.neg(this.D.w), pb.sub(this.A.w, 1e-4));
+            if (REVERSE_Z) {
+              // 0 <= z <= w
+              clip(pb.sub(this.D.z, this.D.w), pb.sub(this.A.w, this.A.z));
+              clip(pb.neg(this.D.z), this.A.z);
+            } else {
+              // -w <= z <= w
+              clip(pb.neg(pb.add(this.D.z, this.D.w)), pb.add(this.A.z, this.A.w));
+              clip(pb.neg(pb.sub(this.D.w, this.D.z)), pb.sub(this.A.w, this.A.z));
+            }
+            this.$if(pb.or(pb.lessThan(this.valid, 0.5), pb.lessThan(this.t1, this.t0)), function () {
+              // Nothing left: all four corners on one point draw nothing.
+              this.$builtins.position = pb.vec4(0, 0, 0, 1);
+              this.$outputs.AB = pb.vec4(0);
+            }).$else(function () {
+              this.$l.CA = pb.add(this.A, pb.mul(this.D, this.t0));
+              this.$l.CB = pb.add(this.A, pb.mul(this.D, this.t1));
+              this.$l.halfSize = pb.mul(this.viewportSize, 0.5);
+              this.$l.pxA = pb.mul(pb.add(pb.div(this.CA.xy, this.CA.w), pb.vec2(1)), this.halfSize);
+              this.$l.pxB = pb.mul(pb.add(pb.div(this.CB.xy, this.CB.w), pb.vec2(1)), this.halfSize);
+              this.$l.dir = pb.sub(this.pxB, this.pxA);
+              this.$l.len = pb.max(pb.length(this.dir), 1e-6);
+              this.$l.tangent = pb.div(this.dir, this.len);
+              this.$l.normal = pb.vec2(pb.neg(this.tangent.y), this.tangent.x);
+              this.$l.end = this.$inputs.corner.x;
+              this.$l.C = pb.mix(this.CA, this.CB, this.end);
+              this.$l.px = pb.add(
+                pb.mix(this.pxA, this.pxB, this.end),
+                pb.mul(this.normal, pb.mul(this.radius, this.$inputs.corner.y))
+              );
+              this.$l.ndc = pb.sub(pb.mul(pb.div(this.px, this.viewportSize), 2), pb.vec2(1));
+              this.$builtins.position = pb.vec4(pb.mul(this.ndc, this.C.w), this.C.z, this.C.w);
+              this.$outputs.AB = pb.vec4(this.pxA, this.pxB);
+            });
+            if (pb.getDevice().type === 'webgpu') {
+              this.$builtins.position.y = pb.neg(this.$builtins.position.y);
+            }
+          });
+        },
+        fragment(pb) {
+          aaLineFragment(this, pb);
+        }
+      });
+      PostGizmoRenderer._aalineBatchBindGroup = device.createBindGroup(
+        PostGizmoRenderer._aalineBatchProgram!.bindGroupLayouts[0]
+      );
+    }
+    const bindGroup = PostGizmoRenderer._aalineBatchBindGroup!;
+    const viewport = device.getViewport();
+    const viewportSize = new Vector2(
+      device.screenXToDevice(viewport.width),
+      device.screenYToDevice(viewport.height)
+    );
+    device.setProgram(PostGizmoRenderer._aalineBatchProgram);
+    device.setBindGroup(0, bindGroup);
+    device.setRenderStates(PostGizmoRenderer._gizmoRenderState);
+    bindGroup.setValue('viewportSize', viewportSize);
+    bindGroup.setValue('texSize', PostGizmoRenderer._texSize);
+    bindGroup.setTexture('depthTex', depthTex, fetchSampler('clamp_nearest_nomip'));
+    const defaultColor = Vector4.one();
+    for (const batch of batches) {
+      const width = batch.width ?? 1;
+      bindGroup.setValue('mvpMatrix', batch.mvpMatrix);
+      bindGroup.setValue('radius', width * 0.5 + 1);
+      bindGroup.setValue('pxWidth', width * 0.5);
+      bindGroup.setValue('lineColor', batch.color ?? defaultColor);
+      batch.primitive.drawInstanced(batch.count);
+    }
   }
   /*
   protected renderAALine(

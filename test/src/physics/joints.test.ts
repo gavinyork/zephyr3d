@@ -7,7 +7,7 @@ import {
   initPhysics,
   Joint,
   PhysicsWorld,
-  registerPhysicsClasses,
+  registerPhysics,
   RigidBody
 } from '@zephyr3d/physics';
 
@@ -327,7 +327,7 @@ describe('joints', () => {
   it('round-trips joints and character controllers through serialization', async () => {
     const scene = new Scene();
     const manager = new ResourceManager(new MemoryFS());
-    registerPhysicsClasses(manager);
+    registerPhysics(manager);
     const other = new SceneNode(scene);
     const node = new SceneNode(scene);
     const joint = new Joint();

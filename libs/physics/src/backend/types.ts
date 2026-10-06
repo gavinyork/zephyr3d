@@ -110,6 +110,11 @@ export interface BackendWorld {
   removeCollider(collider: BackendCollider): void;
   /** Stable id of a collider while it exists, used in events and query results. */
   colliderKey(collider: BackendCollider): number;
+  /**
+   * The triangles of a mesh or convex collider as the backend built them (hull
+   * computed, duplicates merged), in the collider's frame; null for other shapes.
+   */
+  colliderTriangles(collider: BackendCollider): { vertices: Float32Array; indices: Uint32Array } | null;
   setColliderGroups(collider: BackendCollider, groups: number): void;
   createJoint(desc: JointDesc, body1: BackendBody, body2: BackendBody): BackendJoint;
   removeJoint(joint: BackendJoint): void;
