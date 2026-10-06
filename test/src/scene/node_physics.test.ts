@@ -34,6 +34,21 @@ describe('node physics without a physics engine', () => {
     expect(collider.ready).toBe(false);
   });
 
+  it('takes its parts at construction', () => {
+    const body = new RigidBody();
+    const collider = new Collider();
+    const joint = new Joint();
+    const physics = new NodePhysics({ body, colliders: [collider], joint });
+    expect(physics.body).toBe(body);
+    expect(physics.colliders).toEqual([collider]);
+    expect(physics.joint).toBe(joint);
+    expect(collider.owner).toBe(physics);
+    const scene = new Scene();
+    const node = new SceneNode(scene);
+    node.physics = physics;
+    expect(collider.node).toBe(node);
+  });
+
   it('keeps a part on one node only', () => {
     const scene = new Scene();
     const a = new SceneNode(scene);

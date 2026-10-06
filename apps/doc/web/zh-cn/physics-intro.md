@@ -1,6 +1,8 @@
 # 刚体物理
 
-让物体在重力下下落、相互碰撞、堆叠和滚动。物理由独立的包 `@zephyr3d/physics` 提供，内部用 [Rapier](https://rapier.rs) 求解。不用物理的项目不必引入它，`@zephyr3d/scene` 本身不依赖它。
+让物体在重力下下落、相互碰撞、堆叠和滚动。
+
+物理是场景节点的属性：`node.physics` 以纯数据的形式保存节点的刚体、碰撞形状、关节等。要模拟这些数据，还需要两个包：模拟层 `@zephyr3d/physics`，以及物理引擎包 `@zephyr3d/physics-rapier`（用 [Rapier](https://rapier.rs) 求解）。不用物理的项目不加载它们；只有数据时没有任何开销：没有物理引擎时，场景照常保存和加载这些数据，原样不变。
 
 物理和布料、头发是两回事：布料和头发有各自的 GPU 求解器；本章讲的是刚体——箱子、球、门、角色这类形状不变的物体。
 
@@ -10,19 +12,43 @@
 
 ## 最小可跑例
 
-物理引擎是一个 WebAssembly 模块，使用前要先加载。在创建含物理组件的场景之前调用一次 `initPhysics()` 并等它完成：
+物理引擎是一个 WebAssembly 模块，使用前要先加载。用物理引擎调用一次 `initPhysics()` 并等它完成；此后每个场景都会模拟其节点上的物理数据：
 
 <<< @/../src/tut-76/main.js#init
 
-**静态物体只需要碰撞体。** 一个节点上只有 `Collider`、没有 `RigidBody` 时，它就是静态的：从不移动，其他物体落在它上面。地面、墙、关卡几何都这样做：
+**静态物体只需要碰撞体。** 一个节点的物理数据里只有 `Collider`、没有 `RigidBody` 时，它就是静态的：从不移动，其他物体落在它上面。地面、墙、关卡几何都这样做：
 
 <<< @/../src/tut-76/main.js#ground
 
-**会动的物体再加一个 `RigidBody`。** 刚体给节点质量，让模拟来移动它；同一节点上的 `Collider` 给它形状：
+**会动的物体再加一个 `RigidBody`。** 刚体给节点质量，让模拟来移动它；与它放在一起的 `Collider` 给它形状：
 
 <<< @/../src/tut-76/main.js#box
 
-之后不用写任何代码：每帧物理世界自动步进，并把刚体的位置和朝向写回节点。删除节点（`node.remove()`）就把它的刚体和碰撞体移出模拟。
+之后不用写任何代码：每帧场景的物理世界自动步进，并把刚体的位置和朝向写回节点。删除节点（`node.remove()`）就把它的物理数据移出模拟；设置 `node.physics = null` 则彻底去掉这些数据。
+
+---
+
+## 节点的物理数据
+
+`node.physics` 是一个 `NodePhysics`，或 null。每类部件各有一个槽位：
+
+| 槽位 | 内容 | 参见 |
+| --- | --- | --- |
+| `body` | 一个 `RigidBody`，或一个 `CharacterController` | 本页、[角色控制器](zh-cn/physics-character.md) |
+| `colliders` | 碰撞形状（`addCollider` / `removeCollider`） | [碰撞体](zh-cn/physics-colliders.md) |
+| `joint` | 连到另一个刚体或世界的 `Joint` | [关节](zh-cn/physics-joints.md) |
+| `vehicle` | 驱动本节点刚体的 `Vehicle` | [载具](zh-cn/physics-vehicle.md) |
+| `wheel` | 上方载具的一个 `Wheel` | [载具](zh-cn/physics-vehicle.md) |
+
+部件可以像上面那样传给构造函数，也可以之后再赋值：
+
+```js
+node.physics = new NodePhysics();
+node.physics.body = new RigidBody();
+node.physics.addCollider(collider);
+```
+
+一个部件同一时间只属于一个节点。所有部件都随场景保存，并可在编辑器的属性面板里编辑。
 
 ---
 
@@ -42,7 +68,7 @@
 
 ## 形状、缩放与质心
 
-- **复合形状**：刚体的形状是它所在节点上的碰撞体，加上子节点上（且子节点没有自己的刚体）的碰撞体。用几个子节点拼出椅子、汽车这类不规则物体。
+- **复合形状**：刚体的形状是它所在节点的碰撞体，加上子节点（且子节点没有自己的刚体）的碰撞体。用几个子节点拼出椅子、汽车这类不规则物体。
 - **缩放**：碰撞体尺寸乘以节点的世界缩放。`box`、`mesh`、`convex` 按各轴精确缩放；`sphere` 取三轴最大值，`capsule` 和 `cylinder` 的半径取 X、Z 最大值。非均匀缩放的球不会变成椭球。
 - **质心**：刚体绕节点原点转动，不是绕形状中心。偏心的物体想正确翻滚，就把节点原点放在物体中间，用碰撞体的 `offset` 调形状位置。
 - **质量**：`RigidBody.mass`，单位千克，默认 1。只有比值重要：重物推得动轻物，反过来推不动。
@@ -82,16 +108,17 @@ settings.fixedTimeStep = 1 / 120;
 scene.physicsSettings = settings;
 ```
 
-改动在下一帧生效。也可以直接改场景的物理世界：`PhysicsWorld.get(scene).gravity = ...`；这不写回场景设置，场景设置之后再被改动时以场景设置为准。
+改动在下一帧生效。也可以直接改场景的物理世界：`scene.physicsWorld.gravity = ...`；这不写回场景设置，场景设置之后再被改动时以场景设置为准。
 
 ---
 
 ## 限制与须知
 
-- **先 `initPhysics()` 再加载场景。** 它同时注册物理组件的序列化类，否则含物理组件的场景无法加载。
+- **在场景开始运行前调用 `initPhysics()`。** 没有它，含物理数据的场景也能加载，但在它完成前不会被模拟，`scene.physicsWorld` 为 null。
 - **WebGL2 与 WebGPU 都支持**，物理在 CPU 上运行，与渲染后端无关。不支持多线程。
 - **确定性**：模拟只由固定步长驱动。相同的输入（创建顺序、施力时机）在不同机器上得到相同结果。想要逐帧可复现，就在固定步里施力（见 [脚本控制](zh-cn/physics-scripting.md)），不要依赖 `onUpdate` 的帧间隔。
 - **包体积**：Rapier 的 wasm 约 1.1 MB（gzip）。编辑器导出时只有项目用到物理才打包它。
+- **其他物理引擎**：模拟层通过接口（`@zephyr3d/physics` 中的 `PhysicsBackend`）与引擎通信；可以另做一个引擎包接入其他物理引擎，场景和脚本都不用改。
 - 骨骼链、布料、头发的模拟与刚体世界互不影响。
 
 ## 下一步

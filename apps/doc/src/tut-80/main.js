@@ -3,15 +3,20 @@ import {
   Application,
   BoxShape,
   CapsuleShape,
+  CharacterController,
+  Collider,
   DirectionalLight,
   getEngine,
   getInput,
   Mesh,
+  NodePhysics,
   PBRMetallicRoughnessMaterial,
   PerspectiveCamera,
+  RigidBody,
   Scene
 } from '@zephyr3d/scene';
-import { CharacterController, Collider, initPhysics, PhysicsWorld, RigidBody } from '@zephyr3d/physics';
+import { initPhysics } from '@zephyr3d/physics';
+import { rapierPhysics } from '@zephyr3d/physics-rapier';
 import { backendWebGL2 } from '@zephyr3d/backend-webgl';
 import { backendWebGPU } from '@zephyr3d/backend-webgpu';
 
@@ -36,7 +41,7 @@ function block(scene, size, position, mat, rotation) {
   }
   const collider = new Collider();
   collider.size = size;
-  mesh.addComponent(collider);
+  mesh.physics = new NodePhysics({ colliders: [collider] });
   return mesh;
 }
 
@@ -45,7 +50,7 @@ const JUMP_SPEED = 5.5;
 const GRAVITY = 9.81;
 
 myApp.ready().then(async function () {
-  await initPhysics();
+  await initPhysics(rapierPhysics);
 
   const scene = new Scene();
   const sun = new DirectionalLight(scene);
@@ -82,15 +87,14 @@ myApp.ready().then(async function () {
     crate.position.setXYZ(-1 + i * 0.9, 0.35, 1.5);
     const body = new RigidBody();
     body.mass = 10;
-    crate.addComponent(body);
     const collider = new Collider();
     collider.size = new Vector3(0.7, 0.7, 0.7);
-    crate.addComponent(collider);
+    crate.physics = new NodePhysics({ body, colliders: [collider] });
   }
 
   // #region controller
-  // The character brings its own capsule: no RigidBody or Collider needed. Its
-  // node's origin is at the feet.
+  // The character is the node's body and brings its own capsule: no
+  // RigidBody or Collider needed. Its node's origin is at the feet.
   const hero = new Mesh(
     scene,
     new CapsuleShape({ radius: 0.3, height: 1.2, anchor: 0 }),
@@ -100,7 +104,7 @@ myApp.ready().then(async function () {
   const controller = new CharacterController();
   controller.height = 1.8;
   controller.radius = 0.3;
-  hero.addComponent(controller);
+  hero.physics = new NodePhysics({ body: controller });
   // #endregion controller
 
   const keys = new Set();
@@ -124,7 +128,7 @@ myApp.ready().then(async function () {
   // is told, sliding along walls, climbing steps and slopes, and staying on
   // the ground.
   let vy = 0;
-  const world = PhysicsWorld.get(scene);
+  const world = scene.physicsWorld;
   world.on('fixedupdate', (dt) => {
     const x =
       (keys.has('d') || keys.has('arrowright') ? 1 : 0) - (keys.has('a') || keys.has('arrowleft') ? 1 : 0);

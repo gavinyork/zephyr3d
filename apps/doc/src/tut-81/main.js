@@ -3,17 +3,23 @@ import {
   Application,
   BoundingBox,
   BoxShape,
+  Collider,
   CylinderShape,
   DirectionalLight,
   getEngine,
   getInput,
   Mesh,
+  NodePhysics,
   PBRMetallicRoughnessMaterial,
   PerspectiveCamera,
   Primitive,
-  Scene
+  RigidBody,
+  Scene,
+  Vehicle,
+  Wheel
 } from '@zephyr3d/scene';
-import { Collider, initPhysics, RigidBody, Vehicle, Wheel } from '@zephyr3d/physics';
+import { initPhysics } from '@zephyr3d/physics';
+import { rapierPhysics } from '@zephyr3d/physics-rapier';
 import { backendWebGL2 } from '@zephyr3d/backend-webgl';
 import { backendWebGPU } from '@zephyr3d/backend-webgpu';
 
@@ -72,7 +78,7 @@ function bumpyGround() {
 }
 
 myApp.ready().then(async function () {
-  await initPhysics();
+  await initPhysics(rapierPhysics);
 
   const scene = new Scene();
   const sun = new DirectionalLight(scene);
@@ -82,7 +88,7 @@ myApp.ready().then(async function () {
   const ground = new Mesh(scene, bumpyGround(), material(0.45, 0.5, 0.4));
   const groundCollider = new Collider();
   groundCollider.shape = 'mesh';
-  ground.addComponent(groundCollider);
+  ground.physics = new NodePhysics({ colliders: [groundCollider] });
 
   // Ramps and a row of crates to knock over.
   const rampMaterial = material(0.4, 0.45, 0.55);
@@ -95,7 +101,7 @@ myApp.ready().then(async function () {
     ramp.rotation = Quaternion.fromAxisAngle(Vector3.axisPX(), angle);
     const collider = new Collider();
     collider.size = new Vector3(4, 0.4, 8);
-    ramp.addComponent(collider);
+    ramp.physics = new NodePhysics({ colliders: [collider] });
   }
   const crateShape = new BoxShape({ size: 0.8 });
   const crateMaterial = material(0.9, 0.6, 0.2);
@@ -104,10 +110,9 @@ myApp.ready().then(async function () {
     crate.position.setXYZ(8, 0.4 + Math.floor(i / 3) * 0.8, -2 + (i % 3) * 0.9);
     const body = new RigidBody();
     body.mass = 20;
-    crate.addComponent(body);
     const collider = new Collider();
     collider.size = new Vector3(0.8, 0.8, 0.8);
-    crate.addComponent(collider);
+    crate.physics = new NodePhysics({ body, colliders: [collider] });
   }
 
   // #region car
@@ -118,14 +123,12 @@ myApp.ready().then(async function () {
   const body = new RigidBody();
   body.mass = 1200;
   body.linearDamping = 0.1;
-  car.addComponent(body);
   const shell = new Collider();
   shell.size = new Vector3(1.8, 0.6, 4);
-  car.addComponent(shell);
   const vehicle = new Vehicle();
   vehicle.maxEngineForce = 6000;
   vehicle.maxSteerAngle = 30;
-  car.addComponent(vehicle);
+  car.physics = new NodePhysics({ body, colliders: [shell], vehicle });
   // #endregion car
 
   // #region wheels
@@ -146,7 +149,7 @@ myApp.ready().then(async function () {
       wheel.suspensionRestLength = 0.3;
       wheel.steer = front ? 1 : 0;
       wheel.handbrake = front ? 0 : 1;
-      node.addComponent(wheel);
+      node.physics = new NodePhysics({ wheel });
       wheels.push({ wheel, front });
     }
   }

@@ -8,7 +8,7 @@ A joint links two rigid bodies, or a body and the world, allowing only certain m
 
 ## Where a Joint Goes and What It Joins
 
-A `Joint` component can go on any node, and **that node is the joint's frame**:
+A `Joint` can go on any node, in `node.physics.joint`, and **that node is the joint's frame**:
 
 - the **pivot** is the node's origin, moved by `anchor` (node space) if given;
 - the **axis** is the node's local `axis`, Y by default, for hinges and sliders.
@@ -80,7 +80,7 @@ Hinges and sliders can be driven by a motor, `motorMode`:
 
 ## Limits and Troubleshooting
 
-- Joints cannot break under load: Rapier's JavaScript API gives no access to joint forces. To snap one, compare the ends' distance or speed in a script and `removeComponent` it yourself.
+- Joints cannot break under load: Rapier's JavaScript API gives no access to joint forces. To snap one, compare the ends' distance or speed in a script and set `node.physics.joint = null` yourself.
 - There is no generic six-degrees-of-freedom joint; the six types above cover the common needs.
 - A joint between two bodies that are not dynamic is made, but does nothing.
 - When `connectedBody` names a node that does not exist, or both ends resolve to the same body, no joint is made, and `joint.error` says why.

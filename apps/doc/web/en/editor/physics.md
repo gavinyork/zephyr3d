@@ -1,35 +1,38 @@
 # Physics in the Editor
 
-In the editor you give nodes rigid bodies and colliders, then press Play or Preview to see them simulated. What the components mean and how to tune them is in the [Rigid Body Physics](en/physics-intro.md) chapter; this page covers working with them in the editor.
+In the editor you give nodes rigid bodies and colliders, then press Play or Preview to see them simulated. What each part means and how to tune it is in the [Rigid Body Physics](en/physics-intro.md) chapter; this page covers working with them in the editor.
 
 **The edited scene is never simulated**: while editing, things stay where you put them, and the simulation runs only in the page Play or Preview opens. So simulating cannot disturb your layout, and there is nothing to save or restore.
 
 ---
 
-## Adding Physics Components
+## Adding Physics
 
-Two places, with the same menu:
+A node's physics is its **Physics** property in the property panel: empty for nodes without physics. The quickest way to fill it is a preset, from either of two places:
 
-- a node's context menu in the scene hierarchy → **Add Component → Physics**;
-- the **Add Component** button at the bottom of the property panel.
+- a node's context menu in the scene hierarchy → **Add Physics**;
+- the **Add Physics** button at the bottom of the property panel.
 
-Pick Rigid Body, Collider, Joint, Character Controller, Vehicle or Wheel. Remove one with **Remove Component** in the context menu. Adding and removing can be undone.
+| Preset | Adds |
+| --- | --- |
+| Static Collider | A box collider fitted around the node and its children |
+| Dynamic Body | A dynamic rigid body, plus a fitted box collider if nothing on or below the node has a collider |
+| Kinematic Body | The same, kinematic |
+| Trigger Zone | A fitted box collider that is a trigger |
+| Character | A character controller as the node's body |
+| Vehicle Chassis | A 1000 kg dynamic body (unless it has one), a collider if needed, and a vehicle |
+| Wheel | A wheel, its radius fitted to the node |
+| Hinge Joint | A hinge joint |
 
-Conveniences:
+Presets add to what the node has, replacing only the part they set; a fitted box is usually right as is. **Remove Physics** in the context menu clears a node's physics. Both can be undone, and with several nodes selected, each gets data of its own.
 
-- **Adding a Collider** sizes and offsets its box to fit the node and its children, which is usually right as is.
-- **Adding a Rigid Body** to a node with no collider on it or below it adds a box collider around it too; a body without a shape would fall through everything.
-- **Adding a Vehicle** to a node with no rigid body adds a 1000 kg one (and a collider, as above).
-- **Adding a Wheel** sizes its radius to the node's bounds.
-- With several nodes selected, each gets a component of its own.
-
-Component properties are edited in the property panel; hover a property's name for what it does. Properties that only matter for some settings hide otherwise; mass and initial velocity, for example, only show on dynamic bodies.
+Everything a preset sets can be changed in the property panel, under **Physics**: **Body** (a rigid body or a character controller), **Colliders** (add and remove shapes), **Joint**, **Vehicle** and **Wheel**; empty slots can be filled there too. Hover a property's name for what it does. Properties that only matter for some settings hide otherwise; mass and initial velocity, for example, only show on dynamic bodies.
 
 A static floor and a falling ball:
 
-1. Floor: add a Box mesh, then **Add Component → Physics → Collider** (no rigid body means static);
-2. Ball: add a Sphere mesh, then **Add Component → Physics → Rigid Body**; set the added Collider's Shape to Sphere and its Radius to the ball's radius (1 for the built-in sphere);
-3. To throw the ball from the start, set the Rigid Body's **InitialLinearVelocity**;
+1. Floor: add a Box mesh, then **Add Physics → Static Collider**;
+2. Ball: add a Sphere mesh, then **Add Physics → Dynamic Body**; set the added collider's Shape to Sphere and its Radius to the ball's radius (1 for the built-in sphere);
+3. To throw the ball from the start, set the body's **InitialLinearVelocity**;
 4. Press Preview.
 
 ---
@@ -71,19 +74,19 @@ The **Layer** property of colliders and character controllers takes a layer numb
 
 ## Physics in Scripts
 
-Editor scripts can `import { RigidBody, PhysicsWorld } from '@zephyr3d/physics'`, with type hints. The `onFixedUpdate(dt)` hook of `RuntimeScript` is called before every simulation step. For example:
+Physics data is reached from scripts through `node.physics`, and the scene's world through `scene.physicsWorld`; the classes come from `@zephyr3d/scene`, with type hints. The `onFixedUpdate(dt)` hook of `RuntimeScript` is called before every simulation step. For example:
 
 ```ts
 import type { SceneNode } from '@zephyr3d/scene';
-import { RuntimeScript } from '@zephyr3d/scene';
+import { RigidBody, RuntimeScript } from '@zephyr3d/scene';
 import { Vector3 } from '@zephyr3d/base';
-import { RigidBody } from '@zephyr3d/physics';
 
 export default class extends RuntimeScript<SceneNode> {
   private body: RigidBody | null = null;
   onAttached(host: SceneNode) {
-    this.body = host.getComponent(RigidBody);
-    this.body?.on('collisionenter', (ev) => console.log(`hit ${ev.otherNode?.name}`));
+    const body = host.physics?.body;
+    this.body = body instanceof RigidBody ? body : null;
+    host.physics?.on('collisionenter', (ev) => console.log(`hit ${ev.otherNode?.name}`));
   }
   onFixedUpdate() {
     // A steady upward push
@@ -99,4 +102,4 @@ More in [Scripting Physics](en/physics-scripting.md).
 ## Preview and Build
 
 - Play and Preview both load the physics engine and simulate.
-- Building, the editor checks scenes, prefabs and scripts: if any holds a physics component or a script imports `@zephyr3d/physics`, the physics module and Rapier's WebAssembly (about 1.1 MB gzipped) are shipped and loaded at startup; otherwise neither is.
+- Building, the editor checks scenes, prefabs and scripts: if any node has physics data or a script imports `@zephyr3d/physics` or `@zephyr3d/physics-rapier`, the physics modules and Rapier's WebAssembly (about 1.1 MB gzipped) are shipped and loaded at startup; otherwise none of them are.

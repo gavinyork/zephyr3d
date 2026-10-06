@@ -8,7 +8,7 @@
 
 ## 最小可跑例
 
-角色控制器自带一个胶囊碰撞体，不需要再挂 `RigidBody` 和 `Collider`。胶囊底部对齐节点原点，所以角色模型的原点放在脚底就能直接用：
+角色控制器作为节点的身体（`node.physics.body`），自带一个胶囊碰撞体，不需要再加 `RigidBody` 和 `Collider`。胶囊底部对齐节点原点，所以角色模型的原点放在脚底就能直接用：
 
 <<< @/../src/tut-80/main.js#controller
 
@@ -65,6 +65,6 @@ controller.move(new Vector3(vx * dt, vy * dt, vz * dt));
 
 - **在固定步里移动**（`world.on('fixedupdate')` 或脚本的 `onFixedUpdate`），走路速度才与帧率无关、结果可复现。在 `onUpdate` 里按帧间隔移动也能用，但结果会随帧率略有不同。
 - `move` 看到的世界是上一次物理步之后的（与查询相同）；同一步内多次调用都基于最新的位置。
-- 角色进入触发区会收到 `triggerenter`。角色撞到静态物体不产生 `collisionenter`（运动学物体与静态物体之间没有接触事件），撞到了什么从 `move` 的结果里取。
+- 角色进入触发区时，它节点的 `node.physics` 会收到 `triggerenter`。角色撞到静态物体不产生 `collisionenter`（运动学物体与静态物体之间没有接触事件），撞到了什么从 `move` 的结果里取。
 - 胶囊跟随节点的朝向：转向时只绕竖直轴旋转节点，让节点倾斜会让胶囊也倾斜。
 - 不要直接设置节点位置来移动角色，除非是传送（瞬移到新地点）。

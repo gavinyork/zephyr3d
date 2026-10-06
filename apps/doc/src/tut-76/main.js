@@ -2,17 +2,21 @@ import { Quaternion, Vector3, Vector4 } from '@zephyr3d/base';
 import {
   Application,
   BoxShape,
+  Collider,
   DirectionalLight,
   getEngine,
   getInput,
   Mesh,
+  NodePhysics,
   OrbitCameraController,
   PBRMetallicRoughnessMaterial,
   PerspectiveCamera,
+  RigidBody,
   Scene,
   SphereShape
 } from '@zephyr3d/scene';
-import { Collider, initPhysics, RigidBody } from '@zephyr3d/physics';
+import { initPhysics } from '@zephyr3d/physics';
+import { rapierPhysics } from '@zephyr3d/physics-rapier';
 import { backendWebGL2 } from '@zephyr3d/backend-webgl';
 import { backendWebGPU } from '@zephyr3d/backend-webgpu';
 
@@ -38,9 +42,9 @@ const COLORS = [
 
 myApp.ready().then(async function () {
   // #region init
-  // Loads the physics engine (a WebAssembly module). Wait for it before
-  // creating scenes with physics components.
-  await initPhysics();
+  // Loads the physics engine (a WebAssembly module). From then on, scenes
+  // simulate the physics data of their nodes.
+  await initPhysics(rapierPhysics);
   // #endregion init
 
   const scene = new Scene();
@@ -55,7 +59,7 @@ myApp.ready().then(async function () {
   ground.position.setXYZ(0, -0.25, 0);
   const groundCollider = new Collider();
   groundCollider.size = new Vector3(20, 0.5, 20);
-  ground.addComponent(groundCollider);
+  ground.physics = new NodePhysics({ colliders: [groundCollider] });
   // #endregion ground
 
   // A static ramp: also just a collider, turned with its node.
@@ -64,7 +68,7 @@ myApp.ready().then(async function () {
   ramp.rotation = Quaternion.fromAxisAngle(Vector3.axisPZ(), -0.35);
   const rampCollider = new Collider();
   rampCollider.size = new Vector3(5, 0.3, 3);
-  ramp.addComponent(rampCollider);
+  ramp.physics = new NodePhysics({ colliders: [rampCollider] });
 
   const boxShape = new BoxShape({ size: 0.6 });
   const ballShape = new SphereShape({ radius: 0.3 });
@@ -73,16 +77,15 @@ myApp.ready().then(async function () {
 
   // #region box
   // A dynamic body: a RigidBody gives the node mass and lets the simulation
-  // move it; the Collider on the same node gives it its shape.
+  // move it; a Collider on the same node gives it its shape.
   function addBox(x, y, z) {
     const c = COLORS[count++ % COLORS.length];
     const mesh = new Mesh(scene, boxShape, material(c[0], c[1], c[2]));
     mesh.position.setXYZ(x, y, z);
     mesh.rotation = Quaternion.fromAxisAngle(new Vector3(1, 1, 0).inplaceNormalize(), count * 0.4);
-    mesh.addComponent(new RigidBody());
     const collider = new Collider();
     collider.size = new Vector3(0.6, 0.6, 0.6);
-    mesh.addComponent(collider);
+    mesh.physics = new NodePhysics({ body: new RigidBody(), colliders: [collider] });
     bodies.push(mesh);
   }
   // #endregion box
@@ -93,13 +96,12 @@ myApp.ready().then(async function () {
     mesh.position.setXYZ(x, y, z);
     const body = new RigidBody();
     body.mass = 2;
-    mesh.addComponent(body);
     const collider = new Collider();
     collider.shape = 'sphere';
     collider.radius = 0.3;
     // Bouncier than the default.
     collider.restitution = 0.5;
-    mesh.addComponent(collider);
+    mesh.physics = new NodePhysics({ body, colliders: [collider] });
     bodies.push(mesh);
   }
 
@@ -112,7 +114,7 @@ myApp.ready().then(async function () {
     }
   }
 
-  // Removing a node takes its rigid body and colliders out of the simulation.
+  // Removing a node takes its physics data out of the simulation.
   function reset() {
     for (const node of bodies) {
       node.remove();

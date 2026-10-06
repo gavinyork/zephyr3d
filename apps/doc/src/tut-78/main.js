@@ -2,17 +2,21 @@ import { Vector3, Vector4 } from '@zephyr3d/base';
 import {
   Application,
   BoxShape,
+  Collider,
   DirectionalLight,
   getEngine,
   getInput,
   Mesh,
+  NodePhysics,
   OrbitCameraController,
   PBRMetallicRoughnessMaterial,
   PerspectiveCamera,
+  RigidBody,
   Scene,
   SphereShape
 } from '@zephyr3d/scene';
-import { Collider, initPhysics, PhysicsWorld, RigidBody } from '@zephyr3d/physics';
+import { initPhysics } from '@zephyr3d/physics';
+import { rapierPhysics } from '@zephyr3d/physics-rapier';
 import { backendWebGL2 } from '@zephyr3d/backend-webgl';
 import { backendWebGPU } from '@zephyr3d/backend-webgpu';
 
@@ -33,7 +37,7 @@ const BALL_SPEED = 18;
 const WIND = new Vector3(6, 0, 0);
 
 myApp.ready().then(async function () {
-  await initPhysics();
+  await initPhysics(rapierPhysics);
 
   const scene = new Scene();
   const sun = new DirectionalLight(scene);
@@ -44,7 +48,7 @@ myApp.ready().then(async function () {
   ground.position.setXYZ(0, -0.25, 0);
   const groundCollider = new Collider();
   groundCollider.size = new Vector3(30, 0.5, 30);
-  ground.addComponent(groundCollider);
+  ground.physics = new NodePhysics({ colliders: [groundCollider] });
 
   const log = document.querySelector('#log');
   const crateShape = new BoxShape({ size: 0.8 });
@@ -62,15 +66,14 @@ myApp.ready().then(async function () {
         const crate = new Mesh(scene, crateShape, crateMaterials[(x + y) % 2]);
         crate.name = `crate ${x},${y}`;
         crate.position.setXYZ(-2 + x * 0.82, 0.4 + y * 0.81, -2);
-        const body = new RigidBody();
-        crate.addComponent(body);
         const collider = new Collider();
         collider.size = new Vector3(0.8, 0.8, 0.8);
-        crate.addComponent(collider);
+        crate.physics = new NodePhysics({ body: new RigidBody(), colliders: [collider] });
         // #region events
-        // Contact events come from the rigid body: once per pair of objects,
-        // when they start touching, while they touch, and when they let go.
-        body.on('collisionenter', (ev) => {
+        // Contact events come from the node's physics data: once per pair of
+        // objects, when they start touching, while they touch, and when they
+        // let go.
+        crate.physics.on('collisionenter', (ev) => {
           // Only hard knocks: resting contact has a small impulse.
           if (ev.impulse > 5 && ev.otherNode?.name === 'ball') {
             log.textContent = `${crate.name} hit by the ball, impulse ${ev.impulse.toFixed(1)} N·s`;
@@ -98,12 +101,11 @@ myApp.ready().then(async function () {
     // Setting a velocity before the body is in the simulation is fine: it
     // starts with it.
     body.setLinearVelocity(Vector3.scale(ray.direction, BALL_SPEED));
-    ball.addComponent(body);
     // #endregion shoot
     const collider = new Collider();
     collider.shape = 'sphere';
     collider.radius = 0.25;
-    ball.addComponent(collider);
+    ball.physics = new NodePhysics({ body, colliders: [collider] });
     balls.push(ball);
     if (balls.length > 20) {
       const old = balls.shift();
@@ -112,7 +114,7 @@ myApp.ready().then(async function () {
     }
   }
 
-  const world = PhysicsWorld.get(scene);
+  const world = scene.physicsWorld;
 
   // #region raycast
   // Shift-click: ask the world what is under the pointer, and push it.
@@ -134,7 +136,7 @@ myApp.ready().then(async function () {
   world.on('fixedupdate', () => {
     if (wind.checked) {
       for (const crate of crates) {
-        const body = crate.getComponent(RigidBody);
+        const body = crate.physics.body;
         body.wakeUp();
         body.applyForce(WIND);
       }

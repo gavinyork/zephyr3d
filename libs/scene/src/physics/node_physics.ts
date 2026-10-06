@@ -12,6 +12,19 @@ import type { Vehicle, Wheel } from './vehicle';
 let nextObjectId = 1;
 
 /**
+ * Parts to create a {@link NodePhysics} with.
+ *
+ * @public
+ */
+export interface NodePhysicsInit {
+  body?: Nullable<RigidBody | CharacterController>;
+  colliders?: readonly Collider[];
+  joint?: Nullable<Joint>;
+  vehicle?: Nullable<Vehicle>;
+  wheel?: Nullable<Wheel>;
+}
+
+/**
  * The physics data of a scene node: {@link SceneNode.physics}.
  *
  * @remarks
@@ -40,7 +53,11 @@ export class NodePhysics extends makeObservable(Disposable)<PhysicsEventMap>() {
   private _joint: Nullable<Joint>;
   private _vehicle: Nullable<Vehicle>;
   private _wheel: Nullable<Wheel>;
-  constructor() {
+  /**
+   * @param init - Parts to start with, as if assigned one by one:
+   *   `new NodePhysics({ body: new RigidBody(), colliders: [collider] })`.
+   */
+  constructor(init?: NodePhysicsInit) {
     super();
     this._physicsId = nextObjectId++;
     this._node = null;
@@ -49,6 +66,13 @@ export class NodePhysics extends makeObservable(Disposable)<PhysicsEventMap>() {
     this._joint = null;
     this._vehicle = null;
     this._wheel = null;
+    if (init) {
+      this.body = init.body ?? null;
+      this.colliders = init.colliders ?? [];
+      this.joint = init.joint ?? null;
+      this.vehicle = init.vehicle ?? null;
+      this.wheel = init.wheel ?? null;
+    }
   }
   /** The node this data is on. */
   get node(): Nullable<SceneNode> {

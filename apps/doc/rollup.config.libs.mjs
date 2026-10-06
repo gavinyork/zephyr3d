@@ -61,7 +61,7 @@ function getNoopTarget() {
 // Files a package fetches beside its own module at runtime (new URL(..., import.meta.url));
 // bundled into `tut/lib`, the module moves, so they have to move with it.
 const runtimeFiles = {
-  physics: ['rapier/rapier_wasm3d_bg.wasm', 'rapier/LICENSE']
+  'physics-rapier': ['rapier/rapier_wasm3d_bg.wasm', 'rapier/LICENSE']
 };
 
 function copyRuntimeFiles(packageName) {

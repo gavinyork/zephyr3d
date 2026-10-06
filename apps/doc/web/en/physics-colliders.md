@@ -1,6 +1,6 @@
 # Colliders
 
-A `Collider` is the shape an object has in collisions. Simpler shapes simulate faster and steadier, so prefer a basic shape that roughly wraps the object, and use meshes only where needed.
+A `Collider` is the shape an object has in collisions; a node's colliders are in `node.physics.colliders`. Simpler shapes simulate faster and steadier, so prefer a basic shape that roughly wraps the object, and use meshes only where needed.
 
 <div class="showcase" case="tut-77"></div>
 
@@ -48,7 +48,7 @@ Which to use:
 Mesh triangles are read back from the GPU, which takes a few frames depending on the machine. So that nothing falls before the ground is there, the world by default **waits to start until every mesh, convex and terrain collider present at the start is in** (`waitForCollidersOnStart`, can be turned off in the scene settings); time does not run meanwhile. Such colliders added later only hold back their own rigid body.
 
 - `collider.ready` is true once the collider is in the simulation, raising `ready` when it turns true.
-- `await PhysicsWorld.get(scene).whenReady()` waits for every collider still being read.
+- `await scene.physicsWorld.whenReady()` waits for every collider still being read.
 - When a shape cannot be built (say, the hull of points all in one plane) `collider.error` says why, and the console reports it.
 
 ---
@@ -61,7 +61,7 @@ A `terrain` collider goes on a `ClipmapTerrain` node and uses the terrain's load
 const collider = new Collider();
 collider.shape = 'terrain';
 collider.terrainResolution = 2; // one sample every 2 height map texels
-terrain.addComponent(collider);
+terrain.physics = new NodePhysics({ colliders: [collider] });
 ```
 
 - A larger `terrainResolution` follows bumps less closely but uses less memory; at 1 it matches the height map texel for texel.
@@ -83,7 +83,7 @@ A collider with `isTrigger` set only detects what enters and leaves it, blocking
 
 <<< @/../src/tut-77/main.js#trigger
 
-Both the trigger and the object entering it receive `triggerenter` / `triggerexit`. Event details are in [Scripting](en/physics-scripting.md#collision-and-trigger-events).
+Both sides receive `triggerenter` / `triggerexit`, on the physics data of their nodes. Event details are in [Scripting](en/physics-scripting.md#collision-and-trigger-events).
 
 ---
 
