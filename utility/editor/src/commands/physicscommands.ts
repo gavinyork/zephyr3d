@@ -154,14 +154,14 @@ export const PHYSICS_PRESETS: readonly PhysicsPreset[] = [
     label: 'Character',
     description: 'A capsule that walks, climbs steps and slides along walls, moved by a script',
     apply(_node, physics) {
-      physics.body = new CharacterController();
+      physics.character = new CharacterController();
     }
   },
   {
     label: 'Vehicle Chassis',
     description: 'A heavy dynamic body driven as a vehicle; add Wheel to nodes below it',
     apply(node, physics) {
-      if (!(physics.body instanceof RigidBody) || physics.body.motionType !== 'dynamic') {
+      if (!physics.body || physics.body.motionType !== 'dynamic') {
         const body = new RigidBody();
         body.mass = 1000;
         physics.body = body;

@@ -1,4 +1,4 @@
-import { Quaternion, Vector3, Vector4 } from '@zephyr3d/base';
+import { AABB, Quaternion, Vector3, Vector4 } from '@zephyr3d/base';
 import {
   Application,
   BoxShape,
@@ -56,35 +56,50 @@ myApp.ready().then(async function () {
   const sun = new DirectionalLight(scene);
   sun.lookAt(new Vector3(-6, 10, 6), Vector3.zero(), Vector3.axisPY());
   sun.castShadow = true;
+  // Keep the shadow region on the 30 x 30 ground: bodies that fall off it would
+  // otherwise drag the region down with them and thin out the shadow map.
+  sun.shadow.shadowRegion.setLimit(new AABB(new Vector3(-15, -1, -15), new Vector3(15, 8, 15)));
   const grey = material(0.55, 0.55, 0.55);
   block(scene, new Vector3(30, 0.5, 30), new Vector3(0, -0.25, 0), grey);
 
   // Steps 0.25 m high: the character walks up them (stepHeight is 0.3).
   for (let i = 0; i < 4; i++) {
-    block(scene, new Vector3(1, 0.25 * (i + 1), 3), new Vector3(3 + i, 0.125 * (i + 1), -3), grey);
+    const box = block(
+      scene,
+      new Vector3(1, 0.25 * (i + 1), 3),
+      new Vector3(3 + i, 0.125 * (i + 1), -3),
+      grey
+    );
+    sun.shadow.shadowRegion.addDynamicCaster(box);
   }
   // A 0.5 m ledge: too high to step onto, it has to be jumped.
-  block(scene, new Vector3(3, 0.5, 3), new Vector3(-4, 0.25, -3), material(0.4, 0.45, 0.55));
+  const ledge = block(scene, new Vector3(3, 0.5, 3), new Vector3(-4, 0.25, -3), material(0.4, 0.45, 0.55));
+  sun.shadow.shadowRegion.addDynamicCaster(ledge);
+
   // A 25° ramp it walks up, and a 55° one it slides down.
-  block(
+  const ramp1 = block(
     scene,
     new Vector3(4, 0.2, 3),
     new Vector3(3, 0.8, 3),
     grey,
     Quaternion.fromAxisAngle(Vector3.axisPZ(), (25 * Math.PI) / 180)
   );
-  block(
+  sun.shadow.shadowRegion.addDynamicCaster(ramp1);
+  const ramp2 = block(
     scene,
     new Vector3(3, 0.2, 3),
     new Vector3(-4, 1.1, 3),
     material(0.6, 0.35, 0.3),
     Quaternion.fromAxisAngle(Vector3.axisPZ(), (-55 * Math.PI) / 180)
   );
+  sun.shadow.shadowRegion.addDynamicCaster(ramp2);
+
   // Loose crates to push around.
   const crateShape = new BoxShape({ size: 0.7 });
   for (let i = 0; i < 4; i++) {
     const crate = new Mesh(scene, crateShape, material(0.9, 0.6, 0.2));
     crate.position.setXYZ(-1 + i * 0.9, 0.35, 1.5);
+    sun.shadow.shadowRegion.addDynamicCaster(crate);
     const body = new RigidBody();
     body.mass = 10;
     const collider = new Collider();
@@ -93,18 +108,19 @@ myApp.ready().then(async function () {
   }
 
   // #region controller
-  // The character is the node's body and brings its own capsule: no
-  // RigidBody or Collider needed. Its node's origin is at the feet.
+  // The character goes in the node's character slot and brings its own
+  // capsule: no RigidBody or Collider needed. Its node's origin is at the feet.
   const hero = new Mesh(
     scene,
     new CapsuleShape({ radius: 0.3, height: 1.2, anchor: 0 }),
     material(0.3, 0.75, 0.35)
   );
   hero.position.setXYZ(0, 0, 4);
+  sun.shadow.shadowRegion.addDynamicCaster(hero);
   const controller = new CharacterController();
   controller.height = 1.8;
   controller.radius = 0.3;
-  hero.physics = new NodePhysics({ body: controller });
+  hero.physics = new NodePhysics({ character: controller });
   // #endregion controller
 
   const keys = new Set();

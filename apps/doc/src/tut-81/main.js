@@ -1,4 +1,4 @@
-import { Quaternion, Vector3, Vector4 } from '@zephyr3d/base';
+import { AABB, Quaternion, Vector3, Vector4 } from '@zephyr3d/base';
 import {
   Application,
   BoundingBox,
@@ -84,8 +84,12 @@ myApp.ready().then(async function () {
   const sun = new DirectionalLight(scene);
   sun.lookAt(new Vector3(-6, 10, 4), Vector3.zero(), Vector3.axisPY());
   sun.castShadow = true;
+  // Keep the shadow region on the 120 x 120 ground: bodies that fall off it would
+  // otherwise drag the region down with them and thin out the shadow map.
+  sun.shadow.shadowRegion.setLimit(new AABB(new Vector3(-60, -2, -60), new Vector3(60, 10, 60)));
 
   const ground = new Mesh(scene, bumpyGround(), material(0.45, 0.5, 0.4));
+  //sun.shadow.shadowRegion.addStaticCaster(ground);
   const groundCollider = new Collider();
   groundCollider.shape = 'mesh';
   ground.physics = new NodePhysics({ colliders: [groundCollider] });
@@ -99,6 +103,7 @@ myApp.ready().then(async function () {
     const ramp = new Mesh(scene, new BoxShape({ size: 4, sizeY: 0.4, sizeZ: 8 }), rampMaterial);
     ramp.position.setXYZ(x, 0.6, z);
     ramp.rotation = Quaternion.fromAxisAngle(Vector3.axisPX(), angle);
+    sun.shadow.shadowRegion.addDynamicCaster(ramp);
     const collider = new Collider();
     collider.size = new Vector3(4, 0.4, 8);
     ramp.physics = new NodePhysics({ colliders: [collider] });
@@ -108,6 +113,7 @@ myApp.ready().then(async function () {
   for (let i = 0; i < 6; i++) {
     const crate = new Mesh(scene, crateShape, crateMaterial);
     crate.position.setXYZ(8, 0.4 + Math.floor(i / 3) * 0.8, -2 + (i % 3) * 0.9);
+    sun.shadow.shadowRegion.addDynamicCaster(crate);
     const body = new RigidBody();
     body.mass = 20;
     const collider = new Collider();
@@ -120,6 +126,7 @@ myApp.ready().then(async function () {
   // that drives it. Its front is +Z, its up +Y.
   const car = new Mesh(scene, new BoxShape({ size: 1.8, sizeY: 0.6, sizeZ: 4 }), material(0.75, 0.08, 0.1));
   car.position.setXYZ(0, 1.2, 0);
+  sun.shadow.shadowRegion.addDynamicCaster(car);
   const body = new RigidBody();
   body.mass = 1200;
   body.linearDamping = 0.1;
@@ -144,6 +151,7 @@ myApp.ready().then(async function () {
       node.parent = car;
       node.position.setXYZ(side * 1.05, -0.4, front ? 1.3 : -1.3);
       node.rotation = Quaternion.fromAxisAngle(Vector3.axisPZ(), Math.PI / 2);
+      sun.shadow.shadowRegion.addDynamicCaster(node);
       const wheel = new Wheel();
       wheel.radius = 0.4;
       wheel.suspensionRestLength = 0.3;
@@ -163,7 +171,7 @@ myApp.ready().then(async function () {
     }
   }
   // #endregion drive
-  const driveSelect = document.querySelector('#drive');
+  const driveSelect = /** @type {HTMLSelectElement} */ (document.querySelector('#drive'));
   setDrive(driveSelect.value);
   driveSelect.addEventListener('change', () => setDrive(driveSelect.value));
 

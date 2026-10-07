@@ -19,7 +19,7 @@ A node's physics is its **Physics** property in the property panel: empty for no
 | Dynamic Body | A dynamic rigid body, plus a fitted box collider if nothing on or below the node has a collider |
 | Kinematic Body | The same, kinematic |
 | Trigger Zone | A fitted box collider that is a trigger |
-| Character | A character controller as the node's body |
+| Character | A character controller (`physics.character`) |
 | Vehicle Chassis | A 1000 kg dynamic body (unless it has one), a collider if needed, and a vehicle |
 | Wheel | A wheel, its radius fitted to the node |
 | Hinge Joint | A hinge joint |
@@ -78,14 +78,14 @@ Physics data is reached from scripts through `node.physics`, and the scene's wor
 
 ```ts
 import type { SceneNode } from '@zephyr3d/scene';
-import { RigidBody, RuntimeScript } from '@zephyr3d/scene';
+import type { RigidBody } from '@zephyr3d/scene';
+import { RuntimeScript } from '@zephyr3d/scene';
 import { Vector3 } from '@zephyr3d/base';
 
 export default class extends RuntimeScript<SceneNode> {
   private body: RigidBody | null = null;
   onAttached(host: SceneNode) {
-    const body = host.physics?.body;
-    this.body = body instanceof RigidBody ? body : null;
+    this.body = host.physics?.body ?? null;
     host.physics?.on('collisionenter', (ev) => console.log(`hit ${ev.otherNode?.name}`));
   }
   onFixedUpdate() {

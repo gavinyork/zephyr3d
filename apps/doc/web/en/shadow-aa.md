@@ -248,6 +248,13 @@ shadowRegion.removeCaster(character);
 shadowRegion.clearCasters();
 ```
 
+Dynamic casters can wander off, for example a physics body that rolls off the edge and keeps falling. Set a limit to keep the region inside the play area: the union above is clipped to it, and if nothing is left inside it, the scene bounding box is used as above. `clear()` and `clearCasters()` keep the limit; `setLimit(null)` removes it.
+
+```javascript
+// Never cover more than the 20 x 20 platform, from just below it to 12 m up
+shadowRegion.setLimit(new AABB(new Vector3(-10, -1, -10), new Vector3(10, 12, 10)));
+```
+
 > **Editor Tip:**  
 > In the Zephyr3D Editor, the manual AABB of ShadowRegion can be edited visually,  
 > allowing precise control over the area that needs directional shadows and reducing wasted shadow map coverage.

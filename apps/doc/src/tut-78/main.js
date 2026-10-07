@@ -1,4 +1,4 @@
-import { Vector3, Vector4 } from '@zephyr3d/base';
+import { AABB, Vector3, Vector4 } from '@zephyr3d/base';
 import {
   Application,
   BoxShape,
@@ -43,9 +43,13 @@ myApp.ready().then(async function () {
   const sun = new DirectionalLight(scene);
   sun.lookAt(new Vector3(-6, 10, 4), Vector3.zero(), Vector3.axisPY());
   sun.castShadow = true;
+  // Keep the shadow region on the 30 x 30 ground: bodies that fall off it would
+  // otherwise drag the region down with them and thin out the shadow map.
+  sun.shadow.shadowRegion.setLimit(new AABB(new Vector3(-15, -1, -15), new Vector3(15, 12, 15)));
 
   const ground = new Mesh(scene, new BoxShape({ size: 30, sizeY: 0.5, sizeZ: 30 }), material(0.5, 0.5, 0.5));
   ground.position.setXYZ(0, -0.25, 0);
+  ground.castShadow = false;
   const groundCollider = new Collider();
   groundCollider.size = new Vector3(30, 0.5, 30);
   ground.physics = new NodePhysics({ colliders: [groundCollider] });
@@ -66,13 +70,11 @@ myApp.ready().then(async function () {
         const crate = new Mesh(scene, crateShape, crateMaterials[(x + y) % 2]);
         crate.name = `crate ${x},${y}`;
         crate.position.setXYZ(-2 + x * 0.82, 0.4 + y * 0.81, -2);
+        sun.shadow.shadowRegion.addDynamicCaster(crate);
         const collider = new Collider();
         collider.size = new Vector3(0.8, 0.8, 0.8);
         crate.physics = new NodePhysics({ body: new RigidBody(), colliders: [collider] });
         // #region events
-        // Contact events come from the node's physics data: once per pair of
-        // objects, when they start touching, while they touch, and when they
-        // let go.
         crate.physics.on('collisionenter', (ev) => {
           // Only hard knocks: resting contact has a small impulse.
           if (ev.impulse > 5 && ev.otherNode?.name === 'ball') {
@@ -93,13 +95,12 @@ myApp.ready().then(async function () {
     const ball = new Mesh(scene, ballShape, ballMaterial);
     ball.name = 'ball';
     ball.position.set(Vector3.add(ray.origin, Vector3.scale(ray.direction, 1)));
+    sun.shadow.shadowRegion.addDynamicCaster(ball);
     // #region shoot
     const body = new RigidBody();
     body.mass = 4;
     // Fast and small: keep it from passing through a crate between two steps.
     body.ccd = true;
-    // Setting a velocity before the body is in the simulation is fine: it
-    // starts with it.
     body.setLinearVelocity(Vector3.scale(ray.direction, BALL_SPEED));
     // #endregion shoot
     const collider = new Collider();
@@ -109,6 +110,7 @@ myApp.ready().then(async function () {
     balls.push(ball);
     if (balls.length > 20) {
       const old = balls.shift();
+      sun.shadow.shadowRegion.removeCaster(old);
       old.remove();
       old.dispose();
     }
@@ -127,12 +129,12 @@ myApp.ready().then(async function () {
       log.textContent = `${hit.node.name || 'ground'} cannot be pushed`;
     }
   }
-
   // #endregion raycast
+
   // #region fixedupdate
   // Forces applied before each simulation step act on that step only, so the
   // wind is the same at any frame rate.
-  const wind = document.querySelector('#wind');
+  const wind = /** @type {HTMLInputElement} */ (document.querySelector('#wind'));
   world.on('fixedupdate', () => {
     if (wind.checked) {
       for (const crate of crates) {
@@ -143,7 +145,8 @@ myApp.ready().then(async function () {
     }
   });
   // #endregion fixedupdate
-  document.querySelector('#reset').addEventListener('click', buildWall);
+  const resetButton = /** @type {HTMLButtonElement} */ (document.querySelector('#reset'));
+  resetButton.addEventListener('click', buildWall);
 
   const camera = new PerspectiveCamera(scene, Math.PI / 3, 0.1, 200);
   camera.lookAt(new Vector3(0, 3, 9), new Vector3(0, 1.5, -2), Vector3.axisPY());

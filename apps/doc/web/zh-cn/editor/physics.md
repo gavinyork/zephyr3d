@@ -19,7 +19,7 @@
 | Dynamic Body | 一个动态刚体；如果节点及其子节点上还没有碰撞体，再补一个包住它的盒子碰撞体 |
 | Kinematic Body | 同上，运动学刚体 |
 | Trigger Zone | 一个包住节点的触发器盒子 |
-| Character | 角色控制器，作为节点的身体 |
+| Character | 角色控制器（`physics.character`） |
 | Vehicle Chassis | 一个 1000 kg 的动态刚体（已有则保留）、需要时补碰撞体，再加一个载具 |
 | Wheel | 一个轮子，半径按节点包围盒初始化 |
 | Hinge Joint | 一个铰链关节 |
@@ -78,14 +78,14 @@
 
 ```ts
 import type { SceneNode } from '@zephyr3d/scene';
-import { RigidBody, RuntimeScript } from '@zephyr3d/scene';
+import type { RigidBody } from '@zephyr3d/scene';
+import { RuntimeScript } from '@zephyr3d/scene';
 import { Vector3 } from '@zephyr3d/base';
 
 export default class extends RuntimeScript<SceneNode> {
   private body: RigidBody | null = null;
   onAttached(host: SceneNode) {
-    const body = host.physics?.body;
-    this.body = body instanceof RigidBody ? body : null;
+    this.body = host.physics?.body ?? null;
     host.physics?.on('collisionenter', (ev) => console.log(`hit ${ev.otherNode?.name}`));
   }
   onFixedUpdate() {

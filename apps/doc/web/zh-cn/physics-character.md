@@ -8,7 +8,7 @@
 
 ## 最小可跑例
 
-角色控制器作为节点的身体（`node.physics.body`），自带一个胶囊碰撞体，不需要再加 `RigidBody` 和 `Collider`。胶囊底部对齐节点原点，所以角色模型的原点放在脚底就能直接用：
+角色控制器放在节点的 `character` 槽位（`node.physics.character`），自带一个胶囊碰撞体，不需要再加 `RigidBody` 和 `Collider`。胶囊底部对齐节点原点，所以角色模型的原点放在脚底就能直接用：
 
 <<< @/../src/tut-80/main.js#controller
 

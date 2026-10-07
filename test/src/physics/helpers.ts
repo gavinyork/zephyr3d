@@ -18,8 +18,10 @@ export function addPhysics<T extends PhysicsPart>(node: SceneNode, part: T): T {
   const physics = node.physics;
   if (part instanceof Collider) {
     physics.addCollider(part);
-  } else if (part instanceof RigidBody || part instanceof CharacterController) {
+  } else if (part instanceof RigidBody) {
     physics.body = part;
+  } else if (part instanceof CharacterController) {
+    physics.character = part;
   } else if (part instanceof Joint) {
     physics.joint = part;
   } else if (part instanceof Vehicle) {
@@ -42,6 +44,8 @@ export function removePhysics(node: SceneNode, part: PhysicsPart) {
     }
   } else if (physics.body === part) {
     physics.body = null;
+  } else if (physics.character === part) {
+    physics.character = null;
   } else if (physics.joint === part) {
     physics.joint = null;
   } else if (physics.vehicle === part) {

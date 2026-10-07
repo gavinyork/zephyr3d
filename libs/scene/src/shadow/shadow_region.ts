@@ -15,11 +15,19 @@ type DynamicShadowCasterEntry = {
 /**
  * Maintains the world-space region used by directional light shadow maps.
  *
+ * @remarks
+ * The region is the union of a manual AABB and the bounds of the static and dynamic
+ * casters, clipped to the optional limit set with {@link ShadowRegion.setLimit}.
+ * The limit keeps tracked casters that leave the play area, such as a falling
+ * physics body, from stretching the shadow map over empty space.
+ *
  * @public
  */
 export class ShadowRegion extends Disposable {
   /** @internal */
   private _manualRegion: Nullable<AABB>;
+  /** @internal */
+  private _limit: Nullable<AABB>;
   /** @internal */
   private readonly _staticRegion: AABB;
   /** @internal */
@@ -39,6 +47,7 @@ export class ShadowRegion extends Disposable {
   constructor(region?: Nullable<AABB>) {
     super();
     this._manualRegion = region ? new AABB(region) : null;
+    this._limit = null;
     this._staticRegion = new AABB().beginExtend();
     this._dynamicRegion = new AABB().beginExtend();
     this._region = new AABB().beginExtend();
@@ -50,7 +59,9 @@ export class ShadowRegion extends Disposable {
   /**
    * Final world-space shadow region.
    *
-   * @returns The union of the manual, static caster, and dynamic caster regions, or `null` if no valid region exists.
+   * @returns The union of the manual, static caster, and dynamic caster regions clipped to
+   *   {@link ShadowRegion.limit}, or `null` if no valid region exists or the union lies
+   *   entirely outside the limit.
    */
   get region(): Nullable<AABB> {
     return this._region.isValid() ? this._region : null;
@@ -63,6 +74,27 @@ export class ShadowRegion extends Disposable {
    */
   get manualRegion(): Nullable<AABB> {
     return this._manualRegion;
+  }
+
+  /**
+   * World-space AABB the final region is clipped to.
+   *
+   * @returns The limit, or `null` if the region is not limited.
+   */
+  get limit(): Nullable<AABB> {
+    return this._limit;
+  }
+
+  /**
+   * Limits the final region to a world-space AABB.
+   *
+   * @param limit - The AABB to clip the region to, or `null` to remove the limit.
+   * @returns `this` for chaining.
+   */
+  setLimit(limit: Nullable<AABB>): this {
+    this._limit = limit?.isValid() ? new AABB(limit) : null;
+    this.updateRegion();
+    return this;
   }
 
   /**
@@ -198,7 +230,7 @@ export class ShadowRegion extends Disposable {
   }
 
   /**
-   * Clears the manual region and all shadow casters.
+   * Clears the manual region and all shadow casters. The limit is kept.
    *
    * @returns `this` for chaining.
    */
@@ -278,6 +310,17 @@ export class ShadowRegion extends Disposable {
     }
     if (this._dynamicRegion.isValid()) {
       this.extendRegion(this._region, this._dynamicRegion);
+    }
+    if (this._limit && this._region.isValid()) {
+      const min = this._region.minPoint;
+      const max = this._region.maxPoint;
+      const lmin = this._limit.minPoint;
+      const lmax = this._limit.maxPoint;
+      min.setXYZ(Math.max(min.x, lmin.x), Math.max(min.y, lmin.y), Math.max(min.z, lmin.z));
+      max.setXYZ(Math.min(max.x, lmax.x), Math.min(max.y, lmax.y), Math.min(max.z, lmax.z));
+      if (min.x > max.x || min.y > max.y || min.z > max.z) {
+        this._region.beginExtend();
+      }
     }
   }
 

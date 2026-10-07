@@ -1,4 +1,4 @@
-import { Vector3, Vector4 } from '@zephyr3d/base';
+import { AABB, Vector3, Vector4 } from '@zephyr3d/base';
 import {
   Application,
   BoundingBox,
@@ -81,11 +81,15 @@ myApp.ready().then(async function () {
   const sun = new DirectionalLight(scene);
   sun.lookAt(new Vector3(-6, 10, 4), Vector3.zero(), Vector3.axisPY());
   sun.castShadow = true;
+  // Keep the shadow region on the 16 x 16 ground: bodies that fall off it would
+  // otherwise drag the region down with them and thin out the shadow map.
+  sun.shadow.shadowRegion.setLimit(new AABB(new Vector3(-8, -1, -8), new Vector3(8, 10, 8)));
 
   // #region mesh
   // A mesh collider uses the mesh's own triangles. Best for static ground and
   // level geometry; on a moving body use 'convex' instead.
   const ground = new Mesh(scene, rollingGround(), material(0.5, 0.55, 0.45));
+  ground.castShadow = false;
   const groundCollider = new Collider();
   groundCollider.shape = 'mesh';
   ground.physics = new NodePhysics({ colliders: [groundCollider] });
@@ -107,14 +111,13 @@ myApp.ready().then(async function () {
   // trigger's and that of what entered it.
   zone.physics.on('triggerenter', (ev) => {
     const node = ev.otherNode;
-    if (node instanceof Mesh && !original.has(node)) {
+    if (node.isMesh() && !original.has(node)) {
       original.set(node, node.material);
       node.material = highlight;
     }
   });
   zone.physics.on('triggerexit', (ev) => {
-    // #endregion trigger
-    const node = ev.otherNode;
+    const node = /** @type {Mesh} */ (ev.otherNode);
     if (original.has(node)) {
       node.material = original.get(node);
       original.delete(node);
@@ -134,6 +137,7 @@ myApp.ready().then(async function () {
       const rock = new Mesh(scene, rockShape, material(0.6, 0.55, 0.5));
       rock.position.setXYZ(-4 + (i % 4) * 2.2, 3 + Math.floor(i / 4), -1.5 + ((count + i) % 3) * 1.4);
       rock.scale.setXYZ(1, 0.7 + (i % 3) * 0.15, 1.3);
+      sun.shadow.shadowRegion.addDynamicCaster(rock);
       const hull = new Collider();
       hull.shape = 'convex';
       hull.layer = LAYER_ROCKS;
@@ -145,6 +149,7 @@ myApp.ready().then(async function () {
     for (let i = 0; i < 4; i++) {
       const ghost = new Mesh(scene, ghostShape, material(0.95, 0.85, 0.3));
       ghost.position.setXYZ(-3 + i * 2, 5.5, -0.5 + (i % 2));
+      sun.shadow.shadowRegion.addDynamicCaster(ghost);
       const box = new Collider();
       box.size = new Vector3(0.5, 0.5, 0.5);
       box.layer = LAYER_GHOSTS;
@@ -156,7 +161,7 @@ myApp.ready().then(async function () {
 
   // #region layers
   const world = scene.physicsWorld;
-  const passThrough = document.querySelector('#passthrough');
+  const passThrough = /** @type {HTMLInputElement} */ (document.querySelector('#passthrough'));
   passThrough.addEventListener('change', () => {
     world.setLayerCollision(LAYER_ROCKS, LAYER_GHOSTS, !passThrough.checked);
   });

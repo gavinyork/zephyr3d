@@ -1,7 +1,7 @@
 import type { BaseLight } from '../../../scene/light';
 import { DirectionalLight, PointLight, PunctualLight, RectLight, SpotLight } from '../../../scene/light';
 import { defineProps, type SerializableClass } from '../types';
-import { AABB, degree2radian, radian2degree, Vector4 } from '@zephyr3d/base';
+import { AABB, degree2radian, radian2degree, Vector3, Vector4 } from '@zephyr3d/base';
 import { SceneNode } from '../../../scene';
 import type { ShadowMode } from '../../../shadow';
 import { ShadowMapper } from '../../../shadow/shadowmapper';
@@ -188,6 +188,34 @@ export function getPunctualLightClass(): SerializableClass {
           },
           set(this: PunctualLight, value) {
             this.shadow.shadowRegion.setRegion(value.object[0] as AABB);
+          },
+          isValid(this: PunctualLight) {
+            return !!this.castShadow && this.isDirectionLight();
+          }
+        },
+        {
+          name: 'ShadowRegionLimit',
+          description:
+            'World space AABB the shadow region never grows past; keeps objects that leave the scene from spreading the shadow map thin',
+          phase: 1,
+          type: 'object',
+          default: null,
+          options: {
+            edit: 'aabb',
+            objectTypes: [AABB]
+          },
+          isNullable() {
+            return true;
+          },
+          create(this: PunctualLight) {
+            const box = this.scene?.boundingBox;
+            return box?.isValid() ? new AABB(box) : new AABB(new Vector3(-1, -1, -1), new Vector3(1, 1, 1));
+          },
+          get(this: PunctualLight, value) {
+            value.object[0] = this.shadow.shadowRegion.limit;
+          },
+          set(this: PunctualLight, value) {
+            this.shadow.shadowRegion.setLimit(value.object[0] as AABB);
           },
           isValid(this: PunctualLight) {
             return !!this.castShadow && this.isDirectionLight();

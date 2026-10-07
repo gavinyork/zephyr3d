@@ -107,7 +107,7 @@ describe('node physics without a physics engine', () => {
     const restored = (await manager.deserializeObject<SceneNode>(new SceneNode(scene), serialized))!;
     const physics = restored.physics!;
     expect(physics).toBeInstanceOf(NodePhysics);
-    const rb = physics.body as RigidBody;
+    const rb = physics.body!;
     expect(rb).toBeInstanceOf(RigidBody);
     expect(rb.motionType).toBe('kinematic');
     expect(rb.mass).toBe(3);
@@ -123,21 +123,37 @@ describe('node physics without a physics engine', () => {
     expect(restoredWheel.node).toBe(restored.children[0]);
   });
 
-  it('saves a character controller as the body', async () => {
+  it('saves a character controller', async () => {
     const scene = new Scene();
     const manager = new ResourceManager(new MemoryFS());
     const node = new SceneNode(scene);
     node.physics = new NodePhysics();
     const cc = new CharacterController();
     cc.height = 1.5;
-    node.physics.body = cc;
+    node.physics.character = cc;
     const restored = (await manager.deserializeObject<SceneNode>(
       new SceneNode(scene),
       await manager.serializeObject(node)
     ))!;
-    const body = restored.physics!.body as CharacterController;
+    const body = restored.physics!.character!;
     expect(body).toBeInstanceOf(CharacterController);
     expect(body.height).toBe(1.5);
+  });
+
+  it('holds a rigid body or a character, not both', () => {
+    const physics = new NodePhysics();
+    const body = new RigidBody();
+    const cc = new CharacterController();
+    physics.body = body;
+    physics.character = cc;
+    expect(physics.body).toBeNull();
+    expect(body.owner).toBeNull();
+    expect(physics.parts).toEqual([cc]);
+    physics.body = body;
+    expect(physics.character).toBeNull();
+    expect(cc.owner).toBeNull();
+    expect(physics.parts).toEqual([body]);
+    expect(new NodePhysics({ character: cc }).body).toBeNull();
   });
 
   it('saves nothing for nodes without physics', async () => {

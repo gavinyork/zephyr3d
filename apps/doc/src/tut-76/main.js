@@ -1,4 +1,4 @@
-import { Quaternion, Vector3, Vector4 } from '@zephyr3d/base';
+import { AABB, Quaternion, Vector3, Vector4 } from '@zephyr3d/base';
 import {
   Application,
   BoxShape,
@@ -42,8 +42,7 @@ const COLORS = [
 
 myApp.ready().then(async function () {
   // #region init
-  // Loads the physics engine (a WebAssembly module). From then on, scenes
-  // simulate the physics data of their nodes.
+  // Loads the physics engine
   await initPhysics(rapierPhysics);
   // #endregion init
 
@@ -51,12 +50,15 @@ myApp.ready().then(async function () {
   const sun = new DirectionalLight(scene);
   sun.lookAt(new Vector3(-6, 10, 4), Vector3.zero(), Vector3.axisPY());
   sun.castShadow = true;
+  // Bodies that roll off the platform keep falling; without a limit the shadow
+  // region would follow them down and spread the shadow map ever thinner.
+  sun.shadow.shadowRegion.setLimit(new AABB(new Vector3(-10, -1, -10), new Vector3(10, 12, 10)));
 
   // #region ground
-  // The ground: a collider without a rigid body is static. It never moves,
-  // and everything else lands on it.
+  // The ground: a collider without a rigid body is static
   const ground = new Mesh(scene, new BoxShape({ size: 20, sizeY: 0.5, sizeZ: 20 }), material(0.5, 0.5, 0.5));
   ground.position.setXYZ(0, -0.25, 0);
+  ground.castShadow = false;
   const groundCollider = new Collider();
   groundCollider.size = new Vector3(20, 0.5, 20);
   ground.physics = new NodePhysics({ colliders: [groundCollider] });
@@ -66,6 +68,7 @@ myApp.ready().then(async function () {
   const ramp = new Mesh(scene, new BoxShape({ size: 5, sizeY: 0.3, sizeZ: 3 }), material(0.35, 0.4, 0.5));
   ramp.position.setXYZ(-2.5, 1.2, 0);
   ramp.rotation = Quaternion.fromAxisAngle(Vector3.axisPZ(), -0.35);
+  sun.shadow.shadowRegion.addStaticCaster(ramp);
   const rampCollider = new Collider();
   rampCollider.size = new Vector3(5, 0.3, 3);
   ramp.physics = new NodePhysics({ colliders: [rampCollider] });
@@ -83,6 +86,7 @@ myApp.ready().then(async function () {
     const mesh = new Mesh(scene, boxShape, material(c[0], c[1], c[2]));
     mesh.position.setXYZ(x, y, z);
     mesh.rotation = Quaternion.fromAxisAngle(new Vector3(1, 1, 0).inplaceNormalize(), count * 0.4);
+    sun.shadow.shadowRegion.addDynamicCaster(mesh);
     const collider = new Collider();
     collider.size = new Vector3(0.6, 0.6, 0.6);
     mesh.physics = new NodePhysics({ body: new RigidBody(), colliders: [collider] });
@@ -94,12 +98,12 @@ myApp.ready().then(async function () {
     const c = COLORS[count++ % COLORS.length];
     const mesh = new Mesh(scene, ballShape, material(c[0], c[1], c[2]));
     mesh.position.setXYZ(x, y, z);
+    sun.shadow.shadowRegion.addDynamicCaster(mesh);
     const body = new RigidBody();
     body.mass = 2;
     const collider = new Collider();
     collider.shape = 'sphere';
     collider.radius = 0.3;
-    // Bouncier than the default.
     collider.restitution = 0.5;
     mesh.physics = new NodePhysics({ body, colliders: [collider] });
     bodies.push(mesh);

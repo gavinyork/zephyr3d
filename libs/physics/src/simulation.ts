@@ -178,14 +178,13 @@ function isUnder(node: SceneNode | null, root: SceneNode) {
 }
 
 /** Character controllers, told apart without importing the class. */
-function isCharacter(body: unknown): body is CharacterController {
-  return !!body && (body as CharacterController)._ownedBody !== undefined;
+function isCharacter(part: unknown): part is CharacterController {
+  return !!part && (part as CharacterController)._ownedBody !== undefined;
 }
 
 /** The rigid body standing for a node's body: a character's own body for a character. */
 function rigidBodyOf(physics: NodePhysics | null | undefined): RigidBody | null {
-  const body = physics?.body ?? null;
-  return isCharacter(body) ? body._ownedBody : body;
+  return physics?.body ?? physics?.character?._ownedBody ?? null;
 }
 
 /** The parts of a node's physics in creation order; a character brings its body and capsule. */
@@ -1075,7 +1074,7 @@ export class PhysicsSimulation
   private _createVehicle(component: Vehicle, claimed: Set<Wheel>) {
     const host = component.node!;
     const body = host.physics?.body;
-    const owner = body && !isCharacter(body) ? (this._bodies.get(body) ?? null) : null;
+    const owner = body ? (this._bodies.get(body) ?? null) : null;
     if (!owner || owner.component.motionType !== 'dynamic') {
       component._setError('A vehicle needs a dynamic RigidBody on its node');
       return;

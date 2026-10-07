@@ -1117,12 +1117,18 @@ export function getNodePhysicsClass(): SerializableClass {
           isNullable() {
             return true;
           },
+          // One saved property for both slots, told apart by class name.
           get(this: NodePhysics, value) {
-            value.object[0] = this.body;
+            value.object[0] = this.body ?? this.character;
           },
           set(this: NodePhysics, value) {
             const body = value?.object[0];
-            this.body = body instanceof RigidBody || body instanceof CharacterController ? body : null;
+            if (body instanceof CharacterController) {
+              this.character = body;
+            } else {
+              this.body = body instanceof RigidBody ? body : null;
+              this.character = null;
+            }
           }
         },
         {

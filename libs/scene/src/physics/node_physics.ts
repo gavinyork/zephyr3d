@@ -17,7 +17,8 @@ let nextObjectId = 1;
  * @public
  */
 export interface NodePhysicsInit {
-  body?: Nullable<RigidBody | CharacterController>;
+  body?: Nullable<RigidBody>;
+  character?: Nullable<CharacterController>;
   colliders?: readonly Collider[];
   joint?: Nullable<Joint>;
   vehicle?: Nullable<Vehicle>;
@@ -31,7 +32,9 @@ export interface NodePhysicsInit {
  * Plain data until the node is in a scene with a {@link PhysicsWorld}, which
  * then simulates it; without one it is kept, saved and loaded as is.
  *
- * - {@link NodePhysics.body}: a {@link RigidBody}, or a {@link CharacterController}.
+ * - {@link NodePhysics.body}: a {@link RigidBody}.
+ * - {@link NodePhysics.character}: a {@link CharacterController}. A node has a
+ *   rigid body or a character, not both: setting one clears the other.
  * - {@link NodePhysics.colliders}: collision shapes. They belong to the nearest
  *   rigid body on this node or above it; with none, they are static.
  * - {@link NodePhysics.joint}: links the nearest rigid body to another one.
@@ -48,7 +51,8 @@ export class NodePhysics extends makeObservable(Disposable)<PhysicsEventMap>() {
   /** Identifies the object in pair bookkeeping, in creation order. */
   readonly _physicsId: number;
   private _node: Nullable<SceneNode>;
-  private _body: Nullable<RigidBody | CharacterController>;
+  private _body: Nullable<RigidBody>;
+  private _character: Nullable<CharacterController>;
   private _colliders: Collider[];
   private _joint: Nullable<Joint>;
   private _vehicle: Nullable<Vehicle>;
@@ -62,12 +66,16 @@ export class NodePhysics extends makeObservable(Disposable)<PhysicsEventMap>() {
     this._physicsId = nextObjectId++;
     this._node = null;
     this._body = null;
+    this._character = null;
     this._colliders = [];
     this._joint = null;
     this._vehicle = null;
     this._wheel = null;
     if (init) {
       this.body = init.body ?? null;
+      if (init.character) {
+        this.character = init.character;
+      }
       this.colliders = init.colliders ?? [];
       this.joint = init.joint ?? null;
       this.vehicle = init.vehicle ?? null;
@@ -78,15 +86,34 @@ export class NodePhysics extends makeObservable(Disposable)<PhysicsEventMap>() {
   get node(): Nullable<SceneNode> {
     return this._node;
   }
-  /** The node's rigid body or character controller, or null. */
-  get body(): Nullable<RigidBody | CharacterController> {
+  /** The node's rigid body, or null. Setting one removes the node's character. */
+  get body(): Nullable<RigidBody> {
     return this._body;
   }
-  set body(value: Nullable<RigidBody | CharacterController>) {
+  set body(value: Nullable<RigidBody>) {
     const current = this._body;
     if (current !== value) {
       this._check(value);
+      if (value) {
+        this.character = null;
+      }
       this._body = value ?? null;
+      current?._setOwner(null);
+      value?._setOwner(this);
+    }
+  }
+  /** The node's character controller, or null. Setting one removes the node's rigid body. */
+  get character(): Nullable<CharacterController> {
+    return this._character;
+  }
+  set character(value: Nullable<CharacterController>) {
+    const current = this._character;
+    if (current !== value) {
+      this._check(value);
+      if (value) {
+        this.body = null;
+      }
+      this._character = value ?? null;
       current?._setOwner(null);
       value?._setOwner(this);
     }
@@ -163,11 +190,14 @@ export class NodePhysics extends makeObservable(Disposable)<PhysicsEventMap>() {
       value?._setOwner(this);
     }
   }
-  /** Every part, in a fixed order: body, colliders, joint, vehicle, wheel. */
+  /** Every part, in a fixed order: body or character, colliders, joint, vehicle, wheel. */
   get parts(): PhysicsPart[] {
     const parts: PhysicsPart[] = [];
     if (this._body) {
       parts.push(this._body);
+    }
+    if (this._character) {
+      parts.push(this._character);
     }
     parts.push(...this._colliders);
     for (const p of [this._joint, this._vehicle, this._wheel]) {
@@ -225,6 +255,7 @@ export class NodePhysics extends makeObservable(Disposable)<PhysicsEventMap>() {
     }
     this._colliders = [];
     this._body = null;
+    this._character = null;
     this._joint = null;
     this._vehicle = null;
     this._wheel = null;

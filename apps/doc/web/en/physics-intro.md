@@ -34,7 +34,8 @@ Nothing else is needed: the scene's physics world steps every frame and writes t
 
 | Slot | Holds | See |
 | --- | --- | --- |
-| `body` | A `RigidBody`, or a `CharacterController` | This page, [Character Controller](en/physics-character.md) |
+| `body` | A `RigidBody` | This page |
+| `character` | A `CharacterController`; a node has a body or a character, setting one clears the other | [Character Controller](en/physics-character.md) |
 | `colliders` | Collision shapes (`addCollider` / `removeCollider`) | [Colliders](en/physics-colliders.md) |
 | `joint` | A `Joint` to another body or the world | [Joints](en/physics-joints.md) |
 | `vehicle` | A `Vehicle` driving the node's rigid body | [Vehicles](en/physics-vehicle.md) |
@@ -127,5 +128,6 @@ Changes apply from the next frame. The scene's world can also be changed directl
 - [Scripting](en/physics-scripting.md): forces, collision events, ray and shape queries
 - [Joints](en/physics-joints.md): doors, chains, ropes, springs
 - [Character Controller](en/physics-character.md)
+- [Camera Collision](en/physics-camera.md): a third person camera that stays out of walls
 - [Vehicles](en/physics-vehicle.md): cars with suspension, steering and drive layouts
 - In the editor: [Physics in the Editor](en/editor/physics.md)

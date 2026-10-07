@@ -21,14 +21,76 @@ type WheelEventHandler = (this: HTMLElement, ev: WheelEvent) => any;
 type CompositionEventHandler = (this: HTMLElement, ev: CompositionEvent) => any;
 
 /**
+ * Maps every event type delivered to input middlewares to its DOM event class.
+ *
+ * `click` and `dblclick` are synthesized by InputManager from pointer events,
+ * so they carry the originating `PointerEvent`.
+ *
+ * @public
+ */
+export interface InputEventMap {
+  pointerdown: PointerEvent;
+  pointerup: PointerEvent;
+  pointermove: PointerEvent;
+  pointercancel: PointerEvent;
+  contextmenu: PointerEvent;
+  click: PointerEvent;
+  dblclick: PointerEvent;
+  keydown: KeyboardEvent;
+  keyup: KeyboardEvent;
+  keypress: KeyboardEvent;
+  drag: DragEvent;
+  dragenter: DragEvent;
+  dragleave: DragEvent;
+  dragstart: DragEvent;
+  dragend: DragEvent;
+  dragover: DragEvent;
+  drop: DragEvent;
+  wheel: WheelEvent;
+  compositionstart: CompositionEvent;
+  compositionupdate: CompositionEvent;
+  compositionend: CompositionEvent;
+}
+
+/**
+ * Argument list of an input middleware: a union of `[event, type]` pairs, one per
+ * entry of {@link InputEventMap}. Checking `type` narrows `ev` to the matching event class.
+ *
+ * @public
+ */
+export type InputEventArgs = {
+  [K in keyof InputEventMap]: [ev: InputEventMap[K], type: K];
+}[keyof InputEventMap];
+
+/**
  * Input handler middleware type.
  *
  * Return true to indicate the event has been handled and should not be forwarded
  * to the Application's observable event system.
  *
+ * @example
+ * ```ts
+ * getInput().use((ev, type) => {
+ *   if (type === 'pointerdown') {
+ *     console.log(ev.button, ev.offsetX); // ev is PointerEvent here
+ *   }
+ *   return false;
+ * });
+ * ```
+ *
  * @public
  */
-export type InputEventHandler = (ev: Event, type?: string) => boolean;
+export type InputEventHandler = (...args: InputEventArgs) => boolean;
+
+/**
+ * Single-argument form of {@link InputEventHandler}, for middlewares that only inspect the event.
+ *
+ * A separate type is needed because a one-parameter function is not assignable to a
+ * rest parameter typed as a union of two-element tuples.
+ *
+ * @public
+ */
+export type InputEventHandlerSimple = (ev: InputEventMap[keyof InputEventMap]) => boolean;
 
 /**
  * Input manager
@@ -167,9 +229,11 @@ export class InputManager {
    * @param ctx - `this` object for handler
    * @returns The InputManager instance for chaining.
    */
-  use(handler: Nullable<InputEventHandler>, ctx?: unknown) {
+  use(handler: Nullable<InputEventHandler>, ctx?: unknown): this;
+  use(handler: Nullable<InputEventHandlerSimple>, ctx?: unknown): this;
+  use(handler: Nullable<InputEventHandler | InputEventHandlerSimple>, ctx?: unknown) {
     if (handler) {
-      this._middlewares.push({ handler, ctx });
+      this._middlewares.push({ handler: handler as InputEventHandler, ctx });
     }
     return this;
   }
@@ -180,9 +244,11 @@ export class InputManager {
    * @param ctx - `this` object for handler
    * @returns The InputManager instance for chaining.
    */
-  useFirst(handler: Nullable<InputEventHandler>, ctx?: unknown) {
+  useFirst(handler: Nullable<InputEventHandler>, ctx?: unknown): this;
+  useFirst(handler: Nullable<InputEventHandlerSimple>, ctx?: unknown): this;
+  useFirst(handler: Nullable<InputEventHandler | InputEventHandlerSimple>, ctx?: unknown) {
     if (handler) {
-      this._middlewares.unshift({ handler, ctx });
+      this._middlewares.unshift({ handler: handler as InputEventHandler, ctx });
     }
     return this;
   }
@@ -200,7 +266,7 @@ export class InputManager {
    * @param ctx - `this` object that was associated with the `handler` when it was added.
    * @returns The InputManager instance for chaining.
    */
-  unuse(handler: InputEventHandler, ctx?: unknown) {
+  unuse(handler: InputEventHandler | InputEventHandlerSimple, ctx?: unknown) {
     const index = this._middlewares.findIndex((h) => h.handler === handler && h.ctx === ctx);
     if (index >= 0) {
       this._middlewares.splice(index, 1);
@@ -227,8 +293,9 @@ export class InputManager {
     ev: PointerEvent | WheelEvent | KeyboardEvent | DragEvent | CompositionEvent,
     type?: string
   ) {
+    const args = [ev, type ?? ev.type] as InputEventArgs;
     for (const mw of this._middlewares) {
-      if (mw.handler.call(mw.ctx, ev, type ?? ev.type)) {
+      if (mw.handler.call(mw.ctx, ...args)) {
         return true;
       }
     }

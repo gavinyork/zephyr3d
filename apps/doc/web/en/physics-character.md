@@ -8,7 +8,7 @@ Player characters are rarely dynamic bodies: those get knocked over, slide on sl
 
 ## A Minimal Example
 
-The controller is the node's body (`node.physics.body`) and brings its own capsule collider; no `RigidBody` or `Collider` is needed. The capsule's bottom sits on the node's origin, so a character model with its origin at the feet fits as is:
+The controller goes in the node's `character` slot (`node.physics.character`) and brings its own capsule collider; no `RigidBody` or `Collider` is needed. The capsule's bottom sits on the node's origin, so a character model with its origin at the feet fits as is:
 
 <<< @/../src/tut-80/main.js#controller
 

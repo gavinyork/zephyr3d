@@ -244,6 +244,13 @@ shadowRegion.removeCaster(character);
 shadowRegion.clearCasters();
 ```
 
+动态投影体可能跑出场景，例如从平台边缘滚落、一直下坠的物理刚体。用限制框把范围约束在活动区域内：上面的并集会被裁剪到限制框以内；如果裁剪后什么都不剩，则和上面一样回退到场景包围盒。`clear()` 和 `clearCasters()` 会保留限制框，`setLimit(null)` 才会移除它。
+
+```javascript
+// 最多只覆盖 20 x 20 的平台，从平台下方一点到 12 米高
+shadowRegion.setLimit(new AABB(new Vector3(-10, -1, -10), new Vector3(10, 12, 10)));
+```
+
 > **编辑器提示：**  
 > 在 Zephyr3D 编辑器中可以通过可视化操作界面调整 ShadowRegion 的手动 AABB，  
 > 以精确包围需要方向光阴影的区域，从而避免不必要的阴影贴图浪费。

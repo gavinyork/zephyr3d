@@ -1,4 +1,4 @@
-import { Vector3, Vector4 } from '@zephyr3d/base';
+import { AABB, Vector3, Vector4 } from '@zephyr3d/base';
 import {
   Application,
   BoxShape,
@@ -62,10 +62,12 @@ myApp.ready().then(async function () {
   const sun = new DirectionalLight(scene);
   sun.lookAt(new Vector3(-6, 10, 6), Vector3.zero(), Vector3.axisPY());
   sun.castShadow = true;
+  // Keep the shadow region on the 16 x 10 floor: bodies that fall off it would
+  // otherwise drag the region down with them and thin out the shadow map.
+  sun.shadow.shadowRegion.setLimit(new AABB(new Vector3(-8, -1, -5), new Vector3(8, 8, 5)));
   const grey = material(0.55, 0.55, 0.55);
   box(scene, new Vector3(16, 0.5, 10), new Vector3(0, -0.25, 0), grey, false);
 
-  // --- Hinged door -------------------------------------------------------
   // #region hinge
   // The joint sits on its own node, a child of the door: the node's origin is
   // the pivot and its Y axis the hinge axis. Moving that node in the editor
@@ -77,6 +79,7 @@ myApp.ready().then(async function () {
     material(0.6, 0.4, 0.25),
     true
   );
+  sun.shadow.shadowRegion.addDynamicCaster(door);
   const hingeNode = new Mesh(
     scene,
     new CylinderShape({ topRadius: 0.04, bottomRadius: 0.04, height: 2.1, anchor: 0.5 }),
@@ -84,6 +87,7 @@ myApp.ready().then(async function () {
   );
   hingeNode.parent = door;
   hingeNode.position.setXYZ(-0.62, 0, 0);
+  sun.shadow.shadowRegion.addDynamicCaster(hingeNode);
   const hinge = new Joint();
   hinge.type = 'hinge';
   hinge.limitsEnabled = true;
@@ -92,7 +96,7 @@ myApp.ready().then(async function () {
   hingeNode.physics = new NodePhysics({ joint: hinge });
   // #endregion hinge
 
-  const motor = document.querySelector('#motor');
+  const motor = /** @type {HTMLSelectElement} */ (document.querySelector('#motor'));
   motor.addEventListener('change', () => {
     // #region motor
     switch (motor.value) {
@@ -123,6 +127,7 @@ myApp.ready().then(async function () {
   let prev = null;
   for (let i = 0; i < 10; i++) {
     const bead = ball(scene, 0.12, new Vector3(-0.5 + (i + 1) * 0.3, 3.5, 0), beadMaterial);
+    sun.shadow.shadowRegion.addDynamicCaster(bead);
     const link = new Joint();
     link.type = 'ball';
     link.anchor = new Vector3(-0.15, 0, 0);
@@ -137,6 +142,7 @@ myApp.ready().then(async function () {
   // Two-point joints: one end on the body, the other (connectedAnchor) in world
   // space when there is no connected body.
   const lamp = ball(scene, 0.25, new Vector3(4.5, 2.2, 0), material(0.95, 0.8, 0.2));
+  sun.shadow.shadowRegion.addDynamicCaster(lamp);
   const rope = new Joint();
   rope.type = 'rope';
   rope.connectedAnchor = new Vector3(3.5, 4, 0);
@@ -150,6 +156,7 @@ myApp.ready().then(async function () {
     material(0.9, 0.35, 0.15),
     true
   );
+  sun.shadow.shadowRegion.addDynamicCaster(weight);
   const spring = new Joint();
   spring.type = 'spring';
   spring.anchor = new Vector3(0, 0.25, 0);
@@ -165,12 +172,14 @@ myApp.ready().then(async function () {
   const thrown = [];
   document.querySelector('#throw').addEventListener('click', () => {
     const b = ball(scene, 0.3, new Vector3(-3.2, 0.3, 5), throwMaterial);
+    sun.shadow.shadowRegion.addDynamicCaster(b);
     const body = b.physics.body;
     body.mass = 8;
     body.setLinearVelocity(new Vector3(0, 0, -7));
     thrown.push(b);
     if (thrown.length > 5) {
       const old = thrown.shift();
+      sun.shadow.shadowRegion.removeCaster(old);
       old.remove();
       old.dispose();
     }

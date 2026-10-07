@@ -44,6 +44,7 @@
     - [Scripting](en/physics-scripting.md)
     - [Joints](en/physics-joints.md)
     - [Character Controller](en/physics-character.md)
+    - [Camera Collision](en/physics-camera.md)
     - [Vehicles](en/physics-vehicle.md)
   - PostProcessing
     - [Overview](en/posteffect-intro.md)

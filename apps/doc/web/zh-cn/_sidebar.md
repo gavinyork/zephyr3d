@@ -44,6 +44,7 @@
     - [脚本控制](zh-cn/physics-scripting.md)
     - [关节](zh-cn/physics-joints.md)
     - [角色控制器](zh-cn/physics-character.md)
+    - [摄像机碰撞](zh-cn/physics-camera.md)
     - [载具](zh-cn/physics-vehicle.md)
   - 后处理
     - [概述](zh-cn/posteffect-intro.md)

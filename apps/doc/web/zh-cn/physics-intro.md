@@ -34,7 +34,8 @@
 
 | 槽位 | 内容 | 参见 |
 | --- | --- | --- |
-| `body` | 一个 `RigidBody`，或一个 `CharacterController` | 本页、[角色控制器](zh-cn/physics-character.md) |
+| `body` | 一个 `RigidBody` | 本页 |
+| `character` | 一个 `CharacterController`；节点有刚体或角色二者之一，设置一个会清掉另一个 | [角色控制器](zh-cn/physics-character.md) |
 | `colliders` | 碰撞形状（`addCollider` / `removeCollider`） | [碰撞体](zh-cn/physics-colliders.md) |
 | `joint` | 连到另一个刚体或世界的 `Joint` | [关节](zh-cn/physics-joints.md) |
 | `vehicle` | 驱动本节点刚体的 `Vehicle` | [载具](zh-cn/physics-vehicle.md) |
@@ -127,5 +128,6 @@ scene.physicsSettings = settings;
 - [脚本控制](zh-cn/physics-scripting.md)：施力、碰撞事件、射线与形状查询
 - [关节](zh-cn/physics-joints.md)：门、链条、绳子、弹簧
 - [角色控制器](zh-cn/physics-character.md)
+- [摄像机碰撞](zh-cn/physics-camera.md)：不穿墙的第三人称摄像机
 - [载具](zh-cn/physics-vehicle.md)：带悬挂、转向和驱动方式的车辆
 - 在编辑器中使用：[编辑器中的物理](zh-cn/editor/physics.md)

@@ -262,7 +262,7 @@ export const physicsJoints: VisualScene = {
     joint.upperLimit = 100;
     physicsOf(hinge).joint = joint;
     const knock = ball(scene, new Vector4(0.9, 0.35, 0.15, 1), 0.3, new Vector3(2.0, 0.3, 4));
-    const knockBody = knock.physics!.body as RigidBody;
+    const knockBody = knock.physics!.body!;
     knockBody.mass = 8;
     knockBody.setLinearVelocity(new Vector3(0, 0, -6));
 
@@ -295,7 +295,7 @@ export const physicsJoints: VisualScene = {
     );
     hero.position.setXYZ(0.5, 0, 2.5);
     const controller = new CharacterController();
-    physicsOf(hero).body = controller;
+    physicsOf(hero).character = controller;
     let vy = 0;
     const world = scene.physicsWorld!;
     world.on('fixedupdate', (dt) => {

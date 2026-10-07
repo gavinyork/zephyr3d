@@ -8,7 +8,7 @@ import type {
   SceneNode,
   Wheel
 } from '@zephyr3d/scene';
-import { CharacterController, RigidBody } from '@zephyr3d/scene';
+import { CharacterController } from '@zephyr3d/scene';
 import type { Nullable } from '@zephyr3d/base';
 import { Matrix4x4, Vector3, Vector4 } from '@zephyr3d/base';
 import type { AALineBatch, LineGizmo, PostGizmoRenderer } from './postgizmo';
@@ -108,8 +108,8 @@ export class ColliderGizmo {
           return false;
         }
         const outlined: OutlineTarget[] = [...physics.colliders];
-        if (physics.body instanceof CharacterController) {
-          outlined.push(physics.body);
+        if (physics.character) {
+          outlined.push(physics.character);
         }
         for (const target of outlined) {
           targets.set(target, highlighted || targets.get(target) === true);
@@ -242,7 +242,7 @@ export class ColliderGizmo {
     // The rigid body the collider belongs to: on its node or the nearest above.
     for (let node: Nullable<SceneNode> = target.node; node; node = node.parent) {
       const body = node.physics?.body;
-      if (body instanceof RigidBody) {
+      if (body) {
         return body.motionType === 'dynamic'
           ? COLOR_DYNAMIC
           : body.motionType === 'kinematic'

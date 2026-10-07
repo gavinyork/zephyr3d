@@ -34,8 +34,7 @@ import {
   JointDynamicsModifier,
   SphereShape,
   CapsuleShape,
-  RenderGraphExecutor,
-  CharacterController
+  RenderGraphExecutor
 } from '@zephyr3d/scene';
 import type { RGProfileResult, RGProfileScopeResult } from '@zephyr3d/scene';
 import { SceneNode } from '@zephyr3d/scene';
@@ -3310,7 +3309,7 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
       }
       const targets = [
         ...physics.colliders,
-        ...(physics.body instanceof CharacterController ? [physics.body] : [])
+        ...(physics.character ? [physics.character] : [])
       ];
       return targets.map((target) => gizmo.getError(target)).filter((error) => !!error);
     };
