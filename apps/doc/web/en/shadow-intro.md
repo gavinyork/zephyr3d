@@ -3,7 +3,7 @@
 > Code on this page is illustrative and omits imports and application setup. See the embedded
 > live demos for complete runnable examples.
 
-Shadows add depth and realism to scenes. Currently, we support casting shadows with directional, point, and spotlight sources.
+Shadows add depth and realism to scenes. Directional, point, spot and rect lights can all cast shadows.
 
 ## Enable shadow
 
@@ -39,3 +39,16 @@ mesh.castShadow = true;
 
 <div class="showcase" case="tut-18"></div>
 
+## Shadows of rect light：
+
+A rect light's shadow map is a cube map, as for a point light. With the `'pcss'` shadow mode the
+penumbra follows the size of the rectangle: the larger the light, the softer the shadow, and the
+wider it spreads with distance from the object casting it. Other modes keep the same edge
+whatever the light's size.
+
+<<< @/../src/tut-84/main.js#shadow
+
+The example sweeps the light over pillars of different heights. Drag the size slider to watch the
+penumbra grow, and switch modes to compare.
+
+<div class="showcase" case="tut-84"></div>

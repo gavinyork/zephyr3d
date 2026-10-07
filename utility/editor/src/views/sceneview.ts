@@ -3307,10 +3307,7 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
       if (!physics) {
         return [];
       }
-      const targets = [
-        ...physics.colliders,
-        ...(physics.character ? [physics.character] : [])
-      ];
+      const targets = [...physics.colliders, ...(physics.character ? [physics.character] : [])];
       return targets.map((target) => gizmo.getError(target)).filter((error) => !!error);
     };
     if (errors().length === 0) {

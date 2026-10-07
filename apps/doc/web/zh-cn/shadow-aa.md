@@ -79,7 +79,7 @@ light.shadow.mode = 'pcss';
 
 | 参数 | 作用 |
 |------|------|
-| `pcssLightRadius` | 光源半径，以 ShadowMap texel 为单位。数值越大，半影越宽，阴影越柔和；设为 `0` 时基本退化为硬边过滤。 |
+| `pcssLightRadius` | 光源半径，以 ShadowMap texel 为单位。数值越大，半影越宽，阴影越柔和；设为 `0` 时基本退化为硬边过滤。面光源忽略此项，其半影由矩形尺寸决定。 |
 | `pcssBlockerSampleCount` | 遮挡物搜索采样数，范围为 `1` 到 `64`。数值越大，遮挡物估计越稳定，但查找阶段开销更高。 |
 | `pcssFilterSampleCount` | 最终软阴影滤波采样数，范围为 `1` 到 `64`。数值越大，噪点越少、边缘越平滑，但片元着色成本更高。 |
 | `pcssMaxFilterRadius` | 最大滤波半径，以 ShadowMap texel 为单位。用于限制半影扩张，避免阴影过度变宽或采样范围过大。 |
@@ -204,6 +204,8 @@ light.shadow.shadowDistance = 500;
 - `staticRegion`：通过 `addStaticCaster(node)` 添加的静态投影体包围盒快照；
 - `dynamicRegion`：通过 `addDynamicCaster(node)` 添加并随 `bvchanged` 事件更新的动态投影体包围盒。
 
+如果用 `setLimit(aabb)` 设置了限制框，这个并集还会再被裁剪到限制框以内（见下文[限制范围](#限制范围)）。
+
 如果最终范围为空，方向光阴影会退回使用整个场景包围盒。  
 合理限制该区域可以让同样尺寸的 ShadowMap 覆盖更小的世界空间，从而提升阴影边缘精度。
 
@@ -244,15 +246,24 @@ shadowRegion.removeCaster(character);
 shadowRegion.clearCasters();
 ```
 
-动态投影体可能跑出场景，例如从平台边缘滚落、一直下坠的物理刚体。用限制框把范围约束在活动区域内：上面的并集会被裁剪到限制框以内；如果裁剪后什么都不剩，则和上面一样回退到场景包围盒。`clear()` 和 `clearCasters()` 会保留限制框，`setLimit(null)` 才会移除它。
+### 限制范围
+
+动态投影体可能跑出场景，例如从平台边缘滚落、一直下坠的物理刚体。阴影范围会跟着它往下扩展，同一张阴影贴图被摊到越来越大的空白区域上，活动区域里的阴影就会越来越模糊、出现锯齿。用限制框把范围约束在活动区域内：
 
 ```javascript
 // 最多只覆盖 20 x 20 的平台，从平台下方一点到 12 米高
 shadowRegion.setLimit(new AABB(new Vector3(-10, -1, -10), new Vector3(10, 12, 10)));
 ```
 
+- 限制框裁剪的是整个并集：手动范围、静态投影体和动态投影体都会被裁剪。限制框要足够大，能容纳所有需要保留阴影的物体。
+- 如果裁剪后并集什么都不剩，范围为空，则和上面一样回退到场景包围盒。
+- `shadowRegion.limit` 可读取当前的限制框，未设置时为 `null`。
+- `clear()` 和 `clearCasters()` 会保留限制框，`setLimit(null)` 才会移除它。
+
+物理示例都用到了它，可以从[刚体物理](zh-cn/physics-intro.md)开始看：多按几次 Drop more，直到有物体滚出平台，平台上的阴影仍保持清晰。
+
 > **编辑器提示：**  
-> 在 Zephyr3D 编辑器中可以通过可视化操作界面调整 ShadowRegion 的手动 AABB，  
+> 在 Zephyr3D 编辑器中，可以在方向光上通过可视化操作界面调整 ShadowRegion 的手动 AABB（`ShadowRegion`）和限制框（`ShadowRegionLimit`），  
 > 以精确包围需要方向光阴影的区域，从而避免不必要的阴影贴图浪费。
 
 ---

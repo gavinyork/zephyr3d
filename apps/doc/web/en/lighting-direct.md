@@ -60,21 +60,16 @@ real angles in radians.)
 A rect light (`RectLight`) is a rectangular emitting surface. It produces softer, more directional
 lighting and highlights than a point light, which suits windows, light boxes and screens.
 
-```javascript
-const light = new RectLight(scene);
-// Rectangle dimensions in scene units
-light.width = 4;
-light.height = 2;
-// Falloff range
-light.range = 10;
-light.color = new Vector4(1, 1, 1, 1);
-light.intensity = 5;
-// Position and orientation come from the node transform; light travels along its -Z axis
-light.position.setXYZ(0, 5, 0);
-light.lookAt(new Vector3(0, 5, 0), Vector3.zero(), Vector3.axisPY());
-```
+<<< @/../src/tut-83/main.js#rectlight
+
+`width` and `height` are the size of the rectangle in scene units, and `range` bounds its
+influence as for point and spot lights. Its position and orientation come from the node
+transform like the other lights, and light leaves the rectangle along the node's -Z axis. The
+example circles the light around the scene with `lookAt`, always facing the centre. A rect light
+draws nothing itself: the white panel in the example is an unlit mesh parented to the light.
 
 Rect light highlights use an LTC (Linearly Transformed Cosines) approximation and work on all
 backends. Because it integrates over the rectangle area it costs more than the other light types,
 so keep their count in check.
 
+<div class="showcase" case="tut-83"></div>

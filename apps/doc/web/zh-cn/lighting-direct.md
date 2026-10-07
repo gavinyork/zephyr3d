@@ -53,20 +53,14 @@
 面光源（`RectLight`）是一个矩形发光面，能产生比点光更柔和、有方向性的照明和高光，
 适合表现窗户、灯箱、屏幕这类光源。
 
-```javascript
-const light = new RectLight(scene);
-// 矩形的宽高（场景单位）
-light.width = 4;
-light.height = 2;
-// 照射范围
-light.range = 10;
-light.color = new Vector4(1, 1, 1, 1);
-light.intensity = 5;
-// 位置和朝向同样由节点变换决定，光线朝自身 -Z 方向
-light.position.setXYZ(0, 5, 0);
-light.lookAt(new Vector3(0, 5, 0), Vector3.zero(), Vector3.axisPY());
-```
+<<< @/../src/tut-83/main.js#rectlight
+
+`width` 和 `height` 是矩形的宽高（场景单位），`range` 和点光、锥光一样用来限制影响范围。
+位置和朝向同样由节点变换决定，光线从矩形沿节点自身 -Z 方向射出。示例中用 `lookAt` 让光源
+绕场景旋转，并始终朝向中心。面光源本身不会被绘制出来，示例里的白色面板是挂在光源下的一个
+无光照网格。
 
 面光源的高光使用 LTC（Linearly Transformed Cosines）近似，各后端都支持。
 由于要计算矩形面积上的积分，它比其他光源开销更高，数量上要控制。
 
+<div class="showcase" case="tut-83"></div>

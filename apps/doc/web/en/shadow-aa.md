@@ -80,7 +80,7 @@ Parameters:
 
 | Parameter | Description |
 |-----------|-------------|
-| `pcssLightRadius` | Apparent light radius, measured in shadow-map texels. Larger values create wider penumbrae and softer shadows; `0` mostly collapses the result toward hard filtering. |
+| `pcssLightRadius` | Apparent light radius, measured in shadow-map texels. Larger values create wider penumbrae and softer shadows; `0` mostly collapses the result toward hard filtering. Ignored for rect lights, whose penumbra follows the rectangle's size instead. |
 | `pcssBlockerSampleCount` | Number of samples used for blocker search, clamped to `1`–`64`. Higher values make blocker estimation more stable, but increase search cost. |
 | `pcssFilterSampleCount` | Number of samples used for the final soft-shadow filter, clamped to `1`–`64`. Higher values reduce noise and smooth the edge, but increase fragment shading cost. |
 | `pcssMaxFilterRadius` | Maximum filter radius in shadow-map texels. Caps penumbra growth to avoid overly wide shadows and excessive sample coverage. |
@@ -207,6 +207,8 @@ The final region used for rendering is `shadowRegion.region`, which is the union
 - `staticRegion`: snapshots captured from static casters added with `addStaticCaster(node)`;
 - `dynamicRegion`: tracked bounds from dynamic casters added with `addDynamicCaster(node)`, rebuilt when their `bvchanged` event fires.
 
+If a limit is set with `setLimit(aabb)`, the union is then clipped to it (see [Limiting the region](#limiting-the-region) below).
+
 If the final region is empty, directional shadows fall back to the whole scene bounding box.  
 Keeping this region tight lets the same shadow map resolution cover less world space, improving edge precision.
 
@@ -248,15 +250,24 @@ shadowRegion.removeCaster(character);
 shadowRegion.clearCasters();
 ```
 
-Dynamic casters can wander off, for example a physics body that rolls off the edge and keeps falling. Set a limit to keep the region inside the play area: the union above is clipped to it, and if nothing is left inside it, the scene bounding box is used as above. `clear()` and `clearCasters()` keep the limit; `setLimit(null)` removes it.
+### Limiting the region
+
+Dynamic casters can wander off, for example a physics body that rolls off the edge and keeps falling. The region follows it down, and the same shadow map is spread over more and more empty space until the shadows in the play area turn blocky. Set a limit to keep the region inside the play area:
 
 ```javascript
 // Never cover more than the 20 x 20 platform, from just below it to 12 m up
 shadowRegion.setLimit(new AABB(new Vector3(-10, -1, -10), new Vector3(10, 12, 10)));
 ```
 
+- The limit clips the whole union: the manual region, the static casters and the dynamic casters alike. Make it large enough for everything that should keep its shadow.
+- If nothing of the union is left inside the limit, the region is empty and the scene bounding box is used, as above.
+- `shadowRegion.limit` reads the current limit, or `null`.
+- `clear()` and `clearCasters()` keep the limit; `setLimit(null)` removes it.
+
+The physics examples use it, starting with [Rigid Body Physics](en/physics-intro.md): press Drop more a few times until some bodies roll off the platform; the shadows on it stay sharp.
+
 > **Editor Tip:**  
-> In the Zephyr3D Editor, the manual AABB of ShadowRegion can be edited visually,  
+> In the Zephyr3D Editor, the manual AABB of ShadowRegion (`ShadowRegion`) and its limit (`ShadowRegionLimit`) can both be edited visually on a directional light,  
 > allowing precise control over the area that needs directional shadows and reducing wasted shadow map coverage.
 
 ---
