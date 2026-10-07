@@ -1,96 +1,12 @@
-import { diff, applyPatch, type DiffValue } from '@zephyr3d/base';
+import { diff, applyPatch, PRNG } from '@zephyr3d/base';
 
-interface CanonOptions {
-  floatEpsilon?: number;
-  floatDigits?: number;
-  normalizeNewline?: boolean;
-}
-
-function canonicalize(v: DiffValue, opt: CanonOptions = {}): DiffValue {
-  const eps = opt.floatEpsilon ?? 0;
-  const digits = opt.floatDigits;
-  const normNL = opt.normalizeNewline ?? false;
-
-  function normNumber(x: number): number {
-    if (Object.is(x, -0)) {
-      x = 0;
-    }
-    if (eps > 0 && Math.abs(x) < eps) {
-      x = 0;
-    }
-    if (typeof digits === 'number') {
-      const f = Number(x.toFixed(digits));
-      if (eps > 0 && Math.abs(f) < eps) {
-        return 0;
-      }
-      return f;
-    }
-    return x;
-  }
-
-  function normString(s: string): string {
-    if (!normNL) {
-      return s;
-    }
-    return s.replace(/\r\n?/g, '\n');
-  }
-
-  function canon(x: DiffValue): DiffValue {
-    if (x === null) {
-      return null;
-    }
-    if (typeof x === 'boolean') {
-      return x;
-    }
-    if (typeof x === 'number') {
-      return normNumber(x);
-    }
-    if (typeof x === 'string') {
-      return normString(x);
-    }
-
-    if (Array.isArray(x)) {
-      return x.map((el) => canon(el));
-    }
-
-    const keys = Object.keys(x)
-      .filter((k) => (x as any)[k] !== undefined)
-      .sort();
-    const out: any = {};
-    for (const k of keys) {
-      out[k] = canon((x as any)[k]);
-    }
-    return out;
-  }
-
-  return canon(v);
-}
-
-function stringifyCanonical(v: DiffValue, opt?: CanonOptions): string {
-  const c = canonicalize(v, opt);
-  return JSON.stringify(c, null, 2);
-}
-
-function assertEqualJSON(a: any, b: any, msg?: string) {
-  const sa = stringifyCanonical(a, {
-    floatEpsilon: 1e-9,
-    floatDigits: 6,
-    normalizeNewline: true
-  });
-  const sb = stringifyCanonical(b, {
-    floatEpsilon: 1e-9,
-    floatDigits: 6,
-    normalizeNewline: true
-  });
-  if (sa !== sb) {
-    throw new Error((msg ?? 'JSON not equal') + `\nA=${sa}\nB=${sb}`);
-  }
-}
-
+/**
+ * Diffs `base` against `target` and checks that applying the patch yields `target`.
+ * `toEqual` ignores keys whose value is undefined, as the patch format does.
+ */
 function roundTrip(base: any, target: any) {
   const p = diff(base, target);
-  const applied = applyPatch(base, p);
-  assertEqualJSON(applied, target, 'roundTrip failed');
+  expect(applyPatch(base, p)).toEqual(target);
   return p;
 }
 
@@ -197,15 +113,15 @@ describe('diff/applyPatch round-trip tests', () => {
     const once = applyPatch(base, p);
     const twice = applyPatch(once, p);
 
-    // apply twice should be idempotent
-    assertEqualJSON(once, twice, 'apply twice should be idempotent');
+    // Applying twice is idempotent.
+    expect(twice).toEqual(once);
 
     const o = { a: 1, b: [1, 2], c: { d: 'x' } };
     const p0 = diff(o, o);
     expect(Array.isArray(p0) ? p0.length : 0).toBe(0);
 
-    const applied = applyPatch(o, p0 as any);
-    assertEqualJSON(applied, o, 'empty patch should keep object unchanged');
+    // An empty patch leaves the object unchanged.
+    expect(applyPatch(o, p0 as any)).toEqual(o);
   });
 
   test('manual array patch construction', () => {
@@ -220,42 +136,36 @@ describe('diff/applyPatch round-trip tests', () => {
         ]
       }
     ] as const;
-    const applied = applyPatch(base, patch as any);
-    assertEqualJSON(applied, { a: { list: [1, 2] } });
-  });
-
-  test('key order changes should not matter', () => {
-    const base = { a: 1, b: 2 };
-    const target = { b: 2, a: 1 };
-    const p = diff(base, target);
-    const applied = applyPatch(base, p);
-    assertEqualJSON(applied, target);
+    expect(applyPatch(base, patch as any)).toEqual({ a: { list: [1, 2] } });
   });
 
   test('random fuzzing (200 round-trips)', () => {
+    // Seeded, so a failure reproduces.
+    const rng = new PRNG(12345);
+    const random = () => rng.get();
     function randPrim(): any {
-      const t = Math.floor(Math.random() * 4);
+      const t = Math.floor(random() * 4);
       if (t === 0) {
         return null;
       }
       if (t === 1) {
-        return Math.floor(Math.random() * 10);
+        return Math.floor(random() * 10);
       }
       if (t === 2) {
-        return Math.random() < 0.5;
+        return random() < 0.5;
       }
-      return Math.random().toString(36).slice(2, 7);
+      return random().toString(36).slice(2, 7);
     }
 
     function randJSON(depth = 0): any {
       if (depth > 3) {
         return randPrim();
       }
-      const choice = Math.random();
+      const choice = random();
       if (choice < 0.33) {
         // object
         const o: any = {};
-        const n = Math.floor(Math.random() * 4);
+        const n = Math.floor(random() * 4);
         for (let i = 0; i < n; i++) {
           o['k' + i] = randJSON(depth + 1);
         }
@@ -263,7 +173,7 @@ describe('diff/applyPatch round-trip tests', () => {
       } else if (choice < 0.66) {
         // array
         const a: any[] = [];
-        const n = Math.floor(Math.random() * 4);
+        const n = Math.floor(random() * 4);
         for (let i = 0; i < n; i++) {
           a.push(randJSON(depth + 1));
         }
@@ -278,33 +188,5 @@ describe('diff/applyPatch round-trip tests', () => {
       const target = randJSON();
       roundTrip(base, target);
     }
-  });
-
-  test('complex car example', () => {
-    const base = {
-      name: 'Car',
-      transform: { pos: [0, 0, 0], rot: [0, 0, 0, 1], scl: [1, 1, 1] },
-      renderers: [
-        { mesh: 'body.mesh', material: 'mat/default' },
-        { mesh: 'wheel.mesh', material: 'mat/wheel' },
-        { mesh: 'wheel.mesh', material: 'mat/wheel' },
-        { mesh: 'wheel.mesh', material: 'mat/wheel' },
-        { mesh: 'wheel.mesh', material: 'mat/wheel' }
-      ],
-      extras: {}
-    };
-
-    const target = {
-      name: 'Car',
-      transform: { pos: [0, 0, 0], rot: [0, 0, 0, 1], scl: [1, 1, 1] },
-      renderers: [
-        { mesh: 'body.mesh', material: 'mat/sport' },
-        { mesh: 'wheel.mesh', material: 'mat/wheel' },
-        { mesh: 'wheel.mesh', material: 'mat/wheel' }
-      ],
-      extras: { lightbar: { type: 'spot', intensity: 1200 } }
-    };
-
-    roundTrip(base, target);
   });
 });

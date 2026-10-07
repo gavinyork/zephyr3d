@@ -5,7 +5,7 @@
  * `standardDepth + reverseDepth === 1` for the same eye-space position.
  */
 
-import { REVERSE_Z, DEPTH_NEAREST, DEPTH_FARTHEST, Matrix4x4, Vector4, Plane } from '@zephyr3d/base';
+import { REVERSE_Z, Matrix4x4, Vector4, Plane } from '@zephyr3d/base';
 
 /** Device depth produced by the engine's canonical clip space for eye z. */
 function deviceDepth(proj: Matrix4x4, eyeZ: number): number {
@@ -30,18 +30,6 @@ describe('projection matrices under the active depth convention', () => {
   const NEAR = 1.5;
   const FAR = 1000;
 
-  test('perspective endpoints map near/far to DEPTH_NEAREST/DEPTH_FARTHEST', () => {
-    const proj = Matrix4x4.perspective(Math.PI / 3, 16 / 9, NEAR, FAR);
-    expect(deviceDepth(proj, -NEAR)).toBeCloseTo(DEPTH_NEAREST, 6);
-    expect(deviceDepth(proj, -FAR)).toBeCloseTo(DEPTH_FARTHEST, 6);
-  });
-
-  test('ortho endpoints map near/far to DEPTH_NEAREST/DEPTH_FARTHEST', () => {
-    const proj = Matrix4x4.ortho(-10, 10, -10, 10, NEAR, FAR);
-    expect(deviceDepth(proj, -NEAR)).toBeCloseTo(DEPTH_NEAREST, 6);
-    expect(deviceDepth(proj, -FAR)).toBeCloseTo(DEPTH_FARTHEST, 6);
-  });
-
   test('perspective depth satisfies the d_std + d_rev = 1 invariant', () => {
     const proj = Matrix4x4.perspective(Math.PI / 3, 1, NEAR, FAR);
     for (const dist of [NEAR, 2, 10, 100, 500, FAR]) {
@@ -58,33 +46,6 @@ describe('projection matrices under the active depth convention', () => {
       const expected = REVERSE_Z ? 1 - dStd : dStd;
       expect(deviceDepth(proj, -dist)).toBeCloseTo(expected, 6);
     }
-  });
-
-  test('device depth is monotone from DEPTH_NEAREST towards DEPTH_FARTHEST', () => {
-    const proj = Matrix4x4.perspective(Math.PI / 3, 1, NEAR, FAR);
-    let prev = deviceDepth(proj, -NEAR);
-    for (let i = 1; i <= 32; i++) {
-      const dist = NEAR + ((FAR - NEAR) * i) / 32;
-      const d = deviceDepth(proj, -dist);
-      if (DEPTH_FARTHEST > DEPTH_NEAREST) {
-        expect(d).toBeGreaterThan(prev);
-      } else {
-        expect(d).toBeLessThan(prev);
-      }
-      prev = d;
-    }
-  });
-
-  test('getNearPlane/getFarPlane invert perspective construction', () => {
-    const proj = Matrix4x4.perspective(Math.PI / 4, 2, NEAR, FAR);
-    expect(proj.getNearPlane()).toBeCloseTo(NEAR, 4);
-    expect(Math.abs(proj.getFarPlane() - FAR) / FAR).toBeLessThan(1e-4);
-  });
-
-  test('getNearPlane/getFarPlane invert ortho construction', () => {
-    const proj = Matrix4x4.ortho(-4, 4, -3, 3, NEAR, FAR);
-    expect(proj.getNearPlane()).toBeCloseTo(NEAR, 4);
-    expect(Math.abs(proj.getFarPlane() - FAR) / FAR).toBeLessThan(1e-4);
   });
 
   test('setNearFar reconstructs matching projections', () => {

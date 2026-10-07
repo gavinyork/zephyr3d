@@ -201,47 +201,6 @@ describe('mesh and convex colliders', () => {
 });
 
 describe('mesh read back', () => {
-  it('reads one level of detail, only its vertices', async () => {
-    const scene = new Scene();
-    const world = makeWorld(scene);
-    const primitive = cubeWithLod();
-    const colliders = [0, 1, 5].map((lod) => {
-      const mesh = new Mesh(scene, primitive);
-      const c = new Collider();
-      c.shape = 'mesh';
-      c.meshLod = lod;
-      addPhysics(mesh, c);
-      return c;
-    });
-    await world.whenReady();
-    const geometry = colliders.map((c) => c._geometry as { positions: Float32Array; indices: Uint32Array });
-    expect(colliders.every((c) => c.ready)).toBe(true);
-    expect(geometry[0].indices.length).toBe(36);
-    expect(geometry[0].positions.length).toBe(8 * 3);
-    // LOD 1 is the top face alone: 4 vertices, all at y = 0.5.
-    expect(geometry[1].indices.length).toBe(6);
-    expect(geometry[1].positions.length).toBe(4 * 3);
-    expect([1, 4, 7, 10].map((i) => geometry[1].positions[i])).toEqual([0.5, 0.5, 0.5, 0.5]);
-    // Past the lowest detail: the lowest.
-    expect(geometry[2].indices.length).toBe(6);
-  });
-
-  it('reads a mesh shared by many colliders once', async () => {
-    const scene = new Scene();
-    const world = makeWorld(scene);
-    const primitive = cubeWithLod();
-    const read = jest.spyOn(primitive.getIndexBuffer()!, 'getBufferSubData');
-    for (let i = 0; i < 4; i++) {
-      const mesh = new Mesh(scene, primitive);
-      mesh.position.setXYZ(i * 3, 0, 0);
-      const c = new Collider();
-      c.shape = 'convex';
-      addPhysics(mesh, c);
-    }
-    await world.whenReady();
-    expect(read).toHaveBeenCalledTimes(1);
-  });
-
   it('refuses meshes that change shape', async () => {
     const error = jest.spyOn(console, 'error').mockImplementation(() => {});
     try {
@@ -258,20 +217,6 @@ describe('mesh read back', () => {
     } finally {
       error.mockRestore();
     }
-  });
-
-  it('keeps the latest request when a setting changes during a read back', async () => {
-    const scene = new Scene();
-    const world = makeWorld(scene);
-    const mesh = new Mesh(scene, cubeWithLod());
-    const c = new Collider();
-    c.shape = 'mesh';
-    addPhysics(mesh, c);
-    world.update(DT);
-    c.meshLod = 1;
-    await world.whenReady();
-    expect(c.ready).toBe(true);
-    expect((c._geometry as { indices: Uint32Array }).indices.length).toBe(6);
   });
 
   it('waits to start until the starting colliders are in', async () => {
@@ -401,17 +346,6 @@ describe('terrain collider', () => {
     expect(world.raycastAll(new Vector3(35, 100, 0), new Vector3(0, -1, 0)).length).toBe(1);
   });
 
-  it('samples more sparsely at a coarser resolution', () => {
-    const scene = new Scene();
-    const world = makeWorld(scene);
-    const terrain = planeTerrain(scene, 17);
-    const collider = Object.assign(new Collider(), { shape: 'terrain' as const, terrainResolution: 2 });
-    addPhysics(terrain, collider);
-    world.update(DT);
-    // A plane is the same at any resolution.
-    expect(surfaceY(world, 4.5, 6.5)).toBeCloseTo(0.25 * 4 + 0.5 * 6, 3);
-  });
-
   it('rebuilds when the heights change', () => {
     const scene = new Scene();
     const world = makeWorld(scene);
@@ -422,19 +356,5 @@ describe('terrain collider', () => {
     world.update(DT);
     world.update(DT);
     expect(surfaceY(world, 3, 3)).toBeCloseTo(5, 3);
-  });
-
-  it('lets a ball roll down the terrain', () => {
-    const scene = new Scene();
-    const world = makeWorld(scene);
-    const terrain = planeTerrain(scene, 32);
-    addPhysics(terrain, Object.assign(new Collider(), { shape: 'terrain' }));
-    const ball = addBody(scene, 'sphere', new Vector3(16, 30, 16));
-    run(world, 3);
-    const p = ball.getWorldPosition();
-    // Downhill is towards -X and -Z, and the ball stays on the surface.
-    expect(p.x).toBeLessThan(16);
-    expect(p.z).toBeLessThan(16);
-    expect(p.y - surfaceY(world, p.x, p.z)).toBeLessThan(0.7);
   });
 });

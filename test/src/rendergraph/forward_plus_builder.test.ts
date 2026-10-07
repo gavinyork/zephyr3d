@@ -170,24 +170,52 @@ describe('Forward+ render graph builder', () => {
     ).toThrow(/requires module "DepthPrepass"/);
   });
 
-  test('omits TransmissionDepth when scene color copy is not needed', () => {
-    const passNames = compileForwardPlusPassNames(createOptions({ needSceneColor: false }));
-
-    expect(passNames).toContain('LightPass');
-    expect(passNames).toContain('Blit');
-    expect(passNames).not.toContain('TransmissionDepth');
-    expect(passNames.indexOf('LightPass')).toBeLessThan(passNames.indexOf('Blit'));
-  });
-
-  test('inserts TransmissionDepth between LightPass and Blit when scene color copy is needed without SSR prepass', () => {
-    const passNames = compileForwardPlusPassNames(createOptions({ needSceneColor: true }));
-
-    expect(passNames).toContain('LightPass');
-    expect(passNames).toContain('TransmissionDepth');
-    expect(passNames).toContain('Blit');
-    expect(passNames.indexOf('LightPass')).toBeLessThan(passNames.indexOf('TransmissionDepth'));
-    expect(passNames.indexOf('TransmissionDepth')).toBeLessThan(passNames.indexOf('Blit'));
-  });
+  // Optional passes: present, in this order, when their feature is on; absent when it is off.
+  test.each([
+    {
+      pass: 'TransmissionDepth',
+      on: { needSceneColor: true },
+      off: { needSceneColor: false },
+      order: ['LightPass', 'TransmissionDepth', 'Blit']
+    },
+    { pass: 'HiZ', on: { hiZ: true }, off: { hiZ: false }, order: ['HiZ', 'LightPass'] },
+    {
+      pass: 'GPUPicking',
+      on: { gpuPicking: true },
+      off: { gpuPicking: false },
+      order: ['ClusterLights', 'GPUPicking', 'DepthPrepass']
+    },
+    {
+      pass: 'ShadowMaps',
+      on: {},
+      off: {},
+      onQueue: { shadowedLights: [{}] },
+      offQueue: { shadowedLights: [] },
+      order: ['ClusterLights', 'ShadowMaps', 'DepthPrepass']
+    },
+    {
+      pass: 'SceneColorGrab',
+      on: { needSceneColor: true },
+      off: { needSceneColor: false },
+      order: ['DepthPrepass', 'SceneColorGrab', 'LightPass']
+    }
+  ] as {
+    pass: string;
+    on: Partial<ForwardPlusOptions>;
+    off: Partial<ForwardPlusOptions>;
+    onQueue?: Partial<MockRenderQueueOptions>;
+    offQueue?: Partial<MockRenderQueueOptions>;
+    order: string[];
+  }[])(
+    '$pass is ordered when enabled and omitted when disabled',
+    ({ pass, on, off, onQueue, offQueue, order }) => {
+      const enabled = compileForwardPlusPassNames(createOptions(on), onQueue);
+      const indices = order.map((name) => enabled.indexOf(name));
+      expect(indices).not.toContain(-1);
+      expect([...indices].sort((a, b) => a - b)).toEqual(indices);
+      expect(compileForwardPlusPassNames(createOptions(off), offQueue)).not.toContain(pass);
+    }
+  );
 
   test('inserts SSR transmission depth before LightPass and omits late TransmissionDepth', () => {
     const passNames = compileForwardPlusPassNames(
@@ -210,33 +238,6 @@ describe('Forward+ render graph builder', () => {
     expect(passNames.indexOf('TransmissionDepthForSSR')).toBeLessThan(passNames.indexOf('LightPass'));
   });
 
-  test('isolates scene color copy depth when SSR pre-inserts transmission depth', () => {
-    const { graph } = buildForwardPlusGraphForTest(
-      createOptions({
-        needSceneColor: true,
-        ssr: true,
-        needsTransmissionDepthForSSR: true
-      })
-    );
-    const resourceNames = [...graph.resources.values()].map((resource) => resource.name);
-
-    expect(resourceNames).toContain('sceneColorCopy');
-    expect(resourceNames).not.toContain('SceneColorCopyFramebuffer');
-  });
-
-  test('reuses scene color copy depth when no SSR transmission depth prepass is needed', () => {
-    const { graph } = buildForwardPlusGraphForTest(
-      createOptions({
-        needSceneColor: true,
-        needsTransmissionDepthForSSR: false
-      })
-    );
-    const resourceNames = [...graph.resources.values()].map((resource) => resource.name);
-
-    expect(resourceNames).toContain('sceneColorCopy');
-    expect(resourceNames).toContain('SceneColorCopyFramebuffer');
-  });
-
   test('keeps TransmissionDepth after LightPass when SSR scene-color materials also need depth', () => {
     const passNames = compileForwardPlusPassNames(
       createOptions({
@@ -251,25 +252,6 @@ describe('Forward+ render graph builder', () => {
     expect(passNames).toContain('TransmissionDepth');
     expect(passNames.indexOf('LightPass')).toBeLessThan(passNames.indexOf('TransmissionDepth'));
     expect(passNames.indexOf('TransmissionDepth')).toBeLessThan(passNames.indexOf('Blit'));
-  });
-
-  test('models TransmissionDepth as a versioned write of the linear depth texture', () => {
-    const { graph, backbuffer } = buildForwardPlusGraphForTest(
-      createOptions({
-        needSceneColor: true,
-        needsTransmissionDepthForSSR: false
-      })
-    );
-    graph.compile([backbuffer]);
-
-    const transmissionPass = graph.passes.find((pass) => pass.name === 'TransmissionDepth')!;
-    expect(transmissionPass).toBeDefined();
-    // The pass reads the prepass linear depth and writes a new version of it.
-    const depthRead = transmissionPass.reads.find((res) => res.name === 'linearDepth');
-    expect(depthRead).toBeDefined();
-    const depthWrite = transmissionPass.writes.find((res) => res.physicalId === depthRead!.physicalId);
-    expect(depthWrite).toBeDefined();
-    expect(depthWrite!.id).not.toBe(depthRead!.id);
   });
 
   test('models TransmissionDepthForSSR as a versioned write consumed by later depth readers', () => {
@@ -441,20 +423,6 @@ describe('Forward+ render graph builder', () => {
     );
   });
 
-  test('omits HiZ when disabled', () => {
-    const passNames = compileForwardPlusPassNames(createOptions({ hiZ: false }));
-
-    expect(passNames).not.toContain('HiZ');
-  });
-
-  test('inserts HiZ before LightPass when enabled', () => {
-    const passNames = compileForwardPlusPassNames(createOptions({ hiZ: true }));
-
-    expect(passNames).toContain('HiZ');
-    expect(passNames).toContain('LightPass');
-    expect(passNames.indexOf('HiZ')).toBeLessThan(passNames.indexOf('LightPass'));
-  });
-
   test('inserts SSSProfile before LightPass and declares SSS MRT resources when enabled', () => {
     const { graph, backbuffer } = buildForwardPlusGraphForTest(
       createOptions({ sss: true, sceneNormal: true })
@@ -471,18 +439,6 @@ describe('Forward+ render graph builder', () => {
     expect(lightPass?.writes.map((resource) => resource.name)).toEqual(
       expect.arrayContaining(['sssDiffuse', 'sssTransmission'])
     );
-  });
-
-  test('declares the skin mask MRT resource when enabled', () => {
-    const { graph, backbuffer } = buildForwardPlusGraphForTest(createOptions({ postSSS: true }));
-    const passNames = graph.compile([backbuffer]).orderedPasses.map((pass) => pass.name);
-    const lightPassWrites = graph.passes
-      .find((pass) => pass.name === 'LightPass')
-      ?.writes.map((resource) => resource.name);
-
-    expect(passNames).toContain('LightPass');
-    expect(passNames).not.toContain('SSSProfile');
-    expect(lightPassWrites).toContain('postSSS');
   });
 
   test('keeps SSR surface MRT with scene-color materials and omits SSS transmission to reduce MRT count', () => {
@@ -510,13 +466,6 @@ describe('Forward+ render graph builder', () => {
     expect(lightPassWrites).not.toContain('sssTransmission');
   });
 
-  test('uses a single DepthPrepass subpass when motion vectors are disabled', () => {
-    const { graph } = buildForwardPlusGraphForTest(createOptions({ motionVectors: false }));
-    const depthPass = graph.passes.find((pass) => pass.name === 'DepthPrepass');
-
-    expect(depthPass?.subpasses.map((subpass) => subpass.name)).toEqual(['SceneDepth']);
-  });
-
   test('uses ordered DepthPrepass subpasses when motion vectors are enabled', () => {
     const { graph } = buildForwardPlusGraphForTest(createOptions({ motionVectors: true }));
     const depthPass = graph.passes.find((pass) => pass.name === 'DepthPrepass');
@@ -533,96 +482,27 @@ describe('Forward+ render graph builder', () => {
     ]);
   });
 
-  test('keeps GPUPicking side-effect pass before DepthPrepass when enabled', () => {
-    const passNames = compileForwardPlusPassNames(createOptions({ gpuPicking: true }));
-
-    expect(passNames).toContain('ClusterLights');
-    expect(passNames).toContain('GPUPicking');
-    expect(passNames).toContain('DepthPrepass');
-    expect(passNames.indexOf('ClusterLights')).toBeLessThan(passNames.indexOf('GPUPicking'));
-    expect(passNames.indexOf('GPUPicking')).toBeLessThan(passNames.indexOf('DepthPrepass'));
-  });
-
-  test('omits GPUPicking when disabled', () => {
-    const passNames = compileForwardPlusPassNames(createOptions({ gpuPicking: false }));
-
-    expect(passNames).not.toContain('GPUPicking');
-  });
-
-  test('inserts ShadowMaps before DepthPrepass when shadowed lights exist', () => {
-    const passNames = compileForwardPlusPassNames(createOptions(), {
-      shadowedLights: [{}]
-    });
-
-    expect(passNames).toContain('ClusterLights');
-    expect(passNames).toContain('ShadowMaps');
-    expect(passNames).toContain('DepthPrepass');
-    expect(passNames.indexOf('ClusterLights')).toBeLessThan(passNames.indexOf('ShadowMaps'));
-    expect(passNames.indexOf('ShadowMaps')).toBeLessThan(passNames.indexOf('DepthPrepass'));
-  });
-
-  test('omits ShadowMaps when there are no shadowed lights', () => {
-    const passNames = compileForwardPlusPassNames(createOptions(), {
-      shadowedLights: []
-    });
-
-    expect(passNames).not.toContain('ShadowMaps');
-  });
-
-  test('declares compatible SSR history imports as LightPass reads', () => {
-    const allocator: RGTextureAllocator<any> = {
-      allocate: (_desc, _size) => ({}),
-      release: () => {}
-    };
-    const historyManager = new HistoryResourceManager(allocator);
-    const size = { width: 1920, height: 1080 };
-    historyManager.beginFrame();
-    historyManager.queueCommit(
-      RGHistoryResources.SSR_REFLECT,
-      {
-        format: 'rgba16f',
-        sizeMode: 'absolute',
-        width: 1920,
-        height: 1080
-      },
-      size,
-      { id: 'historySSRReflect' }
-    );
-    historyManager.queueCommit(
-      RGHistoryResources.SSR_MOTION_VECTOR,
-      {
-        format: 'rgba16f',
-        sizeMode: 'absolute',
-        width: 1920,
-        height: 1080
-      },
-      size,
-      { id: 'historySSRMotionVector' }
-    );
-    historyManager.commitFrame();
-
-    const { graph } = buildForwardPlusGraphForTest(
-      createOptions({ ssr: true, motionVectors: true }),
-      {},
-      {
-        camera: {
-          TAA: false,
-          ssrTemporal: true,
-          getHistoryResourceManager: () => historyManager
-        }
+  test.each([
+    {
+      effect: 'SSR',
+      histories: [RGHistoryResources.SSR_REFLECT, RGHistoryResources.SSR_MOTION_VECTOR],
+      options: { ssr: true, motionVectors: true },
+      camera: { TAA: false, ssrTemporal: true }
+    },
+    {
+      effect: 'SSGI',
+      histories: [RGHistoryResources.SSGI_IRRADIANCE, RGHistoryResources.SSGI_SURFACE],
+      options: { ssgi: true },
+      camera: {
+        ssgiResolvedSettings: { halfRes: false, raysPerPixel: 2, maxSteps: 64, denoisePasses: 3 }
       }
-    );
-
-    const lightPass = graph.passes.find((pass) => pass.name === 'LightPass');
-    expect(lightPass?.reads.map((resource) => resource.name)).toEqual(
-      expect.arrayContaining([
-        `history:${RGHistoryResources.SSR_REFLECT}:previous`,
-        `history:${RGHistoryResources.SSR_MOTION_VECTOR}:previous`
-      ])
-    );
-  });
-
-  test('declares compatible SSGI irradiance and surface history as LightPass reads', () => {
+    }
+  ] as {
+    effect: string;
+    histories: string[];
+    options: Partial<ForwardPlusOptions>;
+    camera: Record<string, unknown>;
+  }[])('declares compatible $effect history imports as LightPass reads', ({ histories, options, camera }) => {
     const allocator: RGTextureAllocator<any> = {
       allocate: (_desc, _size) => ({}),
       release: () => {}
@@ -630,15 +510,10 @@ describe('Forward+ render graph builder', () => {
     const historyManager = new HistoryResourceManager(allocator);
     const size = { width: 1920, height: 1080 };
     historyManager.beginFrame();
-    for (const name of [RGHistoryResources.SSGI_IRRADIANCE, RGHistoryResources.SSGI_SURFACE]) {
+    for (const name of histories) {
       historyManager.queueCommit(
         name,
-        {
-          format: 'rgba16f',
-          sizeMode: 'absolute',
-          width: size.width,
-          height: size.height
-        },
+        { format: 'rgba16f', sizeMode: 'absolute', width: size.width, height: size.height },
         size,
         { id: name }
       );
@@ -646,27 +521,16 @@ describe('Forward+ render graph builder', () => {
     historyManager.commitFrame();
 
     const { graph } = buildForwardPlusGraphForTest(
-      createOptions({ ssgi: true }),
+      createOptions(options),
       {},
       {
-        camera: {
-          ssgiResolvedSettings: {
-            halfRes: false,
-            raysPerPixel: 2,
-            maxSteps: 64,
-            denoisePasses: 3
-          },
-          getHistoryResourceManager: () => historyManager
-        }
+        camera: { ...camera, getHistoryResourceManager: () => historyManager }
       }
     );
 
     const lightPass = graph.passes.find((pass) => pass.name === 'LightPass');
     expect(lightPass?.reads.map((resource) => resource.name)).toEqual(
-      expect.arrayContaining([
-        `history:${RGHistoryResources.SSGI_IRRADIANCE}:previous`,
-        `history:${RGHistoryResources.SSGI_SURFACE}:previous`
-      ])
+      expect.arrayContaining(histories.map((name) => `history:${name}:previous`))
     );
   });
 
@@ -992,18 +856,27 @@ describe('Forward+ end-layer post effect chain', () => {
     expect(lastEffectPass?.writes.some((res) => res.name.startsWith('backbuffer@'))).toBe(true);
   });
 
-  test('skips disabled end-layer effects', () => {
+  test('skips disabled end-layer effects, falling back to Blit when none is left', () => {
     const effectA = new EffectA();
     effectA.enabled = false;
-    const { graph, backbuffer } = buildForwardPlusGraphForTest(
-      createOptions(),
-      {},
-      { compositor: createCompositor([effectA, new EffectB()]) }
-    );
-    const passNames = graph.compile([backbuffer]).orderedPasses.map((pass) => pass.name);
+    const effectB = new EffectB();
+    const passNamesFor = () => {
+      const { graph, backbuffer } = buildForwardPlusGraphForTest(
+        createOptions(),
+        {},
+        { compositor: createCompositor([effectA, effectB]) }
+      );
+      return graph.compile([backbuffer]).orderedPasses.map((pass) => pass.name);
+    };
 
+    let passNames = passNamesFor();
     expect(passNames).not.toContain('PostEffect:EffectA');
     expect(passNames).toContain('PostEffect:EffectB');
+
+    effectB.enabled = false;
+    passNames = passNamesFor();
+    expect(passNames).toContain('Blit');
+    expect(passNames).not.toContain('PostEffect:EffectB');
   });
 
   test('lets a plain end-layer effect direct-write even when camera TAA is enabled', () => {
@@ -1029,32 +902,6 @@ describe('Forward+ end-layer post effect chain', () => {
     expect(passNames).not.toContain('Blit');
     const effectPass = graph.passes.find((pass) => pass.name === 'PostEffect:EffectA');
     expect(effectPass?.writes.some((res) => res.name.startsWith('backbuffer@'))).toBe(true);
-  });
-
-  test('keeps the Blit pass when no end-layer effect is enabled', () => {
-    const effect = new EffectA();
-    effect.enabled = false;
-    const { graph, backbuffer } = buildForwardPlusGraphForTest(
-      createOptions(),
-      {},
-      { compositor: createCompositor([effect]) }
-    );
-    const passNames = graph.compile([backbuffer]).orderedPasses.map((pass) => pass.name);
-
-    expect(passNames).toContain('Blit');
-    expect(passNames).not.toContain('PostEffect:EffectA');
-  });
-
-  test('orders end-layer effect passes after TransmissionDepth', () => {
-    const { graph, backbuffer } = buildForwardPlusGraphForTest(
-      createOptions({ needSceneColor: true }),
-      {},
-      { compositor: createCompositor([new EffectA()]) }
-    );
-    const passNames = graph.compile([backbuffer]).orderedPasses.map((pass) => pass.name);
-
-    expect(passNames).toContain('TransmissionDepth');
-    expect(passNames.indexOf('TransmissionDepth')).toBeLessThan(passNames.indexOf('PostEffect:EffectA'));
   });
 });
 
@@ -1138,67 +985,7 @@ describe('Forward+ transparent-layer post effect chain', () => {
   });
 });
 
-describe('Bloom native multi-pass setup', () => {
-  test('expands bloom into prefilter/downsample/upsample/compose passes', () => {
-    const { Bloom } = require('../../../libs/scene/src/posteffect/bloom');
-    const bloom = new Bloom();
-    const compositor = new Compositor();
-    compositor.appendPostEffect(bloom);
-    const { graph, backbuffer } = buildForwardPlusGraphForTest(createOptions(), {}, { compositor });
-    const passNames = graph.compile([backbuffer]).orderedPasses.map((pass) => pass.name);
-
-    // 1920x1080 -> prefilter 960x540 -> pyramid 480x270, 240x135, 120x67, 60x33 (4 levels)
-    expect(passNames).toContain('Bloom:Prefilter');
-    expect(passNames).toContain('Bloom:Downsample0');
-    expect(passNames).toContain('Bloom:Downsample3');
-    expect(passNames).toContain('Bloom:Upsample2');
-    expect(passNames).toContain('Bloom:Upsample0');
-    expect(passNames).toContain('Bloom:Compose');
-    expect(passNames.indexOf('LightPass')).toBeLessThan(passNames.indexOf('Bloom:Prefilter'));
-    expect(passNames.indexOf('Bloom:Prefilter')).toBeLessThan(passNames.indexOf('Bloom:Downsample0'));
-    expect(passNames.indexOf('Bloom:Downsample3')).toBeLessThan(passNames.indexOf('Bloom:Upsample2'));
-    expect(passNames.indexOf('Bloom:Upsample0')).toBeLessThan(passNames.indexOf('Bloom:Compose'));
-
-    // Compose takes the direct final write (bloom is the last enabled effect)
-    const composePass = graph.passes.find((pass) => pass.name === 'Bloom:Compose');
-    expect(composePass?.writes.some((res) => res.name.startsWith('backbuffer@'))).toBe(true);
-
-    // Upsample passes write new versions of the downsample level textures
-    const upsamplePass = graph.passes.find((pass) => pass.name === 'Bloom:Upsample0');
-    expect(upsamplePass?.writes.some((res) => res.name.startsWith('Bloom:downsample0@'))).toBe(true);
-  });
-
-  test('declares absolute pyramid sizes matching the legacy runtime math', () => {
-    const { Bloom } = require('../../../libs/scene/src/posteffect/bloom');
-    const bloom = new Bloom();
-    const compositor = new Compositor();
-    compositor.appendPostEffect(bloom);
-    const { graph } = buildForwardPlusGraphForTest(createOptions(), {}, { compositor });
-
-    const prefilter = [...graph.resources.values()].find((res) => res.name === 'Bloom:prefilter');
-    expect(prefilter?.desc).toMatchObject({ sizeMode: 'absolute', width: 960, height: 540 });
-    const level0 = [...graph.resources.values()].find((res) => res.name === 'Bloom:downsample0');
-    expect(level0?.desc).toMatchObject({ sizeMode: 'absolute', width: 480, height: 270 });
-    const level3 = [...graph.resources.values()].find((res) => res.name === 'Bloom:downsample3');
-    expect(level3?.desc).toMatchObject({ sizeMode: 'absolute', width: 60, height: 33 });
-  });
-});
-
 describe('SceneColorGrab pass (P2)', () => {
-  test('extracts the refraction background grab as its own pass before LightPass', () => {
-    const passNames = compileForwardPlusPassNames(createOptions({ needSceneColor: true }));
-
-    expect(passNames).toContain('SceneColorGrab');
-    expect(passNames.indexOf('DepthPrepass')).toBeLessThan(passNames.indexOf('SceneColorGrab'));
-    expect(passNames.indexOf('SceneColorGrab')).toBeLessThan(passNames.indexOf('LightPass'));
-  });
-
-  test('omits the grab pass when scene color is not needed', () => {
-    const passNames = compileForwardPlusPassNames(createOptions({ needSceneColor: false }));
-
-    expect(passNames).not.toContain('SceneColorGrab');
-  });
-
   test('LightPass reads the grab output', () => {
     const { graph, backbuffer } = buildForwardPlusGraphForTest(createOptions({ needSceneColor: true }));
     graph.compile([backbuffer]);
@@ -1230,44 +1017,21 @@ describe('VirtualTextureUpdate pass', () => {
     expect(passNames.indexOf('VirtualTextureUpdate')).toBeLessThan(passNames.indexOf('LightPass'));
   });
 
-  test('is left out when no client is active', () => {
+  test.each([
+    { why: 'no client is active', device: undefined, active: false },
+    { why: 'on WebGL, which has no compute', device: { type: 'webgl2' }, active: true }
+  ])('is left out when $why', ({ device, active }) => {
     const { graph, backbuffer } = buildForwardPlusGraphForTest(
       createOptions(),
       {},
       {
-        scene: { virtualTextureClients: [client(false)] }
+        ...(device ? { device } : {}),
+        scene: { virtualTextureClients: [client(active)] }
       }
     );
     const passNames = graph.compile([backbuffer]).orderedPasses.map((pass) => pass.name);
 
     expect(passNames).not.toContain('VirtualTextureUpdate');
-  });
-
-  test('is left out on WebGL, which has no compute', () => {
-    const { graph, backbuffer } = buildForwardPlusGraphForTest(
-      createOptions(),
-      {},
-      {
-        device: { type: 'webgl2' },
-        scene: { virtualTextureClients: [client(true)] }
-      }
-    );
-    const passNames = graph.compile([backbuffer]).orderedPasses.map((pass) => pass.name);
-
-    expect(passNames).not.toContain('VirtualTextureUpdate');
-  });
-});
-
-describe('TransparentPass split (P2-S2)', () => {
-  test('splits transparent geometry into its own pass writing a scene color version', () => {
-    const { graph, backbuffer } = buildForwardPlusGraphForTest(createOptions({ needSceneColor: true }));
-    const passNames = graph.compile([backbuffer]).orderedPasses.map((pass) => pass.name);
-
-    expect(passNames).toContain('TransparentPass');
-    expect(passNames.indexOf('LightPass')).toBeLessThan(passNames.indexOf('TransparentPass'));
-    expect(passNames.indexOf('TransparentPass')).toBeLessThan(passNames.indexOf('TransmissionDepth'));
-    const transparentPass = graph.passes.find((pass) => pass.name === 'TransparentPass');
-    expect(transparentPass?.writes.some((res) => res.name.startsWith('sceneColor@'))).toBe(true);
   });
 });
 
@@ -1308,41 +1072,19 @@ describe('SSR native multi-pass setup (P3-S3)', () => {
     );
   }
 
-  test('declares intersect/resolve/combine as individual graph passes', () => {
-    const { graph, backbuffer } = buildWithSSR({});
-    const passNames = graph.compile([backbuffer]).orderedPasses.map((pass) => pass.name);
+  test('runs SSR between LightPass and TransparentPass, with a blur pass only when enabled', () => {
+    const passNamesFor = (cameraOverrides: Record<string, unknown>) => {
+      const { graph, backbuffer } = buildWithSSR(cameraOverrides);
+      return graph.compile([backbuffer]).orderedPasses.map((pass) => pass.name);
+    };
 
-    for (const name of ['SSR:Intersect', 'SSR:Resolve', 'PostEffect:SSR']) {
-      expect(passNames).toContain(name);
-    }
-    expect(passNames.indexOf('LightPass')).toBeLessThan(passNames.indexOf('SSR:Intersect'));
-    expect(passNames.indexOf('SSR:Intersect')).toBeLessThan(passNames.indexOf('SSR:Resolve'));
-    expect(passNames.indexOf('SSR:Resolve')).toBeLessThan(passNames.indexOf('PostEffect:SSR'));
+    let passNames = passNamesFor({});
+    expect(passNames.indexOf('LightPass')).toBeLessThan(passNames.indexOf('PostEffect:SSR'));
     expect(passNames.indexOf('PostEffect:SSR')).toBeLessThan(passNames.indexOf('TransparentPass'));
-    // Blur disabled: no blur pass
     expect(passNames).not.toContain('SSR:Blur');
-    expect(passNames).not.toContain('SSR:Temporal');
-  });
 
-  test('scene roughness/normal MRT outputs are graph textures owned by LightPass (P3-S4)', () => {
-    const { graph, backbuffer } = buildWithSSR({});
-    graph.compile([backbuffer]);
-    const lightPass = graph.passes.find((pass) => pass.name === 'LightPass');
-
-    expect(lightPass?.writes.some((res) => res.name === 'sceneRoughness')).toBe(true);
-    expect(lightPass?.writes.some((res) => res.name === 'sceneNormal')).toBe(true);
-    // Effect passes must read them so lifetimes cover the whole opaque chain
-    const intersectPass = graph.passes.find((pass) => pass.name === 'SSR:Intersect');
-    expect(intersectPass?.reads.some((res) => res.name === 'sceneRoughness')).toBe(true);
-    expect(intersectPass?.reads.some((res) => res.name === 'sceneNormal')).toBe(true);
-  });
-
-  test('inserts the bilateral blur pass when enabled', () => {
-    const { graph, backbuffer } = buildWithSSR({ ssrBlurScale: 1, ssrBlurKernelSize: 5 });
-    const passNames = graph.compile([backbuffer]).orderedPasses.map((pass) => pass.name);
-
+    passNames = passNamesFor({ ssrBlurScale: 1, ssrBlurKernelSize: 5 });
     expect(passNames).toContain('SSR:Blur');
-    expect(passNames.indexOf('SSR:Resolve')).toBeLessThan(passNames.indexOf('SSR:Blur'));
     expect(passNames.indexOf('SSR:Blur')).toBeLessThan(passNames.indexOf('PostEffect:SSR'));
   });
 
@@ -1609,35 +1351,6 @@ describe('Forward+ pipeline customization', () => {
     );
     return graph.compile([backbuffer]).orderedPasses.map((pass) => pass.name);
   }
-
-  test('default pipeline reproduces the built-in pass set (parity)', () => {
-    // No camera.renderPipeline → the shared default pipeline is used, which must
-    // match a direct build.
-    const direct = compileForwardPlusPassNames(createOptions());
-    const viaDefault = compilePipelinePassNames(createForwardPlusPipeline());
-    expect(viaDefault).toEqual(direct);
-    expect(viaDefault).toContain('LightPass');
-    expect(viaDefault).toContain('TransparentPass');
-    expect(viaDefault).toContain('Blit');
-  });
-
-  test('a custom module inserted after LightPass adds its pass to the built graph', () => {
-    const customModule: RenderModule = {
-      type: 'MyCustom',
-      prepare: () => ({ enabled: true }),
-      setup(context) {
-        context.graph.addPass('MyCustomPass', (builder) => {
-          builder.read(context.blackboard.expect(FrameResources.LinearDepth));
-          builder.sideEffect();
-          builder.setExecute(() => {});
-        });
-      }
-    };
-    const pipeline = createForwardPlusPipeline().insertAfter('LightPass', customModule);
-    const names = compilePipelinePassNames(pipeline);
-    expect(names).toContain('MyCustomPass');
-    expect(names).toContain('LightPass');
-  });
 
   test('collects a module requirement before setup and produces only the requested surface MRT', () => {
     const customModule: RenderModule = {

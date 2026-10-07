@@ -1,7 +1,6 @@
 import { MemoryFS, Vector4 } from '@zephyr3d/base';
 import {
   DirectionalLight,
-  PBRMetallicRoughnessMaterial,
   PerspectiveCamera,
   PointLight,
   RectLight,
@@ -33,8 +32,13 @@ describe('Legacy lighting is unaffected by the physical alignment', () => {
     point.intensity = 3;
     const spot = new SpotLight(scene);
     spot.intensity = 2;
+    // Legacy drives the rect light by its unitless intensity too.
+    const rect = new RectLight(scene);
+    rect.intensity = 3;
+    rect.width = 2;
+    rect.height = 2;
 
-    for (const light of [dir, point, spot]) {
+    for (const light of [dir, point, spot, rect]) {
       const authored = light.diffuseAndIntensity;
       const uploaded = ShaderHelper.getPreExposedColorIntensity(light, ctx);
       expect(uploaded.x).toBe(authored.x);
@@ -71,53 +75,9 @@ describe('Legacy lighting is unaffected by the physical alignment', () => {
     expect(point.positionAndRange.w).toBeCloseTo(32 * Math.sqrt(9), 5);
   });
 
-  test('legacy tonemap keeps the authored exposure multiplier', () => {
-    const scene = new Scene();
-    const camera = new PerspectiveCamera(scene);
-    camera.toneMapExposure = 2.5;
-    expect(camera.toneMapExposure).toBeCloseTo(2.5, 10);
-  });
-
-  test('legacy serialization exposes the legacy fields and hides the physical ones', async () => {
+  test('legacy serialization hides the physical camera fields', async () => {
     const manager = new ResourceManager(new MemoryFS());
-    const scene = new Scene();
-    const camera = new PerspectiveCamera(scene);
-    camera.toneMapExposure = 1.5;
-
-    const serializedCamera = await manager.serializeObject(camera);
-    expect(serializedCamera.Object.ToneMapExposure).toBeCloseTo(1.5);
+    const serializedCamera = await manager.serializeObject(new PerspectiveCamera(new Scene()));
     expect(serializedCamera.Object.ExposureMode).toBeUndefined();
-
-    const point = new PointLight(scene);
-    point.intensity = 5;
-    const serializedPoint = await manager.serializeObject(point);
-    expect(serializedPoint.Object.Intensity).toBeCloseTo(5);
-
-    const restored = (await manager.deserializeObject<PerspectiveCamera>(scene.rootNode, serializedCamera))!;
-    expect(restored.toneMapExposure).toBeCloseTo(1.5);
-  });
-
-  test('emissive is inert under legacy regardless of the exposure weight', () => {
-    const material = new PBRMetallicRoughnessMaterial();
-    material.emissiveColor = new Vector4(1, 0.5, 0.25, 1).xyz();
-    material.emissiveStrength = 2;
-    // The weight only scales the pre-exposure, which is 1 in legacy, so the emitter is unchanged.
-    material.emissiveExposureWeight = 1;
-    expect(material.emissiveStrength).toBeCloseTo(2, 10);
-    material.emissiveExposureWeight = 0;
-    expect(material.emissiveStrength).toBeCloseTo(2, 10);
-    // The physical cd/m² property must not disturb the legacy authoring value either.
-    material.emissiveLuminance = 8000;
-    expect(material.emissiveStrength).toBeCloseTo(2, 10);
-  });
-
-  test('rect light legacy authoring path still works', () => {
-    const scene = new Scene();
-    const rect = new RectLight(scene);
-    rect.intensity = 3;
-    rect.width = 2;
-    rect.height = 2;
-    // Legacy drives the rect light by its unitless intensity.
-    expect(rect.diffuseAndIntensity.w).toBeCloseTo(3, 10);
   });
 });

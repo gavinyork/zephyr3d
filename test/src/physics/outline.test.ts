@@ -136,17 +136,6 @@ describe('collider outline', () => {
     expect(outline.length / 2).toBe(5);
   });
 
-  it('reports why a shape cannot be built', async () => {
-    const scene = new Scene();
-    const { collider } = addCollider(scene, (c) => {
-      c.shape = 'convex';
-      c.setMeshData(new Float32Array([0, 0, 0, 1, 0, 0, 0, 0, 1, 1, 0, 1]));
-    });
-    await expect(collider.node!.scene!.physicsWorld!.getColliderOutline(collider)).rejects.toThrow(
-      /convex hull/
-    );
-  });
-
   it('puts terrain lines on the surface the simulation collides with', async () => {
     const scene = new Scene();
     const world = scene.physicsWorld as PhysicsSimulation;

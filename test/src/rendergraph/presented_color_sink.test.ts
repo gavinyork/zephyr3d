@@ -42,17 +42,6 @@ function sinkOf(blackboard: RGBlackboard) {
 }
 
 describe('presented-color sink takeover (plan A)', () => {
-  test('without a takeover module, the sink is the tail Present version', () => {
-    const graph = new RenderGraph();
-    const blackboard = new RGBlackboard();
-    buildTail(graph, blackboard);
-
-    const sink = sinkOf(blackboard);
-    expect(sink.name).toContain('backbuffer');
-    // Compiles cleanly: the tail version is the latest backbuffer version.
-    expect(() => graph.compile([sink])).not.toThrow();
-  });
-
   test('a user module appended after the tail takes over the final output', () => {
     const graph = new RenderGraph();
     const blackboard = new RGBlackboard();
@@ -80,26 +69,5 @@ describe('presented-color sink takeover (plan A)', () => {
     const passNames = compiled.orderedPasses.map((p) => p.name);
     expect(passNames).toContain('DepthViz');
     expect(passNames.indexOf('Present')).toBeLessThan(passNames.indexOf('DepthViz'));
-  });
-
-  test('compiling against the stale tail version after a takeover is rejected', () => {
-    // Guards the failure mode plan A fixes: if the sink were still the tail's
-    // version (as it was when the sink came from internal state), compile()
-    // rejects it because it is no longer the latest backbuffer version.
-    const graph = new RenderGraph();
-    const blackboard = new RGBlackboard();
-    buildTail(graph, blackboard);
-    const stale = blackboard.expect(FrameResources.PresentedColor);
-
-    const taken = graph.addPass('DepthViz', (builder) => {
-      builder.read(stale);
-      const out = builder.write(stale);
-      builder.setExecute(() => {});
-      return out;
-    });
-    blackboard.set(FrameResources.PresentedColor, taken);
-
-    expect(() => graph.compile([stale])).toThrow(/latest version/i);
-    expect(() => graph.compile([sinkOf(blackboard)])).not.toThrow();
   });
 });

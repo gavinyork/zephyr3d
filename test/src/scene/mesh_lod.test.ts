@@ -104,16 +104,13 @@ describe('mesh level of detail chain', () => {
     expect(simplifier.calls).toEqual([]);
   });
 
-  test('the level count is capped at the engine maximum', () => {
+  test('the engine predicts the targets the chain aims for, capped at the engine maximum', () => {
     const { levels } = buildLodChain(fakeSimplifier(), indices, positions, null, 1, {
       lodMinTriangles: 1,
       lodReduction: 0.9,
       lodPixelError: 8
     });
-    expect(levels.length).toBe(8);
-  });
-
-  test('the engine predicts the targets the chain aims for', () => {
+    expect(levels.length).toBe(MAX_MESH_LODS);
     const settings = { lodEnabled: true, lodMinTriangles: 100, lodReduction: 0.5 };
     expect(getMeshLodTargets(TRIANGLES, settings)).toEqual([1000, 500, 250, 125]);
     expect(getMeshLodTargets(TRIANGLES, { ...settings, lodEnabled: false })).toEqual([1000]);

@@ -228,6 +228,10 @@ describe('physics', () => {
     body.motionType = 'kinematic';
     body.mass = 3;
     body.gravityScale = 0.5;
+    body.lockRotationX = true;
+    body.lockTranslationZ = true;
+    body.initialLinearVelocity = new Vector3(1, 2, 3);
+    body.initialAngularVelocity = new Vector3(0, -4, 0);
     addPhysics(node, body);
     const collider = new Collider();
     collider.shape = 'capsule';
@@ -236,6 +240,7 @@ describe('physics', () => {
     collider.offset = new Vector3(0, 0.75, 0);
     collider.friction = 0.9;
     collider.isTrigger = true;
+    collider.layer = 7;
     addPhysics(node, collider);
 
     const serialized = await manager.serializeObject(node);
@@ -246,12 +251,20 @@ describe('physics', () => {
     expect(rb.motionType).toBe('kinematic');
     expect(rb.mass).toBe(3);
     expect(rb.gravityScale).toBe(0.5);
+    expect(rb.lockRotationX).toBe(true);
+    expect(rb.lockRotationY).toBe(false);
+    expect(rb.lockTranslationZ).toBe(true);
+    expect([rb.initialLinearVelocity.x, rb.initialLinearVelocity.y, rb.initialLinearVelocity.z]).toEqual([
+      1, 2, 3
+    ]);
+    expect(rb.initialAngularVelocity.y).toBe(-4);
     expect(rc.shape).toBe('capsule');
     expect(rc.radius).toBe(0.25);
     expect(rc.height).toBe(1.5);
     expect(rc.offset.y).toBe(0.75);
     expect(rc.friction).toBeCloseTo(0.9);
     expect(rc.isTrigger).toBe(true);
+    expect(rc.layer).toBe(7);
     expect(rc.world).toBe(scene.physicsWorld);
   });
 
@@ -293,24 +306,5 @@ describe('physics', () => {
     expect(a.getLinearVelocity().x).toBeCloseTo(0, 4);
     expect(a.getLinearVelocity().z).toBeCloseTo(1, 4);
     expect(b.node!.getWorldPosition().x).toBeCloseTo(5, 4);
-  });
-
-  it('round-trips the initial velocities', async () => {
-    const scene = new Scene();
-    const manager = new ResourceManager(new MemoryFS());
-    const node = new SceneNode(scene);
-    const body = new RigidBody();
-    body.initialLinearVelocity = new Vector3(1, 2, 3);
-    body.initialAngularVelocity = new Vector3(0, -4, 0);
-    addPhysics(node, body);
-    const restored = (await manager.deserializeObject<SceneNode>(
-      new SceneNode(scene),
-      await manager.serializeObject(node)
-    ))!;
-    const rb = getPhysics(restored, RigidBody)!;
-    expect([rb.initialLinearVelocity.x, rb.initialLinearVelocity.y, rb.initialLinearVelocity.z]).toEqual([
-      1, 2, 3
-    ]);
-    expect(rb.initialAngularVelocity.y).toBe(-4);
   });
 });

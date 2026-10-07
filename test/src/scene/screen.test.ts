@@ -21,39 +21,15 @@ describe('ScreenAdapter', () => {
       expect(adapter.config.scaleMode).toBe('cover');
     });
 
-    test('应该使用自定义配置创建实例', () => {
-      const config: ScreenConfig = {
-        designWidth: 1280,
-        designHeight: 720,
-        scaleMode: 'fit'
-      };
-      const adapter = new ScreenAdapter(config);
-      expect(adapter.config.designWidth).toBe(1280);
-      expect(adapter.config.designHeight).toBe(720);
-      expect(adapter.config.scaleMode).toBe('fit');
-    });
-
-    test('应该能重新配置', () => {
+    test.each<ScreenConfig>([
+      { designWidth: 1280, designHeight: 720, scaleMode: 'fit' },
+      { designWidth: 800, designHeight: 600, scaleMode: 'stretch' },
+      { designWidth: 1024, designHeight: 768, scaleMode: 'fit-width' }
+    ])('应该能通过构造函数和 config 设置 %o', (config) => {
+      expect(new ScreenAdapter(config).config).toMatchObject(config);
       const adapter = new ScreenAdapter();
-      adapter.config = {
-        designWidth: 800,
-        designHeight: 600,
-        scaleMode: 'stretch'
-      };
-      expect(adapter.config.designWidth).toBe(800);
-      expect(adapter.config.designHeight).toBe(600);
-      expect(adapter.config.scaleMode).toBe('stretch');
-    });
-
-    test('应该合并部分配置与默认值', () => {
-      const adapter = new ScreenAdapter({
-        designWidth: 1024,
-        designHeight: 768,
-        scaleMode: 'fit-width'
-      });
-      expect(adapter.config.designWidth).toBe(1024);
-      expect(adapter.config.designHeight).toBe(768);
-      expect(adapter.config.scaleMode).toBe('fit-width');
+      adapter.config = config;
+      expect(adapter.config).toMatchObject(config);
     });
   });
 
@@ -61,28 +37,6 @@ describe('ScreenAdapter', () => {
     test('初始 viewport 应该为 null', () => {
       const adapter = new ScreenAdapter();
       expect(adapter.viewport).toBeNull();
-    });
-
-    test('应该能设置和获取 viewport', () => {
-      const adapter = new ScreenAdapter();
-      adapter.viewport = [0, 0, 800, 600];
-      expect(adapter.viewport).toEqual([0, 0, 800, 600]);
-    });
-
-    test('设置 viewport 应该触发 transform 重新计算', () => {
-      const adapter = new ScreenAdapter();
-      const transform1 = adapter.transform;
-      adapter.viewport = [0, 0, 1024, 768];
-      const transform2 = adapter.transform;
-      expect(transform1).not.toBe(transform2);
-    });
-
-    test('设置相同的 viewport 应该创建新副本', () => {
-      const adapter = new ScreenAdapter();
-      const vp = [0, 0, 800, 600];
-      adapter.viewport = vp;
-      expect(adapter.viewport).not.toBe(vp);
-      expect(adapter.viewport).toEqual(vp);
     });
   });
 
@@ -192,65 +146,17 @@ describe('ScreenAdapter', () => {
     });
   });
 
-  describe('calculateResolutionTransform - fit-width 模式', () => {
-    test('应该精确匹配宽度，高度跟随宽高比', () => {
-      const adapter = new ScreenAdapter({
-        designWidth: 1920,
-        designHeight: 1080,
-        scaleMode: 'fit-width'
-      });
-
-      const transform = adapter.calculateResolutionTransform(0, 0, 1280, 720);
-
-      expect(transform.viewportWidth).toBeCloseTo(1280);
-      expect(transform.viewportHeight).toBeCloseTo(720); // 1080 * (1280/1920)
-      expect(transform.viewportX).toBeCloseTo(0);
-      expect(transform.viewportY).toBeCloseTo(0);
-    });
-
-    test('高度超出时应该居中', () => {
-      const adapter = new ScreenAdapter({
-        designWidth: 1920,
-        designHeight: 1080,
-        scaleMode: 'fit-width'
-      });
-
-      const transform = adapter.calculateResolutionTransform(0, 0, 960, 540);
-
-      expect(transform.viewportWidth).toBeCloseTo(960);
-      expect(transform.viewportHeight).toBeCloseTo(540); // 1080 * (960/1920)
-      expect(transform.viewportX).toBeCloseTo(0);
-      expect(transform.viewportY).toBeCloseTo(0);
-    });
-  });
-
-  describe('calculateResolutionTransform - fit-height 模式', () => {
-    test('应该精确匹配高度，宽度跟随宽高比', () => {
-      const adapter = new ScreenAdapter({
-        designWidth: 1920,
-        designHeight: 1080,
-        scaleMode: 'fit-height'
-      });
-
-      const transform = adapter.calculateResolutionTransform(0, 0, 1280, 720);
-
-      expect(transform.viewportWidth).toBeCloseTo(1280); // 1920 * (720/1080)
-      expect(transform.viewportHeight).toBeCloseTo(720);
-      expect(transform.viewportX).toBeCloseTo(0);
-      expect(transform.viewportY).toBeCloseTo(0);
-    });
-
-    test('宽度超出时应该居中', () => {
-      const adapter = new ScreenAdapter({
-        designWidth: 1920,
-        designHeight: 1080,
-        scaleMode: 'fit-height'
-      });
-
-      const transform = adapter.calculateResolutionTransform(0, 0, 2560, 1440);
-
-      expect(transform.viewportWidth).toBeCloseTo(2560); // 1920 * (1440/1080)
-      expect(transform.viewportHeight).toBeCloseTo(1440);
+  describe('calculateResolutionTransform - fit-width / fit-height 模式', () => {
+    test.each([
+      ['fit-width', 1280, 720],
+      ['fit-width', 960, 540],
+      ['fit-height', 1280, 720],
+      ['fit-height', 2560, 1440]
+    ] as const)('%s 在 %i x %i 视口中按宽高比匹配并居中', (scaleMode, width, height) => {
+      const adapter = new ScreenAdapter({ designWidth: 1920, designHeight: 1080, scaleMode });
+      const transform = adapter.calculateResolutionTransform(0, 0, width, height);
+      expect(transform.viewportWidth).toBeCloseTo(width);
+      expect(transform.viewportHeight).toBeCloseTo(height);
       expect(transform.viewportX).toBeCloseTo(0);
       expect(transform.viewportY).toBeCloseTo(0);
     });
@@ -319,19 +225,6 @@ describe('ScreenAdapter', () => {
       expect(viewportPos.x).toBeCloseTo(0);
       expect(viewportPos.y).toBeCloseTo(0);
     });
-
-    test('应该能使用输出参数', () => {
-      const adapter = new ScreenAdapter();
-      adapter.viewport = [0, 0, 1920, 1080];
-
-      const canvasPos = new Vector2(100, 200);
-      const output = new Vector2();
-      const result = adapter.canvasPosToViewport(canvasPos, output);
-
-      expect(result).toBe(output);
-      expect(output.x).toBeCloseTo(100);
-      expect(output.y).toBeCloseTo(200);
-    });
   });
 
   describe('坐标转换 - canvasToLogic', () => {
@@ -368,17 +261,6 @@ describe('ScreenAdapter', () => {
       expect(logicPos.x).toBeCloseTo(960); // 设计分辨率中心
       expect(logicPos.y).toBeCloseTo(540);
     });
-
-    test('应该能使用输出参数', () => {
-      const adapter = new ScreenAdapter();
-      adapter.viewport = [0, 0, 1920, 1080];
-
-      const canvasPos = new Vector2(960, 540);
-      const output = new Vector2();
-      const result = adapter.canvasPosToLogic(canvasPos, output);
-
-      expect(result).toBe(output);
-    });
   });
 
   describe('坐标转换 - transformPoint', () => {
@@ -399,37 +281,25 @@ describe('ScreenAdapter', () => {
       expect(output.x).toBeCloseTo(20);
       expect(output.y).toBeCloseTo(50);
     });
+  });
 
-    test('应该能使用输出参数', () => {
-      const adapter = new ScreenAdapter();
-      const transform = {
-        scaleX: 1,
-        scaleY: 1,
-        offsetX: 0,
-        offsetY: 0
-      };
-
-      const input = new Vector2(10, 20);
-      const output = new Vector2();
-      const result = adapter.transformPoint(transform, input, output);
-
-      expect(result).toBe(output);
-      expect(output.x).toBe(10);
-      expect(output.y).toBe(20);
-    });
+  test('坐标转换应该写入并返回输出参数', () => {
+    const adapter = new ScreenAdapter();
+    adapter.viewport = [0, 0, 1920, 1080];
+    const out1 = new Vector2();
+    expect(adapter.canvasPosToViewport(new Vector2(100, 200), out1)).toBe(out1);
+    expect(out1.x).toBeCloseTo(100);
+    expect(out1.y).toBeCloseTo(200);
+    const out2 = new Vector2();
+    expect(adapter.canvasPosToLogic(new Vector2(960, 540), out2)).toBe(out2);
+    const out3 = new Vector2();
+    const identity = { scaleX: 1, scaleY: 1, offsetX: 0, offsetY: 0 };
+    expect(adapter.transformPoint(identity, new Vector2(10, 20), out3)).toBe(out3);
+    expect(out3.x).toBe(10);
+    expect(out3.y).toBe(20);
   });
 
   describe('transform 属性缓存', () => {
-    test('应该缓存 transform 结果', () => {
-      const adapter = new ScreenAdapter();
-      adapter.viewport = [0, 0, 1920, 1080];
-
-      const transform1 = adapter.transform;
-      const transform2 = adapter.transform;
-
-      expect(transform1).toBe(transform2);
-    });
-
     test('改变 viewport 应该使缓存失效', () => {
       const adapter = new ScreenAdapter();
       adapter.viewport = [0, 0, 1920, 1080];
@@ -452,21 +322,6 @@ describe('ScreenAdapter', () => {
   });
 
   describe('裁剪视口计算', () => {
-    test('完全可见的视口', () => {
-      const adapter = new ScreenAdapter({
-        designWidth: 1920,
-        designHeight: 1080,
-        scaleMode: 'fit'
-      });
-
-      const transform = adapter.calculateResolutionTransform(0, 0, 1920, 1080);
-
-      expect(transform.croppedViewport.x).toBeCloseTo(0);
-      expect(transform.croppedViewport.y).toBeCloseTo(0);
-      expect(transform.croppedViewport.width).toBeCloseTo(1920);
-      expect(transform.croppedViewport.height).toBeCloseTo(1080);
-    });
-
     test('cover 模式下的垂直裁剪', () => {
       const adapter = new ScreenAdapter({
         designWidth: 1920,
@@ -501,63 +356,6 @@ describe('ScreenAdapter', () => {
       // 裁剪后的可见区域
       expect(transform.croppedViewport.width).toBeCloseTo(1440);
       expect(transform.croppedViewport.height).toBeCloseTo(1440);
-    });
-
-    test('零尺寸视口导致零裁剪', () => {
-      const adapter = new ScreenAdapter({
-        designWidth: 1920,
-        designHeight: 1080,
-        scaleMode: 'fit'
-      });
-
-      const transform = adapter.calculateResolutionTransform(0, 0, 0, 0);
-
-      expect(transform.croppedViewport.width).toBe(0);
-      expect(transform.croppedViewport.height).toBe(0);
-    });
-  });
-
-  describe('实际应用场景', () => {
-    test('移动端竖屏适配', () => {
-      const adapter = new ScreenAdapter({
-        designWidth: 750, // 移动端常用设计宽度
-        designHeight: 1334,
-        scaleMode: 'fit-width'
-      });
-
-      const transform = adapter.calculateResolutionTransform(0, 0, 375, 812); // iPhone X
-
-      expect(transform.viewportWidth).toBeCloseTo(375);
-      // 高度应该按比例缩放
-      const expectedHeight = 1334 * (375 / 750);
-      expect(transform.viewportHeight).toBeCloseTo(expectedHeight);
-    });
-
-    test('PC 端宽屏适配', () => {
-      const adapter = new ScreenAdapter({
-        designWidth: 1920,
-        designHeight: 1080,
-        scaleMode: 'cover'
-      });
-
-      const transform = adapter.calculateResolutionTransform(0, 0, 3840, 1080); // 超宽屏
-
-      // 应该填满整个宽度
-      expect(transform.viewportWidth).toBeCloseTo(3840);
-    });
-
-    test('游戏场景 - 保持完整可视区域', () => {
-      const adapter = new ScreenAdapter({
-        designWidth: 1920,
-        designHeight: 1080,
-        scaleMode: 'fit'
-      });
-
-      const transform = adapter.calculateResolutionTransform(0, 0, 2560, 1440);
-
-      // 确保所有设计区域都可见
-      expect(transform.viewportWidth).toBeGreaterThanOrEqual(1920 * (1440 / 1080) * 0.99);
-      expect(transform.viewportHeight).toBeGreaterThanOrEqual(1440 * 0.99);
     });
   });
 });

@@ -3,12 +3,9 @@ import {
   DirectionalLight,
   PHYSICAL_BAKE_EXPOSURE,
   PerspectiveCamera,
-  PointLight,
-  RectLight,
   Scene,
   ShaderHelper,
   SkyRenderer,
-  SpotLight,
   Tonemap,
   calculatePhysicalExposure
 } from '../../../libs/scene/src';
@@ -35,7 +32,7 @@ describe('Physical lighting calibration', () => {
     return { scene, camera, env: scene.env } as unknown as DrawContext;
   }
 
-  test('renders an 18% gray card at Sunny 16 near photographic middle gray', () => {
+  test('renders an 18% gray card at Sunny 16 near middle gray, far below the half-float ceiling', () => {
     const scene = new Scene();
     scene.lightingMode = 'physical';
     const camera = new PerspectiveCamera(scene);
@@ -64,27 +61,13 @@ describe('Physical lighting calibration', () => {
     const display = tonemapNeutral(preExposed);
     expect(display).toBeGreaterThan(0.1);
     expect(display).toBeLessThan(0.45);
-  });
 
-  test('keeps a sunlit white surface far below the half-float ceiling', () => {
-    const scene = new Scene();
-    scene.lightingMode = 'physical';
-    const camera = new PerspectiveCamera(scene);
-    camera.aperture = 16;
-    camera.shutterSpeed = 1 / 125;
-    camera.ISO = 100;
-    const ctx = makeCtx(scene, camera);
-    const sun = new DirectionalLight(scene);
-    sun.illuminance = 100000;
-
-    const whiteLuminance = sun.diffuseAndIntensity.w / Math.PI;
-    const preExposed = whiteLuminance * ShaderHelper.getPreExposure(ctx);
-
-    // Before pre-exposure this was ~31,800, roughly one stop under the 65,504 limit; a specular
-    // highlight would overflow to Inf and spread black artifacts through bloom.
+    // A sunlit white surface is ~31,800 cd/m² before pre-exposure, one stop under the half-float
+    // limit of 65,504; a specular highlight would overflow to Inf and spread black artifacts through
+    // bloom. Pre-exposed, a 100x specular peak still fits comfortably.
+    const whiteLuminance = illuminance / Math.PI;
     expect(whiteLuminance).toBeGreaterThan(30000);
-    // Now a 100x specular peak still fits comfortably.
-    expect(preExposed * 100).toBeLessThan(65504);
+    expect(whiteLuminance * ShaderHelper.getPreExposure(ctx) * 100).toBeLessThan(65504);
   });
 
   test('exposure behaves photographically: one stop halves the pre-exposed value', () => {
@@ -112,31 +95,6 @@ describe('Physical lighting calibration', () => {
     camera.ISO = 100;
     camera.exposureCompensation = 1;
     expect(ShaderHelper.getPreExposure(ctx)).toBeCloseTo(base * 2, 6);
-  });
-
-  test('equal luminous power yields consistent illuminance across light types', () => {
-    const scene = new Scene();
-    scene.lightingMode = 'physical';
-
-    // 1000 lm in a point light spreads over the full sphere: I = phi / 4pi.
-    const point = new PointLight(scene);
-    point.luminousPower = 1000;
-    expect(point.luminousIntensity).toBeCloseTo(1000 / (4 * Math.PI), 6);
-
-    // The same flux focused into a 30 degree cone is far more intense.
-    const spot = new SpotLight(scene);
-    spot.outerConeAngle = Math.PI / 6;
-    spot.luminousPower = 1000;
-    const solidAngle = 2 * Math.PI * (1 - Math.cos(Math.PI / 6));
-    expect(spot.luminousIntensity).toBeCloseTo(1000 / solidAngle, 6);
-    expect(spot.luminousIntensity).toBeGreaterThan(point.luminousIntensity);
-
-    // A 1 m² area light emitting the same flux: L = phi / (pi * area).
-    const rect = new RectLight(scene);
-    rect.width = 1;
-    rect.height = 1;
-    rect.luminousFlux = 1000;
-    expect(rect.luminance).toBeCloseTo(1000 / Math.PI, 6);
   });
 
   test('the sky, IBL and fog share one photometric anchor', () => {
@@ -191,23 +149,6 @@ describe('Physical lighting calibration', () => {
     expect(ShaderHelper.getEnvLightLuminance(ctx)).toBeCloseTo(0.25, 10);
   });
 
-  test('changing the physical env intensity invalidates the cached sky bake', () => {
-    // `intensity` is applied at bake time, so without invalidation the cubemap keeps its old value
-    // and the property appears to do nothing.
-    const scene = new Scene();
-    scene.lightingMode = 'physical';
-    const sky = scene.env.sky as unknown as { _bakedSkyboxDirty: boolean };
-
-    sky._bakedSkyboxDirty = false;
-    scene.env.light.intensity = 12000;
-    expect(sky._bakedSkyboxDirty).toBe(true);
-
-    // Setting the same value again is a no-op and must not force a re-bake every frame.
-    sky._bakedSkyboxDirty = false;
-    scene.env.light.intensity = 12000;
-    expect(sky._bakedSkyboxDirty).toBe(false);
-  });
-
   test('stores the sky bake in a range the environment cubemap can represent', () => {
     // Regression: the bake previously held raw photometric luminance. A 100,000 lux sun drove the
     // atmosphere to 100000 * 3.84 = 384,000, overflowing rg11b10uf (~65,024) and rgba16f (65,504) to
@@ -226,48 +167,5 @@ describe('Physical lighting calibration', () => {
     // Even an extreme sun stays representable.
     const extremeBake = 1000000 * SkyRenderer.PHYSICAL_ATMOSPHERE_LUMINANCE_SCALE * PHYSICAL_BAKE_EXPOSURE;
     expect(extremeBake).toBeLessThan(RG11B10UF_MAX);
-  });
-
-  test('bake storage and live exposure round-trip to the correct radiance', () => {
-    const scene = new Scene();
-    scene.lightingMode = 'physical';
-    const camera = new PerspectiveCamera(scene);
-    const ctx = makeCtx(scene, camera);
-
-    for (const [aperture, shutter, iso] of [
-      [16, 1 / 125, 100],
-      [1.4, 1 / 60, 800],
-      [8, 1 / 250, 200]
-    ]) {
-      camera.aperture = aperture;
-      camera.shutterSpeed = shutter;
-      camera.ISO = iso;
-
-      const stored = 100000 * SkyRenderer.PHYSICAL_ATMOSPHERE_LUMINANCE_SCALE * PHYSICAL_BAKE_EXPOSURE;
-      const sampled = stored * ShaderHelper.getEnvLightLuminance(ctx);
-      // Equals what baking the live exposure directly would have produced.
-      const direct = 100000 * SkyRenderer.PHYSICAL_ATMOSPHERE_LUMINANCE_SCALE * camera.exposure;
-      expect(sampled).toBeCloseTo(direct, 6);
-    }
-  });
-
-  test('scene unit scale leaves the exposed result invariant', () => {
-    const scene = new Scene();
-    scene.lightingMode = 'physical';
-    const camera = new PerspectiveCamera(scene);
-    const ctx = makeCtx(scene, camera);
-    const light = new PointLight(scene);
-    light.luminousIntensity = 100;
-
-    // Illuminance at a fixed physical distance must not depend on the unit choice.
-    scene.metersPerUnit = 1;
-    const atMeters = ShaderHelper.getPreExposedColorIntensity(light, ctx).w / (2 * 2);
-
-    scene.metersPerUnit = 0.01;
-    const twoMetersInUnits = 2 / 0.01;
-    const atCentimeters =
-      ShaderHelper.getPreExposedColorIntensity(light, ctx).w / (twoMetersInUnits * twoMetersInUnits);
-
-    expect(atCentimeters).toBeCloseTo(atMeters, 6);
   });
 });

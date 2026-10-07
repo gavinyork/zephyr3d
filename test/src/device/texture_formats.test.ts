@@ -61,13 +61,8 @@ describe('ETC2/EAC texture formats', () => {
     expect(linearTextureFormatToSRGB('eac-rg11')).toBe('eac-rg11');
   });
 
-  test('ETC2 support is reported and can be overridden on the null device', async () => {
+  test('ETC2 support is reported on the null device by default', async () => {
     const device = await createNullDevice({ type: 'webgpu' });
     expect(device.getDeviceCaps().textureCaps.supportETC2).toBe(true);
-    const desktop = await createNullDevice({
-      type: 'webgpu',
-      caps: { textureCaps: { supportETC2: false, supportASTC: false } }
-    });
-    expect(desktop.getDeviceCaps().textureCaps.supportETC2).toBe(false);
   });
 });

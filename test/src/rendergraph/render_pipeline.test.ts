@@ -32,9 +32,17 @@ function types(p: RenderPipeline): string[] {
 }
 
 describe('RenderPipeline', () => {
-  test('constructs from an ordered module list', () => {
-    const p = new RenderPipeline([mod('A'), mod('B'), mod('C')]);
+  test('constructs, appends, prepends, removes and looks up modules by type', () => {
+    const a = mod('A');
+    const p = new RenderPipeline([mod('B')]);
+    p.append(mod('C')).prepend(a);
     expect(types(p)).toEqual(['A', 'B', 'C']);
+    expect(p.has('A')).toBe(true);
+    expect(p.has('Z')).toBe(false);
+    expect(p.get('A')).toBe(a);
+    expect(p.get('Z')).toBeUndefined();
+    p.remove('B');
+    expect(types(p)).toEqual(['A', 'C']);
   });
 
   test('rejects duplicate types on construction and insertion', () => {
@@ -42,12 +50,6 @@ describe('RenderPipeline', () => {
     const p = new RenderPipeline([mod('A')]);
     expect(() => p.append(mod('A'))).toThrow(/already exists/);
     expect(() => p.insertAfter('A', mod('A'))).toThrow(/already exists/);
-  });
-
-  test('append / prepend', () => {
-    const p = new RenderPipeline([mod('B')]);
-    p.append(mod('C')).prepend(mod('A'));
-    expect(types(p)).toEqual(['A', 'B', 'C']);
   });
 
   test('insertBefore / insertAfter anchor by type', () => {
@@ -58,10 +60,12 @@ describe('RenderPipeline', () => {
     expect(types(p)).toEqual(['A', 'B', 'B2', 'C']);
   });
 
-  test('insert throws when the anchor is missing', () => {
+  test('insert, replace and remove throw when the type is missing', () => {
     const p = new RenderPipeline([mod('A')]);
     expect(() => p.insertAfter('X', mod('Y'))).toThrow(/no module with type "X"/);
     expect(() => p.insertBefore('X', mod('Y'))).toThrow(/no module with type "X"/);
+    expect(() => p.replace('X', mod('Y'))).toThrow(/no module with type "X"/);
+    expect(() => p.remove('X')).toThrow(/no module with type "X"/);
   });
 
   test('replace keeps position; allows same type; rejects colliding new type', () => {
@@ -75,27 +79,6 @@ describe('RenderPipeline', () => {
     // Renaming via replace to a fresh type is allowed.
     p.replace('B', mod('B3'));
     expect(types(p)).toEqual(['A', 'B3', 'C']);
-  });
-
-  test('replace / remove throw when the type is missing', () => {
-    const p = new RenderPipeline([mod('A')]);
-    expect(() => p.replace('X', mod('Y'))).toThrow(/no module with type "X"/);
-    expect(() => p.remove('X')).toThrow(/no module with type "X"/);
-  });
-
-  test('remove', () => {
-    const p = new RenderPipeline([mod('A'), mod('B'), mod('C')]);
-    p.remove('B');
-    expect(types(p)).toEqual(['A', 'C']);
-  });
-
-  test('has / get', () => {
-    const a = mod('A');
-    const p = new RenderPipeline([a]);
-    expect(p.has('A')).toBe(true);
-    expect(p.has('Z')).toBe(false);
-    expect(p.get('A')).toBe(a);
-    expect(p.get('Z')).toBeUndefined();
   });
 
   test('clone is independent of the source', () => {
@@ -248,15 +231,18 @@ describe('resolveModuleOrder', () => {
     expect(() => resolveModuleOrder(modules)).toThrow(/cyclic module dependency/i);
   });
 
-  test('preserves authored order when reads are already satisfied', () => {
-    const modules = [dep('PA', undefined, ['A']), dep('PB', undefined, ['B']), dep('C', ['A', 'B'])];
-    expect(order(modules)).toEqual(['PA', 'PB', 'C']);
-  });
-
-  test('stable sort uses authored index as tiebreak', () => {
-    // Two consumers of the same resource — authored order wins.
-    const modules = [dep('P', undefined, ['X']), dep('C1', ['X']), dep('C2', ['X'])];
-    expect(order(modules)).toEqual(['P', 'C1', 'C2']);
+  test('preserves authored order when reads are already satisfied, with authored index as tiebreak', () => {
+    expect(order([dep('PA', undefined, ['A']), dep('PB', undefined, ['B']), dep('C', ['A', 'B'])])).toEqual([
+      'PA',
+      'PB',
+      'C'
+    ]);
+    // Two consumers of the same resource: authored order wins.
+    expect(order([dep('P', undefined, ['X']), dep('C1', ['X']), dep('C2', ['X'])])).toEqual([
+      'P',
+      'C1',
+      'C2'
+    ]);
   });
 
   test('current read selects the nearest prior writer and preserves authored placement', () => {

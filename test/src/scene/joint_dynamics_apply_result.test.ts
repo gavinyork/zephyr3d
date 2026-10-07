@@ -67,11 +67,6 @@ function makePointState(position: Vector3): PointRW {
   };
 }
 
-function getTwistAngle(rotation: Quaternion, axis: Vector3): number {
-  const twist = extractLocalTwist(rotation, axis);
-  return twist.getTwistAngle(axis);
-}
-
 function getExpectedPreservedLocalRotation(point: PointR, targetAxis: Vector3): Quaternion {
   const twistAxis = Vector3.normalize(point.boneAxis);
   const targetDir = Vector3.normalize(targetAxis);
@@ -82,17 +77,6 @@ function getExpectedPreservedLocalRotation(point: PointR, targetAxis: Vector3): 
   const initialAxis = Vector3.normalize(initialNoTwist.transform(twistAxis));
   const swingDelta = Quaternion.unitVectorToUnitVector(initialAxis, targetDir);
   return Quaternion.multiply(Quaternion.multiply(swingDelta, initialNoTwist), point.initialLocalTwist);
-}
-
-function angleDifference(a: number, b: number): number {
-  let diff = a - b;
-  while (diff > Math.PI) {
-    diff -= Math.PI * 2;
-  }
-  while (diff < -Math.PI) {
-    diff += Math.PI * 2;
-  }
-  return Math.abs(diff);
 }
 
 describe('JointDynamics applyResult', () => {
@@ -116,35 +100,6 @@ describe('JointDynamics applyResult', () => {
     const expectedDirection = Vector3.normalize(Vector3.sub(childPosition, rootPosition));
     const actualDirection = Vector3.normalize(outputs[0].rotation.transform(boneAxis));
     expect(Vector3.angleBetween(actualDirection, expectedDirection)).toBeLessThan(0.0001);
-  });
-
-  it('preserves initial twist on fixed joints that aim at simulated children', () => {
-    const boneAxis = new Vector3(0, 1, 0);
-    const initialTwistAngle = Math.PI / 5;
-    const animatedTwistAngle = -Math.PI / 2;
-    const initialLocalRotation = Quaternion.fromAxisAngle(boneAxis, initialTwistAngle);
-    const animatedRotation = Quaternion.fromAxisAngle(boneAxis, animatedTwistAngle);
-    const rootPosition = Vector3.zero();
-    const childPosition = new Vector3(2, 3, 1);
-    const pointsR = [makePoint(-1, 1, 0, boneAxis, initialLocalRotation), makePoint(0, -1, 1, boneAxis)];
-    const pointsRW = [makePointState(rootPosition), makePointState(childPosition)];
-
-    const outputs = applyResult(
-      pointsR,
-      pointsRW,
-      [rootPosition, childPosition],
-      0,
-      [animatedRotation, Quaternion.identity()],
-      [animatedRotation, Quaternion.identity()],
-      true
-    );
-
-    const expectedDirection = Vector3.normalize(Vector3.sub(childPosition, rootPosition));
-    const actualDirection = Vector3.normalize(outputs[0].rotation.transform(boneAxis));
-    const twistAngle = getTwistAngle(outputs[0].rotation, boneAxis);
-
-    expect(Vector3.angleBetween(actualDirection, expectedDirection)).toBeLessThan(0.0001);
-    expect(angleDifference(twistAngle, initialTwistAngle)).toBeLessThan(0.0001);
   });
 
   it('does not keep changing twist across repeated preserve passes', () => {

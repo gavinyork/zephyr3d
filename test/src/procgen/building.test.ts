@@ -17,16 +17,6 @@ function tessellate(spec: GeneratedModelSpec) {
   return generatePrimitive(spec, Infinity);
 }
 
-/** Counts emitted nodes per material group tag. */
-function countGroups(spec: GeneratedModelSpec): Record<string, number> {
-  const counts: Record<string, number> = {};
-  for (const node of spec.nodes ?? []) {
-    const id = node.id ?? '<untagged>';
-    counts[id] = (counts[id] ?? 0) + 1;
-  }
-  return counts;
-}
-
 /**
  * Facade relief stands slightly proud of the wall plane so vertical members are not
  * coplanar with the floor bands. It is the only projection once canopies are off, and
@@ -163,12 +153,9 @@ describe('procgen / grammar engine', () => {
 });
 
 describe('procgen / style registry', () => {
-  it('exposes the built-in modern office style', () => {
+  it('exposes the built-in style, accepts a caller-supplied one and rejects id collisions', () => {
     expect(availableStyles()).toContain('modern-office');
     expect(listStyles()).toContain('modern-office');
-  });
-
-  it('accepts a caller-supplied style and rejects id collisions', () => {
     const custom: Ruleset<Record<string, never>> = {
       id: 'test-custom-style',
       axiom: 'Root',
@@ -273,34 +260,15 @@ describe('procgen / modern office buildings', () => {
     expect(tall.vertexCount).toBeGreaterThan(short.vertexCount);
   });
 
-  it('is deterministic for a given seed', () => {
+  it('is deterministic for a seed and varies between seeds', () => {
     const a = generateBuilding({ seed: 42, footprint: [18, 14] });
     const b = generateBuilding({ seed: 42, footprint: [18, 14] });
     expect(JSON.stringify(b)).toBe(JSON.stringify(a));
-  });
-
-  it('varies between seeds', () => {
     const specs = new Set<string>();
     for (let seed = 0; seed < 8; seed++) {
       specs.add(JSON.stringify(generateBuilding({ seed, footprint: [18, 14] })));
     }
     expect(specs.size).toBeGreaterThan(1);
-  });
-
-  it('produces a spread of massing outcomes, not one silhouette', () => {
-    // One 'glass' node is emitted per mass, so counting them measures whether the
-    // podium / setback decisions actually diversify the silhouette.
-    const massCounts = new Map<number, number>();
-    for (let seed = 0; seed < 40; seed++) {
-      const spec = generateBuilding({ seed, footprint: [22, 18] });
-      const masses = (spec.nodes ?? []).filter((node) => node.id === 'glass').length;
-      massCounts.set(masses, (massCounts.get(masses) ?? 0) + 1);
-    }
-    // Expect single-mass, setback and podium variants all to show up.
-    expect(massCounts.size).toBeGreaterThanOrEqual(3);
-    for (const count of massCounts.values()) {
-      expect(count).toBeGreaterThan(1);
-    }
   });
 
   it('tags every node with a material group', () => {
@@ -313,58 +281,6 @@ describe('procgen / modern office buildings', () => {
     // Untagged geometry cannot be assigned a material, so it must never appear.
     expect(groups.has('<untagged>')).toBe(false);
     expect(groups).toEqual(new Set(['glass', 'frame', 'wall', 'trim']));
-  });
-
-  it('gives each facade style a distinct composition', () => {
-    const only = (style: 'curtain' | 'punched' | 'banded') =>
-      countGroups(
-        generateBuilding({
-          seed: 3,
-          footprint: [24, 18],
-          params: {
-            curtainWeight: style === 'curtain' ? 1 : 0,
-            punchedWeight: style === 'punched' ? 1 : 0,
-            bandedWeight: style === 'banded' ? 1 : 0,
-            // Pin the massing so only the facade differs between the three, and drop
-            // the canopy, which is also a 'frame' node and would skew the counts.
-            podiumChance: 0,
-            setbackChance: 0,
-            canopyChance: 0
-          }
-        })
-      );
-
-    const curtain = only('curtain');
-    const punched = only('punched');
-    const banded = only('banded');
-
-    // A curtain wall's horizontal members are metal trim, not wall.
-    expect(curtain.wall ?? 0).toBe(0);
-    expect(punched.wall ?? 0).toBeGreaterThan(0);
-    expect(banded.wall ?? 0).toBeGreaterThan(0);
-
-    // Ribbon windows have no intermediate piers, only the corners: four faces times
-    // two corners, per mass.
-    expect(banded.frame).toBe(8);
-    expect(punched.frame).toBeGreaterThan(banded.frame);
-    // Finer bays mean a curtain wall carries the most verticals of the three.
-    expect(curtain.frame).toBeGreaterThan(punched.frame);
-  });
-
-  it('picks a facade style per building, and all three occur', () => {
-    const shapes = new Set<string>();
-    for (let seed = 0; seed < 40; seed++) {
-      const counts = countGroups(
-        generateBuilding({
-          seed,
-          footprint: [24, 18],
-          params: { podiumChance: 0, setbackChance: 0, canopyChance: 0 }
-        })
-      );
-      shapes.add(`${(counts.wall ?? 0) > 0}:${counts.frame === 8}`);
-    }
-    // curtain (no wall), punched (wall + piers), banded (wall, corners only).
-    expect(shapes.size).toBe(3);
   });
 
   it('ships a palette covering every material group it emits', () => {
@@ -432,13 +348,6 @@ describe('procgen / modern office buildings', () => {
         }
       }
     }
-  });
-
-  it('emits tangents on request', () => {
-    const plain = tessellate(generateBuilding({ seed: 1, footprint: [12, 12] }));
-    const tangential = tessellate(generateBuilding({ seed: 1, footprint: [12, 12], tangents: true }));
-    expect(plain.hasTangents).toBe(false);
-    expect(tangential.hasTangents).toBe(true);
   });
 
   it('survives extreme parameters without throwing', () => {

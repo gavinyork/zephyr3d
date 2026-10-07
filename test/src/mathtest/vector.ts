@@ -3,6 +3,18 @@ import { Vector3, Vector4, Quaternion, Matrix3x3, Matrix4x4, REVERSE_Z } from '@
 import { rand, randInt, randNonZero, numberEquals } from './common';
 import { Scene, SceneNode } from '@zephyr3d/scene';
 
+/** Each test runs its body this many times, drawing fresh random inputs every time. */
+const REPEAT = 20;
+
+/** Registers a test once and repeats its randomized body {@link REPEAT} times. */
+function test(name: string, fn: () => void) {
+  globalThis.test(name, () => {
+    for (let i = 0; i < REPEAT; i++) {
+      fn();
+    }
+  });
+}
+
 type VectorType = Vector2 | Vector3 | Vector4;
 
 interface VectorConstructor {

@@ -69,38 +69,22 @@ describe.each(systemFactories)('%s input pose tracking', (_name, createSystem) =
     }
   });
 
-  it('keeps an external parent pose while restoring unanimated spring joint rotations', () => {
+  // A rotation written upstream, to the chain's parent or to the spring joint
+  // itself, is the new target pose rather than something to undo.
+  it.each(['parent', 'root'] as const)('accepts a new upstream rotation on the %s', (target) => {
     const fixture = createChainFixture(createSystem);
     try {
       fixture.chain.particles[1].position.setXYZ(1, -1, 0);
       fixture.chain.particles[2].position.setXYZ(2, -2, 0);
       fixture.system.applyToNodes(1);
-      fixture.parent.rotation.set(Quaternion.fromAxisAngle(Vector3.axisPZ(), Math.PI / 2));
+      const upstream = Quaternion.fromAxisAngle(Vector3.axisPZ(), Math.PI / 2);
+      fixture[target].rotation.set(upstream);
 
       fixture.system.update(1 / 60);
 
       expect(fixture.chain.particles[1].animPosition.x).toBeCloseTo(0);
       expect(fixture.chain.particles[1].animPosition.y).toBeCloseTo(1);
-    } finally {
-      fixture.scene.dispose();
-    }
-  });
-
-  it('accepts a new upstream rotation written directly to a spring joint', () => {
-    const fixture = createChainFixture(createSystem);
-    try {
-      fixture.chain.particles[1].position.setXYZ(1, -1, 0);
-      fixture.chain.particles[2].position.setXYZ(2, -2, 0);
-      fixture.system.applyToNodes(1);
-      fixture.root.rotation.set(Quaternion.fromAxisAngle(Vector3.axisPZ(), Math.PI / 2));
-
-      fixture.system.update(1 / 60);
-
-      expect(fixture.chain.particles[1].animPosition.x).toBeCloseTo(0);
-      expect(fixture.chain.particles[1].animPosition.y).toBeCloseTo(1);
-      expect(fixture.root.rotation.equalsTo(Quaternion.fromAxisAngle(Vector3.axisPZ(), Math.PI / 2))).toBe(
-        true
-      );
+      expect(fixture[target].rotation.equalsTo(upstream)).toBe(true);
     } finally {
       fixture.scene.dispose();
     }

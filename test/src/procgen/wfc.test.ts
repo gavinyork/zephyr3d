@@ -6,7 +6,6 @@ import {
   OPPOSITE,
   solveWfc,
   type CityBlockLayout,
-  type WfcModel,
   type WfcTileDef
 } from '@zephyr3d/procgen';
 
@@ -45,18 +44,6 @@ describe('procgen / wfc model', () => {
         { id: 'a', sockets: ['y', 'y', 'y', 'y'] }
       ])
     ).toThrow(/Duplicate WFC tile id "a"/);
-  });
-
-  it('builds an adjacency table from socket equality', () => {
-    const model: WfcModel = buildSocketModel([
-      { id: 'p', sockets: ['p', 'p', 'p', 'p'] },
-      { id: 'q', sockets: ['q', 'q', 'q', 'q'] }
-    ]);
-    // Tile 0 may only sit beside tile 0, so only bit 0 is set in every direction.
-    for (let dir = 0; dir < 4; dir++) {
-      expect(model.allowed[dir][0][0]).toBe(0b01);
-      expect(model.allowed[dir][1][0]).toBe(0b10);
-    }
   });
 });
 

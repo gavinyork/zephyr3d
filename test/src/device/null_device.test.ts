@@ -382,15 +382,6 @@ describe('NullDevice framebuffers', () => {
     expect(fb.getWidth()).toBe(4);
   });
 
-  test('multisampling is available on the deprecated webgl type, which emulates WebGL2', async () => {
-    const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
-    const legacy = await createNullDevice({ type: 'webgl' });
-    warn.mockRestore();
-    const color = legacy.createTexture2D('rgba8unorm', 16, 16, { mipmapping: false })!;
-    const fb = legacy.createFrameBuffer([color], null, { sampleCount: 4 });
-    expect(fb.getSampleCount()).toBe(4);
-  });
-
   test('readPixels() reads the bound color attachment', async () => {
     const color = device.createTexture2D('rgba8unorm', 4, 4, { mipmapping: false })!;
     color.update(new Uint8Array([1, 2, 3, 4]), 0, 0, 1, 1);

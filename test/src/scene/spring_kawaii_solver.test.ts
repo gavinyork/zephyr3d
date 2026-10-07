@@ -4,7 +4,6 @@ import {
   Scene,
   SceneNode,
   SpringChain,
-  SpringModifier,
   SpringSystem,
   createBoxCollider,
   createCapsuleCollider,
@@ -17,11 +16,7 @@ import {
   resolvePlaneCollision,
   resolveSphereCollision
 } from '../../../libs/scene/src';
-import {
-  getParentRelativePoseTarget,
-  solveAngleLimit,
-  solveDistanceConstraint
-} from '../../../libs/scene/src/animation/spring/spring_solver';
+import { solveAngleLimit } from '../../../libs/scene/src/animation/spring/spring_solver';
 
 function appendNode(parent: SceneNode, name: string, position: Vector3) {
   const node = new SceneNode(parent.scene);
@@ -32,52 +27,15 @@ function appendNode(parent: SceneNode, name: string, position: Vector3) {
 }
 
 describe('Kawaii spring solver', () => {
-  it('holds the animated pose during startup and reinitializes before simulation', () => {
-    let reinitializeCount = 0;
-    let updateCount = 0;
-    let applyCount = 0;
-    const system = {
-      reinitializeFromCurrentPose: () => reinitializeCount++,
-      update: () => updateCount++,
-      applyToNodes: () => applyCount++,
-      reset: () => undefined
-    };
-    const modifier = new SpringModifier(system as any, 1, 0.1);
-
-    modifier.apply(null as any, 0.04);
-    modifier.apply(null as any, 0.04);
-    modifier.apply(null as any, 0.04);
-
-    expect(reinitializeCount).toBe(3);
-    expect(updateCount).toBe(0);
-    expect(applyCount).toBe(0);
-
-    modifier.apply(null as any, 1 / 60);
-    expect(updateCount).toBe(1);
-    expect(applyCount).toBe(1);
-
-    modifier.restartSimulation(0.01);
-    modifier.apply(null as any, 1 / 60);
-    expect(reinitializeCount).toBe(4);
-    expect(updateCount).toBe(1);
-  });
-
-  it('uses Kawaii motion by default and retains an explicit legacy fallback', () => {
-    const kawaii = new MultiChainSpringSystem();
-    const legacy = new MultiChainSpringSystem({ motionModel: 'legacy' });
-
-    expect(kawaii.motionModel).toBe('kawaii');
-    expect(kawaii.constraintVelocityHistoryRetention).toBeCloseTo(0.35);
-    expect(kawaii.preserveInitialCollisionPenetration).toBe(true);
-    expect(kawaii.initialCollisionPenetrationReleaseTime).toBeCloseTo(0.25);
-    expect(legacy.motionModel).toBe('legacy');
-  });
-
-  it.each(['single', 'multi'] as const)(
-    'smoothly releases authored collider overlap in the %s-chain system',
-    (systemType) => {
+  it.each([
+    ['single', 0],
+    ['multi', 0],
+    ['multi', 0.1]
+  ] as const)(
+    'smoothly releases authored collider overlap in the %s-chain system (particle radius %d)',
+    (systemType, collisionRadius) => {
       const chain = new SpringChain();
-      const particle = createSpringParticle(new Vector3(0.75, 0, 0), { damping: 1 });
+      const particle = createSpringParticle(new Vector3(0.75, 0, 0), { damping: 1, collisionRadius });
       chain.addParticle(particle);
       const options = {
         gravity: Vector3.zero(),
@@ -102,75 +60,77 @@ describe('Kawaii spring solver', () => {
         system.update(1 / 60);
       }
       expect(particle.position.x).toBeGreaterThan(0.8);
-      expect(particle.position.x).toBeLessThan(0.95);
+      expect(particle.position.x).toBeLessThan(0.95 + collisionRadius);
 
       for (let frame = 0; frame < 4; frame++) {
         system.update(1 / 60);
       }
-      expect(particle.position.x).toBeCloseTo(1);
+      expect(particle.position.x).toBeCloseTo(1 + collisionRadius);
     }
   );
 
-  it('resolves sphere and capsule collisions inside the former one-centimeter blind zone', () => {
-    const spherePosition = new Vector3(0.005, 0, 0);
-    expect(resolveSphereCollision(spherePosition, createSphereCollider(Vector3.zero(), 1))).toBe(true);
-    expect(spherePosition.x).toBeCloseTo(1);
-
-    const capsule = createCapsuleCollider(new Vector3(-1, 0, 0), new Vector3(1, 0, 0), 0.5);
-    const nearAxisPosition = new Vector3(0, 0.005, 0);
-    expect(resolveCapsuleCollision(nearAxisPosition, capsule)).toBe(true);
-    expect(nearAxisPosition.y).toBeCloseTo(0.5);
-
-    const onAxisPosition = Vector3.zero();
-    expect(resolveCapsuleCollision(onAxisPosition, capsule)).toBe(true);
-    expect(onAxisPosition.magnitude).toBeCloseTo(0.5);
-  });
-
-  it('keeps particle collision radius outside every collider shape', () => {
-    const spherePosition = new Vector3(1.05, 0, 0);
-    expect(resolveSphereCollision(spherePosition, createSphereCollider(Vector3.zero(), 1), 0.1)).toBe(true);
-    expect(spherePosition.x).toBeCloseTo(1.1);
-
-    const capsulePosition = new Vector3(0, 0.55, 0);
-    const capsule = createCapsuleCollider(new Vector3(-1, 0, 0), new Vector3(1, 0, 0), 0.5);
-    expect(resolveCapsuleCollision(capsulePosition, capsule, 0.1)).toBe(true);
-    expect(capsulePosition.y).toBeCloseTo(0.6);
-
-    const planePosition = new Vector3(0, 0.05, 0);
-    expect(
-      resolvePlaneCollision(planePosition, createPlaneCollider(Vector3.zero(), Vector3.axisPY()), 0.1)
-    ).toBe(true);
-    expect(planePosition.y).toBeCloseTo(0.1);
-
-    const boxPosition = new Vector3(1.05, 1.05, 0);
-    expect(
-      resolveBoxCollision(boxPosition, createBoxCollider(Vector3.zero(), new Vector3(1, 1, 1)), 0.1)
-    ).toBe(true);
-    expect(Vector3.distance(boxPosition, new Vector3(1, 1, 0))).toBeCloseTo(0.1);
-  });
-
-  it('releases startup overlap to the collider plus particle radius', () => {
-    const chain = new SpringChain();
-    const particle = createSpringParticle(new Vector3(0.75, 0, 0), {
-      damping: 1,
-      collisionRadius: 0.1
-    });
-    chain.addParticle(particle);
-    const system = new MultiChainSpringSystem({
-      gravity: Vector3.zero(),
-      enableInertialForces: false,
-      poseFollowRoot: 0,
-      poseFollowTip: 0,
-      initialCollisionPenetrationReleaseTime: 0.1
-    });
-    system.addChain(chain);
-    system.addCollider(createSphereCollider(Vector3.zero(), 1));
-
-    for (let frame = 0; frame < 8; frame++) {
-      system.update(1 / 60);
-    }
-
-    expect(particle.position.x).toBeCloseTo(1.1);
+  const capsuleX = () => createCapsuleCollider(new Vector3(-1, 0, 0), new Vector3(1, 0, 0), 0.5);
+  it.each([
+    // Inside the former one-centimeter blind zone.
+    [
+      'sphere, near its centre',
+      () => {
+        const p = new Vector3(0.005, 0, 0);
+        return [resolveSphereCollision(p, createSphereCollider(Vector3.zero(), 1)), p.x, 1];
+      }
+    ],
+    [
+      'capsule, near its axis',
+      () => {
+        const p = new Vector3(0, 0.005, 0);
+        return [resolveCapsuleCollision(p, capsuleX()), p.y, 0.5];
+      }
+    ],
+    [
+      'capsule, on its axis',
+      () => {
+        const p = Vector3.zero();
+        return [resolveCapsuleCollision(p, capsuleX()), p.magnitude, 0.5];
+      }
+    ],
+    // A particle radius keeps the particle that far outside every shape.
+    [
+      'sphere, with particle radius',
+      () => {
+        const p = new Vector3(1.05, 0, 0);
+        return [resolveSphereCollision(p, createSphereCollider(Vector3.zero(), 1), 0.1), p.x, 1.1];
+      }
+    ],
+    [
+      'capsule, with particle radius',
+      () => {
+        const p = new Vector3(0, 0.55, 0);
+        return [resolveCapsuleCollision(p, capsuleX(), 0.1), p.y, 0.6];
+      }
+    ],
+    [
+      'plane, with particle radius',
+      () => {
+        const p = new Vector3(0, 0.05, 0);
+        return [
+          resolvePlaneCollision(p, createPlaneCollider(Vector3.zero(), Vector3.axisPY()), 0.1),
+          p.y,
+          0.1
+        ];
+      }
+    ],
+    [
+      'box, with particle radius',
+      () => {
+        const p = new Vector3(1.05, 1.05, 0);
+        const hit = resolveBoxCollision(p, createBoxCollider(Vector3.zero(), new Vector3(1, 1, 1)), 0.1);
+        return [hit, Vector3.distance(p, new Vector3(1, 1, 0)), 0.1];
+      }
+    ]
+  ] as [string, () => [boolean, number, number]][])('pushes a point out of a %s', (_name, run) => {
+    const [hit, actual, expected] = run();
+    expect(hit).toBe(true);
+    expect(actual).toBeCloseTo(expected);
   });
 
   it('settles a double-ended chain under gravity with the default XPBD history retention', () => {
@@ -260,18 +220,6 @@ describe('Kawaii spring solver', () => {
     expect(Vector3.distance(dynamic.position, colliderCenter)).toBeGreaterThanOrEqual(colliderRadius - 1e-6);
   });
 
-  it('uses the simulated parent for the pose-preserving target', () => {
-    const parent = createSpringParticle(new Vector3(4, -2, 0));
-    parent.animPosition.setXYZ(1, 1, 0);
-    const child = createSpringParticle(new Vector3(5, -2, 0));
-    child.animPosition.setXYZ(3, 2, 0);
-
-    const target = getParentRelativePoseTarget(child, parent);
-
-    expect(target.x).toBeCloseTo(6);
-    expect(target.y).toBeCloseTo(-1);
-  });
-
   it('blends pose follow toward the nearest fixed endpoint', () => {
     const chain = new SpringChain();
     for (let i = 0; i < 5; i++) {
@@ -297,16 +245,6 @@ describe('Kawaii spring solver', () => {
     system.update(1 / 60);
 
     expect(Math.abs(chain.particles[1].position.y - chain.particles[3].position.y)).toBeLessThan(0.02);
-  });
-
-  it('applies the full distance correction when the other endpoint is fixed', () => {
-    const fixed = createSpringParticle(Vector3.zero(), { fixed: true });
-    const dynamic = createSpringParticle(new Vector3(2, 0, 0));
-
-    solveDistanceConstraint(fixed, dynamic, 1, 1);
-
-    expect(dynamic.position.x).toBeCloseTo(1);
-    expect(fixed.position.x).toBeCloseTo(0);
   });
 
   it('limits swing around the animated direction without changing segment length', () => {

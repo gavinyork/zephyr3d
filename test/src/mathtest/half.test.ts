@@ -9,114 +9,58 @@ const H_NEG_INF = 0xfc00;
 const H_NAN = 0x7e00; // 一个典型的 NaN（实现会保留部分 payload）
 
 describe('half2float', () => {
-  test('zero (positive and negative)', () => {
-    expect(half2float(H_POS_ZERO)).toBe(0);
+  // [half bits, expected float]
+  test.each([
+    [H_POS_ZERO, 0],
+    [H_POS_INF, Infinity],
+    [H_NEG_INF, -Infinity],
+    [0x0001, Math.pow(2, -24)], // smallest positive subnormal
+    [0x03ff, Math.pow(2, -14) * (1023 / 1024)], // largest subnormal
+    [0x0400, Math.pow(2, -14)], // smallest positive normal
+    [0x3c00, 1],
+    [0xc000, -2],
+    [0x7bff, 65504] // max finite half
+  ])('0x%s', (h, expected) => {
+    const v = half2float(h);
+    if (Number.isFinite(expected)) {
+      expect(v).toBeCloseTo(expected, expected > 1000 ? 0 : 2);
+    } else {
+      expect(v).toBe(expected);
+    }
+  });
+
+  test('negative zero and NaN', () => {
     expect(Object.is(half2float(H_NEG_ZERO), -0)).toBe(true);
-  });
-
-  test('infinities', () => {
-    expect(half2float(H_POS_INF)).toBe(Infinity);
-    expect(half2float(H_NEG_INF)).toBe(-Infinity);
-  });
-
-  test('NaN', () => {
-    const v = half2float(H_NAN);
-    expect(Number.isNaN(v)).toBe(true);
-  });
-
-  test('smallest positive subnormal (0x0001)', () => {
-    // 2^-14 * (1 / 2^10) = 2^-24
-    const v = half2float(0x0001);
-    expect(v).toBeCloseTo(Math.pow(2, -24));
-  });
-
-  test('largest subnormal (0x03ff)', () => {
-    // 2^-14 * (1023 / 1024)
-    const v = half2float(0x03ff);
-    expect(v).toBeCloseTo(Math.pow(2, -14) * (1023 / 1024));
-  });
-
-  test('smallest positive normal (0x0400)', () => {
-    // e = 1, f = 0 -> 2^-14 * 1
-    const v = half2float(0x0400);
-    expect(v).toBeCloseTo(Math.pow(2, -14));
-  });
-
-  test('1.0 (0x3c00)', () => {
-    const v = half2float(0x3c00);
-    expect(v).toBeCloseTo(1.0);
-  });
-
-  test('negative 2.0 (-2.0 -> 0xc000)', () => {
-    const v = half2float(0xc000);
-    expect(v).toBeCloseTo(-2.0);
-  });
-
-  test('max finite half (0x7bff)', () => {
-    // 最大正规半精度 (~65504)
-    const v = half2float(0x7bff);
-    expect(v).toBeCloseTo(65504, 0);
+    expect(Number.isNaN(half2float(H_NAN))).toBe(true);
   });
 });
 
 describe('float2half', () => {
-  test('zero (positive and negative)', () => {
-    expect(float2half(0)).toBe(H_POS_ZERO);
-    expect(float2half(-0)).toBe(H_NEG_ZERO);
-  });
-
-  test('infinities', () => {
-    expect(float2half(Infinity)).toBe(H_POS_INF);
-    expect(float2half(-Infinity)).toBe(H_NEG_INF);
+  // [float, expected half bits]
+  test.each([
+    [0, H_POS_ZERO],
+    [-0, H_NEG_ZERO],
+    [Infinity, H_POS_INF],
+    [-Infinity, H_NEG_INF],
+    [1, 0x3c00],
+    [-2, 0xc000],
+    [65504, 0x7bff], // largest finite half does not overflow
+    [70000, H_POS_INF], // larger values overflow to Inf
+    [-70000, H_NEG_INF],
+    [Math.pow(2, -30), H_POS_ZERO], // below the smallest subnormal underflows to 0
+    [1.0009765625, 0x3c01] // one half step above 1 is kept, not rounded away
+  ])('%s', (f, expected) => {
+    expect(float2half(f)).toBe(expected);
   });
 
   test('NaN produces a NaN half pattern (exponent all 1, fraction non-zero)', () => {
     const h = float2half(NaN);
-    expect((h & 0x7c00) === 0x7c00).toBe(true); // exponent all 1
-    expect((h & 0x03ff) !== 0).toBe(true); // fraction non-zero
-  });
-
-  test('1.0 -> 0x3c00', () => {
-    expect(float2half(1.0)).toBe(0x3c00);
-  });
-
-  test('-2.0 -> 0xc000', () => {
-    expect(float2half(-2.0)).toBe(0xc000);
-  });
-
-  test('largest finite half (~65504) 不溢出为 Inf', () => {
-    // 65504 对应 0x7bff
-    expect(float2half(65504)).toBe(0x7bff);
-  });
-
-  test('大于最大半精度的值溢出为 Inf', () => {
-    expect(float2half(70000)).toBe(H_POS_INF);
-    expect(float2half(-70000)).toBe(H_NEG_INF);
-  });
-
-  test('非常小的数 underflow 为 0', () => {
-    // 比最小 subnormal 还小
-    expect(float2half(Math.pow(2, -30))).toBe(H_POS_ZERO);
-  });
-
-  test('rounding: value near half-precision step is correctly rounded', () => {
-    // 1.0009765625 是离 1.0 最近的一个 half step (约 1 + 1/1024)
-    const half = float2half(1.0009765625);
-    expect(half).toBe(0x3c01);
+    expect((h & 0x7c00) === 0x7c00).toBe(true);
+    expect((h & 0x03ff) !== 0).toBe(true);
   });
 });
 
 describe('round-trip conversions', () => {
-  test('smallest positive subnormal round-trip', () => {
-    const x = half2float(0x0001);
-    expect(float2half(x)).toBe(0x0001);
-  });
-
-  test('largest subnormal round-trip', () => {
-    const x = half2float(0x03ff);
-    expect(float2half(x)).toBe(0x03ff);
-  });
-
   test('float -> half -> float (允许精度损失)', () => {
     const cases: number[] = [
       0,

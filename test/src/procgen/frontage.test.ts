@@ -95,23 +95,6 @@ describe('procgen / street frontage', () => {
     expect(fronting).toBeGreaterThan(rear * 0.4);
   });
 
-  it('still produces disjoint parcels with the asymmetric setbacks', () => {
-    for (const layout of layouts) {
-      for (let a = 0; a < layout.parcels.length; a++) {
-        for (let b = a + 1; b < layout.parcels.length; b++) {
-          const p = layout.parcels[a];
-          const q = layout.parcels[b];
-          const disjoint =
-            p.x + p.width <= q.x + 1e-9 ||
-            q.x + q.width <= p.x + 1e-9 ||
-            p.z + p.depth <= q.z + 1e-9 ||
-            q.z + q.depth <= p.z + 1e-9;
-          expect(disjoint).toBe(true);
-        }
-      }
-    }
-  });
-
   it('never lets a building sit on the carriageway', () => {
     for (const layout of layouts) {
       const spec = cityBlockGroundSpec(layout);

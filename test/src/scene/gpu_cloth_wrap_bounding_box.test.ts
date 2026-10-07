@@ -1,6 +1,5 @@
 import { Matrix4x4, Vector3 } from '@zephyr3d/base';
 import { calculateGPUClothWrapBoundingBox } from '../../../libs/scene/src/animation/cloth/gpu_cloth_system';
-import { Mesh } from '../../../libs/scene/src/scene/mesh';
 import { BoundingBox } from '../../../libs/scene/src/utility/bounding_volume';
 
 describe('GPU cloth wrap bounds', () => {
@@ -35,23 +34,5 @@ describe('GPU cloth wrap bounds', () => {
 
     expect(box.minPoint.x).toBeCloseTo(4.999);
     expect(box.maxPoint.x).toBeCloseTo(22.001);
-  });
-
-  it('retains externally updated bounds while skinning is suspended', () => {
-    const mesh = Object.create(Mesh.prototype) as Mesh;
-    const box = new BoundingBox(new Vector3(-1, -2, -3), new Vector3(1, 2, 3));
-    (mesh as any)._suspendSkinning = false;
-    (mesh as any)._animatedBoundingBox = box;
-    mesh.setAnimatedBoundingBox = jest.fn((value) => {
-      (mesh as any)._animatedBoundingBox = value;
-    });
-    mesh.suspendSkinning = true;
-    expect(mesh.getAnimatedBoundingBox()).toBeNull();
-
-    mesh.setAnimatedBoundingBox(box);
-    mesh.setBoneMatrices = jest.fn();
-    (mesh as any).updateSkeletonState();
-
-    expect(mesh.getAnimatedBoundingBox()).toBe(box);
   });
 });

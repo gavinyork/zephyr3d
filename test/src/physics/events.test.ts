@@ -1,6 +1,5 @@
 import { Quaternion, Vector3 } from '@zephyr3d/base';
-import { MemoryFS } from '@zephyr3d/base';
-import { ResourceManager, Scene, SceneNode } from '@zephyr3d/scene';
+import { Scene, SceneNode } from '@zephyr3d/scene';
 import * as RAPIER from '@dimforge/rapier3d-simd-compat';
 import { Collider, type ColliderShape, type NodePhysics, RigidBody } from '@zephyr3d/scene';
 import type { PhysicsSimulation } from '@zephyr3d/physics';
@@ -452,25 +451,5 @@ describe('rigid body axis locks', () => {
     body.setLinearVelocity(new Vector3(2, 0, 0));
     run(world, 1);
     expect(node.getWorldPosition().x).toBeCloseTo(2, 2);
-  });
-
-  it('round-trips layer and locks through serialization', async () => {
-    const scene = new Scene();
-    const manager = new ResourceManager(new MemoryFS());
-    const node = new SceneNode(scene);
-    const body = new RigidBody();
-    body.lockRotationX = true;
-    body.lockTranslationZ = true;
-    addPhysics(node, body);
-    const collider = new Collider();
-    collider.layer = 7;
-    addPhysics(node, collider);
-    const serialized = await manager.serializeObject(node);
-    const restored = (await manager.deserializeObject<SceneNode>(new SceneNode(scene), serialized))!;
-    const rb = getPhysics(restored, RigidBody)!;
-    expect(rb.lockRotationX).toBe(true);
-    expect(rb.lockRotationY).toBe(false);
-    expect(rb.lockTranslationZ).toBe(true);
-    expect(getPhysics(restored, Collider)!.layer).toBe(7);
   });
 });

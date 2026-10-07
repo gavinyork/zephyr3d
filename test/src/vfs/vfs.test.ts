@@ -66,17 +66,18 @@ async function createGlobTestStructure(fs: VFS) {
 
 // Generate a full test suite for each VFS implementation
 describe.each(VFSTypes)('%s Tests', (vfsType) => {
+  // Every group gets a fresh file system, wiped afterwards.
+  let fs: VFS;
+
+  beforeEach(() => {
+    fs = createVFS(vfsType);
+  });
+
+  afterEach(async () => {
+    await fs.wipe();
+  });
+
   describe('basic file operations', () => {
-    let fs: VFS;
-
-    beforeEach(() => {
-      fs = createVFS(vfsType);
-    });
-
-    afterEach(async () => {
-      await fs.wipe();
-    });
-
     test('writes and reads files', async () => {
       await fs.writeFile('/test.txt', 'Hello World');
       const content = await fs.readFile('/test.txt', { encoding: 'utf8' });
@@ -91,16 +92,6 @@ describe.each(VFSTypes)('%s Tests', (vfsType) => {
   });
 
   describe('directory operations', () => {
-    let fs: VFS;
-
-    beforeEach(() => {
-      fs = createVFS(vfsType);
-    });
-
-    afterEach(async () => {
-      await fs.wipe();
-    });
-
     test('creates directories', async () => {
       await fs.makeDirectory('/testdir');
       expect(await fs.exists('/testdir')).toBe(true);
@@ -157,16 +148,6 @@ describe.each(VFSTypes)('%s Tests', (vfsType) => {
   });
 
   describe('file copy', () => {
-    let fs: VFS;
-
-    beforeEach(() => {
-      fs = createVFS(vfsType);
-    });
-
-    afterEach(async () => {
-      await fs.wipe();
-    });
-
     test('copies files', async () => {
       await fs.writeFile('/source.txt', 'original content');
       await fs.copyFile('/source.txt', '/copy.txt');
@@ -178,16 +159,6 @@ describe.each(VFSTypes)('%s Tests', (vfsType) => {
   });
 
   describe('error handling', () => {
-    let fs: VFS;
-
-    beforeEach(() => {
-      fs = createVFS(vfsType);
-    });
-
-    afterEach(async () => {
-      await fs.wipe();
-    });
-
     test('throws when reading a missing file', async () => {
       await expect(fs.readFile('/nonexistent.txt')).rejects.toThrow(VFSError);
     });
@@ -199,16 +170,6 @@ describe.each(VFSTypes)('%s Tests', (vfsType) => {
   });
 
   describe('binary data', () => {
-    let fs: VFS;
-
-    beforeEach(() => {
-      fs = createVFS(vfsType);
-    });
-
-    afterEach(async () => {
-      await fs.wipe();
-    });
-
     test('reads and writes binary data', async () => {
       const binaryData = new Uint8Array([1, 2, 3, 4, 5]);
       await fs.writeFile('/binary.dat', binaryData.buffer);
@@ -235,16 +196,6 @@ describe.each(VFSTypes)('%s Tests', (vfsType) => {
   });
 
   describe('file moves', () => {
-    let fs: VFS;
-
-    beforeEach(() => {
-      fs = createVFS(vfsType);
-    });
-
-    afterEach(async () => {
-      await fs.wipe();
-    });
-
     test('renames files', async () => {
       await fs.writeFile('/source.txt', 'Hello World');
       await fs.move('/source.txt', '/renamed.txt');
@@ -288,15 +239,8 @@ describe.each(VFSTypes)('%s Tests', (vfsType) => {
   });
 
   describe('glob', () => {
-    let fs: VFS;
-
     beforeEach(async () => {
-      fs = createVFS(vfsType);
       await createGlobTestStructure(fs);
-    });
-
-    afterEach(async () => {
-      await fs.wipe();
     });
 
     test('* matches files in the current directory', async () => {
@@ -322,16 +266,6 @@ describe.each(VFSTypes)('%s Tests', (vfsType) => {
   });
 
   describe('working directory (CWD)', () => {
-    let fs: VFS;
-
-    beforeEach(() => {
-      fs = createVFS(vfsType);
-    });
-
-    afterEach(async () => {
-      await fs.wipe();
-    });
-
     test('defaults to root', () => {
       expect(fs.getCwd()).toBe('/');
     });
@@ -368,16 +302,6 @@ describe.each(VFSTypes)('%s Tests', (vfsType) => {
   });
 
   describe('stat', () => {
-    let fs: VFS;
-
-    beforeEach(() => {
-      fs = createVFS(vfsType);
-    });
-
-    afterEach(async () => {
-      await fs.wipe();
-    });
-
     test('returns file stats', async () => {
       await fs.writeFile('/file.txt', 'content');
       const stat = await fs.stat('/file.txt');
