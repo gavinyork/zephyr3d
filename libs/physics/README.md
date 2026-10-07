@@ -1,17 +1,17 @@
-# @zephyr3d/imgui
+# @zephyr3d/physics
 
 > Part of [Zephyr3D](https://github.com/gavinyork/zephyr3d) — bringing advanced real-time rendering techniques to the browser.
 > A WebGPU-first TypeScript engine with skin, hair, water and terrain rendering, a single-source
 > shader system, and a visual editor.
 
-[Dear ImGui](https://github.com/ocornut/imgui) bindings for Zephyr3D, rendered through the engine's
-own device layer on both WebGPU and WebGL2. Useful for debug panels, tweaking parameters at
-runtime, and building tool UI. The Zephyr3D editor uses it for its interface.
+Rigid-body physics for Zephyr3D. It defines the physics API used by the engine and the editor,
+while the actual simulation is provided by a replaceable physics engine package such as
+[`@zephyr3d/physics-rapier`](https://www.npmjs.com/package/@zephyr3d/physics-rapier).
 
 ## Installation
 
 ```bash
-npm install --save @zephyr3d/imgui
+npm install --save @zephyr3d/physics @zephyr3d/physics-rapier
 ```
 
 ## Links

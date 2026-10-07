@@ -1,46 +1,46 @@
 # @zephyr3d/base
 
-Zephyr3d is a set of API for 3D rendering within the browser. 
+> Part of [Zephyr3D](https://github.com/gavinyork/zephyr3d) — bringing advanced real-time rendering techniques to the browser.
+> A WebGPU-first TypeScript engine with skin, hair, water and terrain rendering, a single-source
+> shader system, and a visual editor.
 
-Zephyr3d is released as ES6 modules and requires npm for installation. It is designed to be used in conjunction with front-end build tools such as Webpack or Vite for development.
+The foundation library shared by every other Zephyr3D package: vectors, matrices, quaternions and
+geometry helpers, the virtual file system (VFS), events, reference counting, and the depth
+convention constants used across the engine.
+
+It has no dependency on a graphics device, so you can also use it on its own, in workers or under
+Node.js.
 
 ## Installation
 
-- @zephyr3d/base
+```bash
+npm install --save @zephyr3d/base
+```
 
-  The basic module includes a math library and content commonly used in other modules.
+## Example
 
-  ```npm install --save @zephyr3d/base```
+```ts
+import { Vector3, Quaternion } from '@zephyr3d/base';
 
-- @zephyr3d/device
+const up = Vector3.axisPY();
+const rotation = Quaternion.fromAxisAngle(up, Math.PI / 2);
+const v = rotation.transform(new Vector3(1, 0, 0));
+```
 
-  Includes the basic definitions and abstract interfaces of the rendering API.
+If you write custom materials or render passes, use the depth constants exported here
+(`DEPTH_CLEAR_VALUE`, `DEPTH_COMPARE_DEFAULT`, ...) instead of hard-coding 0 or 1 — the engine uses
+a [reverse-Z depth convention](https://zephyr3d.org/doc/en/reverse-z.html) by default.
 
-  ```npm install --save @zephyr3d/device```
+## Links
 
-- @zephyr3d/backend-webgl
+- [Documentation](https://zephyr3d.org/doc/)
+- [Demos](https://zephyr3d.org/en/demos.html)
+- [Online editor](https://zephyr3d.org/editor/)
+- [API reference](https://zephyr3d.org/doc/api/)
+- [GitHub](https://github.com/gavinyork/zephyr3d)
 
-  WebGL backend, WebGL/WebGL2 rendering.
+Zephyr3D has not reached 1.0 yet and APIs may change between minor versions, so pin your versions.
 
-  ```npm install --save @zephyr3d/backend-webgl```
+## License
 
-- @zephyr3d/backend-webgpu
-
-  WebGPU backend.
-
-  ```npm install --save @zephyr3d/backend-webgpu```
-
-- @zephyr3d/scene
-
-  The SceneAPI module, built on top of the DeviceAPI module, facilitates rapid development of rendering projects.
-  
-  ```npm install --save @zephyr3d/scene```
-
-- @zephyr3d/imgui
-
-  To render a GUI, you can install the ImGui binding module.
-
-  ```npm install --save @zephyr3d/imgui```
-
-
-
+MIT

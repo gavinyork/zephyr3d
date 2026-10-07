@@ -2,7 +2,7 @@
   "name": "@zephyr3d/base",
   "version": "0.2.10",
   "author": "gyk",
-  "description": "Base library for zephyr3d",
+  "description": "Math, virtual file system, events and reference counting for the Zephyr3D WebGPU/WebGL2 rendering engine",
   "homepage": "https://github.com/gavinyork/zephyr3d#readme",
   "type": "module",
   "main": "./dist/index.js",
@@ -29,28 +29,24 @@
     "node": ">=16.18.0"
   },
   "keywords": [
-    "javascript",
-    "3d",
-    "rendering",
-    "engine",
-    "webgl",
-    "webgpu",
-    "canvas",
     "zephyr3d",
-    "device"
+    "3d",
+    "webgpu",
+    "webgl2",
+    "rendering",
+    "rendering-engine",
+    "typescript",
+    "math",
+    "vector",
+    "matrix",
+    "quaternion",
+    "vfs"
   ],
   "license": "MIT",
   "bugs": {
     "url": "https://github.com/gavinyork/zephyr3d/issues"
   },
   "devDependencies": {
-    
-    
-    
-    
-    
-    
-    
     "@babel/core": "^7.20.12",
     "@babel/preset-env": "^7.20.2",
     "@rollup/plugin-node-resolve": "~16.0.0",

@@ -1,7 +1,7 @@
 {
   "name": "@zephyr3d/backend-webgpu",
   "version": "0.1.21",
-  "description": "WebGPU device backend of zephyr3d",
+  "description": "WebGPU backend for Zephyr3D, with the full feature set including compute shaders",
   "homepage": "https://github.com/gavinyork/zephyr3d#readme",
   "type": "module",
   "main": "./dist/index.js",
@@ -25,15 +25,16 @@
     "build": "cross-env NODE_OPTIONS=--max_old_space_size=8192 rollup -c --silent"
   },
   "keywords": [
-    "javascript",
-    "3d",
-    "rendering",
-    "engine",
-    "webgl",
-    "webgpu",
-    "canvas",
     "zephyr3d",
-    "device"
+    "3d",
+    "webgpu",
+    "webgl2",
+    "rendering",
+    "rendering-engine",
+    "typescript",
+    "wgsl",
+    "compute-shader",
+    "backend"
   ],
   "license": "MIT",
   "bugs": {

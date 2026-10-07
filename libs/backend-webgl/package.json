@@ -1,7 +1,7 @@
 {
   "name": "@zephyr3d/backend-webgl",
   "version": "0.1.18",
-  "description": "The WebGL device backend of zephyr3d",
+  "description": "WebGL2 backend for Zephyr3D, used as the fallback when WebGPU is unavailable",
   "homepage": "https://github.com/gavinyork/zephyr3d#readme",
   "type": "module",
   "main": "./dist/index.js",
@@ -25,15 +25,15 @@
     "build": "cross-env NODE_OPTIONS=--max_old_space_size=8192 rollup -c --silent"
   },
   "keywords": [
-    "javascript",
-    "3d",
-    "rendering",
-    "engine",
-    "webgl",
-    "webgpu",
-    "canvas",
     "zephyr3d",
-    "typescript"
+    "3d",
+    "webgpu",
+    "webgl2",
+    "rendering",
+    "rendering-engine",
+    "typescript",
+    "glsl",
+    "backend"
   ],
   "license": "MIT",
   "bugs": {

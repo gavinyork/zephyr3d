@@ -1,7 +1,7 @@
 {
   "name": "@zephyr3d/imgui",
   "version": "0.2.8",
-  "description": "imgui binding for zephyr3d",
+  "description": "Dear ImGui bindings for Zephyr3D, rendered on WebGPU and WebGL2",
   "homepage": "https://github.com/gavinyork/zephyr3d#readme",
   "type": "module",
   "main": "./dist/index.js",
@@ -25,15 +25,17 @@
     "build": "cross-env NODE_OPTIONS=--max_old_space_size=8192 rollup -c --silent"
   },
   "keywords": [
-    "javascript",
-    "3d",
-    "rendering",
-    "engine",
-    "webgl",
-    "webgpu",
-    "canvas",
     "zephyr3d",
-    "device"
+    "3d",
+    "webgpu",
+    "webgl2",
+    "rendering",
+    "rendering-engine",
+    "typescript",
+    "imgui",
+    "dear-imgui",
+    "gui",
+    "debug-ui"
   ],
   "license": "MIT",
   "bugs": {

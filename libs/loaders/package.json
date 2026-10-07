@@ -1,7 +1,7 @@
 {
   "name": "@zephyr3d/loaders",
   "version": "0.1.6",
-  "description": "Loaders for zephyr3d",
+  "description": "glTF/GLB, FBX, Alembic and hair curve importers for the Zephyr3D rendering engine",
   "homepage": "https://github.com/gavinyork/zephyr3d#readme",
   "type": "module",
   "main": "./dist/index.js",
@@ -27,15 +27,21 @@
     "build": "cross-env NODE_OPTIONS=--max_old_space_size=8192 rollup -c --silent"
   },
   "keywords": [
-    "javascript",
-    "3d",
-    "rendering",
-    "engine",
-    "webgl",
-    "webgpu",
-    "canvas",
     "zephyr3d",
-    "device"
+    "3d",
+    "webgpu",
+    "webgl2",
+    "rendering",
+    "rendering-engine",
+    "typescript",
+    "gltf",
+    "glb",
+    "fbx",
+    "alembic",
+    "draco",
+    "meshopt",
+    "loader",
+    "importer"
   ],
   "license": "MIT",
   "bugs": {

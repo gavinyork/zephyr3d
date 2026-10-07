@@ -2,7 +2,10 @@
 
   ![](https://cdn.zephyr3d.org/doc/assets/images/logo_theme.svg)
 
-> A modern TypeScript rendering engine for the web — one codebase, WebGL / WebGL2 / WebGPU
+### Bringing advanced real-time rendering techniques to the browser.
+
+A WebGPU-first TypeScript engine with skin, hair, water and terrain rendering,<br/>
+a single-source shader system, and a visual editor.
 
 [Documentation](https://zephyr3d.org/doc/) &nbsp;|&nbsp; [Demos](https://zephyr3d.org/en/demos.html) &nbsp;|&nbsp; [Online Editor](https://zephyr3d.org/editor/) &nbsp;|&nbsp; [API Reference](https://zephyr3d.org/doc/api/)
 
@@ -20,19 +23,6 @@
 </div>
 
 ---
-
-## What is Zephyr3D
-
-Zephyr3D is a 3D rendering engine for the browser, written in TypeScript. It gives you two
-levels to work at, and a visual editor on top of both:
-
-- **Device API** — a graphics abstraction over WebGL, WebGL2 and WebGPU, including a shader
-  system where you write shaders in TypeScript and the engine generates GLSL or WGSL per backend.
-- **Scene API** — a complete renderer built on the Device API: scene graph, PBR materials,
-  clustered lighting, shadows, character rendering, terrain, water, animation and post-processing,
-  organized behind a render graph.
-- **Editor** — a browser-based visual editor, plus an Electron desktop build with local projects
-  and an embedded MCP server for agent-driven automation.
 
 <div align="center">
 
@@ -88,10 +78,11 @@ levels to work at, and a visual editor on top of both:
 ## Quick start
 
 ```bash
-npm install --save @zephyr3d/base @zephyr3d/scene @zephyr3d/backend-webgl @zephyr3d/backend-webgpu
+npm install --save @zephyr3d/base @zephyr3d/scene @zephyr3d/backend-webgpu @zephyr3d/backend-webgl
 ```
 
-A lit sphere you can orbit around:
+A lit sphere you can orbit around. It runs on WebGPU when the browser supports it and falls
+back to WebGL2 otherwise:
 
 ```ts
 import { Vector3, Vector4 } from '@zephyr3d/base';
@@ -100,10 +91,11 @@ import {
   OrbitCameraController, PerspectiveCamera, SphereShape,
   DirectionalLight, getInput, getEngine
 } from '@zephyr3d/scene';
+import { backendWebGPU } from '@zephyr3d/backend-webgpu';
 import { backendWebGL2 } from '@zephyr3d/backend-webgl';
 
 const myApp = new Application({
-  backend: backendWebGL2,
+  backend: (await backendWebGPU.supported()) ? backendWebGPU : backendWebGL2,
   canvas: document.querySelector('#my-canvas')
 });
 
@@ -126,72 +118,65 @@ myApp.ready().then(function () {
 });
 ```
 
-Real projects usually prefer WebGPU and fall back to WebGL — see
-[Basic Framework](https://zephyr3d.org/doc/en/scene-basic.html) for backend selection, the HTML
-scaffold and what each step does. Which packages you actually need depends on your case;
+[Basic Framework](https://zephyr3d.org/doc/en/scene-basic.html) walks through the HTML scaffold and
+what each step does. Which packages you actually need depends on your case;
 [Installation](https://zephyr3d.org/doc/en/installation.html) has the breakdown.
 
 ---
 
-## Features
+## Rendering techniques
 
-**Rendering pipeline**
-Forward+ pipeline organized as a render graph with automatic resource pooling and history
-buffers for temporal effects. Clustered lighting, Hi-Z, depth prepass,
-[GPU picking](https://zephyr3d.org/doc/en/picking.html),
-[geometry instancing](https://zephyr3d.org/doc/en/instancing-intro.html), render bundles,
-[multi-view rendering](https://zephyr3d.org/doc/en/multi-views.html).
+Most of the engine's depth goes into a few areas that are usually hard to get on the web.
 
-**Materials and lighting**
-PBR (metallic-roughness and specular-glossiness), [image-based
-lighting](https://zephyr3d.org/doc/en/lighting-intro.html), physical lighting units,
-Lambert/Blinn/Unlit, MToon for stylized shading, and a [mixin-based
-system](https://zephyr3d.org/doc/en/user-material.html) for custom materials.
-[Material blueprints](https://zephyr3d.org/doc/en/editor/material-blueprint.html) author materials
-as node graphs in the editor.
+**Characters**
+Skin with subsurface scattering and transmission, an eye material with socket occlusion, and hair
+with Kajiya-Kay and Marschner shading, expanded into strands on the GPU and simulated in compute
+shaders. MToon and VRM support for stylized characters.
 
-**Character rendering**
-Skin with subsurface scattering profiles, eye material with socket occlusion, and hair as both
-Kajiya-Kay and Marschner models with strand-level geometry expanded on the GPU.
+**Natural environments**
+[Ocean water](https://zephyr3d.org/doc/en/water.html) driven by FFT, Gerstner or FBM waves, with
+caustics, refraction and interaction with floating objects.
+[Clipmap terrain](https://zephyr3d.org/doc/en/terrain-runtime.html) with runtime texturing,
+virtual texturing and grass layers. [Atmospheric sky](https://zephyr3d.org/doc/en/sky.html) and
+height fog.
 
-**[Shadows](https://zephyr3d.org/doc/en/shadow-intro.html)**
-PCF (several variants), PCSS, ESM, VSM, SSM and DOM shadows, with cascaded shadow maps and
-receiver bias control. Pick per light based on the quality/cost tradeoff you want.
+**[Shadows](https://zephyr3d.org/doc/en/shadow-intro.html) and [transparency](https://zephyr3d.org/doc/en/oit.html)**
+PCF (several variants), PCSS, ESM, VSM, SSM and DOM shadows, with cascaded shadow maps and contact
+shadows — pick per light based on the quality/cost tradeoff you want. Three order-independent
+transparency backends: A-buffer (WebGPU), dual depth peeling, and weighted blended.
 
-**[Post-processing](https://zephyr3d.org/doc/en/posteffect-intro.html)**
-TAA, SSGI, SSR, SSAO, bloom, motion blur, FXAA, tonemapping, color grading, and separate
-subsurface-scattering passes for skin.
+**Lighting and [post-processing](https://zephyr3d.org/doc/en/posteffect-intro.html)**
+PBR materials (metallic-roughness and specular-glossiness) with
+[image-based lighting](https://zephyr3d.org/doc/en/lighting-intro.html) and physical lighting
+units, clustered lighting for hundreds of dynamic lights, and rect area lights. TAA, SSGI, SSR,
+SSAO, bloom, motion blur, tonemapping and color grading.
 
-**[Transparency](https://zephyr3d.org/doc/en/oit.html)**
-Three order-independent transparency backends: A-buffer (WebGPU), dual depth peeling, and
-weighted blended.
+### Also in the box
 
-**Terrain, sky and water**
-[Clipmap terrain](https://zephyr3d.org/doc/en/terrain-runtime.html) with runtime texturing and
-grass layers, [atmospheric sky](https://zephyr3d.org/doc/en/sky.html), and
-[ocean water](https://zephyr3d.org/doc/en/water.html) driven by FFT, Gerstner or FBM wave
-generators.
-
-**[Animation and simulation](https://zephyr3d.org/doc/en/animation-intro.html)**
-Skeletal and keyframe animation with blending, masks and an action controller.
-[Inverse kinematics](https://zephyr3d.org/doc/en/animation-ik.html) (CCD, FABRIK, two-bone),
-[joint dynamics](https://zephyr3d.org/doc/en/animation-joint-dynamics.html), spring chains, GPU
-cloth, GPU hair simulation,
-[morph targets](https://zephyr3d.org/doc/en/animation-morph-target.html) and geometry caches.
-
-**Asset pipeline**
-glTF/GLB, FBX, Alembic and hair curve
-[importers](https://zephyr3d.org/doc/en/asset-loading.html), a
-[prefab system](https://zephyr3d.org/doc/en/serialization.html), [virtual file
-system](https://zephyr3d.org/doc/en/vfs.html), and
-[reference-counted resources](https://zephyr3d.org/doc/en/lifetime.html).
+- **Pipeline** — Forward+ renderer organized as a render graph with automatic resource pooling and
+  history buffers. Hi-Z, depth prepass, [GPU picking](https://zephyr3d.org/doc/en/picking.html),
+  [instancing](https://zephyr3d.org/doc/en/instancing-intro.html) with GPU culling, mesh LOD,
+  render bundles, [multi-view rendering](https://zephyr3d.org/doc/en/multi-views.html).
+- **Materials** — Lambert/Blinn/Unlit, a [mixin-based system](https://zephyr3d.org/doc/en/user-material.html)
+  for custom materials, and [material blueprints](https://zephyr3d.org/doc/en/editor/material-blueprint.html)
+  authored as node graphs in the editor.
+- **[Animation and simulation](https://zephyr3d.org/doc/en/animation-intro.html)** — skeletal and
+  keyframe animation with blending, masks and an action controller;
+  [inverse kinematics](https://zephyr3d.org/doc/en/animation-ik.html) (CCD, FABRIK, two-bone),
+  [joint dynamics](https://zephyr3d.org/doc/en/animation-joint-dynamics.html), spring chains, GPU
+  cloth, [morph targets](https://zephyr3d.org/doc/en/animation-morph-target.html) and geometry caches.
+- **Assets** — glTF/GLB, FBX, Alembic and hair curve
+  [importers](https://zephyr3d.org/doc/en/asset-loading.html), KTX2 texture compression, a
+  [prefab system](https://zephyr3d.org/doc/en/serialization.html), a
+  [virtual file system](https://zephyr3d.org/doc/en/vfs.html), and
+  [reference-counted resources](https://zephyr3d.org/doc/en/lifetime.html).
 
 The [documentation](https://zephyr3d.org/doc/) covers these topic by topic — when to use each one,
 how to tune it, and its backend limitations — rather than just listing properties.
 
 ---
 
-## Shaders in TypeScript
+## One shader source, two backends
 
 Rather than maintaining parallel GLSL and WGSL sources, you describe the shader once in
 TypeScript:
@@ -223,16 +208,16 @@ const program = device.buildRenderProgram({
 });
 ```
 
-From this single source the engine emits WebGL2 GLSL (std140 UBOs, explicit outputs), WGSL, and the matching WebGPU bind group layouts
-with computed buffer layouts. Bindings and shader code stay in sync, and you avoid hand-written
-variants that drift apart.
+From this single source the engine emits WGSL and WebGL2 GLSL (std140 UBOs, explicit outputs),
+together with the matching WebGPU bind group layouts and computed buffer layouts. Bindings and
+shader code stay in sync, and you avoid hand-written variants that drift apart.
 
 The [Writing Shaders](https://zephyr3d.org/doc/en/shader.html) guide shows the generated output
 side by side for each backend.
 
 ---
 
-## Editor
+## A visual editor built on the engine
 
 <div align="center">
 
@@ -245,18 +230,37 @@ side by side for each backend.
 
 </div>
 
-The editor is itself built on the Scene and Device APIs. It covers scene editing, the content
-browser, node-graph material blueprints, terrain sculpting and texturing, animation editing,
-TypeScript scripting bound to scene entities, and a plugin API for custom tools and panels.
+The editor is itself built on the Scene and Device APIs, so what you see in it is what the engine
+renders. It covers scene editing, the content browser, node-graph material blueprints, terrain
+sculpting and texturing, animation editing, TypeScript scripting bound to scene entities, and a
+plugin API for custom tools and panels.
 
 The **desktop build** (Electron) adds local project folders with persistent storage, an embedded
-MCP server so AI agents can drive the editor directly, and a built-in LLM assistant. API keys are
-stored locally, encrypted at rest.
+MCP server that lets AI agents and external tools drive the editor, and a built-in LLM assistant.
+API keys are stored locally, encrypted at rest.
 
 Editor documentation: [overview](https://zephyr3d.org/doc/en/editor/overview.html) ·
 [quick start](https://zephyr3d.org/doc/en/editor/getting-started.html) ·
 [desktop editor](https://zephyr3d.org/doc/en/editor/desktop.html)
 
+---
+
+## Is it a good fit?
+
+**Zephyr3D is a good fit if you are**
+
+- building a web project that needs character, water or terrain rendering beyond what
+  general-purpose libraries offer out of the box;
+- building custom tools or an in-house editor, and want an engine whose source you can follow
+  end to end;
+- doing web rendering research, or learning how a complete engine is put together.
+
+**It may not be the right choice yet if**
+
+- you depend on a large third-party ecosystem of plugins, loaders and community examples;
+- your scenes rely on bounce light indoors — there is no baked or probe-based global illumination
+  yet, only screen-space GI. Probe-based GI is planned after 1.0;
+- you need long-term API stability guarantees today (see [Status](#status)).
 ---
 
 ## Support
@@ -298,11 +302,13 @@ The engine is split so you install only what you use. Packages are versioned ind
 |---|---|
 | [`@zephyr3d/base`](https://www.npmjs.com/package/@zephyr3d/base) | Math, virtual file system, events, reference counting |
 | [`@zephyr3d/device`](https://www.npmjs.com/package/@zephyr3d/device) | Graphics abstraction, shader generator, resource binding |
-| [`@zephyr3d/backend-webgl`](https://www.npmjs.com/package/@zephyr3d/backend-webgl) | WebGL and WebGL2 backends |
+| [`@zephyr3d/backend-webgl`](https://www.npmjs.com/package/@zephyr3d/backend-webgl) | WebGL2 backend |
 | [`@zephyr3d/backend-webgpu`](https://www.npmjs.com/package/@zephyr3d/backend-webgpu) | WebGPU backend |
 | [`@zephyr3d/scene`](https://www.npmjs.com/package/@zephyr3d/scene) | Scene graph, materials, lighting, shadows, animation, post FX |
 | [`@zephyr3d/loaders`](https://www.npmjs.com/package/@zephyr3d/loaders) | glTF/GLB, FBX, Alembic, hair curve importers |
 | [`@zephyr3d/imgui`](https://www.npmjs.com/package/@zephyr3d/imgui) | ImGui bindings for debug panels and tool UI |
+| [`@zephyr3d/modelgen`](https://www.npmjs.com/package/@zephyr3d/modelgen) | Dependency-free procedural mesh generation |
+| [`@zephyr3d/procgen`](https://www.npmjs.com/package/@zephyr3d/procgen) | Procedural scene generation (shape grammar, wave function collapse) |
 | [`@zephyr3d/editor`](https://www.npmjs.com/package/@zephyr3d/editor) | Visual editor, desktop shell, plugin API types |
 
 ---
@@ -348,9 +354,9 @@ Actively developed, maintained by one person. The engine is well past prototype 
 own editor and a set of demos — but it has not reached 1.0 and APIs still change between minor
 versions. Pin your versions.
 
-It suits you if you are building custom tools or in-house editors, doing web rendering research,
-or want to read a complete engine end to end. If you need long-term API stability guarantees
-today, that is not something a project at this stage can promise.
+Every change runs through unit tests and a visual regression suite that renders reference scenes
+on both WebGPU and WebGL2 in CI. The 1.0 release will mark a stable core API with a documented
+deprecation policy; until then, long-term API stability is not something this project can promise.
 
 Questions and design discussions are best raised in
 [Discussions](https://github.com/gavinyork/zephyr3d/discussions); bugs and confirmed feature

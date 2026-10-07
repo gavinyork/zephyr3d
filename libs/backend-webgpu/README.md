@@ -1,46 +1,47 @@
 # @zephyr3d/backend-webgpu
 
-Zephyr3d is a set of API for 3D rendering within the browser. 
+> Part of [Zephyr3D](https://github.com/gavinyork/zephyr3d) — bringing advanced real-time rendering techniques to the browser.
+> A WebGPU-first TypeScript engine with skin, hair, water and terrain rendering, a single-source
+> shader system, and a visual editor.
 
-Zephyr3d is released as ES6 modules and requires npm for installation. It is designed to be used in conjunction with front-end build tools such as Webpack or Vite for development.
+The WebGPU backend for Zephyr3D. This is the primary backend: it runs the full feature set,
+including compute shaders, which are required for A-buffer order-independent transparency, DOM
+shadows, GPU hair and cloth simulation, and the terrain shading cache.
+
+Pair it with [`@zephyr3d/backend-webgl`](https://www.npmjs.com/package/@zephyr3d/backend-webgl)
+to fall back to WebGL2 in browsers without WebGPU.
 
 ## Installation
 
-- @zephyr3d/base
+```bash
+npm install --save @zephyr3d/backend-webgpu @zephyr3d/backend-webgl
+```
 
-  The basic module includes a math library and content commonly used in other modules.
+## Usage
 
-  ```npm install --save @zephyr3d/base```
+```ts
+import { Application } from '@zephyr3d/scene';
+import { backendWebGPU } from '@zephyr3d/backend-webgpu';
+import { backendWebGL2 } from '@zephyr3d/backend-webgl';
 
-- @zephyr3d/device
+const app = new Application({
+  backend: (await backendWebGPU.supported()) ? backendWebGPU : backendWebGL2,
+  canvas: document.querySelector('#my-canvas')
+});
+```
 
-  Includes the basic definitions and abstract interfaces of the rendering API.
+See [Basic Framework](https://zephyr3d.org/doc/en/scene-basic.html) for the full setup.
 
-  ```npm install --save @zephyr3d/device```
+## Links
 
-- @zephyr3d/backend-webgl
+- [Documentation](https://zephyr3d.org/doc/)
+- [Demos](https://zephyr3d.org/en/demos.html)
+- [Online editor](https://zephyr3d.org/editor/)
+- [API reference](https://zephyr3d.org/doc/api/)
+- [GitHub](https://github.com/gavinyork/zephyr3d)
 
-  WebGL backend, WebGL/WebGL2 rendering.
+Zephyr3D has not reached 1.0 yet and APIs may change between minor versions, so pin your versions.
 
-  ```npm install --save @zephyr3d/backend-webgl```
+## License
 
-- @zephyr3d/backend-webgpu
-
-  WebGPU backend.
-
-  ```npm install --save @zephyr3d/backend-webgpu```
-
-- @zephyr3d/scene
-
-  The SceneAPI module, built on top of the DeviceAPI module, facilitates rapid development of rendering projects.
-  
-  ```npm install --save @zephyr3d/scene```
-
-- @zephyr3d/imgui
-
-  To render a GUI, you can install the ImGui binding module.
-
-  ```npm install --save @zephyr3d/imgui```
-
-
-
+MIT

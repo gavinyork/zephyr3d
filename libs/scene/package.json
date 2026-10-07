@@ -1,7 +1,7 @@
 {
   "name": "@zephyr3d/scene",
   "version": "0.9.27",
-  "description": "Scene API for zephyr3d",
+  "description": "WebGPU-first TypeScript rendering engine bringing advanced real-time techniques to the browser: skin, hair, water, terrain, shadows and post-processing",
   "homepage": "https://github.com/gavinyork/zephyr3d#readme",
   "type": "module",
   "main": "./dist/index.js",
@@ -28,15 +28,24 @@
     "build": "cross-env NODE_OPTIONS=--max_old_space_size=8192 rollup -c --silent"
   },
   "keywords": [
-    "javascript",
-    "3d",
-    "rendering",
-    "engine",
-    "webgl",
-    "webgpu",
-    "canvas",
     "zephyr3d",
-    "device"
+    "3d",
+    "webgpu",
+    "webgl2",
+    "rendering",
+    "rendering-engine",
+    "typescript",
+    "3d-engine",
+    "game-engine",
+    "pbr",
+    "subsurface-scattering",
+    "hair-rendering",
+    "ocean",
+    "water",
+    "terrain",
+    "shadows",
+    "post-processing",
+    "scene-graph"
   ],
   "license": "MIT",
   "bugs": {

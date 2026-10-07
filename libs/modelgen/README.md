@@ -1,17 +1,19 @@
-# @zephyr3d/imgui
+# @zephyr3d/modelgen
 
 > Part of [Zephyr3D](https://github.com/gavinyork/zephyr3d) — bringing advanced real-time rendering techniques to the browser.
 > A WebGPU-first TypeScript engine with skin, hair, water and terrain rendering, a single-source
 > shader system, and a visual editor.
 
-[Dear ImGui](https://github.com/ocornut/imgui) bindings for Zephyr3D, rendered through the engine's
-own device layer on both WebGPU and WebGL2. Useful for debug panels, tweaking parameters at
-runtime, and building tool UI. The Zephyr3D editor uses it for its interface.
+A dependency-free procedural mesh generator. It takes a declarative model spec — primitives,
+surfaces of revolution, Bezier patches, swept curves, CSG booleans and sandboxed script nodes — and
+tessellates it into plain vertex and index buffers.
+
+Nothing here touches a graphics device, so it runs in a worker, in the browser, or under Node.js.
 
 ## Installation
 
 ```bash
-npm install --save @zephyr3d/imgui
+npm install --save @zephyr3d/modelgen
 ```
 
 ## Links

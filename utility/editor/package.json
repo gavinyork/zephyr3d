@@ -1,7 +1,20 @@
 {
   "name": "@zephyr3d/editor",
   "version": "0.3.16",
-  "description": "zephyr3d studio",
+  "description": "Visual editor for the Zephyr3D rendering engine: scene editing, node-graph materials, terrain tools, TypeScript scripting and a plugin API",
+  "keywords": [
+    "zephyr3d",
+    "3d",
+    "webgpu",
+    "webgl2",
+    "editor",
+    "scene-editor",
+    "level-editor",
+    "material-editor",
+    "node-graph",
+    "mcp",
+    "typescript"
+  ],
   "homepage": "https://github.com/gavinyork/zephyr3d#readme",
   "main": "electron/main.cjs",
   "files": [

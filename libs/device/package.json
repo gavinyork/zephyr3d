@@ -1,7 +1,7 @@
 {
   "name": "@zephyr3d/device",
   "version": "0.2.19",
-  "description": "Device API for zephyr3d",
+  "description": "WebGPU/WebGL2 graphics abstraction with a TypeScript shader system that generates WGSL and GLSL from a single source",
   "homepage": "https://github.com/gavinyork/zephyr3d#readme",
   "type": "module",
   "main": "./dist/index.js",
@@ -25,15 +25,18 @@
     "build": "cross-env NODE_OPTIONS=--max_old_space_size=8192 rollup -c --silent"
   },
   "keywords": [
-    "javascript",
-    "3d",
-    "rendering",
-    "engine",
-    "webgl",
-    "webgpu",
-    "canvas",
     "zephyr3d",
-    "device"
+    "3d",
+    "webgpu",
+    "webgl2",
+    "rendering",
+    "rendering-engine",
+    "typescript",
+    "wgsl",
+    "glsl",
+    "shader",
+    "rhi",
+    "graphics-api"
   ],
   "license": "MIT",
   "bugs": {
