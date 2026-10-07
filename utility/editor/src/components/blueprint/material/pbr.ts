@@ -2,10 +2,6 @@ import type {
   BlueprintDAG,
   BluePrintUniformTexture,
   BluePrintUniformValue,
-  IControllerPointerDownEvent,
-  IControllerPointerMoveEvent,
-  IControllerPointerUpEvent,
-  IControllerWheelEvent,
   IGraphNode,
   MeshMaterial,
   PropertyAccessor,
@@ -749,7 +745,7 @@ export class PBRMaterialEditor extends GraphEditor {
     ImGui.InvisibleButton('Button##previewScene', size);
     const io = ImGui.GetIO();
     if (ImGui.IsItemHovered() && io.MouseWheel !== 0) {
-      const evtWheel: IControllerWheelEvent = {
+      const evtWheel = {
         type: 'wheel',
         offsetX: io.MousePos.x,
         offsetY: io.MousePos.y,
@@ -766,7 +762,7 @@ export class PBRMaterialEditor extends GraphEditor {
     }
     if (ImGui.IsItemActive()) {
       if (ImGui.IsMouseClicked(ImGui.MouseButton.Left)) {
-        const evtPointerDown: IControllerPointerDownEvent = {
+        const evtPointerDown = {
           type: 'pointerdown',
           offsetX: io.MousePos.x,
           offsetY: io.MousePos.y,
@@ -779,7 +775,7 @@ export class PBRMaterialEditor extends GraphEditor {
         this._previewScene.get()?.mainCamera?.handleEvent(evtPointerDown);
         wasDragging = true;
       } else if (io.MouseDelta.x !== 0 || io.MouseDelta.y !== 0) {
-        const evtPointerMove: IControllerPointerMoveEvent = {
+        const evtPointerMove = {
           type: 'pointermove',
           offsetX: io.MousePos.x,
           offsetY: io.MousePos.y,
@@ -793,7 +789,7 @@ export class PBRMaterialEditor extends GraphEditor {
       }
     } else if (wasDragging) {
       // 鼠标释放时触发
-      const evtPointerUp: IControllerPointerUpEvent = {
+      const evtPointerUp = {
         type: 'pointerup',
         offsetX: io.MousePos.x,
         offsetY: io.MousePos.y,

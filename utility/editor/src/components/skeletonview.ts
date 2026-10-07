@@ -2,15 +2,7 @@ import type { Nullable } from '@zephyr3d/base';
 import { AABB, DRef, Quaternion, Vector3, Vector4 } from '@zephyr3d/base';
 import type { FrameBuffer, Texture2D } from '@zephyr3d/device';
 import { ImGui } from '@zephyr3d/imgui';
-import type {
-  AssetHierarchyNode,
-  AssetSkeleton,
-  IControllerPointerDownEvent,
-  IControllerPointerMoveEvent,
-  IControllerPointerUpEvent,
-  IControllerWheelEvent,
-  SceneNode
-} from '@zephyr3d/scene';
+import type { AssetHierarchyNode, AssetSkeleton, SceneNode } from '@zephyr3d/scene';
 import { BatchGroup, CopyBlitter, TetrahedronShape } from '@zephyr3d/scene';
 import { getDevice } from '@zephyr3d/scene';
 import {
@@ -109,7 +101,7 @@ export class SkeletonView {
       }
     }
     if (ImGui.IsItemHovered() && io.MouseWheel !== 0) {
-      const evtWheel: IControllerWheelEvent = {
+      const evtWheel = {
         type: 'wheel',
         offsetX: io.MousePos.x,
         offsetY: io.MousePos.y,
@@ -126,7 +118,7 @@ export class SkeletonView {
     }
     if (ImGui.IsItemActive()) {
       if (ImGui.IsMouseClicked(ImGui.MouseButton.Left)) {
-        const evtPointerDown: IControllerPointerDownEvent = {
+        const evtPointerDown = {
           type: 'pointerdown',
           offsetX: io.MousePos.x,
           offsetY: io.MousePos.y,
@@ -139,7 +131,7 @@ export class SkeletonView {
         this._scene.get()?.mainCamera?.handleEvent(evtPointerDown);
         wasDragging = true;
       } else if (io.MouseDelta.x !== 0 || io.MouseDelta.y !== 0) {
-        const evtPointerMove: IControllerPointerMoveEvent = {
+        const evtPointerMove = {
           type: 'pointermove',
           offsetX: io.MousePos.x,
           offsetY: io.MousePos.y,
@@ -153,7 +145,7 @@ export class SkeletonView {
       }
     } else if (wasDragging) {
       // 鼠标释放时触发
-      const evtPointerUp: IControllerPointerUpEvent = {
+      const evtPointerUp = {
         type: 'pointerup',
         offsetX: io.MousePos.x,
         offsetY: io.MousePos.y,

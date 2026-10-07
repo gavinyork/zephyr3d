@@ -1,6 +1,6 @@
 import { Plane, Vector2, Vector3 } from '@zephyr3d/base';
 import { backendWebGL2 } from '@zephyr3d/backend-webgl';
-import type { IControllerPointerDownEvent, SceneNode } from '@zephyr3d/scene';
+import type { IControllerMouseEvent, SceneNode } from '@zephyr3d/scene';
 import {
   Application,
   DirectionalLight,
@@ -97,7 +97,7 @@ function pickHandle(): IKHandle | null {
   return targetHit <= poleHit ? 'target' : 'pole';
 }
 
-function updateMousePosition(e: IControllerPointerDownEvent) {
+function updateMousePosition(e: IControllerMouseEvent) {
   mouse.x = e.offsetX;
   mouse.y = e.offsetY;
 }
@@ -125,13 +125,12 @@ function moveActiveHandleToMouse() {
   getHandleNode(activeHandle).position.set(dragIntersect);
 }
 
-getInput().useFirst((evt) => {
-  if (evt.type === 'pointerdown') {
-    const e = evt as unknown as IControllerPointerDownEvent;
-    if (e.button !== 0) {
+getInput().useFirst((evt, type) => {
+  if (type === 'pointerdown') {
+    if (evt.button !== 0) {
       return false;
     }
-    updateMousePosition(e);
+    updateMousePosition(evt);
     const pickedHandle = pickHandle();
     if (pickedHandle) {
       setActiveHandle(pickedHandle);
@@ -144,7 +143,7 @@ getInput().useFirst((evt) => {
     return true;
   }
   if (evt.type === 'pointermove') {
-    const e = evt as unknown as IControllerPointerDownEvent;
+    const e = evt as unknown as IControllerMouseEvent;
     if (!dragging) {
       return false;
     }

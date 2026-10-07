@@ -2,13 +2,7 @@ import { ImGui } from '@zephyr3d/imgui';
 import { DRef, Vector3, Vector4 } from '@zephyr3d/base';
 import type { PropertyAccessor } from '@zephyr3d/scene';
 import type { BluePrintUniformTexture, BluePrintUniformValue } from '@zephyr3d/scene';
-import type {
-  IControllerPointerDownEvent,
-  IControllerPointerMoveEvent,
-  IControllerPointerUpEvent,
-  IControllerWheelEvent,
-  MeshMaterial
-} from '@zephyr3d/scene';
+import type { MeshMaterial } from '@zephyr3d/scene';
 import {
   CopyBlitter,
   DirectionalLight,
@@ -565,7 +559,7 @@ export class DlgMaterialInstanceEditor extends DialogRenderer<void> {
     ImGui.InvisibleButton('Button##previewScene', size);
     const io = ImGui.GetIO();
     if (ImGui.IsItemHovered() && io.MouseWheel !== 0) {
-      const evtWheel: IControllerWheelEvent = {
+      const evtWheel = {
         type: 'wheel',
         offsetX: io.MousePos.x,
         offsetY: io.MousePos.y,
@@ -582,7 +576,7 @@ export class DlgMaterialInstanceEditor extends DialogRenderer<void> {
     }
     if (ImGui.IsItemActive()) {
       if (ImGui.IsMouseClicked(ImGui.MouseButton.Left)) {
-        const evtPointerDown: IControllerPointerDownEvent = {
+        const evtPointerDown = {
           type: 'pointerdown',
           offsetX: io.MousePos.x,
           offsetY: io.MousePos.y,
@@ -595,7 +589,7 @@ export class DlgMaterialInstanceEditor extends DialogRenderer<void> {
         camera.handleEvent(evtPointerDown);
         this._previewDragging = true;
       } else if (io.MouseDelta.x !== 0 || io.MouseDelta.y !== 0) {
-        const evtPointerMove: IControllerPointerMoveEvent = {
+        const evtPointerMove = {
           type: 'pointermove',
           offsetX: io.MousePos.x,
           offsetY: io.MousePos.y,
@@ -608,7 +602,7 @@ export class DlgMaterialInstanceEditor extends DialogRenderer<void> {
         camera.handleEvent(evtPointerMove);
       }
     } else if (this._previewDragging) {
-      const evtPointerUp: IControllerPointerUpEvent = {
+      const evtPointerUp = {
         type: 'pointerup',
         offsetX: io.MousePos.x,
         offsetY: io.MousePos.y,

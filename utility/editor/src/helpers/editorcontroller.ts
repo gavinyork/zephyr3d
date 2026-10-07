@@ -1,12 +1,5 @@
 import { Vector3, Quaternion, Matrix3x3, Matrix4x4, ASSERT } from '@zephyr3d/base';
-import type {
-  IControllerPointerDownEvent,
-  IControllerPointerMoveEvent,
-  IControllerPointerUpEvent,
-  IControllerWheelEvent,
-  IControllerKeydownEvent, // 键盘按下事件
-  IControllerKeyupEvent // 键盘抬起事件
-} from '@zephyr3d/scene';
+import type { IControllerKeyboardEvent, IControllerMouseEvent, IControllerWheelEvent } from '@zephyr3d/scene';
 import { BaseCameraController } from '@zephyr3d/scene';
 
 export interface EditorCameraControllerOptions {
@@ -120,7 +113,7 @@ export class EditorCameraController extends BaseCameraController {
    * {@inheritDoc BaseCameraController._onMouseDown}
    * @override
    */
-  protected _onMouseDown(evt: IControllerPointerDownEvent): boolean {
+  protected _onMouseDown(evt: IControllerMouseEvent): boolean {
     // 支持 Alt+左键 / 中键 / 右键三种模式
     if (evt.button === 0 && evt.altKey) {
       this.altLeftMouseDown = true;
@@ -140,7 +133,7 @@ export class EditorCameraController extends BaseCameraController {
    * {@inheritDoc BaseCameraController._onMouseUp}
    * @override
    */
-  protected _onMouseUp(evt: IControllerPointerUpEvent): boolean {
+  protected _onMouseUp(evt: IControllerMouseEvent): boolean {
     // 对应释放 Alt+左键 / 中键 / 右键状态
     if (evt.button === 0 && this.altLeftMouseDown) {
       this.altLeftMouseDown = false;
@@ -162,7 +155,7 @@ export class EditorCameraController extends BaseCameraController {
    * {@inheritDoc BaseCameraController._onMouseMove}
    * @override
    */
-  protected _onMouseMove(evt: IControllerPointerMoveEvent): boolean {
+  protected _onMouseMove(evt: IControllerMouseEvent): boolean {
     // Alt+左键：绕固定视图中心做轨道旋转
     if (this.altLeftMouseDown && evt.altKey && this._getCamera().isPerspective()) {
       const dx = evt.offsetX - this.lastMouseX;
@@ -349,7 +342,7 @@ export class EditorCameraController extends BaseCameraController {
    * 处理键盘按下事件
    * @override
    */
-  protected _onKeyDown(evt: IControllerKeydownEvent): boolean {
+  protected _onKeyDown(evt: IControllerKeyboardEvent): boolean {
     // 只处理用于移动的按键
     if (['KeyW', 'KeyS', 'KeyA', 'KeyD', 'KeyQ', 'KeyE'].includes(evt.code)) {
       this.pressedKeys.add(evt.code);
@@ -362,7 +355,7 @@ export class EditorCameraController extends BaseCameraController {
    * 处理键盘抬起事件
    * @override
    */
-  protected _onKeyUp(evt: IControllerKeyupEvent): boolean {
+  protected _onKeyUp(evt: IControllerKeyboardEvent): boolean {
     if (['KeyW', 'KeyS', 'KeyA', 'KeyD', 'KeyQ', 'KeyE'].includes(evt.code)) {
       this.pressedKeys.delete(evt.code);
       return true;

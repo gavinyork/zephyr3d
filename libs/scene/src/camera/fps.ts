@@ -1,12 +1,6 @@
 import type { RequireOptionals } from '@zephyr3d/base';
 import { Vector3, Quaternion, Matrix3x3, Matrix4x4 } from '@zephyr3d/base';
-import type {
-  IControllerKeydownEvent,
-  IControllerKeyupEvent,
-  IControllerPointerDownEvent,
-  IControllerPointerMoveEvent,
-  IControllerPointerUpEvent
-} from './base';
+import type { IControllerKeyboardEvent, IControllerMouseEvent } from './base';
 import { BaseCameraController } from './base';
 
 /**
@@ -96,7 +90,7 @@ export class FPSCameraController extends BaseCameraController {
    * {@inheritDoc BaseCameraController._onMouseDown}
    * @override
    */
-  protected _onMouseDown(evt: IControllerPointerDownEvent) {
+  protected _onMouseDown(evt: IControllerMouseEvent) {
     if (evt.button === 0) {
       this.mouseDown = true;
       this.lastMouseX = evt.offsetX;
@@ -109,7 +103,7 @@ export class FPSCameraController extends BaseCameraController {
    * {@inheritDoc BaseCameraController._onMouseUp}
    * @override
    */
-  protected _onMouseUp(evt: IControllerPointerUpEvent) {
+  protected _onMouseUp(evt: IControllerMouseEvent) {
     if (evt.button === 0 && this.mouseDown) {
       this.mouseDown = false;
       return true;
@@ -120,7 +114,7 @@ export class FPSCameraController extends BaseCameraController {
    * {@inheritDoc BaseCameraController._onMouseMove}
    * @override
    */
-  protected _onMouseMove(evt: IControllerPointerMoveEvent) {
+  protected _onMouseMove(evt: IControllerMouseEvent) {
     const camera = this._getCamera()!;
     if (this.mouseDown) {
       const dx = evt.offsetX - this.lastMouseX;
@@ -166,7 +160,7 @@ export class FPSCameraController extends BaseCameraController {
    * {@inheritDoc BaseCameraController._onKeyDown}
    * @override
    */
-  protected _onKeyDown(evt: IControllerKeydownEvent) {
+  protected _onKeyDown(evt: IControllerKeyboardEvent) {
     switch (evt.code) {
       case this.options.controlKeys.up:
         this.keyUp = true;
@@ -195,7 +189,7 @@ export class FPSCameraController extends BaseCameraController {
    * {@inheritDoc BaseCameraController._onKeyUp}
    * @override
    */
-  protected _onKeyUp(evt: IControllerKeyupEvent) {
+  protected _onKeyUp(evt: IControllerKeyboardEvent) {
     switch (evt.code) {
       case this.options.controlKeys.up:
         this.keyUp = false;

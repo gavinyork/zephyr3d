@@ -5,7 +5,7 @@ import { createClothGridDemo, type ClothGridDemo } from './cloth-grid';
 import { createBarrelClothDemo, type BarrelClothDemo } from './barrel-cloth';
 import { createClosedChainDemo, type ClosedChainDemo } from './closed-chain';
 import { Plane, Vector2, Vector3 } from '@zephyr3d/base';
-import type { IControllerPointerDownEvent, SceneNode } from '@zephyr3d/scene';
+import type { IControllerMouseEvent, SceneNode } from '@zephyr3d/scene';
 import {
   Application,
   DirectionalLight,
@@ -347,7 +347,7 @@ function updateGrabPlane() {
   }
 }
 
-function updateMousePosition(e: IControllerPointerDownEvent) {
+function updateMousePosition(e: IControllerMouseEvent) {
   mouse.x = e.offsetX;
   mouse.y = e.offsetY;
 }
@@ -370,14 +370,13 @@ function moveGrabberToMouse() {
   }
 }
 
-getInput().useFirst((evt) => {
-  if (evt.type === 'pointerdown') {
-    const e = evt as unknown as IControllerPointerDownEvent;
-    if (e.button !== 2) {
+getInput().useFirst((evt, type) => {
+  if (type === 'pointerdown') {
+    if (evt.button !== 2) {
       return false;
     } // right click only
     grabbing = true;
-    updateMousePosition(e);
+    updateMousePosition(evt);
     updateGrabPlane();
     moveGrabberToMouse();
     const ctrl = getActiveController();
@@ -385,19 +384,18 @@ getInput().useFirst((evt) => {
       ctrl.setGrabberEnabledAt(0, true);
     }
     return true;
-  } else if (evt.type === 'pointermove') {
-    const e = evt as unknown as IControllerPointerDownEvent;
+  } else if (type === 'pointermove') {
     if (!grabbing) {
       return false;
     }
-    updateMousePosition(e);
+    updateMousePosition(evt);
     moveGrabberToMouse();
     const ctrl = getActiveController();
     if (ctrl) {
       ctrl.setGrabberEnabledAt(0, true);
     }
     return true;
-  } else if (evt.type === 'pointerup') {
+  } else if (type === 'pointerup') {
     if (!grabbing) {
       return false;
     }

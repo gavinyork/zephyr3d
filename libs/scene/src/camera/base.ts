@@ -8,9 +8,9 @@ import type { Camera } from './camera';
  *
  * @public
  */
-export interface IBaseEvent<T extends string> {
+export interface IBaseEvent {
   /** Event type identifier. */
-  type: T;
+  type: string;
   /**
    * Optional method to cancel the default event behavior.
    * May be provided by the event source.
@@ -43,7 +43,7 @@ export interface IModKey {
  *
  * @public
  */
-export interface IControllerMouseEvent<T extends string> extends IBaseEvent<T>, IModKey {
+export interface IControllerMouseEvent extends IBaseEvent, IModKey {
   /** Pointer offset along the X-axis, typically relative to the event target. */
   readonly offsetX: number;
   /** Pointer offset along the Y-axis, typically relative to the event target. */
@@ -53,49 +53,13 @@ export interface IControllerMouseEvent<T extends string> extends IBaseEvent<T>, 
 }
 
 /**
- * Pointer down event for camera controllers.
- *
- * Triggered when a mouse, pen, or touch pointer is pressed down.
- *
- * @public
- */
-export interface IControllerPointerDownEvent extends IControllerMouseEvent<'pointerdown'> {}
-
-/**
- * Pointer up event for camera controllers.
- *
- * Triggered when a mouse, pen, or touch pointer is released.
- *
- * @public
- */
-export interface IControllerPointerUpEvent extends IControllerMouseEvent<'pointerup'> {}
-
-/**
- * Pointer move event for camera controllers.
- *
- * Triggered when the pointer (mouse, pen, or touch) moves across the viewport.
- *
- * @public
- */
-export interface IControllerPointerMoveEvent extends IControllerMouseEvent<'pointermove'> {}
-
-/**
- * Pointer cancel event for camera controllers.
- *
- * Triggered when the pointer operation is canceled (e.g., touch canceled, system interruption).
- *
- * @public
- */
-export interface IControllerPointerCancelEvent extends IControllerMouseEvent<'pointercancel'> {}
-
-/**
  * Wheel (scroll) event for camera controllers.
  *
  * Extends a mouse event with wheel delta values for scroll-based input (e.g., zoom).
  *
  * @public
  */
-export interface IControllerWheelEvent extends IControllerMouseEvent<'wheel'> {
+export interface IControllerWheelEvent extends IControllerMouseEvent {
   /** Horizontal wheel scroll delta. */
   readonly deltaX: number;
   /** Vertical wheel scroll delta. */
@@ -111,39 +75,12 @@ export interface IControllerWheelEvent extends IControllerMouseEvent<'wheel'> {
  *
  * @public
  */
-export interface IControllerKeyboardEvent<T extends string> extends IBaseEvent<T>, IModKey {
+export interface IControllerKeyboardEvent extends IBaseEvent, IModKey {
   /** key code */
   readonly code: string;
   /** Character value */
   readonly key: string;
 }
-
-/**
- * Key down event for camera controllers.
- *
- * Triggered when a keyboard key is pressed down.
- *
- * @public
- */
-export interface IControllerKeydownEvent extends IControllerKeyboardEvent<'keydown'> {}
-
-/**
- * Key up event for camera controllers.
- *
- * Triggered when a keyboard key is released.
- *
- * @public
- */
-export interface IControllerKeyupEvent extends IControllerKeyboardEvent<'keyup'> {}
-
-/**
- * Key press event for camera controllers.
- *
- * Triggered when a key is pressed and generates a character value (legacy usage).
- *
- * @public
- */
-export interface IControllerKeypressEvent extends IControllerKeyboardEvent<'keypress'> {}
 
 /**
  * Base class for camera controllers.
@@ -250,7 +187,7 @@ export class BaseCameraController {
    * @param evt - The pointer event.
    * @returns `true` if handled and should stop further processing; otherwise `false`.
    */
-  onMouseDown(evt: IControllerPointerDownEvent) {
+  onMouseDown(evt: IControllerMouseEvent) {
     return this._enabled ? this._onMouseDown(evt) : false;
   }
   /**
@@ -259,7 +196,7 @@ export class BaseCameraController {
    * @param evt - The pointer event.
    * @returns `true` if handled; otherwise `false`.
    */
-  onMouseUp(evt: IControllerPointerUpEvent) {
+  onMouseUp(evt: IControllerMouseEvent) {
     return this._enabled ? this._onMouseUp(evt) : false;
   }
   /**
@@ -281,7 +218,7 @@ export class BaseCameraController {
    * @param evt - The pointer event.
    * @returns `true` if handled; otherwise `false`.
    */
-  onMouseMove(evt: IControllerPointerMoveEvent) {
+  onMouseMove(evt: IControllerMouseEvent) {
     return this._enabled ? this._onMouseMove(evt) : false;
   }
   /**
@@ -292,7 +229,7 @@ export class BaseCameraController {
    * @param evt - The keyboard event.
    * @returns `true` if handled; otherwise `false`.
    */
-  onKeyDown(evt: IControllerKeydownEvent) {
+  onKeyDown(evt: IControllerKeyboardEvent) {
     return this._enabled ? this._onKeyDown(evt) : false;
   }
   /**
@@ -301,7 +238,7 @@ export class BaseCameraController {
    * @param evt - The keyboard event.
    * @returns `true` if handled; otherwise `false`.
    */
-  onKeyUp(evt: IControllerKeyupEvent) {
+  onKeyUp(evt: IControllerKeyboardEvent) {
     return this._enabled ? this._onKeyUp(evt) : false;
   }
   /**
@@ -324,7 +261,7 @@ export class BaseCameraController {
    * @param evt - Mouse event
    * @returns Boolean value indices whether this event was handled
    */
-  protected _onMouseDown(_evt: IControllerPointerDownEvent): boolean {
+  protected _onMouseDown(_evt: IControllerMouseEvent): boolean {
     return false;
   }
   /**
@@ -333,7 +270,7 @@ export class BaseCameraController {
    * @param _evt - Pointer event.
    * @returns `true` if handled; otherwise `false`.
    */
-  protected _onMouseUp(_evt: IControllerPointerUpEvent): boolean {
+  protected _onMouseUp(_evt: IControllerMouseEvent): boolean {
     return false;
   }
   /**
@@ -351,7 +288,7 @@ export class BaseCameraController {
    * @param _evt - Pointer event.
    * @returns `true` if handled; otherwise `false`.
    */
-  protected _onMouseMove(_evt: IControllerPointerMoveEvent): boolean {
+  protected _onMouseMove(_evt: IControllerMouseEvent): boolean {
     return false;
   }
   /**
@@ -360,7 +297,7 @@ export class BaseCameraController {
    * @param _evt - Keyboard event.
    * @returns `true` if handled; otherwise `false`.
    */
-  protected _onKeyDown(_evt: IControllerKeydownEvent): boolean {
+  protected _onKeyDown(_evt: IControllerKeyboardEvent): boolean {
     return false;
   }
   /**
@@ -369,7 +306,7 @@ export class BaseCameraController {
    * @param _evt - Keyboard event.
    * @returns `true` if handled; otherwise `false`.
    */
-  protected _onKeyUp(_evt: IControllerKeyupEvent): boolean {
+  protected _onKeyUp(_evt: IControllerKeyboardEvent): boolean {
     return false;
   }
   /**

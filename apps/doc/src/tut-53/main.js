@@ -124,15 +124,12 @@ function moveActiveHandleToMouse() {
   getHandleNode(activeHandle).position.set(dragIntersect);
 }
 
-getInput().useFirst((evt) => {
-  if (evt.type === 'pointerdown') {
-    const e = /** @type {import('@zephyr3d/scene').IControllerPointerDownEvent} */ (
-      /** @type {unknown} */ (evt)
-    );
-    if (e.button !== 0) {
+getInput().useFirst((evt, type) => {
+  if (type === 'pointerdown') {
+    if (evt.button !== 0) {
       return false;
     }
-    updateMousePosition(e);
+    updateMousePosition(evt);
     const pickedHandle = pickHandle();
     if (pickedHandle) {
       setActiveHandle(pickedHandle);
@@ -144,18 +141,15 @@ getInput().useFirst((evt) => {
     moveActiveHandleToMouse();
     return true;
   }
-  if (evt.type === 'pointermove') {
-    const e = /** @type {import('@zephyr3d/scene').IControllerPointerMoveEvent} */ (
-      /** @type {unknown} */ (evt)
-    );
+  if (type === 'pointermove') {
     if (!dragging) {
       return false;
     }
-    updateMousePosition(e);
+    updateMousePosition(evt);
     moveActiveHandleToMouse();
     return true;
   }
-  if (evt.type === 'pointerup') {
+  if (type === 'pointerup') {
     if (!dragging) {
       return false;
     }

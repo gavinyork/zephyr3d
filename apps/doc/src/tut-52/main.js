@@ -370,19 +370,16 @@ function moveGrabberToMouse() {
   }
 }
 
-getInput().useFirst((evt) => {
+getInput().useFirst((evt, type) => {
   if (evt.target !== canvas) {
     return false;
   }
-  if (evt.type === 'pointerdown') {
-    const e = /** @type {import('@zephyr3d/scene').IControllerPointerDownEvent} */ (
-      /** @type {unknown} */ (evt)
-    );
-    if (e.button !== 2) {
+  if (type === 'pointerdown') {
+    if (evt.button !== 2) {
       return false;
     }
     grabbing = true;
-    updateMousePosition(e);
+    updateMousePosition(evt);
     updateGrabPlane();
     moveGrabberToMouse();
     const ctrl = getActiveController();
@@ -390,14 +387,11 @@ getInput().useFirst((evt) => {
       ctrl.setGrabberEnabledAt(0, true);
     }
     return true;
-  } else if (evt.type === 'pointermove') {
-    const e = /** @type {import('@zephyr3d/scene').IControllerPointerDownEvent} */ (
-      /** @type {unknown} */ (evt)
-    );
+  } else if (type === 'pointermove') {
     if (!grabbing) {
       return false;
     }
-    updateMousePosition(e);
+    updateMousePosition(evt);
     moveGrabberToMouse();
     const ctrl = getActiveController();
     if (ctrl) {

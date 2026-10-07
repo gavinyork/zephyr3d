@@ -1,12 +1,6 @@
 import type { DeepRequireOptionals, Immutable } from '@zephyr3d/base';
 import { Vector3, Quaternion } from '@zephyr3d/base';
-import type {
-  IControllerMouseEvent,
-  IControllerPointerDownEvent,
-  IControllerPointerMoveEvent,
-  IControllerPointerUpEvent,
-  IControllerWheelEvent
-} from './base';
+import type { IControllerMouseEvent, IControllerWheelEvent } from './base';
 import { BaseCameraController } from './base';
 
 /**
@@ -173,7 +167,7 @@ export class OrbitCameraController extends BaseCameraController {
    * {@inheritDoc BaseCameraController._onMouseDown}
    * @override
    */
-  protected _onMouseDown(evt: IControllerPointerDownEvent) {
+  protected _onMouseDown(evt: IControllerMouseEvent) {
     if (this.matchesControl(evt, this.options.controls.rotate)) {
       this.lastMouseX = evt.offsetX;
       this.lastMouseY = evt.offsetY;
@@ -208,7 +202,7 @@ export class OrbitCameraController extends BaseCameraController {
    * {@inheritDoc BaseCameraController._onMouseUp}
    * @override
    */
-  protected _onMouseUp(evt: IControllerPointerUpEvent) {
+  protected _onMouseUp(evt: IControllerMouseEvent) {
     const control =
       this.currentOp === OperationType.ROTATE
         ? this.options.controls.rotate
@@ -248,7 +242,7 @@ export class OrbitCameraController extends BaseCameraController {
    * {@inheritDoc BaseCameraController._onMouseMove}
    * @override
    */
-  protected _onMouseMove(evt: IControllerPointerMoveEvent) {
+  protected _onMouseMove(evt: IControllerMouseEvent) {
     if (this.currentOp !== OperationType.NONE) {
       const dx = evt.offsetX - this.lastMouseX;
       const dy = evt.offsetY - this.lastMouseY;
@@ -283,7 +277,7 @@ export class OrbitCameraController extends BaseCameraController {
     }
   }
   private matchesControl(
-    evt: IControllerMouseEvent<any>,
+    evt: IControllerMouseEvent,
     control: {
       button: number;
       shiftKey: boolean;

@@ -1,15 +1,7 @@
 import { DRef, Vector3 } from '@zephyr3d/base';
 import type { FrameBuffer, Texture2D } from '@zephyr3d/device';
 import { ImGui } from '@zephyr3d/imgui';
-import type {
-  IControllerPointerDownEvent,
-  IControllerPointerMoveEvent,
-  IControllerPointerUpEvent,
-  IControllerWheelEvent,
-  MeshMaterial,
-  Primitive,
-  SceneNode
-} from '@zephyr3d/scene';
+import type { MeshMaterial, Primitive, SceneNode } from '@zephyr3d/scene';
 import { Shape } from '@zephyr3d/scene';
 import {
   CopyBlitter,
@@ -204,7 +196,7 @@ export class PrimitiveEditor extends GraphEditor {
     ImGui.InvisibleButton('Button##previewScene', size);
     const io = ImGui.GetIO();
     if (ImGui.IsItemHovered() && io.MouseWheel !== 0) {
-      const evtWheel: IControllerWheelEvent = {
+      const evtWheel = {
         type: 'wheel',
         offsetX: io.MousePos.x,
         offsetY: io.MousePos.y,
@@ -221,7 +213,7 @@ export class PrimitiveEditor extends GraphEditor {
     }
     if (ImGui.IsItemActive()) {
       if (ImGui.IsMouseClicked(ImGui.MouseButton.Left)) {
-        const evtPointerDown: IControllerPointerDownEvent = {
+        const evtPointerDown = {
           type: 'pointerdown',
           offsetX: io.MousePos.x,
           offsetY: io.MousePos.y,
@@ -234,7 +226,7 @@ export class PrimitiveEditor extends GraphEditor {
         this._previewScene.get()?.mainCamera?.handleEvent(evtPointerDown);
         wasDragging = true;
       } else if (io.MouseDelta.x !== 0 || io.MouseDelta.y !== 0) {
-        const evtPointerMove: IControllerPointerMoveEvent = {
+        const evtPointerMove = {
           type: 'pointermove',
           offsetX: io.MousePos.x,
           offsetY: io.MousePos.y,
@@ -248,7 +240,7 @@ export class PrimitiveEditor extends GraphEditor {
       }
     } else if (wasDragging) {
       // 鼠标释放时触发
-      const evtPointerUp: IControllerPointerUpEvent = {
+      const evtPointerUp = {
         type: 'pointerup',
         offsetX: io.MousePos.x,
         offsetY: io.MousePos.y,
