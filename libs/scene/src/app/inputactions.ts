@@ -135,6 +135,8 @@ export class InputActionMap<A extends Record<string, InputActionDef> = Record<st
   /** While enabled, a blocking map hides all maps below it. */
   blocking: boolean;
   private _enabled: boolean;
+  /** Whether the map was evaluated with input last frame: enabled and not blocked */
+  private _active: boolean;
   private readonly _actions: Map<keyof A, ActionState>;
   /**
    * @param name - Name of the map.
@@ -145,6 +147,7 @@ export class InputActionMap<A extends Record<string, InputActionDef> = Record<st
     this.name = name;
     this.blocking = !!options?.blocking;
     this._enabled = true;
+    this._active = false;
     this._actions = new Map();
     for (const key of Object.keys(actions) as (keyof A)[]) {
       this._actions.set(key, {
@@ -161,7 +164,9 @@ export class InputActionMap<A extends Record<string, InputActionDef> = Record<st
   }
   /**
    * Whether the map is evaluated. A disabled map reads as idle; disabling it
-   * while a button is held reports the release on the next frame.
+   * while a button is held reports the release on the next frame. Enabling it
+   * while a button is held does not report a press: the button must be pressed
+   * again, so the key that switched maps does not also act in the new one.
    */
   get enabled() {
     return this._enabled;
@@ -247,14 +252,19 @@ export class InputActionMap<A extends Record<string, InputActionDef> = Record<st
   }
   /** @internal */
   _evaluate(src: Nullable<InputStateSource>, dt: number) {
+    const active = !!src && this._enabled;
+    // A key held while the map was inactive - such as the one that switched to
+    // it - is no new press: only a press made this frame counts on activation
+    const activated = active && !this._active;
+    this._active = active;
     for (const s of this._actions.values()) {
       s.prevDown = s.down;
       s.x = 0;
       s.y = 0;
       let tapped = false;
-      if (src && this._enabled) {
+      if (active) {
         for (const b of s.def.bindings) {
-          const r = evaluateBinding(b, src, dt);
+          const r = evaluateBinding(b, src!, dt);
           s.x += r.x;
           s.y += r.y;
           tapped ||= r.tapped;
@@ -277,12 +287,12 @@ export class InputActionMap<A extends Record<string, InputActionDef> = Record<st
       } else {
         s.down = s.x !== 0 || s.y !== 0;
       }
-      s.pressed = (s.down && !s.prevDown) || (tapped && !s.prevDown);
+      s.pressed = activated ? tapped : (s.down && !s.prevDown) || (tapped && !s.prevDown);
       s.released = (!s.down && s.prevDown) || (tapped && !s.down && !s.prevDown);
       if (s.pressed) {
         s.latched = true;
       }
-      if (!this._enabled || !src) {
+      if (!active) {
         s.latched = false;
       }
     }

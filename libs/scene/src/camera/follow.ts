@@ -40,8 +40,10 @@ export interface FollowCameraOptions {
   /** Chase mode: the target must move at least this fast for the camera to swing back. */
   recenterMinSpeed: number;
   /**
-   * Radius of the sphere swept from the pivot to the camera. Keep it at least the
-   * near plane's half-diagonal, or the near plane can still cut into walls.
+   * Least radius of the sphere swept from the pivot to the camera. For a
+   * perspective camera the sweep uses at least the distance from the eye to the
+   * near plane's corners, or the near plane would cut into walls; keep the near
+   * plane small (around 0.1) so that this stays small too.
    */
   probeRadius: number;
   /** Collider layers that block the camera, as bits `1 << layer`. */
@@ -85,6 +87,12 @@ const defaultOptions = (): FollowCameraOptions => ({
 });
 
 const identity = Quaternion.identity();
+/** Closest the camera comes to the pivot */
+const MIN_DISTANCE = 0.05;
+/** A sweep hit closer than this started inside something */
+const START_OVERLAP = 1e-3;
+/** Above this, a near plane is warned about as too far from the eye */
+const LARGE_NEAR_RADIUS = 0.5;
 
 /**
  * Third-person camera on a spring arm.
@@ -135,6 +143,7 @@ export class FollowCameraController extends BaseCameraController {
   private _dragging: boolean;
   private _lastX: number;
   private _lastY: number;
+  private _warnedNear = false;
   /**
    * @param target - Node to follow.
    * @param options - Options; unspecified ones take their defaults.
@@ -335,6 +344,8 @@ export class FollowCameraController extends BaseCameraController {
     } else {
       this._distance = Math.min(free, this._distance + o.zoomOutSpeed * dt);
     }
+    // Never on the pivot itself: looking at the point the eye is on has no direction
+    this._distance = Math.max(this._distance, MIN_DISTANCE);
     this._lookAt.set(this._pivot);
     Vector3.combine(this._pivot, back, 1, this._distance, this._eye);
     let eye = this._eye;
@@ -377,22 +388,43 @@ export class FollowCameraController extends BaseCameraController {
   }
   /** How far the camera can go back from the pivot along `dir`, up to `length` */
   private _sweep(dir: Vector3, length: number) {
-    const world = this._getCamera()?.scene?.physicsWorld;
+    const camera = this._getCamera();
+    const world = camera?.scene?.physicsWorld;
     if (!world || length <= 0) {
       return length;
     }
     const o = this.options;
-    const hit = world.shapeCast(
-      { type: 'sphere', radius: o.probeRadius },
-      this._pivot,
-      identity,
-      dir,
-      length,
-      {
-        layerMask: o.collisionMask,
-        exclude: o.exclude ?? this._target?.physics ?? null
+    let radius = o.probeRadius;
+    if (camera!.isPerspective()) {
+      // The near plane's corners are this far from the eye: a smaller sphere
+      // lets them into a wall the sphere itself stopped short of
+      const p = camera as unknown as { near: number; fovY: number; aspect: number };
+      const halfHeight = p.near * Math.tan(p.fovY / 2);
+      const nearRadius = Math.hypot(p.near, halfHeight, halfHeight * p.aspect);
+      if (nearRadius > LARGE_NEAR_RADIUS && !this._warnedNear) {
+        this._warnedNear = true;
+        console.warn(
+          `FollowCameraController: the camera's near plane (${p.near}) is far from the eye, so ` +
+            `the camera keeps ${nearRadius.toFixed(2)} away from walls and is pushed in close in ` +
+            'narrow places; set the near plane to about 0.1'
+        );
       }
-    );
+      radius = Math.max(radius, nearRadius);
+    }
+    const options = { layerMask: o.collisionMask, exclude: o.exclude ?? this._target?.physics ?? null };
+    let hit = world.shapeCast({ type: 'sphere', radius }, this._pivot, identity, dir, length, options);
+    if (hit && hit.distance <= START_OVERLAP && radius > o.probeRadius) {
+      // The sphere is already in a wall at the pivot: there is no room for the
+      // near plane anyway, so fall back to the small probe rather than the pivot
+      hit = world.shapeCast(
+        { type: 'sphere', radius: o.probeRadius },
+        this._pivot,
+        identity,
+        dir,
+        length,
+        options
+      );
+    }
     return hit ? hit.distance : length;
   }
 }

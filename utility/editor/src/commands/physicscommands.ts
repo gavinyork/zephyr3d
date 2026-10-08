@@ -58,8 +58,22 @@ export function getSubtreeLocalBounds(node: SceneNode): Nullable<AABB> {
 
 /** A box collider fitted around what its node shows. */
 function fittedCollider(node: SceneNode) {
+  return colliderAround(getSubtreeLocalBounds(node));
+}
+
+/**
+ * A box collider fitted around a vehicle chassis: around what the node itself
+ * shows, if anything, not its subtree. The wheels below it are rays; a box
+ * around them would rest on the ground with them and drag the car to a stop.
+ */
+function fittedChassisCollider(node: SceneNode) {
+  const own = node.getBoundingVolume()?.toAABB();
+  return own?.isValid() ? colliderAround(own) : fittedCollider(node);
+}
+
+/** A box collider spanning `bounds`, in its node's space; the default box if null. */
+function colliderAround(bounds: Nullable<AABB>) {
   const collider = new Collider();
-  const bounds = getSubtreeLocalBounds(node);
   if (bounds) {
     const size = Vector3.sub(bounds.maxPoint, bounds.minPoint);
     collider.size = new Vector3(Math.max(size.x, 0.01), Math.max(size.y, 0.01), Math.max(size.z, 0.01));
@@ -85,7 +99,66 @@ function fittedWheel(node: SceneNode) {
       wheel.radius = radius;
     }
   }
+  // Front or rear of the vehicle above: front wheels steer, rear wheels drive
+  // (half the engine force each, as for a rear wheel drive car) and hold the handbrake
+  const along = alongVehicleForward(node);
+  if (along > 0) {
+    wheel.steer = 1;
+  } else if (along < 0) {
+    wheel.drive = 0.5;
+    wheel.handbrake = 1;
+  }
   return wheel;
+}
+
+/**
+ * How far a wheel node sits ahead of the centre of the vehicle chassis above it,
+ * along the vehicle's forward axis; 0 if there is no vehicle above.
+ */
+function alongVehicleForward(node: SceneNode) {
+  let chassis = node.parent;
+  while (chassis && !chassis.physics?.vehicle) {
+    chassis = chassis.parent;
+  }
+  const vehicle = chassis?.physics?.vehicle;
+  if (!chassis || !vehicle) {
+    return 0;
+  }
+  const local = Matrix4x4.invertAffine(chassis.worldMatrix).transformPointAffine(
+    node.getWorldPosition(),
+    new Vector3()
+  );
+  switch (vehicle.forward) {
+    case '+x':
+      return local.x;
+    case '-x':
+      return -local.x;
+    case '-z':
+      return -local.z;
+    default:
+      return local.z;
+  }
+}
+
+/**
+ * A character controller fitted to what its node shows. Its capsule stands on
+ * the node's origin and its size is in the node's units, so the local bounds
+ * give it directly: height from the origin to the top, radius from the widest
+ * horizontal extent.
+ */
+function fittedCharacter(node: SceneNode) {
+  const character = new CharacterController();
+  const bounds = getSubtreeLocalBounds(node);
+  if (bounds && bounds.maxPoint.y > 0.01) {
+    const height = bounds.maxPoint.y;
+    const size = Vector3.sub(bounds.maxPoint, bounds.minPoint);
+    const radius = Math.min(Math.max(size.x, size.z) / 2, height / 2);
+    if (radius > 0.01) {
+      character.height = height;
+      character.radius = radius;
+    }
+  }
+  return character;
 }
 
 function hasColliderBelow(node: SceneNode) {
@@ -158,9 +231,10 @@ export const PHYSICS_PRESETS: readonly PhysicsPreset[] = [
   },
   {
     label: 'Character',
-    description: 'A capsule that walks, climbs steps and slides along walls, moved by a script',
-    apply(_node, physics) {
-      physics.character = new CharacterController();
+    description:
+      'A capsule standing on the object origin, sized to the object, that walks, climbs steps and slides along walls, moved by a script',
+    apply(node, physics) {
+      physics.character = fittedCharacter(node);
     }
   },
   {
@@ -173,14 +247,15 @@ export const PHYSICS_PRESETS: readonly PhysicsPreset[] = [
         physics.body = body;
       }
       if (!hasColliderBelow(node)) {
-        physics.addCollider(fittedCollider(node));
+        physics.addCollider(fittedChassisCollider(node));
       }
       physics.vehicle = new Vehicle();
     }
   },
   {
     label: 'Wheel',
-    description: 'A wheel of the vehicle above, sized to the object',
+    description:
+      'A wheel of the vehicle above, sized to the object; a front wheel steers, a rear wheel drives and holds the handbrake',
     apply(node, physics) {
       physics.wheel = fittedWheel(node);
     }
