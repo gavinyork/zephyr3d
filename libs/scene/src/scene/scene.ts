@@ -10,7 +10,7 @@ import type { Drawable } from '../render';
 import { SceneRenderer } from '../render';
 import type { Compositor } from '../posteffect';
 import type { Metadata } from 'draco3d';
-import { getDevice } from '../app/api';
+import { getDevice, tryGetApp } from '../app/api';
 import { SkinPaletteAtlas } from '../animation/skin_palette_atlas';
 import { UpdateQueue } from './update_queue';
 import { AnimationBankTrack } from '../animation/animation_bank';
@@ -54,6 +54,13 @@ export class Scene
      * steps here so that kinematic bodies follow this frame's animated pose.
      */
     afterupdate: [Scene];
+    /**
+     * Dispatched once per frame after `afterupdate` - so after a physics world
+     * has stepped and written back - and after scripts' `onLateUpdate` and a
+     * `'late'` camera controller have run. The main camera's pose is final here:
+     * the place for anything that tracks the camera, such as an audio listener.
+     */
+    lateupdate: [Scene];
     /** Dispatched immediately before rendering begins for a camera. */
     startrender: [Scene, Camera, Compositor];
     /** Dispatched immediately after rendering finishes for a camera. */
@@ -566,8 +573,11 @@ export class Scene
    * - Ensure this runs only once per frame (via `frameInfo.frameCounter`).
    * - Update environment light synchronization.
    * - Dispatch `update` event.
+   * - Update the main camera's controller if its `updatePhase` is `'early'`.
    * - Drain the one-shot node update queue and call `node.update(...)`.
-   * - Dispatch `afterupdate` event.
+   * - Dispatch `afterupdate` event; a physics world steps here.
+   * - Call scripts' `onLateUpdate`, then update the main camera's controller if its
+   *   `updatePhase` is `'late'`, then dispatch `lateupdate` event.
    * - Apply pending octree placement updates.
    *
    */
@@ -577,11 +587,11 @@ export class Scene
       this._updateFrame = frameInfo.frameCounter;
       this._env.wind.update(frameInfo.elapsedFrame * 0.001);
       this.updateEnvLight();
+      const deltaInSeconds = frameInfo.elapsedFrame * 0.001;
       this.dispatchEvent('update', this);
-      this.mainCamera?.updateController();
+      this.mainCamera?.updateController(deltaInSeconds, 'early');
       if (this._nodeUpdateQueue.size > 0) {
         const elapsedInSeconds = frameInfo.elapsedOverall * 0.001;
-        const deltaInSeconds = frameInfo.elapsedFrame * 0.001;
         // Nodes queued while draining are updated next frame
         for (const node of this._nodeUpdateQueue.take()) {
           if (!node.disposed && node.attached) {
@@ -595,6 +605,12 @@ export class Scene
         }
       }
       this.dispatchEvent('afterupdate', this);
+      tryGetApp()?.engine?.lateUpdate(
+        deltaInSeconds,
+        (host) => host === this || (host instanceof SceneNode && host.scene === this)
+      );
+      this.mainCamera?.updateController(deltaInSeconds, 'late');
+      this.dispatchEvent('lateupdate', this);
       this.updateNodePlacement(this._octree, this._nodePlaceList);
     }
     // Palettes written by animation updates are uploaded once all nodes and bank tracks are updated

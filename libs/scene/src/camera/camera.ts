@@ -19,6 +19,7 @@ import { Compositor } from '../posteffect/compositor';
 import type { Scene } from '../scene/scene';
 import type {
   BaseCameraController,
+  CameraControllerUpdatePhase,
   IBaseEvent,
   IControllerKeyboardEvent,
   IControllerMouseEvent,
@@ -2296,10 +2297,20 @@ export class Camera extends SceneNode {
     return this._pickPosY;
   }
   /**
-   * Updates the controller state
+   * Updates the controller state.
+   *
+   * The scene calls this for its main camera twice per frame, once per phase;
+   * the controller is updated only in the phase it declares. Called without a
+   * phase, the controller is updated unconditionally.
+   *
+   * @param deltaTime - Time since the last frame in seconds; defaults to the device's frame time.
+   * @param phase - Only update a controller whose `updatePhase` is this.
    */
-  updateController() {
-    this._controller?.update();
+  updateController(deltaTime?: number, phase?: CameraControllerUpdatePhase) {
+    const controller = this._controller;
+    if (controller && (!phase || controller.updatePhase === phase)) {
+      controller.update(deltaTime);
+    }
   }
   /**
    * Reset the controller

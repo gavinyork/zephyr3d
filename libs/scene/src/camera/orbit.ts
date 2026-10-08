@@ -10,7 +10,7 @@ import { BaseCameraController } from './base';
 export interface OrbitCameraControllerOptions {
   /** target position */
   center: Vector3;
-  /** damping value */
+  /** Fraction of the rotate/pan velocity lost per 1/60 s, independent of the actual frame rate. */
   damping?: number;
   /**
    * Zooming speed: world units the camera moves toward or away from the center per 100 pixels of
@@ -326,21 +326,29 @@ export class OrbitCameraController extends BaseCameraController {
    * {@inheritDoc BaseCameraController._onUpdate}
    * @override
    */
-  protected _onUpdate() {
+  protected _onUpdate(deltaTime: number) {
     const camera = this._getCamera()!;
     const center = this.options.center;
+    // Velocities are per 60 Hz frame and decay by `damping` per frame. For `frames`
+    // such frames the velocity decays by `decay`, and the distance covered is the
+    // sum of the geometric series, `travel` times the current velocity. At 60 fps
+    // this is exactly one frame: travel 1, decay 1 - damping.
+    const frames = deltaTime * 60;
+    const damping = this.options.damping;
+    const decay = Math.pow(1 - damping, frames);
+    const travel = damping > 0 ? (1 - decay) / damping : frames;
 
     if (Math.abs(this.panVelocityX) > 0.0001 || Math.abs(this.panVelocityY) > 0.0001) {
       const right = this.xVector;
       const up = this.upVector;
 
-      center.combineBy(right, 1, this.panVelocityX);
-      center.combineBy(up, 1, this.panVelocityY);
-      this.eyePos.combineBy(right, 1, this.panVelocityX);
-      this.eyePos.combineBy(up, 1, this.panVelocityY);
+      center.combineBy(right, 1, this.panVelocityX * travel);
+      center.combineBy(up, 1, this.panVelocityY * travel);
+      this.eyePos.combineBy(right, 1, this.panVelocityX * travel);
+      this.eyePos.combineBy(up, 1, this.panVelocityY * travel);
 
-      this.panVelocityX *= 1 - this.options.damping;
-      this.panVelocityY *= 1 - this.options.damping;
+      this.panVelocityX *= decay;
+      this.panVelocityY *= decay;
 
       if (Math.abs(this.panVelocityX) < 0.0001) {
         this.panVelocityX = 0;
@@ -351,17 +359,17 @@ export class OrbitCameraController extends BaseCameraController {
     }
 
     if (Math.abs(this.rotateX) > 0.0001 || Math.abs(this.rotateY) > 0.0001) {
-      Quaternion.fromAxisAngle(this.xVector, this.rotateX, this.quat);
+      Quaternion.fromAxisAngle(this.xVector, this.rotateX * travel, this.quat);
       this.quat.transform(this.eyePos.subBy(center), this.eyePos);
-      Quaternion.fromEulerAngle(0, this.rotateY, 0, 'ZYX', this.quat);
+      Quaternion.fromEulerAngle(0, this.rotateY * travel, 0, 'ZYX', this.quat);
       this.quat.transform(this.eyePos, this.eyePos);
       this.quat.transform(this.xVector, this.xVector).inplaceNormalize();
       Vector3.normalize(this.eyePos, this.direction).inplaceNormalize();
       Vector3.cross(this.direction, this.xVector, this.upVector).inplaceNormalize();
       this.eyePos.addBy(center);
 
-      this.rotateX *= 1 - this.options.damping;
-      this.rotateY *= 1 - this.options.damping;
+      this.rotateX *= decay;
+      this.rotateY *= decay;
       if (Math.abs(this.rotateX) < 0.0001) {
         this.rotateX = 0;
       }

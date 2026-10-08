@@ -17,7 +17,7 @@ export interface FPSCameraControllerOptions {
     left: string;
     right: string;
   };
-  /** Moving speed */
+  /** Moving speed: world units per 1/60 s, independent of the actual frame rate. */
   moveSpeed?: number;
   /** Rotating speed */
   rotateSpeed?: number;
@@ -226,8 +226,10 @@ export class FPSCameraController extends BaseCameraController {
    * {@inheritDoc BaseCameraController._onUpdate}
    * @override
    */
-  protected _onUpdate() {
+  protected _onUpdate(deltaTime: number) {
     const camera = this._getCamera()!;
+    // moveSpeed is per 60 Hz frame
+    const step = this.options.moveSpeed * deltaTime * 60;
     const x = camera.worldMatrix.getRow(0).xyz();
     x.y = 0;
     x.inplaceNormalize();
@@ -236,27 +238,27 @@ export class FPSCameraController extends BaseCameraController {
     let changed = false;
     if (this.keyForward) {
       changed = true;
-      move.subBy(Vector3.scale(z, this.options.moveSpeed));
+      move.subBy(Vector3.scale(z, step));
     }
     if (this.keyBackward) {
       changed = true;
-      move.addBy(Vector3.scale(z, this.options.moveSpeed));
+      move.addBy(Vector3.scale(z, step));
     }
     if (this.keyUp) {
       changed = true;
-      move.y += this.options.moveSpeed;
+      move.y += step;
     }
     if (this.keyDown) {
       changed = true;
-      move.y -= this.options.moveSpeed;
+      move.y -= step;
     }
     if (this.keyLeft) {
       changed = true;
-      move.subBy(Vector3.scale(x, this.options.moveSpeed));
+      move.subBy(Vector3.scale(x, step));
     }
     if (this.keyRight) {
       changed = true;
-      move.addBy(Vector3.scale(x, this.options.moveSpeed));
+      move.addBy(Vector3.scale(x, step));
     }
     if (changed) {
       if (camera.parent) {

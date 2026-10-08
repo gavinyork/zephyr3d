@@ -510,6 +510,35 @@ export class ScriptingSystem {
   }
 
   /**
+   * Calls `onLateUpdate(deltaTime)` on attached script instances.
+   *
+   * Driven by a scene once per frame after its physics world has stepped; the
+   * scripting system itself never calls it. Exceptions are caught and logged like
+   * in {@link ScriptingSystem.update}.
+   *
+   * @param deltaTime - Time since last frame in seconds.
+   * @param filter - Only hosts for which this returns true are called, e.g. the
+   *   hosts belonging to the scene being updated.
+   */
+  lateUpdate(deltaTime: number, filter?: (host: unknown) => boolean) {
+    if (this._hostScripts.size === 0) {
+      return;
+    }
+    for (const [host, list] of this._hostScripts) {
+      if (filter && !filter(host)) {
+        continue;
+      }
+      for (const s of list) {
+        try {
+          s.instance.onLateUpdate?.(deltaTime);
+        } catch (err) {
+          console.error(`Error occured at onLateUpdate() of module '${s.id}': ${err}`);
+        }
+      }
+    }
+  }
+
+  /**
    * Detaches all scripts from all hosts.
    *
    * Iteratively calls {@link ScriptingSystem.detachScript} on each host until no attachments remain.

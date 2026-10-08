@@ -1,5 +1,18 @@
 import type { Nullable, Vector3 } from '@zephyr3d/base';
 import type { Camera } from './camera';
+import { getDevice } from '../app/api';
+
+/**
+ * When in a frame a camera controller is updated.
+ *
+ * - `early`: before the scene's nodes and physics are updated. Suits controllers
+ *   driven only by input, such as orbit and FPS.
+ * - `late`: after physics has stepped and written back, so the controller sees
+ *   this frame's pose of whatever it follows.
+ *
+ * @public
+ */
+export type CameraControllerUpdatePhase = 'early' | 'late';
 
 /**
  * Base structure for all controller events.
@@ -105,12 +118,17 @@ export interface IControllerKeyboardEvent extends IBaseEvent, IModKey {
  * Subclassing guidelines:
  * - Override the protected `_onXxx` handlers rather than the public `onXxx` methods.
  * - Override `reset()` to reinitialize controller state when a new camera is attached.
- * - Override `update()` to advance state each frame (e.g., apply accumulated deltas with damping).
+ * - Override `_onUpdate(deltaTime)` to advance state each frame (e.g., apply accumulated
+ *   deltas with damping). Scale per-frame changes by `deltaTime` so the controller
+ *   behaves the same at any frame rate.
+ * - Override `updatePhase` to return `'late'` for a controller that follows a
+ *   physics-driven target.
  *
  * Lifecycle:
  * 1. A camera is attached via internal `_setCamera(camera)`, which calls `reset()`.
  * 2. Input events are passed in through the public `onXxx` methods.
- * 3. Per-frame, `update()` is called to apply state changes to the camera.
+ * 3. Per-frame, `update(deltaTime)` is called to apply state changes to the camera,
+ *    in the phase given by `updatePhase`.
  *
  * Thread-safety/assumptions:
  * - Designed for use on the main thread in a browser environment.
@@ -119,6 +137,12 @@ export interface IControllerKeyboardEvent extends IBaseEvent, IModKey {
  * @public
  */
 export class BaseCameraController {
+  /**
+   * Longest time step passed to `_onUpdate`, in seconds. A longer frame - a
+   * background tab, a breakpoint - is treated as this long, so that a controller
+   * does not jump.
+   */
+  static readonly MAX_DELTA_TIME = 0.1;
   /** @internal */
   private _camera: Nullable<Camera>;
   /** @internal */
@@ -242,18 +266,26 @@ export class BaseCameraController {
     return this._enabled ? this._onKeyUp(evt) : false;
   }
   /**
+   * When in the frame the owning scene updates this controller.
+   *
+   * Defaults to `'early'`. A controller following a physics-driven target should
+   * return `'late'`, see {@link CameraControllerUpdatePhase}.
+   */
+  get updatePhase(): CameraControllerUpdatePhase {
+    return 'early';
+  }
+  /**
    * Per-frame update.
    *
-   * Subclasses should override this to:
-   * - Integrate velocities/accelerations and apply damping.
-   * - Smoothly interpolate camera transforms.
-   * - Clamp angles/distances/FOV, etc.
+   * Called once per frame by the owning system; calls `_onUpdate` when enabled.
    *
-   * Called once per frame by the owning system.
+   * @param deltaTime - Time since the last frame in seconds. Defaults to the
+   *   device's frame time. Clamped to [0, {@link BaseCameraController.MAX_DELTA_TIME}].
    */
-  update() {
+  update(deltaTime?: number) {
     if (this._enabled) {
-      this._onUpdate();
+      const dt = deltaTime ?? getDevice().frameInfo.elapsedFrame * 0.001;
+      this._onUpdate(Math.min(Math.max(dt, 0), BaseCameraController.MAX_DELTA_TIME));
     }
   }
   /**
@@ -311,8 +343,10 @@ export class BaseCameraController {
   }
   /**
    * Per-frame update handler for subclasses to override.
+   *
+   * @param _deltaTime - Time since the last frame in seconds, already clamped.
    */
-  protected _onUpdate() {
+  protected _onUpdate(_deltaTime: number) {
     // Subclasses can override this for per-frame updates.
   }
 }

@@ -282,6 +282,8 @@ export function applyRuntimeScriptConfig<T extends RuntimeScript<any>>(
  * - onAttached(host): Called each time this instance is attached to a host.
  * - onUpdate(deltaTime, elapsedTime): Called every frame/tick while attached.
  * - onFixedUpdate(fixedDeltaTime): Called before each physics step, when a physics world runs.
+ * - onLateUpdate(deltaTime): Called once per frame after physics has stepped, before a
+ *   `'late'` camera controller updates.
  * - onDetached(host): Called when detached from a host.
  * - onDestroy(): Called when the instance is no longer attached to any host
  *   and is about to be discarded.
@@ -342,6 +344,19 @@ export class RuntimeScript<T extends IDisposable | null> {
    * @param _fixedDeltaTime - Length of the step in seconds.
    */
   onFixedUpdate(_fixedDeltaTime: number) {}
+  /**
+   * Called once per frame after the host's scene has updated its nodes and its
+   * physics world has stepped and written poses back.
+   *
+   * Use this for logic that must see this frame's simulated poses, such as
+   * pointing a follow camera's target or placing effects on a moving body. It
+   * runs before a camera controller whose `updatePhase` is `'late'`. Unlike
+   * `onUpdate`, it is only called for scripts whose host is a scene being rendered,
+   * or a node in one.
+   *
+   * @param _deltaTime - Time since last frame in seconds.
+   */
+  onLateUpdate(_deltaTime: number) {}
   /**
    * Called when the script is detached from a host.
    *

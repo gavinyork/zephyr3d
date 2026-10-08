@@ -349,6 +349,18 @@ export class Engine {
     }
   }
   /**
+   * Calls the `onLateUpdate` hooks of scripts, if enabled. Driven by a scene once
+   * per frame, after its physics world has stepped.
+   *
+   * @param deltaTime - Time since last frame in seconds.
+   * @param filter - Only scripts whose host passes are called.
+   */
+  lateUpdate(deltaTime: number, filter?: (host: unknown) => boolean) {
+    if (this._enabled) {
+      this._scriptingSystem.lateUpdate(deltaTime, filter);
+    }
+  }
+  /**
    * Loads a scene from a file path.
    *
    * Concurrent requests for the same normalized path share the same loading promise.
