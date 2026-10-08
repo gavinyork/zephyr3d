@@ -68,13 +68,19 @@ function fittedCollider(node: SceneNode) {
   return collider;
 }
 
-/** A wheel sized to what its node shows: radius from the bounds' largest extent. */
+/**
+ * A wheel sized to what its node shows: radius from the bounds' largest extent.
+ * The radius is in metres, so the node's world scale is applied to its local bounds.
+ */
 function fittedWheel(node: SceneNode) {
   const wheel = new Wheel();
   const bounds = getSubtreeLocalBounds(node);
   if (bounds) {
     const size = Vector3.sub(bounds.maxPoint, bounds.minPoint);
-    const radius = Math.max(size.x, size.y, size.z) / 2;
+    const scale = new Vector3();
+    node.worldMatrix.decompose(scale, null, null);
+    const radius =
+      Math.max(size.x * Math.abs(scale.x), size.y * Math.abs(scale.y), size.z * Math.abs(scale.z)) / 2;
     if (radius > 0.01) {
       wheel.radius = radius;
     }

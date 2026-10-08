@@ -5,6 +5,7 @@ import {
   Camera,
   getEngine,
   PropertyTrack,
+  Scene,
   SceneNode,
   type PropertyAccessor,
   type PropertyValue,
@@ -1571,6 +1572,10 @@ export class PropertyEditor extends Observable<{
     }
     if (object?.scriptHost instanceof SceneNode) {
       return object.scriptHost;
+    }
+    // A script attached to the scene itself: references resolve in the whole scene
+    if (object?.scriptHost instanceof Scene) {
+      return object.scriptHost.rootNode;
     }
     if (this.object instanceof SceneNode) {
       return this.object;
