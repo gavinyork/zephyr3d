@@ -60,7 +60,10 @@ const test = base.extend<{}, { harness: Harness }>({
       const consoleErrors: string[] = [];
       page.on('console', (m) => {
         if (m.type() === 'error') {
-          consoleErrors.push(m.text());
+          // Chromium's text for a failed load ("Failed to load resource: ...")
+          // does not name the resource; the location does.
+          const url = m.location().url;
+          consoleErrors.push(url ? `${m.text()} (${url})` : m.text());
         }
       });
       page.on('pageerror', (e) => consoleErrors.push(`pageerror: ${e.message}`));

@@ -4,7 +4,7 @@ import { PNG } from 'pngjs';
 import pixelmatch from 'pixelmatch';
 import { CI_PLATFORM, computeDigest } from './digest';
 import type { DigestFile } from './digest_file';
-import type { ImageStore } from './image_store';
+import { describeFetchError, type ImageStore } from './image_store';
 
 /**
  * Default tolerance.
@@ -313,7 +313,21 @@ export async function judgeCapture(
     );
   }
 
-  const refPng = await opts.images.get(reference.digest);
+  let refPng: Buffer | null;
+  try {
+    refPng = await opts.images.get(reference.digest);
+  } catch (err) {
+    // The image may well exist: never accept over it, or a network hiccup
+    // during an update would silently replace the baseline.
+    writeActual();
+    return outcome(
+      'reference-unavailable',
+      `digest ${digest} is not accepted, and reference image ${reference.digest} (${reference.platform}) ` +
+        `is not cached and the image store could not be reached (${describeFetchError(err)}); ` +
+        'check the network and rerun, or run "npm run baselines:fetch" once it is reachable',
+      { reference }
+    );
+  }
   if (!refPng) {
     if (opts.update) {
       return accept(`baseline replaced for ${opts.scene} on ${opts.platform} (reference image unavailable)`, {
@@ -324,7 +338,8 @@ export async function judgeCapture(
     return outcome(
       'reference-unavailable',
       `digest ${digest} is not accepted, and reference image ${reference.digest} (${reference.platform}) ` +
-        'is neither cached nor in the image store; run "npm run baselines:fetch" or check the store',
+        'is neither cached nor in the image store: it was never pushed, or was garbage-collected; ' +
+        'run "npm run baselines:push" on the machine that accepted it',
       { reference }
     );
   }

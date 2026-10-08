@@ -12,21 +12,41 @@ export function imageRelativePath(digest: string): string {
   return `${digest.slice(0, 2)}/${digest}.png`;
 }
 
-/** Where reference images come from when they are not cached locally. */
+/**
+ * Where reference images come from when they are not cached locally.
+ *
+ * `get` resolves to null only when the source positively has no such image;
+ * when it cannot tell (network failure, server error, rate limit) it throws,
+ * so that an unreachable store is never mistaken for a missing image.
+ */
 export interface ImageSource {
   get(digest: string): Promise<Buffer | null>;
+}
+
+/** Short reason for a failed request: the socket error code when there is one. */
+export function describeFetchError(err: unknown): string {
+  const e = err as { message?: string; cause?: { code?: string; message?: string } };
+  return e?.cause?.code ?? e?.cause?.message ?? e?.message ?? String(err);
 }
 
 /** Reads images over HTTP. The repository is public, so no credentials are involved. */
 export class HttpImageSource implements ImageSource {
   constructor(private readonly baseUrl = process.env.VISUAL_BASELINE_URL ?? DEFAULT_IMAGE_BASE_URL) {}
   async get(digest: string): Promise<Buffer | null> {
+    const url = `${this.baseUrl}/${imageRelativePath(digest)}`;
+    let res: Response;
     try {
-      const res = await fetch(`${this.baseUrl}/${imageRelativePath(digest)}`);
-      return res.ok ? Buffer.from(await res.arrayBuffer()) : null;
-    } catch {
+      res = await fetch(url);
+    } catch (err) {
+      throw new Error(`${url}: ${describeFetchError(err)}`);
+    }
+    if (res.status === 404) {
       return null;
     }
+    if (!res.ok) {
+      throw new Error(`${url}: HTTP ${res.status}`);
+    }
+    return Buffer.from(await res.arrayBuffer());
   }
 }
 
@@ -47,7 +67,11 @@ export class ImageStore {
     return path.join(this.cacheDir, 'images', imageRelativePath(digest));
   }
 
-  /** PNG bytes for `digest`, fetched into the cache on first use; null when unavailable. */
+  /**
+   * PNG bytes for `digest`, fetched into the cache on first use; null when
+   * neither the cache nor the remote has it. Throws when the remote cannot be
+   * reached, see `ImageSource`.
+   */
   async get(digest: string): Promise<Buffer | null> {
     const local = this.cachePath(digest);
     if (fs.existsSync(local)) {

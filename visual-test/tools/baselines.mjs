@@ -43,6 +43,38 @@ const CI_ARTIFACT = 'visual-captures';
 const imageRelativePath = (digest) => `${digest.slice(0, 2)}/${digest}.png`;
 const cachedImage = (digest) => path.join(CACHE, 'images', imageRelativePath(digest));
 
+/**
+ * Asks the store for an image. Only a 404 means it is not there; anything else
+ * that is not a success means the store could not be asked, and is reported as
+ * such so that a network failure is never taken for a missing image.
+ * Mirrors tests/image_store.ts HttpImageSource.
+ *
+ * @returns {Promise<{ res: Response } | { missing: true } | { error: string }>}
+ */
+async function requestImage(digest, method = 'GET') {
+  let res;
+  try {
+    res = await fetch(`${BASE_URL}/${imageRelativePath(digest)}`, { method });
+  } catch (err) {
+    return { error: err?.cause?.code ?? err?.cause?.message ?? err?.message ?? String(err) };
+  }
+  if (res.ok) {
+    return { res };
+  }
+  return res.status === 404 ? { missing: true } : { error: `HTTP ${res.status}` };
+}
+
+/** Prints the digests that could not be checked, grouped by reason. */
+function reportUnreachable(errors) {
+  const byReason = new Map();
+  for (const { digest, error } of errors) {
+    byReason.set(error, [...(byReason.get(error) ?? []), digest]);
+  }
+  for (const [reason, digests] of byReason) {
+    console.error(`  ${reason}:\n${digests.map((d) => `    ${d}`).join('\n')}`);
+  }
+}
+
 function run(cmd, args, cwd, opts = {}) {
   // With inherited stdio there is no captured output to return.
   const out = execFileSync(cmd, args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], ...opts });
@@ -176,20 +208,34 @@ function openStore() {
 // Commands.
 
 async function fetchCmd() {
-  const missing = [...referencedDigests()].filter((d) => !fs.existsSync(cachedImage(d)));
-  const failed = [];
-  await pool(missing, 16, async (digest) => {
-    const res = await fetch(`${BASE_URL}/${imageRelativePath(digest)}`).catch(() => null);
-    if (!res?.ok) {
-      failed.push(digest);
+  const wanted = [...referencedDigests()].filter((d) => !fs.existsSync(cachedImage(d)));
+  const missing = [];
+  const unreachable = [];
+  await pool(wanted, 16, async (digest) => {
+    const r = await requestImage(digest);
+    if (r.missing) {
+      missing.push(digest);
+      return;
+    }
+    if (r.error) {
+      unreachable.push({ digest, error: r.error });
       return;
     }
     fs.mkdirSync(path.dirname(cachedImage(digest)), { recursive: true });
-    fs.writeFileSync(cachedImage(digest), Buffer.from(await res.arrayBuffer()));
+    fs.writeFileSync(cachedImage(digest), Buffer.from(await r.res.arrayBuffer()));
   });
-  console.log(`fetched ${missing.length - failed.length} image(s); ${failed.length} unavailable`);
-  if (failed.length) {
-    console.log(failed.map((d) => `  ${d}`).join('\n'));
+  const fetched = wanted.length - missing.length - unreachable.length;
+  console.log(
+    `fetched ${fetched} image(s); ${missing.length} not in the store; ${unreachable.length} not reachable`
+  );
+  if (missing.length) {
+    console.log(`not in the store (never pushed?):\n${missing.map((d) => `  ${d}`).join('\n')}`);
+  }
+  if (unreachable.length) {
+    console.log('not reachable (network or server error; rerun to retry):');
+    reportUnreachable(unreachable);
+  }
+  if (missing.length || unreachable.length) {
     process.exitCode = 1;
   }
 }
@@ -235,10 +281,13 @@ function push() {
 async function check() {
   const digests = [...referencedDigests()];
   const missing = [];
+  const unreachable = [];
   await pool(digests, 16, async (digest) => {
-    const res = await fetch(`${BASE_URL}/${imageRelativePath(digest)}`, { method: 'HEAD' }).catch(() => null);
-    if (!res?.ok) {
+    const r = await requestImage(digest, 'HEAD');
+    if (r.missing) {
       missing.push(digest);
+    } else if (r.error) {
+      unreachable.push({ digest, error: r.error });
     }
   });
   if (missing.length) {
@@ -247,6 +296,16 @@ async function check() {
         'Run "npm run baselines:push" from the machine that accepted them:\n' +
         missing.map((d) => `  ${d}`).join('\n')
     );
+  }
+  if (unreachable.length) {
+    console.error(
+      `${unreachable.length} of ${digests.length} referenced image(s) could not be checked: ` +
+        'the store did not answer. This says nothing about whether they were pushed; ' +
+        'check the network and rerun.'
+    );
+    reportUnreachable(unreachable);
+  }
+  if (missing.length || unreachable.length) {
     process.exitCode = 1;
     return;
   }
