@@ -1,5 +1,7 @@
 import type { Nullable } from '@zephyr3d/base';
 import type { Application } from '../app';
+import { GamepadState } from './gamepad';
+import type { InputActionMap, InputDeviceKind, InputStateSource } from './inputactions';
 
 type PointerEventData = {
   lastClick: boolean;
@@ -101,13 +103,21 @@ export type InputEventHandlerSimple = (ev: InputEventMap[keyof InputEventMap]) =
  * - Supports a middleware chain (`use`) to intercept and optionally consume events
  *   before they are dispatched to the Application's observable event map.
  * - Manages pointer capture for mouse interactions to ensure consistent up/move delivery.
+ * - Tracks which keys and mouse buttons are held, polls gamepads, and evaluates
+ *   {@link InputActionMap}s, once per frame at the start of `Application.frame()`.
+ *
+ * Held state and middlewares: a key or button only counts as held if no
+ * middleware consumed its down event, so a UI that consumes keyboard input while
+ * focused keeps it from gameplay. Releases are always recorded. When the canvas
+ * or the window loses focus, every held key is released and a synthesized `keyup`
+ * is sent through the middlewares, so nothing stays stuck.
  *
  * Lifecycle:
  * - Call `start()` to attach all event listeners; `stop()` to remove them.
  *
  * @public
  */
-export class InputManager {
+export class InputManager implements InputStateSource {
   private readonly _app: Application;
   private readonly _target: HTMLElement;
   private _started: boolean;
@@ -128,6 +138,28 @@ export class InputManager {
   private _captureId: number;
   private readonly _middlewares: { handler: InputEventHandler; ctx: unknown }[];
   private _lastEventDatas: PointerEventData[];
+  private readonly _blurHandler: () => void;
+  private readonly _visibilityHandler: () => void;
+  private readonly _keysDown: Map<string, KeyboardEvent>;
+  private _keysPressedPending: Set<string>;
+  private _keysReleasedPending: Set<string>;
+  private _keysPressed: Set<string>;
+  private _keysReleased: Set<string>;
+  /** Held buttons per pointer id, as a mask of `1 << MouseEvent.button` */
+  private readonly _pointerButtons: Map<number, number>;
+  private _buttons: number;
+  private _buttonsPressedPending: number;
+  private _buttonsReleasedPending: number;
+  private _buttonsPressed: number;
+  private _buttonsReleased: number;
+  private readonly _pointerDeltaPending: { x: number; y: number };
+  private readonly _pointerDelta: { x: number; y: number };
+  private readonly _wheelDeltaPending: { x: number; y: number };
+  private readonly _wheelDelta: { x: number; y: number };
+  private readonly _gamepads: GamepadState[];
+  private _activeGamepad: Nullable<GamepadState>;
+  private _lastDevice: Nullable<InputDeviceKind>;
+  private readonly _actionMaps: InputActionMap<any>[];
   /**
    * Creates an instance of InputManager bound to the given application/canvas.
    *
@@ -154,6 +186,31 @@ export class InputManager {
     this._compositionHandler = this._getCompositionHandler();
     this._captureId = -1;
     this._middlewares = [];
+    this._blurHandler = () => this._releaseAll();
+    this._visibilityHandler = () => {
+      if (document.visibilityState === 'hidden') {
+        this._releaseAll();
+      }
+    };
+    this._keysDown = new Map();
+    this._keysPressedPending = new Set();
+    this._keysReleasedPending = new Set();
+    this._keysPressed = new Set();
+    this._keysReleased = new Set();
+    this._pointerButtons = new Map();
+    this._buttons = 0;
+    this._buttonsPressedPending = 0;
+    this._buttonsReleasedPending = 0;
+    this._buttonsPressed = 0;
+    this._buttonsReleased = 0;
+    this._pointerDeltaPending = { x: 0, y: 0 };
+    this._pointerDelta = { x: 0, y: 0 };
+    this._wheelDeltaPending = { x: 0, y: 0 };
+    this._wheelDelta = { x: 0, y: 0 };
+    this._gamepads = [];
+    this._activeGamepad = null;
+    this._lastDevice = null;
+    this._actionMaps = [];
   }
   /**
    * Begin listening to DOM events on the target element.
@@ -184,6 +241,9 @@ export class InputManager {
       this._target.addEventListener('compositionstart', this._compositionHandler);
       this._target.addEventListener('compositionupdate', this._compositionHandler);
       this._target.addEventListener('compositionend', this._compositionHandler);
+      this._target.addEventListener('blur', this._blurHandler);
+      window.addEventListener('blur', this._blurHandler);
+      document.addEventListener('visibilitychange', this._visibilityHandler);
     }
   }
   /**
@@ -215,8 +275,237 @@ export class InputManager {
       this._target.removeEventListener('compositionstart', this._compositionHandler);
       this._target.removeEventListener('compositionupdate', this._compositionHandler);
       this._target.removeEventListener('compositionend', this._compositionHandler);
+      this._target.removeEventListener('blur', this._blurHandler);
+      window.removeEventListener('blur', this._blurHandler);
+      document.removeEventListener('visibilitychange', this._visibilityHandler);
+      this._releaseAll();
       this._lastEventDatas = [];
     }
+  }
+  /**
+   * Whether a key is held, by `KeyboardEvent.code` (e.g. `'KeyW'`, `'Space'`).
+   *
+   * @param code - Key code.
+   */
+  isKeyDown(code: string) {
+    return this._keysDown.has(code);
+  }
+  /**
+   * Whether a key went down during the last frame. True for a tap that went
+   * down and up between two frames, even though `isKeyDown` is false.
+   *
+   * @param code - Key code.
+   */
+  keyPressed(code: string) {
+    return this._keysPressed.has(code);
+  }
+  /**
+   * Whether a key went up during the last frame.
+   *
+   * @param code - Key code.
+   */
+  keyReleased(code: string) {
+    return this._keysReleased.has(code);
+  }
+  /**
+   * Whether a mouse button is held, by `MouseEvent.button` (0 left, 1 middle,
+   * 2 right). A touch or pen contact counts as button 0.
+   *
+   * @param button - Button index.
+   */
+  isMouseDown(button: number) {
+    return !!(this._buttons & (1 << button));
+  }
+  /**
+   * Whether a mouse button went down during the last frame.
+   *
+   * @param button - Button index.
+   */
+  mousePressed(button: number) {
+    return !!(this._buttonsPressed & (1 << button));
+  }
+  /**
+   * Whether a mouse button went up during the last frame.
+   *
+   * @param button - Button index.
+   */
+  mouseReleased(button: number) {
+    return !!(this._buttonsReleased & (1 << button));
+  }
+  /**
+   * Pointer movement during the last frame in CSS pixels, +y down. Keeps
+   * reporting movement while the pointer is locked.
+   */
+  get pointerDelta(): Readonly<{ x: number; y: number }> {
+    return this._pointerDelta;
+  }
+  /** Wheel movement during the last frame in pixels. */
+  get wheelDelta(): Readonly<{ x: number; y: number }> {
+    return this._wheelDelta;
+  }
+  /**
+   * The active gamepad: the one operated most recently, or the first connected
+   * one. Null if no gamepad with the standard layout has been used yet - browsers
+   * only expose a gamepad after one of its buttons has been pressed.
+   */
+  get gamepad(): Nullable<GamepadState> {
+    return this._activeGamepad;
+  }
+  /** All connected gamepads with the standard layout. */
+  get gamepads(): GamepadState[] {
+    return this._gamepads.filter((pad) => pad?.connected);
+  }
+  /**
+   * Device that was operated most recently, e.g. to show matching button
+   * prompts; null before any input.
+   */
+  get lastDevice() {
+    return this._lastDevice;
+  }
+  /**
+   * Adds an action map on top of the existing ones. Its values are evaluated
+   * from the next frame on.
+   *
+   * @param map - Map to add.
+   * @returns The InputManager instance for chaining.
+   */
+  addActionMap(map: InputActionMap<any>) {
+    if (!this._actionMaps.includes(map)) {
+      this._actionMaps.push(map);
+    }
+    return this;
+  }
+  /**
+   * Removes an action map; it then reads as idle.
+   *
+   * @param map - Map to remove.
+   * @returns The InputManager instance for chaining.
+   */
+  removeActionMap(map: InputActionMap<any>) {
+    const index = this._actionMaps.indexOf(map);
+    if (index >= 0) {
+      this._actionMaps.splice(index, 1);
+      map._evaluate(null, 0);
+    }
+    return this;
+  }
+  /** Action maps, from bottom to top. */
+  get actionMaps(): readonly InputActionMap<any>[] {
+    return this._actionMaps;
+  }
+  /** Whether the pointer is locked to the canvas. */
+  get pointerLocked() {
+    return document.pointerLockElement === this._target;
+  }
+  /**
+   * Locks the pointer to the canvas and hides it, for mouse look. Must be called
+   * from a user gesture such as a click. Asks for raw, unaccelerated movement
+   * where supported.
+   */
+  async requestPointerLock() {
+    const target = this._target as HTMLElement & {
+      requestPointerLock(options?: { unadjustedMovement?: boolean }): Promise<void> | void;
+    };
+    try {
+      await target.requestPointerLock({ unadjustedMovement: true });
+    } catch {
+      await target.requestPointerLock();
+    }
+  }
+  /** Releases a pointer lock taken with {@link InputManager.requestPointerLock}. */
+  exitPointerLock() {
+    if (this.pointerLocked) {
+      document.exitPointerLock();
+    }
+  }
+  /**
+   * Starts a new input frame: publishes the edges, movement and wheel collected
+   * since the last call, polls gamepads and evaluates the action maps. Called by
+   * `Application.frame()` before `tick`.
+   *
+   * @param deltaTime - Frame time in seconds, used by `perSecond` bindings.
+   * @internal
+   */
+  _beginFrame(deltaTime: number) {
+    [this._keysPressed, this._keysPressedPending] = [this._keysPressedPending, this._keysPressed];
+    [this._keysReleased, this._keysReleasedPending] = [this._keysReleasedPending, this._keysReleased];
+    this._keysPressedPending.clear();
+    this._keysReleasedPending.clear();
+    this._buttonsPressed = this._buttonsPressedPending;
+    this._buttonsReleased = this._buttonsReleasedPending;
+    this._buttonsPressedPending = 0;
+    this._buttonsReleasedPending = 0;
+    this._pointerDelta.x = this._pointerDeltaPending.x;
+    this._pointerDelta.y = this._pointerDeltaPending.y;
+    this._pointerDeltaPending.x = this._pointerDeltaPending.y = 0;
+    this._wheelDelta.x = this._wheelDeltaPending.x;
+    this._wheelDelta.y = this._wheelDeltaPending.y;
+    this._wheelDeltaPending.x = this._wheelDeltaPending.y = 0;
+    if (this._keysPressed.size > 0 || this._buttonsPressed || this._wheelDelta.x || this._wheelDelta.y) {
+      this._lastDevice = 'keyboardMouse';
+    }
+    this._pollGamepads();
+    let blocked = false;
+    for (let i = this._actionMaps.length - 1; i >= 0; i--) {
+      const map = this._actionMaps[i];
+      map._evaluate(blocked ? null : this, deltaTime);
+      blocked ||= map.enabled && map.blocking;
+    }
+  }
+  private _pollGamepads() {
+    const pads = typeof navigator !== 'undefined' && navigator.getGamepads ? navigator.getGamepads() : [];
+    for (let i = 0; i < Math.max(pads.length, this._gamepads.length); i++) {
+      const raw = pads[i];
+      const pad = raw && raw.mapping === 'standard' ? raw : null;
+      if (!pad && !this._gamepads[i]) {
+        continue;
+      }
+      const state = (this._gamepads[i] ??= new GamepadState(i));
+      state._update(pad);
+      if (state.connected && state.active) {
+        this._activeGamepad = state;
+        this._lastDevice = 'gamepad';
+      }
+    }
+    if (!this._activeGamepad?.connected) {
+      this._activeGamepad = this._gamepads.find((pad) => pad?.connected) ?? null;
+    }
+  }
+  private _releaseAll() {
+    for (const ev of [...this._keysDown.values()]) {
+      const up = new KeyboardEvent('keyup', { code: ev.code, key: ev.key, location: ev.location });
+      this._keyboardHandler.call(this._target, up);
+    }
+    for (const pointerId of [...this._pointerButtons.keys()]) {
+      this._setPointerButtons(pointerId, 0, false);
+    }
+    for (const pad of this._gamepads) {
+      pad?._reset();
+    }
+  }
+  private _setPointerButtons(pointerId: number, mask: number, consumed: boolean) {
+    const old = this._pointerButtons.get(pointerId) ?? 0;
+    // A press consumed by a middleware is not recorded; a release always is
+    const next = (old & mask) | (consumed ? 0 : mask & ~old);
+    if (next) {
+      this._pointerButtons.set(pointerId, next);
+    } else {
+      this._pointerButtons.delete(pointerId);
+    }
+    let buttons = 0;
+    for (const m of this._pointerButtons.values()) {
+      buttons |= m;
+    }
+    this._buttonsPressedPending |= buttons & ~this._buttons;
+    this._buttonsReleasedPending |= this._buttons & ~buttons;
+    this._buttons = buttons;
+  }
+  private _updatePointerState(ev: PointerEvent, consumed: boolean) {
+    // PointerEvent.buttons has right and middle swapped relative to
+    // MouseEvent.button; convert to a mask of 1 << button
+    const b = ev.type === 'pointerup' || ev.type === 'pointercancel' ? 0 : ev.buttons;
+    const mask = (b & 1) | ((b & 4) >> 1) | ((b & 2) << 1) | (b & 24);
+    this._setPointerButtons(ev.pointerId, mask, consumed);
   }
   /**
    * Register a middleware (interceptor) for input events.
@@ -310,6 +599,7 @@ export class InputManager {
       if (!that._callMiddlewares(ev)) {
         that._app.dispatchEvent(ev.type as any, ev);
       }
+      that._updatePointerState(ev, false);
     };
   }
   private _getContextMenuHandler() {
@@ -329,9 +619,14 @@ export class InputManager {
       const eventData = that._getPointerEventData(ev.pointerId);
       eventData.lastMoveX = ev.offsetX;
       eventData.lastMoveY = ev.offsetY;
-      if (!that._callMiddlewares(ev)) {
+      const consumed = that._callMiddlewares(ev);
+      if (!consumed) {
         that._app.dispatchEvent(ev.type as any, ev);
+        that._pointerDeltaPending.x += ev.movementX ?? 0;
+        that._pointerDeltaPending.y += ev.movementY ?? 0;
       }
+      // A button pressed or released while another is held arrives as pointermove
+      that._updatePointerState(ev, consumed);
     };
   }
   private _getPointerDownHandler() {
@@ -347,9 +642,11 @@ export class InputManager {
       eventData.lastDownY = ev.offsetY;
       eventData.lastDownTime = Date.now();
       that._app.focus();
-      if (!that._callMiddlewares(ev)) {
+      const consumed = that._callMiddlewares(ev);
+      if (!consumed) {
         that._app.dispatchEvent(ev.type as any, ev);
       }
+      that._updatePointerState(ev, consumed);
     };
   }
   private _getPointerUpHandler() {
@@ -381,6 +678,7 @@ export class InputManager {
       if (!that._callMiddlewares(ev)) {
         that._app.dispatchEvent(ev.type as any, ev);
       }
+      that._updatePointerState(ev, false);
       if (emitClickEvent) {
         if (!that._callMiddlewares(ev, 'click')) {
           that._app.dispatchEvent('click', ev);
@@ -406,8 +704,20 @@ export class InputManager {
   private _getKeyboardHandler() {
     const that = this;
     return function (ev: KeyboardEvent) {
-      if (!that._callMiddlewares(ev)) {
+      const consumed = that._callMiddlewares(ev);
+      if (!consumed) {
         that._app.dispatchEvent(ev.type as any, ev);
+      }
+      if (ev.code) {
+        if (ev.type === 'keydown') {
+          // A press consumed by a middleware is not recorded; a release always is
+          if (!consumed && !that._keysDown.has(ev.code)) {
+            that._keysDown.set(ev.code, ev);
+            that._keysPressedPending.add(ev.code);
+          }
+        } else if (ev.type === 'keyup' && that._keysDown.delete(ev.code)) {
+          that._keysReleasedPending.add(ev.code);
+        }
       }
     };
   }
@@ -423,7 +733,16 @@ export class InputManager {
     const that = this;
     return function (ev: WheelEvent) {
       if (!that._callMiddlewares(ev)) {
-        that._app.dispatchEvent(ev.type as any);
+        that._app.dispatchEvent(ev.type as any, ev);
+        // Normalize line and page modes to pixels
+        const scale =
+          ev.deltaMode === WheelEvent.DOM_DELTA_LINE
+            ? 16
+            : ev.deltaMode === WheelEvent.DOM_DELTA_PAGE
+              ? that._target.clientHeight
+              : 1;
+        that._wheelDeltaPending.x += ev.deltaX * scale;
+        that._wheelDeltaPending.y += ev.deltaY * scale;
       }
     };
   }
@@ -431,7 +750,7 @@ export class InputManager {
     const that = this;
     return function (ev: CompositionEvent) {
       if (!that._callMiddlewares(ev)) {
-        that._app.dispatchEvent(ev.type as any);
+        that._app.dispatchEvent(ev.type as any, ev);
       }
     };
   }

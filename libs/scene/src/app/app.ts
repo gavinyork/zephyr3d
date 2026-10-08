@@ -256,6 +256,7 @@ export class Application extends Observable<appEventMap> {
    * - Flushes pending disposals from the previous frame.
    * - Clears device state (framebuffer, viewport, scissor).
    * - Queries frame timing from the device (`elapsedFrame`, `elapsedOverall`).
+   * - Starts a new input frame: input state, gamepads and action maps.
    * - Updates the runtime manager (scripting/behaviors).
    * - Emits `tick` with delta/elapsed times.
    *
@@ -270,6 +271,7 @@ export class Application extends Observable<appEventMap> {
       this.device.setScissor(null);
       const dt = this.device.frameInfo.elapsedFrame;
       const elapsed = this.device.frameInfo.elapsedOverall;
+      this._inputManager._beginFrame(dt * 0.001);
       this.dispatchEvent('tick', dt, elapsed);
       this._engine.update(dt * 0.001, elapsed * 0.001);
       this._engine.render();

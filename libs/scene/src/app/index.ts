@@ -1,5 +1,7 @@
 export * from './app';
 export * from './inputmgr';
+export * from './gamepad';
+export * from './inputactions';
 export * from './api';
 export * from './runtimescript';
 export * from './screen';
