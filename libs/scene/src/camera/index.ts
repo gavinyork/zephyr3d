@@ -4,3 +4,4 @@ export * from './perspectivecamera';
 export * from './base';
 export * from './fps';
 export * from './orbit';
+export * from './follow';
