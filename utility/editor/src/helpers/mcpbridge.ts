@@ -53,6 +53,7 @@ import {
   setTerrainGrassLayers
 } from './mcpterrain';
 import { importModelAsset, saveNodeAsPrefab } from './mcpassets';
+import { getNodePhysics, listPhysicsPresets, removeNodePhysics, setNodePhysics } from './mcpphysics';
 import { eraseFoliage, getFoliageInfo, scatterFoliage, setFoliageLayers } from './mcpfoliage';
 
 type JsonValue = null | boolean | number | string | JsonValue[] | { [key: string]: JsonValue };
@@ -1830,6 +1831,26 @@ async function dispatch(editor: Editor, method: string, params: any): Promise<an
         return await saveNodeAsPrefab(getSceneController(editor), params);
       } catch (err) {
         return { prefab_path: null, err: `${err instanceof Error ? err.message : err}` };
+      }
+    case 'physics_list_presets':
+      return listPhysicsPresets();
+    case 'node_set_physics':
+      try {
+        return await setNodePhysics(getSceneController(editor), params);
+      } catch (err) {
+        return { err: `${err instanceof Error ? err.message : err}` };
+      }
+    case 'node_get_physics':
+      try {
+        return await getNodePhysics(getSceneController(editor), params);
+      } catch (err) {
+        return { physics: null, err: `${err instanceof Error ? err.message : err}` };
+      }
+    case 'node_remove_physics':
+      try {
+        return await removeNodePhysics(getSceneController(editor), params);
+      } catch (err) {
+        return { err: `${err instanceof Error ? err.message : err}` };
       }
     case 'foliage_get_info':
       return getFoliageInfo(getSceneController(editor), params);

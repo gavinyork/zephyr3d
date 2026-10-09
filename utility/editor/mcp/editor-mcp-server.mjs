@@ -2645,6 +2645,67 @@ const BASE_TOOLS = [
     }
   },
   {
+    name: 'physics_list_presets',
+    description:
+      'List the physics presets the editor offers, the same ones as the Add Physics menu: static collider, dynamic body, kinematic body, trigger zone, character, vehicle chassis, wheel, hinge joint. Use a preset key with node_set_physics. Returns { presets, err }.',
+    inputSchema: {
+      type: 'object',
+      properties: { timeout_ms: { type: 'number', default: 10000 } }
+    }
+  },
+  {
+    name: 'node_set_physics',
+    description:
+      'Apply a physics preset to a scene node, like the editor\'s Add Physics menu (undoable). Presets add to what the node has, replacing only the slot they fill, and a collider is fitted to the node\'s bounds when nothing below it has one. preset "vehicle_chassis" makes a heavy dynamic body driven as a vehicle; put the wheels on nodes BELOW it with preset "wheel" (a wheel in front of the chassis steers, one behind drives and holds the handbrake, both worked out from where it sits). preset "character" gives a capsule moved by a script. Optional per-component overrides: body (motionType, mass, linearDamping, angularDamping, gravityScale, ccd, ...), vehicle (maxEngineForce, maxBrakeForce, maxSteerAngle, forward, layer), wheel (radius, suspensionRestLength, suspensionStiffness, frictionSlip, steer, drive, brake, handbrake), character (height, radius), joint (type, axis, limitsEnabled, lowerLimit, upperLimit). Returns { preset, components, err }.',
+    inputSchema: {
+      type: 'object',
+      required: ['node_id', 'preset'],
+      properties: {
+        node_id: { type: 'string', description: 'Persistent id of the scene node.' },
+        preset: {
+          type: 'string',
+          description:
+            'Preset key from physics_list_presets: static_collider, dynamic_body, kinematic_body, trigger_zone, character, vehicle_chassis, wheel, hinge_joint.'
+        },
+        body: { type: 'object', additionalProperties: true, description: 'RigidBody property overrides.' },
+        vehicle: { type: 'object', additionalProperties: true, description: 'Vehicle property overrides.' },
+        wheel: { type: 'object', additionalProperties: true, description: 'Wheel property overrides.' },
+        character: {
+          type: 'object',
+          additionalProperties: true,
+          description: 'CharacterController property overrides.'
+        },
+        joint: { type: 'object', additionalProperties: true, description: 'Joint property overrides.' },
+        timeout_ms: { type: 'number', default: 30000 }
+      }
+    }
+  },
+  {
+    name: 'node_get_physics',
+    description:
+      'Report the physics data of a scene node: which components it has (body, collider, character, vehicle, wheel, joint), the body motion type, any error the simulation reported (e.g. a vehicle without a dynamic body or wheels), and the serialized data. Returns { physics, err }.',
+    inputSchema: {
+      type: 'object',
+      required: ['node_id'],
+      properties: {
+        node_id: { type: 'string', description: 'Persistent id of the scene node.' },
+        timeout_ms: { type: 'number', default: 30000 }
+      }
+    }
+  },
+  {
+    name: 'node_remove_physics',
+    description: 'Remove all physics data from a scene node. Undoable. Returns { err }.',
+    inputSchema: {
+      type: 'object',
+      required: ['node_id'],
+      properties: {
+        node_id: { type: 'string', description: 'Persistent id of the scene node.' },
+        timeout_ms: { type: 'number', default: 30000 }
+      }
+    }
+  },
+  {
     name: 'foliage_get_info',
     description:
       'Describe a FoliageSystem node: the terrain it stands on, its world offset, chunk size, and per layer the asset, instance count, settings and the bounds of its instances (in foliage space, which is world space minus world_offset). Returns { info, err }.',
@@ -2915,6 +2976,8 @@ const UNSAFE_TOOLS_ENABLED =
 // the embedded assistant derives its auto-approval whitelist from it.
 const READONLY_TOOL_NAMES = new Set([
   'terrain_get_info',
+  'physics_list_presets',
+  'node_get_physics',
   'foliage_get_info',
   'terrain_sample_height',
   'editor_connect_info',
@@ -4001,6 +4064,30 @@ const handlers = {
       { node_id: args.node_id, path: args.path },
       Number(args.timeout_ms ?? 30000)
     );
+  },
+  async physics_list_presets(args) {
+    return bridge.send('physics_list_presets', {}, Number(args.timeout_ms ?? 10000));
+  },
+  async node_set_physics(args) {
+    return bridge.send(
+      'node_set_physics',
+      {
+        node_id: args.node_id,
+        preset: args.preset,
+        body: args.body,
+        vehicle: args.vehicle,
+        wheel: args.wheel,
+        character: args.character,
+        joint: args.joint
+      },
+      Number(args.timeout_ms ?? 30000)
+    );
+  },
+  async node_get_physics(args) {
+    return bridge.send('node_get_physics', { node_id: args.node_id }, Number(args.timeout_ms ?? 30000));
+  },
+  async node_remove_physics(args) {
+    return bridge.send('node_remove_physics', { node_id: args.node_id }, Number(args.timeout_ms ?? 30000));
   },
   async foliage_get_info(args) {
     return bridge.send('foliage_get_info', { node_id: args.node_id }, Number(args.timeout_ms ?? 10000));
