@@ -102,7 +102,15 @@ function fittedWheel(node: SceneNode) {
   // Front or rear of the vehicle above: front wheels steer, rear wheels drive
   // (half the engine force each, as for a rear wheel drive car) and hold the handbrake
   const along = alongVehicleForward(node);
-  if (along > 0) {
+  if (along === null) {
+    // Without a vehicle above there is nothing to tell front from rear, and a wheel that neither
+    // steers nor drives is a car that cannot turn or move. Say so rather than fitting a dead wheel.
+    console.warn(
+      `Wheel preset: "${node.name || '(noname)'}" has no Vehicle above it, so it was given no ` +
+        'steering or drive. Add the Vehicle Chassis preset to the node it belongs to first, or ' +
+        'move it under one, then apply the Wheel preset again.'
+    );
+  } else if (along > 0) {
     wheel.steer = 1;
   } else if (along < 0) {
     wheel.drive = 0.5;
@@ -113,16 +121,16 @@ function fittedWheel(node: SceneNode) {
 
 /**
  * How far a wheel node sits ahead of the centre of the vehicle chassis above it,
- * along the vehicle's forward axis; 0 if there is no vehicle above.
+ * along the vehicle's forward axis; null if there is no vehicle above.
  */
-function alongVehicleForward(node: SceneNode) {
+function alongVehicleForward(node: SceneNode): Nullable<number> {
   let chassis = node.parent;
   while (chassis && !chassis.physics?.vehicle) {
     chassis = chassis.parent;
   }
   const vehicle = chassis?.physics?.vehicle;
   if (!chassis || !vehicle) {
-    return 0;
+    return null;
   }
   const local = Matrix4x4.invertAffine(chassis.worldMatrix).transformPointAffine(
     node.getWorldPosition(),
