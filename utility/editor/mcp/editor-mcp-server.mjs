@@ -2676,6 +2676,12 @@ const BASE_TOOLS = [
           description: 'CharacterController property overrides.'
         },
         joint: { type: 'object', additionalProperties: true, description: 'Joint property overrides.' },
+        collider: {
+          type: 'object',
+          additionalProperties: true,
+          description:
+            'Collider overrides, applied to the collider the preset fitted: shape (box, sphere, capsule, cylinder, mesh, convex, terrain), size [x,y,z] for a box, radius, height, offset [x,y,z], friction, restitution, isTrigger, layer, meshLod, terrainResolution. Use shape "terrain" on a ClipmapTerrain to make the ground the vehicle drives on.'
+        },
         timeout_ms: { type: 'number', default: 30000 }
       }
     }
@@ -4078,7 +4084,8 @@ const handlers = {
         vehicle: args.vehicle,
         wheel: args.wheel,
         character: args.character,
-        joint: args.joint
+        joint: args.joint,
+        collider: args.collider
       },
       Number(args.timeout_ms ?? 30000)
     );

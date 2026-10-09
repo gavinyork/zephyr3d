@@ -4,6 +4,7 @@
  * a node has.
  */
 import { NodePhysics, getEngine } from '@zephyr3d/scene';
+import { Quaternion, Vector3 } from '@zephyr3d/base';
 import type { SceneController } from '../controllers/scenecontroller';
 import {
   ApplyPhysicsPresetCommand,
@@ -48,26 +49,93 @@ export function listPhysicsPresets() {
   };
 }
 
+/** `max_engine_force` and `maxEngineForce` both name the same property */
+function toCamelCase(key: string) {
+  return key.replace(/_+([a-z0-9])/g, (_m, c: string) => c.toUpperCase());
+}
+
 /**
- * Copies scalar/vector properties onto a physics component. Only existing properties are written,
- * so a typo is reported instead of silently ignored.
+ * Copies properties onto a physics component, e.g. `{ radius: 0.35 }` onto a wheel.
+ *
+ * Property names are taken as written or in camel case, so `max_engine_force` and
+ * `maxEngineForce` both work. Vectors are given as number arrays. An unknown name is reported
+ * rather than silently ignored.
  */
-function applyOverrides(target: object, values: unknown, label: string) {
+function applyOverrides(target: object | null | undefined, values: unknown, label: string) {
   if (values === undefined || values === null) {
     return null;
+  }
+  if (!target) {
+    return `\`${label}\` was given but the preset has no ${label}`;
   }
   if (typeof values !== 'object' || Array.isArray(values)) {
     return `\`${label}\` must be an object of property values`;
   }
-  for (const [key, value] of Object.entries(values as Record<string, unknown>)) {
-    const current = (target as Record<string, unknown>)[key];
-    if (current === undefined && !(key in target)) {
-      return `${label} has no property "${key}"`;
+  for (const [rawKey, value] of Object.entries(values as Record<string, unknown>)) {
+    const key = rawKey in target ? rawKey : toCamelCase(rawKey);
+    if (!(key in target)) {
+      return `${label} has no property "${rawKey}"`;
     }
+    const current = (target as Record<string, unknown>)[key];
     try {
-      (target as Record<string, unknown>)[key] = value;
+      if (current instanceof Vector3) {
+        if (!Array.isArray(value) || value.length !== 3 || value.some((v) => typeof v !== 'number')) {
+          return `${label}.${key} must be an array of 3 numbers`;
+        }
+        (target as Record<string, unknown>)[key] = new Vector3(value[0], value[1], value[2]);
+      } else if (current instanceof Quaternion) {
+        if (!Array.isArray(value) || value.length !== 4 || value.some((v) => typeof v !== 'number')) {
+          return `${label}.${key} must be an array of 4 numbers`;
+        }
+        (target as Record<string, unknown>)[key] = new Quaternion(value[0], value[1], value[2], value[3]);
+      } else {
+        (target as Record<string, unknown>)[key] = value;
+      }
     } catch (err) {
       return `${label}.${key}: ${err instanceof Error ? err.message : err}`;
+    }
+  }
+  return null;
+}
+
+/** Every property group a preset can produce, with the argument each expects */
+const OVERRIDE_GROUPS: readonly [string, string][] = [
+  ['body', 'RigidBody'],
+  ['vehicle', 'Vehicle'],
+  ['wheel', 'Wheel'],
+  ['character', 'CharacterController'],
+  ['joint', 'Joint']
+];
+
+/** Applies every override group of a call. Returns the first error, or null. */
+function applyAllOverrides(physics: NodePhysics, params: any) {
+  const get = (name: string) =>
+    ({
+      body: physics.body,
+      vehicle: physics.vehicle,
+      wheel: physics.wheel,
+      character: physics.character,
+      joint: physics.joint
+    })[name];
+  for (const [name] of OVERRIDE_GROUPS) {
+    if (params[name] === undefined || params[name] === null) {
+      continue;
+    }
+    const err = applyOverrides(get(name) ?? null, params[name], name);
+    if (err) {
+      return err;
+    }
+  }
+  // Colliders are a list; the overrides apply to each one the preset fitted
+  if (params.collider !== undefined && params.collider !== null) {
+    if (physics.colliders.length === 0) {
+      return '`collider` was given but the preset has no collider';
+    }
+    for (const collider of physics.colliders) {
+      const err = applyOverrides(collider, params.collider, 'collider');
+      if (err) {
+        return err;
+      }
     }
   }
   return null;
@@ -133,15 +201,9 @@ export async function setNodePhysics(controller: SceneController | null, params:
   // NodePhysics first and reject the call before the scene is touched
   const scratch = new NodePhysics();
   preset.apply(node, scratch);
-  const errors = [
-    applyOverrides(scratch.body!, params.body, 'body'),
-    applyOverrides(scratch.vehicle!, params.vehicle, 'vehicle'),
-    applyOverrides(scratch.wheel!, params.wheel, 'wheel'),
-    applyOverrides(scratch.character!, params.character, 'character'),
-    applyOverrides(scratch.joint!, params.joint, 'joint')
-  ].filter((e): e is string => !!e);
-  if (errors.length > 0) {
-    return { err: errors.join('; ') };
+  const invalid = applyAllOverrides(scratch, params);
+  if (invalid) {
+    return { err: invalid };
   }
   await controller.view.cmdManager.execute(
     new ApplyPhysicsPresetCommand(node, {
@@ -149,11 +211,7 @@ export async function setNodePhysics(controller: SceneController | null, params:
       description: preset.description,
       apply(target, physics) {
         preset.apply(target, physics);
-        applyOverrides(physics.body!, params.body, 'body');
-        applyOverrides(physics.vehicle!, params.vehicle, 'vehicle');
-        applyOverrides(physics.wheel!, params.wheel, 'wheel');
-        applyOverrides(physics.character!, params.character, 'character');
-        applyOverrides(physics.joint!, params.joint, 'joint');
+        applyAllOverrides(physics, params);
       }
     })
   );
