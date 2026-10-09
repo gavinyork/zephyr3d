@@ -214,6 +214,12 @@ export async function getTerrainInfo(controller: SceneController | null, params:
     });
   }
   const splatMap = material.getSplatMap();
+  // Augment detail layer info with hex tiling settings
+  for (let i = 0; i < detailLayers.length; i++) {
+    (detailLayers[i] as any).hex_tiling = material.getDetailMapHexTiling(i);
+    const [hRot, hScale, hContrast] = material.getDetailMapHexParams(i);
+    (detailLayers[i] as any).hex_params = [hRot, hScale, hContrast];
+  }
   return {
     info: {
       resolution: [terrain.sizeX, terrain.sizeZ],
@@ -226,6 +232,7 @@ export async function getTerrainInfo(controller: SceneController | null, params:
       height_range: [round(min), round(max)],
       splat_map_size: [splatMap.width, splatMap.height],
       max_detail_layers: splatMap.depth * 4,
+      rvt_enabled: terrain.runtimeVirtualTexture,
       detail_layers: detailLayers,
       grass_layers: grassLayers
     },
@@ -428,12 +435,54 @@ export async function setTerrainDetailLayers(controller: SceneController | null,
       return { err: `Detail layer ${i}: ${e}` };
     }
   }
+  // Validate rvt options before starting
+  const rvtParam = params.rvt;
+  if (
+    rvtParam !== undefined &&
+    rvtParam !== null &&
+    rvtParam !== true &&
+    rvtParam !== false &&
+    typeof rvtParam !== 'object'
+  ) {
+    return {
+      err: '`rvt` must be true, false, null, or an options object { virtual_size?, page_size?, atlas_size?, alloc_budget? }'
+    };
+  }
   material.numDetailMaps = loaded.length;
   for (let i = 0; i < loaded.length; i++) {
+    const info = layers[i] ?? {};
     material.setDetailMap(i, loaded[i].albedo);
     material.setDetailNormalMap(i, loaded[i].normal);
     material.setDetailMapUVScale(i, loaded[i].uvScale);
     material.setDetailMapRoughness(i, loaded[i].roughness);
+    if (info.hex_tiling !== undefined) {
+      material.setDetailMapHexTiling(i, !!info.hex_tiling);
+    }
+    if (Array.isArray(info.hex_params) && info.hex_params.length >= 3) {
+      material.setDetailMapHexParams(
+        i,
+        Number(info.hex_params[0]),
+        Number(info.hex_params[1]),
+        Number(info.hex_params[2])
+      );
+    }
+  }
+  // Toggle / configure RVT after layers are set (RVT checks numDetailMaps > 0)
+  if (rvtParam !== undefined) {
+    if (!rvtParam) {
+      terrain.setRuntimeVirtualTexture(null);
+    } else {
+      const opts =
+        typeof rvtParam === 'object'
+          ? {
+              ...(rvtParam.virtual_size !== undefined ? { virtualSize: Number(rvtParam.virtual_size) } : {}),
+              ...(rvtParam.page_size !== undefined ? { pageSize: Number(rvtParam.page_size) } : {}),
+              ...(rvtParam.atlas_size !== undefined ? { atlasSize: Number(rvtParam.atlas_size) } : {}),
+              ...(rvtParam.alloc_budget !== undefined ? { allocBudget: Number(rvtParam.alloc_budget) } : {})
+            }
+          : {};
+      terrain.setRuntimeVirtualTexture(opts);
+    }
   }
   terrain.invalidateRuntimeVirtualTexture();
   eventBus.dispatchEvent('scene_changed');

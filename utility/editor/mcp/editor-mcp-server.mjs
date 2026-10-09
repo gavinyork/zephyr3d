@@ -2762,7 +2762,7 @@ const BASE_TOOLS = [
   {
     name: 'terrain_get_info',
     description:
-      'Describe a ClipmapTerrain node: resolution, height map size and format, world region and cell size, height scale/base and the current height range in world units, splat map size, detail (texture) layers and grass layers. Call it before terrain_generate to know the world extent. Returns { info, err }.',
+      'Describe a ClipmapTerrain node: resolution, height map size and format, world region and cell size, height scale/base and the current height range in world units, splat map size, detail (texture) layers (including rvt_enabled, hex_tiling and hex_params per layer) and grass layers. Call it before terrain_generate to know the world extent. Returns { info, err }.',
     inputSchema: {
       type: 'object',
       required: ['node_id'],
@@ -2824,7 +2824,7 @@ const BASE_TOOLS = [
   {
     name: 'terrain_set_detail_layers',
     description:
-      'Replace the detail (texture) layers of a ClipmapTerrain, which the splat map blends: up to 8 layers, each with an albedo texture, an optional normal map, the UV scale (texture repeats over the whole terrain, default 100) and roughness. Paint where each layer shows with terrain_generate target splat afterwards. Import textures first with asset_import_from_url. Returns { err }.',
+      'Replace the detail (texture) layers of a ClipmapTerrain, which the splat map blends: up to 8 layers, each with an albedo texture, an optional normal map, the UV scale (texture repeats over the whole terrain, default 100) and roughness. Optionally enable hex tiling per layer (hex_tiling: true, hex_params: [rotation, scale, contrast]) to break UV repetition, and toggle the Runtime Virtual Texture (rvt: true to enable on WebGPU, false to disable, or an options object { virtual_size?, page_size?, atlas_size?, alloc_budget? }) — RVT bakes the blended detail into a virtual texture for much cheaper per-pixel shading and is required for hex tiling. Paint where each layer shows with terrain_generate target splat afterwards. Import textures first with asset_import_from_url. Returns { err }.',
     inputSchema: {
       type: 'object',
       required: ['node_id', 'layers'],
@@ -2839,9 +2839,26 @@ const BASE_TOOLS = [
               albedo: { type: 'string', description: 'Albedo texture asset path.' },
               normal: { type: 'string', description: 'Optional normal map asset path.' },
               uv_scale: { type: 'number', description: 'Texture repeats across the terrain. Default 100.' },
-              roughness: { type: 'number', description: 'Roughness 0..1. Default 1.' }
+              roughness: { type: 'number', description: 'Roughness 0..1. Default 1.' },
+              hex_tiling: {
+                type: 'boolean',
+                description:
+                  'Enable hex tiling for this layer to break texture repetition. Requires rvt: true. Default false.'
+              },
+              hex_params: {
+                type: 'array',
+                items: { type: 'number' },
+                minItems: 3,
+                maxItems: 3,
+                description:
+                  'Hex tiling params: [rotation_strength 0..1, scale 0.5..2, contrast 0..1]. Default [1, 1, 0.5].'
+              }
             }
           }
+        },
+        rvt: {
+          description:
+            'Enable (true or options object { virtual_size?, page_size?, atlas_size?, alloc_budget? }), disable (false/null), or leave unchanged (omit) the Runtime Virtual Texture. RVT is WebGPU-only and required for hex tiling.'
         },
         timeout_ms: { type: 'number', default: 30000 }
       }
