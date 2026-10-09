@@ -10,7 +10,15 @@ import {
   PointLight,
   SpotLight,
   RectLight,
-  ScriptAttachment
+  ScriptAttachment,
+  ClipmapTerrain,
+  Water,
+  ParticleSystem,
+  BatchGroup,
+  Sprite,
+  TextSprite,
+  MSDFText,
+  MSDFTextSprite
 } from '@zephyr3d/scene';
 import { getDevice, getEngine, OrthoCamera, PerspectiveCamera } from '@zephyr3d/scene';
 import { BlobReader, BlobWriter, configure, ZipWriter } from '@zip.js/zip.js';
@@ -30,12 +38,19 @@ import { ProjectService } from '../core/services/project';
 import { isDesktopApp } from '../core/services/desktop';
 import { fileListFileName, libDir, templateScript } from '../core/build/templates';
 import { SceneController } from '../controllers/scenecontroller';
-import { AddShapeCommand } from '../commands/scenecommands';
+import { AddChildCommand, AddShapeCommand } from '../commands/scenecommands';
 import { eventBus } from '../core/eventbus';
 import { EditorCameraController } from './editorcontroller';
 import { shapePrimitivePaths, type ShapePrimitiveType } from './shapeprimitives';
 import { buildPrimitiveGlbFromZmshContent } from './primitiveglb';
 import { captureOnNextFrame } from './capture';
+import {
+  generateTerrainField,
+  getTerrainInfo,
+  sampleTerrainHeight,
+  setTerrainDetailLayers,
+  setTerrainGrassLayers
+} from './mcpterrain';
 
 type JsonValue = null | boolean | number | string | JsonValue[] | { [key: string]: JsonValue };
 type TreeData = { files: { name: string; size: number }[]; subDirs: { [name: string]: TreeData } };
@@ -89,7 +104,8 @@ interface ConsoleEntry {
 }
 
 const MAX_LOGS = 400;
-const MAX_SERIALIZE_DEPTH = 5;
+const MAX_SERIALIZE_DEPTH = 10;
+const MAX_SERIALIZE_ARRAY = 1000;
 const DEFAULT_MCP_PORT = '47231';
 const DEFAULT_GENERATED_MODEL_TIMEOUT_MS = 60000;
 
@@ -167,6 +183,52 @@ function formatValue(value: any): string {
   }
 }
 
+/**
+ * Compact property metadata for the *_get_property_list tools: what a caller needs to read and set
+ * a property, without class references or editor-only flags.
+ */
+function describeEditableProperties(props: any[]) {
+  return props.map((prop) => {
+    const info: Record<string, unknown> = { name: prop.name, type: prop.type };
+    if (prop.description) {
+      info.description = prop.description;
+    }
+    if (prop.default !== undefined && typeof prop.default !== 'object') {
+      info.default = prop.default;
+    } else if (Array.isArray(prop.default)) {
+      info.default = prop.default;
+    }
+    if (prop.readonly) {
+      info.readonly = true;
+    }
+    const options = prop.options ?? {};
+    const values = options.enum?.values;
+    if (Array.isArray(values)) {
+      info.enum = values;
+      const labels = options.enum.labels;
+      if (Array.isArray(labels) && labels.some((label: unknown, i: number) => label !== values[i])) {
+        info.enum_labels = labels;
+      }
+    }
+    if (options.minValue !== undefined) {
+      info.min = options.minValue;
+    }
+    if (options.maxValue !== undefined) {
+      info.max = options.maxValue;
+    }
+    if (Array.isArray(options.mimeTypes) && options.mimeTypes.length > 0) {
+      info.mime_types = options.mimeTypes;
+    }
+    if (options.group) {
+      info.group = options.group;
+    }
+    if (prop.type === 'object_array') {
+      info.note = 'object_array properties cannot be read or set through MCP';
+    }
+    return info;
+  });
+}
+
 function toSnakeCase(value: string): string {
   return String(value)
     .replace(/([a-z0-9])([A-Z])/g, '$1_$2')
@@ -228,7 +290,13 @@ function toJson(value: any, depth = MAX_SERIALIZE_DEPTH, seen = new WeakSet<obje
     }
     seen.add(value);
     if (Array.isArray(value)) {
-      return value.slice(0, 100).map((item) => toJson(item, depth - 1, seen));
+      const items: JsonValue[] = value
+        .slice(0, MAX_SERIALIZE_ARRAY)
+        .map((item) => toJson(item, depth - 1, seen));
+      if (value.length > MAX_SERIALIZE_ARRAY) {
+        items.push(`[${value.length - MAX_SERIALIZE_ARRAY} more items truncated]`);
+      }
+      return items;
     }
     if (value instanceof Error) {
       return {
@@ -268,6 +336,25 @@ function toJson(value: any, depth = MAX_SERIALIZE_DEPTH, seen = new WeakSet<obje
   }
   return String(value);
 }
+
+/** Node classes node_create can instantiate, the same set as the editor Add menu */
+const creatableNodeClasses: Record<string, new (scene: Scene) => SceneNode> = {
+  SceneNode,
+  DirectionalLight,
+  PointLight,
+  SpotLight,
+  RectLight,
+  PerspectiveCamera,
+  OrthoCamera,
+  ClipmapTerrain,
+  Water,
+  ParticleSystem,
+  BatchGroup,
+  Sprite,
+  TextSprite,
+  MSDFText,
+  MSDFTextSprite
+};
 
 function getSceneController(editor: Editor) {
   let controller = editor.moduleManager.currentModule?.controller ?? null;
@@ -1725,6 +1812,20 @@ async function dispatch(editor: Editor, method: string, params: any): Promise<an
       return getStatus(editor);
     case 'model_generate_begin':
       return startGeneratedModelJob(editor, params);
+    case 'terrain_get_info':
+      return getTerrainInfo(getSceneController(editor), params);
+    case 'terrain_generate':
+      try {
+        return await generateTerrainField(editor, getSceneController(editor), params);
+      } catch (err) {
+        return { result: null, err: `${err instanceof Error ? err.message : err}` };
+      }
+    case 'terrain_sample_height':
+      return sampleTerrainHeight(getSceneController(editor), params);
+    case 'terrain_set_detail_layers':
+      return setTerrainDetailLayers(getSceneController(editor), params);
+    case 'terrain_set_grass_layers':
+      return setTerrainGrassLayers(getSceneController(editor), params);
     case 'primitive_export_glb':
       return exportPrimitiveGlb(params);
     case 'model_generate_status': {
@@ -1803,8 +1904,9 @@ async function dispatch(editor: Editor, method: string, params: any): Promise<an
     }
     case 'node_create': {
       try {
-        const scene = getScene(editor);
-        if (!scene) {
+        const controller = getSceneController(editor);
+        const scene = controller?.model?.scene ?? null;
+        if (!controller || !scene) {
           return {
             node_id: null,
             err: 'No scene is currently opened; create or open a scene before creating a node'
@@ -1827,13 +1929,6 @@ async function dispatch(editor: Editor, method: string, params: any): Promise<an
             err: parent.err
           };
         }
-        const creatableNodeClasses: Record<string, new (scene: Scene) => SceneNode> = {
-          SceneNode,
-          DirectionalLight,
-          PointLight,
-          SpotLight,
-          RectLight
-        };
         const nodeClass =
           typeof params.class === 'string' && params.class.trim() ? params.class.trim() : 'SceneNode';
         const ctor = creatableNodeClasses[nodeClass];
@@ -1843,14 +1938,45 @@ async function dispatch(editor: Editor, method: string, params: any): Promise<an
             err: `node_create \`class\` must be one of ${Object.keys(creatableNodeClasses).join(', ')}`
           };
         }
-        const node = new ctor(scene);
-        node.parent = parent.node;
-        if (typeof params.name === 'string' && params.name.trim()) {
-          node.name = params.name.trim();
+        let position: Vector3 | undefined;
+        if (params.position !== undefined) {
+          const parsed = parseNumberArray(params.position, 'position', 3, [0, 0, 0]);
+          if (parsed.err) {
+            return {
+              node_id: null,
+              err: parsed.err
+            };
+          }
+          position = new Vector3(parsed.value![0], parsed.value![1], parsed.value![2]);
         }
+        const name = typeof params.name === 'string' ? params.name.trim() : '';
+        // Same command the Add menu commits, so the creation can be undone, the node gets
+        // a default name and its editor proxy (light/camera gizmo) like a node placed by hand
+        const node = await controller.view.cmdManager.execute(
+          new AddChildCommand(parent.node, ctor, position, name).setDesc(`Add ${nodeClass}`)
+        );
+        if (!node) {
+          return {
+            node_id: null,
+            err: `Failed to create node of class ${nodeClass}`
+          };
+        }
+        if (node instanceof DirectionalLight) {
+          // Like the Add menu, but keep an existing sun light as the sun
+          let hasSun = false;
+          scene.rootNode.iterate((n) => {
+            hasSun ||= n !== node && n instanceof DirectionalLight && n.sunLight;
+            return false;
+          });
+          if (!hasSun) {
+            node.sunLight = true;
+          }
+        }
+        controller.view.createEditorProxy().createProxy(node);
         eventBus.dispatchEvent('scene_changed');
         return {
           node_id: node.persistentId,
+          name: node.name,
           err: null
         };
       } catch (err) {
@@ -2706,7 +2832,7 @@ async function dispatch(editor: Editor, method: string, params: any): Promise<an
           getEngine().resourceManager.getClassByConstructor(Scene)
         );
         return {
-          propertyList: JSON.parse(JSON.stringify(props)),
+          propertyList: describeEditableProperties(props),
           err: null
         };
       } catch (err) {
@@ -2855,7 +2981,7 @@ async function dispatch(editor: Editor, method: string, params: any): Promise<an
           };
         }
         return {
-          propertyList: JSON.parse(JSON.stringify(getEngine().resourceManager.getAllPropertiesByClass(cls))),
+          propertyList: describeEditableProperties(getEngine().resourceManager.getAllPropertiesByClass(cls)),
           err: null
         };
       } catch (err) {
@@ -2888,7 +3014,7 @@ async function dispatch(editor: Editor, method: string, params: any): Promise<an
         };
       }
       return {
-        propertyList: JSON.parse(JSON.stringify(getEngine().resourceManager.getAllPropertiesByClass(cls))),
+        propertyList: describeEditableProperties(getEngine().resourceManager.getAllPropertiesByClass(cls)),
         err: null
       };
     }

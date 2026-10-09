@@ -2210,7 +2210,7 @@ const BASE_TOOLS = [
   {
     name: 'node_create',
     description:
-      'Create a scene node in the current scene. Pass `class` to create a light (DirectionalLight, PointLight, SpotLight, RectLight) or a plain SceneNode group; configure light color/intensity/range afterwards with node_set_properties. Good lighting is essential for PBR materials to read well. Returns { node_id, err }.',
+      'Create a scene node in the current scene, the same way as the editor Add menu (undoable, default name, editor gizmo). Pass `class` to create a light (DirectionalLight, PointLight, SpotLight, RectLight), a camera (PerspectiveCamera, OrthoCamera), a ClipmapTerrain, Water, ParticleSystem, BatchGroup, a sprite/text node (Sprite, TextSprite, MSDFText, MSDFTextSprite) or a plain SceneNode group; configure it afterwards with node_get_property_list / node_set_properties. A new DirectionalLight becomes the sun light when the scene has none. Good lighting is essential for PBR materials to read well. Returns { node_id, name, err }.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -2220,8 +2220,31 @@ const BASE_TOOLS = [
         },
         class: {
           type: 'string',
-          enum: ['SceneNode', 'DirectionalLight', 'PointLight', 'SpotLight', 'RectLight'],
+          enum: [
+            'SceneNode',
+            'DirectionalLight',
+            'PointLight',
+            'SpotLight',
+            'RectLight',
+            'PerspectiveCamera',
+            'OrthoCamera',
+            'ClipmapTerrain',
+            'Water',
+            'ParticleSystem',
+            'BatchGroup',
+            'Sprite',
+            'TextSprite',
+            'MSDFText',
+            'MSDFTextSprite'
+          ],
           description: 'Node class to instantiate. Defaults to SceneNode (an empty group node).'
+        },
+        position: {
+          type: 'array',
+          items: { type: 'number' },
+          minItems: 3,
+          maxItems: 3,
+          description: 'Optional local position as [x, y, z]. Defaults to [0, 0, 0].'
         },
         name: {
           type: 'string',
@@ -2549,6 +2572,121 @@ const BASE_TOOLS = [
         timeout_ms: { type: 'number', default: 30000 }
       }
     }
+  },
+  {
+    name: 'terrain_get_info',
+    description:
+      'Describe a ClipmapTerrain node: resolution, height map size and format, world region and cell size, height scale/base and the current height range in world units, splat map size, detail (texture) layers and grass layers. Call it before terrain_generate to know the world extent. Returns { info, err }.',
+    inputSchema: {
+      type: 'object',
+      required: ['node_id'],
+      properties: {
+        node_id: { type: 'string', description: 'Persistent id of the ClipmapTerrain node.' },
+        timeout_ms: { type: 'number', default: 30000 }
+      }
+    }
+  },
+  {
+    name: 'terrain_sample_height',
+    description:
+      'Sample a terrain at world [x, z] positions: the height in world units, the unit normal and the slope in degrees. Use it to place cameras, props, vehicles and characters on the ground (put them a little above the returned height) and to check slopes. node_id may be omitted when the scene has a single terrain. Points outside the terrain report inside=false. Returns { terrain_id, samples: [{ x, z, height, normal, slope, inside }], err }.',
+    inputSchema: {
+      type: 'object',
+      required: ['points'],
+      properties: {
+        node_id: { type: 'string', description: 'Persistent id of the ClipmapTerrain node; optional with a single terrain.' },
+        points: {
+          type: 'array',
+          minItems: 1,
+          maxItems: 10000,
+          items: { type: 'array', items: { type: 'number' }, minItems: 2, maxItems: 2 },
+          description: 'World positions as [x, z].'
+        },
+        timeout_ms: { type: 'number', default: 30000 }
+      }
+    }
+  },
+  {
+    name: 'terrain_generate',
+    description:
+      'Generate a terrain height map, splat (texture blend) map or grass density map by running a sandboxed JavaScript function once per texel inside the editor. Undoable. The source must define `function sample(p, api, input)`. `p` has x, z (world position of the texel centre), u, v (0..1 over the terrain), i, j (texel), width, depth (grid size), height (current terrain height in world units), normal ([x,y,z]) and slope (degrees from horizontal); p is reused between calls, do not keep it. `api` is the same API as model_generate script nodes (api.math with clamp/lerp/smoothstep/remap..., api.noise.value2/fbm2/value3/fbm3, api.rng(seed), api.vec3, api.curve). Return per target: height -> the new world height in world units (the height map has one texel per terrain Resolution unit); splat -> an array of weights, one per detail layer (normalized automatically), or a single layer index; grass -> density 0..1 for grass_layer. Typical flow: terrain_generate height, then terrain_set_detail_layers + terrain_generate splat using p.height/p.slope, then terrain_set_grass_layers + terrain_generate grass. Returns { result: { target, grid_size, value_range }, err }.',
+    inputSchema: {
+      type: 'object',
+      required: ['node_id', 'target', 'source'],
+      properties: {
+        node_id: { type: 'string', description: 'Persistent id of the ClipmapTerrain node.' },
+        target: { type: 'string', enum: ['height', 'splat', 'grass'], description: 'Which map to generate.' },
+        source: {
+          type: 'string',
+          description:
+            'JavaScript defining function sample(p, api, input). Example island: function sample(p, api, input) { const d = Math.hypot(p.u - 0.5, p.v - 0.5) * 2; const n = api.noise.fbm2(p.x * 0.01, p.z * 0.01, 7, 5); return (1 - api.math.smoothstep(0.5, 1, d + n * 0.3)) * 30 - 2; }'
+        },
+        input: { description: 'Optional JSON value passed as the third argument of sample.' },
+        grass_layer: { type: 'integer', minimum: 0, description: 'Grass layer index, for target grass. Defaults to 0.' },
+        entry: { type: 'string', description: 'Entry function name. Defaults to sample.' },
+        timeout_ms: { type: 'number', default: 120000 }
+      }
+    }
+  },
+  {
+    name: 'terrain_set_detail_layers',
+    description:
+      'Replace the detail (texture) layers of a ClipmapTerrain, which the splat map blends: up to 8 layers, each with an albedo texture, an optional normal map, the UV scale (texture repeats over the whole terrain, default 100) and roughness. Paint where each layer shows with terrain_generate target splat afterwards. Import textures first with asset_import_from_url. Returns { err }.',
+    inputSchema: {
+      type: 'object',
+      required: ['node_id', 'layers'],
+      properties: {
+        node_id: { type: 'string', description: 'Persistent id of the ClipmapTerrain node.' },
+        layers: {
+          type: 'array',
+          maxItems: 8,
+          items: {
+            type: 'object',
+            properties: {
+              albedo: { type: 'string', description: 'Albedo texture asset path.' },
+              normal: { type: 'string', description: 'Optional normal map asset path.' },
+              uv_scale: { type: 'number', description: 'Texture repeats across the terrain. Default 100.' },
+              roughness: { type: 'number', description: 'Roughness 0..1. Default 1.' }
+            }
+          }
+        },
+        timeout_ms: { type: 'number', default: 30000 }
+      }
+    }
+  },
+  {
+    name: 'terrain_set_grass_layers',
+    description:
+      'Add or update the grass layers of a ClipmapTerrain. Existing layers are updated in order (their painted density is kept, their kind cannot change, they cannot be removed); extra entries add new layers. kind "card" draws textured crossed cards (needs a texture with alpha, works everywhere); kind "blade" draws procedural blades (WebGPU only). Paint density with terrain_generate target grass afterwards. settings accepts layer fields such as windLean, swayAmplitude, swaySpeed, and for blades heightRandomness, widthRandomness, tilt, bend, taper, clumpSize, rootOcclusion, lodDistance, rootColor/tipColor/transmissionColor ([r,g,b]). Not undoable. Returns { num_layers, err }.',
+    inputSchema: {
+      type: 'object',
+      required: ['node_id', 'layers'],
+      properties: {
+        node_id: { type: 'string', description: 'Persistent id of the ClipmapTerrain node.' },
+        layers: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              kind: { type: 'string', enum: ['card', 'blade'] },
+              texture: { type: 'string', description: 'Card albedo texture asset path (with alpha).' },
+              blade_width: { type: 'number' },
+              blade_height: { type: 'number' },
+              draw_distance: { type: 'number', description: 'Default 150.' },
+              far_density: { type: 'number', description: 'Density kept at the draw distance, 0..1.' },
+              cells_per_texel: {
+                type: 'integer',
+                minimum: 1,
+                maximum: 8,
+                description: 'Placement cells per density texel along each axis.'
+              },
+              settings: { type: 'object', additionalProperties: true }
+            }
+          }
+        },
+        timeout_ms: { type: 'number', default: 30000 }
+      }
+    }
   }
 ];
 
@@ -2566,6 +2704,8 @@ const UNSAFE_TOOLS_ENABLED =
 // clients through the MCP-standard annotations.readOnlyHint on tools/list;
 // the embedded assistant derives its auto-approval whitelist from it.
 const READONLY_TOOL_NAMES = new Set([
+  'terrain_get_info',
+  'terrain_sample_height',
   'editor_connect_info',
   'editor_wait_ready',
   'editor_status',
@@ -3495,6 +3635,9 @@ const handlers = {
     if (typeof args.parent_id === 'string' && args.parent_id.trim()) {
       params.parent_id = args.parent_id.trim();
     }
+    if (args.position !== undefined) {
+      params.position = args.position;
+    }
     return bridge.send('node_create', params, Number(args.timeout_ms ?? 10000));
   },
   async node_remove(args) {
@@ -3575,6 +3718,46 @@ const handlers = {
       params.up = args.up;
     }
     return bridge.send('camera_look_at', params, Number(args.timeout_ms ?? 10000));
+  },
+  async terrain_get_info(args) {
+    return bridge.send('terrain_get_info', { node_id: args.node_id }, Number(args.timeout_ms ?? 30000));
+  },
+  async terrain_sample_height(args) {
+    return bridge.send(
+      'terrain_sample_height',
+      { node_id: args.node_id, points: args.points },
+      Number(args.timeout_ms ?? 30000)
+    );
+  },
+  async terrain_generate(args) {
+    const timeout = Number(args.timeout_ms ?? 120000);
+    return bridge.send(
+      'terrain_generate',
+      {
+        node_id: args.node_id,
+        target: args.target,
+        source: args.source,
+        input: args.input ?? null,
+        grass_layer: args.grass_layer,
+        entry: args.entry,
+        timeout_ms: timeout
+      },
+      timeout + 5000
+    );
+  },
+  async terrain_set_detail_layers(args) {
+    return bridge.send(
+      'terrain_set_detail_layers',
+      { node_id: args.node_id, layers: args.layers },
+      Number(args.timeout_ms ?? 30000)
+    );
+  },
+  async terrain_set_grass_layers(args) {
+    return bridge.send(
+      'terrain_set_grass_layers',
+      { node_id: args.node_id, layers: args.layers },
+      Number(args.timeout_ms ?? 30000)
+    );
   },
   async model_generate_begin(args) {
     if (!args.spec || typeof args.spec !== 'object') {

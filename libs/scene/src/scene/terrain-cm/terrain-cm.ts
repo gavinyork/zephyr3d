@@ -612,6 +612,27 @@ export class ClipmapTerrain extends applyMixins(GraphNode, mixinDrawable) implem
       });
   }
   /**
+   * Replaces every height of an r16f height map with heights from the CPU.
+   *
+   * Unlike writing into {@link ClipmapTerrain.heightMap} and calling
+   * {@link ClipmapTerrain.updateBoundingBox}, the bounds are right at once and the heights stay
+   * available as {@link ClipmapTerrain.heightData}, so physics colliders need no GPU read back.
+   *
+   * @param data - Half float heights, one per height map texel, row by row
+   */
+  setHeights(data: Uint16Array<ArrayBuffer>) {
+    const heightMap = this.heightMap;
+    if (!heightMap || heightMap.format !== 'r16f' || data.length !== heightMap.width * heightMap.height) {
+      console.error('setHeights() needs one half float per texel of an r16f height map');
+      return;
+    }
+    heightMap.update(data, 0, 0, heightMap.width, heightMap.height);
+    this.updateHeightPyramid();
+    this.setHeightRangeFromHalfData(data);
+    this.setHeightData(data, heightMap.width, heightMap.height);
+    this.invalidateRuntimeVirtualTexture();
+  }
+  /**
    * The min/max height pyramid of the height map: (max, min) in (r, g), mip 0 padded to a power
    * of two by repeating the last row and column, so texel j of mip m covers height map texels
    * [j * 2^m, (j + 1) * 2^m). Null until built.
