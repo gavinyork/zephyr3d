@@ -12,6 +12,7 @@ import {
   RectLight,
   ScriptAttachment,
   ClipmapTerrain,
+  FoliageSystem,
   Water,
   ParticleSystem,
   BatchGroup,
@@ -51,6 +52,8 @@ import {
   setTerrainDetailLayers,
   setTerrainGrassLayers
 } from './mcpterrain';
+import { importModelAsset, saveNodeAsPrefab } from './mcpassets';
+import { eraseFoliage, getFoliageInfo, scatterFoliage, setFoliageLayers } from './mcpfoliage';
 
 type JsonValue = null | boolean | number | string | JsonValue[] | { [key: string]: JsonValue };
 type TreeData = { files: { name: string; size: number }[]; subDirs: { [name: string]: TreeData } };
@@ -63,6 +66,7 @@ type NodeClass =
   | 'Water'
   | 'BatchGroup'
   | 'ClipmapTerrain'
+  | 'FoliageSystem'
   | 'Camera'
   | 'PerspectiveCamera'
   | 'OrthoCamera'
@@ -347,6 +351,7 @@ const creatableNodeClasses: Record<string, new (scene: Scene) => SceneNode> = {
   PerspectiveCamera,
   OrthoCamera,
   ClipmapTerrain,
+  FoliageSystem,
   Water,
   ParticleSystem,
   BatchGroup,
@@ -812,25 +817,27 @@ function getNodeClassName(node: SceneNode): NodeClass {
       ? 'BatchGroup'
       : node.isClipmapTerrain()
         ? 'ClipmapTerrain'
-        : node.isLight() && node.isDirectionLight()
-          ? 'DirectionalLight'
-          : node.isLight() && node.isPointLight()
-            ? 'PointLight'
-            : node.isLight() && node.isSpotLight()
-              ? 'SpotLight'
-              : node.isLight() && node.isRectLight()
-                ? 'RectLight'
-                : node.isParticleSystem()
-                  ? 'ParticleSystem'
-                  : node.isWater()
-                    ? 'Water'
-                    : node instanceof PerspectiveCamera
-                      ? 'PerspectiveCamera'
-                      : node instanceof OrthoCamera
-                        ? 'OrthoCamera'
-                        : node.isCamera()
-                          ? 'Camera'
-                          : 'SceneNode';
+        : node instanceof FoliageSystem
+          ? 'FoliageSystem'
+          : node.isLight() && node.isDirectionLight()
+            ? 'DirectionalLight'
+            : node.isLight() && node.isPointLight()
+              ? 'PointLight'
+              : node.isLight() && node.isSpotLight()
+                ? 'SpotLight'
+                : node.isLight() && node.isRectLight()
+                  ? 'RectLight'
+                  : node.isParticleSystem()
+                    ? 'ParticleSystem'
+                    : node.isWater()
+                      ? 'Water'
+                      : node instanceof PerspectiveCamera
+                        ? 'PerspectiveCamera'
+                        : node instanceof OrthoCamera
+                          ? 'OrthoCamera'
+                          : node.isCamera()
+                            ? 'Camera'
+                            : 'SceneNode';
 }
 
 function vec3ToArray(vec: { x: number; y: number; z: number }): [number, number, number] {
@@ -1812,6 +1819,30 @@ async function dispatch(editor: Editor, method: string, params: any): Promise<an
       return getStatus(editor);
     case 'model_generate_begin':
       return startGeneratedModelJob(editor, params);
+    case 'asset_import_model':
+      try {
+        return await importModelAsset(editor, params);
+      } catch (err) {
+        return { prefab_path: null, err: `${err instanceof Error ? err.message : err}` };
+      }
+    case 'node_save_prefab':
+      try {
+        return await saveNodeAsPrefab(getSceneController(editor), params);
+      } catch (err) {
+        return { prefab_path: null, err: `${err instanceof Error ? err.message : err}` };
+      }
+    case 'foliage_get_info':
+      return getFoliageInfo(getSceneController(editor), params);
+    case 'foliage_set_layers':
+      return setFoliageLayers(getSceneController(editor), params);
+    case 'foliage_scatter':
+      try {
+        return await scatterFoliage(getSceneController(editor), params);
+      } catch (err) {
+        return { result: null, err: `${err instanceof Error ? err.message : err}` };
+      }
+    case 'foliage_erase':
+      return eraseFoliage(getSceneController(editor), params);
     case 'terrain_get_info':
       return getTerrainInfo(getSceneController(editor), params);
     case 'terrain_generate':
@@ -3705,6 +3736,7 @@ async function dispatch(editor: Editor, method: string, params: any): Promise<an
         'Water',
         'BatchGroup',
         'ClipmapTerrain',
+        'FoliageSystem',
         'Camera',
         'PerspectiveCamera',
         'OrthoCamera',

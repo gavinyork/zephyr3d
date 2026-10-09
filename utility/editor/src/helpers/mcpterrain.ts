@@ -38,7 +38,7 @@ export function findTerrain(controller: SceneController | null, id: unknown): Te
 }
 
 /** World heights of the height map texels, row by row */
-async function readWorldHeights(terrain: ClipmapTerrain) {
+export async function readWorldHeights(terrain: ClipmapTerrain) {
   const heightMap = terrain.heightMap!;
   const w = heightMap.width;
   const h = heightMap.height;

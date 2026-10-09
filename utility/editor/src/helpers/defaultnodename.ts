@@ -8,6 +8,7 @@ const ctorNameOverrides: Record<string, string> = {
   SceneNode: 'Empty Node',
   BatchGroup: 'Batch Group',
   ClipmapTerrain: 'Terrain',
+  FoliageSystem: 'Foliage',
   MSDFText: 'MSDFText'
 };
 

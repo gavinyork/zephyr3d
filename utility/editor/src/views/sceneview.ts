@@ -23,6 +23,7 @@ import {
   SpotLight,
   Water,
   ClipmapTerrain,
+  FoliageSystem,
   PerspectiveCamera,
   //OrthoCamera,
   getDevice,
@@ -645,6 +646,13 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
               label: 'Terrain',
               action: () => {
                 this.handleAddNode(ClipmapTerrain, 'Add terrain');
+                return true;
+              }
+            },
+            {
+              label: 'Foliage',
+              action: () => {
+                this.handleAddNode(FoliageSystem, 'Add foliage');
                 return true;
               }
             }

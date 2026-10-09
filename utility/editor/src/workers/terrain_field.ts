@@ -14,6 +14,7 @@
  */
 import { checkDeadline, cloneJsonValue, compileSandboxedScript, createScriptApi } from './procedural_core';
 import type { JsonValue } from './procedural_core';
+import { sampleHeight, sampleNormal } from './terrain_sampling';
 
 export type TerrainFieldTarget = 'height' | 'splat' | 'grass';
 
@@ -46,21 +47,6 @@ export type TerrainFieldResult = {
   max: number;
 };
 
-function sampleHeight(heights: Float32Array, w: number, h: number, u: number, v: number) {
-  // Texel i holds the height at the centre of cell i, at u = (i + 0.5) / w
-  const fx = Math.min(Math.max(u * w - 0.5, 0), w - 1);
-  const fz = Math.min(Math.max(v * h - 0.5, 0), h - 1);
-  const x0 = Math.floor(fx);
-  const z0 = Math.floor(fz);
-  const x1 = Math.min(x0 + 1, w - 1);
-  const z1 = Math.min(z0 + 1, h - 1);
-  const tx = fx - x0;
-  const tz = fz - z0;
-  const a = heights[z0 * w + x0] + (heights[z0 * w + x1] - heights[z0 * w + x0]) * tx;
-  const b = heights[z1 * w + x0] + (heights[z1 * w + x1] - heights[z1 * w + x0]) * tx;
-  return a + (b - a) * tz;
-}
-
 function evaluate(msg: TerrainFieldMessage): TerrainFieldResult {
   const { width, depth, region, heights, heightsWidth, heightsDepth, target } = msg;
   if (!(width > 0 && depth > 0)) {
@@ -71,11 +57,6 @@ function evaluate(msg: TerrainFieldMessage): TerrainFieldResult {
   const input = cloneJsonValue(msg.input ?? null);
   const rw = region[2] - region[0];
   const rh = region[3] - region[1];
-  // Normal from central differences one height texel apart
-  const du = 1 / heightsWidth;
-  const dv = 1 / heightsDepth;
-  const cellX = rw / heightsWidth;
-  const cellZ = rh / heightsDepth;
   const normal: [number, number, number] = [0, 1, 0];
   const p = {
     x: 0,
@@ -121,17 +102,7 @@ function evaluate(msg: TerrainFieldMessage): TerrainFieldResult {
       p.x = region[0] + u * rw;
       p.z = region[1] + v * rh;
       p.height = sampleHeight(heights, heightsWidth, heightsDepth, u, v);
-      const hl = sampleHeight(heights, heightsWidth, heightsDepth, u - du, v);
-      const hr = sampleHeight(heights, heightsWidth, heightsDepth, u + du, v);
-      const hd = sampleHeight(heights, heightsWidth, heightsDepth, u, v - dv);
-      const hu = sampleHeight(heights, heightsWidth, heightsDepth, u, v + dv);
-      const nx = -(hr - hl) / (2 * cellX);
-      const nz = -(hu - hd) / (2 * cellZ);
-      const len = Math.sqrt(nx * nx + 1 + nz * nz);
-      normal[0] = nx / len;
-      normal[1] = 1 / len;
-      normal[2] = nz / len;
-      p.slope = (Math.acos(Math.min(1, normal[1])) * 180) / Math.PI;
+      p.slope = sampleNormal(heights, heightsWidth, heightsDepth, u, v, rw, rh, normal);
       const out = fn(p, api, input);
       const index = j * width + i;
       if (target === 'height') {

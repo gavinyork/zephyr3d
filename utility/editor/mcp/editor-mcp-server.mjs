@@ -23,7 +23,15 @@ const ASSISTANT_TYPE_INDEX_PATH = path.resolve(
   'zephyr-types-index.json'
 );
 const ASSISTANT_TYPES_VENDOR_ROOT = path.resolve(__dirname, '..', 'dist', 'vendor', 'zephyr3d');
-const ASSISTANT_TYPE_PACKAGES = ['base', 'device', 'scene', 'physics', 'imgui', 'backend-webgl', 'backend-webgpu'];
+const ASSISTANT_TYPE_PACKAGES = [
+  'base',
+  'device',
+  'scene',
+  'physics',
+  'imgui',
+  'backend-webgl',
+  'backend-webgpu'
+];
 const MAX_TYPE_FILE_LINES = 240;
 let assistantTypeIndexPromise = null;
 
@@ -2210,7 +2218,7 @@ const BASE_TOOLS = [
   {
     name: 'node_create',
     description:
-      'Create a scene node in the current scene, the same way as the editor Add menu (undoable, default name, editor gizmo). Pass `class` to create a light (DirectionalLight, PointLight, SpotLight, RectLight), a camera (PerspectiveCamera, OrthoCamera), a ClipmapTerrain, Water, ParticleSystem, BatchGroup, a sprite/text node (Sprite, TextSprite, MSDFText, MSDFTextSprite) or a plain SceneNode group; configure it afterwards with node_get_property_list / node_set_properties. A new DirectionalLight becomes the sun light when the scene has none. Good lighting is essential for PBR materials to read well. Returns { node_id, name, err }.',
+      'Create a scene node in the current scene, the same way as the editor Add menu (undoable, default name, editor gizmo). Pass `class` to create a light (DirectionalLight, PointLight, SpotLight, RectLight), a camera (PerspectiveCamera, OrthoCamera), a ClipmapTerrain, a FoliageSystem (scattered trees/rocks; create it as a child of the terrain), Water, ParticleSystem, BatchGroup, a sprite/text node (Sprite, TextSprite, MSDFText, MSDFTextSprite) or a plain SceneNode group; configure it afterwards with node_get_property_list / node_set_properties. A new DirectionalLight becomes the sun light when the scene has none. Good lighting is essential for PBR materials to read well. Returns { node_id, name, err }.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -2229,6 +2237,7 @@ const BASE_TOOLS = [
             'PerspectiveCamera',
             'OrthoCamera',
             'ClipmapTerrain',
+            'FoliageSystem',
             'Water',
             'ParticleSystem',
             'BatchGroup',
@@ -2568,7 +2577,184 @@ const BASE_TOOLS = [
     inputSchema: {
       type: 'object',
       properties: {
-        id: { type: 'string', description: 'Checkpoint id returned by scene_checkpoint. Defaults to the latest checkpoint.' },
+        id: {
+          type: 'string',
+          description: 'Checkpoint id returned by scene_checkpoint. Defaults to the latest checkpoint.'
+        },
+        timeout_ms: { type: 'number', default: 30000 }
+      }
+    }
+  },
+  {
+    name: 'asset_import_model',
+    description:
+      'Import a 3D model (glTF .gltf with its .bin and textures, .glb, .fbx, .obj...) into the project as a .zprefab plus its meshes, materials and textures, like importing it in the content browser. The source is a URL (a .gltf URL pulls the buffers and images it references, relative to it) or a model already in the project (src_path). Generates levels of detail by default, which large meshes such as scanned trees and rocks need to be scattered in numbers. Instantiate the prefab with mesh_load_from_asset, or scatter it with foliage_set_layers. Returns { prefab_path, meshes, num_textures, num_animations, err }.',
+    inputSchema: {
+      type: 'object',
+      required: ['dest_dir'],
+      properties: {
+        url: { type: 'string', description: 'http(s) URL of the model file.' },
+        src_path: { type: 'string', description: 'Model asset path in the project, instead of url.' },
+        dependency_urls: {
+          type: 'object',
+          additionalProperties: { type: 'string' },
+          description:
+            'For a .gltf url: download URLs of referenced files that are not hosted next to it, keyed by the uri written in the gltf (e.g. Poly Haven: { "textures/x_diff_1k.jpg": "https://dl.polyhaven.org/.../x_diff_1k.jpg" }, as listed by its files API).'
+        },
+        dest_dir: {
+          type: 'string',
+          description:
+            'Directory under /assets receiving the prefab and its assets, e.g. /assets/models/palm.'
+        },
+        name: { type: 'string', description: 'Prefab name. Defaults to the model file name.' },
+        generate_lods: {
+          type: 'boolean',
+          description: 'Generate levels of detail for the meshes. Default true.'
+        },
+        lod_reduction: {
+          type: 'number',
+          description: 'Fraction of the previous level triangles each level keeps.'
+        },
+        lod_min_triangles: { type: 'number', description: 'Fewest triangles a generated level may have.' },
+        compress_textures: { type: 'boolean', description: 'Mark textures for compression. Default false.' },
+        compress_vertices: {
+          type: 'boolean',
+          description: 'Mark meshes for vertex compression. Default false.'
+        },
+        import_animations: { type: 'boolean', description: 'Default true.' },
+        import_skeletons: { type: 'boolean', description: 'Default true.' },
+        timeout_ms: { type: 'number', default: 600000 }
+      }
+    }
+  },
+  {
+    name: 'node_save_prefab',
+    description:
+      'Save a scene node and its descendants as a .zprefab asset (like Save as Prefab in the editor), e.g. to turn parts assembled from generated meshes into a reusable object for mesh_load_from_asset or foliage layers. The node transform is not stored. Returns { prefab_path, err }.',
+    inputSchema: {
+      type: 'object',
+      required: ['node_id', 'path'],
+      properties: {
+        node_id: { type: 'string', description: 'Persistent id of the node.' },
+        path: {
+          type: 'string',
+          description: 'Destination path under /assets, e.g. /assets/prefabs/palm.zprefab.'
+        },
+        timeout_ms: { type: 'number', default: 30000 }
+      }
+    }
+  },
+  {
+    name: 'foliage_get_info',
+    description:
+      'Describe a FoliageSystem node: the terrain it stands on, its world offset, chunk size, and per layer the asset, instance count, settings and the bounds of its instances (in foliage space, which is world space minus world_offset). Returns { info, err }.',
+    inputSchema: {
+      type: 'object',
+      required: ['node_id'],
+      properties: {
+        node_id: { type: 'string', description: 'Persistent id of the FoliageSystem node.' },
+        timeout_ms: { type: 'number', default: 10000 }
+      }
+    }
+  },
+  {
+    name: 'foliage_set_layers',
+    description:
+      'Set the layers of a FoliageSystem: each layer scatters one asset (a .zprefab or a model such as .glb/.gltf, ideally with LODs; every mesh in it is drawn instanced). The array replaces the layer list in order: a layer keeping its asset keeps its instances (unless clear is true), a changed asset clears them, extra layers are added and missing ones removed. Then place instances with foliage_scatter. Undoable. Returns { num_layers, err }.',
+    inputSchema: {
+      type: 'object',
+      required: ['node_id', 'layers'],
+      properties: {
+        node_id: { type: 'string', description: 'Persistent id of the FoliageSystem node.' },
+        chunk_size: {
+          type: 'number',
+          description: 'Edge of the square draw/cull chunks in meters. Default 64.'
+        },
+        layers: {
+          type: 'array',
+          items: {
+            type: 'object',
+            required: ['asset'],
+            properties: {
+              asset: { type: 'string', description: 'Asset path, e.g. /assets/prefabs/palm.zprefab.' },
+              cast_shadow: { type: 'boolean', description: 'Default true.' },
+              cull_distance: {
+                type: 'number',
+                description: 'Instances farther from the camera are hidden. Default 300.'
+              },
+              align_to_normal: {
+                type: 'number',
+                description: '0 keeps instances upright, 1 tilts them with the ground. Default 0.'
+              },
+              clear: { type: 'boolean', description: 'Remove the existing instances of this layer.' }
+            }
+          }
+        },
+        timeout_ms: { type: 'number', default: 30000 }
+      }
+    }
+  },
+  {
+    name: 'foliage_scatter',
+    description:
+      'Scatter instances of one FoliageSystem layer over its terrain. Candidates lie on a jittered grid with cell `spacing` (also roughly the minimum distance between them) inside `region` (default the whole terrain); a sandboxed script `function place(p, api, input)` decides each one. p has x, z (world), u, v (0..1 over the terrain), height (terrain height in world units), normal [x,y,z], slope (degrees) and random (0..1, deterministic per candidate); api is the model_generate script API (api.math, api.noise.fbm2/value2..., api.rng). Return false/0/null to skip, true to keep, a number 0..1 as the keep probability, or { probability?, scale?, rotation? (radians), y_offset? }; unset scale is random in scale_range, unset rotation random. mode replace (default) replaces the layer instances inside the region, add keeps them and avoids them. avoid_layers keeps new instances avoid_radius (default spacing) away from other layers. Undoable. Example: function place(p, api) { if (p.height < 4 || p.slope > 25) return 0; return api.math.smoothstep(0.4, 0.7, api.noise.fbm2(p.x * 0.01, p.z * 0.01, 3, 4)); }. Returns { result: { layer, candidates, placed, layer_count }, err }.',
+    inputSchema: {
+      type: 'object',
+      required: ['node_id', 'layer', 'source', 'spacing'],
+      properties: {
+        node_id: { type: 'string', description: 'Persistent id of the FoliageSystem node.' },
+        layer: { type: 'integer', minimum: 0, description: 'Layer index.' },
+        source: { type: 'string', description: 'JavaScript defining function place(p, api, input).' },
+        spacing: { type: 'number', description: 'Candidate grid cell in meters.' },
+        mode: { type: 'string', enum: ['replace', 'add'] },
+        region: {
+          type: 'array',
+          items: { type: 'number' },
+          minItems: 4,
+          maxItems: 4,
+          description: 'World [minX, minZ, maxX, maxZ]. Defaults to the whole terrain.'
+        },
+        scale_range: {
+          type: 'array',
+          items: { type: 'number' },
+          minItems: 2,
+          maxItems: 2,
+          description: 'Default [0.8, 1.2].'
+        },
+        avoid_layers: {
+          type: 'array',
+          items: { type: 'integer' },
+          description: 'Layers the new instances keep away from.'
+        },
+        avoid_radius: {
+          type: 'number',
+          description: 'Distance kept from avoided instances. Defaults to spacing.'
+        },
+        seed: { type: 'integer', description: 'Random seed. Default 1.' },
+        input: { description: 'Optional JSON value passed as the third argument of place.' },
+        entry: { type: 'string', description: 'Entry function name. Defaults to place.' },
+        timeout_ms: { type: 'number', default: 120000 }
+      }
+    }
+  },
+  {
+    name: 'foliage_erase',
+    description:
+      'Remove the FoliageSystem instances standing within a circle, of one layer or all layers, e.g. to clear a road or a building plot. Undoable. Returns { removed, err }.',
+    inputSchema: {
+      type: 'object',
+      required: ['node_id', 'center', 'radius'],
+      properties: {
+        node_id: { type: 'string', description: 'Persistent id of the FoliageSystem node.' },
+        center: {
+          type: 'array',
+          items: { type: 'number' },
+          minItems: 2,
+          maxItems: 2,
+          description: 'World [x, z].'
+        },
+        radius: { type: 'number' },
+        layer: { type: 'integer', minimum: 0, description: 'Layer index; all layers when omitted.' },
         timeout_ms: { type: 'number', default: 30000 }
       }
     }
@@ -2594,7 +2780,10 @@ const BASE_TOOLS = [
       type: 'object',
       required: ['points'],
       properties: {
-        node_id: { type: 'string', description: 'Persistent id of the ClipmapTerrain node; optional with a single terrain.' },
+        node_id: {
+          type: 'string',
+          description: 'Persistent id of the ClipmapTerrain node; optional with a single terrain.'
+        },
         points: {
           type: 'array',
           minItems: 1,
@@ -2622,7 +2811,11 @@ const BASE_TOOLS = [
             'JavaScript defining function sample(p, api, input). Example island: function sample(p, api, input) { const d = Math.hypot(p.u - 0.5, p.v - 0.5) * 2; const n = api.noise.fbm2(p.x * 0.01, p.z * 0.01, 7, 5); return (1 - api.math.smoothstep(0.5, 1, d + n * 0.3)) * 30 - 2; }'
         },
         input: { description: 'Optional JSON value passed as the third argument of sample.' },
-        grass_layer: { type: 'integer', minimum: 0, description: 'Grass layer index, for target grass. Defaults to 0.' },
+        grass_layer: {
+          type: 'integer',
+          minimum: 0,
+          description: 'Grass layer index, for target grass. Defaults to 0.'
+        },
         entry: { type: 'string', description: 'Entry function name. Defaults to sample.' },
         timeout_ms: { type: 'number', default: 120000 }
       }
@@ -2705,6 +2898,7 @@ const UNSAFE_TOOLS_ENABLED =
 // the embedded assistant derives its auto-approval whitelist from it.
 const READONLY_TOOL_NAMES = new Set([
   'terrain_get_info',
+  'foliage_get_info',
   'terrain_sample_height',
   'editor_connect_info',
   'editor_wait_ready',
@@ -3565,7 +3759,12 @@ const handlers = {
     // asset_write_file bridge method.
     const url = typeof args.url === 'string' ? args.url.trim() : '';
     if (!/^https?:\/\//i.test(url)) {
-      return { path: null, bytes: 0, content_type: null, err: 'asset_import_from_url requires an http(s) `url`' };
+      return {
+        path: null,
+        bytes: 0,
+        content_type: null,
+        err: 'asset_import_from_url requires an http(s) `url`'
+      };
     }
     const destPath = typeof args.path === 'string' ? args.path.trim() : '';
     if (!destPath.startsWith('/assets/') || destPath.startsWith('/assets/@builtins')) {
@@ -3657,7 +3856,9 @@ const handlers = {
       return { err: 'node_set_parent requires the parent_id' };
     }
     const transformMode =
-      typeof args.transform_mode === 'string' && args.transform_mode.trim() ? args.transform_mode.trim() : 'preserve_world';
+      typeof args.transform_mode === 'string' && args.transform_mode.trim()
+        ? args.transform_mode.trim()
+        : 'preserve_world';
     if (!NODE_REPARENT_TRANSFORM_MODE_VALUES.includes(transformMode)) {
       return {
         err: `node_set_parent transform_mode must be one of: ${NODE_REPARENT_TRANSFORM_MODE_VALUES.join(', ')}`
@@ -3718,6 +3919,88 @@ const handlers = {
       params.up = args.up;
     }
     return bridge.send('camera_look_at', params, Number(args.timeout_ms ?? 10000));
+  },
+  async asset_import_model(args) {
+    const timeoutMs = Number(args.timeout_ms ?? 600000);
+    const params = {
+      dest_dir: args.dest_dir,
+      name: args.name,
+      generate_lods: args.generate_lods,
+      lod_reduction: args.lod_reduction,
+      lod_min_triangles: args.lod_min_triangles,
+      compress_textures: args.compress_textures,
+      compress_vertices: args.compress_vertices,
+      import_animations: args.import_animations,
+      import_skeletons: args.import_skeletons
+    };
+    const url = typeof args.url === 'string' ? args.url.trim() : '';
+    if (!url) {
+      return bridge.send('asset_import_model', { ...params, src_path: args.src_path }, timeoutMs);
+    }
+    if (!/^https?:\/\//i.test(url)) {
+      return { prefab_path: null, err: 'asset_import_model `url` must be http(s)' };
+    }
+    // Downloaded here in the Node worker (no renderer CORS limits), then handed to the renderer
+    const MAX_TOTAL_BYTES = 256 * 1024 * 1024;
+    let total = 0;
+    const download = async (fileUrl) => {
+      const response = await fetch(fileUrl, { redirect: 'follow', signal: AbortSignal.timeout(timeoutMs) });
+      if (!response.ok) {
+        throw new Error(`Download of ${fileUrl} failed with status ${response.status}`);
+      }
+      const buffer = Buffer.from(await response.arrayBuffer());
+      total += buffer.length;
+      if (total > MAX_TOTAL_BYTES) {
+        throw new Error(`The model exceeds the ${MAX_TOTAL_BYTES} byte import limit`);
+      }
+      return buffer;
+    };
+    try {
+      const mainName = decodeURIComponent(new URL(url).pathname.split('/').pop() || 'model');
+      const mainBuffer = await download(url);
+      const files = [{ path: mainName, content: mainBuffer.toString('base64') }];
+      if (/\.gltf$/i.test(mainName)) {
+        const gltf = JSON.parse(mainBuffer.toString('utf8'));
+        const uris = new Set();
+        for (const item of [...(gltf.buffers ?? []), ...(gltf.images ?? [])]) {
+          if (typeof item?.uri === 'string' && !item.uri.startsWith('data:')) {
+            uris.add(item.uri);
+          }
+        }
+        for (const uri of uris) {
+          const override = args.dependency_urls?.[uri] ?? args.dependency_urls?.[decodeURIComponent(uri)];
+          const buffer = await download(typeof override === 'string' ? override : new URL(uri, url).href);
+          files.push({ path: decodeURIComponent(uri), content: buffer.toString('base64') });
+        }
+      }
+      return bridge.send('asset_import_model', { ...params, files, main: mainName }, timeoutMs);
+    } catch (err) {
+      return { prefab_path: null, err: String(err?.message ?? err) };
+    }
+  },
+  async node_save_prefab(args) {
+    return bridge.send(
+      'node_save_prefab',
+      { node_id: args.node_id, path: args.path },
+      Number(args.timeout_ms ?? 30000)
+    );
+  },
+  async foliage_get_info(args) {
+    return bridge.send('foliage_get_info', { node_id: args.node_id }, Number(args.timeout_ms ?? 10000));
+  },
+  async foliage_set_layers(args) {
+    return bridge.send(
+      'foliage_set_layers',
+      { node_id: args.node_id, layers: args.layers, chunk_size: args.chunk_size },
+      Number(args.timeout_ms ?? 30000)
+    );
+  },
+  async foliage_scatter(args) {
+    const timeout = Number(args.timeout_ms ?? 120000);
+    return bridge.send('foliage_scatter', { ...args, timeout_ms: timeout }, timeout + 5000);
+  },
+  async foliage_erase(args) {
+    return bridge.send('foliage_erase', args, Number(args.timeout_ms ?? 30000));
   },
   async terrain_get_info(args) {
     return bridge.send('terrain_get_info', { node_id: args.node_id }, Number(args.timeout_ms ?? 30000));

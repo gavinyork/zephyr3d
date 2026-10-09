@@ -150,6 +150,10 @@ export class ClipmapTerrain extends applyMixins(GraphNode, mixinDrawable) implem
   /** Bumped by every height range update, so a read back overtaken by a newer one is dropped */
   private _heightRangeSerial: number;
   private _heightData: Nullable<{ data: Uint16Array; width: number; height: number }>;
+  private _heightReadBack: Nullable<{
+    version: number;
+    promise: Promise<Nullable<{ data: Uint16Array; width: number; height: number }>>;
+  }>;
   private _heightVersion: number;
   private _tmpTexture: DRef<Texture2D>;
   private _virtualTexture: Nullable<TerrainVirtualTexture>;
@@ -185,6 +189,7 @@ export class ClipmapTerrain extends applyMixins(GraphNode, mixinDrawable) implem
     this._maxHeight = 0;
     this._heightRangeSerial = 0;
     this._heightData = null;
+    this._heightReadBack = null;
     this._heightVersion = 0;
     this._material = new DRef(
       new ClipmapTerrainMaterial(this.createHeightMapTexture(this._sizeX, this._sizeZ))
@@ -408,6 +413,7 @@ export class ClipmapTerrain extends applyMixins(GraphNode, mixinDrawable) implem
       this.updateRegion();
       this.updateHeightPyramid();
       this._heightVersion++;
+      this.readBackHeightData();
     }
   }
   /**
@@ -419,12 +425,14 @@ export class ClipmapTerrain extends applyMixins(GraphNode, mixinDrawable) implem
     return this._heightVersion;
   }
   /**
-   * The heights as loaded from the height map asset, half floats row by row,
-   * while the height map is unchanged since loading; null otherwise.
+   * CPU copy of the heights, half floats row by row (height map texel values, before the terrain
+   * scale and translation); null while unknown.
    *
    * @remarks
-   * Lets CPU-side users such as physics read heights without a GPU read back.
-   * Dropped when the height map is replaced or edited.
+   * Lets CPU-side users such as physics and prop placement read heights without a GPU read back.
+   * Known at once when loaded or set with {@link ClipmapTerrain.setHeights}; after other edits
+   * it is null until a read back started by {@link ClipmapTerrain.updateBoundingBox} lands, which
+   * {@link ClipmapTerrain.whenHeightDataReady} waits for.
    */
   get heightData(): Nullable<{
     readonly data: Uint16Array;
@@ -440,6 +448,133 @@ export class ClipmapTerrain extends applyMixins(GraphNode, mixinDrawable) implem
   setHeightData(data: Uint16Array, width: number, height: number) {
     this._heightData = { data, width, height };
     this._heightVersion++;
+  }
+  /**
+   * Resolves once {@link ClipmapTerrain.heightData} is known, reading the heights back from the
+   * GPU if needed. Resolves to null when the height map format cannot be read back.
+   */
+  whenHeightDataReady(): Promise<
+    Nullable<{ readonly data: Uint16Array; readonly width: number; readonly height: number }>
+  > {
+    if (this._heightData) {
+      return Promise.resolve(this._heightData);
+    }
+    return this.readBackHeightData() ?? Promise.resolve(null);
+  }
+  /**
+   * World height of the terrain surface at a world position, bilinearly interpolated, or null
+   * outside the terrain or while {@link ClipmapTerrain.heightData} is unknown.
+   */
+  getHeightAt(x: number, z: number): Nullable<number> {
+    const data = this._heightData;
+    const region = this.worldRegion;
+    if (!data || region.z <= region.x || region.w <= region.y) {
+      return null;
+    }
+    const u = (x - region.x) / (region.z - region.x);
+    const v = (z - region.y) / (region.w - region.y);
+    if (u < 0 || u > 1 || v < 0 || v > 1) {
+      return null;
+    }
+    return this.sampleHeightTexel(data, u, v) * this.scale.y + this.worldMatrix.m13;
+  }
+  /**
+   * Unit surface normal of the terrain at a world position, from central differences one height
+   * map texel apart, or null where {@link ClipmapTerrain.getHeightAt} is.
+   */
+  getNormalAt(x: number, z: number, out?: Vector3): Nullable<Vector3> {
+    const data = this._heightData;
+    const region = this.worldRegion;
+    if (!data || region.z <= region.x || region.w <= region.y) {
+      return null;
+    }
+    const rw = region.z - region.x;
+    const rh = region.w - region.y;
+    const u = (x - region.x) / rw;
+    const v = (z - region.y) / rh;
+    if (u < 0 || u > 1 || v < 0 || v > 1) {
+      return null;
+    }
+    const du = 1 / data.width;
+    const dv = 1 / data.height;
+    const sy = this.scale.y;
+    const dx = (this.sampleHeightTexel(data, u + du, v) - this.sampleHeightTexel(data, u - du, v)) * sy;
+    const dz = (this.sampleHeightTexel(data, u, v + dv) - this.sampleHeightTexel(data, u, v - dv)) * sy;
+    out = out ?? new Vector3();
+    out.setXYZ(-dx / (2 * du * rw), 1, -dz / (2 * dv * rh));
+    return out.inplaceNormalize();
+  }
+  private sampleHeightTexel(
+    data: { data: Uint16Array; width: number; height: number },
+    u: number,
+    v: number
+  ) {
+    // Texel i holds the height at the centre of cell i, at u = (i + 0.5) / width
+    const w = data.width;
+    const h = data.height;
+    const fx = Math.min(Math.max(u * w - 0.5, 0), w - 1);
+    const fz = Math.min(Math.max(v * h - 0.5, 0), h - 1);
+    const x0 = Math.floor(fx);
+    const z0 = Math.floor(fz);
+    const x1 = Math.min(x0 + 1, w - 1);
+    const z1 = Math.min(z0 + 1, h - 1);
+    const tx = fx - x0;
+    const tz = fz - z0;
+    const d = data.data;
+    const h00 = half2float(d[z0 * w + x0]);
+    const h10 = half2float(d[z0 * w + x1]);
+    const h01 = half2float(d[z1 * w + x0]);
+    const h11 = half2float(d[z1 * w + x1]);
+    const a = h00 + (h10 - h00) * tx;
+    const b = h01 + (h11 - h01) * tx;
+    return a + (b - a) * tz;
+  }
+  /**
+   * Reads the half float heights back from the GPU into {@link ClipmapTerrain.heightData}.
+   * A read back overtaken by another height change is dropped.
+   */
+  private readBackHeightData() {
+    const map = this.heightMap;
+    if (!map || (map.format !== 'r16f' && map.format !== 'rgba16f')) {
+      return null;
+    }
+    if (this._heightReadBack && this._heightReadBack.version === this._heightVersion) {
+      return this._heightReadBack.promise;
+    }
+    const version = this._heightVersion;
+    const w = map.width;
+    const h = map.height;
+    const channels = map.format === 'r16f' ? 1 : 4;
+    const buffer = new Uint16Array(w * h * channels);
+    const promise = map
+      .readPixels(0, 0, w, h, 0, 0, buffer)
+      .then(() => {
+        if (version !== this._heightVersion || this.heightMap !== map) {
+          return this._heightData;
+        }
+        let data = buffer;
+        if (channels !== 1) {
+          // The height is in the red channel
+          data = new Uint16Array(w * h);
+          for (let i = 0; i < data.length; i++) {
+            data[i] = buffer[i * channels];
+          }
+        }
+        // Same heights as on the GPU: the version stays, physics need not rebuild
+        this._heightData = { data, width: w, height: h };
+        return this._heightData;
+      })
+      .catch((err) => {
+        console.error(`Terrain height read back failed: ${err}`);
+        return null;
+      })
+      .finally(() => {
+        if (this._heightReadBack?.promise === promise) {
+          this._heightReadBack = null;
+        }
+      });
+    this._heightReadBack = { version, promise };
+    return promise;
   }
   /** The splat map texture */
   get splatMap() {
@@ -588,6 +723,7 @@ export class ClipmapTerrain extends applyMixins(GraphNode, mixinDrawable) implem
     // Called after the heights changed on the GPU: a CPU copy is stale now.
     this._heightData = null;
     this._heightVersion++;
+    this.readBackHeightData();
     const tmp = this.updateHeightPyramid();
     if (!tmp) {
       return;
