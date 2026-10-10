@@ -54,6 +54,17 @@ interface VehicleEntry {
   /** Front, and the axis wheels roll about going forwards (up × front), chassis space. */
   forward: Vector3;
   spinAxis: Vector3;
+  /** Per wheel, the state one step before the wheel's own, interpolated from for drawing. */
+  prevStates: WheelPose[];
+  /** Whether the wheels have had a state from the simulation yet. */
+  hasStates: boolean;
+}
+
+/** The part of a wheel's state that places its node. */
+interface WheelPose {
+  suspensionLength: number;
+  rotation: number;
+  steering: number;
 }
 
 /** World pose of a node, scale dropped. */
@@ -80,6 +91,13 @@ interface BodyEntry {
   curr: Pose;
   /** Where a kinematic body was told to be at the end of the last frame. */
   kinematicFrom: Pose;
+  /**
+   * For a character's body, once moved: its position when the current step began.
+   * A character is drawn between where it was one step before (`prev`) and where
+   * it moved to (`curr`), like a dynamic body; only its position, its rotation is
+   * the node's own.
+   */
+  stepFrom: Vector3 | null;
   /** World matrix the node had after the last write-back or read, to spot teleports. */
   lastMatrix: Float32Array;
   /** A sleeping body has had its resting pose written and needs no more writes. */
@@ -161,6 +179,24 @@ function matrixEquals(m: Float32Array, node: SceneNode) {
     }
   }
   return true;
+}
+
+/** Whether the node's world position is still the one in `m`. */
+function translationEquals(m: Float32Array, node: SceneNode) {
+  const w = node.worldMatrix;
+  return (
+    Math.abs(m[12] - w[12]) <= 1e-6 && Math.abs(m[13] - w[13]) <= 1e-6 && Math.abs(m[14] - w[14]) <= 1e-6
+  );
+}
+
+function copyWheelPose(dst: WheelPose, src: WheelPose) {
+  dst.suspensionLength = src.suspensionLength;
+  dst.rotation = src.rotation;
+  dst.steering = src.steering;
+}
+
+function lerp(a: number, b: number, t: number) {
+  return a + (b - a) * t;
 }
 
 function storeMatrix(m: Float32Array, node: SceneNode) {
@@ -540,8 +576,9 @@ export class PhysicsSimulation
         entry.component._clearForces(entry.body);
       }
     }
-    this._writeBack(this._interpolation ? this._accumulator / fixed : 1);
-    this._writeWheels();
+    const alpha = this._interpolation ? this._accumulator / fixed : 1;
+    this._writeBack(alpha);
+    this._writeWheels(alpha);
     // A frame without steps changes no contacts; diffing it would only see the
     // colliders rebuilt at its start as having let go.
     if (steps > 0) {
@@ -815,10 +852,15 @@ export class PhysicsSimulation
     }
     const host = component.node!;
     const pose = readWorldPose(host, newPose());
-    if (!matrixEquals(bodyEntry.lastMatrix, host)) {
+    if (!translationEquals(bodyEntry.lastMatrix, host)) {
       // Moved by something else since: start from where the node is.
       this._teleport(bodyEntry, pose);
+    } else {
+      // The node shows a position between steps: go on from the simulated one.
+      // Its rotation is the node's, set by scripts as they like.
+      pose.position.set(bodyEntry.curr.position);
     }
+    bodyEntry.stepFrom ??= bodyEntry.curr.position.clone();
     const ownKey = colliderEntry.key;
     const layer = component.layer;
     const result = controller.move(colliderEntry.collider, displacement, (key) => {
@@ -831,8 +873,18 @@ export class PhysicsSimulation
       );
     });
     pose.position.addBy(result.movement);
+    if (!this._inFixedUpdate) {
+      // Moved at frame rate, not in a step: shown in full at once rather than
+      // eased in over the next step.
+      bodyEntry.prev.position.addBy(result.movement);
+      bodyEntry.stepFrom.addBy(result.movement);
+    }
     host.setWorldPose(pose.position, pose.rotation);
-    this._teleport(bodyEntry, pose);
+    bodyEntry.body.setPose(pose.position, pose.rotation);
+    copyPose(bodyEntry.curr, pose);
+    copyPose(bodyEntry.kinematicFrom, pose);
+    storeMatrix(bodyEntry.lastMatrix, host);
+    this._backend!.syncColliders();
     let groundNormal: Vector3 | null = null;
     const collisions = [];
     for (const hit of result.hits) {
@@ -1160,7 +1212,9 @@ export class PhysicsSimulation
       hardPoints,
       restRotations,
       forward,
-      spinAxis
+      spinAxis,
+      prevStates: wheels.map(() => ({ suspensionLength: 0, rotation: 0, steering: 0 })),
+      hasStates: false
     });
   }
 
@@ -1179,6 +1233,7 @@ export class PhysicsSimulation
   private _updateVehicles(dt: number) {
     const toRad = Math.PI / 180;
     for (const entry of this._vehicles.values()) {
+      entry.wheels.forEach((wheel, i) => copyWheelPose(entry.prevStates[i], wheel._state));
       if (entry.owner.disabled) {
         continue;
       }
@@ -1208,12 +1263,22 @@ export class PhysicsSimulation
         const c = this._byKey.get(key)?.component;
         return !!c && !c.isTrigger && this.getLayerCollision(layer, c.layer);
       });
-      entry.wheels.forEach((wheel, i) => entry.vehicle.wheelState(i, wheel._state));
+      entry.wheels.forEach((wheel, i) => {
+        entry.vehicle.wheelState(i, wheel._state);
+        if (!entry.hasStates) {
+          // Nothing to come from yet.
+          copyWheelPose(entry.prevStates[i], wheel._state);
+        }
+      });
+      entry.hasStates = true;
     }
   }
 
-  /** Places the wheel nodes on the drawn chassis: suspension, steering and roll. */
-  private _writeWheels() {
+  /**
+   * Places the wheel nodes on the drawn chassis: suspension, steering and roll,
+   * `alpha` of the way from their state one step before.
+   */
+  private _writeWheels(alpha: number) {
     const pose = newPose();
     const up = Vector3.axisPY();
     const steer = new Quaternion();
@@ -1222,12 +1287,16 @@ export class PhysicsSimulation
     const center = new Vector3();
     for (const entry of this._vehicles.values()) {
       readWorldPose(entry.component.node!, pose);
+      if (!entry.hasStates) {
+        continue;
+      }
       entry.wheels.forEach((wheel, i) => {
         const s = wheel._state;
+        const from = entry.prevStates[i];
         const hard = entry.hardPoints[i];
-        center.setXYZ(hard.x, hard.y - s.suspensionLength, hard.z);
-        Quaternion.fromAxisAngle(up, s.steering, steer);
-        Quaternion.fromAxisAngle(entry.spinAxis, s.rotation, spin);
+        center.setXYZ(hard.x, hard.y - lerp(from.suspensionLength, s.suspensionLength, alpha), hard.z);
+        Quaternion.fromAxisAngle(up, lerp(from.steering, s.steering, alpha), steer);
+        Quaternion.fromAxisAngle(entry.spinAxis, lerp(from.rotation, s.rotation, alpha), spin);
         Quaternion.multiply(steer, spin, rot).multiplyRight(entry.restRotations[i]);
         const worldPos = Vector3.add(
           pose.position,
@@ -1378,6 +1447,7 @@ export class PhysicsSimulation
     copyPose(entry.curr, pose);
     copyPose(entry.prev, pose);
     copyPose(entry.kinematicFrom, pose);
+    entry.stepFrom?.set(pose.position);
     storeMatrix(entry.lastMatrix, entry.component.node!);
     this._backend!.syncColliders();
   }
@@ -1404,6 +1474,7 @@ export class PhysicsSimulation
       prev: pose,
       curr: { position: pose.position.clone(), rotation: pose.rotation.clone() },
       kinematicFrom: { position: pose.position.clone(), rotation: pose.rotation.clone() },
+      stepFrom: null,
       lastMatrix: new Float32Array(16),
       settled: false,
       disabled: false
@@ -1705,6 +1776,12 @@ export class PhysicsSimulation
       if (entry.component.motionType !== 'kinematic') {
         continue;
       }
+      if (entry.stepFrom) {
+        // A character's node shows a position between steps; its body stays
+        // where the character last moved to.
+        entry.body.setKinematicTarget(entry.curr.position, entry.curr.rotation);
+        continue;
+      }
       const target = readWorldPose(entry.component.node!, tmpPose);
       const from = entry.kinematicFrom;
       const p = Vector3.combine(from.position, target.position, 1 - t, t, tmpVec);
@@ -1718,6 +1795,12 @@ export class PhysicsSimulation
 
   private _captureDynamicPoses() {
     for (const entry of this._bodies.values()) {
+      if (entry.stepFrom) {
+        // A character moves in the fixed update before the step.
+        entry.prev.position.set(entry.stepFrom);
+        entry.stepFrom.set(entry.curr.position);
+        continue;
+      }
       if (entry.component.motionType !== 'dynamic') {
         continue;
       }
@@ -1730,6 +1813,13 @@ export class PhysicsSimulation
   /** Writes dynamic bodies back to their nodes, `alpha` of the way from the previous step. */
   private _writeBack(alpha: number) {
     for (const entry of this._bodies.values()) {
+      if (entry.stepFrom) {
+        const host = entry.component.node!;
+        const p = Vector3.combine(entry.prev.position, entry.curr.position, 1 - alpha, alpha, tmpVec);
+        host.setWorldPose(p, null);
+        storeMatrix(entry.lastMatrix, host);
+        continue;
+      }
       if (entry.component.motionType !== 'dynamic') {
         continue;
       }
