@@ -1,4 +1,10 @@
-import { FoliageSystem, FOLIAGE_INSTANCE_STRIDE, GraphNode, type SceneNode } from '../../../scene';
+import {
+  FoliageSystem,
+  FOLIAGE_INSTANCE_STRIDE,
+  GraphNode,
+  type FoliageCollision,
+  type SceneNode
+} from '../../../scene';
 import { defineProps, type SerializableClass } from '../types';
 import type { ResourceManager } from '../manager';
 import { JSONArray } from '../json';
@@ -13,6 +19,7 @@ type FoliageLayerData = {
   castShadow?: boolean;
   cullDistance?: number;
   alignToNormal?: number;
+  collision?: FoliageCollision | null;
 };
 
 function getFoliageContent(foliage: FoliageSystem): ArrayBuffer {
@@ -76,12 +83,18 @@ export function getFoliageSystemClass(manager: ResourceManager): SerializableCla
             const data: FoliageLayerData[] = [];
             for (let i = 0; i < this.numLayers; i++) {
               const layer = this.getLayer(i)!;
-              data.push({
+              const entry: FoliageLayerData = {
                 asset: layer.asset,
                 castShadow: layer.castShadow,
                 cullDistance: layer.cullDistance,
                 alignToNormal: layer.alignToNormal
-              });
+              };
+              // Left out when there is none: a null does not come back as null
+              const collision = layer.collision;
+              if (collision) {
+                entry.collision = collision;
+              }
+              data.push(entry);
             }
             value.object[0] = new JSONArray(null, data);
           },
@@ -93,7 +106,8 @@ export function getFoliageSystemClass(manager: ResourceManager): SerializableCla
               this.addLayer(String(info?.asset ?? ''), {
                 castShadow: info?.castShadow,
                 cullDistance: info?.cullDistance,
-                alignToNormal: info?.alignToNormal
+                alignToNormal: info?.alignToNormal,
+                collision: info?.collision ?? null
               });
             }
           }

@@ -4,7 +4,7 @@
  */
 import type { SceneController } from '../controllers/scenecontroller';
 import { FoliageSystem, FOLIAGE_INSTANCE_STRIDE } from '@zephyr3d/scene';
-import type { FoliageLayerSettings } from '@zephyr3d/scene';
+import type { FoliageCollision, FoliageLayerSettings } from '@zephyr3d/scene';
 import { CustomCommand } from '../commands/scenecommands';
 import { eventBus } from '../core/eventbus';
 import { readWorldHeights } from './mcpterrain';
@@ -45,7 +45,8 @@ function captureState(foliage: FoliageSystem): FoliageState {
       settings: {
         castShadow: layer.castShadow,
         cullDistance: layer.cullDistance,
-        alignToNormal: layer.alignToNormal
+        alignToNormal: layer.alignToNormal,
+        collision: layer.collision
       },
       instances: layer.getInstances()
     });
@@ -135,6 +136,7 @@ export function getFoliageInfo(controller: SceneController | null, params: any) 
       cast_shadow: layer.castShadow,
       cull_distance: layer.cullDistance,
       align_to_normal: layer.alignToNormal,
+      collision: layer.collision,
       local_bounds: layer.count > 0 ? { min: [minX, minZ], max: [maxX, maxZ] } : null
     });
   }
@@ -160,11 +162,17 @@ export async function setFoliageLayers(controller: SceneController | null, param
   if (!Array.isArray(layers)) {
     return { err: '`layers` must be an array of foliage layer settings' };
   }
+  const collisions: (FoliageCollision | null | undefined)[] = [];
   for (let i = 0; i < layers.length; i++) {
     const asset = layers[i]?.asset;
     if (typeof asset !== 'string' || !asset.trim()) {
       return { err: `Layer ${i}: \`asset\` must be the path of a .zprefab or model asset` };
     }
+    const collision = parseCollision(layers[i]?.collision);
+    if (typeof collision === 'string') {
+      return { err: `Layer ${i}: ${collision}` };
+    }
+    collisions.push(collision);
   }
   await commitChange(controller, foliage, 'Set foliage layers', () => {
     if (params.chunk_size !== undefined) {
@@ -176,7 +184,8 @@ export async function setFoliageLayers(controller: SceneController | null, param
         asset: String(info.asset).trim(),
         castShadow: info.cast_shadow,
         cullDistance: info.cull_distance,
-        alignToNormal: info.align_to_normal
+        alignToNormal: info.align_to_normal,
+        collision: collisions[i]
       };
       if (i < foliage.numLayers) {
         const keep = foliage.getLayer(i)!.asset === settings.asset;
@@ -193,6 +202,41 @@ export async function setFoliageLayers(controller: SceneController | null, param
     }
   });
   return { num_layers: foliage.numLayers, err: null };
+}
+
+const COLLISION_SHAPES = ['box', 'sphere', 'capsule', 'cylinder', 'asset'];
+
+/** The collision of a layer from MCP parameters: undefined keeps it, null removes it, a string is an error */
+function parseCollision(value: any): FoliageCollision | null | undefined | string {
+  if (value === undefined) {
+    return undefined;
+  }
+  if (value === null || value === false) {
+    return null;
+  }
+  if (typeof value !== 'object' || !COLLISION_SHAPES.includes(value.shape)) {
+    return `\`collision.shape\` must be one of ${COLLISION_SHAPES.join(', ')}`;
+  }
+  const num = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? v : undefined);
+  const vec3 = (v: unknown) =>
+    Array.isArray(v) && v.length === 3 && v.every((x) => typeof x === 'number' && Number.isFinite(x))
+      ? (v as [number, number, number])
+      : undefined;
+  for (const key of ['size', 'offset']) {
+    if (value[key] !== undefined && !vec3(value[key])) {
+      return `\`collision.${key}\` must be [x, y, z]`;
+    }
+  }
+  return {
+    shape: value.shape,
+    radius: num(value.radius),
+    height: num(value.height),
+    size: vec3(value.size),
+    offset: vec3(value.offset),
+    friction: num(value.friction),
+    restitution: num(value.restitution),
+    layer: num(value.layer)
+  };
 }
 
 function runScatterWorker(message: FoliageScatterMessage, timeoutMs: number): Promise<FoliageScatterResult> {

@@ -1,5 +1,5 @@
 import type { Nullable } from '@zephyr3d/base';
-import { DRef, Matrix4x4, Quaternion, Vector3 } from '@zephyr3d/base';
+import { AABB, DRef, Matrix4x4, Quaternion, Vector3 } from '@zephyr3d/base';
 import type { Scene } from './scene';
 import { SceneNode } from './scene_node';
 import { GraphNode } from './graph_node';
@@ -10,6 +10,8 @@ import type { Primitive } from '../render';
 import type { MeshMaterial } from '../material';
 import type { Camera } from '../camera';
 import { getEngine } from '../app/api';
+import { Collider, NodePhysics, RigidBody } from '../physics';
+import type { ColliderShape } from '../physics';
 
 /** Number of floats per foliage instance: x, z, y offset, rotation about Y, scale */
 export const FOLIAGE_INSTANCE_STRIDE = 5;
@@ -25,7 +27,62 @@ export interface FoliageLayerSettings {
   cullDistance?: number;
   /** How much the instances lean with the ground: 0 stays upright, 1 follows the normal. Default 0. */
   alignToNormal?: number;
+  /** What the instances collide with in the physics simulation; null for nothing. Default null. */
+  collision?: Nullable<FoliageCollision>;
 }
+
+/**
+ * Shape of the colliders of a {@link FoliageLayer}: a basic shape, or `'asset'` for the
+ * colliders on the nodes of the scattered asset itself.
+ * @public
+ */
+export type FoliageCollisionShape = 'box' | 'sphere' | 'capsule' | 'cylinder' | 'asset';
+
+/**
+ * Colliders of the instances of a {@link FoliageLayer}, which make them static obstacles.
+ *
+ * @remarks
+ * Sizes and the offset are in the asset's own units and scale with each instance. Sizes left
+ * out are fitted to the bounds of the asset's meshes: give a trunk radius for a tree, whose
+ * bounds are its canopy. A capsule or cylinder stands on the bottom of the bounds, centred on
+ * the asset's origin; a box or sphere is centred on the bounds.
+ *
+ * With `'asset'`, the box, sphere, capsule and cylinder colliders found on the asset's nodes
+ * are used as they are; mesh and convex colliders are skipped.
+ * @public
+ */
+export interface FoliageCollision {
+  shape: FoliageCollisionShape;
+  /** Radius of a sphere, capsule or cylinder */
+  radius?: number;
+  /** Total height of a capsule or cylinder */
+  height?: number;
+  /** Full size of a box */
+  size?: [number, number, number];
+  /** Centre of the shape */
+  offset?: [number, number, number];
+  /** Default 0.5 */
+  friction?: number;
+  /** Default 0 */
+  restitution?: number;
+  /** Collision layer, 0 to 15. Default 0. */
+  layer?: number;
+}
+
+/** A collider of every instance: its shape, and its transform relative to the instance */
+type FoliageColliderTemplate = {
+  matrix: Matrix4x4;
+  shape: ColliderShape;
+  size: Vector3;
+  radius: number;
+  height: number;
+  offset: Vector3;
+  friction: number;
+  restitution: number;
+  layer: number;
+};
+
+const PRIMITIVE_COLLIDER_SHAPES: readonly ColliderShape[] = ['box', 'sphere', 'capsule', 'cylinder'];
 
 /** A mesh of the layer asset, with its transform relative to the asset root */
 type FoliagePart = {
@@ -52,7 +109,13 @@ export class FoliageLayer {
   /** @internal */
   _alignToNormal: number;
   /** @internal */
+  _collision: Nullable<FoliageCollision>;
+  /** @internal */
   _parts: Nullable<FoliagePart[]>;
+  /** Bounds of the asset's meshes, relative to its root @internal */
+  _bounds: Nullable<AABB>;
+  /** Colliders found on the asset's nodes @internal */
+  _assetColliders: FoliageColliderTemplate[];
   /** @internal */
   _loading: Nullable<Promise<void>>;
   /** @internal */
@@ -63,7 +126,10 @@ export class FoliageLayer {
     this._castShadow = settings?.castShadow ?? true;
     this._cullDistance = settings?.cullDistance ?? 300;
     this._alignToNormal = settings?.alignToNormal ?? 0;
+    this._collision = copyCollision(settings?.collision);
     this._parts = null;
+    this._bounds = null;
+    this._assetColliders = [];
     this._loading = null;
   }
   /** Path of the prefab or model asset the layer scatters */
@@ -86,6 +152,45 @@ export class FoliageLayer {
   get alignToNormal() {
     return this._alignToNormal;
   }
+  /** What the instances collide with; null for nothing. A copy: change it with {@link FoliageSystem.setLayerSettings}. */
+  get collision(): Nullable<FoliageCollision> {
+    return copyCollision(this._collision);
+  }
+  /** @internal */
+  _colliderTemplates(): FoliageColliderTemplate[] {
+    const c = this._collision;
+    if (!c) {
+      return [];
+    }
+    if (c.shape === 'asset') {
+      return this._assetColliders;
+    }
+    const b = this._bounds;
+    const ext = b ? Vector3.sub(b.maxPoint, b.minPoint) : new Vector3(1, 1, 1);
+    const center = b ? Vector3.scale(Vector3.add(b.minPoint, b.maxPoint), 0.5) : new Vector3(0, 0.5, 0);
+    const bottom = b ? b.minPoint.y : 0;
+    const height = c.height ?? ext.y;
+    const radius =
+      c.radius ?? (c.shape === 'sphere' ? Math.max(ext.x, ext.y, ext.z) : Math.min(ext.x, ext.z)) / 2;
+    const offset = c.offset
+      ? new Vector3(c.offset[0], c.offset[1], c.offset[2])
+      : c.shape === 'capsule' || c.shape === 'cylinder'
+        ? new Vector3(0, bottom + height / 2, 0)
+        : center;
+    return [
+      {
+        matrix: Matrix4x4.identity(),
+        shape: c.shape,
+        size: c.size ? new Vector3(c.size[0], c.size[1], c.size[2]) : ext,
+        radius,
+        height,
+        offset,
+        friction: c.friction ?? 0.5,
+        restitution: c.restitution ?? 0,
+        layer: c.layer ?? 0
+      }
+    ];
+  }
   /**
    * The instances, {@link FOLIAGE_INSTANCE_STRIDE} floats each: x, z (local to the foliage system),
    * height offset above the ground, rotation about the vertical axis in radians, uniform scale.
@@ -101,12 +206,30 @@ export class FoliageLayer {
       part.material.dispose();
     }
     this._parts = null;
+    this._bounds = null;
+    this._assetColliders = [];
   }
+}
+
+const COLLISION_SHAPES: readonly FoliageCollisionShape[] = ['box', 'sphere', 'capsule', 'cylinder', 'asset'];
+
+/** A copy of a collision setting; null for none, or for one without a valid shape */
+function copyCollision(c: Nullable<FoliageCollision> | undefined): Nullable<FoliageCollision> {
+  if (!c || !COLLISION_SHAPES.includes(c.shape)) {
+    return null;
+  }
+  return {
+    ...c,
+    size: c.size ? [c.size[0], c.size[1], c.size[2]] : undefined,
+    offset: c.offset ? [c.offset[0], c.offset[1], c.offset[2]] : undefined
+  };
 }
 
 type FoliageChunk = {
   layer: FoliageLayer;
   group: BatchGroup;
+  /** Static body holding the colliders of the chunk's instances */
+  colliders: Nullable<SceneNode>;
   minX: number;
   minZ: number;
   maxX: number;
@@ -237,6 +360,9 @@ export class FoliageSystem extends GraphNode {
     layer._castShadow = settings.castShadow ?? layer._castShadow;
     layer._cullDistance = settings.cullDistance ?? layer._cullDistance;
     layer._alignToNormal = settings.alignToNormal ?? layer._alignToNormal;
+    if (settings.collision !== undefined) {
+      layer._collision = copyCollision(settings.collision);
+    }
     this.invalidate();
   }
   /**
@@ -392,6 +518,7 @@ export class FoliageSystem extends GraphNode {
     for (const chunk of this._chunks) {
       chunk.group.remove();
       chunk.group.dispose();
+      chunk.colliders?.dispose();
     }
     this._chunks = [];
   }
@@ -417,8 +544,36 @@ export class FoliageSystem extends GraphNode {
           console.error(`Foliage: cannot load ${layer._asset}: ${err}`);
         }
         const parts: FoliagePart[] = [];
+        const colliders: FoliageColliderTemplate[] = [];
+        let bounds: Nullable<AABB> = null;
         root?.iterate((node) => {
+          for (const c of node.physics?.colliders ?? []) {
+            if (PRIMITIVE_COLLIDER_SHAPES.includes(c.shape)) {
+              colliders.push({
+                matrix: new Matrix4x4(node.worldMatrix),
+                shape: c.shape,
+                size: new Vector3(c.size),
+                radius: c.radius,
+                height: c.height,
+                offset: new Vector3(c.offset),
+                friction: c.friction,
+                restitution: c.restitution,
+                layer: c.layer
+              });
+            } else {
+              console.warn(`Foliage: ${c.shape} colliders of ${layer._asset} are skipped`);
+            }
+          }
           if (node.isMesh() && node.primitive && node.material) {
+            const box = node.primitive.getBoundingVolume()?.toAABB();
+            if (box) {
+              const world = AABB.transform(box, node.worldMatrix);
+              if (bounds) {
+                bounds.union(world);
+              } else {
+                bounds = world;
+              }
+            }
             if (node.skeletonName || node.morphTargetGroups?.length) {
               console.warn(`Foliage: skinned and morphed meshes of ${layer._asset} are skipped`);
               return false;
@@ -438,6 +593,8 @@ export class FoliageSystem extends GraphNode {
           console.error(`Foliage: ${layer._asset} has no mesh to scatter`);
         }
         layer._parts = parts;
+        layer._bounds = bounds;
+        layer._assetColliders = colliders;
         layer._loading = null;
       })();
     }
@@ -464,12 +621,24 @@ export class FoliageSystem extends GraphNode {
     const ox = this.worldMatrix.m03;
     const oy = this.worldMatrix.m13;
     const oz = this.worldMatrix.m23;
+    const templates = layer._colliderTemplates();
     for (const [key, offsets] of buckets) {
       const [cx, cz] = key.split(',').map(Number);
       const group = new BatchGroup(this.scene!);
       group.sealed = true;
       group.name = `Foliage chunk ${cx},${cz}`;
       group.parent = this;
+      // One static body per chunk, with a collider node per instance and template
+      let colliders: Nullable<SceneNode> = null;
+      if (templates.length > 0) {
+        colliders = new SceneNode(this.scene!);
+        colliders.sealed = true;
+        colliders.name = `Foliage colliders ${cx},${cz}`;
+        colliders.parent = this;
+        const body = new RigidBody();
+        body.motionType = 'static';
+        colliders.physics = new NodePhysics({ body });
+      }
       for (const o of offsets) {
         const x = d[o];
         const z = d[o + 1];
@@ -500,10 +669,27 @@ export class FoliageSystem extends GraphNode {
           mesh.parent = group;
           mesh.setLocalTransform(Matrix4x4.multiply(tmpMatrix, part.matrix, tmpMatrix2));
         }
+        for (const t of templates) {
+          const node = new SceneNode(this.scene!);
+          node.sealed = true;
+          node.parent = colliders;
+          node.setLocalTransform(Matrix4x4.multiply(tmpMatrix, t.matrix, tmpMatrix2));
+          const collider = new Collider();
+          collider.shape = t.shape;
+          collider.size = t.size;
+          collider.radius = t.radius;
+          collider.height = t.height;
+          collider.offset = t.offset;
+          collider.friction = t.friction;
+          collider.restitution = t.restitution;
+          collider.layer = t.layer;
+          node.physics = new NodePhysics({ colliders: [collider] });
+        }
       }
       this._chunks.push({
         layer,
         group,
+        colliders,
         minX: cx * size,
         minZ: cz * size,
         maxX: (cx + 1) * size,

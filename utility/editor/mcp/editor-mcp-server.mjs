@@ -2727,7 +2727,7 @@ const BASE_TOOLS = [
   {
     name: 'foliage_set_layers',
     description:
-      'Set the layers of a FoliageSystem: each layer scatters one asset (a .zprefab or a model such as .glb/.gltf, ideally with LODs; every mesh in it is drawn instanced). The array replaces the layer list in order: a layer keeping its asset keeps its instances (unless clear is true), a changed asset clears them, extra layers are added and missing ones removed. Then place instances with foliage_scatter. Undoable. Returns { num_layers, err }.',
+      'Set the layers of a FoliageSystem: each layer scatters one asset (a .zprefab or a model such as .glb/.gltf, ideally with LODs; every mesh in it is drawn instanced). The array replaces the layer list in order: a layer keeping its asset keeps its instances (unless clear is true), a changed asset clears them, extra layers are added and missing ones removed. collision makes the instances static obstacles in the physics simulation (trees, big rocks; leave it off for bushes and small stones so vehicles drive over them). Then place instances with foliage_scatter. Undoable. Returns { num_layers, err }.',
     inputSchema: {
       type: 'object',
       required: ['node_id', 'layers'],
@@ -2753,7 +2753,35 @@ const BASE_TOOLS = [
                 type: 'number',
                 description: '0 keeps instances upright, 1 tilts them with the ground. Default 0.'
               },
-              clear: { type: 'boolean', description: 'Remove the existing instances of this layer.' }
+              clear: { type: 'boolean', description: 'Remove the existing instances of this layer.' },
+              collision: {
+                type: ['object', 'null'],
+                description:
+                  'Colliders of the instances; null removes them, omitted keeps the current ones. Sizes and offset are in the asset units and scale with each instance; omitted sizes are fitted to the asset mesh bounds, so give a trunk radius for a tree (its bounds are the canopy). A capsule/cylinder stands on the bottom of the bounds at the asset origin; a box/sphere is centred on the bounds. shape asset uses the box/sphere/capsule/cylinder colliders on the asset nodes.',
+                required: ['shape'],
+                properties: {
+                  shape: { type: 'string', enum: ['box', 'sphere', 'capsule', 'cylinder', 'asset'] },
+                  radius: { type: 'number', description: 'Sphere, capsule or cylinder radius.' },
+                  height: { type: 'number', description: 'Total capsule or cylinder height.' },
+                  size: {
+                    type: 'array',
+                    items: { type: 'number' },
+                    minItems: 3,
+                    maxItems: 3,
+                    description: 'Full box size.'
+                  },
+                  offset: {
+                    type: 'array',
+                    items: { type: 'number' },
+                    minItems: 3,
+                    maxItems: 3,
+                    description: 'Shape centre.'
+                  },
+                  friction: { type: 'number', description: 'Default 0.5.' },
+                  restitution: { type: 'number', description: 'Default 0.' },
+                  layer: { type: 'integer', minimum: 0, maximum: 15, description: 'Collision layer. Default 0.' }
+                }
+              }
             }
           }
         },
