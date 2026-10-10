@@ -110,6 +110,11 @@ export interface BackendWorld {
   createVehicle(chassis: BackendBody, forwardAxis: number, wheels: VehicleWheelDesc[]): BackendVehicle;
   /** Moves colliders of bodies teleported since the last step, for queries and characters. */
   syncColliders(): void;
+  /**
+   * Makes queries see colliders added, removed or moved since the last step, without moving
+   * any body or reporting contacts. Queries otherwise see the world as of the last step.
+   */
+  updateQueries(): void;
   /** Steps, reporting colliders that started or stopped touching. */
   step(dt: number, onCollision?: CollisionCallback): void;
   /** Contact details of a touching pair, or null if they no longer touch. */

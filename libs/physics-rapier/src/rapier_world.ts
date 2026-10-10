@@ -504,6 +504,16 @@ export class RapierWorld implements BackendWorld {
   syncColliders() {
     this._world.propagateModifiedBodyPositionsToColliders();
   }
+  updateQueries() {
+    // The query structure is rebuilt by a step; a step of zero time moves nothing. Gravity
+    // and velocities integrate over the timestep, and no event queue is given, so no
+    // contacts are reported either.
+    const dt = this._world.timestep;
+    this._world.timestep = 0;
+    this._world.propagateModifiedBodyPositionsToColliders();
+    this._world.step();
+    this._world.timestep = dt;
+  }
   colliderKey(collider: BackendCollider) {
     return (collider as RCollider).handle;
   }

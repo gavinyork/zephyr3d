@@ -65,7 +65,7 @@ import {
 } from './scene/primitive';
 import { getSceneClass } from './scene/scene';
 import { getTerrainClass } from './scene/terrain';
-import { getFoliageSystemClass } from './scene/foliage';
+import { getFoliageLayerClass, getFoliageSystemClass } from './scene/foliage';
 import {
   getWaterClass,
   getFFTWaveGeneratorClass,
@@ -353,6 +353,7 @@ export class ResourceManager {
         getHairNodeClass(),
         getTerrainClass(this),
         getFoliageSystemClass(this),
+        getFoliageLayerClass(),
         getFFTWaveGeneratorClass(),
         getFBMWaveGeneratorClass(),
         getGerstnerWaveGeneratorClass(),

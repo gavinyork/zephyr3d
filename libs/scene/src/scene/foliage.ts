@@ -12,9 +12,11 @@ import type { Camera } from '../camera';
 import { getEngine } from '../app/api';
 import { Collider, NodePhysics, RigidBody } from '../physics';
 import type { ColliderShape } from '../physics';
+import { FOLIAGE_INSTANCE_STRIDE, FoliageInstanceBuckets } from './foliage_buckets';
+import { FoliageDensityMask } from './foliage_mask';
 
-/** Number of floats per foliage instance: x, z, y offset, rotation about Y, scale */
-export const FOLIAGE_INSTANCE_STRIDE = 5;
+export { FOLIAGE_INSTANCE_STRIDE } from './foliage_buckets';
+export { FoliageDensityMask, FOLIAGE_MASK_TILE_SIZE, foliageBrushWeight } from './foliage_mask';
 
 /**
  * Settings of a {@link FoliageLayer}
@@ -29,6 +31,8 @@ export interface FoliageLayerSettings {
   alignToNormal?: number;
   /** What the instances collide with in the physics simulation; null for nothing. Default null. */
   collision?: Nullable<FoliageCollision>;
+  /** How painted instances are generated; omitted fields keep their defaults */
+  generation?: Partial<FoliageGeneration>;
 }
 
 /**
@@ -69,6 +73,95 @@ export interface FoliageCollision {
   layer?: number;
 }
 
+/**
+ * What painted instances of a {@link FoliageLayer} stand on: the terrain the foliage system is
+ * a descendant of, following it when it changes, or whatever surface with a collider lies below,
+ * at the height found when they were generated.
+ * @public
+ */
+export type FoliageSurface = 'terrain' | 'any';
+
+/**
+ * How the painted instances of a {@link FoliageLayer} are generated from its density mask.
+ *
+ * @remarks
+ * Candidates lie on a grid of `spacing` aligned with the origin of the foliage system, one per
+ * cell, jittered within it. Each cell draws its position, a threshold, a rotation and a scale
+ * from a random sequence seeded only by its coordinates and `seed`, so a candidate is the same
+ * whenever and wherever it is evaluated. A candidate becomes an instance where the density
+ * there, times what the place script returns, is above its threshold and the slope and height
+ * filters pass; painting denser adds instances without moving the ones already there.
+ * @public
+ */
+export interface FoliageGeneration {
+  /** Distance between candidates, roughly the closest two instances get, in meters. Default 4. */
+  spacing: number;
+  /** Range of the uniform scale. Default [0.8, 1.2]. */
+  scaleRange: [number, number];
+  /** Range of the slope, in degrees from horizontal, instances grow on. Default [0, 45]. */
+  slopeRange: [number, number];
+  /** Range of the world height instances grow at; null for no limit. Default null. */
+  heightRange: Nullable<[number, number]>;
+  /** Height above the surface, negative to sink the base into the ground. Default 0. */
+  yOffset: number;
+  /** Whether instances turn randomly about the vertical axis. Default true. */
+  randomYaw: boolean;
+  /** Seed of the candidate grid. Default random at creation. */
+  seed: number;
+  /** What the instances stand on. Default 'terrain'. */
+  surface: FoliageSurface;
+  /** Optional `function place(p, api, input)`, as for the scatter tool; empty for none. */
+  placeScript: string;
+}
+
+function defaultGeneration(): FoliageGeneration {
+  return {
+    spacing: 4,
+    scaleRange: [0.8, 1.2],
+    slopeRange: [0, 45],
+    heightRange: null,
+    yOffset: 0,
+    randomYaw: true,
+    seed: Math.floor(Math.random() * 0x7fffffff),
+    surface: 'terrain',
+    placeScript: ''
+  };
+}
+
+function copyGeneration(g: FoliageGeneration): FoliageGeneration {
+  return {
+    ...g,
+    scaleRange: [g.scaleRange[0], g.scaleRange[1]],
+    slopeRange: [g.slopeRange[0], g.slopeRange[1]],
+    heightRange: g.heightRange ? [g.heightRange[0], g.heightRange[1]] : null
+  };
+}
+
+/** A generation setting with the omitted and invalid fields of `g` taken from `base` */
+function mergeGeneration(base: FoliageGeneration, g: Partial<FoliageGeneration>): FoliageGeneration {
+  const num = (v: unknown, d: number) => (typeof v === 'number' && Number.isFinite(v) ? v : d);
+  const pair = (v: unknown, d: [number, number]): [number, number] =>
+    Array.isArray(v) && v.length === 2 ? [num(v[0], d[0]), num(v[1], d[1])] : [d[0], d[1]];
+  return {
+    spacing: Math.max(0.05, num(g.spacing, base.spacing)),
+    scaleRange: pair(g.scaleRange, base.scaleRange),
+    slopeRange: pair(g.slopeRange, base.slopeRange),
+    heightRange:
+      g.heightRange === undefined
+        ? base.heightRange
+          ? [base.heightRange[0], base.heightRange[1]]
+          : null
+        : g.heightRange
+          ? pair(g.heightRange, [-Infinity, Infinity])
+          : null,
+    yOffset: num(g.yOffset, base.yOffset),
+    randomYaw: typeof g.randomYaw === 'boolean' ? g.randomYaw : base.randomYaw,
+    seed: Math.floor(num(g.seed, base.seed)) | 0,
+    surface: g.surface === 'terrain' || g.surface === 'any' ? g.surface : base.surface,
+    placeScript: typeof g.placeScript === 'string' ? g.placeScript : base.placeScript
+  };
+}
+
 /** A collider of every instance: its shape, and its transform relative to the instance */
 type FoliageColliderTemplate = {
   matrix: Matrix4x4;
@@ -92,16 +185,36 @@ type FoliagePart = {
 };
 
 /**
+ * Which instances of a {@link FoliageLayer}: the ones generated from its density mask, the ones
+ * placed directly (by the scatter tool or {@link FoliageSystem.setInstances}), or both.
+ * @public
+ */
+export type FoliageInstanceGroup = 'generated' | 'manual' | 'all';
+
+/**
  * One kind of object scattered by a {@link FoliageSystem}: an asset and where its copies stand.
+ *
+ * @remarks
+ * A layer holds two groups of instances. The generated ones follow from its
+ * {@link FoliageLayer.mask | density mask} and {@link FoliageLayer.generation | generation
+ * settings}, and only painting and regenerating change them. The manual ones are placed
+ * directly and are left alone by generation; only erasing and the instance methods remove them.
+ * Both are drawn and collide alike.
  * @public
  */
 export class FoliageLayer {
+  /** The foliage system the layer belongs to @internal */
+  _owner: Nullable<FoliageSystem>;
   /** @internal */
   _asset: string;
   /** @internal */
-  _instances: Float32Array;
+  _generated: FoliageInstanceBuckets;
   /** @internal */
-  _count: number;
+  _manual: FoliageInstanceBuckets;
+  /** @internal */
+  _mask: FoliageDensityMask;
+  /** @internal */
+  _generation: FoliageGeneration;
   /** @internal */
   _castShadow: boolean;
   /** @internal */
@@ -118,11 +231,18 @@ export class FoliageLayer {
   _assetColliders: FoliageColliderTemplate[];
   /** @internal */
   _loading: Nullable<Promise<void>>;
-  /** @internal */
-  constructor(asset: string, settings?: FoliageLayerSettings) {
+  /**
+   * Creates a layer; add it to a foliage system with {@link FoliageSystem.insertLayer}
+   * @param asset - Path of the prefab or model asset the layer scatters
+   * @param settings - Layer settings
+   */
+  constructor(asset = '', settings?: FoliageLayerSettings) {
+    this._owner = null;
     this._asset = asset;
-    this._instances = new Float32Array(0);
-    this._count = 0;
+    this._generated = new FoliageInstanceBuckets(64);
+    this._manual = new FoliageInstanceBuckets(64);
+    this._mask = new FoliageDensityMask(1);
+    this._generation = mergeGeneration(defaultGeneration(), settings?.generation ?? {});
     this._castShadow = settings?.castShadow ?? true;
     this._cullDistance = settings?.cullDistance ?? 300;
     this._alignToNormal = settings?.alignToNormal ?? 0;
@@ -132,29 +252,85 @@ export class FoliageLayer {
     this._assetColliders = [];
     this._loading = null;
   }
-  /** Path of the prefab or model asset the layer scatters */
+  /** The foliage system the layer belongs to */
+  get owner() {
+    return this._owner;
+  }
+  /** Path of the prefab or model asset the layer scatters; changing it keeps the instances */
   get asset() {
     return this._asset;
   }
-  /** Number of instances */
+  set asset(val: string) {
+    if (val !== this._asset) {
+      this._dispose();
+      this._asset = val;
+      this._owner?.invalidate();
+    }
+  }
+  /** Number of instances of both groups */
   get count() {
-    return this._count;
+    return this._generated.count + this._manual.count;
+  }
+  /** Number of instances generated from the density mask */
+  get generatedCount() {
+    return this._generated.count;
+  }
+  /** Number of instances placed directly */
+  get manualCount() {
+    return this._manual.count;
+  }
+  /**
+   * Where the layer grows when painted. Change it through the foliage brush or
+   * {@link FoliageSystem.paintMask}, which keep the generated instances in step.
+   */
+  get mask(): FoliageDensityMask {
+    return this._mask;
+  }
+  /**
+   * How painted instances are generated. Reading gives a copy; assigning one changes the
+   * settings but not the instances, until the layer is regenerated.
+   */
+  get generation(): FoliageGeneration {
+    return copyGeneration(this._generation);
+  }
+  set generation(val: Partial<FoliageGeneration>) {
+    this._generation = mergeGeneration(this._generation, val);
   }
   /** Whether the instances cast shadows */
   get castShadow() {
     return this._castShadow;
   }
+  set castShadow(val: boolean) {
+    if (val !== this._castShadow) {
+      this._castShadow = val;
+      this._owner?.invalidate();
+    }
+  }
   /** Distance from the camera beyond which the instances are not drawn */
   get cullDistance() {
     return this._cullDistance;
+  }
+  set cullDistance(val: number) {
+    // Only decides which chunks are shown each frame, nothing to rebuild
+    this._cullDistance = val;
   }
   /** How much the instances lean with the ground: 0 stays upright, 1 follows the normal */
   get alignToNormal() {
     return this._alignToNormal;
   }
-  /** What the instances collide with; null for nothing. A copy: change it with {@link FoliageSystem.setLayerSettings}. */
+  set alignToNormal(val: number) {
+    if (val !== this._alignToNormal) {
+      this._alignToNormal = val;
+      this._owner?.invalidate();
+    }
+  }
+  /** What the instances collide with; null for nothing. Reading gives a copy; assign to change it. */
   get collision(): Nullable<FoliageCollision> {
     return copyCollision(this._collision);
+  }
+  set collision(val: Nullable<FoliageCollision>) {
+    this._collision = copyCollision(val);
+    this._owner?.invalidate();
   }
   /** @internal */
   _colliderTemplates(): FoliageColliderTemplate[] {
@@ -195,9 +371,21 @@ export class FoliageLayer {
    * The instances, {@link FOLIAGE_INSTANCE_STRIDE} floats each: x, z (local to the foliage system),
    * height offset above the ground, rotation about the vertical axis in radians, uniform scale.
    * A copy: change instances with the methods of {@link FoliageSystem}.
+   * @param group - Which instances; both groups by default, the manual ones first
    */
-  getInstances() {
-    return this._instances.slice(0, this._count * FOLIAGE_INSTANCE_STRIDE);
+  getInstances(group: FoliageInstanceGroup = 'all') {
+    if (group === 'generated') {
+      return this._generated.toArray();
+    }
+    if (group === 'manual') {
+      return this._manual.toArray();
+    }
+    const manual = this._manual.toArray();
+    const generated = this._generated.toArray();
+    const out = new Float32Array(manual.length + generated.length);
+    out.set(manual);
+    out.set(generated, manual.length);
+    return out;
   }
   /** @internal */
   _dispose() {
@@ -208,6 +396,8 @@ export class FoliageLayer {
     this._parts = null;
     this._bounds = null;
     this._assetColliders = [];
+    // A load still running is for the old asset, it discards its result
+    this._loading = null;
   }
 }
 
@@ -225,8 +415,22 @@ function copyCollision(c: Nullable<FoliageCollision> | undefined): Nullable<Foli
   };
 }
 
+/** Deterministic value in [0, 1) from a position, standing in for the threshold of a manual instance */
+function positionHash(x: number, z: number) {
+  const f = new Float32Array([x, z]);
+  const u = new Uint32Array(f.buffer);
+  let h = Math.imul(u[0] ^ 0x9e3779b9, 0x85ebca6b) ^ Math.imul(u[1] ^ 0x7f4a7c15, 0xc2b2ae35);
+  h ^= h >>> 16;
+  h = Math.imul(h, 0x7feb352d);
+  h ^= h >>> 15;
+  h = Math.imul(h, 0x846ca68b);
+  h ^= h >>> 16;
+  return (h >>> 0) / 4294967296;
+}
+
 type FoliageChunk = {
   layer: FoliageLayer;
+  key: string;
   group: BatchGroup;
   /** Static body holding the colliders of the chunk's instances */
   colliders: Nullable<SceneNode>;
@@ -246,6 +450,9 @@ const tmpMatrix = new Matrix4x4();
 const tmpMatrix2 = new Matrix4x4();
 const UP = Vector3.axisPY();
 
+/** A region of the plane of a foliage system, `[minX, minZ, maxX, maxZ]` */
+export type FoliageRegion = [number, number, number, number];
+
 /**
  * Scatters many copies of prefabs or models, such as trees, bushes and rocks, over a terrain.
  *
@@ -258,6 +465,7 @@ const UP = Vector3.axisPY();
  * Instances are drawn in square chunks of {@link FoliageSystem.chunkSize}, each a
  * {@link BatchGroup} built on demand and not serialized, which draws a whole chunk in a few
  * instanced draw calls; chunks farther than the cull distance of their layer are hidden.
+ * Changing the instances of an area rebuilds only the chunks it overlaps.
  *
  * Positions are in the space of the foliage system, which is meant to be translated only.
  * @public
@@ -265,8 +473,10 @@ const UP = Vector3.axisPY();
 export class FoliageSystem extends GraphNode {
   private _layers: FoliageLayer[];
   private _chunkSize: number;
-  private _chunks: FoliageChunk[];
+  private _maskCellSize: number;
+  private _chunks: Map<FoliageLayer, Map<string, FoliageChunk>>;
   private _dirty: boolean;
+  private _dirtyChunks: Map<FoliageLayer, Set<string>>;
   private _buildSerial: number;
   private _builtHeightData: unknown;
   private _builtTerrain: Nullable<ClipmapTerrain>;
@@ -278,8 +488,10 @@ export class FoliageSystem extends GraphNode {
     super(scene);
     this._layers = [];
     this._chunkSize = 64;
-    this._chunks = [];
+    this._maskCellSize = 1;
+    this._chunks = new Map();
     this._dirty = false;
+    this._dirtyChunks = new Map();
     this._buildSerial = 0;
     this._builtHeightData = null;
     this._builtTerrain = null;
@@ -292,7 +504,27 @@ export class FoliageSystem extends GraphNode {
     val = Math.max(1, val);
     if (val !== this._chunkSize) {
       this._chunkSize = val;
+      for (const layer of this._layers) {
+        layer._generated.setChunkSize(val);
+        layer._manual.setChunkSize(val);
+      }
       this.invalidate();
+    }
+  }
+  /**
+   * Edge of a cell of the density masks of the layers, in meters. Default 1. Changing it keeps
+   * the cell values, so what was painted scales with it; regenerate the layers afterwards.
+   */
+  get maskCellSize() {
+    return this._maskCellSize;
+  }
+  set maskCellSize(val: number) {
+    val = Math.max(0.05, val);
+    if (val !== this._maskCellSize) {
+      this._maskCellSize = val;
+      for (const layer of this._layers) {
+        layer._mask.cellSize = val;
+      }
     }
   }
   /** Number of layers */
@@ -301,7 +533,7 @@ export class FoliageSystem extends GraphNode {
   }
   /** Total number of instances of all layers */
   get numInstances() {
-    return this._layers.reduce((sum, layer) => sum + layer._count, 0);
+    return this._layers.reduce((sum, layer) => sum + layer.count, 0);
   }
   /**
    * Gets a layer
@@ -311,15 +543,37 @@ export class FoliageSystem extends GraphNode {
     return this._layers[index] ?? null;
   }
   /**
+   * Index of a layer of this system
+   * @param layer - The layer
+   * @returns Its index, or -1
+   */
+  indexOfLayer(layer: FoliageLayer) {
+    return this._layers.indexOf(layer);
+  }
+  /**
    * Adds a layer scattering a prefab (.zprefab) or a model asset
    * @param asset - Path of the asset
    * @param settings - Layer settings
    * @returns Index of the new layer
    */
   addLayer(asset: string, settings?: FoliageLayerSettings) {
-    this._layers.push(new FoliageLayer(asset, settings));
+    return this.insertLayer(new FoliageLayer(asset, settings));
+  }
+  /**
+   * Inserts a layer, which is moved out of the foliage system it belongs to
+   * @param layer - The layer
+   * @param index - Position to insert at; appended when omitted
+   * @returns Index of the layer
+   */
+  insertLayer(layer: FoliageLayer, index?: number) {
+    if (layer._owner) {
+      layer._owner.detachLayer(layer);
+    }
+    const at = Math.max(0, Math.min(index ?? this._layers.length, this._layers.length));
+    this._layers.splice(at, 0, layer);
+    this.adoptLayer(layer);
     this.invalidate();
-    return this._layers.length - 1;
+    return at;
   }
   /**
    * Removes a layer and its instances
@@ -328,9 +582,8 @@ export class FoliageSystem extends GraphNode {
   removeLayer(index: number) {
     const layer = this._layers[index];
     if (layer) {
-      this._layers.splice(index, 1);
+      this.detachLayer(layer);
       layer._dispose();
-      this.invalidate();
     }
   }
   /**
@@ -338,10 +591,49 @@ export class FoliageSystem extends GraphNode {
    */
   clearLayers() {
     for (const layer of this._layers) {
+      layer._owner = null;
       layer._dispose();
     }
     this._layers = [];
     this.invalidate();
+  }
+  /**
+   * Replaces the layer list. Layers already in the system keep their loaded assets, layers
+   * left out are disposed, and layers of another system are moved here.
+   * @param layers - The new layers, in order
+   */
+  setLayers(layers: FoliageLayer[]) {
+    const next = layers.filter((layer, i) => layers.indexOf(layer) === i);
+    for (const layer of this._layers) {
+      if (!next.includes(layer)) {
+        layer._owner = null;
+        layer._dispose();
+      }
+    }
+    for (const layer of next) {
+      if (layer._owner && layer._owner !== this) {
+        layer._owner.detachLayer(layer);
+      }
+      this.adoptLayer(layer);
+    }
+    this._layers = next;
+    this.invalidate();
+  }
+  /** Makes a layer use this system's chunk and mask cell sizes */
+  private adoptLayer(layer: FoliageLayer) {
+    layer._owner = this;
+    layer._generated.setChunkSize(this._chunkSize);
+    layer._manual.setChunkSize(this._chunkSize);
+    layer._mask.cellSize = this._maskCellSize;
+  }
+  /** Takes a layer out of the list, keeping its instances */
+  private detachLayer(layer: FoliageLayer) {
+    const index = this._layers.indexOf(layer);
+    if (index >= 0) {
+      this._layers.splice(index, 1);
+      layer._owner = null;
+      this.invalidate();
+    }
   }
   /**
    * Changes the settings of a layer
@@ -353,9 +645,8 @@ export class FoliageSystem extends GraphNode {
     if (!layer) {
       return;
     }
-    if (settings.asset !== undefined && settings.asset !== layer._asset) {
-      layer._dispose();
-      layer._asset = settings.asset;
+    if (settings.asset !== undefined) {
+      layer.asset = settings.asset;
     }
     layer._castShadow = settings.castShadow ?? layer._castShadow;
     layer._cullDistance = settings.cullDistance ?? layer._cullDistance;
@@ -363,81 +654,188 @@ export class FoliageSystem extends GraphNode {
     if (settings.collision !== undefined) {
       layer._collision = copyCollision(settings.collision);
     }
+    if (settings.generation) {
+      layer._generation = mergeGeneration(layer._generation, settings.generation);
+    }
     this.invalidate();
   }
   /**
-   * Replaces the instances of a layer
+   * Replaces the instances of a layer of one group
    * @param index - Layer index
    * @param data - {@link FOLIAGE_INSTANCE_STRIDE} floats per instance, see {@link FoliageLayer.getInstances}
+   * @param group - Which instances to replace. Default 'manual'; 'all' empties the generated
+   * group and puts the instances in the manual one.
    */
-  setInstances(index: number, data: ArrayLike<number>) {
+  setInstances(index: number, data: ArrayLike<number>, group: FoliageInstanceGroup = 'manual') {
     const layer = this._layers[index];
     if (!layer) {
       return;
     }
-    const count = Math.floor(data.length / FOLIAGE_INSTANCE_STRIDE);
-    layer._instances = Float32Array.from({ length: count * FOLIAGE_INSTANCE_STRIDE }, (_, i) => data[i]);
-    layer._count = count;
-    this.invalidate();
+    const touched = new Set<string>();
+    if (group === 'generated') {
+      for (const key of layer._generated.clear()) {
+        touched.add(key);
+      }
+      layer._generated.add(data, touched);
+    } else {
+      if (group === 'all') {
+        for (const key of layer._generated.clear()) {
+          touched.add(key);
+        }
+      }
+      for (const key of layer._manual.clear()) {
+        touched.add(key);
+      }
+      layer._manual.add(data, touched);
+    }
+    this.invalidateChunks(layer, touched);
   }
   /**
    * Appends instances to a layer
    * @param index - Layer index
    * @param data - {@link FOLIAGE_INSTANCE_STRIDE} floats per instance, see {@link FoliageLayer.getInstances}
+   * @param group - Which group receives them. Default 'manual'.
    */
-  addInstances(index: number, data: ArrayLike<number>) {
+  addInstances(index: number, data: ArrayLike<number>, group: 'generated' | 'manual' = 'manual') {
     const layer = this._layers[index];
     if (!layer) {
       return;
     }
-    const count = Math.floor(data.length / FOLIAGE_INSTANCE_STRIDE);
-    const total = layer._count + count;
-    if (total * FOLIAGE_INSTANCE_STRIDE > layer._instances.length) {
-      const grown = new Float32Array(Math.max(total, layer._count * 2) * FOLIAGE_INSTANCE_STRIDE);
-      grown.set(layer._instances.subarray(0, layer._count * FOLIAGE_INSTANCE_STRIDE));
-      layer._instances = grown;
+    const touched = new Set<string>();
+    (group === 'generated' ? layer._generated : layer._manual).add(data, touched);
+    this.invalidateChunks(layer, touched);
+  }
+  /**
+   * Replaces the generated instances of a layer standing within a region
+   *
+   * @remarks
+   * Used by the foliage generator: the region is aligned with the candidate grid, so the
+   * instances removed and the ones added are of the same candidates.
+   * @param index - Layer index
+   * @param region - `[minX, minZ, maxX, maxZ]`, local; instances with minX ≤ x < maxX and
+   * minZ ≤ z < maxZ are replaced
+   * @param data - The new instances of the region
+   */
+  replaceGeneratedInRegion(index: number, region: Readonly<FoliageRegion>, data: ArrayLike<number>) {
+    const layer = this._layers[index];
+    if (!layer) {
+      return;
     }
-    for (let i = 0; i < count * FOLIAGE_INSTANCE_STRIDE; i++) {
-      layer._instances[layer._count * FOLIAGE_INSTANCE_STRIDE + i] = data[i];
+    const touched = new Set<string>();
+    layer._generated.removeWhere(
+      region,
+      (d, o) => d[o] >= region[0] && d[o] < region[2] && d[o + 1] >= region[1] && d[o + 1] < region[3],
+      touched
+    );
+    layer._generated.add(data, touched);
+    this.invalidateChunks(layer, touched);
+  }
+  /**
+   * Changes the density mask of a layer within a circle; the generated instances are not
+   * regenerated, see {@link FoliageLayer.mask}
+   * @param index - Layer index
+   * @param x - Circle centre x, local
+   * @param z - Circle centre z, local
+   * @param radius - Circle radius
+   * @param amount - Change at full weight, -1 to 1; negative erases
+   * @param falloff - Fraction of the radius over which the brush weight falls to 0
+   * @returns The changed region, or null
+   */
+  paintMask(index: number, x: number, z: number, radius: number, amount: number, falloff = 0.5) {
+    return this._layers[index]?._mask.paintCircle(x, z, radius, amount, falloff) ?? null;
+  }
+  /**
+   * Moves the density mask of a layer within a circle towards a density; the generated
+   * instances are not regenerated, see {@link FoliageLayer.mask}
+   * @param index - Layer index
+   * @param x - Circle centre x, local
+   * @param z - Circle centre z, local
+   * @param radius - Circle radius
+   * @param density - Density inside the circle, 0 to 1
+   * @param falloff - Fraction of the radius over which it blends into what is around
+   * @returns The changed region, or null
+   */
+  fillMaskCircle(index: number, x: number, z: number, radius: number, density: number, falloff = 0.5) {
+    return this._layers[index]?._mask.blendCircle(x, z, radius, density, falloff) ?? null;
+  }
+  /**
+   * Erases manual instances within a circle, by brush weight: an instance goes where the weight
+   * of the brush there is above a value derived from its position, so a soft brush thins them
+   * out towards its edge, the same way every time
+   * @param index - Layer index
+   * @param x - Circle centre x, local
+   * @param z - Circle centre z, local
+   * @param radius - Circle radius
+   * @param strength - Weight at the centre, 0 to 1
+   * @param weight - Brush weight from the distance over the radius
+   * @returns Number of instances removed
+   */
+  eraseManualInstances(
+    index: number,
+    x: number,
+    z: number,
+    radius: number,
+    strength: number,
+    weight: (t: number) => number
+  ) {
+    const layer = this._layers[index];
+    if (!layer || !(radius > 0) || !(strength > 0)) {
+      return 0;
     }
-    layer._count = total;
-    this.invalidate();
+    const touched = new Set<string>();
+    const removed = layer._manual.removeWhere(
+      [x - radius, z - radius, x + radius, z + radius],
+      (d, o) => {
+        const t = Math.hypot(d[o] - x, d[o + 1] - z) / radius;
+        return t < 1 && strength * weight(t) > positionHash(d[o], d[o + 1]);
+      },
+      touched
+    );
+    this.invalidateChunks(layer, touched);
+    return removed;
   }
   /**
    * Removes the instances standing within a circle
+   *
+   * @remarks
+   * Generated instances are removed by clearing the density mask under the circle, so
+   * regenerating the layer does not bring them back.
    * @param x - Circle centre x, local to the foliage system
    * @param z - Circle centre z, local to the foliage system
    * @param radius - Circle radius
    * @param index - Layer index, or -1 for every layer
+   * @param group - Which instances. Default 'all'.
    * @returns Number of instances removed
    */
-  removeInstancesInCircle(x: number, z: number, radius: number, index = -1) {
+  removeInstancesInCircle(
+    x: number,
+    z: number,
+    radius: number,
+    index = -1,
+    group: FoliageInstanceGroup = 'all'
+  ) {
     let removed = 0;
     const r2 = radius * radius;
+    const region: FoliageRegion = [x - radius, z - radius, x + radius, z + radius];
+    const inside = (d: Float32Array, o: number) => {
+      const dx = d[o] - x;
+      const dz = d[o + 1] - z;
+      return dx * dx + dz * dz <= r2;
+    };
     this._layers.forEach((layer, i) => {
       if (index >= 0 && i !== index) {
         return;
       }
-      const d = layer._instances;
-      let n = 0;
-      for (let k = 0; k < layer._count; k++) {
-        const o = k * FOLIAGE_INSTANCE_STRIDE;
-        const dx = d[o] - x;
-        const dz = d[o + 1] - z;
-        if (dx * dx + dz * dz <= r2) {
-          continue;
-        }
-        if (n !== k) {
-          d.copyWithin(n * FOLIAGE_INSTANCE_STRIDE, o, o + FOLIAGE_INSTANCE_STRIDE);
-        }
-        n++;
+      const touched = new Set<string>();
+      if (group !== 'generated') {
+        removed += layer._manual.removeWhere(region, inside, touched);
       }
-      removed += layer._count - n;
-      layer._count = n;
+      if (group !== 'manual') {
+        layer._mask.fillCircle(x, z, radius, 0);
+        removed += layer._generated.removeWhere(region, inside, touched);
+      }
+      this.invalidateChunks(layer, touched);
     });
-    if (removed > 0) {
-      this.invalidate();
-    }
     return removed;
   }
   /**
@@ -454,11 +852,30 @@ export class FoliageSystem extends GraphNode {
     return null;
   }
   /**
-   * Schedules the chunks to be rebuilt; called by the methods changing layers or instances
+   * Schedules every chunk to be rebuilt; called by the methods changing layers
    */
   invalidate() {
     this._dirty = true;
+    // Also called while the base constructor attaches the node, before the fields exist
+    this._dirtyChunks?.clear();
     this.scene?.queuePerCameraUpdateNode(this);
+  }
+  /** Schedules some chunks of a layer to be rebuilt */
+  private invalidateChunks(layer: FoliageLayer, keys: Iterable<string>) {
+    if (this._dirty) {
+      return;
+    }
+    let set = this._dirtyChunks.get(layer);
+    for (const key of keys) {
+      if (!set) {
+        set = new Set();
+        this._dirtyChunks.set(layer, set);
+      }
+      set.add(key);
+    }
+    if (set) {
+      this.scene?.queuePerCameraUpdateNode(this);
+    }
   }
   /** {@inheritDoc SceneNode.updatePerCamera} */
   updatePerCamera(camera: Camera, _elapsedInSeconds: number, _deltaInSeconds: number) {
@@ -474,20 +891,25 @@ export class FoliageSystem extends GraphNode {
     }
     if (this._dirty) {
       this._dirty = false;
+      this._dirtyChunks.clear();
       this.rebuild();
+    } else if (this._dirtyChunks.size > 0) {
+      this.rebuildChunks();
     }
     const eye = camera.getWorldPosition();
     const ox = this.worldMatrix.m03;
     const oz = this.worldMatrix.m23;
     const ex = eye.x - ox;
     const ez = eye.z - oz;
-    for (const chunk of this._chunks) {
-      const dx = Math.max(chunk.minX - ex, 0, ex - chunk.maxX);
-      const dz = Math.max(chunk.minZ - ez, 0, ez - chunk.maxZ);
-      const visible = dx * dx + dz * dz <= chunk.layer._cullDistance * chunk.layer._cullDistance;
-      if (visible !== chunk.visible) {
-        chunk.visible = visible;
-        chunk.group.showState = visible ? 'inherit' : 'hidden';
+    for (const chunks of this._chunks.values()) {
+      for (const chunk of chunks.values()) {
+        const dx = Math.max(chunk.minX - ex, 0, ex - chunk.maxX);
+        const dz = Math.max(chunk.minZ - ez, 0, ez - chunk.maxZ);
+        const visible = dx * dx + dz * dz <= chunk.layer._cullDistance * chunk.layer._cullDistance;
+        if (visible !== chunk.visible) {
+          chunk.visible = visible;
+          chunk.group.showState = visible ? 'inherit' : 'hidden';
+        }
       }
     }
   }
@@ -510,20 +932,59 @@ export class FoliageSystem extends GraphNode {
       this._builtTerrain = terrain;
       this._builtHeightData = heightData;
       for (const layer of this._layers) {
-        this.buildLayer(layer, terrain);
+        for (const key of new Set([...layer._generated.keys(), ...layer._manual.keys()])) {
+          this.buildChunk(layer, key, terrain);
+        }
       }
     });
   }
+  /** Rebuilds the chunks marked dirty, once every layer is loaded */
+  private rebuildChunks() {
+    if (this._layers.some((layer) => !layer._parts)) {
+      // A layer still loading: its full rebuild picks the changes up
+      this._dirty = true;
+      return;
+    }
+    const terrain = this._builtTerrain;
+    for (const [layer, keys] of this._dirtyChunks) {
+      if (!this._layers.includes(layer)) {
+        continue;
+      }
+      for (const key of keys) {
+        this.disposeChunk(layer, key);
+        this.buildChunk(layer, key, terrain);
+      }
+    }
+    this._dirtyChunks.clear();
+  }
   private clearChunks() {
-    for (const chunk of this._chunks) {
+    for (const chunks of this._chunks.values()) {
+      for (const chunk of chunks.values()) {
+        chunk.group.remove();
+        chunk.group.dispose();
+        chunk.colliders?.dispose();
+      }
+    }
+    this._chunks.clear();
+  }
+  private disposeChunk(layer: FoliageLayer, key: string) {
+    const chunks = this._chunks.get(layer);
+    const chunk = chunks?.get(key);
+    if (chunk) {
       chunk.group.remove();
       chunk.group.dispose();
       chunk.colliders?.dispose();
+      chunks!.delete(key);
     }
-    this._chunks = [];
   }
   private loadLayer(layer: FoliageLayer) {
+    if (!layer._asset) {
+      // A layer just added in the editor, nothing to draw until an asset is picked
+      layer._parts = [];
+      return Promise.resolve();
+    }
     if (!layer._loading) {
+      const asset = layer._asset;
       layer._loading = (async () => {
         const scene = this.scene!;
         const tmp = new SceneNode(scene);
@@ -531,9 +992,9 @@ export class FoliageSystem extends GraphNode {
         let root: Nullable<SceneNode> = null;
         try {
           const manager = getEngine().resourceManager;
-          root = layer._asset.toLowerCase().endsWith('.zprefab')
-            ? await manager.instantiatePrefab(tmp, layer._asset)
-            : ((await manager.fetchModel(layer._asset, scene)) ?? null);
+          root = asset.toLowerCase().endsWith('.zprefab')
+            ? await manager.instantiatePrefab(tmp, asset)
+            : ((await manager.fetchModel(asset, scene)) ?? null);
           if (root) {
             root.parent = tmp;
             root.position.setXYZ(0, 0, 0);
@@ -541,7 +1002,7 @@ export class FoliageSystem extends GraphNode {
             root.scale.setXYZ(1, 1, 1);
           }
         } catch (err) {
-          console.error(`Foliage: cannot load ${layer._asset}: ${err}`);
+          console.error(`Foliage: cannot load ${asset}: ${err}`);
         }
         const parts: FoliagePart[] = [];
         const colliders: FoliageColliderTemplate[] = [];
@@ -561,7 +1022,7 @@ export class FoliageSystem extends GraphNode {
                 layer: c.layer
               });
             } else {
-              console.warn(`Foliage: ${c.shape} colliders of ${layer._asset} are skipped`);
+              console.warn(`Foliage: ${c.shape} colliders of ${asset} are skipped`);
             }
           }
           if (node.isMesh() && node.primitive && node.material) {
@@ -575,7 +1036,7 @@ export class FoliageSystem extends GraphNode {
               }
             }
             if (node.skeletonName || node.morphTargetGroups?.length) {
-              console.warn(`Foliage: skinned and morphed meshes of ${layer._asset} are skipped`);
+              console.warn(`Foliage: skinned and morphed meshes of ${asset} are skipped`);
               return false;
             }
             const material = node.material as MeshMaterial;
@@ -589,8 +1050,16 @@ export class FoliageSystem extends GraphNode {
           return false;
         });
         tmp.dispose();
+        if (layer._asset !== asset) {
+          // The asset changed while loading: the meshes are of the old one
+          for (const part of parts) {
+            part.primitive.dispose();
+            part.material.dispose();
+          }
+          return;
+        }
         if (parts.length === 0) {
-          console.error(`Foliage: ${layer._asset} has no mesh to scatter`);
+          console.error(`Foliage: ${asset} has no mesh to scatter`);
         }
         layer._parts = parts;
         layer._bounds = bounds;
@@ -600,51 +1069,50 @@ export class FoliageSystem extends GraphNode {
     }
     return layer._loading;
   }
-  private buildLayer(layer: FoliageLayer, terrain: Nullable<ClipmapTerrain>) {
+  /** Builds the batch group and colliders of one chunk of a layer, from both instance groups */
+  private buildChunk(layer: FoliageLayer, key: string, terrain: Nullable<ClipmapTerrain>) {
     const parts = layer._parts;
-    if (!parts || parts.length === 0 || layer._count === 0) {
+    if (!parts || parts.length === 0) {
+      return;
+    }
+    const sources = [layer._manual.get(key), layer._generated.get(key)].filter(
+      (d): d is Float32Array => !!d && d.length > 0
+    );
+    if (sources.length === 0) {
       return;
     }
     const size = this._chunkSize;
-    const buckets = new Map<string, number[]>();
-    const d = layer._instances;
-    for (let k = 0; k < layer._count; k++) {
-      const o = k * FOLIAGE_INSTANCE_STRIDE;
-      const key = `${Math.floor(d[o] / size)},${Math.floor(d[o + 1] / size)}`;
-      let list = buckets.get(key);
-      if (!list) {
-        list = [];
-        buckets.set(key, list);
-      }
-      list.push(o);
-    }
+    const [cx, cz] = key.split(',').map(Number);
     const ox = this.worldMatrix.m03;
     const oy = this.worldMatrix.m13;
     const oz = this.worldMatrix.m23;
     const templates = layer._colliderTemplates();
-    for (const [key, offsets] of buckets) {
-      const [cx, cz] = key.split(',').map(Number);
-      const group = new BatchGroup(this.scene!);
-      group.sealed = true;
-      group.name = `Foliage chunk ${cx},${cz}`;
-      group.parent = this;
-      // One static body per chunk, with a collider node per instance and template
-      let colliders: Nullable<SceneNode> = null;
-      if (templates.length > 0) {
-        colliders = new SceneNode(this.scene!);
-        colliders.sealed = true;
-        colliders.name = `Foliage colliders ${cx},${cz}`;
-        colliders.parent = this;
-        const body = new RigidBody();
-        body.motionType = 'static';
-        colliders.physics = new NodePhysics({ body });
-      }
-      for (const o of offsets) {
+    // Painted instances on any surface store their height; the others stand on the terrain
+    const onTerrain = (generated: boolean) => !generated || layer._generation.surface === 'terrain';
+    const group = new BatchGroup(this.scene!);
+    group.sealed = true;
+    group.name = `Foliage chunk ${cx},${cz}`;
+    group.parent = this;
+    // One static body per chunk, with a collider node per instance and template
+    let colliders: Nullable<SceneNode> = null;
+    if (templates.length > 0) {
+      colliders = new SceneNode(this.scene!);
+      colliders.sealed = true;
+      colliders.name = `Foliage colliders ${cx},${cz}`;
+      colliders.parent = this;
+      const body = new RigidBody();
+      body.motionType = 'static';
+      colliders.physics = new NodePhysics({ body });
+    }
+    const manual = layer._manual.get(key);
+    for (const d of sources) {
+      const followTerrain = onTerrain(d !== manual);
+      for (let o = 0; o < d.length; o += FOLIAGE_INSTANCE_STRIDE) {
         const x = d[o];
         const z = d[o + 1];
         let y = d[o + 2];
         let upright = true;
-        if (terrain) {
+        if (terrain && followTerrain) {
           const h = terrain.getHeightAt(x + ox, z + oz);
           if (h !== null) {
             y += h - oy;
@@ -668,6 +1136,9 @@ export class FoliageSystem extends GraphNode {
           mesh.gpuPickable = false;
           mesh.parent = group;
           mesh.setLocalTransform(Matrix4x4.multiply(tmpMatrix, part.matrix, tmpMatrix2));
+          // Chunks are built in updatePerCamera, after the frame update that refreshes the
+          // matrices meshes draw with; without this the group draws them where they were created
+          mesh.syncDrawableTransform();
         }
         for (const t of templates) {
           const node = new SceneNode(this.scene!);
@@ -686,23 +1157,45 @@ export class FoliageSystem extends GraphNode {
           node.physics = new NodePhysics({ colliders: [collider] });
         }
       }
-      this._chunks.push({
-        layer,
-        group,
-        colliders,
-        minX: cx * size,
-        minZ: cz * size,
-        maxX: (cx + 1) * size,
-        maxZ: (cz + 1) * size,
-        visible: true
-      });
     }
+    let chunks = this._chunks.get(layer);
+    if (!chunks) {
+      chunks = new Map();
+      this._chunks.set(layer, chunks);
+    }
+    chunks.set(key, {
+      layer,
+      key,
+      group,
+      colliders,
+      minX: cx * size,
+      minZ: cz * size,
+      maxX: (cx + 1) * size,
+      maxZ: (cz + 1) * size,
+      visible: true
+    });
+  }
+  /**
+   * The chunk nodes built for this system, to tell them apart from other scene nodes
+   * (e.g. to skip the foliage's own colliders when looking for the ground)
+   * @param node - A scene node
+   * @returns Whether the node is, or is below, a chunk of this system
+   */
+  ownsNode(node: Nullable<SceneNode>) {
+    while (node && node !== this) {
+      if (node.parent === this && node.sealed) {
+        return true;
+      }
+      node = node.parent;
+    }
+    return false;
   }
   /** {@inheritDoc SceneNode.onDispose} */
   protected onDispose() {
     this._buildSerial++;
     this.clearChunks();
     for (const layer of this._layers) {
+      layer._owner = null;
       layer._dispose();
     }
     this._layers = [];

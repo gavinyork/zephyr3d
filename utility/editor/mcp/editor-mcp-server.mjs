@@ -2714,7 +2714,7 @@ const BASE_TOOLS = [
   {
     name: 'foliage_get_info',
     description:
-      'Describe a FoliageSystem node: the terrain it stands on, its world offset, chunk size, and per layer the asset, instance count, settings and the bounds of its instances (in foliage space, which is world space minus world_offset). Returns { info, err }.',
+      'Describe a FoliageSystem node: the terrain it stands on, its world offset, chunk size, mask cell size, and per layer the asset, instance counts (count; generated_count painted from the density mask; placed_count scattered or placed directly), settings, generation settings, the density mask extent (mask_tiles, mask_bounds) and the bounds of its instances (in foliage space, which is world space minus world_offset). Returns { info, err }.',
     inputSchema: {
       type: 'object',
       required: ['node_id'],
@@ -2727,7 +2727,7 @@ const BASE_TOOLS = [
   {
     name: 'foliage_set_layers',
     description:
-      'Set the layers of a FoliageSystem: each layer scatters one asset (a .zprefab or a model such as .glb/.gltf, ideally with LODs; every mesh in it is drawn instanced). The array replaces the layer list in order: a layer keeping its asset keeps its instances (unless clear is true), a changed asset clears them, extra layers are added and missing ones removed. collision makes the instances static obstacles in the physics simulation (trees, big rocks; leave it off for bushes and small stones so vehicles drive over them). Then place instances with foliage_scatter. Undoable. Returns { num_layers, err }.',
+      'Set the layers of a FoliageSystem: each layer scatters one asset (a .zprefab or a model such as .glb/.gltf, ideally with LODs; every mesh in it is drawn instanced). The array replaces the layer list in order: a layer keeping its asset keeps its instances (unless clear is true), a changed asset clears them, extra layers are added and missing ones removed. collision makes the instances static obstacles in the physics simulation (trees, big rocks; leave it off for bushes and small stones so vehicles drive over them). generation sets how instances grow where the layer is painted (foliage_paint, the foliage brush); changing it does not touch existing instances until foliage_regenerate. Then place instances with foliage_paint (painted, follows the density mask and the generation settings) or foliage_scatter (placed, decided by a script over the whole terrain). Undoable. Returns { num_layers, err }.',
     inputSchema: {
       type: 'object',
       required: ['node_id', 'layers'],
@@ -2736,6 +2736,10 @@ const BASE_TOOLS = [
         chunk_size: {
           type: 'number',
           description: 'Edge of the square draw/cull chunks in meters. Default 64.'
+        },
+        mask_cell_size: {
+          type: 'number',
+          description: 'Edge of a cell of the density masks in meters. Default 1.'
         },
         layers: {
           type: 'array',
@@ -2753,7 +2757,56 @@ const BASE_TOOLS = [
                 type: 'number',
                 description: '0 keeps instances upright, 1 tilts them with the ground. Default 0.'
               },
-              clear: { type: 'boolean', description: 'Remove the existing instances of this layer.' },
+              clear: {
+                type: 'boolean',
+                description: 'Remove the existing instances and the painted density mask of this layer.'
+              },
+              generation: {
+                type: 'object',
+                description:
+                  'How instances grow where the layer is painted; omitted fields keep their values. Candidates lie on a grid of spacing aligned with the foliage system origin, each with a fixed random threshold: one grows where density x place script probability is above it and the slope and height filters pass, so painting denser only adds instances.',
+                properties: {
+                  spacing: {
+                    type: 'number',
+                    description: 'Candidate grid cell in meters, about the closest two instances get. Default 4.'
+                  },
+                  scale_range: {
+                    type: 'array',
+                    items: { type: 'number' },
+                    minItems: 2,
+                    maxItems: 2,
+                    description: 'Uniform scale range. Default [0.8, 1.2].'
+                  },
+                  slope_range: {
+                    type: 'array',
+                    items: { type: 'number' },
+                    minItems: 2,
+                    maxItems: 2,
+                    description: 'Slope range in degrees instances grow on. Default [0, 45].'
+                  },
+                  height_range: {
+                    type: ['array', 'null'],
+                    items: { type: 'number' },
+                    minItems: 2,
+                    maxItems: 2,
+                    description: 'World height range instances grow at; null for no limit. Default null.'
+                  },
+                  y_offset: { type: 'number', description: 'Height above the surface, negative to sink. Default 0.' },
+                  random_yaw: { type: 'boolean', description: 'Turn instances randomly about Y. Default true.' },
+                  seed: { type: 'integer', description: 'Seed of the candidate grid.' },
+                  surface: {
+                    type: 'string',
+                    enum: ['terrain', 'any'],
+                    description:
+                      'terrain: stand on the terrain and follow it when reshaped. any: land on whatever has a collider below (rocks, buildings), keeping that height; always upright. Default terrain.'
+                  },
+                  place_script: {
+                    type: 'string',
+                    description:
+                      'Optional function place(p, api, input) as for foliage_scatter, also given p.density (mask value) and p.lx, p.lz (local position); empty for none.'
+                  }
+                }
+              },
               collision: {
                 type: ['object', 'null'],
                 description:
@@ -2792,7 +2845,7 @@ const BASE_TOOLS = [
   {
     name: 'foliage_scatter',
     description:
-      'Scatter instances of one FoliageSystem layer over its terrain. Candidates lie on a jittered grid with cell `spacing` (also roughly the minimum distance between them) inside `region` (default the whole terrain); a sandboxed script `function place(p, api, input)` decides each one. p has x, z (world), u, v (0..1 over the terrain), height (terrain height in world units), normal [x,y,z], slope (degrees) and random (0..1, deterministic per candidate); api is the model_generate script API (api.math, api.noise.fbm2/value2..., api.rng). Return false/0/null to skip, true to keep, a number 0..1 as the keep probability, or { probability?, scale?, rotation? (radians), y_offset? }; unset scale is random in scale_range, unset rotation random. mode replace (default) replaces the layer instances inside the region, add keeps them and avoids them. avoid_layers keeps new instances avoid_radius (default spacing) away from other layers. Undoable. Example: function place(p, api) { if (p.height < 4 || p.slope > 25) return 0; return api.math.smoothstep(0.4, 0.7, api.noise.fbm2(p.x * 0.01, p.z * 0.01, 3, 4)); }. Returns { result: { layer, candidates, placed, layer_count }, err }.',
+      'Scatter instances of one FoliageSystem layer over its terrain. Candidates lie on a jittered grid with cell `spacing` (also roughly the minimum distance between them) inside `region` (default the whole terrain); a sandboxed script `function place(p, api, input)` decides each one. p has x, z (world), u, v (0..1 over the terrain), height (terrain height in world units), normal [x,y,z], slope (degrees) and random (0..1, deterministic per candidate); api is the model_generate script API (api.math, api.noise.fbm2/value2..., api.rng). Return false/0/null to skip, true to keep, a number 0..1 as the keep probability, or { probability?, scale?, rotation? (radians), y_offset? }; unset scale is random in scale_range, unset rotation random. The instances are placed ones: painting leaves them alone, erasing removes them. mode replace (default) replaces the placed instances of the layer inside the region (painted ones stay), add keeps them and avoids them. avoid_layers keeps new instances avoid_radius (default spacing) away from other layers. Undoable. Example: function place(p, api) { if (p.height < 4 || p.slope > 25) return 0; return api.math.smoothstep(0.4, 0.7, api.noise.fbm2(p.x * 0.01, p.z * 0.01, 3, 4)); }. Returns { result: { layer, candidates, placed, layer_count }, err }.',
     inputSchema: {
       type: 'object',
       required: ['node_id', 'layer', 'source', 'spacing'],
@@ -2835,7 +2888,7 @@ const BASE_TOOLS = [
   {
     name: 'foliage_erase',
     description:
-      'Remove the FoliageSystem instances standing within a circle, of one layer or all layers, e.g. to clear a road or a building plot. Undoable. Returns { removed, err }.',
+      'Remove the FoliageSystem instances standing within a circle, of one layer or all layers, e.g. to clear a road or a building plot. Painted instances are removed by clearing the density mask there, so regenerating does not bring them back. Undoable. Returns { removed, err }.',
     inputSchema: {
       type: 'object',
       required: ['node_id', 'center', 'radius'],
@@ -2850,7 +2903,68 @@ const BASE_TOOLS = [
         },
         radius: { type: 'number' },
         layer: { type: 'integer', minimum: 0, description: 'Layer index; all layers when omitted.' },
+        group: {
+          type: 'string',
+          enum: ['all', 'painted', 'placed'],
+          description: 'Which instances: painted, placed or both. Default all.'
+        },
         timeout_ms: { type: 'number', default: 30000 }
+      }
+    }
+  },
+  {
+    name: 'foliage_paint',
+    description:
+      'Paint the density mask of one FoliageSystem layer within circles, like the foliage brush, and grow its painted instances there from the layer generation settings (see foliage_set_layers). Only the candidates under the circles are regenerated; everything else stays. mode set (default) makes the density inside each circle `density`, blended into its surroundings over the falloff; add raises it by `density`; erase lowers it by `density`. Painted instances are separate from the placed ones of foliage_scatter, which painting leaves alone. Undoable. Example: paint a forest edge with strokes along a line, density 0.6. Returns { result: { layer, painted, placed, layer_count, mask_tiles }, err }.',
+    inputSchema: {
+      type: 'object',
+      required: ['node_id', 'layer'],
+      properties: {
+        node_id: { type: 'string', description: 'Persistent id of the FoliageSystem node.' },
+        layer: { type: 'integer', minimum: 0, description: 'Layer index.' },
+        center: {
+          type: 'array',
+          items: { type: 'number' },
+          minItems: 2,
+          maxItems: 2,
+          description: 'World [x, z] of a single circle.'
+        },
+        radius: { type: 'number', description: 'Radius of a single circle in meters.' },
+        strokes: {
+          type: 'array',
+          description: 'Several circles, instead of center and radius.',
+          items: {
+            type: 'object',
+            required: ['center', 'radius'],
+            properties: {
+              center: { type: 'array', items: { type: 'number' }, minItems: 2, maxItems: 2 },
+              radius: { type: 'number' }
+            }
+          }
+        },
+        mode: { type: 'string', enum: ['set', 'add', 'erase'] },
+        density: { type: 'number', minimum: 0, maximum: 1, description: 'Default 1.' },
+        falloff: {
+          type: 'number',
+          minimum: 0,
+          maximum: 1,
+          description: 'Fraction of the radius over which the brush fades out. Default 0.5.'
+        },
+        timeout_ms: { type: 'number', default: 120000 }
+      }
+    }
+  },
+  {
+    name: 'foliage_regenerate',
+    description:
+      'Grow the painted instances of FoliageSystem layers again from their density masks, e.g. after changing their generation settings with foliage_set_layers. Placed instances are left alone. Undoable. Returns { result: { layers: [{ layer, painted, placed, layer_count }] }, err }.',
+    inputSchema: {
+      type: 'object',
+      required: ['node_id'],
+      properties: {
+        node_id: { type: 'string', description: 'Persistent id of the FoliageSystem node.' },
+        layer: { type: 'integer', minimum: 0, description: 'Layer index; every layer when omitted.' },
+        timeout_ms: { type: 'number', default: 120000 }
       }
     }
   },
@@ -4130,7 +4244,12 @@ const handlers = {
   async foliage_set_layers(args) {
     return bridge.send(
       'foliage_set_layers',
-      { node_id: args.node_id, layers: args.layers, chunk_size: args.chunk_size },
+      {
+        node_id: args.node_id,
+        layers: args.layers,
+        chunk_size: args.chunk_size,
+        mask_cell_size: args.mask_cell_size
+      },
       Number(args.timeout_ms ?? 30000)
     );
   },
@@ -4140,6 +4259,14 @@ const handlers = {
   },
   async foliage_erase(args) {
     return bridge.send('foliage_erase', args, Number(args.timeout_ms ?? 30000));
+  },
+  async foliage_paint(args) {
+    const timeout = Number(args.timeout_ms ?? 120000);
+    return bridge.send('foliage_paint', args, timeout);
+  },
+  async foliage_regenerate(args) {
+    const timeout = Number(args.timeout_ms ?? 120000);
+    return bridge.send('foliage_regenerate', args, timeout);
   },
   async terrain_get_info(args) {
     return bridge.send('terrain_get_info', { node_id: args.node_id }, Number(args.timeout_ms ?? 30000));

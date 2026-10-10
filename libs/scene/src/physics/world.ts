@@ -86,6 +86,16 @@ export interface PhysicsWorld extends IEventTarget<PhysicsWorldEventMap> {
   update(dt: number): void;
   /** Resolves once every collider waiting for its geometry has it, or failed to. */
   whenReady(): Promise<void>;
+  /**
+   * Brings the world up to date with the scene without stepping it: physics data added,
+   * removed or changed, and nodes moved, since the last step. For tools querying a world that
+   * is not simulated, such as the editor's; queries otherwise see the world as of the last step.
+   *
+   * @remarks
+   * Moves no body. Colliders that come to touch through it start touching without a contact
+   * event, so do not call it on a world being simulated if contact events matter.
+   */
+  syncWithScene(): void;
   /** The nearest collider along a ray. */
   raycast(
     origin: Vector3,

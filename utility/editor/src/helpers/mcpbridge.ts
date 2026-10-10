@@ -54,7 +54,14 @@ import {
 } from './mcpterrain';
 import { importModelAsset, saveNodeAsPrefab } from './mcpassets';
 import { getNodePhysics, listPhysicsPresets, removeNodePhysics, setNodePhysics } from './mcpphysics';
-import { eraseFoliage, getFoliageInfo, scatterFoliage, setFoliageLayers } from './mcpfoliage';
+import {
+  eraseFoliage,
+  getFoliageInfo,
+  paintFoliage,
+  regenerateFoliage,
+  scatterFoliage,
+  setFoliageLayers
+} from './mcpfoliage';
 
 type JsonValue = null | boolean | number | string | JsonValue[] | { [key: string]: JsonValue };
 type TreeData = { files: { name: string; size: number }[]; subDirs: { [name: string]: TreeData } };
@@ -1864,6 +1871,18 @@ async function dispatch(editor: Editor, method: string, params: any): Promise<an
       }
     case 'foliage_erase':
       return eraseFoliage(getSceneController(editor), params);
+    case 'foliage_paint':
+      try {
+        return await paintFoliage(getSceneController(editor), params);
+      } catch (err) {
+        return { result: null, err: `${err instanceof Error ? err.message : err}` };
+      }
+    case 'foliage_regenerate':
+      try {
+        return await regenerateFoliage(getSceneController(editor), params);
+      } catch (err) {
+        return { result: null, err: `${err instanceof Error ? err.message : err}` };
+      }
     case 'terrain_get_info':
       return getTerrainInfo(getSceneController(editor), params);
     case 'terrain_generate':

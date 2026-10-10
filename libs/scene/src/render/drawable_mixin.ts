@@ -20,6 +20,7 @@ export interface IMixinDrawable {
   applyMaterialUniformsAll(): void;
   getObjectColor(): Vector4;
   updateState(): void;
+  syncDrawableTransform(): void;
   bind(ctx: DrawContext, renderQueue: Nullable<RenderQueue>): void;
 }
 
@@ -251,6 +252,29 @@ export function mixinDrawable<
           0,
           uniforms.length
         );
+      }
+    }
+    /**
+     * Takes the current world matrix of the node at once, as the previous one too.
+     *
+     * @remarks
+     * The world matrix a drawable renders with is refreshed in {@link Scene.frameUpdate}. A
+     * drawable created and placed after that, e.g. in `updatePerCamera`, would be drawn that
+     * frame with the matrix it had when created; call this once it is placed. The previous
+     * matrix is set to the same, so it gets no motion from where it was created.
+     */
+    syncDrawableTransform() {
+      const node = this.getNode();
+      this._nodeTransformTag = node.transformTag;
+      const frame = getDevice().frameInfo.frameCounter;
+      this._currentWorldMatrixBuffer.set(node.worldMatrix);
+      this._prevWorldMatrixBuffer.set(this._currentWorldMatrixBuffer);
+      this._framestampBuffer[0] = frame;
+      this._framestampBuffer[1] = frame;
+      for (const ref of this._mdRenderQueueRef) {
+        if (ref.valid && !ref.ref.disposed) {
+          this.applyTransformUniforms(ref.ref);
+        }
       }
     }
     updateState() {

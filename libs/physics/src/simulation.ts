@@ -492,6 +492,23 @@ export class PhysicsSimulation
     return this._layerNames;
   }
   /** Whether colliders on layers `a` and `b` collide. All layers collide by default. */
+  /** See {@link PhysicsWorld.syncWithScene}. */
+  syncWithScene() {
+    if (this.disposed) {
+      return;
+    }
+    this._applySceneSettings();
+    if (!this._ensureBackend()) {
+      return;
+    }
+    this._checkGeometry();
+    this._resolve();
+    this._syncFromNodes();
+    if (this._enablementDirty) {
+      this._updateBodyEnablement();
+    }
+    this._backend!.updateQueries();
+  }
   getLayerCollision(a: number, b: number) {
     return !!(this._layerMasks[this._layer(a)] & (1 << this._layer(b)));
   }
