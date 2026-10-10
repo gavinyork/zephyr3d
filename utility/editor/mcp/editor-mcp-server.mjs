@@ -4282,9 +4282,13 @@ function buildToolResultEnvelope(name, result) {
     };
   }
   const envelope = {
-    structuredContent: result ?? null,
     content: [{ type: 'text', text: formatToolResultText(result) }]
   };
+  // MCP requires structured content to be an object: wrap arrays and plain values
+  if (result !== undefined && result !== null) {
+    envelope.structuredContent =
+      typeof result === 'object' && !Array.isArray(result) ? result : { result };
+  }
   if (isToolErrorResult(result)) {
     envelope.isError = true;
   }
