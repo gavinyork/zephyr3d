@@ -20,4 +20,5 @@ export * from './pool';
 export * from './builder';
 export * from './helpers';
 export * from './timer';
+export type { FramePacing } from './frame_pacer';
 export * from './uniformdata';

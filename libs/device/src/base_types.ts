@@ -1,6 +1,7 @@
 import type { TypedArray, Vector4, IEventTarget, Nullable, Immutable, Rect, Vector3 } from '@zephyr3d/base';
 import { float2half } from '@zephyr3d/base';
 import type { PBComputeOptions, PBRenderOptions, PBStructTypeInfo, ProgramBuilder } from './builder';
+import type { FramePacing } from './frame_pacer';
 import type {
   BaseTexture,
   BindGroup,
@@ -2702,6 +2703,15 @@ export interface AbstractDevice extends IEventTarget<DeviceEventMap> {
   pool: Pool;
   /** vSync */
   vSync: boolean;
+  /**
+   * How often the run loop renders a frame, see {@link FramePacing}. Default `'off'`:
+   * on every display refresh.
+   */
+  framePacing: FramePacing;
+  /** Estimated display refresh interval in milliseconds, 0 until measured. */
+  readonly displayRefreshInterval: number;
+  /** Display refreshes the last frame was held for: 1 at the full refresh rate, 2 at half... */
+  readonly refreshesPerFrame: number;
   /**
    * The fixed per-frame time step in milliseconds, or null when using wall-clock timing.
    * See {@link AbstractDevice.setFixedFrameTime}.

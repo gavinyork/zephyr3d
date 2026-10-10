@@ -1,5 +1,7 @@
 import type { Immutable, Nullable, Rect, Vector3 } from '@zephyr3d/base';
 import { type Vector4, type TypedArray, type IEventTarget, Observable, Z_CONVENTION } from '@zephyr3d/base';
+import type { FramePacing } from './frame_pacer';
+import { FramePacer } from './frame_pacer';
 import type { ITimer } from './timer';
 import { CPUTimer } from './timer';
 import type {
@@ -235,6 +237,10 @@ export abstract class BaseDevice extends Observable<DeviceEventMap> {
   protected _gpuMemCost: number;
   protected _disposeObjectList: GPUObject[];
   protected _beginFrameTime: number;
+  /** Vsync time of the animation frame about to begin, from requestAnimationFrame. */
+  private _pendingFrameTime: number | null;
+  /** Picks the refreshes the run loop renders at. */
+  private readonly _framePacer: FramePacer;
   protected _endFrameTime: number;
   protected _fixedFrameTime: Nullable<number>;
   protected _fixedFrameClock: number;
@@ -279,6 +285,8 @@ export abstract class BaseDevice extends Observable<DeviceEventMap> {
     this._gpuMemCost = 0;
     this._disposeObjectList = [];
     this._beginFrameTime = 0;
+    this._pendingFrameTime = null;
+    this._framePacer = new FramePacer();
     this._endFrameTime = 0;
     this._fixedFrameTime = null;
     this._fixedFrameClock = 0;
@@ -515,6 +523,18 @@ export abstract class BaseDevice extends Observable<DeviceEventMap> {
   set vSync(val) {
     this._vSync = !!val;
   }
+  get framePacing(): FramePacing {
+    return this._framePacer.mode;
+  }
+  set framePacing(value: FramePacing) {
+    this._framePacer.mode = value === 'auto' || (typeof value === 'number' && value > 0) ? value : 'off';
+  }
+  get displayRefreshInterval() {
+    return this._framePacer.refreshInterval;
+  }
+  get refreshesPerFrame() {
+    return this._framePacer.refreshesPerFrame;
+  }
   get fixedFrameTime() {
     return this._fixedFrameTime;
   }
@@ -662,7 +682,13 @@ export abstract class BaseDevice extends Observable<DeviceEventMap> {
       this._disposeObjectList = [];
     }
     this._beginFrameCounter++;
-    this._beginFrameTime = this._cpuTimer.now();
+    // The vsync time of the frame, when there is one, rather than when its
+    // callback got to run: frame times then follow the display, without the
+    // scheduling noise that turns into jitter of anything moving at speed.
+    const vsyncTime = this._pendingFrameTime;
+    this._pendingFrameTime = null;
+    this._beginFrameTime =
+      vsyncTime !== null && vsyncTime >= this._frameInfo.frameTimestamp ? vsyncTime : this._cpuTimer.now();
     this.updateFrameInfo();
     this._poolMap.forEach((pool) => pool.autoRelease());
     return this.onBeginFrame();
@@ -826,9 +852,17 @@ export abstract class BaseDevice extends Observable<DeviceEventMap> {
     }
     const that = this;
     that._runLoopFunc = func;
-    (function entry() {
+    that._framePacer.reset();
+    (function entry(time?: number) {
+      // requestAnimationFrame and performance.now() share a clock; a Date based
+      // timer does not, so the vsync time is only used with performance.
+      const vsyncTime = typeof time === 'number' && globalThis.performance ? time : null;
       if (that._vSync) {
         that._runningLoop = requestAnimationFrame(entry);
+        if (vsyncTime !== null && !that._framePacer.shouldRender(vsyncTime)) {
+          // Not a refresh to render at: the last frame stays on screen.
+          return;
+        }
       } else {
         that._runningLoop = that.nextFrame(() => {
           if (that._runningLoop !== null) {
@@ -836,6 +870,7 @@ export abstract class BaseDevice extends Observable<DeviceEventMap> {
           }
         });
       }
+      that._pendingFrameTime = vsyncTime;
       if (that.beginFrame()) {
         that._runLoopFunc(that as unknown as AbstractDevice);
         that.endFrame();
