@@ -35,9 +35,13 @@ import { eventBus } from '../../core/eventbus';
  * segment (endpoints in pixels, from the vertex shader), half strength where
  * the scene is in front.
  */
-function aaLineFragment(scope: PBGlobalScope, pb: ProgramBuilder) {
-  scope.pxWidth = pb.float().uniform(0);
-  scope.lineColor = pb.vec4().uniform(0);
+/**
+ * @param styleGroup - Bind group of the line width and colour; the depth
+ *   texture and its size are in group 0.
+ */
+function aaLineFragment(scope: PBGlobalScope, pb: ProgramBuilder, styleGroup = 0) {
+  scope.pxWidth = pb.float().uniform(styleGroup);
+  scope.lineColor = pb.vec4().uniform(styleGroup);
   scope.depthTex = pb.tex2D().sampleType('unfilterable-float').uniform(0);
   scope.texSize = pb.vec2().uniform(0);
   scope.$outputs.color = pb.vec4();
@@ -107,12 +111,36 @@ export type AALineBatch = {
   primitive: Primitive;
   /** Number of segments. */
   count: number;
-  /** From the segments' space to clip space. */
-  mvpMatrix: Matrix4x4;
+  /** From the segments' space to world space; the camera is the renderer's. */
+  worldMatrix: Matrix4x4;
   width?: number;
   color?: Vector4;
   enabled: boolean;
 };
+/**
+ * The bind group of an {@link AALineBatch}, holding what is its own, and the
+ * values last written to it: a value is written only when it changes, as every
+ * write uploads the uniforms. The camera is in a bind group all batches share.
+ */
+type AALineBatchState = {
+  bindGroup: BindGroup;
+  worldMatrix: Matrix4x4;
+  width: number;
+  color: Vector4;
+};
+
+/** Copies `src` into `dst` and tells whether anything changed. */
+function updateValues(dst: Float32Array, src: ArrayLike<number>) {
+  let changed = false;
+  for (let i = 0; i < dst.length; i++) {
+    if (dst[i] !== src[i]) {
+      dst[i] = src[i];
+      changed = true;
+    }
+  }
+  return changed;
+}
+
 export type ShapeGizmo = {
   shapes: { primitive: Primitive; mvpMatrix: Matrix4x4; enabled: boolean }[];
   color?: Vector4;
@@ -221,8 +249,8 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
   static _axises = [new Vector3(1, 0, 0), new Vector3(0, 1, 0), new Vector3(0, 0, 1)];
   static _primitives: Nullable<Partial<Record<GizmoMode, Primitive[]>>> = null;
   static _aalinePrimitive: Nullable<Primitive> = null;
-  static _aalineBatchProgram: Nullable<GPUProgram> = null;
   static _aalineBatchBindGroup: Nullable<BindGroup> = null;
+  static _aalineBatchProgram: Nullable<GPUProgram> = null;
   static _aalinePositions: Float32Array<ArrayBuffer> = new Float32Array(4 * 4);
   static _aalineAB: Float32Array<ArrayBuffer> = new Float32Array(4 * 4);
   private _aabbForEdit: Nullable<AABB>;
@@ -254,6 +282,7 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
   private _lineGizmos: LineGizmo[];
   private _shapeGizmos: ShapeGizmo[];
   private _aaLineBatches: AALineBatch[];
+  private readonly _aaLineBatchStates: Map<AALineBatch, AALineBatchState>;
   private readonly _screenSize: number;
   private _drawGrid: boolean;
   private readonly _scaleBox: AABB;
@@ -297,6 +326,7 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
     this._lineGizmos = [];
     this._shapeGizmos = [];
     this._aaLineBatches = [];
+    this._aaLineBatchStates = new Map();
     this._transformSpace = 'world';
     this._screenSize = 0.4;
     this._gridParams = new Vector4(10000, 500, 0, 0);
@@ -468,6 +498,11 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
     const index = this._aaLineBatches.indexOf(batch);
     if (index >= 0) {
       this._aaLineBatches.splice(index, 1);
+    }
+    const state = this._aaLineBatchStates.get(batch);
+    if (state) {
+      state.bindGroup.dispose();
+      this._aaLineBatchStates.delete(batch);
     }
   }
   /** Whether any line batch is to be drawn, so the renderer has to run. */
@@ -2725,13 +2760,15 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
           this.$inputs.corner = pb.vec2().attrib('position');
           this.$inputs.a = pb.vec3().attrib('texCoord0');
           this.$inputs.b = pb.vec3().attrib('texCoord1');
-          this.mvpMatrix = pb.mat4().uniform(0);
+          // Group 0 is shared by every batch, group 1 is each batch's own
+          this.viewProjMatrix = pb.mat4().uniform(0);
           this.viewportSize = pb.vec2().uniform(0);
-          this.radius = pb.float().uniform(0);
+          this.worldMatrix = pb.mat4().uniform(1);
+          this.radius = pb.float().uniform(1);
           this.$outputs.AB = pb.vec4();
           pb.main(function () {
-            this.$l.A = pb.mul(this.mvpMatrix, pb.vec4(this.$inputs.a, 1));
-            this.$l.B = pb.mul(this.mvpMatrix, pb.vec4(this.$inputs.b, 1));
+            this.$l.A = pb.mul(this.viewProjMatrix, pb.mul(this.worldMatrix, pb.vec4(this.$inputs.a, 1)));
+            this.$l.B = pb.mul(this.viewProjMatrix, pb.mul(this.worldMatrix, pb.vec4(this.$inputs.b, 1)));
             this.$l.D = pb.sub(this.B, this.A);
             this.$l.t0 = pb.float(0);
             this.$l.t1 = pb.float(1);
@@ -2800,32 +2837,59 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
           });
         },
         fragment(pb) {
-          aaLineFragment(this, pb);
+          aaLineFragment(this, pb, 1);
         }
       });
       PostGizmoRenderer._aalineBatchBindGroup = device.createBindGroup(
         PostGizmoRenderer._aalineBatchProgram!.bindGroupLayouts[0]
       );
     }
-    const bindGroup = PostGizmoRenderer._aalineBatchBindGroup!;
+    const program = PostGizmoRenderer._aalineBatchProgram!;
     const viewport = device.getViewport();
     const viewportSize = new Vector2(
       device.screenXToDevice(viewport.width),
       device.screenYToDevice(viewport.height)
     );
-    device.setProgram(PostGizmoRenderer._aalineBatchProgram);
-    device.setBindGroup(0, bindGroup);
+    device.setProgram(program);
     device.setRenderStates(PostGizmoRenderer._gizmoRenderState);
-    bindGroup.setValue('viewportSize', viewportSize);
-    bindGroup.setValue('texSize', PostGizmoRenderer._texSize);
-    bindGroup.setTexture('depthTex', depthTex, fetchSampler('clamp_nearest_nomip'));
+    // What the camera decides is written once for all batches
+    const shared = PostGizmoRenderer._aalineBatchBindGroup!;
+    shared.setValue('viewProjMatrix', ctx.camera.viewProjectionMatrix);
+    shared.setValue('viewportSize', viewportSize);
+    shared.setValue('texSize', PostGizmoRenderer._texSize);
+    shared.setTexture('depthTex', depthTex, fetchSampler('clamp_nearest_nomip'));
+    device.setBindGroup(0, shared);
     const defaultColor = Vector4.one();
+    // Each batch keeps its own bind group, written only when its own values
+    // change: writing per batch to one shared group uploads its uniforms once
+    // per batch and frame, which stalls with hundreds of colliders.
     for (const batch of batches) {
+      let state = this._aaLineBatchStates.get(batch);
+      if (!state) {
+        state = {
+          bindGroup: device.createBindGroup(program.bindGroupLayouts[1]),
+          worldMatrix: new Matrix4x4(),
+          width: NaN,
+          color: new Vector4(NaN, NaN, NaN, NaN)
+        };
+        // NaN so the first comparison always writes
+        state.worldMatrix.fill(NaN);
+        this._aaLineBatchStates.set(batch, state);
+      }
+      const bindGroup = state.bindGroup;
+      if (updateValues(state.worldMatrix, batch.worldMatrix)) {
+        bindGroup.setValue('worldMatrix', state.worldMatrix);
+      }
       const width = batch.width ?? 1;
-      bindGroup.setValue('mvpMatrix', batch.mvpMatrix);
-      bindGroup.setValue('radius', width * 0.5 + 1);
-      bindGroup.setValue('pxWidth', width * 0.5);
-      bindGroup.setValue('lineColor', batch.color ?? defaultColor);
+      if (state.width !== width) {
+        state.width = width;
+        bindGroup.setValue('radius', width * 0.5 + 1);
+        bindGroup.setValue('pxWidth', width * 0.5);
+      }
+      if (updateValues(state.color, batch.color ?? defaultColor)) {
+        bindGroup.setValue('lineColor', state.color);
+      }
+      device.setBindGroup(1, bindGroup);
       batch.primitive.drawInstanced(batch.count);
     }
   }

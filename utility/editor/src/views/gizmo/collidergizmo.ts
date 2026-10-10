@@ -39,6 +39,48 @@ const WHEEL_SEGMENTS = 32;
 const DIM_ALPHA = 0.45;
 /** Size of a joint's pivot cross and axis, in world units. */
 const JOINT_MARK_SIZE = 0.15;
+/**
+ * Colliders farther than this from the camera are not drawn: each outline is a
+ * draw call, and a scattered forest has hundreds of them.
+ */
+const MAX_OUTLINE_DISTANCE = 250;
+
+const tmpMatrix = new Matrix4x4();
+const tmpCenter = new Vector3();
+
+/** Shapes whose outline depends only on the numbers in {@link OutlineEntry.params}. */
+const SIMPLE_SHAPES = ['box', 'sphere', 'capsule', 'cylinder'];
+const NUM_PARAMS = 13;
+const tmpParams = new Float32Array(NUM_PARAMS);
+
+/**
+ * What the outline of a box, sphere, capsule or cylinder collider is built
+ * from: shape, node scale, offset, size, radius and height. Cheap to read every
+ * frame, unlike the outline key; false for shapes that also depend on geometry.
+ */
+function readParams(target: OutlineTarget, out: Float32Array) {
+  const collider = target instanceof CharacterController ? target._ownedCollider : target;
+  const shape = SIMPLE_SHAPES.indexOf(collider.shape);
+  const host = collider.node;
+  if (shape < 0 || !host) {
+    return false;
+  }
+  const m = host.worldMatrix;
+  out[0] = shape;
+  out[1] = Math.hypot(m[0], m[1], m[2]);
+  out[2] = Math.hypot(m[4], m[5], m[6]);
+  out[3] = Math.hypot(m[8], m[9], m[10]);
+  out[4] = collider.offset.x;
+  out[5] = collider.offset.y;
+  out[6] = collider.offset.z;
+  out[7] = collider.size.x;
+  out[8] = collider.size.y;
+  out[9] = collider.size.z;
+  out[10] = collider.radius;
+  out[11] = collider.height;
+  out[12] = 1;
+  return true;
+}
 
 type OutlineTarget = Collider | CharacterController;
 
@@ -49,6 +91,40 @@ interface OutlineEntry {
   /** Key of the outline being built, so a stale result is dropped. */
   pendingKey: Nullable<string>;
   error: Nullable<string>;
+  /** Bounding sphere of the outline's segments, in the outline's space. */
+  center: Vector3;
+  radius: number;
+  /** See {@link readParams}, when the key was last computed; all 0 when it is to be computed each frame. */
+  params: Float32Array;
+}
+
+/**
+ * Whether an outline with the bounding sphere (`center`, `radius`) in the space
+ * of `model` is in front of the camera and near enough to draw.
+ */
+function isVisible(
+  model: Matrix4x4,
+  center: Vector3,
+  radius: number,
+  eye: Vector3,
+  planes: readonly { distanceToPoint(p: Vector3): number; a: number; b: number; c: number }[]
+) {
+  const c = model.transformPointAffine(center, tmpCenter);
+  const scale = Math.max(
+    Math.hypot(model[0], model[1], model[2]),
+    Math.hypot(model[4], model[5], model[6]),
+    Math.hypot(model[8], model[9], model[10])
+  );
+  const r = radius * scale;
+  if (Vector3.distance(c, eye) - r > MAX_OUTLINE_DISTANCE) {
+    return false;
+  }
+  for (const plane of planes) {
+    if (plane.distanceToPoint(c) < -r * Math.hypot(plane.a, plane.b, plane.c)) {
+      return false;
+    }
+  }
+  return true;
 }
 
 /**
@@ -104,7 +180,9 @@ export class ColliderGizmo {
     const visit = (node: SceneNode, highlighted: boolean) => {
       node.iterate((child) => {
         const physics = child.physics;
-        if (!physics) {
+        // Colliders the engine makes for itself, such as those of scattered
+        // foliage, are drawn only with a selected node above them
+        if (!physics || (child.sealed && !highlighted)) {
           return false;
         }
         const outlined: OutlineTarget[] = [...physics.colliders];
@@ -148,17 +226,30 @@ export class ColliderGizmo {
       }
     }
     const vp = camera?.viewProjectionMatrix;
+    const eye = camera?.getWorldPosition();
+    const planes = camera?.frustum.planes;
     for (const [target, highlighted] of targets) {
+      // Out of view: not drawn, and whether its shape changed can wait until it is back
+      const existing = this._entries.get(target);
+      if (existing?.batch && existing.outline && vp) {
+        const model = Matrix4x4.multiply(target.node!.worldMatrix, existing.outline.transform, tmpMatrix);
+        if (!isVisible(model, existing.center, existing.radius, eye!, planes!)) {
+          existing.batch.enabled = false;
+          continue;
+        }
+      }
       const entry = this.ensureOutline(world!, target);
       if (entry.batch && entry.outline && vp) {
         const host = target.node!;
-        Matrix4x4.multiply(vp, host.worldMatrix, entry.batch.mvpMatrix).multiplyRight(
-          entry.outline.transform
-        );
+        const model = Matrix4x4.multiply(host.worldMatrix, entry.outline.transform, tmpMatrix);
+        entry.batch.enabled = isVisible(model, entry.center, entry.radius, eye!, planes!);
+        if (!entry.batch.enabled) {
+          continue;
+        }
+        entry.batch.worldMatrix.set(model);
         const rgb = this.colorOf(target);
         entry.batch.color!.setXYZW(rgb.x, rgb.y, rgb.z, highlighted ? 1 : DIM_ALPHA);
         entry.batch.width = highlighted ? 1.5 : 1;
-        entry.batch.enabled = true;
       }
     }
     this.updateJoints(joints, camera);
@@ -175,8 +266,32 @@ export class ColliderGizmo {
   private ensureOutline(world: PhysicsWorld, target: OutlineTarget) {
     let entry = this._entries.get(target);
     if (!entry) {
-      entry = { key: '', outline: null, batch: null, pendingKey: null, error: null };
+      entry = {
+        key: '',
+        outline: null,
+        batch: null,
+        pendingKey: null,
+        error: null,
+        center: new Vector3(),
+        radius: 0,
+        params: new Float32Array(NUM_PARAMS)
+      };
       this._entries.set(target, entry);
+    }
+    if (readParams(target, tmpParams)) {
+      let same = true;
+      for (let i = 0; i < NUM_PARAMS; i++) {
+        if (tmpParams[i] !== entry.params[i]) {
+          same = false;
+          break;
+        }
+      }
+      if (same) {
+        return entry;
+      }
+      entry.params.set(tmpParams);
+    } else {
+      entry.params.fill(0);
     }
     const key = world.getColliderOutlineKey(target);
     if (key !== entry.key && key !== entry.pendingKey) {
@@ -215,10 +330,19 @@ export class ColliderGizmo {
     this.release(entry);
     entry.outline = outline;
     if (outline && outline.segments.length > 0) {
+      const seg = outline.segments;
+      const min = new Vector3(Infinity, Infinity, Infinity);
+      const max = new Vector3(-Infinity, -Infinity, -Infinity);
+      for (let i = 0; i < seg.length; i += 3) {
+        min.setXYZ(Math.min(min.x, seg[i]), Math.min(min.y, seg[i + 1]), Math.min(min.z, seg[i + 2]));
+        max.setXYZ(Math.max(max.x, seg[i]), Math.max(max.y, seg[i + 1]), Math.max(max.z, seg[i + 2]));
+      }
+      Vector3.scale(Vector3.add(min, max, entry.center), 0.5, entry.center);
+      entry.radius = Vector3.distance(min, max) * 0.5;
       entry.batch = {
         primitive: Renderer.createAALineBatch(outline.segments),
         count: outline.segments.length / 6,
-        mvpMatrix: new Matrix4x4(),
+        worldMatrix: new Matrix4x4(),
         color: new Vector4(1, 1, 1, 1),
         enabled: false
       };
