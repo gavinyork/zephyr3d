@@ -90,6 +90,8 @@ export type PropertySceneNodeOptions = {
 export type PropertyAccessorOptions = {
   /** Human-friendly label for UI. Defaults to `name` if omitted. */
   label?: string;
+  /** Element label for object_array type */
+  elementLabel?: string;
   /** Logical grouping/category in UI. */
   group?: string;
   /** Whether the inspector group should be expanded by default. */

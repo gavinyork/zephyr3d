@@ -933,7 +933,8 @@ export function getSceneNodeClass(manager: ResourceManager): SerializableClass {
           phase: 4,
           readonly: true,
           options: {
-            objectTypes: [GPUClothComponent]
+            objectTypes: [GPUClothComponent],
+            elementLabel: 'GPU Cloth'
           },
           isPersistent(this: SceneNode) {
             return !this._prefabId || guessMimeType(this._prefabId) === mimeTypeOf('.zprefab');

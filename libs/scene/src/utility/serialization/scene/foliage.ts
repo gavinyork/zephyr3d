@@ -577,7 +577,10 @@ export function getFoliageSystemClass(manager: ResourceManager): SerializableCla
           description: 'Kinds of objects scattered over the terrain, one asset and its settings per layer',
           type: 'object_array',
           default: [],
-          options: { objectTypes: [FoliageLayer] },
+          options: {
+            objectTypes: [FoliageLayer],
+            elementLabel: 'Layer'
+          },
           isNullable() {
             return false;
           },

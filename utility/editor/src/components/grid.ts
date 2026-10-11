@@ -185,7 +185,7 @@ class PropertyGroup {
       if (tmpProperty.object) {
         if (tmpProperty.object.length === 0) {
           if (value.add) {
-            const propGroup = group.addGroup('<Add Element>');
+            const propGroup = group.addGroup(`<Add ${value.options?.elementLabel ?? 'Element'}>`);
             propGroup.setObject(null, value, obj, 0, 0);
           }
         } else {
