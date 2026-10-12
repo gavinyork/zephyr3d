@@ -126,10 +126,10 @@ function applyAllOverrides(physics: NodePhysics, params: any) {
       return err;
     }
   }
-  // Colliders are a list; the overrides apply to each one the preset fitted
+  // Colliders are a list; the overrides apply to each one the node ends up with
   if (params.collider !== undefined && params.collider !== null) {
     if (physics.colliders.length === 0) {
-      return '`collider` was given but the preset has no collider';
+      return '`collider` was given but neither the node nor the preset has a collider';
     }
     for (const collider of physics.colliders) {
       const err = applyOverrides(collider, params.collider, 'collider');
@@ -197,11 +197,20 @@ export async function setNodePhysics(controller: SceneController | null, params:
       err: `Unknown preset "${params.preset}". Available: ${PHYSICS_PRESETS.map((p) => presetKey(p.label)).join(', ')}`
     };
   }
-  // Overrides are validated against the preset's own result, so apply the preset to a scratch
-  // NodePhysics first and reject the call before the scene is touched
-  const scratch = new NodePhysics();
+  // Overrides are validated against what the preset will produce, so apply it to a scratch copy
+  // of the node's physics first and reject the call before the scene is touched. A copy rather
+  // than empty data: the preset adds to what the node has, so `collider` may well address a
+  // collider the node already carries rather than one the preset fits.
+  const rm = getEngine().resourceManager;
+  const scratch = node.physics
+    ? await rm.deserializeObject<NodePhysics>(
+        node,
+        (await rm.serializeObject(node.physics)) as Record<string, unknown>
+      )
+    : new NodePhysics();
   preset.apply(node, scratch);
   const invalid = applyAllOverrides(scratch, params);
+  scratch.dispose();
   if (invalid) {
     return { err: invalid };
   }

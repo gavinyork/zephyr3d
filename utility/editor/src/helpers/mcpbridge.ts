@@ -248,6 +248,13 @@ function toSnakeCase(value: string): string {
     .toLowerCase();
 }
 
+/**
+ * Result fields holding user or serialized data - script configs, property
+ * values, physics data - whose keys are names the caller sends back (script
+ * property names, serialized fields), so they pass through unchanged.
+ */
+const VERBATIM_RESULT_KEYS = new Set(['config', 'values', 'data']);
+
 function normalizeResultKeysToSnakeCase(value: any): any {
   if (Array.isArray(value)) {
     return value.map((item) => normalizeResultKeysToSnakeCase(item));
@@ -255,7 +262,10 @@ function normalizeResultKeysToSnakeCase(value: any): any {
   if (value && typeof value === 'object') {
     const normalized: Record<string, any> = {};
     for (const [key, childValue] of Object.entries(value)) {
-      normalized[toSnakeCase(key)] = normalizeResultKeysToSnakeCase(childValue);
+      const name = toSnakeCase(key);
+      normalized[name] = VERBATIM_RESULT_KEYS.has(name)
+        ? childValue
+        : normalizeResultKeysToSnakeCase(childValue);
     }
     return normalized;
   }
