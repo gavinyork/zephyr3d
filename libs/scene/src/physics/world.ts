@@ -27,6 +27,8 @@ export interface PhysicsBodyHandle {
   setGravityScale(scale: number): void;
   setCcd(enabled: boolean): void;
   setEnabledAxes(translation: [boolean, boolean, boolean], rotation: [boolean, boolean, boolean]): void;
+  getPosition(out: Vector3): Vector3;
+  getRotation(out: Quaternion): Quaternion;
   getLinearVelocity(out: Vector3): Vector3;
   setLinearVelocity(v: Vector3): void;
   getAngularVelocity(out: Vector3): Vector3;

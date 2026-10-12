@@ -1,4 +1,4 @@
-import { Vector3 } from '@zephyr3d/base';
+import { Quaternion, Vector3 } from '@zephyr3d/base';
 import type { MotionType } from './types';
 import type { PhysicsBodyHandle } from './world';
 import { PhysicsPart } from './part';
@@ -208,6 +208,37 @@ export class RigidBody extends PhysicsPart {
     this._initialAngularVelocity.set(value);
   }
 
+  /**
+   * World position of the body's origin after the latest simulation step.
+   *
+   * @remarks
+   * The node shows the body interpolated between the last two steps, and does
+   * not move between the steps of one frame. Forces that depend on where the
+   * body is (buoyancy, springs) should read this in a fixed update instead.
+   * Before the body is simulated, the node's world position.
+   */
+  getSimulatedPosition(out = new Vector3()): Vector3 {
+    const body = this._backend();
+    if (body) {
+      return body.getPosition(out);
+    }
+    return this.node ? this.node.getWorldPosition(out) : out.setXYZ(0, 0, 0);
+  }
+  /**
+   * World orientation of the body after the latest simulation step; see
+   * {@link RigidBody.getSimulatedPosition}.
+   */
+  getSimulatedRotation(out = new Quaternion()): Quaternion {
+    const body = this._backend();
+    if (body) {
+      return body.getRotation(out);
+    }
+    if (this.node) {
+      this.node.worldMatrix.decompose(null, out, null);
+      return out;
+    }
+    return out.identity();
+  }
   /** Linear velocity in m/s. Returns zero before the body exists in a simulation. */
   getLinearVelocity(out = new Vector3()): Vector3 {
     const body = this._backend();
