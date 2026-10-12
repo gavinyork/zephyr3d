@@ -289,6 +289,9 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
   private readonly _nodeBox: AABB;
   private readonly _rectHandles: number[][];
   private readonly _rectHandlePositions: Vector3[];
+  private _tempLineBatch: Nullable<AALineBatch>;
+  private _tempSegments: Float32Array;
+  private _tempSegmentCapacity: number;
   /**
    * Creates an instance of PostGizmoRenderer.
    */
@@ -353,6 +356,9 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
       new Vector3(this._boxSize, this._boxSize, this._boxSize)
     );
     this._nodeBox = new AABB();
+    this._tempLineBatch = null;
+    this._tempSegmentCapacity = 256;
+    this._tempSegments = new Float32Array(this._tempSegmentCapacity * 6);
   }
   get allowRotate() {
     return this._allowRotate;
@@ -2281,6 +2287,10 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
       );
     }
   }
+  /**
+   * Legacy single-box outline rendering (replaced by batched renderSelectionOutlines).
+   * Kept for reference.
+   */
   private renderSelectGizmo(ctx: DrawContext, depthTex: BaseTexture) {
     ctx.device.setRenderStates(PostGizmoRenderer._blendRenderState);
     const points: number[][] = [
@@ -2333,37 +2343,123 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
     }
   }
   private renderLineGizmos(ctx: DrawContext, depthTex: BaseTexture) {
-    const defaultColor = Vector4.one();
-    const viewport = ctx.device.getViewport();
+    if (this._lineGizmos.length === 0) {
+      return;
+    }
+
+    // 批量收集所有 LineGizmo 的线段
+    let segmentCount = 0;
+
+    // 第一遍：计算总线段数
+    for (const lineGizmo of this._lineGizmos) {
+      for (const line of lineGizmo.lines) {
+        segmentCount += Math.max(0, line.length - 1);
+      }
+    }
+
+    if (segmentCount === 0) {
+      return;
+    }
+
+    // 确保临时缓冲区足够大
+    if (segmentCount > this._tempSegmentCapacity) {
+      this._tempSegmentCapacity = Math.max(segmentCount, this._tempSegmentCapacity * 2);
+      this._tempSegments = new Float32Array(this._tempSegmentCapacity * 6);
+      if (this._tempLineBatch) {
+        this._tempLineBatch.primitive.dispose();
+        this._tempLineBatch = null;
+      }
+    }
+
+    // 第二遍：收集线段（clip space 坐标）
+    let offset = 0;
     for (const lineGizmo of this._lineGizmos) {
       for (const line of lineGizmo.lines) {
         for (let i = 0; i < line.length - 1; i++) {
           const a = line[i];
           const b = line[i + 1];
-          this.renderAALine(
-            a.x,
-            a.y,
-            a.z,
-            a.w,
-            b.x,
-            b.y,
-            b.z,
-            b.w,
-            lineGizmo.width ?? 1,
-            lineGizmo.color ?? defaultColor,
-            ctx.device.screenXToDevice(viewport.width),
-            ctx.device.screenYToDevice(viewport.height),
-            depthTex
-          );
+          // LineGizmo 存储的是 clip space 坐标 (x, y, z, w)，需要转换为世界坐标
+          // 通过 w 除法得到 NDC，然后反投影到世界空间
+          const ndcA = new Vector3(a.x / a.w, a.y / a.w, a.z / a.w);
+          const ndcB = new Vector3(b.x / b.w, b.y / b.w, b.z / b.w);
+          const worldA = ctx.camera.invViewProjectionMatrix.transformPointP(ndcA);
+          const worldB = ctx.camera.invViewProjectionMatrix.transformPointP(ndcB);
+          this._tempSegments[offset++] = worldA.x;
+          this._tempSegments[offset++] = worldA.y;
+          this._tempSegments[offset++] = worldA.z;
+          this._tempSegments[offset++] = worldB.x;
+          this._tempSegments[offset++] = worldB.y;
+          this._tempSegments[offset++] = worldB.z;
         }
       }
     }
+
+    // 创建或更新批次
+    if (!this._tempLineBatch) {
+      const primitive = PostGizmoRenderer.createAALineBatch(this._tempSegments.subarray(0, segmentCount * 6));
+      this._tempLineBatch = {
+        primitive,
+        count: segmentCount,
+        worldMatrix: Matrix4x4.identity(),
+        width: 1,
+        color: Vector4.one(),
+        enabled: true
+      };
+    } else {
+      this.updateAALineBatch(
+        this._tempLineBatch,
+        this._tempSegments.subarray(0, segmentCount * 6),
+        segmentCount
+      );
+    }
+
+    // 使用批量渲染（注意：这里假设所有 LineGizmo 使用相同的宽度和颜色）
+    // 如果需要支持不同颜色/宽度，需要分批处理
+    const firstGizmo = this._lineGizmos[0];
+    this._tempLineBatch.width = firstGizmo.width ?? 1;
+    this._tempLineBatch.color = firstGizmo.color ?? Vector4.one();
+
+    const oldBatches = this._aaLineBatches;
+    this._aaLineBatches = [this._tempLineBatch];
+    this.renderAALineBatches(ctx, depthTex);
+    this._aaLineBatches = oldBatches;
   }
   private renderSelectionOutlines(ctx: DrawContext, depthTex: BaseTexture) {
     if (this._selectedNodes.length === 0) {
       return;
     }
+
+    // 批量收集所有选择框线段
+    let segmentCount = 0;
     const rendered = new Set<SceneNode>();
+
+    // 第一遍：计算需要的线段数量
+    for (const node of this._selectedNodes) {
+      if (!node || rendered.has(node)) {
+        continue;
+      }
+      rendered.add(node);
+      segmentCount += node.isSprite() ? 4 : 12;
+    }
+
+    if (segmentCount === 0) {
+      return;
+    }
+
+    // 确保临时缓冲区足够大
+    if (segmentCount > this._tempSegmentCapacity) {
+      this._tempSegmentCapacity = Math.max(segmentCount, this._tempSegmentCapacity * 2);
+      this._tempSegments = new Float32Array(this._tempSegmentCapacity * 6);
+      // 旧批次需要重建
+      if (this._tempLineBatch) {
+        this._tempLineBatch.primitive.dispose();
+        this._tempLineBatch = null;
+      }
+    }
+
+    // 第二遍：收集线段世界坐标
+    let offset = 0;
+    rendered.clear();
     for (const node of this._selectedNodes) {
       if (!node || rendered.has(node)) {
         continue;
@@ -2372,13 +2468,41 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
       const prevNode = this._node;
       this._node = node;
       this._calcGizmoMVPMatrix('select', false, PostGizmoRenderer._mvpMatrix);
+
       if (node.isSprite()) {
-        this.renderSelectSpriteGizmo(ctx, depthTex);
+        offset = this.collectSpriteBoundarySegments(this._tempSegments, offset);
       } else {
-        this.renderSelectGizmo(ctx, depthTex);
+        offset = this.collectBoxBoundarySegments(this._tempSegments, offset);
       }
+
       this._node = prevNode;
     }
+
+    // 创建或更新批次
+    if (!this._tempLineBatch) {
+      const primitive = PostGizmoRenderer.createAALineBatch(this._tempSegments.subarray(0, segmentCount * 6));
+      this._tempLineBatch = {
+        primitive,
+        count: segmentCount,
+        worldMatrix: Matrix4x4.identity(),
+        width: selectLineWidth3D,
+        color: selectLineColor3D,
+        enabled: true
+      };
+    } else {
+      // 更新现有批次的顶点数据
+      this.updateAALineBatch(
+        this._tempLineBatch,
+        this._tempSegments.subarray(0, segmentCount * 6),
+        segmentCount
+      );
+    }
+
+    // 使用批量渲染
+    const oldBatches = this._aaLineBatches;
+    this._aaLineBatches = [this._tempLineBatch];
+    this.renderAALineBatches(ctx, depthTex);
+    this._aaLineBatches = oldBatches;
   }
   private renderAABBGizmo(ctx: DrawContext, depthTex: BaseTexture) {
     ctx.device.setRenderStates(PostGizmoRenderer._aabbRenderState);
@@ -2401,6 +2525,105 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
     ctx.device.setProgram(PostGizmoRenderer._gizmoProgram);
     ctx.device.setBindGroup(0, PostGizmoRenderer._bindGroup!);
     PostGizmoRenderer._primitives!['edit-aabb'][0]!.draw();
+  }
+  /**
+   * 收集精灵边界的4条线段（世界坐标）
+   */
+  private collectSpriteBoundarySegments(segments: Float32Array, offset: number): number {
+    const sprite = this._node as Sprite;
+    const points: Vector3[] = [
+      this.calcSpriteVertexPosition(sprite, 0, 0),
+      this.calcSpriteVertexPosition(sprite, 1, 0),
+      this.calcSpriteVertexPosition(sprite, 1, 1),
+      this.calcSpriteVertexPosition(sprite, 0, 1)
+    ];
+    for (let i = 0; i < 4; i++) {
+      const A = points[i];
+      const B = points[(i + 1) % 4];
+      segments[offset++] = A.x;
+      segments[offset++] = A.y;
+      segments[offset++] = A.z;
+      segments[offset++] = B.x;
+      segments[offset++] = B.y;
+      segments[offset++] = B.z;
+    }
+    return offset;
+  }
+  /**
+   * 收集立方体边界的12条线段（模型空间坐标，通过 _mvpMatrix 计算世界坐标）
+   */
+  private collectBoxBoundarySegments(segments: Float32Array, offset: number): number {
+    const points: number[][] = [
+      [0, 0, 0],
+      [1, 0, 0],
+      [1, 0, 1],
+      [0, 0, 1],
+      [0, 1, 0],
+      [1, 1, 0],
+      [1, 1, 1],
+      [0, 1, 1]
+    ];
+    const lines: number[][] = [
+      [0, 1],
+      [1, 2],
+      [2, 3],
+      [3, 0],
+      [4, 5],
+      [5, 6],
+      [6, 7],
+      [7, 4],
+      [0, 4],
+      [1, 5],
+      [2, 6],
+      [3, 7]
+    ];
+
+    // _mvpMatrix 在 renderSelectionOutlines 中已经通过 _calcGizmoWorldMatrix('select') 计算
+    // 对于 'select' 模式，它是 node 的世界包围盒变换，我们需要用它来获取世界坐标
+    const worldMatrix = this._calcGizmoWorldMatrix('select', false);
+    const worldPoints = points.map((point) => {
+      const v = new Vector3(point[0], point[1], point[2]);
+      return worldMatrix.transformPointAffine(v);
+    });
+
+    for (const line of lines) {
+      const A = worldPoints[line[0]];
+      const B = worldPoints[line[1]];
+      segments[offset++] = A.x;
+      segments[offset++] = A.y;
+      segments[offset++] = A.z;
+      segments[offset++] = B.x;
+      segments[offset++] = B.y;
+      segments[offset++] = B.z;
+    }
+    return offset;
+  }
+  /**
+   * 更新现有 AALineBatch 的顶点数据
+   */
+  private updateAALineBatch(batch: AALineBatch, segments: Float32Array, count: number) {
+    const segmentCount = segments.length / 6;
+    if (batch.count !== segmentCount) {
+      // 容量变化，需要重建 primitive
+      batch.primitive.dispose();
+      batch.primitive = PostGizmoRenderer.createAALineBatch(segments);
+      batch.count = count;
+    } else {
+      // 容量相同，只更新数据
+      const a = new Float32Array(count * 3);
+      const b = new Float32Array(count * 3);
+      for (let i = 0; i < count; i++) {
+        a.set(segments.subarray(i * 6, i * 6 + 3), i * 3);
+        b.set(segments.subarray(i * 6 + 3, i * 6 + 6), i * 3);
+      }
+      const vertexBufferA = batch.primitive.getVertexBuffer('texCoord0');
+      const vertexBufferB = batch.primitive.getVertexBuffer('texCoord1');
+      if (vertexBufferA && vertexBufferB) {
+        vertexBufferA.bufferSubData(0, a);
+        vertexBufferB.bufferSubData(0, b);
+      }
+      batch.count = count;
+    }
   }
   private calcSpriteVertexPosition(sprite: BaseSprite<any>, x: number, y: number, outWorldPos?: Vector3) {
     outWorldPos = outWorldPos || new Vector3();
