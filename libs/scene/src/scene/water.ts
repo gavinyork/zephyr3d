@@ -1143,9 +1143,13 @@ export class Water extends applyMixins(GraphNode, mixinDrawable) implements Draw
         }
         const primitive = this._feedbackPrimitive.get()!;
         const vertices = new Float32Array(points.length * 4);
+        // The generators add their displacement to the input, which the surface
+        // draw feeds at the still-water level: the caller's Y has to be replaced
+        // by it, or a probe below the surface reports the surface that much lower.
+        const level = this.worldMatrix.m13;
         for (let i = 0; i < points.length; i++) {
           vertices[i * 4 + 0] = points[i].x;
-          vertices[i * 4 + 1] = points[i].y;
+          vertices[i * 4 + 1] = level;
           vertices[i * 4 + 2] = points[i].z;
           vertices[i * 4 + 3] = i;
         }
