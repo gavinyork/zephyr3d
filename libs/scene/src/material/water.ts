@@ -23,6 +23,7 @@ import { waterScatterPhase } from '../shaders/water_medium';
 import { getDevice } from '../app/api';
 import { evaluateLTCRectLightTerms } from '../shaders/ltc_rect';
 import { getLTCAmpLUT, getLTCMatLUT } from '../utility/textures/ltclut';
+import { FOAM_TEX_CELLS, getDefaultFoamTexture } from '../utility/textures/foam';
 
 /**
  * How the water medium converts a path length into transmittance and in-scattering.
@@ -177,19 +178,21 @@ const REFRACT_BLUR_GEOMETRIC = 0.02;
 const REFRACT_BLUR_DENSITY = 1.5;
 /** Cap on the refraction blur LOD. */
 export const REFRACT_BLUR_MAX_LOD = 6;
-/** Share of the shoreline ramp the foam pattern may eat into. Below 1. */
-const SHORE_FOAM_NOISE_BITE = 0.6;
 /** World-space drift of the foam pattern, m/s. */
 const SHORE_FOAM_DRIFT_X = 0.11;
 const SHORE_FOAM_DRIFT_Z = -0.07;
-/** Octave frequency ratio. Not 2, which would align the noise lattices. */
-const SHORE_FOAM_OCTAVE_RATIO = 2.17;
-/** Foam pattern octave weights, coarsest first. */
-const SHORE_FOAM_OCTAVE_WEIGHTS = [0.5, 0.3, 0.2];
 /** Width of the band's gradient, as a fraction of its reach. */
 const SHORE_FOAM_EDGE_SOFTNESS = 0.85;
-/** Hi-Z cells the proximity window spreads over its radius; sets the mip level. */
-const SHORE_QUERY_TAP_SPREAD = 1.5;
+/**
+ * Hi-Z cells the proximity window spreads over its radius; sets the mip level.
+ * The window reaches 2 cells, so this keeps it past the band's outer edge.
+ */
+const SHORE_QUERY_TAP_SPREAD = 1.25;
+/**
+ * Divisor of the soft-min sum. A lone surface reads `k * log(this)` farther
+ * than it is, matching the calibration of the earlier tent-normalized window.
+ */
+const SHORE_QUERY_SOFTMIN_NORM = 4;
 /** Softness of the proximity soft-min, as a fraction of the radius. */
 const SHORE_QUERY_SOFTMIN = 0.25;
 /**
@@ -290,6 +293,7 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
   private _shoreFoamDepth: number;
   private _shoreFoamFalloff: number;
   private _shoreFoamScale: number;
+  private _shoreFoamFeather: number;
   private _shoreFoamWashAmount: number;
   private _shoreFoamWashSpeed: number;
   private _shoreFoamWashScale: number;
@@ -355,6 +359,7 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
     this._shoreFoamDepth = 0.5;
     this._shoreFoamFalloff = 1.5;
     this._shoreFoamScale = 2.5;
+    this._shoreFoamFeather = 0.4;
     this._shoreFoamWashAmount = 0.5;
     this._shoreFoamWashSpeed = 0.12;
     this._shoreFoamWashScale = 0.03;
@@ -889,6 +894,20 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
     }
   }
   /**
+   * Width of the foam texture's black-point fade. Small values cut the
+   * texture into hard-edged clumps, large values fade it in smoothly.
+   */
+  get shoreFoamFeather() {
+    return this._shoreFoamFeather;
+  }
+  set shoreFoamFeather(val: number) {
+    const clamped = Math.min(Math.max(0.001, val), 1);
+    if (clamped !== this._shoreFoamFeather) {
+      this._shoreFoamFeather = clamped;
+      this.uniformChanged();
+    }
+  }
+  /**
    * Run-up of the band's edge, as a fraction of {@link shoreFoamDepth}. 0 is
    * static; above 1 the band closes completely at the bottom of the cycle.
    */
@@ -1151,6 +1170,8 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
         scope.shoreFoamParams = pb.vec4().uniform(2);
         // (run-up amount, run-up cycles/s, run-up cycles/m, query radius in m)
         scope.shoreFoamWashParams = pb.vec4().uniform(2);
+        scope.shoreFoamFeather = pb.float().uniform(2);
+        scope.shoreFoamTex = pb.tex2D().uniform(2);
       }
       // (intensity, anisotropy, 0, 0)
       scope.sunScatterParams = pb.vec4().uniform(2);
@@ -1193,6 +1214,11 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
       }
       // Vertical wave displacement, interpolated from the vertices. Zero on the skirt.
       scope.$l.crestHeight = pb.sub(scope.$inputs.worldPos.y, scope.$inputs.clipmapPos.y);
+      // Screen derivatives of the undisplaced position, taken here in uniform
+      // control flow; the shore foam samples its texture with them under a branch.
+      scope.$l.restXZGrad = this._shoreFoamAvailable(scope)
+        ? pb.vec4(pb.dpdx(scope.$inputs.clipmapPos.xz), pb.dpdy(scope.$inputs.clipmapPos.xz))
+        : pb.vec4(0);
       if (this.debugOutput === 'interaction') {
         // The field on its own, grey at rest, scaled so its amplitude clamp
         // reaches black and white; dimmed outside the window so its reach shows.
@@ -1222,7 +1248,9 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
             scope.$inputs.worldPos,
             scope.normal.xyz,
             scope.normal.w,
-            scope.crestHeight
+            scope.crestHeight,
+            scope.$inputs.clipmapPos.xz,
+            scope.restXZGrad
           ),
           1
         );
@@ -1596,7 +1624,9 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
     worldPos: PBShaderExp,
     worldNormal: PBShaderExp,
     foamFactor: PBShaderExp,
-    crestHeight: PBShaderExp
+    crestHeight: PBShaderExp,
+    restXZ: PBShaderExp,
+    restXZGrad: PBShaderExp
   ) {
     const pb = scope.$builder;
     const that = this;
@@ -1691,59 +1721,38 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
       }
     );
     if (shoreFoam) {
-      // Three octaves of world-space value noise, drifting.
-      pb.func('waterShoreFoamPattern', [pb.vec2('xz'), pb.float('time')], function () {
+      // Foam texture at the undisplaced position, drifting. Sampled with the
+      // screen gradients so its mips filter the pattern out with distance
+      // instead of it aliasing into speckle.
+      pb.func('waterShoreFoamPattern', [pb.vec2('xz'), pb.vec4('xzGrad'), pb.float('time')], function () {
+        // Texture repeats per meter: pattern cycles/m over the cells in a tile.
+        this.$l.uvScale = pb.div(this.shoreFoamParams.w, FOAM_TEX_CELLS);
         // Drift in meters, before the frequency.
-        this.$l.p = pb.mul(
+        this.$l.uv = pb.mul(
           pb.add(this.xz, pb.mul(pb.vec2(SHORE_FOAM_DRIFT_X, SHORE_FOAM_DRIFT_Z), this.time)),
-          this.shoreFoamParams.w
+          this.uvScale
         );
         this.$return(
-          pb.add(
-            pb.mul(valueNoise(this, this.p), SHORE_FOAM_OCTAVE_WEIGHTS[0]),
-            // Offset so the octave lattices do not line up.
-            pb.mul(
-              valueNoise(this, pb.add(pb.mul(this.p, SHORE_FOAM_OCTAVE_RATIO), pb.vec2(13.7, 7.3))),
-              SHORE_FOAM_OCTAVE_WEIGHTS[1]
-            ),
-            pb.mul(
-              valueNoise(
-                this,
-                pb.add(pb.mul(this.p, SHORE_FOAM_OCTAVE_RATIO * SHORE_FOAM_OCTAVE_RATIO), pb.vec2(5.1, 29.3))
-              ),
-              SHORE_FOAM_OCTAVE_WEIGHTS[2]
-            )
-          )
+          pb.textureSampleGrad(
+            this.shoreFoamTex,
+            this.uv,
+            pb.mul(this.xzGrad.xy, this.uvScale),
+            pb.mul(this.xzGrad.zw, this.uvScale)
+          ).r
         );
       });
-      // Distance from the water surface to the nearest opaque surface in a
-      // screen-space neighbourhood of `radius` meters, via the Hi-Z pyramid's
-      // nearest-depth channel. Returns a distance past the band's reach when
-      // the neighbourhood is empty.
+      // One integer pyramid level of the query below.
       pb.func(
-        'waterShoreProximity',
-        [pb.vec3('viewPos'), pb.vec2('screenUV'), pb.float('radius')],
+        'waterShoreProximityLevel',
+        [pb.vec3('viewPos'), pb.vec2('screenUV'), pb.float('radius'), pb.float('level')],
         function () {
           this.$l.renderSize = ShaderHelper.getRenderSize(this);
           this.$l.projMatrix = ShaderHelper.getProjectionMatrix(this);
-          // Screen radius in pixels of a sphere of `radius` meters at this depth.
-          this.$l.viewDist = pb.max(pb.neg(this.viewPos.z), 1e-4);
-          this.$l.pixelRadius = pb.mul(
-            pb.div(pb.mul(this.radius, this.projMatrix[0].x), this.viewDist),
-            0.5,
-            this.renderSize.x
-          );
-          // Integer level: the pyramid uses a nearest mip filter, and a
-          // fractional level shows as a seam.
-          this.$l.level = pb.clamp(
-            pb.floor(pb.log2(pb.max(pb.div(this.pixelRadius, SHORE_QUERY_TAP_SPREAD), 1))),
-            0,
-            pb.sub(pb.float(ShaderHelper.getHiZDepthTextureMipLevelCount(this)), 1)
-          );
           this.$l.mipSize = pb.max(pb.floor(pb.div(this.renderSize, pb.exp2(this.level))), pb.vec2(1));
           this.$l.texelStep = pb.div(pb.vec2(1), this.mipSize);
-          // 4x4 window, tent-weighted to zero at the edge (the pyramid sampler
-          // is nearest, so smoothing happens here). Each cell is read as a point
+          // 4x4 window with a round falloff to 2 cells from the pixel, the
+          // largest circle the window always covers (the pyramid sampler is
+          // nearest, so smoothing happens here). Each cell is read as a point
           // dithered inside it, so the box-distance contours come out round.
           // The dither moves the interpretation, not the fetches, so TAA can
           // average it.
@@ -1754,7 +1763,6 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
           this.$l.softK = pb.mul(this.radius, SHORE_QUERY_SOFTMIN);
           this.$l.dMax = pb.mul(this.radius, SHORE_QUERY_MISS_REACH);
           this.$l.esum = pb.float(0);
-          this.$l.wsum = pb.float(0);
           for (let gy = 0; gy < 4; gy++) {
             for (let gx = 0; gx < 4; gx++) {
               this.$l[`uv${gx}${gy}`] = pb.mul(
@@ -1815,68 +1823,125 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
               );
               this.$l[`dxy${gx}${gy}`] = pb.sub(this.viewPos.xy, this[`guess${gx}${gy}`]);
               this.$l[`d${gx}${gy}`] = pb.length(pb.vec3(this[`dxy${gx}${gy}`], this[`dz${gx}${gy}`]));
-              this.$l[`w${gx}${gy}`] = pb.mul(
-                pb.max(pb.sub(1, pb.abs(pb.div(pb.sub(pb.float(gx - 1), this.gridFrac.x), 2))), 0),
-                pb.max(pb.sub(1, pb.abs(pb.div(pb.sub(pb.float(gy - 1), this.gridFrac.y), 2))), 0)
+              this.$l[`w${gx}${gy}`] = pb.sub(
+                1,
+                pb.smoothStep(1, 2, pb.length(pb.sub(pb.vec2(gx - 1, gy - 1), this.gridFrac)))
               );
-              this.wsum = pb.add(this.wsum, this[`w${gx}${gy}`]);
+              // Fading a cell out pushes its distance to the miss reach rather
+              // than scaling its weight: a weight going to zero under the log
+              // sends the distance to infinity, a hard cut along the window.
               this.esum = pb.add(
                 this.esum,
-                pb.mul(
-                  this[`w${gx}${gy}`],
-                  pb.exp(pb.neg(pb.div(pb.min(this[`d${gx}${gy}`], this.dMax), this.softK)))
+                pb.exp(
+                  pb.neg(
+                    pb.div(
+                      pb.mix(this.dMax, pb.min(this[`d${gx}${gy}`], this.dMax), this[`w${gx}${gy}`]),
+                      this.softK
+                    )
+                  )
                 )
               );
             }
           }
-          // Weighted soft-min: -k * log(sum w * exp(-d / k) / sum w).
-          this.$return(pb.mul(pb.neg(this.softK), pb.log(pb.div(this.esum, this.wsum))));
+          // Soft-min: -k * log(sum exp(-d / k) / norm).
+          this.$return(
+            pb.max(pb.mul(pb.neg(this.softK), pb.log(pb.div(this.esum, SHORE_QUERY_SOFTMIN_NORM))), 0)
+          );
+        }
+      );
+      // Distance from the water surface to the nearest opaque surface in a
+      // screen-space neighbourhood of `radius` meters, via the Hi-Z pyramid's
+      // nearest-depth channel. Returns a distance past the band's reach when
+      // the neighbourhood is empty.
+      pb.func(
+        'waterShoreProximity',
+        [pb.vec3('viewPos'), pb.vec2('screenUV'), pb.float('radius')],
+        function () {
+          // Screen radius in pixels of a sphere of `radius` meters at this depth.
+          this.$l.viewDist = pb.max(pb.neg(this.viewPos.z), 1e-4);
+          this.$l.pixelRadius = pb.mul(
+            pb.div(pb.mul(this.radius, ShaderHelper.getProjectionMatrix(this)[0].x), this.viewDist),
+            0.5,
+            ShaderHelper.getRenderSize(this).x
+          );
+          this.$l.maxLevel = pb.sub(pb.float(ShaderHelper.getHiZDepthTextureMipLevelCount(this)), 1);
+          this.$l.levelF = pb.clamp(
+            pb.log2(pb.max(pb.div(this.pixelRadius, SHORE_QUERY_TAP_SPREAD), 1)),
+            0,
+            this.maxLevel
+          );
+          // The pyramid uses a nearest mip filter, and switching levels at an
+          // integer shows as a seam along a line of equal view distance: query
+          // the two levels around and blend.
+          this.$l.level0 = pb.floor(this.levelF);
+          this.$l.level1 = pb.min(pb.add(this.level0, 1), this.maxLevel);
+          this.$l.d0 = this.waterShoreProximityLevel(this.viewPos, this.screenUV, this.radius, this.level0);
+          this.$l.d1 = this.waterShoreProximityLevel(this.viewPos, this.screenUV, this.radius, this.level1);
+          this.$return(pb.mix(this.d0, this.d1, pb.sub(this.levelF, this.level0)));
         }
       );
       // Shoreline foam as (coverage, distance to the nearest surface).
-      pb.func('waterShoreFoam', [pb.vec3('worldPos'), pb.vec3('viewPos'), pb.vec2('screenUV')], function () {
-        this.$l.time = ShaderHelper.getElapsedTime(this);
-        // Queried at the band's widest reach so the run-up does not move the
-        // mip level under it.
-        this.$l.surfaceDist = this.waterShoreProximity(
-          this.viewPos,
-          this.screenUV,
-          this.shoreFoamWashParams.w
-        );
-        // Run-up phase from a world-space noise field; the query does not know
-        // which way the shore runs.
-        this.$l.washOffset = valueNoise(this, pb.mul(this.worldPos.xz, this.shoreFoamWashParams.z));
-        this.$l.wash = pb.sin(
-          pb.mul(pb.add(pb.mul(this.time, this.shoreFoamWashParams.y), this.washOffset), 2 * Math.PI)
-        );
-        this.$l.edge = pb.max(
-          pb.mul(this.shoreFoamParams.y, pb.add(1, pb.mul(this.shoreFoamWashParams.x, this.wash))),
-          0
-        );
-        this.$l.soft = pb.max(pb.mul(this.edge, SHORE_FOAM_EDGE_SOFTNESS), 1e-4);
-        // The gradient ends at `edge`, so coverage is zero there; straddling it
-        // would give half coverage over the entire open sea.
-        this.$l.ramp = pb.sub(1, pb.smoothStep(pb.sub(this.edge, this.soft), this.edge, this.surfaceDist));
-        this.$if(pb.lessThanEqual(this.ramp, 0), function () {
-          this.$return(pb.vec2(0, this.surfaceDist));
-        });
-        this.$l.pattern = this.waterShoreFoamPattern(this.worldPos.xz, this.time);
-        this.$l.coverage = pb.clamp(
-          pb.div(pb.sub(this.ramp, pb.mul(this.pattern, SHORE_FOAM_NOISE_BITE)), 1 - SHORE_FOAM_NOISE_BITE),
-          0,
-          1
-        );
-        this.$return(
-          pb.vec2(
-            pb.clamp(pb.mul(pb.pow(this.coverage, this.shoreFoamParams.z), this.shoreFoamParams.x), 0, 1),
-            this.surfaceDist
-          )
-        );
-      });
+      pb.func(
+        'waterShoreFoam',
+        [
+          pb.vec3('worldPos'),
+          pb.vec3('viewPos'),
+          pb.vec2('screenUV'),
+          pb.vec2('restXZ'),
+          pb.vec4('restXZGrad')
+        ],
+        function () {
+          this.$l.time = ShaderHelper.getElapsedTime(this);
+          // Queried at the band's widest reach so the run-up does not move the
+          // mip level under it.
+          this.$l.surfaceDist = this.waterShoreProximity(
+            this.viewPos,
+            this.screenUV,
+            this.shoreFoamWashParams.w
+          );
+          // Run-up phase from a world-space noise field; the query does not know
+          // which way the shore runs.
+          this.$l.washOffset = valueNoise(this, pb.mul(this.worldPos.xz, this.shoreFoamWashParams.z));
+          this.$l.wash = pb.sin(
+            pb.mul(pb.add(pb.mul(this.time, this.shoreFoamWashParams.y), this.washOffset), 2 * Math.PI)
+          );
+          this.$l.edge = pb.max(
+            pb.mul(this.shoreFoamParams.y, pb.add(1, pb.mul(this.shoreFoamWashParams.x, this.wash))),
+            0
+          );
+          this.$l.soft = pb.max(pb.mul(this.edge, SHORE_FOAM_EDGE_SOFTNESS), 1e-4);
+          // The gradient ends at `edge`, so coverage is zero there; straddling it
+          // would give half coverage over the entire open sea.
+          this.$l.ramp = pb.sub(1, pb.smoothStep(pb.sub(this.edge, this.soft), this.edge, this.surfaceDist));
+          this.$if(pb.lessThanEqual(this.ramp, 0), function () {
+            this.$return(pb.vec2(0, this.surfaceDist));
+          });
+          this.$l.pattern = this.waterShoreFoamPattern(this.restXZ, this.restXZGrad, this.time);
+          // Crest-style black-point fading: density reveals individual clumps
+          // instead of multiplying them into a uniformly grey contact band.
+          // Keep the ramp as an envelope so a zero-density edge stays empty.
+          this.$l.density = pb.pow(this.ramp, this.shoreFoamParams.z);
+          this.$l.threshold = pb.sub(1, this.density);
+          this.$l.coverage = pb.mul(
+            this.density,
+            pb.smoothStep(this.threshold, pb.add(this.threshold, this.shoreFoamFeather), this.pattern)
+          );
+          this.$return(
+            pb.vec2(pb.clamp(pb.mul(this.coverage, this.shoreFoamParams.x), 0, 1), this.surfaceDist)
+          );
+        }
+      );
     }
     pb.func(
       'waterShading',
-      [pb.vec3('worldPos'), pb.vec3('worldNormal'), pb.float('foamFactor'), pb.float('crestHeight')],
+      [
+        pb.vec3('worldPos'),
+        pb.vec3('worldNormal'),
+        pb.float('foamFactor'),
+        pb.float('crestHeight'),
+        pb.vec2('restXZ'),
+        pb.vec4('restXZGrad')
+      ],
       function () {
         this.$l.screenUV = pb.div(pb.vec2(this.$builtins.fragCoord.xy), ShaderHelper.getRenderSize(this));
         this.$l.dist = pb.length(pb.sub(this.worldPos, ShaderHelper.getCameraPosition(this)));
@@ -2028,7 +2093,13 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
         );
         // (coverage, distance to the nearest surface); y is for the debug view.
         this.$l.shoreFoamInfo = shoreFoam
-          ? (this.waterShoreFoam(this.worldPos, this.viewPos, this.screenUV) as PBShaderExp)
+          ? (this.waterShoreFoam(
+              this.worldPos,
+              this.viewPos,
+              this.screenUV,
+              this.restXZ,
+              this.restXZGrad
+            ) as PBShaderExp)
           : pb.vec2(0, 0);
         this.$l.shoreFoam = this.shoreFoamInfo.x;
         // Independent coverages compose as overlapping area.
@@ -2246,7 +2317,7 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
         }
       }
     );
-    return scope.waterShading(worldPos, worldNormal, foamFactor, crestHeight);
+    return scope.waterShading(worldPos, worldNormal, foamFactor, crestHeight, restXZ, restXZGrad);
   }
   applyUniforms(bindGroup: BindGroup, ctx: DrawContext, needUpdate: boolean, pass: number) {
     super.applyUniforms(bindGroup, ctx, needUpdate, pass);
@@ -2298,6 +2369,8 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
           this._shoreFoamDepth * (1 + this._shoreFoamWashAmount)
         );
         bindGroup.setValue('shoreFoamWashParams', this._shoreFoamWashParams);
+        bindGroup.setValue('shoreFoamFeather', this._shoreFoamFeather);
+        bindGroup.setTexture('shoreFoamTex', getDefaultFoamTexture(), fetchSampler('repeat_linear'));
       }
       bindGroup.setValue('mediumAlbedo', this._scatterAlbedo);
       bindGroup.setValue('mediumExtinction', this._extinction);

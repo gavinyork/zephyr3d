@@ -531,6 +531,16 @@ export class Water extends applyMixins(GraphNode, mixinDrawable) implements Draw
     this.material.shoreFoamScale = val;
   }
   /**
+   * Width of the black-point fade that cuts the foam texture into clumps.
+   * Small values give hard-edged clumps, large values a soft fade.
+   */
+  get shoreFoamFeather() {
+    return this.material.shoreFoamFeather;
+  }
+  set shoreFoamFeather(val: number) {
+    this.material.shoreFoamFeather = val;
+  }
+  /**
    * How far the band's edge runs back and forth, as a fraction of
    * {@link shoreFoamDepth}. 0 leaves a static band.
    */

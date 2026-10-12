@@ -1193,6 +1193,23 @@ export function getWaterClass(manager: ResourceManager): SerializableClass {
           }
         },
         {
+          name: 'ShoreFoamFeather',
+          description:
+            'Width of the fade as foam coverage thresholds the foam texture. Small values cut it into hard-edged clumps; large values fade it in softly.',
+          type: 'float',
+          default: 0.4,
+          options: { animatable: true, minValue: 0.001, maxValue: 1 },
+          isHidden(this: Water) {
+            return this.shoreFoamAmount <= 0;
+          },
+          get(this: Water, value) {
+            value.num[0] = this.shoreFoamFeather;
+          },
+          set(this: Water, value) {
+            this.shoreFoamFeather = value.num[0];
+          }
+        },
+        {
           name: 'ShoreFoamWashAmount',
           description:
             'How far the waterline runs up and back, as a fraction of ShoreFoamDepth. This is what makes the band read as surf rather than as a painted rim; 0 leaves it static. Above 1 the band closes completely at the bottom of the cycle, which looks like the foam blinking out.',
