@@ -2287,61 +2287,6 @@ export class PostGizmoRenderer extends makeObservable(AbstractPostEffect)<{
       );
     }
   }
-  /**
-   * Legacy single-box outline rendering (replaced by batched renderSelectionOutlines).
-   * Kept for reference.
-   */
-  private renderSelectGizmo(ctx: DrawContext, depthTex: BaseTexture) {
-    ctx.device.setRenderStates(PostGizmoRenderer._blendRenderState);
-    const points: number[][] = [
-      [0, 0, 0],
-      [1, 0, 0],
-      [1, 0, 1],
-      [0, 0, 1],
-      [0, 1, 0],
-      [1, 1, 0],
-      [1, 1, 1],
-      [0, 1, 1]
-    ];
-    const lines: number[][] = [
-      [0, 1],
-      [1, 2],
-      [2, 3],
-      [3, 0],
-      [4, 5],
-      [5, 6],
-      [6, 7],
-      [7, 4],
-      [0, 4],
-      [1, 5],
-      [2, 6],
-      [3, 7]
-    ];
-    const viewport = ctx.device.getViewport();
-    const ndcPoints = points.map((point) => {
-      const v = new Vector3(point[0], point[1], point[2]);
-      return PostGizmoRenderer._mvpMatrix.transformPoint(v);
-    });
-    for (const line of lines) {
-      const A = ndcPoints[line[0]];
-      const B = ndcPoints[line[1]];
-      this.renderAALine(
-        A.x,
-        A.y,
-        A.z,
-        A.w,
-        B.x,
-        B.y,
-        B.z,
-        B.w,
-        selectLineWidth3D,
-        selectLineColor3D,
-        ctx.device.screenXToDevice(viewport.width),
-        ctx.device.screenYToDevice(viewport.height),
-        depthTex
-      );
-    }
-  }
   private renderLineGizmos(ctx: DrawContext, depthTex: BaseTexture) {
     if (this._lineGizmos.length === 0) {
       return;
