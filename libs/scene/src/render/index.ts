@@ -31,3 +31,4 @@ export * from './virtualtexture/virtual_texture';
 export * from './virtualtexture/virtual_texture_client';
 export * from './sdf/sdf_atlas';
 export * from './sdf/scene_sdf';
+export * from './sdf/global_sdf';

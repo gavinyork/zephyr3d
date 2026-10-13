@@ -79,7 +79,37 @@ export function getSceneSDFStats(controller: SceneController | null, params: any
       [inst.bounds.maxPoint.x, inst.bounds.maxPoint.y, inst.bounds.maxPoint.z]
     ]
   }));
-  return { enabled: scene.sdf.enabled, stats: scene.sdf.getStats(), instances, err: null };
+  return {
+    enabled: scene.sdf.enabled,
+    stats: scene.sdf.getStats(),
+    global: scene.sdf.global?.getStats() ?? null,
+    program_errors: scene.sdf.global?.getProgramErrors() ?? null,
+    instances,
+    err: null
+  };
+}
+
+/** Signed distance at world positions from the scene's global clipmap field, read back from the GPU. */
+export async function sampleGlobalSDF(controller: SceneController | null, params: any) {
+  const scene = controller?.model?.scene ?? null;
+  if (!scene) {
+    return { distances: null, err: 'No scene is currently opened' };
+  }
+  if (!scene.sdf.enabled) {
+    return { distances: null, err: 'The scene SDF is off; enable it with sdf_stats { enabled: true }' };
+  }
+  const global = scene.sdf.global;
+  if (!global) {
+    return { distances: null, err: 'The global SDF needs WebGPU' };
+  }
+  const points: unknown[] = Array.isArray(params.points) ? params.points : [];
+  const distances = await global.queryDistances(
+    points.map((p) => {
+      const [x, y, z] = (p as number[]).map(Number);
+      return new Vector3(x, y, z);
+    })
+  );
+  return { distances: Array.from(distances), global: global.getStats(), err: null };
 }
 
 /**

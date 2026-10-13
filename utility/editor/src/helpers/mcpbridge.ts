@@ -53,7 +53,7 @@ import {
   setTerrainGrassLayers
 } from './mcpterrain';
 import { importModelAsset, saveNodeAsPrefab } from './mcpassets';
-import { bakeMeshSDFs, getSceneSDFStats, queryMeshSDF } from './mcpsdf';
+import { bakeMeshSDFs, getSceneSDFStats, queryMeshSDF, sampleGlobalSDF } from './mcpsdf';
 import { getNodePhysics, listPhysicsPresets, removeNodePhysics, setNodePhysics } from './mcpphysics';
 import {
   eraseFoliage,
@@ -1909,6 +1909,12 @@ async function dispatch(editor: Editor, method: string, params: any): Promise<an
         return await bakeMeshSDFs(getSceneController(editor), params);
       } catch (err) {
         return { results: null, err: `${err instanceof Error ? err.message : err}` };
+      }
+    case 'sdf_sample':
+      try {
+        return await sampleGlobalSDF(getSceneController(editor), params);
+      } catch (err) {
+        return { distances: null, err: `${err instanceof Error ? err.message : err}` };
       }
     case 'sdf_stats':
       return getSceneSDFStats(getSceneController(editor), params);

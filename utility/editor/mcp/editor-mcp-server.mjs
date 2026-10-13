@@ -3031,6 +3031,25 @@ const BASE_TOOLS = [
     }
   },
   {
+    name: 'sdf_sample',
+    description:
+      'Signed distance at world positions from the scene global SDF (the clipmap built from static meshes with baked fields and the terrain, around the camera), read back from the GPU. Needs WebGPU and the scene SDF enabled (sdf_stats { enabled: true }); the clipmap fills in over the first frames. Distances are clamped to a band of a few voxels per level. Returns { distances, global, err }.',
+    inputSchema: {
+      type: 'object',
+      required: ['points'],
+      properties: {
+        points: {
+          type: 'array',
+          minItems: 1,
+          maxItems: 4096,
+          items: { type: 'array', items: { type: 'number' }, minItems: 3, maxItems: 3 },
+          description: 'World positions as [x, y, z].'
+        },
+        timeout_ms: { type: 'number', default: 30000 }
+      }
+    }
+  },
+  {
     name: 'sdf_query',
     description:
       'Signed distance from world positions to a mesh node surface, read from its baked field (negative inside). Run sdf_bake first. Returns { sdf_path, resolution, voxel_size (world), distances, err }.',
@@ -3175,6 +3194,7 @@ const READONLY_TOOL_NAMES = new Set([
   'foliage_get_info',
   'terrain_sample_height',
   'sdf_query',
+  'sdf_sample',
   'editor_connect_info',
   'editor_wait_ready',
   'editor_status',
@@ -4332,6 +4352,9 @@ const handlers = {
       { paths: args.paths, node_id: args.node_id, force: !!args.force },
       timeout
     );
+  },
+  async sdf_sample(args) {
+    return bridge.send('sdf_sample', { points: args.points }, Number(args.timeout_ms ?? 30000));
   },
   async sdf_stats(args) {
     return bridge.send('sdf_stats', { enabled: args.enabled }, Number(args.timeout_ms ?? 10000));

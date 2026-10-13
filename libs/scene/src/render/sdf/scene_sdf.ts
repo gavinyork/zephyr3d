@@ -7,6 +7,8 @@ import { getEngine } from '../../app/api';
 import { getMeshSDFPath, readZsdf } from '../../asset/zsdf_binary';
 import type { ZsdfHeader } from '../../asset/zsdf_binary';
 import { MeshSDFAtlas } from './sdf_atlas';
+import { GlobalSDF } from './global_sdf';
+import type { ClipmapTerrain } from '../../scene/terrain-cm/terrain-cm';
 
 /**
  * A baked mesh field as loaded, shared by every instance of the mesh.
@@ -115,6 +117,8 @@ export class SceneSDF extends makeObservable(Disposable)<SceneSDFEvents>() {
   private readonly _scene: Scene;
   private _enabled: boolean;
   private _atlas: Nullable<MeshSDFAtlas>;
+  private _global: Nullable<GlobalSDF>;
+  private _terrain: Nullable<ClipmapTerrain>;
   /** Meshes listened to, whether or not they take part. */
   private readonly _tracked: Set<Mesh>;
   private readonly _instances: Map<Mesh, SDFInstance>;
@@ -129,6 +133,8 @@ export class SceneSDF extends makeObservable(Disposable)<SceneSDFEvents>() {
     this._scene = scene;
     this._enabled = false;
     this._atlas = null;
+    this._global = null;
+    this._terrain = null;
     this._tracked = new Set();
     this._instances = new Map();
     this._assets = new Map();
@@ -164,6 +170,9 @@ export class SceneSDF extends makeObservable(Disposable)<SceneSDFEvents>() {
       this._assets.clear();
       this._atlas?.dispose();
       this._atlas = null;
+      this._global?.dispose();
+      this._global = null;
+      this._terrain = null;
     }
   }
   /** The atlas of resident fields, created when first needed. */
@@ -172,6 +181,16 @@ export class SceneSDF extends makeObservable(Disposable)<SceneSDFEvents>() {
       this._atlas = new MeshSDFAtlas();
     }
     return this._atlas;
+  }
+  /**
+   * The clipmap field built from the static instances and the terrain, or null
+   * where it cannot be built (WebGL2) or while disabled.
+   */
+  get global() {
+    if (!this._global && this._enabled && GlobalSDF.isSupported()) {
+      this._global = new GlobalSDF(this);
+    }
+    return this._global;
   }
   /** Instances taking part, static and dynamic. */
   get instances(): IterableIterator<SDFInstance> {
@@ -272,6 +291,10 @@ export class SceneSDF extends makeObservable(Disposable)<SceneSDFEvents>() {
     for (const key of atlas.flush(this.uploadBudget)) {
       this.dirtyAsset(key as MeshSDFAsset);
     }
+    if (this._terrain && (!this._terrain.attached || this._terrain.scene !== this._scene)) {
+      this._terrain = null;
+    }
+    this.global?.update(cameraPos, this._terrain);
   }
   protected onDispose() {
     super.onDispose();
@@ -328,6 +351,8 @@ export class SceneSDF extends makeObservable(Disposable)<SceneSDFEvents>() {
     root.iterate((node) => {
       if (node.isMesh()) {
         this.track(node);
+      } else if (node.isClipmapTerrain() && !this._terrain) {
+        this._terrain = node;
       }
       return false;
     });
@@ -465,6 +490,7 @@ export class SceneSDF extends makeObservable(Disposable)<SceneSDFEvents>() {
   /** @internal */
   private emitBounds(box: AABB) {
     if (box.minPoint.x <= box.maxPoint.x) {
+      this._global?.markDirty(box.minPoint, box.maxPoint);
       this.dispatchEvent('dirty', box.minPoint, box.maxPoint);
     }
   }
