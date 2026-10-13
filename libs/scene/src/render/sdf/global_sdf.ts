@@ -9,6 +9,8 @@ import {
   GLOBAL_SDF_LEVELS,
   GLOBAL_SDF_PARAMS,
   GLOBAL_SDF_TEXTURE,
+  GLOBAL_SDF_BRICK,
+  GLOBAL_SDF_TAGS,
   declareDynamicSDFUniforms,
   MAX_DYNAMIC_SDF_INSTANCES,
   SDF_ATLAS_TEXTURE,
@@ -23,7 +25,7 @@ import type { MeshSDFAtlas } from './sdf_atlas';
 import { WaterlineField } from './waterline';
 
 /** Voxels along a brick edge, the unit of compositing. */
-const BRICK = 8;
+const BRICK = GLOBAL_SDF_BRICK;
 /** vec4s per brick in the brick buffer. */
 const BRICK_VEC4S = 3;
 /** Most points per {@link GlobalSDF.queryDistances} call. */
@@ -116,6 +118,7 @@ export class GlobalSDF {
   brickBudget: number;
   private readonly _sdf: SceneSDF;
   private _texture: Nullable<Texture3D>;
+  private _tags: Nullable<Texture3D>;
   /** Window minimum of each level in voxels of that level; null before the first update. */
   private readonly _origins: Nullable<[number, number, number]>[];
   /** Dirty bricks of each level, keyed by world brick coordinates. */
@@ -148,6 +151,7 @@ export class GlobalSDF {
     this.bandVoxels = Math.max(1, options?.bandVoxels ?? 4);
     this.brickBudget = Math.max(1, Math.floor(options?.brickBudget ?? 512));
     this._texture = null;
+    this._tags = null;
     this._origins = new Array(this.levels).fill(null);
     this._dirty = Array.from({ length: this.levels }, () => new Set<string>());
     this._lastBricks = 0;
@@ -187,6 +191,21 @@ export class GlobalSDF {
     }
     return this._texture;
   }
+  /**
+   * One texel per brick, levels stacked along z: (world brick x, y, z, 1) of
+   * the brick last composited there. Starts all zero, which no brick matches.
+   */
+  get tags() {
+    if (!this._tags) {
+      const nb = this.resolution / BRICK;
+      this._tags = getDevice().createTexture3D('rgba32f', nb, nb, nb * this.levels, {
+        mipmapping: false,
+        writable: true
+      })!;
+      this._tags.name = '@GlobalSDFTags';
+    }
+    return this._tags;
+  }
   /** Voxel size of a level in world units. */
   voxelSize(level: number) {
     return this.baseVoxelSize * 2 ** level;
@@ -225,6 +244,7 @@ export class GlobalSDF {
     // Read with textureLoad, but the unfilterable binding still has a sampler
     // slot, which a filtering sampler fails to validate against
     bindGroup.setTexture(GLOBAL_SDF_TEXTURE, this.texture, fetchSampler('clamp_nearest_nomip'));
+    bindGroup.setTexture(GLOBAL_SDF_TAGS, this.tags, fetchSampler('clamp_nearest_nomip'));
     bindGroup.setValue(GLOBAL_SDF_LEVELS, this._levelInfo);
     bindGroup.setValue(GLOBAL_SDF_PARAMS, this._params);
   }
@@ -390,6 +410,8 @@ export class GlobalSDF {
     this._waterline = null;
     this._texture?.dispose();
     this._texture = null;
+    this._tags?.dispose();
+    this._tags = null;
     this._instanceBuffer?.dispose();
     this._brickBuffer?.dispose();
     this._indexBuffer?.dispose();
@@ -553,6 +575,7 @@ export class GlobalSDF {
       bg.setValue('terrainParams', new Vector4(0, 0, 1, 1));
     }
     bg.setTexture('field', this.texture);
+    bg.setTexture('tagsOut', this.tags);
     device.setProgram(program);
     device.setBindGroup(0, bg);
     device.compute(batch.length * 8, 1, 1);
@@ -594,6 +617,7 @@ export class GlobalSDF {
           // (height scale, world y, 1 / width, 1 / height)
           this.terrainParams = pb.vec4().uniform(0);
           this.field = pb.texStorage3D.r32float().storage(0);
+          this.tagsOut = pb.texStorage3D.rgba32float().storage(0);
           pb.func('terrainHeight', [pb.vec2('xz')], function () {
             this.$l.uv = pb.div(
               pb.sub(this.xz, this.terrainRegion.xy),
@@ -662,6 +686,17 @@ export class GlobalSDF {
             });
             this.d = pb.clamp(this.d, pb.neg(this.band), this.band);
             pb.textureStore(this.field, pb.add(pb.uvec3(this.b1.xyz), this.local), pb.vec4(this.d, 0, 0, 0));
+            // The brick now holds this window's region; readers see the tag in the next pass
+            this.$if(
+              pb.and(pb.equal(this.sub, 0), pb.equal(this.$builtins.localInvocationId, pb.uvec3(0))),
+              function () {
+                pb.textureStore(
+                  this.tagsOut,
+                  pb.div(pb.uvec3(this.b1.xyz), BRICK),
+                  pb.vec4(pb.div(this.b0.xyz, BRICK), 1)
+                );
+              }
+            );
           });
         }
       })!;

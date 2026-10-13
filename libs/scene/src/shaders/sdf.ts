@@ -4,6 +4,9 @@ import type { PBGlobalScope, PBInsideFunctionScope, PBShaderExp } from '@zephyr3
 export const GLOBAL_SDF_TEXTURE = 'zGlobalSDFTex';
 export const GLOBAL_SDF_LEVELS = 'zGlobalSDFLevels';
 export const GLOBAL_SDF_PARAMS = 'zGlobalSDFParams';
+export const GLOBAL_SDF_TAGS = 'zGlobalSDFTags';
+/** Voxels along a brick edge of the global field, the unit it is composited and tagged in. */
+export const GLOBAL_SDF_BRICK = 8;
 /** Uniform names of the dynamic instances, see {@link declareDynamicSDFUniforms}. */
 export const SDF_ATLAS_TEXTURE = 'zSDFAtlasTex';
 export const SDF_DYNAMIC_INSTANCES = 'zSDFDynamic';
@@ -20,6 +23,8 @@ export const SDF_INSTANCE_VEC4S = 6;
  * Declares the uniforms {@link sampleGlobalSDF} reads, in a bind group.
  *
  * - texture: all levels stacked along z, `resolution` texels each, r32f.
+ * - tags: one texel per brick, stacked the same way: (world brick x, y, z, 1)
+ *   of the brick last composited there, rgba32f.
  * - levels[i]: (window origin in voxels of the level, voxel size).
  * - params: (resolution, number of levels, band in voxels, 0).
  *
@@ -29,6 +34,7 @@ export const SDF_INSTANCE_VEC4S = 6;
 export function declareGlobalSDFUniforms(scope: PBGlobalScope, group: number, levels: number) {
   const pb = scope.$builder;
   scope[GLOBAL_SDF_TEXTURE] = pb.tex3D().sampleType('unfilterable-float').uniform(group);
+  scope[GLOBAL_SDF_TAGS] = pb.tex3D().sampleType('unfilterable-float').uniform(group);
   scope[GLOBAL_SDF_LEVELS] = pb.vec4[levels]().uniform(group);
   scope[GLOBAL_SDF_PARAMS] = pb.vec4().uniform(group);
 }
@@ -158,6 +164,12 @@ export function sampleSceneSDF(scope: PBInsideFunctionScope, worldPos: PBShaderE
  * Trilinear by hand from `textureLoad`: r32f is not filterable everywhere, and
  * the windows are toroidal, so neighbouring texels can wrap around the level.
  *
+ * A level answers only where every brick the filter touches is tagged with the
+ * world brick it should hold. After the window moves, the bricks that entered
+ * still hold the region that left on the other side until they are composited
+ * again, a budget per frame; trusting them puts copies of distant geometry
+ * where there is none, the more so the faster the camera moves.
+ *
  * @internal
  */
 export function sampleGlobalSDF(scope: PBInsideFunctionScope, worldPos: PBShaderExp, levels: number) {
@@ -169,6 +181,10 @@ export function sampleGlobalSDF(scope: PBInsideFunctionScope, worldPos: PBShader
     this.$l.band = this[GLOBAL_SDF_PARAMS].z;
     this.$l.result = pb.float(0);
     this.$l.found = false;
+    this.$l.valid = false;
+    this.$l.base = pb.vec3(0);
+    this.$l.t = pb.vec3(0);
+    this.$l.v0 = pb.ivec3(0);
     for (let i = levels - 1; i >= 0; i--) {
       // Coarsest first, each finer level overriding where it is valid; unrolled
       // since `levels` is small and constant
@@ -183,10 +199,14 @@ export function sampleGlobalSDF(scope: PBInsideFunctionScope, worldPos: PBShader
         pb.all(pb.lessThanEqual(this[`f${i}`], pb.vec3(pb.sub(this.resF, 1))))
       );
       this.$if(this[`in${i}`], function () {
-        this.$l.base = pb.floor(this[`f${i}`]);
-        this.$l.t = pb.sub(this[`f${i}`], this.base);
+        this.base = pb.floor(this[`f${i}`]);
+        this.t = pb.sub(this[`f${i}`], this.base);
+        this.valid = false;
         // World voxel index of the lower corner, then toroidal texel
-        this.$l.v0 = pb.add(pb.ivec3(this.base), pb.ivec3(this[`info${i}`].xyz));
+        this.v0 = pb.add(pb.ivec3(this.base), pb.ivec3(this[`info${i}`].xyz));
+        this.valid = bricksCurrent(this, this.v0, i);
+      });
+      this.$if(pb.and(this[`in${i}`], this.valid), function () {
         this.$l.c000 = loadWrapped(this, this.v0, 0, 0, 0, i);
         this.$l.c100 = loadWrapped(this, this.v0, 1, 0, 0, i);
         this.$l.c010 = loadWrapped(this, this.v0, 0, 1, 0, i);
@@ -216,6 +236,62 @@ export function sampleGlobalSDF(scope: PBInsideFunctionScope, worldPos: PBShader
     this.$return(this.result);
   });
   return scope[funcName](worldPos) as PBShaderExp;
+}
+
+/** ((v % n) + n) % n, the remainder of a negative index being negative */
+function wrap(scope: PBInsideFunctionScope, v: PBShaderExp, n: PBShaderExp) {
+  const pb = scope.$builder;
+  return pb.mod(pb.add(pb.mod(v, n), n), n);
+}
+
+/**
+ * True when the bricks covering voxels v0 to v0 + 1 of a level are tagged with
+ * their own world brick coordinates, i.e. composited for the current window.
+ * One to eight bricks, by how many brick boundaries the footprint straddles.
+ */
+function bricksCurrent(scope: PBInsideFunctionScope, v0: PBShaderExp, level: number) {
+  const pb = scope.$builder;
+  const funcName = `Z_globalSDFBricksCurrent${level}`;
+  pb.func(funcName, [pb.ivec3('v0')], function () {
+    this.$l.nb = pb.div(this[GLOBAL_SDF_PARAMS].x, GLOBAL_SDF_BRICK);
+    this.$l.nbi = pb.ivec3(pb.int(this.nb));
+    // Floor division of possibly negative voxel indices
+    this.$l.lo = pb.ivec3(pb.floor(pb.div(pb.vec3(this.v0), GLOBAL_SDF_BRICK)));
+    this.$l.hi = pb.ivec3(pb.floor(pb.div(pb.vec3(pb.add(this.v0, pb.ivec3(1))), GLOBAL_SDF_BRICK)));
+    this.$l.ok = true;
+    for (let c = 0; c < 8; c++) {
+      const bits = [c & 1, (c >> 1) & 1, (c >> 2) & 1];
+      // A corner using the upper brick on an axis matters only where the footprint crosses into it
+      const needs = ['x', 'y', 'z'].filter((_, a) => bits[a]).map((a) => pb.notEqual(this.lo[a], this.hi[a]));
+      const body = function (this: PBInsideFunctionScope) {
+        this.$l.b = pb.ivec3(
+          bits[0] ? this.hi.x : this.lo.x,
+          bits[1] ? this.hi.y : this.lo.y,
+          bits[2] ? this.hi.z : this.lo.z
+        );
+        this.$l.w = wrap(this, this.b, this.nbi);
+        this.$l.tag = pb.textureLoad(
+          this[GLOBAL_SDF_TAGS],
+          pb.ivec3(this.w.x, this.w.y, pb.add(this.w.z, pb.mul(this.nbi.z, level))),
+          0
+        );
+        this.ok = pb.and(
+          this.ok,
+          pb.and(pb.greaterThan(this.tag.w, 0.5), pb.equal(pb.ivec3(this.tag.xyz), this.b))
+        );
+      };
+      if (needs.length === 0) {
+        body.call(this);
+      } else {
+        this.$if(
+          needs.reduce((x, y) => pb.and(x, y)),
+          body
+        );
+      }
+    }
+    this.$return(this.ok);
+  });
+  return scope[funcName](v0) as PBShaderExp;
 }
 
 function loadWrapped(
