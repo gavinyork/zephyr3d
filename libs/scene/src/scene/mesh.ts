@@ -61,6 +61,20 @@ const LOD_COLORATION_COLORS: [number, number, number][] = [
  *
  * @public
  */
+/**
+ * How a mesh takes part in the scene's signed distance field.
+ *
+ * - `auto`: `dynamic` when the mesh or a node above it has a non-static rigid
+ *   body or a character controller, or the mesh is skinned or morphed;
+ *   `static` otherwise.
+ * - `none`: left out.
+ * - `static`: baked into the cached global field; moving it rebuilds the region.
+ * - `dynamic`: queried at its current transform every frame.
+ *
+ * @public
+ */
+export type MeshSDFMode = 'auto' | 'none' | 'static' | 'dynamic';
+
 export type MeshUpdateCallback = (frameId: number, elapsedInSeconds: number, deltaInSeconds: number) => void;
 
 /**
@@ -163,6 +177,7 @@ const MeshBase = castObservable(applyMixins(GraphNode, mixinDrawable))<{
   material_changed: [material: Nullable<MeshMaterial>];
   /** forcedLod or minLod changed */
   lod_changed: [mesh: Mesh];
+  sdfmode_changed: [mesh: Mesh];
 }>();
 
 /**
@@ -176,6 +191,8 @@ export class Mesh extends MeshBase implements BatchDrawable {
   private readonly _material: DRef<MeshMaterial>;
   /** @internal */
   protected _castShadow: boolean;
+  /** @internal */
+  protected _sdfMode: MeshSDFMode;
   /** @internal */
   protected _skinnedBoundingInfo: Nullable<SkinnedBoundingBox>;
   /** @internal */
@@ -249,6 +266,7 @@ export class Mesh extends MeshBase implements BatchDrawable {
     this._primitive = new DRef();
     this._material = new DRef();
     this._castShadow = true;
+    this._sdfMode = 'auto';
     this._skinnedBoundingInfo = null;
     this._animatedBoundingBox = null;
     this._boneMatrices = new DRef();
@@ -366,6 +384,33 @@ export class Mesh extends MeshBase implements BatchDrawable {
   }
   set castShadow(b) {
     this._castShadow = b;
+  }
+  /** How the mesh takes part in the scene's signed distance field. */
+  get sdfMode() {
+    return this._sdfMode;
+  }
+  set sdfMode(val: MeshSDFMode) {
+    if (val !== this._sdfMode) {
+      this._sdfMode = val;
+      this.dispatchEvent('sdfmode_changed', this);
+    }
+  }
+  /** {@link Mesh.sdfMode} with `auto` resolved. */
+  get effectiveSDFMode(): Exclude<MeshSDFMode, 'auto'> {
+    if (this._sdfMode !== 'auto') {
+      return this._sdfMode;
+    }
+    if (this._skinBindingName || this._morphData) {
+      return 'dynamic';
+    }
+    for (let node: Nullable<SceneNode> = this; node; node = node.parent) {
+      const physics = node.physics;
+      const body = physics?.body;
+      if ((body && body.motionType !== 'static') || physics?.character) {
+        return 'dynamic';
+      }
+    }
+    return 'static';
   }
   /**
    * Level of detail to always draw, or -1 to select it by the projected size.

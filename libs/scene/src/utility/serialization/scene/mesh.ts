@@ -7,6 +7,7 @@ import {
   type AssetHierarchyNode,
   type AssetSubMeshData
 } from '../../../asset/model';
+import type { MeshSDFMode } from '../../../scene/mesh';
 import type { MeshMaterial } from '../../../material/meshmaterial';
 import {
   GraphNode,
@@ -176,6 +177,25 @@ export function getMeshClass(manager: ResourceManager): SerializableClass {
           },
           set(this: Mesh, value) {
             this.castShadow = value.bool[0];
+          }
+        },
+        {
+          name: 'SDFMode',
+          description:
+            "How the mesh takes part in the scene's signed distance field. Auto is dynamic for a mesh that moves on its own (a non-static rigid body or a character controller on it or above it, skinning or morph targets) and static otherwise; static meshes are cached in the global field, dynamic ones are queried where they are each frame. Needs a baked field (Mesh Settings > Bake SDF).",
+          type: 'string',
+          default: 'auto',
+          options: {
+            enum: {
+              labels: ['Auto', 'None', 'Static', 'Dynamic'],
+              values: ['auto', 'none', 'static', 'dynamic']
+            }
+          },
+          get(this: Mesh, value) {
+            value.str[0] = this.sdfMode;
+          },
+          set(this: Mesh, value) {
+            this.sdfMode = value.str[0] as MeshSDFMode;
           }
         },
         {

@@ -3019,6 +3019,18 @@ const BASE_TOOLS = [
     }
   },
   {
+    name: 'sdf_stats',
+    description:
+      'State of the scene signed distance field: whether it is enabled, the meshes taking part (static or dynamic, field state, atlas slot) and atlas use. Pass enabled to turn it on or off first (not saved with the scene; the scene SDFEnabled property is). Returns { enabled, stats, instances, err }.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        enabled: { type: 'boolean', description: 'Turn the scene SDF on or off before reporting.' },
+        timeout_ms: { type: 'number', default: 10000 }
+      }
+    }
+  },
+  {
     name: 'sdf_query',
     description:
       'Signed distance from world positions to a mesh node surface, read from its baked field (negative inside). Run sdf_bake first. Returns { sdf_path, resolution, voxel_size (world), distances, err }.',
@@ -4320,6 +4332,9 @@ const handlers = {
       { paths: args.paths, node_id: args.node_id, force: !!args.force },
       timeout
     );
+  },
+  async sdf_stats(args) {
+    return bridge.send('sdf_stats', { enabled: args.enabled }, Number(args.timeout_ms ?? 10000));
   },
   async sdf_query(args) {
     return bridge.send(

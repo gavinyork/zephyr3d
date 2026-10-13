@@ -25,6 +25,7 @@ import type { ScenePhysicsSettings } from './physics_settings';
 import type { PhysicsWorld } from '../physics/world';
 import { getPhysicsWorldFactory } from '../physics/world';
 import type { VirtualTextureClient } from '../render/virtualtexture/virtual_texture_client';
+import { SceneSDF } from '../render/sdf/scene_sdf';
 
 /**
  * Represents a renderable world that manages scene graph, spatial indexing, and environment.
@@ -83,6 +84,8 @@ export class Scene
   protected _nodePlaceList: Set<GraphNode>;
   /** @internal Environment data (sky/light/IBL). */
   protected _env: Environment;
+  /** @internal */
+  protected _sdf: Nullable<SceneSDF>;
   /** @internal Frame counter that last updated this scene. */
   protected _updateFrame: number;
   /** @internal Unique scene ID. */
@@ -142,6 +145,7 @@ export class Scene
       (node, stamp) => (node._perCameraQueueStamp = stamp)
     );
     this._env = new Environment();
+    this._sdf = null;
     this._updateFrame = -1;
     this._rootNode = new DRef();
     this._rootNode.set(new SceneNode(this));
@@ -230,6 +234,13 @@ export class Scene
    */
   get env() {
     return this._env;
+  }
+  /** Signed distance field data of the scene, off until enabled. */
+  get sdf() {
+    if (!this._sdf) {
+      this._sdf = new SceneSDF(this);
+    }
+    return this._sdf;
   }
   /** Lighting unit model. Legacy remains the default for backward compatibility. */
   get lightingMode() {
@@ -612,6 +623,10 @@ export class Scene
       this.mainCamera?.updateController(deltaInSeconds, 'late');
       this.dispatchEvent('lateupdate', this);
       this.updateNodePlacement(this._octree, this._nodePlaceList);
+      const camera = this.mainCamera;
+      if (this._sdf?.enabled && camera) {
+        this._sdf.update(camera.getWorldPosition(), deltaInSeconds);
+      }
     }
     // Palettes written by animation updates are uploaded once all nodes and bank tracks are updated
     AnimationBankTrack.updateAll(getDevice().frameInfo.elapsedFrame * 0.001);
@@ -685,6 +700,8 @@ export class Scene
     this._drawableUpdateQueue.clear();
     this._perCameraUpdateQueue.clear();
     this._env.dispose();
+    this._sdf?.dispose();
+    this._sdf = null;
     this._rootNode.dispose();
     this._mainCamera.dispose();
     this._physicsWorld?.dispose();

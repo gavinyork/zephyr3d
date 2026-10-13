@@ -44,7 +44,42 @@ export async function bakeMeshSDFs(controller: SceneController | null, params: a
     paths = collectMeshPaths(root);
   }
   const results = await MeshSDFBaker.bakeAll(paths, !!params.force);
+  // Streamed copies of the rebaked fields are stale
+  const sdf = controller?.model?.scene?.sdf;
+  for (const r of results) {
+    if (!r.skipped && !r.err) {
+      sdf?.invalidate(r.path);
+    }
+  }
+  sdf?.invalidate();
   return { results, err: null };
+}
+
+/**
+ * State of the scene SDF: instances, streamed fields and atlas use. `enabled`
+ * turns the tracking on or off first when given.
+ */
+export function getSceneSDFStats(controller: SceneController | null, params: any) {
+  const scene = controller?.model?.scene ?? null;
+  if (!scene) {
+    return { stats: null, err: 'No scene is currently opened' };
+  }
+  if (typeof params.enabled === 'boolean') {
+    scene.sdf.enabled = params.enabled;
+  }
+  const instances = [...scene.sdf.instances].map((inst) => ({
+    node_id: inst.mesh.persistentId,
+    mode: inst.mode,
+    mesh: inst.asset?.meshPath ?? null,
+    state: inst.asset ? inst.asset.state : 'no_asset',
+    ready: scene.sdf.isReady(inst),
+    slot: inst.asset ? scene.sdf.atlas.getSlot(inst.asset) : null,
+    bounds: [
+      [inst.bounds.minPoint.x, inst.bounds.minPoint.y, inst.bounds.minPoint.z],
+      [inst.bounds.maxPoint.x, inst.bounds.maxPoint.y, inst.bounds.maxPoint.z]
+    ]
+  }));
+  return { enabled: scene.sdf.enabled, stats: scene.sdf.getStats(), instances, err: null };
 }
 
 /**

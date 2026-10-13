@@ -43,6 +43,36 @@ export function getSceneClass(manager: ResourceManager): SerializableClass {
           }
         },
         {
+          name: 'SDFEnabled',
+          description:
+            'Track the meshes with a baked signed distance field and stream their fields in around the camera, for the effects and simulations that read the scene SDF.',
+          type: 'bool',
+          default: false,
+          options: { group: 'SDF' },
+          get(this: Scene, value) {
+            value.bool[0] = this.sdf.enabled;
+          },
+          set(this: Scene, value) {
+            this.sdf.enabled = value.bool[0];
+          }
+        },
+        {
+          name: 'SDFStreamRadius',
+          description: 'Distance from the camera within which mesh fields are kept loaded.',
+          type: 'float',
+          default: 256,
+          options: { group: 'SDF', minValue: 1, maxValue: 100000 },
+          isHidden(this: Scene) {
+            return !this.sdf.enabled;
+          },
+          get(this: Scene, value) {
+            value.num[0] = this.sdf.streamRadius;
+          },
+          set(this: Scene, value) {
+            this.sdf.streamRadius = Math.max(1, value.num[0]);
+          }
+        },
+        {
           name: 'MetersPerUnit',
           description: 'Physical meters represented by one scene unit',
           type: 'float',
