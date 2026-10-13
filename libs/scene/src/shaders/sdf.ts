@@ -4,6 +4,17 @@ import type { PBGlobalScope, PBInsideFunctionScope, PBShaderExp } from '@zephyr3
 export const GLOBAL_SDF_TEXTURE = 'zGlobalSDFTex';
 export const GLOBAL_SDF_LEVELS = 'zGlobalSDFLevels';
 export const GLOBAL_SDF_PARAMS = 'zGlobalSDFParams';
+/** Uniform names of the dynamic instances, see {@link declareDynamicSDFUniforms}. */
+export const SDF_ATLAS_TEXTURE = 'zSDFAtlasTex';
+export const SDF_DYNAMIC_INSTANCES = 'zSDFDynamic';
+export const SDF_DYNAMIC_INFO = 'zSDFDynamicInfo';
+/** Most dynamic instances a shader merges into the field. */
+export const MAX_DYNAMIC_SDF_INSTANCES = 16;
+/**
+ * vec4s per packed instance: world-to-local rows (3), (field box min, voxel
+ * size), (field box max, world scale), (atlas slot offset, 0).
+ */
+export const SDF_INSTANCE_VEC4S = 6;
 
 /**
  * Declares the uniforms {@link sampleGlobalSDF} reads, in a bind group.
@@ -20,6 +31,118 @@ export function declareGlobalSDFUniforms(scope: PBGlobalScope, group: number, le
   scope[GLOBAL_SDF_TEXTURE] = pb.tex3D().sampleType('unfilterable-float').uniform(group);
   scope[GLOBAL_SDF_LEVELS] = pb.vec4[levels]().uniform(group);
   scope[GLOBAL_SDF_PARAMS] = pb.vec4().uniform(group);
+}
+
+/**
+ * Declares the uniforms {@link sampleDynamicSDF} reads: the mesh field atlas,
+ * up to {@link MAX_DYNAMIC_SDF_INSTANCES} packed instances and
+ * (instance count, 1 / atlas size).
+ * @internal
+ */
+export function declareDynamicSDFUniforms(scope: PBGlobalScope, group: number) {
+  const pb = scope.$builder;
+  scope[SDF_ATLAS_TEXTURE] = pb.tex3D().uniform(group);
+  scope[SDF_DYNAMIC_INSTANCES] = pb.vec4[MAX_DYNAMIC_SDF_INSTANCES * SDF_INSTANCE_VEC4S]().uniform(group);
+  scope[SDF_DYNAMIC_INFO] = pb.vec4().uniform(group);
+}
+
+/**
+ * Signed distance from a world position to the nearest of a set of packed
+ * instances, each its baked field sampled from the atlas: inside the field box
+ * by trilinear lookup, outside it by the border value plus the distance to the
+ * box. `maxDist` is returned when no instance comes nearer.
+ *
+ * Instance packing is described at {@link SDF_INSTANCE_VEC4S}: `baseOf(k)`
+ * gives the first vec4 of the k-th instance visited, `instance(i)` reads vec4
+ * `i` of the packed array.
+ *
+ * @internal
+ */
+export function sampleInstancesSDF(
+  scope: PBInsideFunctionScope,
+  p: PBShaderExp,
+  count: PBShaderExp,
+  maxDist: PBShaderExp,
+  baseOf: (scope: PBInsideFunctionScope, k: PBShaderExp) => PBShaderExp,
+  instance: (scope: PBInsideFunctionScope, index: PBShaderExp) => PBShaderExp,
+  atlas: PBShaderExp,
+  atlasInvSize: PBShaderExp
+) {
+  const pb = scope.$builder;
+  scope.$l.sdfBest = maxDist;
+  scope.$l.sdfP4 = pb.vec4(p, 1);
+  scope.$for(pb.uint('sdfK'), 0, count, function () {
+    this.$l.base = baseOf(this, this.sdfK);
+    this.$l.r0 = instance(this, this.base);
+    this.$l.r1 = instance(this, pb.add(this.base, 1));
+    this.$l.r2 = instance(this, pb.add(this.base, 2));
+    this.$l.bmin = instance(this, pb.add(this.base, 3));
+    this.$l.bmax = instance(this, pb.add(this.base, 4));
+    this.$l.slot = instance(this, pb.add(this.base, 5));
+    this.$l.lp = pb.vec3(
+      pb.dot(this.r0, this.sdfP4),
+      pb.dot(this.r1, this.sdfP4),
+      pb.dot(this.r2, this.sdfP4)
+    );
+    this.$l.c = pb.clamp(this.lp, this.bmin.xyz, this.bmax.xyz);
+    this.$l.outside = pb.length(pb.sub(this.lp, this.c));
+    // A field box farther than the current best cannot improve it
+    this.$if(pb.lessThan(pb.mul(this.outside, this.bmax.w), this.sdfBest), function () {
+      this.$l.res = pb.div(pb.sub(this.bmax.xyz, this.bmin.xyz), this.bmin.w);
+      // Clamped to the outer sample centres, so the filter never reads a neighbour's slot
+      this.$l.f = pb.clamp(
+        pb.div(pb.sub(this.c, this.bmin.xyz), this.bmin.w),
+        pb.vec3(0.5),
+        pb.sub(this.res, pb.vec3(0.5))
+      );
+      this.$l.uvw = pb.mul(pb.add(this.slot.xyz, this.f), atlasInvSize);
+      this.$l.ld = pb.textureSampleLevel(atlas, this.uvw, 0).r;
+      this.sdfBest = pb.min(this.sdfBest, pb.mul(pb.add(this.ld, this.outside), this.bmax.w));
+    });
+  });
+  return scope.sdfBest as PBShaderExp;
+}
+
+/**
+ * Signed distance at a world position to the dynamic instances, at their
+ * current transforms, or `maxDist` when none comes nearer.
+ * @internal
+ */
+export function sampleDynamicSDF(scope: PBInsideFunctionScope, worldPos: PBShaderExp, maxDist: PBShaderExp) {
+  const pb = scope.$builder;
+  const funcName = 'Z_sampleDynamicSDF';
+  pb.func(funcName, [pb.vec3('p'), pb.float('maxDist')], function () {
+    this.$return(
+      sampleInstancesSDF(
+        this,
+        this.p,
+        pb.uint(this[SDF_DYNAMIC_INFO].x),
+        this.maxDist,
+        (s, k) => pb.mul(k, SDF_INSTANCE_VEC4S),
+        (s, i) => s[SDF_DYNAMIC_INSTANCES].at(i),
+        this[SDF_ATLAS_TEXTURE],
+        this[SDF_DYNAMIC_INFO].yzw
+      )
+    );
+  });
+  return scope[funcName](worldPos, maxDist) as PBShaderExp;
+}
+
+/**
+ * Signed distance at a world position to everything in the scene field: the
+ * global clipmap (static meshes and terrain) merged with the dynamic
+ * instances. Needs both {@link declareGlobalSDFUniforms} and
+ * {@link declareDynamicSDFUniforms}.
+ * @internal
+ */
+export function sampleSceneSDF(scope: PBInsideFunctionScope, worldPos: PBShaderExp, levels: number) {
+  const pb = scope.$builder;
+  const funcName = 'Z_sampleSceneSDF';
+  pb.func(funcName, [pb.vec3('p')], function () {
+    this.$l.g = sampleGlobalSDF(this, this.p, levels);
+    this.$return(sampleDynamicSDF(this, this.p, this.g));
+  });
+  return scope[funcName](worldPos) as PBShaderExp;
 }
 
 /**

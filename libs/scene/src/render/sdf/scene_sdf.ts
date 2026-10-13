@@ -119,6 +119,8 @@ export class SceneSDF extends makeObservable(Disposable)<SceneSDFEvents>() {
   private _atlas: Nullable<MeshSDFAtlas>;
   private _global: Nullable<GlobalSDF>;
   private _terrain: Nullable<ClipmapTerrain>;
+  /** Nodes attached since the last update, tracked then. */
+  private readonly _pendingAttach: Set<SceneNode>;
   /** Meshes listened to, whether or not they take part. */
   private readonly _tracked: Set<Mesh>;
   private readonly _instances: Map<Mesh, SDFInstance>;
@@ -135,6 +137,7 @@ export class SceneSDF extends makeObservable(Disposable)<SceneSDFEvents>() {
     this._atlas = null;
     this._global = null;
     this._terrain = null;
+    this._pendingAttach = new Set();
     this._tracked = new Set();
     this._instances = new Map();
     this._assets = new Map();
@@ -164,6 +167,7 @@ export class SceneSDF extends makeObservable(Disposable)<SceneSDFEvents>() {
     } else {
       root.off('nodeattached', this.onNodeAttached, this);
       root.off('noderemoved', this.onNodeRemoved, this);
+      this._pendingAttach.clear();
       for (const mesh of [...this._tracked]) {
         this.untrack(mesh);
       }
@@ -258,6 +262,12 @@ export class SceneSDF extends makeObservable(Disposable)<SceneSDFEvents>() {
       return;
     }
     this._time += deltaSeconds;
+    for (const node of this._pendingAttach) {
+      if (node.attached && !node.disposed) {
+        this.collect(node);
+      }
+    }
+    this._pendingAttach.clear();
     this._updates++;
     this._camera.set(cameraPos);
     // Wanted assets, nearest instance first
@@ -359,11 +369,14 @@ export class SceneSDF extends makeObservable(Disposable)<SceneSDFEvents>() {
   }
   /** @internal */
   private onNodeAttached(node: SceneNode) {
-    // Bubbles to the root once per attach; the subtree comes with it
-    this.collect(node);
+    // Bubbles to the root once per attach; the subtree comes with it. Deferred
+    // to the next update: a node constructed with a parent attaches from the
+    // base class constructor, before the derived class has set itself up.
+    this._pendingAttach.add(node);
   }
   /** @internal */
   private onNodeRemoved(node: SceneNode) {
+    this._pendingAttach.delete(node);
     node.iterate((child) => {
       if (child.isMesh()) {
         this.untrack(child);

@@ -9,18 +9,48 @@ import {
   GLOBAL_SDF_LEVELS,
   GLOBAL_SDF_PARAMS,
   GLOBAL_SDF_TEXTURE,
-  sampleGlobalSDF
+  declareDynamicSDFUniforms,
+  MAX_DYNAMIC_SDF_INSTANCES,
+  SDF_ATLAS_TEXTURE,
+  SDF_DYNAMIC_INFO,
+  SDF_DYNAMIC_INSTANCES,
+  SDF_INSTANCE_VEC4S,
+  sampleInstancesSDF,
+  sampleSceneSDF
 } from '../../shaders/sdf';
 import type { SceneSDF, SDFInstance } from './scene_sdf';
+import type { MeshSDFAtlas } from './sdf_atlas';
 
 /** Voxels along a brick edge, the unit of compositing. */
 const BRICK = 8;
-/** vec4s per instance in the instance buffer. */
-const INSTANCE_VEC4S = 6;
 /** vec4s per brick in the brick buffer. */
 const BRICK_VEC4S = 3;
 /** Most points per {@link GlobalSDF.queryDistances} call. */
 const MAX_QUERY_POINTS = 4096;
+
+/**
+ * Writes an instance in the layout of {@link SDF_INSTANCE_VEC4S}: world to
+ * local by rows, the field box with the voxel size and the world scale, and
+ * the atlas slot. The scale is the smallest axis scale, so a distance scaled
+ * by it never overshoots under non-uniform scale.
+ */
+function packSDFInstance(inst: SDFInstance, atlas: MeshSDFAtlas, out: Float32Array, offset: number) {
+  const header = inst.asset!.header!;
+  const slot = atlas.getSlot(inst.asset!)!;
+  const inv = inst.mesh.invWorldMatrix;
+  const m = inst.mesh.worldMatrix;
+  const scale = Math.min(
+    Math.hypot(m.m00, m.m10, m.m20),
+    Math.hypot(m.m01, m.m11, m.m21),
+    Math.hypot(m.m02, m.m12, m.m22)
+  );
+  out.set([inv.m00, inv.m01, inv.m02, inv.m03], offset);
+  out.set([inv.m10, inv.m11, inv.m12, inv.m13], offset + 4);
+  out.set([inv.m20, inv.m21, inv.m22, inv.m23], offset + 8);
+  out.set([...header.boxMin, header.voxelSize], offset + 12);
+  out.set([...header.boxMax, scale], offset + 16);
+  out.set([...slot.offset, 0], offset + 20);
+}
 
 /**
  * Settings of a {@link GlobalSDF}.
@@ -105,6 +135,8 @@ export class GlobalSDF {
   private _queryOutput: Nullable<Texture2D>;
   private _queryChain: Promise<unknown>;
   private readonly _levelInfo: Float32Array<ArrayBuffer>;
+  private readonly _dynamicData: Float32Array<ArrayBuffer>;
+  private readonly _dynamicInfo: Vector4;
   private readonly _params: Vector4;
   constructor(sdf: SceneSDF, options?: GlobalSDFOptions) {
     this._sdf = sdf;
@@ -132,6 +164,8 @@ export class GlobalSDF {
     this._queryOutput = null;
     this._queryChain = Promise.resolve();
     this._levelInfo = new Float32Array(this.levels * 4);
+    this._dynamicData = new Float32Array(MAX_DYNAMIC_SDF_INSTANCES * SDF_INSTANCE_VEC4S * 4);
+    this._dynamicInfo = new Vector4();
     this._params = new Vector4(this.resolution, this.levels, this.bandVoxels, 0);
   }
   /** True on a device that can build the field. */
@@ -162,8 +196,19 @@ export class GlobalSDF {
   get params() {
     return this._params;
   }
-  /** Binds the field for {@link sampleGlobalSDF} in a program that declared it. */
+  /** Dynamic instances merged at query time this frame. */
+  get dynamicCount() {
+    return this._dynamicInfo.x;
+  }
+  /**
+   * Binds the field for {@link sampleSceneSDF} in a program that declared the
+   * global and the dynamic uniforms.
+   */
   applyBindGroup(bindGroup: BindGroup) {
+    const atlas = this._sdf.atlas;
+    bindGroup.setTexture(SDF_ATLAS_TEXTURE, atlas.texture, fetchSampler('clamp_linear_nomip'));
+    bindGroup.setValue(SDF_DYNAMIC_INSTANCES, this._dynamicData);
+    bindGroup.setValue(SDF_DYNAMIC_INFO, this._dynamicInfo);
     // Read with textureLoad, but the unfilterable binding still has a sampler
     // slot, which a filtering sampler fails to validate against
     bindGroup.setTexture(GLOBAL_SDF_TEXTURE, this.texture, fetchSampler('clamp_nearest_nomip'));
@@ -245,6 +290,33 @@ export class GlobalSDF {
       this.moveWindow(level, cameraPos);
     }
     this.composite();
+    this.gatherDynamic(cameraPos);
+  }
+  /** Packs the ready dynamic instances nearest the camera for query-time merging. @internal */
+  private gatherDynamic(cameraPos: Vector3) {
+    const reach = this.resolution * 0.5 * this.voxelSize(this.levels - 1);
+    const near: { inst: SDFInstance; d: number }[] = [];
+    for (const inst of this._sdf.instances) {
+      if (inst.mode === 'dynamic' && this._sdf.isReady(inst)) {
+        const lo = inst.bounds.minPoint;
+        const hi = inst.bounds.maxPoint;
+        const d = Math.hypot(
+          Math.max(lo.x - cameraPos.x, 0, cameraPos.x - hi.x),
+          Math.max(lo.y - cameraPos.y, 0, cameraPos.y - hi.y),
+          Math.max(lo.z - cameraPos.z, 0, cameraPos.z - hi.z)
+        );
+        if (d <= reach) {
+          near.push({ inst, d });
+        }
+      }
+    }
+    near.sort((a, b) => a.d - b.d);
+    const count = Math.min(near.length, MAX_DYNAMIC_SDF_INSTANCES);
+    const atlas = this._sdf.atlas;
+    for (let i = 0; i < count; i++) {
+      packSDFInstance(near[i].inst, atlas, this._dynamicData, i * SDF_INSTANCE_VEC4S * 4);
+    }
+    this._dynamicInfo.setXYZW(count, 1 / atlas.size[0], 1 / atlas.size[1], 1 / atlas.size[2]);
   }
   /**
    * Signed distances at world positions, read back from the GPU; resolves a
@@ -386,26 +458,8 @@ export class GlobalSDF {
       }
     }
     const atlas = this._sdf.atlas;
-    const instData = new Float32Array(Math.max(1, instances.length) * INSTANCE_VEC4S * 4);
-    instances.forEach((inst, i) => {
-      const header = inst.asset!.header!;
-      const slot = atlas.getSlot(inst.asset!)!;
-      const inv = inst.mesh.invWorldMatrix;
-      const m = inst.mesh.worldMatrix;
-      const scale = Math.min(
-        Math.hypot(m.m00, m.m10, m.m20),
-        Math.hypot(m.m01, m.m11, m.m21),
-        Math.hypot(m.m02, m.m12, m.m22)
-      );
-      const o = i * INSTANCE_VEC4S * 4;
-      // World to local, by rows
-      instData.set([inv.m00, inv.m01, inv.m02, inv.m03], o);
-      instData.set([inv.m10, inv.m11, inv.m12, inv.m13], o + 4);
-      instData.set([inv.m20, inv.m21, inv.m22, inv.m23], o + 8);
-      instData.set([...header.boxMin, header.voxelSize], o + 12);
-      instData.set([...header.boxMax, scale], o + 16);
-      instData.set([...slot.offset, 0], o + 20);
-    });
+    const instData = new Float32Array(Math.max(1, instances.length) * SDF_INSTANCE_VEC4S * 4);
+    instances.forEach((inst, i) => packSDFInstance(inst, atlas, instData, i * SDF_INSTANCE_VEC4S * 4));
     // Per brick: the instances whose bounds come within band reach of it
     const brickData = new Float32Array(batch.length * BRICK_VEC4S * 4);
     const indices: number[] = [];
@@ -552,36 +606,16 @@ export class GlobalSDF {
             this.$l.d = this.band;
             this.$l.start = pb.uint(this.b1.w);
             this.$l.count = pb.uint(this.b2.x);
-            this.$for(pb.uint('k'), 0, this.count, function () {
-              this.$l.base = pb.mul(this.indices.at(pb.add(this.start, this.k)), INSTANCE_VEC4S);
-              this.$l.r0 = this.instances.at(this.base);
-              this.$l.r1 = this.instances.at(pb.add(this.base, 1));
-              this.$l.r2 = this.instances.at(pb.add(this.base, 2));
-              this.$l.bmin = this.instances.at(pb.add(this.base, 3));
-              this.$l.bmax = this.instances.at(pb.add(this.base, 4));
-              this.$l.slot = this.instances.at(pb.add(this.base, 5));
-              this.$l.p4 = pb.vec4(this.p, 1);
-              this.$l.lp = pb.vec3(
-                pb.dot(this.r0, this.p4),
-                pb.dot(this.r1, this.p4),
-                pb.dot(this.r2, this.p4)
-              );
-              this.$l.c = pb.clamp(this.lp, this.bmin.xyz, this.bmax.xyz);
-              this.$l.outside = pb.length(pb.sub(this.lp, this.c));
-              // A field box farther than the current best cannot improve it
-              this.$if(pb.lessThan(pb.mul(this.outside, this.bmax.w), this.d), function () {
-                this.$l.res = pb.div(pb.sub(this.bmax.xyz, this.bmin.xyz), this.bmin.w);
-                // Clamped to the outer sample centres, so the filter never reads a neighbour's slot
-                this.$l.f = pb.clamp(
-                  pb.div(pb.sub(this.c, this.bmin.xyz), this.bmin.w),
-                  pb.vec3(0.5),
-                  pb.sub(this.res, pb.vec3(0.5))
-                );
-                this.$l.uvw = pb.mul(pb.add(this.slot.xyz, this.f), this.atlasInvSize.xyz);
-                this.$l.ld = pb.textureSampleLevel(this.atlas, this.uvw, 0).r;
-                this.d = pb.min(this.d, pb.mul(pb.add(this.ld, this.outside), this.bmax.w));
-              });
-            });
+            this.d = sampleInstancesSDF(
+              this,
+              this.p,
+              this.count,
+              this.d,
+              (scope, k) => pb.mul(scope.indices.at(pb.add(scope.start, k)), SDF_INSTANCE_VEC4S),
+              (scope, i) => scope.instances.at(i),
+              this.atlas,
+              this.atlasInvSize.xyz
+            );
             this.$if(pb.greaterThan(this.b2.y, 0), function () {
               this.$l.inRegion = pb.and(
                 pb.all(pb.greaterThanEqual(this.p.xz, this.terrainRegion.xy)),
@@ -630,10 +664,11 @@ export class GlobalSDF {
         this.count = pb.vec4().uniform(0);
         this.result = pb.texStorage2D.r32float().storage(0);
         declareGlobalSDFUniforms(this, 0, levels);
+        declareDynamicSDFUniforms(this, 0);
         pb.main(function () {
           this.$l.i = this.$builtins.globalInvocationId.x;
           this.$if(pb.lessThan(this.i, pb.uint(this.count.x)), function () {
-            this.$l.d = sampleGlobalSDF(this, this.points.at(this.i).xyz, levels);
+            this.$l.d = sampleSceneSDF(this, this.points.at(this.i).xyz, levels);
             pb.textureStore(this.result, pb.uvec2(this.i, 0), pb.vec4(this.d, 0, 0, 0));
           });
         });

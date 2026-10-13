@@ -3050,6 +3050,22 @@ const BASE_TOOLS = [
     }
   },
   {
+    name: 'sdf_debug_slice',
+    description:
+      'Show a horizontal slice of the scene signed distance field: a plane named __SDFDebugSlice with the SDF debug material (warm outside, cool inside, isolines every iso_spacing, white on the surface; magenta when the field is unavailable) at height, size metres across, centred on center [x, z] (default the camera). Calling again moves it; enabled false removes it. The plane is a normal scene node: remove it before saving the scene. Turns the scene SDF on. Returns { node_id, err }.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        enabled: { type: 'boolean', default: true },
+        height: { type: 'number', description: 'World Y of the slice.' },
+        size: { type: 'number', default: 64 },
+        center: { type: 'array', items: { type: 'number' }, minItems: 2, maxItems: 2 },
+        iso_spacing: { type: 'number', default: 0.25 },
+        timeout_ms: { type: 'number', default: 10000 }
+      }
+    }
+  },
+  {
     name: 'sdf_query',
     description:
       'Signed distance from world positions to a mesh node surface, read from its baked field (negative inside). Run sdf_bake first. Returns { sdf_path, resolution, voxel_size (world), distances, err }.',
@@ -4355,6 +4371,13 @@ const handlers = {
   },
   async sdf_sample(args) {
     return bridge.send('sdf_sample', { points: args.points }, Number(args.timeout_ms ?? 30000));
+  },
+  async sdf_debug_slice(args) {
+    return bridge.send(
+      'sdf_debug_slice',
+      { enabled: args.enabled, height: args.height, size: args.size, center: args.center, iso_spacing: args.iso_spacing },
+      Number(args.timeout_ms ?? 10000)
+    );
   },
   async sdf_stats(args) {
     return bridge.send('sdf_stats', { enabled: args.enabled }, Number(args.timeout_ms ?? 10000));

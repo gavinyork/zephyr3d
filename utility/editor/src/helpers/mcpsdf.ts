@@ -4,7 +4,7 @@
  */
 import { Vector3 } from '@zephyr3d/base';
 import type { Mesh, SceneNode } from '@zephyr3d/scene';
-import { getEngine, sampleMeshSDF } from '@zephyr3d/scene';
+import { getEngine, Mesh as MeshNode, PlaneShape, sampleMeshSDF, SDFDebugMaterial } from '@zephyr3d/scene';
 import type { SceneController } from '../controllers/scenecontroller';
 import { MeshSDFBaker } from '../core/services/sdfbaker';
 
@@ -87,6 +87,56 @@ export function getSceneSDFStats(controller: SceneController | null, params: any
     instances,
     err: null
   };
+}
+
+/** Name of the temporary slice plane {@link setSDFDebugSlice} manages. */
+const SLICE_NODE_NAME = '__SDFDebugSlice';
+
+/**
+ * Shows a horizontal slice of the scene field: a plane with the SDF debug
+ * material at `height`, `size` metres across, centred on `center` (default the
+ * camera). `enabled: false` removes it. The plane is an ordinary node, so it
+ * would be saved with the scene; remove it before saving.
+ */
+export function setSDFDebugSlice(controller: SceneController | null, params: any) {
+  const scene = controller?.model?.scene ?? null;
+  if (!scene) {
+    return { node_id: null, err: 'No scene is currently opened' };
+  }
+  let node: SceneNode | null = null;
+  scene.rootNode.iterate((n) => {
+    if (n.name === SLICE_NODE_NAME) {
+      node = n;
+      return true;
+    }
+    return false;
+  });
+  if (params.enabled === false) {
+    (node as SceneNode | null)?.remove();
+    return { node_id: null, err: null };
+  }
+  if (!scene.sdf.enabled) {
+    scene.sdf.enabled = true;
+  }
+  const size = Math.max(0.1, Number(params.size ?? 64));
+  let mesh = node as MeshNode | null;
+  if (!mesh) {
+    const material = new SDFDebugMaterial();
+    mesh = new MeshNode(scene, new PlaneShape({ size: 1, twoSided: true }), material);
+    mesh.name = SLICE_NODE_NAME;
+    mesh.sdfMode = 'none';
+    mesh.castShadow = false;
+    mesh.parent = scene.rootNode;
+  }
+  const material = mesh.material as SDFDebugMaterial;
+  if (params.iso_spacing !== undefined) {
+    material.isoSpacing = Number(params.iso_spacing);
+  }
+  const cam = scene.mainCamera?.getWorldPosition() ?? new Vector3();
+  const [cx, cz] = Array.isArray(params.center) ? params.center.map(Number) : [cam.x, cam.z];
+  mesh.position.setXYZ(cx, Number(params.height ?? 0), cz);
+  mesh.scale.setXYZ(size, 1, size);
+  return { node_id: mesh.persistentId, err: null };
 }
 
 /** Signed distance at world positions from the scene's global clipmap field, read back from the GPU. */

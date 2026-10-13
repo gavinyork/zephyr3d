@@ -48,6 +48,16 @@ import { getDevice } from '../../app/api';
 import type { Camera } from '../../camera';
 import type { ShadowMapPass } from '../../render/shadowmap_pass';
 import { getShadowReceiverBiasFactor, getShadowReceiverNoL } from '../../shadow/receiver_bias';
+import {
+  declareDynamicSDFUniforms,
+  declareGlobalSDFUniforms,
+  GLOBAL_SDF_TEXTURE,
+  sampleSceneSDF
+} from '../../shaders/sdf';
+import type { GlobalSDF } from '../../render/sdf/global_sdf';
+
+/** Clipmap levels of the scene field declared in a program, by program builder. */
+const sceneSDFLevels = new WeakMap<object, number>();
 
 const UNIFORM_NAME_LIGHT_BUFFER = 'Z_UniformLightBuffer';
 const UNIFORM_NAME_LIGHT_INDEX_TEXTURE = 'Z_UniformLightIndexTex';
@@ -1354,6 +1364,61 @@ export class ShaderHelper {
    * @returns True when the caustic uniforms take part in this pass.
    * @internal
    */
+  /**
+   * The scene's signed distance field as light-pass materials see it, or null
+   * when it is off or cannot be built (WebGL2). Part of the light pass's global
+   * bind group and shader variant hashes.
+   * @internal
+   */
+  static getSceneSDF(ctx: DrawContext): Nullable<GlobalSDF> {
+    if (ctx.renderPass?.type !== RENDER_PASS_TYPE_LIGHT || !ctx.scene?.sdf.enabled) {
+      return null;
+    }
+    return ctx.scene.sdf.global;
+  }
+  /**
+   * Declares the scene signed distance field in a material's bind group, when
+   * the scene has one for this draw ({@link ShaderHelper.getSceneSDF}).
+   * Opt-in per material, so the textures it binds only count against the
+   * shaders that read them. Bind it with {@link ShaderHelper.applySceneSDF}.
+   *
+   * @returns Whether it was declared; without it, fall back to something else.
+   */
+  static declareSceneSDF(scope: PBGlobalScope, ctx: DrawContext, group: number): boolean {
+    const sdf = this.getSceneSDF(ctx);
+    if (!sdf) {
+      return false;
+    }
+    declareGlobalSDFUniforms(scope, group, sdf.levels);
+    declareDynamicSDFUniforms(scope, group);
+    sceneSDFLevels.set(scope.$builder, sdf.levels);
+    return true;
+  }
+  /** Binds what {@link ShaderHelper.declareSceneSDF} declared. */
+  static applySceneSDF(bindGroup: BindGroup, ctx: DrawContext) {
+    this.getSceneSDF(ctx)?.applyBindGroup(bindGroup);
+  }
+  /** Whether {@link ShaderHelper.declareSceneSDF} declared the field in this program. */
+  static hasSceneSDF(scope: PBInsideFunctionScope): boolean {
+    return !!scope[GLOBAL_SDF_TEXTURE];
+  }
+  /**
+   * Signed distance in world units from a world position to the scene's
+   * geometry: static meshes and terrain from the global clipmap, merged with
+   * the nearest dynamic meshes at their current transforms. Negative inside.
+   * Only valid when {@link ShaderHelper.hasSceneSDF} is true.
+   *
+   * Near surfaces the value is accurate to a fraction of the finest voxel
+   * (0.25 m by default); farther away it is a lower bound clamped to a few
+   * voxels of the level covering the point, safe for sphere tracing.
+   */
+  static sampleSceneSDF(scope: PBInsideFunctionScope, worldPos: PBShaderExp): PBShaderExp {
+    const levels = sceneSDFLevels.get(scope.$builder);
+    if (!levels) {
+      throw new Error('ShaderHelper.sampleSceneSDF(): the scene SDF is not bound in this program');
+    }
+    return sampleSceneSDF(scope, worldPos, levels);
+  }
   static usesWaterCaustics(ctx: DrawContext): boolean {
     return !!ctx.waterCaustics && !!ctx.waterCausticLight && ctx.renderPass!.type === RENDER_PASS_TYPE_LIGHT;
   }

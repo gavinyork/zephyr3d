@@ -128,7 +128,7 @@ export class LightPass extends RenderPass {
       ctx.HiZTexture?.uid ?? 0
     }:${ctx.screenSpaceShadowMask ? 1 : 0}:${ctx.scene.lightingMode}:${
       ShaderHelper.usesWaterCaustics(ctx) ? 1 : 0
-    }:${ctx.transmissionThickness ? 1 : 0}`;
+    }:${ctx.transmissionThickness ? 1 : 0}:${ShaderHelper.getSceneSDF(ctx)?.levels ?? 0}`;
   }
   /** @internal */
   protected _getShaderVariantHash(ctx: DrawContext, camera: Camera) {
@@ -142,7 +142,9 @@ export class LightPass extends RenderPass {
       ctx.sceneColorTexture
     )}:${textureVariant(ctx.HiZTexture)}:${ctx.screenSpaceShadowMask ? 1 : 0}:${ctx.scene.lightingMode}:${
       ShaderHelper.usesWaterCaustics(ctx) ? 1 : 0
-    }:${ctx.transmissionThickness ? 1 : 0}:${textureVariant(ctx.transmissionThicknessTexture)}`;
+    }:${ctx.transmissionThickness ? 1 : 0}:${textureVariant(ctx.transmissionThicknessTexture)}:${
+      ShaderHelper.getSceneSDF(ctx)?.levels ?? 0
+    }`;
   }
   /** @internal */
   protected renderLightPass(
