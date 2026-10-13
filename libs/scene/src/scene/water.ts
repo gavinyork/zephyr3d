@@ -787,6 +787,10 @@ export class Water extends applyMixins(GraphNode, mixinDrawable) implements Draw
         }
       });
       this.updateSubmergence(camera, mat);
+      if (mat.shoreFoamAmount > 0 && this.scene?.sdf.enabled) {
+        // The shoreline band is measured from the waterline at the rest level
+        this.scene.sdf.global?.waterline.request(this.worldMatrix.m13);
+      }
       const interaction = mat.interaction;
       if (interaction && interaction.followMode === 'camera') {
         this.updateInteractionFocus(camera, interaction);

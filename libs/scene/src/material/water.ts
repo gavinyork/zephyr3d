@@ -954,8 +954,29 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
    * @internal
    */
   private _shoreFoamAvailable(scope: PBInsideFunctionScope | PBFunctionScope) {
-    return this._shoreFoamEnabled && !!ShaderHelper.getHiZDepthTexture(scope as PBInsideFunctionScope);
+    return (
+      this._shoreFoamEnabled &&
+      (!!ShaderHelper.getHiZDepthTexture(scope as PBInsideFunctionScope) ||
+        this._waterlineAvailable(this.drawContext))
+    );
   }
+  /**
+   * Feature on and the scene has a signed distance field for this draw: the
+   * shoreline band is then measured from the waterline field, horizontally
+   * from where geometry meets the water, rather than by the screen-space query.
+   * @internal
+   */
+  private _waterlineAvailable(ctx: Nullable<DrawContext>) {
+    return this._shoreFoamEnabled && !!ctx && !!ShaderHelper.getSceneSDF(ctx);
+  }
+  /** 1x1 waterline texture bound until the field is first built. @internal */
+  private static _getNoWaterlineTexture() {
+    if (!this._noWaterlineTexture) {
+      this._noWaterlineTexture = getDevice().createTexture2D('rgba16f', 1, 1, { mipmapping: false })!;
+    }
+    return this._noWaterlineTexture;
+  }
+  private static _noWaterlineTexture: Nullable<Texture2D> = null;
   /** @internal */
   private _updateMediumCoefficients() {
     this._extinction.setXYZ(
@@ -1172,6 +1193,12 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
         scope.shoreFoamWashParams = pb.vec4().uniform(2);
         scope.shoreFoamFeather = pb.float().uniform(2);
         scope.shoreFoamTex = pb.tex2D().uniform(2);
+        if (this._waterlineAvailable(this.drawContext)) {
+          // (distance, direction x, direction z, inside); see WaterlineField
+          scope.waterlineTex = pb.tex2D().uniform(2);
+          // (origin x, origin z, cell size, resolution; 0 before the field exists)
+          scope.waterlineRegion = pb.vec4().uniform(2);
+        }
       }
       // (intensity, anisotropy, 0, 0)
       scope.sunScatterParams = pb.vec4().uniform(2);
@@ -1632,6 +1659,9 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
     const that = this;
     const ramp = this.mediumMode === 'ramp';
     const shoreFoam = this._shoreFoamAvailable(scope);
+    const waterline = shoreFoam && this._waterlineAvailable(this.drawContext);
+    // The screen-space query needs the pyramid; with the waterline field it is only the fallback
+    const hiZ = shoreFoam && !!ShaderHelper.getHiZDepthTexture(scope);
     const debugOutput = this.debugOutput;
     // Transmittance over `depth` meters of path.
     pb.func('getAbsorption', [pb.float('depth')], function () {
@@ -1741,145 +1771,150 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
           ).r
         );
       });
-      // One integer pyramid level of the query below.
-      pb.func(
-        'waterShoreProximityLevel',
-        [pb.vec3('viewPos'), pb.vec2('screenUV'), pb.float('radius'), pb.float('level')],
-        function () {
-          this.$l.renderSize = ShaderHelper.getRenderSize(this);
-          this.$l.projMatrix = ShaderHelper.getProjectionMatrix(this);
-          this.$l.mipSize = pb.max(pb.floor(pb.div(this.renderSize, pb.exp2(this.level))), pb.vec2(1));
-          this.$l.texelStep = pb.div(pb.vec2(1), this.mipSize);
-          // 4x4 window with a round falloff to 2 cells from the pixel, the
-          // largest circle the window always covers (the pyramid sampler is
-          // nearest, so smoothing happens here). Each cell is read as a point
-          // dithered inside it, so the box-distance contours come out round.
-          // The dither moves the interpretation, not the fetches, so TAA can
-          // average it.
-          this.$l.dither = pb.mul(pb.float(ShaderHelper.getFramestamp(this)), SHORE_QUERY_DITHER_STRIDE);
-          this.$l.gridCoord = pb.sub(pb.mul(this.screenUV, this.mipSize), pb.vec2(0.5));
-          this.$l.gridBase = pb.floor(this.gridCoord);
-          this.$l.gridFrac = pb.sub(this.gridCoord, this.gridBase);
-          this.$l.softK = pb.mul(this.radius, SHORE_QUERY_SOFTMIN);
-          this.$l.dMax = pb.mul(this.radius, SHORE_QUERY_MISS_REACH);
-          this.$l.esum = pb.float(0);
-          for (let gy = 0; gy < 4; gy++) {
-            for (let gx = 0; gx < 4; gx++) {
-              this.$l[`uv${gx}${gy}`] = pb.mul(
-                pb.add(this.gridBase, pb.vec2(gx - 1 + 0.5, gy - 1 + 0.5)),
-                this.texelStep
-              );
-              this.$l[`hiz${gx}${gy}`] = pb.textureSampleLevel(
-                ShaderHelper.getHiZDepthTexture(this),
-                this[`uv${gx}${gy}`],
-                this.level
-              );
-              this.$l[`z${gx}${gy}`] = ShaderHelper.nonLinearDepthToLinear(this, this[`hiz${gx}${gy}`].g);
-              this.$l[`zFar${gx}${gy}`] = ShaderHelper.nonLinearDepthToLinear(this, this[`hiz${gx}${gy}`].r);
-              // A cell is a frustum block [near, far]. Depth is clamped to it
-              // (the reduction guarantees a surface on the near face), with the
-              // span clipped by SHORE_QUERY_CELL_DEPTH_SPAN.
-              this.$l[`cellW${gx}${gy}`] = pb.max(
-                pb.div(pb.mul(this.texelStep.x, 2, this[`z${gx}${gy}`]), this.projMatrix[0].x),
-                1e-6
-              );
-              this.$l[`zBack${gx}${gy}`] = pb.min(
-                this[`zFar${gx}${gy}`],
-                pb.add(this[`z${gx}${gy}`], pb.mul(this[`cellW${gx}${gy}`], SHORE_QUERY_CELL_DEPTH_SPAN))
-              );
-              this.$l[`zClamp${gx}${gy}`] = pb.clamp(
-                pb.neg(this.viewPos.z),
-                this[`z${gx}${gy}`],
-                this[`zBack${gx}${gy}`]
-              );
-              this.$l[`dz${gx}${gy}`] = pb.add(this.viewPos.z, this[`zClamp${gx}${gy}`]);
-              // Seeded per cell, not shared across the sixteen.
-              this.$l[`jit${gx}${gy}`] = pb.sub(
-                pb.vec2(
-                  interleavedGradientNoise(
-                    this,
-                    pb.add(
-                      this.$builtins.fragCoord.xy,
-                      pb.vec2(pb.add(this.dither, gx * 7.13 + 0.5), pb.add(this.dither, gy * 3.71 + 0.5))
+      if (hiZ) {
+        // One integer pyramid level of the query below.
+        pb.func(
+          'waterShoreProximityLevel',
+          [pb.vec3('viewPos'), pb.vec2('screenUV'), pb.float('radius'), pb.float('level')],
+          function () {
+            this.$l.renderSize = ShaderHelper.getRenderSize(this);
+            this.$l.projMatrix = ShaderHelper.getProjectionMatrix(this);
+            this.$l.mipSize = pb.max(pb.floor(pb.div(this.renderSize, pb.exp2(this.level))), pb.vec2(1));
+            this.$l.texelStep = pb.div(pb.vec2(1), this.mipSize);
+            // 4x4 window with a round falloff to 2 cells from the pixel, the
+            // largest circle the window always covers (the pyramid sampler is
+            // nearest, so smoothing happens here). Each cell is read as a point
+            // dithered inside it, so the box-distance contours come out round.
+            // The dither moves the interpretation, not the fetches, so TAA can
+            // average it.
+            this.$l.dither = pb.mul(pb.float(ShaderHelper.getFramestamp(this)), SHORE_QUERY_DITHER_STRIDE);
+            this.$l.gridCoord = pb.sub(pb.mul(this.screenUV, this.mipSize), pb.vec2(0.5));
+            this.$l.gridBase = pb.floor(this.gridCoord);
+            this.$l.gridFrac = pb.sub(this.gridCoord, this.gridBase);
+            this.$l.softK = pb.mul(this.radius, SHORE_QUERY_SOFTMIN);
+            this.$l.dMax = pb.mul(this.radius, SHORE_QUERY_MISS_REACH);
+            this.$l.esum = pb.float(0);
+            for (let gy = 0; gy < 4; gy++) {
+              for (let gx = 0; gx < 4; gx++) {
+                this.$l[`uv${gx}${gy}`] = pb.mul(
+                  pb.add(this.gridBase, pb.vec2(gx - 1 + 0.5, gy - 1 + 0.5)),
+                  this.texelStep
+                );
+                this.$l[`hiz${gx}${gy}`] = pb.textureSampleLevel(
+                  ShaderHelper.getHiZDepthTexture(this),
+                  this[`uv${gx}${gy}`],
+                  this.level
+                );
+                this.$l[`z${gx}${gy}`] = ShaderHelper.nonLinearDepthToLinear(this, this[`hiz${gx}${gy}`].g);
+                this.$l[`zFar${gx}${gy}`] = ShaderHelper.nonLinearDepthToLinear(
+                  this,
+                  this[`hiz${gx}${gy}`].r
+                );
+                // A cell is a frustum block [near, far]. Depth is clamped to it
+                // (the reduction guarantees a surface on the near face), with the
+                // span clipped by SHORE_QUERY_CELL_DEPTH_SPAN.
+                this.$l[`cellW${gx}${gy}`] = pb.max(
+                  pb.div(pb.mul(this.texelStep.x, 2, this[`z${gx}${gy}`]), this.projMatrix[0].x),
+                  1e-6
+                );
+                this.$l[`zBack${gx}${gy}`] = pb.min(
+                  this[`zFar${gx}${gy}`],
+                  pb.add(this[`z${gx}${gy}`], pb.mul(this[`cellW${gx}${gy}`], SHORE_QUERY_CELL_DEPTH_SPAN))
+                );
+                this.$l[`zClamp${gx}${gy}`] = pb.clamp(
+                  pb.neg(this.viewPos.z),
+                  this[`z${gx}${gy}`],
+                  this[`zBack${gx}${gy}`]
+                );
+                this.$l[`dz${gx}${gy}`] = pb.add(this.viewPos.z, this[`zClamp${gx}${gy}`]);
+                // Seeded per cell, not shared across the sixteen.
+                this.$l[`jit${gx}${gy}`] = pb.sub(
+                  pb.vec2(
+                    interleavedGradientNoise(
+                      this,
+                      pb.add(
+                        this.$builtins.fragCoord.xy,
+                        pb.vec2(pb.add(this.dither, gx * 7.13 + 0.5), pb.add(this.dither, gy * 3.71 + 0.5))
+                      )
+                    ),
+                    interleavedGradientNoise(
+                      this,
+                      pb.add(
+                        this.$builtins.fragCoord.xy,
+                        pb.vec2(pb.add(this.dither, gy * 3.71 + 37), pb.add(this.dither, gx * 7.13 + 17))
+                      )
                     )
                   ),
-                  interleavedGradientNoise(
-                    this,
-                    pb.add(
-                      this.$builtins.fragCoord.xy,
-                      pb.vec2(pb.add(this.dither, gy * 3.71 + 37), pb.add(this.dither, gx * 7.13 + 17))
+                  pb.vec2(0.5)
+                );
+                this.$l[`guessNDC${gx}${gy}`] = pb.sub(
+                  pb.mul(pb.add(this[`uv${gx}${gy}`], pb.mul(this[`jit${gx}${gy}`], this.texelStep)), 2),
+                  pb.vec2(1)
+                );
+                this.$l[`guess${gx}${gy}`] = pb.div(
+                  pb.mul(this[`guessNDC${gx}${gy}`], this[`zClamp${gx}${gy}`]),
+                  pb.vec2(this.projMatrix[0].x, this.projMatrix[1].y)
+                );
+                this.$l[`dxy${gx}${gy}`] = pb.sub(this.viewPos.xy, this[`guess${gx}${gy}`]);
+                this.$l[`d${gx}${gy}`] = pb.length(pb.vec3(this[`dxy${gx}${gy}`], this[`dz${gx}${gy}`]));
+                this.$l[`w${gx}${gy}`] = pb.sub(
+                  1,
+                  pb.smoothStep(1, 2, pb.length(pb.sub(pb.vec2(gx - 1, gy - 1), this.gridFrac)))
+                );
+                // Fading a cell out pushes its distance to the miss reach rather
+                // than scaling its weight: a weight going to zero under the log
+                // sends the distance to infinity, a hard cut along the window.
+                this.esum = pb.add(
+                  this.esum,
+                  pb.exp(
+                    pb.neg(
+                      pb.div(
+                        pb.mix(this.dMax, pb.min(this[`d${gx}${gy}`], this.dMax), this[`w${gx}${gy}`]),
+                        this.softK
+                      )
                     )
                   )
-                ),
-                pb.vec2(0.5)
-              );
-              this.$l[`guessNDC${gx}${gy}`] = pb.sub(
-                pb.mul(pb.add(this[`uv${gx}${gy}`], pb.mul(this[`jit${gx}${gy}`], this.texelStep)), 2),
-                pb.vec2(1)
-              );
-              this.$l[`guess${gx}${gy}`] = pb.div(
-                pb.mul(this[`guessNDC${gx}${gy}`], this[`zClamp${gx}${gy}`]),
-                pb.vec2(this.projMatrix[0].x, this.projMatrix[1].y)
-              );
-              this.$l[`dxy${gx}${gy}`] = pb.sub(this.viewPos.xy, this[`guess${gx}${gy}`]);
-              this.$l[`d${gx}${gy}`] = pb.length(pb.vec3(this[`dxy${gx}${gy}`], this[`dz${gx}${gy}`]));
-              this.$l[`w${gx}${gy}`] = pb.sub(
-                1,
-                pb.smoothStep(1, 2, pb.length(pb.sub(pb.vec2(gx - 1, gy - 1), this.gridFrac)))
-              );
-              // Fading a cell out pushes its distance to the miss reach rather
-              // than scaling its weight: a weight going to zero under the log
-              // sends the distance to infinity, a hard cut along the window.
-              this.esum = pb.add(
-                this.esum,
-                pb.exp(
-                  pb.neg(
-                    pb.div(
-                      pb.mix(this.dMax, pb.min(this[`d${gx}${gy}`], this.dMax), this[`w${gx}${gy}`]),
-                      this.softK
-                    )
-                  )
-                )
-              );
+                );
+              }
             }
+            // Soft-min: -k * log(sum exp(-d / k) / norm).
+            this.$return(
+              pb.max(pb.mul(pb.neg(this.softK), pb.log(pb.div(this.esum, SHORE_QUERY_SOFTMIN_NORM))), 0)
+            );
           }
-          // Soft-min: -k * log(sum exp(-d / k) / norm).
-          this.$return(
-            pb.max(pb.mul(pb.neg(this.softK), pb.log(pb.div(this.esum, SHORE_QUERY_SOFTMIN_NORM))), 0)
-          );
-        }
-      );
-      // Distance from the water surface to the nearest opaque surface in a
-      // screen-space neighbourhood of `radius` meters, via the Hi-Z pyramid's
-      // nearest-depth channel. Returns a distance past the band's reach when
-      // the neighbourhood is empty.
-      pb.func(
-        'waterShoreProximity',
-        [pb.vec3('viewPos'), pb.vec2('screenUV'), pb.float('radius')],
-        function () {
-          // Screen radius in pixels of a sphere of `radius` meters at this depth.
-          this.$l.viewDist = pb.max(pb.neg(this.viewPos.z), 1e-4);
-          this.$l.pixelRadius = pb.mul(
-            pb.div(pb.mul(this.radius, ShaderHelper.getProjectionMatrix(this)[0].x), this.viewDist),
-            0.5,
-            ShaderHelper.getRenderSize(this).x
-          );
-          this.$l.maxLevel = pb.sub(pb.float(ShaderHelper.getHiZDepthTextureMipLevelCount(this)), 1);
-          this.$l.levelF = pb.clamp(
-            pb.log2(pb.max(pb.div(this.pixelRadius, SHORE_QUERY_TAP_SPREAD), 1)),
-            0,
-            this.maxLevel
-          );
-          // The pyramid uses a nearest mip filter, and switching levels at an
-          // integer shows as a seam along a line of equal view distance: query
-          // the two levels around and blend.
-          this.$l.level0 = pb.floor(this.levelF);
-          this.$l.level1 = pb.min(pb.add(this.level0, 1), this.maxLevel);
-          this.$l.d0 = this.waterShoreProximityLevel(this.viewPos, this.screenUV, this.radius, this.level0);
-          this.$l.d1 = this.waterShoreProximityLevel(this.viewPos, this.screenUV, this.radius, this.level1);
-          this.$return(pb.mix(this.d0, this.d1, pb.sub(this.levelF, this.level0)));
-        }
-      );
+        );
+        // Distance from the water surface to the nearest opaque surface in a
+        // screen-space neighbourhood of `radius` meters, via the Hi-Z pyramid's
+        // nearest-depth channel. Returns a distance past the band's reach when
+        // the neighbourhood is empty.
+        pb.func(
+          'waterShoreProximity',
+          [pb.vec3('viewPos'), pb.vec2('screenUV'), pb.float('radius')],
+          function () {
+            // Screen radius in pixels of a sphere of `radius` meters at this depth.
+            this.$l.viewDist = pb.max(pb.neg(this.viewPos.z), 1e-4);
+            this.$l.pixelRadius = pb.mul(
+              pb.div(pb.mul(this.radius, ShaderHelper.getProjectionMatrix(this)[0].x), this.viewDist),
+              0.5,
+              ShaderHelper.getRenderSize(this).x
+            );
+            this.$l.maxLevel = pb.sub(pb.float(ShaderHelper.getHiZDepthTextureMipLevelCount(this)), 1);
+            this.$l.levelF = pb.clamp(
+              pb.log2(pb.max(pb.div(this.pixelRadius, SHORE_QUERY_TAP_SPREAD), 1)),
+              0,
+              this.maxLevel
+            );
+            // The pyramid uses a nearest mip filter, and switching levels at an
+            // integer shows as a seam along a line of equal view distance: query
+            // the two levels around and blend.
+            this.$l.level0 = pb.floor(this.levelF);
+            this.$l.level1 = pb.min(pb.add(this.level0, 1), this.maxLevel);
+            this.$l.d0 = this.waterShoreProximityLevel(this.viewPos, this.screenUV, this.radius, this.level0);
+            this.$l.d1 = this.waterShoreProximityLevel(this.viewPos, this.screenUV, this.radius, this.level1);
+            this.$return(pb.mix(this.d0, this.d1, pb.sub(this.levelF, this.level0)));
+          }
+        );
+      }
       // Shoreline foam as (coverage, distance to the nearest surface).
       pb.func(
         'waterShoreFoam',
@@ -1892,13 +1927,43 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
         ],
         function () {
           this.$l.time = ShaderHelper.getElapsedTime(this);
-          // Queried at the band's widest reach so the run-up does not move the
-          // mip level under it.
-          this.$l.surfaceDist = this.waterShoreProximity(
-            this.viewPos,
-            this.screenUV,
-            this.shoreFoamWashParams.w
-          );
+          if (waterline) {
+            // Horizontal distance to the waterline, from the scene field. Off
+            // its grid, the screen-space query or nothing.
+            this.$l.wlUV = pb.div(
+              pb.sub(this.worldPos.xz, this.waterlineRegion.xy),
+              pb.mul(this.waterlineRegion.z, this.waterlineRegion.w)
+            );
+            this.$l.surfaceDist = pb.mul(this.shoreFoamWashParams.w, SHORE_QUERY_MISS_REACH);
+            this.$if(
+              pb.and(
+                pb.greaterThan(this.waterlineRegion.w, 0),
+                pb.and(
+                  pb.all(pb.greaterThanEqual(this.wlUV, pb.vec2(0))),
+                  pb.all(pb.lessThanEqual(this.wlUV, pb.vec2(1)))
+                )
+              ),
+              function () {
+                this.surfaceDist = pb.textureSampleLevel(this.waterlineTex, this.wlUV, 0).r;
+              }
+            ).$else(function () {
+              if (hiZ) {
+                this.surfaceDist = this.waterShoreProximity(
+                  this.viewPos,
+                  this.screenUV,
+                  this.shoreFoamWashParams.w
+                );
+              }
+            });
+          } else {
+            // Queried at the band's widest reach so the run-up does not move the
+            // mip level under it.
+            this.$l.surfaceDist = this.waterShoreProximity(
+              this.viewPos,
+              this.screenUV,
+              this.shoreFoamWashParams.w
+            );
+          }
           // Run-up phase from a world-space noise field; the query does not know
           // which way the shore runs.
           this.$l.washOffset = valueNoise(this, pb.mul(this.worldPos.xz, this.shoreFoamWashParams.z));
@@ -2371,6 +2436,16 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
         bindGroup.setValue('shoreFoamWashParams', this._shoreFoamWashParams);
         bindGroup.setValue('shoreFoamFeather', this._shoreFoamFeather);
         bindGroup.setTexture('shoreFoamTex', getDefaultFoamTexture(), fetchSampler('repeat_linear'));
+        if (this._waterlineAvailable(ctx)) {
+          const waterline = ShaderHelper.getSceneSDF(ctx)!.waterline;
+          const tex = waterline.ready ? waterline.texture : null;
+          bindGroup.setTexture(
+            'waterlineTex',
+            tex ?? WaterMaterial._getNoWaterlineTexture(),
+            fetchSampler('clamp_linear_nomip')
+          );
+          bindGroup.setValue('waterlineRegion', tex ? waterline.region : new Vector4(0, 0, 1, 0));
+        }
       }
       bindGroup.setValue('mediumAlbedo', this._scatterAlbedo);
       bindGroup.setValue('mediumExtinction', this._extinction);

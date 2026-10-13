@@ -33,3 +33,4 @@ export * from './sdf/sdf_atlas';
 export * from './sdf/scene_sdf';
 export * from './sdf/global_sdf';
 export * from './sdf/sdf_view';
+export * from './sdf/waterline';

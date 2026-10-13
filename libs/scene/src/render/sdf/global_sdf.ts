@@ -20,6 +20,7 @@ import {
 } from '../../shaders/sdf';
 import type { SceneSDF, SDFInstance } from './scene_sdf';
 import type { MeshSDFAtlas } from './sdf_atlas';
+import { WaterlineField } from './waterline';
 
 /** Voxels along a brick edge, the unit of compositing. */
 const BRICK = 8;
@@ -137,6 +138,7 @@ export class GlobalSDF {
   private readonly _levelInfo: Float32Array<ArrayBuffer>;
   private readonly _dynamicData: Float32Array<ArrayBuffer>;
   private readonly _dynamicInfo: Vector4;
+  private _waterline: Nullable<WaterlineField>;
   private readonly _params: Vector4;
   constructor(sdf: SceneSDF, options?: GlobalSDFOptions) {
     this._sdf = sdf;
@@ -166,6 +168,7 @@ export class GlobalSDF {
     this._levelInfo = new Float32Array(this.levels * 4);
     this._dynamicData = new Float32Array(MAX_DYNAMIC_SDF_INSTANCES * SDF_INSTANCE_VEC4S * 4);
     this._dynamicInfo = new Vector4();
+    this._waterline = null;
     this._params = new Vector4(this.resolution, this.levels, this.bandVoxels, 0);
   }
   /** True on a device that can build the field. */
@@ -195,6 +198,16 @@ export class GlobalSDF {
   /** (resolution, levels, band voxels, 0), the `params` uniform of {@link sampleGlobalSDF}. */
   get params() {
     return this._params;
+  }
+  /**
+   * Horizontal distance to the waterline at a water level, for shoreline
+   * effects; built on demand, see {@link WaterlineField.request}.
+   */
+  get waterline() {
+    if (!this._waterline) {
+      this._waterline = new WaterlineField(this);
+    }
+    return this._waterline;
   }
   /** Dynamic instances merged at query time this frame. */
   get dynamicCount() {
@@ -291,6 +304,7 @@ export class GlobalSDF {
     }
     this.composite();
     this.gatherDynamic(cameraPos);
+    this._waterline?.update(cameraPos);
   }
   /** Packs the ready dynamic instances nearest the camera for query-time merging. @internal */
   private gatherDynamic(cameraPos: Vector3) {
@@ -372,6 +386,8 @@ export class GlobalSDF {
     return next;
   }
   dispose() {
+    this._waterline?.dispose();
+    this._waterline = null;
     this._texture?.dispose();
     this._texture = null;
     this._instanceBuffer?.dispose();
