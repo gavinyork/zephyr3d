@@ -6,6 +6,7 @@ import type { MeshCompression, MeshImportSettings } from '@zephyr3d/scene';
 import { getMeshLodTargets, readMeshImportSettings, writeMeshImportSettings } from '@zephyr3d/scene';
 import { DialogRenderer } from '../../components/modal';
 import { DlgMessage } from './messagedlg';
+import { MeshSDFBaker } from '../../core/services/sdfbaker';
 
 const COMPRESSIONS: { value: MeshCompression; label: string }[] = [
   { value: 'none', label: 'None' },
@@ -33,6 +34,7 @@ export class DlgMeshSettings extends DialogRenderer<boolean> {
   private _saving: boolean;
   private _status: DerivedAssetStatus | null;
   private _statusTime: number;
+  private _sdfStatus: string;
   static async editMeshSettings(vfs: VFS, paths: string[]) {
     return new DlgMeshSettings(vfs, paths).showModal();
   }
@@ -46,6 +48,7 @@ export class DlgMeshSettings extends DialogRenderer<boolean> {
     this._saving = false;
     this._status = null;
     this._statusTime = 0;
+    this._sdfStatus = '';
     Promise.all(paths.map((path) => readMeshImportSettings(vfs, path))).then(
       (settings) => {
         this._settings = settings;
@@ -76,7 +79,7 @@ export class DlgMeshSettings extends DialogRenderer<boolean> {
       this._changed.add(key);
     }
   }
-  private checkbox(label: string, key: 'lodEnabled') {
+  private checkbox(label: string, key: 'lodEnabled' | 'sdfTwoSided') {
     const value = [!!this._edited[key]] as [boolean];
     if (ImGui.Checkbox(label, value)) {
       this._edited[key] = value[0];
@@ -92,7 +95,7 @@ export class DlgMeshSettings extends DialogRenderer<boolean> {
   }
   private sliderFloat(
     label: string,
-    key: 'lodReduction' | 'lodPixelError',
+    key: 'lodReduction' | 'lodPixelError' | 'sdfResolutionScale',
     min: number,
     max: number,
     format: string
@@ -133,6 +136,18 @@ export class DlgMeshSettings extends DialogRenderer<boolean> {
       this.renderLodEstimate();
     }
     this.renderStatus();
+    ImGui.Separator();
+    this.sliderFloat('SDF Resolution', 'sdfResolutionScale', 0.25, 2, '%.2f');
+    this.checkbox('SDF Two Sided', 'sdfTwoSided');
+    ImGui.TextDisabled('Distance field voxels along the longest side: 64 x resolution (max 128).');
+    ImGui.TextDisabled('Two sided: an open surface (leaf, sail) with no inside.');
+    if (ImGui.Button('Bake SDF')) {
+      void this.bakeSDF();
+    }
+    if (this._sdfStatus) {
+      ImGui.SameLine();
+      ImGui.TextDisabled(this._sdfStatus);
+    }
     ImGui.Separator();
     if (this._saving) {
       ImGui.TextDisabled('Saving...');
@@ -202,6 +217,36 @@ export class DlgMeshSettings extends DialogRenderer<boolean> {
       case 'uncompressed':
         ImGui.TextDisabled('Derived copy: none, the source mesh is used');
         break;
+    }
+  }
+  /** Saves the settings, then bakes the fields of every edited mesh */
+  private async bakeSDF() {
+    if (this._sdfStatus === 'Baking...') {
+      return;
+    }
+    this._sdfStatus = 'Baking...';
+    try {
+      await this.writeSettings();
+      const results = await MeshSDFBaker.bakeAll(this._paths, true);
+      const failed = results.filter((r) => r.err);
+      const first = results.find((r) => r.resolution);
+      this._sdfStatus = failed.length
+        ? `Failed: ${failed[0].err}`
+        : first
+          ? `Baked ${first.resolution!.join('x')} in ${first.milliseconds} ms`
+          : 'Done';
+    } catch (err) {
+      this._sdfStatus = `Failed: ${err}`;
+    }
+  }
+  private async writeSettings() {
+    for (let i = 0; i < this._paths.length; i++) {
+      const next = { ...this._settings![i] };
+      for (const key of this._changed) {
+        (next as Record<string, unknown>)[key] = this._edited[key];
+      }
+      await writeMeshImportSettings(this._vfs, this._paths[i], next);
+      this._settings![i] = next;
     }
   }
   private async save() {

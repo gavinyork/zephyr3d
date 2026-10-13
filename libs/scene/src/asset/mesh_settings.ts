@@ -38,6 +38,13 @@ export interface MeshImportSettings {
    * simplification error projects to fewer pixels on a 1920 wide, 90 degree view
    */
   lodPixelError: number;
+  /**
+   * Scale on the density of the baked signed distance field: 1 gives 64 voxels
+   * along the longest side (at most 128 per axis).
+   */
+  sdfResolutionScale: number;
+  /** Bake the field as a thin open surface, unsigned, rather than a closed solid. */
+  sdfTwoSided: boolean;
 }
 
 /** Most levels of detail a mesh can have */
@@ -58,7 +65,9 @@ export function defaultMeshImportSettings(compression: MeshCompression = 'none')
     lodEnabled: false,
     lodMinTriangles: 100,
     lodReduction: 0.5,
-    lodPixelError: 8
+    lodPixelError: 8,
+    sdfResolutionScale: 1,
+    sdfTwoSided: false
   };
 }
 
@@ -121,7 +130,12 @@ export function normalizeMeshImportSettings(value: unknown): MeshImportSettings 
         ? v.lodReduction
         : defaults.lodReduction,
     lodPixelError:
-      typeof v.lodPixelError === 'number' && v.lodPixelError > 0 ? v.lodPixelError : defaults.lodPixelError
+      typeof v.lodPixelError === 'number' && v.lodPixelError > 0 ? v.lodPixelError : defaults.lodPixelError,
+    sdfResolutionScale:
+      typeof v.sdfResolutionScale === 'number' && v.sdfResolutionScale > 0
+        ? v.sdfResolutionScale
+        : defaults.sdfResolutionScale,
+    sdfTwoSided: typeof v.sdfTwoSided === 'boolean' ? v.sdfTwoSided : defaults.sdfTwoSided
   };
 }
 

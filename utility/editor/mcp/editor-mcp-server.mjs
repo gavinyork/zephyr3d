@@ -3005,6 +3005,40 @@ const BASE_TOOLS = [
     }
   },
   {
+    name: 'sdf_bake',
+    description:
+      'Bake signed distance fields of mesh assets (.zmsh) into /assets/.sdf, one .zsdf per mesh, in a worker. Pass `paths` for specific meshes, otherwise every mesh used in the current scene (under node_id when given) is baked. Fields whose source mesh and SDF settings (sdfResolutionScale, sdfTwoSided in the mesh .zmeta) are unchanged are skipped unless force. Returns { results: [{ path, sdf_path, skipped, resolution, voxel_size, triangles, milliseconds, err }], err }.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        paths: { type: 'array', items: { type: 'string' }, description: 'Mesh asset paths to bake.' },
+        node_id: { type: 'string', description: 'Bake the meshes under this node instead of the whole scene.' },
+        force: { type: 'boolean', default: false, description: 'Rebake even when up to date.' },
+        timeout_ms: { type: 'number', default: 300000 }
+      }
+    }
+  },
+  {
+    name: 'sdf_query',
+    description:
+      'Signed distance from world positions to a mesh node surface, read from its baked field (negative inside). Run sdf_bake first. Returns { sdf_path, resolution, voxel_size (world), distances, err }.',
+    inputSchema: {
+      type: 'object',
+      required: ['node_id', 'points'],
+      properties: {
+        node_id: { type: 'string', description: 'Persistent id of a Mesh node.' },
+        points: {
+          type: 'array',
+          minItems: 1,
+          maxItems: 10000,
+          items: { type: 'array', items: { type: 'number' }, minItems: 3, maxItems: 3 },
+          description: 'World positions as [x, y, z].'
+        },
+        timeout_ms: { type: 'number', default: 30000 }
+      }
+    }
+  },
+  {
     name: 'terrain_generate',
     description:
       'Generate a terrain height map, splat (texture blend) map or grass density map by running a sandboxed JavaScript function once per texel inside the editor. Undoable. The source must define `function sample(p, api, input)`. `p` has x, z (world position of the texel centre), u, v (0..1 over the terrain), i, j (texel), width, depth (grid size), height (current terrain height in world units), normal ([x,y,z]) and slope (degrees from horizontal); p is reused between calls, do not keep it. `api` is the same API as model_generate script nodes (api.math with clamp/lerp/smoothstep/remap..., api.noise.value2/fbm2/value3/fbm3, api.rng(seed), api.vec3, api.curve). Return per target: height -> the new world height in world units (the height map has one texel per terrain Resolution unit); splat -> an array of weights, one per detail layer (normalized automatically), or a single layer index; grass -> density 0..1 for grass_layer. Typical flow: terrain_generate height, then terrain_set_detail_layers + terrain_generate splat using p.height/p.slope, then terrain_set_grass_layers + terrain_generate grass. Returns { result: { target, grid_size, value_range }, err }.',
@@ -3128,6 +3162,7 @@ const READONLY_TOOL_NAMES = new Set([
   'node_get_physics',
   'foliage_get_info',
   'terrain_sample_height',
+  'sdf_query',
   'editor_connect_info',
   'editor_wait_ready',
   'editor_status',
@@ -4274,6 +4309,21 @@ const handlers = {
   async terrain_sample_height(args) {
     return bridge.send(
       'terrain_sample_height',
+      { node_id: args.node_id, points: args.points },
+      Number(args.timeout_ms ?? 30000)
+    );
+  },
+  async sdf_bake(args) {
+    const timeout = Number(args.timeout_ms ?? 300000);
+    return bridge.send(
+      'sdf_bake',
+      { paths: args.paths, node_id: args.node_id, force: !!args.force },
+      timeout
+    );
+  },
+  async sdf_query(args) {
+    return bridge.send(
+      'sdf_query',
       { node_id: args.node_id, points: args.points },
       Number(args.timeout_ms ?? 30000)
     );

@@ -6,6 +6,8 @@ export * from './bounding_volume';
 export * from './misc';
 export * from './physical';
 export * from './buoyancy';
+export * from './sdf/bvh';
+export * from './sdf/bake';
 export * from './debug';
 export * from './serialization';
 export * from './draco/decoder';

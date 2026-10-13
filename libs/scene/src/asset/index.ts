@@ -8,4 +8,5 @@ export * from './mesh_lod_builder';
 export * from './meshopt_simplifier';
 export * from './asset_manifest';
 export * from './zmsh_binary';
+export * from './zsdf_binary';
 export * from './meshopt_decoder';
