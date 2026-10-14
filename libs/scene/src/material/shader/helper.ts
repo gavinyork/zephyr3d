@@ -1394,7 +1394,12 @@ export class ShaderHelper {
     sceneSDFLevels.set(scope.$builder, sdf.levels);
     return true;
   }
-  /** Binds what {@link ShaderHelper.declareSceneSDF} declared. */
+  /**
+   * Binds what {@link ShaderHelper.declareSceneSDF} declared. The values change
+   * every frame (the clipmap follows the camera, dynamic meshes move), so call
+   * it from `applyUniforms` on every draw, not from `applyUniformValues`, which
+   * only runs when the material itself changed.
+   */
   static applySceneSDF(bindGroup: BindGroup, ctx: DrawContext) {
     this.getSceneSDF(ctx)?.applyBindGroup(bindGroup);
   }

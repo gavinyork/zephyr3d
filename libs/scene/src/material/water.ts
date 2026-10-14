@@ -200,6 +200,11 @@ const SHORE_QUERY_SOFTMIN = 0.25;
  * to it before the exponential so the log never sees zero.
  */
 const SHORE_QUERY_MISS_REACH = 2;
+/**
+ * Field value at the rest level, in meters, within which the waterline's
+ * linear bed model is trusted over its rest-level distance.
+ */
+const WATERLINE_LINEAR_REACH = 4;
 /** Per-frame advance of the dither hash, for TAA to average over. */
 const SHORE_QUERY_DITHER_STRIDE = 5.588238;
 /** Max thickness of a Hi-Z cell's depth block, in multiples of its width. */
@@ -1194,10 +1199,12 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
         scope.shoreFoamFeather = pb.float().uniform(2);
         scope.shoreFoamTex = pb.tex2D().uniform(2);
         if (this._waterlineAvailable(this.drawContext)) {
-          // (distance, direction x, direction z, inside); see WaterlineField
+          // (rest-level distance, model A, model B, field at rest level); see WaterlineField
           scope.waterlineTex = pb.tex2D().uniform(2);
           // (origin x, origin z, cell size, resolution; 0 before the field exists)
           scope.waterlineRegion = pb.vec4().uniform(2);
+          // (rest level y, 0, 0, 0)
+          scope.waterlineLevel = pb.vec4().uniform(2);
         }
       }
       // (intensity, anisotropy, 0, 0)
@@ -1944,7 +1951,16 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
                 )
               ),
               function () {
-                this.surfaceDist = pb.textureSampleLevel(this.waterlineTex, this.wlUV, 0).r;
+                this.$l.wl = pb.textureSampleLevel(this.waterlineTex, this.wlUV, 0);
+                // Near geometry, the edge at this pixel's own surface height: a
+                // wave crest moves it inland and a trough out, metres on a gentle
+                // beach. Farther out, the distance to the rest-level waterline.
+                this.$l.dy = pb.sub(this.worldPos.y, this.waterlineLevel.x);
+                this.surfaceDist = this.$choice(
+                  pb.lessThan(pb.abs(this.wl.w), WATERLINE_LINEAR_REACH),
+                  pb.max(pb.add(this.wl.y, pb.mul(this.wl.z, this.dy)), 0),
+                  this.wl.x
+                );
               }
             ).$else(function () {
               if (hiZ) {
@@ -2393,6 +2409,19 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
       waveGenerator.applyWaterBindGroup(bindGroup);
       this._waveVersionByBindGroup.set(bindGroup, waveGenerator.version);
     }
+    // Every frame, not only on a material change: the waterline grid follows the
+    // camera, and a stale origin slides the shoreline band off the shore
+    if (this.needFragmentColor(ctx) && this._shoreFoamEnabled && this._waterlineAvailable(ctx)) {
+      const waterline = ShaderHelper.getSceneSDF(ctx)!.waterline;
+      const tex = waterline.ready ? waterline.texture : null;
+      bindGroup.setTexture(
+        'waterlineTex',
+        tex ?? WaterMaterial._getNoWaterlineTexture(),
+        fetchSampler('clamp_linear_nomip')
+      );
+      bindGroup.setValue('waterlineRegion', tex ? waterline.region : new Vector4(0, 0, 1, 0));
+      bindGroup.setValue('waterlineLevel', new Vector4(waterline.level ?? 0, 0, 0, 0));
+    }
   }
   applyUniformValues(bindGroup: BindGroup, ctx: DrawContext, pass: number) {
     super.applyUniformValues(bindGroup, ctx, pass);
@@ -2436,16 +2465,6 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
         bindGroup.setValue('shoreFoamWashParams', this._shoreFoamWashParams);
         bindGroup.setValue('shoreFoamFeather', this._shoreFoamFeather);
         bindGroup.setTexture('shoreFoamTex', getDefaultFoamTexture(), fetchSampler('repeat_linear'));
-        if (this._waterlineAvailable(ctx)) {
-          const waterline = ShaderHelper.getSceneSDF(ctx)!.waterline;
-          const tex = waterline.ready ? waterline.texture : null;
-          bindGroup.setTexture(
-            'waterlineTex',
-            tex ?? WaterMaterial._getNoWaterlineTexture(),
-            fetchSampler('clamp_linear_nomip')
-          );
-          bindGroup.setValue('waterlineRegion', tex ? waterline.region : new Vector4(0, 0, 1, 0));
-        }
       }
       bindGroup.setValue('mediumAlbedo', this._scatterAlbedo);
       bindGroup.setValue('mediumExtinction', this._extinction);

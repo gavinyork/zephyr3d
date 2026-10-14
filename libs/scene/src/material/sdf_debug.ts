@@ -81,6 +81,12 @@ export class SDFDebugMaterial extends MeshMaterial {
     super.applyUniformValues(bindGroup, ctx, pass);
     if (this.needFragmentColorInput(ctx)) {
       bindGroup.setValue('isoSpacing', this._isoSpacing);
+    }
+  }
+  applyUniforms(bindGroup: BindGroup, ctx: DrawContext, needUpdate: boolean, pass: number) {
+    super.applyUniforms(bindGroup, ctx, needUpdate, pass);
+    // Every frame: the clipmap windows and the dynamic instances move with the camera
+    if (this.needFragmentColorInput(ctx)) {
       ShaderHelper.applySceneSDF(bindGroup, ctx);
     }
   }
