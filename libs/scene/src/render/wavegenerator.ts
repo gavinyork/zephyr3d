@@ -42,6 +42,15 @@ export interface WaveGenerator extends IDisposable {
     outNormal: PBShaderExp
   ): void;
   /**
+   * Where a vertex was in the previous frame, for motion vectors. Optional:
+   * without it the surface is taken as not moving, which suits waves that
+   * change slowly against the temporal filter.
+   * @param scope - Shader scope.
+   * @param inPos - Undisplaced position.
+   * @param outPos - Receives the previous displaced position.
+   */
+  calcPrevVertexPosition?(scope: PBInsideFunctionScope, inPos: PBShaderExp, outPos: PBShaderExp): void;
+  /**
    *
    * @param scope - Global scope of the shader program.
    * @param xz - XZ position.

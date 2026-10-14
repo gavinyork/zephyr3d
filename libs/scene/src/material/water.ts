@@ -252,6 +252,22 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
   private readonly _shoreWaves: ShoreWaveSettings = { height: 0, wavelength: 8, period: 6, zone: 20 };
   /** The shore wave layer of the effective generator, while the waves are on. */
   private _shoreWaveGenerator: Nullable<ShoreWaveGenerator> = null;
+  private _edgeFadeWidth = 0.05;
+  /**
+   * Thickness in metres over which a thin sheet of water fades in from the
+   * ground under it, so swash running up the sand shows the sand through it.
+   * 0 disables it.
+   */
+  get edgeFadeWidth() {
+    return this._edgeFadeWidth;
+  }
+  set edgeFadeWidth(val: number) {
+    val = Math.max(0, val);
+    if (val !== this._edgeFadeWidth) {
+      this._edgeFadeWidth = val;
+      this.uniformChanged();
+    }
+  }
   /** Seconds of water clock at the last update, for the shore waves. */
   private _waveClock = 0;
   /** Wave uniform version last written, per bind group. */
@@ -1180,7 +1196,18 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
         pb.mul(ShaderHelper.getViewProjectionMatrix(scope), pb.vec4(scope.$outputs.worldPos, 1))
       );
     }
-    ShaderHelper.resolveMotionVector(scope, scope.$outputs.worldPos, scope.$outputs.worldPos);
+    const gen = this.waveGenerator;
+    if (gen?.calcPrevVertexPosition && ShaderHelper.getPrevUnjitteredViewProjectionMatrix(scope)) {
+      scope.$l.prevWorldPos = pb.vec3();
+      gen.calcPrevVertexPosition(scope, scope.clipmapWorldPos, scope.prevWorldPos);
+      if (this.infinite) {
+        // The skirt does not move
+        scope.prevWorldPos = pb.mix(scope.prevWorldPos, scope.$outputs.worldPos, scope.skirt);
+      }
+      ShaderHelper.resolveMotionVector(scope, scope.$outputs.worldPos, scope.prevWorldPos);
+    } else {
+      ShaderHelper.resolveMotionVector(scope, scope.$outputs.worldPos, scope.$outputs.worldPos);
+    }
   }
   fragmentShader(scope: PBFunctionScope) {
     super.fragmentShader(scope);
@@ -1205,6 +1232,8 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
       // (coverage scale, coverage falloff, 0, 0)
       scope.foamShadingParams = pb.vec4().uniform(2);
       scope.foamColor = pb.vec3().uniform(2);
+      // Thickness in metres a sheet of water fades in over, 0 for none
+      scope.edgeFadeWidth = pb.float().uniform(2);
       if (this._shoreFoamAvailable(scope)) {
         // (coverage scale, band depth in m, coverage falloff, pattern cycles/m)
         scope.shoreFoamParams = pb.vec4().uniform(2);
@@ -2356,6 +2385,25 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
             pb.mul(this.irradiance, this.foamColor, this.foam, 1 / Math.PI)
           );
         }
+        // A sheet of water a few centimetres thick, as the swash leaves running
+        // up the sand, shows the sand through it rather than a surface over it;
+        // and where the moving mesh grazes the beach it leaves no stray patches
+        this.$if(pb.not(this.underwaterEye), function () {
+          this.$l.edgeThickness = pb.sub(this.worldPos.y, this.wPos.y);
+          this.$l.edgeFade = this.$choice(
+            pb.greaterThan(this.edgeFadeWidth, 0),
+            pb.smoothStep(0, pb.max(this.edgeFadeWidth, 1e-4), this.edgeThickness),
+            pb.float(1)
+          );
+          this.$if(pb.lessThan(this.edgeFade, 1), function () {
+            this.$l.behind = pb.textureSampleLevel(
+              ShaderHelper.getSceneColorTexture(this),
+              this.screenUV,
+              0
+            ).rgb;
+            this.finalColor = pb.mix(this.behind, this.finalColor, this.edgeFade);
+          });
+        });
         switch (debugOutput) {
           case 'normal':
             this.$if(pb.lessThan(this.diffuseNormal.y, 0.01), function () {
@@ -2460,6 +2508,7 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
       this._foamParams.setXYZW(this._foamAmount, this._foamFalloff, 0, 0);
       bindGroup.setValue('foamShadingParams', this._foamParams);
       bindGroup.setValue('foamColor', this._foamColor);
+      bindGroup.setValue('edgeFadeWidth', this._edgeFadeWidth);
       if (this._shoreFoamEnabled) {
         this._shoreFoamParams.setXYZW(
           this._shoreFoamAmount,

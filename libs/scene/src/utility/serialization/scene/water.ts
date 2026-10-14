@@ -1260,6 +1260,20 @@ export function getWaterClass(manager: ResourceManager): SerializableClass {
           }
         },
         {
+          name: 'EdgeFadeWidth',
+          description:
+            'Thickness in metres over which a thin sheet of water fades in from the ground under it, so swash running up the sand shows the sand through it. 0 disables it.',
+          type: 'float',
+          default: 0.05,
+          options: { animatable: true, minValue: 0, maxValue: 1 },
+          get(this: Water, value) {
+            value.num[0] = this.edgeFadeWidth;
+          },
+          set(this: Water, value) {
+            this.edgeFadeWidth = value.num[0];
+          }
+        },
+        {
           name: 'ShoreWaveHeight',
           description:
             'Crest to trough height in metres of the waves rolling in to the shore, breaking and running up the beach, 0 for none. They come square on to the coast whatever its shape, bunch up as the water shallows and surge up the sand and drain back; boats ride them. Needs the scene signed distance field: WebGPU with the scene SDFEnabled on.',
@@ -1387,9 +1401,10 @@ export function getWaterClass(manager: ResourceManager): SerializableClass {
         },
         {
           name: 'TAAStrength',
-          description: 'Temporal anti-aliasing strength for the water surface',
+          description:
+            'Share of the temporal anti-aliasing history kept on the water surface. Lower trades smoothing for less smearing of fast waves; much lower lets the sub-pixel camera jitter through, and the waterline visibly shakes. 0 keeps no history at all.',
           type: 'float',
-          default: 0.4,
+          default: 0.9,
           options: { minValue: 0, maxValue: 1 },
           get(this: Water, value) {
             value.num[0] = this.TAAStrength;

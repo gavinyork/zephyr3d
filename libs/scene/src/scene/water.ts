@@ -132,7 +132,9 @@ export class Water extends applyMixins(GraphNode, mixinDrawable) implements Draw
     this._lastUpdateTime = 0;
     this._material = new DRef(new WaterMaterial());
     this._material.get()!.region = new Vector4(-1, -1, 1, 1);
-    this._material.get()!.TAAStrength = 0.4;
+    // Most of the history, as other materials: lower lets TAA's sub-pixel
+    // jitter through, and the waterline, foam against sand, visibly shakes
+    this._material.get()!.TAAStrength = 0.9;
     this.waveGenerator = new FBMWaveGenerator();
     this._feedbackProgram = new DRef();
     this._feedbackHash = '';
@@ -584,6 +586,13 @@ export class Water extends applyMixins(GraphNode, mixinDrawable) implements Draw
   }
   set shoreWaveHeight(val: number) {
     this.material.shoreWaveHeight = val;
+  }
+  /** Thickness in metres over which a thin sheet of water fades in from the ground under it; 0 disables it. */
+  get edgeFadeWidth() {
+    return this.material.edgeFadeWidth;
+  }
+  set edgeFadeWidth(val: number) {
+    this.material.edgeFadeWidth = val;
   }
   /** Distance in metres between shore wave crests at the outer edge of their zone. */
   get shoreWaveLength() {

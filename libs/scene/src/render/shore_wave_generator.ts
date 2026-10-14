@@ -35,6 +35,21 @@ const MIN_COMPRESSION = 0.15;
  */
 const SHELVING_MIN = 1.5;
 const SHELVING_FULL = 4;
+/**
+ * Swash: distance in metres from the waterline out to sea over which the
+ * surface turns from rising straight up to sliding along the bed, and the
+ * largest slide per metre of rise (a bed at about 3 degrees).
+ */
+const SWASH_BAND = 3;
+const SWASH_SLIDE_MAX = 20;
+/**
+ * Clearance of the swash sheet from the bed: how much faster its height over
+ * the bed grows near zero, and the most it is raised (or lowered) by that.
+ */
+const SWASH_CLEAR_SLOPE = 8;
+const SWASH_CLEARANCE = 0.06;
+/** Forward displacement of the profile's lip, in amplitudes per unit of the profile's forward channel. */
+const FORWARD_SCALE = 2;
 /** Step in metres of the finite differences the fragment normal is taken with. */
 const NORMAL_STEP = 0.25;
 
@@ -143,6 +158,7 @@ export class ShoreWaveGenerator extends Disposable implements WaveGenerator {
   private readonly _grid: Vector4;
   /** (half height, zone, crests across the zone: 2 zone / wavelength, time / period) */
   private readonly _wave: Vector4;
+  private readonly _prev: Vector4;
   constructor(base: WaveGenerator, settings: ShoreWaveSettings) {
     super();
     this._base = base;
@@ -152,6 +168,7 @@ export class ShoreWaveGenerator extends Disposable implements WaveGenerator {
     this._dummy = null;
     this._grid = new Vector4(0, 0, 0, 0);
     this._wave = new Vector4(0, 1, 1, 0);
+    this._prev = new Vector4(0, 0, 0, 0);
   }
   /** The generator the shore waves are layered over. */
   get base() {
@@ -171,6 +188,7 @@ export class ShoreWaveGenerator extends Disposable implements WaveGenerator {
     this._waterline = waterline;
     const size = region.z * region.w;
     this._grid.setXYZW(region.x, region.y, waterline && size > 0 ? 1 / size : 0, level);
+    this._prev.x = this._wave.w;
     this._wave.setXYZW(
       waterline ? s.height * 0.5 : 0,
       Math.max(0.1, s.zone),
@@ -192,16 +210,23 @@ export class ShoreWaveGenerator extends Disposable implements WaveGenerator {
     scope.swProfile = pb.tex2D().uniform(uniformGroup);
     scope.swGrid = pb.vec4().uniform(uniformGroup);
     scope.swWave = pb.vec4().uniform(uniformGroup);
+    // (wave clock of the previous frame, 0, 0, 0)
+    scope.swPrev = pb.vec4().uniform(uniformGroup);
   }
   /**
    * Shore wave at an undisplaced world XZ: (height, forward displacement,
    * foam, 0) and the direction to the shore in `dir`.
    * @internal
    */
-  private evaluate(scope: PBInsideFunctionScope, xz: PBShaderExp, dir: PBShaderExp): PBShaderExp {
+  private evaluate(
+    scope: PBInsideFunctionScope,
+    xz: PBShaderExp,
+    dir: PBShaderExp,
+    tPhase?: PBShaderExp
+  ): PBShaderExp {
     const pb = scope.$builder;
-    pb.func('swEvaluate', [pb.vec2('xz'), pb.vec2('dir').out()], function () {
-      this.dir = pb.vec2(0);
+    pb.func('swEvaluate', [pb.vec2('xz'), pb.vec4('dir').out(), pb.float('tPhase')], function () {
+      this.dir = pb.vec4(0);
       this.$l.uv = pb.mul(pb.sub(this.xz, this.swGrid.xy), this.swGrid.z);
       this.$if(
         pb.or(
@@ -231,7 +256,7 @@ export class ShoreWaveGenerator extends Disposable implements WaveGenerator {
           pb.textureSampleLevel(this.swWaterline, pb.sub(this.uv, pb.vec2(0, this.c)), 0).x
         )
       );
-      this.dir = pb.neg(pb.div(this.g, pb.max(pb.length(this.g), 1e-5)));
+      this.dir = pb.vec4(pb.neg(pb.div(this.g, pb.max(pb.length(this.g), 1e-5))), 0, 0);
       // Phase: crests travel shoreward and bunch up as they go, the integral
       // of 1 / wavelength with the wavelength shrinking as sqrt of the depth;
       // frozen at its shoreline value inland, where the bore becomes a sheet
@@ -247,7 +272,7 @@ export class ShoreWaveGenerator extends Disposable implements WaveGenerator {
         pb.add(this.rootMin, pb.div(pb.sub(this.dc, this.dMin), pb.mul(2, this.rootMin, this.zone)))
       );
       this.$l.phase = pb.add(
-        this.swWave.w,
+        this.tPhase,
         pb.mul(this.swWave.z, this.rootTerm),
         valueNoise(this, pb.mul(this.xz, PHASE_NOISE_SCALE))
       );
@@ -265,10 +290,7 @@ export class ShoreWaveGenerator extends Disposable implements WaveGenerator {
             pb.smoothStep(
               0.3,
               0.7,
-              valueNoise(
-                this,
-                pb.add(pb.mul(this.xz, SET_SCALE), pb.vec2(pb.mul(this.swWave.w, SET_DRIFT), 0))
-              )
+              valueNoise(this, pb.add(pb.mul(this.xz, SET_SCALE), pb.vec2(pb.mul(this.tPhase, SET_DRIFT), 0)))
             )
           )
         )
@@ -281,9 +303,65 @@ export class ShoreWaveGenerator extends Disposable implements WaveGenerator {
       // against a cliff, a pier or a hull, which the waterline field also holds
       this.$l.shelving = pb.smoothStep(SHELVING_MIN, SHELVING_FULL, this.wl.y);
       this.$l.amp = pb.mul(this.swWave.x, this.waveSet, this.inland, this.shelving);
-      this.$return(pb.vec4(pb.mul(this.prof.x, this.amp), pb.mul(this.prof.y, this.amp), this.prof.z, 0));
+      // Swash weight, 1 at and inland of the waterline, 0 a few metres out
+      this.dir.z = pb.mul(pb.sub(1, pb.smoothStep(0, SWASH_BAND, this.d)), this.shelving);
+      // Height of the rest surface over the bed under it, which the swash slide keeps
+      this.dir.w = pb.div(this.d, pb.clamp(this.wl.y, 1, SWASH_SLIDE_MAX));
+      this.$return(
+        pb.vec4(
+          pb.mul(this.prof.x, this.amp),
+          pb.mul(this.prof.y, this.amp, FORWARD_SCALE),
+          pb.mul(this.prof.z, this.waveSet, this.inland, this.shelving),
+          // Swash: how far a unit of height moves the surface shoreward, so the
+          // rise follows the bed instead of going straight up through the sand.
+          // B (1 / tan of the bed angle) near the shore, fading to 0 offshore.
+          pb.mul(pb.clamp(this.wl.y, 0, SWASH_SLIDE_MAX), this.dir.z)
+        )
+      );
     });
-    return scope.swEvaluate(xz, dir) as PBShaderExp;
+    return scope.swEvaluate(xz, dir, tPhase ?? scope.swWave.w) as PBShaderExp;
+  }
+  /**
+   * Adds the shore wave to a position the wrapped generator displaced, at a
+   * wave clock (time over period): up, and forward towards the shore, the lip
+   * pitching ahead of a breaking crest. In the swash the rise slides along the
+   * bed tangent instead, so a vertex under the sand stays that far under it
+   * and only the water's edge climbs the beach; and the wrapped generator's
+   * chop dies there, which left standing would poke through the sand and slid
+   * would throw the waterline about by B times every ripple.
+   * @internal
+   */
+  private displace(
+    scope: PBInsideFunctionScope,
+    inPos: PBShaderExp,
+    basePos: PBShaderExp,
+    tPhase: PBShaderExp
+  ) {
+    const pb = scope.$builder;
+    const that = this;
+    pb.func('swDisplace', [pb.vec3('inPos'), pb.vec3('basePos'), pb.float('tPhase')], function () {
+      this.$l.dir = pb.vec4(0);
+      // At the undisplaced position, where the fragment stage evaluates it too
+      this.$l.sw = that.evaluate(this, this.inPos.xz, this.dir, this.tPhase);
+      this.$l.p = pb.mix(this.basePos, this.inPos, this.dir.z);
+      // The slide keeps every vertex at its height over the bed, so near the
+      // waterline the sheet lies on the sand within millimetres, and the depth
+      // test flips between the two under TAA's jitter. Remapped so the water
+      // stands clear of the bed or clearly under it: the height over the bed
+      // grows SWASH_CLEAR_SLOPE times faster near zero, up to SWASH_CLEARANCE
+      // more than it was, which narrows the near-coincident band as much.
+      this.$l.gap = this.dir.w;
+      this.$l.gapClear = pb.mul(
+        pb.sign(this.gap),
+        pb.min(pb.mul(pb.abs(this.gap), SWASH_CLEAR_SLOPE), pb.add(pb.abs(this.gap), SWASH_CLEARANCE))
+      );
+      this.p.y = pb.add(this.p.y, pb.mul(pb.sub(this.gapClear, this.gap), this.dir.z));
+      this.$l.fwd = pb.add(this.sw.y, pb.mul(this.sw.x, this.sw.w));
+      this.$return(
+        pb.add(this.p, pb.vec3(pb.mul(this.dir.x, this.fwd), this.sw.x, pb.mul(this.dir.y, this.fwd)))
+      );
+    });
+    return scope.swDisplace(inPos, basePos, tPhase) as PBShaderExp;
   }
   calcVertexPositionAndNormal(
     scope: PBInsideFunctionScope,
@@ -298,13 +376,26 @@ export class ShoreWaveGenerator extends Disposable implements WaveGenerator {
       [pb.vec3('inPos'), pb.vec3('outPos').out(), pb.vec3('outNormal').out()],
       function () {
         that._base.calcVertexPositionAndNormal(this, this.inPos, this.outPos, this.outNormal);
-        this.$l.dir = pb.vec2(0);
-        // At the undisplaced position, where the fragment stage evaluates it too
-        this.$l.sw = that.evaluate(this, this.inPos.xz, this.dir);
-        this.outPos = pb.add(this.outPos, pb.vec3(0, this.sw.x, 0));
+        this.outPos = that.displace(this, this.inPos, this.outPos, this.swWave.w);
       }
     );
     scope.swCalcPositionAndNormal(inPos, outPos, outNormal);
+  }
+  /**
+   * Where a vertex was in the previous frame, for motion vectors: the shore
+   * wave at the previous frame's clock. The shore waves sweep metres across
+   * the beach in a second, and without this the temporal filter smears and
+   * jitters their edge. The wrapped generator is taken as it is now.
+   */
+  calcPrevVertexPosition(scope: PBInsideFunctionScope, inPos: PBShaderExp, outPos: PBShaderExp) {
+    const pb = scope.$builder;
+    const that = this;
+    pb.func('swCalcPrevPosition', [pb.vec3('inPos'), pb.vec3('outPos').out()], function () {
+      this.$l.n = pb.vec3(0, 1, 0);
+      that._base.calcVertexPositionAndNormal(this, this.inPos, this.outPos, this.n);
+      this.outPos = that.displace(this, this.inPos, this.outPos, this.swPrev.x);
+    });
+    scope.swCalcPrevPosition(inPos, outPos);
   }
   /**
    * Slope of the shore wave height at an undisplaced XZ, by central differences.
@@ -314,7 +405,7 @@ export class ShoreWaveGenerator extends Disposable implements WaveGenerator {
     const pb = scope.$builder;
     const that = this;
     pb.func('swSlope', [pb.vec2('xz')], function () {
-      this.$l.dir = pb.vec2(0);
+      this.$l.dir = pb.vec4(0);
       this.$l.hx1 = that.evaluate(this, pb.add(this.xz, pb.vec2(NORMAL_STEP, 0)), this.dir).x;
       this.$l.hx0 = that.evaluate(this, pb.sub(this.xz, pb.vec2(NORMAL_STEP, 0)), this.dir).x;
       this.$l.hz1 = that.evaluate(this, pb.add(this.xz, pb.vec2(0, NORMAL_STEP)), this.dir).x;
@@ -347,7 +438,13 @@ export class ShoreWaveGenerator extends Disposable implements WaveGenerator {
       this.$l.n = pb.normalize(
         pb.add(pb.normalize(this.nf.xyz), pb.vec3(pb.neg(this.s.x), 0, pb.neg(this.s.y)))
       );
-      this.$return(pb.vec4(this.n, this.nf.w));
+      // The breaking crests and the bore are white; composed with the base
+      // foam as overlapping coverage, as the material does with the shore foam
+      this.$l.dir = pb.vec4(0);
+      this.$l.f = pb.clamp(that.evaluate(this, this.xz, this.dir).z, 0, 1);
+      this.$return(
+        pb.vec4(this.n, pb.sub(1, pb.mul(pb.sub(1, pb.clamp(this.nf.w, 0, 1)), pb.sub(1, this.f))))
+      );
     });
     return scope.swCalcNormalAndFoam(xz, vertexNormal) as PBShaderExp;
   }
@@ -361,6 +458,7 @@ export class ShoreWaveGenerator extends Disposable implements WaveGenerator {
     bindGroup.setTexture('swProfile', getProfileTexture(), fetchSampler('repeat_linear_nomip'));
     bindGroup.setValue('swGrid', this._grid);
     bindGroup.setValue('swWave', this._wave);
+    bindGroup.setValue('swPrev', this._prev);
   }
   calcClipmapTileAABB(minX: number, maxX: number, minZ: number, maxZ: number, y: number, outAABB: AABB) {
     this._base.calcClipmapTileAABB(minX, maxX, minZ, maxZ, y, outAABB);
@@ -368,6 +466,13 @@ export class ShoreWaveGenerator extends Disposable implements WaveGenerator {
     const reach = this._settings.height;
     outAABB.minPoint.y -= reach;
     outAABB.maxPoint.y += reach;
+    // The lip pitches forward, and the swash slides up the beach by up to
+    // SWASH_SLIDE_MAX times its rise
+    const slide = reach * SWASH_SLIDE_MAX;
+    outAABB.minPoint.x -= slide;
+    outAABB.minPoint.z -= slide;
+    outAABB.maxPoint.x += slide;
+    outAABB.maxPoint.z += slide;
   }
   /** The material steps the base generator; the clock comes with {@link setFrame}. */
   update() {}
