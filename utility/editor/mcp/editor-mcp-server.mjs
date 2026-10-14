@@ -3050,6 +3050,29 @@ const BASE_TOOLS = [
     }
   },
   {
+    name: 'water_interaction',
+    description:
+      'Attach, configure or detach the interaction field of a Water node (the simulated height field that carries wakes, impulses and, with shallowDepth, waves slowing and growing in shallow water), and fire impulses into it. enabled true adds one when missing, false removes it. properties sets fields: resolution, windowSize, waveSpeed, damping, maxAmplitude, foamAmount, foamDecay, foamThreshold, spongeWidth, shallowDepth, shoreAbsorbDepth. impulses are [x, z, radius, strength] in world units, strength a height in metres. See the field with the water DebugOutput "interaction", or read a row of it with read_row. Not undoable; the field is saved with the scene. Returns { interaction, row, err }.',
+    inputSchema: {
+      type: 'object',
+      required: ['node_id'],
+      properties: {
+        node_id: { type: 'string', description: 'Persistent id of the Water node.' },
+        enabled: { type: 'boolean' },
+        properties: { type: 'object' },
+        impulses: {
+          type: 'array',
+          items: { type: 'array', items: { type: 'number' }, minItems: 4, maxItems: 4 }
+        },
+        read_row: {
+          type: 'object',
+          description: 'Read the field heights along x at world z: { z, count } returns row { z, x, h } decimated to count samples (peak per span).'
+        },
+        timeout_ms: { type: 'number', default: 10000 }
+      }
+    }
+  },
+  {
     name: 'editor_frame_timing',
     description:
       'Measure GPU time and frame time over the next frames frames, after skipping warmup frames so a change made just before has settled. GPU time comes from WebGPU timestamp queries and reads 0 on WebGL. Use it for A/B comparisons: toggle a feature, measure, toggle back. Returns { frames, gpu_ms: { mean, median, p90, min, max }, frame_ms: {...}, fps, err }.',
@@ -4385,6 +4408,19 @@ const handlers = {
   },
   async sdf_sample(args) {
     return bridge.send('sdf_sample', { points: args.points }, Number(args.timeout_ms ?? 30000));
+  },
+  async water_interaction(args) {
+    return bridge.send(
+      'water_interaction',
+      {
+        node_id: args.node_id,
+        enabled: args.enabled,
+        properties: args.properties,
+        impulses: args.impulses,
+        read_row: args.read_row
+      },
+      Number(args.timeout_ms ?? 10000)
+    );
   },
   async editor_frame_timing(args) {
     return bridge.send(

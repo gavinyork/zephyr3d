@@ -53,6 +53,7 @@ import {
   setTerrainGrassLayers
 } from './mcpterrain';
 import { importModelAsset, saveNodeAsPrefab } from './mcpassets';
+import { editWaterInteraction } from './mcpwater';
 import { bakeMeshSDFs, getSceneSDFStats, queryMeshSDF, sampleGlobalSDF, setSDFDebugSlice } from './mcpsdf';
 import { getNodePhysics, listPhysicsPresets, removeNodePhysics, setNodePhysics } from './mcpphysics';
 import {
@@ -1916,6 +1917,8 @@ async function dispatch(editor: Editor, method: string, params: any): Promise<an
       } catch (err) {
         return { distances: null, err: `${err instanceof Error ? err.message : err}` };
       }
+    case 'water_interaction':
+      return await editWaterInteraction(getSceneController(editor), params);
     case 'editor_frame_timing':
       return await measureFrameTiming(params);
     case 'sdf_debug_slice':

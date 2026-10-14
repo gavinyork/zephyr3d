@@ -1,5 +1,5 @@
 import type { AABB, Nullable } from '@zephyr3d/base';
-import { Disposable, Vector2, Vector3, Vector4 } from '@zephyr3d/base';
+import { Disposable, halfToFloat, Vector2, Vector3, Vector4 } from '@zephyr3d/base';
 import type {
   AbstractDevice,
   BindGroup,
@@ -356,7 +356,45 @@ export function createWaterInteractionStepShader(): PBRenderOptions {
       this.impulses = pb.vec4[MAX_IMPULSES]().uniform(0);
       this.numDisturbers = pb.int().uniform(0);
       this.disturbers = pb.vec4[MAX_DISTURBERS * 4]().uniform(0);
+      // Water depth for the wave speed, see WaterInteraction.setBathymetry:
+      // (origin x, origin z, 1 / size x, 1 / size z),
+      // (source: 0 none / 1 distance field / 2 height map, water level, height scale, height offset),
+      // (shallow depth, absorb depth, 0, 0)
+      this.bathyTex = pb.tex2D().uniform(0);
+      this.bathyParams = pb.vec4().uniform(0);
+      this.bathyParams2 = pb.vec4().uniform(0);
+      this.shoreParams = pb.vec4().uniform(0);
       declareFootprintFunctions(pb);
+      // Depth of water at a world XZ, a large value where nothing is known
+      pb.func('wiDepth', [pb.vec2('xz')], function () {
+        this.$l.uv = pb.mul(pb.sub(this.xz, this.bathyParams.xy), this.bathyParams.zw);
+        this.$if(
+          pb.or(
+            pb.lessThan(this.bathyParams2.x, 0.5),
+            pb.or(pb.any(pb.lessThan(this.uv, pb.vec2(0))), pb.any(pb.greaterThan(this.uv, pb.vec2(1))))
+          ),
+          function () {
+            this.$return(pb.float(1e4));
+          }
+        );
+        this.$l.t = pb.textureSampleLevel(this.bathyTex, this.uv, 0);
+        // The distance field at the rest level is the distance to the bed below
+        // it: the depth on a gently shelving bed, a little under on a steep one
+        this.$if(pb.lessThan(this.bathyParams2.x, 1.5), function () {
+          this.$return(this.t.w);
+        });
+        this.$return(
+          pb.sub(this.bathyParams2.y, pb.add(pb.mul(this.t.x, this.bathyParams2.z), this.bathyParams2.w))
+        );
+      });
+      // Squared wave speed relative to the configured one: 1 in water deeper
+      // than the shallow depth, falling with the depth below it, as c = sqrt(g h)
+      pb.func('wiSpeed2', [pb.float('depth')], function () {
+        this.$if(pb.lessThan(this.bathyParams2.x, 0.5), function () {
+          this.$return(pb.float(1));
+        });
+        this.$return(pb.clamp(pb.div(this.depth, pb.max(this.shoreParams.x, 1e-3)), 0, 1));
+      });
       pb.func('wiInside', [pb.ivec2('c')], function () {
         this.$return(
           pb.and(
@@ -424,7 +462,27 @@ export function createWaterInteractionStepShader(): PBRenderOptions {
           pb.add(this.q, pb.ivec2(0, 1)),
           this.cur
         );
-        this.$l.lap = pb.sub(pb.add(this.l, this.r, this.d, this.u), pb.mul(this.cur, 4));
+        // Flux form of div(c^2 grad h): each face carries the mean of the
+        // speeds either side, so a wave crossing into shallower water slows
+        // and steepens without gaining or losing energy at the change. With
+        // no depth every speed is 1 and this is the plain Laplacian.
+        this.$l.texelW = this.worldParams.z;
+        this.$l.wpc = pb.add(this.worldParams.xy, pb.mul(pb.add(pb.vec2(this.p), pb.vec2(0.5)), this.texelW));
+        this.$l.depthC = this.wiDepth(this.wpc);
+        this.$l.sC = this.wiSpeed2(this.depthC);
+        this.$l.sL = this.wiSpeed2(this.wiDepth(pb.sub(this.wpc, pb.vec2(this.texelW, 0))));
+        this.$l.sR = this.wiSpeed2(this.wiDepth(pb.add(this.wpc, pb.vec2(this.texelW, 0))));
+        this.$l.sD = this.wiSpeed2(this.wiDepth(pb.sub(this.wpc, pb.vec2(0, this.texelW))));
+        this.$l.sU = this.wiSpeed2(this.wiDepth(pb.add(this.wpc, pb.vec2(0, this.texelW))));
+        this.$l.lap = pb.mul(
+          0.5,
+          pb.add(
+            pb.mul(pb.add(this.sC, this.sL), pb.sub(this.l, this.cur)),
+            pb.mul(pb.add(this.sC, this.sR), pb.sub(this.r, this.cur)),
+            pb.mul(pb.add(this.sC, this.sD), pb.sub(this.d, this.cur)),
+            pb.mul(pb.add(this.sC, this.sU), pb.sub(this.u, this.cur))
+          )
+        );
         // Sponge: energy retention falls to zero over a band inside the edge,
         // quadratically so the transition into it is soft.
         this.$l.fres = pb.float(pb.sub(this.resolution, 1));
@@ -435,6 +493,11 @@ export function createWaterInteractionStepShader(): PBRenderOptions {
         this.$l.ey = pb.sub(1, pb.smoothStep(0, this.stepParams.z, this.distY));
         this.$l.e = pb.sub(1, pb.mul(pb.sub(1, this.ex), pb.sub(1, this.ey)));
         this.$l.absorb = pb.clamp(pb.sub(1, pb.mul(this.e, this.e)), 0, 1);
+        // The beach is an absorber too: waves die in the last few centimetres
+        // instead of reflecting off the waterline as off a wall
+        this.$if(pb.greaterThan(this.bathyParams2.x, 0.5), function () {
+          this.absorb = pb.mul(this.absorb, pb.smoothStep(0, pb.max(this.shoreParams.y, 1e-3), this.depthC));
+        });
         this.$l.retention = pb.mul(this.stepParams.y, this.absorb);
         this.$l.next = pb.add(
           this.cur,
@@ -503,8 +566,8 @@ export function createWaterInteractionStepShader(): PBRenderOptions {
           1
         );
         this.next = pb.clamp(this.next, pb.neg(this.stepParams.w), this.stepParams.w);
-        // Inside an obstacle there is no water to move.
-        this.$if(this.wiObstacle(this.p), function () {
+        // Inside an obstacle, or on dry land, there is no water to move.
+        this.$if(pb.or(this.wiObstacle(this.p), pb.lessThanEqual(this.depthC, 0)), function () {
           this.next = pb.float(0);
           this.cur = pb.float(0);
           this.foamNext = pb.float(0);
@@ -585,6 +648,26 @@ export function createWaterInteractionObstacleShader(): PBRenderOptions {
  *
  * @public
  */
+/**
+ * Where a {@link WaterInteraction} reads the depth of the water from.
+ *
+ * - `field`: a texture whose w channel is the signed distance from the water
+ *   level down to the bed, as the scene SDF's waterline field holds.
+ * - `height`: a height map, the bed at `r * heightScale + heightOffset`.
+ *
+ * @internal
+ */
+export interface WaterBathymetry {
+  kind: 'field' | 'height';
+  texture: Texture2D;
+  /** World rectangle the texture covers: min x, min z, size x, size z. */
+  region: [number, number, number, number];
+  /** World Y of the water at rest. */
+  level: number;
+  heightScale?: number;
+  heightOffset?: number;
+}
+
 export class WaterInteraction extends Disposable {
   private _resolution: number;
   private _windowSize: number;
@@ -631,6 +714,13 @@ export class WaterInteraction extends Disposable {
   private readonly _shift: Vector2;
   private readonly _sampleParams: Vector4;
   private readonly _sampleParams2: Vector4;
+  private _shallowDepth: number;
+  private _shoreAbsorbDepth: number;
+  private _bathymetry: Nullable<WaterBathymetry>;
+  private readonly _bathyParams: Vector4;
+  private readonly _bathyParams2: Vector4;
+  private readonly _shoreParams: Vector4;
+  private _dummyBathyTexture: Nullable<Texture2D>;
   /**
    * Creates a water interaction field.
    */
@@ -678,6 +768,13 @@ export class WaterInteraction extends Disposable {
     this._shift = new Vector2();
     this._sampleParams = new Vector4();
     this._sampleParams2 = new Vector4();
+    this._shallowDepth = 2;
+    this._shoreAbsorbDepth = 0.2;
+    this._bathymetry = null;
+    this._bathyParams = new Vector4();
+    this._bathyParams2 = new Vector4();
+    this._shoreParams = new Vector4();
+    this._dummyBathyTexture = null;
   }
   protected onDispose() {
     super.onDispose();
@@ -690,6 +787,9 @@ export class WaterInteraction extends Disposable {
     this._obstacleBindGroup = null;
     this._obstacleProgram?.dispose();
     this._obstacleProgram = null;
+    this._dummyBathyTexture?.dispose();
+    this._dummyBathyTexture = null;
+    this._bathymetry = null;
     this._disturbers.length = 0;
     this._followNode = null;
   }
@@ -825,6 +925,35 @@ export class WaterInteraction extends Disposable {
     this._spongeWidth = Math.min(0.45, Math.max(0.01, val));
   }
   /** How the window is positioned. See {@link WaterInteractionFollowMode}. */
+  /**
+   * Depth in metres below which waves slow down, as shallow water waves do:
+   * the speed is {@link waveSpeed} in deeper water and falls with the square
+   * root of the depth below this. A wave running onto a beach then slows,
+   * shortens, grows and turns to meet the shore. 0 ignores the depth. Needs a
+   * depth source, which the water sets each frame: the scene signed distance
+   * field where enabled, else the terrain.
+   */
+  get shallowDepth() {
+    return this._shallowDepth;
+  }
+  set shallowDepth(val: number) {
+    this._shallowDepth = Math.max(0, val);
+  }
+  /** Depth in metres over which the beach absorbs the waves reaching it instead of reflecting them. */
+  get shoreAbsorbDepth() {
+    return this._shoreAbsorbDepth;
+  }
+  set shoreAbsorbDepth(val: number) {
+    this._shoreAbsorbDepth = Math.max(0, val);
+  }
+  /**
+   * Sets where the depth of the water comes from, or null for none (constant
+   * speed). Set by the water each frame.
+   * @internal
+   */
+  setBathymetry(source: Nullable<WaterBathymetry>) {
+    this._bathymetry = source;
+  }
   get followMode() {
     return this._followMode;
   }
@@ -1010,6 +1139,29 @@ export class WaterInteraction extends Disposable {
     bindGroup.setValue('worldParams', this._worldParams);
     bindGroup.setValue('resolution', this._resolution);
     bindGroup.setTexture('obstacleTex', this._obstacleTexture!, nearest);
+    const bathy = this._shallowDepth > 0 ? this._bathymetry : null;
+    if (bathy) {
+      const [x, z, w, d] = bathy.region;
+      this._bathyParams.setXYZW(x, z, 1 / w, 1 / d);
+      this._bathyParams2.setXYZW(
+        bathy.kind === 'field' ? 1 : 2,
+        bathy.level,
+        bathy.heightScale ?? 1,
+        bathy.heightOffset ?? 0
+      );
+    } else {
+      this._bathyParams.setXYZW(0, 0, 1, 1);
+      this._bathyParams2.setXYZW(0, 0, 1, 0);
+    }
+    this._shoreParams.setXYZW(this._shallowDepth, this._shoreAbsorbDepth, 0, 0);
+    bindGroup.setTexture(
+      'bathyTex',
+      bathy?.texture ?? this._getDummyBathyTexture(device),
+      fetchSampler('clamp_linear_nomip')
+    );
+    bindGroup.setValue('bathyParams', this._bathyParams);
+    bindGroup.setValue('bathyParams2', this._bathyParams2);
+    bindGroup.setValue('shoreParams', this._shoreParams);
     for (let i = 0; i < steps; i++) {
       const src = this._textures![this._current];
       const dst = this._framebuffers![1 - this._current];
@@ -1231,7 +1383,40 @@ export class WaterInteraction extends Disposable {
     outAABB.minPoint.y -= this._maxAmplitude;
     outAABB.maxPoint.y += this._maxAmplitude;
   }
+  /**
+   * Heights of the field along the row of texels nearest a world Z, read back
+   * from the GPU: the world X of the first texel centre, the texel size, and
+   * one height per texel. For tools and diagnosis; it costs a GPU readback.
+   */
+  async readRow(z: number) {
+    const texture = this._textures?.[this._current];
+    if (!texture) {
+      return null;
+    }
+    const n = this._resolution;
+    const texel = this.texelSize;
+    const row = Math.min(n - 1, Math.max(0, Math.floor((z - this._originZ) / texel)));
+    const half = texture.format === 'rgba16f';
+    const raw = half ? new Uint16Array(n * 4) : new Float32Array(n * 4);
+    await texture.readPixels(0, row, n, 1, 0, 0, raw);
+    const heights = new Float32Array(n);
+    for (let i = 0; i < n; i++) {
+      heights[i] = half ? halfToFloat(raw[i * 4]) : raw[i * 4];
+    }
+    return {
+      x0: this._originX + texel * 0.5,
+      z: this._originZ + (row + 0.5) * texel,
+      texel,
+      heights
+    };
+  }
   /** @internal */
+  private _getDummyBathyTexture(device: AbstractDevice) {
+    if (!this._dummyBathyTexture) {
+      this._dummyBathyTexture = device.createTexture2D('rgba16f', 1, 1, { mipmapping: false })!;
+    }
+    return this._dummyBathyTexture;
+  }
   private _clampWaveSpeed() {
     this._waveSpeed = Math.min(this._waveSpeed, this.maxWaveSpeed);
   }

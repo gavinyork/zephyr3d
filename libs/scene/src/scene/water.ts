@@ -9,7 +9,12 @@ import { Primitive } from '../render';
 import { Clipmap, FBMWaveGenerator } from '../render';
 import { setWaterSubmergence } from '../render/underwater';
 import { WaterMaterial } from '../material/water';
-import { InteractiveWaveGenerator, type WaterInteraction } from '../render/water_interaction';
+import {
+  InteractiveWaveGenerator,
+  type WaterBathymetry,
+  type WaterInteraction
+} from '../render/water_interaction';
+import type { ClipmapTerrain } from './terrain-cm/terrain-cm';
 import type { WaterDebugOutput, WaterRefractionMode } from '../material/water';
 import type { AbstractDevice, BindGroup, FrameBuffer, GPUProgram, RenderStateSet } from '@zephyr3d/device';
 import type { WaveGenerator } from '../render/wavegenerator';
@@ -787,17 +792,68 @@ export class Water extends applyMixins(GraphNode, mixinDrawable) implements Draw
         }
       });
       this.updateSubmergence(camera, mat);
-      if (mat.shoreFoamAmount > 0 && this.scene?.sdf.enabled) {
-        // The shoreline band is measured from the waterline at the rest level
+      const interaction = mat.interaction;
+      const wantsDepth = !!interaction && interaction.shallowDepth > 0;
+      if ((mat.shoreFoamAmount > 0 || wantsDepth) && this.scene?.sdf.enabled) {
+        // The shoreline band is measured from the waterline at the rest level,
+        // and the interaction field reads the depth from the same grid
         this.scene.sdf.global?.waterline.request(this.worldMatrix.m13);
       }
-      const interaction = mat.interaction;
+      if (interaction) {
+        interaction.setBathymetry(wantsDepth ? this.findBathymetry() : null);
+      }
       if (interaction && interaction.followMode === 'camera') {
         this.updateInteractionFocus(camera, interaction);
       }
       this.scene?.queuePerCameraUpdateNode(this);
     }
   }
+  /**
+   * Where the interaction field reads the depth of the water: the scene
+   * field's waterline grid when there is one, else the first terrain's height
+   * map, else nothing.
+   * @internal
+   */
+  private findBathymetry(): Nullable<WaterBathymetry> {
+    const level = this.worldMatrix.m13;
+    const waterline = this.scene?.sdf.enabled ? this.scene.sdf.global?.waterline : null;
+    if (waterline?.ready && waterline.texture) {
+      const r = waterline.region;
+      return {
+        kind: 'field',
+        texture: waterline.texture,
+        region: [r.x, r.y, r.z * r.w, r.z * r.w],
+        level
+      };
+    }
+    let terrain =
+      this._bathyTerrain?.attached && this._bathyTerrain.scene === this.scene ? this._bathyTerrain : null;
+    if (!terrain && this.scene) {
+      this.scene.rootNode.iterate((node) => {
+        if (node.isClipmapTerrain()) {
+          terrain = node;
+          return true;
+        }
+        return false;
+      });
+      this._bathyTerrain = terrain;
+    }
+    const heightMap = terrain?.heightMap;
+    if (!terrain || !heightMap) {
+      return null;
+    }
+    const region = terrain.worldRegion;
+    return {
+      kind: 'height',
+      texture: heightMap,
+      region: [region.x, region.y, region.z - region.x, region.w - region.y],
+      level,
+      heightScale: Math.abs(terrain.scale.y),
+      heightOffset: terrain.worldMatrix.m13
+    };
+  }
+  /** @internal */
+  private _bathyTerrain: Nullable<ClipmapTerrain> = null;
   /**
    * Decide whether `camera` is inside this body of water and publish the result.
    *

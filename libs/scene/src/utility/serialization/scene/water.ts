@@ -1462,6 +1462,37 @@ export function getWaterInteractionClass(): SerializableClass {
           }
         },
         {
+          name: 'ShallowDepth',
+          description:
+            'Depth in metres below which waves slow down as shallow water waves do: WaveSpeed in deeper water, falling with the square root of the depth below this. A wave running onto a beach then slows, shortens, grows and turns to meet the shore. 0 ignores the depth. The depth comes from the scene signed distance field where SDFEnabled is on, else from the terrain.',
+          type: 'float',
+          default: 2,
+          options: { animatable: true, minValue: 0, maxValue: 50 },
+          get(this: WaterInteraction, value) {
+            value.num[0] = this.shallowDepth;
+          },
+          set(this: WaterInteraction, value) {
+            this.shallowDepth = value.num[0];
+          }
+        },
+        {
+          name: 'ShoreAbsorbDepth',
+          description:
+            'Depth in metres over which the beach absorbs the waves reaching it, instead of reflecting them back out to sea.',
+          type: 'float',
+          default: 0.2,
+          options: { animatable: true, minValue: 0, maxValue: 5 },
+          isHidden(this: WaterInteraction) {
+            return this.shallowDepth <= 0;
+          },
+          get(this: WaterInteraction, value) {
+            value.num[0] = this.shoreAbsorbDepth;
+          },
+          set(this: WaterInteraction, value) {
+            this.shoreAbsorbDepth = value.num[0];
+          }
+        },
+        {
           name: 'Damping',
           description: 'Rate the field loses energy at, in 1/s',
           type: 'float',
