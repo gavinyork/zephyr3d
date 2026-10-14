@@ -574,6 +574,39 @@ export class Water extends applyMixins(GraphNode, mixinDrawable) implements Draw
     this.material.shoreFoamWashScale = val;
   }
   /**
+   * Crest to trough height in metres of the waves rolling in to the shore,
+   * breaking and running up the beach, 0 for none. They come square on to the
+   * coast whatever its shape, and boats ride them. Needs the scene signed
+   * distance field (WebGPU, scene SDF enabled).
+   */
+  get shoreWaveHeight() {
+    return this.material.shoreWaveHeight;
+  }
+  set shoreWaveHeight(val: number) {
+    this.material.shoreWaveHeight = val;
+  }
+  /** Distance in metres between shore wave crests at the outer edge of their zone. */
+  get shoreWaveLength() {
+    return this.material.shoreWaveLength;
+  }
+  set shoreWaveLength(val: number) {
+    this.material.shoreWaveLength = val;
+  }
+  /** Seconds between successive shore waves. */
+  get shoreWavePeriod() {
+    return this.material.shoreWavePeriod;
+  }
+  set shoreWavePeriod(val: number) {
+    this.material.shoreWavePeriod = val;
+  }
+  /** How far out from the waterline the shore waves rise, in metres. */
+  get shoreWaveZone() {
+    return this.material.shoreWaveZone;
+  }
+  set shoreWaveZone(val: number) {
+    this.material.shoreWaveZone = val;
+  }
+  /**
    * How the refracted view sample is located. Defaults to `march`.
    *
    * `offset` drops the depth-buffer search - a fixed number of texture fetches
@@ -794,10 +827,18 @@ export class Water extends applyMixins(GraphNode, mixinDrawable) implements Draw
       this.updateSubmergence(camera, mat);
       const interaction = mat.interaction;
       const wantsDepth = !!interaction && interaction.shallowDepth > 0;
-      if ((mat.shoreFoamAmount > 0 || wantsDepth) && this.scene?.sdf.enabled) {
+      if ((mat.shoreFoamAmount > 0 || mat.shoreWaveHeight > 0 || wantsDepth) && this.scene?.sdf.enabled) {
         // The shoreline band is measured from the waterline at the rest level,
-        // and the interaction field reads the depth from the same grid
+        // and the interaction field and the shore waves read it too
         this.scene.sdf.global?.waterline.request(this.worldMatrix.m13);
+      }
+      if (mat.shoreWaveHeight > 0) {
+        const waterline = this.scene?.sdf.enabled ? this.scene.sdf.global?.waterline : null;
+        mat.setShoreWaveFrame(
+          waterline?.ready ? waterline.smoothTexture : null,
+          waterline?.region ?? new Vector4(0, 0, 1, 0),
+          this.worldMatrix.m13
+        );
       }
       if (interaction) {
         interaction.setBathymetry(wantsDepth ? this.findBathymetry() : null);

@@ -10,6 +10,15 @@ import { buildSDFProgram } from './sdf_programs';
 /** Seed coordinate meaning "no seed yet". */
 const NO_SEED = -1e5;
 const WORKGROUP = 8;
+/** Gaussian smoothing of the shore coordinates, in cells: half width and sigma. */
+const SMOOTH_RADIUS = 4;
+const SMOOTH_SIGMA = 2;
+/** Field value within which the bed model is used, and its coefficient bound. */
+const SMOOTH_MODEL_REACH = 4;
+const SMOOTH_MODEL_CLAMP = 1000;
+/** Jump-flooded distance, in metres, over which the bed model hands over to it. */
+const SMOOTH_BLEND_START = 1;
+const SMOOTH_BLEND_END = 4;
 /** Horizontal field gradient below which the bed counts as flat. */
 const WATERLINE_MIN_SLOPE = 0.02;
 /** Bound of the linear model coefficients, within half float range. */
@@ -59,6 +68,11 @@ export class WaterlineField {
   /** (field at the rest level, field half a cell above) per cell. */
   private _probe: Nullable<Texture2D>;
   private _result: Nullable<Texture2D>;
+  /** Smoothed shore coordinates, see {@link WaterlineField.smoothTexture}; and the pass between. */
+  private _smooth: Nullable<Texture2D>;
+  private _smoothTemp: Nullable<Texture2D>;
+  private _smoothProgram: Nullable<GPUProgram>;
+  private _smoothBindGroups: BindGroup[];
   private _seedProgram: Nullable<GPUProgram>;
   private _jfaProgram: Nullable<GPUProgram>;
   private _resolveProgram: Nullable<GPUProgram>;
@@ -87,6 +101,10 @@ export class WaterlineField {
     this._seedB = null;
     this._probe = null;
     this._result = null;
+    this._smooth = null;
+    this._smoothTemp = null;
+    this._smoothProgram = null;
+    this._smoothBindGroups = [];
     this._seedProgram = null;
     this._jfaProgram = null;
     this._resolveProgram = null;
@@ -110,6 +128,15 @@ export class WaterlineField {
     return this._built;
   }
   /** (rest-level distance, model A, model B, field at the rest level) per cell, rgba16f. */
+  /**
+   * Smooth shore coordinates per cell, rgba16f, for effects that build
+   * geometry on them (see ShoreWaveGenerator), which shows every kink of the
+   * raw field up close: (signed distance to the waterline, negative inland;
+   * B of the bed model; 0; 0), Gaussian-filtered over about two metres.
+   */
+  get smoothTexture() {
+    return this._built ? this._smooth : null;
+  }
   get texture() {
     return this._result;
   }
@@ -194,6 +221,23 @@ export class WaterlineField {
     device.setProgram(this._resolveProgram);
     device.setBindGroup(0, rbg);
     device.compute(groups, groups, 1);
+    // Smooth, separably: the first pass also turns the result into the signed distance
+    for (let pass = 0; pass < 2; pass++) {
+      if (!this._smoothBindGroups[pass]) {
+        this._smoothBindGroups[pass] = device.createBindGroup(this._smoothProgram!.bindGroupLayouts[0]);
+      }
+      const bg = this._smoothBindGroups[pass];
+      bg.setValue('smoothPass', new Vector4(pass, n, 0, 0));
+      bg.setTexture(
+        'src',
+        pass === 0 ? this._result! : this._smoothTemp!,
+        fetchSampler('clamp_nearest_nomip')
+      );
+      bg.setTexture('dst', pass === 0 ? this._smoothTemp! : this._smooth!);
+      device.setProgram(this._smoothProgram);
+      device.setBindGroup(0, bg);
+      device.compute(groups, groups, 1);
+    }
     this._built = true;
   }
   dispose() {
@@ -201,6 +245,13 @@ export class WaterlineField {
     this._seedB?.dispose();
     this._probe?.dispose();
     this._result?.dispose();
+    this._smooth?.dispose();
+    this._smoothTemp?.dispose();
+    for (const bg of this._smoothBindGroups) {
+      bg.dispose();
+    }
+    this._smooth = this._smoothTemp = null;
+    this._smoothBindGroups = [];
     this._seedBindGroup?.dispose();
     this._resolveBindGroup?.dispose();
     for (const bg of this._jfaBindGroups) {
@@ -224,6 +275,9 @@ export class WaterlineField {
     this._seedB = tex('rg32f');
     this._probe = tex('rg32f');
     this._result = tex('rgba16f');
+    this._smooth = tex('rgba16f');
+    this._smooth.name = '@WaterlineSmooth';
+    this._smoothTemp = tex('rgba16f');
     this._result.name = '@WaterlineField';
     const levels = this._global.levels;
     this._seedProgram = buildSDFProgram({
@@ -357,5 +411,46 @@ export class WaterlineField {
     })!;
     this._seedBindGroup = device.createBindGroup(this._seedProgram.bindGroupLayouts[0]);
     this._resolveBindGroup = device.createBindGroup(this._resolveProgram.bindGroupLayouts[0]);
+    this._smoothProgram = buildSDFProgram({
+      label: 'WaterlineSmooth',
+      workgroupSize: [WORKGROUP, WORKGROUP, 1],
+      compute(pb) {
+        // (pass: 0 horizontal from the resolved field, 1 vertical; resolution)
+        this.smoothPass = pb.vec4().uniform(0);
+        this.src = pb.tex2D().sampleType('unfilterable-float').uniform(0);
+        this.dst = pb.texStorage2D.rgba16float().storage(0);
+        // Signed distance and B of a resolved texel: the bed model near the
+        // shore, where it is exact for a planar bed and runs on inland; the
+        // jump-flooded distance farther out, blended over a couple of metres
+        pb.func('wlSigned', [pb.vec4('t')], function () {
+          this.$l.model = pb.and(
+            pb.lessThan(pb.abs(this.t.w), SMOOTH_MODEL_REACH),
+            pb.lessThan(pb.abs(this.t.y), SMOOTH_MODEL_CLAMP)
+          );
+          this.$l.w = this.$choice(
+            this.model,
+            pb.smoothStep(SMOOTH_BLEND_START, SMOOTH_BLEND_END, this.t.x),
+            1
+          );
+          this.$return(pb.vec2(pb.mix(this.t.y, this.t.x, this.w), this.$choice(this.model, this.t.z, 0)));
+        });
+        pb.main(function () {
+          this.$l.id = pb.ivec2(this.$builtins.globalInvocationId.xy);
+          this.$l.last = pb.sub(pb.int(this.smoothPass.y), 1);
+          this.$l.axis = this.$choice(pb.lessThan(this.smoothPass.x, 0.5), pb.ivec2(1, 0), pb.ivec2(0, 1));
+          this.$l.acc = pb.vec2(0);
+          this.$l.wsum = pb.float(0);
+          for (let k = -SMOOTH_RADIUS; k <= SMOOTH_RADIUS; k++) {
+            const w = Math.exp(-(k * k) / (2 * SMOOTH_SIGMA * SMOOTH_SIGMA));
+            this.$l.q = pb.clamp(pb.add(this.id, pb.mul(this.axis, k)), pb.ivec2(0), pb.ivec2(this.last));
+            this.$l.t = pb.textureLoad(this.src, this.q, 0);
+            this.$l.v = this.$choice(pb.lessThan(this.smoothPass.x, 0.5), this.wlSigned(this.t), this.t.xy);
+            this.acc = pb.add(this.acc, pb.mul(this.v, w));
+            this.wsum = pb.add(this.wsum, w);
+          }
+          pb.textureStore(this.dst, pb.uvec2(this.id), pb.vec4(pb.div(this.acc, this.wsum), 0, 0));
+        });
+      }
+    });
   }
 }

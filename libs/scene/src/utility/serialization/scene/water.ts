@@ -1260,6 +1260,73 @@ export function getWaterClass(manager: ResourceManager): SerializableClass {
           }
         },
         {
+          name: 'ShoreWaveHeight',
+          description:
+            'Crest to trough height in metres of the waves rolling in to the shore, breaking and running up the beach, 0 for none. They come square on to the coast whatever its shape, bunch up as the water shallows and surge up the sand and drain back; boats ride them. Needs the scene signed distance field: WebGPU with the scene SDFEnabled on.',
+          type: 'float',
+          default: 0,
+          options: { animatable: true, minValue: 0, maxValue: 3 },
+          isHidden(this: Water) {
+            return false;
+          },
+          get(this: Water, value) {
+            value.num[0] = this.shoreWaveHeight;
+          },
+          set(this: Water, value) {
+            this.shoreWaveHeight = value.num[0];
+          }
+        },
+        {
+          name: 'ShoreWaveLength',
+          description:
+            'Distance in metres between crests at the outer edge of the zone. They bunch up towards the shore as real waves do in shallowing water.',
+          type: 'float',
+          default: 8,
+          options: { animatable: true, minValue: 0.5, maxValue: 100 },
+          isHidden(this: Water) {
+            return this.shoreWaveHeight <= 0;
+          },
+          get(this: Water, value) {
+            value.num[0] = this.shoreWaveLength;
+          },
+          set(this: Water, value) {
+            this.shoreWaveLength = value.num[0];
+          }
+        },
+        {
+          name: 'ShoreWavePeriod',
+          description: 'Seconds between successive shore waves.',
+          type: 'float',
+          default: 6,
+          options: { animatable: true, minValue: 0.5, maxValue: 30 },
+          isHidden(this: Water) {
+            return this.shoreWaveHeight <= 0;
+          },
+          get(this: Water, value) {
+            value.num[0] = this.shoreWavePeriod;
+          },
+          set(this: Water, value) {
+            this.shoreWavePeriod = value.num[0];
+          }
+        },
+        {
+          name: 'ShoreWaveZone',
+          description:
+            'How far out from the waterline the shore waves rise, in metres. They grow over the zone and break near its inner end.',
+          type: 'float',
+          default: 20,
+          options: { animatable: true, minValue: 1, maxValue: 200 },
+          isHidden(this: Water) {
+            return this.shoreWaveHeight <= 0;
+          },
+          get(this: Water, value) {
+            value.num[0] = this.shoreWaveZone;
+          },
+          set(this: Water, value) {
+            this.shoreWaveZone = value.num[0];
+          }
+        },
+        {
           name: 'CheapRefractionDepth',
           description:
             'Depth in meters the cheap refraction mode assumes the water is. Sets how strong the distortion looks when RefractionMode is Offset; ignored by March. A constant rather than the measured distance to the bottom, because an offset scaled by that distance paints a second copy of any object breaking the surface.',

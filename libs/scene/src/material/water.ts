@@ -10,6 +10,8 @@ import { applyMaterialMixins, MeshMaterial } from './meshmaterial';
 import type { DrawContext, WaveGenerator } from '../render';
 import type { WaterInteraction } from '../render/water_interaction';
 import { InteractiveWaveGenerator } from '../render/water_interaction';
+import { ShoreWaveGenerator } from '../render/shore_wave_generator';
+import type { ShoreWaveSettings } from '../render/shore_wave_generator';
 import { LIGHT_TYPE_DIRECTIONAL, LIGHT_TYPE_RECT, MaterialVaryingFlags } from '../values';
 import { ShaderHelper } from './shader/helper';
 import type { Nullable } from '@zephyr3d/base';
@@ -246,6 +248,12 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
    * the base generator itself otherwise.
    */
   private _effectiveWaveGenerator: Nullable<WaveGenerator>;
+  /** Settings of the shore waves, shared by reference with their generator. */
+  private readonly _shoreWaves: ShoreWaveSettings = { height: 0, wavelength: 8, period: 6, zone: 20 };
+  /** The shore wave layer of the effective generator, while the waves are on. */
+  private _shoreWaveGenerator: Nullable<ShoreWaveGenerator> = null;
+  /** Seconds of water clock at the last update, for the shore waves. */
+  private _waveClock = 0;
   /** Wave uniform version last written, per bind group. */
   private _waveVersionByBindGroup: WeakMap<BindGroup, number>;
   private readonly _clipmapInfo: Vector4;
@@ -438,12 +446,18 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
   private _rebuildEffectiveWaveGenerator() {
     const base = this._waveGenerator.get();
     const interaction = this._interaction.get();
+    let effective: Nullable<WaveGenerator> = base;
     if (base && interaction && interaction.isOk()) {
-      this._effectiveWaveGenerator = new InteractiveWaveGenerator(base, interaction);
+      effective = new InteractiveWaveGenerator(base, interaction);
       interaction.ensureResources();
-    } else {
-      this._effectiveWaveGenerator = base;
     }
+    this._shoreWaveGenerator?.dispose();
+    this._shoreWaveGenerator = null;
+    if (effective && this._shoreWaves.height > 0) {
+      this._shoreWaveGenerator = new ShoreWaveGenerator(effective, this._shoreWaves);
+      effective = this._shoreWaveGenerator;
+    }
+    this._effectiveWaveGenerator = effective;
     // Bind groups are pooled; a stale version must not suppress the upload.
     this._waveVersionByBindGroup = new WeakMap();
     this.optionChanged(true);
@@ -2499,9 +2513,57 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
     }
   }
   needUpdate() {
-    return !!this._waveGenerator.get()?.needUpdate() || !!this._interaction.get();
+    return (
+      !!this._waveGenerator.get()?.needUpdate() || !!this._interaction.get() || !!this._shoreWaveGenerator
+    );
+  }
+  /**
+   * Crest to trough height in metres of the waves rolling in to the shore and
+   * running up the beach, 0 for none. See {@link ShoreWaveGenerator}. Needs
+   * the scene signed distance field (WebGPU); without it the waves are off.
+   */
+  get shoreWaveHeight() {
+    return this._shoreWaves.height;
+  }
+  set shoreWaveHeight(val: number) {
+    val = Math.max(0, val);
+    const wasOn = this._shoreWaves.height > 0;
+    this._shoreWaves.height = val;
+    if (wasOn !== val > 0) {
+      this._rebuildEffectiveWaveGenerator();
+    }
+  }
+  /** Distance in metres between shore wave crests at the outer edge of their zone; they bunch up towards the shore. */
+  get shoreWaveLength() {
+    return this._shoreWaves.wavelength;
+  }
+  set shoreWaveLength(val: number) {
+    this._shoreWaves.wavelength = Math.max(0.5, val);
+  }
+  /** Seconds between successive shore waves. */
+  get shoreWavePeriod() {
+    return this._shoreWaves.period;
+  }
+  set shoreWavePeriod(val: number) {
+    this._shoreWaves.period = Math.max(0.5, val);
+  }
+  /** How far out from the waterline the shore waves rise, in metres. */
+  get shoreWaveZone() {
+    return this._shoreWaves.zone;
+  }
+  set shoreWaveZone(val: number) {
+    this._shoreWaves.zone = Math.max(1, val);
+  }
+  /**
+   * Hands the shore waves this frame's waterline field, or null when there is
+   * none, which turns them off. Called by the water every frame.
+   * @internal
+   */
+  setShoreWaveFrame(waterline: Nullable<Texture2D>, region: Vector4, level: number) {
+    this._shoreWaveGenerator?.setFrame(waterline, region, level, this._waveClock);
   }
   update(frameId: number, elapsed: number) {
+    this._waveClock = elapsed;
     // The base generator and the field are stepped separately, each guarded by
     // its own per-frame mark, so a generator shared between two bodies of water
     // is still stepped once even when each body wraps it with its own field.
