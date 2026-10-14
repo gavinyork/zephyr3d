@@ -3050,6 +3050,19 @@ const BASE_TOOLS = [
     }
   },
   {
+    name: 'editor_frame_timing',
+    description:
+      'Measure GPU time and frame time over the next frames frames, after skipping warmup frames so a change made just before has settled. GPU time comes from WebGPU timestamp queries and reads 0 on WebGL. Use it for A/B comparisons: toggle a feature, measure, toggle back. Returns { frames, gpu_ms: { mean, median, p90, min, max }, frame_ms: {...}, fps, err }.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        frames: { type: 'integer', default: 120, minimum: 1, maximum: 1000 },
+        warmup: { type: 'integer', default: 30, minimum: 0, maximum: 1000 },
+        timeout_ms: { type: 'number', default: 60000 }
+      }
+    }
+  },
+  {
     name: 'sdf_debug_slice',
     description:
       'Show a horizontal slice of the scene signed distance field: a plane named __SDFDebugSlice with the SDF debug material (warm outside, cool inside, isolines every iso_spacing, white on the surface; magenta when the field is unavailable) at height, size metres across, centred on center [x, z] (default the camera). Calling again moves it; enabled false removes it. The plane is a normal scene node: remove it before saving the scene. Turns the scene SDF on. Returns { node_id, err }.',
@@ -3211,6 +3224,7 @@ const READONLY_TOOL_NAMES = new Set([
   'terrain_sample_height',
   'sdf_query',
   'sdf_sample',
+  'editor_frame_timing',
   'editor_connect_info',
   'editor_wait_ready',
   'editor_status',
@@ -4371,6 +4385,13 @@ const handlers = {
   },
   async sdf_sample(args) {
     return bridge.send('sdf_sample', { points: args.points }, Number(args.timeout_ms ?? 30000));
+  },
+  async editor_frame_timing(args) {
+    return bridge.send(
+      'editor_frame_timing',
+      { frames: args.frames, warmup: args.warmup },
+      Number(args.timeout_ms ?? 60000)
+    );
   },
   async sdf_debug_slice(args) {
     return bridge.send(

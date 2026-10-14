@@ -1916,12 +1916,20 @@ async function dispatch(editor: Editor, method: string, params: any): Promise<an
       } catch (err) {
         return { distances: null, err: `${err instanceof Error ? err.message : err}` };
       }
+    case 'editor_frame_timing':
+      return await measureFrameTiming(params);
     case 'sdf_debug_slice':
       try {
         return setSDFDebugSlice(getSceneController(editor), params);
       } catch (err) {
-        return { node_id: null, err: err instanceof Error ? `${err.message}
-${err.stack}` : `${err}` };
+        return {
+          node_id: null,
+          err:
+            err instanceof Error
+              ? `${err.message}
+${err.stack}`
+              : `${err}`
+        };
       }
     case 'sdf_stats':
       return getSceneSDFStats(getSceneController(editor), params);
@@ -4442,6 +4450,55 @@ function getStatus(editor: Editor) {
       drawingBufferHeight: device.getDrawingBufferHeight(),
       frameCounter: device.frameInfo.frameCounter
     }
+  };
+}
+
+/**
+ * GPU and frame times over the next `frames` frames, after skipping `warmup`
+ * frames so a change made just before has settled (shader builds, uploads).
+ * GPU time needs WebGPU timestamp queries; it reads 0 elsewhere.
+ */
+async function measureFrameTiming(params: any) {
+  const device = getDevice();
+  const frames = Math.max(1, Math.min(1000, Math.floor(Number(params?.frames ?? 120))));
+  const warmup = Math.max(0, Math.min(1000, Math.floor(Number(params?.warmup ?? 30))));
+  const gpu: number[] = [];
+  const frame: number[] = [];
+  await new Promise<void>((resolve) => {
+    let n = 0;
+    const tick = () => {
+      if (n >= warmup) {
+        gpu.push(device.frameInfo.elapsedTimeGPU);
+        frame.push(device.frameInfo.elapsedFrame);
+      }
+      n++;
+      if (n >= warmup + frames) {
+        resolve();
+      } else {
+        device.runNextFrame(tick);
+      }
+    };
+    device.runNextFrame(tick);
+  });
+  const stats = (values: number[]) => {
+    const sorted = [...values].sort((a, b) => a - b);
+    const at = (q: number) => sorted[Math.min(sorted.length - 1, Math.floor(q * sorted.length))];
+    const mean = values.reduce((a, b) => a + b, 0) / values.length;
+    const r = (v: number) => Math.round(v * 1000) / 1000;
+    return {
+      mean: r(mean),
+      median: r(at(0.5)),
+      p90: r(at(0.9)),
+      min: r(sorted[0]),
+      max: r(sorted[sorted.length - 1])
+    };
+  };
+  return {
+    frames,
+    gpu_ms: stats(gpu),
+    frame_ms: stats(frame),
+    fps: Math.round(device.frameInfo.FPS),
+    err: null
   };
 }
 

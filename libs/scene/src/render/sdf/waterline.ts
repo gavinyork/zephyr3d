@@ -5,6 +5,7 @@ import { getDevice } from '../../app/api';
 import { fetchSampler } from '../../utility/misc';
 import { declareDynamicSDFUniforms, declareGlobalSDFUniforms, sampleSceneSDF } from '../../shaders/sdf';
 import type { GlobalSDF } from './global_sdf';
+import { buildSDFProgram } from './sdf_programs';
 
 /** Seed coordinate meaning "no seed yet". */
 const NO_SEED = -1e5;
@@ -43,7 +44,7 @@ const WATERLINE_MODEL_CLAMP = 10000;
  * B = g.y / |g.xz|. Exact for a planar bed, it holds near the shore, where it is needed; farther
  * out the jump-flooded distance answers.
  *
- * Accurate to about half a cell (0.125 m by default). WebGPU only, as the scene field is.
+ * The jump-flooded distance is accurate to about half a cell (0.25 m by default). WebGPU only, as the scene field is.
  *
  * @public
  */
@@ -67,7 +68,16 @@ export class WaterlineField {
   /** (origin x, origin z, cell size, resolution) of the grid as last built. */
   private readonly _region: Vector4;
   private _built: boolean;
-  constructor(global: GlobalSDF, resolution = 512, cellSize = 0.25) {
+  /** Content version of the global field, origin and level the grid was last built at. */
+  private _builtVersion: number;
+  private readonly _builtAt: [number, number, number];
+  /**
+   * 256 cells of 0.5 m: 128 m around the camera. The bed model near the shore
+   * is smooth, so finer cells cost four times as much for little gain.
+   */
+  constructor(global: GlobalSDF, resolution = 256, cellSize = 0.5) {
+    this._builtVersion = -1;
+    this._builtAt = [NaN, NaN, NaN];
     this._global = global;
     this.resolution = Math.max(16, 2 ** Math.round(Math.log2(resolution)));
     this.cellSize = Math.max(1e-3, cellSize);
@@ -86,6 +96,11 @@ export class WaterlineField {
     this._region = new Vector4(0, 0, this.cellSize, this.resolution);
     this._built = false;
   }
+  /** Grids built so far, for diagnosis. */
+  get rebuilds() {
+    return this._rebuilds;
+  }
+  private _rebuilds = 0;
   /** World Y the field is built at, or null before anything asked for it. */
   get level() {
     return this._level;
@@ -123,6 +138,23 @@ export class WaterlineField {
     // Snapped to cells, so the grid does not swim as the camera moves
     const ox = (Math.floor(cameraPos.x / h) - n / 2) * h;
     const oz = (Math.floor(cameraPos.z / h) - n / 2) * h;
+    const version = this._global.contentVersion;
+    const at = this._builtAt;
+    if (
+      this._built &&
+      version === this._builtVersion &&
+      at[0] === ox &&
+      at[1] === oz &&
+      at[2] === this._level
+    ) {
+      // Nothing it depends on changed
+      return;
+    }
+    this._builtVersion = version;
+    at[0] = ox;
+    at[1] = oz;
+    at[2] = this._level;
+    this._rebuilds++;
     this._region.setXYZW(ox, oz, h, n);
     const groups = n / WORKGROUP;
     // Seed
@@ -194,7 +226,7 @@ export class WaterlineField {
     this._result = tex('rgba16f');
     this._result.name = '@WaterlineField';
     const levels = this._global.levels;
-    this._seedProgram = device.buildComputeProgram({
+    this._seedProgram = buildSDFProgram({
       label: 'WaterlineSeed',
       workgroupSize: [WORKGROUP, WORKGROUP, 1],
       compute(pb) {
@@ -227,7 +259,7 @@ export class WaterlineField {
         });
       }
     })!;
-    this._jfaProgram = device.buildComputeProgram({
+    this._jfaProgram = buildSDFProgram({
       label: 'WaterlineJFA',
       workgroupSize: [WORKGROUP, WORKGROUP, 1],
       compute(pb) {
@@ -268,7 +300,7 @@ export class WaterlineField {
         });
       }
     })!;
-    this._resolveProgram = device.buildComputeProgram({
+    this._resolveProgram = buildSDFProgram({
       label: 'WaterlineResolve',
       workgroupSize: [WORKGROUP, WORKGROUP, 1],
       compute(pb) {

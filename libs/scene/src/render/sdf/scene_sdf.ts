@@ -118,6 +118,7 @@ export class SceneSDF extends makeObservable(Disposable)<SceneSDFEvents>() {
   private _enabled: boolean;
   private _atlas: Nullable<MeshSDFAtlas>;
   private _global: Nullable<GlobalSDF>;
+  private _globalFailed: boolean;
   private _terrain: Nullable<ClipmapTerrain>;
   /** Nodes attached since the last update, tracked then. */
   private readonly _pendingAttach: Set<SceneNode>;
@@ -136,6 +137,7 @@ export class SceneSDF extends makeObservable(Disposable)<SceneSDFEvents>() {
     this._enabled = false;
     this._atlas = null;
     this._global = null;
+    this._globalFailed = false;
     this._terrain = null;
     this._pendingAttach = new Set();
     this._tracked = new Set();
@@ -176,6 +178,7 @@ export class SceneSDF extends makeObservable(Disposable)<SceneSDFEvents>() {
       this._atlas = null;
       this._global?.dispose();
       this._global = null;
+      this._globalFailed = false;
       this._terrain = null;
     }
   }
@@ -191,6 +194,9 @@ export class SceneSDF extends makeObservable(Disposable)<SceneSDFEvents>() {
    * where it cannot be built (WebGL2) or while disabled.
    */
   get global() {
+    if (this._globalFailed) {
+      return null;
+    }
     if (!this._global && this._enabled && GlobalSDF.isSupported()) {
       this._global = new GlobalSDF(this);
     }
@@ -304,7 +310,16 @@ export class SceneSDF extends makeObservable(Disposable)<SceneSDFEvents>() {
     if (this._terrain && (!this._terrain.attached || this._terrain.scene !== this._scene)) {
       this._terrain = null;
     }
-    this.global?.update(cameraPos, this._terrain);
+    if (!this._globalFailed) {
+      try {
+        this.global?.update(cameraPos, this._terrain);
+      } catch (err) {
+        // A program that failed to build fails every frame: report it once and
+        // leave the global field off rather than abort the scene update
+        this._globalFailed = true;
+        console.error('SceneSDF: the global field is disabled after an error', err);
+      }
+    }
   }
   protected onDispose() {
     super.onDispose();

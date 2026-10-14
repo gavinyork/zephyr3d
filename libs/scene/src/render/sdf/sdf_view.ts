@@ -6,6 +6,7 @@ import type { Camera } from '../../camera/camera';
 import type { Scene } from '../../scene/scene';
 import { drawFullscreenQuad } from '../fullscreenquad';
 import { declareDynamicSDFUniforms, declareGlobalSDFUniforms, sampleSceneSDF } from '../../shaders/sdf';
+import { buildSDFProgram } from './sdf_programs';
 
 /** Sphere tracing steps per pixel. */
 const MAX_STEPS = 128;
@@ -17,7 +18,7 @@ function getProgram(levels: number) {
   let entry = programs.get(levels);
   if (!entry) {
     const device = getDevice();
-    const program = device.buildRenderProgram({
+    const program = buildSDFProgram({
       label: 'SceneSDFView',
       vertex(pb) {
         this.$inputs.pos = pb.vec2().attrib('position');

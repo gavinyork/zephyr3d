@@ -4,7 +4,14 @@
  */
 import { Vector3 } from '@zephyr3d/base';
 import type { Mesh, SceneNode } from '@zephyr3d/scene';
-import { getEngine, Mesh as MeshNode, PlaneShape, sampleMeshSDF, SDFDebugMaterial } from '@zephyr3d/scene';
+import {
+  getEngine,
+  getSDFProgramErrors,
+  Mesh as MeshNode,
+  PlaneShape,
+  sampleMeshSDF,
+  SDFDebugMaterial
+} from '@zephyr3d/scene';
 import type { SceneController } from '../controllers/scenecontroller';
 import { MeshSDFBaker } from '../core/services/sdfbaker';
 
@@ -83,7 +90,7 @@ export function getSceneSDFStats(controller: SceneController | null, params: any
     enabled: scene.sdf.enabled,
     stats: scene.sdf.getStats(),
     global: scene.sdf.global?.getStats() ?? null,
-    program_errors: scene.sdf.global?.getProgramErrors() ?? null,
+    program_errors: getSDFProgramErrors(),
     instances,
     err: null
   };

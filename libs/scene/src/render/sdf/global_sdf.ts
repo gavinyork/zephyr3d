@@ -23,6 +23,7 @@ import {
 import type { SceneSDF, SDFInstance } from './scene_sdf';
 import type { MeshSDFAtlas } from './sdf_atlas';
 import { WaterlineField } from './waterline';
+import { buildSDFProgram, getSDFProgramErrors } from './sdf_programs';
 
 /** Voxels along a brick edge, the unit of compositing. */
 const BRICK = GLOBAL_SDF_BRICK;
@@ -87,6 +88,8 @@ export interface GlobalSDFStats {
   lastBricks: number;
   totalBricks: number;
   terrain: boolean;
+  /** Waterline grids built so far, 0 while none was asked for. */
+  waterlineRebuilds: number;
 }
 
 /**
@@ -142,6 +145,8 @@ export class GlobalSDF {
   private readonly _dynamicData: Float32Array<ArrayBuffer>;
   private readonly _dynamicInfo: Vector4;
   private _waterline: Nullable<WaterlineField>;
+  private _contentVersion: number;
+  private _prevDynamic: Float32Array;
   private readonly _params: Vector4;
   constructor(sdf: SceneSDF, options?: GlobalSDFOptions) {
     this._sdf = sdf;
@@ -173,6 +178,8 @@ export class GlobalSDF {
     this._dynamicData = new Float32Array(MAX_DYNAMIC_SDF_INSTANCES * SDF_INSTANCE_VEC4S * 4);
     this._dynamicInfo = new Vector4();
     this._waterline = null;
+    this._contentVersion = 0;
+    this._prevDynamic = new Float32Array(this._dynamicData.length + 1);
     this._params = new Vector4(this.resolution, this.levels, this.bandVoxels, 0);
   }
   /** True on a device that can build the field. */
@@ -228,6 +235,14 @@ export class GlobalSDF {
     }
     return this._waterline;
   }
+  /**
+   * Goes up whenever the field may have changed: a region marked dirty, bricks
+   * composited, or the dynamic instances moved. Lets derived data such as the
+   * waterline skip rebuilding while nothing changed.
+   */
+  get contentVersion() {
+    return this._contentVersion;
+  }
   /** Dynamic instances merged at query time this frame. */
   get dynamicCount() {
     return this._dynamicInfo.x;
@@ -263,18 +278,17 @@ export class GlobalSDF {
       dirtyBricks: dirty,
       lastBricks: this._lastBricks,
       totalBricks: this._totalBricks,
-      terrain: !!this._terrain
+      terrain: !!this._terrain,
+      waterlineRebuilds: this._waterline?.rebuilds ?? 0
     };
   }
   /** Shader compile errors of the composite and query programs, for diagnosis. */
   getProgramErrors() {
-    return {
-      composite: this._program?.getCompileError() || null,
-      query: this._queryProgram?.getCompileError() || null
-    };
+    return getSDFProgramErrors();
   }
   /** Marks every brick within band reach of a world box for rebuilding. */
   markDirty(min: Vector3, max: Vector3) {
+    this._contentVersion++;
     for (let level = 0; level < this.levels; level++) {
       const origin = this._origins[level];
       if (!origin) {
@@ -351,6 +365,17 @@ export class GlobalSDF {
       packSDFInstance(near[i].inst, atlas, this._dynamicData, i * SDF_INSTANCE_VEC4S * 4);
     }
     this._dynamicInfo.setXYZW(count, 1 / atlas.size[0], 1 / atlas.size[1], 1 / atlas.size[2]);
+    // Changed when an instance moved or the set changed
+    const used = count * SDF_INSTANCE_VEC4S * 4;
+    let changed = this._prevDynamic[0] !== count;
+    for (let i = 0; i < used && !changed; i++) {
+      changed = this._prevDynamic[i + 1] !== this._dynamicData[i];
+    }
+    if (changed) {
+      this._prevDynamic[0] = count;
+      this._prevDynamic.set(this._dynamicData.subarray(0, used), 1);
+      this._contentVersion++;
+    }
   }
   /**
    * Signed distances at world positions, read back from the GPU; resolves a
@@ -487,6 +512,7 @@ export class GlobalSDF {
     if (batch.length === 0) {
       return;
     }
+    this._contentVersion++;
     this._totalBricks += batch.length;
     // Static instances whose field is on the GPU
     const instances: SDFInstance[] = [];
@@ -603,7 +629,7 @@ export class GlobalSDF {
   private getProgram() {
     if (!this._program) {
       const device = getDevice();
-      this._program = device.buildComputeProgram({
+      this._program = buildSDFProgram({
         label: 'GlobalSDFComposite',
         workgroupSize: [4, 4, 4],
         compute(pb) {
@@ -707,7 +733,7 @@ export class GlobalSDF {
   /** @internal */
   private createQueryProgram() {
     const levels = this.levels;
-    return getDevice().buildComputeProgram({
+    return buildSDFProgram({
       label: 'GlobalSDFQuery',
       workgroupSize: [64, 1, 1],
       compute(pb) {
