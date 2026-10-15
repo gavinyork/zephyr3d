@@ -65,8 +65,8 @@ type ControlState = {
 const controlStates = new Map<number, ControlState>();
 const widthCache = new Map<string, number>();
 const graphemeSegmenter =
-  typeof Intl !== 'undefined' && typeof Intl.Segmenter === 'function'
-    ? new Intl.Segmenter(undefined, { granularity: 'grapheme' })
+  typeof Intl !== 'undefined' && typeof Intl['Segmenter'] === 'function'
+    ? new Intl['Segmenter'](undefined, { granularity: 'grapheme' })
     : null;
 
 let hiddenTextarea: HTMLTextAreaElement | null = null;

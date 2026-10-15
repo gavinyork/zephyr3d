@@ -1920,8 +1920,14 @@ async function dispatch(editor: Editor, method: string, params: any): Promise<an
       try {
         return setSDFDebugSlice(getSceneController(editor), params);
       } catch (err) {
-        return { node_id: null, err: err instanceof Error ? `${err.message}
-${err.stack}` : `${err}` };
+        return {
+          node_id: null,
+          err:
+            err instanceof Error
+              ? `${err.message}
+${err.stack}`
+              : `${err}`
+        };
       }
     case 'sdf_stats':
       return getSceneSDFStats(getSceneController(editor), params);
