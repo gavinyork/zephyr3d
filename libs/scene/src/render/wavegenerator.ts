@@ -69,6 +69,15 @@ export interface WaveGenerator extends IDisposable {
     vertexNormal: PBShaderExp
   ): PBShaderExp;
   /**
+   * Share of the surface over an undisplaced XZ that is water, by which the
+   * material fades in the scene behind: a generator that runs the mesh on
+   * past the water's edge, to draw that edge per pixel, gives 0 there.
+   * Optional: without it, 1 everywhere.
+   * @param scope - Shader scope.
+   * @param xz - Undisplaced XZ position.
+   */
+  calcSurfaceCoverage?(scope: PBInsideFunctionScope, xz: PBShaderExp): PBShaderExp;
+  /**
    * Apply water bind group.
    * @param bindGroup - Bind group to apply.
    */

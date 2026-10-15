@@ -615,6 +615,20 @@ export class Water extends applyMixins(GraphNode, mixinDrawable) implements Draw
   set shoreWaveZone(val: number) {
     this.material.shoreWaveZone = val;
   }
+  /** How sharp the shore wave crests become at the shore, 0 for a sine and towards 1 for a cusp. */
+  get shoreWaveSharpness() {
+    return this.material.shoreWaveSharpness;
+  }
+  set shoreWaveSharpness(val: number) {
+    this.material.shoreWaveSharpness = val;
+  }
+  /** How far the shore wave crests lean towards the shore there, 0 for upright, 1 for a steep front face. */
+  get shoreWaveLean() {
+    return this.material.shoreWaveLean;
+  }
+  set shoreWaveLean(val: number) {
+    this.material.shoreWaveLean = val;
+  }
   /**
    * How the refracted view sample is located. Defaults to `march`.
    *

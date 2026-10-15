@@ -207,6 +207,11 @@ const SHORE_QUERY_MISS_REACH = 2;
  * linear bed model is trusted over its rest-level distance.
  */
 const WATERLINE_LINEAR_REACH = 4;
+/**
+ * Share of the waterline grid, from each edge inwards, over which the band
+ * hands over from the field to the screen-space query; matches the shore waves.
+ */
+const WATERLINE_EDGE_FADE = 0.15;
 /** Per-frame advance of the dither hash, for TAA to average over. */
 const SHORE_QUERY_DITHER_STRIDE = 5.588238;
 /** Max thickness of a Hi-Z cell's depth block, in multiples of its width. */
@@ -249,7 +254,14 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
    */
   private _effectiveWaveGenerator: Nullable<WaveGenerator>;
   /** Settings of the shore waves, shared by reference with their generator. */
-  private readonly _shoreWaves: ShoreWaveSettings = { height: 0, wavelength: 8, period: 6, zone: 20 };
+  private readonly _shoreWaves: ShoreWaveSettings = {
+    height: 0,
+    wavelength: 8,
+    period: 6,
+    zone: 20,
+    sharpness: 0.7,
+    lean: 0.5
+  };
   /** The shore wave layer of the effective generator, while the waves are on. */
   private _shoreWaveGenerator: Nullable<ShoreWaveGenerator> = null;
   private _edgeFadeWidth = 0.05;
@@ -1293,6 +1305,17 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
       scope.$l.crestHeight = pb.sub(scope.$inputs.worldPos.y, scope.$inputs.clipmapPos.y);
       // Screen derivatives of the undisplaced position, taken here in uniform
       // control flow; the shore foam samples its texture with them under a branch.
+      const surfaceCoverage = this.waveGenerator?.calcSurfaceCoverage;
+      scope.$l.surfaceCoverage = surfaceCoverage
+        ? surfaceCoverage.call(this.waveGenerator, scope, scope.$inputs.clipmapPos.xz)
+        : pb.float(1);
+      // Wholly past the water's edge: nothing to draw, rather than the scene
+      // colour behind, which the final image does not quite match
+      if (surfaceCoverage) {
+        scope.$if(pb.lessThanEqual(scope.surfaceCoverage, 1e-3), function () {
+          pb.discard();
+        });
+      }
       scope.$l.restXZGrad = this._shoreFoamAvailable(scope)
         ? pb.vec4(pb.dpdx(scope.$inputs.clipmapPos.xz), pb.dpdy(scope.$inputs.clipmapPos.xz))
         : pb.vec4(0);
@@ -1327,7 +1350,8 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
             scope.normal.w,
             scope.crestHeight,
             scope.$inputs.clipmapPos.xz,
-            scope.restXZGrad
+            scope.restXZGrad,
+            scope.surfaceCoverage
           ),
           1
         );
@@ -1703,7 +1727,8 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
     foamFactor: PBShaderExp,
     crestHeight: PBShaderExp,
     restXZ: PBShaderExp,
-    restXZGrad: PBShaderExp
+    restXZGrad: PBShaderExp,
+    coverage: PBShaderExp
   ) {
     const pb = scope.$builder;
     const that = this;
@@ -1979,41 +2004,46 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
           this.$l.time = ShaderHelper.getElapsedTime(this);
           if (waterline) {
             // Horizontal distance to the waterline, from the scene field. Off
-            // its grid, the screen-space query or nothing.
+            // its grid, the screen-space query or nothing, handed over to
+            // across the outer part of the grid so its border does not show.
             this.$l.wlUV = pb.div(
               pb.sub(this.worldPos.xz, this.waterlineRegion.xy),
               pb.mul(this.waterlineRegion.z, this.waterlineRegion.w)
             );
-            this.$l.surfaceDist = pb.mul(this.shoreFoamWashParams.w, SHORE_QUERY_MISS_REACH);
-            this.$if(
-              pb.and(
-                pb.greaterThan(this.waterlineRegion.w, 0),
-                pb.and(
-                  pb.all(pb.greaterThanEqual(this.wlUV, pb.vec2(0))),
-                  pb.all(pb.lessThanEqual(this.wlUV, pb.vec2(1)))
-                )
-              ),
-              function () {
-                this.$l.wl = pb.textureSampleLevel(this.waterlineTex, this.wlUV, 0);
-                // Near geometry, the edge at this pixel's own surface height: a
-                // wave crest moves it inland and a trough out, metres on a gentle
-                // beach. Farther out, the distance to the rest-level waterline.
-                this.$l.dy = pb.sub(this.worldPos.y, this.waterlineLevel.x);
-                this.surfaceDist = this.$choice(
-                  pb.lessThan(pb.abs(this.wl.w), WATERLINE_LINEAR_REACH),
-                  pb.max(pb.add(this.wl.y, pb.mul(this.wl.z, this.dy)), 0),
-                  this.wl.x
-                );
-              }
-            ).$else(function () {
-              if (hiZ) {
-                this.surfaceDist = this.waterShoreProximity(
+            this.$l.missDist = pb.mul(this.shoreFoamWashParams.w, SHORE_QUERY_MISS_REACH);
+            this.$l.wlEdge = pb.min(
+              pb.min(this.wlUV.x, this.wlUV.y),
+              pb.min(pb.sub(1, this.wlUV.x), pb.sub(1, this.wlUV.y))
+            );
+            this.$l.wlWeight = this.$choice(
+              pb.greaterThan(this.waterlineRegion.w, 0),
+              pb.smoothStep(0, WATERLINE_EDGE_FADE, this.wlEdge),
+              pb.float(0)
+            );
+            this.$l.fieldDist = this.missDist;
+            this.$if(pb.greaterThan(this.wlWeight, 0), function () {
+              this.$l.wl = pb.textureSampleLevel(this.waterlineTex, this.wlUV, 0);
+              // Near geometry, the edge at this pixel's own surface height: a
+              // wave crest moves it inland and a trough out, metres on a gentle
+              // beach. Farther out, the distance to the rest-level waterline.
+              this.$l.dy = pb.sub(this.worldPos.y, this.waterlineLevel.x);
+              this.fieldDist = this.$choice(
+                pb.lessThan(pb.abs(this.wl.w), WATERLINE_LINEAR_REACH),
+                pb.max(pb.add(this.wl.y, pb.mul(this.wl.z, this.dy)), 0),
+                this.wl.x
+              );
+            });
+            this.$l.fallbackDist = this.missDist;
+            if (hiZ) {
+              this.$if(pb.lessThan(this.wlWeight, 1), function () {
+                this.fallbackDist = this.waterShoreProximity(
                   this.viewPos,
                   this.screenUV,
                   this.shoreFoamWashParams.w
                 );
-              }
-            });
+              });
+            }
+            this.$l.surfaceDist = pb.mix(this.fallbackDist, this.fieldDist, this.wlWeight);
           } else {
             // Queried at the band's widest reach so the run-up does not move the
             // mip level under it.
@@ -2064,7 +2094,8 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
         pb.float('foamFactor'),
         pb.float('crestHeight'),
         pb.vec2('restXZ'),
-        pb.vec4('restXZGrad')
+        pb.vec4('restXZGrad'),
+        pb.float('coverage')
       ],
       function () {
         this.$l.screenUV = pb.div(pb.vec2(this.$builtins.fragCoord.xy), ShaderHelper.getRenderSize(this));
@@ -2387,13 +2418,18 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
         }
         // A sheet of water a few centimetres thick, as the swash leaves running
         // up the sand, shows the sand through it rather than a surface over it;
-        // and where the moving mesh grazes the beach it leaves no stray patches
+        // and where the moving mesh grazes the beach it leaves no stray patches.
+        // Where the wave generator runs the mesh on past the water's edge, the
+        // scene behind shows instead.
         this.$if(pb.not(this.underwaterEye), function () {
           this.$l.edgeThickness = pb.sub(this.worldPos.y, this.wPos.y);
-          this.$l.edgeFade = this.$choice(
-            pb.greaterThan(this.edgeFadeWidth, 0),
-            pb.smoothStep(0, pb.max(this.edgeFadeWidth, 1e-4), this.edgeThickness),
-            pb.float(1)
+          this.$l.edgeFade = pb.mul(
+            this.$choice(
+              pb.greaterThan(this.edgeFadeWidth, 0),
+              pb.smoothStep(0, pb.max(this.edgeFadeWidth, 1e-4), this.edgeThickness),
+              pb.float(1)
+            ),
+            this.coverage
           );
           this.$if(pb.lessThan(this.edgeFade, 1), function () {
             this.$l.behind = pb.textureSampleLevel(
@@ -2460,7 +2496,7 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
         }
       }
     );
-    return scope.waterShading(worldPos, worldNormal, foamFactor, crestHeight, restXZ, restXZGrad);
+    return scope.waterShading(worldPos, worldNormal, foamFactor, crestHeight, restXZ, restXZGrad, coverage);
   }
   applyUniforms(bindGroup: BindGroup, ctx: DrawContext, needUpdate: boolean, pass: number) {
     super.applyUniforms(bindGroup, ctx, needUpdate, pass);
@@ -2602,6 +2638,20 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
   }
   set shoreWaveZone(val: number) {
     this._shoreWaves.zone = Math.max(1, val);
+  }
+  /** How sharp the shore wave crests become at the shore, 0 for a sine and towards 1 for a cusp. */
+  get shoreWaveSharpness() {
+    return this._shoreWaves.sharpness;
+  }
+  set shoreWaveSharpness(val: number) {
+    this._shoreWaves.sharpness = Math.min(Math.max(val, 0), 0.95);
+  }
+  /** How far the shore wave crests lean towards the shore there, 0 for upright, 1 for a steep front face. */
+  get shoreWaveLean() {
+    return this._shoreWaves.lean;
+  }
+  set shoreWaveLean(val: number) {
+    this._shoreWaves.lean = Math.min(Math.max(val, 0), 1);
   }
   /**
    * Hands the shore waves this frame's waterline field, or null when there is

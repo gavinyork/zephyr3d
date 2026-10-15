@@ -1276,7 +1276,7 @@ export function getWaterClass(manager: ResourceManager): SerializableClass {
         {
           name: 'ShoreWaveHeight',
           description:
-            'Crest to trough height in metres of the waves rolling in to the shore, breaking and running up the beach, 0 for none. They come square on to the coast whatever its shape, bunch up as the water shallows and surge up the sand and drain back; boats ride them. Needs the scene signed distance field: WebGPU with the scene SDFEnabled on.',
+            'Crest to trough height in metres of the waves rolling in to the shore and washing up the beach, 0 for none. They come square on to the coast whatever its shape, bunch up as the water shallows, sharpen and lean as they near the shore, and each crest lifts the water up the sand and lets it drain back; boats ride them. Needs the scene signed distance field: WebGPU with the scene SDFEnabled on.',
           type: 'float',
           default: 0,
           options: { animatable: true, minValue: 0, maxValue: 3 },
@@ -1338,6 +1338,40 @@ export function getWaterClass(manager: ResourceManager): SerializableClass {
           },
           set(this: Water, value) {
             this.shoreWaveZone = value.num[0];
+          }
+        },
+        {
+          name: 'ShoreWaveSharpness',
+          description:
+            'How sharp the crests become at the shore: 0 keeps a rounded sine, towards 1 a pointed crest between long flat troughs.',
+          type: 'float',
+          default: 0.7,
+          options: { animatable: true, minValue: 0, maxValue: 0.95 },
+          isHidden(this: Water) {
+            return this.shoreWaveHeight <= 0;
+          },
+          get(this: Water, value) {
+            value.num[0] = this.shoreWaveSharpness;
+          },
+          set(this: Water, value) {
+            this.shoreWaveSharpness = value.num[0];
+          }
+        },
+        {
+          name: 'ShoreWaveLean',
+          description:
+            'How far the crests lean towards the shore there: 0 keeps them upright, 1 gives a steep front face and a long gentle back.',
+          type: 'float',
+          default: 0.5,
+          options: { animatable: true, minValue: 0, maxValue: 1 },
+          isHidden(this: Water) {
+            return this.shoreWaveHeight <= 0;
+          },
+          get(this: Water, value) {
+            value.num[0] = this.shoreWaveLean;
+          },
+          set(this: Water, value) {
+            this.shoreWaveLean = value.num[0];
           }
         },
         {

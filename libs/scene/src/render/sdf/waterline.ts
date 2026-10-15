@@ -65,6 +65,10 @@ export class WaterlineField {
   private _requested: boolean;
   private _seedA: Nullable<Texture2D>;
   private _seedB: Nullable<Texture2D>;
+  /** Seeds in the water, flooded for the distance inland from it; and the pass between. */
+  private _wetA: Nullable<Texture2D>;
+  private _wetB: Nullable<Texture2D>;
+  private _wetJfaBindGroups: BindGroup[];
   /** (field at the rest level, field half a cell above) per cell. */
   private _probe: Nullable<Texture2D>;
   private _result: Nullable<Texture2D>;
@@ -99,6 +103,9 @@ export class WaterlineField {
     this._requested = false;
     this._seedA = null;
     this._seedB = null;
+    this._wetA = null;
+    this._wetB = null;
+    this._wetJfaBindGroups = [];
     this._probe = null;
     this._result = null;
     this._smooth = null;
@@ -132,7 +139,9 @@ export class WaterlineField {
    * Smooth shore coordinates per cell, rgba16f, for effects that build
    * geometry on them (see ShoreWaveGenerator), which shows every kink of the
    * raw field up close: (signed distance to the waterline, negative inland;
-   * B of the bed model; 0; 0), Gaussian-filtered over about two metres.
+   * B of the bed model; height of the bed over the rest level; 0). The first
+   * two are Gaussian-filtered over about two metres; the bed height is the
+   * cell's own, from the field at the rest level, so it matches the ground.
    */
   get smoothTexture() {
     return this._built ? this._smooth : null;
@@ -188,6 +197,7 @@ export class WaterlineField {
     const seedBG = this._seedBindGroup!;
     seedBG.setValue('grid', new Vector4(ox, oz, h, this._level));
     seedBG.setTexture('seedOut', this._seedA!);
+    seedBG.setTexture('wetOut', this._wetA!);
     seedBG.setTexture('probeOut', this._probe!);
     this._global.applyBindGroup(seedBG);
     device.setProgram(this._seedProgram);
@@ -212,6 +222,25 @@ export class WaterlineField {
       src = dst;
       dst = t;
     }
+    // The same from the water side, for the distance inland
+    let wetSrc = this._wetA!;
+    let wetDst = this._wetB!;
+    pass = 0;
+    for (let step = n / 2; step >= 1; step >>= 1, pass++) {
+      if (!this._wetJfaBindGroups[pass]) {
+        this._wetJfaBindGroups[pass] = device.createBindGroup(this._jfaProgram!.bindGroupLayouts[0]);
+      }
+      const bg = this._wetJfaBindGroups[pass];
+      bg.setValue('step', new Vector4(step, n, 0, 0));
+      bg.setTexture('seedIn', wetSrc, fetchSampler('clamp_nearest_nomip'));
+      bg.setTexture('seedOut', wetDst);
+      device.setProgram(this._jfaProgram);
+      device.setBindGroup(0, bg);
+      device.compute(groups, groups, 1);
+      const t = wetSrc;
+      wetSrc = wetDst;
+      wetDst = t;
+    }
     // Resolve
     const rbg = this._resolveBindGroup!;
     rbg.setValue('grid', new Vector4(ox, oz, h, n));
@@ -227,7 +256,8 @@ export class WaterlineField {
         this._smoothBindGroups[pass] = device.createBindGroup(this._smoothProgram!.bindGroupLayouts[0]);
       }
       const bg = this._smoothBindGroups[pass];
-      bg.setValue('smoothPass', new Vector4(pass, n, 0, 0));
+      bg.setValue('smoothPass', new Vector4(pass, n, h, 0));
+      bg.setTexture('wetIn', wetSrc, fetchSampler('clamp_nearest_nomip'));
       bg.setTexture(
         'src',
         pass === 0 ? this._result! : this._smoothTemp!,
@@ -243,6 +273,13 @@ export class WaterlineField {
   dispose() {
     this._seedA?.dispose();
     this._seedB?.dispose();
+    this._wetA?.dispose();
+    this._wetB?.dispose();
+    this._wetA = this._wetB = null;
+    for (const bg of this._wetJfaBindGroups) {
+      bg.dispose();
+    }
+    this._wetJfaBindGroups = [];
     this._probe?.dispose();
     this._result?.dispose();
     this._smooth?.dispose();
@@ -273,6 +310,8 @@ export class WaterlineField {
       device.createTexture2D(format, n, n, { mipmapping: false, writable: true })!;
     this._seedA = tex('rg32f');
     this._seedB = tex('rg32f');
+    this._wetA = tex('rg32f');
+    this._wetB = tex('rg32f');
     this._probe = tex('rg32f');
     this._result = tex('rgba16f');
     this._smooth = tex('rgba16f');
@@ -287,6 +326,7 @@ export class WaterlineField {
         // (origin x, origin z, cell size, water level)
         this.grid = pb.vec4().uniform(0);
         this.seedOut = pb.texStorage2D.rg32float().storage(0);
+        this.wetOut = pb.texStorage2D.rg32float().storage(0);
         this.probeOut = pb.texStorage2D.rg32float().storage(0);
         declareGlobalSDFUniforms(this, 0, levels);
         declareDynamicSDFUniforms(this, 0);
@@ -308,6 +348,15 @@ export class WaterlineField {
               pb.lessThan(this.d, 0),
               pb.vec4(pb.vec2(this.id), 0, 0),
               pb.vec4(NO_SEED, NO_SEED, 0, 0)
+            )
+          );
+          pb.textureStore(
+            this.wetOut,
+            this.id,
+            this.$choice(
+              pb.lessThan(this.d, 0),
+              pb.vec4(NO_SEED, NO_SEED, 0, 0),
+              pb.vec4(pb.vec2(this.id), 0, 0)
             )
           );
         });
@@ -415,24 +464,36 @@ export class WaterlineField {
       label: 'WaterlineSmooth',
       workgroupSize: [WORKGROUP, WORKGROUP, 1],
       compute(pb) {
-        // (pass: 0 horizontal from the resolved field, 1 vertical; resolution)
+        // (pass: 0 horizontal from the resolved field, 1 vertical; resolution; cell size)
         this.smoothPass = pb.vec4().uniform(0);
         this.src = pb.tex2D().sampleType('unfilterable-float').uniform(0);
+        // Nearest cell in the water, for the distance inland
+        this.wetIn = pb.tex2D().sampleType('unfilterable-float').uniform(0);
         this.dst = pb.texStorage2D.rgba16float().storage(0);
         // Signed distance and B of a resolved texel: the bed model near the
         // shore, where it is exact for a planar bed and runs on inland; the
         // jump-flooded distance farther out, blended over a couple of metres
-        pb.func('wlSigned', [pb.vec4('t')], function () {
+        // jump-flooded distance farther out, blended over a couple of metres.
+        // Inland, away from the model, the jump-flooded distance from the water
+        // side, negative; the resolved distance is 0 all over the land.
+        pb.func('wlSigned', [pb.vec4('t'), pb.ivec2('q')], function () {
           this.$l.model = pb.and(
             pb.lessThan(pb.abs(this.t.w), SMOOTH_MODEL_REACH),
             pb.lessThan(pb.abs(this.t.y), SMOOTH_MODEL_CLAMP)
           );
+          this.$l.wet = pb.textureLoad(this.wetIn, this.q, 0).xy;
+          this.$l.inland = this.$choice(
+            pb.lessThan(this.wet.x, NO_SEED * 0.5),
+            pb.mul(this.smoothPass.y, this.smoothPass.z),
+            pb.mul(pb.max(pb.sub(pb.length(pb.sub(pb.vec2(this.q), this.wet)), 0.5), 0), this.smoothPass.z)
+          );
+          this.$l.far = this.$choice(pb.lessThan(this.t.w, 0), pb.neg(this.inland), this.t.x);
           this.$l.w = this.$choice(
             this.model,
-            pb.smoothStep(SMOOTH_BLEND_START, SMOOTH_BLEND_END, this.t.x),
+            pb.smoothStep(SMOOTH_BLEND_START, SMOOTH_BLEND_END, pb.abs(this.far)),
             1
           );
-          this.$return(pb.vec2(pb.mix(this.t.y, this.t.x, this.w), this.$choice(this.model, this.t.z, 0)));
+          this.$return(pb.vec2(pb.mix(this.t.y, this.far, this.w), this.$choice(this.model, this.t.z, 0)));
         });
         pb.main(function () {
           this.$l.id = pb.ivec2(this.$builtins.globalInvocationId.xy);
@@ -444,11 +505,18 @@ export class WaterlineField {
             const w = Math.exp(-(k * k) / (2 * SMOOTH_SIGMA * SMOOTH_SIGMA));
             this.$l.q = pb.clamp(pb.add(this.id, pb.mul(this.axis, k)), pb.ivec2(0), pb.ivec2(this.last));
             this.$l.t = pb.textureLoad(this.src, this.q, 0);
-            this.$l.v = this.$choice(pb.lessThan(this.smoothPass.x, 0.5), this.wlSigned(this.t), this.t.xy);
+            this.$l.v = this.$choice(
+              pb.lessThan(this.smoothPass.x, 0.5),
+              this.wlSigned(this.t, this.q),
+              this.t.xy
+            );
             this.acc = pb.add(this.acc, pb.mul(this.v, w));
             this.wsum = pb.add(this.wsum, w);
           }
-          pb.textureStore(this.dst, pb.uvec2(this.id), pb.vec4(pb.div(this.acc, this.wsum), 0, 0));
+          // The bed height, unfiltered: over the rest level, the negated field there
+          this.$l.own = pb.textureLoad(this.src, this.id, 0);
+          this.$l.bed = this.$choice(pb.lessThan(this.smoothPass.x, 0.5), pb.neg(this.own.w), this.own.z);
+          pb.textureStore(this.dst, pb.uvec2(this.id), pb.vec4(pb.div(this.acc, this.wsum), this.bed, 0));
         });
       }
     });
