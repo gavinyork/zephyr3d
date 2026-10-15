@@ -1152,7 +1152,12 @@ export class Water extends applyMixins(GraphNode, mixinDrawable) implements Draw
     const mat = this._material?.get();
     if (mat) {
       this.bind(ctx, renderQueue);
-      mat.setClipmapGridInfo(this._gridScale, this.worldMatrix.m03, this.worldMatrix.m23);
+      mat.setClipmapGridInfo(
+        this._gridScale,
+        this.worldMatrix.m03,
+        this.worldMatrix.m23,
+        this._clipmap.tileResolution
+      );
       mat.apply(ctx);
       for (const info of this._renderData!) {
         mat.draw(info.primitive, ctx, info.numInstances);

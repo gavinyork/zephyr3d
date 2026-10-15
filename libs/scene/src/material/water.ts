@@ -1084,13 +1084,18 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
     this._clipmapInfo.setXYZW(rotation, scale, offsetX, offsetY);
     this.uniformChanged();
   }
-  setClipmapGridInfo(gridScale: number, gridOffsetX: number, gridOffsetY: number) {
+  /**
+   * @param tileResolution - Cells along a clipmap tile, for the spacing of the
+   *   mesh vertices the wave generator band-limits to; 0 for no limit.
+   */
+  setClipmapGridInfo(gridScale: number, gridOffsetX: number, gridOffsetY: number, tileResolution = 0) {
     if (
       this._clipmapGridInfo.x !== gridScale ||
       this._clipmapGridInfo.y !== gridOffsetX ||
-      this._clipmapGridInfo.z !== gridOffsetY
+      this._clipmapGridInfo.z !== gridOffsetY ||
+      this._clipmapGridInfo.w !== tileResolution
     ) {
-      this._clipmapGridInfo.setXYZW(gridScale, gridOffsetX, gridOffsetY, 0);
+      this._clipmapGridInfo.setXYZW(gridScale, gridOffsetX, gridOffsetY, tileResolution);
       this.uniformChanged();
     }
   }
@@ -1156,6 +1161,19 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
     ).xyz;
     scope.worldNormal = pb.vec3(0, 1, 0);
     scope.worldPos = scope.clipmapWorldPos;
+    // Spacing of the mesh vertices here: level L of the clipmap spans
+    // Chebyshev distances from T 2^L to 2T 2^L cells around the camera with
+    // cells 2^L across, so distance / T bounds it from above. Taken from the
+    // distance rather than the level so that two levels meeting at a seam
+    // agree on it and displace their shared vertices alike.
+    scope.$l.camOffset = pb.abs(pb.sub(scope.clipmapWorldPos.xz, ShaderHelper.getCameraPosition(scope).xz));
+    scope.$l.vertexSpacing = pb.mul(
+      pb.max(
+        scope.clipmapGridInfo.x,
+        pb.div(pb.max(scope.camOffset.x, scope.camOffset.y), pb.max(scope.clipmapGridInfo.w, 1))
+      ),
+      pb.step(0.5, scope.clipmapGridInfo.w)
+    );
     if (this.infinite) {
       const that = this;
       // position.z is 1 on the skirt ring's outer edge, 0 everywhere else.
@@ -1173,7 +1191,8 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
             this,
             this.clipmapWorldPos,
             this.worldPos,
-            this.worldNormal
+            this.worldNormal,
+            this.vertexSpacing
           );
         });
       scope.$outputs.skirt = scope.skirt;
@@ -1182,7 +1201,8 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
         scope,
         scope.clipmapWorldPos,
         scope.worldPos,
-        scope.worldNormal
+        scope.worldNormal,
+        scope.vertexSpacing
       );
     }
     scope.$outputs.worldPos = scope.worldPos;
@@ -1211,7 +1231,7 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
     const gen = this.waveGenerator;
     if (gen?.calcPrevVertexPosition && ShaderHelper.getPrevUnjitteredViewProjectionMatrix(scope)) {
       scope.$l.prevWorldPos = pb.vec3();
-      gen.calcPrevVertexPosition(scope, scope.clipmapWorldPos, scope.prevWorldPos);
+      gen.calcPrevVertexPosition(scope, scope.clipmapWorldPos, scope.prevWorldPos, scope.vertexSpacing);
       if (this.infinite) {
         // The skirt does not move
         scope.prevWorldPos = pb.mix(scope.prevWorldPos, scope.$outputs.worldPos, scope.skirt);

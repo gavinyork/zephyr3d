@@ -34,12 +34,16 @@ export interface WaveGenerator extends IDisposable {
    * @param inPos - Input position.
    * @param outPos - Output position.
    * @param outNormal - Output normal.
+   * @param vertexSpacing - Optional distance in metres between mesh vertices
+   *   around the position, for generators that band-limit their displacement
+   *   to what the mesh can show; 0 or omitted for no limit.
    */
   calcVertexPositionAndNormal(
     scope: PBInsideFunctionScope,
     inPos: PBShaderExp,
     outPos: PBShaderExp,
-    outNormal: PBShaderExp
+    outNormal: PBShaderExp,
+    vertexSpacing?: PBShaderExp
   ): void;
   /**
    * Where a vertex was in the previous frame, for motion vectors. Optional:
@@ -48,8 +52,14 @@ export interface WaveGenerator extends IDisposable {
    * @param scope - Shader scope.
    * @param inPos - Undisplaced position.
    * @param outPos - Receives the previous displaced position.
+   * @param vertexSpacing - As for {@link WaveGenerator.calcVertexPositionAndNormal}.
    */
-  calcPrevVertexPosition?(scope: PBInsideFunctionScope, inPos: PBShaderExp, outPos: PBShaderExp): void;
+  calcPrevVertexPosition?(
+    scope: PBInsideFunctionScope,
+    inPos: PBShaderExp,
+    outPos: PBShaderExp,
+    vertexSpacing?: PBShaderExp
+  ): void;
   /**
    *
    * @param scope - Global scope of the shader program.
