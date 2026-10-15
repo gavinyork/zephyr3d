@@ -72,11 +72,18 @@ export interface WaveGenerator extends IDisposable {
    * @param scope - Global scope of the shader program.
    * @param xz - XZ position.
    * @param vertexNormal - Vertex normal.
+   * @param foamSample - Optional inout vec3: the foam texture as the material
+   *   sampled it here, (value, slope along x, slope along z). A generator that
+   *   carries its foam on texture coordinates of its own (moving with its
+   *   waves) blends its sample in by its share of the foam.
+   * @returns (normal, foam density 0..1). The density is how much foam there
+   *   is, not the area it covers: the material reveals the foam texture by it.
    */
   calcFragmentNormalAndFoam(
     scope: PBInsideFunctionScope,
     xz: PBShaderExp,
-    vertexNormal: PBShaderExp
+    vertexNormal: PBShaderExp,
+    foamSample?: PBShaderExp
   ): PBShaderExp;
   /**
    * Share of the surface over an undisplaced XZ that is water, by which the

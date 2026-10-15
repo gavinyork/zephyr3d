@@ -1125,6 +1125,134 @@ export function getWaterClass(manager: ResourceManager): SerializableClass {
           }
         },
         {
+          name: 'FoamFeather',
+          description:
+            'How the white foam ends at its edges: low values cut crisp, separate clumps with hard outlines; high values let the foam thin out gradually into the bubbles beneath. Shared by all foam.',
+          type: 'float',
+          default: 0.4,
+          options: { animatable: true, minValue: 0.001, maxValue: 1 },
+          get(this: Water, value) {
+            value.num[0] = this.material.foamFeather;
+          },
+          set(this: Water, value) {
+            this.material.foamFeather = value.num[0];
+          }
+        },
+        {
+          name: 'FoamNormalStrength',
+          description:
+            'How lumpy the white foam looks: higher values light it as a heaped-up relief with bright rims towards the sun and shaded hollows; 0 lights it as a flat sheet.',
+          type: 'float',
+          default: 3.5,
+          options: { animatable: true, minValue: 0, maxValue: 30 },
+          get(this: Water, value) {
+            value.num[0] = this.material.foamNormalStrength;
+          },
+          set(this: Water, value) {
+            this.material.foamNormalStrength = value.num[0];
+          }
+        },
+        {
+          name: 'FoamBubbleColor',
+          description:
+            'Tint of the cloud of bubbles under and around the white foam, which gives it a soft, milky halo in the water instead of a cut-out edge.',
+          type: 'rgb',
+          default: [0.64, 0.83, 0.82],
+          options: { animatable: true, minValue: 0, maxValue: 1 },
+          get(this: Water, value) {
+            value.num[0] = this.material.foamBubbleColor.x;
+            value.num[1] = this.material.foamBubbleColor.y;
+            value.num[2] = this.material.foamBubbleColor.z;
+          },
+          set(this: Water, value) {
+            this.material.foamBubbleColor = new Vector3(value.num[0], value.num[1], value.num[2]);
+          }
+        },
+        {
+          name: 'FoamBubbleCoverage',
+          description:
+            'How strongly the bubble cloud shows and how far it reaches past the white foam, lightening the water around it. 0 removes it, leaving only the white foam.',
+          type: 'float',
+          default: 1.68,
+          options: { animatable: true, minValue: 0, maxValue: 5 },
+          get(this: Water, value) {
+            value.num[0] = this.material.foamBubbleCoverage;
+          },
+          set(this: Water, value) {
+            this.material.foamBubbleCoverage = value.num[0];
+          }
+        },
+        {
+          name: 'FoamBubbleDepth',
+          description:
+            'How deep under the surface the bubble cloud seems to float, in metres: it slides against the white foam as the view moves, giving the foam depth. 0 keeps it on the surface.',
+          type: 'float',
+          default: 0.14,
+          options: { animatable: true, minValue: 0, maxValue: 1 },
+          get(this: Water, value) {
+            value.num[0] = this.material.foamBubbleDepth;
+          },
+          set(this: Water, value) {
+            this.material.foamBubbleDepth = value.num[0];
+          }
+        },
+        {
+          name: 'FoamTexture',
+          description:
+            'Pattern the foam is cut from (red channel): as the foam thickens it shows the bright parts of the texture first and fills the dark ones last, so bright clumps appear before dark holes close. Empty for plain white foam that simply fades in and out with no pattern. Shared by all foam.',
+          type: 'object',
+          default: '',
+          options: {
+            mimeTypes: [
+              'image/jpeg',
+              'image/png',
+              'image/tga',
+              'image/vnd.radiance',
+              'image/x-dds',
+              'image/webp'
+            ]
+          },
+          isNullable() {
+            return true;
+          },
+          get(this: Water, value) {
+            value.str[0] = manager.getAssetId(this.material.foamTexture) ?? '';
+          },
+          async set(this: Water, value) {
+            if (!value) {
+              this.material.foamTexture = null;
+            } else if (value.str[0]) {
+              const assetId = value.str[0];
+              let tex: Nullable<Texture2D>;
+              try {
+                tex = await manager.fetchTexture<Texture2D>(assetId);
+              } catch (err) {
+                console.error(`Load asset failed: ${value.str[0]}: ${err}`);
+                tex = null;
+              }
+              if (tex?.isTexture2D()) {
+                this.material.foamTexture = tex;
+              } else {
+                console.error('Invalid texture type');
+              }
+            }
+          }
+        },
+        {
+          name: 'FoamTextureSize',
+          description:
+            'How large the foam pattern is on the water, in metres per repeat of the foam texture: larger values give bigger clumps and holes.',
+          type: 'float',
+          default: 4,
+          options: { animatable: true, minValue: 0.01, maxValue: 50 },
+          get(this: Water, value) {
+            value.num[0] = this.material.foamTextureSize;
+          },
+          set(this: Water, value) {
+            this.material.foamTextureSize = value.num[0];
+          }
+        },
+        {
           name: 'ShoreFoamAmount',
           description:
             'Coverage of the foam that collects where the water meets a surface - the waterline on a shelving bed, and the collar around a piling or a hull. 0 disables it, which also removes its cost. Independent of the crest foam the wave generator produces. Requires WebGL2 or WebGPU.',
@@ -1372,6 +1500,91 @@ export function getWaterClass(manager: ResourceManager): SerializableClass {
           },
           set(this: Water, value) {
             this.shoreWaveLean = value.num[0];
+          }
+        },
+        {
+          name: 'ShoreWaveFoamFadeRate',
+          description:
+            'How quickly the foam the shore waves leave behind dies away: low values leave long-lasting trails and sheets of foam behind each wave, high values keep only fresh foam at the breaking crests.',
+          type: 'float',
+          default: 0.8,
+          options: { animatable: true, minValue: 0, maxValue: 20 },
+          isHidden(this: Water) {
+            return this.shoreWaveHeight <= 0;
+          },
+          get(this: Water, value) {
+            value.num[0] = this.shoreWaveFoamFadeRate;
+          },
+          set(this: Water, value) {
+            this.shoreWaveFoamFadeRate = value.num[0];
+          }
+        },
+        {
+          name: 'ShoreWaveFoamStrength',
+          description:
+            'How much foam the breaking shore waves throw up: higher values give thicker, whiter foam on and behind the crests. Balance it against the fade rate.',
+          type: 'float',
+          default: 1,
+          options: { animatable: true, minValue: 0, maxValue: 5 },
+          isHidden(this: Water) {
+            return this.shoreWaveHeight <= 0;
+          },
+          get(this: Water, value) {
+            value.num[0] = this.shoreWaveFoamStrength;
+          },
+          set(this: Water, value) {
+            this.shoreWaveFoamStrength = value.num[0];
+          }
+        },
+        {
+          name: 'ShoreWaveFoamCoverage',
+          description:
+            'How much of each shore wave foams: low values foam only at the steepest breaking fronts, high values spread foam over more of the wave.',
+          type: 'float',
+          default: 0.55,
+          options: { animatable: true, minValue: 0, maxValue: 1 },
+          isHidden(this: Water) {
+            return this.shoreWaveHeight <= 0;
+          },
+          get(this: Water, value) {
+            value.num[0] = this.shoreWaveFoamCoverage;
+          },
+          set(this: Water, value) {
+            this.shoreWaveFoamCoverage = value.num[0];
+          }
+        },
+        {
+          name: 'ShoreWaveShallowFoamDepth',
+          description:
+            'How deep the water can be and still churn up foam as the waves run in, in metres: larger values widen the band of foam along the beach.',
+          type: 'float',
+          default: 0.65,
+          options: { animatable: true, minValue: 0.01, maxValue: 3 },
+          isHidden(this: Water) {
+            return this.shoreWaveHeight <= 0;
+          },
+          get(this: Water, value) {
+            value.num[0] = this.shoreWaveShallowFoamDepth;
+          },
+          set(this: Water, value) {
+            this.shoreWaveShallowFoamDepth = value.num[0];
+          }
+        },
+        {
+          name: 'ShoreWaveShallowFoamStrength',
+          description:
+            "How much foam the shallow water at the beach makes as the waves wash over it: higher values give a denser white wash, 0 leaves only the breaking crests' foam.",
+          type: 'float',
+          default: 2,
+          options: { animatable: true, minValue: 0, maxValue: 5 },
+          isHidden(this: Water) {
+            return this.shoreWaveHeight <= 0;
+          },
+          get(this: Water, value) {
+            value.num[0] = this.shoreWaveShallowFoamStrength;
+          },
+          set(this: Water, value) {
+            this.shoreWaveShallowFoamStrength = value.num[0];
           }
         },
         {

@@ -3,6 +3,8 @@ import { Disposable, float2half, Vector4 } from '@zephyr3d/base';
 import type {
   AbstractDevice,
   BindGroup,
+  FrameBuffer,
+  GPUProgram,
   PBGlobalScope,
   PBInsideFunctionScope,
   PBShaderExp,
@@ -10,9 +12,10 @@ import type {
 } from '@zephyr3d/device';
 import type { WaveGenerator } from './wavegenerator';
 import { getDevice } from '../app/api';
+import { drawFullscreenQuad } from './fullscreenquad';
 import { fetchSampler } from '../utility/misc';
 import { hash11, valueNoise } from '../shaders/noise';
-import { FOAM_TEX_CELLS, getDefaultFoamTexture } from '../utility/textures/foam';
+import { getDefaultFoamTexture, sampleFoamTexture } from '../utility/textures/foam';
 
 /** Texels of the inverse table along y = x - b sin x over one period, and along b. */
 const INVERSE_SAMPLES = 256;
@@ -73,8 +76,6 @@ const SWASH_DURATION_MAX = 0.8;
  * runs on unbroken from the sea.
  */
 const SWASH_COLLAPSE = 0.6;
-/** Metres behind the swash tip that its foam line spans. */
-const SWASH_FRONT_FOAM = 1.2;
 /**
  * Depth share of the zone, as distance over zone width, past which the waves
  * stop shortening: the crests keep at least sqrt of this times the wavelength
@@ -110,13 +111,20 @@ const SWASH_EDGE_SOFT = 0.08;
  * so the grid following the camera has no visible border.
  */
 const GRID_EDGE_FADE = 0.15;
-/** Shoaling, 0 at the outer edge of the zone and 1 at the waterline, past which the crests break. */
-const BREAK_SHOAL = 0.55;
-/** Size in metres of a cell of the foam's bubble web, and the softness of its threshold. */
-const FOAM_CELL = 0.7;
-const FOAM_FEATHER = 0.12;
-/** Noise per metre staggering where the foam layers swap. */
-const FOAM_SWAP_NOISE_SCALE = 0.05;
+/**
+ * The foam is simulated as Crest does it (UpdateFoam.compute, Wave Harmonic,
+ * MIT): a field on the waterline grid stepped at FOAM_SIM_FREQUENCY per
+ * second, each step advected by the water's velocity, faded, and fed by the
+ * waves where their displacement is squeezed (the determinant of its Jacobian
+ * below a coverage threshold) and by shallow water. At most FOAM_SIM_MAX_STEPS
+ * steps catch up per frame.
+ */
+const FOAM_SIM_FREQUENCY = 30;
+const FOAM_SIM_MAX_STEPS = 8;
+/** Crest's gain on the wave foam source. */
+const FOAM_WAVE_GAIN = 5;
+/** Crest's flow foam: two samples, each slid for up to FOAM_FLOW_PERIOD seconds and faded across. */
+const FOAM_FLOW_PERIOD = 2;
 
 let inverseTexture: Nullable<Texture2D> = null;
 
@@ -174,6 +182,20 @@ export interface ShoreWaveSettings {
   sharpness: number;
   /** How far the crests lean towards the shore there, 0 for upright, 1 for a steep front face. */
   lean: number;
+  /** Texture the breaking foam is cut from, as the water's foam texture; null for plain white. */
+  foamTexture?: Nullable<Texture2D>;
+  /** Metres one repeat of the foam texture covers. Defaults to 4. */
+  foamTextureSize?: number;
+  /** How fast the foam fades, per second (Crest's Foam Fade Rate). Defaults to 0.8. */
+  foamFadeRate?: number;
+  /** Scale of the foam the breaking waves make (Crest's Wave Foam Strength). Defaults to 1. */
+  waveFoamStrength?: number;
+  /** How much of the waves makes foam, 0..1, higher for more (Crest's Wave Foam Coverage). Defaults to 0.55. */
+  waveFoamCoverage?: number;
+  /** Water shallower than this many metres makes foam (Crest's Shoreline Foam Max Depth). Defaults to 0.65. */
+  shorelineFoamMaxDepth?: number;
+  /** Scale of the foam shallow water makes (Crest's Shoreline Foam Strength). Defaults to 2. */
+  shorelineFoamStrength?: number;
 }
 
 /**
@@ -208,6 +230,20 @@ export class ShoreWaveGenerator extends Disposable implements WaveGenerator {
   private readonly _wave: Vector4;
   /** (sharpness at the shore, lean at the shore, wave clock of the previous frame, period in seconds) */
   private readonly _shape: Vector4;
+  /** Foam simulation: ping-pong field on the waterline grid, and its placement (origin x, z, cell size, cells). */
+  private _simTextures: Nullable<Texture2D[]>;
+  private _simFramebuffers: Nullable<FrameBuffer[]>;
+  private _simCurrent: number;
+  private readonly _simRegion: Vector4;
+  private _simTimeToSimulate: number;
+  private _simLastTime: number;
+  private _simPrewarm: boolean;
+  private _simProgram: Nullable<GPUProgram>;
+  private _simBindGroup: Nullable<BindGroup>;
+  /** (dt, fade rate, wave foam strength, wave foam coverage) */
+  private readonly _simParams: Vector4;
+  /** (shoreline foam strength, shoreline foam max depth, prewarm, 0) */
+  private readonly _simParams2: Vector4;
   constructor(base: WaveGenerator, settings: ShoreWaveSettings) {
     super();
     this._base = base;
@@ -218,6 +254,17 @@ export class ShoreWaveGenerator extends Disposable implements WaveGenerator {
     this._grid = new Vector4(0, 0, 0, 0);
     this._wave = new Vector4(0, 1, 1, 0);
     this._shape = new Vector4(0, 0, 0, 0);
+    this._simTextures = null;
+    this._simFramebuffers = null;
+    this._simCurrent = 0;
+    this._simRegion = new Vector4(0, 0, 1, 0);
+    this._simTimeToSimulate = 0;
+    this._simLastTime = -1;
+    this._simPrewarm = true;
+    this._simProgram = null;
+    this._simBindGroup = null;
+    this._simParams = new Vector4();
+    this._simParams2 = new Vector4();
   }
   /** The generator the shore waves are layered over. */
   get base() {
@@ -251,6 +298,216 @@ export class ShoreWaveGenerator extends Disposable implements WaveGenerator {
       timeInSeconds / Math.max(0.1, s.period)
     );
     this._version++;
+    if (waterline && s.height > 0 && size > 0) {
+      this.simulateFoam(region, timeInSeconds);
+    }
+  }
+  /**
+   * Steps the foam field as Crest's persistent simulations are stepped: the
+   * time behind is caught up in fixed steps of 1 / FOAM_SIM_FREQUENCY, and
+   * with no step due a step of no time still carries the field over to where
+   * the grid now lies. The first step prewarms it.
+   * @internal
+   */
+  private simulateFoam(region: Vector4, time: number) {
+    const device = getDevice();
+    const res = region.w;
+    if (!this._simTextures || this._simTextures[0].width !== res) {
+      this.disposeSim();
+      const textures: Texture2D[] = [];
+      const framebuffers: FrameBuffer[] = [];
+      device.pushDeviceStates();
+      for (let i = 0; i < 2; i++) {
+        const tex = device.createTexture2D('r16f', res, res, { mipmapping: false })!;
+        tex.name = `@ShoreWaveFoam${i}`;
+        const fb = device.createFrameBuffer([tex], null);
+        device.setFramebuffer(fb);
+        device.clearFrameBuffer(Vector4.zero(), null, null);
+        textures.push(tex);
+        framebuffers.push(fb);
+      }
+      device.popDeviceStates();
+      this._simTextures = textures;
+      this._simFramebuffers = framebuffers;
+      this._simCurrent = 0;
+      this._simPrewarm = true;
+      this._simRegion.set(region);
+    }
+    const dt = this._simLastTime < 0 ? 0 : Math.min(Math.max(time - this._simLastTime, 0), 0.25);
+    this._simLastTime = time;
+    const moved = !this._simRegion.equalsTo(region);
+    this._simTimeToSimulate += dt;
+    let steps = Math.floor(this._simTimeToSimulate * FOAM_SIM_FREQUENCY);
+    let stepDt = 1 / FOAM_SIM_FREQUENCY;
+    if (steps > FOAM_SIM_MAX_STEPS) {
+      steps = FOAM_SIM_MAX_STEPS;
+      this._simTimeToSimulate = 0;
+    } else {
+      this._simTimeToSimulate -= steps * stepDt;
+    }
+    if (steps === 0) {
+      if (!moved && !this._simPrewarm) {
+        return;
+      }
+      steps = 1;
+      stepDt = 0;
+    }
+    const program = this.getSimProgram(device);
+    const bg = this._simBindGroup!;
+    const s = this._settings;
+    const fadeRate = Math.max(1e-3, s.foamFadeRate ?? 0.8);
+    this._simParams.setXYZW(stepDt, fadeRate, s.waveFoamStrength ?? 1, s.waveFoamCoverage ?? 0.55);
+    this.applyShoreBindGroup(bg);
+    device.pushDeviceStates();
+    for (let i = 0; i < steps; i++) {
+      // Only the first step carries the field across a move of the grid
+      bg.setValue('simPrevRegion', i === 0 ? this._simRegion : region);
+      bg.setValue('simRegion', region);
+      bg.setValue('simParams', this._simParams);
+      this._simParams2.setXYZW(
+        s.shorelineFoamStrength ?? 2,
+        Math.max(0.01, s.shorelineFoamMaxDepth ?? 0.65),
+        this._simPrewarm ? 1 : 0,
+        0
+      );
+      bg.setValue('simParams2', this._simParams2);
+      bg.setTexture('simSrc', this._simTextures[this._simCurrent], fetchSampler('clamp_linear_nomip'));
+      device.setFramebuffer(this._simFramebuffers![1 - this._simCurrent]);
+      device.setProgram(program);
+      device.setBindGroup(0, bg);
+      drawFullscreenQuad();
+      this._simCurrent = 1 - this._simCurrent;
+      this._simPrewarm = false;
+    }
+    device.popDeviceStates();
+    this._simRegion.set(region);
+  }
+  /** @internal */
+  private getSimProgram(device: AbstractDevice) {
+    if (!this._simProgram) {
+      const that = this;
+      this._simProgram = device.buildRenderProgram({
+        vertex(pb) {
+          this.$inputs.pos = pb.vec2().attrib('position');
+          pb.main(function () {
+            this.$builtins.position = pb.vec4(this.$inputs.pos, 0, 1);
+          });
+        },
+        fragment(pb) {
+          this.$outputs.outColor = pb.vec4();
+          that.setupShoreUniforms(this, 0);
+          this.simSrc = pb.tex2D().uniform(0);
+          this.simRegion = pb.vec4().uniform(0);
+          this.simPrevRegion = pb.vec4().uniform(0);
+          this.simParams = pb.vec4().uniform(0);
+          this.simParams2 = pb.vec4().uniform(0);
+          pb.main(function () {
+            this.$l.dt = this.simParams.x;
+            this.$l.fadeRate = this.simParams.y;
+            this.$l.waveStrength = this.simParams.z;
+            this.$l.prewarm = pb.greaterThan(this.simParams2.z, 0.5);
+            // World position of this cell's centre
+            this.$l.xz = pb.add(this.simRegion.xy, pb.mul(this.$builtins.fragCoord.xy, this.simRegion.z));
+            this.$l.dir = pb.vec4(0);
+            this.$l.spacing = pb.float(0);
+            this.$l.sw = that.evaluate(this, this.xz, this.dir, this.spacing);
+            // Sample from the previous step, upstream of the flow; nothing where
+            // that falls off the grid as it was
+            this.$l.velocity = that.foamVelocity(this, this.sw.x, this.dir.xy, this.spacing);
+            this.$l.flowed = pb.sub(this.xz, pb.mul(this.velocity, this.dt));
+            this.$l.prevUV = pb.div(
+              pb.sub(this.flowed, this.simPrevRegion.xy),
+              pb.mul(this.simPrevRegion.z, this.simPrevRegion.w)
+            );
+            this.$l.rMax = pb.sub(0.5, pb.div(1, this.simPrevRegion.w));
+            this.$l.r = pb.abs(pb.sub(this.prevUV, pb.vec2(0.5)));
+            this.$l.foam = pb.float(0);
+            this.$if(pb.lessThanEqual(pb.max(this.r.x, this.r.y), this.rMax), function () {
+              this.foam = pb.textureSampleLevel(this.simSrc, this.prevUV, 0).r;
+            });
+            // Fade
+            this.foam = pb.mul(this.foam, pb.max(0, pb.sub(1, pb.mul(this.fadeRate, this.dt))));
+            // Foam from the waves where their displacement squeezes the water,
+            // prewarmed as Crest does
+            this.$l.waveDt = this.$choice(
+              this.prewarm,
+              pb.max(this.dt, pb.div(pb.min(1, pb.sub(this.waveStrength, 1)), this.fadeRate)),
+              this.dt
+            );
+            this.foam = pb.add(
+              this.foam,
+              pb.mul(
+                FOAM_WAVE_GAIN,
+                this.waveDt,
+                this.waveStrength,
+                pb.clamp(pb.sub(this.simParams.w, this.sw.z), 0, 1)
+              )
+            );
+            // Foam from shallow water, by the depth under the displaced surface.
+            // Only where there is water: Crest feeds dry land too, where it does
+            // not show, but here the swash runs over that land and would find a
+            // full stock of foam waiting for it
+            this.$l.wlUV = pb.mul(pb.sub(this.xz, this.swGrid.xy), this.swGrid.z);
+            this.$l.depth = pb.sub(this.sw.x, pb.textureSampleLevel(this.swWaterline, this.wlUV, 0).z);
+            this.$l.shoreDt = this.$choice(this.prewarm, pb.div(1, this.fadeRate), this.dt);
+            this.$if(pb.greaterThan(this.depth, 0), function () {
+              this.foam = pb.add(
+                this.foam,
+                pb.mul(
+                  this.simParams2.x,
+                  this.shoreDt,
+                  pb.clamp(pb.sub(1, pb.div(this.depth, this.simParams2.y)), 0, 1)
+                )
+              );
+            });
+            this.$outputs.outColor = pb.vec4(pb.clamp(this.foam, 0, 1), 0, 0, 1);
+          });
+        }
+      })!;
+      this._simProgram.name = '@ShoreWaveFoamSim';
+      this._simBindGroup = device.createBindGroup(this._simProgram.bindGroupLayouts[0]);
+    }
+    return this._simProgram;
+  }
+  /**
+   * Velocity of the water carrying the foam. Crest advects its foam by its
+   * flow simulation, which the shore waves do not have; in its place the
+   * water's velocity under a long wave, u = g eta / c with c the speed of the
+   * crests (crest spacing per period), towards the shore: the water under a
+   * crest surges shoreward with it and is still in the trough behind, so the
+   * foam is carried in with the breaking crest and left behind as it passes.
+   * @internal
+   */
+  private foamVelocity(
+    scope: PBInsideFunctionScope,
+    height: PBShaderExp,
+    dir: PBShaderExp,
+    spacing: PBShaderExp
+  ) {
+    const pb = scope.$builder;
+    const c = pb.max(pb.div(spacing, scope.swShape.w), 0.1);
+    return pb.mul(dir, pb.clamp(pb.div(pb.mul(SWASH_GRAVITY, height), c), 0, c));
+  }
+  /**
+   * The foam field at an undisplaced XZ, 0 off its grid.
+   * @internal
+   */
+  private sampleFoamSim(scope: PBInsideFunctionScope, xz: PBShaderExp) {
+    const pb = scope.$builder;
+    const r = scope.swFoamSimRegion;
+    const uv = pb.div(pb.sub(xz, r.xy), pb.max(pb.mul(r.z, r.w), 1e-4));
+    const inside = pb.and(
+      pb.greaterThan(r.w, 0),
+      pb.and(pb.all(pb.greaterThanEqual(uv, pb.vec2(0))), pb.all(pb.lessThanEqual(uv, pb.vec2(1))))
+    );
+    return scope.$choice(inside, pb.textureSampleLevel(scope.swFoamSim, uv, 0).r, pb.float(0));
+  }
+  /** @internal */
+  private disposeSim() {
+    this._simFramebuffers?.forEach((fb) => fb.dispose());
+    this._simTextures?.forEach((tex) => tex.dispose());
+    this._simFramebuffers = null;
+    this._simTextures = null;
   }
   clone() {
     return new ShoreWaveGenerator(this._base.clone(), { ...this._settings }) as this;
@@ -261,16 +518,38 @@ export class ShoreWaveGenerator extends Disposable implements WaveGenerator {
   setupUniforms(scope: PBGlobalScope, uniformGroup: number) {
     const pb = scope.$builder;
     this._base.setupUniforms(scope, uniformGroup);
+    this.setupShoreUniforms(scope, uniformGroup);
+    scope.swFoam = pb.tex2D().uniform(uniformGroup);
+    scope.swFoamUVScale = pb.float().uniform(uniformGroup);
+    scope.swFoamSim = pb.tex2D().uniform(uniformGroup);
+    // (origin x, origin z, cell size, cells; 0 before the field exists)
+    scope.swFoamSimRegion = pb.vec4().uniform(uniformGroup);
+  }
+  /** The uniforms {@link ShoreWaveGenerator.evaluate} reads. @internal */
+  private setupShoreUniforms(scope: PBGlobalScope, uniformGroup: number) {
+    const pb = scope.$builder;
     scope.swWaterline = pb.tex2D().uniform(uniformGroup);
     scope.swInverse = pb.tex2D().uniform(uniformGroup);
     scope.swGrid = pb.vec4().uniform(uniformGroup);
     scope.swWave = pb.vec4().uniform(uniformGroup);
     scope.swShape = pb.vec4().uniform(uniformGroup);
-    scope.swFoam = pb.tex2D().uniform(uniformGroup);
+  }
+  /** @internal */
+  private applyShoreBindGroup(bindGroup: BindGroup) {
+    bindGroup.setTexture(
+      'swWaterline',
+      this._waterline ?? this.getDummy(),
+      fetchSampler('clamp_linear_nomip')
+    );
+    bindGroup.setTexture('swInverse', getInverseTexture(), fetchSampler('clamp_linear_nomip'));
+    bindGroup.setValue('swGrid', this._grid);
+    bindGroup.setValue('swWave', this._wave);
+    bindGroup.setValue('swShape', this._shape);
   }
   /**
    * Shore wave at an undisplaced world XZ, at a wave clock (time over period):
-   * (height, slope of the height along the distance to the shore, foam, 0).
+   * (height over the rest level, slope of the height along the distance to
+   * the shore, determinant of the Jacobian of the displacement, 0).
    * Out parameters: `dir` (direction to the shore xy, weight of the wrapped
    * generator's chop dying near the shore z, bed height the surface is held
    * over w, far below the water where it is not) and `spacing`, the distance
@@ -301,7 +580,7 @@ export class ShoreWaveGenerator extends Disposable implements WaveGenerator {
             pb.or(pb.any(pb.lessThan(this.uv, pb.vec2(0))), pb.any(pb.greaterThan(this.uv, pb.vec2(1))))
           ),
           function () {
-            this.$return(pb.vec4(0));
+            this.$return(pb.vec4(0, 0, 1, 0));
           }
         );
         // Shore coordinates: (signed distance to the waterline, negative inland;
@@ -310,7 +589,7 @@ export class ShoreWaveGenerator extends Disposable implements WaveGenerator {
         this.$l.d = this.wl.x;
         this.$l.zone = this.swWave.y;
         this.$if(pb.greaterThan(this.d, this.zone), function () {
-          this.$return(pb.vec4(0));
+          this.$return(pb.vec4(0, 0, 1, 0));
         });
         // Direction to the shore: down the gradient of the distance, one cell either side
         this.$l.c = this.swGrid.z;
@@ -443,7 +722,8 @@ export class ShoreWaveGenerator extends Disposable implements WaveGenerator {
         this.$l.swashSet = pb.mul(this.waveSet, segment(this, pb.floor(this.phase)));
         // Elsewhere counted from trough to trough, where the height and its slope
         // are 0, so switching to the next wave's noise shows no seam
-        this.waveSet = pb.mul(this.waveSet, segment(this, pb.floor(pb.add(this.phase, 0.5))));
+        this.$l.crestSegment = segment(this, pb.floor(pb.add(this.phase, 0.5)));
+        this.waveSet = pb.mul(this.waveSet, this.crestSegment);
         // Only where the bed shelves: waves roll in as surf on a beach, not
         // against a cliff, a pier or a hull, which the waterline field also
         // holds; and fading out towards the edge of the grid
@@ -471,12 +751,14 @@ export class ShoreWaveGenerator extends Disposable implements WaveGenerator {
           pb.div(pb.mul(this.dYdX, this.amp), this.spacing),
           pb.float(0)
         );
-        // Foam on the crests once they break, more the closer to the shore
-        this.$l.foam = pb.mul(
-          pb.smoothStep(BREAK_SHOAL, 1, this.shoal),
-          pb.smoothStep(0.55, 0.95, this.profile),
-          this.waveSet,
-          this.shelving
+        // Determinant of the Jacobian of the horizontal displacement the profile
+        // stands for, the map from the rest position x / 2pi to the distance X
+        // along the wave: dX/dx 2pi, below 1 where the water is squeezed, at the
+        // steep front of the crest. A lower wave displaces less: the
+        // displacement scales with its share of the full height.
+        this.$l.det = pb.add(
+          1,
+          pb.mul(pb.div(this.amp, pb.max(this.swWave.x, 1e-4)), pb.sub(pb.mul(this.dXdx, Math.PI * 2), 1))
         );
         // The wrapped generator's chop dies near the shore
         this.dir.z = pb.mul(pb.sub(1, pb.smoothStep(0, CHOP_FADE, this.d)), this.shelving);
@@ -537,23 +819,10 @@ export class ShoreWaveGenerator extends Disposable implements WaveGenerator {
           // The crest collapsing at the waterline
           this.$l.collapse = pb.mul(this.height, pb.exp(pb.div(pb.neg(this.s), SWASH_COLLAPSE)));
           this.height = pb.max(this.swash, this.collapse);
-          // A line of foam rides the tip up the beach, thinning out as it runs back
-          this.$l.frontFoam = this.$choice(
-            pb.greaterThan(this.behind, 0),
-            pb.mul(
-              pb.sub(1, pb.smoothStep(0, SWASH_FRONT_FOAM, this.behind)),
-              pb.sub(1, this.tt),
-              this.swashSet,
-              this.shelving
-            ),
-            pb.float(0)
-          );
-          this.foam = pb.max(
-            pb.mul(this.foam, pb.exp(pb.div(pb.neg(this.s), SWASH_COLLAPSE))),
-            this.frontFoam
-          );
+          // The swash runs up as a sheet, not squeezed
+          this.det = pb.float(1);
         });
-        this.$return(pb.vec4(this.height, this.slope, this.foam, 0));
+        this.$return(pb.vec4(this.height, this.slope, this.det, 0));
       }
     );
     return scope.swEvaluate(xz, dir, spacing, tPhase ?? scope.swWave.w, cell ?? pb.float(0)) as PBShaderExp;
@@ -634,65 +903,40 @@ export class ShoreWaveGenerator extends Disposable implements WaveGenerator {
     scope.swCalcPrevPosition(inPos, outPos, vertexSpacing ?? pb.float(0));
   }
   /**
-   * The foam texture carried shoreward with the crests, by a two-layer flow
-   * map: each layer slides along the direction to the shore at the local crest
-   * speed (crest spacing per period) for one wave period, fading in and out
-   * so its jump back is unseen, and starts every period at a new random offset,
-   * so each wave brings its own foam. The layers' wave clocks are staggered by
-   * half a period and by low-frequency noise, so they do not all swap at once.
-   * Blended keeping the variance, which a plain mix halves, to keep the
-   * thresholded web crisp.
+   * The foam texture carried by the water, as Crest's ComputeFoamWithFlow:
+   * two samples, each slid along the flow for up to FOAM_FLOW_PERIOD seconds
+   * and then set back, half a period apart, faded across so neither jump
+   * shows. Returns (value, slope along x, slope along z) as
+   * {@link sampleFoamTexture} does.
    * @internal
    */
-  private foamPattern(
-    scope: PBInsideFunctionScope,
-    xz: PBShaderExp,
-    xzGrad: PBShaderExp,
-    dir: PBShaderExp,
-    spacing: PBShaderExp
-  ) {
+  private foamPattern(scope: PBInsideFunctionScope, xz: PBShaderExp, xzGrad: PBShaderExp, flow: PBShaderExp) {
     const pb = scope.$builder;
-    pb.func(
-      'swFoamPattern',
-      [pb.vec2('xz'), pb.vec4('xzGrad'), pb.vec2('dir'), pb.float('spacing')],
-      function () {
-        this.$l.uvScale = 1 / (FOAM_CELL * FOAM_TEX_CELLS);
-        this.$l.clock = pb.add(this.swWave.w, valueNoise(this, pb.mul(this.xz, FOAM_SWAP_NOISE_SCALE)));
-        this.$l.acc = pb.float(0);
-        this.$l.wsq = pb.float(0);
-        for (let k = 0; k < 2; k++) {
-          this.$l[`t${k}`] = pb.add(this.clock, k * 0.5);
-          this.$l[`tau${k}`] = pb.fract(this[`t${k}`]);
-          this.$l[`cycle${k}`] = pb.floor(this[`t${k}`]);
-          this.$l[`w${k}`] = pb.sub(1, pb.abs(pb.sub(pb.mul(this[`tau${k}`], 2), 1)));
-          this.$l[`jump${k}`] = pb.fract(
-            pb.mul(
-              pb.sin(
-                pb.vec2(
-                  pb.add(pb.mul(this[`cycle${k}`], 12.9898), k * 78.233),
-                  pb.mul(this[`cycle${k}`], 39.346)
-                )
-              ),
-              43758.5453
-            )
-          );
-          this.$l[`p${k}`] = pb.add(
-            pb.mul(pb.sub(this.xz, pb.mul(this.dir, pb.mul(this[`tau${k}`], this.spacing))), this.uvScale),
-            this[`jump${k}`]
-          );
-          this.$l[`s${k}`] = pb.textureSampleGrad(
-            this.swFoam,
-            this[`p${k}`],
-            pb.mul(this.xzGrad.xy, this.uvScale),
-            pb.mul(this.xzGrad.zw, this.uvScale)
-          ).r;
-          this.acc = pb.add(this.acc, pb.mul(pb.sub(this[`s${k}`], 0.5), this[`w${k}`]));
-          this.wsq = pb.add(this.wsq, pb.mul(this[`w${k}`], this[`w${k}`]));
-        }
-        this.$return(pb.clamp(pb.add(0.5, pb.div(this.acc, pb.sqrt(pb.max(this.wsq, 1e-4)))), 0, 1));
-      }
-    );
-    return scope.swFoamPattern(xz, xzGrad, dir, spacing) as PBShaderExp;
+    pb.func('swFoamPattern', [pb.vec2('xz'), pb.vec4('xzGrad'), pb.vec2('flow')], function () {
+      const half = FOAM_FLOW_PERIOD * 0.5;
+      // Seconds, from the wave clock
+      this.$l.time = pb.mul(this.swWave.w, this.swShape.w);
+      this.$l.offset1 = pb.mod(this.time, FOAM_FLOW_PERIOD);
+      this.$l.weight1 = pb.div(this.offset1, half);
+      this.weight1 = this.$choice(pb.greaterThan(this.weight1, 1), pb.sub(2, this.weight1), this.weight1);
+      this.$l.offset2 = pb.mod(pb.add(this.time, half), FOAM_FLOW_PERIOD);
+      this.$l.s1 = sampleFoamTexture(
+        this,
+        this.swFoam,
+        pb.mul(pb.sub(this.xz, pb.mul(this.flow, this.offset1)), this.swFoamUVScale),
+        this.xzGrad,
+        this.swFoamUVScale
+      );
+      this.$l.s2 = sampleFoamTexture(
+        this,
+        this.swFoam,
+        pb.mul(pb.sub(this.xz, pb.mul(this.flow, this.offset2)), this.swFoamUVScale),
+        this.xzGrad,
+        this.swFoamUVScale
+      );
+      this.$return(pb.mix(this.s2, this.s1, this.weight1));
+    });
+    return scope.swFoamPattern(xz, xzGrad, flow) as PBShaderExp;
   }
   /**
    * The water's edge on the beach, per pixel: 1 where the water stands over
@@ -744,50 +988,63 @@ export class ShoreWaveGenerator extends Disposable implements WaveGenerator {
   calcFragmentNormalAndFoam(
     scope: PBInsideFunctionScope,
     xz: PBShaderExp,
-    vertexNormal: PBShaderExp
+    vertexNormal: PBShaderExp,
+    foamSample?: PBShaderExp
   ): PBShaderExp {
     const pb = scope.$builder;
     const that = this;
-    pb.func('swCalcNormalAndFoam', [pb.vec2('xz'), pb.vec3('vn')], function () {
+    const params = [pb.vec2('xz'), pb.vec3('vn')];
+    if (foamSample) {
+      params.push(pb.vec3('fs').inout());
+    }
+    const funcName = foamSample ? 'swCalcNormalAndFoamS' : 'swCalcNormalAndFoam';
+    pb.func(funcName, params, function () {
       // Screen derivatives for the foam texture, here in uniform control flow
       this.$l.xzGrad = pb.vec4(pb.dpdx(this.xz), pb.dpdy(this.xz));
       this.$l.dir = pb.vec4(0);
       this.$l.spacing = pb.float(0);
       this.$l.sw = that.evaluate(this, this.xz, this.dir, this.spacing);
-      this.$l.nf = that._base.calcFragmentNormalAndFoam(this, this.xz, this.vn);
-      this.$l.n = that.tilt(this, this.nf.xyz, this.sw, this.dir);
-      // The breaking crests are white; composed with the base foam as
-      // overlapping coverage, as the material does with the shore foam
-      this.$l.density = pb.clamp(this.sw.z, 0, 1);
-      // Black-point fade of the bubble web: the density uncovers clumps and
-      // filaments instead of greying the whole area
-      this.$l.f = pb.float(0);
-      this.$if(pb.greaterThan(this.density, 0), function () {
-        this.$l.pattern = that.foamPattern(this, this.xz, this.xzGrad, this.dir.xy, this.spacing);
-        this.$l.threshold = pb.sub(1, this.density);
-        this.f = pb.mul(
-          pb.sqrt(this.density),
-          pb.smoothStep(this.threshold, pb.add(this.threshold, FOAM_FEATHER), this.pattern)
-        );
-      });
-      this.$return(
-        pb.vec4(this.n, pb.sub(1, pb.mul(pb.sub(1, pb.clamp(this.nf.w, 0, 1)), pb.sub(1, this.f))))
+      this.$l.nf = that._base.calcFragmentNormalAndFoam(
+        this,
+        this.xz,
+        this.vn,
+        foamSample ? this.fs : undefined
       );
+      this.$l.n = that.tilt(this, this.nf.xyz, this.sw, this.dir);
+      // The simulated foam, composed with the base foam as overlapping
+      // densities, as the material does with the shore foam
+      this.$l.baseDensity = pb.clamp(this.nf.w, 0, 1);
+      this.$l.density = that.sampleFoamSim(this, this.xz);
+      if (foamSample) {
+        // Carried by the water: the texture where this foam is, by its share
+        this.$if(pb.greaterThan(this.density, 0), function () {
+          this.$l.flow = that.foamVelocity(this, this.sw.x, this.dir.xy, this.spacing);
+          this.$l.pattern = that.foamPattern(this, this.xz, this.xzGrad, this.flow);
+          this.fs = pb.mix(
+            this.fs,
+            this.pattern,
+            pb.div(this.density, pb.max(pb.add(this.density, this.baseDensity), 1e-4))
+          );
+        });
+      }
+      this.$return(pb.vec4(this.n, pb.sub(1, pb.mul(pb.sub(1, this.baseDensity), pb.sub(1, this.density)))));
     });
-    return scope.swCalcNormalAndFoam(xz, vertexNormal) as PBShaderExp;
+    return (
+      foamSample ? scope[funcName](xz, vertexNormal, foamSample) : scope[funcName](xz, vertexNormal)
+    ) as PBShaderExp;
   }
   applyWaterBindGroup(bindGroup: BindGroup) {
     this._base.applyWaterBindGroup(bindGroup);
+    this.applyShoreBindGroup(bindGroup);
+    const sim = this._simTextures?.[this._simCurrent];
+    bindGroup.setTexture('swFoamSim', sim ?? this.getDummy(), fetchSampler('clamp_linear_nomip'));
+    bindGroup.setValue('swFoamSimRegion', sim ? this._simRegion : Vector4.zero());
     bindGroup.setTexture(
-      'swWaterline',
-      this._waterline ?? this.getDummy(),
-      fetchSampler('clamp_linear_nomip')
+      'swFoam',
+      this._settings.foamTexture ?? getDefaultFoamTexture(),
+      fetchSampler('repeat_linear')
     );
-    bindGroup.setTexture('swInverse', getInverseTexture(), fetchSampler('clamp_linear_nomip'));
-    bindGroup.setValue('swGrid', this._grid);
-    bindGroup.setValue('swWave', this._wave);
-    bindGroup.setValue('swShape', this._shape);
-    bindGroup.setTexture('swFoam', getDefaultFoamTexture(), fetchSampler('repeat_linear'));
+    bindGroup.setValue('swFoamUVScale', 1 / Math.max(0.01, this._settings.foamTextureSize ?? 4));
   }
   calcClipmapTileAABB(minX: number, maxX: number, minZ: number, maxZ: number, y: number, outAABB: AABB) {
     this._base.calcClipmapTileAABB(minX, maxX, minZ, maxZ, y, outAABB);
@@ -810,6 +1067,11 @@ export class ShoreWaveGenerator extends Disposable implements WaveGenerator {
     super.onDispose();
     this._dummy?.dispose();
     this._dummy = null;
+    this.disposeSim();
+    this._simProgram?.dispose();
+    this._simProgram = null;
+    this._simBindGroup?.dispose();
+    this._simBindGroup = null;
   }
   /** @internal */
   private getDummy() {

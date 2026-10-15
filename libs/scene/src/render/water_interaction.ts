@@ -1638,20 +1638,34 @@ export class InteractiveWaveGenerator extends Disposable implements WaveGenerato
   calcFragmentNormalAndFoam(
     scope: PBInsideFunctionScope,
     xz: PBShaderExp,
-    vertexNormal: PBShaderExp
+    vertexNormal: PBShaderExp,
+    foamSample?: PBShaderExp
   ): PBShaderExp {
     const pb = scope.$builder;
     const that = this;
-    pb.func('wiCalcNormalAndFoam', [pb.vec2('xz'), pb.vec3('vn')], function () {
-      this.$l.nf = that._base.calcFragmentNormalAndFoam(this, this.xz, this.vn);
+    // The foam sample, when there is one, is passed on to the wrapped generator
+    const params = [pb.vec2('xz'), pb.vec3('vn')];
+    if (foamSample) {
+      params.push(pb.vec3('fs').inout());
+    }
+    const funcName = foamSample ? 'wiCalcNormalAndFoamS' : 'wiCalcNormalAndFoam';
+    pb.func(funcName, params, function () {
+      this.$l.nf = that._base.calcFragmentNormalAndFoam(
+        this,
+        this.xz,
+        this.vn,
+        foamSample ? this.fs : undefined
+      );
       this.$l.n = pb.normalize(this.nf.xyz);
-      // Independent coverages compose as overlapping area, the same way the
+      // Independent densities compose as overlapping area, the same way the
       // material combines crest foam with shoreline foam.
       this.$l.f = that._interaction.sampleFoam(this, this.xz);
       this.$l.foam = pb.sub(1, pb.mul(pb.sub(1, pb.clamp(this.nf.w, 0, 1)), pb.sub(1, this.f)));
       this.$return(pb.vec4(that._interaction.blendNormal(this, this.n, this.xz), this.foam));
     });
-    return scope.wiCalcNormalAndFoam(xz, vertexNormal) as PBShaderExp;
+    return (
+      foamSample ? scope[funcName](xz, vertexNormal, foamSample) : scope[funcName](xz, vertexNormal)
+    ) as PBShaderExp;
   }
   applyWaterBindGroup(bindGroup: BindGroup) {
     this._base.applyWaterBindGroup(bindGroup);

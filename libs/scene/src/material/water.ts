@@ -25,7 +25,12 @@ import { waterScatterPhase } from '../shaders/water_medium';
 import { getDevice } from '../app/api';
 import { evaluateLTCRectLightTerms } from '../shaders/ltc_rect';
 import { getLTCAmpLUT, getLTCMatLUT } from '../utility/textures/ltclut';
-import { FOAM_TEX_CELLS, getDefaultFoamTexture } from '../utility/textures/foam';
+import {
+  FOAM_TEX_CELLS,
+  foamTexelSize,
+  getDefaultFoamTexture,
+  sampleFoamTexture
+} from '../utility/textures/foam';
 
 /**
  * How the water medium converts a path length into transmittance and in-scattering.
@@ -183,6 +188,20 @@ export const REFRACT_BLUR_MAX_LOD = 6;
 /** World-space drift of the foam pattern, m/s. */
 const SHORE_FOAM_DRIFT_X = 0.11;
 const SHORE_FOAM_DRIFT_Z = -0.07;
+/**
+ * The foam's look follows Crest's OceanFoam.hlsl (Wave Harmonic, MIT): a
+ * white foam layer cut from the foam texture by the foam density with a
+ * feathered black point, lit through a normal taken from the slope of that
+ * cut over a step of a quarter texel per metre of view depth, with a narrow
+ * glint; and beneath it bubbles, the same texture blurred three mips and
+ * shifted by parallax as if under the surface, tinted and lit by the sky.
+ * The texture drifts at FOAM_DRIFT metres per second along x and z, Crest's
+ * time / 10.
+ */
+const FOAM_DRIFT = 0.1;
+const FOAM_BUBBLE_MIP_SCALE = 8;
+const FOAM_SPECULAR_POWER = 293;
+const FOAM_SPECULAR_BOOST = 0.15;
 /** Width of the band's gradient, as a fraction of its reach. */
 const SHORE_FOAM_EDGE_SOFTNESS = 0.85;
 /**
@@ -260,7 +279,14 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
     period: 6,
     zone: 20,
     sharpness: 0.7,
-    lean: 0.5
+    lean: 0.5,
+    foamTexture: null,
+    foamTextureSize: 4,
+    foamFadeRate: 0.8,
+    waveFoamStrength: 1,
+    waveFoamCoverage: 0.55,
+    shorelineFoamMaxDepth: 0.65,
+    shorelineFoamStrength: 2
   };
   /** The shore wave layer of the effective generator, while the waves are on. */
   private _shoreWaveGenerator: Nullable<ShoreWaveGenerator> = null;
@@ -330,6 +356,14 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
   private _foamFalloff: number;
   private readonly _foamColor: Vector3;
   private readonly _foamParams: Vector4;
+  private _foamFeather: number;
+  private _foamNormalStrength: number;
+  private readonly _foamBubbleColor: Vector3;
+  private _foamBubbleCoverage: number;
+  private _foamBubbleDepth: number;
+  private readonly _foamLookParams: Vector4;
+  private readonly _foamTexture: DRef<Texture2D>;
+  private _foamTextureSize = 4;
   private _shoreFoamAmount: number;
   private _shoreFoamDepth: number;
   private _shoreFoamFalloff: number;
@@ -396,6 +430,14 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
     this._foamFalloff = 1.5;
     this._foamColor = new Vector3(0.92, 0.95, 0.97);
     this._foamParams = new Vector4();
+    // Crest's defaults
+    this._foamFeather = 0.4;
+    this._foamNormalStrength = 3.5;
+    this._foamBubbleColor = new Vector3(0.64, 0.83, 0.82);
+    this._foamBubbleCoverage = 1.68;
+    this._foamBubbleDepth = 0.14;
+    this._foamLookParams = new Vector4();
+    this._foamTexture = new DRef();
     this._shoreFoamAmount = 0;
     this._shoreFoamDepth = 0.5;
     this._shoreFoamFalloff = 1.5;
@@ -421,6 +463,7 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
     this._effectiveWaveGenerator = null;
     this._scatterRampTexture.dispose();
     this._absorptionRampTexture.dispose();
+    this._foamTexture.dispose();
   }
   /** @internal */
   get region() {
@@ -885,6 +928,91 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
     }
   }
   /**
+   * How gradually the white foam fades out at its edges, from a crisp cut
+   * (near 0) to a soft blend into the bubbles beneath (1).
+   */
+  get foamFeather() {
+    return this._foamFeather;
+  }
+  set foamFeather(val: number) {
+    const clamped = Math.min(Math.max(val, 0.001), 1);
+    if (clamped !== this._foamFeather) {
+      this._foamFeather = clamped;
+      this.uniformChanged();
+    }
+  }
+  /** How much the white foam is lit as a lumpy relief rather than a flat sheet, 0 for flat. */
+  get foamNormalStrength() {
+    return this._foamNormalStrength;
+  }
+  set foamNormalStrength(val: number) {
+    const clamped = Math.max(0, val);
+    if (clamped !== this._foamNormalStrength) {
+      this._foamNormalStrength = clamped;
+      this.uniformChanged();
+    }
+  }
+  /** Tint of the bubbles under the white foam, lit by the sky. */
+  get foamBubbleColor() {
+    return this._foamBubbleColor;
+  }
+  set foamBubbleColor(val: Vector3) {
+    if (!val.equalsTo(this._foamBubbleColor)) {
+      this._foamBubbleColor.set(val);
+      this.uniformChanged();
+    }
+  }
+  /** How far the bubbles spread around the white foam and how strongly they show, 0 for none. */
+  get foamBubbleCoverage() {
+    return this._foamBubbleCoverage;
+  }
+  set foamBubbleCoverage(val: number) {
+    const clamped = Math.max(0, val);
+    if (clamped !== this._foamBubbleCoverage) {
+      this._foamBubbleCoverage = clamped;
+      this.uniformChanged();
+    }
+  }
+  /**
+   * Texture the foam is cut from, its value in the red channel: the foam
+   * density uncovers it from its brightest parts down, so bright clumps show
+   * first and dark holes last. Null for plain white, a soft coverage with no
+   * pattern. Tiles every {@link foamTextureSize} metres.
+   */
+  get foamTexture(): Nullable<Texture2D> {
+    return this._foamTexture.get() ?? null;
+  }
+  set foamTexture(tex: Nullable<Texture2D>) {
+    if (tex !== this.foamTexture) {
+      this._foamTexture.set(tex);
+      this._shoreWaves.foamTexture = tex;
+      this.uniformChanged();
+    }
+  }
+  /** Metres of water one repeat of the {@link foamTexture} covers. */
+  get foamTextureSize() {
+    return this._foamTextureSize;
+  }
+  set foamTextureSize(val: number) {
+    const clamped = Math.max(0.01, val);
+    if (clamped !== this._foamTextureSize) {
+      this._foamTextureSize = clamped;
+      this._shoreWaves.foamTextureSize = clamped;
+      this.uniformChanged();
+    }
+  }
+  /** How deep under the surface the bubbles seem to float, in metres; they shift against the foam as the view moves. */
+  get foamBubbleDepth() {
+    return this._foamBubbleDepth;
+  }
+  set foamBubbleDepth(val: number) {
+    const clamped = Math.max(0, val);
+    if (clamped !== this._foamBubbleDepth) {
+      this._foamBubbleDepth = clamped;
+      this.uniformChanged();
+    }
+  }
+  /**
    * Coverage of the foam where the water meets a surface, 0 to disable.
    *
    * Keyed on the distance to the nearest solid around the surface, estimated in
@@ -1264,6 +1392,12 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
       // (coverage scale, coverage falloff, 0, 0)
       scope.foamShadingParams = pb.vec4().uniform(2);
       scope.foamColor = pb.vec3().uniform(2);
+      // (white foam feather, foam normal strength, bubble coverage, bubble depth in m)
+      scope.foamLookParams = pb.vec4().uniform(2);
+      scope.foamBubbleColor = pb.vec3().uniform(2);
+      scope.foamTex = pb.tex2D().uniform(2);
+      // uv of the foam texture per metre
+      scope.foamUVScale = pb.float().uniform(2);
       // Thickness in metres a sheet of water fades in over, 0 for none
       scope.edgeFadeWidth = pb.float().uniform(2);
       if (this._shoreFoamAvailable(scope)) {
@@ -1309,11 +1443,33 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
       });
     }
     if (this.needFragmentColor()) {
+      // Screen derivatives of the undisplaced position, taken here in uniform
+      // control flow; the foam textures are sampled with them under branches.
+      scope.$l.restXZGrad = pb.vec4(
+        pb.dpdx(scope.$inputs.clipmapPos.xz),
+        pb.dpdy(scope.$inputs.clipmapPos.xz)
+      );
+      // The foam texture here, drifting; a generator carrying foam of its own
+      // blends in where its foam is
+      scope.$l.foamSample = sampleFoamTexture(
+        scope,
+        scope.foamTex,
+        pb.mul(
+          pb.add(
+            scope.$inputs.clipmapPos.xz,
+            pb.vec2(pb.mul(ShaderHelper.getElapsedTime(scope), FOAM_DRIFT))
+          ),
+          scope.foamUVScale
+        ),
+        scope.restXZGrad,
+        scope.foamUVScale
+      );
       scope.$l.normal = this.waveGenerator
         ? this.waveGenerator.calcFragmentNormalAndFoam(
             scope,
             scope.$inputs.clipmapPos.xz,
-            scope.$inputs.worldNormal
+            scope.$inputs.worldNormal,
+            scope.foamSample
           )
         : pb.vec4(scope.$inputs.worldNormal, 0);
       if (this.infinite) {
@@ -1323,8 +1479,6 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
       }
       // Vertical wave displacement, interpolated from the vertices. Zero on the skirt.
       scope.$l.crestHeight = pb.sub(scope.$inputs.worldPos.y, scope.$inputs.clipmapPos.y);
-      // Screen derivatives of the undisplaced position, taken here in uniform
-      // control flow; the shore foam samples its texture with them under a branch.
       const surfaceCoverage = this.waveGenerator?.calcSurfaceCoverage;
       scope.$l.surfaceCoverage = surfaceCoverage
         ? surfaceCoverage.call(this.waveGenerator, scope, scope.$inputs.clipmapPos.xz)
@@ -1336,9 +1490,6 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
           pb.discard();
         });
       }
-      scope.$l.restXZGrad = this._shoreFoamAvailable(scope)
-        ? pb.vec4(pb.dpdx(scope.$inputs.clipmapPos.xz), pb.dpdy(scope.$inputs.clipmapPos.xz))
-        : pb.vec4(0);
       if (this.debugOutput === 'interaction') {
         // The field on its own, grey at rest, scaled so its amplitude clamp
         // reaches black and white; dimmed outside the window so its reach shows.
@@ -1371,6 +1522,7 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
             scope.crestHeight,
             scope.$inputs.clipmapPos.xz,
             scope.restXZGrad,
+            scope.foamSample,
             scope.surfaceCoverage
           ),
           1
@@ -1748,6 +1900,7 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
     crestHeight: PBShaderExp,
     restXZ: PBShaderExp,
     restXZGrad: PBShaderExp,
+    foamSample: PBShaderExp,
     coverage: PBShaderExp
   ) {
     const pb = scope.$builder;
@@ -1845,6 +1998,22 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
         this.$return(this.specular);
       }
     );
+    // White foam revealed from a foam texture sample (value, slopes along x
+    // and z) by a density, Crest's feathered black point; as (white foam, its
+    // slope along x, along z).
+    pb.func('waterWhiteFoam', [pb.float('density'), pb.vec3('tex'), pb.float('feather')], function () {
+      this.$l.t = pb.clamp(
+        pb.div(pb.sub(this.tex.x, pb.sub(1, pb.clamp(this.density, 0, 1))), this.feather),
+        0,
+        1
+      );
+      this.$return(
+        pb.vec3(
+          pb.mul(this.t, this.t, pb.sub(3, pb.mul(this.t, 2))),
+          pb.mul(this.tex.yz, pb.div(pb.mul(6, this.t, pb.sub(1, this.t)), this.feather))
+        )
+      );
+    });
     if (shoreFoam) {
       // Foam texture at the undisplaced position, drifting. Sampled with the
       // screen gradients so its mips filter the pattern out with distance
@@ -1857,14 +2026,7 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
           pb.add(this.xz, pb.mul(pb.vec2(SHORE_FOAM_DRIFT_X, SHORE_FOAM_DRIFT_Z), this.time)),
           this.uvScale
         );
-        this.$return(
-          pb.textureSampleGrad(
-            this.shoreFoamTex,
-            this.uv,
-            pb.mul(this.xzGrad.xy, this.uvScale),
-            pb.mul(this.xzGrad.zw, this.uvScale)
-          ).r
-        );
+        this.$return(sampleFoamTexture(this, this.shoreFoamTex, this.uv, this.xzGrad, this.uvScale));
       });
       if (hiZ) {
         // One integer pyramid level of the query below.
@@ -2010,7 +2172,8 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
           }
         );
       }
-      // Shoreline foam as (coverage, distance to the nearest surface).
+      // Shoreline foam as (white foam, distance to the nearest surface,
+      // density); `foamGrad` receives the slope of the white foam along x and z.
       pb.func(
         'waterShoreFoam',
         [
@@ -2018,9 +2181,11 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
           pb.vec3('viewPos'),
           pb.vec2('screenUV'),
           pb.vec2('restXZ'),
-          pb.vec4('restXZGrad')
+          pb.vec4('restXZGrad'),
+          pb.vec2('foamGrad').out()
         ],
         function () {
+          this.foamGrad = pb.vec2(0);
           this.$l.time = ShaderHelper.getElapsedTime(this);
           if (waterline) {
             // Horizontal distance to the waterline, from the scene field. Off
@@ -2088,21 +2253,18 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
           // would give half coverage over the entire open sea.
           this.$l.ramp = pb.sub(1, pb.smoothStep(pb.sub(this.edge, this.soft), this.edge, this.surfaceDist));
           this.$if(pb.lessThanEqual(this.ramp, 0), function () {
-            this.$return(pb.vec2(0, this.surfaceDist));
+            this.$return(pb.vec3(0, this.surfaceDist, 0));
           });
           this.$l.pattern = this.waterShoreFoamPattern(this.restXZ, this.restXZGrad, this.time);
-          // Crest-style black-point fading: density reveals individual clumps
-          // instead of multiplying them into a uniformly grey contact band.
-          // Keep the ramp as an envelope so a zero-density edge stays empty.
-          this.$l.density = pb.pow(this.ramp, this.shoreFoamParams.z);
-          this.$l.threshold = pb.sub(1, this.density);
-          this.$l.coverage = pb.mul(
-            this.density,
-            pb.smoothStep(this.threshold, pb.add(this.threshold, this.shoreFoamFeather), this.pattern)
+          // Black-point fading of the texture by the density, as for all foam
+          this.$l.density = pb.clamp(
+            pb.mul(pb.pow(this.ramp, this.shoreFoamParams.z), this.shoreFoamParams.x),
+            0,
+            1
           );
-          this.$return(
-            pb.vec2(pb.clamp(pb.mul(this.coverage, this.shoreFoamParams.x), 0, 1), this.surfaceDist)
-          );
+          this.$l.white = this.waterWhiteFoam(this.density, this.pattern, this.shoreFoamFeather);
+          this.foamGrad = this.white.yz;
+          this.$return(pb.vec3(this.white.x, this.surfaceDist, this.density));
         }
       );
     }
@@ -2115,6 +2277,7 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
         pb.float('crestHeight'),
         pb.vec2('restXZ'),
         pb.vec4('restXZGrad'),
+        pb.vec3('foamSample'),
         pb.float('coverage')
       ],
       function () {
@@ -2261,24 +2424,50 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
         this.$l.absorption = this.getAbsorption(this.mediumPath);
         this.refraction = pb.mul(this.refraction, this.absorption);
         this.$l.fresnelTerm = this.fresnel(this.shadingNormal, pb.neg(this.eyeVecNorm), this.underwaterEye);
-        this.$l.crestFoam = pb.clamp(
+        // Foam density from the wave generator: crests, wakes, breaking shore waves
+        this.$l.crestDensity = pb.clamp(
           pb.mul(pb.pow(pb.clamp(this.foamFactor, 0, 1), this.foamShadingParams.y), this.foamShadingParams.x),
           0,
           1
         );
-        // (coverage, distance to the nearest surface); y is for the debug view.
+        this.$l.crestWhite = this.waterWhiteFoam(this.crestDensity, this.foamSample, this.foamLookParams.x);
+        // (white foam, distance to the nearest surface, density); y is for the debug view.
+        this.$l.shoreFoamGrad = pb.vec2(0);
         this.$l.shoreFoamInfo = shoreFoam
           ? (this.waterShoreFoam(
               this.worldPos,
               this.viewPos,
               this.screenUV,
               this.restXZ,
-              this.restXZGrad
+              this.restXZGrad,
+              this.shoreFoamGrad
             ) as PBShaderExp)
-          : pb.vec2(0, 0);
+          : pb.vec3(0);
         this.$l.shoreFoam = this.shoreFoamInfo.x;
-        // Independent coverages compose as overlapping area.
-        this.$l.foam = pb.sub(1, pb.mul(pb.sub(1, this.crestFoam), pb.sub(1, this.shoreFoam)));
+        // Independent layers compose as overlapping area, and so their slopes.
+        this.$l.foam = pb.sub(1, pb.mul(pb.sub(1, this.crestWhite.x), pb.sub(1, this.shoreFoam)));
+        this.$l.foamGrad = pb.add(
+          pb.mul(this.crestWhite.yz, pb.sub(1, this.shoreFoam)),
+          pb.mul(this.shoreFoamGrad, pb.sub(1, this.crestWhite.x))
+        );
+        this.$l.bubbleDensity = pb.sub(
+          1,
+          pb.mul(pb.sub(1, this.crestDensity), pb.sub(1, this.shoreFoamInfo.z))
+        );
+        // Normal of the white foam's relief: Crest differences the cut over a
+        // quarter texel per metre of view depth, which keeps the relief at a
+        // distance; the slope times that step here
+        this.$l.foamStep = pb.mul(this.dist, 0.25, foamTexelSize(this, this.foamTex, this.foamUVScale));
+        this.$l.foamNormal = pb.normalize(
+          pb.add(
+            this.diffuseNormal,
+            pb.mul(
+              pb.vec3(pb.neg(this.foamGrad.x), 0, pb.neg(this.foamGrad.y)),
+              this.foamLookParams.y,
+              this.foamStep
+            )
+          )
+        );
         // Foam suppresses the mirror rather than adding to it.
         this.fresnelTerm = pb.mul(this.fresnelTerm, pb.sub(1, this.foam));
         this.$l.finalColor = pb.mix(this.refraction, this.reflectance, this.fresnelTerm);
@@ -2329,7 +2518,7 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
           this.$l.NoLdiffuse = pb.clamp(pb.dot(this.diffuseNormal, this.lightDir), 0, 1);
           // From the raw cosine, so a lee slope below zero still wraps up.
           this.$l.NoLfoam = pb.clamp(
-            pb.div(pb.add(pb.dot(this.diffuseNormal, this.lightDir), FOAM_LIGHT_WRAP), 1 + FOAM_LIGHT_WRAP),
+            pb.div(pb.add(pb.dot(this.foamNormal, this.lightDir), FOAM_LIGHT_WRAP), 1 + FOAM_LIGHT_WRAP),
             0,
             1
           );
@@ -2406,10 +2595,21 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
             );
             this.lightContrib = pb.add(this.lightContrib, this.sunScatterTerm);
           });
-          // Foam as a matte layer.
+          // Foam as a matte layer, with Crest's narrow glint off its relief.
+          this.$l.foamGlint = pb.mul(
+            pb.pow(
+              pb.max(pb.dot(pb.reflect(this.eyeVecNorm, this.foamNormal), this.lightDir), 0),
+              FOAM_SPECULAR_POWER
+            ),
+            FOAM_SPECULAR_BOOST
+          );
           this.lightContrib = pb.add(
             this.lightContrib,
-            pb.mul(this.lightEnergy, this.foamColor, this.foam, this.NoLfoam, 1 / Math.PI)
+            pb.mul(
+              this.lightEnergy,
+              this.foam,
+              pb.add(pb.mul(this.foamColor, this.NoLfoam, 1 / Math.PI), pb.vec3(this.foamGlint))
+            )
           );
           this.$l.shadow = pb.vec3(1);
           if (shadow) {
@@ -2435,6 +2635,43 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
             this.finalColor,
             pb.mul(this.irradiance, this.foamColor, this.foam, 1 / Math.PI)
           );
+          // Bubbles under the white foam, part of the water body as in Crest,
+          // so under the white foam and the mirror: the foam texture blurred and
+          // shifted by parallax, as seen at a depth under the surface
+          this.$if(pb.greaterThan(this.bubbleDensity, 0), function () {
+            this.$l.toEye = pb.neg(this.eyeVecNorm);
+            this.$l.bubbleShift = pb.div(
+              pb.mul(this.toEye.xz, pb.neg(this.foamLookParams.w)),
+              pb.max(pb.dot(this.diffuseNormal, this.toEye), 0.1)
+            );
+            this.$l.bubbleTex = sampleFoamTexture(
+              this,
+              this.foamTex,
+              pb.mul(
+                pb.add(
+                  this.restXZ,
+                  this.bubbleShift,
+                  pb.vec2(pb.mul(ShaderHelper.getElapsedTime(this), FOAM_DRIFT))
+                ),
+                this.foamUVScale
+              ),
+              this.restXZGrad,
+              this.foamUVScale,
+              FOAM_BUBBLE_MIP_SCALE,
+              false
+            ).x;
+            this.finalColor = pb.add(
+              this.finalColor,
+              pb.mul(
+                this.irradiance,
+                this.foamBubbleColor,
+                this.bubbleTex,
+                pb.clamp(pb.mul(this.bubbleDensity, this.foamLookParams.z), 0, 1),
+                this.bodyWeight,
+                1 / Math.PI
+              )
+            );
+          });
         }
         // A sheet of water a few centimetres thick, as the swash leaves running
         // up the sand, shows the sand through it rather than a surface over it;
@@ -2516,7 +2753,16 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
         }
       }
     );
-    return scope.waterShading(worldPos, worldNormal, foamFactor, crestHeight, restXZ, restXZGrad, coverage);
+    return scope.waterShading(
+      worldPos,
+      worldNormal,
+      foamFactor,
+      crestHeight,
+      restXZ,
+      restXZGrad,
+      foamSample,
+      coverage
+    );
   }
   applyUniforms(bindGroup: BindGroup, ctx: DrawContext, needUpdate: boolean, pass: number) {
     super.applyUniforms(bindGroup, ctx, needUpdate, pass);
@@ -2564,6 +2810,20 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
       this._foamParams.setXYZW(this._foamAmount, this._foamFalloff, 0, 0);
       bindGroup.setValue('foamShadingParams', this._foamParams);
       bindGroup.setValue('foamColor', this._foamColor);
+      this._foamLookParams.setXYZW(
+        this._foamFeather,
+        this._foamNormalStrength,
+        this._foamBubbleCoverage,
+        this._foamBubbleDepth
+      );
+      bindGroup.setValue('foamLookParams', this._foamLookParams);
+      bindGroup.setValue('foamBubbleColor', this._foamBubbleColor);
+      bindGroup.setTexture(
+        'foamTex',
+        this.foamTexture ?? getDefaultFoamTexture(),
+        fetchSampler('repeat_linear')
+      );
+      bindGroup.setValue('foamUVScale', 1 / this._foamTextureSize);
       bindGroup.setValue('edgeFadeWidth', this._edgeFadeWidth);
       if (this._shoreFoamEnabled) {
         this._shoreFoamParams.setXYZW(
@@ -2583,7 +2843,11 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
         );
         bindGroup.setValue('shoreFoamWashParams', this._shoreFoamWashParams);
         bindGroup.setValue('shoreFoamFeather', this._shoreFoamFeather);
-        bindGroup.setTexture('shoreFoamTex', getDefaultFoamTexture(), fetchSampler('repeat_linear'));
+        bindGroup.setTexture(
+          'shoreFoamTex',
+          this.foamTexture ?? getDefaultFoamTexture(),
+          fetchSampler('repeat_linear')
+        );
       }
       bindGroup.setValue('mediumAlbedo', this._scatterAlbedo);
       bindGroup.setValue('mediumExtinction', this._extinction);
@@ -2672,6 +2936,41 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
   }
   set shoreWaveLean(val: number) {
     this._shoreWaves.lean = Math.min(Math.max(val, 0), 1);
+  }
+  /** How fast the foam of the shore waves fades, per second (Crest's Foam Fade Rate). */
+  get shoreWaveFoamFadeRate() {
+    return this._shoreWaves.foamFadeRate!;
+  }
+  set shoreWaveFoamFadeRate(val: number) {
+    this._shoreWaves.foamFadeRate = Math.max(0, val);
+  }
+  /** How much foam the breaking shore waves make (Crest's Wave Foam Strength). */
+  get shoreWaveFoamStrength() {
+    return this._shoreWaves.waveFoamStrength!;
+  }
+  set shoreWaveFoamStrength(val: number) {
+    this._shoreWaves.waveFoamStrength = Math.max(0, val);
+  }
+  /** How much of the shore waves makes foam, 0..1, higher for more (Crest's Wave Foam Coverage). */
+  get shoreWaveFoamCoverage() {
+    return this._shoreWaves.waveFoamCoverage!;
+  }
+  set shoreWaveFoamCoverage(val: number) {
+    this._shoreWaves.waveFoamCoverage = Math.min(Math.max(val, 0), 1);
+  }
+  /** Water shallower than this many metres makes foam (Crest's Shoreline Foam Max Depth). */
+  get shoreWaveShallowFoamDepth() {
+    return this._shoreWaves.shorelineFoamMaxDepth!;
+  }
+  set shoreWaveShallowFoamDepth(val: number) {
+    this._shoreWaves.shorelineFoamMaxDepth = Math.max(0.01, val);
+  }
+  /** How much foam shallow water makes (Crest's Shoreline Foam Strength). */
+  get shoreWaveShallowFoamStrength() {
+    return this._shoreWaves.shorelineFoamStrength!;
+  }
+  set shoreWaveShallowFoamStrength(val: number) {
+    this._shoreWaves.shorelineFoamStrength = Math.max(0, val);
   }
   /**
    * Hands the shore waves this frame's waterline field, or null when there is

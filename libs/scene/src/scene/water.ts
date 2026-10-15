@@ -629,6 +629,41 @@ export class Water extends applyMixins(GraphNode, mixinDrawable) implements Draw
   set shoreWaveLean(val: number) {
     this.material.shoreWaveLean = val;
   }
+  /** How fast the foam of the shore waves fades, per second (Crest's Foam Fade Rate). */
+  get shoreWaveFoamFadeRate() {
+    return this.material.shoreWaveFoamFadeRate;
+  }
+  set shoreWaveFoamFadeRate(val: number) {
+    this.material.shoreWaveFoamFadeRate = val;
+  }
+  /** How much foam the breaking shore waves make (Crest's Wave Foam Strength). */
+  get shoreWaveFoamStrength() {
+    return this.material.shoreWaveFoamStrength;
+  }
+  set shoreWaveFoamStrength(val: number) {
+    this.material.shoreWaveFoamStrength = val;
+  }
+  /** How much of the shore waves makes foam, 0..1, higher for more (Crest's Wave Foam Coverage). */
+  get shoreWaveFoamCoverage() {
+    return this.material.shoreWaveFoamCoverage;
+  }
+  set shoreWaveFoamCoverage(val: number) {
+    this.material.shoreWaveFoamCoverage = val;
+  }
+  /** Water shallower than this many metres makes foam (Crest's Shoreline Foam Max Depth). */
+  get shoreWaveShallowFoamDepth() {
+    return this.material.shoreWaveShallowFoamDepth;
+  }
+  set shoreWaveShallowFoamDepth(val: number) {
+    this.material.shoreWaveShallowFoamDepth = val;
+  }
+  /** How much foam shallow water makes (Crest's Shoreline Foam Strength). */
+  get shoreWaveShallowFoamStrength() {
+    return this.material.shoreWaveShallowFoamStrength;
+  }
+  set shoreWaveShallowFoamStrength(val: number) {
+    this.material.shoreWaveShallowFoamStrength = val;
+  }
   /**
    * How the refracted view sample is located. Defaults to `march`.
    *
