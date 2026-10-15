@@ -157,7 +157,7 @@ myApp.ready().then(async function () {
       paused = !paused;
       menu.enabled = paused;
       scene.physicsWorld.enabled = !paused;
-      document.querySelector('#paused').style.display = paused ? 'flex' : 'none';
+      /** @type {HTMLElement} */ (document.querySelector('#paused')).style.display = paused ? 'flex' : 'none';
       if (paused) {
         getInput().exitPointerLock();
       }

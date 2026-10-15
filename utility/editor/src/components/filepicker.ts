@@ -178,7 +178,7 @@ export class FilePicker {
       fileInput.multiple = !!options.multiple;
       fileInput.webkitdirectory = !!options.webkitdirectory;
       fileInput.onchange = () => {
-        finish([...fileInput.files!]);
+        finish(fileInput.files ? Array.from(fileInput.files!) : []);
       };
       fileInput.oncancel = () => finish([]);
       if (options.useFocusCancelFallback) {

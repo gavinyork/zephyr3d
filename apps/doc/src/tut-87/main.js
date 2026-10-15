@@ -53,6 +53,7 @@ const LAYER_PROPS = 1;
 
 // Pointer movement is an amount per frame, stick deflection a rate: scaled by
 // the frame time, both end up in radians.
+/** @type {import('@zephyr3d/scene').InputActionDef} */
 const look = {
   type: 'vector2',
   unbounded: true,
@@ -61,6 +62,7 @@ const look = {
     { pad: 'RS', scale: 2.5, perSecond: true }
   ]
 };
+/** @type {import('@zephyr3d/scene').InputActionDef} */
 const zoom = {
   type: 'axis',
   unbounded: true,
@@ -186,6 +188,7 @@ myApp.ready().then(async function () {
   // #region camera
   // Settings per target. On foot the player turns the camera freely; in the
   // car it swings back behind the car once the player stops turning it.
+  /** @type {Partial<import('@zephyr3d/scene').FollowCameraOptions>} */
   const walkView = {
     mode: 'free',
     pivotOffset: new Vector3(0, 1.5, 0),
@@ -194,6 +197,7 @@ myApp.ready().then(async function () {
     minPitch: -0.6,
     fovBoost: null
   };
+  /** @type {Partial<import('@zephyr3d/scene').FollowCameraOptions>} */
   const driveView = {
     mode: 'chase',
     pivotOffset: new Vector3(0, 1, 0),
@@ -285,6 +289,7 @@ myApp.ready().then(async function () {
       getInput().requestPointerLock();
     }
   });
+  /** @type {HTMLInputElement} */
   const collisionCheck = document.querySelector('#collision');
   collisionCheck.addEventListener('change', () => {
     follow.options.collisionMask = collisionCheck.checked ? ~(1 << LAYER_PROPS) : 0;
