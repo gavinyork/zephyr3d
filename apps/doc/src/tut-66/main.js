@@ -201,9 +201,6 @@ function buildOceanScene() {
   water.sunScatteringIntensity = 0.4;
   water.foamAmount = 1;
   water.foamFalloff = 1.5;
-  water.shoreFoamAmount = 0.5;
-  water.shoreFoamDepth = 2.5;
-  water.shoreFoamWashAmount = 0;
   water.infinite = false;
 
   water.causticsEnabled = true;

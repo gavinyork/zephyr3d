@@ -34,4 +34,4 @@ export * from './mixins/lit';
 export * from './mixins/texture';
 export * from './mixins/vertexcolor';
 export * from './mixins/foliage';
-export type { WaterDebugOutput, WaterMediumMode, WaterRefractionMode } from './water';
+export type { WaterDebugOutput, WaterRefractionMode } from './water';

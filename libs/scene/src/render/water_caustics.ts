@@ -145,7 +145,7 @@ export interface WaterCausticUniforms {
   lightDir: Vector4;
   /** (intensity, focal depth, defocus rate, edge fade start in map-radius units) */
   params: Vector4;
-  /** (unused.xyz, warp strength). The medium moved to {@link waterMedia}. */
+  /** (minimum water depth, unused.yz, warp strength). The medium moved to {@link waterMedia}. */
   extinction: Vector4;
   /** Water bodies contributing to this map, at most {@link MAX_CAUSTIC_WATERS}. */
   waterCount: number;
@@ -1450,7 +1450,7 @@ export class WaterCausticsRenderer {
       material.causticsDefocus,
       1 - fadeFraction
     );
-    u.extinction.setXYZW(0, 0, 0, warp);
+    u.extinction.setXYZW(material.causticsMinDepth, 0, 0, warp);
     this._warp = warp;
     // Retained for the per-body grid fit, which runs per draw rather than here.
     this._sliceRight = right;

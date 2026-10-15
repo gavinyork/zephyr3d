@@ -9,7 +9,7 @@ import { FBMWaveGenerator, FFTWaveGenerator, GerstnerWaveGenerator } from '../..
 import type { WaterDisturberShape, WaterInteractionFollowMode } from '../../../render/water_interaction';
 import { WaterDisturber, WaterInteraction } from '../../../render/water_interaction';
 import { MAX_GERSTNER_WAVE_COUNT } from '../../../values';
-import type { WaterDebugOutput, WaterMediumMode, WaterRefractionMode } from '../../../material/water';
+import type { WaterDebugOutput, WaterRefractionMode } from '../../../material/water';
 import { DEFAULT_SCATTER_ANISOTROPY, WATER_DEBUG_OUTPUTS } from '../../../material/water';
 import type { Texture2D } from '@zephyr3d/device';
 import type { ResourceManager } from '../manager';
@@ -523,6 +523,165 @@ export function getGerstnerWaveClass(): SerializableClass {
   };
 }
 
+/**
+ * Inspector layout of the water's properties: group (sub-groups after a
+ * slash) and label of each, in the order the groups are shown; the inspector
+ * opens the groups marked open. Presentation only: the serialized names stay
+ * as they are, so saved scenes are unaffected.
+ */
+const WATER_PROPERTY_LAYOUT: { group: string; open?: boolean; props: [string, string][] }[] = [
+  {
+    group: 'Surface',
+    open: true,
+    props: [
+      ['WaveGenerator', 'Wave Generator'],
+      ['Interaction', 'Interaction'],
+      ['AnimationSpeed', 'Animation Speed'],
+      ['Infinite', 'Infinite']
+    ]
+  },
+  {
+    group: 'Water Color',
+    open: true,
+    props: [
+      ['Absorption', 'Absorption'],
+      ['AbsorptionScale', 'Absorption Scale'],
+      ['Scattering', 'Scattering'],
+      ['ScatteringScale', 'Scattering Scale']
+    ]
+  },
+  {
+    group: 'Lighting',
+    props: [
+      ['ReflectionStrength', 'Reflection'],
+      ['SunScatteringIntensity', 'Sun Scattering'],
+      ['ScatterAnisotropy', 'Sun Scattering Anisotropy'],
+      ['SubsurfaceIntensity', 'Crest Glow'],
+      ['SubsurfaceCrestHeight', 'Crest Glow Height'],
+      ['SubsurfaceTint', 'Crest Glow Tint']
+    ]
+  },
+  {
+    group: 'Refraction',
+    props: [
+      ['RefractionMode', 'Mode'],
+      ['RefractionScale', 'Strength'],
+      ['RefractionBlur', 'Blur'],
+      ['CheapRefractionDepth', 'Offset Depth']
+    ]
+  },
+  {
+    group: 'Foam',
+    props: [
+      ['FoamAmount', 'Wave Foam'],
+      ['FoamColor', 'Color'],
+      ['FoamTexture', 'Texture'],
+      ['FoamTextureSize', 'Texture Size'],
+      ['FoamFeather', 'Edge Softness']
+    ]
+  },
+  {
+    group: 'Foam/Look',
+    props: [
+      ['FoamFalloff', 'Wave Foam Falloff'],
+      ['FoamNormalStrength', 'Relief'],
+      ['FoamBubbleColor', 'Bubble Color'],
+      ['FoamBubbleCoverage', 'Bubbles'],
+      ['FoamBubbleDepth', 'Bubble Depth']
+    ]
+  },
+  {
+    group: 'Shore',
+    props: [['EdgeFadeWidth', 'Edge Fade']]
+  },
+  {
+    group: 'Shore/Waves',
+    props: [
+      ['ShoreWaveHeight', 'Height'],
+      ['ShoreWaveLength', 'Wavelength'],
+      ['ShoreWavePeriod', 'Period'],
+      ['ShoreWaveZone', 'Zone'],
+      ['ShoreWaveSharpness', 'Sharpness'],
+      ['ShoreWaveLean', 'Lean']
+    ]
+  },
+  {
+    group: 'Shore/Waves/Foam',
+    props: [
+      ['ShoreWaveFoamStrength', 'Breaking Foam'],
+      ['ShoreWaveFoamCoverage', 'Breaking Coverage'],
+      ['ShoreWaveShallowFoamStrength', 'Shallow Foam'],
+      ['ShoreWaveShallowFoamDepth', 'Shallow Depth'],
+      ['ShoreWaveFoamFadeRate', 'Fade Rate']
+    ]
+  },
+
+  {
+    group: 'Caustics',
+    props: [
+      ['CausticsEnabled', 'Enabled'],
+      ['CausticsIntensity', 'Intensity'],
+      ['CausticsDepth', 'Depth'],
+      ['CausticsRange', 'Range'],
+      ['CausticsFadeDistance', 'Fade Distance'],
+      ['CausticsSceneDepth', 'Scene Depth'],
+      ['CausticsWarp', 'Warp'],
+      ['CausticsMinDepth', 'Min Depth']
+    ]
+  },
+  {
+    group: 'Underwater',
+    props: [
+      ['UnderwaterEnabled', 'Enabled'],
+      ['UnderwaterAmbientIntensity', 'Ambient'],
+      ['UnderwaterGodRays', 'God Rays'],
+      ['UnderwaterGodRayIntensity', 'God Ray Intensity'],
+      ['UnderwaterGodRaySteps', 'God Ray Steps'],
+      ['UnderwaterGodRayShadow', 'God Ray Shadow'],
+      ['UnderwaterHysteresis', 'Surface Hysteresis']
+    ]
+  },
+  {
+    group: 'Advanced',
+    props: [
+      ['ViewDistance', 'View Distance'],
+      ['GridScale', 'Grid Scale'],
+      ['TAAStrength', 'TAA Strength'],
+      ['Wireframe', 'Wireframe'],
+      ['DebugOutput', 'Debug Output']
+    ]
+  }
+];
+
+/** Gives the water's properties their group and label, ordered as {@link WATER_PROPERTY_LAYOUT}. */
+function layoutWaterProps<
+  T extends { name: string; options?: { group?: string; label?: string; defaultOpen?: boolean } }
+>(props: T[]): T[] {
+  const placement = new Map<string, { order: number; group: string; label: string; open: boolean }>();
+  let order = 0;
+  for (const entry of WATER_PROPERTY_LAYOUT) {
+    for (const [name, label] of entry.props) {
+      placement.set(name, { order: order++, group: entry.group, label, open: !!entry.open });
+    }
+  }
+  for (const prop of props) {
+    const place = placement.get(prop.name);
+    if (place) {
+      prop.options = {
+        ...prop.options,
+        group: place.group,
+        label: prop.options?.label ?? place.label,
+        ...(place.open ? { defaultOpen: true } : {})
+      };
+    }
+  }
+  // Stable: anything left out of the layout keeps its place after the rest
+  return props
+    .map((prop, index) => ({ prop, index, order: placement.get(prop.name)?.order ?? order + index }))
+    .sort((a, b) => a.order - b.order)
+    .map((e) => e.prop);
+}
+
 /** @internal */
 export function getWaterClass(manager: ResourceManager): SerializableClass {
   return {
@@ -535,1147 +694,664 @@ export function getWaterClass(manager: ResourceManager): SerializableClass {
       return { obj: node };
     },
     getProps() {
-      return defineProps([
-        {
-          name: 'WaveGenerator',
-          description: 'Wave generator used to drive the water surface',
-          type: 'object',
-          default: null,
-          options: {
-            objectTypes: [FFTWaveGenerator, FBMWaveGenerator, GerstnerWaveGenerator]
-          },
-          isNullable() {
-            return true;
-          },
-          get(this: Water, value) {
-            value.object[0] = this.waveGenerator ?? null;
-          },
-          set(this: Water, value) {
-            if (!value.object[0]) {
-              this.waveGenerator = null;
-            } else {
-              this.waveGenerator = value.object[0] as WaveGenerator;
-            }
-          }
-        },
-        {
-          name: 'Interaction',
-          description:
-            'Dynamic height field layered over the surface, driven by things moving through the water: ripples, wakes and a foam trail. Null for none.',
-          type: 'object',
-          default: null,
-          options: {
-            objectTypes: [WaterInteraction]
-          },
-          isNullable() {
-            return true;
-          },
-          get(this: Water, value) {
-            value.object[0] = this.interaction ?? null;
-          },
-          set(this: Water, value) {
-            this.interaction = (value.object[0] as Nullable<WaterInteraction>) ?? null;
-          }
-        },
-        {
-          name: 'GridScale',
-          description: 'Scale of the water simulation grid',
-          type: 'float',
-          default: 1,
-          options: { minValue: 0, maxValue: 1 },
-          get(this: Water, value) {
-            value.num[0] = this.gridScale;
-          },
-          set(this: Water, value) {
-            this.gridScale = value.num[0];
-          }
-        },
-        {
-          name: 'Wireframe',
-          description: 'If true, renders the water surface as wireframe',
-          type: 'bool',
-          default: false,
-          get(this: Water, value) {
-            value.bool[0] = this.wireframe;
-          },
-          set(this: Water, value) {
-            this.wireframe = value.bool[0];
-          }
-        },
-        {
-          name: 'AnimationSpeed',
-          description: 'Playback speed of wave animation',
-          type: 'float',
-          default: 1,
-          options: { animatable: true, minValue: 0, maxValue: 100 },
-          get(this: Water, value) {
-            value.num[0] = this.animationSpeed;
-          },
-          set(this: Water, value) {
-            this.animationSpeed = value.num[0];
-          }
-        },
-        {
-          name: 'Infinite',
-          description:
-            'Draw the surface as an unbounded ocean reaching the horizon instead of a body of water ending at the node extent. Reaches the horizon without enlarging the camera far plane, so near-scene depth precision is unaffected. Leave off for ponds, lakes and pools, which have an edge.',
-          type: 'bool',
-          default: false,
-          get(this: Water, value) {
-            value.bool[0] = this.infinite;
-          },
-          set(this: Water, value) {
-            this.infinite = value.bool[0];
-          }
-        },
-        {
-          name: 'ViewDistance',
-          description:
-            'How far the surface is built out from the camera, in meters, or 0 to derive it from the true horizon distance for the camera height. Keep the sky AerialPerspectiveDistance at least this large, or the far water stops converging towards the sky colour and the hard band comes back.',
-          type: 'float',
-          default: 0,
-          options: { minValue: 0, maxValue: 100000 },
-          isHidden(this: Water) {
-            return !this.infinite;
-          },
-          get(this: Water, value) {
-            value.num[0] = this.viewDistance;
-          },
-          set(this: Water, value) {
-            this.viewDistance = value.num[0];
-          }
-        },
-        {
-          name: 'CausticsEnabled',
-          description: 'Whether the water projects caustics onto the geometry below it',
-          type: 'bool',
-          default: true,
-          get(this: Water, value) {
-            value.bool[0] = this.causticsEnabled;
-          },
-          set(this: Water, value) {
-            this.causticsEnabled = value.bool[0];
-          }
-        },
-        {
-          name: 'CausticsIntensity',
-          description: 'Strength of the caustic contrast',
-          type: 'float',
-          default: 1,
-          options: { animatable: true, minValue: 0, maxValue: 5 },
-          isHidden(this: Water) {
-            return !this.causticsEnabled;
-          },
-          get(this: Water, value) {
-            value.num[0] = this.causticsIntensity;
-          },
-          set(this: Water, value) {
-            this.causticsIntensity = value.num[0];
-          }
-        },
-        {
-          name: 'CausticsDepth',
-          description: 'Depth in meters below the surface where the caustics are in focus',
-          type: 'float',
-          default: 4,
-          options: { animatable: true, minValue: 0.01, maxValue: 100 },
-          isHidden(this: Water) {
-            return !this.causticsEnabled;
-          },
-          get(this: Water, value) {
-            value.num[0] = this.causticsDepth;
-          },
-          set(this: Water, value) {
-            this.causticsDepth = value.num[0];
-          }
-        },
-        {
-          name: 'CausticsRange',
-          description: 'Furthest distance in meters from the camera the caustic map reaches',
-          type: 'float',
-          default: 4,
-          options: { minValue: 1, maxValue: 1000 },
-          isHidden(this: Water) {
-            return !this.causticsEnabled;
-          },
-          get(this: Water, value) {
-            value.num[0] = this.causticsRange;
-          },
-          set(this: Water, value) {
-            this.causticsRange = value.num[0];
-          }
-        },
-        {
-          name: 'CausticsFadeDistance',
-          description:
-            'Width in meters the caustics fade out over at the edge of the map, or 0 to derive it from the range',
-          type: 'float',
-          default: 0,
-          options: { minValue: 0, maxValue: 100 },
-          isHidden(this: Water) {
-            return !this.causticsEnabled;
-          },
-          get(this: Water, value) {
-            value.num[0] = this.causticsFadeDistance;
-          },
-          set(this: Water, value) {
-            this.causticsFadeDistance = value.num[0];
-          }
-        },
-        {
-          name: 'CausticsSceneDepth',
-          description:
-            'Land caustics on the scene instead of on a plane at CausticsDepth. Reuses the sun shadow cascade, so it costs no extra geometry pass; WebGL2 keeps the plane, which its shadow map format cannot avoid.',
-          type: 'bool',
-          default: true,
-          get(this: Water, value) {
-            value.bool[0] = this.causticsSceneDepth;
-          },
-          set(this: Water, value) {
-            this.causticsSceneDepth = value.bool[0];
-          }
-        },
-        {
-          name: 'CausticsWarp',
-          description:
-            'How strongly caustic map texels are concentrated near the camera; ignored while the map already fits the water within range',
-          type: 'float',
-          default: 1.5,
-          options: { minValue: 0, maxValue: 8 },
-          isHidden(this: Water) {
-            return !this.causticsEnabled;
-          },
-          get(this: Water, value) {
-            value.num[0] = this.causticsWarp;
-          },
-          set(this: Water, value) {
-            this.causticsWarp = value.num[0];
-          }
-        },
-        {
-          name: 'UnderwaterEnabled',
-          description:
-            'Whether a camera inside this water sees it from the inside: the medium over the whole scene, the sky replaced by water, and the surface read from below with its Snell window. Atmospheric fog is suppressed while submerged.',
-          type: 'bool',
-          default: true,
-          get(this: Water, value) {
-            value.bool[0] = this.underwaterEnabled;
-          },
-          set(this: Water, value) {
-            this.underwaterEnabled = value.bool[0];
-          }
-        },
-        {
-          name: 'UnderwaterAmbientIntensity',
-          description:
-            'Scale on the downwelling sky light filling the water column. This is what the water fades to in the distance, so it sets how bright the underwater haze reads.',
-          type: 'float',
-          default: 1,
-          options: { animatable: true, minValue: 0, maxValue: 5 },
-          isHidden(this: Water) {
-            return !this.underwaterEnabled;
-          },
-          get(this: Water, value) {
-            value.num[0] = this.underwaterAmbientIntensity;
-          },
-          set(this: Water, value) {
-            this.underwaterAmbientIntensity = value.num[0];
-          }
-        },
-        {
-          name: 'UnderwaterGodRays',
-          description:
-            'Whether shafts of sunlight are marched through the water column. Reads the caustic map as the surface transmittance, so the shafts carry the pattern that lands on the sea bed; needs CausticsEnabled.',
-          type: 'bool',
-          default: true,
-          isHidden(this: Water) {
-            return !this.underwaterEnabled;
-          },
-          get(this: Water, value) {
-            value.bool[0] = this.underwaterGodRays;
-          },
-          set(this: Water, value) {
-            this.underwaterGodRays = value.bool[0];
-          }
-        },
-        {
-          name: 'UnderwaterGodRayIntensity',
-          description: 'Strength of the light shafts, 1 for the value the medium implies',
-          type: 'float',
-          default: 1,
-          options: { animatable: true, minValue: 0, maxValue: 5 },
-          isHidden(this: Water) {
-            return !this.underwaterEnabled || !this.underwaterGodRays;
-          },
-          get(this: Water, value) {
-            value.num[0] = this.underwaterGodRayIntensity;
-          },
-          set(this: Water, value) {
-            this.underwaterGodRayIntensity = value.num[0];
-          }
-        },
-        {
-          name: 'UnderwaterGodRaySteps',
-          description:
-            'Samples taken along each view ray for the light shafts. Raise it when the shafts read as grain rather than as beams.',
-          type: 'int',
-          default: 24,
-          options: { minValue: 4, maxValue: 96 },
-          isHidden(this: Water) {
-            return !this.underwaterEnabled || !this.underwaterGodRays;
-          },
-          get(this: Water, value) {
-            value.num[0] = this.underwaterGodRaySteps;
-          },
-          set(this: Water, value) {
-            this.underwaterGodRaySteps = value.num[0];
-          }
-        },
-        {
-          name: 'UnderwaterGodRayShadow',
-          description:
-            'Whether geometry standing in the water breaks the light shafts. The shafts come from the caustic map, which knows only what the surface did to the sunlight, so without this a shaft runs straight through a piling. Costs a shadow map lookup per march step.',
-          type: 'bool',
-          default: false,
-          isHidden(this: Water) {
-            return !this.underwaterEnabled || !this.underwaterGodRays;
-          },
-          get(this: Water, value) {
-            value.bool[0] = this.underwaterGodRayShadow;
-          },
-          set(this: Water, value) {
-            this.underwaterGodRayShadow = value.bool[0];
-          }
-        },
-        {
-          name: 'UnderwaterHysteresis',
-          description:
-            'Half-width in meters of the dead band around the surface the submerged test uses, so a camera at water level does not flip state every frame',
-          type: 'float',
-          default: 0.05,
-          options: { minValue: 0, maxValue: 2 },
-          isHidden(this: Water) {
-            return !this.underwaterEnabled;
-          },
-          get(this: Water, value) {
-            value.num[0] = this.underwaterHysteresis;
-          },
-          set(this: Water, value) {
-            this.underwaterHysteresis = value.num[0];
-          }
-        },
-        {
-          name: 'MediumMode',
-          description:
-            'How the water medium attenuates light: physical coefficients, or the legacy ramp textures',
-          type: 'string',
-          default: 'physical',
-          options: {
-            enum: {
-              labels: ['Physical', 'Ramp'],
-              values: ['physical', 'ramp']
-            }
-          },
-          get(this: Water, value) {
-            value.str[0] = this.material.mediumMode;
-          },
-          set(this: Water, value) {
-            this.material.mediumMode = value.str[0] as WaterMediumMode;
-          }
-        },
-        {
-          name: 'RefractionMode',
-          description:
-            'How the refracted view sample is located. March walks the refracted ray against the scene depth and samples where it lands, which keeps the sample on the object behind the water; Offset skips the search and displaces the screen UV by the wave normal, which costs no depth fetches but samples the wrong point. Use Offset on hardware that cannot afford the search.',
-          type: 'string',
-          default: 'march',
-          options: {
-            enum: {
-              labels: ['March (accurate)', 'Offset (cheap)'],
-              values: ['march', 'offset']
-            }
-          },
-          get(this: Water, value) {
-            value.str[0] = this.material.refractionMode;
-          },
-          set(this: Water, value) {
-            this.material.refractionMode = value.str[0] as WaterRefractionMode;
-          }
-        },
-        {
-          name: 'DebugOutput',
-          description:
-            'Debugging aid: replaces the water colour with one of the shading terms it is built from, so a broken term can be identified by eye',
-          type: 'string',
-          default: 'none',
-          options: {
-            enum: {
-              labels: WATER_DEBUG_OUTPUTS.map((e) => e.label),
-              values: WATER_DEBUG_OUTPUTS.map((e) => e.value)
-            }
-          },
-          get(this: Water, value) {
-            value.str[0] = this.debugOutput;
-          },
-          set(this: Water, value) {
-            this.debugOutput = value.str[0] as WaterDebugOutput;
-          }
-        },
-        {
-          name: 'Absorption',
-          description: 'Absorption coefficient sigma_a of the water medium, per meter, per channel',
-          type: 'rgb',
-          default: [1.0, 0.25, 0.15],
-          options: { animatable: true, minValue: 0, maxValue: 10 },
-          isHidden(this: Water) {
-            return this.material.mediumMode !== 'physical';
-          },
-          get(this: Water, value) {
-            value.num[0] = this.material.absorption.x;
-            value.num[1] = this.material.absorption.y;
-            value.num[2] = this.material.absorption.z;
-          },
-          set(this: Water, value) {
-            this.material.absorption = new Vector3(value.num[0], value.num[1], value.num[2]);
-          }
-        },
-        {
-          name: 'AbsorptionScale',
-          description: 'Scale for the absorption coefficient',
-          type: 'float',
-          default: 1,
-          options: { animatable: true, minValue: 0, maxValue: 10 },
-          isHidden(this: Water) {
-            return this.material.mediumMode !== 'physical';
-          },
-          get(this: Water, value) {
-            value.num[0] = this.material.absorptionScale;
-          },
-          set(this: Water, value) {
-            this.material.absorptionScale = value.num[0];
-          }
-        },
-        {
-          name: 'Scattering',
-          description: 'Scattering coefficient sigma_s of the water medium, per meter, per channel',
-          type: 'rgb',
-          default: [0.05, 0.12, 0.18],
-          options: { animatable: true, minValue: 0, maxValue: 10 },
-          isHidden(this: Water) {
-            return this.material.mediumMode !== 'physical';
-          },
-          get(this: Water, value) {
-            value.num[0] = this.material.scattering.x;
-            value.num[1] = this.material.scattering.y;
-            value.num[2] = this.material.scattering.z;
-          },
-          set(this: Water, value) {
-            this.material.scattering = new Vector3(value.num[0], value.num[1], value.num[2]);
-          }
-        },
-        {
-          name: 'ScatteringScale',
-          description: 'Scale for the scattering coefficient',
-          type: 'float',
-          default: 1,
-          options: { animatable: true, minValue: 0, maxValue: 10 },
-          isHidden(this: Water) {
-            return this.material.mediumMode !== 'physical';
-          },
-          get(this: Water, value) {
-            value.num[0] = this.material.scatteringScale;
-          },
-          set(this: Water, value) {
-            this.material.scatteringScale = value.num[0];
-          }
-        },
-        {
-          name: 'DepthScale',
-          description: 'Depth attenuation scale for the water material (ramp medium only)',
-          type: 'float',
-          default: 10,
-          options: { animatable: true, minValue: 0, maxValue: 100 },
-          isHidden(this: Water) {
-            return this.material.mediumMode !== 'ramp';
-          },
-          get(this: Water, value) {
-            value.num[0] = this.material.depthMulti;
-          },
-          set(this: Water, value) {
-            this.material.depthMulti = value.num[0];
-          }
-        },
-        {
-          name: 'ReflectionStrength',
-          description:
-            'Scale on the Fresnel reflectance, 1 for the physical value. Lower it to trade the reflection away and show more of what is beneath the surface.',
-          type: 'float',
-          default: 1,
-          options: { animatable: true, minValue: 0, maxValue: 1 },
-          get(this: Water, value) {
-            value.num[0] = this.material.reflectionStrength;
-          },
-          set(this: Water, value) {
-            this.material.reflectionStrength = value.num[0];
-          }
-        },
-        {
-          name: 'SubsurfaceIntensity',
-          description:
-            'Strength of the sunlight scattered forward through a wave crest, which is what makes a backlit crest glow. Grazing views of a low sun show it; looking down at the water does not.',
-          type: 'float',
-          default: 0.5,
-          options: { animatable: true, minValue: 0, maxValue: 10 },
-          get(this: Water, value) {
-            value.num[0] = this.material.subsurfaceIntensity;
-          },
-          set(this: Water, value) {
-            this.material.subsurfaceIntensity = value.num[0];
-          }
-        },
-        {
-          name: 'SubsurfaceCrestHeight',
-          description:
-            'Height above the still-water level, in meters, over which the lit wall of a crest thins by a factor of e. Crests are thin and glow; troughs see the full path through the medium and are absorbed, so they keep only a tinted trace. Lower it for a calm sea whose crests barely rise, raise it so only the tallest waves light up.',
-          type: 'float',
-          default: 1.5,
-          options: { animatable: true, minValue: 0.001, maxValue: 10 },
-          get(this: Water, value) {
-            value.num[0] = this.material.subsurfaceCrestHeight;
-          },
-          set(this: Water, value) {
-            this.material.subsurfaceCrestHeight = value.num[0];
-          }
-        },
-        {
-          name: 'SubsurfaceTint',
-          description:
-            'Colour of the crest glow, before the crest gate tints it with the medium extinction. A warm yellow-green keeps some red on the crests where the troughs have lost it.',
-          type: 'rgb',
-          default: [0.86, 0.98, 0.71],
-          options: { animatable: true, minValue: 0, maxValue: 1 },
-          get(this: Water, value) {
-            value.num[0] = this.material.subsurfaceTint.x;
-            value.num[1] = this.material.subsurfaceTint.y;
-            value.num[2] = this.material.subsurfaceTint.z;
-          },
-          set(this: Water, value) {
-            this.material.subsurfaceTint = new Vector3(value.num[0], value.num[1], value.num[2]);
-          }
-        },
-        {
-          name: 'SunScatteringIntensity',
-          description:
-            'Strength of the sunlight scattered out of the water column towards the eye, 1 for the value the medium coefficients imply. This is what makes a shadow on the water darken the water itself and a low sun tint it; 0 leaves the body lit by the environment alone.',
-          type: 'float',
-          default: 1,
-          options: { animatable: true, minValue: 0, maxValue: 4 },
-          get(this: Water, value) {
-            value.num[0] = this.material.sunScatteringIntensity;
-          },
-          set(this: Water, value) {
-            this.material.sunScatteringIntensity = value.num[0];
-          }
-        },
-        {
-          name: 'FoamAmount',
-          description:
-            'Coverage of the foam on breaking wave crests, mapped from the folding the wave generator reports. 0 disables crest foam. Independent of ShoreFoamAmount.',
-          type: 'float',
-          default: 1,
-          options: { animatable: true, minValue: 0, maxValue: 4 },
-          get(this: Water, value) {
-            value.num[0] = this.material.foamAmount;
-          },
-          set(this: Water, value) {
-            this.material.foamAmount = value.num[0];
-          }
-        },
-        {
-          name: 'FoamFalloff',
-          description:
-            'Falloff applied to crest foam coverage. Above 1 pushes light folding towards no foam at all, so only a genuinely broken crest shows - which is what keeps a windy sea from turning uniformly white.',
-          type: 'float',
-          default: 1.5,
-          options: { animatable: true, minValue: 0.01, maxValue: 8 },
-          isHidden(this: Water) {
-            return this.material.foamAmount <= 0;
-          },
-          get(this: Water, value) {
-            value.num[0] = this.material.foamFalloff;
-          },
-          set(this: Water, value) {
-            this.material.foamFalloff = value.num[0];
-          }
-        },
-        {
-          name: 'FoamColor',
-          description:
-            'Diffuse albedo of the foam, shared by the crest foam and the shoreline foam. Slightly off-white and slightly blue - sea foam is water and air, and a pure white one reads as snow.',
-          type: 'rgb',
-          default: [0.92, 0.95, 0.97],
-          options: { animatable: true, minValue: 0, maxValue: 1 },
-          get(this: Water, value) {
-            value.num[0] = this.material.foamColor.x;
-            value.num[1] = this.material.foamColor.y;
-            value.num[2] = this.material.foamColor.z;
-          },
-          set(this: Water, value) {
-            this.material.foamColor = new Vector3(value.num[0], value.num[1], value.num[2]);
-          }
-        },
-        {
-          name: 'FoamFeather',
-          description:
-            'How the white foam ends at its edges: low values cut crisp, separate clumps with hard outlines; high values let the foam thin out gradually into the bubbles beneath. Shared by all foam.',
-          type: 'float',
-          default: 0.4,
-          options: { animatable: true, minValue: 0.001, maxValue: 1 },
-          get(this: Water, value) {
-            value.num[0] = this.material.foamFeather;
-          },
-          set(this: Water, value) {
-            this.material.foamFeather = value.num[0];
-          }
-        },
-        {
-          name: 'FoamNormalStrength',
-          description:
-            'How lumpy the white foam looks: higher values light it as a heaped-up relief with bright rims towards the sun and shaded hollows; 0 lights it as a flat sheet.',
-          type: 'float',
-          default: 3.5,
-          options: { animatable: true, minValue: 0, maxValue: 30 },
-          get(this: Water, value) {
-            value.num[0] = this.material.foamNormalStrength;
-          },
-          set(this: Water, value) {
-            this.material.foamNormalStrength = value.num[0];
-          }
-        },
-        {
-          name: 'FoamBubbleColor',
-          description:
-            'Tint of the cloud of bubbles under and around the white foam, which gives it a soft, milky halo in the water instead of a cut-out edge.',
-          type: 'rgb',
-          default: [0.64, 0.83, 0.82],
-          options: { animatable: true, minValue: 0, maxValue: 1 },
-          get(this: Water, value) {
-            value.num[0] = this.material.foamBubbleColor.x;
-            value.num[1] = this.material.foamBubbleColor.y;
-            value.num[2] = this.material.foamBubbleColor.z;
-          },
-          set(this: Water, value) {
-            this.material.foamBubbleColor = new Vector3(value.num[0], value.num[1], value.num[2]);
-          }
-        },
-        {
-          name: 'FoamBubbleCoverage',
-          description:
-            'How strongly the bubble cloud shows and how far it reaches past the white foam, lightening the water around it. 0 removes it, leaving only the white foam.',
-          type: 'float',
-          default: 1.68,
-          options: { animatable: true, minValue: 0, maxValue: 5 },
-          get(this: Water, value) {
-            value.num[0] = this.material.foamBubbleCoverage;
-          },
-          set(this: Water, value) {
-            this.material.foamBubbleCoverage = value.num[0];
-          }
-        },
-        {
-          name: 'FoamBubbleDepth',
-          description:
-            'How deep under the surface the bubble cloud seems to float, in metres: it slides against the white foam as the view moves, giving the foam depth. 0 keeps it on the surface.',
-          type: 'float',
-          default: 0.14,
-          options: { animatable: true, minValue: 0, maxValue: 1 },
-          get(this: Water, value) {
-            value.num[0] = this.material.foamBubbleDepth;
-          },
-          set(this: Water, value) {
-            this.material.foamBubbleDepth = value.num[0];
-          }
-        },
-        {
-          name: 'FoamTexture',
-          description:
-            'Pattern the foam is cut from (red channel): as the foam thickens it shows the bright parts of the texture first and fills the dark ones last, so bright clumps appear before dark holes close. Empty for plain white foam that simply fades in and out with no pattern. Shared by all foam.',
-          type: 'object',
-          default: '',
-          options: {
-            mimeTypes: [
-              'image/jpeg',
-              'image/png',
-              'image/tga',
-              'image/vnd.radiance',
-              'image/x-dds',
-              'image/webp'
-            ]
-          },
-          isNullable() {
-            return true;
-          },
-          get(this: Water, value) {
-            value.str[0] = manager.getAssetId(this.material.foamTexture) ?? '';
-          },
-          async set(this: Water, value) {
-            if (!value) {
-              this.material.foamTexture = null;
-            } else if (value.str[0]) {
-              const assetId = value.str[0];
-              let tex: Nullable<Texture2D>;
-              try {
-                tex = await manager.fetchTexture<Texture2D>(assetId);
-              } catch (err) {
-                console.error(`Load asset failed: ${value.str[0]}: ${err}`);
-                tex = null;
-              }
-              if (tex?.isTexture2D()) {
-                this.material.foamTexture = tex;
+      return layoutWaterProps(
+        defineProps([
+          {
+            name: 'WaveGenerator',
+            description: 'Wave generator used to drive the water surface',
+            type: 'object',
+            default: null,
+            options: {
+              objectTypes: [FFTWaveGenerator, FBMWaveGenerator, GerstnerWaveGenerator]
+            },
+            isNullable() {
+              return true;
+            },
+            get(this: Water, value) {
+              value.object[0] = this.waveGenerator ?? null;
+            },
+            set(this: Water, value) {
+              if (!value.object[0]) {
+                this.waveGenerator = null;
               } else {
-                console.error('Invalid texture type');
+                this.waveGenerator = value.object[0] as WaveGenerator;
               }
             }
-          }
-        },
-        {
-          name: 'FoamTextureSize',
-          description:
-            'How large the foam pattern is on the water, in metres per repeat of the foam texture: larger values give bigger clumps and holes.',
-          type: 'float',
-          default: 4,
-          options: { animatable: true, minValue: 0.01, maxValue: 50 },
-          get(this: Water, value) {
-            value.num[0] = this.material.foamTextureSize;
           },
-          set(this: Water, value) {
-            this.material.foamTextureSize = value.num[0];
-          }
-        },
-        {
-          name: 'ShoreFoamAmount',
-          description:
-            'Coverage of the foam that collects where the water meets a surface - the waterline on a shelving bed, and the collar around a piling or a hull. 0 disables it, which also removes its cost. Independent of the crest foam the wave generator produces. Requires WebGL2 or WebGPU.',
-          type: 'float',
-          default: 0,
-          // Deliberately not animatable: crossing zero switches the whole
-          // feature in and out of the shader, so an animation curve driving this
-          // through zero rebuilds the program on the way past.
-          options: { minValue: 0, maxValue: 4 },
-          get(this: Water, value) {
-            value.num[0] = this.shoreFoamAmount;
+          {
+            name: 'Interaction',
+            description:
+              'Dynamic height field layered over the surface, driven by things moving through the water: ripples, wakes and a foam trail. Null for none.',
+            type: 'object',
+            default: null,
+            options: {
+              objectTypes: [WaterInteraction]
+            },
+            isNullable() {
+              return true;
+            },
+            get(this: Water, value) {
+              value.object[0] = this.interaction ?? null;
+            },
+            set(this: Water, value) {
+              this.interaction = (value.object[0] as Nullable<WaterInteraction>) ?? null;
+            }
           },
-          set(this: Water, value) {
-            this.shoreFoamAmount = value.num[0];
-          }
-        },
-        {
-          name: 'ShoreFoamDepth',
-          description:
-            'How far the foam band reaches from the surface behind it, in meters. Over a bed this is a depth of water; against something vertical it is the horizontal distance to its side, and one value serves both. How wide that is on screen depends on the geometry: a thin line on a steep drop-off, a broad stretch on a flat shelf.',
-          type: 'float',
-          default: 0.5,
-          options: { animatable: true, minValue: 0.001, maxValue: 20 },
-          isHidden(this: Water) {
-            return this.shoreFoamAmount <= 0;
+          {
+            name: 'GridScale',
+            description: 'Scale of the water simulation grid',
+            type: 'float',
+            default: 1,
+            options: { minValue: 0, maxValue: 1 },
+            get(this: Water, value) {
+              value.num[0] = this.gridScale;
+            },
+            set(this: Water, value) {
+              this.gridScale = value.num[0];
+            }
           },
-          get(this: Water, value) {
-            value.num[0] = this.shoreFoamDepth;
+          {
+            name: 'Wireframe',
+            description: 'If true, renders the water surface as wireframe',
+            type: 'bool',
+            default: false,
+            get(this: Water, value) {
+              value.bool[0] = this.wireframe;
+            },
+            set(this: Water, value) {
+              this.wireframe = value.bool[0];
+            }
           },
-          set(this: Water, value) {
-            this.shoreFoamDepth = value.num[0];
-          }
-        },
-        {
-          name: 'ShoreFoamFalloff',
-          description:
-            'Falloff across the foam band. Above 1 pushes the coverage towards the contact line and keeps the outer edge thin and broken.',
-          type: 'float',
-          default: 1.5,
-          options: { animatable: true, minValue: 0.01, maxValue: 8 },
-          isHidden(this: Water) {
-            return this.shoreFoamAmount <= 0;
+          {
+            name: 'AnimationSpeed',
+            description: 'Playback speed of wave animation',
+            type: 'float',
+            default: 1,
+            options: { animatable: true, minValue: 0, maxValue: 100 },
+            get(this: Water, value) {
+              value.num[0] = this.animationSpeed;
+            },
+            set(this: Water, value) {
+              this.animationSpeed = value.num[0];
+            }
           },
-          get(this: Water, value) {
-            value.num[0] = this.shoreFoamFalloff;
+          {
+            name: 'Infinite',
+            description:
+              'Draw the surface as an unbounded ocean reaching the horizon instead of a body of water ending at the node extent. Reaches the horizon without enlarging the camera far plane, so near-scene depth precision is unaffected. Leave off for ponds, lakes and pools, which have an edge.',
+            type: 'bool',
+            default: false,
+            get(this: Water, value) {
+              value.bool[0] = this.infinite;
+            },
+            set(this: Water, value) {
+              this.infinite = value.bool[0];
+            }
           },
-          set(this: Water, value) {
-            this.shoreFoamFalloff = value.num[0];
-          }
-        },
-        {
-          name: 'ShoreFoamScale',
-          description:
-            'Size of the clumps the band breaks into, as cycles across the band rather than cycles per meter. Being relative to the band width, one value reads the same on a shoreline metres across and on a collar a handspan wide.',
-          type: 'float',
-          default: 2.5,
-          options: { animatable: true, minValue: 0, maxValue: 20 },
-          isHidden(this: Water) {
-            return this.shoreFoamAmount <= 0;
+          {
+            name: 'ViewDistance',
+            description:
+              'How far the surface is built out from the camera, in meters, or 0 to derive it from the true horizon distance for the camera height. Keep the sky AerialPerspectiveDistance at least this large, or the far water stops converging towards the sky colour and the hard band comes back.',
+            type: 'float',
+            default: 0,
+            options: { minValue: 0, maxValue: 100000 },
+            isHidden(this: Water) {
+              return !this.infinite;
+            },
+            get(this: Water, value) {
+              value.num[0] = this.viewDistance;
+            },
+            set(this: Water, value) {
+              this.viewDistance = value.num[0];
+            }
           },
-          get(this: Water, value) {
-            value.num[0] = this.shoreFoamScale;
+          {
+            name: 'CausticsEnabled',
+            description: 'Whether the water projects caustics onto the geometry below it',
+            type: 'bool',
+            default: true,
+            get(this: Water, value) {
+              value.bool[0] = this.causticsEnabled;
+            },
+            set(this: Water, value) {
+              this.causticsEnabled = value.bool[0];
+            }
           },
-          set(this: Water, value) {
-            this.shoreFoamScale = value.num[0];
-          }
-        },
-        {
-          name: 'ShoreFoamFeather',
-          description:
-            'Width of the fade as foam coverage thresholds the foam texture. Small values cut it into hard-edged clumps; large values fade it in softly.',
-          type: 'float',
-          default: 0.4,
-          options: { animatable: true, minValue: 0.001, maxValue: 1 },
-          isHidden(this: Water) {
-            return this.shoreFoamAmount <= 0;
+          {
+            name: 'CausticsIntensity',
+            description: 'Strength of the caustic contrast',
+            type: 'float',
+            default: 1,
+            options: { animatable: true, minValue: 0, maxValue: 5 },
+            isHidden(this: Water) {
+              return !this.causticsEnabled;
+            },
+            get(this: Water, value) {
+              value.num[0] = this.causticsIntensity;
+            },
+            set(this: Water, value) {
+              this.causticsIntensity = value.num[0];
+            }
           },
-          get(this: Water, value) {
-            value.num[0] = this.shoreFoamFeather;
+          {
+            name: 'CausticsDepth',
+            description: 'Depth in meters below the surface where the caustics are in focus',
+            type: 'float',
+            default: 4,
+            options: { animatable: true, minValue: 0.01, maxValue: 100 },
+            isHidden(this: Water) {
+              return !this.causticsEnabled;
+            },
+            get(this: Water, value) {
+              value.num[0] = this.causticsDepth;
+            },
+            set(this: Water, value) {
+              this.causticsDepth = value.num[0];
+            }
           },
-          set(this: Water, value) {
-            this.shoreFoamFeather = value.num[0];
-          }
-        },
-        {
-          name: 'ShoreFoamWashAmount',
-          description:
-            'How far the waterline runs up and back, as a fraction of ShoreFoamDepth. This is what makes the band read as surf rather than as a painted rim; 0 leaves it static. Above 1 the band closes completely at the bottom of the cycle, which looks like the foam blinking out.',
-          type: 'float',
-          default: 0.5,
-          options: { animatable: true, minValue: 0, maxValue: 2 },
-          isHidden(this: Water) {
-            return this.shoreFoamAmount <= 0;
+          {
+            name: 'CausticsRange',
+            description: 'Furthest distance in meters from the camera the caustic map reaches',
+            type: 'float',
+            default: 4,
+            options: { minValue: 1, maxValue: 1000 },
+            isHidden(this: Water) {
+              return !this.causticsEnabled;
+            },
+            get(this: Water, value) {
+              value.num[0] = this.causticsRange;
+            },
+            set(this: Water, value) {
+              this.causticsRange = value.num[0];
+            }
           },
-          get(this: Water, value) {
-            value.num[0] = this.shoreFoamWashAmount;
+          {
+            name: 'CausticsFadeDistance',
+            description:
+              'Width in meters the caustics fade out over at the edge of the map, or 0 to derive it from the range',
+            type: 'float',
+            default: 0,
+            options: { minValue: 0, maxValue: 100 },
+            isHidden(this: Water) {
+              return !this.causticsEnabled;
+            },
+            get(this: Water, value) {
+              value.num[0] = this.causticsFadeDistance;
+            },
+            set(this: Water, value) {
+              this.causticsFadeDistance = value.num[0];
+            }
           },
-          set(this: Water, value) {
-            this.shoreFoamWashAmount = value.num[0];
-          }
-        },
-        {
-          name: 'ShoreFoamWashSpeed',
-          description: 'Run-up cycles per second. Swell rather than wind waves, so well under 1.',
-          type: 'float',
-          default: 0.12,
-          options: { animatable: true, minValue: 0, maxValue: 2 },
-          isHidden(this: Water) {
-            return this.shoreFoamAmount <= 0;
+          {
+            name: 'CausticsSceneDepth',
+            description:
+              'Land caustics on the scene instead of on a plane at CausticsDepth. Reuses the sun shadow cascade, so it costs no extra geometry pass; WebGL2 keeps the plane, which its shadow map format cannot avoid.',
+            type: 'bool',
+            default: true,
+            get(this: Water, value) {
+              value.bool[0] = this.causticsSceneDepth;
+            },
+            set(this: Water, value) {
+              this.causticsSceneDepth = value.bool[0];
+            }
           },
-          get(this: Water, value) {
-            value.num[0] = this.shoreFoamWashSpeed;
+          {
+            name: 'CausticsWarp',
+            description:
+              'How strongly caustic map texels are concentrated near the camera; ignored while the map already fits the water within range',
+            type: 'float',
+            default: 1.5,
+            options: { minValue: 0, maxValue: 8 },
+            isHidden(this: Water) {
+              return !this.causticsEnabled;
+            },
+            get(this: Water, value) {
+              value.num[0] = this.causticsWarp;
+            },
+            set(this: Water, value) {
+              this.causticsWarp = value.num[0];
+            }
           },
-          set(this: Water, value) {
-            this.shoreFoamWashSpeed = value.num[0];
-          }
-        },
-        {
-          name: 'ShoreFoamWashScale',
-          description:
-            'Spatial frequency of the run-up phase, in cycles per meter. At 0 the whole waterline rises and falls in lockstep, which reads as the water level itself changing; a cycle every few tens of meters breaks a long shoreline into sections that run out of step with one another.',
-          type: 'float',
-          default: 0.03,
-          options: { animatable: true, minValue: 0, maxValue: 1 },
-          isHidden(this: Water) {
-            return this.shoreFoamAmount <= 0;
+          {
+            name: 'CausticsMinDepth',
+            description:
+              "Water shallower than this, in metres, shows no caustics, fading in around it: raise it if dark or jagged caustic patches appear where the water thins out on a beach, lower it to bring the light patterns closer to the water's edge.",
+            type: 'float',
+            default: 0.15,
+            options: { animatable: true, minValue: 0, maxValue: 2 },
+            isHidden(this: Water) {
+              return !this.causticsEnabled;
+            },
+            get(this: Water, value) {
+              value.num[0] = this.causticsMinDepth;
+            },
+            set(this: Water, value) {
+              this.causticsMinDepth = value.num[0];
+            }
           },
-          get(this: Water, value) {
-            value.num[0] = this.shoreFoamWashScale;
+          {
+            name: 'UnderwaterEnabled',
+            description:
+              'Whether a camera inside this water sees it from the inside: the medium over the whole scene, the sky replaced by water, and the surface read from below with its Snell window. Atmospheric fog is suppressed while submerged.',
+            type: 'bool',
+            default: true,
+            get(this: Water, value) {
+              value.bool[0] = this.underwaterEnabled;
+            },
+            set(this: Water, value) {
+              this.underwaterEnabled = value.bool[0];
+            }
           },
-          set(this: Water, value) {
-            this.shoreFoamWashScale = value.num[0];
-          }
-        },
-        {
-          name: 'EdgeFadeWidth',
-          description:
-            'Thickness in metres over which a thin sheet of water fades in from the ground under it, so swash running up the sand shows the sand through it. 0 disables it.',
-          type: 'float',
-          default: 0.05,
-          options: { animatable: true, minValue: 0, maxValue: 1 },
-          get(this: Water, value) {
-            value.num[0] = this.edgeFadeWidth;
+          {
+            name: 'UnderwaterAmbientIntensity',
+            description:
+              'Scale on the downwelling sky light filling the water column. This is what the water fades to in the distance, so it sets how bright the underwater haze reads.',
+            type: 'float',
+            default: 1,
+            options: { animatable: true, minValue: 0, maxValue: 5 },
+            isHidden(this: Water) {
+              return !this.underwaterEnabled;
+            },
+            get(this: Water, value) {
+              value.num[0] = this.underwaterAmbientIntensity;
+            },
+            set(this: Water, value) {
+              this.underwaterAmbientIntensity = value.num[0];
+            }
           },
-          set(this: Water, value) {
-            this.edgeFadeWidth = value.num[0];
-          }
-        },
-        {
-          name: 'ShoreWaveHeight',
-          description:
-            'Crest to trough height in metres of the waves rolling in to the shore and washing up the beach, 0 for none. They come square on to the coast whatever its shape, bunch up as the water shallows, sharpen and lean as they near the shore, and each crest lifts the water up the sand and lets it drain back; boats ride them. Needs the scene signed distance field: WebGPU with the scene SDFEnabled on.',
-          type: 'float',
-          default: 0,
-          options: { animatable: true, minValue: 0, maxValue: 3 },
-          isHidden(this: Water) {
-            return false;
+          {
+            name: 'UnderwaterGodRays',
+            description:
+              'Whether shafts of sunlight are marched through the water column. Reads the caustic map as the surface transmittance, so the shafts carry the pattern that lands on the sea bed; needs CausticsEnabled.',
+            type: 'bool',
+            default: true,
+            isHidden(this: Water) {
+              return !this.underwaterEnabled;
+            },
+            get(this: Water, value) {
+              value.bool[0] = this.underwaterGodRays;
+            },
+            set(this: Water, value) {
+              this.underwaterGodRays = value.bool[0];
+            }
           },
-          get(this: Water, value) {
-            value.num[0] = this.shoreWaveHeight;
+          {
+            name: 'UnderwaterGodRayIntensity',
+            description: 'Strength of the light shafts, 1 for the value the medium implies',
+            type: 'float',
+            default: 1,
+            options: { animatable: true, minValue: 0, maxValue: 5 },
+            isHidden(this: Water) {
+              return !this.underwaterEnabled || !this.underwaterGodRays;
+            },
+            get(this: Water, value) {
+              value.num[0] = this.underwaterGodRayIntensity;
+            },
+            set(this: Water, value) {
+              this.underwaterGodRayIntensity = value.num[0];
+            }
           },
-          set(this: Water, value) {
-            this.shoreWaveHeight = value.num[0];
-          }
-        },
-        {
-          name: 'ShoreWaveLength',
-          description:
-            'Distance in metres between crests at the outer edge of the zone. They bunch up towards the shore as real waves do in shallowing water.',
-          type: 'float',
-          default: 8,
-          options: { animatable: true, minValue: 0.5, maxValue: 100 },
-          isHidden(this: Water) {
-            return this.shoreWaveHeight <= 0;
+          {
+            name: 'UnderwaterGodRaySteps',
+            description:
+              'Samples taken along each view ray for the light shafts. Raise it when the shafts read as grain rather than as beams.',
+            type: 'int',
+            default: 24,
+            options: { minValue: 4, maxValue: 96 },
+            isHidden(this: Water) {
+              return !this.underwaterEnabled || !this.underwaterGodRays;
+            },
+            get(this: Water, value) {
+              value.num[0] = this.underwaterGodRaySteps;
+            },
+            set(this: Water, value) {
+              this.underwaterGodRaySteps = value.num[0];
+            }
           },
-          get(this: Water, value) {
-            value.num[0] = this.shoreWaveLength;
+          {
+            name: 'UnderwaterGodRayShadow',
+            description:
+              'Whether geometry standing in the water breaks the light shafts. The shafts come from the caustic map, which knows only what the surface did to the sunlight, so without this a shaft runs straight through a piling. Costs a shadow map lookup per march step.',
+            type: 'bool',
+            default: false,
+            isHidden(this: Water) {
+              return !this.underwaterEnabled || !this.underwaterGodRays;
+            },
+            get(this: Water, value) {
+              value.bool[0] = this.underwaterGodRayShadow;
+            },
+            set(this: Water, value) {
+              this.underwaterGodRayShadow = value.bool[0];
+            }
           },
-          set(this: Water, value) {
-            this.shoreWaveLength = value.num[0];
-          }
-        },
-        {
-          name: 'ShoreWavePeriod',
-          description: 'Seconds between successive shore waves.',
-          type: 'float',
-          default: 6,
-          options: { animatable: true, minValue: 0.5, maxValue: 30 },
-          isHidden(this: Water) {
-            return this.shoreWaveHeight <= 0;
+          {
+            name: 'UnderwaterHysteresis',
+            description:
+              'Half-width in meters of the dead band around the surface the submerged test uses, so a camera at water level does not flip state every frame',
+            type: 'float',
+            default: 0.05,
+            options: { minValue: 0, maxValue: 2 },
+            isHidden(this: Water) {
+              return !this.underwaterEnabled;
+            },
+            get(this: Water, value) {
+              value.num[0] = this.underwaterHysteresis;
+            },
+            set(this: Water, value) {
+              this.underwaterHysteresis = value.num[0];
+            }
           },
-          get(this: Water, value) {
-            value.num[0] = this.shoreWavePeriod;
+          {
+            name: 'RefractionMode',
+            description:
+              'How the refracted view sample is located. March walks the refracted ray against the scene depth and samples where it lands, which keeps the sample on the object behind the water; Offset skips the search and displaces the screen UV by the wave normal, which costs no depth fetches but samples the wrong point. Use Offset on hardware that cannot afford the search.',
+            type: 'string',
+            default: 'march',
+            options: {
+              enum: {
+                labels: ['March (accurate)', 'Offset (cheap)'],
+                values: ['march', 'offset']
+              }
+            },
+            get(this: Water, value) {
+              value.str[0] = this.material.refractionMode;
+            },
+            set(this: Water, value) {
+              this.material.refractionMode = value.str[0] as WaterRefractionMode;
+            }
           },
-          set(this: Water, value) {
-            this.shoreWavePeriod = value.num[0];
-          }
-        },
-        {
-          name: 'ShoreWaveZone',
-          description:
-            'How far out from the waterline the shore waves rise, in metres. They grow over the zone and break near its inner end.',
-          type: 'float',
-          default: 20,
-          options: { animatable: true, minValue: 1, maxValue: 200 },
-          isHidden(this: Water) {
-            return this.shoreWaveHeight <= 0;
+          {
+            name: 'DebugOutput',
+            description:
+              'Debugging aid: replaces the water colour with one of the shading terms it is built from, so a broken term can be identified by eye',
+            type: 'string',
+            default: 'none',
+            options: {
+              enum: {
+                labels: WATER_DEBUG_OUTPUTS.map((e) => e.label),
+                values: WATER_DEBUG_OUTPUTS.map((e) => e.value)
+              }
+            },
+            get(this: Water, value) {
+              value.str[0] = this.debugOutput;
+            },
+            set(this: Water, value) {
+              this.debugOutput = value.str[0] as WaterDebugOutput;
+            }
           },
-          get(this: Water, value) {
-            value.num[0] = this.shoreWaveZone;
+          {
+            name: 'Absorption',
+            description: 'Absorption coefficient sigma_a of the water medium, per meter, per channel',
+            type: 'rgb',
+            default: [1.0, 0.25, 0.15],
+            options: { animatable: true, minValue: 0, maxValue: 10 },
+            get(this: Water, value) {
+              value.num[0] = this.material.absorption.x;
+              value.num[1] = this.material.absorption.y;
+              value.num[2] = this.material.absorption.z;
+            },
+            set(this: Water, value) {
+              this.material.absorption = new Vector3(value.num[0], value.num[1], value.num[2]);
+            }
           },
-          set(this: Water, value) {
-            this.shoreWaveZone = value.num[0];
-          }
-        },
-        {
-          name: 'ShoreWaveSharpness',
-          description:
-            'How sharp the crests become at the shore: 0 keeps a rounded sine, towards 1 a pointed crest between long flat troughs.',
-          type: 'float',
-          default: 0.7,
-          options: { animatable: true, minValue: 0, maxValue: 0.95 },
-          isHidden(this: Water) {
-            return this.shoreWaveHeight <= 0;
+          {
+            name: 'AbsorptionScale',
+            description: 'Scale for the absorption coefficient',
+            type: 'float',
+            default: 1,
+            options: { animatable: true, minValue: 0, maxValue: 10 },
+            get(this: Water, value) {
+              value.num[0] = this.material.absorptionScale;
+            },
+            set(this: Water, value) {
+              this.material.absorptionScale = value.num[0];
+            }
           },
-          get(this: Water, value) {
-            value.num[0] = this.shoreWaveSharpness;
+          {
+            name: 'Scattering',
+            description: 'Scattering coefficient sigma_s of the water medium, per meter, per channel',
+            type: 'rgb',
+            default: [0.05, 0.12, 0.18],
+            options: { animatable: true, minValue: 0, maxValue: 10 },
+            get(this: Water, value) {
+              value.num[0] = this.material.scattering.x;
+              value.num[1] = this.material.scattering.y;
+              value.num[2] = this.material.scattering.z;
+            },
+            set(this: Water, value) {
+              this.material.scattering = new Vector3(value.num[0], value.num[1], value.num[2]);
+            }
           },
-          set(this: Water, value) {
-            this.shoreWaveSharpness = value.num[0];
-          }
-        },
-        {
-          name: 'ShoreWaveLean',
-          description:
-            'How far the crests lean towards the shore there: 0 keeps them upright, 1 gives a steep front face and a long gentle back.',
-          type: 'float',
-          default: 0.5,
-          options: { animatable: true, minValue: 0, maxValue: 1 },
-          isHidden(this: Water) {
-            return this.shoreWaveHeight <= 0;
+          {
+            name: 'ScatteringScale',
+            description: 'Scale for the scattering coefficient',
+            type: 'float',
+            default: 1,
+            options: { animatable: true, minValue: 0, maxValue: 10 },
+            get(this: Water, value) {
+              value.num[0] = this.material.scatteringScale;
+            },
+            set(this: Water, value) {
+              this.material.scatteringScale = value.num[0];
+            }
           },
-          get(this: Water, value) {
-            value.num[0] = this.shoreWaveLean;
+          {
+            name: 'ReflectionStrength',
+            description:
+              'Scale on the Fresnel reflectance, 1 for the physical value. Lower it to trade the reflection away and show more of what is beneath the surface.',
+            type: 'float',
+            default: 1,
+            options: { animatable: true, minValue: 0, maxValue: 1 },
+            get(this: Water, value) {
+              value.num[0] = this.material.reflectionStrength;
+            },
+            set(this: Water, value) {
+              this.material.reflectionStrength = value.num[0];
+            }
           },
-          set(this: Water, value) {
-            this.shoreWaveLean = value.num[0];
-          }
-        },
-        {
-          name: 'ShoreWaveFoamFadeRate',
-          description:
-            'How quickly the foam the shore waves leave behind dies away: low values leave long-lasting trails and sheets of foam behind each wave, high values keep only fresh foam at the breaking crests.',
-          type: 'float',
-          default: 0.8,
-          options: { animatable: true, minValue: 0, maxValue: 20 },
-          isHidden(this: Water) {
-            return this.shoreWaveHeight <= 0;
+          {
+            name: 'SubsurfaceIntensity',
+            description:
+              'Strength of the sunlight scattered forward through a wave crest, which is what makes a backlit crest glow. Grazing views of a low sun show it; looking down at the water does not.',
+            type: 'float',
+            default: 0.5,
+            options: { animatable: true, minValue: 0, maxValue: 10 },
+            get(this: Water, value) {
+              value.num[0] = this.material.subsurfaceIntensity;
+            },
+            set(this: Water, value) {
+              this.material.subsurfaceIntensity = value.num[0];
+            }
           },
-          get(this: Water, value) {
-            value.num[0] = this.shoreWaveFoamFadeRate;
+          {
+            name: 'SubsurfaceCrestHeight',
+            description:
+              'Height above the still-water level, in meters, over which the lit wall of a crest thins by a factor of e. Crests are thin and glow; troughs see the full path through the medium and are absorbed, so they keep only a tinted trace. Lower it for a calm sea whose crests barely rise, raise it so only the tallest waves light up.',
+            type: 'float',
+            default: 1.5,
+            options: { animatable: true, minValue: 0.001, maxValue: 10 },
+            get(this: Water, value) {
+              value.num[0] = this.material.subsurfaceCrestHeight;
+            },
+            set(this: Water, value) {
+              this.material.subsurfaceCrestHeight = value.num[0];
+            }
           },
-          set(this: Water, value) {
-            this.shoreWaveFoamFadeRate = value.num[0];
-          }
-        },
-        {
-          name: 'ShoreWaveFoamStrength',
-          description:
-            'How much foam the breaking shore waves throw up: higher values give thicker, whiter foam on and behind the crests. Balance it against the fade rate.',
-          type: 'float',
-          default: 1,
-          options: { animatable: true, minValue: 0, maxValue: 5 },
-          isHidden(this: Water) {
-            return this.shoreWaveHeight <= 0;
+          {
+            name: 'SubsurfaceTint',
+            description:
+              'Colour of the crest glow, before the crest gate tints it with the medium extinction. A warm yellow-green keeps some red on the crests where the troughs have lost it.',
+            type: 'rgb',
+            default: [0.86, 0.98, 0.71],
+            options: { animatable: true, minValue: 0, maxValue: 1 },
+            get(this: Water, value) {
+              value.num[0] = this.material.subsurfaceTint.x;
+              value.num[1] = this.material.subsurfaceTint.y;
+              value.num[2] = this.material.subsurfaceTint.z;
+            },
+            set(this: Water, value) {
+              this.material.subsurfaceTint = new Vector3(value.num[0], value.num[1], value.num[2]);
+            }
           },
-          get(this: Water, value) {
-            value.num[0] = this.shoreWaveFoamStrength;
+          {
+            name: 'SunScatteringIntensity',
+            description:
+              'Strength of the sunlight scattered out of the water column towards the eye, 1 for the value the medium coefficients imply. This is what makes a shadow on the water darken the water itself and a low sun tint it; 0 leaves the body lit by the environment alone.',
+            type: 'float',
+            default: 1,
+            options: { animatable: true, minValue: 0, maxValue: 4 },
+            get(this: Water, value) {
+              value.num[0] = this.material.sunScatteringIntensity;
+            },
+            set(this: Water, value) {
+              this.material.sunScatteringIntensity = value.num[0];
+            }
           },
-          set(this: Water, value) {
-            this.shoreWaveFoamStrength = value.num[0];
-          }
-        },
-        {
-          name: 'ShoreWaveFoamCoverage',
-          description:
-            'How much of each shore wave foams: low values foam only at the steepest breaking fronts, high values spread foam over more of the wave.',
-          type: 'float',
-          default: 0.55,
-          options: { animatable: true, minValue: 0, maxValue: 1 },
-          isHidden(this: Water) {
-            return this.shoreWaveHeight <= 0;
+          {
+            name: 'FoamAmount',
+            description:
+              'Coverage of the foam on breaking wave crests, mapped from the folding the wave generator reports. 0 disables crest foam.',
+            type: 'float',
+            default: 1,
+            options: { animatable: true, minValue: 0, maxValue: 4 },
+            get(this: Water, value) {
+              value.num[0] = this.material.foamAmount;
+            },
+            set(this: Water, value) {
+              this.material.foamAmount = value.num[0];
+            }
           },
-          get(this: Water, value) {
-            value.num[0] = this.shoreWaveFoamCoverage;
+          {
+            name: 'FoamFalloff',
+            description:
+              'Falloff applied to crest foam coverage. Above 1 pushes light folding towards no foam at all, so only a genuinely broken crest shows - which is what keeps a windy sea from turning uniformly white.',
+            type: 'float',
+            default: 1.5,
+            options: { animatable: true, minValue: 0.01, maxValue: 8 },
+            isHidden(this: Water) {
+              return this.material.foamAmount <= 0;
+            },
+            get(this: Water, value) {
+              value.num[0] = this.material.foamFalloff;
+            },
+            set(this: Water, value) {
+              this.material.foamFalloff = value.num[0];
+            }
           },
-          set(this: Water, value) {
-            this.shoreWaveFoamCoverage = value.num[0];
-          }
-        },
-        {
-          name: 'ShoreWaveShallowFoamDepth',
-          description:
-            'How deep the water can be and still churn up foam as the waves run in, in metres: larger values widen the band of foam along the beach.',
-          type: 'float',
-          default: 0.65,
-          options: { animatable: true, minValue: 0.01, maxValue: 3 },
-          isHidden(this: Water) {
-            return this.shoreWaveHeight <= 0;
+          {
+            name: 'FoamColor',
+            description:
+              'Diffuse albedo of the foam, shared by the crest foam and the shoreline foam. Slightly off-white and slightly blue - sea foam is water and air, and a pure white one reads as snow.',
+            type: 'rgb',
+            default: [0.92, 0.95, 0.97],
+            options: { animatable: true, minValue: 0, maxValue: 1 },
+            get(this: Water, value) {
+              value.num[0] = this.material.foamColor.x;
+              value.num[1] = this.material.foamColor.y;
+              value.num[2] = this.material.foamColor.z;
+            },
+            set(this: Water, value) {
+              this.material.foamColor = new Vector3(value.num[0], value.num[1], value.num[2]);
+            }
           },
-          get(this: Water, value) {
-            value.num[0] = this.shoreWaveShallowFoamDepth;
+          {
+            name: 'FoamFeather',
+            description:
+              'How the white foam ends at its edges: low values cut crisp, separate clumps with hard outlines; high values let the foam thin out gradually into the bubbles beneath. Shared by all foam.',
+            type: 'float',
+            default: 0.4,
+            options: { animatable: true, minValue: 0.001, maxValue: 1 },
+            get(this: Water, value) {
+              value.num[0] = this.material.foamFeather;
+            },
+            set(this: Water, value) {
+              this.material.foamFeather = value.num[0];
+            }
           },
-          set(this: Water, value) {
-            this.shoreWaveShallowFoamDepth = value.num[0];
-          }
-        },
-        {
-          name: 'ShoreWaveShallowFoamStrength',
-          description:
-            "How much foam the shallow water at the beach makes as the waves wash over it: higher values give a denser white wash, 0 leaves only the breaking crests' foam.",
-          type: 'float',
-          default: 2,
-          options: { animatable: true, minValue: 0, maxValue: 5 },
-          isHidden(this: Water) {
-            return this.shoreWaveHeight <= 0;
+          {
+            name: 'FoamNormalStrength',
+            description:
+              'How lumpy the white foam looks: higher values light it as a heaped-up relief with bright rims towards the sun and shaded hollows; 0 lights it as a flat sheet.',
+            type: 'float',
+            default: 3.5,
+            options: { animatable: true, minValue: 0, maxValue: 30 },
+            get(this: Water, value) {
+              value.num[0] = this.material.foamNormalStrength;
+            },
+            set(this: Water, value) {
+              this.material.foamNormalStrength = value.num[0];
+            }
           },
-          get(this: Water, value) {
-            value.num[0] = this.shoreWaveShallowFoamStrength;
+          {
+            name: 'FoamBubbleColor',
+            description:
+              'Tint of the cloud of bubbles under and around the white foam, which gives it a soft, milky halo in the water instead of a cut-out edge.',
+            type: 'rgb',
+            default: [0.64, 0.83, 0.82],
+            options: { animatable: true, minValue: 0, maxValue: 1 },
+            get(this: Water, value) {
+              value.num[0] = this.material.foamBubbleColor.x;
+              value.num[1] = this.material.foamBubbleColor.y;
+              value.num[2] = this.material.foamBubbleColor.z;
+            },
+            set(this: Water, value) {
+              this.material.foamBubbleColor = new Vector3(value.num[0], value.num[1], value.num[2]);
+            }
           },
-          set(this: Water, value) {
-            this.shoreWaveShallowFoamStrength = value.num[0];
-          }
-        },
-        {
-          name: 'CheapRefractionDepth',
-          description:
-            'Depth in meters the cheap refraction mode assumes the water is. Sets how strong the distortion looks when RefractionMode is Offset; ignored by March. A constant rather than the measured distance to the bottom, because an offset scaled by that distance paints a second copy of any object breaking the surface.',
-          type: 'float',
-          default: 1,
-          options: { animatable: true, minValue: 0, maxValue: 20 },
-          isHidden(this: Water) {
-            return this.material.refractionMode !== 'offset';
+          {
+            name: 'FoamBubbleCoverage',
+            description:
+              'How strongly the bubble cloud shows and how far it reaches past the white foam, lightening the water around it. 0 removes it, leaving only the white foam.',
+            type: 'float',
+            default: 1.68,
+            options: { animatable: true, minValue: 0, maxValue: 5 },
+            get(this: Water, value) {
+              value.num[0] = this.material.foamBubbleCoverage;
+            },
+            set(this: Water, value) {
+              this.material.foamBubbleCoverage = value.num[0];
+            }
           },
-          get(this: Water, value) {
-            value.num[0] = this.material.cheapRefractionDepth;
+          {
+            name: 'FoamBubbleDepth',
+            description:
+              'How deep under the surface the bubble cloud seems to float, in metres: it slides against the white foam as the view moves, giving the foam depth. 0 keeps it on the surface.',
+            type: 'float',
+            default: 0.14,
+            options: { animatable: true, minValue: 0, maxValue: 1 },
+            get(this: Water, value) {
+              value.num[0] = this.material.foamBubbleDepth;
+            },
+            set(this: Water, value) {
+              this.material.foamBubbleDepth = value.num[0];
+            }
           },
-          set(this: Water, value) {
-            this.material.cheapRefractionDepth = value.num[0];
-          }
-        },
-        {
-          name: 'RefractionBlur',
-          description:
-            'Scale on how much the medium blurs what is seen through it, 1 for the width the scattering coefficient and the path length imply. Turbid or deep water smudges the bottom; 0 keeps it sharp at any depth.',
-          type: 'float',
-          default: 1,
-          options: { animatable: true, minValue: 0, maxValue: 4 },
-          get(this: Water, value) {
-            value.num[0] = this.material.refractionBlur;
-          },
-          set(this: Water, value) {
-            this.material.refractionBlur = value.num[0];
-          }
-        },
-        {
-          name: 'ScatterAnisotropy',
-          description:
-            'Mean cosine of a single scattering event. 0 scatters equally in all directions; higher brightens the water when looking towards the sun through it. Sea water measures near 0.9, but a turbid column blends towards isotropic on its own.',
-          type: 'float',
-          default: DEFAULT_SCATTER_ANISOTROPY,
-          options: { animatable: true, minValue: 0, maxValue: 0.95 },
-          get(this: Water, value) {
-            value.num[0] = this.material.scatterAnisotropy;
-          },
-          set(this: Water, value) {
-            this.material.scatterAnisotropy = value.num[0];
-          }
-        },
-        {
-          name: 'RefractionScale',
-          description:
-            'Artistic scale on the refracted view offset. 1 is physical: the view ray is bent by Snell’s law and followed to whatever is behind the water, so the incidence angle, the depth and the perspective are already accounted for. 0 disables refraction.',
-          type: 'float',
-          default: 1,
-          options: { animatable: true, minValue: 0, maxValue: 4 },
-          get(this: Water, value) {
-            value.num[0] = this.material.refractionScale;
-          },
-          set(this: Water, value) {
-            this.material.refractionScale = value.num[0];
-          }
-        },
-        {
-          name: 'TAAStrength',
-          description:
-            'Share of the temporal anti-aliasing history kept on the water surface. Lower trades smoothing for less smearing of fast waves; much lower lets the sub-pixel camera jitter through, and the waterline visibly shakes. 0 keeps no history at all.',
-          type: 'float',
-          default: 0.9,
-          options: { minValue: 0, maxValue: 1 },
-          get(this: Water, value) {
-            value.num[0] = this.TAAStrength;
-          },
-          set(this: Water, value) {
-            this.TAAStrength = value.num[0];
-          }
-        },
-        {
-          name: 'ScatterRampTexture',
-          description: 'Ramp texture used for water scatter lighting',
-          type: 'object',
-          default: null,
-          isNullable() {
-            return true;
-          },
-          get(this: Water, value) {
-            value.str[0] = manager.getAssetId(this.material.scatterRampTexture) ?? '';
-          },
-          async set(value) {
-            if (!value) {
-              this.material.scatterRampTexture = null;
-            } else {
-              if (value.str[0]) {
+          {
+            name: 'FoamTexture',
+            description:
+              'Pattern the foam is cut from (red channel): as the foam thickens it shows the bright parts of the texture first and fills the dark ones last, so bright clumps appear before dark holes close. Empty for plain white foam that simply fades in and out with no pattern. Shared by all foam.',
+            type: 'object',
+            default: '',
+            options: {
+              mimeTypes: [
+                'image/jpeg',
+                'image/png',
+                'image/tga',
+                'image/vnd.radiance',
+                'image/x-dds',
+                'image/webp'
+              ]
+            },
+            isNullable() {
+              return true;
+            },
+            get(this: Water, value) {
+              value.str[0] = manager.getAssetId(this.material.foamTexture) ?? '';
+            },
+            async set(this: Water, value) {
+              if (!value) {
+                this.material.foamTexture = null;
+              } else if (value.str[0]) {
                 const assetId = value.str[0];
                 let tex: Nullable<Texture2D>;
                 try {
@@ -1685,48 +1361,302 @@ export function getWaterClass(manager: ResourceManager): SerializableClass {
                   tex = null;
                 }
                 if (tex?.isTexture2D()) {
-                  this.material.scatterRampTexture = tex;
+                  this.material.foamTexture = tex;
                 } else {
                   console.error('Invalid texture type');
                 }
               }
             }
-          }
-        },
-        {
-          name: 'AbsorptionRampTexture',
-          description: 'Ramp texture used for water absorption',
-          type: 'object',
-          default: null,
-          isNullable() {
-            return true;
           },
-          get(this: Water, value) {
-            value.str[0] = manager.getAssetId(this.material.absorptionRampTexture) ?? '';
+          {
+            name: 'FoamTextureSize',
+            description:
+              'How large the foam pattern is on the water, in metres per repeat of the foam texture: larger values give bigger clumps and holes.',
+            type: 'float',
+            default: 4,
+            options: { animatable: true, minValue: 0.01, maxValue: 50 },
+            get(this: Water, value) {
+              value.num[0] = this.material.foamTextureSize;
+            },
+            set(this: Water, value) {
+              this.material.foamTextureSize = value.num[0];
+            }
           },
-          async set(this: Water, value) {
-            if (!value) {
-              this.material.absorptionRampTexture = null;
-            } else {
-              if (value.str[0]) {
-                const assetId = value.str[0];
-                let tex: Nullable<Texture2D>;
-                try {
-                  tex = await manager.fetchTexture<Texture2D>(assetId);
-                } catch (err) {
-                  console.error(`Load asset failed: ${value.str[0]}: ${err}`);
-                  tex = null;
-                }
-                if (tex?.isTexture2D()) {
-                  this.material.absorptionRampTexture = tex;
-                } else {
-                  console.error('Invalid texture type');
-                }
-              }
+          {
+            name: 'EdgeFadeWidth',
+            description:
+              'Thickness in metres over which a thin sheet of water fades in from the ground under it, so swash running up the sand shows the sand through it. 0 disables it.',
+            type: 'float',
+            default: 0.05,
+            options: { animatable: true, minValue: 0, maxValue: 1 },
+            get(this: Water, value) {
+              value.num[0] = this.edgeFadeWidth;
+            },
+            set(this: Water, value) {
+              this.edgeFadeWidth = value.num[0];
+            }
+          },
+          {
+            name: 'ShoreWaveHeight',
+            description:
+              'Crest to trough height in metres of the waves rolling in to the shore and washing up the beach, 0 for none. They come square on to the coast whatever its shape, bunch up as the water shallows, sharpen and lean as they near the shore, and each crest lifts the water up the sand and lets it drain back; boats ride them. Needs the scene signed distance field: WebGPU with the scene SDFEnabled on.',
+            type: 'float',
+            default: 0,
+            options: { animatable: true, minValue: 0, maxValue: 3 },
+            isHidden(this: Water) {
+              return false;
+            },
+            get(this: Water, value) {
+              value.num[0] = this.shoreWaveHeight;
+            },
+            set(this: Water, value) {
+              this.shoreWaveHeight = value.num[0];
+            }
+          },
+          {
+            name: 'ShoreWaveLength',
+            description:
+              'Distance in metres between crests at the outer edge of the zone. They bunch up towards the shore as real waves do in shallowing water.',
+            type: 'float',
+            default: 8,
+            options: { animatable: true, minValue: 0.5, maxValue: 100 },
+            isHidden(this: Water) {
+              return this.shoreWaveHeight <= 0;
+            },
+            get(this: Water, value) {
+              value.num[0] = this.shoreWaveLength;
+            },
+            set(this: Water, value) {
+              this.shoreWaveLength = value.num[0];
+            }
+          },
+          {
+            name: 'ShoreWavePeriod',
+            description: 'Seconds between successive shore waves.',
+            type: 'float',
+            default: 6,
+            options: { animatable: true, minValue: 0.5, maxValue: 30 },
+            isHidden(this: Water) {
+              return this.shoreWaveHeight <= 0;
+            },
+            get(this: Water, value) {
+              value.num[0] = this.shoreWavePeriod;
+            },
+            set(this: Water, value) {
+              this.shoreWavePeriod = value.num[0];
+            }
+          },
+          {
+            name: 'ShoreWaveZone',
+            description:
+              'How far out from the waterline the shore waves rise, in metres. They grow over the zone and break near its inner end.',
+            type: 'float',
+            default: 20,
+            options: { animatable: true, minValue: 1, maxValue: 200 },
+            isHidden(this: Water) {
+              return this.shoreWaveHeight <= 0;
+            },
+            get(this: Water, value) {
+              value.num[0] = this.shoreWaveZone;
+            },
+            set(this: Water, value) {
+              this.shoreWaveZone = value.num[0];
+            }
+          },
+          {
+            name: 'ShoreWaveSharpness',
+            description:
+              'How sharp the crests become at the shore: 0 keeps a rounded sine, towards 1 a pointed crest between long flat troughs.',
+            type: 'float',
+            default: 0.7,
+            options: { animatable: true, minValue: 0, maxValue: 0.95 },
+            isHidden(this: Water) {
+              return this.shoreWaveHeight <= 0;
+            },
+            get(this: Water, value) {
+              value.num[0] = this.shoreWaveSharpness;
+            },
+            set(this: Water, value) {
+              this.shoreWaveSharpness = value.num[0];
+            }
+          },
+          {
+            name: 'ShoreWaveLean',
+            description:
+              'How far the crests lean towards the shore there: 0 keeps them upright, 1 gives a steep front face and a long gentle back.',
+            type: 'float',
+            default: 0.5,
+            options: { animatable: true, minValue: 0, maxValue: 1 },
+            isHidden(this: Water) {
+              return this.shoreWaveHeight <= 0;
+            },
+            get(this: Water, value) {
+              value.num[0] = this.shoreWaveLean;
+            },
+            set(this: Water, value) {
+              this.shoreWaveLean = value.num[0];
+            }
+          },
+          {
+            name: 'ShoreWaveFoamFadeRate',
+            description:
+              'How quickly the foam the shore waves leave behind dies away: low values leave long-lasting trails and sheets of foam behind each wave, high values keep only fresh foam at the breaking crests.',
+            type: 'float',
+            default: 0.8,
+            options: { animatable: true, minValue: 0, maxValue: 20 },
+            isHidden(this: Water) {
+              return this.shoreWaveHeight <= 0;
+            },
+            get(this: Water, value) {
+              value.num[0] = this.shoreWaveFoamFadeRate;
+            },
+            set(this: Water, value) {
+              this.shoreWaveFoamFadeRate = value.num[0];
+            }
+          },
+          {
+            name: 'ShoreWaveFoamStrength',
+            description:
+              'How much foam the breaking shore waves throw up: higher values give thicker, whiter foam on and behind the crests. Balance it against the fade rate.',
+            type: 'float',
+            default: 1,
+            options: { animatable: true, minValue: 0, maxValue: 5 },
+            isHidden(this: Water) {
+              return this.shoreWaveHeight <= 0;
+            },
+            get(this: Water, value) {
+              value.num[0] = this.shoreWaveFoamStrength;
+            },
+            set(this: Water, value) {
+              this.shoreWaveFoamStrength = value.num[0];
+            }
+          },
+          {
+            name: 'ShoreWaveFoamCoverage',
+            description:
+              'How much of each shore wave foams: low values foam only at the steepest breaking fronts, high values spread foam over more of the wave.',
+            type: 'float',
+            default: 0.55,
+            options: { animatable: true, minValue: 0, maxValue: 1 },
+            isHidden(this: Water) {
+              return this.shoreWaveHeight <= 0;
+            },
+            get(this: Water, value) {
+              value.num[0] = this.shoreWaveFoamCoverage;
+            },
+            set(this: Water, value) {
+              this.shoreWaveFoamCoverage = value.num[0];
+            }
+          },
+          {
+            name: 'ShoreWaveShallowFoamDepth',
+            description:
+              'How deep the water can be and still churn up foam as the waves run in, in metres: larger values widen the band of foam along the beach.',
+            type: 'float',
+            default: 0.65,
+            options: { animatable: true, minValue: 0.01, maxValue: 3 },
+            isHidden(this: Water) {
+              return this.shoreWaveHeight <= 0;
+            },
+            get(this: Water, value) {
+              value.num[0] = this.shoreWaveShallowFoamDepth;
+            },
+            set(this: Water, value) {
+              this.shoreWaveShallowFoamDepth = value.num[0];
+            }
+          },
+          {
+            name: 'ShoreWaveShallowFoamStrength',
+            description:
+              "How much foam the shallow water at the beach makes as the waves wash over it: higher values give a denser white wash, 0 leaves only the breaking crests' foam.",
+            type: 'float',
+            default: 2,
+            options: { animatable: true, minValue: 0, maxValue: 5 },
+            isHidden(this: Water) {
+              return this.shoreWaveHeight <= 0;
+            },
+            get(this: Water, value) {
+              value.num[0] = this.shoreWaveShallowFoamStrength;
+            },
+            set(this: Water, value) {
+              this.shoreWaveShallowFoamStrength = value.num[0];
+            }
+          },
+          {
+            name: 'CheapRefractionDepth',
+            description:
+              'Depth in meters the cheap refraction mode assumes the water is. Sets how strong the distortion looks when RefractionMode is Offset; ignored by March. A constant rather than the measured distance to the bottom, because an offset scaled by that distance paints a second copy of any object breaking the surface.',
+            type: 'float',
+            default: 1,
+            options: { animatable: true, minValue: 0, maxValue: 20 },
+            isHidden(this: Water) {
+              return this.material.refractionMode !== 'offset';
+            },
+            get(this: Water, value) {
+              value.num[0] = this.material.cheapRefractionDepth;
+            },
+            set(this: Water, value) {
+              this.material.cheapRefractionDepth = value.num[0];
+            }
+          },
+          {
+            name: 'RefractionBlur',
+            description:
+              'Scale on how much the medium blurs what is seen through it, 1 for the width the scattering coefficient and the path length imply. Turbid or deep water smudges the bottom; 0 keeps it sharp at any depth.',
+            type: 'float',
+            default: 1,
+            options: { animatable: true, minValue: 0, maxValue: 4 },
+            get(this: Water, value) {
+              value.num[0] = this.material.refractionBlur;
+            },
+            set(this: Water, value) {
+              this.material.refractionBlur = value.num[0];
+            }
+          },
+          {
+            name: 'ScatterAnisotropy',
+            description:
+              'Mean cosine of a single scattering event. 0 scatters equally in all directions; higher brightens the water when looking towards the sun through it. Sea water measures near 0.9, but a turbid column blends towards isotropic on its own.',
+            type: 'float',
+            default: DEFAULT_SCATTER_ANISOTROPY,
+            options: { animatable: true, minValue: 0, maxValue: 0.95 },
+            get(this: Water, value) {
+              value.num[0] = this.material.scatterAnisotropy;
+            },
+            set(this: Water, value) {
+              this.material.scatterAnisotropy = value.num[0];
+            }
+          },
+          {
+            name: 'RefractionScale',
+            description:
+              'Artistic scale on the refracted view offset. 1 is physical: the view ray is bent by Snell’s law and followed to whatever is behind the water, so the incidence angle, the depth and the perspective are already accounted for. 0 disables refraction.',
+            type: 'float',
+            default: 1,
+            options: { animatable: true, minValue: 0, maxValue: 4 },
+            get(this: Water, value) {
+              value.num[0] = this.material.refractionScale;
+            },
+            set(this: Water, value) {
+              this.material.refractionScale = value.num[0];
+            }
+          },
+          {
+            name: 'TAAStrength',
+            description:
+              'Share of the temporal anti-aliasing history kept on the water surface. Lower trades smoothing for less smearing of fast waves; much lower lets the sub-pixel camera jitter through, and the waterline visibly shakes. 0 keeps no history at all.',
+            type: 'float',
+            default: 0.9,
+            options: { minValue: 0, maxValue: 1 },
+            get(this: Water, value) {
+              value.num[0] = this.TAAStrength;
+            },
+            set(this: Water, value) {
+              this.TAAStrength = value.num[0];
             }
           }
-        }
-      ]);
+        ])
+      );
     }
   };
 }

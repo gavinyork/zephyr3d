@@ -1748,7 +1748,17 @@ export class ShaderHelper {
         // else in the column.
         this.$l.defocus = pb.float(1);
       }
-      this.$l.weight = pb.mul(this.cu.params.x, this.defocus, this.edge);
+      // None in water shallower than the minimum depth, faded in across it:
+      // where the water thins out on a beach the surface is too coarse to
+      // say where the water ends, and the pattern there would come from
+      // photons that never reached it
+      this.$l.minDepth = this.cu.extinction.x;
+      this.$l.shallow = pb.smoothStep(
+        pb.mul(this.minDepth, 0.5),
+        pb.add(pb.mul(this.minDepth, 1.5), 1e-4),
+        this.depth
+      );
+      this.$l.weight = pb.mul(this.cu.params.x, this.defocus, this.edge, this.shallow);
       this.$l.caustic = pb.add(1, pb.mul(pb.sub(this.pattern, 1), this.weight));
       // Soften the waterline so the transmittance does not switch on abruptly.
       this.$l.submerged = pb.smoothStep(0, 0.05, this.depth);

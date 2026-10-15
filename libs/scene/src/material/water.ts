@@ -1,5 +1,4 @@
 import type {
-  AbstractDevice,
   BindGroup,
   PBFunctionScope,
   PBInsideFunctionScope,
@@ -15,33 +14,15 @@ import type { ShoreWaveSettings } from '../render/shore_wave_generator';
 import { LIGHT_TYPE_DIRECTIONAL, LIGHT_TYPE_RECT, MaterialVaryingFlags } from '../values';
 import { ShaderHelper } from './shader/helper';
 import type { Nullable } from '@zephyr3d/base';
-import { DRef, DWeakRef, Interpolator, Vector3, Vector4 } from '@zephyr3d/base';
+import { DRef, Vector3, Vector4 } from '@zephyr3d/base';
 import { screenSpaceRayTracing_HiZ, screenSpaceRayTracing_Linear2D } from '../shaders/ssr';
 import { fetchSampler } from '../utility/misc';
 import { mixinLight } from './mixins/lit';
 import { distributionGGX, fresnelSchlick, visGGX } from '../shaders/pbr';
-import { interleavedGradientNoise, valueNoise } from '../shaders/noise';
 import { waterScatterPhase } from '../shaders/water_medium';
-import { getDevice } from '../app/api';
 import { evaluateLTCRectLightTerms } from '../shaders/ltc_rect';
 import { getLTCAmpLUT, getLTCMatLUT } from '../utility/textures/ltclut';
-import {
-  FOAM_TEX_CELLS,
-  foamTexelSize,
-  getDefaultFoamTexture,
-  sampleFoamTexture
-} from '../utility/textures/foam';
-
-/**
- * How the water medium converts a path length into transmittance and in-scattering.
- *
- * - `physical`: Beer-Lambert with authored absorption/scattering coefficients in 1/m.
- * - `ramp`: artist-authored ramp textures indexed by `depth * depthMulti`. Caustics
- *   still use the physical coefficients, so the two can disagree in this mode.
- *
- * @public
- */
-export type WaterMediumMode = 'physical' | 'ramp';
+import { foamTexelSize, getDefaultFoamTexture, sampleFoamTexture } from '../utility/textures/foam';
 
 /**
  * How the refracted view sample is located.
@@ -67,9 +48,8 @@ export type WaterRefractionMode = 'march' | 'offset';
  * - `none`: normal shading.
  * - `normal`: wave normal, remapped to [0,1].
  *   the underside of a folded crest.
- * - `foam`: foam coverage after the amount/falloff ramp, as grey. Both sources.
- * - `shoreFoam`: the shoreline contribution on its own, as grey.
- * - `waterDepth`: distance from the surface to the nearest solid around it, in
+ * - `foam`: foam coverage after the amount/falloff ramp, as grey.
+ * - `waterDepth`: height of the surface above the scene point behind it, in
  *   metres / 10, as grey.
  * - `fresnel`: reflection weight after foam suppression, as grey.
  * - `reflection`: what the surface reflects (SSR blended over the sky).
@@ -95,7 +75,6 @@ export type WaterDebugOutput =
   | 'none'
   | 'normal'
   | 'foam'
-  | 'shoreFoam'
   | 'waterDepth'
   | 'fresnel'
   | 'reflection'
@@ -113,7 +92,6 @@ export const WATER_DEBUG_OUTPUTS = [
   { label: 'None', value: 'none' },
   { label: 'Normal', value: 'normal' },
   { label: 'Foam', value: 'foam' },
-  { label: 'Shore foam', value: 'shoreFoam' },
   { label: 'Water depth', value: 'waterDepth' },
   { label: 'Fresnel', value: 'fresnel' },
   { label: 'Reflection', value: 'reflection' },
@@ -185,9 +163,6 @@ const REFRACT_BLUR_GEOMETRIC = 0.02;
 const REFRACT_BLUR_DENSITY = 1.5;
 /** Cap on the refraction blur LOD. */
 export const REFRACT_BLUR_MAX_LOD = 6;
-/** World-space drift of the foam pattern, m/s. */
-const SHORE_FOAM_DRIFT_X = 0.11;
-const SHORE_FOAM_DRIFT_Z = -0.07;
 /**
  * The foam's look follows Crest's OceanFoam.hlsl (Wave Harmonic, MIT): a
  * white foam layer cut from the foam texture by the foam density with a
@@ -202,68 +177,16 @@ const FOAM_DRIFT = 0.1;
 const FOAM_BUBBLE_MIP_SCALE = 8;
 const FOAM_SPECULAR_POWER = 293;
 const FOAM_SPECULAR_BOOST = 0.15;
-/** Width of the band's gradient, as a fraction of its reach. */
-const SHORE_FOAM_EDGE_SOFTNESS = 0.85;
-/**
- * Hi-Z cells the proximity window spreads over its radius; sets the mip level.
- * The window reaches 2 cells, so this keeps it past the band's outer edge.
- */
-const SHORE_QUERY_TAP_SPREAD = 1.25;
-/**
- * Divisor of the soft-min sum. A lone surface reads `k * log(this)` farther
- * than it is, matching the calibration of the earlier tent-normalized window.
- */
-const SHORE_QUERY_SOFTMIN_NORM = 4;
-/** Softness of the proximity soft-min, as a fraction of the radius. */
-const SHORE_QUERY_SOFTMIN = 0.25;
-/**
- * Distance, in radii, an empty neighbourhood resolves to. Distances are clamped
- * to it before the exponential so the log never sees zero.
- */
-const SHORE_QUERY_MISS_REACH = 2;
-/**
- * Field value at the rest level, in meters, within which the waterline's
- * linear bed model is trusted over its rest-level distance.
- */
-const WATERLINE_LINEAR_REACH = 4;
-/**
- * Share of the waterline grid, from each edge inwards, over which the band
- * hands over from the field to the screen-space query; matches the shore waves.
- */
-const WATERLINE_EDGE_FADE = 0.15;
-/** Per-frame advance of the dither hash, for TAA to average over. */
-const SHORE_QUERY_DITHER_STRIDE = 5.588238;
-/** Max thickness of a Hi-Z cell's depth block, in multiples of its width. */
-const SHORE_QUERY_CELL_DEPTH_SPAN = 2;
 
 export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight) {
-  private static readonly FEATURE_MEDIUM_MODE = this.defineFeature();
   private static readonly FEATURE_REFRACTION_MODE = this.defineFeature();
   private static readonly FEATURE_INFINITE = this.defineFeature();
-  private static readonly FEATURE_SHORE_FOAM = this.defineFeature();
   private static readonly FEATURE_DEBUG_OUTPUT = this.defineFeature();
-  private static readonly _absorptionGrad = new Interpolator(
-    'linear',
-    'vec3',
-    new Float32Array([0, 0.082, 0.318, 0.665, 1]),
-    new Float32Array([1, 1, 1, 0.22, 0.87, 0.87, 0, 0.47, 0.49, 0, 0.275, 0.44, 0, 0, 0])
-  );
-  private static readonly _scatterGrad = new Interpolator(
-    'linear',
-    'vec3',
-    new Float32Array([0, 0.15, 0.42, 1]),
-    new Float32Array([0, 0, 0, 0.08, 0.41, 0.34, 0.13, 0.4, 0.45, 0.21, 0.5, 0.6])
-  );
-  private static readonly _defaultScatterRampTexture: DWeakRef<Texture2D> = new DWeakRef();
-  private static readonly _defaultAbsorptionRampTexture: DWeakRef<Texture2D> = new DWeakRef();
   private static readonly _waveUpdateState: WeakMap<WaveGenerator, number> = new WeakMap();
   private static readonly _interactionUpdateState: WeakMap<WaterInteraction, number> = new WeakMap();
   private readonly _region: Vector4;
   private _refractionScale: number;
-  private _depthMulti: number;
   private _reflectionStrength: number;
-  private readonly _scatterRampTexture: DRef<Texture2D>;
-  private readonly _absorptionRampTexture: DRef<Texture2D>;
   private readonly _waveGenerator: DRef<WaveGenerator>;
   private readonly _interaction: DRef<WaterInteraction>;
   /**
@@ -330,6 +253,7 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
   private _causticsRange: number;
   private _causticsFadeDistance: number;
   private _causticsWarp: number;
+  private _causticsMinDepth: number;
   private _causticsSceneDepth: boolean;
   private _causticsDefocus: number;
   private _causticsResolution: number;
@@ -364,20 +288,9 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
   private readonly _foamLookParams: Vector4;
   private readonly _foamTexture: DRef<Texture2D>;
   private _foamTextureSize = 4;
-  private _shoreFoamAmount: number;
-  private _shoreFoamDepth: number;
-  private _shoreFoamFalloff: number;
-  private _shoreFoamScale: number;
-  private _shoreFoamFeather: number;
-  private _shoreFoamWashAmount: number;
-  private _shoreFoamWashSpeed: number;
-  private _shoreFoamWashScale: number;
-  private readonly _shoreFoamParams: Vector4;
-  private readonly _shoreFoamWashParams: Vector4;
   constructor() {
     super();
     this._region = new Vector4(-99999, -99999, 99999, 99999);
-    // Fitted to the default absorption ramp at depthMulti = 0.1.
     this._absorption = new Vector3(1.0, 0.25, 0.15);
     this._scattering = new Vector3(0.05, 0.12, 0.18);
     this._extinction = new Vector3();
@@ -393,10 +306,7 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
     this._effectiveWaveGenerator = null;
     this._waveVersionByBindGroup = new WeakMap();
     this._ssrParams = new Vector4(1000, 160, 0.5, 2);
-    this._scatterRampTexture = new DRef();
-    this._absorptionRampTexture = new DRef();
     this._refractionScale = 1;
-    this._depthMulti = 0.1;
     this._reflectionStrength = 1;
     this._causticsEnabled = true;
     this._causticsIntensity = 1;
@@ -404,6 +314,7 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
     this._causticsRange = 60;
     this._causticsFadeDistance = 0;
     this._causticsWarp = 1.5;
+    this._causticsMinDepth = 0.15;
     this._causticsSceneDepth = true;
     this._causticsDefocus = 0.12;
     this._causticsResolution = 1024;
@@ -438,21 +349,9 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
     this._foamBubbleDepth = 0.14;
     this._foamLookParams = new Vector4();
     this._foamTexture = new DRef();
-    this._shoreFoamAmount = 0;
-    this._shoreFoamDepth = 0.5;
-    this._shoreFoamFalloff = 1.5;
-    this._shoreFoamScale = 2.5;
-    this._shoreFoamFeather = 0.4;
-    this._shoreFoamWashAmount = 0.5;
-    this._shoreFoamWashSpeed = 0.12;
-    this._shoreFoamWashScale = 0.03;
-    this._shoreFoamParams = new Vector4();
-    this._shoreFoamWashParams = new Vector4();
     this.cullMode = 'none';
-    this.useFeature(WaterMaterial.FEATURE_MEDIUM_MODE, 'physical' as WaterMediumMode);
     this.useFeature(WaterMaterial.FEATURE_REFRACTION_MODE, 'march' as WaterRefractionMode);
     this.useFeature(WaterMaterial.FEATURE_INFINITE, false);
-    this.useFeature(WaterMaterial.FEATURE_SHORE_FOAM, false);
     this.useFeature(WaterMaterial.FEATURE_DEBUG_OUTPUT, 'none' as WaterDebugOutput);
   }
   /** {@inheritDoc Material.onDispose} */
@@ -461,8 +360,6 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
     this._waveGenerator.dispose();
     this._interaction.dispose();
     this._effectiveWaveGenerator = null;
-    this._scatterRampTexture.dispose();
-    this._absorptionRampTexture.dispose();
     this._foamTexture.dispose();
   }
   /** @internal */
@@ -532,35 +429,6 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
     // Bind groups are pooled; a stale version must not suppress the upload.
     this._waveVersionByBindGroup = new WeakMap();
     this.optionChanged(true);
-  }
-  get scatterRampTexture() {
-    const tex = this._getScatterRampTexture(getDevice());
-    return tex === WaterMaterial._defaultScatterRampTexture.get() ? null : tex;
-  }
-  set scatterRampTexture(tex) {
-    if (tex !== this.scatterRampTexture) {
-      this._scatterRampTexture.set(tex);
-      this.uniformChanged();
-    }
-  }
-  get absorptionRampTexture() {
-    const tex = this._getAbsorptionRampTexture(getDevice());
-    return tex === WaterMaterial._defaultAbsorptionRampTexture.get() ? null : tex;
-  }
-  set absorptionRampTexture(tex) {
-    if (tex !== this.absorptionRampTexture) {
-      this._absorptionRampTexture.set(tex);
-      this.uniformChanged();
-    }
-  }
-  /** How the medium turns a path length into transmittance and in-scattering. Defaults to `physical`. */
-  get mediumMode(): WaterMediumMode {
-    return this.featureUsed<WaterMediumMode>(WaterMaterial.FEATURE_MEDIUM_MODE) ?? 'physical';
-  }
-  set mediumMode(val: WaterMediumMode) {
-    if (val !== this.mediumMode) {
-      this.useFeature(WaterMaterial.FEATURE_MEDIUM_MODE, val);
-    }
   }
   /** How the refracted view sample is located. Defaults to `march`. Compile-time feature. */
   get refractionMode(): WaterRefractionMode {
@@ -769,6 +637,16 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
   }
   set causticsWarp(val: number) {
     this._causticsWarp = Math.max(0, Math.min(8, val));
+  }
+  /**
+   * Water depth in metres below which no caustics show, faded in over half
+   * of it either side; 0 shows them right up to the water's edge.
+   */
+  get causticsMinDepth() {
+    return this._causticsMinDepth;
+  }
+  set causticsMinDepth(val: number) {
+    this._causticsMinDepth = Math.max(0, val);
   }
   /** Caustic contrast falloff per meter away from {@link causticsDepth}. */
   get causticsDefocus() {
@@ -1012,146 +890,6 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
       this.uniformChanged();
     }
   }
-  /**
-   * Coverage of the foam where the water meets a surface, 0 to disable.
-   *
-   * Keyed on the distance to the nearest solid around the surface, estimated in
-   * screen space from the Hi-Z pyramid: off-screen, occluded or sub-pixel
-   * geometry produces no foam.
-   */
-  get shoreFoamAmount() {
-    return this._shoreFoamAmount;
-  }
-  set shoreFoamAmount(val: number) {
-    const clamped = Math.max(0, val);
-    if (clamped !== this._shoreFoamAmount) {
-      // Compile-time feature: only crossing zero rebuilds the shader.
-      const wasEnabled = this._shoreFoamAmount > 0;
-      this._shoreFoamAmount = clamped;
-      if (wasEnabled !== clamped > 0) {
-        this.useFeature(WaterMaterial.FEATURE_SHORE_FOAM, clamped > 0);
-      } else {
-        this.uniformChanged();
-      }
-    }
-  }
-  /** Reach in meters of the foam band from the surface behind it. The outer edge, not the midpoint. */
-  get shoreFoamDepth() {
-    return this._shoreFoamDepth;
-  }
-  set shoreFoamDepth(val: number) {
-    const clamped = Math.max(0.001, val);
-    if (clamped !== this._shoreFoamDepth) {
-      this._shoreFoamDepth = clamped;
-      this.uniformChanged();
-    }
-  }
-  /** Power applied across the band before scaling. Above 1 pushes coverage towards the contact. */
-  get shoreFoamFalloff() {
-    return this._shoreFoamFalloff;
-  }
-  set shoreFoamFalloff(val: number) {
-    const clamped = Math.max(0.01, val);
-    if (clamped !== this._shoreFoamFalloff) {
-      this._shoreFoamFalloff = clamped;
-      this.uniformChanged();
-    }
-  }
-  /** Clump frequency of the band's edge, in cycles across {@link shoreFoamDepth}. */
-  get shoreFoamScale() {
-    return this._shoreFoamScale;
-  }
-  set shoreFoamScale(val: number) {
-    const clamped = Math.max(0, val);
-    if (clamped !== this._shoreFoamScale) {
-      this._shoreFoamScale = clamped;
-      this.uniformChanged();
-    }
-  }
-  /**
-   * Width of the foam texture's black-point fade. Small values cut the
-   * texture into hard-edged clumps, large values fade it in smoothly.
-   */
-  get shoreFoamFeather() {
-    return this._shoreFoamFeather;
-  }
-  set shoreFoamFeather(val: number) {
-    const clamped = Math.min(Math.max(0.001, val), 1);
-    if (clamped !== this._shoreFoamFeather) {
-      this._shoreFoamFeather = clamped;
-      this.uniformChanged();
-    }
-  }
-  /**
-   * Run-up of the band's edge, as a fraction of {@link shoreFoamDepth}. 0 is
-   * static; above 1 the band closes completely at the bottom of the cycle.
-   */
-  get shoreFoamWashAmount() {
-    return this._shoreFoamWashAmount;
-  }
-  set shoreFoamWashAmount(val: number) {
-    const clamped = Math.max(0, val);
-    if (clamped !== this._shoreFoamWashAmount) {
-      this._shoreFoamWashAmount = clamped;
-      this.uniformChanged();
-    }
-  }
-  /** Run-up cycles per second. */
-  get shoreFoamWashSpeed() {
-    return this._shoreFoamWashSpeed;
-  }
-  set shoreFoamWashSpeed(val: number) {
-    const clamped = Math.max(0, val);
-    if (clamped !== this._shoreFoamWashSpeed) {
-      this._shoreFoamWashSpeed = clamped;
-      this.uniformChanged();
-    }
-  }
-  /** Spatial frequency of the run-up phase, cycles per meter. 0 moves the whole shoreline in lockstep. */
-  get shoreFoamWashScale() {
-    return this._shoreFoamWashScale;
-  }
-  set shoreFoamWashScale(val: number) {
-    const clamped = Math.max(0, val);
-    if (clamped !== this._shoreFoamWashScale) {
-      this._shoreFoamWashScale = clamped;
-      this.uniformChanged();
-    }
-  }
-  /** @internal */
-  private get _shoreFoamEnabled() {
-    return this.featureUsed<boolean>(WaterMaterial.FEATURE_SHORE_FOAM) ?? false;
-  }
-  /**
-   * Feature on *and* the Hi-Z pyramid bound for this pass. A pass outside the
-   * main graph may have no pyramid, and a fetch against an unbound texture is a
-   * build failure.
-   * @internal
-   */
-  private _shoreFoamAvailable(scope: PBInsideFunctionScope | PBFunctionScope) {
-    return (
-      this._shoreFoamEnabled &&
-      (!!ShaderHelper.getHiZDepthTexture(scope as PBInsideFunctionScope) ||
-        this._waterlineAvailable(this.drawContext))
-    );
-  }
-  /**
-   * Feature on and the scene has a signed distance field for this draw: the
-   * shoreline band is then measured from the waterline field, horizontally
-   * from where geometry meets the water, rather than by the screen-space query.
-   * @internal
-   */
-  private _waterlineAvailable(ctx: Nullable<DrawContext>) {
-    return this._shoreFoamEnabled && !!ctx && !!ShaderHelper.getSceneSDF(ctx);
-  }
-  /** 1x1 waterline texture bound until the field is first built. @internal */
-  private static _getNoWaterlineTexture() {
-    if (!this._noWaterlineTexture) {
-      this._noWaterlineTexture = getDevice().createTexture2D('rgba16f', 1, 1, { mipmapping: false })!;
-    }
-    return this._noWaterlineTexture;
-  }
-  private static _noWaterlineTexture: Nullable<Texture2D> = null;
   /** @internal */
   private _updateMediumCoefficients() {
     this._extinction.setXYZ(
@@ -1164,15 +902,6 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
       this._extinction.y > 0 ? (this._scattering.y * this._scatteringScale) / this._extinction.y : 0,
       this._extinction.z > 0 ? (this._scattering.z * this._scatteringScale) / this._extinction.z : 0
     );
-  }
-  get depthMulti() {
-    return this._depthMulti;
-  }
-  set depthMulti(val) {
-    if (val !== this._depthMulti) {
-      this._depthMulti = val;
-      this.uniformChanged();
-    }
   }
   /** Artistic scale on the refracted view offset. 1 is physical, 0 disables it. */
   get refractionScale() {
@@ -1201,9 +930,6 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
   }
   needSceneDepth() {
     return true;
-  }
-  needHiZNearest() {
-    return this._shoreFoamEnabled;
   }
   protected _createHash() {
     return `${super._createHash()}:${this.waveGenerator?.getHash() ?? ''}`;
@@ -1400,38 +1126,15 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
       scope.foamUVScale = pb.float().uniform(2);
       // Thickness in metres a sheet of water fades in over, 0 for none
       scope.edgeFadeWidth = pb.float().uniform(2);
-      if (this._shoreFoamAvailable(scope)) {
-        // (coverage scale, band depth in m, coverage falloff, pattern cycles/m)
-        scope.shoreFoamParams = pb.vec4().uniform(2);
-        // (run-up amount, run-up cycles/s, run-up cycles/m, query radius in m)
-        scope.shoreFoamWashParams = pb.vec4().uniform(2);
-        scope.shoreFoamFeather = pb.float().uniform(2);
-        scope.shoreFoamTex = pb.tex2D().uniform(2);
-        if (this._waterlineAvailable(this.drawContext)) {
-          // (rest-level distance, model A, model B, field at rest level); see WaterlineField
-          scope.waterlineTex = pb.tex2D().uniform(2);
-          // (origin x, origin z, cell size, resolution; 0 before the field exists)
-          scope.waterlineRegion = pb.vec4().uniform(2);
-          // (rest level y, 0, 0, 0)
-          scope.waterlineLevel = pb.vec4().uniform(2);
-        }
-      }
       // (intensity, anisotropy, 0, 0)
       scope.sunScatterParams = pb.vec4().uniform(2);
       // Mip widths per meter of path; one scalar LOD for all three channels.
       scope.refractBlurDensity = pb.float().uniform(2);
-      // Bound in both medium modes: the ramp only replaces the depth-driven
-      // absorption and scattering.
       scope.mediumAlbedo = pb.vec3().uniform(2);
       scope.mediumExtinction = pb.vec3().uniform(2);
       // Rect light specular (evaluateLTCRectLightTerms).
       scope.zLTCMatLut = pb.tex2D().uniform(2);
       scope.zLTCAmpLut = pb.tex2D().uniform(2);
-      if (this.mediumMode === 'ramp') {
-        scope.depthMulti = pb.float().uniform(2);
-        scope.scatterRampTex = pb.tex2D().uniform(2);
-        scope.absorptionRampTex = pb.tex2D().uniform(2);
-      }
     }
     if (!this.infinite) {
       scope.$l.discardable = pb.or(
@@ -1905,42 +1608,19 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
   ) {
     const pb = scope.$builder;
     const that = this;
-    const ramp = this.mediumMode === 'ramp';
-    const shoreFoam = this._shoreFoamAvailable(scope);
-    const waterline = shoreFoam && this._waterlineAvailable(this.drawContext);
-    // The screen-space query needs the pyramid; with the waterline field it is only the fallback
-    const hiZ = shoreFoam && !!ShaderHelper.getHiZDepthTexture(scope);
     const debugOutput = this.debugOutput;
     // Transmittance over `depth` meters of path.
     pb.func('getAbsorption', [pb.float('depth')], function () {
-      if (ramp) {
-        this.$l.c = pb.textureSampleLevel(
-          this.absorptionRampTex,
-          pb.vec2(pb.mul(this.depth, this.depthMulti), 0.5),
-          0
-        ).rgb;
-        this.$return(pb.mul(this.c, this.c));
-      } else {
-        this.$return(pb.exp(pb.neg(pb.mul(this.mediumExtinction, this.depth))));
-      }
+      this.$return(pb.exp(pb.neg(pb.mul(this.mediumExtinction, this.depth))));
     });
     // Fraction of incident irradiance scattered back over `depth` meters of path.
     pb.func('getScattering', [pb.float('depth')], function () {
-      if (ramp) {
-        this.$l.c = pb.textureSampleLevel(
-          this.scatterRampTex,
-          pb.vec2(pb.mul(this.depth, this.depthMulti), 0.5),
-          0
-        ).rgb;
-        this.$return(pb.mul(this.c, this.c));
-      } else {
-        this.$return(
-          pb.mul(
-            this.mediumAlbedo,
-            pb.sub(pb.vec3(1), pb.exp(pb.neg(pb.mul(this.mediumExtinction, this.depth))))
-          )
-        );
-      }
+      this.$return(
+        pb.mul(
+          this.mediumAlbedo,
+          pb.sub(pb.vec3(1), pb.exp(pb.neg(pb.mul(this.mediumExtinction, this.depth))))
+        )
+      );
     });
     pb.func('fresnel', [pb.vec3('normal'), pb.vec3('eyeVec'), pb.bool('underwater')], function () {
       // abs, not clamp: a folded crest flips the sign inside one wave, and a
@@ -2014,260 +1694,6 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
         )
       );
     });
-    if (shoreFoam) {
-      // Foam texture at the undisplaced position, drifting. Sampled with the
-      // screen gradients so its mips filter the pattern out with distance
-      // instead of it aliasing into speckle.
-      pb.func('waterShoreFoamPattern', [pb.vec2('xz'), pb.vec4('xzGrad'), pb.float('time')], function () {
-        // Texture repeats per meter: pattern cycles/m over the cells in a tile.
-        this.$l.uvScale = pb.div(this.shoreFoamParams.w, FOAM_TEX_CELLS);
-        // Drift in meters, before the frequency.
-        this.$l.uv = pb.mul(
-          pb.add(this.xz, pb.mul(pb.vec2(SHORE_FOAM_DRIFT_X, SHORE_FOAM_DRIFT_Z), this.time)),
-          this.uvScale
-        );
-        this.$return(sampleFoamTexture(this, this.shoreFoamTex, this.uv, this.xzGrad, this.uvScale));
-      });
-      if (hiZ) {
-        // One integer pyramid level of the query below.
-        pb.func(
-          'waterShoreProximityLevel',
-          [pb.vec3('viewPos'), pb.vec2('screenUV'), pb.float('radius'), pb.float('level')],
-          function () {
-            this.$l.renderSize = ShaderHelper.getRenderSize(this);
-            this.$l.projMatrix = ShaderHelper.getProjectionMatrix(this);
-            this.$l.mipSize = pb.max(pb.floor(pb.div(this.renderSize, pb.exp2(this.level))), pb.vec2(1));
-            this.$l.texelStep = pb.div(pb.vec2(1), this.mipSize);
-            // 4x4 window with a round falloff to 2 cells from the pixel, the
-            // largest circle the window always covers (the pyramid sampler is
-            // nearest, so smoothing happens here). Each cell is read as a point
-            // dithered inside it, so the box-distance contours come out round.
-            // The dither moves the interpretation, not the fetches, so TAA can
-            // average it.
-            this.$l.dither = pb.mul(pb.float(ShaderHelper.getFramestamp(this)), SHORE_QUERY_DITHER_STRIDE);
-            this.$l.gridCoord = pb.sub(pb.mul(this.screenUV, this.mipSize), pb.vec2(0.5));
-            this.$l.gridBase = pb.floor(this.gridCoord);
-            this.$l.gridFrac = pb.sub(this.gridCoord, this.gridBase);
-            this.$l.softK = pb.mul(this.radius, SHORE_QUERY_SOFTMIN);
-            this.$l.dMax = pb.mul(this.radius, SHORE_QUERY_MISS_REACH);
-            this.$l.esum = pb.float(0);
-            for (let gy = 0; gy < 4; gy++) {
-              for (let gx = 0; gx < 4; gx++) {
-                this.$l[`uv${gx}${gy}`] = pb.mul(
-                  pb.add(this.gridBase, pb.vec2(gx - 1 + 0.5, gy - 1 + 0.5)),
-                  this.texelStep
-                );
-                this.$l[`hiz${gx}${gy}`] = pb.textureSampleLevel(
-                  ShaderHelper.getHiZDepthTexture(this),
-                  this[`uv${gx}${gy}`],
-                  this.level
-                );
-                this.$l[`z${gx}${gy}`] = ShaderHelper.nonLinearDepthToLinear(this, this[`hiz${gx}${gy}`].g);
-                this.$l[`zFar${gx}${gy}`] = ShaderHelper.nonLinearDepthToLinear(
-                  this,
-                  this[`hiz${gx}${gy}`].r
-                );
-                // A cell is a frustum block [near, far]. Depth is clamped to it
-                // (the reduction guarantees a surface on the near face), with the
-                // span clipped by SHORE_QUERY_CELL_DEPTH_SPAN.
-                this.$l[`cellW${gx}${gy}`] = pb.max(
-                  pb.div(pb.mul(this.texelStep.x, 2, this[`z${gx}${gy}`]), this.projMatrix[0].x),
-                  1e-6
-                );
-                this.$l[`zBack${gx}${gy}`] = pb.min(
-                  this[`zFar${gx}${gy}`],
-                  pb.add(this[`z${gx}${gy}`], pb.mul(this[`cellW${gx}${gy}`], SHORE_QUERY_CELL_DEPTH_SPAN))
-                );
-                this.$l[`zClamp${gx}${gy}`] = pb.clamp(
-                  pb.neg(this.viewPos.z),
-                  this[`z${gx}${gy}`],
-                  this[`zBack${gx}${gy}`]
-                );
-                this.$l[`dz${gx}${gy}`] = pb.add(this.viewPos.z, this[`zClamp${gx}${gy}`]);
-                // Seeded per cell, not shared across the sixteen.
-                this.$l[`jit${gx}${gy}`] = pb.sub(
-                  pb.vec2(
-                    interleavedGradientNoise(
-                      this,
-                      pb.add(
-                        this.$builtins.fragCoord.xy,
-                        pb.vec2(pb.add(this.dither, gx * 7.13 + 0.5), pb.add(this.dither, gy * 3.71 + 0.5))
-                      )
-                    ),
-                    interleavedGradientNoise(
-                      this,
-                      pb.add(
-                        this.$builtins.fragCoord.xy,
-                        pb.vec2(pb.add(this.dither, gy * 3.71 + 37), pb.add(this.dither, gx * 7.13 + 17))
-                      )
-                    )
-                  ),
-                  pb.vec2(0.5)
-                );
-                this.$l[`guessNDC${gx}${gy}`] = pb.sub(
-                  pb.mul(pb.add(this[`uv${gx}${gy}`], pb.mul(this[`jit${gx}${gy}`], this.texelStep)), 2),
-                  pb.vec2(1)
-                );
-                this.$l[`guess${gx}${gy}`] = pb.div(
-                  pb.mul(this[`guessNDC${gx}${gy}`], this[`zClamp${gx}${gy}`]),
-                  pb.vec2(this.projMatrix[0].x, this.projMatrix[1].y)
-                );
-                this.$l[`dxy${gx}${gy}`] = pb.sub(this.viewPos.xy, this[`guess${gx}${gy}`]);
-                this.$l[`d${gx}${gy}`] = pb.length(pb.vec3(this[`dxy${gx}${gy}`], this[`dz${gx}${gy}`]));
-                this.$l[`w${gx}${gy}`] = pb.sub(
-                  1,
-                  pb.smoothStep(1, 2, pb.length(pb.sub(pb.vec2(gx - 1, gy - 1), this.gridFrac)))
-                );
-                // Fading a cell out pushes its distance to the miss reach rather
-                // than scaling its weight: a weight going to zero under the log
-                // sends the distance to infinity, a hard cut along the window.
-                this.esum = pb.add(
-                  this.esum,
-                  pb.exp(
-                    pb.neg(
-                      pb.div(
-                        pb.mix(this.dMax, pb.min(this[`d${gx}${gy}`], this.dMax), this[`w${gx}${gy}`]),
-                        this.softK
-                      )
-                    )
-                  )
-                );
-              }
-            }
-            // Soft-min: -k * log(sum exp(-d / k) / norm).
-            this.$return(
-              pb.max(pb.mul(pb.neg(this.softK), pb.log(pb.div(this.esum, SHORE_QUERY_SOFTMIN_NORM))), 0)
-            );
-          }
-        );
-        // Distance from the water surface to the nearest opaque surface in a
-        // screen-space neighbourhood of `radius` meters, via the Hi-Z pyramid's
-        // nearest-depth channel. Returns a distance past the band's reach when
-        // the neighbourhood is empty.
-        pb.func(
-          'waterShoreProximity',
-          [pb.vec3('viewPos'), pb.vec2('screenUV'), pb.float('radius')],
-          function () {
-            // Screen radius in pixels of a sphere of `radius` meters at this depth.
-            this.$l.viewDist = pb.max(pb.neg(this.viewPos.z), 1e-4);
-            this.$l.pixelRadius = pb.mul(
-              pb.div(pb.mul(this.radius, ShaderHelper.getProjectionMatrix(this)[0].x), this.viewDist),
-              0.5,
-              ShaderHelper.getRenderSize(this).x
-            );
-            this.$l.maxLevel = pb.sub(pb.float(ShaderHelper.getHiZDepthTextureMipLevelCount(this)), 1);
-            this.$l.levelF = pb.clamp(
-              pb.log2(pb.max(pb.div(this.pixelRadius, SHORE_QUERY_TAP_SPREAD), 1)),
-              0,
-              this.maxLevel
-            );
-            // The pyramid uses a nearest mip filter, and switching levels at an
-            // integer shows as a seam along a line of equal view distance: query
-            // the two levels around and blend.
-            this.$l.level0 = pb.floor(this.levelF);
-            this.$l.level1 = pb.min(pb.add(this.level0, 1), this.maxLevel);
-            this.$l.d0 = this.waterShoreProximityLevel(this.viewPos, this.screenUV, this.radius, this.level0);
-            this.$l.d1 = this.waterShoreProximityLevel(this.viewPos, this.screenUV, this.radius, this.level1);
-            this.$return(pb.mix(this.d0, this.d1, pb.sub(this.levelF, this.level0)));
-          }
-        );
-      }
-      // Shoreline foam as (white foam, distance to the nearest surface,
-      // density); `foamGrad` receives the slope of the white foam along x and z.
-      pb.func(
-        'waterShoreFoam',
-        [
-          pb.vec3('worldPos'),
-          pb.vec3('viewPos'),
-          pb.vec2('screenUV'),
-          pb.vec2('restXZ'),
-          pb.vec4('restXZGrad'),
-          pb.vec2('foamGrad').out()
-        ],
-        function () {
-          this.foamGrad = pb.vec2(0);
-          this.$l.time = ShaderHelper.getElapsedTime(this);
-          if (waterline) {
-            // Horizontal distance to the waterline, from the scene field. Off
-            // its grid, the screen-space query or nothing, handed over to
-            // across the outer part of the grid so its border does not show.
-            this.$l.wlUV = pb.div(
-              pb.sub(this.worldPos.xz, this.waterlineRegion.xy),
-              pb.mul(this.waterlineRegion.z, this.waterlineRegion.w)
-            );
-            this.$l.missDist = pb.mul(this.shoreFoamWashParams.w, SHORE_QUERY_MISS_REACH);
-            this.$l.wlEdge = pb.min(
-              pb.min(this.wlUV.x, this.wlUV.y),
-              pb.min(pb.sub(1, this.wlUV.x), pb.sub(1, this.wlUV.y))
-            );
-            this.$l.wlWeight = this.$choice(
-              pb.greaterThan(this.waterlineRegion.w, 0),
-              pb.smoothStep(0, WATERLINE_EDGE_FADE, this.wlEdge),
-              pb.float(0)
-            );
-            this.$l.fieldDist = this.missDist;
-            this.$if(pb.greaterThan(this.wlWeight, 0), function () {
-              this.$l.wl = pb.textureSampleLevel(this.waterlineTex, this.wlUV, 0);
-              // Near geometry, the edge at this pixel's own surface height: a
-              // wave crest moves it inland and a trough out, metres on a gentle
-              // beach. Farther out, the distance to the rest-level waterline.
-              this.$l.dy = pb.sub(this.worldPos.y, this.waterlineLevel.x);
-              this.fieldDist = this.$choice(
-                pb.lessThan(pb.abs(this.wl.w), WATERLINE_LINEAR_REACH),
-                pb.max(pb.add(this.wl.y, pb.mul(this.wl.z, this.dy)), 0),
-                this.wl.x
-              );
-            });
-            this.$l.fallbackDist = this.missDist;
-            if (hiZ) {
-              this.$if(pb.lessThan(this.wlWeight, 1), function () {
-                this.fallbackDist = this.waterShoreProximity(
-                  this.viewPos,
-                  this.screenUV,
-                  this.shoreFoamWashParams.w
-                );
-              });
-            }
-            this.$l.surfaceDist = pb.mix(this.fallbackDist, this.fieldDist, this.wlWeight);
-          } else {
-            // Queried at the band's widest reach so the run-up does not move the
-            // mip level under it.
-            this.$l.surfaceDist = this.waterShoreProximity(
-              this.viewPos,
-              this.screenUV,
-              this.shoreFoamWashParams.w
-            );
-          }
-          // Run-up phase from a world-space noise field; the query does not know
-          // which way the shore runs.
-          this.$l.washOffset = valueNoise(this, pb.mul(this.worldPos.xz, this.shoreFoamWashParams.z));
-          this.$l.wash = pb.sin(
-            pb.mul(pb.add(pb.mul(this.time, this.shoreFoamWashParams.y), this.washOffset), 2 * Math.PI)
-          );
-          this.$l.edge = pb.max(
-            pb.mul(this.shoreFoamParams.y, pb.add(1, pb.mul(this.shoreFoamWashParams.x, this.wash))),
-            0
-          );
-          this.$l.soft = pb.max(pb.mul(this.edge, SHORE_FOAM_EDGE_SOFTNESS), 1e-4);
-          // The gradient ends at `edge`, so coverage is zero there; straddling it
-          // would give half coverage over the entire open sea.
-          this.$l.ramp = pb.sub(1, pb.smoothStep(pb.sub(this.edge, this.soft), this.edge, this.surfaceDist));
-          this.$if(pb.lessThanEqual(this.ramp, 0), function () {
-            this.$return(pb.vec3(0, this.surfaceDist, 0));
-          });
-          this.$l.pattern = this.waterShoreFoamPattern(this.restXZ, this.restXZGrad, this.time);
-          // Black-point fading of the texture by the density, as for all foam
-          this.$l.density = pb.clamp(
-            pb.mul(pb.pow(this.ramp, this.shoreFoamParams.z), this.shoreFoamParams.x),
-            0,
-            1
-          );
-          this.$l.white = this.waterWhiteFoam(this.density, this.pattern, this.shoreFoamFeather);
-          this.foamGrad = this.white.yz;
-          this.$return(pb.vec3(this.white.x, this.surfaceDist, this.density));
-        }
-      );
-    }
     pb.func(
       'waterShading',
       [
@@ -2431,29 +1857,9 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
           1
         );
         this.$l.crestWhite = this.waterWhiteFoam(this.crestDensity, this.foamSample, this.foamLookParams.x);
-        // (white foam, distance to the nearest surface, density); y is for the debug view.
-        this.$l.shoreFoamGrad = pb.vec2(0);
-        this.$l.shoreFoamInfo = shoreFoam
-          ? (this.waterShoreFoam(
-              this.worldPos,
-              this.viewPos,
-              this.screenUV,
-              this.restXZ,
-              this.restXZGrad,
-              this.shoreFoamGrad
-            ) as PBShaderExp)
-          : pb.vec3(0);
-        this.$l.shoreFoam = this.shoreFoamInfo.x;
-        // Independent layers compose as overlapping area, and so their slopes.
-        this.$l.foam = pb.sub(1, pb.mul(pb.sub(1, this.crestWhite.x), pb.sub(1, this.shoreFoam)));
-        this.$l.foamGrad = pb.add(
-          pb.mul(this.crestWhite.yz, pb.sub(1, this.shoreFoam)),
-          pb.mul(this.shoreFoamGrad, pb.sub(1, this.crestWhite.x))
-        );
-        this.$l.bubbleDensity = pb.sub(
-          1,
-          pb.mul(pb.sub(1, this.crestDensity), pb.sub(1, this.shoreFoamInfo.z))
-        );
+        this.$l.foam = this.crestWhite.x;
+        this.$l.foamGrad = this.crestWhite.yz;
+        this.$l.bubbleDensity = this.crestDensity;
         // Normal of the white foam's relief: Crest differences the cut over a
         // quarter texel per metre of view depth, which keeps the relief at a
         // distance; the slope times that step here
@@ -2708,18 +2114,8 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
           case 'foam':
             this.$return(pb.vec3(this.foam));
             break;
-          case 'shoreFoam':
-            this.$return(pb.vec3(this.shoreFoam));
-            break;
           case 'waterDepth':
-            this.$return(
-              pb.vec3(
-                pb.mul(
-                  shoreFoam ? this.shoreFoamInfo.y : pb.max(pb.sub(this.worldPos.y, this.wPos.y), 0),
-                  0.1
-                )
-              )
-            );
+            this.$return(pb.vec3(pb.mul(pb.max(pb.sub(this.worldPos.y, this.wPos.y), 0), 0.1)));
             break;
           case 'fresnel':
             this.$return(pb.vec3(this.fresnelTerm));
@@ -2773,19 +2169,6 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
       waveGenerator.applyWaterBindGroup(bindGroup);
       this._waveVersionByBindGroup.set(bindGroup, waveGenerator.version);
     }
-    // Every frame, not only on a material change: the waterline grid follows the
-    // camera, and a stale origin slides the shoreline band off the shore
-    if (this.needFragmentColor(ctx) && this._shoreFoamEnabled && this._waterlineAvailable(ctx)) {
-      const waterline = ShaderHelper.getSceneSDF(ctx)!.waterline;
-      const tex = waterline.ready ? waterline.texture : null;
-      bindGroup.setTexture(
-        'waterlineTex',
-        tex ?? WaterMaterial._getNoWaterlineTexture(),
-        fetchSampler('clamp_linear_nomip')
-      );
-      bindGroup.setValue('waterlineRegion', tex ? waterline.region : new Vector4(0, 0, 1, 0));
-      bindGroup.setValue('waterlineLevel', new Vector4(waterline.level ?? 0, 0, 0, 0));
-    }
   }
   applyUniformValues(bindGroup: BindGroup, ctx: DrawContext, pass: number) {
     super.applyUniformValues(bindGroup, ctx, pass);
@@ -2825,30 +2208,6 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
       );
       bindGroup.setValue('foamUVScale', 1 / this._foamTextureSize);
       bindGroup.setValue('edgeFadeWidth', this._edgeFadeWidth);
-      if (this._shoreFoamEnabled) {
-        this._shoreFoamParams.setXYZW(
-          this._shoreFoamAmount,
-          this._shoreFoamDepth,
-          this._shoreFoamFalloff,
-          // Cycles per band width -> cycles per meter.
-          this._shoreFoamScale / this._shoreFoamDepth
-        );
-        bindGroup.setValue('shoreFoamParams', this._shoreFoamParams);
-        this._shoreFoamWashParams.setXYZW(
-          this._shoreFoamWashAmount,
-          this._shoreFoamWashSpeed,
-          this._shoreFoamWashScale,
-          // Query radius: the band's widest reach over the run-up cycle.
-          this._shoreFoamDepth * (1 + this._shoreFoamWashAmount)
-        );
-        bindGroup.setValue('shoreFoamWashParams', this._shoreFoamWashParams);
-        bindGroup.setValue('shoreFoamFeather', this._shoreFoamFeather);
-        bindGroup.setTexture(
-          'shoreFoamTex',
-          this.foamTexture ?? getDefaultFoamTexture(),
-          fetchSampler('repeat_linear')
-        );
-      }
       bindGroup.setValue('mediumAlbedo', this._scatterAlbedo);
       bindGroup.setValue('mediumExtinction', this._extinction);
       bindGroup.setTexture('zLTCMatLut', getLTCMatLUT());
@@ -2863,19 +2222,6 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
           REFRACT_BLUR_DENSITY *
           this._refractionBlur
       );
-      if (this.mediumMode === 'ramp') {
-        bindGroup.setValue('depthMulti', this._depthMulti);
-        bindGroup.setTexture(
-          'scatterRampTex',
-          this._getScatterRampTexture(ctx.device),
-          fetchSampler('clamp_linear_nomip')
-        );
-        bindGroup.setTexture(
-          'absorptionRampTex',
-          this._getAbsorptionRampTexture(ctx.device),
-          fetchSampler('clamp_linear_nomip')
-        );
-      }
     }
     if (this.waveGenerator) {
       this.waveGenerator.applyWaterBindGroup(bindGroup);
@@ -3001,46 +2347,5 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
         WaterMaterial._interactionUpdateState.set(interaction, frameId);
       }
     }
-  }
-  private _getRampTexture(device: AbstractDevice, grad: Interpolator) {
-    const width = 128;
-    const height = 1;
-    const texture = device.createTexture2D('rgba8unorm', width, height, {
-      mipmapping: false
-    })!;
-    const numTexels = width * height;
-    const data = new Uint8Array(numTexels * 4);
-    const tmpcolor = new Vector3();
-    for (let i = 0; i < numTexels; i++) {
-      grad.interpolate((i % width) / width, tmpcolor);
-      data[i * 4 + 0] = (tmpcolor.x * 255) >> 0;
-      data[i * 4 + 1] = (tmpcolor.y * 255) >> 0;
-      data[i * 4 + 2] = (tmpcolor.z * 255) >> 0;
-      data[i * 4 + 3] = 255;
-    }
-    texture.update(data, 0, 0, width, height);
-    return texture;
-  }
-  private _getScatterRampTexture(device: AbstractDevice) {
-    if (!this._scatterRampTexture.get()) {
-      if (!WaterMaterial._defaultScatterRampTexture.get()) {
-        WaterMaterial._defaultScatterRampTexture.set(
-          this._getRampTexture(device, WaterMaterial._scatterGrad)
-        );
-      }
-      this._scatterRampTexture.set(WaterMaterial._defaultScatterRampTexture.get());
-    }
-    return this._scatterRampTexture.get()!;
-  }
-  private _getAbsorptionRampTexture(device: AbstractDevice) {
-    if (!this._absorptionRampTexture.get()) {
-      if (!WaterMaterial._defaultAbsorptionRampTexture.get()) {
-        WaterMaterial._defaultAbsorptionRampTexture.set(
-          this._getRampTexture(device, WaterMaterial._absorptionGrad)
-        );
-      }
-      this._absorptionRampTexture.set(WaterMaterial._defaultAbsorptionRampTexture.get());
-    }
-    return this._absorptionRampTexture.get()!;
   }
 }

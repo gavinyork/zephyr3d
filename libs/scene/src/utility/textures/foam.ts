@@ -1,13 +1,6 @@
 import type { PBInsideFunctionScope, PBShaderExp, Texture2D } from '@zephyr3d/device';
 import { getDevice } from '../../app/api';
 
-/**
- * Nominal clumps of foam across one repeat of the foam texture: the shoreline
- * band turns its pattern frequency, in clumps per metre, into repeats per
- * metre with it.
- */
-export const FOAM_TEX_CELLS = 8;
-
 let foamTexture: Texture2D | null = null;
 
 /**

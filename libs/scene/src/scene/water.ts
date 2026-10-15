@@ -347,6 +347,13 @@ export class Water extends applyMixins(GraphNode, mixinDrawable) implements Draw
   set causticsWarp(val: number) {
     this.material.causticsWarp = val;
   }
+  /** Water depth in metres below which no caustics show. */
+  get causticsMinDepth() {
+    return this.material.causticsMinDepth;
+  }
+  set causticsMinDepth(val: number) {
+    this.material.causticsMinDepth = val;
+  }
   /**
    * Whether a camera inside this body of water sees the water from the inside:
    * the medium applied to the whole scene, the sky replaced by water, and the
@@ -479,101 +486,6 @@ export class Water extends applyMixins(GraphNode, mixinDrawable) implements Draw
   }
   set sunScatteringIntensity(val: number) {
     this.material.sunScatteringIntensity = val;
-  }
-  /**
-   * Coverage of the foam that collects where the water meets a surface, 0 to
-   * disable. Off by default.
-   *
-   * Independent of the crest foam the wave generator produces: this one is keyed
-   * on how far the surface is from whatever is behind it, measured to that
-   * surface's own plane - the depth of water over a bed, the horizontal distance
-   * to a piling or a hull - so one band covers both the shoreline and the contact
-   * line around anything standing in the water.
-   * {@link shoreFoamWashAmount} is what makes it run up and drain back rather
-   * than sit there as a rim.
-   *
-   * Estimated from the depth buffer, so it only knows about what the camera can
-   * see: water in front of something standing above the surface gets no foam
-   * rather than a guess. See {@link WaterMaterial.shoreFoamAmount}.
-   */
-  get shoreFoamAmount() {
-    return this.material.shoreFoamAmount;
-  }
-  set shoreFoamAmount(val: number) {
-    this.material.shoreFoamAmount = val;
-  }
-  /**
-   * How far, in meters, the foam band reaches from the surface behind it. A depth
-   * of water over a bed, a horizontal distance against anything vertical. How
-   * wide that is on screen depends on the geometry: a thin line on a steep
-   * drop-off, a broad stretch on a flat shelf.
-   */
-  get shoreFoamDepth() {
-    return this.material.shoreFoamDepth;
-  }
-  set shoreFoamDepth(val: number) {
-    this.material.shoreFoamDepth = val;
-  }
-  /**
-   * Falloff across the band. Above 1 pushes the coverage towards the near end and
-   * keeps the outer edge thin and broken.
-   */
-  get shoreFoamFalloff() {
-    return this.material.shoreFoamFalloff;
-  }
-  set shoreFoamFalloff(val: number) {
-    this.material.shoreFoamFalloff = val;
-  }
-  /**
-   * Size of the clumps the band's edge breaks into, as cycles across the band.
-   *
-   * Relative to {@link shoreFoamDepth} rather than in cycles per metre, so one
-   * setting reads the same on a shoreline metres across and on a collar a
-   * handspan wide around a piling.
-   */
-  get shoreFoamScale() {
-    return this.material.shoreFoamScale;
-  }
-  set shoreFoamScale(val: number) {
-    this.material.shoreFoamScale = val;
-  }
-  /**
-   * Width of the black-point fade that cuts the foam texture into clumps.
-   * Small values give hard-edged clumps, large values a soft fade.
-   */
-  get shoreFoamFeather() {
-    return this.material.shoreFoamFeather;
-  }
-  set shoreFoamFeather(val: number) {
-    this.material.shoreFoamFeather = val;
-  }
-  /**
-   * How far the band's edge runs back and forth, as a fraction of
-   * {@link shoreFoamDepth}. 0 leaves a static band.
-   */
-  get shoreFoamWashAmount() {
-    return this.material.shoreFoamWashAmount;
-  }
-  set shoreFoamWashAmount(val: number) {
-    this.material.shoreFoamWashAmount = val;
-  }
-  /** Run-up cycles per second. Swell rather than wind waves, so well under 1. */
-  get shoreFoamWashSpeed() {
-    return this.material.shoreFoamWashSpeed;
-  }
-  set shoreFoamWashSpeed(val: number) {
-    this.material.shoreFoamWashSpeed = val;
-  }
-  /**
-   * Spatial frequency of the run-up phase, in cycles per meter. At 0 the whole
-   * waterline advances in lockstep, which reads as the water level rising and
-   * falling; a cycle every few tens of meters breaks it into sections.
-   */
-  get shoreFoamWashScale() {
-    return this.material.shoreFoamWashScale;
-  }
-  set shoreFoamWashScale(val: number) {
-    this.material.shoreFoamWashScale = val;
   }
   /**
    * Crest to trough height in metres of the waves rolling in to the shore,
@@ -885,9 +797,8 @@ export class Water extends applyMixins(GraphNode, mixinDrawable) implements Draw
       this.updateSubmergence(camera, mat);
       const interaction = mat.interaction;
       const wantsDepth = !!interaction && interaction.shallowDepth > 0;
-      if ((mat.shoreFoamAmount > 0 || mat.shoreWaveHeight > 0 || wantsDepth) && this.scene?.sdf.enabled) {
-        // The shoreline band is measured from the waterline at the rest level,
-        // and the interaction field and the shore waves read it too
+      if ((mat.shoreWaveHeight > 0 || wantsDepth) && this.scene?.sdf.enabled) {
+        // The interaction field and the shore waves read the waterline at the rest level
         this.scene.sdf.global?.waterline.request(this.worldMatrix.m13);
       }
       if (mat.shoreWaveHeight > 0) {
@@ -1086,12 +997,6 @@ export class Water extends applyMixins(GraphNode, mixinDrawable) implements Draw
    */
   needSceneDepth() {
     return this._material.get()?.needSceneDepth() ?? false;
-  }
-  /**
-   * {@inheritDoc Drawable.needHiZNearest}
-   */
-  needHiZNearest() {
-    return this._material.get()?.needHiZNearest() ?? false;
   }
   /**
    * {@inheritDoc Drawable.getMaterial}
