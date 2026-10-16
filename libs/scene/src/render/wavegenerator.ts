@@ -95,6 +95,18 @@ export interface WaveGenerator extends IDisposable {
    */
   calcSurfaceCoverage?(scope: PBInsideFunctionScope, xz: PBShaderExp): PBShaderExp;
   /**
+   * Thickness in metres of the water over the ground at an undisplaced XZ, for
+   * a generator that knows the ground under it, by which the material fades a
+   * thin sheet into the scene behind. Taken from the generator's own surface
+   * and ground rather than from the depth buffer, whose reconstruction moves
+   * by centimetres with the camera jitter, as much as such a sheet is thick.
+   * Optional: without it, or where it is negative, the material reconstructs
+   * the thickness from the depth buffer.
+   * @param scope - Shader scope.
+   * @param xz - Undisplaced XZ position.
+   */
+  calcSheetThickness?(scope: PBInsideFunctionScope, xz: PBShaderExp): PBShaderExp;
+  /**
    * Apply water bind group.
    * @param bindGroup - Bind group to apply.
    */

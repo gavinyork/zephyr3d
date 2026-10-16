@@ -61,6 +61,9 @@ export type WaterRefractionMode = 'march' | 'offset';
  * - `subsurface`: the backlit-crest translucency term.
  * - `subsurfaceThickness`: the crest gate that term is scaled by, bright on
  *   crests and absorbed in troughs. Independent of the lights.
+ * - `shadow`: the lights' shadow factor on the surface, as grey; white with
+ *   no shadowed light.
+ * - `specular`: the lights' mirror highlights, shadowed, with nothing else.
  * - `depth`: refracted path length through the medium, metres / 10.
  *   no offset is mid grey.
  * - `interaction`: the {@link WaterInteraction} field on its own, mid grey at
@@ -85,6 +88,8 @@ export type WaterDebugOutput =
   | 'sunScattering'
   | 'subsurface'
   | 'subsurfaceThickness'
+  | 'shadow'
+  | 'specular'
   | 'depth'
   | 'interaction';
 
@@ -1192,6 +1197,10 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
       scope.$l.surfaceCoverage = surfaceCoverage
         ? surfaceCoverage.call(this.waveGenerator, scope, scope.$inputs.clipmapPos.xz)
         : pb.float(1);
+      const sheetThickness = this.waveGenerator?.calcSheetThickness;
+      scope.$l.sheetThickness = sheetThickness
+        ? sheetThickness.call(this.waveGenerator, scope, scope.$inputs.clipmapPos.xz)
+        : pb.float(-1);
       // Wholly past the water's edge: nothing to draw, rather than the scene
       // colour behind, which the final image does not quite match
       if (surfaceCoverage) {
@@ -1232,7 +1241,8 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
             scope.$inputs.clipmapPos.xz,
             scope.restXZGrad,
             scope.foamSample,
-            scope.surfaceCoverage
+            scope.surfaceCoverage,
+            scope.sheetThickness
           ),
           1
         );
@@ -1610,7 +1620,8 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
     restXZ: PBShaderExp,
     restXZGrad: PBShaderExp,
     foamSample: PBShaderExp,
-    coverage: PBShaderExp
+    coverage: PBShaderExp,
+    sheetThickness: PBShaderExp
   ) {
     const pb = scope.$builder;
     const that = this;
@@ -1710,7 +1721,8 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
         pb.vec2('restXZ'),
         pb.vec4('restXZGrad'),
         pb.vec3('foamSample'),
-        pb.float('coverage')
+        pb.float('coverage'),
+        pb.float('sheetThickness')
       ],
       function () {
         this.$l.screenUV = pb.div(pb.vec2(this.$builtins.fragCoord.xy), ShaderHelper.getRenderSize(this));
@@ -1886,6 +1898,8 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
         // Debug accumulators. Dead in the `none` variant.
         this.$l.dbgSubsurface = pb.vec3(0);
         this.$l.dbgSunScatter = pb.vec3(0);
+        this.$l.dbgShadow = pb.vec3(1);
+        this.$l.dbgSpecular = pb.vec3(0);
         // Exit transmission times the water (non-foam) share. The refraction
         // already carries it via the `mix`; every body term below must too.
         this.$l.bodyWeight = pb.mul(pb.sub(1, this.fresnelTerm), pb.sub(1, this.foam));
@@ -2032,6 +2046,8 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
           this.finalColor = pb.add(this.finalColor, this.lightContrib);
           this.dbgSubsurface = pb.add(this.dbgSubsurface, pb.mul(this.subsurfaceTerm, this.shadow));
           this.dbgSunScatter = pb.add(this.dbgSunScatter, pb.mul(this.sunScatterTerm, this.shadow));
+          this.dbgShadow = pb.min(this.dbgShadow, this.shadow);
+          this.dbgSpecular = pb.add(this.dbgSpecular, pb.mul(this.specularTerm, this.shadow));
         });
         if (that.needCalculateEnvLight()) {
           this.$l.irradiance = that.getEnvLightIrradiance(this, this.diffuseNormal);
@@ -2091,7 +2107,14 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
         // Where the wave generator runs the mesh on past the water's edge, the
         // scene behind shows instead.
         this.$if(pb.not(this.underwaterEye), function () {
-          this.$l.edgeThickness = pb.sub(this.worldPos.y, this.wPos.y);
+          // From the wave generator's own ground where it has one: the depth
+          // buffer reconstruction moves with the camera jitter by about as much
+          // as the sheet is thick, and the fade flickered with it
+          this.$l.edgeThickness = this.$choice(
+            pb.greaterThanEqual(this.sheetThickness, 0),
+            this.sheetThickness,
+            pb.sub(this.worldPos.y, this.wPos.y)
+          );
           this.$l.edgeFade = pb.mul(
             this.$choice(
               pb.greaterThan(this.edgeFadeWidth, 0),
@@ -2147,6 +2170,12 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
           case 'subsurfaceThickness':
             this.$return(pb.vec3(this.sssThickness));
             break;
+          case 'shadow':
+            this.$return(this.dbgShadow);
+            break;
+          case 'specular':
+            this.$return(this.dbgSpecular);
+            break;
           case 'depth':
             this.$return(pb.vec3(pb.mul(this.depth, 0.1)));
             break;
@@ -2163,7 +2192,8 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
       restXZ,
       restXZGrad,
       foamSample,
-      coverage
+      coverage,
+      sheetThickness
     );
   }
   applyUniforms(bindGroup: BindGroup, ctx: DrawContext, needUpdate: boolean, pass: number) {

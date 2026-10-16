@@ -786,6 +786,26 @@ export class ShoreWaveGenerator extends Disposable implements WaveGenerator {
    * the bed, 0 where the mesh is only held clear of the sand so that its
    * coarse triangles do not draw the edge.
    */
+  /**
+   * Depth of the water over the bed of the waterline field, the shore wave's
+   * surface less the bed height: the same quantity the edge cut compares,
+   * stable under the camera jitter. -1 where there is no bed to measure from,
+   * off the grid or away from the beach.
+   */
+  calcSheetThickness(scope: PBInsideFunctionScope, xz: PBShaderExp): PBShaderExp {
+    const pb = scope.$builder;
+    const that = this;
+    pb.func('swSheetThickness', [pb.vec2('xz')], function () {
+      this.$l.dir = pb.vec4(0);
+      this.$l.spacing = pb.float(0);
+      this.$l.sw = that.evaluate(this, this.xz, this.dir, this.spacing);
+      this.$if(pb.lessThan(this.dir.w, -1e3), function () {
+        this.$return(pb.float(-1));
+      });
+      this.$return(pb.max(pb.sub(this.sw.x, this.dir.w), 0));
+    });
+    return scope.swSheetThickness(xz) as PBShaderExp;
+  }
   calcSurfaceCoverage(scope: PBInsideFunctionScope, xz: PBShaderExp): PBShaderExp {
     const pb = scope.$builder;
     const that = this;
