@@ -11,6 +11,7 @@ import type { WaterInteraction } from '../render/water_interaction';
 import { InteractiveWaveGenerator } from '../render/water_interaction';
 import { ShoreWaveGenerator } from '../render/shore_wave_generator';
 import type { ShoreWaveSettings } from '../render/shore_wave_generator';
+import { WaterFoamField } from '../render/water_foam';
 import { LIGHT_TYPE_DIRECTIONAL, LIGHT_TYPE_RECT, MaterialVaryingFlags } from '../values';
 import { ShaderHelper } from './shader/helper';
 import type { Nullable } from '@zephyr3d/base';
@@ -213,6 +214,8 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
   };
   /** The shore wave layer of the effective generator, while the waves are on. */
   private _shoreWaveGenerator: Nullable<ShoreWaveGenerator> = null;
+  /** Foam with memory, carried by the water; kept across rebuilds of the generators. */
+  private readonly _foamField = new WaterFoamField();
   private _edgeFadeWidth = 0.05;
   /**
    * Thickness in metres over which a thin sheet of water fades in from the
@@ -359,6 +362,9 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
     super.onDispose();
     this._waveGenerator.dispose();
     this._interaction.dispose();
+    this._shoreWaveGenerator?.dispose();
+    this._shoreWaveGenerator = null;
+    this._foamField.dispose();
     this._effectiveWaveGenerator = null;
     this._foamTexture.dispose();
   }
@@ -422,7 +428,7 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
     this._shoreWaveGenerator?.dispose();
     this._shoreWaveGenerator = null;
     if (effective && this._shoreWaves.height > 0) {
-      this._shoreWaveGenerator = new ShoreWaveGenerator(effective, this._shoreWaves);
+      this._shoreWaveGenerator = new ShoreWaveGenerator(effective, this._shoreWaves, this._foamField);
       effective = this._shoreWaveGenerator;
     }
     this._effectiveWaveGenerator = effective;
