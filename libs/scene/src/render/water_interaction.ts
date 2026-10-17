@@ -51,10 +51,12 @@ const ZERO_SHIFT = new Vector2(0, 0);
 const HEIGHT_FORMATS: TextureFormat[] = ['rgba32f', 'rgba16f'];
 /** Most disturbers the field can carry at once. @internal */
 const MAX_DISTURBERS = 16;
-/** Floats per footprint: two vec4. @internal */
-const FOOTPRINT_STRIDE = 8;
+/** Floats per footprint: three vec4. @internal */
+const FOOTPRINT_STRIDE = 12;
 /** Floats per disturber in the uniform array: the current and the previous footprint. @internal */
 const DISTURBER_STRIDE = FOOTPRINT_STRIDE * 2;
+/** Vec4 per disturber in the uniform array. @internal */
+const DISTURBER_VEC4S = DISTURBER_STRIDE / 4;
 /** Footprint type codes. A blocking footprint adds {@link BLOCKING_FLAG}. @internal */
 const SHAPE_SPHERE = 1;
 const SHAPE_CAPSULE = 2;
@@ -118,6 +120,8 @@ export class WaterDisturber {
   enabled: boolean;
   /** @internal */
   _hasPrev: boolean;
+  /** Slot the disturber took in the last step, whose surface height it reads back. @internal */
+  _slot: number;
   /** @internal */
   readonly _now: Float32Array<ArrayBuffer>;
   /** @internal */
@@ -138,17 +142,20 @@ export class WaterDisturber {
     this.blocking = false;
     this.enabled = true;
     this._hasPrev = false;
+    this._slot = -1;
     this._now = new Float32Array(FOOTPRINT_STRIDE);
     this._prev = new Float32Array(FOOTPRINT_STRIDE);
   }
   /**
-   * Evaluate the footprint on the surface at `waterLevel` into `_now`.
+   * Evaluate the footprint into `_now`, its heights relative to the still
+   * water at `waterLevel`. How deep it sits is worked out on the GPU against
+   * the surface it floats on (see `wiFootprint`), which the ambient waves
+   * raise and lower under it.
    *
-   * Layout: `(type, cx, cz, amp)`, `(p0, p1, p2, p3)` with the shape-specific
-   * parameters in world XZ metres. `amp` is `strength` times how much of the
-   * shape's height is under water, faded back out as the whole shape sinks
-   * further than its own height below the surface: a submarine at depth does
-   * not ripple the surface.
+   * Layout: `(type, cx, cz, 1)`, `(p0, p1, p2, p3)` with the shape-specific
+   * parameters in world XZ metres (a sphere's full radius in p0),
+   * `(bottom, top, centre y, strength)`. The previous footprint's first `w`
+   * says whether the surface height read back for its slot is its own.
    * @internal
    */
   _evaluate(waterLevel: number) {
@@ -156,25 +163,26 @@ export class WaterDisturber {
     const out = this._now;
     const flags = this.blocking ? BLOCKING_FLAG : 0;
     const cx = m.m03;
-    const cy = m.m13;
+    const cy = m.m13 - waterLevel;
     const cz = m.m23;
     // Node scale, from the world matrix columns.
     const sx = Math.hypot(m.m00, m.m10, m.m20);
     const sy = Math.hypot(m.m01, m.m11, m.m21);
     const sz = Math.hypot(m.m02, m.m12, m.m22);
+    out[3] = 1;
+    out[10] = cy;
+    out[11] = this.strength;
     if (this.shape === 'sphere') {
       const r = this.radius * Math.max(sx, sy, sz);
-      const dy = cy - waterLevel;
-      // Radius of the circle the sphere cuts in the rest plane.
-      const rEff = dy <= -r ? r : dy >= r ? 0 : Math.sqrt(Math.max(0, r * r - dy * dy));
       out[0] = SHAPE_SPHERE + flags;
       out[1] = cx;
       out[2] = cz;
-      out[3] = this.strength * WaterDisturber._submersion(waterLevel, cy - r, cy + r);
-      out[4] = rEff;
+      out[4] = r;
       out[5] = 0;
       out[6] = 0;
       out[7] = 0;
+      out[8] = cy - r;
+      out[9] = cy + r;
     } else if (this.shape === 'capsule') {
       const r = this.radius * Math.max(sx, sz);
       // Endpoints of the segment along local Y; the column carries the scale.
@@ -187,12 +195,12 @@ export class WaterDisturber {
       out[0] = SHAPE_CAPSULE + flags;
       out[1] = ax;
       out[2] = az;
-      out[3] =
-        this.strength * WaterDisturber._submersion(waterLevel, Math.min(ay, by) - r, Math.max(ay, by) + r);
       out[4] = bx;
       out[5] = bz;
       out[6] = r;
       out[7] = 0;
+      out[8] = Math.min(ay, by) - r;
+      out[9] = Math.max(ay, by) + r;
     } else {
       // Half extents along the world-space columns.
       const hx = this.size.x * 0.5;
@@ -236,23 +244,23 @@ export class WaterDisturber {
       out[0] = SHAPE_BOX + flags;
       out[1] = cx;
       out[2] = cz;
-      out[3] = this.strength * WaterDisturber._submersion(waterLevel, cy - yExtent, cy + yExtent);
       out[4] = ux;
       out[5] = uz;
       out[6] = Math.max(eu, 1e-3);
       out[7] = Math.max(ev, 1e-3);
+      out[8] = cy - yExtent;
+      out[9] = cy + yExtent;
     }
   }
-  /**
-   * How much of a shape spanning `bottom..top` is under `waterLevel`, 0 to 1,
-   * faded back to 0 once the top is a shape's height below the surface.
-   * @internal
-   */
-  private static _submersion(waterLevel: number, bottom: number, top: number) {
-    const height = Math.max(top - bottom, 1e-4);
-    const depth = Math.min(1, Math.max(0, (waterLevel - bottom) / height));
-    const deep = Math.min(1, Math.max(0, 1 - (waterLevel - top) / height));
-    return depth * deep;
+  /** World XZ of the footprint's centre, where the surface under it is read. @internal */
+  _centre(fp: Float32Array, out: Float32Array, offset: number) {
+    if (fp[0] % BLOCKING_FLAG === SHAPE_CAPSULE) {
+      out[offset] = (fp[1] + fp[4]) * 0.5;
+      out[offset + 1] = (fp[2] + fp[5]) * 0.5;
+    } else {
+      out[offset] = fp[1];
+      out[offset + 1] = fp[2];
+    }
   }
 }
 
@@ -267,66 +275,107 @@ interface PendingImpulse {
 /**
  * Declare the footprint functions the simulation shaders share.
  *
- * `wiFootprint(a, b, wp)` is the displaced column at world XZ `wp`, in metres
- * of surface height: the shape's amplitude times a dome over its footprint,
- * so a moving shape's frame-to-frame difference is smooth. `wiFootprintHard`
- * is the footprint as a 0/1 mask, for the obstacle map. Both decode the
- * packed layout {@link WaterDisturber._evaluate} writes.
+ * `wiFootprint(a, b, c, s, wp)` is the displaced column at world XZ `wp`, in
+ * metres of surface height, with the surface under the shape at `s` over the
+ * still water: the shape's amplitude times a dome over its footprint, so a
+ * moving shape's frame-to-frame difference is smooth. The amplitude is the
+ * strength times how much of the shape's height is under that surface, faded
+ * back out as the whole shape sinks further than its own height below it (a
+ * submarine at depth does not ripple the surface); a sphere's footprint is the
+ * circle the surface cuts from it. Measured against the surface the shape
+ * floats on rather than the still water, so a hull riding the swell keeps its
+ * footprint instead of pumping rings into the field with every wave.
+ * `wiFootprintHard` is the footprint as a 0/1 mask, for the obstacle map. Both
+ * decode the packed layout {@link WaterDisturber._evaluate} writes.
  * @internal
  */
 function declareFootprintFunctions(pb: ProgramBuilder) {
-  pb.func('wiShapeMask', [pb.vec4('a'), pb.vec4('b'), pb.vec2('wp'), pb.bool('hard')], function () {
-    this.$l.t = pb.sub(
-      this.a.x,
-      pb.select(pb.float(BLOCKING_FLAG), pb.float(0), pb.greaterThanEqual(this.a.x, BLOCKING_FLAG))
-    );
-    this.$l.m = pb.float(0);
-    this.$if(pb.lessThan(this.t, SHAPE_SPHERE + 0.5), function () {
-      this.$l.dv = pb.sub(this.wp, this.a.yz);
-      this.$l.d2 = pb.dot(this.dv, this.dv);
-      this.$l.r2 = pb.mul(this.b.x, this.b.x);
-      this.$if(pb.greaterThan(this.r2, 0), function () {
-        this.m = pb.select(
-          pb.max(0, pb.sub(1, pb.div(this.d2, this.r2))),
-          pb.select(pb.float(0), pb.float(1), pb.lessThan(this.d2, this.r2)),
-          this.hard
-        );
-      });
-    })
-      .$elseif(pb.lessThan(this.t, SHAPE_CAPSULE + 0.5), function () {
-        this.$l.ab = pb.sub(this.b.xy, this.a.yz);
-        this.$l.ap = pb.sub(this.wp, this.a.yz);
-        this.$l.s = pb.clamp(pb.div(pb.dot(this.ap, this.ab), pb.max(pb.dot(this.ab, this.ab), 1e-6)), 0, 1);
-        this.$l.dv = pb.sub(this.ap, pb.mul(this.ab, this.s));
-        this.$l.d2 = pb.dot(this.dv, this.dv);
-        this.$l.r2 = pb.mul(this.b.z, this.b.z);
-        this.m = pb.select(
-          pb.max(0, pb.sub(1, pb.div(this.d2, this.r2))),
-          pb.select(pb.float(0), pb.float(1), pb.lessThan(this.d2, this.r2)),
-          this.hard
-        );
-      })
-      .$else(function () {
+  pb.func(
+    'wiShapeMask',
+    [pb.vec4('a'), pb.vec4('b'), pb.vec4('c'), pb.float('s'), pb.vec2('wp'), pb.bool('hard')],
+    function () {
+      this.$l.t = pb.sub(
+        this.a.x,
+        pb.select(pb.float(BLOCKING_FLAG), pb.float(0), pb.greaterThanEqual(this.a.x, BLOCKING_FLAG))
+      );
+      this.$l.m = pb.float(0);
+      this.$if(pb.lessThan(this.t, SHAPE_SPHERE + 0.5), function () {
         this.$l.dv = pb.sub(this.wp, this.a.yz);
-        this.$l.u = this.b.xy;
-        this.$l.v = pb.vec2(pb.neg(this.u.y), this.u.x);
-        this.$l.du = pb.div(pb.abs(pb.dot(this.dv, this.u)), this.b.z);
-        this.$l.dw = pb.div(pb.abs(pb.dot(this.dv, this.v)), this.b.w);
-        this.$l.mx = pb.max(this.du, this.dw);
-        this.m = pb.select(
-          pb.sub(1, pb.smoothStep(0.75, 1, this.mx)),
-          pb.select(pb.float(0), pb.float(1), pb.lessThan(this.mx, 1)),
-          this.hard
+        this.$l.d2 = pb.dot(this.dv, this.dv);
+        // Radius of the circle the surface cuts from the sphere
+        this.$l.dy = pb.sub(this.c.z, this.s);
+        this.$l.r = this.b.x;
+        this.$l.rEff = pb.select(
+          pb.sqrt(pb.max(0, pb.sub(pb.mul(this.r, this.r), pb.mul(this.dy, this.dy)))),
+          this.r,
+          pb.lessThanEqual(this.dy, pb.neg(this.r))
         );
-      });
-    this.$return(this.m);
-  });
-  pb.func('wiFootprint', [pb.vec4('a'), pb.vec4('b'), pb.vec2('wp')], function () {
-    this.$return(pb.mul(this.a.w, this.wiShapeMask(this.a, this.b, this.wp, false)));
-  });
-  pb.func('wiFootprintHard', [pb.vec4('a'), pb.vec4('b'), pb.vec2('wp')], function () {
-    this.$return(this.wiShapeMask(this.a, this.b, this.wp, true));
-  });
+        this.$l.r2 = pb.mul(this.rEff, this.rEff);
+        this.$if(pb.greaterThan(this.r2, 0), function () {
+          this.m = pb.select(
+            pb.max(0, pb.sub(1, pb.div(this.d2, this.r2))),
+            pb.select(pb.float(0), pb.float(1), pb.lessThan(this.d2, this.r2)),
+            this.hard
+          );
+        });
+      })
+        .$elseif(pb.lessThan(this.t, SHAPE_CAPSULE + 0.5), function () {
+          this.$l.ab = pb.sub(this.b.xy, this.a.yz);
+          this.$l.ap = pb.sub(this.wp, this.a.yz);
+          this.$l.s = pb.clamp(
+            pb.div(pb.dot(this.ap, this.ab), pb.max(pb.dot(this.ab, this.ab), 1e-6)),
+            0,
+            1
+          );
+          this.$l.dv = pb.sub(this.ap, pb.mul(this.ab, this.s));
+          this.$l.d2 = pb.dot(this.dv, this.dv);
+          this.$l.r2 = pb.mul(this.b.z, this.b.z);
+          this.m = pb.select(
+            pb.max(0, pb.sub(1, pb.div(this.d2, this.r2))),
+            pb.select(pb.float(0), pb.float(1), pb.lessThan(this.d2, this.r2)),
+            this.hard
+          );
+        })
+        .$else(function () {
+          this.$l.dv = pb.sub(this.wp, this.a.yz);
+          this.$l.u = this.b.xy;
+          this.$l.v = pb.vec2(pb.neg(this.u.y), this.u.x);
+          this.$l.du = pb.div(pb.abs(pb.dot(this.dv, this.u)), this.b.z);
+          this.$l.dw = pb.div(pb.abs(pb.dot(this.dv, this.v)), this.b.w);
+          this.$l.mx = pb.max(this.du, this.dw);
+          this.m = pb.select(
+            pb.sub(1, pb.smoothStep(0.75, 1, this.mx)),
+            pb.select(pb.float(0), pb.float(1), pb.lessThan(this.mx, 1)),
+            this.hard
+          );
+        });
+      this.$return(this.m);
+    }
+  );
+  pb.func(
+    'wiFootprint',
+    [pb.vec4('a'), pb.vec4('b'), pb.vec4('c'), pb.float('s'), pb.vec2('wp')],
+    function () {
+      this.$l.height = pb.max(pb.sub(this.c.y, this.c.x), 1e-4);
+      this.$l.depth = pb.clamp(pb.div(pb.sub(this.s, this.c.x), this.height), 0, 1);
+      this.$l.deep = pb.clamp(pb.sub(1, pb.div(pb.sub(this.s, this.c.y), this.height)), 0, 1);
+      this.$return(
+        pb.mul(
+          this.c.w,
+          this.depth,
+          this.deep,
+          this.wiShapeMask(this.a, this.b, this.c, this.s, this.wp, false)
+        )
+      );
+    }
+  );
+  pb.func(
+    'wiFootprintHard',
+    [pb.vec4('a'), pb.vec4('b'), pb.vec4('c'), pb.float('s'), pb.vec2('wp')],
+    function () {
+      this.$return(this.wiShapeMask(this.a, this.b, this.c, this.s, this.wp, true));
+    }
+  );
 }
 
 /**
@@ -355,7 +404,11 @@ export function createWaterInteractionStepShader(): PBRenderOptions {
       this.numImpulses = pb.int().uniform(0);
       this.impulses = pb.vec4[MAX_IMPULSES]().uniform(0);
       this.numDisturbers = pb.int().uniform(0);
-      this.disturbers = pb.vec4[MAX_DISTURBERS * 4]().uniform(0);
+      this.disturbers = pb.vec4[MAX_DISTURBERS * DISTURBER_VEC4S]().uniform(0);
+      // Height of the ambient surface over the still water under each
+      // disturber, at this step and at the last
+      this.surfNow = pb.tex2D().uniform(0);
+      this.surfPrev = pb.tex2D().uniform(0);
       // Water depth for the wave speed, see WaterInteraction.setBathymetry:
       // (origin x, origin z, 1 / size x, 1 / size z),
       // (source: 0 none / 1 distance field / 2 height map, water level, height scale, height offset),
@@ -531,15 +584,26 @@ export function createWaterInteractionStepShader(): PBRenderOptions {
           this.$if(pb.greaterThanEqual(this.j, this.numDisturbers), function () {
             this.$break();
           });
-          this.$l.k = pb.mul(this.j, 4);
+          this.$l.k = pb.mul(this.j, DISTURBER_VEC4S);
+          this.$l.sNow = pb.textureLoad(this.surfNow, pb.ivec2(this.j, 0), 0).x;
+          this.$l.aBefore = this.disturbers.at(pb.add(this.k, 3));
+          this.$l.sBefore = this.$choice(
+            pb.greaterThan(this.aBefore.w, 0.5),
+            pb.textureLoad(this.surfPrev, pb.ivec2(this.j, 0), 0).x,
+            this.sNow
+          );
           this.$l.now = this.wiFootprint(
             this.disturbers.at(this.k),
             this.disturbers.at(pb.add(this.k, 1)),
+            this.disturbers.at(pb.add(this.k, 2)),
+            this.sNow,
             this.wp
           );
           this.$l.before = this.wiFootprint(
-            this.disturbers.at(pb.add(this.k, 2)),
-            this.disturbers.at(pb.add(this.k, 3)),
+            this.aBefore,
+            this.disturbers.at(pb.add(this.k, 4)),
+            this.disturbers.at(pb.add(this.k, 5)),
+            this.sBefore,
             this.wp
           );
           // The change also churns the surface, which is where the trail comes from.
@@ -579,6 +643,44 @@ export function createWaterInteractionStepShader(): PBRenderOptions {
 }
 
 /**
+ * Shader that reads the ambient surface under each disturber: texel i of a
+ * row holds the height over the still water of the surface `generator` draws,
+ * at the centre of the disturber in slot i, displaced as the water's vertices
+ * are.
+ * @internal
+ */
+export function createWaterInteractionSurfaceShader(generator: WaveGenerator): PBRenderOptions {
+  return {
+    vertex(pb) {
+      this.$inputs.pos = pb.vec2().attrib('position');
+      pb.main(function () {
+        this.$builtins.position = pb.vec4(this.$inputs.pos, 0, 1);
+      });
+    },
+    fragment(pb) {
+      this.$outputs.outColor = pb.vec4();
+      generator.setupUniforms(this, 0);
+      // (still water level, slots in use, 0, 0)
+      this.wiSurfParams = pb.vec4().uniform(0);
+      this.wiSurfCentres = pb.vec4[MAX_DISTURBERS]().uniform(0);
+      pb.main(function () {
+        this.$l.slot = pb.int(this.$builtins.fragCoord.x);
+        this.$l.height = pb.float(0);
+        this.$if(pb.lessThan(this.slot, pb.int(this.wiSurfParams.y)), function () {
+          this.$l.centre = this.wiSurfCentres.at(this.slot);
+          this.$l.inPos = pb.vec3(this.centre.x, this.wiSurfParams.x, this.centre.y);
+          this.$l.outPos = pb.vec3(0);
+          this.$l.outNormal = pb.vec3(0, 1, 0);
+          generator.calcVertexPositionAndNormal(this, this.inPos, this.outPos, this.outNormal);
+          this.height = pb.sub(this.outPos.y, this.wiSurfParams.x);
+        });
+        this.$outputs.outColor = pb.vec4(this.height, 0, 0, 1);
+      });
+    }
+  };
+}
+
+/**
  * Shader that paints the blocking disturbers' footprints into the obstacle
  * mask, in the window's current placement.
  * @internal
@@ -595,7 +697,8 @@ export function createWaterInteractionObstacleShader(): PBRenderOptions {
       this.$outputs.outColor = pb.vec4();
       this.worldParams = pb.vec4().uniform(0);
       this.numDisturbers = pb.int().uniform(0);
-      this.disturbers = pb.vec4[MAX_DISTURBERS * 4]().uniform(0);
+      this.disturbers = pb.vec4[MAX_DISTURBERS * DISTURBER_VEC4S]().uniform(0);
+      this.surfNow = pb.tex2D().uniform(0);
       declareFootprintFunctions(pb);
       pb.main(function () {
         this.$l.centre = pb.add(pb.floor(this.$builtins.fragCoord.xy), pb.vec2(0.5));
@@ -605,12 +708,18 @@ export function createWaterInteractionObstacleShader(): PBRenderOptions {
           this.$if(pb.greaterThanEqual(this.j, this.numDisturbers), function () {
             this.$break();
           });
-          this.$l.k = pb.mul(this.j, 4);
+          this.$l.k = pb.mul(this.j, DISTURBER_VEC4S);
           this.$l.a = this.disturbers.at(this.k);
           this.$if(pb.greaterThanEqual(this.a.x, BLOCKING_FLAG), function () {
             this.mask = pb.max(
               this.mask,
-              this.wiFootprintHard(this.a, this.disturbers.at(pb.add(this.k, 1)), this.wp)
+              this.wiFootprintHard(
+                this.a,
+                this.disturbers.at(pb.add(this.k, 1)),
+                this.disturbers.at(pb.add(this.k, 2)),
+                pb.textureLoad(this.surfNow, pb.ivec2(this.j, 0), 0).x,
+                this.wp
+              )
             );
           });
         });
@@ -721,6 +830,19 @@ export class WaterInteraction extends Disposable {
   private readonly _bathyParams2: Vector4;
   private readonly _shoreParams: Vector4;
   private _dummyBathyTexture: Nullable<Texture2D>;
+  /** The surface the field is layered over, which the disturbers float on; null for still water. */
+  private _ambient: Nullable<WaveGenerator>;
+  /** Ambient surface height under each disturber slot, this step's and the last. */
+  private _surfTextures: Nullable<[Texture2D, Texture2D]>;
+  private _surfFramebuffers: Nullable<[FrameBuffer, FrameBuffer]>;
+  private _surfCurrent: number;
+  private _surfProgram: Nullable<GPUProgram>;
+  private _surfBindGroup: Nullable<BindGroup>;
+  private _surfHash: string;
+  /** (centre x, centre z, 0, 0) per disturber slot */
+  private readonly _surfCentres: Float32Array<ArrayBuffer>;
+  /** (still water level, slots in use, 0, 0) */
+  private readonly _surfParams: Vector4;
   /**
    * Creates a water interaction field.
    */
@@ -775,6 +897,15 @@ export class WaterInteraction extends Disposable {
     this._bathyParams2 = new Vector4();
     this._shoreParams = new Vector4();
     this._dummyBathyTexture = null;
+    this._ambient = null;
+    this._surfTextures = null;
+    this._surfFramebuffers = null;
+    this._surfCurrent = 0;
+    this._surfProgram = null;
+    this._surfBindGroup = null;
+    this._surfHash = '';
+    this._surfCentres = new Float32Array(MAX_DISTURBERS * 4);
+    this._surfParams = new Vector4();
   }
   protected onDispose() {
     super.onDispose();
@@ -787,6 +918,11 @@ export class WaterInteraction extends Disposable {
     this._obstacleBindGroup = null;
     this._obstacleProgram?.dispose();
     this._obstacleProgram = null;
+    this._surfBindGroup?.dispose();
+    this._surfBindGroup = null;
+    this._surfProgram?.dispose();
+    this._surfProgram = null;
+    this._ambient = null;
     this._dummyBathyTexture?.dispose();
     this._dummyBathyTexture = null;
     this._bathymetry = null;
@@ -1066,6 +1202,16 @@ export class WaterInteraction extends Disposable {
     this._waterLevel = y;
   }
   /**
+   * Tell the field what surface it is layered over: the ambient waves the
+   * disturbers float on, whose height under each of them sets how deep it
+   * sits. Called by the water material whenever it rebuilds its waves; null
+   * for still water.
+   * @internal
+   */
+  setAmbientSurface(generator: Nullable<WaveGenerator>) {
+    this._ambient = generator;
+  }
+  /**
    * Whether the device can host the field: it needs a filterable float or
    * half-float render target.
    */
@@ -1130,6 +1276,7 @@ export class WaterInteraction extends Disposable {
     const numDisturbers = this._gatherDisturbers();
     this._worldParams.setXYZW(this._originX, this._originZ, texel, 0);
     device.pushDeviceStates();
+    this._renderSurface(device, numDisturbers);
     this._renderObstacles(device, numDisturbers);
     const program = this._getProgram(device);
     const bindGroup = this._bindGroup!;
@@ -1139,6 +1286,8 @@ export class WaterInteraction extends Disposable {
     bindGroup.setValue('worldParams', this._worldParams);
     bindGroup.setValue('resolution', this._resolution);
     bindGroup.setTexture('obstacleTex', this._obstacleTexture!, nearest);
+    bindGroup.setTexture('surfNow', this._surfTextures![this._surfCurrent], nearest);
+    bindGroup.setTexture('surfPrev', this._surfTextures![1 - this._surfCurrent], nearest);
     const bathy = this._shallowDepth > 0 ? this._bathymetry : null;
     if (bathy) {
       const [x, z, w, d] = bathy.region;
@@ -1208,20 +1357,61 @@ export class WaterInteraction extends Disposable {
     for (const d of this._disturbers) {
       if (!d.enabled || !d.node) {
         d._hasPrev = false;
+        d._slot = -1;
         continue;
       }
       if (n >= MAX_DISTURBERS) {
         break;
       }
       d._evaluate(this._waterLevel);
+      // The surface height read back for this slot at the last step is this
+      // disturber's only if it held the same slot then
+      const prevSurface = d._hasPrev && d._slot === n;
+      d._slot = n;
       if (!d._hasPrev) {
         d._prev.set(d._now);
       }
-      this._disturberData.set(d._now, n * DISTURBER_STRIDE);
-      this._disturberData.set(d._prev, n * DISTURBER_STRIDE + FOOTPRINT_STRIDE);
+      const o = n * DISTURBER_STRIDE;
+      this._disturberData.set(d._now, o);
+      this._disturberData.set(d._prev, o + FOOTPRINT_STRIDE);
+      this._disturberData[o + FOOTPRINT_STRIDE + 3] = prevSurface ? 1 : 0;
+      d._centre(d._now, this._surfCentres, n * 4);
       n++;
     }
     return n;
+  }
+  /**
+   * Read the ambient surface under each disturber into a fresh slot texture,
+   * keeping the last step's as the previous one: the height over the still
+   * water at the footprint's centre, by the same generator the water draws.
+   * Runs inside the caller's pushed device state.
+   * @internal
+   */
+  private _renderSurface(device: AbstractDevice, numDisturbers: number) {
+    this._surfCurrent = 1 - this._surfCurrent;
+    device.setFramebuffer(this._surfFramebuffers![this._surfCurrent]);
+    const ambient = this._ambient;
+    if (!ambient || numDisturbers === 0 || !ambient.isOk(device)) {
+      device.clearFrameBuffer(Vector4.zero(), null, null);
+      return;
+    }
+    const hash = ambient.getHash();
+    if (!this._surfProgram || this._surfHash !== hash) {
+      this._surfBindGroup?.dispose();
+      this._surfProgram?.dispose();
+      this._surfProgram = device.buildRenderProgram(createWaterInteractionSurfaceShader(ambient))!;
+      this._surfProgram.name = '@WaterInteraction_Surface';
+      this._surfBindGroup = device.createBindGroup(this._surfProgram.bindGroupLayouts[0]);
+      this._surfHash = hash;
+    }
+    const bindGroup = this._surfBindGroup!;
+    ambient.applyWaterBindGroup(bindGroup);
+    this._surfParams.setXYZW(this._waterLevel, numDisturbers, 0, 0);
+    bindGroup.setValue('wiSurfParams', this._surfParams);
+    bindGroup.setValue('wiSurfCentres', this._surfCentres);
+    device.setProgram(this._surfProgram);
+    device.setBindGroup(0, bindGroup);
+    drawFullscreenQuad();
   }
   /**
    * Paint the blocking footprints into the obstacle mask, in the window's
@@ -1234,6 +1424,11 @@ export class WaterInteraction extends Disposable {
     bindGroup.setValue('worldParams', this._worldParams);
     bindGroup.setValue('numDisturbers', numDisturbers);
     bindGroup.setValue('disturbers', this._disturberData);
+    bindGroup.setTexture(
+      'surfNow',
+      this._surfTextures![this._surfCurrent],
+      fetchSampler('clamp_nearest_nomip')
+    );
     device.setFramebuffer(this._obstacleFramebuffer);
     device.setProgram(program);
     device.setBindGroup(0, bindGroup);
@@ -1455,6 +1650,10 @@ export class WaterInteraction extends Disposable {
     this._obstacleFramebuffer = null;
     this._obstacleTexture?.dispose();
     this._obstacleTexture = null;
+    this._surfFramebuffers?.forEach((fb) => fb.dispose());
+    this._surfFramebuffers = null;
+    this._surfTextures?.forEach((tex) => tex.dispose());
+    this._surfTextures = null;
     this._hasOrigin = false;
     this._current = 0;
     this._accumulator = 0;
@@ -1507,6 +1706,22 @@ export class WaterInteraction extends Disposable {
     this._framebuffers = [fbA, fbB];
     this._obstacleTexture = texO;
     this._obstacleFramebuffer = fbO;
+    const surfA = device.createTexture2D(format, MAX_DISTURBERS, 1, { mipmapping: false })!;
+    const surfB = device.createTexture2D(format, MAX_DISTURBERS, 1, { mipmapping: false })!;
+    surfA.name = 'WaterInteractionSurfaceA';
+    surfB.name = 'WaterInteractionSurfaceB';
+    this._surfTextures = [surfA, surfB];
+    this._surfFramebuffers = [
+      device.createFrameBuffer([surfA], null),
+      device.createFrameBuffer([surfB], null)
+    ];
+    device.pushDeviceStates();
+    for (const fb of this._surfFramebuffers) {
+      device.setFramebuffer(fb);
+      device.clearFrameBuffer(Vector4.zero(), null, null);
+    }
+    device.popDeviceStates();
+    this._surfCurrent = 0;
     this._current = 0;
     this._version++;
   }

@@ -449,6 +449,8 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
     this._foamFieldGenerator?.dispose();
     this._foamFieldGenerator = null;
     this._foamSource = null;
+    // A field left behind must not hold on to the generators disposed here
+    this._interactiveWaveGenerator?.interaction.setAmbientSurface(null);
     this._interactiveWaveGenerator = null;
     let effective: Nullable<WaveGenerator> = null;
     if (base) {
@@ -472,6 +474,9 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
     // than being faded with the open water's chop near the shore, and a query
     // of the surface without the disturbers finds it on top to rebuild
     if (effective && interaction && interaction.isOk()) {
+      // The field reads the surface beneath it under each disturber, so a hull
+      // riding the waves is measured against the water it floats on
+      interaction.setAmbientSurface(effective);
       effective = new InteractiveWaveGenerator(effective, interaction);
       this._interactiveWaveGenerator = effective as InteractiveWaveGenerator;
       interaction.ensureResources();
