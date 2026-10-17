@@ -121,6 +121,12 @@ const FOAM_SLIP_BAND = 2;
  */
 const WALL_SPEED_AVERAGE = 3;
 /**
+ * Metres past FOAM_SLIP_BAND within which a cell's water is followed to where
+ * the waves carry it, to tell whether that is against a wall: about the
+ * largest horizontal displacement of choppy waves.
+ */
+const WALL_DISPLACEMENT_REACH = 6;
+/**
  * FOAM_WALL: foam the water makes dashing against a wall, by the trapped-air
  * potential of Ihmsen, Akinci, Akinci & Teschner, "Unified Spray, Foam and
  * Bubbles for Particle-Based Fluids" (CGI 2012), eq. (1)-(3) and (8). There a
@@ -472,50 +478,68 @@ export class ShoreWaveGenerator extends Disposable implements WaveGenerator, Foa
         // Foam from the water dashing against a wall: the trapped-air
         // potential against the wall at rest, by the surface water's velocity,
         // the change of its displacement since the state was written
-        this.$l.wallW = this.$choice(
-          pb.greaterThan(this.wall.z, 0),
-          pb.mul(this.wall.w, pb.max(0, pb.sub(1, pb.div(this.wall.z, FOAM_SLIP_BAND)))),
-          pb.float(0)
-        );
+        // Cells whose water the waves can carry to within the band of a wall
         this.$l.wallFoam = pb.float(0);
-        this.$if(pb.greaterThan(this.wallW, 0), function () {
-          this.$l.restPos = pb.vec3(this.xz.x, this.swGrid.w, this.xz.y);
-          this.$l.wavePos = pb.vec3(0);
-          this.$l.waveNormal = pb.vec3(0, 1, 0);
-          that._base.calcVertexPositionAndNormal(this, this.restPos, this.wavePos, this.waveNormal);
-          this.$l.rise = pb.sub(this.wavePos.y, this.restPos.y);
-          this.$l.avgSpeed = this.state.y;
-          this.$if(pb.greaterThan(this.state.w, 0), function () {
-            // Averaged over WALL_SPEED_AVERAGE seconds: the waves' own speed at
-            // a point flickers from cell to cell with ripples shorter than a
-            // cell, which the field would show as blocks, while its average
-            // over time is the sea state's and the same along the whole wall
-            this.avgSpeed = pb.mix(
-              this.state.y,
-              pb.abs(pb.div(pb.sub(this.rise, this.state.x), this.state.w)),
-              pb.min(1, pb.div(this.state.w, WALL_SPEED_AVERAGE))
+        this.$if(
+          pb.and(
+            pb.greaterThan(this.wall.w, 0),
+            pb.lessThan(this.wall.z, FOAM_SLIP_BAND + WALL_DISPLACEMENT_REACH)
+          ),
+          function () {
+            this.$l.restPos = pb.vec3(this.xz.x, this.swGrid.w, this.xz.y);
+            this.$l.wavePos = pb.vec3(0);
+            this.$l.waveNormal = pb.vec3(0, 1, 0);
+            that._base.calcVertexPositionAndNormal(this, this.restPos, this.wavePos, this.waveNormal);
+            this.$l.rise = pb.sub(this.wavePos.y, this.restPos.y);
+            // The wall as seen from where the waves carry this water, as Crest
+            // takes the shallow water foam's depth at the displaced position
+            // ("to ensure we add foam where world objects are",
+            // UpdateFoam.compute): the field is kept at undisplaced positions,
+            // and choppy waves carry the water drawn against a wall from metres
+            // away, so foam made where the undisplaced point is near the wall
+            // would show off it, swinging with the waves
+            this.$l.wallAt = that.wall(this, pb.add(this.xz, pb.sub(this.wavePos.xz, this.restPos.xz)));
+            this.$l.wallReach = pb.max(0, pb.sub(1, pb.div(this.wallAt.z, FOAM_SLIP_BAND)));
+            this.$l.wallW = this.$choice(
+              pb.greaterThan(this.wallAt.z, 0),
+              pb.mul(this.wallAt.w, this.wallReach),
+              pb.float(0)
             );
-            this.$l.speed = this.avgSpeed;
-            // |v| W, the trapped-air potential averaged over a wave's orbit, with
-            // W = 1 - d / h folded into wallW but for the steepness
-            this.$l.vDiff = pb.mul(this.speed, pb.max(0, pb.sub(1, pb.div(this.wall.z, FOAM_SLIP_BAND))));
-            this.$l.tMin = this.swWallFoam.y;
-            this.$l.tMax = this.swWallFoam.z;
-            this.$l.trapped = pb.div(
-              pb.sub(pb.min(this.vDiff, this.tMax), pb.min(this.vDiff, this.tMin)),
-              pb.sub(this.tMax, this.tMin)
-            );
-            this.$l.energy = pb.mul(this.speed, this.speed, 0.5);
-            this.$l.eMin = pb.mul(this.tMin, this.tMin, 0.5);
-            this.$l.eMax = pb.mul(this.tMax, this.tMax, 0.5);
-            this.$l.kinetic = pb.div(
-              pb.sub(pb.min(this.energy, this.eMax), pb.min(this.energy, this.eMin)),
-              pb.max(pb.sub(this.eMax, this.eMin), 1e-6)
-            );
-            this.wallFoam = pb.mul(FOAM_WAVE_GAIN, this.kinetic, this.trapped, this.wall.w, this.dt);
-          });
-          this.state = pb.vec4(this.rise, this.avgSpeed, 0, this.state.w);
-        });
+            this.$l.avgSpeed = this.state.y;
+            this.$if(pb.greaterThan(this.state.w, 0), function () {
+              // Averaged over WALL_SPEED_AVERAGE seconds: the waves' own speed at
+              // a point flickers from cell to cell with ripples shorter than a
+              // cell, which the field would show as blocks, while its average
+              // over time is the sea state's and the same along the whole wall
+              this.avgSpeed = pb.mix(
+                this.state.y,
+                pb.abs(pb.div(pb.sub(this.rise, this.state.x), this.state.w)),
+                pb.min(1, pb.div(this.state.w, WALL_SPEED_AVERAGE))
+              );
+              this.$l.speed = this.avgSpeed;
+              // |v| W, the trapped-air potential averaged over a wave's orbit, with
+              // W = 1 - d / h at the displaced position
+              this.$l.vDiff = pb.mul(this.speed, this.wallReach);
+              this.$l.tMin = this.swWallFoam.y;
+              this.$l.tMax = this.swWallFoam.z;
+              this.$l.trapped = pb.div(
+                pb.sub(pb.min(this.vDiff, this.tMax), pb.min(this.vDiff, this.tMin)),
+                pb.sub(this.tMax, this.tMin)
+              );
+              this.$l.energy = pb.mul(this.speed, this.speed, 0.5);
+              this.$l.eMin = pb.mul(this.tMin, this.tMin, 0.5);
+              this.$l.eMax = pb.mul(this.tMax, this.tMax, 0.5);
+              this.$l.kinetic = pb.div(
+                pb.sub(pb.min(this.energy, this.eMax), pb.min(this.energy, this.eMin)),
+                pb.max(pb.sub(this.eMax, this.eMin), 1e-6)
+              );
+              this.$if(pb.greaterThan(this.wallW, 0), function () {
+                this.wallFoam = pb.mul(FOAM_WAVE_GAIN, this.kinetic, this.trapped, this.wallAt.w, this.dt);
+              });
+            });
+            this.state = pb.vec4(this.rise, this.avgSpeed, 0, this.state.w);
+          }
+        );
         this.$return(
           pb.vec4(this.velocity, pb.add(this.baseStep.z, this.foam), pb.add(this.baseStep.w, this.wallFoam))
         );

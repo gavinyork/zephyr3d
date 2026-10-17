@@ -138,6 +138,10 @@ function buildOceanScene() {
   sun.intensity = 8;
   sun.castShadow = true;
 
+  // Shapes built in code have no baked distance field to read; these are
+  // baked at load below, so the water finds where they meet it and rings them
+  // with foam (WebGPU only, as the scene field is)
+  const sdfPrimitives = [];
   const rockMaterial = new PBRMetallicRoughnessMaterial();
   rockMaterial.albedoColor = new Vector4(0.45, 0.4, 0.35, 1);
   rockMaterial.metallic = 0;
@@ -148,6 +152,7 @@ function buildOceanScene() {
     rock.position.setXYZ(Math.cos(angle) * 25, -1.5 + (i % 3) * 0.8, Math.sin(angle) * 25);
     rock.rotation.fromEulerAngle(0.3 * i, 0.7 * i, 0.2 * i);
     sun.shadow.shadowRegion.addStaticCaster(rock);
+    sdfPrimitives.push(rock.primitive);
   }
 
   const pillarMaterial = new PBRMetallicRoughnessMaterial();
@@ -160,6 +165,7 @@ function buildOceanScene() {
   );
   pillar.position.setXYZ(0, -8, 0);
   sun.shadow.shadowRegion.addStaticCaster(pillar);
+  sdfPrimitives.push(pillar.primitive);
 
   const bedMaterial = new PBRMetallicRoughnessMaterial();
   bedMaterial.albedoColor = new Vector4(0.76, 0.7, 0.5, 1);
@@ -199,9 +205,21 @@ function buildOceanScene() {
   water.subsurfaceIntensity = 0.5;
   water.subsurfaceCrestHeight = 1.5;
   water.sunScatteringIntensity = 0.4;
-  water.foamAmount = 1;
-  water.foamFalloff = 1.5;
+  water.foamAmount = 0.5;
+  water.foamFalloff = 1.2;
+  // The wall foam rides on the shore waves, which need the scene field; a low
+  // surf, as the rocks and the pillar are too steep for it to break on
+  water.shoreWaveHeight = 0.3;
+  water.wallFoamStrength = 1;
+  water.wallFoamMinSpeed = 0;
+  water.wallFoamMaxSpeed = 1.5;
   water.infinite = false;
+  if (getDevice().type === 'webgpu') {
+    scene.sdf.enabled = true;
+    for (const primitive of sdfPrimitives) {
+      scene.sdf.bakeField(primitive).catch((err) => console.error(`Cannot bake a distance field: ${err}`));
+    }
+  }
 
   water.causticsEnabled = true;
   water.causticsIntensity = 2;

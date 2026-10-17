@@ -4,18 +4,37 @@ import type { Mesh } from '../../scene/mesh';
 import type { Scene } from '../../scene/scene';
 import type { SceneNode } from '../../scene/scene_node';
 import { getEngine } from '../../app/api';
-import { getMeshSDFPath, readZsdf } from '../../asset/zsdf_binary';
+import { getMeshSDFPath, readZsdf, writeZsdf } from '../../asset/zsdf_binary';
 import type { ZsdfHeader } from '../../asset/zsdf_binary';
 import { MeshSDFAtlas } from './sdf_atlas';
 import { GlobalSDF } from './global_sdf';
 import type { ClipmapTerrain } from '../../scene/terrain-cm/terrain-cm';
+import type { Primitive } from '../primitive';
+import { readPrimitiveTriangles } from '../primitive_readback';
+import type { MeshSDFBakeOptions, MeshSDFData } from '../../utility/sdf/bake';
+import { bakeMeshSDF } from '../../utility/sdf/bake';
+
+/** A field given at run time rather than read from a baked file, see {@link SceneSDF.setField}. */
+interface RuntimeField {
+  header: ZsdfHeader;
+  voxels: Uint16Array<ArrayBuffer>;
+}
+
+/** Fields given at run time, by the key their primitive takes part under; shared by every scene. */
+const runtimeFields = new Map<string, RuntimeField>();
+/** The key of each primitive given a field at run time. */
+const runtimeKeys = new WeakMap<Primitive, string>();
+let runtimeKeyCounter = 0;
 
 /**
  * A baked mesh field as loaded, shared by every instance of the mesh.
  * @public
  */
 export class MeshSDFAsset {
-  /** Asset path of the mesh. */
+  /**
+   * Asset path of the mesh; for a field given at run time (see
+   * {@link SceneSDF.setField}), a key of its own starting with `runtime:`.
+   */
   readonly meshPath: string;
   /** `loading`, then `ready` with data, `missing` when nothing is baked, `failed` on a bad file. */
   state: 'loading' | 'ready' | 'missing' | 'failed';
@@ -103,7 +122,9 @@ type SceneSDFEvents = {
  * the field as a dirty world box for a global field to rebuild.
  *
  * Fields are read from {@link getMeshSDFPath} of the mesh's primitive asset; a
- * mesh with no baked field is left out until one is baked.
+ * mesh with no baked field is left out until one is baked. A primitive built in
+ * code, with no asset, takes part once it is given a field at run time with
+ * {@link SceneSDF.setField} or {@link SceneSDF.bakeField}.
  *
  * @public
  */
@@ -241,6 +262,39 @@ export class SceneSDF extends makeObservable(Disposable)<SceneSDFEvents>() {
     return stats;
   }
   /**
+   * Gives a primitive with no baked field asset (one built in code, such as a
+   * shape) a field at run time, for the meshes drawing it to take part in the
+   * scene field as a baked one would. Replaces a field given before. Shared by
+   * every scene: a mesh of another scene drawing the same primitive takes it up
+   * too. The field is in the primitive's local space, as {@link bakeMeshSDF}
+   * makes it.
+   */
+  setField(primitive: Primitive, sdf: MeshSDFData) {
+    let key = runtimeKeys.get(primitive);
+    if (!key) {
+      key = `runtime:${++runtimeKeyCounter}`;
+      runtimeKeys.set(primitive, key);
+    }
+    const { header, voxels } = readZsdf(writeZsdf(sdf));
+    runtimeFields.set(key, { header, voxels });
+    this.invalidate(key);
+    for (const mesh of this._tracked) {
+      if (mesh.primitive === primitive) {
+        this.retrack(mesh);
+      }
+    }
+  }
+  /**
+   * Bakes the field of a primitive on the CPU from its triangles, read back from
+   * the GPU, and gives it to the primitive with {@link SceneSDF.setField}. For a
+   * primitive built in code; one loaded from an asset is baked in the editor
+   * instead. Takes a moment for a large mesh, as the editor's bake does.
+   */
+  async bakeField(primitive: Primitive, options?: MeshSDFBakeOptions) {
+    const { positions, indices } = await readPrimitiveTriangles(primitive, 0);
+    this.setField(primitive, bakeMeshSDF(positions, indices, options));
+  }
+  /**
    * Drops the loaded field of a mesh so it is read again, e.g. after it was
    * rebaked. Without a path, every field that was missing or failed is retried.
    */
@@ -348,6 +402,13 @@ export class SceneSDF extends makeObservable(Disposable)<SceneSDFEvents>() {
   /** @internal */
   private load(asset: MeshSDFAsset) {
     asset.requested = true;
+    const given = runtimeFields.get(asset.meshPath);
+    if (given) {
+      asset.header = given.header;
+      asset.voxels = given.voxels;
+      asset.state = 'ready';
+      return;
+    }
     this._loading++;
     const vfs = getEngine().VFS;
     const path = getMeshSDFPath(asset.meshPath);
@@ -413,7 +474,15 @@ export class SceneSDF extends makeObservable(Disposable)<SceneSDFEvents>() {
     const mode = mesh.attached ? mesh.effectiveSDFMode : 'none';
     const primitive = mesh.primitive;
     const path = primitive ? getEngine().resourceManager.getAssetId(primitive) : null;
-    const meshPath = path && path.toLowerCase().endsWith('.zmsh') ? path : null;
+    // A field given at run time wins over a baked one, which a primitive built
+    // in code does not have
+    const runtimeKey = primitive ? runtimeKeys.get(primitive) : undefined;
+    const meshPath =
+      runtimeKey && runtimeFields.has(runtimeKey)
+        ? runtimeKey
+        : path && path.toLowerCase().endsWith('.zmsh')
+          ? path
+          : null;
     const prev = this._instances.get(mesh);
     if (prev && prev.mode === mode && prev.asset?.meshPath === (meshPath ?? undefined)) {
       return;

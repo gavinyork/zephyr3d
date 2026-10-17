@@ -198,8 +198,6 @@ const FOAM_DRIFT = 0.1;
 const FOAM_BUBBLE_MIP_SCALE = 8;
 const FOAM_SPECULAR_POWER = 293;
 const FOAM_SPECULAR_BOOST = 0.15;
-/** Darkest the foam texture shades the wall foam, which it does not cut. */
-const WALL_FOAM_TEXTURE_FLOOR = 0.6;
 
 export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight) {
   private static readonly FEATURE_REFRACTION_MODE = this.defineFeature();
@@ -2007,17 +2005,24 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
           1
         );
         this.$l.crestWhite = this.waterWhiteFoam(this.crestDensity, this.foamSample, this.foamLookParams.x);
-        // Wall foam, shown whole where it is rather than cut from the texture,
-        // by its strength: the texture only shades it, so a fringe of foam
-        // around a rock keeps its pattern without breaking into patches
-        this.$l.wallWhite = pb.mul(
-          pb.clamp(this.wallFoam, 0, 1),
-          this.foamShadingParams.z,
-          pb.mix(WALL_FOAM_TEXTURE_FLOOR, 1, pb.clamp(this.foamSample.x, 0, 1))
-        );
+        // Wall foam, cut from the same texture by its own density: saturated
+        // against the wall, so whole there, fraying into the texture's pattern
+        // as it thins out away from it. Its strength is how opaque it is,
+        // after the cut, so it never breaks the fringe into patches
+        this.$l.wallDensity = pb.clamp(this.wallFoam, 0, 1);
+        this.$l.wallCut = this.waterWhiteFoam(this.wallDensity, this.foamSample, this.foamLookParams.x);
+        this.$l.wallWhite = pb.mul(this.wallCut.x, this.foamShadingParams.z);
+        // The two layers overlap as independent covers; the relief and the
+        // bubbles come from what they make together
         this.$l.foam = pb.sub(1, pb.mul(pb.sub(1, this.crestWhite.x), pb.sub(1, this.wallWhite)));
-        this.$l.foamGrad = this.crestWhite.yz;
-        this.$l.bubbleDensity = this.crestDensity;
+        this.$l.foamGrad = pb.add(
+          pb.mul(this.crestWhite.yz, pb.sub(1, this.wallWhite)),
+          pb.mul(this.wallCut.yz, this.foamShadingParams.z, pb.sub(1, this.crestWhite.x))
+        );
+        this.$l.bubbleDensity = pb.sub(
+          1,
+          pb.mul(pb.sub(1, this.crestDensity), pb.sub(1, pb.mul(this.wallDensity, this.foamShadingParams.z)))
+        );
         // Normal of the white foam's relief: Crest differences the cut over a
         // quarter texel per metre of view depth, which keeps the relief at a
         // distance; the slope times that step here
