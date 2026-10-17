@@ -124,6 +124,14 @@ const WATER_F0 = 0.02;
 const WATER_BASE_ROUGHNESS = 0.04;
 /** Specular roughness once distance has flattened the wave normals. */
 const WATER_DISTANT_ROUGHNESS = 0.35;
+/**
+ * Roughness over which the sky reflection hands over from the sharp baked sky
+ * to the environment's GGX-prefiltered radiance map at that roughness: the
+ * slopes distance flattens out of the normals blur the mirror as they widen
+ * the sun's highlight, as Crest picks its reflection mip by roughness.
+ */
+const SKY_PREFILTER_START = 0.06;
+const SKY_PREFILTER_FULL = 0.15;
 /** Wrap of the foam's diffuse lighting, `(N.L + w) / (1 + w)`. At 0 a lee slope is unlit. */
 const FOAM_LIGHT_WRAP = 0.5;
 /** Index of refraction of water. Must match the caustics pass. */
@@ -153,6 +161,8 @@ const SSS_SUN_ALIGN_FLOOR = 0.15;
 const SSS_GRAZING_FLOOR = 0.1;
 /** Softplus width of the crest gate, as a fraction of the crest height. */
 const SSS_HEIGHT_SOFTNESS = 0.6;
+/** Least crest height the gate is worked out over, in metres. See {@link WaterMaterial.subsurfaceCrestHeight}. */
+const SSS_CREST_HEIGHT_MIN = 0.05;
 /** Floor on the crest gate's path length. */
 const SSS_CREST_PATH_FLOOR = 0.2;
 /** Extinction multiplier of the crest gate over a unit path. */
@@ -188,6 +198,8 @@ const FOAM_DRIFT = 0.1;
 const FOAM_BUBBLE_MIP_SCALE = 8;
 const FOAM_SPECULAR_POWER = 293;
 const FOAM_SPECULAR_BOOST = 0.15;
+/** Darkest the foam texture shades the wall foam, which it does not cut. */
+const WALL_FOAM_TEXTURE_FLOOR = 0.6;
 
 export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight) {
   private static readonly FEATURE_REFRACTION_MODE = this.defineFeature();
@@ -221,7 +233,8 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
     shorelineFoamStrength: 2,
     wallFoamStrength: 1,
     wallFoamMinSpeed: 0.2,
-    wallFoamMaxSpeed: 1.5
+    wallFoamMaxSpeed: 1.5,
+    wallFoamDrift: 0.3
   };
   /** The shore wave layer of the effective generator, while the waves are on. */
   private _shoreWaveGenerator: Nullable<ShoreWaveGenerator> = null;
@@ -767,8 +780,10 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
     return this._subsurfaceCrestHeight;
   }
   set subsurfaceCrestHeight(val: number) {
-    // The shader divides by this.
-    const clamped = Math.max(0.001, val);
+    // The gate softens over SSS_HEIGHT_SOFTNESS of this; much below a few
+    // centimetres that is a hard step at the still-water level, crests in
+    // blotches cut along it
+    const clamped = Math.max(SSS_CREST_HEIGHT_MIN, val);
     if (clamped !== this._subsurfaceCrestHeight) {
       this._subsurfaceCrestHeight = clamped;
       this.uniformChanged();
@@ -1283,10 +1298,20 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
         if (this._foamFieldGenerator) {
           scope.$l.ffDebug = this._foamField.sample(scope, scope.$inputs.clipmapPos.xz);
         } else {
-          scope.$l.ffDebug = pb.vec2(0);
+          scope.$l.ffDebug = pb.vec3(0);
         }
-        scope.$l.outColor = pb.vec4(pb.vec3(pb.mix(pb.float(0.5), scope.ffDebug.x, scope.ffDebug.y)), 1);
+        scope.$l.outColor = pb.vec4(
+          pb.vec3(pb.mix(pb.float(0.5), pb.max(scope.ffDebug.x, scope.ffDebug.z), scope.ffDebug.y)),
+          1
+        );
       } else {
+        // The foam field's wall foam layer, see FOAM_WALL
+        scope.$l.wallFoam = this._foamFieldGenerator
+          ? pb.mul(
+              this._foamField.sample(scope, scope.$inputs.clipmapPos.xz).z,
+              this.infinite ? pb.sub(1, scope.$inputs.skirt) : pb.float(1)
+            )
+          : pb.float(0);
         scope.$l.outColor = pb.vec4(
           this.waterShading(
             scope,
@@ -1298,7 +1323,8 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
             scope.restXZGrad,
             scope.foamSample,
             scope.surfaceCoverage,
-            scope.sheetThickness
+            scope.sheetThickness,
+            scope.wallFoam
           ),
           1
         );
@@ -1677,11 +1703,14 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
     restXZGrad: PBShaderExp,
     foamSample: PBShaderExp,
     coverage: PBShaderExp,
-    sheetThickness: PBShaderExp
+    sheetThickness: PBShaderExp,
+    wallFoam: PBShaderExp
   ) {
     const pb = scope.$builder;
     const that = this;
     const debugOutput = this.debugOutput;
+    // The environment's prefiltered radiance, for the distant sky reflection
+    const envLight = this.needCalculateEnvLight() ? (this.drawContext.env?.light.envLight ?? null) : null;
     // Transmittance over `depth` meters of path.
     pb.func('getAbsorption', [pb.float('depth')], function () {
       this.$return(pb.exp(pb.neg(pb.mul(this.mediumExtinction, this.depth))));
@@ -1778,7 +1807,8 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
         pb.vec4('restXZGrad'),
         pb.vec3('foamSample'),
         pb.float('coverage'),
-        pb.float('sheetThickness')
+        pb.float('sheetThickness'),
+        pb.float('wallFoam')
       ],
       function () {
         this.$l.screenUV = pb.div(pb.vec2(this.$builtins.fragCoord.xy), ShaderHelper.getRenderSize(this));
@@ -1886,6 +1916,21 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
           this.refl = pb.normalize(this.refl);
           // Pre-exposed to match the scene colour it is blended against.
           this.reflMiss = ShaderHelper.sampleBakedSkyPreExposed(this, this.refl);
+          if (envLight?.hasRadiance()) {
+            // Blurred as the distant normals are: the prefiltered radiance at
+            // the surface's roughness, in the same pre-exposed space
+            this.$l.skyBlur = pb.smoothStep(SKY_PREFILTER_START, SKY_PREFILTER_FULL, this.roughness);
+            this.$if(pb.greaterThan(this.skyBlur, 0), function () {
+              this.reflMiss = pb.mix(
+                this.reflMiss,
+                pb.mul(
+                  envLight.getRadiance(this, this.refl, this.roughness)!.rgb,
+                  ShaderHelper.getEnvLightStrength(this)
+                ),
+                this.skyBlur
+              );
+            });
+          }
         });
         this.reflectance = pb.mix(
           this.reflMiss,
@@ -1931,7 +1976,15 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
           1
         );
         this.$l.crestWhite = this.waterWhiteFoam(this.crestDensity, this.foamSample, this.foamLookParams.x);
-        this.$l.foam = this.crestWhite.x;
+        // Wall foam, shown whole where it is rather than cut from the texture,
+        // by its strength: the texture only shades it, so a fringe of foam
+        // around a rock keeps its pattern without breaking into patches
+        this.$l.wallWhite = pb.mul(
+          pb.clamp(this.wallFoam, 0, 1),
+          this.foamShadingParams.z,
+          pb.mix(WALL_FOAM_TEXTURE_FLOOR, 1, pb.clamp(this.foamSample.x, 0, 1))
+        );
+        this.$l.foam = pb.sub(1, pb.mul(pb.sub(1, this.crestWhite.x), pb.sub(1, this.wallWhite)));
         this.$l.foamGrad = this.crestWhite.yz;
         this.$l.bubbleDensity = this.crestDensity;
         // Normal of the white foam's relief: Crest differences the cut over a
@@ -1948,17 +2001,23 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
             )
           )
         );
-        // Foam suppresses the mirror rather than adding to it.
-        this.fresnelTerm = pb.mul(this.fresnelTerm, pb.sub(1, this.foam));
-        this.$l.finalColor = pb.mix(this.refraction, this.reflectance, this.fresnelTerm);
+        // The white foam covers the water, its mirror and what is seen through
+        // it alike, as Crest lays it over the finished water colour
+        // (lerp(col, whiteFoam, a)): both only on the share without foam.
+        // `bodyWeight`, the exit transmission on that share, weighs the
+        // refraction and every body term below.
+        this.$l.waterShare = pb.sub(1, this.foam);
+        this.$l.bodyWeight = pb.mul(pb.sub(1, this.fresnelTerm), this.waterShare);
+        this.fresnelTerm = pb.mul(this.fresnelTerm, this.waterShare);
+        this.$l.finalColor = pb.add(
+          pb.mul(this.refraction, this.bodyWeight),
+          pb.mul(this.reflectance, this.fresnelTerm)
+        );
         // Debug accumulators. Dead in the `none` variant.
         this.$l.dbgSubsurface = pb.vec3(0);
         this.$l.dbgSunScatter = pb.vec3(0);
         this.$l.dbgShadow = pb.vec3(1);
         this.$l.dbgSpecular = pb.vec3(0);
-        // Exit transmission times the water (non-foam) share. The refraction
-        // already carries it via the `mix`; every body term below must too.
-        this.$l.bodyWeight = pb.mul(pb.sub(1, this.fresnelTerm), pb.sub(1, this.foam));
         // Subsurface crest gate, after Ceto: the lit wall thins with height,
         // path = max(floor, exp(-softplus(h / H))), gate = exp(-sigma_t *
         // scale * path). On the vertex displacement, not the normal tilt,
@@ -2048,13 +2107,17 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
           this.sssAlign = pb.mix(SSS_SUN_ALIGN_FLOOR, 1, pb.mul(this.sssAlign, this.sssAlign));
           this.$l.sssSunUp = pb.smoothStep(0, 0.1, this.lightDir.y);
           this.$l.sssFacing = pb.mul(this.sssGrazing, this.sssAlign, this.sssSunUp);
-          // Not scaled by the light, so directional only (no distance falloff).
+          // Scaled by the light as Crest scales its subsurface term by the
+          // light colour, so a crest glows the colour of the sun behind it and
+          // dims as it sets; by 1 / pi, as the foam's and every diffuse term
+          // here are. Directional only, from the sun behind the crest.
           // Leaves the body, so it carries `bodyWeight` like every body term.
           this.$l.subsurfaceTerm = pb.vec3(0);
           this.$if(pb.equal(type, LIGHT_TYPE_DIRECTIONAL), function () {
             this.subsurfaceTerm = pb.mul(
               this.subsurfaceTint,
-              pb.mul(this.sssFacing, this.sssThickness, this.subsurfaceParams.x),
+              this.lightEnergy,
+              pb.mul(this.sssFacing, this.sssThickness, this.subsurfaceParams.x, 1 / Math.PI),
               this.bodyWeight
             );
             this.lightContrib = pb.add(this.lightContrib, this.subsurfaceTerm);
@@ -2249,7 +2312,8 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
       restXZGrad,
       foamSample,
       coverage,
-      sheetThickness
+      sheetThickness,
+      wallFoam
     );
   }
   applyUniforms(bindGroup: BindGroup, ctx: DrawContext, needUpdate: boolean, pass: number) {
@@ -2282,7 +2346,12 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
       this._subsurfaceParams.setXYZW(this._subsurfaceIntensity, this._subsurfaceCrestHeight, 0, 0);
       bindGroup.setValue('subsurfaceParams', this._subsurfaceParams);
       bindGroup.setValue('subsurfaceTint', this._subsurfaceTint);
-      this._foamParams.setXYZW(this._foamAmount, this._foamFalloff, 0, 0);
+      this._foamParams.setXYZW(
+        this._foamAmount,
+        this._foamFalloff,
+        this._shoreWaves.height > 0 ? this._shoreWaves.wallFoamStrength! : 0,
+        0
+      );
       bindGroup.setValue('foamShadingParams', this._foamParams);
       bindGroup.setValue('foamColor', this._foamColor);
       this._foamLookParams.setXYZW(
@@ -2438,12 +2507,13 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
   set shoreWaveShallowFoamStrength(val: number) {
     this._shoreWaves.shorelineFoamStrength = Math.max(0, val);
   }
-  /** How much foam the water makes dashing against walls, rocks and piers standing in it. */
+  /** How opaque the foam is that the water makes against walls, rocks and piers standing in it, 0..1; it always rings them whole. */
   get wallFoamStrength() {
     return this._shoreWaves.wallFoamStrength!;
   }
   set wallFoamStrength(val: number) {
-    this._shoreWaves.wallFoamStrength = Math.max(0, val);
+    this._shoreWaves.wallFoamStrength = Math.min(Math.max(val, 0), 1);
+    this.uniformChanged();
   }
   /** Speed in metres per second the water has to hit a wall at before it makes any foam there. */
   get wallFoamMinSpeed() {
@@ -2458,6 +2528,13 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
   }
   set wallFoamMaxSpeed(val: number) {
     this._shoreWaves.wallFoamMaxSpeed = Math.max(0.01, val);
+  }
+  /** Speed in metres per second the foam drifts out from walls, rocks and piers at: higher for a wider ring of foam around them. */
+  get wallFoamDrift() {
+    return this._shoreWaves.wallFoamDrift!;
+  }
+  set wallFoamDrift(val: number) {
+    this._shoreWaves.wallFoamDrift = Math.max(0, val);
   }
   /**
    * Hands the shore waves this frame's waterline field, or null when there is

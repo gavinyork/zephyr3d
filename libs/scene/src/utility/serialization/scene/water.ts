@@ -624,7 +624,8 @@ const WATER_PROPERTY_LAYOUT: { group: string; open?: boolean; props: [string, st
       ['ShoreWaveShallowFoamDepth', 'Shallow Depth'],
       ['WallFoamStrength', 'Wall Foam'],
       ['WallFoamMinSpeed', 'Wall Min Speed'],
-      ['WallFoamMaxSpeed', 'Wall Max Speed']
+      ['WallFoamMaxSpeed', 'Wall Max Speed'],
+      ['WallFoamDrift', 'Wall Foam Spread']
     ]
   },
 
@@ -1181,7 +1182,7 @@ export function getWaterClass(manager: ResourceManager): SerializableClass {
               'Height above the still-water level, in meters, over which the lit wall of a crest thins by a factor of e. Crests are thin and glow; troughs see the full path through the medium and are absorbed, so they keep only a tinted trace. Lower it for a calm sea whose crests barely rise, raise it so only the tallest waves light up.',
             type: 'float',
             default: 1.5,
-            options: { animatable: true, minValue: 0.001, maxValue: 10 },
+            options: { animatable: true, minValue: 0.05, maxValue: 10 },
             get(this: Water, value) {
               value.num[0] = this.material.subsurfaceCrestHeight;
             },
@@ -1653,10 +1654,10 @@ export function getWaterClass(manager: ResourceManager): SerializableClass {
           {
             name: 'WallFoamStrength',
             description:
-              'How much foam the water throws up where it dashes against rocks, walls and piers standing in it: the harder the waves hit, the more foam piles against them and trails away. 0 for none. Needs the shore waves on.',
+              'How solid the ring of foam is where the water dashes against rocks, walls and piers standing in it: 1 for a thick white fringe, lower for a thinner, more see-through one, 0 for none. The ring always goes all the way round; how far it spreads is Wall Foam Spread. Needs the shore waves on.',
             type: 'float',
             default: 1,
-            options: { animatable: true, minValue: 0, maxValue: 5 },
+            options: { animatable: true, minValue: 0, maxValue: 1 },
             isHidden(this: Water) {
               return this.shoreWaveHeight <= 0;
             },
@@ -1699,6 +1700,23 @@ export function getWaterClass(manager: ResourceManager): SerializableClass {
             },
             set(this: Water, value) {
               this.wallFoamMaxSpeed = value.num[0];
+            }
+          },
+          {
+            name: 'WallFoamDrift',
+            description:
+              'How fast the foam spreads out from rocks, walls and piers, in metres per second: higher for a wider ring of foam around them, lower to keep it close in. It spreads evenly on every side whichever way the wind blows.',
+            type: 'float',
+            default: 0.3,
+            options: { animatable: true, minValue: 0, maxValue: 3 },
+            isHidden(this: Water) {
+              return this.shoreWaveHeight <= 0;
+            },
+            get(this: Water, value) {
+              value.num[0] = this.wallFoamDrift;
+            },
+            set(this: Water, value) {
+              this.wallFoamDrift = value.num[0];
             }
           },
           {

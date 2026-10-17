@@ -105,15 +105,21 @@ const MIN_COMPRESSION = 0.15;
 const SHELVING_MIN = 1.5;
 const SHELVING_FULL = 4;
 /**
- * The foam is carried along a wall rather than into it, as by a free-slip
- * boundary: within FOAM_SLIP_BAND metres of a waterline too steep for surf
- * (rocks, cliffs, piers; as much as the waves fade out there, see
- * SHELVING_MIN) the velocity loses the part of it heading into the land,
- * fading out over that distance from the wall, so the foam piles up against
- * the rock and is led round it into its lee. Not on a beach, which the water
- * runs up.
+ * Within FOAM_SLIP_BAND metres of a waterline too steep for surf (rocks,
+ * cliffs, piers; as much as the waves fade out there, see SHELVING_MIN) the
+ * foam is carried out from the wall along its normal at the wall foam's drift
+ * speed, handing over to the water's own velocity over that distance, so it
+ * rings the wall evenly whichever way the wind blows. A look rather than a
+ * flow: the water at a wall runs along it, a free slip that would pile the
+ * foam on the windward face and strip the lee. Not on a beach, which the
+ * water runs up.
  */
 const FOAM_SLIP_BAND = 2;
+/**
+ * Seconds over which the water's speed at a wall is averaged before it makes
+ * foam there, about a wave period: see the wall foam step.
+ */
+const WALL_SPEED_AVERAGE = 3;
 /**
  * FOAM_WALL: foam the water makes dashing against a wall, by the trapped-air
  * potential of Ihmsen, Akinci, Akinci & Teschner, "Unified Spray, Foam and
@@ -125,13 +131,24 @@ const FOAM_SLIP_BAND = 2;
  * foam made at a rate k I_k I_ta with I_k = Phi(E_k) of the kinetic energy.
  * Here the neighbour is the wall, at rest, h = FOAM_SLIP_BAND from it along
  * its normal n (out of the land): v_diff = (|v| - v . n) W, with v the
- * surface water's own velocity, the time derivative of the wrapped
- * generator's displacement of it (exact for a Lagrangian surface such as the
- * FFT's and Gerstner's). Taking the wall as a neighbour at rest, the
- * thresholds (the paper's are in the units of its particles) and the kinetic
- * energy taken per unit mass over the same speeds are ours; so is weighting
- * it by how steep the wall is, the complement of where the surf rolls in,
- * which leaves a beach to the shallow water foam.
+ * surface water's own velocity. Taken over a wave's orbit, v . n averages out
+ * and v_diff to |v| W, which is what is used, so every face of a wall foams
+ * alike rather than the face the water happens to be heading for: a look,
+ * not a flow, the waves not being stopped by the wall. |v| is taken from the
+ * surface's rate of rise, the time derivative of the wrapped generator's
+ * vertical displacement, which over a circular orbit is as fast as its
+ * horizontal motion and is there for generators that only displace
+ * vertically (FBM). Taking the wall as a neighbour at rest, averaging over the
+ * orbit, the thresholds (the paper's are in the units of its particles) and
+ * the kinetic energy taken per unit mass over the same speeds are ours; so is
+ * weighting it by how steep the wall is, the complement of where the surf
+ * rolls in, which leaves a beach to the shallow water foam.
+ *
+ * The foam made goes to a layer of its own (see FoamFieldSource), shown whole
+ * where it is, its strength how opaque, rather than cut from the foam texture
+ * by its density: a fringe of foam around a rock reads as a fringe, not as
+ * patches. It is made at FOAM_WAVE_GAIN regardless of the strength, so it
+ * soon saturates against the wall and thins out as it drifts away.
  */
 /** Largest B anything here is worked out with, a bed at about 3 degrees. */
 const B_MAX = 20;
@@ -232,12 +249,14 @@ export interface ShoreWaveSettings {
   shorelineFoamMaxDepth?: number;
   /** Scale of the foam shallow water makes (Crest's Shoreline Foam Strength). Defaults to 2. */
   shorelineFoamStrength?: number;
-  /** Scale of the foam the water makes dashing against walls, rocks and piers (see FOAM_WALL). Defaults to 1. */
+  /** How opaque the foam the water makes dashing against walls, rocks and piers is, 0..1 (see FOAM_WALL). Defaults to 1. */
   wallFoamStrength?: number;
   /** Impact speed in metres per second below which the water makes no foam against a wall. Defaults to 0.2. */
   wallFoamMinSpeed?: number;
   /** Impact speed in metres per second at and above which the water makes the most foam against a wall. Defaults to 1.5. */
   wallFoamMaxSpeed?: number;
+  /** Speed in metres per second the foam drifts out from a wall at, which sets how wide a ring it makes. Defaults to 0.3. */
+  wallFoamDrift?: number;
 }
 
 /**
@@ -272,7 +291,7 @@ export class ShoreWaveGenerator extends Disposable implements WaveGenerator, Foa
   private readonly _wave: Vector4;
   /** (sharpness at the shore, lean at the shore, wave clock of the previous frame, period in seconds) */
   private readonly _shape: Vector4;
-  /** (wave cycles the irregularity spans, 0, 0, 0) */
+  /** (wave cycles the irregularity spans, wall foam drift speed, 0, 0) */
   private readonly _vary: Vector4;
   /** What the open water feeds the foam field with, which the shore waves add theirs to. */
   private readonly _baseFoamSource: FoamFieldSource;
@@ -330,6 +349,7 @@ export class ShoreWaveGenerator extends Disposable implements WaveGenerator, Foa
       timeInSeconds / Math.max(0.1, s.period)
     );
     this._vary.x = Math.min(Math.max(s.irregularity ?? 0.6, 0), 1) * IRREGULAR_AMPLITUDE;
+    this._vary.y = Math.max(0, s.wallFoamDrift ?? 0.3);
     this._version++;
   }
   /** @internal */
@@ -355,7 +375,7 @@ export class ShoreWaveGenerator extends Disposable implements WaveGenerator, Foa
     bindGroup.setValue('swFoamSource', this._foamSourceParams);
     const minSpeed = Math.max(0, s.wallFoamMinSpeed ?? 0.2);
     this._wallFoamParams.setXYZW(
-      Math.max(0, s.wallFoamStrength ?? 1),
+      Math.min(Math.max(s.wallFoamStrength ?? 1, 0), 1),
       minSpeed,
       Math.max(minSpeed + 1e-3, s.wallFoamMaxSpeed ?? 1.5),
       0
@@ -457,20 +477,28 @@ export class ShoreWaveGenerator extends Disposable implements WaveGenerator, Foa
           pb.mul(this.wall.w, pb.max(0, pb.sub(1, pb.div(this.wall.z, FOAM_SLIP_BAND)))),
           pb.float(0)
         );
+        this.$l.wallFoam = pb.float(0);
         this.$if(pb.greaterThan(this.wallW, 0), function () {
           this.$l.restPos = pb.vec3(this.xz.x, this.swGrid.w, this.xz.y);
           this.$l.wavePos = pb.vec3(0);
           this.$l.waveNormal = pb.vec3(0, 1, 0);
           that._base.calcVertexPositionAndNormal(this, this.restPos, this.wavePos, this.waveNormal);
-          this.$l.disp = pb.sub(this.wavePos, this.restPos);
+          this.$l.rise = pb.sub(this.wavePos.y, this.restPos.y);
+          this.$l.avgSpeed = this.state.y;
           this.$if(pb.greaterThan(this.state.w, 0), function () {
-            this.$l.v = pb.div(pb.sub(this.disp, this.state.xyz), this.state.w);
-            this.$l.speed = pb.length(this.v);
-            // |v| (1 - v^ . n) W, with W = 1 - d / h folded into wallW but for the steepness
-            this.$l.vDiff = pb.mul(
-              pb.sub(this.speed, pb.dot(this.v, pb.vec3(this.wall.x, 0, this.wall.y))),
-              pb.max(0, pb.sub(1, pb.div(this.wall.z, FOAM_SLIP_BAND)))
+            // Averaged over WALL_SPEED_AVERAGE seconds: the waves' own speed at
+            // a point flickers from cell to cell with ripples shorter than a
+            // cell, which the field would show as blocks, while its average
+            // over time is the sea state's and the same along the whole wall
+            this.avgSpeed = pb.mix(
+              this.state.y,
+              pb.abs(pb.div(pb.sub(this.rise, this.state.x), this.state.w)),
+              pb.min(1, pb.div(this.state.w, WALL_SPEED_AVERAGE))
             );
+            this.$l.speed = this.avgSpeed;
+            // |v| W, the trapped-air potential averaged over a wave's orbit, with
+            // W = 1 - d / h folded into wallW but for the steepness
+            this.$l.vDiff = pb.mul(this.speed, pb.max(0, pb.sub(1, pb.div(this.wall.z, FOAM_SLIP_BAND))));
             this.$l.tMin = this.swWallFoam.y;
             this.$l.tMax = this.swWallFoam.z;
             this.$l.trapped = pb.div(
@@ -484,14 +512,13 @@ export class ShoreWaveGenerator extends Disposable implements WaveGenerator, Foa
               pb.sub(pb.min(this.energy, this.eMax), pb.min(this.energy, this.eMin)),
               pb.max(pb.sub(this.eMax, this.eMin), 1e-6)
             );
-            this.foam = pb.add(
-              this.foam,
-              pb.mul(FOAM_WAVE_GAIN, this.swWallFoam.x, this.kinetic, this.trapped, this.wall.w, this.dt)
-            );
+            this.wallFoam = pb.mul(FOAM_WAVE_GAIN, this.kinetic, this.trapped, this.wall.w, this.dt);
           });
-          this.state = pb.vec4(this.disp, this.state.w);
+          this.state = pb.vec4(this.rise, this.avgSpeed, 0, this.state.w);
         });
-        this.$return(pb.vec3(this.velocity, pb.add(this.baseStep.z, this.foam)));
+        this.$return(
+          pb.vec4(this.velocity, pb.add(this.baseStep.z, this.foam), pb.add(this.baseStep.w, this.wallFoam))
+        );
       }
     );
     return scope.swFoamStep(xz, dt, fadeRate, prewarm, state) as PBShaderExp;
@@ -569,18 +596,16 @@ export class ShoreWaveGenerator extends Disposable implements WaveGenerator, Foa
     return scope.swWall(xz) as PBShaderExp;
   }
   /**
-   * A velocity with the part heading into a wall taken out, near a waterline
-   * too steep for surf, given the wall there (see {@link wall}). See
-   * FOAM_SLIP_BAND.
+   * A velocity near a waterline too steep for surf, given the wall there (see
+   * {@link wall}), handed over to the wall foam's drift out along the wall's
+   * normal. See FOAM_SLIP_BAND.
    * @internal
    */
   private slip(scope: PBInsideFunctionScope, wall: PBShaderExp, v: PBShaderExp): PBShaderExp {
     const pb = scope.$builder;
     pb.func('swFoamSlip', [pb.vec4('wall'), pb.vec2('v')], function () {
       this.$l.weight = pb.mul(this.wall.w, pb.sub(1, pb.smoothStep(0, FOAM_SLIP_BAND, this.wall.z)));
-      this.$return(
-        pb.sub(this.v, pb.mul(this.wall.xy, pb.min(pb.dot(this.v, this.wall.xy), 0), this.weight))
-      );
+      this.$return(pb.mix(this.v, pb.mul(this.wall.xy, this.swVary.y), this.weight));
     });
     return scope.swFoamSlip(wall, v) as PBShaderExp;
   }
@@ -602,7 +627,7 @@ export class ShoreWaveGenerator extends Disposable implements WaveGenerator, Foa
     scope.swGrid = pb.vec4().uniform(uniformGroup);
     scope.swWave = pb.vec4().uniform(uniformGroup);
     scope.swShape = pb.vec4().uniform(uniformGroup);
-    // (irregularity: wave cycles J spans, 0, 0, 0)
+    // (irregularity: wave cycles J spans, wall foam drift speed, 0, 0)
     scope.swVary = pb.vec4().uniform(uniformGroup);
   }
   /** @internal */

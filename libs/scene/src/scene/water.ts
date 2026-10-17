@@ -605,7 +605,7 @@ export class Water extends applyMixins(GraphNode, mixinDrawable) implements Draw
   set shoreWaveShallowFoamStrength(val: number) {
     this.material.shoreWaveShallowFoamStrength = val;
   }
-  /** How much foam the water makes dashing against walls, rocks and piers standing in it. */
+  /** How opaque the foam is that the water makes against walls, rocks and piers standing in it, 0..1; it always rings them whole. */
   get wallFoamStrength() {
     return this.material.wallFoamStrength;
   }
@@ -625,6 +625,13 @@ export class Water extends applyMixins(GraphNode, mixinDrawable) implements Draw
   }
   set wallFoamMaxSpeed(val: number) {
     this.material.wallFoamMaxSpeed = val;
+  }
+  /** Speed in metres per second the foam drifts out from walls, rocks and piers at: higher for a wider ring of foam around them. */
+  get wallFoamDrift() {
+    return this.material.wallFoamDrift;
+  }
+  set wallFoamDrift(val: number) {
+    this.material.wallFoamDrift = val;
   }
   /**
    * How the refracted view sample is located. Defaults to `march`.

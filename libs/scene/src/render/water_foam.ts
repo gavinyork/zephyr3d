@@ -65,15 +65,18 @@ export interface FoamFieldSource {
   applyFoamSourceBindGroup(bindGroup: BindGroup): void;
   /**
    * The water's velocity at an undisplaced XZ and the foam made there this
-   * step, as vec3(velocity x, velocity z, foam added).
+   * step, as vec4(velocity x, velocity z, foam added, wall foam added). Wall
+   * foam is a layer of its own, carried and faded as the foam is, which the
+   * water shows whole where it is, by its strength, rather than cutting from
+   * the foam texture by its density.
    * @param dt - Seconds this step covers, 0 for a step that only moves the grid.
    * @param fadeRate - The field's fade rate per second, for prewarming.
    * @param prewarm - True on the first step, which fills the field as if the
    *   sources had been running for a while.
-   * @param state - inout vec4: three floats the field keeps per cell for its
-   *   sources, held in place rather than carried with the foam, in xyz, and
+   * @param state - inout vec4: two floats the field keeps per cell for its
+   *   sources, held in place rather than carried with the foam, in xy, and
    *   in w the seconds since the source last wrote them, or a negative value
-   *   where they hold nothing yet. What the source leaves in xyz is kept at
+   *   where they hold nothing yet. What the source leaves in xy is kept at
    *   the last step of a frame.
    */
   calcFoamStep(
@@ -101,7 +104,7 @@ interface FoamStepProgram {
  * @public
  */
 export class WaterFoamField extends Disposable {
-  /** Ping-pong pair of arrays, a layer per level: the foam in r, the sources' state in gba. */
+  /** Ping-pong pair of arrays, a layer per level: the foam in r, the wall foam in g, the sources' state in ba. */
   private _arrays: Nullable<[Texture2DArray, Texture2DArray]>;
   private _framebuffers: Nullable<[FrameBuffer, FrameBuffer]>;
   private _current: number;
@@ -319,7 +322,8 @@ export class WaterFoamField extends Disposable {
     bindGroup.setValue('ffClock', this._clock);
   }
   /**
-   * The field at an undisplaced XZ, as vec2(foam density, coverage). The
+   * The field at an undisplaced XZ, as vec3(foam density, coverage, wall
+   * foam). The
    * finest level holding the point answers, blended into the next coarser
    * over the last FOAM_FIELD_EDGE_BLEND of it; coverage falls to 0 over that
    * share of the coarsest level and is 0 off it, where the reader falls back
@@ -328,7 +332,7 @@ export class WaterFoamField extends Disposable {
   sample(scope: PBInsideFunctionScope, xz: PBShaderExp): PBShaderExp {
     const pb = scope.$builder;
     pb.func('ffSample', [pb.vec2('xz')], function () {
-      this.$l.result = pb.vec2(0);
+      this.$l.result = pb.vec3(0);
       // Share of the answer still to come from coarser levels
       this.$l.remaining = pb.float(1);
       for (let i = 0; i < FOAM_FIELD_LEVELS; i++) {
@@ -341,10 +345,8 @@ export class WaterFoamField extends Disposable {
           pb.and(pb.greaterThan(this.remaining, 0), pb.and(pb.greaterThan(r.w, 0), pb.greaterThan(edge, 0))),
           function () {
             this.$l.w = pb.mul(this.remaining, pb.smoothStep(0, FOAM_FIELD_EDGE_BLEND, edge));
-            this.result = pb.add(
-              this.result,
-              pb.mul(pb.vec2(pb.textureArraySampleLevel(this.ffTex, uv, i, 0).r, 1), this.w)
-            );
+            this.$l.texel = pb.textureArraySampleLevel(this.ffTex, uv, i, 0);
+            this.result = pb.add(this.result, pb.mul(pb.vec3(this.texel.r, 1, this.texel.g), this.w));
             this.remaining = pb.sub(this.remaining, this.w);
           }
         );
@@ -505,15 +507,15 @@ export class WaterFoamField extends Disposable {
             // The sources' state stays with the cell: from the same place, on
             // the grid as it was, where that grid held it
             this.$l.stateAt = this.ffPrevUV(this.xz, this.ffPrevRegion);
-            this.$l.prevState = pb.vec3(0);
+            this.$l.prevState = pb.vec2(0);
             this.$l.stateAge = pb.float(-1);
             this.$if(pb.greaterThan(this.stateAt.z, 0.5), function () {
-              this.prevState = pb.textureArraySampleLevel(this.ffSrc, this.stateAt.xy, this.level, 0).gba;
+              this.prevState = pb.textureArraySampleLevel(this.ffSrc, this.stateAt.xy, this.level, 0).ba;
               this.$if(pb.and(pb.not(this.prewarm), pb.greaterThan(this.ffState.x, 0)), function () {
                 this.stateAge = this.ffState.x;
               });
             });
-            this.$l.state = pb.vec4(this.prevState, this.stateAge);
+            this.$l.state = pb.vec4(this.prevState, 0, this.stateAge);
             this.$l.src = source.calcFoamStep(
               this,
               this.xz,
@@ -526,9 +528,10 @@ export class WaterFoamField extends Disposable {
             // it was, else the next coarser one, nothing where neither held it
             this.$l.flowed = pb.sub(this.xz, pb.mul(this.src.xy, this.dt));
             this.$l.at = this.ffPrevUV(this.flowed, this.ffPrevRegion);
-            this.$l.foam = pb.float(0);
+            // (foam, wall foam)
+            this.$l.foam = pb.vec2(0);
             this.$if(pb.greaterThan(this.at.z, 0.5), function () {
-              this.foam = pb.textureArraySampleLevel(this.ffSrc, this.at.xy, this.level, 0).r;
+              this.foam = pb.textureArraySampleLevel(this.ffSrc, this.at.xy, this.level, 0).rg;
             }).$else(function () {
               this.$l.atNext = this.ffPrevUV(this.flowed, this.ffPrevRegionNext);
               this.$if(pb.greaterThan(this.atNext.z, 0.5), function () {
@@ -537,15 +540,15 @@ export class WaterFoamField extends Disposable {
                   this.atNext.xy,
                   pb.add(this.level, 1),
                   0
-                ).r;
+                ).rg;
               });
             });
             // Fade, then what the sources make
             this.foam = pb.mul(this.foam, pb.max(0, pb.sub(1, pb.mul(this.fadeRate, this.dt))));
-            this.foam = pb.add(this.foam, this.src.z);
+            this.foam = pb.add(this.foam, this.src.zw);
             this.$outputs.outColor = pb.vec4(
-              pb.clamp(this.foam, 0, 1),
-              this.$choice(pb.greaterThan(this.ffState.y, 0.5), this.state.xyz, this.prevState)
+              pb.clamp(this.foam, pb.vec2(0), pb.vec2(1)),
+              this.$choice(pb.greaterThan(this.ffState.y, 0.5), this.state.xy, this.prevState)
             );
           });
         }
@@ -639,7 +642,9 @@ export class WaveFoamSource implements FoamFieldSource {
           pb.max(this.dt, pb.div(pb.min(1, pb.sub(this.strength, 1)), this.fadeRate)),
           this.dt
         );
-        this.$return(pb.vec3(this.ffDrift, pb.mul(FOAM_WAVE_GAIN, this.waveDt, this.strength, this.density)));
+        this.$return(
+          pb.vec4(this.ffDrift, pb.mul(FOAM_WAVE_GAIN, this.waveDt, this.strength, this.density), 0)
+        );
       }
     );
     return scope.wgFoamStep(xz, dt, fadeRate, prewarm) as PBShaderExp;
@@ -763,7 +768,7 @@ export class FoamFieldWaveGenerator extends Disposable implements WaveGenerator 
       this.$l.ff = that._field.sample(this, this.xz);
       if (foamSample) {
         // Carried by the water: the texture travels with the field's foam
-        this.$if(pb.greaterThan(pb.mul(this.ff.x, this.ff.y), 0), function () {
+        this.$if(pb.greaterThan(pb.mul(pb.add(this.ff.x, this.ff.z), this.ff.y), 0), function () {
           this.$l.flow = that.flowSource
             ? that.flowSource.calcFoamFlow(this, this.xz, this.ffDrift)
             : this.ffDrift;
