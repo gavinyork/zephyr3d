@@ -8,7 +8,8 @@ import type {
   PBGlobalScope,
   PBInsideFunctionScope,
   PBShaderExp,
-  Texture2D
+  Texture2D,
+  Texture2DArray
 } from '@zephyr3d/device';
 import { getDevice } from '../app/api';
 import { drawFullscreenQuad } from './fullscreenquad';
@@ -29,12 +30,13 @@ const FOAM_FIELD_MAX_STEPS = 8;
 /** Crest's flow foam: two samples, each slid for up to FOAM_FLOW_PERIOD seconds and faded across. */
 const FOAM_FLOW_PERIOD = 2;
 /**
- * Levels the field is sampled with. One for now; the levels are laid out as
- * Crest's LODs would be (each twice the size of the one before), and
- * {@link WaterFoamField.sample} picks between them, so more can be added
- * without touching what reads the field.
+ * Levels of the field, laid out as Crest's LODs are: all centred on the view,
+ * each twice the size of the one before at the same number of cells, each
+ * stepped on its own, and an advection that would read off a level reading
+ * the next coarser one instead (UpdateFoam.compute). The material reads the
+ * finest level holding a point, blended into the next over its edge.
  */
-const FOAM_FIELD_MAX_LEVELS = 1;
+const FOAM_FIELD_LEVELS = 4;
 /** Cells along each side of a level. */
 const FOAM_FIELD_CELLS = 256;
 /**
@@ -85,15 +87,6 @@ export interface FoamFieldSource {
 }
 
 /** @internal */
-interface FoamFieldLevel {
-  textures: Texture2D[];
-  framebuffers: FrameBuffer[];
-  current: number;
-  /** (origin x, origin z, cell size, cells) */
-  region: Vector4;
-}
-
-/** @internal */
 interface FoamStepProgram {
   program: GPUProgram;
   bindGroup: BindGroup;
@@ -101,13 +94,21 @@ interface FoamStepProgram {
 
 /**
  * Foam with memory: a scalar field over the water, carried by the water's
- * velocity, fading over time and fed by its sources. One level of a square
- * grid that the water moves along with the camera; a move of the grid is
- * carried over in the next step, new cells starting without foam.
+ * velocity, fading over time and fed by its sources. FOAM_FIELD_LEVELS levels
+ * of square grids that the water moves along with the view, each twice the
+ * size of the one before; a move of a grid is carried over in the next step,
+ * new cells starting with what the next coarser level holds there, if any.
  * @public
  */
 export class WaterFoamField extends Disposable {
-  private _levels: FoamFieldLevel[];
+  /** Ping-pong pair of arrays, a layer per level: the foam in r, the sources' state in gba. */
+  private _arrays: Nullable<[Texture2DArray, Texture2DArray]>;
+  private _framebuffers: Nullable<[FrameBuffer, FrameBuffer]>;
+  private _current: number;
+  /** Per level: (origin x, origin z, cell size, cells) as the field holds it; 0 cells before it does. */
+  private readonly _regions: Vector4[];
+  /** Per level: where the grid goes this frame. */
+  private readonly _targets: Vector4[];
   private _programs: Map<string, FoamStepProgram>;
   private _timeToSimulate: number;
   private _lastTime: number;
@@ -120,9 +121,8 @@ export class WaterFoamField extends Disposable {
   private _drift: number;
   /** Velocity the foam drifts at on the wind, metres per second. */
   private readonly _driftVelocity: Vector2;
-  private readonly _region: Vector4;
-  private _dummy: Nullable<Texture2D>;
-  /** (dt, fade rate, prewarm, 0) */
+  private _dummy: Nullable<Texture2DArray>;
+  /** (dt, fade rate, prewarm, level) */
   private readonly _params: Vector4;
   /** (seconds since the sources' state was written, whether this step writes it, 0, 0) */
   private readonly _stateParams: Vector4;
@@ -131,7 +131,15 @@ export class WaterFoamField extends Disposable {
   private _version: number;
   constructor() {
     super();
-    this._levels = [];
+    this._arrays = null;
+    this._framebuffers = null;
+    this._current = 0;
+    this._regions = [];
+    this._targets = [];
+    for (let i = 0; i < FOAM_FIELD_LEVELS; i++) {
+      this._regions.push(new Vector4());
+      this._targets.push(new Vector4());
+    }
     this._programs = new Map();
     this._timeToSimulate = 0;
     this._lastTime = -1;
@@ -142,7 +150,6 @@ export class WaterFoamField extends Disposable {
     this._baseStrength = 1;
     this._drift = 0.03;
     this._driftVelocity = new Vector2();
-    this._region = new Vector4();
     this._dummy = null;
     this._params = new Vector4();
     this._stateParams = new Vector4();
@@ -156,7 +163,10 @@ export class WaterFoamField extends Disposable {
   set fadeRate(val: number) {
     this._fadeRate = Math.max(1e-3, val);
   }
-  /** Side in metres of the square of water around the view that keeps its foam. */
+  /**
+   * Side in metres of the finest level, the square of water around the view
+   * that keeps its foam in the most detail; each further level doubles it.
+   */
   get size() {
     return this._size;
   }
@@ -191,12 +201,17 @@ export class WaterFoamField extends Disposable {
     return this._version;
   }
   /**
-   * Places the grid around a point of the water, on whole cells so that the
-   * field is carried over without resampling while the point stays put, and
-   * steps the field there. See {@link WaterFoamField.step}.
-   * @param focusX - World x the grid is centred on.
-   * @param focusZ - World z the grid is centred on.
+   * Places the levels around a point of the water, each on whole cells of its
+   * own so that the field is carried over without resampling while the point
+   * stays put, and steps the field to a clock time there. The time behind is
+   * caught up in fixed steps of 1 / FOAM_FIELD_FREQUENCY; with no step due, a
+   * step of no time still carries the field over to where the grids now lie.
+   * The first step prewarms it.
+   * @param focusX - World x the levels are centred on.
+   * @param focusZ - World z the levels are centred on.
+   * @param time - Clock in seconds.
    * @param wind - Wind velocity in metres per second, or null for none.
+   * @param source - What feeds the field and carries it.
    */
   stepAround(
     focusX: number,
@@ -205,35 +220,27 @@ export class WaterFoamField extends Disposable {
     wind: Nullable<Immutable<Vector2>>,
     source: FoamFieldSource
   ) {
-    const cell = this._size / FOAM_FIELD_CELLS;
-    const half = this._size * 0.5;
-    this._region.setXYZW(
-      Math.floor((focusX - half) / cell) * cell,
-      Math.floor((focusZ - half) / cell) * cell,
-      cell,
-      FOAM_FIELD_CELLS
-    );
+    let moved = false;
+    for (let i = 0; i < FOAM_FIELD_LEVELS; i++) {
+      const size = this._size * (1 << i);
+      const cell = size / FOAM_FIELD_CELLS;
+      const half = size * 0.5;
+      this._targets[i].setXYZW(
+        Math.floor((focusX - half) / cell) * cell,
+        Math.floor((focusZ - half) / cell) * cell,
+        cell,
+        FOAM_FIELD_CELLS
+      );
+      moved = moved || !this._regions[i].equalsTo(this._targets[i]);
+    }
     this._driftVelocity.setXY((wind?.x ?? 0) * this._drift, (wind?.y ?? 0) * this._drift);
-    this.step(this._region, time, source);
-  }
-  /**
-   * Steps the field to a clock time on a grid. The time behind is caught up in
-   * fixed steps of 1 / FOAM_FIELD_FREQUENCY; with no step due, a step of no
-   * time still carries the field over to where the grid now lies. The first
-   * step prewarms it.
-   * @param region - Grid placement: (origin x, origin z, cell size, cells).
-   * @param time - Clock in seconds.
-   * @param source - What feeds the field and carries it.
-   */
-  step(region: Vector4, time: number, source: FoamFieldSource) {
     const device = getDevice();
-    const level = this.ensureLevel(device, 0, region);
+    this.ensureArrays(device);
     const dt = this._lastTime < 0 ? 0 : Math.min(Math.max(time - this._lastTime, 0), 0.25);
     this._lastTime = time;
     // The clock carries the foam texture along; readers see it every frame
     this._clock.x = time;
     this._version++;
-    const moved = !level.region.equalsTo(region);
     this._timeToSimulate += dt;
     let steps = Math.floor(this._timeToSimulate * FOAM_FIELD_FREQUENCY);
     let stepDt = 1 / FOAM_FIELD_FREQUENCY;
@@ -257,32 +264,41 @@ export class WaterFoamField extends Disposable {
     // of the frame sees alike: it is read as of the last frame that wrote it
     // and written at the frame's last step
     const sinceState = this._stateTime < 0 ? 0 : Math.max(time - this._stateTime, 0);
+    const sampler = fetchSampler('clamp_linear_nomip');
     device.pushDeviceStates();
-    for (let i = 0; i < steps; i++) {
-      // Only the first step carries the field across a move of the grid
-      bindGroup.setValue('ffPrevRegion', i === 0 ? level.region : region);
-      bindGroup.setValue('ffRegion', region);
-      this._params.setXYZW(stepDt, this._fadeRate, this._prewarm ? 1 : 0, 0);
-      bindGroup.setValue('ffParams', this._params);
-      this._stateParams.setXYZW(sinceState, i === steps - 1 ? 1 : 0, 0, 0);
+    for (let step = 0; step < steps; step++) {
+      const fb = this._framebuffers![1 - this._current];
+      bindGroup.setTexture('ffSrc', this._arrays![this._current], sampler);
+      this._stateParams.setXYZW(sinceState, step === steps - 1 ? 1 : 0, 0, 0);
       bindGroup.setValue('ffState', this._stateParams);
-      bindGroup.setTexture('ffSrc', level.textures[level.current], fetchSampler('clamp_linear_nomip'));
-      device.setFramebuffer(level.framebuffers[1 - level.current]);
-      device.setProgram(program);
-      device.setBindGroup(0, bindGroup);
-      drawFullscreenQuad();
-      level.current = 1 - level.current;
+      for (let i = 0; i < FOAM_FIELD_LEVELS; i++) {
+        // Only the first step carries the field across a move of the grids
+        const prev = step === 0 ? this._regions : this._targets;
+        bindGroup.setValue('ffRegion', this._targets[i]);
+        bindGroup.setValue('ffPrevRegion', prev[i]);
+        bindGroup.setValue('ffPrevRegionNext', i + 1 < FOAM_FIELD_LEVELS ? prev[i + 1] : Vector4.zero());
+        this._params.setXYZW(stepDt, this._fadeRate, this._prewarm ? 1 : 0, i);
+        bindGroup.setValue('ffParams', this._params);
+        fb.setColorAttachmentLayer(0, i);
+        device.setFramebuffer(fb);
+        device.setProgram(program);
+        device.setBindGroup(0, bindGroup);
+        drawFullscreenQuad();
+      }
+      this._current = 1 - this._current;
       this._prewarm = false;
     }
     device.popDeviceStates();
-    level.region.set(region);
+    for (let i = 0; i < FOAM_FIELD_LEVELS; i++) {
+      this._regions[i].set(this._targets[i]);
+    }
     this._stateTime = time;
   }
   /** Declares the uniforms {@link WaterFoamField.sample} reads. */
   setupUniforms(scope: PBGlobalScope, uniformGroup: number) {
     const pb = scope.$builder;
-    for (let i = 0; i < FOAM_FIELD_MAX_LEVELS; i++) {
-      scope[`ffTex${i}`] = pb.tex2D().uniform(uniformGroup);
+    scope.ffTex = pb.tex2DArray().uniform(uniformGroup);
+    for (let i = 0; i < FOAM_FIELD_LEVELS; i++) {
       // (origin x, origin z, cell size, cells; 0 cells before the level exists)
       scope[`ffRegion${i}`] = pb.vec4().uniform(uniformGroup);
     }
@@ -291,42 +307,47 @@ export class WaterFoamField extends Disposable {
   }
   /** Sets the uniforms {@link WaterFoamField.setupUniforms} declared. */
   applyBindGroup(bindGroup: BindGroup) {
-    for (let i = 0; i < FOAM_FIELD_MAX_LEVELS; i++) {
-      const level = this._levels[i];
-      bindGroup.setTexture(
-        `ffTex${i}`,
-        level ? level.textures[level.current] : this.getDummy(),
-        fetchSampler('clamp_linear_nomip')
-      );
-      bindGroup.setValue(`ffRegion${i}`, level ? level.region : Vector4.zero());
+    bindGroup.setTexture(
+      'ffTex',
+      this._arrays ? this._arrays[this._current] : this.getDummy(),
+      fetchSampler('clamp_linear_nomip')
+    );
+    for (let i = 0; i < FOAM_FIELD_LEVELS; i++) {
+      bindGroup.setValue(`ffRegion${i}`, this._arrays ? this._regions[i] : Vector4.zero());
     }
     bindGroup.setValue('ffDrift', this._driftVelocity);
     bindGroup.setValue('ffClock', this._clock);
   }
   /**
-   * The field at an undisplaced XZ, as vec2(foam density, coverage): coverage
-   * is 1 well inside a level, falls to 0 over the last FOAM_FIELD_EDGE_BLEND
-   * of it and is 0 off every level, where the reader falls back to foam with
-   * no memory.
+   * The field at an undisplaced XZ, as vec2(foam density, coverage). The
+   * finest level holding the point answers, blended into the next coarser
+   * over the last FOAM_FIELD_EDGE_BLEND of it; coverage falls to 0 over that
+   * share of the coarsest level and is 0 off it, where the reader falls back
+   * to foam with no memory.
    */
   sample(scope: PBInsideFunctionScope, xz: PBShaderExp): PBShaderExp {
     const pb = scope.$builder;
     pb.func('ffSample', [pb.vec2('xz')], function () {
       this.$l.result = pb.vec2(0);
-      // Finest level first; the first that holds the point answers
-      for (let i = FOAM_FIELD_MAX_LEVELS - 1; i >= 0; i--) {
+      // Share of the answer still to come from coarser levels
+      this.$l.remaining = pb.float(1);
+      for (let i = 0; i < FOAM_FIELD_LEVELS; i++) {
         const r = this[`ffRegion${i}`];
-        const tex = this[`ffTex${i}`];
         this.$l[`uv${i}`] = pb.div(pb.sub(this.xz, r.xy), pb.max(pb.mul(r.z, r.w), 1e-4));
         const uv = this[`uv${i}`];
         this.$l[`edge${i}`] = pb.min(pb.min(uv.x, uv.y), pb.min(pb.sub(1, uv.x), pb.sub(1, uv.y)));
         const edge = this[`edge${i}`];
-        this.$if(pb.and(pb.greaterThan(r.w, 0), pb.greaterThan(edge, 0)), function () {
-          this.result = pb.vec2(
-            pb.textureSampleLevel(tex, uv, 0).r,
-            pb.smoothStep(0, FOAM_FIELD_EDGE_BLEND, edge)
-          );
-        });
+        this.$if(
+          pb.and(pb.greaterThan(this.remaining, 0), pb.and(pb.greaterThan(r.w, 0), pb.greaterThan(edge, 0))),
+          function () {
+            this.$l.w = pb.mul(this.remaining, pb.smoothStep(0, FOAM_FIELD_EDGE_BLEND, edge));
+            this.result = pb.add(
+              this.result,
+              pb.mul(pb.vec2(pb.textureArraySampleLevel(this.ffTex, uv, i, 0).r, 1), this.w)
+            );
+            this.remaining = pb.sub(this.remaining, this.w);
+          }
+        );
       }
       this.$return(this.result);
     });
@@ -381,7 +402,7 @@ export class WaterFoamField extends Disposable {
   }
   protected onDispose() {
     super.onDispose();
-    this.disposeLevels();
+    this.disposeArrays();
     for (const p of this._programs.values()) {
       p.program.dispose();
       p.bindGroup.dispose();
@@ -391,33 +412,42 @@ export class WaterFoamField extends Disposable {
     this._dummy = null;
   }
   /** @internal */
-  private ensureLevel(device: AbstractDevice, index: number, region: Vector4) {
-    const res = region.w;
-    let level = this._levels[index];
-    if (!level || level.textures[0].width !== res) {
-      if (level) {
-        this.disposeLevel(level);
-      }
-      const textures: Texture2D[] = [];
-      const framebuffers: FrameBuffer[] = [];
-      device.pushDeviceStates();
-      for (let i = 0; i < 2; i++) {
-        // The foam in r, the sources' state in gba
-        const tex = device.createTexture2D('rgba16f', res, res, { mipmapping: false })!;
-        tex.name = `@WaterFoamField${index}_${i}`;
-        const fb = device.createFrameBuffer([tex], null);
+  private ensureArrays(device: AbstractDevice) {
+    if (this._arrays) {
+      return;
+    }
+    const arrays: Texture2DArray[] = [];
+    const framebuffers: FrameBuffer[] = [];
+    device.pushDeviceStates();
+    for (let k = 0; k < 2; k++) {
+      const tex = device.createTexture2DArray(
+        'rgba16f',
+        FOAM_FIELD_CELLS,
+        FOAM_FIELD_CELLS,
+        FOAM_FIELD_LEVELS,
+        {
+          mipmapping: false
+        }
+      )!;
+      tex.name = `@WaterFoamField${k}`;
+      const fb = device.createFrameBuffer([tex], null);
+      for (let i = 0; i < FOAM_FIELD_LEVELS; i++) {
+        fb.setColorAttachmentLayer(0, i);
         device.setFramebuffer(fb);
         device.clearFrameBuffer(Vector4.zero(), null, null);
-        textures.push(tex);
-        framebuffers.push(fb);
       }
-      device.popDeviceStates();
-      level = { textures, framebuffers, current: 0, region: new Vector4(region) };
-      this._levels[index] = level;
-      this._prewarm = true;
-      this._stateTime = -1;
+      arrays.push(tex);
+      framebuffers.push(fb);
     }
-    return level;
+    device.popDeviceStates();
+    this._arrays = arrays as [Texture2DArray, Texture2DArray];
+    this._framebuffers = framebuffers as [FrameBuffer, FrameBuffer];
+    this._current = 0;
+    for (const r of this._regions) {
+      r.setXYZW(0, 0, 0, 0);
+    }
+    this._prewarm = true;
+    this._stateTime = -1;
   }
   /** @internal */
   private getStepProgram(device: AbstractDevice, source: FoamFieldSource) {
@@ -433,31 +463,52 @@ export class WaterFoamField extends Disposable {
         fragment(pb) {
           this.$outputs.outColor = pb.vec4();
           source.setupFoamSourceUniforms(this);
-          this.ffSrc = pb.tex2D().uniform(0);
+          this.ffSrc = pb.tex2DArray().uniform(0);
           this.ffRegion = pb.vec4().uniform(0);
+          // Where this level and the next coarser one lay at the last step; 0 cells for none
           this.ffPrevRegion = pb.vec4().uniform(0);
+          this.ffPrevRegionNext = pb.vec4().uniform(0);
+          // (dt, fade rate, prewarm, level)
           this.ffParams = pb.vec4().uniform(0);
           this.ffDrift = pb.vec2().uniform(0);
           // (seconds since the sources' state was written, whether this step writes it, 0, 0)
           this.ffState = pb.vec4().uniform(0);
+          // A point of a level as it was: its uv, and whether the level held it
+          pb.func('ffPrevUV', [pb.vec2('wp'), pb.vec4('region')], function () {
+            this.$l.uv = pb.div(
+              pb.sub(this.wp, this.region.xy),
+              pb.max(pb.mul(this.region.z, this.region.w), 1e-4)
+            );
+            this.$l.rMax = pb.sub(0.5, pb.div(1, pb.max(this.region.w, 1)));
+            this.$l.r = pb.abs(pb.sub(this.uv, pb.vec2(0.5)));
+            this.$return(
+              pb.vec3(
+                this.uv,
+                this.$choice(
+                  pb.and(
+                    pb.greaterThan(this.region.w, 0),
+                    pb.lessThanEqual(pb.max(this.r.x, this.r.y), this.rMax)
+                  ),
+                  pb.float(1),
+                  pb.float(0)
+                )
+              )
+            );
+          });
           pb.main(function () {
             this.$l.dt = this.ffParams.x;
             this.$l.fadeRate = this.ffParams.y;
             this.$l.prewarm = pb.greaterThan(this.ffParams.z, 0.5);
+            this.$l.level = pb.int(this.ffParams.w);
             // World position of this cell's centre
             this.$l.xz = pb.add(this.ffRegion.xy, pb.mul(this.$builtins.fragCoord.xy, this.ffRegion.z));
-            this.$l.rMax = pb.sub(0.5, pb.div(1, this.ffPrevRegion.w));
             // The sources' state stays with the cell: from the same place, on
             // the grid as it was, where that grid held it
-            this.$l.stateUV = pb.div(
-              pb.sub(this.xz, this.ffPrevRegion.xy),
-              pb.mul(this.ffPrevRegion.z, this.ffPrevRegion.w)
-            );
-            this.$l.rs = pb.abs(pb.sub(this.stateUV, pb.vec2(0.5)));
+            this.$l.stateAt = this.ffPrevUV(this.xz, this.ffPrevRegion);
             this.$l.prevState = pb.vec3(0);
             this.$l.stateAge = pb.float(-1);
-            this.$if(pb.lessThanEqual(pb.max(this.rs.x, this.rs.y), this.rMax), function () {
-              this.prevState = pb.textureSampleLevel(this.ffSrc, this.stateUV, 0).gba;
+            this.$if(pb.greaterThan(this.stateAt.z, 0.5), function () {
+              this.prevState = pb.textureArraySampleLevel(this.ffSrc, this.stateAt.xy, this.level, 0).gba;
               this.$if(pb.and(pb.not(this.prewarm), pb.greaterThan(this.ffState.x, 0)), function () {
                 this.stateAge = this.ffState.x;
               });
@@ -471,17 +522,23 @@ export class WaterFoamField extends Disposable {
               this.prewarm,
               this.state
             );
-            // Sample from the previous step, upstream of the flow; nothing where
-            // that falls off the grid as it was
+            // Sample from the previous step, upstream of the flow: this level as
+            // it was, else the next coarser one, nothing where neither held it
             this.$l.flowed = pb.sub(this.xz, pb.mul(this.src.xy, this.dt));
-            this.$l.prevUV = pb.div(
-              pb.sub(this.flowed, this.ffPrevRegion.xy),
-              pb.mul(this.ffPrevRegion.z, this.ffPrevRegion.w)
-            );
-            this.$l.r = pb.abs(pb.sub(this.prevUV, pb.vec2(0.5)));
+            this.$l.at = this.ffPrevUV(this.flowed, this.ffPrevRegion);
             this.$l.foam = pb.float(0);
-            this.$if(pb.lessThanEqual(pb.max(this.r.x, this.r.y), this.rMax), function () {
-              this.foam = pb.textureSampleLevel(this.ffSrc, this.prevUV, 0).r;
+            this.$if(pb.greaterThan(this.at.z, 0.5), function () {
+              this.foam = pb.textureArraySampleLevel(this.ffSrc, this.at.xy, this.level, 0).r;
+            }).$else(function () {
+              this.$l.atNext = this.ffPrevUV(this.flowed, this.ffPrevRegionNext);
+              this.$if(pb.greaterThan(this.atNext.z, 0.5), function () {
+                this.foam = pb.textureArraySampleLevel(
+                  this.ffSrc,
+                  this.atNext.xy,
+                  pb.add(this.level, 1),
+                  0
+                ).r;
+              });
             });
             // Fade, then what the sources make
             this.foam = pb.mul(this.foam, pb.max(0, pb.sub(1, pb.mul(this.fadeRate, this.dt))));
@@ -500,19 +557,16 @@ export class WaterFoamField extends Disposable {
     return entry;
   }
   /** @internal */
-  private disposeLevel(level: FoamFieldLevel) {
-    level.framebuffers.forEach((fb) => fb.dispose());
-    level.textures.forEach((tex) => tex.dispose());
-  }
-  /** @internal */
-  private disposeLevels() {
-    this._levels.forEach((level) => this.disposeLevel(level));
-    this._levels = [];
+  private disposeArrays() {
+    this._framebuffers?.forEach((fb) => fb.dispose());
+    this._framebuffers = null;
+    this._arrays?.forEach((tex) => tex.dispose());
+    this._arrays = null;
   }
   /** @internal */
   private getDummy() {
     if (!this._dummy) {
-      this._dummy = getDevice().createTexture2D('rgba16f', 1, 1, { mipmapping: false })!;
+      this._dummy = getDevice().createTexture2DArray('rgba16f', 1, 1, 1, { mipmapping: false })!;
     }
     return this._dummy;
   }

@@ -570,7 +570,7 @@ export class Water extends applyMixins(GraphNode, mixinDrawable) implements Draw
   set foamDrift(val: number) {
     this.material.foamDrift = val;
   }
-  /** Side in metres of the square of water around the view whose foam lingers; beyond it foam shows only while crests break. */
+  /** Side in metres of the finest square of water around the view whose foam lingers, in the most detail; coarser squares reach eight times as far, beyond which foam shows only while crests break. */
   get foamFieldSize() {
     return this.material.foamFieldSize;
   }

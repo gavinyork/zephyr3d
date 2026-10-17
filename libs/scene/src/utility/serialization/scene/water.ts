@@ -1439,7 +1439,7 @@ export function getWaterClass(manager: ResourceManager): SerializableClass {
           {
             name: 'FoamFieldSize',
             description:
-              'Size in metres of the square of water around where the camera looks in which foam lingers. Beyond it foam shows only on the breaking crests; larger values reach further at coarser detail.',
+              'Size in metres of the square of water around where the camera looks in which lingering foam keeps its finest detail. Coarser rings reach eight times as far before foam shows only on the breaking crests; larger values reach further at coarser detail throughout.',
             type: 'float',
             default: 128,
             options: { animatable: false, minValue: 16, maxValue: 1024 },
