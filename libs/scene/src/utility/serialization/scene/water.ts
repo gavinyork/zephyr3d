@@ -611,7 +611,8 @@ const WATER_PROPERTY_LAYOUT: { group: string; open?: boolean; props: [string, st
       ['ShoreWavePeriod', 'Period'],
       ['ShoreWaveZone', 'Zone'],
       ['ShoreWaveSharpness', 'Sharpness'],
-      ['ShoreWaveLean', 'Lean']
+      ['ShoreWaveLean', 'Lean'],
+      ['ShoreWaveIrregularity', 'Irregularity']
     ]
   },
   {
@@ -1562,6 +1563,23 @@ export function getWaterClass(manager: ResourceManager): SerializableClass {
             },
             set(this: Water, value) {
               this.shoreWaveLean = value.num[0];
+            }
+          },
+          {
+            name: 'ShoreWaveIrregularity',
+            description:
+              'How irregular the shore waves are: at 0 the crests roll in as parallel lines evenly spaced; higher, each wave comes with a spacing and a bend of its own, so crests close up and spread apart, curve differently along the shore and keep those shapes as they come in.',
+            type: 'float',
+            default: 0.6,
+            options: { animatable: true, minValue: 0, maxValue: 1 },
+            isHidden(this: Water) {
+              return this.shoreWaveHeight <= 0;
+            },
+            get(this: Water, value) {
+              value.num[0] = this.shoreWaveIrregularity;
+            },
+            set(this: Water, value) {
+              this.shoreWaveIrregularity = value.num[0];
             }
           },
           {

@@ -542,6 +542,13 @@ export class Water extends applyMixins(GraphNode, mixinDrawable) implements Draw
   set shoreWaveLean(val: number) {
     this.material.shoreWaveLean = val;
   }
+  /** How irregular the shore waves are, 0..1: 0 for parallel crests a fixed wavelength apart, higher for each wave with a period and a bend of its own. */
+  get shoreWaveIrregularity() {
+    return this.material.shoreWaveIrregularity;
+  }
+  set shoreWaveIrregularity(val: number) {
+    this.material.shoreWaveIrregularity = val;
+  }
   /** How fast the foam fades, per second (Crest's Foam Fade Rate): lower leaves longer trails behind breaking waves. */
   get foamFadeRate() {
     return this.material.foamFadeRate;

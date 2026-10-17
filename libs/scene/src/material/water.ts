@@ -214,6 +214,7 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
     zone: 20,
     sharpness: 0.7,
     lean: 0.5,
+    irregularity: 0.6,
     waveFoamStrength: 1,
     waveFoamCoverage: 0.55,
     shorelineFoamMaxDepth: 0.65,
@@ -2372,6 +2373,13 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
   }
   set shoreWaveLean(val: number) {
     this._shoreWaves.lean = Math.min(Math.max(val, 0), 1);
+  }
+  /** How irregular the shore waves are, 0..1: 0 for parallel crests a fixed wavelength apart, higher for each wave with a period and a bend of its own. */
+  get shoreWaveIrregularity() {
+    return this._shoreWaves.irregularity!;
+  }
+  set shoreWaveIrregularity(val: number) {
+    this._shoreWaves.irregularity = Math.min(Math.max(val, 0), 1);
   }
   /** How fast the foam fades, per second (Crest's Foam Fade Rate): lower leaves longer trails behind breaking waves. */
   get foamFadeRate() {

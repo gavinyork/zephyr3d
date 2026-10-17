@@ -20,20 +20,32 @@ const INVERSE_SAMPLES = 256;
 const INVERSE_SHARPNESS = 32;
 /** Largest b the inverse table holds; at 1 the crest becomes a cusp. */
 const SHARPNESS_MAX = 0.95;
-/** Along-shore phase variation: cycles of noise per metre. */
-const PHASE_NOISE_SCALE = 0.04;
 /** Wave sets: noise per metre along the shore, its drift in cycles per wave, and how deep the sets cut. */
 const SET_SCALE = 0.02;
 const SET_DRIFT = 0.02;
 const SET_DEPTH = 0.6;
 /**
- * Crest bends: phase offset in cycles from noise along the shore (at the foot
- * of each point on the waterline), two octaves of noise per metre. Constant
- * along each way in, so a crest comes in bent and straightens as the spacing
- * between crests shrinks towards the shore.
+ * Irregular waves. The phase of a wave train is a clock that crests carry in
+ * with them: a point d out sees at time t the crest that set off from the
+ * outer edge tau(d) earlier, so the phase is Psi(t / T + tau(d) / T). With
+ * Psi the identity every crest is the same and the waves come in as parallel
+ * lines a fixed wavelength apart. Here Psi(s) = s + J(s, foot): J, noise in
+ * s, gives each wave a period of its own, which it keeps all the way in, the
+ * crests closing up and spreading out as they come; noise along the shore
+ * (at the foot of each point on the waterline) gives each a bend of its own.
+ * Psi has to keep rising, 1 + dJ/ds above 0, or crests would pass each other:
+ * dJ/ds is at most IRREGULAR_AMPLITUDE * IRREGULAR_RATE * 1.5 (the steepest
+ * slope of value noise) at full irregularity, 0.56.
+ *
+ * IRREGULAR_RATE is noise cycles per wave, a change of period every few
+ * waves; IRREGULAR_SHORE_SCALE noise cycles per metre along the shore;
+ * IRREGULAR_AMPLITUDE the wave cycles J spans at full irregularity.
  */
-const BEND_SCALE = 0.035;
-const BEND_AMPLITUDE = 0.45;
+const IRREGULAR_RATE = 0.15;
+const IRREGULAR_SHORE_SCALE = 0.035;
+const IRREGULAR_AMPLITUDE = 2.5;
+/** Step in wave cycles over which dJ/ds is taken. */
+const IRREGULAR_STEP = 0.05;
 /**
  * Crest segments: each wave, picked by its count, rises and falls along the
  * shore by its own noise, so no two waves are whole lines broken at the same
@@ -206,6 +218,12 @@ export interface ShoreWaveSettings {
   sharpness: number;
   /** How far the crests lean towards the shore there, 0 for upright, 1 for a steep front face. */
   lean: number;
+  /**
+   * How irregular the waves are, 0..1: 0 for crests coming in as parallel
+   * lines a fixed wavelength apart, higher for each wave with a period and a
+   * bend of its own. Defaults to 0.6.
+   */
+  irregularity?: number;
   /** Scale of the foam the breaking waves make (Crest's Wave Foam Strength). Defaults to 1. */
   waveFoamStrength?: number;
   /** How much of the waves makes foam, 0..1, higher for more (Crest's Wave Foam Coverage). Defaults to 0.55. */
@@ -254,6 +272,8 @@ export class ShoreWaveGenerator extends Disposable implements WaveGenerator, Foa
   private readonly _wave: Vector4;
   /** (sharpness at the shore, lean at the shore, wave clock of the previous frame, period in seconds) */
   private readonly _shape: Vector4;
+  /** (wave cycles the irregularity spans, 0, 0, 0) */
+  private readonly _vary: Vector4;
   /** What the open water feeds the foam field with, which the shore waves add theirs to. */
   private readonly _baseFoamSource: FoamFieldSource;
   /** (wave foam strength, wave foam coverage, shoreline foam strength, shoreline foam max depth) */
@@ -274,6 +294,7 @@ export class ShoreWaveGenerator extends Disposable implements WaveGenerator, Foa
     this._grid = new Vector4(0, 0, 0, 0);
     this._wave = new Vector4(0, 1, 1, 0);
     this._shape = new Vector4(0, 0, 0, 0);
+    this._vary = new Vector4(0, 0, 0, 0);
     this._foamSourceParams = new Vector4();
     this._wallFoamParams = new Vector4();
   }
@@ -308,6 +329,7 @@ export class ShoreWaveGenerator extends Disposable implements WaveGenerator, Foa
       (2 * zone) / Math.max(0.1, s.wavelength),
       timeInSeconds / Math.max(0.1, s.period)
     );
+    this._vary.x = Math.min(Math.max(s.irregularity ?? 0.6, 0), 1) * IRREGULAR_AMPLITUDE;
     this._version++;
   }
   /** @internal */
@@ -395,7 +417,9 @@ export class ShoreWaveGenerator extends Disposable implements WaveGenerator, Foa
         // Only where there is water: Crest feeds dry land too, where it does
         // not show, but here the swash runs over that land and would find a
         // full stock of foam waiting for it. Only on the waterline field, whose
-        // edge texels would otherwise smear over the rest of the foam field
+        // edge texels would otherwise smear over the rest of the foam field,
+        // and faded out towards its edge as the waves are: the field follows
+        // the camera and the foam field reaches past it, ahead of the view
         this.$l.wlUV = pb.mul(pb.sub(this.xz, this.swGrid.xy), this.swGrid.z);
         this.$if(
           pb.and(
@@ -408,6 +432,11 @@ export class ShoreWaveGenerator extends Disposable implements WaveGenerator, Foa
           function () {
             this.$l.depth = pb.sub(this.sw.x, pb.textureSampleLevel(this.swWaterline, this.wlUV, 0).z);
             this.$l.shoreDt = this.$choice(this.prewarm, pb.div(1, this.fadeRate), this.dt);
+            this.$l.gridEdge = pb.min(
+              pb.min(this.wlUV.x, this.wlUV.y),
+              pb.min(pb.sub(1, this.wlUV.x), pb.sub(1, this.wlUV.y))
+            );
+            this.shoreDt = pb.mul(this.shoreDt, pb.smoothStep(0, GRID_EDGE_FADE, this.gridEdge));
             this.$if(pb.greaterThan(this.depth, 0), function () {
               this.foam = pb.add(
                 this.foam,
@@ -507,8 +536,16 @@ export class ShoreWaveGenerator extends Disposable implements WaveGenerator, Foa
         }
       );
       this.$l.wl = pb.textureSampleLevel(this.swWaterline, this.uv, 0);
-      // The complement of the shelving the surf rolls in on
-      this.$l.steep = pb.sub(1, pb.smoothStep(SHELVING_MIN, SHELVING_FULL, this.wl.y));
+      // The complement of the shelving the surf rolls in on, faded out towards
+      // the edge of the field as the waves are
+      this.$l.gridEdge = pb.min(
+        pb.min(this.uv.x, this.uv.y),
+        pb.min(pb.sub(1, this.uv.x), pb.sub(1, this.uv.y))
+      );
+      this.$l.steep = pb.mul(
+        pb.sub(1, pb.smoothStep(SHELVING_MIN, SHELVING_FULL, this.wl.y)),
+        pb.smoothStep(0, GRID_EDGE_FADE, this.gridEdge)
+      );
       this.$if(
         pb.or(pb.lessThanEqual(this.steep, 0), pb.greaterThanEqual(this.wl.x, FOAM_SLIP_BAND)),
         function () {
@@ -565,6 +602,8 @@ export class ShoreWaveGenerator extends Disposable implements WaveGenerator, Foa
     scope.swGrid = pb.vec4().uniform(uniformGroup);
     scope.swWave = pb.vec4().uniform(uniformGroup);
     scope.swShape = pb.vec4().uniform(uniformGroup);
+    // (irregularity: wave cycles J spans, 0, 0, 0)
+    scope.swVary = pb.vec4().uniform(uniformGroup);
   }
   /** @internal */
   private applyShoreBindGroup(bindGroup: BindGroup) {
@@ -577,6 +616,7 @@ export class ShoreWaveGenerator extends Disposable implements WaveGenerator, Foa
     bindGroup.setValue('swGrid', this._grid);
     bindGroup.setValue('swWave', this._wave);
     bindGroup.setValue('swShape', this._shape);
+    bindGroup.setValue('swVary', this._vary);
   }
   /**
    * Shore wave at an undisplaced world XZ, at a wave clock (time over period):
@@ -663,16 +703,25 @@ export class ShoreWaveGenerator extends Disposable implements WaveGenerator, Foa
         // Inland every noise is taken at the foot, so the swash keeps one clock
         // and one height all the way up the beach
         this.$l.noisePos = this.$choice(pb.greaterThan(this.d, 0), this.xz, this.foot);
-        this.$l.bend = pb.add(
-          valueNoise(this, pb.mul(this.foot, BEND_SCALE)),
-          pb.mul(valueNoise(this, pb.add(pb.mul(this.foot, BEND_SCALE * 2.7), pb.vec2(31.7, 17.3))), 0.5)
+        // The crests' clock, in waves, and the irregular phase it reads as:
+        // s + J(s, foot), see IRREGULAR_RATE
+        this.$l.s = pb.add(this.tPhase, pb.mul(this.swWave.z, this.rootTerm));
+        this.$l.shoreUV = pb.mul(this.foot, IRREGULAR_SHORE_SCALE);
+        this.$l.j0 = valueNoise(this, pb.add(this.shoreUV, pb.vec2(pb.mul(this.s, IRREGULAR_RATE), 0)));
+        this.$l.j1 = valueNoise(
+          this,
+          pb.add(this.shoreUV, pb.vec2(pb.mul(pb.add(this.s, IRREGULAR_STEP), IRREGULAR_RATE), 0))
         );
-        this.$l.phase = pb.add(
-          this.tPhase,
-          pb.mul(this.swWave.z, this.rootTerm),
-          valueNoise(this, pb.mul(this.noisePos, PHASE_NOISE_SCALE)),
-          pb.mul(this.bend, BEND_AMPLITUDE)
+        this.$l.phase = pb.add(this.s, pb.mul(this.swVary.x, pb.sub(this.j0, 0.5)));
+        // dPsi/ds: a wave of a longer period here is that much farther apart
+        this.$l.rate = pb.max(
+          pb.add(1, pb.div(pb.mul(this.swVary.x, pb.sub(this.j1, this.j0)), IRREGULAR_STEP)),
+          0.1
         );
+        // The crests travel at the speed of the water depth whatever their
+        // period: set before the spacing takes the period in
+        this.$l.crestSpeed = pb.max(pb.div(this.spacing, this.swShape.w), 0.1);
+        this.spacing = pb.div(this.spacing, this.rate);
         // Distance along the wave from a crest, seaward: 0 at the crest, its front
         // (shoreward) face just below 1
         this.$l.X = pb.fract(this.phase);
@@ -821,7 +870,6 @@ export class ShoreWaveGenerator extends Disposable implements WaveGenerator, Foa
         // water under a crest surges shoreward with it and is still in the
         // trough behind, so the foam is carried in with the breaking crest and
         // left behind as it passes
-        this.$l.crestSpeed = pb.max(pb.div(this.spacing, this.swShape.w), 0.1);
         this.$l.flow = pb.clamp(
           pb.div(pb.mul(SWASH_GRAVITY, this.height), this.crestSpeed),
           0,
