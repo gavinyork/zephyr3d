@@ -1932,9 +1932,40 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
             });
           }
         });
+        // The traced reflection blurred by roughness as Uludag's cone-traced
+        // reflections blur it ("Hi-Z Screen-Space Cone-Traced Reflections",
+        // GPU Pro 5, 2014): the lobe as a cone of half angle
+        // acos(0.244^(1 / (n + 1))) for a Phong power n, here
+        // n = 2 / alpha^2 - 2 for the GGX alpha (Walter et al., "Microfacet
+        // Models for Refraction through Rough Surfaces", EGSR 2007); its
+        // footprint where the ray hits the radius of the circle inscribed in
+        // the isosceles triangle of the cone over the screen-space ray, in
+        // pixels; and the scene colour read at the level of that radius
+        this.$l.alpha = pb.mul(this.roughness, this.roughness);
+        this.$l.phongPower = pb.max(pb.sub(pb.div(2, pb.max(pb.mul(this.alpha, this.alpha), 1e-6)), 2), 0);
+        this.$l.coneCos = pb.pow(0.244, pb.div(1, pb.add(this.phongPower, 1)));
+        this.$l.coneTan = pb.div(
+          pb.sqrt(pb.max(pb.sub(1, pb.mul(this.coneCos, this.coneCos)), 0)),
+          pb.max(this.coneCos, 1e-4)
+        );
+        this.$l.coneBase = pb.mul(2, this.coneTan, this.hitInfo.z);
+        this.$l.coneRadius = pb.div(
+          pb.mul(
+            this.coneBase,
+            pb.sub(
+              pb.sqrt(
+                pb.add(pb.mul(this.coneBase, this.coneBase), pb.mul(4, this.hitInfo.z, this.hitInfo.z))
+              ),
+              this.coneBase
+            )
+          ),
+          pb.max(pb.mul(4, this.hitInfo.z), 1e-4)
+        );
+        this.$l.reflectLod = pb.clamp(pb.log2(pb.max(this.coneRadius, 1)), 0, REFRACT_BLUR_MAX_LOD);
         this.reflectance = pb.mix(
           this.reflMiss,
-          pb.textureSampleLevel(ShaderHelper.getSceneColorTexture(this), this.hitInfo.xy, 0).rgb,
+          pb.textureSampleLevel(ShaderHelper.getSceneColorTexture(this), this.hitInfo.xy, this.reflectLod)
+            .rgb,
           this.hitInfo.w
         );
         this.$l.refractInfo = that.waterRefraction(
