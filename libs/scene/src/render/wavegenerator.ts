@@ -1,4 +1,4 @@
-import type { AABB, IDisposable } from '@zephyr3d/base';
+import type { AABB, IDisposable, Immutable, Vector2 } from '@zephyr3d/base';
 import type {
   AbstractDevice,
   BindGroup,
@@ -22,6 +22,11 @@ export interface WaveGenerator extends IDisposable {
    * @internal
    */
   version: number;
+  /**
+   * Wind velocity in metres per second, for generators driven by a wind; the
+   * foam the water carries drifts on it. Optional: without it, no wind.
+   */
+  readonly wind?: Immutable<Vector2>;
   /**
    * Setup uniforms for the shader program.
    * @param scope - Global scope of the shader program.

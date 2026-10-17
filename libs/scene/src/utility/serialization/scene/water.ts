@@ -591,6 +591,15 @@ const WATER_PROPERTY_LAYOUT: { group: string; open?: boolean; props: [string, st
     ]
   },
   {
+    group: 'Foam/Trails',
+    props: [
+      ['FoamTrailStrength', 'Strength'],
+      ['FoamFadeRate', 'Fade Rate'],
+      ['FoamDrift', 'Wind Drift'],
+      ['FoamFieldSize', 'Range']
+    ]
+  },
+  {
     group: 'Shore',
     props: [['EdgeFadeWidth', 'Edge Fade']]
   },
@@ -611,8 +620,7 @@ const WATER_PROPERTY_LAYOUT: { group: string; open?: boolean; props: [string, st
       ['ShoreWaveFoamStrength', 'Breaking Foam'],
       ['ShoreWaveFoamCoverage', 'Breaking Coverage'],
       ['ShoreWaveShallowFoamStrength', 'Shallow Foam'],
-      ['ShoreWaveShallowFoamDepth', 'Shallow Depth'],
-      ['ShoreWaveFoamFadeRate', 'Fade Rate']
+      ['ShoreWaveShallowFoamDepth', 'Shallow Depth']
     ]
   },
 
@@ -1383,6 +1391,62 @@ export function getWaterClass(manager: ResourceManager): SerializableClass {
             }
           },
           {
+            name: 'FoamTrailStrength',
+            description:
+              'How much foam the breaking crests of the open water leave behind: the foam lingers after the crest has passed, drifts on the wind and fades into streaks and patches. 0 keeps foam only while a crest breaks.',
+            type: 'float',
+            default: 1,
+            options: { animatable: true, minValue: 0, maxValue: 5 },
+            get(this: Water, value) {
+              value.num[0] = this.foamTrailStrength;
+            },
+            set(this: Water, value) {
+              this.foamTrailStrength = value.num[0];
+            }
+          },
+          {
+            name: 'FoamFadeRate',
+            description:
+              'How quickly lingering foam dies away, behind breaking crests and shore waves alike: low values leave long-lasting trails and sheets of foam, high values keep only fresh foam at the breaking crests.',
+            type: 'float',
+            default: 0.8,
+            options: { animatable: true, minValue: 0.01, maxValue: 20 },
+            get(this: Water, value) {
+              value.num[0] = this.foamFadeRate;
+            },
+            set(this: Water, value) {
+              this.foamFadeRate = value.num[0];
+            }
+          },
+          {
+            name: 'FoamDrift',
+            description:
+              'How fast lingering foam drifts downwind, as a share of the wind speed: about 0.03 in nature. 0 leaves it where the crest broke.',
+            type: 'float',
+            default: 0.03,
+            options: { animatable: true, minValue: 0, maxValue: 0.2 },
+            get(this: Water, value) {
+              value.num[0] = this.foamDrift;
+            },
+            set(this: Water, value) {
+              this.foamDrift = value.num[0];
+            }
+          },
+          {
+            name: 'FoamFieldSize',
+            description:
+              'Size in metres of the square of water around where the camera looks in which foam lingers. Beyond it foam shows only on the breaking crests; larger values reach further at coarser detail.',
+            type: 'float',
+            default: 128,
+            options: { animatable: false, minValue: 16, maxValue: 1024 },
+            get(this: Water, value) {
+              value.num[0] = this.foamFieldSize;
+            },
+            set(this: Water, value) {
+              this.foamFieldSize = value.num[0];
+            }
+          },
+          {
             name: 'EdgeFadeWidth',
             description:
               'Thickness in metres over which a thin sheet of water fades in from the ground under it, so swash running up the sand shows the sand through it. 0 disables it.',
@@ -1495,23 +1559,6 @@ export function getWaterClass(manager: ResourceManager): SerializableClass {
             },
             set(this: Water, value) {
               this.shoreWaveLean = value.num[0];
-            }
-          },
-          {
-            name: 'ShoreWaveFoamFadeRate',
-            description:
-              'How quickly the foam the shore waves leave behind dies away: low values leave long-lasting trails and sheets of foam behind each wave, high values keep only fresh foam at the breaking crests.',
-            type: 'float',
-            default: 0.8,
-            options: { animatable: true, minValue: 0, maxValue: 20 },
-            isHidden(this: Water) {
-              return this.shoreWaveHeight <= 0;
-            },
-            get(this: Water, value) {
-              value.num[0] = this.shoreWaveFoamFadeRate;
-            },
-            set(this: Water, value) {
-              this.shoreWaveFoamFadeRate = value.num[0];
             }
           },
           {

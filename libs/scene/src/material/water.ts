@@ -11,7 +11,8 @@ import type { WaterInteraction } from '../render/water_interaction';
 import { InteractiveWaveGenerator } from '../render/water_interaction';
 import { ShoreWaveGenerator } from '../render/shore_wave_generator';
 import type { ShoreWaveSettings } from '../render/shore_wave_generator';
-import { WaterFoamField } from '../render/water_foam';
+import { FoamFieldWaveGenerator, WaterFoamField, WaveFoamSource } from '../render/water_foam';
+import type { FoamFieldSource } from '../render/water_foam';
 import { LIGHT_TYPE_DIRECTIONAL, LIGHT_TYPE_RECT, MaterialVaryingFlags } from '../values';
 import { ShaderHelper } from './shader/helper';
 import type { Nullable } from '@zephyr3d/base';
@@ -69,6 +70,8 @@ export type WaterRefractionMode = 'march' | 'offset';
  * - `interaction`: the {@link WaterInteraction} field on its own, mid grey at
  *   rest and reaching black and white at its amplitude clamp; dimmed outside
  *   the field's window.
+ * - `foamField`: the foam field on its own, its density as grey, black with no
+ *   foam; mid grey off the field, where foam does not linger.
  *
  * Each value is a separate shader variant; the `none` variant carries no trace
  * of the others.
@@ -91,7 +94,8 @@ export type WaterDebugOutput =
   | 'shadow'
   | 'specular'
   | 'depth'
-  | 'interaction';
+  | 'interaction'
+  | 'foamField';
 
 /** Label/value pairs for {@link WaterDebugOutput}, for editor enumerations. */
 export const WATER_DEBUG_OUTPUTS = [
@@ -110,7 +114,8 @@ export const WATER_DEBUG_OUTPUTS = [
   { label: 'Subsurface thickness', value: 'subsurfaceThickness' },
   { label: 'Specular', value: 'specular' },
   { label: 'Depth', value: 'depth' },
-  { label: 'Interaction', value: 'interaction' }
+  { label: 'Interaction', value: 'interaction' },
+  { label: 'Foam field', value: 'foamField' }
 ] as const;
 
 /** Fresnel reflectance of water at normal incidence, n = 1.333. */
@@ -209,9 +214,6 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
     zone: 20,
     sharpness: 0.7,
     lean: 0.5,
-    foamTexture: null,
-    foamTextureSize: 4,
-    foamFadeRate: 0.8,
     waveFoamStrength: 1,
     waveFoamCoverage: 0.55,
     shorelineFoamMaxDepth: 0.65,
@@ -221,6 +223,19 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
   private _shoreWaveGenerator: Nullable<ShoreWaveGenerator> = null;
   /** Foam with memory, carried by the water; kept across rebuilds of the generators. */
   private readonly _foamField = new WaterFoamField();
+  /** The foam field layered over the base generator, innermost in the effective generator. */
+  private _foamFieldGenerator: Nullable<FoamFieldWaveGenerator> = null;
+  /**
+   * The interaction layer of the effective generator while a field is attached,
+   * wherever it sits in the chain (the shore waves wrap it when they are on).
+   */
+  private _interactiveWaveGenerator: Nullable<InteractiveWaveGenerator> = null;
+  /** What feeds the foam field: the shore waves while they are on, else the open water. */
+  private _foamSource: Nullable<FoamFieldSource> = null;
+  /** Frame the foam field was last stepped in. */
+  private _foamFrameId = -1;
+  /** Frame of the last update. */
+  private _frameId = 0;
   private _edgeFadeWidth = 0.05;
   /**
    * Thickness in metres over which a thin sheet of water fades in from the
@@ -369,6 +384,10 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
     this._interaction.dispose();
     this._shoreWaveGenerator?.dispose();
     this._shoreWaveGenerator = null;
+    this._foamFieldGenerator?.dispose();
+    this._foamFieldGenerator = null;
+    this._foamSource = null;
+    this._interactiveWaveGenerator = null;
     this._foamField.dispose();
     this._effectiveWaveGenerator = null;
     this._foamTexture.dispose();
@@ -425,15 +444,33 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
   private _rebuildEffectiveWaveGenerator() {
     const base = this._waveGenerator.get();
     const interaction = this._interaction.get();
-    let effective: Nullable<WaveGenerator> = base;
-    if (base && interaction && interaction.isOk()) {
-      effective = new InteractiveWaveGenerator(base, interaction);
-      interaction.ensureResources();
-    }
     this._shoreWaveGenerator?.dispose();
     this._shoreWaveGenerator = null;
+    this._foamFieldGenerator?.dispose();
+    this._foamFieldGenerator = null;
+    this._foamSource = null;
+    this._interactiveWaveGenerator = null;
+    let effective: Nullable<WaveGenerator> = null;
+    if (base) {
+      // Innermost the foam field, whose foam the interaction field and the
+      // shore waves compose theirs over
+      const that = this;
+      this._foamFieldGenerator = new FoamFieldWaveGenerator(base, this._foamField, {
+        getFoamTexture: () => that.foamTexture,
+        getFoamTextureSize: () => that._foamTextureSize
+      });
+      effective = this._foamFieldGenerator;
+      this._foamSource = new WaveFoamSource(base, this._foamField);
+    }
+    if (effective && interaction && interaction.isOk()) {
+      effective = new InteractiveWaveGenerator(effective, interaction);
+      this._interactiveWaveGenerator = effective as InteractiveWaveGenerator;
+      interaction.ensureResources();
+    }
     if (effective && this._shoreWaves.height > 0) {
-      this._shoreWaveGenerator = new ShoreWaveGenerator(effective, this._shoreWaves, this._foamField);
+      this._shoreWaveGenerator = new ShoreWaveGenerator(effective, this._shoreWaves, this._foamSource!);
+      this._foamFieldGenerator!.flowSource = this._shoreWaveGenerator;
+      this._foamSource = this._shoreWaveGenerator;
       effective = this._shoreWaveGenerator;
     }
     this._effectiveWaveGenerator = effective;
@@ -874,7 +911,6 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
   set foamTexture(tex: Nullable<Texture2D>) {
     if (tex !== this.foamTexture) {
       this._foamTexture.set(tex);
-      this._shoreWaves.foamTexture = tex;
       this.uniformChanged();
     }
   }
@@ -886,7 +922,6 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
     const clamped = Math.max(0.01, val);
     if (clamped !== this._foamTextureSize) {
       this._foamTextureSize = clamped;
-      this._shoreWaves.foamTextureSize = clamped;
       this.uniformChanged();
     }
   }
@@ -1211,8 +1246,8 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
       if (this.debugOutput === 'interaction') {
         // The field on its own, grey at rest, scaled so its amplitude clamp
         // reaches black and white; dimmed outside the window so its reach shows.
-        if (this.waveGenerator instanceof InteractiveWaveGenerator) {
-          const interaction = this.waveGenerator.interaction;
+        if (this._interactiveWaveGenerator) {
+          const interaction = this._interactiveWaveGenerator.interaction;
           scope.$l.wiDebugHeight = pb.div(
             interaction.sampleHeight(scope, scope.$inputs.clipmapPos.xz),
             scope.wiParams2.y
@@ -1230,6 +1265,14 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
           pb.vec3(pb.mul(pb.add(0.5, pb.mul(scope.wiDebugHeight, 0.5)), scope.wiDebugMask)),
           1
         );
+      } else if (this.debugOutput === 'foamField') {
+        // The field's density; mid grey off the field, where coverage is 0
+        if (this._foamFieldGenerator) {
+          scope.$l.ffDebug = this._foamField.sample(scope, scope.$inputs.clipmapPos.xz);
+        } else {
+          scope.$l.ffDebug = pb.vec2(0);
+        }
+        scope.$l.outColor = pb.vec4(pb.vec3(pb.mix(pb.float(0.5), scope.ffDebug.x, scope.ffDebug.y)), 1);
       } else {
         scope.$l.outColor = pb.vec4(
           this.waterShading(
@@ -2319,12 +2362,33 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
   set shoreWaveLean(val: number) {
     this._shoreWaves.lean = Math.min(Math.max(val, 0), 1);
   }
-  /** How fast the foam of the shore waves fades, per second (Crest's Foam Fade Rate). */
-  get shoreWaveFoamFadeRate() {
-    return this._shoreWaves.foamFadeRate!;
+  /** How fast the foam fades, per second (Crest's Foam Fade Rate): lower leaves longer trails behind breaking waves. */
+  get foamFadeRate() {
+    return this._foamField.fadeRate;
   }
-  set shoreWaveFoamFadeRate(val: number) {
-    this._shoreWaves.foamFadeRate = Math.max(0, val);
+  set foamFadeRate(val: number) {
+    this._foamField.fadeRate = val;
+  }
+  /** How much foam the open water's breaking crests leave behind to drift and fade; 0 keeps foam only while a crest breaks. */
+  get foamTrailStrength() {
+    return this._foamField.baseStrength;
+  }
+  set foamTrailStrength(val: number) {
+    this._foamField.baseStrength = val;
+  }
+  /** Share of the wind speed the foam drifts at, about 0.03 in nature. */
+  get foamDrift() {
+    return this._foamField.drift;
+  }
+  set foamDrift(val: number) {
+    this._foamField.drift = val;
+  }
+  /** Side in metres of the square of water around the view whose foam lingers; beyond it foam shows only while crests break. */
+  get foamFieldSize() {
+    return this._foamField.size;
+  }
+  set foamFieldSize(val: number) {
+    this._foamField.size = val;
   }
   /** How much foam the breaking shore waves make (Crest's Wave Foam Strength). */
   get shoreWaveFoamStrength() {
@@ -2362,7 +2426,29 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
   setShoreWaveFrame(waterline: Nullable<Texture2D>, region: Vector4, level: number) {
     this._shoreWaveGenerator?.setFrame(waterline, region, level, this._waveClock);
   }
+  /**
+   * Steps the foam field around the water the view looks at, once a frame
+   * however many views there are. Called by the water after
+   * {@link setShoreWaveFrame}, which its sources read.
+   * @param focusX - World x the field is centred on.
+   * @param focusZ - World z the field is centred on.
+   * @internal
+   */
+  updateFoamField(focusX: number, focusZ: number) {
+    if (!this._foamSource || this._foamFrameId === this._frameId) {
+      return;
+    }
+    this._foamFrameId = this._frameId;
+    this._foamField.stepAround(
+      focusX,
+      focusZ,
+      this._waveClock,
+      this._waveGenerator.get()?.wind ?? null,
+      this._foamSource
+    );
+  }
   update(frameId: number, elapsed: number) {
+    this._frameId = frameId;
     this._waveClock = elapsed;
     // The base generator and the field are stepped separately, each guarded by
     // its own per-frame mark, so a generator shared between two bodies of water
@@ -2376,7 +2462,7 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
       }
     }
     const interaction = this._interaction.get();
-    if (interaction && this._effectiveWaveGenerator instanceof InteractiveWaveGenerator) {
+    if (interaction && this._interactiveWaveGenerator) {
       const updateFrameId = WaterMaterial._interactionUpdateState.get(interaction);
       if (updateFrameId !== frameId) {
         interaction.update(elapsed);

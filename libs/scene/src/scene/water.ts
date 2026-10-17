@@ -1,4 +1,4 @@
-import { Vector4 } from '@zephyr3d/base';
+import { Vector2, Vector4 } from '@zephyr3d/base';
 import type { Matrix4x4, Nullable } from '@zephyr3d/base';
 import { applyMixins, Vector3, DRef } from '@zephyr3d/base';
 import type { Scene } from './scene';
@@ -541,12 +541,33 @@ export class Water extends applyMixins(GraphNode, mixinDrawable) implements Draw
   set shoreWaveLean(val: number) {
     this.material.shoreWaveLean = val;
   }
-  /** How fast the foam of the shore waves fades, per second (Crest's Foam Fade Rate). */
-  get shoreWaveFoamFadeRate() {
-    return this.material.shoreWaveFoamFadeRate;
+  /** How fast the foam fades, per second (Crest's Foam Fade Rate): lower leaves longer trails behind breaking waves. */
+  get foamFadeRate() {
+    return this.material.foamFadeRate;
   }
-  set shoreWaveFoamFadeRate(val: number) {
-    this.material.shoreWaveFoamFadeRate = val;
+  set foamFadeRate(val: number) {
+    this.material.foamFadeRate = val;
+  }
+  /** How much foam the open water's breaking crests leave behind to drift and fade; 0 keeps foam only while a crest breaks. */
+  get foamTrailStrength() {
+    return this.material.foamTrailStrength;
+  }
+  set foamTrailStrength(val: number) {
+    this.material.foamTrailStrength = val;
+  }
+  /** Share of the wind speed the foam drifts at, about 0.03 in nature. */
+  get foamDrift() {
+    return this.material.foamDrift;
+  }
+  set foamDrift(val: number) {
+    this.material.foamDrift = val;
+  }
+  /** Side in metres of the square of water around the view whose foam lingers; beyond it foam shows only while crests break. */
+  get foamFieldSize() {
+    return this.material.foamFieldSize;
+  }
+  set foamFieldSize(val: number) {
+    this.material.foamFieldSize = val;
   }
   /** How much foam the breaking shore waves make (Crest's Wave Foam Strength). */
   get shoreWaveFoamStrength() {
@@ -813,8 +834,12 @@ export class Water extends applyMixins(GraphNode, mixinDrawable) implements Draw
         interaction.setBathymetry(wantsDepth ? this.findBathymetry() : null);
       }
       if (interaction && interaction.followMode === 'camera') {
-        this.updateInteractionFocus(camera, interaction);
+        const focus = this.viewFocus(camera, interaction.windowSize * 0.5);
+        interaction.setFocus(focus.x, focus.y);
       }
+      // After the shore waves' frame, which the foam field's sources read
+      const foamFocus = this.viewFocus(camera, mat.foamFieldSize * 0.5);
+      mat.updateFoamField(foamFocus.x, foamFocus.y);
       this.scene?.queuePerCameraUpdateNode(this);
     }
   }
@@ -903,17 +928,19 @@ export class Water extends applyMixins(GraphNode, mixinDrawable) implements Draw
     setWaterSubmergence(camera, this, submerged, surfaceY);
   }
   /**
-   * Point the interaction window at the water the camera is looking at.
+   * The water the camera is looking at, on which a window that follows the
+   * view (the interaction field, the foam field) is centred.
    *
-   * Not at the camera itself: a camera looking down at the water from a
+   * Not the camera itself: a camera looking down at the water from a
    * distance has the water it sees well ahead of it, and a window centred on
    * the camera would put that water at its edge, inside the sponge band. The
    * focus is where the view direction meets the rest plane, no further ahead
-   * than half a window so that a view towards the horizon still covers the
-   * near water, and half a window ahead when the view does not meet the plane.
+   * than `reach` (half a window) so that a view towards the horizon still
+   * covers the near water, and `reach` ahead when the view does not meet the
+   * plane.
    * @internal
    */
-  private updateInteractionFocus(camera: Camera, interaction: WaterInteraction) {
+  private viewFocus(camera: Camera, reach: number) {
     const camPos = camera.getWorldPosition();
     const m = camera.worldMatrix;
     // The camera looks down its local -Z.
@@ -921,7 +948,6 @@ export class Water extends applyMixins(GraphNode, mixinDrawable) implements Draw
     const fy = -m.m12;
     const fz = -m.m22;
     const horizontal = Math.hypot(fx, fz);
-    const reach = interaction.windowSize * 0.5;
     let ahead = reach;
     if (fy < -1e-4) {
       const t = (this.worldMatrix.m13 - camPos.y) / fy;
@@ -930,10 +956,9 @@ export class Water extends applyMixins(GraphNode, mixinDrawable) implements Draw
       }
     }
     if (horizontal < 1e-6) {
-      interaction.setFocus(camPos.x, camPos.z);
-    } else {
-      interaction.setFocus(camPos.x + (fx / horizontal) * ahead, camPos.z + (fz / horizontal) * ahead);
+      return new Vector2(camPos.x, camPos.z);
     }
+    return new Vector2(camPos.x + (fx / horizontal) * ahead, camPos.z + (fz / horizontal) * ahead);
   }
   /**
    * Distance to the true horizon for the camera's height above this water, in
