@@ -612,8 +612,10 @@ export class GlobalSDF {
       return buffer;
     }
     buffer?.dispose();
-    // Grow by half again so a slowly growing scene does not reallocate every frame
-    return getDevice().createBuffer(Math.max(256, Math.ceil(bytes * 1.5)), {
+    // Grow by half again so a slowly growing scene does not reallocate every
+    // frame, in whole vec4: a storage binding covers the whole buffer, and
+    // WebGPU wants its size a multiple of 4
+    return getDevice().createBuffer(Math.max(256, Math.ceil((bytes * 1.5) / 16) * 16), {
       usage: 'uniform',
       storage: true
     })!;
