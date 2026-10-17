@@ -620,7 +620,10 @@ const WATER_PROPERTY_LAYOUT: { group: string; open?: boolean; props: [string, st
       ['ShoreWaveFoamStrength', 'Breaking Foam'],
       ['ShoreWaveFoamCoverage', 'Breaking Coverage'],
       ['ShoreWaveShallowFoamStrength', 'Shallow Foam'],
-      ['ShoreWaveShallowFoamDepth', 'Shallow Depth']
+      ['ShoreWaveShallowFoamDepth', 'Shallow Depth'],
+      ['WallFoamStrength', 'Wall Foam'],
+      ['WallFoamMinSpeed', 'Wall Min Speed'],
+      ['WallFoamMaxSpeed', 'Wall Max Speed']
     ]
   },
 
@@ -1627,6 +1630,57 @@ export function getWaterClass(manager: ResourceManager): SerializableClass {
             },
             set(this: Water, value) {
               this.shoreWaveShallowFoamStrength = value.num[0];
+            }
+          },
+          {
+            name: 'WallFoamStrength',
+            description:
+              'How much foam the water throws up where it dashes against rocks, walls and piers standing in it: the harder the waves hit, the more foam piles against them and trails away. 0 for none. Needs the shore waves on.',
+            type: 'float',
+            default: 1,
+            options: { animatable: true, minValue: 0, maxValue: 5 },
+            isHidden(this: Water) {
+              return this.shoreWaveHeight <= 0;
+            },
+            get(this: Water, value) {
+              value.num[0] = this.wallFoamStrength;
+            },
+            set(this: Water, value) {
+              this.wallFoamStrength = value.num[0];
+            }
+          },
+          {
+            name: 'WallFoamMinSpeed',
+            description:
+              'How hard the water has to hit a wall before it foams there, in metres per second: raise it to keep calm water clean against rocks, lower it to fringe them with foam in a gentle swell.',
+            type: 'float',
+            default: 0.2,
+            options: { animatable: true, minValue: 0, maxValue: 5 },
+            isHidden(this: Water) {
+              return this.shoreWaveHeight <= 0;
+            },
+            get(this: Water, value) {
+              value.num[0] = this.wallFoamMinSpeed;
+            },
+            set(this: Water, value) {
+              this.wallFoamMinSpeed = value.num[0];
+            }
+          },
+          {
+            name: 'WallFoamMaxSpeed',
+            description:
+              'How hard the water has to hit a wall for the thickest foam, in metres per second: lower it for full white water against rocks in a moderate sea, raise it to keep that for a heavy one.',
+            type: 'float',
+            default: 1.5,
+            options: { animatable: true, minValue: 0.01, maxValue: 10 },
+            isHidden(this: Water) {
+              return this.shoreWaveHeight <= 0;
+            },
+            get(this: Water, value) {
+              value.num[0] = this.wallFoamMaxSpeed;
+            },
+            set(this: Water, value) {
+              this.wallFoamMaxSpeed = value.num[0];
             }
           },
           {

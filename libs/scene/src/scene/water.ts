@@ -9,6 +9,7 @@ import { Primitive } from '../render';
 import { Clipmap, FBMWaveGenerator } from '../render';
 import { setWaterSubmergence } from '../render/underwater';
 import { WaterMaterial } from '../material/water';
+import { ShaderHelper } from '../material/shader/helper';
 import {
   InteractiveWaveGenerator,
   type WaterBathymetry,
@@ -596,6 +597,27 @@ export class Water extends applyMixins(GraphNode, mixinDrawable) implements Draw
   }
   set shoreWaveShallowFoamStrength(val: number) {
     this.material.shoreWaveShallowFoamStrength = val;
+  }
+  /** How much foam the water makes dashing against walls, rocks and piers standing in it. */
+  get wallFoamStrength() {
+    return this.material.wallFoamStrength;
+  }
+  set wallFoamStrength(val: number) {
+    this.material.wallFoamStrength = val;
+  }
+  /** Speed in metres per second the water has to hit a wall at before it makes any foam there. */
+  get wallFoamMinSpeed() {
+    return this.material.wallFoamMinSpeed;
+  }
+  set wallFoamMinSpeed(val: number) {
+    this.material.wallFoamMinSpeed = val;
+  }
+  /** Speed in metres per second at which water hitting a wall makes the most foam. */
+  get wallFoamMaxSpeed() {
+    return this.material.wallFoamMaxSpeed;
+  }
+  set wallFoamMaxSpeed(val: number) {
+    this.material.wallFoamMaxSpeed = val;
   }
   /**
    * How the refracted view sample is located. Defaults to `march`.
@@ -1272,7 +1294,10 @@ export class Water extends applyMixins(GraphNode, mixinDrawable) implements Draw
         primitive.indexCount = points.length;
         const bindGroup = this._feedbackBindGroup.get()!;
         bindGroup.setValue('textureWidth', this._feedbackRenderTarget.get()!.getWidth());
-        waveGenerator?.applyWaterBindGroup(bindGroup);
+        if (waveGenerator) {
+          waveGenerator.applyWaterBindGroup(bindGroup);
+          ShaderHelper.setStandaloneCameraTime(bindGroup);
+        }
         device.pushDeviceStates();
         device.setProgram(this._feedbackProgram.get());
         device.setBindGroup(0, this._feedbackBindGroup.get()!);
@@ -1331,6 +1356,9 @@ export class Water extends applyMixins(GraphNode, mixinDrawable) implements Draw
         this.textureWidth = pb.float().uniform(0);
         if (waveGenerator) {
           waveGenerator.setupUniforms(this, 0);
+          // FBM and Gerstner animate from camera.elapsedTime, which a
+          // standalone program has to declare itself
+          ShaderHelper.declareStandaloneCameraTime(this, 0);
         }
         pb.main(function () {
           if (waveGenerator) {
@@ -1364,6 +1392,7 @@ export class Water extends applyMixins(GraphNode, mixinDrawable) implements Draw
         this.$outputs.worldNorm = pb.vec4();
         if (waveGenerator) {
           waveGenerator.setupUniforms(this, 0);
+          ShaderHelper.declareStandaloneCameraTime(this, 0);
         }
         pb.main(function () {
           this.$outputs.worldPos = pb.vec4(this.$inputs.worldPos, 1);

@@ -19,6 +19,7 @@ import type { Scene } from '../scene/scene';
 import { getDevice } from '../app/api';
 import { fetchSampler } from '../utility/misc';
 import { drawFullscreenQuad } from './fullscreenquad';
+import { ShaderHelper } from '../material/shader/helper';
 
 /**
  * How the interaction window is positioned in the world.
@@ -660,6 +661,9 @@ export function createWaterInteractionSurfaceShader(generator: WaveGenerator): P
     fragment(pb) {
       this.$outputs.outColor = pb.vec4();
       generator.setupUniforms(this, 0);
+      // FBM and Gerstner animate from camera.elapsedTime, which a standalone
+      // program has to declare itself
+      ShaderHelper.declareStandaloneCameraTime(this, 0);
       // (still water level, slots in use, 0, 0)
       this.wiSurfParams = pb.vec4().uniform(0);
       this.wiSurfCentres = pb.vec4[MAX_DISTURBERS]().uniform(0);
@@ -1406,6 +1410,7 @@ export class WaterInteraction extends Disposable {
     }
     const bindGroup = this._surfBindGroup!;
     ambient.applyWaterBindGroup(bindGroup);
+    ShaderHelper.setStandaloneCameraTime(bindGroup);
     this._surfParams.setXYZW(this._waterLevel, numDisturbers, 0, 0);
     bindGroup.setValue('wiSurfParams', this._surfParams);
     bindGroup.setValue('wiSurfCentres', this._surfCentres);

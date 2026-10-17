@@ -65,6 +65,11 @@ const AMP_SAMPLES_FULL = 4;
  * the beach stays dry. Run up to the crest height above the rest level, so
  * u0 = sqrt(2 g height); its up-and-back lasts 2 u0 / (g tan(beta)), at most
  * SWASH_DURATION_MAX wave periods, past which it is slowed to fit.
+ *
+ * The water in it moves at u = ds_f/dt + (2/3)(s - s_f) / t: the velocity of
+ * that solution, which follows from continuity alone, h_t + (u h)_s = 0 with
+ * h going as (s_f - s)^2 / t^2, whatever the constant in front. Up the beach
+ * behind the rising tip, back down all over once the tip turns: the backwash.
  */
 const SWASH_GRAVITY = 9.81;
 const SWASH_DURATION_MAX = 0.8;
@@ -87,6 +92,35 @@ const MIN_COMPRESSION = 0.15;
  */
 const SHELVING_MIN = 1.5;
 const SHELVING_FULL = 4;
+/**
+ * The foam is carried along a wall rather than into it, as by a free-slip
+ * boundary: within FOAM_SLIP_BAND metres of a waterline too steep for surf
+ * (rocks, cliffs, piers; as much as the waves fade out there, see
+ * SHELVING_MIN) the velocity loses the part of it heading into the land,
+ * fading out over that distance from the wall, so the foam piles up against
+ * the rock and is led round it into its lee. Not on a beach, which the water
+ * runs up.
+ */
+const FOAM_SLIP_BAND = 2;
+/**
+ * FOAM_WALL: foam the water makes dashing against a wall, by the trapped-air
+ * potential of Ihmsen, Akinci, Akinci & Teschner, "Unified Spray, Foam and
+ * Bubbles for Particle-Based Fluids" (CGI 2012), eq. (1)-(3) and (8). There a
+ * fluid particle traps air by its velocity relative to each neighbour, the
+ * more the more they close on each other: v_diff = sum |v_ij| (1 - v_ij . x_ij)
+ * W(x_ij, h), W = 1 - |x| / h, clamped to 0..1 by
+ * Phi(I, tmin, tmax) = (min(I, tmax) - min(I, tmin)) / (tmax - tmin), and
+ * foam made at a rate k I_k I_ta with I_k = Phi(E_k) of the kinetic energy.
+ * Here the neighbour is the wall, at rest, h = FOAM_SLIP_BAND from it along
+ * its normal n (out of the land): v_diff = (|v| - v . n) W, with v the
+ * surface water's own velocity, the time derivative of the wrapped
+ * generator's displacement of it (exact for a Lagrangian surface such as the
+ * FFT's and Gerstner's). Taking the wall as a neighbour at rest, the
+ * thresholds (the paper's are in the units of its particles) and the kinetic
+ * energy taken per unit mass over the same speeds are ours; so is weighting
+ * it by how steep the wall is, the complement of where the surf rolls in,
+ * which leaves a beach to the shallow water foam.
+ */
 /** Largest B anything here is worked out with, a bed at about 3 degrees. */
 const B_MAX = 20;
 /** Distance in metres out from the waterline over which the wrapped generator's chop dies away. */
@@ -180,6 +214,12 @@ export interface ShoreWaveSettings {
   shorelineFoamMaxDepth?: number;
   /** Scale of the foam shallow water makes (Crest's Shoreline Foam Strength). Defaults to 2. */
   shorelineFoamStrength?: number;
+  /** Scale of the foam the water makes dashing against walls, rocks and piers (see FOAM_WALL). Defaults to 1. */
+  wallFoamStrength?: number;
+  /** Impact speed in metres per second below which the water makes no foam against a wall. Defaults to 0.2. */
+  wallFoamMinSpeed?: number;
+  /** Impact speed in metres per second at and above which the water makes the most foam against a wall. Defaults to 1.5. */
+  wallFoamMaxSpeed?: number;
 }
 
 /**
@@ -218,6 +258,8 @@ export class ShoreWaveGenerator extends Disposable implements WaveGenerator, Foa
   private readonly _baseFoamSource: FoamFieldSource;
   /** (wave foam strength, wave foam coverage, shoreline foam strength, shoreline foam max depth) */
   private readonly _foamSourceParams: Vector4;
+  /** (wall foam strength, min impact speed, max impact speed, 0) */
+  private readonly _wallFoamParams: Vector4;
   /** The foam field step reads the shore waves under this key. @internal */
   readonly foamSourceKey: string;
   constructor(base: WaveGenerator, settings: ShoreWaveSettings, baseFoamSource: FoamFieldSource) {
@@ -233,6 +275,7 @@ export class ShoreWaveGenerator extends Disposable implements WaveGenerator, Foa
     this._wave = new Vector4(0, 1, 1, 0);
     this._shape = new Vector4(0, 0, 0, 0);
     this._foamSourceParams = new Vector4();
+    this._wallFoamParams = new Vector4();
   }
   /** The generator the shore waves are layered over. */
   get base() {
@@ -273,6 +316,8 @@ export class ShoreWaveGenerator extends Disposable implements WaveGenerator, Foa
     this._baseFoamSource.setupFoamSourceUniforms(scope);
     this.setupShoreUniforms(scope, 0);
     scope.swFoamSource = pb.vec4().uniform(0);
+    // (strength, min impact speed, max impact speed, 0)
+    scope.swWallFoam = pb.vec4().uniform(0);
   }
   /** @internal */
   applyFoamSourceBindGroup(bindGroup: BindGroup) {
@@ -286,11 +331,21 @@ export class ShoreWaveGenerator extends Disposable implements WaveGenerator, Foa
       Math.max(0.01, s.shorelineFoamMaxDepth ?? 0.65)
     );
     bindGroup.setValue('swFoamSource', this._foamSourceParams);
+    const minSpeed = Math.max(0, s.wallFoamMinSpeed ?? 0.2);
+    this._wallFoamParams.setXYZW(
+      Math.max(0, s.wallFoamStrength ?? 1),
+      minSpeed,
+      Math.max(minSpeed + 1e-3, s.wallFoamMaxSpeed ?? 1.5),
+      0
+    );
+    bindGroup.setValue('swWallFoam', this._wallFoamParams);
   }
   /**
    * The water's velocity under the shore waves and the foam they make this
    * step: from the waves where their displacement squeezes the water, and from
-   * shallow water, both prewarmed as Crest does; added to the open water's.
+   * shallow water, both prewarmed as Crest does, and from the water dashing
+   * against walls (see FOAM_WALL); added to the open water's. Keeps the
+   * wrapped generator's displacement in the field's state near walls.
    * @internal
    */
   calcFoamStep(
@@ -298,26 +353,33 @@ export class ShoreWaveGenerator extends Disposable implements WaveGenerator, Foa
     xz: PBShaderExp,
     dt: PBShaderExp,
     fadeRate: PBShaderExp,
-    prewarm: PBShaderExp
+    prewarm: PBShaderExp,
+    state: PBShaderExp
   ): PBShaderExp {
     const pb = scope.$builder;
     const that = this;
     pb.func(
       'swFoamStep',
-      [pb.vec2('xz'), pb.float('dt'), pb.float('fadeRate'), pb.bool('prewarm')],
+      [pb.vec2('xz'), pb.float('dt'), pb.float('fadeRate'), pb.bool('prewarm'), pb.vec4('state').inout()],
       function () {
         this.$l.baseStep = that._baseFoamSource.calcFoamStep(
           this,
           this.xz,
           this.dt,
           this.fadeRate,
-          this.prewarm
+          this.prewarm,
+          this.state
         );
         this.$l.waveStrength = this.swFoamSource.x;
         this.$l.dir = pb.vec4(0);
         this.$l.spacing = pb.float(0);
         this.$l.sw = that.evaluate(this, this.xz, this.dir, this.spacing);
-        this.$l.velocity = that.foamVelocity(this, this.sw.x, this.dir.xy, this.spacing);
+        this.$l.wall = that.wall(this, this.xz);
+        this.$l.velocity = that.slip(
+          this,
+          this.wall,
+          pb.add(this.baseStep.xy, pb.mul(this.dir.xy, this.sw.w))
+        );
         this.$l.waveDt = this.$choice(
           this.prewarm,
           pb.max(this.dt, pb.div(pb.min(1, pb.sub(this.waveStrength, 1)), this.fadeRate)),
@@ -358,45 +420,132 @@ export class ShoreWaveGenerator extends Disposable implements WaveGenerator, Foa
             });
           }
         );
-        this.$return(pb.add(this.baseStep, pb.vec3(this.velocity, this.foam)));
+        // Foam from the water dashing against a wall: the trapped-air
+        // potential against the wall at rest, by the surface water's velocity,
+        // the change of its displacement since the state was written
+        this.$l.wallW = this.$choice(
+          pb.greaterThan(this.wall.z, 0),
+          pb.mul(this.wall.w, pb.max(0, pb.sub(1, pb.div(this.wall.z, FOAM_SLIP_BAND)))),
+          pb.float(0)
+        );
+        this.$if(pb.greaterThan(this.wallW, 0), function () {
+          this.$l.restPos = pb.vec3(this.xz.x, this.swGrid.w, this.xz.y);
+          this.$l.wavePos = pb.vec3(0);
+          this.$l.waveNormal = pb.vec3(0, 1, 0);
+          that._base.calcVertexPositionAndNormal(this, this.restPos, this.wavePos, this.waveNormal);
+          this.$l.disp = pb.sub(this.wavePos, this.restPos);
+          this.$if(pb.greaterThan(this.state.w, 0), function () {
+            this.$l.v = pb.div(pb.sub(this.disp, this.state.xyz), this.state.w);
+            this.$l.speed = pb.length(this.v);
+            // |v| (1 - v^ . n) W, with W = 1 - d / h folded into wallW but for the steepness
+            this.$l.vDiff = pb.mul(
+              pb.sub(this.speed, pb.dot(this.v, pb.vec3(this.wall.x, 0, this.wall.y))),
+              pb.max(0, pb.sub(1, pb.div(this.wall.z, FOAM_SLIP_BAND)))
+            );
+            this.$l.tMin = this.swWallFoam.y;
+            this.$l.tMax = this.swWallFoam.z;
+            this.$l.trapped = pb.div(
+              pb.sub(pb.min(this.vDiff, this.tMax), pb.min(this.vDiff, this.tMin)),
+              pb.sub(this.tMax, this.tMin)
+            );
+            this.$l.energy = pb.mul(this.speed, this.speed, 0.5);
+            this.$l.eMin = pb.mul(this.tMin, this.tMin, 0.5);
+            this.$l.eMax = pb.mul(this.tMax, this.tMax, 0.5);
+            this.$l.kinetic = pb.div(
+              pb.sub(pb.min(this.energy, this.eMax), pb.min(this.energy, this.eMin)),
+              pb.max(pb.sub(this.eMax, this.eMin), 1e-6)
+            );
+            this.foam = pb.add(
+              this.foam,
+              pb.mul(FOAM_WAVE_GAIN, this.swWallFoam.x, this.kinetic, this.trapped, this.wall.w, this.dt)
+            );
+          });
+          this.state = pb.vec4(this.disp, this.state.w);
+        });
+        this.$return(pb.vec3(this.velocity, pb.add(this.baseStep.z, this.foam)));
       }
     );
-    return scope.swFoamStep(xz, dt, fadeRate, prewarm) as PBShaderExp;
+    return scope.swFoamStep(xz, dt, fadeRate, prewarm, state) as PBShaderExp;
   }
   /**
-   * The shore waves' share of the velocity carrying the foam, at an
-   * undisplaced XZ in the water's shaders. See {@link foamVelocity}.
+   * The velocity carrying the foam at an undisplaced XZ in the water's
+   * shaders: the drift it is given plus the shore waves' water, led along the
+   * walls. The same as the foam field's step moves it by.
    * @internal
    */
-  calcFoamFlow(scope: PBInsideFunctionScope, xz: PBShaderExp): PBShaderExp {
+  calcFoamFlow(scope: PBInsideFunctionScope, xz: PBShaderExp, drift: PBShaderExp): PBShaderExp {
     const pb = scope.$builder;
     const that = this;
-    pb.func('swFoamFlow', [pb.vec2('xz')], function () {
+    pb.func('swFoamFlow', [pb.vec2('xz'), pb.vec2('drift')], function () {
       this.$l.dir = pb.vec4(0);
       this.$l.spacing = pb.float(0);
       this.$l.sw = that.evaluate(this, this.xz, this.dir, this.spacing);
-      this.$return(that.foamVelocity(this, this.sw.x, this.dir.xy, this.spacing));
+      this.$return(
+        that.slip(this, that.wall(this, this.xz), pb.add(this.drift, pb.mul(this.dir.xy, this.sw.w)))
+      );
     });
-    return scope.swFoamFlow(xz) as PBShaderExp;
+    return scope.swFoamFlow(xz, drift) as PBShaderExp;
   }
   /**
-   * Velocity of the water carrying the foam. Crest advects its foam by its
-   * flow simulation, which the shore waves do not have; in its place the
-   * water's velocity under a long wave, u = g eta / c with c the speed of the
-   * crests (crest spacing per period), towards the shore: the water under a
-   * crest surges shoreward with it and is still in the trough behind, so the
-   * foam is carried in with the breaking crest and left behind as it passes.
+   * The wall at an undisplaced XZ, from the waterline field: (normal out of
+   * the land x, z, distance to the waterline, how much of a wall the
+   * waterline is, 0 on a beach the surf rolls up and off the field). The
+   * normal is only worked out within FOAM_SLIP_BAND of a wall, else 0.
    * @internal
    */
-  private foamVelocity(
-    scope: PBInsideFunctionScope,
-    height: PBShaderExp,
-    dir: PBShaderExp,
-    spacing: PBShaderExp
-  ) {
+  private wall(scope: PBInsideFunctionScope, xz: PBShaderExp): PBShaderExp {
     const pb = scope.$builder;
-    const c = pb.max(pb.div(spacing, scope.swShape.w), 0.1);
-    return pb.mul(dir, pb.clamp(pb.div(pb.mul(SWASH_GRAVITY, height), c), 0, c));
+    pb.func('swWall', [pb.vec2('xz')], function () {
+      this.$l.uv = pb.mul(pb.sub(this.xz, this.swGrid.xy), this.swGrid.z);
+      this.$if(
+        pb.or(
+          pb.lessThanEqual(this.swGrid.z, 0),
+          pb.or(pb.any(pb.lessThan(this.uv, pb.vec2(0))), pb.any(pb.greaterThan(this.uv, pb.vec2(1))))
+        ),
+        function () {
+          this.$return(pb.vec4(0, 0, 1e4, 0));
+        }
+      );
+      this.$l.wl = pb.textureSampleLevel(this.swWaterline, this.uv, 0);
+      // The complement of the shelving the surf rolls in on
+      this.$l.steep = pb.sub(1, pb.smoothStep(SHELVING_MIN, SHELVING_FULL, this.wl.y));
+      this.$if(
+        pb.or(pb.lessThanEqual(this.steep, 0), pb.greaterThanEqual(this.wl.x, FOAM_SLIP_BAND)),
+        function () {
+          this.$return(pb.vec4(0, 0, this.wl.x, this.steep));
+        }
+      );
+      // Out of the land: up the gradient of the distance to the waterline
+      this.$l.c = this.swGrid.z;
+      this.$l.g = pb.vec2(
+        pb.sub(
+          pb.textureSampleLevel(this.swWaterline, pb.add(this.uv, pb.vec2(this.c, 0)), 0).x,
+          pb.textureSampleLevel(this.swWaterline, pb.sub(this.uv, pb.vec2(this.c, 0)), 0).x
+        ),
+        pb.sub(
+          pb.textureSampleLevel(this.swWaterline, pb.add(this.uv, pb.vec2(0, this.c)), 0).x,
+          pb.textureSampleLevel(this.swWaterline, pb.sub(this.uv, pb.vec2(0, this.c)), 0).x
+        )
+      );
+      this.$return(pb.vec4(pb.div(this.g, pb.max(pb.length(this.g), 1e-5)), this.wl.x, this.steep));
+    });
+    return scope.swWall(xz) as PBShaderExp;
+  }
+  /**
+   * A velocity with the part heading into a wall taken out, near a waterline
+   * too steep for surf, given the wall there (see {@link wall}). See
+   * FOAM_SLIP_BAND.
+   * @internal
+   */
+  private slip(scope: PBInsideFunctionScope, wall: PBShaderExp, v: PBShaderExp): PBShaderExp {
+    const pb = scope.$builder;
+    pb.func('swFoamSlip', [pb.vec4('wall'), pb.vec2('v')], function () {
+      this.$l.weight = pb.mul(this.wall.w, pb.sub(1, pb.smoothStep(0, FOAM_SLIP_BAND, this.wall.z)));
+      this.$return(
+        pb.sub(this.v, pb.mul(this.wall.xy, pb.min(pb.dot(this.v, this.wall.xy), 0), this.weight))
+      );
+    });
+    return scope.swFoamSlip(wall, v) as PBShaderExp;
   }
   clone() {
     return new ShoreWaveGenerator(this._base.clone(), { ...this._settings }, this._baseFoamSource) as this;
@@ -432,7 +581,9 @@ export class ShoreWaveGenerator extends Disposable implements WaveGenerator, Foa
   /**
    * Shore wave at an undisplaced world XZ, at a wave clock (time over period):
    * (height over the rest level, slope of the height along the distance to
-   * the shore, determinant of the Jacobian of the displacement, 0).
+   * the shore, determinant of the Jacobian of the displacement, speed of the
+   * water carrying the foam towards the shore in metres per second, negative
+   * in the backwash).
    * Out parameters: `dir` (direction to the shore xy, weight of the wrapped
    * generator's chop dying near the shore z, bed height the surface is held
    * over w, far below the water where it is not) and `spacing`, the distance
@@ -663,6 +814,19 @@ export class ShoreWaveGenerator extends Disposable implements WaveGenerator, Foa
           this.wl.z,
           pb.float(-1e4)
         );
+        // Speed along the way in of the water carrying the foam. Crest advects its
+        // foam by its flow simulation, which the shore waves do not have; in its
+        // place the water's velocity under a long wave, u = g eta / c with c the
+        // speed of the crests (crest spacing per period), towards the shore: the
+        // water under a crest surges shoreward with it and is still in the
+        // trough behind, so the foam is carried in with the breaking crest and
+        // left behind as it passes
+        this.$l.crestSpeed = pb.max(pb.div(this.spacing, this.swShape.w), 0.1);
+        this.$l.flow = pb.clamp(
+          pb.div(pb.mul(SWASH_GRAVITY, this.height), this.crestSpeed),
+          0,
+          this.crestSpeed
+        );
         // Inland: the swash, in wave periods since its crest reached the waterline
         // (X, the phase there being frozen at its waterline value), instead of
         // the water level rising and falling flat across the beach, which on a
@@ -699,13 +863,27 @@ export class ShoreWaveGenerator extends Disposable implements WaveGenerator, Foa
             pb.add(this.wl.z, this.depth),
             pb.sub(this.wl.z, 1)
           );
+          // Its water's velocity, u = ds_f/dt + (2/3)(s - s_f) / t, in metres per
+          // second: t is tt durations of periods
+          this.$l.seconds = pb.mul(this.duration, this.swShape.w);
+          this.flow = this.$choice(
+            pb.and(pb.greaterThan(this.behind, 0), pb.lessThan(this.tt, 1)),
+            pb.div(
+              pb.sub(
+                pb.mul(4, this.runUpH, pb.sub(1, pb.mul(2, this.tt))),
+                pb.div(pb.mul(this.behind, 2 / 3), pb.max(this.tt, 1e-3))
+              ),
+              this.seconds
+            ),
+            pb.float(0)
+          );
           // The crest collapsing at the waterline
           this.$l.collapse = pb.mul(this.height, pb.exp(pb.div(pb.neg(this.s), SWASH_COLLAPSE)));
           this.height = pb.max(this.swash, this.collapse);
           // The swash runs up as a sheet, not squeezed
           this.det = pb.float(1);
         });
-        this.$return(pb.vec4(this.height, this.slope, this.det, 0));
+        this.$return(pb.vec4(this.height, this.slope, this.det, this.flow));
       }
     );
     return scope.swEvaluate(xz, dir, spacing, tPhase ?? scope.swWave.w, cell ?? pb.float(0)) as PBShaderExp;

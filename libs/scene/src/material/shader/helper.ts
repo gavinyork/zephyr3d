@@ -1988,12 +1988,13 @@ export class ShaderHelper {
    * would animate out of step with the surface they are refracted through.
    *
    * @param bindGroup - Bind group of the standalone program.
-   * @param ctx - Current draw context.
+   * @param ctx - Current draw context; the current device when omitted, for
+   *   a program run outside drawing.
    * @internal
    */
-  static setStandaloneCameraTime(bindGroup: BindGroup, ctx: DrawContext) {
+  static setStandaloneCameraTime(bindGroup: BindGroup, ctx?: DrawContext) {
     bindGroup.setValue('camera', {
-      elapsedTime: ctx.device.frameInfo.elapsedOverall * 0.001,
+      elapsedTime: (ctx?.device ?? getDevice()).frameInfo.elapsedOverall * 0.001,
       _pad0: 0,
       _pad1: 0,
       _pad2: 0

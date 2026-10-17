@@ -217,7 +217,10 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
     waveFoamStrength: 1,
     waveFoamCoverage: 0.55,
     shorelineFoamMaxDepth: 0.65,
-    shorelineFoamStrength: 2
+    shorelineFoamStrength: 2,
+    wallFoamStrength: 1,
+    wallFoamMinSpeed: 0.2,
+    wallFoamMaxSpeed: 1.5
   };
   /** The shore wave layer of the effective generator, while the waves are on. */
   private _shoreWaveGenerator: Nullable<ShoreWaveGenerator> = null;
@@ -2425,6 +2428,27 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
   }
   set shoreWaveShallowFoamStrength(val: number) {
     this._shoreWaves.shorelineFoamStrength = Math.max(0, val);
+  }
+  /** How much foam the water makes dashing against walls, rocks and piers standing in it. */
+  get wallFoamStrength() {
+    return this._shoreWaves.wallFoamStrength!;
+  }
+  set wallFoamStrength(val: number) {
+    this._shoreWaves.wallFoamStrength = Math.max(0, val);
+  }
+  /** Speed in metres per second the water has to hit a wall at before it makes any foam there. */
+  get wallFoamMinSpeed() {
+    return this._shoreWaves.wallFoamMinSpeed!;
+  }
+  set wallFoamMinSpeed(val: number) {
+    this._shoreWaves.wallFoamMinSpeed = Math.max(0, val);
+  }
+  /** Speed in metres per second at which water hitting a wall makes the most foam. */
+  get wallFoamMaxSpeed() {
+    return this._shoreWaves.wallFoamMaxSpeed!;
+  }
+  set wallFoamMaxSpeed(val: number) {
+    this._shoreWaves.wallFoamMaxSpeed = Math.max(0.01, val);
   }
   /**
    * Hands the shore waves this frame's waterline field, or null when there is
