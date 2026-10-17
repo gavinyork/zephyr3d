@@ -914,8 +914,9 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
   /**
    * Texture the foam is cut from, its value in the red channel: the foam
    * density uncovers it from its brightest parts down, so bright clumps show
-   * first and dark holes last. Null for plain white, a soft coverage with no
-   * pattern. Tiles every {@link foamTextureSize} metres.
+   * first and dark holes last. Null for the built-in bubble pattern (see
+   * getDefaultFoamTexture), which reads as a texture of one's own would.
+   * Tiles every {@link foamTextureSize} metres.
    */
   get foamTexture(): Nullable<Texture2D> {
     return this._foamTexture.get() ?? null;

@@ -1341,7 +1341,7 @@ export function getWaterClass(manager: ResourceManager): SerializableClass {
           {
             name: 'FoamTexture',
             description:
-              'Pattern the foam is cut from (red channel): as the foam thickens it shows the bright parts of the texture first and fills the dark ones last, so bright clumps appear before dark holes close. Empty for plain white foam that simply fades in and out with no pattern. Shared by all foam.',
+              'Pattern the foam is cut from (red channel): as the foam thickens it shows the bright parts of the texture first and fills the dark ones last, so bright clumps appear before dark holes close. Empty for the built-in bubble pattern, which thickens as any foam texture does, so the same settings look alike with or without one. Shared by all foam.',
             type: 'object',
             default: '',
             options: {
