@@ -1574,6 +1574,9 @@ export class WaterInteraction extends Disposable {
 export class InteractiveWaveGenerator extends Disposable implements WaveGenerator {
   private readonly _base: WaveGenerator;
   private readonly _interaction: WaterInteraction;
+  calcPrevVertexPosition?: WaveGenerator['calcPrevVertexPosition'];
+  calcSurfaceCoverage?: WaveGenerator['calcSurfaceCoverage'];
+  calcSheetThickness?: WaveGenerator['calcSheetThickness'];
   constructor(
     base: WaveGenerator,
     interaction: WaterInteraction,
@@ -1582,6 +1585,37 @@ export class InteractiveWaveGenerator extends Disposable implements WaveGenerato
     super();
     this._base = base;
     this._interaction = interaction;
+    // The water's edge on the beach and its thickness there are the wrapped
+    // generator's: the field is still water on dry land and dies out over the
+    // last centimetres of depth, so it does not move that edge
+    if (base.calcSurfaceCoverage) {
+      this.calcSurfaceCoverage = base.calcSurfaceCoverage.bind(base);
+    }
+    if (base.calcSheetThickness) {
+      this.calcSheetThickness = base.calcSheetThickness.bind(base);
+    }
+    if (base.calcPrevVertexPosition) {
+      this.calcPrevVertexPosition = this.prevVertexPosition;
+    }
+  }
+  /**
+   * The wrapped generator's previous position with the field's height of now
+   * on it: the field keeps no height per frame, and its ripples are slow
+   * against the temporal filter.
+   */
+  private prevVertexPosition(
+    scope: PBInsideFunctionScope,
+    inPos: PBShaderExp,
+    outPos: PBShaderExp,
+    vertexSpacing?: PBShaderExp
+  ) {
+    const pb = scope.$builder;
+    const that = this;
+    pb.func('wiCalcPrevPosition', [pb.vec3('inPos'), pb.vec3('outPos').out(), pb.float('cell')], function () {
+      that._base.calcPrevVertexPosition!(this, this.inPos, this.outPos, this.cell);
+      this.outPos = pb.add(this.outPos, pb.vec3(0, that._interaction.sampleHeight(this, this.inPos.xz), 0));
+    });
+    scope.wiCalcPrevPosition(inPos, outPos, vertexSpacing ?? pb.float(0));
   }
   /** The generator supplying the ambient surface. */
   get base() {
@@ -1609,22 +1643,23 @@ export class InteractiveWaveGenerator extends Disposable implements WaveGenerato
     scope: PBInsideFunctionScope,
     inPos: PBShaderExp,
     outPos: PBShaderExp,
-    outNormal: PBShaderExp
+    outNormal: PBShaderExp,
+    vertexSpacing?: PBShaderExp
   ) {
     const pb = scope.$builder;
     const that = this;
     pb.func(
       'wiCalcPositionAndNormal',
-      [pb.vec3('inPos'), pb.vec3('outPos').out(), pb.vec3('outNormal').out()],
+      [pb.vec3('inPos'), pb.vec3('outPos').out(), pb.vec3('outNormal').out(), pb.float('cell')],
       function () {
-        that._base.calcVertexPositionAndNormal(this, this.inPos, this.outPos, this.outNormal);
+        that._base.calcVertexPositionAndNormal(this, this.inPos, this.outPos, this.outNormal, this.cell);
         // Sampled at the undisplaced position, which is also where the fragment
         // stage samples it, so the vertex height and the fragment slope agree.
         this.$l.h = that._interaction.sampleHeight(this, this.inPos.xz);
         this.outPos = pb.add(this.outPos, pb.vec3(0, this.h, 0));
       }
     );
-    scope.wiCalcPositionAndNormal(inPos, outPos, outNormal);
+    scope.wiCalcPositionAndNormal(inPos, outPos, outNormal, vertexSpacing ?? pb.float(0));
   }
   calcFragmentNormal(scope: PBInsideFunctionScope, xz: PBShaderExp, vertexNormal: PBShaderExp): PBShaderExp {
     const pb = scope.$builder;

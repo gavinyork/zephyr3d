@@ -452,8 +452,8 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
     this._interactiveWaveGenerator = null;
     let effective: Nullable<WaveGenerator> = null;
     if (base) {
-      // Innermost the foam field, whose foam the interaction field and the
-      // shore waves compose theirs over
+      // Innermost the foam field, whose foam the shore waves and the
+      // interaction field compose theirs over
       const that = this;
       this._foamFieldGenerator = new FoamFieldWaveGenerator(base, this._foamField, {
         getFoamTexture: () => that.foamTexture,
@@ -462,16 +462,19 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
       effective = this._foamFieldGenerator;
       this._foamSource = new WaveFoamSource(base, this._foamField);
     }
-    if (effective && interaction && interaction.isOk()) {
-      effective = new InteractiveWaveGenerator(effective, interaction);
-      this._interactiveWaveGenerator = effective as InteractiveWaveGenerator;
-      interaction.ensureResources();
-    }
     if (effective && this._shoreWaves.height > 0) {
       this._shoreWaveGenerator = new ShoreWaveGenerator(effective, this._shoreWaves, this._foamSource!);
       this._foamFieldGenerator!.flowSource = this._shoreWaveGenerator;
       this._foamSource = this._shoreWaveGenerator;
       effective = this._shoreWaveGenerator;
+    }
+    // Outermost the interaction field: its ripples ride the shore waves rather
+    // than being faded with the open water's chop near the shore, and a query
+    // of the surface without the disturbers finds it on top to rebuild
+    if (effective && interaction && interaction.isOk()) {
+      effective = new InteractiveWaveGenerator(effective, interaction);
+      this._interactiveWaveGenerator = effective as InteractiveWaveGenerator;
+      interaction.ensureResources();
     }
     this._effectiveWaveGenerator = effective;
     // Bind groups are pooled; a stale version must not suppress the upload.
