@@ -502,21 +502,19 @@ export class ShoreWaveGenerator extends Disposable implements WaveGenerator, Foa
     return scope.swFoamStep(xz, dt, fadeRate, prewarm, state) as PBShaderExp;
   }
   /**
-   * The velocity carrying the foam at an undisplaced XZ in the water's
-   * shaders: the drift it is given plus the shore waves' water, led along the
-   * walls. The same as the foam field's step moves it by.
+   * The velocity the foam texture slides with at an undisplaced XZ in the
+   * water's shaders: the drift it is given, led along the walls.
    * @internal
    */
   calcFoamFlow(scope: PBInsideFunctionScope, xz: PBShaderExp, drift: PBShaderExp): PBShaderExp {
     const pb = scope.$builder;
     const that = this;
     pb.func('swFoamFlow', [pb.vec2('xz'), pb.vec2('drift')], function () {
-      this.$l.dir = pb.vec4(0);
-      this.$l.spacing = pb.float(0);
-      this.$l.sw = that.evaluate(this, this.xz, this.dir, this.spacing);
-      this.$return(
-        that.slip(this, that.wall(this, this.xz), pb.add(this.drift, pb.mul(this.dir.xy, this.sw.w)))
-      );
+      // The drift only, not the waves' water: flow mapping (Vlachos, "Water Flow
+      // in Portal 2", SIGGRAPH 2010) needs a smooth, slowly varying flow, as
+      // Crest's currents are, and the surge and swash jump at the waterline and
+      // shear along the beach. The field still carries the foam with the waves.
+      this.$return(that.slip(this, that.wall(this, this.xz), this.drift));
     });
     return scope.swFoamFlow(xz, drift) as PBShaderExp;
   }
