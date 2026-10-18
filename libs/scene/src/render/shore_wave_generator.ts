@@ -403,7 +403,11 @@ export class ShoreWaveGenerator extends Disposable implements WaveGenerator, Foa
           this.waveStrength,
           pb.clamp(pb.sub(this.swFoamSource.y, this.sw.z), 0, 1)
         );
-        // Foam from shallow water, by the depth under the displaced surface.
+        // Foam from shallow water, by the depth under the displaced surface, as
+        // Crest makes it, scaled by the kinetic-energy potential of Ihmsen et al.
+        // (eq. (8), I_k = Phi(E_k)) of the water's speed under the shore waves,
+        // per unit mass between the wall foam's speeds: made while a crest surges
+        // in or the swash runs, not where the water lies still or has drained.
         // Only where there is water (unlike Crest, which feeds dry land the swash
         // would later run over), only on the waterline field, and faded towards
         // its edge as the waves are
@@ -425,11 +429,19 @@ export class ShoreWaveGenerator extends Disposable implements WaveGenerator, Foa
             );
             this.shoreDt = pb.mul(this.shoreDt, pb.smoothStep(0, GRID_EDGE_FADE, this.gridEdge));
             this.$if(pb.greaterThan(this.depth, 0), function () {
+              this.$l.shoreEnergy = pb.mul(this.sw.w, this.sw.w, 0.5);
+              this.$l.shoreEMin = pb.mul(this.swWallFoam.y, this.swWallFoam.y, 0.5);
+              this.$l.shoreEMax = pb.mul(this.swWallFoam.z, this.swWallFoam.z, 0.5);
+              this.$l.shoreKinetic = pb.div(
+                pb.sub(pb.min(this.shoreEnergy, this.shoreEMax), pb.min(this.shoreEnergy, this.shoreEMin)),
+                pb.max(pb.sub(this.shoreEMax, this.shoreEMin), 1e-6)
+              );
               this.foam = pb.add(
                 this.foam,
                 pb.mul(
                   this.swFoamSource.z,
                   this.shoreDt,
+                  this.shoreKinetic,
                   pb.clamp(pb.sub(1, pb.div(this.depth, this.swFoamSource.w)), 0, 1)
                 )
               );
