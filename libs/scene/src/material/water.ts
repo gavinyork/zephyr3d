@@ -19,6 +19,7 @@ import type { Nullable } from '@zephyr3d/base';
 import { DRef, Vector3, Vector4 } from '@zephyr3d/base';
 import { screenSpaceRayTracing_HiZ, screenSpaceRayTracing_Linear2D } from '../shaders/ssr';
 import { fetchSampler } from '../utility/misc';
+import { PHYSICAL_BAKE_EXPOSURE } from '../utility/physical';
 import { mixinLight } from './mixins/lit';
 import { distributionGGX, fresnelSchlick, visGGX } from '../shaders/pbr';
 import { waterScatterPhase } from '../shaders/water_medium';
@@ -122,6 +123,16 @@ const WATER_F0 = 0.02;
 const WATER_BASE_ROUGHNESS = 0.04;
 /** Specular roughness once distance has flattened the wave normals. */
 const WATER_DISTANT_ROUGHNESS = 0.35;
+/**
+ * Slope variance of a wind-driven sea for the mean Fresnel of the slopes
+ * distance flattens out of the normals, from the clean-surface fit of Cox &
+ * Munk, "Measurement of the roughness of the sea surface from photographs of
+ * the sun's glitter" (JOSA 44(11), 1954): upwind sigma_u^2 = 3.16e-3 U and
+ * crosswind sigma_c^2 = 0.003 + 1.92e-3 U, U the wind speed in m/s.
+ */
+const COX_MUNK_UPWIND = 3.16e-3;
+const COX_MUNK_CROSSWIND_BASE = 0.003;
+const COX_MUNK_CROSSWIND = 1.92e-3;
 /**
  * Roughness over which the sky reflection hands over from the sharp baked sky
  * to the environment's GGX-prefiltered radiance map, as Crest picks its
@@ -268,6 +279,8 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
   private readonly _clipmapGridInfo: Vector4;
   private _skirtDistance: number;
   private readonly _ssrParams: Vector4;
+  /** (wind direction x, z, Cox-Munk upwind slope variance, crosswind slope variance) */
+  private readonly _unresolvedSlope: Vector4;
   /** sigma_a, 1/m, per RGB channel. */
   private readonly _absorption: Vector3;
   /** sigma_s, 1/m, per RGB channel. */
@@ -337,6 +350,7 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
     this._effectiveWaveGenerator = null;
     this._waveVersionByBindGroup = new WeakMap();
     this._ssrParams = new Vector4(1000, 160, 0.5, 2);
+    this._unresolvedSlope = new Vector4();
     this._refractionScale = 1;
     this._reflectionStrength = 1;
     this._causticsEnabled = true;
@@ -1170,6 +1184,10 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
         scope.cheapRefractionDepth = pb.float().uniform(2);
       }
       scope.reflectionStrength = pb.float().uniform(2);
+      // (wind direction x, z, upwind slope variance, crosswind slope variance)
+      scope.unresolvedSlope = pb.vec4().uniform(2);
+      // Sky bake to the live pre-exposed space, as the visible sky is drawn
+      scope.skyReflectScale = pb.float().uniform(2);
       scope.ssrParams = pb.vec4().uniform(2);
       // Eye vs. rest plane from the CPU submersion test: 1 above, -1 below,
       // 0 unknown (compare in the shader).
@@ -1711,32 +1729,49 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
         )
       );
     });
-    pb.func('fresnel', [pb.vec3('normal'), pb.vec3('eyeVec'), pb.bool('underwater')], function () {
-      // abs, not clamp: a folded crest flips the sign inside one wave, and a
-      // clamp would drop to F0 exactly at the most grazing geometry.
-      this.$l.NoV = pb.clamp(pb.abs(pb.dot(this.normal, this.eyeVec)), 0, 1);
-      this.$if(this.underwater, function () {
-        this.$l.sinT2 = pb.mul(WATER_TO_AIR_ETA * WATER_TO_AIR_ETA, pb.sub(1, pb.mul(this.NoV, this.NoV)));
-        // Total internal reflection outside the Snell window. Not scaled by
-        // reflectionStrength: there is no transmitted ray to reveal.
-        this.$l.f = pb.float(1);
-        this.$if(pb.lessThan(this.sinT2, 1), function () {
-          // Schlick takes the cosine on the less dense side. F0 is symmetric.
-          this.$l.cosT = pb.sqrt(pb.max(pb.sub(1, this.sinT2), 0));
-          this.f = pb.clamp(
-            pb.mul(
-              pb.add(WATER_F0, pb.mul(1 - WATER_F0, pb.pow(pb.sub(1, this.cosT), 5))),
-              this.reflectionStrength
-            ),
-            0,
-            1
-          );
-        });
-        this.$return(this.f);
-      });
-      this.$l.f = pb.add(WATER_F0, pb.mul(1 - WATER_F0, pb.pow(pb.sub(1, this.NoV), 5)));
-      this.$return(pb.clamp(pb.mul(this.f, this.reflectionStrength), 0, 1));
+    // Mean Fresnel over a Gaussian distribution of unresolved slopes of standard
+    // deviation `sigmaV` along the view direction, Bruneton, Neyret & Holzschuch,
+    // "Real-time Realistic Ocean Lighting using Seamless Transitions from Geometry
+    // to BRDF" (Eurographics 2010), as their ocean demo fits it:
+    // (1 - cos)^(5 exp(-2.69 sigma)) / (1 + 22.7 sigma^1.5), Schlick at sigma = 0.
+    pb.func('meanFresnel', [pb.float('cosThetaV'), pb.float('sigmaV')], function () {
+      this.$return(
+        pb.div(
+          pb.pow(pb.sub(1, this.cosThetaV), pb.mul(5, pb.exp(pb.mul(-2.69, this.sigmaV)))),
+          pb.add(1, pb.mul(22.7, pb.pow(this.sigmaV, 1.5)))
+        )
+      );
     });
+    pb.func(
+      'fresnel',
+      [pb.vec3('normal'), pb.vec3('eyeVec'), pb.bool('underwater'), pb.float('sigmaV')],
+      function () {
+        // abs, not clamp: a folded crest flips the sign inside one wave, and a
+        // clamp would drop to F0 exactly at the most grazing geometry.
+        this.$l.NoV = pb.clamp(pb.abs(pb.dot(this.normal, this.eyeVec)), 0, 1);
+        this.$if(this.underwater, function () {
+          this.$l.sinT2 = pb.mul(WATER_TO_AIR_ETA * WATER_TO_AIR_ETA, pb.sub(1, pb.mul(this.NoV, this.NoV)));
+          // Total internal reflection outside the Snell window. Not scaled by
+          // reflectionStrength: there is no transmitted ray to reveal.
+          this.$l.f = pb.float(1);
+          this.$if(pb.lessThan(this.sinT2, 1), function () {
+            // Schlick takes the cosine on the less dense side. F0 is symmetric.
+            this.$l.cosT = pb.sqrt(pb.max(pb.sub(1, this.sinT2), 0));
+            this.f = pb.clamp(
+              pb.mul(
+                pb.add(WATER_F0, pb.mul(1 - WATER_F0, pb.pow(pb.sub(1, this.cosT), 5))),
+                this.reflectionStrength
+              ),
+              0,
+              1
+            );
+          });
+          this.$return(this.f);
+        });
+        this.$l.f = pb.add(WATER_F0, pb.mul(1 - WATER_F0, this.meanFresnel(this.NoV, this.sigmaV)));
+        this.$return(pb.clamp(pb.mul(this.f, this.reflectionStrength), 0, 1));
+      }
+    );
     pb.func(
       'lightSpecular',
       [
@@ -1901,8 +1936,13 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
         }).$else(function () {
           this.refl.y = pb.max(this.refl.y, HORIZON_REFLECT_BIAS);
           this.refl = pb.normalize(this.refl);
-          // Pre-exposed to match the scene colour it is blended against.
-          this.reflMiss = ShaderHelper.sampleBakedSkyPreExposed(this, this.refl);
+          // The mirror image of the visible sky, at its on-screen scale: the bake
+          // brought to the live exposure without the environment light's
+          // strength, which dims the IBL and not the sky itself.
+          this.reflMiss = pb.mul(
+            pb.textureSampleLevel(ShaderHelper.getBakedSkyTexture(this), this.refl, 0).rgb,
+            this.skyReflectScale
+          );
           if (envLight?.hasRadiance()) {
             // Blurred as the distant normals are: the prefiltered radiance at
             // the surface's roughness, in the same pre-exposed space
@@ -1910,10 +1950,7 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
             this.$if(pb.greaterThan(this.skyBlur, 0), function () {
               this.reflMiss = pb.mix(
                 this.reflMiss,
-                pb.mul(
-                  envLight.getRadiance(this, this.refl, this.roughness)!.rgb,
-                  ShaderHelper.getEnvLightStrength(this)
-                ),
+                pb.mul(envLight.getRadiance(this, this.refl, this.roughness)!.rgb, this.skyReflectScale),
                 this.skyBlur
               );
             });
@@ -1986,7 +2023,30 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
         this.$l.refractionRaw = this.refraction;
         this.$l.absorption = this.getAbsorption(this.mediumPath);
         this.refraction = pb.mul(this.refraction, this.absorption);
-        this.$l.fresnelTerm = this.fresnel(this.shadingNormal, pb.neg(this.eyeVecNorm), this.underwaterEye);
+        // Variance of the slopes the flattened normal no longer shows, (1 - k^2)
+        // of the sea's for a slope scaled by k, along the view direction in wind
+        // space as Bruneton's MeanFresnel takes it
+        this.$l.viewXZ = pb.neg(this.eyeVecNorm.xz);
+        this.$l.viewWind = pb.vec2(
+          pb.dot(this.viewXZ, this.unresolvedSlope.xy),
+          pb.dot(this.viewXZ, pb.vec2(pb.neg(this.unresolvedSlope.y), this.unresolvedSlope.x))
+        );
+        this.$l.viewWindT = pb.div(
+          pb.mul(this.viewWind, this.viewWind),
+          pb.max(pb.dot(this.viewXZ, this.viewXZ), 1e-6)
+        );
+        this.$l.sigmaV = pb.sqrt(
+          pb.mul(
+            pb.dot(this.viewWindT, this.unresolvedSlope.zw),
+            pb.sub(1, pb.mul(this.normalScale, this.normalScale))
+          )
+        );
+        this.$l.fresnelTerm = this.fresnel(
+          this.shadingNormal,
+          pb.neg(this.eyeVecNorm),
+          this.underwaterEye,
+          this.sigmaV
+        );
         // Foam density from the wave generator: crests, wakes, breaking shore waves
         this.$l.crestDensity = pb.clamp(
           pb.mul(pb.pow(pb.clamp(this.foamFactor, 0, 1), this.foamShadingParams.y), this.foamShadingParams.x),
@@ -2355,6 +2415,19 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
         bindGroup.setValue('cheapRefractionDepth', this._cheapRefractionDepth);
       }
       bindGroup.setValue('reflectionStrength', this._reflectionStrength);
+      const wind = this._waveGenerator.get()?.wind;
+      const windSpeed = wind ? Math.hypot(wind.x, wind.y) : 0;
+      this._unresolvedSlope.setXYZW(
+        windSpeed > 0 ? wind!.x / windSpeed : 1,
+        windSpeed > 0 ? wind!.y / windSpeed : 0,
+        COX_MUNK_UPWIND * windSpeed,
+        COX_MUNK_CROSSWIND_BASE + COX_MUNK_CROSSWIND * windSpeed
+      );
+      bindGroup.setValue('unresolvedSlope', this._unresolvedSlope);
+      bindGroup.setValue(
+        'skyReflectScale',
+        ctx.scene.lightingMode === 'physical' ? ShaderHelper.getPreExposure(ctx) / PHYSICAL_BAKE_EXPOSURE : 1
+      );
       bindGroup.setValue('ssrParams', this._ssrParams);
       const eyeUnder = ctx.underwater;
       bindGroup.setValue('eyeSide', eyeUnder ? (eyeUnder.material === this ? -1 : 0) : 1);
