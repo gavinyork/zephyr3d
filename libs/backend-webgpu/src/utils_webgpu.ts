@@ -180,6 +180,7 @@ export class WebGPUMipmapGenerator {
   static _mipmapGenerationProgram: Nullable<WebGPUProgram> = null;
   static _mipmapGenerationStateSet: Nullable<WebGPURenderStateSet> = null;
   static _computeMipmapPrograms: Partial<Record<TextureFormat, WebGPUProgram>> = {};
+  static _computeMipmapPrograms3D: Partial<Record<TextureFormat, WebGPUProgram>> = {};
   static getMipmapGenerationBindGroupLayout(device: WebGPUDevice) {
     if (!this._mipmapGenerationProgram) {
       this.initMipmapGeneration(device);
@@ -196,8 +197,8 @@ export class WebGPUMipmapGenerator {
       !!device.getDeviceCaps().textureCaps.getTextureFormatInfo(format)?.filterable
     );
   }
-  static getComputeMipmapBindGroupLayout(device: WebGPUDevice, format: TextureFormat) {
-    return this.getComputeMipmapProgram(device, format).bindGroupLayouts[0];
+  static getComputeMipmapBindGroupLayout(device: WebGPUDevice, format: TextureFormat, is3D = false) {
+    return this.getComputeMipmapProgram(device, format, is3D).bindGroupLayouts[0];
   }
   static generateMipmap(device: WebGPUDevice, tex: WebGPUBaseTexture, cmdEncoder?: GPUCommandEncoder) {
     const useCompute = tex.canGenerateMipmapWithCompute();
@@ -237,7 +238,8 @@ export class WebGPUMipmapGenerator {
     tex: WebGPUBaseTexture,
     numLayers: number
   ) {
-    const program = this.getComputeMipmapProgram(device, tex.format);
+    const is3D = tex.isTexture3D();
+    const program = this.getComputeMipmapProgram(device, tex.format, is3D);
     const pipeline = device.pipelineCache.fetchComputePipeline(program);
     if (!pipeline) {
       return;
@@ -247,17 +249,22 @@ export class WebGPUMipmapGenerator {
     for (let level = 1; level < tex.mipLevelCount; level++) {
       const groupsX = Math.ceil(Math.max(tex.width >> level, 1) / COMPUTE_MIPMAP_GROUP_SIZE);
       const groupsY = Math.ceil(Math.max(tex.height >> level, 1) / COMPUTE_MIPMAP_GROUP_SIZE);
+      // A 3d level is one dispatch over all its slices, see getComputeMipmapProgram()
+      const groupsZ = is3D ? Math.max(tex.depth >> level, 1) : 1;
       for (let face = 0; face < numLayers; face++) {
         const bindGroup = tex.getMipmapComputeBindGroup(level, face).bindGroup;
         if (bindGroup) {
           pass.setBindGroup(0, bindGroup);
-          pass.dispatchWorkgroups(groupsX, groupsY, 1);
+          pass.dispatchWorkgroups(groupsX, groupsY, groupsZ);
         }
       }
     }
     pass.end();
   }
-  private static getComputeMipmapProgram(device: WebGPUDevice, format: TextureFormat) {
+  private static getComputeMipmapProgram(device: WebGPUDevice, format: TextureFormat, is3D = false) {
+    if (is3D) {
+      return this.getComputeMipmapProgram3D(device, format);
+    }
     let program = this._computeMipmapPrograms[format];
     if (!program) {
       const storageFormat = computeMipmapStorageFormats[format]!;
@@ -284,6 +291,41 @@ export class WebGPUMipmapGenerator {
         }
       }) as WebGPUProgram;
       this._computeMipmapPrograms[format] = program;
+    }
+    return program;
+  }
+  /**
+   * 3d counterpart: one invocation per destination texel, z running over the slices. A single
+   * trilinear fetch at the texel centre averages the 2x2x2 source block, as the bilinear fetch
+   * of the 2d program averages a 2x2 one.
+   */
+  private static getComputeMipmapProgram3D(device: WebGPUDevice, format: TextureFormat) {
+    let program = this._computeMipmapPrograms3D[format];
+    if (!program) {
+      const storageFormat = computeMipmapStorageFormats[format]!;
+      program = device.buildComputeProgram({
+        label: `MipmapGenerationCS3D-${storageFormat}`,
+        workgroupSize: [COMPUTE_MIPMAP_GROUP_SIZE, COMPUTE_MIPMAP_GROUP_SIZE, 1],
+        compute(pb) {
+          this.srcTex = pb.tex3D().uniform(0);
+          this.dstTex = pb.texStorage3D[storageFormat]().storage(0);
+          pb.main(function () {
+            this.dstSize = pb.textureDimensions(this.dstTex);
+            this.$if(pb.all(pb.lessThan(this.$builtins.globalInvocationId, this.dstSize)), function () {
+              this.uvw = pb.div(
+                pb.add(pb.vec3(this.$builtins.globalInvocationId), pb.vec3(0.5)),
+                pb.vec3(this.dstSize)
+              );
+              pb.textureStore(
+                this.dstTex,
+                this.$builtins.globalInvocationId,
+                pb.textureSampleLevel(this.srcTex, this.uvw, 0)
+              );
+            });
+          });
+        }
+      }) as WebGPUProgram;
+      this._computeMipmapPrograms3D[format] = program;
     }
     return program;
   }

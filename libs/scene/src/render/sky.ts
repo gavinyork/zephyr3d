@@ -62,6 +62,10 @@ import {
 import { getDevice, getEngine } from '../app/api';
 import { drawFullscreenQuad } from './fullscreenquad';
 import { panoramaToCubemap } from '../utility/panorama';
+import type { CloudMode, VolumetricCloudDebugView } from './volumetric_cloud/volumetric_cloud';
+import { VolumetricCloud } from './volumetric_cloud/volumetric_cloud';
+import { VolumetricCloudResources } from './volumetric_cloud/resources';
+import { drawVolumetricCloudDebug } from './volumetric_cloud/debug_view';
 import { PerspectiveCamera } from '../camera';
 
 /**
@@ -178,6 +182,13 @@ export class SkyRenderer extends Disposable {
   private readonly _heightFogParams: HeightFogParams;
   private _cloudy: number;
   private _cloudIntensity: number;
+  private _cloudMode: CloudMode;
+  private readonly _volumetricCloud: VolumetricCloud;
+  private readonly _volumetricCloudResources: VolumetricCloudResources;
+  private _cloudDebugView: VolumetricCloudDebugView;
+  private _cloudDebugSlice: number;
+  private _cloudDebugChannel: number;
+  private static _volumetricFallbackWarned = false;
   private _debugAerialPerspective: number;
   private readonly _wind: Vector2;
   private readonly _skyboxRotation: Vector3;
@@ -241,6 +252,12 @@ export class SkyRenderer extends Disposable {
     this._heightFogParams = getDefaultHeightFogParams();
     this._cloudy = 0.45;
     this._cloudIntensity = 15;
+    this._cloudMode = 'procedural';
+    this._volumetricCloud = new VolumetricCloud();
+    this._volumetricCloudResources = new VolumetricCloudResources();
+    this._cloudDebugView = 'none';
+    this._cloudDebugSlice = 0;
+    this._cloudDebugChannel = 0;
     this._wind = new Vector2(0, 0);
     this._skyboxRotation = new Vector3(0, 0, 0);
     this._skyWorldMatrix = defaultSkyWorldMatrix;
@@ -663,6 +680,113 @@ export class SkyRenderer extends Disposable {
     }
   }
   /**
+   * How the clouds of the scatter sky are drawn.
+   *
+   * @remarks
+   * `volumetric` needs a WebGPU device; on other devices the procedural clouds are drawn instead,
+   * see {@link SkyRenderer.effectiveCloudMode}.
+   */
+  get cloudMode(): CloudMode {
+    return this._cloudMode;
+  }
+  set cloudMode(val: CloudMode) {
+    if (val !== this._cloudMode) {
+      this._cloudMode = val;
+      this.invalidate();
+    }
+  }
+  /** The cloud mode actually drawn: `volumetric` falls back to `procedural` off WebGPU. */
+  get effectiveCloudMode(): CloudMode {
+    if (this._cloudMode === 'volumetric' && getDevice().type !== 'webgpu') {
+      if (!SkyRenderer._volumetricFallbackWarned) {
+        SkyRenderer._volumetricFallbackWarned = true;
+        console.warn('Volumetric clouds require WebGPU, drawing procedural clouds instead');
+      }
+      return 'procedural';
+    }
+    return this._cloudMode;
+  }
+  /** Parameters of the volumetric clouds. */
+  get volumetricCloud(): VolumetricCloud {
+    return this._volumetricCloud;
+  }
+  /**
+   * Base shape noise of the volumetric clouds, as a 2D atlas of the slices of a cubic volume,
+   * or null to generate it.
+   *
+   * @remarks
+   * An N^3 volume is stored as N slices of N x N texels laid out row by row, left to right, so
+   * that the atlas holds width * height = N^3 texels, e.g. 128^3 as 2048 x 1024 (16 x 8 slices).
+   * Channels: R Perlin-Worley, GBA Worley fbm of increasing frequency.
+   */
+  get cloudBaseNoise(): Nullable<Texture2D> {
+    return this._volumetricCloudResources.baseNoiseSource;
+  }
+  set cloudBaseNoise(tex: Nullable<Texture2D>) {
+    this._volumetricCloudResources.baseNoiseSource = tex;
+  }
+  /**
+   * Detail noise of the volumetric clouds as a slice atlas (see {@link SkyRenderer.cloudBaseNoise}),
+   * or null to generate it. Channels: RGB Worley fbm of increasing frequency.
+   */
+  get cloudDetailNoise(): Nullable<Texture2D> {
+    return this._volumetricCloudResources.detailNoiseSource;
+  }
+  set cloudDetailNoise(tex: Nullable<Texture2D>) {
+    this._volumetricCloudResources.detailNoiseSource = tex;
+  }
+  /**
+   * Weather map of the volumetric clouds, or null to generate it. Channels: R coverage,
+   * G precipitation, B cloud type (0 stratus, 0.5 stratocumulus, 1 cumulus).
+   */
+  get cloudWeatherMap(): Nullable<Texture2D> {
+    return this._volumetricCloudResources.weatherMapSource;
+  }
+  set cloudWeatherMap(tex: Nullable<Texture2D>) {
+    this._volumetricCloudResources.weatherMapSource = tex;
+  }
+  /** Draws a volumetric cloud resource over the sky, for inspection. */
+  get cloudDebugView(): VolumetricCloudDebugView {
+    return this._cloudDebugView;
+  }
+  set cloudDebugView(val: VolumetricCloudDebugView) {
+    this._cloudDebugView = val;
+  }
+  /** @internal Whether {@link SkyRenderer.drawCloudDebugView} has anything to draw this frame. */
+  get cloudDebugViewActive() {
+    return (
+      this._cloudDebugView !== 'none' &&
+      this._skyType === 'scatter' &&
+      this.effectiveCloudMode === 'volumetric'
+    );
+  }
+  /**
+   * @internal Draws {@link SkyRenderer.cloudDebugView} over the current render target. Called on
+   * the presented image, after tone mapping, so the texels show their stored values.
+   */
+  drawCloudDebugView() {
+    drawVolumetricCloudDebug(
+      this._volumetricCloudResources,
+      this._cloudDebugView,
+      this._cloudDebugSlice,
+      this._cloudDebugChannel
+    );
+  }
+  /** Slice of the noise volume shown by {@link SkyRenderer.cloudDebugView}, 0 to 1. */
+  get cloudDebugSlice() {
+    return this._cloudDebugSlice;
+  }
+  set cloudDebugSlice(val: number) {
+    this._cloudDebugSlice = Math.min(1, Math.max(0, val));
+  }
+  /** Channel shown by {@link SkyRenderer.cloudDebugView}: 0 RGB, 1-4 R, G, B or A as grey. */
+  get cloudDebugChannel() {
+    return this._cloudDebugChannel;
+  }
+  set cloudDebugChannel(val: number) {
+    this._cloudDebugChannel = Math.min(4, Math.max(0, Math.round(val)));
+  }
+  /**
    * Wind velocity
    *
    * @remarks
@@ -821,6 +945,9 @@ export class SkyRenderer extends Disposable {
     return this._skyDistantLightLut.get()!.getColorAttachments()[0] as Texture2D;
   }
   update(ctx: DrawContext) {
+    if (this._skyType === 'scatter' && this.effectiveCloudMode === 'volumetric') {
+      this._volumetricCloudResources.update(this._volumetricCloud.noiseSeed);
+    }
     // Latch the fog scales for this frame. The bake path (updateBakedSkyMap) uses the sky camera
     // whose scene is null, so it cannot read lightingMode itself; both bake and main pass run after
     // update(), so caching them here keeps them consistent.
@@ -1208,6 +1335,7 @@ export class SkyRenderer extends Disposable {
     this._irradianceSHFB.dispose();
     this._irradianceFrameBuffer.dispose();
     this._shProjector.dispose();
+    this._volumetricCloudResources.dispose();
     if (this._skyDistantLightLut.get()) {
       this._skyDistantLightLut.get()!.getColorAttachments()[0].dispose();
       this._skyDistantLightLut.dispose();

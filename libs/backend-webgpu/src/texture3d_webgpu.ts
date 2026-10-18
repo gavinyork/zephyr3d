@@ -35,14 +35,16 @@ export class WebGPUTexture3D extends WebGPUBaseTexture implements Texture3D<GPUT
     this._flags = Number(creationFlags) || 0;
     this.loadEmpty(format, width, height, depth, 0);
   }
-  createView(_level?: number, face?: number, _mipCount?: number) {
+  /**
+   * A 3d view of `mipCount` levels starting at `level` (all remaining levels when 0). A 3d
+   * texture has no layers a 2d view could select, so `face` is ignored.
+   */
+  createView(level?: number, _face?: number, mipCount?: number) {
     return this._object
       ? this._device.gpuCreateTextureView(this._object, {
-          dimension: '2d',
-          baseMipLevel: 0,
-          mipLevelCount: 1,
-          baseArrayLayer: face,
-          arrayLayerCount: 1
+          dimension: '3d',
+          baseMipLevel: level ?? 0,
+          mipLevelCount: mipCount || undefined
         })
       : null;
   }

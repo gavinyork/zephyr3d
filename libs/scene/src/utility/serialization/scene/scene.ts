@@ -1,9 +1,9 @@
 import type { Texture2D } from '@zephyr3d/device';
-import type { EnvLightType, FogType, SkyType } from '../../../render';
+import type { CloudMode, EnvLightType, FogType, SkyType, VolumetricCloudDebugView } from '../../../render';
 import { Scene } from '../../../scene/scene';
 import { defineProps, type SerializableClass } from '../types';
 import type { Nullable } from '@zephyr3d/base';
-import { Vector3, Vector4 } from '@zephyr3d/base';
+import { Vector2, Vector3, Vector4 } from '@zephyr3d/base';
 import type { ResourceManager } from '../manager';
 import { JSONArray, JSONData } from '../json';
 import type { Camera } from '../../../camera';
@@ -773,6 +773,843 @@ export function getSceneClass(manager: ResourceManager): SerializableClass {
           },
           isValid() {
             return this.env.sky.skyType === 'scatter';
+          }
+        },
+        {
+          name: 'CloudMode',
+          description:
+            'Procedural draws a flat cloud layer; Volumetric draws lit 3D clouds (WebGPU only, falls back to Procedural elsewhere)',
+          type: 'string',
+          phase: 1,
+          options: {
+            enum: { labels: ['Procedural', 'Volumetric'], values: ['procedural', 'volumetric'] }
+          },
+          default: 'procedural',
+          get(this: Scene, value) {
+            value.str[0] = this.env.sky.cloudMode;
+          },
+          set(this: Scene, value) {
+            this.env.sky.cloudMode = value.str[0] as CloudMode;
+          },
+          isValid() {
+            return this.env.sky.skyType === 'scatter';
+          }
+        },
+        {
+          name: 'VolumetricCloudLayerBottomAltitude',
+          description: 'Raises the cloud base: higher clouds look smaller and farther away',
+          type: 'float',
+          default: 5000,
+          phase: 2,
+          options: {
+            group: 'VolumetricClouds',
+            label: 'LayerBottomAltitude',
+            animatable: true,
+            minValue: 0,
+            maxValue: 20000
+          },
+          get(this: Scene, value) {
+            value.num[0] = this.env.sky.volumetricCloud.layerBottomAltitude;
+          },
+          set(this: Scene, value) {
+            this.env.sky.volumetricCloud.layerBottomAltitude = value.num[0];
+          },
+          isValid(this: Scene) {
+            return this.env.sky.skyType === 'scatter' && this.env.sky.cloudMode === 'volumetric';
+          }
+        },
+        {
+          name: 'VolumetricCloudLayerHeight',
+          description: 'Lets clouds tower higher above their base',
+          type: 'float',
+          default: 10000,
+          phase: 2,
+          options: {
+            group: 'VolumetricClouds',
+            label: 'LayerHeight',
+            animatable: true,
+            minValue: 100,
+            maxValue: 20000
+          },
+          get(this: Scene, value) {
+            value.num[0] = this.env.sky.volumetricCloud.layerHeight;
+          },
+          set(this: Scene, value) {
+            this.env.sky.volumetricCloud.layerHeight = value.num[0];
+          },
+          isValid(this: Scene) {
+            return this.env.sky.skyType === 'scatter' && this.env.sky.cloudMode === 'volumetric';
+          }
+        },
+        {
+          name: 'VolumetricCloudCoverage',
+          description: 'How much of the sky is covered by clouds',
+          type: 'float',
+          default: 0.45,
+          phase: 2,
+          options: {
+            group: 'VolumetricClouds',
+            label: 'Coverage',
+            animatable: true,
+            minValue: 0,
+            maxValue: 1
+          },
+          get(this: Scene, value) {
+            value.num[0] = this.env.sky.volumetricCloud.coverage;
+          },
+          set(this: Scene, value) {
+            this.env.sky.volumetricCloud.coverage = value.num[0];
+          },
+          isValid(this: Scene) {
+            return this.env.sky.skyType === 'scatter' && this.env.sky.cloudMode === 'volumetric';
+          }
+        },
+        {
+          name: 'VolumetricCloudDensity',
+          description: 'Makes clouds more opaque and their shadowed sides darker',
+          type: 'float',
+          default: 0.03,
+          phase: 2,
+          options: {
+            group: 'VolumetricClouds',
+            label: 'Density',
+            animatable: true,
+            minValue: 0,
+            maxValue: 0.5
+          },
+          get(this: Scene, value) {
+            value.num[0] = this.env.sky.volumetricCloud.density;
+          },
+          set(this: Scene, value) {
+            this.env.sky.volumetricCloud.density = value.num[0];
+          },
+          isValid(this: Scene) {
+            return this.env.sky.skyType === 'scatter' && this.env.sky.cloudMode === 'volumetric';
+          }
+        },
+        {
+          name: 'VolumetricCloudWeatherMapScale',
+          description:
+            'Spreads cloud fields wider apart; lower packs more, smaller cloud fields into the sky',
+          type: 'float',
+          default: 50000,
+          phase: 2,
+          options: {
+            group: 'VolumetricClouds',
+            label: 'WeatherMapScale',
+            animatable: true,
+            minValue: 1000,
+            maxValue: 500000
+          },
+          get(this: Scene, value) {
+            value.num[0] = this.env.sky.volumetricCloud.weatherMapScale;
+          },
+          set(this: Scene, value) {
+            this.env.sky.volumetricCloud.weatherMapScale = value.num[0];
+          },
+          isValid(this: Scene) {
+            return this.env.sky.skyType === 'scatter' && this.env.sky.cloudMode === 'volumetric';
+          }
+        },
+        {
+          name: 'VolumetricCloudBaseNoiseScale',
+          description: 'Size of the large billows that shape each cloud',
+          type: 'float',
+          default: 10000,
+          phase: 2,
+          options: {
+            group: 'VolumetricClouds',
+            label: 'BaseNoiseScale',
+            animatable: true,
+            minValue: 100,
+            maxValue: 100000
+          },
+          get(this: Scene, value) {
+            value.num[0] = this.env.sky.volumetricCloud.baseNoiseScale;
+          },
+          set(this: Scene, value) {
+            this.env.sky.volumetricCloud.baseNoiseScale = value.num[0];
+          },
+          isValid(this: Scene) {
+            return this.env.sky.skyType === 'scatter' && this.env.sky.cloudMode === 'volumetric';
+          }
+        },
+        {
+          name: 'VolumetricCloudDetailNoiseScale',
+          description: 'Size of the small wisps along cloud edges',
+          type: 'float',
+          default: 1000,
+          phase: 2,
+          options: {
+            group: 'VolumetricClouds',
+            label: 'DetailNoiseScale',
+            animatable: true,
+            minValue: 10,
+            maxValue: 10000
+          },
+          get(this: Scene, value) {
+            value.num[0] = this.env.sky.volumetricCloud.detailNoiseScale;
+          },
+          set(this: Scene, value) {
+            this.env.sky.volumetricCloud.detailNoiseScale = value.num[0];
+          },
+          isValid(this: Scene) {
+            return this.env.sky.skyType === 'scatter' && this.env.sky.cloudMode === 'volumetric';
+          }
+        },
+        {
+          name: 'VolumetricCloudDetailErosion',
+          description: 'Higher gives raggeder, wispier cloud edges',
+          type: 'float',
+          default: 0.35,
+          phase: 2,
+          options: {
+            group: 'VolumetricClouds',
+            label: 'DetailErosion',
+            animatable: true,
+            minValue: 0,
+            maxValue: 1
+          },
+          get(this: Scene, value) {
+            value.num[0] = this.env.sky.volumetricCloud.detailErosion;
+          },
+          set(this: Scene, value) {
+            this.env.sky.volumetricCloud.detailErosion = value.num[0];
+          },
+          isValid(this: Scene) {
+            return this.env.sky.skyType === 'scatter' && this.env.sky.cloudMode === 'volumetric';
+          }
+        },
+        {
+          name: 'VolumetricCloudPhaseG',
+          description: 'Tightens and brightens the silver lining around the sun',
+          type: 'float',
+          default: 0.8,
+          phase: 2,
+          options: {
+            group: 'VolumetricClouds',
+            label: 'PhaseG',
+            animatable: true,
+            minValue: -0.999,
+            maxValue: 0.999
+          },
+          get(this: Scene, value) {
+            value.num[0] = this.env.sky.volumetricCloud.phaseG;
+          },
+          set(this: Scene, value) {
+            this.env.sky.volumetricCloud.phaseG = value.num[0];
+          },
+          isValid(this: Scene) {
+            return this.env.sky.skyType === 'scatter' && this.env.sky.cloudMode === 'volumetric';
+          }
+        },
+        {
+          name: 'VolumetricCloudPhaseG2',
+          description: 'Negative values brighten clouds when looking away from the sun',
+          type: 'float',
+          default: -0.3,
+          phase: 2,
+          options: {
+            group: 'VolumetricClouds',
+            label: 'PhaseG2',
+            animatable: true,
+            minValue: -0.999,
+            maxValue: 0.999
+          },
+          get(this: Scene, value) {
+            value.num[0] = this.env.sky.volumetricCloud.phaseG2;
+          },
+          set(this: Scene, value) {
+            this.env.sky.volumetricCloud.phaseG2 = value.num[0];
+          },
+          isValid(this: Scene) {
+            return this.env.sky.skyType === 'scatter' && this.env.sky.cloudMode === 'volumetric';
+          }
+        },
+        {
+          name: 'VolumetricCloudPhaseBlend',
+          description: 'Moves the look from the sun-facing lobe (0) to the second lobe (1)',
+          type: 'float',
+          default: 0.5,
+          phase: 2,
+          options: {
+            group: 'VolumetricClouds',
+            label: 'PhaseBlend',
+            animatable: true,
+            minValue: 0,
+            maxValue: 1
+          },
+          get(this: Scene, value) {
+            value.num[0] = this.env.sky.volumetricCloud.phaseBlend;
+          },
+          set(this: Scene, value) {
+            this.env.sky.volumetricCloud.phaseBlend = value.num[0];
+          },
+          isValid(this: Scene) {
+            return this.env.sky.skyType === 'scatter' && this.env.sky.cloudMode === 'volumetric';
+          }
+        },
+        {
+          name: 'VolumetricCloudMultiScatteringOctaves',
+          description: 'More bounces make thick clouds glow brighter and softer',
+          type: 'int',
+          default: 2,
+          phase: 2,
+          options: {
+            group: 'VolumetricClouds',
+            label: 'MultiScatteringOctaves',
+            animatable: true,
+            minValue: 0,
+            maxValue: 2
+          },
+          get(this: Scene, value) {
+            value.num[0] = this.env.sky.volumetricCloud.msOctaves;
+          },
+          set(this: Scene, value) {
+            this.env.sky.volumetricCloud.msOctaves = value.num[0];
+          },
+          isValid(this: Scene) {
+            return this.env.sky.skyType === 'scatter' && this.env.sky.cloudMode === 'volumetric';
+          }
+        },
+        {
+          name: 'VolumetricCloudMultiScatteringContribution',
+          description: 'Brightness of the bounced light inside clouds',
+          type: 'float',
+          default: 0.5,
+          phase: 2,
+          options: {
+            group: 'VolumetricClouds',
+            label: 'MultiScatteringContribution',
+            animatable: true,
+            minValue: 0,
+            maxValue: 1
+          },
+          get(this: Scene, value) {
+            value.num[0] = this.env.sky.volumetricCloud.msContribution;
+          },
+          set(this: Scene, value) {
+            this.env.sky.volumetricCloud.msContribution = value.num[0];
+          },
+          isValid(this: Scene) {
+            return this.env.sky.skyType === 'scatter' && this.env.sky.cloudMode === 'volumetric';
+          }
+        },
+        {
+          name: 'VolumetricCloudMultiScatteringOcclusion',
+          description: 'Lower lets bounced light reach deeper into thick clouds',
+          type: 'float',
+          default: 0.5,
+          phase: 2,
+          options: {
+            group: 'VolumetricClouds',
+            label: 'MultiScatteringOcclusion',
+            animatable: true,
+            minValue: 0,
+            maxValue: 1
+          },
+          get(this: Scene, value) {
+            value.num[0] = this.env.sky.volumetricCloud.msOcclusion;
+          },
+          set(this: Scene, value) {
+            this.env.sky.volumetricCloud.msOcclusion = value.num[0];
+          },
+          isValid(this: Scene) {
+            return this.env.sky.skyType === 'scatter' && this.env.sky.cloudMode === 'volumetric';
+          }
+        },
+        {
+          name: 'VolumetricCloudMultiScatteringEccentricity',
+          description: 'Lower spreads bounced light evenly instead of around the sun',
+          type: 'float',
+          default: 0.5,
+          phase: 2,
+          options: {
+            group: 'VolumetricClouds',
+            label: 'MultiScatteringEccentricity',
+            animatable: true,
+            minValue: 0,
+            maxValue: 1
+          },
+          get(this: Scene, value) {
+            value.num[0] = this.env.sky.volumetricCloud.msEccentricity;
+          },
+          set(this: Scene, value) {
+            this.env.sky.volumetricCloud.msEccentricity = value.num[0];
+          },
+          isValid(this: Scene) {
+            return this.env.sky.skyType === 'scatter' && this.env.sky.cloudMode === 'volumetric';
+          }
+        },
+        {
+          name: 'VolumetricCloudGroundAlbedo',
+          description: 'Brightens cloud undersides with light bounced off the ground',
+          type: 'float',
+          default: 0.4,
+          phase: 2,
+          options: {
+            group: 'VolumetricClouds',
+            label: 'GroundAlbedo',
+            animatable: true,
+            minValue: 0,
+            maxValue: 1
+          },
+          get(this: Scene, value) {
+            value.num[0] = this.env.sky.volumetricCloud.groundAlbedo;
+          },
+          set(this: Scene, value) {
+            this.env.sky.volumetricCloud.groundAlbedo = value.num[0];
+          },
+          isValid(this: Scene) {
+            return this.env.sky.skyType === 'scatter' && this.env.sky.cloudMode === 'volumetric';
+          }
+        },
+        {
+          name: 'VolumetricCloudSkyLightBottomOcclusion',
+          description: 'Darkens the sky light on cloud undersides',
+          type: 'float',
+          default: 0.5,
+          phase: 2,
+          options: {
+            group: 'VolumetricClouds',
+            label: 'SkyLightBottomOcclusion',
+            animatable: true,
+            minValue: 0,
+            maxValue: 1
+          },
+          get(this: Scene, value) {
+            value.num[0] = this.env.sky.volumetricCloud.skyLightCloudBottomOcclusion;
+          },
+          set(this: Scene, value) {
+            this.env.sky.volumetricCloud.skyLightCloudBottomOcclusion = value.num[0];
+          },
+          isValid(this: Scene) {
+            return this.env.sky.skyType === 'scatter' && this.env.sky.cloudMode === 'volumetric';
+          }
+        },
+        {
+          name: 'VolumetricCloudTracingMaxDistance',
+          description: 'How far into the layer clouds are still drawn; lower drops distant clouds',
+          type: 'float',
+          default: 50000,
+          phase: 2,
+          options: {
+            group: 'VolumetricClouds',
+            label: 'TracingMaxDistance',
+            animatable: true,
+            minValue: 1000,
+            maxValue: 500000
+          },
+          get(this: Scene, value) {
+            value.num[0] = this.env.sky.volumetricCloud.tracingMaxDistance;
+          },
+          set(this: Scene, value) {
+            this.env.sky.volumetricCloud.tracingMaxDistance = value.num[0];
+          },
+          isValid(this: Scene) {
+            return this.env.sky.skyType === 'scatter' && this.env.sky.cloudMode === 'volumetric';
+          }
+        },
+        {
+          name: 'VolumetricCloudViewSampleCountScale',
+          description: 'Finer cloud detail at a higher cost',
+          type: 'float',
+          default: 2,
+          phase: 2,
+          options: {
+            group: 'VolumetricClouds',
+            label: 'ViewSampleCountScale',
+            animatable: true,
+            minValue: 0.05,
+            maxValue: 8
+          },
+          get(this: Scene, value) {
+            value.num[0] = this.env.sky.volumetricCloud.viewSampleCountScale;
+          },
+          set(this: Scene, value) {
+            this.env.sky.volumetricCloud.viewSampleCountScale = value.num[0];
+          },
+          isValid(this: Scene) {
+            return this.env.sky.skyType === 'scatter' && this.env.sky.cloudMode === 'volumetric';
+          }
+        },
+        {
+          name: 'VolumetricCloudShadowSampleCountScale',
+          description: 'Smoother self-shadowing inside clouds at a higher cost',
+          type: 'float',
+          default: 1,
+          phase: 2,
+          options: {
+            group: 'VolumetricClouds',
+            label: 'ShadowSampleCountScale',
+            animatable: true,
+            minValue: 0.05,
+            maxValue: 8
+          },
+          get(this: Scene, value) {
+            value.num[0] = this.env.sky.volumetricCloud.shadowSampleCountScale;
+          },
+          set(this: Scene, value) {
+            this.env.sky.volumetricCloud.shadowSampleCountScale = value.num[0];
+          },
+          isValid(this: Scene) {
+            return this.env.sky.skyType === 'scatter' && this.env.sky.cloudMode === 'volumetric';
+          }
+        },
+        {
+          name: 'VolumetricCloudShadowTracingDistance',
+          description: 'How far towards the sun clouds look for cloud that shades them',
+          type: 'float',
+          default: 15000,
+          phase: 2,
+          options: {
+            group: 'VolumetricClouds',
+            label: 'ShadowTracingDistance',
+            animatable: true,
+            minValue: 100,
+            maxValue: 50000
+          },
+          get(this: Scene, value) {
+            value.num[0] = this.env.sky.volumetricCloud.shadowTracingDistance;
+          },
+          set(this: Scene, value) {
+            this.env.sky.volumetricCloud.shadowTracingDistance = value.num[0];
+          },
+          isValid(this: Scene) {
+            return this.env.sky.skyType === 'scatter' && this.env.sky.cloudMode === 'volumetric';
+          }
+        },
+        {
+          name: 'VolumetricCloudStopTracingTransmittance',
+          description: 'Lower is slightly more exact behind dense clouds but slower',
+          type: 'float',
+          default: 0.005,
+          phase: 2,
+          options: {
+            group: 'VolumetricClouds',
+            label: 'StopTracingTransmittance',
+            animatable: true,
+            minValue: 0,
+            maxValue: 1
+          },
+          get(this: Scene, value) {
+            value.num[0] = this.env.sky.volumetricCloud.stopTracingTransmittanceThreshold;
+          },
+          set(this: Scene, value) {
+            this.env.sky.volumetricCloud.stopTracingTransmittanceThreshold = value.num[0];
+          },
+          isValid(this: Scene) {
+            return this.env.sky.skyType === 'scatter' && this.env.sky.cloudMode === 'volumetric';
+          }
+        },
+        {
+          name: 'VolumetricCloudNoiseSeed',
+          description: 'Picks a different generated cloud pattern',
+          type: 'int',
+          default: 0,
+          phase: 2,
+          options: {
+            group: 'VolumetricClouds',
+            label: 'NoiseSeed',
+            animatable: true,
+            minValue: 0,
+            maxValue: 1000
+          },
+          get(this: Scene, value) {
+            value.num[0] = this.env.sky.volumetricCloud.noiseSeed;
+          },
+          set(this: Scene, value) {
+            this.env.sky.volumetricCloud.noiseSeed = value.num[0];
+          },
+          isValid(this: Scene) {
+            return this.env.sky.skyType === 'scatter' && this.env.sky.cloudMode === 'volumetric';
+          }
+        },
+        {
+          name: 'VolumetricCloudFramesPerUpdate',
+          description: 'Fewer frames let clouds and sunlight change faster but cost more per frame',
+          type: 'int',
+          default: 64,
+          phase: 2,
+          options: {
+            group: 'VolumetricClouds',
+            label: 'FramesPerUpdate',
+            animatable: true,
+            minValue: 4,
+            maxValue: 256
+          },
+          get(this: Scene, value) {
+            value.num[0] = this.env.sky.volumetricCloud.framesPerUpdate;
+          },
+          set(this: Scene, value) {
+            this.env.sky.volumetricCloud.framesPerUpdate = value.num[0];
+          },
+          isValid(this: Scene) {
+            return this.env.sky.skyType === 'scatter' && this.env.sky.cloudMode === 'volumetric';
+          }
+        },
+        {
+          name: 'VolumetricCloudCacheResolution',
+          description: 'Keeps clouds sharp at narrow fields of view at a higher memory cost',
+          type: 'int',
+          default: 768,
+          phase: 2,
+          options: {
+            group: 'VolumetricClouds',
+            label: 'CacheResolution',
+            animatable: true,
+            minValue: 128,
+            maxValue: 2048
+          },
+          get(this: Scene, value) {
+            value.num[0] = this.env.sky.volumetricCloud.cacheResolution;
+          },
+          set(this: Scene, value) {
+            this.env.sky.volumetricCloud.cacheResolution = value.num[0];
+          },
+          isValid(this: Scene) {
+            return this.env.sky.skyType === 'scatter' && this.env.sky.cloudMode === 'volumetric';
+          }
+        },
+        {
+          name: 'VolumetricCloudPerSampleSunTransmittance',
+          description:
+            'Reddens the sunlight inside clouds by the air between each point and the sun; matters most at sunrise and sunset',
+          type: 'bool',
+          default: false,
+          phase: 2,
+          options: { group: 'VolumetricClouds', label: 'PerSampleSunTransmittance' },
+          get(this: Scene, value) {
+            value.bool[0] = this.env.sky.volumetricCloud.perSampleAtmosphericLightTransmittance;
+          },
+          set(this: Scene, value) {
+            this.env.sky.volumetricCloud.perSampleAtmosphericLightTransmittance = value.bool[0];
+          },
+          isValid(this: Scene) {
+            return this.env.sky.skyType === 'scatter' && this.env.sky.cloudMode === 'volumetric';
+          }
+        },
+        {
+          name: 'VolumetricCloudAlbedo',
+          description: 'Tint of the light clouds scatter; lower values make clouds greyer',
+          type: 'rgb',
+          default: [1, 1, 1],
+          phase: 2,
+          options: { group: 'VolumetricClouds', label: 'Albedo', animatable: true },
+          get(this: Scene, value) {
+            const c = this.env.sky.volumetricCloud.albedo;
+            value.num[0] = c.x;
+            value.num[1] = c.y;
+            value.num[2] = c.z;
+          },
+          set(this: Scene, value) {
+            this.env.sky.volumetricCloud.albedo = new Vector3(value.num[0], value.num[1], value.num[2]);
+          },
+          isValid(this: Scene) {
+            return this.env.sky.skyType === 'scatter' && this.env.sky.cloudMode === 'volumetric';
+          }
+        },
+        {
+          name: 'VolumetricCloudWind',
+          description: 'Direction and speed the clouds drift with, in meters per second',
+          type: 'vec2',
+          default: [10, 0],
+          phase: 2,
+          options: {
+            group: 'VolumetricClouds',
+            label: 'Wind',
+            animatable: true,
+            minValue: -100,
+            maxValue: 100
+          },
+          get(this: Scene, value) {
+            const w = this.env.sky.volumetricCloud.wind;
+            value.num[0] = w.x;
+            value.num[1] = w.y;
+          },
+          set(this: Scene, value) {
+            this.env.sky.volumetricCloud.wind = new Vector2(value.num[0], value.num[1]);
+          },
+          isValid(this: Scene) {
+            return this.env.sky.skyType === 'scatter' && this.env.sky.cloudMode === 'volumetric';
+          }
+        },
+        {
+          name: 'VolumetricCloudWeatherMap',
+          description:
+            'Where clouds form: R coverage, G precipitation, B cloud type (0 stratus to 1 cumulus). Empty generates one',
+          type: 'object',
+          default: null,
+          phase: 2,
+          options: {
+            group: 'VolumetricClouds',
+            label: 'WeatherMap',
+            mimeTypes: ['image/png', 'image/tga', 'image/webp', 'image/ktx2', 'image/x-dds']
+          },
+          isNullable() {
+            return true;
+          },
+          get(this: Scene, value) {
+            value.str[0] = manager.getAssetId(this.env.sky.cloudWeatherMap) ?? '';
+          },
+          async set(this: Scene, value) {
+            if (!value || !value.str[0]) {
+              this.env.sky.cloudWeatherMap = null;
+              return;
+            }
+            let tex: Nullable<Texture2D> = null;
+            try {
+              // Data, not color: no sRGB decoding
+              tex = await manager.fetchTexture<Texture2D>(value.str[0], { linearColorSpace: true });
+            } catch (err) {
+              console.error(`Load asset failed: ${value.str[0]}: ${err}`);
+            }
+            if (tex?.isTexture2D()) {
+              this.env.sky.cloudWeatherMap = tex;
+            } else {
+              console.error('Invalid texture type');
+            }
+          },
+          isValid(this: Scene) {
+            return this.env.sky.skyType === 'scatter' && this.env.sky.cloudMode === 'volumetric';
+          }
+        },
+        {
+          name: 'VolumetricCloudBaseNoise',
+          description:
+            'Shape of the large billows, as a 2D atlas of the slices of a cubic volume (e.g. 128^3 as 2048x1024). Empty generates one',
+          type: 'object',
+          default: null,
+          phase: 2,
+          options: {
+            group: 'VolumetricClouds',
+            label: 'BaseNoise',
+            mimeTypes: ['image/png', 'image/tga', 'image/webp', 'image/ktx2', 'image/x-dds']
+          },
+          isNullable() {
+            return true;
+          },
+          get(this: Scene, value) {
+            value.str[0] = manager.getAssetId(this.env.sky.cloudBaseNoise) ?? '';
+          },
+          async set(this: Scene, value) {
+            if (!value || !value.str[0]) {
+              this.env.sky.cloudBaseNoise = null;
+              return;
+            }
+            let tex: Nullable<Texture2D> = null;
+            try {
+              // Data, not color: no sRGB decoding
+              tex = await manager.fetchTexture<Texture2D>(value.str[0], { linearColorSpace: true });
+            } catch (err) {
+              console.error(`Load asset failed: ${value.str[0]}: ${err}`);
+            }
+            if (tex?.isTexture2D()) {
+              this.env.sky.cloudBaseNoise = tex;
+            } else {
+              console.error('Invalid texture type');
+            }
+          },
+          isValid(this: Scene) {
+            return this.env.sky.skyType === 'scatter' && this.env.sky.cloudMode === 'volumetric';
+          }
+        },
+        {
+          name: 'VolumetricCloudDetailNoise',
+          description:
+            'Shape of the small edge wisps, as a 2D atlas of the slices of a cubic volume (e.g. 32^3 as 256x128). Empty generates one',
+          type: 'object',
+          default: null,
+          phase: 2,
+          options: {
+            group: 'VolumetricClouds',
+            label: 'DetailNoise',
+            mimeTypes: ['image/png', 'image/tga', 'image/webp', 'image/ktx2', 'image/x-dds']
+          },
+          isNullable() {
+            return true;
+          },
+          get(this: Scene, value) {
+            value.str[0] = manager.getAssetId(this.env.sky.cloudDetailNoise) ?? '';
+          },
+          async set(this: Scene, value) {
+            if (!value || !value.str[0]) {
+              this.env.sky.cloudDetailNoise = null;
+              return;
+            }
+            let tex: Nullable<Texture2D> = null;
+            try {
+              // Data, not color: no sRGB decoding
+              tex = await manager.fetchTexture<Texture2D>(value.str[0], { linearColorSpace: true });
+            } catch (err) {
+              console.error(`Load asset failed: ${value.str[0]}: ${err}`);
+            }
+            if (tex?.isTexture2D()) {
+              this.env.sky.cloudDetailNoise = tex;
+            } else {
+              console.error('Invalid texture type');
+            }
+          },
+          isValid(this: Scene) {
+            return this.env.sky.skyType === 'scatter' && this.env.sky.cloudMode === 'volumetric';
+          }
+        },
+        {
+          name: 'VolumetricCloudDebugView',
+          description: 'Shows a cloud resource over the sky for inspection',
+          type: 'string',
+          default: 'none',
+          phase: 2,
+          options: {
+            group: 'VolumetricClouds',
+            label: 'DebugView',
+            enum: {
+              labels: ['None', 'WeatherMap', 'BaseNoise', 'DetailNoise'],
+              values: ['none', 'weather', 'baseNoise', 'detailNoise']
+            }
+          },
+          get(this: Scene, value) {
+            value.str[0] = this.env.sky.cloudDebugView;
+          },
+          set(this: Scene, value) {
+            this.env.sky.cloudDebugView = value.str[0] as VolumetricCloudDebugView;
+          },
+          isValid(this: Scene) {
+            return this.env.sky.skyType === 'scatter' && this.env.sky.cloudMode === 'volumetric';
+          }
+        },
+        {
+          name: 'VolumetricCloudDebugSlice',
+          description: 'Depth of the noise slice shown by DebugView',
+          type: 'float',
+          default: 0,
+          phase: 2,
+          options: { group: 'VolumetricClouds', label: 'DebugSlice', minValue: 0, maxValue: 1 },
+          get(this: Scene, value) {
+            value.num[0] = this.env.sky.cloudDebugSlice;
+          },
+          set(this: Scene, value) {
+            this.env.sky.cloudDebugSlice = value.num[0];
+          },
+          isValid(this: Scene) {
+            return this.env.sky.skyType === 'scatter' && this.env.sky.cloudMode === 'volumetric';
+          }
+        },
+        {
+          name: 'VolumetricCloudDebugChannel',
+          description: 'Channel shown by DebugView: 0 color, 1-4 R, G, B or A as grey',
+          type: 'int',
+          default: 0,
+          phase: 2,
+          options: { group: 'VolumetricClouds', label: 'DebugChannel', minValue: 0, maxValue: 4 },
+          get(this: Scene, value) {
+            value.num[0] = this.env.sky.cloudDebugChannel;
+          },
+          set(this: Scene, value) {
+            this.env.sky.cloudDebugChannel = value.num[0];
+          },
+          isValid(this: Scene) {
+            return this.env.sky.skyType === 'scatter' && this.env.sky.cloudMode === 'volumetric';
           }
         },
         {

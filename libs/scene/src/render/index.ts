@@ -29,3 +29,4 @@ export * from './rendergraph';
 export * from './rendergraph/history_resource_manager';
 export * from './virtualtexture/virtual_texture';
 export * from './virtualtexture/virtual_texture_client';
+export * from './volumetric_cloud/volumetric_cloud';
