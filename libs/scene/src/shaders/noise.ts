@@ -349,10 +349,14 @@ export function worleyNoise(scope: PBInsideFunctionScope, uv: PBShaderExp, freq:
           this.$l.offset = pb.vec3(pb.float(this.x), pb.float(this.y), pb.float(this.z));
 
           if (1 /* tilable */) {
-            this.$l.h = pb.add(
-              pb.mul(this[funcNameHash](pb.mod(pb.add(this.id, this.offset), pb.vec3(this.freq))), 0.4),
-              pb.vec3(0.3)
+            // Floored wrap: pb.mod is WGSL's truncated `%` on WebGPU, which leaves the neighbour
+            // cell -1 at -1 instead of freq - 1 and breaks the tiling
+            this.$l.cell = pb.add(this.id, this.offset);
+            this.cell = pb.sub(
+              this.cell,
+              pb.mul(pb.vec3(this.freq), pb.floor(pb.div(this.cell, pb.vec3(this.freq))))
             );
+            this.$l.h = pb.add(pb.mul(this[funcNameHash](this.cell), 0.4), pb.vec3(0.3));
           } else {
             this.$l.h = pb.add(pb.mul(this[funcNameHash](pb.add(this.id, this.offset)), 0.4), pb.vec3(0.3));
           }
