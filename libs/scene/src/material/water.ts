@@ -142,6 +142,11 @@ const SKY_PREFILTER_START = 0.06;
 const SKY_PREFILTER_FULL = 0.15;
 /** Wrap of the foam's diffuse lighting, `(N.L + w) / (1 + w)`. At 0 a lee slope is unlit. */
 const FOAM_LIGHT_WRAP = 0.5;
+/**
+ * Share of the edge fade width over which the foam on a thin sheet fades: the
+ * foam outlasts the water it floats on, down to the last centimetre or so.
+ */
+const FOAM_EDGE_FADE_SHARE = 0.2;
 /** Index of refraction of water. Must match the caustics pass. */
 const WATER_IOR = 1.333;
 const AIR_TO_WATER_ETA = 1 / WATER_IOR;
@@ -2095,6 +2100,9 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
           pb.mul(this.refraction, this.bodyWeight),
           pb.mul(this.reflectance, this.fresnelTerm)
         );
+        // Light the foam sends back, kept apart so the edge fade below can keep
+        // the foam on a sheet too thin to show the water
+        this.$l.foamRadiance = pb.vec3(0);
         // Debug accumulators. Dead in the `none` variant.
         this.$l.dbgSubsurface = pb.vec3(0);
         this.$l.dbgSunScatter = pb.vec3(0);
@@ -2227,20 +2235,19 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
             ),
             FOAM_SPECULAR_BOOST
           );
-          this.lightContrib = pb.add(
-            this.lightContrib,
-            pb.mul(
-              this.lightEnergy,
-              this.foam,
-              pb.add(pb.mul(this.foamColor, this.NoLfoam, 1 / Math.PI), pb.vec3(this.foamGlint))
-            )
+          this.$l.foamLight = pb.mul(
+            this.lightEnergy,
+            this.foam,
+            pb.add(pb.mul(this.foamColor, this.NoLfoam, 1 / Math.PI), pb.vec3(this.foamGlint))
           );
+          this.lightContrib = pb.add(this.lightContrib, this.foamLight);
           this.$l.shadow = pb.vec3(1);
           if (shadow) {
             // +Y, not the wave normal, which would jitter the lookup per pixel.
             this.shadow = pb.vec3(that.calculateShadow(this, this.worldPos, pb.vec3(0, 1, 0), this.NoL));
             this.lightContrib = pb.mul(this.lightContrib, this.shadow);
           }
+          this.foamRadiance = pb.add(this.foamRadiance, pb.mul(this.foamLight, this.shadow));
           this.finalColor = pb.add(this.finalColor, this.lightContrib);
           this.dbgSubsurface = pb.add(this.dbgSubsurface, pb.mul(this.subsurfaceTerm, this.shadow));
           this.dbgSunScatter = pb.add(this.dbgSunScatter, pb.mul(this.sunScatterTerm, this.shadow));
@@ -2257,10 +2264,9 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
             1 / Math.PI
           );
           this.finalColor = pb.add(this.finalColor, this.sss);
-          this.finalColor = pb.add(
-            this.finalColor,
-            pb.mul(this.irradiance, this.foamColor, this.foam, 1 / Math.PI)
-          );
+          this.$l.foamAmbient = pb.mul(this.irradiance, this.foamColor, this.foam, 1 / Math.PI);
+          this.finalColor = pb.add(this.finalColor, this.foamAmbient);
+          this.foamRadiance = pb.add(this.foamRadiance, this.foamAmbient);
           // Bubbles under the white foam, part of the water body as in Crest,
           // so under the white foam and the mirror: the foam texture blurred and
           // shifted by parallax, as seen at a depth under the surface
@@ -2300,7 +2306,8 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
           });
         }
         // A sheet of water a few centimetres thick (swash on the sand) fades into
-        // the scene behind it, as does the mesh past the water's edge.
+        // the scene behind it, as does the mesh past the water's edge. The foam
+        // on it fades over the thinnest FOAM_EDGE_FADE_SHARE of that only.
         this.$if(pb.not(this.underwaterEye), function () {
           // From the wave generator's own ground where it has one: a depth buffer
           // reconstruction moves with the camera jitter by about the sheet's thickness.
@@ -2317,13 +2324,34 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
             ),
             this.coverage
           );
+          this.$l.foamFade = pb.mul(
+            this.$choice(
+              pb.greaterThan(this.edgeFadeWidth, 0),
+              pb.smoothStep(
+                0,
+                pb.max(pb.mul(this.edgeFadeWidth, FOAM_EDGE_FADE_SHARE), 1e-4),
+                this.edgeThickness
+              ),
+              pb.float(1)
+            ),
+            this.coverage
+          );
           this.$if(pb.lessThan(this.edgeFade, 1), function () {
             this.$l.behind = pb.textureSampleLevel(
               ShaderHelper.getSceneColorTexture(this),
               this.screenUV,
               0
             ).rgb;
-            this.finalColor = pb.mix(this.behind, this.finalColor, this.edgeFade);
+            // finalColor = water (on the share without foam) + foam light: the
+            // water fades into what is behind, under the foam
+            this.finalColor = pb.add(
+              pb.mix(
+                pb.mul(this.behind, pb.sub(1, pb.mul(this.foam, this.foamFade))),
+                pb.sub(this.finalColor, this.foamRadiance),
+                this.edgeFade
+              ),
+              pb.mul(this.foamRadiance, this.foamFade)
+            );
           });
         });
         switch (debugOutput) {

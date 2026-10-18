@@ -353,11 +353,12 @@ export class ShoreWaveGenerator extends Disposable implements WaveGenerator, Foa
     bindGroup.setValue('swWallFoam', this._wallFoamParams);
   }
   /**
-   * The water's velocity under the shore waves and the foam they make this
-   * step: from the waves where their displacement squeezes the water, and from
-   * shallow water, both prewarmed as Crest does, and from the water dashing
-   * against walls (see FOAM_WALL); added to the open water's. Keeps the
-   * wrapped generator's displacement in the field's state near walls.
+   * The velocity carrying the foam (the open water's, led along the walls) and
+   * the foam the shore waves make this step: from the waves where their
+   * displacement squeezes the water and from shallow water, both prewarmed as
+   * Crest does, and from the water dashing against walls (see FOAM_WALL);
+   * added to the open water's. Keeps the wrapped generator's displacement in
+   * the field's state near walls.
    * @internal
    */
   calcFoamStep(
@@ -387,11 +388,10 @@ export class ShoreWaveGenerator extends Disposable implements WaveGenerator, Foa
         this.$l.spacing = pb.float(0);
         this.$l.sw = that.evaluate(this, this.xz, this.dir, this.spacing);
         this.$l.wall = that.wall(this, this.xz);
-        this.$l.velocity = that.slip(
-          this,
-          this.wall,
-          pb.add(this.baseStep.xy, pb.mul(this.dir.xy, this.sw.w))
-        );
+        // Carried by the open water's drift alone, as Crest's foam is by its
+        // flow only: the waves' surge (u = g eta / c, onshore only) would pump
+        // the foam up the beach and pile it at the waterline.
+        this.$l.velocity = that.slip(this, this.wall, this.baseStep.xy);
         this.$l.waveDt = this.$choice(
           this.prewarm,
           pb.max(this.dt, pb.div(pb.min(1, pb.sub(this.waveStrength, 1)), this.fadeRate)),
