@@ -14,6 +14,15 @@ import type { PBInsideFunctionScope, PBShaderExp } from '@zephyr3d/device';
  */
 
 /**
+ * Lattice cell wrapped into [0, freq). Floored, unlike pb.mod, which is WGSL's truncated `%` on
+ * WebGPU: that maps the neighbour cell -1 to -1 instead of freq - 1 and breaks the tiling.
+ */
+function wrapCell(scope: PBInsideFunctionScope, cell: PBShaderExp, freq: PBShaderExp) {
+  const pb = scope.$builder;
+  return pb.sub(cell, pb.mul(pb.vec3(freq), pb.floor(pb.div(cell, pb.vec3(freq)))));
+}
+
+/**
  * Integer hash of a lattice cell to [-1, 1]^3 (Dave Hoskins' uint hash, as in 3dVXDc).
  *
  * `seed` shifts the cell by whole cells after the periodic wrap, so a seeded volume still tiles.
@@ -55,7 +64,7 @@ export function cloudGradientNoise(
       pb.add(pb.mul(this.w, pb.sub(pb.mul(this.w, 6), pb.vec3(15))), pb.vec3(10))
     );
     const corner = (scope: PBInsideFunctionScope, o: number[]) =>
-      cloudHash33(scope, pb.mod(pb.add(scope.p, pb.vec3(o[0], o[1], o[2])), pb.vec3(scope.freq)), scope.seed);
+      cloudHash33(scope, wrapCell(scope, pb.add(scope.p, pb.vec3(o[0], o[1], o[2])), scope.freq), scope.seed);
     this.$l.va = pb.dot(corner(this, [0, 0, 0]), this.w);
     this.$l.vb = pb.dot(corner(this, [1, 0, 0]), pb.sub(this.w, pb.vec3(1, 0, 0)));
     this.$l.vc = pb.dot(corner(this, [0, 1, 0]), pb.sub(this.w, pb.vec3(0, 1, 0)));
@@ -107,7 +116,7 @@ export function cloudWorleyNoise(
           this.$l.offset = pb.vec3(pb.float(this.x), pb.float(this.y), pb.float(this.z));
           this.$l.h = pb.add(
             pb.mul(
-              cloudHash33(this, pb.mod(pb.add(this.id, this.offset), pb.vec3(this.freq)), this.seed),
+              cloudHash33(this, wrapCell(this, pb.add(this.id, this.offset), this.freq), this.seed),
               0.5
             ),
             pb.vec3(0.5),

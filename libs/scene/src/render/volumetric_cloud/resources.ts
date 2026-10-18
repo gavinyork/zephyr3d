@@ -303,7 +303,14 @@ export class VolumetricCloudResources extends Disposable {
     let tex = target.get();
     if (!tex || tex.width !== edge) {
       tex = getDevice().createTexture3D('rgba8unorm', edge, edge, edge, {
-        samplerOptions: { addressU: 'repeat', addressV: 'repeat', addressW: 'repeat' }
+        samplerOptions: {
+          addressU: 'repeat',
+          addressV: 'repeat',
+          addressW: 'repeat',
+          magFilter: 'linear',
+          minFilter: 'linear',
+          mipFilter: 'linear'
+        }
       })!;
       target.set(tex);
     }
