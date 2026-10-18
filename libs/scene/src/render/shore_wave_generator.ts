@@ -1026,7 +1026,8 @@ export class ShoreWaveGenerator extends Disposable implements WaveGenerator, Foa
   }
   /**
    * The water's edge on the beach, per pixel: 1 where the water stands over the
-   * bed, 0 where the mesh is only held clear of the sand.
+   * bed, 0 where the mesh is only held clear of the sand or, past where it is
+   * held, runs down into it.
    */
   calcSurfaceCoverage(scope: PBInsideFunctionScope, xz: PBShaderExp): PBShaderExp {
     const pb = scope.$builder;
@@ -1035,15 +1036,26 @@ export class ShoreWaveGenerator extends Disposable implements WaveGenerator, Foa
       this.$l.dir = pb.vec4(0);
       this.$l.spacing = pb.float(0);
       this.$l.sw = that.evaluate(this, this.xz, this.dir, this.spacing);
-      // Off the grid, out of the waves or away from the beach: nothing to cut
-      this.$if(pb.lessThan(this.dir.w, -1e3), function () {
-        this.$return(pb.float(1));
-      });
       this.$l.uv = pb.mul(pb.sub(this.xz, this.swGrid.xy), this.swGrid.z);
-      this.$l.bedB = pb.clamp(pb.textureSampleLevel(this.swWaterline, this.uv, 0).y, 1, B_MAX);
+      // Off the grid or out of the waves: nothing to cut
+      this.$if(
+        pb.or(
+          pb.lessThanEqual(this.swWave.x, 0),
+          pb.or(pb.any(pb.lessThan(this.uv, pb.vec2(0))), pb.any(pb.greaterThan(this.uv, pb.vec2(1))))
+        ),
+        function () {
+          this.$return(pb.float(1));
+        }
+      );
+      this.$l.wlBed = pb.textureSampleLevel(this.swWaterline, this.uv, 0);
+      // The bed wherever the field has one, not only where the mesh is held over
+      // it: past that the mesh runs down from the held height into the sand, and
+      // the face it makes there pokes through unless it is cut too
+      this.$l.bed = this.$choice(pb.lessThan(this.dir.w, -1e3), this.wlBed.z, this.dir.w);
+      this.$l.bedB = pb.clamp(this.wlBed.y, 1, B_MAX);
       // Water over the bed, the softening turned from metres across the slope into a height
       this.$l.soft = pb.div(SWASH_EDGE_SOFT, this.bedB);
-      this.$return(pb.smoothStep(pb.neg(this.soft), this.soft, pb.sub(this.sw.x, this.dir.w)));
+      this.$return(pb.smoothStep(pb.neg(this.soft), this.soft, pb.sub(this.sw.x, this.bed)));
     });
     return scope.swSurfaceCoverage(xz) as PBShaderExp;
   }
