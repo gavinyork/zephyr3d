@@ -6,7 +6,6 @@ import type {
   FrameBuffer,
   GPUDataBuffer,
   GPUProgram,
-  IndexBuffer,
   PBGlobalScope,
   PBRenderOptions,
   ProgramBuilder,
@@ -604,8 +603,6 @@ export class WaterCausticsRenderer {
   private readonly _heightParams: Vector4;
   /** The surface grid the height map is rasterised with; built once. */
   private _heightLayout: Nullable<VertexLayout>;
-  private _heightVertexBuffer: Nullable<GPUDataBuffer>;
-  private _heightIndexBuffer: Nullable<IndexBuffer>;
   private _heightIndexCount: number;
   private _blurProgram: Nullable<GPUProgram>;
   private _blurBindGroup: Nullable<BindGroup>;
@@ -658,8 +655,6 @@ export class WaterCausticsRenderer {
     this._heightStates = [];
     this._heightParams = new Vector4();
     this._heightLayout = null;
-    this._heightVertexBuffer = null;
-    this._heightIndexBuffer = null;
     this._heightIndexCount = 0;
     this._blurProgram = null;
     this._blurBindGroup = null;
@@ -878,8 +873,6 @@ export class WaterCausticsRenderer {
     }
     const vertexBuffer = device.createVertexBuffer('position_f32', ordinals)!;
     const indexBuffer = device.createIndexBuffer(indices);
-    this._heightVertexBuffer = vertexBuffer;
-    this._heightIndexBuffer = indexBuffer;
     this._heightLayout = device.createVertexLayout({
       vertexBuffers: [{ buffer: vertexBuffer }],
       indexBuffer
@@ -986,16 +979,7 @@ export class WaterCausticsRenderer {
    * this light cannot supply one.
    * @internal
    */
-  private _resolveSceneDepth(
-    ctx: DrawContext,
-    light: PunctualLight
-  ): Nullable<{
-    texture: Texture2DArray;
-    layer: number;
-    size: number;
-    matrix: Matrix4x4;
-    matrixInv: Matrix4x4;
-  }> {
+  private _resolveSceneDepth(ctx: DrawContext, light: PunctualLight): Nullable<SceneDepthBinding> {
     // WebGPU only: GLSL ES 3.0 forbids texelFetch on a shadow-sampler texture.
     if (ctx.device.type !== 'webgpu') {
       warnUnsupported(
@@ -1136,10 +1120,6 @@ export class WaterCausticsRenderer {
     // The layout does not own its buffers.
     this._heightLayout?.dispose();
     this._heightLayout = null;
-    this._heightVertexBuffer?.dispose();
-    this._heightVertexBuffer = null;
-    this._heightIndexBuffer?.dispose();
-    this._heightIndexBuffer = null;
     this._heightIndexCount = 0;
     this._blurBindGroup?.dispose();
     this._blurBindGroup = null;

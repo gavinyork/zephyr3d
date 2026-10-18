@@ -1171,7 +1171,7 @@ export class WaterInteraction extends Disposable {
     return this._disturbers;
   }
   /**
-   * Register a disturber. Beyond {@link MAX_DISTURBERS} enabled disturbers the
+   * Register a disturber. Beyond MAX_DISTURBERS enabled disturbers the
    * extra ones are ignored, earliest registered first.
    */
   addDisturber(disturber: WaterDisturber) {
