@@ -19,9 +19,8 @@ const FOAM_CLUMP_WEIGHT = 0.5;
 /**
  * Grey levels of Crest's default foam texture (Foam2.png, Wave Harmonic, MIT)
  * at every sixteenth of its texels in order, darkest to brightest. The
- * default texture takes them on rank for rank, so the foam density uncovers
- * as much of it as of Crest's at every density: how much foam a setting gives
- * is set by these levels, and the pattern only by where they fall.
+ * default texture is remapped to them rank for rank, so a foam density
+ * uncovers as much of it as of Crest's.
  */
 const FOAM_LEVELS = [
   0.0, 0.455, 0.51, 0.557, 0.596, 0.631, 0.655, 0.675, 0.694, 0.71, 0.722, 0.737, 0.753, 0.769, 0.796, 0.839,
@@ -86,9 +85,7 @@ function tiledValueNoise(u: number, v: number, cells: number, seed: number) {
   return a + (b - a) * sy;
 }
 
-/**
- * Smoothstep falloff of a value: 1 at 0, 0 from `width` on.
- */
+/** Smoothstep falloff of a value: 1 at 0, 0 from `width` on. */
 function rim(d: number, width: number) {
   const t = Math.min(Math.max(d / width, 0), 1);
   return 1 - t * t * (3 - 2 * t);
@@ -99,10 +96,7 @@ function rim(d: number, width: number) {
  * scales whose walls (where F2 - F1, the distance to the edge between two
  * cells, is small) are bright and whose middles dark, over clumps of value
  * noise, its grey levels those of Crest's default foam texture (see
- * FOAM_LEVELS). The foam density uncovers it from its brightest parts down,
- * as it does any foam texture: clumps first, then the bubble walls, the holes
- * last. Water lets a
- * foam texture of one's own replace it, its value in the red channel.
+ * FOAM_LEVELS). Value in the red channel.
  *
  * @internal
  */

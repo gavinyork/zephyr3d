@@ -31,23 +31,18 @@ const WATER_IOR = 1.333;
 /** Air-to-water eta used when refracting the sun ray at the surface. */
 const WATER_ETA = 1 / WATER_IOR;
 /**
- * Minimum |sin(sun elevation)| for caustics to be generated. The photon sweep
- * degenerates below this, and real caustics vanish there too, so the pass
- * simply switches off.
+ * Minimum |sin(sun elevation)| for caustics to be generated; below it the
+ * photon sweep degenerates and the pass switches off.
  */
 const MIN_SUN_ELEVATION = 0.15;
 /**
  * Fixed-point steps taken to land a photon on the scene rather than on the
- * focal plane. Two suffice for a receiver flat over the distance the guess
- * moves; the third covers a steep slope. Beyond that the sequence has either
- * converged or is oscillating between two surfaces.
+ * focal plane. Two suffice for a flat receiver; the third covers a steep slope.
  */
 const SCENE_DEPTH_ITERATIONS = 3;
 /**
- * Photons per covered map texel the automatic grid size solves for.
- *
- * Measured against a converged (16x denser) map: four lands within about 4% of
- * it, for a quarter of the photons full convergence would need.
+ * Photons per covered map texel the automatic grid size solves for. Four lands
+ * within about 4% of a converged (16x denser) map.
  */
 const PHOTONS_PER_TEXEL = 4;
 /** Automatic edge fade width, as a fraction of the map half-extent. */
@@ -65,41 +60,30 @@ const MAX_FADE_FRACTION = 0.9;
 const MAX_SLICE_ASPECT = 2;
 /**
  * Steps per octave the fitted half-extents are quantised to. Four costs at most
- * 19% of linear resolution against a perfect fit, and keeps a level change small
- * enough to pass as a slight change in sharpness rather than a pop.
+ * 19% of linear resolution and keeps a level change from reading as a pop.
  */
 const SLICE_QUANTISE_STEPS = 4;
 /** Smallest half-extent in meters a fitted slice may shrink to. */
 const MIN_SLICE_EXTENT = 0.5;
 /**
- * Divisions of the half-extent the slice centre snaps to under a warp.
- *
- * A whole-texel shift is exact only on a linear map; under a warp it is a
- * different number of texels at each position, so the map has to be resampled
- * whenever the centre moves. Snapping coarsely holds the centre still for many
- * frames and pays for one resample, which the resolve's neighbourhood clamp
- * absorbs.
+ * Divisions of the half-extent the slice centre snaps to under a warp. A warped
+ * map must be resampled whenever the centre moves, so it snaps coarsely.
  */
 const WARPED_CENTER_SNAP_DIVISIONS = 8;
 /**
  * How far past the map border the photon grid is laid out, as a fraction of the
  * half-extent, on the sides where the range - not the water - is what bounds it.
  *
- * Horizontal displacement carries a photon across the border in either
- * direction, so a grid cut exactly at the border loses the photons that would
- * have arrived from outside while still losing the ones that leave; the border
- * ring then holds a density no interior texel does. Launching from a margin
- * outside feeds the border from both sides.
- *
- * Only the launch area grows - `_gridFraction` scales the per-photon weight and
- * the solved grid size by it - so density per texel is unchanged and the cost is
- * photon count. At the default warp this margin buys about 11% more photons.
+ * Horizontal displacement carries photons across the border both ways, so
+ * launching from a margin outside keeps the border density consistent.
+ * `_gridFraction` accounts for the larger launch area, so density per texel is
+ * unchanged.
  */
 const GRID_BORDER_MARGIN = 0.15;
 
 /**
  * Concentrates a map coordinate towards the centre. CPU twin of
- * `ShaderHelper.warpCausticNDC`; see it for the reasoning.
+ * `ShaderHelper.warpCausticNDC`.
  *
  * @internal
  */
@@ -145,7 +129,7 @@ export interface WaterCausticUniforms {
   lightDir: Vector4;
   /** (intensity, focal depth, defocus rate, edge fade start in map-radius units) */
   params: Vector4;
-  /** (minimum water depth, unused.yz, warp strength). The medium moved to {@link waterMedia}. */
+  /** (minimum water depth, unused.yz, warp strength). The medium is in {@link waterMedia}. */
   extinction: Vector4;
   /** Water bodies contributing to this map, at most {@link MAX_CAUSTIC_WATERS}. */
   waterCount: number;
@@ -165,11 +149,8 @@ type SceneDepthBinding = {
 };
 
 /**
- * Vertices per side of the grid the height map rasterises the surface with.
- *
- * Laid out in warped map space over the body's footprint, so each cell covers a
- * few map texels at most and the linear height across a cell is well inside what
- * a wave of any visible wavelength needs.
+ * Vertices per side of the grid the height map rasterises the surface with, laid
+ * out in warped map space over the body's footprint.
  */
 const HEIGHT_GRID_SIZE = 256;
 
@@ -183,12 +164,11 @@ type SplatProgramInfo = {
 /**
  * Shader for the photon splat pass.
  *
- * Everything happens in the vertex stage: one vertex is one photon, and the
- * position it emits is where that photon lands. The fragment stage only deposits
+ * One vertex is one photon, emitted where it lands; the fragment stage deposits
  * the weight, which additive blending accumulates.
  *
- * Returned as a descriptor rather than a built program so it can be compiled
- * against a bare {@link ProgramBuilder} in tests, without a device.
+ * Returned as a descriptor so it can be compiled against a bare
+ * {@link ProgramBuilder} in tests, without a device.
  *
  * @param waveGenerator - Supplies the surface displacement and normal.
  * @internal
@@ -207,51 +187,38 @@ export function createCausticSplatShader(waveGenerator: WaveGenerator, sceneDept
     /** (grid size, 1 / grid size, 0, 0) */
     scope.causticPhotonParams = pb.vec4().uniform(0);
     if (sceneDepth) {
-      // The sun's own shadow cascade, reused as a light-space depth map of the
-      // scene: already orthographic, along the light, covering what the light
-      // reaches, and costing no extra geometry pass.
+      // The sun's shadow cascade, reused as an orthographic light-space depth map.
       scope.causticSceneMatrix = pb.mat4().uniform(0);
       scope.causticSceneMatrixInv = pb.mat4().uniform(0);
       /** (cascade layer, 0, 0, 0) */
       scope.causticSceneParams = pb.vec4().uniform(0);
-      // Sampled for its stored depth, not compared against a reference, so this
-      // takes an ordinary sampler rather than the comparison one the lighting
-      // pass binds to the same texture.
+      // Read for its stored depth, not compared.
       scope.causticSceneDepth = pb.tex2DArrayShadow().uniform(0);
     }
-    // FBM and Gerstner animate from camera.elapsedTime, which this pass has to
-    // supply itself - it is not one of the engine's camera passes.
+    // Wave generators animate from camera.elapsedTime, which this standalone
+    // pass supplies itself.
     ShaderHelper.declareStandaloneCameraTime(scope, 0);
     waveGenerator.setupUniforms(scope, 0);
   };
   return {
     vertex(this: PBGlobalScope, pb: ProgramBuilder) {
-      // Photon ordinal, one vertex per photon. The grid coordinate is derived
-      // from it here rather than stored, so the buffer outlives any one grid
-      // size - see _updatePhotonLayout.
+      // Photon ordinal; the grid coordinate is derived from it, so the buffer
+      // serves any grid size.
       this.$inputs.photonIndex = pb.float().attrib('position');
       this.$outputs.photonWeight = pb.float();
       setupUniforms(this);
       pb.main(function () {
-        // Per-axis: the slice is fitted to the water, so its two half-extents
-        // are independent and the map is only square in texels.
+        // Per-axis: the slice's two half-extents are independent.
         this.$l.invRadius = pb.vec2(this.causticFrameX.w, this.causticFrameY.w);
         this.$l.radius = pb.div(pb.vec2(1), this.invRadius);
         this.$l.focalDepth = this.causticSplatParams.y;
         this.$l.eta = this.causticSplatParams.z;
         this.$l.L = this.causticLightDir.xyz;
         this.$l.waterLevel = this.causticCenter.w;
-        // Grid position on the orthographic slice through the map centre.
-        //
-        // The grid spans only the part of the slice the water can actually cast
-        // through, not the whole map: spread over the whole map, a pool covering
-        // a tenth of it would leave most of the lit area with no photon at all,
-        // and a caustic value of zero puts the sun out.
-        //
-        // Laid out in warped map space and unwarped to reach the plane, so the
-        // grid is uniform in texels rather than in meters. That is what keeps
-        // photon (i,j) on texel (i,j) for calm water under any warp strength,
-        // and with it the map's normalisation to 1.0.
+        // Grid position on the orthographic slice through the map centre. The
+        // grid spans only the part of the slice the water casts through, and is
+        // uniform in warped map space so calm water keeps photon (i,j) on texel
+        // (i,j) and the map normalised to 1.0.
         //
         // Ordinal to grid coordinate: row is the quotient, column the remainder.
         this.$l.gridSize = this.causticPhotonParams.x;
@@ -276,17 +243,11 @@ export function createCausticSplatShader(waveGenerator: WaveGenerator, sceneDept
           pb.any(pb.lessThan(this.surfaceXZ.xz, this.causticRegion.xy)),
           pb.any(pb.greaterThan(this.surfaceXZ.xz, this.causticRegion.zw))
         );
-        // Displaced surface point and the detail normal that bends the ray. Both
-        // wave generators sample with an explicit LOD, which is what makes this
-        // legal in a vertex shader.
+        // Displaced surface point and the detail normal that bends the ray. The
+        // wave generators sample with an explicit LOD, legal in a vertex shader.
         //
-        // The photon is launched from the rest point and lands wherever the
-        // surface carried it, so the refraction is right. What it is not is
-        // uniform in world xz - the horizontal displacement bunches the launch
-        // points by the surface Jacobian, over-weighting compressed crests by
-        // 1/J. Inverting the displacement per photon would fix that, but the
-        // inversion only converges where the surface does not fold, and a choppy
-        // FFT folds exactly at the crests it would matter for.
+        // Launching from the rest point over-weights compressed crests by 1/J;
+        // inverting the displacement does not converge where the surface folds.
         this.$l.surfacePos = pb.vec3();
         this.$l.coarseNormal = pb.vec3();
         waveGenerator.calcVertexPositionAndNormal(this, this.surfaceXZ, this.surfacePos, this.coarseNormal);
@@ -297,65 +258,46 @@ export function createCausticSplatShader(waveGenerator: WaveGenerator, sceneDept
         this.$l.refracted = pb.refract(this.L, this.normal, this.eta);
         this.$l.refractedFlat = pb.refract(this.L, pb.vec3(0, 1, 0), this.eta);
         this.$l.dir = pb.normalize(pb.add(pb.sub(this.refracted, this.refractedFlat), this.L));
-        // Intersect the horizontal focal plane below the surface. The ray always
-        // travels downwards here, but clamp anyway so a grazing ray cannot
-        // produce an enormous or negative step.
+        // Intersect the horizontal focal plane below the surface; clamped so a
+        // grazing ray cannot produce an enormous or negative step.
         this.$l.invDirY = pb.min(this.dir.y, -1e-4);
         this.$l.targetY = pb.sub(this.waterLevel, this.focalDepth);
         this.$l.hitT = pb.div(pb.sub(this.targetY, this.surfacePos.y), this.invDirY);
         this.$l.hitPos = pb.add(this.surfacePos, pb.mul(this.dir, pb.max(this.hitT, 0)));
         if (sceneDepth) {
-          // Land the photon on the scene rather than on a plane through it.
-          //
-          // Fixed-point iteration, not a ray march: read the height of the scene
-          // under the current guess, re-intersect the ray with a horizontal
-          // plane at that height, repeat. Each step is one texture fetch and the
-          // sequence converges in two or three for any receiver that is smooth
-          // over the distance the guess moves. A march would need an order of
-          // magnitude more fetches, which the photon count cannot afford - at
-          // the default density a full-coverage 1024 map launches four million.
-          //
-          // Where the assumption fails - a silhouette, an overhang - the
-          // iteration lands on one of the two surfaces rather than diverging,
-          // because every step is still a valid intersection of the ray with
-          // some horizontal plane.
+          // Land the photon on the scene by fixed-point iteration: read the scene
+          // height under the current guess, re-intersect the ray with a
+          // horizontal plane at that height, repeat. One fetch per step; at a
+          // silhouette it lands on one of the two surfaces rather than diverging.
           this.$l.probe = this.hitPos;
           this.$l.layer = pb.int(this.causticSceneParams.x);
           for (let i = 0; i < SCENE_DEPTH_ITERATIONS; i++) {
             this.$l[`clip${i}`] = pb.mul(this.causticSceneMatrix, pb.vec4(this.probe, 1));
             this.$l[`ndc${i}`] = pb.div(this[`clip${i}`].xyz, this[`clip${i}`].w);
             this.$l[`uv${i}`] = pb.add(pb.mul(this[`ndc${i}`].xy, 0.5), pb.vec2(0.5));
-            // Outside the cascade there is nothing to intersect against; keep
-            // whatever the previous step produced, which for the first step is
-            // the focal plane hit the flat path would have used.
+            // Outside the cascade, keep the previous step's result.
             this.$l[`inside${i}`] = pb.and(
               pb.all(pb.greaterThanEqual(this[`uv${i}`], pb.vec2(0))),
               pb.all(pb.lessThanEqual(this[`uv${i}`], pb.vec2(1)))
             );
-            // texelFetch rather than a filtered sample: the value is a depth,
-            // and averaging two depths across a silhouette names a surface that
-            // is not there. WebGPU only - GLSL ES 3.0 forbids texelFetch on a
-            // shadow-sampler texture, which is what gates this whole path.
+            // texelFetch, since filtered depths across a silhouette are wrong.
+            // WebGPU only - GLSL ES 3.0 forbids texelFetch on a shadow-sampler
+            // texture, which gates this whole path.
             this.$l[`depth${i}`] = pb.textureArrayLoad(
               this.causticSceneDepth,
               pb.ivec2(pb.mul(this[`uv${i}`], this.causticSceneParams.y)),
               this.layer,
               pb.int(0)
             );
-            // Back to a world position. The cascade is orthographic, so the
-            // stored depth and the sample's uv are enough to place the point.
+            // Back to a world position through the orthographic cascade.
             this.$l[`sceneNDC${i}`] = pb.vec3(
               this[`ndc${i}`].xy,
               REVERSE_Z ? this[`depth${i}`] : pb.sub(pb.mul(this[`depth${i}`], 2), 1)
             );
             this.$l[`sceneClip${i}`] = pb.mul(this.causticSceneMatrixInv, pb.vec4(this[`sceneNDC${i}`], 1));
             this.$l[`scenePos${i}`] = pb.div(this[`sceneClip${i}`].xyz, this[`sceneClip${i}`].w);
-            // Re-intersect at the height just read. Only accept it while it is
-            // below the *displaced* surface at this photon's entry: a scene
-            // point above that is not something the photon passed through. The
-            // rest level is the wrong bar - it would drop every photon landing
-            // on a receiver that pokes above the rest plane under a passing
-            // crest, cutting the caustics off along a flat line.
+            // Re-intersect at the height just read, accepted only below the
+            // *displaced* surface at this photon's entry (not the rest level).
             this.$l[`t${i}`] = pb.div(pb.sub(this[`scenePos${i}`].y, this.surfacePos.y), this.invDirY);
             this.$l[`next${i}`] = pb.add(this.surfacePos, pb.mul(this.dir, pb.max(this[`t${i}`], 0)));
             // mix rather than select: the builder has no vec3 select.
@@ -377,19 +319,15 @@ export function createCausticSplatShader(waveGenerator: WaveGenerator, sceneDept
         // Into warped space, where the map's texels live.
         this.$l.hitWarped = ShaderHelper.warpCausticNDC(this, this.hitNDC, this.causticSplatParams.x);
         this.$outputs.photonWeight = this.causticSplatParams.w;
-        // No per-backend y flip. A fragment written at clip y lands on the same
-        // texture row on both backends, so the map the receiver samples with
-        // `ndc * 0.5 + 0.5` is the one this writes at clip `ndc`.
+        // No per-backend y flip here; the blur and resolve quads account for it.
         this.$builtins.position = pb.vec4(this.hitWarped, 0, 1);
         if (pb.getDevice().type !== 'webgpu') {
-          // GLSL leaves gl_PointSize undefined unless it is written, and an
-          // undefined size rasterises nothing at all. WebGPU points are always
-          // one pixel.
+          // GLSL rasterises nothing unless gl_PointSize is written; WebGPU points
+          // are always one pixel.
           this.$builtins.pointSize = 1;
         }
         this.$if(this.outside, function () {
-          // Park the photon outside the clip volume so it is discarded. Keep
-          // w at 1: a zero w would divide to NaN instead of clipping.
+          // Park the photon outside the clip volume; w stays 1 to avoid NaN.
           this.$builtins.position = pb.vec4(-2, -2, 0, 1);
         });
       });
@@ -406,30 +344,17 @@ export function createCausticSplatShader(waveGenerator: WaveGenerator, sceneDept
 /**
  * Shader for the displaced surface height map.
  *
- * Rasterises the water surface itself into the light-space slice, one body per
- * draw. A grid is laid out over the body's footprint in warped map space; each
- * vertex sweeps its grid point along the light onto the rest plane, lets the
- * wave generator carry it to where that bit of surface is, and projects the
- * displaced point back into the map as its clip position. The fragment writes
- * its height above the rest plane, offset by `CAUSTIC_HEIGHT_BIAS`, into this
- * body's channel - selected with a colour write mask, so where the surface
- * overlaps itself in the light's view the last triangle wins rather than the two
- * heights adding. The target is cleared first, and a texel the surface never
- * reaches stays at zero, which the receiver reads as "no water on this ray".
+ * Rasterises the water surface into the light-space slice, one body per draw. A
+ * grid over the body's footprint in warped map space is swept along the light
+ * onto the rest plane, displaced by the wave generator, and projected back into
+ * the map. The fragment writes its height above the rest plane, offset by
+ * `CAUSTIC_HEIGHT_BIAS`, into this body's channel via a colour write mask (last
+ * triangle wins). A texel the surface never reaches stays zero, which the
+ * receiver reads as "no water on this ray".
  *
- * Rasterising is what makes the horizontal displacement a non-issue: sampling
- * the generator at the map position would return the surface that *started*
- * there, and inverting that displacement only converges where the surface does
- * not fold. It also makes the footprint edge right - a receiver whose sun ray
- * crosses the rest plane outside the footprint finds an empty texel and stays
- * dry, where a flat stored height would put it under water that does not exist.
- *
- * The receiver looks this up with the very uv it uses for the caustic pattern:
- * its fragment and the ray's crossing of the rest plane lie on one light ray,
- * and the map's projection is invariant along the light.
- *
- * Everything runs in the vertex stage; the generators sample with an explicit
- * LOD, which is what makes that legal.
+ * Rasterising handles horizontal displacement without inverting it, and keeps
+ * the footprint edge exact. The receiver looks this up with the same uv as the
+ * caustic pattern, since the projection is invariant along the light.
  *
  * @param waveGenerator - Supplies the surface displacement of this body.
  * @internal
@@ -458,10 +383,8 @@ export function createCausticHeightShader(waveGenerator: WaveGenerator): PBRende
         this.$l.radius = pb.div(pb.vec2(1), this.invRadius);
         this.$l.L = this.causticLightDir.xyz;
         this.$l.waterLevel = this.causticCenter.w;
-        // Ordinal to grid coordinate, (gridSize + 1) vertices per side. Half a
-        // vertex up before the floor: the reciprocal is inexact, and an ordinal
-        // that is an exact multiple of the row length must not round down into
-        // the previous row.
+        // Ordinal to grid coordinate, (gridSize + 1) vertices per side. The +0.5
+        // keeps the inexact reciprocal from rounding into the previous row.
         this.$l.row = pb.floor(pb.mul(pb.add(this.$inputs.vertexIndex, 0.5), this.causticHeightParams.z));
         this.$l.col = pb.sub(
           this.$inputs.vertexIndex,
@@ -479,8 +402,7 @@ export function createCausticHeightShader(waveGenerator: WaveGenerator): PBRende
         // Along the light onto the rest plane: the rest point of this vertex.
         this.$l.sweep = pb.div(pb.sub(this.waterLevel, this.planePos.y), this.L.y);
         this.$l.surfaceXZ = pb.add(this.planePos, pb.mul(this.L, this.sweep));
-        // Outside the footprint there is no surface. Resolved per vertex and
-        // interpolated, which fades the edge over one grid cell.
+        // Footprint test, interpolated so the edge fades over one grid cell.
         this.$outputs.inside = pb.float(
           pb.and(
             pb.all(pb.greaterThanEqual(this.surfaceXZ.xz, this.causticRegion.xy)),
@@ -492,20 +414,16 @@ export function createCausticHeightShader(waveGenerator: WaveGenerator): PBRende
         this.$l.surfaceNormal = pb.vec3();
         waveGenerator.calcVertexPositionAndNormal(this, this.surfaceXZ, this.surfacePos, this.surfaceNormal);
         this.$outputs.height = pb.sub(this.surfacePos.y, this.waterLevel);
-        // The displaced point back into the map, exactly as the splat projects a
-        // photon hit: two dot products, then the warp.
+        // The displaced point back into the map, as the splat projects a hit.
         this.$l.rel = pb.sub(this.surfacePos, this.causticCenter.xyz);
         this.$l.hitNDC = pb.mul(
           pb.vec2(pb.dot(this.rel, this.causticFrameX.xyz), pb.dot(this.rel, this.causticFrameY.xyz)),
           this.invRadius
         );
         this.$l.hitWarped = ShaderHelper.warpCausticNDC(this, this.hitNDC, this.causticHeightParams.x);
-        // The receiver reads the map at `v = 0.5 + 0.5 * ndc.y`. On WebGL a
-        // fragment at clip y lands on that row; on WebGPU clip +1 is the first
-        // row, so the surface is drawn upside down to land where the receiver
-        // looks. The splat needs no such flip because its map reaches the
-        // receiver through the blur and resolve quads, each of which flips it
-        // once more on WebGPU; this map goes straight.
+        // The receiver reads the map at `v = 0.5 + 0.5 * ndc.y`. On WebGPU clip
+        // +1 is the first row, so the surface is drawn flipped. The splat needs
+        // no flip because its map passes through the blur and resolve quads.
         this.$builtins.position =
           pb.getDevice().type === 'webgpu'
             ? pb.vec4(this.hitWarped.x, pb.neg(this.hitWarped.y), 0, 1)
@@ -515,8 +433,7 @@ export function createCausticHeightShader(waveGenerator: WaveGenerator): PBRende
     fragment(this: PBGlobalScope, pb: ProgramBuilder) {
       this.$outputs.outColor = pb.vec4();
       pb.main(function () {
-        // Outside the footprint nothing is written at all, so the texel keeps
-        // reading as "no surface" rather than as a surface at height zero.
+        // Outside the footprint nothing is written, so the texel reads "no surface".
         this.$if(pb.lessThan(this.$inputs.inside, 0.5), function () {
           pb.discard();
         });
@@ -530,9 +447,8 @@ export function createCausticHeightShader(waveGenerator: WaveGenerator): PBRende
 /**
  * Shader for the caustic map blur.
  *
- * Four bilinear taps at the texel corners average a 2x2 neighbourhood. The
- * weights sum to one, so the "calm water reads 1.0" normalisation established by
- * the accumulation pass survives any number of iterations.
+ * Four bilinear taps at the texel corners average a 2x2 neighbourhood; weights
+ * sum to one, preserving the "calm water reads 1.0" normalisation.
  *
  * @internal
  */
@@ -579,15 +495,12 @@ export function createCausticBlurShader(): PBRenderOptions {
 /**
  * Shader for the temporal resolve.
  *
- * Reprojection is exact and matrix-free. Both frames parameterise the map as an
- * orthographic slice perpendicular to the light, so a texel maps to a world
- * point with two scaled axes, and that point maps into the previous frame with
- * two dot products. Photons travel along the light and the slice is normal to
- * it, so the plane the point is taken on does not matter.
+ * Reprojection is exact and matrix-free: both frames are orthographic slices
+ * perpendicular to the light, so a texel maps to the world with two scaled axes
+ * and into the previous frame with two dot products.
  *
  * Map NDC relates to texture coordinate by the receiver's `ndc * 0.5 + 0.5`
- * (see `ShaderHelper.calculateWaterCaustic`), which is what makes this
- * independent of the clip-space y flip the splat has to apply.
+ * (see `ShaderHelper.calculateWaterCaustic`).
  *
  * @internal
  */
@@ -616,10 +529,8 @@ export function createCausticResolveShader(): PBRenderOptions {
       pb.main(function () {
         this.$l.texel = this.causticResolveParams.y;
         this.$l.current = pb.textureSampleLevel(this.causticCurrent, this.$inputs.uv, 0).x;
-        // Range the current frame supports around this texel. The reprojected
-        // value is clamped into it, which is what lets a long blend coexist with
-        // an animated pattern: where the waves have moved on, the neighbourhood
-        // no longer covers the old value.
+        // Neighbourhood range of the current frame; history is clamped into it
+        // so a long blend can follow an animated pattern.
         this.$l.mn = this.current;
         this.$l.mx = this.current;
         for (let dy = -1; dy <= 1; dy++) {
@@ -636,10 +547,8 @@ export function createCausticResolveShader(): PBRenderOptions {
             this.mx = pb.max(this.mx, this.s);
           }
         }
-        // This texel's world point on the slice, then where the previous frame
-        // put that same point. Texels are laid out in warped space, so this
-        // leaves it to reach the world and re-enters it to land on the history:
-        // the two frames may differ in slice and in warp strength alike.
+        // This texel's world point, then its place in the previous frame; the
+        // frames may differ in slice and warp strength.
         this.$l.warpedNDC = pb.sub(pb.mul(this.$inputs.uv, 2), pb.vec2(1));
         this.$l.ndc = ShaderHelper.unwarpCausticNDC(this, this.warpedNDC, this.causticResolveParams.z);
         this.$l.radius = pb.div(pb.vec2(1), pb.vec2(this.causticFrameX.w, this.causticFrameY.w));
@@ -679,11 +588,9 @@ export function createCausticResolveShader(): PBRenderOptions {
  * One photon is emitted per texel of a uniform grid laid out on the same
  * orthographic light-space slice the map covers. Each photon is refracted at the
  * water surface, intersected with the scene (or a horizontal focal plane) below
- * it, and splatted additively at the hit position. Because the grid and the map
- * share a parameterisation, and the mean deflection of a flat surface is removed
- * from the refracted direction, calm water maps photon `(i,j)` onto texel
- * `(i,j)` and the map converges to a uniform 1.0 - which the receiver treats as
- * "no caustics".
+ * it, and splatted additively at the hit position. With the flat-surface
+ * deflection removed, calm water maps photon `(i,j)` onto texel `(i,j)` and the
+ * map converges to a uniform 1.0 - which the receiver treats as "no caustics".
  *
  * @internal
  */
@@ -705,14 +612,7 @@ export class WaterCausticsRenderer {
   private _resolveProgram: Nullable<GPUProgram>;
   private _resolveBindGroup: Nullable<BindGroup>;
   private _resolveStates: Nullable<RenderStateSet>;
-  /**
-   * Slice parameters the last map committed as history was built with, per
-   * camera.
-   *
-   * Per camera because the history textures are, and this has to describe the
-   * exact map the resolve is about to reproject; one shared entry would make a
-   * second viewport reproject through the first one's slice.
-   */
+  /** Slice parameters of the last map committed as history, per camera. */
   private readonly _prevSlices: WeakMap<
     Camera,
     { frameX: Vector4; frameY: Vector4; center: Vector4; warp: number }
@@ -822,9 +722,8 @@ export class WaterCausticsRenderer {
     return info.renderable && info.filterable ? 'r16f' : 'rgba16f';
   }
   /**
-   * Storage format for the displaced surface height map. One channel per water
-   * slot, so always four wide; half floats carry a wave height to well under a
-   * millimetre at any plausible level.
+   * Storage format for the displaced surface height map: one channel per water
+   * slot.
    */
   static getHeightMapFormat(): TextureFormat {
     return 'rgba16f';
@@ -876,8 +775,7 @@ export class WaterCausticsRenderer {
     this._updateUniforms(ctx, waters, light, map.width);
     const sceneDepth = this._anySceneDepth(waters) ? this._resolveSceneDepth(ctx, light) : null;
 
-    // The height map first: it depends on the slice alone, and the receiver
-    // needs it whatever the splat produces.
+    // The height map first; it depends on the slice alone.
     device.pushDeviceStates();
     device.setFramebuffer(createFramebuffer(heights));
     device.setViewport(null);
@@ -891,16 +789,13 @@ export class WaterCausticsRenderer {
 
     device.pushDeviceStates();
     device.setFramebuffer(createFramebuffer(map));
-    // The viewport and scissor survive a framebuffer change, and this pass runs
-    // straight after the shadow maps, whose targets are a different size.
+    // Viewport and scissor survive a framebuffer change; reset them.
     device.setViewport(null);
     device.setScissor(null);
     device.clearFrameBuffer(Vector4.zero(), null, null);
     device.setRenderStates(this._getSplatStates(device));
 
-    // One draw per water body, accumulating into the one map. They share the
-    // slice, so a receiver still resolves the pattern with a single lookup; the
-    // footprint, surface height and wave generator are per-draw state.
+    // One draw per water body, accumulating into the one shared-slice map.
     for (let i = 0; i < waters.length; i++) {
       this._splatOne(device, ctx, waters[i], i, map, sceneDepth);
     }
@@ -909,15 +804,13 @@ export class WaterCausticsRenderer {
   }
   /**
    * Writes one body's displaced surface height into its channel of the height
-   * map. Per body for the same reason the splat is: each has its own wave
-   * generator, rest level and footprint.
+   * map.
    * @internal
    */
   private _renderHeightsOne(device: AbstractDevice, ctx: DrawContext, water: Water, index: number): void {
     const material = water.material;
     const waveGenerator = material.waveGenerator!;
-    // The grid covers this body's footprint, like the photon grid does; a body
-    // the map does not reach has nothing to draw.
+    // The grid covers this body's footprint.
     this._updateGridBounds(water);
     if (!(this._gridFraction > 0)) {
       return;
@@ -1004,16 +897,13 @@ export class WaterCausticsRenderer {
   ): void {
     const material = water.material;
     const waveGenerator = material.waveGenerator!;
-    // Photons are laid out over this body's own footprint, so the grid bounds
-    // and the fraction of the map they cover are per body, not per map.
+    // Photons are laid out over this body's own footprint.
     this._updateGridBounds(water);
     if (!(this._gridFraction > 0)) {
       return;
     }
     const photonGrid = this._resolvePhotonGrid(material.causticsPhotonResolution, map.width);
     this._updatePhotonLayout(device, photonGrid);
-    // Scene-depth intersection is per material, but the program is per draw, so
-    // a body that has it off simply compiles the flat variant.
     const useSceneDepth = !!sceneDepth && material.causticsSceneDepth;
     const splat = this._getSplatProgram(device, waveGenerator, useSceneDepth);
     // A bind group per slot; see _getSplatBindGroup.
@@ -1023,8 +913,6 @@ export class WaterCausticsRenderer {
       bindGroup.setValue('causticSceneMatrixInv', sceneDepth!.matrixInv);
       this._sceneDepthParams.setXYZW(sceneDepth!.layer, sceneDepth!.size, 0, 0);
       bindGroup.setValue('causticSceneParams', this._sceneDepthParams);
-      // Point sampling: the stored value is a depth, and averaging two depths
-      // across a silhouette names a surface that is not there.
       bindGroup.setTexture('causticSceneDepth', sceneDepth!.texture, fetchSampler('clamp_nearest_nomip'));
     }
     bindGroup.setValue('causticFrameX', this._uniforms.frameX);
@@ -1040,10 +928,8 @@ export class WaterCausticsRenderer {
     bindGroup.setValue('causticLightDir', this._uniforms.lightDir);
     bindGroup.setValue('causticRegion', material.region);
     bindGroup.setValue('causticGridBounds', this._gridBounds);
-    // A photon grid denser than the map deposits more than one photon per texel;
-    // scale the deposit so a flat surface still integrates to exactly 1. The
-    // grid fraction is part of that: concentrating the same photons onto a
-    // smaller part of the map raises the density there by exactly its inverse.
+    // Scale the deposit by covered texels per photon so a flat surface
+    // integrates to exactly 1.
     const photonWeight = (this._gridFraction * map.width * map.height) / (photonGrid * photonGrid);
     this._splatParams.setXYZW(this._warp, material.causticsDepth, WATER_ETA, photonWeight);
     bindGroup.setValue('causticSplatParams', this._splatParams);
@@ -1057,12 +943,8 @@ export class WaterCausticsRenderer {
     device.draw('point-list', 0, this._photonCount);
   }
   /**
-   * Blur and temporal resolve, which run once over the finished map rather than
-   * per water body.
-   *
-   * The settings come from one body's material because the map is one texture.
-   * The largest body supplies them, which is the one the viewer is most likely
-   * under.
+   * Blur and temporal resolve, run once over the finished map. Settings come
+   * from the largest body's material.
    * @internal
    */
   private _postProcess(
@@ -1083,19 +965,15 @@ export class WaterCausticsRenderer {
       this._blur(device, src, createFramebuffer(dst));
     }
 
-    // The blur always lands back in `map`, so `scratch` is free to take the
-    // resolve. Doing it the other way round would make the resolve read and
-    // write one texture.
+    // The blur lands back in `map`, so `scratch` takes the resolve.
     const strength = material.causticsTemporalStrength;
     if (strength <= 0) {
-      // Nothing is committed as history this frame, so the recorded slice has to
-      // keep describing whichever map the history slot still holds.
+      // No history committed; keep the recorded slice matching the history slot.
       return map;
     }
     const camera = ctx.camera;
     const previous = this._prevSlices.get(camera);
-    // No history on the first frame, after a resize, or after the pass was off
-    // for a while. The current map stands on its own and becomes the history.
+    // Without history the current map stands on its own and becomes the history.
     const resolved = history && previous ? scratch : map;
     if (resolved === scratch) {
       this._resolve(device, map, history!, previous!, strength, createFramebuffer(scratch));
@@ -1118,9 +996,7 @@ export class WaterCausticsRenderer {
     matrix: Matrix4x4;
     matrixInv: Matrix4x4;
   }> {
-    // WebGPU only. Reading a raw depth out of the shadow map needs a texel
-    // fetch, and GLSL ES 3.0 does not allow one on a shadow-sampler texture.
-    // WebGL2 keeps the focal plane.
+    // WebGPU only: GLSL ES 3.0 forbids texelFetch on a shadow-sampler texture.
     if (ctx.device.type !== 'webgpu') {
       warnUnsupported(
         'Water caustics on scene depth (WaterMaterial.causticsSceneDepth)',
@@ -1131,15 +1007,12 @@ export class WaterCausticsRenderer {
     }
     const params = ctx.shadowMapInfo?.get(light);
     const shadowMap = params?.shadowMap;
-    // Only the cascaded native-depth path. A packed RGBA map stores an encoded
-    // distance rather than a sampled depth, and a non-array map has no cascade
-    // to select; both fall back to the plane.
+    // Only cascaded native-depth maps; others fall back to the plane.
     if (!params || !shadowMap?.isTexture2DArray() || !shadowMap.isDepth()) {
       return null;
     }
-    // The cascade that covers the slice most tightly: the smallest one whose
-    // split distance clears the slice's reach. Falling off the end means the
-    // slice outruns the shadow map and the last cascade is all there is.
+    // The smallest cascade whose split distance clears the slice's reach, else
+    // the last.
     const count = Math.max(1, Math.min(params.numShadowCascades, 4));
     const reach = Math.max(1, this._sliceReach);
     let layer = count - 1;
@@ -1149,8 +1022,7 @@ export class WaterCausticsRenderer {
         break;
       }
     }
-    // shadowMatrices holds each cascade's view-projection transposed, four vec4
-    // rows per cascade, which is the layout the lighting pass dots against.
+    // shadowMatrices holds each cascade's view-projection transposed.
     this._sceneMatrixT.set(params.shadowMatrices.subarray(layer * 16, layer * 16 + 16));
     Matrix4x4.transpose(this._sceneMatrixT, this._sceneMatrix);
     Matrix4x4.invert(this._sceneMatrix, this._sceneMatrixInv);
@@ -1167,8 +1039,7 @@ export class WaterCausticsRenderer {
    *
    * Auto solves the grid for a fixed density in photons per covered map texel:
    * the grid covers `gridFraction` of the map, so the target is reached at
-   * `grid = size * sqrt(target * gridFraction)`. Fixing the grid instead leaves
-   * the density swinging with the water's footprint.
+   * `grid = size * sqrt(target * gridFraction)`.
    *
    * @param requested - Material setting; 0 asks for the automatic size.
    * @param mapSize - Edge length of the caustic map.
@@ -1262,7 +1133,7 @@ export class WaterCausticsRenderer {
     }
     this._heightPrograms.clear();
     this._heightStates.length = 0;
-    // The layout does not own its buffers; see _updatePhotonLayout.
+    // The layout does not own its buffers.
     this._heightLayout?.dispose();
     this._heightLayout = null;
     this._heightVertexBuffer?.dispose();
@@ -1281,8 +1152,6 @@ export class WaterCausticsRenderer {
     this._blurProgram = null;
     this._photonLayout?.dispose();
     this._photonLayout = null;
-    // Disposing the layout releases its vertex array object, not the buffer it
-    // was built over.
     this._photonBuffer?.dispose();
     this._photonBuffer = null;
     this._photonCapacity = 0;
@@ -1313,15 +1182,12 @@ export class WaterCausticsRenderer {
     light: PunctualLight,
     mapSize: number
   ): void {
-    // Slice-wide settings come from the first body, which the caller has sorted
-    // largest first. They describe the map, not the water, so one body has to
-    // win: a range or a warp per body would ask one texture for two resolutions.
+    // Slice-wide settings come from the first (largest) body.
     const material = waters[0].material;
     const dir = this._tmpDir;
     dir.set(light.directionAndCutoff.xyz());
     dir.inplaceNormalize();
-    // Two axes perpendicular to the light direction. Any pair will do; picking a
-    // world axis that is not parallel to the light keeps the cross products stable.
+    // Two axes perpendicular to the light, seeded by a non-parallel world axis.
     const seed = Math.abs(dir.y) > 0.99 ? Vector3.axisPZ() : Vector3.axisPY();
     Vector3.cross(seed, dir, this._tmpRight);
     this._tmpRight.inplaceNormalize();
@@ -1339,13 +1205,7 @@ export class WaterCausticsRenderer {
     // into the map and the photon sweep are invariant along it.
     const alongDir = Vector3.dot(center, dir);
 
-    // Water region in light space. A world-axis-aligned rectangle projects to a
-    // parallelogram here, so its bounds come from the four corners; the map is a
-    // box in these coordinates, which is why the fit is against the AABB.
-    //
-    // Over every body at once, so the slice covers all of them. Bodies far
-    // apart make the union mostly empty, but `causticsRange` already bounds how
-    // much of that reaches the map.
+    // Light-space AABB of all bodies' regions, from their four corners.
     let regionMinR = Infinity;
     let regionMaxR = -Infinity;
     let regionMinU = Infinity;
@@ -1368,20 +1228,15 @@ export class WaterCausticsRenderer {
         regionMaxU = Math.max(regionMaxU, v);
       }
     }
-    // Fit the slice to what the water can actually cast into, instead of always
-    // spending the map on a camera-centred square of `range`, which leaves most
-    // of it permanently zero for a pool far smaller than the range.
-    // `causticsRange` becomes a cap on how far from the camera the map reaches
-    // rather than its literal half-extent.
+    // Fit the slice to the water; `causticsRange` caps how far from the camera
+    // the map reaches.
     let loR = Math.max(regionMinR, cameraRight - range);
     let hiR = Math.min(regionMaxR, cameraRight + range);
     let loU = Math.max(regionMinU, cameraUp - range);
     let hiU = Math.min(regionMaxU, cameraUp + range);
     if (hiR <= loR || hiU <= loU) {
-      // The water casts nowhere within range. Nothing will be drawn, but the
-      // slice still has to be finite: the receiver projects through it whatever
-      // the map holds, and the grid bounds below have to come out empty rather
-      // than inverted.
+      // No water within range; keep the slice finite so the grid bounds come
+      // out empty rather than inverted.
       loR = cameraRight - range;
       hiR = cameraRight + range;
       loU = cameraUp - range;
@@ -1389,31 +1244,22 @@ export class WaterCausticsRenderer {
     }
     let halfR = Math.max(MIN_SLICE_EXTENT, (hiR - loR) * 0.5);
     let halfU = Math.max(MIN_SLICE_EXTENT, (hiU - loU) * 0.5);
-    // The map is square, so an anisotropic slice gives its two axes different
-    // world texel sizes, which reads as directional smearing. Capping the ratio
-    // keeps most of the fit while bounding that, and bounds the same asymmetry
-    // in the edge fade, whose band is a share of each axis.
+    // Cap the aspect ratio to bound directional smearing on the square map.
     halfR = Math.max(halfR, halfU / MAX_SLICE_ASPECT);
     halfU = Math.max(halfU, halfR / MAX_SLICE_ASPECT);
-    // Quantise so the extent holds still while the camera moves: texel snapping
-    // below only stops the map crawling if the texel size itself is stable, and
-    // a continuously shrinking slice resamples the temporal history every frame.
-    // The two common cases - a pool wholly inside the range, a sea wholly
-    // covering it - sit on a fixed level and never change at all.
+    // Quantise so the texel size holds still while the camera moves, which the
+    // centre snapping and the temporal history rely on.
     halfR = Math.min(range, quantiseSliceExtent(halfR, range));
     halfU = Math.min(range, quantiseSliceExtent(halfU, range));
-    // Warping only pays where the range, not the water, is what bounds the map.
-    // A slice already fitted to a pool has every texel on water the camera can
-    // see, and concentrating them further would just blur its far side.
+    // Warp only when the range, not the water, bounds the map.
     const rangeLimited =
       regionMinR < cameraRight - range ||
       regionMaxR > cameraRight + range ||
       regionMinU < cameraUp - range ||
       regionMaxU > cameraUp + range;
     const warp = rangeLimited ? material.causticsWarp : 0;
-    // Snap the centre so the map does not crawl as the camera moves. Whole
-    // texels when the map is linear, which is exact; a coarse ladder under a
-    // warp, where no shift is exact and the goal is instead to shift rarely.
+    // Snap the centre so the map does not crawl: whole texels when linear, a
+    // coarse ladder under a warp.
     const snapR = warp > 0 ? halfR / WARPED_CENTER_SNAP_DIVISIONS : (2 * halfR) / mapSize;
     const snapU = warp > 0 ? halfU / WARPED_CENTER_SNAP_DIVISIONS : (2 * halfU) / mapSize;
     const centerR = Math.round(((loR + hiR) * 0.5) / snapR) * snapR;
@@ -1428,15 +1274,8 @@ export class WaterCausticsRenderer {
     u.frameY.setXYZW(up.x, up.y, up.z, 1 / halfU);
     u.center.setXYZW(center.x, center.y, center.z, waterLevel);
     u.lightDir.setXYZW(dir.x, dir.y, dir.z, 1 / Math.max(-dir.y, MIN_SUN_ELEVATION));
-    // Edge fade, expressed to the receiver as the distance from the map centre
-    // the fade begins at, in units of the map half-extent. Resolving it here
-    // keeps the shader free of the extents and lets the auto width put a floor
-    // in meters under a band the map fraction alone would collapse.
-    //
-    // Only a border the range put there needs fading. Where the fit stopped at
-    // the water instead, the border already coincides with the region the
-    // receiver gates on, so a band there is at best a no-op and at worst eats
-    // caustics from the last few meters of a pool the map now fits exactly.
+    // Edge fade start, in units of the map half-extent. Only a border set by the
+    // range is faded; a border fitted to the water coincides with the region.
     const minHalf = Math.min(halfR, halfU);
     const fadeDistance = !rangeLimited
       ? 0
@@ -1452,20 +1291,17 @@ export class WaterCausticsRenderer {
     );
     u.extinction.setXYZW(material.causticsMinDepth, 0, 0, warp);
     this._warp = warp;
-    // Retained for the per-body grid fit, which runs per draw rather than here.
+    // Retained for the per-body grid fit.
     this._sliceRight = right;
     this._sliceUp = up;
     this._sliceCenterR = centerR;
     this._sliceCenterU = centerU;
     this._sliceHalfR = halfR;
     this._sliceHalfU = halfU;
-    // How far the slice reaches from the camera, which is what decides how
-    // coarse a shadow cascade has to be to contain it.
+    // Slice reach from the camera, for shadow cascade selection.
     this._sliceReach = Math.hypot(halfR, halfU);
 
-    // The per-body table the receiver searches. Footprint and surface height
-    // decide which body is above a given point; the medium is what attenuates
-    // the light once one is.
+    // Per-body table the receiver searches: footprint, medium and surface height.
     u.waterCount = Math.min(waters.length, MAX_CAUSTIC_WATERS);
     for (let i = 0; i < u.waterCount; i++) {
       const body = waters[i];
@@ -1484,13 +1320,9 @@ export class WaterCausticsRenderer {
   /**
    * Map-NDC bounds of one body's footprint, so its photon grid covers just that.
    *
-   * Projecting into the slice is invariant along the light and the slice is
-   * normal to it, so a point on the water plane and the photon it launches share
-   * a map position: the body's light-space bounds carry over directly. Clamped
-   * to the map, because photons outside it are rasterised away and the fraction
-   * has to describe what is left. Warped, because the grid is laid out in the
-   * space the map's texels live in - the warp is monotone and separable, so
-   * warping the interval's ends gives the warped interval exactly.
+   * The body's light-space bounds carry over directly since the projection is
+   * invariant along the light. Clamped to the map, then warped; the warp is
+   * monotone and separable, so warping the interval's ends is exact.
    * @internal
    */
   private _updateGridBounds(water: Water): void {
@@ -1516,12 +1348,8 @@ export class WaterCausticsRenderer {
       maxU = Math.max(maxU, v);
     }
     const warp = this._warp;
-    // Clamped to the map plus a margin, but never past the water itself. Where
-    // the footprint ends inside the map the bound stays on the water, because a
-    // photon launched off the water is killed by the region test and would only
-    // dilute the weight the fraction below hands out. Where the water carries on
-    // past the border, the margin lets the displaced surface throw photons back
-    // in across it - see GRID_BORDER_MARGIN.
+    // Clamped to the map plus a margin (see GRID_BORDER_MARGIN), but never past
+    // the water itself.
     const m = 1 + GRID_BORDER_MARGIN;
     const lo = (v: number) => Math.max(-m, Math.min(m, v));
     const minX = warpCausticNDC(lo((minR - this._sliceCenterR) / this._sliceHalfR), warp);
@@ -1529,9 +1357,8 @@ export class WaterCausticsRenderer {
     const minY = warpCausticNDC(lo((minU - this._sliceCenterU) / this._sliceHalfU), warp);
     const maxY = warpCausticNDC(lo((maxU - this._sliceCenterU) / this._sliceHalfU), warp);
     this._gridBounds.setXYZW(minX, minY, maxX, maxY);
-    // Share of the map the grid covers, which is what keeps calm water at 1.0:
-    // the same photon count spread over a smaller area has to deposit
-    // proportionally less each.
+    // Share of the map the grid covers; scales the photon weight to keep calm
+    // water at 1.0.
     this._gridFraction = Math.max(0, ((maxX - minX) * (maxY - minY)) / 4);
   }
   /** @internal */
@@ -1540,10 +1367,7 @@ export class WaterCausticsRenderer {
     if (this._photonCapacity >= this._photonCount) {
       return;
     }
-    // Grow only, and never rebuild for a size change.
-    //
-    // The buffer holds each photon's ordinal, and the shader divides that
-    // by the grid size to place it.
+    // Grow only. The buffer holds each photon's ordinal.
     const capacity = Math.max(this._photonCount, this._photonCapacity * 2);
     const indices = new Float32Array(capacity);
     for (let i = 0; i < capacity; i++) {
@@ -1580,8 +1404,7 @@ export class WaterCausticsRenderer {
       states = device.createRenderStateSet();
       states.useRasterizerState().setCullMode('none');
       states.useDepthState().enableTest(false).enableWrite(false);
-      // Plain overwrite into this slot's channel only. Blending would add the
-      // heights wherever the surface overlaps itself in the light's view.
+      // Plain overwrite into this slot's channel only.
       states.useColorState().setColorMask(slot === 0, slot === 1, slot === 2, slot === 3);
       this._heightStates[slot] = states;
     }

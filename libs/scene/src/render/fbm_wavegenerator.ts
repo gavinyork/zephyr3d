@@ -18,7 +18,7 @@ export class FBMWaveGenerator extends Disposable implements WaveGenerator {
   private readonly _lacunarity: number;
   private readonly _gain: number;
   /**
-   * Creates a new Gerstner wave generator.
+   * Creates a new FBM wave generator.
    */
   constructor() {
     super();

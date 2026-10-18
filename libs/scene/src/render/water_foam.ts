@@ -178,8 +178,7 @@ export class WaterFoamField extends Disposable {
   }
   /**
    * Scale of the foam the open water's breaking crests leave behind, as
-   * Crest's Wave Foam Strength: 0 keeps them as they were, foam only while the
-   * crest breaks.
+   * Crest's Wave Foam Strength: 0 leaves foam only while the crest breaks.
    */
   get baseStrength() {
     return this._baseStrength;
@@ -323,11 +322,10 @@ export class WaterFoamField extends Disposable {
   }
   /**
    * The field at an undisplaced XZ, as vec3(foam density, coverage, wall
-   * foam). The
-   * finest level holding the point answers, blended into the next coarser
-   * over the last FOAM_FIELD_EDGE_BLEND of it; coverage falls to 0 over that
-   * share of the coarsest level and is 0 off it, where the reader falls back
-   * to foam with no memory.
+   * foam). The finest level holding the point answers, blended into the next
+   * coarser over the last FOAM_FIELD_EDGE_BLEND of it; coverage falls to 0 over
+   * that share of the coarsest level and is 0 off it, where the reader falls
+   * back to foam with no memory.
    */
   sample(scope: PBInsideFunctionScope, xz: PBShaderExp): PBShaderExp {
     const pb = scope.$builder;

@@ -49,7 +49,6 @@ export type WaterRefractionMode = 'march' | 'offset';
  *
  * - `none`: normal shading.
  * - `normal`: wave normal, remapped to [0,1].
- *   the underside of a folded crest.
  * - `foam`: foam coverage after the amount/falloff ramp, as grey.
  * - `waterDepth`: height of the surface above the scene point behind it, in
  *   metres / 10, as grey.
@@ -66,7 +65,6 @@ export type WaterRefractionMode = 'march' | 'offset';
  *   no shadowed light.
  * - `specular`: the lights' mirror highlights, shadowed, with nothing else.
  * - `depth`: refracted path length through the medium, metres / 10.
- *   no offset is mid grey.
  * - `interaction`: the {@link WaterInteraction} field on its own, mid grey at
  *   rest and reaching black and white at its amplitude clamp; dimmed outside
  *   the field's window.
@@ -126,9 +124,8 @@ const WATER_BASE_ROUGHNESS = 0.04;
 const WATER_DISTANT_ROUGHNESS = 0.35;
 /**
  * Roughness over which the sky reflection hands over from the sharp baked sky
- * to the environment's GGX-prefiltered radiance map at that roughness: the
- * slopes distance flattens out of the normals blur the mirror as they widen
- * the sun's highlight, as Crest picks its reflection mip by roughness.
+ * to the environment's GGX-prefiltered radiance map, as Crest picks its
+ * reflection mip by roughness.
  */
 const SKY_PREFILTER_START = 0.06;
 const SKY_PREFILTER_FULL = 0.15;
@@ -172,11 +169,7 @@ const SSS_ABSORPTION_SCALE = 3;
  * almost nothing returns to a camera looking down.
  */
 export const DEFAULT_SCATTER_ANISOTROPY = 0.7;
-/**
- * Floor on the refracted sun ray's descent. A grazing sun refracts to about
- * 41 degrees below the surface, so this is only reached by a sun below the
- * horizon.
- */
+/** Floor on the refracted sun ray's descent; only reached by a sun below the horizon. */
 const MIN_SUN_SLOPE = 0.05;
 /** Refraction blur per meter of path from geometry alone, in mip widths. */
 const REFRACT_BLUR_GEOMETRIC = 0.02;
@@ -778,9 +771,8 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
     return this._subsurfaceCrestHeight;
   }
   set subsurfaceCrestHeight(val: number) {
-    // The gate softens over SSS_HEIGHT_SOFTNESS of this; much below a few
-    // centimetres that is a hard step at the still-water level, crests in
-    // blotches cut along it
+    // The gate softens over SSS_HEIGHT_SOFTNESS of this; too small a height
+    // makes it a hard step at the still-water level.
     const clamped = Math.max(SSS_CREST_HEIGHT_MIN, val);
     if (clamped !== this._subsurfaceCrestHeight) {
       this._subsurfaceCrestHeight = clamped;
@@ -1087,11 +1079,9 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
     ).xyz;
     scope.worldNormal = pb.vec3(0, 1, 0);
     scope.worldPos = scope.clipmapWorldPos;
-    // Spacing of the mesh vertices here: level L of the clipmap spans
-    // Chebyshev distances from T 2^L to 2T 2^L cells around the camera with
-    // cells 2^L across, so distance / T bounds it from above. Taken from the
-    // distance rather than the level so that two levels meeting at a seam
-    // agree on it and displace their shared vertices alike.
+    // Mesh vertex spacing: clipmap level L spans Chebyshev distances T 2^L to
+    // 2T 2^L cells with cells 2^L across, so distance / T bounds it. Taken from
+    // the distance, not the level, so both sides of a seam agree.
     scope.$l.camOffset = pb.abs(pb.sub(scope.clipmapWorldPos.xz, ShaderHelper.getCameraPosition(scope).xz));
     scope.$l.vertexSpacing = pb.mul(
       pb.max(
@@ -1262,8 +1252,7 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
       scope.$l.sheetThickness = sheetThickness
         ? sheetThickness.call(this.waveGenerator, scope, scope.$inputs.clipmapPos.xz)
         : pb.float(-1);
-      // Wholly past the water's edge: nothing to draw, rather than the scene
-      // colour behind, which the final image does not quite match
+      // Wholly past the water's edge: nothing to draw.
       if (surfaceCoverage) {
         scope.$if(pb.lessThanEqual(scope.surfaceCoverage, 1e-3), function () {
           pb.discard();
@@ -2005,15 +1994,12 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
           1
         );
         this.$l.crestWhite = this.waterWhiteFoam(this.crestDensity, this.foamSample, this.foamLookParams.x);
-        // Wall foam, cut from the same texture by its own density: saturated
-        // against the wall, so whole there, fraying into the texture's pattern
-        // as it thins out away from it. Its strength is how opaque it is,
-        // after the cut, so it never breaks the fringe into patches
+        // Wall foam, cut from the same texture by its own density: whole against
+        // the wall, fraying as it thins. Its strength scales opacity after the cut.
         this.$l.wallDensity = pb.clamp(this.wallFoam, 0, 1);
         this.$l.wallCut = this.waterWhiteFoam(this.wallDensity, this.foamSample, this.foamLookParams.x);
         this.$l.wallWhite = pb.mul(this.wallCut.x, this.foamShadingParams.z);
-        // The two layers overlap as independent covers; the relief and the
-        // bubbles come from what they make together
+        // The two layers combine as independent covers.
         this.$l.foam = pb.sub(1, pb.mul(pb.sub(1, this.crestWhite.x), pb.sub(1, this.wallWhite)));
         this.$l.foamGrad = pb.add(
           pb.mul(this.crestWhite.yz, pb.sub(1, this.wallWhite)),
@@ -2143,11 +2129,8 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
           this.sssAlign = pb.mix(SSS_SUN_ALIGN_FLOOR, 1, pb.mul(this.sssAlign, this.sssAlign));
           this.$l.sssSunUp = pb.smoothStep(0, 0.1, this.lightDir.y);
           this.$l.sssFacing = pb.mul(this.sssGrazing, this.sssAlign, this.sssSunUp);
-          // Scaled by the light as Crest scales its subsurface term by the
-          // light colour, so a crest glows the colour of the sun behind it and
-          // dims as it sets; by 1 / pi, as the foam's and every diffuse term
-          // here are. Directional only, from the sun behind the crest.
-          // Leaves the body, so it carries `bodyWeight` like every body term.
+          // Scaled by the light colour as in Crest, and by 1 / pi like the other
+          // diffuse terms. Directional lights only; carries `bodyWeight`.
           this.$l.subsurfaceTerm = pb.vec3(0);
           this.$if(pb.equal(type, LIGHT_TYPE_DIRECTIONAL), function () {
             this.subsurfaceTerm = pb.mul(
@@ -2256,15 +2239,11 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
             );
           });
         }
-        // A sheet of water a few centimetres thick, as the swash leaves running
-        // up the sand, shows the sand through it rather than a surface over it;
-        // and where the moving mesh grazes the beach it leaves no stray patches.
-        // Where the wave generator runs the mesh on past the water's edge, the
-        // scene behind shows instead.
+        // A sheet of water a few centimetres thick (swash on the sand) fades into
+        // the scene behind it, as does the mesh past the water's edge.
         this.$if(pb.not(this.underwaterEye), function () {
-          // From the wave generator's own ground where it has one: the depth
-          // buffer reconstruction moves with the camera jitter by about as much
-          // as the sheet is thick, and the fade flickered with it
+          // From the wave generator's own ground where it has one: a depth buffer
+          // reconstruction moves with the camera jitter by about the sheet's thickness.
           this.$l.edgeThickness = this.$choice(
             pb.greaterThanEqual(this.sheetThickness, 0),
             this.sheetThickness,

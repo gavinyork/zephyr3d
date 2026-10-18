@@ -287,17 +287,12 @@ export function getGerstnerWaveGeneratorClass(): SerializableClass {
  * A single Gerstner wave, as the editor sees one entry of the
  * `Waves` object array on a {@link GerstnerWaveGenerator}.
  *
- * It behaves as a live view while it is bound: the field setters write the new
- * value straight through to the generator's wave buffer, which is what makes an
- * edit in the property panel take effect on the water immediately. Without that
- * the editor would only touch this object's own fields and the surface would
- * keep the previous wave until something else bumped the generator's version.
+ * While bound it is a live view: the field setters write straight through to
+ * the generator's wave buffer, so a property panel edit takes effect at once.
  *
- * The binding is transient and scoped to one editor session: `_owner` and
- * `_index` are set when the `Waves` getter builds the entry, and the editor
- * rebuilds the whole array from that getter after every add/delete. A copy that
- * survives a list mutation is never reused, so the cached index cannot drift
- * onto a different wave - the same reason it is safe to write through with it.
+ * The binding is transient: `_owner` and `_index` are set when the `Waves`
+ * getter builds the entry, and the editor rebuilds the array from that getter
+ * after every add/delete, so the cached index never drifts onto another wave.
  */
 class GerstnerWave {
   private _owner: Nullable<GerstnerWaveGenerator>;
@@ -348,10 +343,8 @@ class GerstnerWave {
   /**
    * Writes this object's values into slot `index` of `owner`, unconditionally.
    *
-   * Used by the `Waves` setter for a serialised-in array, whose entries were
-   * constructed without an owner, and by `add` for a freshly created one. It is
-   * distinct from the write-through in the field setters, which fire on each
-   * individual edit.
+   * Used by the `Waves` setter for a deserialized array, whose entries have no
+   * owner, and by `add` for a freshly created one.
    * @internal
    */
   applyTo(owner: GerstnerWaveGenerator, index: number) {
@@ -526,8 +519,7 @@ export function getGerstnerWaveClass(): SerializableClass {
 /**
  * Inspector layout of the water's properties: group (sub-groups after a
  * slash) and label of each, in the order the groups are shown; the inspector
- * opens the groups marked open. Presentation only: the serialized names stay
- * as they are, so saved scenes are unaffected.
+ * opens the groups marked open. Presentation only; serialized names are unaffected.
  */
 const WATER_PROPERTY_LAYOUT: { group: string; open?: boolean; props: [string, string][] }[] = [
   {

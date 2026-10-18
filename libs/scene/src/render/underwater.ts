@@ -41,14 +41,11 @@ export interface UnderwaterState {
  * Which waters each camera is currently inside, and the rest plane of each.
  *
  * Written by {@link Water.updatePerCamera}, which runs for every water every
- * frame whether or not the surface survived culling. Reading the render queue
- * instead would lose the state the moment the surface left the frustum - which
- * is exactly what happens to a camera deep underwater looking down.
+ * frame whether or not the surface survived culling, so the state survives the
+ * surface leaving the frustum.
  *
- * Keyed on the camera so multiple views stay independent. The inner map holds a
- * strong reference to the water, which a disposed node would keep alive; entries
- * are pruned on read rather than on dispose, since a disposed water simply stops
- * updating its own entry.
+ * Keyed on the camera so multiple views stay independent. Entries of disposed
+ * waters are pruned on read.
  *
  * @internal
  */
@@ -84,9 +81,8 @@ export function setWaterSubmergence(
 /**
  * The water the camera is currently inside, or null when it is above all of them.
  *
- * Several can qualify - a pool inside a lake, water on terraces - and the one
- * that matters is the highest of them: that is the last surface the eye crossed
- * on its way down, so it owns the column the eye is looking through.
+ * When several qualify, the highest wins: it is the last surface the eye crossed
+ * on its way down.
  *
  * @param ctx - Frame draw context.
  * @returns The submerged state, or null.
@@ -125,10 +121,8 @@ export function selectUnderwaterSource(ctx: DrawContext): Nullable<UnderwaterSta
 /**
  * Optical depth at which a channel is taken to have died completely.
  *
- * exp(-30) is about 1e-13, which is zero in any format the scene color uses. The
- * path length fed to the medium is capped at whatever distance reaches this on
- * the least attenuated channel, so a huge far plane cannot push the exponent
- * anywhere unpleasant.
+ * exp(-30) is about 1e-13, zero in any scene color format. The path length is
+ * capped at the distance reaching this on the least attenuated channel.
  * @internal
  */
 const OPTICAL_DEPTH_CAP = 30;
@@ -136,9 +130,8 @@ const OPTICAL_DEPTH_CAP = 30;
 /**
  * Global name of the shadow map the receiver helpers sample.
  *
- * Fixed by `ShaderHelper`, which declares it under this name for materials and
- * reads it from the implementation's `computeShadow`; a standalone pass sampling
- * shadows has to use the same one.
+ * Must match the name `ShaderHelper` declares and the shadow implementation's
+ * `computeShadow` reads.
  * @internal
  */
 const SHADOW_MAP_UNIFORM = 'Z_UniformShadowMap';
@@ -151,16 +144,12 @@ const SHADOW_MAP_UNIFORM = 'Z_UniformShadowMap';
  * 1. multiply by the medium's transmittance, then
  * 2. add what the medium scatters back towards the eye.
  *
- * Two rather than one because the transmittance is per channel - red dies within
- * a metre or two of clear water while blue carries tens of metres, which is the
- * entire reason water reads as water - and a single blend equation only has a
- * scalar `src-alpha` to attenuate the destination with. Splitting them lets the
- * first draw use `src-color` as the destination factor and keep the colour.
+ * Two draws because the transmittance is per channel and a single blend equation
+ * only has a scalar `src-alpha`; the first draw uses `src-color` as the
+ * destination factor.
  *
- * The pass runs after the sky, and treats a sky pixel as a ray that never left
- * the water: its path length is the cap above, so its transmittance is zero and
- * the horizon is pure medium. That is what replaces the sky underwater, rather
- * than any separate handling of it.
+ * The pass runs after the sky and treats a sky pixel as a ray that never left
+ * the water: its path length is the cap, so the horizon is pure medium.
  *
  * @internal
  */
@@ -189,11 +178,7 @@ export class UnderwaterRenderer {
   private readonly _cameraParams: Vector4;
   private readonly _implParams: Vector4;
   private readonly _cameraForward: Vector4;
-  /**
-   * Scratch for the cascade matrices. Copied rather than passed through, because
-   * the uniform setter wants an array it owns the buffer type of; reused so the
-   * copy does not allocate every frame.
-   */
+  /** Reused scratch copy of the cascade matrices for the uniform setter. */
   private _shadowMatrices: Nullable<Float32Array<ArrayBuffer>>;
   constructor() {
     this._extinctionProgram = null;
@@ -231,16 +216,12 @@ export class UnderwaterRenderer {
   ): void {
     const device = ctx.device;
     const material = state.material;
-    // Shafts need the caustic map as the surface's transmittance, and the sun
-    // that map was built for. Without one the march has nothing to modulate and
-    // would paint a uniform cone, so it degrades to the ambient term alone.
+    // Shafts need the caustic map and its sun; without them only the ambient term
+    // is drawn.
     const sun = ctx.waterCausticLight;
     const godRays =
       material.underwaterGodRays && !!ctx.waterCaustics && !!sun && material.underwaterGodRayIntensity > 0;
     const steps = godRays ? material.underwaterGodRaySteps : 0;
-    // The caustic light is required to cast shadows for the map to exist at all,
-    // so its params are normally there; the lookup stays defensive because this
-    // runs a module later and nothing re-checks in between.
     const shadowMapParams =
       godRays && material.underwaterGodRayShadow ? (ctx.shadowMapInfo?.get(sun!) ?? null) : null;
     const shadow = shadowMapParams?.shadowMap ? shadowMapParams : null;
@@ -320,11 +301,8 @@ export class UnderwaterRenderer {
   /**
    * Upload the shadow receiver uniforms the march samples.
    *
-   * The names and the struct layouts are dictated by the helpers that read them
-   * (`ShaderHelper.calculateShadowSpaceVertex`, the shadow implementation's
-   * `computeShadow`), which expect the material light pass's globals. This is
-   * the same arrangement the shadow mask pass makes for the same reason - see
-   * `ShadowMaskRenderer.setUniforms`.
+   * Names and struct layouts match the material light pass's globals, which the
+   * shadow helpers read; see `ShadowMaskRenderer.setUniforms`.
    * @internal
    */
   private _setShadowUniforms(
@@ -368,10 +346,8 @@ export class UnderwaterRenderer {
       envLightStrength: ShaderHelper.getEnvLightLuminance(ctx),
       envLightSpecularStrength: ctx.env?.light.specularStrength ?? 1
     });
-    // Which way the camera looks, for the cascade split test. The march knows
-    // how far along its ray a sample is, and the splits are measured in view
-    // depth; using the radial distance instead would pick a coarser cascade
-    // towards the edges of a wide frustum and bend the cascade seam.
+    // Camera forward, for the cascade split test, which is measured in view
+    // depth rather than radial distance.
     camera.worldMatrix.getRow(2, this._cameraForward);
     this._cameraForward.scaleBy(-1);
     bindGroup.setValue('cameraForward', this._cameraForward.xyz());
@@ -393,8 +369,7 @@ export class UnderwaterRenderer {
       this._extinctionStates = device.createRenderStateSet();
       this._extinctionStates.useRasterizerState().setCullMode('none');
       this._extinctionStates.useDepthState().enableTest(false).enableWrite(false);
-      // dst.rgb *= src.rgb. The whole reason this is its own draw: the
-      // destination factor has to be the per-channel transmittance.
+      // dst.rgb *= src.rgb (per-channel transmittance).
       this._extinctionStates
         .useBlendingState()
         .enable(true)
@@ -405,20 +380,16 @@ export class UnderwaterRenderer {
       this._inscatterStates = device.createRenderStateSet();
       this._inscatterStates.useRasterizerState().setCullMode('none');
       this._inscatterStates.useDepthState().enableTest(false).enableWrite(false);
-      // dst.rgb += src.rgb. Alpha is left alone, as in the fog pass: folding a
-      // transmittance into the framebuffer coverage makes a dense medium show
-      // the page through the canvas.
+      // dst.rgb += src.rgb. Alpha is left alone, as in the fog pass, so a dense
+      // medium does not make the canvas transparent.
       this._inscatterStates
         .useBlendingState()
         .enable(true)
         .setBlendFuncRGB('one', 'one')
         .setBlendFuncAlpha('zero', 'one');
     }
-    // The march is unrolled, so the step count is part of the program identity.
-    // Authoring it as a uniform loop bound instead would cost a dynamic loop in
-    // every variant including the one with no shafts at all. The shadow hash
-    // joins it because the receiver code is generated from the implementation,
-    // the cascade count and the shadow map's own type.
+    // The march is unrolled, so the step count is part of the program identity,
+    // as is the shadow hash the receiver code is generated from.
     const key = `${steps}|${shadow ? shadow.shaderHash : ''}`;
     let inscatter = this._inscatterPrograms.get(key);
     if (!inscatter) {
@@ -491,9 +462,8 @@ export class UnderwaterRenderer {
           ShaderHelper.declareWaterCausticUniforms(pb);
         }
         if (shadow) {
-          // The shadow receiver helpers read the material light pass's globals by
-          // name, so a standalone pass has to reproduce them field for field.
-          // Same arrangement, and same reason, as ShadowMaskRenderer.
+          // Reproduces the material light pass's globals the shadow helpers read
+          // by name, as ShadowMaskRenderer does.
           const cameraStruct = pb.defineStruct([
             pb.vec4('position'),
             pb.vec4('params'),
@@ -540,13 +510,8 @@ export class UnderwaterRenderer {
             shadowTex.sampleType('unfilterable-float');
           }
           this[SHADOW_MAP_UNIFORM] = shadowTex.uniform(0);
-          // How much sun reaches a point inside the water column.
-          //
-          // No normal offset bias: that exists to stop a surface shadowing
-          // itself at grazing incidence, and a point floating in the medium has
-          // no surface to do it with. NoL is passed as 1 for the same reason -
-          // there is no receiver orientation, and 1 is the value that asks the
-          // depth bias for its smallest correction.
+          // How much sun reaches a point inside the water column. A point in the
+          // medium has no surface orientation, so no normal offset and NoL = 1.
           pb.func('zUnderwaterShadow', [pb.vec3('worldPos'), pb.float('viewDepth')], function () {
             if (numCascades > 1) {
               this.$l.comparison = pb.vec4(
@@ -575,10 +540,7 @@ export class UnderwaterRenderer {
               this.$l.shadowVertex = ShaderHelper.calculateShadowSpaceVertex(this, pb.vec4(this.worldPos, 1));
               this.$l.shadow = shadow.impl!.computeShadow(shadow, this, this.shadowVertex, pb.float(1));
             }
-            // Past the shadow distance there is no map left to read, so the
-            // shafts have to come back to unshadowed rather than to whatever the
-            // last cascade's border holds. Same fade the surfaces use, so a shaft
-            // and the sea bed under it stop being shadowed together.
+            // Fade to unshadowed towards the shadow distance, as the surfaces do.
             this.$l.shadowDistance = this.light.shadowCameraParams.w;
             this.shadow = pb.mix(
               this.shadow,
@@ -604,19 +566,11 @@ export class UnderwaterRenderer {
           this.$l.hPos = pb.mul(this.invProjViewMatrix, this.clipSpacePos);
           this.$l.worldPos = pb.div(this.hPos, this.hPos.w).xyz;
           this.$l.isSky = ShaderHelper.isFarthestDepth(this, this.depthValue);
-          // Direction the eye is looking, as a unit vector. Normalised from the
-          // raw difference rather than divided by the capped path length below:
-          // the cap is a limit on how far the medium is integrated, not on where
-          // the geometry is, so dividing by it scaled this to |worldPos - eye| /
-          // cap - up to 2.4 in the turbid ocean preset. That put cosTheta outside
-          // [-1, 1], drove the Henyey-Greenstein denominator negative, and the
-          // clamp guarding pow() then returned a phase of some 40000 in a flat
-          // band across the distance.
+          // Normalised from the raw difference, not divided by the capped path
+          // length, so it stays a unit vector and cosTheta stays in [-1, 1].
           this.$l.viewDir = pb.normalize(pb.sub(this.worldPos, this.cameraPosition));
           // A ray that reached the sky never left the water, so it takes the
-          // whole cap rather than the far plane's world position. That is the
-          // one thing that makes the horizon converge to the medium instead of
-          // showing the sky through it.
+          // whole cap.
           this.$l.pathLength = this.$choice(
             this.isSky,
             this.params.z,
@@ -626,12 +580,8 @@ export class UnderwaterRenderer {
           if (!inscatter) {
             this.$outputs.outColor = pb.vec4(this.transmittance, 1);
           } else {
-            // Downwelling sky light reaching the column, attenuated over the
-            // vertical depth rather than along the view ray: what lights the
-            // water is the sun and sky above it, and how far down this stretch
-            // of column sits is what decides how much of that is left. Averaged
-            // over the two ends of the path, which is exact for a column at
-            // constant depth and a fair stand-in when it is not.
+            // Downwelling sky light, attenuated over the vertical depth averaged
+            // between the two ends of the path.
             this.$l.endY = this.$choice(this.isSky, this.cameraPosition.y, this.worldPos.y);
             this.$l.columnDepth = pb.mul(
               0.5,
@@ -645,61 +595,31 @@ export class UnderwaterRenderer {
               this.params.x,
               pb.exp(pb.neg(pb.mul(this.mediumExtinction, this.columnDepth)))
             );
-            // Single scattering: the albedo is the share of the extinguished
-            // energy that comes back rather than being absorbed, the same form
-            // getScattering() uses on the surface.
+            // Single scattering, the same form getScattering() uses on the surface.
             this.$l.inscatter = pb.mul(
               this.mediumAlbedo,
               pb.sub(pb.vec3(1), this.transmittance),
               this.ambient
             );
             if (godRays) {
-              // Shafts of sunlight through the column. The ambient term above is
-              // directionless and cannot produce them; this is the same single
-              // scattering integral evaluated against the sun instead, and the
-              // only way to get it is to walk the ray, because how much sun
-              // reaches a point depends on the surface overhead at that point.
+              // Sun shafts: the single scattering integral against the sun,
+              // marched along the view ray since the sun reaching each point
+              // depends on the surface overhead.
               //
-              // Angle between the sun's travel and the direction the scattered
-              // light has to leave in to reach the eye, which is back along the
-              // view ray. Constant along a ray from a directional light, so it
-              // is hoisted out of the march. Clamped because both inputs are
-              // unit vectors only up to rounding, and the phase function below
-              // is not defined outside the range.
+              // Scattering angle, constant along the ray; clamped against rounding.
               this.$l.cosTheta = pb.clamp(pb.neg(pb.dot(this.sunDirection, this.viewDir)), -1, 1);
               this.$l.phase = waterScatterPhase(this, this.cosTheta, this.phaseParams.x);
-              // Dithered sample offset. A fixed one puts every ray's samples on
-              // the same set of distances, and the shafts then show as concentric
-              // bands rather than as beams; the noise turns that structure into
-              // grain the eye reads as the water itself.
+              // Dithered sample offset, trading banding for grain.
               this.$l.jitter = interleavedGradientNoise(this, this.$builtins.fragCoord.xy);
               // The integral is sigma_s * integral(sunAtP(t) * exp(-sigma_t * t) dt),
               // and only `sunAtP` needs sampling - the exponential is analytic.
               // So the march estimates the transmittance-weighted *mean* of
               // sunAtP and the closed form below supplies the rest.
               //
-              // Samples are placed by inverting that exponential rather than
-              // spread evenly along the ray. Evenly spaced ones broke the turbid
-              // ocean preset: at sigma_t = 0.46/m over a 125m cap, 24 steps sit
-              // 5.2m apart against a 2.2m mean free path, so the first sample
-              // outweighed the second tenfold and the red channel was decided by
-              // a single jittered position - noise per pixel. Importance
-              // sampling packs them into the few metres that carry the weight,
-              // where consecutive samples land close enough that the jitter
-              // barely moves them.
-              //
-              // Placement goes by the *least* attenuated channel, not by the
-              // luminance-weighted mean. The per-channel correction is
-              // exp(-sigma_c * t) / pdf, which grows like
-              // exp((sigma_place - sigma_c) * t): any channel thinner than the
-              // placement rate gets an exponentially growing weight, and its
-              // mean ends up decided by the single furthest sample. The
-              // luminance mean did exactly that here - sigma_lum = 0.30 against
-              // a blue 0.24 put a factor of 2000 on the last sample at 125m,
-              // which is both far outside the caustic map (so no pattern, hence
-              // no visible shafts) and violently jittered (hence the grain).
-              // Taking the minimum makes every exponent non-positive, so no
-              // weight can ever run away.
+              // Samples are importance-sampled by inverting the exponential of
+              // the *least* attenuated channel: the per-channel correction grows
+              // like exp((sigma_place - sigma_c) * t), so this keeps every
+              // exponent non-positive and no weight can run away.
               this.$l.sigmaPlace = pb.max(
                 pb.min(pb.min(this.mediumExtinction.x, this.mediumExtinction.y), this.mediumExtinction.z),
                 1e-3
@@ -719,11 +639,9 @@ export class UnderwaterRenderer {
                   this.pathLength
                 );
                 this.$l.samplePos = pb.add(this.cameraPosition, pb.mul(this.viewDir, this.t));
-                // How much sun survives to this point: the caustic map's own
-                // answer, which already carries both the Beer-Lambert
-                // transmittance down the sun ray and the focusing pattern the
-                // waves impose on it. Sharing it is what makes a shaft line up
-                // with the caustic cell it lands in.
+                // Sun reaching this point: the caustic map already carries the
+                // Beer-Lambert transmittance down the sun ray and the focusing
+                // pattern, so shafts line up with the caustics.
                 this.$l.sunAtP = ShaderHelper.sampleWaterCaustic(
                   this,
                   this.samplePos,
@@ -732,29 +650,22 @@ export class UnderwaterRenderer {
                   false
                 );
                 if (shadow) {
-                  // What the caustic map cannot know: it describes what the
-                  // *surface* did to the sunlight and nothing about what stands
-                  // under it, so without this a shaft runs straight through a
-                  // piling. The sea bed's own shadow is unaffected either way -
-                  // that comes from the ordinary lighting path.
+                  // Occlusion by geometry under the surface, which the caustic
+                  // map does not know about.
                   this.$l.viewDepth = pb.dot(pb.sub(this.samplePos, this.cameraPosition), this.cameraForward);
                   this.sunAtP = pb.mul(this.sunAtP, this.zUnderwaterShadow(this.samplePos, this.viewDepth));
                 }
-                // Transmittance back to the eye over the density the sample was
-                // drawn from. The constant factors of the pdf - sigmaPlace and
-                // cdfMax - are the same for every sample, so they cancel in the
-                // ratio below and only the exponentials are kept.
+                // Transmittance back to the eye over the sampling pdf; the pdf's
+                // constant factors cancel in the ratio below.
                 this.$l.weight = pb.exp(
                   pb.mul(pb.sub(pb.vec3(this.sigmaPlace), this.mediumExtinction), this.t)
                 );
                 this.shafts = pb.add(this.shafts, pb.mul(this.sunAtP, this.weight));
                 this.weightSum = pb.add(this.weightSum, this.weight);
               });
-              // The closed form of the same integral with sunAtP held at its
-              // sampled mean: sigma_s/sigma_t * (1 - exp(-sigma_t * path)) is
-              // exactly the (1 - transmittance) factor the ambient term uses, so
-              // the two halves of the in-scattering share one normalisation and
-              // a shaft can never exceed the light available to it.
+              // Closed form with sunAtP at its sampled mean:
+              // sigma_s/sigma_t * (1 - exp(-sigma_t * path)), the same
+              // normalisation as the ambient term.
               this.$l.meanSun = pb.div(this.shafts, pb.max(this.weightSum, pb.vec3(1e-6)));
               this.inscatter = pb.add(
                 this.inscatter,

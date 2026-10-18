@@ -58,35 +58,24 @@ interface ExtraPoints {
  * Height queries against a water surface, driven by the material's own
  * evaluation of it.
  *
- * Why this and not a CPU-side reconstruction of the waves: the displacement the
- * material draws with is produced on the GPU, and any second implementation of
- * it - re-deriving the spectrum, decoding the height textures, summing the
- * dominant waves - is a different function that has to be kept in step by
- * hand. {@link Water.getSurfacePoint} asks the material instead, so it is exact
- * by construction. By default it includes ambient waves and external interaction
+ * {@link Water.getSurfacePoint} evaluates the GPU displacement itself, so the
+ * result is exact by construction rather than a CPU re-implementation of the
+ * waves. By default it includes ambient waves and external interaction
  * impulses, but excludes disturber wakes to prevent buoyancy feeding itself.
  * Set includeDisturbers for queries that need the complete rendered surface.
- * What it costs is one point-list draw and one readback per batch, which is
- * why queries here are batched and throttled
- * rather than issued per call.
+ * Each batch costs one point-list draw and one readback, so queries are
+ * batched and throttled rather than issued per call.
  *
- * The queries are placed on a lattice at construction and never move. A frame
- * asks for the same small set of positions every time, so the whole set costs
- * one draw and one readback - the same as a single query would - and the answer
- * is interpolated across the lattice on demand. Positions that move (a hull's
- * own footprint, say) ride along through {@link addExtraPoints}.
+ * The queries are placed on a fixed lattice at construction; the whole set
+ * costs one draw and one readback and the answer is interpolated across the
+ * lattice on demand. Moving positions (a hull's footprint, say) ride along
+ * through {@link addExtraPoints}.
  *
  * ## The motion
  *
- * The reported height eases towards the newest measurement, exponentially, and
- * nothing else is done to it. Compensating the query lag is tempting - the
- * measurement describes the surface a round trip before it can be used - but
- * every attempt at it bought its smoothness back by other means: predicting
- * from a velocity needs that velocity smoothed, extrapolating a wave diverges
- * as the square of the distance, and rate limiting the result reintroduces the
- * stepping it was meant to remove. A plain ease has none of those failure
- * modes, and the lag it leaves is the lag a floating body has anyway. A rigid
- * body should read {@link sampleWorldYRaw} instead and supply its own inertia.
+ * The reported height eases exponentially towards the newest measurement; the
+ * query lag is not compensated. A rigid body should read
+ * {@link sampleWorldYRaw} instead and supply its own inertia.
  *
  * Consequences a caller has to accept:
  * - Resolution is the lattice spacing. A grid at `h` metres resolves nothing
@@ -151,8 +140,7 @@ export class WaterSurfaceSampler {
     this._lastLatency = 0;
     this._batchFrames = 0;
     this._framesSinceLastBatch = 0;
-    // The lattice is anchored on the water's own origin and kept in world
-    // space, because that is the space the queries are issued in.
+    // The lattice is anchored on the water's origin, in world space.
     const ox = water.worldMatrix.m03;
     const oz = water.worldMatrix.m23;
     this._originX = ox - ((this._cols - 1) / 2) * this._spacing;
@@ -185,9 +173,7 @@ export class WaterSurfaceSampler {
   /**
    * Upper bound on the query rate in hertz.
    *
-   * A ceiling, not a schedule: a batch is issued as soon as the previous one
-   * has landed if that is sooner. Raising it past what a batch costs changes
-   * nothing.
+   * A ceiling, not a schedule: the achieved rate is also limited by batch cost.
    */
   get updateHz() {
     return this._updateHz;
@@ -197,8 +183,7 @@ export class WaterSurfaceSampler {
   }
   /**
    * Seconds for the reported height to close most of the gap to a new
-   * measurement. In seconds rather than per frame so that the behaviour does
-   * not change with frame rate.
+   * measurement. Independent of frame rate.
    */
   get timeConstant() {
     return this._timeConstant;
@@ -252,8 +237,7 @@ export class WaterSurfaceSampler {
    * The array is held by reference and read when a batch is issued, so a
    * caller updates the vectors in place each frame and the next batch picks
    * them up. The listener receives the surface positions for those inputs when
-   * the batch lands, in the same order. Making these a second call to the
-   * water instead would put two feedback renders in one frame.
+   * the batch lands, in the same order.
    *
    * @param inputs - World positions; only X and Z are used.
    * @param onResult - Called per batch with the surface positions.
@@ -278,11 +262,8 @@ export class WaterSurfaceSampler {
    */
   update(deltaSeconds: number) {
     this._framesSinceLastBatch++;
-    // Easing happens here, once a frame, rather than inside the query, so that
-    // every query in a frame sees the same value and asking for more points
-    // does not advance the surface further. The exact exponential decay, not
-    // `1 - dt/tau` approximated per frame, so the result does not depend on
-    // the frame size.
+    // Ease once a frame so every query in a frame sees the same value; exact
+    // exponential decay keeps the result independent of frame size.
     if (this._height && this._target) {
       const k = 1 - Math.exp(-deltaSeconds / this._timeConstant);
       const height = this._height;
@@ -318,12 +299,9 @@ export class WaterSurfaceSampler {
   /**
    * Surface world Y at a world XZ, eased.
    *
-   * Bilinear over the lattice, clamped at the edges rather than wrapped. The
-   * table this reads is advanced once a frame by {@link update}, so this is a
-   * pure lookup and can be called as often as a caller likes.
-   *
-   * For something placed directly at the height it reads, which has no
-   * inertia of its own and needs the height to move smoothly.
+   * Bilinear over the lattice, clamped at the edges. A pure lookup of the table
+   * advanced by {@link update}. For objects placed directly at the height,
+   * without inertia of their own.
    */
   sampleWorldY(x: number, z: number) {
     return this._sampleTable(this._height, x, z);
@@ -331,9 +309,8 @@ export class WaterSurfaceSampler {
   /**
    * Surface world Y at a world XZ, from the newest measurement with no easing.
    *
-   * For a rigid body. Feeding it the eased height adds a second lag on top of
-   * the one the query already carries, and a body a quarter second behind a
-   * falling surface is a body in the air.
+   * For a rigid body, which would otherwise get the easing lag on top of the
+   * query lag.
    */
   sampleWorldYRaw(x: number, z: number) {
     return this._sampleTable(this._target, x, z);

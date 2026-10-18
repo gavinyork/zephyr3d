@@ -62,10 +62,7 @@ function getDefaultBuildParams(): OceanFieldBuildParams {
         strength: 0.4,
         croppiness: -1.5,
         minWave: 0,
-        // The whole patch. Capping this at 100 discarded every wavelength
-        // between 100 and 400 m, which is exactly where the Phillips peak
-        // moves once |wind| passes ~10 m/s - the wind then had nothing left
-        // to put energy into and the swell stopped growing.
+        // The whole patch, so the Phillips peak stays in range at high wind speeds.
         maxWave: 400
       },
       {
@@ -289,17 +286,6 @@ export class FFTWaveGenerator extends Disposable implements WaveGenerator {
   clone() {
     return new FFTWaveGenerator(this._params) as this;
   }
-  /*
-  get params() {
-    return this._params;
-  }
-  set params(val: OceanFieldBuildParams) {
-    if (val && val !== this._params) {
-      this._params = val;
-      this.paramsChanged();
-    }
-  }
-  */
   private paramsChanged() {
     this._paramsChanged = true;
     this._version++;
@@ -459,10 +445,7 @@ export class FFTWaveGenerator extends Disposable implements WaveGenerator {
   /** @internal */
   private getNoiseTexture(size: number, randomSeed: number) {
     const device = getDevice();
-    // Keyed on the seed as well as the size. Keying on size alone let the first
-    // generator of a given resolution decide the noise for every later one,
-    // silently discarding their seeds - two differently seeded oceans came out
-    // identical, and which seed won depended on creation order.
+    // Keyed on the seed as well as the size: both select the noise.
     const key = `${size}:${randomSeed}`;
     let tex = FFTWaveGenerator._globals!.noiseTextures.get(key);
     if (!tex) {
@@ -1100,29 +1083,15 @@ export class FFTWaveGenerator extends Disposable implements WaveGenerator {
         pb.mul(this._sx_sz_dxdx_dzdz1.zw, this.croppinesses.y),
         pb.mul(this._sx_sz_dxdx_dzdz2.zw, this.croppinesses.z)
       );
-      // The normal of the displaced surface. Writing the Jacobian of the
-      // horizontal displacement as [[A, C], [C, F]] with A = 1 + croppiness*d2x,
-      // F = 1 + croppiness*d2z, C = croppiness*dxdz and determinant
-      // J = A*F - C*C, the cross product of the two tangents is
+      // Normal of the displaced surface. With the Jacobian of the horizontal
+      // displacement [[A, C], [C, F]], A = 1 + croppiness*d2x, F = 1 + croppiness*d2z,
+      // C = croppiness*dxdz and J = A*F - C*C, the tangents' cross product is
       //
       //   N ~ ( -sx * F, J, -sz * A )
       //
-      // The determinant never reaches the horizontal components: dividing the
-      // whole vector by A*F recovers the per-axis slope correction -sx/A, -sz/F,
-      // which is what this used to do, plus the J/(A*F) = 1 - C^2/(A*F) term on
-      // the y axis that the earlier form dropped. Putting J on the horizontal
-      // components instead (a form this briefly had) multiplies the whole normal
-      // by sign(J), so they jump as J crosses zero - a hard seam, not a fold.
-      //
-      // The y component takes the magnitude. J goes negative where the choppy
-      // displacement folds the sheet over on itself - the same condition the
-      // foam mask reads - and the cross-product normal there points down, into
-      // the water. That is geometrically true of the overturned sheet and
-      // geometrically useless to a renderer that lights the surface from above:
-      // a downward normal loses the sun, samples the sky's lower hemisphere for
-      // the irradiance and drives the view-facing term negative, which between
-      // them painted the fold black. The shading treats the water interface as
-      // upward-facing wherever it is, and the foam owns the folded band.
+      // J must stay off the horizontal components, or the normal flips with
+      // sign(J). The y component takes |J|: where the sheet folds (J < 0, the
+      // foam band) the true normal points down, which the shading cannot light.
       let dxdzSamples: PBShaderExp;
       if (that._useComputeShader) {
         dxdzSamples = pb.vec3(
@@ -1207,12 +1176,8 @@ export class FFTWaveGenerator extends Disposable implements WaveGenerator {
       );
       this.$l.jacobian4 = this.jacobian(this.dxdx_dzdz.x, this.dxdz, this.dxdx_dzdz.y);
       this.$l.val = this.det(this.jacobian4);
-      // The normal of the displaced surface, from the same Jacobian the foam
-      // reads: N ~ (-sx*F, J, -sz*A), with A and F the diagonals the helper
-      // packs into x and w. Sharing the determinant keeps the shading normal and
-      // the foam mask describing the same fold, and taking its magnitude keeps
-      // the normal upward-facing there - see calcFragmentNormal for why the sign
-      // cannot be used and why the horizontals take A and F rather than J.
+      // Same Jacobian as the foam reads: N ~ (-sx*F, |J|, -sz*A), with A and F
+      // packed into x and w. See calcFragmentNormal.
       this.$l.normal = pb.normalize(
         pb.vec3(
           pb.neg(pb.mul(this.sx, this.jacobian4.w)),

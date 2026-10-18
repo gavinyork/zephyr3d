@@ -30,11 +30,7 @@ const EARTH_RADIUS = 6371000;
 const MIN_HORIZON_EYE_HEIGHT = 0.1;
 /**
  * How far past the tessellated surface the skirt's outer edge is placed, as a
- * multiple of the view distance.
- *
- * Only has to be far enough that the ring reads as a horizon line rather than a
- * visible band; it is depth-pinned to the far plane regardless of how far out
- * it actually lands.
+ * multiple of the view distance. Its depth is pinned to the far plane.
  * @internal
  */
 const SKIRT_DISTANCE_FACTOR = 10;
@@ -47,10 +43,8 @@ const WHOLE_DOMAIN = new Vector4(-99999, -99999, 99999, 99999);
 /**
  * One evaluated point of a water surface, in world space.
  *
- * A flat record rather than the `Vector3`s the public entry point writes into,
- * because the internal batch path allocates one of these per probe per frame and
- * a probe set can be large. `nx`/`ny`/`nz` are only filled when the caller asked
- * for normals; otherwise they stay at the straight-up default.
+ * `nx`/`ny`/`nz` are only filled when the caller asked for normals; otherwise
+ * they stay at the straight-up default.
  *
  * @public
  */
@@ -93,11 +87,8 @@ export class Water extends applyMixins(GraphNode, mixinDrawable) implements Draw
   private _feedbackRenderTarget: DRef<FrameBuffer>;
   private _feedbackRenderStates: Nullable<RenderStateSet>;
   /**
-   * Tail of the surface-query queue.
-   *
-   * The feedback pass reuses one vertex buffer and one render target, so two
-   * overlapping requests would interleave their writes. Each request awaits the
-   * previous tail and publishes its own, which serializes them in issue order.
+   * Tail of the surface-query queue. The feedback pass reuses one vertex buffer
+   * and render target, so requests are serialized in issue order.
    */
   private _feedbackQueue: Promise<void>;
   /**
@@ -109,11 +100,9 @@ export class Water extends applyMixins(GraphNode, mixinDrawable) implements Draw
   lastFeedbackTiming = { issued: 0, recorded: 0, mapped: 0 };
   private readonly _material: DRef<WaterMaterial>;
   /**
-   * Whether each camera was inside this body of water on its previous update.
-   *
-   * The submerged test has a dead band around the surface, so it needs to know
-   * which way it is crossing; per camera, because two views of one ocean can be
-   * on opposite sides of it.
+   * Whether each camera was inside this body of water on its previous update;
+   * the submerged test has a dead band around the surface, so it needs the
+   * crossing direction.
    */
   private readonly _submerged: WeakMap<Camera, boolean>;
   /**
@@ -133,8 +122,7 @@ export class Water extends applyMixins(GraphNode, mixinDrawable) implements Draw
     this._lastUpdateTime = 0;
     this._material = new DRef(new WaterMaterial());
     this._material.get()!.region = new Vector4(-1, -1, 1, 1);
-    // Most of the history, as other materials: lower lets TAA's sub-pixel
-    // jitter through, and the waterline, foam against sand, visibly shakes
+    // Lower values let TAA's sub-pixel jitter through and the waterline shakes
     this._material.get()!.TAAStrength = 0.9;
     this.waveGenerator = new FBMWaveGenerator();
     this._feedbackProgram = new DRef();
@@ -211,13 +199,11 @@ export class Water extends applyMixins(GraphNode, mixinDrawable) implements Draw
    * Whether the surface reads as an unbounded ocean reaching the horizon,
    * rather than a body of water ending at the node's extent.
    *
-   * Off by default. A pond, a lake or a pool has an edge, and the region test
-   * that draws it is skipped entirely while this is on.
+   * Off by default. The region test is skipped while this is on.
    *
    * The horizon is reached without touching the camera's far plane: the
    * clipmap's outermost ring is drawn as a skirt whose outer vertices are
-   * pushed well past it with their depth pinned to the far value. A far plane
-   * sized for the near scene therefore keeps its depth precision.
+   * pushed well past it with their depth pinned to the far value.
    */
   get infinite() {
     return this.material.infinite;
@@ -233,12 +219,9 @@ export class Water extends applyMixins(GraphNode, mixinDrawable) implements Draw
    * on, in meters. 0 derives it from the true horizon distance for the camera's
    * height above the water.
    *
-   * Raising it costs clipmap levels, which are logarithmic in the distance, so
-   * the geometry cost of a much larger value is small. What it really trades is
-   * against the sky's {@link SkyRenderer.aerialPerspectiveDistance}: build the
-   * water out further than the aerial perspective LUT reaches and the far water
-   * stops converging towards the sky colour, which puts back the hard band this
-   * setting exists to remove.
+   * Geometry cost grows only logarithmically. Keep it within the sky's
+   * {@link SkyRenderer.aerialPerspectiveDistance}, or the far water stops
+   * converging towards the sky colour and shows a hard band.
    */
   get viewDistance() {
     return this._viewDistance;
@@ -260,13 +243,11 @@ export class Water extends applyMixins(GraphNode, mixinDrawable) implements Draw
   /**
    * The wave clock the surface is currently at, in seconds.
    *
-   * This is the time the displaced surface was last evaluated with - the same
-   * value {@link WaterMaterial.update} is handed - and not the scene's elapsed
-   * time. Anything that samples the surface from the CPU has to use this clock
-   * to know which frame of the wave it is looking at, and to tell a stale
-   * sample from a current one; a caller comparing against `elapsedInSeconds`
-   * from {@link SceneNode.update} will agree only while
-   * {@link animationSpeed} is 1 and nothing has paused the water.
+   * The time the displaced surface was last evaluated with (the value
+   * {@link WaterMaterial.update} is handed), not the scene's elapsed time. CPU
+   * samplers of the surface should use this clock; it matches `elapsedInSeconds`
+   * from {@link SceneNode.update} only while {@link animationSpeed} is 1 and the
+   * water has not been paused.
    */
   get waveTime() {
     return this._waveTime;
@@ -316,10 +297,8 @@ export class Water extends applyMixins(GraphNode, mixinDrawable) implements Draw
     this.material.causticsSceneDepth = val;
   }
   /**
-   * Furthest distance in meters from the camera the caustic map reaches.
-   *
-   * A cap rather than a fixed extent: the map is fitted to the part of the water
-   * within this distance.
+   * Furthest distance in meters from the camera the caustic map reaches; the
+   * map is fitted to the part of the water within this distance.
    */
   get causticsRange() {
     return this.material.causticsRange;
@@ -361,12 +340,9 @@ export class Water extends applyMixins(GraphNode, mixinDrawable) implements Draw
    * surface read from below with its Snell window.
    *
    * Uses the same medium coefficients the surface does ({@link absorption},
-   * {@link scattering} and their scales), so the volume and the surface never
-   * disagree. Atmospheric fog is suppressed while submerged - the medium the eye
-   * is looking through is water, not air.
-   *
-   * Only reaches opaque geometry, like the atmospheric fog it replaces;
-   * transparent surfaces are not tinted by the column in front of them.
+   * {@link scattering} and their scales). Atmospheric fog is suppressed while
+   * submerged. Only reaches opaque geometry, like the atmospheric fog it
+   * replaces.
    */
   get underwaterEnabled() {
     return this.material.underwaterEnabled;
@@ -388,9 +364,8 @@ export class Water extends applyMixins(GraphNode, mixinDrawable) implements Draw
   /**
    * Whether shafts of sunlight are marched through the water column.
    *
-   * Reads the caustic map as the surface's transmittance, so the shafts carry
-   * the same pattern that lands on the sea bed. Needs {@link causticsEnabled}
-   * and everything it needs; switches itself off wherever the map is
+   * Reads the caustic map as the surface's transmittance. Needs
+   * {@link causticsEnabled}; switches itself off wherever the map is
    * unavailable.
    */
   get underwaterGodRays() {
@@ -408,8 +383,7 @@ export class Water extends applyMixins(GraphNode, mixinDrawable) implements Draw
   }
   /**
    * Samples taken along each view ray for the light shafts. Raise it when the
-   * shafts read as grain rather than as beams, which is what too few samples of
-   * a sharp caustic pattern look like.
+   * shafts read as grain rather than as beams.
    */
   get underwaterGodRaySteps() {
     return this.material.underwaterGodRaySteps;
@@ -421,11 +395,8 @@ export class Water extends applyMixins(GraphNode, mixinDrawable) implements Draw
    * Whether geometry standing in the water breaks the light shafts. Off by
    * default.
    *
-   * The shafts come from the caustic map, which describes what the *surface* did
-   * to the sunlight and knows nothing about what is under it, so without this a
-   * shaft runs straight through a piling or a hull. Costs a shadow map lookup
-   * per march step, roughly doubling what the shafts cost. The sea bed's own
-   * shadows are unaffected either way.
+   * Without it a shaft runs straight through a piling or a hull. Costs a shadow
+   * map lookup per march step, roughly doubling the cost of the shafts.
    */
   get underwaterGodRayShadow() {
     return this.material.underwaterGodRayShadow;
@@ -477,10 +448,8 @@ export class Water extends applyMixins(GraphNode, mixinDrawable) implements Draw
   }
   /**
    * Strength of the sunlight scattered out of the water column towards the eye,
-   * 1 for the value the medium coefficients imply.
-   *
-   * This is what makes a shadow falling on the water darken the water itself,
-   * and a low sun tint it. 0 leaves the body lit by the environment alone.
+   * 1 for the value the medium coefficients imply. Lets shadows darken the
+   * water body and a low sun tint it; 0 leaves it lit by the environment alone.
    */
   get sunScatteringIntensity() {
     return this.material.sunScatteringIntensity;
@@ -636,11 +605,9 @@ export class Water extends applyMixins(GraphNode, mixinDrawable) implements Draw
   /**
    * How the refracted view sample is located. Defaults to `march`.
    *
-   * `offset` drops the depth-buffer search - a fixed number of texture fetches
-   * per water pixel - and displaces the screen UV by the wave normal instead.
-   * The water still refracts, but to the wrong point: a submerged silhouette
-   * smears rather than holding still. Set it on hardware that cannot afford the
-   * search.
+   * `offset` skips the depth-buffer search and displaces the screen UV by the
+   * wave normal instead: cheaper, but submerged silhouettes smear. For hardware
+   * that cannot afford the search.
    */
   get refractionMode() {
     return this.material.refractionMode;
@@ -663,9 +630,8 @@ export class Water extends applyMixins(GraphNode, mixinDrawable) implements Draw
    * Depth in meters the cheap refraction mode assumes the water is, used only
    * when {@link refractionMode} is `offset`.
    *
-   * Sets how strong the cheap distortion looks. A constant rather than the real
-   * distance to the bottom, because an offset scaled by that distance paints a
-   * second copy of anything breaking the surface.
+   * Sets how strong the cheap distortion looks. A constant, because an offset
+   * scaled by the real depth paints a second copy of anything breaking the surface.
    */
   get cheapRefractionDepth() {
     return this.material.cheapRefractionDepth;
@@ -727,15 +693,10 @@ export class Water extends applyMixins(GraphNode, mixinDrawable) implements Draw
   /**
    * Artistic scale on the refracted view offset. 1 is physical, 0 disables it.
    *
-   * The offset itself is derived: the view ray is refracted at the surface by
-   * Snell's law, walked to whatever is behind the water, and the hit point is
-   * projected back to the screen. That already accounts for the incidence angle,
-   * the depth of the receiver and the perspective foreshortening, so this exists
-   * only to dial the result back for a stylised look - not to make it correct.
-   *
-   * Values above 1 exaggerate; the surface stays continuous, but the sample can
-   * wander far enough from the true hit point that the medium tint stops
-   * matching what is visible through it.
+   * The offset comes from refracting the view ray by Snell's law and projecting
+   * its hit point back to the screen; this only dials it for a stylised look.
+   * Values above 1 exaggerate, and the medium tint may stop matching what is
+   * visible through the water.
    */
   get refractionScale() {
     return this.material.refractionScale;
@@ -746,11 +707,8 @@ export class Water extends applyMixins(GraphNode, mixinDrawable) implements Draw
   /**
    * Scale on the Fresnel reflectance, 1 for the physical value.
    *
-   * Below 1 the surface reflects less than it should and shows more of what is
-   * beneath it. Water reflects almost everything at a grazing angle, which is
-   * physically right but can bury a sea bed the shot is about; this is the knob
-   * that trades that reflection away. The F0 floor is scaled with it, so 0 gives
-   * a surface with no specular response at all.
+   * Below 1 the surface reflects less and shows more of what is beneath it. The
+   * F0 floor is scaled with it, so 0 gives no specular response at all.
    */
   get reflectionStrength() {
     return this.material.reflectionStrength;
@@ -761,9 +719,8 @@ export class Water extends applyMixins(GraphNode, mixinDrawable) implements Draw
   /**
    * How much of a folded texel reads as foam.
    *
-   * The wave generator reports where the surface has folded over on itself,
-   * which is a measure of the fold rather than of area; this scales it into a
-   * coverage fraction. 0 disables foam.
+   * Scales the wave generator's fold measure into a coverage fraction. 0
+   * disables foam.
    */
   get foamAmount() {
     return this.material.foamAmount;
@@ -774,9 +731,8 @@ export class Water extends applyMixins(GraphNode, mixinDrawable) implements Draw
   /**
    * Falloff applied to foam coverage before it is scaled.
    *
-   * Above 1 this pushes light folding towards no foam at all, so only a crest
-   * that has genuinely broken shows any - which is what keeps a windy sea from
-   * turning uniformly white.
+   * Above 1 this pushes light folding towards no foam, so only broken crests
+   * show any.
    */
   get foamFalloff() {
     return this.material.foamFalloff;
@@ -798,11 +754,7 @@ export class Water extends applyMixins(GraphNode, mixinDrawable) implements Draw
       if (this._timeStart === 0) {
         this._timeStart = elapsedInSeconds;
       }
-      // A running clock rather than `elapsed * speed`: scaling the absolute
-      // elapsed time by the speed makes a speed of zero freeze the surface at
-      // the origin of the timeline instead of where it is, so pausing snapped
-      // the waves back to their first frame. Accumulating the delta keeps the
-      // phase where it was, and a speed of zero simply stops advancing it.
+      // Accumulate the scaled delta so a speed of zero freezes the phase in place.
       this._waveTime +=
         Math.max(0, elapsedInSeconds - Math.max(this._timeStart, this._lastUpdateTime)) *
         this._animationSpeed;
@@ -825,16 +777,12 @@ export class Water extends applyMixins(GraphNode, mixinDrawable) implements Draw
       let viewDistance = 0;
       if (infinite) {
         viewDistance = this._viewDistance > 0 ? this._viewDistance : this.horizonDistance(camera);
-        // The skirt's outer edge sits beyond where the surface is tessellated,
-        // so the band between them is what hides the last ring of geometry.
+        // The skirt's outer edge sits beyond the tessellated surface to hide its last ring.
         mat.setSkirtDistance(viewDistance * SKIRT_DISTANCE_FACTOR);
       }
       this._renderData = this._clipmap.gather({
         camera,
-        // An unbounded surface is not clipped to the node's extent, and the
-        // region rectangle is what the clipmap would otherwise reject tiles
-        // against. The material's own default is already this whole-domain
-        // value; passing it keeps the two agreeing.
+        // An unbounded surface is not clipped to the node's region.
         minMaxWorldPos: infinite ? WHOLE_DOMAIN : mat.region,
         gridScale: Math.max(0.01, this._gridScale),
         userData: this,
@@ -928,19 +876,13 @@ export class Water extends applyMixins(GraphNode, mixinDrawable) implements Draw
   /**
    * Decide whether `camera` is inside this body of water and publish the result.
    *
-   * Run from `updatePerCamera`, which the node re-queues every frame regardless
-   * of culling - the state has to survive the surface leaving the frustum, which
-   * is exactly what a camera on the sea bed looking down does to it.
+   * Run from `updatePerCamera`, which runs every frame regardless of culling, so
+   * the state survives the surface leaving the frustum.
    *
-   * The test is against the rest plane rather than the displaced surface. Reading
-   * the real wave height means a GPU readback ({@link Water.getSurfacePoint}) and
-   * the frame or two of latency that comes with it; against that, the plane is
-   * wrong only while the eye is within a wave height of the surface, which is
-   * also the one case this feature deliberately does not try to render.
-   *
-   * A dead band of {@link WaterMaterial.underwaterHysteresis} around the plane
-   * keeps an eye parked at water level from flipping state every frame: crossing
-   * in has to reach below the band, crossing out has to reach above it.
+   * The test is against the rest plane rather than the displaced surface, which
+   * would need a GPU readback. A dead band of
+   * {@link WaterMaterial.underwaterHysteresis} around the plane keeps an eye at
+   * water level from flipping state every frame.
    * @internal
    */
   private updateSubmergence(camera: Camera, mat: WaterMaterial) {
@@ -949,9 +891,7 @@ export class Water extends applyMixins(GraphNode, mixinDrawable) implements Draw
     if (!this.hidden && this.attached) {
       const camPos = camera.getWorldPosition();
       const region = mat.region;
-      // An unbounded surface has no edge to fall outside of; a bounded one is
-      // only entered from within its own footprint, so a camera beside a pool at
-      // the height of its water is not in it.
+      // A bounded surface is only entered from within its own footprint.
       const inside =
         mat.infinite ||
         (camPos.x >= region.x && camPos.x <= region.z && camPos.z >= region.y && camPos.z <= region.w);
@@ -967,13 +907,9 @@ export class Water extends applyMixins(GraphNode, mixinDrawable) implements Draw
    * The water the camera is looking at, on which a window that follows the
    * view (the interaction field, the foam field) is centred.
    *
-   * Not the camera itself: a camera looking down at the water from a
-   * distance has the water it sees well ahead of it, and a window centred on
-   * the camera would put that water at its edge, inside the sponge band. The
-   * focus is where the view direction meets the rest plane, no further ahead
-   * than `reach` (half a window) so that a view towards the horizon still
-   * covers the near water, and `reach` ahead when the view does not meet the
-   * plane.
+   * Where the view direction meets the rest plane, no further ahead than
+   * `reach` (half a window), so the window covers the visible water rather
+   * than putting it in the sponge band at its edge.
    * @internal
    */
   private viewFocus(camera: Camera, reach: number) {
@@ -1001,16 +937,13 @@ export class Water extends applyMixins(GraphNode, mixinDrawable) implements Draw
    * meters.
    *
    * `sqrt(2 * R * h)` for earth's radius: about 5km from an eye 2m up, 25km
-   * from 50m. Using the real figure rather than a constant is what makes the
-   * horizon move correctly as the camera climbs, which is most of what sells
-   * the scale of an ocean.
+   * from 50m.
    * @internal
    */
   private horizonDistance(camera: Camera) {
     const camPos = camera.getWorldPosition();
     const waterLevel = this.worldMatrix.transformPointAffine(Vector3.zero()).y;
-    // A camera below the surface still needs a surface to look at; the floor
-    // also keeps the sqrt away from zero when the eye is exactly at water level.
+    // Floored for cameras at or below the surface.
     const height = Math.max(camPos.y - waterLevel, MIN_HORIZON_EYE_HEIGHT);
     return Math.sqrt(2 * EARTH_RADIUS * height);
   }
@@ -1090,10 +1023,8 @@ export class Water extends applyMixins(GraphNode, mixinDrawable) implements Draw
     const p = this.worldMatrix.transformPointAffine(Vector3.zero());
     const mat = this._material?.get();
     if (mat) {
-      // An unbounded surface has no box to test. Null reaches the cull visitor
-      // as ClipState.CLIPPED, which keeps the node in the queue and defers the
-      // decision to the clipmap's per-tile culling - the only place that can
-      // decide it, since the surface is built around wherever the camera is.
+      // Null keeps an unbounded surface in the queue (ClipState.CLIPPED) and
+      // leaves culling to the clipmap's per-tile test.
       if (mat.infinite) {
         return null;
       }
@@ -1191,17 +1122,10 @@ export class Water extends applyMixins(GraphNode, mixinDrawable) implements Draw
   /**
    * Evaluate the disturbed surface over a set of world XZ positions.
    *
-   * This is the surface the material itself draws, evaluated by the same wave
-   * generator, so it is exact by construction - unlike a CPU-side reconstruction
-   * of the spectrum, which is a second implementation that has to be kept in
-   * step with the first. What it costs is one point-list draw plus one readback
-   * per call, all in a single batch, which makes it suitable for a handful of
-   * queries or for a fixed set of probes asked once a frame.
-   *
-   * Requests are serialized: the vertex buffer and the render target behind them
-   * are shared, so two overlapping calls in the same frame would overwrite each
-   * other's input. A caller that issues a second request while one is in flight
-   * waits for the first to finish rather than corrupting it.
+   * Evaluated by the same wave generator the material draws with, so it is
+   * exact by construction. Costs one point-list draw plus one readback per call.
+   * Requests are serialized because the vertex buffer and render target are
+   * shared.
    *
    * @param points - World XZ positions to evaluate. Y is ignored.
    * @param withNormal - Whether to also read the surface normal back, which
@@ -1220,13 +1144,8 @@ export class Water extends applyMixins(GraphNode, mixinDrawable) implements Draw
     }
     points = points.map((v) => v.clone());
     const timing = { issued: device.frameInfo.frameCounter, recorded: 0, mapped: 0 };
-    // Take the queue's tail and replace it in the same synchronous step, and only
-    // then wait on the one taken. Waiting first and replacing after leaves a gap
-    // across the await: two callers arriving together both see the same already
-    // settled tail, both pass, and both go on to write the shared vertex buffer
-    // and render target while the other's draw is still in the command stream.
-    // The draw then reads a buffer the second caller has already resized - the
-    // "vertex range requires a larger buffer" error, and a black frame.
+    // Take and replace the queue's tail in one synchronous step before awaiting,
+    // so two callers arriving together cannot both pass the same settled tail.
     const previous = this._feedbackQueue;
     let release: () => void = () => {};
     this._feedbackQueue = new Promise<void>((resolve) => (release = resolve));
@@ -1249,9 +1168,7 @@ export class Water extends applyMixins(GraphNode, mixinDrawable) implements Draw
             : renderedGenerator;
         const feedbackHash = waveGenerator?.getHash() ?? '';
         if (this._feedbackProgram.get() && this._feedbackHash !== feedbackHash) {
-          // The surface changed under the program (another generator, or an
-          // interaction field attached); a program built for the old one would
-          // answer for a surface that is no longer drawn.
+          // The wave generator changed; rebuild the program for it.
           this._feedbackBindGroup.dispose();
           this._feedbackProgram.dispose();
         }
@@ -1273,9 +1190,7 @@ export class Water extends applyMixins(GraphNode, mixinDrawable) implements Draw
         }
         const primitive = this._feedbackPrimitive.get()!;
         const vertices = new Float32Array(points.length * 4);
-        // The generators add their displacement to the input, which the surface
-        // draw feeds at the still-water level: the caller's Y has to be replaced
-        // by it, or a probe below the surface reports the surface that much lower.
+        // The generators displace from the still-water level, so it replaces the caller's Y.
         const level = this.worldMatrix.m13;
         for (let i = 0; i < points.length; i++) {
           vertices[i * 4 + 0] = points[i].x;
@@ -1319,19 +1234,11 @@ export class Water extends applyMixins(GraphNode, mixinDrawable) implements Draw
         this._feedbackPrimitive.get()!.draw();
         device.popDeviceStates();
         const pos = new Float32Array(points.length * 4);
-        // The normal attachment is only read when it is wanted: it is the same
-        // size as the position one, so skipping it halves the readback for the
-        // callers that only need a height.
+        // The normal attachment is only read when wanted, halving the readback otherwise.
         const norm = withNormal ? new Float32Array(points.length * 4) : null;
-        // Each readPixels records its texture-to-buffer copy synchronously, before
-        // its first await, so once both calls have been made the draw and both
-        // copies are in the command stream. Submitting right here, instead of
-        // letting them ride the end-of-frame submit, means the readback's mapAsync
-        // starts while this frame's main render is still being recorded, rather
-        // than queueing behind it on the GPU. This callback runs from beginFrame,
-        // ahead of the frame's own passes, so the submit carries nothing but the
-        // feedback work and costs the main render nothing. On WebGL flush() is a
-        // plain glFlush and the same ordering holds.
+        // readPixels records its copy synchronously; flushing right after lets the
+        // readback start before this frame's main render is recorded. This runs from
+        // beginFrame, so the submit carries only the feedback work.
         const readPos = this._feedbackRenderTarget
           .get()!
           .getColorAttachment(0)
@@ -1370,8 +1277,7 @@ export class Water extends applyMixins(GraphNode, mixinDrawable) implements Draw
         this.textureWidth = pb.float().uniform(0);
         if (waveGenerator) {
           waveGenerator.setupUniforms(this, 0);
-          // FBM and Gerstner animate from camera.elapsedTime, which a
-          // standalone program has to declare itself
+          // Wave generators animate from camera.elapsedTime, declared standalone here
           ShaderHelper.declareStandaloneCameraTime(this, 0);
         }
         pb.main(function () {

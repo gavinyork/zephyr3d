@@ -29,13 +29,12 @@ const WATERLINE_MODEL_CLAMP = 10000;
  * the rest level of a body of water, the distance in world units from each
  * cell to the nearest point where the scene's geometry pierces that level.
  *
- * This is what a shoreline effect wants rather than the distance to the
- * nearest solid in 3D, which over a gently shelving bed is the water depth
- * and spreads a shoreline band metres wide across a beach. Here a beach and a
- * piling both get a band measured outwards from where they meet the water.
+ * Unlike the 3D distance to the nearest solid (the water depth over a gently
+ * shelving bed), this measures shoreline bands outwards from where geometry
+ * meets the water.
  *
- * Rebuilt every frame on the GPU from the scene field, so dynamic geometry (a
- * boat hull) moves its waterline with it:
+ * Rebuilt on the GPU from the scene field, so dynamic geometry (a boat hull)
+ * moves its waterline with it:
  *
  * 1. Seed: a cell whose centre is inside geometry at the water level is its own nearest shore.
  * 2. Jump flooding, log2(resolution) passes, carries the nearest seed across the grid.
@@ -45,13 +44,11 @@ const WATERLINE_MODEL_CLAMP = 10000;
  *      to the waterline at a height `level + dy` being `A + B * dy`;
  *    - w: the field value at the cell at the rest level, telling how far the linear model holds.
  *
- * The linear model is what follows the waves. On a beach shelving at angle a, a surface raised
- * by dy moves its edge dy / tan(a) inland, metres for a small swell on a gentle slope, so a band
- * measured from the rest-level line would sit out in the water. From the field value s and its
- * gradient g at the rest level, the geometry near the cell is the plane s + g.(p - p0) = 0, and
- * at height dy that plane is crossed (s + g.y * dy) / |g.xz| away horizontally: A = s / |g.xz|,
- * B = g.y / |g.xz|. Exact for a planar bed, it holds near the shore, where it is needed; farther
- * out the jump-flooded distance answers.
+ * The linear model lets the waterline follow the waves (a surface raised by dy moves the edge
+ * dy / tan(a) inland on a slope of angle a). From the field value s and its gradient g at the rest
+ * level, the geometry near the cell is the plane s + g.(p - p0) = 0, crossed at height dy
+ * (s + g.y * dy) / |g.xz| away horizontally: A = s / |g.xz|, B = g.y / |g.xz|. Exact for a planar
+ * bed; farther from the shore the jump-flooded distance is used.
  *
  * The jump-flooded distance is accurate to about half a cell (0.25 m by default). WebGPU only, as the scene field is.
  *
@@ -89,10 +86,7 @@ export class WaterlineField {
   /** Content version of the global field, origin and level the grid was last built at. */
   private _builtVersion: number;
   private readonly _builtAt: [number, number, number];
-  /**
-   * 256 cells of 0.5 m: 128 m around the camera. The bed model near the shore
-   * is smooth, so finer cells cost four times as much for little gain.
-   */
+  /** Defaults to 256 cells of 0.5 m: 128 m around the camera. */
   constructor(global: GlobalSDF, resolution = 256, cellSize = 0.5) {
     this._builtVersion = -1;
     this._builtAt = [NaN, NaN, NaN];
@@ -134,18 +128,17 @@ export class WaterlineField {
   get ready() {
     return this._built;
   }
-  /** (rest-level distance, model A, model B, field at the rest level) per cell, rgba16f. */
   /**
    * Smooth shore coordinates per cell, rgba16f, for effects that build
-   * geometry on them (see ShoreWaveGenerator), which shows every kink of the
-   * raw field up close: (signed distance to the waterline, negative inland;
-   * B of the bed model; height of the bed over the rest level; 0). The first
-   * two are Gaussian-filtered over about two metres; the bed height is the
-   * cell's own, from the field at the rest level, so it matches the ground.
+   * geometry on them (see ShoreWaveGenerator): (signed distance to the
+   * waterline, negative inland; B of the bed model; height of the bed over the
+   * rest level; 0). The first two are Gaussian-filtered over about two metres;
+   * the bed height is the cell's own, so it matches the ground.
    */
   get smoothTexture() {
     return this._built ? this._smooth : null;
   }
+  /** (rest-level distance, model A, model B, field at the rest level) per cell, rgba16f. */
   get texture() {
     return this._result;
   }
@@ -183,7 +176,6 @@ export class WaterlineField {
       at[1] === oz &&
       at[2] === this._level
     ) {
-      // Nothing it depends on changed
       return;
     }
     this._builtVersion = version;
@@ -471,11 +463,9 @@ export class WaterlineField {
         this.wetIn = pb.tex2D().sampleType('unfilterable-float').uniform(0);
         this.dst = pb.texStorage2D.rgba16float().storage(0);
         // Signed distance and B of a resolved texel: the bed model near the
-        // shore, where it is exact for a planar bed and runs on inland; the
-        // jump-flooded distance farther out, blended over a couple of metres
-        // jump-flooded distance farther out, blended over a couple of metres.
-        // Inland, away from the model, the jump-flooded distance from the water
-        // side, negative; the resolved distance is 0 all over the land.
+        // shore, the jump-flooded distance farther out, blended over a couple
+        // of metres. Inland, away from the model, the negated jump-flooded
+        // distance from the water side (the resolved distance is 0 on land).
         pb.func('wlSigned', [pb.vec4('t'), pb.ivec2('q')], function () {
           this.$l.model = pb.and(
             pb.lessThan(pb.abs(this.t.w), SMOOTH_MODEL_REACH),

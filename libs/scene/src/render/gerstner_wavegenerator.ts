@@ -27,8 +27,7 @@ export class GerstnerWaveGenerator extends Disposable implements WaveGenerator {
     this.randomWave(3);
     this._numWaves = 4;
     this._version = 0;
-    // Same defaults as the FFT generator, so switching between the two does not
-    // change the foam response out of the box.
+    // Same defaults as the FFT generator.
     this._foamParams = new Float32Array([1.2, 7.2]);
   }
   /** @internal */
@@ -95,13 +94,9 @@ export class GerstnerWaveGenerator extends Disposable implements WaveGenerator {
     if (this._numWaves >= MAX_GERSTNER_WAVE_COUNT) {
       return;
     }
-    // Shift from the tail backwards so the gap opens at `index` without
-    // overwriting the slot that is about to move. Copying forward here would
-    // duplicate `waveParams[index]` into every later slot instead of moving
-    // them up. The new slot is filled with a random wave rather than left at
-    // zero: a zero wavelength makes `w = 2*PI / length` infinite and drives the
-    // vertex shader into NaN, which collapses the whole surface, so the slot
-    // has to be a valid wave even before the caller writes its parameters.
+    // Shift from the tail backwards so the gap opens at `index`. The new slot
+    // gets a random valid wave: a zero wavelength makes `w = 2*PI / length`
+    // infinite and drives the vertex shader into NaN.
     for (let i = this._numWaves - 1; i >= index; i--) {
       for (let j = 0; j < 8; j++) {
         this._waveParams[(i + 1) * 8 + j] = this._waveParams[i * 8 + j];
@@ -298,10 +293,8 @@ export class GerstnerWaveGenerator extends Disposable implements WaveGenerator {
       this.$l.inPos = pb.vec3(this.xz.x, 0, this.xz.y);
       this.$l.outPos = pb.vec3();
       this.$l.outNormal = pb.vec3(0);
-      // Horizontal-gradient terms accumulated over the waves. The displacement
-      // derivative terms come out of gerstnerWave; summed, they feed det(I + J),
-      // the fold signal the foam is derived from - the same Jacobian the FFT
-      // generator uses, so both generators key foam off the same physics.
+      // Horizontal-gradient terms summed over the waves, for det(I + J), the
+      // fold signal the foam is derived from (same as the FFT generator).
       this.$l.dxdx = pb.float(0);
       this.$l.dzdz = pb.float(0);
       this.$l.dxdz = pb.float(0);
@@ -326,9 +319,8 @@ export class GerstnerWaveGenerator extends Disposable implements WaveGenerator {
         this.dzdz = pb.add(this.dzdz, this.waveDzdz);
         this.dxdz = pb.add(this.dxdz, this.waveDxdz);
       });
-      // Jacobian determinant of the horizontal displacement, det(I + J). When the
-      // surface folds over the determinant drops below the foamParams.x threshold
-      // and the coverage ramps in. Mirrors the FFT generator's foam.
+      // Jacobian determinant of the horizontal displacement, det(I + J); below
+      // the foamParams.x threshold the surface folds and foam ramps in.
       this.$l.val = pb.sub(pb.mul(pb.add(1, this.dxdx), pb.add(1, this.dzdz)), pb.mul(this.dxdz, this.dxdz));
       this.$l.foam = pb.abs(
         pb.pow(pb.neg(pb.min(0, pb.sub(this.val, this.foamParams.x))), this.foamParams.y)
@@ -396,14 +388,9 @@ export class GerstnerWaveGenerator extends Disposable implements WaveGenerator {
           pb.sub(1, pb.mul(this.qi, this.wa, this.sinCalc))
         );
         this.outNormal = pb.div(this.n.xzy, this.numWaves);
-        // Horizontal-gradient of the displacement, per wave. `waveXZ =
-        // windDir.xy * qi * amp * cos`, and the derivative of `cos(calc)` w.r.t.
-        // xz is `-w * sin(calc)`, so the gradient is the outer product of
-        // `windDir.xy` with itself scaled by `-qi * wa * sin`. The sign matters:
-        // at a crest (sin positive, cal near PI/2) the surface is compressed
-        // horizontally, which is what pushes `det(I + J)` down and fires the
-        // fold signal. Summed over waves and run through det(I + J), this is the
-        // same Jacobian criterion the FFT generator uses.
+        // Horizontal gradient of the displacement `windDir.xy * qi * amp * cos`:
+        // the outer product of `windDir.xy` with itself scaled by `-qi * wa * sin`.
+        // At a crest the surface is compressed, pushing det(I + J) down.
         this.$l.jac = pb.neg(pb.mul(this.qi, this.wa, this.sinCalc));
         this.outDxdx = pb.mul(this.jac, this.windDir.x, this.windDir.x);
         this.outDzdz = pb.mul(this.jac, this.windDir.y, this.windDir.y);

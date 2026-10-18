@@ -83,10 +83,8 @@ export type WaterDisturberShape = 'sphere' | 'capsule' | 'box';
  * Follows a scene node and describes the volume the node occupies with one of
  * three shapes. Each frame the field works out how much water column the shape
  * displaces at every texel - its footprint on the surface, weighted by how deep
- * it sits - and injects the change since the previous frame. Something at rest
- * therefore leaves the water alone; something moving pushes water down ahead
- * of itself and lets it back up behind, which is what a wake is; something
- * dropping in pushes down all over its footprint at once.
+ * it sits - and injects the change since the previous frame: something at rest
+ * leaves the water alone, something moving leaves a wake.
  *
  * A `blocking` disturber is also an obstacle: waves stop at its footprint and
  * reflect off it, the way ripples do off a piling.
@@ -281,11 +279,10 @@ interface PendingImpulse {
  * still water: the shape's amplitude times a dome over its footprint, so a
  * moving shape's frame-to-frame difference is smooth. The amplitude is the
  * strength times how much of the shape's height is under that surface, faded
- * back out as the whole shape sinks further than its own height below it (a
- * submarine at depth does not ripple the surface); a sphere's footprint is the
- * circle the surface cuts from it. Measured against the surface the shape
- * floats on rather than the still water, so a hull riding the swell keeps its
- * footprint instead of pumping rings into the field with every wave.
+ * back out as the whole shape sinks further than its own height below it; a
+ * sphere's footprint is the circle the surface cuts from it. Measured against
+ * the surface the shape floats on rather than the still water, so a hull riding
+ * the swell does not pump rings into the field with every wave.
  * `wiFootprintHard` is the footprint as a 0/1 mask, for the obstacle map. Both
  * decode the packed layout {@link WaterDisturber._evaluate} writes.
  * @internal
@@ -734,34 +731,6 @@ export function createWaterInteractionObstacleShader(): PBRenderOptions {
 }
 
 /**
- * A local, dynamic height field layered on top of a water surface, driven by
- * things that touch it.
- *
- * The wave generator gives the surface its ambient motion and knows nothing
- * about what is in the water. This adds what it cannot: a ring spreading from
- * a dropped stone, the wake behind a hull, the slap of a foot. It is a 2D wave
- * equation integrated on a square window of texels aligned to the world, and
- * the water material adds its height and slope to whatever the generator
- * produced, so the ambient sea and the disturbances compose.
- *
- * The window follows a focus point - the camera by default - and covers
- * {@link windowSize} metres at {@link resolution} texels. Its origin is snapped
- * to the texel grid, so moving it is an integer shift of the field rather than
- * a resample, and nothing smears. What scrolls in is still water.
- *
- * The scheme is explicit and needs `waveSpeed * dt / texel` to stay under the
- * CFL bound; the setters clamp {@link waveSpeed} to what the current window
- * allows, so the field cannot be driven unstable from the outside. A sponge
- * band inside the window's edge absorbs outgoing waves so they do not reflect
- * back off the window boundary, which is a boundary of the simulation and not
- * of the water.
- *
- * Attach it with {@link Water.interaction}. Steps run in {@link Water.update}
- * on the water's own clock, so pausing the water pauses this too.
- *
- * @public
- */
-/**
  * Where a {@link WaterInteraction} reads the depth of the water from.
  *
  * - `field`: a texture whose w channel is the signed distance from the water
@@ -781,6 +750,28 @@ export interface WaterBathymetry {
   heightOffset?: number;
 }
 
+/**
+ * A local, dynamic height field layered on top of a water surface, driven by
+ * things that touch it: a ring spreading from a dropped stone, the wake behind
+ * a hull. It is a 2D wave equation integrated on a square window of texels
+ * aligned to the world; the water material adds its height and slope to the
+ * wave generator's surface, so the ambient sea and the disturbances compose.
+ *
+ * The window follows a focus point - the camera by default - and covers
+ * {@link windowSize} metres at {@link resolution} texels. Its origin is snapped
+ * to the texel grid, so moving it is an integer shift of the field rather than
+ * a resample. What scrolls in is still water.
+ *
+ * The scheme is explicit and needs `waveSpeed * dt / texel` to stay under the
+ * CFL bound; {@link waveSpeed} is clamped to what the current window allows. A
+ * sponge band inside the window's edge absorbs outgoing waves so they do not
+ * reflect off the window boundary.
+ *
+ * Attach it with {@link Water.interaction}. Steps run in {@link Water.update}
+ * on the water's own clock, so pausing the water pauses this too.
+ *
+ * @public
+ */
 export class WaterInteraction extends Disposable {
   private _resolution: number;
   private _windowSize: number;
@@ -1009,19 +1000,12 @@ export class WaterInteraction extends Disposable {
     this._damping = Math.max(0, val);
   }
   /**
-   * Height in metres the field is clamped to, either side of the rest level.
-   *
-   * Also what the water's bounding volume is grown by, so keep it to what the
-   * disturbances actually reach.
-   */
-  /**
    * How much foam a disturbance throws, 0 to disable the foam trail. Defaults
    * to 0.15: at 1 a wake reads as solid white.
    *
    * Foam is laid down where something moves through the water, where a stone
    * lands and along the steep, fast crests of the field's own waves, and
-   * fades at {@link foamDecay}. The material shows it with the same look as
-   * the wave generator's crest foam and the shoreline foam.
+   * fades at {@link foamDecay}.
    */
   get foamAmount() {
     return this._foamAmount;
@@ -1047,6 +1031,12 @@ export class WaterInteraction extends Disposable {
   set foamThreshold(val: number) {
     this._foamThreshold = Math.max(0.0001, val);
   }
+  /**
+   * Height in metres the field is clamped to, either side of the rest level.
+   *
+   * Also what the water's bounding volume is grown by, so keep it to what the
+   * disturbances actually reach.
+   */
   get maxAmplitude() {
     return this._maxAmplitude;
   }
@@ -1064,7 +1054,6 @@ export class WaterInteraction extends Disposable {
   set spongeWidth(val: number) {
     this._spongeWidth = Math.min(0.45, Math.max(0.01, val));
   }
-  /** How the window is positioned. See {@link WaterInteractionFollowMode}. */
   /**
    * Depth in metres below which waves slow down, as shallow water waves do:
    * the speed is {@link waveSpeed} in deeper water and falls with the square
@@ -1094,6 +1083,7 @@ export class WaterInteraction extends Disposable {
   setBathymetry(source: Nullable<WaterBathymetry>) {
     this._bathymetry = source;
   }
+  /** How the window is positioned. See {@link WaterInteractionFollowMode}. */
   get followMode() {
     return this._followMode;
   }

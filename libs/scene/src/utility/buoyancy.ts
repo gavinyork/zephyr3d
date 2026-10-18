@@ -6,10 +6,8 @@ export const STANDARD_GRAVITY = 9.81;
 /**
  * Largest step of {@link FloatingBody}, in seconds.
  *
- * The buoyancy that holds a hull up is a hard spring - half a metre of sink
- * produces a force comparable to the hull's whole weight - so a frame that
- * arrives late would advance it far enough to overshoot and diverge. Steps are
- * capped at this and the remainder is carried. @internal
+ * Buoyancy is a stiff spring, so a long step overshoots and diverges; longer
+ * frames are split into steps of at most this. @internal
  */
 const MAX_STEP = 1 / 120;
 /** Ceiling on steps per frame, so a very late frame cannot stall the loop. @internal */
@@ -66,18 +64,14 @@ export interface BuoyancyVolumeOptions {
  * hardest on whichever side has more of its blocks under, which rolls a boat
  * back upright. There is no separate upright target.
  *
- * The lattice fills the box rather than sitting on the bottom face. Probes on
- * the bottom alone are exact for a level hull and wrong the moment it rolls:
- * the columns rise vertically through where the side wall used to be, and the
- * net moment pushes the roll further over instead of back.
+ * The lattice fills the box rather than sitting on the bottom face: probes on
+ * the bottom alone give a moment that pushes a rolled hull further over.
  *
  * The lift a fully submerged hull produces is `mass * g / submergedFraction`:
  * the force that, once the configured share of the probes is under, balances
- * the weight. That makes `submergedFraction` the density ratio and the only
- * thing that sets the float height, and it makes the mass drop out of the
- * buoyant motion altogether - lift and inertia both scale with it. Tying lift
- * to mass rather than to geometry also means a heavy body cannot sink past
- * its deck, where the waterplane and the righting moment would vanish.
+ * the weight. `submergedFraction` is then the density ratio and alone sets the
+ * float height; the mass drops out of the buoyant motion, and a heavy body
+ * cannot sink past its deck.
  *
  * ## What is not modelled
  *
@@ -219,10 +213,8 @@ export interface FloatingBodyOptions extends BuoyancyVolumeOptions {
  *
  * For applications without a physics library. The motion is force driven: the
  * body owns a position, an orientation and their velocities, and the water
- * only ever applies the force and torque a {@link BuoyancyVolume} computes.
- * That is what makes a hull behave like a hull - it has mass, so it lags the
- * surface, overshoots into it and rolls back, instead of sliding along a
- * height field.
+ * only ever applies the force and torque a {@link BuoyancyVolume} computes, so
+ * the hull lags the surface, overshoots and rolls back.
  *
  * Semi-implicit Euler at a fixed step, box inertia kept as a diagonal in body
  * axes, quaternion orientation renormalised every step. Water resistance is a
@@ -271,11 +263,8 @@ export class FloatingBody {
   constructor(options: FloatingBodyOptions) {
     this.volume = new BuoyancyVolume(options);
     this.node = options.node ?? null;
-    // The defaults are tuned to the heave frequency a box like this bobs at,
-    // sqrt(rho g A / m), which for a hull a metre or two across comes to a few
-    // radians per second. Critical damping is roughly twice that; these sit
-    // well under it, so a body dropped on the water bounces a couple of times
-    // and settles within a second or two rather than ringing for ten.
+    // Defaults sit well under critical damping (about twice the heave frequency
+    // sqrt(rho g A / m)), so a dropped body bounces a couple of times and settles.
     this.linearDamping = Math.max(0, options.linearDamping ?? 2.5);
     this.angularDamping = Math.max(0, options.angularDamping ?? 3);
     this.airLinearDamping = Math.max(0, options.airLinearDamping ?? 0.05);

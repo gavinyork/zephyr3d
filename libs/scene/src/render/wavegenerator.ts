@@ -66,7 +66,7 @@ export interface WaveGenerator extends IDisposable {
     vertexSpacing?: PBShaderExp
   ): void;
   /**
-   *
+   * Calculate fragment normal.
    * @param scope - Global scope of the shader program.
    * @param xz - XZ position.
    * @param vertexNormal - Vertex normal.
@@ -102,9 +102,8 @@ export interface WaveGenerator extends IDisposable {
   /**
    * Thickness in metres of the water over the ground at an undisplaced XZ, for
    * a generator that knows the ground under it, by which the material fades a
-   * thin sheet into the scene behind. Taken from the generator's own surface
-   * and ground rather than from the depth buffer, whose reconstruction moves
-   * by centimetres with the camera jitter, as much as such a sheet is thick.
+   * thin sheet into the scene behind; unlike a depth buffer reconstruction it
+   * does not move with the camera jitter.
    * Optional: without it, or where it is negative, the material reconstructs
    * the thickness from the depth buffer.
    * @param scope - Shader scope.
@@ -117,7 +116,7 @@ export interface WaveGenerator extends IDisposable {
    */
   applyWaterBindGroup(bindGroup: BindGroup): void;
   /**
-   *
+   * Bounding box of a clipmap tile with the wave displacement applied.
    * @param minX - Minimum X position of the clipmap tile.
    * @param maxX - Maximum X position of the clipmap tile.
    * @param minZ - Minimum Z position of the clipmap tile.
@@ -137,7 +136,7 @@ export interface WaveGenerator extends IDisposable {
    */
   getHash(): string;
   /**
-   * Wether this wave generator's update() method should be called this frame
+   * Whether this wave generator's update() method should be called this frame
    * @returns true if this wave generator's update() method should be called this frame
    */
   needUpdate(): boolean;

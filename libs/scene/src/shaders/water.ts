@@ -124,15 +124,6 @@ export function createProgramOcean(waveGenerator: WaveGenerator, shadingImpl: Wa
       waveGenerator.setupUniforms(this, 0);
       pb.main(function () {
         this.$l.xz = pb.mul(this.worldMatrix, pb.vec4(this.$inputs.position, 1)).xy;
-        /*
-        this.$l.xz = pb.mul(
-          pb.add(
-            this.offset,
-            pb.mul(pb.mul(this.modelMatrix, pb.vec4(this.$inputs.position, 1)).xy, this.scale)
-          ),
-          this.gridScale
-        );
-        */
         this.$l.outPos = pb.vec3();
         this.$l.outNormal = pb.vec3();
         waveGenerator.calcVertexPositionAndNormal(
@@ -716,13 +707,8 @@ export function createProgramFFT2V(
           this.$l.w = Complex(this.texelButt.r, this.texelButt.g);
           this.$l.a1 = Complex(this.texelA.x, this.texelA.y);
           this.$l.b1 = Complex(this.texelB.x, this.texelB.y);
-          // Unnormalized butterfly. Scaling each stage by 0.5 and multiplying
-          // N^2 back after the transform is a net no-op in exact arithmetic,
-          // but the intermediate textures are fp16: at N=256 the last stage
-          // held values 1/65536 of the final ones, which put every slope
-          // component into the subnormal range and left it 4-6 bits of
-          // precision (or flushed it to zero). Without the per-stage scale the
-          // intermediates stay at metre scale, where fp16 is fine.
+          // Unnormalized butterfly: per-stage 0.5 scaling would push fp16
+          // intermediates into the subnormal range; unscaled they stay at metre scale.
           this.$l.r1 = this.add(this.a1, this.mul(this.b1, this.w));
           this.$l.a2 = Complex(this.texelA.z, this.texelA.w);
           this.$l.b2 = Complex(this.texelB.z, this.texelB.w);
@@ -890,13 +876,8 @@ export function createProgramFFT2H(
           this.$l.w = Complex(this.texelButt.r, this.texelButt.g);
           this.$l.a1 = Complex(this.texelA.x, this.texelA.y);
           this.$l.b1 = Complex(this.texelB.x, this.texelB.y);
-          // Unnormalized butterfly. Scaling each stage by 0.5 and multiplying
-          // N^2 back after the transform is a net no-op in exact arithmetic,
-          // but the intermediate textures are fp16: at N=256 the last stage
-          // held values 1/65536 of the final ones, which put every slope
-          // component into the subnormal range and left it 4-6 bits of
-          // precision (or flushed it to zero). Without the per-stage scale the
-          // intermediates stay at metre scale, where fp16 is fine.
+          // Unnormalized butterfly: per-stage 0.5 scaling would push fp16
+          // intermediates into the subnormal range; unscaled they stay at metre scale.
           this.$l.r1 = this.add(this.a1, this.mul(this.b1, this.w));
           this.$l.a2 = Complex(this.texelA.z, this.texelA.w);
           this.$l.b2 = Complex(this.texelB.z, this.texelB.w);

@@ -25,21 +25,15 @@ const SET_SCALE = 0.02;
 const SET_DRIFT = 0.02;
 const SET_DEPTH = 0.6;
 /**
- * Irregular waves. The phase of a wave train is a clock that crests carry in
- * with them: a point d out sees at time t the crest that set off from the
- * outer edge tau(d) earlier, so the phase is Psi(t / T + tau(d) / T). With
- * Psi the identity every crest is the same and the waves come in as parallel
- * lines a fixed wavelength apart. Here Psi(s) = s + J(s, foot): J, noise in
- * s, gives each wave a period of its own, which it keeps all the way in, the
- * crests closing up and spreading out as they come; noise along the shore
- * (at the foot of each point on the waterline) gives each a bend of its own.
- * Psi has to keep rising, 1 + dJ/ds above 0, or crests would pass each other:
- * dJ/ds is at most IRREGULAR_AMPLITUDE * IRREGULAR_RATE * 1.5 (the steepest
- * slope of value noise) at full irregularity, 0.56.
+ * Irregular waves. A point d out sees at time t the crest that left the outer
+ * edge tau(d) earlier, so the phase is Psi(t / T + tau(d) / T), with
+ * Psi(s) = s + J(s, foot): noise J in s gives each wave its own period, and
+ * noise along the shore (at the foot of each waterline point) its own bend.
+ * Psi must keep rising (1 + dJ/ds > 0) or crests would pass each other; at full
+ * irregularity dJ/ds is at most IRREGULAR_AMPLITUDE * IRREGULAR_RATE * 1.5 = 0.56.
  *
- * IRREGULAR_RATE is noise cycles per wave, a change of period every few
- * waves; IRREGULAR_SHORE_SCALE noise cycles per metre along the shore;
- * IRREGULAR_AMPLITUDE the wave cycles J spans at full irregularity.
+ * IRREGULAR_RATE: noise cycles per wave; IRREGULAR_SHORE_SCALE: noise cycles per
+ * metre along the shore; IRREGULAR_AMPLITUDE: wave cycles J spans at full irregularity.
  */
 const IRREGULAR_RATE = 0.15;
 const IRREGULAR_SHORE_SCALE = 0.035;
@@ -47,54 +41,41 @@ const IRREGULAR_AMPLITUDE = 2.5;
 /** Step in wave cycles over which dJ/ds is taken. */
 const IRREGULAR_STEP = 0.05;
 /**
- * Crest segments: each wave, picked by its count, rises and falls along the
- * shore by its own noise, so no two waves are whole lines broken at the same
- * places. Noise per metre along the shore, and how deep the gaps cut.
+ * Crest segments: each wave rises and falls along the shore by its own noise.
+ * Noise per metre along the shore, and how deep the gaps cut.
  */
 const SEGMENT_SCALE = 0.06;
 const SEGMENT_DEPTH = 0.85;
 /**
- * Band limit of the displacement against the mesh, after Crest's handing each
- * LOD only the wavelengths its vertices can show (Bowles, "Crest: Novel ocean
- * rendering techniques in an open source framework", SIGGRAPH 2017): as mesh
- * vertices per crest spacing fall from SHARP_SAMPLES_FULL to SHARP_SAMPLES_MIN
- * the sharpened, leaning profile, whose narrow crest would zigzag between
- * coarse vertices, eases back to a sine; from AMP_SAMPLES_FULL to
- * AMP_SAMPLES_MIN the wave flattens out. The fragment stage keeps the full
- * profile in its normals.
+ * Band limit of the displacement against the mesh, after Crest's per-LOD
+ * wavelength filtering (Bowles, "Crest: Novel ocean rendering techniques in an
+ * open source framework", SIGGRAPH 2017): as mesh vertices per crest spacing
+ * fall from SHARP_SAMPLES_FULL to SHARP_SAMPLES_MIN the sharpened profile eases
+ * back to a sine; from AMP_SAMPLES_FULL to AMP_SAMPLES_MIN the wave flattens.
+ * The fragment stage keeps the full profile in its normals.
  */
 const SHARP_SAMPLES_MIN = 4;
 const SHARP_SAMPLES_FULL = 12;
 const AMP_SAMPLES_MIN = 2;
 const AMP_SAMPLES_FULL = 4;
 /**
- * The swash, the water a wave throws up the beach after its crest reaches the
- * waterline, after the ballistic run-up of Shen & Meyer ("Climb of a bore on
- * a beach", JFM 16, 1963) in the form Peregrine & Williams give it ("Swash
- * overtopping a truncated plane beach", JFM 440, 2001): the tip leaves the
- * waterline at u0 and slows under g tan(beta), s_f = u0 t - g tan(beta) t^2 / 2,
- * and behind it the water deepens as h = (s_f - s)^2 / (36 g t^2); ahead of it
- * the beach stays dry. Run up to the crest height above the rest level, so
- * u0 = sqrt(2 g height); its up-and-back lasts 2 u0 / (g tan(beta)), at most
- * SWASH_DURATION_MAX wave periods, past which it is slowed to fit.
+ * The swash, after the ballistic run-up of Shen & Meyer ("Climb of a bore on a
+ * beach", JFM 16, 1963) in the form of Peregrine & Williams ("Swash overtopping
+ * a truncated plane beach", JFM 440, 2001): the tip leaves the waterline at u0
+ * and slows under g tan(beta), s_f = u0 t - g tan(beta) t^2 / 2, with depth
+ * h = (s_f - s)^2 / (36 g t^2) behind it. u0 = sqrt(2 g height); the run up and
+ * back lasts 2 u0 / (g tan(beta)), at most SWASH_DURATION_MAX wave periods.
  *
- * The water in it moves at u = ds_f/dt + (2/3)(s - s_f) / t: the velocity of
- * that solution, which follows from continuity alone, h_t + (u h)_s = 0 with
- * h going as (s_f - s)^2 / t^2, whatever the constant in front. Up the beach
- * behind the rising tip, back down all over once the tip turns: the backwash.
+ * Water velocity u = ds_f/dt + (2/3)(s - s_f) / t, from continuity
+ * h_t + (u h)_s = 0.
  */
 const SWASH_GRAVITY = 9.81;
 const SWASH_DURATION_MAX = 0.8;
-/**
- * Metres inland over which the crest collapsing at the waterline sinks into
- * the swash: the water level there falls off exponentially, so the surface
- * runs on unbroken from the sea.
- */
+/** Metres inland over which the crest collapsing at the waterline sinks exponentially into the swash. */
 const SWASH_COLLAPSE = 0.6;
 /**
- * Depth share of the zone, as distance over zone width, past which the waves
- * stop shortening: the crests keep at least sqrt of this times the wavelength
- * apart, as a broken bore does, instead of bunching up without limit.
+ * Depth share of the zone (distance over zone width) past which the waves stop
+ * shortening, so crests keep at least sqrt of this times the wavelength apart.
  */
 const MIN_COMPRESSION = 0.15;
 /**
@@ -105,14 +86,10 @@ const MIN_COMPRESSION = 0.15;
 const SHELVING_MIN = 1.5;
 const SHELVING_FULL = 4;
 /**
- * Within FOAM_SLIP_BAND metres of a waterline too steep for surf (rocks,
- * cliffs, piers; as much as the waves fade out there, see SHELVING_MIN) the
- * foam is carried out from the wall along its normal at the wall foam's drift
- * speed, handing over to the water's own velocity over that distance, so it
- * rings the wall evenly whichever way the wind blows. A look rather than a
- * flow: the water at a wall runs along it, a free slip that would pile the
- * foam on the windward face and strip the lee. Not on a beach, which the
- * water runs up.
+ * Within FOAM_SLIP_BAND metres of a waterline too steep for surf (rocks, cliffs,
+ * piers; see SHELVING_MIN) foam is carried out along the wall's normal at the
+ * wall foam's drift speed, blending into the water's own velocity over that
+ * distance, so it rings the wall evenly whatever the wind. Not on a beach.
  */
 const FOAM_SLIP_BAND = 2;
 /**
@@ -122,52 +99,39 @@ const FOAM_SLIP_BAND = 2;
 const WALL_SPEED_AVERAGE = 3;
 /**
  * Metres past FOAM_SLIP_BAND within which a cell's water is followed to where
- * the waves carry it, to tell whether that is against a wall: about the
- * largest horizontal displacement of choppy waves.
+ * the waves carry it, about the largest horizontal displacement of choppy waves.
  */
 const WALL_DISPLACEMENT_REACH = 6;
 /**
- * FOAM_WALL: foam the water makes dashing against a wall, by the trapped-air
+ * FOAM_WALL: foam the water makes dashing against a wall, after the trapped-air
  * potential of Ihmsen, Akinci, Akinci & Teschner, "Unified Spray, Foam and
- * Bubbles for Particle-Based Fluids" (CGI 2012), eq. (1)-(3) and (8). There a
- * fluid particle traps air by its velocity relative to each neighbour, the
- * more the more they close on each other: v_diff = sum |v_ij| (1 - v_ij . x_ij)
- * W(x_ij, h), W = 1 - |x| / h, clamped to 0..1 by
- * Phi(I, tmin, tmax) = (min(I, tmax) - min(I, tmin)) / (tmax - tmin), and
- * foam made at a rate k I_k I_ta with I_k = Phi(E_k) of the kinetic energy.
- * Here the neighbour is the wall, at rest, h = FOAM_SLIP_BAND from it along
- * its normal n (out of the land): v_diff = (|v| - v . n) W, with v the
- * surface water's own velocity. Taken over a wave's orbit, v . n averages out
- * and v_diff to |v| W, which is what is used, so every face of a wall foams
- * alike rather than the face the water happens to be heading for: a look,
- * not a flow, the waves not being stopped by the wall. |v| is taken from the
- * surface's rate of rise, the time derivative of the wrapped generator's
- * vertical displacement, which over a circular orbit is as fast as its
- * horizontal motion and is there for generators that only displace
- * vertically (FBM). Taking the wall as a neighbour at rest, averaging over the
- * orbit, the thresholds (the paper's are in the units of its particles) and
- * the kinetic energy taken per unit mass over the same speeds are ours; so is
- * weighting it by how steep the wall is, the complement of where the surf
- * rolls in, which leaves a beach to the shallow water foam.
+ * Bubbles for Particle-Based Fluids" (CGI 2012), eq. (1)-(3) and (8):
+ * v_diff = sum |v_ij| (1 - v_ij . x_ij) W(x_ij, h), W = 1 - |x| / h, clamped by
+ * Phi(I, tmin, tmax) = (min(I, tmax) - min(I, tmin)) / (tmax - tmin), and foam
+ * made at a rate k I_k I_ta with I_k = Phi(E_k).
  *
- * The foam made goes to a layer of its own (see FoamFieldSource), shown whole
- * where it is, its strength how opaque, rather than cut from the foam texture
- * by its density: a fringe of foam around a rock reads as a fringe, not as
- * patches. It is made at FOAM_WAVE_GAIN regardless of the strength, so it
- * soon saturates against the wall and thins out as it drifts away.
+ * Here the neighbour is the wall at rest, h = FOAM_SLIP_BAND along its normal n:
+ * v_diff = (|v| - v . n) W, averaged over a wave's orbit to |v| W so every face
+ * of a wall foams alike. |v| is the surface's rate of rise, which also works for
+ * generators that only displace vertically (FBM). The wall-at-rest neighbour,
+ * the orbit average, the thresholds, the per-unit-mass kinetic energy and the
+ * weighting by wall steepness are adaptations, not from the paper.
+ *
+ * The foam goes to a layer of its own (see FoamFieldSource), shown whole with
+ * its strength as opacity rather than cut from the foam texture. It is made at
+ * FOAM_WAVE_GAIN regardless of the strength, so it saturates against the wall.
  */
 /** Largest B anything here is worked out with, a bed at about 3 degrees. */
 const B_MAX = 20;
 /** Distance in metres out from the waterline over which the wrapped generator's chop dies away. */
 const CHOP_FADE = 3;
 /**
- * The water's edge on the beach is drawn per pixel (see calcSurfaceCoverage),
- * where the water meets the bed height of the waterline field, not by where
- * the water mesh's triangles, a metre or more across, dip under the sand:
- * near the edge the mesh is held SWASH_CLEARANCE metres over the bed and cut
- * there. It is held where the bed is at most SWASH_LIFT_MARGIN metres above
- * the highest water, up to SWASH_EDGE_EXTEND metres past the farthest the
- * water reaches; the edge is softened over SWASH_EDGE_SOFT metres.
+ * The water's edge on the beach is cut per pixel (see calcSurfaceCoverage)
+ * where the water meets the bed height of the waterline field; near the edge
+ * the mesh is held SWASH_CLEARANCE metres over the bed. That applies where the
+ * bed is at most SWASH_LIFT_MARGIN above the highest water, up to
+ * SWASH_EDGE_EXTEND metres past the farthest the water reaches; the edge is
+ * softened over SWASH_EDGE_SOFT metres.
  */
 const SWASH_CLEARANCE = 0.06;
 const SWASH_LIFT_MARGIN = 0.1;
@@ -440,12 +404,9 @@ export class ShoreWaveGenerator extends Disposable implements WaveGenerator, Foa
           pb.clamp(pb.sub(this.swFoamSource.y, this.sw.z), 0, 1)
         );
         // Foam from shallow water, by the depth under the displaced surface.
-        // Only where there is water: Crest feeds dry land too, where it does
-        // not show, but here the swash runs over that land and would find a
-        // full stock of foam waiting for it. Only on the waterline field, whose
-        // edge texels would otherwise smear over the rest of the foam field,
-        // and faded out towards its edge as the waves are: the field follows
-        // the camera and the foam field reaches past it, ahead of the view
+        // Only where there is water (unlike Crest, which feeds dry land the swash
+        // would later run over), only on the waterline field, and faded towards
+        // its edge as the waves are
         this.$l.wlUV = pb.mul(pb.sub(this.xz, this.swGrid.xy), this.swGrid.z);
         this.$if(
           pb.and(
@@ -475,9 +436,8 @@ export class ShoreWaveGenerator extends Disposable implements WaveGenerator, Foa
             });
           }
         );
-        // Foam from the water dashing against a wall: the trapped-air
-        // potential against the wall at rest, by the surface water's velocity,
-        // the change of its displacement since the state was written
+        // Foam from the water dashing against a wall: the trapped-air potential
+        // by the surface water's velocity (see FOAM_WALL).
         // Cells whose water the waves can carry to within the band of a wall
         this.$l.wallFoam = pb.float(0);
         this.$if(
@@ -491,13 +451,9 @@ export class ShoreWaveGenerator extends Disposable implements WaveGenerator, Foa
             this.$l.waveNormal = pb.vec3(0, 1, 0);
             that._base.calcVertexPositionAndNormal(this, this.restPos, this.wavePos, this.waveNormal);
             this.$l.rise = pb.sub(this.wavePos.y, this.restPos.y);
-            // The wall as seen from where the waves carry this water, as Crest
-            // takes the shallow water foam's depth at the displaced position
-            // ("to ensure we add foam where world objects are",
-            // UpdateFoam.compute): the field is kept at undisplaced positions,
-            // and choppy waves carry the water drawn against a wall from metres
-            // away, so foam made where the undisplaced point is near the wall
-            // would show off it, swinging with the waves
+            // The wall as seen from where the waves carry this water, as Crest takes
+            // the shallow water foam's depth at the displaced position
+            // (UpdateFoam.compute): the field is kept at undisplaced positions
             this.$l.wallAt = that.wall(this, pb.add(this.xz, pb.sub(this.wavePos.xz, this.restPos.xz)));
             this.$l.wallReach = pb.max(0, pb.sub(1, pb.div(this.wallAt.z, FOAM_SLIP_BAND)));
             this.$l.wallW = this.$choice(
@@ -507,10 +463,8 @@ export class ShoreWaveGenerator extends Disposable implements WaveGenerator, Foa
             );
             this.$l.avgSpeed = this.state.y;
             this.$if(pb.greaterThan(this.state.w, 0), function () {
-              // Averaged over WALL_SPEED_AVERAGE seconds: the waves' own speed at
-              // a point flickers from cell to cell with ripples shorter than a
-              // cell, which the field would show as blocks, while its average
-              // over time is the sea state's and the same along the whole wall
+              // Averaged over WALL_SPEED_AVERAGE seconds: the instantaneous speed
+              // varies per cell with ripples shorter than a cell
               this.avgSpeed = pb.mix(
                 this.state.y,
                 pb.abs(pb.div(pb.sub(this.rise, this.state.x), this.state.w)),
@@ -727,12 +681,9 @@ export class ShoreWaveGenerator extends Disposable implements WaveGenerator, Foa
           )
         );
         this.dir = pb.vec4(pb.neg(pb.div(this.g, pb.max(pb.length(this.g), 1e-5))), 0, 0);
-        // Phase: crests travel shoreward and bunch up as they go, the integral
-        // of 1 / wavelength with the wavelength shrinking as sqrt of the depth.
-        // Past the breaking depth the bore no longer shortens: below `dMin` the
-        // phase runs on linearly at the rate it had there, instead of sqrt's
-        // spacing collapsing to nothing at the waterline. Frozen at its shoreline
-        // value inland, where the water rises and falls over the beach.
+        // Phase: the integral of 1 / wavelength, with the wavelength shrinking as
+        // sqrt of the depth. Below `dMin` (past breaking) it runs on linearly;
+        // inland it is frozen at its shoreline value.
         this.$l.dc = pb.max(this.d, 0);
         this.$l.dMin = pb.mul(this.zone, MIN_COMPRESSION);
         this.$l.rootMin = pb.sqrt(MIN_COMPRESSION);
@@ -856,9 +807,8 @@ export class ShoreWaveGenerator extends Disposable implements WaveGenerator, Foa
         // are 0, so switching to the next wave's noise shows no seam
         this.$l.crestSegment = segment(this, pb.floor(pb.add(this.phase, 0.5)));
         this.waveSet = pb.mul(this.waveSet, this.crestSegment);
-        // Only where the bed shelves: waves roll in as surf on a beach, not
-        // against a cliff, a pier or a hull, which the waterline field also
-        // holds; and fading out towards the edge of the grid
+        // Only where the bed shelves (surf rolls in on a beach, not against a
+        // cliff, pier or hull), faded out towards the edge of the grid
         this.$l.edge = pb.min(
           pb.min(this.uv.x, this.uv.y),
           pb.min(pb.sub(1, this.uv.x), pb.sub(1, this.uv.y))
@@ -884,21 +834,17 @@ export class ShoreWaveGenerator extends Disposable implements WaveGenerator, Foa
           pb.float(0)
         );
         // Determinant of the Jacobian of the horizontal displacement the profile
-        // stands for, the map from the rest position x / 2pi to the distance X
-        // along the wave: dX/dx 2pi, below 1 where the water is squeezed, at the
-        // steep front of the crest. A lower wave displaces less: the
-        // displacement scales with its share of the full height.
+        // stands for (dX/dx 2pi), below 1 where the water is squeezed at the crest's
+        // front; scaled by the wave's share of the full height.
         this.$l.det = pb.add(
           1,
           pb.mul(pb.div(this.amp, pb.max(this.swWave.x, 1e-4)), pb.sub(pb.mul(this.dXdx, Math.PI * 2), 1))
         );
         // The wrapped generator's chop dies near the shore
         this.dir.z = pb.mul(pb.sub(1, pb.smoothStep(0, CHOP_FADE, this.d)), this.shelving);
-        // The water rises straight up and is wet wherever it stands over the bed,
-        // so its edge follows the beach whatever its shape. Near that edge the
-        // mesh is held clear of the bed, with the edge cut per pixel: only where
-        // the water could come near the bed, as far as it could reach, not on a
-        // dune or a flat behind the beach higher than the highest water
+        // The water rises straight up and is wet wherever it stands over the bed.
+        // Near that edge the mesh is held clear of the bed and cut per pixel, only
+        // where the water could reach (not on dunes higher than the highest water)
         this.$l.highest = pb.mul(this.swWave.x, this.waveSet);
         this.$l.reach = pb.mul(this.highest, pb.clamp(this.wl.y, 1, B_MAX));
         this.dir.w = this.$choice(
@@ -912,23 +858,16 @@ export class ShoreWaveGenerator extends Disposable implements WaveGenerator, Foa
           this.wl.z,
           pb.float(-1e4)
         );
-        // Speed along the way in of the water carrying the foam. Crest advects its
-        // foam by its flow simulation, which the shore waves do not have; in its
-        // place the water's velocity under a long wave, u = g eta / c with c the
-        // speed of the crests (crest spacing per period), towards the shore: the
-        // water under a crest surges shoreward with it and is still in the
-        // trough behind, so the foam is carried in with the breaking crest and
-        // left behind as it passes
+        // Speed of the water carrying the foam along the way in. In place of Crest's
+        // flow simulation, the velocity under a long wave, u = g eta / c with c the
+        // crest speed, towards the shore.
         this.$l.flow = pb.clamp(
           pb.div(pb.mul(SWASH_GRAVITY, this.height), this.crestSpeed),
           0,
           this.crestSpeed
         );
         // Inland: the swash, in wave periods since its crest reached the waterline
-        // (X, the phase there being frozen at its waterline value), instead of
-        // the water level rising and falling flat across the beach, which on a
-        // gentle slope floods metres of sand at once and fills hollows ahead of
-        // the water as if from below
+        // (X, the phase there being frozen at its waterline value)
         this.$if(pb.lessThan(this.d, 0), function () {
           this.$l.s = pb.neg(this.d);
           this.$l.bedB = pb.clamp(this.wl.y, 1, B_MAX);
@@ -986,11 +925,9 @@ export class ShoreWaveGenerator extends Disposable implements WaveGenerator, Foa
     return scope.swEvaluate(xz, dir, spacing, tPhase ?? scope.swWave.w, cell ?? pb.float(0)) as PBShaderExp;
   }
   /**
-   * Adds the shore wave to a position the wrapped generator displaced, at a
-   * wave clock (time over period): straight up. Near the shore the wrapped
-   * generator's chop dies, which would poke through the sand and throw the
-   * water's edge about, and near that edge the surface is held clear of the
-   * bed, which the fragment stage cuts it to.
+   * Adds the shore wave to a position the wrapped generator displaced, straight
+   * up, at a wave clock (time over period). Near the shore the wrapped
+   * generator's chop dies and the surface is held clear of the bed.
    * @internal
    */
   private displace(
@@ -1040,10 +977,8 @@ export class ShoreWaveGenerator extends Disposable implements WaveGenerator, Foa
     scope.swCalcPositionAndNormal(inPos, outPos, outNormal, vertexSpacing ?? pb.float(0));
   }
   /**
-   * Where a vertex was in the previous frame, for motion vectors: the shore
-   * wave at the previous frame's clock. The water's edge sweeps metres across
-   * the beach in a second, and without this the temporal filter smears and
-   * jitters it. The wrapped generator is taken as it is now.
+   * Where a vertex was in the previous frame, for motion vectors: the shore wave
+   * at the previous frame's clock. The wrapped generator is taken as it is now.
    */
   calcPrevVertexPosition(
     scope: PBInsideFunctionScope,
@@ -1061,15 +996,9 @@ export class ShoreWaveGenerator extends Disposable implements WaveGenerator, Foa
     scope.swCalcPrevPosition(inPos, outPos, vertexSpacing ?? pb.float(0));
   }
   /**
-   * The water's edge on the beach, per pixel: 1 where the water stands over
-   * the bed, 0 where the mesh is only held clear of the sand so that its
-   * coarse triangles do not draw the edge.
-   */
-  /**
-   * Depth of the water over the bed of the waterline field, the shore wave's
-   * surface less the bed height: the same quantity the edge cut compares,
-   * stable under the camera jitter. -1 where there is no bed to measure from,
-   * off the grid or away from the beach.
+   * Depth of the water over the bed of the waterline field, stable under the
+   * camera jitter. -1 where there is no bed to measure from, off the grid or
+   * away from the beach.
    */
   calcSheetThickness(scope: PBInsideFunctionScope, xz: PBShaderExp): PBShaderExp {
     const pb = scope.$builder;
@@ -1085,6 +1014,10 @@ export class ShoreWaveGenerator extends Disposable implements WaveGenerator, Foa
     });
     return scope.swSheetThickness(xz) as PBShaderExp;
   }
+  /**
+   * The water's edge on the beach, per pixel: 1 where the water stands over the
+   * bed, 0 where the mesh is only held clear of the sand.
+   */
   calcSurfaceCoverage(scope: PBInsideFunctionScope, xz: PBShaderExp): PBShaderExp {
     const pb = scope.$builder;
     const that = this;
