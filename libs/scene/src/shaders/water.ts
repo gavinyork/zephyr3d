@@ -489,10 +489,13 @@ export function createProgramH0(
       this.cascade0 = pb.vec4().uniform(0);
       this.cascade1 = pb.vec4().uniform(0);
       this.cascade2 = pb.vec4().uniform(0);
-      pb.func('gauss', [pb.ivec2('fragCoord')], function () {
-        this.$l.uv = pb.div(pb.vec2(this.fragCoord), pb.float(this.resolution));
+      // Gaussian pair for k and -k. `offset` (texels) gives each cascade a noise of
+      // its own, so the cascades' phases are independent.
+      pb.func('gauss', [pb.ivec2('fragCoord'), pb.ivec2('offset')], function () {
+        this.$l.uv = pb.div(pb.vec2(pb.add(this.fragCoord, this.offset)), pb.float(this.resolution));
+        this.$l.uvNeg = pb.div(pb.vec2(pb.sub(this.offset, this.fragCoord)), pb.float(this.resolution));
         this.$l.noise0 = pb.textureSampleLevel(this.noise, this.uv, 0).rg;
-        this.$l.noise1 = pb.textureSampleLevel(this.noise, pb.neg(this.uv), 0).rg;
+        this.$l.noise1 = pb.textureSampleLevel(this.noise, this.uvNeg, 0).rg;
         this.$l.u0 = pb.mul(this.noise0.x, Math.PI * 2);
         this.$l.v0 = pb.sqrt(pb.mul(pb.log(this.noise0.y), -2));
         this.$l.u1 = pb.mul(this.noise1.x, Math.PI * 2);
@@ -506,17 +509,13 @@ export function createProgramH0(
           )
         );
       });
-      pb.func('phillips', [pb.vec2('k'), pb.float('A'), pb.float('minK'), pb.float('maxK')], function () {
+      // Phillips spectrum over the cascade's band: zero inside the square
+      // |kx|, |ky| < minK the larger cascades cover.
+      pb.func('phillips', [pb.vec2('k'), pb.float('A'), pb.float('minK')], function () {
         this.$l.k2 = pb.dot(this.k, this.k);
-        this.$if(
-          pb.or(
-            pb.lessThanEqual(this.k2, pb.mul(this.minK, this.minK)),
-            pb.greaterThanEqual(this.k2, pb.mul(this.maxK, this.maxK))
-          ),
-          function () {
-            this.$return(pb.vec4(0));
-          }
-        );
+        this.$if(pb.all(pb.lessThan(pb.abs(this.k), pb.vec2(this.minK))), function () {
+          this.$return(pb.vec4(0));
+        });
         this.$l.L = pb.div(pb.dot(this.wind, this.wind), this.g);
         this.$l.L2 = pb.mul(this.L, this.L);
         this.$l.h0k = pb.mul(
@@ -542,20 +541,18 @@ export function createProgramH0(
           pb.sub(pb.ivec2(getFragCoord(this, useComputeShader)), pb.ivec2(pb.div(this.resolution, 2)))
         );
         this.$l.k = pb.mul(pb.vec2(Math.PI * 2), this.x);
-        this.$l.rnd = this.gauss(pb.ivec2(getFragCoord(this, useComputeShader)));
+        this.$l.coord = pb.ivec2(getFragCoord(this, useComputeShader));
+        this.$l.rnd0 = this.gauss(this.coord, pb.ivec2(0, 0));
+        this.$l.rnd1 = this.gauss(this.coord, pb.ivec2(73, 151));
+        this.$l.rnd2 = this.gauss(this.coord, pb.ivec2(157, 41));
         if (useComputeShader) {
           pb.textureArrayStore(
             this.spectrum,
             this.$builtins.globalInvocationId.xy,
             0,
             pb.mul(
-              this.phillips(
-                pb.div(this.k, this.cascade0.x),
-                this.cascade0.y,
-                this.cascade0.z,
-                this.cascade0.w
-              ),
-              this.rnd
+              this.phillips(pb.div(this.k, this.cascade0.x), this.cascade0.y, this.cascade0.z),
+              this.rnd0
             )
           );
           pb.textureArrayStore(
@@ -563,13 +560,8 @@ export function createProgramH0(
             this.$builtins.globalInvocationId.xy,
             1,
             pb.mul(
-              this.phillips(
-                pb.div(this.k, this.cascade1.x),
-                this.cascade1.y,
-                this.cascade1.z,
-                this.cascade1.w
-              ),
-              this.rnd
+              this.phillips(pb.div(this.k, this.cascade1.x), this.cascade1.y, this.cascade1.z),
+              this.rnd1
             )
           );
           pb.textureArrayStore(
@@ -577,27 +569,22 @@ export function createProgramH0(
             this.$builtins.globalInvocationId.xy,
             2,
             pb.mul(
-              this.phillips(
-                pb.div(this.k, this.cascade2.x),
-                this.cascade2.y,
-                this.cascade2.z,
-                this.cascade2.w
-              ),
-              this.rnd
+              this.phillips(pb.div(this.k, this.cascade2.x), this.cascade2.y, this.cascade2.z),
+              this.rnd2
             )
           );
         } else {
           this.$outputs.spectrum0 = pb.mul(
-            this.phillips(pb.div(this.k, this.cascade0.x), this.cascade0.y, this.cascade0.z, this.cascade0.w),
-            this.rnd
+            this.phillips(pb.div(this.k, this.cascade0.x), this.cascade0.y, this.cascade0.z),
+            this.rnd0
           );
           this.$outputs.spectrum1 = pb.mul(
-            this.phillips(pb.div(this.k, this.cascade1.x), this.cascade1.y, this.cascade1.z, this.cascade1.w),
-            this.rnd
+            this.phillips(pb.div(this.k, this.cascade1.x), this.cascade1.y, this.cascade1.z),
+            this.rnd1
           );
           this.$outputs.spectrum2 = pb.mul(
-            this.phillips(pb.div(this.k, this.cascade2.x), this.cascade2.y, this.cascade2.z, this.cascade2.w),
-            this.rnd
+            this.phillips(pb.div(this.k, this.cascade2.x), this.cascade2.y, this.cascade2.z),
+            this.rnd2
           );
         }
       });

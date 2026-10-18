@@ -145,8 +145,8 @@ export function getFFTWaveGeneratorClass(): SerializableClass {
           name: 'WaveLengthCascades',
           description: 'Wavelength values for the three FFT wave cascades',
           type: 'vec3',
-          default: [400, 100, 15],
-          options: { animatable: true, minValue: 0, maxValue: 1000 },
+          default: [5488, 392, 28],
+          options: { animatable: true, minValue: 0, maxValue: 10000 },
           get(this: FFTWaveGenerator, value) {
             value.num[0] = this.getWaveLength(0);
             value.num[1] = this.getWaveLength(1);
@@ -162,7 +162,7 @@ export function getFFTWaveGeneratorClass(): SerializableClass {
           name: 'WaveStrengthCascades',
           description: 'Strength values for the three FFT wave cascades',
           type: 'vec3',
-          default: [0.4, 0.4, 0.2],
+          default: [0.4, 0.4, 0.4],
           options: { animatable: true, minValue: 0, maxValue: 1 },
           get(this: FFTWaveGenerator, value) {
             value.num[0] = this.getWaveStrength(0);

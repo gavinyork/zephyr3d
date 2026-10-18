@@ -33,10 +33,6 @@ type OceanFieldCascade = {
   croppiness: number;
   /** Strength factor for this pattern */
   strength: number;
-  /** Min wave length. Kind of spectrum filter. (Waves less that this thresold are not involved in spectrum generation) */
-  minWave: number;
-  /** Max wave length. Kind of spectrum filter. */
-  maxWave: number;
 };
 
 type OceanFieldBuildParams = {
@@ -54,30 +50,25 @@ type OceanFieldBuildParams = {
   randomSeed: number;
 };
 
+// Default cascade sizes after Bruneton's ocean demo at N = 256 (5488, 392, 28 m), 14 to 1,
+// so each cascade spans about a decade of wavelength between the next larger one's Nyquist and its own.
 function getDefaultBuildParams(): OceanFieldBuildParams {
   return {
     cascades: [
       {
-        size: 400.0,
+        size: 5488,
         strength: 0.4,
-        croppiness: -1.5,
-        minWave: 0,
-        // The whole patch, so the Phillips peak stays in range at high wind speeds.
-        maxWave: 400
+        croppiness: -1.5
       },
       {
-        size: 100.0,
+        size: 392,
         strength: 0.4,
-        croppiness: -1.2,
-        minWave: 0,
-        maxWave: 100
+        croppiness: -1.2
       },
       {
-        size: 15,
-        strength: 0.2,
-        croppiness: -0.5,
-        minWave: 0,
-        maxWave: 7
+        size: 28,
+        strength: 0.4,
+        croppiness: -0.5
       }
     ],
     resolution: 256,
@@ -418,13 +409,25 @@ export class FFTWaveGenerator extends Disposable implements WaveGenerator {
     this._h0BindGroup.setValue('resolution', this._params.resolution);
     this._h0BindGroup.setValue('wind', this._params.wind);
     this._h0BindGroup.setValue('alignment', this._params.alignment);
-    for (let i = 0; i < this._params.cascades.length; i++) {
-      this._cascades[i].x = this._params.cascades[i].size;
-      this._cascades[i].y =
-        (this._params.cascades[i].strength * 0.081) /
-        (this._params.cascades[i].size * this._params.cascades[i].size);
-      this._cascades[i].z = (2 * Math.PI) / this._params.cascades[i].maxWave;
-      this._cascades[i].w = (2 * Math.PI) / this._params.cascades[i].minWave;
+    // Bands split as in Bruneton's ocean demo (and Ceto, its Unity port): each
+    // cascade keeps the wave numbers outside the square |kx|, |ky| < kMin, kMin the
+    // Nyquist pi N / L of the next larger cascade (pi / L for the largest), and
+    // stops at its own Nyquist, so the cascades share no wave number.
+    const cascades = this._params.cascades;
+    for (let i = 0; i < cascades.length; i++) {
+      const size = cascades[i].size;
+      let nextLarger = Infinity;
+      for (let j = 0; j < cascades.length; j++) {
+        const s = cascades[j].size;
+        if (j !== i && (s > size || (s === size && j < i)) && s < nextLarger) {
+          nextLarger = s;
+        }
+      }
+      this._cascades[i].x = size;
+      this._cascades[i].y = (cascades[i].strength * 0.081) / (size * size);
+      this._cascades[i].z =
+        nextLarger === Infinity ? Math.PI / size : (Math.PI * this._params.resolution) / nextLarger;
+      this._cascades[i].w = 0;
     }
     this._h0BindGroup.setValue('cascade0', this._cascades[0]);
     this._h0BindGroup.setValue('cascade1', this._cascades[1]);
