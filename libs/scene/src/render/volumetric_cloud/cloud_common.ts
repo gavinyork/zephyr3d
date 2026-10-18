@@ -1,4 +1,5 @@
 import type { PBInsideFunctionScope, PBShaderExp, ProgramBuilder } from '@zephyr3d/device';
+import type { CloudFormation } from './volumetric_cloud';
 import {
   getAtmosphereParamsStruct,
   getSkyView,
@@ -40,13 +41,40 @@ export const CLOUD_SHADOW_SAMPLE_COUNT_MAX = 80;
 export const CLOUD_DISTANT_SKY_LIGHT_ALTITUDE = 6000;
 /**
  * 5% and 95% quantiles of the base shape (Perlin-Worley remapped by the Worley fbm) of the
- * generated noise, and the median of the generated weather map coverage, measured over 20000
- * samples of a CPU replica of cloud_noise.ts. The coverage remap spans this range so that
- * Coverage c fills about c of the mid layer (0.1 -> 0.11, 0.25 -> 0.26, 0.45 -> 0.51,
- * 0.7 -> 0.76, 0.9 -> 0.88). Imported noise with another distribution maps differently.
+ * generated noise, measured over 20000 samples of a CPU replica of cloud_noise.ts. The base shape
+ * is stretched from this range to [0, 1] before the profile erodes it, so that full coverage at
+ * the profile peak fills the layer. Imported noise with another distribution maps differently.
  */
-export const CLOUD_COVERAGE_BASE_RANGE = [0.68, 0.93];
-export const CLOUD_COVERAGE_WEATHER_MEDIAN = 0.75;
+export const CLOUD_COVERAGE_BASE_RANGE = [0.153, 0.4447];
+/**
+ * Weather coverage range over which a cloud field ramps from its edge (0) to full coverage (1).
+ * The local coverage scales the height profile as Nubis' dimensional profile does
+ * (vertical_profile * cloud_coverage, Nubis3 slide 19), so a wide ramp shrinks the clouds towards
+ * the field edges into domes; a narrow one extruded the weather map into flat-topped blocks.
+ */
+export const CLOUD_COVERAGE_RAMP = 0.4;
+/**
+ * Weather coverage threshold where the ramp starts, for Coverage 0, 1/8, ..., 1. Found by
+ * bisection on a CPU replica of the generated weather map and base shape (40000 samples).
+ * Connected: the area of the mid layer filled with cloud equals Coverage, full sky tops out at
+ * 95%. Isolated: the islands cover at most 17% of the map, so Coverage scales to that maximum.
+ */
+const CLOUD_COVERAGE_THRESHOLDS: Record<CloudFormation, number[]> = {
+  connected: [0.985, 0.6254, 0.4985, 0.3669, 0.2329, 0.1024, -0.0302, -0.1736, -0.4],
+  isolated: [0.98, 0.6601, 0.5615, 0.4707, 0.374, 0.2823, 0.1931, 0.0932, 0]
+};
+/**
+ * Weather coverage threshold for the Coverage parameter, see CLOUD_COVERAGE_THRESHOLDS.
+ * @internal
+ */
+export function cloudCoverageThreshold(coverage: number, formation: CloudFormation) {
+  const table = CLOUD_COVERAGE_THRESHOLDS[formation];
+  const n = table.length - 1;
+  const x = Math.min(1, Math.max(0, coverage)) * n;
+  const i = Math.min(n - 1, Math.floor(x));
+  const f = x - i;
+  return table[i] * (1 - f) + table[i + 1] * f;
+}
 /** [Schneider15] cloud_top_offset: how far the wind pushes cloud tops ahead of their base, in meters */
 export const CLOUD_TOP_OFFSET = 500;
 
@@ -72,7 +100,7 @@ export function getCloudParamsStruct(pb: ProgramBuilder) {
     pb.vec4('phase'),
     // (multiple scattering contribution, occlusion, eccentricity, 0)
     pb.vec4('ms'),
-    // (coverage, extinction per meter, detail erosion, 0)
+    // (weather coverage threshold, extinction per meter, detail erosion, anvil bias)
     pb.vec4('density'),
     // (albedo, 0)
     pb.vec4('albedo'),
@@ -80,7 +108,7 @@ export function getCloudParamsStruct(pb: ProgramBuilder) {
     pb.vec4('scales'),
     // (wind offset of the noise in planet-fixed meters, 0)
     pb.vec4('windOffset'),
-    // (horizontal wind direction x, z, 0, 0)
+    // (horizontal wind direction x, z, formation: 0 connected / 1 isolated, 0)
     pb.vec4('windDir')
   ]);
 }
@@ -123,29 +151,34 @@ function hgPhase(scope: PBInsideFunctionScope, g: PBShaderExp, cosTheta: PBShade
 }
 
 /**
- * Density height gradient by cloud type (0 stratus, 0.5 stratocumulus, 1 cumulus), [Schneider15]
- * figure "height gradients", with the gradient corners of clayjohn's
- * godot-volumetric-cloud-demo-v2 (clouds.glsl, mixGradients).
+ * Vertical profile by cloud type (0 stratus, 0.5 stratocumulus, 1 cumulus), the product of a
+ * bottom and a top profile as in Nubis' vertical profile method (Nubis3 slide 19).
+ *
+ * - Bottom: the rising ramp of the [Schneider15] height gradient, with the corners of clayjohn's
+ *   godot-volumetric-cloud-demo-v2 (clouds.glsl, mixGradients). It is short, so the profile is
+ *   near full right above the cloud base and clouds of a type share one flat base, as at the
+ *   condensation level. The rising envelope pow(h, 2) of Nubis3 slide 21 left it to the noise
+ *   and gave ragged bases.
+ * - Top: the falling envelope pow(1 - h, 1.5) of Nubis3 slide 21 over the type's height range
+ *   (stratus 0.02-0.11, stratocumulus 0.02-0.625, cumulus 0.01-1 of the layer, the extent of its
+ *   Schneider gradient): clouds narrow upwards into rounded tops.
  */
-function densityHeightGradient(
-  scope: PBInsideFunctionScope,
-  heightFrac: PBShaderExp,
-  cloudType: PBShaderExp
-) {
+function verticalProfile(scope: PBInsideFunctionScope, heightFrac: PBShaderExp, cloudType: PBShaderExp) {
   const pb = scope.$builder;
-  const funcName = 'Z_cloudHeightGradient';
+  const funcName = 'Z_cloudVerticalProfile';
   pb.func(funcName, [pb.float('h'), pb.float('t')], function () {
     this.$l.stratus = pb.sub(1, pb.clamp(pb.mul(this.t, 2), 0, 1));
     this.$l.stratocumulus = pb.sub(1, pb.mul(pb.abs(pb.sub(this.t, 0.5)), 2));
     this.$l.cumulus = pb.mul(pb.clamp(pb.sub(this.t, 0.5), 0, 1), 2);
+    // (base, end of the bottom ramp, unused, top)
     this.$l.g = pb.add(
       pb.mul(pb.vec4(0.02, 0.05, 0.09, 0.11), this.stratus),
       pb.mul(pb.vec4(0.02, 0.2, 0.48, 0.625), this.stratocumulus),
       pb.mul(pb.vec4(0.01, 0.0625, 0.78, 1), this.cumulus)
     );
-    this.$return(
-      pb.sub(pb.smoothStep(this.g.x, this.g.y, this.h), pb.smoothStep(this.g.z, this.g.w, this.h))
-    );
+    this.$l.bottom = pb.smoothStep(this.g.x, this.g.y, this.h);
+    this.$l.f = pb.clamp(pb.div(pb.sub(this.h, this.g.x), pb.sub(this.g.w, this.g.x)), 0, 1);
+    this.$return(pb.mul(this.bottom, pb.pow(pb.sub(1, this.f), 1.5)));
   });
   return pb.getGlobalScope()[funcName](heightFrac, cloudType) as PBShaderExp;
 }
@@ -171,12 +204,20 @@ function remap(
  * fetch, as UE does with its material's conservative density output.
  *
  * [Schneider15] SampleCloudDensity with these choices:
- * - the coverage remap's low end is spread over the range the base shape actually takes, so the
- *   Coverage parameter reads as the fraction of the mid layer filled with cloud (see
- *   CLOUD_COVERAGE_BASE_RANGE). With (1 - coverage) as the low end, as clayjohn and most published
- *   implementations do, Coverage 0.45 already filled 92% of the layer;
- * - the global coverage parameter scales the weather map coverage, normalized by its median;
- * - the precipitation channel is not used yet.
+ * - the weather map coverage decides where clouds form, as Nubis' coverage data field does: its
+ *   values are uniform on [0, 1] and clouds grow where they exceed a threshold set by Coverage,
+ *   ramping in over CLOUD_COVERAGE_RAMP. A global coverage that only raised the threshold on the
+ *   base shape spread clouds evenly over the whole sky like popcorn;
+ * - the coverage erodes the noise as Nubis does (Nubis3 slides 19 and 25):
+ *   dimensional_profile = vertical_profile * coverage, density = saturate(noise -
+ *   (1 - dimensional_profile)), the noise being the base shape stretched over its measured range
+ *   (CLOUD_COVERAGE_BASE_RANGE). Lower coverage towards a cloud's edge shrinks it from the top and
+ *   the bottom at once, which rounds it; Schneider's remap of base * gradient by the coverage
+ *   extruded the coverage into walls;
+ * - the cloud map follows Nubis 2017 (slides 54-59): R connected and G isolated coverage, chosen
+ *   by the formation, B type; the coverage does not drift with the wind, only the noise does
+ *   (slide 45), so the cloudscape keeps its arrangement while its details evolve;
+ * - Nubis' anvil inflation of the coverage towards the layer top (slide 46).
  * @internal
  */
 export function cloudSampleDensity(
@@ -202,17 +243,26 @@ export function cloudSampleDensity(
     // follows the curvature
     this.$l.planet = pb.mul(pb.vec4(this.p, 0), this.cloud.referential).xyz;
     this.$l.q = pb.vec3(this.planet.x, pb.sub(this.r, this.cloud.layer.z), this.planet.z);
-    // [Schneider15] wind: tops pushed ahead of the base, plus the drift
+    // Nubis 2017 slide 45: tops skewed along the wind, then the noise drifts with it while the
+    // coverage stays put
     this.q = pb.add(
       this.q,
-      pb.mul(pb.vec3(this.cloud.windDir.x, 0, this.cloud.windDir.y), pb.mul(this.cloud.scales.w, this.h)),
-      this.cloud.windOffset.xyz
+      pb.mul(pb.vec3(this.cloud.windDir.x, 0, this.cloud.windDir.y), pb.mul(this.cloud.scales.w, this.h))
     );
     this.$l.weather = pb.textureSampleLevel(weatherMap, pb.mul(this.q.xz, this.cloud.scales.x), 0);
+    this.q = pb.add(this.q, this.cloud.windOffset.xyz);
     this.$l.coverage = pb.clamp(
-      pb.mul(this.weather.r, this.cloud.density.x, 1 / CLOUD_COVERAGE_WEATHER_MEDIAN),
+      pb.div(
+        pb.sub(pb.mix(this.weather.r, this.weather.g, this.cloud.windDir.z), this.cloud.density.x),
+        CLOUD_COVERAGE_RAMP
+      ),
       0,
       1
+    );
+    // Nubis 2017 slide 46: anvils, coverage inflated towards the layer top
+    this.coverage = pb.pow(
+      this.coverage,
+      pb.mix(1, pb.mix(1, 0.5, this.cloud.density.w), pb.clamp(pb.mul(pb.sub(this.h, 0.7), 10), 0, 1))
     );
     this.$if(pb.lessThanEqual(this.coverage, 0), function () {
       this.$return(pb.vec4(0, 0, this.h, this.altInLayer));
@@ -220,9 +270,13 @@ export function cloudSampleDensity(
     this.$l.n = pb.textureSampleLevel(baseNoise, pb.mul(this.q, this.cloud.scales.y), 0);
     this.$l.lowFbm = pb.add(pb.mul(this.n.g, 0.625), pb.mul(this.n.b, 0.25), pb.mul(this.n.a, 0.125));
     this.$l.base = remap(pb, this.n.r, pb.sub(this.lowFbm, 1), 1, 0, 1);
-    this.base = pb.mul(this.base, densityHeightGradient(this, this.h, this.weather.b));
-    this.$l.coverageLow = pb.mix(CLOUD_COVERAGE_BASE_RANGE[1], CLOUD_COVERAGE_BASE_RANGE[0], this.coverage);
-    this.base = pb.mul(remap(pb, this.base, this.coverageLow, 1, 0, 1), this.coverage);
+    this.$l.noise = pb.clamp(
+      remap(pb, this.base, CLOUD_COVERAGE_BASE_RANGE[0], CLOUD_COVERAGE_BASE_RANGE[1], 0, 1),
+      0,
+      1
+    );
+    this.$l.profile = pb.mul(verticalProfile(this, this.h, this.weather.b), this.coverage);
+    this.base = pb.clamp(pb.sub(this.noise, pb.sub(1, this.profile)), 0, 1);
     this.$if(pb.lessThanEqual(this.base, 0), function () {
       this.$return(pb.vec4(0, 0, this.h, this.altInLayer));
     });

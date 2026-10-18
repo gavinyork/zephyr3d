@@ -1,6 +1,13 @@
 import type { Nullable } from '@zephyr3d/base';
 import { Disposable, DRef, Vector3, Vector4 } from '@zephyr3d/base';
-import type { BindGroup, GPUProgram, Texture2D, Texture3D } from '@zephyr3d/device';
+import type {
+  BindGroup,
+  GPUProgram,
+  PBInsideFunctionScope,
+  PBShaderExp,
+  Texture2D,
+  Texture3D
+} from '@zephyr3d/device';
 import { getDevice } from '../../app/api';
 import { fetchSampler } from '../../utility/misc';
 import { cloudPerlinFbm, cloudPerlinWorley, cloudWorleyFbm } from './cloud_noise';
@@ -19,8 +26,48 @@ export const CLOUD_WEATHER_MAP_SIZE = 512;
  */
 const BASE_FREQ = 4;
 const DETAIL_FREQ = 1;
-const WEATHER_COVERAGE_FREQ = 4;
+/*
+ * Cloud map of Nubis 2017 (slides 54-59): a low frequency noise modulates coverage where air
+ * masses allow clouds, higher frequency noises make the footprints of the clouds; Perlin footprints
+ * give connected formations (R), Perlin-Worley footprints isolated islands (G). B is the type.
+ */
+/** Footprints: 64 km / 8, about 8 km at the default scale */
+const WEATHER_FOOTPRINT_FREQ = 8;
+/** Air mass modulation: 64 km / 2 */
+const WEATHER_MODULATION_FREQ = 2;
 const WEATHER_TYPE_FREQ = 2;
+/**
+ * 16-quantiles of the raw connected coverage (Perlin footprints x modulation), measured over 40000
+ * samples of a CPU replica of the generator. Mapping a value through this table (its empirical
+ * CDF) makes the stored coverage uniform on [0, 1].
+ */
+const WEATHER_CONNECTED_QUANTILES = [
+  0.0496, 0.1364, 0.1608, 0.1791, 0.1944, 0.2076, 0.2193, 0.2309, 0.2431, 0.255, 0.2684, 0.2829, 0.3, 0.3216,
+  0.3513, 0.3956, 0.6949
+];
+/**
+ * 16-quantiles of the nonzero part of the raw isolated coverage, measured as above; it is zero
+ * over 76% of the map, the gaps between the islands. The islands are stored by their rank in
+ * (0, 1] and the gaps as 0, which keeps the channel continuous at the island edges. Filling the
+ * gaps with another field instead left a step there that the clouds extruded into walls.
+ */
+const WEATHER_ISOLATED_QUANTILES = [
+  0, 0.0058, 0.0123, 0.0182, 0.0252, 0.0332, 0.0414, 0.0498, 0.0596, 0.0696, 0.0809, 0.0942, 0.1098, 0.1315,
+  0.1661, 0.2362, 0.5836
+];
+
+/** Piecewise linear empirical CDF: a sum of one ramp per quantile interval. */
+function empiricalCDF(scope: PBInsideFunctionScope, v: PBShaderExp, quantiles: number[]) {
+  const pb = scope.$builder;
+  const n = quantiles.length - 1;
+  let sum: PBShaderExp | number = 0;
+  for (let i = 0; i < n; i++) {
+    const lo = quantiles[i];
+    const hi = quantiles[i + 1];
+    sum = pb.add(sum, pb.mul(pb.clamp(pb.div(pb.sub(v, lo), Math.max(hi - lo, 1e-6)), 0, 1), 1 / n));
+  }
+  return sum as PBShaderExp;
+}
 
 type VolumeKind = 'base' | 'detail';
 
@@ -90,7 +137,7 @@ function getWeatherProgram() {
       workgroupSize: [8, 8, 1],
       compute(pb) {
         this.dst = pb.texStorage2D.rgba8unorm().storage(0);
-        // (size, coverage freq, type freq, 0)
+        // (size, footprint freq, type freq, modulation freq)
         this.params = pb.vec4().uniform(0);
         this.seed = pb.vec3().uniform(0);
         pb.main(function () {
@@ -103,16 +150,43 @@ function getWeatherProgram() {
                 pb.div(pb.add(pb.vec2(this.$builtins.globalInvocationId.xy), pb.vec2(0.5)), this.params.x),
                 0
               );
-              this.$l.worley = cloudWorleyFbm(this, this.p, this.params.y, this.seed);
-              // [Schneider15] channels: R coverage, G precipitation, B cloud type
-              this.$l.coverage = cloudPerlinWorley(this, this.p, this.params.y, this.worley, this.seed);
+              // [Schneider15] channels: R coverage, G precipitation, B cloud type.
+              // Coverage decides where clouds form, as the coverage data field of Nubis does
+              // (Schneider, Nubis3, SIGGRAPH 2023, slide 19: dimensional_profile = vertical_profile *
+              // cloud_coverage). Inverted Worley cells make separate clouds, a low frequency fbm
+              // gathers them into fields with clear sky between.
+              this.$l.modulation = pb.clamp(
+                pb.add(pb.mul(cloudPerlinFbm(this, this.p, this.params.w, 4, this.seed), 0.5), 0.5),
+                0,
+                1
+              );
+              this.$l.connectedRaw = pb.mul(
+                pb.clamp(
+                  pb.add(pb.mul(cloudPerlinFbm(this, this.p, this.params.y, 4, this.seed), 0.5), 0.5),
+                  0,
+                  1
+                ),
+                this.modulation
+              );
+              this.$l.isolatedRaw = pb.mul(
+                cloudPerlinWorley(
+                  this,
+                  this.p,
+                  this.params.y,
+                  cloudWorleyFbm(this, this.p, this.params.y, this.seed),
+                  this.seed
+                ),
+                this.modulation
+              );
+              this.$l.connected = empiricalCDF(this, this.connectedRaw, WEATHER_CONNECTED_QUANTILES);
+              this.$l.isolated = empiricalCDF(this, this.isolatedRaw, WEATHER_ISOLATED_QUANTILES);
               // The fbm stays well inside +-0.5, so +0.5 alone spans the 0 (stratus) to 1 (cumulus)
               // range; halving it as well left nearly every texel at stratocumulus
               this.$l.cloudType = pb.add(cloudPerlinFbm(this, this.p, this.params.z, 4, this.seed), 0.5);
               pb.textureStore(
                 this.dst,
                 this.$builtins.globalInvocationId.xy,
-                pb.clamp(pb.vec4(this.coverage, 0, this.cloudType, 1), pb.vec4(0), pb.vec4(1))
+                pb.clamp(pb.vec4(this.connected, this.isolated, this.cloudType, 1), pb.vec4(0), pb.vec4(1))
               );
             }
           );
@@ -384,7 +458,12 @@ export class VolumetricCloudResources extends Disposable {
         bindGroup.setTextureView('dst', tex, 0, 0, 1);
         bindGroup.setValue(
           'params',
-          new Vector4(CLOUD_WEATHER_MAP_SIZE, WEATHER_COVERAGE_FREQ, WEATHER_TYPE_FREQ, 0)
+          new Vector4(
+            CLOUD_WEATHER_MAP_SIZE,
+            WEATHER_FOOTPRINT_FREQ,
+            WEATHER_TYPE_FREQ,
+            WEATHER_MODULATION_FREQ
+          )
         );
         bindGroup.setValue('seed', seedOffset(seed));
       },

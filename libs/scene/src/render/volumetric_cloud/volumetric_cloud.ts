@@ -12,6 +12,17 @@ import { Vector2, Vector3 } from '@zephyr3d/base';
 export type CloudMode = 'procedural' | 'volumetric';
 
 /**
+ * Which coverage of the cloud map shapes the clouds (Nubis 2017, slides 57-58).
+ *
+ * - `connected`: Perlin footprints, clouds join into formations.
+ * - `isolated`: Perlin-Worley footprints, island-like clouds that join along connecting bands as
+ *   coverage rises.
+ *
+ * @public
+ */
+export type CloudFormation = 'connected' | 'isolated';
+
+/**
  * Debug output of the volumetric cloud resources, drawn over the sky.
  * @public
  */
@@ -62,6 +73,8 @@ export class VolumetricCloud {
   private _detailErosion: number;
   private readonly _wind: Vector2;
   private _noiseSeed: number;
+  private _formation: CloudFormation;
+  private _anvilBias: number;
   // Sky cache
   private _framesPerUpdate: number;
   private _cacheResolution: number;
@@ -88,12 +101,17 @@ export class VolumetricCloud {
     this._coverage = 0.45;
     this._density = 0.03;
     this._albedo = new Vector3(1, 1, 1);
-    this._weatherMapScale = 50000;
+    // Larger than the cloud map of Nubis 2017 (about 10 km) or the data fields of Nubis3 (16 km):
+    // the generated map changes coverage over a few texels, and only spread over 64 km does a
+    // cloud slope from its edge to its full height instead of standing up as a block
+    this._weatherMapScale = 64000;
     this._baseNoiseScale = 10000;
     this._detailNoiseScale = 1000;
     this._detailErosion = 0.35;
     this._wind = new Vector2(10, 0);
     this._noiseSeed = 0;
+    this._formation = 'isolated';
+    this._anvilBias = 0;
     this._framesPerUpdate = 64;
     this._cacheResolution = 768;
   }
@@ -284,6 +302,23 @@ export class VolumetricCloud {
       this._wind.set(val);
       this._version++;
     }
+  }
+  /** Isolated island-like clouds, or clouds joined into formations. */
+  get formation(): CloudFormation {
+    return this._formation;
+  }
+  set formation(val: CloudFormation) {
+    if (val !== this._formation) {
+      this._formation = val;
+      this._version++;
+    }
+  }
+  /** Spreads the tops of tall clouds out into anvils. */
+  get anvilBias() {
+    return this._anvilBias;
+  }
+  set anvilBias(val: number) {
+    this._set('_anvilBias', Math.min(1, Math.max(0, val)));
   }
   /** Picks a different pattern for the generated noise and weather map. */
   get noiseSeed() {

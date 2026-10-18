@@ -187,8 +187,10 @@ export function cloudWorleyFbm(
 }
 
 /**
- * Perlin-Worley: billowy gradient fbm remapped onto a Worley fbm, the base shape channel of
- * [Schneider15]. `worley` is the Worley fbm at the same frequency, which 3dVXDc also stores in G.
+ * Perlin-Worley of Nubis (Schneider, "Nubis: Authoring Real-Time Volumetric Cloudscapes with the
+ * Decima Engine", SIGGRAPH 2017, slide 34): `remap(perlin, 1 - worley, 1, 0, 1)`, the web of the
+ * Worley noise subtracted from the low density regions of a billowy Perlin fbm, which puts round
+ * shapes there. `worley` is the Worley fbm at the same frequency.
  * @internal
  */
 export function cloudPerlinWorley(
@@ -204,8 +206,9 @@ export function cloudPerlinWorley(
     this.$l.pfbm = pb.mix(1, cloudPerlinFbm(this, this.p, this.freq, 7, this.seed), 0.5);
     // Billowy: fold the fbm around its midpoint
     this.pfbm = pb.abs(pb.sub(pb.mul(this.pfbm, 2), 1));
-    // remap(pfbm, 0, 1, worley, 1)
-    this.$return(pb.add(this.worley, pb.mul(this.pfbm, pb.sub(1, this.worley))));
+    this.$return(
+      pb.clamp(pb.div(pb.sub(this.pfbm, pb.sub(1, this.worley)), pb.max(this.worley, 1e-6)), 0, 1)
+    );
   });
   return pb.getGlobalScope()[funcName](p, freq, worley, seed) as PBShaderExp;
 }

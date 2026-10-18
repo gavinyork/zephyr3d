@@ -18,6 +18,7 @@ import {
   CLOUD_TOP_OFFSET,
   CLOUD_VIEW_SAMPLE_COUNT_MAX,
   cloudCacheDecode,
+  cloudCoverageThreshold,
   cloudDistantSkyLight,
   cloudTrace,
   getCloudParamsStruct
@@ -368,7 +369,12 @@ export class VolumetricCloudSkyCache extends Disposable {
           1 - params.skyLightCloudBottomOcclusion
         ),
         ms: new Vector4(params.msContribution, params.msOcclusion, params.msEccentricity, 0),
-        density: new Vector4(params.coverage, params.density, params.detailErosion, 0),
+        density: new Vector4(
+          cloudCoverageThreshold(params.coverage, params.formation),
+          params.density,
+          params.detailErosion,
+          params.anvilBias
+        ),
         albedo: new Vector4(params.albedo.x, params.albedo.y, params.albedo.z, 0),
         scales: new Vector4(
           1 / params.weatherMapScale,
@@ -378,7 +384,7 @@ export class VolumetricCloudSkyCache extends Disposable {
         ),
         // [Schneider15]: drift along the wind, rising at a tenth of its speed
         windOffset: new Vector4(wind.x * time, windSpeed * 0.1 * time, wind.y * time, 0),
-        windDir: new Vector4(windDir.x, windDir.y, 0, 0)
+        windDir: new Vector4(windDir.x, windDir.y, params.formation === 'isolated' ? 1 : 0, 0)
       },
       delta,
       msOctaves: params.msOctaves,

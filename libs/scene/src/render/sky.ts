@@ -749,8 +749,10 @@ export class SkyRenderer extends Disposable {
     this._volumetricCloudResources.detailNoiseSource = tex;
   }
   /**
-   * Weather map of the volumetric clouds, or null to generate it. Channels: R coverage,
-   * G precipitation, B cloud type (0 stratus, 0.5 stratocumulus, 1 cumulus).
+   * Weather map (the cloud map of Nubis 2017) of the volumetric clouds, or null to generate it.
+   * Channels: R coverage of the connected formation, G coverage of the isolated formation (clouds
+   * grow where it is highest; evenly spread over 0 to 1 it makes Coverage the covered fraction),
+   * B cloud type (0 stratus, 0.5 stratocumulus, 1 cumulus).
    */
   get cloudWeatherMap(): Nullable<Texture2D> {
     return this._volumetricCloudResources.weatherMapSource;

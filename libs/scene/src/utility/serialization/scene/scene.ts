@@ -1,5 +1,12 @@
 import type { Texture2D } from '@zephyr3d/device';
-import type { CloudMode, EnvLightType, FogType, SkyType, VolumetricCloudDebugView } from '../../../render';
+import type {
+  CloudFormation,
+  CloudMode,
+  EnvLightType,
+  FogType,
+  SkyType,
+  VolumetricCloudDebugView
+} from '../../../render';
 import { Scene } from '../../../scene/scene';
 import { defineProps, type SerializableClass } from '../types';
 import type { Nullable } from '@zephyr3d/base';
@@ -892,7 +899,7 @@ export function getSceneClass(manager: ResourceManager): SerializableClass {
           description:
             'Spreads cloud fields wider apart; lower packs more, smaller cloud fields into the sky',
           type: 'float',
-          default: 50000,
+          default: 64000,
           phase: 2,
           options: {
             group: 'VolumetricClouds',
@@ -952,6 +959,51 @@ export function getSceneClass(manager: ResourceManager): SerializableClass {
           },
           set(this: Scene, value) {
             this.env.sky.volumetricCloud.detailNoiseScale = value.num[0];
+          },
+          isValid(this: Scene) {
+            return this.env.sky.skyType === 'scatter' && this.env.sky.cloudMode === 'volumetric';
+          }
+        },
+        {
+          name: 'VolumetricCloudFormation',
+          description:
+            'Isolated: separate island-like clouds that join along bands as Coverage rises. Connected: clouds joined into larger formations',
+          type: 'string',
+          default: 'isolated',
+          phase: 2,
+          options: {
+            group: 'VolumetricClouds',
+            label: 'Formation',
+            enum: { labels: ['Isolated', 'Connected'], values: ['isolated', 'connected'] }
+          },
+          get(this: Scene, value) {
+            value.str[0] = this.env.sky.volumetricCloud.formation;
+          },
+          set(this: Scene, value) {
+            this.env.sky.volumetricCloud.formation = value.str[0] as CloudFormation;
+          },
+          isValid(this: Scene) {
+            return this.env.sky.skyType === 'scatter' && this.env.sky.cloudMode === 'volumetric';
+          }
+        },
+        {
+          name: 'VolumetricCloudAnvilBias',
+          description: 'Spreads the tops of tall clouds out into anvils',
+          type: 'float',
+          default: 0,
+          phase: 2,
+          options: {
+            group: 'VolumetricClouds',
+            label: 'AnvilBias',
+            animatable: true,
+            minValue: 0,
+            maxValue: 1
+          },
+          get(this: Scene, value) {
+            value.num[0] = this.env.sky.volumetricCloud.anvilBias;
+          },
+          set(this: Scene, value) {
+            this.env.sky.volumetricCloud.anvilBias = value.num[0];
           },
           isValid(this: Scene) {
             return this.env.sky.skyType === 'scatter' && this.env.sky.cloudMode === 'volumetric';
@@ -1437,7 +1489,7 @@ export function getSceneClass(manager: ResourceManager): SerializableClass {
         {
           name: 'VolumetricCloudWeatherMap',
           description:
-            'Where clouds form: R coverage, G precipitation, B cloud type (0 stratus to 1 cumulus). Empty generates one',
+            'Where clouds form: R coverage of the Connected formation, G coverage of the Isolated formation (clouds grow where it is highest, more of it as Coverage rises; spread it evenly over 0 to 1 so Coverage matches the covered area), B cloud type (0 stratus to 1 cumulus). Empty generates one',
           type: 'object',
           default: null,
           phase: 2,
