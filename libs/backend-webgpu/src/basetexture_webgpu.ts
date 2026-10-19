@@ -365,11 +365,20 @@ export abstract class WebGPUBaseTexture<
   }
   /** @internal */
   protected _calcMipLevelCount(format: TextureFormat, width: number, height: number, _depth: number) {
-    if (hasDepthChannel(format) || this.isTexture3D() || this.isTextureVideo()) {
+    if (hasDepthChannel(format) || this.isTextureVideo()) {
       return 1;
     }
     if (this._flags & GPUResourceUsageFlags.TF_NO_MIPMAP) {
       return 1;
+    }
+    if (this.isTexture3D()) {
+      // Only the compute path can build a 3d chain - a 3d texture cannot be a render
+      // attachment. Writable ones keep a single level so their default view stays a valid
+      // storage binding.
+      return !(this._flags & GPUResourceUsageFlags.TF_WRITABLE) &&
+        WebGPUMipmapGenerator.supportsComputeMipmap(this._device, format)
+        ? Math.floor(Math.log2(Math.max(width, height, _depth))) + 1
+        : 1;
     }
     const params = (this.getTextureCaps() as WebGPUTextureCaps).getTextureFormatInfo(format);
     if (!params || !params.renderable) {
@@ -425,9 +434,7 @@ export abstract class WebGPUBaseTexture<
         // Mip chains of storage-capable formats are generated in a compute pass, which needs
         // the texture to be bindable as a storage texture.
         this._computeMipmap =
-          this._mipLevelCount > 1 &&
-          !this.isTexture3D() &&
-          WebGPUMipmapGenerator.supportsComputeMipmap(this._device, this._format);
+          this._mipLevelCount > 1 && WebGPUMipmapGenerator.supportsComputeMipmap(this._device, this._format);
         this._object = this._device.gpuCreateTexture({
           size: {
             width: this._width,
@@ -728,7 +735,7 @@ export abstract class WebGPUBaseTexture<
     let levelGroup = levelGroups[level];
     if (!levelGroup) {
       levelGroup = this._device.createBindGroup(
-        WebGPUMipmapGenerator.getComputeMipmapBindGroupLayout(this._device, this.format)
+        WebGPUMipmapGenerator.getComputeMipmapBindGroupLayout(this._device, this.format, this.isTexture3D())
       ) as WebGPUBindGroup;
       levelGroup.setTextureView('srcTex', this, level - 1, face, 1);
       levelGroup.setTextureView('dstTex', this, level, face, 1);

@@ -62,6 +62,12 @@ import {
 import { getDevice, getEngine } from '../app/api';
 import { drawFullscreenQuad } from './fullscreenquad';
 import { panoramaToCubemap } from '../utility/panorama';
+import type { CloudMode, VolumetricCloudDebugView } from './volumetric_cloud/volumetric_cloud';
+import { VolumetricCloud } from './volumetric_cloud/volumetric_cloud';
+import { VolumetricCloudResources } from './volumetric_cloud/resources';
+import { drawVolumetricCloudDebug } from './volumetric_cloud/debug_view';
+import { VolumetricCloudSkyCache } from './volumetric_cloud/sky_cache';
+import { cloudCacheEncode } from './volumetric_cloud/cloud_common';
 import { PerspectiveCamera } from '../camera';
 
 /**
@@ -90,6 +96,8 @@ const fogTypeMap: Record<FogType, number> = {
 
 const defaultSkyWorldMatrix = Matrix4x4.identity();
 const SKY_OUTPUT_MAX = 64512 * 0.5;
+/** Volumetric clouds give way to procedural ones this far below the cloud base, in meters */
+const VOLUMETRIC_CLOUD_CEILING_MARGIN = 500;
 
 /**
  * The sky renderer
@@ -178,6 +186,19 @@ export class SkyRenderer extends Disposable {
   private readonly _heightFogParams: HeightFogParams;
   private _cloudy: number;
   private _cloudIntensity: number;
+  private _cloudMode: CloudMode;
+  private readonly _volumetricCloud: VolumetricCloud;
+  private readonly _volumetricCloudResources: VolumetricCloudResources;
+  private readonly _volumetricCloudCache: VolumetricCloudSkyCache;
+  /** Volumetric clouds drawn this frame: requested, supported and the observer below the layer */
+  private _volumetricActive: boolean;
+  private readonly _bindgroupSkyVolumetric: DRef<BindGroup>;
+  private static _programSkyVolumetric: Nullable<GPUProgram> = null;
+  private static _volumetricAltitudeWarned = false;
+  private _cloudDebugView: VolumetricCloudDebugView;
+  private _cloudDebugSlice: number;
+  private _cloudDebugChannel: number;
+  private static _volumetricFallbackWarned = false;
   private _debugAerialPerspective: number;
   private readonly _wind: Vector2;
   private readonly _skyboxRotation: Vector3;
@@ -241,6 +262,15 @@ export class SkyRenderer extends Disposable {
     this._heightFogParams = getDefaultHeightFogParams();
     this._cloudy = 0.45;
     this._cloudIntensity = 15;
+    this._cloudMode = 'procedural';
+    this._volumetricCloud = new VolumetricCloud();
+    this._volumetricCloudResources = new VolumetricCloudResources();
+    this._volumetricCloudCache = new VolumetricCloudSkyCache();
+    this._volumetricActive = false;
+    this._bindgroupSkyVolumetric = new DRef();
+    this._cloudDebugView = 'none';
+    this._cloudDebugSlice = 0;
+    this._cloudDebugChannel = 0;
     this._wind = new Vector2(0, 0);
     this._skyboxRotation = new Vector3(0, 0, 0);
     this._skyWorldMatrix = defaultSkyWorldMatrix;
@@ -663,6 +693,119 @@ export class SkyRenderer extends Disposable {
     }
   }
   /**
+   * How the clouds of the scatter sky are drawn.
+   *
+   * @remarks
+   * `volumetric` needs a WebGPU device; on other devices the procedural clouds are drawn instead,
+   * see {@link SkyRenderer.effectiveCloudMode}.
+   */
+  get cloudMode(): CloudMode {
+    return this._cloudMode;
+  }
+  set cloudMode(val: CloudMode) {
+    if (val !== this._cloudMode) {
+      this._cloudMode = val;
+      this.invalidate();
+    }
+  }
+  /** The cloud mode actually drawn: `volumetric` falls back to `procedural` off WebGPU. */
+  get effectiveCloudMode(): CloudMode {
+    if (this._cloudMode === 'volumetric' && getDevice().type !== 'webgpu') {
+      if (!SkyRenderer._volumetricFallbackWarned) {
+        SkyRenderer._volumetricFallbackWarned = true;
+        console.warn('Volumetric clouds require WebGPU, drawing procedural clouds instead');
+      }
+      return 'procedural';
+    }
+    return this._cloudMode;
+  }
+  /** Parameters of the volumetric clouds. */
+  get volumetricCloud(): VolumetricCloud {
+    return this._volumetricCloud;
+  }
+  /**
+   * Base shape noise of the volumetric clouds, as a 2D atlas of the slices of a cubic volume,
+   * or null to generate it.
+   *
+   * @remarks
+   * An N^3 volume is stored as N slices of N x N texels laid out row by row, left to right, so
+   * that the atlas holds width * height = N^3 texels, e.g. 128^3 as 2048 x 1024 (16 x 8 slices).
+   * Channels: R Perlin-Worley, GBA Worley fbm of increasing frequency.
+   */
+  get cloudBaseNoise(): Nullable<Texture2D> {
+    return this._volumetricCloudResources.baseNoiseSource;
+  }
+  set cloudBaseNoise(tex: Nullable<Texture2D>) {
+    this._volumetricCloudResources.baseNoiseSource = tex;
+    this._volumetricCloudCache.invalidate();
+  }
+  /**
+   * Detail noise of the volumetric clouds as a slice atlas (see {@link SkyRenderer.cloudBaseNoise}),
+   * or null to generate it. Channels: RGB Worley fbm of increasing frequency.
+   */
+  get cloudDetailNoise(): Nullable<Texture2D> {
+    return this._volumetricCloudResources.detailNoiseSource;
+  }
+  set cloudDetailNoise(tex: Nullable<Texture2D>) {
+    this._volumetricCloudResources.detailNoiseSource = tex;
+    this._volumetricCloudCache.invalidate();
+  }
+  /**
+   * Weather map (the cloud map of Nubis 2017) of the volumetric clouds, or null to generate it.
+   * Channels: R coverage of the connected formation, G coverage of the isolated formation (clouds
+   * grow where it is highest; Coverage lowers the threshold, rather than prescribing sky area),
+   * B cloud type (0 stratus, 0.5 stratocumulus, 1 cumulus).
+   */
+  get cloudWeatherMap(): Nullable<Texture2D> {
+    return this._volumetricCloudResources.weatherMapSource;
+  }
+  set cloudWeatherMap(tex: Nullable<Texture2D>) {
+    this._volumetricCloudResources.weatherMapSource = tex;
+    this._volumetricCloudCache.invalidate();
+  }
+  /** Draws a volumetric cloud resource over the sky, for inspection. */
+  get cloudDebugView(): VolumetricCloudDebugView {
+    return this._cloudDebugView;
+  }
+  set cloudDebugView(val: VolumetricCloudDebugView) {
+    this._cloudDebugView = val;
+  }
+  /** @internal Whether {@link SkyRenderer.drawCloudDebugView} has anything to draw this frame. */
+  get cloudDebugViewActive() {
+    return (
+      this._cloudDebugView !== 'none' &&
+      this._skyType === 'scatter' &&
+      this.effectiveCloudMode === 'volumetric'
+    );
+  }
+  /**
+   * @internal Draws {@link SkyRenderer.cloudDebugView} over the current render target. Called on
+   * the presented image, after tone mapping, so the texels show their stored values.
+   */
+  drawCloudDebugView() {
+    drawVolumetricCloudDebug(
+      this._volumetricCloudResources,
+      this._cloudDebugView,
+      this._cloudDebugSlice,
+      this._cloudDebugChannel,
+      this._volumetricCloudCache.densityParams
+    );
+  }
+  /** Slice, 0 to 1: noise volume depth, density XY depth, or density XZ altitude. */
+  get cloudDebugSlice() {
+    return this._cloudDebugSlice;
+  }
+  set cloudDebugSlice(val: number) {
+    this._cloudDebugSlice = Math.min(1, Math.max(0, val));
+  }
+  /** Channel shown by {@link SkyRenderer.cloudDebugView}: 0 RGB, 1-4 R, G, B or A as grey. */
+  get cloudDebugChannel() {
+    return this._cloudDebugChannel;
+  }
+  set cloudDebugChannel(val: number) {
+    this._cloudDebugChannel = Math.min(4, Math.max(0, Math.round(val)));
+  }
+  /**
    * Wind velocity
    *
    * @remarks
@@ -821,6 +964,7 @@ export class SkyRenderer extends Disposable {
     return this._skyDistantLightLut.get()!.getColorAttachments()[0] as Texture2D;
   }
   update(ctx: DrawContext) {
+    const wantVolumetric = this._skyType === 'scatter' && this.effectiveCloudMode === 'volumetric';
     // Latch the fog scales for this frame. The bake path (updateBakedSkyMap) uses the sky camera
     // whose scene is null, so it cannot read lightingMode itself; both bake and main pass run after
     // update(), so caching them here keeps them consistent.
@@ -851,10 +995,15 @@ export class SkyRenderer extends Disposable {
     if (useScatter || !atmosphereLUTRendered()) {
       this.renderAtmosphereLUTs(ctx);
     }
+    this._updateVolumetricClouds(ctx, wantVolumetric);
     const oldSunLight = ctx.sunLight && useScatter ? ctx.sunLight.color : null;
     const sunDir = SkyRenderer._getSunDir(ctx.sunLight);
     const sunColor = SkyRenderer._getSunColor(ctx.sunLight);
-    if (this._skyType === 'scatter' && (this._wind.x !== 0 || this._wind.y !== 0)) {
+    if (
+      this._skyType === 'scatter' &&
+      !this._volumetricActive &&
+      (this._wind.x !== 0 || this._wind.y !== 0)
+    ) {
       this._bakedSkyboxDirty = true;
     }
     if (!this._skyDistantLightLut.get()) {
@@ -925,6 +1074,48 @@ export class SkyRenderer extends Disposable {
       this._heightFogParams.lightDir.set(SkyRenderer._getSunDir(ctx.sunLight));
     }
     return oldSunLight;
+  }
+  /**
+   * Advances the volumetric cloud sky cache, after the atmosphere parameters of the frame are set.
+   * The sky cache only holds what an observer below the layer sees; above that the procedural
+   * clouds are drawn instead.
+   */
+  private _updateVolumetricClouds(ctx: DrawContext, wanted: boolean) {
+    let active = wanted;
+    if (active) {
+      const altitude = this._atmosphereParams.observerAltitude;
+      if (altitude > this._volumetricCloud.layerBottomAltitude - VOLUMETRIC_CLOUD_CEILING_MARGIN) {
+        active = false;
+        if (!SkyRenderer._volumetricAltitudeWarned) {
+          SkyRenderer._volumetricAltitudeWarned = true;
+          console.warn(
+            'Volumetric clouds are only drawn below the cloud layer, drawing procedural clouds instead'
+          );
+        }
+      }
+    }
+    if (active) {
+      this._volumetricCloudResources.update(this._volumetricCloud.noiseSeed);
+      this._volumetricCloudCache.update(
+        this._volumetricCloud,
+        this._volumetricCloudResources,
+        this._atmosphereParams,
+        ctx.camera.getWorldPosition(),
+        ctx.device.frameInfo.elapsedOverall * 0.001
+      );
+      active = !!this._volumetricCloudCache.toMap;
+      if (this._volumetricCloudCache.roundCompleted) {
+        // The environment lighting follows the clouds once per round
+        this._bakedSkyboxDirty = true;
+      }
+    } else if (this._volumetricActive) {
+      // Resumes with a full rebuild rather than a fade from stale maps
+      this._volumetricCloudCache.invalidate();
+    }
+    if (active !== this._volumetricActive) {
+      this._volumetricActive = active;
+      this._bakedSkyboxDirty = true;
+    }
   }
   renderAtmosphereLUTs(ctx: DrawContext) {
     this._atmosphereParams.lightDir.set(SkyRenderer._getSunDir(ctx.sunLight));
@@ -1208,6 +1399,9 @@ export class SkyRenderer extends Disposable {
     this._irradianceSHFB.dispose();
     this._irradianceFrameBuffer.dispose();
     this._shProjector.dispose();
+    this._volumetricCloudResources.dispose();
+    this._volumetricCloudCache.dispose();
+    this._bindgroupSkyVolumetric.dispose();
     if (this._skyDistantLightLut.get()) {
       this._skyDistantLightLut.get()!.getColorAttachments()[0].dispose();
       this._skyDistantLightLut.dispose();
@@ -1386,7 +1580,8 @@ export class SkyRenderer extends Disposable {
    * heavy-overcast floor {@link SkyRenderer.CLOUD_SUN_MIN_TRANSMITTANCE}.
    */
   cloudSunTransmittance(_sunDir: Immutable<Vector3>): Vector3 {
-    if (this._skyType !== 'scatter') {
+    // Volumetric clouds shade the sun per pixel through their shadow instead
+    if (this._skyType !== 'scatter' || this._volumetricActive) {
       return Vector3.one();
     }
     const coverage = Math.min(1, Math.max(0, this._cloudy));
@@ -1463,8 +1658,15 @@ export class SkyRenderer extends Disposable {
     const tLut = getTransmittanceLut();
     const skyLut = getSkyViewLut();
     //const apLut = ScatteringLut.getAerialPerspectiveLut(alpha, 8000);
-    const program = SkyRenderer._programSky.scatter!;
-    const bindgroup = this._bindgroupSky.scatter!.get()!;
+    const volumetric = this._volumetricActive;
+    const program = volumetric ? SkyRenderer._programSkyVolumetric! : SkyRenderer._programSky.scatter!;
+    const bindgroup = volumetric ? this._bindgroupSkyVolumetric.get()! : this._bindgroupSky.scatter!.get()!;
+    if (volumetric) {
+      const cache = this._volumetricCloudCache;
+      bindgroup.setTexture('cloudFrom', cache.fromMap!, fetchSampler('clamp_linear_nomip'));
+      bindgroup.setTexture('cloudTo', cache.toMap!, fetchSampler('clamp_linear_nomip'));
+      bindgroup.setValue('cloudBlend', new Vector4(cache.blend, cache.fromDelta, cache.toDelta, 0));
+    }
     bindgroup.setValue(
       'flip',
       device.getFramebuffer() && device.type === 'webgpu' ? new Vector4(1, -1, 1, 1) : new Vector4(1, 1, 1, 1)
@@ -1480,10 +1682,12 @@ export class SkyRenderer extends Disposable {
     bindgroup.setTexture('tLut', tLut, fetchSampler('clamp_linear_nomip'));
     bindgroup.setTexture('skyLut', skyLut, fetchSampler('clamp_linear_nomip'));
     bindgroup.setTexture('msLut', getMultiScatteringLut(), fetchSampler('clamp_linear_nomip'));
-    bindgroup.setValue('cloudy', this._cloudy);
-    bindgroup.setValue('cloudIntensity', this._cloudIntensity);
-    bindgroup.setValue('time', device.frameInfo.elapsedOverall * 0.001);
-    bindgroup.setValue('velocity', this._wind);
+    if (!volumetric) {
+      bindgroup.setValue('cloudy', this._cloudy);
+      bindgroup.setValue('cloudIntensity', this._cloudIntensity);
+      bindgroup.setValue('time', device.frameInfo.elapsedOverall * 0.001);
+      bindgroup.setValue('velocity', this._wind);
+    }
     device.setProgram(program);
     device.setBindGroup(0, bindgroup);
     device.setRenderStates(
@@ -1593,7 +1797,15 @@ export class SkyRenderer extends Disposable {
       );
     }
     if (!SkyRenderer._programSky.scatter) {
-      SkyRenderer._programSky.scatter = SkyRenderer._createScatterProgram(device, true);
+      SkyRenderer._programSky.scatter = SkyRenderer._createScatterProgram(device, 'procedural');
+    }
+    if (!SkyRenderer._programSkyVolumetric) {
+      SkyRenderer._programSkyVolumetric = SkyRenderer._createScatterProgram(device, 'volumetric');
+    }
+    if (!this._bindgroupSkyVolumetric.get()) {
+      this._bindgroupSkyVolumetric.set(
+        device.createBindGroup(SkyRenderer._programSkyVolumetric.bindGroupLayouts[0])
+      );
     }
     if (!this._bindgroupSky.scatter) {
       this._bindgroupSky.scatter = new DRef(
@@ -1829,7 +2041,9 @@ export class SkyRenderer extends Disposable {
       this.APLutProgram = createAPLutProgram(device);
     }
   }
-  private static _createScatterProgram(device: AbstractDevice, cloud: boolean) {
+  private static _createScatterProgram(device: AbstractDevice, cloudMode: CloudMode) {
+    const cloud = cloudMode === 'procedural';
+    const volumetric = cloudMode === 'volumetric';
     const program = device.buildRenderProgram({
       vertex(pb) {
         this.$inputs.pos = pb.vec3().attrib('position');
@@ -1855,6 +2069,12 @@ export class SkyRenderer extends Disposable {
         this.params = getAtmosphereParamsStruct(pb)().uniform(0);
         this.includeSunDisk = pb.int().uniform(0);
         this.lowerHemisphereBlack = pb.int().uniform(0);
+        if (volumetric) {
+          this.cloudFrom = pb.tex2D().uniform(0);
+          this.cloudTo = pb.tex2D().uniform(0);
+          // (blend, delta of cloudFrom, delta of cloudTo, 0)
+          this.cloudBlend = pb.vec4().uniform(0);
+        }
         if (cloud) {
           this.cloudy = pb.float().uniform(0);
           this.cloudIntensity = pb.float().uniform(0);
@@ -1977,6 +2197,29 @@ export class SkyRenderer extends Disposable {
             });
             this.$l.factor = pb.clamp(pb.mul(this.noiseValue, this.vfactor), 0, 1);
             this.$l.color = pb.mix(this.skyColor, this.cloudColor, this.factor);
+          } else if (volumetric) {
+            // Cached clouds: (luminance, transmittance) over the sky, blended between the two
+            // latest completed maps. Below -delta a map holds no clouds.
+            this.$l.color = this.skyColor;
+            this.$l.elevation = pb.asin(pb.clamp(this.rayDir.y, -1, 1));
+            this.$l.cFrom = pb.vec4(0, 0, 0, 1);
+            this.$l.cTo = pb.vec4(0, 0, 0, 1);
+            this.$if(pb.greaterThanEqual(this.elevation, pb.neg(this.cloudBlend.y)), function () {
+              this.cFrom = pb.textureSampleLevel(
+                this.cloudFrom,
+                cloudCacheEncode(this, this.rayDir, this.cloudBlend.y),
+                0
+              );
+            });
+            this.$if(pb.greaterThanEqual(this.elevation, pb.neg(this.cloudBlend.z)), function () {
+              this.cTo = pb.textureSampleLevel(
+                this.cloudTo,
+                cloudCacheEncode(this, this.rayDir, this.cloudBlend.z),
+                0
+              );
+            });
+            this.$l.clouds = pb.mix(this.cFrom, this.cTo, this.cloudBlend.x);
+            this.color = pb.add(pb.mul(this.color, this.clouds.a), this.clouds.rgb);
           } else {
             this.$l.color = this.skyColor;
           }
@@ -1995,7 +2238,7 @@ export class SkyRenderer extends Disposable {
         });
       }
     })!;
-    program.name = cloud ? '@SkyScatterCloud' : '@SkyScatter';
+    program.name = cloud ? '@SkyScatterCloud' : volumetric ? '@SkyScatterVolumetricCloud' : '@SkyScatter';
     return program;
   }
 }

@@ -68,7 +68,8 @@ const test = base.extend<{}, { harness: Harness }>({
       });
       page.on('pageerror', (e) => consoleErrors.push(`pageerror: ${e.message}`));
 
-      await page.goto(`/index.html?convention=${meta.convention}`);
+      const diagnosticQuery = process.env.VISUAL_CLOUD_DIAGNOSTICS === '1' ? '&diagnostics=clouds' : '';
+      await page.goto(`/index.html?convention=${meta.convention}${diagnosticQuery}`);
       await page.waitForFunction(() => (globalThis as any).__zephyrHarnessReady === true);
 
       const info = await page.evaluate(
@@ -124,7 +125,7 @@ const test = base.extend<{}, { harness: Harness }>({
 // The scene list lives in the page, but Playwright needs test names up front.
 // Kept in sync by asserting against the page's list in the first test rather
 // than by duplicating scene metadata here.
-const SCENE_NAMES = [
+const REGRESSION_SCENE_NAMES = [
   'sanity-orientation',
   'unlit-textured',
   'ktx2-basis',
@@ -234,6 +235,32 @@ const SCENE_NAMES = [
   'physics-joints',
   'physics-vehicle'
 ];
+
+// Kept out of the default suite while these candidate presets await GPU review
+// and accepted image baselines. Opt in explicitly to capture and compare them.
+const CLOUD_DIAGNOSTIC_SCENE_NAMES = [
+  'cloud-profile-stratocumulus-xy',
+  'cloud-profile-cumulus-xy',
+  'cloud-base-density-xy',
+  'cloud-density-xy',
+  'cloud-density-xz',
+  'cloud-controlled-base',
+  'cloud-controlled-detail',
+  'cloud-generated-connected-seed-0',
+  'cloud-generated-connected-seed-1',
+  'cloud-generated-connected-seed-2',
+  'cloud-generated-isolated-seed-0',
+  'cloud-generated-isolated-seed-1',
+  'cloud-generated-isolated-seed-2',
+  'cloud-generated-connected-seed-0-side',
+  'cloud-generated-connected-seed-1-side',
+  'cloud-generated-connected-seed-2-side',
+  'cloud-generated-isolated-seed-0-side',
+  'cloud-generated-isolated-seed-1-side',
+  'cloud-generated-isolated-seed-2-side'
+];
+const SCENE_NAMES =
+  process.env.VISUAL_CLOUD_DIAGNOSTICS === '1' ? CLOUD_DIAGNOSTIC_SCENE_NAMES : REGRESSION_SCENE_NAMES;
 
 test('scene registry matches the harness page', async ({ harness }) => {
   expect(harness.scenes.map((s) => s.name)).toEqual(SCENE_NAMES);

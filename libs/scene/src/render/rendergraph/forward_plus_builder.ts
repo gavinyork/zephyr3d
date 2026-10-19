@@ -1961,6 +1961,28 @@ const CompositeTailModule: RenderModule<FrameGraphContext> = {
         return outputBackbuffer;
       });
     }
+    // Debug views of raw data go on the presented image, past tone mapping and exposure
+    const sky = ctx.scene.env.sky;
+    if (sky.cloudDebugViewActive) {
+      const presentedBeforeDebug = presentedBackbuffer;
+      presentedBackbuffer = graph.addPass('VolumetricCloudDebug', (builder) => {
+        const out = builder.write(presentedBeforeDebug);
+        builder.sideEffect();
+        builder.setExecute(() => {
+          const device = ctx.device;
+          device.pushDeviceStates();
+          try {
+            device.setFramebuffer(ctx.finalFramebuffer ?? null);
+            device.setViewport(null);
+            device.setScissor(null);
+            sky.drawCloudDebugView();
+          } finally {
+            device.popDeviceStates();
+          }
+        });
+        return out;
+      });
+    }
     fg.state.presentedBackbuffer = presentedBackbuffer;
     // Downstream modules may replace this sink registration.
     blackboard.set(FrameResources.PresentedColor, presentedBackbuffer);

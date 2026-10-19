@@ -92,6 +92,77 @@ run (`UPDATE_BASELINES=1 npm run test:gpu`) for local regression detection.
 
 ## Adding a scene
 
+### Cloud shaping diagnostics
+
+Candidate cloud shaping scenes are separate from the default regression suite
+until their GPU images have been reviewed and baselines accepted. Their weather
+fixtures are generated in memory: a 1x1 constant map isolates the height profile;
+a 128x128 smooth circular footprint isolates one cloud without encoding a dome.
+No weather image download or manual preparation is needed.
+
+The diagnostic group contains height profiles for types 0.5 and 1, vertical
+sections before/after detail erosion, a horizontal density section, matched
+rendered clouds with/without detail, and generated connected/isolated weather
+for seeds 0, 1 and 2 from two camera positions (19 scenes total). All require
+WebGPU; WebGL2 is explicitly unsupported so a
+procedural fallback cannot masquerade as a volumetric result. Input parameters
+and candidate presets are in `src/scenes/volumetric-clouds.ts`.
+
+Build without starting a server:
+
+```bash
+npm run build:check
+npm run build
+```
+
+The built page is `dist/index.html` with bundle `dist/js/harness.js`. To select
+this group when opening a served harness page, append `?diagnostics=clouds`.
+The page API remains `__zephyrHarness.init('webgpu')`, `listScenes()`, and
+`runScene(name)`; captures are RGBA base64, independent of the visible canvas.
+
+To capture through headless Chromium directly from `file://`, without a server:
+
+```bash
+node tools/cloud-diagnostics.mjs
+node tools/cloud-diagnostics.mjs --scenes=cloud-density-xy,cloud-controlled-detail
+node tools/cloud-diagnostics.mjs --adapter=swiftshader --output=test-results/cloud-swiftshader
+node tools/cloud-diagnostics.mjs --checks-only
+node tools/cloud-diagnostics.mjs --profile
+```
+
+The default output is `test-results/cloud-diagnostics`: one PNG per scene and
+`summary.json` recording the adapter, pixel statistics, host durations, and
+browser errors. XY density sections also include a `.metric.png` crop shown
+at physical proportions (16 km x 5 km). The runner records the engine's probe
+for the optional editor-build asset manifest separately from rendering errors.
+Capturing an image does not accept it as a visual baseline.
+Add `--checks` to include GPU density boundary, profile and coverage checks plus
+texture readback calibration, or use `--checks-only` to omit scene captures.
+The full check report is saved as `checks.json`; a failed check fails the run.
+`--profile` records whole-scene GPU timestamps and device texture/buffer memory.
+Its median excludes initialization frame 0; each later frame traces one quarter
+of the cloud sky cache. Device memory includes shared and pending resources,
+so it is not the allocation size of the cloud alone.
+For parameter comparisons, `--cloud-overrides='{"coverage":0.35}'` overrides
+approved numeric fields for all selected diagnostic scenes. Supported fields
+are coverage, shape/detail strengths, noise/weather periods, layer height/base
+and seed. The summary records the overrides; density is intentionally excluded
+so additional extinction cannot hide a broken silhouette.
+
+When you choose to start the test server, run the opt-in group explicitly:
+
+```bash
+VISUAL_CLOUD_DIAGNOSTICS=1 npx playwright test --project=webgpu-gpu --grep cloud-
+```
+
+In PowerShell, set `$env:VISUAL_CLOUD_DIAGNOSTICS='1'` first, then run the
+`npx playwright` command. Playwright starts the local static server configured
+in `playwright.config.ts`. These candidate scenes do not have accepted image
+baselines yet; a first normal run records captures for review and reports
+missing baselines. Do not treat successful compilation as visual acceptance.
+
+### Regression scenes
+
 1. Write it in `src/scenes/`, exporting a `VisualScene` (see `src/types.ts`).
 2. Register it in `src/registry.ts`.
 3. Add its name to `SCENE_NAMES` in `tests/visual.spec.ts`. The first test
