@@ -2145,6 +2145,19 @@ export function getWaterDisturberClass(): SerializableClass {
           }
         },
         {
+          name: 'Floating',
+          description:
+            'Whether the shape floats, as a boat hull does: it displaces its full strength however it bobs and leaves a wake only by moving',
+          type: 'bool',
+          default: false,
+          get(this: WaterDisturber, value) {
+            value.bool[0] = this.floating;
+          },
+          set(this: WaterDisturber, value) {
+            this.floating = value.bool[0];
+          }
+        },
+        {
           name: 'Enabled',
           description: 'Whether the disturber is taken into account',
           type: 'bool',

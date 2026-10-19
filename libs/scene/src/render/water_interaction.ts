@@ -115,6 +115,15 @@ export class WaterDisturber {
   strength: number;
   /** Whether waves stop at and reflect off the footprint. */
   blocking: boolean;
+  /**
+   * Whether the shape floats, as a boat hull does: it then displaces
+   * {@link strength} whatever its height against the surface, the way a
+   * floating body displaces its own weight however it bobs, and leaves a
+   * wake only by moving across the water. Otherwise how much it displaces
+   * follows how deep it sits, so a hull bobbing out of step with the waves
+   * pumps the field and its wake drowns in that.
+   */
+  floating: boolean;
   /** Whether the disturber is taken into account. */
   enabled: boolean;
   /** @internal */
@@ -139,6 +148,7 @@ export class WaterDisturber {
     this.size = new Vector3(1, 1, 1);
     this.strength = 0.15;
     this.blocking = false;
+    this.floating = false;
     this.enabled = true;
     this._hasPrev = false;
     this._slot = -1;
@@ -250,6 +260,11 @@ export class WaterDisturber {
       out[8] = cy - yExtent;
       out[9] = cy + yExtent;
     }
+    if (this.floating) {
+      // Bottom over top, which no shape has, marks a floating one
+      out[8] = 1;
+      out[9] = 0;
+    }
   }
   /** World XZ of the footprint's centre, where the surface under it is read. @internal */
   _centre(fp: Float32Array, out: Float32Array, offset: number) {
@@ -280,7 +295,8 @@ interface PendingImpulse {
  * moving shape's frame-to-frame difference is smooth. The amplitude is the
  * strength times how much of the shape's height is under that surface, faded
  * back out as the whole shape sinks further than its own height below it; a
- * sphere's footprint is the circle the surface cuts from it. Measured against
+ * floating shape (bottom over top) displaces the full strength however it
+ * sits. A sphere's footprint is the circle the surface cuts from it. Measured against
  * the surface the shape floats on rather than the still water, so a hull riding
  * the swell does not pump rings into the field with every wave.
  * `wiFootprintHard` is the footprint as a 0/1 mask, for the obstacle map. Both
@@ -294,7 +310,7 @@ function declareFootprintFunctions(pb: ProgramBuilder) {
     function () {
       this.$l.t = pb.sub(
         this.a.x,
-        pb.select(pb.float(BLOCKING_FLAG), pb.float(0), pb.greaterThanEqual(this.a.x, BLOCKING_FLAG))
+        pb.select(pb.float(0), pb.float(BLOCKING_FLAG), pb.greaterThanEqual(this.a.x, BLOCKING_FLAG))
       );
       this.$l.m = pb.float(0);
       this.$if(pb.lessThan(this.t, SHAPE_SPHERE + 0.5), function () {
@@ -357,13 +373,13 @@ function declareFootprintFunctions(pb: ProgramBuilder) {
       this.$l.height = pb.max(pb.sub(this.c.y, this.c.x), 1e-4);
       this.$l.depth = pb.clamp(pb.div(pb.sub(this.s, this.c.x), this.height), 0, 1);
       this.$l.deep = pb.clamp(pb.sub(1, pb.div(pb.sub(this.s, this.c.y), this.height)), 0, 1);
+      this.$l.immersion = pb.select(
+        pb.mul(this.depth, this.deep),
+        pb.float(1),
+        pb.greaterThan(this.c.x, this.c.y)
+      );
       this.$return(
-        pb.mul(
-          this.c.w,
-          this.depth,
-          this.deep,
-          this.wiShapeMask(this.a, this.b, this.c, this.s, this.wp, false)
-        )
+        pb.mul(this.c.w, this.immersion, this.wiShapeMask(this.a, this.b, this.c, this.s, this.wp, false))
       );
     }
   );
