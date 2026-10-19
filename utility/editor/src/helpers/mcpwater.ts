@@ -14,7 +14,10 @@ const SETTABLE = [
   'maxAmplitude',
   'foamAmount',
   'foamDecay',
-  'foamThreshold',
+  'foamMinSpeed',
+  'foamMaxSpeed',
+  'breakingAcceleration',
+  'foamDiffusion',
   'spongeWidth',
   'shallowDepth',
   'shoreAbsorbDepth'

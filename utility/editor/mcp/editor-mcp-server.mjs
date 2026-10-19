@@ -3052,7 +3052,7 @@ const BASE_TOOLS = [
   {
     name: 'water_interaction',
     description:
-      'Attach, configure or detach the interaction field of a Water node (the simulated height field that carries wakes, impulses and, with shallowDepth, waves slowing and growing in shallow water), and fire impulses into it. enabled true adds one when missing, false removes it. properties sets fields: resolution, windowSize, waveSpeed, damping, maxAmplitude, foamAmount, foamDecay, foamThreshold, spongeWidth, shallowDepth, shoreAbsorbDepth. impulses are [x, z, radius, strength] in world units, strength a height in metres. See the field with the water DebugOutput "interaction", or read a row of it with read_row. Not undoable; the field is saved with the scene. Returns { interaction, row, err }.',
+      'Attach, configure or detach the interaction field of a Water node (the simulated height field that carries wakes, impulses and, with shallowDepth, waves slowing and growing in shallow water), and fire impulses into it. enabled true adds one when missing, false removes it. properties sets fields: resolution, windowSize, waveSpeed, damping, maxAmplitude, foamAmount (foam made per second where the water is churned to the full), foamDecay, foamMinSpeed, foamMaxSpeed (m/s, the speeds between which the water traps air), breakingAcceleration (share of g at which crests break), foamDiffusion (m^2/s), spongeWidth, shallowDepth, shoreAbsorbDepth. impulses are [x, z, radius, strength] in world units, strength a height in metres. See the field with the water DebugOutput "interaction", or read a row of it with read_row. Not undoable; the field is saved with the scene. Returns { interaction, row, err }.',
     inputSchema: {
       type: 'object',
       required: ['node_id'],

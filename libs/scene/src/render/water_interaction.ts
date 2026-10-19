@@ -20,6 +20,7 @@ import { getDevice } from '../app/api';
 import { fetchSampler } from '../utility/misc';
 import { drawFullscreenQuad } from './fullscreenquad';
 import { ShaderHelper } from '../material/shader/helper';
+import { STANDARD_GRAVITY } from '../utility/buoyancy';
 
 /**
  * How the interaction window is positioned in the world.
@@ -411,7 +412,11 @@ export function createWaterInteractionStepShader(): PBRenderOptions {
       this.srcTex = pb.tex2D().uniform(0);
       this.obstacleTex = pb.tex2D().uniform(0);
       this.stepParams = pb.vec4().uniform(0);
+      // Foam: (rate * dt, per-step retention, kinetic energy per unit mass at
+      // the lower and upper speed), (breaking acceleration lower and upper
+      // bound, diffusion per step in texels squared, 1 / dt)
       this.foamParams = pb.vec4().uniform(0);
+      this.foamParams2 = pb.vec4().uniform(0);
       this.worldParams = pb.vec4().uniform(0);
       this.resolution = pb.int().uniform(0);
       this.shift = pb.vec2().uniform(0);
@@ -495,6 +500,23 @@ export function createWaterInteractionStepShader(): PBRenderOptions {
           this.$return(this.wiFetch(this.qn, this.cur));
         });
       });
+      // A neighbour's foam, the texel's own across an obstacle or the window
+      // edge so that none spreads into or out of them
+      pb.func('wiNeighbourFoam', [pb.ivec2('pn'), pb.ivec2('qn'), pb.float('own')], function () {
+        this.$if(pb.or(this.wiObstacle(this.pn), pb.not(this.wiInside(this.qn))), function () {
+          this.$return(this.own);
+        });
+        this.$return(pb.textureLoad(this.srcTex, this.qn, 0).z);
+      });
+      // Ihmsen et al.'s potential, eq. (8): 0 below lo, 1 above hi, linear between
+      pb.func('wiPotential', [pb.float('i'), pb.float('lo'), pb.float('hi')], function () {
+        this.$return(
+          pb.div(
+            pb.sub(pb.min(this.i, this.hi), pb.min(this.i, this.lo)),
+            pb.max(pb.sub(this.hi, this.lo), 1e-6)
+          )
+        );
+      });
       pb.main(function () {
         this.$l.p = pb.ivec2(this.$builtins.fragCoord.xy);
         // Where this texel was in the field before the window moved. Texels
@@ -571,9 +593,12 @@ export function createWaterInteractionStepShader(): PBRenderOptions {
           pb.mul(pb.sub(this.cur, this.prev), this.retention),
           pb.mul(this.stepParams.x, this.lap)
         );
+        // Downward acceleration of the surface under the waves alone, before
+        // anything is forced into it, for the breaking crests
+        this.$l.sink = pb.mul(pb.neg(this.stepParams.x), this.lap, this.foamParams2.w, this.foamParams2.w);
         this.$l.centre = pb.add(this.fp, pb.vec2(0.5));
-        // Foam laid down this step, from every source below.
-        this.$l.foamIn = pb.float(0);
+        // Height forced into the surface this step by impulses and disturbers
+        this.$l.forced = pb.float(0);
         this.$for(pb.int('i'), 0, MAX_IMPULSES, function () {
           this.$if(pb.greaterThanEqual(this.i, this.numImpulses), function () {
             this.$break();
@@ -585,9 +610,9 @@ export function createWaterInteractionStepShader(): PBRenderOptions {
           this.$if(pb.lessThan(this.r2, pb.mul(this.rad, this.rad)), function () {
             this.$l.sigma = pb.mul(this.rad, 0.4);
             this.$l.g = pb.exp(pb.neg(pb.div(this.r2, pb.mul(2, this.sigma, this.sigma))));
-            this.next = pb.add(this.next, pb.mul(this.g, this.imp.w, this.absorb));
-            // A stone breaks the surface: a splash of foam over the bump.
-            this.foamIn = pb.add(this.foamIn, pb.mul(this.g, pb.abs(this.imp.w), this.foamParams.x));
+            this.$l.push = pb.mul(this.g, this.imp.w, this.absorb);
+            this.next = pb.add(this.next, this.push);
+            this.forced = pb.add(this.forced, this.push);
           });
         });
         this.next = pb.clamp(this.next, pb.neg(this.stepParams.w), this.stepParams.w);
@@ -620,26 +645,50 @@ export function createWaterInteractionStepShader(): PBRenderOptions {
             this.sBefore,
             this.wp
           );
-          // The change also churns the surface, which is where the trail comes from.
-          this.$l.change = pb.sub(this.now, this.before);
-          this.next = pb.sub(this.next, pb.mul(this.change, this.absorb));
-          this.foamIn = pb.add(this.foamIn, pb.mul(pb.abs(this.change), this.foamParams.y));
+          this.$l.change = pb.mul(pb.sub(this.now, this.before), this.absorb);
+          this.next = pb.sub(this.next, this.change);
+          this.forced = pb.sub(this.forced, this.change);
         });
-        // Foam is also thrown where the field itself is steep and moving fast:
-        // the crest of a wake, not the whole wake. Then the whole lot decays.
-        this.$l.slope = pb.max(pb.abs(pb.sub(this.r, this.l)), pb.abs(pb.sub(this.u, this.d)));
-        this.$l.velocity = pb.abs(pb.sub(this.next, this.cur));
-        this.$l.churn = pb.mul(this.slope, this.velocity, 1000);
-        this.foamIn = pb.add(
-          this.foamIn,
+        // Foam, as air trapped in the water (Ihmsen et al.): made in
+        // proportion to the kinetic-energy potential of the surface's speed
+        // times what traps the air, the water forced aside by a disturber or an
+        // impulse, and crests breaking by Longuet-Higgins' limit, their
+        // downward acceleration past a share of gravity.
+        this.$l.speed = pb.mul(pb.abs(pb.sub(this.next, this.cur)), this.foamParams2.w);
+        this.$l.kinetic = this.wiPotential(
+          pb.mul(this.speed, this.speed, 0.5),
+          this.foamParams.z,
+          this.foamParams.w
+        );
+        this.$l.forcedSpeed = pb.mul(pb.abs(this.forced), this.foamParams2.w);
+        this.$l.trapped = this.wiPotential(
+          pb.mul(this.forcedSpeed, this.forcedSpeed, 0.5),
+          this.foamParams.z,
+          this.foamParams.w
+        );
+        this.$l.breaking = pb.mul(
+          this.wiPotential(this.sink, this.foamParams2.x, this.foamParams2.y),
+          pb.step(0, this.cur)
+        );
+        this.$l.foamIn = pb.mul(
+          this.foamParams.x,
+          this.kinetic,
+          pb.min(1, pb.add(this.trapped, this.breaking))
+        );
+        // Spread by turbulent diffusion, explicit, and faded as the bubbles rise
+        this.$l.fl = this.wiNeighbourFoam(pb.add(this.p, pb.ivec2(-1, 0)), pb.add(this.q, pb.ivec2(-1, 0)), this.foam);
+        this.$l.fr = this.wiNeighbourFoam(pb.add(this.p, pb.ivec2(1, 0)), pb.add(this.q, pb.ivec2(1, 0)), this.foam);
+        this.$l.fd = this.wiNeighbourFoam(pb.add(this.p, pb.ivec2(0, -1)), pb.add(this.q, pb.ivec2(0, -1)), this.foam);
+        this.$l.fu = this.wiNeighbourFoam(pb.add(this.p, pb.ivec2(0, 1)), pb.add(this.q, pb.ivec2(0, 1)), this.foam);
+        this.$l.spread = pb.add(
+          this.foam,
           pb.mul(
-            pb.smoothStep(this.foamParams.w, pb.mul(this.foamParams.w, 3), this.churn),
-            this.foamParams.x,
-            0.02
+            this.foamParams2.z,
+            pb.sub(pb.add(this.fl, this.fr, this.fd, this.fu), pb.mul(this.foam, 4))
           )
         );
         this.$l.foamNext = pb.clamp(
-          pb.add(pb.mul(this.foam, this.foamParams.z), pb.mul(this.foamIn, this.absorb)),
+          pb.add(pb.mul(this.spread, this.foamParams.y), pb.mul(this.foamIn, this.absorb)),
           0,
           1
         );
@@ -796,8 +845,12 @@ export class WaterInteraction extends Disposable {
   private _maxAmplitude: number;
   private _foamAmount: number;
   private _foamDecay: number;
-  private _foamThreshold: number;
+  private _foamMinSpeed: number;
+  private _foamMaxSpeed: number;
+  private _breakingAcceleration: number;
+  private _foamDiffusion: number;
   private readonly _foamParams: Vector4;
+  private readonly _foamParams2: Vector4;
   private _spongeWidth: number;
   private _followMode: WaterInteractionFollowMode;
   private _followNode: Nullable<SceneNode>;
@@ -864,10 +917,14 @@ export class WaterInteraction extends Disposable {
     this._waveSpeed = 1.5;
     this._damping = 1;
     this._maxAmplitude = 0.5;
-    this._foamAmount = 0.15;
+    this._foamAmount = 3;
     this._foamDecay = 0.6;
-    this._foamThreshold = 0.02;
+    this._foamMinSpeed = 0.5;
+    this._foamMaxSpeed = 2;
+    this._breakingAcceleration = 0.5;
+    this._foamDiffusion = 0.1;
     this._foamParams = new Vector4();
+    this._foamParams2 = new Vector4();
     this._spongeWidth = 0.1;
     this._followMode = 'camera';
     this._followNode = null;
@@ -1016,12 +1073,16 @@ export class WaterInteraction extends Disposable {
     this._damping = Math.max(0, val);
   }
   /**
-   * How much foam a disturbance throws, 0 to disable the foam trail. Defaults
-   * to 0.15: at 1 a wake reads as solid white.
+   * Rate foam is made at where the water is churned to the full, in coverage
+   * per second; 0 disables the foam. Defaults to 3.
    *
-   * Foam is laid down where something moves through the water, where a stone
-   * lands and along the steep, fast crests of the field's own waves, and
-   * fades at {@link foamDecay}.
+   * Foam is air trapped in the water, as in Ihmsen et al., "Unified spray,
+   * foam and bubbles for particle-based fluids": it is made in proportion to
+   * the kinetic-energy potential of the water's speed (see
+   * {@link foamMinSpeed}) times what traps the air, which is the water forced
+   * aside by something moving through it or landing in it, and crests that
+   * break (see {@link breakingAcceleration}). Once made it spreads (see
+   * {@link foamDiffusion}) and fades at {@link foamDecay} as its bubbles rise.
    */
   get foamAmount() {
     return this._foamAmount;
@@ -1029,7 +1090,7 @@ export class WaterInteraction extends Disposable {
   set foamAmount(val: number) {
     this._foamAmount = Math.max(0, val);
   }
-  /** Rate the foam trail fades at, in 1/s. */
+  /** Rate the foam fades at as its bubbles rise and burst, in 1/s. */
   get foamDecay() {
     return this._foamDecay;
   }
@@ -1037,15 +1098,44 @@ export class WaterInteraction extends Disposable {
     this._foamDecay = Math.max(0, val);
   }
   /**
-   * How steep and fast a wave of the field has to be before it foams on its
-   * own. Lower foams more of the wake; higher keeps foam to what is directly
-   * disturbed.
+   * Speed of the water in m/s below which it traps no air: the lower bound of
+   * the kinetic-energy potential, between which and {@link foamMaxSpeed} the
+   * foam made grows with the water's kinetic energy. Defaults to 0.5.
    */
-  get foamThreshold() {
-    return this._foamThreshold;
+  get foamMinSpeed() {
+    return this._foamMinSpeed;
   }
-  set foamThreshold(val: number) {
-    this._foamThreshold = Math.max(0.0001, val);
+  set foamMinSpeed(val: number) {
+    this._foamMinSpeed = Math.max(0, val);
+  }
+  /** Speed of the water in m/s from which it foams to the full. Defaults to 2. */
+  get foamMaxSpeed() {
+    return this._foamMaxSpeed;
+  }
+  set foamMaxSpeed(val: number) {
+    this._foamMaxSpeed = Math.max(0, val);
+  }
+  /**
+   * Downward acceleration of a crest, as a share of gravity, at which it
+   * breaks and foams: Longuet-Higgins' limit for a steady crest is half of
+   * gravity. Foam grows from there to twice that. Defaults to 0.5.
+   */
+  get breakingAcceleration() {
+    return this._breakingAcceleration;
+  }
+  set breakingAcceleration(val: number) {
+    this._breakingAcceleration = Math.max(0.01, val);
+  }
+  /**
+   * Turbulent diffusivity the foam spreads by, in m²/s: a wake's band of
+   * foam widens and thins behind the hull at this rate. 0 keeps foam where it
+   * was made. Defaults to 0.1.
+   */
+  get foamDiffusion() {
+    return this._foamDiffusion;
+  }
+  set foamDiffusion(val: number) {
+    this._foamDiffusion = Math.max(0, val);
   }
   /**
    * Height in metres the field is clamped to, either side of the rest level.
@@ -1263,13 +1353,22 @@ export class WaterInteraction extends Disposable {
     const k = (this._waveSpeed * FIXED_STEP) / texel;
     const retention = Math.max(0, 1 - this._damping * FIXED_STEP);
     this._stepParams.setXYZW(k * k, retention, this._spongeWidth * this._resolution, this._maxAmplitude);
-    // Foam: (splash gain, churn gain per metre of displacement change,
-    // per-step retention, self-foaming threshold).
+    // Foam: (rate per step, per-step retention, kinetic energy per unit mass
+    // at the lower and upper speed), (downward acceleration at which crests
+    // start and finish breaking, diffusion per step in texels squared, held
+    // under the explicit scheme's stability limit, 1 / dt)
+    const minSpeed = Math.min(this._foamMinSpeed, this._foamMaxSpeed);
     this._foamParams.setXYZW(
-      this._foamAmount * 2,
-      this._foamAmount * 8,
+      this._foamAmount * FIXED_STEP,
       Math.exp(-this._foamDecay * FIXED_STEP),
-      this._foamThreshold
+      0.5 * minSpeed * minSpeed,
+      0.5 * this._foamMaxSpeed * this._foamMaxSpeed
+    );
+    this._foamParams2.setXYZW(
+      this._breakingAcceleration * STANDARD_GRAVITY,
+      2 * this._breakingAcceleration * STANDARD_GRAVITY,
+      Math.min(0.24, (this._foamDiffusion * FIXED_STEP) / (texel * texel)),
+      1 / FIXED_STEP
     );
     const numImpulses = Math.min(this._impulses.length, MAX_IMPULSES);
     for (let i = 0; i < numImpulses; i++) {
@@ -1293,6 +1392,7 @@ export class WaterInteraction extends Disposable {
     const nearest = fetchSampler('clamp_nearest_nomip');
     bindGroup.setValue('stepParams', this._stepParams);
     bindGroup.setValue('foamParams', this._foamParams);
+    bindGroup.setValue('foamParams2', this._foamParams2);
     bindGroup.setValue('worldParams', this._worldParams);
     bindGroup.setValue('resolution', this._resolution);
     bindGroup.setTexture('obstacleTex', this._obstacleTexture!, nearest);

@@ -1966,10 +1966,11 @@ export function getWaterInteractionClass(): SerializableClass {
         },
         {
           name: 'FoamAmount',
-          description: 'How much foam a disturbance throws, 0 to disable the foam trail',
+          description:
+            'Rate foam is made at where the water is churned to the full, in coverage per second; 0 disables the foam',
           type: 'float',
-          default: 0.15,
-          options: { animatable: true, minValue: 0, maxValue: 3 },
+          default: 3,
+          options: { animatable: true, minValue: 0, maxValue: 30 },
           get(this: WaterInteraction, value) {
             value.num[0] = this.foamAmount;
           },
@@ -1991,16 +1992,56 @@ export function getWaterInteractionClass(): SerializableClass {
           }
         },
         {
-          name: 'FoamThreshold',
-          description: 'How steep and fast a wave of the field has to be before it foams on its own',
+          name: 'FoamMinSpeed',
+          description: 'Speed of the water in m/s below which it traps no air and makes no foam',
           type: 'float',
-          default: 0.02,
-          options: { minValue: 0.0001, maxValue: 0.5 },
+          default: 0.5,
+          options: { minValue: 0, maxValue: 10 },
           get(this: WaterInteraction, value) {
-            value.num[0] = this.foamThreshold;
+            value.num[0] = this.foamMinSpeed;
           },
           set(this: WaterInteraction, value) {
-            this.foamThreshold = value.num[0];
+            this.foamMinSpeed = value.num[0];
+          }
+        },
+        {
+          name: 'FoamMaxSpeed',
+          description: 'Speed of the water in m/s from which it foams to the full',
+          type: 'float',
+          default: 2,
+          options: { minValue: 0, maxValue: 20 },
+          get(this: WaterInteraction, value) {
+            value.num[0] = this.foamMaxSpeed;
+          },
+          set(this: WaterInteraction, value) {
+            this.foamMaxSpeed = value.num[0];
+          }
+        },
+        {
+          name: 'BreakingAcceleration',
+          description:
+            "Downward acceleration of a crest, as a share of gravity, at which it breaks and foams; Longuet-Higgins' limit is 0.5",
+          type: 'float',
+          default: 0.5,
+          options: { minValue: 0.01, maxValue: 4 },
+          get(this: WaterInteraction, value) {
+            value.num[0] = this.breakingAcceleration;
+          },
+          set(this: WaterInteraction, value) {
+            this.breakingAcceleration = value.num[0];
+          }
+        },
+        {
+          name: 'FoamDiffusion',
+          description: 'Turbulent diffusivity the foam spreads by, in square metres per second',
+          type: 'float',
+          default: 0.1,
+          options: { minValue: 0, maxValue: 2 },
+          get(this: WaterInteraction, value) {
+            value.num[0] = this.foamDiffusion;
+          },
+          set(this: WaterInteraction, value) {
+            this.foamDiffusion = value.num[0];
           }
         },
         {

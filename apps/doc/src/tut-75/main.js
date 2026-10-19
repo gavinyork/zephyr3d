@@ -191,7 +191,7 @@ myApp.ready().then(function () {
   bindRange(
     'foam',
     (v) => (interaction.foamAmount = v),
-    (v) => v.toFixed(2)
+    (v) => `${v.toFixed(1)}/s`
   );
   bindRange(
     'foamdecay',
