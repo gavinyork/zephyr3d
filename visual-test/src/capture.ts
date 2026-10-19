@@ -61,6 +61,10 @@ export class SceneCapturer {
   async capture(def: VisualScene): Promise<CaptureResult> {
     const device = getDevice();
     const frames = Math.max(1, Math.floor(def.frames ?? 1));
+    const profile = new URLSearchParams(location.search).get('profile') === '1';
+    const timestampQueries: { frame: number; id: number }[] = [];
+    let captureFrame = 0;
+    let activeTimestampQuery: number | null = null;
 
     const scene = new Scene();
     const camera = new PerspectiveCamera(scene, Math.PI / 3, 0.1, 100);
@@ -78,7 +82,17 @@ export class SceneCapturer {
           device.setFramebuffer(this._framebuffer);
           device.setViewport(null);
           device.setScissor(null);
+          if (profile) {
+            activeTimestampQuery = device.beginTimestampQuery(`${def.name}:frame-${captureFrame}`);
+            timestampQueries.push({ frame: captureFrame, id: activeTimestampQuery });
+          }
           return true;
+        },
+        afterRender: () => {
+          if (activeTimestampQuery !== null) {
+            device.endTimestampQuery(activeTimestampQuery);
+            activeTimestampQuery = null;
+          }
         }
       });
 
@@ -128,6 +142,7 @@ export class SceneCapturer {
         // Before the step, so frame 0 is still the state `setup` left behind and
         // a scene without this hook behaves exactly as it did.
         def.onFrame?.(sceneContext, i);
+        captureFrame = i;
         if (!this._app.stepFrame()) {
           // beginFrame() refused - context lost, or a device still coming up.
           if (++stalls > 100) {
@@ -145,6 +160,19 @@ export class SceneCapturer {
       const raw = new Uint8Array(this._size * this._size * 4);
       await device.readPixels(0, 0, 0, this._size, this._size, raw);
       device.setFramebuffer(null);
+      // Only expose JSON-safe timing fields: raw device timestamps are BigInts.
+      // These scopes cover the whole scene render, including its cloud passes.
+      const profiling: Pick<CaptureResult, 'gpuTimingMs' | 'videoMemoryUsage'> = profile
+        ? {
+            gpuTimingMs: await Promise.all(
+              timestampQueries.map(async ({ frame, id }) => {
+                const { status, durationMs } = await device.resolveTimestampQuery(id);
+                return { frame, status, durationMs };
+              })
+            ),
+            videoMemoryUsage: device.videoMemoryUsage
+          }
+        : {};
 
       return {
         name: def.name,
@@ -153,7 +181,8 @@ export class SceneCapturer {
         rgbaBase64: toBase64(normalizeRowOrder(raw, this._size, this._backend)),
         frames,
         tolerance: def.tolerance,
-        deterministic: def.deterministic
+        deterministic: def.deterministic,
+        ...profiling
       };
     } finally {
       getEngine().setRenderable(null, 0);

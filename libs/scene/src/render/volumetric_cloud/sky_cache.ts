@@ -199,6 +199,10 @@ export class VolumetricCloudSkyCache extends Disposable {
   get blend() {
     return this._framesPerUpdate > 0 ? this._frame / this._framesPerUpdate : 1;
   }
+  /** Frozen density inputs, shared with density debug slices. */
+  get densityParams() {
+    return this._inputs?.cloud ?? null;
+  }
   /** Forces the next update to rebuild the whole cache at once. */
   invalidate() {
     this._rebuild = true;
@@ -375,6 +379,7 @@ export class VolumetricCloudSkyCache extends Disposable {
           params.detailErosion,
           params.anvilBias
         ),
+        shape: new Vector4(params.shapeStrength, params.detailBottomErosion, params.coverage, 0),
         albedo: new Vector4(params.albedo.x, params.albedo.y, params.albedo.z, 0),
         scales: new Vector4(
           1 / params.weatherMapScale,

@@ -1,4 +1,5 @@
 import type { PerspectiveCamera, Scene } from '@zephyr3d/scene';
+import type { TimestampQueryStatus } from '@zephyr3d/device';
 
 /** Backends the harness can drive. Extend alongside playwright.config.ts. */
 export type BackendId = 'webgl2' | 'webgpu';
@@ -80,4 +81,8 @@ export interface CaptureResult {
   frames: number;
   tolerance?: Tolerance;
   deterministic?: boolean;
+  /** Per-frame GPU scene render duration, available only with the profile=1 query flag. */
+  gpuTimingMs?: { frame: number; status: TimestampQueryStatus; durationMs: number }[];
+  /** Device texture/buffer memory usage in bytes after the capture, when profiling. */
+  videoMemoryUsage?: number;
 }

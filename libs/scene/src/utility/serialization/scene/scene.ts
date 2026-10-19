@@ -850,7 +850,7 @@ export function getSceneClass(manager: ResourceManager): SerializableClass {
         },
         {
           name: 'VolumetricCloudCoverage',
-          description: 'How much of the sky is covered by clouds',
+          description: 'Weather coverage: higher grows cloud fields; zero removes all clouds',
           type: 'float',
           default: 0.45,
           phase: 2,
@@ -942,6 +942,30 @@ export function getSceneClass(manager: ResourceManager): SerializableClass {
           }
         },
         {
+          name: 'VolumetricCloudShapeStrength',
+          description:
+            'Strength of the large noise billows; lower keeps cloud bodies fuller and more connected',
+          type: 'float',
+          default: 1,
+          phase: 2,
+          options: {
+            group: 'VolumetricClouds',
+            label: 'ShapeStrength',
+            animatable: true,
+            minValue: 0,
+            maxValue: 1
+          },
+          get(this: Scene, value) {
+            value.num[0] = this.env.sky.volumetricCloud.shapeStrength;
+          },
+          set(this: Scene, value) {
+            this.env.sky.volumetricCloud.shapeStrength = value.num[0];
+          },
+          isValid(this: Scene) {
+            return this.env.sky.skyType === 'scatter' && this.env.sky.cloudMode === 'volumetric';
+          }
+        },
+        {
           name: 'VolumetricCloudDetailNoiseScale',
           description: 'Size of the small wisps along cloud edges',
           type: 'float',
@@ -967,7 +991,7 @@ export function getSceneClass(manager: ResourceManager): SerializableClass {
         {
           name: 'VolumetricCloudFormation',
           description:
-            'Isolated: separate island-like clouds that join along bands as Coverage rises. Connected: clouds joined into larger formations',
+            'Isolated: separate island-like clouds with persistent gaps. Connected: cloud fields that merge as Coverage rises',
           type: 'string',
           default: 'isolated',
           phase: 2,
@@ -1027,6 +1051,30 @@ export function getSceneClass(manager: ResourceManager): SerializableClass {
           },
           set(this: Scene, value) {
             this.env.sky.volumetricCloud.detailErosion = value.num[0];
+          },
+          isValid(this: Scene) {
+            return this.env.sky.skyType === 'scatter' && this.env.sky.cloudMode === 'volumetric';
+          }
+        },
+        {
+          name: 'VolumetricCloudDetailBottomErosion',
+          description:
+            'Detail erosion at the cloud base relative to the full amount; lower keeps the base flatter',
+          type: 'float',
+          default: 1,
+          phase: 2,
+          options: {
+            group: 'VolumetricClouds',
+            label: 'DetailBottomErosion',
+            animatable: true,
+            minValue: 0,
+            maxValue: 1
+          },
+          get(this: Scene, value) {
+            value.num[0] = this.env.sky.volumetricCloud.detailBottomErosion;
+          },
+          set(this: Scene, value) {
+            this.env.sky.volumetricCloud.detailBottomErosion = value.num[0];
           },
           isValid(this: Scene) {
             return this.env.sky.skyType === 'scatter' && this.env.sky.cloudMode === 'volumetric';
@@ -1489,7 +1537,7 @@ export function getSceneClass(manager: ResourceManager): SerializableClass {
         {
           name: 'VolumetricCloudWeatherMap',
           description:
-            'Where clouds form: R coverage of the Connected formation, G coverage of the Isolated formation (clouds grow where it is highest, more of it as Coverage rises; spread it evenly over 0 to 1 so Coverage matches the covered area), B cloud type (0 stratus to 1 cumulus). Empty generates one',
+            'Where clouds form: R Connected footprints, G Isolated footprints (higher values fill first as Coverage rises), B cloud type (0 stratus to 1 cumulus). Empty generates one',
           type: 'object',
           default: null,
           phase: 2,
@@ -1608,7 +1656,8 @@ export function getSceneClass(manager: ResourceManager): SerializableClass {
         },
         {
           name: 'VolumetricCloudDebugView',
-          description: 'Shows a cloud resource over the sky for inspection',
+          description:
+            'Shows a cloud resource, height profile or density section over the sky for inspection',
           type: 'string',
           default: 'none',
           phase: 2,
@@ -1616,8 +1665,30 @@ export function getSceneClass(manager: ResourceManager): SerializableClass {
             group: 'VolumetricClouds',
             label: 'DebugView',
             enum: {
-              labels: ['None', 'WeatherMap', 'BaseNoise', 'DetailNoise'],
-              values: ['none', 'weather', 'baseNoise', 'detailNoise']
+              labels: [
+                'None',
+                'WeatherMap',
+                'BaseNoise',
+                'DetailNoise',
+                'HeightProfileXY',
+                'HeightProfileXZ',
+                'BaseDensityXY',
+                'BaseDensityXZ',
+                'DensityXY',
+                'DensityXZ'
+              ],
+              values: [
+                'none',
+                'weather',
+                'baseNoise',
+                'detailNoise',
+                'profileXY',
+                'profileXZ',
+                'baseDensityXY',
+                'baseDensityXZ',
+                'densityXY',
+                'densityXZ'
+              ]
             }
           },
           get(this: Scene, value) {
@@ -1632,7 +1703,8 @@ export function getSceneClass(manager: ResourceManager): SerializableClass {
         },
         {
           name: 'VolumetricCloudDebugSlice',
-          description: 'Depth of the noise slice shown by DebugView',
+          description:
+            'Noise slice depth, normalized Z of XY sections, or normalized layer height of XZ sections',
           type: 'float',
           default: 0,
           phase: 2,

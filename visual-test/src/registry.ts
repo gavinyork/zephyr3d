@@ -116,6 +116,7 @@ import {
   batchInstanceCullingOff
 } from './scenes/instance-culling';
 import { physicsDrop, physicsJoints, physicsMeshGround, physicsVehicle } from './scenes/physics';
+import { CLOUD_SHAPING_SCENES } from './scenes/volumetric-clouds';
 
 /**
  * Every scene, in a fixed order.
@@ -254,5 +255,10 @@ export const SCENES: VisualScene[] = [
 ];
 
 export function findScene(name: string): VisualScene | undefined {
-  return SCENES.find((s) => s.name === name);
+  return SCENES.find((s) => s.name === name) ?? CLOUD_SHAPING_SCENES.find((s) => s.name === name);
+}
+
+/** Candidate cloud scenes remain opt-in until their image baselines are reviewed. */
+export function diagnosticScenes(group: string | null): VisualScene[] {
+  return group === 'clouds' ? CLOUD_SHAPING_SCENES : SCENES;
 }

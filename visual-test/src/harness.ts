@@ -2,8 +2,9 @@ import { backendWebGL2 } from '@zephyr3d/backend-webgl';
 import { backendWebGPU } from '@zephyr3d/backend-webgpu';
 import { Application, getDevice } from '@zephyr3d/scene';
 import { SceneCapturer } from './capture';
-import { findScene, SCENES } from './registry';
+import { diagnosticScenes, findScene } from './registry';
 import type { BackendId, CaptureResult } from './types';
+import { runCloudChecks } from './cloud-checks';
 
 /**
  * Capture resolution. Small on purpose: the SwiftShader gate is CPU-bound, and
@@ -15,6 +16,7 @@ interface HarnessApi {
   init(backend: BackendId): Promise<{ backend: BackendId; adapter: string }>;
   listScenes(): { name: string; description: string; frames: number; supported: boolean }[];
   runScene(name: string): Promise<CaptureResult>;
+  runCloudChecks: typeof runCloudChecks;
 }
 
 let app: Application | null = null;
@@ -90,10 +92,11 @@ function unmaskedWebglRenderer(device: ReturnType<typeof getDevice>): string | n
 
 const api: HarnessApi = {
   init,
+  runCloudChecks,
   // `supported` is resolved here rather than in the Node runner, because a scene's
   // predicate takes the backend and only the page knows which one is live.
   listScenes: () =>
-    SCENES.map((s) => ({
+    diagnosticScenes(new URLSearchParams(location.search).get('diagnostics')).map((s) => ({
       name: s.name,
       description: s.description,
       frames: s.frames ?? 1,

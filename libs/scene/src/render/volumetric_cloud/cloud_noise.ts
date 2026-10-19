@@ -198,12 +198,13 @@ export function cloudPerlinWorley(
   p: PBShaderExp,
   freq: PBShaderExp | number,
   worley: PBShaderExp,
-  seed: PBShaderExp
+  seed: PBShaderExp,
+  octaves = 7
 ) {
   const pb = scope.$builder;
-  const funcName = 'Z_cloudPerlinWorley';
+  const funcName = `Z_cloudPerlinWorley${octaves}`;
   pb.func(funcName, [pb.vec3('p'), pb.float('freq'), pb.float('worley'), pb.vec3('seed')], function () {
-    this.$l.pfbm = pb.mix(1, cloudPerlinFbm(this, this.p, this.freq, 7, this.seed), 0.5);
+    this.$l.pfbm = pb.mix(1, cloudPerlinFbm(this, this.p, this.freq, octaves, this.seed), 0.5);
     // Billowy: fold the fbm around its midpoint
     this.pfbm = pb.abs(pb.sub(pb.mul(this.pfbm, 2), 1));
     this.$return(

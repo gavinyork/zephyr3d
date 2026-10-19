@@ -737,6 +737,7 @@ export class SkyRenderer extends Disposable {
   }
   set cloudBaseNoise(tex: Nullable<Texture2D>) {
     this._volumetricCloudResources.baseNoiseSource = tex;
+    this._volumetricCloudCache.invalidate();
   }
   /**
    * Detail noise of the volumetric clouds as a slice atlas (see {@link SkyRenderer.cloudBaseNoise}),
@@ -747,11 +748,12 @@ export class SkyRenderer extends Disposable {
   }
   set cloudDetailNoise(tex: Nullable<Texture2D>) {
     this._volumetricCloudResources.detailNoiseSource = tex;
+    this._volumetricCloudCache.invalidate();
   }
   /**
    * Weather map (the cloud map of Nubis 2017) of the volumetric clouds, or null to generate it.
    * Channels: R coverage of the connected formation, G coverage of the isolated formation (clouds
-   * grow where it is highest; evenly spread over 0 to 1 it makes Coverage the covered fraction),
+   * grow where it is highest; Coverage lowers the threshold, rather than prescribing sky area),
    * B cloud type (0 stratus, 0.5 stratocumulus, 1 cumulus).
    */
   get cloudWeatherMap(): Nullable<Texture2D> {
@@ -759,6 +761,7 @@ export class SkyRenderer extends Disposable {
   }
   set cloudWeatherMap(tex: Nullable<Texture2D>) {
     this._volumetricCloudResources.weatherMapSource = tex;
+    this._volumetricCloudCache.invalidate();
   }
   /** Draws a volumetric cloud resource over the sky, for inspection. */
   get cloudDebugView(): VolumetricCloudDebugView {
@@ -784,10 +787,11 @@ export class SkyRenderer extends Disposable {
       this._volumetricCloudResources,
       this._cloudDebugView,
       this._cloudDebugSlice,
-      this._cloudDebugChannel
+      this._cloudDebugChannel,
+      this._volumetricCloudCache.densityParams
     );
   }
-  /** Slice of the noise volume shown by {@link SkyRenderer.cloudDebugView}, 0 to 1. */
+  /** Slice, 0 to 1: noise volume depth, density XY depth, or density XZ altitude. */
   get cloudDebugSlice() {
     return this._cloudDebugSlice;
   }

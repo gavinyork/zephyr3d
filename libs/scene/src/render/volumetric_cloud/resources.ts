@@ -10,7 +10,7 @@ import type {
 } from '@zephyr3d/device';
 import { getDevice } from '../../app/api';
 import { fetchSampler } from '../../utility/misc';
-import { cloudPerlinFbm, cloudPerlinWorley, cloudWorleyFbm } from './cloud_noise';
+import { cloudPerlinFbm, cloudPerlinWorley, cloudWorleyFbm, cloudWorleyNoise } from './cloud_noise';
 
 /** Edge of the base shape volume, [Schneider15]: 128^3 Perlin-Worley + Worley fbm. */
 export const CLOUD_BASE_NOISE_SIZE = 128;
@@ -29,10 +29,13 @@ const DETAIL_FREQ = 1;
 /*
  * Cloud map of Nubis 2017 (slides 54-59): a low frequency noise modulates coverage where air
  * masses allow clouds, higher frequency noises make the footprints of the clouds; Perlin footprints
- * give connected formations (R), Perlin-Worley footprints isolated islands (G). B is the type.
+ * give connected formations (R). Broad single-octave Worley footprints form the isolated
+ * islands (G); this shoulder replaces the original narrow Perlin-Worley peaks. B is the type.
  */
 /** Footprints: 64 km / 8, about 8 km at the default scale */
 const WEATHER_FOOTPRINT_FREQ = 8;
+/** Broad isolated footprints: four cells per weather period, with a smooth radial falloff. */
+const WEATHER_ISOLATED_FREQ = 4;
 /** Air mass modulation: 64 km / 2 */
 const WEATHER_MODULATION_FREQ = 2;
 const WEATHER_TYPE_FREQ = 2;
@@ -44,16 +47,6 @@ const WEATHER_TYPE_FREQ = 2;
 const WEATHER_CONNECTED_QUANTILES = [
   0.0496, 0.1364, 0.1608, 0.1791, 0.1944, 0.2076, 0.2193, 0.2309, 0.2431, 0.255, 0.2684, 0.2829, 0.3, 0.3216,
   0.3513, 0.3956, 0.6949
-];
-/**
- * 16-quantiles of the nonzero part of the raw isolated coverage, measured as above; it is zero
- * over 76% of the map, the gaps between the islands. The islands are stored by their rank in
- * (0, 1] and the gaps as 0, which keeps the channel continuous at the island edges. Filling the
- * gaps with another field instead left a step there that the clouds extruded into walls.
- */
-const WEATHER_ISOLATED_QUANTILES = [
-  0, 0.0058, 0.0123, 0.0182, 0.0252, 0.0332, 0.0414, 0.0498, 0.0596, 0.0696, 0.0809, 0.0942, 0.1098, 0.1315,
-  0.1661, 0.2362, 0.5836
 ];
 
 /** Piecewise linear empirical CDF: a sum of one ramp per quantile interval. */
@@ -107,7 +100,9 @@ function getVolumeProgram(kind: VolumeKind) {
           this.$l.w2 = cloudWorleyFbm(this, this.p, pb.mul(this.freq, 4), this.seed);
           if (kind === 'base') {
             // R: Perlin-Worley, GBA: Worley fbm of increasing frequency
-            this.$l.r = cloudPerlinWorley(this, this.p, this.freq, this.w0, this.seed);
+            // Four Perlin octaves: 4..32 cells fit at least four texels per cell in 128^3.
+            // Weather uses independent frequencies and octave counts below.
+            this.$l.r = cloudPerlinWorley(this, this.p, this.freq, this.w0, this.seed, 4);
             this.$l.value = pb.vec4(this.r, this.w0, this.w1, this.w2);
           } else {
             // RGB: Worley fbm of increasing frequency
@@ -150,7 +145,7 @@ function getWeatherProgram() {
                 pb.div(pb.add(pb.vec2(this.$builtins.globalInvocationId.xy), pb.vec2(0.5)), this.params.x),
                 0
               );
-              // [Schneider15] channels: R coverage, G precipitation, B cloud type.
+              // Unlike [Schneider15]'s G precipitation, this map stores isolated coverage in G.
               // Coverage decides where clouds form, as the coverage data field of Nubis does
               // (Schneider, Nubis3, SIGGRAPH 2023, slide 19: dimensional_profile = vertical_profile *
               // cloud_coverage). Inverted Worley cells make separate clouds, a low frequency fbm
@@ -168,18 +163,24 @@ function getWeatherProgram() {
                 ),
                 this.modulation
               );
-              this.$l.isolatedRaw = pb.mul(
-                cloudPerlinWorley(
-                  this,
-                  this.p,
-                  this.params.y,
-                  cloudWorleyFbm(this, this.p, this.params.y, this.seed),
-                  this.seed
+              // A single broad Worley cell gives each island a continuous shoulder. Ranking
+              // narrow Perlin-Worley peaks through a CDF made the shoulders too steep and
+              // extruded them into columns. Keep the zero gaps and radial falloff here;
+              // the 3D base volume supplies the smaller billows.
+              this.$l.isolated = pb.mul(
+                pb.smoothStep(
+                  0.35,
+                  0.95,
+                  cloudWorleyNoise(
+                    this,
+                    pb.mul(this.p, WEATHER_ISOLATED_FREQ),
+                    pb.float(WEATHER_ISOLATED_FREQ),
+                    this.seed
+                  )
                 ),
-                this.modulation
+                pb.smoothStep(0.15, 0.65, this.modulation)
               );
               this.$l.connected = empiricalCDF(this, this.connectedRaw, WEATHER_CONNECTED_QUANTILES);
-              this.$l.isolated = empiricalCDF(this, this.isolatedRaw, WEATHER_ISOLATED_QUANTILES);
               // The fbm stays well inside +-0.5, so +0.5 alone spans the 0 (stratus) to 1 (cumulus)
               // range; halving it as well left nearly every texel at stratocumulus
               this.$l.cloudType = pb.add(cloudPerlinFbm(this, this.p, this.params.z, 4, this.seed), 0.5);
@@ -377,6 +378,7 @@ export class VolumetricCloudResources extends Disposable {
     let tex = target.get();
     if (!tex || tex.width !== edge) {
       tex = getDevice().createTexture3D('rgba8unorm', edge, edge, edge, {
+        writable: true,
         samplerOptions: {
           addressU: 'repeat',
           addressV: 'repeat',

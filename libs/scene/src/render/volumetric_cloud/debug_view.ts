@@ -1,4 +1,5 @@
 import type { Nullable } from '@zephyr3d/base';
+import type { Matrix4x4 } from '@zephyr3d/base';
 import { Vector4 } from '@zephyr3d/base';
 import type { BindGroup, GPUProgram } from '@zephyr3d/device';
 import { getDevice } from '../../app/api';
@@ -6,13 +7,15 @@ import { fetchSampler } from '../../utility/misc';
 import { drawFullscreenQuad } from '../fullscreenquad';
 import type { VolumetricCloudResources } from './resources';
 import type { VolumetricCloudDebugView } from './volumetric_cloud';
+import { cloudSampleDensity, getCloudParamsStruct } from './cloud_common';
 
 let volumeProgram: Nullable<GPUProgram> = null;
 let mapProgram: Nullable<GPUProgram> = null;
 let volumeBindGroup: Nullable<BindGroup> = null;
 let mapBindGroup: Nullable<BindGroup> = null;
+const densityPrograms = new Map<string, { program: GPUProgram; bindGroup: BindGroup }>();
 
-function createProgram(volume: boolean) {
+function createProgram(volume: boolean, densityView?: string) {
   const device = getDevice();
   return device.buildRenderProgram({
     label: volume ? 'CloudDebugVolume' : 'CloudDebugMap',
@@ -29,11 +32,48 @@ function createProgram(volume: boolean) {
       });
     },
     fragment(pb) {
-      this.tex = volume ? pb.tex3D().uniform(0) : pb.tex2D().uniform(0);
+      if (densityView) {
+        this.cloud = getCloudParamsStruct(pb)().uniform(0);
+        this.weatherMap = pb.tex2D().uniform(0);
+        this.baseNoise = pb.tex3D().uniform(0);
+        this.detailNoise = pb.tex3D().uniform(0);
+      } else {
+        this.tex = volume ? pb.tex3D().uniform(0) : pb.tex2D().uniform(0);
+      }
       // (slice, channel, 0, 0)
       this.params = pb.vec4().uniform(0);
       this.$outputs.color = pb.vec4();
       pb.main(function () {
+        if (densityView) {
+          const xy = densityView.endsWith('XY');
+          this.$l.uv = this.$inputs.uv;
+          this.$l.h = xy ? this.uv.y : this.params.x;
+          this.$l.xz = pb.div(xy ? pb.vec2(this.uv.x, this.params.x) : this.uv, this.cloud.scales.x);
+          this.$l.r = pb.mix(this.cloud.layer.x, this.cloud.layer.y, this.h);
+          // Planet-fixed XZ coordinates; the slice follows the spherical layer at each height.
+          this.$l.planet = pb.vec3(
+            this.xz.x,
+            pb.sqrt(pb.max(pb.sub(pb.mul(this.r, this.r), pb.dot(this.xz, this.xz)), 0)),
+            this.xz.y
+          );
+          this.$l.p = pb.mul(this.cloud.referential, pb.vec4(this.planet, 0)).xyz;
+          this.$l.medium = cloudSampleDensity(
+            this,
+            this.cloud,
+            this.p,
+            this.weatherMap,
+            this.baseNoise,
+            this.detailNoise,
+            densityView.startsWith('profile')
+              ? 'profile'
+              : densityView.startsWith('base')
+                ? 'base'
+                : 'density'
+          );
+          this.$l.value = pb.clamp(pb.div(this.medium.x, pb.max(this.cloud.density.y, 1e-6)), 0, 1);
+          this.$outputs.color = pb.vec4(pb.vec3(this.value), 1);
+          return;
+        }
         this.$l.value = volume
           ? pb.textureSampleLevel(this.tex, pb.vec3(this.$inputs.uv, this.params.x), 0)
           : pb.textureSampleLevel(this.tex, this.$inputs.uv, 0);
@@ -66,8 +106,32 @@ export function drawVolumetricCloudDebug(
   resources: VolumetricCloudResources,
   view: VolumetricCloudDebugView,
   slice: number,
-  channel: number
+  channel: number,
+  densityParams?: Nullable<Record<string, Vector4 | Matrix4x4>>
 ) {
+  if (view.endsWith('XY') || view.endsWith('XZ')) {
+    if (!densityParams || !resources.weatherMap || !resources.baseNoise || !resources.detailNoise) {
+      return;
+    }
+    const device = getDevice();
+    let entry = densityPrograms.get(view);
+    if (!entry) {
+      const program = createProgram(false, view);
+      entry = { program, bindGroup: device.createBindGroup(program.bindGroupLayouts[0]) };
+      densityPrograms.set(view, entry);
+    }
+    const { program, bindGroup } = entry;
+    bindGroup.setValue('cloud', densityParams);
+    bindGroup.setValue('params', new Vector4(slice, 0, 0, 0));
+    bindGroup.setValue('flip', device.type === 'webgpu' && device.getFramebuffer() ? 1 : 0);
+    bindGroup.setTexture('weatherMap', resources.weatherMap, fetchSampler('repeat_linear'));
+    bindGroup.setTexture('baseNoise', resources.baseNoise);
+    bindGroup.setTexture('detailNoise', resources.detailNoise);
+    device.setProgram(program);
+    device.setBindGroup(0, bindGroup);
+    drawFullscreenQuad();
+    return;
+  }
   const tex =
     view === 'baseNoise'
       ? resources.baseNoise

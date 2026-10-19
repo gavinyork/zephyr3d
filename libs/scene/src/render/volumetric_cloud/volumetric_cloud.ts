@@ -15,8 +15,7 @@ export type CloudMode = 'procedural' | 'volumetric';
  * Which coverage of the cloud map shapes the clouds (Nubis 2017, slides 57-58).
  *
  * - `connected`: Perlin footprints, clouds join into formations.
- * - `isolated`: Perlin-Worley footprints, island-like clouds that join along connecting bands as
- *   coverage rises.
+ * - `isolated`: broad Worley footprints, separate cloud islands with persistent clear gaps.
  *
  * @public
  */
@@ -26,7 +25,17 @@ export type CloudFormation = 'connected' | 'isolated';
  * Debug output of the volumetric cloud resources, drawn over the sky.
  * @public
  */
-export type VolumetricCloudDebugView = 'none' | 'weather' | 'baseNoise' | 'detailNoise';
+export type VolumetricCloudDebugView =
+  | 'none'
+  | 'weather'
+  | 'baseNoise'
+  | 'detailNoise'
+  | 'profileXY'
+  | 'profileXZ'
+  | 'baseDensityXY'
+  | 'baseDensityXZ'
+  | 'densityXY'
+  | 'densityXZ';
 
 /**
  * Parameters of the volumetric cloud layer.
@@ -69,8 +78,10 @@ export class VolumetricCloud {
   private readonly _albedo: Vector3;
   private _weatherMapScale: number;
   private _baseNoiseScale: number;
+  private _shapeStrength: number;
   private _detailNoiseScale: number;
   private _detailErosion: number;
+  private _detailBottomErosion: number;
   private readonly _wind: Vector2;
   private _noiseSeed: number;
   private _formation: CloudFormation;
@@ -101,13 +112,13 @@ export class VolumetricCloud {
     this._coverage = 0.45;
     this._density = 0.03;
     this._albedo = new Vector3(1, 1, 1);
-    // Larger than the cloud map of Nubis 2017 (about 10 km) or the data fields of Nubis3 (16 km):
-    // the generated map changes coverage over a few texels, and only spread over 64 km does a
-    // cloud slope from its edge to its full height instead of standing up as a block
+    // Generated weather has eight connected or four isolated footprint cells per period.
     this._weatherMapScale = 64000;
     this._baseNoiseScale = 10000;
+    this._shapeStrength = 1;
     this._detailNoiseScale = 1000;
     this._detailErosion = 0.35;
+    this._detailBottomErosion = 1;
     this._wind = new Vector2(10, 0);
     this._noiseSeed = 0;
     this._formation = 'isolated';
@@ -241,7 +252,7 @@ export class VolumetricCloud {
   set msEccentricity(val: number) {
     this._set('_msEccentricity', Math.min(1, Math.max(0, val)));
   }
-  /** Fraction of the sky covered by clouds. */
+  /** Weather coverage: higher grows cloud fields; zero removes all clouds. */
   get coverage() {
     return this._coverage;
   }
@@ -272,12 +283,19 @@ export class VolumetricCloud {
   set weatherMapScale(val: number) {
     this._set('_weatherMapScale', Math.max(1, val));
   }
-  /** Size of the large billows that shape each cloud. */
+  /** Repetition period of the base noise; the generated volume's first octave has four cells per period. */
   get baseNoiseScale() {
     return this._baseNoiseScale;
   }
   set baseNoiseScale(val: number) {
     this._set('_baseNoiseScale', Math.max(1, val));
+  }
+  /** Strength of the large noise billows: lower values keep cloud bodies fuller and more connected. */
+  get shapeStrength() {
+    return this._shapeStrength;
+  }
+  set shapeStrength(val: number) {
+    this._set('_shapeStrength', Math.min(1, Math.max(0, val)));
   }
   /** Size of the small wisps that erode cloud edges. */
   get detailNoiseScale() {
@@ -292,6 +310,13 @@ export class VolumetricCloud {
   }
   set detailErosion(val: number) {
     this._set('_detailErosion', Math.min(1, Math.max(0, val)));
+  }
+  /** Detail erosion at the cloud base relative to the full amount: lower values keep the base flatter. */
+  get detailBottomErosion() {
+    return this._detailBottomErosion;
+  }
+  set detailBottomErosion(val: number) {
+    this._set('_detailBottomErosion', Math.min(1, Math.max(0, val)));
   }
   /** Direction and speed the clouds drift with, in meters per second. */
   get wind(): Vector2 {
