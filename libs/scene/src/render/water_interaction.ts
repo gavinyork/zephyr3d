@@ -676,16 +676,29 @@ export function createWaterInteractionStepShader(): PBRenderOptions {
           pb.min(1, pb.add(this.trapped, this.breaking))
         );
         // Spread by turbulent diffusion, explicit, and faded as the bubbles rise
-        this.$l.fl = this.wiNeighbourFoam(pb.add(this.p, pb.ivec2(-1, 0)), pb.add(this.q, pb.ivec2(-1, 0)), this.foam);
-        this.$l.fr = this.wiNeighbourFoam(pb.add(this.p, pb.ivec2(1, 0)), pb.add(this.q, pb.ivec2(1, 0)), this.foam);
-        this.$l.fd = this.wiNeighbourFoam(pb.add(this.p, pb.ivec2(0, -1)), pb.add(this.q, pb.ivec2(0, -1)), this.foam);
-        this.$l.fu = this.wiNeighbourFoam(pb.add(this.p, pb.ivec2(0, 1)), pb.add(this.q, pb.ivec2(0, 1)), this.foam);
+        this.$l.fl = this.wiNeighbourFoam(
+          pb.add(this.p, pb.ivec2(-1, 0)),
+          pb.add(this.q, pb.ivec2(-1, 0)),
+          this.foam
+        );
+        this.$l.fr = this.wiNeighbourFoam(
+          pb.add(this.p, pb.ivec2(1, 0)),
+          pb.add(this.q, pb.ivec2(1, 0)),
+          this.foam
+        );
+        this.$l.fd = this.wiNeighbourFoam(
+          pb.add(this.p, pb.ivec2(0, -1)),
+          pb.add(this.q, pb.ivec2(0, -1)),
+          this.foam
+        );
+        this.$l.fu = this.wiNeighbourFoam(
+          pb.add(this.p, pb.ivec2(0, 1)),
+          pb.add(this.q, pb.ivec2(0, 1)),
+          this.foam
+        );
         this.$l.spread = pb.add(
           this.foam,
-          pb.mul(
-            this.foamParams2.z,
-            pb.sub(pb.add(this.fl, this.fr, this.fd, this.fu), pb.mul(this.foam, 4))
-          )
+          pb.mul(this.foamParams2.z, pb.sub(pb.add(this.fl, this.fr, this.fd, this.fu), pb.mul(this.foam, 4)))
         );
         this.$l.foamNext = pb.clamp(
           pb.add(pb.mul(this.spread, this.foamParams.y), pb.mul(this.foamIn, this.absorb)),

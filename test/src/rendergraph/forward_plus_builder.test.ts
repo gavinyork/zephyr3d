@@ -32,10 +32,12 @@ function createMockDrawContext(overrides: Record<string, unknown> = {}) {
   const {
     camera: cameraOverrides,
     device: deviceOverrides,
+    scene: sceneOverrides,
     ...restOverrides
   } = overrides as {
     camera?: Record<string, unknown>;
     device?: Record<string, unknown>;
+    scene?: Record<string, unknown>;
   } & Record<string, unknown>;
   return {
     device: {
@@ -73,7 +75,9 @@ function createMockDrawContext(overrides: Record<string, unknown> = {}) {
     // The VirtualTextureUpdate module asks the scene for its virtual texture clients on every
     // build, so every context needs this to exist.
     scene: {
-      virtualTextureClients: []
+      virtualTextureClients: [],
+      env: { sky: { cloudDebugViewActive: false } },
+      ...sceneOverrides
     },
     ...restOverrides
   } as any;

@@ -269,7 +269,7 @@ export class ShoreWaveGenerator extends Disposable implements WaveGenerator, Foa
   private readonly _foamSourceParams: Vector4;
   /** (wall foam strength, min impact speed, max impact speed, 0) */
   private readonly _wallFoamParams: Vector4;
-  /** The foam field step reads the shore waves under this key. @internal */
+  /** The foam field step reads the shore waves under this key. */
   readonly foamSourceKey: string;
   constructor(base: WaveGenerator, settings: ShoreWaveSettings, baseFoamSource: FoamFieldSource) {
     super();
@@ -322,7 +322,6 @@ export class ShoreWaveGenerator extends Disposable implements WaveGenerator, Foa
     this._vary.y = Math.max(0, s.wallFoamDrift ?? 0.3);
     this._version++;
   }
-  /** @internal */
   setupFoamSourceUniforms(scope: PBGlobalScope) {
     const pb = scope.$builder;
     this._baseFoamSource.setupFoamSourceUniforms(scope);
@@ -331,7 +330,6 @@ export class ShoreWaveGenerator extends Disposable implements WaveGenerator, Foa
     // (strength, min impact speed, max impact speed, 0)
     scope.swWallFoam = pb.vec4().uniform(0);
   }
-  /** @internal */
   applyFoamSourceBindGroup(bindGroup: BindGroup) {
     const s = this._settings;
     this._baseFoamSource.applyFoamSourceBindGroup(bindGroup);
@@ -359,7 +357,6 @@ export class ShoreWaveGenerator extends Disposable implements WaveGenerator, Foa
    * Crest does, and from the water dashing against walls (see FOAM_WALL);
    * added to the open water's. Keeps the wrapped generator's displacement in
    * the field's state near walls.
-   * @internal
    */
   calcFoamStep(
     scope: PBInsideFunctionScope,
@@ -516,7 +513,6 @@ export class ShoreWaveGenerator extends Disposable implements WaveGenerator, Foa
   /**
    * The velocity the foam texture slides with at an undisplaced XZ in the
    * water's shaders: the drift it is given, led along the walls.
-   * @internal
    */
   calcFoamFlow(scope: PBInsideFunctionScope, xz: PBShaderExp, drift: PBShaderExp): PBShaderExp {
     const pb = scope.$builder;
