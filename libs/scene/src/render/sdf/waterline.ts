@@ -3,7 +3,7 @@ import type { Nullable, Vector3 } from '@zephyr3d/base';
 import { Vector4 } from '@zephyr3d/base';
 import { getDevice } from '../../app/api';
 import { fetchSampler } from '../../utility/misc';
-import { declareDynamicSDFUniforms, declareGlobalSDFUniforms, sampleSceneSDF } from '../../shaders/sdf';
+import { declareDynamicSDFUniforms, declareGlobalSDFUniforms, sampleGlobalSDF } from '../../shaders/sdf';
 import type { GlobalSDF } from './global_sdf';
 import { buildSDFProgram } from './sdf_programs';
 
@@ -33,8 +33,9 @@ const WATERLINE_MODEL_CLAMP = 10000;
  * shelving bed), this measures shoreline bands outwards from where geometry
  * meets the water.
  *
- * Rebuilt on the GPU from the scene field, so dynamic geometry (a boat hull)
- * moves its waterline with it:
+ * Rebuilt on the GPU from the global clipmap, static geometry and the terrain
+ * only: dynamic instances (a boat, a car wading in) are not shores and would
+ * ring themselves with shore waves and foam. Steps:
  *
  * 1. Seed: a cell whose centre is inside geometry at the water level is its own nearest shore.
  * 2. Jump flooding, log2(resolution) passes, carries the nearest seed across the grid.
@@ -167,7 +168,7 @@ export class WaterlineField {
     // Snapped to cells, so the grid does not swim as the camera moves
     const ox = (Math.floor(cameraPos.x / h) - n / 2) * h;
     const oz = (Math.floor(cameraPos.z / h) - n / 2) * h;
-    const version = this._global.contentVersion;
+    const version = this._global.staticVersion;
     const at = this._builtAt;
     if (
       this._built &&
@@ -321,13 +322,14 @@ export class WaterlineField {
         this.wetOut = pb.texStorage2D.rg32float().storage(0);
         this.probeOut = pb.texStorage2D.rg32float().storage(0);
         declareGlobalSDFUniforms(this, 0, levels);
+        // Unsampled, declared for GlobalSDF.applyBindGroup
         declareDynamicSDFUniforms(this, 0);
         pb.main(function () {
           this.$l.id = this.$builtins.globalInvocationId.xy;
           this.$l.xz = pb.add(this.grid.xy, pb.mul(pb.add(pb.vec2(this.id), pb.vec2(0.5)), this.grid.z));
-          this.$l.d = sampleSceneSDF(this, pb.vec3(this.xz.x, this.grid.w, this.xz.y), levels);
+          this.$l.d = sampleGlobalSDF(this, pb.vec3(this.xz.x, this.grid.w, this.xz.y), levels);
           // Half a cell up, for the vertical slope of the field
-          this.$l.dUp = sampleSceneSDF(
+          this.$l.dUp = sampleGlobalSDF(
             this,
             pb.vec3(this.xz.x, pb.add(this.grid.w, pb.mul(this.grid.z, 0.5)), this.xz.y),
             levels

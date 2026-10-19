@@ -146,6 +146,7 @@ export class GlobalSDF {
   private readonly _dynamicInfo: Vector4;
   private _waterline: Nullable<WaterlineField>;
   private _contentVersion: number;
+  private _staticVersion: number;
   private _prevDynamic: Float32Array;
   private readonly _params: Vector4;
   constructor(sdf: SceneSDF, options?: GlobalSDFOptions) {
@@ -179,6 +180,7 @@ export class GlobalSDF {
     this._dynamicInfo = new Vector4();
     this._waterline = null;
     this._contentVersion = 0;
+    this._staticVersion = 0;
     this._prevDynamic = new Float32Array(this._dynamicData.length + 1);
     this._params = new Vector4(this.resolution, this.levels, this.bandVoxels, 0);
   }
@@ -243,6 +245,13 @@ export class GlobalSDF {
   get contentVersion() {
     return this._contentVersion;
   }
+  /**
+   * As {@link GlobalSDF.contentVersion}, but only for the clipmap itself (static
+   * geometry and the terrain), not the dynamic instances merged at query time.
+   */
+  get staticVersion() {
+    return this._staticVersion;
+  }
   /** Dynamic instances merged at query time this frame. */
   get dynamicCount() {
     return this._dynamicInfo.x;
@@ -289,6 +298,7 @@ export class GlobalSDF {
   /** Marks every brick within band reach of a world box for rebuilding. */
   markDirty(min: Vector3, max: Vector3) {
     this._contentVersion++;
+    this._staticVersion++;
     for (let level = 0; level < this.levels; level++) {
       const origin = this._origins[level];
       if (!origin) {
@@ -513,6 +523,7 @@ export class GlobalSDF {
       return;
     }
     this._contentVersion++;
+    this._staticVersion++;
     this._totalBricks += batch.length;
     // Static instances whose field is on the GPU
     const instances: SDFInstance[] = [];
