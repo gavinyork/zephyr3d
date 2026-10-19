@@ -6,6 +6,7 @@ const LOG_CHANNEL = 'zephyr-editor:log';
 const SETTINGS_CHANNEL = 'zephyr-editor:settings';
 const ASSISTANT_EVENT_CHANNEL = 'zephyr-editor:assistant-event';
 const HEADLESS_CHANNEL = 'zephyr-editor:headless';
+const PREVIEW_LOG_CHANNEL = 'zephyr-editor:preview-log';
 
 function invokeFS(operation, args) {
   return ipcRenderer.invoke(FS_CHANNEL, { operation, args });
@@ -84,6 +85,18 @@ contextBridge.exposeInMainWorld('zephyrEditorDesktop', {
       ipcRenderer.on(ASSISTANT_EVENT_CHANNEL, handler);
       return () => {
         ipcRenderer.removeListener(ASSISTANT_EVENT_CHANNEL, handler);
+      };
+    }
+  },
+  preview: {
+    onLog: (listener) => {
+      if (typeof listener !== 'function') {
+        return () => {};
+      }
+      const handler = (_event, payload) => listener(payload);
+      ipcRenderer.on(PREVIEW_LOG_CHANNEL, handler);
+      return () => {
+        ipcRenderer.removeListener(PREVIEW_LOG_CHANNEL, handler);
       };
     }
   },

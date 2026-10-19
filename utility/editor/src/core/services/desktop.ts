@@ -283,6 +283,10 @@ export type ZephyrEditorDesktopAPI = {
     listLlmModels(provider: DesktopLlmProvider, baseUrl: string): Promise<string[]>;
     onAssistantEvent(listener: (event: DesktopAssistantEvent) => void): () => void;
   };
+  preview?: {
+    /** Console output of the play preview window, forwarded by the main process. */
+    onLog(listener: (entry: { level: string; message: string }) => void): () => void;
+  };
   headless?: {
     reportResult(payload: DesktopHeadlessResult): Promise<void>;
   };

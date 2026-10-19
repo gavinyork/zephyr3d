@@ -167,19 +167,23 @@ function installConsoleCapture(): void {
     return;
   }
   consoleInstalled = true;
+  // The play preview window has no bridge of its own; its console arrives here
+  window.zephyrEditorDesktop?.preview?.onLog((entry) => {
+    pushConsoleEntry(entry.level, `[preview] ${entry.message}`);
+  });
   for (const level of ['log', 'info', 'warn', 'error'] as const) {
     const original = console[level].bind(console);
     console[level] = (...args: any[]) => {
-      consoleEntries.push({
-        level,
-        message: args.map((arg) => formatValue(arg)).join(' '),
-        time: Date.now()
-      });
-      if (consoleEntries.length > MAX_LOGS) {
-        consoleEntries.splice(0, consoleEntries.length - MAX_LOGS);
-      }
+      pushConsoleEntry(level, args.map((arg) => formatValue(arg)).join(' '));
       original(...args);
     };
+  }
+}
+
+function pushConsoleEntry(level: string, message: string) {
+  consoleEntries.push({ level, message, time: Date.now() });
+  if (consoleEntries.length > MAX_LOGS) {
+    consoleEntries.splice(0, consoleEntries.length - MAX_LOGS);
   }
 }
 

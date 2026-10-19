@@ -14,6 +14,7 @@ const FS_EVENT_CHANNEL = 'zephyr-editor:fs-event';
 const LOG_CHANNEL = 'zephyr-editor:log';
 const SETTINGS_CHANNEL = 'zephyr-editor:settings';
 const ASSISTANT_EVENT_CHANNEL = 'zephyr-editor:assistant-event';
+const PREVIEW_LOG_CHANNEL = 'zephyr-editor:preview-log';
 const HEADLESS_CHANNEL = 'zephyr-editor:headless';
 const EDITOR_PROTOCOL = 'zephyr-editor';
 const MCP_HTTP_PATH = '/mcp';
@@ -3304,6 +3305,26 @@ function createPreviewWindow(url) {
       shell.openExternal(childUrl);
     }
     return { action: 'deny' };
+  });
+  // F12 or Ctrl+Shift+I opens the preview's developer tools
+  previewWindow.webContents.on('before-input-event', (event, input) => {
+    if (input.type !== 'keyDown') {
+      return;
+    }
+    const key = String(input.key || '').toLowerCase();
+    if (key === 'f12' || (key === 'i' && input.shift && (input.control || input.meta))) {
+      event.preventDefault();
+      previewWindow.webContents.toggleDevTools();
+    }
+  });
+  // The preview runs without the MCP bridge: pass its console on to the editor
+  // window, whose bridge keeps it with its own for editor_console_logs
+  previewWindow.webContents.on('console-message', (event, legacyLevel, legacyMessage) => {
+    const level = typeof event?.level === 'string' ? event.level : ['debug', 'info', 'warning', 'error'][legacyLevel] ?? 'info';
+    const message = typeof event?.message === 'string' ? event.message : String(legacyMessage ?? '');
+    if (mainWindowRef && !mainWindowRef.isDestroyed()) {
+      mainWindowRef.webContents.send(PREVIEW_LOG_CHANNEL, { level, message });
+    }
   });
   previewWindow.loadURL(stripMcpQueryParams(url));
   if (process.env.ZEPHYR_PREVIEW_DEVTOOLS === '1') {
