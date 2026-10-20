@@ -19,6 +19,7 @@ type DensityCase = {
   bottom: number;
   height: number;
   formation: 'connected' | 'isolated';
+  baseVariation?: number;
 };
 type NoiseTextures = { weatherMap: Texture2D; baseNoise: Texture3D; detailNoise: Texture3D };
 
@@ -163,7 +164,7 @@ function makeDensityProgram() {
             this.$l.c = this.cloud;
             this.c.density.x = this.a.y;
             this.c.density.z = this.a.w;
-            this.c.shape = pb.vec4(this.a.z, this.b.x, this.a.x, 0);
+            this.c.shape = pb.vec4(this.a.z, this.b.x, this.a.x, this.b.w);
             this.c.windDir.z = this.b.z;
             this.$l.xz = pb.mul(
               pb.sub(
@@ -241,7 +242,7 @@ async function sampleDensity(
         c.bottom,
         c.height,
         c.formation === 'isolated' ? 1 : 0,
-        0
+        c.baseVariation ?? 0
       ],
       index * 8
     );
@@ -301,6 +302,54 @@ function generatedCases() {
   return cases;
 }
 
+async function checkBaseVariation(
+  program: GPUProgram,
+  textures: NoiseTextures,
+  checks: Check[],
+  seed: number
+) {
+  const edge = 32;
+  const heights = Array.from({ length: 21 }, (_, index) => index * 0.005);
+  const cases: DensityCase[] = [];
+  for (const formation of ['connected', 'isolated'] as const) {
+    for (const baseVariation of [0, 700]) {
+      for (const height of heights) {
+        cases.push({ coverage: 0.75, strength: 0, erosion: 0, bottom: 0, height, formation, baseVariation });
+      }
+    }
+  }
+  const pixels = await sampleDensity(program, textures, cases, edge);
+  const perCase = edge * edge * 4;
+  for (let formation = 0; formation < 2; formation++) {
+    const lifts: number[] = [];
+    const variedBases: number[] = [];
+    for (let pixel = 0; pixel < edge * edge; pixel++) {
+      const first = (variation: number) => {
+        for (let height = 0; height < heights.length; height++) {
+          const caseIndex = (formation * 2 + variation) * heights.length + height;
+          if (pixels[caseIndex * perCase + pixel * 4 + 1] > 0.05) {
+            return height;
+          }
+        }
+        return -1;
+      };
+      const flat = first(0);
+      const varied = first(1);
+      if (flat >= 0 && varied >= 0) {
+        lifts.push((varied - flat) * 50);
+        variedBases.push(varied * 50);
+      }
+    }
+    const spread = variedBases.length ? Math.max(...variedBases) - Math.min(...variedBases) : 0;
+    const lifted = lifts.filter((value) => value >= 50).length;
+    checks.push({
+      name: `varying-cloud-base-${seed}-${formation}`,
+      passed: lifts.length > 20 && lifted > 0 && lifts.every((value) => value >= 0) && spread >= 100,
+      details: { samples: lifts.length, lifted, spreadMeters: spread, maxLiftMeters: Math.max(0, ...lifts) }
+    });
+  }
+}
+
 async function checkProfiles(checks: Check[]) {
   const device = getDevice();
   const rows = TYPES.flatMap((type) => LAYER_HEIGHTS.map((height) => ({ type, height })));
@@ -327,7 +376,7 @@ async function checkProfiles(checks: Check[]) {
         this.$if(pb.lessThan(this.id.y, rows.length), function () {
           this.$l.request = pb.textureLoad(this.requests, pb.ivec2(this.id), 0);
           this.$l.profile = cloudHeightProfile(this, this.request.x, this.request.y, this.request.z);
-          pb.textureStore(this.dst, this.id, pb.vec4(this.profile, this.request.xy));
+          pb.textureStore(this.dst, this.id, pb.vec4(this.profile.xy, this.request.xy));
         });
       });
     }
@@ -424,6 +473,8 @@ export async function runCloudChecks() {
       const density = await sampleDensity(densityProgram, resources, cases, 32);
       const summary = checkDensity(density, cases, 32);
       let monotonicViolations = 0;
+      let shapingViolations = 0;
+      let shapedPixels = 0;
       const perCase = 32 * 32 * 4;
       for (let index = 0; index < cases.length; index += COVERAGES.length) {
         for (let step = 1; step < COVERAGES.length; step++) {
@@ -431,6 +482,21 @@ export async function runCloudChecks() {
             monotonicViolations += Number(
               density[(index + step) * perCase + pixel] + 1e-6 < density[(index + step - 1) * perCase + pixel]
             );
+          }
+        }
+      }
+      const casesPerStrength = 2 * COVERAGES.length;
+      const casesPerFormation = 3 * casesPerStrength;
+      for (let formation = 0; formation < 2; formation++) {
+        for (let strength = 1; strength < 3; strength++) {
+          for (let offset = 0; offset < casesPerStrength; offset++) {
+            const weaker =
+              (formation * casesPerFormation + (strength - 1) * casesPerStrength + offset) * perCase;
+            const stronger = (formation * casesPerFormation + strength * casesPerStrength + offset) * perCase;
+            for (let pixel = 0; pixel < perCase; pixel += 4) {
+              shapingViolations += Number(density[stronger + pixel] > density[weaker + pixel] + 1e-6);
+              shapedPixels += Number(density[weaker + pixel] > density[stronger + pixel] + 1e-4);
+            }
           }
         }
       }
@@ -448,10 +514,16 @@ export async function runCloudChecks() {
         passed: monotonicViolations === 0,
         details: { monotonicViolations, samplesPerCase: 1024, cases: cases.length }
       });
+      checks.push({
+        name: `actual-density-shape-strength-seed-${seed}`,
+        passed: shapingViolations === 0 && shapedPixels > 0,
+        details: { shapingViolations, shapedPixels }
+      });
       coverageResponses.push({
         seed,
         cases: cases.map((c, index) => ({ ...c, occupancy: summary.occupancy[index] }))
       });
+      await checkBaseVariation(densityProgram, resources, checks, seed);
     }
 
     const customCases: DensityCase[] = [];

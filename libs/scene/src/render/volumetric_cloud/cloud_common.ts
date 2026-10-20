@@ -17,9 +17,9 @@ import {
  * SetupParticipatingMediaPhaseContext), the analytic segment integral of Hillaire 2016, and the
  * aerial perspective applied once at the transmittance-weighted mean depth.
  *
- * UE leaves the density to a user material. Here it is the model of Schneider, "The Real-time
- * Volumetric Cloudscapes of Horizon Zero Dawn" (SIGGRAPH 2015 / GPU Pro 7), see
- * cloudSampleDensity().
+ * UE leaves the density to a user material. Here Schneider's "The Real-time Volumetric Cloudscapes
+ * of Horizon Zero Dawn" (SIGGRAPH 2015 / GPU Pro 7) supplies the noise fields; cloudSampleDensity()
+ * also uses edge-weighted sculpting from https://zhuanlan.zhihu.com/p/2067943631445610508.
  *
  * Everything runs in the observer-local atmosphere frame (planet centre at the origin, +Y up at
  * the observer, meters); the noise is anchored to the planet through the referential.
@@ -92,7 +92,7 @@ export function getCloudParamsStruct(pb: ProgramBuilder) {
     pb.vec4('ms'),
     // (weather coverage threshold, extinction per meter, detail erosion, anvil bias)
     pb.vec4('density'),
-    // (base noise shaping strength, bottom detail erosion multiplier, global coverage, 0)
+    // (base noise shaping strength, bottom detail erosion multiplier, global coverage, base variation meters)
     pb.vec4('shape'),
     // (albedo, 0)
     pb.vec4('albedo'),
@@ -143,40 +143,66 @@ function hgPhase(scope: PBInsideFunctionScope, g: PBShaderExp, cosTheta: PBShade
 }
 
 /**
- * Returns (height profile, height within this cloud type). Four-corner gradients follow the
- * Horizon/Godot model, with a shared condensation base and a short transition measured in
- * meters. The top can taper without reducing density throughout the entire cloud interior.
- * The type-relative height also keeps bottom erosion consistent for thin and tall clouds.
+ * Returns (height profile, height within this cloud type, bottom ramp, top cut). Four-corner
+ * gradients follow the Horizon/Godot model, with a shared condensation base and a short
+ * transition measured in meters. Local base lift changes only the bottom ramp; the top cut
+ * remains at the layer's original height. The type-relative height keeps detail erosion
+ * consistent for thin and tall clouds.
  * @internal
  */
 export function cloudHeightProfile(
   scope: PBInsideFunctionScope,
   heightFrac: PBShaderExp,
   cloudType: PBShaderExp,
-  layerHeight: PBShaderExp
+  layerHeight: PBShaderExp,
+  baseOffsetMeters: PBShaderExp | number = 0
 ) {
   const pb = scope.$builder;
   const funcName = 'Z_cloudVerticalProfile';
-  pb.func(funcName, [pb.float('h'), pb.float('t'), pb.float('layerHeight')], function () {
-    this.$l.cloudType = pb.clamp(this.t, 0, 1);
-    this.$l.stratus = pb.sub(1, pb.clamp(pb.mul(this.cloudType, 2), 0, 1));
-    this.$l.stratocumulus = pb.sub(1, pb.mul(pb.abs(pb.sub(this.cloudType, 0.5)), 2));
-    this.$l.cumulus = pb.mul(pb.clamp(pb.sub(this.cloudType, 0.5), 0, 1), 2);
-    // (base, nominal end of the bottom ramp, start of the top falloff, top)
-    this.$l.g = pb.add(
-      pb.mul(pb.vec4(0, 0.05, 0.09, 0.11), this.stratus),
-      pb.mul(pb.vec4(0, 0.2, 0.2, 0.625), this.stratocumulus),
-      pb.mul(pb.vec4(0, 0.0625, 0.2, 1), this.cumulus)
-    );
-    this.$l.bottomWidth = pb.min(
-      pb.min(this.g.y, pb.div(CLOUD_BOTTOM_TRANSITION_METERS, pb.max(this.layerHeight, 1))),
-      pb.mul(this.g.w, 0.15)
-    );
-    this.$l.bottom = pb.smoothStep(0, pb.max(this.bottomWidth, 1e-6), this.h);
-    this.$l.top = pb.sub(1, pb.smoothStep(this.g.z, this.g.w, this.h));
-    this.$return(pb.vec2(pb.mul(this.bottom, this.top), pb.clamp(pb.div(this.h, this.g.w), 0, 1)));
-  });
-  return pb.getGlobalScope()[funcName](heightFrac, cloudType, layerHeight) as PBShaderExp;
+  pb.func(
+    funcName,
+    [pb.float('h'), pb.float('t'), pb.float('layerHeight'), pb.float('baseOffsetMeters')],
+    function () {
+      this.$l.cloudType = pb.clamp(this.t, 0, 1);
+      this.$l.stratus = pb.sub(1, pb.clamp(pb.mul(this.cloudType, 2), 0, 1));
+      this.$l.stratocumulus = pb.sub(1, pb.mul(pb.abs(pb.sub(this.cloudType, 0.5)), 2));
+      this.$l.cumulus = pb.mul(pb.clamp(pb.sub(this.cloudType, 0.5), 0, 1), 2);
+      // (base, nominal end of the bottom ramp, start of the top falloff, top)
+      this.$l.g = pb.add(
+        pb.mul(pb.vec4(0, 0.05, 0.09, 0.11), this.stratus),
+        pb.mul(pb.vec4(0, 0.2, 0.2, 0.625), this.stratocumulus),
+        pb.mul(pb.vec4(0, 0.0625, 0.2, 1), this.cumulus)
+      );
+      this.$l.bottomWidth = pb.min(
+        pb.min(this.g.y, pb.div(CLOUD_BOTTOM_TRANSITION_METERS, pb.max(this.layerHeight, 1))),
+        pb.mul(this.g.w, 0.15)
+      );
+      this.$l.localBase = pb.clamp(
+        pb.div(this.baseOffsetMeters, pb.max(this.layerHeight, 1)),
+        0,
+        pb.mul(this.g.w, 0.25)
+      );
+      this.$l.bottom = pb.smoothStep(
+        this.localBase,
+        pb.add(this.localBase, pb.max(this.bottomWidth, 1e-6)),
+        this.h
+      );
+      this.$l.top = pb.sub(1, pb.smoothStep(this.g.z, this.g.w, this.h));
+      this.$return(
+        pb.vec4(
+          pb.mul(this.bottom, this.top),
+          pb.clamp(
+            pb.div(pb.sub(this.h, this.localBase), pb.max(pb.sub(this.g.w, this.localBase), 1e-6)),
+            0,
+            1
+          ),
+          this.bottom,
+          pb.sub(1, this.top)
+        )
+      );
+    }
+  );
+  return pb.getGlobalScope()[funcName](heightFrac, cloudType, layerHeight, baseOffsetMeters) as PBShaderExp;
 }
 
 /** remap(v, l0, h0, l1, h1) of [Schneider15] */
@@ -199,7 +225,7 @@ function remap(
  * before detail erosion: zero there means zero density, which lets the march skip the detail
  * fetch, as UE does with its material's conservative density output.
  *
- * Weather locates clouds, low-frequency Perlin-Worley shapes the body, then detail erodes it.
+ * Weather locates clouds, low-frequency Perlin-Worley sculpts the silhouette, then detail erodes it.
  * Shaping strength is independent of noise scale (as in HDRP), and the bottom detail multiplier
  * is independent of the wispy/billowy noise inversion. All diagnostic stages use this function.
  * @internal
@@ -263,13 +289,22 @@ export function cloudSampleDensity(
     this.$if(pb.lessThanEqual(this.coverage, 0), function () {
       this.$return(pb.vec4(0, 0, this.h, this.altInLayer));
     });
+    // Weather varies the condensation level between fields; coverage lifts the shoulders
+    // within each footprint. Thin cloud types cap the lift in cloudHeightProfile().
+    this.$l.baseOffset = pb.mul(
+      this.cloud.shape.w,
+      pb.add(0.15, pb.mul(this.weather.b, 0.45), pb.mul(pb.sub(1, this.coverage), 0.4))
+    );
     this.$l.heightProfile = cloudHeightProfile(
       this,
       this.h,
       this.weather.b,
-      pb.sub(this.cloud.layer.y, this.cloud.layer.x)
+      pb.sub(this.cloud.layer.y, this.cloud.layer.x),
+      this.baseOffset
     );
-    this.$l.profile = pb.mul(this.heightProfile.x, this.coverage);
+    // Sculpt the top by subtracting its envelope from local coverage. Multiplication kept
+    // partially covered cloud edges at nearly the same height as their dense centres.
+    this.$l.profile = pb.mul(this.heightProfile.z, pb.max(pb.sub(this.coverage, this.heightProfile.w), 0));
     if (stage === 'profile') {
       this.$return(
         pb.vec4(pb.mul(this.profile, this.cloud.density.y), this.profile, this.h, this.altInLayer)
@@ -281,17 +316,21 @@ export function cloudSampleDensity(
       this.$l.n = pb.textureSampleLevel(baseNoise, pb.mul(this.q, this.cloud.scales.y), 0);
       this.$l.lowFbm = pb.add(pb.mul(this.n.g, 0.625), pb.mul(this.n.b, 0.25), pb.mul(this.n.a, 0.125));
       this.$l.rawBase = remap(pb, this.n.r, pb.sub(this.lowFbm, 1), 1, 0, 1);
-      this.noise = pb.mix(
-        1,
-        pb.clamp(
-          remap(pb, this.rawBase, CLOUD_COVERAGE_BASE_RANGE[0], CLOUD_COVERAGE_BASE_RANGE[1], 0, 1),
-          0,
-          1
-        ),
-        this.cloud.shape.x
+      this.noise = pb.clamp(
+        remap(pb, this.rawBase, CLOUD_COVERAGE_BASE_RANGE[0], CLOUD_COVERAGE_BASE_RANGE[1], 0, 1),
+        0,
+        1
       );
     });
-    this.$l.base = pb.clamp(pb.sub(this.noise, pb.sub(1, this.profile)), 0, 1);
+    this.$l.macroNoise = pb.sub(1, this.noise);
+    // Keep dense cores intact while the low-frequency volume carves the silhouette.
+    this.$l.macroErosion = pb.mul(
+      this.cloud.shape.x,
+      this.macroNoise,
+      this.macroNoise,
+      pb.smoothStep(0, 1, pb.sub(1, this.profile))
+    );
+    this.$l.base = pb.clamp(pb.sub(this.profile, this.macroErosion), 0, 1);
     this.$if(pb.lessThanEqual(this.base, 0), function () {
       this.$return(pb.vec4(0, 0, this.h, this.altInLayer));
     });
@@ -311,7 +350,17 @@ export function cloudSampleDensity(
       pb.clamp(pb.mul(this.heightProfile.y, 10), 0, 1)
     );
     this.$l.bottomErosion = pb.mix(this.cloud.shape.y, 1, pb.smoothStep(0, 0.25, this.heightProfile.y));
-    this.$l.erosion = pb.clamp(pb.mul(this.modifier, this.cloud.density.z, this.bottomErosion), 0, 1);
+    // Finer erosion fades with height, preserving broad billows near the cloud top.
+    this.$l.detailFade = pb.add(
+      0.6,
+      pb.mul(0.2, pb.smoothStep(0.85, 1, pb.sub(1, this.heightProfile.y))),
+      pb.mul(-0.35, pb.smoothStep(0.05, 0.5, this.heightProfile.y))
+    );
+    this.$l.erosion = pb.clamp(
+      pb.mul(this.modifier, this.cloud.density.z, this.bottomErosion, this.detailFade),
+      0,
+      1
+    );
     this.$l.eroded = pb.clamp(
       pb.div(pb.sub(this.base, this.erosion), pb.max(pb.sub(1, this.erosion), 1e-5)),
       0,

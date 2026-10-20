@@ -8,7 +8,6 @@ import {
   getMultiScatteringLut,
   getTransmittanceLut
 } from '../../shaders/atmosphere';
-import { interleavedGradientNoise } from '../../shaders/noise';
 import { fetchSampler } from '../../utility/misc';
 import { uniformSphereSamples } from '../../values';
 import {
@@ -35,8 +34,8 @@ import type { VolumetricCloud } from './volumetric_cloud';
  * sun, time, parameters) is frozen when it starts so the blocks of one map agree.
  */
 
-/** Sample count scale of a full rebuild, traced in a single frame */
-const REBUILD_STEP_SCALE = 0.25;
+/** A rebuild needs enough steps to resolve cloud edges before the regular rounds finish. */
+const REBUILD_STEP_SCALE = 0.5;
 /** Margin added below the horizon dip, radians */
 const HORIZON_MARGIN = Math.PI / 180;
 
@@ -71,8 +70,9 @@ function getTraceProgram(msOctaves: number) {
           this.$l.uv = pb.div(pb.add(pb.vec2(this.texel), pb.vec2(0.5)), this.block.z);
           this.$l.dir = cloudCacheDecode(this, this.uv, this.cacheParams.x);
           this.$l.ambient = pb.textureLoad(this.ambientTex, pb.ivec2(0), 0).rgb;
-          // A static jitter: each texel is traced once per round, nothing integrates over frames
-          this.$l.jitter = interleavedGradientNoise(this, pb.vec2(this.texel));
+          // Every cache texel is traced once per round, so a fixed screen-space noise phase
+          // survives the map blend as a visible grid. Sample each segment at its midpoint.
+          this.$l.jitter = pb.float(0.5);
           this.$l.result = cloudTrace(
             this,
             msCount,
@@ -379,7 +379,12 @@ export class VolumetricCloudSkyCache extends Disposable {
           params.detailErosion,
           params.anvilBias
         ),
-        shape: new Vector4(params.shapeStrength, params.detailBottomErosion, params.coverage, 0),
+        shape: new Vector4(
+          params.shapeStrength,
+          params.detailBottomErosion,
+          params.coverage,
+          params.baseHeightVariation
+        ),
         albedo: new Vector4(params.albedo.x, params.albedo.y, params.albedo.z, 0),
         scales: new Vector4(
           1 / params.weatherMapScale,

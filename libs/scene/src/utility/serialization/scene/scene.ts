@@ -879,6 +879,29 @@ export function getSceneClass(manager: ResourceManager): SerializableClass {
           }
         },
         {
+          name: 'VolumetricCloudBaseHeightVariation',
+          description: 'Maximum local rise of cloud undersides above the layer base, in meters',
+          type: 'float',
+          default: 700,
+          phase: 2,
+          options: {
+            group: 'VolumetricClouds',
+            label: 'BaseHeightVariation',
+            animatable: true,
+            minValue: 0,
+            maxValue: 2000
+          },
+          get(this: Scene, value) {
+            value.num[0] = this.env.sky.volumetricCloud.baseHeightVariation;
+          },
+          set(this: Scene, value) {
+            this.env.sky.volumetricCloud.baseHeightVariation = value.num[0];
+          },
+          isValid(this: Scene) {
+            return this.env.sky.skyType === 'scatter' && this.env.sky.cloudMode === 'volumetric';
+          }
+        },
+        {
           name: 'VolumetricCloudCoverage',
           description: 'Weather coverage: higher grows cloud fields; zero removes all clouds',
           type: 'float',
@@ -952,7 +975,7 @@ export function getSceneClass(manager: ResourceManager): SerializableClass {
           name: 'VolumetricCloudBaseNoiseScale',
           description: 'Size of the large billows that shape each cloud',
           type: 'float',
-          default: 10000,
+          default: 12000,
           phase: 2,
           options: {
             group: 'VolumetricClouds',
@@ -1067,7 +1090,7 @@ export function getSceneClass(manager: ResourceManager): SerializableClass {
           name: 'VolumetricCloudDetailErosion',
           description: 'Higher gives raggeder, wispier cloud edges',
           type: 'float',
-          default: 0.35,
+          default: 0.25,
           phase: 2,
           options: {
             group: 'VolumetricClouds',
@@ -1091,7 +1114,7 @@ export function getSceneClass(manager: ResourceManager): SerializableClass {
           description:
             'Detail erosion at the cloud base relative to the full amount; lower keeps the base flatter',
           type: 'float',
-          default: 1,
+          default: 0.1,
           phase: 2,
           options: {
             group: 'VolumetricClouds',

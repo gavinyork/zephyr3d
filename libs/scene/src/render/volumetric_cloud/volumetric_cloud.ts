@@ -82,6 +82,7 @@ export class VolumetricCloud {
   private _detailNoiseScale: number;
   private _detailErosion: number;
   private _detailBottomErosion: number;
+  private _baseHeightVariation: number;
   private readonly _wind: Vector2;
   private _noiseSeed: number;
   private _formation: CloudFormation;
@@ -114,11 +115,12 @@ export class VolumetricCloud {
     this._albedo = new Vector3(1, 1, 1);
     // Generated weather has eight connected or four isolated footprint cells per period.
     this._weatherMapScale = 64000;
-    this._baseNoiseScale = 10000;
+    this._baseNoiseScale = 12000;
     this._shapeStrength = 1;
     this._detailNoiseScale = 1000;
-    this._detailErosion = 0.35;
-    this._detailBottomErosion = 1;
+    this._detailErosion = 0.25;
+    this._detailBottomErosion = 0.1;
+    this._baseHeightVariation = 700;
     this._wind = new Vector2(10, 0);
     this._noiseSeed = 0;
     this._formation = 'isolated';
@@ -317,6 +319,13 @@ export class VolumetricCloud {
   }
   set detailBottomErosion(val: number) {
     this._set('_detailBottomErosion', Math.min(1, Math.max(0, val)));
+  }
+  /** Maximum local rise of the cloud underside above the layer base, in meters. */
+  get baseHeightVariation() {
+    return this._baseHeightVariation;
+  }
+  set baseHeightVariation(val: number) {
+    this._set('_baseHeightVariation', Math.max(0, val));
   }
   /** Direction and speed the clouds drift with, in meters per second. */
   get wind(): Vector2 {

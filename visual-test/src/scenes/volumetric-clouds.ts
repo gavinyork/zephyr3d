@@ -19,6 +19,11 @@ interface CloudDiagnostic {
   formation?: CloudFormation;
   seed?: number;
   side?: boolean;
+  sunElevation?: number;
+  frames?: number;
+  toneMapDither?: boolean;
+  cacheResolution?: number;
+  framesPerUpdate?: number;
 }
 
 const CLOUD_OVERRIDE_KEYS = [
@@ -26,6 +31,7 @@ const CLOUD_OVERRIDE_KEYS = [
   'shapeStrength',
   'detailErosion',
   'detailBottomErosion',
+  'baseHeightVariation',
   'weatherMapScale',
   'baseNoiseScale',
   'detailNoiseScale',
@@ -90,13 +96,12 @@ export function createCloudWeatherFixture(kind: 'constant' | 'footprint', cloudT
 }
 
 /**
- * Candidate large-cloud presets. These are diagnostic inputs, not accepted
- * visual baselines: inspect the WebGPU captures before promoting a preset.
- * Periods are metres: 24 km base noise has an approximately 6 km first octave.
+ * Cloud-shaping diagnostic presets. Captures are diagnostic artifacts, not accepted visual baselines.
+ * Periods are metres: 12 km base noise has an approximately 3 km first octave.
  */
 export const CLOUD_SHAPING_PRESETS = {
-  connected: { coverage: 0.4, weatherMapScale: 64000, baseNoiseScale: 24000 },
-  isolated: { coverage: 0.5, weatherMapScale: 64000, baseNoiseScale: 24000 }
+  connected: { coverage: 0.4, weatherMapScale: 64000, baseNoiseScale: 12000 },
+  isolated: { coverage: 0.5, weatherMapScale: 64000, baseNoiseScale: 12000 }
 } as const;
 
 function setupCloudDiagnostic({ scene, camera }: SceneContext, diagnostic: CloudDiagnostic) {
@@ -122,15 +127,15 @@ function setupCloudDiagnostic({ scene, camera }: SceneContext, diagnostic: Cloud
   cloud.detailNoiseScale = 1200;
   cloud.coverage = preset.coverage;
   cloud.density = 0.03;
-  cloud.shapeStrength = diagnostic.shape ?? 0.55;
+  cloud.shapeStrength = diagnostic.shape ?? 1;
   cloud.detailErosion = diagnostic.detail ?? 0.25;
   cloud.detailBottomErosion = 0.1;
   cloud.formation = formation;
   cloud.noiseSeed = diagnostic.seed ?? 0;
   cloud.wind = new Vector2(0, 0);
   cloud.anvilBias = 0;
-  cloud.framesPerUpdate = 4;
-  cloud.cacheResolution = 512;
+  cloud.framesPerUpdate = diagnostic.framesPerUpdate ?? 4;
+  cloud.cacheResolution = diagnostic.cacheResolution ?? 512;
   cloud.viewSampleCountScale = 2;
   cloud.shadowSampleCountScale = 1;
   for (const [key, value] of Object.entries(cloudOverrides())) {
@@ -146,11 +151,12 @@ function setupCloudDiagnostic({ scene, camera }: SceneContext, diagnostic: Cloud
   sun.sunLight = true;
   sun.color = new Vector4(1, 1, 1, 1);
   sun.intensity = 10;
-  sun.lookAt(new Vector3(-1, 1, 1), Vector3.zero(), Vector3.axisPY());
+  sun.lookAt(new Vector3(-1, diagnostic.sunElevation ?? 1, 1), Vector3.zero(), Vector3.axisPY());
   camera.near = 1;
   camera.far = 100000;
   camera.fovY = Math.PI / 3;
   camera.toneMapExposure = 1;
+  camera.toneMapDither = diagnostic.toneMapDither ?? true;
   placeCamera(
     camera,
     diagnostic.side ? new Vector3(0, 100, 32000) : new Vector3(32000, 100, 50000),
@@ -163,10 +169,10 @@ function cloudDiagnostic(diagnostic: CloudDiagnostic): VisualScene {
     name: diagnostic.name,
     description: diagnostic.description,
     supports: (backend) => backend === 'webgpu',
-    // Frame 1 initializes the low-quality sky maps. Two complete four-frame
-    // rounds then replace both blended maps with full-quality traces. Wind and
-    // anvil are off; the harness fixes frame time, camera, sun and seed.
-    frames: diagnostic.debugView ? 1 : 9,
+    // Frame 1 initializes the quick sky maps. Ordinary scenes complete two
+    // four-frame rounds before capture; the production-cache scene records its
+    // initial map. Wind and anvil are off for deterministic comparison.
+    frames: diagnostic.frames ?? (diagnostic.debugView ? 1 : 9),
     setup: (ctx) => setupCloudDiagnostic(ctx, diagnostic)
   };
 }
@@ -218,6 +224,39 @@ export const CLOUD_SHAPING_SCENES: VisualScene[] = [
   cloudDiagnostic({
     name: 'cloud-controlled-detail',
     description: 'Rendered same cumulus footprint with detail and protected cloud base.'
+  }),
+  cloudDiagnostic({
+    name: 'cloud-dusk-initial',
+    description: 'Low-sun cloud cache immediately after its quick rebuild.',
+    weather: 'generated',
+    formation: 'isolated',
+    sunElevation: 0.06,
+    frames: 1
+  }),
+  cloudDiagnostic({
+    name: 'cloud-dusk-settled',
+    description: 'Low-sun cloud cache after two full-quality rounds.',
+    weather: 'generated',
+    formation: 'isolated',
+    sunElevation: 0.06
+  }),
+  cloudDiagnostic({
+    name: 'cloud-dusk-settled-no-tonemap-dither',
+    description: 'Low-sun cloud cache without display tonemap dithering.',
+    weather: 'generated',
+    formation: 'isolated',
+    sunElevation: 0.06,
+    toneMapDither: false
+  }),
+  cloudDiagnostic({
+    name: 'cloud-dusk-default-cache',
+    description: 'Low-sun cloud with the production cache resolution and update cadence.',
+    weather: 'generated',
+    formation: 'isolated',
+    sunElevation: 0.06,
+    frames: 1,
+    framesPerUpdate: 64,
+    cacheResolution: 768
   }),
   ...(['connected', 'isolated'] as const).flatMap((formation) =>
     [0, 1, 2].map((seed) =>
