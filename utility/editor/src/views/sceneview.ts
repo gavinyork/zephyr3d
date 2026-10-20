@@ -164,7 +164,7 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
   private _wireframe: boolean;
   private _lodColoration: boolean;
   private _sdfView: boolean;
-  private _showAllColliders: boolean;
+  private _showColliders: boolean;
   private _colliderGizmo: Nullable<ColliderGizmo>;
   /** Whether the gizmo renderer was added to the compositor for the frame being drawn. */
   private _gizmoEffectAppended: boolean;
@@ -228,7 +228,7 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
     this._wireframe = false;
     this._lodColoration = false;
     this._sdfView = false;
-    this._showAllColliders = false;
+    this._showColliders = false;
     this._colliderGizmo = null;
     this._gizmoEffectAppended = false;
     this._showDeviceInfo = false;
@@ -697,15 +697,12 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
               checked: () => this._sdfView
             },
             {
-              label: 'Show All Colliders',
+              label: 'Show Colliders',
               action: () => {
-                this._showAllColliders = !this._showAllColliders;
-                if (this._colliderGizmo) {
-                  this._colliderGizmo.showAll = this._showAllColliders;
-                }
+                this._showColliders = !this._showColliders;
                 return true;
               },
-              checked: () => this._showAllColliders
+              checked: () => this._showColliders
             },
             {
               label: 'Texture viewer',
@@ -1808,7 +1805,6 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
       this._postGizmoRenderer = new PostGizmoRenderer(this.controller.model.scene.mainCamera!, null);
       this._postGizmoRenderer.mode = 'select';
       this._colliderGizmo = new ColliderGizmo(this._postGizmoRenderer, () => this._propGrid.refresh());
-      this._colliderGizmo.showAll = this._showAllColliders;
       this.updateGizmoTransformSpace();
       this._leftDockPanel = new DockPannel(
         0,
@@ -2191,7 +2187,7 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
       this._currentEditTool.get()!.update(dt);
     }
     this._colliderGizmo?.update(
-      this.controller.model.scene,
+      this._showColliders ? this.controller.model.scene : null,
       this.getSelectedSceneNodes(),
       this.controller.model.scene?.mainCamera ?? null
     );

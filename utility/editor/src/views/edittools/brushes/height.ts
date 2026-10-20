@@ -16,6 +16,10 @@ export abstract class TerrainHeightBrush extends BaseTerrainBrush {
   set sourceHeightMap(tex: Texture2D) {
     this._sourceHeightMap.set(tex);
   }
+  override dispose() {
+    this._sourceHeightMap.dispose();
+    super.dispose();
+  }
   getOriginHeightMap(scope: PBInsideFunctionScope) {
     return scope.sourceHeightMap;
   }

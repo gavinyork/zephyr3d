@@ -51,6 +51,10 @@ export abstract class BaseTerrainBrush {
     BaseTerrainBrush._brushPrimitive.draw();
   }
   renderSettings(_tool: TerrainEditTool) {}
+  dispose() {
+    this._brushBindGroup.dispose();
+    this._brushProgram.dispose();
+  }
   protected abstract brushFragment(
     scope: PBInsideFunctionScope,
     mask: PBShaderExp,

@@ -35,8 +35,6 @@ function forwardVector(forward: string) {
 }
 /** Segments per wheel circle. */
 const WHEEL_SEGMENTS = 32;
-/** Alpha of colliders that do not belong to a selected node. */
-const DIM_ALPHA = 0.45;
 /** Size of a joint's pivot cross and axis, in world units. */
 const JOINT_MARK_SIZE = 0.15;
 /**
@@ -129,7 +127,7 @@ function isVisible(
 
 /**
  * Draws physics colliders, character capsules and joints in the scene view:
- * those on the selected nodes and below them, or everything in the scene.
+ * those on the selected nodes and below them. Select the root to draw the scene.
  * Outlines come from the scene's physics world, so they are the shapes the
  * simulation builds; they are rebuilt only when a collider's shape changes.
  */
@@ -138,7 +136,6 @@ export class ColliderGizmo {
   private readonly _entries: Map<OutlineTarget, OutlineEntry>;
   private readonly _jointGizmo: LineGizmo;
   private readonly _wheelGizmo: LineGizmo;
-  private _showAll: boolean;
   private readonly _onErrorChanged: Nullable<() => void>;
   /**
    * @param onErrorChanged - Called when a collider's outline fails to build, or
@@ -150,16 +147,8 @@ export class ColliderGizmo {
     this._entries = new Map();
     this._jointGizmo = { lines: [], width: 1.5, color: COLOR_JOINT };
     this._wheelGizmo = { lines: [], width: 1.5, color: COLOR_WHEEL };
-    this._showAll = false;
     renderer.addLineGizmo(this._jointGizmo);
     renderer.addLineGizmo(this._wheelGizmo);
-  }
-  /** Draw the colliders of the whole scene, not only of the selection. */
-  get showAll() {
-    return this._showAll;
-  }
-  set showAll(value: boolean) {
-    this._showAll = !!value;
   }
   /** Whether anything is drawn, so the gizmo renderer has to run. */
   get active() {
@@ -174,15 +163,13 @@ export class ColliderGizmo {
     return this._entries.get(target)?.error ?? null;
   }
   update(scene: Nullable<Scene>, selected: SceneNode[], camera: Nullable<Camera>) {
-    const targets = new Map<OutlineTarget, boolean>();
+    const targets = new Set<OutlineTarget>();
     const joints: Joint[] = [];
     const wheels: Wheel[] = [];
-    const visit = (node: SceneNode, highlighted: boolean) => {
+    const visit = (node: SceneNode) => {
       node.iterate((child) => {
         const physics = child.physics;
-        // Colliders the engine makes for itself, such as those of scattered
-        // foliage, are drawn only with a selected node above them
-        if (!physics || (child.sealed && !highlighted)) {
+        if (!physics) {
           return false;
         }
         const outlined: OutlineTarget[] = [...physics.colliders];
@@ -190,7 +177,7 @@ export class ColliderGizmo {
           outlined.push(physics.character);
         }
         for (const target of outlined) {
-          targets.set(target, highlighted || targets.get(target) === true);
+          targets.add(target);
         }
         if (physics.joint && !joints.includes(physics.joint)) {
           joints.push(physics.joint);
@@ -202,12 +189,9 @@ export class ColliderGizmo {
       });
     };
     if (scene && camera) {
-      if (this._showAll) {
-        visit(scene.rootNode, false);
-      }
       for (const node of selected) {
         if (node.scene === scene) {
-          visit(node, true);
+          visit(node);
         }
       }
     }
@@ -228,7 +212,7 @@ export class ColliderGizmo {
     const vp = camera?.viewProjectionMatrix;
     const eye = camera?.getWorldPosition();
     const planes = camera?.frustum.planes;
-    for (const [target, highlighted] of targets) {
+    for (const target of targets) {
       // Out of view: not drawn, and whether its shape changed can wait until it is back
       const existing = this._entries.get(target);
       if (existing?.batch && existing.outline && vp) {
@@ -248,8 +232,8 @@ export class ColliderGizmo {
         }
         entry.batch.worldMatrix.set(model);
         const rgb = this.colorOf(target);
-        entry.batch.color!.setXYZW(rgb.x, rgb.y, rgb.z, highlighted ? 1 : DIM_ALPHA);
-        entry.batch.width = highlighted ? 1.5 : 1;
+        entry.batch.color!.setXYZW(rgb.x, rgb.y, rgb.z, 1);
+        entry.batch.width = 1.5;
       }
     }
     this.updateJoints(joints, camera);

@@ -31,6 +31,8 @@ import type { BaseTerrainBrush } from './brushes/base';
 import { EraseGrassBrush, GrassBrush } from './brushes/grass';
 import { ThermalErosionBrush } from './brushes/thermalerosion';
 import { HydraulicErosionBrush } from './brushes/hydraulicerosion';
+import { WindErosionBrush } from './brushes/winderosion';
+import { TerrainComputeErosionBrush } from './brushes/computeerosionbrush';
 
 const blitter = new CopyBlitter();
 
@@ -159,6 +161,7 @@ export class TerrainEditTool extends Disposable implements EditTool {
       new TerrainFlattenBrush(),
       new ThermalErosionBrush(),
       new HydraulicErosionBrush(),
+      new WindErosionBrush(),
       new TerrainTextureBrush(),
       new GrassBrush(),
       new EraseGrassBrush()
@@ -206,17 +209,30 @@ export class TerrainEditTool extends Disposable implements EditTool {
     return this._grassAlbedo;
   }
   handlePointerEvent(evt: PointerEvent, hitObject: any, hitPos: Vector3): boolean {
+    const selectedBrush = this._brushList[this._editSelected];
     if (hitPos && hitObject === this._terrain.get()) {
       this._hitPos = this._hitPos ?? new Vector2();
       this._hitPos.setXY(hitPos.x, hitPos.z);
       if (evt.type === 'pointerdown' && evt.button === 0 && this._editSelected >= 0) {
         this._brushing = true;
+        if (selectedBrush instanceof TerrainComputeErosionBrush) {
+          selectedBrush.beginStroke();
+        }
+      }
+      if ((evt.buttons & 1) === 0) {
+        this._brushing = false;
+        if (selectedBrush instanceof TerrainComputeErosionBrush) {
+          selectedBrush.endStroke();
+        }
+      }
+    } else {
+      this._hitPos = null;
+      if (selectedBrush instanceof TerrainComputeErosionBrush) {
+        selectedBrush.endStroke();
       }
       if ((evt.buttons & 1) === 0) {
         this._brushing = false;
       }
-    } else {
-      this._hitPos = null;
     }
     return false;
   }
@@ -302,6 +318,16 @@ export class TerrainEditTool extends Disposable implements EditTool {
         case 'hydraulic erosion':
           this.applyHeightBrush(
             this._brushList[this._editSelected] as HydraulicErosionBrush,
+            texture,
+            this._hitPos,
+            this._brushSize,
+            angle,
+            this._brushStrength
+          );
+          break;
+        case 'wind erosion':
+          this.applyHeightBrush(
+            this._brushList[this._editSelected] as WindErosionBrush,
             texture,
             this._hitPos,
             this._brushSize,
@@ -512,6 +538,30 @@ export class TerrainEditTool extends Disposable implements EditTool {
   ) {
     const terrain = this._terrain.get();
     const heightMap = terrain.heightMap;
+    if (brush instanceof TerrainComputeErosionBrush) {
+      if (
+        brush.applyCompute(
+          heightMap,
+          brushTexture,
+          terrain.worldRegion,
+          terrain.scale,
+          hitPos,
+          brushSize,
+          strength,
+          angle
+        )
+      ) {
+        terrain.invalidateRuntimeVirtualTexture(
+          hitPos.x - brushSize,
+          hitPos.y - brushSize,
+          hitPos.x + brushSize,
+          hitPos.y + brushSize
+        );
+        this._heightDirty = true;
+        eventBus.dispatchEvent('scene_changed');
+      }
+      return;
+    }
     blitter.blit(heightMap, this._heightMapCopy.get(), fetchSampler('clamp_nearest_nomip'));
     const device = getDevice();
     const fb = device.pool.fetchTemporalFramebuffer<Texture2D>(false, 0, 0, heightMap, null, false);
@@ -550,7 +600,7 @@ export class TerrainEditTool extends Disposable implements EditTool {
       'EditChild',
       new ImGui.ImVec2(
         0,
-        2 * ImGui.GetStyle().WindowPadding.y + ImGui.GetStyle().ItemSpacing.y * 3 + 3 * ImGui.GetFrameHeight()
+        2 * ImGui.GetStyle().WindowPadding.y + ImGui.GetStyle().ItemSpacing.y * 4 + 4 * ImGui.GetFrameHeight()
       ),
       true
     );
@@ -558,9 +608,32 @@ export class TerrainEditTool extends Disposable implements EditTool {
     if (ImGui.Button('Import Height Map...')) {
       this.importHeightMap();
     }
-    const sel = [this._editSelected] as [number];
-    if (ImGui.Combo('Edit', sel, this._editList)) {
-      this._editSelected = sel[0];
+    const availableIndices: number[] = [];
+    const availableBrushNames: string[] = [];
+    for (let i = 0; i < this._brushList.length; i++) {
+      const brush = this._brushList[i];
+      if (brush instanceof TerrainComputeErosionBrush && !brush.computeSupported) {
+        continue;
+      }
+      availableIndices.push(i);
+      availableBrushNames.push(this._editList[i]);
+    }
+    let selectedIndex = availableIndices.indexOf(this._editSelected);
+    if (selectedIndex < 0) {
+      selectedIndex = 0;
+    }
+    const sel = [selectedIndex] as [number];
+    if (ImGui.Combo('Edit', sel, availableBrushNames)) {
+      const previousBrush = this._brushList[this._editSelected];
+      if (previousBrush instanceof TerrainComputeErosionBrush) {
+        previousBrush.resetCompute();
+      }
+      this._editSelected = availableIndices[sel[0]];
+    } else if (availableIndices.indexOf(this._editSelected) < 0) {
+      this._editSelected = availableIndices[selectedIndex];
+    }
+    if (availableBrushNames.length < this._editList.length) {
+      ImGui.TextDisabled('Hydraulic, thermal and wind erosion require WebGPU.');
     }
     ImGui.EndChild();
   }
@@ -856,9 +929,14 @@ export class TerrainEditTool extends Disposable implements EditTool {
   }
   protected onDispose(): void {
     super.onDispose();
-    if (this._heightDirty && this._terrain?.get()) {
-      this._heightDirty = false;
-      this._terrain.get().updateBoundingBox();
+    const terrain = this._terrain?.get();
+    if (terrain) {
+      terrain.grassRenderer.suspendOcclusionCulling = false;
+      if (this._heightDirty) {
+        this._heightDirty = false;
+        terrain.updateBoundingBox();
+        terrain.updateRegion();
+      }
     }
     this._terrain?.dispose();
     this._terrain = null;
@@ -870,6 +948,9 @@ export class TerrainEditTool extends Disposable implements EditTool {
     this._detailNormal = null;
     this._splatMapCopy.dispose();
     this._heightMapCopy.dispose();
+    for (const brush of this._brushList) {
+      brush.dispose();
+    }
     this._brushMaskCache.clear();
   }
 }

@@ -39,7 +39,7 @@ A static floor and a falling ball:
 
 ## Collider Outlines
 
-Selecting a node draws the colliders on it and its children as outlines. Outlines are the shapes the simulation uses: scale applied, convex hulls as the physics engine computes them, meshes at the chosen level of detail, terrain at its sampling resolution (every line lies on the collision surface). Parts hidden behind models are drawn faded.
+Collider outlines are hidden by default. Enable **View → Show Colliders** to draw the colliders on selected nodes and their children. Select the scene's root node to show the colliders throughout the scene. Outlines are the shapes the simulation uses: scale applied, convex hulls as the physics engine computes them, meshes at the chosen level of detail, terrain at its sampling resolution (every line lies on the collision surface). Parts hidden behind models are drawn faded.
 
 | Colour | Meaning |
 | --- | --- |
@@ -51,7 +51,6 @@ Selecting a node draws the colliders on it and its children as outlines. Outline
 | Magenta | Joints: pivot cross, hinge or slider axis, line to the other end |
 | White | Wheels: the circle at rest, the suspension up to where it is attached, and its travel |
 
-- **View → Show All Colliders** draws every collider in the scene, the selected ones highlighted.
 - Mesh, convex and terrain shapes are read back from the GPU and appear a few frames after selecting.
 - A collider whose shape cannot be built (say, a hull of points in one plane) has no outline, and **ColliderError** in the property panel says why.
 

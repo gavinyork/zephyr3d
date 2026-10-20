@@ -46,6 +46,13 @@
 - 平整到高度(flatten)：将四周地形高度拉平到笔刷所在位置的地形高度。
 - 热力侵蚀(thermal erosion)：模拟碎石下滑导致的山体「钝化」。
 - 水力侵蚀(hydraulic erosion)：模拟水流冲刷、搬运与沉积形成的沟壑与河谷。
+- 风力侵蚀(wind erosion)：冲刷暴露的迎风坡，沿风向搬运松散物质，并在受遮蔽的背风坡沉积。
+
+热力、水力和风力侵蚀使用 GPU Compute 模拟，仅在编辑器使用 WebGPU 时可用。
+
+水力侵蚀会在持续按住笔刷时沿坡面发展汇流沟壑，水和泥沙在模拟批次及重叠的笔刷位置之间连续搬运。`Channeling` 控制径流向沟谷集中的程度，`Catchment Persistence` 控制上游汇水面积随时间的平滑程度。水流可以排出笔刷边界，笔划结束时仍悬浮的泥沙随水流带走。要表现细小支沟，地形高度图需要有足够的分辨率。
+
+风蚀的 `Wind Direction` 表示风吹向的方向：0° 沿 +X，90° 沿 +Z。持续将笔刷放在暴露的迎风坡可侵蚀该坡面，搬运的泥沙可在背风侧堆积。`Wind Speed` 和 `Transport Rate` 分别控制风力与泥沙搬运速度。沉积受到每步限幅、周围地形支撑与稳定坡度的约束，暂时无法沉积的泥沙会继续随风搬运。
 
 <video src="https://cdn.zephyr3d.org/doc/assets/videos/height-brush.mp4" controls width="640">
   您的浏览器不支持 video 标签。

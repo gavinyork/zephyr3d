@@ -47,6 +47,13 @@ The height brush is used to sculpt hills, valleys, plateaus, and other terrain f
 - Flatten: Flattens the surrounding terrain height to match the height at the brush position.
 - Thermal Erosion: Simulates mountain "dulling" caused by rock sliding.
 - Hydraulic Erosion: Simulates gullies and valleys formed by water flow erosion, transport, and deposition.
+- Wind Erosion: Scours exposed windward slopes, transports loose material downwind, and deposits it on sheltered lee slopes.
+
+Thermal, hydraulic, and wind erosion run as GPU compute simulations and are available only when the editor uses WebGPU.
+
+Hydraulic erosion develops drainage channels while you hold the brush on a slope. Water and sediment continue across simulation batches and overlapping brush positions. `Channeling` controls how strongly runoff concentrates into valleys; `Catchment Persistence` smooths the upstream contributing area over time. Brush edges allow runoff to leave, and suspended sediment leaves with the flow when a stroke ends. Use a terrain with enough heightmap resolution to represent tributaries.
+
+For wind erosion, `Wind Direction` is the direction the wind blows toward: 0° follows +X and 90° follows +Z. Keep the brush over the exposed face to erode it; transported sediment can accumulate on the sheltered side. `Wind Speed` and `Transport Rate` control wind strength and sediment movement. Deposition is limited per step and by surrounding terrain support and a stable slope angle; excess airborne sand continues downwind.
 
 <video src="https://cdn.zephyr3d.org/doc/assets/videos/height-brush.mp4" controls width="640">
   Your browser does not support the video tag.
