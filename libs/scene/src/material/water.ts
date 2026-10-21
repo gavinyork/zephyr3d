@@ -2314,7 +2314,13 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
           this.$l.edgeThickness = this.$choice(
             pb.greaterThanEqual(this.sheetThickness, 0),
             this.sheetThickness,
-            pb.sub(this.worldPos.y, this.wPos.y)
+            // Sky reconstructs to the far plane, which can lie above an infinite
+            // surface. With no bottom there, keep the water and foam fully visible.
+            this.$choice(
+              pb.greaterThanEqual(this.wPos.w, SCENE_SKY_DEPTH01),
+              pb.max(this.edgeFadeWidth, 1e-4),
+              pb.sub(this.worldPos.y, this.wPos.y)
+            )
           );
           this.$l.edgeFade = pb.mul(
             this.$choice(
