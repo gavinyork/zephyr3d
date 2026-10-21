@@ -1588,7 +1588,7 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
             this,
             ShaderHelper.getLinearDepthTexture(this),
             this.refractUV,
-            ShaderHelper.getInvViewProjectionMatrix(this),
+            ShaderHelper.getJitteredInvVPMatrix(this),
             ShaderHelper.getCameraParams(this).xy
           );
           this.$if(
@@ -1845,11 +1845,12 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
           pb.mul(this.worldNormal, pb.vec3(this.normalScale, 1, this.normalScale))
         );
         this.$l.roughness = that.waterRoughness(this, this.worldPos);
+        // Scene depth is rasterized with the current TAA jitter.
         this.$l.wPos = ShaderHelper.samplePositionFromDepth(
           this,
           ShaderHelper.getLinearDepthTexture(this),
           this.screenUV,
-          ShaderHelper.getInvViewProjectionMatrix(this),
+          ShaderHelper.getJitteredInvVPMatrix(this),
           ShaderHelper.getCameraParams(this).xy
         );
         this.$l.eyeVec = pb.sub(this.worldPos.xyz, ShaderHelper.getCameraPosition(this));
@@ -2309,8 +2310,7 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
         // the scene behind it, as does the mesh past the water's edge. The foam
         // on it fades over the thinnest FOAM_EDGE_FADE_SHARE of that only.
         this.$if(pb.not(this.underwaterEye), function () {
-          // From the wave generator's own ground where it has one: a depth buffer
-          // reconstruction moves with the camera jitter by about the sheet's thickness.
+          // Prefer the wave generator's own ground for the thickness of thin swash.
           this.$l.edgeThickness = this.$choice(
             pb.greaterThanEqual(this.sheetThickness, 0),
             this.sheetThickness,
