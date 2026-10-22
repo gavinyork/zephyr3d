@@ -51,6 +51,14 @@ water.waveGenerator = waves;
 
 Because the material uses scene color and scene depth, water is rendered in the main scene pipeline. Keep transparent objects and post effects in mind when tuning the final look.
 
+Select `Shore regions (geometry)` under `Debug Output` in the editor, or set `water.debugOutput = 'shoreRegions'`, to inspect the coastal geometry. Blue marks base water, cyan the offshore ShoreWave region, orange the wet inland swash, and magenta the dry inland carrier. The fade from blue to a coastal color shows the ShoreWave envelope weight. ShoreWave and base water share one displaced mesh; the colors identify regions rather than separate meshes.
+
+This view bypasses wet-edge clipping, foam shading, and projected-ground depth correction in both color and depth passes. It preserves the actual geometry and terrain occlusion, revealing dry carrier surfaces that normal rendering hides. Combine it with `wireframe` to inspect mesh coverage. Select `None` (`'none'`) to restore normal rendering.
+
+Three RGB views keep normal wet clipping and ground-depth handling for diagnosing swash foam. `swashHandover` shows carrier wet coverage in red, reconstructed ground wet coverage in green, and ground replacement weight in blue. `swashFoamSources` shows surface foam density in red, wet ground mobile density in green, and deposited density in blue. `swashFoamCuts` shows the surface foam opacity after texture cutting in red, the ground foam opacity in green, and the replacement weight in blue. Compare these views at the same paused wave phase to locate a break between density, texture cutting, and final handover. Temporarily set `animationSpeed` to 0 to pause the waves, then restore its original value.
+
+`swashVisibility` reveals fragments normally clipped or hidden: red marks wet-edge discard, green marks a selected depth behind the opaque surface, and blue shows projected ground foam density. `swashGroundSupport` shows the beach-bed mask in red, foam-field coverage in green, and ground wet coverage in blue. Both bypass wet-edge clipping and draw at the ground depth where the beach-bed mask is valid. Use them to distinguish a missing mesh from rejected shading support; they intentionally reveal dry carrier pixels.
+
 ## The Water Medium
 
 The water's color comes from two coefficients, **absorption** and **scattering**, both per-meter, per-RGB-channel physical coefficients (units 1/m).

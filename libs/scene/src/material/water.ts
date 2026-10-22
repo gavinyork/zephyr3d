@@ -71,6 +71,25 @@ export type WaterRefractionMode = 'march' | 'offset';
  *   the field's window.
  * - `foamField`: the foam field on its own, its density as grey, black with no
  *   foam; mid grey off the field, where foam does not linger.
+ * - `shoreRegions`: raw carrier geometry, without wet-edge clipping or ground
+ *   projection. Blue is the base water, cyan the offshore shore-wave region,
+ *   orange the wet inland swash and magenta its dry support. Smooth colour
+ *   transitions show the shore-wave envelope, not separate meshes.
+ * - `swashHandover`: red is carrier wet coverage, green is reconstructed
+ *   ground wet coverage and blue is the ground-foam replacement weight.
+ *   Magenta identifies wet carrier pixels being replaced by dry ground.
+ * - `swashFoamSources`: red is carrier foam density, green is wet ground
+ *   mobile density and blue is deposited density, before texture cutting.
+ * - `swashFoamCuts`: red is surface foam opacity, green is ground foam
+ *   opacity and blue is the ground replacement weight, after texture cutting.
+ * - `swashVisibility`: reveals discarded beach fragments in red and fragments
+ *   whose selected depth lies behind the opaque surface in green. Blue is the
+ *   projected ground foam density. Bypasses wet clipping and uses ground depth on
+ *   valid beach pixels so otherwise invisible fragments can be inspected.
+ *
+ * - `swashGroundSupport`: red is the beach-bed mask, green the foam-field
+ *   coverage and blue the wet ground coverage. Like `swashVisibility`, reveals
+ *   clipped fragments at the ground depth to inspect the handover's support.
  *
  * Each value is a separate shader variant; the `none` variant carries no trace
  * of the others.
@@ -94,7 +113,13 @@ export type WaterDebugOutput =
   | 'specular'
   | 'depth'
   | 'interaction'
-  | 'foamField';
+  | 'foamField'
+  | 'shoreRegions'
+  | 'swashHandover'
+  | 'swashFoamSources'
+  | 'swashFoamCuts'
+  | 'swashVisibility'
+  | 'swashGroundSupport';
 
 /** Label/value pairs for {@link WaterDebugOutput}, for editor enumerations. */
 export const WATER_DEBUG_OUTPUTS = [
@@ -114,7 +139,13 @@ export const WATER_DEBUG_OUTPUTS = [
   { label: 'Specular', value: 'specular' },
   { label: 'Depth', value: 'depth' },
   { label: 'Interaction', value: 'interaction' },
-  { label: 'Foam field', value: 'foamField' }
+  { label: 'Foam field', value: 'foamField' },
+  { label: 'Shore regions (geometry)', value: 'shoreRegions' },
+  { label: 'Swash handover (RGB)', value: 'swashHandover' },
+  { label: 'Swash foam sources (RGB)', value: 'swashFoamSources' },
+  { label: 'Swash foam cuts (RGB)', value: 'swashFoamCuts' },
+  { label: 'Swash visibility (RGB)', value: 'swashVisibility' },
+  { label: 'Swash ground support (RGB)', value: 'swashGroundSupport' }
 ] as const;
 
 /** Fresnel reflectance of water at normal incidence, n = 1.333. */
@@ -1230,6 +1261,40 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
         pb.discard();
       });
     }
+    if (this.debugOutput === 'shoreRegions') {
+      // Show the actual displaced carrier in every pass. Wet-edge discard and
+      // ground-depth projection would otherwise conceal its geometry or create
+      // an apparent boundary unrelated to rasterized mesh coverage.
+      if (this.needFragmentColor()) {
+        scope.$l.shoreRegion = this._shoreWaveGenerator
+          ? this._shoreWaveGenerator.calcDebugRegion(scope, scope.$inputs.clipmapPos.xz)
+          : pb.vec3(0, 0, 1);
+        scope.$l.shoreColor = scope.$choice(
+          pb.greaterThan(scope.shoreRegion.y, 0.5),
+          scope.$choice(
+            pb.greaterThan(scope.shoreRegion.z, 1e-3),
+            pb.vec3(1, 0.3, 0.02),
+            pb.vec3(0.85, 0.02, 0.8)
+          ),
+          pb.vec3(0, 0.85, 1)
+        );
+        scope.$l.outColor = pb.vec4(
+          pb.mix(pb.vec3(0.02, 0.12, 0.9), scope.shoreColor, scope.shoreRegion.x),
+          1
+        );
+        if (
+          this.drawContext.materialFlags &
+          (MaterialVaryingFlags.SCENE_STORE_ROUGHNESS | MaterialVaryingFlags.SCENE_STORE_NORMAL)
+        ) {
+          this.outputFragmentColor(scope, scope.$inputs.worldPos, scope.outColor, pb.vec4(0), scope.outColor);
+        } else {
+          this.outputFragmentColor(scope, scope.$inputs.worldPos, scope.outColor);
+        }
+      } else {
+        this.outputFragmentColor(scope, scope.$inputs.worldPos, null);
+      }
+      return;
+    }
     if (this.needFragmentColor()) {
       // Screen derivatives of the undisplaced position, taken here in uniform
       // control flow; the foam textures are sampled with them under branches.
@@ -1275,13 +1340,201 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
       scope.$l.sheetThickness = sheetThickness
         ? sheetThickness.call(this.waveGenerator, scope, scope.$inputs.clipmapPos.xz)
         : pb.float(-1);
-      // Wholly past the water's edge: nothing to draw.
-      if (surfaceCoverage) {
-        scope.$if(pb.lessThanEqual(scope.surfaceCoverage, 1e-3), function () {
+      if (this._shoreWaveGenerator) {
+        // Near the shore the foam is at least the near-shore density, joining
+        // the breaking waves' foam to the beach's (see nearShore).
+        scope.normal.w = this._shoreWaveGenerator.calcNearShoreFoam(
+          scope,
+          scope.$inputs.clipmapPos.xz,
+          scope.normal.w
+        );
+      }
+      // Reconstruct the opaque surface before the swash's discard. Deposited
+      // foam is projected onto this ground, independently of the raised mesh.
+      scope.$l.scenePos = ShaderHelper.samplePositionFromDepth(
+        scope,
+        ShaderHelper.getLinearDepthTexture(scope),
+        pb.div(scope.$builtins.fragCoord.xy, ShaderHelper.getRenderSize(scope)),
+        ShaderHelper.getJitteredInvVPMatrix(scope),
+        ShaderHelper.getCameraParams(scope).xy
+      );
+      scope.$l.groundFoamDensity = pb.float(0);
+      scope.$l.groundFoamSample = pb.vec3(0);
+      scope.$l.groundFoamWeight = pb.float(0);
+      scope.$l.groundNormal = pb.vec3(0, 1, 0);
+      if (this.debugOutput === 'swashVisibility') {
+        scope.$l.visibilityDepthFail = pb.float(0);
+      }
+      if (this.debugOutput === 'swashGroundSupport') {
+        scope.$l.groundFieldCoverage = pb.float(0);
+        scope.$l.groundWetCoverage = pb.float(0);
+      } else if (this.debugOutput === 'swashHandover') {
+        scope.$l.groundWetCoverage = pb.float(0);
+      } else if (this.debugOutput === 'swashFoamSources') {
+        scope.$l.groundMobileDensity = pb.float(0);
+        scope.$l.groundDepositedDensity = pb.float(0);
+      }
+      if (this._shoreWaveGenerator && this._foamFieldGenerator) {
+        // Derivatives precede all coverage branches; pattern coordinates stay
+        // fixed to the sand even while the water and camera move.
+        scope.$l.groundGrad = pb.vec4(pb.dpdx(scope.scenePos.xz), pb.dpdy(scope.scenePos.xz));
+        scope.$l.groundCross = pb.cross(pb.dpdx(scope.scenePos.xyz), pb.dpdy(scope.scenePos.xyz));
+        scope.groundNormal = pb.normalize(
+          pb.add(pb.mul(scope.groundCross, pb.sign(scope.groundCross.y)), pb.vec3(0, 1e-8, 0))
+        );
+        scope.$l.groundMask = this._shoreWaveGenerator.calcFoamGroundMask(scope, scope.scenePos.xyz);
+        const field = this._foamField;
+        const shore = this._shoreWaveGenerator;
+        const debugOutput = this.debugOutput;
+        scope.$if(
+          pb.and(pb.lessThan(scope.scenePos.w, SCENE_SKY_DEPTH01), pb.greaterThan(scope.groundMask, 0)),
+          function () {
+            // Thin-film mobile foam and deposited foam share the actual ground
+            // position and one texture cut. The deposit is an imprint of the
+            // drifting foam, so the two are not added: the more of them shows.
+            this.$l.groundMobile = field.sample(this, this.scenePos.xz);
+            this.$l.deposited = field.sampleDeposited(this, this.scenePos.xz);
+            this.$l.groundWet = shore.calcSurfaceCoverage(this, this.scenePos.xz);
+            this.$l.groundThickness = shore.calcSheetThickness(this, this.scenePos.xz);
+            // Coverage and handover describe the same carrier point. Using the
+            // ground point's thickness here leaves a gap at grazing angles:
+            // the carrier can be dry while its projected ground is still wet.
+            this.$l.groundHandoverThickness = this.$choice(
+              pb.greaterThanEqual(this.sheetThickness, 0),
+              this.sheetThickness,
+              this.groundThickness
+            );
+            if (debugOutput === 'swashGroundSupport') {
+              this.groundWetCoverage = this.groundWet;
+              this.groundFieldCoverage = this.groundMobile.y;
+            } else if (debugOutput === 'swashHandover') {
+              this.groundWetCoverage = this.groundWet;
+            } else if (debugOutput === 'swashFoamSources') {
+              this.groundMobileDensity = pb.mul(this.groundMobile.x, this.groundWet);
+              this.groundDepositedDensity = this.deposited.x;
+            }
+            this.groundFoamWeight = pb.mul(
+              this.groundMask,
+              this.groundMobile.y,
+              // Unknown thickness must retain the water surface. In particular,
+              // a valid sand bed outside the shore-wave zone is not a dry sheet.
+              this.$choice(
+                pb.greaterThanEqual(this.groundHandoverThickness, 0),
+                pb.sub(1, pb.smoothStep(0.01, 0.06, this.groundHandoverThickness)),
+                pb.float(0)
+              )
+            );
+            this.groundFoamDensity = pb.clamp(
+              pb.max(
+                pb.mul(shore.calcNearShoreFoam(this, this.scenePos.xz, this.groundMobile.x), this.groundWet),
+                this.deposited.x
+              ),
+              0,
+              1
+            );
+            this.$if(pb.greaterThan(this.groundFoamDensity, 1e-3), function () {
+              // The water's foam pattern at the ground: it stands still near
+              // the shore (see nearShore), so the beach's foam and the water's
+              // are one pattern through the handover.
+              this.groundFoamSample = WaterFoamField.flowPattern(
+                this,
+                this.ffFoamTex,
+                this.ffFoamUVScale,
+                this.ffClock.x,
+                this.scenePos.xz,
+                this.groundGrad,
+                shore.calcFoamFlow(this, this.scenePos.xz, this.ffDrift)
+              );
+            });
+          }
+        );
+        // The thin-film foam and its depth use the same ground transition.
+        // Otherwise a wet carrier can still clip the projected foam against
+        // the terrain right where the two layers meet.
+        scope.$builtins.fragDepth = pb.mix(
+          scope.$builtins.fragCoord.z,
+          ShaderHelper.linearNormalizedToNonLinearDepth(
+            scope,
+            pb.max(pb.sub(scope.scenePos.w, pb.div(0.001, ShaderHelper.getCameraParams(scope).y)), 0),
+            ShaderHelper.getCameraParams(scope).xy
+          ),
+          scope.$choice(pb.lessThanEqual(scope.surfaceCoverage, 1e-3), pb.float(1), scope.groundFoamWeight)
+        );
+      }
+      const revealSwash =
+        this.debugOutput === 'foamField' ||
+        this.debugOutput === 'swashVisibility' ||
+        this.debugOutput === 'swashGroundSupport';
+      if (revealSwash && this._shoreWaveGenerator && this._foamFieldGenerator) {
+        if (this.debugOutput === 'swashVisibility') {
+          scope.visibilityDepthFail = scope.$choice(
+            pb.greaterThan(
+              pb.mul(
+                pb.sub(
+                  ShaderHelper.nonLinearDepthToLinearNormalized(
+                    scope,
+                    scope.$builtins.fragDepth as PBShaderExp
+                  ),
+                  scope.scenePos.w
+                ),
+                ShaderHelper.getCameraParams(scope).y
+              ),
+              0.0001
+            ),
+            pb.float(1),
+            pb.float(0)
+          );
+        }
+        scope.$if(
+          pb.and(pb.lessThan(scope.scenePos.w, SCENE_SKY_DEPTH01), pb.greaterThan(scope.groundMask, 0)),
+          function () {
+            this.$builtins.fragDepth = ShaderHelper.linearNormalizedToNonLinearDepth(
+              this,
+              pb.max(pb.sub(this.scenePos.w, pb.div(0.001, ShaderHelper.getCameraParams(this).y)), 0),
+              ShaderHelper.getCameraParams(this).xy
+            );
+          }
+        );
+      }
+      scope.$l.swashDiscard = pb.and(
+        pb.lessThanEqual(scope.surfaceCoverage, 1e-3),
+        pb.lessThanEqual(pb.mul(scope.groundFoamDensity, scope.groundFoamWeight), 1e-3)
+      );
+      // Past the wet edge, only the foam actually left on the ground draws.
+      if (surfaceCoverage && !revealSwash) {
+        scope.$if(scope.swashDiscard, function () {
           pb.discard();
         });
       }
-      if (this.debugOutput === 'interaction') {
+      if (this.debugOutput === 'swashGroundSupport') {
+        scope.$l.outColor = pb.vec4(
+          this._shoreWaveGenerator && this._foamFieldGenerator ? scope.groundMask : pb.float(0),
+          scope.groundFieldCoverage,
+          scope.groundWetCoverage,
+          1
+        );
+      } else if (this.debugOutput === 'swashVisibility') {
+        scope.$l.outColor = pb.vec4(
+          scope.$choice(scope.swashDiscard, pb.float(1), pb.float(0)),
+          scope.visibilityDepthFail,
+          scope.groundFoamDensity,
+          1
+        );
+      } else if (this.debugOutput === 'swashHandover') {
+        scope.$l.outColor = pb.vec4(
+          scope.surfaceCoverage,
+          scope.groundWetCoverage,
+          scope.groundFoamWeight,
+          1
+        );
+      } else if (this.debugOutput === 'swashFoamSources') {
+        scope.$l.outColor = pb.vec4(
+          scope.normal.w,
+          scope.groundMobileDensity,
+          scope.groundDepositedDensity,
+          1
+        );
+      } else if (this.debugOutput === 'interaction') {
         // The field on its own, grey at rest, scaled so its amplitude clamp
         // reaches black and white; dimmed outside the window so its reach shows.
         if (this._interactiveWaveGenerator) {
@@ -1334,7 +1587,12 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
             scope.foamSample,
             scope.surfaceCoverage,
             scope.sheetThickness,
-            scope.wallFoam
+            scope.wallFoam,
+            scope.scenePos,
+            scope.groundFoamDensity,
+            scope.groundFoamSample,
+            scope.groundNormal,
+            scope.groundFoamWeight
           ),
           1
         );
@@ -1355,6 +1613,15 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
         this.outputFragmentColor(scope, scope.$inputs.worldPos, scope.outColor);
       }
     } else {
+      // The support mesh over dry sand is only a carrier for the colour pass.
+      // It must not replace terrain depth or its motion vectors in other passes.
+      const coverage = this.waveGenerator?.calcSurfaceCoverage;
+      if (coverage) {
+        scope.$l.surfaceCoverage = coverage.call(this.waveGenerator, scope, scope.$inputs.clipmapPos.xz);
+        scope.$if(pb.lessThanEqual(scope.surfaceCoverage, 1e-3), function () {
+          pb.discard();
+        });
+      }
       this.outputFragmentColor(scope, scope.$inputs.worldPos, null);
     }
   }
@@ -1714,11 +1981,17 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
     foamSample: PBShaderExp,
     coverage: PBShaderExp,
     sheetThickness: PBShaderExp,
-    wallFoam: PBShaderExp
+    wallFoam: PBShaderExp,
+    scenePos: PBShaderExp,
+    groundFoamDensity: PBShaderExp,
+    groundFoamSample: PBShaderExp,
+    groundNormal: PBShaderExp,
+    groundFoamWeight: PBShaderExp
   ) {
     const pb = scope.$builder;
     const that = this;
     const debugOutput = this.debugOutput;
+    const hasDepositedFoam = !!(this._shoreWaveGenerator && this._foamFieldGenerator);
     // The environment's prefiltered radiance, for the distant sky reflection
     const envLight = this.needCalculateEnvLight() ? (this.drawContext.env?.light.envLight ?? null) : null;
     // Transmittance over `depth` meters of path.
@@ -1835,7 +2108,12 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
         pb.vec3('foamSample'),
         pb.float('coverage'),
         pb.float('sheetThickness'),
-        pb.float('wallFoam')
+        pb.float('wallFoam'),
+        pb.vec4('scenePos'),
+        pb.float('groundFoamDensity'),
+        pb.vec3('groundFoamSample'),
+        pb.vec3('groundNormal'),
+        pb.float('groundFoamWeight')
       ],
       function () {
         this.$l.screenUV = pb.div(pb.vec2(this.$builtins.fragCoord.xy), ShaderHelper.getRenderSize(this));
@@ -1845,14 +2123,7 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
           pb.mul(this.worldNormal, pb.vec3(this.normalScale, 1, this.normalScale))
         );
         this.$l.roughness = that.waterRoughness(this, this.worldPos);
-        // Scene depth is rasterized with the current TAA jitter.
-        this.$l.wPos = ShaderHelper.samplePositionFromDepth(
-          this,
-          ShaderHelper.getLinearDepthTexture(this),
-          this.screenUV,
-          ShaderHelper.getJitteredInvVPMatrix(this),
-          ShaderHelper.getCameraParams(this).xy
-        );
+        this.$l.wPos = this.scenePos;
         this.$l.eyeVec = pb.sub(this.worldPos.xyz, ShaderHelper.getCameraPosition(this));
         this.$l.eyeVecNorm = pb.normalize(this.eyeVec);
         // Mirror-term normal, turned towards the eye on a folded underside.
@@ -2101,9 +2372,57 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
           pb.mul(this.refraction, this.bodyWeight),
           pb.mul(this.reflectance, this.fresnelTerm)
         );
+        // Prefer the wave generator's own ground for the thickness of thin swash.
+        this.$l.edgeThickness = this.$choice(
+          pb.greaterThanEqual(this.sheetThickness, 0),
+          this.sheetThickness,
+          // Sky reconstructs to the far plane, which can lie above an infinite
+          // surface. With no bottom there, keep the water and foam fully visible.
+          this.$choice(
+            pb.greaterThanEqual(this.wPos.w, SCENE_SKY_DEPTH01),
+            pb.max(this.edgeFadeWidth, 1e-4),
+            pb.sub(this.worldPos.y, this.wPos.y)
+          )
+        );
+        this.$l.foamFade = pb.mul(
+          this.$choice(
+            pb.greaterThanEqual(this.sheetThickness, 0),
+            pb.float(1),
+            this.$choice(
+              pb.greaterThan(this.edgeFadeWidth, 0),
+              pb.smoothStep(
+                0,
+                pb.max(pb.mul(this.edgeFadeWidth, FOAM_EDGE_FADE_SHARE), 1e-4),
+                this.edgeThickness
+              ),
+              pb.float(1)
+            )
+          ),
+          this.coverage
+        );
         // Light the foam sends back, kept apart so the edge fade below can keep
         // the foam on a sheet too thin to show the water
         this.$l.foamRadiance = pb.vec3(0);
+        this.$l.groundFoamOpacity = pb.float(0);
+        this.$l.groundFoamRadiance = pb.vec3(0);
+        if (hasDepositedFoam) {
+          this.$if(pb.greaterThan(this.groundFoamDensity, 1e-3), function () {
+            this.$l.groundFoamWhite = this.waterWhiteFoam(
+              pb.clamp(
+                pb.mul(pb.pow(this.groundFoamDensity, this.foamShadingParams.y), this.foamShadingParams.x),
+                0,
+                1
+              ),
+              this.groundFoamSample,
+              this.foamLookParams.x
+            );
+            this.groundFoamOpacity = this.groundFoamWhite.x;
+          });
+          // The carrier P can still foam while its projected ground Q is dry.
+          // Keep that visible cover through the handoff; once P drains, only
+          // the ground foam remains. Set opacity before lighting both covers.
+          this.groundFoamOpacity = pb.max(this.groundFoamOpacity, pb.mul(this.foam, this.foamFade));
+        }
         // Debug accumulators. Dead in the `none` variant.
         this.$l.dbgSubsurface = pb.vec3(0);
         this.$l.dbgSunScatter = pb.vec3(0);
@@ -2249,6 +2568,35 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
             this.lightContrib = pb.mul(this.lightContrib, this.shadow);
           }
           this.foamRadiance = pb.add(this.foamRadiance, pb.mul(this.foamLight, this.shadow));
+          if (hasDepositedFoam) {
+            this.$if(pb.greaterThan(this.groundFoamOpacity, 0), function () {
+              this.$l.groundNoL = pb.clamp(
+                pb.div(
+                  pb.add(pb.dot(this.groundNormal, this.lightDir), FOAM_LIGHT_WRAP),
+                  1 + FOAM_LIGHT_WRAP
+                ),
+                0,
+                1
+              );
+              this.$l.groundShadow = pb.vec3(1);
+              if (shadow) {
+                this.groundShadow = pb.vec3(
+                  that.calculateShadow(this, this.wPos.xyz, this.groundNormal, this.groundNoL)
+                );
+              }
+              this.groundFoamRadiance = pb.add(
+                this.groundFoamRadiance,
+                pb.mul(
+                  this.lightEnergy,
+                  this.foamColor,
+                  this.groundNoL,
+                  this.groundShadow,
+                  this.groundFoamOpacity,
+                  1 / Math.PI
+                )
+              );
+            });
+          }
           this.finalColor = pb.add(this.finalColor, this.lightContrib);
           this.dbgSubsurface = pb.add(this.dbgSubsurface, pb.mul(this.subsurfaceTerm, this.shadow));
           this.dbgSunScatter = pb.add(this.dbgSunScatter, pb.mul(this.sunScatterTerm, this.shadow));
@@ -2268,6 +2616,17 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
           this.$l.foamAmbient = pb.mul(this.irradiance, this.foamColor, this.foam, 1 / Math.PI);
           this.finalColor = pb.add(this.finalColor, this.foamAmbient);
           this.foamRadiance = pb.add(this.foamRadiance, this.foamAmbient);
+          if (hasDepositedFoam) {
+            this.groundFoamRadiance = pb.add(
+              this.groundFoamRadiance,
+              pb.mul(
+                that.getEnvLightIrradiance(this, this.groundNormal),
+                this.foamColor,
+                this.groundFoamOpacity,
+                1 / Math.PI
+              )
+            );
+          }
           // Bubbles under the white foam, part of the water body as in Crest,
           // so under the white foam and the mirror: the foam texture blurred and
           // shifted by parallax, as seen at a depth under the surface
@@ -2306,38 +2665,14 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
             );
           });
         }
-        // A sheet of water a few centimetres thick (swash on the sand) fades into
-        // the scene behind it, as does the mesh past the water's edge. The foam
-        // on it fades over the thinnest FOAM_EDGE_FADE_SHARE of that only.
+        // A thin sheet fades into the scene behind it. Where the generator
+        // knows the wet edge, its coverage keeps foam visible on even a
+        // millimetre-thick sheet; elsewhere foam fades by the measured depth.
         this.$if(pb.not(this.underwaterEye), function () {
-          // Prefer the wave generator's own ground for the thickness of thin swash.
-          this.$l.edgeThickness = this.$choice(
-            pb.greaterThanEqual(this.sheetThickness, 0),
-            this.sheetThickness,
-            // Sky reconstructs to the far plane, which can lie above an infinite
-            // surface. With no bottom there, keep the water and foam fully visible.
-            this.$choice(
-              pb.greaterThanEqual(this.wPos.w, SCENE_SKY_DEPTH01),
-              pb.max(this.edgeFadeWidth, 1e-4),
-              pb.sub(this.worldPos.y, this.wPos.y)
-            )
-          );
           this.$l.edgeFade = pb.mul(
             this.$choice(
               pb.greaterThan(this.edgeFadeWidth, 0),
               pb.smoothStep(0, pb.max(this.edgeFadeWidth, 1e-4), this.edgeThickness),
-              pb.float(1)
-            ),
-            this.coverage
-          );
-          this.$l.foamFade = pb.mul(
-            this.$choice(
-              pb.greaterThan(this.edgeFadeWidth, 0),
-              pb.smoothStep(
-                0,
-                pb.max(pb.mul(this.edgeFadeWidth, FOAM_EDGE_FADE_SHARE), 1e-4),
-                this.edgeThickness
-              ),
               pb.float(1)
             ),
             this.coverage
@@ -2359,6 +2694,23 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
               pb.mul(this.foamRadiance, this.foamFade)
             );
           });
+          if (hasDepositedFoam) {
+            this.$if(pb.greaterThan(this.groundFoamWeight, 0), function () {
+              this.$l.groundBehind = pb.textureSampleLevel(
+                ShaderHelper.getSceneColorTexture(this),
+                this.screenUV,
+                0
+              ).rgb;
+              // One crossfade between complete covers. Attenuating the mobile
+              // foam before overlaying ground foam applies this weight twice
+              // and exposes sand in the middle even if both covers are white.
+              this.$l.groundColor = pb.add(
+                pb.mul(this.groundBehind, pb.sub(1, this.groundFoamOpacity)),
+                this.groundFoamRadiance
+              );
+              this.finalColor = pb.mix(this.finalColor, this.groundColor, this.groundFoamWeight);
+            });
+          }
         });
         switch (debugOutput) {
           case 'normal':
@@ -2369,7 +2721,10 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
             });
             break;
           case 'foam':
-            this.$return(pb.vec3(this.foam));
+            this.$return(pb.vec3(pb.mix(this.foam, this.groundFoamOpacity, this.groundFoamWeight)));
+            break;
+          case 'swashFoamCuts':
+            this.$return(pb.vec3(this.foam, this.groundFoamOpacity, this.groundFoamWeight));
             break;
           case 'waterDepth':
             this.$return(pb.vec3(pb.mul(pb.max(pb.sub(this.worldPos.y, this.wPos.y), 0), 0.1)));
@@ -2422,7 +2777,12 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
       foamSample,
       coverage,
       sheetThickness,
-      wallFoam
+      wallFoam,
+      scenePos,
+      groundFoamDensity,
+      groundFoamSample,
+      groundNormal,
+      groundFoamWeight
     );
   }
   applyUniforms(bindGroup: BindGroup, ctx: DrawContext, needUpdate: boolean, pass: number) {

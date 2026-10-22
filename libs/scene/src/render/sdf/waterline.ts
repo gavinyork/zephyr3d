@@ -505,9 +505,25 @@ export class WaterlineField {
             this.acc = pb.add(this.acc, pb.mul(this.v, w));
             this.wsum = pb.add(this.wsum, w);
           }
-          // The bed height, unfiltered: over the rest level, the negated field there
+          // Keep the bed unfiltered; the second pass carries its height through.
           this.$l.own = pb.textureLoad(this.src, this.id, 0);
           this.$l.bed = this.$choice(pb.lessThan(this.smoothPass.x, 0.5), pb.neg(this.own.w), this.own.z);
+          this.$if(
+            pb.and(
+              pb.lessThan(this.smoothPass.x, 0.5),
+              pb.and(
+                pb.lessThan(pb.abs(this.own.w), SMOOTH_MODEL_REACH),
+                pb.and(
+                  pb.lessThan(pb.abs(this.own.y), SMOOTH_MODEL_CLAMP),
+                  pb.and(pb.greaterThan(this.own.z, 1e-3), pb.lessThan(this.own.z, WATERLINE_MODEL_CLAMP))
+                )
+              )
+            ),
+            function () {
+              // A + B * dy = 0 gives vertical bed height; -SDF is a normal distance.
+              this.bed = pb.div(pb.neg(this.own.y), this.own.z);
+            }
+          );
           pb.textureStore(this.dst, pb.uvec2(this.id), pb.vec4(pb.div(this.acc, this.wsum), this.bed, 0));
         });
       }
