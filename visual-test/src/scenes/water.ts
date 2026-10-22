@@ -368,9 +368,6 @@ export const waterCausticsRangeBorder: VisualScene = {
 
     const waves = new FFTWaveGenerator();
     waves.wind = new Vector2(12, 5);
-    waves.setWaveLength(0, 120);
-    waves.setWaveLength(1, 30);
-    waves.setWaveLength(2, 6);
     waves.setWaveStrength(0, 0.9);
     waves.setWaveStrength(1, 0.9);
     waves.setWaveStrength(2, 0.9);
@@ -443,9 +440,6 @@ export const waterSubsurfaceBacklit: VisualScene = {
     // is seeded from randomSeed through a PRNG, not from anything ambient.
     const waves = new FFTWaveGenerator();
     waves.wind = new Vector2(6, 2);
-    waves.setWaveLength(0, 200);
-    waves.setWaveLength(1, 40);
-    waves.setWaveLength(2, 8);
     waves.setWaveStrength(0, 0.4);
     waves.setWaveStrength(1, 0.5);
     waves.setWaveStrength(2, 0.6);
@@ -513,9 +507,6 @@ export const waterFoamStorm: VisualScene = {
     water.position.setXYZ(0, 0, 0);
     const waves = new FFTWaveGenerator();
     waves.wind = new Vector2(14, 5);
-    waves.setWaveLength(0, 120);
-    waves.setWaveLength(1, 30);
-    waves.setWaveLength(2, 6);
     waves.setWaveStrength(0, 0.7);
     waves.setWaveStrength(1, 0.8);
     waves.setWaveStrength(2, 0.9);

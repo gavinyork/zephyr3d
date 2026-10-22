@@ -278,7 +278,7 @@ waves.foamContrast = 1.5;
 water.waveGenerator = waves;
 ```
 
-`FFTWaveGenerator` allocates GPU resources and is more suitable for wide ocean surfaces than small pools. Its spectrum is built from three cascades (`setWaveLength` / `setWaveStrength` / `setWaveCroppiness`); `foamWidth` / `foamContrast` control foam width and contrast. It works on WebGPU and WebGL2 (with half-float color-buffer support); on other devices the water silently falls back to flat - no waves.
+`FFTWaveGenerator` allocates GPU resources and is more suitable for wide ocean surfaces than small pools. Its spectrum is built from three cascades whose sizes follow the wind speed (`getWaveLength` reports them), each with its own `setWaveStrength` / `setWaveCroppiness`; `foamWidth` / `foamContrast` control foam width and contrast. It works on WebGPU and WebGL2 (with half-float color-buffer support); on other devices the water silently falls back to flat - no waves.
 
 ## Sampling the Water Surface
 

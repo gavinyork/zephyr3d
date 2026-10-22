@@ -38,6 +38,7 @@ export abstract class WebGPUBaseTexture<
   protected _memCost: number;
   protected _views: GPUTextureView[][][];
   protected _defaultView: Nullable<GPUTextureView>;
+  protected _storageView: Nullable<GPUTextureView>;
   protected _mipmapDirty: boolean;
   protected _flags: number;
   protected _width: number;
@@ -74,6 +75,7 @@ export abstract class WebGPUBaseTexture<
     this._computeMipmap = false;
     this._views = [];
     this._defaultView = null;
+    this._storageView = null;
     this._ringBuffer = new UploadRingBuffer(device);
     this._pendingUploads = [];
   }
@@ -165,6 +167,7 @@ export abstract class WebGPUBaseTexture<
         (this._object as GPUTexture).destroy();
       }
       this._object = null;
+      this._storageView = null;
       this._device.updateVideoMemoryCost(-this._memCost);
       this._memCost = 0;
       this._ringBuffer.purge();
@@ -233,6 +236,31 @@ export abstract class WebGPUBaseTexture<
   }
   getDefaultView() {
     return this._defaultView;
+  }
+  /**
+   * View for binding as a storage texture: the default view restricted to the
+   * top mip level, as a storage binding may only see a single level.
+   */
+  getStorageView() {
+    if (this._mipLevelCount <= 1 || !this._object) {
+      return this._defaultView;
+    }
+    if (!this._storageView) {
+      this._storageView = this._device.gpuCreateTextureView(this._object as GPUTexture, {
+        dimension: this.isTextureCube()
+          ? '2d-array'
+          : this.isTexture3D()
+            ? '3d'
+            : this.isTexture2DArray()
+              ? '2d-array'
+              : '2d',
+        baseMipLevel: 0,
+        mipLevelCount: 1,
+        arrayLayerCount: this.isTextureCube() ? 6 : this.isTexture2DArray() ? this._depth : 1,
+        aspect: 'all'
+      });
+    }
+    return this._storageView;
   }
   copyPixelDataToBuffer(
     x: number,
@@ -454,6 +482,7 @@ export abstract class WebGPUBaseTexture<
               ? GPUTextureUsage.STORAGE_BINDING
               : 0)
         }) as any;
+        this._storageView = null;
         this._defaultView = this._device.gpuCreateTextureView(this._object as GPUTexture, {
           dimension: this.isTextureCube()
             ? 'cube'

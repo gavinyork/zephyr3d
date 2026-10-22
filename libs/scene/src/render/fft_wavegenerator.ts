@@ -13,7 +13,8 @@ import type {
   Texture2D,
   Texture2DArray,
   TextureCreationOptions,
-  TextureFormat
+  TextureFormat,
+  TextureSampler
 } from '@zephyr3d/device';
 import { Primitive } from './primitive';
 import {
@@ -27,8 +28,6 @@ import { fetchSampler } from '../utility/misc';
 import { getDevice } from '../app/api';
 
 type OceanFieldCascade = {
-  /** The size of simulated patch of field. (in meters) */
-  size: number;
   /** How "croppy" this pattern would be */
   croppiness: number;
   /** Strength factor for this pattern */
@@ -50,23 +49,36 @@ type OceanFieldBuildParams = {
   randomSeed: number;
 };
 
-// Default cascade sizes after Bruneton's ocean demo at N = 256 (5488, 392, 28 m), 14 to 1,
-// so each cascade spans about a decade of wavelength between the next larger one's Nyquist and its own.
+/**
+ * Size of the largest cascade over the peak wavelength of the spectrum,
+ * 2 pi sqrt(2) U^2 / g for the Phillips spectrum at wind speed U: the peak
+ * repeats some 14 times across it, and the band below it, where no wave
+ * height is left, stays out of every cascade.
+ */
+const CASCADE_PEAK_SPAN = 14;
+/**
+ * Size of a cascade over that of the next smaller one. Each covers the
+ * wavelengths between the next larger one's Nyquist and its own, about three
+ * octaves at this ratio; not an integer, so the tiles of the cascades do not
+ * repeat in step.
+ */
+const CASCADE_RATIO = 7.5;
+/** Sizes of the largest cascade are kept within, in meters. */
+const CASCADE_MIN_SIZE = 16;
+const CASCADE_MAX_SIZE = 16384;
+
 function getDefaultBuildParams(): OceanFieldBuildParams {
   return {
     cascades: [
       {
-        size: 5488,
         strength: 0.4,
         croppiness: -1.5
       },
       {
-        size: 392,
         strength: 0.4,
         croppiness: -1.2
       },
       {
-        size: 28,
         strength: 0.4,
         croppiness: -0.5
       }
@@ -101,6 +113,7 @@ type Globales = {
   /** Keyed `${size}:${randomSeed}`, since both select the contents. */
   noiseTextures: Map<string, Texture2D>;
   butterflyTextures: Map<number, Texture2D>;
+  slopeSampler?: TextureSampler;
 };
 
 type WaterInstanceData = {
@@ -125,6 +138,26 @@ const RENDER_NORMAL = 1;
 const RENDER_TWO_PASS = 2;
 
 const THREAD_GROUP_SIZE = 16;
+
+/**
+ * Mip levels of a cascade over which the share of its slope variance kept is
+ * tabulated (levels 1 to this); level 0 keeps it all, the level past the table
+ * none.
+ */
+const SLOPE_LOD_LEVELS = 8;
+/**
+ * Anisotropy of the slope sampling. At 1 the mip level follows the pixel's
+ * long axis: soft at grazing views, but the finest near the camera. Higher
+ * picks it from the short axis, and the few taps the hardware takes along the
+ * long one leave the shortest waves to alias into speckle close by.
+ */
+const SLOPE_MAX_ANISOTROPY = 1;
+/**
+ * Scale of the screen derivatives the slopes are filtered by, log2 of it a bias
+ * of the mip level. Above 1 hides the speckle of a higher anisotropy, but
+ * softens the near waves by as much.
+ */
+const SLOPE_FILTER_SCALE = 1;
 
 /**
  * This class generates a 2D ocean field using the Fast Fourier Transform (FFT) algorithm.
@@ -157,6 +190,10 @@ export class FFTWaveGenerator extends Disposable implements WaveGenerator {
   private _instanceData!: Nullable<WaterInstanceData>;
   private _ifftTextures!: Nullable<Texture2D[] | Texture2DArray>;
   private readonly _cascades!: Vector4[];
+  /** Per cascade: slope (var x, var z, cov xz) in world units, and its texel size */
+  private readonly _slopeVariances!: Vector4[];
+  /** Per cascade, two each: share of its slope variance mip levels 1-4 and 5-8 keep */
+  private readonly _slopeRetained!: Float32Array<ArrayBuffer>;
   private _paramsChanged!: boolean;
   private _version!: number;
   private _resolutionChanged!: boolean;
@@ -264,6 +301,8 @@ export class FFTWaveGenerator extends Disposable implements WaveGenerator {
       this._sizes = new Vector4();
       this._croppinesses = new Vector4();
       this._cascades = [new Vector4(), new Vector4(), new Vector4(), new Vector4()];
+      this._slopeVariances = [new Vector4(), new Vector4(), new Vector4()];
+      this._slopeRetained = new Float32Array(6 * 4);
       this._updateRenderStates = getDevice().createRenderStateSet();
       this._updateRenderStates.useRasterizerState().setCullMode('none');
       this._updateRenderStates.useDepthState().enableTest(false).enableWrite(false);
@@ -322,20 +361,19 @@ export class FFTWaveGenerator extends Disposable implements WaveGenerator {
       this.paramsChanged();
     }
   }
-  /** Gets the wave length for the specified cascade */
-  getWaveLength(cascade: number) {
-    return this._params.cascades[cascade].size;
-  }
   /**
-   * Sets the wave length for the specified cascade
+   * Gets the size of the patch the specified cascade simulates, in meters.
+   *
+   * The sizes follow the wind: the largest cascade spans the peak wavelength of
+   * the spectrum some times over, and each next one is a fixed fraction of it,
+   * so the three cover the waves that carry height and slope at any wind speed.
    * @param cascade - The cascade index
-   * @param length - The new wave length for the specified cascade
    */
-  setWaveLength(cascade: number, length: number) {
-    if (this._params.cascades[cascade].size !== length) {
-      this._params.cascades[cascade].size = length;
-      this.paramsChanged();
-    }
+  getWaveLength(cascade: number) {
+    const windSpeed = Math.hypot(this._params.wind.x, this._params.wind.y);
+    const peak = (2 * Math.PI * Math.SQRT2 * windSpeed * windSpeed) / 9.81;
+    const largest = Math.min(Math.max(peak * CASCADE_PEAK_SPAN, CASCADE_MIN_SIZE), CASCADE_MAX_SIZE);
+    return largest / Math.pow(CASCADE_RATIO, cascade);
   }
   /** Gets the wave strength for the specified cascade */
   getWaveStrength(cascade: number) {
@@ -415,20 +453,14 @@ export class FFTWaveGenerator extends Disposable implements WaveGenerator {
     // stops at its own Nyquist, so the cascades share no wave number.
     const cascades = this._params.cascades;
     for (let i = 0; i < cascades.length; i++) {
-      const size = cascades[i].size;
-      let nextLarger = Infinity;
-      for (let j = 0; j < cascades.length; j++) {
-        const s = cascades[j].size;
-        if (j !== i && (s > size || (s === size && j < i)) && s < nextLarger) {
-          nextLarger = s;
-        }
-      }
+      const size = this.getWaveLength(i);
       this._cascades[i].x = size;
       this._cascades[i].y = (cascades[i].strength * 0.081) / (size * size);
       this._cascades[i].z =
-        nextLarger === Infinity ? Math.PI / size : (Math.PI * this._params.resolution) / nextLarger;
+        i === 0 ? Math.PI / size : (Math.PI * this._params.resolution) / this.getWaveLength(i - 1);
       this._cascades[i].w = 0;
     }
+    this.computeSlopeVariances();
     this._h0BindGroup.setValue('cascade0', this._cascades[0]);
     this._h0BindGroup.setValue('cascade1', this._cascades[1]);
     this._h0BindGroup.setValue('cascade2', this._cascades[2]);
@@ -443,6 +475,71 @@ export class FFTWaveGenerator extends Disposable implements WaveGenerator {
       device.setFramebuffer(instanceData.h0Framebuffer);
       device.clearFrameBuffer(Vector4.zero(), null, null);
       FFTWaveGenerator._globals!.quad.draw();
+    }
+  }
+  /**
+   * Expected slope covariance of each cascade, summed over the same spectrum the
+   * h0 and hk programs build: E|h(k)|^2 = 2 P(k) (a(k) + a(-k)), P the Phillips
+   * spectrum halved as h0 takes it, a the wind alignment, and the slopes i k h(k)
+   * with the Nyquist row and column zeroed. The inverse FFT is unnormalized, so
+   * a field's variance is the plain sum over the grid.
+   *
+   * Also how much of it each mip level of the cascade keeps: a level halving the
+   * texels keeps the wave numbers below its Nyquist along both axes.
+   * @internal
+   */
+  private computeSlopeVariances() {
+    const N = this._params.resolution;
+    const wind = this._params.wind;
+    const windLen = Math.hypot(wind.x, wind.y);
+    const wx = windLen > 0 ? wind.x / windLen : 1;
+    const wz = windLen > 0 ? wind.y / windLen : 0;
+    const L = (windLen * windLen) / 9.81;
+    const L2 = L * L;
+    const alignment = this._params.alignment;
+    for (let i = 0; i < 3; i++) {
+      const size = this._cascades[i].x;
+      const A = this._cascades[i].y;
+      const minK = this._cascades[i].z;
+      let xx = 0;
+      let zz = 0;
+      let xz = 0;
+      // Variance whose wave numbers are cut first at level 1 + n
+      const cut = new Array<number>(SLOPE_LOD_LEVELS + 1).fill(0);
+      const nyquist = (Math.PI * N) / size;
+      if (size > 1e-3 && L2 > 0) {
+        const dk = (Math.PI * 2) / size;
+        for (let cy = 1; cy < N; cy++) {
+          const kz = (cy - N / 2) * dk;
+          for (let cx = 1; cx < N; cx++) {
+            const kx = (cx - N / 2) * dk;
+            if (Math.abs(kx) < minK && Math.abs(kz) < minK) {
+              continue;
+            }
+            const k2 = kx * kx + kz * kz;
+            let e = (A / (k2 * k2)) * Math.exp(-1 / (k2 * L2));
+            if (alignment > 0) {
+              const c = (kx * wx + kz * wz) / Math.sqrt(k2);
+              e *= Math.pow(Math.max(0, c), alignment) + Math.pow(Math.max(0, -c), alignment);
+            } else {
+              e *= 2;
+            }
+            xx += kx * kx * e;
+            zz += kz * kz * e;
+            xz += kx * kz * e;
+            // Kept up to the level whose Nyquist nyquist / 2^level it still lies below
+            const kept = Math.log2(nyquist / Math.max(Math.abs(kx), Math.abs(kz)));
+            cut[Math.min(Math.max(Math.ceil(kept), 1), SLOPE_LOD_LEVELS + 1) - 1] += k2 * e;
+          }
+        }
+      }
+      this._slopeVariances[i].setXYZW(xx, zz, xz, size / N);
+      const total = xx + zz;
+      let kept = total;
+      for (let level = 1; level <= SLOPE_LOD_LEVELS; level++) {
+        kept -= cut[level - 1];
+        this._slopeRetained[i * SLOPE_LOD_LEVELS + level - 1] = total > 0 ? Math.max(kept / total, 0) : 0;
+      }
     }
   }
   /** @internal */
@@ -526,6 +623,7 @@ export class FFTWaveGenerator extends Disposable implements WaveGenerator {
         this._params.resolution,
         6,
         'Water-data',
+        true,
         true
       );
       const spectrumTextures = this.createNTextures(
@@ -599,18 +697,19 @@ export class FFTWaveGenerator extends Disposable implements WaveGenerator {
     size: number,
     num: number,
     name: string,
-    linear: boolean
+    linear: boolean,
+    mipmapping = false
   ) {
     const options: TextureCreationOptions = {
       samplerOptions: {
         minFilter: linear ? 'linear' : 'nearest',
         magFilter: linear ? 'linear' : 'nearest',
-        mipFilter: 'none',
+        mipFilter: mipmapping ? 'linear' : 'none',
         addressU: 'repeat',
         addressV: 'repeat'
       },
       writable: !!this._useComputeShader,
-      mipmapping: false
+      mipmapping
     };
     if (this._useComputeShader) {
       const tex = device.createTexture2DArray(format, size, size, num, options)!;
@@ -638,7 +737,7 @@ export class FFTWaveGenerator extends Disposable implements WaveGenerator {
     this._resolutionChanged = false;
     this._paramsChanged = false;
     for (let i = 0; i < 3; i++) {
-      this._sizes[i] = this._params.cascades[i].size;
+      this._sizes[i] = this._cascades[i].x;
       this._croppinesses[i] = this._params.cascades[i].croppiness;
     }
     if (this._renderMode === RENDER_NORMAL) {
@@ -649,6 +748,13 @@ export class FFTWaveGenerator extends Disposable implements WaveGenerator {
       this.generateSpectrumTwoPass(time);
       this.ifft2TwoPass();
       this.postIfft2TwoPass();
+    }
+    // The fragment normal reads the slopes filtered to the pixel
+    const dataTextures = this.getInstanceData().dataTextures;
+    if (Array.isArray(dataTextures)) {
+      dataTextures.forEach((tex) => tex.generateMipmaps());
+    } else {
+      dataTextures.generateMipmaps();
     }
     device.popDeviceStates();
   }
@@ -1010,6 +1116,81 @@ export class FFTWaveGenerator extends Disposable implements WaveGenerator {
       scope.sx_sz_dxdx_dzdz2 = pb.tex2D().uniform(uniformGroup);
     }
     scope.foamParams = pb.vec2().uniform(uniformGroup);
+    scope.slopeVar0 = pb.vec4().uniform(uniformGroup);
+    scope.slopeVar1 = pb.vec4().uniform(uniformGroup);
+    scope.slopeVar2 = pb.vec4().uniform(uniformGroup);
+    scope.slopeRetained = pb.vec4[6]().uniform(uniformGroup);
+  }
+  /**
+   * Mip level each cascade is read at by a pixel with screen derivatives
+   * `xzGrad` of its xz, as anisotropic filtering picks it: from the shorter
+   * axis of the pixel, or the longer over the anisotropy where that is more.
+   * @internal
+   */
+  private cascadeLods(scope: PBInsideFunctionScope, xzGrad: PBShaderExp) {
+    const pb = scope.$builder;
+    pb.func('fftCascadeLods', [pb.vec4('xzGrad')], function () {
+      this.$l.lx = pb.mul(pb.length(this.xzGrad.xy), SLOPE_FILTER_SCALE);
+      this.$l.ly = pb.mul(pb.length(this.xzGrad.zw), SLOPE_FILTER_SCALE);
+      this.$l.fp = pb.max(
+        pb.max(pb.min(this.lx, this.ly), pb.div(pb.max(this.lx, this.ly), SLOPE_MAX_ANISOTROPY)),
+        1e-6
+      );
+      this.$l.texel = pb.vec3(this.slopeVar0.w, this.slopeVar1.w, this.slopeVar2.w);
+      this.$return(pb.max(pb.log2(pb.div(pb.vec3(this.fp), this.texel)), pb.vec3(0)));
+    });
+    return scope.fftCascadeLods(xzGrad) as PBShaderExp;
+  }
+  /** Trilinear, anisotropic sampler of the slope mips. @internal */
+  private static getSlopeSampler() {
+    const globals = FFTWaveGenerator._globals!;
+    if (!globals.slopeSampler) {
+      globals.slopeSampler = getDevice().createSampler({
+        addressU: 'repeat',
+        addressV: 'repeat',
+        magFilter: 'linear',
+        minFilter: 'linear',
+        mipFilter: 'linear',
+        maxAnisotropy: SLOPE_MAX_ANISOTROPY
+      });
+    }
+    return globals.slopeSampler;
+  }
+  /** {@inheritDoc WaveGenerator.calcUnresolvedSlopeVariance} */
+  calcUnresolvedSlopeVariance(scope: PBInsideFunctionScope, xzGrad: PBShaderExp) {
+    const pb = scope.$builder;
+    const that = this;
+    // Share of a cascade's slope variance its mip level keeps, linear between levels
+    pb.func('fftSlopeRetained', [pb.float('lod'), pb.vec4('lo'), pb.vec4('hi')], function () {
+      this.$l.hatLo = pb.max(pb.sub(pb.vec4(1), pb.abs(pb.sub(pb.vec4(this.lod), pb.vec4(1, 2, 3, 4)))), pb.vec4(0));
+      this.$l.hatHi = pb.max(pb.sub(pb.vec4(1), pb.abs(pb.sub(pb.vec4(this.lod), pb.vec4(5, 6, 7, 8)))), pb.vec4(0));
+      this.$return(
+        pb.add(
+          pb.max(pb.sub(1, this.lod), 0),
+          pb.dot(this.hatLo, this.lo),
+          pb.mul(pb.dot(this.hatHi, this.hi), pb.clamp(pb.sub(SLOPE_LOD_LEVELS + 1, this.lod), 0, 1))
+        )
+      );
+    });
+    pb.func('fftUnresolvedSlopeVariance', [pb.vec4('xzGrad')], function () {
+      this.$l.lod = that.cascadeLods(this, this.xzGrad);
+      this.$l.lost = pb.sub(
+        pb.vec3(1),
+        pb.vec3(
+          this.fftSlopeRetained(this.lod.x, this.slopeRetained.at(0), this.slopeRetained.at(1)),
+          this.fftSlopeRetained(this.lod.y, this.slopeRetained.at(2), this.slopeRetained.at(3)),
+          this.fftSlopeRetained(this.lod.z, this.slopeRetained.at(4), this.slopeRetained.at(5))
+        )
+      );
+      this.$return(
+        pb.add(
+          pb.mul(this.slopeVar0.xyz, this.lost.x),
+          pb.mul(this.slopeVar1.xyz, this.lost.y),
+          pb.mul(this.slopeVar2.xyz, this.lost.z)
+        )
+      );
+    });
+    return scope.fftUnresolvedSlopeVariance(xzGrad) as PBShaderExp;
   }
   /** {@inheritDoc WaveGenerator.calcVertexPositionAndNormal} */
   calcVertexPositionAndNormal(
@@ -1125,7 +1306,13 @@ export class FFTWaveGenerator extends Disposable implements WaveGenerator {
     return scope.calcFragmentNormal(xz) as PBShaderExp;
   }
   /** {@inheritDoc WaveGenerator.calcFragmentNormalAndFoam} */
-  calcFragmentNormalAndFoam(scope: PBInsideFunctionScope, xz: PBShaderExp) {
+  calcFragmentNormalAndFoam(
+    scope: PBInsideFunctionScope,
+    xz: PBShaderExp,
+    _vertexNormal?: PBShaderExp,
+    _foamSample?: PBShaderExp,
+    xzGrad?: PBShaderExp
+  ) {
     const pb = scope.$builder;
     const that = this;
     pb.func('jacobian', [pb.float('dxdx'), pb.float('dxdz'), pb.float('dzdz')], function () {
@@ -1139,19 +1326,31 @@ export class FFTWaveGenerator extends Disposable implements WaveGenerator {
         pb.sub(pb.mul(this.jacobian.x, this.jacobian.w), pb.mul(this.jacobian.y, this.jacobian.z))
       );
     });
-    pb.func('calcNormalAndFoam', [pb.vec2('xz')], function () {
+    const params = xzGrad ? [pb.vec2('xz'), pb.vec4('xzGrad')] : [pb.vec2('xz')];
+    const funcName = xzGrad ? 'calcNormalAndFoamF' : 'calcNormalAndFoam';
+    pb.func(funcName, params, function () {
       this.$l.uv0 = pb.div(this.xz, this.sizes.x);
       this.$l.uv1 = pb.div(this.xz, this.sizes.y);
       this.$l.uv2 = pb.div(this.xz, this.sizes.z);
-      if (that._useComputeShader) {
-        this.$l._sx_sz_dxdx_dzdz0 = pb.textureArraySampleLevel(this.dataTexture, this.uv0, 1, 0);
-        this.$l._sx_sz_dxdx_dzdz1 = pb.textureArraySampleLevel(this.dataTexture, this.uv1, 3, 0);
-        this.$l._sx_sz_dxdx_dzdz2 = pb.textureArraySampleLevel(this.dataTexture, this.uv2, 5, 0);
-      } else {
-        this.$l._sx_sz_dxdx_dzdz0 = pb.textureSampleLevel(this.sx_sz_dxdx_dzdz0, this.uv0, 0);
-        this.$l._sx_sz_dxdx_dzdz1 = pb.textureSampleLevel(this.sx_sz_dxdx_dzdz1, this.uv1, 0);
-        this.$l._sx_sz_dxdx_dzdz2 = pb.textureSampleLevel(this.sx_sz_dxdx_dzdz2, this.uv2, 0);
-      }
+      // Slopes and Jacobian filtered down to the pixel: each cascade read with
+      // the screen derivatives of its texture coordinates, trilinear and
+      // anisotropic, so the waves too short for the pixel average out rather
+      // than alias into speckle
+      const sample = (tex: string, layer: number, uv: string, size: string) => {
+        if (!xzGrad) {
+          return that._useComputeShader
+            ? pb.textureArraySampleLevel(this.dataTexture, this[uv], layer, 0)
+            : pb.textureSampleLevel(this[tex], this[uv], 0);
+        }
+        const ddx = pb.mul(this.xzGrad.xy, pb.div(SLOPE_FILTER_SCALE, this.sizes[size]));
+        const ddy = pb.mul(this.xzGrad.zw, pb.div(SLOPE_FILTER_SCALE, this.sizes[size]));
+        return that._useComputeShader
+          ? pb.textureArraySampleGrad(this.dataTexture, this[uv], layer, ddx, ddy)
+          : pb.textureSampleGrad(this[tex], this[uv], ddx, ddy);
+      };
+      this.$l._sx_sz_dxdx_dzdz0 = sample('sx_sz_dxdx_dzdz0', 1, 'uv0', 'x');
+      this.$l._sx_sz_dxdx_dzdz1 = sample('sx_sz_dxdx_dzdz1', 3, 'uv1', 'y');
+      this.$l._sx_sz_dxdx_dzdz2 = sample('sx_sz_dxdx_dzdz2', 5, 'uv2', 'z');
       this.$l.sx = pb.add(this._sx_sz_dxdx_dzdz0.x, this._sx_sz_dxdx_dzdz1.x, this._sx_sz_dxdx_dzdz2.x);
       this.$l.sz = pb.add(this._sx_sz_dxdx_dzdz0.y, this._sx_sz_dxdx_dzdz1.y, this._sx_sz_dxdx_dzdz2.y);
       this.$l.dxdx_dzdz = pb.add(
@@ -1159,19 +1358,9 @@ export class FFTWaveGenerator extends Disposable implements WaveGenerator {
         pb.mul(this._sx_sz_dxdx_dzdz1.zw, this.croppinesses.y),
         pb.mul(this._sx_sz_dxdx_dzdz2.zw, this.croppinesses.z)
       );
-      // foam
-      this.$l.dxdx_dzdz0 = this._sx_sz_dxdx_dzdz0.zw;
-      this.$l.dxdx_dzdz1 = this._sx_sz_dxdx_dzdz1.zw;
-      this.$l.dxdx_dzdz2 = this._sx_sz_dxdx_dzdz2.zw;
-      if (that._useComputeShader) {
-        this.$l.dxdz0 = pb.textureArraySampleLevel(this.dataTexture, this.uv0, 0, 0).w;
-        this.$l.dxdz1 = pb.textureArraySampleLevel(this.dataTexture, this.uv1, 2, 0).w;
-        this.$l.dxdz2 = pb.textureArraySampleLevel(this.dataTexture, this.uv2, 4, 0).w;
-      } else {
-        this.$l.dxdz0 = pb.textureSampleLevel(this.dx_hy_dz_dxdz0, this.uv0, 0).w;
-        this.$l.dxdz1 = pb.textureSampleLevel(this.dx_hy_dz_dxdz1, this.uv1, 0).w;
-        this.$l.dxdz2 = pb.textureSampleLevel(this.dx_hy_dz_dxdz2, this.uv2, 0).w;
-      }
+      this.$l.dxdz0 = sample('dx_hy_dz_dxdz0', 0, 'uv0', 'x').w;
+      this.$l.dxdz1 = sample('dx_hy_dz_dxdz1', 2, 'uv1', 'y').w;
+      this.$l.dxdz2 = sample('dx_hy_dz_dxdz2', 4, 'uv2', 'z').w;
       this.$l.dxdz = pb.add(
         pb.mul(this.dxdz0, this.croppinesses.x),
         pb.mul(this.dxdz1, this.croppinesses.y),
@@ -1193,7 +1382,7 @@ export class FFTWaveGenerator extends Disposable implements WaveGenerator {
       );
       this.$return(pb.vec4(this.normal, this.foam));
     });
-    return scope.calcNormalAndFoam(xz) as PBShaderExp;
+    return (xzGrad ? scope[funcName](xz, xzGrad) : scope[funcName](xz)) as PBShaderExp;
   }
   /** {@inheritDoc WaveGenerator.isOk} */
   isOk() {
@@ -1202,7 +1391,7 @@ export class FFTWaveGenerator extends Disposable implements WaveGenerator {
   /** {@inheritDoc WaveGenerator.applyWaterBindGroup} */
   applyWaterBindGroup(bindGroup: BindGroup) {
     const instanceData = this.getInstanceData();
-    const linearRepeatSampler = fetchSampler('repeat_linear_nomip');
+    const linearRepeatSampler = FFTWaveGenerator.getSlopeSampler();
     if (this._useComputeShader) {
       bindGroup.setTexture('dataTexture', instanceData.dataTextures as Texture2DArray, linearRepeatSampler);
     } else {
@@ -1217,6 +1406,10 @@ export class FFTWaveGenerator extends Disposable implements WaveGenerator {
     bindGroup.setValue('foamParams', this._params.foamParams);
     bindGroup.setValue('sizes', this._sizes);
     bindGroup.setValue('croppinesses', this._croppinesses);
+    bindGroup.setValue('slopeVar0', this._slopeVariances[0]);
+    bindGroup.setValue('slopeVar1', this._slopeVariances[1]);
+    bindGroup.setValue('slopeVar2', this._slopeVariances[2]);
+    bindGroup.setValue('slopeRetained', this._slopeRetained);
   }
   /** {@inheritDoc WaveGenerator.calcClipmapTileAABB} */
   calcClipmapTileAABB(minX: number, maxX: number, minZ: number, maxZ: number, y: number, outAABB: AABB) {

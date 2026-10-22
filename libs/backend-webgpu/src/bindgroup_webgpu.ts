@@ -285,7 +285,9 @@ export class WebGPUBindGroup extends WebGPUObject<GPUObjectBase> implements Bind
               `WebGPUBindGroup.setTexture() failed: invalid texture type of resource '${name}'`
             );
           }
-          const view = (value as WebGPUBaseTexture).getDefaultView();
+          const view = entry.storageTexture
+            ? (value as WebGPUBaseTexture).getStorageView()
+            : (value as WebGPUBaseTexture).getDefaultView();
           if (!entry.externalTexture && !view) {
             throw new Error('WebGPUBindGroup.setTexture() failed: create texture view failed');
           }

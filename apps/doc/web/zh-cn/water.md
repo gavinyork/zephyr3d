@@ -278,7 +278,7 @@ waves.foamContrast = 1.5;
 water.waveGenerator = waves;
 ```
 
-`FFTWaveGenerator` 会分配 GPU 资源，更适合大范围海面而不是小水池。它的波谱由三层级联（`setWaveLength` / `setWaveStrength` / `setWaveCroppiness`）控制，`foamWidth` / `foamContrast` 控制浮沫的宽度与对比度。它在 WebGPU 和 WebGL2（需支持半浮点颜色缓冲）下可用，其余设备会静默回退到没有波浪的平面。
+`FFTWaveGenerator` 会分配 GPU 资源，更适合大范围海面而不是小水池。它的波谱由三层级联构成，各层尺寸随风速自动确定（可用 `getWaveLength` 读取），每层可用 `setWaveStrength` / `setWaveCroppiness` 调节，`foamWidth` / `foamContrast` 控制浮沫的宽度与对比度。它在 WebGPU 和 WebGL2（需支持半浮点颜色缓冲）下可用，其余设备会静默回退到没有波浪的平面。
 
 ## 查询水面高度
 

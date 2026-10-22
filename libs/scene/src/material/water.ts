@@ -1322,7 +1322,8 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
             scope,
             scope.$inputs.clipmapPos.xz,
             scope.$inputs.worldNormal,
-            scope.foamSample
+            scope.foamSample,
+            this.waveGenerator.calcUnresolvedSlopeVariance ? scope.restXZGrad : undefined
           )
         : pb.vec4(scope.$inputs.worldNormal, 0);
       if (this.infinite) {
@@ -1601,7 +1602,10 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
         this.drawContext.materialFlags &
         (MaterialVaryingFlags.SCENE_STORE_ROUGHNESS | MaterialVaryingFlags.SCENE_STORE_NORMAL)
       ) {
-        scope.$l.outRoughness = pb.vec4(pb.vec3(this.waterRoughness(scope, scope.$inputs.worldPos)), 0);
+        scope.$l.outRoughness = pb.vec4(
+          pb.vec3(this.waterRoughness(scope, scope.$inputs.worldPos, scope.restXZGrad)),
+          0
+        );
         this.outputFragmentColor(
           scope,
           scope.$inputs.worldPos,
@@ -1626,18 +1630,41 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
     }
   }
   /**
-   * Specular roughness at a world position. Distance flattens the wave normals,
-   * and the lost slope is handed to the lobe. Also written to the scene
-   * roughness buffer.
+   * Covariance (x, z, xz) of the wave slopes the shading normal no longer shows
+   * at this pixel, or null when the wave generator cannot tell.
    */
-  waterRoughness(scope: PBInsideFunctionScope, worldPos: PBShaderExp) {
+  unresolvedSlopeVariance(scope: PBInsideFunctionScope, restXZGrad: PBShaderExp): Nullable<PBShaderExp> {
+    const gen = this.waveGenerator;
+    return gen?.calcUnresolvedSlopeVariance
+      ? gen.calcUnresolvedSlopeVariance(scope, restXZGrad)
+      : null;
+  }
+  /**
+   * Specular roughness at a world position. The slopes too fine for the pixel
+   * leave the normal and are handed to the lobe, GGX alpha^2 taking their
+   * variance (Beckmann m^2 = 2 sigma^2 per axis). Without the generator's
+   * account of them, distance flattens the normals and the lobe widens with it.
+   * Also written to the scene roughness buffer.
+   */
+  waterRoughness(scope: PBInsideFunctionScope, worldPos: PBShaderExp, restXZGrad: PBShaderExp) {
     const pb = scope.$builder;
-    pb.func('waterRoughness', [pb.vec3('worldPos')], function () {
-      this.$l.dist = pb.length(pb.sub(this.worldPos, ShaderHelper.getCameraPosition(this)));
-      this.$l.normalScale = pb.clamp(pb.div(100, this.dist), 0, 1);
-      this.$return(pb.mix(WATER_DISTANT_ROUGHNESS, WATER_BASE_ROUGHNESS, this.normalScale));
+    const that = this;
+    pb.func('waterRoughness', [pb.vec3('worldPos'), pb.vec4('restXZGrad')], function () {
+      const slopeVar = that.unresolvedSlopeVariance(this, this.restXZGrad);
+      if (slopeVar) {
+        this.$l.slopeVar = slopeVar;
+        this.$l.alpha2 = pb.add(
+          WATER_BASE_ROUGHNESS ** 4,
+          pb.max(pb.add(this.slopeVar.x, this.slopeVar.y), 0)
+        );
+        this.$return(pb.sqrt(pb.sqrt(this.alpha2)));
+      } else {
+        this.$l.dist = pb.length(pb.sub(this.worldPos, ShaderHelper.getCameraPosition(this)));
+        this.$l.normalScale = pb.clamp(pb.div(100, this.dist), 0, 1);
+        this.$return(pb.mix(WATER_DISTANT_ROUGHNESS, WATER_BASE_ROUGHNESS, this.normalScale));
+      }
     });
-    return scope.waterRoughness(worldPos) as PBShaderExp;
+    return scope.waterRoughness(worldPos, restXZGrad) as PBShaderExp;
   }
   /**
    * Where to sample the scene behind the water, and the medium path length to it.
@@ -2118,11 +2145,18 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
       function () {
         this.$l.screenUV = pb.div(pb.vec2(this.$builtins.fragCoord.xy), ShaderHelper.getRenderSize(this));
         this.$l.dist = pb.length(pb.sub(this.worldPos, ShaderHelper.getCameraPosition(this)));
-        this.$l.normalScale = pb.clamp(pb.div(100, this.dist), 0, 1);
-        this.$l.normal = pb.normalize(
-          pb.mul(this.worldNormal, pb.vec3(this.normalScale, 1, this.normalScale))
-        );
-        this.$l.roughness = that.waterRoughness(this, this.worldPos);
+        const slopeVar = that.unresolvedSlopeVariance(this, this.restXZGrad);
+        if (slopeVar) {
+          // The generator has already faded the slopes too fine for the pixel
+          this.$l.slopeVar = slopeVar;
+          this.$l.normal = pb.normalize(this.worldNormal);
+        } else {
+          this.$l.normalScale = pb.clamp(pb.div(100, this.dist), 0, 1);
+          this.$l.normal = pb.normalize(
+            pb.mul(this.worldNormal, pb.vec3(this.normalScale, 1, this.normalScale))
+          );
+        }
+        this.$l.roughness = that.waterRoughness(this, this.worldPos, this.restXZGrad);
         this.$l.wPos = this.scenePos;
         this.$l.eyeVec = pb.sub(this.worldPos.xyz, ShaderHelper.getCameraPosition(this));
         this.$l.eyeVecNorm = pb.normalize(this.eyeVec);
@@ -2300,24 +2334,42 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
         this.$l.refractionRaw = this.refraction;
         this.$l.absorption = this.getAbsorption(this.mediumPath);
         this.refraction = pb.mul(this.refraction, this.absorption);
-        // Variance of the slopes the flattened normal no longer shows, (1 - k^2)
-        // of the sea's for a slope scaled by k, along the view direction in wind
-        // space as Bruneton's MeanFresnel takes it
         this.$l.viewXZ = pb.neg(this.eyeVecNorm.xz);
-        this.$l.viewWind = pb.vec2(
-          pb.dot(this.viewXZ, this.unresolvedSlope.xy),
-          pb.dot(this.viewXZ, pb.vec2(pb.neg(this.unresolvedSlope.y), this.unresolvedSlope.x))
-        );
-        this.$l.viewWindT = pb.div(
-          pb.mul(this.viewWind, this.viewWind),
-          pb.max(pb.dot(this.viewXZ, this.viewXZ), 1e-6)
-        );
-        this.$l.sigmaV = pb.sqrt(
-          pb.mul(
-            pb.dot(this.viewWindT, this.unresolvedSlope.zw),
-            pb.sub(1, pb.mul(this.normalScale, this.normalScale))
-          )
-        );
+        if (slopeVar) {
+          // Variance of the slopes the normal no longer shows along the view
+          // direction, as Bruneton's MeanFresnel takes it
+          this.$l.sigmaV = pb.sqrt(
+            pb.max(
+              pb.div(
+                pb.add(
+                  pb.mul(this.viewXZ.x, this.viewXZ.x, this.slopeVar.x),
+                  pb.mul(this.viewXZ.y, this.viewXZ.y, this.slopeVar.y),
+                  pb.mul(this.viewXZ.x, this.viewXZ.y, this.slopeVar.z, 2)
+                ),
+                pb.max(pb.dot(this.viewXZ, this.viewXZ), 1e-6)
+              ),
+              0
+            )
+          );
+        } else {
+          // Variance of the slopes the flattened normal no longer shows, (1 - k^2)
+          // of the sea's for a slope scaled by k, along the view direction in wind
+          // space as Bruneton's MeanFresnel takes it
+          this.$l.viewWind = pb.vec2(
+            pb.dot(this.viewXZ, this.unresolvedSlope.xy),
+            pb.dot(this.viewXZ, pb.vec2(pb.neg(this.unresolvedSlope.y), this.unresolvedSlope.x))
+          );
+          this.$l.viewWindT = pb.div(
+            pb.mul(this.viewWind, this.viewWind),
+            pb.max(pb.dot(this.viewXZ, this.viewXZ), 1e-6)
+          );
+          this.$l.sigmaV = pb.sqrt(
+            pb.mul(
+              pb.dot(this.viewWindT, this.unresolvedSlope.zw),
+              pb.sub(1, pb.mul(this.normalScale, this.normalScale))
+            )
+          );
+        }
         this.$l.fresnelTerm = this.fresnel(
           this.shadingNormal,
           pb.neg(this.eyeVecNorm),

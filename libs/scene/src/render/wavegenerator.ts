@@ -81,6 +81,10 @@ export interface WaveGenerator extends IDisposable {
    *   sampled it here, (value, slope along x, slope along z). A generator that
    *   carries its foam on texture coordinates of its own (moving with its
    *   waves) blends its sample in by its share of the foam.
+   * @param xzGrad - Optional vec4: screen derivatives of `xz`, (dpdx, dpdy).
+   *   A generator filters out the waves too short for the pixel by them, which
+   *   would alias into speckle; {@link WaveGenerator.calcUnresolvedSlopeVariance}
+   *   reports the slopes so lost.
    * @returns (normal, foam density 0..1). The density is how much foam there
    *   is, not the area it covers: the material reveals the foam texture by it.
    */
@@ -88,8 +92,18 @@ export interface WaveGenerator extends IDisposable {
     scope: PBInsideFunctionScope,
     xz: PBShaderExp,
     vertexNormal: PBShaderExp,
-    foamSample?: PBShaderExp
+    foamSample?: PBShaderExp,
+    xzGrad?: PBShaderExp
   ): PBShaderExp;
+  /**
+   * Covariance of the wave slopes {@link WaveGenerator.calcFragmentNormalAndFoam}
+   * filters out at a pixel, which the material hands to the roughness of the
+   * surface. Optional: without it the material guesses from distance.
+   * @param scope - Shader scope.
+   * @param xzGrad - Screen derivatives of the undisplaced xz, (dpdx, dpdy).
+   * @returns vec3 (var x, var z, cov xz) of the slopes along world x and z.
+   */
+  calcUnresolvedSlopeVariance?(scope: PBInsideFunctionScope, xzGrad: PBShaderExp): PBShaderExp;
   /**
    * Share of the surface over an undisplaced XZ that is water, by which the
    * material fades in the scene behind: a generator that runs the mesh on

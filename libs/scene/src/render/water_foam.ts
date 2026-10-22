@@ -843,6 +843,7 @@ export class FoamFieldWaveGenerator extends Disposable implements WaveGenerator 
   calcPrevVertexPosition?: WaveGenerator['calcPrevVertexPosition'];
   calcSurfaceCoverage?: WaveGenerator['calcSurfaceCoverage'];
   calcSheetThickness?: WaveGenerator['calcSheetThickness'];
+  calcUnresolvedSlopeVariance?: WaveGenerator['calcUnresolvedSlopeVariance'];
   constructor(base: WaveGenerator, field: WaterFoamField, look: FoamFieldLook) {
     super();
     this._base = base;
@@ -859,6 +860,9 @@ export class FoamFieldWaveGenerator extends Disposable implements WaveGenerator 
     }
     if (base.calcSheetThickness) {
       this.calcSheetThickness = base.calcSheetThickness.bind(base);
+    }
+    if (base.calcUnresolvedSlopeVariance) {
+      this.calcUnresolvedSlopeVariance = base.calcUnresolvedSlopeVariance.bind(base);
     }
   }
   /** The generator the field is layered over. */
@@ -901,15 +905,22 @@ export class FoamFieldWaveGenerator extends Disposable implements WaveGenerator 
     scope: PBInsideFunctionScope,
     xz: PBShaderExp,
     vertexNormal: PBShaderExp,
-    foamSample?: PBShaderExp
+    foamSample?: PBShaderExp,
+    footprint?: PBShaderExp
   ): PBShaderExp {
     const pb = scope.$builder;
     const that = this;
     const params = [pb.vec2('xz'), pb.vec3('vn')];
+    const args = [xz, vertexNormal];
     if (foamSample) {
       params.push(pb.vec3('fs').inout());
+      args.push(foamSample);
     }
-    const funcName = foamSample ? 'ffCalcNormalAndFoamS' : 'ffCalcNormalAndFoam';
+    if (footprint) {
+      params.push(pb.vec4('fp'));
+      args.push(footprint);
+    }
+    const funcName = `ffCalcNormalAndFoam${foamSample ? 'S' : ''}${footprint ? 'F' : ''}`;
     pb.func(funcName, params, function () {
       // Screen derivatives for the foam texture, here in uniform control flow
       if (foamSample) {
@@ -919,7 +930,8 @@ export class FoamFieldWaveGenerator extends Disposable implements WaveGenerator 
         this,
         this.xz,
         this.vn,
-        foamSample ? this.fs : undefined
+        foamSample ? this.fs : undefined,
+        footprint ? this.fp : undefined
       );
       this.$l.ff = that._field.sample(this, this.xz);
       // The ground layer draws the more of drifting and deposited foam, but
@@ -948,9 +960,7 @@ export class FoamFieldWaveGenerator extends Disposable implements WaveGenerator 
       }
       this.$return(pb.vec4(this.nf.xyz, pb.mix(pb.clamp(this.nf.w, 0, 1), this.ffTotal, this.ff.y)));
     });
-    return (
-      foamSample ? scope[funcName](xz, vertexNormal, foamSample) : scope[funcName](xz, vertexNormal)
-    ) as PBShaderExp;
+    return scope[funcName](...args) as PBShaderExp;
   }
   applyWaterBindGroup(bindGroup: BindGroup) {
     this._base.applyWaterBindGroup(bindGroup);

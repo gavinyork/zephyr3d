@@ -296,9 +296,14 @@ export class ShoreWaveGenerator extends Disposable implements WaveGenerator, Foa
   /** The foam field step reads the shore waves under this key. */
   readonly foamSourceKey: string;
   readonly supportsFoamDeposition = true;
+  calcUnresolvedSlopeVariance?: WaveGenerator['calcUnresolvedSlopeVariance'];
   constructor(base: WaveGenerator, settings: ShoreWaveSettings, baseFoamSource: FoamFieldSource) {
     super();
     this._base = base;
+    // The shore waves are smooth at any footprint; the slopes lost are the open sea's
+    if (base.calcUnresolvedSlopeVariance) {
+      this.calcUnresolvedSlopeVariance = base.calcUnresolvedSlopeVariance.bind(base);
+    }
     this._settings = settings;
     this._baseFoamSource = baseFoamSource;
     this.foamSourceKey = `SW:${baseFoamSource.foamSourceKey}`;
@@ -1346,15 +1351,22 @@ export class ShoreWaveGenerator extends Disposable implements WaveGenerator, Foa
     scope: PBInsideFunctionScope,
     xz: PBShaderExp,
     vertexNormal: PBShaderExp,
-    foamSample?: PBShaderExp
+    foamSample?: PBShaderExp,
+    footprint?: PBShaderExp
   ): PBShaderExp {
     const pb = scope.$builder;
     const that = this;
     const params = [pb.vec2('xz'), pb.vec3('vn')];
+    const args = [xz, vertexNormal];
     if (foamSample) {
       params.push(pb.vec3('fs').inout());
+      args.push(foamSample);
     }
-    const funcName = foamSample ? 'swCalcNormalAndFoamS' : 'swCalcNormalAndFoam';
+    if (footprint) {
+      params.push(pb.vec4('fp'));
+      args.push(footprint);
+    }
+    const funcName = `swCalcNormalAndFoam${foamSample ? 'S' : ''}${footprint ? 'F' : ''}`;
     pb.func(funcName, params, function () {
       this.$l.dir = pb.vec4(0);
       this.$l.spacing = pb.float(0);
@@ -1366,13 +1378,12 @@ export class ShoreWaveGenerator extends Disposable implements WaveGenerator, Foa
         this,
         this.xz,
         this.vn,
-        foamSample ? this.fs : undefined
+        foamSample ? this.fs : undefined,
+        footprint ? this.fp : undefined
       );
       this.$return(pb.vec4(that.tilt(this, this.nf.xyz, this.sw, this.dir), this.nf.w));
     });
-    return (
-      foamSample ? scope[funcName](xz, vertexNormal, foamSample) : scope[funcName](xz, vertexNormal)
-    ) as PBShaderExp;
+    return scope[funcName](...args) as PBShaderExp;
   }
   applyWaterBindGroup(bindGroup: BindGroup) {
     this._base.applyWaterBindGroup(bindGroup);
