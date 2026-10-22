@@ -94,29 +94,44 @@ const SHELVING_FULL = 4;
  */
 const FOAM_SLIP_BAND = 2;
 /**
- * Thin swash imprints its foam on the sand, at a rate per second rising to
- * FOAM_DEPOSIT_RATE as the sheet thins below FOAM_DEPOSIT_DEPTH metres; where
- * it drains away entirely, at FOAM_STRAND_RATE. The thin front of the uprush
- * crosses each cell in a few hundredths of a second, carrying the densest
- * foam, so the rate has to imprint most of it in one pass: otherwise only the
- * highest reach, where the front lingers, keeps foam, and the backwash leaves
- * it there as a band apart from the water.
+ * FOAM_SETTLE: the shallower the water, the less of the foam's drift it
+ * carries, by a settling coefficient k of the depth under the displaced
+ * surface, 1 at or below the settle depth (and on dry sand), 0 at and beyond
+ * the drift depth, smoothly between; the foam moves at (1 - k) of its
+ * velocity. One field and one fade over the open water, the shallows, the
+ * swash and the sand: the depth is continuous across them, so the foam is.
+ * Settled foam also fades slower, at a share of the fade rate that goes from 1
+ * to the settled foam fade with k. An empirical model with the two depths and
+ * that share as its parameters, not from a paper.
  */
-const FOAM_DEPOSIT_DEPTH = 0.05;
-const FOAM_DEPOSIT_RATE = 30;
-const FOAM_STRAND_RATE = 30;
 /**
  * The near-shore zone, see nearShore: still water shallower than the shore
  * wave height over NEAR_SHORE_BREAKER (a wave breaks once its height reaches
  * about 0.78 of the depth), blended into the open water over a further
- * NEAR_SHORE_BLEND of that depth. Foam there stands still and is at least
- * NEAR_SHORE_FOAM_EDGE at the threshold, rising to NEAR_SHORE_FOAM_SHORE at
- * the waterline and on the wet beach.
+ * NEAR_SHORE_BLEND of that depth. There the surf's foam is
+ * NEAR_SHORE_FOAM_EDGE just behind a crest at the threshold, rising to
+ * NEAR_SHORE_FOAM_SHORE at the waterline and on the wet beach.
  */
 const NEAR_SHORE_BREAKER = 0.78;
 const NEAR_SHORE_BLEND = 0.5;
 const NEAR_SHORE_FOAM_EDGE = 0.6;
 const NEAR_SHORE_FOAM_SHORE = 0.85;
+/**
+ * SURF_FOAM: within the near-shore zone each broken crest comes in as a bore
+ * with foam on its front, which fades behind it, exp(-age / duration), age
+ * being the seconds since the crest passed. Inland the swash runs on the
+ * waterline's clock, so the bore's foam goes on up the beach with it and
+ * fades as it runs up and drains: the foam surges up and back with each wave
+ * rather than lying along the shore, after the foam that rises and falls with
+ * the waves in Yang Chao's "near-shore waves" (zhuanlan.zhihu.com/p/495906664).
+ * Over the last SURF_FOAM_FRONT of a wave before its crest the foam rises,
+ * softening the bore's front. A broken wave is white water whatever its
+ * height, which sets how far it runs rather than how white it is: the foam is
+ * full from SURF_FOAM_FULL of the full height up, the wave sets and segments
+ * that weaken a wave below that only thinning it towards nothing.
+ */
+const SURF_FOAM_FRONT = 0.04;
+const SURF_FOAM_FULL = 0.25;
 /**
  * Seconds over which the water's speed at a wall is averaged before it makes
  * foam there, about a wave period: see the wall foam step.
@@ -186,6 +201,8 @@ const SHORE_TRUST_START = 0.5;
 let inverseTexture: Nullable<Texture2D> = null;
 /** Names the level weights of callers that do not want them. */
 let weightLocals = 0;
+/** Names the surf out parameter of evaluate's callers that do not want it. */
+let surfLocals = 0;
 const COMPONENTS = ['x', 'y', 'z', 'w'] as const;
 
 /**
@@ -264,6 +281,14 @@ export interface ShoreWaveSettings {
   wallFoamMaxSpeed?: number;
   /** Speed in metres per second the foam drifts out from a wall at, which sets how wide a ring it makes. Defaults to 0.3. */
   wallFoamDrift?: number;
+  /** Seconds the foam a breaking wave brings in takes to fade to about a third, behind its crest and up the beach (see SURF_FOAM). Defaults to 1.5. */
+  surfFoamDuration?: number;
+  /** Water depth in metres at and below which foam stays where it is (see FOAM_SETTLE). Defaults to 0.02. */
+  foamSettleDepth?: number;
+  /** Water depth in metres at and beyond which foam drifts freely (see FOAM_SETTLE). Defaults to 0.3. */
+  foamDriftDepth?: number;
+  /** Share of the foam's fade rate settled foam fades at, 0..1 (see FOAM_SETTLE). Defaults to 0.25. */
+  settledFoamFade?: number;
 }
 
 /**
@@ -304,8 +329,10 @@ export class ShoreWaveGenerator extends Disposable implements WaveGenerator, Foa
   private readonly _wave: Vector4;
   /** (sharpness at the shore, lean at the shore, wave clock of the previous frame, period in seconds) */
   private readonly _shape: Vector4;
-  /** (wave cycles the irregularity spans, wall foam drift speed, 0, 0) */
+  /** (wave cycles the irregularity spans, wall foam drift speed, 1 / surf foam duration, 0) */
   private readonly _vary: Vector4;
+  /** (foam settle depth, foam drift depth, settled foam fade, 0), see FOAM_SETTLE */
+  private readonly _settle: Vector4;
   /** What the open water feeds the foam field with, which the shore waves add theirs to. */
   private readonly _baseFoamSource: FoamFieldSource;
   /** (wave foam strength, wave foam coverage, shoreline foam strength, shoreline foam max depth) */
@@ -314,7 +341,6 @@ export class ShoreWaveGenerator extends Disposable implements WaveGenerator, Foa
   private readonly _wallFoamParams: Vector4;
   /** The foam field step reads the shore waves under this key. */
   readonly foamSourceKey: string;
-  readonly supportsFoamDeposition = true;
   calcUnresolvedSlopeVariance?: WaveGenerator['calcUnresolvedSlopeVariance'];
   constructor(base: WaveGenerator, settings: ShoreWaveSettings, baseFoamSource: FoamFieldSource) {
     super();
@@ -336,6 +362,7 @@ export class ShoreWaveGenerator extends Disposable implements WaveGenerator, Foa
     this._wave = new Vector4(0, 1, 1, 0);
     this._shape = new Vector4(0, 0, 0, 0);
     this._vary = new Vector4(0, 0, 0, 0);
+    this._settle = new Vector4(0, 0, 0, 0);
     this._foamSourceParams = new Vector4();
     this._wallFoamParams = new Vector4();
   }
@@ -393,6 +420,14 @@ export class ShoreWaveGenerator extends Disposable implements WaveGenerator, Foa
     );
     this._vary.x = Math.min(Math.max(s.irregularity ?? 0.6, 0), 1) * IRREGULAR_AMPLITUDE;
     this._vary.y = Math.max(0, s.wallFoamDrift ?? 0.3);
+    this._vary.z = 1 / Math.max(0.05, s.surfFoamDuration ?? 1.5);
+    const settleDepth = Math.max(0, s.foamSettleDepth ?? 0.02);
+    this._settle.setXYZW(
+      settleDepth,
+      Math.max(settleDepth + 1e-3, s.foamDriftDepth ?? 0.3),
+      Math.min(Math.max(s.settledFoamFade ?? 0.25, 0.01), 1),
+      0
+    );
     this._version++;
   }
   setupFoamSourceUniforms(scope: PBGlobalScope) {
@@ -424,12 +459,13 @@ export class ShoreWaveGenerator extends Disposable implements WaveGenerator, Foa
     bindGroup.setValue('swWallFoam', this._wallFoamParams);
   }
   /**
-   * The velocity carrying the foam (drift and the swash, led along walls) and
-   * the foam the shore waves make this step: from the waves where their
-   * displacement squeezes the water and from shallow water, both prewarmed as
-   * Crest does, and from the water dashing against walls (see FOAM_WALL);
-   * added to the open water's. Keeps the wrapped generator's displacement in
-   * the field's state near walls.
+   * The velocity carrying the foam (the drift, led along walls, slowed in
+   * shallow water, see FOAM_SETTLE) and the foam the shore waves make this
+   * step: from the waves where their displacement squeezes the water and from
+   * shallow water past the surf, both prewarmed as Crest does, and from the
+   * water dashing against walls (see FOAM_WALL); added to the open water's.
+   * Raises the foam to the surf's (see SURF_FOAM) through the state's z, and
+   * keeps the wrapped generator's displacement in the field's state near walls.
    */
   calcFoamStep(
     scope: PBInsideFunctionScope,
@@ -438,46 +474,62 @@ export class ShoreWaveGenerator extends Disposable implements WaveGenerator, Foa
     fadeRate: PBShaderExp,
     prewarm: PBShaderExp,
     state: PBShaderExp,
-    contact?: PBShaderExp
+    shape: PBShaderExp
   ): PBShaderExp {
     const pb = scope.$builder;
     const that = this;
-    const funcName = contact ? 'swFoamDepositStep' : 'swFoamStep';
     pb.func(
-      funcName,
+      'swFoamStep',
       [
         pb.vec2('xz'),
         pb.float('dt'),
         pb.float('fadeRate'),
         pb.bool('prewarm'),
         pb.vec4('state').inout(),
-        ...(contact ? [pb.vec2('contact').out()] : [])
+        pb.vec2('shape').inout()
       ],
       function () {
-        if (contact) {
-          this.contact = pb.vec2(0);
-        }
         this.$l.baseStep = that._baseFoamSource.calcFoamStep(
           this,
           this.xz,
           this.dt,
           this.fadeRate,
           this.prewarm,
-          this.state
+          this.state,
+          this.shape
         );
         this.$l.waveStrength = this.swFoamSource.x;
         this.$l.dir = pb.vec4(0);
         this.$l.spacing = pb.float(0);
         this.$l.coverage = pb.float(1);
-        this.$l.sw = that.evaluate(this, this.xz, this.dir, this.spacing, this.coverage);
-        this.$l.wall = that.wall(this, this.xz);
-        // Drift alone, stopping near the shore (see nearShore): the onshore-
-        // only surge would continuously pump foam onto the beach, and the
-        // swash would strip it (see below).
-        this.$l.velocity = pb.mul(
-          that.slip(this, this.wall, this.baseStep.xy),
-          pb.sub(1, that.nearShore(this, this.xz).x)
+        this.$l.surf = pb.vec4(0);
+        this.$l.sw = that.evaluate(
+          this,
+          this.xz,
+          this.dir,
+          this.spacing,
+          this.coverage,
+          undefined,
+          undefined,
+          this.surf
         );
+        this.$l.wall = that.wall(this, this.xz);
+        this.$l.near = that.nearShore(this, this.xz);
+        this.$l.wl = pb.vec4(0);
+        this.$l.gridFade = that.waterlineAt(this, this.xz, this.wl);
+        this.$l.onField = pb.and(pb.greaterThan(this.swWave.x, 0), pb.greaterThanEqual(this.gridFade, 0));
+        // Depth under the displaced surface, 0 on dry sand; deep off the field
+        this.$l.depth = pb.float(1e4);
+        this.$if(this.onField, function () {
+          this.depth = pb.max(pb.sub(this.sw.x, this.wl.z), 0);
+        });
+        // The drift, led along walls, as much of it as the depth lets carry the
+        // foam (see FOAM_SETTLE), faded out towards the edge of the field
+        this.$l.settle = pb.mul(
+          pb.sub(1, pb.smoothStep(this.swSettle.x, this.swSettle.y, this.depth)),
+          pb.max(this.gridFade, 0)
+        );
+        this.$l.velocity = pb.mul(that.slip(this, this.wall, this.baseStep.xy), pb.sub(1, this.settle));
         this.$l.waveDt = this.$choice(
           this.prewarm,
           pb.max(this.dt, pb.div(pb.min(1, pb.sub(this.waveStrength, 1)), this.fadeRate)),
@@ -493,78 +545,31 @@ export class ShoreWaveGenerator extends Disposable implements WaveGenerator, Foa
         // Crest makes it, scaled by the kinetic-energy potential of Ihmsen et al.
         // (eq. (8), I_k = Phi(E_k)) of the water's speed under the shore waves,
         // per unit mass between the wall foam's speeds: made while a crest surges
-        // in or the swash runs, not where the water lies still or has drained.
-        // Only where there is water (unlike Crest, which feeds dry land the swash
-        // would later run over), only on the waterline field, and faded towards
-        // its edge as the waves are
-        this.$l.wl = pb.vec4(0);
-        this.$l.gridFade = that.waterlineAt(this, this.xz, this.wl);
+        // in, not where the water lies still. Only where there is water, only on
+        // the waterline field, faded towards its edge as the waves are, and not
+        // in the surf, whose foam is the bores' (see SURF_FOAM): there it would
+        // gather most where the sheet lingers, at the swash's highest reach.
         this.$if(
-          pb.and(pb.greaterThan(this.swWave.x, 0), pb.greaterThanEqual(this.gridFade, 0)),
+          pb.and(this.onField, pb.and(pb.greaterThan(this.depth, 0), pb.lessThan(this.near.x, 1))),
           function () {
-            this.$l.depth = pb.sub(this.sw.x, this.wl.z);
             this.$l.shoreDt = this.$choice(this.prewarm, pb.div(1, this.fadeRate), this.dt);
-            this.shoreDt = pb.mul(this.shoreDt, this.gridFade);
-            if (contact) {
-              // Beach the swash reaches: a dry cell strands the foam the
-              // drained sheet held. Farther inland, nothing comes to rest.
-              this.$l.beach = pb.mul(
-                pb.smoothStep(0, SWASH_EDGE_SOFT, pb.neg(this.wl.x)),
-                pb.smoothStep(SHELVING_MIN, SHELVING_FULL, this.wl.y),
-                this.gridFade,
-                this.$choice(
-                  pb.greaterThan(
-                    this.wl.x,
-                    pb.neg(
-                      pb.add(pb.mul(this.swWave.x, pb.clamp(this.wl.y, 1, B_MAX), 1.5), SWASH_EDGE_EXTEND)
-                    )
-                  ),
-                  pb.float(1),
-                  pb.float(0)
-                )
-              );
-              this.contact = pb.vec2(pb.mul(FOAM_STRAND_RATE, this.beach), 1);
-            }
-            this.$if(pb.greaterThan(this.depth, 0), function () {
-              // The swash does not carry the field's foam: advected with the
-              // ballistic sheet, it all piles up at the highest reach, which
-              // drains and keeps it, while the backwash strips the beach below
-              // and leaves a band apart from the water. Foam stays where the
-              // waves made it and settles on the sand as the sheet thins.
-              if (contact) {
-                // The thinner the sheet, the faster its foam settles. Not
-                // weighed by coverage, which reaches 0 just as the sheet is
-                // thinnest; the sheet's front, thinning to nothing, strands
-                // what it carries as the drained ground does.
-                this.contact = pb.vec2(
-                  pb.mul(
-                    this.beach,
-                    pb.mix(
-                      FOAM_STRAND_RATE,
-                      pb.mul(FOAM_DEPOSIT_RATE, pb.sub(1, pb.smoothStep(0, FOAM_DEPOSIT_DEPTH, this.depth))),
-                      this.coverage
-                    )
-                  ),
-                  pb.sub(1, this.coverage)
-                );
-              }
-              this.$l.shoreEnergy = pb.mul(this.sw.w, this.sw.w, 0.5);
-              this.$l.shoreEMin = pb.mul(this.swWallFoam.y, this.swWallFoam.y, 0.5);
-              this.$l.shoreEMax = pb.mul(this.swWallFoam.z, this.swWallFoam.z, 0.5);
-              this.$l.shoreKinetic = pb.div(
-                pb.sub(pb.min(this.shoreEnergy, this.shoreEMax), pb.min(this.shoreEnergy, this.shoreEMin)),
-                pb.max(pb.sub(this.shoreEMax, this.shoreEMin), 1e-6)
-              );
-              this.foam = pb.add(
-                this.foam,
-                pb.mul(
-                  this.swFoamSource.z,
-                  this.shoreDt,
-                  this.shoreKinetic,
-                  pb.clamp(pb.sub(1, pb.div(this.depth, this.swFoamSource.w)), 0, 1)
-                )
-              );
-            });
+            this.shoreDt = pb.mul(this.shoreDt, this.gridFade, pb.sub(1, this.near.x));
+            this.$l.shoreEnergy = pb.mul(this.sw.w, this.sw.w, 0.5);
+            this.$l.shoreEMin = pb.mul(this.swWallFoam.y, this.swWallFoam.y, 0.5);
+            this.$l.shoreEMax = pb.mul(this.swWallFoam.z, this.swWallFoam.z, 0.5);
+            this.$l.shoreKinetic = pb.div(
+              pb.sub(pb.min(this.shoreEnergy, this.shoreEMax), pb.min(this.shoreEnergy, this.shoreEMin)),
+              pb.max(pb.sub(this.shoreEMax, this.shoreEMin), 1e-6)
+            );
+            this.foam = pb.add(
+              this.foam,
+              pb.mul(
+                this.swFoamSource.z,
+                this.shoreDt,
+                this.shoreKinetic,
+                pb.clamp(pb.sub(1, pb.div(this.depth, this.swFoamSource.w)), 0, 1)
+              )
+            );
           }
         );
         // Foam from the water dashing against a wall: the trapped-air potential
@@ -625,20 +630,24 @@ export class ShoreWaveGenerator extends Disposable implements WaveGenerator, Foa
             this.state = pb.vec4(this.rise, this.avgSpeed, 0, this.state.w);
           }
         );
+        // The surf's foam on the water there is (see SURF_FOAM): the field holds
+        // it, and where the sheet drains, keeps it on the sand (see FOAM_SETTLE),
+        // where it fades the slower the more it has settled
+        this.shape = pb.vec2(
+          pb.mul(that.surfFoam(this, this.near, this.surf), this.coverage),
+          pb.mix(1, this.swSettle.z, this.settle)
+        );
         this.$return(
           pb.vec4(this.velocity, pb.add(this.baseStep.z, this.foam), pb.add(this.baseStep.w, this.wallFoam))
         );
       }
     );
-    return (
-      contact
-        ? scope[funcName](xz, dt, fadeRate, prewarm, state, contact)
-        : scope[funcName](xz, dt, fadeRate, prewarm, state)
-    ) as PBShaderExp;
+    return scope.swFoamStep(xz, dt, fadeRate, prewarm, state, shape) as PBShaderExp;
   }
   /**
-   * Restricts projected, deposited foam to the beach bed. The mesh above it
-   * only carries the draw; a scene point supplies the actual ground position.
+   * Restricts the foam projected onto the ground to the beach bed. The mesh
+   * above it only carries the draw; a scene point supplies the actual ground
+   * position.
    */
   calcFoamGroundMask(scope: PBInsideFunctionScope, worldPos: PBShaderExp): PBShaderExp {
     const pb = scope.$builder;
@@ -651,10 +660,10 @@ export class ShoreWaveGenerator extends Disposable implements WaveGenerator, Foa
       });
       this.$l.bed = pb.add(this.swGrid.w, this.wl.z);
       this.$l.reach = pb.mul(this.swWave.x, pb.clamp(this.wl.y, 1, B_MAX));
-      // This is a bed-support mask, shared by thin mobile and deposited foam.
-      // Do not cut at the static waterline: a raised, dry carrier can project
-      // to wet ground just seaward of it, leaving neither layer visible there.
-      // Sheet thickness controls the handover; deposition itself stays onshore.
+      // A bed-support mask. Not cut at the still waterline: a raised, dry
+      // carrier can project to wet ground just seaward of it, leaving neither
+      // the water nor the ground showing foam there. Sheet thickness controls
+      // the handover.
       this.$return(
         pb.mul(
           pb.smoothStep(SHELVING_MIN, SHELVING_FULL, this.wl.y),
@@ -685,14 +694,19 @@ export class ShoreWaveGenerator extends Disposable implements WaveGenerator, Foa
       // in Portal 2", SIGGRAPH 2010) needs a smooth, slowly varying flow, as
       // Crest's currents are, and the surge and swash jump at the waterline and
       // shear along the beach. The field still carries the foam with the waves.
-      // Standing still near the shore, as the field's foam does there, so
-      // the water's foam pattern and the beach's are one.
-      this.$return(
-        pb.mul(
-          that.slip(this, that.wall(this, this.xz), this.drift),
-          pb.sub(1, that.nearShore(this, this.xz).x)
-        )
-      );
+      // Slowed in shallow water as the field's foam is (see FOAM_SETTLE), so
+      // the water's foam pattern and the beach's are one; by the still-water
+      // depth, which a pattern sliding at the waves' pace would tear on.
+      this.$l.wl = pb.vec4(0);
+      this.$l.gridFade = that.waterlineAt(this, this.xz, this.wl);
+      this.$l.settle = pb.float(0);
+      this.$if(pb.and(pb.greaterThan(this.swWave.x, 0), pb.greaterThanEqual(this.gridFade, 0)), function () {
+        this.settle = pb.mul(
+          pb.sub(1, pb.smoothStep(this.swSettle.x, this.swSettle.y, pb.max(pb.neg(this.wl.z), 0))),
+          this.gridFade
+        );
+      });
+      this.$return(pb.mul(that.slip(this, that.wall(this, this.xz), this.drift), pb.sub(1, this.settle)));
     });
     return scope.swFoamFlow(xz, drift) as PBShaderExp;
   }
@@ -884,8 +898,10 @@ export class ShoreWaveGenerator extends Disposable implements WaveGenerator, Foa
     scope.swGrid = pb.vec4().uniform(uniformGroup);
     scope.swWave = pb.vec4().uniform(uniformGroup);
     scope.swShape = pb.vec4().uniform(uniformGroup);
-    // (irregularity: wave cycles J spans, wall foam drift speed, 0, 0)
+    // (irregularity: wave cycles J spans, wall foam drift speed, 1 / surf foam duration, 0)
     scope.swVary = pb.vec4().uniform(uniformGroup);
+    // (foam settle depth, foam drift depth, settled foam fade, 0)
+    scope.swSettle = pb.vec4().uniform(uniformGroup);
   }
   /** @internal */
   private applyShoreBindGroup(bindGroup: BindGroup) {
@@ -900,6 +916,7 @@ export class ShoreWaveGenerator extends Disposable implements WaveGenerator, Foa
     bindGroup.setValue('swWave', this._wave);
     bindGroup.setValue('swShape', this._shape);
     bindGroup.setValue('swVary', this._vary);
+    bindGroup.setValue('swSettle', this._settle);
   }
   /**
    * Shore wave at an undisplaced world XZ, at a wave clock (time over period):
@@ -911,6 +928,10 @@ export class ShoreWaveGenerator extends Disposable implements WaveGenerator, Foa
    * generator's chop dying near the shore z, bed height the surface is held
    * over w, far below the water where it is not), `spacing`, the distance
    * between crests here, and `coverage`, the water's share of the surface.
+   * `surf`, when given, gets (seconds since the last crest passed here, on
+   * the waterline's clock inland, which the swash keeps (see SURF_FOAM); the
+   * wave's share of the full height; X, the share of a wave since the crest;
+   * the depth of the water over the bed), and (1e4, 0, 0, 0) off the shore zone.
    * `cell` is the distance between mesh vertices to
    * band-limit to, 0 for the full profile.
    * @internal
@@ -922,7 +943,8 @@ export class ShoreWaveGenerator extends Disposable implements WaveGenerator, Foa
     spacing: PBShaderExp,
     coverage: PBShaderExp,
     tPhase?: PBShaderExp,
-    cell?: PBShaderExp
+    cell?: PBShaderExp,
+    surf?: PBShaderExp
   ): PBShaderExp {
     const pb = scope.$builder;
     const that = this;
@@ -934,13 +956,15 @@ export class ShoreWaveGenerator extends Disposable implements WaveGenerator, Foa
         pb.float('spacing').out(),
         pb.float('coverage').out(),
         pb.float('tPhase'),
-        pb.float('cell')
+        pb.float('cell'),
+        pb.vec4('surf').out()
       ],
       function () {
         // No bed to hold the surface over, unless the shore says otherwise
         this.dir = pb.vec4(0, 0, 0, -1e4);
         this.spacing = pb.float(1);
         this.coverage = pb.float(1);
+        this.surf = pb.vec4(1e4, 0, 0, 0);
         // Shore coordinates: (signed distance to the waterline, negative inland;
         // bed B; bed height over the rest level)
         this.$l.wl = pb.vec4(0);
@@ -1114,6 +1138,19 @@ export class ShoreWaveGenerator extends Disposable implements WaveGenerator, Foa
         );
         // The wrapped generator's chop dies near the shore
         this.dir.z = pb.mul(pb.sub(1, pb.smoothStep(0, CHOP_FADE, this.d)), this.shelving);
+        // Seconds since the crest passed: the phase advances at rate / period a
+        // second, and X counts it from the crest. Inland the phase is the
+        // waterline's, so the swash's age goes on from the bore's.
+        this.surf = pb.vec4(
+          pb.div(pb.mul(this.X, this.swShape.w), this.rate),
+          this.$choice(
+            pb.greaterThan(this.d, 0),
+            pb.div(this.amp, pb.max(this.swWave.x, 1e-4)),
+            pb.mul(this.swashSet, this.shelving)
+          ),
+          this.X,
+          0
+        );
         // The water rises straight up and is wet wherever it stands over the bed.
         // Near that edge the mesh is held clear of the bed and cut per pixel, only
         // where the water could reach (not on dunes higher than the highest water)
@@ -1210,16 +1247,23 @@ export class ShoreWaveGenerator extends Disposable implements WaveGenerator, Foa
           // The swash runs up as a sheet, not squeezed
           this.det = pb.float(1);
         });
+        this.surf.w = pb.max(pb.sub(this.height, this.wl.z), 0);
         this.$return(pb.vec4(this.height, this.slope, this.det, this.flow));
       }
     );
+    if (!surf) {
+      const name = `swSurfUnused${surfLocals++}`;
+      scope.$l[name] = pb.vec4(0);
+      surf = scope[name] as PBShaderExp;
+    }
     return scope.swEvaluate(
       xz,
       dir,
       spacing,
       coverage,
       tPhase ?? scope.swWave.w,
-      cell ?? pb.float(0)
+      cell ?? pb.float(0),
+      surf
     ) as PBShaderExp;
   }
   /**
@@ -1326,10 +1370,9 @@ export class ShoreWaveGenerator extends Disposable implements WaveGenerator, Foa
    * The near-shore zone at an undisplaced XZ, as vec2(weight, foam density):
    * weight 1 where the still water is shallower than the breaking depth and
    * on the beach, 0 in the open water, off a beach or off the field; the
-   * density the foam is at least shown with there. Both depend only on the
-   * still-water depth, which is continuous from the open water across the
-   * waterline (0 inland) and does not pulse as the crests pass. Not a
-   * simulation: it makes the breaking waves' foam and the beach's one sheet.
+   * density of the surf's foam just behind a crest there (see SURF_FOAM).
+   * Both depend only on the still-water depth, which is continuous from the
+   * open water across the waterline (0 inland).
    */
   nearShore(scope: PBInsideFunctionScope, xz: PBShaderExp): PBShaderExp {
     const pb = scope.$builder;
@@ -1359,16 +1402,51 @@ export class ShoreWaveGenerator extends Disposable implements WaveGenerator, Foa
   }
   /**
    * Foam density shown at an undisplaced XZ from the field's: in the
-   * near-shore zone at least its density, blended in over the zone's edge.
+   * near-shore zone at least the surf's foam, which each crest brings in and
+   * which fades behind it (see SURF_FOAM).
    */
   calcNearShoreFoam(scope: PBInsideFunctionScope, xz: PBShaderExp, density: PBShaderExp): PBShaderExp {
     const pb = scope.$builder;
     const that = this;
     pb.func('swNearShoreFoam', [pb.vec2('xz'), pb.float('density')], function () {
       this.$l.ns = that.nearShore(this, this.xz);
-      this.$return(pb.mix(this.density, pb.max(this.density, this.ns.y), this.ns.x));
+      this.$if(pb.lessThanEqual(this.ns.x, 0), function () {
+        this.$return(this.density);
+      });
+      this.$l.dir = pb.vec4(0);
+      this.$l.spacing = pb.float(0);
+      this.$l.coverage = pb.float(1);
+      this.$l.surf = pb.vec4(0);
+      that.evaluate(this, this.xz, this.dir, this.spacing, this.coverage, undefined, undefined, this.surf);
+      this.$return(pb.max(this.density, that.surfFoam(this, this.ns, this.surf)));
     });
     return scope.swNearShoreFoam(xz, density) as PBShaderExp;
+  }
+  /**
+   * Density of the surf's foam (see SURF_FOAM), from the near-shore zone (see
+   * nearShore) and the wave's `surf` output of evaluate.
+   * @internal
+   */
+  private surfFoam(scope: PBInsideFunctionScope, near: PBShaderExp, surf: PBShaderExp): PBShaderExp {
+    const pb = scope.$builder;
+    pb.func('swSurfFoam', [pb.vec2('near'), pb.vec4('surf')], function () {
+      // The roller rises over the front face just before the crest, then fades;
+      // the slower the shallower the water it rides up the beach on, as foam
+      // settled there does in the field (see FOAM_SETTLE), so the swash keeps
+      // the bore's foam rather than losing it on the way up
+      this.$l.front = pb.smoothStep(1 - SURF_FOAM_FRONT, 1, this.surf.z);
+      this.$l.settle = pb.sub(1, pb.smoothStep(this.swSettle.x, this.swSettle.y, this.surf.w));
+      this.$l.rate = pb.mul(this.swVary.z, pb.mix(1, this.swSettle.z, this.settle));
+      this.$return(
+        pb.mul(
+          this.near.x,
+          this.near.y,
+          pb.smoothStep(0, SURF_FOAM_FULL, this.surf.y),
+          pb.max(pb.exp(pb.neg(pb.mul(this.surf.x, this.rate))), this.front)
+        )
+      );
+    });
+    return scope.swSurfFoam(near, surf) as PBShaderExp;
   }
   /**
    * The water's edge on the beach, per pixel: 1 where the water stands over the

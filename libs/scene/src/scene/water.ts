@@ -619,6 +619,34 @@ export class Water extends applyMixins(GraphNode, mixinDrawable) implements Draw
   set wallFoamDrift(val: number) {
     this.material.wallFoamDrift = val;
   }
+  /** Seconds the foam each breaking wave brings in lasts, behind the crest and up the beach. */
+  get surfFoamDuration() {
+    return this.material.surfFoamDuration;
+  }
+  set surfFoamDuration(val: number) {
+    this.material.surfFoamDuration = val;
+  }
+  /** Water depth in metres at and below which foam stops drifting and stays where it is. */
+  get foamSettleDepth() {
+    return this.material.foamSettleDepth;
+  }
+  set foamSettleDepth(val: number) {
+    this.material.foamSettleDepth = val;
+  }
+  /** Water depth in metres at and beyond which foam drifts freely. */
+  get foamDriftDepth() {
+    return this.material.foamDriftDepth;
+  }
+  set foamDriftDepth(val: number) {
+    this.material.foamDriftDepth = val;
+  }
+  /** How fast foam settled in shallow water and on the sand fades, as a share of the foam's fade. */
+  get settledFoamFade() {
+    return this.material.settledFoamFade;
+  }
+  set settledFoamFade(val: number) {
+    this.material.settledFoamFade = val;
+  }
   /**
    * How the refracted view sample is located. Defaults to `march`.
    *

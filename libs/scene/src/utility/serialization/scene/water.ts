@@ -1695,6 +1695,74 @@ export function getWaterClass(manager: ResourceManager): SerializableClass {
             }
           },
           {
+            name: 'SurfFoamDuration',
+            description:
+              'How long, in seconds, the foam of each breaking wave lasts as the wave comes in and washes up the beach: higher for long white trails behind the crests and foam carried all the way up the sand, lower for brief flashes of white that clear before the wave has run up.',
+            type: 'float',
+            default: 1.5,
+            options: { animatable: true, minValue: 0.05, maxValue: 6 },
+            isHidden(this: Water) {
+              return this.shoreWaveHeight <= 0;
+            },
+            get(this: Water, value) {
+              value.num[0] = this.surfFoamDuration;
+            },
+            set(this: Water, value) {
+              this.surfFoamDuration = value.num[0];
+            }
+          },
+          {
+            name: 'FoamSettleDepth',
+            description:
+              'Water depth in metres at and below which foam stops drifting and stays where it is, on the thin wash and the wet sand alike, until it fades: higher to leave foam lying over a wider band of the shallows and the beach, lower to let it drift until the water is almost gone.',
+            type: 'float',
+            default: 0.02,
+            options: { animatable: true, minValue: 0, maxValue: 1 },
+            isHidden(this: Water) {
+              return this.shoreWaveHeight <= 0;
+            },
+            get(this: Water, value) {
+              value.num[0] = this.foamSettleDepth;
+            },
+            set(this: Water, value) {
+              this.foamSettleDepth = value.num[0];
+            }
+          },
+          {
+            name: 'FoamDriftDepth',
+            description:
+              'Water depth in metres at and beyond which foam drifts freely with the water; between this and FoamSettleDepth it slows down the shallower the water gets. Higher to calm the foam over a wider band of shallow water, lower to keep it moving until close in.',
+            type: 'float',
+            default: 0.3,
+            options: { animatable: true, minValue: 0, maxValue: 3 },
+            isHidden(this: Water) {
+              return this.shoreWaveHeight <= 0;
+            },
+            get(this: Water, value) {
+              value.num[0] = this.foamDriftDepth;
+            },
+            set(this: Water, value) {
+              this.foamDriftDepth = value.num[0];
+            }
+          },
+          {
+            name: 'SettledFoamFade',
+            description:
+              'How fast foam that has come to rest in shallow water and on the sand fades, compared with foam on open water: lower to leave the foam lying on the beach longer after each wave drains, 1 to let it vanish as quickly as foam out at sea.',
+            type: 'float',
+            default: 0.25,
+            options: { animatable: true, minValue: 0.01, maxValue: 1 },
+            isHidden(this: Water) {
+              return this.shoreWaveHeight <= 0;
+            },
+            get(this: Water, value) {
+              value.num[0] = this.settledFoamFade;
+            },
+            set(this: Water, value) {
+              this.settledFoamFade = value.num[0];
+            }
+          },
+          {
             name: 'CheapRefractionDepth',
             description:
               'Depth in meters the cheap refraction mode assumes the water is. Sets how strong the distortion looks when RefractionMode is Offset; ignored by March. A constant rather than the measured distance to the bottom, because an offset scaled by that distance paints a second copy of any object breaking the surface.',

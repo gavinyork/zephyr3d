@@ -85,7 +85,8 @@ export type WaterRefractionMode = 'march' | 'offset';
  *   ground wet coverage and blue is the ground-foam replacement weight.
  *   Magenta identifies wet carrier pixels being replaced by dry ground.
  * - `swashFoamSources`: red is carrier foam density, green is wet ground
- *   mobile density and blue is deposited density, before texture cutting.
+ *   field density and blue is the surf's foam on the wet ground, before
+ *   texture cutting.
  * - `swashFoamCuts`: red is surface foam opacity, green is ground foam
  *   opacity and blue is the ground replacement weight, after texture cutting.
  * - `swashVisibility`: reveals discarded beach fragments in red and fragments
@@ -280,7 +281,11 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
     wallFoamStrength: 1,
     wallFoamMinSpeed: 0.2,
     wallFoamMaxSpeed: 1.5,
-    wallFoamDrift: 0.3
+    wallFoamDrift: 0.3,
+    surfFoamDuration: 1.5,
+    foamSettleDepth: 0.02,
+    foamDriftDepth: 0.3,
+    settledFoamFade: 0.25
   };
   /** The shore wave layer of the effective generator, while the waves are on. */
   private _shoreWaveGenerator: Nullable<ShoreWaveGenerator> = null;
@@ -1389,8 +1394,8 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
       } else if (this.debugOutput === 'swashHandover') {
         scope.$l.groundWetCoverage = pb.float(0);
       } else if (this.debugOutput === 'swashFoamSources') {
-        scope.$l.groundMobileDensity = pb.float(0);
-        scope.$l.groundDepositedDensity = pb.float(0);
+        scope.$l.groundFieldDensity = pb.float(0);
+        scope.$l.groundSurfDensity = pb.float(0);
       }
       if (this._shoreWaveGenerator && this._foamFieldGenerator) {
         // Derivatives precede all coverage branches; pattern coordinates stay
@@ -1407,11 +1412,10 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
         scope.$if(
           pb.and(pb.lessThan(scope.scenePos.w, SCENE_SKY_DEPTH01), pb.greaterThan(scope.groundMask, 0)),
           function () {
-            // Thin-film mobile foam and deposited foam share the actual ground
-            // position and one texture cut. The deposit is an imprint of the
-            // drifting foam, so the two are not added: the more of them shows.
+            // The field's foam at the actual ground position: on a thin sheet and
+            // on the sand it drained from alike, the field holding it there
+            // (FOAM_SETTLE of the shore waves)
             this.$l.groundMobile = field.sample(this, this.scenePos.xz);
-            this.$l.deposited = field.sampleDeposited(this, this.scenePos.xz);
             this.$l.groundWet = shore.calcSurfaceCoverage(this, this.scenePos.xz);
             this.$l.groundThickness = shore.calcSheetThickness(this, this.scenePos.xz);
             // Coverage and handover describe the same carrier point. Using the
@@ -1428,8 +1432,11 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
             } else if (debugOutput === 'swashHandover') {
               this.groundWetCoverage = this.groundWet;
             } else if (debugOutput === 'swashFoamSources') {
-              this.groundMobileDensity = pb.mul(this.groundMobile.x, this.groundWet);
-              this.groundDepositedDensity = this.deposited.x;
+              this.groundFieldDensity = this.groundMobile.x;
+              this.groundSurfDensity = pb.mul(
+                shore.calcNearShoreFoam(this, this.scenePos.xz, pb.float(0)),
+                this.groundWet
+              );
             }
             this.groundFoamWeight = pb.mul(
               this.groundMask,
@@ -1442,10 +1449,11 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
                 pb.float(0)
               )
             );
+            // The surf's foam only where the sheet now is; the field's wherever it holds it
             this.groundFoamDensity = pb.clamp(
               pb.max(
-                pb.mul(shore.calcNearShoreFoam(this, this.scenePos.xz, this.groundMobile.x), this.groundWet),
-                this.deposited.x
+                this.groundMobile.x,
+                pb.mul(shore.calcNearShoreFoam(this, this.scenePos.xz, pb.float(0)), this.groundWet)
               ),
               0,
               1
@@ -1546,12 +1554,7 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
           1
         );
       } else if (this.debugOutput === 'swashFoamSources') {
-        scope.$l.outColor = pb.vec4(
-          scope.normal.w,
-          scope.groundMobileDensity,
-          scope.groundDepositedDensity,
-          1
-        );
+        scope.$l.outColor = pb.vec4(scope.normal.w, scope.groundFieldDensity, scope.groundSurfDensity, 1);
       } else if (this.debugOutput === 'interaction') {
         // The field on its own, grey at rest, scaled so its amplitude clamp
         // reaches black and white; dimmed outside the window so its reach shows.
@@ -2033,7 +2036,7 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
     const pb = scope.$builder;
     const that = this;
     const debugOutput = this.debugOutput;
-    const hasDepositedFoam = !!(this._shoreWaveGenerator && this._foamFieldGenerator);
+    const hasGroundFoam = !!(this._shoreWaveGenerator && this._foamFieldGenerator);
     // The environment's prefiltered radiance, for the distant sky reflection
     const envLight = this.needCalculateEnvLight() ? (this.drawContext.env?.light.envLight ?? null) : null;
     // Transmittance over `depth` meters of path.
@@ -2472,7 +2475,7 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
         this.$l.foamRadiance = pb.vec3(0);
         this.$l.groundFoamOpacity = pb.float(0);
         this.$l.groundFoamRadiance = pb.vec3(0);
-        if (hasDepositedFoam) {
+        if (hasGroundFoam) {
           this.$if(pb.greaterThan(this.groundFoamDensity, 1e-3), function () {
             this.$l.groundFoamWhite = this.waterWhiteFoam(
               pb.clamp(
@@ -2635,7 +2638,7 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
             this.lightContrib = pb.mul(this.lightContrib, this.shadow);
           }
           this.foamRadiance = pb.add(this.foamRadiance, pb.mul(this.foamLight, this.shadow));
-          if (hasDepositedFoam) {
+          if (hasGroundFoam) {
             this.$if(pb.greaterThan(this.groundFoamOpacity, 0), function () {
               this.$l.groundNoL = pb.clamp(
                 pb.div(
@@ -2683,7 +2686,7 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
           this.$l.foamAmbient = pb.mul(this.irradiance, this.foamColor, this.foam, 1 / Math.PI);
           this.finalColor = pb.add(this.finalColor, this.foamAmbient);
           this.foamRadiance = pb.add(this.foamRadiance, this.foamAmbient);
-          if (hasDepositedFoam) {
+          if (hasGroundFoam) {
             this.groundFoamRadiance = pb.add(
               this.groundFoamRadiance,
               pb.mul(
@@ -2761,7 +2764,7 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
               pb.mul(this.foamRadiance, this.foamFade)
             );
           });
-          if (hasDepositedFoam) {
+          if (hasGroundFoam) {
             this.$if(pb.greaterThan(this.groundFoamWeight, 0), function () {
               this.$l.groundBehind = pb.textureSampleLevel(
                 ShaderHelper.getSceneColorTexture(this),
@@ -3084,6 +3087,50 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
   }
   set wallFoamDrift(val: number) {
     this._shoreWaves.wallFoamDrift = Math.max(0, val);
+  }
+  /**
+   * Seconds the foam each breaking wave brings in lasts: higher for longer
+   * white trails behind the crests and foam that stays on the swash all the
+   * way up the beach, lower for brief flashes of white at the crests.
+   */
+  get surfFoamDuration() {
+    return this._shoreWaves.surfFoamDuration!;
+  }
+  set surfFoamDuration(val: number) {
+    this._shoreWaves.surfFoamDuration = Math.max(0.05, val);
+  }
+  /**
+   * Water depth in metres at and below which foam stops drifting and stays
+   * where it is: higher to leave foam lying over a wider band of the shallows
+   * and the beach, lower to let it drift until the water is almost gone.
+   */
+  get foamSettleDepth() {
+    return this._shoreWaves.foamSettleDepth!;
+  }
+  set foamSettleDepth(val: number) {
+    this._shoreWaves.foamSettleDepth = Math.max(0, val);
+  }
+  /**
+   * Water depth in metres at and beyond which foam drifts freely: higher to
+   * slow the foam over a wider band of shallow water, lower to keep it moving
+   * until close in.
+   */
+  get foamDriftDepth() {
+    return this._shoreWaves.foamDriftDepth!;
+  }
+  set foamDriftDepth(val: number) {
+    this._shoreWaves.foamDriftDepth = Math.max(0, val);
+  }
+  /**
+   * How fast foam that has settled in shallow water and on the sand fades, as
+   * a share of the foam's fade: lower to leave it lying on the beach longer
+   * after the wave has drained, 1 to fade it as fast as foam on open water.
+   */
+  get settledFoamFade() {
+    return this._shoreWaves.settledFoamFade!;
+  }
+  set settledFoamFade(val: number) {
+    this._shoreWaves.settledFoamFade = Math.min(Math.max(val, 0.01), 1);
   }
   /**
    * Hands the shore waves this frame's waterline fields: the shore field in

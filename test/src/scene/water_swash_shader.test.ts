@@ -194,9 +194,8 @@ describe.each(['webgl2', 'webgpu'] as const)('Swash shaders on %s', (type) => {
     }
   });
 
-  test.each([false, true])('foam step forwards source state with deposition contact: %s', (withContact) => {
+  test('foam step forwards source state', () => {
     const waves = createWaves();
-    expect(waves.supportsFoamDeposition).toBe(true);
     const source = build(type, {
       vertex(pb) {
         this.$inputs.pos = pb.vec2().attrib('position');
@@ -209,7 +208,7 @@ describe.each(['webgl2', 'webgpu'] as const)('Swash shaders on %s', (type) => {
         waves.setupFoamSourceUniforms(this);
         pb.main(function () {
           this.$l.state = pb.vec4(0, 0, 0, 1 / 30);
-          this.$l.contact = pb.vec2(0);
+          this.$l.shape = pb.vec2(0, 1);
           this.$l.step = waves.calcFoamStep(
             this,
             this.$builtins.fragCoord.xy,
@@ -217,49 +216,25 @@ describe.each(['webgl2', 'webgpu'] as const)('Swash shaders on %s', (type) => {
             pb.float(0.8),
             pb.bool(false),
             this.state,
-            withContact ? this.contact : undefined
+            this.shape
           );
-          // Both signatures must coexist in a shader: a cached function for
-          // the legacy call must not swallow the deposition out parameter.
-          this.$l.legacyStep = withContact
-            ? waves.calcFoamStep(
-                this,
-                this.$builtins.fragCoord.xy,
-                pb.float(1 / 30),
-                pb.float(0.8),
-                pb.bool(false),
-                this.state
-              )
-            : pb.vec4(0);
-          this.$outputs.color = pb.add(
-            this.step,
-            this.legacyStep,
-            this.state,
-            pb.vec4(this.contact, this.contact)
-          );
+          this.$outputs.color = pb.add(this.step, this.state, pb.vec4(this.shape, this.shape));
         });
       }
     });
     expect(source.fragment).toContain('baseFoamStep');
-    const functionName = withContact ? 'swFoamDepositStep' : 'swFoamStep';
-    const signature = source.fragment.match(new RegExp(`${functionName}\\([^\\n]+`))?.[0];
+    const signature = source.fragment.match(/swFoamStep\([^\n]+/)?.[0];
     expect(signature).toMatch(
       type === 'webgpu' ? /state\s*:\s*ptr<function\s*,\s*vec4<f32>\s*>/ : /inout vec4 state/
     );
+    // (floor density, fade share) back to the field
+    expect(signature).toMatch(
+      type === 'webgpu' ? /shape\s*:\s*ptr<function\s*,\s*vec2<f32>\s*>/ : /inout vec2 shape/
+    );
+    expect(signature).not.toContain('contact');
     expect(source.fragment).toMatch(/baseFoamStep\(dt,state[,)]/);
-    if (withContact) {
-      expect(signature).toMatch(
-        type === 'webgpu' ? /contact\s*:\s*ptr<function\s*,\s*vec2<f32>\s*>/ : /out vec2 contact/
-      );
-      expect(source.fragment).toMatch(
-        type === 'webgpu' ? /swFoamDepositStep\([^\n]*,&contact,/ : /swFoamDepositStep\([^\n]*,contact\)/
-      );
-      const legacySignature = source.fragment.match(/swFoamStep\([^\n]+/)?.[0];
-      expect(legacySignature).toBeDefined();
-      expect(legacySignature).not.toContain('contact');
-    } else {
-      expect(signature).not.toContain('contact');
-    }
+    // The settling coefficient slows the foam's velocity and fade (FOAM_SETTLE)
+    expect(source.fragment).toContain('swSettle');
   });
 });
 
@@ -378,7 +353,7 @@ describe.each(['webgl2', 'webgpu'] as const)('Swash handover diagnostics on %s',
         expect(fragment).toContain('swSurfaceCoverage');
         expect(fragment).toContain('discard');
         expect(fragment).toContain('swFoamGroundMask');
-        expect(fragment).toContain('ffSampleDeposited');
+        expect(fragment).not.toContain('ffSampleDeposited');
         expect(fragment).toMatch(/(?:gl_FragDepth|zFragDepth) = mix\([^\n]*groundFoamWeight/);
       } else {
         expect(fragment).not.toContain('swSurfaceCoverage');
@@ -395,13 +370,13 @@ describe.each(['webgl2', 'webgpu'] as const)('Swash handover diagnostics on %s',
         }
       } else if (mode === 'swashFoamSources') {
         expect(fragment).toMatch(
-          /outColor[^=\n]*=\s*vec4(?:<f32>)?\(normal.w,groundMobileDensity,groundDepositedDensity,1(?:\.0)?\)/
+          /outColor[^=\n]*=\s*vec4(?:<f32>)?\(normal.w,groundFieldDensity,groundSurfDensity,1(?:\.0)?\)/
         );
-        expect(fragment).toMatch(/groundMobileDensity[^;\n]*=\s*0(?:\.0)?;/);
-        expect(fragment).toMatch(/groundDepositedDensity[^;\n]*=\s*0(?:\.0)?;/);
+        expect(fragment).toMatch(/groundFieldDensity[^;\n]*=\s*0(?:\.0)?;/);
+        expect(fragment).toMatch(/groundSurfDensity[^;\n]*=\s*0(?:\.0)?;/);
         if (withShore) {
-          expect(fragment).toMatch(/groundMobileDensity\s*=\s*[^;\n]*groundMobile.x[^;\n]*groundWet/);
-          expect(fragment).toMatch(/groundDepositedDensity\s*=\s*deposited.x;/);
+          expect(fragment).toMatch(/groundFieldDensity\s*=\s*groundMobile.x;/);
+          expect(fragment).toMatch(/groundSurfDensity\s*=\s*[^;\n]*swNearShoreFoam[^;\n]*groundWet/);
         }
       } else {
         expect(fragment).toMatch(/return vec3(?:<f32>)?\(foam,groundFoamOpacity,groundFoamWeight\)/);
@@ -497,57 +472,25 @@ describe.each(['webgl2', 'webgpu'] as const)(
   }
 );
 
-/** Run the opacity expression emitted by the real foam helper, avoiding a
- * second implementation of its nonlinear texture threshold in the regression.
- */
-function foamOpacityFromShader(shader: string) {
-  const definition = shader.match(/vec3 waterWhiteFoam\([^)]*\)\s*\{([^}]+)\}/);
-  if (!definition) {
-    throw new Error('No generated white foam function');
-  }
-  const body = definition[1];
-  const returnStart = body.indexOf('return vec3(');
-  if (returnStart < 0) {
-    throw new Error('No generated white foam return');
-  }
-  const expressionStart = returnStart + 'return vec3('.length;
-  let depth = 0;
-  let expressionEnd = expressionStart;
-  for (; expressionEnd < body.length; expressionEnd++) {
-    const char = body[expressionEnd];
-    if (char === '(') {
-      depth++;
-    } else if (char === ')') {
-      depth--;
-    } else if (char === ',' && depth === 0) {
-      break;
-    }
-  }
-  const prefix = body.slice(0, returnStart).replace(/\bfloat\s+/g, 'const ');
-  const opacity = body.slice(expressionStart, expressionEnd);
-  return new Function('clamp', `return function(density, tex, feather) { ${prefix} return ${opacity}; };`)(
-    (x: number, lo: number, hi: number) => Math.min(Math.max(x, lo), hi)
-  ) as (density: number, tex: { x: number }, feather: number) => number;
-}
-
 function groundDensityFromShader(shader: string) {
   const expression = shader.match(/groundFoamDensity\s*=\s*([^;\n]*groundMobile[^;\n]*);/)?.[1];
   if (!expression) {
     throw new Error('No generated ground foam density expression');
   }
-  // The near-shore floor is outside these cases: it passes the density on.
-  return new Function(
-    'clamp',
-    'max',
-    'swNearShoreFoam',
-    'scenePos',
-    `return function(groundMobile, groundWet, deposited) { return ${expression}; };`
-  )(
-    (x: number, lo: number, hi: number) => Math.min(Math.max(x, lo), hi),
-    Math.max,
-    (_xz: unknown, density: number) => density,
-    { xz: 0 }
-  ) as (groundMobile: { x: number }, groundWet: number, deposited: { x: number }) => number;
+  // The surf's foam is supplied by the test, raising the density passed in.
+  return (surf: number) =>
+    new Function(
+      'clamp',
+      'max',
+      'swNearShoreFoam',
+      'scenePos',
+      `return function(groundMobile, groundWet) { return ${expression}; };`
+    )(
+      (x: number, lo: number, hi: number) => Math.min(Math.max(x, lo), hi),
+      Math.max,
+      (_xz: unknown, density: number) => Math.max(density, surf),
+      { xz: 0 }
+    ) as (groundMobile: { x: number }, groundWet: number) => number;
 }
 
 /** Run the final scalar mask emitted for a valid point inside the grid.
@@ -580,7 +523,7 @@ function groundMaskFromShader(shader: string) {
     'clamp',
     'abs',
     'smoothstep',
-    `return function(wl, position, swWave, swGrid, edge) {
+    `return function(wl, position, swWave, swGrid, gridFade) {
       const bed = ${bed};
       const reach = ${reach};
       return ${result};
@@ -597,7 +540,7 @@ function groundMaskFromShader(shader: string) {
     position: { y: number },
     wave: { x: number },
     grid: { w: number },
-    edge: number
+    gridFade: number
   ) => number;
 }
 
@@ -667,7 +610,7 @@ function groundBlendFromShader(shader: string) {
   ) => { color: number; opacity: number };
 }
 
-describe.each(['webgl2', 'webgpu'] as const)('Deposited foam material on %s', (type) => {
+describe.each(['webgl2', 'webgpu'] as const)('Ground foam material on %s', (type) => {
   test.each(['color', 'depth', 'lit color'] as const)(
     '%s pass preserves separate wet and ground rendering',
     async (pass) => {
@@ -723,14 +666,13 @@ describe.each(['webgl2', 'webgpu'] as const)('Deposited foam material on %s', (t
         expect(fragment).toContain('discard');
         if (isColor) {
           expect(fragment).toContain('swFoamGroundMask');
-          expect(fragment).toContain('ffSampleDeposited');
+          expect(fragment).not.toContain('ffSampleDeposited');
           expect(fragment).toContain('zSamplePositionFromDepth');
           expect(fragment).toContain(type === 'webgpu' ? '@builtin(frag_depth)' : 'gl_FragDepth');
-          // Both conserved foam shares and the handover mask must refer to
-          // the same ground point, even when the raised carrier projects far
-          // from it at a grazing view angle.
+          // The foam and the handover mask must refer to the same ground
+          // point, even when the raised carrier projects far from it at a
+          // grazing view angle.
           expect(fragment).toMatch(/groundMobile[^\n]*ffSample\(scenePos.xz[,)]/);
-          expect(fragment).toMatch(/deposited[^\n]*ffSampleDeposited\(scenePos.xz[,)]/);
           expect(fragment).toMatch(/groundWet[^\n]*swSurfaceCoverage\(scenePos.xz[,)]/);
           expect(fragment).toMatch(/groundThickness[^\n]*swSheetThickness\(scenePos.xz[,)]/);
           const handoverThickness = fragment.match(/groundHandoverThickness[^=\n]*=\s*([^;\n]+);/)?.[1];
@@ -785,23 +727,19 @@ async function buildGroundFoamFragment() {
   }
 }
 
-test('the ground shows its foam imprint without stacking it on the water foam', async () => {
+test("the ground shows the field's foam whether or not the sheet still covers it", async () => {
   const fragment = await buildGroundFoamFragment();
-  const density = groundDensityFromShader(fragment);
-  const opacity = foamOpacityFromShader(fragment);
-  const texture = { x: 0.5 };
-  const reveal = (mobile: number, deposited: number, wet = 1) =>
-    opacity(density({ x: mobile }, wet, { x: deposited }), texture, 0.1);
-
-  // The deposit is an imprint of the drifting foam (it does not drain it), so
-  // an imprint up to the water's own density changes nothing while wet.
-  for (const imprint of [0, 0.35, 0.7]) {
-    expect(density({ x: 0.7 }, 1, { x: imprint })).toBe(0.7);
+  const withoutSurf = groundDensityFromShader(fragment)(0);
+  const withSurf = groundDensityFromShader(fragment)(0.5);
+  // The field holds the foam where the sheet drained (FOAM_SETTLE), so a dry
+  // ground shows it as a wet one does.
+  for (const wet of [0, 0.5, 1]) {
+    expect(withoutSurf({ x: 0.7 }, wet)).toBe(0.7);
   }
-  expect(reveal(0.35, 0.35)).toBe(reveal(0.35, 0));
-  // A dry carrier cannot reveal mobile foam; the imprint remains visible.
-  expect(reveal(0.7, 0, 0)).toBe(0);
-  expect(reveal(0.7, 0.7, 0)).toBe(reveal(0.7, 0));
+  // The surf's foam is on the water: only where the sheet still covers the ground.
+  expect(withSurf({ x: 0 }, 0)).toBe(0);
+  expect(withSurf({ x: 0 }, 1)).toBe(0.5);
+  expect(withSurf({ x: 0.7 }, 1)).toBe(0.7);
 });
 
 test('two complete white covers never expose sand during their colour handover', async () => {
@@ -863,9 +801,9 @@ test('ground handover uses the same carrier thickness as the wet-edge discard', 
 
 test('valid beach support remains continuous across the static shoreline', async () => {
   const mask = groundMaskFromShader(await buildGroundFoamFragment());
-  const support = (distance: number, offset = 0, slope = 8, edge = 0.5) => {
+  const support = (distance: number, offset = 0, slope = 8, gridFade = 1) => {
     const bed = -distance / slope;
-    return mask({ x: distance, y: slope, z: bed }, { y: bed + offset }, { x: 0.5 }, { w: 0 }, edge);
+    return mask({ x: distance, y: slope, z: bed }, { y: bed + offset }, { x: 0.5 }, { w: 0 }, gridFade);
   };
 
   // Foam's carrier and its reconstructed beach point lie on different XZs.

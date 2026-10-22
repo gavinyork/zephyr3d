@@ -45,13 +45,6 @@ const FOAM_FIELD_CELLS = 256;
  */
 const FOAM_FIELD_EDGE_BLEND = 0.15;
 /**
- * Fade of foam left on the ground, as a multiple of the field's fade rate:
- * under water and once the ground has dried. At the default fade rate of 0.8
- * the deposit halves in about 3.5 s under the swash and 0.9 s on dry sand.
- */
-const FOAM_DEPOSIT_WET_FADE = 0.25;
-const FOAM_DEPOSIT_DRY_FADE = 1;
-/**
  * Crest's gain on the foam the waves make (UpdateFoam.compute): foam is added
  * at FOAM_WAVE_GAIN times the strength times how squeezed the water is, per
  * second.
@@ -66,8 +59,6 @@ export const FOAM_WAVE_GAIN = 5;
 export interface FoamFieldSource {
   /** Identifies the step shader the source builds into; equal keys share a program. */
   readonly foamSourceKey: string;
-  /** Whether this source can leave foam attached to the ground. */
-  readonly supportsFoamDeposition?: boolean;
   /** Declares the uniforms {@link FoamFieldSource.calcFoamStep} reads, in bind group 0. */
   setupFoamSourceUniforms(scope: PBGlobalScope): void;
   /** Sets the uniforms {@link FoamFieldSource.setupFoamSourceUniforms} declared. */
@@ -87,10 +78,10 @@ export interface FoamFieldSource {
    *   in w the seconds since the source last wrote them, or a negative value
    *   where they hold nothing yet. What the source leaves in xy is kept at
    *   the last step of a frame.
-   * @param contact - Optional out vec2: in x the rate per second at which
-   *   mobile foam attaches to the ground here, in y how dry the ground is,
-   *   0..1, which speeds up the fading of foam left on it. Starts at 0 for
-   *   sources without deposition.
+   * @param shape - inout vec2, (0, 1) on entry: in x a density the foam here
+   *   is raised to at least this step, for foam whose amount the source knows
+   *   outright rather than as a rate; in y the share of the fade rate the foam
+   *   here fades at.
    */
   calcFoamStep(
     scope: PBInsideFunctionScope,
@@ -99,7 +90,7 @@ export interface FoamFieldSource {
     fadeRate: PBShaderExp,
     prewarm: PBShaderExp,
     state: PBShaderExp,
-    contact?: PBShaderExp
+    shape: PBShaderExp
   ): PBShaderExp;
 }
 
@@ -120,9 +111,6 @@ interface FoamStepProgram {
 export class WaterFoamField extends Disposable {
   /** Ping-pong pair of arrays, a layer per level: the foam in r, the wall foam in g, the sources' state in ba. */
   private _arrays: Nullable<[Texture2DArray, Texture2DArray]>;
-  /** Foam attached to world XZ, with the same levels and ping-pong index. */
-  private _depositedArrays: Nullable<[Texture2DArray, Texture2DArray]>;
-  private _depositionSourceKey: Nullable<string>;
   private _framebuffers: Nullable<[FrameBuffer, FrameBuffer]>;
   private _current: number;
   /** Per level: (origin x, origin z, cell size, cells) as the field holds it; 0 cells before it does. */
@@ -152,8 +140,6 @@ export class WaterFoamField extends Disposable {
   constructor() {
     super();
     this._arrays = null;
-    this._depositedArrays = null;
-    this._depositionSourceKey = null;
     this._framebuffers = null;
     this._current = 0;
     this._regions = [];
@@ -256,7 +242,7 @@ export class WaterFoamField extends Disposable {
     }
     this._driftVelocity.setXY((wind?.x ?? 0) * this._drift, (wind?.y ?? 0) * this._drift);
     const device = getDevice();
-    this.ensureArrays(device, source);
+    this.ensureArrays(device);
     const dt = this._lastTime < 0 ? 0 : Math.min(Math.max(time - this._lastTime, 0), 0.25);
     this._lastTime = time;
     // The clock carries the foam texture along; readers see it every frame
@@ -290,9 +276,6 @@ export class WaterFoamField extends Disposable {
     for (let step = 0; step < steps; step++) {
       const fb = this._framebuffers![1 - this._current];
       bindGroup.setTexture('ffSrc', this._arrays![this._current], sampler);
-      if (this._depositedArrays) {
-        bindGroup.setTexture('ffDepositedSrc', this._depositedArrays[this._current], sampler);
-      }
       this._stateParams.setXYZW(sinceState, step === steps - 1 ? 1 : 0, 0, 0);
       bindGroup.setValue('ffState', this._stateParams);
       for (let i = 0; i < FOAM_FIELD_LEVELS; i++) {
@@ -304,9 +287,6 @@ export class WaterFoamField extends Disposable {
         this._params.setXYZW(stepDt, this._fadeRate, this._prewarm ? 1 : 0, i);
         bindGroup.setValue('ffParams', this._params);
         fb.setColorAttachmentLayer(0, i);
-        if (this._depositedArrays) {
-          fb.setColorAttachmentLayer(1, i);
-        }
         device.setFramebuffer(fb);
         device.setProgram(program);
         device.setBindGroup(0, bindGroup);
@@ -325,8 +305,6 @@ export class WaterFoamField extends Disposable {
   setupUniforms(scope: PBGlobalScope, uniformGroup: number) {
     const pb = scope.$builder;
     scope.ffTex = pb.tex2DArray().uniform(uniformGroup);
-    scope.ffDepositedTex = pb.tex2DArray().uniform(uniformGroup);
-    scope.ffDepositedEnabled = pb.float().uniform(uniformGroup);
     for (let i = 0; i < FOAM_FIELD_LEVELS; i++) {
       // (origin x, origin z, cell size, cells; 0 cells before the level exists)
       scope[`ffRegion${i}`] = pb.vec4().uniform(uniformGroup);
@@ -341,12 +319,6 @@ export class WaterFoamField extends Disposable {
       this._arrays ? this._arrays[this._current] : this.getDummy(),
       fetchSampler('clamp_linear_nomip')
     );
-    bindGroup.setTexture(
-      'ffDepositedTex',
-      this._depositedArrays ? this._depositedArrays[this._current] : this.getDummy(),
-      fetchSampler('clamp_linear_nomip')
-    );
-    bindGroup.setValue('ffDepositedEnabled', this._depositedArrays ? 1 : 0);
     for (let i = 0; i < FOAM_FIELD_LEVELS; i++) {
       bindGroup.setValue(`ffRegion${i}`, this._arrays ? this._regions[i] : Vector4.zero());
     }
@@ -385,35 +357,6 @@ export class WaterFoamField extends Disposable {
       this.$return(this.result);
     });
     return scope.ffSample(xz) as PBShaderExp;
-  }
-  /** Foam attached to world XZ, as (density, coverage), with the same LOD blend. */
-  sampleDeposited(scope: PBInsideFunctionScope, xz: PBShaderExp): PBShaderExp {
-    const pb = scope.$builder;
-    pb.func('ffSampleDeposited', [pb.vec2('xz')], function () {
-      this.$l.result = pb.vec2(0);
-      this.$if(pb.lessThan(this.ffDepositedEnabled, 0.5), function () {
-        this.$return(this.result);
-      });
-      this.$l.remaining = pb.float(1);
-      for (let i = 0; i < FOAM_FIELD_LEVELS; i++) {
-        const r = this[`ffRegion${i}`];
-        this.$l[`uv${i}`] = pb.div(pb.sub(this.xz, r.xy), pb.max(pb.mul(r.z, r.w), 1e-4));
-        const uv = this[`uv${i}`];
-        this.$l[`edge${i}`] = pb.min(pb.min(uv.x, uv.y), pb.min(pb.sub(1, uv.x), pb.sub(1, uv.y)));
-        const edge = this[`edge${i}`];
-        this.$if(
-          pb.and(pb.greaterThan(this.remaining, 0), pb.and(pb.greaterThan(r.w, 0), pb.greaterThan(edge, 0))),
-          function () {
-            this.$l.w = pb.mul(this.remaining, pb.smoothStep(0, FOAM_FIELD_EDGE_BLEND, edge));
-            this.$l.density = pb.textureArraySampleLevel(this.ffDepositedTex, uv, i, 0).r;
-            this.result = pb.add(this.result, pb.mul(pb.vec2(this.density, 1), this.w));
-            this.remaining = pb.sub(this.remaining, this.w);
-          }
-        );
-      }
-      this.$return(this.result);
-    });
-    return scope.ffSampleDeposited(xz) as PBShaderExp;
   }
   /**
    * The foam texture carried by the water, as Crest's ComputeFoamWithFlow:
@@ -474,11 +417,20 @@ export class WaterFoamField extends Disposable {
     this._dummy = null;
   }
   /** @internal */
-  private ensureArrays(device: AbstractDevice, source: FoamFieldSource) {
-    const createArray = (format: 'rgba16f' | 'r16f', name: string) => {
-      const tex = device.createTexture2DArray(format, FOAM_FIELD_CELLS, FOAM_FIELD_CELLS, FOAM_FIELD_LEVELS, {
-        mipmapping: false
-      })!;
+  private ensureArrays(device: AbstractDevice) {
+    if (this._arrays) {
+      return;
+    }
+    const createArray = (name: string) => {
+      const tex = device.createTexture2DArray(
+        'rgba16f',
+        FOAM_FIELD_CELLS,
+        FOAM_FIELD_CELLS,
+        FOAM_FIELD_LEVELS,
+        {
+          mipmapping: false
+        }
+      )!;
       tex.name = name;
       const fb = device.createFrameBuffer([tex], null);
       for (let i = 0; i < FOAM_FIELD_LEVELS; i++) {
@@ -489,85 +441,26 @@ export class WaterFoamField extends Disposable {
       fb.dispose();
       return tex;
     };
-    const depositionKey = source.supportsFoamDeposition ? source.foamSourceKey : null;
-    if (this._arrays && depositionKey === this._depositionSourceKey) {
-      return;
-    }
     device.pushDeviceStates();
     try {
-      if (!this._arrays) {
-        this._arrays = [
-          createArray('rgba16f', '@WaterFoamField0'),
-          createArray('rgba16f', '@WaterFoamField1')
-        ];
-        this._current = 0;
-        for (const r of this._regions) {
-          r.setXYZW(0, 0, 0, 0);
-        }
-        this._prewarm = true;
-        this._stateTime = -1;
+      this._arrays = [createArray('@WaterFoamField0'), createArray('@WaterFoamField1')];
+      this._current = 0;
+      for (const r of this._regions) {
+        r.setXYZW(0, 0, 0, 0);
       }
-      // Switching away from a beach discards its attached foam. Keep mobile
-      // foam and wall history intact, and never resurrect old beach deposits.
-      this._framebuffers?.forEach((fb) => fb.dispose());
-      this._depositedArrays?.forEach((tex) => tex.dispose());
-      this._depositedArrays =
-        depositionKey !== null
-          ? [createArray('r16f', '@WaterDepositedFoam0'), createArray('r16f', '@WaterDepositedFoam1')]
-          : null;
-      this._framebuffers = [0, 1].map((i) =>
-        device.createFrameBuffer(
-          this._depositedArrays ? [this._arrays![i], this._depositedArrays[i]] : [this._arrays![i]],
-          null
-        )
-      ) as [FrameBuffer, FrameBuffer];
-      this._depositionSourceKey = depositionKey;
+      this._prewarm = true;
+      this._stateTime = -1;
+      this._framebuffers = [0, 1].map((i) => device.createFrameBuffer([this._arrays![i]], null)) as [
+        FrameBuffer,
+        FrameBuffer
+      ];
     } finally {
       device.popDeviceStates();
     }
   }
-  /**
-   * Foam the thin sheet leaves on the ground: the ground's foam rises towards
-   * the drifting foam over it, never past it, and the drifting foam is not
-   * drained. A conserved transfer piles up where the sheet keeps flowing over
-   * the same thin cells, saturating a band denser than any foam the water
-   * carries, and starves the water flowing on of the foam it should leave
-   * farther down. Wall foam is not involved.
-   */
-  private static depositFoam(
-    scope: PBInsideFunctionScope,
-    mobile: PBShaderExp,
-    deposited: PBShaderExp,
-    contact: PBShaderExp,
-    dt: PBShaderExp,
-    fadeRate: PBShaderExp
-  ): PBShaderExp {
-    const pb = scope.$builder;
-    pb.func(
-      'ffDeposit',
-      [pb.float('mobile'), pb.float('deposited'), pb.vec2('contact'), pb.float('dt'), pb.float('fadeRate')],
-      function () {
-        this.$l.m = pb.clamp(this.mobile, 0, 1);
-        // Slower than the drifting foam while water still covers it; once the
-        // sheet drains away, faster, or the swash's upper reach, which holds
-        // the most of it, outlasts everything below as a stranded line.
-        this.$l.fade = pb.mix(FOAM_DEPOSIT_WET_FADE, FOAM_DEPOSIT_DRY_FADE, pb.clamp(this.contact.y, 0, 1));
-        this.$l.d = pb.mul(
-          pb.clamp(this.deposited, 0, 1),
-          pb.exp(pb.neg(pb.mul(this.fade, this.fadeRate, this.dt)))
-        );
-        this.$l.fraction = pb.sub(1, pb.exp(pb.neg(pb.mul(pb.max(this.contact.x, 0), this.dt))));
-        this.$return(
-          pb.vec2(this.m, pb.add(this.d, pb.mul(pb.max(pb.sub(this.m, this.d), 0), this.fraction)))
-        );
-      }
-    );
-    return scope.ffDeposit(mobile, deposited, contact, dt, fadeRate) as PBShaderExp;
-  }
   /** @internal */
   private getStepProgram(device: AbstractDevice, source: FoamFieldSource) {
-    const deposition = !!source.supportsFoamDeposition;
-    const programKey = `${source.foamSourceKey}:${deposition ? 'deposited' : 'mobile'}`;
+    const programKey = source.foamSourceKey;
     let entry = this._programs.get(programKey);
     if (!entry) {
       const program = device.buildRenderProgram({
@@ -579,10 +472,6 @@ export class WaterFoamField extends Disposable {
         },
         fragment(pb) {
           this.$outputs.outColor = pb.vec4();
-          if (deposition) {
-            this.$outputs.outDeposited = pb.vec4();
-            this.ffDepositedSrc = pb.tex2DArray().uniform(0);
-          }
           source.setupFoamSourceUniforms(this);
           this.ffSrc = pb.tex2DArray().uniform(0);
           this.ffRegion = pb.vec4().uniform(0);
@@ -635,7 +524,7 @@ export class WaterFoamField extends Disposable {
               });
             });
             this.$l.state = pb.vec4(this.prevState, 0, this.stateAge);
-            this.$l.contact = pb.vec2(0);
+            this.$l.shape = pb.vec2(0, 1);
             this.$l.src = source.calcFoamStep(
               this,
               this.xz,
@@ -643,7 +532,7 @@ export class WaterFoamField extends Disposable {
               this.fadeRate,
               this.prewarm,
               this.state,
-              this.contact
+              this.shape
             );
             // Sample from the previous step, upstream of the flow: this level as
             // it was, else the next coarser one, nothing where neither held it
@@ -665,40 +554,13 @@ export class WaterFoamField extends Disposable {
               });
             });
             // Fade, then what the sources make
-            this.foam = pb.mul(this.foam, pb.max(0, pb.sub(1, pb.mul(this.fadeRate, this.dt))));
+            this.foam = pb.mul(
+              this.foam,
+              pb.max(0, pb.sub(1, pb.mul(this.fadeRate, pb.max(this.shape.y, 0), this.dt)))
+            );
             this.foam = pb.add(this.foam, this.src.zw);
-            if (deposition) {
-              // Ground foam is sampled at this world position, never upstream.
-              this.$l.deposited = pb.float(0);
-              this.$if(pb.greaterThan(this.stateAt.z, 0.5), function () {
-                this.deposited = pb.textureArraySampleLevel(
-                  this.ffDepositedSrc,
-                  this.stateAt.xy,
-                  this.level,
-                  0
-                ).r;
-              }).$else(function () {
-                this.$l.depositedNext = this.ffPrevUV(this.xz, this.ffPrevRegionNext);
-                this.$if(pb.greaterThan(this.depositedNext.z, 0.5), function () {
-                  this.deposited = pb.textureArraySampleLevel(
-                    this.ffDepositedSrc,
-                    this.depositedNext.xy,
-                    pb.add(this.level, 1),
-                    0
-                  ).r;
-                });
-              });
-              this.$l.exchange = WaterFoamField.depositFoam(
-                this,
-                this.foam.r,
-                this.deposited,
-                this.contact,
-                this.dt,
-                this.fadeRate
-              );
-              this.foam.r = this.exchange.x;
-              this.$outputs.outDeposited = pb.vec4(this.exchange.y, 0, 0, 1);
-            }
+            // At least what the source knows is here
+            this.foam.x = pb.max(this.foam.x, pb.clamp(this.shape.x, 0, 1));
             this.$outputs.outColor = pb.vec4(
               pb.clamp(this.foam, pb.vec2(0), pb.vec2(1)),
               this.$choice(pb.greaterThan(this.ffState.y, 0.5), this.state.xy, this.prevState)
@@ -718,9 +580,6 @@ export class WaterFoamField extends Disposable {
     this._framebuffers = null;
     this._arrays?.forEach((tex) => tex.dispose());
     this._arrays = null;
-    this._depositedArrays?.forEach((tex) => tex.dispose());
-    this._depositedArrays = null;
-    this._depositionSourceKey = null;
   }
   /** @internal */
   private getDummy() {
@@ -775,7 +634,8 @@ export class WaveFoamSource implements FoamFieldSource {
     dt: PBShaderExp,
     fadeRate: PBShaderExp,
     prewarm: PBShaderExp,
-    _state: PBShaderExp
+    _state: PBShaderExp,
+    _shape: PBShaderExp
   ): PBShaderExp {
     const pb = scope.$builder;
     const that = this;
@@ -934,10 +794,7 @@ export class FoamFieldWaveGenerator extends Disposable implements WaveGenerator 
         footprint ? this.fp : undefined
       );
       this.$l.ff = that._field.sample(this, this.xz);
-      // The ground layer draws the more of drifting and deposited foam, but
-      // only once the sheet thins enough to hand over to it. Show the same
-      // here, or foam the ground holds vanishes until then and opens a seam.
-      this.$l.ffTotal = pb.clamp(pb.max(this.ff.x, that._field.sampleDeposited(this, this.xz).x), 0, 1);
+      this.$l.ffTotal = pb.clamp(this.ff.x, 0, 1);
       if (foamSample) {
         // Carried by the water: the texture travels with the field's foam.
         // Over the whole field, not only where it holds foam: the flow source
