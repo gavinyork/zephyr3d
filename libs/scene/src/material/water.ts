@@ -3,7 +3,8 @@ import type {
   PBFunctionScope,
   PBInsideFunctionScope,
   PBShaderExp,
-  Texture2D
+  Texture2D,
+  Texture2DArray
 } from '@zephyr3d/device';
 import { applyMaterialMixins, MeshMaterial } from './meshmaterial';
 import type { DrawContext, WaveGenerator } from '../render';
@@ -3075,7 +3076,7 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
    * none, which turns them off. Called by the water every frame.
    * @internal
    */
-  setShoreWaveFrame(waterline: Nullable<Texture2D>, region: Vector4, level: number) {
+  setShoreWaveFrame(waterline: Nullable<Texture2DArray>, region: Vector4, level: number) {
     this._shoreWaveGenerator?.setFrame(waterline, region, level, this._waveClock);
   }
   /**

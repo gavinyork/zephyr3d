@@ -23,6 +23,7 @@ import { QUEUE_OPAQUE } from '../values';
 import { BoundingBox } from '../utility/bounding_volume';
 import type { Camera } from '../camera';
 import { getDevice } from '../app/api';
+import { TerrainWaterlineSource, WaterlineField } from '../render/sdf/waterline';
 
 /** Mean earth radius in meters, for the horizon distance. @internal */
 const EARTH_RADIUS = 6371000;
@@ -39,6 +40,14 @@ const SKIRT_DISTANCE_FACTOR = 10;
  * default. @internal
  */
 const WHOLE_DOMAIN = new Vector4(-99999, -99999, 99999, 99999);
+/**
+ * The shore field's levels around the camera: cells along a side and the
+ * finest cell size in metres, each level twice the size of the one before,
+ * laid out as the foam field's are.
+ */
+const SHORE_FIELD_LEVELS = 2;
+const SHORE_FIELD_CELLS = 256;
+const SHORE_FIELD_CELL_SIZE = 0.5;
 
 /**
  * One evaluated point of a water surface, in world space.
@@ -139,6 +148,10 @@ export class Water extends applyMixins(GraphNode, mixinDrawable) implements Draw
   protected onDispose() {
     super.onDispose();
     this._clipmap.dispose();
+    this._shoreField?.dispose();
+    this._shoreSource?.dispose();
+    this._shoreField = null;
+    this._shoreSource = null;
     this._renderData = null;
     this._feedbackBindGroup.dispose();
     this._feedbackPrimitive.dispose();
@@ -807,6 +820,7 @@ export class Water extends applyMixins(GraphNode, mixinDrawable) implements Draw
         this.scene.sdf.global?.waterline.request(this.worldMatrix.m13);
       }
       if (mat.shoreWaveHeight > 0) {
+        this.updateShoreField(camera);
         const waterline = this.scene?.sdf.enabled ? this.scene.sdf.global?.waterline : null;
         mat.setShoreWaveFrame(
           waterline?.ready ? waterline.smoothTexture : null,
@@ -845,18 +859,7 @@ export class Water extends applyMixins(GraphNode, mixinDrawable) implements Draw
         level
       };
     }
-    let terrain =
-      this._bathyTerrain?.attached && this._bathyTerrain.scene === this.scene ? this._bathyTerrain : null;
-    if (!terrain && this.scene) {
-      this.scene.rootNode.iterate((node) => {
-        if (node.isClipmapTerrain()) {
-          terrain = node;
-          return true;
-        }
-        return false;
-      });
-      this._bathyTerrain = terrain;
-    }
+    let terrain = this.findTerrain();
     const heightMap = terrain?.heightMap;
     if (!terrain || !heightMap) {
       return null;
@@ -871,6 +874,55 @@ export class Water extends applyMixins(GraphNode, mixinDrawable) implements Draw
       heightOffset: terrain.worldMatrix.m13
     };
   }
+  /** The first terrain in the scene, cached while it stays in it. @internal */
+  private findTerrain(): Nullable<ClipmapTerrain> {
+    let terrain =
+      this._bathyTerrain?.attached && this._bathyTerrain.scene === this.scene ? this._bathyTerrain : null;
+    if (!terrain && this.scene) {
+      this.scene.rootNode.iterate((node) => {
+        if (node.isClipmapTerrain()) {
+          terrain = node;
+          return true;
+        }
+        return false;
+      });
+      this._bathyTerrain = terrain;
+    }
+    return terrain;
+  }
+  /**
+   * Rebuilds the shore field, the waterline of the terrain alone in levels
+   * around the camera, which the shore waves read. Nothing without a terrain
+   * or off WebGPU.
+   * @internal
+   */
+  private updateShoreField(camera: Camera) {
+    const terrain = this.findTerrain();
+    const device = getDevice();
+    if (!terrain?.heightMap || device.type !== 'webgpu') {
+      return;
+    }
+    if (!this._shoreField) {
+      this._shoreSource = new TerrainWaterlineSource();
+      this._shoreField = new WaterlineField(this._shoreSource, {
+        levels: SHORE_FIELD_LEVELS,
+        resolution: SHORE_FIELD_CELLS,
+        cellSize: SHORE_FIELD_CELL_SIZE
+      });
+    }
+    this._shoreSource!.setTerrain(terrain);
+    this._shoreField.request(this.worldMatrix.m13);
+    device.pushDeviceStates();
+    try {
+      this._shoreField.update(camera.getWorldPosition());
+    } finally {
+      device.popDeviceStates();
+    }
+  }
+  /** @internal */
+  private _shoreSource: Nullable<TerrainWaterlineSource> = null;
+  /** @internal */
+  private _shoreField: Nullable<WaterlineField> = null;
   /** @internal */
   private _bathyTerrain: Nullable<ClipmapTerrain> = null;
   /**

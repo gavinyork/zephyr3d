@@ -6,7 +6,8 @@ import type {
   PBGlobalScope,
   PBInsideFunctionScope,
   PBShaderExp,
-  Texture2D
+  Texture2D,
+  Texture2DArray
 } from '@zephyr3d/device';
 import type { WaveGenerator } from './wavegenerator';
 import type { FoamFieldSource, FoamFlowSource } from './water_foam';
@@ -276,9 +277,9 @@ export interface ShoreWaveSettings {
 export class ShoreWaveGenerator extends Disposable implements WaveGenerator, FoamFieldSource, FoamFlowSource {
   private readonly _base: WaveGenerator;
   private readonly _settings: ShoreWaveSettings;
-  private _waterline: Nullable<Texture2D>;
+  private _waterline: Nullable<Texture2DArray>;
   private _version: number;
-  private _dummy: Nullable<Texture2D>;
+  private _dummy: Nullable<Texture2DArray>;
   /** (grid origin x, origin z, 1 / grid size, rest level) */
   private readonly _grid: Vector4;
   /** (height, zone, crests across the zone: 2 zone / wavelength, time / period) */
@@ -330,7 +331,7 @@ export class ShoreWaveGenerator extends Disposable implements WaveGenerator, Foa
    * the field when there is none, which turns the waves off.
    * @param region - Grid placement as the waterline field reports it: (origin x, origin z, cell size, cells).
    */
-  setFrame(waterline: Nullable<Texture2D>, region: Vector4, level: number, timeInSeconds: number) {
+  setFrame(waterline: Nullable<Texture2DArray>, region: Vector4, level: number, timeInSeconds: number) {
     const s = this._settings;
     this._waterline = waterline;
     const size = region.z * region.w;
@@ -705,7 +706,7 @@ export class ShoreWaveGenerator extends Disposable implements WaveGenerator, Foa
           this.$return(pb.float(-1));
         }
       );
-      this.wl = pb.textureSampleLevel(this.swWaterline, this.uv, 0);
+      this.wl = pb.textureArraySampleLevel(this.swWaterline, this.uv, 0, 0);
       this.$l.edge = pb.min(pb.min(this.uv.x, this.uv.y), pb.min(pb.sub(1, this.uv.x), pb.sub(1, this.uv.y)));
       this.$return(pb.smoothStep(0, GRID_EDGE_FADE, this.edge));
     });
@@ -724,12 +725,12 @@ export class ShoreWaveGenerator extends Disposable implements WaveGenerator, Foa
       this.$return(
         pb.vec2(
           pb.sub(
-            pb.textureSampleLevel(this.swWaterline, pb.add(this.uv, pb.vec2(this.c, 0)), 0).x,
-            pb.textureSampleLevel(this.swWaterline, pb.sub(this.uv, pb.vec2(this.c, 0)), 0).x
+            pb.textureArraySampleLevel(this.swWaterline, pb.add(this.uv, pb.vec2(this.c, 0)), 0, 0).x,
+            pb.textureArraySampleLevel(this.swWaterline, pb.sub(this.uv, pb.vec2(this.c, 0)), 0, 0).x
           ),
           pb.sub(
-            pb.textureSampleLevel(this.swWaterline, pb.add(this.uv, pb.vec2(0, this.c)), 0).x,
-            pb.textureSampleLevel(this.swWaterline, pb.sub(this.uv, pb.vec2(0, this.c)), 0).x
+            pb.textureArraySampleLevel(this.swWaterline, pb.add(this.uv, pb.vec2(0, this.c)), 0, 0).x,
+            pb.textureArraySampleLevel(this.swWaterline, pb.sub(this.uv, pb.vec2(0, this.c)), 0, 0).x
           )
         )
       );
@@ -763,7 +764,7 @@ export class ShoreWaveGenerator extends Disposable implements WaveGenerator, Foa
   /** The uniforms {@link ShoreWaveGenerator.evaluate} reads. @internal */
   private setupShoreUniforms(scope: PBGlobalScope, uniformGroup: number) {
     const pb = scope.$builder;
-    scope.swWaterline = pb.tex2D().uniform(uniformGroup);
+    scope.swWaterline = pb.tex2DArray().uniform(uniformGroup);
     scope.swInverse = pb.tex2D().uniform(uniformGroup);
     scope.swGrid = pb.vec4().uniform(uniformGroup);
     scope.swWave = pb.vec4().uniform(uniformGroup);
@@ -1393,7 +1394,7 @@ export class ShoreWaveGenerator extends Disposable implements WaveGenerator, Foa
   /** @internal */
   private getDummy() {
     if (!this._dummy) {
-      this._dummy = getDevice().createTexture2D('rgba16f', 1, 1, { mipmapping: false })!;
+      this._dummy = getDevice().createTexture2DArray('rgba16f', 1, 1, 1, { mipmapping: false })!;
     }
     return this._dummy;
   }

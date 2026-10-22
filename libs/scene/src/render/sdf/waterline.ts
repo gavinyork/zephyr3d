@@ -1,9 +1,18 @@
-import type { BindGroup, GPUProgram, Texture2D } from '@zephyr3d/device';
+import type {
+  BindGroup,
+  GPUProgram,
+  PBGlobalScope,
+  PBInsideFunctionScope,
+  PBShaderExp,
+  Texture2D,
+  Texture2DArray
+} from '@zephyr3d/device';
 import type { Nullable, Vector3 } from '@zephyr3d/base';
 import { Vector4 } from '@zephyr3d/base';
 import { getDevice } from '../../app/api';
 import { fetchSampler } from '../../utility/misc';
 import { declareDynamicSDFUniforms, declareGlobalSDFUniforms, sampleGlobalSDF } from '../../shaders/sdf';
+import type { ClipmapTerrain } from '../../scene/terrain-cm/terrain-cm';
 import type { GlobalSDF } from './global_sdf';
 import { buildSDFProgram } from './sdf_programs';
 
@@ -23,42 +32,243 @@ const SMOOTH_BLEND_END = 4;
 const WATERLINE_MIN_SLOPE = 0.02;
 /** Bound of the linear model coefficients, within half float range. */
 const WATERLINE_MODEL_CLAMP = 10000;
+/** Distance a terrain source reports off its height map: open water, well past the bed model's reach. */
+const TERRAIN_OFF_MAP = 1e4;
 
 /**
- * Horizontal distance to the waterline around the camera: on a square grid at
+ * What a {@link WaterlineField} is built from: a signed distance to the solid
+ * ground at a world position, negative inside it, which the seed pass samples
+ * at the rest level and half a cell above.
+ * @internal
+ */
+export interface WaterlineSource {
+  /** Identifies the seed program the source builds into. */
+  readonly label: string;
+  /** Goes up whenever the ground may have changed. */
+  readonly version: number;
+  /** Declares the uniforms {@link WaterlineSource.sampleDistance} reads, in bind group 0. */
+  declareUniforms(scope: PBGlobalScope): void;
+  /** Sets the uniforms {@link WaterlineSource.declareUniforms} declared. */
+  applyBindGroup(bindGroup: BindGroup): void;
+  /** Signed distance to the ground at a world position. */
+  sampleDistance(scope: PBInsideFunctionScope, pos: PBShaderExp): PBShaderExp;
+}
+
+/**
+ * The global scene field as a waterline source: static geometry and the
+ * terrain, without the dynamic instances.
+ * @internal
+ */
+export class SDFWaterlineSource implements WaterlineSource {
+  readonly label = 'SDF';
+  private readonly _global: GlobalSDF;
+  constructor(global: GlobalSDF) {
+    this._global = global;
+  }
+  get version() {
+    return this._global.staticVersion;
+  }
+  declareUniforms(scope: PBGlobalScope) {
+    declareGlobalSDFUniforms(scope, 0, this._global.levels);
+    // Unsampled, declared for GlobalSDF.applyBindGroup
+    declareDynamicSDFUniforms(scope, 0);
+  }
+  applyBindGroup(bindGroup: BindGroup) {
+    this._global.applyBindGroup(bindGroup);
+  }
+  sampleDistance(scope: PBInsideFunctionScope, pos: PBShaderExp) {
+    return sampleGlobalSDF(scope, pos, this._global.levels);
+  }
+}
+
+/**
+ * A terrain's height map as a waterline source: the distance above the
+ * surface over its slope, exact on a plane, as the global field composites
+ * the terrain. Only the terrain, so nothing standing on a beach bends its
+ * shoreline. Off the height map, or with no terrain, everything is water.
+ * @internal
+ */
+export class TerrainWaterlineSource implements WaterlineSource {
+  readonly label = 'Terrain';
+  private _terrain: Nullable<ClipmapTerrain>;
+  private _version: number;
+  private _key: string;
+  private readonly _region: Vector4;
+  /** (height scale, world y, 1 / width, 1 / height) */
+  private readonly _params: Vector4;
+  private _dummy: Nullable<Texture2D>;
+  constructor() {
+    this._terrain = null;
+    this._version = 0;
+    this._key = '';
+    this._region = new Vector4(0, 0, 0, 0);
+    this._params = new Vector4(0, 0, 1, 1);
+    this._dummy = null;
+  }
+  get terrain() {
+    return this._terrain;
+  }
+  get version() {
+    return this._version;
+  }
+  /** Sets the terrain and notices changes to it; call before the field updates. */
+  setTerrain(terrain: Nullable<ClipmapTerrain>) {
+    this._terrain = terrain;
+    const heightMap = terrain?.heightMap ?? null;
+    let key = '';
+    if (terrain && heightMap) {
+      const r = terrain.worldRegion;
+      this._region.setXYZW(r.x, r.y, r.z, r.w);
+      this._params.setXYZW(
+        Math.abs(terrain.scale.y),
+        terrain.worldMatrix.m13,
+        1 / heightMap.width,
+        1 / heightMap.height
+      );
+      key = `${heightMap.uid}:${terrain.heightVersion}:${[...this._region, ...this._params].join(',')}`;
+    } else {
+      this._region.setXYZW(0, 0, 0, 0);
+    }
+    if (key !== this._key) {
+      this._key = key;
+      this._version++;
+    }
+  }
+  declareUniforms(scope: PBGlobalScope) {
+    const pb = scope.$builder;
+    scope.wlHeightMap = pb.tex2D().uniform(0);
+    // (min x, min z, max x, max z); empty for no terrain
+    scope.wlTerrainRegion = pb.vec4().uniform(0);
+    scope.wlTerrainParams = pb.vec4().uniform(0);
+  }
+  applyBindGroup(bindGroup: BindGroup) {
+    const heightMap = this._terrain?.heightMap ?? null;
+    bindGroup.setTexture('wlHeightMap', heightMap ?? this.getDummy(), fetchSampler('clamp_linear_nomip'));
+    bindGroup.setValue('wlTerrainRegion', this._region);
+    bindGroup.setValue('wlTerrainParams', this._params);
+  }
+  sampleDistance(scope: PBInsideFunctionScope, pos: PBShaderExp) {
+    const pb = scope.$builder;
+    pb.func('wlTerrainHeight', [pb.vec2('xz')], function () {
+      this.$l.uv = pb.div(
+        pb.sub(this.xz, this.wlTerrainRegion.xy),
+        pb.sub(this.wlTerrainRegion.zw, this.wlTerrainRegion.xy)
+      );
+      this.$return(
+        pb.add(
+          pb.mul(pb.textureSampleLevel(this.wlHeightMap, this.uv, 0).r, this.wlTerrainParams.x),
+          this.wlTerrainParams.y
+        )
+      );
+    });
+    pb.func('wlTerrainDistance', [pb.vec3('p')], function () {
+      this.$if(
+        pb.or(
+          pb.any(pb.lessThanEqual(this.wlTerrainRegion.zw, this.wlTerrainRegion.xy)),
+          pb.or(
+            pb.any(pb.lessThan(this.p.xz, this.wlTerrainRegion.xy)),
+            pb.any(pb.greaterThan(this.p.xz, this.wlTerrainRegion.zw))
+          )
+        ),
+        function () {
+          this.$return(pb.float(TERRAIN_OFF_MAP));
+        }
+      );
+      this.$l.h = this.wlTerrainHeight(this.p.xz);
+      // Central differences one height map texel apart, in world units
+      this.$l.cell = pb.mul(
+        pb.sub(this.wlTerrainRegion.zw, this.wlTerrainRegion.xy),
+        this.wlTerrainParams.zw
+      );
+      this.$l.hx = pb.sub(
+        this.wlTerrainHeight(pb.add(this.p.xz, pb.vec2(this.cell.x, 0))),
+        this.wlTerrainHeight(pb.sub(this.p.xz, pb.vec2(this.cell.x, 0)))
+      );
+      this.$l.hz = pb.sub(
+        this.wlTerrainHeight(pb.add(this.p.xz, pb.vec2(0, this.cell.y))),
+        this.wlTerrainHeight(pb.sub(this.p.xz, pb.vec2(0, this.cell.y)))
+      );
+      this.$l.grad = pb.div(pb.vec2(this.hx, this.hz), pb.mul(this.cell, 2));
+      this.$return(pb.div(pb.sub(this.p.y, this.h), pb.sqrt(pb.add(1, pb.dot(this.grad, this.grad)))));
+    });
+    return scope.wlTerrainDistance(pos) as PBShaderExp;
+  }
+  dispose() {
+    this._dummy?.dispose();
+    this._dummy = null;
+  }
+  /** @internal */
+  private getDummy() {
+    if (!this._dummy) {
+      this._dummy = getDevice().createTexture2D('r16f', 1, 1, { mipmapping: false })!;
+    }
+    return this._dummy;
+  }
+}
+
+/** Bind groups of one level's build: each dispatch of a frame needs its own uniforms. */
+interface LevelBindGroups {
+  seed: BindGroup;
+  jfa: BindGroup[];
+  wetJfa: BindGroup[];
+  resolve: BindGroup;
+  smooth: [BindGroup, BindGroup];
+}
+
+/**
+ * Options of a {@link WaterlineField}.
+ * @public
+ */
+export interface WaterlineFieldOptions {
+  /** Levels, each twice the cell size of the one before at the same number of cells. Default 1. */
+  levels?: number;
+  /** Cells along each side of a level, a power of two. Default 256. */
+  resolution?: number;
+  /** Cell size of the finest level in world units. Default 0.5. */
+  cellSize?: number;
+}
+
+/**
+ * Horizontal distance to the waterline around the camera: on square grids at
  * the rest level of a body of water, the distance in world units from each
- * cell to the nearest point where the scene's geometry pierces that level.
+ * cell to the nearest point where the ground pierces that level.
  *
  * Unlike the 3D distance to the nearest solid (the water depth over a gently
- * shelving bed), this measures shoreline bands outwards from where geometry
+ * shelving bed), this measures shoreline bands outwards from where the ground
  * meets the water.
  *
- * Rebuilt on the GPU from the global clipmap, static geometry and the terrain
- * only: dynamic instances (a boat, a car wading in) are not shores and would
- * ring themselves with shore waves and foam. Steps:
+ * Built on the GPU from a {@link WaterlineSource}: the global clipmap (static
+ * geometry and the terrain; dynamic instances, a boat or a car wading in, are
+ * not shores and would ring themselves with shore waves and foam) or the
+ * terrain alone. One or more levels, all centred on the camera, each twice the
+ * cell size of the one before. Per level:
  *
- * 1. Seed: a cell whose centre is inside geometry at the water level is its own nearest shore.
+ * 1. Seed: a cell whose centre is inside the ground at the water level is its own nearest shore.
  * 2. Jump flooding, log2(resolution) passes, carries the nearest seed across the grid.
- * 3. Resolve, into an rgba16f texture sampled linearly by consumers:
+ * 3. Resolve, into an rgba16f texture:
  *    - x: distance to the nearest seed, the waterline at the rest level;
- *    - y, z: a linear model of the geometry around the cell, A and B with the horizontal distance
+ *    - y, z: a linear model of the ground around the cell, A and B with the horizontal distance
  *      to the waterline at a height `level + dy` being `A + B * dy`;
  *    - w: the field value at the cell at the rest level, telling how far the linear model holds.
+ * 4. Smooth, into a layer of {@link WaterlineField.smoothTexture}.
  *
  * The linear model lets the waterline follow the waves (a surface raised by dy moves the edge
  * dy / tan(a) inland on a slope of angle a). From the field value s and its gradient g at the rest
- * level, the geometry near the cell is the plane s + g.(p - p0) = 0, crossed at height dy
+ * level, the ground near the cell is the plane s + g.(p - p0) = 0, crossed at height dy
  * (s + g.y * dy) / |g.xz| away horizontally: A = s / |g.xz|, B = g.y / |g.xz|. Exact for a planar
  * bed; farther from the shore the jump-flooded distance is used.
  *
- * The jump-flooded distance is accurate to about half a cell (0.25 m by default). WebGPU only, as the scene field is.
+ * The jump-flooded distance is accurate to about half a cell. A level only sees
+ * the shores on its own grid, so near its edge the nearest one may lie off it.
+ * WebGPU only.
  *
  * @public
  */
 export class WaterlineField {
+  readonly levels: number;
   readonly resolution: number;
   readonly cellSize: number;
-  private readonly _global: GlobalSDF;
+  private readonly _source: WaterlineSource;
   private _level: Nullable<number>;
   private _requested: boolean;
   private _seedA: Nullable<Texture2D>;
@@ -66,86 +276,88 @@ export class WaterlineField {
   /** Seeds in the water, flooded for the distance inland from it; and the pass between. */
   private _wetA: Nullable<Texture2D>;
   private _wetB: Nullable<Texture2D>;
-  private _wetJfaBindGroups: BindGroup[];
   /** (field at the rest level, field half a cell above) per cell. */
   private _probe: Nullable<Texture2D>;
   private _result: Nullable<Texture2D>;
-  /** Smoothed shore coordinates, see {@link WaterlineField.smoothTexture}; and the pass between. */
-  private _smooth: Nullable<Texture2D>;
+  /** Smoothed shore coordinates, a layer per level, see {@link WaterlineField.smoothTexture}. */
+  private _smooth: Nullable<Texture2DArray>;
   private _smoothTemp: Nullable<Texture2D>;
-  private _smoothProgram: Nullable<GPUProgram>;
-  private _smoothBindGroups: BindGroup[];
+  private _smoothHProgram: Nullable<GPUProgram>;
+  private _smoothVProgram: Nullable<GPUProgram>;
   private _seedProgram: Nullable<GPUProgram>;
   private _jfaProgram: Nullable<GPUProgram>;
   private _resolveProgram: Nullable<GPUProgram>;
-  private _seedBindGroup: Nullable<BindGroup>;
-  private _jfaBindGroups: BindGroup[];
-  private _resolveBindGroup: Nullable<BindGroup>;
-  /** (origin x, origin z, cell size, resolution) of the grid as last built. */
-  private readonly _region: Vector4;
-  private _built: boolean;
-  /** Content version of the global field, origin and level the grid was last built at. */
-  private _builtVersion: number;
-  private readonly _builtAt: [number, number, number];
-  /** Defaults to 256 cells of 0.5 m: 128 m around the camera. */
-  constructor(global: GlobalSDF, resolution = 256, cellSize = 0.5) {
-    this._builtVersion = -1;
-    this._builtAt = [NaN, NaN, NaN];
-    this._global = global;
-    this.resolution = Math.max(16, 2 ** Math.round(Math.log2(resolution)));
-    this.cellSize = Math.max(1e-3, cellSize);
+  private _bindGroups: LevelBindGroups[];
+  /** Per level: (origin x, origin z, cell size, resolution) as last built; 0 cells before it is. */
+  private readonly _regions: Vector4[];
+  /** Per level: source version, origin x, origin z and water level it was last built at. */
+  private readonly _builtAt: [number, number, number, number][];
+  constructor(source: WaterlineSource, options?: WaterlineFieldOptions) {
+    this._source = source;
+    this.levels = Math.max(1, Math.min(8, Math.floor(options?.levels ?? 1)));
+    this.resolution = Math.max(16, 2 ** Math.round(Math.log2(options?.resolution ?? 256)));
+    this.cellSize = Math.max(1e-3, options?.cellSize ?? 0.5);
     this._level = null;
     this._requested = false;
     this._seedA = null;
     this._seedB = null;
     this._wetA = null;
     this._wetB = null;
-    this._wetJfaBindGroups = [];
     this._probe = null;
     this._result = null;
     this._smooth = null;
     this._smoothTemp = null;
-    this._smoothProgram = null;
-    this._smoothBindGroups = [];
+    this._smoothHProgram = null;
+    this._smoothVProgram = null;
     this._seedProgram = null;
     this._jfaProgram = null;
     this._resolveProgram = null;
-    this._seedBindGroup = null;
-    this._jfaBindGroups = [];
-    this._resolveBindGroup = null;
-    this._region = new Vector4(0, 0, this.cellSize, this.resolution);
-    this._built = false;
+    this._bindGroups = [];
+    this._regions = Array.from({ length: this.levels }, () => new Vector4(0, 0, 0, 0));
+    this._builtAt = Array.from({ length: this.levels }, () => [NaN, NaN, NaN, NaN]);
   }
-  /** Grids built so far, for diagnosis. */
+  /** Grids built so far, a level each, for diagnosis. */
   get rebuilds() {
     return this._rebuilds;
   }
   private _rebuilds = 0;
+  /** What the field is built from. */
+  get source() {
+    return this._source;
+  }
   /** World Y the field is built at, or null before anything asked for it. */
   get level() {
     return this._level;
   }
-  /** True once a grid has been built and {@link WaterlineField.texture} holds it. */
+  /** True once the finest level has been built. */
   get ready() {
-    return this._built;
+    return this._regions[0].w > 0;
   }
   /**
-   * Smooth shore coordinates per cell, rgba16f, for effects that build
-   * geometry on them (see ShoreWaveGenerator): (signed distance to the
-   * waterline, negative inland; B of the bed model; height of the bed over the
-   * rest level; 0). The first two are Gaussian-filtered over about two metres;
-   * the bed height is the cell's own, so it matches the ground.
+   * Smooth shore coordinates per cell, an rgba16f array with a layer per
+   * level, for effects that build geometry on them (see ShoreWaveGenerator):
+   * (signed distance to the waterline, negative inland; B of the bed model;
+   * height of the bed over the rest level; 0). The first two are
+   * Gaussian-filtered over two cells; the bed height is the cell's own, so it
+   * matches the ground. Null before the finest level is built.
    */
   get smoothTexture() {
-    return this._built ? this._smooth : null;
+    return this.ready ? this._smooth : null;
   }
-  /** (rest-level distance, model A, model B, field at the rest level) per cell, rgba16f. */
+  /**
+   * (rest-level distance, model A, model B, field at the rest level) per cell
+   * of the level built last, rgba16f: the finest level when there is one.
+   */
   get texture() {
     return this._result;
   }
-  /** (origin x, origin z, cell size, resolution) of the grid, for sampling. */
+  /** (origin x, origin z, cell size, resolution) of the finest level, for sampling. */
   get region() {
-    return this._region;
+    return this._regions[0];
+  }
+  /** (origin x, origin z, cell size, resolution) per level; 0 cells for a level not built yet. */
+  get regions(): readonly Vector4[] {
+    return this._regions;
   }
   /**
    * Asks for the field at a water level this frame. Without a request in a
@@ -155,89 +367,105 @@ export class WaterlineField {
     this._level = level;
     this._requested = true;
   }
-  /** Rebuilds the grid around the camera when requested. Called by the global field after compositing. */
+  /** Rebuilds the levels around the camera that moved or went stale, when requested. */
   update(cameraPos: Vector3) {
     if (!this._requested || this._level === null) {
       return;
     }
     this._requested = false;
-    const n = this.resolution;
-    const h = this.cellSize;
-    const device = getDevice();
     this.ensureResources();
-    // Snapped to cells, so the grid does not swim as the camera moves
-    const ox = (Math.floor(cameraPos.x / h) - n / 2) * h;
-    const oz = (Math.floor(cameraPos.z / h) - n / 2) * h;
-    const version = this._global.staticVersion;
-    const at = this._builtAt;
-    if (
-      this._built &&
-      version === this._builtVersion &&
-      at[0] === ox &&
-      at[1] === oz &&
-      at[2] === this._level
-    ) {
-      return;
+    const version = this._source.version;
+    // Coarse first, so the resolved texture ends up holding the finest level
+    for (let i = this.levels - 1; i >= 0; i--) {
+      const h = this.cellSize * 2 ** i;
+      const n = this.resolution;
+      // Snapped to cells, so the grid does not swim as the camera moves
+      const ox = (Math.floor(cameraPos.x / h) - n / 2) * h;
+      const oz = (Math.floor(cameraPos.z / h) - n / 2) * h;
+      const at = this._builtAt[i];
+      if (
+        this._regions[i].w > 0 &&
+        at[0] === version &&
+        at[1] === ox &&
+        at[2] === oz &&
+        at[3] === this._level
+      ) {
+        continue;
+      }
+      at[0] = version;
+      at[1] = ox;
+      at[2] = oz;
+      at[3] = this._level;
+      this.buildLevel(i, ox, oz, h);
+      this._regions[i].setXYZW(ox, oz, h, n);
+      this._rebuilds++;
     }
-    this._builtVersion = version;
-    at[0] = ox;
-    at[1] = oz;
-    at[2] = this._level;
-    this._rebuilds++;
-    this._region.setXYZW(ox, oz, h, n);
+  }
+  dispose() {
+    this._seedA?.dispose();
+    this._seedB?.dispose();
+    this._wetA?.dispose();
+    this._wetB?.dispose();
+    this._probe?.dispose();
+    this._result?.dispose();
+    this._smooth?.dispose();
+    this._smoothTemp?.dispose();
+    this._seedA = this._seedB = this._wetA = this._wetB = null;
+    this._probe = this._result = this._smoothTemp = null;
+    this._smooth = null;
+    for (const bgs of this._bindGroups) {
+      bgs.seed.dispose();
+      bgs.resolve.dispose();
+      for (const bg of [...bgs.jfa, ...bgs.wetJfa, ...bgs.smooth]) {
+        bg.dispose();
+      }
+    }
+    this._bindGroups = [];
+    for (const r of this._regions) {
+      r.setXYZW(0, 0, 0, 0);
+    }
+  }
+  /** Builds one level into its layer of the smoothed array. @internal */
+  private buildLevel(index: number, ox: number, oz: number, h: number) {
+    const device = getDevice();
+    const n = this.resolution;
     const groups = n / WORKGROUP;
+    const bgs = this._bindGroups[index];
     // Seed
-    const seedBG = this._seedBindGroup!;
-    seedBG.setValue('grid', new Vector4(ox, oz, h, this._level));
+    const seedBG = bgs.seed;
+    seedBG.setValue('grid', new Vector4(ox, oz, h, this._level!));
     seedBG.setTexture('seedOut', this._seedA!);
     seedBG.setTexture('wetOut', this._wetA!);
     seedBG.setTexture('probeOut', this._probe!);
-    this._global.applyBindGroup(seedBG);
+    this._source.applyBindGroup(seedBG);
     device.setProgram(this._seedProgram);
     device.setBindGroup(0, seedBG);
     device.compute(groups, groups, 1);
-    // Jump flooding, halving the step down to one cell
-    let src = this._seedA!;
-    let dst = this._seedB!;
-    let pass = 0;
-    for (let step = n / 2; step >= 1; step >>= 1, pass++) {
-      if (!this._jfaBindGroups[pass]) {
-        this._jfaBindGroups[pass] = device.createBindGroup(this._jfaProgram!.bindGroupLayouts[0]);
+    // Jump flooding, halving the step down to one cell, from the shore and from the water side
+    const flood = (a: Texture2D, b: Texture2D, bindGroups: BindGroup[]) => {
+      let src = a;
+      let dst = b;
+      let pass = 0;
+      for (let step = n / 2; step >= 1; step >>= 1, pass++) {
+        const bg = bindGroups[pass];
+        bg.setValue('step', new Vector4(step, n, 0, 0));
+        bg.setTexture('seedIn', src, fetchSampler('clamp_nearest_nomip'));
+        bg.setTexture('seedOut', dst);
+        device.setProgram(this._jfaProgram);
+        device.setBindGroup(0, bg);
+        device.compute(groups, groups, 1);
+        const t = src;
+        src = dst;
+        dst = t;
       }
-      const bg = this._jfaBindGroups[pass];
-      bg.setValue('step', new Vector4(step, n, 0, 0));
-      bg.setTexture('seedIn', src, fetchSampler('clamp_nearest_nomip'));
-      bg.setTexture('seedOut', dst);
-      device.setProgram(this._jfaProgram);
-      device.setBindGroup(0, bg);
-      device.compute(groups, groups, 1);
-      const t = src;
-      src = dst;
-      dst = t;
-    }
-    // The same from the water side, for the distance inland
-    let wetSrc = this._wetA!;
-    let wetDst = this._wetB!;
-    pass = 0;
-    for (let step = n / 2; step >= 1; step >>= 1, pass++) {
-      if (!this._wetJfaBindGroups[pass]) {
-        this._wetJfaBindGroups[pass] = device.createBindGroup(this._jfaProgram!.bindGroupLayouts[0]);
-      }
-      const bg = this._wetJfaBindGroups[pass];
-      bg.setValue('step', new Vector4(step, n, 0, 0));
-      bg.setTexture('seedIn', wetSrc, fetchSampler('clamp_nearest_nomip'));
-      bg.setTexture('seedOut', wetDst);
-      device.setProgram(this._jfaProgram);
-      device.setBindGroup(0, bg);
-      device.compute(groups, groups, 1);
-      const t = wetSrc;
-      wetSrc = wetDst;
-      wetDst = t;
-    }
+      return src;
+    };
+    const seeds = flood(this._seedA!, this._seedB!, bgs.jfa);
+    const wet = flood(this._wetA!, this._wetB!, bgs.wetJfa);
     // Resolve
-    const rbg = this._resolveBindGroup!;
+    const rbg = bgs.resolve;
     rbg.setValue('grid', new Vector4(ox, oz, h, n));
-    rbg.setTexture('seedIn', src, fetchSampler('clamp_nearest_nomip'));
+    rbg.setTexture('seedIn', seeds, fetchSampler('clamp_nearest_nomip'));
     rbg.setTexture('probeIn', this._probe!, fetchSampler('clamp_nearest_nomip'));
     rbg.setTexture('result', this._result!);
     device.setProgram(this._resolveProgram);
@@ -245,52 +473,19 @@ export class WaterlineField {
     device.compute(groups, groups, 1);
     // Smooth, separably: the first pass also turns the result into the signed distance
     for (let pass = 0; pass < 2; pass++) {
-      if (!this._smoothBindGroups[pass]) {
-        this._smoothBindGroups[pass] = device.createBindGroup(this._smoothProgram!.bindGroupLayouts[0]);
-      }
-      const bg = this._smoothBindGroups[pass];
-      bg.setValue('smoothPass', new Vector4(pass, n, h, 0));
-      bg.setTexture('wetIn', wetSrc, fetchSampler('clamp_nearest_nomip'));
+      const bg = bgs.smooth[pass];
+      bg.setValue('smoothPass', new Vector4(pass, n, h, index));
+      bg.setTexture('wetIn', wet, fetchSampler('clamp_nearest_nomip'));
       bg.setTexture(
         'src',
         pass === 0 ? this._result! : this._smoothTemp!,
         fetchSampler('clamp_nearest_nomip')
       );
       bg.setTexture('dst', pass === 0 ? this._smoothTemp! : this._smooth!);
-      device.setProgram(this._smoothProgram);
+      device.setProgram(pass === 0 ? this._smoothHProgram : this._smoothVProgram);
       device.setBindGroup(0, bg);
       device.compute(groups, groups, 1);
     }
-    this._built = true;
-  }
-  dispose() {
-    this._seedA?.dispose();
-    this._seedB?.dispose();
-    this._wetA?.dispose();
-    this._wetB?.dispose();
-    this._wetA = this._wetB = null;
-    for (const bg of this._wetJfaBindGroups) {
-      bg.dispose();
-    }
-    this._wetJfaBindGroups = [];
-    this._probe?.dispose();
-    this._result?.dispose();
-    this._smooth?.dispose();
-    this._smoothTemp?.dispose();
-    for (const bg of this._smoothBindGroups) {
-      bg.dispose();
-    }
-    this._smooth = this._smoothTemp = null;
-    this._smoothBindGroups = [];
-    this._seedBindGroup?.dispose();
-    this._resolveBindGroup?.dispose();
-    for (const bg of this._jfaBindGroups) {
-      bg.dispose();
-    }
-    this._seedA = this._seedB = this._probe = this._result = null;
-    this._seedBindGroup = this._resolveBindGroup = null;
-    this._jfaBindGroups = [];
-    this._built = false;
   }
   /** @internal */
   private ensureResources() {
@@ -307,13 +502,16 @@ export class WaterlineField {
     this._wetB = tex('rg32f');
     this._probe = tex('rg32f');
     this._result = tex('rgba16f');
-    this._smooth = tex('rgba16f');
-    this._smooth.name = '@WaterlineSmooth';
+    this._result.name = `@Waterline${this._source.label}`;
     this._smoothTemp = tex('rgba16f');
-    this._result.name = '@WaterlineField';
-    const levels = this._global.levels;
+    this._smooth = device.createTexture2DArray('rgba16f', n, n, this.levels, {
+      mipmapping: false,
+      writable: true
+    })!;
+    this._smooth.name = `@Waterline${this._source.label}Smooth`;
+    const source = this._source;
     this._seedProgram = buildSDFProgram({
-      label: 'WaterlineSeed',
+      label: `WaterlineSeed${source.label}`,
       workgroupSize: [WORKGROUP, WORKGROUP, 1],
       compute(pb) {
         // (origin x, origin z, cell size, water level)
@@ -321,18 +519,15 @@ export class WaterlineField {
         this.seedOut = pb.texStorage2D.rg32float().storage(0);
         this.wetOut = pb.texStorage2D.rg32float().storage(0);
         this.probeOut = pb.texStorage2D.rg32float().storage(0);
-        declareGlobalSDFUniforms(this, 0, levels);
-        // Unsampled, declared for GlobalSDF.applyBindGroup
-        declareDynamicSDFUniforms(this, 0);
+        source.declareUniforms(this);
         pb.main(function () {
           this.$l.id = this.$builtins.globalInvocationId.xy;
           this.$l.xz = pb.add(this.grid.xy, pb.mul(pb.add(pb.vec2(this.id), pb.vec2(0.5)), this.grid.z));
-          this.$l.d = sampleGlobalSDF(this, pb.vec3(this.xz.x, this.grid.w, this.xz.y), levels);
+          this.$l.d = source.sampleDistance(this, pb.vec3(this.xz.x, this.grid.w, this.xz.y));
           // Half a cell up, for the vertical slope of the field
-          this.$l.dUp = sampleGlobalSDF(
+          this.$l.dUp = source.sampleDistance(
             this,
-            pb.vec3(this.xz.x, pb.add(this.grid.w, pb.mul(this.grid.z, 0.5)), this.xz.y),
-            levels
+            pb.vec3(this.xz.x, pb.add(this.grid.w, pb.mul(this.grid.z, 0.5)), this.xz.y)
           );
           pb.textureStore(this.probeOut, this.id, pb.vec4(this.d, this.dUp, 0, 0));
           pb.textureStore(
@@ -452,71 +647,99 @@ export class WaterlineField {
         });
       }
     })!;
-    this._seedBindGroup = device.createBindGroup(this._seedProgram.bindGroupLayouts[0]);
-    this._resolveBindGroup = device.createBindGroup(this._resolveProgram.bindGroupLayouts[0]);
-    this._smoothProgram = buildSDFProgram({
-      label: 'WaterlineSmooth',
-      workgroupSize: [WORKGROUP, WORKGROUP, 1],
-      compute(pb) {
-        // (pass: 0 horizontal from the resolved field, 1 vertical; resolution; cell size)
-        this.smoothPass = pb.vec4().uniform(0);
-        this.src = pb.tex2D().sampleType('unfilterable-float').uniform(0);
-        // Nearest cell in the water, for the distance inland
-        this.wetIn = pb.tex2D().sampleType('unfilterable-float').uniform(0);
-        this.dst = pb.texStorage2D.rgba16float().storage(0);
-        // Signed distance and B of a resolved texel: the bed model near the
-        // shore, the jump-flooded distance farther out, blended over a couple
-        // of metres. Inland, away from the model, the negated jump-flooded
-        // distance from the water side (the resolved distance is 0 on land).
-        pb.func('wlSigned', [pb.vec4('t'), pb.ivec2('q')], function () {
-          this.$l.model = pb.and(
-            pb.lessThan(pb.abs(this.t.w), SMOOTH_MODEL_REACH),
-            pb.lessThan(pb.abs(this.t.y), SMOOTH_MODEL_CLAMP)
+    this._smoothHProgram = buildSmoothProgram(false);
+    this._smoothVProgram = buildSmoothProgram(true);
+    const passes = Math.log2(n);
+    for (let i = 0; i < this.levels; i++) {
+      this._bindGroups.push({
+        seed: device.createBindGroup(this._seedProgram.bindGroupLayouts[0]),
+        jfa: Array.from({ length: passes }, () =>
+          device.createBindGroup(this._jfaProgram!.bindGroupLayouts[0])
+        ),
+        wetJfa: Array.from({ length: passes }, () =>
+          device.createBindGroup(this._jfaProgram!.bindGroupLayouts[0])
+        ),
+        resolve: device.createBindGroup(this._resolveProgram.bindGroupLayouts[0]),
+        smooth: [
+          device.createBindGroup(this._smoothHProgram.bindGroupLayouts[0]),
+          device.createBindGroup(this._smoothVProgram.bindGroupLayouts[0])
+        ]
+      });
+    }
+  }
+}
+
+/**
+ * One pass of the separable smoothing: horizontal from the resolved field
+ * into a scratch texture, or vertical from it into a level's layer.
+ */
+function buildSmoothProgram(toArray: boolean) {
+  return buildSDFProgram({
+    label: toArray ? 'WaterlineSmoothV' : 'WaterlineSmoothH',
+    workgroupSize: [WORKGROUP, WORKGROUP, 1],
+    compute(pb) {
+      // (pass: 0 horizontal from the resolved field, 1 vertical; resolution; cell size; layer)
+      this.smoothPass = pb.vec4().uniform(0);
+      this.src = pb.tex2D().sampleType('unfilterable-float').uniform(0);
+      // Nearest cell in the water, for the distance inland
+      this.wetIn = pb.tex2D().sampleType('unfilterable-float').uniform(0);
+      this.dst = toArray
+        ? pb.texStorage2DArray.rgba16float().storage(0)
+        : pb.texStorage2D.rgba16float().storage(0);
+      // Signed distance and B of a resolved texel: the bed model near the
+      // shore, the jump-flooded distance farther out, blended over a couple
+      // of metres. Inland, away from the model, the negated jump-flooded
+      // distance from the water side (the resolved distance is 0 on land).
+      pb.func('wlSigned', [pb.vec4('t'), pb.ivec2('q')], function () {
+        this.$l.model = pb.and(
+          pb.lessThan(pb.abs(this.t.w), SMOOTH_MODEL_REACH),
+          pb.lessThan(pb.abs(this.t.y), SMOOTH_MODEL_CLAMP)
+        );
+        this.$l.wet = pb.textureLoad(this.wetIn, this.q, 0).xy;
+        this.$l.inland = this.$choice(
+          pb.lessThan(this.wet.x, NO_SEED * 0.5),
+          pb.mul(this.smoothPass.y, this.smoothPass.z),
+          pb.mul(pb.max(pb.sub(pb.length(pb.sub(pb.vec2(this.q), this.wet)), 0.5), 0), this.smoothPass.z)
+        );
+        this.$l.far = this.$choice(pb.lessThan(this.t.w, 0), pb.neg(this.inland), this.t.x);
+        this.$l.w = this.$choice(
+          this.model,
+          pb.smoothStep(SMOOTH_BLEND_START, SMOOTH_BLEND_END, pb.abs(this.far)),
+          1
+        );
+        this.$return(pb.vec2(pb.mix(this.t.y, this.far, this.w), this.$choice(this.model, this.t.z, 0)));
+      });
+      pb.main(function () {
+        this.$l.id = pb.ivec2(this.$builtins.globalInvocationId.xy);
+        this.$l.last = pb.sub(pb.int(this.smoothPass.y), 1);
+        this.$l.axis = toArray ? pb.ivec2(0, 1) : pb.ivec2(1, 0);
+        this.$l.acc = pb.vec2(0);
+        this.$l.wsum = pb.float(0);
+        for (let k = -SMOOTH_RADIUS; k <= SMOOTH_RADIUS; k++) {
+          const w = Math.exp(-(k * k) / (2 * SMOOTH_SIGMA * SMOOTH_SIGMA));
+          this.$l.q = pb.clamp(pb.add(this.id, pb.mul(this.axis, k)), pb.ivec2(0), pb.ivec2(this.last));
+          this.$l.t = pb.textureLoad(this.src, this.q, 0);
+          this.$l.v = toArray ? this.t.xy : this.wlSigned(this.t, this.q);
+          this.acc = pb.add(this.acc, pb.mul(this.v, w));
+          this.wsum = pb.add(this.wsum, w);
+        }
+        // Keep the bed unfiltered; the second pass carries its height through.
+        this.$l.own = pb.textureLoad(this.src, this.id, 0);
+        if (toArray) {
+          pb.textureArrayStore(
+            this.dst,
+            pb.uvec2(this.id),
+            pb.int(this.smoothPass.w),
+            pb.vec4(pb.div(this.acc, this.wsum), this.own.z, 0)
           );
-          this.$l.wet = pb.textureLoad(this.wetIn, this.q, 0).xy;
-          this.$l.inland = this.$choice(
-            pb.lessThan(this.wet.x, NO_SEED * 0.5),
-            pb.mul(this.smoothPass.y, this.smoothPass.z),
-            pb.mul(pb.max(pb.sub(pb.length(pb.sub(pb.vec2(this.q), this.wet)), 0.5), 0), this.smoothPass.z)
-          );
-          this.$l.far = this.$choice(pb.lessThan(this.t.w, 0), pb.neg(this.inland), this.t.x);
-          this.$l.w = this.$choice(
-            this.model,
-            pb.smoothStep(SMOOTH_BLEND_START, SMOOTH_BLEND_END, pb.abs(this.far)),
-            1
-          );
-          this.$return(pb.vec2(pb.mix(this.t.y, this.far, this.w), this.$choice(this.model, this.t.z, 0)));
-        });
-        pb.main(function () {
-          this.$l.id = pb.ivec2(this.$builtins.globalInvocationId.xy);
-          this.$l.last = pb.sub(pb.int(this.smoothPass.y), 1);
-          this.$l.axis = this.$choice(pb.lessThan(this.smoothPass.x, 0.5), pb.ivec2(1, 0), pb.ivec2(0, 1));
-          this.$l.acc = pb.vec2(0);
-          this.$l.wsum = pb.float(0);
-          for (let k = -SMOOTH_RADIUS; k <= SMOOTH_RADIUS; k++) {
-            const w = Math.exp(-(k * k) / (2 * SMOOTH_SIGMA * SMOOTH_SIGMA));
-            this.$l.q = pb.clamp(pb.add(this.id, pb.mul(this.axis, k)), pb.ivec2(0), pb.ivec2(this.last));
-            this.$l.t = pb.textureLoad(this.src, this.q, 0);
-            this.$l.v = this.$choice(
-              pb.lessThan(this.smoothPass.x, 0.5),
-              this.wlSigned(this.t, this.q),
-              this.t.xy
-            );
-            this.acc = pb.add(this.acc, pb.mul(this.v, w));
-            this.wsum = pb.add(this.wsum, w);
-          }
-          // Keep the bed unfiltered; the second pass carries its height through.
-          this.$l.own = pb.textureLoad(this.src, this.id, 0);
-          this.$l.bed = this.$choice(pb.lessThan(this.smoothPass.x, 0.5), pb.neg(this.own.w), this.own.z);
+        } else {
+          this.$l.bed = pb.neg(this.own.w);
           this.$if(
             pb.and(
-              pb.lessThan(this.smoothPass.x, 0.5),
+              pb.lessThan(pb.abs(this.own.w), SMOOTH_MODEL_REACH),
               pb.and(
-                pb.lessThan(pb.abs(this.own.w), SMOOTH_MODEL_REACH),
-                pb.and(
-                  pb.lessThan(pb.abs(this.own.y), SMOOTH_MODEL_CLAMP),
-                  pb.and(pb.greaterThan(this.own.z, 1e-3), pb.lessThan(this.own.z, WATERLINE_MODEL_CLAMP))
-                )
+                pb.lessThan(pb.abs(this.own.y), SMOOTH_MODEL_CLAMP),
+                pb.and(pb.greaterThan(this.own.z, 1e-3), pb.lessThan(this.own.z, WATERLINE_MODEL_CLAMP))
               )
             ),
             function () {
@@ -525,8 +748,8 @@ export class WaterlineField {
             }
           );
           pb.textureStore(this.dst, pb.uvec2(this.id), pb.vec4(pb.div(this.acc, this.wsum), this.bed, 0));
-        });
-      }
-    });
-  }
+        }
+      });
+    }
+  });
 }

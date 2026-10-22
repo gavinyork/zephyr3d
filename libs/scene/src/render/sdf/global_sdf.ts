@@ -22,7 +22,7 @@ import {
 } from '../../shaders/sdf';
 import type { SceneSDF, SDFInstance } from './scene_sdf';
 import type { MeshSDFAtlas } from './sdf_atlas';
-import { WaterlineField } from './waterline';
+import { SDFWaterlineSource, WaterlineField } from './waterline';
 import { buildSDFProgram, getSDFProgramErrors } from './sdf_programs';
 
 /** Voxels along a brick edge, the unit of compositing. */
@@ -233,7 +233,7 @@ export class GlobalSDF {
    */
   get waterline() {
     if (!this._waterline) {
-      this._waterline = new WaterlineField(this);
+      this._waterline = new WaterlineField(new SDFWaterlineSource(this));
     }
     return this._waterline;
   }
