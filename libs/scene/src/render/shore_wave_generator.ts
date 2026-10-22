@@ -637,8 +637,15 @@ export class ShoreWaveGenerator extends Disposable implements WaveGenerator, Foa
           pb.mul(that.surfFoam(this, this.near, this.surf), this.coverage),
           pb.mix(1, this.swSettle.z, this.settle)
         );
+        // Foam is only made where there is water: the open sea's crests run on
+        // under the beach, and their foam would surface through the sand that
+        // the field's foam is shown on (FOAM_SETTLE)
         this.$return(
-          pb.vec4(this.velocity, pb.add(this.baseStep.z, this.foam), pb.add(this.baseStep.w, this.wallFoam))
+          pb.vec4(
+            this.velocity,
+            pb.mul(pb.add(this.baseStep.z, this.foam), this.coverage),
+            pb.mul(pb.add(this.baseStep.w, this.wallFoam), this.coverage)
+          )
         );
       }
     );
