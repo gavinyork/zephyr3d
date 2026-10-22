@@ -3072,12 +3072,19 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
     this._shoreWaves.wallFoamDrift = Math.max(0, val);
   }
   /**
-   * Hands the shore waves this frame's waterline field, or null when there is
-   * none, which turns them off. Called by the water every frame.
+   * Hands the shore waves this frame's waterline fields: the shore field in
+   * levels, null when there is none, which turns them off; and the wall field,
+   * null for no foam against walls. Called by the water every frame.
    * @internal
    */
-  setShoreWaveFrame(waterline: Nullable<Texture2DArray>, region: Vector4, level: number) {
-    this._shoreWaveGenerator?.setFrame(waterline, region, level, this._waveClock);
+  setShoreWaveFrame(
+    shore: Nullable<Texture2DArray>,
+    shoreRegions: readonly Vector4[],
+    wall: Nullable<Texture2DArray>,
+    wallRegion: Vector4,
+    level: number
+  ) {
+    this._shoreWaveGenerator?.setFrame(shore, shoreRegions, wall, wallRegion, level, this._waveClock);
   }
   /**
    * Steps the foam field around the water the view looks at, once a frame

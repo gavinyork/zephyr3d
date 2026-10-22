@@ -48,6 +48,8 @@ const WHOLE_DOMAIN = new Vector4(-99999, -99999, 99999, 99999);
 const SHORE_FIELD_LEVELS = 2;
 const SHORE_FIELD_CELLS = 256;
 const SHORE_FIELD_CELL_SIZE = 0.5;
+/** No waterline grid: 0 cells. */
+const NO_REGIONS: readonly Vector4[] = [new Vector4(0, 0, 1, 0)];
 
 /**
  * One evaluated point of a water surface, in world space.
@@ -820,11 +822,19 @@ export class Water extends applyMixins(GraphNode, mixinDrawable) implements Draw
         this.scene.sdf.global?.waterline.request(this.worldMatrix.m13);
       }
       if (mat.shoreWaveHeight > 0) {
-        this.updateShoreField(camera);
+        // The waves and the beach's foam follow the terrain alone, in levels
+        // out to the foam field's reach; the foam against walls, rocks and
+        // piers the scene field's single level. Without a terrain the scene
+        // field shapes the waves too.
+        const terrainField = this.updateShoreField(camera);
         const waterline = this.scene?.sdf.enabled ? this.scene.sdf.global?.waterline : null;
+        const wall = waterline?.ready ? waterline : null;
+        const shore = terrainField?.ready ? terrainField : terrainField ? null : wall;
         mat.setShoreWaveFrame(
-          waterline?.ready ? waterline.smoothTexture : null,
-          waterline?.region ?? new Vector4(0, 0, 1, 0),
+          shore?.smoothTexture ?? null,
+          shore?.regions ?? NO_REGIONS,
+          wall?.smoothTexture ?? null,
+          wall?.region ?? NO_REGIONS[0],
           this.worldMatrix.m13
         );
       }
@@ -892,15 +902,15 @@ export class Water extends applyMixins(GraphNode, mixinDrawable) implements Draw
   }
   /**
    * Rebuilds the shore field, the waterline of the terrain alone in levels
-   * around the camera, which the shore waves read. Nothing without a terrain
-   * or off WebGPU.
+   * around the camera, which the shore waves read, and returns it. Null
+   * without a terrain or off WebGPU.
    * @internal
    */
-  private updateShoreField(camera: Camera) {
+  private updateShoreField(camera: Camera): Nullable<WaterlineField> {
     const terrain = this.findTerrain();
     const device = getDevice();
     if (!terrain?.heightMap || device.type !== 'webgpu') {
-      return;
+      return null;
     }
     if (!this._shoreField) {
       this._shoreSource = new TerrainWaterlineSource();
@@ -918,6 +928,7 @@ export class Water extends applyMixins(GraphNode, mixinDrawable) implements Draw
     } finally {
       device.popDeviceStates();
     }
+    return this._shoreField;
   }
   /** @internal */
   private _shoreSource: Nullable<TerrainWaterlineSource> = null;
