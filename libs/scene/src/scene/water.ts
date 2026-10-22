@@ -45,7 +45,7 @@ const WHOLE_DOMAIN = new Vector4(-99999, -99999, 99999, 99999);
  * finest cell size in metres, each level twice the size of the one before,
  * laid out as the foam field's are.
  */
-const SHORE_FIELD_LEVELS = 2;
+const SHORE_FIELD_LEVELS = 4;
 const SHORE_FIELD_CELLS = 256;
 const SHORE_FIELD_CELL_SIZE = 0.5;
 /** No waterline grid: 0 cells. */
