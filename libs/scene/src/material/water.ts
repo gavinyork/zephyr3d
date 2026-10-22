@@ -76,6 +76,11 @@ export type WaterRefractionMode = 'march' | 'offset';
  *   projection. Blue is the base water, cyan the offshore shore-wave region,
  *   orange the wet inland swash and magenta its dry support. Smooth colour
  *   transitions show the shore-wave envelope, not separate meshes.
+ * - `shoreLevels`: which level of the shore field answers, red, green, blue
+ *   and yellow from the finest, blended where levels hand over and darkening
+ *   towards the edge of the coarsest; bands every 2 metres of the distance to
+ *   the waterline, which should run on unbroken across the handovers. Dark grey
+ *   off the field.
  * - `swashHandover`: red is carrier wet coverage, green is reconstructed
  *   ground wet coverage and blue is the ground-foam replacement weight.
  *   Magenta identifies wet carrier pixels being replaced by dry ground.
@@ -116,6 +121,7 @@ export type WaterDebugOutput =
   | 'interaction'
   | 'foamField'
   | 'shoreRegions'
+  | 'shoreLevels'
   | 'swashHandover'
   | 'swashFoamSources'
   | 'swashFoamCuts'
@@ -142,6 +148,7 @@ export const WATER_DEBUG_OUTPUTS = [
   { label: 'Interaction', value: 'interaction' },
   { label: 'Foam field', value: 'foamField' },
   { label: 'Shore regions (geometry)', value: 'shoreRegions' },
+  { label: 'Shore field levels', value: 'shoreLevels' },
   { label: 'Swash handover (RGB)', value: 'swashHandover' },
   { label: 'Swash foam sources (RGB)', value: 'swashFoamSources' },
   { label: 'Swash foam cuts (RGB)', value: 'swashFoamCuts' },
@@ -1262,27 +1269,36 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
         pb.discard();
       });
     }
-    if (this.debugOutput === 'shoreRegions') {
+    if (this.debugOutput === 'shoreRegions' || this.debugOutput === 'shoreLevels') {
       // Show the actual displaced carrier in every pass. Wet-edge discard and
       // ground-depth projection would otherwise conceal its geometry or create
       // an apparent boundary unrelated to rasterized mesh coverage.
       if (this.needFragmentColor()) {
-        scope.$l.shoreRegion = this._shoreWaveGenerator
-          ? this._shoreWaveGenerator.calcDebugRegion(scope, scope.$inputs.clipmapPos.xz)
-          : pb.vec3(0, 0, 1);
-        scope.$l.shoreColor = scope.$choice(
-          pb.greaterThan(scope.shoreRegion.y, 0.5),
-          scope.$choice(
-            pb.greaterThan(scope.shoreRegion.z, 1e-3),
-            pb.vec3(1, 0.3, 0.02),
-            pb.vec3(0.85, 0.02, 0.8)
-          ),
-          pb.vec3(0, 0.85, 1)
-        );
-        scope.$l.outColor = pb.vec4(
-          pb.mix(pb.vec3(0.02, 0.12, 0.9), scope.shoreColor, scope.shoreRegion.x),
-          1
-        );
+        if (this.debugOutput === 'shoreLevels') {
+          scope.$l.outColor = pb.vec4(
+            this._shoreWaveGenerator
+              ? this._shoreWaveGenerator.calcDebugLevels(scope, scope.$inputs.clipmapPos.xz)
+              : pb.vec3(0.1),
+            1
+          );
+        } else {
+          scope.$l.shoreRegion = this._shoreWaveGenerator
+            ? this._shoreWaveGenerator.calcDebugRegion(scope, scope.$inputs.clipmapPos.xz)
+            : pb.vec3(0, 0, 1);
+          scope.$l.shoreColor = scope.$choice(
+            pb.greaterThan(scope.shoreRegion.y, 0.5),
+            scope.$choice(
+              pb.greaterThan(scope.shoreRegion.z, 1e-3),
+              pb.vec3(1, 0.3, 0.02),
+              pb.vec3(0.85, 0.02, 0.8)
+            ),
+            pb.vec3(0, 0.85, 1)
+          );
+          scope.$l.outColor = pb.vec4(
+            pb.mix(pb.vec3(0.02, 0.12, 0.9), scope.shoreColor, scope.shoreRegion.x),
+            1
+          );
+        }
         if (
           this.drawContext.materialFlags &
           (MaterialVaryingFlags.SCENE_STORE_ROUGHNESS | MaterialVaryingFlags.SCENE_STORE_NORMAL)
@@ -1636,9 +1652,7 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
    */
   unresolvedSlopeVariance(scope: PBInsideFunctionScope, restXZGrad: PBShaderExp): Nullable<PBShaderExp> {
     const gen = this.waveGenerator;
-    return gen?.calcUnresolvedSlopeVariance
-      ? gen.calcUnresolvedSlopeVariance(scope, restXZGrad)
-      : null;
+    return gen?.calcUnresolvedSlopeVariance ? gen.calcUnresolvedSlopeVariance(scope, restXZGrad) : null;
   }
   /**
    * Specular roughness at a world position. The slopes too fine for the pixel

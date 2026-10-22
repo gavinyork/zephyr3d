@@ -1421,6 +1421,40 @@ export class ShoreWaveGenerator extends Disposable implements WaveGenerator, Foa
     return scope.swDebugRegion(xz) as PBShaderExp;
   }
   /**
+   * Debug colour of the shore field's levels at an undisplaced XZ: red, green,
+   * blue and yellow from the finest by their shares, times the fade out of
+   * the coarsest, banded every 2 metres of the distance to the waterline.
+   * @internal
+   */
+  calcDebugLevels(scope: PBInsideFunctionScope, xz: PBShaderExp): PBShaderExp {
+    const pb = scope.$builder;
+    const that = this;
+    pb.func('swDebugLevels', [pb.vec2('xz')], function () {
+      this.$l.wl = pb.vec4(0);
+      this.$l.levelWeights = pb.vec4(0);
+      this.$l.gridFade = that.waterlineAt(this, this.xz, this.wl, this.levelWeights);
+      this.$if(pb.lessThan(this.gridFade, 0), function () {
+        this.$return(pb.vec3(0.1));
+      });
+      this.$l.c = pb.div(
+        pb.add(
+          pb.add(
+            pb.mul(pb.vec3(1, 0.1, 0.1), this.levelWeights.x),
+            pb.mul(pb.vec3(0.1, 1, 0.1), this.levelWeights.y)
+          ),
+          pb.add(
+            pb.mul(pb.vec3(0.15, 0.3, 1), this.levelWeights.z),
+            pb.mul(pb.vec3(1, 0.9, 0.1), this.levelWeights.w)
+          )
+        ),
+        this.gridFade
+      );
+      this.$l.band = pb.step(0.5, pb.fract(pb.mul(this.wl.x, 0.5)));
+      this.$return(pb.mul(this.c, this.gridFade, pb.mix(0.55, 1, this.band)));
+    });
+    return scope.swDebugLevels(xz) as PBShaderExp;
+  }
+  /**
    * Normal tilted by the shore wave's slope, which runs along the direction to
    * the shore: the analytic dY/dX of the profile, so no extra evaluations.
    * @internal

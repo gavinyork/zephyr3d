@@ -48,6 +48,8 @@ const WHOLE_DOMAIN = new Vector4(-99999, -99999, 99999, 99999);
 const SHORE_FIELD_LEVELS = 4;
 const SHORE_FIELD_CELLS = 256;
 const SHORE_FIELD_CELL_SIZE = 0.5;
+/** Shore field levels rebuilt in a frame at most, so the camera crossing every level's cell at once is no spike. */
+const SHORE_FIELD_REBUILDS = 2;
 /** No waterline grid: 0 cells. */
 const NO_REGIONS: readonly Vector4[] = [new Vector4(0, 0, 1, 0)];
 
@@ -917,7 +919,8 @@ export class Water extends applyMixins(GraphNode, mixinDrawable) implements Draw
       this._shoreField = new WaterlineField(this._shoreSource, {
         levels: SHORE_FIELD_LEVELS,
         resolution: SHORE_FIELD_CELLS,
-        cellSize: SHORE_FIELD_CELL_SIZE
+        cellSize: SHORE_FIELD_CELL_SIZE,
+        maxRebuilds: SHORE_FIELD_REBUILDS
       });
     }
     this._shoreSource!.setTerrain(terrain);

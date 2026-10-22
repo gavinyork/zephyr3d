@@ -226,6 +226,11 @@ export interface WaterlineFieldOptions {
   resolution?: number;
   /** Cell size of the finest level in world units. Default 0.5. */
   cellSize?: number;
+  /**
+   * Levels rebuilt in one update at most, the finest first; the rest wait for
+   * the next. Default all.
+   */
+  maxRebuilds?: number;
 }
 
 /**
@@ -268,6 +273,7 @@ export class WaterlineField {
   readonly levels: number;
   readonly resolution: number;
   readonly cellSize: number;
+  readonly maxRebuilds: number;
   private readonly _source: WaterlineSource;
   private _level: Nullable<number>;
   private _requested: boolean;
@@ -297,6 +303,7 @@ export class WaterlineField {
     this.levels = Math.max(1, Math.min(8, Math.floor(options?.levels ?? 1)));
     this.resolution = Math.max(16, 2 ** Math.round(Math.log2(options?.resolution ?? 256)));
     this.cellSize = Math.max(1e-3, options?.cellSize ?? 0.5);
+    this.maxRebuilds = Math.max(1, Math.floor(options?.maxRebuilds ?? this.levels));
     this._level = null;
     this._requested = false;
     this._seedA = null;
@@ -346,7 +353,7 @@ export class WaterlineField {
   }
   /**
    * (rest-level distance, model A, model B, field at the rest level) per cell
-   * of the level built last, rgba16f: the finest level when there is one.
+   * of the level built last, rgba16f: for a field of a single level, that level.
    */
   get texture() {
     return this._result;
@@ -375,8 +382,11 @@ export class WaterlineField {
     this._requested = false;
     this.ensureResources();
     const version = this._source.version;
-    // Coarse first, so the resolved texture ends up holding the finest level
-    for (let i = this.levels - 1; i >= 0; i--) {
+    let budget = this.maxRebuilds;
+    // Finest first: it is the one the camera moves out of soonest and the one
+    // seen up close; a coarser level waiting a frame keeps its old grid, which
+    // its region still describes
+    for (let i = 0; i < this.levels && budget > 0; i++) {
       const h = this.cellSize * 2 ** i;
       const n = this.resolution;
       // Snapped to cells, so the grid does not swim as the camera moves
@@ -399,6 +409,7 @@ export class WaterlineField {
       this.buildLevel(i, ox, oz, h);
       this._regions[i].setXYZW(ox, oz, h, n);
       this._rebuilds++;
+      budget--;
     }
   }
   dispose() {
