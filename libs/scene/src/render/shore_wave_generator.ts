@@ -454,31 +454,21 @@ export class ShoreWaveGenerator extends Disposable implements WaveGenerator, Foa
         // Only where there is water (unlike Crest, which feeds dry land the swash
         // would later run over), only on the waterline field, and faded towards
         // its edge as the waves are
-        this.$l.wlUV = pb.mul(pb.sub(this.xz, this.swGrid.xy), this.swGrid.z);
+        this.$l.wl = pb.vec4(0);
+        this.$l.gridFade = that.waterlineAt(this, this.xz, this.wl);
         this.$if(
-          pb.and(
-            pb.greaterThan(this.swWave.x, 0),
-            pb.and(
-              pb.all(pb.greaterThanEqual(this.wlUV, pb.vec2(0))),
-              pb.all(pb.lessThanEqual(this.wlUV, pb.vec2(1)))
-            )
-          ),
+          pb.and(pb.greaterThan(this.swWave.x, 0), pb.greaterThanEqual(this.gridFade, 0)),
           function () {
-            this.$l.wl = pb.textureSampleLevel(this.swWaterline, this.wlUV, 0);
             this.$l.depth = pb.sub(this.sw.x, this.wl.z);
             this.$l.shoreDt = this.$choice(this.prewarm, pb.div(1, this.fadeRate), this.dt);
-            this.$l.gridEdge = pb.min(
-              pb.min(this.wlUV.x, this.wlUV.y),
-              pb.min(pb.sub(1, this.wlUV.x), pb.sub(1, this.wlUV.y))
-            );
-            this.shoreDt = pb.mul(this.shoreDt, pb.smoothStep(0, GRID_EDGE_FADE, this.gridEdge));
+            this.shoreDt = pb.mul(this.shoreDt, this.gridFade);
             if (contact) {
               // Beach the swash reaches: a dry cell strands the foam the
               // drained sheet held. Farther inland, nothing comes to rest.
               this.$l.beach = pb.mul(
                 pb.smoothStep(0, SWASH_EDGE_SOFT, pb.neg(this.wl.x)),
                 pb.smoothStep(SHELVING_MIN, SHELVING_FULL, this.wl.y),
-                pb.smoothStep(0, GRID_EDGE_FADE, this.gridEdge),
+                this.gridFade,
                 this.$choice(
                   pb.greaterThan(
                     this.wl.x,
@@ -609,21 +599,15 @@ export class ShoreWaveGenerator extends Disposable implements WaveGenerator, Foa
    */
   calcFoamGroundMask(scope: PBInsideFunctionScope, worldPos: PBShaderExp): PBShaderExp {
     const pb = scope.$builder;
+    const that = this;
     pb.func('swFoamGroundMask', [pb.vec3('position')], function () {
-      this.$l.uv = pb.mul(pb.sub(this.position.xz, this.swGrid.xy), this.swGrid.z);
-      this.$if(
-        pb.or(
-          pb.lessThanEqual(this.swWave.x, 0),
-          pb.or(pb.any(pb.lessThan(this.uv, pb.vec2(0))), pb.any(pb.greaterThan(this.uv, pb.vec2(1))))
-        ),
-        function () {
-          this.$return(pb.float(0));
-        }
-      );
-      this.$l.wl = pb.textureSampleLevel(this.swWaterline, this.uv, 0);
+      this.$l.wl = pb.vec4(0);
+      this.$l.gridFade = that.waterlineAt(this, this.position.xz, this.wl);
+      this.$if(pb.or(pb.lessThanEqual(this.swWave.x, 0), pb.lessThan(this.gridFade, 0)), function () {
+        this.$return(pb.float(0));
+      });
       this.$l.bed = pb.add(this.swGrid.w, this.wl.z);
       this.$l.reach = pb.mul(this.swWave.x, pb.clamp(this.wl.y, 1, B_MAX));
-      this.$l.edge = pb.min(pb.min(this.uv.x, this.uv.y), pb.min(pb.sub(1, this.uv.x), pb.sub(1, this.uv.y)));
       // This is a bed-support mask, shared by thin mobile and deposited foam.
       // Do not cut at the static waterline: a raised, dry carrier can project
       // to wet ground just seaward of it, leaving neither layer visible there.
@@ -631,7 +615,7 @@ export class ShoreWaveGenerator extends Disposable implements WaveGenerator, Foa
       this.$return(
         pb.mul(
           pb.smoothStep(SHELVING_MIN, SHELVING_FULL, this.wl.y),
-          pb.smoothStep(0, GRID_EDGE_FADE, this.edge),
+          this.gridFade,
           pb.sub(1, pb.smoothStep(0.08, 0.2, pb.abs(pb.sub(this.position.y, this.bed)))),
           this.$choice(
             pb.and(
@@ -678,28 +662,16 @@ export class ShoreWaveGenerator extends Disposable implements WaveGenerator, Foa
    */
   private wall(scope: PBInsideFunctionScope, xz: PBShaderExp): PBShaderExp {
     const pb = scope.$builder;
+    const that = this;
     pb.func('swWall', [pb.vec2('xz')], function () {
-      this.$l.uv = pb.mul(pb.sub(this.xz, this.swGrid.xy), this.swGrid.z);
-      this.$if(
-        pb.or(
-          pb.lessThanEqual(this.swGrid.z, 0),
-          pb.or(pb.any(pb.lessThan(this.uv, pb.vec2(0))), pb.any(pb.greaterThan(this.uv, pb.vec2(1))))
-        ),
-        function () {
-          this.$return(pb.vec4(0, 0, 1e4, 0));
-        }
-      );
-      this.$l.wl = pb.textureSampleLevel(this.swWaterline, this.uv, 0);
+      this.$l.wl = pb.vec4(0);
+      this.$l.gridFade = that.waterlineAt(this, this.xz, this.wl);
+      this.$if(pb.lessThan(this.gridFade, 0), function () {
+        this.$return(pb.vec4(0, 0, 1e4, 0));
+      });
       // The complement of the shelving the surf rolls in on, faded out towards
       // the edge of the field as the waves are
-      this.$l.gridEdge = pb.min(
-        pb.min(this.uv.x, this.uv.y),
-        pb.min(pb.sub(1, this.uv.x), pb.sub(1, this.uv.y))
-      );
-      this.$l.steep = pb.mul(
-        pb.sub(1, pb.smoothStep(SHELVING_MIN, SHELVING_FULL, this.wl.y)),
-        pb.smoothStep(0, GRID_EDGE_FADE, this.gridEdge)
-      );
+      this.$l.steep = pb.mul(pb.sub(1, pb.smoothStep(SHELVING_MIN, SHELVING_FULL, this.wl.y)), this.gridFade);
       this.$if(
         pb.or(pb.lessThanEqual(this.steep, 0), pb.greaterThanEqual(this.wl.x, FOAM_SLIP_BAND)),
         function () {
@@ -707,20 +679,62 @@ export class ShoreWaveGenerator extends Disposable implements WaveGenerator, Foa
         }
       );
       // Out of the land: up the gradient of the distance to the waterline
-      this.$l.c = this.swGrid.z;
-      this.$l.g = pb.vec2(
-        pb.sub(
-          pb.textureSampleLevel(this.swWaterline, pb.add(this.uv, pb.vec2(this.c, 0)), 0).x,
-          pb.textureSampleLevel(this.swWaterline, pb.sub(this.uv, pb.vec2(this.c, 0)), 0).x
-        ),
-        pb.sub(
-          pb.textureSampleLevel(this.swWaterline, pb.add(this.uv, pb.vec2(0, this.c)), 0).x,
-          pb.textureSampleLevel(this.swWaterline, pb.sub(this.uv, pb.vec2(0, this.c)), 0).x
-        )
-      );
+      this.$l.g = that.waterlineGradient(this, this.xz);
       this.$return(pb.vec4(pb.div(this.g, pb.max(pb.length(this.g), 1e-5)), this.wl.x, this.steep));
     });
     return scope.swWall(xz) as PBShaderExp;
+  }
+  /**
+   * The waterline field at an undisplaced XZ: its shore coordinates (see
+   * WaterlineField.smoothTexture) into `wl`, and returned, the weight the
+   * shore effects fade by towards the edge of the field, or -1 off it or
+   * with no field.
+   * @internal
+   */
+  private waterlineAt(scope: PBInsideFunctionScope, xz: PBShaderExp, wl: PBShaderExp): PBShaderExp {
+    const pb = scope.$builder;
+    pb.func('swWaterlineAt', [pb.vec2('xz'), pb.vec4('wl').out()], function () {
+      this.wl = pb.vec4(0);
+      this.$l.uv = pb.mul(pb.sub(this.xz, this.swGrid.xy), this.swGrid.z);
+      this.$if(
+        pb.or(
+          pb.lessThanEqual(this.swGrid.z, 0),
+          pb.or(pb.any(pb.lessThan(this.uv, pb.vec2(0))), pb.any(pb.greaterThan(this.uv, pb.vec2(1))))
+        ),
+        function () {
+          this.$return(pb.float(-1));
+        }
+      );
+      this.wl = pb.textureSampleLevel(this.swWaterline, this.uv, 0);
+      this.$l.edge = pb.min(pb.min(this.uv.x, this.uv.y), pb.min(pb.sub(1, this.uv.x), pb.sub(1, this.uv.y)));
+      this.$return(pb.smoothStep(0, GRID_EDGE_FADE, this.edge));
+    });
+    return scope.swWaterlineAt(xz, wl) as PBShaderExp;
+  }
+  /**
+   * Gradient of the distance to the waterline at an undisplaced XZ within the
+   * field, unnormalised: the difference a metre either side along x and z.
+   * @internal
+   */
+  private waterlineGradient(scope: PBInsideFunctionScope, xz: PBShaderExp): PBShaderExp {
+    const pb = scope.$builder;
+    pb.func('swWaterlineGradient', [pb.vec2('xz')], function () {
+      this.$l.uv = pb.mul(pb.sub(this.xz, this.swGrid.xy), this.swGrid.z);
+      this.$l.c = this.swGrid.z;
+      this.$return(
+        pb.vec2(
+          pb.sub(
+            pb.textureSampleLevel(this.swWaterline, pb.add(this.uv, pb.vec2(this.c, 0)), 0).x,
+            pb.textureSampleLevel(this.swWaterline, pb.sub(this.uv, pb.vec2(this.c, 0)), 0).x
+          ),
+          pb.sub(
+            pb.textureSampleLevel(this.swWaterline, pb.add(this.uv, pb.vec2(0, this.c)), 0).x,
+            pb.textureSampleLevel(this.swWaterline, pb.sub(this.uv, pb.vec2(0, this.c)), 0).x
+          )
+        )
+      );
+    });
+    return scope.swWaterlineGradient(xz) as PBShaderExp;
   }
   /**
    * A velocity near a waterline too steep for surf, given the wall there (see
@@ -794,6 +808,7 @@ export class ShoreWaveGenerator extends Disposable implements WaveGenerator, Foa
     cell?: PBShaderExp
   ): PBShaderExp {
     const pb = scope.$builder;
+    const that = this;
     pb.func(
       'swEvaluate',
       [
@@ -809,36 +824,20 @@ export class ShoreWaveGenerator extends Disposable implements WaveGenerator, Foa
         this.dir = pb.vec4(0, 0, 0, -1e4);
         this.spacing = pb.float(1);
         this.coverage = pb.float(1);
-        this.$l.uv = pb.mul(pb.sub(this.xz, this.swGrid.xy), this.swGrid.z);
-        this.$if(
-          pb.or(
-            pb.lessThanEqual(this.swWave.x, 0),
-            pb.or(pb.any(pb.lessThan(this.uv, pb.vec2(0))), pb.any(pb.greaterThan(this.uv, pb.vec2(1))))
-          ),
-          function () {
-            this.$return(pb.vec4(0, 0, 1, 0));
-          }
-        );
         // Shore coordinates: (signed distance to the waterline, negative inland;
         // bed B; bed height over the rest level)
-        this.$l.wl = pb.textureSampleLevel(this.swWaterline, this.uv, 0);
+        this.$l.wl = pb.vec4(0);
+        this.$l.gridFade = that.waterlineAt(this, this.xz, this.wl);
+        this.$if(pb.or(pb.lessThanEqual(this.swWave.x, 0), pb.lessThan(this.gridFade, 0)), function () {
+          this.$return(pb.vec4(0, 0, 1, 0));
+        });
         this.$l.d = this.wl.x;
         this.$l.zone = this.swWave.y;
         this.$if(pb.greaterThan(this.d, this.zone), function () {
           this.$return(pb.vec4(0, 0, 1, 0));
         });
-        // Direction to the shore: down the gradient of the distance, one cell either side
-        this.$l.c = this.swGrid.z;
-        this.$l.g = pb.vec2(
-          pb.sub(
-            pb.textureSampleLevel(this.swWaterline, pb.add(this.uv, pb.vec2(this.c, 0)), 0).x,
-            pb.textureSampleLevel(this.swWaterline, pb.sub(this.uv, pb.vec2(this.c, 0)), 0).x
-          ),
-          pb.sub(
-            pb.textureSampleLevel(this.swWaterline, pb.add(this.uv, pb.vec2(0, this.c)), 0).x,
-            pb.textureSampleLevel(this.swWaterline, pb.sub(this.uv, pb.vec2(0, this.c)), 0).x
-          )
-        );
+        // Direction to the shore: down the gradient of the distance
+        this.$l.g = that.waterlineGradient(this, this.xz);
         this.dir = pb.vec4(pb.neg(pb.div(this.g, pb.max(pb.length(this.g), 1e-5))), 0, 0);
         // Phase: the integral of 1 / wavelength, with the wavelength shrinking as
         // sqrt of the depth. Below `dMin` (past breaking) it runs on linearly;
@@ -968,14 +967,7 @@ export class ShoreWaveGenerator extends Disposable implements WaveGenerator, Foa
         this.waveSet = pb.mul(this.waveSet, this.crestSegment);
         // Only where the bed shelves (surf rolls in on a beach, not against a
         // cliff, pier or hull), faded out towards the edge of the grid
-        this.$l.edge = pb.min(
-          pb.min(this.uv.x, this.uv.y),
-          pb.min(pb.sub(1, this.uv.x), pb.sub(1, this.uv.y))
-        );
-        this.$l.shelving = pb.mul(
-          pb.smoothStep(SHELVING_MIN, SHELVING_FULL, this.wl.y),
-          pb.smoothStep(0, GRID_EDGE_FADE, this.edge)
-        );
+        this.$l.shelving = pb.mul(pb.smoothStep(SHELVING_MIN, SHELVING_FULL, this.wl.y), this.gridFade);
         // Rising out of the sea over the outer part of the zone
         this.$l.amp = pb.mul(
           this.swWave.x,
@@ -1223,26 +1215,20 @@ export class ShoreWaveGenerator extends Disposable implements WaveGenerator, Foa
    */
   nearShore(scope: PBInsideFunctionScope, xz: PBShaderExp): PBShaderExp {
     const pb = scope.$builder;
+    const that = this;
     pb.func('swNearShore', [pb.vec2('xz')], function () {
-      this.$l.uv = pb.mul(pb.sub(this.xz, this.swGrid.xy), this.swGrid.z);
-      this.$if(
-        pb.or(
-          pb.lessThanEqual(this.swWave.x, 0),
-          pb.or(pb.any(pb.lessThan(this.uv, pb.vec2(0))), pb.any(pb.greaterThan(this.uv, pb.vec2(1))))
-        ),
-        function () {
-          this.$return(pb.vec2(0));
-        }
-      );
-      this.$l.wl = pb.textureSampleLevel(this.swWaterline, this.uv, 0);
-      this.$l.edge = pb.min(pb.min(this.uv.x, this.uv.y), pb.min(pb.sub(1, this.uv.x), pb.sub(1, this.uv.y)));
+      this.$l.wl = pb.vec4(0);
+      this.$l.gridFade = that.waterlineAt(this, this.xz, this.wl);
+      this.$if(pb.or(pb.lessThanEqual(this.swWave.x, 0), pb.lessThan(this.gridFade, 0)), function () {
+        this.$return(pb.vec2(0));
+      });
       // Still-water depth: the bed below the rest level, 0 inland
       this.$l.h = pb.max(pb.neg(this.wl.z), 0);
       this.$l.hn = pb.div(this.swWave.x, NEAR_SHORE_BREAKER);
       this.$l.weight = pb.mul(
         pb.sub(1, pb.smoothStep(this.hn, pb.mul(this.hn, 1 + NEAR_SHORE_BLEND), this.h)),
         pb.smoothStep(SHELVING_MIN, SHELVING_FULL, this.wl.y),
-        pb.smoothStep(0, GRID_EDGE_FADE, this.edge)
+        this.gridFade
       );
       this.$return(
         pb.vec2(
@@ -1294,23 +1280,16 @@ export class ShoreWaveGenerator extends Disposable implements WaveGenerator, Foa
     const pb = scope.$builder;
     const that = this;
     pb.func('swDebugRegion', [pb.vec2('xz')], function () {
-      this.$l.uv = pb.mul(pb.sub(this.xz, this.swGrid.xy), this.swGrid.z);
-      this.$if(
-        pb.or(
-          pb.lessThanEqual(this.swWave.x, 0),
-          pb.or(pb.any(pb.lessThan(this.uv, pb.vec2(0))), pb.any(pb.greaterThan(this.uv, pb.vec2(1))))
-        ),
-        function () {
-          this.$return(pb.vec3(0, 0, 1));
-        }
-      );
-      this.$l.wl = pb.textureSampleLevel(this.swWaterline, this.uv, 0);
-      this.$l.edge = pb.min(pb.min(this.uv.x, this.uv.y), pb.min(pb.sub(1, this.uv.x), pb.sub(1, this.uv.y)));
+      this.$l.wl = pb.vec4(0);
+      this.$l.gridFade = that.waterlineAt(this, this.xz, this.wl);
+      this.$if(pb.or(pb.lessThanEqual(this.swWave.x, 0), pb.lessThan(this.gridFade, 0)), function () {
+        this.$return(pb.vec3(0, 0, 1));
+      });
       // Match evaluate's shelving, grid-edge and outer-zone amplitude fades;
       // dir.z alone only measures the much narrower chop-suppression band.
       this.$l.weight = pb.mul(
         pb.smoothStep(SHELVING_MIN, SHELVING_FULL, this.wl.y),
-        pb.smoothStep(0, GRID_EDGE_FADE, this.edge),
+        this.gridFade,
         pb.smoothStep(0, 0.4, pb.sub(1, pb.div(pb.max(this.wl.x, 0), this.swWave.y)))
       );
       this.$l.dir = pb.vec4(0);
