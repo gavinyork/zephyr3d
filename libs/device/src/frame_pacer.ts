@@ -37,15 +37,20 @@ const MIN_MISSES_TO_SLOW_DOWN = 3;
 const OVERRUNS_TO_SLOW_DOWN = 2;
 /**
  * Share of frames missing a refresh that makes auto pacing hold frames longer.
- * An occasional miss costs less than halving the frame rate.
+ * A miss is a stutter, so few are tolerated; with the fewest misses above, a
+ * single one does not halve the frame rate.
  */
-const MISS_RATIO_TO_SLOW_DOWN = 0.12;
+const MISS_RATIO_TO_SLOW_DOWN = 0.04;
 /**
  * Share of frames done soon enough for a shorter hold needed to try one. Below
  * one minus the miss ratio above, so that a rate it speeds up to is kept.
  */
-const HEADROOM_TO_SPEED_UP = 0.94;
-/** How long auto pacing first holds a rate before trying to render more often again. */
+const HEADROOM_TO_SPEED_UP = 0.97;
+/**
+ * How long auto pacing first holds a rate before trying to render more often
+ * again. Doubled by a failed try, halved by one that holds, never reset: a
+ * machine that keeps failing is not asked again every few seconds.
+ */
 const INITIAL_PROBE_DELAY = 2000;
 const MAX_PROBE_DELAY = 16000;
 /** Slowing down this soon after speeding up means the speed up was too early. */
@@ -244,6 +249,11 @@ export class FramePacer {
     return 1;
   }
   private _adapt(time: number, missed: boolean) {
+    if (this._lastSpeedUp > -Infinity && time - this._lastSpeedUp >= FAILED_PROBE_TIME) {
+      // The last speed up held: the next try may come sooner.
+      this._lastSpeedUp = -Infinity;
+      this._probeDelay = Math.max(INITIAL_PROBE_DELAY, this._probeDelay / 2);
+    }
     const misses = this._misses;
     pushSample(misses, time, missed);
     if (
@@ -280,11 +290,12 @@ export class FramePacer {
     };
   }
   private _slowDown(time: number, to: number) {
-    // Slowing down soon after speeding up means that was too early; wait longer next time.
-    this._probeDelay =
-      time - this._lastSpeedUp < FAILED_PROBE_TIME
-        ? Math.min(this._probeDelay * 2, MAX_PROBE_DELAY)
-        : INITIAL_PROBE_DELAY;
+    // Slowing down soon after speeding up means that was too early: wait
+    // longer next time. Otherwise the delay stays as it is.
+    if (time - this._lastSpeedUp < FAILED_PROBE_TIME) {
+      this._lastSpeedUp = -Infinity;
+      this._probeDelay = Math.min(this._probeDelay * 2, MAX_PROBE_DELAY);
+    }
     this._setAutoRefreshes(to, time);
   }
   private _setAutoRefreshes(value: number, time: number) {
