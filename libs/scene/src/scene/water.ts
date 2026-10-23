@@ -135,8 +135,7 @@ export class Water extends applyMixins(GraphNode, mixinDrawable) implements Draw
     this._lastUpdateTime = 0;
     this._material = new DRef(new WaterMaterial());
     this._material.get()!.region = new Vector4(-1, -1, 1, 1);
-    // Lower values let TAA's sub-pixel jitter through and the waterline shakes
-    this._material.get()!.TAAStrength = 0.9;
+    this._material.get()!.TAAStrength = 0.2;
     this.waveGenerator = new FBMWaveGenerator();
     this._feedbackProgram = new DRef();
     this._feedbackHash = '';
