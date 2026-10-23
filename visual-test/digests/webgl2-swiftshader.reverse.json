@@ -276,8 +276,11 @@
     },
     "physics-joints": {
       "accepted": {
+        "linux-x64": [
+          "dbedee6955880c83f914a5640aac344e"
+        ],
         "win32-x64": [
-          "747565277b1f4dffa5ce719cf2aa5f83"
+          "dbedee6955880c83f914a5640aac344e"
         ]
       },
       "size": 512
@@ -292,8 +295,11 @@
     },
     "physics-vehicle": {
       "accepted": {
+        "linux-x64": [
+          "e53148ef0580b10f99cdd8f09c656f9c"
+        ],
         "win32-x64": [
-          "f64907d2204f027bc123d6990e66d7d9"
+          "e53148ef0580b10f99cdd8f09c656f9c"
         ]
       },
       "size": 512
@@ -741,10 +747,10 @@
     "water-caustics-crest": {
       "accepted": {
         "linux-x64": [
-          "03bc7ca96c5ed91070ef1aa81f97c8d5"
+          "0bcaac7773c89ee7ff233bd18e2b9400"
         ],
         "win32-x64": [
-          "03bc7ca96c5ed91070ef1aa81f97c8d5"
+          "0bcaac7773c89ee7ff233bd18e2b9400"
         ]
       },
       "size": 512
@@ -752,10 +758,10 @@
     "water-caustics-deep-bed": {
       "accepted": {
         "linux-x64": [
-          "dc716081881ee78b2631cdc6e430573b"
+          "59ff6b9734d1572bd357a24a42a37341"
         ],
         "win32-x64": [
-          "dc716081881ee78b2631cdc6e430573b"
+          "59ff6b9734d1572bd357a24a42a37341"
         ]
       },
       "size": 512
@@ -763,10 +769,10 @@
     "water-caustics-moving": {
       "accepted": {
         "linux-x64": [
-          "521a13429446814382b56648510359bb"
+          "f8e9821797a14ca320403dc8c38ca95a"
         ],
         "win32-x64": [
-          "521a13429446814382b56648510359bb"
+          "f8e9821797a14ca320403dc8c38ca95a"
         ]
       },
       "size": 512
@@ -774,10 +780,10 @@
     "water-caustics-off": {
       "accepted": {
         "linux-x64": [
-          "abd3339616edfdec01052789846b1b47"
+          "791f5954d9dda6609f90645dbbad1543"
         ],
         "win32-x64": [
-          "abd3339616edfdec01052789846b1b47"
+          "791f5954d9dda6609f90645dbbad1543"
         ]
       },
       "size": 512
@@ -785,10 +791,10 @@
     "water-caustics-on": {
       "accepted": {
         "linux-x64": [
-          "463768ebf141416fc9a19d2c87e9c493"
+          "6ece6213f52f58e35c361117c4db0e3a"
         ],
         "win32-x64": [
-          "463768ebf141416fc9a19d2c87e9c493"
+          "6ece6213f52f58e35c361117c4db0e3a"
         ]
       },
       "size": 512
@@ -796,10 +802,10 @@
     "water-caustics-range-border": {
       "accepted": {
         "linux-x64": [
-          "a8c09dba90fe713e62dd5ed6088d6ed3"
+          "9ef24b11a15632c959c5464990a2a8b0"
         ],
         "win32-x64": [
-          "a8c09dba90fe713e62dd5ed6088d6ed3"
+          "9ef24b11a15632c959c5464990a2a8b0"
         ]
       },
       "size": 512
@@ -807,10 +813,10 @@
     "water-caustics-two-pools": {
       "accepted": {
         "linux-x64": [
-          "a0abe387a530c2b9c64cff4f6d4be805"
+          "db5aa6a757a90f2d932049e5f51da33a"
         ],
         "win32-x64": [
-          "a0abe387a530c2b9c64cff4f6d4be805"
+          "db5aa6a757a90f2d932049e5f51da33a"
         ]
       },
       "size": 512
@@ -818,10 +824,10 @@
     "water-foam-gerstner": {
       "accepted": {
         "linux-x64": [
-          "0fa03fbf4efe8c433c4c7a3447f35d14"
+          "adc7fdc4a6323484fe471864528d58e0"
         ],
         "win32-x64": [
-          "0fa03fbf4efe8c433c4c7a3447f35d14"
+          "adc7fdc4a6323484fe471864528d58e0"
         ]
       },
       "size": 512
@@ -829,10 +835,10 @@
     "water-foam-storm": {
       "accepted": {
         "linux-x64": [
-          "9c8636c8bcbebcd7ce74070089f092c4"
+          "177d1d36c2a49fae68846318f6eb0f35"
         ],
         "win32-x64": [
-          "9c8636c8bcbebcd7ce74070089f092c4"
+          "177d1d36c2a49fae68846318f6eb0f35"
         ]
       },
       "size": 512
@@ -840,10 +846,10 @@
     "water-horizon-reflect": {
       "accepted": {
         "linux-x64": [
-          "7be67c9eef8875039226212c249c78d4"
+          "89dd63150766e586d264229bbfdcff5d"
         ],
         "win32-x64": [
-          "7be67c9eef8875039226212c249c78d4"
+          "89dd63150766e586d264229bbfdcff5d"
         ]
       },
       "size": 512
@@ -851,10 +857,10 @@
     "water-infinite-horizon": {
       "accepted": {
         "linux-x64": [
-          "62375eef55c1cd71a8fad93dbe65dbb2"
+          "62c3f99babf023f1cb33f4837e90fc6a"
         ],
         "win32-x64": [
-          "62375eef55c1cd71a8fad93dbe65dbb2"
+          "62c3f99babf023f1cb33f4837e90fc6a"
         ]
       },
       "size": 512
@@ -862,10 +868,10 @@
     "water-infinite-horizon-control": {
       "accepted": {
         "linux-x64": [
-          "bfb6c8f7b7cc3ec4229a89c1770a1f11"
+          "c6d9bd1d1e3825672516201bff05a5a3"
         ],
         "win32-x64": [
-          "bfb6c8f7b7cc3ec4229a89c1770a1f11"
+          "c6d9bd1d1e3825672516201bff05a5a3"
         ]
       },
       "size": 512
@@ -873,10 +879,10 @@
     "water-infinite-horizon-raised": {
       "accepted": {
         "linux-x64": [
-          "2f8a922766123f0318d40820752b60d6"
+          "fac898d2fb0c8a714e650c5c26375c9a"
         ],
         "win32-x64": [
-          "2f8a922766123f0318d40820752b60d6"
+          "fac898d2fb0c8a714e650c5c26375c9a"
         ]
       },
       "size": 512
@@ -884,10 +890,10 @@
     "water-refraction-cheap": {
       "accepted": {
         "linux-x64": [
-          "62102c410f54bceac60be3e53d16aecd"
+          "36895bc0f0b4253ea94b6c401707f1f9"
         ],
         "win32-x64": [
-          "62102c410f54bceac60be3e53d16aecd"
+          "36895bc0f0b4253ea94b6c401707f1f9"
         ]
       },
       "size": 512
@@ -895,10 +901,10 @@
     "water-subsurface-backlit": {
       "accepted": {
         "linux-x64": [
-          "325c106401852519224bea8855374c6b"
+          "74ff2b34a06b5bb27c665c16ac3a14df"
         ],
         "win32-x64": [
-          "325c106401852519224bea8855374c6b"
+          "74ff2b34a06b5bb27c665c16ac3a14df"
         ]
       },
       "size": 512
@@ -906,10 +912,10 @@
     "water-surface-grazing": {
       "accepted": {
         "linux-x64": [
-          "e44e828d90e76807d87a113270ab29a2"
+          "e8c8d801b987ee754751e296a55b5f76"
         ],
         "win32-x64": [
-          "e44e828d90e76807d87a113270ab29a2"
+          "e8c8d801b987ee754751e296a55b5f76"
         ]
       },
       "size": 512
