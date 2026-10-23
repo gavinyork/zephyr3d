@@ -39,7 +39,7 @@ const TERRAIN_OFF_MAP = 1e4;
  * What a {@link WaterlineField} is built from: a signed distance to the solid
  * ground at a world position, negative inside it, which the seed pass samples
  * at the rest level and half a cell above.
- * @internal
+ * @public
  */
 export interface WaterlineSource {
   /** Identifies the seed program the source builds into. */
