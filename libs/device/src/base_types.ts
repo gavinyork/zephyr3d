@@ -2284,7 +2284,11 @@ export type ShaderKind = 'vertex' | 'fragment' | 'compute';
 export interface FrameInfo {
   /** counter of frames */
   frameCounter: number;
-  /** timestamp of current frame, in milliseconds */
+  /**
+   * Timestamp of the current frame in milliseconds: with a vsync'ed run loop, the
+   * time the frame is expected on screen, one or more display refreshes after
+   * its vsync time depending on {@link AbstractDevice.framePacing}.
+   */
   frameTimestamp: number;
   /** time spent by the CPU from last frame, in milliseconds */
   elapsedTimeCPU: number;

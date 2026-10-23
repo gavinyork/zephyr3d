@@ -241,6 +241,11 @@ export abstract class BaseDevice extends Observable<DeviceEventMap> {
   private _pendingFrameTime: number | null;
   /** Picks the refreshes the run loop renders at. */
   private readonly _framePacer: FramePacer;
+  /** A frame rendered to the held image that is not on screen yet. */
+  private _presentPending: boolean;
+  /** Vsync time of the frame being rendered, and the refreshes it is held for. */
+  private _deferredFrameVsync: number;
+  private _deferredFrameHold: number;
   protected _endFrameTime: number;
   protected _fixedFrameTime: Nullable<number>;
   protected _fixedFrameClock: number;
@@ -287,6 +292,9 @@ export abstract class BaseDevice extends Observable<DeviceEventMap> {
     this._beginFrameTime = 0;
     this._pendingFrameTime = null;
     this._framePacer = new FramePacer();
+    this._presentPending = false;
+    this._deferredFrameVsync = 0;
+    this._deferredFrameHold = 1;
     this._endFrameTime = 0;
     this._fixedFrameTime = null;
     this._fixedFrameClock = 0;
@@ -685,10 +693,23 @@ export abstract class BaseDevice extends Observable<DeviceEventMap> {
     // The vsync time of the frame, when there is one, rather than when its
     // callback got to run: frame times then follow the display, without the
     // scheduling noise that turns into jitter of anything moving at speed.
+    // Moved on to when the frame is expected on screen, so that a frame held
+    // for two refreshes draws the world at the time it is seen at, and a change
+    // of hold does not jump.
     const vsyncTime = this._pendingFrameTime;
     this._pendingFrameTime = null;
-    this._beginFrameTime =
-      vsyncTime !== null && vsyncTime >= this._frameInfo.frameTimestamp ? vsyncTime : this._cpuTimer.now();
+    let frameTime: Nullable<number> = null;
+    if (vsyncTime !== null) {
+      const pacer = this._framePacer;
+      frameTime = vsyncTime + pacer.wantedRefreshes * pacer.refreshInterval;
+      const last = this._frameInfo.frameTimestamp;
+      if (frameTime < last) {
+        // A shorter hold or a faster display than expected: time stands still
+        // rather than going back. Far behind is another clock, not a prediction.
+        frameTime = frameTime > last - 1000 ? last : null;
+      }
+    }
+    this._beginFrameTime = frameTime ?? this._cpuTimer.now();
     this.updateFrameInfo();
     this._poolMap.forEach((pool) => pool.autoRelease());
     return this.onBeginFrame();
@@ -714,6 +735,46 @@ export abstract class BaseDevice extends Observable<DeviceEventMap> {
    */
   protected shouldSkipFrame(): boolean {
     return false;
+  }
+  /**
+   * Makes the frames that follow render to an image the device holds, shown by
+   * {@link BaseDevice.presentDeferredFrame} later, or render to the canvas again.
+   * @returns Whether the backend can hold frames; false keeps rendering to the canvas.
+   */
+  protected setDeferredPresent(_on: boolean): boolean {
+    return false;
+  }
+  /** Shows the held frame on the canvas. */
+  protected onPresentDeferredFrame(): void {}
+  /** Vsync time of the frame being rendered, to keep for {@link BaseDevice.reportDeferredFrameDone}. */
+  protected get deferredFrameVsync() {
+    return this._deferredFrameVsync;
+  }
+  /** Display refreshes the frame being rendered is held for, to keep for {@link BaseDevice.reportDeferredFrameDone}. */
+  protected get deferredFrameHold() {
+    return this._deferredFrameHold;
+  }
+  /** Called at every display refresh offered to the run loop, before anything else; backends poll GPU fences here. */
+  protected pollDeferredFrame(): void {}
+  /**
+   * Called by backends when the GPU was done with a held frame, with the
+   * {@link BaseDevice.deferredFrameVsync} and {@link BaseDevice.deferredFrameHold}
+   * kept from when the frame was rendered, and the performance clock time it was
+   * done at. Feeds auto frame pacing.
+   */
+  protected reportDeferredFrameDone(vsyncTime: number, hold: number, doneTime: number) {
+    const pacer = this._framePacer;
+    const refresh = pacer.refreshInterval;
+    if (refresh <= 0) {
+      return;
+    }
+    // Refreshes the frame took: done just before a refresh counts as done for it.
+    const needed = Math.max(1, Math.ceil((doneTime - vsyncTime) / refresh - 0.05));
+    pacer.reportFrameDone(needed < hold, needed);
+  }
+  private presentDeferredFrame() {
+    this._presentPending = false;
+    this.onPresentDeferredFrame();
   }
   getVertexAttribFormat(semantic: VertexSemantic, dataType: DataType, componentCount: number) {
     return getVertexAttribFormat(semantic, dataType, componentCount);
@@ -853,15 +914,38 @@ export abstract class BaseDevice extends Observable<DeviceEventMap> {
     const that = this;
     that._runLoopFunc = func;
     that._framePacer.reset();
+    if (that._presentPending) {
+      that.presentDeferredFrame();
+    }
     (function entry(time?: number) {
       // requestAnimationFrame and performance.now() share a clock; a Date based
       // timer does not, so the vsync time is only used with performance.
       const vsyncTime = typeof time === 'number' && globalThis.performance ? time : null;
+      let deferred = false;
       if (that._vSync) {
         that._runningLoop = requestAnimationFrame(entry);
-        if (vsyncTime !== null && !that._framePacer.shouldRender(vsyncTime)) {
-          // Not a refresh to render at: the last frame stays on screen.
-          return;
+        if (vsyncTime !== null) {
+          const pacer = that._framePacer;
+          that.pollDeferredFrame();
+          if (!pacer.shouldRender(vsyncTime)) {
+            // Not a refresh to render at: the last frame stays on screen, or
+            // goes on screen now if it was held back for this refresh.
+            if (that._presentPending && pacer.refreshesSinceRender >= pacer.wantedRefreshes - 1) {
+              that.presentDeferredFrame();
+            }
+            return;
+          }
+          if (that._presentPending) {
+            // The refresh to show it at was not offered: show it before the next frame.
+            that.presentDeferredFrame();
+          }
+          // A frame held for several refreshes is rendered now but shown at the
+          // last of them, so that it is seen at the same time whether the GPU
+          // takes one refresh or two.
+          deferred = pacer.wantedRefreshes > 1 && that.setDeferredPresent(true);
+          pacer.deferredPresent = deferred;
+          that._deferredFrameVsync = vsyncTime;
+          that._deferredFrameHold = pacer.wantedRefreshes;
         }
       } else {
         that._runningLoop = that.nextFrame(() => {
@@ -870,8 +954,12 @@ export abstract class BaseDevice extends Observable<DeviceEventMap> {
           }
         });
       }
+      if (!deferred) {
+        that.setDeferredPresent(false);
+      }
       that._pendingFrameTime = vsyncTime;
       if (that.beginFrame()) {
+        that._presentPending = deferred;
         that._runLoopFunc(that as unknown as AbstractDevice);
         that.endFrame();
       }

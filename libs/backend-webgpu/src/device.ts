@@ -97,6 +97,9 @@ export class WebGPUDevice extends BaseDevice {
   private _vertexLayoutCache!: VertexLayoutCache;
   private readonly _samplerCache: SamplerCache;
   private _backbufferTexture: Nullable<GPUTexture>;
+  /** Image frames render to while they are shown at a later refresh, see setDeferredPresent. */
+  private _presentProxy: Nullable<GPUTexture>;
+  private _deferredPresent: boolean;
   private _currentProgram: Nullable<WebGPUProgram>;
   private _currentVertexData: Nullable<WebGPUVertexLayout>;
   private _currentStateSet: Nullable<WebGPURenderStateSet>;
@@ -130,6 +133,8 @@ export class WebGPUDevice extends BaseDevice {
     this._adapterInfo = {};
     this._latestGPUFrameId = -1;
     this._backbufferTexture = null;
+    this._presentProxy = null;
+    this._deferredPresent = false;
   }
   get context() {
     return this._context;
@@ -144,6 +149,9 @@ export class WebGPUDevice extends BaseDevice {
     return this._adapter;
   }
   get backbufferTexture(): GPUTexture {
+    if (this._deferredPresent) {
+      return this.presentProxy;
+    }
     const frameid = this._frameInfo.frameCounter;
     const label = this.inFrame() ? `swapchain-frame-${frameid}` : `swapchain-out-${frameid}`;
     const tex = this._context.getCurrentTexture();
@@ -158,6 +166,45 @@ export class WebGPUDevice extends BaseDevice {
   }
   get commandQueue() {
     return this._commandQueue;
+  }
+  /** The held image, the size of the canvas; made when first needed and after a resize. */
+  private get presentProxy(): GPUTexture {
+    const width = Math.max(1, this.canvas.width);
+    const height = Math.max(1, this.canvas.height);
+    let tex = this._presentProxy;
+    if (!tex || tex.width !== width || tex.height !== height) {
+      tex?.destroy();
+      tex = this.gpuCreateTexture({
+        label: 'present-proxy',
+        size: { width, height, depthOrArrayLayers: 1 },
+        format: this._backBufferFormat,
+        dimension: '2d',
+        mipLevelCount: 1,
+        sampleCount: 1,
+        usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.COPY_SRC | GPUTextureUsage.COPY_DST
+      });
+      this._presentProxy = tex;
+    }
+    return tex;
+  }
+  /** @internal */
+  protected setDeferredPresent(on: boolean): boolean {
+    this._deferredPresent = !!(on && this._canRender);
+    return this._deferredPresent;
+  }
+  /** @internal */
+  protected onPresentDeferredFrame() {
+    const proxy = this._presentProxy;
+    if (!proxy || !this._canRender) {
+      return;
+    }
+    const target = this._context.getCurrentTexture();
+    if (target.width !== proxy.width || target.height !== proxy.height) {
+      // Resized since the frame was rendered: nothing of the right size to show.
+      return;
+    }
+    this._commandQueue.copyTexture(proxy, target, 0, 0, proxy.width, proxy.height, 1);
+    this._commandQueue.flush();
   }
   get drawingBufferWidth() {
     return this.getDrawingBufferWidth();
@@ -912,6 +959,15 @@ export class WebGPUDevice extends BaseDevice {
     const frameTime = this._timestampQueries.endFrame();
     this._timestampQueries.autoCloseOpenScopes();
     this._commandQueue.endFrame();
+    if (this._deferredPresent) {
+      // When the held frame was done, for auto pacing.
+      const vsyncTime = this.deferredFrameVsync;
+      const hold = this.deferredFrameHold;
+      void this._device.queue.onSubmittedWorkDone().then(
+        () => this.reportDeferredFrameDone(vsyncTime, hold, performance.now()),
+        () => undefined
+      );
+    }
     // Track the frame until the GPU reports it finished. Only counted when a
     // bound is set, so an unbounded device does not accumulate callbacks; the
     // count is also what shouldSkipFrame compares against, so it must be
@@ -1112,7 +1168,7 @@ export class WebGPUDevice extends BaseDevice {
     this._context!.configure({
       device: this._device!,
       format: this._backBufferFormat,
-      usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.COPY_SRC,
+      usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.COPY_SRC | GPUTextureUsage.COPY_DST,
       alphaMode: 'opaque',
       colorSpace: 'srgb'
     });

@@ -212,6 +212,17 @@ export class WebGLDevice extends BaseDevice {
   private _clipSpaceZeroToOne = false;
   private _isRendering: boolean;
   private _reverseWindingOrder: boolean;
+  /** Framebuffer frames render to while they are shown at a later refresh, see setDeferredPresent. */
+  private _presentProxy: Nullable<FrameBuffer>;
+  private _presentProgram: Nullable<GPUProgram>;
+  private _presentBindGroup: Nullable<BindGroup>;
+  private _presentVertexLayout: Nullable<VertexLayout>;
+  private _presentStates: Nullable<RenderStateSet>;
+  /** Signalled when the GPU is done with the held frame, with the frame's vsync time and hold. */
+  private _presentFence: Nullable<WebGLSync>;
+  private _presentFenceVsync: number;
+  private _presentFenceHold: number;
+  private _deferredPresent: boolean;
   private _deviceCaps!: DeviceCaps;
   private _vaoExt!: VertexArrayObjectEXT;
   private _instancedArraysExt!: InstancedArraysEXT;
@@ -260,6 +271,15 @@ export class WebGLDevice extends BaseDevice {
     this._contextLost = false;
     this._drawBuffersIndexedExt = null;
     this._reverseWindingOrder = false;
+    this._presentProxy = null;
+    this._presentProgram = null;
+    this._presentBindGroup = null;
+    this._presentVertexLayout = null;
+    this._presentStates = null;
+    this._presentFence = null;
+    this._presentFenceVsync = 0;
+    this._presentFenceHold = 1;
+    this._deferredPresent = false;
     this._context = context;
     this._currentProgram = null;
     this._currentVertexData = null;
@@ -889,7 +909,9 @@ export class WebGLDevice extends BaseDevice {
     return this._currentStateSet;
   }
   getFramebuffer() {
-    return this._context._currentFramebuffer ?? null;
+    const fb = this._context._currentFramebuffer ?? null;
+    // Drawing to the held frame is drawing to the canvas as far as callers can tell.
+    return fb && fb === this._presentProxy ? null : fb;
   }
   reverseVertexWindingOrder(reverse: boolean) {
     if (this._reverseWindingOrder !== !!reverse) {
@@ -1018,11 +1040,167 @@ export class WebGLDevice extends BaseDevice {
     return (renderBundle as WebGLRenderBundle).length;
   }
   /** @internal */
-  protected _setFramebuffer(rt: FrameBuffer) {
-    if (rt !== this._context._currentFramebuffer) {
+  protected _setFramebuffer(rt: Nullable<FrameBuffer>) {
+    const target = rt ?? (this._deferredPresent ? this._presentProxy : null);
+    if (target !== this._context._currentFramebuffer) {
       this._context._currentFramebuffer?.unbind();
-      rt?.bind();
+      target?.bind();
     }
+  }
+  /** @internal */
+  protected setDeferredPresent(on: boolean): boolean {
+    const gl = this._context;
+    this._deferredPresent = false;
+    if (!on || this._contextLost) {
+      if (gl._currentFramebuffer && gl._currentFramebuffer === this._presentProxy) {
+        gl._currentFramebuffer.unbind();
+      }
+      return false;
+    }
+    const width = gl.drawingBufferWidth;
+    const height = gl.drawingBufferHeight;
+    let proxy = this._presentProxy;
+    if (proxy && (proxy.getWidth() !== width || proxy.getHeight() !== height)) {
+      this.disposePresentProxy();
+      proxy = null;
+    }
+    if (!proxy) {
+      const nearest: SamplerOptions = {
+        minFilter: 'nearest',
+        magFilter: 'nearest',
+        mipFilter: 'none',
+        addressU: 'clamp',
+        addressV: 'clamp'
+      };
+      const color = this.createTexture2D('rgba8unorm', width, height, {
+        mipmapping: false,
+        samplerOptions: nearest
+      });
+      const depth = this.createTexture2D('d24s8', width, height, {
+        mipmapping: false,
+        samplerOptions: nearest
+      });
+      if (!color || !depth) {
+        color?.dispose();
+        depth?.dispose();
+        return false;
+      }
+      color.name = 'present-proxy-color';
+      depth.name = 'present-proxy-depth';
+      proxy = this.createFrameBuffer([color], depth, { sampleCount: this._msaaSampleCount });
+      this._presentProxy = proxy;
+      this._presentBindGroup = null;
+    }
+    this._deferredPresent = true;
+    if (!gl._currentFramebuffer) {
+      proxy.bind();
+    }
+    return true;
+  }
+  /** @internal */
+  protected pollDeferredFrame() {
+    const fence = this._presentFence;
+    if (fence && !this._contextLost) {
+      const status = this._context.clientWaitSync(fence, 0, 0);
+      if (status !== WebGLEnum.TIMEOUT_EXPIRED) {
+        this.finishPresentFence(status !== WebGLEnum.WAIT_FAILED);
+      }
+    }
+  }
+  /** Drops the fence of the held frame, reporting the frame done now unless told not to. */
+  private finishPresentFence(report: boolean) {
+    const fence = this._presentFence;
+    if (!fence) {
+      return;
+    }
+    this._presentFence = null;
+    if (!this._contextLost) {
+      this._context.deleteSync(fence);
+    }
+    if (report) {
+      this.reportDeferredFrameDone(this._presentFenceVsync, this._presentFenceHold, performance.now());
+    }
+  }
+  /** @internal */
+  protected onPresentDeferredFrame() {
+    const proxy = this._presentProxy;
+    if (!proxy || this._contextLost) {
+      return;
+    }
+    const program = this.getPresentProgram();
+    if (!program) {
+      return;
+    }
+    if (!this._presentBindGroup) {
+      this._presentBindGroup = this.createBindGroup(program.bindGroupLayouts[0]);
+      this._presentBindGroup.setTexture('tex', proxy.getColorAttachments()[0]);
+    }
+    // Draw the held frame to the canvas. A draw rather than blitFramebuffer:
+    // an antialiased canvas is a multisampled target, which cannot be blitted to.
+    this._deferredPresent = false;
+    this.pushDeviceStates();
+    this._setFramebuffer(null);
+    this.setViewport(null);
+    this.setScissor(null);
+    this.setProgram(program);
+    this.setBindGroup(0, this._presentBindGroup);
+    this.setRenderStates(this._presentStates);
+    this.setVertexLayout(this._presentVertexLayout);
+    this.draw('triangle-strip', 0, 4);
+    this.popDeviceStates();
+  }
+  private getPresentProgram() {
+    if (!this._presentProgram) {
+      this._presentProgram = this.buildRenderProgram({
+        label: 'PresentHeldFrame',
+        vertex(pb) {
+          this.$inputs.pos = pb.vec2().attrib('position');
+          this.$outputs.uv = pb.vec2();
+          pb.main(function () {
+            this.$builtins.position = pb.vec4(this.$inputs.pos, 0, 1);
+            this.$outputs.uv = pb.add(pb.mul(this.$inputs.pos, 0.5), pb.vec2(0.5));
+          });
+        },
+        fragment(pb) {
+          this.$outputs.color = pb.vec4();
+          this.tex = pb.tex2D().uniform(0);
+          pb.main(function () {
+            this.$outputs.color = pb.textureSampleLevel(this.tex, this.$inputs.uv, 0);
+          });
+        }
+      });
+      if (!this._presentProgram) {
+        return null;
+      }
+      const vertices = this.createInterleavedVertexBuffer(
+        ['position_f32x2'],
+        new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1])
+      );
+      this._presentVertexLayout = vertices
+        ? this.createVertexLayout({ vertexBuffers: [{ buffer: vertices }] })
+        : null;
+      this._presentStates = this.createRenderStateSet();
+      this._presentStates.useDepthState().enableTest(false).enableWrite(false);
+      this._presentStates.useRasterizerState().setCullMode('none');
+    }
+    return this._presentVertexLayout ? this._presentProgram : null;
+  }
+  private disposePresentProxy() {
+    const proxy = this._presentProxy;
+    if (proxy) {
+      if (this._context._currentFramebuffer === proxy) {
+        proxy.unbind();
+      }
+      const color = proxy.getColorAttachments()[0];
+      const depth = proxy.getDepthAttachment();
+      proxy.dispose();
+      color?.dispose();
+      depth?.dispose();
+    }
+    this._presentProxy = null;
+    this._presentBindGroup?.dispose();
+    this._presentBindGroup = null;
+    this.finishPresentFence(false);
   }
   /** @internal */
   protected onBeginFrame() {
@@ -1041,7 +1219,18 @@ export class WebGLDevice extends BaseDevice {
     cancelAnimationFrame(handle);
   }
   /** @internal */
-  protected onEndFrame() {}
+  protected onEndFrame() {
+    if (this._deferredPresent && !this._contextLost) {
+      // Polled at each refresh to learn when the GPU was done with the frame. A
+      // fence still waiting from the frame before counts as done only now.
+      this.finishPresentFence(true);
+      const gl = this._context;
+      this._presentFence = gl.fenceSync(WebGLEnum.SYNC_GPU_COMMANDS_COMPLETE, 0);
+      this._presentFenceVsync = this.deferredFrameVsync;
+      this._presentFenceHold = this.deferredFrameHold;
+      gl.flush();
+    }
+  }
   /** @internal */
   protected _draw(primitiveType: PrimitiveType, first: number, count: number) {
     if (this._currentVertexData) {
@@ -1221,6 +1410,12 @@ export class WebGLDevice extends BaseDevice {
   /** @internal */
   private handleContextLost() {
     this._isRendering = this.isRendering;
+    this._deferredPresent = false;
+    this._presentProxy = null;
+    this._presentBindGroup = null;
+    this._presentProgram = null;
+    this._presentVertexLayout = null;
+    this._presentFence = null;
     this.invalidateAll();
     this.dispatchEvent('devicelost');
   }
