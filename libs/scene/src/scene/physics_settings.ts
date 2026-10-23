@@ -28,7 +28,7 @@ export class ScenePhysicsSettings {
   constructor() {
     this._gravity = new Vector3(0, -9.81, 0);
     this._fixedTimeStep = 1 / 60;
-    this._maxSubSteps = 4;
+    this._maxSubSteps = 8;
     this._interpolation = true;
     this._waitForCollidersOnStart = true;
     this._layerNames = Array.from({ length: PHYSICS_LAYER_COUNT }, (_, i) =>
@@ -66,7 +66,7 @@ export class ScenePhysicsSettings {
       this._version++;
     }
   }
-  /** Most simulation steps taken in one frame. Default 4. */
+  /** Most simulation steps taken in one frame. Default 8: real time down to 7.5 frames per second at the default step. */
   get maxSubSteps() {
     return this._maxSubSteps;
   }

@@ -266,10 +266,11 @@ function queryShapeDesc(shape: PhysicsShape): ShapeDesc {
  * nodes are drawn where the simulation put them.
  *
  * The simulation advances in fixed steps of {@link PhysicsSimulation.fixedTimeStep},
- * at most {@link PhysicsSimulation.maxSubSteps} per frame; time beyond that is
- * dropped rather than carried over, so a long frame slows the simulation down
- * instead of making the next frames catch up in a burst. Rendered poses of
- * dynamic bodies are interpolated between the last two steps.
+ * at most {@link PhysicsSimulation.maxSubSteps} per frame (8 by default, real
+ * time down to 7.5 frames per second); time beyond that is dropped rather than
+ * carried over, so a long frame slows the simulation down instead of making the
+ * next frames catch up in a burst. Rendered poses of dynamic bodies are
+ * interpolated between the last two steps.
  *
  * Only the fixed steps feed the simulation; frame rate and interpolation never
  * do, so the same inputs give the same result on any machine.
@@ -361,7 +362,7 @@ export class PhysicsSimulation
     this._backend = null;
     this._gravity = new Vector3(0, -9.81, 0);
     this._fixedTimeStep = 1 / 60;
-    this._maxSubSteps = 4;
+    this._maxSubSteps = 8;
     this._interpolation = true;
     this._enabled = true;
     this._accumulator = 0;
@@ -423,7 +424,7 @@ export class PhysicsSimulation
   set fixedTimeStep(value: number) {
     this._fixedTimeStep = Math.max(1e-4, value);
   }
-  /** Most simulation steps taken in one frame. Default 4. */
+  /** Most simulation steps taken in one frame. Default 8. */
   get maxSubSteps() {
     return this._maxSubSteps;
   }
@@ -571,9 +572,11 @@ export class PhysicsSimulation
       steps = this._maxSubSteps;
     }
     this._accumulator -= steps * fixed;
-    // Time beyond maxSubSteps is dropped, not carried into later frames.
     if (this._accumulator >= fixed) {
-      this._accumulator %= fixed;
+      // Time beyond maxSubSteps is dropped, not carried into later frames. All
+      // of it: keeping a remainder would put the interpolation at a random
+      // point between the last two steps, a jump of up to a step every frame.
+      this._accumulator = 0;
     }
     if (steps > 0) {
       this._started = true;

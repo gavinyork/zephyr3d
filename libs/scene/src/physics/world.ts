@@ -70,7 +70,7 @@ export interface PhysicsWorld extends IEventTarget<PhysicsWorldEventMap> {
   gravity: Vector3;
   /** Length of one simulation step, in seconds. Default 1/60. */
   fixedTimeStep: number;
-  /** Most simulation steps taken in one frame. Default 4. */
+  /** Most simulation steps taken in one frame. Default 8: real time down to 7.5 frames per second at the default step. */
   maxSubSteps: number;
   /** Whether moving bodies are drawn between their last two simulated poses. Default true. */
   interpolation: boolean;
