@@ -131,6 +131,23 @@ export function getSceneClass(manager: ResourceManager): SerializableClass {
           }
         },
         {
+          name: 'GISunShadowConeAngle',
+          description:
+            'Softness of the sun shadow in the bounced light, as the half angle in degrees of the cone traced through the distance field. Wider blurs the shadow edges in the indirect light; narrower sharpens them but lets the coarse field leak.',
+          type: 'float',
+          default: 5,
+          options: { group: 'Global Illumination', minValue: 0.1, maxValue: 45 },
+          isHidden(this: Scene) {
+            return !this.gi.enabled;
+          },
+          get(this: Scene, value) {
+            value.num[0] = this.gi.sunShadowConeAngle;
+          },
+          set(this: Scene, value) {
+            this.gi.sunShadowConeAngle = value.num[0];
+          }
+        },
+        {
           name: 'MetersPerUnit',
           description: 'Physical meters represented by one scene unit',
           type: 'float',

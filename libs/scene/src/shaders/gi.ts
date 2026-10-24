@@ -1,5 +1,11 @@
 import type { PBGlobalScope, PBInsideFunctionScope, PBShaderExp } from '@zephyr3d/device';
-import { GLOBAL_SDF_LEVELS, GLOBAL_SDF_PARAMS, globalSDFVoxelCurrent, sampleInstanceField } from './sdf';
+import {
+  GLOBAL_SDF_LEVELS,
+  GLOBAL_SDF_PARAMS,
+  globalSDFVoxelCurrent,
+  sampleGlobalSDF,
+  sampleInstanceField
+} from './sdf';
 
 /**
  * Uniform names of the voxelize pass, see {@link declareVoxelizeUniforms}.
@@ -19,6 +25,8 @@ export const VOXELIZE_PARAMS = 'zVoxelizeParams';
 export const VOXEL_SCENE_ALBEDO = 'zVoxelSceneAlbedo';
 /** @internal */
 export const VOXEL_SCENE_EMISSIVE = 'zVoxelSceneEmissive';
+/** @internal */
+export const VOXEL_SCENE_RADIANCE = 'zVoxelSceneRadiance';
 
 /**
  * Declares what {@link storeVoxelMaterial} writes to, in the fragment stage of
@@ -223,12 +231,13 @@ export function sampleInstanceMaterial(
 }
 
 /**
- * Declares the voxel scene's material clipmaps, which share the layout of the
- * global SDF (levels stacked along z, toroidal windows, the same bricks and
- * tags) at half its resolution:
+ * Declares the voxel scene's clipmaps, which share the layout of the global
+ * SDF (levels stacked along z, toroidal windows, the same bricks and tags) at
+ * half its resolution:
  *
  * - albedo: rgba8unorm, rgb the albedo and a = 1 where a surface is.
  * - emissive: rgba16float, emitted radiance.
+ * - radiance: rgba16float, outgoing radiance (lit albedo plus emissive).
  *
  * Needs the global SDF uniforms declared as well ({@link declareGlobalSDFUniforms}).
  * @internal
@@ -237,6 +246,70 @@ export function declareVoxelSceneUniforms(scope: PBGlobalScope, group: number) {
   const pb = scope.$builder;
   scope[VOXEL_SCENE_ALBEDO] = pb.tex3D().sampleType('unfilterable-float').uniform(group);
   scope[VOXEL_SCENE_EMISSIVE] = pb.tex3D().sampleType('unfilterable-float').uniform(group);
+  scope[VOXEL_SCENE_RADIANCE] = pb.tex3D().sampleType('unfilterable-float').uniform(group);
+}
+
+/**
+ * Outgoing radiance at a texel of {@link voxelSceneTexel}; zero for level -1.
+ * @internal
+ */
+export function loadVoxelSceneRadiance(scope: PBInsideFunctionScope, texel: PBShaderExp) {
+  const pb = scope.$builder;
+  const funcName = 'Z_loadVoxelSceneRadiance';
+  pb.func(funcName, [pb.ivec4('t')], function () {
+    this.$if(pb.lessThan(this.t.w, 0), function () {
+      this.$return(pb.vec3(0));
+    });
+    this.$return(pb.textureLoad(this[VOXEL_SCENE_RADIANCE], this.t.xyz, 0).rgb);
+  });
+  return scope[funcName](texel) as PBShaderExp;
+}
+
+/**
+ * Visibility of a distant light from a point through the global field, by
+ * cone tracing along the light direction: at each step the ray's distance to
+ * the nearest surface over the cone's width there bounds the unoccluded
+ * fraction, and the smallest bound along the ray is the shadow. Wright,
+ * "Dynamic Occlusion with Signed Distance Fields", SIGGRAPH 2015 Advances.
+ *
+ * `start` should already be offset off the surface. `tanHalfAngle` sets the
+ * softness, `minStep` keeps the march from stalling in the field's band,
+ * `maxDistance` ends it. Static geometry only (the clipmap).
+ * @internal
+ */
+export function sdfConeShadow(
+  scope: PBInsideFunctionScope,
+  start: PBShaderExp,
+  dir: PBShaderExp,
+  tanHalfAngle: PBShaderExp,
+  minStep: PBShaderExp,
+  maxDistance: PBShaderExp,
+  levels: number,
+  steps = 24
+) {
+  const pb = scope.$builder;
+  const funcName = 'Z_sdfConeShadow';
+  pb.func(
+    funcName,
+    [pb.vec3('start'), pb.vec3('dir'), pb.float('tanHalf'), pb.float('minStep'), pb.float('maxDist')],
+    function () {
+      this.$l.shadow = pb.float(1);
+      this.$l.t = this.minStep;
+      this.$for(pb.int('i'), 0, steps, function () {
+        this.$l.d = sampleGlobalSDF(this, pb.add(this.start, pb.mul(this.dir, this.t)), levels);
+        this.shadow = pb.min(this.shadow, pb.clamp(pb.div(this.d, pb.mul(this.t, this.tanHalf)), 0, 1));
+        this.$if(pb.lessThan(this.shadow, 0.01), function () {
+          this.$break();
+        });
+        this.t = pb.add(this.t, pb.clamp(this.d, this.minStep, pb.mul(this.minStep, 16)));
+        this.$if(pb.greaterThan(this.t, this.maxDist), function () {
+          this.$break();
+        });
+      });
+      this.$return(this.shadow);
+    }
+  );
+  return scope[funcName](start, dir, tanHalfAngle, minStep, maxDistance) as PBShaderExp;
 }
 
 /**

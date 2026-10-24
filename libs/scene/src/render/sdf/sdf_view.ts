@@ -15,8 +15,10 @@ import {
   declareVoxelSceneUniforms,
   loadVoxelSceneAlbedo,
   loadVoxelSceneEmissive,
+  loadVoxelSceneRadiance,
   VOXEL_SCENE_ALBEDO,
   VOXEL_SCENE_EMISSIVE,
+  VOXEL_SCENE_RADIANCE,
   voxelSceneTexel
 } from '../../shaders/gi';
 import { buildSDFProgram } from './sdf_programs';
@@ -27,7 +29,7 @@ import { fetchSampler } from '../../utility/misc';
  * voxel scene's albedo or emissive at the hit.
  * @public
  */
-export type SceneSDFViewMode = 'distance' | 'albedo' | 'emissive';
+export type SceneSDFViewMode = 'distance' | 'albedo' | 'emissive' | 'radiance';
 
 /** Sphere tracing steps per pixel. */
 const MAX_STEPS = 128;
@@ -143,9 +145,12 @@ function getProgram(levels: number, mode: SceneSDFViewMode) {
                   pb.vec4(pb.mul(this.a.rgb, this.shade), 1),
                   pb.vec4(pb.mul(this.flag, this.shade), 1)
                 );
-              } else {
+              } else if (mode === 'emissive') {
                 this.$l.em = loadVoxelSceneEmissive(this, this.texel);
                 this.$outputs.color = pb.vec4(pb.div(this.em, pb.add(this.em, pb.vec3(1))), 1);
+              } else {
+                this.$l.rad = loadVoxelSceneRadiance(this, this.texel);
+                this.$outputs.color = pb.vec4(pb.div(this.rad, pb.add(this.rad, pb.vec3(1))), 1);
               }
             });
           }
@@ -184,7 +189,7 @@ export function renderSceneSDFView(scene: Scene, camera: Camera, mode: SceneSDFV
     return false;
   }
   const voxels = mode !== 'distance' && scene.gi.enabled ? scene.gi.voxels : null;
-  if (!voxels?.ready) {
+  if (!voxels?.ready || (mode === 'radiance' && !voxels.lit)) {
     mode = 'distance';
   }
   const device = getDevice();
@@ -205,6 +210,12 @@ export function renderSceneSDFView(scene: Scene, camera: Camera, mode: SceneSDFV
   if (voxels && mode !== 'distance') {
     bindGroup.setTexture(VOXEL_SCENE_ALBEDO, voxels.albedo, fetchSampler('clamp_nearest_nomip'));
     bindGroup.setTexture(VOXEL_SCENE_EMISSIVE, voxels.emissive, fetchSampler('clamp_nearest_nomip'));
+    // The layout declares all three; before the first lighting pass the albedo stands in
+    bindGroup.setTexture(
+      VOXEL_SCENE_RADIANCE,
+      voxels.lit ? voxels.radiance : voxels.emissive,
+      fetchSampler('clamp_nearest_nomip')
+    );
   }
   device.pushDeviceStates();
   try {

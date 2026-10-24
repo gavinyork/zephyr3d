@@ -714,6 +714,14 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
               checked: () => this._sdfView === 'emissive'
             },
             {
+              label: 'Voxel Radiance',
+              action: () => {
+                this._sdfView = this._sdfView === 'radiance' ? null : 'radiance';
+                return true;
+              },
+              checked: () => this._sdfView === 'radiance'
+            },
+            {
               label: 'Show Colliders',
               action: () => {
                 this._showColliders = !this._showColliders;

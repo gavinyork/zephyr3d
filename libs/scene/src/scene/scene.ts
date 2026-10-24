@@ -642,6 +642,8 @@ export class Scene
         if (this._sdf?.enabled) {
           this._sdf.update(cameraPos, deltaInSeconds);
         }
+        // Lighting reads what the field just composited
+        this._gi?.updateLighting(camera);
       }
     }
     // Palettes written by animation updates are uploaded once all nodes and bank tracks are updated

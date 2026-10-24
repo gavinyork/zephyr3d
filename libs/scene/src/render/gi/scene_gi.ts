@@ -1,9 +1,11 @@
 import type { Nullable } from '@zephyr3d/base';
 import { Vector3 } from '@zephyr3d/base';
 import type { Scene } from '../../scene/scene';
+import type { Camera } from '../../camera/camera';
 import { GlobalSDF } from '../sdf/global_sdf';
 import { VoxelScene } from './voxel_scene';
 import type { VoxelSceneStats } from './voxel_scene';
+import type { VoxelLightingOptions } from './voxel_lighting';
 
 /**
  * Counters of a {@link SceneGI}.
@@ -36,6 +38,7 @@ export class SceneGI {
   private _atlasSize: number;
   private _voxelizeBudget: number;
   private readonly _terrainAlbedo: Vector3;
+  private readonly _lighting: VoxelLightingOptions;
   private _warned: boolean;
   constructor(scene: Scene) {
     this._scene = scene;
@@ -44,6 +47,7 @@ export class SceneGI {
     this._atlasSize = 256;
     this._voxelizeBudget = 8;
     this._terrainAlbedo = new Vector3(0.3, 0.3, 0.3);
+    this._lighting = { sunShadowConeAngle: 5, slicesPerFrame: 8 };
     this._warned = false;
   }
   /** True on a device that can build it. */
@@ -95,6 +99,20 @@ export class SceneGI {
       this._voxels = null;
     }
   }
+  /** Half angle of the sun shadow cone in the voxel lighting, in degrees; wider is softer. */
+  get sunShadowConeAngle() {
+    return this._lighting.sunShadowConeAngle;
+  }
+  set sunShadowConeAngle(val: number) {
+    this._lighting.sunShadowConeAngle = Math.max(0.1, Math.min(45, val));
+  }
+  /** Z slices of every clipmap level lit per frame; the voxel lighting is refreshed every `64 / slices` frames. */
+  get lightingSlicesPerFrame() {
+    return this._lighting.slicesPerFrame;
+  }
+  set lightingSlicesPerFrame(val: number) {
+    this._lighting.slicesPerFrame = Math.max(1, Math.floor(val));
+  }
   /** The voxel scene, once built. */
   get voxels() {
     return this._voxels;
@@ -129,6 +147,13 @@ export class SceneGI {
       1
     );
     this._voxels.update(this._scene.sdf, cameraPos, deltaSeconds);
+  }
+  /** Called by the scene once a frame, after the scene field's update. */
+  updateLighting(camera: Camera) {
+    if (!this._enabled || !this._voxels || !this._scene.sdf.enabled) {
+      return;
+    }
+    this._voxels.updateLighting(this._scene.sdf, camera, this._lighting);
   }
   dispose() {
     this.enabled = false;

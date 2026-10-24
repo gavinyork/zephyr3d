@@ -12,6 +12,9 @@ import type { MeshMaterial } from '../../material/meshmaterial';
 import { VoxelMaterialAtlas } from './voxel_atlas';
 import type { VoxelAtlasSlot } from './voxel_atlas';
 import { Voxelizer } from './voxelize_pass';
+import { VoxelLighting } from './voxel_lighting';
+import type { VoxelLightingOptions } from './voxel_lighting';
+import type { Camera } from '../../camera/camera';
 
 /** Seconds a material's uniforms must have been stable before it is voxelized again. */
 const REVOXELIZE_COOLDOWN = 0.5;
@@ -53,6 +56,8 @@ export interface VoxelSceneStats {
   voxelizations: number;
   /** Voxelizations by the last update. */
   lastVoxelizations: number;
+  /** Lighting passes run so far. */
+  lightingPasses: number;
 }
 
 /**
@@ -81,6 +86,7 @@ export class VoxelScene implements GlobalSDFMaterials {
   readonly atlas: VoxelMaterialAtlas;
   private readonly _scene: Scene;
   private _voxelizer: Nullable<Voxelizer>;
+  private _lighting: Nullable<VoxelLighting>;
   private _albedo: Nullable<Texture3D>;
   private _emissive: Nullable<Texture3D>;
   private _resolution: number;
@@ -96,6 +102,7 @@ export class VoxelScene implements GlobalSDFMaterials {
     this.terrainAlbedo = new Vector4(0.3, 0.3, 0.3, 1);
     this.atlas = new VoxelMaterialAtlas([atlasSize, atlasSize, atlasSize]);
     this._voxelizer = null;
+    this._lighting = null;
     this._albedo = null;
     this._emissive = null;
     this._resolution = 0;
@@ -129,6 +136,17 @@ export class VoxelScene implements GlobalSDFMaterials {
     }
     return this._emissive;
   }
+  /** Outgoing radiance clipmap: rgba16float, laid out like the albedo; see {@link VoxelLighting}. */
+  get radiance() {
+    if (!this._lighting?.ready) {
+      throw new Error('VoxelScene: no radiance before the first lighting update');
+    }
+    return this._lighting.radiance;
+  }
+  /** True once the radiance clipmap exists. */
+  get lit() {
+    return !!this._lighting?.ready;
+  }
   /** Voxels per axis of a clipmap level, half the field's. */
   get resolution() {
     return this._resolution;
@@ -155,7 +173,8 @@ export class VoxelScene implements GlobalSDFMaterials {
       atlasOccupancy: this.atlas.occupancy,
       atlasFull: this._atlasFull,
       voxelizations: this._voxelizations,
-      lastVoxelizations: this._lastVoxelizations
+      lastVoxelizations: this._lastVoxelizations,
+      lightingPasses: this._lighting?.passes ?? 0
     };
     for (const entry of this._entries.values()) {
       stats[entry.state]++;
@@ -264,6 +283,20 @@ export class VoxelScene implements GlobalSDFMaterials {
       }
     }
   }
+  /**
+   * Lights the next slab of the voxels. Called by the scene once a frame
+   * after the field's update, which composites the materials it reads.
+   */
+  updateLighting(sdf: SceneSDF, camera: Camera, options: VoxelLightingOptions) {
+    const global = sdf.enabled ? sdf.global : null;
+    if (!global || !this._albedo || !this._emissive) {
+      return;
+    }
+    if (!this._lighting) {
+      this._lighting = new VoxelLighting(this._scene);
+    }
+    this._lighting.update(global, this._albedo, this._emissive, this._resolution, camera, options);
+  }
   /** Stops the global field compositing materials, when it still composites this. */
   detach(sdf: SceneSDF) {
     const global = sdf.enabled ? sdf.global : null;
@@ -274,6 +307,8 @@ export class VoxelScene implements GlobalSDFMaterials {
   dispose() {
     this._voxelizer?.dispose();
     this._voxelizer = null;
+    this._lighting?.dispose();
+    this._lighting = null;
     this.atlas.dispose();
     this._albedo?.dispose();
     this._emissive?.dispose();
