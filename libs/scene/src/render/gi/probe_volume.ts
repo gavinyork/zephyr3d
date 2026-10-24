@@ -112,6 +112,19 @@ export function getProbeVolumeForDraw(ctx?: DrawContext): Nullable<ProbeVolume> 
 }
 
 /**
+ * The scene's probe volume when the global illumination is on and it has
+ * been built, for passes other than the light pass (SSGI, the voxel lighting).
+ * @internal
+ */
+export function getActiveProbeVolume(scene: Scene): Nullable<ProbeVolume> {
+  if (!scene.gi.enabled) {
+    return null;
+  }
+  const probes = scene.gi.probes;
+  return probes?.ready ? probes : null;
+}
+
+/**
  * A grid of light probes around the camera holding the diffuse irradiance and
  * the distance to the nearest surface per direction, as octahedral maps:
  * dynamic diffuse global illumination after Majercik et al. (JCGT 2019; the

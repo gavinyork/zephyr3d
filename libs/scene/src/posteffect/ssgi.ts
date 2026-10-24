@@ -8,6 +8,8 @@ import { screenSpaceRayTracing_HiZ, screenSpaceRayTracing_Linear2D } from '../sh
 import { ShaderHelper } from '../material';
 import { linearToGamma } from '../shaders/misc';
 import { fetchSampler } from '../utility/misc';
+import { getActiveProbeVolume } from '../render/gi/probe_volume';
+import { declareProbeUniforms, sampleProbeIrradiance } from '../shaders/probes';
 import { AbstractPostEffect, PostEffectLayer } from './posteffect';
 import type { PostEffectSetupContext } from './posteffect';
 
@@ -498,14 +500,15 @@ export class SSGI extends AbstractPostEffect {
     height: number
   ) {
     const sampleHistory = !!(previousColor && motion && previousSurface);
-    const envHash = ctx.env!.light.getHash();
+    const probes = getActiveProbeVolume(ctx.scene);
+    const envHash = `${ctx.env!.light.getHash()}:probes${probes ? 1 : 0}`;
     const historyHash = sampleHistory ? `${previousColor!.uid}:${motion!.uid}:${previousSurface!.uid}` : '';
     const hizHash = hiZ ? `${hiZ.uid}` : '';
     const programHash = `${sampleHistory ? '1' : '0'}:${hiZ ? '1' : '0'}:${ctx.camera.ssgiResolvedSettings.raysPerPixel}:${envHash}`;
     const bindGroupHash = `${currentColor.uid}:${depth.uid}:${normal.uid}:(${historyHash}):(${hizHash}):${ctx.camera.ssgiResolvedSettings.raysPerPixel}:${envHash}`;
     let program = SSGI._tracePrograms[programHash];
     if (!program) {
-      program = this.createTraceProgram(ctx, !!hiZ, sampleHistory);
+      program = this.createTraceProgram(ctx, !!hiZ, sampleHistory, !!probes);
       SSGI._tracePrograms[programHash] = program;
     }
     const colorSampler = fetchSampler('clamp_linear_nomip');
@@ -562,6 +565,7 @@ export class SSGI extends AbstractPostEffect {
     bindGroup.setValue('skyOcclusion', ctx.camera.ssgiSkyOcclusion);
     bindGroup.setValue('flip', this.needFlip(ctx.device) ? 1 : 0);
     ctx.env!.light.envLight.updateBindGroup(bindGroup);
+    probes?.applyBindGroup(bindGroup);
     ctx.device.setProgram(program);
     ctx.device.setBindGroup(0, bindGroup);
     this.drawFullscreenQuad(AbstractPostEffect.getDefaultRenderState(ctx, 'always'));
@@ -742,7 +746,7 @@ export class SSGI extends AbstractPostEffect {
   }
 
   /** @internal */
-  private createTraceProgram(ctx: DrawContext, useHiZ: boolean, sampleHistory: boolean) {
+  private createTraceProgram(ctx: DrawContext, useHiZ: boolean, sampleHistory: boolean, useProbes: boolean) {
     const raysPerPixel = ctx.camera.ssgiResolvedSettings.raysPerPixel;
     const program = ctx.device.buildRenderProgram({
       vertex(pb) {
@@ -787,6 +791,9 @@ export class SSGI extends AbstractPostEffect {
         this.radianceParams = pb.vec4().uniform(0);
         this.skyOcclusion = pb.float().uniform(0);
         ctx.env!.light.envLight.initShaderBindings(pb);
+        if (useProbes) {
+          declareProbeUniforms(this, 0);
+        }
         this.$outputs.outColor = pb.vec4();
         this.$outputs.outAO = pb.vec4();
         pb.func('SSGI_getPosition', [pb.vec2('uv')], function () {
@@ -857,6 +864,22 @@ export class SSGI extends AbstractPostEffect {
               ctx.env!.light.envLight.getIrradiance(this, this.worldNormal),
               this.radianceParams.z
             );
+            // With a probe volume the baseline is its irradiance where it
+            // covers the pixel: occlusion and bounces are then in the baseline
+            // already, and the rays only refine it with on-screen detail
+            this.$l.probeValid = pb.float(0);
+            if (useProbes) {
+              this.$l.worldPos = pb.mul(this.invViewMatrix, pb.vec4(this.pos.xyz, 1)).xyz;
+              this.$l.cameraPos = pb.mul(this.invViewMatrix, pb.vec4(0, 0, 0, 1)).xyz;
+              this.$l.probe = sampleProbeIrradiance(
+                this,
+                this.worldPos,
+                this.worldNormal,
+                pb.normalize(pb.sub(this.cameraPos, this.worldPos))
+              );
+              this.iblIrradiance = pb.mix(this.iblIrradiance, this.probe.rgb, this.probe.a);
+              this.probeValid = this.probe.a;
+            }
             this.$l.correctionSum = pb.vec3(0);
             // Rays whose outcome the depth buffer cannot resolve (they left the
             // screen or ran out of iterations behind geometry) are excluded from
@@ -954,6 +977,10 @@ export class SSGI extends AbstractPostEffect {
                 this.rawEnvRadiance,
                 pb.vec3(0)
               );
+              if (useProbes) {
+                // A hit is judged against what the probes expect there, not the open sky
+                this.envRadiance = pb.mix(this.envRadiance, this.iblIrradiance, this.probeValid);
+              }
               this.$l.currentRadiance = pb.textureSampleLevel(this.currentColorTex, this.hitUV, 0).rgb;
               if (sampleHistory) {
                 this.$l.hitMotion = pb.textureSampleLevel(this.motionTex, this.hitUV, 0).xy;
@@ -1059,10 +1086,15 @@ export class SSGI extends AbstractPostEffect {
             // not remove more than that blend permits (at the default 0.7, at least 30% remains).
             // That reserved share is itself scaled by measured visibility, otherwise no amount of
             // occlusion could ever darken an enclosed corner.
+            // With probes the baseline is already occluded, so the floor is not scaled down again
             this.$l.minimumIrradiance = pb.mul(
               this.iblIrradiance,
               pb.max(0, pb.sub(1, this.radianceParams.x)),
-              pb.mix(pb.float(1), pb.div(this.escapedSum, this.determinateCount), this.skyOcclusion)
+              pb.mix(
+                pb.mix(pb.float(1), pb.div(this.escapedSum, this.determinateCount), this.skyOcclusion),
+                pb.float(1),
+                this.probeValid
+              )
             );
             // Clamp before the render-target conversion: a finite value that overflows becomes Inf
             // in the texture, and every a-trous pass then expands the contaminated region by its

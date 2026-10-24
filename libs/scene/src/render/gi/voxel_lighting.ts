@@ -19,6 +19,8 @@ import {
   sampleGlobalSDF
 } from '../../shaders/sdf';
 import { sdfConeShadow } from '../../shaders/gi';
+import { declareProbeUniforms, sampleProbeIrradiance } from '../../shaders/probes';
+import { getActiveProbeVolume } from './probe_volume';
 
 /** Most lights the voxels are lit by, the sun aside. */
 export const MAX_VOXEL_LIGHTS = 64;
@@ -135,13 +137,14 @@ export class VoxelLighting {
       ? (preExposure / PHYSICAL_BAKE_EXPOSURE) * (scene.env.light.strength ?? 0)
       : (scene.env.light.strength ?? 0);
     const skyIrradiance = !!envLight && envLight.hasIrradiance();
+    const probes = getActiveProbeVolume(scene);
     const key = `${global.levels}:${scene.lightingMode}:${skyIrradiance ? envLight.getType() : 'none'}:${
       skyIrradiance ? this.envVariant() : ''
-    }`;
+    }:probes${probes ? 1 : 0}`;
     if (!this._program || this._programKey !== key) {
       this._bindGroup?.dispose();
       this._program?.dispose();
-      this._program = this.createProgram(global.levels, physical, skyIrradiance);
+      this._program = this.createProgram(global.levels, physical, skyIrradiance, !!probes);
       this._programKey = key;
       this._bindGroup = device.createBindGroup(this._program.bindGroupLayouts[0]);
     }
@@ -163,6 +166,7 @@ export class VoxelLighting {
     if (skyIrradiance) {
       envLight.updateBindGroup(bg);
     }
+    probes?.applyBindGroup(bg);
     if (!this._renderStates) {
       this._renderStates = device.createRenderStateSet();
       this._renderStates.useDepthState().enableTest(false).enableWrite(false);
@@ -269,7 +273,7 @@ export class VoxelLighting {
     return count;
   }
   /** @internal */
-  private createProgram(levels: number, physical: boolean, skyIrradiance: boolean) {
+  private createProgram(levels: number, physical: boolean, skyIrradiance: boolean, useProbes: boolean) {
     const scene = this._scene;
     const envLight = scene.env.light.envLight;
     return buildSDFProgram({
@@ -298,6 +302,9 @@ export class VoxelLighting {
         this.slab = pb.vec4().uniform(0);
         if (skyIrradiance) {
           envLight.initShaderBindings(pb);
+        }
+        if (useProbes) {
+          declareProbeUniforms(this, 0);
         }
         pb.func('Z_pointAttenuation', [pb.vec3('p'), pb.vec4('posRange')], function () {
           this.$l.d = pb.sub(this.p, this.posRange.xyz);
@@ -383,10 +390,18 @@ export class VoxelLighting {
             // Lit from just off the surface along the normal
             this.$l.surf = pb.sub(this.p, pb.mul(this.n, this.d0));
             this.$l.ps = pb.add(this.surf, pb.mul(this.n, this.vs));
-            this.$l.light = pb.vec3(0);
+            // Ambient: the sky, or where the probes cover the voxel their
+            // irradiance, which carries the sky and every earlier bounce
+            // (the recursion of Majercik et al. 2019, section 3.2)
+            this.$l.ambient = pb.vec3(0);
             if (skyIrradiance) {
-              this.light = pb.mul(envLight.getIrradiance(this, this.n).rgb, this.params.y);
+              this.ambient = pb.mul(envLight.getIrradiance(this, this.n).rgb, this.params.y);
             }
+            if (useProbes) {
+              this.$l.bounce = sampleProbeIrradiance(this, this.ps, this.n, this.n);
+              this.ambient = pb.mix(this.ambient, this.bounce.rgb, this.bounce.a);
+            }
+            this.$l.light = pb.vec3(0);
             this.$if(pb.greaterThan(this.sunDir.w, 0.5), function () {
               this.$l.L = pb.neg(this.sunDir.xyz);
               this.$l.NoL = pb.dot(this.n, this.L);
@@ -443,7 +458,13 @@ export class VoxelLighting {
               );
             });
             this.$l.emissive = pb.textureLoad(this.emissiveTex, this.texel, 0).rgb;
-            this.radiance = pb.add(pb.mul(this.a.rgb, this.light), this.emissive);
+            // The ambient feeds back through the probes; an albedo short of 1
+            // keeps the loop convergent whatever the material claims
+            this.radiance = pb.add(
+              pb.mul(this.a.rgb, this.light),
+              pb.mul(pb.min(this.a.rgb, pb.vec3(0.9)), this.ambient),
+              this.emissive
+            );
           });
           pb.textureStore(this.radianceOut, pb.uvec3(this.texel), pb.vec4(this.radiance, 1));
           this.$outputs.color = pb.vec4(0);
