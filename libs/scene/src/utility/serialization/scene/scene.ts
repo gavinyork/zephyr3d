@@ -4,6 +4,7 @@ import type {
   CloudMode,
   EnvLightType,
   FogType,
+  GIUpdateMode,
   SkyType,
   VolumetricCloudDebugView
 } from '../../../render';
@@ -213,6 +214,43 @@ export function getSceneClass(manager: ResourceManager): SerializableClass {
           },
           set(this: Scene, value) {
             this.gi.probeRays = value.num[0];
+          }
+        },
+        {
+          name: 'GIProbeLevels',
+          description:
+            'Nested probe volumes around the camera, each four times coarser and wider than the one inside it. More levels carry bounced light farther out at little cost; one level covers only the finest volume.',
+          type: 'int',
+          default: 3,
+          options: { group: 'Global Illumination', minValue: 1, maxValue: 4 },
+          isHidden(this: Scene) {
+            return !this.gi.enabled;
+          },
+          get(this: Scene, value) {
+            value.num[0] = this.gi.probeLevels;
+          },
+          set(this: Scene, value) {
+            this.gi.probeLevels = value.num[0];
+          }
+        },
+        {
+          name: 'GIUpdateMode',
+          description:
+            'Continuous keeps the bounced light following the sun, the lights and the camera. Frozen stops it where it is: cheaper, and right for a scene whose lighting does not change, but the volume no longer follows the camera.',
+          type: 'string',
+          default: 'continuous',
+          options: {
+            group: 'Global Illumination',
+            enum: { labels: ['Continuous', 'Frozen'], values: ['continuous', 'frozen'] }
+          },
+          isHidden(this: Scene) {
+            return !this.gi.enabled;
+          },
+          get(this: Scene, value) {
+            value.str[0] = this.gi.updateMode;
+          },
+          set(this: Scene, value) {
+            this.gi.updateMode = value.str[0] as GIUpdateMode;
           }
         },
         {

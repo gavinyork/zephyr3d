@@ -32,9 +32,11 @@ import {
   octDecode,
   PROBE_DATA,
   PROBE_IRRADIANCE,
+  PROBE_MAX_LEVELS,
   PROBE_PARAM_VEC4S,
   PROBE_PARAMS,
   PROBE_VISIBILITY,
+  probeLevelOrigin,
   probePosition,
   probeTexelFromIndex,
   probeTileOrigin,
@@ -51,19 +53,30 @@ const VISIBILITY_TEXELS = 16;
 const TRACE_STEPS = 48;
 /** Frames between relocations of an updated probe. */
 const RELOCATE_EVERY = 8;
+/** Bits of a selection entry: tile index, level, first-update flag. */
+const SELECT_INDEX_MASK = 0x00ffffff;
+const SELECT_LEVEL_SHIFT = 24;
+const SELECT_FIRST_BIT = 0x80000000;
+/** Magic and version of a saved probe state. */
+const STATE_MAGIC = 0x50494a5a; // 'ZJIP'
+const STATE_VERSION = 1;
 
 /**
  * Settings of the probe volume, on {@link SceneGI}.
  * @public
  */
 export interface ProbeVolumeOptions {
-  /** Probes along x, y and z. */
+  /** Probes along x, y and z of the finest level; the coarsest level has half as many per axis. */
   grid: [number, number, number];
-  /** Distance between probes in world units. */
+  /** Distance between probes of the finest level in world units. */
   spacing: number;
+  /** Clipmap levels, each `levelScale` times the spacing of the one inside it; 1 to {@link PROBE_MAX_LEVELS}. */
+  levels: number;
+  /** Spacing ratio between consecutive levels. */
+  levelScale: number;
   /** Rays traced per probe per update. */
   raysPerProbe: number;
-  /** Probes updated per frame. */
+  /** Probes updated per frame, all levels together. */
   budget: number;
   /** Share of the previous value kept per update, 0 to 1. */
   hysteresis: number;
@@ -73,7 +86,7 @@ export interface ProbeVolumeOptions {
   viewBias: number;
   /** Multiplier on the irradiance the probes give. */
   intensity: number;
-  /** Distance a probe ray gives up at, in world units. */
+  /** Distance a ray of the finest level gives up at, in world units; coarser levels go proportionally farther. */
   maxRayDistance: number;
 }
 
@@ -82,14 +95,28 @@ export interface ProbeVolumeOptions {
  * @public
  */
 export interface ProbeVolumeStats {
+  levels: number;
   probes: number;
-  /** Probes never updated since entering the window. */
+  /** Probes never updated since entering their window. */
   uninitialized: number;
   /** Probes updated by the last frame. */
   lastUpdated: number;
   updates: number;
-  /** World index of the window's first probe. */
-  origin: [number, number, number];
+  /** Per level: probes per axis, spacing and the world index of the window's first probe. */
+  levelInfo: { grid: [number, number, number]; spacing: number; origin: [number, number, number] }[];
+}
+
+interface ProbeLevel {
+  grid: [number, number, number];
+  spacing: number;
+  count: number;
+  /** First tile of the level in the atlases and the data buffer. */
+  tileBase: number;
+  origin: Nullable<[number, number, number]>;
+  /** 0 until a probe's first update since entering the window. */
+  state: Uint8Array;
+  lastRelocated: Int32Array;
+  cursor: number;
 }
 
 /**
@@ -125,20 +152,24 @@ export function getActiveProbeVolume(scene: Scene): Nullable<ProbeVolume> {
 }
 
 /**
- * A grid of light probes around the camera holding the diffuse irradiance and
- * the distance to the nearest surface per direction, as octahedral maps:
+ * A clipmap of light probes around the camera holding the diffuse irradiance
+ * and the distance to the nearest surface per direction, as octahedral maps:
  * dynamic diffuse global illumination after Majercik et al. (JCGT 2019; the
- * scrolling window, relocation and classification of JCGT 2021). Each frame a
- * budget of probes traces a set of rays through the scene field, reads the
- * voxel scene's radiance where they hit and the sky where they miss, and
- * blends the result into its maps with hysteresis. Surfaces in the light pass
- * read the volume through the environment light's irradiance
+ * scrolling window, relocation and classification of JCGT 2021), in levels
+ * of growing spacing like Lumen's radiance cache. Each frame a budget of
+ * probes traces a set of rays through the scene field, reads the voxel
+ * scene's radiance where they hit and the sky where they miss, and blends the
+ * result into its maps with hysteresis. Surfaces in the light pass read the
+ * volume through the environment light's irradiance
  * ({@link sampleProbeIrradiance}).
  *
- * The window follows the camera a spacing at a time, probes addressed
- * toroidally by world index; a probe entering the window starts over.
- * Probes inside geometry or too near it are pushed out along the field's
- * gradient.
+ * Every level's window follows the camera a spacing at a time, probes
+ * addressed toroidally by world index; a probe entering a window starts
+ * over. Probes inside geometry or too near it are pushed out along the
+ * field's gradient.
+ *
+ * The state can be saved ({@link ProbeVolume.exportState}) and restored, for
+ * a scene whose lighting is then frozen.
  *
  * WebGPU only.
  *
@@ -147,7 +178,7 @@ export function getActiveProbeVolume(scene: Scene): Nullable<ProbeVolume> {
 export class ProbeVolume {
   private readonly _scene: Scene;
   private readonly _options: ProbeVolumeOptions;
-  private readonly _grid: [number, number, number];
+  private readonly _levels: ProbeLevel[];
   private readonly _count: number;
   private readonly _tileCols: number;
   private readonly _rays: number;
@@ -160,12 +191,8 @@ export class ProbeVolume {
   private _rayFramebuffer: Nullable<FrameBuffer>;
   private _data: Nullable<GPUDataBuffer>;
   private _selected: Nullable<GPUDataBuffer>;
-  private readonly _state: Uint8Array;
-  private readonly _lastRelocated: Int32Array;
   private readonly _selection: Uint32Array<ArrayBuffer>;
   private readonly _dataReset: Float32Array<ArrayBuffer>;
-  private _origin: Nullable<[number, number, number]>;
-  private _cursor: number;
   private _frame: number;
   private _updates: number;
   private _lastUpdated: number;
@@ -182,11 +209,36 @@ export class ProbeVolume {
   private _blendVisProgram: Nullable<GPUProgram>;
   private _blendVisBindGroup: Nullable<BindGroup>;
   private _renderStates: Nullable<RenderStateSet>;
+  private readonly _scratch: Map<string, GPUDataBuffer>;
   constructor(scene: Scene, options: ProbeVolumeOptions) {
     this._scene = scene;
     this._options = options;
-    this._grid = options.grid.map((v) => Math.max(2, Math.floor(v))) as [number, number, number];
-    this._count = this._grid[0] * this._grid[1] * this._grid[2];
+    const levels = Math.max(1, Math.min(PROBE_MAX_LEVELS, Math.floor(options.levels)));
+    const scale = Math.max(1.5, options.levelScale);
+    const grid = options.grid.map((v) => Math.max(2, Math.floor(v))) as [number, number, number];
+    this._levels = [];
+    let tileBase = 0;
+    for (let l = 0; l < levels; l++) {
+      // The coarsest level covers the most ground with the fewest probes
+      const g = (l === levels - 1 && levels > 1 ? grid.map((v) => Math.max(2, v >> 1)) : grid) as [
+        number,
+        number,
+        number
+      ];
+      const count = g[0] * g[1] * g[2];
+      this._levels.push({
+        grid: g,
+        spacing: options.spacing * scale ** l,
+        count,
+        tileBase,
+        origin: null,
+        state: new Uint8Array(count),
+        lastRelocated: new Int32Array(count).fill(-1000),
+        cursor: 0
+      });
+      tileBase += count;
+    }
+    this._count = tileBase;
     this._tileCols = Math.ceil(Math.sqrt(this._count));
     this._rays = Math.max(16, Math.min(1024, Math.floor(options.raysPerProbe)));
     this._budget = Math.max(1, Math.min(this._count, Math.floor(options.budget)));
@@ -198,16 +250,12 @@ export class ProbeVolume {
     this._rayFramebuffer = null;
     this._data = null;
     this._selected = null;
-    this._state = new Uint8Array(this._count);
-    this._lastRelocated = new Int32Array(this._count).fill(-1000);
-    this._selection = new Uint32Array(this._budget);
-    this._dataReset = new Float32Array(4);
-    this._origin = null;
-    this._cursor = 0;
+    this._selection = new Uint32Array(new ArrayBuffer(this._budget * 4));
+    this._dataReset = new Float32Array(new ArrayBuffer(16));
     this._frame = 0;
     this._updates = 0;
     this._lastUpdated = 0;
-    this._params = new Float32Array(PROBE_PARAM_VEC4S * 4);
+    this._params = new Float32Array(new ArrayBuffer(PROBE_PARAM_VEC4S * 16));
     this._rotation = new Vector4(0, 0, 0, 1);
     this._prng = new PRNG(1234);
     this._relocateProgram = null;
@@ -220,28 +268,42 @@ export class ProbeVolume {
     this._blendVisProgram = null;
     this._blendVisBindGroup = null;
     this._renderStates = null;
+    this._scratch = new Map();
   }
-  get grid(): [number, number, number] {
-    return this._grid;
+  /** Clipmap levels. */
+  get levels() {
+    return this._levels.length;
   }
+  /** Probes of every level together. */
+  get count() {
+    return this._count;
+  }
+  /** Spacing of the finest level. */
   get spacing() {
     return this._options.spacing;
   }
-  /** True once the volume has been placed and updated. */
+  /** True once the volume has been placed and updated, or a state restored. */
   get ready() {
-    return !!this._origin && this._updates > 0;
+    return !!this._levels[0].origin && this._updates > 0;
   }
   getStats(): ProbeVolumeStats {
     let uninitialized = 0;
-    for (let i = 0; i < this._count; i++) {
-      uninitialized += this._state[i] ? 0 : 1;
+    for (const level of this._levels) {
+      for (let i = 0; i < level.count; i++) {
+        uninitialized += level.state[i] ? 0 : 1;
+      }
     }
     return {
+      levels: this._levels.length,
       probes: this._count,
       uninitialized,
       lastUpdated: this._lastUpdated,
       updates: this._updates,
-      origin: this._origin ? [...this._origin] : [0, 0, 0]
+      levelInfo: this._levels.map((level) => ({
+        grid: [...level.grid] as [number, number, number],
+        spacing: level.spacing,
+        origin: (level.origin ? [...level.origin] : [0, 0, 0]) as [number, number, number]
+      }))
     };
   }
   /** Binds the volume for {@link sampleProbeIrradiance} in a program that declared it. */
@@ -265,16 +327,19 @@ export class ProbeVolume {
     }
     const device = getDevice();
     this.ensureResources();
-    this.moveWindow(camera.getWorldPosition());
+    const cameraPos = camera.getWorldPosition();
+    for (const level of this._levels) {
+      this.moveWindow(level, cameraPos);
+    }
     this._frame++;
     const selected = this.select();
+    this.updateParams();
     if (selected === 0) {
       return;
     }
     this._selected!.bufferSubData(0, this._selection);
     // A fresh random rotation of the ray set each update
     this.randomRotation();
-    this.updateParams();
     this.runRelocate(global, selected);
     this.runTrace(global, voxels, camera, selected);
     this.runBlend(selected);
@@ -282,6 +347,91 @@ export class ProbeVolume {
     device.copyTexture2D(this._visibilityNext!, 0, this._visibility!, 0);
     this._updates++;
     this._lastUpdated = selected;
+  }
+  /**
+   * Saves the volume: its maps, probe data and windows, to restore with
+   * {@link ProbeVolume.importState} on a volume built with the same settings.
+   * Resolves once the GPU has handed the maps back.
+   */
+  async exportState(): Promise<ArrayBuffer> {
+    if (!this.ready || !this._irradiance || !this._visibility || !this._data) {
+      throw new Error('ProbeVolume.exportState(): nothing to save yet');
+    }
+    const irr = new Uint16Array(new ArrayBuffer(this._irradiance.width * this._irradiance.height * 8));
+    const vis = new Uint16Array(new ArrayBuffer(this._visibility.width * this._visibility.height * 8));
+    const data = new Float32Array(new ArrayBuffer(this._count * 16));
+    // Issued together so the three readbacks wait for the GPU once, not three times
+    await Promise.all([
+      this._irradiance.readPixels(0, 0, this._irradiance.width, this._irradiance.height, 0, 0, irr),
+      this._visibility.readPixels(0, 0, this._visibility.width, this._visibility.height, 0, 0, vis),
+      this._data.getBufferSubData(new Uint8Array(data.buffer), 0, data.byteLength)
+    ]);
+    const header = JSON.stringify({
+      grid: this._options.grid,
+      spacing: this._options.spacing,
+      levels: this._levels.length,
+      levelScale: this._options.levelScale,
+      origins: this._levels.map((l) => l.origin),
+      irradiance: [this._irradiance.width, this._irradiance.height],
+      visibility: [this._visibility.width, this._visibility.height]
+    });
+    const headerBytes = new TextEncoder().encode(header);
+    const headerLength = (headerBytes.byteLength + 3) & ~3;
+    const out = new Uint8Array(12 + headerLength + irr.byteLength + vis.byteLength + data.byteLength);
+    const view = new DataView(out.buffer);
+    view.setUint32(0, STATE_MAGIC, true);
+    view.setUint32(4, STATE_VERSION, true);
+    view.setUint32(8, headerLength, true);
+    out.fill(0x20, 12, 12 + headerLength);
+    out.set(headerBytes, 12);
+    let offset = 12 + headerLength;
+    out.set(new Uint8Array(irr.buffer), offset);
+    offset += irr.byteLength;
+    out.set(new Uint8Array(vis.buffer), offset);
+    offset += vis.byteLength;
+    out.set(new Uint8Array(data.buffer), offset);
+    return out.buffer;
+  }
+  /**
+   * Restores a state saved by {@link ProbeVolume.exportState}. The settings
+   * must match; the windows come back where they were, so freeze the
+   * lighting afterwards or they move on with the camera.
+   */
+  importState(buffer: ArrayBuffer) {
+    const view = new DataView(buffer);
+    if (view.getUint32(0, true) !== STATE_MAGIC || view.getUint32(4, true) !== STATE_VERSION) {
+      throw new Error('ProbeVolume.importState(): not a probe state');
+    }
+    const headerLength = view.getUint32(8, true);
+    const header = JSON.parse(new TextDecoder().decode(new Uint8Array(buffer, 12, headerLength)));
+    if (
+      header.levels !== this._levels.length ||
+      header.spacing !== this._options.spacing ||
+      header.levelScale !== this._options.levelScale ||
+      header.grid.some((v: number, i: number) => v !== this._options.grid[i])
+    ) {
+      throw new Error('ProbeVolume.importState(): the state was saved with other settings');
+    }
+    this.ensureResources();
+    const irrSize = this._irradiance!.width * this._irradiance!.height * 4;
+    const visSize = this._visibility!.width * this._visibility!.height * 4;
+    let offset = 12 + headerLength;
+    const irr = new Uint16Array(buffer, offset, irrSize);
+    offset += irr.byteLength;
+    const vis = new Uint16Array(buffer, offset, visSize);
+    offset += vis.byteLength;
+    const data = new Float32Array(buffer, offset, this._count * 4);
+    this._irradiance!.update(irr, 0, 0, this._irradiance!.width, this._irradiance!.height);
+    this._visibility!.update(vis, 0, 0, this._visibility!.width, this._visibility!.height);
+    this._data!.bufferSubData(0, data);
+    this._levels.forEach((level, l) => {
+      level.origin = header.origins[l];
+      for (let i = 0; i < level.count; i++) {
+        level.state[i] = data[(level.tileBase + i) * 4 + 3] > 0.5 ? 1 : 0;
+      }
+    });
+    this.updateParams();
+    this._updates = Math.max(this._updates, 1);
   }
   dispose() {
     for (const tex of [
@@ -304,6 +454,10 @@ export class ProbeVolume {
     this._data?.dispose();
     this._selected?.dispose();
     this._data = this._selected = null;
+    for (const buffer of this._scratch.values()) {
+      buffer.dispose();
+    }
+    this._scratch.clear();
     for (const bg of [
       this._relocateBindGroup,
       this._traceBindGroup,
@@ -322,7 +476,9 @@ export class ProbeVolume {
     }
     this._relocateBindGroup = this._traceBindGroup = this._blendIrrBindGroup = this._blendVisBindGroup = null;
     this._relocateProgram = this._traceProgram = this._blendIrrProgram = this._blendVisProgram = null;
-    this._origin = null;
+    for (const level of this._levels) {
+      level.origin = null;
+    }
     this._updates = 0;
   }
   /** @internal */
@@ -348,24 +504,26 @@ export class ProbeVolume {
     this._rayTexture.name = '@ProbeRays';
     this._rayFramebuffer = device.createFrameBuffer([this._rayTexture], null)!;
     this._data = device.createBuffer(this._count * 16, { usage: 'uniform', storage: true })!;
-    this._data.bufferSubData(0, new Float32Array(this._count * 4));
+    this._data.bufferSubData(0, new Float32Array(new ArrayBuffer(this._count * 16)));
     this._selected = device.createBuffer(this._budget * 4, { usage: 'uniform', storage: true })!;
-    this._state.fill(0);
+    for (const level of this._levels) {
+      level.state.fill(0);
+    }
   }
-  /** Re-centres the window on the camera, a spacing at a time; probes that entered start over. @internal */
-  private moveWindow(cameraPos: Vector3) {
-    const s = this._options.spacing;
-    const n = this._grid;
+  /** Re-centres a level's window on the camera, a spacing at a time; probes that entered start over. @internal */
+  private moveWindow(level: ProbeLevel, cameraPos: Vector3) {
+    const s = level.spacing;
+    const n = level.grid;
     const next: [number, number, number] = [
       Math.floor(cameraPos.x / s) - (n[0] >> 1),
       Math.floor(cameraPos.y / s) - (n[1] >> 1),
       Math.floor(cameraPos.z / s) - (n[2] >> 1)
     ];
-    const prev = this._origin;
+    const prev = level.origin;
     if (prev && prev[0] === next[0] && prev[1] === next[1] && prev[2] === next[2]) {
       return;
     }
-    this._origin = next;
+    level.origin = next;
     const wrap = (v: number, m: number) => ((v % m) + m) % m;
     for (let z = 0; z < n[2]; z++) {
       for (let y = 0; y < n[1]; y++) {
@@ -383,32 +541,53 @@ export class ProbeVolume {
             wz < prev[2] + n[2];
           if (!inPrev) {
             const index = wrap(wx, n[0]) + n[0] * (wrap(wy, n[1]) + n[1] * wrap(wz, n[2]));
-            this._state[index] = 0;
-            this._lastRelocated[index] = -1000;
-            this._data!.bufferSubData(index * 16, this._dataReset);
+            level.state[index] = 0;
+            level.lastRelocated[index] = -1000;
+            this._data!.bufferSubData((level.tileBase + index) * 16, this._dataReset);
           }
         }
       }
     }
   }
-  /** Picks the probes to update: those never updated first, then in turn. @internal */
+  /**
+   * Picks the probes to update: those never updated first, a quarter of the
+   * budget going to the coarsest level so something covers the whole scene
+   * at once and the rest finest level first; then every level in turn by its
+   * share of the budget.
+   * @internal
+   */
   private select() {
     let count = 0;
     const budget = this._budget;
-    const n = this._count;
-    for (let i = 0; i < n && count < budget; i++) {
-      if (!this._state[i]) {
-        this._selection[count++] = i | 0x80000000;
-        this._state[i] = 1;
+    const takeNew = (l: number, limit: number) => {
+      const level = this._levels[l];
+      for (let i = 0; i < level.count && count < limit; i++) {
+        if (!level.state[i]) {
+          this._selection[count++] =
+            ((level.tileBase + i) | (l << SELECT_LEVEL_SHIFT) | SELECT_FIRST_BIT) >>> 0;
+          level.state[i] = 1;
+        }
       }
+    };
+    if (this._levels.length > 1) {
+      takeNew(this._levels.length - 1, budget >> 2);
     }
-    let scanned = 0;
-    while (count < budget && scanned < n) {
-      const i = this._cursor;
-      this._cursor = (this._cursor + 1) % n;
-      scanned++;
-      if (this._state[i]) {
-        this._selection[count++] = i;
+    for (let l = 0; l < this._levels.length && count < budget; l++) {
+      takeNew(l, budget);
+    }
+    const remaining = budget - count;
+    for (let l = 0; l < this._levels.length && count < budget; l++) {
+      const level = this._levels[l];
+      let share = Math.max(1, Math.round((remaining * level.count) / this._count));
+      let scanned = 0;
+      while (share > 0 && count < budget && scanned < level.count) {
+        const i = level.cursor;
+        level.cursor = (level.cursor + 1) % level.count;
+        scanned++;
+        if (level.state[i]) {
+          this._selection[count++] = ((level.tileBase + i) | (l << SELECT_LEVEL_SHIFT)) >>> 0;
+          share--;
+        }
       }
     }
     for (let i = count; i < budget; i++) {
@@ -430,15 +609,17 @@ export class ProbeVolume {
   private updateParams() {
     const o = this._options;
     const p = this._params;
-    const n = this._grid;
-    p.set([this._origin![0], this._origin![1], this._origin![2], o.spacing], 0);
-    p.set([n[0], n[1], n[2], this._tileCols], 4);
-    p.set([IRRADIANCE_TEXELS, VISIBILITY_TEXELS, o.normalBias, o.viewBias], 8);
+    p.set([this._levels.length, this._tileCols, IRRADIANCE_TEXELS, VISIBILITY_TEXELS], 0);
     p.set(
       [this._irradiance!.width, this._irradiance!.height, this._visibility!.width, this._visibility!.height],
-      12
+      4
     );
-    p.set([o.intensity, o.maxRayDistance, 0, 0], 16);
+    p.set([o.intensity, o.normalBias, o.viewBias, o.maxRayDistance], 8);
+    this._levels.forEach((level, l) => {
+      const origin = level.origin ?? [0, 0, 0];
+      p.set([origin[0], origin[1], origin[2], level.spacing], 12 + l * 8);
+      p.set([level.grid[0], level.grid[1], level.grid[2], level.tileBase], 16 + l * 8);
+    });
   }
   /** @internal */
   private bindCommon(bg: BindGroup, global: NonNullable<SceneSDF['global']>) {
@@ -448,6 +629,16 @@ export class ProbeVolume {
     bg.setBuffer('selected', this._selected!);
     bg.setValue('rotation', this._rotation);
     bg.setValue('rayInfo', new Vector4(this._rays, this._budget, this._frame, this._options.hysteresis));
+  }
+  /** @internal */
+  private scratchBuffer(name: string, bytes: number) {
+    let buffer = this._scratch.get(name);
+    if (!buffer || buffer.byteLength < bytes) {
+      buffer?.dispose();
+      buffer = getDevice().createBuffer(Math.max(16, bytes), { usage: 'uniform', storage: true })!;
+      this._scratch.set(name, buffer);
+    }
+    return buffer;
   }
   /**
    * Pushes a selected probe out of nearby geometry along the field's gradient,
@@ -480,13 +671,14 @@ export class ProbeVolume {
               this.$return();
             });
             this.$l.sel = this.selected.at(this.slot);
-            this.$l.index = pb.int(pb.compAnd(this.sel, pb.uint(0x7fffffff)));
-            this.$l.first = pb.greaterThan(pb.compAnd(this.sel, pb.uint(0x80000000)), pb.uint(0));
-            this.$l.texel = probeTexelFromIndex(this, this.index);
-            this.$l.world = probeWorldFromTexel(this, this.texel);
+            this.$l.index = pb.int(pb.compAnd(this.sel, pb.uint(SELECT_INDEX_MASK)));
+            this.$l.level = pb.int(pb.compAnd(pb.sar(this.sel, SELECT_LEVEL_SHIFT), pb.uint(0x7f)));
+            this.$l.first = pb.greaterThan(pb.compAnd(this.sel, pb.uint(SELECT_FIRST_BIT)), pb.uint(0));
+            this.$l.texel = probeTexelFromIndex(this, this.level, this.index);
+            this.$l.world = probeWorldFromTexel(this, this.level, this.texel);
             this.$l.data = this[PROBE_DATA].at(this.index);
             this.$l.offset = this.$choice(this.first, pb.vec3(0), this.data.xyz);
-            this.$l.spacing = this[PROBE_PARAMS].at(0).w;
+            this.$l.spacing = probeLevelOrigin(this, this.level).w;
             this.$l.pos = pb.add(pb.mul(pb.vec3(this.world), this.spacing), this.offset);
             // Keep at least this far from surfaces, moving at most this far from the grid point
             this.$l.keep = pb.mul(this.spacing, 0.3);
@@ -515,10 +707,12 @@ export class ProbeVolume {
     // Which selected probes relocate this frame
     const flags = new Uint32Array(new ArrayBuffer(this._budget * 4));
     for (let i = 0; i < selected; i++) {
-      const index = this._selection[i] & 0x7fffffff;
-      if (this._frame - this._lastRelocated[index] >= RELOCATE_EVERY) {
+      const sel = this._selection[i];
+      const level = this._levels[(sel >>> SELECT_LEVEL_SHIFT) & 0x7f];
+      const index = (sel & SELECT_INDEX_MASK) - level.tileBase;
+      if (this._frame - level.lastRelocated[index] >= RELOCATE_EVERY) {
         flags[i] = 1;
-        this._lastRelocated[index] = this._frame;
+        level.lastRelocated[index] = this._frame;
       }
     }
     const relocateBuffer = this.scratchBuffer('relocate', flags.byteLength);
@@ -529,17 +723,6 @@ export class ProbeVolume {
     device.setProgram(this._relocateProgram);
     device.setBindGroup(0, bg);
     device.compute(Math.ceil(selected / 64), 1, 1);
-  }
-  private readonly _scratch: Map<string, GPUDataBuffer> = new Map();
-  /** @internal */
-  private scratchBuffer(name: string, bytes: number) {
-    let buffer = this._scratch.get(name);
-    if (!buffer || buffer.byteLength < bytes) {
-      buffer?.dispose();
-      buffer = getDevice().createBuffer(Math.max(16, bytes), { usage: 'uniform', storage: true })!;
-      this._scratch.set(name, buffer);
-    }
-    return buffer;
   }
   /**
    * Traces the rays of the selected probes: one fragment per ray, the hit's
@@ -609,17 +792,23 @@ export class ProbeVolume {
             this.$l.fc = pb.ivec2(pb.floor(this.$builtins.fragCoord.xy));
             this.$l.slot = pb.uint(this.fc.y);
             this.$l.sel = this.selected.at(this.slot);
-            this.$l.index = pb.int(pb.compAnd(this.sel, pb.uint(0x7fffffff)));
-            this.$l.texel = probeTexelFromIndex(this, this.index);
-            this.$l.world = probeWorldFromTexel(this, this.texel);
+            this.$l.index = pb.int(pb.compAnd(this.sel, pb.uint(SELECT_INDEX_MASK)));
+            this.$l.level = pb.int(pb.compAnd(pb.sar(this.sel, SELECT_LEVEL_SHIFT), pb.uint(0x7f)));
+            this.$l.texel = probeTexelFromIndex(this, this.level, this.index);
+            this.$l.world = probeWorldFromTexel(this, this.level, this.texel);
             this.$l.data = this[PROBE_DATA].at(this.index);
-            this.$l.pos = probePosition(this, this.world, this.data);
+            this.$l.pos = probePosition(this, this.level, this.world, this.data);
             this.$l.dir = quatRotate(
               this,
               this.rotation,
               sphericalFibonacci(this, pb.float(this.fc.x), this.rayInfo.x)
             );
-            this.$l.maxDist = this[PROBE_PARAMS].at(4).y;
+            // Coarser levels look proportionally farther
+            this.$l.spacing = probeLevelOrigin(this, this.level).w;
+            this.$l.maxDist = pb.mul(
+              this[PROBE_PARAMS].at(2).w,
+              pb.div(this.spacing, probeLevelOrigin(this, 0).w)
+            );
             this.$l.radiance = pb.vec3(0);
             this.$l.dist = this.maxDist;
             this.$l.d0 = sampleSceneSDF(this, this.pos, levels);
@@ -738,8 +927,9 @@ export class ProbeVolume {
         pb.main(function () {
           this.$l.slot = this.$builtins.workGroupId.x;
           this.$l.sel = this.selected.at(this.slot);
-          this.$l.index = pb.int(pb.compAnd(this.sel, pb.uint(0x7fffffff)));
-          this.$l.first = pb.greaterThan(pb.compAnd(this.sel, pb.uint(0x80000000)), pb.uint(0));
+          this.$l.index = pb.int(pb.compAnd(this.sel, pb.uint(SELECT_INDEX_MASK)));
+          this.$l.level = pb.int(pb.compAnd(pb.sar(this.sel, SELECT_LEVEL_SHIFT), pb.uint(0x7f)));
+          this.$l.first = pb.greaterThan(pb.compAnd(this.sel, pb.uint(SELECT_FIRST_BIT)), pb.uint(0));
           this.$l.uv = pb.ivec2(this.$builtins.localInvocationId.xy);
           // Border texels mirror the interior: take the direction of the texel they copy
           const s = texels;
@@ -771,7 +961,9 @@ export class ProbeVolume {
           this.$l.dir = octDecode(this, this.oct);
           this.$l.sum = pb.vec4(0);
           this.$l.wsum = pb.float(0);
-          this.$l.maxDist = this[PROBE_PARAMS].at(4).y;
+          // Distances are clamped a little beyond the probe spacing: the
+          // moments only have to tell blockers between neighbouring probes apart
+          this.$l.maxDist = pb.mul(probeLevelOrigin(this, this.level).w, 2.6);
           this.$for(pb.int('r'), 0, rays, function () {
             this.$l.ray = pb.textureLoad(this.rays, pb.ivec2(this.r, pb.int(this.slot)), 0);
             this.$l.rd = quatRotate(

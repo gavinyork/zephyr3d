@@ -7,7 +7,14 @@ import { VoxelScene } from './voxel_scene';
 import type { VoxelSceneStats } from './voxel_scene';
 import type { VoxelLightingOptions } from './voxel_lighting';
 import { ProbeVolume } from './probe_volume';
+import { PROBE_MAX_LEVELS } from '../../shaders/probes';
 import type { ProbeVolumeOptions, ProbeVolumeStats } from './probe_volume';
+
+/**
+ * Whether the indirect lighting keeps updating, see {@link SceneGI.updateMode}.
+ * @public
+ */
+export type GIUpdateMode = 'continuous' | 'frozen';
 
 /**
  * Counters of a {@link SceneGI}.
@@ -44,6 +51,7 @@ export class SceneGI {
   private readonly _lighting: VoxelLightingOptions;
   private readonly _probeOptions: ProbeVolumeOptions;
   private _probes: Nullable<ProbeVolume>;
+  private _updateMode: GIUpdateMode;
   private _warned: boolean;
   constructor(scene: Scene) {
     this._scene = scene;
@@ -56,6 +64,8 @@ export class SceneGI {
     this._probeOptions = {
       grid: [32, 16, 32],
       spacing: 1,
+      levels: 3,
+      levelScale: 4,
       raysPerProbe: 128,
       budget: 4096,
       hysteresis: 0.97,
@@ -65,6 +75,7 @@ export class SceneGI {
       maxRayDistance: 48
     };
     this._probes = null;
+    this._updateMode = 'continuous';
     this._warned = false;
   }
   /** True on a device that can build it. */
@@ -117,6 +128,48 @@ export class SceneGI {
       this._probeOptions.grid = grid;
       this.rebuildProbes();
     }
+  }
+  /** Clipmap levels of the probe volume, each four times the spacing of the one inside it; applied when the volume is next built. */
+  get probeLevels() {
+    return this._probeOptions.levels;
+  }
+  set probeLevels(val: number) {
+    val = Math.max(1, Math.min(PROBE_MAX_LEVELS, Math.floor(val)));
+    if (val !== this._probeOptions.levels) {
+      this._probeOptions.levels = val;
+      this.rebuildProbes();
+    }
+  }
+  /**
+   * Whether the indirect lighting keeps updating. `frozen` stops the voxel
+   * lighting and the probe updates where they are, which also stops the
+   * probe windows following the camera: what was lit stays lit, for a scene
+   * whose state was restored with {@link SceneGI.importProbeState} or that
+   * has converged and is not going to change.
+   */
+  get updateMode() {
+    return this._updateMode;
+  }
+  set updateMode(val: GIUpdateMode) {
+    this._updateMode = val === 'frozen' ? 'frozen' : 'continuous';
+  }
+  /** Saves the probe volume's state, see {@link ProbeVolume.exportState}. */
+  exportProbeState() {
+    if (!this._probes?.ready) {
+      throw new Error('SceneGI.exportProbeState(): the probes are not built yet');
+    }
+    return this._probes.exportState();
+  }
+  /**
+   * Restores a probe state saved by {@link SceneGI.exportProbeState} into a
+   * volume built with the current settings, and freezes the lighting.
+   */
+  importProbeState(buffer: ArrayBuffer) {
+    if (!this._probes) {
+      this._probes = new ProbeVolume(this._scene, this._probeOptions);
+    }
+    this._probes.importState(buffer);
+    this._updateMode = 'frozen';
   }
   /** Rays traced per probe per update; applied when the volume is next built. */
   get probeRays() {
@@ -252,7 +305,7 @@ export class SceneGI {
   }
   /** Called by the scene once a frame, after the scene field's update. */
   updateLighting(camera: Camera) {
-    if (!this._enabled || !this._voxels || !this._scene.sdf.enabled) {
+    if (!this._enabled || !this._voxels || !this._scene.sdf.enabled || this._updateMode === 'frozen') {
       return;
     }
     this._voxels.updateLighting(this._scene.sdf, camera, this._lighting);
