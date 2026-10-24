@@ -225,7 +225,31 @@ export function sampleInstanceMaterial(
     }
     this.$if(pb.greaterThan(this.gmA.a, 0.02), function () {
       this[outAlbedo] = pb.vec4(pb.div(this.gmA.rgb, this.gmA.a), 1);
-      this[outEmissive] = decodeRGBE(this, pb.textureSampleLevel(matEmissive, this.gmUVW, 0));
+      // RGBE cannot be filtered: average the decoded texels the albedo's
+      // trilinear filter covered, each by its filter weight and coverage, so
+      // an empty neighbour never reads as black
+      this.$l.gmSize = pb.div(pb.vec3(1), matAtlasInvSize);
+      this.$l.gmTc = pb.sub(pb.mul(this.gmUVW, this.gmSize), pb.vec3(0.5));
+      this.$l.gmBase = pb.ivec3(pb.floor(this.gmTc));
+      this.$l.gmFr = pb.sub(this.gmTc, pb.floor(this.gmTc));
+      this.$l.gmEsum = pb.vec3(0);
+      this.$l.gmWsum = pb.float(0);
+      for (let k = 0; k < 8; k++) {
+        const off = [k & 1, (k >> 1) & 1, (k >> 2) & 1];
+        this.$l[`gmT${k}`] = pb.add(this.gmBase, pb.ivec3(off[0], off[1], off[2]));
+        this.$l[`gmW${k}`] = pb.mul(
+          off[0] ? this.gmFr.x : pb.sub(1, this.gmFr.x),
+          off[1] ? this.gmFr.y : pb.sub(1, this.gmFr.y),
+          off[2] ? this.gmFr.z : pb.sub(1, this.gmFr.z),
+          pb.textureLoad(matAlbedo, this[`gmT${k}`], 0).a
+        );
+        this.gmEsum = pb.add(
+          this.gmEsum,
+          pb.mul(decodeRGBE(this, pb.textureLoad(matEmissive, this[`gmT${k}`], 0)), this[`gmW${k}`])
+        );
+        this.gmWsum = pb.add(this.gmWsum, this[`gmW${k}`]);
+      }
+      this[outEmissive] = pb.div(this.gmEsum, pb.max(this.gmWsum, 1e-4));
     });
   });
 }

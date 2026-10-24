@@ -180,6 +180,14 @@ export class Material extends Disposable implements Clonable<Material>, IDisposa
     return this._id;
   }
   /**
+   * Incremented on every option or uniform change (see `optionChanged()`),
+   * including value edits that leave the programs alone, which
+   * {@link Material.changeTag} does not count.
+   */
+  get optionTag() {
+    return this._optionTag;
+  }
+  /**
    * Number of rendering passes this material uses.
    *
    * Increasing this will expand the per-pass hash cache; make sure to implement

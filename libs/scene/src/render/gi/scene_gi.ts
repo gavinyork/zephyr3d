@@ -6,6 +6,8 @@ import { GlobalSDF } from '../sdf/global_sdf';
 import { VoxelScene } from './voxel_scene';
 import type { VoxelSceneStats } from './voxel_scene';
 import type { VoxelLightingOptions } from './voxel_lighting';
+import { ProbeVolume } from './probe_volume';
+import type { ProbeVolumeOptions, ProbeVolumeStats } from './probe_volume';
 
 /**
  * Counters of a {@link SceneGI}.
@@ -16,6 +18,7 @@ export interface SceneGIStats {
   /** False on a device that cannot build it (WebGL2). */
   supported: boolean;
   voxels: Nullable<VoxelSceneStats>;
+  probes: Nullable<ProbeVolumeStats>;
 }
 
 /**
@@ -39,6 +42,8 @@ export class SceneGI {
   private _voxelizeBudget: number;
   private readonly _terrainAlbedo: Vector3;
   private readonly _lighting: VoxelLightingOptions;
+  private readonly _probeOptions: ProbeVolumeOptions;
+  private _probes: Nullable<ProbeVolume>;
   private _warned: boolean;
   constructor(scene: Scene) {
     this._scene = scene;
@@ -48,6 +53,18 @@ export class SceneGI {
     this._voxelizeBudget = 8;
     this._terrainAlbedo = new Vector3(0.3, 0.3, 0.3);
     this._lighting = { sunShadowConeAngle: 5, slicesPerFrame: 8 };
+    this._probeOptions = {
+      grid: [32, 16, 32],
+      spacing: 1,
+      raysPerProbe: 128,
+      budget: 4096,
+      hysteresis: 0.97,
+      normalBias: 0.1,
+      viewBias: 0.3,
+      intensity: 1,
+      maxRayDistance: 48
+    };
+    this._probes = null;
     this._warned = false;
   }
   /** True on a device that can build it. */
@@ -70,7 +87,91 @@ export class SceneGI {
       this._voxels?.detach(this._scene.sdf);
       this._voxels?.dispose();
       this._voxels = null;
+      this._probes?.dispose();
+      this._probes = null;
     }
+  }
+  /** The probe volume, once built. */
+  get probes() {
+    return this._probes;
+  }
+  /** Distance between probes in world units; applied when the volume is next built. */
+  get probeSpacing() {
+    return this._probeOptions.spacing;
+  }
+  set probeSpacing(val: number) {
+    val = Math.max(0.1, val);
+    if (val !== this._probeOptions.spacing) {
+      this._probeOptions.spacing = val;
+      this.rebuildProbes();
+    }
+  }
+  /** Probes along x, y and z; applied when the volume is next built. */
+  get probeGrid(): [number, number, number] {
+    return [...this._probeOptions.grid];
+  }
+  set probeGrid(val: [number, number, number]) {
+    const grid = val.map((v) => Math.max(2, Math.floor(v))) as [number, number, number];
+    const cur = this._probeOptions.grid;
+    if (grid[0] !== cur[0] || grid[1] !== cur[1] || grid[2] !== cur[2]) {
+      this._probeOptions.grid = grid;
+      this.rebuildProbes();
+    }
+  }
+  /** Rays traced per probe per update; applied when the volume is next built. */
+  get probeRays() {
+    return this._probeOptions.raysPerProbe;
+  }
+  set probeRays(val: number) {
+    val = Math.max(16, Math.min(1024, Math.floor(val)));
+    if (val !== this._probeOptions.raysPerProbe) {
+      this._probeOptions.raysPerProbe = val;
+      this.rebuildProbes();
+    }
+  }
+  /** Probes updated per frame; applied when the volume is next built. */
+  get probeBudget() {
+    return this._probeOptions.budget;
+  }
+  set probeBudget(val: number) {
+    val = Math.max(1, Math.floor(val));
+    if (val !== this._probeOptions.budget) {
+      this._probeOptions.budget = val;
+      this.rebuildProbes();
+    }
+  }
+  /** Share of a probe's previous value kept per update, 0 to 1. */
+  get probeHysteresis() {
+    return this._probeOptions.hysteresis;
+  }
+  set probeHysteresis(val: number) {
+    this._probeOptions.hysteresis = Math.max(0, Math.min(0.999, val));
+  }
+  /** Multiplier on the indirect light the probes give. */
+  get intensity() {
+    return this._probeOptions.intensity;
+  }
+  set intensity(val: number) {
+    this._probeOptions.intensity = Math.max(0, val);
+  }
+  /** Surface offset along the normal when sampling the probes, in world units. */
+  get probeNormalBias() {
+    return this._probeOptions.normalBias;
+  }
+  set probeNormalBias(val: number) {
+    this._probeOptions.normalBias = Math.max(0, val);
+  }
+  /** Surface offset towards the viewer when sampling the probes, in world units. */
+  get probeViewBias() {
+    return this._probeOptions.viewBias;
+  }
+  set probeViewBias(val: number) {
+    this._probeOptions.viewBias = Math.max(0, val);
+  }
+  /** @internal */
+  private rebuildProbes() {
+    this._probes?.dispose();
+    this._probes = null;
   }
   /** Meshes voxelized per frame. */
   get voxelizeBudget() {
@@ -121,7 +222,8 @@ export class SceneGI {
     return {
       enabled: this._enabled,
       supported: SceneGI.isSupported(),
-      voxels: this._voxels?.getStats() ?? null
+      voxels: this._voxels?.getStats() ?? null,
+      probes: this._probes?.getStats() ?? null
     };
   }
   /** Called by the scene once a frame, before the scene field's update. */
@@ -154,6 +256,13 @@ export class SceneGI {
       return;
     }
     this._voxels.updateLighting(this._scene.sdf, camera, this._lighting);
+    if (!this._voxels.lit) {
+      return;
+    }
+    if (!this._probes) {
+      this._probes = new ProbeVolume(this._scene, this._probeOptions);
+    }
+    this._probes.update(this._scene.sdf, this._voxels, camera);
   }
   dispose() {
     this.enabled = false;

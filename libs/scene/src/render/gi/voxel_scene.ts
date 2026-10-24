@@ -24,7 +24,12 @@ const ENTRY_LIFETIME = 30;
 interface VoxelMaterialEntry {
   key: string;
   primitive: Primitive;
+  /** The material drawn: the mesh's own, or a copy of its core carrying a material instance's values. */
   material: MeshMaterial;
+  /** True when `material` is such a copy, owned by the entry. */
+  ownsMaterial: boolean;
+  /** The mesh's own material, whose edits are watched. */
+  source: MeshMaterial;
   /** Voxels per axis of the material field, half the baked field's. */
   resolution: [number, number, number];
   /** Lower corner of the field box in the mesh's local space. */
@@ -32,8 +37,8 @@ interface VoxelMaterialEntry {
   /** Edge of a material voxel in local units. */
   voxelSize: number;
   state: 'pending' | 'ready' | 'failed';
-  /** The material's change tag when it was last voxelized. */
-  materialTag: number;
+  /** {@link materialTagOf} the source when it was last voxelized. */
+  materialTag: string;
   lastWanted: number;
   readyTime: number;
 }
@@ -220,15 +225,18 @@ export class VoxelScene implements GlobalSDFMaterials {
       }
       let entry = this._entries.get(key);
       if (!entry) {
+        const resolved = resolveMaterial(material);
         entry = {
           key,
           primitive,
-          material,
+          material: resolved.material,
+          ownsMaterial: resolved.owned,
+          source: material,
           resolution: header.resolution.map((v) => Math.max(1, Math.ceil(v / 2))) as [number, number, number],
           boxMin: [...header.boxMin],
           voxelSize: header.voxelSize * 2,
           state: 'pending',
-          materialTag: -1,
+          materialTag: '',
           lastWanted: 0,
           readyTime: -Infinity
         };
@@ -238,7 +246,7 @@ export class VoxelScene implements GlobalSDFMaterials {
       // A material edit shows up in its change tag; wait for the edits to settle
       if (
         entry.state === 'ready' &&
-        entry.materialTag !== material.changeTag &&
+        entry.materialTag !== materialTagOf(material) &&
         this._time - entry.readyTime > REVOXELIZE_COOLDOWN
       ) {
         entry.state = 'pending';
@@ -260,6 +268,13 @@ export class VoxelScene implements GlobalSDFMaterials {
       if (!slot) {
         continue;
       }
+      if (entry.ownsMaterial) {
+        // A copy carries the values of its making; take them again
+        entry.material.dispose();
+        const resolved = resolveMaterial(entry.source);
+        entry.material = resolved.material;
+        entry.ownsMaterial = resolved.owned;
+      }
       const ok = this.voxelizer.voxelize(entry.primitive, entry.material, {
         albedo: this.atlas.albedo,
         emissive: this.atlas.emissive,
@@ -268,7 +283,7 @@ export class VoxelScene implements GlobalSDFMaterials {
         voxelSize: entry.voxelSize
       });
       entry.state = ok ? 'ready' : 'failed';
-      entry.materialTag = entry.material.changeTag;
+      entry.materialTag = materialTagOf(entry.source);
       entry.readyTime = this._time;
       done++;
       this._voxelizations++;
@@ -280,6 +295,9 @@ export class VoxelScene implements GlobalSDFMaterials {
       if (!wanted.has(entry) && this._time - entry.lastWanted > ENTRY_LIFETIME) {
         this.atlas.remove(entry);
         this._entries.delete(entry.key);
+        if (entry.ownsMaterial) {
+          entry.material.dispose();
+        }
       }
     }
   }
@@ -314,6 +332,11 @@ export class VoxelScene implements GlobalSDFMaterials {
     this._emissive?.dispose();
     this._albedo = null;
     this._emissive = null;
+    for (const entry of this._entries.values()) {
+      if (entry.ownsMaterial) {
+        entry.material.dispose();
+      }
+    }
     this._entries.clear();
   }
   /** @internal */
@@ -394,11 +417,88 @@ export class VoxelScene implements GlobalSDFMaterials {
   }
 }
 
-/** Identity of what a mesh voxelizes to: its primitive with its material. */
+/**
+ * Identity of what a mesh voxelizes to: its primitive with its material. A
+ * material instance (see {@link MeshMaterial.createInstance}) counts as its
+ * core unless it overrides instance uniforms, when their values join the key,
+ * so instances sharing a look share one voxelization and instances tinted
+ * apart get their own.
+ */
 function keyOf(mesh: Mesh): Nullable<string> {
   const primitive = mesh.primitive;
   const material = mesh.material;
-  return primitive && material ? `${primitive.id}:${material.instanceId}` : null;
+  if (!primitive || !material) {
+    return null;
+  }
+  const core = material.coreMaterial;
+  return `${primitive.id}:${core.instanceId}${instanceSuffix(material)}`;
+}
+
+/**
+ * What a voxelization depends on in a material: the core's option tag, which
+ * every uniform or option edit advances, and its change tag. An instance's
+ * own overrides are part of the entry key instead.
+ */
+function materialTagOf(material: MeshMaterial) {
+  const core = material.coreMaterial;
+  return `${core.optionTag}:${core.changeTag}`;
+}
+
+/** The instance uniform values a material instance overrides its core with, as a key suffix, else empty. */
+function instanceSuffix(material: MeshMaterial) {
+  if (!material.$isInstance) {
+    return '';
+  }
+  const core = material.coreMaterial;
+  const parts: string[] = [];
+  for (const { prop } of core.getInstancedUniforms()) {
+    const a = (material as unknown as Record<string, unknown>)[prop];
+    const b = (core as unknown as Record<string, unknown>)[prop];
+    if (!sameValue(a, b)) {
+      parts.push(`${prop}=${String(a)}`);
+    }
+  }
+  return parts.length ? `:${parts.join(',')}` : '';
+}
+
+function sameValue(a: unknown, b: unknown) {
+  if (typeof a === 'number' || typeof b === 'number') {
+    return a === b;
+  }
+  const va = a as ArrayLike<number> | undefined;
+  const vb = b as ArrayLike<number> | undefined;
+  if (!va || !vb || va.length !== vb.length) {
+    return a === b;
+  }
+  for (let i = 0; i < va.length; i++) {
+    if (va[i] !== vb[i]) {
+      return false;
+    }
+  }
+  return true;
+}
+
+/**
+ * The material to draw for a mesh's material: the core for a plain material
+ * or an instance that overrides nothing, else a copy of the core carrying the
+ * instance's values, which the plain (non-instanced) draw of the voxelize pass
+ * reads where the instanced draw would read the instance buffer.
+ */
+function resolveMaterial(material: MeshMaterial): { material: MeshMaterial; owned: boolean } {
+  if (!material.$isInstance || !instanceSuffix(material)) {
+    return { material: material.coreMaterial, owned: false };
+  }
+  const core = material.coreMaterial;
+  const copy = (core as unknown as { clone?: () => MeshMaterial }).clone?.();
+  if (!copy) {
+    return { material: core, owned: false };
+  }
+  for (const { prop } of core.getInstancedUniforms()) {
+    (copy as unknown as Record<string, unknown>)[prop] = (material as unknown as Record<string, unknown>)[
+      prop
+    ];
+  }
+  return { material: copy, owned: true };
 }
 
 function boxValid(box: AABB) {

@@ -13,6 +13,8 @@ import type {
 import { fetchSampler, getSamplerOptions } from '../utility/misc';
 import { getDevice } from '../app/api';
 import type { DrawContext } from './drawable';
+import { getProbeVolumeForDraw } from './gi/probe_volume';
+import { declareProbeUniforms, sampleProbeIrradiance } from '../shaders/probes';
 
 /**
  * Depth-proportional term of the SSGI history rejection tolerance.
@@ -148,6 +150,51 @@ export abstract class EnvironmentLighting extends Disposable {
    * Returns whether this environment lighting supports diffuse light
    */
   abstract hasIrradiance(): boolean;
+  /**
+   * Declares the scene's probe volume where the draw reads it, see
+   * {@link getProbeVolumeForDraw}. Subclasses call this from
+   * `initShaderBindings` in the fragment stage.
+   * @internal
+   */
+  protected initProbeBindings(pb: ProgramBuilder, ctx?: DrawContext) {
+    if (pb.shaderKind === 'fragment' && getProbeVolumeForDraw(ctx)) {
+      declareProbeUniforms(pb.getGlobalScope(), 0);
+    }
+  }
+  /** Binds what {@link EnvironmentLighting.initProbeBindings} declared. @internal */
+  protected updateProbeBindGroup(bg: BindGroup, ctx?: DrawContext) {
+    getProbeVolumeForDraw(ctx)?.applyBindGroup(bg);
+  }
+  /**
+   * The irradiance with the probe volume's answer in place of the environment's
+   * wherever the probes cover the fragment: global illumination over the sky
+   * term. Needs the fragment's world position, read from the material's
+   * `worldPos` varying; a material without one keeps the environment.
+   * @internal
+   */
+  protected applyProbes(
+    scope: PBInsideFunctionScope,
+    normal: PBShaderExp,
+    ctx: Nullable<DrawContext>,
+    irradiance: PBShaderExp
+  ) {
+    const pb = scope.$builder;
+    if (!getProbeVolumeForDraw(ctx ?? undefined)) {
+      return irradiance;
+    }
+    const global = pb.getGlobalScope();
+    const worldPos = global.$inputs.worldPos as PBShaderExp | undefined;
+    if (!worldPos) {
+      return irradiance;
+    }
+    const funcName = 'Z_envIrradianceWithProbes';
+    pb.func(funcName, [pb.vec3('n'), pb.vec3('p'), pb.vec3('env')], function () {
+      this.$l.v = pb.normalize(pb.sub(this.camera.position.xyz, this.p));
+      this.$l.probe = sampleProbeIrradiance(this, this.p, this.n, this.v);
+      this.$return(pb.mix(this.env, this.probe.rgb, this.probe.a));
+    });
+    return global[funcName](normal, worldPos, irradiance) as PBShaderExp;
+  }
 }
 
 /**
@@ -317,6 +364,7 @@ export class EnvShIBL extends EnvironmentLighting {
         pb.getGlobalScope()[EnvShIBL.UNIFORM_NAME_SSGI_VIEW_TO_PREV_CLIP] = pb.mat4().uniform(0);
         pb.getGlobalScope()[EnvShIBL.UNIFORM_NAME_SSGI_INV_PROJECTION] = pb.mat4().uniform(0);
       }
+      this.initProbeBindings(pb, ctx);
     }
   }
   /**
@@ -384,6 +432,7 @@ export class EnvShIBL extends EnvironmentLighting {
       bg.setValue(EnvShIBL.UNIFORM_NAME_SSGI_VIEW_TO_PREV_CLIP, EnvShIBL._viewToPrevClip);
       bg.setValue(EnvShIBL.UNIFORM_NAME_SSGI_INV_PROJECTION, ctx!.camera.getInvProjectionMatrix());
     }
+    this.updateProbeBindGroup(bg, ctx);
   }
   /**
    * {@inheritDoc EnvironmentLighting.getRadiance}
@@ -569,7 +618,12 @@ export class EnvShIBL extends EnvironmentLighting {
       }
       this.$return(this.c);
     });
-    const iblIrradiance = pb.getGlobalScope().Z_sh_eval(normal) as PBShaderExp;
+    const iblIrradiance = this.applyProbes(
+      scope,
+      normal,
+      ctx ?? null,
+      pb.getGlobalScope().Z_sh_eval(normal) as PBShaderExp
+    );
     if (!EnvShIBL.hasSSGIHistory(ctx)) {
       return iblIrradiance;
     }
@@ -886,17 +940,19 @@ export class EnvConstantAmbient extends EnvironmentLighting {
    * {@inheritDoc EnvironmentLighting.initShaderBindings}
    * @override
    */
-  initShaderBindings(pb: ProgramBuilder) {
+  initShaderBindings(pb: ProgramBuilder, ctx?: DrawContext) {
     if (pb.shaderKind === 'fragment') {
       pb.getGlobalScope()[EnvConstantAmbient.UNIFORM_NAME_CONSTANT_AMBIENT] = pb.vec4().uniform(0);
+      this.initProbeBindings(pb, ctx);
     }
   }
   /**
    * {@inheritDoc EnvironmentLighting.updateBindGroup}
    * @override
    */
-  updateBindGroup(bg: BindGroup) {
+  updateBindGroup(bg: BindGroup, ctx?: DrawContext) {
     bg.setValue(EnvConstantAmbient.UNIFORM_NAME_CONSTANT_AMBIENT, this._ambientColor);
+    this.updateProbeBindGroup(bg, ctx);
   }
   /**
    * {@inheritDoc EnvironmentLighting.getRadiance}
@@ -923,8 +979,13 @@ export class EnvConstantAmbient extends EnvironmentLighting {
    * {@inheritDoc EnvironmentLighting.getIrradiance}
    * @override
    */
-  getIrradiance(scope: PBInsideFunctionScope, _normal: PBShaderExp) {
-    return scope[EnvConstantAmbient.UNIFORM_NAME_CONSTANT_AMBIENT].rgb as PBShaderExp;
+  getIrradiance(scope: PBInsideFunctionScope, normal: PBShaderExp, ctx?: DrawContext) {
+    return this.applyProbes(
+      scope,
+      normal,
+      ctx ?? null,
+      scope[EnvConstantAmbient.UNIFORM_NAME_CONSTANT_AMBIENT].rgb as PBShaderExp
+    );
   }
   /**
    * {@inheritDoc EnvironmentLighting.hasRadiance}
@@ -1001,19 +1062,21 @@ export class EnvHemisphericAmbient extends EnvironmentLighting {
    * {@inheritDoc EnvironmentLighting.initShaderBindings}
    * @override
    */
-  initShaderBindings(pb: ProgramBuilder) {
+  initShaderBindings(pb: ProgramBuilder, ctx?: DrawContext) {
     if (pb.shaderKind === 'fragment') {
       pb.getGlobalScope()[EnvHemisphericAmbient.UNIFORM_NAME_AMBIENT_UP] = pb.vec4().uniform(0);
       pb.getGlobalScope()[EnvHemisphericAmbient.UNIFORM_NAME_AMBIENT_DOWN] = pb.vec4().uniform(0);
+      this.initProbeBindings(pb, ctx);
     }
   }
   /**
    * {@inheritDoc EnvironmentLighting.updateBindGroup}
    * @override
    */
-  updateBindGroup(bg: BindGroup) {
+  updateBindGroup(bg: BindGroup, ctx?: DrawContext) {
     bg.setValue(EnvHemisphericAmbient.UNIFORM_NAME_AMBIENT_UP, this._ambientUp);
     bg.setValue(EnvHemisphericAmbient.UNIFORM_NAME_AMBIENT_DOWN, this._ambientDown);
+    this.updateProbeBindGroup(bg, ctx);
   }
   /**
    * {@inheritDoc EnvironmentLighting.getRadiance}
@@ -1039,14 +1102,19 @@ export class EnvHemisphericAmbient extends EnvironmentLighting {
    * {@inheritDoc EnvironmentLighting.getIrradiance}
    * @override
    */
-  getIrradiance(scope: PBInsideFunctionScope, normal: PBShaderExp) {
+  getIrradiance(scope: PBInsideFunctionScope, normal: PBShaderExp, ctx?: DrawContext) {
     const pb = scope.$builder;
     const factor = pb.add(pb.mul(normal.y, 0.5), 0.5);
-    return pb.mix(
-      scope[EnvHemisphericAmbient.UNIFORM_NAME_AMBIENT_DOWN],
-      scope[EnvHemisphericAmbient.UNIFORM_NAME_AMBIENT_UP],
-      factor
-    ).rgb as PBShaderExp;
+    return this.applyProbes(
+      scope,
+      normal,
+      ctx ?? null,
+      pb.mix(
+        scope[EnvHemisphericAmbient.UNIFORM_NAME_AMBIENT_DOWN],
+        scope[EnvHemisphericAmbient.UNIFORM_NAME_AMBIENT_UP],
+        factor
+      ).rgb as PBShaderExp
+    );
   }
   /**
    * {@inheritDoc EnvironmentLighting.hasRadiance}

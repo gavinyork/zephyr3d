@@ -2,6 +2,7 @@ import type { Immutable, Nullable, Vector4 } from '@zephyr3d/base';
 import { Vector3, DRef, Disposable } from '@zephyr3d/base';
 import { ObservableVector4 } from '@zephyr3d/base';
 import type { DrawContext, EnvironmentLighting } from '../render';
+import { getProbeVolumeForDraw } from '../render/gi/probe_volume';
 import { EnvShIBL } from '../render';
 import { EnvConstantAmbient, EnvHemisphericAmbient } from '../render';
 import { SkyRenderer } from '../render/sky';
@@ -85,7 +86,9 @@ export class EnvLightWrapper extends Disposable {
     return !ctx || ctx.drawEnvLight
       ? `${this.type}:${this._envLight!.hasRadiance() ? '1' : '0'}:${
           this._envLight!.hasSheenRadiance() ? '1' : '0'
-        }:${this._envLight!.hasIrradiance() ? '1' : '0'}:${irradianceSource}:ssgi${ssgiHistory ? '1' : '0'}`
+        }:${this._envLight!.hasIrradiance() ? '1' : '0'}:${irradianceSource}:ssgi${ssgiHistory ? '1' : '0'}:probes${
+          getProbeVolumeForDraw(ctx) ? '1' : '0'
+        }`
       : 'none';
   }
   /** @internal */

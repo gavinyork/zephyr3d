@@ -148,6 +148,74 @@ export function getSceneClass(manager: ResourceManager): SerializableClass {
           }
         },
         {
+          name: 'GIIntensity',
+          description:
+            'Strength of the bounced light the probes add. 1 is physically consistent with the direct lighting; raise to exaggerate colour bleeding, lower to tone it down.',
+          type: 'float',
+          default: 1,
+          options: { group: 'Global Illumination', minValue: 0, maxValue: 10 },
+          isHidden(this: Scene) {
+            return !this.gi.enabled;
+          },
+          get(this: Scene, value) {
+            value.num[0] = this.gi.intensity;
+          },
+          set(this: Scene, value) {
+            this.gi.intensity = value.num[0];
+          }
+        },
+        {
+          name: 'GIProbeSpacing',
+          description:
+            'Distance in world units between light probes. Smaller resolves indirect light in tighter spaces and leaks less through thin walls, but the volume covers less distance around the camera and takes longer to refresh.',
+          type: 'float',
+          default: 1,
+          options: { group: 'Global Illumination', minValue: 0.25, maxValue: 16 },
+          isHidden(this: Scene) {
+            return !this.gi.enabled;
+          },
+          get(this: Scene, value) {
+            value.num[0] = this.gi.probeSpacing;
+          },
+          set(this: Scene, value) {
+            this.gi.probeSpacing = value.num[0];
+          }
+        },
+        {
+          name: 'GIProbeBudget',
+          description:
+            'Light probes updated per frame. Higher makes bounced light follow moving lights and the camera sooner, at more GPU time per frame.',
+          type: 'int',
+          default: 4096,
+          options: { group: 'Global Illumination', minValue: 64, maxValue: 16384 },
+          isHidden(this: Scene) {
+            return !this.gi.enabled;
+          },
+          get(this: Scene, value) {
+            value.num[0] = this.gi.probeBudget;
+          },
+          set(this: Scene, value) {
+            this.gi.probeBudget = value.num[0];
+          }
+        },
+        {
+          name: 'GIProbeRays',
+          description:
+            'Rays each probe traces per update. More gives smoother, less flickering bounced light at more GPU time per frame.',
+          type: 'int',
+          default: 128,
+          options: { group: 'Global Illumination', minValue: 16, maxValue: 512 },
+          isHidden(this: Scene) {
+            return !this.gi.enabled;
+          },
+          get(this: Scene, value) {
+            value.num[0] = this.gi.probeRays;
+          },
+          set(this: Scene, value) {
+            this.gi.probeRays = value.num[0];
+          }
+        },
+        {
           name: 'MetersPerUnit',
           description: 'Physical meters represented by one scene unit',
           type: 'float',
