@@ -208,6 +208,11 @@ const HORIZON_REFLECT_BIAS = 0.08;
 const REFRACT_EDGE_FADE = 0.06;
 /** Normalized depth at or above which the scene behind the water is sky. */
 const SCENE_SKY_DEPTH01 = 0.999;
+/**
+ * Medium path in metres through water with only sky behind it: long enough
+ * that any absorbing medium is opaque over it.
+ */
+const BOTTOMLESS_PATH = 1e4;
 /** Floor on the subsurface term's sun-alignment factor. */
 const SSS_SUN_ALIGN_FLOOR = 0.15;
 /** Floor on the subsurface term's grazing-view factor. */
@@ -1701,7 +1706,8 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
    * @param straightWorldPos - Unrefracted scene world position behind the surface
    * @param straightDist - Straight-line distance from the surface to that scene
    * @param underwater - Whether the eye is below the surface
-   * @returns `vec3(uv, pathLength)` - where to sample, and the medium path in meters
+   * @returns `vec3(uv, pathLength)` - where to sample, and the medium path in meters,
+   * {@link BOTTOMLESS_PATH} with only sky behind the surface
    */
   waterRefraction(
     scope: PBInsideFunctionScope,
@@ -1846,8 +1852,12 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
         this.$l.faceNormal = this.$choice(this.underwater, pb.neg(this.normal), this.normal);
         this.$l.eta = this.$choice(this.underwater, pb.float(WATER_TO_AIR_ETA), pb.float(AIR_TO_WATER_ETA));
         this.$l.uvBase = this.waterRefractProjectUV(this.worldPos);
+        // Sky behind the surface: nothing under the water, so the column is
+        // bottomless. The sky reconstructs to the far plane, and the distance
+        // to that falls to zero where the surface meets it, which would show a
+        // band of clear water there.
         this.$if(pb.greaterThanEqual(this.straightDepth01, SCENE_SKY_DEPTH01), function () {
-          this.$return(pb.vec3(this.screenUV, this.straightDist));
+          this.$return(pb.vec3(this.screenUV, BOTTOMLESS_PATH));
         });
         this.$l.waterCrossDir = pb.normalize(pb.sub(this.straightWorldPos, this.worldPos));
         // refractDir = view line + (refract by wave normal - refract by flat
