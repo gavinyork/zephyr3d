@@ -48,6 +48,9 @@ export class PBRMetallicRoughnessMaterial
     other.copyFrom(this);
     return other;
   }
+  supportsVoxelization() {
+    return true;
+  }
   copyFrom(other: this) {
     super.copyFrom(other);
     this.vertexNormal = other.vertexNormal;

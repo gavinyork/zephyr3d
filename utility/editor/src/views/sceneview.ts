@@ -39,6 +39,7 @@ import {
 } from '@zephyr3d/scene';
 import type { RGProfileResult, RGProfileScopeResult } from '@zephyr3d/scene';
 import { renderSceneSDFView, SceneNode } from '@zephyr3d/scene';
+import type { SceneSDFViewMode } from '@zephyr3d/scene';
 import { DirectionalLight } from '@zephyr3d/scene';
 import { eventBus } from '../core/eventbus';
 import { ToolBar } from '../components/toolbar';
@@ -163,7 +164,7 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
   private _showTextureViewer: boolean;
   private _wireframe: boolean;
   private _lodColoration: boolean;
-  private _sdfView: boolean;
+  private _sdfView: Nullable<SceneSDFViewMode>;
   private _showColliders: boolean;
   private _colliderGizmo: Nullable<ColliderGizmo>;
   /** Whether the gizmo renderer was added to the compositor for the frame being drawn. */
@@ -227,7 +228,7 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
     this._showTextureViewer = false;
     this._wireframe = false;
     this._lodColoration = false;
-    this._sdfView = false;
+    this._sdfView = null;
     this._showColliders = false;
     this._colliderGizmo = null;
     this._gizmoEffectAppended = false;
@@ -691,10 +692,26 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
             {
               label: 'Distance Field',
               action: () => {
-                this._sdfView = !this._sdfView;
+                this._sdfView = this._sdfView === 'distance' ? null : 'distance';
                 return true;
               },
-              checked: () => this._sdfView
+              checked: () => this._sdfView === 'distance'
+            },
+            {
+              label: 'Voxel Albedo',
+              action: () => {
+                this._sdfView = this._sdfView === 'albedo' ? null : 'albedo';
+                return true;
+              },
+              checked: () => this._sdfView === 'albedo'
+            },
+            {
+              label: 'Voxel Emissive',
+              action: () => {
+                this._sdfView = this._sdfView === 'emissive' ? null : 'emissive';
+                return true;
+              },
+              checked: () => this._sdfView === 'emissive'
             },
             {
               label: 'Show Colliders',
@@ -1339,10 +1356,14 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
       camera.lodColoration = this._lodColoration;
       camera!.render(this.controller.model.scene);
       if (this._sdfView) {
-        // The view needs the field; the scene keeps it on until SDFEnabled is turned off
+        // The view needs the field; the scene keeps it on until SDFEnabled is turned off.
+        // The voxel views need the global illumination's voxel scene likewise
         const scene = this.controller.model.scene;
         scene.sdf.enabled = true;
-        renderSceneSDFView(scene, camera);
+        if (this._sdfView !== 'distance') {
+          scene.gi.enabled = true;
+        }
+        renderSceneSDFView(scene, camera, this._sdfView);
       }
 
       // Render selected camera

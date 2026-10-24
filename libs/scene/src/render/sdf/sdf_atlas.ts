@@ -1,6 +1,8 @@
 import type { Texture3D } from '@zephyr3d/device';
 import type { Nullable } from '@zephyr3d/base';
 import { getDevice } from '../../app/api';
+import { VolumeBoxAllocator } from './box_allocator';
+import type { VolumeBox } from './box_allocator';
 
 /** Allocation granularity of the atlas in voxels, per axis. */
 export const SDF_ATLAS_BLOCK = 8;
@@ -16,19 +18,10 @@ export interface MeshSDFAtlasSlot {
   resolution: [number, number, number];
 }
 
-interface Box {
-  x: number;
-  y: number;
-  z: number;
-  w: number;
-  h: number;
-  d: number;
-}
-
 interface Entry {
   key: object;
   slot: MeshSDFAtlasSlot;
-  box: Box;
+  box: VolumeBox;
   voxels: Uint16Array<ArrayBuffer>;
   uploaded: boolean;
 }
@@ -54,7 +47,7 @@ interface Entry {
 export class MeshSDFAtlas {
   readonly size: [number, number, number];
   private _texture: Nullable<Texture3D>;
-  private _free: Box[];
+  private readonly _allocator: VolumeBoxAllocator;
   private readonly _entries: Map<object, Entry>;
   private _usedVoxels: number;
   private _version: number;
@@ -63,7 +56,7 @@ export class MeshSDFAtlas {
       Math.max(SDF_ATLAS_BLOCK, Math.ceil(v / SDF_ATLAS_BLOCK) * SDF_ATLAS_BLOCK)
     ) as [number, number, number];
     this._texture = null;
-    this._free = [this.fullBox()];
+    this._allocator = new VolumeBoxAllocator(this.size);
     this._entries = new Map();
     this._usedVoxels = 0;
     this._version = 0;
@@ -133,10 +126,10 @@ export class MeshSDFAtlas {
     if (need[0] > this.size[0] || need[1] > this.size[1] || need[2] > this.size[2]) {
       return null;
     }
-    let box = this.allocate(need);
+    let box = this._allocator.allocate(need);
     if (!box) {
       this.repack();
-      box = this.allocate(need);
+      box = this._allocator.allocate(need);
       if (!box) {
         return null;
       }
@@ -157,7 +150,7 @@ export class MeshSDFAtlas {
     const entry = this._entries.get(key);
     if (entry) {
       this._entries.delete(key);
-      this._free.push(entry.box);
+      this._allocator.free(entry.box);
       this._usedVoxels -= entry.box.w * entry.box.h * entry.box.d;
       this._version++;
     }
@@ -191,59 +184,20 @@ export class MeshSDFAtlas {
     this._texture?.dispose();
     this._texture = null;
     this._entries.clear();
-    this._free = [this.fullBox()];
+    this._allocator.reset();
     this._usedVoxels = 0;
     this._version++;
-  }
-  /** @internal */
-  private fullBox(): Box {
-    return { x: 0, y: 0, z: 0, w: this.size[0], h: this.size[1], d: this.size[2] };
-  }
-  /** Best fit by leftover volume, split along the longest leftover first. @internal */
-  private allocate([w, h, d]: [number, number, number]): Nullable<Box> {
-    let best = -1;
-    let bestWaste = Infinity;
-    for (let i = 0; i < this._free.length; i++) {
-      const f = this._free[i];
-      if (f.w >= w && f.h >= h && f.d >= d) {
-        const waste = f.w * f.h * f.d - w * h * d;
-        if (waste < bestWaste) {
-          bestWaste = waste;
-          best = i;
-        }
-      }
-    }
-    if (best < 0) {
-      return null;
-    }
-    const f = this._free[best];
-    this._free.splice(best, 1);
-    // Guillotine: the rest of the slab along x, then the rest of the column
-    // along y within it, then the rest along z within that
-    const rx = f.w - w;
-    const ry = f.h - h;
-    const rz = f.d - d;
-    if (rx > 0) {
-      this._free.push({ x: f.x + w, y: f.y, z: f.z, w: rx, h: f.h, d: f.d });
-    }
-    if (ry > 0) {
-      this._free.push({ x: f.x, y: f.y + h, z: f.z, w, h: ry, d: f.d });
-    }
-    if (rz > 0) {
-      this._free.push({ x: f.x, y: f.y, z: f.z + d, w, h, d: rz });
-    }
-    return { x: f.x, y: f.y, z: f.z, w, h, d };
   }
   /** Packs every resident field again from an empty atlas, largest first. @internal */
   private repack() {
     const entries = [...this._entries.values()].sort(
       (a, b) => b.box.w * b.box.h * b.box.d - a.box.w * a.box.h * a.box.d
     );
-    this._free = [this.fullBox()];
+    this._allocator.reset();
     this._usedVoxels = 0;
     this._version++;
     for (const entry of entries) {
-      const box = this.allocate([entry.box.w, entry.box.h, entry.box.d]);
+      const box = this._allocator.allocate([entry.box.w, entry.box.h, entry.box.d]);
       if (!box) {
         // Another packing order can fail to fit the same set; the field drops
         // out and its owner sees it missing and adds it again

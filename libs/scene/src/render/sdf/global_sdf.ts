@@ -24,6 +24,8 @@ import type { SceneSDF, SDFInstance } from './scene_sdf';
 import type { MeshSDFAtlas } from './sdf_atlas';
 import { SDFWaterlineSource, WaterlineField } from './waterline';
 import { buildSDFProgram, getSDFProgramErrors } from './sdf_programs';
+import { sampleInstanceMaterial } from '../../shaders/gi';
+import type { VoxelAtlasSlot } from '../gi/voxel_atlas';
 
 /** Voxels along a brick edge, the unit of compositing. */
 const BRICK = GLOBAL_SDF_BRICK;
@@ -93,6 +95,24 @@ export interface GlobalSDFStats {
 }
 
 /**
+ * What the field composites materials from and into, when it does: the
+ * material atlases the voxelized meshes live in, the clipmaps (albedo
+ * rgba8unorm, emissive rgba16float; the field's layout at half its
+ * resolution) to write, the terrain's colour, and the atlas slot of an
+ * instance. Provided by the voxel scene.
+ * @public
+ */
+export interface GlobalSDFMaterials {
+  readonly atlasAlbedo: Texture3D;
+  readonly atlasEmissive: Texture3D;
+  readonly atlasSize: [number, number, number];
+  readonly albedo: Texture3D;
+  readonly emissive: Texture3D;
+  readonly terrainAlbedo: Vector4;
+  getSlot(inst: SDFInstance): Nullable<VoxelAtlasSlot>;
+}
+
+/**
  * A clipmap of signed distance around the camera: `levels` cubes of
  * `resolution`³ voxels, centred on the camera, each with twice the voxel size
  * of the one inside it. Built on the GPU from the static instances of a
@@ -135,6 +155,8 @@ export class GlobalSDF {
   private _instanceBuffer: Nullable<GPUDataBuffer>;
   private _brickBuffer: Nullable<GPUDataBuffer>;
   private _indexBuffer: Nullable<GPUDataBuffer>;
+  private _materialBuffer: Nullable<GPUDataBuffer>;
+  private _materials: Nullable<GlobalSDFMaterials>;
   private _dummyHeightMap: Nullable<Texture2D>;
   private _queryProgram: Nullable<GPUProgram>;
   private _queryBindGroup: Nullable<BindGroup>;
@@ -169,6 +191,8 @@ export class GlobalSDF {
     this._instanceBuffer = null;
     this._brickBuffer = null;
     this._indexBuffer = null;
+    this._materialBuffer = null;
+    this._materials = null;
     this._dummyHeightMap = null;
     this._queryProgram = null;
     this._queryBindGroup = null;
@@ -255,6 +279,23 @@ export class GlobalSDF {
   /** Dynamic instances merged at query time this frame. */
   get dynamicCount() {
     return this._dynamicInfo.x;
+  }
+  /**
+   * The materials composited alongside the distances, or null for distances
+   * alone. Changing it rebuilds the whole field.
+   */
+  get materials() {
+    return this._materials;
+  }
+  set materials(val: Nullable<GlobalSDFMaterials>) {
+    if (val !== this._materials) {
+      this._materials = val;
+      this._program?.dispose();
+      this._program = null;
+      this._bindGroup?.dispose();
+      this._bindGroup = null;
+      this.invalidate();
+    }
   }
   /**
    * Binds the field for {@link sampleSceneSDF} in a program that declared the
@@ -450,12 +491,14 @@ export class GlobalSDF {
     this._instanceBuffer?.dispose();
     this._brickBuffer?.dispose();
     this._indexBuffer?.dispose();
+    this._materialBuffer?.dispose();
     this._dummyHeightMap?.dispose();
     this._queryPoints?.dispose();
     this._queryOutput?.dispose();
     this._bindGroup?.dispose();
     this._queryBindGroup?.dispose();
     this._instanceBuffer = this._brickBuffer = this._indexBuffer = this._queryPoints = null;
+    this._materialBuffer = null;
     this._dummyHeightMap = this._queryOutput = null;
     this._bindGroup = this._queryBindGroup = null;
     this.invalidate();
@@ -591,6 +634,29 @@ export class GlobalSDF {
     bg.setBuffer('instances', this._instanceBuffer);
     bg.setBuffer('bricks', this._brickBuffer);
     bg.setBuffer('indices', this._indexBuffer);
+    const materials = this._materials;
+    if (materials) {
+      // Per instance: (atlas slot offset, 1 when resident), (slot resolution, 0)
+      const matData = new Float32Array(Math.max(1, instances.length) * 8);
+      instances.forEach((inst, i) => {
+        const slot = materials.getSlot(inst);
+        if (slot) {
+          matData.set([slot.offset[0], slot.offset[1], slot.offset[2], 1], i * 8);
+          matData.set([slot.resolution[0], slot.resolution[1], slot.resolution[2], 0], i * 8 + 4);
+        }
+      });
+      this._materialBuffer = this.ensureBuffer(this._materialBuffer, matData.byteLength);
+      this._materialBuffer.bufferSubData(0, matData);
+      bg.setBuffer('materialSlots', this._materialBuffer);
+      bg.setTexture('matAlbedoAtlas', materials.atlasAlbedo, fetchSampler('clamp_linear_nomip'));
+      // RGBE must not be filtered
+      bg.setTexture('matEmissiveAtlas', materials.atlasEmissive, fetchSampler('clamp_nearest_nomip'));
+      const s = materials.atlasSize;
+      bg.setValue('matAtlasInvSize', new Vector4(1 / s[0], 1 / s[1], 1 / s[2], 0));
+      bg.setValue('terrainAlbedo', materials.terrainAlbedo);
+      bg.setTexture('albedoOut', materials.albedo);
+      bg.setTexture('emissiveOut', materials.emissive);
+    }
     bg.setTexture('atlas', atlas.texture, fetchSampler('clamp_linear_nomip'));
     bg.setValue('atlasInvSize', new Vector4(1 / atlas.size[0], 1 / atlas.size[1], 1 / atlas.size[2], 0));
     const terrain = this._terrain;
@@ -642,8 +708,9 @@ export class GlobalSDF {
   private getProgram() {
     if (!this._program) {
       const device = getDevice();
+      const materials = !!this._materials;
       this._program = buildSDFProgram({
-        label: 'GlobalSDFComposite',
+        label: materials ? 'GlobalSDFCompositeMaterials' : 'GlobalSDFComposite',
         workgroupSize: [4, 4, 4],
         compute(pb) {
           this.instances = pb.vec4[0]().storageBufferReadonly(0);
@@ -657,6 +724,15 @@ export class GlobalSDF {
           this.terrainParams = pb.vec4().uniform(0);
           this.field = pb.texStorage3D.r32float().storage(0);
           this.tagsOut = pb.texStorage3D.rgba32float().storage(0);
+          if (materials) {
+            this.materialSlots = pb.vec4[0]().storageBufferReadonly(0);
+            this.matAlbedoAtlas = pb.tex3D().uniform(0);
+            this.matEmissiveAtlas = pb.tex3D().uniform(0);
+            this.matAtlasInvSize = pb.vec4().uniform(0);
+            this.terrainAlbedo = pb.vec4().uniform(0);
+            this.albedoOut = pb.texStorage3D.rgba8unorm().storage(0);
+            this.emissiveOut = pb.texStorage3D.rgba16float().storage(0);
+          }
           pb.func('terrainHeight', [pb.vec2('xz')], function () {
             this.$l.uv = pb.div(
               pb.sub(this.xz, this.terrainRegion.xy),
@@ -695,6 +771,7 @@ export class GlobalSDF {
               this.atlas,
               this.atlasInvSize.xyz
             );
+            this.$l.terrainD = this.band;
             this.$if(pb.greaterThan(this.b2.y, 0), function () {
               this.$l.inRegion = pb.and(
                 pb.all(pb.greaterThanEqual(this.p.xz, this.terrainRegion.xy)),
@@ -717,13 +794,13 @@ export class GlobalSDF {
                 );
                 this.$l.grad = pb.div(pb.vec2(this.hx, this.hz), pb.mul(this.cell, 2));
                 // Height above the surface over the slope: exact on a plane
-                this.d = pb.min(
-                  this.d,
+                this.terrainD = pb.min(
+                  this.terrainD,
                   pb.div(pb.sub(this.p.y, this.h), pb.sqrt(pb.add(1, pb.dot(this.grad, this.grad))))
                 );
               });
             });
-            this.d = pb.clamp(this.d, pb.neg(this.band), this.band);
+            this.d = pb.clamp(pb.min(this.d, this.terrainD), pb.neg(this.band), this.band);
             pb.textureStore(this.field, pb.add(pb.uvec3(this.b1.xyz), this.local), pb.vec4(this.d, 0, 0, 0));
             // The brick now holds this window's region; readers see the tag in the next pass
             this.$if(
@@ -736,6 +813,82 @@ export class GlobalSDF {
                 );
               }
             );
+            if (materials) {
+              // Material voxels are 2³ field voxels: the thread at the even
+              // corner writes the one holding it, read at its centre from the
+              // instance nearest the centre (the terrain where that is nearer)
+              this.$if(pb.equal(pb.mod(this.local, pb.uvec3(2)), pb.uvec3(0)), function () {
+                this.$l.pc = pb.add(this.p, pb.vec3(pb.mul(this.vs, 0.5)));
+                this.$l.bestK = pb.int(-1);
+                this.$l.instD = sampleInstancesSDF(
+                  this,
+                  this.pc,
+                  this.count,
+                  this.band,
+                  (scope, k) => pb.mul(scope.indices.at(pb.add(scope.start, k)), SDF_INSTANCE_VEC4S),
+                  (scope, i) => scope.instances.at(i),
+                  this.atlas,
+                  this.atlasInvSize.xyz,
+                  'bestK'
+                );
+                this.$l.terrainWins = pb.and(
+                  pb.lessThan(this.terrainD, this.band),
+                  pb.lessThan(this.terrainD, this.instD)
+                );
+                this.$l.useInst = pb.and(
+                  pb.greaterThanEqual(this.bestK, 0),
+                  pb.lessThan(this.instD, this.band),
+                  pb.not(this.terrainWins)
+                );
+                this.$l.idx = this.$choice(
+                  this.useInst,
+                  this.indices.at(pb.add(this.start, pb.uint(pb.max(this.bestK, 0)))),
+                  pb.uint(0)
+                );
+                this.$l.ibase = pb.mul(this.idx, SDF_INSTANCE_VEC4S);
+                this.$l.mr0 = this.instances.at(this.ibase);
+                this.$l.mr1 = this.instances.at(pb.add(this.ibase, 1));
+                this.$l.mr2 = this.instances.at(pb.add(this.ibase, 2));
+                this.$l.mbmin = this.instances.at(pb.add(this.ibase, 3));
+                this.$l.mbmax = this.instances.at(pb.add(this.ibase, 4));
+                this.$l.mslot = this.instances.at(pb.add(this.ibase, 5));
+                this.$l.matSlot = this.$choice(
+                  this.useInst,
+                  this.materialSlots.at(pb.mul(this.idx, 2)),
+                  pb.vec4(0)
+                );
+                this.$l.matRes = this.materialSlots.at(pb.add(pb.mul(this.idx, 2), 1));
+                this.$l.pc4 = pb.vec4(this.pc, 1);
+                this.$l.lp = pb.vec3(
+                  pb.dot(this.mr0, this.pc4),
+                  pb.dot(this.mr1, this.pc4),
+                  pb.dot(this.mr2, this.pc4)
+                );
+                sampleInstanceMaterial(
+                  this,
+                  this.lp,
+                  this.mbmin,
+                  this.mbmax,
+                  this.mslot,
+                  this.matSlot,
+                  this.matRes,
+                  this.atlas,
+                  this.atlasInvSize.xyz,
+                  this.matAlbedoAtlas,
+                  this.matEmissiveAtlas,
+                  this.matAtlasInvSize.xyz,
+                  'outAlbedo',
+                  'outEmissive'
+                );
+                this.$if(this.terrainWins, function () {
+                  this.outAlbedo = pb.vec4(this.terrainAlbedo.rgb, 1);
+                  this.outEmissive = pb.vec3(0);
+                });
+                this.$l.ct = pb.div(pb.add(pb.uvec3(this.b1.xyz), this.local), pb.uvec3(2));
+                pb.textureStore(this.albedoOut, this.ct, this.outAlbedo);
+                pb.textureStore(this.emissiveOut, this.ct, pb.vec4(this.outEmissive, 0));
+              });
+            }
           });
         }
       })!;

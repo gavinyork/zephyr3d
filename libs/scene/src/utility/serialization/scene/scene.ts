@@ -80,6 +80,57 @@ export function getSceneClass(manager: ResourceManager): SerializableClass {
           }
         },
         {
+          name: 'GIEnabled',
+          description:
+            'Build the voxel scene the global illumination reads: the static meshes with a baked distance field are rasterized into a material atlas around the camera, giving the field surfaces their colour and glow. Turns SDFEnabled on. WebGPU only; nothing changes on WebGL2.',
+          type: 'bool',
+          default: false,
+          options: { group: 'Global Illumination' },
+          get(this: Scene, value) {
+            value.bool[0] = this.gi.enabled;
+          },
+          set(this: Scene, value) {
+            this.gi.enabled = value.bool[0];
+          }
+        },
+        {
+          name: 'GIVoxelizeBudget',
+          description:
+            'Meshes voxelized per frame. Higher fills the voxel scene sooner after loading or moving far, at the cost of a longer frame while it does.',
+          type: 'int',
+          default: 8,
+          options: { group: 'Global Illumination', minValue: 1, maxValue: 64 },
+          isHidden(this: Scene) {
+            return !this.gi.enabled;
+          },
+          get(this: Scene, value) {
+            value.num[0] = this.gi.voxelizeBudget;
+          },
+          set(this: Scene, value) {
+            this.gi.voxelizeBudget = value.num[0];
+          }
+        },
+        {
+          name: 'GITerrainAlbedo',
+          description:
+            'Colour the terrain is given in the voxel scene, so the light it bounces onto nearby surfaces takes this tint, until it is read from the terrain itself.',
+          type: 'rgb',
+          default: [0.3, 0.3, 0.3],
+          options: { group: 'Global Illumination' },
+          isHidden(this: Scene) {
+            return !this.gi.enabled;
+          },
+          get(this: Scene, value) {
+            const color = this.gi.terrainAlbedo;
+            value.num[0] = color.x;
+            value.num[1] = color.y;
+            value.num[2] = color.z;
+          },
+          set(this: Scene, value) {
+            this.gi.terrainAlbedo.setXYZ(value.num[0], value.num[1], value.num[2]);
+          }
+        },
+        {
           name: 'MetersPerUnit',
           description: 'Physical meters represented by one scene unit',
           type: 'float',

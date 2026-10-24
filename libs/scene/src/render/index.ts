@@ -36,4 +36,7 @@ export * from './sdf/sdf_view';
 export * from './shore_wave_generator';
 export * from './sdf/waterline';
 export { getSDFProgramErrors } from './sdf/sdf_programs';
+export * from './gi/voxel_atlas';
+export * from './gi/voxel_scene';
+export * from './gi/scene_gi';
 export * from './volumetric_cloud/volumetric_cloud';

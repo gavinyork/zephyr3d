@@ -837,7 +837,7 @@ export interface ProgramBuilder {
   determinant(mat: PBShaderExp): PBShaderExp;
   /** Same as inverse builtin function in GLSL, only valid for WebGL2 device */
   inverse(mat: PBShaderExp): PBShaderExp;
-  /** return true if x is less than y, otherwise false */
+  /** return true if x is less than y, otherwise false, per component */
   lessThan(x: number | PBShaderExp, y: number | PBShaderExp): PBShaderExp;
   /** return true if x is less than or equals y, otherwise false, per component */
   lessThanEqual(x: number | PBShaderExp, y: number | PBShaderExp): PBShaderExp;
@@ -849,9 +849,9 @@ export interface ProgramBuilder {
   compEqual(x: PBShaderExp, y: PBShaderExp): PBShaderExp;
   /** return true if x is not equal to y, otherwise false, per component */
   compNotEqual(x: PBShaderExp, y: PBShaderExp): PBShaderExp;
-  /** return true if x equals y, otherwise false */
+  /** return true if x equals y, otherwise false; vectors compare as a whole (see compEqual for per component) */
   equal(x: PBShaderExp | number, y: PBShaderExp | number): PBShaderExp;
-  /** return true if x is not equal to y, otherwise false */
+  /** return true if x is not equal to y, otherwise false; vectors compare as a whole (see compNotEqual for per component) */
   notEqual(x: PBShaderExp | number, y: PBShaderExp | number): PBShaderExp;
   /** return x && y */
   and_2(x: PBShaderExp | number | boolean, y: PBShaderExp | number | boolean): PBShaderExp;

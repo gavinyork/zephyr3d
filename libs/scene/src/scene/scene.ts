@@ -26,6 +26,7 @@ import type { PhysicsWorld } from '../physics/world';
 import { getPhysicsWorldFactory } from '../physics/world';
 import type { VirtualTextureClient } from '../render/virtualtexture/virtual_texture_client';
 import { SceneSDF } from '../render/sdf/scene_sdf';
+import { SceneGI } from '../render/gi/scene_gi';
 
 /**
  * Represents a renderable world that manages scene graph, spatial indexing, and environment.
@@ -86,6 +87,8 @@ export class Scene
   protected _env: Environment;
   /** @internal */
   protected _sdf: Nullable<SceneSDF>;
+  /** @internal */
+  protected _gi: Nullable<SceneGI>;
   /** @internal Frame counter that last updated this scene. */
   protected _updateFrame: number;
   /** @internal Unique scene ID. */
@@ -146,6 +149,7 @@ export class Scene
     );
     this._env = new Environment();
     this._sdf = null;
+    this._gi = null;
     this._updateFrame = -1;
     this._rootNode = new DRef();
     this._rootNode.set(new SceneNode(this));
@@ -241,6 +245,13 @@ export class Scene
       this._sdf = new SceneSDF(this);
     }
     return this._sdf;
+  }
+  /** Global illumination of the scene, off until enabled. */
+  get gi() {
+    if (!this._gi) {
+      this._gi = new SceneGI(this);
+    }
+    return this._gi;
   }
   /** Lighting unit model. Legacy remains the default for backward compatibility. */
   get lightingMode() {
@@ -624,8 +635,13 @@ export class Scene
       this.dispatchEvent('lateupdate', this);
       this.updateNodePlacement(this._octree, this._nodePlaceList);
       const camera = this.mainCamera;
-      if (this._sdf?.enabled && camera) {
-        this._sdf.update(camera.getWorldPosition(), deltaInSeconds);
+      if (camera && (this._gi?.enabled || this._sdf?.enabled)) {
+        const cameraPos = camera.getWorldPosition();
+        // The voxel scene feeds the field's compositing, so it goes first
+        this._gi?.update(cameraPos, deltaInSeconds);
+        if (this._sdf?.enabled) {
+          this._sdf.update(cameraPos, deltaInSeconds);
+        }
       }
     }
     // Palettes written by animation updates are uploaded once all nodes and bank tracks are updated
@@ -700,6 +716,8 @@ export class Scene
     this._drawableUpdateQueue.clear();
     this._perCameraUpdateQueue.clear();
     this._env.dispose();
+    this._gi?.dispose();
+    this._gi = null;
     this._sdf?.dispose();
     this._sdf = null;
     this._rootNode.dispose();

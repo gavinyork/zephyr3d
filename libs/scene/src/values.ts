@@ -20,6 +20,13 @@ export const RENDER_PASS_TYPE_DEPTH = 2;
  * @public
  */
 export const RENDER_PASS_TYPE_OBJECT_COLOR = 3;
+/**
+ * Voxelize render pass type: a mesh is rasterized along three axes into a 3D
+ * material atlas, its fragments storing albedo and emissive rather than a
+ * shaded colour. Used by the global illumination's voxel scene.
+ * @public
+ */
+export const RENDER_PASS_TYPE_VOXELIZE = 4;
 
 /**
  * Builtin texture name for sheen LUT

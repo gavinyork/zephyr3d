@@ -53,6 +53,44 @@ export function declareDynamicSDFUniforms(scope: PBGlobalScope, group: number) {
 }
 
 /**
+ * Distance in local units from a local position to one packed instance's
+ * field: inside the field box by trilinear lookup of the atlas, outside it the
+ * border value plus the distance to the box. `bmin` is (box min, voxel size),
+ * `bmax` is (box max, world scale), `slot` the atlas slot offset.
+ * @internal
+ */
+export function sampleInstanceField(
+  scope: PBInsideFunctionScope,
+  lp: PBShaderExp,
+  bmin: PBShaderExp,
+  bmax: PBShaderExp,
+  slot: PBShaderExp,
+  atlas: PBShaderExp,
+  atlasInvSize: PBShaderExp
+) {
+  const pb = scope.$builder;
+  const funcName = `Z_sampleInstanceField_${atlas.$str}`;
+  pb.func(
+    funcName,
+    [pb.vec3('lp'), pb.vec4('bmin'), pb.vec4('bmax'), pb.vec4('slot'), pb.vec3('invSize')],
+    function () {
+      this.$l.c = pb.clamp(this.lp, this.bmin.xyz, this.bmax.xyz);
+      this.$l.outside = pb.length(pb.sub(this.lp, this.c));
+      this.$l.res = pb.div(pb.sub(this.bmax.xyz, this.bmin.xyz), this.bmin.w);
+      // Clamped to the outer sample centres, so the filter never reads a neighbour's slot
+      this.$l.f = pb.clamp(
+        pb.div(pb.sub(this.c, this.bmin.xyz), this.bmin.w),
+        pb.vec3(0.5),
+        pb.sub(this.res, pb.vec3(0.5))
+      );
+      this.$l.uvw = pb.mul(pb.add(this.slot.xyz, this.f), this.invSize);
+      this.$return(pb.add(pb.textureSampleLevel(atlas, this.uvw, 0).r, this.outside));
+    }
+  );
+  return scope[funcName](lp, bmin, bmax, slot, atlasInvSize) as PBShaderExp;
+}
+
+/**
  * Signed distance from a world position to the nearest of a set of packed
  * instances, each its baked field sampled from the atlas: inside the field box
  * by trilinear lookup, outside it by the border value plus the distance to the
@@ -60,7 +98,9 @@ export function declareDynamicSDFUniforms(scope: PBGlobalScope, group: number) {
  *
  * Instance packing is described at {@link SDF_INSTANCE_VEC4S}: `baseOf(k)`
  * gives the first vec4 of the k-th instance visited, `instance(i)` reads vec4
- * `i` of the packed array.
+ * `i` of the packed array. With `bestIndex`, the name of an int variable of the
+ * scope, the k of the nearest instance is written to it (left alone when none
+ * is nearer).
  *
  * @internal
  */
@@ -72,7 +112,8 @@ export function sampleInstancesSDF(
   baseOf: (scope: PBInsideFunctionScope, k: PBShaderExp) => PBShaderExp,
   instance: (scope: PBInsideFunctionScope, index: PBShaderExp) => PBShaderExp,
   atlas: PBShaderExp,
-  atlasInvSize: PBShaderExp
+  atlasInvSize: PBShaderExp,
+  bestIndex?: string
 ) {
   const pb = scope.$builder;
   scope.$l.sdfBest = maxDist;
@@ -94,16 +135,16 @@ export function sampleInstancesSDF(
     this.$l.outside = pb.length(pb.sub(this.lp, this.c));
     // A field box farther than the current best cannot improve it
     this.$if(pb.lessThan(pb.mul(this.outside, this.bmax.w), this.sdfBest), function () {
-      this.$l.res = pb.div(pb.sub(this.bmax.xyz, this.bmin.xyz), this.bmin.w);
-      // Clamped to the outer sample centres, so the filter never reads a neighbour's slot
-      this.$l.f = pb.clamp(
-        pb.div(pb.sub(this.c, this.bmin.xyz), this.bmin.w),
-        pb.vec3(0.5),
-        pb.sub(this.res, pb.vec3(0.5))
+      this.$l.cand = pb.mul(
+        sampleInstanceField(this, this.lp, this.bmin, this.bmax, this.slot, atlas, atlasInvSize),
+        this.bmax.w
       );
-      this.$l.uvw = pb.mul(pb.add(this.slot.xyz, this.f), atlasInvSize);
-      this.$l.ld = pb.textureSampleLevel(atlas, this.uvw, 0).r;
-      this.sdfBest = pb.min(this.sdfBest, pb.mul(pb.add(this.ld, this.outside), this.bmax.w));
+      this.$if(pb.lessThan(this.cand, this.sdfBest), function () {
+        this.sdfBest = this.cand;
+        if (bestIndex) {
+          this[bestIndex] = pb.int(this.sdfK);
+        }
+      });
     });
   });
   return scope.sdfBest as PBShaderExp;
@@ -242,6 +283,28 @@ export function sampleGlobalSDF(scope: PBInsideFunctionScope, worldPos: PBShader
 function wrap(scope: PBInsideFunctionScope, v: PBShaderExp, n: PBShaderExp) {
   const pb = scope.$builder;
   return pb.mod(pb.add(pb.mod(v, n), n), n);
+}
+
+/**
+ * True when the brick of a level holding world voxel `v` is tagged with its own
+ * world brick coordinates, i.e. composited for the current window.
+ * @internal
+ */
+export function globalSDFVoxelCurrent(scope: PBInsideFunctionScope, v: PBShaderExp, level: number) {
+  const pb = scope.$builder;
+  const funcName = `Z_globalSDFVoxelCurrent${level}`;
+  pb.func(funcName, [pb.ivec3('v')], function () {
+    this.$l.nbi = pb.ivec3(pb.int(pb.div(this[GLOBAL_SDF_PARAMS].x, GLOBAL_SDF_BRICK)));
+    this.$l.b = pb.ivec3(pb.floor(pb.div(pb.vec3(this.v), GLOBAL_SDF_BRICK)));
+    this.$l.w = wrap(this, this.b, this.nbi);
+    this.$l.tag = pb.textureLoad(
+      this[GLOBAL_SDF_TAGS],
+      pb.ivec3(this.w.x, this.w.y, pb.add(this.w.z, pb.mul(this.nbi.z, level))),
+      0
+    );
+    this.$return(pb.and(pb.greaterThan(this.tag.w, 0.5), pb.equal(pb.ivec3(this.tag.xyz), this.b)));
+  });
+  return scope[funcName](v) as PBShaderExp;
 }
 
 /**
