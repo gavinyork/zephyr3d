@@ -722,6 +722,14 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
               checked: () => this._sdfView === 'radiance'
             },
             {
+              label: 'GI Sky Occlusion',
+              action: () => {
+                this._sdfView = this._sdfView === 'skyVisibility' ? null : 'skyVisibility';
+                return true;
+              },
+              checked: () => this._sdfView === 'skyVisibility'
+            },
+            {
               label: 'Show Colliders',
               action: () => {
                 this._showColliders = !this._showColliders;

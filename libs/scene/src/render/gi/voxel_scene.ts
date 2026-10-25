@@ -37,6 +37,12 @@ interface VoxelMaterialEntry {
   /** Edge of a material voxel in local units. */
   voxelSize: number;
   state: 'pending' | 'ready' | 'failed';
+  /**
+   * True while the atlas region holds a voxelization of this entry, current or
+   * not: a material edit leaves the old one in place until it is redone, so
+   * the clipmaps never lose the mesh's colour in between.
+   */
+  voxelized: boolean;
   /** {@link materialTagOf} the source when it was last voxelized. */
   materialTag: string;
   lastWanted: number;
@@ -148,6 +154,20 @@ export class VoxelScene implements GlobalSDFMaterials {
     }
     return this._lighting.radiance;
   }
+  /** Share of the radiance each voxel face carries, (+x, +y, +z, -x); see declareVoxelSceneUniforms. */
+  get radianceAniso0() {
+    if (!this._lighting?.ready) {
+      throw new Error('VoxelScene: no radiance before the first lighting update');
+    }
+    return this._lighting.aniso0;
+  }
+  /** Share of the radiance each voxel face carries, (-y, -z) in rg. */
+  get radianceAniso1() {
+    if (!this._lighting?.ready) {
+      throw new Error('VoxelScene: no radiance before the first lighting update');
+    }
+    return this._lighting.aniso1;
+  }
   /** True once the radiance clipmap exists. */
   get lit() {
     return !!this._lighting?.ready;
@@ -166,7 +186,7 @@ export class VoxelScene implements GlobalSDFMaterials {
   getSlot(inst: SDFInstance): Nullable<VoxelAtlasSlot> {
     const key = keyOf(inst.mesh);
     const entry = key ? this._entries.get(key) : null;
-    return entry && entry.state === 'ready' ? this.atlas.getSlot(entry) : null;
+    return entry && entry.voxelized ? this.atlas.getSlot(entry) : null;
   }
   getStats(): VoxelSceneStats {
     const stats: VoxelSceneStats = {
@@ -236,6 +256,7 @@ export class VoxelScene implements GlobalSDFMaterials {
           boxMin: [...header.boxMin],
           voxelSize: header.voxelSize * 2,
           state: 'pending',
+          voxelized: false,
           materialTag: '',
           lastWanted: 0,
           readyTime: -Infinity
@@ -283,6 +304,7 @@ export class VoxelScene implements GlobalSDFMaterials {
         voxelSize: entry.voxelSize
       });
       entry.state = ok ? 'ready' : 'failed';
+      entry.voxelized = ok;
       entry.materialTag = materialTagOf(entry.source);
       entry.readyTime = this._time;
       done++;
@@ -385,6 +407,7 @@ export class VoxelScene implements GlobalSDFMaterials {
     for (const victim of victims) {
       this.atlas.remove(victim);
       victim.state = 'pending';
+      victim.voxelized = false;
       slot = this.atlas.add(entry, entry.resolution);
       if (slot) {
         return slot;
@@ -395,6 +418,7 @@ export class VoxelScene implements GlobalSDFMaterials {
     if (this.atlas.occupancy < 0.75) {
       this.atlas.clear();
       for (const e of this._entries.values()) {
+        e.voxelized = false;
         if (e.state === 'ready') {
           e.state = 'pending';
         }
@@ -435,13 +459,15 @@ function keyOf(mesh: Mesh): Nullable<string> {
 }
 
 /**
- * What a voxelization depends on in a material: the core's option tag, which
- * every uniform or option edit advances, and its change tag. An instance's
- * own overrides are part of the entry key instead.
+ * What a voxelization depends on in a material: the core's appearance tag,
+ * which every uniform or option edit that can change its look advances (and
+ * the object color GPU picking sets each frame it picks does not), and its
+ * change tag, which a texture that finishes loading advances. An
+ * instance's own overrides are part of the entry key instead.
  */
 function materialTagOf(material: MeshMaterial) {
   const core = material.coreMaterial;
-  return `${core.optionTag}:${core.changeTag}`;
+  return `${core.appearanceTag}:${core.changeTag}`;
 }
 
 /** The instance uniform values a material instance overrides its core with, as a key suffix, else empty. */

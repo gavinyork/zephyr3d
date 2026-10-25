@@ -504,16 +504,10 @@ export function mixinLight<T extends typeof MeshMaterial>(BaseCls: T) {
         console.warn('getEnvLightIrradiance(): No need to calculate environment lighting');
         return scope.$builder.vec3(0);
       }
+      // Scaled by the environment strength, probes and SSGI included; see EnvironmentLighting.getIrradiance
       return this.drawContext.env!.light.envLight.hasIrradiance()
-        ? ((this.drawContext.SSGI &&
-          this.drawContext.SSGIIrradianceHistoryTexture &&
-          this.drawContext.SSGISurfaceHistoryTexture &&
-          this.drawContext.motionVectorTexture
-            ? this.drawContext.env!.light.envLight.getIrradiance(scope, normal, this.drawContext).rgb
-            : scope.$builder.mul(
-                this.drawContext.env!.light.envLight.getIrradiance(scope, normal, this.drawContext).rgb,
-                ShaderHelper.getEnvLightStrength(scope)
-              )) as PBShaderExp)
+        ? (this.drawContext.env!.light.envLight.getIrradiance(scope, normal, this.drawContext)
+            .rgb as PBShaderExp)
         : scope.$builder.vec3(0);
     }
     /**

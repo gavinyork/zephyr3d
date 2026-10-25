@@ -9,7 +9,7 @@ import type { GlobalSDF } from '../sdf/global_sdf';
 import { buildSDFProgram } from '../sdf/sdf_programs';
 import { drawFullscreenQuad } from '../fullscreenquad';
 import { fetchSampler } from '../../utility/misc';
-import { PHYSICAL_BAKE_EXPOSURE } from '../../utility/physical';
+import { getGICacheExposure } from '../../utility/physical';
 import { LIGHT_TYPE_DIRECTIONAL, LIGHT_TYPE_SPOT } from '../../values';
 import {
   declareDynamicSDFUniforms,
@@ -28,6 +28,15 @@ export const MAX_VOXEL_LIGHTS = 64;
 const LIGHT_VEC4S = 4;
 /** Cone tracing steps of the sun shadow. */
 const SHADOW_STEPS = 24;
+/** The axis faces of a voxel, in the order of the aniso textures (Godot's aniso_dir). */
+const ANISO_DIRS: [number, number, number][] = [
+  [1, 0, 0],
+  [0, 1, 0],
+  [0, 0, 1],
+  [-1, 0, 0],
+  [0, -1, 0],
+  [0, 0, -1]
+];
 
 /**
  * Settings of the voxel lighting, on {@link SceneGI}.
@@ -45,7 +54,9 @@ export interface VoxelLightingOptions {
  * tracing the global field, see {@link sdfConeShadow}), the punctual lights
  * in range (unshadowed), the sky irradiance of the environment light, times
  * the albedo, plus the emissive; written to the radiance clipmap. The radiance
- * a ray of the global illumination picks up where it hits.
+ * a ray of the global illumination picks up where it hits. Kept at the fixed
+ * cache exposure (getGICacheExposure) rather than the camera's, so the probes
+ * accumulating it over many frames do not drift when the exposure changes.
  *
  * After the surface cache direct lighting of Lumen (Wright, "Radiance Caching
  * for Real-Time Global Illumination", SIGGRAPH 2021 Advances), on voxels.
@@ -60,6 +71,8 @@ export interface VoxelLightingOptions {
 export class VoxelLighting {
   private readonly _scene: Scene;
   private _radiance: Nullable<Texture3D>;
+  private _aniso0: Nullable<Texture3D>;
+  private _aniso1: Nullable<Texture3D>;
   private _resolution: number;
   private _levels: number;
   private _program: Nullable<GPUProgram>;
@@ -76,6 +89,8 @@ export class VoxelLighting {
   constructor(scene: Scene) {
     this._scene = scene;
     this._radiance = null;
+    this._aniso0 = null;
+    this._aniso1 = null;
     this._resolution = 0;
     this._levels = 0;
     this._program = null;
@@ -96,6 +111,20 @@ export class VoxelLighting {
       throw new Error('VoxelLighting: no radiance before the first update');
     }
     return this._radiance;
+  }
+  /** Share of the radiance each voxel face carries, (+x, +y, +z, -x); see declareVoxelSceneUniforms. */
+  get aniso0() {
+    if (!this._aniso0) {
+      throw new Error('VoxelLighting: no radiance before the first update');
+    }
+    return this._aniso0;
+  }
+  /** Share of the radiance each voxel face carries, (-y, -z) in rg. */
+  get aniso1() {
+    if (!this._aniso1) {
+      throw new Error('VoxelLighting: no radiance before the first update');
+    }
+    return this._aniso1;
   }
   get ready() {
     return !!this._radiance;
@@ -121,21 +150,35 @@ export class VoxelLighting {
     const scene = this._scene;
     if (!this._radiance || this._resolution !== resolution || this._levels !== global.levels) {
       this._radiance?.dispose();
+      this._aniso0?.dispose();
+      this._aniso1?.dispose();
       this._resolution = resolution;
       this._levels = global.levels;
-      this._radiance = device.createTexture3D('rgba16f', resolution, resolution, resolution * global.levels, {
+      const depth = resolution * global.levels;
+      this._radiance = device.createTexture3D('rgba16f', resolution, resolution, depth, {
         mipmapping: false,
         writable: true
       })!;
       this._radiance.name = '@VoxelSceneRadiance';
+      // rgba8 for both: rg8 is not a storage texture format in WebGPU
+      this._aniso0 = device.createTexture3D('rgba8unorm', resolution, resolution, depth, {
+        mipmapping: false,
+        writable: true
+      })!;
+      this._aniso0.name = '@VoxelSceneAniso0';
+      this._aniso1 = device.createTexture3D('rgba8unorm', resolution, resolution, depth, {
+        mipmapping: false,
+        writable: true
+      })!;
+      this._aniso1.name = '@VoxelSceneAniso1';
       this._zStart = 0;
     }
     const envLight = scene.env.light.envLight;
     const physical = scene.lightingMode === 'physical';
-    const preExposure = physical ? camera.exposure : 1;
-    const envStrength = physical
-      ? (preExposure / PHYSICAL_BAKE_EXPOSURE) * (scene.env.light.strength ?? 0)
-      : (scene.env.light.strength ?? 0);
+    // Radiance is kept at the fixed cache exposure, whatever the camera's; the
+    // sky bake is stored at the same exposure, so it takes the strength alone
+    const cacheExposure = getGICacheExposure(scene.lightingMode);
+    const envStrength = scene.env.light.strength ?? 0;
     const skyIrradiance = !!envLight && envLight.hasIrradiance();
     const probes = getActiveProbeVolume(scene);
     const key = `${global.levels}:${scene.lightingMode}:${skyIrradiance ? envLight.getType() : 'none'}:${
@@ -148,13 +191,15 @@ export class VoxelLighting {
       this._programKey = key;
       this._bindGroup = device.createBindGroup(this._program.bindGroupLayouts[0]);
     }
-    const numLights = this.collectLights(camera, preExposure);
+    const numLights = this.collectLights(camera, cacheExposure);
     const slices = Math.max(1, Math.min(resolution, Math.floor(options.slicesPerFrame)));
     const bg = this._bindGroup!;
     global.applyBindGroup(bg);
     bg.setTexture('albedoTex', albedo, fetchSampler('clamp_nearest_nomip'));
     bg.setTexture('emissiveTex', emissive, fetchSampler('clamp_nearest_nomip'));
     bg.setTexture('radianceOut', this._radiance);
+    bg.setTexture('aniso0Out', this._aniso0!);
+    bg.setTexture('aniso1Out', this._aniso1!);
     bg.setValue('lights', this._lightData);
     bg.setValue('sunDir', this._sunDir);
     bg.setValue('sunColor', this._sunColor);
@@ -197,6 +242,10 @@ export class VoxelLighting {
   dispose() {
     this._radiance?.dispose();
     this._radiance = null;
+    this._aniso0?.dispose();
+    this._aniso0 = null;
+    this._aniso1?.dispose();
+    this._aniso1 = null;
     this._bindGroup?.dispose();
     this._bindGroup = null;
     this._program?.dispose();
@@ -215,10 +264,10 @@ export class VoxelLighting {
    * Packs the visible punctual lights: the sun apart (first directional light,
    * the scene's sun light where one is marked), the rest nearest the camera
    * first, up to {@link MAX_VOXEL_LIGHTS}. Only the intensity carries the
-   * pre-exposure, as the clustered light buffer does.
+   * exposure (the cache exposure), as the clustered light buffer does.
    * @internal
    */
-  private collectLights(camera: Camera, preExposure: number) {
+  private collectLights(camera: Camera, exposure: number) {
     const scene = this._scene;
     const cameraPos = camera.getWorldPosition();
     const found: { sun: Nullable<DirectionalLight> } = { sun: null };
@@ -250,7 +299,7 @@ export class VoxelLighting {
       const dir = sunLight.directionAndCutoff;
       const c = sunLight.diffuseAndIntensity;
       this._sunDir.setXYZW(dir.x, dir.y, dir.z, 1);
-      this._sunColor.setXYZW(c.x * c.w * preExposure, c.y * c.w * preExposure, c.z * c.w * preExposure, 0);
+      this._sunColor.setXYZW(c.x * c.w * exposure, c.y * c.w * exposure, c.z * c.w * exposure, 0);
     } else {
       this._sunDir.setXYZW(0, -1, 0, 0);
       this._sunColor.setXYZW(0, 0, 0, 0);
@@ -267,7 +316,7 @@ export class VoxelLighting {
       data[o + 8] = c.x;
       data[o + 9] = c.y;
       data[o + 10] = c.z;
-      data[o + 11] = c.w * preExposure;
+      data[o + 11] = c.w * exposure;
       data.set(light.extraParams, o + 12);
     }
     return count;
@@ -292,6 +341,8 @@ export class VoxelLighting {
         this.albedoTex = pb.tex3D().sampleType('unfilterable-float').uniform(0);
         this.emissiveTex = pb.tex3D().sampleType('unfilterable-float').uniform(0);
         this.radianceOut = pb.texStorage3D.rgba16float().storage(0);
+        this.aniso0Out = pb.texStorage3D.rgba8unorm().storage(0);
+        this.aniso1Out = pb.texStorage3D.rgba8unorm().storage(0);
         this.lights = pb.vec4[MAX_VOXEL_LIGHTS * LIGHT_VEC4S]().uniform(0);
         // (direction the light travels, 1 when there is a sun)
         this.sunDir = pb.vec4().uniform(0);
@@ -360,6 +411,8 @@ export class VoxelLighting {
           this.$l.tz = pb.add(this.t.z, pb.mul(this.level, this.res));
           this.$l.texel = pb.ivec3(this.t.x, this.t.y, this.tz);
           this.$l.radiance = pb.vec3(0);
+          this.$l.aniso0 = pb.vec4(0);
+          this.$l.aniso1 = pb.vec4(0);
           this.$l.a = pb.textureLoad(this.albedoTex, this.texel, 0);
           this.$if(pb.greaterThan(this.a.a, 0), function () {
             // World voxel of the texel: the one in the level's window with this toroidal address
@@ -378,48 +431,53 @@ export class VoxelLighting {
             );
             this.$l.vs = pb.mul(this.info.w, 2);
             this.$l.p = pb.mul(pb.add(pb.vec3(this.w), pb.vec3(0.5)), this.vs);
-            // Normal from the field's gradient at the voxel
-            this.$l.h = this.info.w;
-            this.$l.d0 = sampleGlobalSDF(this, this.p, levels);
-            this.$l.g = pb.vec3(
-              pb.sub(sampleGlobalSDF(this, pb.add(this.p, pb.vec3(this.h, 0, 0)), levels), this.d0),
-              pb.sub(sampleGlobalSDF(this, pb.add(this.p, pb.vec3(0, this.h, 0)), levels), this.d0),
-              pb.sub(sampleGlobalSDF(this, pb.add(this.p, pb.vec3(0, 0, this.h)), levels), this.d0)
-            );
-            this.$l.n = pb.div(this.g, pb.max(pb.length(this.g), 1e-6));
-            // Lit from just off the surface along the normal
-            this.$l.surf = pb.sub(this.p, pb.mul(this.n, this.d0));
-            this.$l.ps = pb.add(this.surf, pb.mul(this.n, this.vs));
-            // Ambient: the sky, or where the probes cover the voxel their
-            // irradiance, which carries the sky and every earlier bounce
-            // (the recursion of Majercik et al. 2019, section 3.2)
-            this.$l.ambient = pb.vec3(0);
-            if (skyIrradiance) {
-              this.ambient = pb.mul(envLight.getIrradiance(this, this.n).rgb, this.params.y);
+            // Light per axis face of the voxel, as Godot's SDFGI keeps it
+            // (sdfgi_direct_light.glsl): a voxel holding a floor thinner than
+            // itself is lit on top and dark below, which one normal from the
+            // field's gradient at its centre cannot tell apart; pointing down,
+            // it left sunlit floors black. Godot marks the faces with geometry
+            // from the triangle normals at voxelization; the material atlas is
+            // in the meshes' own spaces, so here a face counts where the field
+            // is outside the solid at its centre, open space lying that way.
+            this.$l.half = pb.mul(this.vs, 0.5);
+            for (let k = 0; k < 6; k++) {
+              this.$l[`open${k}`] = pb.greaterThan(
+                sampleGlobalSDF(this, pb.add(this.p, pb.mul(pb.vec3(...ANISO_DIRS[k]), this.half)), levels),
+                0
+              );
+              this.$l[`acc${k}`] = pb.vec3(0);
             }
-            if (useProbes) {
-              this.$l.bounce = sampleProbeIrradiance(this, this.ps, this.n, this.n);
-              this.ambient = pb.mix(this.ambient, this.bounce.rgb, this.bounce.a);
-            }
-            this.$l.light = pb.vec3(0);
+            this.$l.albedo = this.a.rgb;
+            // Sun: one shadow ray for every face, started almost at the corner
+            // of the voxel toward the light and a little along it (Godot's bias
+            // of outgoing rays), so a thin floor is left from the lit side
             this.$if(pb.greaterThan(this.sunDir.w, 0.5), function () {
               this.$l.L = pb.neg(this.sunDir.xyz);
-              this.$l.NoL = pb.dot(this.n, this.L);
-              this.$if(pb.greaterThan(this.NoL, 0), function () {
-                this.$l.shadow = sdfConeShadow(
-                  this,
-                  this.ps,
-                  this.L,
-                  this.params.z,
-                  this.vs,
-                  pb.mul(this[GLOBAL_SDF_PARAMS].x, this[GLOBAL_SDF_LEVELS].at(levels - 1).w, 0.5),
-                  levels,
-                  SHADOW_STEPS
-                );
-                this.light = pb.add(
-                  this.light,
-                  pb.mul(this.sunColor.rgb, this.NoL, this.shadow, 1 / Math.PI)
-                );
+              this.$l.ps = pb.add(
+                this.p,
+                pb.mul(pb.sign(this.L), this.vs, 0.48),
+                pb.mul(this.L, this.vs, 0.4)
+              );
+              this.$l.shadow = sdfConeShadow(
+                this,
+                this.ps,
+                this.L,
+                this.params.z,
+                this.vs,
+                pb.mul(this[GLOBAL_SDF_PARAMS].x, this[GLOBAL_SDF_LEVELS].at(levels - 1).w, 0.5),
+                levels,
+                SHADOW_STEPS
+              );
+              this.$if(pb.greaterThan(this.shadow, 0), function () {
+                this.$l.sun = pb.mul(this.albedo, this.sunColor.rgb, this.shadow, 1 / Math.PI);
+                for (let k = 0; k < 6; k++) {
+                  this.$if(this[`open${k}`], function () {
+                    this[`acc${k}`] = pb.add(
+                      this[`acc${k}`],
+                      pb.mul(this.sun, pb.max(pb.dot(pb.vec3(...ANISO_DIRS[k]), this.L), 0))
+                    );
+                  });
+                }
               });
             });
             this.$l.count = pb.int(this.params.x);
@@ -440,33 +498,76 @@ export class VoxelLighting {
                 this.Ld = pb.neg(this.dirCutoff.xyz);
               })
                 .$elseif(pb.equal(this.ltype, LIGHT_TYPE_SPOT), function () {
-                  this.atten = this.Z_spotAttenuation(this.ps, this.posRange, this.dirCutoff, this.extra.xy);
-                  this.Ld = pb.normalize(pb.sub(this.posRange.xyz, this.ps));
+                  this.atten = this.Z_spotAttenuation(this.p, this.posRange, this.dirCutoff, this.extra.xy);
+                  this.Ld = pb.normalize(pb.sub(this.posRange.xyz, this.p));
                 })
                 .$else(function () {
                   // Point, and a rect light reduced to its centre
-                  this.atten = this.Z_pointAttenuation(this.ps, this.posRange);
-                  this.Ld = pb.normalize(pb.sub(this.posRange.xyz, this.ps));
+                  this.atten = this.Z_pointAttenuation(this.p, this.posRange);
+                  this.Ld = pb.normalize(pb.sub(this.posRange.xyz, this.p));
                 });
-              this.$l.NoL2 = pb.max(pb.dot(this.n, this.Ld), 0);
-              this.light = pb.add(
-                this.light,
-                pb.mul(
-                  this.colorIntensity.rgb,
-                  pb.mul(this.colorIntensity.w, this.NoL2, this.atten, 1 / Math.PI)
-                )
+              this.$l.lc = pb.mul(
+                this.albedo,
+                this.colorIntensity.rgb,
+                pb.mul(this.colorIntensity.w, this.atten, 1 / Math.PI)
               );
+              for (let k = 0; k < 6; k++) {
+                this.$if(this[`open${k}`], function () {
+                  this[`acc${k}`] = pb.add(
+                    this[`acc${k}`],
+                    pb.mul(this.lc, pb.max(pb.dot(pb.vec3(...ANISO_DIRS[k]), this.Ld), 0))
+                  );
+                });
+              }
             });
+            // Ambient per open face: the sky, or where the probes cover the face
+            // their irradiance, which carries the sky and every earlier bounce
+            // (the recursion of Majercik et al. 2019, section 3.2; Godot reads
+            // its probes per face the same way). An albedo short of 1 keeps the
+            // loop convergent whatever the material claims. The emissive leaves
+            // every open face.
+            this.$l.feedback = pb.min(this.albedo, pb.vec3(0.9));
             this.$l.emissive = pb.textureLoad(this.emissiveTex, this.texel, 0).rgb;
-            // The ambient feeds back through the probes; an albedo short of 1
-            // keeps the loop convergent whatever the material claims
-            this.radiance = pb.add(
-              pb.mul(this.a.rgb, this.light),
-              pb.mul(pb.min(this.a.rgb, pb.vec3(0.9)), this.ambient),
-              this.emissive
+            for (let k = 0; k < 6; k++) {
+              this.$if(this[`open${k}`], function () {
+                this.$l.faceDir = pb.vec3(...ANISO_DIRS[k]);
+                this.$l.ambient = pb.vec3(0);
+                if (skyIrradiance) {
+                  this.ambient = pb.mul(envLight.getIrradiance(this, this.faceDir).rgb, this.params.y);
+                }
+                if (useProbes) {
+                  this.$l.bounce = sampleProbeIrradiance(
+                    this,
+                    pb.add(this.p, pb.mul(this.faceDir, this.half)),
+                    this.faceDir,
+                    this.faceDir,
+                    'feedback'
+                  );
+                  this.ambient = pb.mix(this.ambient, this.bounce.rgb, this.bounce.a);
+                }
+                this[`acc${k}`] = pb.add(this[`acc${k}`], pb.mul(this.feedback, this.ambient), this.emissive);
+              });
+            }
+            // Stored as the sum, with the share of each face by luminance
+            this.radiance = pb.add(this.acc0, this.acc1, this.acc2, this.acc3, this.acc4, this.acc5);
+            this.$l.lumaTotal = pb.max(pb.max(this.radiance.r, this.radiance.g), this.radiance.b);
+            this.$l.invLuma = this.$choice(
+              pb.greaterThan(this.lumaTotal, 0),
+              pb.div(1, pb.max(this.lumaTotal, 1e-8)),
+              pb.float(0)
             );
+            for (let k = 0; k < 6; k++) {
+              this.$l[`luma${k}`] = pb.mul(
+                pb.max(pb.max(this[`acc${k}`].r, this[`acc${k}`].g), this[`acc${k}`].b),
+                this.invLuma
+              );
+            }
+            this.aniso0 = pb.vec4(this.luma0, this.luma1, this.luma2, this.luma3);
+            this.aniso1 = pb.vec4(this.luma4, this.luma5, 0, 0);
           });
           pb.textureStore(this.radianceOut, pb.uvec3(this.texel), pb.vec4(this.radiance, 1));
+          pb.textureStore(this.aniso0Out, pb.uvec3(this.texel), this.aniso0);
+          pb.textureStore(this.aniso1Out, pb.uvec3(this.texel), this.aniso1);
           this.$outputs.color = pb.vec4(0);
         });
       }

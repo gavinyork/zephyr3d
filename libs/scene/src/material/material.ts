@@ -103,6 +103,13 @@ export class Material extends Disposable implements Clonable<Material>, IDisposa
    */
   private _optionTag: number;
   /**
+   * Incremented by every option change that can alter how the material looks,
+   * which leaves out per-object values of utility passes (the object color of
+   * GPU picking).
+   * @internal
+   */
+  private _appearanceTag: number;
+  /**
    * Unique runtime instance ID.
    * @internal
    */
@@ -138,6 +145,7 @@ export class Material extends Disposable implements Clonable<Material>, IDisposa
     this._numPasses = 1;
     this._hash = [null];
     this._optionTag = 0;
+    this._appearanceTag = 0;
     this._changeTag = 0;
     this._currentHash = [];
   }
@@ -186,6 +194,15 @@ export class Material extends Disposable implements Clonable<Material>, IDisposa
    */
   get optionTag() {
     return this._optionTag;
+  }
+  /**
+   * Like {@link Material.optionTag}, but not advanced by values that do not
+   * change how the material looks, such as the object color GPU picking sets
+   * every frame it picks. For caches of the material's appearance, like the
+   * voxelized materials of the global illumination.
+   */
+  get appearanceTag() {
+    return this._appearanceTag;
   }
   /**
    * Number of rendering passes this material uses.
@@ -489,10 +506,15 @@ export class Material extends Disposable implements Clonable<Material>, IDisposa
    *   increments `_changeTag`, and notifies `RenderBundleWrapper` to regenerate recorded bundles.
    *
    * @param changeHash - Set true if the change affects shader compilation or render states.
+   * @param appearance - Set false for a value that does not change how the material looks
+   *   (see {@link Material.appearanceTag}); defaults to true.
    * @internal
    */
-  optionChanged(changeHash: boolean) {
+  optionChanged(changeHash: boolean, appearance = true) {
     this._optionTag++;
+    if (appearance || changeHash) {
+      this._appearanceTag++;
+    }
     if (changeHash) {
       for (let i = 0; i < this._numPasses; i++) {
         this._hash[i] = null;

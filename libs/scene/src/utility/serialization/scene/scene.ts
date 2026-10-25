@@ -81,6 +81,26 @@ export function getSceneClass(manager: ResourceManager): SerializableClass {
           }
         },
         {
+          name: 'SDFAtlasSize',
+          description:
+            'Voxels per axis of the texture that holds the loaded mesh fields. When meshes near the camera are missing from the distance field view and the console warns that the atlas is full, raise it; each axis costs memory, 512×256×256 is 64 MB.',
+          type: 'int3',
+          default: [512, 256, 256],
+          options: { group: 'SDF', minValue: 64, maxValue: 2048 },
+          isHidden(this: Scene) {
+            return !this.sdf.enabled;
+          },
+          get(this: Scene, value) {
+            const size = this.sdf.atlasSize;
+            value.num[0] = size[0];
+            value.num[1] = size[1];
+            value.num[2] = size[2];
+          },
+          set(this: Scene, value) {
+            this.sdf.atlasSize = [value.num[0], value.num[1], value.num[2]];
+          }
+        },
+        {
           name: 'GIEnabled',
           description:
             'Build the voxel scene the global illumination reads: the static meshes with a baked distance field are rasterized into a material atlas around the camera, giving the field surfaces their colour and glow. Turns SDFEnabled on. WebGPU only; nothing changes on WebGL2.',
@@ -134,9 +154,9 @@ export function getSceneClass(manager: ResourceManager): SerializableClass {
         {
           name: 'GISunShadowConeAngle',
           description:
-            'Softness of the sun shadow in the bounced light, as the half angle in degrees of the cone traced through the distance field. Wider blurs the shadow edges in the indirect light; narrower sharpens them but lets the coarse field leak.',
+            'Softness of the sun shadow in the bounced light, as the half angle in degrees of the cone traced through the distance field; the default is the size of the sun. Wider blurs the shadow edges in the indirect light but darkens floors lit through narrow openings; narrower sharpens them.',
           type: 'float',
-          default: 5,
+          default: 0.5357,
           options: { group: 'Global Illumination', minValue: 0.1, maxValue: 45 },
           isHidden(this: Scene) {
             return !this.gi.enabled;

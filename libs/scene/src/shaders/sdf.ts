@@ -15,7 +15,9 @@ export const SDF_DYNAMIC_INFO = 'zSDFDynamicInfo';
 export const MAX_DYNAMIC_SDF_INSTANCES = 16;
 /**
  * vec4s per packed instance: world-to-local rows (3), (field box min, voxel
- * size), (field box max, world scale), (atlas slot offset, 0).
+ * size), (field box max, world scale), (atlas slot offset, thin). `thin` is
+ * the half thickness in world units of the solid a two-sided field gives its
+ * surface, -1 for a one-sided field; see `expand` of {@link sampleInstancesSDF}.
  */
 export const SDF_INSTANCE_VEC4S = 6;
 
@@ -102,6 +104,13 @@ export function sampleInstanceField(
  * scope, the k of the nearest instance is written to it (left alone when none
  * is nearer).
  *
+ * `expand`, in world units, is the least half thickness a two-sided field's
+ * surface is given here: a cloth or leaf baked two-sided is solid only half
+ * a field voxel to each side, which a coarser grid sampling it would step
+ * over without ever reading a negative value, so the surface is pushed out to
+ * `expand` where its own solid is thinner. Half the voxel size of the grid
+ * being written, 0 when sampling at a point.
+ *
  * @internal
  */
 export function sampleInstancesSDF(
@@ -113,11 +122,13 @@ export function sampleInstancesSDF(
   instance: (scope: PBInsideFunctionScope, index: PBShaderExp) => PBShaderExp,
   atlas: PBShaderExp,
   atlasInvSize: PBShaderExp,
+  expand: PBShaderExp,
   bestIndex?: string
 ) {
   const pb = scope.$builder;
   scope.$l.sdfBest = maxDist;
   scope.$l.sdfP4 = pb.vec4(p, 1);
+  scope.$l.sdfExpand = expand;
   scope.$for(pb.uint('sdfK'), 0, count, function () {
     this.$l.base = baseOf(this, this.sdfK);
     this.$l.r0 = instance(this, this.base);
@@ -133,11 +144,20 @@ export function sampleInstancesSDF(
     );
     this.$l.c = pb.clamp(this.lp, this.bmin.xyz, this.bmax.xyz);
     this.$l.outside = pb.length(pb.sub(this.lp, this.c));
+    // How far a two-sided surface is pushed out to reach the half thickness asked for
+    this.$l.grow = this.$choice(
+      pb.greaterThanEqual(this.slot.w, 0),
+      pb.max(pb.sub(this.sdfExpand, this.slot.w), 0),
+      pb.float(0)
+    );
     // A field box farther than the current best cannot improve it
-    this.$if(pb.lessThan(pb.mul(this.outside, this.bmax.w), this.sdfBest), function () {
-      this.$l.cand = pb.mul(
-        sampleInstanceField(this, this.lp, this.bmin, this.bmax, this.slot, atlas, atlasInvSize),
-        this.bmax.w
+    this.$if(pb.lessThan(pb.sub(pb.mul(this.outside, this.bmax.w), this.grow), this.sdfBest), function () {
+      this.$l.cand = pb.sub(
+        pb.mul(
+          sampleInstanceField(this, this.lp, this.bmin, this.bmax, this.slot, atlas, atlasInvSize),
+          this.bmax.w
+        ),
+        this.grow
       );
       this.$if(pb.lessThan(this.cand, this.sdfBest), function () {
         this.sdfBest = this.cand;
@@ -168,7 +188,8 @@ export function sampleDynamicSDF(scope: PBInsideFunctionScope, worldPos: PBShade
         (s, k) => pb.mul(k, SDF_INSTANCE_VEC4S),
         (s, i) => s[SDF_DYNAMIC_INSTANCES].at(i),
         this[SDF_ATLAS_TEXTURE],
-        this[SDF_DYNAMIC_INFO].yzw
+        this[SDF_DYNAMIC_INFO].yzw,
+        pb.float(0)
       )
     );
   });

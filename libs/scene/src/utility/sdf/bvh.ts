@@ -166,8 +166,51 @@ export class TriangleBVH {
     }
     return n;
   }
+  /**
+   * The nearest triangle a ray crosses within `tMax`.
+   * @param dir - Unit ray direction.
+   * @returns The ray parameter of the hit, negated when the triangle faces
+   * away from the ray (its winding normal points along `dir`); 0 when the ray
+   * crosses nothing within `tMax`.
+   */
+  rayNearestHit(ox: number, oy: number, oz: number, dx: number, dy: number, dz: number, tMax: number) {
+    if (this.order.length === 0) {
+      return 0;
+    }
+    const ix = 1 / dx;
+    const iy = 1 / dy;
+    const iz = 1 / dz;
+    const stack = this._stack;
+    let sp = 0;
+    let best = tMax;
+    let back = false;
+    stack[sp++] = 0;
+    while (sp > 0) {
+      const node = stack[--sp];
+      if (rayBoxEntry(this.bounds, node, ox, oy, oz, ix, iy, iz) > best) {
+        continue;
+      }
+      const count = this.count[node];
+      if (count > 0) {
+        const first = this.offset[node];
+        for (let i = first; i < first + count; i++) {
+          const t = this._rayTriangle(this.order[i], ox, oy, oz, dx, dy, dz);
+          if (t > 0 && t <= best) {
+            best = t;
+            back = this._lastHitBack;
+          }
+        }
+      } else {
+        stack[sp++] = node + 1;
+        stack[sp++] = this.offset[node];
+      }
+    }
+    return best < tMax ? (back ? -best : best) : 0;
+  }
   private readonly _stack = new Uint32Array(256);
   private readonly _closest = new Float32Array(3);
+  /** Whether the last triangle `_rayTriangle` hit faced away from the ray. */
+  private _lastHitBack = false;
   /** @internal */
   private _build(first: number, count: number, centroids: Float32Array, triBounds: Float32Array): number {
     const node = this._numNodes++;
@@ -357,6 +400,8 @@ export class TriangleBVH {
     if (Math.abs(det) < 1e-20) {
       return 0;
     }
+    // det = -dir . (e1 x e2): negative when the ray runs along the winding normal
+    this._lastHitBack = det < 0;
     const inv = 1 / det;
     const sx = ox - ax;
     const sy = oy - ay;
@@ -404,6 +449,44 @@ function boxDistSq(b: Float32Array, node: number, px: number, py: number, pz: nu
   const dy = Math.max(b[o + 1] - py, 0, py - b[o + 4]);
   const dz = Math.max(b[o + 2] - pz, 0, pz - b[o + 5]);
   return dx * dx + dy * dy + dz * dz;
+}
+
+/** Ray parameter at which a ray enters node bounds, Infinity when it misses them. */
+function rayBoxEntry(
+  b: Float32Array,
+  node: number,
+  ox: number,
+  oy: number,
+  oz: number,
+  ix: number,
+  iy: number,
+  iz: number
+) {
+  const o = node * 6;
+  let t0x = (b[o] - ox) * ix;
+  let t1x = (b[o + 3] - ox) * ix;
+  if (t0x > t1x) {
+    const t = t0x;
+    t0x = t1x;
+    t1x = t;
+  }
+  let t0y = (b[o + 1] - oy) * iy;
+  let t1y = (b[o + 4] - oy) * iy;
+  if (t0y > t1y) {
+    const t = t0y;
+    t0y = t1y;
+    t1y = t;
+  }
+  let t0z = (b[o + 2] - oz) * iz;
+  let t1z = (b[o + 5] - oz) * iz;
+  if (t0z > t1z) {
+    const t = t0z;
+    t0z = t1z;
+    t1z = t;
+  }
+  const tNear = Math.max(nanTo(t0x, -Infinity), nanTo(t0y, -Infinity), nanTo(t0z, -Infinity), 0);
+  const tFar = Math.min(nanTo(t1x, Infinity), nanTo(t1y, Infinity), nanTo(t1z, Infinity));
+  return tNear <= tFar ? tNear : Infinity;
 }
 
 function rayHitsBox(

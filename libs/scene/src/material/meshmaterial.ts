@@ -713,7 +713,9 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
   set objectColor(val: Immutable<Vector4>) {
     if (val !== this._objectColor) {
       this._objectColor = val;
-      this.uniformChanged();
+      // Set by every frame that picks: the uniforms must be uploaded again, but
+      // the look is unchanged, so caches of it (voxelized materials) stay valid
+      this.optionChanged(false, false);
     }
   }
   /**

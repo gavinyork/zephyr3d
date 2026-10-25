@@ -6,7 +6,7 @@ import type { SceneNode } from '../../scene/scene_node';
 import { getEngine } from '../../app/api';
 import { getMeshSDFPath, readZsdf, writeZsdf } from '../../asset/zsdf_binary';
 import type { ZsdfHeader } from '../../asset/zsdf_binary';
-import { MeshSDFAtlas } from './sdf_atlas';
+import { MeshSDFAtlas, SDF_ATLAS_BLOCK } from './sdf_atlas';
 import { GlobalSDF } from './global_sdf';
 import type { ClipmapTerrain } from '../../scene/terrain-cm/terrain-cm';
 import type { Primitive } from '../primitive';
@@ -133,6 +133,8 @@ export class SceneSDF extends makeObservable(Disposable)<SceneSDFEvents>() {
   streamRadius: number;
   /** Field files read at once. */
   maxConcurrentLoads: number;
+  private _atlasSize: [number, number, number];
+  private _atlasFullWarned: boolean;
   /** Bytes uploaded to the atlas per frame. */
   uploadBudget: number;
   private readonly _scene: Scene;
@@ -167,6 +169,8 @@ export class SceneSDF extends makeObservable(Disposable)<SceneSDFEvents>() {
     this._loading = 0;
     this._time = 0;
     this._atlasFull = 0;
+    this._atlasFullWarned = false;
+    this._atlasSize = [512, 256, 256];
     this._updates = 0;
     this._camera = new Vector3();
     this.streamRadius = 256;
@@ -203,10 +207,37 @@ export class SceneSDF extends makeObservable(Disposable)<SceneSDFEvents>() {
       this._terrain = null;
     }
   }
+  /**
+   * Voxels per axis of the atlas the resident fields share, half floats;
+   * 512×256×256 (64 MB) by default. Fields that do not fit once the ones
+   * nearer the camera are placed are left out of the scene field, and a
+   * warning says so. Changing it empties the atlas; the fields come back
+   * over the following frames.
+   */
+  get atlasSize(): [number, number, number] {
+    return [...this._atlasSize];
+  }
+  set atlasSize(val: [number, number, number]) {
+    const size = val.map((v) => Math.max(SDF_ATLAS_BLOCK, Math.floor(v))) as [number, number, number];
+    if (size.some((v, i) => v !== this._atlasSize[i])) {
+      this._atlasSize = size;
+      if (this._atlas) {
+        for (const asset of this._assets.values()) {
+          if (this._atlas.getSlot(asset)) {
+            this.dirtyAsset(asset);
+          }
+        }
+        this._atlas.dispose();
+        this._atlas = null;
+      }
+      this._atlasFull = 0;
+      this._atlasFullWarned = false;
+    }
+  }
   /** The atlas of resident fields, created when first needed. */
   get atlas() {
     if (!this._atlas) {
-      this._atlas = new MeshSDFAtlas();
+      this._atlas = new MeshSDFAtlas(this._atlasSize);
     }
     return this._atlas;
   }
@@ -398,6 +429,12 @@ export class SceneSDF extends makeObservable(Disposable)<SceneSDFEvents>() {
       }
     }
     this._atlasFull++;
+    if (!this._atlasFullWarned) {
+      this._atlasFullWarned = true;
+      console.warn(
+        `SceneSDF: the field of ${asset.meshPath} (${res.join('×')} voxels) does not fit the ${this._atlasSize.join('×')} atlas, which is ${Math.round(atlas.occupancy * 100)}% full; it and any other field that does not fit are left out of the scene field. Raise SceneSDF.atlasSize or bake the small meshes at a lower resolution scale.`
+      );
+    }
   }
   /** @internal */
   private load(asset: MeshSDFAsset) {

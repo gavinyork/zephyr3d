@@ -132,10 +132,22 @@ export abstract class EnvironmentLighting extends Disposable {
   /**
    * Get irradiance for a fragment
    *
+   * @remarks
+   * With a draw context, as when a material shades a fragment, the result is
+   * the final diffuse environment lighting: the sky's irradiance scaled by the
+   * environment light strength, replaced by the probe volume's global
+   * illumination where it covers the fragment and refined by the SSGI history
+   * when there is one. The environment light strength is applied here and
+   * nowhere else, so callers must not scale the result by it again.
+   *
+   * Without one, the raw sky irradiance, unscaled: for the global
+   * illumination passes, which apply the strength themselves.
+   *
    * @param scope - The shader scope
    * @param normal - surface normal
+   * @param ctx - Draw context of the material shading the fragment, if any
    *
-   * @returns The radiance for the fragment
+   * @returns The irradiance for the fragment
    */
   abstract getIrradiance(scope: PBInsideFunctionScope, normal: PBShaderExp, ctx?: DrawContext): PBShaderExp;
   /**
@@ -166,10 +178,51 @@ export abstract class EnvironmentLighting extends Disposable {
     getProbeVolumeForDraw(ctx)?.applyBindGroup(bg);
   }
   /**
-   * The irradiance with the probe volume's answer in place of the environment's
-   * wherever the probes cover the fragment: global illumination over the sky
-   * term. Needs the fragment's world position, read from the material's
-   * `worldPos` varying; a material without one keeps the environment.
+   * How much of the environment's specular reflection reaches a fragment:
+   * the probe volume's sky visibility there turned into a specular occlusion
+   * by Lagarde and de Rousiers' fit ("Moving Frostbite to PBR", 2014, the
+   * \`GetSpecularOcclusion\` of Unreal's ReflectionEnvironmentShared.ush),
+   * which Unreal feeds with its ambient occlusion. The sky's reflection is an
+   * open sky; a surface that sees little of it must reflect little of it. 1
+   * where the probes do not cover the fragment, or without a probe volume or
+   * the material's \`worldPos\` varying.
+   * @internal
+   */
+  getSkySpecularOcclusion(
+    scope: PBInsideFunctionScope,
+    normal: PBShaderExp,
+    NoV: PBShaderExp,
+    roughness: PBShaderExp,
+    ctx?: DrawContext
+  ): PBShaderExp {
+    const pb = scope.$builder;
+    if (!getProbeVolumeForDraw(ctx)) {
+      return pb.float(1);
+    }
+    const global = pb.getGlobalScope();
+    const worldPos = global.$inputs.worldPos as PBShaderExp | undefined;
+    if (!worldPos) {
+      return pb.float(1);
+    }
+    const funcName = 'Z_envSkySpecularOcclusion';
+    pb.func(funcName, [pb.vec3('n'), pb.vec3('p'), pb.float('NoV'), pb.float('roughness')], function () {
+      this.$l.v = pb.normalize(pb.sub(this.camera.position.xyz, this.p));
+      this.$l.sky = sampleProbeIrradiance(this, this.p, this.n, this.v, 'sky');
+      this.$l.vis = pb.mix(pb.float(1), this.sky.r, this.sky.a);
+      this.$l.r2 = pb.mul(this.roughness, this.roughness);
+      this.$return(pb.clamp(pb.add(pb.sub(pb.pow(pb.add(this.NoV, this.vis), this.r2), 1), this.vis), 0, 1));
+    });
+    return global[funcName](normal, worldPos, NoV, roughness) as PBShaderExp;
+  }
+  /**
+   * Turns the raw sky irradiance into what a material shades with (see
+   * {@link EnvironmentLighting.getIrradiance}): scaled by the environment
+   * light strength, then the probe volume's answer in its place wherever the
+   * probes cover the fragment. The probes carry the sky already, scaled by the
+   * strength where their rays escaped, and their own intensity, so they are
+   * not scaled again. Needs the fragment's world position, read from the
+   * material's `worldPos` varying; a material without one keeps the sky.
+   * Without a draw context the raw irradiance is returned unchanged.
    * @internal
    */
   protected applyProbes(
@@ -179,13 +232,18 @@ export abstract class EnvironmentLighting extends Disposable {
     irradiance: PBShaderExp
   ) {
     const pb = scope.$builder;
-    if (!getProbeVolumeForDraw(ctx ?? undefined)) {
+    if (!ctx) {
       return irradiance;
+    }
+    // The light uniforms of the material's light pass; see ShaderHelper.getEnvLightStrength
+    const sky = pb.mul(irradiance, scope.light.envLightStrength) as PBShaderExp;
+    if (!getProbeVolumeForDraw(ctx)) {
+      return sky;
     }
     const global = pb.getGlobalScope();
     const worldPos = global.$inputs.worldPos as PBShaderExp | undefined;
     if (!worldPos) {
-      return irradiance;
+      return sky;
     }
     const funcName = 'Z_envIrradianceWithProbes';
     pb.func(funcName, [pb.vec3('n'), pb.vec3('p'), pb.vec3('env')], function () {
@@ -193,7 +251,7 @@ export abstract class EnvironmentLighting extends Disposable {
       this.$l.probe = sampleProbeIrradiance(this, this.p, this.n, this.v);
       this.$return(pb.mix(this.env, this.probe.rgb, this.probe.a));
     });
-    return global[funcName](normal, worldPos, irradiance) as PBShaderExp;
+    return global[funcName](normal, worldPos, sky) as PBShaderExp;
   }
 }
 
@@ -639,7 +697,8 @@ export class EnvShIBL extends EnvironmentLighting {
         this.$l.motionValid = pb.bool(true);
       }
       this.$l.params = this[EnvShIBL.UNIFORM_NAME_SSGI_REPROJECTION];
-      this.$l.fallback = pb.mul(this.ibl, this.light.envLightStrength);
+      // Already in the history's units: scaled by the environment strength, probes in place
+      this.$l.fallback = this.ibl;
       this.$l.normalizedCurrentNormal = pb.normalize(this.currentNormal);
       this.$l.depthTolerance = pb.max(this.params.x, 1e-4);
       this.$l.texelSize = pb.div(pb.vec2(1), this[EnvShIBL.UNIFORM_NAME_SSGI_TARGET_SIZE]);

@@ -13,7 +13,7 @@ import type { SDFBakeRequest, SDFBakeResponse } from '../../workers/sdf_bake';
 import { ProjectService } from './project';
 
 /** Bumped whenever the baker's output changes, so every field is rebaked. */
-const SDF_BAKER_VERSION = 1;
+const SDF_BAKER_VERSION = 2;
 
 /** Outcome of baking one mesh. */
 export interface MeshSDFBakeResult {
@@ -40,17 +40,19 @@ function settingsKey(settings: MeshImportSettings) {
 
 /**
  * Bakes the signed distance fields of mesh assets into {@link MESH_SDF_DIR},
- * one `.zsdf` per `.zmsh`, in a worker.
+ * one `.zsdf` per `.zmsh`, in a pool of workers.
  *
  * A field records the content hash of its source and the settings it was baked
  * with, so a bake is skipped while both still match.
  */
 export class MeshSDFBaker {
-  private static _worker: Worker | null = null;
+  private static readonly _workers: { worker: Worker; busy: boolean }[] = [];
+  /** Requests waiting for a worker, oldest first */
+  private static readonly _queue: (() => void)[] = [];
   private static _nextId = 1;
   private static readonly _pending = new Map<
     number,
-    { resolve: (r: SDFBakeResponse) => void; reject: (e: Error) => void }
+    { resolve: (r: SDFBakeResponse) => void; reject: (e: Error) => void; worker: Worker }
   >();
   /** Decoded fields, per mesh path and the hash they were decoded at */
   private static readonly _decoded = new Map<string, { key: string; sdf: MeshSDFData }>();
@@ -105,18 +107,29 @@ export class MeshSDFBaker {
     }
   }
 
-  /** Bakes meshes one after another, so the worker is never handed more than one. */
+  /** Workers baking at once: one per core but the main thread's, at most eight. */
+  static get poolSize() {
+    return Math.max(1, Math.min(8, (globalThis.navigator?.hardwareConcurrency ?? 4) - 1));
+  }
+
+  /** Bakes meshes with as many workers as the pool holds; results are in the order of `paths`. */
   static async bakeAll(
     paths: string[],
     force = false,
     onProgress?: (done: number, total: number) => void
   ): Promise<MeshSDFBakeResult[]> {
     const unique = [...new Set(paths)];
-    const results: MeshSDFBakeResult[] = [];
-    for (let i = 0; i < unique.length; i++) {
-      results.push(await this.bake(unique[i], force));
-      onProgress?.(i + 1, unique.length);
-    }
+    const results: MeshSDFBakeResult[] = new Array(unique.length);
+    let next = 0;
+    let done = 0;
+    const lane = async () => {
+      while (next < unique.length) {
+        const i = next++;
+        results[i] = await this.bake(unique[i], force);
+        onProgress?.(++done, unique.length);
+      }
+    };
+    await Promise.all(Array.from({ length: Math.min(this.poolSize, unique.length) }, lane));
     return results;
   }
 
@@ -160,37 +173,79 @@ export class MeshSDFBaker {
     }
   }
 
-  private static run(req: Omit<SDFBakeRequest, 'id'>) {
+  private static async run(req: Omit<SDFBakeRequest, 'id'>) {
+    const slot = await this.acquireWorker();
     const id = this._nextId++;
     return new Promise<SDFBakeResponse>((resolve, reject) => {
-      this._pending.set(id, { resolve, reject });
-      this.getWorker().postMessage({ ...req, id }, [req.positions.buffer, req.indices.buffer]);
+      this._pending.set(id, { resolve, reject, worker: slot.worker });
+      slot.worker.postMessage({ ...req, id }, [req.positions.buffer, req.indices.buffer]);
     });
   }
 
-  private static getWorker() {
-    if (!this._worker) {
-      this._worker = new Worker(new URL('../../workers/sdf_bake.ts', import.meta.url), { type: 'module' });
-      this._worker.onmessage = (e: MessageEvent<SDFBakeResponse>) => {
-        const p = this._pending.get(e.data.id);
-        if (p) {
-          this._pending.delete(e.data.id);
-          if (e.data.type === 'result') {
-            p.resolve(e.data);
-          } else {
-            p.reject(new Error(e.data.message));
-          }
+  /** An idle worker, a new one while the pool is not full, or the next one to finish. */
+  private static acquireWorker(): Promise<{ worker: Worker; busy: boolean }> {
+    const idle = this._workers.find((w) => !w.busy);
+    if (idle) {
+      idle.busy = true;
+      return Promise.resolve(idle);
+    }
+    if (this._workers.length < this.poolSize) {
+      const slot = { worker: this.createWorker(), busy: true };
+      this._workers.push(slot);
+      return Promise.resolve(slot);
+    }
+    return new Promise((resolve) => {
+      this._queue.push(() => {
+        const slot = this._workers.find((w) => !w.busy);
+        if (slot) {
+          slot.busy = true;
+          resolve(slot);
+        } else {
+          // Every worker died meanwhile; start afresh
+          const fresh = { worker: this.createWorker(), busy: true };
+          this._workers.push(fresh);
+          resolve(fresh);
         }
-      };
-      this._worker.onerror = (e) => {
-        for (const p of this._pending.values()) {
+      });
+    });
+  }
+
+  private static releaseWorker(worker: Worker) {
+    const slot = this._workers.find((w) => w.worker === worker);
+    if (slot) {
+      slot.busy = false;
+    }
+    this._queue.shift()?.();
+  }
+
+  private static createWorker() {
+    const worker = new Worker(new URL('../../workers/sdf_bake.ts', import.meta.url), { type: 'module' });
+    worker.onmessage = (e: MessageEvent<SDFBakeResponse>) => {
+      const p = this._pending.get(e.data.id);
+      if (p) {
+        this._pending.delete(e.data.id);
+        if (e.data.type === 'result') {
+          p.resolve(e.data);
+        } else {
+          p.reject(new Error(e.data.message));
+        }
+      }
+      this.releaseWorker(worker);
+    };
+    worker.onerror = (e) => {
+      for (const [id, p] of [...this._pending]) {
+        if (p.worker === worker) {
+          this._pending.delete(id);
           p.reject(new Error(e.message || 'SDF bake worker crashed'));
         }
-        this._pending.clear();
-        this._worker?.terminate();
-        this._worker = null;
-      };
-    }
-    return this._worker;
+      }
+      worker.terminate();
+      const at = this._workers.findIndex((w) => w.worker === worker);
+      if (at >= 0) {
+        this._workers.splice(at, 1);
+      }
+      this._queue.shift()?.();
+    };
+    return worker;
   }
 }

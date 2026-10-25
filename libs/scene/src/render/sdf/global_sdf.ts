@@ -37,8 +37,10 @@ const MAX_QUERY_POINTS = 4096;
 /**
  * Writes an instance in the layout of {@link SDF_INSTANCE_VEC4S}: world to
  * local by rows, the field box with the voxel size and the world scale, and
- * the atlas slot. The scale is the smallest axis scale, so a distance scaled
- * by it never overshoots under non-uniform scale.
+ * the atlas slot with the half thickness of a two-sided field's solid (half a
+ * field voxel, in world units; -1 for a one-sided field). The scale is the
+ * smallest axis scale, so a distance scaled by it never overshoots under
+ * non-uniform scale.
  */
 function packSDFInstance(inst: SDFInstance, atlas: MeshSDFAtlas, out: Float32Array, offset: number) {
   const header = inst.asset!.header!;
@@ -55,7 +57,7 @@ function packSDFInstance(inst: SDFInstance, atlas: MeshSDFAtlas, out: Float32Arr
   out.set([inv.m20, inv.m21, inv.m22, inv.m23], offset + 8);
   out.set([...header.boxMin, header.voxelSize], offset + 12);
   out.set([...header.boxMax, scale], offset + 16);
-  out.set([...slot.offset, 0], offset + 20);
+  out.set([...slot.offset, header.twoSided ? 0.5 * header.voxelSize * scale : -1], offset + 20);
 }
 
 /**
@@ -769,7 +771,8 @@ export class GlobalSDF {
               (scope, k) => pb.mul(scope.indices.at(pb.add(scope.start, k)), SDF_INSTANCE_VEC4S),
               (scope, i) => scope.instances.at(i),
               this.atlas,
-              this.atlasInvSize.xyz
+              this.atlasInvSize.xyz,
+              pb.mul(this.vs, 0.5)
             );
             this.$l.terrainD = this.band;
             this.$if(pb.greaterThan(this.b2.y, 0), function () {
@@ -829,6 +832,7 @@ export class GlobalSDF {
                   (scope, i) => scope.instances.at(i),
                   this.atlas,
                   this.atlasInvSize.xyz,
+                  pb.mul(this.vs, 0.5),
                   'bestK'
                 );
                 this.$l.terrainWins = pb.and(

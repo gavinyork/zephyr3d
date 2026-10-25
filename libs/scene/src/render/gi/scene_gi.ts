@@ -60,7 +60,12 @@ export class SceneGI {
     this._atlasSize = 256;
     this._voxelizeBudget = 8;
     this._terrainAlbedo = new Vector3(0.3, 0.3, 0.3);
-    this._lighting = { sunShadowConeAngle: 5, slicesPerFrame: 8 };
+    // The sun's angular size, the cone Unreal traces distance field shadows of a
+    // directional light with (LightSourceAngle 0.5357, DirectionalLightComponent.cpp;
+    // its tangent is the cone's, DistanceFieldShadowing.cpp). Wider cones close the
+    // openings sunlight comes through: at 5 degrees a courtyard floor lit through
+    // an opening a few metres up read as shadowed.
+    this._lighting = { sunShadowConeAngle: 0.5357, slicesPerFrame: 8 };
     this._probeOptions = {
       grid: [32, 16, 32],
       spacing: 1,
@@ -305,7 +310,12 @@ export class SceneGI {
   }
   /** Called by the scene once a frame, after the scene field's update. */
   updateLighting(camera: Camera) {
-    if (!this._enabled || !this._voxels || !this._scene.sdf.enabled || this._updateMode === 'frozen') {
+    if (!this._enabled || !this._voxels || !this._scene.sdf.enabled) {
+      return;
+    }
+    // The probes are read at the camera's exposure even while frozen
+    this._probes?.setReadExposure(camera);
+    if (this._updateMode === 'frozen') {
       return;
     }
     this._voxels.updateLighting(this._scene.sdf, camera, this._lighting);
@@ -315,6 +325,7 @@ export class SceneGI {
     if (!this._probes) {
       this._probes = new ProbeVolume(this._scene, this._probeOptions);
     }
+    this._probes.setReadExposure(camera);
     this._probes.update(this._scene.sdf, this._voxels, camera);
   }
   dispose() {

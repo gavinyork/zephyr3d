@@ -20,6 +20,7 @@ import { DlgPromptName } from '../views/dlg/promptnamedlg';
 import { DlgRename } from '../views/dlg/renamedlg';
 import { DlgMessage } from '../views/dlg/messagedlg';
 import { DlgProgress } from '../views/dlg/progressdlg';
+import { MeshSDFBaker } from '../core/services/sdfbaker';
 import { DlgMessageBoxEx } from '../views/dlg/messageexdlg';
 import { templateScript } from '../core/build/templates';
 import { installDeps, reinstallPackages } from '../core/build/dep';
@@ -2955,6 +2956,30 @@ export class VFSRenderer extends makeObservable(Disposable)<{
                   dlgProgressBar.setProgress(done, total)
                 );
               }
+              // Distance fields of every mesh of the models that asked for them, so a
+              // model that imports as many meshes needs no bake per mesh afterwards
+              const sdfMeshes = new Set<string>();
+              models.forEach((model, i) => {
+                if (saveOptions[i].bakeSDF) {
+                  for (const info of model.primitives) {
+                    if (info.path) {
+                      sdfMeshes.add(info.path);
+                    }
+                  }
+                }
+              });
+              if (sdfMeshes.size > 0) {
+                dlgProgressBar.setMessage('Baking distance fields...');
+                dlgProgressBar.setProgress(0, sdfMeshes.size);
+                const results = await MeshSDFBaker.bakeAll([...sdfMeshes], false, (done, total) =>
+                  dlgProgressBar.setProgress(done, total)
+                );
+                for (const r of results) {
+                  if (r.err) {
+                    console.error(`Bake distance field of ${r.path} failed: ${r.err}`);
+                  }
+                }
+              }
               dlgProgressBar.close();
             }
           }
@@ -3416,13 +3441,13 @@ export class VFSRenderer extends makeObservable(Disposable)<{
         }
       };
       await this.runWithVFSBatchUpdate(execute);
+      dlg.close();
     } catch (err) {
+      dlg.close();
       DlgMessage.messageBox(
         'Error',
         `${copy ? 'Copy asset failed' : 'Move asset failed'}: ${err}\n\nThe operation was stopped before completing all remaining items.`
       );
-    } finally {
-      dlg.close();
     }
   }
 

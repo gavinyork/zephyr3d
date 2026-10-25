@@ -1580,12 +1580,6 @@ export function mixinPBRCommon<T extends typeof MeshMaterial>(BaseCls: T) {
       const pb = scope.$builder;
       const that = this;
       const ctx = that.drawContext;
-      const useReprojectedSSGI = !!(
-        ctx.SSGI &&
-        ctx.SSGIIrradianceHistoryTexture &&
-        ctx.SSGISurfaceHistoryTexture &&
-        ctx.motionVectorTexture
-      );
       const funcName = 'Z_PBRIndirectLighting';
       pb.func(
         funcName,
@@ -1620,8 +1614,19 @@ export function mixinPBRCommon<T extends typeof MeshMaterial>(BaseCls: T) {
             this.ambientOcclusion = pb.mul(this.ambientOcclusion, this.customOcclusion);
             this.occlusion = pb.mul(this.occlusion, this.customOcclusion);
           }
-          this.$l.diffuseOcclusion = useReprojectedSSGI ? this.ambientOcclusion : this.occlusion;
+          // The irradiance carries the environment strength already (see
+          // EnvironmentLighting.getIrradiance); only the specular terms take it here
+          this.$l.diffuseOcclusion = this.ambientOcclusion;
           this.$l.NoV = pb.clamp(pb.dot(this.normal, this.viewVec), 0.0001, 1);
+          // The sky's reflection darkened where the probes see little of the
+          // sky; on the environment's reflections only, not on what SSR resolves
+          this.$l.skySpecularOcclusion = ctx.env!.light.envLight.getSkySpecularOcclusion(
+            this,
+            this.normal,
+            this.NoV,
+            this.data.roughness,
+            ctx
+          );
           if (that.sheen) {
             this.$l.sheenLutSample = pb.clamp(
               pb.textureSampleLevel(
@@ -1698,7 +1703,12 @@ export function mixinPBRCommon<T extends typeof MeshMaterial>(BaseCls: T) {
               );
               this.outColor = pb.add(
                 this.outColor,
-                pb.mul(this.radiance, this.specularFactor, envLightSpecularStrength)
+                pb.mul(
+                  this.radiance,
+                  this.specularFactor,
+                  envLightSpecularStrength,
+                  this.skySpecularOcclusion
+                )
               );
             }
           }
@@ -1794,12 +1804,18 @@ export function mixinPBRCommon<T extends typeof MeshMaterial>(BaseCls: T) {
               );
               this.outColor = pb.add(
                 this.outColor,
-                pb.mul(this.data.sheenColor, this.sheenRadiance, this.sheenBRDF, this.occlusion)
+                pb.mul(
+                  this.data.sheenColor,
+                  this.sheenRadiance,
+                  this.sheenBRDF,
+                  this.occlusion,
+                  this.skySpecularOcclusion
+                )
               );
             } else {
               this.outColor = pb.add(
                 this.outColor,
-                pb.mul(this.data.sheenColor, this.irradiance.rgb, this.sheenBRDF, this.occlusion)
+                pb.mul(this.data.sheenColor, this.irradiance.rgb, this.sheenBRDF, this.diffuseOcclusion)
               );
             }
           }
@@ -1830,7 +1846,13 @@ export function mixinPBRCommon<T extends typeof MeshMaterial>(BaseCls: T) {
               this.data.ccFactor.y
             );
             this.$l.FssEss = pb.add(pb.mul(this.k_S, this.f_ab.x), pb.vec3(this.f_ab.y));
-            this.$l.ccSpecular = pb.mul(this.radiance, this.FssEss, this.occlusion, envLightSpecularStrength);
+            this.$l.ccSpecular = pb.mul(
+              this.radiance,
+              this.FssEss,
+              this.occlusion,
+              envLightSpecularStrength,
+              this.skySpecularOcclusion
+            );
             this.outColor = pb.add(this.outColor, pb.mul(this.ccSpecular, this.data.ccFactor.x));
           }
         }

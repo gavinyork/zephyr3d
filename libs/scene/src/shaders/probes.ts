@@ -20,14 +20,19 @@ export const PROBE_PARAM_VEC4S = 3 + 2 * PROBE_MAX_LEVELS;
  * Declares the probe volume as a program reads it:
  *
  * - irradiance: rgba16f 2D atlas of octahedral tiles, one per probe, each
- *   `irrTexels`² with a one texel border; E/π in the engine's irradiance units.
+ *   `irrTexels`² with a one texel border; rgb E/π in the engine's irradiance
+ *   units at the fixed cache exposure (getGICacheExposure), which the read
+ *   scale of params[2] converts to the camera's; a the sky visibility, the
+ *   cosine-weighted share of the probe's rays that escaped to the sky.
  * - visibility: rgba16f atlas of `visTexels`² tiles holding (mean distance,
  *   mean squared distance) per direction.
  * - data: one vec4 per probe, (relocation offset, state), state 0 while the
  *   probe has never been updated; a storage buffer, writable when `writable`.
  * - params[0]: (levels, tiles per atlas row, irrTexels, visTexels),
  *   params[1]: (irradiance atlas size, visibility atlas size),
- *   params[2]: (intensity, normal bias, view bias, max ray distance),
+ *   params[2]: (read scale, normal bias, view bias, max ray distance), the read
+ *   scale being what a surface reading the probes multiplies them by (the
+ *   global illumination intensity); the bounce feedback reads them unscaled;
  *   params[3 + 2l]: (world index of level l's first probe, its spacing),
  *   params[4 + 2l]: (probes per axis of level l, its first tile).
  *
@@ -236,10 +241,11 @@ function sampleProbeLevel(
   level: PBShaderExp,
   p: PBShaderExp,
   biased: PBShaderExp,
-  n: PBShaderExp
+  n: PBShaderExp,
+  sky: boolean
 ) {
   const pb = scope.$builder;
-  const funcName = 'Z_sampleProbeLevel';
+  const funcName = sky ? 'Z_sampleProbeLevelSky' : 'Z_sampleProbeLevel';
   pb.func(funcName, [pb.int('level'), pb.vec3('p'), pb.vec3('biased'), pb.vec3('n')], function () {
     this.$l.p0 = this[PROBE_PARAMS].at(0);
     this.$l.p1 = this[PROBE_PARAMS].at(1);
@@ -306,7 +312,7 @@ function sampleProbeLevel(
             this.p1.xy,
             this.n
           );
-          this.sum = pb.add(this.sum, pb.mul(this.irr.rgb, this.w));
+          this.sum = pb.add(this.sum, pb.mul(sky ? pb.vec3(this.irr.a) : this.irr.rgb, this.w));
           this.wsum = pb.add(this.wsum, this.w);
         });
       }
@@ -325,16 +331,30 @@ function sampleProbeLevel(
  * Majercik et al., "Dynamic Diffuse Global Illumination with Ray-Traced
  * Irradiance Fields", JCGT 2019, §4; the level selection follows Lumen's
  * radiance cache clipmaps.
+ *
+ * Mode `surface` scales it by the read scale of params[2], for a surface
+ * shading with it. `feedback` returns the value as stored, for the voxel
+ * lighting's next bounce: the global illumination intensity applies to what
+ * reaches the image once, not to every bounce, as SDFGI keeps its energy out
+ * of the bounce feedback (Godot, sdfgi_direct_light.glsl) and Lumen has no
+ * intensity in its radiosity loop. `sky` interpolates the sky visibility
+ * instead, 0 to 1 in every channel, with the same weights.
  * @internal
  */
 export function sampleProbeIrradiance(
   scope: PBInsideFunctionScope,
   worldPos: PBShaderExp,
   normal: PBShaderExp,
-  viewDir: PBShaderExp
+  viewDir: PBShaderExp,
+  mode: 'surface' | 'feedback' | 'sky' = 'surface'
 ) {
   const pb = scope.$builder;
-  const funcName = 'Z_sampleProbeIrradiance';
+  const funcName =
+    mode === 'surface'
+      ? 'Z_sampleProbeIrradiance'
+      : mode === 'feedback'
+        ? 'Z_sampleProbeIrradianceFeedback'
+        : 'Z_sampleProbeSkyVisibility';
   pb.func(funcName, [pb.vec3('p'), pb.vec3('n'), pb.vec3('v')], function () {
     this.$l.p0 = this[PROBE_PARAMS].at(0);
     this.$l.p2 = this[PROBE_PARAMS].at(2);
@@ -349,7 +369,7 @@ export function sampleProbeIrradiance(
           this.$break();
         }
       );
-      this.$l.s = sampleProbeLevel(this, this.l, this.p, this.biased, this.n);
+      this.$l.s = sampleProbeLevel(this, this.l, this.p, this.biased, this.n, mode === 'sky');
       this.$if(pb.greaterThan(this.s.a, 1e-5), function () {
         // Fade over the last spacing of the window, in probes
         this.$l.lo = probeLevelOrigin(this, this.l);
@@ -363,7 +383,8 @@ export function sampleProbeIrradiance(
       });
     });
     this.$l.valid = this.$choice(pb.greaterThan(this.accW, 1e-4), pb.float(1), pb.float(0));
-    this.$return(pb.vec4(pb.mul(pb.div(this.acc, pb.max(this.accW, 1e-4)), this.p2.x), this.valid));
+    this.$l.e = pb.div(this.acc, pb.max(this.accW, 1e-4));
+    this.$return(pb.vec4(mode === 'surface' ? pb.mul(this.e, this.p2.x) : this.e, this.valid));
   });
   return scope[funcName](worldPos, normal, viewDir) as PBShaderExp;
 }

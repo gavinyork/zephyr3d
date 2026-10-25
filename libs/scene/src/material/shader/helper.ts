@@ -41,7 +41,7 @@ import type { PunctualLight } from '../../scene/light';
 import { linearToGamma } from '../../shaders/misc';
 import { declareVoxelizeUniforms } from '../../shaders/gi';
 import { fetchSampler, getSamplerOptions } from '../../utility/misc';
-import { PHYSICAL_BAKE_EXPOSURE } from '../../utility/physical';
+import { getGICacheExposure, PHYSICAL_BAKE_EXPOSURE } from '../../utility/physical';
 import type { AtmosphereParams } from '../../shaders';
 import { getAtmosphereParamsStruct, getDefaultAtmosphereParams } from '../../shaders';
 import type { HeightFogParams } from '../../shaders/fog';
@@ -1250,6 +1250,10 @@ export class ShaderHelper {
    * awareness. Legacy returns 1 so its uploads stay byte-identical.
    */
   static getPreExposure(ctx: DrawContext) {
+    // The voxelize pass writes the global illumination's caches, kept at a fixed exposure
+    if (ctx.renderPass?.type === RENDER_PASS_TYPE_VOXELIZE) {
+      return getGICacheExposure(ctx.scene.lightingMode);
+    }
     return ctx.scene.lightingMode === 'physical' ? ctx.camera.exposure : 1;
   }
   /**

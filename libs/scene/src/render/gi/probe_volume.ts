@@ -17,15 +17,22 @@ import type { VoxelScene } from './voxel_scene';
 import { buildSDFProgram } from '../sdf/sdf_programs';
 import { drawFullscreenQuad } from '../fullscreenquad';
 import { fetchSampler } from '../../utility/misc';
-import { PHYSICAL_BAKE_EXPOSURE } from '../../utility/physical';
+import { getGICacheExposure } from '../../utility/physical';
 import { RENDER_PASS_TYPE_LIGHT } from '../../values';
-import { declareDynamicSDFUniforms, declareGlobalSDFUniforms, sampleSceneSDF } from '../../shaders/sdf';
+import {
+  declareDynamicSDFUniforms,
+  declareGlobalSDFUniforms,
+  GLOBAL_SDF_LEVELS,
+  sampleSceneSDF
+} from '../../shaders/sdf';
 import {
   declareVoxelSceneUniforms,
   loadVoxelSceneRadiance,
   VOXEL_SCENE_ALBEDO,
   VOXEL_SCENE_EMISSIVE,
   VOXEL_SCENE_RADIANCE,
+  VOXEL_SCENE_ANISO0,
+  VOXEL_SCENE_ANISO1,
   voxelSceneTexel
 } from '../../shaders/gi';
 import {
@@ -59,7 +66,18 @@ const SELECT_LEVEL_SHIFT = 24;
 const SELECT_FIRST_BIT = 0x80000000;
 /** Magic and version of a saved probe state. */
 const STATE_MAGIC = 0x50494a5a; // 'ZJIP'
-const STATE_VERSION = 1;
+/**
+ * 2: irradiance stored at the fixed cache exposure (see getGICacheExposure).
+ * 3: sky visibility in the irradiance alpha.
+ * 4: irradiance from voxel radiance kept per face (light anisotropy).
+ */
+const STATE_VERSION = 4;
+/**
+ * Hit distance a ray that escaped to the sky writes: beyond any trace length,
+ * so the irradiance blend can count escapes, within half float range. The
+ * visibility blend clamps distances well below it, so it reads as far.
+ */
+const SKY_ESCAPE_DISTANCE = 16384;
 
 /**
  * Settings of the probe volume, on {@link SceneGI}.
@@ -197,6 +215,8 @@ export class ProbeVolume {
   private _updates: number;
   private _lastUpdated: number;
   private readonly _params: Float32Array<ArrayBuffer>;
+  /** Live camera exposure over the cache exposure, see {@link ProbeVolume.setReadExposure}. */
+  private _exposureScale: number;
   private readonly _rotation: Vector4;
   private readonly _prng: PRNG;
   private _relocateProgram: Nullable<GPUProgram>;
@@ -256,6 +276,7 @@ export class ProbeVolume {
     this._updates = 0;
     this._lastUpdated = 0;
     this._params = new Float32Array(new ArrayBuffer(PROBE_PARAM_VEC4S * 16));
+    this._exposureScale = 1;
     this._rotation = new Vector4(0, 0, 0, 1);
     this._prng = new PRNG(1234);
     this._relocateProgram = null;
@@ -315,6 +336,24 @@ export class ProbeVolume {
     bg.setTexture(PROBE_VISIBILITY, this._visibility, fetchSampler('clamp_linear_nomip'));
     bg.setBuffer(PROBE_DATA, this._data);
     bg.setValue(PROBE_PARAMS, this._params);
+  }
+  /**
+   * Converts what surfaces read from the probes to a camera's exposure: the
+   * irradiance is kept at the fixed cache exposure (see getGICacheExposure),
+   * the image at the camera's. Called once a frame, also while the volume is
+   * frozen, so a frozen or restored volume follows exposure changes.
+   */
+  setReadExposure(camera: Camera) {
+    const scene = this._scene;
+    const live = scene.lightingMode === 'physical' ? camera.exposure : 1;
+    const scale = live / getGICacheExposure(scene.lightingMode);
+    if (scale !== this._exposureScale) {
+      this._exposureScale = scale;
+      // Before the first update there are no maps to describe; that update writes the params
+      if (this._irradiance && this._visibility) {
+        this.updateParams();
+      }
+    }
   }
   /**
    * Follows the camera and updates a budget of probes. Called by the scene
@@ -614,7 +653,7 @@ export class ProbeVolume {
       [this._irradiance!.width, this._irradiance!.height, this._visibility!.width, this._visibility!.height],
       4
     );
-    p.set([o.intensity, o.normalBias, o.viewBias, o.maxRayDistance], 8);
+    p.set([o.intensity * this._exposureScale, o.normalBias, o.viewBias, o.maxRayDistance], 8);
     this._levels.forEach((level, l) => {
       const origin = level.origin ?? [0, 0, 0];
       p.set([origin[0], origin[1], origin[2], level.spacing], 12 + l * 8);
@@ -727,7 +766,8 @@ export class ProbeVolume {
   /**
    * Traces the rays of the selected probes: one fragment per ray, the hit's
    * voxel radiance or the sky, and the hit distance (negative when the ray
-   * started inside geometry), into the ray texture.
+   * started inside geometry, {@link SKY_ESCAPE_DISTANCE} when it escaped to
+   * the sky), into the ray texture.
    * @internal
    */
   private runTrace(
@@ -739,11 +779,9 @@ export class ProbeVolume {
     const device = getDevice();
     const scene = this._scene;
     const envLight = scene.env.light.envLight;
-    const physical = scene.lightingMode === 'physical';
-    const preExposure = physical ? camera.exposure : 1;
-    const envStrength = physical
-      ? (preExposure / PHYSICAL_BAKE_EXPOSURE) * (scene.env.light.strength ?? 0)
-      : (scene.env.light.strength ?? 0);
+    // Rays read the voxel radiance, kept at the fixed cache exposure, and the
+    // sky bake, stored at the same exposure: the sky takes the strength alone
+    const envStrength = scene.env.light.strength ?? 0;
     const skyMode = !envLight
       ? 'none'
       : envLight.hasRadiance()
@@ -832,8 +870,23 @@ export class ProbeVolume {
               this.$if(this.hit, function () {
                 this.dist = this.t;
                 this.$l.hp = pb.add(this.pos, pb.mul(this.dir, this.t));
-                this.radiance = loadVoxelSceneRadiance(this, voxelSceneTexel(this, this.hp, levels));
+                // The side of the surface the ray came from: the field's gradient
+                // at the hit, by forward differences over the finest voxel
+                this.$l.he = this[GLOBAL_SDF_LEVELS].at(0).w;
+                this.$l.hd = sampleSceneSDF(this, this.hp, levels);
+                this.$l.hg = pb.vec3(
+                  pb.sub(sampleSceneSDF(this, pb.add(this.hp, pb.vec3(this.he, 0, 0)), levels), this.hd),
+                  pb.sub(sampleSceneSDF(this, pb.add(this.hp, pb.vec3(0, this.he, 0)), levels), this.hd),
+                  pb.sub(sampleSceneSDF(this, pb.add(this.hp, pb.vec3(0, 0, this.he)), levels), this.hd)
+                );
+                this.$l.hn = this.$choice(
+                  pb.greaterThan(pb.dot(this.hg, this.hg), 1e-12),
+                  pb.normalize(this.hg),
+                  pb.neg(this.dir)
+                );
+                this.radiance = loadVoxelSceneRadiance(this, voxelSceneTexel(this, this.hp, levels), this.hn);
               }).$else(function () {
+                this.dist = pb.float(SKY_ESCAPE_DISTANCE);
                 if (skyMode === 'radiance') {
                   this.radiance = pb.mul(
                     envLight.getRadiance(this, this.dir, pb.float(0))!.rgb,
@@ -856,6 +909,8 @@ export class ProbeVolume {
     bg.setTexture(VOXEL_SCENE_ALBEDO, voxels.albedo, fetchSampler('clamp_nearest_nomip'));
     bg.setTexture(VOXEL_SCENE_EMISSIVE, voxels.emissive, fetchSampler('clamp_nearest_nomip'));
     bg.setTexture(VOXEL_SCENE_RADIANCE, voxels.radiance, fetchSampler('clamp_nearest_nomip'));
+    bg.setTexture(VOXEL_SCENE_ANISO0, voxels.radianceAniso0, fetchSampler('clamp_nearest_nomip'));
+    bg.setTexture(VOXEL_SCENE_ANISO1, voxels.radianceAniso1, fetchSampler('clamp_nearest_nomip'));
     bg.setValue('skyInfo', new Vector4(envStrength, 0, 0, 0));
     if (skyMode !== 'none') {
       envLight.updateBindGroup(bg);
@@ -983,8 +1038,12 @@ export class ProbeVolume {
               this.sum = pb.add(this.sum, pb.mul(pb.vec4(this.hd, pb.mul(this.hd, this.hd), 0, 0), this.w));
               this.wsum = pb.add(this.wsum, this.w);
             } else {
+              // Cosine-weighted share of the rays that escaped to the sky: the
+              // sky visibility, in alpha, as DDGI keeps it beside the irradiance
+              // ([Majercik19] stores the escape mask with every ray)
               this.$if(pb.greaterThanEqual(this.ray.a, 0), function () {
-                this.sum = pb.add(this.sum, pb.mul(pb.vec4(this.ray.rgb, 0), this.c));
+                this.$l.escaped = pb.float(pb.greaterThanEqual(this.ray.a, SKY_ESCAPE_DISTANCE * 0.5));
+                this.sum = pb.add(this.sum, pb.mul(pb.vec4(this.ray.rgb, this.escaped), this.c));
                 this.wsum = pb.add(this.wsum, this.c);
               });
             }
@@ -999,7 +1058,11 @@ export class ProbeVolume {
           this.$l.old = pb.textureLoad(this.current, this.texel, 0);
           this.$l.h = this.$choice(this.first, pb.float(0), this.rayInfo.w);
           this.$l.value = pb.mix(this.result, this.old, this.h);
-          pb.textureStore(this.next, pb.uvec2(this.texel), pb.vec4(this.value.xyz, 1));
+          pb.textureStore(
+            this.next,
+            pb.uvec2(this.texel),
+            visibility ? pb.vec4(this.value.xyz, 1) : this.value
+          );
           if (!visibility) {
             // The probe counts as updated once its maps hold something
             this.$if(pb.equal(this.$builtins.localInvocationId.xy, pb.uvec2(0)), function () {

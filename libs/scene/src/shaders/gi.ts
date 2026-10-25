@@ -27,6 +27,10 @@ export const VOXEL_SCENE_ALBEDO = 'zVoxelSceneAlbedo';
 export const VOXEL_SCENE_EMISSIVE = 'zVoxelSceneEmissive';
 /** @internal */
 export const VOXEL_SCENE_RADIANCE = 'zVoxelSceneRadiance';
+/** @internal */
+export const VOXEL_SCENE_ANISO0 = 'zVoxelSceneAniso0';
+/** @internal */
+export const VOXEL_SCENE_ANISO1 = 'zVoxelSceneAniso1';
 
 /**
  * Declares what {@link storeVoxelMaterial} writes to, in the fragment stage of
@@ -261,7 +265,13 @@ export function sampleInstanceMaterial(
  *
  * - albedo: rgba8unorm, rgb the albedo and a = 1 where a surface is.
  * - emissive: rgba16float, emitted radiance.
- * - radiance: rgba16float, outgoing radiance (lit albedo plus emissive).
+ * - radiance: rgba16float, outgoing radiance (lit albedo plus emissive)
+ *   summed over the six axis faces of the voxel.
+ * - aniso0, aniso1: rgba8unorm, the share of that sum each face carries, by
+ *   luminance: (+x, +y, +z, -x) and (-y, -z) in rg. A voxel holding a thin
+ *   floor is lit on top and dark below; one radiance for the voxel would be
+ *   read the same from both sides. After the light anisotropy of Godot's SDFGI
+ *   (sdfgi_direct_light.glsl, the dst_aniso0/1 images).
  *
  * Needs the global SDF uniforms declared as well ({@link declareGlobalSDFUniforms}).
  * @internal
@@ -271,22 +281,37 @@ export function declareVoxelSceneUniforms(scope: PBGlobalScope, group: number) {
   scope[VOXEL_SCENE_ALBEDO] = pb.tex3D().sampleType('unfilterable-float').uniform(group);
   scope[VOXEL_SCENE_EMISSIVE] = pb.tex3D().sampleType('unfilterable-float').uniform(group);
   scope[VOXEL_SCENE_RADIANCE] = pb.tex3D().sampleType('unfilterable-float').uniform(group);
+  scope[VOXEL_SCENE_ANISO0] = pb.tex3D().sampleType('unfilterable-float').uniform(group);
+  scope[VOXEL_SCENE_ANISO1] = pb.tex3D().sampleType('unfilterable-float').uniform(group);
 }
 
 /**
- * Outgoing radiance at a texel of {@link voxelSceneTexel}; zero for level -1.
+ * Outgoing radiance at a texel of {@link voxelSceneTexel} toward the side
+ * `normal` faces, the surface normal where a ray hit (the field's gradient
+ * there, which points back at the ray): the voxel's radiance weighted by the
+ * shares its faces carry, Godot's SDFGI read of a hit (sdfgi_integrate.glsl,
+ * the "one liner" over hit_aniso0/1). Zero for level -1.
  * @internal
  */
-export function loadVoxelSceneRadiance(scope: PBInsideFunctionScope, texel: PBShaderExp) {
+export function loadVoxelSceneRadiance(
+  scope: PBInsideFunctionScope,
+  texel: PBShaderExp,
+  normal: PBShaderExp
+) {
   const pb = scope.$builder;
   const funcName = 'Z_loadVoxelSceneRadiance';
-  pb.func(funcName, [pb.ivec4('t')], function () {
+  pb.func(funcName, [pb.ivec4('t'), pb.vec3('n')], function () {
     this.$if(pb.lessThan(this.t.w, 0), function () {
       this.$return(pb.vec3(0));
     });
-    this.$return(pb.textureLoad(this[VOXEL_SCENE_RADIANCE], this.t.xyz, 0).rgb);
+    this.$l.total = pb.textureLoad(this[VOXEL_SCENE_RADIANCE], this.t.xyz, 0).rgb;
+    this.$l.a0 = pb.textureLoad(this[VOXEL_SCENE_ANISO0], this.t.xyz, 0);
+    this.$l.a1 = pb.textureLoad(this[VOXEL_SCENE_ANISO1], this.t.xyz, 0);
+    this.$l.pos = pb.max(pb.vec3(0), pb.mul(this.n, this.a0.xyz));
+    this.$l.neg = pb.max(pb.vec3(0), pb.mul(pb.neg(this.n), pb.vec3(this.a0.w, this.a1.x, this.a1.y)));
+    this.$return(pb.mul(this.total, pb.add(pb.dot(this.pos, pb.vec3(1)), pb.dot(this.neg, pb.vec3(1)))));
   });
-  return scope[funcName](texel) as PBShaderExp;
+  return scope[funcName](texel, normal) as PBShaderExp;
 }
 
 /**
