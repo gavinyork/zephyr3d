@@ -733,7 +733,8 @@ export class ProbeVolume {
   }
   /**
    * Pushes a selected probe out of nearby geometry along the field's gradient,
-   * on its first update and every few frames after.
+   * from its grid point on its first update and every few frames after, never
+   * through a surface.
    * @internal
    */
   private runRelocate(global: NonNullable<SceneSDF['global']>, selected: number) {
@@ -764,31 +765,73 @@ export class ProbeVolume {
             this.$l.sel = this.selected.at(this.slot);
             this.$l.index = pb.int(pb.compAnd(this.sel, pb.uint(SELECT_INDEX_MASK)));
             this.$l.level = pb.int(pb.compAnd(pb.sar(this.sel, SELECT_LEVEL_SHIFT), pb.uint(0x7f)));
-            this.$l.first = pb.greaterThan(pb.compAnd(this.sel, pb.uint(SELECT_FIRST_BIT)), pb.uint(0));
             this.$l.texel = probeTexelFromIndex(this, this.level, this.index);
             this.$l.world = probeWorldFromTexel(this, this.level, this.texel);
             this.$l.data = this[PROBE_DATA].at(this.index);
-            this.$l.offset = this.$choice(this.first, pb.vec3(0), this.data.xyz);
             this.$l.spacing = probeLevelOrigin(this, this.level).w;
-            this.$l.pos = pb.add(pb.mul(pb.vec3(this.world), this.spacing), this.offset);
+            this.$l.grid = pb.mul(pb.vec3(this.world), this.spacing);
             // Keep at least this far from surfaces, moving at most this far from the grid point
             this.$l.keep = pb.mul(this.spacing, 0.3);
             this.$l.limit = pb.mul(this.spacing, 0.45);
-            this.$l.d = sampleSceneSDF(this, this.pos, levels);
-            this.$if(pb.lessThan(this.d, this.keep), function () {
-              this.$l.h = pb.mul(this.spacing, 0.05);
+            // Central differences at least a finest field voxel apart: a wall or
+            // floor thinner than a voxel never reads negative, and differences
+            // inside it point either way
+            this.$l.h = pb.max(pb.mul(this.spacing, 0.05), this[GLOBAL_SDF_LEVELS].at(0).w);
+            // Crossing check every quarter voxel: the inside of such a wall dips
+            // only a few centimetres below the distance at its face
+            this.$l.probeStep = pb.mul(this[GLOBAL_SDF_LEVELS].at(0).w, 0.25);
+            // From the grid point every time, never from where the probe was:
+            // the result depends on the field alone, so a probe misplaced while
+            // the field was still being built returns, and none drifts away
+            // over successive relocations to where it never comes back from
+            this.$l.pos = this.grid;
+            this.$for(pb.int('iter'), 0, 3, function () {
+              this.$l.d = sampleSceneSDF(this, this.pos, levels);
+              this.$if(pb.greaterThanEqual(this.d, this.keep), function () {
+                this.$break();
+              });
               this.$l.g = pb.vec3(
-                pb.sub(sampleSceneSDF(this, pb.add(this.pos, pb.vec3(this.h, 0, 0)), levels), this.d),
-                pb.sub(sampleSceneSDF(this, pb.add(this.pos, pb.vec3(0, this.h, 0)), levels), this.d),
-                pb.sub(sampleSceneSDF(this, pb.add(this.pos, pb.vec3(0, 0, this.h)), levels), this.d)
+                pb.sub(
+                  sampleSceneSDF(this, pb.add(this.pos, pb.vec3(this.h, 0, 0)), levels),
+                  sampleSceneSDF(this, pb.sub(this.pos, pb.vec3(this.h, 0, 0)), levels)
+                ),
+                pb.sub(
+                  sampleSceneSDF(this, pb.add(this.pos, pb.vec3(0, this.h, 0)), levels),
+                  sampleSceneSDF(this, pb.sub(this.pos, pb.vec3(0, this.h, 0)), levels)
+                ),
+                pb.sub(
+                  sampleSceneSDF(this, pb.add(this.pos, pb.vec3(0, 0, this.h)), levels),
+                  sampleSceneSDF(this, pb.sub(this.pos, pb.vec3(0, 0, this.h)), levels)
+                )
               );
               this.$l.n = pb.div(this.g, pb.max(pb.length(this.g), 1e-6));
-              this.offset = pb.add(this.offset, pb.mul(this.n, pb.sub(this.keep, this.d)));
-              this.$l.len = pb.length(this.offset);
+              this.$l.next = pb.sub(pb.add(this.pos, pb.mul(this.n, pb.sub(this.keep, this.d))), this.grid);
+              this.$l.len = pb.length(this.next);
               this.$if(pb.greaterThan(this.len, this.limit), function () {
-                this.offset = pb.mul(this.offset, pb.div(this.limit, this.len));
+                this.next = pb.mul(this.next, pb.div(this.limit, this.len));
               });
+              this.next = pb.add(this.grid, this.next);
+              // Moving away from a surface the distance only grows; a dip on
+              // the way means the move passes through geometry, so stop here
+              this.$l.moveLen = pb.length(pb.sub(this.next, this.pos));
+              this.$l.samples = pb.int(pb.min(pb.ceil(pb.div(this.moveLen, this.probeStep)), 64));
+              this.$l.through = false;
+              this.$for(pb.int('k'), 1, this.samples, function () {
+                this.$l.q = pb.mix(this.pos, this.next, pb.div(pb.float(this.k), pb.float(this.samples)));
+                this.$if(
+                  pb.lessThan(sampleSceneSDF(this, this.q, levels), pb.sub(this.d, this.probeStep)),
+                  function () {
+                    this.through = true;
+                    this.$break();
+                  }
+                );
+              });
+              this.$if(this.through, function () {
+                this.$break();
+              });
+              this.pos = this.next;
             });
+            this.$l.offset = pb.sub(this.pos, this.grid);
             this[PROBE_DATA].setAt(this.index, pb.vec4(this.offset, this.data.w));
           });
         }
