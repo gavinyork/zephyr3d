@@ -3,6 +3,8 @@ import type {
   FrameBuffer,
   GPUDataBuffer,
   GPUProgram,
+  PBInsideFunctionScope,
+  PBShaderExp,
   RenderStateSet,
   Texture2D
 } from '@zephyr3d/device';
@@ -58,6 +60,10 @@ import {
 const IRRADIANCE_TEXELS = 8;
 /** Texels of a visibility tile, border included. */
 const VISIBILITY_TEXELS = 16;
+/** Tiles per row of the blend outputs, which hold the tiles of one update by selection slot. */
+const STAGING_COLS = 64;
+/** Rays a blend workgroup stages in shared memory at a time. */
+const BLEND_BATCH = 128;
 /** Sphere tracing steps of a probe ray. */
 const TRACE_STEPS = 48;
 /** Frames between relocations of an updated probe. */
@@ -230,6 +236,8 @@ export class ProbeVolume {
   private _blendIrrBindGroup: Nullable<BindGroup>;
   private _blendVisProgram: Nullable<GPUProgram>;
   private _blendVisBindGroup: Nullable<BindGroup>;
+  private _commitProgram: Nullable<GPUProgram>;
+  private _commitBindGroup: Nullable<BindGroup>;
   private _renderStates: Nullable<RenderStateSet>;
   private readonly _scratch: Map<string, GPUDataBuffer>;
   constructor(scene: Scene, options: ProbeVolumeOptions) {
@@ -290,6 +298,8 @@ export class ProbeVolume {
     this._blendIrrBindGroup = null;
     this._blendVisProgram = null;
     this._blendVisBindGroup = null;
+    this._commitProgram = null;
+    this._commitBindGroup = null;
     this._renderStates = null;
     this._scratch = new Map();
   }
@@ -366,7 +376,6 @@ export class ProbeVolume {
     if (!global || !voxels.lit) {
       return;
     }
-    const device = getDevice();
     this.ensureResources();
     const cameraPos = camera.getWorldPosition();
     for (const level of this._levels) {
@@ -384,8 +393,7 @@ export class ProbeVolume {
     this.runRelocate(global, selected);
     this.runTrace(global, voxels, camera, selected);
     this.runBlend(selected);
-    device.copyTexture2D(this._irradianceNext!, 0, this._irradiance!, 0);
-    device.copyTexture2D(this._visibilityNext!, 0, this._visibility!, 0);
+    this.runCommit(selected);
     this._updates++;
     this._lastUpdated = selected;
   }
@@ -503,7 +511,8 @@ export class ProbeVolume {
       this._relocateBindGroup,
       this._traceBindGroup,
       this._blendIrrBindGroup,
-      this._blendVisBindGroup
+      this._blendVisBindGroup,
+      this._commitBindGroup
     ]) {
       bg?.dispose();
     }
@@ -511,12 +520,14 @@ export class ProbeVolume {
       this._relocateProgram,
       this._traceProgram,
       this._blendIrrProgram,
-      this._blendVisProgram
+      this._blendVisProgram,
+      this._commitProgram
     ]) {
       prog?.dispose();
     }
     this._relocateBindGroup = this._traceBindGroup = this._blendIrrBindGroup = this._blendVisBindGroup = null;
     this._relocateProgram = this._traceProgram = this._blendIrrProgram = this._blendVisProgram = null;
+    this._commitProgram = this._commitBindGroup = null;
     for (const level of this._levels) {
       level.origin = null;
     }
@@ -529,8 +540,8 @@ export class ProbeVolume {
     }
     const device = getDevice();
     const rows = Math.ceil(this._count / this._tileCols);
-    const make = (texels: number, name: string) => {
-      const tex = device.createTexture2D('rgba16f', this._tileCols * texels, rows * texels, {
+    const make = (texels: number, name: string, cols = this._tileCols, r = rows) => {
+      const tex = device.createTexture2D('rgba16f', cols * texels, r * texels, {
         mipmapping: false,
         writable: true
       })!;
@@ -538,9 +549,11 @@ export class ProbeVolume {
       return tex;
     };
     this._irradiance = make(IRRADIANCE_TEXELS, '@ProbeIrradiance');
-    this._irradianceNext = make(IRRADIANCE_TEXELS, '@ProbeIrradianceNext');
+    // The blend outputs hold one update's tiles, committed to the maps after
+    const stagingRows = Math.ceil(this._budget / STAGING_COLS);
+    this._irradianceNext = make(IRRADIANCE_TEXELS, '@ProbeIrradianceNext', STAGING_COLS, stagingRows);
     this._visibility = make(VISIBILITY_TEXELS, '@ProbeVisibility');
-    this._visibilityNext = make(VISIBILITY_TEXELS, '@ProbeVisibilityNext');
+    this._visibilityNext = make(VISIBILITY_TEXELS, '@ProbeVisibilityNext', STAGING_COLS, stagingRows);
     this._rayTexture = device.createTexture2D('rgba16f', this._rays, this._budget, { mipmapping: false })!;
     this._rayTexture.name = '@ProbeRays';
     this._rayFramebuffer = device.createFrameBuffer([this._rayTexture], null)!;
@@ -973,6 +986,65 @@ export class ProbeVolume {
       device.compute(selected, 1, 1);
     }
   }
+  /**
+   * Copies the tiles staged by {@link ProbeVolume.runBlend} into the maps, one
+   * workgroup per updated probe: the rest of the maps stays as it was, where
+   * copying the whole staging maps would move every probe's tiles each frame.
+   * @internal
+   */
+  private runCommit(selected: number) {
+    const device = getDevice();
+    if (!this._commitProgram) {
+      this._commitProgram = buildSDFProgram({
+        label: 'ProbeCommit',
+        workgroupSize: [VISIBILITY_TEXELS, VISIBILITY_TEXELS, 1],
+        compute(pb) {
+          this[PROBE_PARAMS] = pb.vec4[PROBE_PARAM_VEC4S]().uniform(0);
+          this.selected = pb.uint[0]().storageBufferReadonly(0);
+          this.stagedIrradiance = pb.tex2D().sampleType('unfilterable-float').uniform(0);
+          this.stagedVisibility = pb.tex2D().sampleType('unfilterable-float').uniform(0);
+          this.irradiance = pb.texStorage2D.rgba16float().storage(0);
+          this.visibility = pb.texStorage2D.rgba16float().storage(0);
+          pb.main(function () {
+            this.$l.slot = this.$builtins.workGroupId.x;
+            this.$l.index = pb.int(pb.compAnd(this.selected.at(this.slot), pb.uint(SELECT_INDEX_MASK)));
+            this.$l.uv = pb.ivec2(this.$builtins.localInvocationId.xy);
+            pb.textureStore(
+              this.visibility,
+              pb.uvec2(pb.add(probeTileOrigin(this, this.index, pb.float(VISIBILITY_TEXELS)), this.uv)),
+              pb.textureLoad(
+                this.stagedVisibility,
+                pb.add(stagingOrigin(this, this.slot, VISIBILITY_TEXELS), this.uv),
+                0
+              )
+            );
+            this.$if(pb.all(pb.lessThan(this.uv, pb.ivec2(IRRADIANCE_TEXELS))), function () {
+              pb.textureStore(
+                this.irradiance,
+                pb.uvec2(pb.add(probeTileOrigin(this, this.index, pb.float(IRRADIANCE_TEXELS)), this.uv)),
+                pb.textureLoad(
+                  this.stagedIrradiance,
+                  pb.add(stagingOrigin(this, this.slot, IRRADIANCE_TEXELS), this.uv),
+                  0
+                )
+              );
+            });
+          });
+        }
+      })!;
+      this._commitBindGroup = device.createBindGroup(this._commitProgram.bindGroupLayouts[0]);
+    }
+    const bg = this._commitBindGroup!;
+    bg.setValue(PROBE_PARAMS, this._params);
+    bg.setBuffer('selected', this._selected!);
+    bg.setTexture('stagedIrradiance', this._irradianceNext!, fetchSampler('clamp_nearest_nomip'));
+    bg.setTexture('stagedVisibility', this._visibilityNext!, fetchSampler('clamp_nearest_nomip'));
+    bg.setTexture('irradiance', this._irradiance!);
+    bg.setTexture('visibility', this._visibility!);
+    device.setProgram(this._commitProgram);
+    device.setBindGroup(0, bg);
+    device.compute(selected, 1, 1);
+  }
   /** @internal */
   private createBlendProgram(texels: number, visibility: boolean) {
     const rays = this._rays;
@@ -988,6 +1060,9 @@ export class ProbeVolume {
         this.rays = pb.tex2D().sampleType('unfilterable-float').uniform(0);
         this.current = pb.tex2D().sampleType('unfilterable-float').uniform(0);
         this.next = pb.texStorage2D.rgba16float().storage(0);
+        // A batch of the probe's rays, direction and traced result, read once per workgroup
+        this.batchDir = pb.vec4[BLEND_BATCH]().workgroup();
+        this.batchRay = pb.vec4[BLEND_BATCH]().workgroup();
         pb.main(function () {
           this.$l.slot = this.$builtins.workGroupId.x;
           this.$l.sel = this.selected.at(this.slot);
@@ -1028,35 +1103,62 @@ export class ProbeVolume {
           // Distances are clamped a little beyond the probe spacing: the
           // moments only have to tell blockers between neighbouring probes apart
           this.$l.maxDist = pb.mul(probeLevelOrigin(this, this.level).w, 2.6);
-          this.$for(pb.int('r'), 0, rays, function () {
-            this.$l.ray = pb.textureLoad(this.rays, pb.ivec2(this.r, pb.int(this.slot)), 0);
-            this.$l.rd = quatRotate(
-              this,
-              this.rotation,
-              sphericalFibonacci(this, pb.float(this.r), pb.float(rays))
-            );
-            this.$l.c = pb.max(pb.dot(this.dir, this.rd), 0);
+          // One ray, `ray` its traced result and `c` the cosine to the texel's direction
+          const accumulate = (scope: PBInsideFunctionScope) => {
             if (visibility) {
-              // Sharpened so a texel only sees rays near its direction
-              this.$l.w = pb.pow(this.c, 50);
-              this.$l.hd = pb.abs(this.ray.a);
-              this.$if(pb.lessThan(this.ray.a, 0), function () {
-                this.hd = pb.mul(this.hd, 0.2);
+              // Sharpened so a texel only sees rays near its direction; below
+              // cos 0.8 the weight is under 2e-5, nothing next to the rays near it
+              scope.$if(pb.greaterThan(scope.c, 0.8), function (this: PBInsideFunctionScope) {
+                this.$l.w = pb.pow(this.c, 50);
+                this.$l.hd = pb.abs(this.ray.a);
+                this.$if(pb.lessThan(this.ray.a, 0), function () {
+                  this.hd = pb.mul(this.hd, 0.2);
+                });
+                this.hd = pb.min(this.hd, this.maxDist);
+                this.sum = pb.add(this.sum, pb.mul(pb.vec4(this.hd, pb.mul(this.hd, this.hd), 0, 0), this.w));
+                this.wsum = pb.add(this.wsum, this.w);
               });
-              this.hd = pb.min(this.hd, this.maxDist);
-              this.sum = pb.add(this.sum, pb.mul(pb.vec4(this.hd, pb.mul(this.hd, this.hd), 0, 0), this.w));
-              this.wsum = pb.add(this.wsum, this.w);
             } else {
               // Cosine-weighted share of the rays that escaped to the sky: the
               // sky visibility, in alpha, as DDGI keeps it beside the irradiance
               // ([Majercik19] stores the escape mask with every ray)
-              this.$if(pb.greaterThanEqual(this.ray.a, 0), function () {
+              scope.$if(pb.greaterThanEqual(scope.ray.a, 0), function (this: PBInsideFunctionScope) {
                 this.$l.escaped = pb.float(pb.greaterThanEqual(this.ray.a, SKY_ESCAPE_DISTANCE * 0.5));
                 this.sum = pb.add(this.sum, pb.mul(pb.vec4(this.ray.rgb, this.escaped), this.c));
                 this.wsum = pb.add(this.wsum, this.c);
               });
             }
-          });
+          };
+          this.$l.thread = pb.int(
+            pb.add(pb.mul(this.$builtins.localInvocationId.y, texels), this.$builtins.localInvocationId.x)
+          );
+          for (let b = 0; b < rays; b += BLEND_BATCH) {
+            const count = Math.min(BLEND_BATCH, rays - b);
+            // Each thread stages every (texels²)-th ray of the batch
+            this.$for(pb.int('stageRound'), 0, Math.ceil(count / (texels * texels)), function () {
+              this.$l.j = pb.add(this.thread, pb.mul(this.stageRound, texels * texels));
+              this.$if(pb.greaterThanEqual(this.j, count), function () {
+                this.$break();
+              });
+              this.$l.r = pb.add(this.j, b);
+              this.batchRay.setAt(this.j, pb.textureLoad(this.rays, pb.ivec2(this.r, pb.int(this.slot)), 0));
+              this.batchDir.setAt(
+                this.j,
+                pb.vec4(
+                  quatRotate(this, this.rotation, sphericalFibonacci(this, pb.float(this.r), pb.float(rays))),
+                  0
+                )
+              );
+            });
+            pb.workgroupBarrier();
+            this.$for(pb.int('k'), 0, count, function () {
+              this.$l.ray = this.batchRay.at(this.k);
+              this.$l.c = pb.max(pb.dot(this.dir, this.batchDir.at(this.k).xyz), 0);
+              accumulate(this);
+            });
+            // The next batch overwrites the one still being read
+            pb.workgroupBarrier();
+          }
           this.$l.result = this.$choice(
             pb.greaterThan(this.wsum, 1e-5),
             pb.div(this.sum, this.wsum),
@@ -1067,9 +1169,10 @@ export class ProbeVolume {
           this.$l.old = pb.textureLoad(this.current, this.texel, 0);
           this.$l.h = this.$choice(this.first, pb.float(0), this.rayInfo.w);
           this.$l.value = pb.mix(this.result, this.old, this.h);
+          // Staged by selection slot; runCommit copies the tile into the map
           pb.textureStore(
             this.next,
-            pb.uvec2(this.texel),
+            pb.uvec2(pb.add(stagingOrigin(this, this.slot, s), this.uv)),
             visibility ? pb.vec4(this.value.xyz, 1) : this.value
           );
           if (!visibility) {
@@ -1083,4 +1186,11 @@ export class ProbeVolume {
       }
     });
   }
+}
+
+/** First texel of a selection slot's tile in a blend output, {@link STAGING_COLS} tiles a row. */
+function stagingOrigin(scope: PBInsideFunctionScope, slot: PBShaderExp, texels: number) {
+  const pb = scope.$builder;
+  const s = pb.int(slot);
+  return pb.mul(pb.ivec2(pb.mod(s, STAGING_COLS), pb.div(s, STAGING_COLS)), texels) as PBShaderExp;
 }

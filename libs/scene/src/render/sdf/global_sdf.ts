@@ -249,7 +249,11 @@ export class GlobalSDF {
   get levelInfo() {
     return this._levelInfo;
   }
-  /** (resolution, levels, band voxels, 0), the `params` uniform of {@link sampleGlobalSDF}. */
+  /**
+   * (resolution, levels, band voxels, current mask), the `params` uniform of
+   * {@link sampleGlobalSDF}; bit i of the mask set when every brick of level i
+   * is composited for its window, so readers can skip the tag checks there.
+   */
   get params() {
     return this._params;
   }
@@ -390,6 +394,14 @@ export class GlobalSDF {
       this.moveWindow(level, cameraPos);
     }
     this.composite();
+    // Levels with nothing left to composite hold their whole window
+    let current = 0;
+    for (let level = 0; level < this.levels; level++) {
+      if (this._origins[level] && this._dirty[level].size === 0) {
+        current |= 1 << level;
+      }
+    }
+    this._params.w = current;
     this.gatherDynamic(cameraPos);
     this._waterline?.update(cameraPos);
   }

@@ -28,7 +28,8 @@ export const SDF_INSTANCE_VEC4S = 6;
  * - tags: one texel per brick, stacked the same way: (world brick x, y, z, 1)
  *   of the brick last composited there, rgba32f.
  * - levels[i]: (window origin in voxels of the level, voxel size).
- * - params: (resolution, number of levels, band in voxels, 0).
+ * - params: (resolution, number of levels, band in voxels, current mask): bit i
+ *   of the mask set when every brick of level i is current, its tags unread.
  *
  * @param levels - Clipmap levels; a compile-time constant of the program.
  * @internal
@@ -344,7 +345,11 @@ export function sampleGlobalSDFWithVoxel(
           this.t = pb.sub(this.f, this.base);
           // World voxel index of the lower corner, then toroidal texel
           this.v0 = pb.add(pb.ivec3(this.base), pb.ivec3(this.info.xyz));
-          this.valid = bricksCurrent(this, this.v0, i);
+          this.$if(levelCurrent(this, i), function () {
+            this.valid = true;
+          }).$else(function () {
+            this.valid = bricksCurrent(this, this.v0, i);
+          });
         });
         this.$if(this.valid, function () {
           this.$l.c000 = loadWrapped(this, this.v0, 0, 0, 0, i);
@@ -407,6 +412,9 @@ export function globalSDFVoxelCurrent(scope: PBInsideFunctionScope, v: PBShaderE
   const pb = scope.$builder;
   const funcName = `Z_globalSDFVoxelCurrent${level}`;
   pb.func(funcName, [pb.ivec3('v')], function () {
+    this.$if(levelCurrent(this, level), function () {
+      this.$return(true);
+    });
     this.$l.nbi = pb.ivec3(pb.int(pb.div(this[GLOBAL_SDF_PARAMS].x, GLOBAL_SDF_BRICK)));
     this.$l.b = pb.ivec3(pb.floor(pb.div(pb.vec3(this.v), GLOBAL_SDF_BRICK)));
     this.$l.w = wrap(this, this.b, this.nbi);
@@ -418,6 +426,12 @@ export function globalSDFVoxelCurrent(scope: PBInsideFunctionScope, v: PBShaderE
     this.$return(pb.and(pb.greaterThan(this.tag.w, 0.5), pb.equal(pb.ivec3(this.tag.xyz), this.b)));
   });
   return scope[funcName](v) as PBShaderExp;
+}
+
+/** True when every brick of a level is current, by the mask in the params' w. */
+function levelCurrent(scope: PBInsideFunctionScope, level: number) {
+  const pb = scope.$builder;
+  return pb.notEqual(pb.compAnd(pb.uint(scope[GLOBAL_SDF_PARAMS].w), pb.uint(1 << level)), pb.uint(0));
 }
 
 /**
