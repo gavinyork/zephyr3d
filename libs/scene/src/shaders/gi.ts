@@ -4,7 +4,8 @@ import {
   GLOBAL_SDF_PARAMS,
   globalSDFVoxelCurrent,
   sampleGlobalSDFHinted,
-  sampleInstanceField
+  sampleInstanceField,
+  SDF_LEVEL_BLEND_VOXELS
 } from './sdf';
 
 /**
@@ -401,6 +402,71 @@ export function voxelSceneTexel(scope: PBInsideFunctionScope, worldPos: PBShader
     this.$return(this.result);
   });
   return scope[funcName](worldPos) as PBShaderExp;
+}
+
+/**
+ * Outgoing radiance of the voxel scene at a world position toward the side
+ * `normal` faces, as {@link loadVoxelSceneRadiance} reads it, blended across
+ * the levels as {@link sampleGlobalSDF} blends the field: within
+ * {@link SDF_LEVEL_BLEND_VOXELS} field voxels of a window edge a level fades
+ * into the next coarser one, so a hit near where levels meet does not flip
+ * between their lighting as the windows follow the camera. Zero where no
+ * level's window holds the point with a current brick.
+ * @internal
+ */
+export function sampleVoxelSceneRadiance(
+  scope: PBInsideFunctionScope,
+  worldPos: PBShaderExp,
+  normal: PBShaderExp,
+  levels: number
+) {
+  const pb = scope.$builder;
+  const funcName = 'Z_sampleVoxelSceneRadiance';
+  pb.func(funcName, [pb.vec3('p'), pb.vec3('n')], function () {
+    this.$l.res = pb.int(this[GLOBAL_SDF_PARAMS].x);
+    this.$l.resF = this[GLOBAL_SDF_PARAMS].x;
+    this.$l.half = pb.div(this.res, 2);
+    this.$l.halfV = pb.ivec3(this.half);
+    this.$l.sum = pb.vec3(0);
+    this.$l.remaining = pb.float(1);
+    for (let i = 0; i < levels; i++) {
+      // Finest first, each level taking the share its finer levels left
+      this.$if(pb.greaterThan(this.remaining, 1e-4), function () {
+        this.$l.info = this[GLOBAL_SDF_LEVELS].at(i);
+        this.$l.vf = pb.ivec3(pb.floor(pb.div(this.p, this.info.w)));
+        this.$l.o = pb.ivec3(this.info.xyz);
+        this.$l.inside = pb.and(
+          pb.all(pb.greaterThanEqual(this.vf, this.o)),
+          pb.all(pb.lessThan(this.vf, pb.add(this.o, pb.ivec3(this.res))))
+        );
+        this.$if(this.inside, function () {
+          this.$if(globalSDFVoxelCurrent(this, this.vf, i), function () {
+            this.$l.vc = pb.ivec3(pb.floor(pb.div(pb.vec3(this.vf), 2)));
+            this.$l.t = pb.mod(pb.add(pb.mod(this.vc, this.halfV), this.halfV), this.halfV);
+            this.$l.rad = loadVoxelSceneRadiance(
+              this,
+              pb.ivec4(this.t.x, this.t.y, pb.add(this.t.z, pb.mul(this.half, i)), i),
+              this.n
+            );
+            if (i === levels - 1) {
+              this.$l.w = pb.float(1);
+            } else {
+              // Field voxels to the window edge, sample centres at integers
+              this.$l.f = pb.sub(pb.div(this.p, this.info.w), pb.add(this.info.xyz, pb.vec3(0.5)));
+              this.$l.lo = pb.min(pb.min(this.f.x, this.f.y), this.f.z);
+              this.$l.hi = pb.sub(pb.sub(this.resF, 1), pb.max(pb.max(this.f.x, this.f.y), this.f.z));
+              this.$l.w = pb.smoothStep(1, 1 + SDF_LEVEL_BLEND_VOXELS, pb.min(this.lo, this.hi));
+            }
+            this.$l.share = pb.mul(this.remaining, this.w);
+            this.sum = pb.add(this.sum, pb.mul(this.rad, this.share));
+            this.remaining = pb.sub(this.remaining, this.share);
+          });
+        });
+      });
+    }
+    this.$return(this.sum);
+  });
+  return scope[funcName](worldPos, normal) as PBShaderExp;
 }
 
 /**

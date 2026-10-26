@@ -1,4 +1,11 @@
-import type { BindGroup, FrameBuffer, GPUProgram, RenderStateSet, Texture3D } from '@zephyr3d/device';
+import type {
+  BindGroup,
+  FrameBuffer,
+  GPUDataBuffer,
+  GPUProgram,
+  RenderStateSet,
+  Texture3D
+} from '@zephyr3d/device';
 import type { Nullable } from '@zephyr3d/base';
 import { Vector4 } from '@zephyr3d/base';
 import { getDevice } from '../../app/api';
@@ -26,6 +33,8 @@ import { getActiveProbeVolume } from './probe_volume';
 export const MAX_VOXEL_LIGHTS = 64;
 /** vec4s per packed light: (position, range), (direction, cutoff), (colour, intensity), extra. */
 const LIGHT_VEC4S = 4;
+/** Material voxels along a brick edge of the global field, whose bricks are 8³ field voxels. */
+const BRICK_VOXELS = 4;
 /** Cone tracing steps of the sun shadow. */
 const SHADOW_STEPS = 24;
 /** The axis faces of a voxel, in the order of the aniso textures (Godot's aniso_dir). */
@@ -78,6 +87,9 @@ export class VoxelLighting {
   private _program: Nullable<GPUProgram>;
   private _programKey: string;
   private _bindGroup: Nullable<BindGroup>;
+  private _brickProgram: Nullable<GPUProgram>;
+  private _brickBindGroup: Nullable<BindGroup>;
+  private _brickBuffer: Nullable<GPUDataBuffer>;
   private _renderStates: Nullable<RenderStateSet>;
   private readonly _lightData: Float32Array<ArrayBuffer>;
   private _zStart: number;
@@ -96,6 +108,9 @@ export class VoxelLighting {
     this._program = null;
     this._programKey = '';
     this._bindGroup = null;
+    this._brickProgram = null;
+    this._brickBindGroup = null;
+    this._brickBuffer = null;
     this._renderStates = null;
     this._lightData = new Float32Array(MAX_VOXEL_LIGHTS * LIGHT_VEC4S * 4);
     this._zStart = 0;
@@ -185,56 +200,78 @@ export class VoxelLighting {
       skyIrradiance ? this.envVariant() : ''
     }:probes${probes ? 1 : 0}`;
     if (!this._program || this._programKey !== key) {
-      this._bindGroup?.dispose();
-      this._program?.dispose();
-      this._program = this.createProgram(global.levels, physical, skyIrradiance, !!probes);
+      this.disposePrograms();
+      this._program = this.createProgram(global.levels, physical, skyIrradiance, !!probes, false);
       this._programKey = key;
       this._bindGroup = device.createBindGroup(this._program.bindGroupLayouts[0]);
     }
     const numLights = this.collectLights(camera, cacheExposure);
     const slices = Math.max(1, Math.min(resolution, Math.floor(options.slicesPerFrame)));
-    const bg = this._bindGroup!;
-    global.applyBindGroup(bg);
-    bg.setTexture('albedoTex', albedo, fetchSampler('clamp_nearest_nomip'));
-    bg.setTexture('emissiveTex', emissive, fetchSampler('clamp_nearest_nomip'));
-    bg.setTexture('radianceOut', this._radiance);
-    bg.setTexture('aniso0Out', this._aniso0!);
-    bg.setTexture('aniso1Out', this._aniso1!);
-    bg.setValue('lights', this._lightData);
-    bg.setValue('sunDir', this._sunDir);
-    bg.setValue('sunColor', this._sunColor);
     const tanHalf = Math.tan((Math.max(0.1, options.sunShadowConeAngle) * Math.PI) / 180);
     this._params.setXYZW(numLights, envStrength, tanHalf, 0);
-    bg.setValue('params', this._params);
     this._slab.setXYZW(resolution, global.levels, slices, this._zStart);
-    bg.setValue('slab', this._slab);
-    if (skyIrradiance) {
-      envLight.updateBindGroup(bg);
-    }
-    probes?.applyBindGroup(bg);
+    const bind = (bg: BindGroup) => {
+      global.applyBindGroup(bg);
+      bg.setTexture('albedoTex', albedo, fetchSampler('clamp_nearest_nomip'));
+      bg.setTexture('emissiveTex', emissive, fetchSampler('clamp_nearest_nomip'));
+      bg.setTexture('radianceOut', this._radiance!);
+      bg.setTexture('aniso0Out', this._aniso0!);
+      bg.setTexture('aniso1Out', this._aniso1!);
+      bg.setValue('lights', this._lightData);
+      bg.setValue('sunDir', this._sunDir);
+      bg.setValue('sunColor', this._sunColor);
+      bg.setValue('params', this._params);
+      bg.setValue('slab', this._slab);
+      if (skyIrradiance) {
+        envLight.updateBindGroup(bg);
+      }
+      probes?.applyBindGroup(bg);
+    };
     if (!this._renderStates) {
       this._renderStates = device.createRenderStateSet();
       this._renderStates.useDepthState().enableTest(false).enableWrite(false);
       this._renderStates.useRasterizerState().setCullMode('none');
       this._renderStates.useColorState().setColorMask(false, false, false, false);
     }
-    const width = resolution;
-    const height = resolution * slices * global.levels;
-    let fb: Nullable<FrameBuffer> = null;
-    device.pushDeviceStates();
-    try {
-      fb = device.pool.fetchTemporalFramebuffer(false, width, height, 'rgba8unorm');
-      device.setFramebuffer(fb);
-      device.setViewport([0, 0, width, height]);
-      device.setScissor([0, 0, width, height]);
-      device.setProgram(this._program);
-      device.setBindGroup(0, bg);
-      drawFullscreenQuad(this._renderStates);
-    } finally {
-      device.popDeviceStates();
-      if (fb) {
-        device.pool.releaseFrameBuffer(fb);
+    const draw = (program: GPUProgram, bg: BindGroup, width: number, height: number) => {
+      let fb: Nullable<FrameBuffer> = null;
+      device.pushDeviceStates();
+      try {
+        fb = device.pool.fetchTemporalFramebuffer(false, width, height, 'rgba8unorm');
+        device.setFramebuffer(fb);
+        device.setViewport([0, 0, width, height]);
+        device.setScissor([0, 0, width, height]);
+        device.setProgram(program);
+        device.setBindGroup(0, bg);
+        drawFullscreenQuad(this._renderStates!);
+      } finally {
+        device.popDeviceStates();
+        if (fb) {
+          device.pool.releaseFrameBuffer(fb);
+        }
       }
+    };
+    bind(this._bindGroup!);
+    draw(this._program, this._bindGroup!, resolution, resolution * slices * global.levels);
+    // The bricks the field composited this frame came into a window holding
+    // the radiance of the region that left it; light them now rather than when
+    // the slab comes round, up to resolution / slices frames later
+    const fresh = global.freshMaterialBricks;
+    if (fresh.count > 0) {
+      if (!this._brickProgram) {
+        this._brickProgram = this.createProgram(global.levels, physical, skyIrradiance, !!probes, true);
+        this._brickBindGroup = device.createBindGroup(this._brickProgram.bindGroupLayouts[0]);
+      }
+      const bytes = fresh.data.byteLength;
+      if (!this._brickBuffer || this._brickBuffer.byteLength < bytes) {
+        this._brickBuffer?.dispose();
+        this._brickBuffer = device.createBuffer(bytes, { usage: 'uniform', storage: true })!;
+      }
+      this._brickBuffer.bufferSubData(0, fresh.data, 0, fresh.count * 4);
+      const bg = this._brickBindGroup!;
+      bind(bg);
+      bg.setBuffer('bricks', this._brickBuffer);
+      draw(this._brickProgram, bg, BRICK_VOXELS ** 3, fresh.count);
     }
     this._zStart = (this._zStart + slices) % resolution;
     this._passes++;
@@ -246,10 +283,20 @@ export class VoxelLighting {
     this._aniso0 = null;
     this._aniso1?.dispose();
     this._aniso1 = null;
+    this.disposePrograms();
+    this._brickBuffer?.dispose();
+    this._brickBuffer = null;
+  }
+  /** @internal */
+  private disposePrograms() {
     this._bindGroup?.dispose();
     this._bindGroup = null;
     this._program?.dispose();
     this._program = null;
+    this._brickBindGroup?.dispose();
+    this._brickBindGroup = null;
+    this._brickProgram?.dispose();
+    this._brickProgram = null;
     this._programKey = '';
   }
   /** What of the environment light's bindings the program depends on. @internal */
@@ -322,11 +369,23 @@ export class VoxelLighting {
     return count;
   }
   /** @internal */
-  private createProgram(levels: number, physical: boolean, skyIrradiance: boolean, useProbes: boolean) {
+  /**
+   * The lighting program: one fragment per voxel of the slab, or with
+   * `bricks` per voxel of a list of bricks, a row of
+   * {@link BRICK_VOXELS}³ fragments each.
+   * @internal
+   */
+  private createProgram(
+    levels: number,
+    physical: boolean,
+    skyIrradiance: boolean,
+    useProbes: boolean,
+    bricks: boolean
+  ) {
     const scene = this._scene;
     const envLight = scene.env.light.envLight;
     return buildSDFProgram({
-      label: 'VoxelLighting',
+      label: bricks ? 'VoxelLightingBricks' : 'VoxelLighting',
       vertex(pb) {
         this.$inputs.pos = pb.vec2().attrib('position');
         pb.main(function () {
@@ -351,6 +410,10 @@ export class VoxelLighting {
         this.params = pb.vec4().uniform(0);
         // (resolution, levels, slices per pass, first slice)
         this.slab = pb.vec4().uniform(0);
+        if (bricks) {
+          // Per brick: (first material voxel within its level, level)
+          this.bricks = pb.vec4[0]().storageBufferReadonly(0);
+        }
         if (skyIrradiance) {
           envLight.initShaderBindings(pb);
         }
@@ -397,17 +460,30 @@ export class VoxelLighting {
         );
         pb.main(function () {
           this.$l.res = pb.int(this.slab.x);
-          this.$l.slices = pb.int(this.slab.z);
           this.$l.fc = pb.ivec2(pb.floor(this.$builtins.fragCoord.xy));
-          this.$l.rowsPerLevel = pb.mul(this.res, this.slices);
-          this.$l.level = pb.div(this.fc.y, this.rowsPerLevel);
-          this.$l.rem = pb.sub(this.fc.y, pb.mul(this.level, this.rowsPerLevel));
-          this.$l.z = pb.add(pb.int(this.slab.w), pb.div(this.rem, this.res));
-          this.$l.t = pb.ivec3(
-            this.fc.x,
-            pb.sub(this.rem, pb.mul(pb.div(this.rem, this.res), this.res)),
-            this.z
-          );
+          if (bricks) {
+            this.$l.brick = this.bricks.at(this.fc.y);
+            this.$l.level = pb.int(this.brick.w);
+            this.$l.t = pb.add(
+              pb.ivec3(this.brick.xyz),
+              pb.ivec3(
+                pb.mod(this.fc.x, BRICK_VOXELS),
+                pb.mod(pb.div(this.fc.x, BRICK_VOXELS), BRICK_VOXELS),
+                pb.div(this.fc.x, BRICK_VOXELS * BRICK_VOXELS)
+              )
+            );
+          } else {
+            this.$l.slices = pb.int(this.slab.z);
+            this.$l.rowsPerLevel = pb.mul(this.res, this.slices);
+            this.$l.level = pb.div(this.fc.y, this.rowsPerLevel);
+            this.$l.rem = pb.sub(this.fc.y, pb.mul(this.level, this.rowsPerLevel));
+            this.$l.z = pb.add(pb.int(this.slab.w), pb.div(this.rem, this.res));
+            this.$l.t = pb.ivec3(
+              this.fc.x,
+              pb.sub(this.rem, pb.mul(pb.div(this.rem, this.res), this.res)),
+              this.z
+            );
+          }
           this.$l.tz = pb.add(this.t.z, pb.mul(this.level, this.res));
           this.$l.texel = pb.ivec3(this.t.x, this.t.y, this.tz);
           this.$l.radiance = pb.vec3(0);

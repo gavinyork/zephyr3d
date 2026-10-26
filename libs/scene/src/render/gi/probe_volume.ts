@@ -31,13 +31,12 @@ import {
 } from '../../shaders/sdf';
 import {
   declareVoxelSceneUniforms,
-  loadVoxelSceneRadiance,
+  sampleVoxelSceneRadiance,
   VOXEL_SCENE_ALBEDO,
   VOXEL_SCENE_EMISSIVE,
   VOXEL_SCENE_RADIANCE,
   VOXEL_SCENE_ANISO0,
-  VOXEL_SCENE_ANISO1,
-  voxelSceneTexel
+  VOXEL_SCENE_ANISO1
 } from '../../shaders/gi';
 import {
   octDecode,
@@ -913,7 +912,7 @@ export class ProbeVolume {
                   pb.normalize(this.hg),
                   pb.neg(this.dir)
                 );
-                this.radiance = loadVoxelSceneRadiance(this, voxelSceneTexel(this, this.hp, levels), this.hn);
+                this.radiance = sampleVoxelSceneRadiance(this, this.hp, this.hn, levels);
               }).$else(function () {
                 this.dist = pb.float(SKY_ESCAPE_DISTANCE);
                 if (skyMode === 'radiance') {

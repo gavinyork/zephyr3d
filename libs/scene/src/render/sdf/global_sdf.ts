@@ -150,6 +150,8 @@ export class GlobalSDF {
   /** Dirty bricks of each level, keyed by world brick coordinates. */
   private readonly _dirty: Set<string>[];
   private _lastBricks: number;
+  private _freshBricks: Float32Array<ArrayBuffer>;
+  private _freshCount: number;
   private _totalBricks: number;
   private _terrain: Nullable<ClipmapTerrain>;
   private _terrainVersion: number;
@@ -186,6 +188,8 @@ export class GlobalSDF {
     this._origins = new Array(this.levels).fill(null);
     this._dirty = Array.from({ length: this.levels }, () => new Set<string>());
     this._lastBricks = 0;
+    this._freshBricks = new Float32Array(this.brickBudget * 4);
+    this._freshCount = 0;
     this._totalBricks = 0;
     this._terrain = null;
     this._terrainVersion = -1;
@@ -245,6 +249,14 @@ export class GlobalSDF {
       this._tags.name = '@GlobalSDFTags';
     }
     return this._tags;
+  }
+  /**
+   * The bricks whose materials the last update composited, for the voxel
+   * lighting to light at once: per brick (first material voxel of the brick
+   * within its level, level), `count` of them.
+   */
+  get freshMaterialBricks() {
+    return { data: this._freshBricks, count: this._freshCount };
   }
   /** Voxel size of a level in world units. */
   voxelSize(level: number) {
@@ -585,6 +597,11 @@ export class GlobalSDF {
       }
     }
     this._lastBricks = batch.length;
+    this._freshCount = 0;
+    // The budget can be raised at run time
+    if (this._freshBricks.length < batch.length * 4) {
+      this._freshBricks = new Float32Array(batch.length * 4);
+    }
     if (batch.length === 0) {
       return;
     }
@@ -640,6 +657,13 @@ export class GlobalSDF {
       const wrap = (v: number) => (((v * BRICK) % n) + n) % n;
       const o = b * BRICK_VEC4S * 4;
       brickData.set([brick.x * BRICK, brick.y * BRICK, brick.z * BRICK, vs], o);
+      if (this._materials) {
+        // Material voxels are 2³ field voxels: the brick's first one within its level
+        this._freshBricks.set(
+          [wrap(brick.x) / 2, wrap(brick.y) / 2, wrap(brick.z) / 2, brick.level],
+          this._freshCount++ * 4
+        );
+      }
       brickData.set([wrap(brick.x), wrap(brick.y), wrap(brick.z) + brick.level * n, start], o + 4);
       brickData.set([indices.length - start, terrainHit ? 1 : 0, reach, brick.level], o + 8);
     });

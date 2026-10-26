@@ -17,7 +17,7 @@ import {
   declareVoxelSceneUniforms,
   loadVoxelSceneAlbedo,
   loadVoxelSceneEmissive,
-  loadVoxelSceneRadiance,
+  sampleVoxelSceneRadiance,
   VOXEL_SCENE_ALBEDO,
   VOXEL_SCENE_EMISSIVE,
   VOXEL_SCENE_RADIANCE,
@@ -221,7 +221,7 @@ function getProgram(levels: number, mode: SceneSDFViewMode) {
                     )
                   )
                 );
-                this.$l.rad = loadVoxelSceneRadiance(this, this.texel, this.n);
+                this.$l.rad = sampleVoxelSceneRadiance(this, this.hp, this.n, levels);
                 this.$outputs.color = pb.vec4(pb.div(this.rad, pb.add(this.rad, pb.vec3(1))), 1);
               }
             });
