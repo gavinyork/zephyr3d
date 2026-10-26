@@ -26,8 +26,8 @@ export const SDF_INSTANCE_VEC4S = 6;
  * Declares the uniforms {@link sampleGlobalSDF} reads, in a bind group.
  *
  * - texture: all levels stacked along z, `resolution + 1` slices each (the
- *   last repeating the first), r32f; filtered where the device filters r32f,
- *   see {@link isGlobalSDFFilterable}.
+ *   last repeating the first), in {@link globalSDFFormat}; filtered where the
+ *   device filters it, see {@link isGlobalSDFFilterable}.
  * - tags: one texel per brick, stacked the same way: (world brick x, y, z, 1)
  *   of the brick last composited there, rgba32f.
  * - levels[i]: (window origin in voxels of the level, voxel size).
@@ -48,13 +48,26 @@ export function declareGlobalSDFUniforms(scope: PBGlobalScope, group: number, le
 }
 
 /**
- * True when the device filters r32f (the optional float32-filterable feature
- * of WebGPU): the global field is then read with one filtered fetch per level,
- * else trilinear by hand from eight loads.
+ * Texel format of the global field: r16f where the device can write it from a
+ * compute shader (the WebGPU feature texture-formats-tier1), half the memory
+ * and filterable everywhere; r32f otherwise. The field only holds distances
+ * within its band, a few voxels of the coarsest level, where half precision
+ * resolves well under a millimetre per metre.
+ * @internal
+ */
+export function globalSDFFormat(): 'r16f' | 'r32f' {
+  return getDevice().getDeviceCaps().textureCaps.getTextureFormatInfo('r16f')?.writable ? 'r16f' : 'r32f';
+}
+
+/**
+ * True when the device filters the global field's format (r16f always, r32f
+ * with the optional float32-filterable feature of WebGPU): the field is then
+ * read with one filtered fetch per level, else trilinear by hand from eight
+ * loads.
  * @internal
  */
 export function isGlobalSDFFilterable() {
-  return !!getDevice().getDeviceCaps().textureCaps.getTextureFormatInfo('r32f')?.filterable;
+  return !!getDevice().getDeviceCaps().textureCaps.getTextureFormatInfo(globalSDFFormat())?.filterable;
 }
 
 /**

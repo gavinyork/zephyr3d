@@ -17,6 +17,7 @@ import {
   SDF_DYNAMIC_INFO,
   SDF_DYNAMIC_INSTANCES,
   SDF_INSTANCE_VEC4S,
+  globalSDFFormat,
   isGlobalSDFFilterable,
   sampleInstancesSDF,
   sampleSceneSDF
@@ -220,14 +221,14 @@ export class GlobalSDF {
     return getDevice().type === 'webgpu';
   }
   /**
-   * The levels, stacked along z, r32f: `resolution + 1` slices each, the last
+   * The levels, stacked along z, in {@link globalSDFFormat}: `resolution + 1` slices each, the last
    * a copy of the first so a filtered read wraps across the toroidal seam in z
    * as the sampler's repeat mode does in x and y.
    */
   get texture() {
     if (!this._texture) {
       const n = this.resolution;
-      this._texture = getDevice().createTexture3D('r32f', n, n, (n + 1) * this.levels, {
+      this._texture = getDevice().createTexture3D(globalSDFFormat(), n, n, (n + 1) * this.levels, {
         mipmapping: false,
         writable: true
       })!;
@@ -770,7 +771,10 @@ export class GlobalSDF {
           this.terrainRegion = pb.vec4().uniform(0);
           // (height scale, world y, 1 / width, 1 / height)
           this.terrainParams = pb.vec4().uniform(0);
-          this.field = pb.texStorage3D.r32float().storage(0);
+          this.field =
+            globalSDFFormat() === 'r16f'
+              ? pb.texStorage3D.r16float().storage(0)
+              : pb.texStorage3D.r32float().storage(0);
           this.tagsOut = pb.texStorage3D.rgba32float().storage(0);
           if (materials) {
             this.materialSlots = pb.vec4[0]().storageBufferReadonly(0);

@@ -212,6 +212,12 @@ export class ProbeVolume {
   private _irradianceNext: Nullable<Texture2D>;
   private _visibility: Nullable<Texture2D>;
   private _visibilityNext: Nullable<Texture2D>;
+  /**
+   * The visibility maps keep two moments of the distance: rg16f where the
+   * device can write it from a compute shader (texture-formats-tier1), half
+   * the memory of rgba16f.
+   */
+  private readonly _visibilityFormat: 'rg16f' | 'rgba16f';
   private _rayTexture: Nullable<Texture2D>;
   private _rayFramebuffer: Nullable<FrameBuffer>;
   private _data: Nullable<GPUDataBuffer>;
@@ -275,6 +281,9 @@ export class ProbeVolume {
     this._irradianceNext = null;
     this._visibility = null;
     this._visibilityNext = null;
+    this._visibilityFormat = getDevice().getDeviceCaps().textureCaps.getTextureFormatInfo('rg16f')?.writable
+      ? 'rg16f'
+      : 'rgba16f';
     this._rayTexture = null;
     this._rayFramebuffer = null;
     this._data = null;
@@ -406,14 +415,18 @@ export class ProbeVolume {
       throw new Error('ProbeVolume.exportState(): nothing to save yet');
     }
     const irr = new Uint16Array(new ArrayBuffer(this._irradiance.width * this._irradiance.height * 8));
-    const vis = new Uint16Array(new ArrayBuffer(this._visibility.width * this._visibility.height * 8));
+    const visTexels = this._visibility.width * this._visibility.height;
+    const visChannels = this._visibilityFormat === 'rg16f' ? 2 : 4;
+    const visRead = new Uint16Array(new ArrayBuffer(visTexels * visChannels * 2));
     const data = new Float32Array(new ArrayBuffer(this._count * 16));
     // Issued together so the three readbacks wait for the GPU once, not three times
     await Promise.all([
       this._irradiance.readPixels(0, 0, this._irradiance.width, this._irradiance.height, 0, 0, irr),
-      this._visibility.readPixels(0, 0, this._visibility.width, this._visibility.height, 0, 0, vis),
+      this._visibility.readPixels(0, 0, this._visibility.width, this._visibility.height, 0, 0, visRead),
       this._data.getBufferSubData(new Uint8Array(data.buffer), 0, data.byteLength)
     ]);
+    // Saved as rgba16f whatever the device keeps, so a state moves between devices
+    const vis = visChannels === 4 ? visRead : expandVisibility(visRead, visTexels);
     const header = JSON.stringify({
       grid: this._options.grid,
       spacing: this._options.spacing,
@@ -468,9 +481,16 @@ export class ProbeVolume {
     offset += irr.byteLength;
     const vis = new Uint16Array(buffer, offset, visSize);
     offset += vis.byteLength;
+    const visTexels = this._visibility!.width * this._visibility!.height;
     const data = new Float32Array(buffer, offset, this._count * 4);
     this._irradiance!.update(irr, 0, 0, this._irradiance!.width, this._irradiance!.height);
-    this._visibility!.update(vis, 0, 0, this._visibility!.width, this._visibility!.height);
+    this._visibility!.update(
+      this._visibilityFormat === 'rg16f' ? compactVisibility(vis, visTexels) : vis,
+      0,
+      0,
+      this._visibility!.width,
+      this._visibility!.height
+    );
     this._data!.bufferSubData(0, data);
     this._levels.forEach((level, l) => {
       level.origin = header.origins[l];
@@ -539,8 +559,14 @@ export class ProbeVolume {
     }
     const device = getDevice();
     const rows = Math.ceil(this._count / this._tileCols);
-    const make = (texels: number, name: string, cols = this._tileCols, r = rows) => {
-      const tex = device.createTexture2D('rgba16f', cols * texels, r * texels, {
+    const make = (
+      texels: number,
+      name: string,
+      cols = this._tileCols,
+      r = rows,
+      format: 'rgba16f' | 'rg16f' = 'rgba16f'
+    ) => {
+      const tex = device.createTexture2D(format, cols * texels, r * texels, {
         mipmapping: false,
         writable: true
       })!;
@@ -551,8 +577,20 @@ export class ProbeVolume {
     // The blend outputs hold one update's tiles, committed to the maps after
     const stagingRows = Math.ceil(this._budget / STAGING_COLS);
     this._irradianceNext = make(IRRADIANCE_TEXELS, '@ProbeIrradianceNext', STAGING_COLS, stagingRows);
-    this._visibility = make(VISIBILITY_TEXELS, '@ProbeVisibility');
-    this._visibilityNext = make(VISIBILITY_TEXELS, '@ProbeVisibilityNext', STAGING_COLS, stagingRows);
+    this._visibility = make(
+      VISIBILITY_TEXELS,
+      '@ProbeVisibility',
+      this._tileCols,
+      rows,
+      this._visibilityFormat
+    );
+    this._visibilityNext = make(
+      VISIBILITY_TEXELS,
+      '@ProbeVisibilityNext',
+      STAGING_COLS,
+      stagingRows,
+      this._visibilityFormat
+    );
     this._rayTexture = device.createTexture2D('rgba16f', this._rays, this._budget, { mipmapping: false })!;
     this._rayTexture.name = '@ProbeRays';
     this._rayFramebuffer = device.createFrameBuffer([this._rayTexture], null)!;
@@ -1000,6 +1038,7 @@ export class ProbeVolume {
    */
   private runCommit(selected: number) {
     const device = getDevice();
+    const twoChannel = this._visibilityFormat === 'rg16f';
     if (!this._commitProgram) {
       this._commitProgram = buildSDFProgram({
         label: 'ProbeCommit',
@@ -1010,7 +1049,9 @@ export class ProbeVolume {
           this.stagedIrradiance = pb.tex2D().sampleType('unfilterable-float').uniform(0);
           this.stagedVisibility = pb.tex2D().sampleType('unfilterable-float').uniform(0);
           this.irradiance = pb.texStorage2D.rgba16float().storage(0);
-          this.visibility = pb.texStorage2D.rgba16float().storage(0);
+          this.visibility = twoChannel
+            ? pb.texStorage2D.rg16float().storage(0)
+            : pb.texStorage2D.rgba16float().storage(0);
           pb.main(function () {
             this.$l.slot = this.$builtins.workGroupId.x;
             this.$l.index = pb.int(pb.compAnd(this.selected.at(this.slot), pb.uint(SELECT_INDEX_MASK)));
@@ -1054,6 +1095,7 @@ export class ProbeVolume {
   /** @internal */
   private createBlendProgram(texels: number, visibility: boolean) {
     const rays = this._rays;
+    const twoChannel = this._visibilityFormat === 'rg16f';
     return buildSDFProgram({
       label: visibility ? 'ProbeBlendVisibility' : 'ProbeBlendIrradiance',
       workgroupSize: [texels, texels, 1],
@@ -1065,7 +1107,10 @@ export class ProbeVolume {
         this.rayInfo = pb.vec4().uniform(0);
         this.rays = pb.tex2D().sampleType('unfilterable-float').uniform(0);
         this.current = pb.tex2D().sampleType('unfilterable-float').uniform(0);
-        this.next = pb.texStorage2D.rgba16float().storage(0);
+        this.next =
+          visibility && twoChannel
+            ? pb.texStorage2D.rg16float().storage(0)
+            : pb.texStorage2D.rgba16float().storage(0);
         // A batch of the probe's rays, direction and traced result, read once per workgroup
         this.batchDir = pb.vec4[BLEND_BATCH]().workgroup();
         this.batchRay = pb.vec4[BLEND_BATCH]().workgroup();
@@ -1199,4 +1244,26 @@ function stagingOrigin(scope: PBInsideFunctionScope, slot: PBShaderExp, texels: 
   const pb = scope.$builder;
   const s = pb.int(slot);
   return pb.mul(pb.ivec2(pb.mod(s, STAGING_COLS), pb.div(s, STAGING_COLS)), texels) as PBShaderExp;
+}
+
+/** Visibility texels as saved, rgba16f: the two moments, then 0 and 1. */
+function expandVisibility(rg: Uint16Array<ArrayBuffer>, texels: number) {
+  const out = new Uint16Array(new ArrayBuffer(texels * 8));
+  for (let i = 0; i < texels; i++) {
+    out[i * 4] = rg[i * 2];
+    out[i * 4 + 1] = rg[i * 2 + 1];
+    // Half 1.0, which the blend writes to alpha
+    out[i * 4 + 3] = 0x3c00;
+  }
+  return out;
+}
+
+/** The two moments of saved rgba16f visibility texels, for an rg16f map. */
+function compactVisibility(rgba: Uint16Array, texels: number) {
+  const out = new Uint16Array(new ArrayBuffer(texels * 4));
+  for (let i = 0; i < texels; i++) {
+    out[i * 2] = rgba[i * 4];
+    out[i * 2 + 1] = rgba[i * 4 + 1];
+  }
+  return out;
 }

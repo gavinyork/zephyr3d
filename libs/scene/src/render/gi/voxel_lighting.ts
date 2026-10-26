@@ -35,6 +35,15 @@ export const MAX_VOXEL_LIGHTS = 64;
 const LIGHT_VEC4S = 4;
 /** Material voxels along a brick edge of the global field, whose bricks are 8³ field voxels. */
 const BRICK_VOXELS = 4;
+/**
+ * Format of the second aniso texture, two faces (-y, -z): rg8unorm where the
+ * device can write it from a shader (texture-formats-tier1), else rgba8unorm.
+ */
+function aniso1Format(): 'rg8unorm' | 'rgba8unorm' {
+  return getDevice().getDeviceCaps().textureCaps.getTextureFormatInfo('rg8unorm')?.writable
+    ? 'rg8unorm'
+    : 'rgba8unorm';
+}
 /** Cone tracing steps of the sun shadow. */
 const SHADOW_STEPS = 24;
 /** The axis faces of a voxel, in the order of the aniso textures (Godot's aniso_dir). */
@@ -175,13 +184,13 @@ export class VoxelLighting {
         writable: true
       })!;
       this._radiance.name = '@VoxelSceneRadiance';
-      // rgba8 for both: rg8 is not a storage texture format in WebGPU
       this._aniso0 = device.createTexture3D('rgba8unorm', resolution, resolution, depth, {
         mipmapping: false,
         writable: true
       })!;
       this._aniso0.name = '@VoxelSceneAniso0';
-      this._aniso1 = device.createTexture3D('rgba8unorm', resolution, resolution, depth, {
+      // Two faces: rg8 where the device can write it (texture-formats-tier1)
+      this._aniso1 = device.createTexture3D(aniso1Format(), resolution, resolution, depth, {
         mipmapping: false,
         writable: true
       })!;
@@ -401,7 +410,10 @@ export class VoxelLighting {
         this.emissiveTex = pb.tex3D().sampleType('unfilterable-float').uniform(0);
         this.radianceOut = pb.texStorage3D.rgba16float().storage(0);
         this.aniso0Out = pb.texStorage3D.rgba8unorm().storage(0);
-        this.aniso1Out = pb.texStorage3D.rgba8unorm().storage(0);
+        this.aniso1Out =
+          aniso1Format() === 'rg8unorm'
+            ? pb.texStorage3D.rg8unorm().storage(0)
+            : pb.texStorage3D.rgba8unorm().storage(0);
         this.lights = pb.vec4[MAX_VOXEL_LIGHTS * LIGHT_VEC4S]().uniform(0);
         // (direction the light travels, 1 when there is a sun)
         this.sunDir = pb.vec4().uniform(0);

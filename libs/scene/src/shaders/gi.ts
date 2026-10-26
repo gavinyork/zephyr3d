@@ -268,8 +268,9 @@ export function sampleInstanceMaterial(
  * - emissive: rgba16float, emitted radiance.
  * - radiance: rgba16float, outgoing radiance (lit albedo plus emissive)
  *   summed over the six axis faces of the voxel.
- * - aniso0, aniso1: rgba8unorm, the share of that sum each face carries, by
- *   luminance: (+x, +y, +z, -x) and (-y, -z) in rg. A voxel holding a thin
+ * - aniso0, aniso1: rgba8unorm (aniso1 rg8unorm with texture-formats-tier1),
+ *   the share of that sum each face carries, by luminance: (+x, +y, +z, -x)
+ *   and (-y, -z) in rg. A voxel holding a thin
  *   floor is lit on top and dark below; one radiance for the voxel would be
  *   read the same from both sides. After the light anisotropy of Godot's SDFGI
  *   (sdfgi_direct_light.glsl, the dst_aniso0/1 images).
