@@ -1,4 +1,5 @@
 import type { PBGlobalScope, PBInsideFunctionScope, PBShaderExp } from '@zephyr3d/device';
+import { getDevice } from '../app/api';
 
 /** Uniform names of the global field, see {@link declareGlobalSDFUniforms}. */
 export const GLOBAL_SDF_TEXTURE = 'zGlobalSDFTex';
@@ -24,7 +25,9 @@ export const SDF_INSTANCE_VEC4S = 6;
 /**
  * Declares the uniforms {@link sampleGlobalSDF} reads, in a bind group.
  *
- * - texture: all levels stacked along z, `resolution` texels each, r32f.
+ * - texture: all levels stacked along z, `resolution + 1` slices each (the
+ *   last repeating the first), r32f; filtered where the device filters r32f,
+ *   see {@link isGlobalSDFFilterable}.
  * - tags: one texel per brick, stacked the same way: (world brick x, y, z, 1)
  *   of the brick last composited there, rgba32f.
  * - levels[i]: (window origin in voxels of the level, voxel size).
@@ -36,10 +39,22 @@ export const SDF_INSTANCE_VEC4S = 6;
  */
 export function declareGlobalSDFUniforms(scope: PBGlobalScope, group: number, levels: number) {
   const pb = scope.$builder;
-  scope[GLOBAL_SDF_TEXTURE] = pb.tex3D().sampleType('unfilterable-float').uniform(group);
+  scope[GLOBAL_SDF_TEXTURE] = isGlobalSDFFilterable()
+    ? pb.tex3D().uniform(group)
+    : pb.tex3D().sampleType('unfilterable-float').uniform(group);
   scope[GLOBAL_SDF_TAGS] = pb.tex3D().sampleType('unfilterable-float').uniform(group);
   scope[GLOBAL_SDF_LEVELS] = pb.vec4[levels]().uniform(group);
   scope[GLOBAL_SDF_PARAMS] = pb.vec4().uniform(group);
+}
+
+/**
+ * True when the device filters r32f (the optional float32-filterable feature
+ * of WebGPU): the global field is then read with one filtered fetch per level,
+ * else trilinear by hand from eight loads.
+ * @internal
+ */
+export function isGlobalSDFFilterable() {
+  return !!getDevice().getDeviceCaps().textureCaps.getTextureFormatInfo('r32f')?.filterable;
 }
 
 /**
@@ -286,8 +301,9 @@ export const SDF_LEVEL_BLEND_VOXELS = 16;
  * the coarsest band) is returned, a lower bound on the true distance that
  * keeps sphere tracing safe.
  *
- * Trilinear by hand from `textureLoad`: r32f is not filterable everywhere, and
- * the windows are toroidal, so neighbouring texels can wrap around the level.
+ * The windows are toroidal: a filtered read wraps by the sampler's repeat mode
+ * in x and y and by the slice repeated past each level in z. Where r32f is not
+ * filterable, trilinear by hand from `textureLoad`, wrapping each texel.
  *
  * A level answers only where every brick the filter touches is tagged with the
  * world brick it should hold. After the window moves, the bricks that entered
@@ -302,18 +318,100 @@ export function sampleGlobalSDF(scope: PBInsideFunctionScope, worldPos: PBShader
 }
 
 /**
+ * The first level worth reading a step after a sphere trace read `prevDist`:
+ * the levels finer than it saturate at that distance, their band narrower.
+ * @internal
+ */
+function sdfStartLevel(scope: PBInsideFunctionScope, prevDist: PBShaderExp, levels: number) {
+  const pb = scope.$builder;
+  let start: PBShaderExp = pb.int(0);
+  for (let i = 0; i < levels - 1; i++) {
+    start = pb.add(
+      start,
+      pb.int(
+        pb.greaterThanEqual(
+          prevDist,
+          pb.mul(scope[GLOBAL_SDF_PARAMS].z, scope[GLOBAL_SDF_LEVELS].at(i).w, 0.95)
+        )
+      )
+    );
+  }
+  return start;
+}
+
+/**
+ * {@link sampleGlobalSDFWithVoxel} for a sphere trace, `prevDist` the distance
+ * its previous step read (0 for the first): the read starts at the level that
+ * distance needs, skipping finer levels that would have saturated, as Lumen
+ * skips empty space with its coarse mip. Where the value comes back within the
+ * band of the level skipped last, the march has neared a surface and the point
+ * is read again from the finest level.
+ * @internal
+ */
+export function sampleGlobalSDFHinted(
+  scope: PBInsideFunctionScope,
+  worldPos: PBShaderExp,
+  prevDist: PBShaderExp,
+  levels: number
+) {
+  const pb = scope.$builder;
+  const funcName = 'Z_sampleGlobalSDFHinted';
+  pb.func(funcName, [pb.vec3('p'), pb.float('prevDist')], function () {
+    this.$l.start = sdfStartLevel(this, this.prevDist, levels);
+    this.$l.g = sampleGlobalSDFWithVoxel(this, this.p, levels, this.start);
+    this.$if(pb.greaterThan(this.start, 0), function () {
+      this.$if(
+        pb.lessThan(
+          this.g.x,
+          pb.mul(this[GLOBAL_SDF_PARAMS].z, this[GLOBAL_SDF_LEVELS].at(pb.sub(this.start, 1)).w)
+        ),
+        function () {
+          this.g = sampleGlobalSDFWithVoxel(this, this.p, levels, pb.int(0));
+        }
+      );
+    });
+    this.$return(this.g);
+  });
+  return scope[funcName](worldPos, prevDist) as PBShaderExp;
+}
+
+/**
+ * {@link sampleSceneSDFWithVoxel} for a sphere trace, the global field read
+ * by {@link sampleGlobalSDFHinted}.
+ * @internal
+ */
+export function sampleSceneSDFHinted(
+  scope: PBInsideFunctionScope,
+  worldPos: PBShaderExp,
+  prevDist: PBShaderExp,
+  levels: number
+) {
+  const pb = scope.$builder;
+  const funcName = 'Z_sampleSceneSDFHinted';
+  pb.func(funcName, [pb.vec3('p'), pb.float('prevDist')], function () {
+    this.$l.g = sampleGlobalSDFHinted(this, this.p, this.prevDist, levels);
+    this.$l.d = sampleDynamicSDF(this, this.p, this.g.x);
+    this.$return(pb.vec2(this.d, this.$choice(pb.lessThan(this.d, this.g.x), pb.float(0), this.g.y)));
+  });
+  return scope[funcName](worldPos, prevDist) as PBShaderExp;
+}
+
+/**
  * {@link sampleGlobalSDF} with the voxel size of the level that answered:
- * (distance, voxel size), both in world units.
+ * (distance, voxel size), both in world units. Levels finer than `minLevel`
+ * are not read.
  * @internal
  */
 export function sampleGlobalSDFWithVoxel(
   scope: PBInsideFunctionScope,
   worldPos: PBShaderExp,
-  levels: number
+  levels: number,
+  minLevel?: PBShaderExp
 ) {
   const pb = scope.$builder;
+  const filterable = isGlobalSDFFilterable();
   const funcName = 'Z_sampleGlobalSDFWithVoxel';
-  pb.func(funcName, [pb.vec3('p')], function () {
+  pb.func(funcName, [pb.vec3('p'), pb.int('minLevel')], function () {
     this.$l.res = pb.int(this[GLOBAL_SDF_PARAMS].x);
     this.$l.resF = this[GLOBAL_SDF_PARAMS].x;
     this.$l.band = this[GLOBAL_SDF_PARAMS].z;
@@ -331,7 +429,11 @@ export function sampleGlobalSDFWithVoxel(
     for (let i = 0; i < levels; i++) {
       // Finest first, each level taking the share its finer levels left;
       // unrolled since `levels` is small and constant
-      this.$if(pb.greaterThan(this.remaining, 1e-4), function () {
+      const wanted =
+        i === levels - 1
+          ? pb.greaterThan(this.remaining, 1e-4)
+          : pb.and(pb.greaterThan(this.remaining, 1e-4), pb.lessThanEqual(this.minLevel, i));
+      this.$if(wanted, function () {
         this.$l.info = this[GLOBAL_SDF_LEVELS].at(i);
         // Position in voxels of the window, sample centres at integers
         this.$l.f = pb.sub(pb.div(this.p, this.info.w), pb.add(this.info.xyz, pb.vec3(0.5)));
@@ -341,30 +443,54 @@ export function sampleGlobalSDFWithVoxel(
         );
         this.valid = false;
         this.$if(this.inside, function () {
-          this.base = pb.floor(this.f);
-          this.t = pb.sub(this.f, this.base);
-          // World voxel index of the lower corner, then toroidal texel
-          this.v0 = pb.add(pb.ivec3(this.base), pb.ivec3(this.info.xyz));
           this.$if(levelCurrent(this, i), function () {
             this.valid = true;
           }).$else(function () {
-            this.valid = bricksCurrent(this, this.v0, i);
+            // World voxel index of the filter's lower corner
+            this.valid = bricksCurrent(this, pb.add(pb.ivec3(pb.floor(this.f)), pb.ivec3(this.info.xyz)), i);
           });
         });
         this.$if(this.valid, function () {
-          this.$l.c000 = loadWrapped(this, this.v0, 0, 0, 0, i);
-          this.$l.c100 = loadWrapped(this, this.v0, 1, 0, 0, i);
-          this.$l.c010 = loadWrapped(this, this.v0, 0, 1, 0, i);
-          this.$l.c110 = loadWrapped(this, this.v0, 1, 1, 0, i);
-          this.$l.c001 = loadWrapped(this, this.v0, 0, 0, 1, i);
-          this.$l.c101 = loadWrapped(this, this.v0, 1, 0, 1, i);
-          this.$l.c011 = loadWrapped(this, this.v0, 0, 1, 1, i);
-          this.$l.c111 = loadWrapped(this, this.v0, 1, 1, 1, i);
-          this.$l.d = pb.mix(
-            pb.mix(pb.mix(this.c000, this.c100, this.t.x), pb.mix(this.c010, this.c110, this.t.x), this.t.y),
-            pb.mix(pb.mix(this.c001, this.c101, this.t.x), pb.mix(this.c011, this.c111, this.t.x), this.t.y),
-            this.t.z
-          );
+          if (filterable) {
+            // World voxel position, sample centres at integers, wrapped into the window
+            this.$l.vw = pb.add(this.f, this.info.xyz);
+            this.vw = pb.sub(this.vw, pb.mul(pb.floor(pb.div(this.vw, this.resF)), this.resF));
+            this.$l.depth = pb.add(this.resF, 1);
+            this.$l.d = pb.textureSampleLevel(
+              this[GLOBAL_SDF_TEXTURE],
+              pb.vec3(
+                pb.div(pb.add(this.vw.xy, pb.vec2(0.5)), this.resF),
+                pb.div(pb.add(this.vw.z, pb.add(pb.mul(this.depth, i), 0.5)), pb.mul(this.depth, levels))
+              ),
+              0
+            ).r;
+          } else {
+            this.base = pb.floor(this.f);
+            this.t = pb.sub(this.f, this.base);
+            // World voxel index of the lower corner, then toroidal texel
+            this.v0 = pb.add(pb.ivec3(this.base), pb.ivec3(this.info.xyz));
+            this.$l.c000 = loadWrapped(this, this.v0, 0, 0, 0, i);
+            this.$l.c100 = loadWrapped(this, this.v0, 1, 0, 0, i);
+            this.$l.c010 = loadWrapped(this, this.v0, 0, 1, 0, i);
+            this.$l.c110 = loadWrapped(this, this.v0, 1, 1, 0, i);
+            this.$l.c001 = loadWrapped(this, this.v0, 0, 0, 1, i);
+            this.$l.c101 = loadWrapped(this, this.v0, 1, 0, 1, i);
+            this.$l.c011 = loadWrapped(this, this.v0, 0, 1, 1, i);
+            this.$l.c111 = loadWrapped(this, this.v0, 1, 1, 1, i);
+            this.$l.d = pb.mix(
+              pb.mix(
+                pb.mix(this.c000, this.c100, this.t.x),
+                pb.mix(this.c010, this.c110, this.t.x),
+                this.t.y
+              ),
+              pb.mix(
+                pb.mix(this.c001, this.c101, this.t.x),
+                pb.mix(this.c011, this.c111, this.t.x),
+                this.t.y
+              ),
+              this.t.z
+            );
+          }
           this.last = this.d;
           this.lastVoxel = this.info.w;
           if (i === levels - 1) {
@@ -394,7 +520,7 @@ export function sampleGlobalSDFWithVoxel(
     this.$l.resultVoxel = pb.add(this.sumVoxel, pb.mul(this.remaining, this.lastVoxel));
     this.$return(pb.vec2(this.result, this.resultVoxel));
   });
-  return scope[funcName](worldPos) as PBShaderExp;
+  return scope[funcName](worldPos, minLevel ?? pb.int(0)) as PBShaderExp;
 }
 
 /** ((v % n) + n) % n, the remainder of a negative index being negative */
@@ -498,7 +624,7 @@ function loadWrapped(
   const t = pb.mod(pb.add(pb.mod(v, pb.ivec3(scope.res)), pb.ivec3(scope.res)), pb.ivec3(scope.res));
   return pb.textureLoad(
     scope[GLOBAL_SDF_TEXTURE],
-    pb.ivec3(t.x, t.y, pb.add(t.z, pb.mul(scope.res, level))),
+    pb.ivec3(t.x, t.y, pb.add(t.z, pb.mul(pb.add(scope.res, 1), level))),
     0
   ).r;
 }

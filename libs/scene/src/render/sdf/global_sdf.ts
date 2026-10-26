@@ -17,6 +17,7 @@ import {
   SDF_DYNAMIC_INFO,
   SDF_DYNAMIC_INSTANCES,
   SDF_INSTANCE_VEC4S,
+  isGlobalSDFFilterable,
   sampleInstancesSDF,
   sampleSceneSDF
 } from '../../shaders/sdf';
@@ -214,11 +215,15 @@ export class GlobalSDF {
   static isSupported() {
     return getDevice().type === 'webgpu';
   }
-  /** The levels, stacked along z, r32f. */
+  /**
+   * The levels, stacked along z, r32f: `resolution + 1` slices each, the last
+   * a copy of the first so a filtered read wraps across the toroidal seam in z
+   * as the sampler's repeat mode does in x and y.
+   */
   get texture() {
     if (!this._texture) {
       const n = this.resolution;
-      this._texture = getDevice().createTexture3D('r32f', n, n, n * this.levels, {
+      this._texture = getDevice().createTexture3D('r32f', n, n, (n + 1) * this.levels, {
         mipmapping: false,
         writable: true
       })!;
@@ -314,7 +319,11 @@ export class GlobalSDF {
     bindGroup.setValue(SDF_DYNAMIC_INFO, this._dynamicInfo);
     // Read with textureLoad, but the unfilterable binding still has a sampler
     // slot, which a filtering sampler fails to validate against
-    bindGroup.setTexture(GLOBAL_SDF_TEXTURE, this.texture, fetchSampler('clamp_nearest_nomip'));
+    bindGroup.setTexture(
+      GLOBAL_SDF_TEXTURE,
+      this.texture,
+      fetchSampler(isGlobalSDFFilterable() ? 'repeat_linear_nomip' : 'clamp_nearest_nomip')
+    );
     bindGroup.setTexture(GLOBAL_SDF_TAGS, this.tags, fetchSampler('clamp_nearest_nomip'));
     bindGroup.setValue(GLOBAL_SDF_LEVELS, this._levelInfo);
     bindGroup.setValue(GLOBAL_SDF_PARAMS, this._params);
@@ -632,7 +641,7 @@ export class GlobalSDF {
       const o = b * BRICK_VEC4S * 4;
       brickData.set([brick.x * BRICK, brick.y * BRICK, brick.z * BRICK, vs], o);
       brickData.set([wrap(brick.x), wrap(brick.y), wrap(brick.z) + brick.level * n, start], o + 4);
-      brickData.set([indices.length - start, terrainHit ? 1 : 0, reach, 0], o + 8);
+      brickData.set([indices.length - start, terrainHit ? 1 : 0, reach, brick.level], o + 8);
     });
     const device = getDevice();
     const program = this.getProgram();
@@ -723,6 +732,7 @@ export class GlobalSDF {
     if (!this._program) {
       const device = getDevice();
       const materials = !!this._materials;
+      const fieldRes = this.resolution;
       this._program = buildSDFProgram({
         label: materials ? 'GlobalSDFCompositeMaterials' : 'GlobalSDFComposite',
         workgroupSize: [4, 4, 4],
@@ -816,7 +826,23 @@ export class GlobalSDF {
               });
             });
             this.d = pb.clamp(pb.min(this.d, this.terrainD), pb.neg(this.band), this.band);
-            pb.textureStore(this.field, pb.add(pb.uvec3(this.b1.xyz), this.local), pb.vec4(this.d, 0, 0, 0));
+            // b1 addresses the level as `resolution` slices; the field has one more each
+            this.$l.level = pb.uint(this.b2.w);
+            this.$l.ft = pb.add(pb.uvec3(this.b1.xyz), this.local);
+            this.ft.z = pb.add(this.ft.z, this.level);
+            pb.textureStore(this.field, this.ft, pb.vec4(this.d, 0, 0, 0));
+            // The first slice of the window again past the last, the seam the filter crosses
+            this.$l.res = pb.uint(fieldRes);
+            this.$if(
+              pb.and(pb.equal(this.local.z, 0), pb.equal(pb.uint(this.b1.z), pb.mul(this.level, this.res))),
+              function () {
+                pb.textureStore(
+                  this.field,
+                  pb.uvec3(this.ft.x, this.ft.y, pb.add(pb.mul(this.level, pb.add(this.res, 1)), this.res)),
+                  pb.vec4(this.d, 0, 0, 0)
+                );
+              }
+            );
             // The brick now holds this window's region; readers see the tag in the next pass
             this.$if(
               pb.and(pb.equal(this.sub, 0), pb.equal(this.$builtins.localInvocationId, pb.uvec3(0))),

@@ -3,7 +3,7 @@ import {
   GLOBAL_SDF_LEVELS,
   GLOBAL_SDF_PARAMS,
   globalSDFVoxelCurrent,
-  sampleGlobalSDF,
+  sampleGlobalSDFHinted,
   sampleInstanceField
 } from './sdf';
 
@@ -344,8 +344,15 @@ export function sdfConeShadow(
     function () {
       this.$l.shadow = pb.float(1);
       this.$l.t = this.minStep;
+      this.$l.prevD = pb.float(0);
       this.$for(pb.int('i'), 0, steps, function () {
-        this.$l.d = sampleGlobalSDF(this, pb.add(this.start, pb.mul(this.dir, this.t)), levels);
+        this.$l.d = sampleGlobalSDFHinted(
+          this,
+          pb.add(this.start, pb.mul(this.dir, this.t)),
+          this.prevD,
+          levels
+        ).x;
+        this.prevD = this.d;
         this.shadow = pb.min(this.shadow, pb.clamp(pb.div(this.d, pb.mul(this.t, this.tanHalf)), 0, 1));
         this.$if(pb.lessThan(this.shadow, 0.01), function () {
           this.$break();

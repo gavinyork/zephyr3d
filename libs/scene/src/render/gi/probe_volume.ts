@@ -26,7 +26,7 @@ import {
   declareGlobalSDFUniforms,
   GLOBAL_SDF_LEVELS,
   sampleSceneSDF,
-  sampleSceneSDFWithVoxel,
+  sampleSceneSDFHinted,
   sdfTraceTolerance
 } from '../../shaders/sdf';
 import {
@@ -871,9 +871,16 @@ export class ProbeVolume {
             }).$else(function () {
               this.$l.t = pb.float(0);
               this.$l.hit = false;
+              this.$l.prevD = pb.float(0);
               this.$for(pb.int('i'), 0, TRACE_STEPS, function () {
-                this.$l.s = sampleSceneSDFWithVoxel(this, pb.add(this.pos, pb.mul(this.dir, this.t)), levels);
+                this.$l.s = sampleSceneSDFHinted(
+                  this,
+                  pb.add(this.pos, pb.mul(this.dir, this.t)),
+                  this.prevD,
+                  levels
+                );
                 this.$l.d = this.s.x;
+                this.prevD = this.d;
                 this.$if(
                   pb.lessThan(
                     this.d,

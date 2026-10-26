@@ -10,7 +10,7 @@ import {
   declareGlobalSDFUniforms,
   sampleGlobalSDF,
   sampleSceneSDF,
-  sampleSceneSDFWithVoxel,
+  sampleSceneSDFHinted,
   sdfTraceTolerance
 } from '../../shaders/sdf';
 import {
@@ -81,13 +81,16 @@ function getProgram(levels: number, mode: SceneSDFViewMode) {
           this.$l.t = pb.float(0);
           this.$l.steps = pb.float(0);
           this.$l.hit = false;
+          this.$l.prevD = pb.float(0);
           this.$for(pb.int('i'), 0, MAX_STEPS, function () {
-            this.$l.s = sampleSceneSDFWithVoxel(
+            this.$l.s = sampleSceneSDFHinted(
               this,
               pb.add(this.cameraInfo.xyz, pb.mul(this.dir, this.t)),
+              this.prevD,
               levels
             );
             this.$l.d = this.s.x;
+            this.prevD = this.d;
             this.steps = pb.add(this.steps, 1);
             // Hit tolerance grows with distance and with the voxels of the level read
             this.$if(
