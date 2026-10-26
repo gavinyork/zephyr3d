@@ -54,7 +54,14 @@ import {
 } from './mcpterrain';
 import { importModelAsset, saveNodeAsPrefab } from './mcpassets';
 import { editWaterInteraction } from './mcpwater';
-import { bakeMeshSDFs, getSceneSDFStats, queryMeshSDF, sampleGlobalSDF, setSDFDebugSlice } from './mcpsdf';
+import {
+  bakeMeshSDFs,
+  getSceneSDFStats,
+  queryGIProbes,
+  queryMeshSDF,
+  sampleGlobalSDF,
+  setSDFDebugSlice
+} from './mcpsdf';
 import { getNodePhysics, listPhysicsPresets, removeNodePhysics, setNodePhysics } from './mcpphysics';
 import {
   eraseFoliage,
@@ -1920,6 +1927,12 @@ async function dispatch(editor: Editor, method: string, params: any): Promise<an
         return await sampleGlobalSDF(getSceneController(editor), params);
       } catch (err) {
         return { distances: null, err: `${err instanceof Error ? err.message : err}` };
+      }
+    case 'gi_probe_query':
+      try {
+        return await queryGIProbes(getSceneController(editor), params);
+      } catch (err) {
+        return { probes: null, err: `${err instanceof Error ? err.message : err}` };
       }
     case 'water_interaction':
       return await editWaterInteraction(getSceneController(editor), params);

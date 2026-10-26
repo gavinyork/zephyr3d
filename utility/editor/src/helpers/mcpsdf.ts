@@ -221,3 +221,34 @@ export async function queryMeshSDF(controller: SceneController | null, params: a
     err: null
   };
 }
+
+/** The global illumination probes of a level in a world box, read back from the GPU, with the scene SDF at each. */
+export async function queryGIProbes(controller: SceneController | null, params: any) {
+  const scene = controller?.model?.scene ?? null;
+  if (!scene) {
+    return { probes: null, err: 'No scene is currently opened' };
+  }
+  const probes = scene.gi.enabled ? scene.gi.probes : null;
+  if (!probes?.ready) {
+    return { probes: null, err: 'No probe volume: enable GIEnabled (WebGPU) and let it build' };
+  }
+  const [x0, y0, z0] = (params.min as number[]).map(Number);
+  const [x1, y1, z1] = (params.max as number[]).map(Number);
+  const result = await probes.queryProbes(
+    Number(params.level ?? 0),
+    new Vector3(Math.min(x0, x1), Math.min(y0, y1), Math.min(z0, z1)),
+    new Vector3(Math.max(x0, x1), Math.max(y0, y1), Math.max(z0, z1)),
+    Math.max(1, Math.min(Number(params.limit ?? 256), 4096))
+  );
+  if (!result) {
+    return { probes: null, err: 'No such probe level, or the volume has not been placed yet' };
+  }
+  const global = scene.sdf.enabled ? scene.sdf.global : null;
+  if (global && result.probes.length > 0) {
+    const d = await global.queryDistances(
+      result.probes.map((p) => new Vector3(p.position[0], p.position[1], p.position[2]))
+    );
+    result.probes.forEach((p, i) => ((p as any).sdf = Math.round(d[i] * 1000) / 1000));
+  }
+  return { ...result, err: null };
+}

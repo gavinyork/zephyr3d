@@ -9,7 +9,7 @@ import type {
   Texture2D
 } from '@zephyr3d/device';
 import type { Nullable, Vector3 } from '@zephyr3d/base';
-import { PRNG, Vector4 } from '@zephyr3d/base';
+import { half2float, PRNG, Vector4 } from '@zephyr3d/base';
 import { getDevice } from '../../app/api';
 import type { Scene } from '../../scene/scene';
 import type { Camera } from '../../camera/camera';
@@ -452,6 +452,107 @@ export class ProbeVolume {
     offset += vis.byteLength;
     out.set(new Uint8Array(data.buffer), offset);
     return out.buffer;
+  }
+  /**
+   * Reads back the probes of a level whose grid points lie in a world box,
+   * for inspection: where each one is (grid point plus relocation offset),
+   * whether it has been updated, the mean irradiance and sky visibility over
+   * its tile, and the nearest and mean of the hit distances its visibility
+   * map holds (near 0 for a probe buried in geometry). At most `limit`
+   * probes, nearest the box centre first.
+   */
+  async queryProbes(level: number, min: Vector3, max: Vector3, limit = 512) {
+    const l = this._levels[level];
+    if (!l || !l.origin || !this._irradiance || !this._visibility || !this._data) {
+      return null;
+    }
+    const s = l.spacing;
+    const lo = [Math.ceil(min.x / s), Math.ceil(min.y / s), Math.ceil(min.z / s)];
+    const hi = [Math.floor(max.x / s), Math.floor(max.y / s), Math.floor(max.z / s)];
+    const centre = [(min.x + max.x) / 2, (min.y + max.y) / 2, (min.z + max.z) / 2];
+    const wrap = (v: number, m: number) => ((v % m) + m) % m;
+    const picked: { world: number[]; index: number }[] = [];
+    for (let z = lo[2]; z <= hi[2]; z++) {
+      for (let y = lo[1]; y <= hi[1]; y++) {
+        for (let x = lo[0]; x <= hi[0]; x++) {
+          const w = [x, y, z];
+          if (w.some((v, a) => v < l.origin![a] || v >= l.origin![a] + l.grid[a])) {
+            continue;
+          }
+          const local =
+            wrap(x, l.grid[0]) + l.grid[0] * (wrap(y, l.grid[1]) + l.grid[1] * wrap(z, l.grid[2]));
+          picked.push({ world: w, index: local });
+        }
+      }
+    }
+    const dist2 = (w: number[]) => w.reduce((acc, v, a) => acc + (v * s - centre[a]) ** 2, 0);
+    picked.sort((a, b) => dist2(a.world) - dist2(b.world));
+    picked.length = Math.min(picked.length, limit);
+    const irr = new Uint16Array(new ArrayBuffer(this._irradiance.width * this._irradiance.height * 8));
+    const visChannels = this._visibilityFormat === 'rg16f' ? 2 : 4;
+    const vis = new Uint16Array(
+      new ArrayBuffer(this._visibility.width * this._visibility.height * visChannels * 2)
+    );
+    const data = new Float32Array(new ArrayBuffer(this._count * 16));
+    await Promise.all([
+      this._irradiance.readPixels(0, 0, this._irradiance.width, this._irradiance.height, 0, 0, irr),
+      this._visibility.readPixels(0, 0, this._visibility.width, this._visibility.height, 0, 0, vis),
+      this._data.getBufferSubData(new Uint8Array(data.buffer), 0, data.byteLength)
+    ]);
+    const tileMean = (
+      texels: number,
+      width: number,
+      channels: number,
+      raw: Uint16Array,
+      index: number,
+      reduce: (texel: number[]) => void
+    ) => {
+      const ox = (index % this._tileCols) * texels;
+      const oy = Math.floor(index / this._tileCols) * texels;
+      // Interior texels only; the border repeats them
+      for (let y = 1; y < texels - 1; y++) {
+        for (let x = 1; x < texels - 1; x++) {
+          const o = ((oy + y) * width + ox + x) * channels;
+          const t: number[] = [];
+          for (let c = 0; c < channels; c++) {
+            t.push(half2float(raw[o + c]));
+          }
+          reduce(t);
+        }
+      }
+    };
+    const probes = picked.map(({ world, index }) => {
+      const tile = l.tileBase + index;
+      const d = data.subarray(tile * 4, tile * 4 + 4);
+      const irrSum = [0, 0, 0, 0];
+      let n = 0;
+      tileMean(IRRADIANCE_TEXELS, this._irradiance!.width, 4, irr, tile, (t) => {
+        for (let c = 0; c < 4; c++) {
+          irrSum[c] += t[c];
+        }
+        n++;
+      });
+      let visMin = Infinity;
+      let visSum = 0;
+      let m = 0;
+      tileMean(VISIBILITY_TEXELS, this._visibility!.width, visChannels, vis, tile, (t) => {
+        visMin = Math.min(visMin, t[0]);
+        visSum += t[0];
+        m++;
+      });
+      const r = (v: number) => Math.round(v * 1000) / 1000;
+      return {
+        world,
+        position: [world[0] * s + d[0], world[1] * s + d[1], world[2] * s + d[2]].map(r),
+        offset: [d[0], d[1], d[2]].map(r),
+        updated: d[3] > 0.5,
+        irradiance: irrSum.slice(0, 3).map((v) => r(v / n)),
+        sky: r(irrSum[3] / n),
+        hitMin: r(visMin),
+        hitMean: r(visSum / m)
+      };
+    });
+    return { level, spacing: s, origin: [...l.origin], grid: [...l.grid], probes };
   }
   /**
    * Restores a state saved by {@link ProbeVolume.exportState}. The settings

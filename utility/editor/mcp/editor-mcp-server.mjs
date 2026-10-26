@@ -3050,6 +3050,22 @@ const BASE_TOOLS = [
     }
   },
   {
+    name: 'gi_probe_query',
+    description:
+      'Read back the global illumination light probes of one level whose grid points lie in a world box (WebGPU, GIEnabled, the probe volume built). Per probe: world grid index, position (grid point plus relocation offset), offset, updated, irradiance (mean over its octahedral tile, at the GI cache exposure), sky (sky visibility 0..1), hitMin/hitMean (nearest and mean hit distance of its visibility map, near 0 for a probe buried in geometry) and sdf (scene SDF at the position, negative inside geometry). At most limit probes, nearest the box centre first. Returns { level, spacing, origin, grid, probes, err }.',
+    inputSchema: {
+      type: 'object',
+      required: ['min', 'max'],
+      properties: {
+        min: { type: 'array', items: { type: 'number' }, minItems: 3, maxItems: 3, description: 'World box min [x, y, z].' },
+        max: { type: 'array', items: { type: 'number' }, minItems: 3, maxItems: 3, description: 'World box max [x, y, z].' },
+        level: { type: 'number', default: 0, description: 'Probe level, 0 the finest.' },
+        limit: { type: 'number', default: 256 },
+        timeout_ms: { type: 'number', default: 30000 }
+      }
+    }
+  },
+  {
     name: 'water_interaction',
     description:
       'Attach, configure or detach the interaction field of a Water node (the simulated height field that carries wakes, impulses and, with shallowDepth, waves slowing and growing in shallow water), and fire impulses into it. enabled true adds one when missing, false removes it. properties sets fields: resolution, windowSize, waveSpeed, damping, maxAmplitude, foamAmount (foam made per second where the water is churned to the full), foamDecay, foamMinSpeed, foamMaxSpeed (m/s, the speeds between which the water traps air), breakingAcceleration (share of g at which crests break), foamDiffusion (m^2/s), spongeWidth, shallowDepth, shoreAbsorbDepth. impulses are [x, z, radius, strength] in world units, strength a height in metres. See the field with the water DebugOutput "interaction", or read a row of it with read_row. Not undoable; the field is saved with the scene. Returns { interaction, row, err }.',
@@ -3247,6 +3263,7 @@ const READONLY_TOOL_NAMES = new Set([
   'terrain_sample_height',
   'sdf_query',
   'sdf_sample',
+  'gi_probe_query',
   'editor_frame_timing',
   'editor_connect_info',
   'editor_wait_ready',
@@ -4404,6 +4421,13 @@ const handlers = {
       'sdf_bake',
       { paths: args.paths, node_id: args.node_id, force: !!args.force },
       timeout
+    );
+  },
+  async gi_probe_query(args) {
+    return bridge.send(
+      'gi_probe_query',
+      { min: args.min, max: args.max, level: args.level, limit: args.limit },
+      Number(args.timeout_ms ?? 30000)
     );
   },
   async sdf_sample(args) {
