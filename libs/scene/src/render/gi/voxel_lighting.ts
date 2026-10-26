@@ -203,7 +203,8 @@ export class VoxelLighting {
     // sky bake is stored at the same exposure, so it takes the strength alone
     const cacheExposure = getGICacheExposure(scene.lightingMode);
     const envStrength = scene.env.light.strength ?? 0;
-    const skyIrradiance = !!envLight && envLight.hasIrradiance();
+    // No sky without an environment light (its stand-in carries only the probes)
+    const skyIrradiance = scene.env.light.type !== 'none' && envLight.hasIrradiance();
     const probes = getActiveProbeVolume(scene);
     const key = `${global.levels}:${scene.lightingMode}:${skyIrradiance ? envLight.getType() : 'none'}:${
       skyIrradiance ? this.envVariant() : ''

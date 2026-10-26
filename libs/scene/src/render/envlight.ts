@@ -1197,3 +1197,78 @@ export class EnvHemisphericAmbient extends EnvironmentLighting {
     return true;
   }
 }
+
+/**
+ * What the environment light of type `none` shades with: no sky at all, only
+ * the global illumination of the scene's probe volume, laid over black. The
+ * probes carry the light of the scene's own lights bounced off its surfaces,
+ * which owes nothing to an environment, so turning the environment off must
+ * not turn it off too. Draws use it only while the probe volume is ready (see
+ * the light pass); without one it would add nothing.
+ * @internal
+ */
+export class EnvProbesOnly extends EnvironmentLighting {
+  /**
+   * {@inheritDoc EnvironmentLighting.getType}
+   * @override
+   */
+  getType() {
+    return 'none' as const;
+  }
+  /**
+   * {@inheritDoc EnvironmentLighting.initShaderBindings}
+   * @override
+   */
+  initShaderBindings(pb: ProgramBuilder, ctx?: DrawContext) {
+    this.initProbeBindings(pb, ctx);
+  }
+  /**
+   * {@inheritDoc EnvironmentLighting.updateBindGroup}
+   * @override
+   */
+  updateBindGroup(bg: BindGroup, ctx?: DrawContext) {
+    this.updateProbeBindGroup(bg, ctx);
+  }
+  /**
+   * {@inheritDoc EnvironmentLighting.getRadiance}
+   * @override
+   */
+  getRadiance(_scope: PBInsideFunctionScope, _refl: PBShaderExp, _roughness: PBShaderExp) {
+    return null;
+  }
+  /**
+   * {@inheritDoc EnvironmentLighting.getSheenRadiance}
+   * @override
+   */
+  getSheenRadiance(_scope: PBInsideFunctionScope, _refl: PBShaderExp, _roughness: PBShaderExp) {
+    return null;
+  }
+  /**
+   * {@inheritDoc EnvironmentLighting.getIrradiance}
+   * @override
+   */
+  getIrradiance(scope: PBInsideFunctionScope, normal: PBShaderExp, ctx?: DrawContext) {
+    return this.applyProbes(scope, normal, ctx ?? null, scope.$builder.vec3(0));
+  }
+  /**
+   * {@inheritDoc EnvironmentLighting.hasRadiance}
+   * @override
+   */
+  hasRadiance() {
+    return false;
+  }
+  /**
+   * {@inheritDoc EnvironmentLighting.hasSheenRadiance}
+   * @override
+   */
+  hasSheenRadiance() {
+    return false;
+  }
+  /**
+   * {@inheritDoc EnvironmentLighting.hasIrradiance}
+   * @override
+   */
+  hasIrradiance() {
+    return true;
+  }
+}

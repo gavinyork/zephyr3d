@@ -834,22 +834,25 @@ export class ProbeVolume {
     // Rays read the voxel radiance, kept at the fixed cache exposure, and the
     // sky bake, stored at the same exposure: the sky takes the strength alone
     const envStrength = scene.env.light.strength ?? 0;
-    const skyMode = !envLight
-      ? 'none'
-      : envLight.hasRadiance()
-        ? 'radiance'
-        : envLight.hasIrradiance()
-          ? 'irradiance'
-          : 'none';
-    const envVariant = envLight
-      ? `${envLight.getType()}:${
-          (envLight as unknown as { irradianceSHFB?: unknown }).irradianceSHFB
-            ? 'fb'
-            : (envLight as unknown as { irradianceSH?: unknown }).irradianceSH
-              ? 'buf'
-              : ''
-        }`
-      : '';
+    // No sky without an environment light (its stand-in carries only the probes)
+    const skyMode =
+      scene.env.light.type === 'none'
+        ? 'none'
+        : envLight.hasRadiance()
+          ? 'radiance'
+          : envLight.hasIrradiance()
+            ? 'irradiance'
+            : 'none';
+    const envVariant =
+      skyMode !== 'none'
+        ? `${envLight.getType()}:${
+            (envLight as unknown as { irradianceSHFB?: unknown }).irradianceSHFB
+              ? 'fb'
+              : (envLight as unknown as { irradianceSH?: unknown }).irradianceSH
+                ? 'buf'
+                : ''
+          }`
+        : '';
     const key = `${global.levels}:${skyMode}:${envVariant}`;
     if (!this._traceProgram || this._traceKey !== key) {
       this._traceBindGroup?.dispose();

@@ -10,6 +10,7 @@ import { ShaderHelper } from '../material/shader/helper';
 import { warnUnsupported } from '../utility/unsupported';
 import { DualDepthPeelingOIT } from './dualdepthpeeling_oit';
 import type { Camera } from '../camera';
+import { getActiveProbeVolume } from './gi/probe_volume';
 
 const SURFACE_MRT_FLAGS =
   MaterialVaryingFlags.SCENE_STORE_ROUGHNESS |
@@ -155,10 +156,13 @@ export class LightPass extends RenderPass {
     flags: any
   ) {
     const baseLightPass = !ctx.lightBlending;
+    // Without an environment light the probes' global illumination still
+    // shades the draw, through the probe-only stand-in (see EnvProbesOnly)
     ctx.drawEnvLight =
       baseLightPass &&
-      ctx.env!.light.type !== 'none' &&
-      (ctx.env!.light.envLight.hasRadiance() || ctx.env!.light.envLight.hasIrradiance());
+      (ctx.env!.light.type !== 'none'
+        ? ctx.env!.light.envLight.hasRadiance() || ctx.env!.light.envLight.hasIrradiance()
+        : !!getActiveProbeVolume(ctx.scene));
     ctx.renderPassHash = this.getGlobalBindGroupHash(ctx, camera);
     ctx.shaderVariantHash = this._getShaderVariantHash(ctx, camera);
     const bindGroup = ctx.globalBindGroupAllocator.getGlobalBindGroup(ctx);
