@@ -81,7 +81,6 @@ function getProgram(levels: number, mode: SceneSDFViewMode) {
           this.$l.t = pb.float(0);
           this.$l.steps = pb.float(0);
           this.$l.hit = false;
-          this.$l.d0 = sampleSceneSDF(this, this.cameraInfo.xyz, levels);
           this.$for(pb.int('i'), 0, MAX_STEPS, function () {
             this.$l.s = sampleSceneSDFWithVoxel(
               this,
@@ -94,7 +93,7 @@ function getProgram(levels: number, mode: SceneSDFViewMode) {
             this.$if(
               pb.lessThan(
                 this.d,
-                sdfTraceTolerance(this, this.s, pb.add(0.01, pb.mul(this.t, 0.002)), this.d0)
+                sdfTraceTolerance(this, this.s, pb.add(0.01, pb.mul(this.t, 0.002)), this.t)
               ),
               function () {
                 this.hit = true;

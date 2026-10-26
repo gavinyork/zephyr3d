@@ -242,21 +242,35 @@ export const SDF_TRACE_VOXEL_EXPAND = 0.6;
 
 /**
  * Hit tolerance of a sphere trace at a sample of
- * {@link sampleSceneSDFWithVoxel}: the larger of `base` and
- * {@link SDF_TRACE_VOXEL_EXPAND} voxels, the latter held below `startDist`,
- * the field at the ray's origin, so a ray leaving a nearby surface does not
- * hit it at once.
+ * {@link sampleSceneSDFWithVoxel} a distance `t` along the ray: the larger of
+ * `base` and {@link SDF_TRACE_VOXEL_EXPAND} voxels, the latter growing from 0
+ * over the first two voxels travelled so a ray leaving a nearby surface does
+ * not hit it at once; Lumen's surface expand (GlobalDistanceFieldUtils.ush,
+ * RayTraceGlobalDistanceField).
  * @internal
  */
 export function sdfTraceTolerance(
   scope: PBInsideFunctionScope,
   sample: PBShaderExp,
   base: PBShaderExp | number,
-  startDist: PBShaderExp | number
+  t: PBShaderExp
 ) {
   const pb = scope.$builder;
-  return pb.max(base, pb.min(pb.mul(sample.y, SDF_TRACE_VOXEL_EXPAND), pb.mul(startDist, 0.9)));
+  return pb.max(
+    base,
+    pb.min(pb.mul(sample.y, SDF_TRACE_VOXEL_EXPAND), pb.mul(t, SDF_TRACE_VOXEL_EXPAND * 0.5))
+  );
 }
+
+/**
+ * Voxels over which a level of the global field hands over to the next
+ * coarser one, inward from a voxel inside its window edge. Wider than a brick,
+ * the step the windows move in, so the hand-over never jumps as they follow
+ * the camera; the two levels are read and blended there, as Godot blends its
+ * SDFGI cascades over two probe spacings (gi.glsl, sdfgi_process).
+ * @internal
+ */
+export const SDF_LEVEL_BLEND_VOXELS = 16;
 
 /**
  * Signed distance at a world position from the global clipmap field, in world
@@ -264,9 +278,12 @@ export function sdfTraceTolerance(
  *
  * The finest level whose window holds the point and whose value lies inside
  * its band answers; a value at the band edge only says "at least this far", so
- * the next coarser level is asked. Past the coarsest window, or with every
- * level saturated, the coarsest band is returned, a lower bound on the true
- * distance that keeps sphere tracing safe.
+ * the next coarser level is asked. Within {@link SDF_LEVEL_BLEND_VOXELS} of a
+ * window edge, and as a value nears the band edge, the level fades into the
+ * next coarser one, so nothing changes abruptly where levels meet. Past the
+ * coarsest window, or with every level saturated, the coarsest value read (or
+ * the coarsest band) is returned, a lower bound on the true distance that
+ * keeps sphere tracing safe.
  *
  * Trilinear by hand from `textureLoad`: r32f is not filterable everywhere, and
  * the windows are toroidal, so neighbouring texels can wrap around the level.
@@ -299,63 +316,77 @@ export function sampleGlobalSDFWithVoxel(
     this.$l.res = pb.int(this[GLOBAL_SDF_PARAMS].x);
     this.$l.resF = this[GLOBAL_SDF_PARAMS].x;
     this.$l.band = this[GLOBAL_SDF_PARAMS].z;
-    this.$l.result = pb.float(0);
-    this.$l.resultVoxel = pb.float(0);
-    this.$l.found = false;
+    // Weighted sums of the levels read, and the weight still left to coarser levels
+    this.$l.sum = pb.float(0);
+    this.$l.sumVoxel = pb.float(0);
+    this.$l.remaining = pb.float(1);
+    // The coarsest value read: a bound when every level read was saturated
+    this.$l.last = pb.mul(this.band, this[GLOBAL_SDF_LEVELS].at(levels - 1).w);
+    this.$l.lastVoxel = this[GLOBAL_SDF_LEVELS].at(levels - 1).w;
     this.$l.valid = false;
     this.$l.base = pb.vec3(0);
     this.$l.t = pb.vec3(0);
     this.$l.v0 = pb.ivec3(0);
-    for (let i = levels - 1; i >= 0; i--) {
-      // Coarsest first, each finer level overriding where it is valid; unrolled
-      // since `levels` is small and constant
-      this.$l[`info${i}`] = this[GLOBAL_SDF_LEVELS].at(i);
-      // Position in voxels of the window, sample centres at integers
-      this.$l[`f${i}`] = pb.sub(
-        pb.div(this.p, this[`info${i}`].w),
-        pb.add(this[`info${i}`].xyz, pb.vec3(0.5))
-      );
-      this.$l[`in${i}`] = pb.and(
-        pb.all(pb.greaterThanEqual(this[`f${i}`], pb.vec3(0))),
-        pb.all(pb.lessThanEqual(this[`f${i}`], pb.vec3(pb.sub(this.resF, 1))))
-      );
-      this.$if(this[`in${i}`], function () {
-        this.base = pb.floor(this[`f${i}`]);
-        this.t = pb.sub(this[`f${i}`], this.base);
+    for (let i = 0; i < levels; i++) {
+      // Finest first, each level taking the share its finer levels left;
+      // unrolled since `levels` is small and constant
+      this.$if(pb.greaterThan(this.remaining, 1e-4), function () {
+        this.$l.info = this[GLOBAL_SDF_LEVELS].at(i);
+        // Position in voxels of the window, sample centres at integers
+        this.$l.f = pb.sub(pb.div(this.p, this.info.w), pb.add(this.info.xyz, pb.vec3(0.5)));
+        this.$l.inside = pb.and(
+          pb.all(pb.greaterThanEqual(this.f, pb.vec3(0))),
+          pb.all(pb.lessThanEqual(this.f, pb.vec3(pb.sub(this.resF, 1))))
+        );
         this.valid = false;
-        // World voxel index of the lower corner, then toroidal texel
-        this.v0 = pb.add(pb.ivec3(this.base), pb.ivec3(this[`info${i}`].xyz));
-        this.valid = bricksCurrent(this, this.v0, i);
-      });
-      this.$if(pb.and(this[`in${i}`], this.valid), function () {
-        this.$l.c000 = loadWrapped(this, this.v0, 0, 0, 0, i);
-        this.$l.c100 = loadWrapped(this, this.v0, 1, 0, 0, i);
-        this.$l.c010 = loadWrapped(this, this.v0, 0, 1, 0, i);
-        this.$l.c110 = loadWrapped(this, this.v0, 1, 1, 0, i);
-        this.$l.c001 = loadWrapped(this, this.v0, 0, 0, 1, i);
-        this.$l.c101 = loadWrapped(this, this.v0, 1, 0, 1, i);
-        this.$l.c011 = loadWrapped(this, this.v0, 0, 1, 1, i);
-        this.$l.c111 = loadWrapped(this, this.v0, 1, 1, 1, i);
-        this.$l.d = pb.mix(
-          pb.mix(pb.mix(this.c000, this.c100, this.t.x), pb.mix(this.c010, this.c110, this.t.x), this.t.y),
-          pb.mix(pb.mix(this.c001, this.c101, this.t.x), pb.mix(this.c011, this.c111, this.t.x), this.t.y),
-          this.t.z
-        );
-        // A saturated value is only a bound; a coarser level already wrote its answer
-        this.$if(
-          pb.or(pb.not(this.found), pb.lessThan(pb.abs(this.d), pb.mul(this.band, this[`info${i}`].w, 0.95))),
-          function () {
-            this.result = this.d;
-            this.resultVoxel = this[`info${i}`].w;
-            this.found = true;
+        this.$if(this.inside, function () {
+          this.base = pb.floor(this.f);
+          this.t = pb.sub(this.f, this.base);
+          // World voxel index of the lower corner, then toroidal texel
+          this.v0 = pb.add(pb.ivec3(this.base), pb.ivec3(this.info.xyz));
+          this.valid = bricksCurrent(this, this.v0, i);
+        });
+        this.$if(this.valid, function () {
+          this.$l.c000 = loadWrapped(this, this.v0, 0, 0, 0, i);
+          this.$l.c100 = loadWrapped(this, this.v0, 1, 0, 0, i);
+          this.$l.c010 = loadWrapped(this, this.v0, 0, 1, 0, i);
+          this.$l.c110 = loadWrapped(this, this.v0, 1, 1, 0, i);
+          this.$l.c001 = loadWrapped(this, this.v0, 0, 0, 1, i);
+          this.$l.c101 = loadWrapped(this, this.v0, 1, 0, 1, i);
+          this.$l.c011 = loadWrapped(this, this.v0, 0, 1, 1, i);
+          this.$l.c111 = loadWrapped(this, this.v0, 1, 1, 1, i);
+          this.$l.d = pb.mix(
+            pb.mix(pb.mix(this.c000, this.c100, this.t.x), pb.mix(this.c010, this.c110, this.t.x), this.t.y),
+            pb.mix(pb.mix(this.c001, this.c101, this.t.x), pb.mix(this.c011, this.c111, this.t.x), this.t.y),
+            this.t.z
+          );
+          this.last = this.d;
+          this.lastVoxel = this.info.w;
+          if (i === levels - 1) {
+            // Nothing coarser to hand over to
+            this.$l.w = pb.float(1);
+          } else {
+            // Handing over to the next level near the window edge, and where the
+            // value nears the band edge, past which it only says "at least this far"
+            this.$l.lo = pb.min(pb.min(this.f.x, this.f.y), this.f.z);
+            this.$l.hi = pb.sub(pb.sub(this.resF, 1), pb.max(pb.max(this.f.x, this.f.y), this.f.z));
+            this.$l.edge = pb.min(this.lo, this.hi);
+            this.$l.bandW = pb.mul(this.band, this.info.w);
+            this.$l.w = pb.mul(
+              pb.smoothStep(1, 1 + SDF_LEVEL_BLEND_VOXELS, this.edge),
+              pb.sub(1, pb.smoothStep(pb.mul(this.bandW, 0.75), pb.mul(this.bandW, 0.95), pb.abs(this.d)))
+            );
           }
-        );
+          this.$l.share = pb.mul(this.remaining, this.w);
+          this.sum = pb.add(this.sum, pb.mul(this.share, this.d));
+          this.sumVoxel = pb.add(this.sumVoxel, pb.mul(this.share, this.info.w));
+          this.remaining = pb.sub(this.remaining, this.share);
+        });
       });
     }
-    this.$if(pb.not(this.found), function () {
-      this.resultVoxel = this[GLOBAL_SDF_LEVELS].at(levels - 1).w;
-      this.result = pb.mul(this.band, this.resultVoxel);
-    });
+    // What no level answered for: past the coarsest window, or every level saturated
+    this.$l.result = pb.add(this.sum, pb.mul(this.remaining, this.last));
+    this.$l.resultVoxel = pb.add(this.sumVoxel, pb.mul(this.remaining, this.lastVoxel));
     this.$return(pb.vec2(this.result, this.resultVoxel));
   });
   return scope[funcName](worldPos) as PBShaderExp;

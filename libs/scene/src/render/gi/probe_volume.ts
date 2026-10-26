@@ -864,7 +864,7 @@ export class ProbeVolume {
                 this.$if(
                   pb.lessThan(
                     this.d,
-                    sdfTraceTolerance(this, this.s, pb.add(0.01, pb.mul(this.t, 0.004)), this.d0)
+                    sdfTraceTolerance(this, this.s, pb.add(0.01, pb.mul(this.t, 0.004)), this.t)
                   ),
                   function () {
                     this.hit = true;
