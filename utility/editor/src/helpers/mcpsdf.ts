@@ -172,7 +172,8 @@ export async function sampleGlobalSDF(controller: SceneController | null, params
 /**
  * Signed distance from world positions to a mesh node's surface, from its baked
  * field. The field is in the mesh's local space; under non-uniform scale the
- * local distance is scaled by the smallest axis scale, which never overshoots.
+ * distance to the field box is measured per axis and the field's own value is
+ * scaled by the smallest axis scale, which never overshoots.
  */
 export async function queryMeshSDF(controller: SceneController | null, params: any) {
   const scene = controller?.model?.scene ?? null;
@@ -200,10 +201,17 @@ export async function queryMeshSDF(controller: SceneController | null, params: a
   const scale = Math.min(sx, sy, sz);
   const inv = node.invWorldMatrix;
   const local = new Vector3();
+  const clamp = (v: number, axis: number) => Math.min(Math.max(v, sdf.boxMin[axis]), sdf.boxMax[axis]);
   const distances = points.map((p) => {
     const [x, y, z] = (p as number[]).map(Number);
     inv.transformPointAffine(new Vector3(x, y, z), local);
-    return sampleMeshSDF(sdf, local.x, local.y, local.z) * scale;
+    // As the scene field composites it: the distance to the field box per
+    // axis in world units, the field's value on the box by the smallest scale
+    const cx = clamp(local.x, 0);
+    const cy = clamp(local.y, 1);
+    const cz = clamp(local.z, 2);
+    const outside = Math.hypot((local.x - cx) * sx, (local.y - cy) * sy, (local.z - cz) * sz);
+    return sampleMeshSDF(sdf, cx, cy, cz) * scale + outside;
   });
   return {
     sdf_path: path,

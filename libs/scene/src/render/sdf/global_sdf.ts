@@ -42,8 +42,9 @@ const MAX_QUERY_POINTS = 4096;
  * local by rows, the field box with the voxel size and the world scale, and
  * the atlas slot with the half thickness of a two-sided field's solid (half a
  * field voxel, in world units; -1 for a one-sided field). The scale is the
- * smallest axis scale, so a distance scaled by it never overshoots under
- * non-uniform scale.
+ * smallest axis scale, so a field value scaled by it never overshoots under
+ * non-uniform scale; the distance to the field box is measured per axis from
+ * the rows instead, see {@link sampleInstancesSDF}.
  */
 function packSDFInstance(inst: SDFInstance, atlas: MeshSDFAtlas, out: Float32Array, offset: number) {
   const header = inst.asset!.header!;

@@ -172,7 +172,17 @@ export function sampleInstancesSDF(
       pb.dot(this.r2, this.sdfP4)
     );
     this.$l.c = pb.clamp(this.lp, this.bmin.xyz, this.bmax.xyz);
-    this.$l.outside = pb.length(pb.sub(this.lp, this.c));
+    // World length of a unit along each local axis: row i of world to local is
+    // local axis i over its scale
+    this.$l.axisScale = pb.div(
+      pb.vec3(1),
+      pb.vec3(pb.length(this.r0.xyz), pb.length(this.r1.xyz), pb.length(this.r2.xyz))
+    );
+    // Distance to the field box in world units, exact under non-uniform scale;
+    // only the field's own value, read on the box, takes the smallest axis
+    // scale. A wall scaled 25 times thinner than it is wide would otherwise
+    // read 25 times too near across all the space beside it.
+    this.$l.outside = pb.length(pb.mul(pb.sub(this.lp, this.c), this.axisScale));
     // How far a two-sided surface is pushed out to reach the half thickness asked for
     this.$l.grow = this.$choice(
       pb.greaterThanEqual(this.slot.w, 0),
@@ -180,11 +190,14 @@ export function sampleInstancesSDF(
       pb.float(0)
     );
     // A field box farther than the current best cannot improve it
-    this.$if(pb.lessThan(pb.sub(pb.mul(this.outside, this.bmax.w), this.grow), this.sdfBest), function () {
+    this.$if(pb.lessThan(pb.sub(this.outside, this.grow), this.sdfBest), function () {
       this.$l.cand = pb.sub(
-        pb.mul(
-          sampleInstanceField(this, this.lp, this.bmin, this.bmax, this.slot, atlas, atlasInvSize),
-          this.bmax.w
+        pb.add(
+          pb.mul(
+            sampleInstanceField(this, this.c, this.bmin, this.bmax, this.slot, atlas, atlasInvSize),
+            this.bmax.w
+          ),
+          this.outside
         ),
         this.grow
       );
