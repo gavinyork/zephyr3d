@@ -9,6 +9,7 @@ import type { VoxelLightingOptions } from './voxel_lighting';
 import { ProbeVolume } from './probe_volume';
 import { PROBE_MAX_LEVELS } from '../../shaders/probes';
 import type { ProbeVolumeOptions, ProbeVolumeStats } from './probe_volume';
+import { RenderGraphExecutor } from '../rendergraph/executor';
 
 /**
  * Whether the indirect lighting keeps updating, see {@link SceneGI.updateMode}.
@@ -318,7 +319,9 @@ export class SceneGI {
     if (this._updateMode === 'frozen') {
       return;
     }
-    this._voxels.updateLighting(this._scene.sdf, camera, this._lighting);
+    RenderGraphExecutor.profileScope('VoxelLighting', () =>
+      this._voxels!.updateLighting(this._scene.sdf, camera, this._lighting)
+    );
     if (!this._voxels.lit) {
       return;
     }
@@ -326,7 +329,9 @@ export class SceneGI {
       this._probes = new ProbeVolume(this._scene, this._probeOptions);
     }
     this._probes.setReadExposure(camera);
-    this._probes.update(this._scene.sdf, this._voxels, camera);
+    RenderGraphExecutor.profileScope('ProbeUpdate', () =>
+      this._probes!.update(this._scene.sdf, this._voxels!, camera)
+    );
   }
   dispose() {
     this.enabled = false;

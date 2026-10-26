@@ -1986,11 +1986,20 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
       if (!profile) {
         ImGui.TextDisabled('Waiting for GPU timings…');
       } else {
-        const totalMs = profile.graph.durationMs;
+        // External scopes ran before the graph, outside its duration
+        let externalMs = 0;
+        for (const scope of profile.passes) {
+          if (scope.type === 'external') {
+            externalMs += scope.durationMs;
+          }
+        }
+        const totalMs = profile.graph.durationMs + externalMs;
         ImGui.Text(`Frame #${profile.frameId}`);
         ImGui.SameLine();
         this.renderProfileStatus(profile.status);
-        ImGui.Text(`Total: ${totalMs.toFixed(3)} ms`);
+        ImGui.Text(
+          `Total: ${totalMs.toFixed(3)} ms (graph ${profile.graph.durationMs.toFixed(3)} ms, outside graph ${externalMs.toFixed(3)} ms)`
+        );
         ImGui.Separator();
         const tableFlags =
           ImGui.TableFlags.Resizable |

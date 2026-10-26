@@ -27,6 +27,7 @@ import { getPhysicsWorldFactory } from '../physics/world';
 import type { VirtualTextureClient } from '../render/virtualtexture/virtual_texture_client';
 import { SceneSDF } from '../render/sdf/scene_sdf';
 import { SceneGI } from '../render/gi/scene_gi';
+import { RenderGraphExecutor } from '../render/rendergraph/executor';
 
 /**
  * Represents a renderable world that manages scene graph, spatial indexing, and environment.
@@ -612,19 +613,23 @@ export class Scene
       const deltaInSeconds = frameInfo.elapsedFrame * 0.001;
       this.dispatchEvent('update', this);
       this.mainCamera?.updateController(deltaInSeconds, 'early');
-      if (this._nodeUpdateQueue.size > 0) {
-        const elapsedInSeconds = frameInfo.elapsedOverall * 0.001;
-        // Nodes queued while draining are updated next frame
-        for (const node of this._nodeUpdateQueue.take()) {
-          if (!node.disposed && node.attached) {
-            node.update(frameInfo.frameCounter, elapsedInSeconds, deltaInSeconds);
+      if (this._nodeUpdateQueue.size > 0 || this._drawableUpdateQueue.size > 0) {
+        RenderGraphExecutor.profileScope('SceneUpdate', () => {
+          if (this._nodeUpdateQueue.size > 0) {
+            const elapsedInSeconds = frameInfo.elapsedOverall * 0.001;
+            // Nodes queued while draining are updated next frame
+            for (const node of this._nodeUpdateQueue.take()) {
+              if (!node.disposed && node.attached) {
+                node.update(frameInfo.frameCounter, elapsedInSeconds, deltaInSeconds);
+              }
+            }
           }
-        }
-      }
-      if (this._drawableUpdateQueue.size > 0) {
-        for (const drawable of this._drawableUpdateQueue.take()) {
-          drawable.updateState();
-        }
+          if (this._drawableUpdateQueue.size > 0) {
+            for (const drawable of this._drawableUpdateQueue.take()) {
+              drawable.updateState();
+            }
+          }
+        });
       }
       this.dispatchEvent('afterupdate', this);
       tryGetApp()?.engine?.lateUpdate(
@@ -638,17 +643,23 @@ export class Scene
       if (camera && (this._gi?.enabled || this._sdf?.enabled)) {
         const cameraPos = camera.getWorldPosition();
         // The voxel scene feeds the field's compositing, so it goes first
-        this._gi?.update(cameraPos, deltaInSeconds);
+        if (this._gi?.enabled) {
+          RenderGraphExecutor.profileScope('GIVoxelize', () => this._gi!.update(cameraPos, deltaInSeconds));
+        }
         if (this._sdf?.enabled) {
-          this._sdf.update(cameraPos, deltaInSeconds);
+          RenderGraphExecutor.profileScope('SceneSDF', () => this._sdf!.update(cameraPos, deltaInSeconds));
         }
         // Lighting reads what the field just composited
-        this._gi?.updateLighting(camera);
+        if (this._gi?.enabled) {
+          RenderGraphExecutor.profileScope('GILighting', () => this._gi!.updateLighting(camera));
+        }
       }
     }
     // Palettes written by animation updates are uploaded once all nodes and bank tracks are updated
-    AnimationBankTrack.updateAll(getDevice().frameInfo.elapsedFrame * 0.001);
-    SkinPaletteAtlas.flushPending();
+    RenderGraphExecutor.profileScope('Animation', () => {
+      AnimationBankTrack.updateAll(getDevice().frameInfo.elapsedFrame * 0.001);
+      SkinPaletteAtlas.flushPending();
+    });
   }
   /**
    * Performs per-camera scene updates for the current frame.
@@ -661,14 +672,16 @@ export class Scene
    */
   frameUpdatePerCamera(camera: Camera) {
     if (this._perCameraUpdateQueue.size > 0) {
-      const frameInfo = getDevice().frameInfo;
-      const elapsedInSeconds = frameInfo.elapsedOverall * 0.001;
-      const deltaInSeconds = frameInfo.elapsedFrame * 0.001;
-      for (const node of this._perCameraUpdateQueue.take()) {
-        if (!node.disposed) {
-          node.updatePerCamera(camera, elapsedInSeconds, deltaInSeconds);
+      RenderGraphExecutor.profileScope('SceneUpdatePerCamera', () => {
+        const frameInfo = getDevice().frameInfo;
+        const elapsedInSeconds = frameInfo.elapsedOverall * 0.001;
+        const deltaInSeconds = frameInfo.elapsedFrame * 0.001;
+        for (const node of this._perCameraUpdateQueue.take()) {
+          if (!node.disposed) {
+            node.updatePerCamera(camera, elapsedInSeconds, deltaInSeconds);
+          }
         }
-      }
+      });
     }
     this.updateNodePlacement(this._octree, this._nodePlaceList);
     SkinPaletteAtlas.flushPending();

@@ -27,6 +27,7 @@ import { waterScatterPhase } from '../shaders/water_medium';
 import { evaluateLTCRectLightTerms } from '../shaders/ltc_rect';
 import { getLTCAmpLUT, getLTCMatLUT } from '../utility/textures/ltclut';
 import { foamTexelSize, getDefaultFoamTexture, sampleFoamTexture } from '../utility/textures/foam';
+import { RenderGraphExecutor } from '../render/rendergraph/executor';
 
 /**
  * How the refracted view sample is located.
@@ -3178,7 +3179,7 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
     if (waveGenerator) {
       const updateFrameId = WaterMaterial._waveUpdateState.get(waveGenerator);
       if (updateFrameId !== frameId) {
-        waveGenerator.update(elapsed);
+        RenderGraphExecutor.profileScope('WaterWaves', () => waveGenerator.update(elapsed));
         WaterMaterial._waveUpdateState.set(waveGenerator, frameId);
       }
     }
@@ -3186,7 +3187,7 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
     if (interaction && this._interactiveWaveGenerator) {
       const updateFrameId = WaterMaterial._interactionUpdateState.get(interaction);
       if (updateFrameId !== frameId) {
-        interaction.update(elapsed);
+        RenderGraphExecutor.profileScope('WaterInteraction', () => interaction.update(elapsed));
         WaterMaterial._interactionUpdateState.set(interaction, frameId);
       }
     }

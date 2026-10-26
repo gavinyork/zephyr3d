@@ -44,12 +44,15 @@ interface RGProfileScopeInternal {
   result: RGProfileScopeResult;
   queryId: number;
   ended: boolean;
+  /** Device that began an external scope's query */
+  device?: AbstractDevice;
 }
 
 interface RGProfileFrameInternal {
   serial: number;
   device: AbstractDevice | null;
   supported: boolean;
+  includePendingUploads: boolean;
   result: RGProfileResult;
   root: RGProfileScopeInternal;
   scopes: RGProfileScopeInternal[];
@@ -74,6 +77,15 @@ export class RenderGraphExecutor<TTexture = BaseTexture> {
   private static _latestPendingProfileFrame: RGProfileFrameInternal | null = null;
   private static _latestResolvedProfileSerial = 0;
   private static _nextProfileSerial = 0;
+  /** External scopes recorded outside execution, waiting for the next graph to adopt them */
+  private static _externalRoots: RGProfileScopeResult[] = [];
+  private static _externalScopes: RGProfileScopeInternal[] = [];
+  private static _externalFrameId = -1;
+  /** Open external scopes, innermost last */
+  private static _externalStack: RGProfileScopeInternal[] = [];
+  /** The profiled frame being executed and its innermost open scope */
+  private static _executingFrame: RGProfileFrameInternal | null = null;
+  private static _executingScope: RGProfileScopeInternal | null = null;
 
   private _allocator: RGTextureAllocator<TTexture>;
   private _backbufferWidth: number;
@@ -110,6 +122,118 @@ export class RenderGraphExecutor<TTexture = BaseTexture> {
   /** Set profiling defaults for new executors. */
   static setDefaultProfilingOptions(options: boolean | RGProfilingOptions): void {
     RenderGraphExecutor._defaultProfilingOptions = options;
+    RenderGraphExecutor._dropExternalScopes();
+  }
+
+  /**
+   * Times the GPU work `fn` records, for GPU work issued outside a graph pass
+   * (scene updates, simulations). Outside execution the scope is reported
+   * ahead of the passes of the next graph executed; inside execution it nests
+   * under the current pass. Scopes nest. Active while the default profiling
+   * options are enabled, or inside a profiled execution; otherwise just calls `fn`.
+   */
+  static profileScope<T>(name: string, fn: () => T): T {
+    const scope = RenderGraphExecutor._beginExternalScope(name);
+    if (!scope) {
+      return fn();
+    }
+    try {
+      return fn();
+    } finally {
+      RenderGraphExecutor._endExternalScope(scope);
+    }
+  }
+
+  private static _beginExternalScope(name: string): RGProfileScopeInternal | null {
+    const executing = RenderGraphExecutor._executingFrame;
+    const defaults = RenderGraphExecutor._defaultProfilingOptions;
+    let device: AbstractDevice | null;
+    let includePendingUploads: boolean;
+    if (executing) {
+      device = executing.device;
+      includePendingUploads = executing.includePendingUploads;
+    } else {
+      const enabled = typeof defaults === 'object' ? (defaults.enabled ?? true) : defaults;
+      if (!enabled) {
+        return null;
+      }
+      const options = typeof defaults === 'object' ? defaults : null;
+      try {
+        device = options?.device ?? getDevice();
+      } catch {
+        device = null;
+      }
+      includePendingUploads =
+        options?.includePendingUploads ?? DEFAULT_PROFILING_OPTIONS.includePendingUploads;
+    }
+    if (!device?.getDeviceCaps().miscCaps.supportTimestampQuery) {
+      return null;
+    }
+    const stack = RenderGraphExecutor._externalStack;
+    if (!executing && stack.length === 0) {
+      // Scopes no graph adopted within their frame would land in an unrelated later one
+      const frameId = device.frameInfo.frameCounter;
+      if (frameId !== RenderGraphExecutor._externalFrameId) {
+        RenderGraphExecutor._externalRoots.length = 0;
+        RenderGraphExecutor._externalScopes.length = 0;
+        RenderGraphExecutor._externalFrameId = frameId;
+      }
+    }
+    const queryId = device.beginTimestampQuery(name, { includePendingUploads, allowCrossFrame: false });
+    if (queryId <= 0) {
+      return null;
+    }
+    const result: RGProfileScopeResult = {
+      name,
+      type: 'external',
+      queryId,
+      durationMs: 0,
+      status: 'pending',
+      children: []
+    };
+    const scope: RGProfileScopeInternal = { result, queryId, ended: false, device };
+    const parent = stack[stack.length - 1] ?? RenderGraphExecutor._executingScope;
+    if (parent) {
+      parent.result.children.push(result);
+    } else {
+      RenderGraphExecutor._externalRoots.push(result);
+    }
+    if (executing) {
+      executing.scopes.push(scope);
+    } else {
+      RenderGraphExecutor._externalScopes.push(scope);
+    }
+    stack.push(scope);
+    return scope;
+  }
+
+  private static _endExternalScope(scope: RGProfileScopeInternal): void {
+    const stack = RenderGraphExecutor._externalStack;
+    const index = stack.lastIndexOf(scope);
+    if (index >= 0) {
+      stack.length = index;
+    }
+    if (!scope.ended) {
+      scope.ended = true;
+      scope.device!.endTimestampQuery(scope.queryId);
+    }
+  }
+
+  /** Moves the external scopes recorded so far into `frame`, or discards them */
+  private static _adoptExternalScopes(frame: RGProfileFrameInternal | null): void {
+    const roots = RenderGraphExecutor._externalRoots;
+    const scopes = RenderGraphExecutor._externalScopes;
+    if (frame && frame.supported && roots.length > 0) {
+      frame.root.result.children.push(...roots);
+      frame.scopes.push(...scopes);
+    }
+    roots.length = 0;
+    scopes.length = 0;
+  }
+
+  private static _dropExternalScopes(): void {
+    RenderGraphExecutor._externalRoots.length = 0;
+    RenderGraphExecutor._externalScopes.length = 0;
   }
 
   /** Return the latest resolved result from any executor. */
@@ -164,6 +288,9 @@ export class RenderGraphExecutor<TTexture = BaseTexture> {
     this._cleanupCallbacks.length = 0;
     this._resolveImportedTextureAliases(compiled);
     const profileFrame = this._beginProfileFrame();
+    RenderGraphExecutor._adoptExternalScopes(profileFrame);
+    const outerExecutingFrame = RenderGraphExecutor._executingFrame;
+    const outerExecutingScope = RenderGraphExecutor._executingScope;
     const affinityEntries = new Map<string, RGTextureAffinityEntry<TTexture>>();
 
     const allocateAt = new Map<number, number[]>();
@@ -219,6 +346,10 @@ export class RenderGraphExecutor<TTexture = BaseTexture> {
 
     let completed = false;
     let executionError: unknown = null;
+    if (profileFrame) {
+      RenderGraphExecutor._executingFrame = profileFrame;
+      RenderGraphExecutor._executingScope = profileFrame.root;
+    }
     try {
       for (let i = 0; i < compiled.orderedPasses.length; i++) {
         const pass = compiled.orderedPasses[i];
@@ -254,6 +385,9 @@ export class RenderGraphExecutor<TTexture = BaseTexture> {
         // Preserve pass errors ahead of release errors.
         let passError: unknown = null;
         const passProfile = this._beginPassProfileScope(profileFrame, pass);
+        if (profileFrame) {
+          RenderGraphExecutor._executingScope = passProfile ?? profileFrame.root;
+        }
         try {
           if (pass.subpasses.length > 0) {
             const accessScope = this._createAccessScope(pass);
@@ -265,6 +399,9 @@ export class RenderGraphExecutor<TTexture = BaseTexture> {
                 pass,
                 subpass.name
               );
+              if (profileFrame) {
+                RenderGraphExecutor._executingScope = subpassProfile ?? passProfile ?? profileFrame.root;
+              }
               try {
                 (subpass.executeFn as RGExecuteFn<unknown>)(ctx, pass.data);
               } catch (e) {
@@ -324,6 +461,8 @@ export class RenderGraphExecutor<TTexture = BaseTexture> {
     } catch (e) {
       executionError = e;
     } finally {
+      RenderGraphExecutor._executingFrame = outerExecutingFrame;
+      RenderGraphExecutor._executingScope = outerExecutingScope;
       this._finishProfileFrame(profileFrame);
       let cleanupError: unknown = null;
       try {
@@ -436,6 +575,7 @@ export class RenderGraphExecutor<TTexture = BaseTexture> {
       serial: ++RenderGraphExecutor._nextProfileSerial,
       device,
       supported,
+      includePendingUploads: this._profilingOptions.includePendingUploads,
       result,
       root,
       scopes: [],

@@ -28,6 +28,7 @@ import { SDFWaterlineSource, WaterlineField } from './waterline';
 import { buildSDFProgram, getSDFProgramErrors } from './sdf_programs';
 import { sampleInstanceMaterial } from '../../shaders/gi';
 import type { VoxelAtlasSlot } from '../gi/voxel_atlas';
+import { RenderGraphExecutor } from '../rendergraph/executor';
 
 /** Voxels along a brick edge, the unit of compositing. */
 const BRICK = GLOBAL_SDF_BRICK;
@@ -425,7 +426,9 @@ export class GlobalSDF {
     }
     this._params.w = current;
     this.gatherDynamic(cameraPos);
-    this._waterline?.update(cameraPos);
+    if (this._waterline) {
+      RenderGraphExecutor.profileScope('Waterline', () => this._waterline!.update(cameraPos));
+    }
   }
   /** Packs the ready dynamic instances nearest the camera for query-time merging. @internal */
   private gatherDynamic(cameraPos: Vector3) {

@@ -245,8 +245,12 @@ export interface CompiledRenderGraph {
   readonly lifetimes: ReadonlyMap<number, RGResourceLifetime>;
 }
 
-/** Profiling scope type. @public */
-export type RGProfileScopeType = 'graph' | 'pass' | 'subpass';
+/**
+ * Profiling scope type. `'external'` scopes time GPU work recorded through
+ * {@link RenderGraphExecutor.profileScope} outside the graph's passes.
+ * @public
+ */
+export type RGProfileScopeType = 'graph' | 'pass' | 'subpass' | 'external';
 
 /** GPU timestamp profiling options. @public */
 export interface RGProfilingOptions {
@@ -312,7 +316,11 @@ export interface RGProfileResult {
   status: TimestampQueryStatus;
   /** Root graph scope. */
   graph: RGProfileScopeResult;
-  /** Top-level pass scopes. Same objects as graph.children. */
+  /**
+   * Top-level scopes, the same objects as graph.children: the graph's passes,
+   * preceded by the external scopes recorded since the previous graph ran.
+   * External scopes lie outside the graph scope's duration.
+   */
   passes: RGProfileScopeResult[];
 }
 

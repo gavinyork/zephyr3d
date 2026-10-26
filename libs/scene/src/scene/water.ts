@@ -24,6 +24,7 @@ import { BoundingBox } from '../utility/bounding_volume';
 import type { Camera } from '../camera';
 import { getDevice } from '../app/api';
 import { TerrainWaterlineSource, WaterlineField } from '../render/sdf/waterline';
+import { RenderGraphExecutor } from '../render/rendergraph/executor';
 
 /** Mean earth radius in meters, for the horizon distance. @internal */
 const EARTH_RADIUS = 6371000;
@@ -876,7 +877,7 @@ export class Water extends applyMixins(GraphNode, mixinDrawable) implements Draw
       }
       // After the shore waves' frame, which the foam field's sources read
       const foamFocus = this.viewFocus(camera, mat.foamFieldSize * 0.5);
-      mat.updateFoamField(foamFocus.x, foamFocus.y);
+      RenderGraphExecutor.profileScope('WaterFoamField', () => mat.updateFoamField(foamFocus.x, foamFocus.y));
       this.scene?.queuePerCameraUpdateNode(this);
     }
   }
@@ -954,7 +955,9 @@ export class Water extends applyMixins(GraphNode, mixinDrawable) implements Draw
     this._shoreField.request(this.worldMatrix.m13);
     device.pushDeviceStates();
     try {
-      this._shoreField.update(camera.getWorldPosition());
+      RenderGraphExecutor.profileScope('WaterShoreField', () =>
+        this._shoreField!.update(camera.getWorldPosition())
+      );
     } finally {
       device.popDeviceStates();
     }
