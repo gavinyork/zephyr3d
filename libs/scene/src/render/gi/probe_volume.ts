@@ -23,7 +23,9 @@ import {
   declareDynamicSDFUniforms,
   declareGlobalSDFUniforms,
   GLOBAL_SDF_LEVELS,
-  sampleSceneSDF
+  sampleSceneSDF,
+  sampleSceneSDFWithVoxel,
+  sdfTraceTolerance
 } from '../../shaders/sdf';
 import {
   declareVoxelSceneUniforms,
@@ -857,11 +859,18 @@ export class ProbeVolume {
               this.$l.t = pb.float(0);
               this.$l.hit = false;
               this.$for(pb.int('i'), 0, TRACE_STEPS, function () {
-                this.$l.d = sampleSceneSDF(this, pb.add(this.pos, pb.mul(this.dir, this.t)), levels);
-                this.$if(pb.lessThan(this.d, pb.add(0.01, pb.mul(this.t, 0.004))), function () {
-                  this.hit = true;
-                  this.$break();
-                });
+                this.$l.s = sampleSceneSDFWithVoxel(this, pb.add(this.pos, pb.mul(this.dir, this.t)), levels);
+                this.$l.d = this.s.x;
+                this.$if(
+                  pb.lessThan(
+                    this.d,
+                    sdfTraceTolerance(this, this.s, pb.add(0.01, pb.mul(this.t, 0.004)), this.d0)
+                  ),
+                  function () {
+                    this.hit = true;
+                    this.$break();
+                  }
+                );
                 this.t = pb.add(this.t, pb.max(this.d, 0.02));
                 this.$if(pb.greaterThan(this.t, this.maxDist), function () {
                   this.$break();

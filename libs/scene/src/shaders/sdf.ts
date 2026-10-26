@@ -214,6 +214,51 @@ export function sampleSceneSDF(scope: PBInsideFunctionScope, worldPos: PBShaderE
 }
 
 /**
+ * {@link sampleSceneSDF} with the voxel size of the grid the distance came
+ * from: (distance, voxel size), the voxel size 0 where a dynamic instance,
+ * sampled at its own field's resolution, is the nearer.
+ * @internal
+ */
+export function sampleSceneSDFWithVoxel(scope: PBInsideFunctionScope, worldPos: PBShaderExp, levels: number) {
+  const pb = scope.$builder;
+  const funcName = 'Z_sampleSceneSDFWithVoxel';
+  pb.func(funcName, [pb.vec3('p')], function () {
+    this.$l.g = sampleGlobalSDFWithVoxel(this, this.p, levels);
+    this.$l.d = sampleDynamicSDF(this, this.p, this.g.x);
+    this.$return(pb.vec2(this.d, this.$choice(pb.lessThan(this.d, this.g.x), pb.float(0), this.g.y)));
+  });
+  return scope[funcName](worldPos) as PBShaderExp;
+}
+
+/**
+ * Fraction of the voxel size of the level read that a sphere trace counts as
+ * a hit. A wall thinner than a voxel lying between two sample centres reads
+ * no less than half a voxel anywhere, so a tolerance below that lets rays
+ * through it, the more often the coarser the level; the price is surfaces
+ * swollen by up to this many voxels.
+ * @internal
+ */
+export const SDF_TRACE_VOXEL_EXPAND = 0.6;
+
+/**
+ * Hit tolerance of a sphere trace at a sample of
+ * {@link sampleSceneSDFWithVoxel}: the larger of `base` and
+ * {@link SDF_TRACE_VOXEL_EXPAND} voxels, the latter held below `startDist`,
+ * the field at the ray's origin, so a ray leaving a nearby surface does not
+ * hit it at once.
+ * @internal
+ */
+export function sdfTraceTolerance(
+  scope: PBInsideFunctionScope,
+  sample: PBShaderExp,
+  base: PBShaderExp | number,
+  startDist: PBShaderExp | number
+) {
+  const pb = scope.$builder;
+  return pb.max(base, pb.min(pb.mul(sample.y, SDF_TRACE_VOXEL_EXPAND), pb.mul(startDist, 0.9)));
+}
+
+/**
  * Signed distance at a world position from the global clipmap field, in world
  * units, negative inside geometry.
  *
@@ -235,13 +280,27 @@ export function sampleSceneSDF(scope: PBInsideFunctionScope, worldPos: PBShaderE
  * @internal
  */
 export function sampleGlobalSDF(scope: PBInsideFunctionScope, worldPos: PBShaderExp, levels: number) {
+  return sampleGlobalSDFWithVoxel(scope, worldPos, levels).x as PBShaderExp;
+}
+
+/**
+ * {@link sampleGlobalSDF} with the voxel size of the level that answered:
+ * (distance, voxel size), both in world units.
+ * @internal
+ */
+export function sampleGlobalSDFWithVoxel(
+  scope: PBInsideFunctionScope,
+  worldPos: PBShaderExp,
+  levels: number
+) {
   const pb = scope.$builder;
-  const funcName = 'Z_sampleGlobalSDF';
+  const funcName = 'Z_sampleGlobalSDFWithVoxel';
   pb.func(funcName, [pb.vec3('p')], function () {
     this.$l.res = pb.int(this[GLOBAL_SDF_PARAMS].x);
     this.$l.resF = this[GLOBAL_SDF_PARAMS].x;
     this.$l.band = this[GLOBAL_SDF_PARAMS].z;
     this.$l.result = pb.float(0);
+    this.$l.resultVoxel = pb.float(0);
     this.$l.found = false;
     this.$l.valid = false;
     this.$l.base = pb.vec3(0);
@@ -287,15 +346,17 @@ export function sampleGlobalSDF(scope: PBInsideFunctionScope, worldPos: PBShader
           pb.or(pb.not(this.found), pb.lessThan(pb.abs(this.d), pb.mul(this.band, this[`info${i}`].w, 0.95))),
           function () {
             this.result = this.d;
+            this.resultVoxel = this[`info${i}`].w;
             this.found = true;
           }
         );
       });
     }
     this.$if(pb.not(this.found), function () {
-      this.result = pb.mul(this.band, this[GLOBAL_SDF_LEVELS].at(levels - 1).w);
+      this.resultVoxel = this[GLOBAL_SDF_LEVELS].at(levels - 1).w;
+      this.result = pb.mul(this.band, this.resultVoxel);
     });
-    this.$return(this.result);
+    this.$return(pb.vec2(this.result, this.resultVoxel));
   });
   return scope[funcName](worldPos) as PBShaderExp;
 }

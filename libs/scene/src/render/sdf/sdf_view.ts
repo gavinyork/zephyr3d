@@ -9,7 +9,9 @@ import {
   declareDynamicSDFUniforms,
   declareGlobalSDFUniforms,
   sampleGlobalSDF,
-  sampleSceneSDF
+  sampleSceneSDF,
+  sampleSceneSDFWithVoxel,
+  sdfTraceTolerance
 } from '../../shaders/sdf';
 import {
   declareVoxelSceneUniforms,
@@ -79,14 +81,26 @@ function getProgram(levels: number, mode: SceneSDFViewMode) {
           this.$l.t = pb.float(0);
           this.$l.steps = pb.float(0);
           this.$l.hit = false;
+          this.$l.d0 = sampleSceneSDF(this, this.cameraInfo.xyz, levels);
           this.$for(pb.int('i'), 0, MAX_STEPS, function () {
-            this.$l.d = sampleSceneSDF(this, pb.add(this.cameraInfo.xyz, pb.mul(this.dir, this.t)), levels);
+            this.$l.s = sampleSceneSDFWithVoxel(
+              this,
+              pb.add(this.cameraInfo.xyz, pb.mul(this.dir, this.t)),
+              levels
+            );
+            this.$l.d = this.s.x;
             this.steps = pb.add(this.steps, 1);
-            // Hit tolerance grows with distance, as the voxels do
-            this.$if(pb.lessThan(this.d, pb.add(0.01, pb.mul(this.t, 0.002))), function () {
-              this.hit = true;
-              this.$break();
-            });
+            // Hit tolerance grows with distance and with the voxels of the level read
+            this.$if(
+              pb.lessThan(
+                this.d,
+                sdfTraceTolerance(this, this.s, pb.add(0.01, pb.mul(this.t, 0.002)), this.d0)
+              ),
+              function () {
+                this.hit = true;
+                this.$break();
+              }
+            );
             this.t = pb.add(this.t, pb.max(this.d, 0.02));
             this.$if(pb.greaterThan(this.t, this.cameraInfo.w), function () {
               this.$break();
