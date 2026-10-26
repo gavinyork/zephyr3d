@@ -388,7 +388,23 @@ const storageTexelFormatMap = {
   rg32i: 'rg32sint',
   rgba32f: 'rgba32float',
   rgba32ui: 'rgba32uint',
-  rgba32i: 'rgba32sint'
+  rgba32i: 'rgba32sint',
+  // WebGPU feature texture-formats-tier1
+  r8unorm: 'r8unorm',
+  r8snorm: 'r8snorm',
+  r8ui: 'r8uint',
+  r8i: 'r8sint',
+  rg8unorm: 'rg8unorm',
+  rg8snorm: 'rg8snorm',
+  rg8ui: 'rg8uint',
+  rg8i: 'rg8sint',
+  r16ui: 'r16uint',
+  r16i: 'r16sint',
+  r16f: 'r16float',
+  rg16ui: 'rg16uint',
+  rg16i: 'rg16sint',
+  rg16f: 'rg16float',
+  rg11b10uf: 'rg11b10ufloat'
 } as const;
 
 /**
@@ -1693,8 +1709,8 @@ export class PBTextureTypeInfo extends PBTypeInfo<TextureTypeDetail> {
       if (this.isStorageTexture()) {
         const storageTexelFormat =
           storageTexelFormatMap[this.storageTexelFormat as keyof typeof storageTexelFormatMap];
-        // storage textures currently only support 'write' access control
-        const accessMode = this.writable ? (this.readable ? 'read_write' : 'write') : 'read'; // this.readable ? (this.writable ? 'read_write' : 'read') : 'write';
+        // write unless loaded from, matching the bind group layout (see ProgramBuilder)
+        const accessMode = this.readable ? (this.writable ? 'read_write' : 'read') : 'write';
         typename = `${typename}<${storageTexelFormat}, ${accessMode}>`;
       }
       return varName ? `${varName}: ${typename}` : typename;

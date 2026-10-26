@@ -26,7 +26,49 @@ export interface TextureFormatInfoWebGPU extends TextureFormatInfo {
   renderable: boolean;
   compressed: boolean;
   writable: boolean;
+  readWritable?: boolean;
 }
+
+/** Formats texture-formats-tier1 makes storage textures, with read-only and write-only access. */
+const TIER1_STORAGE_FORMATS: TextureFormat[] = [
+  'r8unorm',
+  'r8snorm',
+  'r8ui',
+  'r8i',
+  'rg8unorm',
+  'rg8snorm',
+  'rg8ui',
+  'rg8i',
+  'r16ui',
+  'r16i',
+  'r16f',
+  'rg16ui',
+  'rg16i',
+  'rg16f',
+  'rg11b10uf'
+];
+/** Formats texture-formats-tier1 makes render targets. */
+const TIER1_RENDERABLE_FORMATS: TextureFormat[] = ['r8snorm', 'rg8snorm', 'rgba8snorm', 'rg11b10uf'];
+/** Formats storage textures can read and write without any feature. */
+const CORE_READ_WRITE_FORMATS: TextureFormat[] = ['r32f', 'r32ui', 'r32i'];
+/** Formats texture-formats-tier2 lets storage textures read and write. */
+const TIER2_READ_WRITE_FORMATS: TextureFormat[] = [
+  'r8unorm',
+  'r8ui',
+  'r8i',
+  'rgba8unorm',
+  'rgba8ui',
+  'rgba8i',
+  'r16ui',
+  'r16i',
+  'r16f',
+  'rgba16ui',
+  'rgba16i',
+  'rgba16f',
+  'rgba32ui',
+  'rgba32i',
+  'rgba32f'
+];
 
 export class WebGPUFramebufferCaps implements FramebufferCaps {
   maxDrawBuffers: number;
@@ -126,6 +168,8 @@ export class WebGPUTextureCaps implements TextureCaps {
   supportFloatColorBuffer: boolean;
   supportHalfFloatColorBuffer: boolean;
   supportFloatBlending: boolean;
+  supportTextureFormatsTier1: boolean;
+  supportTextureFormatsTier2: boolean;
   constructor(device: WebGPUDevice) {
     this.supportAnisotropicFiltering = true;
     this.supportDepthTexture = true;
@@ -179,7 +223,7 @@ export class WebGPUTextureCaps implements TextureCaps {
         filterable: true,
         renderable: true,
         compressed: false,
-        writable: false, // TODO: require "bgra8unorm-storage" feature
+        writable: device.device.features.has('bgra8unorm-storage'),
         blockWidth: 1,
         blockHeight: 1,
         size: 4
@@ -759,6 +803,26 @@ export class WebGPUTextureCaps implements TextureCaps {
       blockHeight: 1,
       size: 4
     };
+    // Storage and render target support beyond the core formats. tier2 enables tier1
+    this.supportTextureFormatsTier2 = device.device.features.has('texture-formats-tier2');
+    this.supportTextureFormatsTier1 =
+      this.supportTextureFormatsTier2 || device.device.features.has('texture-formats-tier1');
+    if (this.supportTextureFormatsTier1) {
+      for (const format of TIER1_STORAGE_FORMATS) {
+        this._textureFormatInfos[format].writable = true;
+      }
+      for (const format of TIER1_RENDERABLE_FORMATS) {
+        this._textureFormatInfos[format].renderable = true;
+      }
+    }
+    for (const format of CORE_READ_WRITE_FORMATS) {
+      this._textureFormatInfos[format].readWritable = true;
+    }
+    if (this.supportTextureFormatsTier2) {
+      for (const format of TIER2_READ_WRITE_FORMATS) {
+        this._textureFormatInfos[format].readWritable = true;
+      }
+    }
     this.supportLinearFloatTexture =
       this._textureFormatInfos['r32f'].filterable &&
       this._textureFormatInfos['rg32f'].filterable &&

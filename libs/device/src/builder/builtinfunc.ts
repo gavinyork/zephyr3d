@@ -11,6 +11,7 @@ import {
 } from './errors';
 import type { ExpValueType, ProgramBuilder } from './programbuilder';
 import type { Nullable } from '@zephyr3d/base';
+import type { TextureFormat } from '../base_types';
 
 const genTypeList = [
   [typeinfo.typeF32, typeinfo.typeF32Vec2, typeinfo.typeF32Vec3, typeinfo.typeF32Vec4],
@@ -147,6 +148,85 @@ function genTypeF16ScalarVec(name: string) {
     ...genType(name, MASK_WEBGPU, typeinfo.typeF16Vec4, [typeinfo.typeF16, typeinfo.typeF16Vec4]),
     ...genType(name, MASK_WEBGPU, typeinfo.typeF16Vec4, [typeinfo.typeF16Vec4, typeinfo.typeF16])
   ];
+}
+
+/**
+ * Storage texel formats of the WebGPU feature texture-formats-tier1, with the
+ * component type their texels are read and written as.
+ */
+const tier1StorageFormats: [TextureFormat, 'f' | 'u' | 'i'][] = [
+  ['r8unorm', 'f'],
+  ['r8snorm', 'f'],
+  ['r8ui', 'u'],
+  ['r8i', 'i'],
+  ['rg8unorm', 'f'],
+  ['rg8snorm', 'f'],
+  ['rg8ui', 'u'],
+  ['rg8i', 'i'],
+  ['r16ui', 'u'],
+  ['r16i', 'i'],
+  ['r16f', 'f'],
+  ['rg16ui', 'u'],
+  ['rg16i', 'i'],
+  ['rg16f', 'f'],
+  ['rg11b10uf', 'f']
+];
+
+/**
+ * Overloads of a storage texture built-in for the texture-formats-tier1
+ * formats, generated rather than listed one by one as the core formats are.
+ */
+function genTier1StorageOverloads(
+  func: 'textureDimensions' | 'textureLoad' | 'textureStore' | 'textureArrayStore' | 'textureNumLayers'
+) {
+  const T = typeinfo.PBTextureType;
+  const result: (ASTFunction | number)[][] = [];
+  for (const [format, kind] of tier1StorageFormats) {
+    const texel =
+      kind === 'f' ? typeinfo.typeF32Vec4 : kind === 'u' ? typeinfo.typeU32Vec4 : typeinfo.typeI32Vec4;
+    const tex1D = new typeinfo.PBTextureTypeInfo(T.TEX_STORAGE_1D, format);
+    const tex2D = new typeinfo.PBTextureTypeInfo(T.TEX_STORAGE_2D, format);
+    const tex2DArray = new typeinfo.PBTextureTypeInfo(T.TEX_STORAGE_2D_ARRAY, format);
+    const tex3D = new typeinfo.PBTextureTypeInfo(T.TEX_STORAGE_3D, format);
+    switch (func) {
+      case 'textureDimensions':
+        result.push(
+          ...genType(func, MASK_WEBGPU, typeinfo.typeU32, [tex1D]),
+          ...genType(func, MASK_WEBGPU, typeinfo.typeU32Vec2, [tex2D]),
+          ...genType(func, MASK_WEBGPU, typeinfo.typeU32Vec2, [tex2DArray]),
+          ...genType(func, MASK_WEBGPU, typeinfo.typeU32Vec3, [tex3D])
+        );
+        break;
+      case 'textureLoad':
+        result.push(
+          ...genType(func, MASK_WEBGPU, texel, [tex1D, typeinfo.typeI32]),
+          ...genType(func, MASK_WEBGPU, texel, [tex2D, typeinfo.typeI32Vec2]),
+          ...genType(func, MASK_WEBGPU, texel, [tex3D, typeinfo.typeI32Vec3])
+        );
+        break;
+      case 'textureStore':
+        result.push(
+          ...genType(func, MASK_WEBGPU, typeinfo.typeVoid, [tex1D, typeinfo.typeU32, texel]),
+          ...genType(func, MASK_WEBGPU, typeinfo.typeVoid, [tex2D, typeinfo.typeU32Vec2, texel]),
+          ...genType(func, MASK_WEBGPU, typeinfo.typeVoid, [tex3D, typeinfo.typeU32Vec3, texel])
+        );
+        break;
+      case 'textureArrayStore':
+        result.push(
+          ...genType('textureStore', MASK_WEBGPU, typeinfo.typeVoid, [
+            tex2DArray,
+            typeinfo.typeU32Vec2,
+            typeinfo.typeI32,
+            texel
+          ])
+        );
+        break;
+      case 'textureNumLayers':
+        result.push(...genType(func, MASK_WEBGPU, typeinfo.typeI32, [tex2DArray]));
+        break;
+    }
+  }
+  return result;
 }
 
 const builtinFunctionsAll = {
@@ -1146,6 +1226,7 @@ const builtinFunctionsAll = {
   // textureDimensions(tex: PBShaderExp, level?: number|PBShaderExp);
   textureDimensions: {
     overloads: [
+      ...genTier1StorageOverloads('textureDimensions'),
       ...genType('textureDimensions', MASK_WEBGPU, typeinfo.typeU32, [typeinfo.typeTex1D, typeinfo.typeI32]),
       ...genType('textureDimensions', MASK_WEBGPU, typeinfo.typeU32, [typeinfo.typeITex1D, typeinfo.typeI32]),
       ...genType('textureDimensions', MASK_WEBGPU, typeinfo.typeU32, [typeinfo.typeUTex1D, typeinfo.typeI32]),
@@ -1598,6 +1679,7 @@ const builtinFunctionsAll = {
   // textureLoad(tex: PBShaderExp, coords: number|PBShaderExp, levelOrSampleIndex: number|PBShaderExp);
   textureLoad: {
     overloads: [
+      ...genTier1StorageOverloads('textureLoad'),
       ...genType('textureLoad', MASK_WEBGPU, typeinfo.typeF32Vec4, [
         typeinfo.typeTex1D,
         typeinfo.typeI32,
@@ -2045,6 +2127,7 @@ const builtinFunctionsAll = {
   // textureStore(tex: PBShaderExp, coords: number|PBShaderExp, value: PBShaderExp);
   textureStore: {
     overloads: [
+      ...genTier1StorageOverloads('textureStore'),
       ...genType('textureStore', MASK_WEBGPU, typeinfo.typeVoid, [
         typeinfo.typeTexStorage1D_rgba8unorm,
         typeinfo.typeU32,
@@ -2307,6 +2390,7 @@ const builtinFunctionsAll = {
   // textureArrayStore(tex: PBShaderExp, coords: PBShaderExp, arrayIndex: number|PBShaderExp, value: PBShaderExp);
   textureArrayStore: {
     overloads: [
+      ...genTier1StorageOverloads('textureArrayStore'),
       ...genType('textureStore', MASK_WEBGPU, typeinfo.typeVoid, [
         typeinfo.typeTexStorage2DArray_rgba8unorm,
         typeinfo.typeU32Vec2,
@@ -2420,6 +2504,7 @@ const builtinFunctionsAll = {
   // textureNumLayers(tex: PBShaderExp);
   textureNumLayers: {
     overloads: [
+      ...genTier1StorageOverloads('textureNumLayers'),
       ...genType('textureNumLayers', MASK_WEBGPU, typeinfo.typeI32, [typeinfo.typeTex2DArray]),
       ...genType('textureNumLayers', MASK_WEBGPU, typeinfo.typeI32, [typeinfo.typeITex2DArray]),
       ...genType('textureNumLayers', MASK_WEBGPU, typeinfo.typeI32, [typeinfo.typeUTex2DArray]),

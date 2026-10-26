@@ -458,6 +458,11 @@ export abstract class WebGPUBaseTexture<
       if (!this._device.isContextLost()) {
         this._gpuFormat = textureFormatMap[this._format];
         const params = (this.getTextureCaps() as WebGPUTextureCaps).getTextureFormatInfo(this._format);
+        if (this._flags & GPUResourceUsageFlags.TF_WRITABLE && !params.writable) {
+          throw new Error(
+            `WebGPU: texture format ${this._format} cannot be a storage texture on this device (8 and 16 bit one and two component formats need texture-formats-tier1)`
+          );
+        }
         this._renderable = params.renderable && !(this._flags & GPUResourceUsageFlags.TF_WRITABLE);
         // Mip chains of storage-capable formats are generated in a compute pass, which needs
         // the texture to be bindable as a storage texture.

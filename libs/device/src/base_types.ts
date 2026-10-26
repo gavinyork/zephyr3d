@@ -2530,6 +2530,16 @@ export interface TextureFormatInfo {
   blockWidth: number;
   /** Block height */
   blockHeight: number;
+  /**
+   * True if the format can be bound as a storage texture with read-only or
+   * write-only access. Absent means false.
+   */
+  writable?: boolean;
+  /**
+   * True if the format can be bound as a storage texture with read-write
+   * access. Absent means false.
+   */
+  readWritable?: boolean;
 }
 
 /**
@@ -2579,6 +2589,17 @@ export interface TextureCaps {
   supportHalfFloatColorBuffer: boolean;
   /** True if device supports alpha blending with floating-point frame buffer */
   supportFloatBlending: boolean;
+  /**
+   * True if the WebGPU feature texture-formats-tier1 is enabled: 8 and 16 bit
+   * one and two component formats, rgb10a2 and rg11b10 can be storage
+   * textures, and the snorm8 formats render targets
+   */
+  supportTextureFormatsTier1: boolean;
+  /**
+   * True if the WebGPU feature texture-formats-tier2 is enabled: the r8, rgba8,
+   * r16, rgba16 and rgba32 formats can be storage textures with read-write access
+   */
+  supportTextureFormatsTier2: boolean;
   /**
    * Get information of a given texture format
    * @param format - The texture format

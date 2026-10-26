@@ -132,6 +132,8 @@ export class NullTextureCaps implements TextureCaps {
   supportFloatColorBuffer: boolean;
   supportHalfFloatColorBuffer: boolean;
   supportFloatBlending: boolean;
+  supportTextureFormatsTier1: boolean;
+  supportTextureFormatsTier2: boolean;
   /** @internal */
   private readonly _formatInfos: Partial<Record<TextureFormat, TextureFormatInfo>>;
   constructor(type: NullDeviceType, overrides?: Partial<Omit<TextureCaps, 'getTextureFormatInfo'>>) {
@@ -156,6 +158,8 @@ export class NullTextureCaps implements TextureCaps {
     this.supportFloatColorBuffer = true;
     this.supportHalfFloatColorBuffer = true;
     this.supportFloatBlending = type === 'webgpu';
+    this.supportTextureFormatsTier1 = false;
+    this.supportTextureFormatsTier2 = false;
     Object.assign(this, overrides ?? {});
     this._formatInfos = {};
   }
