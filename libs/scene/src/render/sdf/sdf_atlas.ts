@@ -32,10 +32,12 @@ interface Entry {
  *
  * Regions are packed with a guillotine allocator over a list of free boxes. A
  * freed region goes back on the list unmerged, so the space fragments; when an
- * allocation no longer fits, every resident field is packed again from scratch
- * from the copies the atlas keeps of their voxels, and only if that still does
- * not fit does the allocation fail (the caller evicts and retries). The copies
- * are what makes the repack cheap: no field has to be reloaded.
+ * allocation no longer fits, the resident fields and the new one are packed
+ * again from scratch on trial, and the new packing replaces the old only when
+ * all of them fit; otherwise the allocation fails and the atlas is left as it
+ * was (the caller evicts and retries). Fields are moved from the copies the
+ * atlas keeps of their voxels, so no field has to be reloaded, and only those
+ * that moved are uploaded again.
  *
  * Uploads are deferred to {@link MeshSDFAtlas.flush}, which takes a byte budget
  * per call so a burst of arrivals is spread over frames.
@@ -47,7 +49,7 @@ interface Entry {
 export class MeshSDFAtlas {
   readonly size: [number, number, number];
   private _texture: Nullable<Texture3D>;
-  private readonly _allocator: VolumeBoxAllocator;
+  private _allocator: VolumeBoxAllocator;
   private readonly _entries: Map<object, Entry>;
   private _usedVoxels: number;
   private _version: number;
@@ -118,21 +120,13 @@ export class MeshSDFAtlas {
     if (existing) {
       return existing.slot;
     }
-    const need = resolution.map((v) => Math.ceil(v / SDF_ATLAS_BLOCK) * SDF_ATLAS_BLOCK) as [
-      number,
-      number,
-      number
-    ];
+    const need = this.blockAligned(resolution);
     if (need[0] > this.size[0] || need[1] > this.size[1] || need[2] > this.size[2]) {
       return null;
     }
-    let box = this._allocator.allocate(need);
+    const box = this._allocator.allocate(need) ?? this.repack(need);
     if (!box) {
-      this.repack();
-      box = this._allocator.allocate(need);
-      if (!box) {
-        return null;
-      }
+      return null;
     }
     const entry: Entry = {
       key,
@@ -144,6 +138,23 @@ export class MeshSDFAtlas {
     this._entries.set(key, entry);
     this._usedVoxels += box.w * box.h * box.d;
     return entry.slot;
+  }
+  /**
+   * True when a field of the given resolution would fit an atlas holding only
+   * the resident fields of `keep`, packed from scratch. Changes nothing; tells
+   * a caller whether evicting the others is worth it.
+   */
+  fits(resolution: [number, number, number], keep: Iterable<object>) {
+    const sizes: [number, number, number][] = [this.blockAligned(resolution)];
+    for (const key of keep) {
+      const box = this._entries.get(key)?.box;
+      if (box) {
+        sizes.push([box.w, box.h, box.d]);
+      }
+    }
+    sizes.sort((a, b) => b[0] * b[1] * b[2] - a[0] * a[1] * a[2]);
+    const allocator = new VolumeBoxAllocator(this.size);
+    return sizes.every((size) => !!allocator.allocate(size));
   }
   /** Frees the region of a field. */
   remove(key: object) {
@@ -188,26 +199,55 @@ export class MeshSDFAtlas {
     this._usedVoxels = 0;
     this._version++;
   }
-  /** Packs every resident field again from an empty atlas, largest first. @internal */
-  private repack() {
-    const entries = [...this._entries.values()].sort(
-      (a, b) => b.box.w * b.box.h * b.box.d - a.box.w * a.box.h * a.box.d
-    );
-    this._allocator.reset();
-    this._usedVoxels = 0;
-    this._version++;
-    for (const entry of entries) {
-      const box = this._allocator.allocate([entry.box.w, entry.box.h, entry.box.d]);
+  /** @internal */
+  private blockAligned(resolution: [number, number, number]) {
+    return resolution.map((v) => Math.ceil(v / SDF_ATLAS_BLOCK) * SDF_ATLAS_BLOCK) as [
+      number,
+      number,
+      number
+    ];
+  }
+  /**
+   * Packs the resident fields and a new region from an empty atlas, largest
+   * first, on a trial allocator. Commits only when everything fits: a failed
+   * attempt leaves every field where it is and still uploaded, so a field that
+   * does not fit costs nothing to the ones that do.
+   * @returns The box of the new region, or null with the atlas unchanged.
+   * @internal
+   */
+  private repack(need: [number, number, number]): Nullable<VolumeBox> {
+    const items: { entry: Nullable<Entry>; size: [number, number, number] }[] = [
+      { entry: null, size: need },
+      ...[...this._entries.values()].map((entry) => ({
+        entry,
+        size: [entry.box.w, entry.box.h, entry.box.d] as [number, number, number]
+      }))
+    ].sort((a, b) => b.size[0] * b.size[1] * b.size[2] - a.size[0] * a.size[1] * a.size[2]);
+    const allocator = new VolumeBoxAllocator(this.size);
+    const boxes: VolumeBox[] = [];
+    for (const item of items) {
+      const box = allocator.allocate(item.size);
       if (!box) {
-        // Another packing order can fail to fit the same set; the field drops
-        // out and its owner sees it missing and adds it again
-        this._entries.delete(entry.key);
+        return null;
+      }
+      boxes.push(box);
+    }
+    this._allocator = allocator;
+    this._version++;
+    let result: Nullable<VolumeBox> = null;
+    for (let i = 0; i < items.length; i++) {
+      const entry = items[i].entry;
+      const box = boxes[i];
+      if (!entry) {
+        result = box;
         continue;
       }
+      if (entry.box.x !== box.x || entry.box.y !== box.y || entry.box.z !== box.z) {
+        entry.slot.offset = [box.x, box.y, box.z];
+        entry.uploaded = false;
+      }
       entry.box = box;
-      entry.slot.offset = [box.x, box.y, box.z];
-      entry.uploaded = false;
-      this._usedVoxels += box.w * box.h * box.d;
     }
+    return result;
   }
 }

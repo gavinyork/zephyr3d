@@ -46,9 +46,15 @@ export class MeshSDFAsset {
   lastWanted: number;
   /** True once its file read has started. */
   requested: boolean;
+  /**
+   * {@link MeshSDFAtlas.version} when it last did not fit, or -1; it is not
+   * tried again until the atlas changes.
+   */
+  failedVersion: number;
   constructor(meshPath: string) {
     this.meshPath = meshPath;
     this.requested = false;
+    this.failedVersion = -1;
     this.state = 'loading';
     this.header = null;
     this.voxels = null;
@@ -385,7 +391,7 @@ export class SceneSDF extends makeObservable(Disposable)<SceneSDFEvents>() {
         }
         continue;
       }
-      if (asset.state === 'ready' && !atlas.getSlot(asset)) {
+      if (asset.state === 'ready' && !atlas.getSlot(asset) && asset.failedVersion !== atlas.version) {
         this.place(asset, wanted);
       }
     }
@@ -417,22 +423,41 @@ export class SceneSDF extends makeObservable(Disposable)<SceneSDFEvents>() {
     if (atlas.add(asset, res, asset.voxels!)) {
       return;
     }
-    // Evict resident fields that are not wanted, least recently wanted first
-    const victims = [...this._assets.values()]
-      .filter((a) => !wanted.has(a) && atlas.getSlot(a))
-      .sort((a, b) => a.lastWanted - b.lastWanted);
-    for (const victim of victims) {
+    // Evict resident fields that are not wanted, least recently wanted first,
+    // then wanted ones farther from the camera than this one, farthest first
+    const resident = [...this._assets.values()].filter((a) => a !== asset && atlas.getSlot(a));
+    const dist = wanted.get(asset)!;
+    const nearer = (a: MeshSDFAsset) => wanted.has(a) && wanted.get(a)! <= dist;
+    const victims = [
+      ...resident.filter((a) => !wanted.has(a)).sort((a, b) => a.lastWanted - b.lastWanted),
+      ...resident.filter((a) => wanted.get(a)! > dist).sort((a, b) => wanted.get(b)! - wanted.get(a)!)
+    ];
+    // Evicting is pointless, and makes the evicted fields and this one push each
+    // other out frame after frame, when even the nearer fields alone leave no room
+    const fits = atlas.fits(res, resident.filter(nearer));
+    for (const victim of fits ? victims : []) {
       atlas.remove(victim);
       this.dirtyAsset(victim);
       if (atlas.add(asset, res, asset.voxels!)) {
         return;
       }
     }
+    asset.failedVersion = atlas.version;
     this._atlasFull++;
     if (!this._atlasFullWarned) {
       this._atlasFullWarned = true;
+      let demand = 0;
+      for (const a of wanted.keys()) {
+        if (a.header) {
+          demand += a.header.resolution.reduce(
+            (n, v) => n * Math.ceil(v / SDF_ATLAS_BLOCK) * SDF_ATLAS_BLOCK,
+            1
+          );
+        }
+      }
+      const capacity = atlas.size[0] * atlas.size[1] * atlas.size[2];
       console.warn(
-        `SceneSDF: the field of ${asset.meshPath} (${res.join('×')} voxels) does not fit the ${this._atlasSize.join('×')} atlas, which is ${Math.round(atlas.occupancy * 100)}% full; it and any other field that does not fit are left out of the scene field. Raise SceneSDF.atlasSize or bake the small meshes at a lower resolution scale.`
+        `SceneSDF: the field of ${asset.meshPath} (${res.join('×')} voxels) does not fit the ${this._atlasSize.join('×')} atlas, which is ${Math.round(atlas.occupancy * 100)}% full; the loaded fields within SceneSDF.streamRadius (${this.streamRadius}) need ${(demand / capacity).toFixed(1)}× the atlas. It and any other field that does not fit are left out of the scene field. Raise SceneSDF.atlasSize, lower SceneSDF.streamRadius or bake meshes at a lower resolution scale.`
       );
     }
   }

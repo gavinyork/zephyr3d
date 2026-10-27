@@ -78,6 +78,8 @@ interface VoxelMaterialEntry {
   materialTag: string;
   lastWanted: number;
   readyTime: number;
+  /** {@link VoxelMaterialAtlas.version} when it last found no room, or -1. */
+  failedVersion: number;
 }
 
 /**
@@ -136,6 +138,7 @@ export class VoxelScene implements GlobalSDFMaterials {
   private readonly _entries: Map<string, VoxelMaterialEntry>;
   private _time: number;
   private _atlasFull: number;
+  private _atlasFullWarned: boolean;
   private _voxelizations: number;
   private _lastVoxelizations: number;
   private _queryProgram: Nullable<GPUProgram>;
@@ -158,6 +161,7 @@ export class VoxelScene implements GlobalSDFMaterials {
     this._entries = new Map();
     this._time = 0;
     this._atlasFull = 0;
+    this._atlasFullWarned = false;
     this._voxelizations = 0;
     this._lastVoxelizations = 0;
     this._queryProgram = null;
@@ -333,7 +337,8 @@ export class VoxelScene implements GlobalSDFMaterials {
           voxelized: false,
           materialTag: '',
           lastWanted: 0,
-          readyTime: -Infinity
+          readyTime: -Infinity,
+          failedVersion: -1
         };
         this._entries.set(key, entry);
       }
@@ -351,7 +356,7 @@ export class VoxelScene implements GlobalSDFMaterials {
       wanted.set(entry, prev === undefined ? d : Math.min(prev, d));
     }
     const candidates = [...wanted.entries()]
-      .filter((e) => e[0].state === 'pending')
+      .filter((e) => e[0].state === 'pending' && e[0].failedVersion !== this.atlas.version)
       .sort((a, b) => a[1] - b[1])
       .map((e) => e[0]);
     let done = 0;
@@ -584,15 +589,29 @@ export class VoxelScene implements GlobalSDFMaterials {
       global.materials = this;
     }
   }
-  /** A slot for an entry, evicting unwanted meshes when the atlas is full. @internal */
+  /**
+   * A slot for an entry, evicting unwanted meshes, then wanted ones farther
+   * from the camera, when the atlas is full. Meshes as near as this one or
+   * nearer are never given up for it: when they leave it no room, it waits
+   * for the atlas to change, so meshes that do not all fit do not push each
+   * other out frame after frame. @internal
+   */
   private place(entry: VoxelMaterialEntry, wanted: Map<VoxelMaterialEntry, number>) {
     let slot = this.atlas.add(entry, entry.resolution);
     if (slot) {
       return slot;
     }
-    const victims = [...this._entries.values()]
-      .filter((e) => !wanted.has(e) && this.atlas.getSlot(e))
-      .sort((a, b) => a.lastWanted - b.lastWanted);
+    const resident = [...this._entries.values()].filter((e) => e !== entry && this.atlas.getSlot(e));
+    const dist = wanted.get(entry)!;
+    const kept = resident.filter((e) => wanted.has(e) && wanted.get(e)! <= dist);
+    if (!this.atlas.fits([entry.resolution, ...kept.map((e) => e.resolution)])) {
+      this.fail(entry);
+      return null;
+    }
+    const victims = [
+      ...resident.filter((e) => !wanted.has(e)).sort((a, b) => a.lastWanted - b.lastWanted),
+      ...resident.filter((e) => wanted.get(e)! > dist).sort((a, b) => wanted.get(b)! - wanted.get(a)!)
+    ];
     for (const victim of victims) {
       this.atlas.remove(victim);
       victim.state = 'pending';
@@ -602,23 +621,32 @@ export class VoxelScene implements GlobalSDFMaterials {
         return slot;
       }
     }
-    // Nothing more to evict: with room left, the atlas is fragmented; start
-    // over, every resident mesh being rasterized again as it is wanted
-    if (this.atlas.occupancy < 0.75) {
-      this.atlas.clear();
+    // The kept meshes and this one fit packed afresh, but not around the gaps
+    // left by the ones freed: repack them, rasterizing again only those moved
+    const moved = this.atlas.repack([entry, ...kept].map((e) => ({ key: e, resolution: e.resolution })));
+    if (moved) {
       for (const e of this._entries.values()) {
-        e.voxelized = false;
-        if (e.state === 'ready') {
+        if (e !== entry && e.voxelized && (moved.has(e) || !this.atlas.getSlot(e))) {
+          e.voxelized = false;
           e.state = 'pending';
         }
       }
-      slot = this.atlas.add(entry, entry.resolution);
-      if (slot) {
-        return slot;
-      }
+      return this.atlas.getSlot(entry);
     }
-    this._atlasFull++;
+    this.fail(entry);
     return null;
+  }
+  /** Records an entry that found no room, not to be tried until the atlas changes. @internal */
+  private fail(entry: VoxelMaterialEntry) {
+    entry.failedVersion = this.atlas.version;
+    this._atlasFull++;
+    if (!this._atlasFullWarned) {
+      this._atlasFullWarned = true;
+      const s = this.atlas.size;
+      console.warn(
+        `VoxelScene: the materials of the meshes in the scene field do not fit the ${s.join('×')} material atlas; the farthest are left out and read black where global illumination rays hit them. Raise SceneGI.atlasSize.`
+      );
+    }
   }
   /** Rebuilds the field around every instance drawing a (primitive, material). @internal */
   private dirtyInstances(sdf: SceneSDF, global: GlobalSDF, key: string) {

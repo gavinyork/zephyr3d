@@ -40,7 +40,7 @@ export class VoxelMaterialAtlas {
   readonly size: [number, number, number];
   private _albedo: Nullable<Texture3D>;
   private _emissive: Nullable<Texture3D>;
-  private readonly _allocator: VolumeBoxAllocator;
+  private _allocator: VolumeBoxAllocator;
   private readonly _entries: Map<object, Entry>;
   private _usedVoxels: number;
   private _version: number;
@@ -96,11 +96,7 @@ export class VoxelMaterialAtlas {
     if (existing) {
       return existing.slot;
     }
-    const need = resolution.map((v) => Math.ceil(v / VOXEL_ATLAS_BLOCK) * VOXEL_ATLAS_BLOCK) as [
-      number,
-      number,
-      number
-    ];
+    const need = this.blockAligned(resolution);
     if (need[0] > this.size[0] || need[1] > this.size[1] || need[2] > this.size[2]) {
       return null;
     }
@@ -115,6 +111,62 @@ export class VoxelMaterialAtlas {
     this._entries.set(key, entry);
     this._usedVoxels += box.w * box.h * box.d;
     return entry.slot;
+  }
+  /**
+   * True when meshes of the given resolutions would fit an empty atlas, packed
+   * in {@link VoxelMaterialAtlas.packOrder}. Changes nothing.
+   */
+  fits(resolutions: [number, number, number][]) {
+    const allocator = new VolumeBoxAllocator(this.size);
+    return VoxelMaterialAtlas.packOrder(resolutions).every((r) => !!allocator.allocate(this.blockAligned(r)));
+  }
+  /**
+   * The order an atlas cleared for a set of meshes adds them in, largest
+   * first, for which {@link VoxelMaterialAtlas.fits} answers.
+   */
+  static packOrder<T extends [number, number, number] | { resolution: [number, number, number] }>(
+    items: T[]
+  ) {
+    const volume = (item: T) => {
+      const r = Array.isArray(item) ? item : item.resolution;
+      return r[0] * r[1] * r[2];
+    };
+    return [...items].sort((a, b) => volume(b) - volume(a));
+  }
+  /**
+   * Packs the given meshes from an empty atlas in
+   * {@link VoxelMaterialAtlas.packOrder}, freeing every other region. Fails,
+   * changing nothing, when they do not all fit (see {@link VoxelMaterialAtlas.fits}).
+   * @returns The keys whose region moved, whose content is lost, or null.
+   */
+  repack(items: { key: object; resolution: [number, number, number] }[]): Nullable<Set<object>> {
+    const allocator = new VolumeBoxAllocator(this.size);
+    const placed: { key: object; resolution: [number, number, number]; box: VolumeBox }[] = [];
+    for (const item of VoxelMaterialAtlas.packOrder(items)) {
+      const box = allocator.allocate(this.blockAligned(item.resolution));
+      if (!box) {
+        return null;
+      }
+      placed.push({ ...item, box });
+    }
+    const moved = new Set<object>();
+    const entries = new Map<object, Entry>();
+    this._usedVoxels = 0;
+    for (const { key, resolution, box } of placed) {
+      const old = this._entries.get(key)?.box;
+      if (!old || old.x !== box.x || old.y !== box.y || old.z !== box.z) {
+        moved.add(key);
+      }
+      entries.set(key, { slot: { offset: [box.x, box.y, box.z], resolution: [...resolution] }, box });
+      this._usedVoxels += box.w * box.h * box.d;
+    }
+    this._entries.clear();
+    for (const [key, entry] of entries) {
+      this._entries.set(key, entry);
+    }
+    this._allocator = allocator;
+    this._version++;
+    return moved;
   }
   /** Frees the region of a mesh. */
   remove(key: object) {
@@ -139,6 +191,14 @@ export class VoxelMaterialAtlas {
     this._albedo = null;
     this._emissive = null;
     this.clear();
+  }
+  /** @internal */
+  private blockAligned(resolution: [number, number, number]) {
+    return resolution.map((v) => Math.ceil(v / VOXEL_ATLAS_BLOCK) * VOXEL_ATLAS_BLOCK) as [
+      number,
+      number,
+      number
+    ];
   }
   /** @internal */
   private createTexture(name: string) {
