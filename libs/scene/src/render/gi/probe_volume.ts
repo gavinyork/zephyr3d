@@ -21,6 +21,7 @@ import { drawFullscreenQuad } from '../fullscreenquad';
 import { fetchSampler } from '../../utility/misc';
 import { getGICacheExposure } from '../../utility/physical';
 import { RENDER_PASS_TYPE_LIGHT } from '../../values';
+import { RenderGraphExecutor } from '../rendergraph/executor';
 import {
   declareDynamicSDFUniforms,
   declareGlobalSDFUniforms,
@@ -402,10 +403,10 @@ export class ProbeVolume {
     this._selected!.bufferSubData(0, this._selection);
     // A fresh random rotation of the ray set each update
     this.randomRotation();
-    this.runRelocate(global, selected);
-    this.runTrace(global, voxels, camera, selected);
+    RenderGraphExecutor.profileScope('ProbeRelocate', () => this.runRelocate(global, selected));
+    RenderGraphExecutor.profileScope('ProbeTrace', () => this.runTrace(global, voxels, camera, selected));
     this.runBlend(selected);
-    this.runCommit(selected);
+    RenderGraphExecutor.profileScope('ProbeCommit', () => this.runCommit(selected));
     this._updates++;
     this._lastUpdated = selected;
   }
@@ -1190,11 +1191,23 @@ export class ProbeVolume {
     }
     // The irradiance blend marks the probes updated, so it goes last: both read
     // whether a probe starts over from its state before then
-    const passes: [GPUProgram, BindGroup, Texture2D, Texture2D][] = [
-      [this._blendVisProgram!, this._blendVisBindGroup!, this._visibility!, this._visibilityNext!],
-      [this._blendIrrProgram, this._blendIrrBindGroup!, this._irradiance!, this._irradianceNext!]
+    const passes: [string, GPUProgram, BindGroup, Texture2D, Texture2D][] = [
+      [
+        'ProbeBlendVisibility',
+        this._blendVisProgram!,
+        this._blendVisBindGroup!,
+        this._visibility!,
+        this._visibilityNext!
+      ],
+      [
+        'ProbeBlendIrradiance',
+        this._blendIrrProgram,
+        this._blendIrrBindGroup!,
+        this._irradiance!,
+        this._irradianceNext!
+      ]
     ];
-    for (const [program, bg, current, next] of passes) {
+    for (const [scope, program, bg, current, next] of passes) {
       bg.setBuffer(PROBE_DATA, this._data!);
       bg.setValue(PROBE_PARAMS, this._params);
       bg.setBuffer('selected', this._selected!);
@@ -1203,9 +1216,11 @@ export class ProbeVolume {
       bg.setTexture('rays', this._rayTexture!, fetchSampler('clamp_nearest_nomip'));
       bg.setTexture('current', current, fetchSampler('clamp_nearest_nomip'));
       bg.setTexture('next', next);
-      device.setProgram(program);
-      device.setBindGroup(0, bg);
-      device.compute(selected, 1, 1);
+      RenderGraphExecutor.profileScope(scope, () => {
+        device.setProgram(program);
+        device.setBindGroup(0, bg);
+        device.compute(selected, 1, 1);
+      });
     }
   }
   /**
