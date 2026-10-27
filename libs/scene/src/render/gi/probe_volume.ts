@@ -27,6 +27,7 @@ import {
   declareGlobalSDFUniforms,
   GLOBAL_SDF_LEVELS,
   sampleGlobalSDF,
+  sampleGlobalSDFLevel,
   sampleSceneSDF,
   sampleSceneSDFHinted,
   sdfSurfaceExpand
@@ -1106,6 +1107,8 @@ export class ProbeVolume {
               this.$l.hit = false;
               this.$l.prevD = pb.float(0);
               this.$l.hitT = pb.float(0);
+              // Voxel size of the level that answered at the hit, 0 for a dynamic instance
+              this.$l.hitVoxel = pb.float(0);
               this.$for(pb.int('i'), 0, TRACE_STEPS, function () {
                 this.$l.sp = pb.add(this.pos, pb.mul(this.dir, this.t));
                 this.$l.s = sampleSceneSDFHinted(this, this.sp, this.prevD, levels, this.minLevel);
@@ -1117,6 +1120,7 @@ export class ProbeVolume {
                   // where along the ray the step stopped no longer shows in it
                   this.hitT = pb.max(pb.sub(pb.add(this.t, this.d), this.expand), 0);
                   this.hit = true;
+                  this.hitVoxel = this.s.y;
                   this.$break();
                 });
                 this.t = pb.add(this.t, pb.max(this.d, 0.02));
@@ -1131,14 +1135,54 @@ export class ProbeVolume {
                 this.dist = this.hitT;
                 this.$l.hp = pb.add(this.pos, pb.mul(this.dir, this.t));
                 // The side of the surface the ray came from: the field's gradient
-                // at the hit, by forward differences over the finest voxel
-                this.$l.he = this[GLOBAL_SDF_LEVELS].at(0).w;
-                this.$l.hd = sampleSceneSDF(this, this.hp, levels);
-                this.$l.hg = pb.vec3(
-                  pb.sub(sampleSceneSDF(this, pb.add(this.hp, pb.vec3(this.he, 0, 0)), levels), this.hd),
-                  pb.sub(sampleSceneSDF(this, pb.add(this.hp, pb.vec3(0, this.he, 0)), levels), this.hd),
-                  pb.sub(sampleSceneSDF(this, pb.add(this.hp, pb.vec3(0, 0, this.he)), levels), this.hd)
-                );
+                // at the hit
+                this.$l.hg = pb.vec3(0);
+                this.$if(pb.greaterThan(this.hitVoxel, 0), function () {
+                  // Central differences over half a voxel of the one level that
+                  // answered, as Lumen takes the normal at a global field hit
+                  // (ComputeGlobalDistanceFieldNormal, GlobalDistanceFieldShared.ush).
+                  // A hit blended between two levels takes the nearer of them
+                  this.$l.hl = this.minLevel;
+                  for (let i = 1; i < levels; i++) {
+                    this.$if(
+                      pb.and(
+                        pb.greaterThanEqual(pb.int(i), this.minLevel),
+                        pb.greaterThan(
+                          this.hitVoxel,
+                          pb.mul(this[GLOBAL_SDF_LEVELS].at(i - 1).w, Math.SQRT2)
+                        )
+                      ),
+                      function () {
+                        this.hl = pb.int(i);
+                      }
+                    );
+                  }
+                  this.$l.he = pb.mul(this[GLOBAL_SDF_LEVELS].at(this.hl).w, 0.5);
+                  this.hg = pb.vec3(
+                    pb.sub(
+                      sampleGlobalSDFLevel(this, pb.add(this.hp, pb.vec3(this.he, 0, 0)), this.hl, levels),
+                      sampleGlobalSDFLevel(this, pb.sub(this.hp, pb.vec3(this.he, 0, 0)), this.hl, levels)
+                    ),
+                    pb.sub(
+                      sampleGlobalSDFLevel(this, pb.add(this.hp, pb.vec3(0, this.he, 0)), this.hl, levels),
+                      sampleGlobalSDFLevel(this, pb.sub(this.hp, pb.vec3(0, this.he, 0)), this.hl, levels)
+                    ),
+                    pb.sub(
+                      sampleGlobalSDFLevel(this, pb.add(this.hp, pb.vec3(0, 0, this.he)), this.hl, levels),
+                      sampleGlobalSDFLevel(this, pb.sub(this.hp, pb.vec3(0, 0, this.he)), this.hl, levels)
+                    )
+                  );
+                }).$else(function () {
+                  // A dynamic instance, sampled at its own field's resolution:
+                  // forward differences of the merged field over the finest voxel
+                  this.$l.he = this[GLOBAL_SDF_LEVELS].at(0).w;
+                  this.$l.hd = sampleSceneSDF(this, this.hp, levels);
+                  this.hg = pb.vec3(
+                    pb.sub(sampleSceneSDF(this, pb.add(this.hp, pb.vec3(this.he, 0, 0)), levels), this.hd),
+                    pb.sub(sampleSceneSDF(this, pb.add(this.hp, pb.vec3(0, this.he, 0)), levels), this.hd),
+                    pb.sub(sampleSceneSDF(this, pb.add(this.hp, pb.vec3(0, 0, this.he)), levels), this.hd)
+                  );
+                });
                 this.$l.hn = this.$choice(
                   pb.greaterThan(pb.dot(this.hg, this.hg), 1e-12),
                   pb.normalize(this.hg),

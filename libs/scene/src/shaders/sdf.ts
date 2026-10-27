@@ -627,6 +627,75 @@ export function sampleGlobalSDFWithVoxel(
   return scope[funcName](worldPos, minLevel ?? pb.int(0)) as PBShaderExp;
 }
 
+/**
+ * Signed distance at a world position read from one level of the global
+ * clipmap alone, `level` chosen at run time: no hand-over to other levels and
+ * no check that the bricks read are current, as Unreal reads one clipmap for
+ * the gradient at a hit (GlobalDistanceFieldPageCentralDiff,
+ * GlobalDistanceFieldShared.ush). For the normal at a hit, where the level
+ * that answered holds the point.
+ * @internal
+ */
+export function sampleGlobalSDFLevel(
+  scope: PBInsideFunctionScope,
+  worldPos: PBShaderExp,
+  level: PBShaderExp,
+  levels: number
+) {
+  const pb = scope.$builder;
+  const filterable = isGlobalSDFFilterable();
+  const funcName = 'Z_sampleGlobalSDFLevel';
+  pb.func(funcName, [pb.vec3('p'), pb.int('level')], function () {
+    this.$l.res = pb.int(this[GLOBAL_SDF_PARAMS].x);
+    this.$l.resF = this[GLOBAL_SDF_PARAMS].x;
+    this.$l.info = this[GLOBAL_SDF_LEVELS].at(this.level);
+    // Position in voxels of the window, sample centres at integers
+    this.$l.f = pb.sub(pb.div(this.p, this.info.w), pb.add(this.info.xyz, pb.vec3(0.5)));
+    // Slice of the level's first z, `resolution + 1` slices a level
+    this.$l.z0 = pb.mul(pb.add(this.res, 1), this.level);
+    if (filterable) {
+      this.$l.vw = pb.add(this.f, this.info.xyz);
+      this.vw = pb.sub(this.vw, pb.mul(pb.floor(pb.div(this.vw, this.resF)), this.resF));
+      this.$l.depth = pb.add(this.resF, 1);
+      this.$return(
+        pb.textureSampleLevel(
+          this[GLOBAL_SDF_TEXTURE],
+          pb.vec3(
+            pb.div(pb.add(this.vw.xy, pb.vec2(0.5)), this.resF),
+            pb.div(pb.add(this.vw.z, pb.add(pb.float(this.z0), 0.5)), pb.mul(this.depth, levels))
+          ),
+          0
+        ).r
+      );
+    } else {
+      this.$l.base = pb.floor(this.f);
+      this.$l.t = pb.sub(this.f, this.base);
+      this.$l.v0 = pb.add(pb.ivec3(this.base), pb.ivec3(this.info.xyz));
+      const load = (dx: number, dy: number, dz: number) => {
+        const v = pb.add(this.v0, pb.ivec3(dx, dy, dz));
+        const w = wrap(this, v, pb.ivec3(this.res));
+        return pb.textureLoad(this[GLOBAL_SDF_TEXTURE], pb.ivec3(w.x, w.y, pb.add(w.z, this.z0)), 0).r;
+      };
+      this.$return(
+        pb.mix(
+          pb.mix(
+            pb.mix(load(0, 0, 0), load(1, 0, 0), this.t.x),
+            pb.mix(load(0, 1, 0), load(1, 1, 0), this.t.x),
+            this.t.y
+          ),
+          pb.mix(
+            pb.mix(load(0, 0, 1), load(1, 0, 1), this.t.x),
+            pb.mix(load(0, 1, 1), load(1, 1, 1), this.t.x),
+            this.t.y
+          ),
+          this.t.z
+        )
+      );
+    }
+  });
+  return scope[funcName](worldPos, level) as PBShaderExp;
+}
+
 /** ((v % n) + n) % n, the remainder of a negative index being negative */
 function wrap(scope: PBInsideFunctionScope, v: PBShaderExp, n: PBShaderExp) {
   const pb = scope.$builder;
