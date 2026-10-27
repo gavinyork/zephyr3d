@@ -1260,15 +1260,20 @@ export class SceneNode
     if (invalidateLocal) {
       this._localMatrix = null;
     }
-    // A synchronized subtree is invalidated recursively below, so each node can
-    // update its own placement once instead of rescanning all descendants here.
-    this.invalidateWorldBoundingVolume(!this._worldMatrix);
-    this.dispatchEvent('transformchanged', this);
-    if (this._worldMatrix) {
+    // Drop the cached world matrices before any listener runs, so one reading the
+    // world matrix or bounding volume from an event sees the new transform
+    const hadWorldMatrix = !!this._worldMatrix;
+    if (hadWorldMatrix) {
       this._transformTag++;
       this._worldMatrix = null;
       this._invWorldMatrix = null;
       this._worldMatrixDet = null;
+    }
+    // A synchronized subtree is invalidated recursively below, so each node can
+    // update its own placement once instead of rescanning all descendants here.
+    this.invalidateWorldBoundingVolume(!hadWorldMatrix);
+    this.dispatchEvent('transformchanged', this);
+    if (hadWorldMatrix) {
       for (const child of this._children) {
         child.get()!._onTransformChanged(false);
       }
