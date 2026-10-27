@@ -480,23 +480,24 @@ export function sampleGlobalSDFHinted(
 
 /**
  * {@link sampleSceneSDFWithVoxel} for a sphere trace, the global field read
- * by {@link sampleGlobalSDFHinted}.
+ * by {@link sampleGlobalSDFHinted}, its levels finer than `minLevel` left out.
  * @internal
  */
 export function sampleSceneSDFHinted(
   scope: PBInsideFunctionScope,
   worldPos: PBShaderExp,
   prevDist: PBShaderExp,
-  levels: number
+  levels: number,
+  minLevel?: PBShaderExp
 ) {
   const pb = scope.$builder;
   const funcName = 'Z_sampleSceneSDFHinted';
-  pb.func(funcName, [pb.vec3('p'), pb.float('prevDist')], function () {
-    this.$l.g = sampleGlobalSDFHinted(this, this.p, this.prevDist, levels);
+  pb.func(funcName, [pb.vec3('p'), pb.float('prevDist'), pb.int('minLevel')], function () {
+    this.$l.g = sampleGlobalSDFHinted(this, this.p, this.prevDist, levels, this.minLevel);
     this.$l.d = sampleDynamicSDF(this, this.p, this.g.x);
     this.$return(pb.vec2(this.d, this.$choice(pb.lessThan(this.d, this.g.x), pb.float(0), this.g.y)));
   });
-  return scope[funcName](worldPos, prevDist) as PBShaderExp;
+  return scope[funcName](worldPos, prevDist, minLevel ?? pb.int(0)) as PBShaderExp;
 }
 
 /**

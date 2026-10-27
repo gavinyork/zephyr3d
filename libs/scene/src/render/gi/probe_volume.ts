@@ -1078,6 +1078,23 @@ export class ProbeVolume {
               this[PROBE_PARAMS].at(2).w,
               pb.div(this.spacing, probeLevelOrigin(this, 0).w)
             );
+            // The finest field level read: the one matching the probe level as the
+            // finest field level matches the finest probe level, so a coarse probe
+            // traces the coarse field, as Godot's SDFGI traces a cascade's probes
+            // from that cascade on (sdfgi_integrate.glsl, process)
+            this.$l.fieldScale = pb.div(this[GLOBAL_SDF_LEVELS].at(0).w, probeLevelOrigin(this, 0).w);
+            this.$l.minLevel = pb.int(0);
+            for (let i = 1; i < levels; i++) {
+              this.$if(
+                pb.lessThanEqual(
+                  this[GLOBAL_SDF_LEVELS].at(i).w,
+                  pb.mul(this.spacing, this.fieldScale, 1.01)
+                ),
+                function () {
+                  this.minLevel = pb.int(i);
+                }
+              );
+            }
             this.$l.radiance = pb.vec3(0);
             this.$l.dist = this.maxDist;
             this.$l.d0 = sampleSceneSDF(this, this.pos, levels);
@@ -1091,7 +1108,7 @@ export class ProbeVolume {
               this.$l.hitT = pb.float(0);
               this.$for(pb.int('i'), 0, TRACE_STEPS, function () {
                 this.$l.sp = pb.add(this.pos, pb.mul(this.dir, this.t));
-                this.$l.s = sampleSceneSDFHinted(this, this.sp, this.prevD, levels);
+                this.$l.s = sampleSceneSDFHinted(this, this.sp, this.prevD, levels, this.minLevel);
                 this.$l.d = this.s.x;
                 this.prevD = this.d;
                 this.$l.expand = sdfSurfaceExpand(this, this.sp, this.s, this.t, levels);
