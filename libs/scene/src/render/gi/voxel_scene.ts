@@ -1,4 +1,4 @@
-import type { Texture3D } from '@zephyr3d/device';
+import type { BindGroup, GPUDataBuffer, GPUProgram, Texture2D, Texture3D } from '@zephyr3d/device';
 import type { Nullable, Vector3 } from '@zephyr3d/base';
 import { Vector4 } from '@zephyr3d/base';
 import type { AABB } from '@zephyr3d/base';
@@ -15,6 +15,37 @@ import { Voxelizer } from './voxelize_pass';
 import { VoxelLighting } from './voxel_lighting';
 import type { VoxelLightingOptions } from './voxel_lighting';
 import type { Camera } from '../../camera/camera';
+import { buildSDFProgram } from '../sdf/sdf_programs';
+import { fetchSampler } from '../../utility/misc';
+import { declareDynamicSDFUniforms, declareGlobalSDFUniforms } from '../../shaders/sdf';
+import {
+  declareVoxelSceneUniforms,
+  loadVoxelSceneAlbedo,
+  loadVoxelSceneEmissive,
+  VOXEL_SCENE_ALBEDO,
+  VOXEL_SCENE_ANISO0,
+  VOXEL_SCENE_ANISO1,
+  VOXEL_SCENE_EMISSIVE,
+  VOXEL_SCENE_RADIANCE,
+  voxelSceneTexel
+} from '../../shaders/gi';
+
+/** Most points per {@link VoxelScene.queryVoxels} call. */
+const MAX_QUERY_POINTS = 1024;
+
+/**
+ * What the voxel scene holds at a world position, see {@link VoxelScene.queryVoxels}.
+ * @public
+ */
+export interface VoxelSceneSample {
+  /** Clipmap level of the material voxel holding the position, -1 where none does with a current brick. */
+  level: number;
+  /** Albedo, and in `a` 1 where a surface's material was composited into the voxel. */
+  albedo: [number, number, number, number];
+  emissive: [number, number, number];
+  /** Outgoing radiance summed over the voxel's faces, at the cache exposure; zeros before the first lighting. */
+  radiance: [number, number, number];
+}
 
 /** Seconds a material's uniforms must have been stable before it is voxelized again. */
 const REVOXELIZE_COOLDOWN = 0.5;
@@ -107,6 +138,12 @@ export class VoxelScene implements GlobalSDFMaterials {
   private _atlasFull: number;
   private _voxelizations: number;
   private _lastVoxelizations: number;
+  private _queryProgram: Nullable<GPUProgram>;
+  private _queryLevels: number;
+  private _queryBindGroup: Nullable<BindGroup>;
+  private _queryPoints: Nullable<GPUDataBuffer>;
+  private _queryOutput: Nullable<Texture2D>;
+  private _queryChain: Promise<unknown>;
   constructor(scene: Scene, atlasSize = 256) {
     this._scene = scene;
     this.voxelizeBudget = 8;
@@ -123,6 +160,12 @@ export class VoxelScene implements GlobalSDFMaterials {
     this._atlasFull = 0;
     this._voxelizations = 0;
     this._lastVoxelizations = 0;
+    this._queryProgram = null;
+    this._queryLevels = 0;
+    this._queryBindGroup = null;
+    this._queryPoints = null;
+    this._queryOutput = null;
+    this._queryChain = Promise.resolve();
   }
   get atlasAlbedo() {
     return this.atlas.albedo;
@@ -187,6 +230,37 @@ export class VoxelScene implements GlobalSDFMaterials {
     const key = keyOf(inst.mesh);
     const entry = key ? this._entries.get(key) : null;
     return entry && entry.voxelized ? this.atlas.getSlot(entry) : null;
+  }
+  /**
+   * How the voxel scene holds an instance's material, for tools: `unsupported`
+   * when it never will (a material that cannot be voxelized, see
+   * {@link MeshMaterial.supportsVoxelization}, or not a triangle list),
+   * `unknown` before it was first wanted (its field not loaded yet, or not a
+   * static instance), else the state of its voxelization with the atlas slot
+   * it was rasterized into, null while it has none.
+   */
+  describeInstance(inst: SDFInstance): {
+    state: 'unsupported' | 'unknown' | VoxelMaterialEntry['state'];
+    voxelized: boolean;
+    slot: Nullable<VoxelAtlasSlot>;
+  } {
+    const mesh = inst.mesh;
+    const primitive = mesh.primitive;
+    const material = mesh.material;
+    if (
+      !primitive ||
+      !material ||
+      primitive.primitiveType !== 'triangle-list' ||
+      !material.supportsVoxelization()
+    ) {
+      return { state: 'unsupported', voxelized: false, slot: null };
+    }
+    const key = keyOf(mesh);
+    const entry = key ? this._entries.get(key) : null;
+    if (!entry) {
+      return { state: 'unknown', voxelized: false, slot: null };
+    }
+    return { state: entry.state, voxelized: entry.voxelized, slot: this.atlas.getSlot(entry) };
   }
   getStats(): VoxelSceneStats {
     const stats: VoxelSceneStats = {
@@ -344,7 +418,86 @@ export class VoxelScene implements GlobalSDFMaterials {
       global.materials = null;
     }
   }
+  /**
+   * What the clipmaps hold at world positions, read back from the GPU as a
+   * ray of the global illumination reads them where it hits; resolves a frame
+   * or two later. For tools, not per-frame use. At most 1024 points.
+   */
+  queryVoxels(global: GlobalSDF, points: Vector3[]): Promise<VoxelSceneSample[]> {
+    const run = async () => {
+      const n = Math.min(points.length, MAX_QUERY_POINTS);
+      if (n === 0 || !this._albedo || !this._emissive) {
+        return [];
+      }
+      const device = getDevice();
+      const pixels = new Float32Array(MAX_QUERY_POINTS * 4 * 3);
+      // Recorded at the start of a frame, as the field's distance queries are
+      await device.runNextFrameAsync(async () => {
+        if (!this._queryProgram || this._queryLevels !== global.levels) {
+          this._queryProgram?.dispose();
+          this._queryBindGroup?.dispose();
+          this._queryProgram = this.createQueryProgram(global.levels);
+          this._queryLevels = global.levels;
+          this._queryBindGroup = device.createBindGroup(this._queryProgram.bindGroupLayouts[0]);
+        }
+        if (!this._queryPoints) {
+          this._queryPoints = device.createBuffer(MAX_QUERY_POINTS * 16, { usage: 'uniform', storage: true });
+          this._queryOutput = device.createTexture2D('rgba32f', MAX_QUERY_POINTS, 3, {
+            mipmapping: false,
+            writable: true
+          })!;
+        }
+        const data = new Float32Array(MAX_QUERY_POINTS * 4);
+        for (let i = 0; i < n; i++) {
+          data.set([points[i].x, points[i].y, points[i].z, 0], i * 4);
+        }
+        this._queryPoints.bufferSubData(0, data);
+        const bg = this._queryBindGroup!;
+        global.applyBindGroup(bg);
+        const lit = this.lit;
+        const nearest = fetchSampler('clamp_nearest_nomip');
+        bg.setTexture(VOXEL_SCENE_ALBEDO, this._albedo!, nearest);
+        bg.setTexture(VOXEL_SCENE_EMISSIVE, this._emissive!, nearest);
+        // Before the first lighting any volume of the layout stands in, the radiance read as zero
+        bg.setTexture(VOXEL_SCENE_RADIANCE, lit ? this.radiance : this._emissive!, nearest);
+        bg.setTexture(VOXEL_SCENE_ANISO0, lit ? this.radianceAniso0 : this._albedo!, nearest);
+        bg.setTexture(VOXEL_SCENE_ANISO1, lit ? this.radianceAniso1 : this._albedo!, nearest);
+        bg.setBuffer('points', this._queryPoints);
+        bg.setTexture('result', this._queryOutput!);
+        bg.setValue('count', new Vector4(n, lit ? 1 : 0, 0, 0));
+        device.setProgram(this._queryProgram);
+        device.setBindGroup(0, bg);
+        device.compute(Math.ceil(n / 64), 1, 1);
+        const read = this._queryOutput!.readPixels(0, 0, MAX_QUERY_POINTS, 3, 0, 0, pixels);
+        device.flush();
+        await read;
+      });
+      const row = MAX_QUERY_POINTS * 4;
+      return Array.from({ length: n }, (_, i): VoxelSceneSample => {
+        const a = pixels.subarray(i * 4, i * 4 + 4);
+        const e = pixels.subarray(row + i * 4, row + i * 4 + 4);
+        const r = pixels.subarray(2 * row + i * 4, 2 * row + i * 4 + 4);
+        return {
+          level: Math.round(e[3]),
+          albedo: [a[0], a[1], a[2], a[3]],
+          emissive: [e[0], e[1], e[2]],
+          radiance: [r[0], r[1], r[2]]
+        };
+      });
+    };
+    const next = this._queryChain.then(run, run);
+    this._queryChain = next.catch(() => undefined);
+    return next;
+  }
   dispose() {
+    this._queryProgram?.dispose();
+    this._queryBindGroup?.dispose();
+    this._queryPoints?.dispose();
+    this._queryOutput?.dispose();
+    this._queryProgram = null;
+    this._queryBindGroup = null;
+    this._queryPoints = null;
+    this._queryOutput = null;
     this._voxelizer?.dispose();
     this._voxelizer = null;
     this._lighting?.dispose();
@@ -360,6 +513,42 @@ export class VoxelScene implements GlobalSDFMaterials {
       }
     }
     this._entries.clear();
+  }
+  /** @internal */
+  private createQueryProgram(levels: number) {
+    return buildSDFProgram({
+      label: 'VoxelSceneQuery',
+      workgroupSize: [64, 1, 1],
+      compute(pb) {
+        this.points = pb.vec4[0]().storageBufferReadonly(0);
+        // (point count, 1 once lit)
+        this.count = pb.vec4().uniform(0);
+        this.result = pb.texStorage2D.rgba32float().storage(0);
+        declareGlobalSDFUniforms(this, 0, levels);
+        declareDynamicSDFUniforms(this, 0);
+        declareVoxelSceneUniforms(this, 0);
+        pb.main(function () {
+          this.$l.i = this.$builtins.globalInvocationId.x;
+          this.$if(pb.lessThan(this.i, pb.uint(this.count.x)), function () {
+            this.$l.texel = voxelSceneTexel(this, this.points.at(this.i).xyz, levels);
+            this.$l.radiance = pb.vec3(0);
+            this.$if(
+              pb.and(pb.greaterThanEqual(this.texel.w, 0), pb.greaterThan(this.count.y, 0)),
+              function () {
+                this.radiance = pb.textureLoad(this[VOXEL_SCENE_RADIANCE], this.texel.xyz, 0).rgb;
+              }
+            );
+            pb.textureStore(this.result, pb.uvec2(this.i, 0), loadVoxelSceneAlbedo(this, this.texel));
+            pb.textureStore(
+              this.result,
+              pb.uvec2(this.i, 1),
+              pb.vec4(loadVoxelSceneEmissive(this, this.texel), pb.float(this.texel.w))
+            );
+            pb.textureStore(this.result, pb.uvec2(this.i, 2), pb.vec4(this.radiance, 0));
+          });
+        });
+      }
+    })!;
   }
   /** @internal */
   private get voxelizer() {

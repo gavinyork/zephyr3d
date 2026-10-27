@@ -268,6 +268,65 @@ export async function queryGIProbes(controller: SceneController | null, params: 
   return { ...result, err: null };
 }
 
+/**
+ * State of the global illumination: its counters, and per static instance of
+ * the scene field how the voxel scene holds its material (see
+ * VoxelScene.describeInstance). `missing_only` lists only the instances
+ * whose material is not in the voxel scene.
+ */
+export function getGIStats(controller: SceneController | null, params: any) {
+  const scene = controller?.model?.scene ?? null;
+  if (!scene) {
+    return { stats: null, err: 'No scene is currently opened' };
+  }
+  const voxels = scene.gi.enabled ? scene.gi.voxels : null;
+  const instances = [...scene.sdf.instances]
+    .filter((inst) => inst.mode === 'static')
+    .map((inst) => {
+      const voxel = voxels?.describeInstance(inst) ?? null;
+      return {
+        node_id: inst.mesh.persistentId,
+        node_name: inst.mesh.name,
+        mesh: inst.asset?.meshPath ?? null,
+        material: inst.mesh.material?.constructor.name ?? null,
+        field: inst.asset ? inst.asset.state : 'no_asset',
+        voxel_state: voxel?.state ?? null,
+        voxel_slot: voxel?.slot?.resolution ?? null
+      };
+    })
+    .filter((i) => !params.missing_only || i.voxel_state !== 'ready' || !i.voxel_slot);
+  return { enabled: scene.gi.enabled, stats: scene.gi.getStats(), instances, err: null };
+}
+
+/**
+ * What the voxel scene holds at world positions, as a global illumination ray
+ * reads it where it hits: the clipmap level, albedo (a = 1 where a surface's
+ * material was composited), emissive and lit radiance of the material voxel
+ * holding each point.
+ */
+export async function queryGIVoxels(controller: SceneController | null, params: any) {
+  const scene = controller?.model?.scene ?? null;
+  if (!scene) {
+    return { samples: null, err: 'No scene is currently opened' };
+  }
+  const global = scene.sdf.enabled ? scene.sdf.global : null;
+  const voxels = scene.gi.enabled ? scene.gi.voxels : null;
+  if (!global || !voxels?.ready) {
+    return { samples: null, err: 'No voxel scene: enable GIEnabled (WebGPU) and let it build' };
+  }
+  const points: Vector3[] = (Array.isArray(params.points) ? params.points : []).map(
+    (p: unknown) => new Vector3(...((p as number[]).map(Number) as [number, number, number]))
+  );
+  const r = (v: number) => Math.round(v * 10000) / 10000;
+  const samples = (await voxels.queryVoxels(global, points)).map((s) => ({
+    level: s.level,
+    albedo: s.albedo.map(r),
+    emissive: s.emissive.map(r),
+    radiance: s.radiance.map(r)
+  }));
+  return { samples, err: null };
+}
+
 /** Modes of the distance field debug view the scene view can draw. */
 const SDF_VIEW_MODES = ['distance', 'albedo', 'emissive', 'radiance', 'skyVisibility', 'irradiance'] as const;
 

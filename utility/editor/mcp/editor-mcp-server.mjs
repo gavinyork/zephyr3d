@@ -1837,7 +1837,7 @@ const BASE_TOOLS = [
   {
     name: 'material_get_properties',
     description:
-      'Get property values from a material asset. Property names must match getMaterialPropertyList. Returns { values, err }.',
+      'Get property values from a material asset. Property names must match getMaterialPropertyList. A property that does not apply to the material as it is (such as the sampler settings of an empty texture slot) reads null. Returns { values, err }.',
     inputSchema: {
       type: 'object',
       required: ['path', 'properties'],
@@ -3118,6 +3118,36 @@ const BASE_TOOLS = [
     }
   },
   {
+    name: 'gi_stats',
+    description:
+      'State of the scene global illumination (WebGPU, GIEnabled): counters of the voxel scene (material entries ready/pending/failed, material atlas use, voxelizations, lighting passes) and the probe volume (levels, probes, never updated, updated last frame), and per static mesh of the scene SDF how the voxel scene holds its material: voxel_state unsupported (material cannot be voxelized or not a triangle list), unknown (not wanted yet, e.g. its field not loaded), pending, ready or failed, with voxel_slot the material atlas resolution it was rasterized at (null while it has none). A mesh without a voxelized material reads black where GI rays hit it. missing_only lists only the meshes whose material is not in the voxel scene. Returns { enabled, stats, instances, err }.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        missing_only: { type: 'boolean', default: false },
+        timeout_ms: { type: 'number', default: 10000 }
+      }
+    }
+  },
+  {
+    name: 'gi_voxel_query',
+    description:
+      'Read back what the global illumination voxel scene holds at world positions, as a probe ray reads it where it hits (WebGPU, GIEnabled): per point the clipmap level of the material voxel holding it (-1 where no level holds it with a current brick), albedo rgba (a = 1 where a surface material was composited into the voxel, 0 for an empty voxel, which a ray hitting there reads as black), emissive and radiance (lit outgoing radiance summed over the voxel faces, at the GI cache exposure). Material voxels are twice the global SDF voxel size of their level. At most 1024 points. Returns { samples, err }.',
+    inputSchema: {
+      type: 'object',
+      required: ['points'],
+      properties: {
+        points: {
+          type: 'array',
+          items: { type: 'array', items: { type: 'number' }, minItems: 3, maxItems: 3 },
+          maxItems: 1024,
+          description: 'World positions as [x, y, z].'
+        },
+        timeout_ms: { type: 'number', default: 30000 }
+      }
+    }
+  },
+  {
     name: 'sdf_debug_view',
     description:
       'Draw a distance field debug view over the scene view, as the View menu entries Distance Field, Voxel Albedo/Emissive/Radiance and GI Sky Occlusion/Irradiance do: every pixel sphere traces the scene SDF and shows, at the hit, the step count (distance), the voxel scene material (albedo, emissive), its lit radiance (radiance), the probe sky visibility (skyVisibility: white sees all the sky, black none, magenta no probe) or the probe irradiance a white surface there shades with (irradiance). mode none draws the scene alone. exposure scales radiance and irradiance (shown as x/(1+x)). Not saved with the scene. Returns { mode, exposure, err }.',
@@ -3280,6 +3310,8 @@ const READONLY_TOOL_NAMES = new Set([
   'sdf_query',
   'sdf_sample',
   'gi_probe_query',
+  'gi_stats',
+  'gi_voxel_query',
   'editor_frame_timing',
   'editor_connect_info',
   'editor_wait_ready',
@@ -4478,6 +4510,12 @@ const handlers = {
   },
   async sdf_stats(args) {
     return bridge.send('sdf_stats', { enabled: args.enabled }, Number(args.timeout_ms ?? 10000));
+  },
+  async gi_voxel_query(args) {
+    return bridge.send('gi_voxel_query', { points: args.points }, Number(args.timeout_ms ?? 30000));
+  },
+  async gi_stats(args) {
+    return bridge.send('gi_stats', { missing_only: args.missing_only }, Number(args.timeout_ms ?? 10000));
   },
   async sdf_debug_view(args) {
     return bridge.send(

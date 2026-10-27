@@ -50,6 +50,20 @@ export interface VoxelizeTarget {
   voxelSize: number;
 }
 
+/**
+ * Draws per axis along each screen axis, each shifted by a fraction of a
+ * pixel: a grid of VOXELIZE_JITTER² sample positions per voxel face. One
+ * sample per voxel misses a strip narrower than a voxel lying between pixel
+ * centres in all three projections, and the field, built from the exact mesh,
+ * then has a surface the material atlas has nothing for: a ray hitting it
+ * reads black. WebGPU has no conservative rasterization; drawing again with
+ * sub-pixel offsets, the jittered passes of Haeberli and Akeley's accumulation
+ * buffer (SIGGRAPH 1990), samples as densely as rasterizing at this many times
+ * the resolution while the texture derivatives, and so the mip the albedo is
+ * read at, stay those of a voxel.
+ */
+const VOXELIZE_JITTER = 4;
+
 const AXES: { dir: Vector3; up: Vector3 }[] = [
   { dir: new Vector3(1, 0, 0), up: new Vector3(0, 1, 0) },
   { dir: new Vector3(0, 1, 0), up: new Vector3(0, 0, 1) },
@@ -57,18 +71,18 @@ const AXES: { dir: Vector3; up: Vector3 }[] = [
 ];
 
 /**
- * Rasterizes a mesh with its material into the material atlases: three
- * orthographic draws, one along each axis, over a viewport one pixel per
- * voxel, every fragment storing its albedo and emissive in the voxel holding
- * its position (the three projections together reach surfaces facing any
- * way). Depth test, culling and colour writes are off; the colour attachment
- * is a scratch target.
+ * Rasterizes a mesh with its material into the material atlases: orthographic
+ * draws along each axis over a viewport one pixel per voxel, jittered by
+ * sub-pixel offsets ({@link VOXELIZE_JITTER}), every fragment storing its
+ * albedo and emissive in the voxel holding its position (the three
+ * projections together reach surfaces facing any way). Depth test, culling
+ * and colour writes are off; the colour attachment is a scratch target.
  *
  * After Crassin and Green, "Octree-Based Sparse Voxelization Using the GPU
  * Hardware Rasterizer", OpenGL Insights 2012, without conservative
- * rasterization, which WebGPU lacks: gaps a projection leaves are closed by
- * the other two, and what remains is read through the mesh's distance field
- * at composite time.
+ * rasterization, which WebGPU lacks: the jittered draws stand in for it, and
+ * what still slips through is read through the mesh's distance field at
+ * composite time.
  *
  * @internal
  */
@@ -128,15 +142,24 @@ export class Voxelizer {
       if (!material.apply(ctx)) {
         return false;
       }
+      // One pixel per voxel: the view spans the box's largest side in n pixels
+      const pixel = (2 * half) / n;
       for (const axis of AXES) {
         // Looking down the axis from outside the box, a symmetric orthographic
         // view wide enough for the box whichever way it is turned
         this._eye.set(this._center);
         this._eye.addBy(Vector3.scale(axis.dir, half + 1));
         this._camera.lookAt(this._eye, this._center, axis.up);
-        this._camera.setProjectionMatrix(Matrix4x4.ortho(-half, half, -half, half, 1, 2 * half + 2));
-        ShaderHelper.setCameraUniforms(bindGroup, ctx, this._camera, true);
-        material.draw(primitive, ctx);
+        for (let j = 0; j < VOXELIZE_JITTER * VOXELIZE_JITTER; j++) {
+          // Sample positions spread evenly over the pixel
+          const ox = (((j % VOXELIZE_JITTER) + 0.5) / VOXELIZE_JITTER - 0.5) * pixel;
+          const oy = ((Math.floor(j / VOXELIZE_JITTER) + 0.5) / VOXELIZE_JITTER - 0.5) * pixel;
+          this._camera.setProjectionMatrix(
+            Matrix4x4.ortho(-half + ox, half + ox, -half + oy, half + oy, 1, 2 * half + 2)
+          );
+          ShaderHelper.setCameraUniforms(bindGroup, ctx, this._camera, true);
+          material.draw(primitive, ctx);
+        }
       }
       return true;
     } finally {

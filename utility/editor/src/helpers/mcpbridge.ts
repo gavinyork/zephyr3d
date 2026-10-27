@@ -56,8 +56,10 @@ import { importModelAsset, saveNodeAsPrefab } from './mcpassets';
 import { editWaterInteraction } from './mcpwater';
 import {
   bakeMeshSDFs,
+  getGIStats,
   getSceneSDFStats,
   queryGIProbes,
+  queryGIVoxels,
   queryMeshSDF,
   sampleGlobalSDF,
   setSDFDebugSlice,
@@ -1956,6 +1958,14 @@ ${err.stack}`
       return getSceneSDFStats(getSceneController(editor), params);
     case 'sdf_debug_view':
       return setSDFDebugView(getSceneController(editor), params);
+    case 'gi_stats':
+      return getGIStats(getSceneController(editor), params);
+    case 'gi_voxel_query':
+      try {
+        return await queryGIVoxels(getSceneController(editor), params);
+      } catch (err) {
+        return { samples: null, err: `${err instanceof Error ? err.message : err}` };
+      }
     case 'sdf_query':
       try {
         return await queryMeshSDF(getSceneController(editor), params);
@@ -2763,7 +2773,7 @@ ${err.stack}`
             err: `Cannot resolve material class for asset: ${path}`
           };
         }
-        const values: (number[] | number | boolean | string)[] = [];
+        const values: (number[] | number | boolean | string | null)[] = [];
         const props = getEngine().resourceManager.getAllPropertiesByClass(materialClass);
         for (const p of properties) {
           let propertyName = p as string;
@@ -2785,6 +2795,12 @@ ${err.stack}`
               values: null,
               err: `material_get_properties does not support object_array property "${prop.name}"`
             };
+          }
+          // Not applicable as the material is, such as the sampler settings of an
+          // empty texture slot, whose getter has no texture to read them from
+          if (prop.isValid && !prop.isValid.call(material)) {
+            values.push(null);
+            continue;
           }
           const value: PropertyValue = {
             num: [0, 0, 0, 0],

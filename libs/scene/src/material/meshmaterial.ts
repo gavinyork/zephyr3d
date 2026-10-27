@@ -1414,11 +1414,10 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
           this.$outputs.zSSSProfileId = pb.vec4(profileId ?? pb.float(0));
         }
       } else if (that.drawContext.renderPass!.type === RENDER_PASS_TYPE_VOXELIZE) {
-        if (color && this.zAlphaCutoff) {
-          this.$if(pb.getGlobalScope()[alphaClipFuncName](this.outColor.a, this.zAlphaCutoff), function () {
-            pb.discard();
-          });
-        }
+        // No alpha test: the mesh's distance field is built from its triangles,
+        // masked or not, so a ray stops on the whole of a leaf card and must
+        // find a material all over it, else it reads black. Lumen's card capture
+        // keeps masked fragments for the same reason (LumenCardBasePass.ush).
         // The colour handed in is the albedo (see supportsVoxelization); a
         // material with an emissive term contributes it too
         const emissiveMaterial = that as unknown as {
