@@ -23,7 +23,7 @@ import {
   declareGlobalSDFUniforms,
   GLOBAL_SDF_LEVELS,
   GLOBAL_SDF_PARAMS,
-  sampleGlobalSDF
+  sampleGlobalSDFWithVoxel
 } from '../../shaders/sdf';
 import { sdfConeShadow } from '../../shaders/gi';
 import { declareProbeUniforms, sampleProbeIrradiance } from '../../shaders/probes';
@@ -529,9 +529,16 @@ export class VoxelLighting {
             // in the meshes' own spaces, so here a face counts where the field
             // is outside the solid at its centre, open space lying that way.
             this.$l.half = pb.mul(this.vs, 0.5);
+            // Read from the voxel's own level on, as the sun shadow below: a finer
+            // level knows geometry the voxel cannot tell apart
             for (let k = 0; k < 6; k++) {
               this.$l[`open${k}`] = pb.greaterThan(
-                sampleGlobalSDF(this, pb.add(this.p, pb.mul(pb.vec3(...ANISO_DIRS[k]), this.half)), levels),
+                sampleGlobalSDFWithVoxel(
+                  this,
+                  pb.add(this.p, pb.mul(pb.vec3(...ANISO_DIRS[k]), this.half)),
+                  levels,
+                  this.level
+                ).x,
                 0
               );
               this.$l[`acc${k}`] = pb.vec3(0);
@@ -555,7 +562,8 @@ export class VoxelLighting {
                 this.vs,
                 pb.mul(this[GLOBAL_SDF_PARAMS].x, this[GLOBAL_SDF_LEVELS].at(levels - 1).w, 0.5),
                 levels,
-                SHADOW_STEPS
+                SHADOW_STEPS,
+                this.level
               );
               this.$if(pb.greaterThan(this.shadow, 0), function () {
                 this.$l.sun = pb.mul(this.albedo, this.sunColor.rgb, this.shadow, 1 / Math.PI);

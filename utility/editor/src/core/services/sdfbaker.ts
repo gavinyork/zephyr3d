@@ -1,5 +1,5 @@
 import type { VFS } from '@zephyr3d/base';
-import type { MeshSDFData, MeshImportSettings } from '@zephyr3d/scene';
+import type { AssetHierarchyNode, MeshSDFData, MeshImportSettings, SharedModel } from '@zephyr3d/scene';
 import {
   decodeZsdf,
   getEngine,
@@ -7,13 +7,14 @@ import {
   MESH_SDF_DIR,
   readMeshImportSettings,
   readPrimitiveTriangles,
-  readZsdf
+  readZsdf,
+  writeMeshImportSettings
 } from '@zephyr3d/scene';
 import type { SDFBakeRequest, SDFBakeResponse } from '../../workers/sdf_bake';
 import { ProjectService } from './project';
 
 /** Bumped whenever the baker's output changes, so every field is rebaked. */
-const SDF_BAKER_VERSION = 2;
+const SDF_BAKER_VERSION = 3;
 
 /** Outcome of baking one mesh. */
 export interface MeshSDFBakeResult {
@@ -35,7 +36,12 @@ async function sha1Hex(data: ArrayBuffer | string) {
 }
 
 function settingsKey(settings: MeshImportSettings) {
-  return JSON.stringify([settings.sdfResolutionScale, settings.sdfTwoSided, SDF_BAKER_VERSION]);
+  return JSON.stringify([
+    settings.sdfResolutionScale,
+    settings.sdfTwoSided,
+    settings.sdfUnitScale,
+    SDF_BAKER_VERSION
+  ]);
 }
 
 /**
@@ -80,7 +86,11 @@ export class MeshSDFBaker {
       const res = await this.run({
         positions,
         indices,
-        options: { resolutionScale: settings.sdfResolutionScale, twoSided: settings.sdfTwoSided },
+        options: {
+          resolutionScale: settings.sdfResolutionScale,
+          twoSided: settings.sdfTwoSided,
+          unitScale: settings.sdfUnitScale
+        },
         source
       });
       if (!(await vfs.exists(MESH_SDF_DIR))) {
@@ -131,6 +141,58 @@ export class MeshSDFBaker {
     };
     await Promise.all(Array.from({ length: Math.min(this.poolSize, unique.length) }, lane));
     return results;
+  }
+
+  /**
+   * World units one local unit spans for each mesh of an imported model, the
+   * largest over the nodes (and their instances) using it, keyed by mesh asset
+   * path and merged into `scales`. Per node the product of the largest axis
+   * scale of it and each of its parents, which bounds the stretch any rotation
+   * between them can give.
+   */
+  static modelUnitScales(model: SharedModel, scales = new Map<string, number>()) {
+    const largest = (v: { x: number; y: number; z: number }) =>
+      Math.max(Math.abs(v.x), Math.abs(v.y), Math.abs(v.z));
+    for (const node of model.nodes) {
+      if (!node.mesh) {
+        continue;
+      }
+      let scale = 1;
+      for (let n: AssetHierarchyNode | null = node; n; n = n.parent) {
+        scale *= largest(n.scaling);
+      }
+      if (node.instances.length > 0) {
+        scale *= Math.max(...node.instances.map((i) => largest(i.s)));
+      }
+      for (const sub of node.mesh.subMeshes) {
+        const path = sub.primitive?.path;
+        if (path) {
+          scales.set(path, Math.max(scales.get(path) ?? 0, scale));
+        }
+      }
+    }
+    return scales;
+  }
+
+  /**
+   * Records in the meshes' settings the world units one of their local units
+   * spans (`sdfUnitScale`), where it differs from what is recorded, so their
+   * next bake measures the voxel density in world units. Built-in meshes,
+   * whose settings cannot be written, are left out.
+   */
+  static async setUnitScales(scales: Map<string, number>) {
+    const vfs = ProjectService.VFS;
+    for (const [path, scale] of scales) {
+      if (!(scale > 0) || !Number.isFinite(scale) || path.startsWith('/assets/@builtins/')) {
+        continue;
+      }
+      // Rounded so scales that differ by float noise keep the same bake key
+      const rounded = Number(scale.toPrecision(4));
+      const settings = await readMeshImportSettings(vfs, path);
+      if (settings.sdfUnitScale !== rounded) {
+        await writeMeshImportSettings(vfs, path, { ...settings, sdfUnitScale: rounded });
+      }
+    }
   }
 
   /** The baked field of a mesh asset, decoded for CPU queries, or null if none is baked. */

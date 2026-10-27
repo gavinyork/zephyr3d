@@ -273,35 +273,109 @@ export function sampleSceneSDFWithVoxel(scope: PBInsideFunctionScope, worldPos: 
 }
 
 /**
- * Fraction of the voxel size of the level read that a sphere trace counts as
- * a hit. A wall thinner than a voxel lying between two sample centres reads
- * no less than half a voxel anywhere, so a tolerance below that lets rays
- * through it, the more often the coarser the level; the price is surfaces
- * swollen by up to this many voxels.
+ * Scale on the surface expand of {@link sdfSurfaceExpand} where a brick holds
+ * two-sided meshes, against 1 elsewhere: Lumen's
+ * r.LumenScene.GlobalSDF.NotCoveredExpandSurfaceScale and
+ * CoveredExpandSurfaceScale (GlobalDistanceField.cpp). A one-sided wall thinner
+ * than a voxel lying between two sample centres reads up to half a voxel
+ * anywhere, and the field interpolated from a coarser mesh field more, so less
+ * than a whole voxel lets rays through it; foliage and cloth, solid only as
+ * thick as the compositing makes them, would close up at a whole voxel.
  * @internal
  */
-export const SDF_TRACE_VOXEL_EXPAND = 0.6;
+export const SDF_NOT_COVERED_EXPAND_SCALE = 0.6;
 
 /**
- * Hit tolerance of a sphere trace at a sample of
- * {@link sampleSceneSDFWithVoxel} a distance `t` along the ray: the larger of
- * `base` and {@link SDF_TRACE_VOXEL_EXPAND} voxels, the latter growing from 0
- * over the first two voxels travelled so a ray leaving a nearby surface does
- * not hit it at once; Lumen's surface expand (GlobalDistanceFieldUtils.ush,
- * RayTraceGlobalDistanceField).
+ * Tag alpha of a brick of the global field holding two-sided meshes, against 1
+ * for one holding none; see {@link SDF_NOT_COVERED_EXPAND_SCALE}. Lumen marks
+ * such pages with a coverage bit (GLOBALSDF_SIMPLE_COVERAGE_BASED_EXPAND).
  * @internal
  */
-export function sdfTraceTolerance(
+export const GLOBAL_SDF_TAG_NOT_COVERED = 2;
+
+/**
+ * True unless the brick of the global field holding a world position was
+ * composited with two-sided meshes in it, read from the finest level whose
+ * window holds the position; true outside every window and where the brick
+ * is not current.
+ * @internal
+ */
+export function globalSDFCovered(scope: PBInsideFunctionScope, worldPos: PBShaderExp, levels: number) {
+  const pb = scope.$builder;
+  const funcName = 'Z_globalSDFCovered';
+  pb.func(funcName, [pb.vec3('p')], function () {
+    this.$l.res = pb.int(this[GLOBAL_SDF_PARAMS].x);
+    this.$l.nbi = pb.ivec3(pb.div(this.res, GLOBAL_SDF_BRICK));
+    for (let i = 0; i < levels; i++) {
+      this.$l[`cvInfo${i}`] = this[GLOBAL_SDF_LEVELS].at(i);
+      this.$l[`cvV${i}`] = pb.ivec3(pb.floor(pb.div(this.p, this[`cvInfo${i}`].w)));
+      this.$l[`cvO${i}`] = pb.ivec3(this[`cvInfo${i}`].xyz);
+      this.$if(
+        pb.and(
+          pb.all(pb.greaterThanEqual(this[`cvV${i}`], this[`cvO${i}`])),
+          pb.all(pb.lessThan(this[`cvV${i}`], pb.add(this[`cvO${i}`], pb.ivec3(this.res))))
+        ),
+        function () {
+          this.$l.b = pb.ivec3(pb.floor(pb.div(pb.vec3(this[`cvV${i}`]), GLOBAL_SDF_BRICK)));
+          this.$l.w = wrap(this, this.b, this.nbi);
+          this.$l.tag = pb.textureLoad(
+            this[GLOBAL_SDF_TAGS],
+            pb.ivec3(this.w.x, this.w.y, pb.add(this.w.z, pb.mul(this.nbi.z, i))),
+            0
+          );
+          this.$return(
+            pb.not(
+              pb.and(
+                pb.greaterThan(this.tag.w, GLOBAL_SDF_TAG_NOT_COVERED - 0.5),
+                pb.equal(pb.ivec3(this.tag.xyz), this.b)
+              )
+            )
+          );
+        }
+      );
+    }
+    this.$return(true);
+  });
+  return scope[funcName](worldPos) as PBShaderExp;
+}
+
+/**
+ * Lumen's surface expand (GlobalDistanceFieldUtils.ush, RayTraceGlobalDistanceField)
+ * at a sample of {@link sampleSceneSDFWithVoxel} at world position `p`, a
+ * distance `t` past the start of a trace: a whole voxel of the level read,
+ * {@link SDF_NOT_COVERED_EXPAND_SCALE} of one in bricks with two-sided meshes,
+ * growing from 0 over the first two voxels so a ray leaving a surface does not
+ * hit it at once. The trace hits where the distance falls below it; the hit
+ * lies on the surface swollen by it, `t + distance - expand` along the ray.
+ * Zero where a dynamic instance answered (voxel size 0), sampled at its own
+ * field's resolution. The coverage is only read where it decides the hit.
+ * @internal
+ */
+export function sdfSurfaceExpand(
   scope: PBInsideFunctionScope,
+  p: PBShaderExp,
   sample: PBShaderExp,
-  base: PBShaderExp | number,
-  t: PBShaderExp
+  t: PBShaderExp,
+  levels: number
 ) {
   const pb = scope.$builder;
-  return pb.max(
-    base,
-    pb.min(pb.mul(sample.y, SDF_TRACE_VOXEL_EXPAND), pb.mul(t, SDF_TRACE_VOXEL_EXPAND * 0.5))
-  );
+  const funcName = 'Z_sdfSurfaceExpand';
+  pb.func(funcName, [pb.vec3('p'), pb.vec2('s'), pb.float('t')], function () {
+    this.$l.e = pb.mul(this.s.y, pb.clamp(pb.div(this.t, pb.max(pb.mul(this.s.y, 2), 1e-6)), 0, 1));
+    this.$if(
+      pb.and(
+        pb.lessThan(this.s.x, this.e),
+        pb.greaterThanEqual(this.s.x, pb.mul(this.e, SDF_NOT_COVERED_EXPAND_SCALE))
+      ),
+      function () {
+        this.$if(pb.not(globalSDFCovered(this, this.p, levels)), function () {
+          this.e = pb.mul(this.e, SDF_NOT_COVERED_EXPAND_SCALE);
+        });
+      }
+    );
+    this.$return(this.e);
+  });
+  return scope[funcName](p, sample, t) as PBShaderExp;
 }
 
 /**
@@ -371,34 +445,37 @@ function sdfStartLevel(scope: PBInsideFunctionScope, prevDist: PBShaderExp, leve
  * distance needs, skipping finer levels that would have saturated, as Lumen
  * skips empty space with its coarse mip. Where the value comes back within the
  * band of the level skipped last, the march has neared a surface and the point
- * is read again from the finest level.
+ * is read again from the finest level. Levels finer than `minLevel` are never
+ * read, for a trace that belongs to a coarse level, as Godot's SDFGI traces a
+ * cascade's voxels from that cascade on (sdfgi_direct_light.glsl).
  * @internal
  */
 export function sampleGlobalSDFHinted(
   scope: PBInsideFunctionScope,
   worldPos: PBShaderExp,
   prevDist: PBShaderExp,
-  levels: number
+  levels: number,
+  minLevel?: PBShaderExp
 ) {
   const pb = scope.$builder;
   const funcName = 'Z_sampleGlobalSDFHinted';
-  pb.func(funcName, [pb.vec3('p'), pb.float('prevDist')], function () {
-    this.$l.start = sdfStartLevel(this, this.prevDist, levels);
+  pb.func(funcName, [pb.vec3('p'), pb.float('prevDist'), pb.int('minLevel')], function () {
+    this.$l.start = pb.max(sdfStartLevel(this, this.prevDist, levels), this.minLevel);
     this.$l.g = sampleGlobalSDFWithVoxel(this, this.p, levels, this.start);
-    this.$if(pb.greaterThan(this.start, 0), function () {
+    this.$if(pb.greaterThan(this.start, this.minLevel), function () {
       this.$if(
         pb.lessThan(
           this.g.x,
           pb.mul(this[GLOBAL_SDF_PARAMS].z, this[GLOBAL_SDF_LEVELS].at(pb.sub(this.start, 1)).w)
         ),
         function () {
-          this.g = sampleGlobalSDFWithVoxel(this, this.p, levels, pb.int(0));
+          this.g = sampleGlobalSDFWithVoxel(this, this.p, levels, this.minLevel);
         }
       );
     });
     this.$return(this.g);
   });
-  return scope[funcName](worldPos, prevDist) as PBShaderExp;
+  return scope[funcName](worldPos, prevDist, minLevel ?? pb.int(0)) as PBShaderExp;
 }
 
 /**

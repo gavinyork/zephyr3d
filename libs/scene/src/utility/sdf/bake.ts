@@ -6,10 +6,15 @@ import { closestPointOnTriangle, TriangleBVH } from './bvh';
  */
 export interface MeshSDFBakeOptions {
   /**
-   * Scale on the voxel density: voxels along the longest side of the mesh are
-   * `64 * resolutionScale`, before the padding and the clamp. Default 1.
+   * Scale on the voxel density of {@link SDF_VOXELS_PER_UNIT} voxels per world
+   * unit, before the padding and the clamp. Default 1.
    */
   resolutionScale?: number;
+  /**
+   * World units one local unit of the mesh spans where it is used, which the
+   * density is measured in. Default 1.
+   */
+  unitScale?: number;
   /**
    * Treat the mesh as a thin open surface (a leaf, a sail, a terrain skirt):
    * no inside, the distance is unsigned less half a voxel so the surface still
@@ -24,7 +29,11 @@ export interface MeshSDFBakeOptions {
   signSamples?: number;
   /** Voxels of empty space around the mesh bounds on every side. Default 2. */
   padding?: number;
-  /** Voxels per axis, at most. Default 128. */
+  /**
+   * Voxels per axis, at most, padding included. Default 128, or 256 for a
+   * resolution scale above 1, as Unreal halves r.DistanceFields.MaxPerMeshResolution
+   * (256) for meshes not scaled up (MeshDistanceFieldUtilities.cpp).
+   */
   maxResolution?: number;
   /** Voxels per axis, at least. Default 8. */
   minResolution?: number;
@@ -59,6 +68,19 @@ export interface MeshSDFData {
   /** One distance per voxel. */
   distances: Float32Array;
 }
+
+/**
+ * Voxels per world unit of a baked field at a resolution scale of 1, taking a
+ * unit as a metre: Unreal's r.DistanceFields.DefaultVoxelDensity, 0.2 voxels a
+ * centimetre (DistanceFieldAtlas.cpp). The density is fixed, so a small mesh
+ * gets few voxels and a large one many, up to the cap per axis; the global
+ * field composites them all at its own voxel size of a quarter metre and up.
+ * Unreal counts it per local unit, its meshes being built in centimetres; here
+ * a mesh keeps the units it was authored in, so the bake is told the world
+ * units a local unit spans ({@link MeshSDFBakeOptions.unitScale}).
+ * @public
+ */
+export const SDF_VOXELS_PER_UNIT = 20;
 
 /** Voxels from the surface within which the sign is decided by rays; further voxels take it from their neighbours. */
 const SIGN_BAND_VOXELS = 1;
@@ -232,7 +254,7 @@ export function bakeMeshSDF(
   const scale = Math.max(0.01, options?.resolutionScale ?? 1);
   const twoSided = !!options?.twoSided;
   const padding = Math.max(1, Math.floor(options?.padding ?? 2));
-  const maxRes = Math.max(4, Math.floor(options?.maxResolution ?? 128));
+  const maxRes = Math.max(4, Math.floor(options?.maxResolution ?? (scale > 1 ? 256 : 128)));
   const minRes = Math.min(maxRes, Math.max(2, Math.floor(options?.minResolution ?? 8)));
   const meshMin: [number, number, number] = [Infinity, Infinity, Infinity];
   const meshMax: [number, number, number] = [-Infinity, -Infinity, -Infinity];
@@ -253,7 +275,8 @@ export function bakeMeshSDF(
   }
   const extent = [meshMax[0] - meshMin[0], meshMax[1] - meshMin[1], meshMax[2] - meshMin[2]];
   const longest = Math.max(extent[0], extent[1], extent[2], 1e-6);
-  let voxelSize = longest / (64 * scale);
+  const unitScale = options?.unitScale && options.unitScale > 0 ? options.unitScale : 1;
+  let voxelSize = 1 / (SDF_VOXELS_PER_UNIT * scale * unitScale);
   // Fit the longest side, padding included, under the cap
   voxelSize = Math.max(voxelSize, longest / (maxRes - 2 * padding));
   const resolution: [number, number, number] = [0, 0, 0];

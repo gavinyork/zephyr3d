@@ -70,8 +70,8 @@ export class SceneGI {
     this._probeOptions = {
       grid: [32, 16, 32],
       spacing: 1,
-      levels: 3,
-      levelScale: 4,
+      levels: 4,
+      levelScale: 2,
       raysPerProbe: 128,
       budget: 4096,
       hysteresis: 0.97,
@@ -135,7 +135,7 @@ export class SceneGI {
       this.rebuildProbes();
     }
   }
-  /** Clipmap levels of the probe volume, each four times the spacing of the one inside it; applied when the volume is next built. */
+  /** Clipmap levels of the probe volume, each twice the spacing of the one inside it; applied when the volume is next built. */
   get probeLevels() {
     return this._probeOptions.levels;
   }

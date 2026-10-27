@@ -25,9 +25,10 @@ import {
   declareDynamicSDFUniforms,
   declareGlobalSDFUniforms,
   GLOBAL_SDF_LEVELS,
+  sampleGlobalSDF,
   sampleSceneSDF,
   sampleSceneSDFHinted,
-  sdfTraceTolerance
+  sdfSurfaceExpand
 } from '../../shaders/sdf';
 import {
   declareVoxelSceneUniforms,
@@ -41,10 +42,13 @@ import {
 import {
   octDecode,
   PROBE_DATA,
+  PROBE_FIELD_PARAMS,
   PROBE_IRRADIANCE,
+  PROBE_MAX_FIELD_LEVELS,
   PROBE_MAX_LEVELS,
   PROBE_PARAM_VEC4S,
   PROBE_PARAMS,
+  PROBE_STATE_INACTIVE,
   PROBE_VISIBILITY,
   probeLevelOrigin,
   probePosition,
@@ -91,13 +95,17 @@ const SKY_ESCAPE_DISTANCE = 16384;
  * @public
  */
 export interface ProbeVolumeOptions {
-  /** Probes along x, y and z of the finest level; the coarsest level has half as many per axis. */
+  /** Probes along x, y and z of every level. */
   grid: [number, number, number];
   /** Distance between probes of the finest level in world units. */
   spacing: number;
   /** Clipmap levels, each `levelScale` times the spacing of the one inside it; 1 to {@link PROBE_MAX_LEVELS}. */
   levels: number;
-  /** Spacing ratio between consecutive levels. */
+  /**
+   * Spacing ratio between consecutive levels: 2, as the cascades of Godot's
+   * SDFGI, Lumen's radiance cache clipmaps and cascaded DDGI volumes double, so
+   * where levels meet the spacing never jumps more than twofold.
+   */
   levelScale: number;
   /** Rays traced per probe per update. */
   raysPerProbe: number;
@@ -141,6 +149,8 @@ interface ProbeLevel {
   /** 0 until a probe's first update since entering the window. */
   state: Uint8Array;
   lastRelocated: Int32Array;
+  /** Frame a probe was last selected in, so no frame updates one twice. */
+  lastSelected: Int32Array;
   cursor: number;
 }
 
@@ -254,21 +264,16 @@ export class ProbeVolume {
     this._levels = [];
     let tileBase = 0;
     for (let l = 0; l < levels; l++) {
-      // The coarsest level covers the most ground with the fewest probes
-      const g = (l === levels - 1 && levels > 1 ? grid.map((v) => Math.max(2, v >> 1)) : grid) as [
-        number,
-        number,
-        number
-      ];
-      const count = g[0] * g[1] * g[2];
+      const count = grid[0] * grid[1] * grid[2];
       this._levels.push({
-        grid: g,
+        grid: [...grid],
         spacing: options.spacing * scale ** l,
         count,
         tileBase,
         origin: null,
         state: new Uint8Array(count),
         lastRelocated: new Int32Array(count).fill(-1000),
+        lastSelected: new Int32Array(count).fill(-1),
         cursor: 0
       });
       tileBase += count;
@@ -361,18 +366,17 @@ export class ProbeVolume {
    * Converts what surfaces read from the probes to a camera's exposure: the
    * irradiance is kept at the fixed cache exposure (see getGICacheExposure),
    * the image at the camera's. Called once a frame, also while the volume is
-   * frozen, so a frozen or restored volume follows exposure changes.
+   * frozen, so a frozen or restored volume follows exposure changes and the
+   * global field's windows, which the read takes the surface expand from.
    */
   setReadExposure(camera: Camera) {
     const scene = this._scene;
     const live = scene.lightingMode === 'physical' ? camera.exposure : 1;
-    const scale = live / getGICacheExposure(scene.lightingMode);
-    if (scale !== this._exposureScale) {
-      this._exposureScale = scale;
-      // Before the first update there are no maps to describe; that update writes the params
-      if (this._irradiance && this._visibility) {
-        this.updateParams();
-      }
+    this._exposureScale = live / getGICacheExposure(scene.lightingMode);
+    // Before the first update there are no maps to describe; that update writes the params.
+    // Rewritten every frame: the global field's windows in them move with the camera
+    if (this._irradiance && this._visibility) {
+      this.updateParams();
     }
   }
   /**
@@ -456,7 +460,8 @@ export class ProbeVolume {
   /**
    * Reads back the probes of a level whose grid points lie in a world box,
    * for inspection: where each one is (grid point plus relocation offset),
-   * whether it has been updated, the mean irradiance and sky visibility over
+   * whether it has been updated and whether it is inactive (buried in
+   * geometry, read by no surface), the mean irradiance and sky visibility over
    * its tile, and the nearest and mean of the hit distances its visibility
    * map holds (near 0 for a probe buried in geometry). At most `limit`
    * probes, nearest the box centre first.
@@ -546,6 +551,7 @@ export class ProbeVolume {
         position: [world[0] * s + d[0], world[1] * s + d[1], world[2] * s + d[2]].map(r),
         offset: [d[0], d[1], d[2]].map(r),
         updated: d[3] > 0.5,
+        inactive: d[3] > PROBE_STATE_INACTIVE - 0.5,
         irradiance: irrSum.slice(0, 3).map((v) => r(v / n)),
         sky: r(irrSum[3] / n),
         hitMin: r(visMin),
@@ -745,12 +751,16 @@ export class ProbeVolume {
    * Picks the probes to update: those never updated first, a quarter of the
    * budget going to the coarsest level so something covers the whole scene
    * at once and the rest finest level first; then every level in turn by its
-   * share of the budget.
+   * share of the budget. A probe is picked at most once a frame: picked twice,
+   * its two updates would blend into the same tile in either order, and one
+   * of them, not its first, would start from what the tile held before, the
+   * maps of the probe that left the window on the other side.
    * @internal
    */
   private select() {
     let count = 0;
     const budget = this._budget;
+    const frame = this._frame;
     const takeNew = (l: number, limit: number) => {
       const level = this._levels[l];
       for (let i = 0; i < level.count && count < limit; i++) {
@@ -758,6 +768,7 @@ export class ProbeVolume {
           this._selection[count++] =
             ((level.tileBase + i) | (l << SELECT_LEVEL_SHIFT) | SELECT_FIRST_BIT) >>> 0;
           level.state[i] = 1;
+          level.lastSelected[i] = frame;
         }
       }
     };
@@ -776,8 +787,9 @@ export class ProbeVolume {
         const i = level.cursor;
         level.cursor = (level.cursor + 1) % level.count;
         scanned++;
-        if (level.state[i]) {
+        if (level.state[i] && level.lastSelected[i] !== frame) {
           this._selection[count++] = ((level.tileBase + i) | (l << SELECT_LEVEL_SHIFT)) >>> 0;
+          level.lastSelected[i] = frame;
           share--;
         }
       }
@@ -812,6 +824,14 @@ export class ProbeVolume {
       p.set([origin[0], origin[1], origin[2], level.spacing], 12 + l * 8);
       p.set([level.grid[0], level.grid[1], level.grid[2], level.tileBase], 16 + l * 8);
     });
+    // The global field's windows, for the surface expand a surface reading the probes allows for
+    const sdf = this._scene.sdf;
+    const global = sdf.enabled ? sdf.global : null;
+    const fieldLevels = global ? Math.min(global.levels, PROBE_MAX_FIELD_LEVELS) : 0;
+    p.set([fieldLevels, global?.resolution ?? 0, 0, 0], PROBE_FIELD_PARAMS * 4);
+    if (global) {
+      p.set(global.levelInfo.subarray(0, fieldLevels * 4), (PROBE_FIELD_PARAMS + 1) * 4);
+    }
   }
   /** @internal */
   private bindCommon(bg: BindGroup, global: NonNullable<SceneSDF['global']>) {
@@ -933,7 +953,18 @@ export class ProbeVolume {
               this.pos = this.next;
             });
             this.$l.offset = pb.sub(this.pos, this.grid);
-            this[PROBE_DATA].setAt(this.index, pb.vec4(this.offset, this.data.w));
+            // Classification (Majercik et al. 2021, "Scaling Probe-Based Real-Time
+            // Dynamic Global Illumination for Production", §5): a probe left
+            // inside geometry, all of whose rays would start there, is inactive
+            // and read by no surface; one that is out again starts over. By the
+            // static field, so a dynamic instance passing by turns none off
+            this.$l.probeState = this.data.w;
+            this.$if(pb.lessThan(sampleGlobalSDF(this, this.pos, levels), 0), function () {
+              this.probeState = pb.float(PROBE_STATE_INACTIVE);
+            }).$elseif(pb.greaterThan(this.probeState, PROBE_STATE_INACTIVE - 0.5), function () {
+              this.probeState = pb.float(0);
+            });
+            this[PROBE_DATA].setAt(this.index, pb.vec4(this.offset, this.probeState));
           });
         }
       });
@@ -1056,32 +1087,30 @@ export class ProbeVolume {
               this.$l.t = pb.float(0);
               this.$l.hit = false;
               this.$l.prevD = pb.float(0);
+              this.$l.hitT = pb.float(0);
               this.$for(pb.int('i'), 0, TRACE_STEPS, function () {
-                this.$l.s = sampleSceneSDFHinted(
-                  this,
-                  pb.add(this.pos, pb.mul(this.dir, this.t)),
-                  this.prevD,
-                  levels
-                );
+                this.$l.sp = pb.add(this.pos, pb.mul(this.dir, this.t));
+                this.$l.s = sampleSceneSDFHinted(this, this.sp, this.prevD, levels);
                 this.$l.d = this.s.x;
                 this.prevD = this.d;
-                this.$if(
-                  pb.lessThan(
-                    this.d,
-                    sdfTraceTolerance(this, this.s, pb.add(0.01, pb.mul(this.t, 0.004)), this.t)
-                  ),
-                  function () {
-                    this.hit = true;
-                    this.$break();
-                  }
-                );
+                this.$l.expand = sdfSurfaceExpand(this, this.sp, this.s, this.t, levels);
+                this.$if(pb.lessThan(this.d, this.expand), function () {
+                  // On the surface swollen by the expand, as Lumen places the hit:
+                  // where along the ray the step stopped no longer shows in it
+                  this.hitT = pb.max(pb.sub(pb.add(this.t, this.d), this.expand), 0);
+                  this.hit = true;
+                  this.$break();
+                });
                 this.t = pb.add(this.t, pb.max(this.d, 0.02));
                 this.$if(pb.greaterThan(this.t, this.maxDist), function () {
                   this.$break();
                 });
               });
               this.$if(this.hit, function () {
-                this.dist = this.t;
+                // The probe sees surfaces swollen by the expand; a surface reading
+                // the probes moves its point out by as much (fieldExpandAt in
+                // sampleProbeIrradiance) to stay on the visible side
+                this.dist = this.hitT;
                 this.$l.hp = pb.add(this.pos, pb.mul(this.dir, this.t));
                 // The side of the surface the ray came from: the field's gradient
                 // at the hit, by forward differences over the finest voxel
@@ -1159,9 +1188,11 @@ export class ProbeVolume {
       this._blendVisProgram = this.createBlendProgram(VISIBILITY_TEXELS, true);
       this._blendVisBindGroup = device.createBindGroup(this._blendVisProgram.bindGroupLayouts[0]);
     }
+    // The irradiance blend marks the probes updated, so it goes last: both read
+    // whether a probe starts over from its state before then
     const passes: [GPUProgram, BindGroup, Texture2D, Texture2D][] = [
-      [this._blendIrrProgram, this._blendIrrBindGroup!, this._irradiance!, this._irradianceNext!],
-      [this._blendVisProgram!, this._blendVisBindGroup!, this._visibility!, this._visibilityNext!]
+      [this._blendVisProgram!, this._blendVisBindGroup!, this._visibility!, this._visibilityNext!],
+      [this._blendIrrProgram, this._blendIrrBindGroup!, this._irradiance!, this._irradianceNext!]
     ];
     for (const [program, bg, current, next] of passes) {
       bg.setBuffer(PROBE_DATA, this._data!);
@@ -1266,7 +1297,13 @@ export class ProbeVolume {
           this.$l.sel = this.selected.at(this.slot);
           this.$l.index = pb.int(pb.compAnd(this.sel, pb.uint(SELECT_INDEX_MASK)));
           this.$l.level = pb.int(pb.compAnd(pb.sar(this.sel, SELECT_LEVEL_SHIFT), pb.uint(0x7f)));
-          this.$l.first = pb.greaterThan(pb.compAnd(this.sel, pb.uint(SELECT_FIRST_BIT)), pb.uint(0));
+          // New to its window, or with maps holding nothing yet (state 0, as a
+          // probe reactivated by the relocation is left)
+          this.$l.probeState = this[PROBE_DATA].at(this.index).w;
+          this.$l.first = pb.or(
+            pb.greaterThan(pb.compAnd(this.sel, pb.uint(SELECT_FIRST_BIT)), pb.uint(0)),
+            pb.lessThan(this.probeState, 0.5)
+          );
           this.$l.uv = pb.ivec2(this.$builtins.localInvocationId.xy);
           // Border texels mirror the interior: take the direction of the texel they copy
           const s = texels;
@@ -1374,10 +1411,21 @@ export class ProbeVolume {
             visibility ? pb.vec4(this.value.xyz, 1) : this.value
           );
           if (!visibility) {
-            // The probe counts as updated once its maps hold something
+            // The probe counts as updated once its maps hold something; an
+            // inactive one stays inactive
             this.$if(pb.equal(this.$builtins.localInvocationId.xy, pb.uvec2(0)), function () {
               this.$l.data = this[PROBE_DATA].at(this.index);
-              this[PROBE_DATA].setAt(this.index, pb.vec4(this.data.xyz, 1));
+              this[PROBE_DATA].setAt(
+                this.index,
+                pb.vec4(
+                  this.data.xyz,
+                  this.$choice(
+                    pb.greaterThan(this.data.w, PROBE_STATE_INACTIVE - 0.5),
+                    pb.float(PROBE_STATE_INACTIVE),
+                    pb.float(1)
+                  )
+                )
+              );
             });
           }
         });

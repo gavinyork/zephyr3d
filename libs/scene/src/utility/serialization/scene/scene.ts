@@ -239,9 +239,9 @@ export function getSceneClass(manager: ResourceManager): SerializableClass {
         {
           name: 'GIProbeLevels',
           description:
-            'Nested probe volumes around the camera, each four times coarser and wider than the one inside it. More levels carry bounced light farther out at little cost; one level covers only the finest volume.',
+            'Nested probe volumes around the camera, each twice as coarse and as wide as the one inside it. More levels carry bounced light farther out, each adding as many probes as the finest, so every probe is refreshed less often; one level covers only the finest volume.',
           type: 'int',
-          default: 3,
+          default: 4,
           options: { group: 'Global Illumination', minValue: 1, maxValue: 4 },
           isHidden(this: Scene) {
             return !this.gi.enabled;

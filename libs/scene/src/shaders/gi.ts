@@ -5,6 +5,7 @@ import {
   globalSDFVoxelCurrent,
   sampleGlobalSDFHinted,
   sampleInstanceField,
+  sdfSurfaceExpand,
   SDF_LEVEL_BLEND_VOXELS
 } from './sdf';
 
@@ -322,10 +323,18 @@ export function loadVoxelSceneRadiance(
  * the nearest surface over the cone's width there bounds the unoccluded
  * fraction, and the smallest bound along the ray is the shadow. Wright,
  * "Dynamic Occlusion with Signed Distance Fields", SIGGRAPH 2015 Advances.
+ * The surfaces are swollen by the trace's surface expand ({@link sdfSurfaceExpand}),
+ * growing from the start, as Unreal's distance field shadows expand them
+ * (DistanceFieldShadowingShared.ush, bExpandSurface) and Lumen's off-screen
+ * surface cache shadows trace the global field: a wall thinner than a voxel
+ * never reads much below half a voxel, which a narrow cone alone passes.
  *
  * `start` should already be offset off the surface. `tanHalfAngle` sets the
  * softness, `minStep` keeps the march from stalling in the field's band,
- * `maxDistance` ends it. Static geometry only (the clipmap).
+ * `maxDistance` ends it. Levels finer than `minLevel` are not read: a voxel
+ * of a coarse level traced through a finer one would find the geometry inside
+ * itself, as Godot's SDFGI traces a cascade's lights from that cascade on
+ * (sdfgi_direct_light.glsl). Static geometry only (the clipmap).
  * @internal
  */
 export function sdfConeShadow(
@@ -336,26 +345,35 @@ export function sdfConeShadow(
   minStep: PBShaderExp,
   maxDistance: PBShaderExp,
   levels: number,
-  steps = 24
+  steps = 24,
+  minLevel?: PBShaderExp
 ) {
   const pb = scope.$builder;
   const funcName = 'Z_sdfConeShadow';
   pb.func(
     funcName,
-    [pb.vec3('start'), pb.vec3('dir'), pb.float('tanHalf'), pb.float('minStep'), pb.float('maxDist')],
+    [
+      pb.vec3('start'),
+      pb.vec3('dir'),
+      pb.float('tanHalf'),
+      pb.float('minStep'),
+      pb.float('maxDist'),
+      pb.int('minLevel')
+    ],
     function () {
       this.$l.shadow = pb.float(1);
       this.$l.t = this.minStep;
       this.$l.prevD = pb.float(0);
       this.$for(pb.int('i'), 0, steps, function () {
-        this.$l.d = sampleGlobalSDFHinted(
-          this,
-          pb.add(this.start, pb.mul(this.dir, this.t)),
-          this.prevD,
-          levels
-        ).x;
+        this.$l.sp = pb.add(this.start, pb.mul(this.dir, this.t));
+        this.$l.s = sampleGlobalSDFHinted(this, this.sp, this.prevD, levels, this.minLevel);
+        this.$l.d = this.s.x;
         this.prevD = this.d;
-        this.shadow = pb.min(this.shadow, pb.clamp(pb.div(this.d, pb.mul(this.t, this.tanHalf)), 0, 1));
+        this.$l.expand = sdfSurfaceExpand(this, this.sp, this.s, pb.sub(this.t, this.minStep), levels);
+        this.shadow = pb.min(
+          this.shadow,
+          pb.clamp(pb.div(pb.sub(this.d, this.expand), pb.mul(this.t, this.tanHalf)), 0, 1)
+        );
         this.$if(pb.lessThan(this.shadow, 0.01), function () {
           this.$break();
         });
@@ -367,7 +385,14 @@ export function sdfConeShadow(
       this.$return(this.shadow);
     }
   );
-  return scope[funcName](start, dir, tanHalfAngle, minStep, maxDistance) as PBShaderExp;
+  return scope[funcName](
+    start,
+    dir,
+    tanHalfAngle,
+    minStep,
+    maxDistance,
+    minLevel ?? pb.int(0)
+  ) as PBShaderExp;
 }
 
 /**

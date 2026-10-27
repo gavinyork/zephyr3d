@@ -3007,7 +3007,7 @@ const BASE_TOOLS = [
   {
     name: 'sdf_bake',
     description:
-      'Bake signed distance fields of mesh assets (.zmsh) into /assets/.sdf, one .zsdf per mesh, in a worker. Pass `paths` for specific meshes, otherwise every mesh used in the current scene (under node_id when given) is baked. Fields whose source mesh and SDF settings (sdfResolutionScale, sdfTwoSided in the mesh .zmeta) are unchanged are skipped unless force. Returns { results: [{ path, sdf_path, skipped, resolution, voxel_size, triangles, milliseconds, err }], err }.',
+      'Bake signed distance fields of mesh assets (.zmsh) into /assets/.sdf, one .zsdf per mesh, in a worker. Pass `paths` for specific meshes, otherwise every mesh used in the current scene (under node_id when given) is baked. The voxel density is 20 per world unit (times sdfResolutionScale, at most 128 per axis): the world units one local unit of each mesh spans are taken from the largest scale of its instances in the open scene and recorded as sdfUnitScale in the mesh .zmeta. Fields whose source mesh and SDF settings (sdfResolutionScale, sdfTwoSided, sdfUnitScale) are unchanged are skipped unless force. Returns { results: [{ path, sdf_path, skipped, resolution, voxel_size, triangles, milliseconds, err }], err }.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -3052,7 +3052,7 @@ const BASE_TOOLS = [
   {
     name: 'gi_probe_query',
     description:
-      'Read back the global illumination light probes of one level whose grid points lie in a world box (WebGPU, GIEnabled, the probe volume built). Per probe: world grid index, position (grid point plus relocation offset), offset, updated, irradiance (mean over its octahedral tile, at the GI cache exposure), sky (sky visibility 0..1), hitMin/hitMean (nearest and mean hit distance of its visibility map, near 0 for a probe buried in geometry) and sdf (scene SDF at the position, negative inside geometry). At most limit probes, nearest the box centre first. Returns { level, spacing, origin, grid, probes, err }.',
+      'Read back the global illumination light probes of one level whose grid points lie in a world box (WebGPU, GIEnabled, the probe volume built). Per probe: world grid index, position (grid point plus relocation offset), offset, updated, inactive (classified as buried in geometry: skipped by every surface), irradiance (mean over its octahedral tile, at the GI cache exposure), sky (sky visibility 0..1), hitMin/hitMean (nearest and mean hit distance of its visibility map, near 0 for a probe buried in geometry) and sdf (scene SDF at the position, negative inside geometry). At most limit probes, nearest the box centre first. Returns { level, spacing, origin, grid, probes, err }.',
     inputSchema: {
       type: 'object',
       required: ['min', 'max'],
@@ -3113,6 +3113,22 @@ const BASE_TOOLS = [
         size: { type: 'number', default: 64 },
         center: { type: 'array', items: { type: 'number' }, minItems: 2, maxItems: 2 },
         iso_spacing: { type: 'number', default: 0.25 },
+        timeout_ms: { type: 'number', default: 10000 }
+      }
+    }
+  },
+  {
+    name: 'sdf_debug_view',
+    description:
+      'Draw a distance field debug view over the scene view, as the View menu entries Distance Field, Voxel Albedo/Emissive/Radiance and GI Sky Occlusion/Irradiance do: every pixel sphere traces the scene SDF and shows, at the hit, the step count (distance), the voxel scene material (albedo, emissive), its lit radiance (radiance), the probe sky visibility (skyVisibility: white sees all the sky, black none, magenta no probe) or the probe irradiance a white surface there shades with (irradiance). mode none draws the scene alone. exposure scales radiance and irradiance (shown as x/(1+x)). Not saved with the scene. Returns { mode, exposure, err }.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        mode: {
+          type: 'string',
+          enum: ['none', 'distance', 'albedo', 'emissive', 'radiance', 'skyVisibility', 'irradiance']
+        },
+        exposure: { type: 'number', description: 'Scale on radiance and irradiance before display.' },
         timeout_ms: { type: 'number', default: 10000 }
       }
     }
@@ -4462,6 +4478,13 @@ const handlers = {
   },
   async sdf_stats(args) {
     return bridge.send('sdf_stats', { enabled: args.enabled }, Number(args.timeout_ms ?? 10000));
+  },
+  async sdf_debug_view(args) {
+    return bridge.send(
+      'sdf_debug_view',
+      { mode: args.mode, exposure: args.exposure },
+      Number(args.timeout_ms ?? 10000)
+    );
   },
   async sdf_query(args) {
     return bridge.send(

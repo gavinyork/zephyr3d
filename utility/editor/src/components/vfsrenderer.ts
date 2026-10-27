@@ -2959,6 +2959,7 @@ export class VFSRenderer extends makeObservable(Disposable)<{
               // Distance fields of every mesh of the models that asked for them, so a
               // model that imports as many meshes needs no bake per mesh afterwards
               const sdfMeshes = new Set<string>();
+              const unitScales = new Map<string, number>();
               models.forEach((model, i) => {
                 if (saveOptions[i].bakeSDF) {
                   for (const info of model.primitives) {
@@ -2966,9 +2967,13 @@ export class VFSRenderer extends makeObservable(Disposable)<{
                       sdfMeshes.add(info.path);
                     }
                   }
+                  // A model authored in other units than the scene's carries the
+                  // conversion in its nodes; the fields are dense per world unit
+                  MeshSDFBaker.modelUnitScales(model, unitScales);
                 }
               });
               if (sdfMeshes.size > 0) {
+                await MeshSDFBaker.setUnitScales(unitScales);
                 dlgProgressBar.setMessage('Baking distance fields...');
                 dlgProgressBar.setProgress(0, sdfMeshes.size);
                 const results = await MeshSDFBaker.bakeAll([...sdfMeshes], false, (done, total) =>

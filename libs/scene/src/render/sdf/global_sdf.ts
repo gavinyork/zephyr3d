@@ -11,6 +11,7 @@ import {
   GLOBAL_SDF_TEXTURE,
   GLOBAL_SDF_BRICK,
   GLOBAL_SDF_TAGS,
+  GLOBAL_SDF_TAG_NOT_COVERED,
   declareDynamicSDFUniforms,
   MAX_DYNAMIC_SDF_INSTANCES,
   SDF_ATLAS_TEXTURE,
@@ -636,6 +637,9 @@ export class GlobalSDF {
       const min = [brick.x * size - reach, brick.y * size - reach, brick.z * size - reach];
       const max = [min[0] + size + 2 * reach, min[1] + size + 2 * reach, min[2] + size + 2 * reach];
       const start = indices.length;
+      // Whether a two-sided mesh comes near, which narrows the trace's surface
+      // expand in the brick (see SDF_NOT_COVERED_EXPAND_SCALE)
+      let twoSided = false;
       instances.forEach((inst, i) => {
         const lo = inst.bounds.minPoint;
         const hi = inst.bounds.maxPoint;
@@ -648,6 +652,7 @@ export class GlobalSDF {
           hi.z >= min[2]
         ) {
           indices.push(i);
+          twoSided ||= !!inst.asset!.header!.twoSided;
         }
       });
       const terrainHit =
@@ -670,7 +675,11 @@ export class GlobalSDF {
         );
       }
       brickData.set([wrap(brick.x), wrap(brick.y), wrap(brick.z) + brick.level * n, start], o + 4);
-      brickData.set([indices.length - start, terrainHit ? 1 : 0, reach, brick.level], o + 8);
+      // y: bit 0 the terrain comes near, bit 1 a two-sided mesh does
+      brickData.set(
+        [indices.length - start, (terrainHit ? 1 : 0) + (twoSided ? 2 : 0), reach, brick.level],
+        o + 8
+      );
     });
     const device = getDevice();
     const program = this.getProgram();
@@ -828,8 +837,9 @@ export class GlobalSDF {
               this.atlasInvSize.xyz,
               pb.mul(this.vs, 0.5)
             );
+            this.$l.flags = pb.uint(this.b2.y);
             this.$l.terrainD = this.band;
-            this.$if(pb.greaterThan(this.b2.y, 0), function () {
+            this.$if(pb.notEqual(pb.compAnd(this.flags, pb.uint(1)), pb.uint(0)), function () {
               this.$l.inRegion = pb.and(
                 pb.all(pb.greaterThanEqual(this.p.xz, this.terrainRegion.xy)),
                 pb.all(pb.lessThanEqual(this.p.xz, this.terrainRegion.zw))
@@ -875,14 +885,22 @@ export class GlobalSDF {
                 );
               }
             );
-            // The brick now holds this window's region; readers see the tag in the next pass
+            // The brick now holds this window's region; readers see the tag in the
+            // next pass. Its alpha says whether two-sided meshes are in it
             this.$if(
               pb.and(pb.equal(this.sub, 0), pb.equal(this.$builtins.localInvocationId, pb.uvec3(0))),
               function () {
                 pb.textureStore(
                   this.tagsOut,
                   pb.div(pb.uvec3(this.b1.xyz), BRICK),
-                  pb.vec4(pb.div(this.b0.xyz, BRICK), 1)
+                  pb.vec4(
+                    pb.div(this.b0.xyz, BRICK),
+                    this.$choice(
+                      pb.notEqual(pb.compAnd(this.flags, pb.uint(2)), pb.uint(0)),
+                      pb.float(GLOBAL_SDF_TAG_NOT_COVERED),
+                      pb.float(1)
+                    )
+                  )
                 );
               }
             );

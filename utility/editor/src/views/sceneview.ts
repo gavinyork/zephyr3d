@@ -165,6 +165,7 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
   private _wireframe: boolean;
   private _lodColoration: boolean;
   private _sdfView: Nullable<SceneSDFViewMode>;
+  private _sdfViewExposure: number;
   private _showColliders: boolean;
   private _colliderGizmo: Nullable<ColliderGizmo>;
   /** Whether the gizmo renderer was added to the compositor for the frame being drawn. */
@@ -229,6 +230,7 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
     this._wireframe = false;
     this._lodColoration = false;
     this._sdfView = null;
+    this._sdfViewExposure = 1;
     this._showColliders = false;
     this._colliderGizmo = null;
     this._gizmoEffectAppended = false;
@@ -348,6 +350,20 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
   }
   get editToolContext() {
     return this._editToolContext;
+  }
+  /** The distance field debug view drawn over the scene, null for none; see View > Distance Field and the GI views. */
+  get sdfView(): Nullable<SceneSDFViewMode> {
+    return this._sdfView;
+  }
+  set sdfView(val: Nullable<SceneSDFViewMode>) {
+    this._sdfView = val ?? null;
+  }
+  /** Exposure of the radiance and irradiance debug views. */
+  get sdfViewExposure() {
+    return this._sdfViewExposure;
+  }
+  set sdfViewExposure(val: number) {
+    this._sdfViewExposure = Math.max(0, val);
   }
   private createMenuOptions(): MenuBarOptions {
     const menuOptions: MenuBarOptions = {
@@ -728,6 +744,14 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
                 return true;
               },
               checked: () => this._sdfView === 'skyVisibility'
+            },
+            {
+              label: 'GI Irradiance',
+              action: () => {
+                this._sdfView = this._sdfView === 'irradiance' ? null : 'irradiance';
+                return true;
+              },
+              checked: () => this._sdfView === 'irradiance'
             },
             {
               label: 'Show Colliders',
@@ -1379,7 +1403,7 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
         if (this._sdfView !== 'distance') {
           scene.gi.enabled = true;
         }
-        renderSceneSDFView(scene, camera, this._sdfView);
+        renderSceneSDFView(scene, camera, this._sdfView, this._sdfViewExposure);
       }
 
       // Render selected camera

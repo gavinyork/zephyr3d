@@ -106,6 +106,13 @@ export class DlgMeshSettings extends DialogRenderer<boolean> {
       this._changed.add(key);
     }
   }
+  private inputPositive(label: string, key: 'sdfUnitScale') {
+    const value = [this._edited[key] ?? 1] as [number];
+    if (ImGui.InputFloat(label, value, 0, 0, '%.4g') && value[0] > 0) {
+      this._edited[key] = value[0];
+      this._changed.add(key);
+    }
+  }
   doRender(): void {
     if (!this._settings) {
       ImGui.Text('Loading...');
@@ -139,7 +146,11 @@ export class DlgMeshSettings extends DialogRenderer<boolean> {
     ImGui.Separator();
     this.sliderFloat('SDF Resolution', 'sdfResolutionScale', 0.25, 2, '%.2f');
     this.checkbox('SDF Two Sided', 'sdfTwoSided');
-    ImGui.TextDisabled('Distance field voxels along the longest side: 64 x resolution (max 128).');
+    this.inputPositive('SDF Unit Scale', 'sdfUnitScale');
+    ImGui.TextDisabled(
+      'Distance field voxels per world unit: 20 x resolution (max 128 per axis, 256 above 1).'
+    );
+    ImGui.TextDisabled('Unit scale: world units one mesh unit spans, set on import from the node scale.');
     ImGui.TextDisabled('Two sided: an open surface (leaf, sail) with no inside.');
     if (ImGui.Button('Bake SDF')) {
       void this.bakeSDF();

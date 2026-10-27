@@ -13,8 +13,12 @@ export const PROBE_DATA = 'zProbeData';
 export const PROBE_PARAMS = 'zProbeParams';
 /** Most clipmap levels of a probe volume. @internal */
 export const PROBE_MAX_LEVELS = 4;
+/** Most levels of the global field described in {@link PROBE_PARAMS}, as many as it can have. @internal */
+export const PROBE_MAX_FIELD_LEVELS = 8;
+/** First vec4 of the global field's description in {@link PROBE_PARAMS}. @internal */
+export const PROBE_FIELD_PARAMS = 3 + 2 * PROBE_MAX_LEVELS;
 /** vec4s of {@link PROBE_PARAMS}. @internal */
-export const PROBE_PARAM_VEC4S = 3 + 2 * PROBE_MAX_LEVELS;
+export const PROBE_PARAM_VEC4S = PROBE_FIELD_PARAMS + 1 + PROBE_MAX_FIELD_LEVELS;
 
 /**
  * Declares the probe volume as a program reads it:
@@ -34,7 +38,10 @@ export const PROBE_PARAM_VEC4S = 3 + 2 * PROBE_MAX_LEVELS;
  *   scale being what a surface reading the probes multiplies them by (the
  *   global illumination intensity); the bounce feedback reads them unscaled;
  *   params[3 + 2l]: (world index of level l's first probe, its spacing),
- *   params[4 + 2l]: (probes per axis of level l, its first tile).
+ *   params[4 + 2l]: (probes per axis of level l, its first tile);
+ *   params[PROBE_FIELD_PARAMS]: (levels of the global field, its resolution),
+ *   params[PROBE_FIELD_PARAMS + 1 + i]: (window origin of field level i in its
+ *   voxels, voxel size), the global field's levels, for {@link probeFieldExpand}.
  *
  * The levels are clipmap windows around the camera, each a multiple of the
  * spacing of the one inside it. Probes are addressed toroidally by world
@@ -230,10 +237,65 @@ export function sampleProbeTile(
 }
 
 /**
- * Irradiance from one level of the volume at a biased surface point: the
- * eight probes around it weighted by trilinear position, by how much each
- * faces the point and by Chebyshev visibility. Returns (irradiance, weight
- * sum), the sum 0 outside the level's window or among probes never updated.
+ * Voxel size of the finest level of the global field whose window holds a
+ * world position, the coarsest level's outside them all: the surface expand
+ * the probe rays trace with there (see sdfSurfaceExpand), the distance by which
+ * the probes see a surface at that point swollen.
+ * @internal
+ */
+export function probeFieldExpand(scope: PBInsideFunctionScope, worldPos: PBShaderExp) {
+  const pb = scope.$builder;
+  const funcName = 'Z_probeFieldExpand';
+  pb.func(funcName, [pb.vec3('p')], function () {
+    this.$l.info = this[PROBE_PARAMS].at(PROBE_FIELD_PARAMS);
+    this.$l.count = pb.int(this.info.x);
+    this.$l.res = this.info.y;
+    this.$l.e = pb.float(0);
+    // Coarsest first, so the finest holding the point is the one left
+    for (let i = PROBE_MAX_FIELD_LEVELS - 1; i >= 0; i--) {
+      this.$if(pb.lessThan(pb.int(i), this.count), function () {
+        this.$l.li = this[PROBE_PARAMS].at(PROBE_FIELD_PARAMS + 1 + i);
+        this.$l.f = pb.sub(pb.div(this.p, this.li.w), this.li.xyz);
+        this.$if(
+          pb.or(
+            pb.equal(this.e, 0),
+            pb.and(
+              pb.all(pb.greaterThanEqual(this.f, pb.vec3(0))),
+              pb.all(pb.lessThanEqual(this.f, pb.vec3(this.res)))
+            )
+          ),
+          function () {
+            this.e = this.li.w;
+          }
+        );
+      });
+    }
+    this.$return(this.e);
+  });
+  return scope[funcName](worldPos) as PBShaderExp;
+}
+
+/**
+ * Probe state in the w of its data: 0 while its maps hold nothing (never
+ * updated, or just reactivated), 1 updated, {@link PROBE_STATE_INACTIVE} when
+ * buried in geometry.
+ * @internal
+ */
+export const PROBE_STATE_INACTIVE = 2;
+
+/** True for a probe whose maps a surface may read, by the w of its data. @internal */
+export function probeActive(scope: PBInsideFunctionScope, data: PBShaderExp) {
+  const pb = scope.$builder;
+  return pb.and(pb.greaterThan(data.w, 0.5), pb.lessThan(data.w, PROBE_STATE_INACTIVE - 0.5)) as PBShaderExp;
+}
+
+/**
+ * Irradiance from one level of the volume at a surface point: the eight
+ * probes around the biased point weighted by trilinear position, by how much
+ * each faces the surface and by Chebyshev visibility of `visPoint` (the biased
+ * point moved out to the swollen surface the probes see). Returns (irradiance,
+ * weight sum), the sum 0 outside the level's window or among probes never
+ * updated or inactive.
  * @internal
  */
 function sampleProbeLevel(
@@ -241,96 +303,112 @@ function sampleProbeLevel(
   level: PBShaderExp,
   p: PBShaderExp,
   biased: PBShaderExp,
+  visPoint: PBShaderExp,
   n: PBShaderExp,
   sky: boolean
 ) {
   const pb = scope.$builder;
   const funcName = sky ? 'Z_sampleProbeLevelSky' : 'Z_sampleProbeLevel';
-  pb.func(funcName, [pb.int('level'), pb.vec3('p'), pb.vec3('biased'), pb.vec3('n')], function () {
-    this.$l.p0 = this[PROBE_PARAMS].at(0);
-    this.$l.p1 = this[PROBE_PARAMS].at(1);
-    this.$l.lo = probeLevelOrigin(this, this.level);
-    this.$l.lg = probeLevelGrid(this, this.level);
-    this.$l.spacing = this.lo.w;
-    this.$l.origin = pb.ivec3(this.lo.xyz);
-    this.$l.n3 = pb.ivec3(this.lg.xyz);
-    this.$l.g = pb.sub(pb.div(this.biased, this.spacing), pb.vec3(this.origin));
-    this.$l.sum = pb.vec3(0);
-    this.$l.wsum = pb.float(0);
-    this.$l.inside = pb.and(
-      pb.all(pb.greaterThanEqual(this.g, pb.vec3(0))),
-      pb.all(pb.lessThanEqual(this.g, pb.sub(pb.vec3(this.n3), pb.vec3(1))))
-    );
-    this.$if(this.inside, function () {
-      this.$l.base = pb.ivec3(pb.clamp(pb.floor(this.g), pb.vec3(0), pb.sub(pb.vec3(this.n3), pb.vec3(2))));
-      this.$l.alpha = pb.clamp(pb.sub(this.g, pb.vec3(this.base)), pb.vec3(0), pb.vec3(1));
-      for (let i = 0; i < 8; i++) {
-        const off = [i & 1, (i >> 1) & 1, (i >> 2) & 1];
-        this.$l[`w${i}`] = pb.add(this.origin, this.base, pb.ivec3(off[0], off[1], off[2]));
-        this.$l[`t${i}`] = probeTexelFromWorld(this, this.level, this[`w${i}`]);
-        this.$l[`i${i}`] = probeTileIndex(this, this.level, this[`t${i}`]);
-        this.$l[`d${i}`] = this[PROBE_DATA].at(this[`i${i}`]);
-        this.$if(pb.greaterThan(this[`d${i}`].w, 0.5), function () {
-          this.$l.pp = probePosition(this, this.level, this[`w${i}`], this[`d${i}`]);
-          this.$l.tri = pb.mul(
-            off[0] ? this.alpha.x : pb.sub(1, this.alpha.x),
-            off[1] ? this.alpha.y : pb.sub(1, this.alpha.y),
-            off[2] ? this.alpha.z : pb.sub(1, this.alpha.z)
-          );
-          this.$l.dirToProbe = pb.normalize(pb.sub(this.pp, this.p));
-          // Wrap shading: a probe behind the surface still contributes a little
-          this.$l.wrap = pb.mul(pb.add(pb.dot(this.dirToProbe, this.n), 1), 0.5);
-          this.$l.w = pb.add(pb.mul(this.wrap, this.wrap), 0.2);
-          // Chebyshev visibility from the biased point
-          this.$l.toBiased = pb.sub(this.biased, this.pp);
-          this.$l.dist = pb.length(this.toBiased);
-          this.$l.vis = sampleProbeTile(
-            this,
-            this[PROBE_VISIBILITY],
-            this[`i${i}`],
-            this.p0.w,
-            this.p1.zw,
-            pb.div(this.toBiased, pb.max(this.dist, 1e-6))
-          );
-          this.$l.mean = this.vis.x;
-          this.$l.variance = pb.abs(pb.sub(pb.mul(this.mean, this.mean), this.vis.y));
-          this.$if(pb.greaterThan(this.dist, this.mean), function () {
-            this.$l.dd = pb.sub(this.dist, this.mean);
-            this.$l.cheb = pb.div(this.variance, pb.add(this.variance, pb.mul(this.dd, this.dd)));
-            this.w = pb.mul(this.w, pb.max(pb.mul(this.cheb, this.cheb, this.cheb), 0.05));
+  pb.func(
+    funcName,
+    [pb.int('level'), pb.vec3('p'), pb.vec3('biased'), pb.vec3('visPoint'), pb.vec3('n')],
+    function () {
+      this.$l.p0 = this[PROBE_PARAMS].at(0);
+      this.$l.p1 = this[PROBE_PARAMS].at(1);
+      this.$l.lo = probeLevelOrigin(this, this.level);
+      this.$l.lg = probeLevelGrid(this, this.level);
+      this.$l.spacing = this.lo.w;
+      this.$l.origin = pb.ivec3(this.lo.xyz);
+      this.$l.n3 = pb.ivec3(this.lg.xyz);
+      this.$l.g = pb.sub(pb.div(this.biased, this.spacing), pb.vec3(this.origin));
+      this.$l.sum = pb.vec3(0);
+      this.$l.wsum = pb.float(0);
+      this.$l.inside = pb.and(
+        pb.all(pb.greaterThanEqual(this.g, pb.vec3(0))),
+        pb.all(pb.lessThanEqual(this.g, pb.sub(pb.vec3(this.n3), pb.vec3(1))))
+      );
+      this.$if(this.inside, function () {
+        this.$l.base = pb.ivec3(pb.clamp(pb.floor(this.g), pb.vec3(0), pb.sub(pb.vec3(this.n3), pb.vec3(2))));
+        this.$l.alpha = pb.clamp(pb.sub(this.g, pb.vec3(this.base)), pb.vec3(0), pb.vec3(1));
+        for (let i = 0; i < 8; i++) {
+          const off = [i & 1, (i >> 1) & 1, (i >> 2) & 1];
+          this.$l[`w${i}`] = pb.add(this.origin, this.base, pb.ivec3(off[0], off[1], off[2]));
+          this.$l[`t${i}`] = probeTexelFromWorld(this, this.level, this[`w${i}`]);
+          this.$l[`i${i}`] = probeTileIndex(this, this.level, this[`t${i}`]);
+          this.$l[`d${i}`] = this[PROBE_DATA].at(this[`i${i}`]);
+          // Updated and active: an inactive probe, buried in geometry, would
+          // only bring the dark of the inside (Majercik et al. 2021, probe
+          // classification)
+          this.$if(probeActive(this, this[`d${i}`]), function () {
+            this.$l.pp = probePosition(this, this.level, this[`w${i}`], this[`d${i}`]);
+            this.$l.tri = pb.mul(
+              off[0] ? this.alpha.x : pb.sub(1, this.alpha.x),
+              off[1] ? this.alpha.y : pb.sub(1, this.alpha.y),
+              off[2] ? this.alpha.z : pb.sub(1, this.alpha.z)
+            );
+            this.$l.dirToProbe = pb.normalize(pb.sub(this.pp, this.p));
+            // Wrap shading: a probe behind the surface still contributes a little
+            this.$l.wrap = pb.mul(pb.add(pb.dot(this.dirToProbe, this.n), 1), 0.5);
+            this.$l.w = pb.add(pb.mul(this.wrap, this.wrap), 0.2);
+            // Chebyshev visibility of the point as the probe sees the surface
+            this.$l.toBiased = pb.sub(this.visPoint, this.pp);
+            this.$l.dist = pb.length(this.toBiased);
+            this.$l.vis = sampleProbeTile(
+              this,
+              this[PROBE_VISIBILITY],
+              this[`i${i}`],
+              this.p0.w,
+              this.p1.zw,
+              pb.div(this.toBiased, pb.max(this.dist, 1e-6))
+            );
+            this.$l.mean = this.vis.x;
+            this.$l.variance = pb.abs(pb.sub(pb.mul(this.mean, this.mean), this.vis.y));
+            this.$if(pb.greaterThan(this.dist, this.mean), function () {
+              this.$l.dd = pb.sub(this.dist, this.mean);
+              this.$l.cheb = pb.div(this.variance, pb.add(this.variance, pb.mul(this.dd, this.dd)));
+              this.w = pb.mul(this.w, pb.max(pb.mul(this.cheb, this.cheb, this.cheb), 0.05));
+            });
+            // Crush tiny weights to avoid noise from a nearly-blocked probe
+            this.$if(pb.lessThan(this.w, 0.2), function () {
+              this.w = pb.mul(this.w, pb.div(pb.mul(this.w, this.w), 0.04));
+            });
+            this.w = pb.mul(this.w, this.tri);
+            this.$l.irr = sampleProbeTile(
+              this,
+              this[PROBE_IRRADIANCE],
+              this[`i${i}`],
+              this.p0.z,
+              this.p1.xy,
+              this.n
+            );
+            this.sum = pb.add(this.sum, pb.mul(sky ? pb.vec3(this.irr.a) : this.irr.rgb, this.w));
+            this.wsum = pb.add(this.wsum, this.w);
           });
-          // Crush tiny weights to avoid noise from a nearly-blocked probe
-          this.$if(pb.lessThan(this.w, 0.2), function () {
-            this.w = pb.mul(this.w, pb.div(pb.mul(this.w, this.w), 0.04));
-          });
-          this.w = pb.mul(this.w, this.tri);
-          this.$l.irr = sampleProbeTile(
-            this,
-            this[PROBE_IRRADIANCE],
-            this[`i${i}`],
-            this.p0.z,
-            this.p1.xy,
-            this.n
-          );
-          this.sum = pb.add(this.sum, pb.mul(sky ? pb.vec3(this.irr.a) : this.irr.rgb, this.w));
-          this.wsum = pb.add(this.wsum, this.w);
-        });
-      }
-    });
-    this.$return(pb.vec4(pb.div(this.sum, pb.max(this.wsum, 1e-5)), this.wsum));
-  });
-  return scope[funcName](level, p, biased, n) as PBShaderExp;
+        }
+      });
+      this.$return(pb.vec4(pb.div(this.sum, pb.max(this.wsum, 1e-5)), this.wsum));
+    }
+  );
+  return scope[funcName](level, p, biased, visPoint, n) as PBShaderExp;
 }
 
 /**
  * Irradiance (E/π, rgb) at a surface from the probe volume, and in `a` whether
  * any probe answered (0 outside every level or among probes not yet updated).
- * The finest level holding the point answers, fading into the next over the
- * last probe spacing of its window so nothing pops as the windows move; a
- * level whose probes are not ready yet hands over to the next as well.
- * Majercik et al., "Dynamic Diffuse Global Illumination with Ray-Traced
- * Irradiance Fields", JCGT 2019, §4; the level selection follows Lumen's
- * radiance cache clipmaps.
+ * The finest level holding the point answers, handing over to the next over
+ * the outer two probe spacings of its window as Godot blends its SDFGI
+ * cascades (gi.glsl, sdfgi_process: a smoothstep from 2.5 to 0.5 probes inside
+ * the edge), so nothing pops as the windows move; a level whose probes are not
+ * ready yet hands over to the next as well. Majercik et al., "Dynamic Diffuse
+ * Global Illumination with Ray-Traced Irradiance Fields", JCGT 2019, §4; the
+ * level selection follows Lumen's radiance cache clipmaps.
+ *
+ * The normal and view biases of params[2] are for the finest level; each
+ * level scales them by its spacing, as DDGI sizes its self-shadow bias by the
+ * probe spacing (0.75 of the smallest distance between probes) and a cascade
+ * of DDGI volumes sets each its own bias. The Chebyshev test further moves the
+ * point out along the normal by the field's surface expand there
+ * ({@link probeFieldExpand}): the probe rays hit surfaces swollen by it.
  *
  * Mode `surface` scales it by the read scale of params[2], for a surface
  * shading with it. `feedback` returns the value as stored, for the voxel
@@ -359,7 +437,9 @@ export function sampleProbeIrradiance(
     this.$l.p0 = this[PROBE_PARAMS].at(0);
     this.$l.p2 = this[PROBE_PARAMS].at(2);
     this.$l.levels = pb.int(this.p0.x);
-    this.$l.biased = pb.add(this.p, pb.mul(this.n, this.p2.y), pb.mul(this.v, this.p2.z));
+    this.$l.bias = pb.add(pb.mul(this.n, this.p2.y), pb.mul(this.v, this.p2.z));
+    this.$l.expand = pb.mul(this.n, probeFieldExpand(this, this.p));
+    this.$l.spacing0 = probeLevelOrigin(this, 0).w;
     this.$l.acc = pb.vec3(0);
     this.$l.accW = pb.float(0);
     this.$for(pb.int('l'), 0, PROBE_MAX_LEVELS, function () {
@@ -369,14 +449,23 @@ export function sampleProbeIrradiance(
           this.$break();
         }
       );
-      this.$l.s = sampleProbeLevel(this, this.l, this.p, this.biased, this.n, mode === 'sky');
+      this.$l.lo = probeLevelOrigin(this, this.l);
+      this.$l.biased = pb.add(this.p, pb.mul(this.bias, pb.div(this.lo.w, this.spacing0)));
+      this.$l.s = sampleProbeLevel(
+        this,
+        this.l,
+        this.p,
+        this.biased,
+        pb.add(this.biased, this.expand),
+        this.n,
+        mode === 'sky'
+      );
       this.$if(pb.greaterThan(this.s.a, 1e-5), function () {
-        // Fade over the last spacing of the window, in probes
-        this.$l.lo = probeLevelOrigin(this, this.l);
+        // Distance in probes to the window edge
         this.$l.lg = probeLevelGrid(this, this.l);
         this.$l.g = pb.sub(pb.div(this.biased, this.lo.w), this.lo.xyz);
         this.$l.edge = pb.min(this.g, pb.sub(pb.sub(this.lg.xyz, pb.vec3(1)), this.g));
-        this.$l.t = pb.clamp(pb.min(pb.min(this.edge.x, this.edge.y), this.edge.z), 0, 1);
+        this.$l.t = pb.smoothStep(0.5, 2.5, pb.min(pb.min(this.edge.x, this.edge.y), this.edge.z));
         this.$l.share = pb.mul(this.t, pb.sub(1, this.accW));
         this.acc = pb.add(this.acc, pb.mul(this.s.rgb, this.share));
         this.accW = pb.add(this.accW, this.share);

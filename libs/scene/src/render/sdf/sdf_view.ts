@@ -11,7 +11,7 @@ import {
   sampleGlobalSDF,
   sampleSceneSDF,
   sampleSceneSDFHinted,
-  sdfTraceTolerance
+  sdfSurfaceExpand
 } from '../../shaders/sdf';
 import {
   declareVoxelSceneUniforms,
@@ -33,10 +33,21 @@ import { getActiveProbeVolume } from '../gi/probe_volume';
 /**
  * What {@link renderSceneSDFView} shows: the field by its step count, the
  * voxel scene's albedo, emissive or radiance at the hit, or the probe
- * volume's sky visibility there.
+ * volume's sky visibility or irradiance there.
  * @public
  */
-export type SceneSDFViewMode = 'distance' | 'albedo' | 'emissive' | 'radiance' | 'skyVisibility';
+export type SceneSDFViewMode =
+  | 'distance'
+  | 'albedo'
+  | 'emissive'
+  | 'radiance'
+  | 'skyVisibility'
+  | 'irradiance';
+
+/** True for the modes that read the probe volume rather than the voxel scene. */
+function readsProbes(mode: SceneSDFViewMode) {
+  return mode === 'skyVisibility' || mode === 'irradiance';
+}
 
 /** Sphere tracing steps per pixel. */
 const MAX_STEPS = 128;
@@ -64,9 +75,11 @@ function getProgram(levels: number, mode: SceneSDFViewMode) {
         this.invViewProj = pb.mat4().uniform(0);
         // (camera position, trace distance)
         this.cameraInfo = pb.vec4().uniform(0);
+        // (exposure of the radiance and irradiance views, 0, 0, 0)
+        this.viewInfo = pb.vec4().uniform(0);
         declareGlobalSDFUniforms(this, 0, levels);
         declareDynamicSDFUniforms(this, 0);
-        if (mode === 'skyVisibility') {
+        if (readsProbes(mode)) {
           declareProbeUniforms(this, 0);
         } else if (mode !== 'distance') {
           declareVoxelSceneUniforms(this, 0);
@@ -82,27 +95,23 @@ function getProgram(levels: number, mode: SceneSDFViewMode) {
           this.$l.steps = pb.float(0);
           this.$l.hit = false;
           this.$l.prevD = pb.float(0);
+          this.$l.hitT = pb.float(0);
+          this.$l.hitExpand = pb.float(0);
           this.$for(pb.int('i'), 0, MAX_STEPS, function () {
-            this.$l.s = sampleSceneSDFHinted(
-              this,
-              pb.add(this.cameraInfo.xyz, pb.mul(this.dir, this.t)),
-              this.prevD,
-              levels
-            );
+            this.$l.sp = pb.add(this.cameraInfo.xyz, pb.mul(this.dir, this.t));
+            this.$l.s = sampleSceneSDFHinted(this, this.sp, this.prevD, levels);
             this.$l.d = this.s.x;
             this.prevD = this.d;
             this.steps = pb.add(this.steps, 1);
-            // Hit tolerance grows with distance and with the voxels of the level read
-            this.$if(
-              pb.lessThan(
-                this.d,
-                sdfTraceTolerance(this, this.s, pb.add(0.01, pb.mul(this.t, 0.002)), this.t)
-              ),
-              function () {
-                this.hit = true;
-                this.$break();
-              }
-            );
+            // The hit test of the global illumination's rays: surfaces swollen
+            // by a voxel of the level read
+            this.$l.expand = sdfSurfaceExpand(this, this.sp, this.s, this.t, levels);
+            this.$if(pb.lessThan(this.d, this.expand), function () {
+              this.hitT = pb.max(pb.sub(pb.add(this.t, this.d), this.expand), 0);
+              this.hitExpand = this.expand;
+              this.hit = true;
+              this.$break();
+            });
             this.t = pb.add(this.t, pb.max(this.d, 0.02));
             this.$if(pb.greaterThan(this.t, this.cameraInfo.w), function () {
               this.$break();
@@ -118,10 +127,12 @@ function getProgram(levels: number, mode: SceneSDFViewMode) {
               pb.vec4(pb.vec3(pb.mix(0.08, 1, this.k)), 1),
               this.miss
             );
-          } else if (mode === 'skyVisibility') {
+          } else if (readsProbes(mode)) {
             this.$outputs.color = this.miss;
             this.$if(this.hit, function () {
-              this.$l.hp = pb.add(this.cameraInfo.xyz, pb.mul(this.dir, this.t));
+              // From the swollen surface the trace hit back onto the field's own,
+              // where the depth buffer would put a fragment
+              this.$l.hp = pb.add(this.cameraInfo.xyz, pb.mul(this.dir, this.hitT));
               this.$l.e = pb.mul(this.cameraInfo.w, 0.0005);
               this.$l.n = pb.normalize(
                 pb.vec3(
@@ -139,15 +150,28 @@ function getProgram(levels: number, mode: SceneSDFViewMode) {
                   )
                 )
               );
-              // The visibility as a surface reads it, unshaded so the values read
-              // directly: white sees the whole sky, black none; magenta where no
-              // probe covers the point
-              this.$l.sv = sampleProbeIrradiance(this, this.hp, this.n, pb.neg(this.dir), 'sky');
-              this.$outputs.color = this.$choice(
-                pb.greaterThan(this.sv.a, 0),
-                pb.vec4(this.sv.rgb, 1),
-                pb.vec4(1, 0, 1, 1)
-              );
+              this.hp = pb.sub(this.hp, pb.mul(this.n, this.hitExpand));
+              if (mode === 'skyVisibility') {
+                // The visibility as a surface reads it, unshaded so the values read
+                // directly: white sees the whole sky, black none; magenta where no
+                // probe covers the point
+                this.$l.sv = sampleProbeIrradiance(this, this.hp, this.n, pb.neg(this.dir), 'sky');
+                this.$outputs.color = this.$choice(
+                  pb.greaterThan(this.sv.a, 0),
+                  pb.vec4(this.sv.rgb, 1),
+                  pb.vec4(1, 0, 1, 1)
+                );
+              } else {
+                // The irradiance (E/pi) a white surface would shade with, at the
+                // view's exposure, unshaded; magenta where no probe covers the point
+                this.$l.irr = sampleProbeIrradiance(this, this.hp, this.n, pb.neg(this.dir));
+                this.$l.ev = pb.mul(this.irr.rgb, this.viewInfo.x);
+                this.$outputs.color = this.$choice(
+                  pb.greaterThan(this.irr.a, 0),
+                  pb.vec4(pb.div(this.ev, pb.add(this.ev, pb.vec3(1))), 1),
+                  pb.vec4(1, 0, 1, 1)
+                );
+              }
             });
           } else {
             this.$outputs.color = this.miss;
@@ -221,7 +245,10 @@ function getProgram(levels: number, mode: SceneSDFViewMode) {
                     )
                   )
                 );
-                this.$l.rad = sampleVoxelSceneRadiance(this, this.hp, this.n, levels);
+                this.$l.rad = pb.mul(
+                  sampleVoxelSceneRadiance(this, this.hp, this.n, levels),
+                  this.viewInfo.x
+                );
                 this.$outputs.color = pb.vec4(pb.div(this.rad, pb.add(this.rad, pb.vec3(1))), 1);
               }
             });
@@ -247,7 +274,9 @@ function getProgram(levels: number, mode: SceneSDFViewMode) {
  * material there instead; the scene's global illumination must be enabled and
  * built, else the view falls back to the field. `skyVisibility` shows how
  * much of the sky the probe volume sees from the hit, white all of it and
- * black none, magenta where no probe covers it; it needs the probe volume. In `albedo`, a surface without
+ * black none, magenta where no probe covers it; `irradiance` the irradiance a
+ * surface there reads from the probes, at `exposure`; both need the probe
+ * volume. `radiance` is scaled by `exposure` as well. In `albedo`, a surface without
  * material is flagged: orange for a dynamic instance (the voxel scene holds
  * static meshes only), cyan, yellow or white for a static surface by the
  * clipmap level read, magenta where no level's window holds the point.
@@ -257,14 +286,19 @@ function getProgram(levels: number, mode: SceneSDFViewMode) {
  * @returns Whether it drew.
  * @public
  */
-export function renderSceneSDFView(scene: Scene, camera: Camera, mode: SceneSDFViewMode = 'distance') {
+export function renderSceneSDFView(
+  scene: Scene,
+  camera: Camera,
+  mode: SceneSDFViewMode = 'distance',
+  exposure = 1
+) {
   const sdf = scene.sdf.enabled ? scene.sdf.global : null;
   if (!sdf) {
     return false;
   }
-  const probes = mode === 'skyVisibility' && scene.gi.enabled ? getActiveProbeVolume(scene) : null;
-  const voxels = mode !== 'distance' && mode !== 'skyVisibility' && scene.gi.enabled ? scene.gi.voxels : null;
-  if (mode === 'skyVisibility' ? !probes : !voxels?.ready || (mode === 'radiance' && !voxels.lit)) {
+  const probes = readsProbes(mode) && scene.gi.enabled ? getActiveProbeVolume(scene) : null;
+  const voxels = mode !== 'distance' && !readsProbes(mode) && scene.gi.enabled ? scene.gi.voxels : null;
+  if (readsProbes(mode) ? !probes : !voxels?.ready || (mode === 'radiance' && !voxels.lit)) {
     mode = 'distance';
   }
   const device = getDevice();
@@ -281,11 +315,12 @@ export function renderSceneSDFView(scene: Scene, camera: Camera, mode: SceneSDFV
     'cameraInfo',
     new Vector4(pos.x, pos.y, pos.z, sdf.resolution * sdf.voxelSize(sdf.levels - 1))
   );
+  bindGroup.setValue('viewInfo', new Vector4(exposure, 0, 0, 0));
   sdf.applyBindGroup(bindGroup);
-  if (probes && mode === 'skyVisibility') {
+  if (probes && readsProbes(mode)) {
     probes.applyBindGroup(bindGroup);
   }
-  if (voxels && mode !== 'distance' && mode !== 'skyVisibility') {
+  if (voxels && mode !== 'distance' && !readsProbes(mode)) {
     bindGroup.setTexture(VOXEL_SCENE_ALBEDO, voxels.albedo, fetchSampler('clamp_nearest_nomip'));
     bindGroup.setTexture(VOXEL_SCENE_EMISSIVE, voxels.emissive, fetchSampler('clamp_nearest_nomip'));
     // The layout declares all three; before the first lighting pass the albedo stands in

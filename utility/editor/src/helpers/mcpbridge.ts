@@ -60,7 +60,8 @@ import {
   queryGIProbes,
   queryMeshSDF,
   sampleGlobalSDF,
-  setSDFDebugSlice
+  setSDFDebugSlice,
+  setSDFDebugView
 } from './mcpsdf';
 import { getNodePhysics, listPhysicsPresets, removeNodePhysics, setNodePhysics } from './mcpphysics';
 import {
@@ -1953,6 +1954,8 @@ ${err.stack}`
       }
     case 'sdf_stats':
       return getSceneSDFStats(getSceneController(editor), params);
+    case 'sdf_debug_view':
+      return setSDFDebugView(getSceneController(editor), params);
     case 'sdf_query':
       try {
         return await queryMeshSDF(getSceneController(editor), params);

@@ -15,20 +15,30 @@ import {
 import type { SceneController } from '../controllers/scenecontroller';
 import { MeshSDFBaker } from '../core/services/sdfbaker';
 
-/** Mesh asset paths used by the meshes under a node, the node included */
-function collectMeshPaths(root: SceneNode) {
-  const paths = new Set<string>();
+/**
+ * Mesh asset paths used by the meshes under a node, the node included, with
+ * the world units one local unit spans for each: the largest axis scale of
+ * its instances' world matrices.
+ */
+function collectMeshUnitScales(root: SceneNode) {
+  const scales = new Map<string, number>();
   root.iterate((node) => {
     if (node.isMesh()) {
       const primitive = (node as Mesh).primitive;
       const id = primitive ? getEngine().resourceManager.getAssetId(primitive) : null;
       if (id && id.toLowerCase().endsWith('.zmsh')) {
-        paths.add(id);
+        const m = node.worldMatrix;
+        const scale = Math.max(
+          Math.hypot(m.m00, m.m10, m.m20),
+          Math.hypot(m.m01, m.m11, m.m21),
+          Math.hypot(m.m02, m.m12, m.m22)
+        );
+        scales.set(id, Math.max(scales.get(id) ?? 0, scale));
       }
     }
     return false;
   });
-  return [...paths];
+  return scales;
 }
 
 /**
@@ -37,10 +47,12 @@ function collectMeshPaths(root: SceneNode) {
  */
 export async function bakeMeshSDFs(controller: SceneController | null, params: any) {
   let paths: string[];
+  const scene = controller?.model?.scene ?? null;
+  // The scene's instances say how many world units a local unit of each mesh spans
+  const scales = scene ? collectMeshUnitScales(scene.rootNode) : new Map<string, number>();
   if (Array.isArray(params.paths) && params.paths.length > 0) {
     paths = params.paths.map((p: unknown) => String(p));
   } else {
-    const scene = controller?.model?.scene ?? null;
     if (!scene) {
       return { results: null, err: 'No scene is currently opened; pass `paths`' };
     }
@@ -48,8 +60,11 @@ export async function bakeMeshSDFs(controller: SceneController | null, params: a
     if (!root) {
       return { results: null, err: `Node not found in current scene: ${params.node_id}` };
     }
-    paths = collectMeshPaths(root);
+    paths = [...collectMeshUnitScales(root).keys()];
   }
+  await MeshSDFBaker.setUnitScales(
+    new Map(paths.filter((p) => scales.has(p)).map((p) => [p, scales.get(p)!]))
+  );
   const results = await MeshSDFBaker.bakeAll(paths, !!params.force);
   // Streamed copies of the rebaked fields are stale
   const sdf = controller?.model?.scene?.sdf;
@@ -251,4 +266,38 @@ export async function queryGIProbes(controller: SceneController | null, params: 
     result.probes.forEach((p, i) => ((p as any).sdf = Math.round(d[i] * 1000) / 1000));
   }
   return { ...result, err: null };
+}
+
+/** Modes of the distance field debug view the scene view can draw. */
+const SDF_VIEW_MODES = ['distance', 'albedo', 'emissive', 'radiance', 'skyVisibility', 'irradiance'] as const;
+
+/**
+ * Shows a distance field debug view over the scene view, as View > Distance
+ * Field and the voxel and GI entries do: `mode` one of {@link SDF_VIEW_MODES},
+ * or `none` to draw the scene alone. `exposure` scales the radiance and
+ * irradiance views. Either may be left out to keep it. Returns the state after.
+ */
+export function setSDFDebugView(controller: SceneController | null, params: any) {
+  const view = controller?.view ?? null;
+  if (!view || !controller?.model?.scene) {
+    return { mode: null, exposure: null, err: 'No scene is currently opened' };
+  }
+  if (params.mode !== undefined) {
+    const mode = String(params.mode);
+    if (mode === 'none') {
+      view.sdfView = null;
+    } else if ((SDF_VIEW_MODES as readonly string[]).includes(mode)) {
+      view.sdfView = mode as (typeof SDF_VIEW_MODES)[number];
+    } else {
+      return {
+        mode: view.sdfView ?? 'none',
+        exposure: view.sdfViewExposure,
+        err: `Unknown mode ${mode}; one of none, ${SDF_VIEW_MODES.join(', ')}`
+      };
+    }
+  }
+  if (typeof params.exposure === 'number') {
+    view.sdfViewExposure = params.exposure;
+  }
+  return { mode: view.sdfView ?? 'none', exposure: view.sdfViewExposure, err: null };
 }
