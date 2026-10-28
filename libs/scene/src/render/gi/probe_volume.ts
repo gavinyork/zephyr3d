@@ -71,6 +71,12 @@ const STAGING_COLS = 64;
 const BLEND_BATCH = 128;
 /** Sphere tracing steps of a probe ray. */
 const TRACE_STEPS = 48;
+/**
+ * Probe spacings out to which the visibility maps hold distances, farther hits
+ * clamped to it: a little beyond the spacing, the moments only having to tell
+ * blockers between neighbouring probes apart.
+ */
+const VISIBILITY_RANGE = 2.6;
 /** Frames between relocations of an updated probe. */
 const RELOCATE_EVERY = 8;
 /** Bits of a selection entry: tile index, level, first-update flag. */
@@ -115,9 +121,9 @@ export interface ProbeVolumeOptions {
   budget: number;
   /** Share of the previous value kept per update, 0 to 1. */
   hysteresis: number;
-  /** Surface offset along the normal when sampling, in world units. */
+  /** Surface offset along the normal when sampling, in probe spacings of the level read. */
   normalBias: number;
-  /** Surface offset towards the viewer when sampling, in world units. */
+  /** Surface offset towards the viewer when sampling, in probe spacings of the level read. */
   viewBias: number;
   /** Multiplier on the irradiance the probes give. */
   intensity: number;
@@ -1079,12 +1085,17 @@ export class ProbeVolume {
               this[PROBE_PARAMS].at(2).w,
               pb.div(this.spacing, probeLevelOrigin(this, 0).w)
             );
-            // The finest field level read: the one matching the probe level as the
-            // finest field level matches the finest probe level, so a coarse probe
-            // traces the coarse field, as Godot's SDFGI traces a cascade's probes
-            // from that cascade on (sdfgi_integrate.glsl, process)
+            // The finest field level read past the visibility range: the one
+            // matching the probe level as the finest field level matches the finest
+            // probe level, so a coarse probe traces the coarse field far out, as
+            // Godot's SDFGI traces a cascade's probes from that cascade on
+            // (sdfgi_integrate.glsl, process). Within the range every level is
+            // read: the visibility map holds those distances alone, and a coarse
+            // level places no wall thinner than its voxel and no gap narrower than
+            // one, so a probe between two close surfaces would see itself shut in
+            // and the surfaces reading it would go dark in patches
             this.$l.fieldScale = pb.div(this[GLOBAL_SDF_LEVELS].at(0).w, probeLevelOrigin(this, 0).w);
-            this.$l.minLevel = pb.int(0);
+            this.$l.farLevel = pb.int(0);
             for (let i = 1; i < levels; i++) {
               this.$if(
                 pb.lessThanEqual(
@@ -1092,10 +1103,11 @@ export class ProbeVolume {
                   pb.mul(this.spacing, this.fieldScale, 1.01)
                 ),
                 function () {
-                  this.minLevel = pb.int(i);
+                  this.farLevel = pb.int(i);
                 }
               );
             }
+            this.$l.fineRange = pb.mul(this.spacing, VISIBILITY_RANGE);
             this.$l.radiance = pb.vec3(0);
             this.$l.dist = this.maxDist;
             this.$l.d0 = sampleSceneSDF(this, this.pos, levels);
@@ -1109,9 +1121,12 @@ export class ProbeVolume {
               this.$l.hitT = pb.float(0);
               // Voxel size of the level that answered at the hit, 0 for a dynamic instance
               this.$l.hitVoxel = pb.float(0);
+              // Finest field level the step that hit could read
+              this.$l.hitMin = pb.int(0);
               this.$for(pb.int('i'), 0, TRACE_STEPS, function () {
                 this.$l.sp = pb.add(this.pos, pb.mul(this.dir, this.t));
-                this.$l.s = sampleSceneSDFHinted(this, this.sp, this.prevD, levels, this.minLevel);
+                this.$l.stepMin = this.$choice(pb.lessThan(this.t, this.fineRange), pb.int(0), this.farLevel);
+                this.$l.s = sampleSceneSDFHinted(this, this.sp, this.prevD, levels, this.stepMin);
                 this.$l.d = this.s.x;
                 this.prevD = this.d;
                 this.$l.expand = sdfSurfaceExpand(this, this.sp, this.s, this.t, levels);
@@ -1121,6 +1136,7 @@ export class ProbeVolume {
                   this.hitT = pb.max(pb.sub(pb.add(this.t, this.d), this.expand), 0);
                   this.hit = true;
                   this.hitVoxel = this.s.y;
+                  this.hitMin = this.stepMin;
                   this.$break();
                 });
                 this.t = pb.add(this.t, pb.max(this.d, 0.02));
@@ -1142,15 +1158,12 @@ export class ProbeVolume {
                   // answered, as Lumen takes the normal at a global field hit
                   // (ComputeGlobalDistanceFieldNormal, GlobalDistanceFieldShared.ush).
                   // A hit blended between two levels takes the nearer of them
-                  this.$l.hl = this.minLevel;
+                  this.$l.hl = this.hitMin;
                   for (let i = 1; i < levels; i++) {
                     this.$if(
                       pb.and(
-                        pb.greaterThanEqual(pb.int(i), this.minLevel),
-                        pb.greaterThan(
-                          this.hitVoxel,
-                          pb.mul(this[GLOBAL_SDF_LEVELS].at(i - 1).w, Math.SQRT2)
-                        )
+                        pb.greaterThanEqual(pb.int(i), this.hitMin),
+                        pb.greaterThan(this.hitVoxel, pb.mul(this[GLOBAL_SDF_LEVELS].at(i - 1).w, Math.SQRT2))
                       ),
                       function () {
                         this.hl = pb.int(i);
@@ -1411,9 +1424,7 @@ export class ProbeVolume {
           this.$l.dir = octDecode(this, this.oct);
           this.$l.sum = pb.vec4(0);
           this.$l.wsum = pb.float(0);
-          // Distances are clamped a little beyond the probe spacing: the
-          // moments only have to tell blockers between neighbouring probes apart
-          this.$l.maxDist = pb.mul(probeLevelOrigin(this, this.level).w, 2.6);
+          this.$l.maxDist = pb.mul(probeLevelOrigin(this, this.level).w, VISIBILITY_RANGE);
           // One ray, `ray` its traced result and `c` the cosine to the texel's direction
           const accumulate = (scope: PBInsideFunctionScope) => {
             if (visibility) {

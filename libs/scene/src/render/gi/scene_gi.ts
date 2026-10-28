@@ -75,8 +75,9 @@ export class SceneGI {
       raysPerProbe: 128,
       budget: 4096,
       hysteresis: 0.97,
-      normalBias: 0.1,
-      viewBias: 0.3,
+      // Lumen's irradiance field gather: (0.2 N + 0.8 V) * 0.75 * cell * 0.8
+      normalBias: 0.12,
+      viewBias: 0.48,
       intensity: 1,
       maxRayDistance: 48
     };
@@ -213,14 +214,18 @@ export class SceneGI {
   set intensity(val: number) {
     this._probeOptions.intensity = Math.max(0, val);
   }
-  /** Surface offset along the normal when sampling the probes, in world units. */
+  /** Surface offset along the normal when sampling the probes, in probe spacings of the level read. */
   get probeNormalBias() {
     return this._probeOptions.normalBias;
   }
   set probeNormalBias(val: number) {
     this._probeOptions.normalBias = Math.max(0, val);
   }
-  /** Surface offset towards the viewer when sampling the probes, in world units. */
+  /**
+   * Surface offset towards the viewer when sampling the probes, in probe
+   * spacings of the level read, fading out as the viewer comes nearer than a
+   * spacing.
+   */
   get probeViewBias() {
     return this._probeOptions.viewBias;
   }

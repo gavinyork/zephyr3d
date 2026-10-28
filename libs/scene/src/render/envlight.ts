@@ -206,8 +206,13 @@ export abstract class EnvironmentLighting extends Disposable {
     }
     const funcName = 'Z_envSkySpecularOcclusion';
     pb.func(funcName, [pb.vec3('n'), pb.vec3('p'), pb.float('NoV'), pb.float('roughness')], function () {
-      this.$l.v = pb.normalize(pb.sub(this.camera.position.xyz, this.p));
-      this.$l.sky = sampleProbeIrradiance(this, this.p, this.n, this.v, 'sky');
+      this.$l.sky = sampleProbeIrradiance(
+        this,
+        this.p,
+        this.n,
+        pb.sub(this.camera.position.xyz, this.p),
+        'sky'
+      );
       this.$l.vis = pb.mix(pb.float(1), this.sky.r, this.sky.a);
       this.$l.r2 = pb.mul(this.roughness, this.roughness);
       this.$return(pb.clamp(pb.add(pb.sub(pb.pow(pb.add(this.NoV, this.vis), this.r2), 1), this.vis), 0, 1));
@@ -247,8 +252,7 @@ export abstract class EnvironmentLighting extends Disposable {
     }
     const funcName = 'Z_envIrradianceWithProbes';
     pb.func(funcName, [pb.vec3('n'), pb.vec3('p'), pb.vec3('env')], function () {
-      this.$l.v = pb.normalize(pb.sub(this.camera.position.xyz, this.p));
-      this.$l.probe = sampleProbeIrradiance(this, this.p, this.n, this.v);
+      this.$l.probe = sampleProbeIrradiance(this, this.p, this.n, pb.sub(this.camera.position.xyz, this.p));
       this.$return(pb.mix(this.env, this.probe.rgb, this.probe.a));
     });
     return global[funcName](normal, worldPos, sky) as PBShaderExp;

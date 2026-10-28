@@ -875,7 +875,7 @@ export class SSGI extends AbstractPostEffect {
                 this,
                 this.worldPos,
                 this.worldNormal,
-                pb.normalize(pb.sub(this.cameraPos, this.worldPos))
+                pb.sub(this.cameraPos, this.worldPos)
               );
               this.iblIrradiance = pb.mix(this.iblIrradiance, this.probe.rgb, this.probe.a);
               this.probeValid = this.probe.a;

@@ -155,7 +155,13 @@ function getProgram(levels: number, mode: SceneSDFViewMode) {
                 // The visibility as a surface reads it, unshaded so the values read
                 // directly: white sees the whole sky, black none; magenta where no
                 // probe covers the point
-                this.$l.sv = sampleProbeIrradiance(this, this.hp, this.n, pb.neg(this.dir), 'sky');
+                this.$l.sv = sampleProbeIrradiance(
+                  this,
+                  this.hp,
+                  this.n,
+                  pb.sub(this.cameraInfo.xyz, this.hp),
+                  'sky'
+                );
                 this.$outputs.color = this.$choice(
                   pb.greaterThan(this.sv.a, 0),
                   pb.vec4(this.sv.rgb, 1),
@@ -164,7 +170,12 @@ function getProgram(levels: number, mode: SceneSDFViewMode) {
               } else {
                 // The irradiance (E/pi) a white surface would shade with, at the
                 // view's exposure, unshaded; magenta where no probe covers the point
-                this.$l.irr = sampleProbeIrradiance(this, this.hp, this.n, pb.neg(this.dir));
+                this.$l.irr = sampleProbeIrradiance(
+                  this,
+                  this.hp,
+                  this.n,
+                  pb.sub(this.cameraInfo.xyz, this.hp)
+                );
                 this.$l.ev = pb.mul(this.irr.rgb, this.viewInfo.x);
                 this.$outputs.color = this.$choice(
                   pb.greaterThan(this.irr.a, 0),

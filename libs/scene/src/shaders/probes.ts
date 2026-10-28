@@ -403,11 +403,16 @@ function sampleProbeLevel(
  * Global Illumination with Ray-Traced Irradiance Fields", JCGT 2019, §4; the
  * level selection follows Lumen's radiance cache clipmaps.
  *
- * The normal and view biases of params[2] are for the finest level; each
- * level scales them by its spacing, as DDGI sizes its self-shadow bias by the
- * probe spacing (0.75 of the smallest distance between probes) and a cascade
- * of DDGI volumes sets each its own bias. The Chebyshev test further moves the
- * point out along the normal by the field's surface expand there
+ * The normal and view biases of params[2] are in probe spacings, so each level
+ * scales them by its own, as DDGI sizes its self-shadow bias by the probe
+ * spacing and Lumen's irradiance field gather by its clipmap cell
+ * (LumenIrradianceFieldInterpolation.ush, GetIrradianceFieldInterpolatedLighting:
+ * (0.2 N + 0.8 V) * 0.75 * cell * ProbeOcclusionBias 0.8). As there, the view
+ * bias fades out as the viewer comes nearer than a spacing: pushed toward a
+ * viewer that close, the point would land beside it. `toViewer` runs from the
+ * point to the viewer, its length the viewing distance; the feedback mode has
+ * no viewer and takes the whole view bias along it. The Chebyshev test further
+ * moves the point out along the normal by the field's surface expand there
  * ({@link probeFieldExpand}): the probe rays hit surfaces swollen by it.
  *
  * Mode `surface` scales it by the read scale of params[2], for a surface
@@ -423,7 +428,7 @@ export function sampleProbeIrradiance(
   scope: PBInsideFunctionScope,
   worldPos: PBShaderExp,
   normal: PBShaderExp,
-  viewDir: PBShaderExp,
+  toViewer: PBShaderExp,
   mode: 'surface' | 'feedback' | 'sky' = 'surface'
 ) {
   const pb = scope.$builder;
@@ -433,13 +438,13 @@ export function sampleProbeIrradiance(
       : mode === 'feedback'
         ? 'Z_sampleProbeIrradianceFeedback'
         : 'Z_sampleProbeSkyVisibility';
-  pb.func(funcName, [pb.vec3('p'), pb.vec3('n'), pb.vec3('v')], function () {
+  pb.func(funcName, [pb.vec3('p'), pb.vec3('n'), pb.vec3('toViewer')], function () {
     this.$l.p0 = this[PROBE_PARAMS].at(0);
     this.$l.p2 = this[PROBE_PARAMS].at(2);
     this.$l.levels = pb.int(this.p0.x);
-    this.$l.bias = pb.add(pb.mul(this.n, this.p2.y), pb.mul(this.v, this.p2.z));
+    this.$l.viewDist = pb.length(this.toViewer);
+    this.$l.v = pb.div(this.toViewer, pb.max(this.viewDist, 1e-6));
     this.$l.expand = pb.mul(this.n, probeFieldExpand(this, this.p));
-    this.$l.spacing0 = probeLevelOrigin(this, 0).w;
     this.$l.acc = pb.vec3(0);
     this.$l.accW = pb.float(0);
     this.$for(pb.int('l'), 0, PROBE_MAX_LEVELS, function () {
@@ -450,7 +455,11 @@ export function sampleProbeIrradiance(
         }
       );
       this.$l.lo = probeLevelOrigin(this, this.l);
-      this.$l.biased = pb.add(this.p, pb.mul(this.bias, pb.div(this.lo.w, this.spacing0)));
+      this.$l.viewFade = mode === 'feedback' ? pb.float(1) : pb.clamp(pb.div(this.viewDist, this.lo.w), 0, 1);
+      this.$l.biased = pb.add(
+        this.p,
+        pb.mul(pb.add(pb.mul(this.n, this.p2.y), pb.mul(this.v, this.p2.z, this.viewFade)), this.lo.w)
+      );
       this.$l.s = sampleProbeLevel(
         this,
         this.l,
@@ -475,5 +484,5 @@ export function sampleProbeIrradiance(
     this.$l.e = pb.div(this.acc, pb.max(this.accW, 1e-4));
     this.$return(pb.vec4(mode === 'surface' ? pb.mul(this.e, this.p2.x) : this.e, this.valid));
   });
-  return scope[funcName](worldPos, normal, viewDir) as PBShaderExp;
+  return scope[funcName](worldPos, normal, toViewer) as PBShaderExp;
 }
