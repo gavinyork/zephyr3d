@@ -40,7 +40,8 @@ export const PROBE_PARAM_VEC4S = PROBE_FIELD_PARAMS + 1 + PROBE_MAX_FIELD_LEVELS
  *   global illumination intensity); the bounce feedback reads them unscaled;
  *   params[3 + 2l]: (world index of level l's first probe, its spacing),
  *   params[4 + 2l]: (probes per axis of level l, its first tile);
- *   params[PROBE_FIELD_PARAMS]: (levels of the global field, its resolution),
+ *   params[PROBE_FIELD_PARAMS]: (levels of the global field, its resolution,
+ *   1 when a surface weighs the probes by Chebyshev visibility else 0),
  *   params[PROBE_FIELD_PARAMS + 1 + i]: (window origin of field level i in its
  *   voxels, voxel size), the global field's levels, for {@link probeFieldExpand}.
  *
@@ -297,8 +298,9 @@ export function probeActive(scope: PBInsideFunctionScope, data: PBShaderExp) {
 /**
  * Irradiance from one level of the volume at a surface point: the eight
  * probes around the biased point weighted by trilinear position, by how much
- * each faces the surface and by Chebyshev visibility of `visPoint` (the biased
- * point moved out to the swollen surface the probes see). Returns (irradiance,
+ * each faces the surface and, when the volume has the test on, by Chebyshev
+ * visibility of `visPoint` (the biased point moved out to the swollen surface
+ * the probes see). Returns (irradiance,
  * weight sum), the sum 0 outside the level's window or among probes never
  * updated or inactive.
  * @internal
@@ -320,6 +322,7 @@ function sampleProbeLevel(
     function () {
       this.$l.p0 = this[PROBE_PARAMS].at(0);
       this.$l.p1 = this[PROBE_PARAMS].at(1);
+      this.$l.chebyshev = pb.greaterThan(this[PROBE_PARAMS].at(PROBE_FIELD_PARAMS).z, 0.5);
       this.$l.lo = probeLevelOrigin(this, this.level);
       this.$l.lg = probeLevelGrid(this, this.level);
       this.$l.spacing = this.lo.w;
@@ -355,23 +358,26 @@ function sampleProbeLevel(
             // Wrap shading: a probe behind the surface still contributes a little
             this.$l.wrap = pb.mul(pb.add(pb.dot(this.dirToProbe, this.n), 1), 0.5);
             this.$l.w = pb.add(pb.mul(this.wrap, this.wrap), 0.2);
-            // Chebyshev visibility of the point as the probe sees the surface
-            this.$l.toBiased = pb.sub(this.visPoint, this.pp);
-            this.$l.dist = pb.length(this.toBiased);
-            this.$l.vis = sampleProbeTile(
-              this,
-              this[PROBE_VISIBILITY],
-              this[`i${i}`],
-              this.p0.w,
-              this.p1.zw,
-              pb.div(this.toBiased, pb.max(this.dist, 1e-6))
-            );
-            this.$l.mean = this.vis.x;
-            this.$l.variance = pb.abs(pb.sub(pb.mul(this.mean, this.mean), this.vis.y));
-            this.$if(pb.greaterThan(this.dist, this.mean), function () {
-              this.$l.dd = pb.sub(this.dist, this.mean);
-              this.$l.cheb = pb.div(this.variance, pb.add(this.variance, pb.mul(this.dd, this.dd)));
-              this.w = pb.mul(this.w, pb.max(pb.mul(this.cheb, this.cheb, this.cheb), 0.05));
+            // Chebyshev visibility of the point as the probe sees the surface,
+            // when the volume has it on
+            this.$if(this.chebyshev, function () {
+              this.$l.toBiased = pb.sub(this.visPoint, this.pp);
+              this.$l.dist = pb.length(this.toBiased);
+              this.$l.vis = sampleProbeTile(
+                this,
+                this[PROBE_VISIBILITY],
+                this[`i${i}`],
+                this.p0.w,
+                this.p1.zw,
+                pb.div(this.toBiased, pb.max(this.dist, 1e-6))
+              );
+              this.$l.mean = this.vis.x;
+              this.$l.variance = pb.abs(pb.sub(pb.mul(this.mean, this.mean), this.vis.y));
+              this.$if(pb.greaterThan(this.dist, this.mean), function () {
+                this.$l.dd = pb.sub(this.dist, this.mean);
+                this.$l.cheb = pb.div(this.variance, pb.add(this.variance, pb.mul(this.dd, this.dd)));
+                this.w = pb.mul(this.w, pb.max(pb.mul(this.cheb, this.cheb, this.cheb), 0.05));
+              });
             });
             // Crush tiny weights to avoid noise from a nearly-blocked probe
             this.$if(pb.lessThan(this.w, 0.2), function () {
