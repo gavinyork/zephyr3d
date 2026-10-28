@@ -1,4 +1,5 @@
 import type { PBGlobalScope, PBInsideFunctionScope, PBShaderExp } from '@zephyr3d/device';
+import { getSamplerOptions } from '../utility/misc';
 
 /**
  * Uniform names of the probe volume, see {@link declareProbeUniforms}.
@@ -51,8 +52,12 @@ export const PROBE_PARAM_VEC4S = PROBE_FIELD_PARAMS + 1 + PROBE_MAX_FIELD_LEVELS
  */
 export function declareProbeUniforms(scope: PBGlobalScope, group: number, writable = false) {
   const pb = scope.$builder;
-  scope[PROBE_IRRADIANCE] = pb.tex2D().uniform(group);
-  scope[PROBE_VISIBILITY] = pb.tex2D().uniform(group);
+  // The sampler every program reads them with (ProbeVolume.applyBindGroup),
+  // declared static so they share one sampler binding on WebGPU: a material
+  // heavy on textures, such as the water's, reads them in a fragment stage
+  // that has few of the 16 samplers left
+  scope[PROBE_IRRADIANCE] = pb.tex2D().uniform(group).withSampler(getSamplerOptions('clamp_linear_nomip'));
+  scope[PROBE_VISIBILITY] = pb.tex2D().uniform(group).withSampler(getSamplerOptions('clamp_linear_nomip'));
   scope[PROBE_DATA] = writable
     ? pb.vec4[0]().storageBuffer(group)
     : pb.vec4[0]().storageBufferReadonly(group);
