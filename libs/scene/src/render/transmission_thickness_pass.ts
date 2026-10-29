@@ -254,7 +254,12 @@ export class TransmissionThicknessRenderer {
       envLightStrength: ShaderHelper.getEnvLightLuminance(ctx),
       envLightSpecularStrength: ctx.env?.light.specularStrength ?? 1
     });
-    bindGroup.setValue('invViewProjMatrix', camera.invViewProjectionMatrix);
+    // The depth prepass draws with the TAA jitter; take positions back through it
+    // (see ShadowMaskPass)
+    bindGroup.setValue(
+      'invViewProjMatrix',
+      ctx.motionVectors ? camera.jitteredInvVPMatrix : camera.invViewProjectionMatrix
+    );
     bindGroup.setValue('cameraNearFar', this._nearFar);
     bindGroup.setValue('profileTexelSize', this._profileTexelSize);
     this._invRenderSize.setXY(1 / depthTexture.width, 1 / depthTexture.height);
