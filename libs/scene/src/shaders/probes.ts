@@ -266,86 +266,82 @@ function sampleProbeLevel(
 ) {
   const pb = scope.$builder;
   const funcName = sky ? 'Z_sampleProbeLevelSky' : 'Z_sampleProbeLevel';
-  pb.func(
-    funcName,
-    [pb.int('level'), pb.vec3('p'), pb.vec3('biased'), pb.vec3('n')],
-    function () {
-      this.$l.p0 = this[PROBE_PARAMS].at(0);
-      this.$l.p1 = this[PROBE_PARAMS].at(1);
-      this.$l.lo = probeLevelOrigin(this, this.level);
-      this.$l.lg = probeLevelGrid(this, this.level);
-      this.$l.spacing = this.lo.w;
-      this.$l.origin = pb.ivec3(this.lo.xyz);
-      this.$l.n3 = pb.ivec3(this.lg.xyz);
-      this.$l.g = pb.sub(pb.div(this.biased, this.spacing), pb.vec3(this.origin));
-      this.$l.sum = pb.vec3(0);
-      this.$l.wsum = pb.float(0);
-      this.$l.inside = pb.and(
-        pb.all(pb.greaterThanEqual(this.g, pb.vec3(0))),
-        pb.all(pb.lessThanEqual(this.g, pb.sub(pb.vec3(this.n3), pb.vec3(1))))
-      );
-      this.$if(this.inside, function () {
-        this.$l.base = pb.ivec3(pb.clamp(pb.floor(this.g), pb.vec3(0), pb.sub(pb.vec3(this.n3), pb.vec3(2))));
-        this.$l.alpha = pb.clamp(pb.sub(this.g, pb.vec3(this.base)), pb.vec3(0), pb.vec3(1));
-        for (let i = 0; i < 8; i++) {
-          const off = [i & 1, (i >> 1) & 1, (i >> 2) & 1];
-          this.$l[`w${i}`] = pb.add(this.origin, this.base, pb.ivec3(off[0], off[1], off[2]));
-          this.$l[`t${i}`] = probeTexelFromWorld(this, this.level, this[`w${i}`]);
-          this.$l[`i${i}`] = probeTileIndex(this, this.level, this[`t${i}`]);
-          this.$l[`d${i}`] = this[PROBE_DATA].at(this[`i${i}`]);
-          // Updated and active: an inactive probe, buried in geometry, would
-          // only bring the dark of the inside (Majercik et al. 2021, probe
-          // classification)
-          this.$if(probeActive(this, this[`d${i}`]), function () {
-            this.$l.pp = probePosition(this, this.level, this[`w${i}`], this[`d${i}`]);
-            this.$l.tri = pb.mul(
-              off[0] ? this.alpha.x : pb.sub(1, this.alpha.x),
-              off[1] ? this.alpha.y : pb.sub(1, this.alpha.y),
-              off[2] ? this.alpha.z : pb.sub(1, this.alpha.z)
-            );
-            this.$l.dirToProbe = pb.normalize(pb.sub(this.pp, this.p));
-            // Wrap shading: a probe behind the surface still contributes a little
-            this.$l.wrap = pb.mul(pb.add(pb.dot(this.dirToProbe, this.n), 1), 0.5);
-            this.$l.w = pb.add(pb.mul(this.wrap, this.wrap), 0.2);
-            // Chebyshev visibility of the point as the probe sees the surface
-            this.$l.toBiased = pb.sub(this.biased, this.pp);
-            this.$l.dist = pb.length(this.toBiased);
-            this.$l.vis = sampleProbeTile(
-              this,
-              this[PROBE_VISIBILITY],
-              this[`i${i}`],
-              this.p0.w,
-              this.p1.zw,
-              pb.div(this.toBiased, pb.max(this.dist, 1e-6))
-            );
-            this.$l.mean = this.vis.x;
-            this.$l.variance = pb.abs(pb.sub(pb.mul(this.mean, this.mean), this.vis.y));
-            this.$if(pb.greaterThan(this.dist, this.mean), function () {
-              this.$l.dd = pb.sub(this.dist, this.mean);
-              this.$l.cheb = pb.div(this.variance, pb.add(this.variance, pb.mul(this.dd, this.dd)));
-              this.w = pb.mul(this.w, pb.max(pb.mul(this.cheb, this.cheb, this.cheb), 0.05));
-            });
-            // Crush tiny weights to avoid noise from a nearly-blocked probe
-            this.$if(pb.lessThan(this.w, 0.2), function () {
-              this.w = pb.mul(this.w, pb.div(pb.mul(this.w, this.w), 0.04));
-            });
-            this.w = pb.mul(this.w, this.tri);
-            this.$l.irr = sampleProbeTile(
-              this,
-              this[PROBE_IRRADIANCE],
-              this[`i${i}`],
-              this.p0.z,
-              this.p1.xy,
-              this.n
-            );
-            this.sum = pb.add(this.sum, pb.mul(sky ? pb.vec3(this.irr.a) : this.irr.rgb, this.w));
-            this.wsum = pb.add(this.wsum, this.w);
+  pb.func(funcName, [pb.int('level'), pb.vec3('p'), pb.vec3('biased'), pb.vec3('n')], function () {
+    this.$l.p0 = this[PROBE_PARAMS].at(0);
+    this.$l.p1 = this[PROBE_PARAMS].at(1);
+    this.$l.lo = probeLevelOrigin(this, this.level);
+    this.$l.lg = probeLevelGrid(this, this.level);
+    this.$l.spacing = this.lo.w;
+    this.$l.origin = pb.ivec3(this.lo.xyz);
+    this.$l.n3 = pb.ivec3(this.lg.xyz);
+    this.$l.g = pb.sub(pb.div(this.biased, this.spacing), pb.vec3(this.origin));
+    this.$l.sum = pb.vec3(0);
+    this.$l.wsum = pb.float(0);
+    this.$l.inside = pb.and(
+      pb.all(pb.greaterThanEqual(this.g, pb.vec3(0))),
+      pb.all(pb.lessThanEqual(this.g, pb.sub(pb.vec3(this.n3), pb.vec3(1))))
+    );
+    this.$if(this.inside, function () {
+      this.$l.base = pb.ivec3(pb.clamp(pb.floor(this.g), pb.vec3(0), pb.sub(pb.vec3(this.n3), pb.vec3(2))));
+      this.$l.alpha = pb.clamp(pb.sub(this.g, pb.vec3(this.base)), pb.vec3(0), pb.vec3(1));
+      for (let i = 0; i < 8; i++) {
+        const off = [i & 1, (i >> 1) & 1, (i >> 2) & 1];
+        this.$l[`w${i}`] = pb.add(this.origin, this.base, pb.ivec3(off[0], off[1], off[2]));
+        this.$l[`t${i}`] = probeTexelFromWorld(this, this.level, this[`w${i}`]);
+        this.$l[`i${i}`] = probeTileIndex(this, this.level, this[`t${i}`]);
+        this.$l[`d${i}`] = this[PROBE_DATA].at(this[`i${i}`]);
+        // Updated and active: an inactive probe, buried in geometry, would
+        // only bring the dark of the inside (Majercik et al. 2021, probe
+        // classification)
+        this.$if(probeActive(this, this[`d${i}`]), function () {
+          this.$l.pp = probePosition(this, this.level, this[`w${i}`], this[`d${i}`]);
+          this.$l.tri = pb.mul(
+            off[0] ? this.alpha.x : pb.sub(1, this.alpha.x),
+            off[1] ? this.alpha.y : pb.sub(1, this.alpha.y),
+            off[2] ? this.alpha.z : pb.sub(1, this.alpha.z)
+          );
+          this.$l.dirToProbe = pb.normalize(pb.sub(this.pp, this.p));
+          // Wrap shading: a probe behind the surface still contributes a little
+          this.$l.wrap = pb.mul(pb.add(pb.dot(this.dirToProbe, this.n), 1), 0.5);
+          this.$l.w = pb.add(pb.mul(this.wrap, this.wrap), 0.2);
+          // Chebyshev visibility of the point as the probe sees the surface
+          this.$l.toBiased = pb.sub(this.biased, this.pp);
+          this.$l.dist = pb.length(this.toBiased);
+          this.$l.vis = sampleProbeTile(
+            this,
+            this[PROBE_VISIBILITY],
+            this[`i${i}`],
+            this.p0.w,
+            this.p1.zw,
+            pb.div(this.toBiased, pb.max(this.dist, 1e-6))
+          );
+          this.$l.mean = this.vis.x;
+          this.$l.variance = pb.abs(pb.sub(pb.mul(this.mean, this.mean), this.vis.y));
+          this.$if(pb.greaterThan(this.dist, this.mean), function () {
+            this.$l.dd = pb.sub(this.dist, this.mean);
+            this.$l.cheb = pb.div(this.variance, pb.add(this.variance, pb.mul(this.dd, this.dd)));
+            this.w = pb.mul(this.w, pb.max(pb.mul(this.cheb, this.cheb, this.cheb), 0.05));
           });
-        }
-      });
-      this.$return(pb.vec4(pb.div(this.sum, pb.max(this.wsum, 1e-5)), this.wsum));
-    }
-  );
+          // Crush tiny weights to avoid noise from a nearly-blocked probe
+          this.$if(pb.lessThan(this.w, 0.2), function () {
+            this.w = pb.mul(this.w, pb.div(pb.mul(this.w, this.w), 0.04));
+          });
+          this.w = pb.mul(this.w, this.tri);
+          this.$l.irr = sampleProbeTile(
+            this,
+            this[PROBE_IRRADIANCE],
+            this[`i${i}`],
+            this.p0.z,
+            this.p1.xy,
+            this.n
+          );
+          this.sum = pb.add(this.sum, pb.mul(sky ? pb.vec3(this.irr.a) : this.irr.rgb, this.w));
+          this.wsum = pb.add(this.wsum, this.w);
+        });
+      }
+    });
+    this.$return(pb.vec4(pb.div(this.sum, pb.max(this.wsum, 1e-5)), this.wsum));
+  });
   return scope[funcName](level, p, biased, n) as PBShaderExp;
 }
 

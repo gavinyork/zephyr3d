@@ -184,9 +184,6 @@ function buildOceanScene() {
   // both the foam and cresting here.
   const waves = new FFTWaveGenerator();
   waves.wind = new Vector2(11, 1);
-  waves.setWaveLength(0, 400);
-  waves.setWaveLength(1, 100);
-  waves.setWaveLength(2, 16);
   waves.setWaveStrength(0, 1.2);
   waves.setWaveStrength(1, 0.8);
   waves.setWaveStrength(2, 0.9);
@@ -295,9 +292,6 @@ function buildPoolScene() {
 
   const waves = new FFTWaveGenerator();
   waves.wind = new Vector2(1, 1);
-  waves.setWaveLength(0, 400);
-  waves.setWaveLength(1, 100);
-  waves.setWaveLength(2, 15);
   waves.setWaveStrength(0, 0.4);
   waves.setWaveStrength(1, 0.4);
   waves.setWaveStrength(2, 0.02);

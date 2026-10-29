@@ -1162,8 +1162,14 @@ export class FFTWaveGenerator extends Disposable implements WaveGenerator {
     const that = this;
     // Share of a cascade's slope variance its mip level keeps, linear between levels
     pb.func('fftSlopeRetained', [pb.float('lod'), pb.vec4('lo'), pb.vec4('hi')], function () {
-      this.$l.hatLo = pb.max(pb.sub(pb.vec4(1), pb.abs(pb.sub(pb.vec4(this.lod), pb.vec4(1, 2, 3, 4)))), pb.vec4(0));
-      this.$l.hatHi = pb.max(pb.sub(pb.vec4(1), pb.abs(pb.sub(pb.vec4(this.lod), pb.vec4(5, 6, 7, 8)))), pb.vec4(0));
+      this.$l.hatLo = pb.max(
+        pb.sub(pb.vec4(1), pb.abs(pb.sub(pb.vec4(this.lod), pb.vec4(1, 2, 3, 4)))),
+        pb.vec4(0)
+      );
+      this.$l.hatHi = pb.max(
+        pb.sub(pb.vec4(1), pb.abs(pb.sub(pb.vec4(this.lod), pb.vec4(5, 6, 7, 8)))),
+        pb.vec4(0)
+      );
       this.$return(
         pb.add(
           pb.max(pb.sub(1, this.lod), 0),

@@ -351,9 +351,6 @@ function buildScene() {
 
   const waves = new FFTWaveGenerator();
   waves.wind = new Vector2(1, 1);
-  waves.setWaveLength(0, 400);
-  waves.setWaveLength(1, 100);
-  waves.setWaveLength(2, 15);
   waves.setWaveStrength(0, 0.4);
   waves.setWaveStrength(1, 0.4);
   waves.setWaveStrength(2, 0.02);
