@@ -79,6 +79,39 @@ const REFINE_STEPS = 8;
 const VISIBILITY_RANGE = 2.6;
 /** Frames between relocations of an updated probe. */
 const RELOCATE_EVERY = 8;
+/** Most updates a probe counts since its maps started over. */
+const MAX_AGE = 255;
+/**
+ * Share a probe's short-term mean of its rays' irradiance keeps per update:
+ * a few updates' worth, against the long history of its map, so a change of
+ * the light shows through the noise of single updates. Where few rays find
+ * the light, a small sunlit patch seen through an opening, one update's noise
+ * can be twice the mean, and no single update tells a change from it.
+ */
+const CHANGE_FAST_KEEP = 0.75;
+/**
+ * Share the running variance of a probe's single updates about its
+ * short-term mean, relative to that mean, keeps per update.
+ */
+const CHANGE_NOISE_KEEP = 0.95;
+/**
+ * How far, in its own noise, the short-term mean may lie from the map before
+ * the map is taken to lag behind a change of the light.
+ */
+const CHANGE_THRESHOLD = 4;
+/** Most squared deviation of a single update from the short-term mean, relative to it, the variance takes in. */
+const CHANGE_MAX_DEVIATION = 16;
+/**
+ * The lag, in the short-term mean's noise, the map is let keep once a change
+ * is seen: the share an update keeps is cut to this over the lag measured, so
+ * a light that jumps is followed within a few updates and one that changes
+ * steadily is trailed by about this much.
+ */
+const CHANGE_KEPT_LAG = 2;
+/** Least noise of the short-term mean taken for the change test, as a share of it. */
+const CHANGE_NOISE_FLOOR = 0.02;
+/** Rec. 709 luminance weights, which the change test compares irradiance by. */
+const LUMINANCE: [number, number, number] = [0.2126, 0.7152, 0.0722];
 /** Bits of a selection entry: tile index, level, first-update flag. */
 const SELECT_INDEX_MASK = 0x00ffffff;
 const SELECT_LEVEL_SHIFT = 24;
@@ -120,7 +153,12 @@ export interface ProbeVolumeOptions {
   raysPerProbe: number;
   /** Probes updated per frame, all levels together. */
   budget: number;
-  /** Share of the previous value kept per update, 0 to 1. */
+  /**
+   * Most share of the previous value an update keeps, 0 to 1. A probe whose
+   * maps started over, new to its window, or whose rays bring irradiance
+   * farther from its map than their noise explains, the light having changed,
+   * keeps less until enough updates have come in again.
+   */
   hysteresis: number;
   /** Surface offset along the normal when sampling, in probe spacings of the level read. */
   normalBias: number;
@@ -241,6 +279,13 @@ export class ProbeVolume {
   private _rayFramebuffer: Nullable<FrameBuffer>;
   private _data: Nullable<GPUDataBuffer>;
   private _selected: Nullable<GPUDataBuffer>;
+  /**
+   * Per probe, (updates its irradiance has taken since starting over, the
+   * same for its visibility, short-term mean luminance of its rays, variance
+   * of single updates about that mean relative to it), the mean negative
+   * while unset.
+   */
+  private _ages: Nullable<GPUDataBuffer>;
   private readonly _selection: Uint32Array<ArrayBuffer>;
   private readonly _dataReset: Float32Array<ArrayBuffer>;
   private _frame: number;
@@ -302,6 +347,7 @@ export class ProbeVolume {
     this._rayFramebuffer = null;
     this._data = null;
     this._selected = null;
+    this._ages = null;
     this._selection = new Uint32Array(new ArrayBuffer(this._budget * 4));
     this._dataReset = new Float32Array(new ArrayBuffer(16));
     this._frame = 0;
@@ -608,6 +654,12 @@ export class ProbeVolume {
       this._visibility!.height
     );
     this._data!.bufferSubData(0, data);
+    // Saved maps have converged; the change test starts over from them
+    const ages = new Float32Array(this._count * 4);
+    for (let i = 0; i < this._count; i++) {
+      ages.set([MAX_AGE, MAX_AGE, -1, 0], i * 4);
+    }
+    this._ages!.bufferSubData(0, ages);
     this._levels.forEach((level, l) => {
       level.origin = header.origins[l];
       for (let i = 0; i < level.count; i++) {
@@ -637,7 +689,8 @@ export class ProbeVolume {
     this._rayFramebuffer = null;
     this._data?.dispose();
     this._selected?.dispose();
-    this._data = this._selected = null;
+    this._ages?.dispose();
+    this._data = this._selected = this._ages = null;
     for (const buffer of this._scratch.values()) {
       buffer.dispose();
     }
@@ -713,6 +766,7 @@ export class ProbeVolume {
     this._data = device.createBuffer(this._count * 16, { usage: 'uniform', storage: true })!;
     this._data.bufferSubData(0, new Float32Array(new ArrayBuffer(this._count * 16)));
     this._selected = device.createBuffer(this._budget * 4, { usage: 'uniform', storage: true })!;
+    this._ages = device.createBuffer(this._count * 16, { usage: 'uniform', storage: true })!;
     for (const level of this._levels) {
       level.state.fill(0);
     }
@@ -1312,6 +1366,7 @@ export class ProbeVolume {
       bg.setBuffer(PROBE_DATA, this._data!);
       bg.setValue(PROBE_PARAMS, this._params);
       bg.setBuffer('selected', this._selected!);
+      bg.setBuffer('ages', this._ages!);
       bg.setValue('rotation', this._rotation);
       bg.setValue('rayInfo', new Vector4(this._rays, this._budget, this._frame, this._options.hysteresis));
       bg.setTexture('rays', this._rayTexture!, fetchSampler('clamp_nearest_nomip'));
@@ -1397,7 +1452,11 @@ export class ProbeVolume {
         this[PROBE_DATA] = pb.vec4[0]().storageBuffer(0);
         this[PROBE_PARAMS] = pb.vec4[PROBE_PARAM_VEC4S]().uniform(0);
         this.selected = pb.uint[0]().storageBufferReadonly(0);
+        // Per probe, (irradiance updates, visibility updates since starting
+        // over, short-term mean luminance, its relative update variance)
+        this.ages = pb.vec4[0]().storageBuffer(0);
         this.rotation = pb.vec4().uniform(0);
+        // (rays per probe, probes selected, frame, most share of the maps an update keeps)
         this.rayInfo = pb.vec4().uniform(0);
         this.rays = pb.tex2D().sampleType('unfilterable-float').uniform(0);
         this.current = pb.tex2D().sampleType('unfilterable-float').uniform(0);
@@ -1408,6 +1467,12 @@ export class ProbeVolume {
         // A batch of the probe's rays, direction and traced result, read once per workgroup
         this.batchDir = pb.vec4[BLEND_BATCH]().workgroup();
         this.batchRay = pb.vec4[BLEND_BATCH]().workgroup();
+        if (!visibility) {
+          // Each texel's luminance, of the rays and of the map, then the share
+          // of the map the probe keeps in [0]
+          this.lumNew = pb.float[texels * texels]().workgroup();
+          this.lumOld = pb.float[texels * texels]().workgroup();
+        }
         pb.main(function () {
           this.$l.slot = this.$builtins.workGroupId.x;
           this.$l.sel = this.selected.at(this.slot);
@@ -1420,6 +1485,9 @@ export class ProbeVolume {
             pb.greaterThan(pb.compAnd(this.sel, pb.uint(SELECT_FIRST_BIT)), pb.uint(0)),
             pb.lessThan(this.probeState, 0.5)
           );
+          // Read here by every thread, before the barriers of the ray batches;
+          // the first thread writes it back once they are all past them
+          this.$l.ageIn = this.ages.at(this.index);
           this.$l.uv = pb.ivec2(this.$builtins.localInvocationId.xy);
           // Border texels mirror the interior: take the direction of the texel they copy
           const s = texels;
@@ -1516,7 +1584,105 @@ export class ProbeVolume {
           this.$l.origin = probeTileOrigin(this, this.index, pb.float(s));
           this.$l.texel = pb.add(this.origin, this.uv);
           this.$l.old = pb.textureLoad(this.current, this.texel, 0);
-          this.$l.h = this.$choice(this.first, pb.float(0), this.rayInfo.w);
+          // The share of the maps the update keeps: k / (k + 2) after k updates
+          // since starting over, so the maps hold the mean of the later half of
+          // them, up to the volume's hysteresis
+          this.$l.age = this.$choice(this.first, pb.float(0), visibility ? this.ageIn.y : this.ageIn.x);
+          if (visibility) {
+            this.$l.h = this.$choice(
+              this.first,
+              pb.float(0),
+              pb.min(this.rayInfo.w, pb.div(this.age, pb.add(this.age, 2)))
+            );
+            this.$if(pb.equal(this.thread, 0), function () {
+              this.ages.setAt(
+                this.index,
+                pb.vec4(this.ageIn.x, pb.min(pb.add(this.age, 1), MAX_AGE), this.ageIn.z, this.ageIn.w)
+              );
+            });
+          } else {
+            // Whether the light changed, from the probe's mean luminance over
+            // its interior texels: a short-term mean of what the rays bring
+            // set against the map's, in the short-term mean's own noise, taken
+            // from the running variance of single updates about it. RTXGI's
+            // probe blending cuts the hysteresis on a fixed difference of one
+            // update; a mean over a few, measured against their own spread,
+            // tells a change from noise where single updates cannot. The
+            // variance is kept relative to the mean and scaled back by the
+            // darker of the two sides, so a probe turning dark is not judged
+            // by the noise of its bright past, and the update is tested
+            // against the variance before it, so a jump does not widen the
+            // noise it is measured by.
+            this.$l.interior = pb.not(pb.or(this.onX, this.onY));
+            this.lumNew.setAt(
+              this.thread,
+              this.$choice(this.interior, pb.dot(this.result.rgb, pb.vec3(...LUMINANCE)), pb.float(0))
+            );
+            this.lumOld.setAt(
+              this.thread,
+              this.$choice(this.interior, pb.dot(this.old.rgb, pb.vec3(...LUMINANCE)), pb.float(0))
+            );
+            pb.workgroupBarrier();
+            this.$if(pb.equal(this.thread, 0), function () {
+              this.$l.rayLum = pb.float(0);
+              this.$l.mapLum = pb.float(0);
+              this.$for(pb.int('ci'), 0, texels * texels, function () {
+                this.rayLum = pb.add(this.rayLum, this.lumNew.at(this.ci));
+                this.mapLum = pb.add(this.mapLum, this.lumOld.at(this.ci));
+              });
+              const interiorTexels = (texels - 2) * (texels - 2);
+              this.rayLum = pb.div(this.rayLum, interiorTexels);
+              this.mapLum = pb.div(this.mapLum, interiorTexels);
+              this.$l.keep = pb.min(this.rayInfo.w, pb.div(this.age, pb.add(this.age, 2)));
+              this.$l.fast = this.ageIn.z;
+              this.$l.spread = this.ageIn.w;
+              this.$if(pb.or(this.first, pb.lessThan(this.fast, 0)), function () {
+                // Starting over: single updates taken to stray half the mean
+                // until they have shown how far, so little is seen to change
+                this.fast = this.rayLum;
+                this.spread = pb.float(0.25);
+              }).$else(function () {
+                this.$l.deviation = pb.div(pb.sub(this.rayLum, this.fast), pb.max(this.fast, 1e-8));
+                this.fast = pb.mix(this.rayLum, this.fast, CHANGE_FAST_KEEP);
+                // The short-term mean's share of the spread of single updates
+                // about the previous one
+                const c = (1 - CHANGE_FAST_KEEP) / (1 + CHANGE_FAST_KEEP);
+                this.$l.noiseFloor = pb.mul(pb.max(this.fast, this.mapLum), CHANGE_NOISE_FLOOR);
+                this.$l.noise = pb.max(
+                  pb.max(
+                    pb.mul(pb.sqrt(pb.mul(this.spread, c / (1 + c))), pb.min(this.fast, this.mapLum)),
+                    this.noiseFloor
+                  ),
+                  1e-6
+                );
+                this.spread = pb.mix(
+                  pb.min(pb.mul(this.deviation, this.deviation), CHANGE_MAX_DEVIATION),
+                  this.spread,
+                  CHANGE_NOISE_KEEP
+                );
+                this.$l.lag = pb.div(pb.abs(pb.sub(this.fast, this.mapLum)), this.noise);
+                this.$if(pb.greaterThan(this.lag, CHANGE_THRESHOLD), function () {
+                  // Cut to keep the lag near CHANGE_KEPT_LAG, counting the
+                  // updates on from the age that keeps as much
+                  this.$l.cut = pb.min(pb.div(CHANGE_KEPT_LAG, this.lag), 1);
+                  this.$if(pb.lessThan(this.cut, this.keep), function () {
+                    this.keep = this.cut;
+                    this.age = pb.div(pb.mul(this.cut, 2), pb.sub(1, this.cut));
+                  });
+                });
+              });
+              this.$if(this.first, function () {
+                this.keep = pb.float(0);
+              });
+              this.ages.setAt(
+                this.index,
+                pb.vec4(pb.min(pb.add(this.age, 1), MAX_AGE), this.ageIn.y, this.fast, this.spread)
+              );
+              this.lumNew.setAt(0, this.keep);
+            });
+            pb.workgroupBarrier();
+            this.$l.h = this.lumNew.at(0);
+          }
           this.$l.value = pb.mix(this.result, this.old, this.h);
           // Staged by selection slot; runCommit copies the tile into the map
           pb.textureStore(
