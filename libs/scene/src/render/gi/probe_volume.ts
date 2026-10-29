@@ -51,9 +51,13 @@ import {
   PROBE_PARAMS,
   PROBE_STATE_INACTIVE,
   PROBE_VISIBILITY,
+  probeActive,
+  probeLevelGrid,
   probeLevelOrigin,
   probePosition,
   probeTexelFromIndex,
+  probeTexelFromWorld,
+  probeTileIndex,
   probeTileOrigin,
   probeWorldFromTexel,
   quatRotate,
@@ -208,8 +212,9 @@ export function getActiveProbeVolume(scene: Scene): Nullable<ProbeVolume> {
  *
  * Every level's window follows the camera a spacing at a time, probes
  * addressed toroidally by world index; a probe entering a window starts
- * over. Probes inside geometry or too near it are pushed out along the
- * field's gradient.
+ * over, its irradiance seeded from the level above where that holds it
+ * ({@link ProbeVolume.runSeed}). Probes inside geometry or too near it are
+ * pushed out along the field's gradient.
  *
  * The state can be saved ({@link ProbeVolume.exportState}) and restored, for
  * a scene whose lighting is then frozen.
@@ -228,6 +233,8 @@ export class ProbeVolume {
   private readonly _budget: number;
   private _irradiance: Nullable<Texture2D>;
   private _irradianceNext: Nullable<Texture2D>;
+  /** Irradiance seeds of one update's probes starting over, by selection slot like the blend outputs. */
+  private _irradianceSeed: Nullable<Texture2D>;
   private _visibility: Nullable<Texture2D>;
   private _visibilityNext: Nullable<Texture2D>;
   /**
@@ -252,6 +259,8 @@ export class ProbeVolume {
   private readonly _prng: PRNG;
   private _relocateProgram: Nullable<GPUProgram>;
   private _relocateBindGroup: Nullable<BindGroup>;
+  private _seedProgram: Nullable<GPUProgram>;
+  private _seedBindGroup: Nullable<BindGroup>;
   private _traceProgram: Nullable<GPUProgram>;
   private _traceBindGroup: Nullable<BindGroup>;
   private _traceKey: string;
@@ -292,6 +301,7 @@ export class ProbeVolume {
     this._budget = Math.max(1, Math.min(this._count, Math.floor(options.budget)));
     this._irradiance = null;
     this._irradianceNext = null;
+    this._irradianceSeed = null;
     this._visibility = null;
     this._visibilityNext = null;
     this._visibilityFormat = getDevice().getDeviceCaps().textureCaps.getTextureFormatInfo('rg16f')?.writable
@@ -312,6 +322,8 @@ export class ProbeVolume {
     this._prng = new PRNG(1234);
     this._relocateProgram = null;
     this._relocateBindGroup = null;
+    this._seedProgram = null;
+    this._seedBindGroup = null;
     this._traceProgram = null;
     this._traceBindGroup = null;
     this._traceKey = '';
@@ -411,6 +423,9 @@ export class ProbeVolume {
     // A fresh random rotation of the ray set each update
     this.randomRotation();
     RenderGraphExecutor.profileScope('ProbeRelocate', () => this.runRelocate(global, selected));
+    // After the relocation, which decides which probes start over, and before
+    // the blend, which reads the seeds
+    RenderGraphExecutor.profileScope('ProbeSeed', () => this.runSeed(selected));
     RenderGraphExecutor.profileScope('ProbeTrace', () => this.runTrace(global, voxels, camera, selected));
     this.runBlend(selected);
     RenderGraphExecutor.profileScope('ProbeCommit', () => this.runCommit(selected));
@@ -620,6 +635,7 @@ export class ProbeVolume {
     for (const tex of [
       this._irradiance,
       this._irradianceNext,
+      this._irradianceSeed,
       this._visibility,
       this._visibilityNext,
       this._rayTexture
@@ -628,6 +644,7 @@ export class ProbeVolume {
     }
     this._irradiance =
       this._irradianceNext =
+      this._irradianceSeed =
       this._visibility =
       this._visibilityNext =
       this._rayTexture =
@@ -643,6 +660,7 @@ export class ProbeVolume {
     this._scratch.clear();
     for (const bg of [
       this._relocateBindGroup,
+      this._seedBindGroup,
       this._traceBindGroup,
       this._blendIrrBindGroup,
       this._blendVisBindGroup,
@@ -652,6 +670,7 @@ export class ProbeVolume {
     }
     for (const prog of [
       this._relocateProgram,
+      this._seedProgram,
       this._traceProgram,
       this._blendIrrProgram,
       this._blendVisProgram,
@@ -661,6 +680,7 @@ export class ProbeVolume {
     }
     this._relocateBindGroup = this._traceBindGroup = this._blendIrrBindGroup = this._blendVisBindGroup = null;
     this._relocateProgram = this._traceProgram = this._blendIrrProgram = this._blendVisProgram = null;
+    this._seedProgram = this._seedBindGroup = null;
     this._commitProgram = this._commitBindGroup = null;
     for (const level of this._levels) {
       level.origin = null;
@@ -692,6 +712,7 @@ export class ProbeVolume {
     // The blend outputs hold one update's tiles, committed to the maps after
     const stagingRows = Math.ceil(this._budget / STAGING_COLS);
     this._irradianceNext = make(IRRADIANCE_TEXELS, '@ProbeIrradianceNext', STAGING_COLS, stagingRows);
+    this._irradianceSeed = make(IRRADIANCE_TEXELS, '@ProbeIrradianceSeed', STAGING_COLS, stagingRows);
     this._visibility = make(
       VISIBILITY_TEXELS,
       '@ProbeVisibility',
@@ -991,6 +1012,134 @@ export class ProbeVolume {
     device.compute(Math.ceil(selected / 64), 1, 1);
   }
   /**
+   * Seeds the irradiance of the selected probes that start over from the
+   * level above, as Godot's SDFGI fills a probe scrolled into a cascade from
+   * the next cascade's probes (sdfgi_integrate.glsl, MODE_SCROLL): the eight
+   * probes of that level around it, weighted trilinearly by its position, the
+   * same texel of each tile, all tiles sharing one octahedral layout. Its
+   * first update then blends into the seed with the volume's hysteresis, as
+   * into a history, so the noise of a single update does not become its value
+   * for the seconds the hysteresis takes to wash it out. Only probes of that
+   * level that are updated and active count: an inactive one holds the dark
+   * of the inside, one not yet updated nothing. With none of them, or in the
+   * coarsest level, the seed is marked missing (alpha -1) and the probe starts
+   * from its first update alone. One workgroup per selected probe, written by
+   * selection slot like the blend outputs.
+   * @internal
+   */
+  private runSeed(selected: number) {
+    const device = getDevice();
+    if (!this._seedProgram) {
+      this._seedProgram = buildSDFProgram({
+        label: 'ProbeSeed',
+        workgroupSize: [IRRADIANCE_TEXELS, IRRADIANCE_TEXELS, 1],
+        compute(pb) {
+          this[PROBE_DATA] = pb.vec4[0]().storageBufferReadonly(0);
+          this[PROBE_PARAMS] = pb.vec4[PROBE_PARAM_VEC4S]().uniform(0);
+          this.selected = pb.uint[0]().storageBufferReadonly(0);
+          this.irradiance = pb.tex2D().sampleType('unfilterable-float').uniform(0);
+          this.seedOut = pb.texStorage2D.rgba16float().storage(0);
+          pb.main(function () {
+            this.$l.slot = this.$builtins.workGroupId.x;
+            this.$l.sel = this.selected.at(this.slot);
+            this.$l.index = pb.int(pb.compAnd(this.sel, pb.uint(SELECT_INDEX_MASK)));
+            this.$l.level = pb.int(pb.compAnd(pb.sar(this.sel, SELECT_LEVEL_SHIFT), pb.uint(0x7f)));
+            this.$l.uv = pb.ivec2(this.$builtins.localInvocationId.xy);
+            this.$l.data = this[PROBE_DATA].at(this.index);
+            // Starting over as the blend tells it
+            this.$l.first = pb.or(
+              pb.greaterThan(pb.compAnd(this.sel, pb.uint(SELECT_FIRST_BIT)), pb.uint(0)),
+              pb.lessThan(this.data.w, 0.5)
+            );
+            this.$l.parent = pb.add(this.level, 1);
+            this.$l.sum = pb.vec4(0);
+            this.$l.wsum = pb.float(0);
+            this.$if(
+              pb.and(this.first, pb.lessThan(this.parent, pb.int(this[PROBE_PARAMS].at(0).x))),
+              function () {
+                this.$l.texel = probeTexelFromIndex(this, this.level, this.index);
+                this.$l.pos = probePosition(
+                  this,
+                  this.level,
+                  probeWorldFromTexel(this, this.level, this.texel),
+                  this.data
+                );
+                this.$l.lo = probeLevelOrigin(this, this.parent);
+                this.$l.n3 = pb.vec3(probeLevelGrid(this, this.parent).xyz);
+                // In probes of the level above, its grid points at integers
+                this.$l.g = pb.sub(pb.div(this.pos, this.lo.w), this.lo.xyz);
+                this.$if(
+                  pb.and(
+                    pb.all(pb.greaterThanEqual(this.g, pb.vec3(0))),
+                    pb.all(pb.lessThanEqual(this.g, pb.sub(this.n3, pb.vec3(1))))
+                  ),
+                  function () {
+                    this.$l.base = pb.clamp(pb.floor(this.g), pb.vec3(0), pb.sub(this.n3, pb.vec3(2)));
+                    this.$l.alpha = pb.clamp(pb.sub(this.g, this.base), pb.vec3(0), pb.vec3(1));
+                    for (let i = 0; i < 8; i++) {
+                      const off = [i & 1, (i >> 1) & 1, (i >> 2) & 1];
+                      this.$l[`pw${i}`] = pb.add(
+                        pb.ivec3(this.lo.xyz),
+                        pb.ivec3(this.base),
+                        pb.ivec3(off[0], off[1], off[2])
+                      );
+                      this.$l[`pi${i}`] = probeTileIndex(
+                        this,
+                        this.parent,
+                        probeTexelFromWorld(this, this.parent, this[`pw${i}`])
+                      );
+                      this.$if(probeActive(this, this[PROBE_DATA].at(this[`pi${i}`])), function () {
+                        this.$l.tri = pb.mul(
+                          off[0] ? this.alpha.x : pb.sub(1, this.alpha.x),
+                          off[1] ? this.alpha.y : pb.sub(1, this.alpha.y),
+                          off[2] ? this.alpha.z : pb.sub(1, this.alpha.z)
+                        );
+                        this.sum = pb.add(
+                          this.sum,
+                          pb.mul(
+                            pb.textureLoad(
+                              this.irradiance,
+                              pb.add(
+                                probeTileOrigin(this, this[`pi${i}`], pb.float(IRRADIANCE_TEXELS)),
+                                this.uv
+                              ),
+                              0
+                            ),
+                            this.tri
+                          )
+                        );
+                        this.wsum = pb.add(this.wsum, this.tri);
+                      });
+                    }
+                  }
+                );
+              }
+            );
+            pb.textureStore(
+              this.seedOut,
+              pb.uvec2(pb.add(stagingOrigin(this, this.slot, IRRADIANCE_TEXELS), this.uv)),
+              this.$choice(
+                pb.greaterThan(this.wsum, 1e-4),
+                pb.div(this.sum, pb.max(this.wsum, 1e-4)),
+                pb.vec4(0, 0, 0, -1)
+              )
+            );
+          });
+        }
+      })!;
+      this._seedBindGroup = device.createBindGroup(this._seedProgram.bindGroupLayouts[0]);
+    }
+    const bg = this._seedBindGroup!;
+    bg.setBuffer(PROBE_DATA, this._data!);
+    bg.setValue(PROBE_PARAMS, this._params);
+    bg.setBuffer('selected', this._selected!);
+    bg.setTexture('irradiance', this._irradiance!, fetchSampler('clamp_nearest_nomip'));
+    bg.setTexture('seedOut', this._irradianceSeed!);
+    device.setProgram(this._seedProgram);
+    device.setBindGroup(0, bg);
+    device.compute(selected, 1, 1);
+  }
+  /**
    * Traces the rays of the selected probes: one fragment per ray, the hit's
    * voxel radiance or the sky, and the hit distance (negative when the ray
    * started inside geometry, {@link SKY_ESCAPE_DISTANCE} when it escaped to
@@ -1269,23 +1418,28 @@ export class ProbeVolume {
     }
     // The irradiance blend marks the probes updated, so it goes last: both read
     // whether a probe starts over from its state before then
-    const passes: [string, GPUProgram, BindGroup, Texture2D, Texture2D][] = [
+    const passes: [string, GPUProgram, BindGroup, Texture2D, Texture2D, Nullable<Texture2D>][] = [
       [
         'ProbeBlendVisibility',
         this._blendVisProgram!,
         this._blendVisBindGroup!,
         this._visibility!,
-        this._visibilityNext!
+        this._visibilityNext!,
+        null
       ],
       [
         'ProbeBlendIrradiance',
         this._blendIrrProgram,
         this._blendIrrBindGroup!,
         this._irradiance!,
-        this._irradianceNext!
+        this._irradianceNext!,
+        this._irradianceSeed!
       ]
     ];
-    for (const [scope, program, bg, current, next] of passes) {
+    for (const [scope, program, bg, current, next, seed] of passes) {
+      if (seed) {
+        bg.setTexture('seedTex', seed, fetchSampler('clamp_nearest_nomip'));
+      }
       bg.setBuffer(PROBE_DATA, this._data!);
       bg.setValue(PROBE_PARAMS, this._params);
       bg.setBuffer('selected', this._selected!);
@@ -1378,6 +1532,10 @@ export class ProbeVolume {
         this.rayInfo = pb.vec4().uniform(0);
         this.rays = pb.tex2D().sampleType('unfilterable-float').uniform(0);
         this.current = pb.tex2D().sampleType('unfilterable-float').uniform(0);
+        if (!visibility) {
+          // Seeds of the probes starting over, by selection slot (runSeed)
+          this.seedTex = pb.tex2D().sampleType('unfilterable-float').uniform(0);
+        }
         this.next =
           visibility && twoChannel
             ? pb.texStorage2D.rg16float().storage(0)
@@ -1494,6 +1652,21 @@ export class ProbeVolume {
           this.$l.texel = pb.add(this.origin, this.uv);
           this.$l.old = pb.textureLoad(this.current, this.texel, 0);
           this.$l.h = this.$choice(this.first, pb.float(0), this.rayInfo.w);
+          if (!visibility) {
+            // A probe starting over blends into its seed as into a history,
+            // where the level above gave one (alpha -1 where it did not)
+            this.$if(this.first, function () {
+              this.$l.seedValue = pb.textureLoad(
+                this.seedTex,
+                pb.add(stagingOrigin(this, this.slot, s), this.uv),
+                0
+              );
+              this.$if(pb.greaterThanEqual(this.seedValue.a, 0), function () {
+                this.old = this.seedValue;
+                this.h = this.rayInfo.w;
+              });
+            });
+          }
           this.$l.value = pb.mix(this.result, this.old, this.h);
           // Staged by selection slot; runCommit copies the tile into the map
           pb.textureStore(
