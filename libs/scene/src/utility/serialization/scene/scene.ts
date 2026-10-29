@@ -237,6 +237,23 @@ export function getSceneClass(manager: ResourceManager): SerializableClass {
           }
         },
         {
+          name: 'GIProbeHysteresis',
+          description:
+            'How long bounced light holds on to what it showed before. Higher keeps it steadier in a still view but slower to follow a light or camera change; lower follows sooner with more flicker.',
+          type: 'float',
+          default: 0.97,
+          options: { group: 'Global Illumination', minValue: 0.5, maxValue: 0.99 },
+          isHidden(this: Scene) {
+            return !this.gi.enabled;
+          },
+          get(this: Scene, value) {
+            value.num[0] = this.gi.probeHysteresis;
+          },
+          set(this: Scene, value) {
+            this.gi.probeHysteresis = value.num[0];
+          }
+        },
+        {
           name: 'GIProbeLevels',
           description:
             'Nested probe volumes around the camera, each twice as coarse and as wide as the one inside it. More levels carry bounced light farther out, each adding as many probes as the finest, so every probe is refreshed less often; one level covers only the finest volume.',
