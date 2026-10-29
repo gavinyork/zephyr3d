@@ -44,9 +44,7 @@ import {
 import {
   octDecode,
   PROBE_DATA,
-  PROBE_FIELD_PARAMS,
   PROBE_IRRADIANCE,
-  PROBE_MAX_FIELD_LEVELS,
   PROBE_MAX_LEVELS,
   PROBE_PARAM_VEC4S,
   PROBE_PARAMS,
@@ -71,6 +69,8 @@ const STAGING_COLS = 64;
 const BLEND_BATCH = 128;
 /** Sphere tracing steps of a probe ray. */
 const TRACE_STEPS = 48;
+/** Steps a probe ray takes past its hit on the swollen surface to find the field's own. */
+const REFINE_STEPS = 8;
 /**
  * Probe spacings out to which the visibility maps hold distances, farther hits
  * clamped to it: a little beyond the spacing, the moments only having to tell
@@ -89,8 +89,9 @@ const STATE_MAGIC = 0x50494a5a; // 'ZJIP'
  * 2: irradiance stored at the fixed cache exposure (see getGICacheExposure).
  * 3: sky visibility in the irradiance alpha.
  * 4: irradiance from voxel radiance kept per face (light anisotropy).
+ * 5: visibility distances to the field's own surface, not the swollen one.
  */
-const STATE_VERSION = 4;
+const STATE_VERSION = 5;
 /**
  * Hit distance a ray that escaped to the sky writes: beyond any trace length,
  * so the irradiance blend can count escapes, within half float range. The
@@ -832,14 +833,6 @@ export class ProbeVolume {
       p.set([origin[0], origin[1], origin[2], level.spacing], 12 + l * 8);
       p.set([level.grid[0], level.grid[1], level.grid[2], level.tileBase], 16 + l * 8);
     });
-    // The global field's windows, for the surface expand a surface reading the probes allows for
-    const sdf = this._scene.sdf;
-    const global = sdf.enabled ? sdf.global : null;
-    const fieldLevels = global ? Math.min(global.levels, PROBE_MAX_FIELD_LEVELS) : 0;
-    p.set([fieldLevels, global?.resolution ?? 0, 0, 0], PROBE_FIELD_PARAMS * 4);
-    if (global) {
-      p.set(global.levelInfo.subarray(0, fieldLevels * 4), (PROBE_FIELD_PARAMS + 1) * 4);
-    }
   }
   /** @internal */
   private bindCommon(bg: BindGroup, global: NonNullable<SceneSDF['global']>) {
@@ -1118,7 +1111,8 @@ export class ProbeVolume {
               this.$l.t = pb.float(0);
               this.$l.hit = false;
               this.$l.prevD = pb.float(0);
-              this.$l.hitT = pb.float(0);
+              // Distance read at the hit
+              this.$l.hitD = pb.float(0);
               // Voxel size of the level that answered at the hit, 0 for a dynamic instance
               this.$l.hitVoxel = pb.float(0);
               // Finest field level the step that hit could read
@@ -1131,9 +1125,9 @@ export class ProbeVolume {
                 this.prevD = this.d;
                 this.$l.expand = sdfSurfaceExpand(this, this.sp, this.s, this.t, levels);
                 this.$if(pb.lessThan(this.d, this.expand), function () {
-                  // On the surface swollen by the expand, as Lumen places the hit:
-                  // where along the ray the step stopped no longer shows in it
-                  this.hitT = pb.max(pb.sub(pb.add(this.t, this.d), this.expand), 0);
+                  // The swollen surface decides the hit, so walls thinner than a
+                  // voxel still stop the ray
+                  this.hitD = this.d;
                   this.hit = true;
                   this.hitVoxel = this.s.y;
                   this.hitMin = this.stepMin;
@@ -1145,10 +1139,43 @@ export class ProbeVolume {
                 });
               });
               this.$if(this.hit, function () {
-                // The probe sees surfaces swollen by the expand; a surface reading
-                // the probes moves its point out by as much (fieldExpandAt in
-                // sampleProbeIrradiance) to stay on the visible side
-                this.dist = this.hitT;
+                // The distance kept is to the field's own surface: on to where it
+                // crosses zero, or to its least value for a wall too thin to read
+                // negative. The swollen surface sits a voxel short of it along its
+                // normal, so a surface reading the probes could step out along its
+                // own normal to meet the hit there; in a concave corner a point
+                // within a voxel of the other surface never steps out of that
+                // surface's swelling, and every probe on its side saw it hidden.
+                this.$l.rt = this.t;
+                this.$l.rd = this.hitD;
+                this.dist = pb.max(pb.add(this.t, pb.min(this.hitD, 0)), 0);
+                this.$if(pb.greaterThan(this.rd, 0), function () {
+                  this.dist = this.rt;
+                  this.$l.rStep = pb.mul(pb.max(this.hitVoxel, this[GLOBAL_SDF_LEVELS].at(0).w), 0.125);
+                  this.$for(pb.int('r'), 0, REFINE_STEPS, function () {
+                    this.$l.nt = pb.add(this.rt, pb.max(this.rd, this.rStep));
+                    this.$l.nd = sampleSceneSDFHinted(
+                      this,
+                      pb.add(this.pos, pb.mul(this.dir, this.nt)),
+                      this.rd,
+                      levels,
+                      this.hitMin
+                    ).x;
+                    this.$if(pb.lessThanEqual(this.nd, 0), function () {
+                      this.dist = pb.add(
+                        this.rt,
+                        pb.mul(pb.sub(this.nt, this.rt), pb.div(this.rd, pb.sub(this.rd, this.nd)))
+                      );
+                      this.$break();
+                    });
+                    this.$if(pb.greaterThanEqual(this.nd, this.rd), function () {
+                      this.$break();
+                    });
+                    this.rt = this.nt;
+                    this.rd = this.nd;
+                    this.dist = this.rt;
+                  });
+                });
                 this.$l.hp = pb.add(this.pos, pb.mul(this.dir, this.t));
                 // The side of the surface the ray came from: the field's gradient
                 // at the hit
