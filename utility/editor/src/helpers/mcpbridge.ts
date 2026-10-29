@@ -4409,11 +4409,14 @@ ${err.stack}`
       if (resolved.err) {
         return { bounds: null, err: resolved.err };
       }
+      const includeChildren = params?.include_children !== false;
       const min = [Infinity, Infinity, Infinity];
       const max = [-Infinity, -Infinity, -Infinity];
       let found = false;
       // Group nodes have no bounding volume of their own; aggregate the
       // subtree so bounds work for compound objects assembled under a parent.
+      // That also takes in editor helpers such as a light's gizmo proxy, so
+      // the caller can ask for the node alone.
       const visit = (node: SceneNode) => {
         const aabb = node.getWorldBoundingVolume()?.toAABB();
         if (aabb) {
@@ -4427,15 +4430,19 @@ ${err.stack}`
           max[1] = Math.max(max[1], hi.y);
           max[2] = Math.max(max[2], hi.z);
         }
-        for (const child of node.children) {
-          visit(child);
+        if (includeChildren) {
+          for (const child of node.children) {
+            visit(child);
+          }
         }
       };
       visit(resolved.node);
       if (!found) {
         return {
           bounds: null,
-          err: 'Node subtree has no bounding volume (empty groups and lights have no bounds)'
+          err: includeChildren
+            ? 'Node subtree has no bounding volume (empty groups and directional lights have no bounds)'
+            : 'Node has no bounding volume of its own (group nodes and directional lights have none); pass include_children: true to merge its descendants'
         };
       }
       return {

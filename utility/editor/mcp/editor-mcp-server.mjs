@@ -2531,12 +2531,18 @@ const BASE_TOOLS = [
   {
     name: 'node_get_world_bounds',
     description:
-      'Get the world-space axis-aligned bounding box of a scene node, aggregated over its whole subtree. Returns { bounds: { min, max, center, size }, err }. Use this to verify part placement numerically when assembling compound objects (e.g. a wing should touch the body: wing.min/max should meet the body bounds) instead of judging alignment from screenshots alone.',
+      'Get the world-space axis-aligned bounding box of a scene node, by default aggregated over its whole subtree. Returns { bounds: { min, max, center, size }, err }. Use this to verify part placement numerically when assembling compound objects (e.g. a wing should touch the body: wing.min/max should meet the body bounds) instead of judging alignment from screenshots alone. Pass include_children: false to measure the node alone, e.g. the culling bounds of a light, which the editor gizmo child would otherwise widen.',
     inputSchema: {
       type: 'object',
       required: ['id'],
       properties: {
         id: { type: 'string', description: 'Persistent id of the scene node.' },
+        include_children: {
+          type: 'boolean',
+          default: true,
+          description:
+            'Merge the bounds of every descendant, editor helper nodes included. False returns the bounds of this node only.'
+        },
         timeout_ms: { type: 'number', default: 10000 }
       }
     }
@@ -4164,7 +4170,11 @@ const handlers = {
     return bridge.send('sceneCheckpoint', { label: args.label }, Number(args.timeout_ms ?? 30000));
   },
   async node_get_world_bounds(args) {
-    return bridge.send('nodeGetWorldBounds', { id: args.id }, Number(args.timeout_ms ?? 10000));
+    return bridge.send(
+      'nodeGetWorldBounds',
+      { id: args.id, include_children: args.include_children ?? true },
+      Number(args.timeout_ms ?? 10000)
+    );
   },
   async asset_import_from_url(args) {
     // Download happens here in the Node worker (no renderer CORS limits);
