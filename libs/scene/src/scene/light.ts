@@ -1,6 +1,7 @@
-import type { Immutable, Matrix4x4, Nullable } from '@zephyr3d/base';
-import { Vector3, Vector4, DWeakRef } from '@zephyr3d/base';
+import type { Immutable, Nullable } from '@zephyr3d/base';
+import { Matrix4x4, Vector3, Vector4, DWeakRef } from '@zephyr3d/base';
 import { GraphNode } from './graph_node';
+import type { BoundingVolume } from '../utility/bounding_volume';
 import { BoundingBox } from '../utility/bounding_volume';
 import { ShadowMapper } from '../shadow/shadowmapper';
 import { LIGHT_TYPE_DIRECTIONAL, LIGHT_TYPE_POINT, LIGHT_TYPE_SPOT, LIGHT_TYPE_RECT } from '../values';
@@ -211,6 +212,26 @@ export class PunctualLight extends BaseLight {
   constructor(scene: Scene, type: number) {
     super(scene, type);
     this.ensurePunctualState();
+  }
+  /**
+   * {@inheritDoc SceneNode.computeWorldBoundingVolume}
+   *
+   * @remarks
+   * The local bounds are built from the range in world units, the same value
+   * the shader uses, so they are placed with the world rotation and position
+   * only. Scaling a light changes neither its reach nor its cone.
+   *
+   * @override
+   */
+  computeWorldBoundingVolume(localBV: Nullable<BoundingVolume>): Nullable<BoundingVolume> {
+    if (!localBV) {
+      return null;
+    }
+    const m = new Matrix4x4(this.worldMatrix as Matrix4x4);
+    for (let i = 0; i < 3; i++) {
+      m.setRow(i, m.getRow(i).inplaceNormalize());
+    }
+    return localBV.transform(m);
   }
   /** @internal */
   protected ensurePunctualState() {
@@ -697,9 +718,8 @@ export class PointLight extends PunctualLight {
     if (intensity !== this._luminousIntensity) {
       this._luminousIntensity = intensity;
       this.invalidateUniforms();
-      if (this._range <= 0) {
-        this.invalidateBoundingVolume();
-      }
+      // computeUniforms caps a set range by the derived one too, so the bounds follow either way.
+      this.invalidateBoundingVolume();
     }
   }
   /**
@@ -729,6 +749,19 @@ export class PointLight extends PunctualLight {
     return this;
   }
   /**
+   * {@inheritDoc BaseLight.setIntensity}
+   * @override
+   */
+  setIntensity(val: number) {
+    const changed = val !== this._intensity;
+    super.setIntensity(val);
+    // The range is capped by the one the intensity gives, and with it the culling bounds.
+    if (changed) {
+      this.invalidateBoundingVolume();
+    }
+    return this;
+  }
+  /**
    * Sets the diffuse scale of the light
    * @param val - The value to set
    * @returns self
@@ -738,6 +771,7 @@ export class PointLight extends PunctualLight {
     if (this._diffuseScale !== val) {
       this._diffuseScale = val;
       this.invalidateUniforms();
+      this.invalidateBoundingVolume();
     }
     return this;
   }
@@ -751,6 +785,7 @@ export class PointLight extends PunctualLight {
     if (this._specularScale !== val) {
       this._specularScale = val;
       this.invalidateUniforms();
+      this.invalidateBoundingVolume();
     }
     return this;
   }
@@ -858,6 +893,19 @@ export class SpotLight extends PunctualLight {
     if (this._range !== val) {
       this._range = val;
       this.invalidateUniforms();
+      this.invalidateBoundingVolume();
+    }
+    return this;
+  }
+  /**
+   * {@inheritDoc BaseLight.setIntensity}
+   * @override
+   */
+  setIntensity(val: number) {
+    const changed = val !== this._intensity;
+    super.setIntensity(val);
+    // The automatic range follows the intensity, and with it the culling bounds.
+    if (changed && this._range <= 0) {
       this.invalidateBoundingVolume();
     }
     return this;
