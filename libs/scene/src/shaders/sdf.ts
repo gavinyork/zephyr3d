@@ -500,6 +500,74 @@ export function sampleSceneSDFHinted(
   return scope[funcName](worldPos, prevDist, minLevel ?? pb.int(0)) as PBShaderExp;
 }
 
+/** Steps {@link sdfRefineHit} takes past a hit on the swollen surface. @internal */
+export const SDF_REFINE_STEPS = 8;
+
+/**
+ * Distance along a sphere trace's ray to the field's own surface, from where
+ * the trace stopped on the surface swollen by {@link sdfSurfaceExpand}: `t`
+ * along the ray from `origin`, `d` the distance read there, `voxel` the voxel
+ * size of the level that answered (0 for a dynamic instance), `minLevel` the
+ * finest level the trace read. The ray goes on to where the field crosses
+ * zero, or to its least value for a wall too thin to read negative, at most
+ * {@link SDF_REFINE_STEPS} steps of at least an eighth of a voxel.
+ *
+ * The swollen surface decides the hit, so walls thinner than a voxel still
+ * stop the ray, but it lies a voxel short of the surface along its normal:
+ * in a concave corner a point within a voxel of the other surface never
+ * steps out of that surface's swelling along its own normal. Whatever reads
+ * where the ray met the scene takes this distance.
+ * @internal
+ */
+export function sdfRefineHit(
+  scope: PBInsideFunctionScope,
+  origin: PBShaderExp,
+  dir: PBShaderExp,
+  t: PBShaderExp,
+  d: PBShaderExp,
+  voxel: PBShaderExp,
+  minLevel: PBShaderExp,
+  levels: number
+) {
+  const pb = scope.$builder;
+  const funcName = 'Z_sdfRefineHit';
+  pb.func(
+    funcName,
+    [pb.vec3('o'), pb.vec3('dir'), pb.float('t'), pb.float('d'), pb.float('voxel'), pb.int('minLevel')],
+    function () {
+      // Stopped inside: back out by as much
+      this.$if(pb.lessThanEqual(this.d, 0), function () {
+        this.$return(pb.max(pb.add(this.t, this.d), 0));
+      });
+      this.$l.rt = this.t;
+      this.$l.rd = this.d;
+      this.$l.rStep = pb.mul(pb.max(this.voxel, this[GLOBAL_SDF_LEVELS].at(0).w), 0.125);
+      this.$for(pb.int('r'), 0, SDF_REFINE_STEPS, function () {
+        this.$l.nt = pb.add(this.rt, pb.max(this.rd, this.rStep));
+        this.$l.nd = sampleSceneSDFHinted(
+          this,
+          pb.add(this.o, pb.mul(this.dir, this.nt)),
+          this.rd,
+          levels,
+          this.minLevel
+        ).x;
+        this.$if(pb.lessThanEqual(this.nd, 0), function () {
+          this.$return(
+            pb.add(this.rt, pb.mul(pb.sub(this.nt, this.rt), pb.div(this.rd, pb.sub(this.rd, this.nd))))
+          );
+        });
+        this.$if(pb.greaterThanEqual(this.nd, this.rd), function () {
+          this.$break();
+        });
+        this.rt = this.nt;
+        this.rd = this.nd;
+      });
+      this.$return(this.rt);
+    }
+  );
+  return scope[funcName](origin, dir, t, d, voxel, minLevel) as PBShaderExp;
+}
+
 /**
  * {@link sampleGlobalSDF} with the voxel size of the level that answered:
  * (distance, voxel size), both in world units. Levels finer than `minLevel`

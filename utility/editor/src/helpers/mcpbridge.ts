@@ -4378,6 +4378,12 @@ ${err.stack}`
           err: 'openScene requires `path`, for example /assets/scene.zscn'
         };
       }
+      if (!editor.currentProject) {
+        return {
+          ...getStatus(editor),
+          err: 'No project is currently opened; open the project holding the scene first'
+        };
+      }
       const controller = getSceneController(editor);
       if (!controller?.openScene) {
         await editor.moduleManager.activate('Scene', '');
