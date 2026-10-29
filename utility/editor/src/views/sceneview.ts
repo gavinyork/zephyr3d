@@ -1323,7 +1323,7 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
       this._statusbar.height -
       this._assetView!.panel.height;
 
-    this._menubar.render(this.controller.editor.currentProject.name);
+    this._menubar.render(this.controller.editor.currentProject?.name ?? '');
 
     if (
       this._leftDockPanel!.begin(
