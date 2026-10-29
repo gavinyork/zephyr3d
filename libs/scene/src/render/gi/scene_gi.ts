@@ -200,7 +200,7 @@ export class SceneGI {
       this.rebuildProbes();
     }
   }
-  /** Most share of a probe's previous value an update keeps, 0 to 1; less while it builds up again after starting over or once its rays show the light changed. */
+  /** Share of a probe's previous value kept per update, 0 to 1. */
   get probeHysteresis() {
     return this._probeOptions.hysteresis;
   }
