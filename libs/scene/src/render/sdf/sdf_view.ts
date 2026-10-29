@@ -11,6 +11,7 @@ import {
   sampleGlobalSDF,
   sampleSceneSDF,
   sampleSceneSDFHinted,
+  sdfRefineHit,
   sdfSurfaceExpand
 } from '../../shaders/sdf';
 import {
@@ -96,7 +97,6 @@ function getProgram(levels: number, mode: SceneSDFViewMode) {
           this.$l.hit = false;
           this.$l.prevD = pb.float(0);
           this.$l.hitT = pb.float(0);
-          this.$l.hitExpand = pb.float(0);
           this.$for(pb.int('i'), 0, MAX_STEPS, function () {
             this.$l.sp = pb.add(this.cameraInfo.xyz, pb.mul(this.dir, this.t));
             this.$l.s = sampleSceneSDFHinted(this, this.sp, this.prevD, levels);
@@ -104,11 +104,24 @@ function getProgram(levels: number, mode: SceneSDFViewMode) {
             this.prevD = this.d;
             this.steps = pb.add(this.steps, 1);
             // The hit test of the global illumination's rays: surfaces swollen
-            // by a voxel of the level read
+            // by a voxel of the level read. The probe views read the volume
+            // where the ray meets the field's own surface, as a surface there
+            // shades with it; the voxel views read where the trace stopped, as
+            // a probe ray reads the voxel radiance: on the surface itself the
+            // nearest voxel, half the field's resolution, often lies inside
+            // the geometry and holds no light
             this.$l.expand = sdfSurfaceExpand(this, this.sp, this.s, this.t, levels);
             this.$if(pb.lessThan(this.d, this.expand), function () {
-              this.hitT = pb.max(pb.sub(pb.add(this.t, this.d), this.expand), 0);
-              this.hitExpand = this.expand;
+              this.hitT = sdfRefineHit(
+                this,
+                this.cameraInfo.xyz,
+                this.dir,
+                this.t,
+                this.d,
+                this.s.y,
+                pb.int(0),
+                levels
+              );
               this.hit = true;
               this.$break();
             });
@@ -130,8 +143,7 @@ function getProgram(levels: number, mode: SceneSDFViewMode) {
           } else if (readsProbes(mode)) {
             this.$outputs.color = this.miss;
             this.$if(this.hit, function () {
-              // From the swollen surface the trace hit back onto the field's own,
-              // where the depth buffer would put a fragment
+              // On the field's own surface, where the depth buffer would put a fragment
               this.$l.hp = pb.add(this.cameraInfo.xyz, pb.mul(this.dir, this.hitT));
               this.$l.e = pb.mul(this.cameraInfo.w, 0.0005);
               this.$l.n = pb.normalize(
@@ -150,7 +162,6 @@ function getProgram(levels: number, mode: SceneSDFViewMode) {
                   )
                 )
               );
-              this.hp = pb.sub(this.hp, pb.mul(this.n, this.hitExpand));
               if (mode === 'skyVisibility') {
                 // The visibility as a surface reads it, unshaded so the values read
                 // directly: white sees the whole sky, black none; magenta where no

@@ -30,6 +30,7 @@ import {
   sampleGlobalSDFLevel,
   sampleSceneSDF,
   sampleSceneSDFHinted,
+  sdfRefineHit,
   sdfSurfaceExpand
 } from '../../shaders/sdf';
 import {
@@ -69,8 +70,6 @@ const STAGING_COLS = 64;
 const BLEND_BATCH = 128;
 /** Sphere tracing steps of a probe ray. */
 const TRACE_STEPS = 48;
-/** Steps a probe ray takes past its hit on the swollen surface to find the field's own. */
-const REFINE_STEPS = 8;
 /**
  * Probe spacings out to which the visibility maps hold distances, farther hits
  * clamped to it: a little beyond the spacing, the moments only having to tell
@@ -1193,43 +1192,21 @@ export class ProbeVolume {
                 });
               });
               this.$if(this.hit, function () {
-                // The distance kept is to the field's own surface: on to where it
-                // crosses zero, or to its least value for a wall too thin to read
-                // negative. The swollen surface sits a voxel short of it along its
-                // normal, so a surface reading the probes could step out along its
-                // own normal to meet the hit there; in a concave corner a point
-                // within a voxel of the other surface never steps out of that
-                // surface's swelling, and every probe on its side saw it hidden.
-                this.$l.rt = this.t;
-                this.$l.rd = this.hitD;
-                this.dist = pb.max(pb.add(this.t, pb.min(this.hitD, 0)), 0);
-                this.$if(pb.greaterThan(this.rd, 0), function () {
-                  this.dist = this.rt;
-                  this.$l.rStep = pb.mul(pb.max(this.hitVoxel, this[GLOBAL_SDF_LEVELS].at(0).w), 0.125);
-                  this.$for(pb.int('r'), 0, REFINE_STEPS, function () {
-                    this.$l.nt = pb.add(this.rt, pb.max(this.rd, this.rStep));
-                    this.$l.nd = sampleSceneSDFHinted(
-                      this,
-                      pb.add(this.pos, pb.mul(this.dir, this.nt)),
-                      this.rd,
-                      levels,
-                      this.hitMin
-                    ).x;
-                    this.$if(pb.lessThanEqual(this.nd, 0), function () {
-                      this.dist = pb.add(
-                        this.rt,
-                        pb.mul(pb.sub(this.nt, this.rt), pb.div(this.rd, pb.sub(this.rd, this.nd)))
-                      );
-                      this.$break();
-                    });
-                    this.$if(pb.greaterThanEqual(this.nd, this.rd), function () {
-                      this.$break();
-                    });
-                    this.rt = this.nt;
-                    this.rd = this.nd;
-                    this.dist = this.rt;
-                  });
-                });
+                // The distance kept is to the field's own surface: a surface
+                // reading the probes, in a concave corner within a voxel of the
+                // other surface, never steps out of the swelling of that one
+                // along its own normal, and every probe on its side would see it
+                // hidden (sdfRefineHit)
+                this.dist = sdfRefineHit(
+                  this,
+                  this.pos,
+                  this.dir,
+                  this.t,
+                  this.hitD,
+                  this.hitVoxel,
+                  this.hitMin,
+                  levels
+                );
                 this.$l.hp = pb.add(this.pos, pb.mul(this.dir, this.t));
                 // The side of the surface the ray came from: the field's gradient
                 // at the hit
