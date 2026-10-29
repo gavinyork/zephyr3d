@@ -129,8 +129,6 @@ export interface ProbeVolumeOptions {
   intensity: number;
   /** Distance a ray of the finest level gives up at, in world units; coarser levels go proportionally farther. */
   maxRayDistance: number;
-  /** Whether a surface weighs each probe by the Chebyshev visibility test of its depth moments. */
-  chebyshevTest: boolean;
 }
 
 /**
@@ -838,7 +836,7 @@ export class ProbeVolume {
     const sdf = this._scene.sdf;
     const global = sdf.enabled ? sdf.global : null;
     const fieldLevels = global ? Math.min(global.levels, PROBE_MAX_FIELD_LEVELS) : 0;
-    p.set([fieldLevels, global?.resolution ?? 0, o.chebyshevTest ? 1 : 0, 0], PROBE_FIELD_PARAMS * 4);
+    p.set([fieldLevels, global?.resolution ?? 0, 0, 0], PROBE_FIELD_PARAMS * 4);
     if (global) {
       p.set(global.levelInfo.subarray(0, fieldLevels * 4), (PROBE_FIELD_PARAMS + 1) * 4);
     }

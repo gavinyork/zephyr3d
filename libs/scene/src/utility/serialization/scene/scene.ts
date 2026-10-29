@@ -254,23 +254,6 @@ export function getSceneClass(manager: ResourceManager): SerializableClass {
           }
         },
         {
-          name: 'GIProbeChebyshevTest',
-          description:
-            'Hide the light of probes that cannot see the surface, such as those behind a wall or inside an object. On cuts light leaking through walls and darkens corners where probes are cut off; off gives smoother bounced light that can bleed through thin walls.',
-          type: 'bool',
-          default: false,
-          options: { group: 'Global Illumination' },
-          isHidden(this: Scene) {
-            return !this.gi.enabled;
-          },
-          get(this: Scene, value) {
-            value.bool[0] = this.gi.probeChebyshevTest;
-          },
-          set(this: Scene, value) {
-            this.gi.probeChebyshevTest = value.bool[0];
-          }
-        },
-        {
           name: 'GIUpdateMode',
           description:
             'Continuous keeps the bounced light following the sun, the lights and the camera. Frozen stops it where it is: cheaper, and right for a scene whose lighting does not change, but the volume no longer follows the camera.',

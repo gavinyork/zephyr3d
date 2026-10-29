@@ -79,8 +79,7 @@ export class SceneGI {
       normalBias: 0.12,
       viewBias: 0.48,
       intensity: 1,
-      maxRayDistance: 48,
-      chebyshevTest: false
+      maxRayDistance: 48
     };
     this._probes = null;
     this._updateMode = 'continuous';
@@ -232,17 +231,6 @@ export class SceneGI {
   }
   set probeViewBias(val: number) {
     this._probeOptions.viewBias = Math.max(0, val);
-  }
-  /**
-   * Whether a surface weighs each probe by the Chebyshev test of the probe's
-   * depth moments (DDGI visibility), cutting the light of probes behind walls.
-   * Off by default.
-   */
-  get probeChebyshevTest() {
-    return this._probeOptions.chebyshevTest;
-  }
-  set probeChebyshevTest(val: boolean) {
-    this._probeOptions.chebyshevTest = !!val;
   }
   /** @internal */
   private rebuildProbes() {
