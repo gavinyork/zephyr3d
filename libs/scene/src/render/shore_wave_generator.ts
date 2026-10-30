@@ -1114,9 +1114,19 @@ export class ShoreWaveGenerator extends Disposable implements WaveGenerator, Foa
         // are 0, so switching to the next wave's noise shows no seam
         this.$l.crestSegment = segment(this, pb.floor(pb.add(this.phase, 0.5)));
         this.waveSet = pb.mul(this.waveSet, this.crestSegment);
+        // Bed B the surf here comes in on. Inland the water comes up from the
+        // waterline, so the bed there counts too: the top of a rock or a pier
+        // standing out of the water is flat, but the water meets it at a wall
+        // and never runs up onto it as onto a beach
+        this.$l.bedSlope = this.wl.y;
+        this.$if(pb.lessThan(this.d, 0), function () {
+          this.$l.footWl = pb.vec4(0);
+          that.waterlineAt(this, this.foot, this.footWl);
+          this.bedSlope = pb.min(this.bedSlope, this.footWl.y);
+        });
         // Only where the bed shelves (surf rolls in on a beach, not against a
         // cliff, pier or hull), faded out towards the edge of the grid
-        this.$l.shelving = pb.mul(pb.smoothStep(SHELVING_MIN, SHELVING_FULL, this.wl.y), this.gridFade);
+        this.$l.shelving = pb.mul(pb.smoothStep(SHELVING_MIN, SHELVING_FULL, this.bedSlope), this.gridFade);
         // Rising out of the sea over the outer part of the zone
         this.$l.amp = pb.mul(
           this.swWave.x,
@@ -1127,7 +1137,7 @@ export class ShoreWaveGenerator extends Disposable implements WaveGenerator, Foa
         );
         this.$l.height = pb.mul(this.profile, this.amp);
         // Keep the whole soft edge on the wet side of the bed intersection.
-        this.$l.edgeSoft = pb.div(SWASH_EDGE_SOFT, pb.clamp(this.wl.y, 1, B_MAX));
+        this.$l.edgeSoft = pb.div(SWASH_EDGE_SOFT, pb.clamp(this.bedSlope, 1, B_MAX));
         this.coverage = pb.smoothStep(0, this.edgeSoft, pb.sub(this.height, this.wl.z));
         // Slope along the distance to the shore: X runs seaward at 1 / spacing,
         // and stands still inland where the phase is frozen
@@ -1165,7 +1175,7 @@ export class ShoreWaveGenerator extends Disposable implements WaveGenerator, Foa
         // crest must not drop the mesh under a swash that is still draining.
         // Actual water is bounded by coverage, independently of this mesh.
         this.$l.highest = this.swWave.x;
-        this.$l.reach = pb.mul(this.highest, pb.clamp(this.wl.y, 1, B_MAX));
+        this.$l.reach = pb.mul(this.highest, pb.clamp(this.bedSlope, 1, B_MAX));
         this.dir.w = this.$choice(
           pb.and(
             pb.and(
@@ -1189,7 +1199,7 @@ export class ShoreWaveGenerator extends Disposable implements WaveGenerator, Foa
         // (X, the phase there being frozen at its waterline value)
         this.$if(pb.lessThan(this.d, 0), function () {
           this.$l.s = pb.neg(this.d);
-          this.$l.bedB = pb.clamp(this.wl.y, 1, B_MAX);
+          this.$l.bedB = pb.clamp(this.bedSlope, 1, B_MAX);
           this.$l.runUp = pb.mul(this.swWave.x, this.swashSet, this.shelving);
           this.$l.runUpH = pb.max(pb.mul(this.runUp, this.bedB), 1e-3);
           // Up and back in 2 u0 / (g tan(beta)) = 2 B sqrt(2 height / g) seconds
@@ -1207,16 +1217,23 @@ export class ShoreWaveGenerator extends Disposable implements WaveGenerator, Foa
             pb.mul(4, this.runUpH, this.tt, pb.sub(1, this.tt)),
             pb.float(0)
           );
-          // h = (s_f - s)^2 / (36 g' t^2) with g' tan(beta) = 8 runUpH / duration^2
-          this.$l.behind = pb.sub(this.front, this.s);
+          // h = (s_f - s)^2 / (36 g' t^2) with g' tan(beta) = 8 runUpH / duration^2.
+          // The sheet climbs a bed of slope 1 / B, so a bed standing higher
+          // than that would put it here lies as far up as its height says: on
+          // a plain beach the same as the way in, and past the front on a
+          // ledge or a rock top above the reach of the swash
+          this.$l.behind = pb.sub(this.front, pb.max(this.s, pb.mul(this.wl.z, this.bedB)));
           this.$l.depth = pb.div(
             pb.mul(this.behind, this.behind),
             pb.mul(288, this.runUpH, this.bedB, pb.max(pb.mul(this.tt, this.tt), 1e-6))
           );
+          // Where the sheet is not, below the rest level and the bed: never
+          // lifting the mesh, which a bed high above the water would otherwise
+          // pull up through whatever stands there
           this.$l.swash = this.$choice(
             pb.greaterThan(this.behind, 0),
             pb.add(this.wl.z, this.depth),
-            pb.sub(this.wl.z, 1)
+            pb.sub(pb.min(this.wl.z, 0), 1)
           );
           // Its water's velocity, u = ds_f/dt + (2/3)(s - s_f) / t, in metres per
           // second: t is tt durations of periods
