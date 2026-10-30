@@ -1271,6 +1271,14 @@ export class ShoreWaveGenerator extends Disposable implements WaveGenerator, Foa
           // The swash runs up as a sheet, not squeezed
           this.det = pb.float(1);
         });
+        // No surf where the bed does not shelve (a wall, a hull, a rock or box
+        // standing out of the sea): the depth test meets the water with what
+        // stands there, as without shore waves. Cutting by the bed there opens
+        // holes along the object, whose cells read a bed above the rest level
+        // up to a cell outside it.
+        this.$if(pb.lessThanEqual(this.shelving, 0), function () {
+          this.coverage = pb.float(1);
+        });
         this.surf.w = pb.max(pb.sub(this.height, this.wl.z), 0);
         this.$return(pb.vec4(this.height, this.slope, this.det, this.flow));
       }
