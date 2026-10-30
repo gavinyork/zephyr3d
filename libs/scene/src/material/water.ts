@@ -209,6 +209,8 @@ const HORIZON_REFLECT_BIAS = 0.08;
 const REFRACT_EDGE_FADE = 0.06;
 /** Normalized depth at or above which the scene behind the water is sky. */
 const SCENE_SKY_DEPTH01 = 0.999;
+/** Medium path, in meters, through water with only sky behind it: deep enough to absorb everything. */
+const SKY_MEDIUM_PATH = 1e4;
 /** Floor on the subsurface term's sun-alignment factor. */
 const SSS_SUN_ALIGN_FLOOR = 0.15;
 /** Floor on the subsurface term's grazing-view factor. */
@@ -1847,8 +1849,11 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
         this.$l.faceNormal = this.$choice(this.underwater, pb.neg(this.normal), this.normal);
         this.$l.eta = this.$choice(this.underwater, pb.float(WATER_TO_AIR_ETA), pb.float(AIR_TO_WATER_ETA));
         this.$l.uvBase = this.waterRefractProjectUV(this.worldPos);
+        // Sky behind the water has no bottom. Its point lies on the far plane,
+        // so the straight distance falls to 0 where the surface crosses that
+        // plane and the water there would show the sky unabsorbed.
         this.$if(pb.greaterThanEqual(this.straightDepth01, SCENE_SKY_DEPTH01), function () {
-          this.$return(pb.vec3(this.screenUV, this.straightDist));
+          this.$return(pb.vec3(this.screenUV, SKY_MEDIUM_PATH));
         });
         this.$l.waterCrossDir = pb.normalize(pb.sub(this.straightWorldPos, this.worldPos));
         // refractDir = view line + (refract by wave normal - refract by flat
