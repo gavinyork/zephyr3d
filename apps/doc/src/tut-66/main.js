@@ -132,6 +132,7 @@ myApp.ready().then(function () {
 
 function buildOceanScene() {
   const scene = new Scene();
+  scene.env.sky.cloudMode = 'volumetric';
 
   const sun = new DirectionalLight(scene);
   sun.rotation.fromEulerAngle(-Math.PI / 4, Math.PI / 4, 0);
@@ -178,15 +179,15 @@ function buildOceanScene() {
   water.position.setXYZ(0, 2, 0);
   water.gridScale = 1;
   water.animationSpeed = 2;
-  water.infinite = false;
+  water.infinite = true;
 
   // FFT rather than FBM, so the surface genuinely folds - that is what feeds
   // both the foam and cresting here.
   const waves = new FFTWaveGenerator();
-  waves.wind = new Vector2(11, 1);
+  waves.wind = new Vector2(12, 1);
   waves.setWaveStrength(0, 1.2);
-  waves.setWaveStrength(1, 0.8);
-  waves.setWaveStrength(2, 0.9);
+  waves.setWaveStrength(1, 1.2);
+  waves.setWaveStrength(2, 1.2);
   waves.setWaveCroppiness(0, -2.2);
   waves.setWaveCroppiness(1, -2);
   waves.setWaveCroppiness(2, -1.4);
