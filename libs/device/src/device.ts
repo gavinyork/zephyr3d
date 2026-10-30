@@ -63,6 +63,11 @@ import type {
   DeviceViewport,
   DrawTextLayoutOptions,
   FrameBufferClearColors,
+  PipelineCacheData,
+  PipelineCacheStats,
+  PipelinePrecompileJob,
+  PipelinePrecompileOptions,
+  PipelinePrecompileResult,
   PipelineRecorder,
   TimestampQueryFilter,
   TimestampQueryHandle,
@@ -665,6 +670,29 @@ export abstract class BaseDevice extends Observable<DeviceEventMap> {
   }
   getPipelineRecorder(): Nullable<PipelineRecorder> {
     return null;
+  }
+  precompilePipelines(
+    _data: PipelineCacheData | PipelineCacheData[],
+    _options?: PipelinePrecompileOptions
+  ): PipelinePrecompileJob {
+    const result: PipelinePrecompileResult = {
+      total: 0,
+      completed: 0,
+      failed: 0,
+      skipped: 0,
+      cancelled: false,
+      elapsedMs: 0
+    };
+    return {
+      progress: result,
+      done: true,
+      priority: 'foreground',
+      result: Promise.resolve(result),
+      cancel() {}
+    };
+  }
+  getPipelineCacheStats(): PipelineCacheStats {
+    return { precompiled: 0, precompiledUsed: 0, onDemand: 0, onDemandPrograms: [] };
   }
   beginTimestampQuery(_label?: string, _options?: TimestampQueryOptions): number {
     return 0;

@@ -7,7 +7,7 @@ import { getFrameBufferContentHash, getRenderPipelineContentHash } from './pipel
 import { hashString } from './content_hash';
 
 /** Version of the pipeline cache files this backend writes and reads */
-const PIPELINE_CACHE_VERSION = 1;
+export const PIPELINE_CACHE_VERSION = 1;
 
 /**
  * A bind group layout as stored in a pipeline cache file
@@ -26,12 +26,17 @@ type TagRecords = {
 
 /**
  * Key of a recorded render pipeline on a device: pipelines drawn to the canvas take
- * the canvas formats of that device
+ * the canvas formats of that device. The sample count is kept: alpha to coverage
+ * depends on it, and the record only holds what it came to
  * @internal
  */
 export function getRenderRecordKey(record: WebGPURenderPipelineRecord, device: WebGPUDevice) {
   const frameBuffer = record.backbuffer
-    ? getFrameBufferContentHash([device.backbufferFormat], device.backbufferDepthFormat, device.sampleCount)
+    ? getFrameBufferContentHash(
+        [device.backbufferFormat],
+        record.depth ? device.backbufferDepthFormat : '',
+        record.samples
+      )
     : getFrameBufferContentHash(record.colors, record.depth, record.samples);
   return getRenderPipelineContentHash(
     record.program,

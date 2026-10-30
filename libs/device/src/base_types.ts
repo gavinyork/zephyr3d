@@ -2785,6 +2785,86 @@ export interface PipelineRecorder {
 }
 
 /**
+ * How eagerly pipelines are compiled ahead of time.
+ *
+ * @remarks
+ * `foreground` compiles as fast as the browser allows, for a loading screen.
+ * `background` keeps few pipelines compiling at once and spreads the work over
+ * frames, to compile what is needed next while the application runs.
+ * @public
+ */
+export type PipelinePrecompilePriority = 'foreground' | 'background';
+
+/**
+ * Progress of compiling pipelines ahead of time
+ * @public
+ */
+export interface PipelinePrecompileProgress {
+  /** Pipelines in the job */
+  total: number;
+  /** Pipelines compiled */
+  completed: number;
+  /** Pipelines that failed to compile */
+  failed: number;
+  /** Pipelines not compiled: already compiled or compiling, unreadable, or left when the job was cancelled */
+  skipped: number;
+}
+
+/**
+ * Outcome of compiling pipelines ahead of time
+ * @public
+ */
+export interface PipelinePrecompileResult extends PipelinePrecompileProgress {
+  /** Whether the job was cancelled before it compiled everything */
+  cancelled: boolean;
+  /** Time from the start of the job to its end */
+  elapsedMs: number;
+}
+
+/**
+ * Options of compiling pipelines ahead of time
+ * @public
+ */
+export interface PipelinePrecompileOptions {
+  /** How eagerly to compile, defaults to `foreground` */
+  priority?: PipelinePrecompilePriority;
+  /** Called whenever a pipeline of the job is accounted for */
+  onProgress?: (progress: Readonly<PipelinePrecompileProgress>) => void;
+}
+
+/**
+ * Pipelines being compiled ahead of time
+ * @public
+ */
+export interface PipelinePrecompileJob {
+  /** Progress so far */
+  readonly progress: Readonly<PipelinePrecompileProgress>;
+  /** Whether every pipeline of the job is accounted for, or the job was cancelled */
+  readonly done: boolean;
+  /** How eagerly the rest of the job is compiled; can be changed while it runs */
+  priority: PipelinePrecompilePriority;
+  /** Resolves when the job is done */
+  readonly result: Promise<PipelinePrecompileResult>;
+  /** Compiles nothing more; pipelines already compiling are still kept */
+  cancel(): void;
+}
+
+/**
+ * How the pipelines of a device were made
+ * @public
+ */
+export interface PipelineCacheStats {
+  /** Pipelines compiled ahead of time */
+  precompiled: number;
+  /** Pipelines compiled ahead of time that draws or dispatches have used */
+  precompiledUsed: number;
+  /** Pipelines a draw or dispatch had to compile when it was issued, stalling it */
+  onDemand: number;
+  /** Programs of the most recent pipelines compiled on demand, oldest first */
+  onDemandPrograms: string[];
+}
+
+/**
  * Abstract interface for the rendering device.
  * @public
  */
@@ -3278,6 +3358,24 @@ export interface AbstractDevice extends IEventTarget<DeviceEventMap> {
    * @returns The recorder, or null if the device has no pipelines to record
    */
   getPipelineRecorder(): Nullable<PipelineRecorder>;
+  /**
+   * Compiles recorded pipelines ahead of time, so draws and dispatches that need them
+   * later do not stall on compiling them.
+   *
+   * @remarks
+   * Recordings of another device type are skipped. Pipelines compile in the background
+   * of the browser; nothing waits for them unless the caller awaits the job.
+   *
+   * @param data - Recordings made by {@link PipelineRecorder.export}
+   * @param options - Priority and progress callback
+   * @returns The job compiling them
+   */
+  precompilePipelines(
+    data: PipelineCacheData | PipelineCacheData[],
+    options?: PipelinePrecompileOptions
+  ): PipelinePrecompileJob;
+  /** Gets how the pipelines of the device were made */
+  getPipelineCacheStats(): PipelineCacheStats;
   /** Get the video memory usage in bytes */
   videoMemoryUsage: number;
   /** Get the current frame information */

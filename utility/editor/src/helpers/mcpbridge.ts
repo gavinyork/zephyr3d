@@ -1,4 +1,5 @@
 import type { Editor } from '../core/editor';
+import type { PipelineCacheData, PipelinePrecompilePriority } from '@zephyr3d/device';
 import type { Camera } from '@zephyr3d/scene';
 import type { PropertyValue, Material } from '@zephyr3d/scene';
 import type { Primitive } from '@zephyr3d/scene';
@@ -1962,6 +1963,8 @@ ${err.stack}`
       return getGIStats(getSceneController(editor), params);
     case 'pipeline_recorder':
       return runPipelineRecorder(params);
+    case 'pipeline_cache':
+      return runPipelineCache(params);
     case 'gi_voxel_query':
       try {
         return await queryGIVoxels(getSceneController(editor), params);
@@ -4519,6 +4522,28 @@ function runPipelineRecorder(params: { action?: string; tag?: string | null }) {
     ...(params.action === 'export' ? { data: recorder.export(params.tag ?? null) } : {}),
     err: null
   };
+}
+
+async function runPipelineCache(params: {
+  action?: string;
+  data?: PipelineCacheData | PipelineCacheData[];
+  priority?: PipelinePrecompilePriority;
+}) {
+  const device = getDevice();
+  switch (params?.action) {
+    case 'stats':
+      return { stats: device.getPipelineCacheStats(), err: null };
+    case 'precompile': {
+      if (!params.data) {
+        return { err: 'precompile needs data' };
+      }
+      const job = device.precompilePipelines(params.data, { priority: params.priority ?? 'foreground' });
+      const result = await job.result;
+      return { result, stats: device.getPipelineCacheStats(), err: null };
+    }
+    default:
+      return { err: `Unknown action: ${params?.action}` };
+  }
 }
 
 function getStatus(editor: Editor) {

@@ -1,5 +1,5 @@
 import { primitiveTypeMap } from './constants_webgpu';
-import type { PrimitiveType } from '@zephyr3d/device';
+import type { PipelineCacheStats, PrimitiveType } from '@zephyr3d/device';
 import { PBPrimitiveTypeInfo, PBPrimitiveType } from '@zephyr3d/device';
 import * as rs from './renderstates_webgpu';
 import type { WebGPUVertexLayout } from './vertexlayout_webgpu';
@@ -78,13 +78,21 @@ type RenderPipelineEntry = {
   /** Key of the pipeline in every session */
   key: string;
   record: WebGPURenderPipelineRecord;
+  /** Compiled ahead of time; used once a draw asked for it */
+  precompiled?: boolean;
+  used?: boolean;
 };
 
 type ComputePipelineEntry = {
   pipeline: GPUComputePipeline;
   key: string;
   record: WebGPUComputePipelineRecord;
+  precompiled?: boolean;
+  used?: boolean;
 };
+
+/** Programs of pipelines compiled on demand that the stats keep */
+const MAX_ON_DEMAND_PROGRAMS = 256;
 
 /** @internal */
 export function getFrameBufferContentHash(
@@ -141,18 +149,61 @@ export class PipelineCache {
   private _computePipelines: Record<string, ComputePipelineEntry>;
   private _renderPipelinesByContent: Map<string, RenderPipelineEntry>;
   private _computePipelinesByContent: Map<string, ComputePipelineEntry>;
+  private readonly _stats: PipelineCacheStats;
   constructor(device: WebGPUDevice) {
     this._device = device;
     this._renderPipelines = {};
     this._computePipelines = {};
     this._renderPipelinesByContent = new Map();
     this._computePipelinesByContent = new Map();
+    this._stats = { precompiled: 0, precompiledUsed: 0, onDemand: 0, onDemandPrograms: [] };
   }
   wipeCache() {
     this._renderPipelines = {};
     this._computePipelines = {};
     this._renderPipelinesByContent = new Map();
     this._computePipelinesByContent = new Map();
+  }
+  getStats(): PipelineCacheStats {
+    return { ...this._stats, onDemandPrograms: [...this._stats.onDemandPrograms] };
+  }
+  /** Whether a render pipeline of a content key is compiled */
+  hasRenderPipeline(key: string) {
+    return this._renderPipelinesByContent.has(key);
+  }
+  hasComputePipeline(key: string) {
+    return this._computePipelinesByContent.has(key);
+  }
+  /** Adds a pipeline compiled ahead of time, unless a draw compiled it meanwhile */
+  addPrecompiledRenderPipeline(key: string, pipeline: GPURenderPipeline, record: WebGPURenderPipelineRecord) {
+    if (!this._renderPipelinesByContent.has(key)) {
+      this._renderPipelinesByContent.set(key, { pipeline, key, record, precompiled: true, used: false });
+      this._stats.precompiled++;
+    }
+  }
+  addPrecompiledComputePipeline(
+    key: string,
+    pipeline: GPUComputePipeline,
+    record: WebGPUComputePipelineRecord
+  ) {
+    if (!this._computePipelinesByContent.has(key)) {
+      this._computePipelinesByContent.set(key, { pipeline, key, record, precompiled: true, used: false });
+      this._stats.precompiled++;
+    }
+  }
+  private markUsed(entry: RenderPipelineEntry | ComputePipelineEntry) {
+    if (entry.precompiled && !entry.used) {
+      entry.used = true;
+      this._stats.precompiledUsed++;
+    }
+  }
+  private countOnDemand(program: WebGPUProgram) {
+    this._stats.onDemand++;
+    const programs = this._stats.onDemandPrograms;
+    programs.push(program.name || program.label);
+    if (programs.length > MAX_ON_DEMAND_PROGRAMS) {
+      programs.shift();
+    }
   }
   fetchComputePipeline(program: WebGPUProgram) {
     const hash = this.getComputePipelineHash(program);
@@ -209,7 +260,10 @@ export class PipelineCache {
     const content = program.getContent();
     const key = content.hash;
     let entry = this._computePipelinesByContent.get(key);
-    if (!entry) {
+    if (entry) {
+      this.markUsed(entry);
+    } else {
+      this.countOnDemand(program);
       const shaderModule = program.getShaderModule();
       const desc: GPUComputePipelineDescriptor = {
         layout: shaderModule.pipelineLayout,
@@ -257,7 +311,10 @@ export class PipelineCache {
       winding
     );
     let entry = this._renderPipelinesByContent.get(key);
-    if (!entry) {
+    if (entry) {
+      this.markUsed(entry);
+    } else {
+      this.countOnDemand(program);
       const bufferLayouts = vertexLayout
         ? this._device.fetchVertexLayout(vertexLayout.getLayouts(program.vertexAttributes)!.layoutHash)
         : null;

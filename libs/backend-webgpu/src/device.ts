@@ -26,6 +26,8 @@ import type {
   DeviceViewport,
   BaseTexture,
   FrameBufferClearColors,
+  PipelineCacheData,
+  PipelinePrecompileOptions,
   RenderBundle
 } from '@zephyr3d/device';
 import { getTextureFormatBlockSize, BaseDevice, GPUResourceUsageFlags } from '@zephyr3d/device';
@@ -45,6 +47,7 @@ import {
 import { WebGPUVertexLayout } from './vertexlayout_webgpu';
 import { PipelineCache } from './pipeline_cache';
 import { WebGPUPipelineRecorder } from './pipeline_recorder';
+import { WebGPUPipelinePrecompiler } from './pipeline_precompiler';
 import {
   WebGPUBlendingState,
   WebGPUColorState,
@@ -77,6 +80,43 @@ type WebGPURenderBundle = {
   renderBundle: Nullable<GPURenderBundle>;
 };
 
+/** @internal */
+export type WebGPUShaderModuleEntry = {
+  module: GPUShaderModule;
+  /** Compile messages of the module, empty when there are none */
+  messages: Promise<string>;
+};
+
+/** Logs the compile messages of a shader module, and resolves with their text */
+function reportCompileMessages(module: GPUShaderModule, code: string): Promise<string> {
+  const getInfo: ((this: GPUShaderModule) => Promise<GPUCompilationInfo>) | undefined =
+    (module as any).getCompilationInfo ?? (module as any).compilationInfo;
+  if (!getInfo) {
+    return Promise.resolve('');
+  }
+  return getInfo.call(module).then(
+    (info) => {
+      let text = '';
+      for (const message of info?.messages ?? []) {
+        const msg = `Line ${message.lineNum}:${message.linePos} - ${code.slice(
+          message.offset,
+          message.offset + message.length
+        )}\n${message.message}\n`;
+        if (message.type === 'error') {
+          console.error(msg);
+        } else if (message.type === 'warning') {
+          console.warn(msg);
+        } else {
+          console.info(msg);
+        }
+        text += msg;
+      }
+      return text;
+    },
+    () => ''
+  );
+}
+
 export class WebGPUDevice extends BaseDevice {
   private _context!: GPUCanvasContext;
   private _device!: GPUDevice;
@@ -95,6 +135,9 @@ export class WebGPUDevice extends BaseDevice {
   private _defaultDepthTextureView!: GPUTextureView;
   private _pipelineCache!: PipelineCache;
   private readonly _pipelineRecorder: WebGPUPipelineRecorder;
+  private readonly _pipelinePrecompiler: WebGPUPipelinePrecompiler;
+  /** Shader modules by source hash */
+  private readonly _shaderModules: Map<string, WebGPUShaderModuleEntry>;
   private _bindGroupCache!: BindGroupCache;
   private _vertexLayoutCache!: VertexLayoutCache;
   private readonly _samplerCache: SamplerCache;
@@ -133,6 +176,8 @@ export class WebGPUDevice extends BaseDevice {
     this._captureRenderBundle = null;
     this._samplerCache = new SamplerCache(this);
     this._pipelineRecorder = new WebGPUPipelineRecorder(this);
+    this._pipelinePrecompiler = new WebGPUPipelinePrecompiler(this);
+    this._shaderModules = new Map();
     this._adapterInfo = {};
     this._latestGPUFrameId = -1;
     this._backbufferTexture = null;
@@ -230,6 +275,37 @@ export class WebGPUDevice extends BaseDevice {
   }
   getPipelineRecorder() {
     return this._pipelineRecorder;
+  }
+  precompilePipelines(data: PipelineCacheData | PipelineCacheData[], options?: PipelinePrecompileOptions) {
+    return this._pipelinePrecompiler.submit(Array.isArray(data) ? data : [data], options);
+  }
+  getPipelineCacheStats() {
+    return this._pipelineCache.getStats();
+  }
+  /** @internal */
+  get bindGroupCache() {
+    return this._bindGroupCache;
+  }
+  /**
+   * Gets the shader module of a source, made the first time it is asked for: programs
+   * with the same source and pipelines compiled ahead of time share it
+   * @internal
+   */
+  fetchShaderModule(code: string, hash: string, label?: string) {
+    let entry = this._shaderModules.get(hash);
+    if (!entry) {
+      const module = this._device.createShaderModule({ label, code });
+      entry = { module, messages: reportCompileMessages(module, code) };
+      this._shaderModules.set(hash, entry);
+    }
+    return entry;
+  }
+  /**
+   * Gets the pipeline layout of bind group layouts given by their content keys
+   * @internal
+   */
+  fetchPipelineLayout(hashes: string[], getLayouts: () => GPUBindGroupLayout[]) {
+    return this._bindGroupCache.fetchPipelineLayout(hashes, getLayouts);
   }
   get backbufferFormat() {
     return this._backBufferFormat;

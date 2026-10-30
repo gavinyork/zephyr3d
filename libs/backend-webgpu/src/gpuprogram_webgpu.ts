@@ -36,7 +36,7 @@ export class WebGPUProgram extends WebGPUObject<unknown> implements GPUProgram {
   private readonly _cs!: string;
   private readonly _label: string;
   private readonly _hash: string;
-  private _content: Nullable<WebGPUProgramContent>;
+  private readonly _content: WebGPUProgramContent;
   private readonly _fragmentOutputCount: number;
   private _error: string;
   private readonly _bindGroupLayouts: BindGroupLayout[];
@@ -51,7 +51,6 @@ export class WebGPUProgram extends WebGPUObject<unknown> implements GPUProgram {
     this._label = params.label ?? `Program ${this.uid}`;
     this._bindGroupLayouts = [...params.params.bindGroupLayouts];
     this._error = '';
-    this._content = null;
     if (params.type === 'render') {
       const renderParams = params.params as RenderProgramConstructParams;
       this._vs = renderParams.vs;
@@ -64,6 +63,7 @@ export class WebGPUProgram extends WebGPUObject<unknown> implements GPUProgram {
       this._cs = computeParams.source;
       this._fragmentOutputCount = 0;
     }
+    this._content = this.computeContent();
     this._load();
     this._hash = String(++WebGPUProgram._hashCounter);
   }
@@ -123,19 +123,6 @@ export class WebGPUProgram extends WebGPUObject<unknown> implements GPUProgram {
    * @internal
    */
   getContent(): WebGPUProgramContent {
-    if (!this._content) {
-      const vs = this._type === 'render' ? hashString(this._vs) : '';
-      const fs = this._type === 'render' ? hashString(this._fs) : '';
-      const cs = this._type === 'compute' ? hashString(this._cs) : '';
-      const layouts = this._bindGroupLayouts.map((layout) => BindGroupCache.getLayoutHash(layout));
-      this._content = {
-        hash: hashString(`${this._type}|${vs}|${fs}|${cs}|${layouts.join('|')}`),
-        vs,
-        fs,
-        cs,
-        layouts
-      };
-    }
     return this._content;
   }
   getPipelineLayout() {
@@ -167,63 +154,39 @@ export class WebGPUProgram extends WebGPUObject<unknown> implements GPUProgram {
     const type = this.getBindingInfo(uniform)?.type as PBStructTypeInfo;
     return type ? this.device.createStructuredBuffer(type, { usage: 'uniform' }) : null;
   }
+  private computeContent(): WebGPUProgramContent {
+    const vs = this._type === 'render' ? hashString(this._vs) : '';
+    const fs = this._type === 'render' ? hashString(this._fs) : '';
+    const cs = this._type === 'compute' ? hashString(this._cs) : '';
+    const layouts = this._bindGroupLayouts.map((layout) => BindGroupCache.getLayoutHash(layout));
+    return {
+      hash: hashString(`${this._type}|${vs}|${fs}|${cs}|${layouts.join('|')}`),
+      vs,
+      fs,
+      cs,
+      layouts
+    };
+  }
   private _load() {
+    // Modules and layouts are shared by content with other programs and with
+    // pipelines compiled ahead of time
     if (this._type === 'render') {
-      this._vsModule = this.createShaderModule(this._vs);
-      this._fsModule = this.createShaderModule(this._fs);
+      this._vsModule = this.fetchShaderModule(this._vs, this._content.vs);
+      this._fsModule = this.fetchShaderModule(this._fs, this._content.fs);
     } else {
-      this._csModule = this.createShaderModule(this._cs);
+      this._csModule = this.fetchShaderModule(this._cs, this._content.cs);
     }
-    this._pipelineLayout = this.createPipelineLayout(this._bindGroupLayouts);
+    this._pipelineLayout = this._device.fetchPipelineLayout(this._content.layouts, () =>
+      this._bindGroupLayouts.map((val) => this._device.fetchBindGroupLayout(val)[1])
+    );
     this._object = {};
   }
-  private createPipelineLayout(bindGroupLayouts: BindGroupLayout[]) {
-    const layouts: GPUBindGroupLayout[] = [];
-    bindGroupLayouts.forEach((val) => {
-      layouts.push(this._device.fetchBindGroupLayout(val)[1]);
+  private fetchShaderModule(code: string, hash: string) {
+    const entry = this._device.fetchShaderModule(code, hash, this._label);
+    entry.messages.then((messages) => {
+      this._error += messages;
     });
-    return this._device.device.createPipelineLayout({
-      bindGroupLayouts: layouts
-    });
-  }
-  private createShaderModule(code: string) {
-    let sm: Nullable<GPUShaderModule> = this._device.device.createShaderModule({ label: this._label, code });
-    if (sm) {
-      const func: (this: GPUShaderModule) => Promise<GPUCompilationInfo> =
-        (sm as any).compilationInfo || (sm as any).getCompilationInfo;
-      if (!func) {
-        return sm;
-      }
-      func.call(sm).then((compilationInfo) => {
-        let err = false;
-        if (compilationInfo?.messages?.length > 0) {
-          let msg = '';
-          for (const message of compilationInfo.messages) {
-            if (message.type === 'error') {
-              err = true;
-            }
-            msg += `Line ${message.lineNum}:${message.linePos} - ${code.slice(
-              message.offset,
-              message.offset + message.length
-            )}\n`;
-            msg += `${message.message}\n`;
-            if (message.type === 'error') {
-              err = true;
-              console.error(msg);
-            } else if (message.type === 'warning') {
-              console.warn(msg);
-            } else {
-              console.info(msg);
-            }
-            this._error += msg;
-          }
-        }
-        if (err) {
-          sm = null;
-        }
-      });
-    }
-    return sm;
+    return entry.module;
   }
   private static countFragmentOutputs(source: string) {
     const outputStruct = /struct\s+zFSOutput\s*\{([\s\S]*?)\};/.exec(source);

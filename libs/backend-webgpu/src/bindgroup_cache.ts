@@ -7,9 +7,11 @@ import type { Immutable, Nullable } from '@zephyr3d/base';
 export class BindGroupCache {
   private readonly _device: WebGPUDevice;
   private _bindGroupLayoutCache: Record<string, [GPUBindGroupLayoutDescriptor, GPUBindGroupLayout]>;
+  private readonly _pipelineLayoutCache: Map<string, GPUPipelineLayout>;
   constructor(device: WebGPUDevice) {
     this._device = device;
     this._bindGroupLayoutCache = {};
+    this._pipelineLayoutCache = new Map();
   }
   fetchBindGroupLayout(desc: Immutable<BindGroupLayout>): [GPUBindGroupLayoutDescriptor, GPUBindGroupLayout] {
     const hash = BindGroupCache.getLayoutHash(desc);
@@ -23,6 +25,31 @@ export class BindGroupCache {
       }
     }
     return bgl;
+  }
+  /**
+   * Gets the layout of a content key, creating it from a recorded descriptor if no
+   * program has made it yet
+   */
+  fetchRecordedBindGroupLayout(
+    hash: string,
+    desc: GPUBindGroupLayoutDescriptor
+  ): [GPUBindGroupLayoutDescriptor, GPUBindGroupLayout] {
+    let bgl = this._bindGroupLayoutCache[hash];
+    if (!bgl) {
+      bgl = [desc, this._device.device.createBindGroupLayout(desc)];
+      this._bindGroupLayoutCache[hash] = bgl;
+    }
+    return bgl;
+  }
+  /** Gets the pipeline layout of bind group layouts given by their content keys */
+  fetchPipelineLayout(hashes: string[], getLayouts: () => GPUBindGroupLayout[]) {
+    const key = hashes.join('|');
+    let layout = this._pipelineLayoutCache.get(key);
+    if (!layout) {
+      layout = this._device.device.createPipelineLayout({ bindGroupLayouts: getLayouts() });
+      this._pipelineLayoutCache.set(key, layout);
+    }
+    return layout;
   }
   /** Content of a layout, the key layouts are shared by */
   static getLayoutHash(desc: Nullable<Immutable<BindGroupLayout>>) {
