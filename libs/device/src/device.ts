@@ -63,6 +63,7 @@ import type {
   DeviceViewport,
   DrawTextLayoutOptions,
   FrameBufferClearColors,
+  PipelineRecorder,
   TimestampQueryFilter,
   TimestampQueryHandle,
   TimestampQueryOptions,
@@ -661,6 +662,9 @@ export abstract class BaseDevice extends Observable<DeviceEventMap> {
       this._gpuTimer?.end();
       this._gpuTimer = null;
     }
+  }
+  getPipelineRecorder(): Nullable<PipelineRecorder> {
+    return null;
   }
   beginTimestampQuery(_label?: string, _options?: TimestampQueryOptions): number {
     return 0;

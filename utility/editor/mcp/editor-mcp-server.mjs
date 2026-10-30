@@ -3136,6 +3136,20 @@ const BASE_TOOLS = [
     }
   },
   {
+    name: 'pipeline_recorder',
+    description:
+      'Records the WebGPU pipelines the editor page uses, for the pipeline cache (WebGPU only). Recording only watches the pipelines draws and dispatches ask for, rendering is unchanged; a render bundle replays its draws without asking again, so begin before opening the scene to see them all. Pipelines are grouped by tag, null for those used with no tag. action status reports the recorder; begin and end nest; clear forgets everything recorded; export also returns the pipeline cache JSON of one tag (data). Returns { available, recording, count, tags, data?, err }.',
+    inputSchema: {
+      type: 'object',
+      required: ['action'],
+      properties: {
+        action: { type: 'string', enum: ['status', 'begin', 'end', 'clear', 'export'] },
+        tag: { type: ['string', 'null'], default: null, description: 'Tag to export, null for the untagged pipelines.' },
+        timeout_ms: { type: 'number', default: 30000 }
+      }
+    }
+  },
+  {
     name: 'gi_voxel_query',
     description:
       'Read back what the global illumination voxel scene holds at world positions, as a probe ray reads it where it hits (WebGPU, GIEnabled): per point the clipmap level of the material voxel holding it (-1 where no level holds it with a current brick), albedo rgba (a = 1 where a surface material was composited into the voxel, 0 for an empty voxel, which a ray hitting there reads as black), emissive and radiance (lit outgoing radiance summed over the voxel faces, at the GI cache exposure). Material voxels are twice the global SDF voxel size of their level. At most 1024 points. Returns { samples, err }.',
@@ -4526,6 +4540,13 @@ const handlers = {
   },
   async gi_stats(args) {
     return bridge.send('gi_stats', { missing_only: args.missing_only }, Number(args.timeout_ms ?? 10000));
+  },
+  async pipeline_recorder(args) {
+    return bridge.send(
+      'pipeline_recorder',
+      { action: args.action, tag: args.tag ?? null },
+      Number(args.timeout_ms ?? 30000)
+    );
   },
   async sdf_debug_view(args) {
     return bridge.send(

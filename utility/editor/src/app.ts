@@ -171,6 +171,13 @@ function isEditableShortcutTarget(target: EventTarget | null) {
 }
 
 editorApp.ready().then(async () => {
+  // `?recordPSO` records the pipelines used from the first frame on, and leaves the
+  // recorder on window for the console, until recordings are saved to the project
+  if (searchParams.get('recordPSO') !== null) {
+    const recorder = getDevice().getPipelineRecorder();
+    recorder?.begin();
+    (window as unknown as { __zephyrPSO: unknown }).__zephyrPSO = recorder;
+  }
   ProjectService.attachDerivedData();
   getEngine().resourceManager.setModelLoader('model/gltf+json', new GLTFImporter());
   getEngine().resourceManager.setModelLoader('model/gltf-binary', new GLTFImporter());

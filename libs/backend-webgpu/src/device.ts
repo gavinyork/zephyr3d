@@ -44,6 +44,7 @@ import {
 } from './capabilities_webgpu';
 import { WebGPUVertexLayout } from './vertexlayout_webgpu';
 import { PipelineCache } from './pipeline_cache';
+import { WebGPUPipelineRecorder } from './pipeline_recorder';
 import {
   WebGPUBlendingState,
   WebGPUColorState,
@@ -93,6 +94,7 @@ export class WebGPUDevice extends BaseDevice {
   private _defaultDepthTexture!: GPUTexture;
   private _defaultDepthTextureView!: GPUTextureView;
   private _pipelineCache!: PipelineCache;
+  private readonly _pipelineRecorder: WebGPUPipelineRecorder;
   private _bindGroupCache!: BindGroupCache;
   private _vertexLayoutCache!: VertexLayoutCache;
   private readonly _samplerCache: SamplerCache;
@@ -130,6 +132,7 @@ export class WebGPUDevice extends BaseDevice {
     this._gpuObjectHashCounter = 1;
     this._captureRenderBundle = null;
     this._samplerCache = new SamplerCache(this);
+    this._pipelineRecorder = new WebGPUPipelineRecorder(this);
     this._adapterInfo = {};
     this._latestGPUFrameId = -1;
     this._backbufferTexture = null;
@@ -220,6 +223,13 @@ export class WebGPUDevice extends BaseDevice {
   }
   get pipelineCache() {
     return this._pipelineCache;
+  }
+  /** @internal */
+  get pipelineRecorder() {
+    return this._pipelineRecorder;
+  }
+  getPipelineRecorder() {
+    return this._pipelineRecorder;
   }
   get backbufferFormat() {
     return this._backBufferFormat;

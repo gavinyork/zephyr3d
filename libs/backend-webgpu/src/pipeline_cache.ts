@@ -8,6 +8,7 @@ import type { WebGPUDevice } from './device';
 import type { WebGPURenderStateSet } from './renderstates_webgpu';
 import type { WebGPUFrameBuffer } from './framebuffer_webgpu';
 import type { Nullable } from '@zephyr3d/base';
+import { hashString } from './content_hash';
 
 const typeU16 = PBPrimitiveTypeInfo.getCachedTypeInfo(PBPrimitiveType.U16);
 const stencilFormats = ['stencil8', 'depth24plus-stencil8', 'depth24unorm-stencil8', 'depth32float-stencil8'];
@@ -26,37 +27,145 @@ export type FrameBufferInfo = {
   sampleCount: number;
   hash: Nullable<string>;
   clearHash: string;
+  /** Whether the target is the canvas, whose formats differ between devices */
+  backbuffer?: boolean;
 };
 
+/**
+ * A render pipeline as stored in a pipeline cache file: the parts of its key that are
+ * the same in every session, and the descriptor without the objects of this session
+ * @internal
+ */
+export type WebGPURenderPipelineRecord = {
+  /** Content hash of the program */
+  program: string;
+  /** Source hashes of the vertex and fragment stages */
+  vs: string;
+  fs: string;
+  /** Hashes of the bind group layouts */
+  layouts: string[];
+  /** Vertex buffer layouts, empty for pipelines without vertex buffers */
+  vertex: string;
+  colors: GPUTextureFormat[];
+  /** Depth format, empty for targets without depth */
+  depth: string;
+  samples: number;
+  /** Drawn to the canvas: formats and sample count are those of the device it is compiled on */
+  backbuffer: boolean;
+  primitiveType: PrimitiveType;
+  /** Content of the render states */
+  state: string;
+  winding: number;
+  vertexBuffers: Nullable<GPUVertexBufferLayout[]>;
+  primitive: GPUPrimitiveState;
+  depthStencil?: GPUDepthStencilState;
+  multisample: GPUMultisampleState;
+  targets: GPUColorTargetState[];
+};
+
+/** @internal */
+export type WebGPUComputePipelineRecord = {
+  /** Content hash of the program */
+  program: string;
+  /** Source hash of the compute stage */
+  cs: string;
+  /** Hashes of the bind group layouts */
+  layouts: string[];
+};
+
+type RenderPipelineEntry = {
+  pipeline: GPURenderPipeline;
+  /** Key of the pipeline in every session */
+  key: string;
+  record: WebGPURenderPipelineRecord;
+};
+
+type ComputePipelineEntry = {
+  pipeline: GPUComputePipeline;
+  key: string;
+  record: WebGPUComputePipelineRecord;
+};
+
+/** @internal */
+export function getFrameBufferContentHash(
+  colors: GPUTextureFormat[],
+  depth: Nullable<string> | undefined,
+  samples: number
+) {
+  return `${colors.join('-')}:${depth ?? ''}:${samples}`;
+}
+
+/** @internal */
+export function getRenderPipelineContentHash(
+  program: string,
+  vertex: string,
+  frameBuffer: string,
+  primitiveType: PrimitiveType,
+  stripIndexFormat: Nullable<string> | undefined,
+  state: string,
+  winding: number
+) {
+  return `${program}:${vertex}:${frameBuffer}:${primitiveType}${stripIndexFormat ? `/${stripIndexFormat}` : ''}:${state}:${winding}`;
+}
+
+/**
+ * Index format a pipeline has to name: an indexed draw with a strip topology fails
+ * unless the pipeline names the format of the index buffer it draws with, which comes
+ * with the vertex data whether or not the program reads vertex attributes
+ */
+function getStripIndexFormat(
+  vertexData: Nullable<WebGPUVertexLayout>,
+  primitiveType: PrimitiveType
+): GPUIndexFormat | undefined {
+  const topology = primitiveTypeMap[primitiveType];
+  if (topology !== 'triangle-strip' && topology !== 'line-strip') {
+    return undefined;
+  }
+  const indexBuffer = vertexData?.getIndexBuffer();
+  return indexBuffer ? (indexBuffer.indexType === typeU16 ? 'uint16' : 'uint32') : undefined;
+}
+
+/**
+ * Caches the pipelines draws and dispatches ask for.
+ *
+ * @remarks
+ * Each pipeline is looked up by a key built from objects of this session, cheap to
+ * build on every draw but different in every session, and the first time a key is
+ * seen by a key built from what the objects contain: pipelines are only created when
+ * that second key is new too, so programs or states that are made again, or a
+ * pipeline compiled ahead of time from a recording, are shared.
+ */
 export class PipelineCache {
   private readonly _device: WebGPUDevice;
-  private _renderPipelines: Record<string, GPURenderPipeline>;
-  private _computePipelines: Record<string, GPUComputePipeline>;
+  private _renderPipelines: Record<string, RenderPipelineEntry>;
+  private _computePipelines: Record<string, ComputePipelineEntry>;
+  private _renderPipelinesByContent: Map<string, RenderPipelineEntry>;
+  private _computePipelinesByContent: Map<string, ComputePipelineEntry>;
   constructor(device: WebGPUDevice) {
     this._device = device;
     this._renderPipelines = {};
     this._computePipelines = {};
+    this._renderPipelinesByContent = new Map();
+    this._computePipelinesByContent = new Map();
   }
   wipeCache() {
     this._renderPipelines = {};
     this._computePipelines = {};
+    this._renderPipelinesByContent = new Map();
+    this._computePipelinesByContent = new Map();
   }
   fetchComputePipeline(program: WebGPUProgram) {
     const hash = this.getComputePipelineHash(program);
-    let pipeline = this._computePipelines[hash];
-    if (pipeline === undefined) {
-      const shaderModule = program.getShaderModule();
-      const desc: GPUComputePipelineDescriptor = {
-        layout: shaderModule.pipelineLayout,
-        compute: {
-          module: shaderModule.csModule,
-          entryPoint: 'main'
-        }
-      };
-      pipeline = this._device.gpuCreateComputePipeline(desc);
-      this._computePipelines[hash] = pipeline;
+    let entry = this._computePipelines[hash];
+    if (entry === undefined) {
+      entry = this.resolveComputePipeline(program);
+      this._computePipelines[hash] = entry;
     }
-    return pipeline;
+    const recorder = this._device.pipelineRecorder;
+    if (recorder.recording) {
+      recorder.recordCompute(entry.key, entry.record, program);
+    }
+    return entry.pipeline;
   }
   fetchRenderPipeline(
     program: WebGPUProgram,
@@ -69,15 +178,86 @@ export class PipelineCache {
       return null;
     }
     const vertexLayout = program.vertexAttributes ? vertexData : null;
+    const stripIndexFormat = getStripIndexFormat(vertexData, primitiveType);
     const hash = this.getRenderPipelineHash(
       frameBufferInfo.hash,
       program,
       vertexLayout,
       stateSet,
-      primitiveType
+      primitiveType,
+      stripIndexFormat
     );
-    let pipeline = this._renderPipelines[hash];
-    if (pipeline === undefined) {
+    let entry = this._renderPipelines[hash];
+    if (entry === undefined) {
+      entry = this.resolveRenderPipeline(
+        program,
+        vertexLayout,
+        stateSet,
+        primitiveType,
+        stripIndexFormat,
+        frameBufferInfo
+      );
+      this._renderPipelines[hash] = entry;
+    }
+    const recorder = this._device.pipelineRecorder;
+    if (recorder.recording) {
+      recorder.recordRender(entry.key, entry.record, program);
+    }
+    return entry.pipeline;
+  }
+  private resolveComputePipeline(program: WebGPUProgram): ComputePipelineEntry {
+    const content = program.getContent();
+    const key = content.hash;
+    let entry = this._computePipelinesByContent.get(key);
+    if (!entry) {
+      const shaderModule = program.getShaderModule();
+      const desc: GPUComputePipelineDescriptor = {
+        layout: shaderModule.pipelineLayout,
+        compute: {
+          module: shaderModule.csModule,
+          entryPoint: 'main'
+        }
+      };
+      entry = {
+        pipeline: this._device.gpuCreateComputePipeline(desc),
+        key,
+        record: {
+          program: content.hash,
+          cs: content.cs,
+          layouts: content.layouts.map((layout) => hashString(layout))
+        }
+      };
+      this._computePipelinesByContent.set(key, entry);
+    }
+    return entry;
+  }
+  private resolveRenderPipeline(
+    program: WebGPUProgram,
+    vertexLayout: Nullable<WebGPUVertexLayout>,
+    stateSet: WebGPURenderStateSet,
+    primitiveType: PrimitiveType,
+    stripIndexFormat: GPUIndexFormat | undefined,
+    frameBufferInfo: FrameBufferInfo
+  ): RenderPipelineEntry {
+    const content = program.getContent();
+    const vertexHash = vertexLayout?.getLayouts(program.vertexAttributes)?.layoutHash || '';
+    const stateHash = stateSet?.contentHash || '';
+    const winding = Number(this._device.isWindingOrderReversed());
+    const key = getRenderPipelineContentHash(
+      content.hash,
+      vertexHash,
+      getFrameBufferContentHash(
+        frameBufferInfo.colorFormats,
+        frameBufferInfo.depthFormat,
+        frameBufferInfo.sampleCount
+      ),
+      primitiveType,
+      stripIndexFormat,
+      stateHash,
+      winding
+    );
+    let entry = this._renderPipelinesByContent.get(key);
+    if (!entry) {
       const bufferLayouts = vertexLayout
         ? this._device.fetchVertexLayout(vertexLayout.getLayouts(program.vertexAttributes)!.layoutHash)
         : null;
@@ -89,33 +269,62 @@ export class PipelineCache {
       if (bufferLayouts) {
         vertex.buffers = bufferLayouts;
       }
-      const primitiveState = this.createPrimitiveState(vertexLayout, stateSet, primitiveType);
+      const primitiveState = this.createPrimitiveState(stateSet, primitiveType, stripIndexFormat);
       const depthStencilState = this.createDepthStencilState(frameBufferInfo.depthFormat, stateSet);
       const colorTargetStates = frameBufferInfo.colorFormats.map((val, index) =>
         this.createColorTargetState(stateSet, val, index)
       );
+      const multisampleState = this.createMultisampleState(frameBufferInfo.sampleCount, stateSet);
       const desc: GPURenderPipelineDescriptor = {
-        label: hash,
+        label: key,
         layout: shaderModule.pipelineLayout,
         vertex,
         primitive: primitiveState,
         depthStencil: depthStencilState,
-        multisample: this.createMultisampleState(frameBufferInfo.sampleCount, stateSet),
+        multisample: multisampleState,
         fragment: {
           module: shaderModule.fsModule,
           entryPoint: 'main',
           targets: colorTargetStates
         }
       };
-      pipeline = this._device.gpuCreateRenderPipeline(desc);
-      this._renderPipelines[hash] = pipeline;
+      // The states are shared and may change later: the record keeps a copy
+      const parts = JSON.parse(
+        JSON.stringify({
+          vertexBuffers: bufferLayouts ?? null,
+          primitive: primitiveState,
+          depthStencil: depthStencilState,
+          multisample: multisampleState,
+          targets: colorTargetStates
+        })
+      );
+      entry = {
+        pipeline: this._device.gpuCreateRenderPipeline(desc),
+        key,
+        record: {
+          program: content.hash,
+          vs: content.vs,
+          fs: content.fs,
+          layouts: content.layouts.map((layout) => hashString(layout)),
+          vertex: vertexHash,
+          colors: [...frameBufferInfo.colorFormats],
+          depth: frameBufferInfo.depthFormat ?? '',
+          samples: frameBufferInfo.sampleCount,
+          backbuffer: !!frameBufferInfo.backbuffer,
+          primitiveType,
+          state: stateHash,
+          winding,
+          ...parts
+        }
+      };
+      this._renderPipelinesByContent.set(key, entry);
     }
-    return pipeline;
+    return entry;
   }
   private createPrimitiveState(
-    vertexData: Nullable<WebGPUVertexLayout>,
     stateSet: WebGPURenderStateSet,
-    primitiveType: PrimitiveType
+    primitiveType: PrimitiveType,
+    stripIndexFormat: GPUIndexFormat | undefined
   ) {
     const topology = primitiveTypeMap[primitiveType];
     if (!topology) {
@@ -133,8 +342,8 @@ export class PipelineCache {
     if (this._device.device.features.has('depth-clip-control')) {
       state.unclippedDepth = rasterizerState.unclippedDepth;
     }
-    if (topology === 'triangle-strip' || topology === 'line-strip') {
-      state.stripIndexFormat = vertexData?.getIndexBuffer()?.indexType === typeU16 ? 'uint16' : 'uint32';
+    if (stripIndexFormat) {
+      state.stripIndexFormat = stripIndexFormat;
     }
     return state;
   }
@@ -197,14 +406,15 @@ export class PipelineCache {
     program: WebGPUProgram,
     vertexData: Nullable<WebGPUVertexLayout>,
     stateSet: WebGPURenderStateSet,
-    primitiveType: PrimitiveType
+    primitiveType: PrimitiveType,
+    stripIndexFormat: GPUIndexFormat | undefined
   ) {
     const programHash = program.hash;
     const vertexHash = vertexData?.getLayouts(program.vertexAttributes)?.layoutHash || '';
     const stateHash = stateSet?.hash || '';
-    return `${programHash}:${vertexHash}:${fbHash}:${primitiveType}:${stateHash}:${Number(
-      this._device.isWindingOrderReversed()
-    )}`;
+    return `${programHash}:${vertexHash}:${fbHash}:${primitiveType}${
+      stripIndexFormat ? `/${stripIndexFormat}` : ''
+    }:${stateHash}:${Number(this._device.isWindingOrderReversed())}`;
   }
   private getComputePipelineHash(program: WebGPUProgram) {
     return program.hash;

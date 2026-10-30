@@ -2720,6 +2720,71 @@ export interface DrawTextLayoutOptions {
 }
 
 /**
+ * Serialized pipelines recorded under one tag, ready to be precompiled.
+ *
+ * @remarks
+ * The file is plain JSON. Everything below `profile` is backend specific and
+ * only meaningful to the backend named in `backend`.
+ * @public
+ */
+export interface PipelineCacheData {
+  /** Always `'zephyr3d-pso'` */
+  format: 'zephyr3d-pso';
+  /** Format version */
+  version: number;
+  /** Device type that recorded the pipelines, e.g. `'webgpu'` */
+  backend: string;
+  /** Tag the pipelines were recorded under, `null` for pipelines no tag claimed */
+  tag: Nullable<string>;
+  /** Device properties the recorded shaders and pipelines depend on */
+  profile: Record<string, unknown>;
+  /** Shader sources by content hash */
+  sources: Record<string, string>;
+  /** Bind group layouts by content hash */
+  layouts: Record<string, unknown>;
+  /** Render pipelines */
+  render: unknown[];
+  /** Compute pipelines */
+  compute: unknown[];
+}
+
+/**
+ * Records the pipelines a device uses so they can be compiled ahead of time.
+ *
+ * @remarks
+ * Recording only watches the pipelines draws and dispatches ask for: rendering is
+ * not changed. A pipeline is recorded each time it is used while recording, not
+ * only when it is created, but a render bundle replays its draws without asking
+ * again, so recording has to begin before the first frame to see them all.
+ *
+ * Pipelines are grouped by the innermost tag pushed when they are used; those used
+ * with no tag pushed are grouped under `null`.
+ * @public
+ */
+export interface PipelineRecorder {
+  /** Whether pipelines are being recorded */
+  readonly recording: boolean;
+  /** Number of distinct pipelines recorded, over all tags */
+  readonly count: number;
+  /** Starts recording. Calls nest: recording stops after the matching number of `end()` calls */
+  begin(): void;
+  /** Ends one `begin()` */
+  end(): void;
+  /** Groups the pipelines used from now on under a tag, until the matching `popTag()` */
+  pushTag(tag: string): void;
+  /** Ends the innermost `pushTag()` */
+  popTag(): void;
+  /** Tags holding at least one pipeline */
+  tags(): Nullable<string>[];
+  /** Serializes the pipelines recorded under a tag */
+  export(tag: Nullable<string>): PipelineCacheData;
+  /** Adds the pipelines of earlier recordings, under the tag stored in the data */
+  merge(data: PipelineCacheData): void;
+  /** Forgets everything recorded */
+  clear(): void;
+}
+
+/**
  * Abstract interface for the rendering device.
  * @public
  */
@@ -3208,6 +3273,11 @@ export interface AbstractDevice extends IEventTarget<DeviceEventMap> {
    * @returns A RenderBundle that holds the captured draw commands
    */
   endCapture(): RenderBundle;
+  /**
+   * Gets the pipeline recorder of the device
+   * @returns The recorder, or null if the device has no pipelines to record
+   */
+  getPipelineRecorder(): Nullable<PipelineRecorder>;
   /** Get the video memory usage in bytes */
   videoMemoryUsage: number;
   /** Get the current frame information */

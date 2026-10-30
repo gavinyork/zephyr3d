@@ -10,6 +10,23 @@ import type {
 import { WebGPUObject } from './gpuobject_webgpu';
 import type { WebGPUDevice } from './device';
 import type { Immutable, Nullable } from '@zephyr3d/base';
+import { BindGroupCache } from './bindgroup_cache';
+import { hashString } from './content_hash';
+
+/**
+ * What a program is made of, identified the same way in every session
+ * @internal
+ */
+export type WebGPUProgramContent = {
+  /** Hash of everything below */
+  hash: string;
+  /** Source hashes of the stages, empty for stages the program does not have */
+  vs: string;
+  fs: string;
+  cs: string;
+  /** Content of the bind group layouts */
+  layouts: string[];
+};
 
 export class WebGPUProgram extends WebGPUObject<unknown> implements GPUProgram {
   private static _hashCounter = 0;
@@ -19,6 +36,7 @@ export class WebGPUProgram extends WebGPUObject<unknown> implements GPUProgram {
   private readonly _cs!: string;
   private readonly _label: string;
   private readonly _hash: string;
+  private _content: Nullable<WebGPUProgramContent>;
   private readonly _fragmentOutputCount: number;
   private _error: string;
   private readonly _bindGroupLayouts: BindGroupLayout[];
@@ -33,6 +51,7 @@ export class WebGPUProgram extends WebGPUObject<unknown> implements GPUProgram {
     this._label = params.label ?? `Program ${this.uid}`;
     this._bindGroupLayouts = [...params.params.bindGroupLayouts];
     this._error = '';
+    this._content = null;
     if (params.type === 'render') {
       const renderParams = params.params as RenderProgramConstructParams;
       this._vs = renderParams.vs;
@@ -97,6 +116,27 @@ export class WebGPUProgram extends WebGPUObject<unknown> implements GPUProgram {
   }
   get hash() {
     return this._hash;
+  }
+  /**
+   * Content of the program: unlike hash, which numbers programs in the order they are
+   * made, it is the same in every session, so pipelines can be matched across sessions
+   * @internal
+   */
+  getContent(): WebGPUProgramContent {
+    if (!this._content) {
+      const vs = this._type === 'render' ? hashString(this._vs) : '';
+      const fs = this._type === 'render' ? hashString(this._fs) : '';
+      const cs = this._type === 'compute' ? hashString(this._cs) : '';
+      const layouts = this._bindGroupLayouts.map((layout) => BindGroupCache.getLayoutHash(layout));
+      this._content = {
+        hash: hashString(`${this._type}|${vs}|${fs}|${cs}|${layouts.join('|')}`),
+        vs,
+        fs,
+        cs,
+        layouts
+      };
+    }
+    return this._content;
   }
   getPipelineLayout() {
     return this._pipelineLayout;

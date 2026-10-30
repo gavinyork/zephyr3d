@@ -1960,6 +1960,8 @@ ${err.stack}`
       return setSDFDebugView(getSceneController(editor), params);
     case 'gi_stats':
       return getGIStats(getSceneController(editor), params);
+    case 'pipeline_recorder':
+      return runPipelineRecorder(params);
     case 'gi_voxel_query':
       try {
         return await queryGIVoxels(getSceneController(editor), params);
@@ -4474,6 +4476,49 @@ ${err.stack}`
     default:
       throw new Error(`Unknown editor bridge method: ${method}`);
   }
+}
+
+function runPipelineRecorder(params: { action?: string; tag?: string | null }) {
+  const recorder = getDevice().getPipelineRecorder();
+  if (!recorder) {
+    return {
+      available: false,
+      recording: false,
+      count: 0,
+      tags: [],
+      err: 'The device records no pipelines: only WebGPU has a pipeline recorder'
+    };
+  }
+  switch (params?.action) {
+    case 'begin':
+      recorder.begin();
+      break;
+    case 'end':
+      recorder.end();
+      break;
+    case 'clear':
+      recorder.clear();
+      break;
+    case 'status':
+    case 'export':
+      break;
+    default:
+      return {
+        available: true,
+        recording: recorder.recording,
+        count: recorder.count,
+        tags: recorder.tags(),
+        err: `Unknown action: ${params?.action}`
+      };
+  }
+  return {
+    available: true,
+    recording: recorder.recording,
+    count: recorder.count,
+    tags: recorder.tags(),
+    ...(params.action === 'export' ? { data: recorder.export(params.tag ?? null) } : {}),
+    err: null
+  };
 }
 
 function getStatus(editor: Editor) {

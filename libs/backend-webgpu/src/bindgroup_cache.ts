@@ -2,7 +2,7 @@ import type { BindGroupLayout } from '@zephyr3d/device';
 import { ShaderType } from '@zephyr3d/device';
 import { textureFormatMap } from './constants_webgpu';
 import type { WebGPUDevice } from './device';
-import type { Immutable } from '@zephyr3d/base';
+import type { Immutable, Nullable } from '@zephyr3d/base';
 
 export class BindGroupCache {
   private readonly _device: WebGPUDevice;
@@ -12,7 +12,7 @@ export class BindGroupCache {
     this._bindGroupLayoutCache = {};
   }
   fetchBindGroupLayout(desc: Immutable<BindGroupLayout>): [GPUBindGroupLayoutDescriptor, GPUBindGroupLayout] {
-    const hash = desc ? this.getLayoutHash(desc) : '';
+    const hash = BindGroupCache.getLayoutHash(desc);
     let bgl = this._bindGroupLayoutCache[hash];
     if (!bgl) {
       bgl = this.createBindGroupLayout(desc);
@@ -24,7 +24,11 @@ export class BindGroupCache {
     }
     return bgl;
   }
-  private getLayoutHash(desc: Immutable<BindGroupLayout>) {
+  /** Content of a layout, the key layouts are shared by */
+  static getLayoutHash(desc: Nullable<Immutable<BindGroupLayout>>) {
+    if (!desc) {
+      return '';
+    }
     let hash = '';
     for (const entry of desc.entries) {
       let s = `${entry.binding}:${entry.visibility}:`;
