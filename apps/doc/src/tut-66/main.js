@@ -126,6 +126,24 @@ myApp.ready().then(function () {
   });
   applyGodRays(godRayCheck.checked);
 
+  // wireframe
+  /** @type {HTMLInputElement} */
+  const wireframeCheck = document.querySelector('#wireframe-check');
+  const applyWireframe = function (enabled) {
+    for (const scene of [ocean.get(), pool.get()]) {
+      scene.rootNode.iterate(function (node) {
+        if (node instanceof Water) {
+          node.wireframe = enabled;
+        }
+        return false;
+      });
+    }
+  };
+  wireframeCheck.addEventListener('change', function () {
+    applyWireframe(wireframeCheck.checked);
+  });
+  applyWireframe(wireframeCheck.checked);
+
   getInput().use(forwarder);
   myApp.run();
 });
@@ -207,7 +225,7 @@ function buildOceanScene() {
   water.foamFalloff = 1.2;
   // The wall foam rides on the shore waves, which need the scene field; a low
   // surf, as the rocks and the pillar are too steep for it to break on
-  water.shoreWaveHeight = 0.3;
+  water.shoreWaveHeight = 0.1;
   water.wallFoamStrength = 1;
   water.wallFoamMinSpeed = 0;
   water.wallFoamMaxSpeed = 1.5;
