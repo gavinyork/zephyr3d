@@ -196,10 +196,12 @@ export class SceneSDF extends makeObservable(Disposable)<SceneSDFEvents>() {
     if (val) {
       root.on('nodeattached', this.onNodeAttached, this);
       root.on('noderemoved', this.onNodeRemoved, this);
+      root.on('visiblechanged', this.onVisibleChanged, this);
       this.collect(root);
     } else {
       root.off('nodeattached', this.onNodeAttached, this);
       root.off('noderemoved', this.onNodeRemoved, this);
+      root.off('visiblechanged', this.onVisibleChanged, this);
       this._pendingAttach.clear();
       for (const mesh of [...this._tracked]) {
         this.untrack(mesh);
@@ -531,9 +533,19 @@ export class SceneSDF extends makeObservable(Disposable)<SceneSDFEvents>() {
     }
     this.retrack(mesh);
   }
-  /** Places a tracked mesh again after its mode, primitive or parentage changed. @internal */
+  /** @internal */
+  private onVisibleChanged(node: SceneNode) {
+    // Bubbles to the root from the node whose show state changed
+    node.iterate((child) => {
+      if (child.isMesh() && this._tracked.has(child)) {
+        this.retrack(child);
+      }
+      return false;
+    });
+  }
+  /** Places a tracked mesh again after its mode, primitive, parentage or visibility changed. @internal */
   private retrack(mesh: Mesh) {
-    const mode = mesh.attached ? mesh.effectiveSDFMode : 'none';
+    const mode = mesh.attached && !mesh.hidden ? mesh.effectiveSDFMode : 'none';
     const primitive = mesh.primitive;
     const path = primitive ? getEngine().resourceManager.getAssetId(primitive) : null;
     // A field given at run time wins over a baked one, which a primitive built
