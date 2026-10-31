@@ -659,9 +659,10 @@ export function mixinLight<T extends typeof MeshMaterial>(BaseCls: T) {
       angleScaleOffset?: PBShaderExp
     ) {
       const pb = scope.$builder;
+      const that = this;
       const physical = this.drawContext.scene.lightingMode === 'physical';
-      // The two modes emit different falloff and cone-attenuation bodies, so they must not share a
-      // cached function under one name.
+      // The two modes emit different cone-attenuation bodies, so they must not share a cached
+      // function under one name.
       const funcName = physical
         ? 'Z_calculateSpotLightAttenuationPhysical'
         : 'Z_calculateSpotLightAttenuation';
@@ -669,18 +670,9 @@ export function mixinLight<T extends typeof MeshMaterial>(BaseCls: T) {
         funcName,
         [pb.vec3('worldPos'), pb.vec4('posRange'), pb.vec4('dirCutoff'), pb.vec2('angleScaleOffset')],
         function () {
-          this.$l.dist = pb.distance(this.posRange.xyz, this.worldPos);
-          if (physical) {
-            this.$l.dist2 = pb.mul(this.dist, this.dist);
-            this.$l.lightAtten = pb.div(1, pb.max(this.dist2, 0.0001));
-            this.$l.range2 = pb.mul(this.posRange.w, this.posRange.w);
-            this.$l.f = pb.div(this.dist2, pb.max(this.range2, 0.0001));
-            this.$l.f2 = pb.clamp(pb.sub(1, pb.mul(this.f, this.f)), 0, 1);
-            this.$l.falloff = pb.mul(this.lightAtten, this.f2, this.f2);
-          } else {
-            this.$l.falloff = pb.max(0, pb.sub(1, pb.div(this.dist, this.posRange.w)));
-            this.falloff = pb.mul(this.falloff, this.falloff);
-          }
+          // The point light's distance falloff in both modes: inverse square with the windowing
+          // to the range, so a spot and a point light of one intensity light a surface alike
+          this.$l.falloff = that.calculatePointLightAttenuation(this, this.worldPos, this.posRange);
           this.$l.cd = pb.dot(pb.normalize(pb.sub(this.worldPos, this.posRange.xyz)), this.dirCutoff.xyz);
           if (physical) {
             // Filament's getAngleAttenuation: saturate(cd * scale + offset) squared. The scale/offset

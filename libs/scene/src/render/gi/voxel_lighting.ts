@@ -446,17 +446,8 @@ export class VoxelLighting {
           'Z_spotAttenuation',
           [pb.vec3('p'), pb.vec4('posRange'), pb.vec4('dirCutoff'), pb.vec2('angleScaleOffset')],
           function () {
-            this.$l.dist = pb.distance(this.posRange.xyz, this.p);
-            if (physical) {
-              this.$l.dist2 = pb.mul(this.dist, this.dist);
-              this.$l.range2 = pb.mul(this.posRange.w, this.posRange.w);
-              this.$l.f = pb.div(this.dist2, pb.max(this.range2, 0.0001));
-              this.$l.f2 = pb.clamp(pb.sub(1, pb.mul(this.f, this.f)), 0, 1);
-              this.$l.falloff = pb.mul(pb.div(1, pb.max(this.dist2, 0.0001)), this.f2, this.f2);
-            } else {
-              this.$l.falloff = pb.max(0, pb.sub(1, pb.div(this.dist, this.posRange.w)));
-              this.falloff = pb.mul(this.falloff, this.falloff);
-            }
+            // The point light's distance falloff in both modes, as the surfaces light them
+            this.$l.falloff = this.Z_pointAttenuation(this.p, this.posRange);
             this.$l.cd = pb.dot(pb.normalize(pb.sub(this.p, this.posRange.xyz)), this.dirCutoff.xyz);
             if (physical) {
               this.$l.spot = pb.clamp(
