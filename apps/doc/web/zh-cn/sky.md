@@ -61,6 +61,8 @@ directionalLight.sunLight = false;
 
 <div class="showcase" case="tut-34"></div>
 
+需要有层厚、自阴影和多次散射近似的云层时，使用[体积云](zh-cn/volumetric-clouds.md)。体积云仅支持 WebGPU；其他后端会退回本页介绍的 2D 云层。
+
 天空中的云层是用 2D 噪声函数生成的，有三个可调参数：
 
 ```javascript

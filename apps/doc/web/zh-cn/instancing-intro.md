@@ -1,5 +1,7 @@
 # 几何体实例化（Geometry Instancing）
 
+WebGPU 还支持[骨骼动画网格实例化](zh-cn/instancing-skinned.md)，同一角色模型的多个实例可使用各自的骨骼动画。
+
 > 本页代码为片段示意，省略了 import 与应用初始化，完整可运行示例见页内嵌入的实例。
 
 ## 概述

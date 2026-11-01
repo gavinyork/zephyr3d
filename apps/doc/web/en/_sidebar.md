@@ -21,8 +21,10 @@
     - [Direct lighting](en/lighting-direct.md)
     - [Indirect lighting](en/lighting-indirect.md)
     - [Physical Lighting Mode](en/lighting-physical.md)
+    - [SDF-based DDGI](en/lighting-ddgi.md)
   - Environment
     - [Sky](en/sky.md)
+    - [Volumetric Clouds](en/volumetric-clouds.md)
     - [Water](en/water.md)
     - [Runtime Terrain](en/terrain-runtime.md)
   - Shadows
@@ -60,6 +62,9 @@
     - [Overview](en/picking.md)
   - Geometry Instancing
     - [Overview](en/instancing-intro.md)
+    - [Skinned Mesh Instancing](en/instancing-skinned.md)
+  - Spatial Fields
+    - [Mesh and Global SDF](en/sdf.md)
   - Character Rendering
     - [Skin and Subsurface Scattering](en/material-skin.md)
     - [Hair Rendering](en/material-hair.md)

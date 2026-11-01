@@ -21,8 +21,10 @@
     - [直接光照](zh-cn/lighting-direct.md)
     - [间接光照](zh-cn/lighting-indirect.md)
     - [物理光照模式](zh-cn/lighting-physical.md)
+    - [基于 SDF 的 DDGI](zh-cn/lighting-ddgi.md)
   - 环境
     - [天空](zh-cn/sky.md)
+    - [体积云](zh-cn/volumetric-clouds.md)
     - [水面](zh-cn/water.md)
     - [运行时地形](zh-cn/terrain-runtime.md)
   - 阴影
@@ -60,6 +62,9 @@
     - [概述](zh-cn/picking.md)
   - 几何体实例化
     - [概述](zh-cn/instancing-intro.md)
+    - [骨骼动画网格实例化](zh-cn/instancing-skinned.md)
+  - 空间场
+    - [网格 SDF 与全局 SDF](zh-cn/sdf.md)
   - 角色渲染
     - [皮肤与次表面散射](zh-cn/material-skin.md)
     - [头发渲染](zh-cn/material-hair.md)

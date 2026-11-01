@@ -1,6 +1,8 @@
 
 # Indirect Lighting
 
+For dynamic diffuse indirect light from scene geometry, see [SDF-based DDGI](en/lighting-ddgi.md). This page covers IBL and hemispheric light; DDGI requires WebGPU and baked mesh SDF assets.
+
 > Code on this page is illustrative and omits imports and application setup. See the embedded
 > live demos for complete runnable examples.
 

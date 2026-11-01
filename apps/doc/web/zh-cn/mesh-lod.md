@@ -10,6 +10,14 @@ zephyr3d 的 LOD 是**离散 LOD 链**：
 
 LOD 一般在编辑器里生成，见[资产压缩](zh-cn/editor/asset-compression.md)中的“细节层次（LOD）”一节。生成后的网格无需任何代码，加载后自动按距离切换。不使用编辑器时，也可以在加载模型时生成，见[加载时生成](#加载时生成)。
 
+## 在编辑器中生成
+
+导入 GLB、FBX 或 OBJ 时，在导入选项中勾选 **Generate LODs**，设置 **Min Triangles**、**Triangles Per Level** 和 **Pixel Error**，点击 **OK**。导入进度中的 `Generating levels of detail...` 完成后，派生网格即可使用。
+
+已有网格可在 Content Browser 中右键 `.zmsh`，选择 **Mesh Settings...**，勾选 **Generate LODs**，调整上述参数并点击 **OK**。派生副本在后台生成；状态显示 **in use in the editor** 后，重新打开场景即可确认视口已使用新副本。设置保存在网格旁的 `.zmeta` 文件中，源文件不会被修改。
+
+编辑器只为 triangle-list 网格生成 LOD。发布时由 **Build Project** 将派生副本写入构建产物。
+
 ---
 
 ## 选级规则

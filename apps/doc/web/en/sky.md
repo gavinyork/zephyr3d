@@ -60,6 +60,9 @@ directional light created in a scene automatically becomes the sun**, so orienti
 
 <div class="showcase" case="tut-34"></div>
 
+For clouds with a finite layer, self-shadowing, and multiple-scattering approximation, see
+[Volumetric Clouds](en/volumetric-clouds.md). Volumetric mode is WebGPU-only; other backends use the 2D clouds described on this page.
+
 The clouds in the sky are generated from a 2D noise function, with three parameters to tune:
 
 ```javascript

@@ -1,5 +1,7 @@
 # Geometry Instancing
 
+WebGPU also supports [skinned mesh instancing](en/instancing-skinned.md), so instances of the same character model can use their own skeletal animation.
+
 > Code on this page is illustrative and omits imports and application setup. See the embedded
 > live demos for complete runnable examples.
 

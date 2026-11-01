@@ -1,6 +1,8 @@
 
 # 间接光照（Indirect Lighting）
 
+需要动态、基于场景几何的漫反射间接光时，请参阅[基于 SDF 的 DDGI](zh-cn/lighting-ddgi.md)。本页介绍 IBL 和半球光；DDGI 需要 WebGPU 以及已烘焙的网格 SDF。
+
 > 本页代码为片段示意，省略了 import 与应用初始化，完整可运行示例见页内嵌入的实例。
 
 在 Zephyr3D 中，场景支持单一的**环境光源（Ambient Light）**，
