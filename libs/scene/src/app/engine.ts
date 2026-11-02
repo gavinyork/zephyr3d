@@ -28,6 +28,7 @@ import { StandardSpriteMaterial } from '../material/sprite_std';
 import { SSSMaterial } from '../material/sss';
 import { HairMaterial } from '../material/hair';
 import { ScreenAdapter } from './screen';
+import { PipelineCacheManager } from './pipelinecache';
 import { MSDFTextAtlasManager } from '../text/runtime';
 import type { AssetSourceResolver } from '../asset/assetmanager';
 import {
@@ -88,6 +89,7 @@ export class Engine {
   private _msdfTextAtlasManager: MSDFTextAtlasManager;
   private _enabled: boolean;
   private _screen: ScreenAdapter;
+  private readonly _pipelineCache: PipelineCacheManager;
   /** Resolver this engine installed from a build's asset manifest */
   private _manifestResolver: Nullable<AssetSourceResolver> = null;
   protected _activeRenderables: {
@@ -112,6 +114,7 @@ export class Engine {
     this._activeRenderables = [];
     this._loadingScenes = {};
     this._screen = new ScreenAdapter();
+    this._pipelineCache = new PipelineCacheManager(() => this.VFS);
   }
   /**
    * Exposes the instance of {@link ScriptingSystem}.
@@ -234,6 +237,13 @@ export class Engine {
    */
   get screen() {
     return this._screen;
+  }
+  /**
+   * Reads pipeline cache files and compiles the pipelines they record ahead of time.
+   * The engine never calls it by itself.
+   */
+  get pipelineCache() {
+    return this._pipelineCache;
   }
   /** @internal */
   async init() {

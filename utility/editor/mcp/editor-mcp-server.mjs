@@ -3152,13 +3152,16 @@ const BASE_TOOLS = [
   {
     name: 'pipeline_cache',
     description:
-      'Pipelines of the editor page device (WebGPU only). action stats returns how its pipelines were made: { precompiled, precompiledUsed, onDemand, onDemandPrograms } where onDemand counts pipelines a draw or dispatch compiled when issued (a stall) and onDemandPrograms names the programs of the latest of them. action precompile compiles recorded pipelines (data: the data of pipeline_recorder export, or an array of them) ahead of time with the asynchronous pipeline creation and waits for the job: { result: { total, completed, failed, skipped, cancelled, elapsedMs }, stats }.',
+      'Pipelines of the editor page device (WebGPU only). action stats returns how its pipelines were made: { precompiled, precompiledUsed, onDemand, onDemandPrograms } where onDemand counts pipelines a draw or dispatch compiled when issued (a stall) and onDemandPrograms names the programs of the latest of them. action precompile compiles recorded pipelines (data: the data of pipeline_recorder export, or an array of them) ahead of time with the asynchronous pipeline creation and waits for the job: { result: { total, completed, failed, skipped, cancelled, elapsedMs }, stats }. action compile goes through the engine API getEngine().pipelineCache, reading files from the project VFS: manifest (a manifest path, with scenes to pick entries; without scenes every entry) or files (recording file paths); returns { entries, result: { ...counts, missing }, stats }.',
     inputSchema: {
       type: 'object',
       required: ['action'],
       properties: {
-        action: { type: 'string', enum: ['stats', 'precompile'] },
+        action: { type: 'string', enum: ['stats', 'precompile', 'compile'] },
         data: { type: ['object', 'array'], description: 'Recorded pipelines, for precompile.' },
+        manifest: { type: 'string', description: 'Manifest path, for compile.' },
+        scenes: { type: 'array', items: { type: 'string' }, description: 'Scene paths picking manifest entries, for compile.' },
+        files: { type: 'array', items: { type: 'string' }, description: 'Recording file paths, for compile.' },
         priority: { type: 'string', enum: ['foreground', 'background'], default: 'foreground' },
         timeout_ms: { type: 'number', default: 120000 }
       }
@@ -4566,7 +4569,14 @@ const handlers = {
   async pipeline_cache(args) {
     return bridge.send(
       'pipeline_cache',
-      { action: args.action, data: args.data, priority: args.priority },
+      {
+        action: args.action,
+        data: args.data,
+        priority: args.priority,
+        manifest: args.manifest,
+        scenes: args.scenes,
+        files: args.files
+      },
       Number(args.timeout_ms ?? 120000)
     );
   },
