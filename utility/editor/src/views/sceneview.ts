@@ -158,6 +158,8 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
   private _oldTransform: Nullable<TRS>;
   private _workspaceDragging: boolean;
   private _renderDropZone: boolean;
+  /** Preview windows of the desktop app open: the viewport is not drawn meanwhile */
+  private _previewWindowsOpen = 0;
   private readonly _nodeToBePlaced: DRef<SceneNode>;
   private _typeToBePlaced: 'shape' | 'asset' | 'mesh' | 'prefab' | 'node' | 'hair' | 'none';
   private _ctorToBePlaced: Nullable<{ new (scene: Scene): SceneNode }>;
@@ -217,6 +219,9 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
   private _busyStatusText: string;
   constructor(controller: SceneController) {
     super(controller);
+    window.zephyrEditorDesktop?.preview?.onStateChanged?.((state) => {
+      this._previewWindowsOpen = state.open;
+    });
     this._cmdManager = new CommandManager();
     this._transformNode = new DRef();
     this._oldTransform = null;
@@ -1427,25 +1432,21 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
       // Whichever camera views the scene shows the editor's wireframe setting
       camera.wireframe = this._wireframe;
       camera.lodColoration = this._lodColoration;
-      camera!.render(this.controller.model.scene);
-      if (this._sdfView) {
-        // The view needs the field; the scene keeps it on until SDFEnabled is turned off.
-        // The voxel views need the global illumination's voxel scene likewise
-        const scene = this.controller.model.scene;
-        scene.sdf.enabled = true;
-        if (this._sdfView !== 'distance') {
-          scene.gi.enabled = true;
-        }
-        renderSceneSDFView(scene, camera, this._sdfView, this._sdfViewExposure);
-      }
-
-      // Render selected camera
-      const selectedNode = this._sceneHierarchy!.selectedNode;
-      if (selectedNode instanceof PerspectiveCamera && selectedNode !== camera) {
-        selectedNode.viewport = [camera!.viewport![0] + 20, camera!.viewport![1] + 20, 300, 200];
-        selectedNode.scissor = selectedNode.viewport;
-        selectedNode.aspect = selectedNode.viewport[2] / selectedNode.viewport[3];
-        selectedNode.render(this.controller.model.scene);
+      if (this._previewWindowsOpen > 0) {
+        // A preview window draws the scene meanwhile: drawing it here as well would
+        // halve the GPU the preview gets, and it would not run as a build does
+        const text = 'Viewport paused while a preview window is open';
+        const size = ImGui.CalcTextSize(text);
+        ImGui.GetBackgroundDrawList().AddText(
+          new ImGui.ImVec2(
+            this._leftDockPanel!.width + (viewportWidth - size.x) * 0.5,
+            this._menubar.height + this._toolbar.height + (viewportHeight - size.y) * 0.5
+          ),
+          ImGui.GetColorU32(new ImGui.ImVec4(0.8, 0.8, 0.8, 1)),
+          text
+        );
+      } else {
+        this.renderViewportScene(camera);
       }
 
       if (this._renderDropZone) {
@@ -1515,6 +1516,29 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
     a.target = '_blank';
     a.rel = 'noopener noreferrer';
     a.click();
+  }
+  /** Draws the scene in the viewport, with the SDF view and the selected camera's inset */
+  private renderViewportScene(camera: Camera) {
+    camera.render(this.controller.model.scene);
+    if (this._sdfView) {
+      // The view needs the field; the scene keeps it on until SDFEnabled is turned off.
+      // The voxel views need the global illumination's voxel scene likewise
+      const scene = this.controller.model.scene;
+      scene.sdf.enabled = true;
+      if (this._sdfView !== 'distance') {
+        scene.gi.enabled = true;
+      }
+      renderSceneSDFView(scene, camera, this._sdfView, this._sdfViewExposure);
+    }
+
+    // Render selected camera
+    const selectedNode = this._sceneHierarchy!.selectedNode;
+    if (selectedNode instanceof PerspectiveCamera && selectedNode !== camera) {
+      selectedNode.viewport = [camera.viewport![0] + 20, camera.viewport![1] + 20, 300, 200];
+      selectedNode.scissor = selectedNode.viewport;
+      selectedNode.aspect = selectedNode.viewport[2] / selectedNode.viewport[3];
+      selectedNode.render(this.controller.model.scene);
+    }
   }
   renderDropZone(x: number, y: number, w: number, h: number) {
     const color = new ImGui.ImVec4(0, 0, 0, 0);

@@ -286,6 +286,8 @@ export type ZephyrEditorDesktopAPI = {
   preview?: {
     /** Console output of the play preview window, forwarded by the main process. */
     onLog(listener: (entry: { level: string; message: string }) => void): () => void;
+    /** Number of preview windows open, whenever one opens or closes. */
+    onStateChanged?(listener: (state: { open: number }) => void): () => void;
   };
   headless?: {
     reportResult(payload: DesktopHeadlessResult): Promise<void>;
