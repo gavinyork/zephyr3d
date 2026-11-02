@@ -42,6 +42,10 @@ export type ProjectSettings = {
   morphTargetLimit?: number;
   activeMorphTargetLimit?: number;
   skinInfluenceLimit?: number;
+  /** Compile the recorded pipelines of the startup scene before it starts (WebGPU); defaults to true */
+  precompilePipelines?: boolean;
+  /** Then compile those of the other scenes in the background; defaults to true */
+  precompileOtherScenes?: boolean;
   dependencies?: { [name: string]: string };
 };
 

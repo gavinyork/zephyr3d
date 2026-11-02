@@ -11,6 +11,7 @@ import { getVertexFormatSize } from '@zephyr3d/device';
 import type { VertexAttribFormat } from '@zephyr3d/device';
 import type { AssetManifest, AssetSourceKind } from '@zephyr3d/scene';
 import { DerivedAssetService, getDerivedAssetKind } from '../services/derivedassets';
+import { isScenePipelineCachePath, shipPipelineCaches } from '../services/pipelinecache';
 
 function rewriteImports(code: string): string {
   const reStatic = /\b(?:import|export)\s+[^"']*?from\s+(['"])([^'"]+)\1/g;
@@ -419,8 +420,16 @@ export async function buildForEndUser(options: {
     includeFiles: true,
     recursive: true
   });
-  // .zmeta sidecars only steer the editor's asset pipeline and are not shipped
-  const assetFiles = assetFileList.filter((path) => path.type === 'file' && !isAssetMetaPath(path.path));
+  // .zmeta sidecars only steer the editor's asset pipeline and are not shipped, nor are
+  // recorded pipelines a build does not precompile
+  const precompilePipelines =
+    (await ProjectService.getCurrentProjectSettings()).precompilePipelines !== false;
+  const assetFiles = assetFileList.filter(
+    (path) =>
+      path.type === 'file' &&
+      !isAssetMetaPath(path.path) &&
+      (precompilePipelines || !isScenePipelineCachePath(path.path))
+  );
   const manifest: Required<AssetManifest> = { version: 1, textures: {}, primitives: {} };
   const assetReport: BuildAssetReport[] = [];
   for (let i = 0; i < assetFiles.length; i++) {
@@ -453,6 +462,9 @@ export async function buildForEndUser(options: {
       encoding: 'utf8',
       create: true
     });
+  }
+  if (precompilePipelines) {
+    await shipPipelineCaches(vfs, distDir);
   }
 
   const importMap = await getImportMap(vfs, distDir, true, physics);

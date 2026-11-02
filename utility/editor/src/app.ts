@@ -10,7 +10,7 @@ import { runHeadlessCapture } from './helpers/headless';
 import type { ProjectSettings } from './core/services/project';
 import { ProjectService } from './core/services/project';
 import { isDesktopApp } from './core/services/desktop';
-import { PipelineRecordingSession } from './core/services/pipelinecache';
+import { PipelineRecordingSession, precompileStartupPipelines } from './core/services/pipelinecache';
 import type { Nullable } from '@zephyr3d/base';
 import { GenericHtmlDirectoryReader } from '@zephyr3d/base';
 import type { DeviceBackend } from '@zephyr3d/device';
@@ -294,6 +294,18 @@ editorApp.ready().then(async () => {
     // first frame: render bundles replay their draws without asking for pipelines again
     if (recordPipelines) {
       await PipelineRecordingSession.start(editorApp, ProjectService.VFS);
+    }
+    // Recorded pipelines are compiled before the startup scene, as a build does
+    if (settings!.precompilePipelines !== false) {
+      const loading = document.getElementById('zephyr-loading');
+      await precompileStartupPipelines(ProjectService.VFS, previewScene ?? settings!.startupScene, {
+        otherScenes: settings!.precompileOtherScenes !== false,
+        onProgress: (done, total) => {
+          if (loading && total > 0) {
+            loading.textContent = `Compiling shaders ${Math.floor((done / total) * 100)}%`;
+          }
+        }
+      });
     }
     // Keep the loading mask until the startup scene is on screen, as a build does;
     // a failed startup leaves it up showing the error.

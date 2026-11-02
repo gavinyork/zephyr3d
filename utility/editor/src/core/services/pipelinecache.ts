@@ -1,7 +1,7 @@
 import type { VFS } from '@zephyr3d/base';
 import type { PipelineCacheData, PipelineRecorder } from '@zephyr3d/device';
 import type { Application, PipelineCacheManifest, Scene, SceneNode, Camera } from '@zephyr3d/scene';
-import { getDevice, getEngine } from '@zephyr3d/scene';
+import { getDevice, getEngine, PIPELINE_CACHE_MANIFEST_FILE } from '@zephyr3d/scene';
 
 // Pipelines recorded while a project is previewed, so a build can compile them
 // before the draws that need them. A scene's pipelines are kept beside it as
@@ -63,7 +63,8 @@ export async function listPipelineCacheFiles(vfs: VFS) {
   if (await vfs.exists(PIPELINE_CACHE_COMMON_FILE)) {
     files.push(PIPELINE_CACHE_COMMON_FILE);
   }
-  const sidecars = await vfs.glob(`/**/*.zscn${PIPELINE_CACHE_EXTENSION}`, {
+  // Scenes live under /assets; a build's copies under /dist are not the project's
+  const sidecars = await vfs.glob(`/assets/**/*.zscn${PIPELINE_CACHE_EXTENSION}`, {
     includeDirs: false,
     recursive: true
   });
@@ -89,6 +90,55 @@ export async function scanPipelineCacheManifest(vfs: VFS): Promise<PipelineCache
     }
   }
   return { format: 'zephyr3d-pso-manifest', version: 1, entries };
+}
+
+/**
+ * Ships the pipeline caches with a build: those beside scenes are copied with the
+ * assets, this adds the common file and the manifest the build's entry reads
+ */
+export async function shipPipelineCaches(vfs: VFS, distDir: string) {
+  const manifest = await scanPipelineCacheManifest(vfs);
+  if (manifest.entries.length === 0) {
+    return;
+  }
+  if (await vfs.exists(PIPELINE_CACHE_COMMON_FILE)) {
+    await vfs.copyFile(PIPELINE_CACHE_COMMON_FILE, vfs.join(distDir, PIPELINE_CACHE_COMMON_FILE), {
+      overwrite: true
+    });
+  }
+  // Relative to the manifest, so the build can be served from any path
+  const shipped: PipelineCacheManifest = {
+    ...manifest,
+    entries: manifest.entries.map((entry) => ({ ...entry, file: entry.file.replace(/^\/+/, '') }))
+  };
+  await vfs.writeFile(vfs.join(distDir, PIPELINE_CACHE_MANIFEST_FILE), JSON.stringify(shipped, null, 2), {
+    encoding: 'utf8',
+    create: true
+  });
+}
+
+/**
+ * Compiles the recorded pipelines of a scene, and those no scene claimed, before it
+ * starts; then, if asked, those of the other scenes in the background. The preview
+ * does what a build's entry does
+ */
+export async function precompileStartupPipelines(
+  vfs: VFS,
+  startupScene: string | null | undefined,
+  options: { otherScenes: boolean; onProgress?: (done: number, total: number) => void }
+) {
+  const manifest = await scanPipelineCacheManifest(vfs);
+  if (manifest.entries.length === 0) {
+    return;
+  }
+  const cache = getEngine().pipelineCache;
+  const entries = cache.findEntries(manifest, { scenes: startupScene ? [startupScene] : [] });
+  await cache.createTask(entries, { name: 'startup' }).run({
+    onProgress: (p) => options.onProgress?.(p.completed + p.failed + p.skipped, p.total)
+  });
+  if (options.otherScenes) {
+    void cache.createTask(manifest.entries, { name: 'other scenes' }).run({ priority: 'background' });
+  }
 }
 
 /**

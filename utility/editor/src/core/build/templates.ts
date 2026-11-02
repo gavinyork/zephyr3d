@@ -259,13 +259,46 @@ application.ready().then(async () => {
   getEngine().resourceManager.setModelLoader('model/gltf-binary', new GLTFImporter());
   getEngine().resourceManager.setModelLoader('model/fbx', new FBXImporter());
   getEngine().resourceManager.setModelLoader('model/obj', new OBJImporter());
-  ${physics ? `// Before the startup scene, so it is simulated from its first frame\n  await initPhysics(rapierPhysics);\n  ` : ''}application.run();
+  ${physics ? `// Before the startup scene, so it is simulated from its first frame\n  await initPhysics(rapierPhysics);\n  ` : ''}${
+    settings.precompilePipelines !== false ? precompileStartupCode(settings) : ''
+  }application.run();
   await getEngine().startup(${JSON.stringify(settings.startupScene ?? '')}, ${JSON.stringify(settings.startupScript ?? '')});
   // Keep the loading screen of index.html until the startup scene is on screen
   await application.nextFrame();
-  ${splashHideCode}
+  ${splashHideCode}${
+    settings.precompilePipelines !== false && settings.precompileOtherScenes !== false
+      ? `
+  // The pipelines of the other scenes, without holding up the frames
+  if (pipelineManifest) {
+    void getEngine().pipelineCache.createTask(pipelineManifest.entries).run({ priority: 'background' });
+  }`
+      : ''
+  }
 });
 `;
+}
+
+/**
+ * Compiles the recorded pipelines of the startup scene, and those no scene claimed,
+ * before the scene starts, showing the progress on the loading screen
+ */
+function precompileStartupCode(settings: ProjectSettings) {
+  const scenes = settings.startupScene ? [settings.startupScene] : [];
+  return `// Recorded pipelines are compiled before the draws that need them, so they do not stall
+  const pipelineManifest = await getEngine().pipelineCache.loadManifest();
+  if (pipelineManifest) {
+    const cache = getEngine().pipelineCache;
+    const progress = document.getElementById('${SPLASH_ELEMENT_ID}-progress');
+    await cache.createTask(cache.findEntries(pipelineManifest, { scenes: ${JSON.stringify(scenes)} })).run({
+      onProgress: (p) => {
+        if (progress && p.total > 0) {
+          progress.style.visibility = 'visible';
+          (progress.firstElementChild as HTMLElement).style.width = \`\${(100 * (p.completed + p.failed + p.skipped)) / p.total}%\`;
+        }
+      }
+    });
+  }
+  `;
 }
 
 /** Fades out and removes the loading screen of index.html */
@@ -426,6 +459,21 @@ export function generateIndexHTML(options: {
         text-align: center;
         white-space: pre-wrap;
       }
+      #${SPLASH_ELEMENT_ID}-progress {
+        width: min(240px, 60vw);
+        height: 3px;
+        border-radius: 2px;
+        background: color-mix(in srgb, currentColor 20%, transparent);
+        overflow: hidden;
+        visibility: hidden;
+      }
+      #${SPLASH_ELEMENT_ID}-progress > div {
+        width: 0;
+        height: 100%;
+        background: currentColor;
+        opacity: 0.7;
+        transition: width 0.1s linear;
+      }
       @keyframes ${SPLASH_ELEMENT_ID}-spin {
         to {
           transform: rotate(360deg);
@@ -438,6 +486,7 @@ export function generateIndexHTML(options: {
     <div id="${SPLASH_ELEMENT_ID}" role="status" aria-live="polite">
       ${image}
       <div id="${SPLASH_ELEMENT_ID}-spinner"></div>
+      <div id="${SPLASH_ELEMENT_ID}-progress"><div></div></div>
       <div id="${SPLASH_ELEMENT_ID}-message"></div>
     </div>
     <script>
@@ -449,6 +498,7 @@ export function generateIndexHTML(options: {
           splash.classList.remove('${SPLASH_HIDDEN_CLASS}');
           splash.setAttribute('role', 'alert');
           document.getElementById('${SPLASH_ELEMENT_ID}-spinner')?.remove();
+          document.getElementById('${SPLASH_ELEMENT_ID}-progress')?.remove();
           document.getElementById('${SPLASH_ELEMENT_ID}-message').textContent = \`Startup failed: \${message}\`;
         }
       };

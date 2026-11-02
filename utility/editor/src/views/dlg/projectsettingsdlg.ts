@@ -271,6 +271,18 @@ export class DlgProjectSettings extends DialogRenderer<ProjectSettings> {
       this._settings.renderScale = DlgProjectSettings.RENDER_SCALE_ITEMS[selectedRenderScaleIndex[0]];
     }
 
+    // Pipelines recorded by "record pipelines" in the toolbar, compiled before the draws need them
+    const precompilePipelines = [this._settings.precompilePipelines !== false] as [boolean];
+    if (ImGui.Checkbox('Precompile Recorded Pipelines', precompilePipelines)) {
+      this._settings.precompilePipelines = precompilePipelines[0];
+    }
+    if (precompilePipelines[0]) {
+      const precompileOtherScenes = [this._settings.precompileOtherScenes !== false] as [boolean];
+      if (ImGui.Checkbox('Then Precompile Other Scenes in Background', precompileOtherScenes)) {
+        this._settings.precompileOtherScenes = precompileOtherScenes[0];
+      }
+    }
+
     const morphTargetLimit = [this._settings.morphTargetLimit ?? DEFAULT_MORPH_TARGET_LIMIT] as [number];
     if (ImGui.InputInt('Morph Target Limit', morphTargetLimit, 32, 128)) {
       this._settings.morphTargetLimit = normalizeMorphTargetLimit(morphTargetLimit[0]);
