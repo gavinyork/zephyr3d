@@ -2720,6 +2720,151 @@ export interface DrawTextLayoutOptions {
 }
 
 /**
+ * Serialized pipelines recorded under one tag, ready to be precompiled.
+ *
+ * @remarks
+ * The file is plain JSON. Everything below `profile` is backend specific and
+ * only meaningful to the backend named in `backend`.
+ * @public
+ */
+export interface PipelineCacheData {
+  /** Always `'zephyr3d-pso'` */
+  format: 'zephyr3d-pso';
+  /** Format version */
+  version: number;
+  /** Device type that recorded the pipelines, e.g. `'webgpu'` */
+  backend: string;
+  /** Tag the pipelines were recorded under, `null` for pipelines no tag claimed */
+  tag: Nullable<string>;
+  /** Device properties the recorded shaders and pipelines depend on */
+  profile: Record<string, unknown>;
+  /** Shader sources by content hash */
+  sources: Record<string, string>;
+  /** Bind group layouts by content hash */
+  layouts: Record<string, unknown>;
+  /** Render pipelines */
+  render: unknown[];
+  /** Compute pipelines */
+  compute: unknown[];
+}
+
+/**
+ * Records the pipelines a device uses so they can be compiled ahead of time.
+ *
+ * @remarks
+ * Recording only watches the pipelines draws and dispatches ask for: rendering is
+ * not changed. A pipeline is recorded each time it is used while recording, not
+ * only when it is created, but a render bundle replays its draws without asking
+ * again, so recording has to begin before the first frame to see them all.
+ *
+ * Pipelines are grouped by the innermost tag pushed when they are used; those used
+ * with no tag pushed are grouped under `null`.
+ * @public
+ */
+export interface PipelineRecorder {
+  /** Whether pipelines are being recorded */
+  readonly recording: boolean;
+  /** Number of distinct pipelines recorded, over all tags */
+  readonly count: number;
+  /** Starts recording. Calls nest: recording stops after the matching number of `end()` calls */
+  begin(): void;
+  /** Ends one `begin()` */
+  end(): void;
+  /** Groups the pipelines used from now on under a tag, until the matching `popTag()` */
+  pushTag(tag: string): void;
+  /** Ends the innermost `pushTag()` */
+  popTag(): void;
+  /** Tags holding at least one pipeline */
+  tags(): Nullable<string>[];
+  /** Serializes the pipelines recorded under a tag */
+  export(tag: Nullable<string>): PipelineCacheData;
+  /** Adds the pipelines of earlier recordings, under the tag stored in the data */
+  merge(data: PipelineCacheData): void;
+  /** Forgets everything recorded */
+  clear(): void;
+}
+
+/**
+ * How eagerly pipelines are compiled ahead of time.
+ *
+ * @remarks
+ * `foreground` compiles as fast as the browser allows, for a loading screen.
+ * `background` keeps few pipelines compiling at once and spreads the work over
+ * frames, to compile what is needed next while the application runs.
+ * @public
+ */
+export type PipelinePrecompilePriority = 'foreground' | 'background';
+
+/**
+ * Progress of compiling pipelines ahead of time
+ * @public
+ */
+export interface PipelinePrecompileProgress {
+  /** Pipelines in the job */
+  total: number;
+  /** Pipelines compiled */
+  completed: number;
+  /** Pipelines that failed to compile */
+  failed: number;
+  /** Pipelines not compiled: already compiled or compiling, unreadable, or left when the job was cancelled */
+  skipped: number;
+}
+
+/**
+ * Outcome of compiling pipelines ahead of time
+ * @public
+ */
+export interface PipelinePrecompileResult extends PipelinePrecompileProgress {
+  /** Whether the job was cancelled before it compiled everything */
+  cancelled: boolean;
+  /** Time from the start of the job to its end */
+  elapsedMs: number;
+}
+
+/**
+ * Options of compiling pipelines ahead of time
+ * @public
+ */
+export interface PipelinePrecompileOptions {
+  /** How eagerly to compile, defaults to `foreground` */
+  priority?: PipelinePrecompilePriority;
+  /** Called whenever a pipeline of the job is accounted for */
+  onProgress?: (progress: Readonly<PipelinePrecompileProgress>) => void;
+}
+
+/**
+ * Pipelines being compiled ahead of time
+ * @public
+ */
+export interface PipelinePrecompileJob {
+  /** Progress so far */
+  readonly progress: Readonly<PipelinePrecompileProgress>;
+  /** Whether every pipeline of the job is accounted for, or the job was cancelled */
+  readonly done: boolean;
+  /** How eagerly the rest of the job is compiled; can be changed while it runs */
+  priority: PipelinePrecompilePriority;
+  /** Resolves when the job is done */
+  readonly result: Promise<PipelinePrecompileResult>;
+  /** Compiles nothing more; pipelines already compiling are still kept */
+  cancel(): void;
+}
+
+/**
+ * How the pipelines of a device were made
+ * @public
+ */
+export interface PipelineCacheStats {
+  /** Pipelines compiled ahead of time */
+  precompiled: number;
+  /** Pipelines compiled ahead of time that draws or dispatches have used */
+  precompiledUsed: number;
+  /** Pipelines a draw or dispatch had to compile when it was issued, stalling it */
+  onDemand: number;
+  /** Programs of the most recent pipelines compiled on demand, oldest first */
+  onDemandPrograms: string[];
+}
+
+/**
  * Abstract interface for the rendering device.
  * @public
  */
@@ -3208,6 +3353,29 @@ export interface AbstractDevice extends IEventTarget<DeviceEventMap> {
    * @returns A RenderBundle that holds the captured draw commands
    */
   endCapture(): RenderBundle;
+  /**
+   * Gets the pipeline recorder of the device
+   * @returns The recorder, or null if the device has no pipelines to record
+   */
+  getPipelineRecorder(): Nullable<PipelineRecorder>;
+  /**
+   * Compiles recorded pipelines ahead of time, so draws and dispatches that need them
+   * later do not stall on compiling them.
+   *
+   * @remarks
+   * Recordings of another device type are skipped. Pipelines compile in the background
+   * of the browser; nothing waits for them unless the caller awaits the job.
+   *
+   * @param data - Recordings made by {@link PipelineRecorder.export}
+   * @param options - Priority and progress callback
+   * @returns The job compiling them
+   */
+  precompilePipelines(
+    data: PipelineCacheData | PipelineCacheData[],
+    options?: PipelinePrecompileOptions
+  ): PipelinePrecompileJob;
+  /** Gets how the pipelines of the device were made */
+  getPipelineCacheStats(): PipelineCacheStats;
   /** Get the video memory usage in bytes */
   videoMemoryUsage: number;
   /** Get the current frame information */

@@ -15,6 +15,15 @@ const LOG_CHANNEL = 'zephyr-editor:log';
 const SETTINGS_CHANNEL = 'zephyr-editor:settings';
 const ASSISTANT_EVENT_CHANNEL = 'zephyr-editor:assistant-event';
 const PREVIEW_LOG_CHANNEL = 'zephyr-editor:preview-log';
+const PREVIEW_STATE_CHANNEL = 'zephyr-editor:preview-state';
+/** Preview windows open, so the editor can stop drawing its viewport while there are any */
+const previewWindows = new Set();
+
+function notifyPreviewState() {
+  if (mainWindowRef && !mainWindowRef.isDestroyed()) {
+    mainWindowRef.webContents.send(PREVIEW_STATE_CHANNEL, { open: previewWindows.size });
+  }
+}
 const HEADLESS_CHANNEL = 'zephyr-editor:headless';
 const EDITOR_PROTOCOL = 'zephyr-editor';
 const MCP_HTTP_PATH = '/mcp';
@@ -3298,6 +3307,13 @@ function createPreviewWindow(url) {
     backgroundColor: '#1f1f1f',
     icon: editorIconPath(),
     webPreferences: editorWebPreferences()
+  });
+  // Both windows drawing would share the GPU: the preview would run slower than a build
+  previewWindows.add(previewWindow);
+  notifyPreviewState();
+  previewWindow.on('closed', () => {
+    previewWindows.delete(previewWindow);
+    notifyPreviewState();
   });
 
   previewWindow.webContents.setWindowOpenHandler(({ url: childUrl }) => {

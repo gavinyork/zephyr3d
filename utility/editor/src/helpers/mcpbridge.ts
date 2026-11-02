@@ -1,5 +1,6 @@
 import type { Editor } from '../core/editor';
-import type { Camera } from '@zephyr3d/scene';
+import type { PipelineCacheData, PipelinePrecompilePriority } from '@zephyr3d/device';
+import type { Camera, PipelineCacheManifestEntry, PipelineCompileSource } from '@zephyr3d/scene';
 import type { PropertyValue, Material } from '@zephyr3d/scene';
 import type { Primitive } from '@zephyr3d/scene';
 import {
@@ -1960,6 +1961,10 @@ ${err.stack}`
       return setSDFDebugView(getSceneController(editor), params);
     case 'gi_stats':
       return getGIStats(getSceneController(editor), params);
+    case 'pipeline_recorder':
+      return runPipelineRecorder(params);
+    case 'pipeline_cache':
+      return runPipelineCache(params);
     case 'gi_voxel_query':
       try {
         return await queryGIVoxels(getSceneController(editor), params);
@@ -4473,6 +4478,90 @@ ${err.stack}`
       return runEval(editor, params?.script ?? params?.expression ?? '', !!params?.expression);
     default:
       throw new Error(`Unknown editor bridge method: ${method}`);
+  }
+}
+
+function runPipelineRecorder(params: { action?: string; tag?: string | null }) {
+  const recorder = getDevice().getPipelineRecorder();
+  if (!recorder) {
+    return {
+      available: false,
+      recording: false,
+      count: 0,
+      tags: [],
+      err: 'The device records no pipelines: only WebGPU has a pipeline recorder'
+    };
+  }
+  switch (params?.action) {
+    case 'begin':
+      recorder.begin();
+      break;
+    case 'end':
+      recorder.end();
+      break;
+    case 'clear':
+      recorder.clear();
+      break;
+    case 'status':
+    case 'export':
+      break;
+    default:
+      return {
+        available: true,
+        recording: recorder.recording,
+        count: recorder.count,
+        tags: recorder.tags(),
+        err: `Unknown action: ${params?.action}`
+      };
+  }
+  return {
+    available: true,
+    recording: recorder.recording,
+    count: recorder.count,
+    tags: recorder.tags(),
+    ...(params.action === 'export' ? { data: recorder.export(params.tag ?? null) } : {}),
+    err: null
+  };
+}
+
+async function runPipelineCache(params: {
+  action?: string;
+  data?: PipelineCacheData | PipelineCacheData[];
+  priority?: PipelinePrecompilePriority;
+  manifest?: string;
+  scenes?: string[];
+  files?: string[];
+}) {
+  const device = getDevice();
+  switch (params?.action) {
+    case 'stats':
+      return { stats: device.getPipelineCacheStats(), err: null };
+    case 'precompile': {
+      if (!params.data) {
+        return { err: 'precompile needs data' };
+      }
+      const job = device.precompilePipelines(params.data, { priority: params.priority ?? 'foreground' });
+      const result = await job.result;
+      return { result, stats: device.getPipelineCacheStats(), err: null };
+    }
+    case 'compile': {
+      const cache = getEngine().pipelineCache;
+      let sources: PipelineCompileSource[] = params.files ?? [];
+      let entries: PipelineCacheManifestEntry[] | null = null;
+      if (params.manifest) {
+        const manifest = await cache.loadManifest(params.manifest);
+        if (!manifest) {
+          return { err: `No pipeline cache manifest at ${params.manifest}` };
+        }
+        entries = cache.findEntries(manifest, params.scenes ? { scenes: params.scenes } : undefined);
+        sources = [...sources, ...entries];
+      }
+      const task = cache.createTask(sources, { name: 'mcp' });
+      const result = await task.run({ priority: params.priority ?? 'foreground' });
+      return { entries, state: task.state, result, stats: cache.getStats(), err: null };
+    }
+    default:
+      return { err: `Unknown action: ${params?.action}` };
   }
 }
 

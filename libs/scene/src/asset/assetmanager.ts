@@ -47,6 +47,8 @@ import type { Skeleton } from '../animation';
 import { Primitive } from '../render';
 import { FontAsset } from '../text';
 import type { MeshLodSettings } from './mesh_lod_builder';
+import type { AssetRequest, AssetRequestType } from './asset_preload';
+import { getRecordableOptions } from './asset_preload';
 
 /**
  * Base fetch options
@@ -323,6 +325,8 @@ export class AssetManager {
   private readonly _cachePathByKey: Map<string, string>;
   /** @internal */
   private readonly _resourceManager: ResourceManager;
+  /** @internal */
+  private readonly _requestListeners: Set<(request: AssetRequest) => void>;
   /**
    * Creates an instance of AssetManager
    */
@@ -340,6 +344,39 @@ export class AssetManager {
     this._jsonDatas = {};
     this._cacheKeysByPath = new Map();
     this._cachePathByKey = new Map();
+    this._requestListeners = new Set();
+  }
+  /**
+   * Watches the fetches made from now on, to record them for {@link AssetPreloader}.
+   *
+   * @remarks
+   * Only fetches that can be made again from a recording are reported: not those
+   * reading from another VFS, loading into an existing texture, or post-processing
+   * through a callback. Fetching is unchanged.
+   *
+   * @param listener - Called with each fetch as it is made, cached or not
+   */
+  addRequestListener(listener: (request: AssetRequest) => void) {
+    this._requestListeners.add(listener);
+  }
+  /** Stops a listener added by {@link AssetManager.addRequestListener} */
+  removeRequestListener(listener: (request: AssetRequest) => void) {
+    this._requestListeners.delete(listener);
+  }
+  /** @internal */
+  private notifyRequest(type: AssetRequestType, url: string, options: unknown, replayable = true) {
+    if (this._requestListeners.size === 0 || !replayable) {
+      return;
+    }
+    const recordable = getRecordableOptions(options as Record<string, unknown>);
+    if (!recordable) {
+      return;
+    }
+    const request: AssetRequest =
+      Object.keys(recordable).length > 0 ? { type, url, options: recordable } : { type, url };
+    for (const listener of this._requestListeners) {
+      listener(request);
+    }
   }
   /**
    * VFS used to read resources (files, URLs, virtual mounts).
@@ -563,6 +600,7 @@ export class AssetManager {
     httpRequest?: HttpRequest,
     options?: BaseFetchOptions
   ) {
+    this.notifyRequest('text', url, options, !postProcess && !httpRequest);
     const hash = httpRequest?.urlResolver?.(url) ?? url;
     let P = this._textDatas[hash];
     if (!P) {
@@ -589,6 +627,7 @@ export class AssetManager {
     httpRequest?: Nullable<HttpRequest>,
     options?: BaseFetchOptions
   ): Promise<T> {
+    this.notifyRequest('json', url, options, !postProcess && !httpRequest);
     const hash = httpRequest?.urlResolver?.(url) ?? url;
     let P = this._jsonDatas[hash] as Promise<T>;
     if (!P) {
@@ -615,6 +654,7 @@ export class AssetManager {
     httpRequest?: Nullable<HttpRequest>,
     options?: BaseFetchOptions
   ) {
+    this.notifyRequest('binary', url, options, !postProcess && !httpRequest);
     const hash = httpRequest?.urlResolver?.(url) ?? url;
     let P = this._binaryDatas[hash];
     if (!P) {
@@ -636,6 +676,7 @@ export class AssetManager {
    * @returns A promise that resolves to the loaded (and optionally processed) font asset.
    */
   async fetchFontAsset(url: string, options?: FontAssetFetchOptions) {
+    this.notifyRequest('font', url, options);
     const hash = url;
     let P = this._fontAssets[hash];
     if (!P) {
@@ -665,6 +706,7 @@ export class AssetManager {
     return this._fontAssets[hash] instanceof Promise ? null : (this._fontAssets[hash] ?? null);
   }
   async fetchBluePrint(url: string, options?: BaseFetchOptions) {
+    this.notifyRequest('blueprint', url, options);
     const hash = url;
     let P = this._bluePrints[hash];
     if (!P) {
@@ -685,6 +727,7 @@ export class AssetManager {
     url: string,
     options?: BaseFetchOptions
   ): Promise<Nullable<T>> {
+    this.notifyRequest('material', url, options);
     const hash = url;
     let P = this._materials[hash] as Promise<Nullable<T>> | DWeakRef<T>;
     if (P instanceof DWeakRef && P.get() && !P.get()!.disposed) {
@@ -711,6 +754,7 @@ export class AssetManager {
     url: string,
     options?: BaseFetchOptions
   ): Promise<Nullable<T>> {
+    this.notifyRequest('primitive', url, options);
     const hash = url;
     let P = this._primitives[hash] as Promise<Nullable<T>> | DWeakRef<T>;
     if (P instanceof DWeakRef && P.get() && !P.get()!.disposed) {
@@ -741,6 +785,7 @@ export class AssetManager {
    * @returns A promise that resolves to the loaded texture.
    */
   async fetchTexture<T extends BaseTexture>(url: string, options?: TextureFetchOptions<T>): Promise<T> {
+    this.notifyRequest('texture', url, options);
     if (options?.texture) {
       return this.loadTexture(
         url,
@@ -786,6 +831,7 @@ export class AssetManager {
    * @internal
    */
   async fetchModelData(url: string, options?: ModelFetchOptions) {
+    this.notifyRequest('model', url, options);
     // The same model with and without levels of detail are different models
     const hash = options?.generateLods ? `${url}#lod:${JSON.stringify(options.generateLods)}` : url;
     let P = this._models[hash];

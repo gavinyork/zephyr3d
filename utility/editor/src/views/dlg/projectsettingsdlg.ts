@@ -158,34 +158,19 @@ export class DlgProjectSettings extends DialogRenderer<ProjectSettings> {
       }
     }
 
-    const splashImage = [this._settings.splashImage ?? ''] as [string];
-    if (customTextInput('Splash Image', splashImage)) {
-      this._settings.splashImage = splashImage[0];
+    // The engine's splash screen: its logo and the loading progress, shown as soon as the page is
+    const defaultSplash = [this._settings.defaultSplash !== false] as [boolean];
+    if (ImGui.Checkbox('Splash Screen', defaultSplash)) {
+      this._settings.defaultSplash = defaultSplash[0];
     }
     if (ImGui.IsItemHovered()) {
-      ImGui.SetTooltip(
-        'Image shown on the loading screen until the startup scene is drawn.\nDouble click to select image'
-      );
-      if (ImGui.IsMouseDoubleClicked(0)) {
-        DlgOpenFile.openFile(
-          'Select Image File',
-          this._vfs,
-          '/assets',
-          'Image (*.jpg;*.png;*.webp;*.svg;*.gif)|*.jpg;*.png;*.webp;*.svg;*.gif',
-          false,
-          500,
-          400
-        ).then((value) => {
-          if (value.length > 0) {
-            this._settings.splashImage = value[0].meta.path;
-          }
-        });
-      }
+      ImGui.SetTooltip('Show the engine logo and the loading progress until the startup scene is drawn');
     }
-
-    const splashBackground = cssColorToRGB(this._settings.splashBackground ?? DEFAULT_SPLASH_BACKGROUND);
-    if (ImGui.ColorEdit3('Splash Background', splashBackground)) {
-      this._settings.splashBackground = rgbToCSSColor(splashBackground);
+    if (defaultSplash[0]) {
+      const splashBackground = cssColorToRGB(this._settings.splashBackground ?? DEFAULT_SPLASH_BACKGROUND);
+      if (ImGui.ColorEdit3('Splash Background', splashBackground)) {
+        this._settings.splashBackground = rgbToCSSColor(splashBackground);
+      }
     }
 
     const startupScene = [this._settings.startupScene ?? ''] as [string];
@@ -269,6 +254,18 @@ export class DlgProjectSettings extends DialogRenderer<ProjectSettings> {
     const selectedRenderScaleIndex = [renderScaleIndex] as [number];
     if (ImGui.Combo('Render Scale', selectedRenderScaleIndex, DlgProjectSettings.RENDER_SCALE_LABELS)) {
       this._settings.renderScale = DlgProjectSettings.RENDER_SCALE_ITEMS[selectedRenderScaleIndex[0]];
+    }
+
+    // Pipelines recorded by "record pipelines" in the toolbar, compiled before the draws need them
+    const precompilePipelines = [this._settings.precompilePipelines !== false] as [boolean];
+    if (ImGui.Checkbox('Precompile Recorded Pipelines', precompilePipelines)) {
+      this._settings.precompilePipelines = precompilePipelines[0];
+    }
+    if (precompilePipelines[0]) {
+      const precompileOtherScenes = [this._settings.precompileOtherScenes !== false] as [boolean];
+      if (ImGui.Checkbox('Then Precompile Other Scenes in Background', precompileOtherScenes)) {
+        this._settings.precompileOtherScenes = precompileOtherScenes[0];
+      }
     }
 
     const morphTargetLimit = [this._settings.morphTargetLimit ?? DEFAULT_MORPH_TARGET_LIMIT] as [number];

@@ -13,6 +13,7 @@ import {
 } from '@zephyr3d/scene';
 import type { PropertyAccessor } from '@zephyr3d/scene';
 import { drawPhysicsMenus } from '../views/physicsmenu';
+import { isPipelineWarmupCamera } from '../core/services/pipelinecache';
 import type { PhysicsPreset } from '../commands/physicscommands';
 import { TreeViewData, TreeView } from './treeview';
 import { ImGui } from '@zephyr3d/imgui';
@@ -96,6 +97,7 @@ export class SceneHierarchy extends TreeView<
     node_drag_drop: [from: SceneNode, target: SceneNode];
     node_picker_drop: [payload: SceneHierarchyNodePickerPayload, target: SceneNode];
     set_main_camera: [camea: Camera];
+    toggle_pipeline_warmup: [camera: Camera];
     request_go_to_assets: [node: SceneNode];
     request_add_child: [node: SceneNode, ctor: { new (scene: Scene): SceneNode }];
     request_physics_preset: [node: SceneNode, preset: PhysicsPreset];
@@ -224,6 +226,10 @@ export class SceneHierarchy extends TreeView<
       ImGui.Separator();
       if (ImGui.MenuItem('Make Active')) {
         this.dispatchEvent('set_main_camera', node);
+      }
+      // Recording pipelines renders the scene through it too, so what it sees is compiled ahead of time
+      if (ImGui.MenuItem('Pipeline Warmup Camera', null, isPipelineWarmupCamera(node))) {
+        this.dispatchEvent('toggle_pipeline_warmup', node);
       }
     }
   }

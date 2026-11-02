@@ -6,6 +6,8 @@ import {
   isTextureSourcePath,
   moveAssetMeta
 } from '../core/services/assetmeta';
+import { isScenePipelineCachePath } from '../core/services/pipelinecache';
+import { isScenePreloadPath } from '../core/services/assetpreload';
 import { DlgTextureSettings } from '../views/dlg/texturesettingsdlg';
 import { DlgMeshSettings } from '../views/dlg/meshsettingsdlg';
 import type { TextureAddressMode, TextureFilterMode, TextureSampler } from '@zephyr3d/device';
@@ -2728,8 +2730,14 @@ export class VFSRenderer extends makeObservable(Disposable)<{
               dirInfo.parent = info;
             }
           }
-        } else if (entry.type === 'file' && !isAssetMetaPath(entry.path)) {
-          // .zmeta sidecars belong to the asset beside them and are edited through it
+        } else if (
+          entry.type === 'file' &&
+          !isAssetMetaPath(entry.path) &&
+          !isScenePipelineCachePath(entry.path) &&
+          !isScenePreloadPath(entry.path)
+        ) {
+          // .zmeta sidecars belong to the asset beside them and are edited through it,
+          // .zpso pipeline caches to the scene beside them
           info.files.push({
             meta: entry,
             parent: info

@@ -6,6 +6,7 @@ import { SceneView } from '../views/sceneview';
 import { Dialog } from '../views/dlg/dlg';
 import type { Editor } from '../core/editor';
 import { ProjectService } from '../core/services/project';
+import { recordAssetRequests, writeScenePreload } from '../core/services/assetpreload';
 import { DlgProjectSettings } from '../views/dlg/projectsettingsdlg';
 import { DlgMessage } from '../views/dlg/messagedlg';
 import { DlgSystemPlugins } from '../views/dlg/systempluginsdlg';
@@ -335,7 +336,9 @@ export class SceneController extends BaseController<SceneModel, SceneView> {
   }
   async openScene(path: string, resetView: boolean) {
     this._editor.plugins.dispatchEvent('sceneOpening', path);
-    const scene = await this.loadScene(path);
+    // What loading the saved scene fetches, so builds and previews can load it first
+    const { result: scene, requests } = await recordAssetRequests(() => this.loadScene(path));
+    void writeScenePreload(ProjectService.VFS, path, 'static', requests);
     this._editor.currentProject.lastEditScene = path;
     await this._editor.saveProject();
     this._scenePath = path;

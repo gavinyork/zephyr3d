@@ -10,6 +10,8 @@ import { runHeadlessCapture } from './helpers/headless';
 import type { ProjectSettings } from './core/services/project';
 import { ProjectService } from './core/services/project';
 import { isDesktopApp } from './core/services/desktop';
+import { PipelineRecordingSession } from './core/services/pipelinecache';
+import { startPreview } from './core/services/previewstartup';
 import type { Nullable } from '@zephyr3d/base';
 import { GenericHtmlDirectoryReader } from '@zephyr3d/base';
 import type { DeviceBackend } from '@zephyr3d/device';
@@ -28,6 +30,7 @@ const project = searchParams.get('project');
 const open = searchParams.get('open') !== null;
 const remote = searchParams.get('remote') !== null;
 const previewScene = searchParams.get('scene');
+const recordPipelines = searchParams.get('recordPSO') !== null;
 // Headless capture uses a fixed-timestep preview loop.
 const headless = searchParams.get('headless') !== null;
 const headlessFrames = Number(searchParams.get('frames')) || 64;
@@ -288,12 +291,14 @@ editorApp.ready().then(async () => {
     }
     return;
   } else {
-    // Keep the loading mask until the startup scene is on screen, as a build does;
-    // a failed startup leaves it up showing the error.
-    getEngine()
-      .startup(previewScene ?? settings!.startupScene, settings!.startupScript)
-      .then(() => editorApp.nextFrame())
-      .then(() => document.getElementById('zephyr-loading')?.remove());
+    // `?recordPSO` records the pipelines of the preview into the project, from before the
+    // first frame: render bundles replay their draws without asking for pipelines again
+    if (recordPipelines) {
+      await PipelineRecordingSession.start(editorApp, ProjectService.VFS);
+    }
+    // Loads as a build does: splash screen, recorded pipelines and assets first; a failed
+    // startup leaves the loading screen up showing the error
+    void startPreview(editorApp, ProjectService.VFS, settings!, previewScene);
   }
   if (headless) {
     // Persistent headless (hidden window): rAF never fires for windows that

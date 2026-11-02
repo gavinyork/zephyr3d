@@ -50,6 +50,25 @@ const INITIAL_PROBE_DELAY = 2000;
 const MAX_PROBE_DELAY = 16000;
 /** Slowing down this soon after speeding up means the speed up was too early. */
 const FAILED_PROBE_TIME = 3000;
+/**
+ * After speeding up, frames missing or overrunning are not held against the new rate
+ * for this long: the GPU, clocked down while frames were rare, takes a moment to
+ * clock up again, and until then frames take longer than they will.
+ */
+const PROBE_GRACE = 500;
+/**
+ * Holds up to which auto pacing tries every refresh at once when it tries rendering
+ * more often. Every refresh is judged by whether frames come in time, the CPU of one
+ * frame overlapping the GPU of the one before; a hold of two by whether each frame is
+ * done before it is shown, CPU and GPU one after the other. The two are about as hard
+ * to keep, so from here trying two first only delays every refresh; a frame rate
+ * that keeps two but not one still gets there, slowing down from every refresh.
+ * From any hold while no try failed lately: frames rendered rarely take longer than
+ * they would rendered often, as the GPU clocks down between them, so a hold judged
+ * by them can fail where every refresh does not (a scene loading, say, leaves the
+ * longest hold behind it).
+ */
+const PROBE_EVERY_REFRESH_FROM = 3;
 
 /** A recent frame: when, and whether it went the way the sample is about. */
 interface Sample {
@@ -93,6 +112,8 @@ export class FramePacer {
   deferredPresent: boolean;
   /** Held frames in a row that took more refreshes than their hold. */
   private _overruns: number;
+  /** Fewest refreshes the held frames in a row that overran took. */
+  private _overrunNeeded: number;
   /** Estimated display refresh interval in ms; 0 until measured. */
   private _refresh: number;
   /** Consecutive refreshes clearly shorter than the estimate: the display got faster. */
@@ -119,6 +140,7 @@ export class FramePacer {
     this.mode = 'off';
     this.deferredPresent = false;
     this._overruns = 0;
+    this._overrunNeeded = 0;
     this._refresh = 0;
     this._faster = 0;
     this._lastVsync = -1;
@@ -179,12 +201,14 @@ export class FramePacer {
       this._waitingHeadroom = false;
       pushSample(this._headroom, this._lastVsync, fit);
     }
-    if (this.mode !== 'auto') {
+    if (this.mode !== 'auto' || this._inProbeGrace(this._lastVsync)) {
       return;
     }
     if (needed > this._autoRefreshes && this._autoRefreshes < MAX_REFRESHES_PER_FRAME) {
+      // The hold all of them overran: one slow frame among them does not set it
+      this._overrunNeeded = this._overruns > 0 ? Math.min(this._overrunNeeded, needed) : needed;
       if (++this._overruns >= OVERRUNS_TO_SLOW_DOWN) {
-        this._slowDown(this._lastVsync, Math.min(needed, MAX_REFRESHES_PER_FRAME));
+        this._slowDown(this._lastVsync, Math.min(this._overrunNeeded, MAX_REFRESHES_PER_FRAME));
       }
     } else {
       this._overruns = 0;
@@ -244,6 +268,9 @@ export class FramePacer {
     return 1;
   }
   private _adapt(time: number, missed: boolean) {
+    if (this._inProbeGrace(time)) {
+      return;
+    }
     const misses = this._misses;
     pushSample(misses, time, missed);
     if (
@@ -260,13 +287,22 @@ export class FramePacer {
     if (
       this._autoRefreshes > 1 &&
       time - this._stableSince >= this._probeDelay &&
-      headroom.length >= MIN_SAMPLES &&
-      ratio(headroom) >= HEADROOM_TO_SPEED_UP
+      ((headroom.length >= MIN_SAMPLES && ratio(headroom) >= HEADROOM_TO_SPEED_UP) ||
+        // No frame missed a refresh: try rendering more often even without frames done
+        // early. Frames rendered rarely take longer than they would rendered often, as
+        // the GPU clocks down between them, so the headroom they show is no measure of
+        // the rate they could keep; a failed try backs off as the probe delay grows.
+        (misses.length >= MIN_SAMPLES && count(misses) === 0))
     ) {
-      // Frames have been done soon enough: try rendering more often.
       this._lastSpeedUp = time;
-      this._setAutoRefreshes(this._autoRefreshes - 1, time);
+      // Unless trying failed lately: then a hold at a time, not to stutter a slow scene again and again
+      const everyRefresh =
+        this._autoRefreshes <= PROBE_EVERY_REFRESH_FROM || this._probeDelay === INITIAL_PROBE_DELAY;
+      this._setAutoRefreshes(everyRefresh ? 1 : this._autoRefreshes - 1, time);
     }
+  }
+  private _inProbeGrace(time: number) {
+    return time - this._lastSpeedUp < PROBE_GRACE;
   }
   /** Auto pacing state, for diagnostics. */
   get stats() {

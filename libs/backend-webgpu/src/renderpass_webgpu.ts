@@ -101,7 +101,8 @@ export class WebGPURenderPass {
           depthFormat: this._device.backbufferDepthFormat,
           sampleCount: this._device.sampleCount,
           hash: null,
-          clearHash: 'f'
+          clearHash: 'f',
+          backbuffer: true
         }
       : {
           frameBuffer: fb,
