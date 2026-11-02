@@ -10,6 +10,7 @@ import { runHeadlessCapture } from './helpers/headless';
 import type { ProjectSettings } from './core/services/project';
 import { ProjectService } from './core/services/project';
 import { isDesktopApp } from './core/services/desktop';
+import { PipelineRecordingSession } from './core/services/pipelinecache';
 import type { Nullable } from '@zephyr3d/base';
 import { GenericHtmlDirectoryReader } from '@zephyr3d/base';
 import type { DeviceBackend } from '@zephyr3d/device';
@@ -28,6 +29,7 @@ const project = searchParams.get('project');
 const open = searchParams.get('open') !== null;
 const remote = searchParams.get('remote') !== null;
 const previewScene = searchParams.get('scene');
+const recordPipelines = searchParams.get('recordPSO') !== null;
 // Headless capture uses a fixed-timestep preview loop.
 const headless = searchParams.get('headless') !== null;
 const headlessFrames = Number(searchParams.get('frames')) || 64;
@@ -171,13 +173,6 @@ function isEditableShortcutTarget(target: EventTarget | null) {
 }
 
 editorApp.ready().then(async () => {
-  // `?recordPSO` records the pipelines used from the first frame on, and leaves the
-  // recorder on window for the console, until recordings are saved to the project
-  if (searchParams.get('recordPSO') !== null) {
-    const recorder = getDevice().getPipelineRecorder();
-    recorder?.begin();
-    (window as unknown as { __zephyrPSO: unknown }).__zephyrPSO = recorder;
-  }
   ProjectService.attachDerivedData();
   getEngine().resourceManager.setModelLoader('model/gltf+json', new GLTFImporter());
   getEngine().resourceManager.setModelLoader('model/gltf-binary', new GLTFImporter());
@@ -295,6 +290,11 @@ editorApp.ready().then(async () => {
     }
     return;
   } else {
+    // `?recordPSO` records the pipelines of the preview into the project, from before the
+    // first frame: render bundles replay their draws without asking for pipelines again
+    if (recordPipelines) {
+      await PipelineRecordingSession.start(editorApp, ProjectService.VFS);
+    }
     // Keep the loading mask until the startup scene is on screen, as a build does;
     // a failed startup leaves it up showing the error.
     getEngine()

@@ -105,6 +105,13 @@ import type {
   VFSRendererSceneNodeDropPayload
 } from '../components/vfsrenderer';
 import { ProjectService } from '../core/services/project';
+import {
+  getScenePipelineCachePath,
+  isPipelineWarmupCamera,
+  listPipelineCacheFiles,
+  scanPipelineCacheManifest,
+  setPipelineWarmupCamera
+} from '../core/services/pipelinecache';
 import type { SceneController } from '../controllers/scenecontroller';
 import { EditorCameraController } from '../helpers/editorcontroller';
 import { ensureDependencies } from '../core/build/dep';
@@ -421,6 +428,20 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
               label: 'Build Project',
               action: () => {
                 eventBus.dispatchEvent('action', 'BUILD_PROJECT');
+                return true;
+              }
+            },
+            {
+              label: 'Clear Pipeline Cache of Current Scene...',
+              action: () => {
+                void this.clearPipelineCaches(true);
+                return true;
+              }
+            },
+            {
+              label: 'Clear All Pipeline Caches...',
+              action: () => {
+                void this.clearPipelineCaches(false);
                 return true;
               }
             },
@@ -1134,6 +1155,18 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
             this.playCurrentScene();
             return true;
           }
+        },
+        {
+          label: FontGlyph.glyphs['video'],
+          id: 'RECORD_PIPELINES',
+          selected: () => true,
+          tooltip: () => {
+            return 'Play current project in new tab, recording the pipelines it uses so builds compile them ahead of time';
+          },
+          action: () => {
+            this.play(true);
+            return true;
+          }
         }
       ] as ToolBarItem[]
     ).concat(this.editor.plugins.getToolbarItems({ scene: this.createSceneContext() }));
@@ -1438,13 +1471,15 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
       this.renderProfiler();
     }
   }
-  play() {
+  play(recordPipelines = false) {
     ensureDependencies().then(() => {
       this.controller.editor.getProjectSettings().then((settings) => {
         if (!settings!.startupScene && !settings!.startupScript) {
           DlgMessage.messageBox('Error', 'Please set startup scene or startup script in <Project Settings>');
+        } else if (recordPipelines && ProjectService.VFS.readOnly) {
+          DlgMessage.messageBox('Error', 'Pipelines cannot be recorded into a read-only project');
         } else {
-          this.openPreviewInNewTab();
+          this.openPreviewInNewTab(undefined, recordPipelines);
         }
       });
     });
@@ -1461,13 +1496,16 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
     }
     this.openPreviewInNewTab(scenePath);
   }
-  private openPreviewInNewTab(sceneOverride?: string) {
+  private openPreviewInNewTab(sceneOverride?: string, recordPipelines = false) {
     const projectId = this.controller.editor.currentProject.uuid!;
     const url = new URL(window.location.href);
     url.search = '';
     url.searchParams.append('project', projectId);
     if (sceneOverride) {
       url.searchParams.append('scene', sceneOverride);
+    }
+    if (recordPipelines) {
+      url.searchParams.append('recordPSO', '');
     }
     if (ProjectService.VFS instanceof HttpFS) {
       url.searchParams.append('remote', '');
@@ -1895,6 +1933,7 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
       this._sceneHierarchy.on('node_picker_drop', this.handleNodePickerDrop, this);
       this._sceneHierarchy.on('node_double_clicked', this.handleNodeDoubleClicked, this);
       this._sceneHierarchy.on('set_main_camera', this.handleSetMainCamera, this);
+      this._sceneHierarchy.on('toggle_pipeline_warmup', this.handleTogglePipelineWarmup, this);
       this._sceneHierarchy.on('request_go_to_assets', this.handleGoToAssets, this);
       this._sceneHierarchy.on('request_add_child', this.handleAddChild, this);
       this._sceneHierarchy.on('request_physics_preset', this.handlePhysicsPreset, this);
@@ -1932,6 +1971,7 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
       this._sceneHierarchy.off('node_picker_drop', this.handleNodePickerDrop, this);
       this._sceneHierarchy.off('node_double_clicked', this.handleNodeDoubleClicked, this);
       this._sceneHierarchy.off('set_main_camera', this.handleSetMainCamera, this);
+      this._sceneHierarchy.off('toggle_pipeline_warmup', this.handleTogglePipelineWarmup, this);
       this._sceneHierarchy.off('request_go_to_assets', this.handleGoToAssets, this);
       this._sceneHierarchy.off('request_add_child', this.handleAddChild, this);
       this._sceneHierarchy.off('request_physics_preset', this.handlePhysicsPreset, this);
@@ -3757,6 +3797,51 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
       compositor.removePostEffect(this._postGizmoRenderer);
       this._gizmoEffectAppended = false;
     }
+  }
+  /** Deletes recorded pipelines, those of the current scene or all of the project */
+  private async clearPipelineCaches(currentScene: boolean) {
+    const vfs = ProjectService.VFS;
+    let files: string[];
+    if (currentScene) {
+      const scenePath = this.controller.scenePath;
+      if (!scenePath) {
+        await DlgMessage.messageBox('Error', 'Please save current scene first.');
+        return;
+      }
+      const path = getScenePipelineCachePath(scenePath);
+      files = (await vfs.exists(path)) ? [path] : [];
+    } else {
+      files = await listPipelineCacheFiles(vfs);
+    }
+    if (files.length === 0) {
+      await DlgMessage.messageBox('Pipeline Cache', 'No pipelines are recorded.');
+      return;
+    }
+    let pipelines = 0;
+    let bytes = 0;
+    for (const entry of (await scanPipelineCacheManifest(vfs)).entries) {
+      if (files.includes(entry.file)) {
+        pipelines += entry.render + entry.compute;
+      }
+    }
+    for (const file of files) {
+      bytes += (await vfs.stat(file)).size;
+    }
+    const answer = await Dialog.messageBoxEx(
+      'Pipeline Cache',
+      `Delete ${files.length} pipeline cache file(s): ${pipelines} pipelines, ${(bytes / 1024).toFixed(0)} KB?`,
+      ['Delete', 'Cancel']
+    );
+    if (answer !== 'Delete') {
+      return;
+    }
+    for (const file of files) {
+      await vfs.deleteFile(file);
+    }
+  }
+  private handleTogglePipelineWarmup(camera: Camera) {
+    setPipelineWarmupCamera(camera, !isPipelineWarmupCamera(camera));
+    eventBus.dispatchEvent('scene_changed');
   }
   private handleSetMainCamera(camera: Camera) {
     if (camera !== this.controller.model.scene.mainCamera) {
