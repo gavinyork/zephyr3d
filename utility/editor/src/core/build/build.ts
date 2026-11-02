@@ -12,6 +12,7 @@ import type { VertexAttribFormat } from '@zephyr3d/device';
 import type { AssetManifest, AssetSourceKind } from '@zephyr3d/scene';
 import { DerivedAssetService, getDerivedAssetKind } from '../services/derivedassets';
 import { isScenePipelineCachePath, shipPipelineCaches } from '../services/pipelinecache';
+import { isScenePreloadPath, recordAllScenePreloads, shipScenePreloads } from '../services/assetpreload';
 
 function rewriteImports(code: string): string {
   const reStatic = /\b(?:import|export)\s+[^"']*?from\s+(['"])([^'"]+)\1/g;
@@ -276,29 +277,6 @@ async function shipDerivedAsset(
   return shipped;
 }
 
-/**
- * Makes sure the splash image is in the build as the browser can show it. The
- * asset pipeline may have shipped only a KTX2 copy of it, which an <img> can't
- * display, so the source is copied to its own path when missing.
- *
- * @returns Page-relative URL of the image, empty when there is none
- */
-async function shipSplashImage(vfs: VFS, distDir: string, path: string | undefined) {
-  if (!path) {
-    return '';
-  }
-  path = vfs.normalizePath(path);
-  if (!(await vfs.exists(path))) {
-    console.warn(`Splash image '${path}' not found, building without it`);
-    return '';
-  }
-  const shipped = vfs.join(distDir, path);
-  if (!(await vfs.exists(shipped))) {
-    await vfs.copyFile(path, shipped, { overwrite: true });
-  }
-  return encodeURI(`.${path}`);
-}
-
 /** Specifier of a static import (`import 'x'`, `import a from 'x'`) or re-export (`export * from 'x'`) */
 const STATIC_IMPORT_RE =
   /^[ \t]*(?:import\s*(['"])([^'"\n]+)\1|(?:import|export)\b[^'";]*?\bfrom\s*(['"])([^'"\n]+)\3)/gm;
@@ -413,6 +391,10 @@ export async function buildForEndUser(options: {
 
   await bundle.close();
 
+  // What each scene fetches while it loads, recorded again from the saved scenes, so the
+  // build's loading screen can load it first with a known total
+  const preloadLists = await recordAllScenePreloads(vfs, onProgress);
+
   // copy asset files to dist
   const assetFileList = await vfs.glob('assets/**/*', {
     includeHidden: true,
@@ -428,7 +410,9 @@ export async function buildForEndUser(options: {
     (path) =>
       path.type === 'file' &&
       !isAssetMetaPath(path.path) &&
-      (precompilePipelines || !isScenePipelineCachePath(path.path))
+      (precompilePipelines || !isScenePipelineCachePath(path.path)) &&
+      // Shipped below with the sizes of the shipped files
+      !isScenePreloadPath(path.path)
   );
   const manifest: Required<AssetManifest> = { version: 1, textures: {}, primitives: {} };
   const assetReport: BuildAssetReport[] = [];
@@ -466,6 +450,7 @@ export async function buildForEndUser(options: {
   if (precompilePipelines) {
     await shipPipelineCaches(vfs, distDir);
   }
+  await shipScenePreloads(vfs, distDir, preloadLists, { ...manifest.textures, ...manifest.primitives });
 
   const importMap = await getImportMap(vfs, distDir, true, physics);
 
@@ -474,11 +459,10 @@ export async function buildForEndUser(options: {
   const favicon = settings.favicon
     ? `<link rel="icon" type="${vfs.guessMIMEType(settings.favicon)}" href=".${settings.favicon}" />`
     : '';
-  const splashImage = await shipSplashImage(vfs, distDir, settings.splashImage);
   let htmlContent = generateIndexHTML({
     title: settings.title ?? info.name,
     head: favicon,
-    splashImage,
+    splash: settings.defaultSplash !== false,
     splashBackground: settings.splashBackground ?? DEFAULT_SPLASH_BACKGROUND
   });
   htmlContent = htmlContent.replace('</body>', `  <script type="module" src="./index.js"></script>\n</body>`);

@@ -2,6 +2,7 @@ import type { VFS } from '@zephyr3d/base';
 import type { PipelineCacheData, PipelineRecorder } from '@zephyr3d/device';
 import type { Application, PipelineCacheManifest, Scene, SceneNode, Camera } from '@zephyr3d/scene';
 import { getDevice, getEngine, PIPELINE_CACHE_MANIFEST_FILE } from '@zephyr3d/scene';
+import { recordAssetRequests, writeScenePreload } from './assetpreload';
 
 // Pipelines recorded while a project is previewed, so a build can compile them
 // before the draws that need them. A scene's pipelines are kept beside it as
@@ -118,27 +119,21 @@ export async function shipPipelineCaches(vfs: VFS, distDir: string) {
 }
 
 /**
- * Compiles the recorded pipelines of a scene, and those no scene claimed, before it
- * starts; then, if asked, those of the other scenes in the background. The preview
- * does what a build's entry does
+ * Recorded pipelines to compile before a scene starts: those of the scene and those no
+ * scene claimed, and the task for all of them, to compile the rest in the background
  */
-export async function precompileStartupPipelines(
-  vfs: VFS,
-  startupScene: string | null | undefined,
-  options: { otherScenes: boolean; onProgress?: (done: number, total: number) => void }
-) {
+export async function createStartupPipelineTasks(vfs: VFS, startupScene: string | null | undefined) {
   const manifest = await scanPipelineCacheManifest(vfs);
   if (manifest.entries.length === 0) {
-    return;
+    return null;
   }
   const cache = getEngine().pipelineCache;
-  const entries = cache.findEntries(manifest, { scenes: startupScene ? [startupScene] : [] });
-  await cache.createTask(entries, { name: 'startup' }).run({
-    onProgress: (p) => options.onProgress?.(p.completed + p.failed + p.skipped, p.total)
-  });
-  if (options.otherScenes) {
-    void cache.createTask(manifest.entries, { name: 'other scenes' }).run({ priority: 'background' });
-  }
+  return {
+    startup: cache.createTask(cache.findEntries(manifest, { scenes: startupScene ? [startupScene] : [] }), {
+      name: 'startup'
+    }),
+    all: () => cache.createTask(manifest.entries, { name: 'other scenes' })
+  };
 }
 
 /**
@@ -228,11 +223,14 @@ export class PipelineRecordingSession {
     const engine = getEngine();
     const loadSceneFromFile = engine.loadSceneFromFile.bind(engine);
     engine.loadSceneFromFile = async (path: string) => {
-      const scene = await loadSceneFromFile(path);
+      // With scripts running, loading may fetch more than the editor sees when it opens the scene
+      const { result: scene, requests } = await recordAssetRequests(() => loadSceneFromFile(path));
       if (scene && !this._scenePaths.has(scene)) {
-        this._scenePaths.set(scene, engine.VFS.normalizePath(path));
+        const scenePath = engine.VFS.normalizePath(path);
+        this._scenePaths.set(scene, scenePath);
         scene.on('startrender', this.onStartRender, this);
         scene.on('endrender', this.onEndRender, this);
+        void writeScenePreload(this._vfs, scenePath, 'runtime', requests);
       }
       return scene;
     };

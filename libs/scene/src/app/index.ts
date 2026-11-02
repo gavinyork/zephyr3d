@@ -6,6 +6,7 @@ export * from './api';
 export * from './runtimescript';
 export * from './screen';
 export * from './pipelinecache';
+export * from './splash';
 export * from './engine';
 export * from './scriptingsystem';
 export * from './scriptregistry';

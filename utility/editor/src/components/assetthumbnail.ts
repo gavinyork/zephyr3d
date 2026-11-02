@@ -1,6 +1,7 @@
 import { DRef, Disposable, type FileMetadata, type Nullable, type VFS } from '@zephyr3d/base';
 import type { Texture2D } from '@zephyr3d/device';
 import { CopyBlitter, fetchSampler, getDevice, getEngine } from '@zephyr3d/scene';
+import { withoutPreloadRecording } from '../core/services/assetpreload';
 
 export type AssetThumbnailStatus = 'loading' | 'ready' | 'error' | 'unsupported';
 
@@ -277,9 +278,12 @@ export class ImageAssetThumbnailProvider implements AssetThumbnailProvider {
 
   async load(request: AssetThumbnailRequest) {
     const textureRef = new DRef<Texture2D>(
-      await getEngine().resourceManager.fetchTexture<Texture2D>(request.path, {
-        mimeType: request.mimeType || undefined
-      })
+      // Thumbnails are not what a scene loading meanwhile fetches
+      await withoutPreloadRecording(() =>
+        getEngine().resourceManager.fetchTexture<Texture2D>(request.path, {
+          mimeType: request.mimeType || undefined
+        })
+      )
     );
     try {
       const texture = textureRef.get();

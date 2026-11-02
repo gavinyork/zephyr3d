@@ -1,8 +1,9 @@
 import type { VFS } from '@zephyr3d/base';
 import { getAssetMetaPath } from '@zephyr3d/scene';
 import { getScenePipelineCachePath } from './pipelinecache';
+import { getScenePreloadPath } from './assetpreload';
 
-// Sidecar `.zmeta` files, and the `.zpso` pipeline caches of scenes, travel with
+// Sidecar `.zmeta` files, and the `.zpso` pipeline caches and `.zpreload` lists of scenes, travel with
 // their asset. They are hidden in the asset
 // panel, so every file operation the panel offers has to carry them along;
 // directory operations do so for free since the sidecar sits in the same folder.
@@ -12,7 +13,7 @@ import { getScenePipelineCachePath } from './pipelinecache';
 /** Sidecar files an asset may have */
 function getSidecarPaths(path: string) {
   return path.toLowerCase().endsWith('.zscn')
-    ? [getAssetMetaPath(path), getScenePipelineCachePath(path)]
+    ? [getAssetMetaPath(path), getScenePipelineCachePath(path), getScenePreloadPath(path)]
     : [getAssetMetaPath(path)];
 }
 

@@ -29,6 +29,7 @@ import { SSSMaterial } from '../material/sss';
 import { HairMaterial } from '../material/hair';
 import { ScreenAdapter } from './screen';
 import { PipelineCacheManager } from './pipelinecache';
+import { AssetPreloader } from '../asset/asset_preload';
 import { MSDFTextAtlasManager } from '../text/runtime';
 import type { AssetSourceResolver } from '../asset/assetmanager';
 import {
@@ -90,6 +91,7 @@ export class Engine {
   private _enabled: boolean;
   private _screen: ScreenAdapter;
   private readonly _pipelineCache: PipelineCacheManager;
+  private readonly _assetPreloader: AssetPreloader;
   /** Resolver this engine installed from a build's asset manifest */
   private _manifestResolver: Nullable<AssetSourceResolver> = null;
   protected _activeRenderables: {
@@ -115,6 +117,10 @@ export class Engine {
     this._loadingScenes = {};
     this._screen = new ScreenAdapter();
     this._pipelineCache = new PipelineCacheManager(() => this.VFS);
+    this._assetPreloader = new AssetPreloader(
+      () => this.VFS,
+      () => this._resourceManager.assetManager
+    );
   }
   /**
    * Exposes the instance of {@link ScriptingSystem}.
@@ -244,6 +250,13 @@ export class Engine {
    */
   get pipelineCache() {
     return this._pipelineCache;
+  }
+  /**
+   * Loads assets ahead of time from requests recorded while scenes were loaded.
+   * The engine never calls it by itself.
+   */
+  get assetPreloader() {
+    return this._assetPreloader;
   }
   /** @internal */
   async init() {
