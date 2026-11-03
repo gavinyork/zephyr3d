@@ -28,7 +28,7 @@ myApp.ready().then(function () {
   // Create a spot light
   const spotLight = new SpotLight(scene);
   spotLight.cutoff = Math.PI * 0.2;
-  spotLight.intensity = 10;
+  spotLight.intensity = 100;
   spotLight.position.setXYZ(0, 10, 0);
   spotLight.castShadow = true;
 
