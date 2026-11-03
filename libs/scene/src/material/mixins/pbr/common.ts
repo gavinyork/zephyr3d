@@ -1614,12 +1614,10 @@ export function mixinPBRCommon<T extends typeof MeshMaterial>(BaseCls: T) {
             this.ambientOcclusion = pb.mul(this.ambientOcclusion, this.customOcclusion);
             this.occlusion = pb.mul(this.occlusion, this.customOcclusion);
           }
-          // The irradiance carries the environment strength already (see
-          // EnvironmentLighting.getIrradiance); only the specular terms take it here
+          // Irradiance already carries the environment strength; only specular takes it here
           this.$l.diffuseOcclusion = this.ambientOcclusion;
           this.$l.NoV = pb.clamp(pb.dot(this.normal, this.viewVec), 0.0001, 1);
-          // The sky's reflection darkened where the probes see little of the
-          // sky; on the environment's reflections only, not on what SSR resolves
+          // Darkens sky reflection where probes see little sky; not applied to SSR
           this.$l.skySpecularOcclusion = ctx.env!.light.envLight.getSkySpecularOcclusion(
             this,
             this.normal,

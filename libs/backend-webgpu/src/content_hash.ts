@@ -1,9 +1,6 @@
 /**
- * Content hash of a string, the same in every session.
- *
- * @remarks
- * Two 32-bit lanes (cyrb53 mixing) plus the length: thousands of shaders hashed
- * into 64 bits make a collision negligible, while 32 bits alone would not.
+ * Session-stable content hash of a string: two 32-bit cyrb53 lanes plus the length,
+ * as 32 bits alone would collide across thousands of shaders.
  *
  * @internal
  */

@@ -65,15 +65,9 @@ export type CameraSensorFit = 'horizontal' | 'vertical';
 export const PHYSICAL_BAKE_EXPOSURE = 1 / 38400;
 
 /**
- * Exposure the global illumination's caches (voxel radiance, probe
- * irradiance) are stored at: {@link PHYSICAL_BAKE_EXPOSURE} in physical
- * lighting mode, 1 in legacy. Fixed, so the caches, which accumulate over many
- * frames, do not change meaning when the camera exposure does; a reader
- * converts with `cameraExposure / getGICacheExposure(...)`, as Lumen keeps its
- * surface and radiance caches at a fixed `CachedLightingPreExposure`
- * (PostProcessEyeAdaptation.cpp) and multiplies by the view's pre-exposure
- * where it reads them. Equal to the sky bake's exposure, so the sky reaches the
- * caches scaled by the environment strength alone.
+ * Fixed exposure GI caches (voxel radiance, probe irradiance) are stored at:
+ * {@link PHYSICAL_BAKE_EXPOSURE} in physical mode, 1 in legacy. Readers convert with
+ * `cameraExposure / getGICacheExposure(...)` (as Lumen's CachedLightingPreExposure).
  *
  * @internal
  */

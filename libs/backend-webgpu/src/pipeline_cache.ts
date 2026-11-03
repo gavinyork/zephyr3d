@@ -32,8 +32,7 @@ export type FrameBufferInfo = {
 };
 
 /**
- * A render pipeline as stored in a pipeline cache file: the parts of its key that are
- * the same in every session, and the descriptor without the objects of this session
+ * A render pipeline as stored in a pipeline cache file: session-independent key parts and descriptor
  * @internal
  */
 export type WebGPURenderPipelineRecord = {
@@ -50,7 +49,7 @@ export type WebGPURenderPipelineRecord = {
   /** Depth format, empty for targets without depth */
   depth: string;
   samples: number;
-  /** Drawn to the canvas: formats and sample count are those of the device it is compiled on */
+  /** Drawn to the canvas: formats and sample count come from the compiling device */
   backbuffer: boolean;
   primitiveType: PrimitiveType;
   /** Content of the render states */
@@ -75,7 +74,7 @@ export type WebGPUComputePipelineRecord = {
 
 type RenderPipelineEntry = {
   pipeline: GPURenderPipeline;
-  /** Key of the pipeline in every session */
+  /** Session-independent content key */
   key: string;
   record: WebGPURenderPipelineRecord;
   /** Compiled ahead of time; used once a draw asked for it */
@@ -116,11 +115,7 @@ export function getRenderPipelineContentHash(
   return `${program}:${vertex}:${frameBuffer}:${primitiveType}${stripIndexFormat ? `/${stripIndexFormat}` : ''}:${state}:${winding}`;
 }
 
-/**
- * Index format a pipeline has to name: an indexed draw with a strip topology fails
- * unless the pipeline names the format of the index buffer it draws with, which comes
- * with the vertex data whether or not the program reads vertex attributes
- */
+/** Strip index format to name in the pipeline: indexed strip draws fail without it */
 function getStripIndexFormat(
   vertexData: Nullable<WebGPUVertexLayout>,
   primitiveType: PrimitiveType
@@ -134,14 +129,11 @@ function getStripIndexFormat(
 }
 
 /**
- * Caches the pipelines draws and dispatches ask for.
+ * Caches render and compute pipelines.
  *
  * @remarks
- * Each pipeline is looked up by a key built from objects of this session, cheap to
- * build on every draw but different in every session, and the first time a key is
- * seen by a key built from what the objects contain: pipelines are only created when
- * that second key is new too, so programs or states that are made again, or a
- * pipeline compiled ahead of time from a recording, are shared.
+ * Looked up by a cheap per-session object key, falling back on first sight to a content
+ * key, so recreated programs/states and precompiled pipelines are shared.
  */
 export class PipelineCache {
   private readonly _device: WebGPUDevice;

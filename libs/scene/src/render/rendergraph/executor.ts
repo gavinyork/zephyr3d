@@ -126,11 +126,9 @@ export class RenderGraphExecutor<TTexture = BaseTexture> {
   }
 
   /**
-   * Times the GPU work `fn` records, for GPU work issued outside a graph pass
-   * (scene updates, simulations). Outside execution the scope is reported
-   * ahead of the passes of the next graph executed; inside execution it nests
-   * under the current pass. Scopes nest. Active while the default profiling
-   * options are enabled, or inside a profiled execution; otherwise just calls `fn`.
+   * Times GPU work `fn` records outside a graph pass (scene updates, simulations).
+   * Outside execution it is reported before the next graph's passes; inside, it
+   * nests under the current pass. Only active while profiling; otherwise calls `fn`.
    */
   static profileScope<T>(name: string, fn: () => T): T {
     const scope = RenderGraphExecutor._beginExternalScope(name);

@@ -32,9 +32,8 @@ import { declareProbeUniforms, sampleProbeIrradiance } from '../../shaders/probe
 import { getActiveProbeVolume } from '../gi/probe_volume';
 
 /**
- * What {@link renderSceneSDFView} shows: the field by its step count, the
- * voxel scene's albedo, emissive or radiance at the hit, or the probe
- * volume's sky visibility or irradiance there.
+ * What {@link renderSceneSDFView} shows: step count, voxel scene albedo/emissive/radiance at the
+ * hit, or probe sky visibility/irradiance there.
  * @public
  */
 export type SceneSDFViewMode =
@@ -103,13 +102,9 @@ function getProgram(levels: number, mode: SceneSDFViewMode) {
             this.$l.d = this.s.x;
             this.prevD = this.d;
             this.steps = pb.add(this.steps, 1);
-            // The hit test of the global illumination's rays: surfaces swollen
-            // by a voxel of the level read. The probe views read the volume
-            // where the ray meets the field's own surface, as a surface there
-            // shades with it; the voxel views read where the trace stopped, as
-            // a probe ray reads the voxel radiance: on the surface itself the
-            // nearest voxel, half the field's resolution, often lies inside
-            // the geometry and holds no light
+            // Same hit test as GI rays (surfaces swollen by a voxel). Probe views read at the
+            // refined surface; voxel views read where the trace stopped, since the voxel nearest
+            // the surface often lies inside geometry and holds no light
             this.$l.expand = sdfSurfaceExpand(this, this.sp, this.s, this.t, levels);
             this.$if(pb.lessThan(this.d, this.expand), function () {
               this.hitT = sdfRefineHit(
@@ -130,8 +125,7 @@ function getProgram(levels: number, mode: SceneSDFViewMode) {
               this.$break();
             });
           });
-          // Brightness from the step count: few steps on surfaces facing the
-          // ray, many where rays graze a surface, so silhouettes glow
+          // Brightness from step count, so grazing silhouettes glow
           this.$l.k = pb.sqrt(pb.div(this.steps, MAX_STEPS));
           this.$l.miss = pb.vec4(pb.mix(pb.vec3(0.12, 0.12, 0.55), pb.vec3(0.85), this.k), 1);
           if (mode === 'distance') {
@@ -163,9 +157,7 @@ function getProgram(levels: number, mode: SceneSDFViewMode) {
                 )
               );
               if (mode === 'skyVisibility') {
-                // The visibility as a surface reads it, unshaded so the values read
-                // directly: white sees the whole sky, black none; magenta where no
-                // probe covers the point
+                // Unshaded: white sees the whole sky, black none; magenta where no probe covers
                 this.$l.sv = sampleProbeIrradiance(
                   this,
                   this.hp,
@@ -179,8 +171,7 @@ function getProgram(levels: number, mode: SceneSDFViewMode) {
                   pb.vec4(1, 0, 1, 1)
                 );
               } else {
-                // The irradiance (E/pi) a white surface would shade with, at the
-                // view's exposure, unshaded; magenta where no probe covers the point
+                // Irradiance (E/pi) at the view's exposure, unshaded; magenta where no probe covers
                 this.$l.irr = sampleProbeIrradiance(
                   this,
                   this.hp,
@@ -221,10 +212,8 @@ function getProgram(levels: number, mode: SceneSDFViewMode) {
                 );
                 this.$l.a = loadVoxelSceneAlbedo(this, this.texel);
                 this.$l.shade = pb.add(0.25, pb.mul(0.75, pb.max(pb.dot(this.n, pb.neg(this.dir)), 0)));
-                // Magenta where no level's window holds the hit with a current
-                // brick; orange where the hit is a dynamic instance, which the
-                // voxel scene leaves out; where it has no material at a static
-                // surface, cyan at the finest level, yellow at the next, white beyond
+                // No material: magenta outside every current window, orange for a dynamic
+                // instance (not voxelized), else cyan/yellow/white by clipmap level 0/1/2+
                 this.$l.staticD = sampleGlobalSDF(this, this.hp, levels);
                 this.$l.dynamicHit = pb.greaterThan(this.staticD, pb.add(0.05, pb.mul(this.t, 0.004)));
                 this.$l.flag = this.$choice(
@@ -286,24 +275,11 @@ function getProgram(levels: number, mode: SceneSDFViewMode) {
 }
 
 /**
- * Draws the scene's signed distance field as seen from a camera, over the
- * current framebuffer inside the camera viewport: every pixel sphere traces
- * the field (global clipmap and dynamic instances) and is shaded by its step
- * count, grey on a hit and blue on a miss, with silhouettes glowing where rays
- * graze surfaces. A debug view; call it after the camera has rendered.
- *
- * With a mode of `albedo` or `emissive`, a hit shows the voxel scene's
- * material there instead; the scene's global illumination must be enabled and
- * built, else the view falls back to the field. `skyVisibility` shows how
- * much of the sky the probe volume sees from the hit, white all of it and
- * black none, magenta where no probe covers it; `irradiance` the irradiance a
- * surface there reads from the probes, at `exposure`; both need the probe
- * volume. `radiance` is scaled by `exposure` as well. In `albedo`, a surface without
- * material is flagged: orange for a dynamic instance (the voxel scene holds
- * static meshes only), cyan, yellow or white for a static surface by the
- * clipmap level read, magenta where no level's window holds the point.
- *
- * Does nothing where the scene has no field (disabled, or WebGL2).
+ * Debug-draws the scene's signed distance field from a camera over the current framebuffer:
+ * each pixel sphere traces the field and is shaded by step count, or by the voxel scene /
+ * probe volume at the hit for other modes (falling back to `distance` when unavailable).
+ * `exposure` scales `radiance` and `irradiance`; magenta marks uncovered points. Call after the
+ * camera has rendered; does nothing without a field (disabled or WebGL2).
  *
  * @returns Whether it drew.
  * @public
@@ -345,13 +321,12 @@ export function renderSceneSDFView(
   if (voxels && mode !== 'distance' && !readsProbes(mode)) {
     bindGroup.setTexture(VOXEL_SCENE_ALBEDO, voxels.albedo, fetchSampler('clamp_nearest_nomip'));
     bindGroup.setTexture(VOXEL_SCENE_EMISSIVE, voxels.emissive, fetchSampler('clamp_nearest_nomip'));
-    // The layout declares all three; before the first lighting pass the albedo stands in
+    // The layout declares all three; before the first lighting pass stand-ins are bound
     bindGroup.setTexture(
       VOXEL_SCENE_RADIANCE,
       voxels.lit ? voxels.radiance : voxels.emissive,
       fetchSampler('clamp_nearest_nomip')
     );
-    // Before the first lighting pass any rgba8 volume of the layout stands in
     bindGroup.setTexture(
       VOXEL_SCENE_ANISO0,
       voxels.lit ? voxels.radianceAniso0 : voxels.albedo,

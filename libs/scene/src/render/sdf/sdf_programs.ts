@@ -7,13 +7,8 @@ const programs = new Map<string, Nullable<GPUProgram>>();
 const buildErrors = new Map<string, string>();
 
 /**
- * Builds a program of the SDF system and records the outcome under its label.
- *
- * A shader builder error (a JS-side failure, before any WGSL exists) makes the
- * device return null with the message only in the builder's `lastError`; a
- * caller dereferencing the null then fails far from the cause, and nothing
- * reaches {@link getSDFProgramErrors}. Here the message is kept and a clear
- * error thrown instead.
+ * Builds a program of the SDF system and records the outcome under its label. Throws on a shader
+ * builder error (which the device reports only as a null program) so the message is kept.
  *
  * @internal
  */

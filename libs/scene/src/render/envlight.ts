@@ -17,29 +17,18 @@ import { getProbeVolumeForDraw } from './gi/probe_volume';
 import { declareProbeUniforms, sampleProbeIrradiance } from '../shaders/probes';
 
 /**
- * Depth-proportional term of the SSGI history rejection tolerance.
- *
- * The surface history stores `linearDepth * cameraFar` in an `rgba16f` alpha
- * channel, so its quantization error grows with depth: fp16 carries ~11 bits of
- * mantissa, giving a relative error near 4.9e-4 (~0.49 world units at a depth of
- * 1000). A purely absolute tolerance is therefore unusable in the distance -- at
- * `ssgiDepthReject`'s 0.5 default, storage quantization alone consumes the whole
- * budget and the test degenerates into dithered noise. This factor keeps roughly
- * 4x headroom over that error while staying far below the depth step of a real
- * disocclusion.
+ * Depth-proportional term of the SSGI history rejection tolerance. fp16 storage of
+ * `linearDepth * cameraFar` has ~4.9e-4 relative error; this keeps ~4x headroom
+ * while staying far below a real disocclusion's depth step.
  *
  * @internal
  */
 const SSGI_DEPTH_TOLERANCE_RELATIVE = 2e-3;
 
 /**
- * Multiple of the scaled tolerance at which history is dropped outright.
- *
- * Inside this gate the depth term contributes a smooth `exp(-d/tol)` weight
- * rather than a boolean, so confidence decays continuously instead of flipping.
- * At 3x the weight is already down to ~0.05, making the cutoff visually
- * continuous -- which is what keeps a rejection boundary from reading as a
- * staircase after nearest-neighbour sampling quantizes it to texel steps.
+ * Multiple of the scaled tolerance at which history is dropped outright. Inside it
+ * the depth term is a smooth `exp(-d/tol)` weight (~0.05 at 3x), so the cutoff
+ * does not staircase.
  *
  * @internal
  */
@@ -47,29 +36,17 @@ const SSGI_DEPTH_GATE_SCALE = 3;
 
 /**
  * Clamp distance, in texels, at which history repair reaches its widest radius.
- *
- * The clamp distance says how far the reprojection had to travel to get back on
- * screen, which is a direct measure of how unrelated to this pixel the surviving
- * history is. It scales the repair radius rather than gating repair off: the
- * lighting pass only ever sees the previous frame, so a pixel rotating in from
- * off screen has no fresh data anywhere and both alternatives to spreading the
- * taps look worse than the blur does.
+ * Clamp travel measures how unrelated the surviving history is, so it scales the
+ * repair radius rather than gating repair off.
  *
  * @internal
  */
 const SSGI_REPAIR_WIDE_CLAMP_TEXELS = 8;
 
 /**
- * Repair tap radius in texels, from an interior hole to a camera-edge one.
- *
- * The radius is what trades structure against smoothness. At one texel the taps
- * of neighbouring pixels barely overlap, so detail survives -- correct for a hole
- * in the middle of the screen, where the reprojection landed near its true
- * position. Wide taps instead overlap heavily between neighbours, which turns the
- * one strip of history that survives at a screen edge into a smooth low-frequency
- * estimate of the surface's irradiance rather than a per-column copy of single
- * texels, and copying single texels is what draws streaks along the direction of
- * travel.
+ * Repair tap radius in texels, from an interior hole to a camera-edge one. Narrow
+ * taps keep detail; wide taps average the surviving edge strip into a smooth
+ * estimate instead of copying single texels into streaks.
  *
  * @internal
  */
@@ -133,15 +110,9 @@ export abstract class EnvironmentLighting extends Disposable {
    * Get irradiance for a fragment
    *
    * @remarks
-   * With a draw context, as when a material shades a fragment, the result is
-   * the final diffuse environment lighting: the sky's irradiance scaled by the
-   * environment light strength, replaced by the probe volume's global
-   * illumination where it covers the fragment and refined by the SSGI history
-   * when there is one. The environment light strength is applied here and
-   * nowhere else, so callers must not scale the result by it again.
-   *
-   * Without one, the raw sky irradiance, unscaled: for the global
-   * illumination passes, which apply the strength themselves.
+   * With a draw context: the final diffuse environment lighting (sky irradiance times
+   * the environment strength, replaced by probe GI where covered and refined by SSGI
+   * history); callers must not scale it again. Without one: raw unscaled sky irradiance.
    *
    * @param scope - The shader scope
    * @param normal - surface normal
@@ -163,9 +134,8 @@ export abstract class EnvironmentLighting extends Disposable {
    */
   abstract hasIrradiance(): boolean;
   /**
-   * Declares the scene's probe volume where the draw reads it, see
-   * {@link getProbeVolumeForDraw}. Subclasses call this from
-   * `initShaderBindings` in the fragment stage.
+   * Declares the scene's probe volume where the draw reads it (see
+   * {@link getProbeVolumeForDraw}); call from `initShaderBindings` in the fragment stage.
    * @internal
    */
   protected initProbeBindings(pb: ProgramBuilder, ctx?: DrawContext) {
@@ -178,14 +148,9 @@ export abstract class EnvironmentLighting extends Disposable {
     getProbeVolumeForDraw(ctx)?.applyBindGroup(bg);
   }
   /**
-   * How much of the environment's specular reflection reaches a fragment:
-   * the probe volume's sky visibility there turned into a specular occlusion
-   * by Lagarde and de Rousiers' fit ("Moving Frostbite to PBR", 2014, the
-   * \`GetSpecularOcclusion\` of Unreal's ReflectionEnvironmentShared.ush),
-   * which Unreal feeds with its ambient occlusion. The sky's reflection is an
-   * open sky; a surface that sees little of it must reflect little of it. 1
-   * where the probes do not cover the fragment, or without a probe volume or
-   * the material's \`worldPos\` varying.
+   * Specular occlusion from the probe volume's sky visibility, via Lagarde's fit
+   * (\`GetSpecularOcclusion\`, UE ReflectionEnvironmentShared.ush). 1 where probes
+   * do not cover the fragment or without a `worldPos` varying.
    * @internal
    */
   getSkySpecularOcclusion(
@@ -220,14 +185,9 @@ export abstract class EnvironmentLighting extends Disposable {
     return global[funcName](normal, worldPos, NoV, roughness) as PBShaderExp;
   }
   /**
-   * Turns the raw sky irradiance into what a material shades with (see
-   * {@link EnvironmentLighting.getIrradiance}): scaled by the environment
-   * light strength, then the probe volume's answer in its place wherever the
-   * probes cover the fragment. The probes carry the sky already, scaled by the
-   * strength where their rays escaped, and their own intensity, so they are
-   * not scaled again. Needs the fragment's world position, read from the
-   * material's `worldPos` varying; a material without one keeps the sky.
-   * Without a draw context the raw irradiance is returned unchanged.
+   * Turns raw sky irradiance into material shading irradiance: scaled by the environment
+   * strength, then replaced by probe GI where covered (probes are not scaled again).
+   * Needs the `worldPos` varying; returns the raw irradiance without a draw context.
    * @internal
    */
   protected applyProbes(
@@ -287,9 +247,7 @@ export class EnvShIBL extends EnvironmentLighting {
   /** @internal */
   public static readonly UNIFORM_NAME_SSGI_REPROJECTION = 'zSSGIReprojection';
   /**
-   * Transforms a current-frame view-space position into previous-frame clip
-   * space, so the reprojected depth can be compared against the surface history
-   * in the frame that history was written in. @internal
+   * Current view space -> previous-frame clip space. @internal
    */
   public static readonly UNIFORM_NAME_SSGI_VIEW_TO_PREV_CLIP = 'zSSGIViewToPrevClip';
   /** Unprojects a screen-space sample back into current view space. @internal */
@@ -485,10 +443,7 @@ export class EnvShIBL extends EnvironmentLighting {
           ctx!.camera.getNearPlane()
         )
       );
-      // View -> world -> previous clip. `prevVPMatrix` is null on the first frame
-      // after a history reset; falling back to the current VP makes the expected
-      // previous depth equal the current one, so the depth term is a no-op until
-      // a real previous frame exists.
+      // View -> world -> previous clip; without a previous VP the current one makes the depth term a no-op.
       const prevVP = ctx!.camera.prevVPMatrix ?? ctx!.camera.viewProjectionMatrix;
       Matrix4x4.multiply(prevVP as Matrix4x4, ctx!.camera.worldMatrix as Matrix4x4, EnvShIBL._viewToPrevClip);
       bg.setValue(EnvShIBL.UNIFORM_NAME_SSGI_VIEW_TO_PREV_CLIP, EnvShIBL._viewToPrevClip);
@@ -726,24 +681,14 @@ export class EnvShIBL extends EnvironmentLighting {
         0
       );
       this.$l.currentDepth = pb.mul(this.currentDepthSample.r, this.params.z);
-      // The surface history holds a Z measured in the *previous* frame's view
-      // space, so the current Z cannot be compared against it directly: under
-      // camera rotation a static, correctly reprojected point has
-      // `dz ~ r * sin(theta) * dphi`, which crosses any fixed threshold at the
-      // screen edges and drops history in the exact staircase pattern that
-      // nearest-neighbour sampling of the reprojected UV produces. Rebuild the
-      // current view-space position and push it through `view -> previous clip`
-      // instead; `clip.w` is `-view.z`, i.e. the same positive view-space
-      // distance the history stores.
+      // History Z is in the previous frame's view space; compare via view -> previous
+      // clip (`clip.w` = positive view distance) to avoid edge staircases under rotation.
       this.$l.ndc = pb.sub(pb.mul(this.uv, 2), pb.vec2(1));
       this.$l.nearPlaneRay = pb.mul(
         this[EnvShIBL.UNIFORM_NAME_SSGI_INV_PROJECTION],
         pb.vec4(this.ndc, REVERSE_Z ? 1 : -1, 1)
       );
-      // Perspective unprojection of the near-plane NDC depth (GL -1, reverse
-      // ZO 1) lands on the near plane, where view z is exactly -near; scaling
-      // that ray by depth/near walks it out to the sample without a
-      // non-linear depth round trip.
+      // Unprojecting near-plane NDC depth lands at view z = -near; scale by depth/near.
       this.$l.viewPos = pb.mul(
         pb.div(this.nearPlaneRay.xyz, this.nearPlaneRay.w),
         pb.div(this.currentDepth, pb.max(this.params.w, 1e-6))
@@ -780,41 +725,28 @@ export class EnvShIBL extends EnvironmentLighting {
         pb.greaterThan(this.previousAlpha, 1e-4)
       );
       this.$if(this.exactHistoryValid, function () {
-        // Weighting confidence by the depth term keeps the gate boundary a ramp
-        // rather than a step, so residual reprojection error on moving geometry
-        // and grazing surfaces fades out instead of outlining itself.
+        // Depth-weighted confidence ramps the gate boundary instead of stepping it.
         this.$l.exactConfidence = pb.mul(this.previousAlpha, this.depthWeight);
         this.$if(pb.greaterThan(this.exactConfidence, 1e-4), function () {
           this.$return(pb.mix(this.fallback, this.previousIrradiance.rgb, this.exactConfidence));
         });
       });
 
-      // Repair disoccluded and off-screen history from nearby samples before
-      // falling back to IBL. Sampling around the clamped reprojected position
-      // fills camera-edge holes, while current UV provides a conservative
-      // screen-stationary candidate for invalid motion vectors.
+      // Repair disoccluded/off-screen history from nearby samples before falling back to
+      // IBL: taps around the clamped reprojection, plus current UV for invalid motion.
       this.$l.repairCenter = this.$choice(
         this.motionValid,
         this.previousSampleUV,
         pb.clamp(this.uv, this.halfTexel, this.maxUV)
       );
-      // How far the reprojection had to be clamped to land back on screen. For a
-      // hole in the interior this is zero and the taps really are neighbours of
-      // the reprojected point, but for geometry rotating in from off screen the
-      // clamp can travel hundreds of pixels -- and the depth and normal terms
-      // cannot catch that, because the edge texel it lands on is usually the same
-      // continuous surface (same normal, similar depth) merely sampled somewhere
-      // spatially unrelated. Its irradiance therefore belongs to a different part
-      // of the surface, so reading it as a point sample smears into streaks along
-      // the direction of travel. Drive the tap radius with it instead, trading
-      // that structure for a blur.
+      // Clamp travel back onto the screen: zero for interior holes, large for geometry
+      // rotating in, where the edge texel is the same surface but unrelated irradiance.
+      // It drives the tap radius, trading streaks for blur.
       this.$l.repairClampTexels = pb.div(
         pb.length(pb.sub(this.previousSampleUV, this.previousUV)),
         pb.max(pb.min(this.texelSize.x, this.texelSize.y), 1e-8)
       );
-      // Widen the taps as the clamp travel grows. Only meaningful while the motion
-      // vector is usable: without one the centre is already the current UV by
-      // construction, so there is no travel to react to.
+      // Widen taps with clamp travel; only while motion vectors are usable.
       this.$l.repairRadius = pb.mix(
         pb.float(SSGI_REPAIR_MIN_RADIUS_TEXELS),
         pb.float(SSGI_REPAIR_MAX_RADIUS_TEXELS),
@@ -824,10 +756,8 @@ export class EnvShIBL extends EnvironmentLighting {
           pb.float(0)
         )
       );
-      // Taps this far apart straddle real depth variation across the surface, so a
-      // gate tuned for immediate neighbours would reject most of them and bring
-      // the dark band back. Loosen it with the radius and lean on the normal term,
-      // which stays strict, to keep the average on one surface.
+      // Wide taps straddle real depth variation: loosen the depth gate with the radius
+      // and rely on the strict normal term.
       this.$l.repairDepthTolerance = pb.mul(
         this.scaledDepthTolerance,
         SSGI_DEPTH_GATE_SCALE,
@@ -835,9 +765,7 @@ export class EnvShIBL extends EnvironmentLighting {
       );
       this.$l.repairSum = pb.vec3(0);
       this.$l.repairWeight = pb.float(0);
-      // A full ring rather than a cross: at the wide end four taps are not an
-      // average but four distant point copies, and their axis alignment paints
-      // directional artifacts of its own.
+      // Full ring: four wide axis-aligned taps paint directional artifacts.
       const repairSamples = [
         { currentUV: false, x: 0, y: 0, kernel: 1 },
         { currentUV: false, x: -1, y: 0, kernel: 0.7 },
@@ -869,9 +797,7 @@ export class EnvShIBL extends EnvironmentLighting {
         this.$l[`repairNormal${i}`] = pb.normalize(
           pb.sub(pb.mul(this[`repairSurface${i}`].rgb, 2), pb.vec3(1))
         );
-        // Compared against the reprojected depth, not the current one: the taps
-        // are samples of the previous frame's surface, so they live in the same
-        // space as `expectedPreviousDepth`.
+        // Compared against the reprojected depth: taps sample the previous frame's surface.
         this.$l[`repairDepthDelta${i}`] = pb.abs(
           pb.sub(this[`repairSurface${i}`].a, this.expectedPreviousDepth)
         );
@@ -886,8 +812,7 @@ export class EnvShIBL extends EnvironmentLighting {
           pb.clamp(this[`repairUV${i}`], this.halfTexel, this.maxUV),
           0
         );
-        // Same widening as the hard gate above: a falloff tuned for immediate
-        // neighbours decays to nothing across a wide tap and starves the average.
+        // Same widening as the hard gate above.
         this.$l[`repairDepthWeight${i}`] = pb.exp(
           pb.neg(pb.div(this[`repairDepthDelta${i}`], this.repairDepthTolerance))
         );
@@ -897,10 +822,8 @@ export class EnvShIBL extends EnvironmentLighting {
           pb.clamp(this[`repairIrradiance${i}`].a, 0, 1),
           this[`repairDepthWeight${i}`],
           this[`repairNormalWeight${i}`],
-          // The screen-stationary tap only exists to cover unusable motion
-          // vectors; while motion is valid it is a history read at the wrong world
-          // point, which survives the depth term on any flat surface and leaves a
-          // stationary ghost.
+          // The screen-stationary tap only covers unusable motion vectors; otherwise it
+          // leaves a stationary ghost.
           sample.currentUV ? pb.float(pb.not(this.motionValid)) : pb.float(1),
           sample.kernel
         );
@@ -1022,11 +945,8 @@ export class EnvConstantAmbient extends EnvironmentLighting {
    * @override
    *
    * @remarks
-   * A uniform environment prefilters to itself at every roughness, so the
-   * radiance is the ambient color. It must not be absent: the diffuse IBL term
-   * is weighted by the energy the specular lobe takes, which approaches all of
-   * it at grazing angles, and without a specular term to hand it back every
-   * silhouette turns black.
+   * A uniform environment prefilters to itself, so radiance is the ambient color. It
+   * must be present: at grazing angles specular takes the diffuse energy, else silhouettes go black.
    */
   getRadiance(scope: PBInsideFunctionScope, _refl: PBShaderExp, _roughness: PBShaderExp) {
     return scope[EnvConstantAmbient.UNIFORM_NAME_CONSTANT_AMBIENT].rgb as PBShaderExp;
@@ -1203,12 +1123,9 @@ export class EnvHemisphericAmbient extends EnvironmentLighting {
 }
 
 /**
- * What the environment light of type `none` shades with: no sky at all, only
- * the global illumination of the scene's probe volume, laid over black. The
- * probes carry the light of the scene's own lights bounced off its surfaces,
- * which owes nothing to an environment, so turning the environment off must
- * not turn it off too. Draws use it only while the probe volume is ready (see
- * the light pass); without one it would add nothing.
+ * Environment lighting for type `none`: no sky, only probe-volume GI over black,
+ * since bounced scene light does not depend on the environment. Used only while
+ * the probe volume is ready.
  * @internal
  */
 export class EnvProbesOnly extends EnvironmentLighting {

@@ -45,11 +45,9 @@ function settingsKey(settings: MeshImportSettings) {
 }
 
 /**
- * Bakes the signed distance fields of mesh assets into {@link MESH_SDF_DIR},
- * one `.zsdf` per `.zmsh`, in a pool of workers.
- *
- * A field records the content hash of its source and the settings it was baked
- * with, so a bake is skipped while both still match.
+ * Bakes mesh signed distance fields into {@link MESH_SDF_DIR}, one `.zsdf` per
+ * `.zmsh`, in a worker pool. A bake is skipped while the recorded source hash
+ * and settings still match.
  */
 export class MeshSDFBaker {
   private static readonly _workers: { worker: Worker; busy: boolean }[] = [];
@@ -144,11 +142,10 @@ export class MeshSDFBaker {
   }
 
   /**
-   * World units one local unit spans for each mesh of an imported model, the
-   * largest over the nodes (and their instances) using it, keyed by mesh asset
-   * path and merged into `scales`. Per node the product of the largest axis
-   * scale of it and each of its parents, which bounds the stretch any rotation
-   * between them can give.
+   * World units one local unit spans for each mesh of an imported model (largest
+   * over its users), keyed by mesh asset path and merged into `scales`. Per node
+   * the product of the largest axis scale along its parent chain, which bounds
+   * the stretch any rotation between them can give.
    */
   static modelUnitScales(model: SharedModel, scales = new Map<string, number>()) {
     const largest = (v: { x: number; y: number; z: number }) =>
@@ -175,10 +172,8 @@ export class MeshSDFBaker {
   }
 
   /**
-   * Records in the meshes' settings the world units one of their local units
-   * spans (`sdfUnitScale`), where it differs from what is recorded, so their
-   * next bake measures the voxel density in world units. Built-in meshes,
-   * whose settings cannot be written, are left out.
+   * Writes `sdfUnitScale` into the meshes' settings where it changed, so the next
+   * bake measures voxel density in world units. Built-in meshes are skipped.
    */
   static async setUnitScales(scales: Map<string, number>) {
     const vfs = ProjectService.VFS;

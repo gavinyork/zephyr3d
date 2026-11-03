@@ -24,15 +24,11 @@ interface Entry {
 }
 
 /**
- * The material atlases of the voxel scene: two 3D textures of the same layout,
- * one holding albedo (rgba8unorm, a = 1 where a surface was rasterized) and
- * one emissive (rgba8unorm as RGBE), each voxelized mesh in its own
- * block-aligned region of both. Written on the GPU by the voxelize pass, so
- * nothing is kept on the CPU: a region that is evicted is rasterized again
- * when wanted, and a fragmented atlas is cleared and refilled rather than
- * repacked.
- *
- * WebGPU only: the textures are storage textures.
+ * Material atlases of the voxel scene: two same-layout 3D textures, albedo
+ * (rgba8unorm, a = 1 where a surface was rasterized) and emissive (rgba8unorm as RGBE),
+ * one block-aligned region per voxelized mesh. GPU-written only, so evicted regions are
+ * re-rasterized and a fragmented atlas is cleared and refilled rather than repacked.
+ * WebGPU only.
  *
  * @public
  */

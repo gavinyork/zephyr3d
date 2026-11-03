@@ -15,24 +15,22 @@ export const SDF_DYNAMIC_INFO = 'zSDFDynamicInfo';
 /** Most dynamic instances a shader merges into the field. */
 export const MAX_DYNAMIC_SDF_INSTANCES = 16;
 /**
- * vec4s per packed instance: world-to-local rows (3), (field box min, voxel
- * size), (field box max, world scale), (atlas slot offset, thin). `thin` is
- * the half thickness in world units of the solid a two-sided field gives its
- * surface, -1 for a one-sided field; see `expand` of {@link sampleInstancesSDF}.
+ * vec4s per packed instance: world-to-local rows (3), (field box min, voxel size),
+ * (field box max, world scale), (atlas slot offset, thin). `thin` = half thickness in world
+ * units of a two-sided field's surface, -1 for one-sided; see `expand` of {@link sampleInstancesSDF}.
  */
 export const SDF_INSTANCE_VEC4S = 6;
 
 /**
- * Declares the uniforms {@link sampleGlobalSDF} reads, in a bind group.
+ * Declares the uniforms {@link sampleGlobalSDF} reads.
  *
- * - texture: all levels stacked along z, `resolution + 1` slices each (the
- *   last repeating the first), in {@link globalSDFFormat}; filtered where the
- *   device filters it, see {@link isGlobalSDFFilterable}.
- * - tags: one texel per brick, stacked the same way: (world brick x, y, z, 1)
- *   of the brick last composited there, rgba32f.
- * - levels[i]: (window origin in voxels of the level, voxel size).
- * - params: (resolution, number of levels, band in voxels, current mask): bit i
- *   of the mask set when every brick of level i is current, its tags unread.
+ * - texture: levels stacked along z, `resolution + 1` slices each (last repeats the first),
+ *   in {@link globalSDFFormat}; see {@link isGlobalSDFFilterable}.
+ * - tags: rgba32f, one texel per brick, stacked the same way: (world brick x, y, z, 1) of the
+ *   brick last composited there.
+ * - levels[i]: (window origin in voxels, voxel size).
+ * - params: (resolution, number of levels, band in voxels, current mask); bit i set when
+ *   every brick of level i is current (tags need not be read).
  *
  * @param levels - Clipmap levels; a compile-time constant of the program.
  * @internal
@@ -48,11 +46,8 @@ export function declareGlobalSDFUniforms(scope: PBGlobalScope, group: number, le
 }
 
 /**
- * Texel format of the global field: r16f where the device can write it from a
- * compute shader (the WebGPU feature texture-formats-tier1), half the memory
- * and filterable everywhere; r32f otherwise. The field only holds distances
- * within its band, a few voxels of the coarsest level, where half precision
- * resolves well under a millimetre per metre.
+ * Texel format of the global field: r16f where compute-writable (WebGPU texture-formats-tier1),
+ * else r32f. Half precision suffices since only distances within the band are stored.
  * @internal
  */
 export function globalSDFFormat(): 'r16f' | 'r32f' {
@@ -60,10 +55,8 @@ export function globalSDFFormat(): 'r16f' | 'r32f' {
 }
 
 /**
- * True when the device filters the global field's format (r16f always, r32f
- * with the optional float32-filterable feature of WebGPU): the field is then
- * read with one filtered fetch per level, else trilinear by hand from eight
- * loads.
+ * True when the device filters the global field's format (r16f always, r32f with
+ * float32-filterable); otherwise trilinear is done by hand from eight loads.
  * @internal
  */
 export function isGlobalSDFFilterable() {
@@ -84,10 +77,9 @@ export function declareDynamicSDFUniforms(scope: PBGlobalScope, group: number) {
 }
 
 /**
- * Distance in local units from a local position to one packed instance's
- * field: inside the field box by trilinear lookup of the atlas, outside it the
- * border value plus the distance to the box. `bmin` is (box min, voxel size),
- * `bmax` is (box max, world scale), `slot` the atlas slot offset.
+ * Distance in local units from a local position to one packed instance's field: trilinear
+ * atlas lookup inside the box, border value plus box distance outside. `bmin` is (box min,
+ * voxel size), `bmax` (box max, world scale), `slot` the atlas slot offset.
  * @internal
  */
 export function sampleInstanceField(
@@ -122,24 +114,13 @@ export function sampleInstanceField(
 }
 
 /**
- * Signed distance from a world position to the nearest of a set of packed
- * instances, each its baked field sampled from the atlas: inside the field box
- * by trilinear lookup, outside it by the border value plus the distance to the
- * box. `maxDist` is returned when no instance comes nearer.
+ * Signed distance from a world position to the nearest of a set of packed instances
+ * (layout at {@link SDF_INSTANCE_VEC4S}), or `maxDist` when none is nearer. `baseOf(k)` gives
+ * the first vec4 of the k-th instance, `instance(i)` reads vec4 `i`. If `bestIndex` names an
+ * int variable, the nearest k is written to it.
  *
- * Instance packing is described at {@link SDF_INSTANCE_VEC4S}: `baseOf(k)`
- * gives the first vec4 of the k-th instance visited, `instance(i)` reads vec4
- * `i` of the packed array. With `bestIndex`, the name of an int variable of the
- * scope, the k of the nearest instance is written to it (left alone when none
- * is nearer).
- *
- * `expand`, in world units, is the least half thickness a two-sided field's
- * surface is given here: a cloth or leaf baked two-sided is solid only half
- * a field voxel to each side, which a coarser grid sampling it would step
- * over without ever reading a negative value, so the surface is pushed out to
- * `expand` where its own solid is thinner. Half the voxel size of the grid
- * being written, 0 when sampling at a point.
- *
+ * `expand` (world units) is the minimum half thickness given to two-sided surfaces so coarser
+ * grids don't step over them: half the voxel size of the grid being written, 0 for point samples.
  * @internal
  */
 export function sampleInstancesSDF(
@@ -172,16 +153,13 @@ export function sampleInstancesSDF(
       pb.dot(this.r2, this.sdfP4)
     );
     this.$l.c = pb.clamp(this.lp, this.bmin.xyz, this.bmax.xyz);
-    // World length of a unit along each local axis: row i of world to local is
-    // local axis i over its scale
+    // World length of a unit along each local axis
     this.$l.axisScale = pb.div(
       pb.vec3(1),
       pb.vec3(pb.length(this.r0.xyz), pb.length(this.r1.xyz), pb.length(this.r2.xyz))
     );
-    // Distance to the field box in world units, exact under non-uniform scale;
-    // only the field's own value, read on the box, takes the smallest axis
-    // scale. A wall scaled 25 times thinner than it is wide would otherwise
-    // read 25 times too near across all the space beside it.
+    // World distance to the field box, exact under non-uniform scale; only the
+    // field's own value takes the smallest axis scale
     this.$l.outside = pb.length(pb.mul(pb.sub(this.lp, this.c), this.axisScale));
     // How far a two-sided surface is pushed out to reach the half thickness asked for
     this.$l.grow = this.$choice(
@@ -213,8 +191,7 @@ export function sampleInstancesSDF(
 }
 
 /**
- * Signed distance at a world position to the dynamic instances, at their
- * current transforms, or `maxDist` when none comes nearer.
+ * Signed distance to the dynamic instances at their current transforms, or `maxDist`.
  * @internal
  */
 export function sampleDynamicSDF(scope: PBInsideFunctionScope, worldPos: PBShaderExp, maxDist: PBShaderExp) {
@@ -239,10 +216,8 @@ export function sampleDynamicSDF(scope: PBInsideFunctionScope, worldPos: PBShade
 }
 
 /**
- * Signed distance at a world position to everything in the scene field: the
- * global clipmap (static meshes and terrain) merged with the dynamic
- * instances. Needs both {@link declareGlobalSDFUniforms} and
- * {@link declareDynamicSDFUniforms}.
+ * Signed distance to the whole scene field: global clipmap merged with dynamic instances.
+ * Needs {@link declareGlobalSDFUniforms} and {@link declareDynamicSDFUniforms}.
  * @internal
  */
 export function sampleSceneSDF(scope: PBInsideFunctionScope, worldPos: PBShaderExp, levels: number) {
@@ -256,9 +231,8 @@ export function sampleSceneSDF(scope: PBInsideFunctionScope, worldPos: PBShaderE
 }
 
 /**
- * {@link sampleSceneSDF} with the voxel size of the grid the distance came
- * from: (distance, voxel size), the voxel size 0 where a dynamic instance,
- * sampled at its own field's resolution, is the nearer.
+ * {@link sampleSceneSDF} returning (distance, voxel size); voxel size 0 where a dynamic
+ * instance is nearer.
  * @internal
  */
 export function sampleSceneSDFWithVoxel(scope: PBInsideFunctionScope, worldPos: PBShaderExp, levels: number) {
@@ -273,31 +247,23 @@ export function sampleSceneSDFWithVoxel(scope: PBInsideFunctionScope, worldPos: 
 }
 
 /**
- * Scale on the surface expand of {@link sdfSurfaceExpand} where a brick holds
- * two-sided meshes, against 1 elsewhere: Lumen's
- * r.LumenScene.GlobalSDF.NotCoveredExpandSurfaceScale and
- * CoveredExpandSurfaceScale (GlobalDistanceField.cpp). A one-sided wall thinner
- * than a voxel lying between two sample centres reads up to half a voxel
- * anywhere, and the field interpolated from a coarser mesh field more, so less
- * than a whole voxel lets rays through it; foliage and cloth, solid only as
- * thick as the compositing makes them, would close up at a whole voxel.
+ * Surface expand scale in bricks holding two-sided meshes (1 elsewhere), after Lumen
+ * r.LumenScene.GlobalSDF.NotCoveredExpandSurfaceScale: a full voxel is needed to stop rays at
+ * thin one-sided walls, but would close up foliage and cloth.
  * @internal
  */
 export const SDF_NOT_COVERED_EXPAND_SCALE = 0.6;
 
 /**
- * Tag alpha of a brick of the global field holding two-sided meshes, against 1
- * for one holding none; see {@link SDF_NOT_COVERED_EXPAND_SCALE}. Lumen marks
- * such pages with a coverage bit (GLOBALSDF_SIMPLE_COVERAGE_BASED_EXPAND).
+ * Tag alpha of a brick holding two-sided meshes (1 otherwise); see
+ * {@link SDF_NOT_COVERED_EXPAND_SCALE}. Lumen GLOBALSDF_SIMPLE_COVERAGE_BASED_EXPAND.
  * @internal
  */
 export const GLOBAL_SDF_TAG_NOT_COVERED = 2;
 
 /**
- * True unless the brick of the global field holding a world position was
- * composited with two-sided meshes in it, read from the finest level whose
- * window holds the position; true outside every window and where the brick
- * is not current.
+ * False where the global field brick holding a position (finest level) was composited with
+ * two-sided meshes; true otherwise, including outside every window or for stale bricks.
  * @internal
  */
 export function globalSDFCovered(scope: PBInsideFunctionScope, worldPos: PBShaderExp, levels: number) {
@@ -340,15 +306,9 @@ export function globalSDFCovered(scope: PBInsideFunctionScope, worldPos: PBShade
 }
 
 /**
- * Lumen's surface expand (GlobalDistanceFieldUtils.ush, RayTraceGlobalDistanceField)
- * at a sample of {@link sampleSceneSDFWithVoxel} at world position `p`, a
- * distance `t` past the start of a trace: a whole voxel of the level read,
- * {@link SDF_NOT_COVERED_EXPAND_SCALE} of one in bricks with two-sided meshes,
- * growing from 0 over the first two voxels so a ray leaving a surface does not
- * hit it at once. The trace hits where the distance falls below it; the hit
- * lies on the surface swollen by it, `t + distance - expand` along the ray.
- * Zero where a dynamic instance answered (voxel size 0), sampled at its own
- * field's resolution. The coverage is only read where it decides the hit.
+ * Lumen surface expand (GlobalDistanceFieldUtils.ush) for a {@link sampleSceneSDFWithVoxel}
+ * sample at `p`, `t` along a trace: one voxel of the level read ({@link SDF_NOT_COVERED_EXPAND_SCALE}
+ * in two-sided bricks), ramping from 0 over the first two voxels. Zero for dynamic instances.
  * @internal
  */
 export function sdfSurfaceExpand(
@@ -379,38 +339,20 @@ export function sdfSurfaceExpand(
 }
 
 /**
- * Voxels over which a level of the global field hands over to the next
- * coarser one, inward from a voxel inside its window edge. Wider than a brick,
- * the step the windows move in, so the hand-over never jumps as they follow
- * the camera; the two levels are read and blended there, as Godot blends its
- * SDFGI cascades over two probe spacings (gi.glsl, sdfgi_process).
+ * Voxels over which a global field level blends into the next coarser one near its window
+ * edge; wider than a brick (the window move step) so the hand-over never jumps.
  * @internal
  */
 export const SDF_LEVEL_BLEND_VOXELS = 16;
 
 /**
- * Signed distance at a world position from the global clipmap field, in world
- * units, negative inside geometry.
+ * Signed distance (world units, negative inside) from the global clipmap field.
  *
- * The finest level whose window holds the point and whose value lies inside
- * its band answers; a value at the band edge only says "at least this far", so
- * the next coarser level is asked. Within {@link SDF_LEVEL_BLEND_VOXELS} of a
- * window edge, and as a value nears the band edge, the level fades into the
- * next coarser one, so nothing changes abruptly where levels meet. Past the
- * coarsest window, or with every level saturated, the coarsest value read (or
- * the coarsest band) is returned, a lower bound on the true distance that
- * keeps sphere tracing safe.
- *
- * The windows are toroidal: a filtered read wraps by the sampler's repeat mode
- * in x and y and by the slice repeated past each level in z. Where r32f is not
- * filterable, trilinear by hand from `textureLoad`, wrapping each texel.
- *
- * A level answers only where every brick the filter touches is tagged with the
- * world brick it should hold. After the window moves, the bricks that entered
- * still hold the region that left on the other side until they are composited
- * again, a budget per frame; trusting them puts copies of distant geometry
- * where there is none, the more so the faster the camera moves.
- *
+ * The finest level holding the point within its band answers, blending into the next coarser
+ * level near window edges and band edges. Past all windows or with every level saturated, the
+ * coarsest value is returned as a lower bound, keeping sphere tracing safe. Windows are toroidal;
+ * non-filterable formats use manual trilinear. A level answers only where all bricks under the
+ * filter are tagged current, so stale bricks after a window move are ignored.
  * @internal
  */
 export function sampleGlobalSDF(scope: PBInsideFunctionScope, worldPos: PBShaderExp, levels: number) {
@@ -418,8 +360,7 @@ export function sampleGlobalSDF(scope: PBInsideFunctionScope, worldPos: PBShader
 }
 
 /**
- * The first level worth reading a step after a sphere trace read `prevDist`:
- * the levels finer than it saturate at that distance, their band narrower.
+ * First level worth reading after a sphere-trace step read `prevDist`; finer levels saturate.
  * @internal
  */
 function sdfStartLevel(scope: PBInsideFunctionScope, prevDist: PBShaderExp, levels: number) {
@@ -440,14 +381,9 @@ function sdfStartLevel(scope: PBInsideFunctionScope, prevDist: PBShaderExp, leve
 }
 
 /**
- * {@link sampleGlobalSDFWithVoxel} for a sphere trace, `prevDist` the distance
- * its previous step read (0 for the first): the read starts at the level that
- * distance needs, skipping finer levels that would have saturated, as Lumen
- * skips empty space with its coarse mip. Where the value comes back within the
- * band of the level skipped last, the march has neared a surface and the point
- * is read again from the finest level. Levels finer than `minLevel` are never
- * read, for a trace that belongs to a coarse level, as Godot's SDFGI traces a
- * cascade's voxels from that cascade on (sdfgi_direct_light.glsl).
+ * {@link sampleGlobalSDFWithVoxel} for sphere tracing: starts at the level `prevDist` needs
+ * (as Lumen skips empty space via its coarse mip), rereading from the finest level near a
+ * surface. Levels finer than `minLevel` are never .
  * @internal
  */
 export function sampleGlobalSDFHinted(
@@ -479,8 +415,7 @@ export function sampleGlobalSDFHinted(
 }
 
 /**
- * {@link sampleSceneSDFWithVoxel} for a sphere trace, the global field read
- * by {@link sampleGlobalSDFHinted}, its levels finer than `minLevel` left out.
+ * {@link sampleSceneSDFWithVoxel} for sphere tracing, using {@link sampleGlobalSDFHinted}.
  * @internal
  */
 export function sampleSceneSDFHinted(
@@ -504,19 +439,10 @@ export function sampleSceneSDFHinted(
 export const SDF_REFINE_STEPS = 8;
 
 /**
- * Distance along a sphere trace's ray to the field's own surface, from where
- * the trace stopped on the surface swollen by {@link sdfSurfaceExpand}: `t`
- * along the ray from `origin`, `d` the distance read there, `voxel` the voxel
- * size of the level that answered (0 for a dynamic instance), `minLevel` the
- * finest level the trace read. The ray goes on to where the field crosses
- * zero, or to its least value for a wall too thin to read negative, at most
- * {@link SDF_REFINE_STEPS} steps of at least an eighth of a voxel.
- *
- * The swollen surface decides the hit, so walls thinner than a voxel still
- * stop the ray, but it lies a voxel short of the surface along its normal:
- * in a concave corner a point within a voxel of the other surface never
- * steps out of that surface's swelling along its own normal. Whatever reads
- * where the ray met the scene takes this distance.
+ * Refines a sphere-trace hit on the surface swollen by {@link sdfSurfaceExpand} to the field's
+ * own surface: steps on from `t` (distance `d`, answering `voxel` size, 0 for dynamic) to the zero
+ * crossing or minimum, at most {@link SDF_REFINE_STEPS} steps of at least 1/8 voxel. Needed because
+ * the swollen surface lies up to a voxel short, notably in concave corners.
  * @internal
  */
 export function sdfRefineHit(
@@ -569,9 +495,8 @@ export function sdfRefineHit(
 }
 
 /**
- * {@link sampleGlobalSDF} with the voxel size of the level that answered:
- * (distance, voxel size), both in world units. Levels finer than `minLevel`
- * are not read.
+ * {@link sampleGlobalSDF} returning (distance, voxel size) in world units; levels finer than
+ * `minLevel` are skipped.
  * @internal
  */
 export function sampleGlobalSDFWithVoxel(
@@ -599,8 +524,7 @@ export function sampleGlobalSDFWithVoxel(
     this.$l.t = pb.vec3(0);
     this.$l.v0 = pb.ivec3(0);
     for (let i = 0; i < levels; i++) {
-      // Finest first, each level taking the share its finer levels left;
-      // unrolled since `levels` is small and constant
+      // Finest first, each level taking the share its finer levels left
       const wanted =
         i === levels - 1
           ? pb.greaterThan(this.remaining, 1e-4)
@@ -666,11 +590,9 @@ export function sampleGlobalSDFWithVoxel(
           this.last = this.d;
           this.lastVoxel = this.info.w;
           if (i === levels - 1) {
-            // Nothing coarser to hand over to
             this.$l.w = pb.float(1);
           } else {
-            // Handing over to the next level near the window edge, and where the
-            // value nears the band edge, past which it only says "at least this far"
+            // Hand over near the window edge and near the band edge (beyond which values are lower bounds)
             this.$l.lo = pb.min(pb.min(this.f.x, this.f.y), this.f.z);
             this.$l.hi = pb.sub(pb.sub(this.resF, 1), pb.max(pb.max(this.f.x, this.f.y), this.f.z));
             this.$l.edge = pb.min(this.lo, this.hi);
@@ -696,12 +618,8 @@ export function sampleGlobalSDFWithVoxel(
 }
 
 /**
- * Signed distance at a world position read from one level of the global
- * clipmap alone, `level` chosen at run time: no hand-over to other levels and
- * no check that the bricks read are current, as Unreal reads one clipmap for
- * the gradient at a hit (GlobalDistanceFieldPageCentralDiff,
- * GlobalDistanceFieldShared.ush). For the normal at a hit, where the level
- * that answered holds the point.
+ * Signed distance from one global clipmap level chosen at run time, with no blending or brick
+ * currency check; for hit normals, as UE GlobalDistanceFieldPageCentralDiff.
  * @internal
  */
 export function sampleGlobalSDFLevel(
@@ -802,9 +720,7 @@ function levelCurrent(scope: PBInsideFunctionScope, level: number) {
 }
 
 /**
- * True when the bricks covering voxels v0 to v0 + 1 of a level are tagged with
- * their own world brick coordinates, i.e. composited for the current window.
- * One to eight bricks, by how many brick boundaries the footprint straddles.
+ * True when every brick covering voxels v0..v0+1 of a level is tagged current (one to eight bricks).
  */
 function bricksCurrent(scope: PBInsideFunctionScope, v0: PBShaderExp, level: number) {
   const pb = scope.$builder;

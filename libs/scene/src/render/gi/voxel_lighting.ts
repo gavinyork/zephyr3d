@@ -46,7 +46,7 @@ function aniso1Format(): 'rg8unorm' | 'rgba8unorm' {
 }
 /** Cone tracing steps of the sun shadow. */
 const SHADOW_STEPS = 24;
-/** The axis faces of a voxel, in the order of the aniso textures (Godot's aniso_dir). */
+/** The axis faces of a voxel, in the order of the aniso textures. */
 const ANISO_DIRS: [number, number, number][] = [
   [1, 0, 0],
   [0, 1, 0],
@@ -61,28 +61,21 @@ const ANISO_DIRS: [number, number, number][] = [
  * @public
  */
 export interface VoxelLightingOptions {
-  /** Half angle of the sun shadow cone in degrees; wider is softer. Default 5. */
+  /** Half angle of the sun shadow cone in degrees; wider is softer. */
   sunShadowConeAngle: number;
   /** Z slices of every clipmap level lit per frame; a level is refreshed every `resolution / slices` frames. Default 8. */
   slicesPerFrame: number;
 }
 
 /**
- * Lights the voxel scene: for every material voxel, the sun (shadowed by cone
- * tracing the global field, see {@link sdfConeShadow}), the punctual lights
- * in range (unshadowed), the sky irradiance of the environment light, times
- * the albedo, plus the emissive; written to the radiance clipmap. The radiance
- * a ray of the global illumination picks up where it hits. Kept at the fixed
- * cache exposure (getGICacheExposure) rather than the camera's, so the probes
- * accumulating it over many frames do not drift when the exposure changes.
+ * Lights the voxel scene: per material voxel, the sun (cone-traced field shadow, see
+ * {@link sdfConeShadow}), unshadowed punctual lights in range and sky irradiance, times
+ * albedo, plus emissive, into the radiance clipmap. Kept at the fixed cache exposure
+ * (getGICacheExposure) so probes accumulating it don't drift with camera exposure.
+ * After Lumen's surface cache direct lighting (Wright, SIGGRAPH 2021 Advances), on voxels.
  *
- * After the surface cache direct lighting of Lumen (Wright, "Radiance Caching
- * for Real-Time Global Illumination", SIGGRAPH 2021 Advances), on voxels.
- *
- * Runs as a fragment pass, one fragment per voxel of a slab of z slices
- * rotating through every level, so the whole scene is refreshed over a few
- * frames and a moving sun or light follows with that latency. Voxels without
- * material write zero. Normals come from the field's gradient.
+ * A fragment pass, one fragment per voxel of a slab of z slices rotating through every
+ * level, so the scene refreshes over a few frames. Voxels without material write zero.
  *
  * @internal
  */
@@ -189,7 +182,6 @@ export class VoxelLighting {
         writable: true
       })!;
       this._aniso0.name = '@VoxelSceneAniso0';
-      // Two faces: rg8 where the device can write it (texture-formats-tier1)
       this._aniso1 = device.createTexture3D(aniso1Format(), resolution, resolution, depth, {
         mipmapping: false,
         writable: true
@@ -199,8 +191,7 @@ export class VoxelLighting {
     }
     const envLight = scene.env.light.envLight;
     const physical = scene.lightingMode === 'physical';
-    // Radiance is kept at the fixed cache exposure, whatever the camera's; the
-    // sky bake is stored at the same exposure, so it takes the strength alone
+    // Fixed cache exposure; the sky bake uses the same exposure, so it takes the strength alone
     const cacheExposure = getGICacheExposure(scene.lightingMode);
     const envStrength = scene.env.light.strength ?? 0;
     // No sky without an environment light (its stand-in carries only the probes)
@@ -263,9 +254,8 @@ export class VoxelLighting {
     };
     bind(this._bindGroup!);
     draw(this._program, this._bindGroup!, resolution, resolution * slices * global.levels);
-    // The bricks the field composited this frame came into a window holding
-    // the radiance of the region that left it; light them now rather than when
-    // the slab comes round, up to resolution / slices frames later
+    // Bricks the field composited this frame hold stale radiance; light them now
+    // rather than up to resolution / slices frames later
     const fresh = global.freshMaterialBricks;
     if (fresh.count > 0) {
       if (!this._brickProgram) {
@@ -318,10 +308,9 @@ export class VoxelLighting {
     return `${envLight.irradianceSHFB ? 'fb' : envLight.irradianceSH ? 'buf' : ''}`;
   }
   /**
-   * Packs the visible punctual lights: the sun apart (first directional light,
-   * the scene's sun light where one is marked), the rest nearest the camera
-   * first, up to {@link MAX_VOXEL_LIGHTS}. Only the intensity carries the
-   * exposure (the cache exposure), as the clustered light buffer does.
+   * Packs the visible punctual lights: the sun apart (the marked sun light, else the
+   * first directional), the rest nearest the camera first, up to {@link MAX_VOXEL_LIGHTS}.
+   * Only the intensity carries the cache exposure, as in the clustered light buffer.
    * @internal
    */
   private collectLights(camera: Camera, exposure: number) {
@@ -378,11 +367,9 @@ export class VoxelLighting {
     }
     return count;
   }
-  /** @internal */
   /**
-   * The lighting program: one fragment per voxel of the slab, or with
-   * `bricks` per voxel of a list of bricks, a row of
-   * {@link BRICK_VOXELS}³ fragments each.
+   * The lighting program: one fragment per voxel of the slab, or with `bricks`
+   * a row of {@link BRICK_VOXELS}³ fragments per listed brick.
    * @internal
    */
   private createProgram(
@@ -511,17 +498,11 @@ export class VoxelLighting {
             );
             this.$l.vs = pb.mul(this.info.w, 2);
             this.$l.p = pb.mul(pb.add(pb.vec3(this.w), pb.vec3(0.5)), this.vs);
-            // Light per axis face of the voxel, as Godot's SDFGI keeps it
-            // (sdfgi_direct_light.glsl): a voxel holding a floor thinner than
-            // itself is lit on top and dark below, which one normal from the
-            // field's gradient at its centre cannot tell apart; pointing down,
-            // it left sunlit floors black. Godot marks the faces with geometry
-            // from the triangle normals at voxelization; the material atlas is
-            // in the meshes' own spaces, so here a face counts where the field
-            // is outside the solid at its centre, open space lying that way.
+            // Light per axis face of the voxel, so a floor thinner than the voxel is lit
+            // on top and dark below. A face counts as open where the field at its centre
+            // is outside the solid.
             this.$l.half = pb.mul(this.vs, 0.5);
-            // Read from the voxel's own level on, as the sun shadow below: a finer
-            // level knows geometry the voxel cannot tell apart
+            // Read from the voxel's own level on: a finer level resolves more geometry
             for (let k = 0; k < 6; k++) {
               this.$l[`open${k}`] = pb.greaterThan(
                 sampleGlobalSDFWithVoxel(
@@ -535,9 +516,8 @@ export class VoxelLighting {
               this.$l[`acc${k}`] = pb.vec3(0);
             }
             this.$l.albedo = this.a.rgb;
-            // Sun: one shadow ray for every face, started almost at the corner
-            // of the voxel toward the light and a little along it (Godot's bias
-            // of outgoing rays), so a thin floor is left from the lit side
+            // Sun: one shadow ray for all faces, started near the voxel corner toward the
+            // light and offset along it
             this.$if(pb.greaterThan(this.sunDir.w, 0.5), function () {
               this.$l.L = pb.neg(this.sunDir.xyz);
               this.$l.ps = pb.add(
@@ -608,12 +588,9 @@ export class VoxelLighting {
                 });
               }
             });
-            // Ambient per open face: the sky, or where the probes cover the face
-            // their irradiance, which carries the sky and every earlier bounce
-            // (the recursion of Majercik et al. 2019, section 3.2; Godot reads
-            // its probes per face the same way). An albedo short of 1 keeps the
-            // loop convergent whatever the material claims. The emissive leaves
-            // every open face.
+            // Ambient per open face: sky, or probe irradiance where covered, carrying every
+            // earlier bounce (Majercik et al. 2019 sec. 3.2). Albedo clamped below 1 keeps
+            // the feedback loop convergent. Emissive leaves every open face.
             this.$l.feedback = pb.min(this.albedo, pb.vec3(0.9));
             this.$l.emissive = pb.textureLoad(this.emissiveTex, this.texel, 0).rgb;
             for (let k = 0; k < 6; k++) {

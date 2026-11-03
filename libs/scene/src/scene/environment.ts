@@ -97,10 +97,8 @@ export class EnvLightWrapper extends Disposable {
   }
   /**
    * @internal
-   * What materials shade the environment lighting with. For type `none` a
-   * stand-in with no sky that still lays the probes' global illumination on
-   * the draw, which the light pass uses only while the probe volume is ready;
-   * passes that read the sky itself check {@link EnvLightWrapper.type} first.
+   * Environment lighting used by materials. For type `none`, a sky-less stand-in
+   * that applies probe GI only; passes reading the sky check {@link EnvLightWrapper.type}.
    */
   get envLight(): EnvironmentLighting {
     return this._envLight ?? this._probesOnly;

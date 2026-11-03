@@ -722,12 +722,8 @@ export abstract class BaseDevice extends Observable<DeviceEventMap> {
       this._disposeObjectList = [];
     }
     this._beginFrameCounter++;
-    // The vsync time of the frame, when there is one, rather than when its
-    // callback got to run: frame times then follow the display, without the
-    // scheduling noise that turns into jitter of anything moving at speed.
-    // Moved on to when the frame is expected on screen, so that a frame held
-    // for two refreshes draws the world at the time it is seen at, and a change
-    // of hold does not jump.
+    // Use the vsync time (no callback scheduling jitter), advanced to when the
+    // frame is expected on screen so held frames and hold changes stay smooth.
     const vsyncTime = this._pendingFrameTime;
     this._pendingFrameTime = null;
     let frameTime: Nullable<number> = null;
@@ -736,8 +732,7 @@ export abstract class BaseDevice extends Observable<DeviceEventMap> {
       frameTime = vsyncTime + pacer.wantedRefreshes * pacer.refreshInterval;
       const last = this._frameInfo.frameTimestamp;
       if (frameTime < last) {
-        // A shorter hold or a faster display than expected: time stands still
-        // rather than going back. Far behind is another clock, not a prediction.
+        // Never go back in time; far behind means a different clock.
         frameTime = frameTime > last - 1000 ? last : null;
       }
     }
@@ -789,10 +784,8 @@ export abstract class BaseDevice extends Observable<DeviceEventMap> {
   /** Called at every display refresh offered to the run loop, before anything else; backends poll GPU fences here. */
   protected pollDeferredFrame(): void {}
   /**
-   * Called by backends when the GPU was done with a held frame, with the
-   * {@link BaseDevice.deferredFrameVsync} and {@link BaseDevice.deferredFrameHold}
-   * kept from when the frame was rendered, and the performance clock time it was
-   * done at. Feeds auto frame pacing.
+   * Called by backends when the GPU finished a held frame, with the vsync/hold kept at
+   * render time and the performance-clock completion time. Feeds auto frame pacing.
    */
   protected reportDeferredFrameDone(vsyncTime: number, hold: number, doneTime: number) {
     const pacer = this._framePacer;
@@ -960,8 +953,7 @@ export abstract class BaseDevice extends Observable<DeviceEventMap> {
           const pacer = that._framePacer;
           that.pollDeferredFrame();
           if (!pacer.shouldRender(vsyncTime)) {
-            // Not a refresh to render at: the last frame stays on screen, or
-            // goes on screen now if it was held back for this refresh.
+            // Not rendering at this refresh; present a held frame if this is its last refresh.
             if (that._presentPending && pacer.refreshesSinceRender >= pacer.wantedRefreshes - 1) {
               that.presentDeferredFrame();
             }
@@ -971,9 +963,7 @@ export abstract class BaseDevice extends Observable<DeviceEventMap> {
             // The refresh to show it at was not offered: show it before the next frame.
             that.presentDeferredFrame();
           }
-          // A frame held for several refreshes is rendered now but shown at the
-          // last of them, so that it is seen at the same time whether the GPU
-          // takes one refresh or two.
+          // Held frames render now but present at the last refresh of their hold.
           deferred = pacer.wantedRefreshes > 1 && that.setDeferredPresent(true);
           pacer.deferredPresent = deferred;
           that._deferredFrameVsync = vsyncTime;

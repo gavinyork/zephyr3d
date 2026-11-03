@@ -7,13 +7,9 @@ import { getScenePreloadPath } from './assetpreload';
 import { DEFAULT_SPLASH_BACKGROUND } from '../build/templates';
 
 /**
- * Starts a preview the way a build's entry does: the splash screen shows the progress
- * of compiling the recorded pipelines and loading the recorded assets of the startup
- * scene, then of loading the scene, and goes once the scene is drawn.
- *
- * @remarks
- * The editor's own loading mask comes first, since the page is the editor's; the
- * splash screen replaces it as soon as the engine is ready.
+ * Starts a preview the way a build's entry does: the splash screen tracks pipeline
+ * precompilation, asset preloading and scene loading, and hides once the scene is drawn.
+ * It replaces the editor's own loading mask.
  */
 export async function startPreview(
   app: Application,

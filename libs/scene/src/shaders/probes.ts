@@ -18,37 +18,26 @@ export const PROBE_MAX_LEVELS = 4;
 export const PROBE_PARAM_VEC4S = 3 + 2 * PROBE_MAX_LEVELS;
 
 /**
- * Declares the probe volume as a program reads it:
+ * Declares the probe volume uniforms.
  *
- * - irradiance: rgba16f 2D atlas of octahedral tiles, one per probe, each
- *   `irrTexels`² with a one texel border; rgb E/π in the engine's irradiance
- *   units at the fixed cache exposure (getGICacheExposure), which the read
- *   scale of params[2] converts to the camera's; a the sky visibility, the
- *   cosine-weighted share of the probe's rays that escaped to the sky.
- * - visibility: rgba16f atlas of `visTexels`² tiles holding (mean distance,
- *   mean squared distance) per direction, to the field's own surface.
- * - data: one vec4 per probe, (relocation offset, state), state 0 while the
- *   probe has never been updated; a storage buffer, writable when `writable`.
+ * - irradiance: rgba16f atlas of octahedral tiles, `irrTexels`² each with a one-texel border;
+ *   rgb E/π at the fixed cache exposure (getGICacheExposure), a = cosine-weighted sky visibility.
+ * - visibility: rgba16f atlas of `visTexels`² tiles, (mean distance, mean squared distance).
+ * - data: storage buffer, one vec4 per probe (relocation offset, state); writable when `writable`.
  * - params[0]: (levels, tiles per atlas row, irrTexels, visTexels),
  *   params[1]: (irradiance atlas size, visibility atlas size),
- *   params[2]: (read scale, normal bias, view bias, max ray distance), the read
- *   scale being what a surface reading the probes multiplies them by (the
- *   global illumination intensity); the bounce feedback reads them unscaled;
- *   params[3 + 2l]: (world index of level l's first probe, its spacing),
- *   params[4 + 2l]: (probes per axis of level l, its first tile).
+ *   params[2]: (read scale = GI intensity, normal bias, view bias, max ray distance),
+ *   params[3 + 2l]: (world index of level l's first probe, spacing),
+ *   params[4 + 2l]: (probes per axis of level l, first tile).
  *
- * The levels are clipmap windows around the camera, each a multiple of the
- * spacing of the one inside it. Probes are addressed toroidally by world
- * index like the field's voxels; a probe's tile index, which also indexes
- * `data`, is its level's first tile plus `x + nx (y + ny z)` of its texel.
+ * Levels are camera-centred clipmap windows addressed toroidally by world index; tile index
+ * (also indexing `data`) = first tile + `x + nx (y + ny z)` of the texel.
  * @internal
  */
 export function declareProbeUniforms(scope: PBGlobalScope, group: number, writable = false) {
   const pb = scope.$builder;
-  // The sampler every program reads them with (ProbeVolume.applyBindGroup),
-  // declared static so they share one sampler binding on WebGPU: a material
-  // heavy on textures, such as the water's, reads them in a fragment stage
-  // that has few of the 16 samplers left
+  // Static sampler so both share one sampler binding on WebGPU (texture-heavy materials
+  // such as water are near the 16-sampler limit)
   scope[PROBE_IRRADIANCE] = pb.tex2D().uniform(group).withSampler(getSamplerOptions('clamp_linear_nomip'));
   scope[PROBE_VISIBILITY] = pb.tex2D().uniform(group).withSampler(getSamplerOptions('clamp_linear_nomip'));
   scope[PROBE_DATA] = writable
@@ -166,7 +155,7 @@ export function probeTexelFromIndex(scope: PBInsideFunctionScope, level: PBShade
   return scope[funcName](level, index) as PBShaderExp;
 }
 
-/** World index of the probe at a texel of a level: the one of the window with that toroidal address. @internal */
+/** World index of the probe at a toroidal texel of a level. @internal */
 export function probeWorldFromTexel(scope: PBInsideFunctionScope, level: PBShaderExp, texel: PBShaderExp) {
   const pb = scope.$builder;
   const funcName = 'Z_probeWorldFromTexel';
@@ -189,7 +178,7 @@ export function probeTexelFromWorld(
   return pb.mod(pb.add(pb.mod(world, n), n), n) as PBShaderExp;
 }
 
-/** World position of a probe: its world index times its level's spacing, plus its relocation offset. @internal */
+/** World position of a probe: world index times level spacing plus relocation offset. @internal */
 export function probePosition(
   scope: PBInsideFunctionScope,
   level: PBShaderExp | number,
@@ -208,8 +197,7 @@ export function probeTileOrigin(scope: PBInsideFunctionScope, index: PBShaderExp
 }
 
 /**
- * Bilinear sample of a probe's tile in a direction: the octahedral coordinate
- * mapped into the tile's interior, the border texels making the filter wrap.
+ * Bilinear sample of a probe's tile in a direction; border texels make the filter wrap.
  * @internal
  */
 export function sampleProbeTile(
@@ -235,25 +223,22 @@ export function sampleProbeTile(
 }
 
 /**
- * Probe state in the w of its data: 0 while its maps hold nothing (never
- * updated, or just reactivated), 1 updated, {@link PROBE_STATE_INACTIVE} when
- * buried in geometry.
+ * Probe state in data.w: 0 = no data (never updated or just reactivated), 1 = updated,
+ * {@link PROBE_STATE_INACTIVE} = buried in geometry.
  * @internal
  */
 export const PROBE_STATE_INACTIVE = 2;
 
-/** True for a probe whose maps a surface may read, by the w of its data. @internal */
+/** True for a probe whose maps a surface may read. @internal */
 export function probeActive(scope: PBInsideFunctionScope, data: PBShaderExp) {
   const pb = scope.$builder;
   return pb.and(pb.greaterThan(data.w, 0.5), pb.lessThan(data.w, PROBE_STATE_INACTIVE - 0.5)) as PBShaderExp;
 }
 
 /**
- * Irradiance from one level of the volume at a surface point: the eight
- * probes around the biased point weighted by trilinear position, by how much
- * each faces the surface and by Chebyshev visibility of the biased point.
- * Returns (irradiance, weight sum), the sum 0 outside the level's window or
- * among probes never updated or inactive.
+ * Irradiance from one volume level: the eight surrounding probes weighted by trilinear,
+ * wrap-facing and Chebyshev visibility (DDGI). Returns (irradiance, weight sum); sum 0 when
+ * outside the window or no probe is active.
  * @internal
  */
 function sampleProbeLevel(
@@ -290,9 +275,7 @@ function sampleProbeLevel(
         this.$l[`t${i}`] = probeTexelFromWorld(this, this.level, this[`w${i}`]);
         this.$l[`i${i}`] = probeTileIndex(this, this.level, this[`t${i}`]);
         this.$l[`d${i}`] = this[PROBE_DATA].at(this[`i${i}`]);
-        // Updated and active: an inactive probe, buried in geometry, would
-        // only bring the dark of the inside (Majercik et al. 2021, probe
-        // classification)
+        // Skip inactive (buried) probes (Majercik et al. 2021, probe classification)
         this.$if(probeActive(this, this[`d${i}`]), function () {
           this.$l.pp = probePosition(this, this.level, this[`w${i}`], this[`d${i}`]);
           this.$l.tri = pb.mul(
@@ -346,35 +329,16 @@ function sampleProbeLevel(
 }
 
 /**
- * Irradiance (E/π, rgb) at a surface from the probe volume, and in `a` whether
- * any probe answered (0 outside every level or among probes not yet updated).
- * The finest level holding the point answers, handing over to the next over
- * the outer two probe spacings of its window as Godot blends its SDFGI
- * cascades (gi.glsl, sdfgi_process: a smoothstep from 2.5 to 0.5 probes inside
- * the edge), so nothing pops as the windows move; a level whose probes are not
- * ready yet hands over to the next as well. Majercik et al., "Dynamic Diffuse
- * Global Illumination with Ray-Traced Irradiance Fields", JCGT 2019, §4; the
- * level selection follows Lumen's radiance cache clipmaps.
+ * Probe volume irradiance (E/π, rgb) at a surface; `a` = 1 if any probe answered. The finest
+ * level holding the point answers, fading to the next over the outer 0.5-2.5 probe spacings of
+ * its window. DDGI (Majercik et al., JCGT 2019, §4);
  *
- * The normal and view biases of params[2] are in probe spacings, so each level
- * scales them by its own, as DDGI sizes its self-shadow bias by the probe
- * spacing and Lumen's irradiance field gather by its clipmap cell
- * (LumenIrradianceFieldInterpolation.ush, GetIrradianceFieldInterpolatedLighting:
- * (0.2 N + 0.8 V) * 0.75 * cell * ProbeOcclusionBias 0.8). As there, the view
- * bias fades out as the viewer comes nearer than a spacing: pushed toward a
- * viewer that close, the point would land beside it. `toViewer` runs from the
- * point to the viewer, its length the viewing distance; the feedback mode has
- * no viewer and takes the whole view bias along it. The visibility maps hold
- * distances to the field's own surface, the probe rays carrying on past the
- * swollen surface they hit, so the biased point needs no further offset.
+ * Normal/view biases of params[2] are in probe spacings, scaled per level; the view bias fades
+ * out within one spacing of the viewer. `toViewer` runs from point to viewer; feedback mode
+ * applies the full view bias.
  *
- * Mode `surface` scales it by the read scale of params[2], for a surface
- * shading with it. `feedback` returns the value as stored, for the voxel
- * lighting's next bounce: the global illumination intensity applies to what
- * reaches the image once, not to every bounce, as SDFGI keeps its energy out
- * of the bounce feedback (Godot, sdfgi_direct_light.glsl) and Lumen has no
- * intensity in its radiosity loop. `sky` interpolates the sky visibility
- * instead, 0 to 1 in every channel, with the same weights.
+ * Modes: `surface` applies the read scale; `feedback` returns the stored value for the next
+ * voxel bounce; `sky` interpolates sky visibility (0..1) with the same weights.
  * @internal
  */
 export function sampleProbeIrradiance(

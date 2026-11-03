@@ -713,8 +713,7 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
   set objectColor(val: Immutable<Vector4>) {
     if (val !== this._objectColor) {
       this._objectColor = val;
-      // Set by every frame that picks: the uniforms must be uploaded again, but
-      // the look is unchanged, so caches of it (voxelized materials) stay valid
+      // Uniforms only: the look is unchanged, so voxelized material caches stay valid
       this.optionChanged(false, false);
     }
   }
@@ -805,8 +804,7 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
    */
   protected updateRenderStates(pass: number, stateSet: RenderStateSet, ctx: DrawContext) {
     if (ctx.renderPass!.type === RENDER_PASS_TYPE_VOXELIZE) {
-      // Every fragment of every face must store its voxel: no depth test, no
-      // culling; the colour attachment is scratch
+      // Every fragment of every face stores its voxel; the colour attachment is scratch
       stateSet.defaultBlendingState();
       stateSet.useDepthState().enableTest(false).enableWrite(false);
       stateSet.useRasterizerState().setCullMode('none');
@@ -1047,12 +1045,9 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
     );
   }
   /**
-   * Whether the material can be voxelized for the global illumination: drawn
-   * in the voxelize pass, where its fragment shader is expected to hand
-   * {@link MeshMaterial.outputFragmentColor} its albedo (and alpha for the
-   * cutoff) as the colour, as the standard materials do outside the light
-   * pass. False by default; a material whose fragment path assumes the light
-   * pass whenever it computes a colour must stay out.
+   * Whether the material can be voxelized for global illumination: in the voxelize
+   * pass its fragment shader must hand {@link MeshMaterial.outputFragmentColor} its
+   * albedo (and alpha) as the colour. False by default.
    */
   supportsVoxelization(): boolean {
     return false;
@@ -1414,12 +1409,9 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
           this.$outputs.zSSSProfileId = pb.vec4(profileId ?? pb.float(0));
         }
       } else if (that.drawContext.renderPass!.type === RENDER_PASS_TYPE_VOXELIZE) {
-        // No alpha test: the mesh's distance field is built from its triangles,
-        // masked or not, so a ray stops on the whole of a leaf card and must
-        // find a material all over it, else it reads black. Lumen's card capture
-        // keeps masked fragments for the same reason (LumenCardBasePass.ush).
-        // The colour handed in is the albedo (see supportsVoxelization); a
-        // material with an emissive term contributes it too
+        // No alpha test: the distance field ignores masking, so rays hit the whole
+        // card and need material everywhere (as Lumen, LumenCardBasePass.ush).
+        // The colour handed in is the albedo (see supportsVoxelization)
         const emissiveMaterial = that as unknown as {
           calculateEmissiveColor?: (scope: PBInsideFunctionScope) => PBShaderExp;
         };

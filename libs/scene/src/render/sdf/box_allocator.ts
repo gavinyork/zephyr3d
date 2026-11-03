@@ -11,10 +11,9 @@ export interface VolumeBox {
 }
 
 /**
- * Guillotine allocation of boxes within a volume: best fit by leftover volume
- * over a list of free boxes, the remainder split along x, then y within it,
- * then z within that. A freed box goes back on the list unmerged, so the space
- * fragments; {@link VolumeBoxAllocator.reset} starts over for a repack.
+ * Guillotine box allocator over a list of free boxes: best fit by leftover volume, remainder
+ * split along x, then y, then z. Freed boxes are not merged; use {@link VolumeBoxAllocator.reset}
+ * to repack.
  * @internal
  */
 export class VolumeBoxAllocator {

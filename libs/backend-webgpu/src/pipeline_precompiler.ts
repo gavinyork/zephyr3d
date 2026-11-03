@@ -14,11 +14,7 @@ import { getRenderRecordKey, PIPELINE_CACHE_VERSION } from './pipeline_recorder'
 /** Pipelines compiling at once */
 const FOREGROUND_CONCURRENCY = 8;
 const BACKGROUND_CONCURRENCY = 2;
-/**
- * Main thread time spent starting compiles before yielding: shader modules are parsed
- * when they are created, which blocks. In the foreground yielding lets a loading screen
- * update; in the background it keeps the frames of the application short
- */
+/** Main thread time (ms) spent starting compiles before yielding, since shader module creation blocks */
 const FOREGROUND_SLICE_MS = 8;
 const BACKGROUND_SLICE_MS = 2;
 /** Delay before the background goes on after using up its slice, about a frame */
@@ -326,7 +322,7 @@ export class WebGPUPipelinePrecompiler {
     }
     let primitive = record.primitive;
     if (primitive.unclippedDepth !== undefined && !this._device.device.features.has('depth-clip-control')) {
-      // Left out on such a device by the pipelines draws make too
+      // Dropped without depth-clip-control, as on-demand pipelines do
       primitive = { ...primitive };
       delete primitive.unclippedDepth;
     }

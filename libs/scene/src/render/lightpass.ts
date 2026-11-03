@@ -156,8 +156,7 @@ export class LightPass extends RenderPass {
     flags: any
   ) {
     const baseLightPass = !ctx.lightBlending;
-    // Without an environment light the probes' global illumination still
-    // shades the draw, through the probe-only stand-in (see EnvProbesOnly)
+    // Without an environment light probe GI still applies via EnvProbesOnly
     ctx.drawEnvLight =
       baseLightPass &&
       (ctx.env!.light.type !== 'none'

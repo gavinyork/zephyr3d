@@ -35,18 +35,14 @@ export const VOXEL_SCENE_ANISO0 = 'zVoxelSceneAniso0';
 export const VOXEL_SCENE_ANISO1 = 'zVoxelSceneAniso1';
 
 /**
- * Declares what {@link storeVoxelMaterial} writes to, in the fragment stage of
- * a voxelize pass program:
+ * Declares the voxelize pass targets of {@link storeVoxelMaterial}; fragment stage only
+ * (write-only storage textures).
  *
- * - albedo: the material atlas, rgba8unorm storage; rgb the albedo, a = 1
- *   where a surface was rasterized, so a trilinear sample of it reads as
- *   premultiplied colour and coverage.
- * - emissive: the emissive atlas, rgba8unorm storage holding RGBE.
+ * - albedo: rgba8unorm storage, rgb albedo, a = 1 where rasterized (trilinear reads as
+ *   premultiplied colour and coverage).
+ * - emissive: rgba8unorm storage holding RGBE.
  * - params[0]: (field box min, voxel size), params[1]: (atlas slot offset, 0),
- *   params[2]: (voxels per axis of the slot, 0); all in the mesh's local space.
- *
- * Write-only storage textures are only valid in the fragment stage, so the
- * caller must declare these there alone.
+ *   params[2]: (voxels per axis of the slot, 0); all in mesh local space.
  * @internal
  */
 export function declareVoxelizeUniforms(scope: PBGlobalScope, group: number) {
@@ -93,9 +89,8 @@ export function decodeRGBE(scope: PBInsideFunctionScope, value: PBShaderExp) {
 }
 
 /**
- * Stores a fragment's material in the voxel of the atlas slot holding its
- * position, which is in the mesh's local space (the voxelize pass draws with an
- * identity world matrix). Fragments outside the slot's box are dropped.
+ * Stores a fragment's material in the atlas slot voxel holding its mesh-local position
+ * (the voxelize pass draws with an identity world matrix); fragments outside the box are dropped.
  * @internal
  */
 export function storeVoxelMaterial(
@@ -124,16 +119,11 @@ export function storeVoxelMaterial(
 }
 
 /**
- * Albedo and emissive of one packed instance at a local point, read from the
- * material atlases at the point's projection onto the mesh surface: the baked
- * field gives the distance and, by differences, the direction to the surface,
- * so a point a voxel or two off it still lands on the voxels the mesh was
- * rasterized into. Trilinear albedo reads as premultiplied colour and coverage
- * and is unpremultiplied; a read with no coverage, or an instance without a
- * material slot (`matSlot.w <= 0`), gives alpha 0.
+ * Albedo and emissive of one packed instance at a local point, read from the material
+ * atlases after projecting the point onto the surface along the baked field's gradient.
+ * No coverage, or no material slot (`matSlot.w <= 0`), gives alpha 0.
  *
- * Declares `outAlbedo` (vec4, rgb and a = 1 where valid) and `outEmissive`
- * (vec3) as locals of the scope under the given names.
+ * Declares locals `outAlbedo` (vec4, a = 1 where valid) and `outEmissive` (vec3).
  * @internal
  */
 export function sampleInstanceMaterial(
@@ -156,11 +146,8 @@ export function sampleInstanceMaterial(
   scope.$l[outAlbedo] = pb.vec4(0);
   scope.$l[outEmissive] = pb.vec3(0);
   scope.$if(pb.greaterThan(matSlot.w, 0), function () {
-    // Unclamped: outside the field box the function adds the distance to
-    // the box, so its differences still point at the mesh there; clamping
-    // first would zero the gradient along every clamped axis. A few steps:
-    // where several faces are equally near (inside a corner) the differenced
-    // gradient is their blend and one step stops short of all of them
+    // Unclamped so the gradient stays valid outside the field box; several steps
+    // because in corners the differenced gradient blends faces and one step falls short
     this.$l.gmH = bmin.w;
     this.$l.gmS = lp;
     this.$l.gmN = pb.vec3(0, 1, 0);
@@ -207,9 +194,8 @@ export function sampleInstanceMaterial(
       this.gmN = pb.div(this.gmG, pb.max(pb.length(this.gmG), 1e-6));
       this.gmS = pb.sub(this.gmS, pb.mul(this.gmN, this.gmD));
     });
-    // Material voxels are twice the field's; clamped to the outer sample centres.
-    // The surface voxels are a one-voxel shell, so a landing half a voxel off
-    // can read empty: of three samples along the normal, the best covered wins
+    // Material voxels are twice the field's. The surface is a one-voxel shell, so take
+    // the best covered of three samples along the normal
     this.$l.gmA = pb.vec4(0);
     this.$l.gmUVW = pb.vec3(0);
     for (const [k, tag] of [
@@ -231,9 +217,7 @@ export function sampleInstanceMaterial(
     }
     this.$if(pb.greaterThan(this.gmA.a, 0.02), function () {
       this[outAlbedo] = pb.vec4(pb.div(this.gmA.rgb, this.gmA.a), 1);
-      // RGBE cannot be filtered: average the decoded texels the albedo's
-      // trilinear filter covered, each by its filter weight and coverage, so
-      // an empty neighbour never reads as black
+      // RGBE cannot be filtered: manual trilinear over decoded texels, weighted by coverage
       this.$l.gmSize = pb.div(pb.vec3(1), matAtlasInvSize);
       this.$l.gmTc = pb.sub(pb.mul(this.gmUVW, this.gmSize), pb.vec3(0.5));
       this.$l.gmBase = pb.ivec3(pb.floor(this.gmTc));
@@ -261,22 +245,14 @@ export function sampleInstanceMaterial(
 }
 
 /**
- * Declares the voxel scene's clipmaps, which share the layout of the global
- * SDF (levels stacked along z, toroidal windows, the same bricks and tags) at
- * half its resolution:
+ * Declares the voxel scene clipmaps; same layout as the global SDF (levels stacked along z,
+ * toroidal windows, same bricks) at half resolution. Requires {@link declareGlobalSDFUniforms}.
  *
- * - albedo: rgba8unorm, rgb the albedo and a = 1 where a surface is.
+ * - albedo: rgba8unorm, rgb albedo, a = 1 where a surface is.
  * - emissive: rgba16float, emitted radiance.
- * - radiance: rgba16float, outgoing radiance (lit albedo plus emissive)
- *   summed over the six axis faces of the voxel.
- * - aniso0, aniso1: rgba8unorm (aniso1 rg8unorm with texture-formats-tier1),
- *   the share of that sum each face carries, by luminance: (+x, +y, +z, -x)
- *   and (-y, -z) in rg. A voxel holding a thin
- *   floor is lit on top and dark below; one radiance for the voxel would be
- *   read the same from both sides. After the light anisotropy of Godot's SDFGI
- *   (sdfgi_direct_light.glsl, the dst_aniso0/1 images).
- *
- * Needs the global SDF uniforms declared as well ({@link declareGlobalSDFUniforms}).
+ * - radiance: rgba16float, outgoing radiance summed over the six axis faces.
+ * - aniso0, aniso1: rgba8unorm (aniso1 rg8unorm with texture-formats-tier1), per-face share
+ *   of that sum by luminance: (+x, +y, +z, -x) and (-y, -z) in rg.
  * @internal
  */
 export function declareVoxelSceneUniforms(scope: PBGlobalScope, group: number) {
@@ -289,11 +265,8 @@ export function declareVoxelSceneUniforms(scope: PBGlobalScope, group: number) {
 }
 
 /**
- * Outgoing radiance at a texel of {@link voxelSceneTexel} toward the side
- * `normal` faces, the surface normal where a ray hit (the field's gradient
- * there, which points back at the ray): the voxel's radiance weighted by the
- * shares its faces carry, Godot's SDFGI read of a hit (sdfgi_integrate.glsl,
- * the "one liner" over hit_aniso0/1). Zero for level -1.
+ * Outgoing radiance at a texel of {@link voxelSceneTexel} toward `normal`, weighted by the
+ * per-face anisotropy shares. Zero for level -1.
  * @internal
  */
 export function loadVoxelSceneRadiance(
@@ -318,23 +291,13 @@ export function loadVoxelSceneRadiance(
 }
 
 /**
- * Visibility of a distant light from a point through the global field, by
- * cone tracing along the light direction: at each step the ray's distance to
- * the nearest surface over the cone's width there bounds the unoccluded
- * fraction, and the smallest bound along the ray is the shadow. Wright,
- * "Dynamic Occlusion with Signed Distance Fields", SIGGRAPH 2015 Advances.
- * The surfaces are swollen by the trace's surface expand ({@link sdfSurfaceExpand}),
- * growing from the start, as Unreal's distance field shadows expand them
- * (DistanceFieldShadowingShared.ush, bExpandSurface) and Lumen's off-screen
- * surface cache shadows trace the global field: a wall thinner than a voxel
- * never reads much below half a voxel, which a narrow cone alone passes.
+ * Distant-light visibility by SDF cone tracing through the global field (Wright,
+ * "Dynamic Occlusion with Signed Distance Fields", SIGGRAPH 2015), with surfaces expanded by
+ * {@link sdfSurfaceExpand} as UE distance field shadows (bExpandSurface) so sub-voxel walls occlude.
  *
- * `start` should already be offset off the surface. `tanHalfAngle` sets the
- * softness, `minStep` keeps the march from stalling in the field's band,
- * `maxDistance` ends it. Levels finer than `minLevel` are not read: a voxel
- * of a coarse level traced through a finer one would find the geometry inside
- * itself, as Godot's SDFGI traces a cascade's lights from that cascade on
- * (sdfgi_direct_light.glsl). Static geometry only (the clipmap).
+ * `start` should already be offset off the surface; `tanHalfAngle` sets softness, `minStep`
+ * prevents stalling, `maxDistance` ends the march. Levels finer than `minLevel` are skipped.
+ * Static geometry only.
  * @internal
  */
 export function sdfConeShadow(
@@ -396,9 +359,8 @@ export function sdfConeShadow(
 }
 
 /**
- * Texel of the material clipmaps holding a world position: (x, y, z, level),
- * level -1 when no level's window holds it with a current brick. The finest
- * such level answers.
+ * Texel (x, y, z, level) of the finest material clipmap level holding a world position with a
+ * current brick; level -1 when none does.
  * @internal
  */
 export function voxelSceneTexel(scope: PBInsideFunctionScope, worldPos: PBShaderExp, levels: number) {
@@ -431,13 +393,9 @@ export function voxelSceneTexel(scope: PBInsideFunctionScope, worldPos: PBShader
 }
 
 /**
- * Outgoing radiance of the voxel scene at a world position toward the side
- * `normal` faces, as {@link loadVoxelSceneRadiance} reads it, blended across
- * the levels as {@link sampleGlobalSDF} blends the field: within
- * {@link SDF_LEVEL_BLEND_VOXELS} field voxels of a window edge a level fades
- * into the next coarser one, so a hit near where levels meet does not flip
- * between their lighting as the windows follow the camera. Zero where no
- * level's window holds the point with a current brick.
+ * Voxel scene radiance at a world position toward `normal` (see {@link loadVoxelSceneRadiance}),
+ * blended across levels like {@link sampleGlobalSDF} within {@link SDF_LEVEL_BLEND_VOXELS} of a
+ * window edge. Zero where no level holds the point with a current brick.
  * @internal
  */
 export function sampleVoxelSceneRadiance(

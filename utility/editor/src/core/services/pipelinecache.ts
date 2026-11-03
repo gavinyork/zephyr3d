@@ -140,11 +140,9 @@ export async function createStartupPipelineTasks(vfs: VFS, startupScene: string 
  * Records the pipelines of a preview into the project.
  *
  * @remarks
- * Only uses what the engine offers anyway: the device's pipeline recorder, the
- * scenes' `startrender`/`endrender` events to group pipelines by scene, and the
- * application's `tick` to render warmup cameras before each frame. Rendering itself
- * is untouched. Recording starts before the first frame, as render bundles replay
- * their draws without asking for pipelines again.
+ * Pipelines are grouped by scene via `startrender`/`endrender`; warmup cameras render on `tick`.
+ * Recording must start before the first frame, as render bundles replay draws without
+ * requesting pipelines again.
  */
 export class PipelineRecordingSession {
   private readonly _vfs: VFS;

@@ -16,9 +16,8 @@ import type { SceneController } from '../controllers/scenecontroller';
 import { MeshSDFBaker } from '../core/services/sdfbaker';
 
 /**
- * Mesh asset paths used by the meshes under a node, the node included, with
- * the world units one local unit spans for each: the largest axis scale of
- * its instances' world matrices.
+ * Mesh asset paths used under a node (inclusive), each with the world units one
+ * local unit spans: the largest axis scale of its instances' world matrices.
  */
 function collectMeshUnitScales(root: SceneNode) {
   const scales = new Map<string, number>();
@@ -186,9 +185,8 @@ export async function sampleGlobalSDF(controller: SceneController | null, params
 
 /**
  * Signed distance from world positions to a mesh node's surface, from its baked
- * field. The field is in the mesh's local space; under non-uniform scale the
- * distance to the field box is measured per axis and the field's own value is
- * scaled by the smallest axis scale, which never overshoots.
+ * local-space field. Under non-uniform scale the distance to the field box is
+ * per axis and the field value is scaled by the smallest axis, which never overshoots.
  */
 export async function queryMeshSDF(controller: SceneController | null, params: any) {
   const scene = controller?.model?.scene ?? null;
@@ -220,8 +218,7 @@ export async function queryMeshSDF(controller: SceneController | null, params: a
   const distances = points.map((p) => {
     const [x, y, z] = (p as number[]).map(Number);
     inv.transformPointAffine(new Vector3(x, y, z), local);
-    // As the scene field composites it: the distance to the field box per
-    // axis in world units, the field's value on the box by the smallest scale
+    // Same compositing as the scene field
     const cx = clamp(local.x, 0);
     const cy = clamp(local.y, 1);
     const cz = clamp(local.z, 2);
@@ -269,10 +266,8 @@ export async function queryGIProbes(controller: SceneController | null, params: 
 }
 
 /**
- * State of the global illumination: its counters, and per static instance of
- * the scene field how the voxel scene holds its material (see
- * VoxelScene.describeInstance). `missing_only` lists only the instances
- * whose material is not in the voxel scene.
+ * GI state: counters, and for each static scene-field instance how the voxel
+ * scene holds its material. `missing_only` lists only instances not in it.
  */
 export function getGIStats(controller: SceneController | null, params: any) {
   const scene = controller?.model?.scene ?? null;
@@ -299,10 +294,8 @@ export function getGIStats(controller: SceneController | null, params: any) {
 }
 
 /**
- * What the voxel scene holds at world positions, as a global illumination ray
- * reads it where it hits: the clipmap level, albedo (a = 1 where a surface's
- * material was composited), emissive and lit radiance of the material voxel
- * holding each point.
+ * Voxel scene contents at world positions as a GI ray reads them: clipmap level,
+ * albedo (a = 1 where material was composited), emissive and lit radiance.
  */
 export async function queryGIVoxels(controller: SceneController | null, params: any) {
   const scene = controller?.model?.scene ?? null;
@@ -331,10 +324,9 @@ export async function queryGIVoxels(controller: SceneController | null, params: 
 const SDF_VIEW_MODES = ['distance', 'albedo', 'emissive', 'radiance', 'skyVisibility', 'irradiance'] as const;
 
 /**
- * Shows a distance field debug view over the scene view, as View > Distance
- * Field and the voxel and GI entries do: `mode` one of {@link SDF_VIEW_MODES},
- * or `none` to draw the scene alone. `exposure` scales the radiance and
- * irradiance views. Either may be left out to keep it. Returns the state after.
+ * Sets the scene view's distance field debug view: `mode` one of
+ * {@link SDF_VIEW_MODES} or `none`; `exposure` scales radiance/irradiance views.
+ * Omitted params are kept. Returns the resulting state.
  */
 export function setSDFDebugView(controller: SceneController | null, params: any) {
   const view = controller?.view ?? null;

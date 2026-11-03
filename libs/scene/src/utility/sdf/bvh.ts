@@ -4,12 +4,9 @@ const LEAF_SIZE = 4;
 const SAH_BINS = 12;
 
 /**
- * Bounding volume hierarchy over a triangle soup, for closest-point and ray
- * queries on the CPU. Built once, immutable, safe to use from a worker.
- *
- * Nodes are flattened depth first: an interior node's left child follows it
- * directly, `right` holds the index of the other. A leaf has `count > 0` and
- * covers triangles `[first, first + count)` of {@link TriangleBVH.order}.
+ * Immutable BVH over a triangle soup for CPU closest-point and ray queries. Nodes are flattened
+ * depth first (left child follows its parent, `offset` holds the right); a leaf has `count > 0`
+ * and covers `[first, first + count)` of {@link TriangleBVH.order}.
  *
  * @public
  */
@@ -169,9 +166,8 @@ export class TriangleBVH {
   /**
    * The nearest triangle a ray crosses within `tMax`.
    * @param dir - Unit ray direction.
-   * @returns The ray parameter of the hit, negated when the triangle faces
-   * away from the ray (its winding normal points along `dir`); 0 when the ray
-   * crosses nothing within `tMax`.
+   * @returns The hit's ray parameter, negated for a back face (winding normal along `dir`);
+   * 0 when nothing is hit within `tMax`.
    */
   rayNearestHit(ox: number, oy: number, oz: number, dx: number, dy: number, dz: number, tMax: number) {
     if (this.order.length === 0) {

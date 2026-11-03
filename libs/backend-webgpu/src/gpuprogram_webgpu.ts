@@ -118,8 +118,8 @@ export class WebGPUProgram extends WebGPUObject<unknown> implements GPUProgram {
     return this._hash;
   }
   /**
-   * Content of the program: unlike hash, which numbers programs in the order they are
-   * made, it is the same in every session, so pipelines can be matched across sessions
+   * Session-stable content of the program (unlike hash, which is creation-ordered),
+   * so pipelines can be matched across sessions
    * @internal
    */
   getContent(): WebGPUProgramContent {

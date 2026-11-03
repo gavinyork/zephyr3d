@@ -68,11 +68,7 @@ interface VoxelMaterialEntry {
   /** Edge of a material voxel in local units. */
   voxelSize: number;
   state: 'pending' | 'ready' | 'failed';
-  /**
-   * True while the atlas region holds a voxelization of this entry, current or
-   * not: a material edit leaves the old one in place until it is redone, so
-   * the clipmaps never lose the mesh's colour in between.
-   */
+  /** True while the atlas region holds a voxelization, possibly stale; kept until redone so the mesh's colour never drops out. */
   voxelized: boolean;
   /** {@link materialTagOf} the source when it was last voxelized. */
   materialTag: string;
@@ -105,20 +101,14 @@ export interface VoxelSceneStats {
 }
 
 /**
- * The material side of the scene's voxel representation: every static mesh
- * taking part in the scene SDF is rasterized once per (primitive, material)
- * into a material atlas ({@link VoxelMaterialAtlas}), and the global SDF's
- * compositing carries the albedo and emissive of the nearest mesh into two
- * clipmaps laid out like the field itself at half its resolution. The
- * clipmaps are what gives a point the global illumination's rays hit its
- * colour.
+ * Material side of the scene's voxel representation: each static mesh in the scene SDF
+ * is rasterized once per (primitive, material) into a {@link VoxelMaterialAtlas}, and
+ * global SDF compositing carries the nearest mesh's albedo and emissive into two clipmaps
+ * laid out like the field at half its resolution, giving GI ray hits their colour.
  *
- * Voxelizations are budgeted per frame, nearest mesh first, and redone when
- * a material changes. Meshes whose material cannot be voxelized (see
- * {@link MeshMaterial.supportsVoxelization}) are left out; the terrain is
- * given a flat colour.
- *
- * WebGPU only, like the global field it extends.
+ * Voxelizations are budgeted per frame, nearest first, and redone on material change.
+ * Materials that cannot be voxelized (see {@link MeshMaterial.supportsVoxelization}) are
+ * skipped; terrain gets a flat colour. WebGPU only.
  *
  * @public
  */
@@ -236,12 +226,8 @@ export class VoxelScene implements GlobalSDFMaterials {
     return entry && entry.voxelized ? this.atlas.getSlot(entry) : null;
   }
   /**
-   * How the voxel scene holds an instance's material, for tools: `unsupported`
-   * when it never will (a material that cannot be voxelized, see
-   * {@link MeshMaterial.supportsVoxelization}, or not a triangle list),
-   * `unknown` before it was first wanted (its field not loaded yet, or not a
-   * static instance), else the state of its voxelization with the atlas slot
-   * it was rasterized into, null while it has none.
+   * How the voxel scene holds an instance's material, for tools: `unsupported` when it
+   * never will, `unknown` before first wanted, else the voxelization state and atlas slot.
    */
   describeInstance(inst: SDFInstance): {
     state: 'unsupported' | 'unknown' | VoxelMaterialEntry['state'];
@@ -285,9 +271,8 @@ export class VoxelScene implements GlobalSDFMaterials {
     return stats;
   }
   /**
-   * Voxelizes the meshes that came into the scene field, nearest first within
-   * the budget, and keeps the global field compositing materials. Called by
-   * the scene once a frame, before the field's own update.
+   * Voxelizes meshes that entered the scene field, nearest first within the budget.
+   * Called once a frame, before the field's own update.
    */
   update(sdf: SceneSDF, cameraPos: Vector3, deltaSeconds: number) {
     const global = sdf.enabled ? sdf.global : null;
@@ -403,8 +388,8 @@ export class VoxelScene implements GlobalSDFMaterials {
     }
   }
   /**
-   * Lights the next slab of the voxels. Called by the scene once a frame
-   * after the field's update, which composites the materials it reads.
+   * Lights the next slab of voxels. Called once a frame after the field's update,
+   * which composites the materials it reads.
    */
   updateLighting(sdf: SceneSDF, camera: Camera, options: VoxelLightingOptions) {
     const global = sdf.enabled ? sdf.global : null;
@@ -424,9 +409,8 @@ export class VoxelScene implements GlobalSDFMaterials {
     }
   }
   /**
-   * What the clipmaps hold at world positions, read back from the GPU as a
-   * ray of the global illumination reads them where it hits; resolves a frame
-   * or two later. For tools, not per-frame use. At most 1024 points.
+   * Reads back what the clipmaps hold at world positions, as a GI ray hit would; resolves
+   * a frame or two later. For tools, at most 1024 points.
    */
   queryVoxels(global: GlobalSDF, points: Vector3[]): Promise<VoxelSceneSample[]> {
     const run = async () => {
@@ -590,11 +574,9 @@ export class VoxelScene implements GlobalSDFMaterials {
     }
   }
   /**
-   * A slot for an entry, evicting unwanted meshes, then wanted ones farther
-   * from the camera, when the atlas is full. Meshes as near as this one or
-   * nearer are never given up for it: when they leave it no room, it waits
-   * for the atlas to change, so meshes that do not all fit do not push each
-   * other out frame after frame. @internal
+   * A slot for an entry, evicting unwanted meshes then farther wanted ones when full.
+   * Nearer meshes are never evicted for it, so meshes that don't all fit don't thrash.
+   * @internal
    */
   private place(entry: VoxelMaterialEntry, wanted: Map<VoxelMaterialEntry, number>) {
     let slot = this.atlas.add(entry, entry.resolution);
@@ -621,8 +603,7 @@ export class VoxelScene implements GlobalSDFMaterials {
         return slot;
       }
     }
-    // The kept meshes and this one fit packed afresh, but not around the gaps
-    // left by the ones freed: repack them, rasterizing again only those moved
+    // Fits packed afresh but not around the freed gaps: repack, re-rasterizing only those moved
     const moved = this.atlas.repack([entry, ...kept].map((e) => ({ key: e, resolution: e.resolution })));
     if (moved) {
       for (const e of this._entries.values()) {
@@ -659,11 +640,8 @@ export class VoxelScene implements GlobalSDFMaterials {
 }
 
 /**
- * Identity of what a mesh voxelizes to: its primitive with its material. A
- * material instance (see {@link MeshMaterial.createInstance}) counts as its
- * core unless it overrides instance uniforms, when their values join the key,
- * so instances sharing a look share one voxelization and instances tinted
- * apart get their own.
+ * Identity of what a mesh voxelizes to: primitive plus core material, with a material
+ * instance's overridden uniform values appended so differently tinted instances differ.
  */
 function keyOf(mesh: Mesh): Nullable<string> {
   const primitive = mesh.primitive;
@@ -676,11 +654,8 @@ function keyOf(mesh: Mesh): Nullable<string> {
 }
 
 /**
- * What a voxelization depends on in a material: the core's appearance tag,
- * which every uniform or option edit that can change its look advances (and
- * the object color GPU picking sets each frame it picks does not), and its
- * change tag, which a texture that finishes loading advances. An
- * instance's own overrides are part of the entry key instead.
+ * What a voxelization depends on in a material: the core's appearance tag (look-changing
+ * edits, not the per-frame picking color) and change tag (texture loads).
  */
 function materialTagOf(material: MeshMaterial) {
   const core = material.coreMaterial;
@@ -722,10 +697,8 @@ function sameValue(a: unknown, b: unknown) {
 }
 
 /**
- * The material to draw for a mesh's material: the core for a plain material
- * or an instance that overrides nothing, else a copy of the core carrying the
- * instance's values, which the plain (non-instanced) draw of the voxelize pass
- * reads where the instanced draw would read the instance buffer.
+ * The material to draw: the core, or for an instance with overrides a copy of the core
+ * carrying its values, since the voxelize pass draws non-instanced.
  */
 function resolveMaterial(material: MeshMaterial): { material: MeshMaterial; owned: boolean } {
   if (!material.$isInstance || !instanceSuffix(material)) {

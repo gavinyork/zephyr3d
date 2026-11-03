@@ -27,22 +27,10 @@ interface Entry {
 }
 
 /**
- * One 3D `r16f` texture shared by the mesh distance fields that are resident,
- * each in its own block-aligned region.
- *
- * Regions are packed with a guillotine allocator over a list of free boxes. A
- * freed region goes back on the list unmerged, so the space fragments; when an
- * allocation no longer fits, the resident fields and the new one are packed
- * again from scratch on trial, and the new packing replaces the old only when
- * all of them fit; otherwise the allocation fails and the atlas is left as it
- * was (the caller evicts and retries). Fields are moved from the copies the
- * atlas keeps of their voxels, so no field has to be reloaded, and only those
- * that moved are uploaded again.
- *
- * Uploads are deferred to {@link MeshSDFAtlas.flush}, which takes a byte budget
- * per call so a burst of arrivals is spread over frames.
- *
- * Read-only on the GPU, so the texture works on WebGL2 as well as WebGPU.
+ * A 3D `r16f` texture shared by the resident mesh distance fields, each in a block-aligned region
+ * from a guillotine allocator. When an allocation no longer fits, everything is repacked on trial
+ * and committed only if all fit; uploads are deferred to {@link MeshSDFAtlas.flush} under a byte
+ * budget. Works on WebGL2 and WebGPU.
  *
  * @public
  */
@@ -69,7 +57,7 @@ export class MeshSDFAtlas {
       const [w, h, d] = this.size;
       this._texture = getDevice().createTexture3D('r16f', w, h, d, { mipmapping: false })!;
       this._texture.name = '@MeshSDFAtlas';
-      // Uploads happened into nothing; redo them into the new texture
+      // Earlier uploads had no texture; redo them
       for (const entry of this._entries.values()) {
         entry.uploaded = false;
       }
@@ -140,9 +128,8 @@ export class MeshSDFAtlas {
     return entry.slot;
   }
   /**
-   * True when a field of the given resolution would fit an atlas holding only
-   * the resident fields of `keep`, packed from scratch. Changes nothing; tells
-   * a caller whether evicting the others is worth it.
+   * True when a field of this resolution would fit alongside only the fields of `keep`, packed
+   * from scratch. Changes nothing; tells a caller whether evicting is worth it.
    */
   fits(resolution: [number, number, number], keep: Iterable<object>) {
     const sizes: [number, number, number][] = [this.blockAligned(resolution)];
@@ -208,10 +195,8 @@ export class MeshSDFAtlas {
     ];
   }
   /**
-   * Packs the resident fields and a new region from an empty atlas, largest
-   * first, on a trial allocator. Commits only when everything fits: a failed
-   * attempt leaves every field where it is and still uploaded, so a field that
-   * does not fit costs nothing to the ones that do.
+   * Repacks the resident fields plus a new region from scratch, largest first, on a trial
+   * allocator; commits only when everything fits, re-uploading only fields that moved.
    * @returns The box of the new region, or null with the atlas unchanged.
    * @internal
    */

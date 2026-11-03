@@ -51,16 +51,10 @@ export interface VoxelizeTarget {
 }
 
 /**
- * Draws per axis along each screen axis, each shifted by a fraction of a
- * pixel: a grid of VOXELIZE_JITTER² sample positions per voxel face. One
- * sample per voxel misses a strip narrower than a voxel lying between pixel
- * centres in all three projections, and the field, built from the exact mesh,
- * then has a surface the material atlas has nothing for: a ray hitting it
- * reads black. WebGPU has no conservative rasterization; drawing again with
- * sub-pixel offsets, the jittered passes of Haeberli and Akeley's accumulation
- * buffer (SIGGRAPH 1990), samples as densely as rasterizing at this many times
- * the resolution while the texture derivatives, and so the mip the albedo is
- * read at, stay those of a voxel.
+ * Sub-pixel jittered draws per screen axis (VOXELIZE_JITTER² samples per voxel face),
+ * standing in for conservative rasterization, which WebGPU lacks: one sample per voxel
+ * misses sub-voxel strips that then read black. Jittered passes after Haeberli and
+ * Akeley's accumulation buffer (SIGGRAPH 1990); derivatives (albedo mip) stay per voxel.
  */
 const VOXELIZE_JITTER = 4;
 
@@ -71,18 +65,11 @@ const AXES: { dir: Vector3; up: Vector3 }[] = [
 ];
 
 /**
- * Rasterizes a mesh with its material into the material atlases: orthographic
- * draws along each axis over a viewport one pixel per voxel, jittered by
- * sub-pixel offsets ({@link VOXELIZE_JITTER}), every fragment storing its
- * albedo and emissive in the voxel holding its position (the three
- * projections together reach surfaces facing any way). Depth test, culling
- * and colour writes are off; the colour attachment is a scratch target.
- *
- * After Crassin and Green, "Octree-Based Sparse Voxelization Using the GPU
- * Hardware Rasterizer", OpenGL Insights 2012, without conservative
- * rasterization, which WebGPU lacks: the jittered draws stand in for it, and
- * what still slips through is read through the mesh's distance field at
- * composite time.
+ * Rasterizes a mesh with its material into the material atlases: jittered orthographic
+ * draws along each axis, one pixel per voxel, each fragment storing albedo and emissive
+ * into its voxel. Depth test, culling and colour writes are off (scratch colour target).
+ * After Crassin and Green, OpenGL Insights 2012, minus conservative rasterization;
+ * what still slips through is filled via the mesh's distance field at composite time.
  *
  * @internal
  */
@@ -145,8 +132,7 @@ export class Voxelizer {
       // One pixel per voxel: the view spans the box's largest side in n pixels
       const pixel = (2 * half) / n;
       for (const axis of AXES) {
-        // Looking down the axis from outside the box, a symmetric orthographic
-        // view wide enough for the box whichever way it is turned
+        // Symmetric ortho view down the axis from outside the box, covering any orientation
         this._eye.set(this._center);
         this._eye.addBy(Vector3.scale(axis.dir, half + 1));
         this._camera.lookAt(this._eye, this._center, axis.up);

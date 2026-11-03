@@ -5,47 +5,28 @@ import { closestPointOnTriangle, TriangleBVH } from './bvh';
  * @public
  */
 export interface MeshSDFBakeOptions {
-  /**
-   * Scale on the voxel density of {@link SDF_VOXELS_PER_UNIT} voxels per world
-   * unit, before the padding and the clamp. Default 1.
-   */
+  /** Scale on the {@link SDF_VOXELS_PER_UNIT} voxel density, before padding and clamp. Default 1. */
   resolutionScale?: number;
-  /**
-   * World units one local unit of the mesh spans where it is used, which the
-   * density is measured in. Default 1.
-   */
+  /** World units one local mesh unit spans, which the density is measured in. Default 1. */
   unitScale?: number;
   /**
-   * Treat the mesh as a thin open surface (a leaf, a sail, a terrain skirt):
-   * no inside, the distance is unsigned less half a voxel so the surface still
-   * has a negative shell. Default false.
+   * Treat the mesh as a thin open surface (leaf, sail): unsigned distance less half a voxel.
+   * Default false.
    */
   twoSided?: boolean;
-  /**
-   * Rays per hemisphere that decide which side of the surface a voxel is on,
-   * a square number; 49 by default. More rays settle ambiguous voxels, such as
-   * those near where single-sided sheets meet, at proportionally more time.
-   */
+  /** Rays per hemisphere for the inside/outside test, a square number. Default 49. */
   signSamples?: number;
   /** Voxels of empty space around the mesh bounds on every side. Default 2. */
   padding?: number;
-  /**
-   * Voxels per axis, at most, padding included. Default 128, or 256 for a
-   * resolution scale above 1, as Unreal halves r.DistanceFields.MaxPerMeshResolution
-   * (256) for meshes not scaled up (MeshDistanceFieldUtilities.cpp).
-   */
+  /** Max voxels per axis, padding included. Default 128, or 256 above resolution scale 1. */
   maxResolution?: number;
   /** Voxels per axis, at least. Default 8. */
   minResolution?: number;
 }
 
 /**
- * A signed distance field over a mesh, in the mesh's local space: negative
- * inside, positive outside, in local units.
- *
- * Samples sit at voxel centres: sample `(i, j, k)` is at
- * `boxMin + (i + 0.5, j + 0.5, k + 0.5) * voxelSize`, stored x fastest, then y,
- * then z. Voxels are cubes.
+ * A signed distance field over a mesh in its local space (negative inside, local units). Sample
+ * `(i, j, k)` sits at voxel centre `boxMin + (i + 0.5, j + 0.5, k + 0.5) * voxelSize`, x fastest.
  *
  * @public
  */
@@ -70,14 +51,9 @@ export interface MeshSDFData {
 }
 
 /**
- * Voxels per world unit of a baked field at a resolution scale of 1, taking a
- * unit as a metre: Unreal's r.DistanceFields.DefaultVoxelDensity, 0.2 voxels a
- * centimetre (DistanceFieldAtlas.cpp). The density is fixed, so a small mesh
- * gets few voxels and a large one many, up to the cap per axis; the global
- * field composites them all at its own voxel size of a quarter metre and up.
- * Unreal counts it per local unit, its meshes being built in centimetres; here
- * a mesh keeps the units it was authored in, so the bake is told the world
- * units a local unit spans ({@link MeshSDFBakeOptions.unitScale}).
+ * Voxels per world unit (metre) of a baked field at resolution scale 1, matching UE5's
+ * r.DistanceFields.DefaultVoxelDensity (0.2/cm). Scaled by {@link MeshSDFBakeOptions.unitScale}
+ * since meshes keep their authored units.
  * @public
  */
 export const SDF_VOXELS_PER_UNIT = 20;
@@ -92,14 +68,9 @@ const SIGN_BACK_FRACTION = 0.25;
 const SEED_MARGIN = 1;
 
 /**
- * Unsigned distance per voxel by closest-triangle propagation: every voxel near
- * a triangle gets its exact distance to it, then fast sweeps in the eight
- * diagonal orders pass each voxel's nearest triangle on to its neighbours,
- * which keep it if it is nearer than theirs. Each voxel ends up measured
- * against the triangle nearest to it (up to rare cases where the nearest
- * triangle of a voxel is nearest to none of its neighbours, off by a small
- * fraction of a voxel). A few triangle distances per voxel, against a BVH
- * query per voxel that degrades to every triangle near a medial axis.
+ * Unsigned distance per voxel by closest-triangle propagation: voxels near each triangle are
+ * seeded with their exact distance, then fast sweeps in the eight diagonal orders pass each
+ * voxel's nearest triangle to its neighbours. Rarely off by a small fraction of a voxel.
  */
 function computeUnsignedDistances(
   positions: Float32Array,
@@ -170,9 +141,8 @@ function computeUnsignedDistances(
       }
     }
   }
-  // Sweeps: in each of the eight diagonal orders, a voxel tries the nearest
-  // triangles of its three predecessors along the order. One round of eight
-  // measured as accurate as two.
+  // Sweeps: each voxel tries the nearest triangles of its three predecessors along the order;
+  // one round of eight is as accurate as two
   const strides = [1, nx, nx * ny];
   for (let order = 0; order < 8; order++) {
     const sx = order & 1 ? -1 : 1;
@@ -230,17 +200,9 @@ function computeUnsignedDistances(
 }
 
 /**
- * Bakes the signed distance field of a triangle mesh on the CPU.
- *
- * Distance is by closest-triangle propagation (see computeUnsignedDistances),
- * exact near the surface. The sign comes from the faces the voxels see (see
- * signDistances): a voxel within a band of the surface is inside when more
- * than a quarter of the rays cast from it hit back faces, and the voxels
- * further out take the sign of the band around them. Unlike crossing parity
- * this needs no closed surface: a single-sided wall is solid just behind it,
- * so the courtyard it encloses stays empty, and a surface that is open at the
- * back is still a surface. Cost is a few triangle distances per voxel and, in
- * the band, one short BVH ray per sample direction.
+ * Bakes the signed distance field of a triangle mesh on the CPU. Unsigned distance by
+ * closest-triangle propagation; sign by back-face ray voting near the surface (as UE5's mesh
+ * distance field builder), so open and single-sided meshes work without a closed surface.
  *
  * @param positions - Vertex positions, xyz per vertex.
  * @param indices - Three indices per triangle.
@@ -379,15 +341,10 @@ function sphereDirections(perHemisphere: number) {
 }
 
 /**
- * Gives the unsigned distances their sign. Every voxel within SIGN_BAND_VOXELS
- * of the surface casts the sample directions a few voxels out and is inside
- * when it hit anything and more than SIGN_BACK_FRACTION of the rays hit a
- * back face: the criterion of the Unreal Engine mesh distance field builder,
- * which holds for open and single-sided meshes where crossing parity does
- * not. The voxels beyond the band are flood filled in connected regions; a
- * region reaching the volume border is outside, any other takes the sign most
- * of the band voxels around it have (the interior of a thick part, the air in
- * a closed room).
+ * Signs the unsigned distances. Voxels within SIGN_BAND_VOXELS of the surface are inside when
+ * they hit anything and more than SIGN_BACK_FRACTION of the rays hit a back face (UE5 mesh
+ * distance field criterion). Six-connected regions beyond the band are outside if they reach the
+ * volume border, else take the majority sign of their surrounding band voxels.
  */
 function signDistances(
   distances: Float32Array,
@@ -503,9 +460,8 @@ function signDistances(
 }
 
 /**
- * Trilinear sample of a baked field at a local position. Outside the volume
- * the nearest border sample plus the distance to the volume is returned, a
- * bound that never undershoots by more than the border's own error.
+ * Trilinear sample of a baked field at a local position; outside the volume, the nearest border
+ * sample plus the distance to the volume.
  * @public
  */
 export function sampleMeshSDF(sdf: MeshSDFData, x: number, y: number, z: number) {

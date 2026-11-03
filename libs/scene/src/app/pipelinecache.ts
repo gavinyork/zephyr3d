@@ -79,11 +79,9 @@ const MANIFEST_VERSION = 1;
  * Recorded pipelines to compile ahead of time.
  *
  * @remarks
- * Made by {@link PipelineCacheManager.createTask}; nothing happens until {@link PipelineCompileTask.run}
- * is called. Running reads the recording files through the engine's VFS, then compiles
- * their pipelines in the background of the browser. Files that cannot be read are
- * listed in {@link PipelineCompileTask.missing}: the pipelines they hold are compiled
- * when draws need them, as without a pipeline cache.
+ * Made by {@link PipelineCacheManager.createTask}; nothing happens until {@link PipelineCompileTask.run}.
+ * Files that cannot be read are listed in {@link PipelineCompileTask.missing}; their pipelines
+ * are compiled on demand when draws need them.
  * @public
  */
 export class PipelineCompileTask {
@@ -220,11 +218,9 @@ export class PipelineCompileTask {
  * Reads pipeline cache files and compiles the pipelines they record ahead of time.
  *
  * @remarks
- * Pipelines recorded by the editor (or by an application through the device's
- * {@link @zephyr3d/device#PipelineRecorder}) can be compiled before the draws that need
- * them, so those draws do not stall on compiling. The engine never calls this by itself:
- * an application that does not use it behaves as without a pipeline cache. Only the
- * WebGPU device compiles anything; on other devices tasks finish at once.
+ * Pipelines recorded by the editor (or through the device's {@link @zephyr3d/device#PipelineRecorder})
+ * are compiled before the draws that need them, so those draws do not stall. The engine never
+ * calls this by itself. Only WebGPU compiles anything; on other devices tasks finish at once.
  *
  * @example
  * ```ts

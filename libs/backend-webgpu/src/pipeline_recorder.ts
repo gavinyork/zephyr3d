@@ -25,9 +25,8 @@ type TagRecords = {
 };
 
 /**
- * Key of a recorded render pipeline on a device: pipelines drawn to the canvas take
- * the canvas formats of that device. The sample count is kept: alpha to coverage
- * depends on it, and the record only holds what it came to
+ * Key of a recorded render pipeline on a device; canvas pipelines take that device's
+ * canvas formats, but keep the recorded sample count (alpha to coverage depends on it)
  * @internal
  */
 export function getRenderRecordKey(record: WebGPURenderPipelineRecord, device: WebGPUDevice) {

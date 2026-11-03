@@ -30,15 +30,10 @@ export interface SceneGIStats {
 }
 
 /**
- * The global illumination of a scene, at `scene.gi`. Off by default.
+ * Probe-based global illumination of a scene, at `scene.gi`. Off by default.
  *
- * Built on the scene's signed distance field, which it turns on: the static
- * meshes with a baked field are rasterized into a voxel scene
- * ({@link VoxelScene}) that gives the field's surfaces an albedo and an
- * emissive, the first of the pieces the probe-based global illumination
- * needs.
- *
- * WebGPU only; on WebGL2 enabling it changes nothing.
+ * Built on the scene's signed distance field (enabling it turns the field on) plus
+ * a {@link VoxelScene} giving the field's surfaces albedo and emissive. WebGPU only.
  *
  * @public
  */
@@ -61,11 +56,8 @@ export class SceneGI {
     this._atlasSize = 256;
     this._voxelizeBudget = 8;
     this._terrainAlbedo = new Vector3(0.3, 0.3, 0.3);
-    // The sun's angular size, the cone Unreal traces distance field shadows of a
-    // directional light with (LightSourceAngle 0.5357, DirectionalLightComponent.cpp;
-    // its tangent is the cone's, DistanceFieldShadowing.cpp). Wider cones close the
-    // openings sunlight comes through: at 5 degrees a courtyard floor lit through
-    // an opening a few metres up read as shadowed.
+    // UE's default directional LightSourceAngle (DirectionalLightComponent.cpp); wider
+    // cones close the small openings sunlight comes through
     this._lighting = { sunShadowConeAngle: 0.5357, slicesPerFrame: 8 };
     this._probeOptions = {
       grid: [32, 16, 32],
@@ -148,11 +140,8 @@ export class SceneGI {
     }
   }
   /**
-   * Whether the indirect lighting keeps updating. `frozen` stops the voxel
-   * lighting and the probe updates where they are, which also stops the
-   * probe windows following the camera: what was lit stays lit, for a scene
-   * whose state was restored with {@link SceneGI.importProbeState} or that
-   * has converged and is not going to change.
+   * Whether the indirect lighting keeps updating. `frozen` stops voxel lighting and
+   * probe updates (including the probe windows following the camera).
    */
   get updateMode() {
     return this._updateMode;
@@ -221,11 +210,7 @@ export class SceneGI {
   set probeNormalBias(val: number) {
     this._probeOptions.normalBias = Math.max(0, val);
   }
-  /**
-   * Surface offset towards the viewer when sampling the probes, in probe
-   * spacings of the level read, fading out as the viewer comes nearer than a
-   * spacing.
-   */
+  /** Surface offset towards the viewer when sampling the probes, in probe spacings of the level read. */
   get probeViewBias() {
     return this._probeOptions.viewBias;
   }

@@ -2752,13 +2752,9 @@ export interface PipelineCacheData {
  * Records the pipelines a device uses so they can be compiled ahead of time.
  *
  * @remarks
- * Recording only watches the pipelines draws and dispatches ask for: rendering is
- * not changed. A pipeline is recorded each time it is used while recording, not
- * only when it is created, but a render bundle replays its draws without asking
- * again, so recording has to begin before the first frame to see them all.
- *
- * Pipelines are grouped by the innermost tag pushed when they are used; those used
- * with no tag pushed are grouped under `null`.
+ * Pipelines are recorded on use without changing rendering. Render bundles replay
+ * without re-requesting pipelines, so begin recording before the first frame.
+ * Pipelines are grouped by the innermost pushed tag, or `null` when none.
  * @public
  */
 export interface PipelineRecorder {
@@ -3359,12 +3355,8 @@ export interface AbstractDevice extends IEventTarget<DeviceEventMap> {
    */
   getPipelineRecorder(): Nullable<PipelineRecorder>;
   /**
-   * Compiles recorded pipelines ahead of time, so draws and dispatches that need them
-   * later do not stall on compiling them.
-   *
-   * @remarks
-   * Recordings of another device type are skipped. Pipelines compile in the background
-   * of the browser; nothing waits for them unless the caller awaits the job.
+   * Compiles recorded pipelines ahead of time so later draws and dispatches do not stall.
+   * Recordings of another device type are skipped.
    *
    * @param data - Recordings made by {@link PipelineRecorder.export}
    * @param options - Priority and progress callback

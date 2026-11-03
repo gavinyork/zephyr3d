@@ -74,11 +74,7 @@ const STAGING_COLS = 64;
 const BLEND_BATCH = 128;
 /** Sphere tracing steps of a probe ray. */
 const TRACE_STEPS = 48;
-/**
- * Probe spacings out to which the visibility maps hold distances, farther hits
- * clamped to it: a little beyond the spacing, the moments only having to tell
- * blockers between neighbouring probes apart.
- */
+/** Visibility distance clamp, in probe spacings: just enough to separate blockers between neighbouring probes. */
 const VISIBILITY_RANGE = 2.6;
 /** Frames between relocations of an updated probe. */
 const RELOCATE_EVERY = 8;
@@ -88,18 +84,9 @@ const SELECT_LEVEL_SHIFT = 24;
 const SELECT_FIRST_BIT = 0x80000000;
 /** Magic and version of a saved probe state. */
 const STATE_MAGIC = 0x50494a5a; // 'ZJIP'
-/**
- * 2: irradiance stored at the fixed cache exposure (see getGICacheExposure).
- * 3: sky visibility in the irradiance alpha.
- * 4: irradiance from voxel radiance kept per face (light anisotropy).
- * 5: visibility distances to the field's own surface, not the swollen one.
- */
+/** Bump when the saved layout or meaning changes. */
 const STATE_VERSION = 5;
-/**
- * Hit distance a ray that escaped to the sky writes: beyond any trace length,
- * so the irradiance blend can count escapes, within half float range. The
- * visibility blend clamps distances well below it, so it reads as far.
- */
+/** Hit distance written by a sky-escaping ray: beyond any trace length, within half float range. */
 const SKY_ESCAPE_DISTANCE = 16384;
 
 /**
@@ -113,11 +100,7 @@ export interface ProbeVolumeOptions {
   spacing: number;
   /** Clipmap levels, each `levelScale` times the spacing of the one inside it; 1 to {@link PROBE_MAX_LEVELS}. */
   levels: number;
-  /**
-   * Spacing ratio between consecutive levels: 2, as the cascades of Godot's
-   * SDFGI, Lumen's radiance cache clipmaps and cascaded DDGI volumes double, so
-   * where levels meet the spacing never jumps more than twofold.
-   */
+  /** Spacing ratio between consecutive levels, typically 2. */
   levelScale: number;
   /** Rays traced per probe per update. */
   raysPerProbe: number;
@@ -167,9 +150,8 @@ interface ProbeLevel {
 }
 
 /**
- * The probe volume for the draw, or null when the draw does not read it: not
- * the light pass, the environment light off, global illumination disabled or
- * not yet built.
+ * The probe volume read by the draw, or null outside the light pass, with the
+ * environment light off, or with GI disabled or not yet built.
  * @internal
  */
 export function getProbeVolumeForDraw(ctx?: DrawContext): Nullable<ProbeVolume> {
@@ -186,8 +168,7 @@ export function getProbeVolumeForDraw(ctx?: DrawContext): Nullable<ProbeVolume> 
 }
 
 /**
- * The scene's probe volume when the global illumination is on and it has
- * been built, for passes other than the light pass (SSGI, the voxel lighting).
+ * The scene's built probe volume when GI is on, for passes other than the light pass.
  * @internal
  */
 export function getActiveProbeVolume(scene: Scene): Nullable<ProbeVolume> {
@@ -199,27 +180,13 @@ export function getActiveProbeVolume(scene: Scene): Nullable<ProbeVolume> {
 }
 
 /**
- * A clipmap of light probes around the camera holding the diffuse irradiance
- * and the distance to the nearest surface per direction, as octahedral maps:
- * dynamic diffuse global illumination after Majercik et al. (JCGT 2019; the
- * scrolling window, relocation and classification of JCGT 2021), in levels
- * of growing spacing like Lumen's radiance cache. Each frame a budget of
- * probes traces a set of rays through the scene field, reads the voxel
- * scene's radiance where they hit and the sky where they miss, and blends the
- * result into its maps with hysteresis. Surfaces in the light pass read the
- * volume through the environment light's irradiance
- * ({@link sampleProbeIrradiance}).
- *
- * Every level's window follows the camera a spacing at a time, probes
- * addressed toroidally by world index; a probe entering a window starts
- * over, its irradiance seeded from the level above where that holds it
- * ({@link ProbeVolume.runSeed}). Probes inside geometry or too near it are
- * pushed out along the field's gradient.
- *
- * The state can be saved ({@link ProbeVolume.exportState}) and restored, for
- * a scene whose lighting is then frozen.
- *
- * WebGPU only.
+ * A camera-centred clipmap of DDGI light probes (Majercik et al. JCGT 2019/2021)
+ * holding octahedral irradiance and visibility maps, levels of growing spacing
+ * as Lumen's radiance cache. Each frame a budget of probes traces rays through
+ * the scene SDF, shading hits from the voxel scene and misses from the sky.
+ * Windows scroll toroidally; entering probes are seeded from the level above.
+ * Read via {@link sampleProbeIrradiance}; state can be saved with
+ * {@link ProbeVolume.exportState}. WebGPU only.
  *
  * @public
  */
@@ -237,11 +204,7 @@ export class ProbeVolume {
   private _irradianceSeed: Nullable<Texture2D>;
   private _visibility: Nullable<Texture2D>;
   private _visibilityNext: Nullable<Texture2D>;
-  /**
-   * The visibility maps keep two moments of the distance: rg16f where the
-   * device can write it from a compute shader (texture-formats-tier1), half
-   * the memory of rgba16f.
-   */
+  /** Two distance moments; rg16f where storage-writable (texture-formats-tier1), else rgba16f. */
   private readonly _visibilityFormat: 'rg16f' | 'rgba16f';
   private _rayTexture: Nullable<Texture2D>;
   private _rayFramebuffer: Nullable<FrameBuffer>;
@@ -383,18 +346,14 @@ export class ProbeVolume {
     bg.setValue(PROBE_PARAMS, this._params);
   }
   /**
-   * Converts what surfaces read from the probes to a camera's exposure: the
-   * irradiance is kept at the fixed cache exposure (see getGICacheExposure),
-   * the image at the camera's. Called once a frame, also while the volume is
-   * frozen, so a frozen or restored volume follows exposure changes and the
-   * global field's windows, which the read takes the surface expand from.
+   * Rescales probe reads from the fixed cache exposure to the camera's. Call
+   * every frame, also while frozen, so params follow exposure and SDF windows.
    */
   setReadExposure(camera: Camera) {
     const scene = this._scene;
     const live = scene.lightingMode === 'physical' ? camera.exposure : 1;
     this._exposureScale = live / getGICacheExposure(scene.lightingMode);
-    // Before the first update there are no maps to describe; that update writes the params.
-    // Rewritten every frame: the global field's windows in them move with the camera
+    // Before the first update there are no maps; that update writes the params
     if (this._irradiance && this._visibility) {
       this.updateParams();
     }
@@ -481,13 +440,9 @@ export class ProbeVolume {
     return out.buffer;
   }
   /**
-   * Reads back the probes of a level whose grid points lie in a world box,
-   * for inspection: where each one is (grid point plus relocation offset),
-   * whether it has been updated and whether it is inactive (buried in
-   * geometry, read by no surface), the mean irradiance and sky visibility over
-   * its tile, and the nearest and mean of the hit distances its visibility
-   * map holds (near 0 for a probe buried in geometry). At most `limit`
-   * probes, nearest the box centre first.
+   * Reads back up to `limit` probes of a level inside a world box, nearest the
+   * centre first, for inspection: position, update/inactive state, mean
+   * irradiance and sky visibility, and min/mean visibility hit distance.
    */
   async queryProbes(level: number, min: Vector3, max: Vector3, limit = 512) {
     const l = this._levels[level];
@@ -584,9 +539,8 @@ export class ProbeVolume {
     return { level, spacing: s, origin: [...l.origin], grid: [...l.grid], probes };
   }
   /**
-   * Restores a state saved by {@link ProbeVolume.exportState}. The settings
-   * must match; the windows come back where they were, so freeze the
-   * lighting afterwards or they move on with the camera.
+   * Restores a state saved by {@link ProbeVolume.exportState} with matching
+   * settings; freeze the lighting afterwards or the windows follow the camera.
    */
   importState(buffer: ArrayBuffer) {
     const view = new DataView(buffer);
@@ -777,13 +731,10 @@ export class ProbeVolume {
     }
   }
   /**
-   * Picks the probes to update: those never updated first, a quarter of the
-   * budget going to the coarsest level so something covers the whole scene
-   * at once and the rest finest level first; then every level in turn by its
-   * share of the budget. A probe is picked at most once a frame: picked twice,
-   * its two updates would blend into the same tile in either order, and one
-   * of them, not its first, would start from what the tile held before, the
-   * maps of the probe that left the window on the other side.
+   * Picks the probes to update: never-updated ones first (a quarter of the
+   * budget to the coarsest level, the rest finest first), then each level by
+   * its share. At most once per frame per probe, since two updates would race
+   * on the same staged tile.
    * @internal
    */
   private select() {
@@ -874,9 +825,8 @@ export class ProbeVolume {
     return buffer;
   }
   /**
-   * Pushes a selected probe out of nearby geometry along the field's gradient,
-   * from its grid point on its first update and every few frames after, never
-   * through a surface.
+   * Pushes selected probes out of nearby geometry along the SDF gradient,
+   * never through a surface; on first update and every few frames after.
    * @internal
    */
   private runRelocate(global: NonNullable<SceneSDF['global']>, selected: number) {
@@ -915,17 +865,11 @@ export class ProbeVolume {
             // Keep at least this far from surfaces, moving at most this far from the grid point
             this.$l.keep = pb.mul(this.spacing, 0.3);
             this.$l.limit = pb.mul(this.spacing, 0.45);
-            // Central differences at least a finest field voxel apart: a wall or
-            // floor thinner than a voxel never reads negative, and differences
-            // inside it point either way
+            // Central differences at least a finest field voxel apart, so sub-voxel walls give a gradient
             this.$l.h = pb.max(pb.mul(this.spacing, 0.05), this[GLOBAL_SDF_LEVELS].at(0).w);
-            // Crossing check every quarter voxel: the inside of such a wall dips
-            // only a few centimetres below the distance at its face
+            // Crossing check every quarter voxel: thin walls dip only slightly below their face distance
             this.$l.probeStep = pb.mul(this[GLOBAL_SDF_LEVELS].at(0).w, 0.25);
-            // From the grid point every time, never from where the probe was:
-            // the result depends on the field alone, so a probe misplaced while
-            // the field was still being built returns, and none drifts away
-            // over successive relocations to where it never comes back from
+            // Always from the grid point, so the result depends on the field alone and never drifts
             this.$l.pos = this.grid;
             this.$for(pb.int('iter'), 0, 3, function () {
               this.$l.d = sampleSceneSDF(this, this.pos, levels);
@@ -953,8 +897,7 @@ export class ProbeVolume {
                 this.next = pb.mul(this.next, pb.div(this.limit, this.len));
               });
               this.next = pb.add(this.grid, this.next);
-              // Moving away from a surface the distance only grows; a dip on
-              // the way means the move passes through geometry, so stop here
+              // A distance dip along the move means it passes through geometry: stop here
               this.$l.moveLen = pb.length(pb.sub(this.next, this.pos));
               this.$l.samples = pb.int(pb.min(pb.ceil(pb.div(this.moveLen, this.probeStep)), 64));
               this.$l.through = false;
@@ -974,11 +917,8 @@ export class ProbeVolume {
               this.pos = this.next;
             });
             this.$l.offset = pb.sub(this.pos, this.grid);
-            // Classification (Majercik et al. 2021, "Scaling Probe-Based Real-Time
-            // Dynamic Global Illumination for Production", §5): a probe left
-            // inside geometry, all of whose rays would start there, is inactive
-            // and read by no surface; one that is out again starts over. By the
-            // static field, so a dynamic instance passing by turns none off
+            // Classification (Majercik et al. 2021, §5): a probe inside geometry is
+            // inactive; one out again starts over. Static field only, so dynamic instances turn none off
             this.$l.probeState = this.data.w;
             this.$if(pb.lessThan(sampleGlobalSDF(this, this.pos, levels), 0), function () {
               this.probeState = pb.float(PROBE_STATE_INACTIVE);
@@ -1012,19 +952,10 @@ export class ProbeVolume {
     device.compute(Math.ceil(selected / 64), 1, 1);
   }
   /**
-   * Seeds the irradiance of the selected probes that start over from the
-   * level above, as Godot's SDFGI fills a probe scrolled into a cascade from
-   * the next cascade's probes (sdfgi_integrate.glsl, MODE_SCROLL): the eight
-   * probes of that level around it, weighted trilinearly by its position, the
-   * same texel of each tile, all tiles sharing one octahedral layout. Its
-   * first update then blends into the seed with the volume's hysteresis, as
-   * into a history, so the noise of a single update does not become its value
-   * for the seconds the hysteresis takes to wash it out. Only probes of that
-   * level that are updated and active count: an inactive one holds the dark
-   * of the inside, one not yet updated nothing. With none of them, or in the
-   * coarsest level, the seed is marked missing (alpha -1) and the probe starts
-   * from its first update alone. One workgroup per selected probe, written by
-   * selection slot like the blend outputs.
+   * Seeds the irradiance of probes starting over by trilinearly blending the
+   * eight surrounding active probes of the level above; the first update then
+   * blends into the seed with hysteresis. Without a seed, alpha is -1. One
+   * workgroup per selected probe, written by selection slot.
    * @internal
    */
   private runSeed(selected: number) {
@@ -1155,8 +1086,7 @@ export class ProbeVolume {
     const device = getDevice();
     const scene = this._scene;
     const envLight = scene.env.light.envLight;
-    // Rays read the voxel radiance, kept at the fixed cache exposure, and the
-    // sky bake, stored at the same exposure: the sky takes the strength alone
+    // Voxel radiance and sky bake share the cache exposure; the sky takes the strength alone
     const envStrength = scene.env.light.strength ?? 0;
     // No sky without an environment light (its stand-in carries only the probes)
     const skyMode =
@@ -1226,15 +1156,9 @@ export class ProbeVolume {
               this[PROBE_PARAMS].at(2).w,
               pb.div(this.spacing, probeLevelOrigin(this, 0).w)
             );
-            // The finest field level read past the visibility range: the one
-            // matching the probe level as the finest field level matches the finest
-            // probe level, so a coarse probe traces the coarse field far out, as
-            // Godot's SDFGI traces a cascade's probes from that cascade on
-            // (sdfgi_integrate.glsl, process). Within the range every level is
-            // read: the visibility map holds those distances alone, and a coarse
-            // level places no wall thinner than its voxel and no gap narrower than
-            // one, so a probe between two close surfaces would see itself shut in
-            // and the surfaces reading it would go dark in patches
+            // Past the visibility range, start at the field level matching the probe level;
+            // within it read every level, since coarse
+            // levels close thin gaps and would shut probes in
             this.$l.fieldScale = pb.div(this[GLOBAL_SDF_LEVELS].at(0).w, probeLevelOrigin(this, 0).w);
             this.$l.farLevel = pb.int(0);
             for (let i = 1; i < levels; i++) {
@@ -1273,8 +1197,7 @@ export class ProbeVolume {
                 this.prevD = this.d;
                 this.$l.expand = sdfSurfaceExpand(this, this.sp, this.s, this.t, levels);
                 this.$if(pb.lessThan(this.d, this.expand), function () {
-                  // The swollen surface decides the hit, so walls thinner than a
-                  // voxel still stop the ray
+                  // Swollen surface decides the hit so sub-voxel walls stop the ray
                   this.hitD = this.d;
                   this.hit = true;
                   this.hitVoxel = this.s.y;
@@ -1287,11 +1210,7 @@ export class ProbeVolume {
                 });
               });
               this.$if(this.hit, function () {
-                // The distance kept is to the field's own surface: a surface
-                // reading the probes, in a concave corner within a voxel of the
-                // other surface, never steps out of the swelling of that one
-                // along its own normal, and every probe on its side would see it
-                // hidden (sdfRefineHit)
+                // Keep the distance to the unswollen surface, else concave corners read as hidden
                 this.dist = sdfRefineHit(
                   this,
                   this.pos,
@@ -1303,14 +1222,11 @@ export class ProbeVolume {
                   levels
                 );
                 this.$l.hp = pb.add(this.pos, pb.mul(this.dir, this.t));
-                // The side of the surface the ray came from: the field's gradient
-                // at the hit
+                // Hit normal from the SDF gradient
                 this.$l.hg = pb.vec3(0);
                 this.$if(pb.greaterThan(this.hitVoxel, 0), function () {
-                  // Central differences over half a voxel of the one level that
-                  // answered, as Lumen takes the normal at a global field hit
-                  // (ComputeGlobalDistanceFieldNormal, GlobalDistanceFieldShared.ush).
-                  // A hit blended between two levels takes the nearer of them
+                  // Central differences over half a voxel of the answering level, as UE5 Lumen
+                  // (ComputeGlobalDistanceFieldNormal); level blends take the nearer level
                   this.$l.hl = this.hitMin;
                   for (let i = 1; i < levels; i++) {
                     this.$if(
@@ -1339,8 +1255,7 @@ export class ProbeVolume {
                     )
                   );
                 }).$else(function () {
-                  // A dynamic instance, sampled at its own field's resolution:
-                  // forward differences of the merged field over the finest voxel
+                  // Dynamic instance: forward differences of the merged field over the finest voxel
                   this.$l.he = this[GLOBAL_SDF_LEVELS].at(0).w;
                   this.$l.hd = sampleSceneSDF(this, this.hp, levels);
                   this.hg = pb.vec3(
@@ -1403,9 +1318,8 @@ export class ProbeVolume {
     }
   }
   /**
-   * Blends the traced rays into the selected probes' maps: one thread per
-   * texel, each integrating every ray of its probe for its direction, border
-   * texels taking the direction of the interior texel they mirror.
+   * Integrates the traced rays into the selected probes' maps, one thread per
+   * texel; border texels use the direction of the interior texel they mirror.
    * @internal
    */
   private runBlend(selected: number) {
@@ -1416,8 +1330,7 @@ export class ProbeVolume {
       this._blendVisProgram = this.createBlendProgram(VISIBILITY_TEXELS, true);
       this._blendVisBindGroup = device.createBindGroup(this._blendVisProgram.bindGroupLayouts[0]);
     }
-    // The irradiance blend marks the probes updated, so it goes last: both read
-    // whether a probe starts over from its state before then
+    // Irradiance last: it marks probes updated, and both passes read the prior state
     const passes: [string, GPUProgram, BindGroup, Texture2D, Texture2D, Nullable<Texture2D>][] = [
       [
         'ProbeBlendVisibility',
@@ -1456,9 +1369,8 @@ export class ProbeVolume {
     }
   }
   /**
-   * Copies the tiles staged by {@link ProbeVolume.runBlend} into the maps, one
-   * workgroup per updated probe: the rest of the maps stays as it was, where
-   * copying the whole staging maps would move every probe's tiles each frame.
+   * Copies the staged tiles of {@link ProbeVolume.runBlend} into the maps, one
+   * workgroup per updated probe, leaving other tiles untouched.
    * @internal
    */
   private runCommit(selected: number) {
@@ -1548,8 +1460,7 @@ export class ProbeVolume {
           this.$l.sel = this.selected.at(this.slot);
           this.$l.index = pb.int(pb.compAnd(this.sel, pb.uint(SELECT_INDEX_MASK)));
           this.$l.level = pb.int(pb.compAnd(pb.sar(this.sel, SELECT_LEVEL_SHIFT), pb.uint(0x7f)));
-          // New to its window, or with maps holding nothing yet (state 0, as a
-          // probe reactivated by the relocation is left)
+          // First update: new to its window, or state 0 (e.g. reactivated by relocation)
           this.$l.probeState = this[PROBE_DATA].at(this.index).w;
           this.$l.first = pb.or(
             pb.greaterThan(pb.compAnd(this.sel, pb.uint(SELECT_FIRST_BIT)), pb.uint(0)),
@@ -1590,8 +1501,7 @@ export class ProbeVolume {
           // One ray, `ray` its traced result and `c` the cosine to the texel's direction
           const accumulate = (scope: PBInsideFunctionScope) => {
             if (visibility) {
-              // Sharpened so a texel only sees rays near its direction; below
-              // cos 0.8 the weight is under 2e-5, nothing next to the rays near it
+              // Sharpened (cos^50); below cos 0.8 the weight is under 2e-5, so skip
               scope.$if(pb.greaterThan(scope.c, 0.8), function (this: PBInsideFunctionScope) {
                 this.$l.w = pb.pow(this.c, 50);
                 this.$l.hd = pb.abs(this.ray.a);
@@ -1603,9 +1513,7 @@ export class ProbeVolume {
                 this.wsum = pb.add(this.wsum, this.w);
               });
             } else {
-              // Cosine-weighted share of the rays that escaped to the sky: the
-              // sky visibility, in alpha, as DDGI keeps it beside the irradiance
-              // ([Majercik19] stores the escape mask with every ray)
+              // Cosine-weighted sky escape share in alpha: sky visibility, as DDGI [Majercik19]
               scope.$if(pb.greaterThanEqual(scope.ray.a, 0), function (this: PBInsideFunctionScope) {
                 this.$l.escaped = pb.float(pb.greaterThanEqual(this.ray.a, SKY_ESCAPE_DISTANCE * 0.5));
                 this.sum = pb.add(this.sum, pb.mul(pb.vec4(this.ray.rgb, this.escaped), this.c));
@@ -1653,8 +1561,7 @@ export class ProbeVolume {
           this.$l.old = pb.textureLoad(this.current, this.texel, 0);
           this.$l.h = this.$choice(this.first, pb.float(0), this.rayInfo.w);
           if (!visibility) {
-            // A probe starting over blends into its seed as into a history,
-            // where the level above gave one (alpha -1 where it did not)
+            // A probe starting over blends into its seed, if any (alpha -1 = none)
             this.$if(this.first, function () {
               this.$l.seedValue = pb.textureLoad(
                 this.seedTex,
@@ -1675,8 +1582,7 @@ export class ProbeVolume {
             visibility ? pb.vec4(this.value.xyz, 1) : this.value
           );
           if (!visibility) {
-            // The probe counts as updated once its maps hold something; an
-            // inactive one stays inactive
+            // Mark the probe updated; an inactive one stays inactive
             this.$if(pb.equal(this.$builtins.localInvocationId.xy, pb.uvec2(0)), function () {
               this.$l.data = this[PROBE_DATA].at(this.index);
               this[PROBE_DATA].setAt(

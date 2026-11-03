@@ -39,13 +39,10 @@ const BRICK_VEC4S = 3;
 const MAX_QUERY_POINTS = 4096;
 
 /**
- * Writes an instance in the layout of {@link SDF_INSTANCE_VEC4S}: world to
- * local by rows, the field box with the voxel size and the world scale, and
- * the atlas slot with the half thickness of a two-sided field's solid (half a
- * field voxel, in world units; -1 for a one-sided field). The scale is the
- * smallest axis scale, so a field value scaled by it never overshoots under
- * non-uniform scale; the distance to the field box is measured per axis from
- * the rows instead, see {@link sampleInstancesSDF}.
+ * Writes an instance in the layout of {@link SDF_INSTANCE_VEC4S}: world-to-local rows, field box
+ * with voxel size and world scale, atlas slot with the two-sided half thickness (half a field
+ * voxel in world units; -1 for one-sided). The scale is the smallest axis scale so scaled field
+ * values never overshoot under non-uniform scale.
  */
 function packSDFInstance(inst: SDFInstance, atlas: MeshSDFAtlas, out: Float32Array, offset: number) {
   const header = inst.asset!.header!;
@@ -102,11 +99,9 @@ export interface GlobalSDFStats {
 }
 
 /**
- * What the field composites materials from and into, when it does: the
- * material atlases the voxelized meshes live in, the clipmaps (albedo
- * rgba8unorm, emissive rgba16float; the field's layout at half its
- * resolution) to write, the terrain's colour, and the atlas slot of an
- * instance. Provided by the voxel scene.
+ * Material sources and targets for compositing materials alongside the field, provided by the
+ * voxel scene. The output clipmaps (albedo rgba8unorm, emissive rgba16float) use the field's
+ * layout at half its resolution.
  * @public
  */
 export interface GlobalSDFMaterials {
@@ -120,23 +115,14 @@ export interface GlobalSDFMaterials {
 }
 
 /**
- * A clipmap of signed distance around the camera: `levels` cubes of
- * `resolution`³ voxels, centred on the camera, each with twice the voxel size
- * of the one inside it. Built on the GPU from the static instances of a
- * {@link SceneSDF} (their baked fields, sampled from its atlas) and the
- * terrain height map, and kept up to date incrementally.
+ * Camera-centred clipmap of signed distance (`levels` cubes of `resolution`³ voxels, each level
+ * doubling the voxel size), composited on the GPU from the static instances of a {@link SceneSDF}
+ * and the terrain height map. WebGPU only.
  *
- * Each level is addressed toroidally: a world voxel `v` lives at texel
- * `v mod resolution`, so when the window follows the camera only the slabs that
- * entered it are composited; the rest of the level stays where it is. Work is
- * counted in 8³ bricks, marked dirty by window moves and by the scene field's
- * `dirty` boxes, and composited a budget per frame, coarsest level first.
- *
- * Distances are clamped to a band of a few voxels per level, so a brick only
- * needs the instances within that band; {@link sampleGlobalSDF} falls back to
- * coarser levels outside it.
- *
- * WebGPU only: the levels are written by a compute shader.
+ * Levels are toroidally addressed (world voxel `v` at texel `v mod resolution`) and updated
+ * incrementally in dirty 8³ bricks, a budget per frame, coarsest level first. Distances are
+ * clamped to a band of a few voxels per level; {@link sampleGlobalSDF} falls back to coarser
+ * levels outside it.
  *
  * @public
  */
@@ -224,9 +210,8 @@ export class GlobalSDF {
     return getDevice().type === 'webgpu';
   }
   /**
-   * The levels, stacked along z, in {@link globalSDFFormat}: `resolution + 1` slices each, the last
-   * a copy of the first so a filtered read wraps across the toroidal seam in z
-   * as the sampler's repeat mode does in x and y.
+   * The levels stacked along z in {@link globalSDFFormat}, `resolution + 1` slices each; the last
+   * copies the first so filtering wraps across the toroidal seam in z as repeat does in x and y.
    */
   get texture() {
     if (!this._texture) {
@@ -255,9 +240,8 @@ export class GlobalSDF {
     return this._tags;
   }
   /**
-   * The bricks whose materials the last update composited, for the voxel
-   * lighting to light at once: per brick (first material voxel of the brick
-   * within its level, level), `count` of them.
+   * Bricks whose materials the last update composited, for immediate voxel lighting: per brick
+   * (first material voxel within its level, level), `count` of them.
    */
   get freshMaterialBricks() {
     return { data: this._freshBricks, count: this._freshCount };
@@ -289,17 +273,13 @@ export class GlobalSDF {
     return this._waterline;
   }
   /**
-   * Goes up whenever the field may have changed: a region marked dirty, bricks
-   * composited, or the dynamic instances moved. Lets derived data such as the
-   * waterline skip rebuilding while nothing changed.
+   * Increments whenever the field may have changed (dirty region, bricks composited, dynamic
+   * instances moved), so derived data such as the waterline can skip rebuilding.
    */
   get contentVersion() {
     return this._contentVersion;
   }
-  /**
-   * As {@link GlobalSDF.contentVersion}, but only for the clipmap itself (static
-   * geometry and the terrain), not the dynamic instances merged at query time.
-   */
+  /** As {@link GlobalSDF.contentVersion}, but for the clipmap only (static geometry and terrain). */
   get staticVersion() {
     return this._staticVersion;
   }
@@ -562,7 +542,7 @@ export class GlobalSDF {
     const lo = next.map((v) => v / BRICK);
     const plo = prev?.map((v) => v / BRICK);
     const dirty = this._dirty[level];
-    // Bricks that left the window are no longer anyone's concern
+    // Drop dirty bricks that left the window
     for (const key of dirty) {
       const [x, y, z] = key.split(',').map(Number);
       if (x < lo[0] || y < lo[1] || z < lo[2] || x >= lo[0] + nb || y >= lo[1] + nb || z >= lo[2] + nb) {
@@ -668,7 +648,7 @@ export class GlobalSDF {
       const o = b * BRICK_VEC4S * 4;
       brickData.set([brick.x * BRICK, brick.y * BRICK, brick.z * BRICK, vs], o);
       if (this._materials) {
-        // Material voxels are 2³ field voxels: the brick's first one within its level
+        // Material voxels are 2³ field voxels
         this._freshBricks.set(
           [wrap(brick.x) / 2, wrap(brick.y) / 2, wrap(brick.z) / 2, brick.level],
           this._freshCount++ * 4
@@ -750,9 +730,8 @@ export class GlobalSDF {
       return buffer;
     }
     buffer?.dispose();
-    // Grow by half again so a slowly growing scene does not reallocate every
-    // frame, in whole vec4: a storage binding covers the whole buffer, and
-    // WebGPU wants its size a multiple of 4
+    // Grow by 1.5x to avoid per-frame reallocation; whole vec4s since the storage binding covers
+    // the whole buffer
     return getDevice().createBuffer(Math.max(256, Math.ceil((bytes * 1.5) / 16) * 16), {
       usage: 'uniform',
       storage: true
@@ -885,8 +864,8 @@ export class GlobalSDF {
                 );
               }
             );
-            // The brick now holds this window's region; readers see the tag in the
-            // next pass. Its alpha says whether two-sided meshes are in it
+            // Tag the brick with its world brick coords (visible to readers next pass); alpha
+            // flags two-sided meshes
             this.$if(
               pb.and(pb.equal(this.sub, 0), pb.equal(this.$builtins.localInvocationId, pb.uvec3(0))),
               function () {
@@ -905,9 +884,8 @@ export class GlobalSDF {
               }
             );
             if (materials) {
-              // Material voxels are 2³ field voxels: the thread at the even
-              // corner writes the one holding it, read at its centre from the
-              // instance nearest the centre (the terrain where that is nearer)
+              // Material voxels are 2³ field voxels: the even-corner thread writes it, sampled at
+              // its centre from the nearest instance (or the terrain where nearer)
               this.$if(pb.equal(pb.mod(this.local, pb.uvec3(2)), pb.uvec3(0)), function () {
                 this.$l.pc = pb.add(this.p, pb.vec3(pb.mul(this.vs, 0.5)));
                 this.$l.bestK = pb.int(-1);
