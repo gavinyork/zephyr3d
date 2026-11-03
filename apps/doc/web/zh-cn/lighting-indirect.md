@@ -1,7 +1,7 @@
 
 # 间接光照（Indirect Lighting）
 
-需要动态、基于场景几何的漫反射间接光时，请参阅[基于 SDF 的 DDGI](zh-cn/lighting-ddgi.md)。本页介绍 IBL 和半球光；DDGI 需要 WebGPU 以及已烘焙的网格 SDF。
+本页介绍环境光（IBL、半球光）以及基于场景几何的动态漫反射全局光照 DDGI。
 
 > 本页代码为片段示意，省略了 import 与应用初始化，完整可运行示例见页内嵌入的实例。
 
@@ -121,6 +121,73 @@ scene.env.light.type = 'none';
 
 ---
 
+## 基于 SDF 的 DDGI
+
+**概念说明：**
+
+上面几种环境光都与场景几何无关：墙角不会更暗，红墙也不会把旁边的白墙映红。
+DDGI（Dynamic Diffuse Global Illumination，动态漫反射全局光照）在场景中布置探针，
+用场景 SDF 发射探针射线，再把探针的辐照度和可见性插值到表面，从而得到随光源和几何实时变化的漫反射间接光。
+Zephyr3D 的实现由体素材质场和多级 probe clipmap 组成，适合动态摄像机和中等规模的室外/室内场景。
+
+DDGI 与 `scene.env.light` 叠加使用，并不是它的一个取值；`scene.env.light.type = 'none'` 时也能工作。
+
+**示例：Cornell box**
+
+下面的示例搭了一个经典的 Cornell box：5 m 的白色盒子，左墙红、右墙绿，只有天花板上一盏点光源，
+环境光和天空都关掉，所以画面里除了直接光之外的亮度全部来自 DDGI。用左上角按钮切换 GI，
+可以看到打开后阴影区不再全黑，两侧方块和天花板分别被染上红色和绿色。
+
+示例的盒子是代码生成的 `BoxShape`，没有烘焙好的 SDF 资源，所以要用 `scene.sdf.bakeField()` 在运行时烘焙。
+七个部件共用同一个单位盒子图元，只需要烘焙一次：
+
+<<< @/../src/tut-88/main.js{78-86 js}
+
+墙厚只有 0.2 m，所以把 `probeSpacing` 从默认的 1 m 缩小到 0.5 m，避免探针跨过墙体导致漏光。
+
+切换按钮只调整 `scene.gi.intensity`，探针继续更新，重新打开时无需重新收敛：
+
+<<< @/../src/tut-88/main.js{104-111 js}
+
+<div class="showcase" case="tut-88"></div>
+
+> 首次打开需要等待 SDF 烘焙、体素化和探针收敛，前几秒的画面不是最终效果。
+
+**启用与参数：**
+
+```ts
+scene.sdf.enabled = true; // 先提供网格字段
+scene.gi.enabled = true;
+
+scene.gi.probeSpacing = 1;
+scene.gi.probeGrid = [32, 16, 32];
+scene.gi.probeLevels = 4;
+scene.gi.probeRays = 128;
+scene.gi.probeBudget = 4096;
+```
+
+`scene.gi.enabled` 会自动保持 `scene.sdf` 开启。只有带 SDF 字段（烘焙资源或 `bakeField()`）的静态网格会进入体素材质场；地形可通过 `scene.gi.terrainAlbedo` 提供默认反照率。
+
+**收敛与画质：**
+
+`probeSpacing` 决定近处探针间距，`probeLevels` 扩大覆盖范围，`probeRays` 提高单探针的采样质量，`probeBudget` 决定每帧更新多少探针。提高 `probeHysteresis` 能减少闪烁，但会让光照变化更慢。漏光时先增大 `probeNormalBias` 或 `probeViewBias`，再检查 SDF 是否闭合和尺度是否正确。
+
+动态场景保持默认的 `updateMode = 'continuous'`。场景稳定后可导出并冻结探针状态：
+
+```ts
+const state = await scene.gi.exportProbeState();
+scene.gi.importProbeState(state); // 导入后自动切换为 frozen
+scene.gi.updateMode = 'frozen';
+```
+
+> **限制与诊断：**
+> - DDGI、全局 SDF 和体素光照仅 WebGPU；WebGL2 上 `scene.gi.enabled` 不会构建光照。
+> - 首次启用需要等待 SDF 流式加载、体素化和探针收敛，不能把第一帧当作最终画质。
+> - 用 `scene.gi.getStats()` 检查 `supported`、体素和 probe 的更新计数；用 `scene.sdf.getStats()` 检查缺失或未驻留的字段。
+> - `atlasSize`、`voxelizeBudget` 和 `lightingSlicesPerFrame` 是显存与更新开销的主要旋钮。
+
+---
+
 ## 小结
 
 | 环境光类型 | 特征 | 适用材质 | 适合场景 | 性能 |
@@ -128,6 +195,8 @@ scene.env.light.type = 'none';
 | **IBL** | 基于 HDR 天空的高精度反射与漫射光 | PBR | 写实、反射性场景 | 较高 |
 | **Hemispheric** | 上下半球颜色插值的简化照明 | Lambert / Unlit | 低性能设备或卡通风格 | 高 |
 | **None** | 不计算间接光，仅保留直射光 | 任意 | 特效、暗场或特殊视觉风格 | 最高 |
+
+DDGI 可叠加在以上任一模式之上，提供随场景几何变化的漫反射间接光，仅 WebGPU，开销最高。
 
 ---
 

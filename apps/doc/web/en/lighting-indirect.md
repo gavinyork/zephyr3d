@@ -1,7 +1,7 @@
 
 # Indirect Lighting
 
-For dynamic diffuse indirect light from scene geometry, see [SDF-based DDGI](en/lighting-ddgi.md). This page covers IBL and hemispheric light; DDGI requires WebGPU and baked mesh SDF assets.
+This page covers ambient lighting (IBL and hemispheric light) and DDGI, dynamic diffuse global illumination from scene geometry.
 
 > Code on this page is illustrative and omits imports and application setup. See the embedded
 > live demos for complete runnable examples.
@@ -127,6 +127,73 @@ After disabling:
 
 ---
 
+## SDF-based DDGI
+
+**Concept Overview:**
+
+The ambient modes above know nothing about scene geometry: corners do not darken, and a red wall does not tint the white wall next to it.
+DDGI (Dynamic Diffuse Global Illumination) places probes in the scene, traces probe rays through the scene SDF, and interpolates probe irradiance and visibility on surfaces,
+giving diffuse indirect light that follows lights and geometry in real time.
+Zephyr3D combines a voxel material field with a multi-level probe clipmap, which suits moving cameras in medium-sized indoor and outdoor scenes.
+
+DDGI adds to `scene.env.light` rather than being one of its types, and also works with `scene.env.light.type = 'none'`.
+
+**Example: Cornell box**
+
+The example below builds the classic Cornell box: a 5 m white box with a red left wall and a green right wall, lit only by a point light under the ceiling.
+Ambient light and the sky are off, so everything beyond direct light comes from DDGI. Toggle GI with the buttons in the top-left corner:
+with it on, shadows are no longer black, and the blocks and ceiling pick up red and green from the side walls.
+
+The box is a code-built `BoxShape` with no baked SDF asset, so its field is baked at run time with `scene.sdf.bakeField()`.
+All seven parts share one unit-box primitive, so a single bake covers them:
+
+<<< @/../src/tut-88/main.js{78-86 js}
+
+The walls are only 0.2 m thick, so `probeSpacing` is lowered from the default 1 m to 0.5 m to keep probes from reaching across a wall and leaking light.
+
+The buttons only change `scene.gi.intensity`; the probes keep updating, so switching back needs no reconvergence:
+
+<<< @/../src/tut-88/main.js{104-111 js}
+
+<div class="showcase" case="tut-88"></div>
+
+> The first seconds wait for SDF baking, voxelization, and probe convergence; they are not the final image.
+
+**Enable it:**
+
+```ts
+scene.sdf.enabled = true;
+scene.gi.enabled = true;
+
+scene.gi.probeSpacing = 1;
+scene.gi.probeGrid = [32, 16, 32];
+scene.gi.probeLevels = 4;
+scene.gi.probeRays = 128;
+scene.gi.probeBudget = 4096;
+```
+
+Enabling `scene.gi` keeps the scene SDF enabled. Only static meshes with a field (a baked asset or `bakeField()`) enter the voxel material field; set `scene.gi.terrainAlbedo` when terrain data does not provide an albedo yet.
+
+**Convergence and quality:**
+
+`probeSpacing` controls near-field detail, `probeLevels` expands coverage, `probeRays` improves per-probe quality, and `probeBudget` controls updates per frame. A higher `probeHysteresis` reduces noise but slows changes. Increase `probeNormalBias` or `probeViewBias` when leakage appears, then verify that the SDF is closed and the scene scale is correct.
+
+Keep `updateMode = 'continuous'` for changing scenes. A converged volume can be saved and frozen:
+
+```ts
+const state = await scene.gi.exportProbeState();
+scene.gi.importProbeState(state); // imports also select frozen mode
+scene.gi.updateMode = 'frozen';
+```
+
+> **Limits and diagnostics:**
+> - DDGI, the global SDF, and voxel lighting are WebGPU-only; on WebGL2 `scene.gi.enabled` builds no lighting.
+> - The first frames wait for SDF streaming, voxelization, and probe convergence.
+> - Use `scene.gi.getStats()` and `scene.sdf.getStats()` to inspect support, updates, missing fields, and residency.
+> - `atlasSize`, `voxelizeBudget`, and `lightingSlicesPerFrame` are the main memory and update-cost controls.
+
+---
+
 ## Summary
 
 | Ambient Type | Characteristics | Suitable Materials | Typical Use | Performance |
@@ -134,6 +201,8 @@ After disabling:
 | **IBL** | HDR‑based indirect reflection & diffuse lighting | PBR | Realistic / reflective environments | Higher |
 | **Hemispheric** | Interpolated upper/lower hemisphere lighting | Lambert / Unlit | Mobile, stylized, or simple scenes | Very High |
 | **None** | No indirect lighting, direct lights only | Any | FX, dark scenes, artistic control | Highest |
+
+DDGI can be added on top of any of these for diffuse indirect light that follows scene geometry; it is WebGPU-only and the most expensive.
 
 ---
 
