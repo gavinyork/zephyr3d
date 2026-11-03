@@ -1410,8 +1410,7 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
         }
       } else if (that.drawContext.renderPass!.type === RENDER_PASS_TYPE_VOXELIZE) {
         // No alpha test: the distance field ignores masking, so rays hit the whole
-        // card and need material everywhere (as Lumen, LumenCardBasePass.ush).
-        // The colour handed in is the albedo (see supportsVoxelization)
+        // card and need material everywhere. The colour handed in is the albedo (see supportsVoxelization)
         const emissiveMaterial = that as unknown as {
           calculateEmissiveColor?: (scope: PBInsideFunctionScope) => PBShaderExp;
         };

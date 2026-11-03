@@ -247,16 +247,14 @@ export function sampleSceneSDFWithVoxel(scope: PBInsideFunctionScope, worldPos: 
 }
 
 /**
- * Surface expand scale in bricks holding two-sided meshes (1 elsewhere), after Lumen
- * r.LumenScene.GlobalSDF.NotCoveredExpandSurfaceScale: a full voxel is needed to stop rays at
- * thin one-sided walls, but would close up foliage and cloth.
+ * Surface expand scale in bricks holding two-sided meshes (1 elsewhere)
  * @internal
  */
 export const SDF_NOT_COVERED_EXPAND_SCALE = 0.6;
 
 /**
  * Tag alpha of a brick holding two-sided meshes (1 otherwise); see
- * {@link SDF_NOT_COVERED_EXPAND_SCALE}. Lumen GLOBALSDF_SIMPLE_COVERAGE_BASED_EXPAND.
+ * {@link SDF_NOT_COVERED_EXPAND_SCALE}.
  * @internal
  */
 export const GLOBAL_SDF_TAG_NOT_COVERED = 2;
@@ -381,9 +379,8 @@ function sdfStartLevel(scope: PBInsideFunctionScope, prevDist: PBShaderExp, leve
 }
 
 /**
- * {@link sampleGlobalSDFWithVoxel} for sphere tracing: starts at the level `prevDist` needs
- * (as Lumen skips empty space via its coarse mip), rereading from the finest level near a
- * surface. Levels finer than `minLevel` are never .
+ * {@link sampleGlobalSDFWithVoxel} for sphere tracing: starts at the level `prevDist` needs,
+ * rereading from the finest level near a surface. Levels finer than `minLevel` are never .
  * @internal
  */
 export function sampleGlobalSDFHinted(

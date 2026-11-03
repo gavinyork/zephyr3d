@@ -67,7 +67,7 @@ export const PHYSICAL_BAKE_EXPOSURE = 1 / 38400;
 /**
  * Fixed exposure GI caches (voxel radiance, probe irradiance) are stored at:
  * {@link PHYSICAL_BAKE_EXPOSURE} in physical mode, 1 in legacy. Readers convert with
- * `cameraExposure / getGICacheExposure(...)` (as Lumen's CachedLightingPreExposure).
+ * `cameraExposure / getGICacheExposure(...)`.
  *
  * @internal
  */

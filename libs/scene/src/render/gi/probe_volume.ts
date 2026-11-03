@@ -181,10 +181,10 @@ export function getActiveProbeVolume(scene: Scene): Nullable<ProbeVolume> {
 
 /**
  * A camera-centred clipmap of DDGI light probes (Majercik et al. JCGT 2019/2021)
- * holding octahedral irradiance and visibility maps, levels of growing spacing
- * as Lumen's radiance cache. Each frame a budget of probes traces rays through
- * the scene SDF, shading hits from the voxel scene and misses from the sky.
- * Windows scroll toroidally; entering probes are seeded from the level above.
+ * holding octahedral irradiance and visibility maps. Each frame a budget of probes
+ * traces rays through the scene SDF, shading hits from the voxel scene and misses
+ * from the sky. Windows scroll toroidally; entering probes are seeded from the level
+ * above.
  * Read via {@link sampleProbeIrradiance}; state can be saved with
  * {@link ProbeVolume.exportState}. WebGPU only.
  *
@@ -1225,7 +1225,7 @@ export class ProbeVolume {
                 // Hit normal from the SDF gradient
                 this.$l.hg = pb.vec3(0);
                 this.$if(pb.greaterThan(this.hitVoxel, 0), function () {
-                  // Central differences over half a voxel of the answering level, as UE5 Lumen
+                  // Central differences over half a voxel of the answering level
                   // (ComputeGlobalDistanceFieldNormal); level blends take the nearer level
                   this.$l.hl = this.hitMin;
                   for (let i = 1; i < levels; i++) {

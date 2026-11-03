@@ -72,7 +72,6 @@ export interface VoxelLightingOptions {
  * {@link sdfConeShadow}), unshadowed punctual lights in range and sky irradiance, times
  * albedo, plus emissive, into the radiance clipmap. Kept at the fixed cache exposure
  * (getGICacheExposure) so probes accumulating it don't drift with camera exposure.
- * After Lumen's surface cache direct lighting (Wright, SIGGRAPH 2021 Advances), on voxels.
  *
  * A fragment pass, one fragment per voxel of a slab of z slices rotating through every
  * level, so the scene refreshes over a few frames. Voxels without material write zero.
