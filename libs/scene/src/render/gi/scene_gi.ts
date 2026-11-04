@@ -1,5 +1,5 @@
 import type { Nullable } from '@zephyr3d/base';
-import { Vector3 } from '@zephyr3d/base';
+import type { Vector3 } from '@zephyr3d/base';
 import type { Scene } from '../../scene/scene';
 import type { Camera } from '../../camera/camera';
 import { GlobalSDF } from '../sdf/global_sdf';
@@ -43,7 +43,6 @@ export class SceneGI {
   private _voxels: Nullable<VoxelScene>;
   private _atlasSize: number;
   private _voxelizeBudget: number;
-  private readonly _terrainAlbedo: Vector3;
   private readonly _lighting: VoxelLightingOptions;
   private readonly _probeOptions: ProbeVolumeOptions;
   private _probes: Nullable<ProbeVolume>;
@@ -55,7 +54,6 @@ export class SceneGI {
     this._voxels = null;
     this._atlasSize = 256;
     this._voxelizeBudget = 8;
-    this._terrainAlbedo = new Vector3(0.3, 0.3, 0.3);
     // UE's default directional LightSourceAngle (DirectionalLightComponent.cpp); wider
     // cones close the small openings sunlight comes through
     this._lighting = { sunShadowConeAngle: 0.5357, slicesPerFrame: 8, localLightShadows: true };
@@ -229,13 +227,6 @@ export class SceneGI {
   set voxelizeBudget(val: number) {
     this._voxelizeBudget = Math.max(1, Math.floor(val));
   }
-  /** Albedo given to the terrain, until it is read from the terrain itself. */
-  get terrainAlbedo(): Vector3 {
-    return this._terrainAlbedo;
-  }
-  set terrainAlbedo(val: Vector3) {
-    this._terrainAlbedo.set(val);
-  }
   /** Voxels per axis of the material atlas; applied when the voxel scene is next built. */
   get atlasSize() {
     return this._atlasSize;
@@ -301,12 +292,6 @@ export class SceneGI {
       this._voxels = new VoxelScene(this._scene, this._atlasSize);
     }
     this._voxels.voxelizeBudget = this._voxelizeBudget;
-    this._voxels.terrainAlbedo.setXYZW(
-      this._terrainAlbedo.x,
-      this._terrainAlbedo.y,
-      this._terrainAlbedo.z,
-      1
-    );
     this._voxels.update(this._scene.sdf, cameraPos, deltaSeconds);
   }
   /** Called by the scene once a frame, after the scene field's update. */
