@@ -169,6 +169,23 @@ export function getSceneClass(manager: ResourceManager): SerializableClass {
           }
         },
         {
+          name: 'GILocalLightShadows',
+          description:
+            'Let point, spot and rect lights that cast shadows also cast them in the bounced light, so objects block the light they bounce. Applies to the eight lights nearest the camera; turn off to save GPU time in scenes with many shadowed lights.',
+          type: 'bool',
+          default: true,
+          options: { group: 'Global Illumination' },
+          isHidden(this: Scene) {
+            return !this.gi.enabled;
+          },
+          get(this: Scene, value) {
+            value.bool[0] = this.gi.localLightShadows;
+          },
+          set(this: Scene, value) {
+            this.gi.localLightShadows = value.bool[0];
+          }
+        },
+        {
           name: 'GIIntensity',
           description:
             'Strength of the bounced light the probes add. 1 is physically consistent with the direct lighting; raise to exaggerate colour bleeding, lower to tone it down.',

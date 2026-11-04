@@ -58,7 +58,7 @@ export class SceneGI {
     this._terrainAlbedo = new Vector3(0.3, 0.3, 0.3);
     // UE's default directional LightSourceAngle (DirectionalLightComponent.cpp); wider
     // cones close the small openings sunlight comes through
-    this._lighting = { sunShadowConeAngle: 0.5357, slicesPerFrame: 8 };
+    this._lighting = { sunShadowConeAngle: 0.5357, slicesPerFrame: 8, localLightShadows: true };
     this._probeOptions = {
       grid: [32, 16, 32],
       spacing: 1,
@@ -255,6 +255,16 @@ export class SceneGI {
   }
   set sunShadowConeAngle(val: number) {
     this._lighting.sunShadowConeAngle = Math.max(0.1, Math.min(45, val));
+  }
+  /**
+   * Whether point, spot and rect lights that cast shadows also cast them in the bounced light,
+   * traced through the global distance field for the nearest eight such lights. Default true.
+   */
+  get localLightShadows() {
+    return this._lighting.localLightShadows;
+  }
+  set localLightShadows(val: boolean) {
+    this._lighting.localLightShadows = !!val;
   }
   /** Z slices of every clipmap level lit per frame; the voxel lighting is refreshed every `64 / slices` frames. */
   get lightingSlicesPerFrame() {
