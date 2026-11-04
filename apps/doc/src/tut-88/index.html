@@ -23,93 +23,60 @@
         height: 100%;
         z-index: 0;
       }
-      #ui {
+      /* Part of the page, so it shows before the engine modules have loaded */
+      #loading {
         position: absolute;
-        top: 12px;
-        left: 12px;
-        z-index: 10;
-        display: inline-flex;
-        gap: 4px;
-        max-width: calc(100vw - 24px);
-        padding: 4px;
-        border: 1px solid rgba(255, 255, 255, 0.14);
-        border-radius: 6px;
-        background: rgba(15, 20, 28, 0.78);
-        color: #f4f7fb;
-        font:
-          13px/1.2 system-ui,
-          -apple-system,
-          BlinkMacSystemFont,
-          "Segoe UI",
-          sans-serif;
-        backdrop-filter: blur(8px);
-      }
-      #ui button {
-        min-width: 72px;
-        min-height: 32px;
-        padding: 0 12px;
-        border: 1px solid transparent;
-        border-radius: 4px;
-        background: transparent;
-        color: inherit;
-        cursor: pointer;
-        font: inherit;
-        font-weight: 600;
-        white-space: nowrap;
-      }
-      #ui button:hover {
-        background: rgba(255, 255, 255, 0.1);
-      }
-      #ui button.active {
-        border-color: rgba(125, 186, 255, 0.7);
-        background: #2f6fc5;
-      }
-      #ui button:disabled {
-        opacity: 0.45;
-        cursor: not-allowed;
-      }
-      #ui button:disabled:hover {
-        background: transparent;
-      }
-      #ui button:focus-visible {
-        outline: 2px solid #9ed0ff;
-        outline-offset: 2px;
-      }
-      #notice {
-        position: absolute;
-        left: 12px;
-        bottom: 12px;
-        z-index: 10;
-        padding: 6px 10px;
-        border-radius: 6px;
-        background: rgba(15, 20, 28, 0.78);
+        inset: 0;
+        z-index: 20;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 12px;
+        background: #11161d;
         color: #f4f7fb;
         font: 13px/1.2 system-ui, sans-serif;
+        transition: opacity 0.3s ease;
       }
-      #notice[hidden] {
-        display: none;
+      #loading.done {
+        opacity: 0;
+        pointer-events: none;
       }
-      @media (max-width: 420px) {
-        #ui {
-          left: 8px;
-          right: 8px;
-          max-width: none;
-        }
-        #ui button {
-          flex: 1;
-          min-width: 0;
-          padding: 0 8px;
-        }
+      #loading-bar {
+        width: min(240px, 60vw);
+        height: 3px;
+        border-radius: 2px;
+        background: rgba(255, 255, 255, 0.15);
+        overflow: hidden;
+      }
+      #loading-bar > div {
+        width: 0;
+        height: 100%;
+        background: #2f6fc5;
+        transition: width 0.2s ease-out;
+      }
+      #loading-message {
+        min-height: 1.2em;
+        opacity: 0.7;
       }
     </style>
   </head>
   <body>
     <canvas id="my-canvas"></canvas>
-    <div id="ui" aria-label="Global illumination">
-      <button id="btn-off" type="button" aria-pressed="false">GI Off</button>
-      <button id="btn-on" class="active" type="button" aria-pressed="true">GI On</button>
+    <div id="loading" role="status" aria-live="polite">
+      <div id="loading-bar"><div></div></div>
+      <div id="loading-message">Loading engine</div>
     </div>
-    <div id="notice" hidden>DDGI requires WebGPU. Showing direct lighting only.</div>
+    <!-- The scene script imports the engine by name; map it to the bundles this page loads -->
+    <script type="importmap">
+      {
+        "imports": {
+          "@zephyr3d/base": "./lib/zephyr3d-base.js",
+          "@zephyr3d/device": "./lib/zephyr3d-device.js",
+          "@zephyr3d/scene": "./lib/zephyr3d-scene.js"
+        }
+      }
+    </script>
     <script type="module" src="js/tut-88.js"></script>
   </body>
 </html>
