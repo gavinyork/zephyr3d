@@ -1,10 +1,11 @@
 import type { VFS } from '@zephyr3d/base';
 import type { Application } from '@zephyr3d/scene';
-import { generateSplashScreenHTML, getEngine, SplashScreen } from '@zephyr3d/scene';
+import { getEngine, LoadingProgress } from '@zephyr3d/scene';
 import type { ProjectSettings } from './project';
 import { createStartupPipelineTasks } from './pipelinecache';
 import { getScenePreloadPath } from './assetpreload';
 import { DEFAULT_SPLASH_BACKGROUND } from '../build/templates';
+import { installSplashScreen } from '../build/splash';
 
 /**
  * Starts a preview the way a build's entry does: the splash screen tracks pipeline
@@ -18,15 +19,10 @@ export async function startPreview(
   sceneOverride: string | null
 ) {
   const startupScene = sceneOverride ?? settings.startupScene ?? '';
-  let splash: SplashScreen | null = null;
-  if (settings.defaultSplash !== false) {
-    const markup = generateSplashScreenHTML({
-      background: settings.splashBackground ?? DEFAULT_SPLASH_BACKGROUND
-    });
-    document.head.insertAdjacentHTML('beforeend', markup.head);
-    document.body.insertAdjacentHTML('beforeend', markup.body);
-    splash = SplashScreen.find();
-  }
+  const splash =
+    settings.defaultSplash !== false
+      ? new LoadingProgress(installSplashScreen(settings.splashBackground ?? DEFAULT_SPLASH_BACKGROUND))
+      : null;
   document.getElementById('zephyr-loading')?.remove();
   const loading: Promise<unknown>[] = [];
   const pipelines =
@@ -48,7 +44,7 @@ export async function startPreview(
   assets?.release();
   sceneStage?.done();
   await app.nextFrame();
-  await splash?.hide();
+  await splash?.finish();
   if (pipelines && settings.precompileOtherScenes !== false) {
     void pipelines.all().run({ priority: 'background' });
   }

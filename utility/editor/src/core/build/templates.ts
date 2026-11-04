@@ -1,5 +1,5 @@
 import type { ProjectSettings } from '../services/project';
-import { generateSplashScreenHTML } from '@zephyr3d/scene';
+import { generateSplashScreenHTML, SPLASH_SCREEN_GLOBAL } from './splash';
 
 export const projectFileName = 'project.json';
 export const fileListFileName = 'filelist.json';
@@ -210,7 +210,7 @@ export function generateIndexTS(settings: ProjectSettings, physics = false) {
   const precompile = settings.precompilePipelines !== false;
   const startupScene = settings.startupScene ?? '';
   return `import { Application, getEngine, setActiveMorphTargetLimit, setMorphTargetLimit, setSkinInfluenceLimit${
-    splash ? ', SplashScreen' : ''
+    splash ? ', LoadingProgress' : ''
   } } from '@zephyr3d/scene';
 import { FBXImporter, GLTFImporter, OBJImporter } from '@zephyr3d/loaders';
 import type { DeviceBackend } from '@zephyr3d/device';
@@ -264,7 +264,10 @@ application.ready().then(async () => {
   getEngine().resourceManager.setModelLoader('model/obj', new OBJImporter());
   ${physics ? `// Before the startup scene, so it is simulated from its first frame\n  await initPhysics(rapierPhysics);\n  ` : ''}${
     splash
-      ? `// The splash screen of index.html shows the loading until the startup scene is drawn\n  const splash = SplashScreen.find();\n  `
+      ? `// The splash screen of index.html shows the loading until the startup scene is drawn
+  const splashScreen = (window as any).${SPLASH_SCREEN_GLOBAL};
+  const splash = splashScreen ? new LoadingProgress(splashScreen) : null;
+  `
       : ''
   }const loading: Promise<unknown>[] = [];
   ${
@@ -295,7 +298,7 @@ application.ready().then(async () => {
       ? `sceneStage?.done();
   // Up until the startup scene is on screen
   await application.nextFrame();
-  await splash?.hide();`
+  await splash?.finish();`
       : ''
   }${
     precompile && settings.precompileOtherScenes !== false
@@ -371,24 +374,24 @@ application.ready().then(async () => {
 /**
  * Generates the index.html of a build.
  *
- * With the splash screen on, the page carries the engine's splash screen, drawn by
+ * With the splash screen on, the page carries the editor's splash screen, drawn by
  * the browser before any script loads, so downloading the engine modules and
- * creating the device show feedback instead of a blank page; index.js takes it over
- * to show the loading progress and hides it once the startup scene is drawn. Errors
- * thrown while starting show on it.
+ * creating the device show feedback instead of a blank page; index.js drives it
+ * through its LoadingScreen to show the loading progress and hides it once the
+ * startup scene is drawn. Errors thrown while starting show on it.
  */
 export function generateIndexHTML(options: {
   title: string;
   /** Extra head markup, e.g. the favicon link */
   head: string;
-  /** Whether to show the engine's splash screen */
+  /** Whether to show the default splash screen */
   splash: boolean;
   /** CSS color of the splash screen */
   splashBackground: string;
 }) {
   const splash = options.splash
-    ? generateSplashScreenHTML({ background: options.splashBackground })
-    : { head: '', body: '' };
+    ? generateSplashScreenHTML(options.splashBackground)
+    : { style: '', markup: '', script: '' };
   return `<!DOCTYPE html>
 <html lang="en">
   <head>
@@ -422,11 +425,14 @@ export function generateIndexHTML(options: {
         outline: none;
       }
     </style>
-    ${splash.head}
+    ${splash.style}
   </head>
   <body>
     <canvas id="canvas"></canvas>
-    ${splash.body}
+    ${splash.markup}
+    ${splash.script ? `<script>
+      ${splash.script}
+    </script>` : ''}
   </body>
 </html>
 `;
