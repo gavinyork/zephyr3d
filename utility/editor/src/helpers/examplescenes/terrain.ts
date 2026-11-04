@@ -264,9 +264,11 @@ export const terrainScene: ExampleSceneType = {
           y += warp * wy;
         }
         const h = mountains ? ridged(noise, x, y, octaves) : fbm(noise, x, y, octaves, roughness);
-        raw[j * resolution + i] = h;
-        min = Math.min(min, h);
-        max = Math.max(max, h);
+        // Range of the stored float32 values, not of the doubles: a minimum taken before
+        // rounding can lie above its rounded texel, and pow() of the negative t gives NaN
+        const stored = (raw[j * resolution + i] = h);
+        min = Math.min(min, stored);
+        max = Math.max(max, stored);
       }
       // Keep the editor drawing while a large map is generated
       if (performance.now() - lastYield > 50) {
@@ -278,7 +280,7 @@ export const terrainScene: ExampleSceneType = {
     const range = max - min || 1;
     const halfs = new Uint16Array(resolution * resolution);
     for (let k = 0; k < raw.length; k++) {
-      const t = (raw[k] - min) / range;
+      const t = Math.min(1, Math.max(0, (raw[k] - min) / range));
       raw[k] = Math.pow(t, flatness) * maxHeight;
       halfs[k] = float2half(raw[k]);
     }
