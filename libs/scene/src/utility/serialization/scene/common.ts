@@ -39,10 +39,20 @@ export const meshInstanceClsMap: Map<
   { C: { new (m: MeshMaterial): any }; S: SerializableClass }
 > = new Map();
 
-/** @internal */
-export function getMeshMaterialInstanceUniformsClass(cls: {
-  new (...args: any[]): MeshMaterial;
-}): SerializableClass {
+/**
+ * Gets the class serializing the instance uniforms of a material class.
+ *
+ * @param cls - The material class
+ * @param baseName - Base name for the serialized class; `"InstanceUniforms"` is appended.
+ *   Not taken from `cls.name`, which minifiers may rename.
+ * @internal
+ */
+export function getMeshMaterialInstanceUniformsClass(
+  cls: {
+    new (...args: any[]): MeshMaterial;
+  },
+  baseName: string
+): SerializableClass {
   let info = meshInstanceClsMap.get(cls);
   if (!info) {
     class C {
@@ -53,7 +63,7 @@ export function getMeshMaterialInstanceUniformsClass(cls: {
     }
     const S: SerializableClass = {
       ctor: C,
-      name: `${cls.name}InstanceUniforms`,
+      name: `${baseName}InstanceUniforms`,
       async createFunc(_ctx, init) {
         const material = await getEngine().resourceManager.fetchMaterial<MeshMaterial>(init);
         if (!material) {
