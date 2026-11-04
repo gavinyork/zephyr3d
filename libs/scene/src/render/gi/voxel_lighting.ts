@@ -17,7 +17,8 @@ import { buildSDFProgram } from '../sdf/sdf_programs';
 import { drawFullscreenQuad } from '../fullscreenquad';
 import { fetchSampler } from '../../utility/misc';
 import { getGICacheExposure } from '../../utility/physical';
-import { LIGHT_TYPE_DIRECTIONAL, LIGHT_TYPE_SPOT } from '../../values';
+import { LIGHT_TYPE_DIRECTIONAL, LIGHT_TYPE_RECT, LIGHT_TYPE_SPOT } from '../../values';
+import { defineLTCEdgeFunctions } from '../../shaders/ltc_rect';
 import {
   declareDynamicSDFUniforms,
   declareGlobalSDFUniforms,
@@ -31,8 +32,11 @@ import { getActiveProbeVolume } from './probe_volume';
 
 /** Most lights the voxels are lit by, the sun aside. */
 export const MAX_VOXEL_LIGHTS = 64;
-/** vec4s per packed light: (position, range), (direction, cutoff), (colour, intensity), extra. */
-const LIGHT_VEC4S = 4;
+/**
+ * vec4s per packed light: (position, range), (direction, cutoff), (colour, intensity), extra,
+ * (shadowed, 0, 0, 0).
+ */
+const LIGHT_VEC4S = 5;
 /** Material voxels along a brick edge of the global field, whose bricks are 8³ field voxels. */
 const BRICK_VOXELS = 4;
 /**
@@ -44,7 +48,14 @@ function aniso1Format(): 'rg8unorm' | 'rgba8unorm' {
     ? 'rg8unorm'
     : 'rgba8unorm';
 }
-/** Cone tracing steps of the sun shadow. */
+/** Most local lights whose voxel lighting is shadowed, the nearest the camera first. */
+export const MAX_SHADOWED_VOXEL_LIGHTS = 8;
+/**
+ * Cone of a local light shadow ray. Lumen traces these as hard hit tests; a vanishing cone through
+ * {@link sdfConeShadow} is the same test with its expanded surfaces.
+ */
+const HARD_SHADOW_TAN = 1e-4;
+/** Cone tracing steps of the sun shadow and the local light shadows. */
 const SHADOW_STEPS = 24;
 /** The axis faces of a voxel, in the order of the aniso textures. */
 const ANISO_DIRS: [number, number, number][] = [
@@ -65,12 +76,20 @@ export interface VoxelLightingOptions {
   sunShadowConeAngle: number;
   /** Z slices of every clipmap level lit per frame; a level is refreshed every `resolution / slices` frames. Default 8. */
   slicesPerFrame: number;
+  /**
+   * Whether local lights that cast shadows also shadow the voxel lighting, up to
+   * {@link MAX_SHADOWED_VOXEL_LIGHTS} of them. Default true.
+   */
+  localLightShadows: boolean;
 }
 
 /**
  * Lights the voxel scene: per material voxel, the sun (cone-traced field shadow, see
- * {@link sdfConeShadow}), unshadowed punctual lights in range and sky irradiance, times
- * albedo, plus emissive, into the radiance clipmap. Kept at the fixed cache exposure
+ * {@link sdfConeShadow}), punctual lights in range (rect lights by their one-sided
+ * polygon form factor per voxel face, as surfaces shade them; shadowed by one hard field ray for
+ * the nearest {@link MAX_SHADOWED_VOXEL_LIGHTS} local lights casting shadows) and sky irradiance,
+ * times albedo,
+ * plus emissive, into the radiance clipmap. Kept at the fixed cache exposure
  * (getGICacheExposure) so probes accumulating it don't drift with camera exposure.
  *
  * A fragment pass, one fragment per voxel of a slab of z slices rotating through every
@@ -205,7 +224,7 @@ export class VoxelLighting {
       this._programKey = key;
       this._bindGroup = device.createBindGroup(this._program.bindGroupLayouts[0]);
     }
-    const numLights = this.collectLights(camera, cacheExposure);
+    const numLights = this.collectLights(camera, cacheExposure, options.localLightShadows);
     const slices = Math.max(1, Math.min(resolution, Math.floor(options.slicesPerFrame)));
     const tanHalf = Math.tan((Math.max(0.1, options.sunShadowConeAngle) * Math.PI) / 180);
     this._params.setXYZW(numLights, envStrength, tanHalf, 0);
@@ -309,10 +328,12 @@ export class VoxelLighting {
   /**
    * Packs the visible punctual lights: the sun apart (the marked sun light, else the
    * first directional), the rest nearest the camera first, up to {@link MAX_VOXEL_LIGHTS}.
+   * The first {@link MAX_SHADOWED_VOXEL_LIGHTS} local lights casting shadows are flagged for a
+   * shadow ray when `localShadows` is on.
    * Only the intensity carries the cache exposure, as in the clustered light buffer.
    * @internal
    */
-  private collectLights(camera: Camera, exposure: number) {
+  private collectLights(camera: Camera, exposure: number, localShadows: boolean) {
     const scene = this._scene;
     const cameraPos = camera.getWorldPosition();
     const found: { sun: Nullable<DirectionalLight> } = { sun: null };
@@ -352,6 +373,7 @@ export class VoxelLighting {
     others.sort((a, b) => a.d - b.d);
     const count = Math.min(others.length, MAX_VOXEL_LIGHTS);
     const data = this._lightData;
+    let shadowedCount = 0;
     for (let i = 0; i < count; i++) {
       const light = others[i].light;
       const o = i * LIGHT_VEC4S * 4;
@@ -363,6 +385,19 @@ export class VoxelLighting {
       data[o + 10] = c.z;
       data[o + 11] = c.w * exposure;
       data.set(light.extraParams, o + 12);
+      // Local lights only; a directional light besides the sun stays unshadowed
+      const shadowed =
+        localShadows &&
+        shadowedCount < MAX_SHADOWED_VOXEL_LIGHTS &&
+        !light.isDirectionLight() &&
+        light.castShadow;
+      if (shadowed) {
+        shadowedCount++;
+      }
+      data[o + 16] = shadowed ? 1 : 0;
+      data[o + 17] = 0;
+      data[o + 18] = 0;
+      data[o + 19] = 0;
     }
     return count;
   }
@@ -428,6 +463,40 @@ export class VoxelLighting {
           this.$l.f2 = pb.clamp(pb.sub(1, pb.mul(this.f, this.f)), 0, 1);
           this.$return(pb.mul(this.atten, this.f2, this.f2));
         });
+        // Rect lights as the surfaces shade their diffuse part (see evaluateLTCRectLightTerms):
+        // the polygon form factor clipped to the horizon (LTC with the identity matrix, Heitz et
+        // al. 2016), one-sided about the light plane, with the same range window
+        defineLTCEdgeFunctions(this);
+        pb.func(
+          'Z_rectFormFactor',
+          [pb.vec3('p'), pb.vec3('N'), pb.vec3('V'), pb.vec4('posRange'), pb.vec3('ax'), pb.vec3('ay')],
+          function () {
+            this.$l.lightNormal = pb.neg(pb.normalize(pb.cross(this.ax, this.ay)));
+            this.$l.toPoint = pb.sub(this.p, this.posRange.xyz);
+            this.$if(pb.lessThanEqual(pb.dot(this.lightNormal, this.toPoint), 0), function () {
+              this.$return(pb.float(0));
+            });
+            this.$l.falloff = pb.float(1);
+            this.$if(pb.greaterThan(this.posRange.w, 0), function () {
+              this.falloff = pb.sub(
+                1,
+                pb.smoothStep(pb.mul(this.posRange.w, 0.9), this.posRange.w, pb.length(this.toPoint))
+              );
+            });
+            this.$l.c = this.posRange.xyz;
+            this.$l.ff = this.Z_LTCEvaluateRect(
+              this.N,
+              this.V,
+              this.p,
+              pb.mat3(pb.vec3(1, 0, 0), pb.vec3(0, 1, 0), pb.vec3(0, 0, 1)),
+              pb.sub(pb.sub(this.c, this.ax), this.ay),
+              pb.add(pb.sub(this.c, this.ay), this.ax),
+              pb.add(pb.add(this.c, this.ax), this.ay),
+              pb.add(pb.sub(this.c, this.ax), this.ay)
+            ).x;
+            this.$return(pb.mul(this.ff, this.falloff));
+          }
+        );
         pb.func(
           'Z_spotAttenuation',
           [pb.vec3('p'), pb.vec4('posRange'), pb.vec4('dirCutoff'), pb.vec2('angleScaleOffset')],
@@ -557,34 +626,99 @@ export class VoxelLighting {
               this.$l.dirCutoff = this.lights.at(pb.add(this.base, 1));
               this.$l.colorIntensity = this.lights.at(pb.add(this.base, 2));
               this.$l.extra = this.lights.at(pb.add(this.base, 3));
+              this.$l.shadowInfo = this.lights.at(pb.add(this.base, 4));
               this.$l.ltype = pb.int(this.extra.w);
-              this.$l.atten = pb.float(0);
-              this.$l.Ld = pb.vec3(0, 1, 0);
-              this.$if(pb.equal(this.ltype, LIGHT_TYPE_DIRECTIONAL), function () {
-                this.atten = 1;
-                this.Ld = pb.neg(this.dirCutoff.xyz);
-              })
-                .$elseif(pb.equal(this.ltype, LIGHT_TYPE_SPOT), function () {
-                  this.atten = this.Z_spotAttenuation(this.p, this.posRange, this.dirCutoff, this.extra.xy);
-                  this.Ld = pb.normalize(pb.sub(this.posRange.xyz, this.p));
+              // This light's share of each open face, before the shadow
+              for (let k = 0; k < 6; k++) {
+                this.$l[`lf${k}`] = pb.vec3(0);
+              }
+              this.$if(pb.equal(this.ltype, LIGHT_TYPE_RECT), function () {
+                // Radiance times the form factor seen by each face; (dirCutoff, extra) hold the
+                // half-extent axes
+                this.$l.rc = pb.mul(this.albedo, this.colorIntensity.rgb, this.colorIntensity.w);
+                for (let k = 0; k < 6; k++) {
+                  this.$if(this[`open${k}`], function () {
+                    // Any direction off the normal: the identity-matrix integral does not
+                    // depend on the tangent frame
+                    const v: [number, number, number] = ANISO_DIRS[k][1] !== 0 ? [1, 0, 0] : [0, 1, 0];
+                    this[`lf${k}`] = pb.mul(
+                      this.rc,
+                      this.Z_rectFormFactor(
+                        this.p,
+                        pb.vec3(...ANISO_DIRS[k]),
+                        pb.vec3(...v),
+                        this.posRange,
+                        this.dirCutoff.xyz,
+                        this.extra.xyz
+                      )
+                    );
+                  });
+                }
+              }).$else(function () {
+                this.$l.atten = pb.float(0);
+                this.$l.Ld = pb.vec3(0, 1, 0);
+                this.$if(pb.equal(this.ltype, LIGHT_TYPE_DIRECTIONAL), function () {
+                  this.atten = 1;
+                  this.Ld = pb.neg(this.dirCutoff.xyz);
                 })
-                .$else(function () {
-                  // Point, and a rect light reduced to its centre
-                  this.atten = this.Z_pointAttenuation(this.p, this.posRange);
-                  this.Ld = pb.normalize(pb.sub(this.posRange.xyz, this.p));
-                });
-              this.$l.lc = pb.mul(
-                this.albedo,
-                this.colorIntensity.rgb,
-                pb.mul(this.colorIntensity.w, this.atten, 1 / Math.PI)
+                  .$elseif(pb.equal(this.ltype, LIGHT_TYPE_SPOT), function () {
+                    this.atten = this.Z_spotAttenuation(this.p, this.posRange, this.dirCutoff, this.extra.xy);
+                    this.Ld = pb.normalize(pb.sub(this.posRange.xyz, this.p));
+                  })
+                  .$else(function () {
+                    this.atten = this.Z_pointAttenuation(this.p, this.posRange);
+                    this.Ld = pb.normalize(pb.sub(this.posRange.xyz, this.p));
+                  });
+                this.$l.lc = pb.mul(
+                  this.albedo,
+                  this.colorIntensity.rgb,
+                  pb.mul(this.colorIntensity.w, this.atten, 1 / Math.PI)
+                );
+                for (let k = 0; k < 6; k++) {
+                  this.$if(this[`open${k}`], function () {
+                    this[`lf${k}`] = pb.mul(this.lc, pb.max(pb.dot(pb.vec3(...ANISO_DIRS[k]), this.Ld), 0));
+                  });
+                }
+              });
+              // Local light shadow, as Lumen's offscreen shadowing through the global field
+              // (LumenSceneDirectLightingSoftwareRayTracing.usf, TraceOffscreenShadows): one hard
+              // ray from the voxel to the light position, a rect light's centre included,
+              // stopping one field voxel short of the light so geometry right next to it does
+              // not shadow it (VoxelSizeRelativeRayEndBias). Traced only where it lights a face.
+              this.$l.lightSum = pb.add(this.lf0, this.lf1, this.lf2, this.lf3, this.lf4, this.lf5);
+              this.$l.lightShadow = pb.float(1);
+              this.$if(
+                pb.and(
+                  pb.greaterThan(this.shadowInfo.x, 0.5),
+                  pb.greaterThan(pb.max(pb.max(this.lightSum.r, this.lightSum.g), this.lightSum.b), 0)
+                ),
+                function () {
+                  this.$l.toLight = pb.sub(this.posRange.xyz, this.p);
+                  this.$l.SL = pb.normalize(this.toLight);
+                  // Started as the sun's ray: near the voxel corner toward the light
+                  this.$l.sps = pb.add(
+                    this.p,
+                    pb.mul(pb.sign(this.SL), this.vs, 0.48),
+                    pb.mul(this.SL, this.vs, 0.4)
+                  );
+                  this.$l.slen = pb.sub(pb.dot(pb.sub(this.posRange.xyz, this.sps), this.SL), this.info.w);
+                  this.$if(pb.greaterThan(this.slen, 0), function () {
+                    this.lightShadow = sdfConeShadow(
+                      this,
+                      this.sps,
+                      this.SL,
+                      pb.float(HARD_SHADOW_TAN),
+                      this.vs,
+                      this.slen,
+                      levels,
+                      SHADOW_STEPS,
+                      this.level
+                    );
+                  });
+                }
               );
               for (let k = 0; k < 6; k++) {
-                this.$if(this[`open${k}`], function () {
-                  this[`acc${k}`] = pb.add(
-                    this[`acc${k}`],
-                    pb.mul(this.lc, pb.max(pb.dot(pb.vec3(...ANISO_DIRS[k]), this.Ld), 0))
-                  );
-                });
+                this[`acc${k}`] = pb.add(this[`acc${k}`], pb.mul(this[`lf${k}`], this.lightShadow));
               }
             });
             // Ambient per open face: sky, or probe irradiance where covered, carrying every

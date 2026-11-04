@@ -132,26 +132,6 @@ export function getSceneClass(manager: ResourceManager): SerializableClass {
           }
         },
         {
-          name: 'GITerrainAlbedo',
-          description:
-            'Colour the terrain is given in the voxel scene, so the light it bounces onto nearby surfaces takes this tint, until it is read from the terrain itself.',
-          type: 'rgb',
-          default: [0.3, 0.3, 0.3],
-          options: { group: 'Global Illumination' },
-          isHidden(this: Scene) {
-            return !this.gi.enabled;
-          },
-          get(this: Scene, value) {
-            const color = this.gi.terrainAlbedo;
-            value.num[0] = color.x;
-            value.num[1] = color.y;
-            value.num[2] = color.z;
-          },
-          set(this: Scene, value) {
-            this.gi.terrainAlbedo.setXYZ(value.num[0], value.num[1], value.num[2]);
-          }
-        },
-        {
           name: 'GISunShadowConeAngle',
           description:
             'Softness of the sun shadow in the bounced light, as the half angle in degrees of the cone traced through the distance field; the default is the size of the sun. Wider blurs the shadow edges in the indirect light but darkens floors lit through narrow openings; narrower sharpens them.',
@@ -166,6 +146,23 @@ export function getSceneClass(manager: ResourceManager): SerializableClass {
           },
           set(this: Scene, value) {
             this.gi.sunShadowConeAngle = value.num[0];
+          }
+        },
+        {
+          name: 'GILocalLightShadows',
+          description:
+            'Let point, spot and rect lights that cast shadows also cast them in the bounced light, so objects block the light they bounce. Applies to the eight lights nearest the camera; turn off to save GPU time in scenes with many shadowed lights.',
+          type: 'bool',
+          default: true,
+          options: { group: 'Global Illumination' },
+          isHidden(this: Scene) {
+            return !this.gi.enabled;
+          },
+          get(this: Scene, value) {
+            value.bool[0] = this.gi.localLightShadows;
+          },
+          set(this: Scene, value) {
+            this.gi.localLightShadows = value.bool[0];
           }
         },
         {

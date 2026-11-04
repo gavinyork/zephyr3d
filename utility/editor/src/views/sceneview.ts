@@ -351,6 +351,13 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
     this._busyStatusText = statusText?.trim() ?? '';
     this._statusbar.setStatus(this._busyStatusText);
   }
+  /** Replaces the status text of the running busy tasks */
+  updateBusyTask(statusText: string) {
+    if (this._busyTaskCount > 0) {
+      this._busyStatusText = statusText?.trim() ?? '';
+      this._statusbar.setStatus(this._busyStatusText);
+    }
+  }
   endBusyTask(statusText?: string) {
     this._busyTaskCount = Math.max(0, this._busyTaskCount - 1);
     if (this._busyTaskCount === 0) {
@@ -471,6 +478,13 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
               shortCut: 'Ctrl+N',
               action: () => {
                 eventBus.dispatchEvent('action', 'NEW_DOC');
+                return true;
+              }
+            },
+            {
+              label: 'Create Example Scene...',
+              action: () => {
+                eventBus.dispatchEvent('action', 'NEW_EXAMPLE_DOC');
                 return true;
               }
             },

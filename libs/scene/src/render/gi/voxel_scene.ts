@@ -108,15 +108,13 @@ export interface VoxelSceneStats {
  *
  * Voxelizations are budgeted per frame, nearest first, and redone on material change.
  * Materials that cannot be voxelized (see {@link MeshMaterial.supportsVoxelization}) are
- * skipped; terrain gets a flat colour. WebGPU only.
+ * skipped. The terrain's albedo comes from its top-down capture, see TerrainGIAlbedo. WebGPU only.
  *
  * @public
  */
 export class VoxelScene implements GlobalSDFMaterials {
   /** Meshes voxelized per frame. */
   voxelizeBudget: number;
-  /** Albedo given to the terrain, rgb. */
-  readonly terrainAlbedo: Vector4;
   readonly atlas: VoxelMaterialAtlas;
   private readonly _scene: Scene;
   private _voxelizer: Nullable<Voxelizer>;
@@ -140,7 +138,6 @@ export class VoxelScene implements GlobalSDFMaterials {
   constructor(scene: Scene, atlasSize = 256) {
     this._scene = scene;
     this.voxelizeBudget = 8;
-    this.terrainAlbedo = new Vector4(0.3, 0.3, 0.3, 1);
     this.atlas = new VoxelMaterialAtlas([atlasSize, atlasSize, atlasSize]);
     this._voxelizer = null;
     this._lighting = null;

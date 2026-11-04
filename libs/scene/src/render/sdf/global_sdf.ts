@@ -1,8 +1,9 @@
 import type { BindGroup, GPUDataBuffer, GPUProgram, Texture2D, Texture3D } from '@zephyr3d/device';
-import type { Nullable, Vector3 } from '@zephyr3d/base';
-import { Vector4 } from '@zephyr3d/base';
+import type { Nullable } from '@zephyr3d/base';
+import { Vector3, Vector4 } from '@zephyr3d/base';
 import { getDevice } from '../../app/api';
 import { fetchSampler } from '../../utility/misc';
+import { getDefaultTexture2D } from '../../utility/blueprint/material/texture';
 import type { ClipmapTerrain } from '../../scene/terrain-cm/terrain-cm';
 import {
   declareGlobalSDFUniforms,
@@ -98,6 +99,9 @@ export interface GlobalSDFStats {
   waterlineRebuilds: number;
 }
 
+const tmpDirtyMin = new Vector3();
+const tmpDirtyMax = new Vector3();
+
 /**
  * Material sources and targets for compositing materials alongside the field, provided by the
  * voxel scene. The output clipmaps (albedo rgba8unorm, emissive rgba16float) use the field's
@@ -110,7 +114,6 @@ export interface GlobalSDFMaterials {
   readonly atlasSize: [number, number, number];
   readonly albedo: Texture3D;
   readonly emissive: Texture3D;
-  readonly terrainAlbedo: Vector4;
   getSlot(inst: SDFInstance): Nullable<VoxelAtlasSlot>;
 }
 
@@ -393,6 +396,17 @@ export class GlobalSDF {
         if (box) {
           this.markDirty(box.minPoint, box.maxPoint);
         }
+      }
+    }
+    if (this._materials && terrain) {
+      // Recapture the terrain albedo where it changed and recomposite the materials there
+      const rect = terrain.giAlbedo.update();
+      const box = rect ? terrain.getWorldBoundingVolume()?.toAABB() : null;
+      if (rect && box) {
+        this.markDirty(
+          tmpDirtyMin.setXYZ(rect[0], box.minPoint.y, rect[1]),
+          tmpDirtyMax.setXYZ(rect[2], box.maxPoint.y, rect[3])
+        );
       }
     }
     for (let level = 0; level < this.levels; level++) {
@@ -694,7 +708,12 @@ export class GlobalSDF {
       bg.setTexture('matEmissiveAtlas', materials.atlasEmissive, fetchSampler('clamp_nearest_nomip'));
       const s = materials.atlasSize;
       bg.setValue('matAtlasInvSize', new Vector4(1 / s[0], 1 / s[1], 1 / s[2], 0));
-      bg.setValue('terrainAlbedo', materials.terrainAlbedo);
+      const terrainAlbedo = this._terrain?.giAlbedo.texture ?? null;
+      bg.setTexture('terrainAlbedo', terrainAlbedo ?? getDefaultTexture2D(), fetchSampler('clamp_linear'));
+      bg.setValue(
+        'terrainAlbedoSize',
+        new Vector4(terrainAlbedo?.width ?? 1, terrainAlbedo?.height ?? 1, 0, 0)
+      );
       bg.setTexture('albedoOut', materials.albedo);
       bg.setTexture('emissiveOut', materials.emissive);
     }
@@ -773,7 +792,10 @@ export class GlobalSDF {
             this.matAlbedoAtlas = pb.tex3D().uniform(0);
             this.matEmissiveAtlas = pb.tex3D().uniform(0);
             this.matAtlasInvSize = pb.vec4().uniform(0);
-            this.terrainAlbedo = pb.vec4().uniform(0);
+            // Top-down capture of the terrain material albedo, see TerrainGIAlbedo
+            this.terrainAlbedo = pb.tex2D().uniform(0);
+            // (capture width, capture height, 0, 0)
+            this.terrainAlbedoSize = pb.vec4().uniform(0);
             this.albedoOut = pb.texStorage3D.rgba8unorm().storage(0);
             this.emissiveOut = pb.texStorage3D.rgba16float().storage(0);
           }
@@ -951,7 +973,19 @@ export class GlobalSDF {
                   'outEmissive'
                 );
                 this.$if(this.terrainWins, function () {
-                  this.outAlbedo = pb.vec4(this.terrainAlbedo.rgb, 1);
+                  // The capture's mip whose texels match the material voxel (two field voxels),
+                  // so coarse levels read the average over their footprint
+                  this.$l.tregion = pb.sub(this.terrainRegion.zw, this.terrainRegion.xy);
+                  this.$l.tuv = pb.div(pb.sub(this.pc.xz, this.terrainRegion.xy), this.tregion);
+                  this.$l.ttexel = pb.max(
+                    pb.div(this.tregion.x, this.terrainAlbedoSize.x),
+                    pb.div(this.tregion.y, this.terrainAlbedoSize.y)
+                  );
+                  this.$l.tlod = pb.max(pb.log2(pb.div(pb.mul(this.vs, 2), this.ttexel)), 0);
+                  this.outAlbedo = pb.vec4(
+                    pb.textureSampleLevel(this.terrainAlbedo, this.tuv, this.tlod).rgb,
+                    1
+                  );
                   this.outEmissive = pb.vec3(0);
                 });
                 this.$l.ct = pb.div(pb.add(pb.uvec3(this.b1.xyz), this.local), pb.uvec3(2));

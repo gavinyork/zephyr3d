@@ -38,6 +38,7 @@ import { getDevice } from '../../app/api';
 import type { TerrainVirtualTextureOptions } from './terrain_rvt';
 import type { VirtualTexture } from '../../render/virtualtexture/virtual_texture';
 import { TerrainVirtualTexture } from './terrain_rvt';
+import { TerrainGIAlbedo } from './terrain_gi_albedo';
 import { warnUnsupported } from '../../utility/unsupported';
 
 class HeightMinMaxBlitter extends CopyBlitter {
@@ -157,6 +158,7 @@ export class ClipmapTerrain extends applyMixins(GraphNode, mixinDrawable) implem
   private _heightVersion: number;
   private _tmpTexture: DRef<Texture2D>;
   private _virtualTexture: Nullable<TerrainVirtualTexture>;
+  private _giAlbedo: Nullable<TerrainGIAlbedo>;
   /**
    * Creates a new clipmap terrain instance.
    *
@@ -196,6 +198,7 @@ export class ClipmapTerrain extends applyMixins(GraphNode, mixinDrawable) implem
     );
     this._tmpTexture = new DRef();
     this._virtualTexture = null;
+    this._giAlbedo = null;
     this.updateRegion();
     this.updateHeightPyramid();
     scene.queuePerCameraUpdateNode(this);
@@ -353,11 +356,12 @@ export class ClipmapTerrain extends applyMixins(GraphNode, mixinDrawable) implem
   }
   /**
    * Refills the runtime virtual texture over a world XZ rectangle, or everywhere without
-   * arguments. Needed after writing into the splat map or the height map directly (brushes);
-   * replacing textures or changing layer parameters through the material is picked up
-   * automatically.
+   * arguments, and recaptures the albedo global illumination reads there. Needed after writing
+   * into the splat map or the height map directly (brushes); replacing textures or changing
+   * layer parameters through the material is picked up automatically.
    */
   invalidateRuntimeVirtualTexture(x0?: number, z0?: number, x1?: number, z1?: number) {
+    this._giAlbedo?.invalidate(x0, z0, x1, z1);
     if (!this._virtualTexture) {
       return;
     }
@@ -366,6 +370,17 @@ export class ClipmapTerrain extends applyMixins(GraphNode, mixinDrawable) implem
     } else {
       this._virtualTexture.invalidateWorldRegion(x0, z0, x1, z1);
     }
+  }
+  /**
+   * Top-down capture of the material albedo read by global illumination, created on first use.
+   * WebGPU only.
+   * @internal
+   */
+  get giAlbedo() {
+    if (!this._giAlbedo) {
+      this._giAlbedo = new TerrainGIAlbedo(this);
+    }
+    return this._giAlbedo;
   }
   /**
    * The virtual texture behind {@link ClipmapTerrain.runtimeVirtualTexture}, null when disabled.
@@ -1072,6 +1087,8 @@ export class ClipmapTerrain extends applyMixins(GraphNode, mixinDrawable) implem
   protected onDispose() {
     super.onDispose();
     this.setRuntimeVirtualTexture(null);
+    this._giAlbedo?.dispose();
+    this._giAlbedo = null;
     this._clipmap?.dispose();
     this._shadowClipmap?.dispose();
     this._material?.dispose();

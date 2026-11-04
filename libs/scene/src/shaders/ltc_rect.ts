@@ -1,4 +1,4 @@
-import type { PBInsideFunctionScope, PBShaderExp } from '@zephyr3d/device';
+import type { PBGlobalScope, PBInsideFunctionScope, PBShaderExp } from '@zephyr3d/device';
 
 /**
  * Rect light integration with linearly transformed cosines, shared by every
@@ -17,7 +17,7 @@ const LUT_BIAS = 0.5 / LUT_SIZE;
  *
  * @internal
  */
-export function defineLTCEdgeFunctions(scope: PBInsideFunctionScope) {
+export function defineLTCEdgeFunctions(scope: PBGlobalScope | PBInsideFunctionScope) {
   const pb = scope.$builder;
   pb.func('Z_LTCIntegrateEdgeVec', [pb.vec3('v1'), pb.vec3('v2')], function () {
     this.$l.x = pb.dot(this.v1, this.v2);
