@@ -124,6 +124,15 @@ export class HttpFS extends VFS {
     return super.normalizePath(path);
   }
 
+  /**
+   * Gets the URL a VFS path is fetched from.
+   *
+   * @param path - VFS path, may carry a query
+   * @returns Absolute URL, or the path itself if it is a data URI or an object URL
+   */
+  getURL(path: string) {
+    return this.toAbsoluteURL(this.normalizePath(path));
+  }
   protected setReadonly(readonly: boolean) {
     if (!readonly) {
       console.error('Http VFS is always read-only');
