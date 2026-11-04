@@ -17,7 +17,8 @@ import { buildSDFProgram } from '../sdf/sdf_programs';
 import { drawFullscreenQuad } from '../fullscreenquad';
 import { fetchSampler } from '../../utility/misc';
 import { getGICacheExposure } from '../../utility/physical';
-import { LIGHT_TYPE_DIRECTIONAL, LIGHT_TYPE_SPOT } from '../../values';
+import { LIGHT_TYPE_DIRECTIONAL, LIGHT_TYPE_RECT, LIGHT_TYPE_SPOT } from '../../values';
+import { defineLTCEdgeFunctions } from '../../shaders/ltc_rect';
 import {
   declareDynamicSDFUniforms,
   declareGlobalSDFUniforms,
@@ -69,8 +70,9 @@ export interface VoxelLightingOptions {
 
 /**
  * Lights the voxel scene: per material voxel, the sun (cone-traced field shadow, see
- * {@link sdfConeShadow}), unshadowed punctual lights in range and sky irradiance, times
- * albedo, plus emissive, into the radiance clipmap. Kept at the fixed cache exposure
+ * {@link sdfConeShadow}), unshadowed punctual lights in range (rect lights by their one-sided
+ * polygon form factor per voxel face, as surfaces shade them) and sky irradiance, times albedo,
+ * plus emissive, into the radiance clipmap. Kept at the fixed cache exposure
  * (getGICacheExposure) so probes accumulating it don't drift with camera exposure.
  *
  * A fragment pass, one fragment per voxel of a slab of z slices rotating through every
@@ -428,6 +430,40 @@ export class VoxelLighting {
           this.$l.f2 = pb.clamp(pb.sub(1, pb.mul(this.f, this.f)), 0, 1);
           this.$return(pb.mul(this.atten, this.f2, this.f2));
         });
+        // Rect lights as the surfaces shade their diffuse part (see evaluateLTCRectLightTerms):
+        // the polygon form factor clipped to the horizon (LTC with the identity matrix, Heitz et
+        // al. 2016), one-sided about the light plane, with the same range window
+        defineLTCEdgeFunctions(this);
+        pb.func(
+          'Z_rectFormFactor',
+          [pb.vec3('p'), pb.vec3('N'), pb.vec3('V'), pb.vec4('posRange'), pb.vec3('ax'), pb.vec3('ay')],
+          function () {
+            this.$l.lightNormal = pb.neg(pb.normalize(pb.cross(this.ax, this.ay)));
+            this.$l.toPoint = pb.sub(this.p, this.posRange.xyz);
+            this.$if(pb.lessThanEqual(pb.dot(this.lightNormal, this.toPoint), 0), function () {
+              this.$return(pb.float(0));
+            });
+            this.$l.falloff = pb.float(1);
+            this.$if(pb.greaterThan(this.posRange.w, 0), function () {
+              this.falloff = pb.sub(
+                1,
+                pb.smoothStep(pb.mul(this.posRange.w, 0.9), this.posRange.w, pb.length(this.toPoint))
+              );
+            });
+            this.$l.c = this.posRange.xyz;
+            this.$l.ff = this.Z_LTCEvaluateRect(
+              this.N,
+              this.V,
+              this.p,
+              pb.mat3(pb.vec3(1, 0, 0), pb.vec3(0, 1, 0), pb.vec3(0, 0, 1)),
+              pb.sub(pb.sub(this.c, this.ax), this.ay),
+              pb.add(pb.sub(this.c, this.ay), this.ax),
+              pb.add(pb.add(this.c, this.ax), this.ay),
+              pb.add(pb.sub(this.c, this.ax), this.ay)
+            ).x;
+            this.$return(pb.mul(this.ff, this.falloff));
+          }
+        );
         pb.func(
           'Z_spotAttenuation',
           [pb.vec3('p'), pb.vec4('posRange'), pb.vec4('dirCutoff'), pb.vec2('angleScaleOffset')],
@@ -558,34 +594,60 @@ export class VoxelLighting {
               this.$l.colorIntensity = this.lights.at(pb.add(this.base, 2));
               this.$l.extra = this.lights.at(pb.add(this.base, 3));
               this.$l.ltype = pb.int(this.extra.w);
-              this.$l.atten = pb.float(0);
-              this.$l.Ld = pb.vec3(0, 1, 0);
-              this.$if(pb.equal(this.ltype, LIGHT_TYPE_DIRECTIONAL), function () {
-                this.atten = 1;
-                this.Ld = pb.neg(this.dirCutoff.xyz);
-              })
-                .$elseif(pb.equal(this.ltype, LIGHT_TYPE_SPOT), function () {
-                  this.atten = this.Z_spotAttenuation(this.p, this.posRange, this.dirCutoff, this.extra.xy);
-                  this.Ld = pb.normalize(pb.sub(this.posRange.xyz, this.p));
+              this.$if(pb.equal(this.ltype, LIGHT_TYPE_RECT), function () {
+                // Radiance times the form factor seen by each face; (dirCutoff, extra) hold the
+                // half-extent axes
+                this.$l.rc = pb.mul(this.albedo, this.colorIntensity.rgb, this.colorIntensity.w);
+                for (let k = 0; k < 6; k++) {
+                  this.$if(this[`open${k}`], function () {
+                    // Any direction off the normal: the identity-matrix integral does not
+                    // depend on the tangent frame
+                    const v: [number, number, number] = ANISO_DIRS[k][1] !== 0 ? [1, 0, 0] : [0, 1, 0];
+                    this[`acc${k}`] = pb.add(
+                      this[`acc${k}`],
+                      pb.mul(
+                        this.rc,
+                        this.Z_rectFormFactor(
+                          this.p,
+                          pb.vec3(...ANISO_DIRS[k]),
+                          pb.vec3(...v),
+                          this.posRange,
+                          this.dirCutoff.xyz,
+                          this.extra.xyz
+                        )
+                      )
+                    );
+                  });
+                }
+              }).$else(function () {
+                this.$l.atten = pb.float(0);
+                this.$l.Ld = pb.vec3(0, 1, 0);
+                this.$if(pb.equal(this.ltype, LIGHT_TYPE_DIRECTIONAL), function () {
+                  this.atten = 1;
+                  this.Ld = pb.neg(this.dirCutoff.xyz);
                 })
-                .$else(function () {
-                  // Point, and a rect light reduced to its centre
-                  this.atten = this.Z_pointAttenuation(this.p, this.posRange);
-                  this.Ld = pb.normalize(pb.sub(this.posRange.xyz, this.p));
-                });
-              this.$l.lc = pb.mul(
-                this.albedo,
-                this.colorIntensity.rgb,
-                pb.mul(this.colorIntensity.w, this.atten, 1 / Math.PI)
-              );
-              for (let k = 0; k < 6; k++) {
-                this.$if(this[`open${k}`], function () {
-                  this[`acc${k}`] = pb.add(
-                    this[`acc${k}`],
-                    pb.mul(this.lc, pb.max(pb.dot(pb.vec3(...ANISO_DIRS[k]), this.Ld), 0))
-                  );
-                });
-              }
+                  .$elseif(pb.equal(this.ltype, LIGHT_TYPE_SPOT), function () {
+                    this.atten = this.Z_spotAttenuation(this.p, this.posRange, this.dirCutoff, this.extra.xy);
+                    this.Ld = pb.normalize(pb.sub(this.posRange.xyz, this.p));
+                  })
+                  .$else(function () {
+                    this.atten = this.Z_pointAttenuation(this.p, this.posRange);
+                    this.Ld = pb.normalize(pb.sub(this.posRange.xyz, this.p));
+                  });
+                this.$l.lc = pb.mul(
+                  this.albedo,
+                  this.colorIntensity.rgb,
+                  pb.mul(this.colorIntensity.w, this.atten, 1 / Math.PI)
+                );
+                for (let k = 0; k < 6; k++) {
+                  this.$if(this[`open${k}`], function () {
+                    this[`acc${k}`] = pb.add(
+                      this[`acc${k}`],
+                      pb.mul(this.lc, pb.max(pb.dot(pb.vec3(...ANISO_DIRS[k]), this.Ld), 0))
+                    );
+                  });
+                }
+              });
             });
             // Ambient per open face: sky, or probe irradiance where covered, carrying every
             // earlier bounce (Majercik et al. 2019 sec. 3.2). Albedo clamped below 1 keeps
