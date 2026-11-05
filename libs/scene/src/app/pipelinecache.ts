@@ -68,7 +68,11 @@ export interface PipelineCompileRunOptions {
 
 /**
  * Source of the pipelines of a {@link PipelineCompileTask}: the VFS path of a recording
- * file, an entry of a manifest, or a recording already read
+ * file, an entry of a manifest, or a recording already read.
+ *
+ * @remarks
+ * A recording file holds one {@link @zephyr3d/device#PipelineCacheData}, or an array of
+ * them, one per backend that recorded the pipelines; only those of the device are compiled.
  * @public
  */
 export type PipelineCompileSource = string | PipelineCacheManifestEntry | PipelineCacheData;
@@ -166,9 +170,10 @@ export class PipelineCompileTask {
       return this.finish({ ...this._progress, cancelled: true, elapsedMs: 0 });
     }
     this._state = 'loading';
-    const dataList = (await Promise.all(this._sources.map((source) => this.load(source)))).filter(
-      (data): data is PipelineCacheData => !!data
-    );
+    const backend = getDevice().type;
+    const dataList = (await Promise.all(this._sources.map((source) => this.load(source))))
+      .flat()
+      .filter((data) => data.backend === backend);
     if (this._cancelRequested) {
       this._state = 'cancelled';
       return this.finish({ ...this._progress, cancelled: true, elapsedMs: performance.now() - start });
@@ -190,19 +195,23 @@ export class PipelineCompileTask {
     }
     return { ...result, missing: [...this._missing] };
   }
-  private async load(source: PipelineCompileSource): Promise<Nullable<PipelineCacheData>> {
+  private async load(source: PipelineCompileSource): Promise<PipelineCacheData[]> {
     if (typeof source !== 'string' && 'format' in source) {
-      return source;
+      return [source];
     }
     const path = typeof source === 'string' ? source : source.file;
     try {
       if (await this._vfs.exists(path)) {
         const text = (await this._vfs.readFile(path, { encoding: 'utf8' })) as string;
         // Hosts that answer missing files with an HTML page are not pipeline caches
-        if (text.trimStart().startsWith('{')) {
-          const data = JSON.parse(text) as PipelineCacheData;
-          if (data?.format === 'zephyr3d-pso') {
-            return data;
+        const trimmed = text.trimStart();
+        if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
+          const parsed = JSON.parse(text) as PipelineCacheData | PipelineCacheData[];
+          const dataList = (Array.isArray(parsed) ? parsed : [parsed]).filter(
+            (data) => data?.format === 'zephyr3d-pso'
+          );
+          if (dataList.length > 0) {
+            return dataList;
           }
         }
       }
@@ -210,7 +219,7 @@ export class PipelineCompileTask {
       console.warn(`Pipeline cache ${path} unreadable: ${err}`);
     }
     this._missing.push(path);
-    return null;
+    return [];
   }
 }
 
@@ -220,7 +229,8 @@ export class PipelineCompileTask {
  * @remarks
  * Pipelines recorded by the editor (or through the device's {@link @zephyr3d/device#PipelineRecorder})
  * are compiled before the draws that need them, so those draws do not stall. The engine never
- * calls this by itself. Only WebGPU compiles anything; on other devices tasks finish at once.
+ * calls this by itself. WebGPU and WebGL 2 compile the pipelines (on WebGL, the programs) recorded
+ * on the same device type; recordings of other device types are skipped.
  *
  * @example
  * ```ts

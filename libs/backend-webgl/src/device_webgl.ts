@@ -30,7 +30,9 @@ import type {
   DeviceEventMap,
   AbstractDevice,
   FrameBufferClearColors,
-  RenderBundle
+  RenderBundle,
+  PipelineCacheData,
+  PipelinePrecompileOptions
 } from '@zephyr3d/device';
 import {
   hasAlphaChannel,
@@ -68,6 +70,8 @@ import {
 } from './renderstate_webgl';
 import type { DrawBuffersIndexedEXT } from './renderstate_webgl';
 import { GPUTimer } from './gpu_timer';
+import { WebGLPipelineRecorder } from './pipeline_recorder';
+import { WebGLPipelinePrecompiler } from './pipeline_precompiler';
 import { WebGLTextureCaps, WebGLFramebufferCaps, WebGLMiscCaps, WebGLShaderCaps } from './capabilities_webgl';
 import { WebGLBindGroup } from './bindgroup_webgl';
 import { WebGLGPUProgram } from './gpuprogram_webgl';
@@ -249,8 +253,12 @@ export class WebGLDevice extends BaseDevice {
     }
   >;
   private readonly _adapterInfo: { vendor: string; renderer: string; version: string };
+  private readonly _pipelineRecorder: WebGLPipelineRecorder;
+  private readonly _pipelinePrecompiler: WebGLPipelinePrecompiler;
   constructor(backend: DeviceBackend, cvs: HTMLCanvasElement, options?: DeviceOptions) {
     super(cvs, backend, options?.dpr);
+    this._pipelineRecorder = new WebGLPipelineRecorder();
+    this._pipelinePrecompiler = new WebGLPipelinePrecompiler(this);
     this._isRendering = false;
     this._captureRenderBundle = null;
     this._msaaSampleCount = options?.msaa ? 4 : 1;
@@ -1008,6 +1016,23 @@ export class WebGLDevice extends BaseDevice {
         console.error(err);
       }
     }
+  }
+  /** @internal */
+  get pipelineRecorder() {
+    return this._pipelineRecorder;
+  }
+  /** @internal */
+  get pipelinePrecompiler() {
+    return this._pipelinePrecompiler;
+  }
+  getPipelineRecorder() {
+    return this._pipelineRecorder;
+  }
+  precompilePipelines(data: PipelineCacheData | PipelineCacheData[], options?: PipelinePrecompileOptions) {
+    return this._pipelinePrecompiler.submit(Array.isArray(data) ? data : [data], options);
+  }
+  getPipelineCacheStats() {
+    return this._pipelinePrecompiler.getStats();
   }
   beginCapture() {
     if (this._captureRenderBundle) {

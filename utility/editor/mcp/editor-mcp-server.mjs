@@ -3138,7 +3138,7 @@ const BASE_TOOLS = [
   {
     name: 'pipeline_recorder',
     description:
-      'Records the WebGPU pipelines the editor page uses, for the pipeline cache (WebGPU only). Recording only watches the pipelines draws and dispatches ask for, rendering is unchanged; a render bundle replays its draws without asking again, so begin before opening the scene to see them all. Pipelines are grouped by tag, null for those used with no tag. action status reports the recorder; begin and end nest; clear forgets everything recorded; export also returns the pipeline cache JSON of one tag (data). Returns { available, recording, count, tags, data?, err }.',
+      'Records the pipelines the editor page uses, for the pipeline cache (WebGPU pipelines, or WebGL 2 programs). Recording only watches the pipelines draws and dispatches ask for, rendering is unchanged; a render bundle replays its draws without asking again, so begin before opening the scene to see them all. Pipelines are grouped by tag, null for those used with no tag. action status reports the recorder; begin and end nest; clear forgets everything recorded; export also returns the pipeline cache JSON of one tag (data). Returns { available, recording, count, tags, data?, err }.',
     inputSchema: {
       type: 'object',
       required: ['action'],
@@ -3152,7 +3152,7 @@ const BASE_TOOLS = [
   {
     name: 'pipeline_cache',
     description:
-      'Pipelines of the editor page device (WebGPU only). action stats returns how its pipelines were made: { precompiled, precompiledUsed, onDemand, onDemandPrograms } where onDemand counts pipelines a draw or dispatch compiled when issued (a stall) and onDemandPrograms names the programs of the latest of them. action precompile compiles recorded pipelines (data: the data of pipeline_recorder export, or an array of them) ahead of time with the asynchronous pipeline creation and waits for the job: { result: { total, completed, failed, skipped, cancelled, elapsedMs }, stats }. action compile goes through the engine API getEngine().pipelineCache, reading files from the project VFS: manifest (a manifest path, with scenes to pick entries; without scenes every entry) or files (recording file paths); returns { entries, result: { ...counts, missing }, stats }.',
+      'Pipelines of the editor page device (WebGPU, or WebGL 2 programs). action stats returns how its pipelines were made: { precompiled, precompiledUsed, onDemand, onDemandPrograms } where onDemand counts pipelines a draw or dispatch compiled when issued (a stall) and onDemandPrograms names the programs of the latest of them. action precompile compiles recorded pipelines (data: the data of pipeline_recorder export, or an array of them) ahead of time (asynchronous pipeline creation on WebGPU, KHR_parallel_shader_compile on WebGL 2) and waits for the job: { result: { total, completed, failed, skipped, cancelled, elapsedMs }, stats }. action compile goes through the engine API getEngine().pipelineCache, reading files from the project VFS: manifest (a manifest path, with scenes to pick entries; without scenes every entry) or files (recording file paths); returns { entries, result: { ...counts, missing }, stats }.',
     inputSchema: {
       type: 'object',
       required: ['action'],

@@ -4447,7 +4447,7 @@ function runPipelineRecorder(params: { action?: string; tag?: string | null }) {
       recording: false,
       count: 0,
       tags: [],
-      err: 'The device records no pipelines: only WebGPU has a pipeline recorder'
+      err: 'The device records no pipelines: it has no pipeline recorder'
     };
   }
   switch (params?.action) {

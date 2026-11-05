@@ -7,7 +7,8 @@ import { recordAssetRequests, writeScenePreload } from './assetpreload';
 // Pipelines recorded while a project is previewed, so a build can compile them
 // before the draws that need them. A scene's pipelines are kept beside it as
 // `<scene>.zpso`, carried along with the scene like `.zmeta` sidecars and shipped
-// with the assets; those no scene claimed go to the project root.
+// with the assets; those no scene claimed go to the project root. A file holds the
+// recordings of every backend previewed, one each; recording replaces only its own.
 
 /** Extension of the pipeline cache kept beside a scene */
 export const PIPELINE_CACHE_EXTENSION = '.zpso';
@@ -44,18 +45,20 @@ export function setPipelineWarmupCamera(node: SceneNode, warmup: boolean) {
   node.metaData = Object.keys(metaData).length > 0 ? metaData : null;
 }
 
-async function readPipelineCache(vfs: VFS, path: string) {
+/** Reads the recordings of a pipeline cache file, one per backend */
+async function readPipelineCache(vfs: VFS, path: string): Promise<PipelineCacheData[]> {
   try {
     if (await vfs.exists(path)) {
-      const data = JSON.parse(
-        (await vfs.readFile(path, { encoding: 'utf8' })) as string
-      ) as PipelineCacheData;
-      return data?.format === 'zephyr3d-pso' ? data : null;
+      const parsed = JSON.parse((await vfs.readFile(path, { encoding: 'utf8' })) as string) as
+        | PipelineCacheData
+        | PipelineCacheData[];
+      // Files written before they held several backends hold a single recording
+      return (Array.isArray(parsed) ? parsed : [parsed]).filter((data) => data?.format === 'zephyr3d-pso');
     }
   } catch (err) {
     console.warn(`Pipeline cache ${path} unreadable: ${err}`);
   }
-  return null;
+  return [];
 }
 
 /** Pipeline cache files of a project: the common file, then those beside scenes */
@@ -80,13 +83,13 @@ export async function listPipelineCacheFiles(vfs: VFS) {
 export async function scanPipelineCacheManifest(vfs: VFS): Promise<PipelineCacheManifest> {
   const entries: PipelineCacheManifest['entries'] = [];
   for (const file of await listPipelineCacheFiles(vfs)) {
-    const data = await readPipelineCache(vfs, file);
-    if (data) {
+    const dataList = await readPipelineCache(vfs, file);
+    if (dataList.length > 0) {
       entries.push({
         tag: file === PIPELINE_CACHE_COMMON_FILE ? null : file.slice(0, -PIPELINE_CACHE_EXTENSION.length),
         file,
-        render: data.render.length,
-        compute: data.compute.length
+        render: dataList.reduce((count, data) => count + data.render.length, 0),
+        compute: dataList.reduce((count, data) => count + data.compute.length, 0)
       });
     }
   }
@@ -178,7 +181,7 @@ export class PipelineRecordingSession {
     if (!recorder || vfs.readOnly) {
       const badge = PipelineRecordingSession.createBadge();
       badge.textContent = !recorder
-        ? 'Pipelines not recorded: only WebGPU records pipelines'
+        ? 'Pipelines not recorded: this device does not record pipelines'
         : 'Pipelines not recorded: the project is read-only';
       return null;
     }
@@ -206,13 +209,15 @@ export class PipelineRecordingSession {
     document.body.appendChild(badge);
     return badge;
   }
-  /** Earlier recordings are kept: each session adds what it sees */
+  /** Earlier recordings of this backend are kept: each session adds what it sees */
   private async mergeExisting() {
+    const backend = getDevice().type;
     for (const file of await listPipelineCacheFiles(this._vfs)) {
-      const data = await readPipelineCache(this._vfs, file);
-      if (data) {
-        this._recorder.merge(data);
-        this._written.set(data.tag, data.render.length + data.compute.length);
+      for (const data of await readPipelineCache(this._vfs, file)) {
+        if (data.backend === backend) {
+          this._recorder.merge(data);
+          this._written.set(data.tag, data.render.length + data.compute.length);
+        }
       }
     }
   }
@@ -289,7 +294,14 @@ export class PipelineRecordingSession {
           continue;
         }
         const path = tag === null ? PIPELINE_CACHE_COMMON_FILE : getScenePipelineCachePath(tag);
-        await this._vfs.writeFile(path, JSON.stringify(data), { encoding: 'utf8', create: true });
+        // The recordings of the other backends stay as they are
+        const others = (await readPipelineCache(this._vfs, path)).filter(
+          (other) => other.backend !== data.backend
+        );
+        await this._vfs.writeFile(path, JSON.stringify([...others, data]), {
+          encoding: 'utf8',
+          create: true
+        });
         this._written.set(tag, size);
       }
       this._lastCount = count;
