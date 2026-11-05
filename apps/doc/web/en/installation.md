@@ -15,16 +15,16 @@ The engine is split into several packages and you rarely need all of them. Find 
 
 At least one backend package is required; it decides which graphics API the engine runs on:
 
-- `@zephyr3d/backend-webgl` — provides both the WebGL and WebGL2 backends; the most compatible option.
-- `@zephyr3d/backend-webgpu` — the WebGPU backend, with better performance. Some advanced features
-  (ABuffer OIT, compute shaders) are only available here.
+- `@zephyr3d/backend-webgl` — provides the WebGL2 backend; the most compatible option.
+- `@zephyr3d/backend-webgpu` — the WebGPU backend, with better performance and more advanced
+  features such as GPU culling and DDGI.
 
 You can install both and choose at runtime based on device capability — see
 [Your First Application](en/first-app.md).
 
 ## The common combination
 
-For a 3D application that should run on WebGPU where available and WebGL otherwise:
+For a 3D application that should run on WebGPU where available and WebGL2 otherwise:
 
 ```bash
 npm install --save @zephyr3d/base @zephyr3d/scene @zephyr3d/backend-webgl @zephyr3d/backend-webgpu

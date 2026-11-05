@@ -131,7 +131,7 @@ for (let i = 0; i < 100; i++) {
 因此，如果需要对 **透明对象** 使用实例化渲染，推荐使用顺序无关透明渲染技术（**Order‑Independent Transparency, OIT**）。  
 Zephyr3D 提供以下两种 OIT 实现方案：
 
-1. **Weighted Blended OIT** – 兼容 WebGL、WebGL2 和 WebGPU  
+1. **Weighted Blended OIT** – 兼容 WebGL2 和 WebGPU  
 2. **Per‑Pixel Linked List OIT** – 仅支持 WebGPU  
 
 详细说明请参考：[OIT 渲染](zh-cn/oit.md)

@@ -4,12 +4,10 @@
 
 ## 创建设备
 
-渲染设备是一个抽象的接口，目前我们实现了WebGL, WebGL2, WebGPU三个后端。要创建渲染设备实例，需要选择其中一个后端。
+渲染设备是一个抽象的接口，目前我们实现了WebGL2、WebGPU两个后端。要创建渲染设备实例，需要选择其中一个后端。
 
 ```javascript
 
-// 引入WebGL后端
-// import { backendWebGL } from '@zephyr3d/backend-webgl';
 // 引入WebGL2后端
 // import { backendWebGL2 } from '@zephyr3d/backend-webgl';
 // 引入WebGPU后端

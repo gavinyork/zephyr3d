@@ -4,7 +4,7 @@ layout: home
 hero:
   name: Zephyr3d
   text: Browser-native 3D rendering engine
-  tagline: A WebGL, WebGL2 and WebGPU rendering framework with scene, animation, material and editor workflows.
+  tagline: A WebGL2 and WebGPU rendering framework with scene, animation, material and editor workflows.
   image:
     src: https://cdn.zephyr3d.org/doc/assets/images/logo_i.svg
     alt: Zephyr3d
@@ -21,7 +21,7 @@ hero:
 
 features:
   - title: Device API
-    details: Use one rendering abstraction across WebGL, WebGL2 and WebGPU.
+    details: Use one rendering abstraction across WebGL2 and WebGPU.
   - title: Scene API
     details: Build scenes with materials, lighting, animation, post effects and resource loading.
   - title: Editor Workflow

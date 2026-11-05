@@ -6,7 +6,7 @@ Lighting is an essential element in making scenes look more realistic.
 
 Direct lighting refers to objects being illuminated by specific light sources. Currently, we support directional, point, and spot lights.
 
-We utilize Clustered Lighting technology, supporting up to 255 light sources within the view frustum. For WebGL devices, each pixel can receive illumination from up to 8 lights, while for WebGL2 and WebGPU devices, each pixel can be illuminated by up to 16 lights.
+We utilize Clustered Lighting technology, supporting up to 255 light sources within the view frustum. Each pixel can receive illumination from up to 16 lights.
 
 ## Indirect lighting
 

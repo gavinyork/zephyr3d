@@ -76,9 +76,8 @@ const myApp = new Application({
 
 zephyr3d 已不再支持 WebGL1，WebGL 后端最低要求 WebGL2。
 
-后端差异需要留意：WebGPU 支持计算着色器，WebGL 完全不支持；部分特性（如 ABuffer OIT、
-DOM 阴影）也只在 WebGPU 上可用。引擎在能力不足时通常会静默回退到替代实现，
-所以**跨后端开发时要在目标设备上实测**，不能只看代码没报错。
+后端差异需要留意：WebGPU 支持计算着色器，WebGL2 完全不支持；部分特性（如 GPU 剔除、
+DOM 阴影、DDGI 等）也只在 WebGPU 上可用。引擎在能力不足时通常会静默回退到替代实现。
 
 ## 渲染一个场景
 

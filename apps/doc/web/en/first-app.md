@@ -78,10 +78,9 @@ const myApp = new Application({
 
 zephyr3d no longer supports WebGL1; the WebGL backend requires WebGL2.
 
-Backend differences matter: WebGPU supports compute shaders and WebGL does not at all, and some
-features (ABuffer OIT, DOM shadows) are WebGPU-only. The engine usually falls back silently to an
-alternative when a capability is missing, so **test on your target devices** rather than assuming
-that code without errors means the feature is active.
+Backend differences matter: WebGPU supports compute shaders and WebGL2 does not at all, and some
+features (GPU culling, DOM shadows, DDGI) are WebGPU-only. The engine usually falls back silently
+to an alternative when a capability is missing.
 
 ## Rendering a scene
 

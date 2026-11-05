@@ -8,8 +8,8 @@ Zephyr3d是一个面向浏览器的3D渲染框架，提供了两套API接口及�
 
 ### Device API
 
-  DeviceAPI提供了一组面向底层的抽象封装接口，允许用户使用完全相同的方式调用WebGL，WebGL2和WebGPU图形接口。这些接口覆盖了绝大多数的底层API能力，可以轻松支持跨API的图形渲染。
-  跨平台渲染的一个主要困难是Shader语言不同，WebGL和WebGL2使用GLSL而WebGPU使用WGSL，为了能够统一Shader的编写，我们实现了一套动态生成Shader的功能，用户可以使用原生Javascript
+  DeviceAPI提供了一组面向底层的抽象封装接口，允许用户使用完全相同的方式调用WebGL2和WebGPU图形接口。这些接口覆盖了绝大多数的底层API能力，可以轻松支持跨API的图形渲染。
+  跨平台渲染的一个主要困难是Shader语言不同，WebGL2使用GLSL而WebGPU使用WGSL，为了能够统一Shader的编写，我们实现了一套动态生成Shader的功能，用户可以使用原生Javascript
   编写Shader，对于不同的后端，系统自动生成对应的Shader代码，不存在繁琐的字符串拼接，不存在大量的#ifdef，具有极高的灵活性。
 
 ### Scene API

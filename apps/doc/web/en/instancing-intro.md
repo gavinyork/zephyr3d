@@ -145,10 +145,10 @@ it is strongly recommended to use **Order‑Independent Transparency (OIT)** tec
 
 Zephyr3D supports the following OIT implementations:
 
-1. **Weighted Blended OIT** – supported on WebGL, WebGL2, and WebGPU  
+1. **Weighted Blended OIT** – supported on WebGL2 and WebGPU  
 2. **Per‑Pixel Linked List OIT** – available on WebGPU only  
 
-For details, see [OIT Rendering](zh-cn/oit.md).
+For details, see [OIT Rendering](en/oit.md).
 
 ---
 

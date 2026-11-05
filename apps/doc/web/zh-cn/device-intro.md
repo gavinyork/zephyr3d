@@ -12,7 +12,7 @@ Zephyr3d 提供两套 API，本章是其中偏底层的那套。**如果你的�
    │        │
    └────────┴─── Device API   （设备、缓冲区、纹理、shader、绘制调用）
                      │
-              WebGL / WebGL2 / WebGPU
+              WebGL2 / WebGPU
 ```
 
 Scene API 建立在 Device API 之上，两者可以混用：用 Scene API 搭建场景，同时用 Device API
@@ -33,9 +33,9 @@ Scene API 建立在 Device API 之上，两者可以混用：用 Scene API 搭�
 
 ## 这一章提供什么
 
-Device API 把 WebGL、WebGL2 和 WebGPU 抽象成一套统一接口，覆盖了绝大多数底层能力：
+Device API 把 WebGL2 和 WebGPU 抽象成一套统一接口，覆盖了绝大多数底层能力：
 
-- **统一的设备接口** —— 同一份代码跑在三种图形 API 上，见[创建设备](zh-cn/device.md)。
+- **统一的设备接口** —— 同一份代码跑在两种图形 API 上，见[创建设备](zh-cn/device.md)。
 - **用 JavaScript 写 shader** —— 跨 API 最大的障碍是 shader 语言不同（GLSL vs WGSL）。
   引擎让你用原生 JavaScript 描述 shader，再按后端生成对应代码。没有字符串拼接，
   没有成堆的 `#ifdef`，见[编写 shader](zh-cn/shader.md)。
@@ -46,12 +46,12 @@ Device API 把 WebGL、WebGL2 和 WebGPU 抽象成一套统一接口，覆盖了
 
 统一接口不等于能力相同，写跨后端代码时要注意：
 
-| 能力 | WebGL | WebGL2 | WebGPU |
-| --- | --- | --- | --- |
-| 计算着色器 | 不支持 | 不支持 | 支持 |
-| 多渲染目标 | 需扩展 | 支持 | 支持 |
-| 浮点纹理渲染 | 需扩展 | 视扩展而定 | 支持 |
-| Uniform Buffer | 不支持 | 支持 | 支持 |
+| 能力 | WebGL2 | WebGPU |
+| --- | --- | --- |
+| 计算着色器 | 不支持 | 支持 |
+| 多渲染目标 | 支持 | 支持 |
+| 浮点纹理渲染 | 视扩展而定 | 支持 |
+| Uniform Buffer | 支持 | 支持 |
 
 具体能力通过 `device.getDeviceCaps()` 查询。**引擎在能力不足时通常静默回退**，
 所以跨后端开发要在目标设备上实测。
