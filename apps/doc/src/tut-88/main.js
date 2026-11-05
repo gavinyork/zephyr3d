@@ -1,5 +1,5 @@
 import { HttpFS } from '@zephyr3d/base';
-import { Application, getEngine, LoadingProgress } from '@zephyr3d/scene';
+import { Application, getEngine, LoadingProgress, PIPELINE_CACHE_FILE } from '@zephyr3d/scene';
 import { backendWebGL2 } from '@zephyr3d/backend-webgl';
 import { backendWebGPU } from '@zephyr3d/backend-webgpu';
 
@@ -61,16 +61,13 @@ myApp
     const startupScene = '/assets/CornellBox.zscn';
     const tasks = [];
     const preloadList = `${startupScene}.zpreload`;
-    const pipelineCache = getEngine().pipelineCache;
-    const [pipelineManifest, hasPreloadList] = await Promise.all([
-      pipelineCache.loadManifest(),
+    const [hasPipelineCache, hasPreloadList] = await Promise.all([
+      getEngine().VFS.exists(PIPELINE_CACHE_FILE),
       getEngine().VFS.exists(preloadList)
     ]);
-    // Compile the recorded pipelines before the first draws, so they do not stall (WebGPU)
-    if (pipelineManifest) {
-      const pipelines = pipelineCache.createTask(
-        pipelineCache.findEntries(pipelineManifest, { scenes: [startupScene] })
-      );
+    // Compile the recorded pipelines before the first draws, so they do not stall
+    if (hasPipelineCache) {
+      const pipelines = getEngine().pipelineCache.createTask();
       loading.trackPipelines(pipelines, 1);
       tasks.push(pipelines.run());
     }

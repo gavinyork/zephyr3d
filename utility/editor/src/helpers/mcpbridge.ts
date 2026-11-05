@@ -1,6 +1,6 @@
 import type { Editor } from '../core/editor';
 import type { PipelineCacheData, PipelinePrecompilePriority } from '@zephyr3d/device';
-import type { Camera, PipelineCacheManifestEntry, PipelineCompileSource } from '@zephyr3d/scene';
+import type { Camera } from '@zephyr3d/scene';
 import type { PropertyValue, Material } from '@zephyr3d/scene';
 import type { Primitive } from '@zephyr3d/scene';
 import {
@@ -4486,8 +4486,6 @@ async function runPipelineCache(params: {
   action?: string;
   data?: PipelineCacheData | PipelineCacheData[];
   priority?: PipelinePrecompilePriority;
-  manifest?: string;
-  scenes?: string[];
   files?: string[];
 }) {
   const device = getDevice();
@@ -4504,19 +4502,9 @@ async function runPipelineCache(params: {
     }
     case 'compile': {
       const cache = getEngine().pipelineCache;
-      let sources: PipelineCompileSource[] = params.files ?? [];
-      let entries: PipelineCacheManifestEntry[] | null = null;
-      if (params.manifest) {
-        const manifest = await cache.loadManifest(params.manifest);
-        if (!manifest) {
-          return { err: `No pipeline cache manifest at ${params.manifest}` };
-        }
-        entries = cache.findEntries(manifest, params.scenes ? { scenes: params.scenes } : undefined);
-        sources = [...sources, ...entries];
-      }
-      const task = cache.createTask(sources, { name: 'mcp' });
+      const task = cache.createTask(params.files?.length ? params.files : undefined, { name: 'mcp' });
       const result = await task.run({ priority: params.priority ?? 'foreground' });
-      return { entries, state: task.state, result, stats: cache.getStats(), err: null };
+      return { state: task.state, result, stats: cache.getStats(), err: null };
     }
     default:
       return { err: `Unknown action: ${params?.action}` };

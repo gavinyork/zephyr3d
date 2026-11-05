@@ -211,7 +211,7 @@ export function generateIndexTS(settings: ProjectSettings, physics = false) {
   const startupScene = settings.startupScene ?? '';
   return `import { Application, getEngine, setActiveMorphTargetLimit, setMorphTargetLimit, setSkinInfluenceLimit${
     splash ? ', LoadingProgress' : ''
-  } } from '@zephyr3d/scene';
+  }${precompile ? ', PIPELINE_CACHE_FILE' : ''} } from '@zephyr3d/scene';
 import { FBXImporter, GLTFImporter, OBJImporter } from '@zephyr3d/loaders';
 import type { DeviceBackend } from '@zephyr3d/device';
 ${physics ? `import { initPhysics } from '@zephyr3d/physics';\nimport { rapierPhysics } from '@zephyr3d/physics-rapier';\n` : ''}let backend: DeviceBackend = null;
@@ -272,7 +272,7 @@ application.ready().then(async () => {
   }const loading: Promise<unknown>[] = [];
   ${
     startupScene
-      ? `// Asked alongside the pipeline manifest; a project may be published without the list
+      ? `// Asked alongside the pipeline cache; a project may be published without the list
   const preloadList = ${JSON.stringify(`${startupScene}.zpreload`)};
   const hasPreloadList = getEngine().VFS.exists(preloadList);
   `
@@ -280,12 +280,8 @@ application.ready().then(async () => {
   }${
     precompile
       ? `// Recorded pipelines are compiled before the draws that need them, so they do not stall
-  const pipelineManifest = await getEngine().pipelineCache.loadManifest();
-  if (pipelineManifest) {
-    const cache = getEngine().pipelineCache;
-    const pipelines = cache.createTask(cache.findEntries(pipelineManifest, { scenes: ${JSON.stringify(
-      startupScene ? [startupScene] : []
-    )} }));
+  if (await getEngine().VFS.exists(PIPELINE_CACHE_FILE)) {
+    const pipelines = getEngine().pipelineCache.createTask();
     ${splash ? 'splash?.trackPipelines(pipelines, 1);\n    ' : ''}loading.push(pipelines.run());
   }
   `
@@ -314,14 +310,6 @@ application.ready().then(async () => {
   await application.nextFrame();
   sceneStage?.done();
   await splash?.finish();`
-      : ''
-  }${
-    precompile && settings.precompileOtherScenes !== false
-      ? `
-  // The pipelines of the other scenes, without holding up the frames
-  if (pipelineManifest) {
-    void getEngine().pipelineCache.createTask(pipelineManifest.entries).run({ priority: 'background' });
-  }`
       : ''
   }
 });

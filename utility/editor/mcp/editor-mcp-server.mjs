@@ -3152,16 +3152,14 @@ const BASE_TOOLS = [
   {
     name: 'pipeline_cache',
     description:
-      'Pipelines of the editor page device (WebGPU, or WebGL 2 programs). action stats returns how its pipelines were made: { precompiled, precompiledUsed, onDemand, onDemandPrograms } where onDemand counts pipelines a draw or dispatch compiled when issued (a stall) and onDemandPrograms names the programs of the latest of them. action precompile compiles recorded pipelines (data: the data of pipeline_recorder export, or an array of them) ahead of time (asynchronous pipeline creation on WebGPU, KHR_parallel_shader_compile on WebGL 2) and waits for the job: { result: { total, completed, failed, skipped, cancelled, elapsedMs }, stats }. action compile goes through the engine API getEngine().pipelineCache, reading files from the project VFS: manifest (a manifest path, with scenes to pick entries; without scenes every entry) or files (recording file paths); returns { entries, result: { ...counts, missing }, stats }.',
+      'Pipelines of the editor page device (WebGPU, or WebGL 2 programs). action stats returns how its pipelines were made: { precompiled, precompiledUsed, onDemand, onDemandPrograms } where onDemand counts pipelines a draw or dispatch compiled when issued (a stall) and onDemandPrograms names the programs of the latest of them. action precompile compiles recorded pipelines (data: the data of pipeline_recorder export, or an array of them) ahead of time (asynchronous pipeline creation on WebGPU, KHR_parallel_shader_compile on WebGL 2) and waits for the job: { result: { total, completed, failed, skipped, cancelled, elapsedMs }, stats }. action compile goes through the engine API getEngine().pipelineCache, reading pipeline cache files from the project VFS: files, defaulting to /pipeline-cache.json; returns { state, result: { ...counts, missing }, stats }.',
     inputSchema: {
       type: 'object',
       required: ['action'],
       properties: {
         action: { type: 'string', enum: ['stats', 'precompile', 'compile'] },
         data: { type: ['object', 'array'], description: 'Recorded pipelines, for precompile.' },
-        manifest: { type: 'string', description: 'Manifest path, for compile.' },
-        scenes: { type: 'array', items: { type: 'string' }, description: 'Scene paths picking manifest entries, for compile.' },
-        files: { type: 'array', items: { type: 'string' }, description: 'Recording file paths, for compile.' },
+        files: { type: 'array', items: { type: 'string' }, description: 'Pipeline cache file paths, for compile; defaults to /pipeline-cache.json.' },
         priority: { type: 'string', enum: ['foreground', 'background'], default: 'foreground' },
         timeout_ms: { type: 'number', default: 120000 }
       }

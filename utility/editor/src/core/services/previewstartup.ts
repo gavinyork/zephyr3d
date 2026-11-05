@@ -2,7 +2,7 @@ import type { VFS } from '@zephyr3d/base';
 import type { Application } from '@zephyr3d/scene';
 import { getEngine, LoadingProgress } from '@zephyr3d/scene';
 import type { ProjectSettings } from './project';
-import { createStartupPipelineTasks } from './pipelinecache';
+import { createPipelineCacheTask } from './pipelinecache';
 import { getScenePreloadPath } from './assetpreload';
 import { DEFAULT_SPLASH_BACKGROUND } from '../build/templates';
 import { installSplashScreen } from '../build/splash';
@@ -27,12 +27,12 @@ export async function startPreview(
   const loading: Promise<unknown>[] = [];
   const preloadList = startupScene ? getScenePreloadPath(startupScene) : '';
   const [pipelines, hasPreloadList] = await Promise.all([
-    settings.precompilePipelines !== false ? createStartupPipelineTasks(vfs, startupScene) : null,
+    settings.precompilePipelines !== false ? createPipelineCacheTask(vfs) : null,
     preloadList ? vfs.exists(preloadList) : false
   ]);
   if (pipelines) {
-    splash?.trackPipelines(pipelines.startup, 1);
-    loading.push(pipelines.startup.run());
+    splash?.trackPipelines(pipelines, 1);
+    loading.push(pipelines.run());
   }
   const assets = hasPreloadList ? getEngine().assetPreloader.createTask([preloadList]) : null;
   if (assets) {
@@ -48,7 +48,4 @@ export async function startPreview(
   await app.nextFrame();
   sceneStage?.done();
   await splash?.finish();
-  if (pipelines && settings.precompileOtherScenes !== false) {
-    void pipelines.all().run({ priority: 'background' });
-  }
 }

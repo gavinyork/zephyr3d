@@ -11,7 +11,7 @@ import { getVertexFormatSize } from '@zephyr3d/device';
 import type { VertexAttribFormat } from '@zephyr3d/device';
 import type { AssetManifest, AssetSourceKind } from '@zephyr3d/scene';
 import { DerivedAssetService, getDerivedAssetKind } from '../services/derivedassets';
-import { isScenePipelineCachePath, shipPipelineCaches } from '../services/pipelinecache';
+import { shipPipelineCache } from '../services/pipelinecache';
 import { isScenePreloadPath, recordAllScenePreloads, shipScenePreloads } from '../services/assetpreload';
 
 function rewriteImports(code: string): string {
@@ -402,15 +402,13 @@ export async function buildForEndUser(options: {
     includeFiles: true,
     recursive: true
   });
-  // .zmeta sidecars only steer the editor's asset pipeline and are not shipped, nor are
-  // recorded pipelines a build does not precompile
+  // .zmeta sidecars only steer the editor's asset pipeline and are not shipped
   const precompilePipelines =
     (await ProjectService.getCurrentProjectSettings()).precompilePipelines !== false;
   const assetFiles = assetFileList.filter(
     (path) =>
       path.type === 'file' &&
       !isAssetMetaPath(path.path) &&
-      (precompilePipelines || !isScenePipelineCachePath(path.path)) &&
       // Shipped below with the sizes of the shipped files
       !isScenePreloadPath(path.path)
   );
@@ -448,7 +446,7 @@ export async function buildForEndUser(options: {
     });
   }
   if (precompilePipelines) {
-    await shipPipelineCaches(vfs, distDir);
+    await shipPipelineCache(vfs, distDir);
   }
   await shipScenePreloads(vfs, distDir, preloadLists, { ...manifest.textures, ...manifest.primitives });
 

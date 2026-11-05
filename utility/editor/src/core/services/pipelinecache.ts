@@ -1,34 +1,20 @@
 import type { VFS } from '@zephyr3d/base';
 import type { PipelineCacheData, PipelineRecorder } from '@zephyr3d/device';
-import type { Application, PipelineCacheManifest, Scene, SceneNode, Camera } from '@zephyr3d/scene';
-import { getDevice, getEngine, PIPELINE_CACHE_MANIFEST_FILE } from '@zephyr3d/scene';
+import type { Application, Scene, SceneNode, Camera } from '@zephyr3d/scene';
+import { getDevice, getEngine, PIPELINE_CACHE_FILE } from '@zephyr3d/scene';
 import { recordAssetRequests, writeScenePreload } from './assetpreload';
 
 // Pipelines recorded while a project is previewed, so a build can compile them
-// before the draws that need them. A scene's pipelines are kept beside it as
-// `<scene>.zpso`, carried along with the scene like `.zmeta` sidecars and shipped
-// with the assets; those no scene claimed go to the project root. A file holds the
-// recordings of every backend previewed, one each; recording replaces only its own.
+// before the draws that need them. They are kept in one file at the project root,
+// shipped as it is at the root of a build. The file holds the recordings of every
+// backend previewed, one each; recording replaces only its own.
 
-/** Extension of the pipeline cache kept beside a scene */
-export const PIPELINE_CACHE_EXTENSION = '.zpso';
-/** Pipelines no scene claimed */
-export const PIPELINE_CACHE_COMMON_FILE = `/pipeline-cache${PIPELINE_CACHE_EXTENSION}`;
 /** Key in a camera's metadata marking it as a pipeline warmup camera */
 const WARMUP_METADATA_KEY = 'pipelineWarmup';
 /** Frames each warmup camera renders: the first frame of a view and the frames after differ */
 const WARMUP_FRAMES = 4;
 /** Recordings are written back this often while they grow */
 const SAVE_INTERVAL_MS = 3000;
-
-export function getScenePipelineCachePath(scenePath: string) {
-  return `${scenePath}${PIPELINE_CACHE_EXTENSION}`;
-}
-
-/** Whether a path is the pipeline cache beside a scene */
-export function isScenePipelineCachePath(path: string) {
-  return path.toLowerCase().endsWith(`.zscn${PIPELINE_CACHE_EXTENSION}`);
-}
 
 export function isPipelineWarmupCamera(node: SceneNode) {
   const metaData = node.metaData as Record<string, unknown> | null;
@@ -46,7 +32,7 @@ export function setPipelineWarmupCamera(node: SceneNode, warmup: boolean) {
 }
 
 /** Reads the recordings of a pipeline cache file, one per backend */
-async function readPipelineCache(vfs: VFS, path: string): Promise<PipelineCacheData[]> {
+export async function readPipelineCache(vfs: VFS, path = PIPELINE_CACHE_FILE): Promise<PipelineCacheData[]> {
   try {
     if (await vfs.exists(path)) {
       const parsed = JSON.parse((await vfs.readFile(path, { encoding: 'utf8' })) as string) as
@@ -61,89 +47,23 @@ async function readPipelineCache(vfs: VFS, path: string): Promise<PipelineCacheD
   return [];
 }
 
-/** Pipeline cache files of a project: the common file, then those beside scenes */
-export async function listPipelineCacheFiles(vfs: VFS) {
-  const files: string[] = [];
-  if (await vfs.exists(PIPELINE_CACHE_COMMON_FILE)) {
-    files.push(PIPELINE_CACHE_COMMON_FILE);
+/** Copies the pipeline cache of a project to the root of a build, where its entry reads it */
+export async function shipPipelineCache(vfs: VFS, distDir: string) {
+  if (await vfs.exists(PIPELINE_CACHE_FILE)) {
+    await vfs.copyFile(PIPELINE_CACHE_FILE, vfs.join(distDir, PIPELINE_CACHE_FILE), { overwrite: true });
   }
-  // Scenes live under /assets; a build's copies under /dist are not the project's
-  const sidecars = await vfs.glob(`/assets/**/*.zscn${PIPELINE_CACHE_EXTENSION}`, {
-    includeDirs: false,
-    recursive: true
-  });
-  files.push(...sidecars.map((entry) => entry.path).sort());
-  return files;
 }
 
-/**
- * Manifest of the pipeline caches of a project, read from the files themselves,
- * as {@link PipelineCacheManager.findEntries} takes it
- */
-export async function scanPipelineCacheManifest(vfs: VFS): Promise<PipelineCacheManifest> {
-  const entries: PipelineCacheManifest['entries'] = [];
-  for (const file of await listPipelineCacheFiles(vfs)) {
-    const dataList = await readPipelineCache(vfs, file);
-    if (dataList.length > 0) {
-      entries.push({
-        tag: file === PIPELINE_CACHE_COMMON_FILE ? null : file.slice(0, -PIPELINE_CACHE_EXTENSION.length),
-        file,
-        render: dataList.reduce((count, data) => count + data.render.length, 0),
-        compute: dataList.reduce((count, data) => count + data.compute.length, 0)
-      });
-    }
-  }
-  return { format: 'zephyr3d-pso-manifest', version: 1, entries };
-}
-
-/**
- * Ships the pipeline caches with a build: those beside scenes are copied with the
- * assets, this adds the common file and the manifest the build's entry reads
- */
-export async function shipPipelineCaches(vfs: VFS, distDir: string) {
-  const manifest = await scanPipelineCacheManifest(vfs);
-  if (manifest.entries.length === 0) {
-    return;
-  }
-  if (await vfs.exists(PIPELINE_CACHE_COMMON_FILE)) {
-    await vfs.copyFile(PIPELINE_CACHE_COMMON_FILE, vfs.join(distDir, PIPELINE_CACHE_COMMON_FILE), {
-      overwrite: true
-    });
-  }
-  // Relative to the manifest, so the build can be served from any path
-  const shipped: PipelineCacheManifest = {
-    ...manifest,
-    entries: manifest.entries.map((entry) => ({ ...entry, file: entry.file.replace(/^\/+/, '') }))
-  };
-  await vfs.writeFile(vfs.join(distDir, PIPELINE_CACHE_MANIFEST_FILE), JSON.stringify(shipped, null, 2), {
-    encoding: 'utf8',
-    create: true
-  });
-}
-
-/**
- * Recorded pipelines to compile before a scene starts: those of the scene and those no
- * scene claimed, and the task for all of them, to compile the rest in the background
- */
-export async function createStartupPipelineTasks(vfs: VFS, startupScene: string | null | undefined) {
-  const manifest = await scanPipelineCacheManifest(vfs);
-  if (manifest.entries.length === 0) {
-    return null;
-  }
-  const cache = getEngine().pipelineCache;
-  return {
-    startup: cache.createTask(cache.findEntries(manifest, { scenes: startupScene ? [startupScene] : [] }), {
-      name: 'startup'
-    }),
-    all: () => cache.createTask(manifest.entries, { name: 'other scenes' })
-  };
+/** The task compiling the recorded pipelines of a project, or null if none are recorded */
+export async function createPipelineCacheTask(vfs: VFS) {
+  return (await vfs.exists(PIPELINE_CACHE_FILE)) ? getEngine().pipelineCache.createTask() : null;
 }
 
 /**
  * Records the pipelines of a preview into the project.
  *
  * @remarks
- * Pipelines are grouped by scene via `startrender`/`endrender`; warmup cameras render on `tick`.
+ * Scenes get their warmup cameras rendered on `tick` the first time they are rendered.
  * Recording must start before the first frame, as render bundles replay draws without
  * requesting pipelines again.
  */
@@ -154,8 +74,8 @@ export class PipelineRecordingSession {
   /** Warmup frames left per scene; scenes get their turn the first time they are rendered */
   private readonly _warmups: Map<Scene, number>;
   private readonly _warmedUp: WeakSet<Scene>;
-  /** Pipelines per tag when last written */
-  private readonly _written: Map<string | null, number>;
+  /** Pipelines when last written */
+  private _written: number;
   private _warmingUp: boolean;
   private _saving: boolean;
   private _lastCount: number;
@@ -166,7 +86,7 @@ export class PipelineRecordingSession {
     this._scenePaths = new WeakMap();
     this._warmups = new Map();
     this._warmedUp = new WeakSet();
-    this._written = new Map();
+    this._written = -1;
     this._warmingUp = false;
     this._saving = false;
     this._lastCount = -1;
@@ -212,16 +132,15 @@ export class PipelineRecordingSession {
   /** Earlier recordings of this backend are kept: each session adds what it sees */
   private async mergeExisting() {
     const backend = getDevice().type;
-    for (const file of await listPipelineCacheFiles(this._vfs)) {
-      for (const data of await readPipelineCache(this._vfs, file)) {
-        if (data.backend === backend) {
-          this._recorder.merge(data);
-          this._written.set(data.tag, data.render.length + data.compute.length);
-        }
+    for (const data of await readPipelineCache(this._vfs)) {
+      if (data.backend === backend) {
+        // All in one group, as the file is read whole
+        this._recorder.merge({ ...data, tag: null });
+        this._written = data.render.length + data.compute.length;
       }
     }
   }
-  /** Scenes loaded from files group their pipelines under their path */
+  /** Scenes loaded from files record what they fetch, and get warmed up when first shown */
   private watchScenes() {
     const engine = getEngine();
     const loadSceneFromFile = engine.loadSceneFromFile.bind(engine);
@@ -232,21 +151,16 @@ export class PipelineRecordingSession {
         const scenePath = engine.VFS.normalizePath(path);
         this._scenePaths.set(scene, scenePath);
         scene.on('startrender', this.onStartRender, this);
-        scene.on('endrender', this.onEndRender, this);
         void writeScenePreload(this._vfs, scenePath, 'runtime', requests);
       }
       return scene;
     };
   }
   private onStartRender(scene: Scene) {
-    this._recorder.pushTag(this._scenePaths.get(scene)!);
     if (!this._warmedUp.has(scene)) {
       this._warmedUp.add(scene);
       this._warmups.set(scene, WARMUP_FRAMES);
     }
-  }
-  private onEndRender() {
-    this._recorder.popTag();
   }
   /**
    * Renders the warmup cameras of newly shown scenes before the frame: the frame then
@@ -279,7 +193,7 @@ export class PipelineRecordingSession {
       this._warmingUp = false;
     }
   }
-  /** Writes back the recordings that grew since they were last written */
+  /** Writes back the recording once it grew since it was last written */
   private async save() {
     const count = this._recorder.count;
     if (this._saving || count === this._lastCount) {
@@ -287,26 +201,20 @@ export class PipelineRecordingSession {
     }
     this._saving = true;
     try {
-      for (const tag of this._recorder.tags()) {
-        const data = this._recorder.export(tag);
-        const size = data.render.length + data.compute.length;
-        if (size === this._written.get(tag)) {
-          continue;
-        }
-        const path = tag === null ? PIPELINE_CACHE_COMMON_FILE : getScenePipelineCachePath(tag);
+      const data = this._recorder.export(null);
+      const size = data.render.length + data.compute.length;
+      if (size !== this._written) {
         // The recordings of the other backends stay as they are
-        const others = (await readPipelineCache(this._vfs, path)).filter(
-          (other) => other.backend !== data.backend
-        );
-        await this._vfs.writeFile(path, JSON.stringify([...others, data]), {
+        const others = (await readPipelineCache(this._vfs)).filter((other) => other.backend !== data.backend);
+        await this._vfs.writeFile(PIPELINE_CACHE_FILE, JSON.stringify([...others, data]), {
           encoding: 'utf8',
           create: true
         });
-        this._written.set(tag, size);
+        this._written = size;
       }
       this._lastCount = count;
     } catch (err) {
-      console.error(`Writing pipeline caches failed: ${err}`);
+      console.error(`Writing the pipeline cache failed: ${err}`);
     } finally {
       this._saving = false;
       this.updateBadge();

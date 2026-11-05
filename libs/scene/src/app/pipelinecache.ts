@@ -9,36 +9,8 @@ import type {
 } from '@zephyr3d/device';
 import { getDevice } from './api';
 
-/** Default VFS path of the pipeline cache manifest */
-export const PIPELINE_CACHE_MANIFEST_FILE = 'pipeline-cache.json';
-
-/**
- * One recording file listed by a pipeline cache manifest
- * @public
- */
-export interface PipelineCacheManifestEntry {
-  /** Tag the pipelines were recorded under: a scene path, or `null` for pipelines no scene claimed */
-  tag: Nullable<string>;
-  /** VFS path of the recording file; {@link PipelineCacheManager.loadManifest} makes it absolute */
-  file: string;
-  /** Render pipelines in the file */
-  render: number;
-  /** Compute pipelines in the file */
-  compute: number;
-}
-
-/**
- * Lists the recording files of a pipeline cache and the scenes they belong to
- * @public
- */
-export interface PipelineCacheManifest {
-  /** Always `'zephyr3d-pso-manifest'` */
-  format: 'zephyr3d-pso-manifest';
-  /** Format version */
-  version: number;
-  /** Recording files */
-  entries: PipelineCacheManifestEntry[];
-}
+/** VFS path of the pipeline cache file {@link PipelineCacheManager.createTask} reads by default */
+export const PIPELINE_CACHE_FILE = '/pipeline-cache.json';
 
 /**
  * State of a {@link PipelineCompileTask}
@@ -67,17 +39,15 @@ export interface PipelineCompileRunOptions {
 }
 
 /**
- * Source of the pipelines of a {@link PipelineCompileTask}: the VFS path of a recording
- * file, an entry of a manifest, or a recording already read.
+ * Source of the pipelines of a {@link PipelineCompileTask}: the VFS path of a pipeline
+ * cache file, or a recording already read.
  *
  * @remarks
- * A recording file holds one {@link @zephyr3d/device#PipelineCacheData}, or an array of
+ * A pipeline cache file holds one {@link @zephyr3d/device#PipelineCacheData}, or an array of
  * them, one per backend that recorded the pipelines; only those of the device are compiled.
  * @public
  */
-export type PipelineCompileSource = string | PipelineCacheManifestEntry | PipelineCacheData;
-
-const MANIFEST_VERSION = 1;
+export type PipelineCompileSource = string | PipelineCacheData;
 
 /**
  * Recorded pipelines to compile ahead of time.
@@ -196,10 +166,10 @@ export class PipelineCompileTask {
     return { ...result, missing: [...this._missing] };
   }
   private async load(source: PipelineCompileSource): Promise<PipelineCacheData[]> {
-    if (typeof source !== 'string' && 'format' in source) {
+    if (typeof source !== 'string') {
       return [source];
     }
-    const path = typeof source === 'string' ? source : source.file;
+    const path = source;
     try {
       if (await this._vfs.exists(path)) {
         const text = (await this._vfs.readFile(path, { encoding: 'utf8' })) as string;
@@ -235,9 +205,8 @@ export class PipelineCompileTask {
  * @example
  * ```ts
  * const cache = getEngine().pipelineCache;
- * const manifest = await cache.loadManifest();
- * if (manifest) {
- *   const task = cache.createTask(cache.findEntries(manifest, { scenes: ['/assets/main.zscn'] }));
+ * if (await getEngine().VFS.exists(PIPELINE_CACHE_FILE)) {
+ *   const task = cache.createTask();
  *   await task.run({ onProgress: (p) => showProgress(p.completed + p.failed + p.skipped, p.total) });
  * }
  * ```
@@ -252,83 +221,14 @@ export class PipelineCacheManager {
     this._taskCounter = 0;
   }
   /**
-   * Reads a pipeline cache manifest from the engine's VFS.
+   * Makes a task compiling the pipelines of pipeline cache files. It does nothing until it is run.
    *
-   * @param path - VFS path of the manifest, defaults to `/pipeline-cache.json`
-   * @returns The manifest with absolute file paths, or null if there is none or it cannot be read
-   */
-  async loadManifest(path = `/${PIPELINE_CACHE_MANIFEST_FILE}`): Promise<Nullable<PipelineCacheManifest>> {
-    const vfs = this._getVFS();
-    try {
-      if (!(await vfs.exists(path))) {
-        return null;
-      }
-      const text = (await vfs.readFile(path, { encoding: 'utf8' })) as string;
-      if (!text.trimStart().startsWith('{')) {
-        return null;
-      }
-      const manifest = JSON.parse(text) as PipelineCacheManifest;
-      if (
-        manifest?.format !== 'zephyr3d-pso-manifest' ||
-        manifest.version !== MANIFEST_VERSION ||
-        !Array.isArray(manifest.entries)
-      ) {
-        console.warn(`Pipeline cache manifest ${path} skipped: not a version ${MANIFEST_VERSION} manifest`);
-        return null;
-      }
-      const dir = vfs.dirname(vfs.normalizePath(path));
-      return {
-        ...manifest,
-        entries: manifest.entries.map((entry) => ({
-          ...entry,
-          file: vfs.normalizePath(entry.file.startsWith('/') ? entry.file : vfs.join(dir, entry.file))
-        }))
-      };
-    } catch (err) {
-      console.warn(`Pipeline cache manifest ${path} unreadable: ${err}`);
-      return null;
-    }
-  }
-  /**
-   * Picks the entries of a manifest.
-   *
-   * @param manifest - Manifest to pick from
-   * @param query - Scene paths and tags to pick; the entry no scene claimed is included
-   * unless `includeCommon` is false. Without scenes and tags, every entry is picked
-   * @returns The entries picked
-   */
-  findEntries(
-    manifest: PipelineCacheManifest,
-    query?: { scenes?: string[]; tags?: Nullable<string>[]; includeCommon?: boolean }
-  ): PipelineCacheManifestEntry[] {
-    const vfs = this._getVFS();
-    if (!query?.scenes && !query?.tags) {
-      return query?.includeCommon === false
-        ? manifest.entries.filter((entry) => entry.tag !== null)
-        : [...manifest.entries];
-    }
-    const wanted = new Set<Nullable<string>>();
-    for (const scene of query.scenes ?? []) {
-      wanted.add(vfs.normalizePath(scene));
-    }
-    for (const tag of query.tags ?? []) {
-      wanted.add(tag);
-    }
-    if (query.includeCommon !== false) {
-      wanted.add(null);
-    }
-    return manifest.entries.filter(
-      (entry) => wanted.has(entry.tag) || (entry.tag !== null && wanted.has(vfs.normalizePath(entry.tag)))
-    );
-  }
-  /**
-   * Makes a task compiling the pipelines of recording files. It does nothing until it is run.
-   *
-   * @param sources - VFS paths of recording files, manifest entries, or recordings already read
+   * @param sources - VFS paths of pipeline cache files, or recordings already read; defaults
+   * to {@link PIPELINE_CACHE_FILE}
    * @param options - Name of the task, for messages
    * @returns The task
    */
-  createTask(sources: PipelineCompileSource[], options?: { name?: string }) {
+  createTask(sources: PipelineCompileSource[] = [PIPELINE_CACHE_FILE], options?: { name?: string }) {
     return new PipelineCompileTask(
       this._getVFS(),
       sources,

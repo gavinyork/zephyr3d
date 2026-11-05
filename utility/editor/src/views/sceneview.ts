@@ -35,7 +35,8 @@ import {
   JointDynamicsModifier,
   SphereShape,
   CapsuleShape,
-  RenderGraphExecutor
+  RenderGraphExecutor,
+  PIPELINE_CACHE_FILE
 } from '@zephyr3d/scene';
 import type { RGProfileResult, RGProfileScopeResult } from '@zephyr3d/scene';
 import { renderSceneSDFView, SceneNode } from '@zephyr3d/scene';
@@ -106,10 +107,8 @@ import type {
 } from '../components/vfsrenderer';
 import { ProjectService } from '../core/services/project';
 import {
-  getScenePipelineCachePath,
   isPipelineWarmupCamera,
-  listPipelineCacheFiles,
-  scanPipelineCacheManifest,
+  readPipelineCache,
   setPipelineWarmupCamera
 } from '../core/services/pipelinecache';
 import type { SceneController } from '../controllers/scenecontroller';
@@ -444,16 +443,9 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
               }
             },
             {
-              label: 'Clear Pipeline Cache of Current Scene...',
+              label: 'Clear Pipeline Cache...',
               action: () => {
-                void this.clearPipelineCaches(true);
-                return true;
-              }
-            },
-            {
-              label: 'Clear All Pipeline Caches...',
-              action: () => {
-                void this.clearPipelineCaches(false);
+                void this.clearPipelineCache();
                 return true;
               }
             },
@@ -3836,46 +3828,27 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
       this._gizmoEffectAppended = false;
     }
   }
-  /** Deletes recorded pipelines, those of the current scene or all of the project */
-  private async clearPipelineCaches(currentScene: boolean) {
+  /** Deletes the recorded pipelines of the project, of every backend */
+  private async clearPipelineCache() {
     const vfs = ProjectService.VFS;
-    let files: string[];
-    if (currentScene) {
-      const scenePath = this.controller.scenePath;
-      if (!scenePath) {
-        await DlgMessage.messageBox('Error', 'Please save current scene first.');
-        return;
-      }
-      const path = getScenePipelineCachePath(scenePath);
-      files = (await vfs.exists(path)) ? [path] : [];
-    } else {
-      files = await listPipelineCacheFiles(vfs);
-    }
-    if (files.length === 0) {
+    if (!(await vfs.exists(PIPELINE_CACHE_FILE))) {
       await DlgMessage.messageBox('Pipeline Cache', 'No pipelines are recorded.');
       return;
     }
-    let pipelines = 0;
-    let bytes = 0;
-    for (const entry of (await scanPipelineCacheManifest(vfs)).entries) {
-      if (files.includes(entry.file)) {
-        pipelines += entry.render + entry.compute;
-      }
-    }
-    for (const file of files) {
-      bytes += (await vfs.stat(file)).size;
-    }
+    const recordings = await readPipelineCache(vfs);
+    const pipelines = recordings.reduce((count, data) => count + data.render.length + data.compute.length, 0);
+    const bytes = (await vfs.stat(PIPELINE_CACHE_FILE)).size;
     const answer = await Dialog.messageBoxEx(
       'Pipeline Cache',
-      `Delete ${files.length} pipeline cache file(s): ${pipelines} pipelines, ${(bytes / 1024).toFixed(0)} KB?`,
+      `Delete the pipeline cache: ${pipelines} pipelines of ${recordings
+        .map((data) => data.backend)
+        .join(', ')}, ${(bytes / 1024).toFixed(0)} KB?`,
       ['Delete', 'Cancel']
     );
     if (answer !== 'Delete') {
       return;
     }
-    for (const file of files) {
-      await vfs.deleteFile(file);
-    }
+    await vfs.deleteFile(PIPELINE_CACHE_FILE);
   }
   private handleTogglePipelineWarmup(camera: Camera) {
     setPipelineWarmupCamera(camera, !isPipelineWarmupCamera(camera));
