@@ -28,22 +28,31 @@
 
 **概念说明：**
 
-IBL 是通过对一张高动态范围（HDR）的环境贴图进行球面积分，
+IBL 以场景的天空作为光源，对天空进行球面积分，
 预计算出环境反射（Radiance）与环境漫反射（Irradiance），  
 进而在 PBR 材质中实现真实的间接光照和反射效果。
 
 IBL 特点：
 - 适用于 PBR 材质；
 - 能够准确模拟物体与环境的光能交换；
-- 可与天空盒协同工作（基于同一环境贴图）；
-- 支持实时或预计算的辐射/辐照纹理更新。
+- 光源就是当前的天空，天空盒和大气散射天空都可以驱动 IBL；
+- 大气散射天空下，阳光方向或颜色变化时会自动重新烘焙，环境光随昼夜变化。
 
 **使用步骤：**
 
-1. 将 `scene.env.light.type` 设置为 `'ibl'`；  
-2. 赋予场景一个可用于生成天空盒的**HDR 全景图**；  
-3. 通过工具函数将全景图转换为立方体天空贴图；  
-4. 设置天空类型，如天空类型为`'skybox'`，指定天空盒贴图。
+1. 将 `scene.env.light.type` 设置为 `'ibl'`（默认值即为 `'ibl'`）；  
+2. 设置天空类型，`scene.env.sky.skyType` 不能为 `'none'`：
+   - `'scatter'`：大气散射天空，无需任何贴图，环境光由阳光方向实时决定；
+   - `'skybox'`：天空盒，需要指定一张立方体贴图，可直接加载，也可以由 HDR 全景图转换而来。
+
+使用大气散射天空时无需准备任何资源：
+
+```javascript
+scene.env.sky.skyType = 'scatter';
+scene.env.light.type = 'ibl';
+```
+
+使用天空盒时，下例把 HDR 全景图转换为立方体贴图后作为天空盒：
 
 ```javascript
 // 加载 HDR 全景图并生成 IBL 环境光
@@ -65,11 +74,13 @@ getEngine().resourceManager.fetchTexture('https://cdn.zephyr3d.org/doc/assets/im
 ```
 
 > **注意事项：**
-> - IBL 需要一个“天空源”（Sky Source）来计算环境反射，也就是说scene.env.sky.skyType不能为'none'
+> - IBL 需要一个“天空源”（Sky Source）来计算环境反射，也就是说 `scene.env.sky.skyType` 不能为 `'none'`。
 > - IBL 通常与 **PBRMetallicRoughnessMaterial** 一起使用。
-> - 通过动态更换天空贴图即可实现不同场景的环境匹配效果。
+> - 天空盒模式下动态更换天空贴图，或大气散射模式下改变阳光方向，环境光都会随之更新。
 
-<div class="showcase" case="tut-14" style="width:600px;height:800px;"></div>
+下面的示例可以通过左上角按钮开关 IBL 环境光。
+
+<div class="showcase" case="tut-14" style="width:600px;height:500px;"></div>
 
 ---
 
@@ -101,7 +112,9 @@ scene.env.light.ambientDown = new Vector4(0.2, 0.2, 0.2, 1.0);
 > - 它只影响物体的环境光分量；
 > - 对于 PBR Material 来说，效果较为粗糙，如果需要更真实的反射建议使用 IBL。
 
-<div class="showcase" case="tut-15" style="width:600px;height:800px;"></div>
+下面的示例可以通过左上角按钮开关半球环境光。
+
+<div class="showcase" case="tut-15" style="width:600px;height:500px;"></div>
 
 ---
 
@@ -134,24 +147,28 @@ DDGI 与 `scene.env.light` 叠加使用，并不是它的一个取值；`scene.e
 
 **示例：Cornell box**
 
-下面的示例搭了一个经典的 Cornell box：5 m 的白色盒子，左墙红、右墙绿，只有天花板上一盏点光源，
+下面的示例是一个经典的 Cornell box：约 20 m 的白色盒子，左墙红、右墙绿，只有天花板上一盏矩形面光源，
 环境光和天空都关掉，所以画面里除了直接光之外的亮度全部来自 DDGI。用左上角按钮切换 GI，
 可以看到打开后阴影区不再全黑，两侧方块和天花板分别被染上红色和绿色。
 
-示例的盒子是代码生成的 `BoxShape`，没有烘焙好的 SDF 资源，所以要用 `scene.sdf.bakeField()` 在运行时烘焙。
-七个部件共用同一个单位盒子图元，只需要烘焙一次：
+场景是在编辑器里搭建并发布的项目，页面只负责加载并启动它。场景属性里打开了 SDF 和 GI，
+各个墙体和方块的 SDF 已在编辑器中通过 **Mesh Settings > Bake SDF** 预烘焙为 `.zsdf`（参见[网格 SDF 与全局 SDF](sdf.md)），
+运行时直接流式加载，不需要再调用 `scene.sdf.bakeField()`。
 
-<<< @/../src/tut-88/main.js{78-86 js}
-
-墙厚只有 0.2 m，所以把 `probeSpacing` 从默认的 1 m 缩小到 0.5 m，避免探针跨过墙体导致漏光。
-
-切换按钮只调整 `scene.gi.intensity`，探针继续更新，重新打开时无需重新收敛：
-
-<<< @/../src/tut-88/main.js{104-111 js}
+```typescript
+// Keep the probes running and only scale their light, so switching back is instant
+const intensity = scene.gi.intensity > 0 ? scene.gi.intensity : 1;
+const setGI = (enabled: boolean) => {
+  scene.gi.intensity = enabled ? intensity : 0;
+  // ...update the button state
+};
+btnOff.addEventListener('click', () => setGI(false));
+btnOn.addEventListener('click', () => setGI(true));
+```
 
 <div class="showcase" case="tut-88"></div>
 
-> 首次打开需要等待 SDF 烘焙、体素化和探针收敛，前几秒的画面不是最终效果。
+> 首次打开需要等待资源加载、体素化和探针收敛，前几秒的画面不是最终效果。
 
 **启用与参数：**
 
@@ -192,7 +209,7 @@ scene.gi.updateMode = 'frozen';
 
 | 环境光类型 | 特征 | 适用材质 | 适合场景 | 性能 |
 |-------------|--------|------------|------------|--------|
-| **IBL** | 基于 HDR 天空的高精度反射与漫射光 | PBR | 写实、反射性场景 | 较高 |
+| **IBL** | 基于天空（天空盒或大气散射）的高精度反射与漫射光 | PBR | 写实、反射性场景 | 较高 |
 | **Hemispheric** | 上下半球颜色插值的简化照明 | Lambert / Unlit | 低性能设备或卡通风格 | 高 |
 | **None** | 不计算间接光，仅保留直射光 | 任意 | 特效、暗场或特殊视觉风格 | 最高 |
 

@@ -34,8 +34,6 @@ myApp.ready().then(function () {
       scene.env.sky.skyboxTexture = skyMap;
       // Turn off fog
       scene.env.sky.fogType = 'none';
-      // Set the environment lighting mode to IBL and set the radiance map and irradiance map
-      scene.env.light.type = 'ibl';
     });
 
   // Create directional light
@@ -58,23 +56,23 @@ myApp.ready().then(function () {
 
   getInput().use(scene.mainCamera.handleEvent, scene.mainCamera);
 
-  getEngine().setRenderable(scene, 0, {
-    beforeRender: (scene) => {
-      const width = myApp.device.deviceXToScreen(myApp.device.canvas.width);
-      const height = myApp.device.deviceYToScreen(myApp.device.canvas.height);
-      scene.env.light.type = 'ibl';
-      scene.mainCamera.viewport = [0, 0, width, height >> 1];
-    }
-  });
+  // Toggle IBL through the UI buttons
+  const btnOff = document.querySelector('#btn-off');
+  const btnOn = document.querySelector('#btn-on');
 
-  getEngine().setRenderable(scene, 1, {
-    beforeRender: (scene) => {
-      const width = myApp.device.deviceXToScreen(myApp.device.canvas.width);
-      const height = myApp.device.deviceYToScreen(myApp.device.canvas.height);
-      scene.env.light.type = 'none';
-      scene.mainCamera.viewport = [0, height >> 1, width, height - (height >> 1)];
-    }
-  });
+  function setIBL(enabled) {
+    scene.env.light.type = enabled ? 'ibl' : 'none';
+    btnOff.classList.toggle('active', !enabled);
+    btnOn.classList.toggle('active', enabled);
+    btnOff.setAttribute('aria-pressed', String(!enabled));
+    btnOn.setAttribute('aria-pressed', String(enabled));
+  }
+
+  btnOff.addEventListener('click', () => setIBL(false));
+  btnOn.addEventListener('click', () => setIBL(true));
+  setIBL(true);
+
+  getEngine().setRenderable(scene, 0);
 
   myApp.run();
 });

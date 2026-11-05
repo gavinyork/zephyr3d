@@ -36,23 +36,23 @@ myApp.ready().then(function () {
 
   getInput().use(scene.mainCamera.handleEvent, scene.mainCamera);
 
-  getEngine().setRenderable(scene, 0, {
-    beforeRender: (scene) => {
-      const width = myApp.device.deviceXToScreen(myApp.device.canvas.width);
-      const height = myApp.device.deviceYToScreen(myApp.device.canvas.height);
-      scene.env.light.type = 'hemisphere';
-      scene.mainCamera.viewport = [0, 0, width, height >> 1];
-    }
-  });
+  // Toggle Ambient through the UI buttons
+  const btnOff = document.querySelector('#btn-off');
+  const btnOn = document.querySelector('#btn-on');
 
-  getEngine().setRenderable(scene, 1, {
-    beforeRender: (scene) => {
-      const width = myApp.device.deviceXToScreen(myApp.device.canvas.width);
-      const height = myApp.device.deviceYToScreen(myApp.device.canvas.height);
-      scene.env.light.type = 'none';
-      scene.mainCamera.viewport = [0, height >> 1, width, height - (height >> 1)];
-    }
-  });
+  function setAmbient(enabled) {
+    scene.env.light.type = enabled ? 'hemisphere' : 'none';
+    btnOff.classList.toggle('active', !enabled);
+    btnOn.classList.toggle('active', enabled);
+    btnOff.setAttribute('aria-pressed', String(!enabled));
+    btnOn.setAttribute('aria-pressed', String(enabled));
+  }
+
+  btnOff.addEventListener('click', () => setAmbient(false));
+  btnOn.addEventListener('click', () => setAmbient(true));
+  setAmbient(true);
+
+  getEngine().setRenderable(scene, 0);
 
   myApp.run();
 });

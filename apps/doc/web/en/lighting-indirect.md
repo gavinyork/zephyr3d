@@ -29,22 +29,31 @@ If set to `'none'`, the scene disables all ambient lighting, leaving only direct
 
 **Concept Overview:**
 
-IBL computes indirect lighting by integrating an **HDR environment texture** over the spherical domain,  
+IBL uses the scene's sky as the light source, integrating it over the spherical domain and  
 pre‑calculating the *radiance* and *irradiance* distributions used in PBR shading.  
 It provides realistic environmental reflections and energy exchange between objects and their surroundings.
 
 **IBL Characteristics:**
 - Designed for **PBR materials**;
 - Simulates realistic environmental reflection and diffuse lighting;
-- Works with both skyboxes and atmospheric skies as the environment source;
-- Supports both precomputed and dynamically updated radiance/irradiance maps.
+- The light source is the current sky: both skyboxes and atmospheric scattering skies can drive IBL;
+- With the scattering sky, the lighting is re-baked automatically when the sun direction or color changes, so ambient light follows the time of day.
 
 **Setup Procedure:**
 
-1. Set `scene.env.light.type = 'ibl'`;  
-2. Provide an HDR panoramic image for the environment;  
-3. Convert the panoramic image into a cube‑map texture;  
-4. Set the sky type (e.g. `'skybox'`) and assign the sky texture.
+1. Set `scene.env.light.type = 'ibl'` (this is the default);  
+2. Set the sky type; `scene.env.sky.skyType` must not be `'none'`:
+   - `'scatter'`: atmospheric scattering sky. No texture needed; the lighting follows the sun direction in real time;
+   - `'skybox'`: skybox. Requires a cube map, loaded directly or converted from an HDR panorama.
+
+The scattering sky needs no assets at all:
+
+```javascript
+scene.env.sky.skyType = 'scatter';
+scene.env.light.type = 'ibl';
+```
+
+For a skybox, the example below converts an HDR panorama into a cube map and uses it as the skybox:
 
 ```javascript
 // Load an HDR panorama and create IBL lighting
@@ -68,11 +77,12 @@ getEngine().resourceManager.fetchTexture('https://cdn.zephyr3d.org/doc/assets/im
 > **Notes:**
 > - IBL requires a *sky source* to evaluate environment reflections,  
 >   meaning `scene.env.sky.skyType` must **not** be `'none'`.  
-> - Both **skybox** and **atmospheric scattering skies** can drive IBL.  
 > - Commonly used with **PBRMetallicRoughnessMaterial**.  
-> - You can dynamically swap sky textures to achieve environment matching effects.
+> - Swapping the skybox texture, or moving the sun under the scattering sky, updates the ambient lighting accordingly.
 
-<div class="showcase" case="tut-14" style="width:600px;height:800px;"></div>
+The example below lets you toggle IBL ambient lighting with the buttons in the top-left corner.
+
+<div class="showcase" case="tut-14" style="width:600px;height:500px;"></div>
 
 ---
 
@@ -106,7 +116,9 @@ scene.env.light.ambientDown = new Vector4(0.2, 0.2, 0.2, 1.0);
 > - It only affects the **ambient** contribution of materials.  
 > - For PBR materials, the effect is approximate—use **IBL** for physically accurate reflections.
 
-<div class="showcase" case="tut-15" style="width:600px;height:800px;"></div>
+The example below lets you toggle hemispheric ambient lighting with the buttons in the top-left corner.
+
+<div class="showcase" case="tut-15" style="width:600px;height:500px;"></div>
 
 ---
 
@@ -140,24 +152,28 @@ DDGI adds to `scene.env.light` rather than being one of its types, and also work
 
 **Example: Cornell box**
 
-The example below builds the classic Cornell box: a 5 m white box with a red left wall and a green right wall, lit only by a point light under the ceiling.
+The example below is the classic Cornell box: a roughly 20 m white box with a red left wall and a green right wall, lit only by a rectangular area light on the ceiling.
 Ambient light and the sky are off, so everything beyond direct light comes from DDGI. Toggle GI with the buttons in the top-left corner:
 with it on, shadows are no longer black, and the blocks and ceiling pick up red and green from the side walls.
 
-The box is a code-built `BoxShape` with no baked SDF asset, so its field is baked at run time with `scene.sdf.bakeField()`.
-All seven parts share one unit-box primitive, so a single bake covers them:
+The scene is a project built and published in the editor; the page only loads and starts it. SDF and GI are enabled in the scene properties,
+and the fields of the walls and blocks were baked to `.zsdf` in the editor with **Mesh Settings > Bake SDF** (see [Mesh and Global SDF](sdf.md)),
+so they stream in at run time with no `scene.sdf.bakeField()` call.
 
-<<< @/../src/tut-88/main.js{78-86 js}
-
-The walls are only 0.2 m thick, so `probeSpacing` is lowered from the default 1 m to 0.5 m to keep probes from reaching across a wall and leaking light.
-
-The buttons only change `scene.gi.intensity`; the probes keep updating, so switching back needs no reconvergence:
-
-<<< @/../src/tut-88/main.js{104-111 js}
+```typescript
+// Keep the probes running and only scale their light, so switching back is instant
+const intensity = scene.gi.intensity > 0 ? scene.gi.intensity : 1;
+const setGI = (enabled: boolean) => {
+  scene.gi.intensity = enabled ? intensity : 0;
+  // ...update the button state
+};
+btnOff.addEventListener('click', () => setGI(false));
+btnOn.addEventListener('click', () => setGI(true));
+```
 
 <div class="showcase" case="tut-88"></div>
 
-> The first seconds wait for SDF baking, voxelization, and probe convergence; they are not the final image.
+> The first seconds wait for asset loading, voxelization, and probe convergence; they are not the final image.
 
 **Enable it:**
 
