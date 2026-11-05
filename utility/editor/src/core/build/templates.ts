@@ -271,6 +271,13 @@ application.ready().then(async () => {
       : ''
   }const loading: Promise<unknown>[] = [];
   ${
+    startupScene
+      ? `// Asked alongside the pipeline manifest; a project may be published without the list
+  const preloadList = ${JSON.stringify(`${startupScene}.zpreload`)};
+  const hasPreloadList = getEngine().VFS.exists(preloadList);
+  `
+      : ''
+  }${
     precompile
       ? `// Recorded pipelines are compiled before the draws that need them, so they do not stall
   const pipelineManifest = await getEngine().pipelineCache.loadManifest();
@@ -286,18 +293,26 @@ application.ready().then(async () => {
   }${
     startupScene
       ? `// The assets the startup scene fetches, recorded by the editor, load first with a known total
-  const assets = getEngine().assetPreloader.createTask([${JSON.stringify(`${startupScene}.zpreload`)}]);
-  ${splash ? 'splash?.trackPreload(assets, 2);\n  ' : ''}loading.push(assets.run());
+  const assets = (await hasPreloadList) ? getEngine().assetPreloader.createTask([preloadList]) : null;
+  if (assets) {
+    ${splash ? 'splash?.trackPreload(assets, 2);\n    ' : ''}loading.push(assets.run());
+  }
   `
       : ''
-  }${splash ? `const sceneStage = splash?.addStage('Loading scene', 1);\n  ` : ''}await Promise.all(loading);
+  }${
+    splash
+      ? `// Without the list, nothing tells how far loading the scene got: it takes no share of the bar
+  const sceneStage = splash?.addStage('Loading scene', ${startupScene ? 'assets ? 1 : 0' : '0'});
+  `
+      : ''
+  }await Promise.all(loading);
   application.run();
   await getEngine().startup(${JSON.stringify(startupScene)}, ${JSON.stringify(settings.startupScript ?? '')});
-  ${startupScene ? 'assets.release();\n  ' : ''}${
+  ${startupScene ? 'assets?.release();\n  ' : ''}${
     splash
-      ? `sceneStage?.done();
-  // Up until the startup scene is on screen
+      ? `// Up until the startup scene is on screen: the first frame compiles the shaders not precompiled
   await application.nextFrame();
+  sceneStage?.done();
   await splash?.finish();`
       : ''
   }${

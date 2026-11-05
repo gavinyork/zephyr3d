@@ -20,20 +20,29 @@ async function resolveBackend() {
 const loadingElement = document.querySelector('#loading');
 const loading = new LoadingProgress({
   setProgress(fraction) {
-    loadingElement.querySelector('#loading-bar > div').style.width = `${fraction * 100}%`;
+    // The bar shows from the first progress on; without any, only the message shows
+    const bar = /** @type {HTMLDivElement} */ (loadingElement.querySelector('#loading-bar'));
+    bar.hidden = false;
+    /** @type {HTMLDivElement} */ (bar.firstElementChild).style.width = `${fraction * 100}%`;
   },
   setMessage(text) {
-    loadingElement.querySelector('#loading-message').textContent = text;
+    /** @type {HTMLDivElement} */ (loadingElement.querySelector('#loading-message')).textContent = text;
   },
   showError(message) {
-    loadingElement.querySelector('#loading-message').textContent = `Startup failed: ${message}`;
+    /** @type {HTMLDivElement} */ (loadingElement.querySelector('#loading-message')).textContent =
+      `Startup failed: ${message}`;
   },
   hide() {
-    loadingElement.classList.add('done');
-    return new Promise((resolve) => setTimeout(resolve, 300)).then(() => loadingElement.remove());
+    const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+    // Let the bar fill up before fading out
+    return wait(200)
+      .then(() => {
+        loadingElement.classList.add('done');
+        return wait(300);
+      })
+      .then(() => loadingElement.remove());
   }
 });
-const deviceStage = loading.addStage('Creating device');
 
 const myApp = new Application({
   backend: await resolveBackend(),
@@ -46,33 +55,42 @@ const myApp = new Application({
   }
 });
 
-myApp.ready().then(async function () {
-  deviceStage.done();
-  const startupScene = '/assets/CornellBox.zscn';
-  const tasks = [];
-  // Compile the recorded pipelines before the first draws, so they do not stall (WebGPU)
-  const pipelineCache = getEngine().pipelineCache;
-  const pipelineManifest = await pipelineCache.loadManifest();
-  if (pipelineManifest) {
-    const pipelines = pipelineCache.createTask(
-      pipelineCache.findEntries(pipelineManifest, { scenes: [startupScene] })
-    );
-    loading.trackPipelines(pipelines, 1);
-    tasks.push(pipelines.run());
-  }
-  // Fetch the assets the scene loads, with a known total
-  const assets = getEngine().assetPreloader.createTask([`${startupScene}.zpreload`]);
-  loading.trackPreload(assets, 2);
-  tasks.push(assets.run());
-  const sceneStage = loading.addStage('Loading scene');
-  await Promise.all(tasks);
+myApp
+  .ready()
+  .then(async function () {
+    const startupScene = '/assets/CornellBox.zscn';
+    const tasks = [];
+    const preloadList = `${startupScene}.zpreload`;
+    const pipelineCache = getEngine().pipelineCache;
+    const [pipelineManifest, hasPreloadList] = await Promise.all([
+      pipelineCache.loadManifest(),
+      getEngine().VFS.exists(preloadList)
+    ]);
+    // Compile the recorded pipelines before the first draws, so they do not stall (WebGPU)
+    if (pipelineManifest) {
+      const pipelines = pipelineCache.createTask(
+        pipelineCache.findEntries(pipelineManifest, { scenes: [startupScene] })
+      );
+      loading.trackPipelines(pipelines, 1);
+      tasks.push(pipelines.run());
+    }
+    // Fetch the assets the scene loads, with a known total
+    const assets = hasPreloadList ? getEngine().assetPreloader.createTask([preloadList]) : null;
+    if (assets) {
+      loading.trackPreload(assets, 2);
+      tasks.push(assets.run());
+    }
+    // Without the list, nothing tells how far loading the scene got: it takes no share of the bar
+    const sceneStage = loading.addStage('Loading scene', assets ? 1 : 0);
+    await Promise.all(tasks);
 
-  myApp.run();
-  // The scene script sets up the orbit camera and the GI toggle
-  await getEngine().startup(startupScene);
-  assets.release();
-  sceneStage.done();
-  // Hide the loading screen once the scene is on screen
-  await myApp.nextFrame();
-  await loading.finish();
-}).catch((err) => loading.fail(err));
+    myApp.run();
+    // The scene script sets up the orbit camera and the GI toggle
+    await getEngine().startup(startupScene);
+    assets?.release();
+    // The first frame belongs to the scene stage: it compiles the shaders not precompiled
+    await myApp.nextFrame();
+    sceneStage.done();
+    await loading.finish();
+  })
+  .catch((err) => loading.fail(err));

@@ -13,7 +13,13 @@ import type { PipelineCompileTask } from './pipelinecache';
  * @public
  */
 export interface LoadingScreen {
-  /** Shows the overall progress in [0, 1], which never goes back */
+  /**
+   * Shows the overall progress in [0, 1], which never goes back.
+   *
+   * @remarks
+   * Only called once a stage with a share of the progress is added: until then there is
+   * no progress to show, so a screen shows its progress bar from the first call on.
+   */
   setProgress(fraction: number): void;
   /** Shows the name of the stage being loaded */
   setMessage?(text: string): void;
@@ -47,14 +53,17 @@ type Stage = {
  * @remarks
  * Loading is split into stages with weights, such as compiling pipelines, preloading
  * assets and loading the scene; the progress is their weighted sum, never going back,
- * and the message is the name of the first stage not done. The engine never creates
- * one by itself: the code starting the application adds the stages and finishes it.
+ * and the message is the name of the first stage not done. Without a stage with a share
+ * of the progress, the screen is never given one and shows only the message. The engine
+ * never creates one by itself: the code starting the application adds the stages and
+ * finishes it.
  * @public
  */
 export class LoadingProgress {
   private readonly _screen: LoadingScreen;
   private readonly _stages: Stage[];
   private _progress: number;
+  private _reported: boolean;
   private _message: string;
   private _frame: number;
   private _finished: boolean;
@@ -65,6 +74,7 @@ export class LoadingProgress {
     this._screen = screen;
     this._stages = [];
     this._progress = 0;
+    this._reported = false;
     this._message = '';
     this._frame = 0;
     this._finished = false;
@@ -125,7 +135,9 @@ export class LoadingProgress {
     }
     this.stop();
     this._progress = 1;
-    this._screen.setProgress(1);
+    if (this._stages.some((stage) => stage.weight > 0)) {
+      this._screen.setProgress(1);
+    }
     return Promise.resolve(this._screen.hide());
   }
   private stop() {
@@ -164,8 +176,10 @@ export class LoadingProgress {
       }
     }
     const progress = Math.max(this._progress, weight > 0 ? done / weight : 0);
-    if (progress !== this._progress) {
+    // Without a stage with a share, there is no bar to fill
+    if (weight > 0 && (progress !== this._progress || !this._reported)) {
       this._progress = progress;
+      this._reported = true;
       this._screen.setProgress(progress);
     }
     if (message && message !== this._message) {

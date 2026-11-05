@@ -23,7 +23,8 @@ function parseColor(color: string): [number, number, number] {
 }
 
 /**
- * The editor's default splash screen: the engine logo, a progress bar and a message line.
+ * The editor's default splash screen: the engine logo, a progress bar, shown once there is
+ * progress to show, and a message line.
  *
  * @remarks
  * `style` goes in the head and `markup` first in the body, so the browser draws it
@@ -68,6 +69,9 @@ export function generateSplashScreenHTML(background: string) {
         background: color-mix(in srgb, currentColor 18%, transparent);
         overflow: hidden;
       }
+      #${ID}-progress[hidden] {
+        display: none;
+      }
       #${ID}-progress > div {
         width: 0;
         height: 100%;
@@ -84,8 +88,8 @@ export function generateSplashScreenHTML(background: string) {
     </style>`;
   const markup = `<div id="${ID}" role="status" aria-live="polite">
       <div id="${ID}-logo">${ENGINE_LOGO_SVG}</div>
-      <div id="${ID}-progress"><div></div></div>
-      <div id="${ID}-message"></div>
+      <div id="${ID}-progress" hidden><div></div></div>
+      <div id="${ID}-message">Loading</div>
     </div>`;
   const script = `(() => {
         const root = document.getElementById('${ID}');
@@ -94,6 +98,8 @@ export function generateSplashScreenHTML(background: string) {
         let hidden = null;
         const screen = {
           setProgress(fraction) {
+            // Shown from the first progress on; without any, only the message shows
+            progress.hidden = false;
             progress.firstElementChild.style.width = (Math.min(Math.max(fraction, 0), 1) * 100).toFixed(1) + '%';
           },
           setMessage(text) {

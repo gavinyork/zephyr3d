@@ -49,6 +49,9 @@
         background: rgba(255, 255, 255, 0.15);
         overflow: hidden;
       }
+      #loading-bar[hidden] {
+        display: none;
+      }
       #loading-bar > div {
         width: 0;
         height: 100%;
@@ -64,8 +67,8 @@
   <body>
     <canvas id="my-canvas"></canvas>
     <div id="loading" role="status" aria-live="polite">
-      <div id="loading-bar"><div></div></div>
-      <div id="loading-message">Loading engine</div>
+      <div id="loading-bar" hidden><div></div></div>
+      <div id="loading-message">Loading</div>
     </div>
     <!-- The scene script imports the engine by name; map it to the bundles this page loads -->
     <script type="importmap">

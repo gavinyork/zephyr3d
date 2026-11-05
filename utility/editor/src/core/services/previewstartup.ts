@@ -25,25 +25,28 @@ export async function startPreview(
       : null;
   document.getElementById('zephyr-loading')?.remove();
   const loading: Promise<unknown>[] = [];
-  const pipelines =
-    settings.precompilePipelines !== false ? await createStartupPipelineTasks(vfs, startupScene) : null;
+  const preloadList = startupScene ? getScenePreloadPath(startupScene) : '';
+  const [pipelines, hasPreloadList] = await Promise.all([
+    settings.precompilePipelines !== false ? createStartupPipelineTasks(vfs, startupScene) : null,
+    preloadList ? vfs.exists(preloadList) : false
+  ]);
   if (pipelines) {
     splash?.trackPipelines(pipelines.startup, 1);
     loading.push(pipelines.startup.run());
   }
-  const assets = startupScene
-    ? getEngine().assetPreloader.createTask([getScenePreloadPath(startupScene)])
-    : null;
+  const assets = hasPreloadList ? getEngine().assetPreloader.createTask([preloadList]) : null;
   if (assets) {
     splash?.trackPreload(assets, 2);
     loading.push(assets.run());
   }
-  const sceneStage = splash?.addStage('Loading scene', 1);
+  // Without the list, nothing tells how far loading the scene got: it takes no share of the bar
+  const sceneStage = splash?.addStage('Loading scene', assets ? 1 : 0);
   await Promise.all(loading);
   await getEngine().startup(startupScene, settings.startupScript);
   assets?.release();
-  sceneStage?.done();
+  // The first frame compiles the shaders not precompiled
   await app.nextFrame();
+  sceneStage?.done();
   await splash?.finish();
   if (pipelines && settings.precompileOtherScenes !== false) {
     void pipelines.all().run({ priority: 'background' });
