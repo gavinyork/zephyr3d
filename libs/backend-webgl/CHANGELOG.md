@@ -1,6 +1,19 @@
 # Change Log - @zephyr3d/backend-webgl
 
-This log was last generated on Mon, 14 Sep 2026 20:07:40 GMT and should not be manually modified.
+This log was last generated on Fri, 06 Nov 2026 12:12:00 GMT and should not be manually modified.
+
+## 0.2.0
+Fri, 06 Nov 2026 12:12:00 GMT
+
+### Minor changes
+
+- Drop WebGL1 support: backendWebGL1 is a deprecated alias that creates WebGL2 devices.
+- Add ETC2/EAC compressed texture formats.
+- Record and precompile shader programs through the pipeline cache; implement frame pacing.
+
+### Patches
+
+- Add dummy implementation for computeIndirect API.
 
 ## 0.1.18
 Mon, 14 Sep 2026 20:07:40 GMT

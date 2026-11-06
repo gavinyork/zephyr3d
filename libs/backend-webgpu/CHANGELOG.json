@@ -2,6 +2,43 @@
   "name": "@zephyr3d/backend-webgpu",
   "entries": [
     {
+      "version": "0.2.0",
+      "tag": "@zephyr3d/backend-webgpu_v0.2.0",
+      "date": "Fri, 06 Nov 2026 12:12:00 GMT",
+      "comments": {
+        "patch": [
+          {
+            "comment": "Defer destroying staging buffers with a pending mapAsync so disposing a buffer mid-frame no longer reports a validation error"
+          },
+          {
+            "comment": "Supports indirect dispatch API."
+          },
+          {
+            "comment": "Reuse per-frame upload and readback buffers and defer readback copies to the next submit."
+          }
+        ],
+        "minor": [
+          {
+            "comment": "Add ETC2/EAC compressed texture formats; render bundles capture indirect draws."
+          },
+          {
+            "comment": "Record the pipelines draws and dispatches use under stable content keys and compile them ahead of time with asynchronous pipeline creation; share shader modules and pipeline layouts by content."
+          },
+          {
+            "comment": "Support tier1/tier2 storage texture formats and read-only/read-write access; build 3D texture mip chains with compute; implement frame pacing."
+          }
+        ],
+        "dependency": [
+          {
+            "comment": "Updating dependency \"@zephyr3d/base\" from `^0.2.10` to `0.2.11`"
+          },
+          {
+            "comment": "Updating dependency \"@zephyr3d/device\" from `^0.2.19` to `0.3.0`"
+          }
+        ]
+      }
+    },
+    {
       "version": "0.1.21",
       "tag": "@zephyr3d/backend-webgpu_v0.1.21",
       "date": "Tue, 01 Sep 2026 07:54:12 GMT",

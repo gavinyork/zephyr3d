@@ -1,6 +1,13 @@
 # Change Log - @zephyr3d/base
 
-This log was last generated on Tue, 01 Sep 2026 07:54:12 GMT and should not be manually modified.
+This log was last generated on Fri, 06 Nov 2026 12:12:00 GMT and should not be manually modified.
+
+## 0.2.11
+Fri, 06 Nov 2026 12:12:00 GMT
+
+### Patches
+
+- Add the DEBUG_VIEWS global flag that gates engine debug views.
 
 ## 0.2.10
 Tue, 01 Sep 2026 07:54:12 GMT

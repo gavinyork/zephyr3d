@@ -2,6 +2,37 @@
   "name": "@zephyr3d/loaders",
   "entries": [
     {
+      "version": "0.2.0",
+      "tag": "@zephyr3d/loaders_v0.2.0",
+      "date": "Fri, 06 Nov 2026 12:12:00 GMT",
+      "comments": {
+        "minor": [
+          {
+            "comment": "Load KTX2 textures (KHR_texture_basisu) and meshopt, quantized and Draco-compressed glTF geometry."
+          },
+          {
+            "comment": "Generate levels of detail on load with the generateLods option."
+          }
+        ],
+        "patch": [
+          {
+            "comment": "Fix the evaluation order of FBX PreRotation/PostRotation."
+          }
+        ],
+        "dependency": [
+          {
+            "comment": "Updating dependency \"@zephyr3d/base\" from `^0.2.10` to `0.2.11`"
+          },
+          {
+            "comment": "Updating dependency \"@zephyr3d/scene\" from `^0.9.27` to `0.10.0`"
+          },
+          {
+            "comment": "Updating dependency \"@zephyr3d/device\" from `^0.2.19` to `0.3.0`"
+          }
+        ]
+      }
+    },
+    {
       "version": "0.1.6",
       "tag": "@zephyr3d/loaders_v0.1.6",
       "date": "Mon, 14 Sep 2026 20:07:40 GMT",

@@ -1,6 +1,28 @@
 # Change Log - @zephyr3d/editor
 
-This log was last generated on Mon, 14 Sep 2026 20:07:40 GMT and should not be manually modified.
+This log was last generated on Fri, 06 Nov 2026 12:12:00 GMT and should not be manually modified.
+
+## 0.4.0
+Fri, 06 Nov 2026 12:12:00 GMT
+
+### Minor changes
+
+- Drop the WebGL1 target; projects targeting WebGL now use WebGL2.
+- Opt-in asset compression: per-texture .zmeta settings, KTX2 textures and meshopt meshes built in a background derived data cache and shipped through an asset manifest.
+- Generate mesh levels of detail by minimum triangle count at import; add wireframe and LOD coloration views to the View menu.
+- Builds show an HTML loading screen until the startup scene is drawn.
+- Add rigid body physics: Add Physics presets with undo, outlines of colliders, joints and wheels, scene physics settings with a collision layer editor, simulation in Play and Preview, and builds that ship the physics engine only when a project uses it.
+- Extend the MCP tools to terrain (height sampling, scripted height/splat/grass generation, detail and grass layers), node_create for every Add menu class, foliage, physics presets, SDF bake and queries, water interaction, GI probe and voxel queries, the pipeline recorder, frame timing and preview console logs.
+- Add foliage editing: a layer list, a density mask painting brush and deterministic regeneration.
+- Add WebGPU compute erosion brushes with persistent hydraulic flow and wind sediment transport. Collider outlines are now hidden by default behind View > Show Colliders.
+- Add the Bake SDF dialog (Mesh Settings > Bake SDF) and the Distance Field view.
+- Record the pipelines a project preview uses into pipeline-cache.json, ship it with builds and compile it on the loading screen before the startup scene starts.
+- Show a default loading screen with the engine logo and progress in builds and previews, and preload the assets each scene requests.
+- Add Create Example Scene (Cornell Box, Buildings, Terrain).
+
+### Patches
+
+- Add serializable GPU cloth component.
 
 ## 0.3.16
 Mon, 14 Sep 2026 20:07:40 GMT

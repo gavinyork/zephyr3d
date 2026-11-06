@@ -1,6 +1,55 @@
 # Change Log - @zephyr3d/scene
 
-This log was last generated on Mon, 14 Sep 2026 20:07:40 GMT and should not be manually modified.
+This log was last generated on Fri, 06 Nov 2026 12:12:00 GMT and should not be manually modified.
+
+## 0.10.0
+Fri, 06 Nov 2026 12:12:00 GMT
+
+### Minor changes
+
+- Add new SSS material.
+- Fix incorrect computation of atmosphere, aerial perspective and height fog.
+- Drop WebGL1 support, WebGL2 is the minimum.
+- Add mesh levels of detail with runtime generation and GPU selection for BatchGroup instances.
+- Add instanced skinned meshes, GPU animation banks and GPU culling of BatchGroup instances.
+- Load KTX2 textures, compressed geometry and binary .zmsh primitives.
+- Add procedural blade grass, a scene wind field and screen-space contact shadows.
+- Add wireframe and LOD debug views; remove the per-mesh wireframe property.
+- Add ScenePhysicsSettings: gravity, step rate and collision layers saved with a scene as its optional physicsSettings.
+- Add input state polling, gamepad support and input action maps (InputActionMap), and type the input middleware arguments.
+- Make camera controllers frame-rate independent with update phases, a lateupdate scene event and the onLateUpdate script hook; add FollowCameraController, a spring-arm camera with collision, chase recentering, target blending and speed-based FOV.
+- Breaking: camera controller event types are no longer generic, and the per-type pointer event interfaces (IControllerPointerDownEvent etc.) are removed.
+- Add the FoliageSystem node: layered scattering in a worker, density mask painting, placement on any surface and per-chunk static colliders; add terrain getHeightAt/getNormalAt/setHeights and asynchronous height read back.
+- Add signed distance fields (scene.sdf, WebGPU): mesh fields baked offline to .zsdf or at run time with bakeField, streamed into a shared atlas and composited with terrain into a global SDF clipmap; materials can opt in to sampling it.
+- Add probe-based dynamic global illumination (scene.gi, WebGPU): a voxel scene lit by the sun, local and rect lights and the sky, plus a multi-level DDGI probe clipmap traced through the global SDF. It feeds the environment light and the SSGI baseline and is tuned with the GIProbeHysteresis setting.
+- Add volumetric clouds (sky.volumetricCloud, WebGPU): coverage-map and noise shaping, an octahedral sky cache for lighting, generated or imported noise volumes and weather maps, and debug views.
+- Add shore waves (ShoreWaveGenerator): trochoid wave trains that shoal, break and swash up the beach. They are driven by a cascaded WaterlineField built from pluggable WaterlineSources (terrain or the scene SDF).
+- Rework water foam: a persistent, advected WaterFoamField for breaking crests, shore surf and interaction, with Crest-style foam shading and a new default foam texture.
+- Improve water rendering: FFT cascades split into non-overlapping bands sized from the wind, slopes filtered by mip footprint, reflections blurred by roughness, and interaction waves that respond to water depth. The default water TAA history share is lowered to 0.2.
+- Breaking: remove the water's legacy ramp medium mode (mediumMode, scatterRampTexture, absorptionRampTexture) and the shoreline foam band properties (shoreFoam*).
+- Add getEngine().pipelineCache to compile pipelines recorded in a pipeline-cache.json ahead of time.
+- Add the LoadingScreen protocol, driven by LoadingProgress, for application startup.
+- Add an onFixedUpdate script hook, called before each physics step.
+- Add primitive triangle read back helpers and CPU access to loaded terrain heights; GPU cloth now reads only the full-detail triangles of meshes with LODs.
+- Add physics data on scene nodes: SceneNode.physics (NodePhysics with RigidBody, Collider, Joint, CharacterController, Vehicle and Wheel, saved with scenes) and Scene.physicsWorld, which is provided by a physics package through setPhysicsWorldFactory. Also the afterupdate scene event and SceneNode.setWorldPose.
+
+### Patches
+
+- Add serializable GPU cloth component
+- rework water subsurface scattering, fix foam lighting on lee slope.
+- Add water interaction: a GPU height field layered over the wave generator with disturbers, obstacles and a foam trail; add WaterSurfaceSampler, BuoyancyVolume and FloatingBody
+- Fix rect light LTC normalization and use float16 LTC LUT, add rect light visual tests
+- Render rect light shadows as cube maps, support point/rect light transmission, fix transmission zeroed by shadow mask
+- Support cube maps in deep opacity map shadows for point and rect lights
+- Support cube maps in deep opacity map shadows for point and rect lights
+- Fix rect light terminator shadow artifacts and black rims under constant ambient.
+- Build light clusters in a compute pass with shared light batches on WebGPU.
+- Terrain runtime virtual texture
+- Fix SSS transmission on WebGL2 and make sky lighting deterministic; improve light clustering and fix several rendering issues.
+- Warn once when a WebGPU-only feature degrades on WebGL2; Hair nodes are skipped on WebGL2 instead of failing to build their shaders.
+- Fix shapes saved without level of detail settings coming back with levels of detail turned on.
+- Spot lights in legacy lighting now use the same inverse square falloff as point lights, so a spot light no longer lights far brighter than a point light of the same intensity.
+- Improve subsurface scattering for water.
 
 ## 0.9.27
 Mon, 14 Sep 2026 20:07:40 GMT

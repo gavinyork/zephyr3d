@@ -1,6 +1,6 @@
 {
   "name": "@zephyr3d/physics-rapier",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Rapier physics engine for @zephyr3d/physics",
   "homepage": "https://github.com/gavinyork/zephyr3d#readme",
   "type": "module",
@@ -15,6 +15,9 @@
     "**/rapier/LICENSE"
   ],
   "sideEffects": false,
+  "publishConfig": {
+    "access": "public"
+  },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/gavinyork/zephyr3d.git"
@@ -72,8 +75,8 @@
     "typescript": "^5.7.3"
   },
   "dependencies": {
-    "@zephyr3d/base": "workspace:^0.2.10",
-    "@zephyr3d/scene": "workspace:^0.9.27",
-    "@zephyr3d/physics": "workspace:^0.1.0"
+    "@zephyr3d/base": "workspace:^0.2.11",
+    "@zephyr3d/scene": "workspace:^0.10.0",
+    "@zephyr3d/physics": "workspace:^0.1.1"
   }
 }

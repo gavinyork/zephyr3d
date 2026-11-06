@@ -63,7 +63,7 @@
     "typescript": "^5.7.3"
   },
   "dependencies": {
-    "@zephyr3d/base": "workspace:^0.2.10",
+    "@zephyr3d/base": "workspace:^0.2.11",
     "@zephyr3d/modelgen": "workspace:^0.1.1"
   }
 }

@@ -1,0 +1,28 @@
+{
+  "name": "@zephyr3d/physics",
+  "entries": [
+    {
+      "version": "0.1.1",
+      "tag": "@zephyr3d/physics_v0.1.1",
+      "date": "Fri, 06 Nov 2026 12:12:00 GMT",
+      "comments": {
+        "none": [
+          {
+            "comment": "New package: simulates the physics data of scene nodes. It provides PhysicsSimulation and initPhysics(engine), with collision and trigger events, collision layers, ray and shape queries, fixed-update forces, mesh, convex hull and terrain colliders, joints, character controllers, ray cast vehicles and collider outlines. The physics engine sits behind a replaceable interface (PhysicsBackend)."
+          }
+        ],
+        "dependency": [
+          {
+            "comment": "Updating dependency \"@zephyr3d/base\" from `^0.2.10` to `0.2.11`"
+          },
+          {
+            "comment": "Updating dependency \"@zephyr3d/device\" from `^0.2.19` to `0.3.0`"
+          },
+          {
+            "comment": "Updating dependency \"@zephyr3d/scene\" from `^0.9.27` to `0.10.0`"
+          }
+        ]
+      }
+    }
+  ]
+}

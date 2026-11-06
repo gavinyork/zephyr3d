@@ -1,6 +1,23 @@
 # Change Log - @zephyr3d/device
 
-This log was last generated on Tue, 01 Sep 2026 07:54:12 GMT and should not be manually modified.
+This log was last generated on Fri, 06 Nov 2026 12:12:00 GMT and should not be manually modified.
+
+## 0.3.0
+Fri, 06 Nov 2026 12:12:00 GMT
+
+### Minor changes
+
+- Drop WebGL1 support: the shader builder no longer generates GLSL ES 1.00, WebGL2 is the minimum.
+- Add ETC2/EAC compressed texture formats and normalized integer vertex formats for normals, tangents and skin weights.
+- Time frames by the vsync timestamp and add framePacing, which holds frames for a steady number of display refreshes and presents them at the last held refresh.
+- Support texture-formats-tier1/tier2 storage formats and read-only/read-write storage texture access.
+- Add pipeline recorder and pipeline cache interfaces for recording and precompiling pipelines.
+
+### Patches
+
+- Add maxFramesInFlight property to device.
+- Supports indirect dispatch API.
+- Add the supportIndirectFirstInstance device capability.
 
 ## 0.2.19
 Tue, 01 Sep 2026 07:54:12 GMT

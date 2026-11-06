@@ -2,6 +2,85 @@
   "name": "@zephyr3d/editor",
   "entries": [
     {
+      "version": "0.4.0",
+      "tag": "@zephyr3d/editor_v0.4.0",
+      "date": "Fri, 06 Nov 2026 12:12:00 GMT",
+      "comments": {
+        "patch": [
+          {
+            "comment": "Add serializable GPU cloth component."
+          }
+        ],
+        "minor": [
+          {
+            "comment": "Drop the WebGL1 target; projects targeting WebGL now use WebGL2."
+          },
+          {
+            "comment": "Opt-in asset compression: per-texture .zmeta settings, KTX2 textures and meshopt meshes built in a background derived data cache and shipped through an asset manifest."
+          },
+          {
+            "comment": "Generate mesh levels of detail by minimum triangle count at import; add wireframe and LOD coloration views to the View menu."
+          },
+          {
+            "comment": "Builds show an HTML loading screen until the startup scene is drawn."
+          },
+          {
+            "comment": "Add rigid body physics: Add Physics presets with undo, outlines of colliders, joints and wheels, scene physics settings with a collision layer editor, simulation in Play and Preview, and builds that ship the physics engine only when a project uses it."
+          },
+          {
+            "comment": "Extend the MCP tools to terrain (height sampling, scripted height/splat/grass generation, detail and grass layers), node_create for every Add menu class, foliage, physics presets, SDF bake and queries, water interaction, GI probe and voxel queries, the pipeline recorder, frame timing and preview console logs."
+          },
+          {
+            "comment": "Add foliage editing: a layer list, a density mask painting brush and deterministic regeneration."
+          },
+          {
+            "comment": "Add WebGPU compute erosion brushes with persistent hydraulic flow and wind sediment transport. Collider outlines are now hidden by default behind View > Show Colliders."
+          },
+          {
+            "comment": "Add the Bake SDF dialog (Mesh Settings > Bake SDF) and the Distance Field view."
+          },
+          {
+            "comment": "Record the pipelines a project preview uses into pipeline-cache.json, ship it with builds and compile it on the loading screen before the startup scene starts."
+          },
+          {
+            "comment": "Show a default loading screen with the engine logo and progress in builds and previews, and preload the assets each scene requests."
+          },
+          {
+            "comment": "Add Create Example Scene (Cornell Box, Buildings, Terrain)."
+          }
+        ],
+        "dependency": [
+          {
+            "comment": "Updating dependency \"@zephyr3d/base\" from `^0.2.10` to `0.2.11`"
+          },
+          {
+            "comment": "Updating dependency \"@zephyr3d/device\" from `^0.2.19` to `0.3.0`"
+          },
+          {
+            "comment": "Updating dependency \"@zephyr3d/scene\" from `^0.9.27` to `0.10.0`"
+          },
+          {
+            "comment": "Updating dependency \"@zephyr3d/loaders\" from `^0.1.6` to `0.2.0`"
+          },
+          {
+            "comment": "Updating dependency \"@zephyr3d/physics\" from `^0.1.0` to `0.1.1`"
+          },
+          {
+            "comment": "Updating dependency \"@zephyr3d/physics-rapier\" from `^0.1.0` to `0.1.1`"
+          },
+          {
+            "comment": "Updating dependency \"@zephyr3d/imgui\" from `^0.2.8` to `0.2.9`"
+          },
+          {
+            "comment": "Updating dependency \"@zephyr3d/backend-webgl\" from `^0.1.18` to `0.2.0`"
+          },
+          {
+            "comment": "Updating dependency \"@zephyr3d/backend-webgpu\" from `^0.1.21` to `0.2.0`"
+          }
+        ]
+      }
+    },
+    {
       "version": "0.3.16",
       "tag": "@zephyr3d/editor_v0.3.16",
       "date": "Mon, 14 Sep 2026 20:07:40 GMT",

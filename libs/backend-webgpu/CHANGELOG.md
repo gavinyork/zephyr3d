@@ -1,6 +1,21 @@
 # Change Log - @zephyr3d/backend-webgpu
 
-This log was last generated on Tue, 01 Sep 2026 07:54:12 GMT and should not be manually modified.
+This log was last generated on Fri, 06 Nov 2026 12:12:00 GMT and should not be manually modified.
+
+## 0.2.0
+Fri, 06 Nov 2026 12:12:00 GMT
+
+### Minor changes
+
+- Add ETC2/EAC compressed texture formats; render bundles capture indirect draws.
+- Record the pipelines draws and dispatches use under stable content keys and compile them ahead of time with asynchronous pipeline creation; share shader modules and pipeline layouts by content.
+- Support tier1/tier2 storage texture formats and read-only/read-write access; build 3D texture mip chains with compute; implement frame pacing.
+
+### Patches
+
+- Defer destroying staging buffers with a pending mapAsync so disposing a buffer mid-frame no longer reports a validation error
+- Supports indirect dispatch API.
+- Reuse per-frame upload and readback buffers and defer readback copies to the next submit.
 
 ## 0.1.21
 Tue, 01 Sep 2026 07:54:12 GMT

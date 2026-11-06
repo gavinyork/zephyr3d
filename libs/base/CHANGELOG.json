@@ -2,6 +2,18 @@
   "name": "@zephyr3d/base",
   "entries": [
     {
+      "version": "0.2.11",
+      "tag": "@zephyr3d/base_v0.2.11",
+      "date": "Fri, 06 Nov 2026 12:12:00 GMT",
+      "comments": {
+        "patch": [
+          {
+            "comment": "Add the DEBUG_VIEWS global flag that gates engine debug views."
+          }
+        ]
+      }
+    },
+    {
       "version": "0.2.10",
       "tag": "@zephyr3d/base_v0.2.10",
       "date": "Tue, 01 Sep 2026 07:54:12 GMT",

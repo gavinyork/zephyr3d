@@ -1,6 +1,18 @@
 # Change Log - @zephyr3d/loaders
 
-This log was last generated on Mon, 14 Sep 2026 20:07:40 GMT and should not be manually modified.
+This log was last generated on Fri, 06 Nov 2026 12:12:00 GMT and should not be manually modified.
+
+## 0.2.0
+Fri, 06 Nov 2026 12:12:00 GMT
+
+### Minor changes
+
+- Load KTX2 textures (KHR_texture_basisu) and meshopt, quantized and Draco-compressed glTF geometry.
+- Generate levels of detail on load with the generateLods option.
+
+### Patches
+
+- Fix the evaluation order of FBX PreRotation/PostRotation.
 
 ## 0.1.6
 Mon, 14 Sep 2026 20:07:40 GMT
