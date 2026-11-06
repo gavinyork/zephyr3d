@@ -656,7 +656,7 @@ describe.each(['webgl2', 'webgpu'] as const)('Ground foam material on %s', (type
                 ]
               ])
             : undefined,
-          scene: { lightingMode: 'physical' },
+          scene: { lightingMode: 'physical', gi: { enabled: false } },
           linearDepthTexture: isColor ? {} : undefined,
           sceneColorTexture: isColor ? {} : undefined
         } as unknown as DrawContext;

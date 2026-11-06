@@ -18,6 +18,64 @@ import {
 } from '@zephyr3d/device';
 import type { NullDeviceCapsOptions, NullDeviceType } from './types';
 
+/** Formats WebGPU storage textures can write without any feature */
+const CORE_STORAGE_FORMATS: ReadonlySet<TextureFormat> = new Set<TextureFormat>([
+  'rgba8unorm',
+  'rgba8snorm',
+  'rgba8ui',
+  'rgba8i',
+  'rgba16ui',
+  'rgba16i',
+  'rgba16f',
+  'r32f',
+  'r32ui',
+  'r32i',
+  'rg32f',
+  'rg32ui',
+  'rg32i',
+  'rgba32f',
+  'rgba32ui',
+  'rgba32i'
+]);
+/** Formats texture-formats-tier1 adds to the WebGPU storage formats */
+const TIER1_STORAGE_FORMATS: ReadonlySet<TextureFormat> = new Set<TextureFormat>([
+  'r8unorm',
+  'r8snorm',
+  'r8ui',
+  'r8i',
+  'rg8unorm',
+  'rg8snorm',
+  'rg8ui',
+  'rg8i',
+  'r16ui',
+  'r16i',
+  'r16f',
+  'rg16ui',
+  'rg16i',
+  'rg16f',
+  'rg11b10uf'
+]);
+/** Formats WebGPU storage textures can read and write without any feature */
+const CORE_READ_WRITE_FORMATS: ReadonlySet<TextureFormat> = new Set<TextureFormat>(['r32f', 'r32ui', 'r32i']);
+/** Formats texture-formats-tier2 lets WebGPU storage textures read and write */
+const TIER2_READ_WRITE_FORMATS: ReadonlySet<TextureFormat> = new Set<TextureFormat>([
+  'r8unorm',
+  'r8ui',
+  'r8i',
+  'rgba8unorm',
+  'rgba8ui',
+  'rgba8i',
+  'r16ui',
+  'r16i',
+  'r16f',
+  'rgba16ui',
+  'rgba16i',
+  'rgba16f',
+  'rgba32ui',
+  'rgba32i',
+  'rgba32f'
+]);
+
 /**
  * Frame buffer capabilities of a null device
  * @public
@@ -136,7 +194,10 @@ export class NullTextureCaps implements TextureCaps {
   supportTextureFormatsTier2: boolean;
   /** @internal */
   private readonly _formatInfos: Partial<Record<TextureFormat, TextureFormatInfo>>;
+  /** @internal */
+  private readonly _type: NullDeviceType;
   constructor(type: NullDeviceType, overrides?: Partial<Omit<TextureCaps, 'getTextureFormatInfo'>>) {
+    this._type = type;
     this.maxTextureSize = 8192;
     this.maxCubeTextureSize = 8192;
     this.npo2Mipmapping = true;
@@ -169,6 +230,10 @@ export class NullTextureCaps implements TextureCaps {
       const compressed = isCompressedTextureFormat(format);
       const float = isFloatTextureFormat(format);
       const integer = isIntegerTextureFormat(format);
+      // Storage textures follow WebGPU, where the tiers widen the core formats; WebGL has none
+      const webgpu = this._type === 'webgpu';
+      const tier2 = this.supportTextureFormatsTier2;
+      const tier1 = tier2 || this.supportTextureFormatsTier1;
       info = {
         // Integer formats are never filterable, compressed formats are never renderable.
         filterable: !integer && (!float || this.supportLinearFloatTexture || hasDepthChannel(format)),
@@ -176,7 +241,11 @@ export class NullTextureCaps implements TextureCaps {
         compressed,
         size: getTextureFormatBlockSize(format),
         blockWidth: getTextureFormatBlockWidth(format),
-        blockHeight: getTextureFormatBlockHeight(format)
+        blockHeight: getTextureFormatBlockHeight(format),
+        writable:
+          webgpu && (CORE_STORAGE_FORMATS.has(format) || (tier1 && TIER1_STORAGE_FORMATS.has(format))),
+        readWritable:
+          webgpu && (CORE_READ_WRITE_FORMATS.has(format) || (tier2 && TIER2_READ_WRITE_FORMATS.has(format)))
       };
       this._formatInfos[format] = info;
     }

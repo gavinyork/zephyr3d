@@ -35,7 +35,7 @@ describe('physics registration and scene settings', () => {
       const world = scene.physicsWorld as PhysicsSimulation;
       expect(world.gravity.y).toBeCloseTo(-9.81, 5);
       expect(world.fixedTimeStep).toBeCloseTo(1 / 60, 8);
-      expect(world.maxSubSteps).toBe(4);
+      expect(world.maxSubSteps).toBe(8);
       expect(world.getLayerCollision(3, 5)).toBe(true);
       expect(world.layerNames[0]).toBe('Default');
     });
