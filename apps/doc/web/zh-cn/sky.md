@@ -96,9 +96,9 @@ sky.skyType = 'scatter';
 sky.cloudMode = 'volumetric';
 
 const clouds = sky.volumetricCloud;
-clouds.layerBottomAltitude = 5000;
-clouds.layerHeight = 10000;
-clouds.coverage = 0.45;
+clouds.layerBottomAltitude = 1500;
+clouds.layerHeight = 4000;
+clouds.coverage = 0.55;
 clouds.density = 0.03;
 clouds.wind.setXY(10, 0);
 clouds.framesPerUpdate = 64;

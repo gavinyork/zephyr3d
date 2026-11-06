@@ -15,7 +15,7 @@ export type CloudMode = 'procedural' | 'volumetric';
  * Which coverage of the cloud map shapes the clouds (Nubis 2017, slides 57-58).
  *
  * - `connected`: Perlin footprints, clouds join into formations.
- * - `isolated`: broad Worley footprints, separate cloud islands with persistent clear gaps.
+ * - `isolated`: Worley footprints about as wide as a cloud is tall, separate clouds with clear gaps.
  *
  * @public
  */
@@ -40,10 +40,10 @@ export type VolumetricCloudDebugView =
 /**
  * Parameters of the volumetric cloud layer.
  *
- * Layer, tracing and lighting parameters follow UE 5.8 `UVolumetricCloudComponent` and its
- * defaults (`VolumetricCloudComponent.cpp`); the density model replaces the UE cloud material
- * with the weather map / noise model of Schneider, "The Real-time Volumetric Cloudscapes of
- * Horizon Zero Dawn" (SIGGRAPH 2015). All distances are in meters.
+ * Tracing and lighting parameters follow UE 5.8 `UVolumetricCloudComponent`; the density model
+ * replaces the UE cloud material with the weather map / noise model of Schneider, "The Real-time
+ * Volumetric Cloudscapes of Horizon Zero Dawn" (SIGGRAPH 2015). The defaults make a fair-weather
+ * cumulus field. All distances are in meters.
  *
  * Every setter bumps {@link VolumetricCloud.version}, which the renderer compares to tell when
  * the cached sky has to be rebuilt rather than updated over the next frames.
@@ -92,13 +92,14 @@ export class VolumetricCloud {
   private _cacheResolution: number;
   constructor() {
     this._version = 0;
-    this._layerBottomAltitude = 5000;
-    this._layerHeight = 10000;
+    this._layerBottomAltitude = 1500;
+    this._layerHeight = 4000;
     this._tracingMaxDistance = 50000;
     // Twice UE's default: the sky cache spreads a full trace over many frames
     this._viewSampleCountScale = 2;
     this._shadowSampleCountScale = 1;
-    this._shadowTracingDistance = 15000;
+    // About where a ray towards a 30 degree sun leaves the layer
+    this._shadowTracingDistance = 8000;
     this._stopTracingTransmittanceThreshold = 0.005;
     this._groundAlbedo = 0.4;
     this._skyLightCloudBottomOcclusion = 0.5;
@@ -110,15 +111,17 @@ export class VolumetricCloud {
     this._msContribution = 0.5;
     this._msOcclusion = 0.5;
     this._msEccentricity = 0.5;
-    this._coverage = 0.45;
+    this._coverage = 0.55;
     this._density = 0.03;
     this._albedo = new Vector3(1, 1, 1);
-    // Generated weather has eight connected or four isolated footprint cells per period.
+    // Isolated cells of 4 km
     this._weatherMapScale = 64000;
-    this._baseNoiseScale = 12000;
+    // Billows of 2 km down to 250 m
+    this._baseNoiseScale = 8000;
     this._shapeStrength = 1;
-    this._detailNoiseScale = 1000;
-    this._detailErosion = 0.25;
+    // Edge cells of 300, 150 and 75 m
+    this._detailNoiseScale = 600;
+    this._detailErosion = 0.35;
     this._detailBottomErosion = 0.1;
     this._baseHeightVariation = 700;
     this._wind = new Vector2(10, 0);

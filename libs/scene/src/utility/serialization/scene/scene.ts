@@ -1044,7 +1044,7 @@ export function getSceneClass(manager: ResourceManager): SerializableClass {
           name: 'VolumetricCloudLayerBottomAltitude',
           description: 'Raises the cloud base: higher clouds look smaller and farther away',
           type: 'float',
-          default: 5000,
+          default: 1500,
           phase: 2,
           options: {
             group: 'VolumetricClouds',
@@ -1067,7 +1067,7 @@ export function getSceneClass(manager: ResourceManager): SerializableClass {
           name: 'VolumetricCloudLayerHeight',
           description: 'Lets clouds tower higher above their base',
           type: 'float',
-          default: 10000,
+          default: 4000,
           phase: 2,
           options: {
             group: 'VolumetricClouds',
@@ -1113,7 +1113,7 @@ export function getSceneClass(manager: ResourceManager): SerializableClass {
           name: 'VolumetricCloudCoverage',
           description: 'Weather coverage: higher grows cloud fields; zero removes all clouds',
           type: 'float',
-          default: 0.45,
+          default: 0.55,
           phase: 2,
           options: {
             group: 'VolumetricClouds',
@@ -1183,7 +1183,7 @@ export function getSceneClass(manager: ResourceManager): SerializableClass {
           name: 'VolumetricCloudBaseNoiseScale',
           description: 'Size of the large billows that shape each cloud',
           type: 'float',
-          default: 12000,
+          default: 8000,
           phase: 2,
           options: {
             group: 'VolumetricClouds',
@@ -1230,7 +1230,7 @@ export function getSceneClass(manager: ResourceManager): SerializableClass {
           name: 'VolumetricCloudDetailNoiseScale',
           description: 'Size of the small wisps along cloud edges',
           type: 'float',
-          default: 1000,
+          default: 600,
           phase: 2,
           options: {
             group: 'VolumetricClouds',
@@ -1298,7 +1298,7 @@ export function getSceneClass(manager: ResourceManager): SerializableClass {
           name: 'VolumetricCloudDetailErosion',
           description: 'Higher gives raggeder, wispier cloud edges',
           type: 'float',
-          default: 0.25,
+          default: 0.35,
           phase: 2,
           options: {
             group: 'VolumetricClouds',
@@ -1621,7 +1621,7 @@ export function getSceneClass(manager: ResourceManager): SerializableClass {
           name: 'VolumetricCloudShadowTracingDistance',
           description: 'How far towards the sun clouds look for cloud that shades them',
           type: 'float',
-          default: 15000,
+          default: 8000,
           phase: 2,
           options: {
             group: 'VolumetricClouds',
