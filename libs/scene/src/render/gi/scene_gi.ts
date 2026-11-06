@@ -54,8 +54,6 @@ export class SceneGI {
     this._voxels = null;
     this._atlasSize = 256;
     this._voxelizeBudget = 8;
-    // UE's default directional LightSourceAngle (DirectionalLightComponent.cpp); wider
-    // cones close the small openings sunlight comes through
     this._lighting = { sunShadowConeAngle: 0.5357, slicesPerFrame: 8, localLightShadows: true };
     this._probeOptions = {
       grid: [32, 16, 32],

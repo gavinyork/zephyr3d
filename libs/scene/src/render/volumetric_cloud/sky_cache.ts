@@ -365,7 +365,6 @@ export class VolumetricCloudSkyCache extends Disposable {
           params.perSampleAtmosphericLightTransmittance ? 1 : 0
         ),
         sunIlluminance: new Vector4(sunIlluminance.x, sunIlluminance.y, sunIlluminance.z, 0),
-        // UE: SkyLightCloudBottomVisibility = 1 - SkyLightCloudBottomOcclusion
         phase: new Vector4(
           params.phaseG,
           params.phaseG2,

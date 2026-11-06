@@ -279,9 +279,7 @@ export class ClipmapBladeGrassMaterial
   }
   /**
    * Minimum width of a blade on screen, in pixels: farther blades are widened to it so they stay
-   * at least this wide instead of thinning below a pixel and flickering. As r.HairStrands.RasterizationScale
-   * of UE's hair strands, where 0.5 is the default with temporal anti-aliasing and about 1.3 is
-   * suggested without; 0 disables it.
+   * at least this wide instead of thinning below a pixel and flickering.
    */
   get minScreenWidth() {
     return this._pixelSize.z;
@@ -657,14 +655,6 @@ export class ClipmapBladeGrassMaterial
         pb.mul(sc[v('widthDir')], pb.mul(side, sc[`${tag}HalfWidth`])),
         pb.mul(sc[`${tag}Across`], pb.mul(side, sc[`${tag}HalfWidth`], sc.zBladeLook.y, sc[`${tag}EdgeOn`]))
       );
-      // Minimum screen width, as UE's hair strands (ComputeViewAlignedWorldPosition in
-      // HairStrandsVertexFactory.ush): a strand's half width is raised to at least
-      // RadiusAtDepth1 * distance, RadiusAtDepth1 being half the rasterization scale times the
-      // world size of a pixel at distance 1 (ComputeMinStrandRadiusAtDepth1, HairStrandsUtils.cpp),
-      // so it covers about a pixel instead of slipping between the samples. A blade is not
-      // camera-facing like a strand: its half width as seen is what its sides reach across the view,
-      // and only what is missing is added in that direction. The overall scale fades the minimum
-      // with the blade, so blades shrinking into the ground or away at the detail switch still go.
       sc.$l[`${tag}AcrossLen`] = pb.length(sc[`${tag}Across`]);
       sc.$l[`${tag}AcrossDir`] = pb.div(sc[`${tag}Across`], pb.max(sc[`${tag}AcrossLen`], 1e-4));
       sc.$l[`${tag}SeenHalfWidth`] = pb.mul(

@@ -148,8 +148,7 @@ export abstract class EnvironmentLighting extends Disposable {
     getProbeVolumeForDraw(ctx)?.applyBindGroup(bg);
   }
   /**
-   * Specular occlusion from the probe volume's sky visibility, via Lagarde's fit
-   * (\`GetSpecularOcclusion\`, UE ReflectionEnvironmentShared.ush). 1 where probes
+   * Specular occlusion from the probe volume's sky visibility. 1 where probes
    * do not cover the fragment or without a `worldPos` varying.
    * @internal
    */

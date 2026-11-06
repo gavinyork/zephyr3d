@@ -7,37 +7,21 @@ import {
   transmittanceToSky
 } from '../../shaders/atmosphere';
 
-/*
- * Volumetric cloud ray marching, shared by every cloud pass.
- *
- * The march, lighting and integration follow UE 5.8 VolumetricCloud.usf (RenderVolumetricCloud,
- * lines 523-1500): layer entry/exit from the top and bottom spheres, uniform steps whose count
- * grows with the traced length up to 15 km, a secondary march towards the sun with x^2 sample
- * distribution, Wrenninge multiple-scattering octaves (SetupParticipatingMediaContext /
- * SetupParticipatingMediaPhaseContext), the analytic segment integral of Hillaire 2016, and the
- * aerial perspective applied once at the transmittance-weighted mean depth.
- *
- * UE leaves the density to a user material. Here Schneider's "The Real-time Volumetric Cloudscapes
- * of Horizon Zero Dawn" (SIGGRAPH 2015 / GPU Pro 7) supplies the noise fields, which
- * cloudSampleDensity() uses to erode a coverage and height envelope.
- *
- * Everything runs in the observer-local atmosphere frame (planet centre at the origin, +Y up at
- * the observer, meters); the noise is anchored to the planet through the referential.
- */
-
-/** UE r.VolumetricCloud.SampleMinCount */
+/** @internal */
 export const CLOUD_SAMPLE_COUNT_MIN = 2;
-/** UE r.VolumetricCloud.DistanceToSampleMaxCount: traced length at which the full count is used, in meters */
+/** @internal */
 export const CLOUD_DISTANCE_TO_SAMPLE_COUNT_MAX = 15000;
-/** UE VolumetricCloudComponent TracingStartMaxDistance default, in meters */
+/** @internal */
 export const CLOUD_TRACING_START_MAX_DISTANCE = 350000;
-/** UE UVolumetricCloudComponent::BaseViewRaySampleCount and r.VolumetricCloud.ViewRaySampleMaxCount */
+/** @internal */
 export const CLOUD_BASE_VIEW_SAMPLE_COUNT = 96;
+/** @internal */
 export const CLOUD_VIEW_SAMPLE_COUNT_MAX = 768;
-/** UE UVolumetricCloudComponent::BaseShadowRaySampleCount and r.VolumetricCloud.Shadow.ViewRaySampleMaxCount */
+/** @internal */
 export const CLOUD_BASE_SHADOW_SAMPLE_COUNT = 10;
+/** @internal */
 export const CLOUD_SHADOW_SAMPLE_COUNT_MAX = 80;
-/** UE r.SkyAtmosphere.DistantSkyLightLUT.Altitude, in meters */
+/** @internal */
 export const CLOUD_DISTANT_SKY_LIGHT_ALTITUDE = 6000;
 /**
  * 5th/95th percentiles of the generated Perlin-Worley base shape (seeds 0-2), remapped to [0, 1].
@@ -111,7 +95,6 @@ export function getCloudParamsStruct(pb: ProgramBuilder) {
 
 /**
  * Both roots of a ray / origin-centred sphere intersection, (-1, -1) when missed.
- * Mirrors UE RayIntersectSphereSolution.
  */
 function raySphereSolutions(
   scope: PBInsideFunctionScope,
@@ -134,7 +117,7 @@ function raySphereSolutions(
   return pb.getGlobalScope()[funcName](origin, dir, radius) as PBShaderExp;
 }
 
-/** Henyey-Greenstein with the forward peak where the view looks into the light (UE convention). */
+/** Henyey-Greenstein with the forward peak where the view looks into the light. */
 function hgPhase(scope: PBInsideFunctionScope, g: PBShaderExp, cosTheta: PBShaderExp) {
   const pb = scope.$builder;
   const funcName = 'Z_cloudHGPhase';
@@ -219,7 +202,7 @@ function remap(
 }
 
 /**
- * Cloud medium at an observer-local position, standing in for the UE cloud material.
+ * Cloud medium at an observer-local position.
  *
  * Returns (extinction per meter, conservative density, normalized altitude in the layer,
  * altitude in the layer in meters). The conservative density omits the detail erosion, so a
@@ -246,7 +229,6 @@ export function cloudSampleDensity(
   const CloudParams = getCloudParamsStruct(pb);
   const funcName = `Z_cloudSampleDensity_${stage}${edgeWidth === CLOUD_EDGE_WIDTH ? '' : '_shadow'}`;
   pb.func(funcName, [CloudParams('cloud'), pb.vec3('p')], function () {
-    // UE UpdateMaterialCloudParam
     this.$l.r = pb.length(this.p);
     this.$l.altInLayer = pb.sub(this.r, this.cloud.layer.x);
     this.$l.h = pb.div(this.altInLayer, pb.sub(this.cloud.layer.y, this.cloud.layer.x));
@@ -372,7 +354,7 @@ export function cloudSampleDensity(
  * units of the atmosphere (`params.lightColor`) so it composites directly over `skyBox()`:
  * `sky * a + rgb`.
  *
- * @param msCount - 1 + multiple scattering octaves (UE MSCOUNT), compile time
+ * @param msCount - 1 + multiple scattering octaves, compile time
  * @param jitter - start offset of the march in steps, 0..1
  * @param stepScale - scales the sample count, below 1 for quick previews
  * @internal
@@ -421,7 +403,6 @@ export function cloudTrace(
     ],
     function () {
       this.$l.eye = this.cloud.eye.xyz;
-      // Layer entry and exit, UE RenderVolumetricCloud lines 527-559
       this.$l.tTop2 = raySphereSolutions(this, this.eye, this.dir, this.cloud.layer.y);
       this.$l.tBottom2 = raySphereSolutions(this, this.eye, this.dir, this.cloud.layer.x);
       this.$l.tMin = pb.float(0);
@@ -452,7 +433,6 @@ export function cloudTrace(
       });
       this.tMin = pb.max(this.tMin, 0);
       this.tMax = pb.max(this.tMax, 0);
-      // The planet ground stands in for UE's depth buffer test
       this.$l.tGround = rayIntersectSphere(this, pb.vec3(0), this.cloud.layer.z, this.eye, this.dir);
       this.$if(pb.greaterThan(this.tGround, 0), function () {
         this.tMax = pb.min(this.tMax, this.tGround);
@@ -481,7 +461,6 @@ export function cloudTrace(
       this.$l.stepT = pb.div(pb.sub(this.tMax, this.tMin), this.stepCount);
       this.$l.iStepCount = pb.int(this.stepCount);
 
-      // Per-ray factors, UE lines 737-794
       this.$l.msScatt = this.cloud.ms.x;
       this.$l.msExtin = pb.clamp(this.cloud.ms.y, 0, 1);
       this.$l.cosTheta = pb.dot(this.cloud.sunDir.xyz, this.dir);
@@ -553,13 +532,11 @@ export function cloudTrace(
           }
           this.$l[`lightT${ms}`] = this.atmoTransmittance;
         }
-        // Sky light, occluded towards the layer bottom (UE line 954)
         this.$l.distantLight = pb.mul(
           this.ambient,
           pb.clamp(pb.add(this.cloud.phase.w, this.medium.z), 0, 1)
         );
         this.$if(pb.greaterThan(this.extinction, 0), function () {
-          // Secondary march towards the sun, x^2 distribution, fixed 0.5 jitter (UE lines 1063-1149)
           for (let ms = 0; ms < msCount; ms++) {
             this.$l[`extAcc${ms}`] = pb.float(0);
           }
@@ -607,8 +584,6 @@ export function cloudTrace(
           this.tAPWeightedSum = pb.add(this.tAPWeightedSum, pb.mul(this.t, this.transmittanceToView));
           this.tAPWeightsSum = pb.add(this.tAPWeightsSum, this.transmittanceToView);
         });
-        // Analytic integration over the step, octaves in reverse so the last one updates the
-        // view transmittance (UE lines 1353-1440)
         for (let ms = msCount - 1; ms >= 0; ms--) {
           this.$l.sunSky = pb.mul(this[`lightT${ms}`], this.lightIlluminance, this[`phaseMs${ms}`]);
           if (ms === 0) {
@@ -633,8 +608,8 @@ export function cloudTrace(
         });
         this.t = pb.add(this.t, this.stepT);
       });
-      // Aerial perspective at the mean cloud depth (UE lines 1481-1530), integrated along the
-      // direction since the cache covers directions outside any camera's AP froxel volume
+      // Aerial perspective at the mean cloud depth, integrated along the direction since
+      // the cache covers directions outside any camera's AP froxel volume
       this.$if(pb.greaterThan(this.tAPWeightsSum, 0), function () {
         this.$l.tAP = pb.div(this.tAPWeightedSum, pb.max(this.tAPWeightsSum, 1e-10));
         this.$l.ap = getSkyView(
@@ -658,9 +633,7 @@ export function cloudTrace(
 }
 
 /**
- * Average sky luminance over the sphere at the distant sky light altitude: UE
- * RenderDistantSkyLightLutCS (SkyAtmosphere.usf), 64 uniform directions without ground,
- * illuminance times the isotropic phase.
+ * Average sky luminance over the sphere at the distant sky light altitude.
  * @internal
  */
 export function cloudDistantSkyLight(

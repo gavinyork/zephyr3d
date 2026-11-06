@@ -616,7 +616,7 @@ export function sampleGlobalSDFWithVoxel(
 
 /**
  * Signed distance from one global clipmap level chosen at run time, with no blending or brick
- * currency check; for hit normals, as UE GlobalDistanceFieldPageCentralDiff.
+ * currency check.
  * @internal
  */
 export function sampleGlobalSDFLevel(

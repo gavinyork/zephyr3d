@@ -433,9 +433,13 @@ export function generateIndexHTML(options: {
   <body>
     <canvas id="canvas"></canvas>
     ${splash.markup}
-    ${splash.script ? `<script>
+    ${
+      splash.script
+        ? `<script>
       ${splash.script}
-    </script>` : ''}
+    </script>`
+        : ''
+    }
   </body>
 </html>
 `;

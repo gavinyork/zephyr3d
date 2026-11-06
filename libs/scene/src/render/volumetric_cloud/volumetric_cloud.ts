@@ -39,15 +39,6 @@ export type VolumetricCloudDebugView =
 
 /**
  * Parameters of the volumetric cloud layer.
- *
- * Tracing and lighting parameters follow UE 5.8 `UVolumetricCloudComponent`; the density model
- * replaces the UE cloud material with the weather map / noise model of Schneider, "The Real-time
- * Volumetric Cloudscapes of Horizon Zero Dawn" (SIGGRAPH 2015). The defaults make a fair-weather
- * cumulus field. All distances are in meters.
- *
- * Every setter bumps {@link VolumetricCloud.version}, which the renderer compares to tell when
- * the cached sky has to be rebuilt rather than updated over the next frames.
- *
  * @public
  */
 export class VolumetricCloud {
@@ -95,10 +86,8 @@ export class VolumetricCloud {
     this._layerBottomAltitude = 1500;
     this._layerHeight = 4000;
     this._tracingMaxDistance = 50000;
-    // Twice UE's default: the sky cache spreads a full trace over many frames
     this._viewSampleCountScale = 2;
     this._shadowSampleCountScale = 1;
-    // About where a ray towards a 30 degree sun leaves the layer
     this._shadowTracingDistance = 8000;
     this._stopTracingTransmittanceThreshold = 0.005;
     this._groundAlbedo = 0.4;

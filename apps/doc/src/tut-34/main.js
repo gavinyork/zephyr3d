@@ -58,6 +58,7 @@ myApp.ready().then(async () => {
 
   // Switch between 2D and volumetric clouds through the UI buttons
   const btn2D = document.querySelector('#btn-2d');
+  /** @type {HTMLButtonElement} */
   const btnVolumetric = document.querySelector('#btn-volumetric');
   const webgpu = myApp.device.type === 'webgpu';
   if (!webgpu) {

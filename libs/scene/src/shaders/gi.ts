@@ -292,8 +292,7 @@ export function loadVoxelSceneRadiance(
 
 /**
  * Distant-light visibility by SDF cone tracing through the global field (Wright,
- * "Dynamic Occlusion with Signed Distance Fields", SIGGRAPH 2015), with surfaces expanded by
- * {@link sdfSurfaceExpand} as UE distance field shadows (bExpandSurface) so sub-voxel walls occlude.
+ * "Dynamic Occlusion with Signed Distance Fields", SIGGRAPH 2015).
  *
  * `start` should already be offset off the surface; `tanHalfAngle` sets softness, `minStep`
  * prevents stalling, `maxDistance` ends the march. Levels finer than `minLevel` are skipped.

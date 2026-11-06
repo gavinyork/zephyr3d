@@ -60,7 +60,7 @@ export const SDF_VOXELS_PER_UNIT = 20;
 
 /** Voxels from the surface within which the sign is decided by rays; further voxels take it from their neighbours. */
 const SIGN_BAND_VOXELS = 1;
-/** Length of a sign ray in voxel diagonals, the band size of the Unreal Engine mesh distance fields. */
+/** Length of a sign ray in voxel diagonals. */
 const SIGN_TRACE_DIAGONALS = 4;
 /** Fraction of the sign rays that must hit a back face for a voxel to count as inside. */
 const SIGN_BACK_FRACTION = 0.25;
