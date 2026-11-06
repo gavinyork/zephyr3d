@@ -1,0 +1,15 @@
+{
+  "changes": [
+    {
+      "packageName": "@zephyr3d/backend-webgpu",
+      "comment": "Record the pipelines draws and dispatches use under stable content keys and compile them ahead of time with asynchronous pipeline creation; share shader modules and pipeline layouts by content.",
+      "type": "minor"
+    },
+    {
+      "packageName": "@zephyr3d/backend-webgpu",
+      "comment": "Support tier1/tier2 storage texture formats and read-only/read-write access; build 3D texture mip chains with compute; implement frame pacing.",
+      "type": "minor"
+    }
+  ],
+  "packageName": "@zephyr3d/backend-webgpu"
+}

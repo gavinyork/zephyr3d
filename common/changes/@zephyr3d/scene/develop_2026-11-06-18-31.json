@@ -1,0 +1,75 @@
+{
+  "changes": [
+    {
+      "packageName": "@zephyr3d/scene",
+      "comment": "Add input state polling, gamepad support and input action maps (InputActionMap), and type the input middleware arguments.",
+      "type": "minor"
+    },
+    {
+      "packageName": "@zephyr3d/scene",
+      "comment": "Make camera controllers frame-rate independent with update phases, a lateupdate scene event and the onLateUpdate script hook; add FollowCameraController, a spring-arm camera with collision, chase recentering, target blending and speed-based FOV.",
+      "type": "minor"
+    },
+    {
+      "packageName": "@zephyr3d/scene",
+      "comment": "Breaking: camera controller event types are no longer generic, and the per-type pointer event interfaces (IControllerPointerDownEvent etc.) are removed.",
+      "type": "minor"
+    },
+    {
+      "packageName": "@zephyr3d/scene",
+      "comment": "Add the FoliageSystem node: layered scattering in a worker, density mask painting, placement on any surface and per-chunk static colliders; add terrain getHeightAt/getNormalAt/setHeights and asynchronous height read back.",
+      "type": "minor"
+    },
+    {
+      "packageName": "@zephyr3d/scene",
+      "comment": "Add signed distance fields (scene.sdf, WebGPU): mesh fields baked offline to .zsdf or at run time with bakeField, streamed into a shared atlas and composited with terrain into a global SDF clipmap; materials can opt in to sampling it.",
+      "type": "minor"
+    },
+    {
+      "packageName": "@zephyr3d/scene",
+      "comment": "Add probe-based dynamic global illumination (scene.gi, WebGPU): a voxel scene lit by the sun, local and rect lights and the sky, plus a multi-level DDGI probe clipmap traced through the global SDF. It feeds the environment light and the SSGI baseline and is tuned with the GIProbeHysteresis setting.",
+      "type": "minor"
+    },
+    {
+      "packageName": "@zephyr3d/scene",
+      "comment": "Add volumetric clouds (sky.volumetricCloud, WebGPU): coverage-map and noise shaping, an octahedral sky cache for lighting, generated or imported noise volumes and weather maps, and debug views.",
+      "type": "minor"
+    },
+    {
+      "packageName": "@zephyr3d/scene",
+      "comment": "Add shore waves (ShoreWaveGenerator): trochoid wave trains that shoal, break and swash up the beach. They are driven by a cascaded WaterlineField built from pluggable WaterlineSources (terrain or the scene SDF).",
+      "type": "minor"
+    },
+    {
+      "packageName": "@zephyr3d/scene",
+      "comment": "Rework water foam: a persistent, advected WaterFoamField for breaking crests, shore surf and interaction, with Crest-style foam shading and a new default foam texture.",
+      "type": "minor"
+    },
+    {
+      "packageName": "@zephyr3d/scene",
+      "comment": "Improve water rendering: FFT cascades split into non-overlapping bands sized from the wind, slopes filtered by mip footprint, reflections blurred by roughness, and interaction waves that respond to water depth. The default water TAA history share is lowered to 0.2.",
+      "type": "minor"
+    },
+    {
+      "packageName": "@zephyr3d/scene",
+      "comment": "Breaking: remove the water's legacy ramp medium mode (mediumMode, scatterRampTexture, absorptionRampTexture) and the shoreline foam band properties (shoreFoam*).",
+      "type": "minor"
+    },
+    {
+      "packageName": "@zephyr3d/scene",
+      "comment": "Add getEngine().pipelineCache to compile pipelines recorded in a pipeline-cache.json ahead of time.",
+      "type": "minor"
+    },
+    {
+      "packageName": "@zephyr3d/scene",
+      "comment": "Add the LoadingScreen protocol, driven by LoadingProgress, for application startup.",
+      "type": "minor"
+    },
+    {
+      "packageName": "@zephyr3d/scene",
+      "comment": "Spot lights in legacy lighting now use the same inverse square falloff as point lights, so a spot light no longer lights far brighter than a point light of the same intensity.",
+      "type": "patch"
+    }
+  ],
+  "packageName": "@zephyr3d/scene"
+}

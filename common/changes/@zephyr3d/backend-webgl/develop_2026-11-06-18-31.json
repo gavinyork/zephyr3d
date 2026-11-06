@@ -1,0 +1,10 @@
+{
+  "changes": [
+    {
+      "packageName": "@zephyr3d/backend-webgl",
+      "comment": "Record and precompile shader programs through the pipeline cache; implement frame pacing.",
+      "type": "minor"
+    }
+  ],
+  "packageName": "@zephyr3d/backend-webgl"
+}
