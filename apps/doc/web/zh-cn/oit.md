@@ -44,7 +44,7 @@ OIT 允许透明片元在无需显式排序的情况下正确混合，从而在�
 
 ### 支持平台
 
-支持 **WebGL / WebGL2 / WebGPU** 设备。
+支持 **WebGL2 / WebGPU** 设备。
 
 ### 用法示例
 
@@ -138,7 +138,7 @@ camera.oitMode = 'dual-depth';
 下面的演示中有多个相互穿插的透明球体和圆环，它们的混合顺序随动画持续变化。
 可以在四种模式之间切换对比：关闭 OIT 时能明显看到混合顺序错误产生的瑕疵。
 
-该示例会优先创建 WebGPU 设备，不支持则依次回退到 WebGL2 和 WebGL，并在界面上显示当前设备类型。**当前设备不支持的模式会被置灰**——例如在 WebGL2 上 ABuffer 不可用。
+该示例会优先创建 WebGPU 设备，不支持则回退到 WebGL2，并在界面上显示当前设备类型。**当前设备不支持的模式会被置灰**——例如在 WebGL2 上 ABuffer 不可用。
 
 <div class="showcase" case="tut-67"></div>
 
@@ -154,7 +154,7 @@ camera.oitMode = 'dual-depth';
 
 | 技术类型 | `oitMode` | 精度 | 性能表现 | 适用平台 | 建议 |
 |-----------|-----------|-------|------------|------------|------|
-| **Weighted Blended OIT** | `'weighted'` | 近似 | 极佳（高帧率） | WebGL / WebGL2 / WebGPU | 默认推荐使用 |
+| **Weighted Blended OIT** | `'weighted'` | 近似 | 极佳（高帧率） | WebGL2 / WebGPU | 默认推荐使用 |
 | **Dual Depth Peeling OIT** | `'dual-depth'` | 按层精确，受层数限制 | 中等（趟数越多越慢） | WebGL2 / WebGPU（依赖能力检测） | 需要比加权更准、又不便用 ABuffer 时 |
 | **Per‑Pixel Linked List OIT** | `'abuffer'` | 精确 | 较高（显存开销大） | WebGPU | 对质量要求极高时使用 |
 

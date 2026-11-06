@@ -141,14 +141,6 @@ export function temporalResolve(
     }
     this.colorAvg = pb.div(this.colorAvg, n - 1);
     this.colorAvg2 = pb.div(this.colorAvg2, n - 1);
-    // Variance box of 1.25 standard deviations, as UE's TemporalAA.usf
-    // (HISTORY_CLAMPING_BOX_VARIANCE). It used to widen to 2.5 below a velocity
-    // of 0.02 in UV, some 40 pixels: content moving a few pixels a frame, like
-    // foliage in the wind, kept the loose box, which in a high contrast
-    // neighbourhood (blades against the gaps between them) let almost any stale
-    // history through and left trails behind every moving blade. Not collapsed
-    // further while moving: a box shrunk to the 3x3 mean discards all sub-pixel
-    // detail and shimmers with the jitter phase.
     this.$l.dev = pb.mul(pb.sqrt(pb.abs(pb.sub(this.colorAvg2, pb.mul(this.colorAvg, this.colorAvg)))), 1.25);
     this.$l.colorMin = pb.sub(this.colorAvg, this.dev);
     this.$l.colorMax = pb.add(this.colorAvg, this.dev);
@@ -255,26 +247,11 @@ export function temporalResolve(
     this.currentColor = this.reinhard(this.sampleColor);
     this.$l.currentLum = this.luminance(this.currentColor);
     this.$l.prevLum = this.luminance(this.prevColor);
-    // Weight of the current frame, following the BlendFinal computation of UE's
-    // TemporalAA.usf. The base is the per-material strength from the motion
-    // vectors (a responsive material such as grass asks for more of the current
-    // frame, like UE's responsive AA stencil).
-    //
-    // Fast motion pulls the weight toward 0.2, where the history is blurred by
-    // resampling anyway. UE's Velocity is measured in 2/viewport units, twice the
-    // pixel distance, so its Velocity / 40 is pixels / 20 here.
     this.$l.velocityPixels = pb.length(pb.mul(this.velocityClosest.xy, this.texSize));
     this.$l.alpha = pb.max(
       this.blendFactor,
       pb.mix(this.blendFactor, 0.2, pb.clamp(pb.div(this.velocityPixels, 20), 0, 1))
     );
-    // Converges faster where current and history agree, so the small contribution
-    // never stalls. This replaces a weighting that went the other way, down to 5%
-    // of the current frame the more the two differed: a blade moving onto a pixel
-    // is exactly the case where they differ most, so the stale image was kept
-    // longest and the per-material strength was overridden. Flicker is damped by
-    // blending in Reinhard space instead, the 1 / (1 + luma) weighting UE's
-    // HdrWeight / WeightedLerpFactors apply to linear colors.
     this.alpha = pb.max(
       this.alpha,
       pb.clamp(

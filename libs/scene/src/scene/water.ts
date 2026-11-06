@@ -24,6 +24,7 @@ import { BoundingBox } from '../utility/bounding_volume';
 import type { Camera } from '../camera';
 import { getDevice } from '../app/api';
 import { TerrainWaterlineSource, WaterlineField } from '../render/sdf/waterline';
+import { RenderGraphExecutor } from '../render/rendergraph/executor';
 
 /** Mean earth radius in meters, for the horizon distance. @internal */
 const EARTH_RADIUS = 6371000;
@@ -795,6 +796,12 @@ export class Water extends applyMixins(GraphNode, mixinDrawable) implements Draw
   update(frameId: number, elapsedInSeconds: number) {
     if (this.material.needUpdate()) {
       this.scene?.queueUpdateNode(this);
+      if (this.hidden) {
+        // Nothing shows the waves, the interaction or the foam: leave them be, and
+        // pick the phase up from here once the water shows again
+        this._lastUpdateTime = elapsedInSeconds;
+        return;
+      }
       if (this._timeStart === 0) {
         this._timeStart = elapsedInSeconds;
       }
@@ -815,6 +822,11 @@ export class Water extends applyMixins(GraphNode, mixinDrawable) implements Draw
   /** {@inheritDoc SceneNode.updatePerCamera} */
   updatePerCamera(camera: Camera, _elapsedInSeconds: number, _deltaInSeconds: number) {
     const mat = this._material.get();
+    if (mat && this.hidden) {
+      // Not drawn: no surface to gather, no shore or foam field to step
+      this.scene?.queuePerCameraUpdateNode(this);
+      return;
+    }
     if (mat) {
       const that = this;
       const infinite = mat.infinite;
@@ -876,7 +888,7 @@ export class Water extends applyMixins(GraphNode, mixinDrawable) implements Draw
       }
       // After the shore waves' frame, which the foam field's sources read
       const foamFocus = this.viewFocus(camera, mat.foamFieldSize * 0.5);
-      mat.updateFoamField(foamFocus.x, foamFocus.y);
+      RenderGraphExecutor.profileScope('WaterFoamField', () => mat.updateFoamField(foamFocus.x, foamFocus.y));
       this.scene?.queuePerCameraUpdateNode(this);
     }
   }
@@ -954,7 +966,9 @@ export class Water extends applyMixins(GraphNode, mixinDrawable) implements Draw
     this._shoreField.request(this.worldMatrix.m13);
     device.pushDeviceStates();
     try {
-      this._shoreField.update(camera.getWorldPosition());
+      RenderGraphExecutor.profileScope('WaterShoreField', () =>
+        this._shoreField!.update(camera.getWorldPosition())
+      );
     } finally {
       device.popDeviceStates();
     }

@@ -31,7 +31,7 @@ myApp.ready().then(function () {
   // Cosine of the cone half-angle, not the angle itself
   light.cutoff = Math.cos(Math.PI * 0.2);
   // light range
-  light.range = 200;
+  light.intensity = 80;
   // light position
   light.position.setXYZ(0, 10, 0);
 

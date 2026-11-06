@@ -26,8 +26,8 @@ myApp.ready().then(function () {
 
 `Application` takes two required options:
 
-- `backend` — the rendering backend. Available choices are `backendWebGL` and `backendWebGL2`
-  (both from `@zephyr3d/backend-webgl`) and `backendWebGPU` (from `@zephyr3d/backend-webgpu`).
+- `backend` — the rendering backend. Available choices are `backendWebGL2`
+  (from `@zephyr3d/backend-webgl`) and `backendWebGPU` (from `@zephyr3d/backend-webgpu`).
 - `canvas` — the canvas element to render into.
 
 `ready()` returns a promise that resolves once the rendering device is initialized, and `run()`

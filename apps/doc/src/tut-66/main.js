@@ -126,12 +126,31 @@ myApp.ready().then(function () {
   });
   applyGodRays(godRayCheck.checked);
 
+  // wireframe
+  /** @type {HTMLInputElement} */
+  const wireframeCheck = document.querySelector('#wireframe-check');
+  const applyWireframe = function (enabled) {
+    for (const scene of [ocean.get(), pool.get()]) {
+      scene.rootNode.iterate(function (node) {
+        if (node instanceof Water) {
+          node.wireframe = enabled;
+        }
+        return false;
+      });
+    }
+  };
+  wireframeCheck.addEventListener('change', function () {
+    applyWireframe(wireframeCheck.checked);
+  });
+  applyWireframe(wireframeCheck.checked);
+
   getInput().use(forwarder);
   myApp.run();
 });
 
 function buildOceanScene() {
   const scene = new Scene();
+  scene.env.sky.cloudMode = 'volumetric';
 
   const sun = new DirectionalLight(scene);
   sun.rotation.fromEulerAngle(-Math.PI / 4, Math.PI / 4, 0);
@@ -178,18 +197,15 @@ function buildOceanScene() {
   water.position.setXYZ(0, 2, 0);
   water.gridScale = 1;
   water.animationSpeed = 2;
-  water.infinite = false;
+  water.infinite = true;
 
   // FFT rather than FBM, so the surface genuinely folds - that is what feeds
   // both the foam and cresting here.
   const waves = new FFTWaveGenerator();
-  waves.wind = new Vector2(11, 1);
-  waves.setWaveLength(0, 400);
-  waves.setWaveLength(1, 100);
-  waves.setWaveLength(2, 16);
+  waves.wind = new Vector2(12, 1);
   waves.setWaveStrength(0, 1.2);
-  waves.setWaveStrength(1, 0.8);
-  waves.setWaveStrength(2, 0.9);
+  waves.setWaveStrength(1, 1.2);
+  waves.setWaveStrength(2, 1.2);
   waves.setWaveCroppiness(0, -2.2);
   waves.setWaveCroppiness(1, -2);
   waves.setWaveCroppiness(2, -1.4);
@@ -209,7 +225,7 @@ function buildOceanScene() {
   water.foamFalloff = 1.2;
   // The wall foam rides on the shore waves, which need the scene field; a low
   // surf, as the rocks and the pillar are too steep for it to break on
-  water.shoreWaveHeight = 0.3;
+  water.shoreWaveHeight = 0.1;
   water.wallFoamStrength = 1;
   water.wallFoamMinSpeed = 0;
   water.wallFoamMaxSpeed = 1.5;
@@ -295,9 +311,6 @@ function buildPoolScene() {
 
   const waves = new FFTWaveGenerator();
   waves.wind = new Vector2(1, 1);
-  waves.setWaveLength(0, 400);
-  waves.setWaveLength(1, 100);
-  waves.setWaveLength(2, 15);
   waves.setWaveStrength(0, 0.4);
   waves.setWaveStrength(1, 0.4);
   waves.setWaveStrength(2, 0.02);

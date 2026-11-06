@@ -6,6 +6,7 @@ import {
   isTextureSourcePath,
   moveAssetMeta
 } from '../core/services/assetmeta';
+import { isScenePreloadPath } from '../core/services/assetpreload';
 import { DlgTextureSettings } from '../views/dlg/texturesettingsdlg';
 import { DlgMeshSettings } from '../views/dlg/meshsettingsdlg';
 import type { TextureAddressMode, TextureFilterMode, TextureSampler } from '@zephyr3d/device';
@@ -20,6 +21,7 @@ import { DlgPromptName } from '../views/dlg/promptnamedlg';
 import { DlgRename } from '../views/dlg/renamedlg';
 import { DlgMessage } from '../views/dlg/messagedlg';
 import { DlgProgress } from '../views/dlg/progressdlg';
+import { MeshSDFBaker } from '../core/services/sdfbaker';
 import { DlgMessageBoxEx } from '../views/dlg/messageexdlg';
 import { templateScript } from '../core/build/templates';
 import { installDeps, reinstallPackages } from '../core/build/dep';
@@ -2727,8 +2729,9 @@ export class VFSRenderer extends makeObservable(Disposable)<{
               dirInfo.parent = info;
             }
           }
-        } else if (entry.type === 'file' && !isAssetMetaPath(entry.path)) {
-          // .zmeta sidecars belong to the asset beside them and are edited through it
+        } else if (entry.type === 'file' && !isAssetMetaPath(entry.path) && !isScenePreloadPath(entry.path)) {
+          // .zmeta sidecars belong to the asset beside them and are edited through it,
+          // .zpreload lists to the scene beside them
           info.files.push({
             meta: entry,
             parent: info
@@ -2954,6 +2957,35 @@ export class VFSRenderer extends makeObservable(Disposable)<{
                 await DerivedAssetService.deriveMeshesNow([...lodMeshes], (done, total) =>
                   dlgProgressBar.setProgress(done, total)
                 );
+              }
+              // Distance fields of every mesh of the models that asked for them, so a
+              // model that imports as many meshes needs no bake per mesh afterwards
+              const sdfMeshes = new Set<string>();
+              const unitScales = new Map<string, number>();
+              models.forEach((model, i) => {
+                if (saveOptions[i].bakeSDF) {
+                  for (const info of model.primitives) {
+                    if (info.path) {
+                      sdfMeshes.add(info.path);
+                    }
+                  }
+                  // A model authored in other units than the scene's carries the
+                  // conversion in its nodes; the fields are dense per world unit
+                  MeshSDFBaker.modelUnitScales(model, unitScales);
+                }
+              });
+              if (sdfMeshes.size > 0) {
+                await MeshSDFBaker.setUnitScales(unitScales);
+                dlgProgressBar.setMessage('Baking distance fields...');
+                dlgProgressBar.setProgress(0, sdfMeshes.size);
+                const results = await MeshSDFBaker.bakeAll([...sdfMeshes], false, (done, total) =>
+                  dlgProgressBar.setProgress(done, total)
+                );
+                for (const r of results) {
+                  if (r.err) {
+                    console.error(`Bake distance field of ${r.path} failed: ${r.err}`);
+                  }
+                }
               }
               dlgProgressBar.close();
             }
@@ -3416,13 +3448,13 @@ export class VFSRenderer extends makeObservable(Disposable)<{
         }
       };
       await this.runWithVFSBatchUpdate(execute);
+      dlg.close();
     } catch (err) {
+      dlg.close();
       DlgMessage.messageBox(
         'Error',
         `${copy ? 'Copy asset failed' : 'Move asset failed'}: ${err}\n\nThe operation was stopped before completing all remaining items.`
       );
-    } finally {
-      dlg.close();
     }
   }
 

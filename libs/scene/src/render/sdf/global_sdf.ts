@@ -1,8 +1,9 @@
 import type { BindGroup, GPUDataBuffer, GPUProgram, Texture2D, Texture3D } from '@zephyr3d/device';
-import type { Nullable, Vector3 } from '@zephyr3d/base';
-import { Vector4 } from '@zephyr3d/base';
+import type { Nullable } from '@zephyr3d/base';
+import { Vector3, Vector4 } from '@zephyr3d/base';
 import { getDevice } from '../../app/api';
 import { fetchSampler } from '../../utility/misc';
+import { getDefaultTexture2D } from '../../utility/blueprint/material/texture';
 import type { ClipmapTerrain } from '../../scene/terrain-cm/terrain-cm';
 import {
   declareGlobalSDFUniforms,
@@ -11,12 +12,15 @@ import {
   GLOBAL_SDF_TEXTURE,
   GLOBAL_SDF_BRICK,
   GLOBAL_SDF_TAGS,
+  GLOBAL_SDF_TAG_NOT_COVERED,
   declareDynamicSDFUniforms,
   MAX_DYNAMIC_SDF_INSTANCES,
   SDF_ATLAS_TEXTURE,
   SDF_DYNAMIC_INFO,
   SDF_DYNAMIC_INSTANCES,
   SDF_INSTANCE_VEC4S,
+  globalSDFFormat,
+  isGlobalSDFFilterable,
   sampleInstancesSDF,
   sampleSceneSDF
 } from '../../shaders/sdf';
@@ -24,6 +28,9 @@ import type { SceneSDF, SDFInstance } from './scene_sdf';
 import type { MeshSDFAtlas } from './sdf_atlas';
 import { SDFWaterlineSource, WaterlineField } from './waterline';
 import { buildSDFProgram, getSDFProgramErrors } from './sdf_programs';
+import { sampleInstanceMaterial } from '../../shaders/gi';
+import type { VoxelAtlasSlot } from '../gi/voxel_atlas';
+import { RenderGraphExecutor } from '../rendergraph/executor';
 
 /** Voxels along a brick edge, the unit of compositing. */
 const BRICK = GLOBAL_SDF_BRICK;
@@ -33,10 +40,10 @@ const BRICK_VEC4S = 3;
 const MAX_QUERY_POINTS = 4096;
 
 /**
- * Writes an instance in the layout of {@link SDF_INSTANCE_VEC4S}: world to
- * local by rows, the field box with the voxel size and the world scale, and
- * the atlas slot. The scale is the smallest axis scale, so a distance scaled
- * by it never overshoots under non-uniform scale.
+ * Writes an instance in the layout of {@link SDF_INSTANCE_VEC4S}: world-to-local rows, field box
+ * with voxel size and world scale, atlas slot with the two-sided half thickness (half a field
+ * voxel in world units; -1 for one-sided). The scale is the smallest axis scale so scaled field
+ * values never overshoot under non-uniform scale.
  */
 function packSDFInstance(inst: SDFInstance, atlas: MeshSDFAtlas, out: Float32Array, offset: number) {
   const header = inst.asset!.header!;
@@ -53,7 +60,7 @@ function packSDFInstance(inst: SDFInstance, atlas: MeshSDFAtlas, out: Float32Arr
   out.set([inv.m20, inv.m21, inv.m22, inv.m23], offset + 8);
   out.set([...header.boxMin, header.voxelSize], offset + 12);
   out.set([...header.boxMax, scale], offset + 16);
-  out.set([...slot.offset, 0], offset + 20);
+  out.set([...slot.offset, header.twoSided ? 0.5 * header.voxelSize * scale : -1], offset + 20);
 }
 
 /**
@@ -92,24 +99,33 @@ export interface GlobalSDFStats {
   waterlineRebuilds: number;
 }
 
+const tmpDirtyMin = new Vector3();
+const tmpDirtyMax = new Vector3();
+
 /**
- * A clipmap of signed distance around the camera: `levels` cubes of
- * `resolution`³ voxels, centred on the camera, each with twice the voxel size
- * of the one inside it. Built on the GPU from the static instances of a
- * {@link SceneSDF} (their baked fields, sampled from its atlas) and the
- * terrain height map, and kept up to date incrementally.
+ * Material sources and targets for compositing materials alongside the field, provided by the
+ * voxel scene. The output clipmaps (albedo rgba8unorm, emissive rgba16float) use the field's
+ * layout at half its resolution.
+ * @public
+ */
+export interface GlobalSDFMaterials {
+  readonly atlasAlbedo: Texture3D;
+  readonly atlasEmissive: Texture3D;
+  readonly atlasSize: [number, number, number];
+  readonly albedo: Texture3D;
+  readonly emissive: Texture3D;
+  getSlot(inst: SDFInstance): Nullable<VoxelAtlasSlot>;
+}
+
+/**
+ * Camera-centred clipmap of signed distance (`levels` cubes of `resolution`³ voxels, each level
+ * doubling the voxel size), composited on the GPU from the static instances of a {@link SceneSDF}
+ * and the terrain height map. WebGPU only.
  *
- * Each level is addressed toroidally: a world voxel `v` lives at texel
- * `v mod resolution`, so when the window follows the camera only the slabs that
- * entered it are composited; the rest of the level stays where it is. Work is
- * counted in 8³ bricks, marked dirty by window moves and by the scene field's
- * `dirty` boxes, and composited a budget per frame, coarsest level first.
- *
- * Distances are clamped to a band of a few voxels per level, so a brick only
- * needs the instances within that band; {@link sampleGlobalSDF} falls back to
- * coarser levels outside it.
- *
- * WebGPU only: the levels are written by a compute shader.
+ * Levels are toroidally addressed (world voxel `v` at texel `v mod resolution`) and updated
+ * incrementally in dirty 8³ bricks, a budget per frame, coarsest level first. Distances are
+ * clamped to a band of a few voxels per level; {@link sampleGlobalSDF} falls back to coarser
+ * levels outside it.
  *
  * @public
  */
@@ -127,6 +143,8 @@ export class GlobalSDF {
   /** Dirty bricks of each level, keyed by world brick coordinates. */
   private readonly _dirty: Set<string>[];
   private _lastBricks: number;
+  private _freshBricks: Float32Array<ArrayBuffer>;
+  private _freshCount: number;
   private _totalBricks: number;
   private _terrain: Nullable<ClipmapTerrain>;
   private _terrainVersion: number;
@@ -135,6 +153,8 @@ export class GlobalSDF {
   private _instanceBuffer: Nullable<GPUDataBuffer>;
   private _brickBuffer: Nullable<GPUDataBuffer>;
   private _indexBuffer: Nullable<GPUDataBuffer>;
+  private _materialBuffer: Nullable<GPUDataBuffer>;
+  private _materials: Nullable<GlobalSDFMaterials>;
   private _dummyHeightMap: Nullable<Texture2D>;
   private _queryProgram: Nullable<GPUProgram>;
   private _queryBindGroup: Nullable<BindGroup>;
@@ -161,6 +181,8 @@ export class GlobalSDF {
     this._origins = new Array(this.levels).fill(null);
     this._dirty = Array.from({ length: this.levels }, () => new Set<string>());
     this._lastBricks = 0;
+    this._freshBricks = new Float32Array(this.brickBudget * 4);
+    this._freshCount = 0;
     this._totalBricks = 0;
     this._terrain = null;
     this._terrainVersion = -1;
@@ -169,6 +191,8 @@ export class GlobalSDF {
     this._instanceBuffer = null;
     this._brickBuffer = null;
     this._indexBuffer = null;
+    this._materialBuffer = null;
+    this._materials = null;
     this._dummyHeightMap = null;
     this._queryProgram = null;
     this._queryBindGroup = null;
@@ -188,11 +212,14 @@ export class GlobalSDF {
   static isSupported() {
     return getDevice().type === 'webgpu';
   }
-  /** The levels, stacked along z, r32f. */
+  /**
+   * The levels stacked along z in {@link globalSDFFormat}, `resolution + 1` slices each; the last
+   * copies the first so filtering wraps across the toroidal seam in z as repeat does in x and y.
+   */
   get texture() {
     if (!this._texture) {
       const n = this.resolution;
-      this._texture = getDevice().createTexture3D('r32f', n, n, n * this.levels, {
+      this._texture = getDevice().createTexture3D(globalSDFFormat(), n, n, (n + 1) * this.levels, {
         mipmapping: false,
         writable: true
       })!;
@@ -215,6 +242,13 @@ export class GlobalSDF {
     }
     return this._tags;
   }
+  /**
+   * Bricks whose materials the last update composited, for immediate voxel lighting: per brick
+   * (first material voxel within its level, level), `count` of them.
+   */
+  get freshMaterialBricks() {
+    return { data: this._freshBricks, count: this._freshCount };
+  }
   /** Voxel size of a level in world units. */
   voxelSize(level: number) {
     return this.baseVoxelSize * 2 ** level;
@@ -223,7 +257,11 @@ export class GlobalSDF {
   get levelInfo() {
     return this._levelInfo;
   }
-  /** (resolution, levels, band voxels, 0), the `params` uniform of {@link sampleGlobalSDF}. */
+  /**
+   * (resolution, levels, band voxels, current mask), the `params` uniform of
+   * {@link sampleGlobalSDF}; bit i of the mask set when every brick of level i
+   * is composited for its window, so readers can skip the tag checks there.
+   */
   get params() {
     return this._params;
   }
@@ -238,23 +276,36 @@ export class GlobalSDF {
     return this._waterline;
   }
   /**
-   * Goes up whenever the field may have changed: a region marked dirty, bricks
-   * composited, or the dynamic instances moved. Lets derived data such as the
-   * waterline skip rebuilding while nothing changed.
+   * Increments whenever the field may have changed (dirty region, bricks composited, dynamic
+   * instances moved), so derived data such as the waterline can skip rebuilding.
    */
   get contentVersion() {
     return this._contentVersion;
   }
-  /**
-   * As {@link GlobalSDF.contentVersion}, but only for the clipmap itself (static
-   * geometry and the terrain), not the dynamic instances merged at query time.
-   */
+  /** As {@link GlobalSDF.contentVersion}, but for the clipmap only (static geometry and terrain). */
   get staticVersion() {
     return this._staticVersion;
   }
   /** Dynamic instances merged at query time this frame. */
   get dynamicCount() {
     return this._dynamicInfo.x;
+  }
+  /**
+   * The materials composited alongside the distances, or null for distances
+   * alone. Changing it rebuilds the whole field.
+   */
+  get materials() {
+    return this._materials;
+  }
+  set materials(val: Nullable<GlobalSDFMaterials>) {
+    if (val !== this._materials) {
+      this._materials = val;
+      this._program?.dispose();
+      this._program = null;
+      this._bindGroup?.dispose();
+      this._bindGroup = null;
+      this.invalidate();
+    }
   }
   /**
    * Binds the field for {@link sampleSceneSDF} in a program that declared the
@@ -267,7 +318,11 @@ export class GlobalSDF {
     bindGroup.setValue(SDF_DYNAMIC_INFO, this._dynamicInfo);
     // Read with textureLoad, but the unfilterable binding still has a sampler
     // slot, which a filtering sampler fails to validate against
-    bindGroup.setTexture(GLOBAL_SDF_TEXTURE, this.texture, fetchSampler('clamp_nearest_nomip'));
+    bindGroup.setTexture(
+      GLOBAL_SDF_TEXTURE,
+      this.texture,
+      fetchSampler(isGlobalSDFFilterable() ? 'repeat_linear_nomip' : 'clamp_nearest_nomip')
+    );
     bindGroup.setTexture(GLOBAL_SDF_TAGS, this.tags, fetchSampler('clamp_nearest_nomip'));
     bindGroup.setValue(GLOBAL_SDF_LEVELS, this._levelInfo);
     bindGroup.setValue(GLOBAL_SDF_PARAMS, this._params);
@@ -343,12 +398,33 @@ export class GlobalSDF {
         }
       }
     }
+    if (this._materials && terrain) {
+      // Recapture the terrain albedo where it changed and recomposite the materials there
+      const rect = terrain.giAlbedo.update();
+      const box = rect ? terrain.getWorldBoundingVolume()?.toAABB() : null;
+      if (rect && box) {
+        this.markDirty(
+          tmpDirtyMin.setXYZ(rect[0], box.minPoint.y, rect[1]),
+          tmpDirtyMax.setXYZ(rect[2], box.maxPoint.y, rect[3])
+        );
+      }
+    }
     for (let level = 0; level < this.levels; level++) {
       this.moveWindow(level, cameraPos);
     }
     this.composite();
+    // Levels with nothing left to composite hold their whole window
+    let current = 0;
+    for (let level = 0; level < this.levels; level++) {
+      if (this._origins[level] && this._dirty[level].size === 0) {
+        current |= 1 << level;
+      }
+    }
+    this._params.w = current;
     this.gatherDynamic(cameraPos);
-    this._waterline?.update(cameraPos);
+    if (this._waterline) {
+      RenderGraphExecutor.profileScope('Waterline', () => this._waterline!.update(cameraPos));
+    }
   }
   /** Packs the ready dynamic instances nearest the camera for query-time merging. @internal */
   private gatherDynamic(cameraPos: Vector3) {
@@ -450,12 +526,14 @@ export class GlobalSDF {
     this._instanceBuffer?.dispose();
     this._brickBuffer?.dispose();
     this._indexBuffer?.dispose();
+    this._materialBuffer?.dispose();
     this._dummyHeightMap?.dispose();
     this._queryPoints?.dispose();
     this._queryOutput?.dispose();
     this._bindGroup?.dispose();
     this._queryBindGroup?.dispose();
     this._instanceBuffer = this._brickBuffer = this._indexBuffer = this._queryPoints = null;
+    this._materialBuffer = null;
     this._dummyHeightMap = this._queryOutput = null;
     this._bindGroup = this._queryBindGroup = null;
     this.invalidate();
@@ -478,7 +556,7 @@ export class GlobalSDF {
     const lo = next.map((v) => v / BRICK);
     const plo = prev?.map((v) => v / BRICK);
     const dirty = this._dirty[level];
-    // Bricks that left the window are no longer anyone's concern
+    // Drop dirty bricks that left the window
     for (const key of dirty) {
       const [x, y, z] = key.split(',').map(Number);
       if (x < lo[0] || y < lo[1] || z < lo[2] || x >= lo[0] + nb || y >= lo[1] + nb || z >= lo[2] + nb) {
@@ -519,6 +597,11 @@ export class GlobalSDF {
       }
     }
     this._lastBricks = batch.length;
+    this._freshCount = 0;
+    // The budget can be raised at run time
+    if (this._freshBricks.length < batch.length * 4) {
+      this._freshBricks = new Float32Array(batch.length * 4);
+    }
     if (batch.length === 0) {
       return;
     }
@@ -548,6 +631,9 @@ export class GlobalSDF {
       const min = [brick.x * size - reach, brick.y * size - reach, brick.z * size - reach];
       const max = [min[0] + size + 2 * reach, min[1] + size + 2 * reach, min[2] + size + 2 * reach];
       const start = indices.length;
+      // Whether a two-sided mesh comes near, which narrows the trace's surface
+      // expand in the brick (see SDF_NOT_COVERED_EXPAND_SCALE)
+      let twoSided = false;
       instances.forEach((inst, i) => {
         const lo = inst.bounds.minPoint;
         const hi = inst.bounds.maxPoint;
@@ -560,6 +646,7 @@ export class GlobalSDF {
           hi.z >= min[2]
         ) {
           indices.push(i);
+          twoSided ||= !!inst.asset!.header!.twoSided;
         }
       });
       const terrainHit =
@@ -574,8 +661,19 @@ export class GlobalSDF {
       const wrap = (v: number) => (((v * BRICK) % n) + n) % n;
       const o = b * BRICK_VEC4S * 4;
       brickData.set([brick.x * BRICK, brick.y * BRICK, brick.z * BRICK, vs], o);
+      if (this._materials) {
+        // Material voxels are 2³ field voxels
+        this._freshBricks.set(
+          [wrap(brick.x) / 2, wrap(brick.y) / 2, wrap(brick.z) / 2, brick.level],
+          this._freshCount++ * 4
+        );
+      }
       brickData.set([wrap(brick.x), wrap(brick.y), wrap(brick.z) + brick.level * n, start], o + 4);
-      brickData.set([indices.length - start, terrainHit ? 1 : 0, reach, 0], o + 8);
+      // y: bit 0 the terrain comes near, bit 1 a two-sided mesh does
+      brickData.set(
+        [indices.length - start, (terrainHit ? 1 : 0) + (twoSided ? 2 : 0), reach, brick.level],
+        o + 8
+      );
     });
     const device = getDevice();
     const program = this.getProgram();
@@ -591,6 +689,34 @@ export class GlobalSDF {
     bg.setBuffer('instances', this._instanceBuffer);
     bg.setBuffer('bricks', this._brickBuffer);
     bg.setBuffer('indices', this._indexBuffer);
+    const materials = this._materials;
+    if (materials) {
+      // Per instance: (atlas slot offset, 1 when resident), (slot resolution, 0)
+      const matData = new Float32Array(Math.max(1, instances.length) * 8);
+      instances.forEach((inst, i) => {
+        const slot = materials.getSlot(inst);
+        if (slot) {
+          matData.set([slot.offset[0], slot.offset[1], slot.offset[2], 1], i * 8);
+          matData.set([slot.resolution[0], slot.resolution[1], slot.resolution[2], 0], i * 8 + 4);
+        }
+      });
+      this._materialBuffer = this.ensureBuffer(this._materialBuffer, matData.byteLength);
+      this._materialBuffer.bufferSubData(0, matData);
+      bg.setBuffer('materialSlots', this._materialBuffer);
+      bg.setTexture('matAlbedoAtlas', materials.atlasAlbedo, fetchSampler('clamp_linear_nomip'));
+      // RGBE must not be filtered
+      bg.setTexture('matEmissiveAtlas', materials.atlasEmissive, fetchSampler('clamp_nearest_nomip'));
+      const s = materials.atlasSize;
+      bg.setValue('matAtlasInvSize', new Vector4(1 / s[0], 1 / s[1], 1 / s[2], 0));
+      const terrainAlbedo = this._terrain?.giAlbedo.texture ?? null;
+      bg.setTexture('terrainAlbedo', terrainAlbedo ?? getDefaultTexture2D(), fetchSampler('clamp_linear'));
+      bg.setValue(
+        'terrainAlbedoSize',
+        new Vector4(terrainAlbedo?.width ?? 1, terrainAlbedo?.height ?? 1, 0, 0)
+      );
+      bg.setTexture('albedoOut', materials.albedo);
+      bg.setTexture('emissiveOut', materials.emissive);
+    }
     bg.setTexture('atlas', atlas.texture, fetchSampler('clamp_linear_nomip'));
     bg.setValue('atlasInvSize', new Vector4(1 / atlas.size[0], 1 / atlas.size[1], 1 / atlas.size[2], 0));
     const terrain = this._terrain;
@@ -623,9 +749,8 @@ export class GlobalSDF {
       return buffer;
     }
     buffer?.dispose();
-    // Grow by half again so a slowly growing scene does not reallocate every
-    // frame, in whole vec4: a storage binding covers the whole buffer, and
-    // WebGPU wants its size a multiple of 4
+    // Grow by 1.5x to avoid per-frame reallocation; whole vec4s since the storage binding covers
+    // the whole buffer
     return getDevice().createBuffer(Math.max(256, Math.ceil((bytes * 1.5) / 16) * 16), {
       usage: 'uniform',
       storage: true
@@ -642,8 +767,10 @@ export class GlobalSDF {
   private getProgram() {
     if (!this._program) {
       const device = getDevice();
+      const materials = !!this._materials;
+      const fieldRes = this.resolution;
       this._program = buildSDFProgram({
-        label: 'GlobalSDFComposite',
+        label: materials ? 'GlobalSDFCompositeMaterials' : 'GlobalSDFComposite',
         workgroupSize: [4, 4, 4],
         compute(pb) {
           this.instances = pb.vec4[0]().storageBufferReadonly(0);
@@ -655,8 +782,23 @@ export class GlobalSDF {
           this.terrainRegion = pb.vec4().uniform(0);
           // (height scale, world y, 1 / width, 1 / height)
           this.terrainParams = pb.vec4().uniform(0);
-          this.field = pb.texStorage3D.r32float().storage(0);
+          this.field =
+            globalSDFFormat() === 'r16f'
+              ? pb.texStorage3D.r16float().storage(0)
+              : pb.texStorage3D.r32float().storage(0);
           this.tagsOut = pb.texStorage3D.rgba32float().storage(0);
+          if (materials) {
+            this.materialSlots = pb.vec4[0]().storageBufferReadonly(0);
+            this.matAlbedoAtlas = pb.tex3D().uniform(0);
+            this.matEmissiveAtlas = pb.tex3D().uniform(0);
+            this.matAtlasInvSize = pb.vec4().uniform(0);
+            // Top-down capture of the terrain material albedo, see TerrainGIAlbedo
+            this.terrainAlbedo = pb.tex2D().uniform(0);
+            // (capture width, capture height, 0, 0)
+            this.terrainAlbedoSize = pb.vec4().uniform(0);
+            this.albedoOut = pb.texStorage3D.rgba8unorm().storage(0);
+            this.emissiveOut = pb.texStorage3D.rgba16float().storage(0);
+          }
           pb.func('terrainHeight', [pb.vec2('xz')], function () {
             this.$l.uv = pb.div(
               pb.sub(this.xz, this.terrainRegion.xy),
@@ -693,9 +835,12 @@ export class GlobalSDF {
               (scope, k) => pb.mul(scope.indices.at(pb.add(scope.start, k)), SDF_INSTANCE_VEC4S),
               (scope, i) => scope.instances.at(i),
               this.atlas,
-              this.atlasInvSize.xyz
+              this.atlasInvSize.xyz,
+              pb.mul(this.vs, 0.5)
             );
-            this.$if(pb.greaterThan(this.b2.y, 0), function () {
+            this.$l.flags = pb.uint(this.b2.y);
+            this.$l.terrainD = this.band;
+            this.$if(pb.notEqual(pb.compAnd(this.flags, pb.uint(1)), pb.uint(0)), function () {
               this.$l.inRegion = pb.and(
                 pb.all(pb.greaterThanEqual(this.p.xz, this.terrainRegion.xy)),
                 pb.all(pb.lessThanEqual(this.p.xz, this.terrainRegion.zw))
@@ -717,25 +862,137 @@ export class GlobalSDF {
                 );
                 this.$l.grad = pb.div(pb.vec2(this.hx, this.hz), pb.mul(this.cell, 2));
                 // Height above the surface over the slope: exact on a plane
-                this.d = pb.min(
-                  this.d,
+                this.terrainD = pb.min(
+                  this.terrainD,
                   pb.div(pb.sub(this.p.y, this.h), pb.sqrt(pb.add(1, pb.dot(this.grad, this.grad))))
                 );
               });
             });
-            this.d = pb.clamp(this.d, pb.neg(this.band), this.band);
-            pb.textureStore(this.field, pb.add(pb.uvec3(this.b1.xyz), this.local), pb.vec4(this.d, 0, 0, 0));
-            // The brick now holds this window's region; readers see the tag in the next pass
+            this.d = pb.clamp(pb.min(this.d, this.terrainD), pb.neg(this.band), this.band);
+            // b1 addresses the level as `resolution` slices; the field has one more each
+            this.$l.level = pb.uint(this.b2.w);
+            this.$l.ft = pb.add(pb.uvec3(this.b1.xyz), this.local);
+            this.ft.z = pb.add(this.ft.z, this.level);
+            pb.textureStore(this.field, this.ft, pb.vec4(this.d, 0, 0, 0));
+            // The first slice of the window again past the last, the seam the filter crosses
+            this.$l.res = pb.uint(fieldRes);
+            this.$if(
+              pb.and(pb.equal(this.local.z, 0), pb.equal(pb.uint(this.b1.z), pb.mul(this.level, this.res))),
+              function () {
+                pb.textureStore(
+                  this.field,
+                  pb.uvec3(this.ft.x, this.ft.y, pb.add(pb.mul(this.level, pb.add(this.res, 1)), this.res)),
+                  pb.vec4(this.d, 0, 0, 0)
+                );
+              }
+            );
+            // Tag the brick with its world brick coords (visible to readers next pass); alpha
+            // flags two-sided meshes
             this.$if(
               pb.and(pb.equal(this.sub, 0), pb.equal(this.$builtins.localInvocationId, pb.uvec3(0))),
               function () {
                 pb.textureStore(
                   this.tagsOut,
                   pb.div(pb.uvec3(this.b1.xyz), BRICK),
-                  pb.vec4(pb.div(this.b0.xyz, BRICK), 1)
+                  pb.vec4(
+                    pb.div(this.b0.xyz, BRICK),
+                    this.$choice(
+                      pb.notEqual(pb.compAnd(this.flags, pb.uint(2)), pb.uint(0)),
+                      pb.float(GLOBAL_SDF_TAG_NOT_COVERED),
+                      pb.float(1)
+                    )
+                  )
                 );
               }
             );
+            if (materials) {
+              // Material voxels are 2³ field voxels: the even-corner thread writes it, sampled at
+              // its centre from the nearest instance (or the terrain where nearer)
+              this.$if(pb.equal(pb.mod(this.local, pb.uvec3(2)), pb.uvec3(0)), function () {
+                this.$l.pc = pb.add(this.p, pb.vec3(pb.mul(this.vs, 0.5)));
+                this.$l.bestK = pb.int(-1);
+                this.$l.instD = sampleInstancesSDF(
+                  this,
+                  this.pc,
+                  this.count,
+                  this.band,
+                  (scope, k) => pb.mul(scope.indices.at(pb.add(scope.start, k)), SDF_INSTANCE_VEC4S),
+                  (scope, i) => scope.instances.at(i),
+                  this.atlas,
+                  this.atlasInvSize.xyz,
+                  pb.mul(this.vs, 0.5),
+                  'bestK'
+                );
+                this.$l.terrainWins = pb.and(
+                  pb.lessThan(this.terrainD, this.band),
+                  pb.lessThan(this.terrainD, this.instD)
+                );
+                this.$l.useInst = pb.and(
+                  pb.greaterThanEqual(this.bestK, 0),
+                  pb.lessThan(this.instD, this.band),
+                  pb.not(this.terrainWins)
+                );
+                this.$l.idx = this.$choice(
+                  this.useInst,
+                  this.indices.at(pb.add(this.start, pb.uint(pb.max(this.bestK, 0)))),
+                  pb.uint(0)
+                );
+                this.$l.ibase = pb.mul(this.idx, SDF_INSTANCE_VEC4S);
+                this.$l.mr0 = this.instances.at(this.ibase);
+                this.$l.mr1 = this.instances.at(pb.add(this.ibase, 1));
+                this.$l.mr2 = this.instances.at(pb.add(this.ibase, 2));
+                this.$l.mbmin = this.instances.at(pb.add(this.ibase, 3));
+                this.$l.mbmax = this.instances.at(pb.add(this.ibase, 4));
+                this.$l.mslot = this.instances.at(pb.add(this.ibase, 5));
+                this.$l.matSlot = this.$choice(
+                  this.useInst,
+                  this.materialSlots.at(pb.mul(this.idx, 2)),
+                  pb.vec4(0)
+                );
+                this.$l.matRes = this.materialSlots.at(pb.add(pb.mul(this.idx, 2), 1));
+                this.$l.pc4 = pb.vec4(this.pc, 1);
+                this.$l.lp = pb.vec3(
+                  pb.dot(this.mr0, this.pc4),
+                  pb.dot(this.mr1, this.pc4),
+                  pb.dot(this.mr2, this.pc4)
+                );
+                sampleInstanceMaterial(
+                  this,
+                  this.lp,
+                  this.mbmin,
+                  this.mbmax,
+                  this.mslot,
+                  this.matSlot,
+                  this.matRes,
+                  this.atlas,
+                  this.atlasInvSize.xyz,
+                  this.matAlbedoAtlas,
+                  this.matEmissiveAtlas,
+                  this.matAtlasInvSize.xyz,
+                  'outAlbedo',
+                  'outEmissive'
+                );
+                this.$if(this.terrainWins, function () {
+                  // The capture's mip whose texels match the material voxel (two field voxels),
+                  // so coarse levels read the average over their footprint
+                  this.$l.tregion = pb.sub(this.terrainRegion.zw, this.terrainRegion.xy);
+                  this.$l.tuv = pb.div(pb.sub(this.pc.xz, this.terrainRegion.xy), this.tregion);
+                  this.$l.ttexel = pb.max(
+                    pb.div(this.tregion.x, this.terrainAlbedoSize.x),
+                    pb.div(this.tregion.y, this.terrainAlbedoSize.y)
+                  );
+                  this.$l.tlod = pb.max(pb.log2(pb.div(pb.mul(this.vs, 2), this.ttexel)), 0);
+                  this.outAlbedo = pb.vec4(
+                    pb.textureSampleLevel(this.terrainAlbedo, this.tuv, this.tlod).rgb,
+                    1
+                  );
+                  this.outEmissive = pb.vec3(0);
+                });
+                this.$l.ct = pb.div(pb.add(pb.uvec3(this.b1.xyz), this.local), pb.uvec3(2));
+                pb.textureStore(this.albedoOut, this.ct, this.outAlbedo);
+                pb.textureStore(this.emissiveOut, this.ct, pb.vec4(this.outEmissive, 0));
+              });
+            }
           });
         }
       })!;

@@ -64,6 +64,17 @@ export type CameraSensorFit = 'horizontal' | 'vertical';
  */
 export const PHYSICAL_BAKE_EXPOSURE = 1 / 38400;
 
+/**
+ * Fixed exposure GI caches (voxel radiance, probe irradiance) are stored at:
+ * {@link PHYSICAL_BAKE_EXPOSURE} in physical mode, 1 in legacy. Readers convert with
+ * `cameraExposure / getGICacheExposure(...)`.
+ *
+ * @internal
+ */
+export function getGICacheExposure(lightingMode: string) {
+  return lightingMode === 'physical' ? PHYSICAL_BAKE_EXPOSURE : 1;
+}
+
 /** Calculate photographic EV100 from aperture, shutter time and ISO. */
 export function calculateEV100(aperture: number, shutterSeconds: number, iso: number): number {
   const safeAperture = Math.max(aperture, 0.0001);

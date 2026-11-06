@@ -39,10 +39,19 @@ export interface MeshImportSettings {
    */
   lodPixelError: number;
   /**
-   * Scale on the density of the baked signed distance field: 1 gives 64 voxels
-   * along the longest side (at most 128 per axis).
+   * Scale on the density of the baked signed distance field: 1 gives 20 voxels
+   * per world unit (at most 128 per axis; 256 above 1), see SDF_VOXELS_PER_UNIT.
    */
   sdfResolutionScale: number;
+  /**
+   * World units one local unit of the mesh spans where it is used, so the
+   * density of the baked field is per world unit: a model authored in
+   * centimetres and scaled down by its nodes would otherwise get a hundred
+   * times the voxels it needs. Set when the model is imported, from the
+   * largest scale of the nodes using the mesh, and when the meshes of a scene
+   * are baked, from the largest scale of their instances.
+   */
+  sdfUnitScale: number;
   /** Bake the field as a thin open surface, unsigned, rather than a closed solid. */
   sdfTwoSided: boolean;
 }
@@ -67,6 +76,7 @@ export function defaultMeshImportSettings(compression: MeshCompression = 'none')
     lodReduction: 0.5,
     lodPixelError: 8,
     sdfResolutionScale: 1,
+    sdfUnitScale: 1,
     sdfTwoSided: false
   };
 }
@@ -135,6 +145,8 @@ export function normalizeMeshImportSettings(value: unknown): MeshImportSettings 
       typeof v.sdfResolutionScale === 'number' && v.sdfResolutionScale > 0
         ? v.sdfResolutionScale
         : defaults.sdfResolutionScale,
+    sdfUnitScale:
+      typeof v.sdfUnitScale === 'number' && v.sdfUnitScale > 0 ? v.sdfUnitScale : defaults.sdfUnitScale,
     sdfTwoSided: typeof v.sdfTwoSided === 'boolean' ? v.sdfTwoSided : defaults.sdfTwoSided
   };
 }

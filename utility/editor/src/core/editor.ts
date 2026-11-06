@@ -642,14 +642,19 @@ export class Editor {
   }
   render() {
     imGuiNewFrame();
-    const module = this._moduleManager.currentModule;
-    if (module?.view) {
-      module.view.render();
-    } else {
-      this.renderWelcomePage();
+    // A throw while rendering must still end the frame, or every frame after
+    // it fails in imGuiNewFrame and the error that started it scrolls away
+    try {
+      const module = this._moduleManager.currentModule;
+      if (module?.view) {
+        module.view.render();
+      } else {
+        this.renderWelcomePage();
+      }
+      DialogRenderer.render();
+    } finally {
+      imGuiEndFrame();
     }
-    DialogRenderer.render();
-    imGuiEndFrame();
     this.updateBusyCursor();
   }
   renderWelcomePage() {

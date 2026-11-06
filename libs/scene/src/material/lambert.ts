@@ -25,6 +25,9 @@ export class LambertMaterial
     other.copyFrom(this);
     return other;
   }
+  supportsVoxelization() {
+    return true;
+  }
   /** true if vertex normal attribute presents */
   get vertexNormal() {
     return this.featureUsed<boolean>(LambertMaterial.FEATURE_VERTEX_NORMAL);

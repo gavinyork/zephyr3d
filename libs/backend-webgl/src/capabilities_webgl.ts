@@ -301,6 +301,8 @@ export class WebGLTextureCaps implements TextureCaps {
   supportFloatColorBuffer: boolean;
   supportHalfFloatColorBuffer: boolean;
   supportFloatBlending: boolean;
+  supportTextureFormatsTier1: boolean;
+  supportTextureFormatsTier2: boolean;
   constructor(gl: WebGL2RenderingContext) {
     this._extTextureFilterAnisotropic =
       gl.getExtension('EXT_texture_filter_anisotropic') ||
@@ -326,6 +328,9 @@ export class WebGLTextureCaps implements TextureCaps {
       this.supportFloatColorBuffer = false;
     }
     this.supportFloatBlending = this.supportFloatColorBuffer && !!gl.getExtension('EXT_float_blend');
+    // WebGPU features; WebGL2 has no storage textures
+    this.supportTextureFormatsTier1 = false;
+    this.supportTextureFormatsTier2 = false;
 
     this._extS3TC =
       gl.getExtension('WEBGL_compressed_texture_s3tc') ||

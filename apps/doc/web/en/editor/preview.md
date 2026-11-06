@@ -88,21 +88,19 @@ The **Project Settings** panel mainly includes the following options:
 
 - Purpose: Defines which rendering backends (RHI, Rendering Hardware Interface) the application is allowed to use at runtime.
 - Available options (multi-select):
-  - `WebGL`
   - `WebGL2`
   - `WebGPU`
 - Selection logic at startup:
   - On startup, the application checks the **enabled options** in the following priority order:
     1. WebGPU  
     2. WebGL2  
-    3. WebGL
   - The first backend in this order that is both **enabled** and **available** in the current browser/device environment will be used.
 - Examples:
   - If you enable `WebGL2` and `WebGPU`:
     - On browsers that support WebGPU, the app will prefer WebGPU;
     - On browsers that only support WebGL2, it will fall back to WebGL2.
-  - If you only enable `WebGL`:
-    - WebGL is used even if the environment supports WebGPU or WebGL2.
+  - If you only enable `WebGL2`:
+    - WebGL2 is used even if the environment supports WebGPU.
 
 ---
 

@@ -6,6 +6,8 @@ Physics is a property of scene nodes: `node.physics` holds a node's rigid body, 
 
 This is not cloth or hair, which have GPU solvers of their own. This chapter is about rigid bodies: boxes, balls, doors, characters - things that keep their shape.
 
+Rigid-body physics uses the separate `@zephyr3d/physics` simulation layer and `@zephyr3d/physics-rapier` backend. After Rapier's WASM is initialized, the same CPU fixed-step simulation works with WebGL2 and WebGPU. See [Colliders](en/physics-colliders.md), [Scripting](en/physics-scripting.md), [Character Controller](en/physics-character.md), and [Physics in the Editor](en/editor/physics.md).
+
 <div class="showcase" case="tut-76"></div>
 
 ---

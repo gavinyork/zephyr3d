@@ -2,8 +2,9 @@ import type { Immutable, Nullable, Vector4 } from '@zephyr3d/base';
 import { Vector3, DRef, Disposable } from '@zephyr3d/base';
 import { ObservableVector4 } from '@zephyr3d/base';
 import type { DrawContext, EnvironmentLighting } from '../render';
+import { getProbeVolumeForDraw } from '../render/gi/probe_volume';
 import { EnvShIBL } from '../render';
-import { EnvConstantAmbient, EnvHemisphericAmbient } from '../render';
+import { EnvConstantAmbient, EnvHemisphericAmbient, EnvProbesOnly } from '../render';
 import { SkyRenderer } from '../render/sky';
 import { WindField } from './wind';
 import type { FrameBuffer, GPUDataBuffer, TextureCube } from '@zephyr3d/device';
@@ -14,6 +15,8 @@ import type { FrameBuffer, GPUDataBuffer, TextureCube } from '@zephyr3d/device';
  */
 export class EnvLightWrapper extends Disposable {
   private _envLight: Nullable<EnvironmentLighting>;
+  /** Stands in for the environment light of type `none`, see {@link EnvLightWrapper.envLight}. */
+  private readonly _probesOnly: EnvProbesOnly;
   private readonly _ambientColor: ObservableVector4;
   private readonly _ambientDown: ObservableVector4;
   private readonly _ambientUp: ObservableVector4;
@@ -32,6 +35,7 @@ export class EnvLightWrapper extends Disposable {
   constructor() {
     super();
     this._envLight = new EnvShIBL();
+    this._probesOnly = new EnvProbesOnly();
     this._ambientColor = new ObservableVector4(0.2, 0.2, 0.2, 1).setCallback(() => {
       if (this.type === 'constant') {
         (this._envLight as EnvConstantAmbient).ambientColor.set(this._ambientColor);
@@ -82,15 +86,22 @@ export class EnvLightWrapper extends Disposable {
       !!ctx.SSGIIrradianceHistoryTexture &&
       !!ctx.SSGISurfaceHistoryTexture &&
       !!ctx.motionVectorTexture;
+    const envLight = this.envLight;
     return !ctx || ctx.drawEnvLight
-      ? `${this.type}:${this._envLight!.hasRadiance() ? '1' : '0'}:${
-          this._envLight!.hasSheenRadiance() ? '1' : '0'
-        }:${this._envLight!.hasIrradiance() ? '1' : '0'}:${irradianceSource}:ssgi${ssgiHistory ? '1' : '0'}`
+      ? `${this.type}:${envLight.hasRadiance() ? '1' : '0'}:${
+          envLight.hasSheenRadiance() ? '1' : '0'
+        }:${envLight.hasIrradiance() ? '1' : '0'}:${irradianceSource}:ssgi${ssgiHistory ? '1' : '0'}:probes${
+          getProbeVolumeForDraw(ctx) ? '1' : '0'
+        }`
       : 'none';
   }
-  /** @internal */
-  get envLight() {
-    return this._envLight!;
+  /**
+   * @internal
+   * Environment lighting used by materials. For type `none`, a sky-less stand-in
+   * that applies probe GI only; passes reading the sky check {@link EnvLightWrapper.type}.
+   */
+  get envLight(): EnvironmentLighting {
+    return this._envLight ?? this._probesOnly;
   }
   /**
    * Multiplier on environment lighting, in both lighting modes.
@@ -263,6 +274,7 @@ export class EnvLightWrapper extends Disposable {
   protected onDispose() {
     super.onDispose();
     this._envLight?.dispose();
+    this._probesOnly.dispose();
     this._radianceMap.dispose();
     this._sheenRadianceMap.dispose();
     this._irradianceMap.dispose();

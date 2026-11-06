@@ -6,6 +6,8 @@
 
 物理和布料、头发是两回事：布料和头发有各自的 GPU 求解器；本章讲的是刚体——箱子、球、门、角色这类形状不变的物体。
 
+刚体物理由独立的 `@zephyr3d/physics` 模拟层和 `@zephyr3d/physics-rapier` 后端接入；初始化 Rapier 的 WASM 后，WebGL2 与 WebGPU 场景都使用相同的 CPU 固定步长模拟。相关章节：[碰撞体](zh-cn/physics-colliders.md)、[脚本控制](zh-cn/physics-scripting.md)、[角色控制器](zh-cn/physics-character.md)和[编辑器中的物理](zh-cn/editor/physics.md)。
+
 <div class="showcase" case="tut-76"></div>
 
 ---

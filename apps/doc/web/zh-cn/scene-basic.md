@@ -24,7 +24,7 @@ myApp.ready().then(function () {
 
 构造 `Application` 时的两个必要选项：
 
-- `backend`：渲染后端。目前可选 `backendWebGL`、`backendWebGL2`（均来自 `@zephyr3d/backend-webgl`）
+- `backend`：渲染后端。目前可选 `backendWebGL2`（来自 `@zephyr3d/backend-webgl`）
   和 `backendWebGPU`（来自 `@zephyr3d/backend-webgpu`）。
 - `canvas`：用于渲染的画布元素。
 

@@ -1837,7 +1837,7 @@ const BASE_TOOLS = [
   {
     name: 'material_get_properties',
     description:
-      'Get property values from a material asset. Property names must match getMaterialPropertyList. Returns { values, err }.',
+      'Get property values from a material asset. Property names must match getMaterialPropertyList. A property that does not apply to the material as it is (such as the sampler settings of an empty texture slot) reads null. Returns { values, err }.',
     inputSchema: {
       type: 'object',
       required: ['path', 'properties'],
@@ -2531,12 +2531,18 @@ const BASE_TOOLS = [
   {
     name: 'node_get_world_bounds',
     description:
-      'Get the world-space axis-aligned bounding box of a scene node, aggregated over its whole subtree. Returns { bounds: { min, max, center, size }, err }. Use this to verify part placement numerically when assembling compound objects (e.g. a wing should touch the body: wing.min/max should meet the body bounds) instead of judging alignment from screenshots alone.',
+      'Get the world-space axis-aligned bounding box of a scene node, by default aggregated over its whole subtree. Returns { bounds: { min, max, center, size }, err }. Use this to verify part placement numerically when assembling compound objects (e.g. a wing should touch the body: wing.min/max should meet the body bounds) instead of judging alignment from screenshots alone. Pass include_children: false to measure the node alone, e.g. the culling bounds of a light, which the editor gizmo child would otherwise widen.',
     inputSchema: {
       type: 'object',
       required: ['id'],
       properties: {
         id: { type: 'string', description: 'Persistent id of the scene node.' },
+        include_children: {
+          type: 'boolean',
+          default: true,
+          description:
+            'Merge the bounds of every descendant, editor helper nodes included. False returns the bounds of this node only.'
+        },
         timeout_ms: { type: 'number', default: 10000 }
       }
     }
@@ -3007,7 +3013,7 @@ const BASE_TOOLS = [
   {
     name: 'sdf_bake',
     description:
-      'Bake signed distance fields of mesh assets (.zmsh) into /assets/.sdf, one .zsdf per mesh, in a worker. Pass `paths` for specific meshes, otherwise every mesh used in the current scene (under node_id when given) is baked. Fields whose source mesh and SDF settings (sdfResolutionScale, sdfTwoSided in the mesh .zmeta) are unchanged are skipped unless force. Returns { results: [{ path, sdf_path, skipped, resolution, voxel_size, triangles, milliseconds, err }], err }.',
+      'Bake signed distance fields of mesh assets (.zmsh) into /assets/.sdf, one .zsdf per mesh, in a worker. Pass `paths` for specific meshes, otherwise every mesh used in the current scene (under node_id when given) is baked. The voxel density is 20 per world unit (times sdfResolutionScale, at most 128 per axis): the world units one local unit of each mesh spans are taken from the largest scale of its instances in the open scene and recorded as sdfUnitScale in the mesh .zmeta. Fields whose source mesh and SDF settings (sdfResolutionScale, sdfTwoSided, sdfUnitScale) are unchanged are skipped unless force. Returns { results: [{ path, sdf_path, skipped, resolution, voxel_size, triangles, milliseconds, err }], err }.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -3045,6 +3051,22 @@ const BASE_TOOLS = [
           items: { type: 'array', items: { type: 'number' }, minItems: 3, maxItems: 3 },
           description: 'World positions as [x, y, z].'
         },
+        timeout_ms: { type: 'number', default: 30000 }
+      }
+    }
+  },
+  {
+    name: 'gi_probe_query',
+    description:
+      'Read back the global illumination light probes of one level whose grid points lie in a world box (WebGPU, GIEnabled, the probe volume built). Per probe: world grid index, position (grid point plus relocation offset), offset, updated, inactive (classified as buried in geometry: skipped by every surface), irradiance (mean over its octahedral tile, at the GI cache exposure), sky (sky visibility 0..1), hitMin/hitMean (nearest and mean hit distance of its visibility map, near 0 for a probe buried in geometry) and sdf (scene SDF at the position, negative inside geometry). At most limit probes, nearest the box centre first. Returns { level, spacing, origin, grid, probes, err }.',
+    inputSchema: {
+      type: 'object',
+      required: ['min', 'max'],
+      properties: {
+        min: { type: 'array', items: { type: 'number' }, minItems: 3, maxItems: 3, description: 'World box min [x, y, z].' },
+        max: { type: 'array', items: { type: 'number' }, minItems: 3, maxItems: 3, description: 'World box max [x, y, z].' },
+        level: { type: 'number', default: 0, description: 'Probe level, 0 the finest.' },
+        limit: { type: 'number', default: 256 },
         timeout_ms: { type: 'number', default: 30000 }
       }
     }
@@ -3097,6 +3119,82 @@ const BASE_TOOLS = [
         size: { type: 'number', default: 64 },
         center: { type: 'array', items: { type: 'number' }, minItems: 2, maxItems: 2 },
         iso_spacing: { type: 'number', default: 0.25 },
+        timeout_ms: { type: 'number', default: 10000 }
+      }
+    }
+  },
+  {
+    name: 'gi_stats',
+    description:
+      'State of the scene global illumination (WebGPU, GIEnabled): counters of the voxel scene (material entries ready/pending/failed, material atlas use, voxelizations, lighting passes) and the probe volume (levels, probes, never updated, updated last frame), and per static mesh of the scene SDF how the voxel scene holds its material: voxel_state unsupported (material cannot be voxelized or not a triangle list), unknown (not wanted yet, e.g. its field not loaded), pending, ready or failed, with voxel_slot the material atlas resolution it was rasterized at (null while it has none). A mesh without a voxelized material reads black where GI rays hit it. missing_only lists only the meshes whose material is not in the voxel scene. Returns { enabled, stats, instances, err }.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        missing_only: { type: 'boolean', default: false },
+        timeout_ms: { type: 'number', default: 10000 }
+      }
+    }
+  },
+  {
+    name: 'pipeline_recorder',
+    description:
+      'Records the pipelines the editor page uses, for the pipeline cache (WebGPU pipelines, or WebGL 2 programs). Recording only watches the pipelines draws and dispatches ask for, rendering is unchanged; a render bundle replays its draws without asking again, so begin before opening the scene to see them all. Pipelines are grouped by tag, null for those used with no tag. action status reports the recorder; begin and end nest; clear forgets everything recorded; export also returns the pipeline cache JSON of one tag (data). Returns { available, recording, count, tags, data?, err }.',
+    inputSchema: {
+      type: 'object',
+      required: ['action'],
+      properties: {
+        action: { type: 'string', enum: ['status', 'begin', 'end', 'clear', 'export'] },
+        tag: { type: ['string', 'null'], default: null, description: 'Tag to export, null for the untagged pipelines.' },
+        timeout_ms: { type: 'number', default: 30000 }
+      }
+    }
+  },
+  {
+    name: 'pipeline_cache',
+    description:
+      'Pipelines of the editor page device (WebGPU, or WebGL 2 programs). action stats returns how its pipelines were made: { precompiled, precompiledUsed, onDemand, onDemandPrograms } where onDemand counts pipelines a draw or dispatch compiled when issued (a stall) and onDemandPrograms names the programs of the latest of them. action precompile compiles recorded pipelines (data: the data of pipeline_recorder export, or an array of them) ahead of time (asynchronous pipeline creation on WebGPU, KHR_parallel_shader_compile on WebGL 2) and waits for the job: { result: { total, completed, failed, skipped, cancelled, elapsedMs }, stats }. action compile goes through the engine API getEngine().pipelineCache, reading pipeline cache files from the project VFS: files, defaulting to /pipeline-cache.json; returns { state, result: { ...counts, missing }, stats }.',
+    inputSchema: {
+      type: 'object',
+      required: ['action'],
+      properties: {
+        action: { type: 'string', enum: ['stats', 'precompile', 'compile'] },
+        data: { type: ['object', 'array'], description: 'Recorded pipelines, for precompile.' },
+        files: { type: 'array', items: { type: 'string' }, description: 'Pipeline cache file paths, for compile; defaults to /pipeline-cache.json.' },
+        priority: { type: 'string', enum: ['foreground', 'background'], default: 'foreground' },
+        timeout_ms: { type: 'number', default: 120000 }
+      }
+    }
+  },
+  {
+    name: 'gi_voxel_query',
+    description:
+      'Read back what the global illumination voxel scene holds at world positions, as a probe ray reads it where it hits (WebGPU, GIEnabled): per point the clipmap level of the material voxel holding it (-1 where no level holds it with a current brick), albedo rgba (a = 1 where a surface material was composited into the voxel, 0 for an empty voxel, which a ray hitting there reads as black), emissive and radiance (lit outgoing radiance summed over the voxel faces, at the GI cache exposure). Material voxels are twice the global SDF voxel size of their level. At most 1024 points. Returns { samples, err }.',
+    inputSchema: {
+      type: 'object',
+      required: ['points'],
+      properties: {
+        points: {
+          type: 'array',
+          items: { type: 'array', items: { type: 'number' }, minItems: 3, maxItems: 3 },
+          maxItems: 1024,
+          description: 'World positions as [x, y, z].'
+        },
+        timeout_ms: { type: 'number', default: 30000 }
+      }
+    }
+  },
+  {
+    name: 'sdf_debug_view',
+    description:
+      'Draw a distance field debug view over the scene view, as the View menu entries Distance Field, Voxel Albedo/Emissive/Radiance and GI Sky Occlusion/Irradiance do: every pixel sphere traces the scene SDF and shows, at the hit, the step count (distance), the voxel scene material (albedo, emissive), its lit radiance (radiance), the probe sky visibility (skyVisibility: white sees all the sky, black none, magenta no probe) or the probe irradiance a white surface there shades with (irradiance). mode none draws the scene alone. exposure scales radiance and irradiance (shown as x/(1+x)). Not saved with the scene. Returns { mode, exposure, err }.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        mode: {
+          type: 'string',
+          enum: ['none', 'distance', 'albedo', 'emissive', 'radiance', 'skyVisibility', 'irradiance']
+        },
+        exposure: { type: 'number', description: 'Scale on radiance and irradiance before display.' },
         timeout_ms: { type: 'number', default: 10000 }
       }
     }
@@ -3247,6 +3345,9 @@ const READONLY_TOOL_NAMES = new Set([
   'terrain_sample_height',
   'sdf_query',
   'sdf_sample',
+  'gi_probe_query',
+  'gi_stats',
+  'gi_voxel_query',
   'editor_frame_timing',
   'editor_connect_info',
   'editor_wait_ready',
@@ -4099,7 +4200,11 @@ const handlers = {
     return bridge.send('sceneCheckpoint', { label: args.label }, Number(args.timeout_ms ?? 30000));
   },
   async node_get_world_bounds(args) {
-    return bridge.send('nodeGetWorldBounds', { id: args.id }, Number(args.timeout_ms ?? 10000));
+    return bridge.send(
+      'nodeGetWorldBounds',
+      { id: args.id, include_children: args.include_children ?? true },
+      Number(args.timeout_ms ?? 10000)
+    );
   },
   async asset_import_from_url(args) {
     // Download happens here in the Node worker (no renderer CORS limits);
@@ -4406,6 +4511,13 @@ const handlers = {
       timeout
     );
   },
+  async gi_probe_query(args) {
+    return bridge.send(
+      'gi_probe_query',
+      { min: args.min, max: args.max, level: args.level, limit: args.limit },
+      Number(args.timeout_ms ?? 30000)
+    );
+  },
   async sdf_sample(args) {
     return bridge.send('sdf_sample', { points: args.points }, Number(args.timeout_ms ?? 30000));
   },
@@ -4438,6 +4550,40 @@ const handlers = {
   },
   async sdf_stats(args) {
     return bridge.send('sdf_stats', { enabled: args.enabled }, Number(args.timeout_ms ?? 10000));
+  },
+  async gi_voxel_query(args) {
+    return bridge.send('gi_voxel_query', { points: args.points }, Number(args.timeout_ms ?? 30000));
+  },
+  async gi_stats(args) {
+    return bridge.send('gi_stats', { missing_only: args.missing_only }, Number(args.timeout_ms ?? 10000));
+  },
+  async pipeline_recorder(args) {
+    return bridge.send(
+      'pipeline_recorder',
+      { action: args.action, tag: args.tag ?? null },
+      Number(args.timeout_ms ?? 30000)
+    );
+  },
+  async pipeline_cache(args) {
+    return bridge.send(
+      'pipeline_cache',
+      {
+        action: args.action,
+        data: args.data,
+        priority: args.priority,
+        manifest: args.manifest,
+        scenes: args.scenes,
+        files: args.files
+      },
+      Number(args.timeout_ms ?? 120000)
+    );
+  },
+  async sdf_debug_view(args) {
+    return bridge.send(
+      'sdf_debug_view',
+      { mode: args.mode, exposure: args.exposure },
+      Number(args.timeout_ms ?? 10000)
+    );
   },
   async sdf_query(args) {
     return bridge.send(

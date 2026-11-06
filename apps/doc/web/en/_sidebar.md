@@ -60,6 +60,9 @@
     - [Overview](en/picking.md)
   - Geometry Instancing
     - [Overview](en/instancing-intro.md)
+    - [Skinned Mesh Instancing](en/instancing-skinned.md)
+  - Spatial Fields
+    - [Mesh and Global SDF](en/sdf.md)
   - Character Rendering
     - [Skin and Subsurface Scattering](en/material-skin.md)
     - [Hair Rendering](en/material-hair.md)

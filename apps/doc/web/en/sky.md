@@ -52,15 +52,25 @@ post-processing with [Tone mapping](en/posteffect-tonemap.md) to achieve the des
 
 Here is a complete atmospheric scattering setup:
 
-<<< @/../src/tut-34/main.js{27-37 js}
+<<< @/../src/tut-34/main.js{40-50 js}
 
-Note that the directional light on line 28 never sets `sunLight = true` explicitly — **the first
+Note that the directional light on line 41 never sets `sunLight = true` explicitly — **the first
 directional light created in a scene automatically becomes the sun**, so orienting it with
 `lookAt()` is enough to drive the sky.
 
 <div class="showcase" case="tut-34"></div>
 
-The clouds in the sky are generated from a 2D noise function, with three parameters to tune:
+### Clouds
+
+The atmospheric sky supports two kinds of clouds, selected with `cloudMode`: the default `procedural` 2D clouds, and WebGPU ray-marched `volumetric` clouds. Both are drawn only when `skyType = 'scatter'`; the skybox mode shows no clouds.
+
+The buttons in the top-left corner of the example above switch between the two. Switching only takes a `cloudMode` change; read `effectiveCloudMode` back to get the mode actually drawn (off WebGPU, volumetric falls back to 2D clouds, which is why the example disables the volumetric button there):
+
+<<< @/../src/tut-34/main.js{59-80 js}
+
+#### 2D clouds
+
+2D clouds are generated from a 2D noise function. They are cheap and available on every backend, with three parameters to tune:
 
 ```javascript
 // Cloud cover; only effective in atmospheric scattering mode
@@ -74,3 +84,30 @@ scene.env.sky.wind = new Vector2(300, 500);
 // Or mutate in place to avoid an extra allocation
 scene.env.sky.wind.setXY(600, 0);
 ```
+
+#### Volumetric clouds
+
+For clouds with a finite layer, self-shadowing, and an approximation of multiple scattering, use volumetric clouds, at the cost of noise volumes and a sky-cache update.
+
+```ts
+const sky = scene.env.sky;
+sky.skyType = 'scatter';
+sky.cloudMode = 'volumetric';
+
+const clouds = sky.volumetricCloud;
+clouds.layerBottomAltitude = 1500;
+clouds.layerHeight = 4000;
+clouds.coverage = 0.55;
+clouds.density = 0.03;
+clouds.wind.setXY(10, 0);
+clouds.framesPerUpdate = 64;
+clouds.cacheResolution = 768;
+```
+
+Distances are in metres. `coverage` controls the amount of cloud, `density` its thickness, and `baseHeightVariation`, `formation`, and the noise scales shape the field. `viewSampleCountScale` and `shadowSampleCountScale` improve ray quality while increasing cost.
+
+The engine generates weather, base-noise, and detail-noise resources by default. For authored results, assign slice atlases to `sky.cloudWeatherMap`, `sky.cloudBaseNoise`, and `sky.cloudDetailNoise`. The sky cache updates over `framesPerUpdate` frames; lower values respond faster but cost more per frame.
+
+Use `sky.cloudDebugView = 'weather'` (or `baseNoise`, `detailNoise`, `densityXY`, and related views) to inspect the generated resources.
+
+Volumetric mode is WebGPU-only. Other backends fall back to `effectiveCloudMode === 'procedural'` and show the 2D clouds above. Volumetric clouds are not scene geometry and do not participate in Mesh LOD, SDF, or physics. Keep cloud altitudes and `scene.metersPerUnit` in the same world scale.

@@ -26,6 +26,8 @@ import type { PhysicsWorld } from '../physics/world';
 import { getPhysicsWorldFactory } from '../physics/world';
 import type { VirtualTextureClient } from '../render/virtualtexture/virtual_texture_client';
 import { SceneSDF } from '../render/sdf/scene_sdf';
+import { SceneGI } from '../render/gi/scene_gi';
+import { RenderGraphExecutor } from '../render/rendergraph/executor';
 
 /**
  * Represents a renderable world that manages scene graph, spatial indexing, and environment.
@@ -86,6 +88,8 @@ export class Scene
   protected _env: Environment;
   /** @internal */
   protected _sdf: Nullable<SceneSDF>;
+  /** @internal */
+  protected _gi: Nullable<SceneGI>;
   /** @internal Frame counter that last updated this scene. */
   protected _updateFrame: number;
   /** @internal Unique scene ID. */
@@ -146,6 +150,7 @@ export class Scene
     );
     this._env = new Environment();
     this._sdf = null;
+    this._gi = null;
     this._updateFrame = -1;
     this._rootNode = new DRef();
     this._rootNode.set(new SceneNode(this));
@@ -241,6 +246,13 @@ export class Scene
       this._sdf = new SceneSDF(this);
     }
     return this._sdf;
+  }
+  /** Global illumination of the scene, off until enabled. */
+  get gi() {
+    if (!this._gi) {
+      this._gi = new SceneGI(this);
+    }
+    return this._gi;
   }
   /** Lighting unit model. Legacy remains the default for backward compatibility. */
   get lightingMode() {
@@ -601,19 +613,23 @@ export class Scene
       const deltaInSeconds = frameInfo.elapsedFrame * 0.001;
       this.dispatchEvent('update', this);
       this.mainCamera?.updateController(deltaInSeconds, 'early');
-      if (this._nodeUpdateQueue.size > 0) {
-        const elapsedInSeconds = frameInfo.elapsedOverall * 0.001;
-        // Nodes queued while draining are updated next frame
-        for (const node of this._nodeUpdateQueue.take()) {
-          if (!node.disposed && node.attached) {
-            node.update(frameInfo.frameCounter, elapsedInSeconds, deltaInSeconds);
+      if (this._nodeUpdateQueue.size > 0 || this._drawableUpdateQueue.size > 0) {
+        RenderGraphExecutor.profileScope('SceneUpdate', () => {
+          if (this._nodeUpdateQueue.size > 0) {
+            const elapsedInSeconds = frameInfo.elapsedOverall * 0.001;
+            // Nodes queued while draining are updated next frame
+            for (const node of this._nodeUpdateQueue.take()) {
+              if (!node.disposed && node.attached) {
+                node.update(frameInfo.frameCounter, elapsedInSeconds, deltaInSeconds);
+              }
+            }
           }
-        }
-      }
-      if (this._drawableUpdateQueue.size > 0) {
-        for (const drawable of this._drawableUpdateQueue.take()) {
-          drawable.updateState();
-        }
+          if (this._drawableUpdateQueue.size > 0) {
+            for (const drawable of this._drawableUpdateQueue.take()) {
+              drawable.updateState();
+            }
+          }
+        });
       }
       this.dispatchEvent('afterupdate', this);
       tryGetApp()?.engine?.lateUpdate(
@@ -624,13 +640,26 @@ export class Scene
       this.dispatchEvent('lateupdate', this);
       this.updateNodePlacement(this._octree, this._nodePlaceList);
       const camera = this.mainCamera;
-      if (this._sdf?.enabled && camera) {
-        this._sdf.update(camera.getWorldPosition(), deltaInSeconds);
+      if (camera && (this._gi?.enabled || this._sdf?.enabled)) {
+        const cameraPos = camera.getWorldPosition();
+        // The voxel scene feeds the field's compositing, so it goes first
+        if (this._gi?.enabled) {
+          RenderGraphExecutor.profileScope('GIVoxelize', () => this._gi!.update(cameraPos, deltaInSeconds));
+        }
+        if (this._sdf?.enabled) {
+          RenderGraphExecutor.profileScope('SceneSDF', () => this._sdf!.update(cameraPos, deltaInSeconds));
+        }
+        // Lighting reads what the field just composited
+        if (this._gi?.enabled) {
+          RenderGraphExecutor.profileScope('GILighting', () => this._gi!.updateLighting(camera));
+        }
       }
     }
     // Palettes written by animation updates are uploaded once all nodes and bank tracks are updated
-    AnimationBankTrack.updateAll(getDevice().frameInfo.elapsedFrame * 0.001);
-    SkinPaletteAtlas.flushPending();
+    RenderGraphExecutor.profileScope('Animation', () => {
+      AnimationBankTrack.updateAll(getDevice().frameInfo.elapsedFrame * 0.001);
+      SkinPaletteAtlas.flushPending();
+    });
   }
   /**
    * Performs per-camera scene updates for the current frame.
@@ -643,14 +672,16 @@ export class Scene
    */
   frameUpdatePerCamera(camera: Camera) {
     if (this._perCameraUpdateQueue.size > 0) {
-      const frameInfo = getDevice().frameInfo;
-      const elapsedInSeconds = frameInfo.elapsedOverall * 0.001;
-      const deltaInSeconds = frameInfo.elapsedFrame * 0.001;
-      for (const node of this._perCameraUpdateQueue.take()) {
-        if (!node.disposed) {
-          node.updatePerCamera(camera, elapsedInSeconds, deltaInSeconds);
+      RenderGraphExecutor.profileScope('SceneUpdatePerCamera', () => {
+        const frameInfo = getDevice().frameInfo;
+        const elapsedInSeconds = frameInfo.elapsedOverall * 0.001;
+        const deltaInSeconds = frameInfo.elapsedFrame * 0.001;
+        for (const node of this._perCameraUpdateQueue.take()) {
+          if (!node.disposed) {
+            node.updatePerCamera(camera, elapsedInSeconds, deltaInSeconds);
+          }
         }
-      }
+      });
     }
     this.updateNodePlacement(this._octree, this._nodePlaceList);
     SkinPaletteAtlas.flushPending();
@@ -700,6 +731,8 @@ export class Scene
     this._drawableUpdateQueue.clear();
     this._perCameraUpdateQueue.clear();
     this._env.dispose();
+    this._gi?.dispose();
+    this._gi = null;
     this._sdf?.dispose();
     this._sdf = null;
     this._rootNode.dispose();

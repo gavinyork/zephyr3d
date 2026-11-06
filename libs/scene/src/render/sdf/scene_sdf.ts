@@ -6,7 +6,7 @@ import type { SceneNode } from '../../scene/scene_node';
 import { getEngine } from '../../app/api';
 import { getMeshSDFPath, readZsdf, writeZsdf } from '../../asset/zsdf_binary';
 import type { ZsdfHeader } from '../../asset/zsdf_binary';
-import { MeshSDFAtlas } from './sdf_atlas';
+import { MeshSDFAtlas, SDF_ATLAS_BLOCK } from './sdf_atlas';
 import { GlobalSDF } from './global_sdf';
 import type { ClipmapTerrain } from '../../scene/terrain-cm/terrain-cm';
 import type { Primitive } from '../primitive';
@@ -46,9 +46,12 @@ export class MeshSDFAsset {
   lastWanted: number;
   /** True once its file read has started. */
   requested: boolean;
+  /** {@link MeshSDFAtlas.version} when it last did not fit, or -1; retried only after the atlas changes. */
+  failedVersion: number;
   constructor(meshPath: string) {
     this.meshPath = meshPath;
     this.requested = false;
+    this.failedVersion = -1;
     this.state = 'loading';
     this.header = null;
     this.voxels = null;
@@ -112,19 +115,11 @@ type SceneSDFEvents = {
 };
 
 /**
- * The signed distance field data of a scene: which meshes take part, their
- * baked fields streamed in on demand into a shared {@link MeshSDFAtlas}.
- *
- * Off by default. While enabled it tracks every mesh with an effective
- * {@link Mesh.sdfMode} other than `none`, keeps the fields of those within
- * {@link SceneSDF.streamRadius} of the camera loaded, nearest first, evicting the
- * least recently wanted ones when the atlas fills, and reports every change of
- * the field as a dirty world box for a global field to rebuild.
- *
- * Fields are read from {@link getMeshSDFPath} of the mesh's primitive asset; a
- * mesh with no baked field is left out until one is baked. A primitive built in
- * code, with no asset, takes part once it is given a field at run time with
- * {@link SceneSDF.setField} or {@link SceneSDF.bakeField}.
+ * Signed distance field data of a scene: tracks meshes whose effective {@link Mesh.sdfMode} is not
+ * `none` and streams their baked fields (from {@link getMeshSDFPath}, or given at run time via
+ * {@link SceneSDF.setField} / {@link SceneSDF.bakeField}) into a shared {@link MeshSDFAtlas},
+ * nearest the camera first, evicting least recently wanted. Changes are reported as dirty world
+ * boxes. Off by default.
  *
  * @public
  */
@@ -133,6 +128,8 @@ export class SceneSDF extends makeObservable(Disposable)<SceneSDFEvents>() {
   streamRadius: number;
   /** Field files read at once. */
   maxConcurrentLoads: number;
+  private _atlasSize: [number, number, number];
+  private _atlasFullWarned: boolean;
   /** Bytes uploaded to the atlas per frame. */
   uploadBudget: number;
   private readonly _scene: Scene;
@@ -167,6 +164,8 @@ export class SceneSDF extends makeObservable(Disposable)<SceneSDFEvents>() {
     this._loading = 0;
     this._time = 0;
     this._atlasFull = 0;
+    this._atlasFullWarned = false;
+    this._atlasSize = [512, 256, 256];
     this._updates = 0;
     this._camera = new Vector3();
     this.streamRadius = 256;
@@ -186,10 +185,12 @@ export class SceneSDF extends makeObservable(Disposable)<SceneSDFEvents>() {
     if (val) {
       root.on('nodeattached', this.onNodeAttached, this);
       root.on('noderemoved', this.onNodeRemoved, this);
+      root.on('visiblechanged', this.onVisibleChanged, this);
       this.collect(root);
     } else {
       root.off('nodeattached', this.onNodeAttached, this);
       root.off('noderemoved', this.onNodeRemoved, this);
+      root.off('visiblechanged', this.onVisibleChanged, this);
       this._pendingAttach.clear();
       for (const mesh of [...this._tracked]) {
         this.untrack(mesh);
@@ -203,10 +204,34 @@ export class SceneSDF extends makeObservable(Disposable)<SceneSDFEvents>() {
       this._terrain = null;
     }
   }
+  /**
+   * Voxels per axis of the shared half-float atlas; 512×256×256 (64 MB) by default. Fields that
+   * do not fit are left out with a warning. Changing it empties the atlas.
+   */
+  get atlasSize(): [number, number, number] {
+    return [...this._atlasSize];
+  }
+  set atlasSize(val: [number, number, number]) {
+    const size = val.map((v) => Math.max(SDF_ATLAS_BLOCK, Math.floor(v))) as [number, number, number];
+    if (size.some((v, i) => v !== this._atlasSize[i])) {
+      this._atlasSize = size;
+      if (this._atlas) {
+        for (const asset of this._assets.values()) {
+          if (this._atlas.getSlot(asset)) {
+            this.dirtyAsset(asset);
+          }
+        }
+        this._atlas.dispose();
+        this._atlas = null;
+      }
+      this._atlasFull = 0;
+      this._atlasFullWarned = false;
+    }
+  }
   /** The atlas of resident fields, created when first needed. */
   get atlas() {
     if (!this._atlas) {
-      this._atlas = new MeshSDFAtlas();
+      this._atlas = new MeshSDFAtlas(this._atlasSize);
     }
     return this._atlas;
   }
@@ -262,12 +287,9 @@ export class SceneSDF extends makeObservable(Disposable)<SceneSDFEvents>() {
     return stats;
   }
   /**
-   * Gives a primitive with no baked field asset (one built in code, such as a
-   * shape) a field at run time, for the meshes drawing it to take part in the
-   * scene field as a baked one would. Replaces a field given before. Shared by
-   * every scene: a mesh of another scene drawing the same primitive takes it up
-   * too. The field is in the primitive's local space, as {@link bakeMeshSDF}
-   * makes it.
+   * Gives a primitive without a baked field asset (e.g. a code-built shape) a field at run time,
+   * in the primitive's local space as {@link bakeMeshSDF} makes it. Replaces any earlier one and
+   * is shared by every scene.
    */
   setField(primitive: Primitive, sdf: MeshSDFData) {
     let key = runtimeKeys.get(primitive);
@@ -285,10 +307,8 @@ export class SceneSDF extends makeObservable(Disposable)<SceneSDFEvents>() {
     }
   }
   /**
-   * Bakes the field of a primitive on the CPU from its triangles, read back from
-   * the GPU, and gives it to the primitive with {@link SceneSDF.setField}. For a
-   * primitive built in code; one loaded from an asset is baked in the editor
-   * instead. Takes a moment for a large mesh, as the editor's bake does.
+   * Bakes a primitive's field on the CPU from its GPU-read-back triangles and applies it with
+   * {@link SceneSDF.setField}. For code-built primitives; may take a moment for large meshes.
    */
   async bakeField(primitive: Primitive, options?: MeshSDFBakeOptions) {
     const { positions, indices } = await readPrimitiveTriangles(primitive, 0);
@@ -313,9 +333,8 @@ export class SceneSDF extends makeObservable(Disposable)<SceneSDFEvents>() {
     }
   }
   /**
-   * Streams fields for a camera position: starts loads for the nearest wanted
-   * fields, places loaded ones in the atlas (evicting unwanted ones when it is
-   * full) and uploads within the byte budget. Called by the scene once a frame.
+   * Streams fields for a camera position: loads the nearest wanted, places loaded ones in the
+   * atlas (evicting when full) and uploads within the byte budget. Called once a frame.
    */
   update(cameraPos: Vector3, deltaSeconds: number) {
     if (!this._enabled) {
@@ -354,7 +373,7 @@ export class SceneSDF extends makeObservable(Disposable)<SceneSDFEvents>() {
         }
         continue;
       }
-      if (asset.state === 'ready' && !atlas.getSlot(asset)) {
+      if (asset.state === 'ready' && !atlas.getSlot(asset) && asset.failedVersion !== atlas.version) {
         this.place(asset, wanted);
       }
     }
@@ -368,8 +387,7 @@ export class SceneSDF extends makeObservable(Disposable)<SceneSDFEvents>() {
       try {
         this.global?.update(cameraPos, this._terrain);
       } catch (err) {
-        // A program that failed to build fails every frame: report it once and
-        // leave the global field off rather than abort the scene update
+        // A failed program fails every frame: report once and disable the global field
         this._globalFailed = true;
         console.error('SceneSDF: the global field is disabled after an error', err);
       }
@@ -386,18 +404,42 @@ export class SceneSDF extends makeObservable(Disposable)<SceneSDFEvents>() {
     if (atlas.add(asset, res, asset.voxels!)) {
       return;
     }
-    // Evict resident fields that are not wanted, least recently wanted first
-    const victims = [...this._assets.values()]
-      .filter((a) => !wanted.has(a) && atlas.getSlot(a))
-      .sort((a, b) => a.lastWanted - b.lastWanted);
-    for (const victim of victims) {
+    // Evict resident fields that are not wanted, least recently wanted first,
+    // then wanted ones farther from the camera than this one, farthest first
+    const resident = [...this._assets.values()].filter((a) => a !== asset && atlas.getSlot(a));
+    const dist = wanted.get(asset)!;
+    const nearer = (a: MeshSDFAsset) => wanted.has(a) && wanted.get(a)! <= dist;
+    const victims = [
+      ...resident.filter((a) => !wanted.has(a)).sort((a, b) => a.lastWanted - b.lastWanted),
+      ...resident.filter((a) => wanted.get(a)! > dist).sort((a, b) => wanted.get(b)! - wanted.get(a)!)
+    ];
+    // Skip evicting when even the nearer fields leave no room, or fields would thrash each frame
+    const fits = atlas.fits(res, resident.filter(nearer));
+    for (const victim of fits ? victims : []) {
       atlas.remove(victim);
       this.dirtyAsset(victim);
       if (atlas.add(asset, res, asset.voxels!)) {
         return;
       }
     }
+    asset.failedVersion = atlas.version;
     this._atlasFull++;
+    if (!this._atlasFullWarned) {
+      this._atlasFullWarned = true;
+      let demand = 0;
+      for (const a of wanted.keys()) {
+        if (a.header) {
+          demand += a.header.resolution.reduce(
+            (n, v) => n * Math.ceil(v / SDF_ATLAS_BLOCK) * SDF_ATLAS_BLOCK,
+            1
+          );
+        }
+      }
+      const capacity = atlas.size[0] * atlas.size[1] * atlas.size[2];
+      console.warn(
+        `SceneSDF: the field of ${asset.meshPath} (${res.join('×')} voxels) does not fit the ${this._atlasSize.join('×')} atlas, which is ${Math.round(atlas.occupancy * 100)}% full; the loaded fields within SceneSDF.streamRadius (${this.streamRadius}) need ${(demand / capacity).toFixed(1)}× the atlas. It and any other field that does not fit are left out of the scene field. Raise SceneSDF.atlasSize, lower SceneSDF.streamRadius or bake meshes at a lower resolution scale.`
+      );
+    }
   }
   /** @internal */
   private load(asset: MeshSDFAsset) {
@@ -445,9 +487,8 @@ export class SceneSDF extends makeObservable(Disposable)<SceneSDFEvents>() {
   }
   /** @internal */
   private onNodeAttached(node: SceneNode) {
-    // Bubbles to the root once per attach; the subtree comes with it. Deferred
-    // to the next update: a node constructed with a parent attaches from the
-    // base class constructor, before the derived class has set itself up.
+    // Deferred to the next update: a node constructed with a parent attaches from the base
+    // constructor, before the derived class is set up
     this._pendingAttach.add(node);
   }
   /** @internal */
@@ -469,13 +510,22 @@ export class SceneSDF extends makeObservable(Disposable)<SceneSDFEvents>() {
     }
     this.retrack(mesh);
   }
-  /** Places a tracked mesh again after its mode, primitive or parentage changed. @internal */
+  /** @internal */
+  private onVisibleChanged(node: SceneNode) {
+    // Bubbles to the root from the node whose show state changed
+    node.iterate((child) => {
+      if (child.isMesh() && this._tracked.has(child)) {
+        this.retrack(child);
+      }
+      return false;
+    });
+  }
+  /** Places a tracked mesh again after its mode, primitive, parentage or visibility changed. @internal */
   private retrack(mesh: Mesh) {
-    const mode = mesh.attached ? mesh.effectiveSDFMode : 'none';
+    const mode = mesh.attached && !mesh.hidden ? mesh.effectiveSDFMode : 'none';
     const primitive = mesh.primitive;
     const path = primitive ? getEngine().resourceManager.getAssetId(primitive) : null;
-    // A field given at run time wins over a baked one, which a primitive built
-    // in code does not have
+    // A field given at run time wins over a baked one
     const runtimeKey = primitive ? runtimeKeys.get(primitive) : undefined;
     const meshPath =
       runtimeKey && runtimeFields.has(runtimeKey)
@@ -561,8 +611,7 @@ export class SceneSDF extends makeObservable(Disposable)<SceneSDFEvents>() {
     }
     const box = bv.toAABB();
     const b = inst.bounds;
-    // equalsTo's tolerance scales with the values, so it would call the
-    // infinite empty box equal to anything: test emptiness first
+    // equalsTo's tolerance scales with the values, so test emptiness (infinite box) first
     const wasValid = b.minPoint.x <= b.maxPoint.x;
     if (wasValid && b.minPoint.equalsTo(box.minPoint) && b.maxPoint.equalsTo(box.maxPoint)) {
       return;

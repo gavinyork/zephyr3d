@@ -162,7 +162,19 @@ export class WebGPUClearQuad {
 const computeMipmapStorageFormats: Partial<
   Record<
     TextureFormat,
-    'rgba8unorm' | 'rgba8snorm' | 'rgba16float' | 'r32float' | 'rg32float' | 'rgba32float'
+    | 'rgba8unorm'
+    | 'rgba8snorm'
+    | 'rgba16float'
+    | 'r32float'
+    | 'rg32float'
+    | 'rgba32float'
+    | 'r8unorm'
+    | 'r8snorm'
+    | 'rg8unorm'
+    | 'rg8snorm'
+    | 'r16float'
+    | 'rg16float'
+    | 'rg11b10ufloat'
   >
 > = {
   rgba8unorm: 'rgba8unorm',
@@ -170,7 +182,15 @@ const computeMipmapStorageFormats: Partial<
   rgba16f: 'rgba16float',
   r32f: 'r32float',
   rg32f: 'rg32float',
-  rgba32f: 'rgba32float'
+  rgba32f: 'rgba32float',
+  // Storage formats only with texture-formats-tier1, see supportsComputeMipmap
+  r8unorm: 'r8unorm',
+  r8snorm: 'r8snorm',
+  rg8unorm: 'rg8unorm',
+  rg8snorm: 'rg8snorm',
+  r16f: 'r16float',
+  rg16f: 'rg16float',
+  rg11b10uf: 'rg11b10ufloat'
 };
 
 const COMPUTE_MIPMAP_GROUP_SIZE = 8;
@@ -194,7 +214,8 @@ export class WebGPUMipmapGenerator {
   static supportsComputeMipmap(device: WebGPUDevice, format: TextureFormat) {
     return (
       !!computeMipmapStorageFormats[format] &&
-      !!device.getDeviceCaps().textureCaps.getTextureFormatInfo(format)?.filterable
+      !!device.getDeviceCaps().textureCaps.getTextureFormatInfo(format)?.filterable &&
+      !!device.getDeviceCaps().textureCaps.getTextureFormatInfo(format)?.writable
     );
   }
   static getComputeMipmapBindGroupLayout(device: WebGPUDevice, format: TextureFormat, is3D = false) {

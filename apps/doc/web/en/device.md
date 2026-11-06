@@ -1,15 +1,13 @@
-# Rending device
+# Rendering device
 
 The ([rendering device](/doc/markdown/./device.abstractdevice)) is an abstract interface that encapsulates most of the underlying graphics API functions, serving as the core of the Device API.
 
 ## Creating device
 
-The rendering device is an abstract interface, and we have currently implemented three backends: WebGL, WebGL2, and WebGPU. To create an instance of the rendering device, one of these backends must be selected.
+The rendering device is an abstract interface, and we have currently implemented two backends: WebGL2, and WebGPU. To create an instance of the rendering device, one of these backends must be selected.
 
 ```javascript
 
-// Importing WebGL backend
-// import { backendWebGL } from '@zephyr3d/backend-webgl';
 // Importing WebGL2 backend
 // import { backendWebGL2 } from '@zephyr3d/backend-webgl';
 // Importing WebGPU backend

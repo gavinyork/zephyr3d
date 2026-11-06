@@ -4,6 +4,7 @@ import type {
   CloudMode,
   EnvLightType,
   FogType,
+  GIUpdateMode,
   SkyType,
   VolumetricCloudDebugView
 } from '../../../render';
@@ -77,6 +78,213 @@ export function getSceneClass(manager: ResourceManager): SerializableClass {
           },
           set(this: Scene, value) {
             this.sdf.streamRadius = Math.max(1, value.num[0]);
+          }
+        },
+        {
+          name: 'SDFAtlasSize',
+          description:
+            'Voxels per axis of the texture that holds the loaded mesh fields. When meshes near the camera are missing from the distance field view and the console warns that the atlas is full, raise it; each axis costs memory, 512×256×256 is 64 MB.',
+          type: 'int3',
+          default: [512, 256, 256],
+          options: { group: 'SDF', minValue: 64, maxValue: 2048 },
+          isHidden(this: Scene) {
+            return !this.sdf.enabled;
+          },
+          get(this: Scene, value) {
+            const size = this.sdf.atlasSize;
+            value.num[0] = size[0];
+            value.num[1] = size[1];
+            value.num[2] = size[2];
+          },
+          set(this: Scene, value) {
+            this.sdf.atlasSize = [value.num[0], value.num[1], value.num[2]];
+          }
+        },
+        {
+          name: 'GIEnabled',
+          description:
+            'Build the voxel scene the global illumination reads: the static meshes with a baked distance field are rasterized into a material atlas around the camera, giving the field surfaces their colour and glow. Turns SDFEnabled on. WebGPU only; nothing changes on WebGL2.',
+          type: 'bool',
+          default: false,
+          options: { group: 'Global Illumination' },
+          get(this: Scene, value) {
+            value.bool[0] = this.gi.enabled;
+          },
+          set(this: Scene, value) {
+            this.gi.enabled = value.bool[0];
+          }
+        },
+        {
+          name: 'GIVoxelizeBudget',
+          description:
+            'Meshes voxelized per frame. Higher fills the voxel scene sooner after loading or moving far, at the cost of a longer frame while it does.',
+          type: 'int',
+          default: 8,
+          options: { group: 'Global Illumination', minValue: 1, maxValue: 64 },
+          isHidden(this: Scene) {
+            return !this.gi.enabled;
+          },
+          get(this: Scene, value) {
+            value.num[0] = this.gi.voxelizeBudget;
+          },
+          set(this: Scene, value) {
+            this.gi.voxelizeBudget = value.num[0];
+          }
+        },
+        {
+          name: 'GISunShadowConeAngle',
+          description:
+            'Softness of the sun shadow in the bounced light, as the half angle in degrees of the cone traced through the distance field; the default is the size of the sun. Wider blurs the shadow edges in the indirect light but darkens floors lit through narrow openings; narrower sharpens them.',
+          type: 'float',
+          default: 0.5357,
+          options: { group: 'Global Illumination', minValue: 0.1, maxValue: 45 },
+          isHidden(this: Scene) {
+            return !this.gi.enabled;
+          },
+          get(this: Scene, value) {
+            value.num[0] = this.gi.sunShadowConeAngle;
+          },
+          set(this: Scene, value) {
+            this.gi.sunShadowConeAngle = value.num[0];
+          }
+        },
+        {
+          name: 'GILocalLightShadows',
+          description:
+            'Let point, spot and rect lights that cast shadows also cast them in the bounced light, so objects block the light they bounce. Applies to the eight lights nearest the camera; turn off to save GPU time in scenes with many shadowed lights.',
+          type: 'bool',
+          default: true,
+          options: { group: 'Global Illumination' },
+          isHidden(this: Scene) {
+            return !this.gi.enabled;
+          },
+          get(this: Scene, value) {
+            value.bool[0] = this.gi.localLightShadows;
+          },
+          set(this: Scene, value) {
+            this.gi.localLightShadows = value.bool[0];
+          }
+        },
+        {
+          name: 'GIIntensity',
+          description:
+            'Strength of the bounced light the probes add. 1 is physically consistent with the direct lighting; raise to exaggerate colour bleeding, lower to tone it down.',
+          type: 'float',
+          default: 1,
+          options: { group: 'Global Illumination', minValue: 0, maxValue: 10 },
+          isHidden(this: Scene) {
+            return !this.gi.enabled;
+          },
+          get(this: Scene, value) {
+            value.num[0] = this.gi.intensity;
+          },
+          set(this: Scene, value) {
+            this.gi.intensity = value.num[0];
+          }
+        },
+        {
+          name: 'GIProbeSpacing',
+          description:
+            'Distance in world units between light probes. Smaller resolves indirect light in tighter spaces and leaks less through thin walls, but the volume covers less distance around the camera and takes longer to refresh.',
+          type: 'float',
+          default: 1,
+          options: { group: 'Global Illumination', minValue: 0.25, maxValue: 16 },
+          isHidden(this: Scene) {
+            return !this.gi.enabled;
+          },
+          get(this: Scene, value) {
+            value.num[0] = this.gi.probeSpacing;
+          },
+          set(this: Scene, value) {
+            this.gi.probeSpacing = value.num[0];
+          }
+        },
+        {
+          name: 'GIProbeBudget',
+          description:
+            'Light probes updated per frame. Higher makes bounced light follow moving lights and the camera sooner, at more GPU time per frame.',
+          type: 'int',
+          default: 4096,
+          options: { group: 'Global Illumination', minValue: 64, maxValue: 16384 },
+          isHidden(this: Scene) {
+            return !this.gi.enabled;
+          },
+          get(this: Scene, value) {
+            value.num[0] = this.gi.probeBudget;
+          },
+          set(this: Scene, value) {
+            this.gi.probeBudget = value.num[0];
+          }
+        },
+        {
+          name: 'GIProbeRays',
+          description:
+            'Rays each probe traces per update. More gives smoother, less flickering bounced light at more GPU time per frame.',
+          type: 'int',
+          default: 128,
+          options: { group: 'Global Illumination', minValue: 16, maxValue: 512 },
+          isHidden(this: Scene) {
+            return !this.gi.enabled;
+          },
+          get(this: Scene, value) {
+            value.num[0] = this.gi.probeRays;
+          },
+          set(this: Scene, value) {
+            this.gi.probeRays = value.num[0];
+          }
+        },
+        {
+          name: 'GIProbeHysteresis',
+          description:
+            'How long bounced light holds on to what it showed before. Higher keeps it steadier in a still view but slower to follow a light or camera change; lower follows sooner with more flicker.',
+          type: 'float',
+          default: 0.97,
+          options: { group: 'Global Illumination', minValue: 0.5, maxValue: 0.99 },
+          isHidden(this: Scene) {
+            return !this.gi.enabled;
+          },
+          get(this: Scene, value) {
+            value.num[0] = this.gi.probeHysteresis;
+          },
+          set(this: Scene, value) {
+            this.gi.probeHysteresis = value.num[0];
+          }
+        },
+        {
+          name: 'GIProbeLevels',
+          description:
+            'Nested probe volumes around the camera, each twice as coarse and as wide as the one inside it. More levels carry bounced light farther out, each adding as many probes as the finest, so every probe is refreshed less often; one level covers only the finest volume.',
+          type: 'int',
+          default: 4,
+          options: { group: 'Global Illumination', minValue: 1, maxValue: 4 },
+          isHidden(this: Scene) {
+            return !this.gi.enabled;
+          },
+          get(this: Scene, value) {
+            value.num[0] = this.gi.probeLevels;
+          },
+          set(this: Scene, value) {
+            this.gi.probeLevels = value.num[0];
+          }
+        },
+        {
+          name: 'GIUpdateMode',
+          description:
+            'Continuous keeps the bounced light following the sun, the lights and the camera. Frozen stops it where it is: cheaper, and right for a scene whose lighting does not change, but the volume no longer follows the camera.',
+          type: 'string',
+          default: 'continuous',
+          options: {
+            group: 'Global Illumination',
+            enum: { labels: ['Continuous', 'Frozen'], values: ['continuous', 'frozen'] }
+          },
+          isHidden(this: Scene) {
+            return !this.gi.enabled;
+          },
+          get(this: Scene, value) {
+            value.str[0] = this.gi.updateMode;
+          },
+          set(this: Scene, value) {
+            this.gi.updateMode = value.str[0] as GIUpdateMode;
           }
         },
         {
@@ -836,7 +1044,7 @@ export function getSceneClass(manager: ResourceManager): SerializableClass {
           name: 'VolumetricCloudLayerBottomAltitude',
           description: 'Raises the cloud base: higher clouds look smaller and farther away',
           type: 'float',
-          default: 5000,
+          default: 1500,
           phase: 2,
           options: {
             group: 'VolumetricClouds',
@@ -859,7 +1067,7 @@ export function getSceneClass(manager: ResourceManager): SerializableClass {
           name: 'VolumetricCloudLayerHeight',
           description: 'Lets clouds tower higher above their base',
           type: 'float',
-          default: 10000,
+          default: 4000,
           phase: 2,
           options: {
             group: 'VolumetricClouds',
@@ -905,7 +1113,7 @@ export function getSceneClass(manager: ResourceManager): SerializableClass {
           name: 'VolumetricCloudCoverage',
           description: 'Weather coverage: higher grows cloud fields; zero removes all clouds',
           type: 'float',
-          default: 0.45,
+          default: 0.55,
           phase: 2,
           options: {
             group: 'VolumetricClouds',
@@ -975,7 +1183,7 @@ export function getSceneClass(manager: ResourceManager): SerializableClass {
           name: 'VolumetricCloudBaseNoiseScale',
           description: 'Size of the large billows that shape each cloud',
           type: 'float',
-          default: 12000,
+          default: 8000,
           phase: 2,
           options: {
             group: 'VolumetricClouds',
@@ -1022,7 +1230,7 @@ export function getSceneClass(manager: ResourceManager): SerializableClass {
           name: 'VolumetricCloudDetailNoiseScale',
           description: 'Size of the small wisps along cloud edges',
           type: 'float',
-          default: 1000,
+          default: 600,
           phase: 2,
           options: {
             group: 'VolumetricClouds',
@@ -1090,7 +1298,7 @@ export function getSceneClass(manager: ResourceManager): SerializableClass {
           name: 'VolumetricCloudDetailErosion',
           description: 'Higher gives raggeder, wispier cloud edges',
           type: 'float',
-          default: 0.25,
+          default: 0.35,
           phase: 2,
           options: {
             group: 'VolumetricClouds',
@@ -1413,7 +1621,7 @@ export function getSceneClass(manager: ResourceManager): SerializableClass {
           name: 'VolumetricCloudShadowTracingDistance',
           description: 'How far towards the sun clouds look for cloud that shades them',
           type: 'float',
-          default: 15000,
+          default: 8000,
           phase: 2,
           options: {
             group: 'VolumetricClouds',

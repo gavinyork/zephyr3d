@@ -1,6 +1,8 @@
 
 # Indirect Lighting
 
+This page covers ambient lighting (IBL and hemispheric light) and DDGI, dynamic diffuse global illumination from scene geometry.
+
 > Code on this page is illustrative and omits imports and application setup. See the embedded
 > live demos for complete runnable examples.
 
@@ -27,22 +29,31 @@ If set to `'none'`, the scene disables all ambient lighting, leaving only direct
 
 **Concept Overview:**
 
-IBL computes indirect lighting by integrating an **HDR environment texture** over the spherical domain,  
+IBL uses the scene's sky as the light source, integrating it over the spherical domain and  
 pre‑calculating the *radiance* and *irradiance* distributions used in PBR shading.  
 It provides realistic environmental reflections and energy exchange between objects and their surroundings.
 
 **IBL Characteristics:**
 - Designed for **PBR materials**;
 - Simulates realistic environmental reflection and diffuse lighting;
-- Works with both skyboxes and atmospheric skies as the environment source;
-- Supports both precomputed and dynamically updated radiance/irradiance maps.
+- The light source is the current sky: both skyboxes and atmospheric scattering skies can drive IBL;
+- With the scattering sky, the lighting is re-baked automatically when the sun direction or color changes, so ambient light follows the time of day.
 
 **Setup Procedure:**
 
-1. Set `scene.env.light.type = 'ibl'`;  
-2. Provide an HDR panoramic image for the environment;  
-3. Convert the panoramic image into a cube‑map texture;  
-4. Set the sky type (e.g. `'skybox'`) and assign the sky texture.
+1. Set `scene.env.light.type = 'ibl'` (this is the default);  
+2. Set the sky type; `scene.env.sky.skyType` must not be `'none'`:
+   - `'scatter'`: atmospheric scattering sky. No texture needed; the lighting follows the sun direction in real time;
+   - `'skybox'`: skybox. Requires a cube map, loaded directly or converted from an HDR panorama.
+
+The scattering sky needs no assets at all:
+
+```javascript
+scene.env.sky.skyType = 'scatter';
+scene.env.light.type = 'ibl';
+```
+
+For a skybox, the example below converts an HDR panorama into a cube map and uses it as the skybox:
 
 ```javascript
 // Load an HDR panorama and create IBL lighting
@@ -66,11 +77,12 @@ getEngine().resourceManager.fetchTexture('https://cdn.zephyr3d.org/doc/assets/im
 > **Notes:**
 > - IBL requires a *sky source* to evaluate environment reflections,  
 >   meaning `scene.env.sky.skyType` must **not** be `'none'`.  
-> - Both **skybox** and **atmospheric scattering skies** can drive IBL.  
 > - Commonly used with **PBRMetallicRoughnessMaterial**.  
-> - You can dynamically swap sky textures to achieve environment matching effects.
+> - Swapping the skybox texture, or moving the sun under the scattering sky, updates the ambient lighting accordingly.
 
-<div class="showcase" case="tut-14" style="width:600px;height:800px;"></div>
+The example below lets you toggle IBL ambient lighting with the buttons in the top-left corner.
+
+<div class="showcase" case="tut-14" style="width:600px;height:500px;"></div>
 
 ---
 
@@ -104,7 +116,9 @@ scene.env.light.ambientDown = new Vector4(0.2, 0.2, 0.2, 1.0);
 > - It only affects the **ambient** contribution of materials.  
 > - For PBR materials, the effect is approximate—use **IBL** for physically accurate reflections.
 
-<div class="showcase" case="tut-15" style="width:600px;height:800px;"></div>
+The example below lets you toggle hemispheric ambient lighting with the buttons in the top-left corner.
+
+<div class="showcase" case="tut-15" style="width:600px;height:500px;"></div>
 
 ---
 
@@ -125,6 +139,77 @@ After disabling:
 
 ---
 
+## SDF-based DDGI
+
+**Concept Overview:**
+
+The ambient modes above know nothing about scene geometry: corners do not darken, and a red wall does not tint the white wall next to it.
+DDGI (Dynamic Diffuse Global Illumination) places probes in the scene, traces probe rays through the scene SDF, and interpolates probe irradiance and visibility on surfaces,
+giving diffuse indirect light that follows lights and geometry in real time.
+Zephyr3D combines a voxel material field with a multi-level probe clipmap, which suits moving cameras in medium-sized indoor and outdoor scenes.
+
+DDGI adds to `scene.env.light` rather than being one of its types, and also works with `scene.env.light.type = 'none'`.
+
+**Example: Cornell box**
+
+The example below is the classic Cornell box: a roughly 20 m white box with a red left wall and a green right wall, lit only by a rectangular area light on the ceiling.
+Ambient light and the sky are off, so everything beyond direct light comes from DDGI. Toggle GI with the buttons in the top-left corner:
+with it on, shadows are no longer black, and the blocks and ceiling pick up red and green from the side walls.
+
+The scene is a project built and published in the editor; the page only loads and starts it. SDF and GI are enabled in the scene properties,
+and the fields of the walls and blocks were baked to `.zsdf` in the editor with **Mesh Settings > Bake SDF** (see [Mesh and Global SDF](sdf.md)),
+so they stream in at run time with no `scene.sdf.bakeField()` call.
+
+```typescript
+// Keep the probes running and only scale their light, so switching back is instant
+const intensity = scene.gi.intensity > 0 ? scene.gi.intensity : 1;
+const setGI = (enabled: boolean) => {
+  scene.gi.intensity = enabled ? intensity : 0;
+  // ...update the button state
+};
+btnOff.addEventListener('click', () => setGI(false));
+btnOn.addEventListener('click', () => setGI(true));
+```
+
+<div class="showcase" case="tut-88"></div>
+
+> The first seconds wait for asset loading, voxelization, and probe convergence; they are not the final image.
+
+**Enable it:**
+
+```ts
+scene.sdf.enabled = true;
+scene.gi.enabled = true;
+
+scene.gi.probeSpacing = 1;
+scene.gi.probeGrid = [32, 16, 32];
+scene.gi.probeLevels = 4;
+scene.gi.probeRays = 128;
+scene.gi.probeBudget = 4096;
+```
+
+Enabling `scene.gi` keeps the scene SDF enabled. Only static meshes with a field (a baked asset or `bakeField()`) enter the voxel material field; set `scene.gi.terrainAlbedo` when terrain data does not provide an albedo yet.
+
+**Convergence and quality:**
+
+`probeSpacing` controls near-field detail, `probeLevels` expands coverage, `probeRays` improves per-probe quality, and `probeBudget` controls updates per frame. A higher `probeHysteresis` reduces noise but slows changes. Increase `probeNormalBias` or `probeViewBias` when leakage appears, then verify that the SDF is closed and the scene scale is correct.
+
+Keep `updateMode = 'continuous'` for changing scenes. A converged volume can be saved and frozen:
+
+```ts
+const state = await scene.gi.exportProbeState();
+scene.gi.importProbeState(state); // imports also select frozen mode
+scene.gi.updateMode = 'frozen';
+```
+
+> **Limits and diagnostics:**
+> - DDGI, the global SDF, and voxel lighting are WebGPU-only; on WebGL2 `scene.gi.enabled` builds no lighting.
+> - The first frames wait for SDF streaming, voxelization, and probe convergence.
+> - Use `scene.gi.getStats()` and `scene.sdf.getStats()` to inspect support, updates, missing fields, and residency.
+> - `atlasSize`, `voxelizeBudget`, and `lightingSlicesPerFrame` are the main memory and update-cost controls.
+
+---
+
 ## Summary
 
 | Ambient Type | Characteristics | Suitable Materials | Typical Use | Performance |
@@ -132,6 +217,8 @@ After disabling:
 | **IBL** | HDR‑based indirect reflection & diffuse lighting | PBR | Realistic / reflective environments | Higher |
 | **Hemispheric** | Interpolated upper/lower hemisphere lighting | Lambert / Unlit | Mobile, stylized, or simple scenes | Very High |
 | **None** | No indirect lighting, direct lights only | Any | FX, dark scenes, artistic control | Highest |
+
+DDGI can be added on top of any of these for diffuse indirect light that follows scene geometry; it is WebGPU-only and the most expensive.
 
 ---
 

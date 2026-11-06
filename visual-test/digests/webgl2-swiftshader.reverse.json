@@ -670,10 +670,10 @@
     "spot-shadow": {
       "accepted": {
         "linux-x64": [
-          "7b4c28e2a3a9e7db75354f56af354988"
+          "c71084cd2c8388d6fbc737ce69028043"
         ],
         "win32-x64": [
-          "7b4c28e2a3a9e7db75354f56af354988"
+          "c71084cd2c8388d6fbc737ce69028043"
         ]
       },
       "size": 512
@@ -879,10 +879,10 @@
     "water-infinite-horizon-raised": {
       "accepted": {
         "linux-x64": [
-          "fac898d2fb0c8a714e650c5c26375c9a"
+          "b3f7d9d2acbc9e5f73fc40d700fff449"
         ],
         "win32-x64": [
-          "fac898d2fb0c8a714e650c5c26375c9a"
+          "b3f7d9d2acbc9e5f73fc40d700fff449"
         ]
       },
       "size": 512

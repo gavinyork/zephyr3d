@@ -27,6 +27,8 @@ const stateMap: Record<string, InternalState> = {};
 
 export type InternalState<InternalGPUState = any> = {
   index: number;
+  /** Content of the state, the same in every session, unlike the index */
+  key: string;
   internal: InternalGPUState;
 };
 
@@ -42,6 +44,10 @@ export abstract class WebGPURenderState<U> {
   get hash(): string {
     return String(this.internalState.index);
   }
+  /** Like hash, but the same in every session: the index depends on the order states are first used */
+  get contentHash(): string {
+    return this.internalState.key;
+  }
   get internalState(): InternalState<U> {
     if (!this._internalState) {
       const hash = `${this.constructor.name}:${this.computeHash()}`;
@@ -49,6 +55,7 @@ export abstract class WebGPURenderState<U> {
       if (!this._internalState) {
         this._internalState = {
           index: stateList.length,
+          key: hash,
           internal: this.createInternalState()
         };
         stateList.push(this._internalState);
@@ -765,6 +772,15 @@ export class WebGPURenderStateSet implements RenderStateSet {
       this.rasterizerState?.hash || ''
     }:${this.depthState?.hash || ''}:${this.stencilState?.hash || ''}`;
   }
+  /** Like hash, but the same in every session */
+  get contentHash() {
+    return `${this.colorState?.contentHash || ''}:${this.blendingState?.contentHash || ''}:${this.targetStateHash(
+      this._targetColorStates,
+      true
+    )}:${this.targetStateHash(this._targetBlendingStates, true)}:${
+      this.rasterizerState?.contentHash || ''
+    }:${this.depthState?.contentHash || ''}:${this.stencilState?.contentHash || ''}`;
+  }
   useColorState(state?: ColorState) {
     return (this.colorState = (state as WebGPUColorState) ?? this.colorState ?? new WebGPUColorState());
   }
@@ -847,9 +863,9 @@ export class WebGPURenderStateSet implements RenderStateSet {
   apply(_force?: boolean) {
     this._device.setRenderStates(this);
   }
-  private targetStateHash(states: Nullable<{ hash: string }>[]) {
+  private targetStateHash(states: Nullable<{ hash: string; contentHash: string }>[], content = false) {
     return states
-      .map((state, index) => (state ? `${index}:${state.hash}` : ''))
+      .map((state, index) => (state ? `${index}:${content ? state.contentHash : state.hash}` : ''))
       .filter((value) => !!value)
       .join(',');
   }

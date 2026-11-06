@@ -7,10 +7,10 @@
 
 ### Device API
 
-The **Device API** provides a set of low-level abstraction interfaces that allow users to call WebGL, WebGL2, and WebGPU graphics APIs in a unified way.  
+The **Device API** provides a set of low-level abstraction interfaces that allow users to call WebGL2 and WebGPU graphics APIs in a unified way.  
 These interfaces cover most of the underlying graphics API capabilities, enabling easy cross-API rendering support.
 
-One major challenge in cross-platform rendering is the difference between shader languages — WebGL and WebGL2 use **GLSL**, while WebGPU uses **WGSL**.  
+One major challenge in cross-platform rendering is the difference between shader languages — WebGL2 uses **GLSL**, while WebGPU uses **WGSL**.  
 To solve this problem, Zephyr3D provides a **dynamic shader generation system**. Users can write shaders directly in **native JavaScript**, and the framework will automatically generate the corresponding GLSL or WGSL code for each backend.  
 This approach eliminates the need for complex string concatenation or extensive `#ifdef` preprocessing, offering high flexibility and clarity.
 
@@ -91,25 +91,6 @@ TypeScript scripting bound to scene entities, and a plugin API for custom tools 
 The **desktop build** (Electron) adds local project folders with persistent storage, an embedded
 MCP server so AI agents can drive the editor directly, and a built-in LLM assistant. API keys are
 stored locally, encrypted at rest.
-
-## Where to start
-
-If you are **building a 3D application in code**, just read these in order:
-
-1. [Installation](en/installation.md) — figure out which packages you need
-2. [Your First Application](en/first-app.md) — get the first frame on screen
-3. [Adding Models and Materials](en/first-scene.md) — put things in the scene
-4. [Shadows and Post-processing](en/first-polish.md) — make it look presentable
-
-After that, go deeper into individual topics under "Using the Scene API" as needed.
-
-If you would rather use a **visual workflow**, start with the
-[editor overview](en/editor/overview.md).
-
-If you are **writing your own renderer** and do not plan to use the engine's scene management, go
-straight to the [low-level graphics API](en/device-intro.md).
-
----
 
 ## Where to start
 

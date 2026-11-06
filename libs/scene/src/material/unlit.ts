@@ -22,6 +22,9 @@ export class UnlitMaterial
     other.copyFrom(this);
     return other;
   }
+  supportsVoxelization() {
+    return true;
+  }
   vertexShader(scope: PBFunctionScope) {
     super.vertexShader(scope);
     const pb = scope.$builder;

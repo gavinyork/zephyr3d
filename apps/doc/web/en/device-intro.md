@@ -13,7 +13,7 @@ Your application
    │        │
    └────────┴─── Device API   (device, buffers, textures, shaders, draw calls)
                      │
-              WebGL / WebGL2 / WebGPU
+              WebGL2 / WebGPU
 ```
 
 The Scene API is built on the Device API, and the two mix freely: build your scene with the Scene API
@@ -34,10 +34,10 @@ already wraps all of that and the higher-level interface is less work.
 
 ## What this chapter provides
 
-The Device API abstracts WebGL, WebGL2 and WebGPU behind one interface covering most low-level
+The Device API abstracts WebGL2 and WebGPU behind one interface covering most low-level
 capabilities:
 
-- **A unified device interface** — the same code runs on all three graphics APIs; see
+- **A unified device interface** — the same code runs on both graphics APIs; see
   [Create Device](en/device.md).
 - **Shaders written in JavaScript** — the biggest obstacle to cross-API rendering is that the shader
   languages differ (GLSL vs WGSL). The engine lets you describe shaders in plain JavaScript and
@@ -50,12 +50,12 @@ capabilities:
 
 A unified interface does not mean identical capabilities. When writing cross-backend code:
 
-| Capability | WebGL | WebGL2 | WebGPU |
-| --- | --- | --- | --- |
-| Compute shaders | No | No | Yes |
-| Multiple render targets | Extension required | Yes | Yes |
-| Float color buffers | Extension required | Extension dependent | Yes |
-| Uniform buffers | No | Yes | Yes |
+| Capability | WebGL2 | WebGPU |
+| --- | --- | --- |
+| Compute shaders | No | Yes |
+| Multiple render targets | Yes | Yes |
+| Float color buffers | Extension dependent | Yes |
+| Uniform buffers | Yes | Yes |
 
 Query actual capabilities through `device.getDeviceCaps()`. **The engine usually falls back silently
 when a capability is missing**, so test cross-backend code on your target devices.

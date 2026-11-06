@@ -21,7 +21,23 @@ const StorageTextureFormatMap = {
   rg32sint: 'rg32i',
   rgba32float: 'rgba32f',
   rgba32uint: 'rgba32ui',
-  rgba32sint: 'rgba32i'
+  rgba32sint: 'rgba32i',
+  // WebGPU feature texture-formats-tier1
+  r8unorm: 'r8unorm',
+  r8snorm: 'r8snorm',
+  r8uint: 'r8ui',
+  r8sint: 'r8i',
+  rg8unorm: 'rg8unorm',
+  rg8snorm: 'rg8snorm',
+  rg8uint: 'rg8ui',
+  rg8sint: 'rg8i',
+  r16uint: 'r16ui',
+  r16sint: 'r16i',
+  r16float: 'r16f',
+  rg16uint: 'rg16ui',
+  rg16sint: 'rg16i',
+  rg16float: 'rg16f',
+  rg11b10ufloat: 'rg11b10uf'
 };
 
 export type StorageTextureConstructor = {

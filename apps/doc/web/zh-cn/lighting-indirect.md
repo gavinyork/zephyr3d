@@ -1,6 +1,8 @@
 
 # 间接光照（Indirect Lighting）
 
+本页介绍环境光（IBL、半球光）以及基于场景几何的动态漫反射全局光照 DDGI。
+
 > 本页代码为片段示意，省略了 import 与应用初始化，完整可运行示例见页内嵌入的实例。
 
 在 Zephyr3D 中，场景支持单一的**环境光源（Ambient Light）**，
@@ -26,22 +28,31 @@
 
 **概念说明：**
 
-IBL 是通过对一张高动态范围（HDR）的环境贴图进行球面积分，
+IBL 以场景的天空作为光源，对天空进行球面积分，
 预计算出环境反射（Radiance）与环境漫反射（Irradiance），  
 进而在 PBR 材质中实现真实的间接光照和反射效果。
 
 IBL 特点：
 - 适用于 PBR 材质；
 - 能够准确模拟物体与环境的光能交换；
-- 可与天空盒协同工作（基于同一环境贴图）；
-- 支持实时或预计算的辐射/辐照纹理更新。
+- 光源就是当前的天空，天空盒和大气散射天空都可以驱动 IBL；
+- 大气散射天空下，阳光方向或颜色变化时会自动重新烘焙，环境光随昼夜变化。
 
 **使用步骤：**
 
-1. 将 `scene.env.light.type` 设置为 `'ibl'`；  
-2. 赋予场景一个可用于生成天空盒的**HDR 全景图**；  
-3. 通过工具函数将全景图转换为立方体天空贴图；  
-4. 设置天空类型，如天空类型为`'skybox'`，指定天空盒贴图。
+1. 将 `scene.env.light.type` 设置为 `'ibl'`（默认值即为 `'ibl'`）；  
+2. 设置天空类型，`scene.env.sky.skyType` 不能为 `'none'`：
+   - `'scatter'`：大气散射天空，无需任何贴图，环境光由阳光方向实时决定；
+   - `'skybox'`：天空盒，需要指定一张立方体贴图，可直接加载，也可以由 HDR 全景图转换而来。
+
+使用大气散射天空时无需准备任何资源：
+
+```javascript
+scene.env.sky.skyType = 'scatter';
+scene.env.light.type = 'ibl';
+```
+
+使用天空盒时，下例把 HDR 全景图转换为立方体贴图后作为天空盒：
 
 ```javascript
 // 加载 HDR 全景图并生成 IBL 环境光
@@ -63,11 +74,13 @@ getEngine().resourceManager.fetchTexture('https://cdn.zephyr3d.org/doc/assets/im
 ```
 
 > **注意事项：**
-> - IBL 需要一个“天空源”（Sky Source）来计算环境反射，也就是说scene.env.sky.skyType不能为'none'
+> - IBL 需要一个“天空源”（Sky Source）来计算环境反射，也就是说 `scene.env.sky.skyType` 不能为 `'none'`。
 > - IBL 通常与 **PBRMetallicRoughnessMaterial** 一起使用。
-> - 通过动态更换天空贴图即可实现不同场景的环境匹配效果。
+> - 天空盒模式下动态更换天空贴图，或大气散射模式下改变阳光方向，环境光都会随之更新。
 
-<div class="showcase" case="tut-14" style="width:600px;height:800px;"></div>
+下面的示例可以通过左上角按钮开关 IBL 环境光。
+
+<div class="showcase" case="tut-14" style="width:600px;height:500px;"></div>
 
 ---
 
@@ -99,7 +112,9 @@ scene.env.light.ambientDown = new Vector4(0.2, 0.2, 0.2, 1.0);
 > - 它只影响物体的环境光分量；
 > - 对于 PBR Material 来说，效果较为粗糙，如果需要更真实的反射建议使用 IBL。
 
-<div class="showcase" case="tut-15" style="width:600px;height:800px;"></div>
+下面的示例可以通过左上角按钮开关半球环境光。
+
+<div class="showcase" case="tut-15" style="width:600px;height:500px;"></div>
 
 ---
 
@@ -119,13 +134,86 @@ scene.env.light.type = 'none';
 
 ---
 
+## 基于 SDF 的 DDGI
+
+**概念说明：**
+
+上面几种环境光都与场景几何无关：墙角不会更暗，红墙也不会把旁边的白墙映红。
+DDGI（Dynamic Diffuse Global Illumination，动态漫反射全局光照）在场景中布置探针，
+用场景 SDF 发射探针射线，再把探针的辐照度和可见性插值到表面，从而得到随光源和几何实时变化的漫反射间接光。
+Zephyr3D 的实现由体素材质场和多级 probe clipmap 组成，适合动态摄像机和中等规模的室外/室内场景。
+
+DDGI 与 `scene.env.light` 叠加使用，并不是它的一个取值；`scene.env.light.type = 'none'` 时也能工作。
+
+**示例：Cornell box**
+
+下面的示例是一个经典的 Cornell box：约 20 m 的白色盒子，左墙红、右墙绿，只有天花板上一盏矩形面光源，
+环境光和天空都关掉，所以画面里除了直接光之外的亮度全部来自 DDGI。用左上角按钮切换 GI，
+可以看到打开后阴影区不再全黑，两侧方块和天花板分别被染上红色和绿色。
+
+场景是在编辑器里搭建并发布的项目，页面只负责加载并启动它。场景属性里打开了 SDF 和 GI，
+各个墙体和方块的 SDF 已在编辑器中通过 **Mesh Settings > Bake SDF** 预烘焙为 `.zsdf`（参见[网格 SDF 与全局 SDF](sdf.md)），
+运行时直接流式加载，不需要再调用 `scene.sdf.bakeField()`。
+
+```typescript
+// Keep the probes running and only scale their light, so switching back is instant
+const intensity = scene.gi.intensity > 0 ? scene.gi.intensity : 1;
+const setGI = (enabled: boolean) => {
+  scene.gi.intensity = enabled ? intensity : 0;
+  // ...update the button state
+};
+btnOff.addEventListener('click', () => setGI(false));
+btnOn.addEventListener('click', () => setGI(true));
+```
+
+<div class="showcase" case="tut-88"></div>
+
+> 首次打开需要等待资源加载、体素化和探针收敛，前几秒的画面不是最终效果。
+
+**启用与参数：**
+
+```ts
+scene.sdf.enabled = true; // 先提供网格字段
+scene.gi.enabled = true;
+
+scene.gi.probeSpacing = 1;
+scene.gi.probeGrid = [32, 16, 32];
+scene.gi.probeLevels = 4;
+scene.gi.probeRays = 128;
+scene.gi.probeBudget = 4096;
+```
+
+`scene.gi.enabled` 会自动保持 `scene.sdf` 开启。只有带 SDF 字段（烘焙资源或 `bakeField()`）的静态网格会进入体素材质场；地形可通过 `scene.gi.terrainAlbedo` 提供默认反照率。
+
+**收敛与画质：**
+
+`probeSpacing` 决定近处探针间距，`probeLevels` 扩大覆盖范围，`probeRays` 提高单探针的采样质量，`probeBudget` 决定每帧更新多少探针。提高 `probeHysteresis` 能减少闪烁，但会让光照变化更慢。漏光时先增大 `probeNormalBias` 或 `probeViewBias`，再检查 SDF 是否闭合和尺度是否正确。
+
+动态场景保持默认的 `updateMode = 'continuous'`。场景稳定后可导出并冻结探针状态：
+
+```ts
+const state = await scene.gi.exportProbeState();
+scene.gi.importProbeState(state); // 导入后自动切换为 frozen
+scene.gi.updateMode = 'frozen';
+```
+
+> **限制与诊断：**
+> - DDGI、全局 SDF 和体素光照仅 WebGPU；WebGL2 上 `scene.gi.enabled` 不会构建光照。
+> - 首次启用需要等待 SDF 流式加载、体素化和探针收敛，不能把第一帧当作最终画质。
+> - 用 `scene.gi.getStats()` 检查 `supported`、体素和 probe 的更新计数；用 `scene.sdf.getStats()` 检查缺失或未驻留的字段。
+> - `atlasSize`、`voxelizeBudget` 和 `lightingSlicesPerFrame` 是显存与更新开销的主要旋钮。
+
+---
+
 ## 小结
 
 | 环境光类型 | 特征 | 适用材质 | 适合场景 | 性能 |
 |-------------|--------|------------|------------|--------|
-| **IBL** | 基于 HDR 天空的高精度反射与漫射光 | PBR | 写实、反射性场景 | 较高 |
+| **IBL** | 基于天空（天空盒或大气散射）的高精度反射与漫射光 | PBR | 写实、反射性场景 | 较高 |
 | **Hemispheric** | 上下半球颜色插值的简化照明 | Lambert / Unlit | 低性能设备或卡通风格 | 高 |
 | **None** | 不计算间接光，仅保留直射光 | 任意 | 特效、暗场或特殊视觉风格 | 最高 |
+
+DDGI 可叠加在以上任一模式之上，提供随场景几何变化的漫反射间接光，仅 WebGPU，开销最高。
 
 ---
 

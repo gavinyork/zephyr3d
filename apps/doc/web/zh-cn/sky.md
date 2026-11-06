@@ -54,14 +54,24 @@ directionalLight.sunLight = false;
 
 下面是一个完整的大气散射天空设置：
 
-<<< @/../src/tut-34/main.js{27-37 js}
+<<< @/../src/tut-34/main.js{40-50 js}
 
-注意第 28 行创建方向光时并没有显式设置 `sunLight = true`——**场景中第一个被创建的方向光会自动
+注意第 41 行创建方向光时并没有显式设置 `sunLight = true`——**场景中第一个被创建的方向光会自动
 成为阳光**，所以这里只需要用 `lookAt()` 定好它的朝向，天空就会随之变化。
 
 <div class="showcase" case="tut-34"></div>
 
-天空中的云层是用 2D 噪声函数生成的，有三个可调参数：
+### 云层
+
+大气散射天空支持两种云层，通过 `cloudMode` 切换：默认的 `procedural` 2D 云层，以及 WebGPU 上通过 ray marching 绘制的 `volumetric` 体积云。两者都只在 `skyType = 'scatter'` 时绘制，天空盒模式不显示云层。
+
+上面示例左上角的按钮可以在两种云层之间切换。切换只需改 `cloudMode`，再用 `effectiveCloudMode` 读回实际生效的模式（非 WebGPU 后端上体积云会退回 2D 云层，示例因此禁用了体积云按钮）：
+
+<<< @/../src/tut-34/main.js{59-80 js}
+
+#### 2D 云层
+
+2D 云层是用 2D 噪声函数生成的，开销很小，所有后端都可用。有三个可调参数：
 
 ```javascript
 // 云层覆盖率，仅在大气散射模式下有效
@@ -75,3 +85,40 @@ scene.env.sky.wind = new Vector2(300, 500);
 // 也可以就地修改，避免额外分配
 scene.env.sky.wind.setXY(600, 0);
 ```
+
+#### 体积云
+
+需要有层厚、自阴影和多次散射近似的云层时，使用体积云。代价是需要额外的噪声体和天空缓存更新。
+
+```ts
+const sky = scene.env.sky;
+sky.skyType = 'scatter';
+sky.cloudMode = 'volumetric';
+
+const clouds = sky.volumetricCloud;
+clouds.layerBottomAltitude = 1500;
+clouds.layerHeight = 4000;
+clouds.coverage = 0.55;
+clouds.density = 0.03;
+clouds.wind.setXY(10, 0);
+clouds.framesPerUpdate = 64;
+clouds.cacheResolution = 768;
+```
+
+所有距离使用米。`coverage` 控制云量，`density` 控制厚度，`baseHeightVariation`、`formation` 和噪声缩放控制形状。`viewSampleCountScale` 和 `shadowSampleCountScale` 提高射线采样质量，也会线性增加开销。
+
+**资源与缓存**
+
+默认情况下引擎生成 weather、base noise 和 detail noise。需要固定艺术方向时，可把切片图集分别赋给 `sky.cloudWeatherMap`、`sky.cloudBaseNoise` 和 `sky.cloudDetailNoise`。天空缓存按 `framesPerUpdate` 分帧更新；降低该值能更快响应参数变化，但会增加每帧成本。
+
+调试资源可设置：
+
+```ts
+sky.cloudDebugView = 'weather'; // 也可用 baseNoise、detailNoise、densityXY 等
+```
+
+**限制**
+
+- `volumetric` 仅 WebGPU。其他后端会通过 `effectiveCloudMode` 自动退回 `procedural`，显示上面介绍的 2D 云层。
+- 体积云不是场景几何体，不参与 Mesh LOD、SDF 或物理碰撞。
+- 云层高度和 `scene.metersPerUnit` 必须使用一致的世界尺度；尺度不一致会导致云层过薄或过厚。

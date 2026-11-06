@@ -27,6 +27,7 @@ import { waterScatterPhase } from '../shaders/water_medium';
 import { evaluateLTCRectLightTerms } from '../shaders/ltc_rect';
 import { getLTCAmpLUT, getLTCMatLUT } from '../utility/textures/ltclut';
 import { foamTexelSize, getDefaultFoamTexture, sampleFoamTexture } from '../utility/textures/foam';
+import { RenderGraphExecutor } from '../render/rendergraph/executor';
 
 /**
  * How the refracted view sample is located.
@@ -208,11 +209,8 @@ const HORIZON_REFLECT_BIAS = 0.08;
 const REFRACT_EDGE_FADE = 0.06;
 /** Normalized depth at or above which the scene behind the water is sky. */
 const SCENE_SKY_DEPTH01 = 0.999;
-/**
- * Medium path in metres through water with only sky behind it: long enough
- * that any absorbing medium is opaque over it.
- */
-const BOTTOMLESS_PATH = 1e4;
+/** Medium path, in meters, through water with only sky behind it: deep enough to absorb everything. */
+const SKY_MEDIUM_PATH = 1e4;
 /** Floor on the subsurface term's sun-alignment factor. */
 const SSS_SUN_ALIGN_FLOOR = 0.15;
 /** Floor on the subsurface term's grazing-view factor. */
@@ -1852,12 +1850,11 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
         this.$l.faceNormal = this.$choice(this.underwater, pb.neg(this.normal), this.normal);
         this.$l.eta = this.$choice(this.underwater, pb.float(WATER_TO_AIR_ETA), pb.float(AIR_TO_WATER_ETA));
         this.$l.uvBase = this.waterRefractProjectUV(this.worldPos);
-        // Sky behind the surface: nothing under the water, so the column is
-        // bottomless. The sky reconstructs to the far plane, and the distance
-        // to that falls to zero where the surface meets it, which would show a
-        // band of clear water there.
+        // Sky behind the water has no bottom. Its point lies on the far plane,
+        // so the straight distance falls to 0 where the surface crosses that
+        // plane and the water there would show the sky unabsorbed.
         this.$if(pb.greaterThanEqual(this.straightDepth01, SCENE_SKY_DEPTH01), function () {
-          this.$return(pb.vec3(this.screenUV, BOTTOMLESS_PATH));
+          this.$return(pb.vec3(this.screenUV, SKY_MEDIUM_PATH));
         });
         this.$l.waterCrossDir = pb.normalize(pb.sub(this.straightWorldPos, this.worldPos));
         // refractDir = view line + (refract by wave normal - refract by flat
@@ -3188,7 +3185,7 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
     if (waveGenerator) {
       const updateFrameId = WaterMaterial._waveUpdateState.get(waveGenerator);
       if (updateFrameId !== frameId) {
-        waveGenerator.update(elapsed);
+        RenderGraphExecutor.profileScope('WaterWaves', () => waveGenerator.update(elapsed));
         WaterMaterial._waveUpdateState.set(waveGenerator, frameId);
       }
     }
@@ -3196,7 +3193,7 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
     if (interaction && this._interactiveWaveGenerator) {
       const updateFrameId = WaterMaterial._interactionUpdateState.get(interaction);
       if (updateFrameId !== frameId) {
-        interaction.update(elapsed);
+        RenderGraphExecutor.profileScope('WaterInteraction', () => interaction.update(elapsed));
         WaterMaterial._interactionUpdateState.set(interaction, frameId);
       }
     }

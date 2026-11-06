@@ -15,20 +15,29 @@ import {
 import type { SceneController } from '../controllers/scenecontroller';
 import { MeshSDFBaker } from '../core/services/sdfbaker';
 
-/** Mesh asset paths used by the meshes under a node, the node included */
-function collectMeshPaths(root: SceneNode) {
-  const paths = new Set<string>();
+/**
+ * Mesh asset paths used under a node (inclusive), each with the world units one
+ * local unit spans: the largest axis scale of its instances' world matrices.
+ */
+function collectMeshUnitScales(root: SceneNode) {
+  const scales = new Map<string, number>();
   root.iterate((node) => {
     if (node.isMesh()) {
       const primitive = (node as Mesh).primitive;
       const id = primitive ? getEngine().resourceManager.getAssetId(primitive) : null;
       if (id && id.toLowerCase().endsWith('.zmsh')) {
-        paths.add(id);
+        const m = node.worldMatrix;
+        const scale = Math.max(
+          Math.hypot(m.m00, m.m10, m.m20),
+          Math.hypot(m.m01, m.m11, m.m21),
+          Math.hypot(m.m02, m.m12, m.m22)
+        );
+        scales.set(id, Math.max(scales.get(id) ?? 0, scale));
       }
     }
     return false;
   });
-  return [...paths];
+  return scales;
 }
 
 /**
@@ -37,10 +46,12 @@ function collectMeshPaths(root: SceneNode) {
  */
 export async function bakeMeshSDFs(controller: SceneController | null, params: any) {
   let paths: string[];
+  const scene = controller?.model?.scene ?? null;
+  // The scene's instances say how many world units a local unit of each mesh spans
+  const scales = scene ? collectMeshUnitScales(scene.rootNode) : new Map<string, number>();
   if (Array.isArray(params.paths) && params.paths.length > 0) {
     paths = params.paths.map((p: unknown) => String(p));
   } else {
-    const scene = controller?.model?.scene ?? null;
     if (!scene) {
       return { results: null, err: 'No scene is currently opened; pass `paths`' };
     }
@@ -48,8 +59,11 @@ export async function bakeMeshSDFs(controller: SceneController | null, params: a
     if (!root) {
       return { results: null, err: `Node not found in current scene: ${params.node_id}` };
     }
-    paths = collectMeshPaths(root);
+    paths = [...collectMeshUnitScales(root).keys()];
   }
+  await MeshSDFBaker.setUnitScales(
+    new Map(paths.filter((p) => scales.has(p)).map((p) => [p, scales.get(p)!]))
+  );
   const results = await MeshSDFBaker.bakeAll(paths, !!params.force);
   // Streamed copies of the rebaked fields are stale
   const sdf = controller?.model?.scene?.sdf;
@@ -171,8 +185,8 @@ export async function sampleGlobalSDF(controller: SceneController | null, params
 
 /**
  * Signed distance from world positions to a mesh node's surface, from its baked
- * field. The field is in the mesh's local space; under non-uniform scale the
- * local distance is scaled by the smallest axis scale, which never overshoots.
+ * local-space field. Under non-uniform scale the distance to the field box is
+ * per axis and the field value is scaled by the smallest axis, which never overshoots.
  */
 export async function queryMeshSDF(controller: SceneController | null, params: any) {
   const scene = controller?.model?.scene ?? null;
@@ -200,10 +214,16 @@ export async function queryMeshSDF(controller: SceneController | null, params: a
   const scale = Math.min(sx, sy, sz);
   const inv = node.invWorldMatrix;
   const local = new Vector3();
+  const clamp = (v: number, axis: number) => Math.min(Math.max(v, sdf.boxMin[axis]), sdf.boxMax[axis]);
   const distances = points.map((p) => {
     const [x, y, z] = (p as number[]).map(Number);
     inv.transformPointAffine(new Vector3(x, y, z), local);
-    return sampleMeshSDF(sdf, local.x, local.y, local.z) * scale;
+    // Same compositing as the scene field
+    const cx = clamp(local.x, 0);
+    const cy = clamp(local.y, 1);
+    const cz = clamp(local.z, 2);
+    const outside = Math.hypot((local.x - cx) * sx, (local.y - cy) * sy, (local.z - cz) * sz);
+    return sampleMeshSDF(sdf, cx, cy, cz) * scale + outside;
   });
   return {
     sdf_path: path,
@@ -212,4 +232,123 @@ export async function queryMeshSDF(controller: SceneController | null, params: a
     distances,
     err: null
   };
+}
+
+/** The global illumination probes of a level in a world box, read back from the GPU, with the scene SDF at each. */
+export async function queryGIProbes(controller: SceneController | null, params: any) {
+  const scene = controller?.model?.scene ?? null;
+  if (!scene) {
+    return { probes: null, err: 'No scene is currently opened' };
+  }
+  const probes = scene.gi.enabled ? scene.gi.probes : null;
+  if (!probes?.ready) {
+    return { probes: null, err: 'No probe volume: enable GIEnabled (WebGPU) and let it build' };
+  }
+  const [x0, y0, z0] = (params.min as number[]).map(Number);
+  const [x1, y1, z1] = (params.max as number[]).map(Number);
+  const result = await probes.queryProbes(
+    Number(params.level ?? 0),
+    new Vector3(Math.min(x0, x1), Math.min(y0, y1), Math.min(z0, z1)),
+    new Vector3(Math.max(x0, x1), Math.max(y0, y1), Math.max(z0, z1)),
+    Math.max(1, Math.min(Number(params.limit ?? 256), 4096))
+  );
+  if (!result) {
+    return { probes: null, err: 'No such probe level, or the volume has not been placed yet' };
+  }
+  const global = scene.sdf.enabled ? scene.sdf.global : null;
+  if (global && result.probes.length > 0) {
+    const d = await global.queryDistances(
+      result.probes.map((p) => new Vector3(p.position[0], p.position[1], p.position[2]))
+    );
+    result.probes.forEach((p, i) => ((p as any).sdf = Math.round(d[i] * 1000) / 1000));
+  }
+  return { ...result, err: null };
+}
+
+/**
+ * GI state: counters, and for each static scene-field instance how the voxel
+ * scene holds its material. `missing_only` lists only instances not in it.
+ */
+export function getGIStats(controller: SceneController | null, params: any) {
+  const scene = controller?.model?.scene ?? null;
+  if (!scene) {
+    return { stats: null, err: 'No scene is currently opened' };
+  }
+  const voxels = scene.gi.enabled ? scene.gi.voxels : null;
+  const instances = [...scene.sdf.instances]
+    .filter((inst) => inst.mode === 'static')
+    .map((inst) => {
+      const voxel = voxels?.describeInstance(inst) ?? null;
+      return {
+        node_id: inst.mesh.persistentId,
+        node_name: inst.mesh.name,
+        mesh: inst.asset?.meshPath ?? null,
+        material: inst.mesh.material?.constructor.name ?? null,
+        field: inst.asset ? inst.asset.state : 'no_asset',
+        voxel_state: voxel?.state ?? null,
+        voxel_slot: voxel?.slot?.resolution ?? null
+      };
+    })
+    .filter((i) => !params.missing_only || i.voxel_state !== 'ready' || !i.voxel_slot);
+  return { enabled: scene.gi.enabled, stats: scene.gi.getStats(), instances, err: null };
+}
+
+/**
+ * Voxel scene contents at world positions as a GI ray reads them: clipmap level,
+ * albedo (a = 1 where material was composited), emissive and lit radiance.
+ */
+export async function queryGIVoxels(controller: SceneController | null, params: any) {
+  const scene = controller?.model?.scene ?? null;
+  if (!scene) {
+    return { samples: null, err: 'No scene is currently opened' };
+  }
+  const global = scene.sdf.enabled ? scene.sdf.global : null;
+  const voxels = scene.gi.enabled ? scene.gi.voxels : null;
+  if (!global || !voxels?.ready) {
+    return { samples: null, err: 'No voxel scene: enable GIEnabled (WebGPU) and let it build' };
+  }
+  const points: Vector3[] = (Array.isArray(params.points) ? params.points : []).map(
+    (p: unknown) => new Vector3(...((p as number[]).map(Number) as [number, number, number]))
+  );
+  const r = (v: number) => Math.round(v * 10000) / 10000;
+  const samples = (await voxels.queryVoxels(global, points)).map((s) => ({
+    level: s.level,
+    albedo: s.albedo.map(r),
+    emissive: s.emissive.map(r),
+    radiance: s.radiance.map(r)
+  }));
+  return { samples, err: null };
+}
+
+/** Modes of the distance field debug view the scene view can draw. */
+const SDF_VIEW_MODES = ['distance', 'albedo', 'emissive', 'radiance', 'skyVisibility', 'irradiance'] as const;
+
+/**
+ * Sets the scene view's distance field debug view: `mode` one of
+ * {@link SDF_VIEW_MODES} or `none`; `exposure` scales radiance/irradiance views.
+ * Omitted params are kept. Returns the resulting state.
+ */
+export function setSDFDebugView(controller: SceneController | null, params: any) {
+  const view = controller?.view ?? null;
+  if (!view || !controller?.model?.scene) {
+    return { mode: null, exposure: null, err: 'No scene is currently opened' };
+  }
+  if (params.mode !== undefined) {
+    const mode = String(params.mode);
+    if (mode === 'none') {
+      view.sdfView = null;
+    } else if ((SDF_VIEW_MODES as readonly string[]).includes(mode)) {
+      view.sdfView = mode as (typeof SDF_VIEW_MODES)[number];
+    } else {
+      return {
+        mode: view.sdfView ?? 'none',
+        exposure: view.sdfViewExposure,
+        err: `Unknown mode ${mode}; one of none, ${SDF_VIEW_MODES.join(', ')}`
+      };
+    }
+  }
+  if (typeof params.exposure === 'number') {
+    view.sdfViewExposure = params.exposure;
+  }
+  return { mode: view.sdfView ?? 'none', exposure: view.sdfViewExposure, err: null };
 }

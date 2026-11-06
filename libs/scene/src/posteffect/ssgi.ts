@@ -8,6 +8,8 @@ import { screenSpaceRayTracing_HiZ, screenSpaceRayTracing_Linear2D } from '../sh
 import { ShaderHelper } from '../material';
 import { linearToGamma } from '../shaders/misc';
 import { fetchSampler } from '../utility/misc';
+import { getActiveProbeVolume } from '../render/gi/probe_volume';
+import { declareProbeUniforms, sampleProbeIrradiance } from '../shaders/probes';
 import { AbstractPostEffect, PostEffectLayer } from './posteffect';
 import type { PostEffectSetupContext } from './posteffect';
 
@@ -75,12 +77,8 @@ export class SSGI extends AbstractPostEffect {
     const normalHandle = blackboard.get(FrameResources.SceneNormal);
     const motionHandle = blackboard.get(FrameResources.MotionVector);
     const hiZHandle = blackboard.get(FrameResources.HiZ);
-    // Traced hits read this as outgoing surface radiance, so it must exclude the
-    // fog the camera ray accumulated: that fog belongs to a different path than
-    // the one being integrated, and feeding it back would brighten every bounce.
-    // Absent when the scene has no fog, in which case SceneColor is already fog
-    // free. Both the sampled color and the committed history use it, otherwise
-    // the current and previous frames would disagree and flicker.
+    // Fog-free scene colour: traced hits read outgoing surface radiance, and camera
+    // fog would brighten every bounce. Trace and committed history must both use it.
     const noFogHandle = blackboard.get(FrameResources.SceneColorNoFog);
     const sampleColorHandle = noFogHandle ?? s.input;
     if (!linearDepthHandle || !normalHandle) {
@@ -139,17 +137,13 @@ export class SSGI extends AbstractPostEffect {
       momentsDesc,
       traceSize
     );
-    // Only this effect's own temporal pass reads the AO history, so it is
-    // imported directly instead of being routed through the light pass history
-    // read bindings the way irradiance and surface are.
+    // Only this effect's temporal pass reads the AO history, so it is imported directly.
     const previousAOHandle = history.importPreviousIfCompatible(
       graph,
       RGHistoryResources.SSGI_AO,
       aoTraceDesc,
       traceSize
     );
-    // Reprojecting last frame's colour needs motion vectors, which both WebGL2
-    // and WebGPU produce, so both take the multi-bounce path.
     const previousSceneColorHandle = history.importPreviousIfCompatible(
       graph,
       RGHistoryResources.SSGI_SCENE_COLOR,
@@ -177,9 +171,8 @@ export class SSGI extends AbstractPostEffect {
       }
     };
 
-    // Trace one or two cosine-weighted diffuse rays. A hit prefers the previous
-    // frame through previousHitUV = hitUV - motion(hitUV) for multi-bounce
-    // feedback and falls back to the current frame when that reprojection fails.
+    // Trace one or two cosine-weighted diffuse rays. A hit prefers the previous frame
+    // (previousHitUV = hitUV - motion(hitUV)) for multi-bounce, else the current frame.
     const traceResult = graph.addPass('SSGI:Trace', (builder) => {
       builder.read(sampleColorHandle);
       readFrameInputs(builder);
@@ -221,8 +214,7 @@ export class SSGI extends AbstractPostEffect {
       return { irradiance: out, ao };
     });
 
-    // Store the current full-resolution surface independently from irradiance;
-    // no albedo MRT is needed because the next lighting pass applies the BRDF.
+    // Surface stored separately; no albedo MRT, the lighting pass applies the BRDF.
     const surfaceHandle = graph.addPass('SSGI:Surface', (builder) => {
       builder.read(linearDepthHandle);
       builder.read(normalHandle);
@@ -261,9 +253,7 @@ export class SSGI extends AbstractPostEffect {
       previousAOHandle
     );
 
-    // Temporal pass always creates moments. On the first frame it simply
-    // initializes them; with valid history it rejects by depth and normal,
-    // neighborhood-clamps radiance, and accumulates first/second moments.
+    // Rejects by depth and normal, neighborhood-clamps radiance, accumulates moments.
     const temporalResult = graph.addPass('SSGI:Temporal', (builder) => {
       builder.read(traceResult.irradiance);
       builder.read(traceResult.ao);
@@ -311,9 +301,7 @@ export class SSGI extends AbstractPostEffect {
       return { irradiance, moments, ao };
     });
 
-    // Variance-guided, cross-bilateral a-trous filtering. The increasing
-    // kernel step removes low-frequency Monte Carlo noise while depth/normal
-    // weights preserve discontinuities.
+    // Variance-guided cross-bilateral a-trous filtering.
     let filteredHandle = temporalResult.irradiance;
     let filteredAOHandle = temporalResult.ao;
     for (let pass = 0; pass < settings.denoisePasses; pass++) {
@@ -362,8 +350,7 @@ export class SSGI extends AbstractPostEffect {
       filteredAOHandle = filtered.ao;
     }
 
-    // Half-resolution presets use a joint bilateral upsample before history is
-    // consumed by full-resolution materials on the next frame.
+    // Joint bilateral upsample for half-resolution presets.
     let finalIrradianceHandle = filteredHandle;
     let finalAOHandle = filteredAOHandle;
     if (settings.halfRes) {
@@ -406,14 +393,11 @@ export class SSGI extends AbstractPostEffect {
       finalAOHandle = upsampled.ao;
     }
 
-    // Pinned before the commit closure captures it: the a-trous loop above
-    // reassigns the handle, and the AO history has to be the trace-resolution
-    // one regardless of whether an upsample ran.
+    // Pinned here: the a-trous loop reassigns the handle, and AO history stays at trace resolution.
     const traceResolutionAOHandle = filteredAOHandle;
 
-    // SSGI history is independent from TAA/SSR history. Commit the opaque HDR
-    // SceneColor input (before SSR/transparency/tone-map/AA), irradiance,
-    // surface and moments, then pass SceneColor through unchanged.
+    // Commit opaque HDR SceneColor (pre SSR/transparency/tonemap/AA), irradiance,
+    // surface and moments; SceneColor passes through unchanged.
     return graph.addPass('SSGI:Commit', (builder) => {
       builder.read(s.input);
       if (noFogHandle) {
@@ -421,8 +405,7 @@ export class SSGI extends AbstractPostEffect {
       }
       builder.read(finalIrradianceHandle);
       builder.read(finalAOHandle);
-      // The trace-resolution AO is what goes back into history, so it has to be
-      // read here too even when the upsampled one is what gets composited.
+      // The trace-resolution AO goes back into history.
       builder.read(traceResolutionAOHandle);
       builder.read(surfaceHandle);
       builder.read(temporalResult.moments);
@@ -443,8 +426,7 @@ export class SSGI extends AbstractPostEffect {
           } else {
             this.passThrough(ctx, sceneColor, output.srgbOutput);
           }
-          // Commit the same fog-free color the trace sampled, so next frame's
-          // reprojected history is on the same footing as this frame's fallback.
+          // Same fog-free colour the trace sampled.
           this.commitHistory(
             history,
             RGHistoryResources.SSGI_SCENE_COLOR,
@@ -453,9 +435,8 @@ export class SSGI extends AbstractPostEffect {
           this.commitHistory(history, RGHistoryResources.SSGI_IRRADIANCE, irradiance);
           this.commitHistory(history, RGHistoryResources.SSGI_SURFACE, surface);
           this.commitHistory(history, RGHistoryResources.SSGI_MOMENTS, moments);
-          // Committed at trace resolution: the temporal pass that consumes it
-          // runs before the upsample, so a full-resolution AO would fail the
-          // descriptor compatibility check and silently disable accumulation.
+          // Trace resolution: the temporal pass runs before the upsample and needs a
+          // compatible descriptor, else accumulation is silently disabled.
           this.commitHistory(history, RGHistoryResources.SSGI_AO, filteredAO);
         } finally {
           device.popDeviceStates();
@@ -498,14 +479,15 @@ export class SSGI extends AbstractPostEffect {
     height: number
   ) {
     const sampleHistory = !!(previousColor && motion && previousSurface);
-    const envHash = ctx.env!.light.getHash();
+    const probes = getActiveProbeVolume(ctx.scene);
+    const envHash = `${ctx.env!.light.getHash()}:probes${probes ? 1 : 0}`;
     const historyHash = sampleHistory ? `${previousColor!.uid}:${motion!.uid}:${previousSurface!.uid}` : '';
     const hizHash = hiZ ? `${hiZ.uid}` : '';
     const programHash = `${sampleHistory ? '1' : '0'}:${hiZ ? '1' : '0'}:${ctx.camera.ssgiResolvedSettings.raysPerPixel}:${envHash}`;
     const bindGroupHash = `${currentColor.uid}:${depth.uid}:${normal.uid}:(${historyHash}):(${hizHash}):${ctx.camera.ssgiResolvedSettings.raysPerPixel}:${envHash}`;
     let program = SSGI._tracePrograms[programHash];
     if (!program) {
-      program = this.createTraceProgram(ctx, !!hiZ, sampleHistory);
+      program = this.createTraceProgram(ctx, !!hiZ, sampleHistory, !!probes);
       SSGI._tracePrograms[programHash] = program;
     }
     const colorSampler = fetchSampler('clamp_linear_nomip');
@@ -562,6 +544,7 @@ export class SSGI extends AbstractPostEffect {
     bindGroup.setValue('skyOcclusion', ctx.camera.ssgiSkyOcclusion);
     bindGroup.setValue('flip', this.needFlip(ctx.device) ? 1 : 0);
     ctx.env!.light.envLight.updateBindGroup(bindGroup);
+    probes?.applyBindGroup(bindGroup);
     ctx.device.setProgram(program);
     ctx.device.setBindGroup(0, bindGroup);
     this.drawFullscreenQuad(AbstractPostEffect.getDefaultRenderState(ctx, 'always'));
@@ -607,8 +590,7 @@ export class SSGI extends AbstractPostEffect {
         );
         bindGroup.setTexture('previousSurfaceTex', previousSurface!, fetchSampler('clamp_nearest_nomip'));
         bindGroup.setTexture('previousMomentsTex', previousMoments!, fetchSampler('clamp_linear_nomip'));
-        // Linear is safe here: both WebGL2 and WebGPU filter r16f
-        // unconditionally. The read is at a reprojected UV.
+        // r16f is filterable on WebGL2 and WebGPU.
         bindGroup.setTexture('previousAOTex', previousAO!, fetchSampler('clamp_linear_nomip'));
       }
       this._temporalBindGroups[hash] = bindGroup;
@@ -668,9 +650,8 @@ export class SSGI extends AbstractPostEffect {
         4
       )
     );
-    // Number of accumulated frames a pixel needs before its variance estimate is
-    // trusted. Zero disables the ramp for paths that never build history, where
-    // the stored length is pinned at 1 and would read as permanently new.
+    // Accumulated frames before the variance estimate is trusted. Zero disables the
+    // ramp for paths without history (stored length pinned at 1).
     bindGroup.setValue('denoiseParams', new Vector4(hasTemporalHistory ? 8 : 0, 0, 0, 0));
     bindGroup.setValue('cameraFar', ctx.camera.getFarPlane());
     bindGroup.setValue('flip', this.needFlip(ctx.device) ? 1 : 0);
@@ -742,7 +723,7 @@ export class SSGI extends AbstractPostEffect {
   }
 
   /** @internal */
-  private createTraceProgram(ctx: DrawContext, useHiZ: boolean, sampleHistory: boolean) {
+  private createTraceProgram(ctx: DrawContext, useHiZ: boolean, sampleHistory: boolean, useProbes: boolean) {
     const raysPerPixel = ctx.camera.ssgiResolvedSettings.raysPerPixel;
     const program = ctx.device.buildRenderProgram({
       vertex(pb) {
@@ -759,9 +740,7 @@ export class SSGI extends AbstractPostEffect {
       },
       fragment(pb) {
         this.currentColorTex = pb.tex2D().uniform(0);
-        // Linear depth is r32f (or rg32f when thickness is enabled). These
-        // formats are not filterable without the optional float32-filterable
-        // feature, and all SSGI depth reads use a nearest sampler.
+        // Linear depth is r32f/rg32f, not filterable without float32-filterable; nearest only.
         this.depthTex = pb.tex2D().sampleType('unfilterable-float').uniform(0);
         this.normalTex = pb.tex2D().uniform(0);
         if (sampleHistory) {
@@ -771,9 +750,8 @@ export class SSGI extends AbstractPostEffect {
           this.historyRejectParams = pb.vec2().uniform(0);
         }
         if (useHiZ) {
-          // Hi-Z is stored as r32f. It is only read with a nearest sampler,
-          // so use the unfilterable sample type for adapters without the
-          // optional float32-filterable feature (notably some AMD iGPUs).
+          // Hi-Z is r32f read with nearest; unfilterable sample type for adapters without
+          // float32-filterable (notably some AMD iGPUs).
           this.hizTex = pb.tex2D().sampleType('unfilterable-float').uniform(0);
           this.depthMipLevels = pb.int().uniform(0);
         }
@@ -787,6 +765,9 @@ export class SSGI extends AbstractPostEffect {
         this.radianceParams = pb.vec4().uniform(0);
         this.skyOcclusion = pb.float().uniform(0);
         ctx.env!.light.envLight.initShaderBindings(pb);
+        if (useProbes) {
+          declareProbeUniforms(this, 0);
+        }
         this.$outputs.outColor = pb.vec4();
         this.$outputs.outAO = pb.vec4();
         pb.func('SSGI_getPosition', [pb.vec2('uv')], function () {
@@ -834,38 +815,42 @@ export class SSGI extends AbstractPostEffect {
           this.$l.pos = this.SSGI_getPosition(this.uv);
           this.$if(pb.greaterThanEqual(this.pos.w, 1), function () {
             this.$outputs.outColor = pb.vec4(0);
-            // Sky is unoccluded. Its irradiance validity is zero, so this value
-            // is never read as a weight, but it must not be a dark texel: the
-            // a-trous and upsample kernels reach across the silhouette.
+            // Sky: validity is zero, but the texel must not be dark since the a-trous and
+            // upsample kernels reach across the silhouette.
             this.$outputs.outAO = pb.vec4(1);
           }).$else(function () {
             this.$l.worldNormal = pb.normalize(
               pb.sub(pb.mul(pb.textureSampleLevel(this.normalTex, this.uv, 0).rgb, 2), pb.vec3(1))
             );
             this.$l.viewNormal = pb.normalize(pb.mul(this.viewMatrix, pb.vec4(this.worldNormal, 0)).xyz);
-            // Use the SH-integrated diffuse IBL as an exact, noise-free
-            // baseline. Stochastic rays only estimate the screen-space
-            // replacement relative to the environment in the same direction.
-            //
-            // getIrradiance returns the cosine-convolved SH, which already
-            // carries the 1/PI of the Lambert BRDF: materials consume it as
-            // k_D * irradiance with no further division, matching punctual
-            // lights that apply 1/PI explicitly. The published history is mixed
-            // against that same value in the lighting pass, so this baseline
-            // must stay in those units and must not be scaled by PI.
+            // Baseline is the SH diffuse IBL; rays only estimate the screen-space correction.
+            // getIrradiance already carries the Lambert 1/PI, as does the lighting pass that
+            // mixes the history, so this must not be scaled by PI.
             this.$l.iblIrradiance = pb.mul(
               ctx.env!.light.envLight.getIrradiance(this, this.worldNormal),
               this.radianceParams.z
             );
+            // With probes the baseline is their irradiance, which already includes occlusion
+            // and bounces; rays only add on-screen detail.
+            this.$l.probeValid = pb.float(0);
+            if (useProbes) {
+              this.$l.worldPos = pb.mul(this.invViewMatrix, pb.vec4(this.pos.xyz, 1)).xyz;
+              this.$l.cameraPos = pb.mul(this.invViewMatrix, pb.vec4(0, 0, 0, 1)).xyz;
+              this.$l.probe = sampleProbeIrradiance(
+                this,
+                this.worldPos,
+                this.worldNormal,
+                pb.sub(this.cameraPos, this.worldPos)
+              );
+              this.iblIrradiance = pb.mix(this.iblIrradiance, this.probe.rgb, this.probe.a);
+              this.probeValid = this.probe.a;
+            }
             this.$l.correctionSum = pb.vec3(0);
-            // Rays whose outcome the depth buffer cannot resolve (they left the
-            // screen or ran out of iterations behind geometry) are excluded from
-            // the average instead of counted as unoccluded sky.
+            // Rays the depth buffer cannot resolve (off-screen or out of iterations) are
+            // excluded from the average, not counted as sky.
             this.$l.determinateSum = pb.float(0);
             this.$l.escapedSum = pb.float(0);
-            // Ambient occlusion reuses the very same visibility measurement the
-            // sky removal is built on, so the two can never disagree. No extra
-            // ray march: only this accumulator is new.
+            // AO reuses the sky-removal visibility measurement, so the two never disagree.
             this.$l.occludedSum = pb.float(0);
             this.$for(pb.float('rayIndex'), 0, raysPerPixel, function () {
               this.$l.xi = this.SSGI_hash22(
@@ -924,16 +909,10 @@ export class SSGI extends AbstractPostEffect {
                   this.giTrace
                 );
               }
-              // Grazing/projectively degenerate rays can return Inf or NaN.
-              // A zero weight is not sufficient because NaN * 0 remains NaN and
-              // the spatial passes then spread it into a dark block.
+              // Degenerate rays can return Inf/NaN; a zero weight is not enough (NaN * 0 = NaN).
               this.$l.hitFinite = pb.all(pb.lessThan(pb.abs(this.hit), pb.vec4(1e30)));
-              // Visibility and radiance are kept apart: whether the ray was
-              // blocked is independent of whether the blocker's outgoing
-              // radiance can be read back from the screen. Geometric certainty
-              // gates occlusion so a thin-object false positive cannot darken,
-              // while the hit's screen colour is always a usable radiance
-              // estimate because the marcher only ever stops on-screen.
+              // Visibility and radiance are separate: geometric certainty gates occlusion so thin
+              // false positives cannot darken, while the on-screen hit colour is always usable.
               this.$l.occluded = pb.mul(
                 pb.float(this.hitFinite),
                 pb.clamp(this.giTrace.x, 0, 1),
@@ -954,6 +933,10 @@ export class SSGI extends AbstractPostEffect {
                 this.rawEnvRadiance,
                 pb.vec3(0)
               );
+              if (useProbes) {
+                // A hit is judged against what the probes expect there, not the open sky
+                this.envRadiance = pb.mix(this.envRadiance, this.iblIrradiance, this.probeValid);
+              }
               this.$l.currentRadiance = pb.textureSampleLevel(this.currentColorTex, this.hitUV, 0).rgb;
               if (sampleHistory) {
                 this.$l.hitMotion = pb.textureSampleLevel(this.motionTex, this.hitUV, 0).xy;
@@ -994,11 +977,8 @@ export class SSGI extends AbstractPostEffect {
                     this.historyRejectParams.y
                   )
                 );
-                // Prefer the reprojected previous frame for multi-bounce
-                // feedback, but fall back to this frame's already-shaded opaque
-                // colour rather than dropping the sample. Losing one bounce of
-                // feedback is a far smaller error than reverting to unoccluded
-                // IBL, which is what made newly disoccluded regions flash.
+                // Prefer the reprojected previous frame for multi-bounce, else this frame's
+                // shaded colour rather than dropping the sample (avoids disocclusion flashes).
                 this.$l.screenRadiance = this.$choice(
                   this.historyValid,
                   this.historyRadiance,
@@ -1023,19 +1003,13 @@ export class SSGI extends AbstractPostEffect {
                 pb.float(1)
               );
               this.$l.clampedScreenRadiance = pb.mul(this.screenRadiance, this.fireflyScale);
-              // Split the correction into the bounce the blocker adds and the sky
-              // it takes away. The bounce is always kept: the hit is on-screen, so
-              // its colour is a real measurement. Only the removal is scaled by
-              // skyOcclusion, which lets the sky be dimmed less than physically
-              // implied without also discarding measured bounce light.
+              // Bounce added by the blocker is always kept; only the sky removal is scaled by skyOcclusion.
               this.$l.bounceGain = pb.max(pb.sub(this.clampedScreenRadiance, this.envRadiance), pb.vec3(0));
               this.$l.skyLoss = pb.mul(
                 pb.max(pb.sub(this.envRadiance, this.clampedScreenRadiance), pb.vec3(0)),
                 this.skyOcclusion
               );
-              // Cosine-weighted sampling makes the estimator of E/PI - the unit
-              // the baseline and the lighting pass both use - the plain mean of
-              // the sampled radiance, so no PI appears here either.
+              // Cosine-weighted sampling: the plain mean estimates E/PI, so no PI here.
               this.$l.correction = pb.mul(
                 pb.sub(this.bounceGain, this.skyLoss),
                 this.occluded,
@@ -1046,39 +1020,32 @@ export class SSGI extends AbstractPostEffect {
               this.escapedSum = pb.add(this.escapedSum, this.escaped);
               this.occludedSum = pb.add(this.occludedSum, this.occluded);
             });
-            // Average over resolved rays only. Dividing by raysPerPixel would
-            // implicitly treat every indeterminate ray as an unoccluded sky
-            // sample, which is the systematic sky leak this pass has to avoid.
+            // Average over resolved rays only, so indeterminate rays do not leak sky.
             this.$l.determinateCount = pb.max(this.determinateSum, 1);
             this.$l.irradiance = pb.add(
               this.iblIrradiance,
               pb.div(this.correctionSum, this.determinateCount)
             );
-            // radianceParams.x blends the traced estimate over the IBL baseline. A finite-ray
-            // correction can have much higher variance than the integrated physical sky and must
-            // not remove more than that blend permits (at the default 0.7, at least 30% remains).
-            // That reserved share is itself scaled by measured visibility, otherwise no amount of
-            // occlusion could ever darken an enclosed corner.
+            // radianceParams.x blends the traced estimate over the IBL baseline; the reserved
+            // share (30% at 0.7) is scaled by visibility so corners can still darken.
+            // With probes the baseline is already occluded, so the floor is not scaled down again
             this.$l.minimumIrradiance = pb.mul(
               this.iblIrradiance,
               pb.max(0, pb.sub(1, this.radianceParams.x)),
-              pb.mix(pb.float(1), pb.div(this.escapedSum, this.determinateCount), this.skyOcclusion)
+              pb.mix(
+                pb.mix(pb.float(1), pb.div(this.escapedSum, this.determinateCount), this.skyOcclusion),
+                pb.float(1),
+                this.probeValid
+              )
             );
-            // Clamp before the render-target conversion: a finite value that overflows becomes Inf
-            // in the texture, and every a-trous pass then expands the contaminated region by its
-            // kernel radius. Pre-exposed lighting makes this unlikely, but a bright emissive hit
-            // amplified by a low-probability ray can still reach it.
+            // Clamp before the RT conversion: overflow becomes Inf and a-trous spreads it.
             this.$l.boundedIrradiance = pb.clamp(
               pb.max(this.irradiance, this.minimumIrradiance),
               pb.vec3(0),
               pb.vec3(HALF_FLOAT_MAX)
             );
             this.$outputs.outColor = pb.vec4(this.boundedIrradiance, 1);
-            // Cosine-weighted sampling makes the mean of `occluded` over the
-            // resolved rays an unbiased estimate of cosine-weighted visibility.
-            // Averaging over the determinate set - not raysPerPixel - is what
-            // keeps an indeterminate ray from reading as unoccluded, the same
-            // reasoning the irradiance average uses above.
+            // Mean of `occluded` over resolved rays estimates cosine-weighted visibility.
             this.$outputs.outAO = pb.vec4(
               pb.clamp(pb.sub(1, pb.div(this.occludedSum, this.determinateCount)), 0, 1)
             );
@@ -1199,15 +1166,12 @@ export class SSGI extends AbstractPostEffect {
               pb.float(pb.and(this.validUV, this.surfaceValid)),
               pb.clamp(this.previous.a, 0, 1)
             );
-            // Start new histories as a running average, then cap their weight
-            // at the configured value once enough samples have accumulated.
+            // Running average until the configured history weight cap is reached.
             this.$l.runningAverageWeight = pb.div(this.previousMoment.z, pb.add(this.previousMoment.z, 1));
             this.$l.historyWeight = pb.min(this.temporalParams.x, this.runningAverageWeight);
             this.$l.weight = pb.mul(this.historyWeight, this.validity);
             this.result = pb.mix(this.current.rgb, this.previousClamped, this.weight);
-            // AO accumulates on exactly the same validity and weight as the
-            // irradiance: it was measured by the same rays against the same
-            // surface, so any disagreement between the two would be an artifact.
+            // AO accumulates with the same validity and weight as irradiance.
             this.$l.previousAO = pb.textureSampleLevel(
               this.previousAOTex,
               pb.clamp(this.previousUV, pb.vec2(0), pb.vec2(1)),
@@ -1228,9 +1192,7 @@ export class SSGI extends AbstractPostEffect {
             this.$l.variance = pb.max(0, pb.sub(this.momentXY.y, pb.mul(this.momentXY.x, this.momentXY.x)));
             this.moment = pb.vec4(this.momentXY, this.historyLength, this.variance);
           } else {
-            // Without temporal history there is no accumulated variance. Seed
-            // a-trous with spatial variance so its luminance weighting can
-            // still remove Monte Carlo noise instead of treating it as an edge.
+            // No temporal history: seed a-trous with spatial variance.
             this.$l.spatialLum = pb.float(0);
             this.$l.spatialLum2 = pb.float(0);
             for (let y = -1; y <= 1; y++) {
@@ -1306,17 +1268,9 @@ export class SSGI extends AbstractPostEffect {
           );
           this.$l.centerLum = this.SSGI_luminance(this.center.rgb);
           this.$l.moments = pb.textureSampleLevel(this.momentsTex, this.uv, 0);
-          // A pixel with little accumulated history has an unreliable variance
-          // estimate, so the edge-stopping functions would preserve Monte Carlo
-          // noise as if it were detail. Widen the kernel and relax the luminance
-          // and normal tests until enough frames have converged, then hand back
-          // to the sharp weights (standard SVGF history-driven ramp).
-          //
-          // A path that never accumulates history (no temporal resolve, so
-          // moments.z is pinned at 1) is permanently unconverged, not converged:
-          // it is the noisiest input this filter ever sees. Sending it to the
-          // relaxed end is the whole point of the ramp - the sharp end would give
-          // it the narrowest kernel and one eighth the luminance tolerance.
+          // SVGF history-driven ramp: low-history pixels get a wider kernel and relaxed
+          // luminance/normal tests. Paths without history (moments.z pinned at 1) are
+          // treated as unconverged.
           this.$l.historyConfidence = this.$choice(
             pb.greaterThan(this.denoiseParams.x, 0),
             pb.clamp(pb.div(this.moments.z, this.denoiseParams.x), 0, 1),
@@ -1381,11 +1335,8 @@ export class SSGI extends AbstractPostEffect {
               );
               this.sum = pb.add(this.sum, pb.mul(this.sampleValue.rgb, this.weight));
               this.weightSum = pb.add(this.weightSum, this.weight);
-              // AO deliberately drops colorWeight: that term is driven by the
-              // moments' luminance variance, which describes the irradiance and
-              // says nothing about AO. Leaving it out is a stronger smoothing,
-              // which is what a per-ray binary quantity needs - with 1-2 rays per
-              // pixel, single-frame AO is close to binary.
+              // AO drops colorWeight (driven by irradiance variance) for stronger smoothing;
+              // with 1-2 rays per pixel single-frame AO is nearly binary.
               this.$l.aoWeight = pb.mul(
                 kernelWeight,
                 this.depthWeight,
@@ -1453,10 +1404,8 @@ export class SSGI extends AbstractPostEffect {
   }
 
   /**
-   * Multiply the traced ambient occlusion into the scene color.
-   *
-   * This is the same multiply-into-final-color semantics the standalone SAO post
-   * effect applies, so enabling both double darkens.
+   * Multiplies the traced ambient occlusion into the scene color, like the SAO
+   * effect, so enabling both double darkens.
    *
    * @internal
    */
@@ -1472,9 +1421,7 @@ export class SSGI extends AbstractPostEffect {
     if (!bindGroup) {
       bindGroup = ctx.device.createBindGroup(program.bindGroupLayouts[0]);
       bindGroup.setTexture('colorTex', sceneColor, fetchSampler('clamp_nearest_nomip'));
-      // Nearest, not linear: the AO handed to this pass is already at full
-      // resolution, so filtering would only add a dependency on the WebGL
-      // half-float linear filtering cap for no gain.
+      // Nearest: AO is already full resolution.
       bindGroup.setTexture('aoTex', ao, fetchSampler('clamp_nearest_nomip'));
       this._compositeBindGroups[hash] = bindGroup;
     }
@@ -1511,9 +1458,7 @@ export class SSGI extends AbstractPostEffect {
         pb.main(function () {
           this.$l.color = pb.textureSampleLevel(this.colorTex, this.$inputs.uv, 0);
           this.$l.ao = pb.clamp(pb.textureSampleLevel(this.aoTex, this.$inputs.uv, 0).r, 0, 1);
-          // mix() toward 1 rather than a plain multiply: intensity then doubles as
-          // the fallback for noisy or unresolved texels, which matters most when
-          // there is no temporal accumulation to converge them.
+          // mix() toward 1: intensity also tempers noisy or unresolved texels.
           this.$l.shapedAO = pb.pow(this.ao, this.aoParams.y);
           this.$l.finalAO = pb.mix(pb.float(1), this.shapedAO, this.aoParams.x);
           this.$l.occludedColor = pb.mul(this.color.rgb, this.finalAO);
@@ -1586,8 +1531,7 @@ export class SSGI extends AbstractPostEffect {
               this.$l.weight = pb.mul(this.depthWeight, this.normalWeight, this.sampleValue.a);
               this.sum = pb.add(this.sum, pb.mul(this.sampleValue.rgb, this.weight));
               this.weightSum = pb.add(this.weightSum, this.weight);
-              // Same joint bilateral weights as the irradiance, so the upsampled
-              // AO cannot cross a depth or normal edge the irradiance respects.
+              // Same joint bilateral weights as the irradiance.
               this.aoSum = pb.add(this.aoSum, pb.mul(this.sampleAO, this.weight));
             }
           }

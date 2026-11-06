@@ -2003,7 +2003,7 @@ export function getMeshMaterialClass(): SerializableClass[] {
         ]);
       }
     },
-    getMeshMaterialInstanceUniformsClass(MeshMaterial)
+    getMeshMaterialInstanceUniformsClass(MeshMaterial, 'MeshMaterial')
   ];
 }
 
@@ -2018,7 +2018,7 @@ export function getSpriteMaterialClass(_manager: ResourceManager): SerializableC
         return [];
       }
     },
-    getMeshMaterialInstanceUniformsClass(SpriteMaterial)
+    getMeshMaterialInstanceUniformsClass(SpriteMaterial, 'SpriteMaterial')
   ];
 }
 
@@ -2080,7 +2080,7 @@ export function getStandardSpriteMaterialClass(manager: ResourceManager): Serial
         ]);
       }
     },
-    getMeshMaterialInstanceUniformsClass(StandardSpriteMaterial)
+    getMeshMaterialInstanceUniformsClass(StandardSpriteMaterial, 'StandardSpriteMaterial')
   ];
 }
 
@@ -2176,7 +2176,7 @@ export function getParticleMaterialClass(manager: ResourceManager): Serializable
         ]);
       }
     },
-    getMeshMaterialInstanceUniformsClass(ParticleMaterial)
+    getMeshMaterialInstanceUniformsClass(ParticleMaterial, 'ParticleMaterial')
   ];
 }
 
@@ -2191,7 +2191,7 @@ export function getPBRBluePrintMaterialClass(): SerializableClass[] {
         return defineProps([]);
       }
     },
-    getMeshMaterialInstanceUniformsClass(PBRBluePrintMaterial)
+    getMeshMaterialInstanceUniformsClass(PBRBluePrintMaterial, 'PBRBluePrintMaterial')
   ];
 }
 
@@ -2206,7 +2206,7 @@ export function getPBRBluePrintMaterialInstanceClass(): SerializableClass[] {
         return defineProps([]);
       }
     },
-    getMeshMaterialInstanceUniformsClass(PBRBluePrintMaterialInstance)
+    getMeshMaterialInstanceUniformsClass(PBRBluePrintMaterialInstance, 'PBRBluePrintMaterialInstance')
   ];
 }
 
@@ -2221,7 +2221,7 @@ export function getSpriteBlueprintMaterialClass(): SerializableClass[] {
         return [];
       }
     },
-    getMeshMaterialInstanceUniformsClass(SpriteBlueprintMaterial)
+    getMeshMaterialInstanceUniformsClass(SpriteBlueprintMaterial, 'SpriteBlueprintMaterial')
   ];
 }
 
@@ -2236,7 +2236,7 @@ export function getUnlitMaterialClass(manager: ResourceManager): SerializableCla
         return getUnlitMaterialProps(manager);
       }
     },
-    getMeshMaterialInstanceUniformsClass(UnlitMaterial)
+    getMeshMaterialInstanceUniformsClass(UnlitMaterial, 'UnlitMaterial')
   ];
 }
 
@@ -2251,7 +2251,7 @@ export function getMToonMaterialClass(manager: ResourceManager): SerializableCla
         return getMToonMaterialProps(manager);
       }
     },
-    getMeshMaterialInstanceUniformsClass(MToonMaterial)
+    getMeshMaterialInstanceUniformsClass(MToonMaterial, 'MToonMaterial')
   ];
 }
 
@@ -2266,7 +2266,7 @@ export function getLambertMaterialClass(manager: ResourceManager): SerializableC
         return getLitMaterialProps(manager);
       }
     },
-    getMeshMaterialInstanceUniformsClass(LambertMaterial)
+    getMeshMaterialInstanceUniformsClass(LambertMaterial, 'LambertMaterial')
   ];
 }
 
@@ -2302,7 +2302,7 @@ export function getBlinnMaterialClass(manager: ResourceManager): SerializableCla
         ]);
       }
     },
-    getMeshMaterialInstanceUniformsClass(BlinnMaterial)
+    getMeshMaterialInstanceUniformsClass(BlinnMaterial, 'BlinnMaterial')
   ];
 }
 
@@ -2758,7 +2758,7 @@ export function getHairMaterialClass(manager: ResourceManager): SerializableClas
         ]);
       }
     },
-    getMeshMaterialInstanceUniformsClass(HairMaterial)
+    getMeshMaterialInstanceUniformsClass(HairMaterial, 'HairMaterial')
   ];
 }
 
@@ -2880,7 +2880,7 @@ export function getHairStrandMaterialClass(): SerializableClass[] {
         ]);
       }
     },
-    getMeshMaterialInstanceUniformsClass(HairStrandMaterial)
+    getMeshMaterialInstanceUniformsClass(HairStrandMaterial, 'HairStrandMaterial')
   ];
 }
 
@@ -2967,7 +2967,7 @@ export function getSkinMaterialClass(manager: ResourceManager): SerializableClas
         ]);
       }
     },
-    getMeshMaterialInstanceUniformsClass(SSSMaterial)
+    getMeshMaterialInstanceUniformsClass(SSSMaterial, 'SSSMaterial')
   ];
 }
 
@@ -3458,7 +3458,7 @@ export function getEyeMaterialClass(manager: ResourceManager): SerializableClass
         ]);
       }
     },
-    getMeshMaterialInstanceUniformsClass(EyeMaterial)
+    getMeshMaterialInstanceUniformsClass(EyeMaterial, 'EyeMaterial')
   ];
 }
 
@@ -4080,7 +4080,7 @@ export function getPBRMetallicRoughnessMaterialClass(manager: ResourceManager): 
         ]);
       }
     },
-    getMeshMaterialInstanceUniformsClass(PBRMetallicRoughnessMaterial)
+    getMeshMaterialInstanceUniformsClass(PBRMetallicRoughnessMaterial, 'PBRMetallicRoughnessMaterial')
   ];
 }
 
@@ -4135,6 +4135,6 @@ export function getPBRSpecularGlossinessMaterialClass(manager: ResourceManager):
         ]);
       }
     },
-    getMeshMaterialInstanceUniformsClass(PBRSpecularGlossinessMaterial)
+    getMeshMaterialInstanceUniformsClass(PBRSpecularGlossinessMaterial, 'PBRSpecularGlossinessMaterial')
   ];
 }

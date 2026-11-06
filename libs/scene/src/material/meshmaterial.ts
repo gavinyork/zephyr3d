@@ -14,13 +14,15 @@ import {
   RENDER_PASS_TYPE_DEPTH,
   RENDER_PASS_TYPE_LIGHT,
   RENDER_PASS_TYPE_OBJECT_COLOR,
-  RENDER_PASS_TYPE_SHADOWMAP
+  RENDER_PASS_TYPE_SHADOWMAP,
+  RENDER_PASS_TYPE_VOXELIZE
 } from '../values';
 import { Material } from './material';
 import type { DepthPass } from '../render';
 import { type DrawContext, type ShadowMapPass } from '../render';
 import { encodeNormalizedFloatToRGBA } from '../shaders/misc';
 import { interleavedGradientNoise } from '../shaders/noise';
+import { storeVoxelMaterial } from '../shaders/gi';
 import { ShaderHelper } from './shader/helper';
 import type { Clonable, Immutable, Nullable } from '@zephyr3d/base';
 import { Vector2, Vector3, Vector4, applyMixins, DRef } from '@zephyr3d/base';
@@ -711,7 +713,8 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
   set objectColor(val: Immutable<Vector4>) {
     if (val !== this._objectColor) {
       this._objectColor = val;
-      this.uniformChanged();
+      // Uniforms only: the look is unchanged, so voxelized material caches stay valid
+      this.optionChanged(false, false);
     }
   }
   /**
@@ -800,6 +803,15 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
    * @returns void
    */
   protected updateRenderStates(pass: number, stateSet: RenderStateSet, ctx: DrawContext) {
+    if (ctx.renderPass!.type === RENDER_PASS_TYPE_VOXELIZE) {
+      // Every fragment of every face stores its voxel; the colour attachment is scratch
+      stateSet.defaultBlendingState();
+      stateSet.useDepthState().enableTest(false).enableWrite(false);
+      stateSet.useRasterizerState().setCullMode('none');
+      stateSet.useColorState().setColorMask(false, false, false, false);
+      stateSet.defaultStencilState();
+      return;
+    }
     const isObjectColorPass = ctx.renderPass!.type === RENDER_PASS_TYPE_OBJECT_COLOR;
     const blendMode = this.getEffectiveBlendMode(pass, ctx);
     const blending = !isObjectColorPass && (blendMode !== 'none' || ctx.lightBlending);
@@ -1026,8 +1038,19 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
       return this._alphaCutoff > 0 || this.alphaToCoverage;
     }
     return (
-      drawContext.renderPass!.type === RENDER_PASS_TYPE_LIGHT || this._alphaCutoff > 0 || this.alphaToCoverage
+      drawContext.renderPass!.type === RENDER_PASS_TYPE_LIGHT ||
+      drawContext.renderPass!.type === RENDER_PASS_TYPE_VOXELIZE ||
+      this._alphaCutoff > 0 ||
+      this.alphaToCoverage
     );
+  }
+  /**
+   * Whether the material can be voxelized for global illumination: in the voxelize
+   * pass its fragment shader must hand {@link MeshMaterial.outputFragmentColor} its
+   * albedo (and alpha) as the colour. False by default.
+   */
+  supportsVoxelization(): boolean {
+    return false;
   }
   /**
    * Vertex shader hook.
@@ -1385,6 +1408,15 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
           const profileId = that.getDepthPassProfileId(this);
           this.$outputs.zSSSProfileId = pb.vec4(profileId ?? pb.float(0));
         }
+      } else if (that.drawContext.renderPass!.type === RENDER_PASS_TYPE_VOXELIZE) {
+        // No alpha test: the distance field ignores masking, so rays hit the whole
+        // card and need material everywhere. The colour handed in is the albedo (see supportsVoxelization)
+        const emissiveMaterial = that as unknown as {
+          calculateEmissiveColor?: (scope: PBInsideFunctionScope) => PBShaderExp;
+        };
+        const emissive = emissiveMaterial.calculateEmissiveColor?.(this) ?? pb.vec3(0);
+        storeVoxelMaterial(this, this.worldPos, color ? this.outColor.rgb : pb.vec3(0.5), emissive);
+        this.$outputs.zFragmentOutput = pb.vec4(0);
       } else if (that.drawContext.renderPass!.type === RENDER_PASS_TYPE_OBJECT_COLOR) {
         if (color) {
           this.$if(pb.getGlobalScope()[alphaClipFuncName](this.outColor.a, this.zAlphaCutoff), function () {

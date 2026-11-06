@@ -35,10 +35,12 @@ import {
   JointDynamicsModifier,
   SphereShape,
   CapsuleShape,
-  RenderGraphExecutor
+  RenderGraphExecutor,
+  PIPELINE_CACHE_FILE
 } from '@zephyr3d/scene';
 import type { RGProfileResult, RGProfileScopeResult } from '@zephyr3d/scene';
 import { renderSceneSDFView, SceneNode } from '@zephyr3d/scene';
+import type { SceneSDFViewMode } from '@zephyr3d/scene';
 import { DirectionalLight } from '@zephyr3d/scene';
 import { eventBus } from '../core/eventbus';
 import { ToolBar } from '../components/toolbar';
@@ -104,6 +106,11 @@ import type {
   VFSRendererSceneNodeDropPayload
 } from '../components/vfsrenderer';
 import { ProjectService } from '../core/services/project';
+import {
+  isPipelineWarmupCamera,
+  readPipelineCache,
+  setPipelineWarmupCamera
+} from '../core/services/pipelinecache';
 import type { SceneController } from '../controllers/scenecontroller';
 import { EditorCameraController } from '../helpers/editorcontroller';
 import { ensureDependencies } from '../core/build/dep';
@@ -150,6 +157,8 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
   private _oldTransform: Nullable<TRS>;
   private _workspaceDragging: boolean;
   private _renderDropZone: boolean;
+  /** Preview windows of the desktop app open: the viewport is not drawn meanwhile */
+  private _previewWindowsOpen = 0;
   private readonly _nodeToBePlaced: DRef<SceneNode>;
   private _typeToBePlaced: 'shape' | 'asset' | 'mesh' | 'prefab' | 'node' | 'hair' | 'none';
   private _ctorToBePlaced: Nullable<{ new (scene: Scene): SceneNode }>;
@@ -163,7 +172,8 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
   private _showTextureViewer: boolean;
   private _wireframe: boolean;
   private _lodColoration: boolean;
-  private _sdfView: boolean;
+  private _sdfView: Nullable<SceneSDFViewMode>;
+  private _sdfViewExposure: number;
   private _showColliders: boolean;
   private _colliderGizmo: Nullable<ColliderGizmo>;
   /** Whether the gizmo renderer was added to the compositor for the frame being drawn. */
@@ -208,6 +218,9 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
   private _busyStatusText: string;
   constructor(controller: SceneController) {
     super(controller);
+    window.zephyrEditorDesktop?.preview?.onStateChanged?.((state) => {
+      this._previewWindowsOpen = state.open;
+    });
     this._cmdManager = new CommandManager();
     this._transformNode = new DRef();
     this._oldTransform = null;
@@ -227,7 +240,8 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
     this._showTextureViewer = false;
     this._wireframe = false;
     this._lodColoration = false;
-    this._sdfView = false;
+    this._sdfView = null;
+    this._sdfViewExposure = 1;
     this._showColliders = false;
     this._colliderGizmo = null;
     this._gizmoEffectAppended = false;
@@ -336,6 +350,13 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
     this._busyStatusText = statusText?.trim() ?? '';
     this._statusbar.setStatus(this._busyStatusText);
   }
+  /** Replaces the status text of the running busy tasks */
+  updateBusyTask(statusText: string) {
+    if (this._busyTaskCount > 0) {
+      this._busyStatusText = statusText?.trim() ?? '';
+      this._statusbar.setStatus(this._busyStatusText);
+    }
+  }
   endBusyTask(statusText?: string) {
     this._busyTaskCount = Math.max(0, this._busyTaskCount - 1);
     if (this._busyTaskCount === 0) {
@@ -347,6 +368,20 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
   }
   get editToolContext() {
     return this._editToolContext;
+  }
+  /** The distance field debug view drawn over the scene, null for none; see View > Distance Field and the GI views. */
+  get sdfView(): Nullable<SceneSDFViewMode> {
+    return this._sdfView;
+  }
+  set sdfView(val: Nullable<SceneSDFViewMode>) {
+    this._sdfView = val ?? null;
+  }
+  /** Exposure of the radiance and irradiance debug views. */
+  get sdfViewExposure() {
+    return this._sdfViewExposure;
+  }
+  set sdfViewExposure(val: number) {
+    this._sdfViewExposure = Math.max(0, val);
   }
   private createMenuOptions(): MenuBarOptions {
     const menuOptions: MenuBarOptions = {
@@ -408,6 +443,13 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
               }
             },
             {
+              label: 'Clear Pipeline Cache...',
+              action: () => {
+                void this.clearPipelineCache();
+                return true;
+              }
+            },
+            {
               label: '-'
             },
             {
@@ -428,6 +470,13 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
               shortCut: 'Ctrl+N',
               action: () => {
                 eventBus.dispatchEvent('action', 'NEW_DOC');
+                return true;
+              }
+            },
+            {
+              label: 'Create Example Scene...',
+              action: () => {
+                eventBus.dispatchEvent('action', 'NEW_EXAMPLE_DOC');
                 return true;
               }
             },
@@ -691,10 +740,50 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
             {
               label: 'Distance Field',
               action: () => {
-                this._sdfView = !this._sdfView;
+                this._sdfView = this._sdfView === 'distance' ? null : 'distance';
                 return true;
               },
-              checked: () => this._sdfView
+              checked: () => this._sdfView === 'distance'
+            },
+            {
+              label: 'Voxel Albedo',
+              action: () => {
+                this._sdfView = this._sdfView === 'albedo' ? null : 'albedo';
+                return true;
+              },
+              checked: () => this._sdfView === 'albedo'
+            },
+            {
+              label: 'Voxel Emissive',
+              action: () => {
+                this._sdfView = this._sdfView === 'emissive' ? null : 'emissive';
+                return true;
+              },
+              checked: () => this._sdfView === 'emissive'
+            },
+            {
+              label: 'Voxel Radiance',
+              action: () => {
+                this._sdfView = this._sdfView === 'radiance' ? null : 'radiance';
+                return true;
+              },
+              checked: () => this._sdfView === 'radiance'
+            },
+            {
+              label: 'GI Sky Occlusion',
+              action: () => {
+                this._sdfView = this._sdfView === 'skyVisibility' ? null : 'skyVisibility';
+                return true;
+              },
+              checked: () => this._sdfView === 'skyVisibility'
+            },
+            {
+              label: 'GI Irradiance',
+              action: () => {
+                this._sdfView = this._sdfView === 'irradiance' ? null : 'irradiance';
+                return true;
+              },
+              checked: () => this._sdfView === 'irradiance'
             },
             {
               label: 'Show Colliders',
@@ -1077,6 +1166,18 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
             this.playCurrentScene();
             return true;
           }
+        },
+        {
+          label: FontGlyph.glyphs['video'],
+          id: 'RECORD_PIPELINES',
+          selected: () => true,
+          tooltip: () => {
+            return 'Play current project in new tab, recording the pipelines it uses so builds compile them ahead of time';
+          },
+          action: () => {
+            this.play(true);
+            return true;
+          }
         }
       ] as ToolBarItem[]
     ).concat(this.editor.plugins.getToolbarItems({ scene: this.createSceneContext() }));
@@ -1266,7 +1367,7 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
       this._statusbar.height -
       this._assetView!.panel.height;
 
-    this._menubar.render(this.controller.editor.currentProject.name);
+    this._menubar.render(this.controller.editor.currentProject?.name ?? '');
 
     if (
       this._leftDockPanel!.begin(
@@ -1337,21 +1438,21 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
       // Whichever camera views the scene shows the editor's wireframe setting
       camera.wireframe = this._wireframe;
       camera.lodColoration = this._lodColoration;
-      camera!.render(this.controller.model.scene);
-      if (this._sdfView) {
-        // The view needs the field; the scene keeps it on until SDFEnabled is turned off
-        const scene = this.controller.model.scene;
-        scene.sdf.enabled = true;
-        renderSceneSDFView(scene, camera);
-      }
-
-      // Render selected camera
-      const selectedNode = this._sceneHierarchy!.selectedNode;
-      if (selectedNode instanceof PerspectiveCamera && selectedNode !== camera) {
-        selectedNode.viewport = [camera!.viewport![0] + 20, camera!.viewport![1] + 20, 300, 200];
-        selectedNode.scissor = selectedNode.viewport;
-        selectedNode.aspect = selectedNode.viewport[2] / selectedNode.viewport[3];
-        selectedNode.render(this.controller.model.scene);
+      if (this._previewWindowsOpen > 0) {
+        // A preview window draws the scene meanwhile: drawing it here as well would
+        // halve the GPU the preview gets, and it would not run as a build does
+        const text = 'Viewport paused while a preview window is open';
+        const size = ImGui.CalcTextSize(text);
+        ImGui.GetBackgroundDrawList().AddText(
+          new ImGui.ImVec2(
+            this._leftDockPanel!.width + (viewportWidth - size.x) * 0.5,
+            this._menubar.height + this._toolbar.height + (viewportHeight - size.y) * 0.5
+          ),
+          ImGui.GetColorU32(new ImGui.ImVec4(0.8, 0.8, 0.8, 1)),
+          text
+        );
+      } else {
+        this.renderViewportScene(camera);
       }
 
       if (this._renderDropZone) {
@@ -1377,13 +1478,15 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
       this.renderProfiler();
     }
   }
-  play() {
+  play(recordPipelines = false) {
     ensureDependencies().then(() => {
       this.controller.editor.getProjectSettings().then((settings) => {
         if (!settings!.startupScene && !settings!.startupScript) {
           DlgMessage.messageBox('Error', 'Please set startup scene or startup script in <Project Settings>');
+        } else if (recordPipelines && ProjectService.VFS.readOnly) {
+          DlgMessage.messageBox('Error', 'Pipelines cannot be recorded into a read-only project');
         } else {
-          this.openPreviewInNewTab();
+          this.openPreviewInNewTab(undefined, recordPipelines);
         }
       });
     });
@@ -1400,13 +1503,16 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
     }
     this.openPreviewInNewTab(scenePath);
   }
-  private openPreviewInNewTab(sceneOverride?: string) {
+  private openPreviewInNewTab(sceneOverride?: string, recordPipelines = false) {
     const projectId = this.controller.editor.currentProject.uuid!;
     const url = new URL(window.location.href);
     url.search = '';
     url.searchParams.append('project', projectId);
     if (sceneOverride) {
       url.searchParams.append('scene', sceneOverride);
+    }
+    if (recordPipelines) {
+      url.searchParams.append('recordPSO', '');
     }
     if (ProjectService.VFS instanceof HttpFS) {
       url.searchParams.append('remote', '');
@@ -1416,6 +1522,29 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
     a.target = '_blank';
     a.rel = 'noopener noreferrer';
     a.click();
+  }
+  /** Draws the scene in the viewport, with the SDF view and the selected camera's inset */
+  private renderViewportScene(camera: Camera) {
+    camera.render(this.controller.model.scene);
+    if (this._sdfView) {
+      // The view needs the field; the scene keeps it on until SDFEnabled is turned off.
+      // The voxel views need the global illumination's voxel scene likewise
+      const scene = this.controller.model.scene;
+      scene.sdf.enabled = true;
+      if (this._sdfView !== 'distance') {
+        scene.gi.enabled = true;
+      }
+      renderSceneSDFView(scene, camera, this._sdfView, this._sdfViewExposure);
+    }
+
+    // Render selected camera
+    const selectedNode = this._sceneHierarchy!.selectedNode;
+    if (selectedNode instanceof PerspectiveCamera && selectedNode !== camera) {
+      selectedNode.viewport = [camera.viewport![0] + 20, camera.viewport![1] + 20, 300, 200];
+      selectedNode.scissor = selectedNode.viewport;
+      selectedNode.aspect = selectedNode.viewport[2] / selectedNode.viewport[3];
+      selectedNode.render(this.controller.model.scene);
+    }
   }
   renderDropZone(x: number, y: number, w: number, h: number) {
     const color = new ImGui.ImVec4(0, 0, 0, 0);
@@ -1834,6 +1963,7 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
       this._sceneHierarchy.on('node_picker_drop', this.handleNodePickerDrop, this);
       this._sceneHierarchy.on('node_double_clicked', this.handleNodeDoubleClicked, this);
       this._sceneHierarchy.on('set_main_camera', this.handleSetMainCamera, this);
+      this._sceneHierarchy.on('toggle_pipeline_warmup', this.handleTogglePipelineWarmup, this);
       this._sceneHierarchy.on('request_go_to_assets', this.handleGoToAssets, this);
       this._sceneHierarchy.on('request_add_child', this.handleAddChild, this);
       this._sceneHierarchy.on('request_physics_preset', this.handlePhysicsPreset, this);
@@ -1871,6 +2001,7 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
       this._sceneHierarchy.off('node_picker_drop', this.handleNodePickerDrop, this);
       this._sceneHierarchy.off('node_double_clicked', this.handleNodeDoubleClicked, this);
       this._sceneHierarchy.off('set_main_camera', this.handleSetMainCamera, this);
+      this._sceneHierarchy.off('toggle_pipeline_warmup', this.handleTogglePipelineWarmup, this);
       this._sceneHierarchy.off('request_go_to_assets', this.handleGoToAssets, this);
       this._sceneHierarchy.off('request_add_child', this.handleAddChild, this);
       this._sceneHierarchy.off('request_physics_preset', this.handlePhysicsPreset, this);
@@ -1949,11 +2080,20 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
       if (!profile) {
         ImGui.TextDisabled('Waiting for GPU timings…');
       } else {
-        const totalMs = profile.graph.durationMs;
+        // External scopes ran before the graph, outside its duration
+        let externalMs = 0;
+        for (const scope of profile.passes) {
+          if (scope.type === 'external') {
+            externalMs += scope.durationMs;
+          }
+        }
+        const totalMs = profile.graph.durationMs + externalMs;
         ImGui.Text(`Frame #${profile.frameId}`);
         ImGui.SameLine();
         this.renderProfileStatus(profile.status);
-        ImGui.Text(`Total: ${totalMs.toFixed(3)} ms`);
+        ImGui.Text(
+          `Total: ${totalMs.toFixed(3)} ms (graph ${profile.graph.durationMs.toFixed(3)} ms, outside graph ${externalMs.toFixed(3)} ms)`
+        );
         ImGui.Separator();
         const tableFlags =
           ImGui.TableFlags.Resizable |
@@ -3687,6 +3827,32 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
       compositor.removePostEffect(this._postGizmoRenderer);
       this._gizmoEffectAppended = false;
     }
+  }
+  /** Deletes the recorded pipelines of the project, of every backend */
+  private async clearPipelineCache() {
+    const vfs = ProjectService.VFS;
+    if (!(await vfs.exists(PIPELINE_CACHE_FILE))) {
+      await DlgMessage.messageBox('Pipeline Cache', 'No pipelines are recorded.');
+      return;
+    }
+    const recordings = await readPipelineCache(vfs);
+    const pipelines = recordings.reduce((count, data) => count + data.render.length + data.compute.length, 0);
+    const bytes = (await vfs.stat(PIPELINE_CACHE_FILE)).size;
+    const answer = await Dialog.messageBoxEx(
+      'Pipeline Cache',
+      `Delete the pipeline cache: ${pipelines} pipelines of ${recordings
+        .map((data) => data.backend)
+        .join(', ')}, ${(bytes / 1024).toFixed(0)} KB?`,
+      ['Delete', 'Cancel']
+    );
+    if (answer !== 'Delete') {
+      return;
+    }
+    await vfs.deleteFile(PIPELINE_CACHE_FILE);
+  }
+  private handleTogglePipelineWarmup(camera: Camera) {
+    setPipelineWarmupCamera(camera, !isPipelineWarmupCamera(camera));
+    eventBus.dispatchEvent('scene_changed');
   }
   private handleSetMainCamera(camera: Camera) {
     if (camera !== this.controller.model.scene.mainCamera) {

@@ -1,4 +1,4 @@
-import { getEngine, type Scene } from '@zephyr3d/scene';
+import { getEngine, Scene } from '@zephyr3d/scene';
 import { eventBus } from '../core/eventbus';
 import { SceneModel } from '../models/scenemodel';
 import { BaseController } from './basecontroller';
@@ -6,6 +6,7 @@ import { SceneView } from '../views/sceneview';
 import { Dialog } from '../views/dlg/dlg';
 import type { Editor } from '../core/editor';
 import { ProjectService } from '../core/services/project';
+import { recordAssetRequests, writeScenePreload } from '../core/services/assetpreload';
 import { DlgProjectSettings } from '../views/dlg/projectsettingsdlg';
 import { DlgMessage } from '../views/dlg/messagedlg';
 import { DlgSystemPlugins } from '../views/dlg/systempluginsdlg';
@@ -13,6 +14,7 @@ import type { Nullable } from '@zephyr3d/base';
 import { DlgEditorSettings } from '../views/dlg/editorsettingsdlg';
 import { EditorSettingsService } from '../core/services/editorsettings';
 import { DlgAbout } from '../views/dlg/aboutdlg';
+import { DlgCreateExampleScene, type ExampleSceneRequest } from '../views/dlg/examplescenedlg';
 
 export class SceneController extends BaseController<SceneModel, SceneView> {
   protected _editor: Editor;
@@ -248,6 +250,28 @@ export class SceneController extends BaseController<SceneModel, SceneView> {
         }
         break;
       }
+      case 'NEW_EXAMPLE_DOC': {
+        let path: string = null;
+        let err: string = null;
+        if (ProjectService.VFS.readOnly) {
+          err = 'Cannot create an example scene in read-only mode';
+          await DlgMessage.messageBox('Error', err);
+        } else if (arg?.force || (await this.ensureSceneSaved())) {
+          const request = await DlgCreateExampleScene.createExampleScene(ProjectService.VFS);
+          if (request) {
+            path = await this.createExampleScene(request);
+            if (!path) {
+              err = 'Failed to create example scene';
+            }
+          } else {
+            err = 'User cancelled creating example scene';
+          }
+        } else {
+          err = 'User refused to create scene';
+        }
+        arg?.cb?.({ path, err });
+        break;
+      }
       case 'SAVE_DOC':
         if (!this._scenePath) {
           await this.sceneAction('SAVE_DOC_AS', arg);
@@ -335,7 +359,9 @@ export class SceneController extends BaseController<SceneModel, SceneView> {
   }
   async openScene(path: string, resetView: boolean) {
     this._editor.plugins.dispatchEvent('sceneOpening', path);
-    const scene = await this.loadScene(path);
+    // What loading the saved scene fetches, so builds and previews can load it first
+    const { result: scene, requests } = await recordAssetRequests(() => this.loadScene(path));
+    void writeScenePreload(ProjectService.VFS, path, 'static', requests);
     this._editor.currentProject.lastEditScene = path;
     await this._editor.saveProject();
     this._scenePath = path;
@@ -348,6 +374,40 @@ export class SceneController extends BaseController<SceneModel, SceneView> {
     this._sceneChanged = true;
     this.reset(null, resetView);
     this._editor.plugins.dispatchEvent('sceneCreated', this.model.scene, this._scenePath);
+    return this._scenePath;
+  }
+  /**
+   * Builds an example scene, shows it and saves it to the requested path.
+   * @returns The scene path, or null if building failed
+   */
+  async createExampleScene(request: ExampleSceneRequest): Promise<string | null> {
+    const scene = new Scene();
+    // The same defaults as a new empty scene; a type may override them
+    scene.env.sky.fogType = 'height_fog';
+    this._view.beginBusyTask(`Creating ${request.type.label}...`);
+    try {
+      await request.type.build(
+        {
+          scene,
+          vfs: ProjectService.VFS,
+          assetDir: request.assetDir,
+          progress: (text) => this._view.updateBusyTask(text)
+        },
+        request.params
+      );
+    } catch (err) {
+      scene.dispose();
+      console.error(err);
+      await DlgMessage.messageBox('Error', `Failed to create ${request.type.label}: ${err}`);
+      return null;
+    } finally {
+      this._view.endBusyTask();
+    }
+    this._scenePath = request.scenePath;
+    this._sceneChanged = true;
+    this.reset(scene, true);
+    this._editor.plugins.dispatchEvent('sceneCreated', this.model.scene, this._scenePath);
+    await this.saveScene();
     return this._scenePath;
   }
   async ensureSceneSaved(): Promise<boolean> {

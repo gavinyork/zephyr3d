@@ -42,6 +42,7 @@ export class DlgImportOptions extends DialogRenderer<SaveOptions[]> {
       compressTextures: false,
       compressVertices: false,
       generateLods: false,
+      bakeSDF: false,
       lodMinTriangles: defaultMeshImportSettings().lodMinTriangles,
       lodReduction: defaultMeshImportSettings().lodReduction,
       lodPixelError: defaultMeshImportSettings().lodPixelError
@@ -254,6 +255,24 @@ export class DlgImportOptions extends DialogRenderer<SaveOptions[]> {
           'A level shows once its error looks smaller than this many pixels on screen; higher values switch to simpler levels closer to the camera.'
         );
       }
+    }
+
+    if (!hasMeshes) {
+      ImGui.PushStyleVar(ImGui.StyleVar.Alpha, ImGui.GetStyle().Alpha * 0.5);
+    }
+    const bakeSDF = [hasMeshes && !!this._options[this._current].bakeSDF] as [boolean];
+    if (ImGui.Checkbox('Bake Distance Fields', bakeSDF)) {
+      if (hasMeshes) {
+        this._options[this._current].bakeSDF = bakeSDF[0];
+      }
+    }
+    if (!hasMeshes) {
+      ImGui.PopStyleVar();
+    }
+    if (ImGui.IsItemHovered()) {
+      ImGui.SetTooltip(
+        'Bake a signed distance field for every newly imported mesh, so it takes part in the scene field and global illumination without baking each mesh by hand. Uses the default field settings; Mesh Settings can rebake with others.'
+      );
     }
 
     ImGui.Separator();

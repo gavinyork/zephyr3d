@@ -5,32 +5,28 @@ import { closestPointOnTriangle, TriangleBVH } from './bvh';
  * @public
  */
 export interface MeshSDFBakeOptions {
-  /**
-   * Scale on the voxel density: voxels along the longest side of the mesh are
-   * `64 * resolutionScale`, before the padding and the clamp. Default 1.
-   */
+  /** Scale on the {@link SDF_VOXELS_PER_UNIT} voxel density, before padding and clamp. Default 1. */
   resolutionScale?: number;
+  /** World units one local mesh unit spans, which the density is measured in. Default 1. */
+  unitScale?: number;
   /**
-   * Treat the mesh as a thin open surface (a leaf, a sail, a terrain skirt):
-   * no inside, the distance is unsigned less half a voxel so the surface still
-   * has a negative shell. Default false.
+   * Treat the mesh as a thin open surface (leaf, sail): unsigned distance less half a voxel.
+   * Default false.
    */
   twoSided?: boolean;
+  /** Rays per hemisphere for the inside/outside test, a square number. Default 49. */
+  signSamples?: number;
   /** Voxels of empty space around the mesh bounds on every side. Default 2. */
   padding?: number;
-  /** Voxels per axis, at most. Default 128. */
+  /** Max voxels per axis, padding included. Default 128, or 256 above resolution scale 1. */
   maxResolution?: number;
   /** Voxels per axis, at least. Default 8. */
   minResolution?: number;
 }
 
 /**
- * A signed distance field over a mesh, in the mesh's local space: negative
- * inside, positive outside, in local units.
- *
- * Samples sit at voxel centres: sample `(i, j, k)` is at
- * `boxMin + (i + 0.5, j + 0.5, k + 0.5) * voxelSize`, stored x fastest, then y,
- * then z. Voxels are cubes.
+ * A signed distance field over a mesh in its local space (negative inside, local units). Sample
+ * `(i, j, k)` sits at voxel centre `boxMin + (i + 0.5, j + 0.5, k + 0.5) * voxelSize`, x fastest.
  *
  * @public
  */
@@ -54,20 +50,27 @@ export interface MeshSDFData {
   distances: Float32Array;
 }
 
-/** Most crossings recorded along one sign ray. */
-const MAX_RAY_HITS = 2048;
+/**
+ * Voxels per world unit (metre) of a baked field at resolution scale 1, matching UE5's
+ * r.DistanceFields.DefaultVoxelDensity (0.2/cm). Scaled by {@link MeshSDFBakeOptions.unitScale}
+ * since meshes keep their authored units.
+ * @public
+ */
+export const SDF_VOXELS_PER_UNIT = 20;
+
+/** Voxels from the surface within which the sign is decided by rays; further voxels take it from their neighbours. */
+const SIGN_BAND_VOXELS = 1;
+/** Length of a sign ray in voxel diagonals. */
+const SIGN_TRACE_DIAGONALS = 4;
+/** Fraction of the sign rays that must hit a back face for a voxel to count as inside. */
+const SIGN_BACK_FRACTION = 0.25;
 /** Voxels around a triangle's bounds seeded with its exact distance. */
 const SEED_MARGIN = 1;
 
 /**
- * Unsigned distance per voxel by closest-triangle propagation: every voxel near
- * a triangle gets its exact distance to it, then fast sweeps in the eight
- * diagonal orders pass each voxel's nearest triangle on to its neighbours,
- * which keep it if it is nearer than theirs. Each voxel ends up measured
- * against the triangle nearest to it (up to rare cases where the nearest
- * triangle of a voxel is nearest to none of its neighbours, off by a small
- * fraction of a voxel). A few triangle distances per voxel, against a BVH
- * query per voxel that degrades to every triangle near a medial axis.
+ * Unsigned distance per voxel by closest-triangle propagation: voxels near each triangle are
+ * seeded with their exact distance, then fast sweeps in the eight diagonal orders pass each
+ * voxel's nearest triangle to its neighbours. Rarely off by a small fraction of a voxel.
  */
 function computeUnsignedDistances(
   positions: Float32Array,
@@ -138,9 +141,8 @@ function computeUnsignedDistances(
       }
     }
   }
-  // Sweeps: in each of the eight diagonal orders, a voxel tries the nearest
-  // triangles of its three predecessors along the order. One round of eight
-  // measured as accurate as two.
+  // Sweeps: each voxel tries the nearest triangles of its three predecessors along the order;
+  // one round of eight is as accurate as two
   const strides = [1, nx, nx * ny];
   for (let order = 0; order < 8; order++) {
     const sx = order & 1 ? -1 : 1;
@@ -198,14 +200,9 @@ function computeUnsignedDistances(
 }
 
 /**
- * Bakes the signed distance field of a triangle mesh on the CPU.
- *
- * Distance is by closest-triangle propagation (see computeUnsignedDistances),
- * exact near the surface. The sign comes from
- * crossing parity along rays swept through the volume on the three axes, one
- * per row of voxels, and a majority vote of the three: a hole in the surface
- * spoils at most the rays passing through it, not the whole interior. Cost is
- * a few triangle distances per voxel and three BVH rays per row.
+ * Bakes the signed distance field of a triangle mesh on the CPU. Unsigned distance by
+ * closest-triangle propagation; sign by back-face ray voting near the surface (as UE5's mesh
+ * distance field builder), so open and single-sided meshes work without a closed surface.
  *
  * @param positions - Vertex positions, xyz per vertex.
  * @param indices - Three indices per triangle.
@@ -219,7 +216,7 @@ export function bakeMeshSDF(
   const scale = Math.max(0.01, options?.resolutionScale ?? 1);
   const twoSided = !!options?.twoSided;
   const padding = Math.max(1, Math.floor(options?.padding ?? 2));
-  const maxRes = Math.max(4, Math.floor(options?.maxResolution ?? 128));
+  const maxRes = Math.max(4, Math.floor(options?.maxResolution ?? (scale > 1 ? 256 : 128)));
   const minRes = Math.min(maxRes, Math.max(2, Math.floor(options?.minResolution ?? 8)));
   const meshMin: [number, number, number] = [Infinity, Infinity, Infinity];
   const meshMax: [number, number, number] = [-Infinity, -Infinity, -Infinity];
@@ -240,7 +237,8 @@ export function bakeMeshSDF(
   }
   const extent = [meshMax[0] - meshMin[0], meshMax[1] - meshMin[1], meshMax[2] - meshMin[2]];
   const longest = Math.max(extent[0], extent[1], extent[2], 1e-6);
-  let voxelSize = longest / (64 * scale);
+  const unitScale = options?.unitScale && options.unitScale > 0 ? options.unitScale : 1;
+  let voxelSize = 1 / (SDF_VOXELS_PER_UNIT * scale * unitScale);
   // Fit the longest side, padding included, under the cap
   voxelSize = Math.max(voxelSize, longest / (maxRes - 2 * padding));
   const resolution: [number, number, number] = [0, 0, 0];
@@ -264,56 +262,7 @@ export function bakeMeshSDF(
       distances[i] -= voxelSize * 0.5;
     }
   } else {
-    const votes = new Uint8Array(count);
-    const hits = new Float32Array(MAX_RAY_HITS);
-    // Rays start outside the volume and are nudged off the voxel centre lines
-    // by an irrational fraction of a voxel, so they do not run along edges of
-    // axis-aligned geometry, where a crossing would count twice or not at all.
-    const nudgeA = voxelSize * 0.0137;
-    const nudgeB = voxelSize * 0.0071;
-    for (let axis = 0; axis < 3; axis++) {
-      const a1 = (axis + 1) % 3;
-      const a2 = (axis + 2) % 3;
-      const n0 = resolution[axis];
-      const n1 = resolution[a1];
-      const n2 = resolution[a2];
-      const start = boxMin[axis] - voxelSize;
-      const origin = [0, 0, 0];
-      const dir = [0, 0, 0];
-      dir[axis] = 1;
-      const stride = [1, nx, nx * ny];
-      for (let v = 0; v < n2; v++) {
-        for (let u = 0; u < n1; u++) {
-          origin[axis] = start;
-          origin[a1] = boxMin[a1] + (u + 0.5) * voxelSize + nudgeA;
-          origin[a2] = boxMin[a2] + (v + 0.5) * voxelSize + nudgeB;
-          const n = bvh.rayHits(origin[0], origin[1], origin[2], dir[0], dir[1], dir[2], hits);
-          const sorted = hits.subarray(0, n).sort();
-          let h = 0;
-          let inside = false;
-          const base = u * stride[a1] + v * stride[a2];
-          for (let s = 0; s < n0; s++) {
-            const t = (s + 0.5) * voxelSize + voxelSize;
-            while (h < n && sorted[h] < t) {
-              inside = !inside;
-              h++;
-              // Coincident crossings, from a ray through a shared edge, count once
-              while (h < n && sorted[h] - sorted[h - 1] < voxelSize * 1e-5) {
-                h++;
-              }
-            }
-            if (inside) {
-              votes[base + s * stride[axis]]++;
-            }
-          }
-        }
-      }
-    }
-    for (let i = 0; i < count; i++) {
-      if (votes[i] >= 2) {
-        distances[i] = -distances[i];
-      }
-    }
+    signDistances(distances, bvh, boxMin, resolution, voxelSize, options?.signSamples);
   }
   let minDistance = Infinity;
   let maxDistance = -Infinity;
@@ -335,10 +284,184 @@ export function bakeMeshSDF(
   };
 }
 
+/** Deterministic 32-bit generator (mulberry32), so a mesh bakes the same every time. */
+function makeRandom(seed: number) {
+  let a = seed >>> 0;
+  return () => {
+    a = (a + 0x6d2b79f5) >>> 0;
+    let t = a;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
 /**
- * Trilinear sample of a baked field at a local position. Outside the volume
- * the nearest border sample plus the distance to the volume is returned, a
- * bound that never undershoots by more than the border's own error.
+ * Stratified directions over the sphere: a square grid of jittered samples on
+ * each hemisphere, mapped through the concentric disk [Shirley & Chiu 1997],
+ * one hemisphere mirrored in z. xyz per direction.
+ */
+function sphereDirections(perHemisphere: number) {
+  const dim = Math.max(1, Math.floor(Math.sqrt(perHemisphere)));
+  const random = makeRandom(0);
+  const dirs = new Float32Array(dim * dim * 2 * 3);
+  let n = 0;
+  // The two hemispheres interleave, so a prefix of the list covers both sides
+  for (let i = 0; i < dim; i++) {
+    for (let j = 0; j < dim; j++) {
+      for (let hemi = 0; hemi < 2; hemi++) {
+        const u = ((i + random()) / dim) * 2 - 1;
+        const v = ((j + random()) / dim) * 2 - 1;
+        let x = 0;
+        let y = 0;
+        let z = 1;
+        if (u !== 0 || v !== 0) {
+          let r: number;
+          let theta: number;
+          if (Math.abs(u) > Math.abs(v)) {
+            r = u;
+            theta = (Math.PI / 4) * (v / u);
+          } else {
+            r = v;
+            theta = Math.PI / 2 - (Math.PI / 4) * (u / v);
+          }
+          const r2 = r * r;
+          const s = Math.sqrt(2 - r2);
+          x = r * Math.cos(theta) * s;
+          y = r * Math.sin(theta) * s;
+          z = 1 - r2;
+        }
+        dirs[n++] = x;
+        dirs[n++] = y;
+        dirs[n++] = hemi === 0 ? z : -z;
+      }
+    }
+  }
+  return dirs;
+}
+
+/**
+ * Signs the unsigned distances. Voxels within SIGN_BAND_VOXELS of the surface are inside when
+ * they hit anything and more than SIGN_BACK_FRACTION of the rays hit a back face (UE5 mesh
+ * distance field criterion). Six-connected regions beyond the band are outside if they reach the
+ * volume border, else take the majority sign of their surrounding band voxels.
+ */
+function signDistances(
+  distances: Float32Array,
+  bvh: TriangleBVH,
+  boxMin: [number, number, number],
+  resolution: [number, number, number],
+  h: number,
+  samples?: number
+) {
+  const [nx, ny, nz] = resolution;
+  const count = nx * ny * nz;
+  const dirs = sphereDirections(Math.max(1, Math.floor(samples ?? 49)));
+  const numDirs = dirs.length / 3;
+  const band = SIGN_BAND_VOXELS * h;
+  const traceDistance = SIGN_TRACE_DIAGONALS * Math.sqrt(3) * h;
+  // Pulled back a little so a ray starting on a triangle still crosses it
+  const pullback = 1e-4 * traceDistance;
+  const tMax = traceDistance + pullback;
+  const needBack = SIGN_BACK_FRACTION * numDirs;
+  // 0: beyond the band, 1: outside, 2: inside
+  const side = new Uint8Array(count);
+  for (let k = 0; k < nz; k++) {
+    const z = boxMin[2] + (k + 0.5) * h;
+    for (let j = 0; j < ny; j++) {
+      const y = boxMin[1] + (j + 0.5) * h;
+      for (let i = 0; i < nx; i++) {
+        const index = i + j * nx + k * nx * ny;
+        if (distances[index] > band) {
+          continue;
+        }
+        const x = boxMin[0] + (i + 0.5) * h;
+        let hit = 0;
+        let hitBack = 0;
+        // Stops once the back faces seen settle it either way
+        for (let d = 0; d < numDirs && hitBack <= needBack && hitBack + numDirs - d > needBack; d++) {
+          const dx = dirs[d * 3];
+          const dy = dirs[d * 3 + 1];
+          const dz = dirs[d * 3 + 2];
+          const t = bvh.rayNearestHit(
+            x - dx * pullback,
+            y - dy * pullback,
+            z - dz * pullback,
+            dx,
+            dy,
+            dz,
+            tMax
+          );
+          if (t !== 0) {
+            hit++;
+            if (t < 0) {
+              hitBack++;
+            }
+          }
+        }
+        side[index] = hit > 0 && hitBack > needBack ? 2 : 1;
+      }
+    }
+  }
+  // Regions beyond the band, six-connected
+  const queue = new Int32Array(count);
+  const region = new Int32Array(count).fill(-1);
+  const strides = [1, nx, nx * ny];
+  for (let seed = 0; seed < count; seed++) {
+    if (side[seed] !== 0 || region[seed] >= 0) {
+      continue;
+    }
+    let head = 0;
+    let tail = 0;
+    let border = false;
+    let inside = 0;
+    let outside = 0;
+    queue[tail++] = seed;
+    region[seed] = seed;
+    while (head < tail) {
+      const v = queue[head++];
+      const vi = v % nx;
+      const vj = ((v - vi) / nx) % ny;
+      const vk = (v - vi - vj * nx) / (nx * ny);
+      const coord = [vi, vj, vk];
+      for (let axis = 0; axis < 3; axis++) {
+        for (let step = -1; step <= 1; step += 2) {
+          const c = coord[axis] + step;
+          if (c < 0 || c >= resolution[axis]) {
+            border = true;
+            continue;
+          }
+          const w = v + step * strides[axis];
+          const s = side[w];
+          if (s === 0) {
+            if (region[w] < 0) {
+              region[w] = seed;
+              queue[tail++] = w;
+            }
+          } else if (s === 2) {
+            inside++;
+          } else {
+            outside++;
+          }
+        }
+      }
+    }
+    if (!border && inside > outside) {
+      for (let q = 0; q < tail; q++) {
+        side[queue[q]] = 2;
+      }
+    }
+  }
+  for (let i = 0; i < count; i++) {
+    if (side[i] === 2) {
+      distances[i] = -distances[i];
+    }
+  }
+}
+
+/**
+ * Trilinear sample of a baked field at a local position; outside the volume, the nearest border
+ * sample plus the distance to the volume.
  * @public
  */
 export function sampleMeshSDF(sdf: MeshSDFData, x: number, y: number, z: number) {

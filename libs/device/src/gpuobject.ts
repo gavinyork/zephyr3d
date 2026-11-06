@@ -1194,8 +1194,11 @@ export interface TextureBindingLayout {
  * @public
  */
 export interface StorageTextureBindingLayout {
-  /** Access mode */
-  access: 'write-only';
+  /**
+   * Access mode. read-write needs a format whose info is readWritable (core
+   * r32 formats, else texture-formats-tier2)
+   */
+  access: 'write-only' | 'read-only' | 'read-write';
   /** The texture format */
   format: TextureFormat;
   /** View dimension */

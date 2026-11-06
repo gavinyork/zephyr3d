@@ -10,16 +10,9 @@
  *   refresh, 60 on a 144Hz display every third, giving 48).
  *
  * @remarks
- * A frame that misses a refresh stays on screen twice as long and the next one
- * makes up for it, so motion that is exact in time still stutters on screen.
- * Holding a steady fraction of the refresh rate keeps it even: a steady 30
- * looks smoother than an uneven 50. Only applies to a vsync'ed run loop.
- *
- * A frame held for two or more refreshes is rendered at the first of them but
- * shown at the last: the browser otherwise shows it as soon as the GPU is done,
- * one refresh earlier or later depending on how long the frame took, which is
- * the same stutter. Frame times are the moments the frames are expected on
- * screen, so motion stays even when the hold changes.
+ * A steady fraction of the refresh rate looks smoother than an uneven higher
+ * rate. Only applies to a vsync'ed run loop. Held frames are presented at the
+ * last refresh of their hold, and frame times are their expected display times.
  *
  * @public
  */
@@ -29,7 +22,7 @@ export type FramePacing = 'off' | 'auto' | number;
 const MAX_REFRESHES_PER_FRAME = 6;
 /** Auto pacing judges the frames of this many recent milliseconds. */
 const STATS_WINDOW = 1500;
-/** Fewest frames in the window to judge by. Few enough to be met at 10 frames per second. */
+/** Fewest frames in the window to judge by (reachable at 10 fps). */
 const MIN_SAMPLES = 8;
 /** Fewest frames in the window that missed a refresh to slow down for. */
 const MIN_MISSES_TO_SLOW_DOWN = 3;
@@ -40,16 +33,21 @@ const OVERRUNS_TO_SLOW_DOWN = 2;
  * An occasional miss costs less than halving the frame rate.
  */
 const MISS_RATIO_TO_SLOW_DOWN = 0.12;
-/**
- * Share of frames done soon enough for a shorter hold needed to try one. Below
- * one minus the miss ratio above, so that a rate it speeds up to is kept.
- */
+/** Share of frames done early enough to try a shorter hold; below 1 - MISS_RATIO_TO_SLOW_DOWN so a sped-up rate is kept. */
 const HEADROOM_TO_SPEED_UP = 0.94;
 /** How long auto pacing first holds a rate before trying to render more often again. */
 const INITIAL_PROBE_DELAY = 2000;
 const MAX_PROBE_DELAY = 16000;
 /** Slowing down this soon after speeding up means the speed up was too early. */
 const FAILED_PROBE_TIME = 3000;
+/** Grace period (ms) after speeding up while the down-clocked GPU ramps up; misses are ignored. */
+const PROBE_GRACE = 500;
+/**
+ * Holds up to which speeding up jumps straight to every refresh (holds 1 and 2 are
+ * about equally hard to keep). From any hold while no try failed lately, since rarely
+ * rendered frames run on a down-clocked GPU and understate the achievable rate.
+ */
+const PROBE_EVERY_REFRESH_FROM = 3;
 
 /** A recent frame: when, and whether it went the way the sample is about. */
 interface Sample {
@@ -85,14 +83,14 @@ function ratio(samples: Sample[]) {
 export class FramePacer {
   mode: FramePacing;
   /**
-   * Whether frames are shown at the last refresh they are held for rather than
-   * when the GPU is done. The headroom of such frames is reported by the device
-   * from GPU completion, see {@link FramePacer.reportFrameDone}, as the refresh
-   * after them is offered on time regardless.
+   * Whether held frames are presented at the last refresh of their hold; their headroom
+   * is then reported via {@link FramePacer.reportFrameDone}.
    */
   deferredPresent: boolean;
   /** Held frames in a row that took more refreshes than their hold. */
   private _overruns: number;
+  /** Fewest refreshes the held frames in a row that overran took. */
+  private _overrunNeeded: number;
   /** Estimated display refresh interval in ms; 0 until measured. */
   private _refresh: number;
   /** Consecutive refreshes clearly shorter than the estimate: the display got faster. */
@@ -119,6 +117,7 @@ export class FramePacer {
     this.mode = 'off';
     this.deferredPresent = false;
     this._overruns = 0;
+    this._overrunNeeded = 0;
     this._refresh = 0;
     this._faster = 0;
     this._lastVsync = -1;
@@ -142,11 +141,7 @@ export class FramePacer {
   get refreshesPerFrame() {
     return this._refreshes;
   }
-  /**
-   * Refreshes the frame rendered last is held for: the one after
-   * {@link FramePacer.shouldRender} returned true. The frame is expected on
-   * screen this many refreshes after its vsync time.
-   */
+  /** Refreshes the last rendered frame is held for, i.e. it is expected on screen this many refreshes after its vsync. */
   get wantedRefreshes() {
     return this._wanted;
   }
@@ -165,11 +160,8 @@ export class FramePacer {
     this._overruns = 0;
   }
   /**
-   * Reports a frame shown at the last refresh of its hold: whether it was done
-   * soon enough to be held one refresh less, and how many refreshes it did
-   * take. Frames taking more than their hold again and again get a longer one
-   * at once, rather than when the refreshes they miss add up in the statistics,
-   * which at a low frame rate they are slow to.
+   * Reports a deferred-present frame: whether it fit a hold one refresh shorter, and how
+   * many refreshes it took. Repeated overruns lengthen the hold immediately.
    */
   reportFrameDone(fit: boolean, needed: number) {
     if (!this.deferredPresent) {
@@ -179,12 +171,14 @@ export class FramePacer {
       this._waitingHeadroom = false;
       pushSample(this._headroom, this._lastVsync, fit);
     }
-    if (this.mode !== 'auto') {
+    if (this.mode !== 'auto' || this._inProbeGrace(this._lastVsync)) {
       return;
     }
     if (needed > this._autoRefreshes && this._autoRefreshes < MAX_REFRESHES_PER_FRAME) {
+      // The hold all of them overran: one slow frame among them does not set it
+      this._overrunNeeded = this._overruns > 0 ? Math.min(this._overrunNeeded, needed) : needed;
       if (++this._overruns >= OVERRUNS_TO_SLOW_DOWN) {
-        this._slowDown(this._lastVsync, Math.min(needed, MAX_REFRESHES_PER_FRAME));
+        this._slowDown(this._lastVsync, Math.min(this._overrunNeeded, MAX_REFRESHES_PER_FRAME));
       }
     } else {
       this._overruns = 0;
@@ -244,6 +238,9 @@ export class FramePacer {
     return 1;
   }
   private _adapt(time: number, missed: boolean) {
+    if (this._inProbeGrace(time)) {
+      return;
+    }
     const misses = this._misses;
     pushSample(misses, time, missed);
     if (
@@ -260,13 +257,19 @@ export class FramePacer {
     if (
       this._autoRefreshes > 1 &&
       time - this._stableSince >= this._probeDelay &&
-      headroom.length >= MIN_SAMPLES &&
-      ratio(headroom) >= HEADROOM_TO_SPEED_UP
+      ((headroom.length >= MIN_SAMPLES && ratio(headroom) >= HEADROOM_TO_SPEED_UP) ||
+        // No misses: try anyway, as headroom understates a down-clocked GPU; failures back off via probe delay
+        (misses.length >= MIN_SAMPLES && count(misses) === 0))
     ) {
-      // Frames have been done soon enough: try rendering more often.
       this._lastSpeedUp = time;
-      this._setAutoRefreshes(this._autoRefreshes - 1, time);
+      // After recent failed tries, step one hold at a time
+      const everyRefresh =
+        this._autoRefreshes <= PROBE_EVERY_REFRESH_FROM || this._probeDelay === INITIAL_PROBE_DELAY;
+      this._setAutoRefreshes(everyRefresh ? 1 : this._autoRefreshes - 1, time);
     }
+  }
+  private _inProbeGrace(time: number) {
+    return time - this._lastSpeedUp < PROBE_GRACE;
   }
   /** Auto pacing state, for diagnostics. */
   get stats() {

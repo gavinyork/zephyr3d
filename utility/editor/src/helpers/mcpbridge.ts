@@ -1,4 +1,5 @@
 import type { Editor } from '../core/editor';
+import type { PipelineCacheData, PipelinePrecompilePriority } from '@zephyr3d/device';
 import type { Camera } from '@zephyr3d/scene';
 import type { PropertyValue, Material } from '@zephyr3d/scene';
 import type { Primitive } from '@zephyr3d/scene';
@@ -34,7 +35,7 @@ import {
   uint8ArrayToBase64,
   Vector3
 } from '@zephyr3d/base';
-import { SharedModel, type AssetPrimitiveInfo } from '@zephyr3d/scene';
+import { SharedModel } from '@zephyr3d/scene';
 import { ProjectService } from '../core/services/project';
 import { isDesktopApp } from '../core/services/desktop';
 import { fileListFileName, libDir, templateScript } from '../core/build/templates';
@@ -44,6 +45,7 @@ import { eventBus } from '../core/eventbus';
 import { EditorCameraController } from './editorcontroller';
 import { shapePrimitivePaths, type ShapePrimitiveType } from './shapeprimitives';
 import { buildPrimitiveGlbFromZmshContent } from './primitiveglb';
+import { createGeneratedAssetPrimitive } from './generatedprimitive';
 import { captureOnNextFrame } from './capture';
 import {
   generateTerrainField,
@@ -54,7 +56,17 @@ import {
 } from './mcpterrain';
 import { importModelAsset, saveNodeAsPrefab } from './mcpassets';
 import { editWaterInteraction } from './mcpwater';
-import { bakeMeshSDFs, getSceneSDFStats, queryMeshSDF, sampleGlobalSDF, setSDFDebugSlice } from './mcpsdf';
+import {
+  bakeMeshSDFs,
+  getGIStats,
+  getSceneSDFStats,
+  queryGIProbes,
+  queryGIVoxels,
+  queryMeshSDF,
+  sampleGlobalSDF,
+  setSDFDebugSlice,
+  setSDFDebugView
+} from './mcpsdf';
 import { getNodePhysics, listPhysicsPresets, removeNodePhysics, setNodePhysics } from './mcpphysics';
 import {
   eraseFoliage,
@@ -1606,45 +1618,6 @@ async function finishGeneratedModelJob(editor: Editor, job: GeneratedModelJob, m
   }
 }
 
-function createGeneratedAssetPrimitive(message: any): AssetPrimitiveInfo {
-  const primitive = message?.primitive;
-  if (!primitive || typeof primitive !== 'object') {
-    throw new Error('Generated model worker did not return primitive data');
-  }
-  const indices = primitive.indices;
-  if (!(indices instanceof Uint16Array) && !(indices instanceof Uint32Array)) {
-    throw new Error('Generated model worker returned invalid primitive indices');
-  }
-  const normalizedIndices =
-    indices instanceof Uint16Array ? new Uint16Array(indices) : new Uint32Array(indices);
-  const vertices: AssetPrimitiveInfo['vertices'] = {} as AssetPrimitiveInfo['vertices'];
-  if (!primitive.vertices || typeof primitive.vertices !== 'object') {
-    throw new Error('Generated model worker returned invalid primitive vertices');
-  }
-  for (const [semantic, vertex] of Object.entries(primitive.vertices as Record<string, any>)) {
-    if (!vertex || typeof vertex.format !== 'string' || !ArrayBuffer.isView(vertex.data)) {
-      throw new Error(`Generated model worker returned invalid vertex buffer: ${semantic}`);
-    }
-    vertices[semantic as keyof AssetPrimitiveInfo['vertices']] = {
-      format: vertex.format,
-      data: vertex.data
-    } as AssetPrimitiveInfo['vertices'][keyof AssetPrimitiveInfo['vertices']];
-  }
-  const boxMin = Array.isArray(primitive.boxMin) ? primitive.boxMin : message.boxMin;
-  const boxMax = Array.isArray(primitive.boxMax) ? primitive.boxMax : message.boxMax;
-  if (!isNumberArray(boxMin, 3) || !isNumberArray(boxMax, 3)) {
-    throw new Error('Generated model worker returned invalid primitive bounds');
-  }
-  return {
-    vertices,
-    indices: normalizedIndices,
-    indexCount: Number(primitive.indexCount ?? normalizedIndices.length),
-    type: primitive.type === 'triangle-list' ? 'triangle-list' : primitive.type,
-    boxMin: new Vector3(boxMin),
-    boxMax: new Vector3(boxMax)
-  };
-}
-
 async function exportPrimitiveGlb(
   params: any
 ): Promise<{ path: string | null; bytes: number; err: string | null }> {
@@ -1736,10 +1709,6 @@ async function exportPrimitiveGlb(
       err: err instanceof Error ? err.message : String(err)
     };
   }
-}
-
-function isNumberArray(value: unknown, length: number): value is number[] {
-  return Array.isArray(value) && value.length === length && value.every((item) => typeof item === 'number');
 }
 
 function completeGeneratedModelJob(
@@ -1921,6 +1890,12 @@ async function dispatch(editor: Editor, method: string, params: any): Promise<an
       } catch (err) {
         return { distances: null, err: `${err instanceof Error ? err.message : err}` };
       }
+    case 'gi_probe_query':
+      try {
+        return await queryGIProbes(getSceneController(editor), params);
+      } catch (err) {
+        return { probes: null, err: `${err instanceof Error ? err.message : err}` };
+      }
     case 'water_interaction':
       return await editWaterInteraction(getSceneController(editor), params);
     case 'editor_frame_timing':
@@ -1940,6 +1915,20 @@ ${err.stack}`
       }
     case 'sdf_stats':
       return getSceneSDFStats(getSceneController(editor), params);
+    case 'sdf_debug_view':
+      return setSDFDebugView(getSceneController(editor), params);
+    case 'gi_stats':
+      return getGIStats(getSceneController(editor), params);
+    case 'pipeline_recorder':
+      return runPipelineRecorder(params);
+    case 'pipeline_cache':
+      return runPipelineCache(params);
+    case 'gi_voxel_query':
+      try {
+        return await queryGIVoxels(getSceneController(editor), params);
+      } catch (err) {
+        return { samples: null, err: `${err instanceof Error ? err.message : err}` };
+      }
     case 'sdf_query':
       try {
         return await queryMeshSDF(getSceneController(editor), params);
@@ -2747,7 +2736,7 @@ ${err.stack}`
             err: `Cannot resolve material class for asset: ${path}`
           };
         }
-        const values: (number[] | number | boolean | string)[] = [];
+        const values: (number[] | number | boolean | string | null)[] = [];
         const props = getEngine().resourceManager.getAllPropertiesByClass(materialClass);
         for (const p of properties) {
           let propertyName = p as string;
@@ -2769,6 +2758,12 @@ ${err.stack}`
               values: null,
               err: `material_get_properties does not support object_array property "${prop.name}"`
             };
+          }
+          // Not applicable as the material is, such as the sampler settings of an
+          // empty texture slot, whose getter has no texture to read them from
+          if (prop.isValid && !prop.isValid.call(material)) {
+            values.push(null);
+            continue;
           }
           const value: PropertyValue = {
             num: [0, 0, 0, 0],
@@ -4346,6 +4341,12 @@ ${err.stack}`
           err: 'openScene requires `path`, for example /assets/scene.zscn'
         };
       }
+      if (!editor.currentProject) {
+        return {
+          ...getStatus(editor),
+          err: 'No project is currently opened; open the project holding the scene first'
+        };
+      }
       const controller = getSceneController(editor);
       if (!controller?.openScene) {
         await editor.moduleManager.activate('Scene', '');
@@ -4371,11 +4372,14 @@ ${err.stack}`
       if (resolved.err) {
         return { bounds: null, err: resolved.err };
       }
+      const includeChildren = params?.include_children !== false;
       const min = [Infinity, Infinity, Infinity];
       const max = [-Infinity, -Infinity, -Infinity];
       let found = false;
       // Group nodes have no bounding volume of their own; aggregate the
       // subtree so bounds work for compound objects assembled under a parent.
+      // That also takes in editor helpers such as a light's gizmo proxy, so
+      // the caller can ask for the node alone.
       const visit = (node: SceneNode) => {
         const aabb = node.getWorldBoundingVolume()?.toAABB();
         if (aabb) {
@@ -4389,15 +4393,19 @@ ${err.stack}`
           max[1] = Math.max(max[1], hi.y);
           max[2] = Math.max(max[2], hi.z);
         }
-        for (const child of node.children) {
-          visit(child);
+        if (includeChildren) {
+          for (const child of node.children) {
+            visit(child);
+          }
         }
       };
       visit(resolved.node);
       if (!found) {
         return {
           bounds: null,
-          err: 'Node subtree has no bounding volume (empty groups and lights have no bounds)'
+          err: includeChildren
+            ? 'Node subtree has no bounding volume (empty groups and directional lights have no bounds)'
+            : 'Node has no bounding volume of its own (group nodes and directional lights have none); pass include_children: true to merge its descendants'
         };
       }
       return {
@@ -4428,6 +4436,78 @@ ${err.stack}`
       return runEval(editor, params?.script ?? params?.expression ?? '', !!params?.expression);
     default:
       throw new Error(`Unknown editor bridge method: ${method}`);
+  }
+}
+
+function runPipelineRecorder(params: { action?: string; tag?: string | null }) {
+  const recorder = getDevice().getPipelineRecorder();
+  if (!recorder) {
+    return {
+      available: false,
+      recording: false,
+      count: 0,
+      tags: [],
+      err: 'The device records no pipelines: it has no pipeline recorder'
+    };
+  }
+  switch (params?.action) {
+    case 'begin':
+      recorder.begin();
+      break;
+    case 'end':
+      recorder.end();
+      break;
+    case 'clear':
+      recorder.clear();
+      break;
+    case 'status':
+    case 'export':
+      break;
+    default:
+      return {
+        available: true,
+        recording: recorder.recording,
+        count: recorder.count,
+        tags: recorder.tags(),
+        err: `Unknown action: ${params?.action}`
+      };
+  }
+  return {
+    available: true,
+    recording: recorder.recording,
+    count: recorder.count,
+    tags: recorder.tags(),
+    ...(params.action === 'export' ? { data: recorder.export(params.tag ?? null) } : {}),
+    err: null
+  };
+}
+
+async function runPipelineCache(params: {
+  action?: string;
+  data?: PipelineCacheData | PipelineCacheData[];
+  priority?: PipelinePrecompilePriority;
+  files?: string[];
+}) {
+  const device = getDevice();
+  switch (params?.action) {
+    case 'stats':
+      return { stats: device.getPipelineCacheStats(), err: null };
+    case 'precompile': {
+      if (!params.data) {
+        return { err: 'precompile needs data' };
+      }
+      const job = device.precompilePipelines(params.data, { priority: params.priority ?? 'foreground' });
+      const result = await job.result;
+      return { result, stats: device.getPipelineCacheStats(), err: null };
+    }
+    case 'compile': {
+      const cache = getEngine().pipelineCache;
+      const task = cache.createTask(params.files?.length ? params.files : undefined, { name: 'mcp' });
+      const result = await task.run({ priority: params.priority ?? 'foreground' });
+      return { state: task.state, result, stats: cache.getStats(), err: null };
+    }
+    default:
+      return { err: `Unknown action: ${params?.action}` };
   }
 }
 

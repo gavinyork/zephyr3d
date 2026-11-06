@@ -88,21 +88,19 @@ Zephyr3D 编辑器提供实时预览功能，用于在浏览器中运行当前�
 
 - 用途：指定运行时可选的渲染后端（RHI, Rendering Hardware Interface）。
 - 可选项（多选）：
-  - `WebGL`
   - `WebGL2`
   - `WebGPU`
 - 启动时的选择逻辑：
   - 应用启动时，会在你**勾选的选项中**，按以下优先级顺序查找可用的渲染后端：
     1. WebGPU
     2. WebGL2
-    3. WebGL
   - 一旦在当前浏览器/设备环境中找到第一个可用且被勾选的后端，即使用该后端运行应用。
 - 示例：
   - 若勾选了 `WebGL2` 和 `WebGPU`：
     - 在支持 `WebGPU` 的浏览器上，将优先使用 WebGPU；
     - 在仅支持 `WebGL2` 的浏览器上，将退回使用 WebGL2。
-  - 若只勾选了 `WebGL`：
-    - 即使环境支持更高级的 WebGPU / WebGL2，也只会使用 WebGL。
+  - 若只勾选了 `WebGL2`：
+    - 即使环境支持 WebGPU，也只会使用 WebGL2。
 
 ---
 

@@ -2872,6 +2872,9 @@ importers:
       '@zephyr3d/physics-rapier':
         specifier: workspace:^0.1.0
         version: link:../../libs/physics-rapier
+      '@zephyr3d/procgen':
+        specifier: workspace:^0.1.1
+        version: link:../../libs/procgen
       '@zephyr3d/scene':
         specifier: workspace:^0.9.27
         version: link:../../libs/scene

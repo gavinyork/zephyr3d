@@ -14,35 +14,33 @@ import { cloudPerlinFbm, cloudPerlinWorley, cloudWorleyFbm, cloudWorleyNoise } f
 
 /** Edge of the base shape volume, [Schneider15]: 128^3 Perlin-Worley + Worley fbm. */
 export const CLOUD_BASE_NOISE_SIZE = 128;
-/** Edge of the detail volume, [Schneider15]: 32^3 Worley fbm. */
-export const CLOUD_DETAIL_NOISE_SIZE = 32;
+/** Edge of the detail volume: 64^3 Worley fbm. */
+export const CLOUD_DETAIL_NOISE_SIZE = 64;
 /** Edge of the generated weather map. */
 export const CLOUD_WEATHER_MAP_SIZE = 512;
 
 /*
- * Lattice frequencies of the generated volumes. The base volume follows 3dVXDc (Worley fbm at 4,
- * 8 and 16 cells, Perlin-Worley at 4). The detail volume keeps the same texels per cell, i.e. a
- * quarter of the frequency for a quarter of the resolution.
+ * Lattice frequencies of the generated volumes: base after 3dVXDc (Worley fbm at 4, 8 and 16
+ * cells, Perlin-Worley at 4), detail at 2, 4 and 8 cells. Worley needs at least two cells, or
+ * every neighbour wraps onto the same feature point.
  */
 const BASE_FREQ = 4;
-const DETAIL_FREQ = 1;
+const DETAIL_FREQ = 2;
 /*
- * Cloud map of Nubis 2017 (slides 54-59): a low frequency noise modulates coverage where air
- * masses allow clouds, higher frequency noises make the footprints of the clouds; Perlin footprints
- * give connected formations (R). Broad single-octave Worley footprints form the isolated
- * islands (G); this shoulder replaces the original narrow Perlin-Worley peaks. B is the type.
+ * Cloud map after Nubis 2017: R connected coverage (Perlin footprints), G isolated coverage
+ * (Worley domes), both modulated by a low frequency air mass noise; B cloud type.
+ * Periods below are at the default 64 km weather scale.
  */
-/** Footprints: 64 km / 8, about 8 km at the default scale */
+/** Connected footprints of 8 km */
 const WEATHER_FOOTPRINT_FREQ = 8;
-/** Broad isolated footprints: four cells per weather period, with a smooth radial falloff. */
-const WEATHER_ISOLATED_FREQ = 4;
-/** Air mass modulation: 64 km / 2 */
+/** Isolated cells of 4 km */
+const WEATHER_ISOLATED_FREQ = 16;
+/** Air masses of 32 km */
 const WEATHER_MODULATION_FREQ = 2;
 const WEATHER_TYPE_FREQ = 2;
 /**
- * 16-quantiles of the raw connected coverage (Perlin footprints x modulation), measured over 40000
- * samples of a CPU replica of the generator. Mapping a value through this table (its empirical
- * CDF) makes the stored coverage uniform on [0, 1].
+ * 16-quantiles of the raw connected coverage (Perlin footprints x modulation). Mapping a value
+ * through this table (its empirical CDF) makes the stored coverage uniform on [0, 1].
  */
 const WEATHER_CONNECTED_QUANTILES = [
   0.0496, 0.1364, 0.1608, 0.1791, 0.1944, 0.2076, 0.2193, 0.2309, 0.2431, 0.255, 0.2684, 0.2829, 0.3, 0.3216,
@@ -99,9 +97,7 @@ function getVolumeProgram(kind: VolumeKind) {
           this.$l.w1 = cloudWorleyFbm(this, this.p, pb.mul(this.freq, 2), this.seed);
           this.$l.w2 = cloudWorleyFbm(this, this.p, pb.mul(this.freq, 4), this.seed);
           if (kind === 'base') {
-            // R: Perlin-Worley, GBA: Worley fbm of increasing frequency
-            // Four Perlin octaves: 4..32 cells fit at least four texels per cell in 128^3.
-            // Weather uses independent frequencies and octave counts below.
+            // R: Perlin-Worley (4 octaves, 4..32 cells), GBA: Worley fbm of increasing frequency
             this.$l.r = cloudPerlinWorley(this, this.p, this.freq, this.w0, this.seed, 4);
             this.$l.value = pb.vec4(this.r, this.w0, this.w1, this.w2);
           } else {
@@ -145,11 +141,6 @@ function getWeatherProgram() {
                 pb.div(pb.add(pb.vec2(this.$builtins.globalInvocationId.xy), pb.vec2(0.5)), this.params.x),
                 0
               );
-              // Unlike [Schneider15]'s G precipitation, this map stores isolated coverage in G.
-              // Coverage decides where clouds form, as the coverage data field of Nubis does
-              // (Schneider, Nubis3, SIGGRAPH 2023, slide 19: dimensional_profile = vertical_profile *
-              // cloud_coverage). Inverted Worley cells make separate clouds, a low frequency fbm
-              // gathers them into fields with clear sky between.
               this.$l.modulation = pb.clamp(
                 pb.add(pb.mul(cloudPerlinFbm(this, this.p, this.params.w, 4, this.seed), 0.5), 0.5),
                 0,
@@ -163,26 +154,31 @@ function getWeatherProgram() {
                 ),
                 this.modulation
               );
-              // A single broad Worley cell gives each island a continuous shoulder. Ranking
-              // narrow Perlin-Worley peaks through a CDF made the shoulders too steep and
-              // extruded them into columns. Keep the zero gaps and radial falloff here;
-              // the 3D base volume supplies the smaller billows.
+              // One dome per Worley cell: saturate(1 - d^2 / 0.7) x modulation
               this.$l.isolated = pb.mul(
-                pb.smoothStep(
-                  0.35,
-                  0.95,
-                  cloudWorleyNoise(
-                    this,
-                    pb.mul(this.p, WEATHER_ISOLATED_FREQ),
-                    pb.float(WEATHER_ISOLATED_FREQ),
-                    this.seed
-                  )
+                pb.clamp(
+                  pb.add(
+                    pb.mul(
+                      pb.sub(
+                        cloudWorleyNoise(
+                          this,
+                          pb.mul(this.p, WEATHER_ISOLATED_FREQ),
+                          pb.float(WEATHER_ISOLATED_FREQ),
+                          this.seed
+                        ),
+                        1
+                      ),
+                      1 / 0.7
+                    ),
+                    1
+                  ),
+                  0,
+                  1
                 ),
                 pb.smoothStep(0.15, 0.65, this.modulation)
               );
               this.$l.connected = empiricalCDF(this, this.connectedRaw, WEATHER_CONNECTED_QUANTILES);
-              // The fbm stays well inside +-0.5, so +0.5 alone spans the 0 (stratus) to 1 (cumulus)
-              // range; halving it as well left nearly every texel at stratocumulus
+              // fbm + 0.5 spans 0 (stratus) to 1 (cumulus)
               this.$l.cloudType = pb.add(cloudPerlinFbm(this, this.p, this.params.z, 4, this.seed), 0.5);
               pb.textureStore(
                 this.dst,

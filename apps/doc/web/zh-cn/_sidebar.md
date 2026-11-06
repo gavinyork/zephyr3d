@@ -60,6 +60,9 @@
     - [概述](zh-cn/picking.md)
   - 几何体实例化
     - [概述](zh-cn/instancing-intro.md)
+    - [骨骼动画网格实例化](zh-cn/instancing-skinned.md)
+  - 空间场
+    - [网格 SDF 与全局 SDF](zh-cn/sdf.md)
   - 角色渲染
     - [皮肤与次表面散射](zh-cn/material-skin.md)
     - [头发渲染](zh-cn/material-hair.md)

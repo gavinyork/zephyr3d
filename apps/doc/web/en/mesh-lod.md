@@ -10,6 +10,14 @@ zephyr3d uses **discrete LOD chains**:
 
 Levels of detail are usually generated in the editor, see the "Levels of Detail (LOD)" section of [Asset Compression](en/editor/asset-compression.md). Generated meshes need no code: once loaded they switch by distance on their own. Without the editor, models can generate them as they load, see [Generating when Loading](#generating-when-loading).
 
+## Generate in the editor
+
+When importing a GLB, FBX, or OBJ, enable **Generate LODs** in the import options, set **Min Triangles**, **Triangles Per Level**, and **Pixel Error**, then click **OK**. The progress dialog shows `Generating levels of detail...` while the derived mesh is built.
+
+For an existing mesh, right-click its `.zmsh` entry in the Content Browser and choose **Mesh Settings...**. Enable **Generate LODs**, adjust the same values, and click **OK**. The derived copy is built in the background; after its status says **in use in the editor**, reopen the scene to verify that the viewport uses it. Settings are stored in the adjacent `.zmeta` file and the source mesh is unchanged.
+
+The editor generates levels only for triangle-list meshes. **Build Project** publishes the derived copy.
+
 ---
 
 ## How a Level Is Chosen

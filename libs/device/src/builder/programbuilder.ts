@@ -837,7 +837,7 @@ export interface ProgramBuilder {
   determinant(mat: PBShaderExp): PBShaderExp;
   /** Same as inverse builtin function in GLSL, only valid for WebGL2 device */
   inverse(mat: PBShaderExp): PBShaderExp;
-  /** return true if x is less than y, otherwise false */
+  /** return true if x is less than y, otherwise false, per component */
   lessThan(x: number | PBShaderExp, y: number | PBShaderExp): PBShaderExp;
   /** return true if x is less than or equals y, otherwise false, per component */
   lessThanEqual(x: number | PBShaderExp, y: number | PBShaderExp): PBShaderExp;
@@ -849,9 +849,9 @@ export interface ProgramBuilder {
   compEqual(x: PBShaderExp, y: PBShaderExp): PBShaderExp;
   /** return true if x is not equal to y, otherwise false, per component */
   compNotEqual(x: PBShaderExp, y: PBShaderExp): PBShaderExp;
-  /** return true if x equals y, otherwise false */
+  /** return true if x equals y, otherwise false; vectors compare as a whole (see compEqual for per component) */
   equal(x: PBShaderExp | number, y: PBShaderExp | number): PBShaderExp;
-  /** return true if x is not equal to y, otherwise false */
+  /** return true if x is not equal to y, otherwise false; vectors compare as a whole (see compNotEqual for per component) */
   notEqual(x: PBShaderExp | number, y: PBShaderExp | number): PBShaderExp;
   /** return x && y */
   and_2(x: PBShaderExp | number | boolean, y: PBShaderExp | number | boolean): PBShaderExp;
@@ -2645,10 +2645,29 @@ export class ProgramBuilder {
           } else {
             viewDimension = '2d';
           }
+          // As the shader declares it: write-only unless it loads, so a texture
+          // a variant declares without using keeps the layout of the variants
+          // that write it, which share their bind groups
+          const format = entry.type.storageTexelFormat!;
+          const access = entry.type.readable
+            ? entry.type.writable
+              ? 'read-write'
+              : 'read-only'
+            : 'write-only';
+          const formatInfo = this._device.getDeviceCaps().textureCaps.getTextureFormatInfo(format);
+          if (access === 'read-write' ? !formatInfo?.readWritable : !formatInfo?.writable) {
+            throw new errors.PBDeviceNotSupport(
+              `${access} storage texture of format ${format}${
+                access === 'read-write'
+                  ? ' (texture-formats-tier2 for most formats)'
+                  : ' (texture-formats-tier1 for 8 and 16 bit formats)'
+              }`
+            );
+          }
           entry.storageTexture = {
-            access: 'write-only',
+            access,
             viewDimension: viewDimension,
-            format: entry.type.storageTexelFormat!
+            format
           };
         } else if (entry.type.isExternalTexture()) {
           entry.externalTexture = {

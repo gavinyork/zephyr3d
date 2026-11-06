@@ -239,7 +239,17 @@ export class ShadowMaskRenderer {
       envLightStrength: ShaderHelper.getEnvLightLuminance(ctx),
       envLightSpecularStrength: ctx.env?.light.specularStrength ?? 1
     });
-    bindGroup.setValue('invViewProjMatrix', camera.invViewProjectionMatrix);
+    // The depth prepass draws with the TAA jitter (ShaderHelper.setCameraUniforms),
+    // so positions are taken back through the same jittered matrices. Undoing
+    // the jitter with the plain ones moves each point off its surface by part of
+    // a pixel, a different way every frame; near a light, where the shadow bias
+    // shrinks with the shadow map texels, that is enough to put the point behind
+    // its own surface, and patches of it flicker into shadow.
+    const jittered = ctx.motionVectors;
+    bindGroup.setValue(
+      'invViewProjMatrix',
+      jittered ? camera.jitteredInvVPMatrix : camera.invViewProjectionMatrix
+    );
     bindGroup.setValue('cameraNearFar', this._nearFar);
     // Neighbour tap spacing for the depth-based normal reconstruction.
     this._invRenderSize.setXY(1 / depthTexture.width, 1 / depthTexture.height);
@@ -264,7 +274,7 @@ export class ShadowMaskRenderer {
       bindGroup.setValue('contactShadow', this._contactShadow);
       bindGroup.setValue('contactScale', this._contactScale);
       bindGroup.setValue('projZColumn', this._projZColumn);
-      bindGroup.setValue('viewProjMatrix', camera.viewProjectionMatrix);
+      bindGroup.setValue('viewProjMatrix', jittered ? camera.jitteredVPMatrix : camera.viewProjectionMatrix);
     }
     bindGroup.setTexture('depthTex', depthTexture, fetchSampler('clamp_nearest_nomip'));
     bindGroup.setTexture(

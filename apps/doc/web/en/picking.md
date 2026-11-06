@@ -109,7 +109,7 @@ myApp.on('tick', picking);
 | Method | Execution | Precision | Use Case | Advantages | Limitations |
 |---------|------------|------------|------------|-------------|--------------|
 | **Ray‑based Picking** | CPU | Bounding box (approximate) | Simple models, low‑precision selection | High performance, no GPU dependency | Inaccurate for detailed or deforming meshes |
-| **Color‑based Picking** | GPU | Pixel‑accurate | Editors, precise user interaction | High accuracy, supports complex geometry | May cause stalls under WebGL due to synchronous readback |
+| **Color‑based Picking** | GPU | Pixel‑accurate | Editors, precise user interaction | High accuracy, supports complex geometry | Results available only asynchronously |
 
 ---
 
@@ -119,5 +119,4 @@ Scene picking is a fundamental feature for building interactive 3D applications.
 Zephyr3D provides both **Ray‑based** and **Color‑based** picking solutions, allowing developers to balance precision and performance based on their needs:
 
 - For simple scenes or frequent, lightweight interactions, use **Ray‑based Picking** (fast but approximate).  
-- For high‑precision selection or editor‑style tools, use **Color‑based Picking** (accurate but more demanding).  
-- On **WebGL2** or **WebGPU**, color‑based picking is recommended as the preferred approach.
+- For high‑precision selection or editor‑style tools, use **Color‑based Picking** (accurate but more demanding).

@@ -7,6 +7,7 @@ import type { WebGLBaseTexture } from './basetexture_webgl';
 import type { WebGLGPUBuffer } from './buffer_webgl';
 import type { WebGLDevice } from './device_webgl';
 import type { Immutable, Nullable, TypedArrayConstructor } from '@zephyr3d/base';
+import { hashString } from './content_hash';
 
 type UniformBlockArray = Int32Array<ArrayBuffer> | Uint32Array<ArrayBuffer> | Float32Array<ArrayBuffer>;
 export interface AttributeSetter {
@@ -50,6 +51,8 @@ export class WebGLGPUProgram extends WebGLGPUObject<WebGLProgram> implements GPU
   private _error: Nullable<string>;
   private _vertexShader: Nullable<WebGLShader>;
   private _fragmentShader: Nullable<WebGLShader>;
+  private _vsHash: string;
+  private _fsHash: string;
   constructor(
     device: WebGLDevice,
     vertexShader: string,
@@ -70,7 +73,28 @@ export class WebGLGPUProgram extends WebGLGPUObject<WebGLProgram> implements GPU
     this._fs = fragmentShader;
     this._bindGroupLayouts = [...bindGroupLayouts];
     this._vertexAttributes = [...vertexAttributes];
+    this._vsHash = '';
+    this._fsHash = '';
     this.load();
+    this._device.pipelinePrecompiler.programCreated(this);
+  }
+  /** Content hash of the vertex shader source, the same across sessions */
+  get vsHash() {
+    if (!this._vsHash) {
+      this._vsHash = hashString(this._vs);
+    }
+    return this._vsHash;
+  }
+  /** Content hash of the fragment shader source, the same across sessions */
+  get fsHash() {
+    if (!this._fsHash) {
+      this._fsHash = hashString(this._fs);
+    }
+    return this._fsHash;
+  }
+  /** Content key of the program, as pipeline cache files store it */
+  get contentKey() {
+    return `${this.vsHash}:${this.fsHash}`;
   }
   get type() {
     return 'render' as const;
@@ -171,6 +195,10 @@ export class WebGLGPUProgram extends WebGLGPUObject<WebGLProgram> implements GPU
     return true;
   }
   use() {
+    const recorder = this._device.pipelineRecorder;
+    if (recorder.recording) {
+      recorder.recordProgram(this);
+    }
     if (this !== this._device.context._currentProgram) {
       if (!this.checkLoad()) {
         return false;

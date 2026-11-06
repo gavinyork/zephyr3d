@@ -34,6 +34,8 @@ export type SaveOptions = {
   lodReduction?: number;
   /** Pixel error the automatic switch distances allow, when generateLods is set */
   lodPixelError?: number;
+  /** Bake the signed distance field of every new mesh after import; off by default */
+  bakeSDF?: boolean;
 };
 
 type SharedModelWithPreprocessOptions = SharedModel & {

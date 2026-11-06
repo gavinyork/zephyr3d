@@ -48,7 +48,7 @@ and resource‑limited platforms such as mobile devices and WebGL environments.
 
 ### Supported Platforms
 
-Supported on **WebGL / WebGL2 / WebGPU** devices.
+Supported on **WebGL2 / WebGPU** devices.
 
 ### Example
 
@@ -150,7 +150,7 @@ The demo below contains several intersecting transparent spheres and a torus who
 changes continuously as they animate. You can switch between all four modes to compare them —
 with OIT off, the blend-order artifacts are clearly visible.
 
-The example prefers a WebGPU device and falls back to WebGL2 and then WebGL, showing the active
+The example prefers a WebGPU device and falls back to WebGL2, showing the active
 device type in the UI. **Modes the current device cannot run are greyed out** — ABuffer is
 unavailable on WebGL2, for instance.
 
@@ -169,7 +169,7 @@ Manual disposal is generally unnecessary unless you reassign OIT objects explici
 
 | Technique | `oitMode` | Accuracy | Performance | Supported Platforms | Recommendation |
 |------------|-----------|-----------|-------------|---------------------|----------------|
-| **Weighted Blended OIT** | `'weighted'` | Approximate | Excellent (high FPS) | WebGL / WebGL2 / WebGPU | Default preferred method |
+| **Weighted Blended OIT** | `'weighted'` | Approximate | Excellent (high FPS) | WebGL2 / WebGPU | Default preferred method |
 | **Dual Depth Peeling OIT** | `'dual-depth'` | Layer‑accurate, bounded by peel count | Moderate (slower with more passes) | WebGL2 / WebGPU (capability‑gated) | When weighted is not accurate enough but ABuffer is impractical |
 | **Per‑Pixel Linked List OIT** | `'abuffer'` | Precise | High (more GPU memory) | WebGPU | Use when maximum quality is required |
 

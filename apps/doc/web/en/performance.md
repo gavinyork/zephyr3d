@@ -91,7 +91,7 @@ group.gpuInstanceCulling = true;
 - Content changes rebuild the whole group's cache: do not add, remove or hide meshes of a group every frame. Keep frequently changing objects outside batch groups.
 - Without GPU culling (WebGL, or `gpuInstanceCulling` off), a visible group draws all of its meshes, including those outside the view. Split very large areas into several groups so whole groups can be culled.
 - On WebGL, and for meshes the GPU path does not cover, levels of detail are selected on the CPU per mesh, and a mesh switching level rebuilds the cache; hysteresis keeps this rare.
-- GPU level selection has no hysteresis: a mesh right at a switch distance may flip between two levels as the camera moves.
+- GPU level selection has no smooth transition: a mesh right at a switch distance may flip between two levels as the camera moves.
 
 ---
 

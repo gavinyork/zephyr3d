@@ -98,10 +98,10 @@ describe('volumetric cloud shaping controls', () => {
     delete serialized.Object.VolumetricCloudDetailBottomErosion;
     delete serialized.Object.VolumetricCloudBaseHeightVariation;
     const restored = (await manager.deserializeObject<Scene>(null, serialized))!;
-    expect(restored.env.sky.volumetricCloud.coverage).toBe(0.45);
-    expect(restored.env.sky.volumetricCloud.baseNoiseScale).toBe(12000);
+    expect(restored.env.sky.volumetricCloud.coverage).toBe(0.55);
+    expect(restored.env.sky.volumetricCloud.baseNoiseScale).toBe(8000);
     expect(restored.env.sky.volumetricCloud.shapeStrength).toBe(1);
-    expect(restored.env.sky.volumetricCloud.detailErosion).toBe(0.25);
+    expect(restored.env.sky.volumetricCloud.detailErosion).toBe(0.35);
     expect(restored.env.sky.volumetricCloud.detailBottomErosion).toBe(0.1);
     expect(restored.env.sky.volumetricCloud.baseHeightVariation).toBe(700);
     restored.dispose();

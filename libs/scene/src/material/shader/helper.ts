@@ -22,6 +22,7 @@ import {
   RENDER_PASS_TYPE_LIGHT,
   RENDER_PASS_TYPE_OBJECT_COLOR,
   RENDER_PASS_TYPE_SHADOWMAP,
+  RENDER_PASS_TYPE_VOXELIZE,
   LIGHT_TYPE_DIRECTIONAL
 } from '../../values';
 import type {
@@ -38,8 +39,9 @@ import type {
 import { ProgramBuilder } from '@zephyr3d/device';
 import type { PunctualLight } from '../../scene/light';
 import { linearToGamma } from '../../shaders/misc';
+import { declareVoxelizeUniforms } from '../../shaders/gi';
 import { fetchSampler, getSamplerOptions } from '../../utility/misc';
-import { PHYSICAL_BAKE_EXPOSURE } from '../../utility/physical';
+import { getGICacheExposure, PHYSICAL_BAKE_EXPOSURE } from '../../utility/physical';
 import type { AtmosphereParams } from '../../shaders';
 import { getAtmosphereParamsStruct, getDefaultAtmosphereParams } from '../../shaders';
 import type { HeightFogParams } from '../../shaders/fog';
@@ -305,9 +307,14 @@ export class ShaderHelper {
       }
     } else if (
       ctx.renderPass!.type === RENDER_PASS_TYPE_DEPTH ||
-      ctx.renderPass!.type === RENDER_PASS_TYPE_OBJECT_COLOR
+      ctx.renderPass!.type === RENDER_PASS_TYPE_OBJECT_COLOR ||
+      ctx.renderPass!.type === RENDER_PASS_TYPE_VOXELIZE
     ) {
       scope.camera = cameraStruct().uniform(0);
+      // Write-only storage textures are fragment-only in WebGPU
+      if (ctx.renderPass!.type === RENDER_PASS_TYPE_VOXELIZE && pb.shaderKind === 'fragment') {
+        declareVoxelizeUniforms(scope, 0);
+      }
     } else if (ctx.renderPass!.type === RENDER_PASS_TYPE_LIGHT) {
       const useClusteredLighting = !ctx.currentShadowLight;
       if (ctx.materialFlags & MaterialVaryingFlags.APPLY_FOG) {
@@ -1141,7 +1148,8 @@ export class ShaderHelper {
     const useJitter =
       ctx.motionVectors &&
       ctx.renderPass!.type !== RENDER_PASS_TYPE_SHADOWMAP &&
-      ctx.renderPass!.type !== RENDER_PASS_TYPE_OBJECT_COLOR;
+      ctx.renderPass!.type !== RENDER_PASS_TYPE_OBJECT_COLOR &&
+      ctx.renderPass!.type !== RENDER_PASS_TYPE_VOXELIZE;
     const cameraStruct = {
       position: new Vector4(pos.x, pos.y, pos.z, 0),
       renderSize: new Vector2(ctx.renderWidth, ctx.renderHeight),
@@ -1242,6 +1250,10 @@ export class ShaderHelper {
    * awareness. Legacy returns 1 so its uploads stay byte-identical.
    */
   static getPreExposure(ctx: DrawContext) {
+    // The voxelize pass writes the global illumination's caches, kept at a fixed exposure
+    if (ctx.renderPass?.type === RENDER_PASS_TYPE_VOXELIZE) {
+      return getGICacheExposure(ctx.scene.lightingMode);
+    }
     return ctx.scene.lightingMode === 'physical' ? ctx.camera.exposure : 1;
   }
   /**

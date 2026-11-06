@@ -7,63 +7,51 @@ import {
   transmittanceToSky
 } from '../../shaders/atmosphere';
 
-/*
- * Volumetric cloud ray marching, shared by every cloud pass.
- *
- * The march, lighting and integration follow UE 5.8 VolumetricCloud.usf (RenderVolumetricCloud,
- * lines 523-1500): layer entry/exit from the top and bottom spheres, uniform steps whose count
- * grows with the traced length up to 15 km, a secondary march towards the sun with x^2 sample
- * distribution, Wrenninge multiple-scattering octaves (SetupParticipatingMediaContext /
- * SetupParticipatingMediaPhaseContext), the analytic segment integral of Hillaire 2016, and the
- * aerial perspective applied once at the transmittance-weighted mean depth.
- *
- * UE leaves the density to a user material. Here Schneider's "The Real-time Volumetric Cloudscapes
- * of Horizon Zero Dawn" (SIGGRAPH 2015 / GPU Pro 7) supplies the noise fields; cloudSampleDensity()
- * also uses edge-weighted sculpting from https://zhuanlan.zhihu.com/p/2067943631445610508.
- *
- * Everything runs in the observer-local atmosphere frame (planet centre at the origin, +Y up at
- * the observer, meters); the noise is anchored to the planet through the referential.
- */
-
-/** UE r.VolumetricCloud.SampleMinCount */
+/** @internal */
 export const CLOUD_SAMPLE_COUNT_MIN = 2;
-/** UE r.VolumetricCloud.DistanceToSampleMaxCount: traced length at which the full count is used, in meters */
+/** @internal */
 export const CLOUD_DISTANCE_TO_SAMPLE_COUNT_MAX = 15000;
-/** UE VolumetricCloudComponent TracingStartMaxDistance default, in meters */
+/** @internal */
 export const CLOUD_TRACING_START_MAX_DISTANCE = 350000;
-/** UE UVolumetricCloudComponent::BaseViewRaySampleCount and r.VolumetricCloud.ViewRaySampleMaxCount */
+/** @internal */
 export const CLOUD_BASE_VIEW_SAMPLE_COUNT = 96;
+/** @internal */
 export const CLOUD_VIEW_SAMPLE_COUNT_MAX = 768;
-/** UE UVolumetricCloudComponent::BaseShadowRaySampleCount and r.VolumetricCloud.Shadow.ViewRaySampleMaxCount */
+/** @internal */
 export const CLOUD_BASE_SHADOW_SAMPLE_COUNT = 10;
+/** @internal */
 export const CLOUD_SHADOW_SAMPLE_COUNT_MAX = 80;
-/** UE r.SkyAtmosphere.DistantSkyLightLUT.Altitude, in meters */
+/** @internal */
 export const CLOUD_DISTANT_SKY_LIGHT_ALTITUDE = 6000;
 /**
- * Pooled 5th/95th percentiles of the generated Perlin-Worley shape, before height and coverage.
- * Measured on WebGPU: seeds 0/1/2, 40^3 off-centre samples each, rgba8 quantization and trilinear
- * filtering included (visual-test/src/cloud-checks.ts). This normalizes noise contrast, not sky
- * coverage. Imported volumes may have another range.
+ * 5th/95th percentiles of the generated Perlin-Worley base shape (seeds 0-2), remapped to [0, 1].
+ * Imported volumes may have another range.
  */
 export const CLOUD_COVERAGE_BASE_RANGE = [0.1552, 0.4032];
+/** 5th/95th percentiles of the generated detail fbm (0.625 R + 0.25 G + 0.125 B), remapped to [0, 1]. */
+export const CLOUD_DETAIL_RANGE = [0.53, 0.85];
+/** Largest envelope erosion by the base noise; envelope values above it stay solid. */
+export const CLOUD_SHAPE_EROSION = 0.6;
+/** Largest envelope erosion by the detail noise, at detail erosion 1. */
+export const CLOUD_DETAIL_EROSION = 0.4;
+/** Envelope margin over which the density rises from 0 to 1 below the cloud surface. */
+export const CLOUD_EDGE_WIDTH = 0.35;
 /**
- * Weather coverage range over which a cloud field ramps from its edge (0) to full coverage (1).
- * The local coverage scales the height profile as Nubis' dimensional profile does
- * (vertical_profile * cloud_coverage, Nubis3 slide 19), so a wide ramp shrinks the clouds towards
- * the field edges into domes; a narrow one extruded the weather map into flat-topped blocks.
+ * Softer edge for the march towards the sun: its few unjittered x^2 samples would otherwise
+ * streak the lighting along the sun direction.
  */
+export const CLOUD_SHADOW_EDGE_WIDTH = 0.7;
+/** Weather value range over which the local coverage ramps from 0 to 1. */
 export const CLOUD_COVERAGE_RAMP = 0.4;
 /**
- * Monotonic weather threshold. Connected can fill the map; isolated preserves its zero-valued
- * gaps. Coverage controls weather occupancy, not an exact projected fraction of the sky: the
- * cloud type, shaping strength and detail also change that fraction.
+ * Weather threshold of a global coverage: connected can fill the map, isolated keeps its gaps.
  * @internal
  */
 export function cloudCoverageThreshold(coverage: number, formation: CloudFormation) {
   const c = Math.min(1, Math.max(0, coverage));
   return 1 - c * (formation === 'connected' ? 1 + CLOUD_COVERAGE_RAMP : 1);
 }
-/** Width of the condensation transition, capped by the cloud type's vertical extent. */
+/** Width of the cloud base transition, in meters. */
 export const CLOUD_BOTTOM_TRANSITION_METERS = 150;
 /** [Schneider15] cloud_top_offset: how far the wind pushes cloud tops ahead of their base, in meters */
 export const CLOUD_TOP_OFFSET = 500;
@@ -107,7 +95,6 @@ export function getCloudParamsStruct(pb: ProgramBuilder) {
 
 /**
  * Both roots of a ray / origin-centred sphere intersection, (-1, -1) when missed.
- * Mirrors UE RayIntersectSphereSolution.
  */
 function raySphereSolutions(
   scope: PBInsideFunctionScope,
@@ -130,7 +117,7 @@ function raySphereSolutions(
   return pb.getGlobalScope()[funcName](origin, dir, radius) as PBShaderExp;
 }
 
-/** Henyey-Greenstein with the forward peak where the view looks into the light (UE convention). */
+/** Henyey-Greenstein with the forward peak where the view looks into the light. */
 function hgPhase(scope: PBInsideFunctionScope, g: PBShaderExp, cosTheta: PBShaderExp) {
   const pb = scope.$builder;
   const funcName = 'Z_cloudHGPhase';
@@ -143,11 +130,8 @@ function hgPhase(scope: PBInsideFunctionScope, g: PBShaderExp, cosTheta: PBShade
 }
 
 /**
- * Returns (height profile, height within this cloud type, bottom ramp, top cut). Four-corner
- * gradients follow the Horizon/Godot model, with a shared condensation base and a short
- * transition measured in meters. Local base lift changes only the bottom ramp; the top cut
- * remains at the layer's original height. The type-relative height keeps detail erosion
- * consistent for thin and tall clouds.
+ * Returns (height profile, height within the cloud type, bottom ramp, top cut) for a cloud type
+ * of 0 (stratus), 0.5 (stratocumulus) or 1 (cumulus), the base lifted by `baseOffsetMeters`.
  * @internal
  */
 export function cloudHeightProfile(
@@ -218,16 +202,17 @@ function remap(
 }
 
 /**
- * Cloud medium at an observer-local position, standing in for the UE cloud material.
+ * Cloud medium at an observer-local position.
  *
  * Returns (extinction per meter, conservative density, normalized altitude in the layer,
- * altitude in the layer in meters). The conservative density is the base shape with coverage,
- * before detail erosion: zero there means zero density, which lets the march skip the detail
- * fetch, as UE does with its material's conservative density output.
+ * altitude in the layer in meters). The conservative density omits the detail erosion, so a
+ * zero lets the march skip the sample.
  *
- * Weather locates clouds, low-frequency Perlin-Worley sculpts the silhouette, then detail erodes it.
- * Shaping strength is independent of noise scale (as in HDRP), and the bottom detail multiplier
- * is independent of the wispy/billowy noise inversion. All diagnostic stages use this function.
+ *   envelope = bottom(h) * max(coverage - topCut(h), 0)
+ *   margin   = envelope - shape * CLOUD_SHAPE_EROSION * (1 - baseNoise)
+ *                       - detail * CLOUD_DETAIL_EROSION * detailModifier
+ *   density  = saturate(margin / edgeWidth)
+ *
  * @internal
  */
 export function cloudSampleDensity(
@@ -237,13 +222,13 @@ export function cloudSampleDensity(
   weatherMap: PBShaderExp,
   baseNoise: PBShaderExp,
   detailNoise: PBShaderExp,
-  stage: 'profile' | 'base' | 'density' = 'density'
+  stage: 'profile' | 'base' | 'density' = 'density',
+  edgeWidth = CLOUD_EDGE_WIDTH
 ) {
   const pb = scope.$builder;
   const CloudParams = getCloudParamsStruct(pb);
-  const funcName = `Z_cloudSampleDensity_${stage}`;
+  const funcName = `Z_cloudSampleDensity_${stage}${edgeWidth === CLOUD_EDGE_WIDTH ? '' : '_shadow'}`;
   pb.func(funcName, [CloudParams('cloud'), pb.vec3('p')], function () {
-    // UE UpdateMaterialCloudParam
     this.$l.r = pb.length(this.p);
     this.$l.altInLayer = pb.sub(this.r, this.cloud.layer.x);
     this.$l.h = pb.div(this.altInLayer, pb.sub(this.cloud.layer.y, this.cloud.layer.x));
@@ -257,12 +242,10 @@ export function cloudSampleDensity(
         this.$return(pb.vec4(0, 0, this.h, this.altInLayer));
       }
     );
-    // Planet-fixed position (transpose of the referential), altitude as height so the noise
-    // follows the curvature
+    // Planet-fixed position, altitude as height so the noise follows the curvature
     this.$l.planet = pb.mul(pb.vec4(this.p, 0), this.cloud.referential).xyz;
     this.$l.q = pb.vec3(this.planet.x, pb.sub(this.r, this.cloud.layer.z), this.planet.z);
-    // Nubis 2017 slide 45: tops skewed along the wind, then the noise drifts with it while the
-    // coverage stays put
+    // Tops skewed along the wind (Nubis 2017); the noise drifts, the coverage stays put
     this.q = pb.add(
       this.q,
       pb.mul(pb.vec3(this.cloud.windDir.x, 0, this.cloud.windDir.y), pb.mul(this.cloud.scales.w, this.h))
@@ -281,7 +264,7 @@ export function cloudSampleDensity(
       0,
       1
     );
-    // Nubis 2017 slide 46: anvils, coverage inflated towards the layer top
+    // Anvils: coverage inflated towards the layer top (Nubis 2017)
     this.coverage = pb.pow(
       this.coverage,
       pb.mix(1, pb.mix(1, 0.5, this.cloud.density.w), pb.clamp(pb.mul(pb.sub(this.h, 0.7), 10), 0, 1))
@@ -289,8 +272,7 @@ export function cloudSampleDensity(
     this.$if(pb.lessThanEqual(this.coverage, 0), function () {
       this.$return(pb.vec4(0, 0, this.h, this.altInLayer));
     });
-    // Weather varies the condensation level between fields; coverage lifts the shoulders
-    // within each footprint. Thin cloud types cap the lift in cloudHeightProfile().
+    // Base lift: higher for cumulus and towards the footprint edges
     this.$l.baseOffset = pb.mul(
       this.cloud.shape.w,
       pb.add(0.15, pb.mul(this.weather.b, 0.45), pb.mul(pb.sub(1, this.coverage), 0.4))
@@ -302,8 +284,6 @@ export function cloudSampleDensity(
       pb.sub(this.cloud.layer.y, this.cloud.layer.x),
       this.baseOffset
     );
-    // Sculpt the top by subtracting its envelope from local coverage. Multiplication kept
-    // partially covered cloud edges at nearly the same height as their dense centres.
     this.$l.profile = pb.mul(this.heightProfile.z, pb.max(pb.sub(this.coverage, this.heightProfile.w), 0));
     if (stage === 'profile') {
       this.$return(
@@ -322,15 +302,11 @@ export function cloudSampleDensity(
         1
       );
     });
-    this.$l.macroNoise = pb.sub(1, this.noise);
-    // Keep dense cores intact while the low-frequency volume carves the silhouette.
-    this.$l.macroErosion = pb.mul(
-      this.cloud.shape.x,
-      this.macroNoise,
-      this.macroNoise,
-      pb.smoothStep(0, 1, pb.sub(1, this.profile))
+    this.$l.margin = pb.sub(
+      this.profile,
+      pb.mul(this.cloud.shape.x, CLOUD_SHAPE_EROSION, pb.sub(1, this.noise))
     );
-    this.$l.base = pb.clamp(pb.sub(this.profile, this.macroErosion), 0, 1);
+    this.$l.base = pb.clamp(pb.div(this.margin, edgeWidth), 0, 1);
     this.$if(pb.lessThanEqual(this.base, 0), function () {
       this.$return(pb.vec4(0, 0, this.h, this.altInLayer));
     });
@@ -342,7 +318,18 @@ export function cloudSampleDensity(
       this.$return(pb.vec4(pb.mul(this.base, this.cloud.density.y), this.base, this.h, this.altInLayer));
     });
     this.$l.d = pb.textureSampleLevel(detailNoise, pb.mul(this.q, this.cloud.scales.z), 0).rgb;
-    this.$l.highFbm = pb.add(pb.mul(this.d.r, 0.625), pb.mul(this.d.g, 0.25), pb.mul(this.d.b, 0.125));
+    this.$l.highFbm = pb.clamp(
+      remap(
+        pb,
+        pb.add(pb.mul(this.d.r, 0.625), pb.mul(this.d.g, 0.25), pb.mul(this.d.b, 0.125)),
+        CLOUD_DETAIL_RANGE[0],
+        CLOUD_DETAIL_RANGE[1],
+        0,
+        1
+      ),
+      0,
+      1
+    );
     // Wispy at the base, billowy above
     this.$l.modifier = pb.mix(
       this.highFbm,
@@ -350,22 +337,11 @@ export function cloudSampleDensity(
       pb.clamp(pb.mul(this.heightProfile.y, 10), 0, 1)
     );
     this.$l.bottomErosion = pb.mix(this.cloud.shape.y, 1, pb.smoothStep(0, 0.25, this.heightProfile.y));
-    // Finer erosion fades with height, preserving broad billows near the cloud top.
-    this.$l.detailFade = pb.add(
-      0.6,
-      pb.mul(0.2, pb.smoothStep(0.85, 1, pb.sub(1, this.heightProfile.y))),
-      pb.mul(-0.35, pb.smoothStep(0.05, 0.5, this.heightProfile.y))
+    this.margin = pb.sub(
+      this.margin,
+      pb.mul(this.modifier, this.cloud.density.z, this.bottomErosion, CLOUD_DETAIL_EROSION)
     );
-    this.$l.erosion = pb.clamp(
-      pb.mul(this.modifier, this.cloud.density.z, this.bottomErosion, this.detailFade),
-      0,
-      1
-    );
-    this.$l.eroded = pb.clamp(
-      pb.div(pb.sub(this.base, this.erosion), pb.max(pb.sub(1, this.erosion), 1e-5)),
-      0,
-      1
-    );
+    this.$l.eroded = pb.clamp(pb.div(this.margin, edgeWidth), 0, 1);
     this.$return(pb.vec4(pb.mul(this.eroded, this.cloud.density.y), this.base, this.h, this.altInLayer));
   });
   return pb.getGlobalScope()[funcName](cloud, pos) as PBShaderExp;
@@ -378,10 +354,9 @@ export function cloudSampleDensity(
  * units of the atmosphere (`params.lightColor`) so it composites directly over `skyBox()`:
  * `sky * a + rgb`.
  *
- * @param msCount - 1 + multiple scattering octaves (UE MSCOUNT), compile time
+ * @param msCount - 1 + multiple scattering octaves, compile time
  * @param jitter - start offset of the march in steps, 0..1
  * @param stepScale - scales the sample count, below 1 for quick previews
- * @param groundDistance - distance at which the planet ground blocks the ray, or < 0
  * @internal
  */
 export function cloudTrace(
@@ -405,8 +380,17 @@ export function cloudTrace(
   const AtmosphereParams = getAtmosphereParamsStruct(pb);
   const CloudParams = getCloudParamsStruct(pb);
   const funcName = `Z_cloudTrace${msCount}`;
-  const density = (s: PBInsideFunctionScope, p: PBShaderExp) =>
-    cloudSampleDensity(s, s.cloud, p, textures.weatherMap, textures.baseNoise, textures.detailNoise);
+  const density = (s: PBInsideFunctionScope, p: PBShaderExp, edgeWidth = CLOUD_EDGE_WIDTH) =>
+    cloudSampleDensity(
+      s,
+      s.cloud,
+      p,
+      textures.weatherMap,
+      textures.baseNoise,
+      textures.detailNoise,
+      'density',
+      edgeWidth
+    );
   pb.func(
     funcName,
     [
@@ -419,7 +403,6 @@ export function cloudTrace(
     ],
     function () {
       this.$l.eye = this.cloud.eye.xyz;
-      // Layer entry and exit, UE RenderVolumetricCloud lines 527-559
       this.$l.tTop2 = raySphereSolutions(this, this.eye, this.dir, this.cloud.layer.y);
       this.$l.tBottom2 = raySphereSolutions(this, this.eye, this.dir, this.cloud.layer.x);
       this.$l.tMin = pb.float(0);
@@ -450,7 +433,6 @@ export function cloudTrace(
       });
       this.tMin = pb.max(this.tMin, 0);
       this.tMax = pb.max(this.tMax, 0);
-      // The planet ground stands in for UE's depth buffer test
       this.$l.tGround = rayIntersectSphere(this, pb.vec3(0), this.cloud.layer.z, this.eye, this.dir);
       this.$if(pb.greaterThan(this.tGround, 0), function () {
         this.tMax = pb.min(this.tMax, this.tGround);
@@ -479,7 +461,6 @@ export function cloudTrace(
       this.$l.stepT = pb.div(pb.sub(this.tMax, this.tMin), this.stepCount);
       this.$l.iStepCount = pb.int(this.stepCount);
 
-      // Per-ray factors, UE lines 737-794
       this.$l.msScatt = this.cloud.ms.x;
       this.$l.msExtin = pb.clamp(this.cloud.ms.y, 0, 1);
       this.$l.cosTheta = pb.dot(this.cloud.sunDir.xyz, this.dir);
@@ -551,13 +532,11 @@ export function cloudTrace(
           }
           this.$l[`lightT${ms}`] = this.atmoTransmittance;
         }
-        // Sky light, occluded towards the layer bottom (UE line 954)
         this.$l.distantLight = pb.mul(
           this.ambient,
           pb.clamp(pb.add(this.cloud.phase.w, this.medium.z), 0, 1)
         );
         this.$if(pb.greaterThan(this.extinction, 0), function () {
-          // Secondary march towards the sun, x^2 distribution, fixed 0.5 jitter (UE lines 1063-1149)
           for (let ms = 0; ms < msCount; ms++) {
             this.$l[`extAcc${ms}`] = pb.float(0);
           }
@@ -575,7 +554,7 @@ export function cloudTrace(
               )
             );
             this.prevNormT = this.curNormT;
-            this.$l.shadowMedium = density(this, this.shadowPos);
+            this.$l.shadowMedium = density(this, this.shadowPos, CLOUD_SHADOW_EDGE_WIDTH);
             this.$if(
               pb.or(pb.lessThanEqual(this.shadowMedium.z, 0), pb.greaterThanEqual(this.shadowMedium.z, 1)),
               function () {
@@ -605,8 +584,6 @@ export function cloudTrace(
           this.tAPWeightedSum = pb.add(this.tAPWeightedSum, pb.mul(this.t, this.transmittanceToView));
           this.tAPWeightsSum = pb.add(this.tAPWeightsSum, this.transmittanceToView);
         });
-        // Analytic integration over the step, octaves in reverse so the last one updates the
-        // view transmittance (UE lines 1353-1440)
         for (let ms = msCount - 1; ms >= 0; ms--) {
           this.$l.sunSky = pb.mul(this[`lightT${ms}`], this.lightIlluminance, this[`phaseMs${ms}`]);
           if (ms === 0) {
@@ -631,8 +608,8 @@ export function cloudTrace(
         });
         this.t = pb.add(this.t, this.stepT);
       });
-      // Aerial perspective at the mean cloud depth (UE lines 1481-1530), integrated along the
-      // direction since the cache covers directions outside any camera's AP froxel volume
+      // Aerial perspective at the mean cloud depth, integrated along the direction since
+      // the cache covers directions outside any camera's AP froxel volume
       this.$if(pb.greaterThan(this.tAPWeightsSum, 0), function () {
         this.$l.tAP = pb.div(this.tAPWeightedSum, pb.max(this.tAPWeightsSum, 1e-10));
         this.$l.ap = getSkyView(
@@ -656,9 +633,7 @@ export function cloudTrace(
 }
 
 /**
- * Average sky luminance over the sphere at the distant sky light altitude: UE
- * RenderDistantSkyLightLutCS (SkyAtmosphere.usf), 64 uniform directions without ground,
- * illuminance times the isotropic phase.
+ * Average sky luminance over the sphere at the distant sky light altitude.
  * @internal
  */
 export function cloudDistantSkyLight(

@@ -10,6 +10,19 @@ import { Matrix4x4 } from '@zephyr3d/base';
 
 const tmpMatrix = new Matrix4x4();
 
+/** Child meshes of a batch group split by how they are drawn, collected at tag */
+interface BatchGroupMeshSplit {
+  tag: number;
+  /** Meshes the cached queues hold, recorded into render bundles */
+  cached: Mesh[];
+  /**
+   * Meshes whose level of detail the CPU selects from the view, culled like any mesh every frame
+   * instead: a cached queue holding them would be rebuilt, with all its render bundles recorded
+   * again, whenever one switched level, which happens every few frames while the view moves
+   */
+  dynamic: Mesh[];
+}
+
 /**
  * Batch group node
  * @public
@@ -20,19 +33,17 @@ export class BatchGroup extends GraphNode {
     {
       queue: RenderQueue;
       tag: number;
-      /** Levels of detail of _lodMeshes the queue was built with */
-      lods: number[];
       /** Whether the queue was built for a camera coloring levels of detail */
       lodColoration: boolean;
     }
   >;
   private readonly _bindGroupAllocator: InstanceBindGroupAllocator;
   private _changeTag: number;
-  /** Child meshes whose primitive has levels of detail, collected at _lodMeshesTag */
-  private _lodMeshes: Mesh[];
-  private _lodMeshesTag: number;
-  /** Whether _lodMeshes left out the meshes whose level GPU culling selects */
-  private _lodMeshesGpu: boolean;
+  /**
+   * Child meshes split by how they are drawn, keyed by whether GPU instance culling selects the
+   * levels of detail of the queue, see getMeshSplit
+   */
+  private readonly _meshSplits: Map<boolean, BatchGroupMeshSplit>;
   private _staticBV: boolean;
   private _gpuInstanceCulling: boolean;
   /**
@@ -43,9 +54,7 @@ export class BatchGroup extends GraphNode {
     super(scene);
     this._renderQueueMap = new Map();
     this._changeTag = 0;
-    this._lodMeshes = [];
-    this._lodMeshesTag = -1;
-    this._lodMeshesGpu = false;
+    this._meshSplits = new Map();
     this._bindGroupAllocator = new InstanceBindGroupAllocator();
     this._staticBV = false;
     this._gpuInstanceCulling = true;
@@ -69,11 +78,14 @@ export class BatchGroup extends GraphNode {
     const materialCallback = () => {
       this.invalidate();
     };
+    // A forced level decides whether the view selects the mesh's level, so the meshes are split
+    // again; cached queues hold forced levels as they were built with, so they are rebuilt too.
     // Levels selected by GPU culling read the level limits of the mesh with its bounds
     const lodCallback = (mesh: Mesh) => {
       for (const { queue } of this._renderQueueMap.values()) {
         queue.markInstanceBoundsDirty(mesh);
       }
+      this.invalidate();
     };
     this.on('visiblechanged', (node) => {
       node.iterate((child) => {
@@ -203,20 +215,15 @@ export class BatchGroup extends GraphNode {
       queueInfo = {
         queue: new RenderQueue(cullVisitor.renderPass, this._bindGroupAllocator, this._gpuInstanceCulling),
         tag: -1,
-        lods: [],
         lodColoration: false
       };
       this._renderQueueMap.set(cullVisitor.renderPass, queueInfo);
     }
-    // The cached queue holds each child at the level of detail it was built with, so a child
-    // switching level rebuilds it; levels switch rarely thanks to the hysteresis
+    // The cached queue holds its meshes at the levels of detail they were built with, none of
+    // which the view selects, so moving the view does not rebuild it
     const lodColoration = !!cullVisitor.camera?.lodColoration;
-    const lodsChanged = this.updateLods(
-      cullVisitor,
-      queueInfo.lods,
-      queueInfo.queue.culledOnGpu && !lodColoration
-    );
-    if (queueInfo.tag !== this._changeTag || lodsChanged || queueInfo.lodColoration !== lodColoration) {
+    const split = this.getMeshSplit(queueInfo.queue.culledOnGpu && !lodColoration);
+    if (queueInfo.tag !== this._changeTag || queueInfo.lodColoration !== lodColoration) {
       queueInfo.tag = this._changeTag;
       queueInfo.lodColoration = lodColoration;
       queueInfo.queue.reset();
@@ -224,11 +231,9 @@ export class BatchGroup extends GraphNode {
       const renderQueue = cullVisitor.renderQueue;
       cullVisitor.frustumCulling = false;
       cullVisitor.renderQueue = queueInfo.queue;
-      this.iterate((node) => {
-        if (node.isMesh()) {
-          cullVisitor.visit(node);
-        }
-      });
+      for (const mesh of split.cached) {
+        cullVisitor.visit(mesh);
+      }
       queueInfo.queue.end(cullVisitor.camera, true, cullVisitor.lodCamera);
       cullVisitor.frustumCulling = frustumCulling;
       cullVisitor.renderQueue = renderQueue;
@@ -238,35 +243,40 @@ export class BatchGroup extends GraphNode {
       queueInfo.queue.registerObjectColors();
     }
     cullVisitor.pushRenderQueue(queueInfo.queue);
+    // Culled, and their levels selected, in the view's queue as if they were not in the group
+    for (const mesh of split.dynamic) {
+      cullVisitor.visit(mesh);
+    }
   }
   /**
-   * Selects the levels of detail of the child meshes having some, true if any differs from lods.
-   * Meshes whose level GPU instance culling selects are left out: their batch holds every level.
+   * Splits the child meshes into those the cached queues hold and the dynamic ones, whose level of
+   * detail the CPU selects from the view: a primitive with levels, no forced level, and GPU culling
+   * not selecting the level. Batchable meshes are dynamic too when the CPU selects their level
+   * (WebGL, no indirect first instance, or level coloration).
+   *
+   * @remarks
+   * Taken again whenever the group changes. Forcing or freeing the level of a mesh does so through
+   * lod_changed; assigning Primitive.lods to a primitive already in the group does not, and it is
+   * only picked up with the next change.
+   *
+   * @param gpuLod - Whether GPU instance culling selects the levels of the queue's batches
    */
-  private updateLods(cullVisitor: CullVisitor, lods: number[], gpuLod: boolean) {
-    if (this._lodMeshesTag !== this._changeTag || this._lodMeshesGpu !== gpuLod) {
-      this._lodMeshesTag = this._changeTag;
-      this._lodMeshesGpu = gpuLod;
-      this._lodMeshes = [];
+  private getMeshSplit(gpuLod: boolean) {
+    let split = this._meshSplits.get(gpuLod);
+    if (!split || split.tag !== this._changeTag) {
+      split = { tag: this._changeTag, cached: [], dynamic: [] };
+      this._meshSplits.set(gpuLod, split);
       this.iterate((node) => {
-        if (
-          node.isMesh() &&
-          (node.primitive?.lodCount ?? 1) > 1 &&
-          !(gpuLod && node.isBatchable() && InstanceCuller.selectsLod(node))
-        ) {
-          this._lodMeshes.push(node);
+        if (node.isMesh()) {
+          const viewLod =
+            (node.primitive?.lodCount ?? 1) > 1 &&
+            node.forcedLod < 0 &&
+            !(gpuLod && node.isBatchable() && InstanceCuller.selectsLod(node));
+          (viewLod ? split!.dynamic : split!.cached).push(node);
         }
+        return false;
       });
     }
-    let changed = lods.length !== this._lodMeshes.length;
-    lods.length = this._lodMeshes.length;
-    for (let i = 0; i < this._lodMeshes.length; i++) {
-      const lod = this._lodMeshes[i].selectLod(cullVisitor.lodCamera);
-      if (lods[i] !== lod) {
-        lods[i] = lod;
-        changed = true;
-      }
-    }
-    return changed;
+    return split;
   }
 }

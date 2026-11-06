@@ -15,15 +15,14 @@ Zephyr3d 以 ES6 模块形式发布，通过 npm 安装，配合 Vite、Webpack 
 
 后端包至少要装一个，决定引擎跑在什么图形 API 上：
 
-- `@zephyr3d/backend-webgl` —— 提供 WebGL 和 WebGL2 两个后端，兼容性最好。
-- `@zephyr3d/backend-webgpu` —— WebGPU 后端，性能更好，部分高级特性（如 ABuffer OIT、
-  计算着色器）只在这里可用。
+- `@zephyr3d/backend-webgl` —— WebGL2 后端，兼容性最好。
+- `@zephyr3d/backend-webgpu` —— WebGPU 后端，性能更好，支持更多高级特性，如 GPU 剔除、DDGI 等。
 
 两个后端可以同时装，运行时按设备能力选择，参见[第一个应用](zh-cn/first-app.md)。
 
 ## 最常见的组合
 
-做 3D 应用、并希望同时支持 WebGPU 和 WebGL：
+做 3D 应用、并希望同时支持 WebGPU 和 WebGL2：
 
 ```bash
 npm install --save @zephyr3d/base @zephyr3d/scene @zephyr3d/backend-webgl @zephyr3d/backend-webgpu

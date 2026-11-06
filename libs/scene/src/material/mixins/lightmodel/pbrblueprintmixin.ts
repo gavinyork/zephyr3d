@@ -612,13 +612,9 @@ export function mixinPBRBluePrint<T extends typeof MeshMaterial>(BaseCls: T) {
           const envLightStrength = ShaderHelper.getEnvLightStrength(this);
           const envLightSpecularStrength = ShaderHelper.getEnvLightSpecularStrength(this);
           this.$l.occlusion = envLightStrength;
-          this.$l.diffuseOcclusion =
-            ctx.SSGI &&
-            ctx.SSGIIrradianceHistoryTexture &&
-            ctx.SSGISurfaceHistoryTexture &&
-            ctx.motionVectorTexture
-              ? pb.float(1)
-              : this.occlusion;
+          // The irradiance carries the environment strength already (see
+          // EnvironmentLighting.getIrradiance); only the specular terms take it here
+          this.$l.diffuseOcclusion = pb.float(1);
           this.$l.reflectionMode = this.zReflectionMode;
           this.$l.NoV = pb.clamp(pb.dot(this.data.normal, this.viewVec), 0.0001, 1);
           this.$l.ggxLutSample = pb.clamp(
@@ -631,6 +627,14 @@ export function mixinPBRBluePrint<T extends typeof MeshMaterial>(BaseCls: T) {
             pb.vec4(1)
           );
           this.$l.f_ab = this.ggxLutSample.rg;
+          // The sky's reflection darkened where the probes see little of the sky
+          this.$l.skySpecularOcclusion = ctx.env!.light.envLight.getSkySpecularOcclusion(
+            this,
+            this.data.normal,
+            this.NoV,
+            this.data.roughness,
+            ctx
+          );
           this.$l.Fr = pb.sub(
             pb.max(pb.vec3(pb.sub(1, this.data.roughness)), this.data.f0.rgb),
             this.data.f0.rgb
@@ -662,7 +666,12 @@ export function mixinPBRBluePrint<T extends typeof MeshMaterial>(BaseCls: T) {
               );
               this.outColor = pb.add(
                 this.outColor,
-                pb.mul(this.radiance, this.specularFactor, envLightSpecularStrength)
+                pb.mul(
+                  this.radiance,
+                  this.specularFactor,
+                  envLightSpecularStrength,
+                  this.skySpecularOcclusion
+                )
               );
             }
           }

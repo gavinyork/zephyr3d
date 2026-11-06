@@ -232,7 +232,9 @@ export default defineConfig(({ command }) => {
         input: {
           main: resolve(__dirname, 'index.html')
         },
-        external: isDev ? undefined : (id) => id.startsWith('@zephyr3d/'),
+        // Packages in the import map are shared with user scripts; procgen is editor-only and
+        // not in the map, so it is bundled (its own @zephyr3d/base import stays external)
+        external: isDev ? undefined : (id) => id.startsWith('@zephyr3d/') && !id.startsWith('@zephyr3d/procgen'),
         treeshake: {
           moduleSideEffects: (id) => /[\\\/]zephyr3d[\\\/]libs[\\\/]/.test(id),
           propertyReadSideEffects: true,
