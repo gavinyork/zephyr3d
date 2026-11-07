@@ -654,6 +654,8 @@ export class ParticleSystem extends applyMixins(GraphNode, mixinDrawable) implem
     this._primitive.get()!.getVertexBuffer('texCoord0')!.bufferSubData(0, instanceData);
   }
   newParticle(num: number, worldMatrix: Matrix4x4) {
+    // The instance buffer holds maxParticleCount particles; emission is capped at that as well
+    num = Math.min(num, this._maxParticleCount - this._activeParticleList.length);
     for (let i = 0; i < num; i++) {
       const particle = this.initParticle();
       particle.size1 *= this._scalar;
