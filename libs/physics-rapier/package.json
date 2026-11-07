@@ -1,6 +1,6 @@
 {
   "name": "@zephyr3d/physics-rapier",
-  "version": "0.1.1",
+  "version": "1.0.0",
   "description": "Rapier physics engine for @zephyr3d/physics",
   "homepage": "https://github.com/gavinyork/zephyr3d#readme",
   "type": "module",
@@ -42,7 +42,7 @@
     "url": "https://github.com/gavinyork/zephyr3d/issues"
   },
   "engines": {
-    "node": ">=16.18.0"
+    "node": ">=20.0.0"
   },
   "devDependencies": {
     "@babel/core": "^7.20.12",
@@ -75,8 +75,8 @@
     "typescript": "^5.7.3"
   },
   "dependencies": {
-    "@zephyr3d/base": "workspace:^0.2.11",
-    "@zephyr3d/scene": "workspace:^0.10.0",
-    "@zephyr3d/physics": "workspace:^0.1.1"
+    "@zephyr3d/base": "workspace:^1.0.0",
+    "@zephyr3d/scene": "workspace:^1.0.0",
+    "@zephyr3d/physics": "workspace:^1.0.0"
   }
 }

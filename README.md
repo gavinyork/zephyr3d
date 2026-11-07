@@ -258,8 +258,8 @@ Editor documentation: [overview](https://zephyr3d.org/doc/en/editor/overview.htm
 **It may not be the right choice yet if**
 
 - you depend on a large third-party ecosystem of plugins, loaders and community examples;
-- your scenes rely on bounce light indoors — there is no baked or probe-based global illumination
-  yet, only screen-space GI. Probe-based GI is planned after 1.0;
+- your scenes rely heavily on bounce light indoors — DDGI probe-based global illumination is
+  available on WebGPU but is still maturing; screen-space GI supplements it on both backends;
 - you need long-term API stability guarantees today (see [Status](#status)).
 ---
 
@@ -350,13 +350,11 @@ Documentation is available in [English](https://zephyr3d.org/doc/en/intro.html) 
 
 ## Status
 
-Actively developed, maintained by one person. The engine is well past prototype — it drives its
-own editor and a set of demos — but it has not reached 1.0 and APIs still change between minor
-versions. Pin your versions.
+Actively developed, maintained by one person. The engine drives its own editor and a set of demos.
+The 1.0 release marks a stable core API with semver guarantees and a documented deprecation policy.
 
 Every change runs through unit tests and a visual regression suite that renders reference scenes
-on both WebGPU and WebGL2 in CI. The 1.0 release will mark a stable core API with a documented
-deprecation policy; until then, long-term API stability is not something this project can promise.
+on both WebGPU and WebGL2 in CI. Long-term API stability is a promise this project now makes.
 
 Questions and design discussions are best raised in
 [Discussions](https://github.com/gavinyork/zephyr3d/discussions); bugs and confirmed feature

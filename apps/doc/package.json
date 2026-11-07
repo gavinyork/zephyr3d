@@ -32,7 +32,7 @@
     "serve": "cross-env DOC_BASE=/doc/ vitepress preview web --host 0.0.0.0"
   },
   "engines": {
-    "node": ">=16.18.0"
+    "node": ">=20.0.0"
   },
   "devDependencies": {
     "@microsoft/api-extractor": "^7.34.4",
@@ -91,14 +91,14 @@
     "lil-gui": "^0.19.2",
     "@zip.js/zip.js": "^2.7.54",
     "@popperjs/core": "^2.11.8",
-    "@zephyr3d/base": "workspace:^0.2.11",
-    "@zephyr3d/device": "workspace:^0.3.0",
-    "@zephyr3d/scene": "workspace:^0.10.0",
-    "@zephyr3d/loaders": "workspace:^0.2.0",
-    "@zephyr3d/physics": "workspace:^0.1.1",
-    "@zephyr3d/physics-rapier": "workspace:^0.1.1",
-    "@zephyr3d/imgui": "workspace:^0.2.9",
-    "@zephyr3d/backend-webgl": "workspace:^0.2.0",
-    "@zephyr3d/backend-webgpu": "workspace:^0.2.0"
+    "@zephyr3d/base": "workspace:^1.0.0",
+    "@zephyr3d/device": "workspace:^1.0.0",
+    "@zephyr3d/scene": "workspace:^1.0.0",
+    "@zephyr3d/loaders": "workspace:^1.0.0",
+    "@zephyr3d/physics": "workspace:^1.0.0",
+    "@zephyr3d/physics-rapier": "workspace:^1.0.0",
+    "@zephyr3d/imgui": "workspace:^1.0.0",
+    "@zephyr3d/backend-webgl": "workspace:^1.0.0",
+    "@zephyr3d/backend-webgpu": "workspace:^1.0.0"
   }
 }

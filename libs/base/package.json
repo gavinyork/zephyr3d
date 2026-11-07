@@ -1,6 +1,6 @@
 {
   "name": "@zephyr3d/base",
-  "version": "0.2.11",
+  "version": "1.0.0",
   "author": "gyk",
   "description": "Math, virtual file system, events and reference counting for the Zephyr3D WebGPU/WebGL2 rendering engine",
   "homepage": "https://github.com/gavinyork/zephyr3d#readme",
@@ -26,7 +26,7 @@
     "build": "cross-env NODE_OPTIONS=--max_old_space_size=8192 rollup -c --silent"
   },
   "engines": {
-    "node": ">=16.18.0"
+    "node": ">=20.0.0"
   },
   "keywords": [
     "zephyr3d",
@@ -73,11 +73,10 @@
     "eslint-import-resolver-typescript": "~4.4.4",
     "eslint-plugin-tsdoc": "~0.4.0",
     "globals": "^16.4.0",
-    "eslint-formatter-compact": "~8.40.0"
-  },
-  "dependencies": {
-    "@types/node": "^22.12.0",
+    "eslint-formatter-compact": "~8.40.0",
     "@rollup/plugin-commonjs": "~28.0.2",
-    "rollup-plugin-import-css": "~3.5.8"
-  }
+    "rollup-plugin-import-css": "~3.5.8",
+    "@types/node": "^22.12.0"
+  },
+  "dependencies": {}
 }

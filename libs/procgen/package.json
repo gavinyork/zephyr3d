@@ -1,6 +1,6 @@
 {
   "name": "@zephyr3d/procgen",
-  "version": "0.1.1",
+  "version": "1.0.0",
   "description": "Procedural scene generation (shape grammar + wave function collapse) for zephyr3d",
   "homepage": "https://github.com/gavinyork/zephyr3d#readme",
   "type": "module",
@@ -37,7 +37,7 @@
     "url": "https://github.com/gavinyork/zephyr3d/issues"
   },
   "engines": {
-    "node": ">=16.18.0"
+    "node": ">=20.0.0"
   },
   "devDependencies": {
     "@eslint/js": "~9.38.0",
@@ -63,7 +63,7 @@
     "typescript": "^5.7.3"
   },
   "dependencies": {
-    "@zephyr3d/base": "workspace:^0.2.11",
-    "@zephyr3d/modelgen": "workspace:^0.1.1"
+    "@zephyr3d/base": "workspace:^1.0.0",
+    "@zephyr3d/modelgen": "workspace:^1.0.0"
   }
 }

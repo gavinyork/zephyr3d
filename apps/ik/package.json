@@ -20,7 +20,7 @@
     "serve": "web-dev-server --no-cache --watch --open dist/index.html"
   },
   "engines": {
-    "node": ">=16.18.0"
+    "node": ">=20.0.0"
   },
   "devDependencies": {
     "@web/dev-server": "^0.1.35",
@@ -54,15 +54,15 @@
     "eslint-import-resolver-typescript": "~4.4.4",
     "eslint-plugin-tsdoc": "~0.4.0",
     "globals": "^16.4.0",
-    "eslint-formatter-compact": "~8.40.0"
+    "eslint-formatter-compact": "~8.40.0",
+    "@rollup/plugin-commonjs": "~28.0.2"
   },
   "dependencies": {
     "@webgpu/types": "^0.1.65",
-    "@zephyr3d/base": "workspace:^0.2.11",
-    "@zephyr3d/device": "workspace:^0.3.0",
-    "@zephyr3d/scene": "workspace:^0.10.0",
-    "@zephyr3d/backend-webgl": "workspace:^0.2.0",
-    "@zephyr3d/backend-webgpu": "workspace:^0.2.0",
-    "@rollup/plugin-commonjs": "~28.0.2"
+    "@zephyr3d/base": "workspace:^1.0.0",
+    "@zephyr3d/device": "workspace:^1.0.0",
+    "@zephyr3d/scene": "workspace:^1.0.0",
+    "@zephyr3d/backend-webgl": "workspace:^1.0.0",
+    "@zephyr3d/backend-webgpu": "workspace:^1.0.0"
   }
 }

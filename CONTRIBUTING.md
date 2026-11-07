@@ -6,7 +6,7 @@ you open one — it is short, and it is honest about what this project is right 
 
 ## Where the project is
 
-Zephyr3D is **pre-1.0 and APIs still change between minor versions**. That has two consequences for
+Zephyr3D has reached **1.0 and the core API follows semver**. That has two consequences for
 contributors:
 
 - Large, refactor-shaped pull requests are very hard to accept. They conflict with private branch
@@ -23,7 +23,7 @@ corrections**, and **small, self-contained fixes** — not new subsystems.
 Rendering bugs are hard to act on without context. A useful report includes:
 
 - What you expected and what you got.
-- **Which backend**: WebGL1, WebGL2 or WebGPU. The engine falls back silently when a capability is
+- **Which backend**: WebGL2 or WebGPU. The engine falls back silently when a capability is
   missing, so "it works on my laptop" often means a different backend ran.
 - Your GPU and driver, and the browser version.
 - A minimal reproduction. A failing code snippet, or a scene you can share, is worth more than a

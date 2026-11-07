@@ -1,6 +1,6 @@
 {
   "name": "@zephyr3d/modelgen",
-  "version": "0.1.1",
+  "version": "1.0.0",
   "description": "Dependency-free procedural mesh generator for zephyr3d",
   "homepage": "https://github.com/gavinyork/zephyr3d#readme",
   "type": "module",
@@ -37,7 +37,7 @@
     "url": "https://github.com/gavinyork/zephyr3d/issues"
   },
   "engines": {
-    "node": ">=16.18.0"
+    "node": ">=20.0.0"
   },
   "devDependencies": {
     "@eslint/js": "~9.38.0",

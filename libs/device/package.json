@@ -1,6 +1,6 @@
 {
   "name": "@zephyr3d/device",
-  "version": "0.3.0",
+  "version": "1.0.0",
   "description": "WebGPU/WebGL2 graphics abstraction with a TypeScript shader system that generates WGSL and GLSL from a single source",
   "homepage": "https://github.com/gavinyork/zephyr3d#readme",
   "type": "module",
@@ -43,7 +43,7 @@
     "url": "https://github.com/gavinyork/zephyr3d/issues"
   },
   "engines": {
-    "node": ">=16.18.0"
+    "node": ">=20.0.0"
   },
   "devDependencies": {
     "@babel/core": "^7.20.12",
@@ -72,13 +72,13 @@
     "rollup-plugin-swc3": "~0.12.1",
     "rollup-plugin-typescript2": "^0.34.1",
     "shx": "^0.3.4",
-    "typescript": "^5.7.3"
+    "typescript": "^5.7.3",
+    "@rollup/plugin-commonjs": "~28.0.2",
+    "rollup-plugin-import-css": "~3.5.8",
+    "@types/node": "^22.12.0"
   },
   "dependencies": {
-    "@rollup/plugin-commonjs": "~28.0.2",
-    "@types/node": "^22.12.0",
     "@webgpu/types": "^0.1.65",
-    "@zephyr3d/base": "workspace:^0.2.11",
-    "rollup-plugin-import-css": "~3.5.8"
+    "@zephyr3d/base": "workspace:^1.0.0"
   }
 }
