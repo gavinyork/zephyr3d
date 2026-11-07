@@ -73,7 +73,8 @@ export function renderObjectColors(
   ])
     .then(() => {
       const drawable = getDrawableByColor(colorPixels);
-      const d = distancePixels[0];
+      // The object color pass writes vec4(worldPos, distance to the camera).
+      const d = distancePixels[3];
       const intersectedPoint = new Vector3(distancePixels[0], distancePixels[1], distancePixels[2]);
       pickResolveFunc(
         drawable
