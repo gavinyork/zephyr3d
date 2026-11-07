@@ -10,8 +10,8 @@ Shadows are controlled from both the light and the mesh side:
 
 <<< @/../src/tut-16/main.js{28-35 js}
 
-- `light.castShadow = true` — makes that light cast shadows. Directional, point and spot lights all
-  support it.
+- `light.castShadow = true` — makes that light cast shadows. Directional, point, spot and rect lights
+  all support it.
 - `mesh.castShadow` — controls whether an individual mesh casts a shadow. It **defaults to true**, so
   you normally only set it explicitly to exclude something.
 
@@ -46,7 +46,7 @@ camera.bloom = true;
 camera.bloomThreshold = 0.85;
 camera.bloomIntensity = 1.2;
 
-// Anti-aliasing: FXAA is cheap, TAA looks better
+// Anti-aliasing: FXAA is cheap; TAA looks better and is turned on with camera.TAA = true
 camera.FXAA = true;
 ```
 
@@ -56,33 +56,33 @@ scattering sky, whose computed luminance far exceeds display range.
 
 <div class="showcase" case="tut-27"></div>
 
-The example above splits the screen in half to compare tone mapping on and off.
+The example above has two buttons that turn tone mapping on and off, so you can compare the two directly.
 
 Per-effect parameters are covered in [Post-processing](en/posteffect-intro.md). For a custom chain,
 append your own `AbstractPostEffect` instances to `camera.compositor`.
 
 ## Adding ambient light
 
-With only direct lights, shadowed areas go pitch black. Ambient (indirect) lighting fills that in:
+Scenes have ambient (indirect) lighting by default: `scene.env.light.type` defaults to `'ibl'`, lit every frame from the current sky (the atmospheric scattering sky by default), so no extra texture is needed. Shadowed areas only go pitch black when ambient light is turned off and only direct lights remain.
 
 ```javascript
-// Image-based lighting, needs an environment cube map
+// Default: image-based lighting from the sky; a sky box texture can be used instead, see Indirect lighting
 scene.env.light.type = 'ibl';
 
 // Or hemispheric sky light, which is cheaper
 scene.env.light.type = 'hemisphere';
 
-// Ambient strength
+// Ambient strength, default 1
 scene.env.light.strength = 0.6;
 ```
 
-Earlier examples mostly turned ambient light off (`scene.env.light.type = 'none'`) to isolate the
-contribution of a single light. **Real projects normally want both direct and ambient lighting.** See
+The shadow example above (tut-16) turns ambient light off (`scene.env.light.type = 'none'`) to isolate
+the contribution of the light itself. **Real projects normally want both direct and ambient lighting.** See
 [Indirect lighting](en/lighting-indirect.md).
 
 ## A reasonable starting point
 
-Putting it together, a realistic-looking scene can start from this and be tuned from there:
+Putting it together, a realistic-looking scene can start from this and be tuned from there. The sky type, ambient light type, HDR and tone mapping are already the defaults; they are spelled out to make the intent explicit:
 
 ```javascript
 // Environment
@@ -107,7 +107,8 @@ camera.FXAA = true;
 That completes the getting-started track. From here, go deeper as needed:
 
 - [Basic Framework](en/scene-basic.md) — application lifecycle, input middleware, frame events in full
-- [Meshes and Materials](en/mesh-material.md) — manual vertex data, material instancing
+- [Meshes and Materials](en/mesh-material.md) — manual vertex data
+- [Geometry Instancing](en/instancing-intro.md) — material instancing and batching
 - [Lighting](en/lighting-intro.md) / [Shadows](en/shadow-intro.md) / [Post-processing](en/posteffect-intro.md)
 - [Animation](en/animation-intro.md) — skeletal animation, keyframes, blending and orchestration
 - [Using the Editor](en/editor/overview.md) — the visual workflow for authoring assets and scenes

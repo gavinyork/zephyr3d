@@ -16,8 +16,10 @@ very poor precision in the distance, which shows up as z-fighting and flickering
 
 Reverse-Z maps the near plane to 1 and the far plane to 0, so the region where float precision is
 highest coincides with where the depth distribution is densest. **Combined with a floating-point depth
-buffer** (`d32f` / `d32fs8`, the default on WebGPU and WebGL2) the depth error distribution becomes
-nearly uniform and far-distance z-fighting is greatly reduced.
+buffer** (`d32f` / `d32fs8`) the depth error distribution becomes nearly uniform and far-distance
+z-fighting is greatly reduced. Scene rendering uses `d32fs8` by default: it is always available on
+WebGL2, while WebGPU needs the device to support the `depth32float-stencil8` feature and otherwise falls
+back to the integer `d24s8`, with much less precision gain.
 
 ## Switching conventions
 
@@ -117,8 +119,9 @@ force the shader-side fallback and verify that path.
 ## Known limitation
 
 **Oblique-clipped projections do not work under Reverse-Z.** `Matrix4x4.obliqueProjection()` and
-`obliquePerspective()` throw an explicit error under reverse-Z. These are used for planar water
-reflections, so **planar reflections currently require switching back to Standard-Z**.
+`obliquePerspective()` throw an explicit error under reverse-Z. The engine itself (the built-in
+water included) does not use oblique projections and is unaffected; only planar reflections you
+implement yourself with these functions require switching back to Standard-Z.
 
 ## See also
 

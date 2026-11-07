@@ -13,8 +13,9 @@
 密集，两个因素叠加使远景的深度精度极差，表现为远距离的 z-fighting 和闪烁。
 
 Reverse-Z 把近平面映射到 1、远平面映射到 0，让浮点精度最高的区域正好落在深度分布最密集的
-远处。**配合浮点深度缓冲**（`d32f` / `d32fs8`，在 WebGPU 和 WebGL2 上是默认格式）时，
-深度误差分布接近均匀，远距离 z-fighting 大幅减少。
+远处。**配合浮点深度缓冲**（`d32f` / `d32fs8`）时，
+深度误差分布接近均匀，远距离 z-fighting 大幅减少。引擎的场景渲染默认使用 `d32fs8`：WebGL2 上总是可用；
+WebGPU 上需要设备支持 `depth32float-stencil8` 特性，不支持时退回整数格式 `d24s8`，精度收益会小很多。
 
 ## 切换约定
 
@@ -110,8 +111,8 @@ device.clearFrameBuffer(clearColor, 1, 0);
 ## 已知限制
 
 **斜裁剪投影在 Reverse-Z 下不可用。** `Matrix4x4.obliqueProjection()` 和
-`obliquePerspective()` 在 reverse-Z 下会抛出明确的错误。这两个函数用于平面水面反射，
-所以**需要平面反射时目前必须切回 Standard-Z**。
+`obliquePerspective()` 在 reverse-Z 下会抛出明确的错误。引擎自身（包括内置水面）不使用
+斜裁剪投影，不受影响；只有自己用这两个函数实现平面反射时，才需要切回 Standard-Z。
 
 ## 相关
 

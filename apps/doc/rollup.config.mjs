@@ -74,7 +74,8 @@ function traverseDirectory(dirPath, rootPath, dict) {
 function hasTutOutput(output) {
   return (
     fs.existsSync(path.join(destdir, 'js', `${output}.js`)) &&
-    fs.existsSync(path.join(destdir, `${output}.html`))
+    fs.existsSync(path.join(destdir, `${output}.html`)) &&
+    fs.existsSync(path.join(destdir, `${output}.main.js`))
   );
 }
 
@@ -199,7 +200,8 @@ function getTutTarget(input, output) {
           rename: `${output}.html`
         },
         {
-          src: `src/${output}/main.js`,
+          // The source shown by the showcase's code panel; an example may be main.js or main.ts
+          src: `src/${output}/${path.basename(input)}`,
           dest: 'web/public/tut',
           rename: `${output}.main.js`
         }

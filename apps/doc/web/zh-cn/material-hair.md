@@ -12,9 +12,10 @@
 | 资产来源 | DCC 建模 + 贴图 | 从 Alembic / `.zhair` 导入的曲线 |
 | 开销 | 低 | 高（发丝数量直接决定） |
 | 适合 | 移动端、远景角色、风格化 | 特写、写实、需要物理模拟 |
-| 物理模拟 | 无 | 有（仅 WebGPU） |
+| 物理模拟 | 无 | 有 |
+| 后端 | 全部 | **仅 WebGPU**（顶点阶段要读存储缓冲区） |
 
-不确定的话从发卡开始——它兼容性和性能都更好，绝大多数项目够用。
+不确定的话从发卡开始——它兼容性和性能都更好，绝大多数项目够用。发丝在 WebGL2 上完全画不出来，需要支持 WebGL2 的项目只能用发卡，或者在 WebGL2 上退回到发卡版本。
 
 ## 着色模型：两套独立参数
 
@@ -153,9 +154,11 @@ await hair.setHairAsset('/assets/hair.zhair');
 import { isHairSimulationSupported } from '@zephyr3d/scene';
 
 if (isHairSimulationSupported()) {
-  // 启用模拟
+  hair.simulationEnabled = true; // hair 是 HairNode
 }
 ```
+
+重力、刚度、阻尼、子步数等模拟参数（`gravity`、`localStiffness`、`globalStiffness`、`damping`、`substeps` 等）直接设在 `HairNode` 上，示例 tut-71 给出了一组可以参考的取值。
 
 在别的后端上这个函数返回 false，需要走静态发型的分支。**不要假定模拟可用**——
 它依赖计算着色器，WebGL 完全没有。

@@ -13,10 +13,12 @@ entirely different technical paths — pick the path first, then worry about par
 | Asset source | DCC modelling + textures | Curves imported from Alembic / `.zhair` |
 | Cost | Low | High (driven directly by strand count) |
 | Suits | Mobile, distant characters, stylized looks | Close-ups, realism, physical simulation |
-| Physical simulation | No | Yes (WebGPU only) |
+| Physical simulation | No | Yes |
+| Backends | All | **WebGPU only** (the vertex stage reads storage buffers) |
 
 When unsure, start with cards — they are better for both compatibility and performance, and are enough
-for most projects.
+for most projects. Strands cannot be drawn on WebGL2 at all, so a project that has to support WebGL2
+needs cards, or a card fallback on WebGL2.
 
 ## Shading model: two separate parameter sets
 
@@ -163,9 +165,11 @@ The strand path supports GPU strand simulation, **available on WebGPU only**:
 import { isHairSimulationSupported } from '@zephyr3d/scene';
 
 if (isHairSimulationSupported()) {
-  // enable simulation
+  hair.simulationEnabled = true; // hair is a HairNode
 }
 ```
+
+Simulation parameters such as gravity, stiffness, damping and substeps (`gravity`, `localStiffness`, `globalStiffness`, `damping`, `substeps` and so on) are set directly on the `HairNode`; the tut-71 example has a set of values to start from.
 
 On other backends this returns false and you need a static-hair branch. **Do not assume simulation is
 available** — it depends on compute shaders, which WebGL does not have at all.

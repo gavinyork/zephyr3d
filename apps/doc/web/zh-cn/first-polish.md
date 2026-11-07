@@ -9,7 +9,7 @@
 
 <<< @/../src/tut-16/main.js{28-35 js}
 
-- `light.castShadow = true` —— 让该光源投射阴影。平行光、点光、锥光都支持。
+- `light.castShadow = true` —— 让该光源投射阴影。平行光、点光、锥光和矩形面光源都支持。
 - `mesh.castShadow` —— 控制单个网格是否投射阴影，**默认为 true**，通常只在需要排除某些
   物体时才显式设为 false。
 
@@ -43,7 +43,7 @@ camera.bloom = true;
 camera.bloomThreshold = 0.85;
 camera.bloomIntensity = 1.2;
 
-// 抗锯齿：FXAA 开销低，TAA 质量更好
+// 抗锯齿：FXAA 开销低；TAA 质量更好，用 camera.TAA = true 开启
 camera.FXAA = true;
 ```
 
@@ -52,33 +52,33 @@ camera.FXAA = true;
 
 <div class="showcase" case="tut-27"></div>
 
-上面这个示例把屏幕分成上下两半对比开关色调映射的差别。
+上面这个示例用两个按钮开关色调映射，可以直接对比两者的差别。
 
 各个效果的参数含义见[后处理](zh-cn/posteffect-intro.md)专题。需要自定义后处理链时，
 可以往 `camera.compositor` 里追加自己的 `AbstractPostEffect` 实例。
 
 ## 加环境光
 
-只有直接光源的场景，阴影里会是死黑。环境光（间接光照）负责补上这部分：
+场景默认就有环境光（间接光照）：`scene.env.light.type` 默认为 `'ibl'`，光照每帧取自当前天空（默认是大气散射天空），不需要额外准备贴图。只有关掉环境光、只剩直接光源时，阴影里才会是死黑。
 
 ```javascript
-// 基于图像的光照，需要一张环境立方体贴图
+// 默认：基于图像的光照，取自天空；也可以改用天空盒贴图，见间接光照页
 scene.env.light.type = 'ibl';
 
 // 或者用半球形天光，开销更低
 scene.env.light.type = 'hemisphere';
 
-// 环境光强度
+// 环境光强度，默认 1
 scene.env.light.strength = 0.6;
 ```
 
-前面几页的示例为了突出单个光源的效果，大多显式关掉了环境光
+上面的阴影示例（tut-16）为了突出光源本身的效果，显式关掉了环境光
 （`scene.env.light.type = 'none'`）。**实际项目里通常直接光和环境光都要有。**
 详见[间接光照](zh-cn/lighting-indirect.md)。
 
 ## 一个合理的起点配置
 
-综合下来，写实风格场景可以从这套配置起步，再按需微调：
+综合下来，写实风格场景可以从这套配置起步，再按需微调。其中天空类型、环境光类型、HDR 和色调映射本来就是默认值，写出来是为了明确意图：
 
 ```javascript
 // 环境
@@ -103,7 +103,8 @@ camera.FXAA = true;
 入门到这里就完成了。接下来可以按需深入：
 
 - [基本框架](zh-cn/scene-basic.md) —— 应用生命周期、输入中间件、帧事件的完整说明
-- [网格及材质](zh-cn/mesh-material.md) —— 手动填充顶点、材质实例化
+- [网格及材质](zh-cn/mesh-material.md) —— 手动填充顶点
+- [几何体实例化](zh-cn/instancing-intro.md) —— 材质实例化与合批
 - [光照](zh-cn/lighting-intro.md) / [阴影](zh-cn/shadow-intro.md) / [后处理](zh-cn/posteffect-intro.md)
 - [动画](zh-cn/animation-intro.md) —— 骨骼动画、关键帧、融合与编排
 - [使用编辑器](zh-cn/editor/overview.md) —— 可视化工作流，做资产和场景更方便

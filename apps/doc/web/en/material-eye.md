@@ -11,8 +11,9 @@ dark ring at the edge) are exactly the things a general PBR material cannot expr
 This approach needs no mask texture: the regions are derived **analytically from the UV distance to the
 iris centre**. The cost is that the asset must follow a convention:
 
-- **A single eyeball mesh** (sphere or front dome), carrying both **normals and tangents**.
-  **Without tangents there is no TBN and refraction degrades to a flat iris** — the most common problem.
+- **A single eyeball mesh** (sphere or front dome), carrying both **normals and tangents**, with
+  `material.vertexTangent = true` set on the material (it defaults to `false`).
+  **Without tangents, or with `vertexTangent` left off, refraction is skipped and the iris stays flat** — the most common problem.
 - **UVs must place the pupil centre at `irisCenter`** (default `(0.5, 0.5)`), with the iris occupying a
   disc of radius `irisRadius` (default 0.22) around it.
 - **The iris texture must have the pupil at its centre.** A sclera texture is optional; without one the

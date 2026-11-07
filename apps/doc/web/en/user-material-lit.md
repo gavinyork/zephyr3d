@@ -189,8 +189,8 @@ class MyLambertMaterial extends applyMaterialMixins(MeshMaterial, mixinLight) {
         scope. The parameters are as follows:
 
         int type: 
-          refers to the type of light source, which can be either LIGHT_TYPE_DIRECTIONAL,
-          LIGHT_TYPE_POINT, or LIGHT_TYPE_SPOT.
+          refers to the type of light source: LIGHT_TYPE_DIRECTIONAL, LIGHT_TYPE_POINT,
+          LIGHT_TYPE_SPOT or LIGHT_TYPE_RECT.
         vec4 posRange: 
           represents the light source's world coordinates in the xyz components, and the
           light's range in the w component.
@@ -200,21 +200,25 @@ class MyLambertMaterial extends applyMaterialMixins(MeshMaterial, mixinLight) {
         vec4 colorIntensity:
           consists of the light's color in the xyz components and the light's intensity
           in the w component.
+        vec4 extra:
+          extra parameters of the light (such as the size of a rect light); pass it on
+          unchanged to the attenuation and direction calculations.
         bool shadow:
-          indicates whether the light source casts shadows.
+          whether the shadow has to be calculated here. When false, the engine has already
+          applied the shadow to colorIntensity, or the light casts no shadow.
        */
       const that = this;
-      this.forEachLight(scope, function(type, posRange, dirCutoff, colorIntensity, shadow){
+      this.forEachLight(scope, function(type, posRange, dirCutoff, colorIntensity, extra, shadow){
         /*
           Use the calculateLightAttenuation method provided by mixinLight to
           calculate light attenuation.
          */
-        this.$l.lightAtten = that.calculateLightAttenuation(this, type, this.worldPos, posRange, dirCutoff);
+        this.$l.lightAtten = that.calculateLightAttenuation(this, type, this.$inputs.worldPos, posRange, dirCutoff, extra);
         /*
           Use the calculateLightDirection method provided by mixinLight to
           calculate the direction of light pointing towards the light source.
          */
-        this.$l.lightDir = that.calculateLightDirection(this, type, this.worldPos, posRange, dirCutoff);
+        this.$l.lightDir = that.calculateLightDirection(this, type, this.$inputs.worldPos, posRange, dirCutoff, extra);
         // Attenuated light color
         this.$l.lightColor = pb.mul(colorIntensity.rgb, colorIntensity.a, this.lightAtten);
         // Compute lighting using the lambert lighting model.
@@ -222,7 +226,7 @@ class MyLambertMaterial extends applyMaterialMixins(MeshMaterial, mixinLight) {
         this.$l.diffuse = pb.mul(this.lightColor, this.NoL);
         // Calculate the shadow if the light casts a shadow.
         if (shadow) {
-          this.$l.shadow = pb.vec3(that.calculateShadow(this, this.worldPos, this.NoL));
+          this.$l.shadow = pb.vec3(that.calculateShadow(this, this.$inputs.worldPos, this.$inputs.worldNorm, this.NoL));
           this.diffuse = pb.mul(this.diffuse, this.shadow);
         }
         // Accumulate the contributions of the light source.

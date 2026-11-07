@@ -206,18 +206,19 @@ class MyLambertMaterial extends applyMaterialMixins(MeshMaterial, mixinLight) {
         scope.litColor = this.getEnvLightIrradiance(scope, scope.normal);
       }
       // 调用mixinLight组件提供的forEachLight()方法遍历影响本片元的所有光源
-      // 第二个参数是一个回调函数，this指向当前的shader作用域。参数如下：
-      // type(int): 光源类型，取值为LIGHT_TYPE_DIRECTIONAL, LIGHT_TYPE_POINT或LIGHT_TYPE_SPOT
-      // posRange(vec4): xyz分量光源世界坐标，w分量光源范围(vec4)
-      // dirCutoff(vec4): xyz分量光源照射方向，w分量锥光衰减系数(vec4)
+      // 第二个参数是一个回调函数，this指向当前的shader作用域。常用参数如下：
+      // type(int): 光源类型，取值为LIGHT_TYPE_DIRECTIONAL、LIGHT_TYPE_POINT、LIGHT_TYPE_SPOT或LIGHT_TYPE_RECT
+      // posRange(vec4): xyz分量光源世界坐标，w分量光源范围
+      // dirCutoff(vec4): xyz分量光源照射方向，w分量锥光衰减系数
       // colorIntensity(vec4): xyz分量光源颜色，w分量光的强度
-      // shadow(bool): 此光源是否投射阴影
+      // extra(vec4): 光源的附加参数（如矩形面光源的尺寸），需原样传给衰减和方向的计算
+      // shadow(bool): 是否需要在这里计算阴影；为false时阴影已由引擎计入colorIntensity，或该光源不投射阴影
       const that = this;
-      this.forEachLight(scope, function(type, posRange, dirCutoff, colorIntensity, shadow){
+      this.forEachLight(scope, function(type, posRange, dirCutoff, colorIntensity, extra, shadow){
         // 计算光线衰减
-        this.$l.lightAtten = that.calculateLightAttenuation(this, type, this.worldPos, posRange, dirCutoff);
+        this.$l.lightAtten = that.calculateLightAttenuation(this, type, this.$inputs.worldPos, posRange, dirCutoff, extra);
         // 计算片元到光源的方向
-        this.$l.lightDir = that.calculateLightDirection(this, type, this.worldPos, posRange, dirCutoff);
+        this.$l.lightDir = that.calculateLightDirection(this, type, this.$inputs.worldPos, posRange, dirCutoff, extra);
         // 经过衰减的光源颜色
         this.$l.lightColor = pb.mul(colorIntensity.rgb, colorIntensity.a, this.lightAtten);
         // Lambert光照模型
@@ -225,7 +226,7 @@ class MyLambertMaterial extends applyMaterialMixins(MeshMaterial, mixinLight) {
         this.$l.diffuse = pb.mul(this.lightColor, this.NoL);
         // 如果光线投射阴影则需要计算阴影
         if (shadow) {
-          this.$l.shadow = pb.vec3(that.calculateShadow(this, this.worldPos, this.NoL));
+          this.$l.shadow = pb.vec3(that.calculateShadow(this, this.$inputs.worldPos, this.$inputs.worldNorm, this.NoL));
           this.diffuse = pb.mul(this.diffuse, this.shadow);
         }
         // 累积该光源的贡献
