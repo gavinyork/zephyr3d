@@ -387,6 +387,8 @@ export class Engine {
    * Loads a scene from a file path.
    *
    * Concurrent requests for the same normalized path share the same loading promise.
+   * Once a load has settled, the next call reads the file again and returns a new scene;
+   * hold the scene with a `DRef` to reuse it.
    * Scripts declared on the scene and its nodes are attached after the scene is loaded.
    *
    * @param path - Scene file path in the current VFS.
@@ -394,10 +396,18 @@ export class Engine {
    */
   async loadSceneFromFile(path: string) {
     path = this.VFS.normalizePath(path);
-    if (!this._loadingScenes[path]) {
-      this._loadingScenes[path] = this._loadScene(path);
+    let P = this._loadingScenes[path];
+    if (!P) {
+      // Only in-flight loads are shared. Keeping settled ones would hand out a scene that
+      // has since been disposed, or one already changed by play, and pin a failed load.
+      P = this._loadScene(path).finally(() => {
+        if (this._loadingScenes[path] === P) {
+          delete this._loadingScenes[path];
+        }
+      });
+      this._loadingScenes[path] = P;
     }
-    return this._loadingScenes[path]!;
+    return P;
   }
   /**
    * Sets or clears the renderable for a render layer.
