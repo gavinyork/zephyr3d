@@ -68,14 +68,14 @@ myApp.on('tick', () => {
   camera.aspect = camera.viewport[2] / camera.viewport[3];  
   camera.render(scene);  
 
-  // —— Second render: small window in bottom‑right corner ——  
+  // —— Second render: small window in the bottom-left corner ——  
   camera.viewport = [30, 30, 200, 160];  
   camera.aspect = camera.viewport[2] / camera.viewport[3];  
   camera.render(scene);  
 });  
 ```
 
-Result: The scene is rendered fullscreen first, then drawn again as a smaller window (200×160) in the bottom‑right corner.
+Result: The scene is rendered fullscreen first, then drawn again as a smaller window (200×160) in the bottom-left corner, 30 pixels in from the left and bottom edges.
 
 <div class="showcase" case="tut-46"></div>
 
@@ -86,9 +86,10 @@ Result: The scene is rendered fullscreen first, then drawn again as a smaller wi
 You can create multiple cameras and assign each its own viewport region to achieve split or multi‑angle layouts:
 
 ```javascript  
-const camMain = new Camera(scene);  
-const camTop = new Camera(scene);  
-const camSide = new Camera(scene);  
+// The base Camera has an identity projection by default; use PerspectiveCamera or OrthoCamera  
+const camMain = new PerspectiveCamera(scene);  
+const camTop = new PerspectiveCamera(scene);  
+const camSide = new PerspectiveCamera(scene);  
 
 const w = app.device.deviceXToScreen(app.device.canvas.width);  
 const h = app.device.deviceYToScreen(app.device.canvas.height);  
@@ -120,9 +121,11 @@ This layout is particularly useful in editor or modeling tools that require mult
 - Multiple viewports can **share the same Scene** instance, avoiding duplicate resource loads.
 
 - For slow‑updating or auxiliary windows (e.g., mini‑map, debug view),  
-  you can **render to a RenderTexture** first, then display that texture in the main viewport to save performance.
+  you can render into the texture of an offscreen framebuffer at a lower rate, then display that texture in the main viewport to save performance.
 
 - Rendering order matters: later renders will visually overlay earlier ones.
+
+- With TAA, SSR, SSGI or other effects that rely on history from earlier frames, use a separate camera for a picture-in-picture view. Rendering one camera twice per frame at different sizes leaves its history the wrong size, so it is discarded.
 
 - Multi‑viewport rendering works with **Post‑Processing**, **Instancing**, and **Order‑Independent Transparency (OIT)**.  
   However, ensure that post‑processing effects are configured per camera when necessary.

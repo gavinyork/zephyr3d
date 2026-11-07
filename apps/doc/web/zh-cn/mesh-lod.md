@@ -22,11 +22,11 @@ LOD 一般在编辑器里生成，见[资产压缩](zh-cn/editor/asset-compressi
 
 ## 选级规则
 
-**屏幕尺寸**：网格世界包围盒的外接球投影到屏幕上的**直径**，以半个屏幕为单位。物体正好占满屏幕高度时约为 2，占半屏时约为 1。透视投影下它与距离成反比，正交投影下与距离无关。
+**屏幕尺寸**：网格世界包围盒的外接球投影到屏幕上的**直径**，与屏幕较短一边（横屏时为高度）之比。外接球正好占满屏幕高度时约为 1，占半屏时约为 0.5。透视投影下它与距离成反比，正交投影下与距离无关。
 
 每一级 LOD 都有一个**切换尺寸**（`screenSize`）。引擎选用切换尺寸仍大于网格当前屏幕尺寸的最粗那一级；屏幕尺寸比所有切换尺寸都大时用第 0 级。
 
-**滞回**：每一级还有一个滞回量（`hysteresis`），默认值为 0.02。从粗的一级切回细的一级时，要求屏幕尺寸再多长出这个量，这样网格停在临界距离附近时不会每帧来回跳。
+**滞回**：每一级还有一个滞回量（`hysteresis`），编辑器生成的各级为 0.02。从粗的一级切回细的一级时，要求屏幕尺寸再多长出这个量，这样网格停在临界距离附近时不会每帧来回跳。
 
 ---
 
@@ -82,8 +82,8 @@ const model = await getEngine().resourceManager.fetchModel('/models/tree.glb', s
   generateLods: true // 或 { lodMinTriangles: 200, lodReduction: 0.5, lodPixelError: 8 }
 });
 
-// 或直接使用导入器
-const model = await new GLTFImporter().loadModel('/models/tree.glb', undefined, { generateLods: true });
+// 或直接使用导入器（GLTFImporter 来自 @zephyr3d/loaders），得到的是 SharedModel
+const sharedModel = await new GLTFImporter().loadModel('/models/tree.glb', undefined, { generateLods: true });
 ```
 
 `generateLods: true` 使用编辑器的默认设置：每级至少 100 个三角形，每级保留上一级一半的三角形，Pixel Error 为 8。各项设置的含义与编辑器的网格设置相同（见[资产压缩](zh-cn/editor/asset-compression.md)）。
@@ -128,14 +128,14 @@ primitive.lods = [
 
 `lods` 按从细到粗排列，切换尺寸应逐级递减。各级的索引可以用 [meshoptimizer](https://github.com/zeux/meshoptimizer) 的 `simplify` 生成：它只输出新的索引，引用的仍是原来的顶点，正好符合这种布局。
 
-需要按同样的规则判断网格大小时，可以用 `computeBoundsScreenSize(center, radius, camera)` 计算一个包围球的屏幕尺寸。
+引擎没有公开计算屏幕尺寸的函数。需要按同样的规则判断网格大小时，透视投影下可以自己计算 `max(|m00|, |m11|) × r / d`：`m00`、`m11` 取自 `camera.getProjectionMatrix()`，`r` 是包围球半径，`d` 是球心到相机的距离。
 
 ---
 
 ## 与合批的关系
 
 - 自动实例化按“图元 + 材质”合批，同一个图元的不同 LOD 分别合批，各画各的索引段。
-- `BatchGroup` 会缓存渲染队列。在 WebGPU 上，如果设备支持 `indirect-first-instance` 且 `gpuInstanceCulling` 开启（默认开启），合批网格的 LOD 在 GPU 上逐实例选取，与视锥剔除在同一个 compute pass 中完成，网格换级不会导致缓存重建。阴影视图和 CPU 路径一样按主相机选级。
+- `BatchGroup` 会缓存渲染队列。在 WebGPU 上，如果设备支持 `indirect-first-instance` 且 `gpuInstanceCulling` 开启（默认开启），合批网格的 LOD 在 GPU 上逐实例选取，与视锥剔除在同一个 compute pass 中完成，网格换级不会导致缓存重建。阴影视图和 CPU 路径一样按主相机选级。这条路径没有滞回，网格恰好停在切换距离附近时，可能随相机移动在两级之间来回切换。其他情况（WebGL2、关闭 GPU 剔除、打开 LOD 着色、未合批的网格）下每个网格在 CPU 上选级，有网格换级时缓存会重建，滞回让这种情况很少发生。
 
 ---
 

@@ -35,8 +35,8 @@ Smart pointers handle reference counting, dependency tracking, and delayed relea
 | **Weak Reference** | `DWeakRef<T>` | Observes an object without increasing its reference count; automatically becomes invalid when the object is destroyed |
 
 Smart pointers not only hold references but also manage reference counting internally.  
-Developers should **never call a resource object’s `.dispose()` directly**.  
-Instead, they must release ownership by calling the smart pointer’s `.dispose()`.
+Once an object has been handed to the engine (assigned to a material, a mesh, a parent node and so on) or is held by a `DRef`, **do not call its `.dispose()` directly**; release the reference you hold instead.  
+An object you own exclusively, will not use again and that no engine object references can be disposed directly, as in the examples that call `node.remove()` followed by `node.dispose()`.
 
 ---
 
@@ -46,11 +46,13 @@ Instead, they must release ownership by calling the smart pointer’s `.dispose(
 2. **`DRef.dispose()`** — releases ownership and decreases the reference count.  
 3. When all `DRef` instances have been disposed (count = 0), the engine **automatically calls the object’s `dispose()` method during the next frame** to destroy the underlying GPU resource.
 
+"The next frame" means the start of the next `Application.frame()`, where `flushPendingDisposals()` (from `@zephyr3d/base`) runs. If you drive the render loop yourself instead of through `Application`, call `flushPendingDisposals()` every frame, or these objects are never released.
+
 This design ensures that no GPU resource is freed during an active rendering process, preventing state corruption and runtime instability.
 
-> ⚠️ Calling a resource’s `.dispose()` directly bypasses reference tracking  
-> and may leave other pointers referencing a destroyed object.  
-> Always manage lifetime through `DRef.dispose()`.
+> ⚠️ Calling `.dispose()` on a resource that other objects still reference  
+> leaves them holding a destroyed object.  
+> Manage the lifetime of shared objects through `DRef.dispose()`.
 
 ---
 
@@ -59,8 +61,9 @@ This design ensures that no GPU resource is freed during an active rendering pro
 All GPU or system resources in Zephyr3D implement the `IDisposable` interface:
 
 ```typescript
-interface IDisposable {
+interface IDisposable extends IEventTarget<{ dispose: [] }> {
   dispose(): void;
+  readonly disposed: boolean;
 }
 ```
 
@@ -83,8 +86,8 @@ class MyResource extends Disposable {
 }
 ```
 
-> Developers should **not** manually call `myResource.dispose()`.  
-> Under smart pointer management, the engine automatically invokes it once all `DRef`s are released.
+> Once a `DRef` manages it, do **not** call `myResource.dispose()` yourself.  
+> The engine invokes it once all `DRef`s are released.
 
 ---
 
@@ -110,7 +113,7 @@ if (tex) {
 }
 ```
 
-`.get()` returns the currently bound object, or `null` if it has already been destroyed.
+`.get()` returns the currently bound object. A `DRef` does not check whether the object has been destroyed: `.get()` only returns `null` after this `DRef` itself has been disposed. To find out whether an object is destroyed, check its `disposed` property, or use a `DWeakRef`, which invalidates itself.
 
 ---
 
@@ -197,28 +200,31 @@ The following core engine objects are managed under the smart‑pointer lifecycl
 | **Animation System** | `AnimationClip`, `AnimationSet` | Animation and motion resources |
 | **Low‑Level Graphics** | `Texture`, `Buffer`, `FrameBuffer` | GPU resource abstractions |
 
+### Who holds scene nodes and scenes
+
+- A parent node holds its children through `DRef`s. After `node.remove()` (which sets `parent` to `null`), a node that no other `DRef` holds is destroyed at the start of the next frame. To detach a node and attach it again a few frames later, hold it with a `DRef` of your own first; attaching it again within the same frame is fine.
+- `getEngine().setRenderable(scene, layer)` also holds the scene through a `DRef`. When another scene takes its place, the old one is destroyed unless another `DRef` holds it. To switch back and forth between scenes, hold each with a `DRef` (tut-66 on the [Water](en/water.md) page does this).
+
 ---
 
-## Resource Objects Loaded via the Resource Module
+## Objects Loaded Through the Resource Manager
 
-Objects obtained through the `Resource` module (textures, shaders, models, etc.) are **plain objects** —  
-they are **not automatically managed by smart references**.
+Textures, models and other objects loaded through `getEngine().resourceManager` are not held by any `DRef` when you get them.
 
-This means:
-- These objects can safely be wrapped in a `DRef` or `DWeakRef` for lifetime management;  
-- If not managed by a smart pointer, the developer **must explicitly call the object’s `.dispose()`** after use to release the resource.
+- Once you hand one to an engine object (assign it to a texture property of a material, or set it as a mesh's primitive or material), the engine holds it through a `DRef`. **Do not `dispose()` it yourself** after that, or you destroy a resource that is still in use.
+- `fetchTexture()` returns the same cached instance for the same URL, so disposing it by hand affects everything that uses it.
+- Only an object that was never handed to an engine object and is not held by a `DRef` has to be disposed by hand after use. It is safer to hold it with a `DRef` and release that when done.
 
 Example:
 
 ```typescript
-// Plain resource usage
-const tex = await getEngine().resourceManager.fetchTexture("stone.png");
-...
-tex.dispose();  // Manual cleanup if unmanaged
+// Held by the material once assigned; do not dispose it by hand
+material.albedoTexture = await getEngine().resourceManager.fetchTexture("stone.png");
 
-// Managed usage
+// Held by you: wrap it in a DRef and release that reference when done
 const texRef = new DRef(await getEngine().resourceManager.fetchTexture("stone.png"));
-// Later, release by texRef.dispose()
+// ...
+texRef.dispose();
 ```
 
 ---
@@ -226,8 +232,8 @@ const texRef = new DRef(await getEngine().resourceManager.fetchTexture("stone.pn
 ## Best Practices
 
 1. **All cross‑frame or shared resources must be held via `DRef` or `DWeakRef`.**  
-2. **Never directly call `.dispose()` on objects managed by smart pointers.**  
-3. **Unmanaged temporary resources must be cleaned up manually using `.dispose()`.**  
+2. **Never directly call `.dispose()` on objects held by smart pointers or engine objects.**  
+3. **Objects never handed to the engine and not held by a smart pointer must be disposed manually after use.**  
 4. **Access resources through `.get()` — there are no `.value` or `.valid` properties.**
 
 ---
@@ -255,7 +261,6 @@ This approach shifts resource cleanup responsibility from individual objects to 
 
 - Always call the smart pointer’s `.dispose()`, not the resource’s.  
 - The engine automatically calls the internal `dispose()` once all references are released.  
-- Resources loaded via the `Resource` module must be disposed manually if unmanaged.  
+- Objects loaded through the resource manager but never handed to the engine or held by a `DRef` must be disposed manually after use.  
 - Use `.get()` to safely access or verify an object’s existence.
 
-Through this unified model, Zephyr3D achieves near‑native engine reliability and predictable resource cleanup behavior entirely within the JavaScript environment.

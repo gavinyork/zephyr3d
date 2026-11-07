@@ -18,10 +18,13 @@ Available types include:
 |:--------|:------------|
 | `'ibl'` | *Image-Based Lighting*, suitable for PBR materials |
 | `'hemisphere'` | *Hemispheric Sky Light*, a simplified ambient lighting model |
+| `'constant'` | A constant colour, set by `scene.env.light.ambientColor` |
 | `'none'` | No ambient lighting |
 
 The default value is `'ibl'`.  
 If set to `'none'`, the scene disables all ambient lighting, leaving only direct lighting sources (e.g., directional or point lights).
+
+`scene.env.light.strength` is an overall multiplier on the ambient light that works for every type, and 0 turns it off; `specularStrength` scales the specular part of the ambient light on its own.
 
 ---
 
@@ -148,7 +151,7 @@ DDGI (Dynamic Diffuse Global Illumination) places probes in the scene, traces pr
 giving diffuse indirect light that follows lights and geometry in real time.
 Zephyr3D combines a voxel material field with a multi-level probe clipmap, which suits moving cameras in medium-sized indoor and outdoor scenes.
 
-DDGI adds to `scene.env.light` rather than being one of its types, and also works with `scene.env.light.type = 'none'`.
+DDGI is not one of the types of `scene.env.light` but works together with it: within the probes' reach, the DDGI result **replaces** the diffuse part of the ambient light, and outside it the ambient light takes over again. Probe lighting is not scaled by `scene.env.light.strength`; adjust its brightness with `scene.gi.intensity`. It also works with `scene.env.light.type = 'none'`.
 
 **Example: Cornell box**
 
@@ -173,7 +176,7 @@ btnOn.addEventListener('click', () => setGI(true));
 
 <div class="showcase" case="tut-88"></div>
 
-> The first seconds wait for asset loading, voxelization, and probe convergence; they are not the final image.
+> The first frames wait for asset loading, voxelization, and probe convergence; they are not the final image. With the default `probeHysteresis` of 0.97 each probe update takes in only about 3% of the new result, so if geometry settles after the probes have started updating, the stale lighting can take tens of seconds or longer to clear.
 
 **Enable it:**
 
@@ -188,11 +191,15 @@ scene.gi.probeRays = 128;
 scene.gi.probeBudget = 4096;
 ```
 
-Enabling `scene.gi` keeps the scene SDF enabled. Only static meshes with a field (a baked asset or `bakeField()`) enter the voxel material field; set `scene.gi.terrainAlbedo` when terrain data does not provide an albedo yet.
+Enabling `scene.gi` keeps the scene SDF enabled. Only static meshes with a field (a baked asset or `bakeField()`) enter the voxel material field; terrain in the scene takes part automatically, with its albedo taken from the terrain itself.
 
 **Convergence and quality:**
 
-`probeSpacing` controls near-field detail, `probeLevels` expands coverage, `probeRays` improves per-probe quality, and `probeBudget` controls updates per frame. A higher `probeHysteresis` reduces noise but slows changes. Increase `probeNormalBias` or `probeViewBias` when leakage appears, then verify that the SDF is closed and the scene scale is correct.
+`probeSpacing` is the probe spacing of the nearest level and `probeGrid` the number of probes in each level. The probes form a clipmap in which each level has twice the spacing and reach of the one before; `probeLevels` is the number of levels, and 4 is both the default and the maximum, so with default settings it cannot be raised to extend the reach. For a larger reach, increase `probeSpacing` or `probeGrid`. With default settings the nearest level covers 32×16×32 units and the farthest about 256×128×256. `probeRays` improves per-probe quality, and `probeBudget` controls updates per frame.
+
+Changing `probeSpacing`, `probeGrid`, `probeLevels`, `probeRays` or `probeBudget` destroys the probe volume and starts convergence from scratch, so do not change them often at run time; `probeHysteresis`, `intensity`, `probeNormalBias` and `probeViewBias` can be adjusted live.
+
+ A higher `probeHysteresis` reduces noise but slows changes. Increase `probeNormalBias` or `probeViewBias` when leakage appears, then verify that the SDF is closed and the scene scale is correct.
 
 Keep `updateMode = 'continuous'` for changing scenes. A converged volume can be saved and frozen:
 
@@ -204,6 +211,7 @@ scene.gi.updateMode = 'frozen';
 
 > **Limits and diagnostics:**
 > - DDGI, the global SDF, and voxel lighting are WebGPU-only; on WebGL2 `scene.gi.enabled` builds no lighting.
+> - Probe spacing and reach, and the global SDF (about ±128 units around the camera), are measured in scene units and are not converted by `scene.metersPerUnit`. A scene modelled in centimetres needs a correspondingly larger `probeSpacing`.
 > - The first frames wait for SDF streaming, voxelization, and probe convergence.
 > - Use `scene.gi.getStats()` and `scene.sdf.getStats()` to inspect support, updates, missing fields, and residency.
 > - `atlasSize`, `voxelizeBudget`, and `lightingSlicesPerFrame` are the main memory and update-cost controls.
@@ -215,10 +223,11 @@ scene.gi.updateMode = 'frozen';
 | Ambient Type | Characteristics | Suitable Materials | Typical Use | Performance |
 |---------------|-----------------|--------------------|--------------|-------------|
 | **IBL** | HDR‑based indirect reflection & diffuse lighting | PBR | Realistic / reflective environments | Higher |
-| **Hemispheric** | Interpolated upper/lower hemisphere lighting | Lambert / Unlit | Mobile, stylized, or simple scenes | Very High |
+| **Hemispheric** | Interpolated upper/lower hemisphere lighting | Lit materials (Lambert, Blinn, PBR, ...) | Mobile, stylized, or simple scenes | Very High |
+| **Constant** | Uniform ambient light of a single colour | Lit materials | Simple scenes, debugging | Very High |
 | **None** | No indirect lighting, direct lights only | Any | FX, dark scenes, artistic control | Highest |
 
-DDGI can be added on top of any of these for diffuse indirect light that follows scene geometry; it is WebGPU-only and the most expensive.
+DDGI can work with any of these, replacing their diffuse part within the probes' reach, for diffuse indirect light that follows scene geometry; it is WebGPU-only and the most expensive.
 
 ---
 

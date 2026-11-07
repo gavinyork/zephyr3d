@@ -1,6 +1,15 @@
 # Sky
 
-We support two sky modes: Skybox and Atmospheric Scattering
+`scene.env.sky.skyType` decides how the sky is drawn:
+
+| Value | Meaning |
+| --- | --- |
+| `'scatter'` | Atmospheric scattering (default), computed live from the sun direction |
+| `'skybox'` | A sky box from a cube map |
+| `'image'` | A plain colour or a single image as the background, set with `skyColor` / `skyImage` |
+| `'none'` | No sky |
+
+This page covers the sky box and atmospheric scattering. Note also that scenes have height fog on by default (`scene.env.sky.fogType = 'height_fog'`); the sky box examples below set it to `'none'` to show only the sky.
 
 ## Sky box
 
@@ -21,8 +30,8 @@ If you only have a panoramic image (equirectangular, as most HDRI assets are), t
 
 <<< @/../src/tut-33/main.js{28-44 js}
 
-The key step is creating an empty cube map with `device.createCubeTexture()` as the target
-(line 35), then rendering the panorama into it. The `rgba16f` format matters here: HDR panoramas
+The key step is creating an empty cube map with `device.createCubeTexture()` as the target,
+then rendering the panorama into it. The `rgba16f` format matters here: HDR panoramas
 carry luminance beyond [0,1], and an 8-bit format would clip the highlights.
 
 <div class="showcase" case="tut-33"></div>
@@ -54,7 +63,7 @@ Here is a complete atmospheric scattering setup:
 
 <<< @/../src/tut-34/main.js{40-50 js}
 
-Note that the directional light on line 41 never sets `sunLight = true` explicitly — **the first
+Note that the directional light never sets `sunLight = true` explicitly — **the first
 directional light created in a scene automatically becomes the sun**, so orienting it with
 `lookAt()` is enough to drive the sky.
 
@@ -73,17 +82,19 @@ The buttons in the top-left corner of the example above switch between the two. 
 2D clouds are generated from a 2D noise function. They are cheap and available on every backend, with three parameters to tune:
 
 ```javascript
-// Cloud cover; only effective in atmospheric scattering mode
+// Cloud cover
 scene.env.sky.cloudy = 0.5;
 
-// Cloud brightness
-scene.env.sky.cloudIntensity = 1.5;
+// Cloud brightness, default 15
+scene.env.sky.cloudIntensity = 15;
 
 // Wind, which drives cloud movement speed and direction
 scene.env.sky.wind = new Vector2(300, 500);
 // Or mutate in place to avoid an extra allocation
 scene.env.sky.wind.setXY(600, 0);
 ```
+
+> `cloudy` and `cloudIntensity` can only be set while `skyType` is `'scatter'`; with any other sky type the assignment is silently ignored. Set `skyType` first, then the cloud parameters.
 
 #### Volumetric clouds
 
@@ -104,10 +115,14 @@ clouds.framesPerUpdate = 64;
 clouds.cacheResolution = 768;
 ```
 
-Distances are in metres. `coverage` controls the amount of cloud, `density` its thickness, and `baseHeightVariation`, `formation`, and the noise scales shape the field. `viewSampleCountScale` and `shadowSampleCountScale` improve ray quality while increasing cost.
+The values above are the defaults. Distances are in atmosphere metres (see the limits below for how they map to world units). `coverage` controls the amount of cloud, `density` its thickness, and `baseHeightVariation`, `formation`, and the noise scales shape the field. `viewSampleCountScale` and `shadowSampleCountScale` improve ray quality while increasing cost.
 
 The engine generates weather, base-noise, and detail-noise resources by default. For authored results, assign slice atlases to `sky.cloudWeatherMap`, `sky.cloudBaseNoise`, and `sky.cloudDetailNoise`. The sky cache updates over `framesPerUpdate` frames; lower values respond faster but cost more per frame.
 
 Use `sky.cloudDebugView = 'weather'` (or `baseNoise`, `detailNoise`, `densityXY`, and related views) to inspect the generated resources.
 
-Volumetric mode is WebGPU-only. Other backends fall back to `effectiveCloudMode === 'procedural'` and show the 2D clouds above. Volumetric clouds are not scene geometry and do not participate in Mesh LOD, SDF, or physics. Keep cloud altitudes and `scene.metersPerUnit` in the same world scale.
+Volumetric mode is WebGPU-only. Other backends fall back to `effectiveCloudMode === 'procedural'` and show the 2D clouds above. Volumetric clouds are not scene geometry and do not participate in Mesh LOD, SDF, or physics.
+
+**Volumetric clouds are only drawn from below the layer.** When the observer is higher than `layerBottomAltitude` minus 500 m, the engine draws the 2D clouds instead and warns once in the console; `effectiveCloudMode` still reports `'volumetric'`, since it only reflects backend support. Keep this in mind for flight or high-altitude shots.
+
+Cloud parameters are in atmosphere metres. World units map to atmosphere metres through `scene.env.sky.cameraHeightScale` (atmosphere metres per world unit, default 1), not `scene.metersPerUnit`. When scene units are not metres, adjust `cameraHeightScale`, or the camera height and the cloud layer will not line up.

@@ -74,17 +74,18 @@ box.animationSet.stopAnimation('move');
 
 ## Interpolation Modes
 
-When creating a track instance, the first parameter defines the interpolation type between keyframes:
+When creating a track instance, the first parameter (required) defines the interpolation type between keyframes:
 
 | Interpolation Mode | Description |
 |--------------------|--------------|
-| `'linear'` | Linear interpolation (default), produces smooth transitions |
+| `'linear'` | Linear interpolation, produces smooth transitions |
 | `'step'` | Step‑based transition (no blending), jumps directly to the next value |
-| `'cubicspline'` | Cubic spline interpolation, used for highly continuous or smooth motion |
+| `'cubicspline-natural'` | Natural cubic spline. Give only the keyframe values and the curve passes through them smoothly. Use it for smooth motion from hand-written keyframes |
+| `'cubicspline'` | glTF-style cubic spline: every keyframe needs an in-tangent, a value and an out-tangent, so it only suits data that carries tangents (such as animations imported from glTF). Do **not** use it when building a track from `{ time, value }` keyframes, or it reads invalid data |
 
 > Choose an interpolation mode according to your animation style:  
 > Use `step` for discrete events or mechanical motion,  
-> and `linear` or `cubicspline` for natural or continuous movement.
+> and `linear` or `cubicspline-natural` for natural or continuous movement.
 
 ---
 

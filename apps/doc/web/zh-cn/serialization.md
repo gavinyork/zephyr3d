@@ -19,27 +19,27 @@ Zephyr3D 可以将引擎对象序列化为 JSON，并在之后恢复。序列化
 
 ## 加载和保存场景
 
-场景文件以 JSON 形式保存在当前 VFS 中。
+场景文件以 JSON 形式保存在当前 VFS 中，扩展名约定为 `.zscn`。
 
 ```ts
 import { getEngine } from '@zephyr3d/scene';
 
-const resources = getEngine().resourceManager;
-
-const scene = await resources.loadScene('/scenes/level-01.json');
+const scene = await getEngine().loadSceneFromFile('/scenes/level-01.zscn');
 
 if (scene) {
   getEngine().setRenderable(scene, 0);
 }
 ```
 
+`getEngine().loadSceneFromFile()` 加载后会挂载场景和节点上声明的脚本。底层的 `resourceManager.loadScene()` 只做反序列化，**不会挂载脚本**；只有确定场景不带脚本，或想自己控制挂载时，才直接用它。
+
 保存场景：
 
 ```ts
-await getEngine().resourceManager.saveScene(scene, '/scenes/level-01.json');
+await getEngine().resourceManager.saveScene(scene, '/scenes/level-01.zscn');
 ```
 
-目标 VFS 必须支持写入。例如 `MemFS` 和 `IDBFS` 适合编辑器类工作流；普通只读 HTTP 文件系统通常不能把文件写回服务器。
+目标 VFS 必须支持写入。例如 `@zephyr3d/base` 中的 `MemoryFS` 和 `IndexedDBFS` 适合编辑器类工作流；普通只读 HTTP 文件系统通常不能把文件写回服务器。
 
 ## 预制体
 
@@ -50,6 +50,8 @@ const node = await getEngine().resourceManager.instantiatePrefab(scene.rootNode,
 
 if (node) {
   node.position.setXYZ(5, 0, -3);
+  // instantiatePrefab() 不会挂载脚本，这里挂载预制体中声明的脚本
+  await getEngine().attachScriptsInSubtree(node);
 }
 ```
 
@@ -65,7 +67,7 @@ if (node) {
 }
 ```
 
-`data` 字段就是普通序列化对象。`instantiatePrefab()` 会检查外壳格式，创建节点，设置 `prefabId`，挂到指定父节点下，并为实例生成新的 persistent id。
+`data` 字段就是普通序列化对象。`instantiatePrefab()` 会检查外壳格式，创建节点，设置 `prefabId`，挂到指定父节点下，并为实例生成新的 persistent id。它只反序列化节点树，**不会挂载**节点上声明的脚本，所以带脚本的预制体实例化后要再调用 `getEngine().attachScriptsInSubtree(node)`（见上例）。
 
 ## 序列化对象
 
@@ -91,14 +93,13 @@ await getEngine().VFS.writeFile('/prefabs/box.zprefab', JSON.stringify(prefab, n
 使用 `deserializeObject()` 可以从 JSON 恢复一个已注册对象：
 
 ```ts
+// 第一个参数是上下文：恢复出的 SceneNode 会挂到它下面
 const restored = await getEngine().resourceManager.deserializeObject(scene.rootNode, prefab.data);
-
-if (restored) {
-  restored.parent = scene.rootNode;
-}
 ```
 
-普通场景文件和预制体文件优先使用 `loadScene()`、`saveScene()` 和 `instantiatePrefab()`。
+`deserializeObject()` 会原样恢复节点的 persistent id。用它复制一个已在场景中的节点，会得到 id 重复的两个节点；复制节点请用 `instantiatePrefab()`，它会生成新 id。
+
+普通场景文件和预制体文件优先使用 `getEngine().loadSceneFromFile()`、`saveScene()` 和 `instantiatePrefab()`。
 
 ## 资源身份
 
@@ -152,6 +153,11 @@ getEngine().resourceManager.registerClass(gameSettingsClass);
 ```
 
 注册后，这个对象就可以像内置类一样传给 `serializeObject()` 和 `deserializeObject()`。
+
+> `name` 是写进文件的类型名，有两条要求：
+>
+> - 必须写成固定字符串，不要用 `GameSettings.name`。打包压缩后类名会改变，已保存的文件将无法反序列化。
+> - 必须全局唯一。反序列化时按 `name` 查找第一个匹配的注册项，与内置类重名会匹配到内置类。
 
 ## 实践建议
 

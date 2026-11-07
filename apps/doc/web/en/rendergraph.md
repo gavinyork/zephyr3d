@@ -19,25 +19,29 @@ Typical reasons to read this page:
 The frame graph is not written by hand. It is assembled from a **pipeline** (`RenderPipeline`) holding
 a sequence of **modules** (`RenderModule`), each contributing its own passes.
 
-The default pipeline is built by `createForwardPlusPipeline()` and contains 13 modules in this order:
+The default pipeline is built by `createForwardPlusPipeline()` and contains 17 modules in this order:
 
-| # | Module `type` | Responsibility |
-| --- | --- | --- |
-| 1 | `SkyUpdate` | Update sky / atmosphere LUTs |
-| 2 | `ClusterLights` | Light assignment for clustered lighting |
-| 3 | `GPUPicking` | GPU picking |
-| 4 | `ShadowMaps` | Render each light's shadow map |
-| 5 | `DepthPrepass` | Depth prepass |
-| 6 | `ShadowMaskPass` | Screen-space shadow mask |
-| 7 | `TransmissionDepthForSSR` | Transmissive depth for SSR |
-| 8 | `HiZ` | Build the hierarchical depth buffer |
-| 9 | `SSSProfile` | Subsurface scattering profiles |
-| 10 | `SceneColorGrab` | Grab scene color for refraction |
-| 11 | `LightPass` | Main lighting pass |
-| 12 | `SkyPass` | Sky and fog |
-| 13 | `CompositeTail` | Post-processing chain and final composite |
+| # | Module `type` | Key in `ForwardPlusModules` | Responsibility |
+| --- | --- | --- | --- |
+| 1 | `SkyUpdate` | `SkyUpdate` | Update sky / atmosphere LUTs |
+| 2 | `ClusterLights` | `ClusterLights` | Light assignment for clustered lighting |
+| 3 | `GPUPicking` | `GPUPicking` | GPU picking |
+| 4 | `ShadowMaps` | `ShadowMaps` | Render each light's shadow map |
+| 5 | `WaterCaustics` | `WaterCaustics` | Water caustics map |
+| 6 | `DepthPrepass` | `DepthPrepass` | Depth prepass |
+| 7 | `VirtualTextureUpdate` | `VirtualTextureUpdate` | Terrain virtual texture update |
+| 8 | `ShadowMaskPass` | `ShadowMask` | Screen-space shadow mask |
+| 9 | `TransmissionThicknessPass` | `TransmissionThickness` | Transmission thickness from shadow depth (for skin and other transmissive materials) |
+| 10 | `TransmissionDepthForSSR` | `TransmissionDepthForSSR` | Transmissive depth for SSR |
+| 11 | `HiZ` | `HiZ` | Build the hierarchical depth buffer |
+| 12 | `SSSProfile` | `SSSProfile` | Subsurface scattering profiles |
+| 13 | `SceneColorGrab` | `SceneColorGrab` | Grab scene color for refraction |
+| 14 | `LightPass` | `LightPass` | Main lighting pass |
+| 15 | `SkyPass` | `SkyPass` | Sky and fog |
+| 16 | `Underwater` | `Underwater` | Underwater effects |
+| 17 | `CompositeTail` | `CompositeTail` | Post-processing chain and final composite |
 
-These modules are available through `ForwardPlusModules`, e.g. `ForwardPlusModules.LightPass`.
+These modules are available through `ForwardPlusModules`, e.g. `ForwardPlusModules.LightPass`. A few keys differ from the module `type` (for example `ShadowMask` for `ShadowMaskPass`).
 
 ## Giving a camera its own pipeline
 
@@ -217,7 +221,7 @@ Here is a complete, runnable example: a module that reads linear depth, detects 
 discontinuities and composites outlines over the scene colour. The module itself
 (declarations, `prepare`, `setup`) looks like this:
 
-<<< @/../src/tut-70/main.js{113-186 js}
+<<< @/../src/tut-70/main.js{113-182 js}
 
 Key points:
 
@@ -233,7 +237,7 @@ Key points:
 
 Installing it on a camera:
 
-<<< @/../src/tut-70/main.js{217-233 js}
+<<< @/../src/tut-70/main.js{213-234 js}
 
 This inserts after `LightPass`, so outlines are drawn before sky and fog are composited. Inserting
 after `SkyPass` instead would draw them on top of the sky. Placement depends on which stage of the

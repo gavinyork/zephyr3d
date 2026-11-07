@@ -44,13 +44,15 @@ Physical mode follows Filament's conventions:
 | Point light | lumen (authored) / candela (shaded) | `luminousPower` / `luminousIntensity` |
 | Spot light | lumen (authored) / candela (shaded) | `luminousPower` / `luminousIntensity` |
 | Rect light | cd/m² (nit) | `RectLight.luminance` |
-| Environment / IBL | cd/m² (nit) | `EnvLightWrapper.intensity` |
+| Environment / IBL | lux | `EnvLightWrapper.intensity` (default 30000) |
 | Emissive material | cd/m² (nit) | `emissiveLuminance` |
 | Camera exposure | unitless multiplier | `Camera.exposure` (read-only, derived) |
 
 Point and spot lights expose two related properties: `luminousPower` (luminous flux — the lumen
 figure printed on a bulb's packaging) is convenient for authoring, while `luminousIntensity`
 (candela) is what shading actually uses. The engine converts between them with Filament's formulas.
+
+The environment light's `intensity` is the illuminance an environment texture value of 1 stands for. It only applies to authored skies (`skybox`, `image`), when the sky is baked. A `scatter` sky derives its brightness from the sun's illuminance and ignores it; to dim the ambient light under a `scatter` sky, use `scene.env.light.strength`, which works in both lighting modes.
 
 ## The photometric camera
 
@@ -98,6 +100,8 @@ scene.metersPerUnit = 0.01; // 1 unit = 1 centimeter
 
 With this set correctly, changing scene scale does not change the resulting lighting — the engine
 rescales light intensity so that illuminance at the same physical distance stays the same.
+
+`metersPerUnit` is only used for light falloff and the depth slicing of clustered lighting. The size parameters of the global SDF, probe GI, volumetric clouds, water, SSAO and so on are read directly in scene units (or their own units) and are not converted by it.
 
 ## Where exposure is applied
 

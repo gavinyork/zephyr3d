@@ -66,74 +66,72 @@ Engine 中的反序列化与加载流程均通过 VFS 进行：
 
 ```typescript
 // 加载场景的入口是 Engine.loadSceneFromFile()，
-// 它会对相同路径的并发请求复用同一个 Promise，并在场景加载后附加脚本
+// 它会对相同路径的并发请求复用同一个 Promise，并在场景加载后附加脚本；
+// 加载完成后再次调用会重新读取文件，得到一个新的场景
 const scene = await engine.loadSceneFromFile('/scenes/demo.zscn');
 const texData = await engine.VFS.readFile('/textures/stone.png');
 ```
 
-内部实现中，该方法最终委托给 `engine.resourceManager.loadScene()`。当引擎序列化或保存场景时，序列化层同样使用当前的 VFS 进行 I/O：
+内部实现中，该方法最终委托给 `engine.resourceManager.loadScene()`。保存场景同样经过当前的 VFS：
 
 ```typescript
-await this._vfs.writeFile(filename, JSON.stringify(content), { encoding: 'utf8', create: true });
+await engine.resourceManager.saveScene(scene, '/scenes/demo.zscn');
 ```
 
----
-
-## VFS 的可扩展性
-
-Zephyr3D 的 VFS 体系支持用户自定义文件系统。  
-只需继承 `VFS` 并实现其抽象方法（`_readFile`, `_writeFile`, `_stat` 等），即可接入引擎的资源读取流程。
-
-自定义文件系统适用的典型场景包括：
-
-| 场景 | 示例 |
-|------|------|
-| **本地缓存层** | 先查缓存再回退到 HttpFS |
-| **加密资源访问** | 在 `_readFile` / `_writeFile` 中集成加密解密 |
-| **版本控制** | 使用自定义 urlResolver 实现路径版本映射 |
-| **压缩包读取** | 实现 ZipFS 直接读取打包资源 |
-| **离线加载** | 使用 MemoryFS 或 IndexedDBFS 实现资源持久化 |
+默认的 `HttpFS` 是只读的，向它保存会抛出 `EROFS` 错误；需要保存时，换成或挂载一个可写的文件系统（见下文）。
 
 ---
 
-## 示例：实现自定义缓存文件系统
+## 内置文件系统
+
+`@zephyr3d/base` 自带以下文件系统，大多数需求不必自己实现：
+
+| 类 | 读写 | 用途 |
+|------|------|------|
+| `HttpFS` | 只读 | 通过 HTTP 读取，写操作抛出 `EROFS`。`urlResolver` 选项可改写请求的 URL（例如加上版本号）；要在它上面使用 `readDirectory` / `glob`，需配置 `directoryReader` 选项 |
+| `MemoryFS` | 读写 | 数据保存在内存中，页面关闭即丢失 |
+| `IndexedDBFS` | 读写 | 数据保存在浏览器 IndexedDB 中，可持久化，适合离线和编辑器类工作流 |
+| `ZipFS` | 读写 | 读写 zip 包中的文件，需要传入 zip.js |
+| `DataTransferVFS` | 只读 | 拖放到页面上的文件或文件夹，或 `<input type="file">` 选中的文件 |
+| `NullVFS` | — | 空文件系统 |
+
+这些文件系统可以通过挂载组合使用（见下文）。
+
+## 自定义文件系统
+
+确有特殊需求（如加密资源、自定义缓存）时，可以继承现有文件系统，只覆写需要改变的方法。直接继承 `VFS` 需要实现全部抽象方法（`_readFile`、`_writeFile`、`_stat`、`_readDirectory` 等十余个），工作量大得多。
+
+## 示例：带内存缓存的 HttpFS
 
 ```typescript
-import { VFS, VFSError } from '@zephyr3d/base';
+import { HttpFS, type ReadOptions } from '@zephyr3d/base';
 
-class CachedHttpFS extends VFS {
-  constructor(private httpfs) {
-    super();
-  }
+// 只覆写读取，只读、目录读取等其余行为沿用 HttpFS
+class CachedHttpFS extends HttpFS {
+  private cache = new Map<string, Promise<ArrayBuffer | string>>();
 
-  private cache = new Map<string, ArrayBuffer>();
-
-  async _readFile(path) {
-    if (this.cache.has(path)) {
-      return this.cache.get(path);
+  protected _readFile(path: string, options?: ReadOptions) {
+    // 引擎读场景、预制体时用 utf8，读贴图时用二进制；编码和读取范围都要进缓存键
+    const key = `${path}|${options?.encoding ?? 'binary'}|${options?.offset ?? ''}|${options?.length ?? ''}`;
+    let data = this.cache.get(key);
+    if (!data) {
+      data = super._readFile(path, options);
+      data.catch(() => this.cache.delete(key)); // 失败的请求不缓存
+      this.cache.set(key, data);
     }
-    const data = await this.httpfs.readFile(path, { encoding: 'binary' });
-    this.cache.set(path, data);
     return data;
   }
-
-  async _writeFile() {
-    throw new VFSError('Read-only', 'EROFS');
-  }
-
-  async _exists(path) {
-    return this.cache.has(path) || this.httpfs.exists(path);
-  }
-  // 其他抽象方法可根据需求重写或抛出异常
 }
 ```
 
 应用此类时：
 
 ```typescript
-const cachedFS = new CachedHttpFS(new HttpFS('./cdn'));
+const cachedFS = new CachedHttpFS('./cdn');
 const app = new Application({ backend, canvas, runtimeOptions: { VFS: cachedFS } });
 ```
+
+覆写读取时一定要把 `options` 传下去：忽略 `encoding`、总是返回二进制数据，会让引擎把场景文件当成文本解析时失败。
 
 ---
 

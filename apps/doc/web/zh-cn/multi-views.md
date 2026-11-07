@@ -68,14 +68,14 @@ myApp.on('tick', () => {
   camera.aspect = camera.viewport[2] / camera.viewport[3];  
   camera.render(scene);  
 
-  // —— 第二次渲染：右下角小窗口（画中画） ——  
+  // —— 第二次渲染：左下角小窗口（画中画） ——  
   camera.viewport = [30, 30, 200, 160];  
   camera.aspect = camera.viewport[2] / camera.viewport[3];  
   camera.render(scene);  
 });  
 ```
 
-效果：主视图全屏显示，同时在右下角绘制一块 200×160 的小画面。
+效果：主视图全屏显示，同时在左下角（距左、下边缘各 30 像素）绘制一块 200×160 的小画面。
 
 <div class="showcase" case="tut-46"></div>
 
@@ -86,9 +86,10 @@ myApp.on('tick', () => {
 你也可以创建多个 `Camera` 对象，为它们分配不同的视口，实现多角度分屏视图。
 
 ```javascript  
-const camMain = new Camera(scene);  
-const camTop = new Camera(scene);  
-const camSide = new Camera(scene);  
+// 基类 Camera 的投影矩阵默认是单位矩阵，分屏要用 PerspectiveCamera 或 OrthoCamera  
+const camMain = new PerspectiveCamera(scene);  
+const camTop = new PerspectiveCamera(scene);  
+const camSide = new PerspectiveCamera(scene);  
 
 const w = app.device.deviceXToScreen(app.device.canvas.width);  
 const h = app.device.deviceYToScreen(app.device.canvas.height);  
@@ -120,9 +121,11 @@ camMain.render(scene);
 - 多视口可以共享同一 `Scene` 实例，避免重复加载资源。
 
 - 对于更新不频繁的界面（如小地图），  
-  可以将画面渲染到 **RenderTexture**，再在主画面中显示该纹理，从而提升性能。  
+  可以先渲染到离屏帧缓冲（FrameBuffer）的纹理中，降低更新频率，再在主画面中显示该纹理，从而提升性能。  
 
 - 渲染顺序会影响叠加关系，后绘制的内容会显示在前者之上。
+
+- 开启了 TAA、SSR、SSGI 等依赖历史帧的效果时，画中画应使用独立的相机。同一相机在一帧内以不同尺寸渲染两次，历史数据的尺寸对不上，会被丢弃。
 
 - 多视口渲染可与 **后期处理（Post‑Processing）**、**几何体实例化（Instancing）**  
   和 **顺序无关透明度（OIT）** 等系统一同使用，但请注意各相机的后处理链独立性。

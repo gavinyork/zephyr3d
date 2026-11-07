@@ -69,78 +69,75 @@ In the engine, all serialization and resource loading operations rely on VFS:
 ```typescript
 // Engine.loadSceneFromFile() is the entry point for loading a scene. It shares one
 // promise across concurrent requests for the same path and attaches declared scripts
-// once the scene is loaded.
+// once the scene is loaded; a call after the load has finished reads the file again
+// and returns a new scene.
 const scene = await engine.loadSceneFromFile('/scenes/demo.zscn');
 const texData = await engine.VFS.readFile('/textures/stone.png');
 ```
 
-Internally it delegates to `engine.resourceManager.loadScene()`. When saving or serializing scenes, the serialization layer uses VFS for I/O as well:
+Internally it delegates to `engine.resourceManager.loadScene()`. Saving a scene goes through the active VFS too:
 
 ```typescript
-await this._vfs.writeFile(filename, JSON.stringify(content), { encoding: 'utf8', create: true });
+await engine.resourceManager.saveScene(scene, '/scenes/demo.zscn');
 ```
+
+The default `HttpFS` is read-only, so saving to it throws an `EROFS` error; to save, use or mount a writable file system (see below).
 
 Thus, both reading and writing are fully abstracted from the underlying storage system.
 
 ---
 
-## Extensibility of VFS
+## Built-in File Systems
 
-Zephyr3D’s VFS layer allows developers to define their own custom file systems by extending `VFS` and implementing its abstract methods (e.g. `_readFile`, `_writeFile`, `_stat`).  
-This makes it possible to plug in any kind of file management logic directly into the engine.
+`@zephyr3d/base` ships these file systems, so most needs do not call for a custom one:
 
-**Typical customization scenarios include:**
+| Class | Access | Use |
+|------|------|------|
+| `HttpFS` | read-only | Reads over HTTP; writes throw `EROFS`. The `urlResolver` option rewrites request URLs (for example to add a version); `readDirectory` / `glob` on it need the `directoryReader` option |
+| `MemoryFS` | read-write | Keeps data in memory; it is lost when the page closes |
+| `IndexedDBFS` | read-write | Keeps data in the browser's IndexedDB, persistently; suits offline and editor-like workflows |
+| `ZipFS` | read-write | Reads and writes files in a zip archive; needs zip.js passed in |
+| `DataTransferVFS` | read-only | Files or folders dropped onto the page, or picked with `<input type="file">` |
+| `NullVFS` | — | An empty file system |
 
-| Use Case | Example |
-|-----------|----------|
-| **Local caching layer** | Implement a local cache before falling back to HttpFS |
-| **Encrypted assets** | Add encryption/decryption logic in `_readFile` and `_writeFile` |
-| **Version-controlled resources** | Use a custom URL resolver to append version tags |
-| **Archive-based loading** | Create a `ZipFS` to access resources from packaged archives |
-| **Offline access** | Use `MemoryFS` or `IndexedDBFS` for persistent offline storage |
+They can be combined by mounting (see below).
 
----
+## Custom File Systems
 
-## Example: Custom Cached File System
+When you do have special needs (encrypted assets, a custom cache), extend an existing file system and override only what changes. Extending `VFS` directly means implementing every abstract method (`_readFile`, `_writeFile`, `_stat`, `_readDirectory` and about ten more), which is far more work.
+
+## Example: HttpFS with an In-Memory Cache
 
 ```typescript
-import { VFS, VFSError } from '@zephyr3d/base';
+import { HttpFS, type ReadOptions } from '@zephyr3d/base';
 
-class CachedHttpFS extends VFS {
-  constructor(private httpfs) {
-    super();
-  }
+// Only reading is overridden; read-only behaviour, directory reading and the rest come from HttpFS
+class CachedHttpFS extends HttpFS {
+  private cache = new Map<string, Promise<ArrayBuffer | string>>();
 
-  private cache = new Map<string, ArrayBuffer>();
-
-  async _readFile(path) {
-    if (this.cache.has(path)) {
-      return this.cache.get(path);
+  protected _readFile(path: string, options?: ReadOptions) {
+    // The engine reads scenes and prefabs as utf8 and textures as binary;
+    // the encoding and the read range belong in the cache key
+    const key = `${path}|${options?.encoding ?? 'binary'}|${options?.offset ?? ''}|${options?.length ?? ''}`;
+    let data = this.cache.get(key);
+    if (!data) {
+      data = super._readFile(path, options);
+      data.catch(() => this.cache.delete(key)); // do not cache failed requests
+      this.cache.set(key, data);
     }
-    const data = await this.httpfs.readFile(path, { encoding: 'binary' });
-    this.cache.set(path, data);
     return data;
   }
-
-  async _writeFile() {
-    throw new VFSError('Read-only', 'EROFS');
-  }
-
-  async _exists(path) {
-    return this.cache.has(path) || this.httpfs.exists(path);
-  }
-  // Other abstract methods can be overridden or left unimplemented as needed
 }
 ```
 
-Usage:
+To use it:
 
 ```typescript
-const cachedFS = new CachedHttpFS(new HttpFS('./cdn'));
+const cachedFS = new CachedHttpFS('./cdn');
 const app = new Application({ backend, canvas, runtimeOptions: { VFS: cachedFS } });
 ```
 
-This approach allows flexible caching at the VFS level while maintaining full engine compatibility.
+Always pass `options` on when overriding reads: ignoring `encoding` and always returning binary data makes the engine fail when it parses scene files as text.
 
 ---
 

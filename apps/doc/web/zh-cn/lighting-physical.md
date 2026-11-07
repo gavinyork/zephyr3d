@@ -39,12 +39,14 @@ scene.lightingMode = 'physical';
 | 点光 | lumen（录入）/ candela（着色） | `luminousPower` / `luminousIntensity` |
 | 锥光 | lumen（录入）/ candela（着色） | `luminousPower` / `luminousIntensity` |
 | 面光源 | cd/m²（nit） | `RectLight.luminance` |
-| 环境光 / IBL | cd/m²（nit） | `EnvLightWrapper.intensity` |
+| 环境光 / IBL | lux | `EnvLightWrapper.intensity`（默认 30000） |
 | 自发光材质 | cd/m²（nit） | `emissiveLuminance` |
 | 相机曝光 | 无单位倍数 | `Camera.exposure`（只读，由摄影参数推导） |
 
 点光和锥光有两个相关属性：`luminousPower`（光通量，即灯泡包装上标的流明数）便于录入，
 `luminousIntensity`（光强，candela）是着色实际使用的量，两者按 Filament 的公式换算。
+
+环境光的 `intensity` 表示环境贴图上值为 1 的像素对应的照度，只作用于手工指定的天空（`skybox`、`image`），在烘焙天空时应用。`scatter` 天空的亮度由太阳照度推导，会忽略它；要调暗 `scatter` 天空下的环境光，用两种光照模式下都生效的 `scene.env.light.strength`。
 
 ## 光度相机
 
@@ -89,6 +91,8 @@ scene.metersPerUnit = 0.01; // 1 单位 = 1 厘米
 
 设置正确以后，改变场景尺度不会改变实际的光照结果——引擎会相应换算光强，
 让同一个物理距离上的照度保持一致。
+
+`metersPerUnit` 只用于光源衰减和聚簇光照的深度切分。全局 SDF、探针 GI、体积云、水面、SSAO 等的尺寸参数都直接按场景单位（或各自的单位）解释，不会随它换算。
 
 ## 曝光在哪一步发生
 

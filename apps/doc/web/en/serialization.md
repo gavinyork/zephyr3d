@@ -19,27 +19,27 @@ Only registered classes and registered properties are serialized. Ordinary JavaS
 
 ## Loading and Saving a Scene
 
-Scene files are stored as JSON in the active VFS.
+Scene files are stored as JSON in the active VFS, with the `.zscn` extension by convention.
 
 ```ts
 import { getEngine } from '@zephyr3d/scene';
 
-const resources = getEngine().resourceManager;
-
-const scene = await resources.loadScene('/scenes/level-01.json');
+const scene = await getEngine().loadSceneFromFile('/scenes/level-01.zscn');
 
 if (scene) {
   getEngine().setRenderable(scene, 0);
 }
 ```
 
+`getEngine().loadSceneFromFile()` attaches the scripts declared on the scene and its nodes after loading. The lower-level `resourceManager.loadScene()` only deserializes and **does not attach scripts**; use it directly only when the scene has no scripts or you want to attach them yourself.
+
 To save:
 
 ```ts
-await getEngine().resourceManager.saveScene(scene, '/scenes/level-01.json');
+await getEngine().resourceManager.saveScene(scene, '/scenes/level-01.zscn');
 ```
 
-The target VFS must support writing. For example, `MemFS` and `IDBFS` can be used in editor-like workflows, while a read-only HTTP file system usually cannot save files back to the server.
+The target VFS must support writing. For example, `MemoryFS` and `IndexedDBFS` from `@zephyr3d/base` can be used in editor-like workflows, while a read-only HTTP file system usually cannot save files back to the server.
 
 ## Prefabs
 
@@ -50,6 +50,8 @@ const node = await getEngine().resourceManager.instantiatePrefab(scene.rootNode,
 
 if (node) {
   node.position.setXYZ(5, 0, -3);
+  // instantiatePrefab() does not attach scripts; attach the ones declared in the prefab
+  await getEngine().attachScriptsInSubtree(node);
 }
 ```
 
@@ -65,7 +67,7 @@ Prefab files use a small envelope:
 }
 ```
 
-The `data` field is the normal serialized object. `instantiatePrefab()` checks the envelope, creates the node, assigns `prefabId`, attaches it to the requested parent, and gives the instance a new persistent id.
+The `data` field is the normal serialized object. `instantiatePrefab()` checks the envelope, creates the node, assigns `prefabId`, attaches it to the requested parent, and gives the instance a new persistent id. It only deserializes the node tree and **does not attach** the scripts declared on its nodes, so call `getEngine().attachScriptsInSubtree(node)` after instantiating a prefab with scripts (as above).
 
 ## Serializing Objects
 
@@ -91,14 +93,13 @@ await getEngine().VFS.writeFile('/prefabs/box.zprefab', JSON.stringify(prefab, n
 Use `deserializeObject()` to reconstruct a registered object from JSON:
 
 ```ts
+// The first argument is the context: a restored SceneNode is attached under it
 const restored = await getEngine().resourceManager.deserializeObject(scene.rootNode, prefab.data);
-
-if (restored) {
-  restored.parent = scene.rootNode;
-}
 ```
 
-For normal scene files and prefab files, prefer `loadScene()`, `saveScene()`, and `instantiatePrefab()`.
+`deserializeObject()` restores a node's persistent id as saved. Using it to copy a node already in the scene gives two nodes with the same id; copy nodes with `instantiatePrefab()`, which assigns a new id.
+
+For normal scene files and prefab files, prefer `getEngine().loadSceneFromFile()`, `saveScene()`, and `instantiatePrefab()`.
 
 ## Asset Identity
 
@@ -152,6 +153,11 @@ getEngine().resourceManager.registerClass(gameSettingsClass);
 ```
 
 After registration, the object can be passed to `serializeObject()` and `deserializeObject()` like built-in classes.
+
+> `name` is the type name written into files, and it has two requirements:
+>
+> - It must be a fixed string, not `GameSettings.name`. Bundlers minify class names, and files saved earlier would no longer deserialize.
+> - It must be globally unique. Deserialization takes the first registration whose `name` matches, so a name shared with a built-in class resolves to the built-in class.
 
 ## Practical Guidance
 

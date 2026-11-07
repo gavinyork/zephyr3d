@@ -17,10 +17,13 @@
 |:--------|:------|
 | `'ibl'` | 基于图像的光照（Image-Based Lighting, 适用于 PBR 材质） |
 | `'hemisphere'` | 半球形天光（简单环境光近似） |
+| `'constant'` | 纯色环境光，颜色由 `scene.env.light.ambientColor` 指定 |
 | `'none'` | 无环境光照 |
 
 默认值为 `'ibl'`。  
 若设置为 `'none'`，场景中将完全关闭环境光照，仅保留直接光照（如方向光、点光等）。
+
+`scene.env.light.strength` 是环境光的整体倍率，对所有类型都生效，设为 0 关闭环境光；`specularStrength` 单独缩放环境光的镜面反射部分。
 
 ---
 
@@ -143,7 +146,7 @@ DDGI（Dynamic Diffuse Global Illumination，动态漫反射全局光照）在�
 用场景 SDF 发射探针射线，再把探针的辐照度和可见性插值到表面，从而得到随光源和几何实时变化的漫反射间接光。
 Zephyr3D 的实现由体素材质场和多级 probe clipmap 组成，适合动态摄像机和中等规模的室外/室内场景。
 
-DDGI 与 `scene.env.light` 叠加使用，并不是它的一个取值；`scene.env.light.type = 'none'` 时也能工作。
+DDGI 不是 `scene.env.light` 的一个取值，而是与它配合：在探针覆盖的范围内，DDGI 的结果**取代**环境光的漫反射部分，范围之外回退到环境光。探针结果不受 `scene.env.light.strength` 缩放，亮度用 `scene.gi.intensity` 调节。`scene.env.light.type = 'none'` 时也能工作。
 
 **示例：Cornell box**
 
@@ -168,7 +171,7 @@ btnOn.addEventListener('click', () => setGI(true));
 
 <div class="showcase" case="tut-88"></div>
 
-> 首次打开需要等待资源加载、体素化和探针收敛，前几秒的画面不是最终效果。
+> 首次打开需要等待资源加载、体素化和探针收敛，最初的画面不是最终效果。默认 `probeHysteresis` 为 0.97，探针每次更新只吸收约 3% 的新结果；如果几何体在探针开始更新之后才就位，残留的旧光照可能要几十秒甚至更久才散去。
 
 **启用与参数：**
 
@@ -183,11 +186,13 @@ scene.gi.probeRays = 128;
 scene.gi.probeBudget = 4096;
 ```
 
-`scene.gi.enabled` 会自动保持 `scene.sdf` 开启。只有带 SDF 字段（烘焙资源或 `bakeField()`）的静态网格会进入体素材质场；地形可通过 `scene.gi.terrainAlbedo` 提供默认反照率。
+`scene.gi.enabled` 会自动保持 `scene.sdf` 开启。只有带 SDF 字段（烘焙资源或 `bakeField()`）的静态网格会进入体素材质场；场景中的地形会自动参与，反照率取自地形本身，无需额外设置。
 
 **收敛与画质：**
 
-`probeSpacing` 决定近处探针间距，`probeLevels` 扩大覆盖范围，`probeRays` 提高单探针的采样质量，`probeBudget` 决定每帧更新多少探针。提高 `probeHysteresis` 能减少闪烁，但会让光照变化更慢。漏光时先增大 `probeNormalBias` 或 `probeViewBias`，再检查 SDF 是否闭合和尺度是否正确。
+`probeSpacing` 决定最近一级的探针间距，`probeGrid` 是每一级的探针数。探针按 clipmap 分级，每级的间距和覆盖范围是上一级的两倍；`probeLevels` 是级数，上限和默认值都是 4，所以默认设置下不能再靠它扩大覆盖范围，需要更大范围时应增大 `probeSpacing` 或 `probeGrid`。默认设置下最近一级覆盖 32×16×32 单位，最远一级约 256×128×256 单位。`probeRays` 提高单探针的采样质量，`probeBudget` 决定每帧更新多少探针。
+
+修改 `probeSpacing`、`probeGrid`、`probeLevels`、`probeRays`、`probeBudget` 会销毁探针体并从零重新收敛，不要在运行时频繁改动；`probeHysteresis`、`intensity`、`probeNormalBias`、`probeViewBias` 可以实时调整。提高 `probeHysteresis` 能减少闪烁，但会让光照变化更慢。漏光时先增大 `probeNormalBias` 或 `probeViewBias`，再检查 SDF 是否闭合和尺度是否正确。
 
 动态场景保持默认的 `updateMode = 'continuous'`。场景稳定后可导出并冻结探针状态：
 
@@ -199,6 +204,7 @@ scene.gi.updateMode = 'frozen';
 
 > **限制与诊断：**
 > - DDGI、全局 SDF 和体素光照仅 WebGPU；WebGL2 上 `scene.gi.enabled` 不会构建光照。
+> - 探针间距和覆盖范围、全局 SDF（约相机周围 ±128 单位）都按场景单位计算，不随 `scene.metersPerUnit` 换算。以厘米为单位的场景需要相应放大 `probeSpacing`。
 > - 首次启用需要等待 SDF 流式加载、体素化和探针收敛，不能把第一帧当作最终画质。
 > - 用 `scene.gi.getStats()` 检查 `supported`、体素和 probe 的更新计数；用 `scene.sdf.getStats()` 检查缺失或未驻留的字段。
 > - `atlasSize`、`voxelizeBudget` 和 `lightingSlicesPerFrame` 是显存与更新开销的主要旋钮。
@@ -210,10 +216,11 @@ scene.gi.updateMode = 'frozen';
 | 环境光类型 | 特征 | 适用材质 | 适合场景 | 性能 |
 |-------------|--------|------------|------------|--------|
 | **IBL** | 基于天空（天空盒或大气散射）的高精度反射与漫射光 | PBR | 写实、反射性场景 | 较高 |
-| **Hemispheric** | 上下半球颜色插值的简化照明 | Lambert / Unlit | 低性能设备或卡通风格 | 高 |
+| **Hemispheric** | 上下半球颜色插值的简化照明 | 受光照材质（Lambert、Blinn、PBR 等） | 低性能设备或卡通风格 | 高 |
+| **Constant** | 单一颜色的均匀环境光 | 受光照材质 | 简单场景、调试 | 高 |
 | **None** | 不计算间接光，仅保留直射光 | 任意 | 特效、暗场或特殊视觉风格 | 最高 |
 
-DDGI 可叠加在以上任一模式之上，提供随场景几何变化的漫反射间接光，仅 WebGPU，开销最高。
+DDGI 可与以上任一模式配合，在探针覆盖范围内取代其漫反射部分，提供随场景几何变化的漫反射间接光，仅 WebGPU，开销最高。
 
 ---
 

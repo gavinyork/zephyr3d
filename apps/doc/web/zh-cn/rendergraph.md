@@ -18,25 +18,29 @@
 渲染图不是手写的，而是由一条**管线**（`RenderPipeline`）里的一串**模块**
 （`RenderModule`）各自贡献 pass 组装出来的。
 
-默认管线由 `createForwardPlusPipeline()` 构造，包含 13 个模块，按此顺序：
+默认管线由 `createForwardPlusPipeline()` 构造，包含 17 个模块，按此顺序：
 
-| # | 模块 `type` | 职责 |
-| --- | --- | --- |
-| 1 | `SkyUpdate` | 更新天空/大气 LUT |
-| 2 | `ClusterLights` | 聚簇光照的光源分配 |
-| 3 | `GPUPicking` | GPU 拾取 |
-| 4 | `ShadowMaps` | 渲染各光源的 shadow map |
-| 5 | `DepthPrepass` | 深度预渲染 |
-| 6 | `ShadowMaskPass` | 屏幕空间阴影遮罩 |
-| 7 | `TransmissionDepthForSSR` | 透射物体深度（供 SSR 用） |
-| 8 | `HiZ` | 构建 Hi-Z 层级深度 |
-| 9 | `SSSProfile` | 次表面散射 profile |
-| 10 | `SceneColorGrab` | 抓取场景颜色（供折射用） |
-| 11 | `LightPass` | 主光照 pass |
-| 12 | `SkyPass` | 天空与雾 |
-| 13 | `CompositeTail` | 后处理链与最终合成 |
+| # | 模块 `type` | `ForwardPlusModules` 中的键 | 职责 |
+| --- | --- | --- | --- |
+| 1 | `SkyUpdate` | `SkyUpdate` | 更新天空/大气 LUT |
+| 2 | `ClusterLights` | `ClusterLights` | 聚簇光照的光源分配 |
+| 3 | `GPUPicking` | `GPUPicking` | GPU 拾取 |
+| 4 | `ShadowMaps` | `ShadowMaps` | 渲染各光源的 shadow map |
+| 5 | `WaterCaustics` | `WaterCaustics` | 水面焦散贴图 |
+| 6 | `DepthPrepass` | `DepthPrepass` | 深度预渲染 |
+| 7 | `VirtualTextureUpdate` | `VirtualTextureUpdate` | 地形虚拟纹理更新 |
+| 8 | `ShadowMaskPass` | `ShadowMask` | 屏幕空间阴影遮罩 |
+| 9 | `TransmissionThicknessPass` | `TransmissionThickness` | 根据阴影深度计算透射厚度（供皮肤等材质的透射使用） |
+| 10 | `TransmissionDepthForSSR` | `TransmissionDepthForSSR` | 透射物体深度（供 SSR 用） |
+| 11 | `HiZ` | `HiZ` | 构建 Hi-Z 层级深度 |
+| 12 | `SSSProfile` | `SSSProfile` | 次表面散射 profile |
+| 13 | `SceneColorGrab` | `SceneColorGrab` | 抓取场景颜色（供折射用） |
+| 14 | `LightPass` | `LightPass` | 主光照 pass |
+| 15 | `SkyPass` | `SkyPass` | 天空与雾 |
+| 16 | `Underwater` | `Underwater` | 水下效果 |
+| 17 | `CompositeTail` | `CompositeTail` | 后处理链与最终合成 |
 
-这些模块可以从 `ForwardPlusModules` 取到，例如 `ForwardPlusModules.LightPass`。
+这些模块可以从 `ForwardPlusModules` 取到，例如 `ForwardPlusModules.LightPass`。注意少数模块的键名与 `type` 不同（如 `ShadowMask` 对应 `ShadowMaskPass`）。
 
 ## 给相机换一条管线
 
@@ -205,7 +209,7 @@ builder.setExecute((rgCtx) => {
 下面是一个完整可运行的例子：一个读取线性深度、检测深度不连续处、给场景颜色叠加描边的模块。
 模块本体（声明、`prepare`、`setup`）如下：
 
-<<< @/../src/tut-70/main.js{113-186 js}
+<<< @/../src/tut-70/main.js{113-182 js}
 
 要点：
 
@@ -219,7 +223,7 @@ builder.setExecute((rgCtx) => {
 
 装到相机上：
 
-<<< @/../src/tut-70/main.js{217-233 js}
+<<< @/../src/tut-70/main.js{213-234 js}
 
 这里插在 `LightPass` 之后，所以描边发生在天空和雾合成之前。改插到 `SkyPass` 之后就会
 叠在天空之上。位置取决于你要读的是哪个阶段的画面。
