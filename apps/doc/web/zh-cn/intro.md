@@ -22,7 +22,7 @@ Forward+ 管线以 render graph 组织，具备自动资源池化与用于时域
 
 **材质与光照**
 
-PBR（metallic-roughness 与 specular-glossiness 两套工作流）、[基于图像的光照](./lighting-intro.html)、物理光照单位、Lambert/Blinn/Unlit、用于风格化着色的 MToon，以及可用于自定义材质的[基于mixin的系统](./user-material.html)。[材质蓝图](./material-blueprint.html)可在编辑器中以节点图的方式编写材质。
+PBR（metallic-roughness 与 specular-glossiness 两套工作流）、[基于图像的光照](./lighting-intro.html)、物理光照单位、Lambert/Blinn/Unlit、用于风格化着色的 MToon，以及可用于自定义材质的[基于mixin的系统](./user-material.html)。[材质蓝图](./editor/material-blueprint.md)可在编辑器中以节点图的方式编写材质。
 
 **角色渲染**
 

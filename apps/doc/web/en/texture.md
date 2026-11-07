@@ -30,7 +30,7 @@ const texture = device.createTexture2D('rgba8unorm', 256, 256, {
 // Create 2D textures with Image
 const img = document.createElement('img');
 img.src = IMAGE_URL;
-img.onLoad = function(){
+img.onload = function(){
   createImageBitmap(img, { premultiplyAlpha: 'none' }).then(bm => {
     // parameter 1：ImageBitmap or HTMLCanvasElement
     // parameter 2: Whether the image color space is sRGB, true is the sRGB color space, and false is the linear color space

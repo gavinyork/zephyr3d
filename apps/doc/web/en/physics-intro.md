@@ -98,7 +98,7 @@ It applies when the node enters a simulated scene and its body is built for the 
 
 The simulation advances in fixed steps, independent of the frame rate:
 
-- 60 steps a second by default (`fixedTimeStep` = 1/60), at most 4 per frame (`maxSubSteps`). Below 15 frames a second the extra time is dropped: things slow down instead of catching up in a burst.
+- 60 steps a second by default (`fixedTimeStep` = 1/60), at most 8 per frame (`maxSubSteps`). Below 7.5 frames a second the extra time is dropped: things slow down instead of catching up in a burst.
 - When the frame rate differs from the step rate, nodes are drawn between the last two steps (`interpolation`) to avoid stutter.
 - Collision layers and the collision matrix are in [Colliders](en/physics-colliders.md#collision-layers).
 
@@ -119,7 +119,7 @@ Changes apply from the next frame. The scene's world can also be changed directl
 
 - **Call `initPhysics()` before scenes start running.** Scenes with physics data load without it, but are not simulated until it has completed. `scene.physicsWorld` is null until then.
 - **WebGL2 and WebGPU** both work: physics runs on the CPU, independent of the rendering backend. It is single-threaded.
-- **Determinism**: only fixed steps feed the simulation. The same inputs (creation order, when forces are applied) give the same results on any machine. For frame-exact reproducibility apply forces in the fixed step (see [Scripting](en/physics-scripting.md)), not by frame time in `onUpdate`.
+- **Determinism**: only fixed steps feed the simulation. The same inputs (creation order, when forces are applied) give the same results on the same machine and browser; bit-identical results across machines and browsers are not guaranteed, because the engine uses Rapier's SIMD build rather than its cross-platform deterministic build. For frame-exact reproducibility apply forces in the fixed step (see [Scripting](en/physics-scripting.md)), not by frame time in `onUpdate`.
 - **Download size**: Rapier's WebAssembly is about 1.1 MB gzipped. Editor builds only ship it when the project uses physics.
 - **Other engines**: the simulation talks to the engine through an interface (`PhysicsBackend` in `@zephyr3d/physics`); another engine can be added as a package of its own without changing scenes or scripts.
 - Bone chains, cloth and hair simulate independently of the rigid body world.

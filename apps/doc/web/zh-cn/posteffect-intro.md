@@ -8,19 +8,19 @@
 
 内置效果：
 
-| 效果 | 类名 | 用途 |
+| 效果 | 开启方式 | 用途 |
 | --- | --- | --- |
-| 色调映射 | `Tonemap` | 将 HDR 场景颜色转换为显示颜色 |
-| FXAA | `FXAA` | 快速边缘平滑 |
-| TAA | `TAA` | 基于 jitter 和累积缓冲的时间抗锯齿 |
-| Bloom | `Bloom` | 高亮区域光晕 |
-| SSR | `SSR` | 屏幕空间反射 |
-| SSGI | `SSGI` | 基于历史 HDR 场景颜色的屏幕空间漫反射全局光照 |
-| SSAO/SAO | `SAO` | 屏幕空间环境光遮蔽 |
-| Motion Blur | `MotionBlur` | 相机或物体运动造成的模糊 |
-| Skin SSS | `SkinSSS` | 皮肤次表面散射，配合 `SkinMaterial` 使用，见[皮肤与次表面散射](zh-cn/material-skin.md) |
-| Color Adjust | `ColorAdjust` | 饱和度、对比度、色相和锐化调整 |
-| Grayscale | `Grayscale` | 用于自定义 compositor 链的灰度转换 |
+| 色调映射 | `camera.toneMap` | 将 HDR 场景颜色转换为显示颜色 |
+| FXAA | `camera.FXAA` | 快速边缘平滑 |
+| TAA | `camera.TAA` | 基于 jitter 和累积缓冲的时间抗锯齿 |
+| Bloom | `camera.bloom` | 高亮区域光晕 |
+| SSR | `camera.SSR` | 屏幕空间反射 |
+| SSGI | `camera.SSGI` | 基于历史 HDR 场景颜色的屏幕空间漫反射全局光照 |
+| SSAO/SAO | `camera.SSAO` | 屏幕空间环境光遮蔽 |
+| Motion Blur | `camera.motionBlur` | 相机或物体运动造成的模糊 |
+| Skin SSS | 无开关：画面中有 `SSSMaterial` 时自动启用（`PostSSS`，仅 WebGPU） | 皮肤次表面散射，见[皮肤与次表面散射](zh-cn/material-skin.md) |
+| Color Adjust | `camera.colorAdjust` | 饱和度、对比度、色相和锐化调整 |
+| Grayscale | `camera.compositor.appendPostEffect(new Grayscale())` | 用于自定义 compositor 链的灰度转换 |
 
 ## 摄像机属性
 

@@ -26,6 +26,8 @@
 camera.SSR = true;
 ```
 
+> SSR 需要环境光提供 radiance（反射探针或 IBL）。若 `scene.env.light` 没有 radiance，即使 `camera.SSR = true` 也不会生效，且没有警告。
+
 ### 启用 HiZ 加速
 
 - **接口：** [Camera.HiZ](/doc/markdown/./scene.camera.hiz)  
@@ -33,14 +35,14 @@ camera.SSR = true;
 - **默认值：** `false`
 
 开启 **HiZ（Hierarchical Z‑buffer）** 可显著提升屏幕空间反射或遮蔽计算性能。  
-它使用层级深度金字塔结构加速屏幕空间光线追踪，仅支持 **WebGL2** 与 **WebGPU** 后端。
+它使用层级深度金字塔结构加速屏幕空间光线追踪。
 
 ```javascript
 // 启用HiZ加速以提升SSR性能
 camera.HiZ = true;
 ```
 
-> 当 HiZ 启用时，部分射线追踪属性（如 `ssrStride` 与 `ssrMaxDistance`）将被自动忽略。
+> 当 HiZ 启用时，`ssrStride` 与 `ssrCalcThickness` 不再参与追踪；`ssrMaxDistance`、`ssrIterations`、`ssrThickness` 仍然生效。
 
 ---
 
@@ -50,7 +52,7 @@ camera.HiZ = true;
 
 - **接口：** [Camera.ssrMaxRoughness](/doc/markdown/./scene.camera.ssrmaxroughness)  
 - **取值范围：** `0.0 ~ 1.0`  
-- **默认值：** `0.8`
+- **默认值：** `0.55`
 
 设置允许 SSR 生效的表面粗糙度阈值。  
 只有粗糙度低于该值的材质才会生成反射效果。
@@ -60,6 +62,15 @@ camera.HiZ = true;
 camera.ssrMaxRoughness = 0.9;
 ```
 
+### 粗糙度缩放
+
+- **接口：** [Camera.ssrRoughnessFactor](/doc/markdown/./scene.camera.ssrroughnessfactor)  
+- **类型：** `number`  
+- **默认值：** `1`
+
+开启 SSR 时，所有 PBR 材质的粗糙度都会乘以这个系数——它改变的是材质本身的高光，而不只是反射。  
+调小它能让整个场景看起来更"亮滑"，但也会让开/关 SSR 的对比里混入粗糙度变化（本页示例 tut-49 就把它设成了 `0.002`）。
+
 ---
 
 ### 射线追踪参数
@@ -68,7 +79,7 @@ camera.ssrMaxRoughness = 0.9;
 
 - **接口：** [Camera.ssrStride](/doc/markdown/./scene.camera.ssrstride)  
 - **类型：** `number`  
-- **默认值：** `2`
+- **默认值：** `1`
 
 表示光线每次在屏幕空间前进的像素步长。  
 步长越小，精度越高但性能下降。
@@ -86,7 +97,7 @@ camera.ssrStride = 4;
 
 - **接口：** [Camera.ssrIterations](/doc/markdown/./scene.camera.ssriterations)  
 - **类型：** `number`  
-- **默认值：** `120`
+- **默认值：** `96`
 
 控制 SSR 光线的最大迭代次数。  
 “步长 × 步进次数” 决定最大追踪深度，数值过大会降低性能。
@@ -102,7 +113,7 @@ camera.ssrIterations = 200;
 
 - **接口：** [Camera.ssrMaxDistance](/doc/markdown/./scene.camera.ssrmaxdistance)  
 - **类型：** `number`  
-- **默认值：** `100`
+- **默认值：** `64`
 
 控制摄像机空间中射线的最大反射距离。  
 值越大，反射可涵盖更远的物体（性能损耗相应增加）。
@@ -118,7 +129,7 @@ camera.ssrMaxDistance = 500;
 
 - **接口：** [Camera.ssrThickness](/doc/markdown/./scene.camera.ssrthickness)  
 - **类型：** `number`  
-- **默认值：** `0.5`
+- **默认值：** `0.9`
 
 定义物体表面相交检测时的厚度阈值，用于避免错误穿透。
 
@@ -137,7 +148,7 @@ camera.ssrThickness = 0.2;
 
 启用此功能后，将自动渲染双面深度缓冲以计算真实厚度。  
 在某些复杂几何下可提升精度，但开销较大。  
-当 HiZ 启用时，此选项被忽略。
+当 HiZ 启用时，追踪不使用这份厚度，但双面深度仍会照常渲染——HiZ 下请保持关闭，免得白付开销。
 
 ```javascript
 // 开启自动厚度计算
@@ -155,7 +166,7 @@ SSR 在粗糙表面或高采样场景中常伴随反射噪点，因此需要模�
 
 - **接口：** [Camera.ssrBlurScale](/doc/markdown/./scene.camera.ssrblurscale)  
 - **类型：** `number`  
-- **默认值：** `0.05`
+- **默认值：** `0.008`
 
 控制模糊影响范围。值越大模糊越强，细节丢失越多。
 
@@ -184,7 +195,7 @@ camera.ssrBlurDepthCutoff = 4;
 
 - **接口：** [Camera.ssrBlurKernelSize](/doc/markdown/./scene.camera.ssrblurkernelsize)  
 - **类型：** `number`  
-- **默认值：** `17`
+- **默认值：** `5`
 
 定义用于模糊的核大小。  
 较大的值产生更柔和的模糊，但性能开销更大。
@@ -199,7 +210,7 @@ camera.ssrBlurKernelSize = 5;
 
 - **接口：** [Camera.ssrBlurStdDev](/doc/markdown/./scene.camera.ssrblurstddev)  
 - **类型：** `number`  
-- **默认值：** `10`
+- **默认值：** `4`
 
 控制高斯权重曲线的分布范围，更高的值提供更强的模糊。
 
@@ -213,7 +224,7 @@ camera.ssrBlurStdDev = 4;
 
 | 目标效果 | 参数建议 |
 |-----------|----------|
-| 高精度镜面反射（金属） | `stride = 2`, `iterations = 120`, `ssrMaxRoughness = 0.3`, 禁用自动厚度 |
+| 高精度镜面反射（金属） | `stride = 1`（默认）, `iterations = 120`, `ssrMaxRoughness = 0.3`, 禁用自动厚度 |
 | 柔和反射（水面、玻璃） | `blurScale = 0.05`, `blurKernelSize = 9`, `blurStdDev = 6` |
 | 高性能模式（移动端） | 启用 `HiZ`，降低 `iterations` 至 `60`，关闭 `calcThickness` |
 | 高质量桌面效果 | 启用 `HiZ`，`blurKernelSize = 17`，`ssrBlurDepthCutoff = 1.5` |

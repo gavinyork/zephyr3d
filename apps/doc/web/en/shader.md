@@ -282,20 +282,24 @@ The built-in variable scope encompasses all the built-in variables within a Shad
 ```javascript
 
 vertex(pb){
-  // Obtain the built-in scope through the $builtins property.
-  // vertexIndex corresponds to the gl_VertexID in GLSL or the @builtin@(vertex_index) in WebGPU
-  this.$l.vertexId = this.$builtins.vertexIndex;
+  pb.main(function(){
+    // Obtain the built-in scope through the $builtins property.
+    // vertexIndex corresponds to gl_VertexID in GLSL or @builtin(vertex_index) in WGSL
+    this.$l.vertexId = this.$builtins.vertexIndex;
+  });
 },
 
 ```
+
+Built-in variables can only be read or written inside a function body (usually `pb.main`), not in the global scope of the stage function.
 
 The table below contains all the built-in variables we currently support.
 
 |Builtin variable|WebGL2|WGSL|Stage|
 |--|--|--|--|
-|```$builtins.position```|gl_Position|$builtin(position)|vertex|
+|```$builtins.position```|gl_Position|@builtin(position)|vertex|
 |```$builtins.pointSize```|gl_PointSize|N/A|vertex|
-|```$builtins.fragCoord```|gl_FragCoord|$builtin(position)|fragment|
+|```$builtins.fragCoord```|gl_FragCoord|@builtin(position)|fragment|
 |```$builtins.frontFacing```|gl_FrontFacing|@builtin(front_facing)|fragment|
 |```$builtins.fragDepth```|gl_FragDepth|@builtin(frag_depth)|fragment|
 |```$builtins.vertexIndex```|gl_VertexID|@builtin(vertex_index)|vertex|
@@ -540,7 +544,7 @@ vertex(pb){
   // Entry point
   pb.main(function(){
     this.x = pb.float(1);
-    this.y = pb.float(2):
+    this.y = pb.float(2);
     this.swapTwoNumbers(this.x, this.y);
     // ... ...
   });
@@ -561,7 +565,11 @@ pb.func('foo', [pb.vec3('v')], function(){
 
 ```
 
-The following table contains the built-in functions that we support.
+The following table contains the built-in functions that we support. Two of them are easy to get wrong:
+
+> - **`pb.select(x, y, cond)` takes the false value first**: the result is `cond ? y : x`, the reverse of how a ternary reads (it follows WGSL's `select`). WebGL2 generates `mix(x, y, cond)`. To write it in ternary order, use the scope method `this.$choice(cond, a, b)`, which is `cond ? a : b` on both backends.
+> - **`pb.mod(x, y)` gives different results for negative numbers on the two backends**: for floats, WebGPU generates `x % y` (the result takes the sign of the dividend) and WebGL2 generates GLSL's `mod(x, y)` (the result takes the sign of the divisor). When the dividend can be negative and both backends must agree, write `pb.sub(x, pb.mul(y, pb.floor(pb.div(x, y))))` yourself. Integers generate `%` on both backends.
+
 
 |Function|GLSL|WGSL|
 |--|--|--|
@@ -577,9 +585,9 @@ The following table contains the built-in functions that we support.
 |```pb.sinh(this.x)```|```sinh(x)```|```sinh(x)```|
 |```pb.cosh(this.x)```|```cosh(x)```|```cosh(x)```|
 |```pb.tanh(this.x)```|```tanh(x)```|```tanh(x)```|
-|```pb.asinh(this.x)```|```asinh(x)```|```asinh(x)```|
-|```pb.acosh(this.x)```|```acosh(x)```|```acosh(x)```|
-|```pb.atanh(this.x)```|```atanh(x)```|```atanh(x)```|
+|```pb.asinh(this.x)```|```asinh(x)```|N/A|
+|```pb.acosh(this.x)```|```acosh(x)```|N/A|
+|```pb.atanh(this.x)```|```atanh(x)```|N/A|
 |```pb.pow(this.x, this.y)```|```pow(x, y)```|```pow(x, y)```|
 |```pb.exp(this.x)```|```exp(x)```|```exp(x)```|
 |```pb.exp2(this.x)```|```exp2(x)```|```exp2(x)```|
@@ -591,34 +599,32 @@ The following table contains the built-in functions that we support.
 |```pb.sign(this.x)```|```sign(x)```|```sign(x)```|
 |```pb.floor(this.x)```|```floor(x)```|```floor(x)```|
 |```pb.ceil(this.x)```|```ceil(x)```|```ceil(x)```|
-|```pb.round(this.x)```|```sinh(x)```|```sinh(x)```|
 |```pb.fract(this.x)```|```fract(x)```|```fract(x)```|
-|```pb.mod(this.x)```|```mod(x)```|```mod(x)```|
-|```pb.sinh(this.x)```|```sinh(x)```|```sinh(x)```|
+|```pb.mod(this.x, this.y)```|```mod(x, y)```|```x % y```|
 |```pb.fma(this.x, this.y, this.z)```|```x * y + z```|```fma(x, y, z)```|
 |```pb.min(this.x, this.y)```|```min(x, y)```|```min(x, y)```|
 |```pb.max(this.x, this.y)```|```max(x, y)```|```max(x, y)```|
 |```pb.clamp(this.x, this.y, this.z)```|```clamp(x, y, z)```|```clamp(x, y, z)```|
 |```pb.mix(this.x, this.y, this.z)```|```mix(x, y, z)```|```mix(x, y, z)```|
 |```pb.step(this.x, this.y)```|```step(x, y)```|```step(x, y)```|
-|```pb.smoothStep(this.x, this.y, this.z)```|```smoothstep(x)```|```smoothstep(x)```|
+|```pb.smoothStep(this.x, this.y, this.z)```|```smoothstep(x, y, z)```|```smoothstep(x, y, z)```|
 |```pb.length(this.x)```|```length(x)```|```length(x)```|
 |```pb.distance(this.x, this.y)```|```distance(x, y)```|```distance(x, y)```|
 |```pb.dot(this.x, this.y)```|```dot(x, y)```|```dot(x, y)```|
 |```pb.cross(this.x, this.y)```|```cross(x, y)```|```cross(x, y)```|
 |```pb.normalize(this.x)```|```normalize(x)```|```normalize(x)```|
-|```pb.faceForward(this.x, this.y, this.z)```|N/A|```faceForward(x, y, z)```|
+|```pb.faceForward(this.x, this.y, this.z)```|```faceforward(x, y, z)```|```faceForward(x, y, z)```|
 |```pb.reflect(this.x, this.y)```|```reflect(x, y)```|```reflect(x, y)```|
 |```pb.refract(this.x, this.y, this.z)```|```refract(x, y, z)```|```refract(x, y, z)```|
 |```pb.frexp(this.x)```|N/A|```frexp(x)```|
 |```pb.transpose(this.x)```|```transpose(x)```|```transpose(x)```|
 |```pb.determinant(this.x)```|```determinant(x)```|```determinant(x)```|
 |```pb.arrayLength(this.x)```|N/A|```arrayLength(x)```|
-|```pb.select(this.x, this.y, this.z)```|N/A|```select(x, y, z)```|
-|```pb.floatBitsToInt(this.x)```|```floatBitsToInt(x)```|N/A|
-|```pb.floatBitsToUint(this.x)```|```floatBitsToUint(x)```|N/A|
-|```pb.intBitsToFloat(this.x)```|```intBitsToFloat(x)```|N/A|
-|```pb.uintBitsToFloat(this.x)```|```uintBitsToFloat(x)```|N/A|
+|```pb.select(this.x, this.y, this.z)```|```mix(x, y, z)```|```select(x, y, z)```|
+|```pb.floatBitsToInt(this.x)```|```floatBitsToInt(x)```|```bitcast<i32>(x)```|
+|```pb.floatBitsToUint(this.x)```|```floatBitsToUint(x)```|```bitcast<u32>(x)```|
+|```pb.intBitsToFloat(this.x)```|```intBitsToFloat(x)```|```bitcast<f32>(x)```|
+|```pb.uintBitsToFloat(this.x)```|```uintBitsToFloat(x)```|```bitcast<f32>(x)```|
 |```pb.pack4x8snorm(this.x)```|N/A|```pack4x8snorm(x)```|
 |```pb.unpack4x8snorm(this.x)```|N/A|```unpack4x8snorm(x)```|
 |```pb.pack4x8unorm(this.x)```|N/A|```pack4x8unorm(x)```|
@@ -639,17 +645,16 @@ The following table contains the built-in functions that we support.
 |```pb.round(this.x)```|N/A|```round(x)```|
 |```pb.trunc(this.x)```|N/A|```trunc(x)```|
 |```pb.textureDimensions(this.tex, this.level)```|```textureSize(tex, level)```|```textureDimensions(tex, level)```|
-|```pb.textureGather(this.tex, this.sampler, this.coord)```|N/A|```textureGater(tex, sampler, coord)```|
-|```pb.textureGather(this.comp, this.tex, this.sampler, this.coord)```|N/A|```textureGater(comp, tex, sampler, coord)```|
-|```pb.textureArrayGather(this.tex, this.sampler, this.coord, this.arrayIndex)```|N/A|```textureGater(tex, sampler, coord, arrayIndex)```|
-|```pb.textureArrayGather(this.comp, this.tex, this.sampler, this.coord, this.arrayIndex)```|N/A|```textureGater(comp, tex, sampler, coord, arrayIndex)```|
-|```pb.textureGatherCompare(this.x, this.sampler, this.coord, this.depthRef)```|N/A|```textureGaterCompare(x, sampler, coord, depthRef)```|
-|```pb.textureArrayGatherCompare(this.x, this.sampler, this.coord, this.arrayIndex, this.depthRef)```|N/A|```textureGaterCompare(x, sampler, coord, arrayIndexdepthRef)```|
+|```pb.textureGather(this.tex, this.sampler, this.coord)```|N/A|```textureGather(tex, sampler, coord)```|
+|```pb.textureGather(this.comp, this.tex, this.sampler, this.coord)```|N/A|```textureGather(comp, tex, sampler, coord)```|
+|```pb.textureArrayGather(this.tex, this.sampler, this.coord, this.arrayIndex)```|N/A|```textureGather(tex, sampler, coord, arrayIndex)```|
+|```pb.textureArrayGather(this.comp, this.tex, this.sampler, this.coord, this.arrayIndex)```|N/A|```textureGather(comp, tex, sampler, coord, arrayIndex)```|
+|```pb.textureGatherCompare(this.x, this.sampler, this.coord, this.depthRef)```|N/A|```textureGatherCompare(x, sampler, coord, depthRef)```|
+|```pb.textureArrayGatherCompare(this.x, this.sampler, this.coord, this.arrayIndex, this.depthRef)```|N/A|```textureGatherCompare(x, sampler, coord, arrayIndex, depthRef)```|
 |```pb.textureLoad(this.tex, this.coord, this.level)```|```texelFetch(tex, coord, level)```|```textureLoad(tex, coord, level)```|
 |```pb.textureArrayLoad(this.tex, this.coord, this.arrayIndex, this.level)```|```texelFetch(tex, coord, level)```|```textureLoad(tex, coord, arrayIndex, level)```|
 |```pb.textureStore(this.tex, this.coord, this.value)```|N/A|```textureStore(tex, coord, value)```|
 |```pb.textureArrayStore(this.tex, this.coord, this.arrayIndex, this.value)```|N/A|```textureStore(tex, coord, arrayIndex, value)```|
-|```pb.textureLoad(this.tex, this.coord, this.level)```|```texelFetch(tex, coord, level)```|```textureLoad(tex, coord, level)```|
 |```pb.textureNumLayers(this.tex)```|N/A|```textureNumLayers(tex)```|
 |```pb.textureNumLevels(this.tex)```|N/A|```textureNumLevels(tex)```|
 |```pb.textureNumSamples(this.tex)```|N/A|```textureNumSamples(tex)```|
@@ -658,7 +663,7 @@ The following table contains the built-in functions that we support.
 |```pb.textureSampleBias(this.tex, this.coord, this.bias)```|```texture(tex, coord, bias)```|```textureSampleBias(tex, coord, bias)```|
 |```pb.textureArraySampleBias(this.tex, this.coord, this.arrayIndex, this.bias)```|```texture(tex, coord, bias)```|```textureSampleBias(tex, coord, arrayIndex, bias)```|
 |```pb.textureSampleCompare(this.tex, this.coord, this.depthRef)```|```texture(tex, coord)```|```textureSampleCompare(tex, coord, depthRef)```|
-|```pb.textureArraySampleCompare(this.tex, this.coord, this.arrayIndex, this.depthRef)```|```texture(tex, coord)```|```textureSampleCompare(tex, coord, this.arrayIndex, depthRef)```|
+|```pb.textureArraySampleCompare(this.tex, this.coord, this.arrayIndex, this.depthRef)```|```texture(tex, coord)```|```textureSampleCompare(tex, coord, arrayIndex, depthRef)```|
 |```pb.textureSampleLevel(this.tex, this.coord, this.level)```|```textureLod(tex, coord, level)```|```textureSampleLevel(tex, coord, level)```|
 |```pb.textureArraySampleLevel(this.tex, this.coord, this.arrayIndex, this.level)```|```textureLod(tex, coord, level)```|```textureSampleLevel(tex, coord, arrayIndex, level)```|
 |```pb.textureSampleCompareLevel(this.tex, this.coord, this.depthRef)```|```texture(tex, coord)```|```textureSampleCompareLevel(tex, coord, depthRef)```|

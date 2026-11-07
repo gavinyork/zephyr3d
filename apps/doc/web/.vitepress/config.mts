@@ -235,6 +235,13 @@ function normalizeDocLink(href: string): string {
   if (cleanHref === 'doc/markdown/index.md' || cleanHref === '/doc/markdown/index.md') {
     return '/api/';
   }
+  // Guide pages link to each other docsify-style, relative to the docs root
+  // (`zh-cn/scene-basic.md`), the same form `_sidebar.md` uses. VitePress resolves
+  // a bare path against the current page, which would give /zh-cn/zh-cn/..., so
+  // anchor these at the root; VitePress then adds the base and the .html suffix.
+  if (/^(zh-cn|en)\//.test(cleanHref)) {
+    return `/${cleanHref}`;
+  }
   return cleanHref;
 }
 
@@ -369,7 +376,9 @@ export default defineConfig({
   metaChunk: true,
   cleanUrls: false,
   lastUpdated: false,
-  ignoreDeadLinks: true,
+  // Dead links fail the build. DOC_SKIP_API drops the API pages, so links into
+  // them cannot be checked in that mode.
+  ignoreDeadLinks: process.env.DOC_SKIP_API ? [/^\/api(\/|$)/] : false,
   // The ~1569 generated API pages dominate build time. Set DOC_SKIP_API=1 to
   // exclude them when iterating on the guides or the examples; never use it for
   // a release build, which must contain the API reference.

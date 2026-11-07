@@ -67,7 +67,7 @@ const ub = device.createStructuredBuffer(bufferType, { usage: 'uniform' });
 
 ## Storage Buffer
 
-Storage Buffer is a type of buffer that provides shaders with read and write access to a buffer of structured data.
+Storage Buffer is a type of buffer that provides shaders with read and write access to a buffer of structured data. It is WebGPU only; on WebGL2 a program that declares a storage buffer fails to build.
 
 ```javascript
 
@@ -82,10 +82,11 @@ const program = device.buildRenderProgram({
   }
 });
 // Gets the structure type of the buffer
-const bufferType = shaderProgram.getBindingInfo('myBuffer').type;
+const bufferType = program.getBindingInfo('myBuffer').type;
 
-// Creates storage buffer based on that structure type
-const ub = device.createStructuredBuffer(bufferType, { usage: 'storage' });
+// Creates storage buffer based on that structure type. Storage is requested with
+// storage: true; there is no 'storage' value in BufferUsage
+const ub = device.createStructuredBuffer(bufferType, { storage: true });
 
 ```
 

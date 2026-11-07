@@ -13,6 +13,9 @@
   docsify 风格的缩进列表）。新增或移动页面必须同步改这两个文件，且两边结构保持对称。
 - 正文里的 `/doc/markdown/./scene.xxx` 形式的 API 链接由 `normalizeDocLink()` 在渲染期重映射到
   TypeDoc 产出的页面。这是有意保留的兼容层，**不是死链，不要批量改写**。
+- 页面之间互链沿用 `_sidebar.md` 的写法 `[文字](zh-cn/xxx.md)`（相对站点根），同样由
+  `normalizeDocLink()` 补成 `/zh-cn/xxx.md` 再交给 VitePress 加 base。同目录也可写 `./xxx.md`。
+- 构建会检查死链，有死链即失败（`DOC_SKIP_API=1` 时跳过指向 `/api/` 的链接）。
 - API 参考由 TypeDoc 从库源码直接生成，不要手写。
 - `_sidebar.md` 之外的下划线开头文件会被 `srcExclude` 排除，不会构建。
 

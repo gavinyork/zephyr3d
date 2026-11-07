@@ -98,7 +98,7 @@ body.initialAngularVelocity = new Vector3(0, 6.28, 0); // rad/s，每秒绕 Y �
 
 物理以固定步长推进，与帧率无关：
 
-- 默认每秒 60 步（`fixedTimeStep` = 1/60），一帧最多 4 步（`maxSubSteps`）。帧率低于 15 时多出的时间丢弃，物体看起来变慢，而不是一下子追赶。
+- 默认每秒 60 步（`fixedTimeStep` = 1/60），一帧最多 8 步（`maxSubSteps`）。帧率低于 7.5 时多出的时间丢弃，物体看起来变慢，而不是一下子追赶。
 - 渲染帧率与步长不一致时，节点位置在最近两步之间插值（`interpolation`），避免抖动。
 - 碰撞层与碰撞矩阵见 [碰撞体](zh-cn/physics-colliders.md#碰撞层)。
 
@@ -119,7 +119,7 @@ scene.physicsSettings = settings;
 
 - **在场景开始运行前调用 `initPhysics()`。** 没有它，含物理数据的场景也能加载，但在它完成前不会被模拟，`scene.physicsWorld` 为 null。
 - **WebGL2 与 WebGPU 都支持**，物理在 CPU 上运行，与渲染后端无关。不支持多线程。
-- **确定性**：模拟只由固定步长驱动。相同的输入（创建顺序、施力时机）在不同机器上得到相同结果。想要逐帧可复现，就在固定步里施力（见 [脚本控制](zh-cn/physics-scripting.md)），不要依赖 `onUpdate` 的帧间隔。
+- **确定性**：模拟只由固定步长驱动。相同的输入（创建顺序、施力时机）在同一台机器、同一浏览器上得到相同结果；跨机器、跨浏览器不保证逐位一致，因为使用的是 Rapier 的 SIMD 构建，而不是它的跨平台确定性构建。想要逐帧可复现，就在固定步里施力（见 [脚本控制](zh-cn/physics-scripting.md)），不要依赖 `onUpdate` 的帧间隔。
 - **包体积**：Rapier 的 wasm 约 1.1 MB（gzip）。编辑器导出时只有项目用到物理才打包它。
 - **其他物理引擎**：模拟层通过接口（`@zephyr3d/physics` 中的 `PhysicsBackend`）与引擎通信；可以另做一个引擎包接入其他物理引擎，场景和脚本都不用改。
 - 骨骼链、布料、头发的模拟与刚体世界互不影响。

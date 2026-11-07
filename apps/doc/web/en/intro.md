@@ -35,7 +35,7 @@ PBR (metallic-roughness and specular-glossiness), [image-based
 lighting](./lighting-intro.html), physical lighting units,
 Lambert/Blinn/Unlit, MToon for stylized shading, and a [mixin-based
 system](./user-material.html) for custom materials.
-[Material blueprints](./material-blueprint.html) author materials
+[Material blueprints](./editor/material-blueprint.md) author materials
 as node graphs in the editor.
 
 **Character rendering**

@@ -50,9 +50,9 @@ The camera must use HDR, SSGI intensity must be greater than zero, and the IBL m
 
 | Preset | Resolution | Rays/pixel | Max steps | Denoise passes |
 | --- | --- | ---: | ---: | ---: |
-| `quality` | Full | 2 | 64 | 3 |
-| `balanced` | Half | 1 | 48 | 2 |
-| `performance` | Half | 1 | 24 | 1 |
+| `quality` | Full | 2 | 64 | 4 |
+| `balanced` | Half | 1 | 48 | 4 |
+| `performance` | Half | 1 | 24 | 4 |
 | `custom` | Configurable | 1–4 | 1–256 | 0–5 |
 
 ```ts
@@ -79,6 +79,8 @@ Changing any custom setting through the API automatically switches the preset to
 | --- | ---: | --- |
 | `ssgiIntensity` | `0.7` | Strength of screen-space indirect lighting relative to IBL. Controls how much SSGI affects the final image |
 | `ssgiSkyOcclusion` | `1` | How much occluding geometry blocks environment light. `1` is full physical occlusion; lower values reduce darkening |
+| `ssgiAOIntensity` | `0.8` | How strongly the ambient occlusion traced by the same SSGI rays is multiplied into the final colour; `0` turns it off. It works the same way as SSAO, so **enabling it together with `camera.SSAO` darkens twice** |
+| `ssgiAOPower` | `1` | Contrast curve for that occlusion; above 1 deepens occluded areas, below 1 lifts them |
 | `ssgiMaxDistance` | `32` | Maximum view-space trace distance. Larger values capture more distant bounces but cost more performance |
 | `ssgiThickness` | `0.5` | Depth intersection thickness for ray hits |
 | `ssgiStride` | `1` | Pixel stride for linear ray marching, used only when no Hi-Z pyramid is available |

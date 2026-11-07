@@ -21,6 +21,12 @@ The engine provides two main picking methods:
 The principle is simple: based on the input position on screen, a ray is generated from the camera through that position in world (or camera) space.  
 This ray is then tested against the bounding volumes of scene objects to determine which object is intersected.
 
+Ray picking only considers nodes whose `pickable` is `true`, and `SceneNode.pickable` **defaults to `false`**. Until you turn it on, `scene.raycast()` always returns `null`:
+
+```javascript  
+mesh.pickable = true;  
+```
+
 Example:
 
 ```javascript  
@@ -49,8 +55,8 @@ if (pickResult) {
 >
 > `target.node` works the same way in both, but the distance and point fields are not interchangeable.
 
-> Ray‑based picking tests intersections using object **bounding boxes**,  
-> so it is approximate by nature — for irregular meshes, transparent surfaces, or skinned/animated geometry,  
+> Built-in shapes (`BoxShape`, `SphereShape`, `TorusShape` and so on) are intersected exactly; other meshes are tested against their **bounding boxes**,  
+> so for them it is approximate by nature — for irregular meshes, transparent surfaces, or skinned/animated geometry,  
 > the picked result may be inaccurate.  
 > For pixel‑level accuracy or complex object selection, **Color‑based Picking** is recommended.
 

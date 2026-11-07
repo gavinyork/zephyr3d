@@ -30,7 +30,7 @@ const texture = device.createTexture2D('rgba8unorm', 256, 256, {
 // 通过Image创建2D纹理
 const img = document.createElement('img');
 img.src = IMAGE_URL;
-img.onLoad = function(){
+img.onload = function(){
   createImageBitmap(img, { premultiplyAlpha: 'none' }).then(bm => {
     // 参数1：ImageBitmap或HTMLCanvasElement
     // 参数2: 图像颜色空间是否sRGB，true为sRGB颜色空间，false为线性颜色空间

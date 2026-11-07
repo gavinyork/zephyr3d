@@ -51,25 +51,6 @@ water.waveGenerator = waves;
 
 Because the material uses scene color and scene depth, water is rendered in the main scene pipeline. Keep transparent objects and post effects in mind when tuning the final look.
 
-Select `Shore regions (geometry)` under `Debug Output` in the editor, or set `water.debugOutput = 'shoreRegions'`, to inspect the coastal geometry. Blue marks base water, cyan the offshore ShoreWave region, orange the wet inland swash, and magenta the dry inland carrier. The fade from blue to a coastal color shows the ShoreWave envelope weight. ShoreWave and base water share one displaced mesh; the colors identify regions rather than separate meshes.
-
-This view bypasses wet-edge clipping, foam shading, and projected-ground depth correction in both color and depth passes. It preserves the actual geometry and terrain occlusion, revealing dry carrier surfaces that normal rendering hides. Combine it with `wireframe` to inspect mesh coverage. Select `None` (`'none'`) to restore normal rendering.
-
-ShoreWave reads the shoreline from the height map of the scene's first terrain, in four levels around the camera, each twice the size of the one before, covering 1024 m square with the waves fading out from about 450 m, matching the foam field; props and piers on the beach do not bend the waves. Foam against walls still comes from the scene SDF, within about 50 m of the camera, so it needs the scene SDF enabled. Without a terrain the waves fall back to the scene SDF too, with the same 50 m reach. WebGPU only. Select `Shore field levels` (`'shoreLevels'`) to see which level answers where: red, green, blue and yellow from the nearest, blending where levels hand over and darkening towards the edge of the farthest; light and dark bands every 2 m of the distance to the waterline should run on unbroken across the handovers.
-
-Shore-wave foam rises and falls with the waves: each broken wave carries a sheet of white water shoreward that fades behind the crest, runs up the beach with the swash, and stays on the sand to fade away once the water drains. The foam in the water and on the beach is one foam field; the shallower the water, the less the foam drifts and the slower it fades, so the beach foam and the sea foam form one sheet.
-
-| Parameter | Meaning |
-| --- | --- |
-| `surfFoamDuration` | How long, in seconds, the foam of each breaking wave lasts. Higher gives longer white trails behind the crests and foam that stays longer on the sand |
-| `foamSettleDepth` | Water depth in metres below which foam stops drifting and stays where it is until it fades. Higher widens the band of foam lying in the shallows and on the beach |
-| `foamDriftDepth` | Water depth in metres above which foam drifts freely; in between, the shallower the water the slower it drifts |
-| `settledFoamFade` | How fast foam resting in the shallows and on the sand fades compared with open water. Lower leaves it on the beach longer after each wave drains; 1 fades it as fast as at sea |
-
-Three RGB views keep normal wet clipping and ground-depth handling for diagnosing swash foam. `swashHandover` shows carrier wet coverage in red, reconstructed ground wet coverage in green, and ground replacement weight in blue. `swashFoamSources` shows surface foam density in red, the foam field's density at the ground in green, and the breaking waves' foam on the wet ground in blue. `swashFoamCuts` shows the surface foam opacity after texture cutting in red, the ground foam opacity in green, and the replacement weight in blue. Compare these views at the same paused wave phase to locate a break between density, texture cutting, and final handover. Temporarily set `animationSpeed` to 0 to pause the waves, then restore its original value.
-
-`swashVisibility` reveals fragments normally clipped or hidden: red marks wet-edge discard, green marks a selected depth behind the opaque surface, and blue shows projected ground foam density. `swashGroundSupport` shows the beach-bed mask in red, foam-field coverage in green, and ground wet coverage in blue. Both bypass wet-edge clipping and draw at the ground depth where the beach-bed mask is valid. Use them to distinguish a missing mesh from rejected shading support; they intentionally reveal dry carrier pixels.
-
 ## The Water Medium
 
 The water's color comes from two coefficients, **absorption** and **scattering**, both per-meter, per-RGB-channel physical coefficients (units 1/m).
@@ -89,7 +70,8 @@ water.scattering = new Vector3(0.01, 0.02, 0.03);
 | `absorption` | How fast light dies out in the body. Higher, and deeper, means less transmitted light and a darker body |
 | `scattering` | How much light the body throws back toward the eye. Higher means a milkier, more opaque body - but also one that glows from within |
 | `absorptionScale` / `scatteringScale` | Global multipliers for quick turbidity adjustment without touching the per-channel color |
-| `mediumMode` | `physical` (default) or `ramp`. `ramp` is the legacy gradient-texture path, kept only for scenes tuned against it |
+
+> 1.0 removes the legacy gradient-texture medium: `mediumMode`, `scatterRampTexture` and `absorptionRampTexture` are gone, and the medium comes from the two coefficients above alone.
 
 These coefficients are **shared**: refraction, caustics, directional scattering and refraction blur all read the same values, so changing them affects all of those at once.
 
@@ -112,7 +94,7 @@ water.cheapRefractionDepth = 1;
 
 ## Caustics
 
-Caustics are the web of focused sunlight the surface casts onto submerged geometry. They need a **shadow-casting directional light** and a WebGL2/WebGPU device; the pass switches itself off when either is missing.
+Caustics are the web of focused sunlight the surface casts onto submerged geometry. They need a **shadow-casting directional light** and a WebGL2/WebGPU device; the pass switches itself off when either is missing, and also when the sun is close to the horizon.
 
 ```ts
 water.causticsEnabled = true;
@@ -123,7 +105,7 @@ water.causticsIntensity = 1;
 
 | Property | Meaning |
 | --- | --- |
-| `causticsEnabled` | Master switch. Keep it `false` when you do not want caustics to skip the photon launch and temporal accumulation entirely |
+| `causticsEnabled` | Master switch, default `true`. Set it to `false` when you do not want caustics, to skip the photon launch and temporal accumulation entirely. The underwater light shafts read the caustic map, so they disappear with it |
 | `causticsDepth` | The depth (meters) where caustics are sharpest. Receivers away from it are progressively **defocused** rather than displaced, so set it to the depth most receiving geometry - pool floor, sea bed - sits at |
 | `causticsRange` | How far from the camera the caustic map reaches (meters). A cap rather than a fixed extent: the map is fitted to the water actually within it. Raise it to light more of the scene at the cost of resolution |
 | `causticsIntensity` | Caustic contrast. 0 leaves the light unmodulated, 1 is the default physical amount |
@@ -174,13 +156,13 @@ water.underwaterGodRays = true;
 | --- | --- |
 | `underwaterEnabled` | Master switch, default `true`. Turn it off for a water body the camera is never meant to enter |
 | `underwaterAmbientIntensity` | Scale on the downwelling sky light filling the column. This is what the water fades to in the distance, so it sets how bright the underwater haze reads |
-| `underwaterGodRays` | Shafts of sunlight through the column, default `true` |
+| `underwaterGodRays` | Shafts of sunlight through the column, default `true`. Needs caustics: with `causticsEnabled = false` there are no shafts |
 | `underwaterGodRayIntensity` | Shaft strength, 1 for the value the medium implies |
 | `underwaterGodRaySteps` | Samples per view ray, default 24. Raise it when the shafts read as grain rather than as beams |
 | `underwaterGodRayShadow` | Let geometry standing in the water break the shafts. Default `false`; costs a shadow map lookup per march step |
 | `underwaterHysteresis` | Half-width (meters) of the dead band around the surface the submerged test uses |
 
-> Tthe underwater medium reaches **opaque geometry only**.
+> The underwater medium reaches **opaque geometry only**.
 >
 > The submerged test is against the water's **rest plane**, not the displaced surface, so a camera within a wave height of the surface may disagree with what the waves are doing. .
 
@@ -210,37 +192,75 @@ water.material.foamColor = new Vector3(0.92, 0.95, 0.97);
 | `foamFalloff` | A power applied to the coverage. Above 1 it pushes light folding toward no foam at all, so only a genuinely broken crest shows - which is what keeps a windy sea from turning uniformly white |
 | `foamColor` | Diffuse albedo of the foam, shared with shoreline foam. Slightly off-white and slightly blue (water plus air); a pure white one reads as snow |
 
+Foam left by breaking crests on open water does not vanish at once; it drifts with the wind and fades:
+
+| Property | Default | Meaning |
+| --- | --- | --- |
+| `foamFadeRate` | `0.8` | How fast the foam fades, per second. Lower leaves longer white trails behind breaking waves |
+| `foamTrailStrength` | `1` | How much foam breaking crests leave behind to drift and fade. 0 keeps foam only while a crest breaks |
+| `foamDrift` | `0.03` | Share of the wind speed the foam drifts at, about 0.03 in nature |
+| `foamFieldSize` | `128` | Side in metres of the finest level of the foam field around the camera. Coarser levels reach eight times as far; beyond them foam shows only while crests break |
+
 Foam is a **lit** surface: it suppresses the specular underneath it and the light coming up through the column, and responds to the sun and the ambient the way a matte surface does.
 
-## Shoreline Foam
+## Shore Waves
 
-Shoreline foam is the white water that collects where the surface comes close to something solid: the waterline on a shelving bed, and the collar where a piling, a hull or a rock breaks the surface. It is independent of crest foam and switches on separately.
+Shore waves are the wave trains that roll in from open water, steepen in the shallows, break and run up the beach. They are layered over the waves of the `waveGenerator`; whatever the shape of the coast, the crests come in square to it, and boats and other floating objects ride them.
 
-It is **off by default**.
+**Off by default**; they turn on when `shoreWaveHeight` is greater than 0. WebGPU only.
 
 ```ts
-water.shoreFoamAmount = 1;
-water.shoreFoamDepth = 0.5;
-water.shoreFoamWashAmount = 0.5;
+water.shoreWaveHeight = 0.6; // crest-to-trough height in metres, 0 for none
+water.shoreWavePeriod = 6;   // seconds between successive waves
+water.shoreWaveLength = 8;   // crest spacing in metres at the outer edge of the zone, bunching up shoreward
+water.shoreWaveZone = 20;    // how far out from the waterline the waves rise, in metres
 ```
 
-| Property | Meaning |
-| --- | --- |
-| `shoreFoamAmount` | Coverage strength. 0 disables it (default), which also removes its cost |
-| `shoreFoamDepth` | How far the band reaches from the solid surface (meters). Over a bed that is a depth of water; against something vertical like a piling or a hull it is the horizontal distance to its side, and one value serves both. How wide that is on screen depends on the geometry: a thin line on a steep drop-off, a broad stretch on a flat shelf |
-| `shoreFoamFalloff` | Falloff across the band. Above 1 it pushes coverage toward the contact line and keeps the outer edge thin and broken |
-| `shoreFoamScale` | Size of the foam clumps, as **cycles across the band**. 2.5 puts a couple of clumps across it. Being relative to the band width rather than an absolute frequency, one value reads the same on a shoreline metres across and on a collar a handspan wide |
-| `shoreFoamWashAmount` | How far the waterline runs up and back, as a fraction of `shoreFoamDepth`. 0 leaves a static rim; this is what makes the band read as surf rather than as a decal. Above 1 the band closes completely at the bottom of the cycle, which looks like the foam blinking out |
-| `shoreFoamWashSpeed` | Run-up cycles per second. This is swell rather than wind waves, so well under 1 |
-| `shoreFoamWashScale` | Spatial frequency of the run-up phase (cycles per meter). At 0 the whole waterline rises and falls in lockstep, which reads as the water level itself changing; a cycle every few tens of meters breaks a long shoreline into sections that run out of step with one another |
+| Property | Default | Meaning |
+| --- | --- | --- |
+| `shoreWaveHeight` | `0` | Crest-to-trough height in metres. 0 turns the shore waves off, and the shore field and foam work with them |
+| `shoreWaveLength` | `8` | Distance in metres between crests at the outer edge of the zone; they bunch up towards the shore |
+| `shoreWavePeriod` | `6` | Seconds between successive waves |
+| `shoreWaveZone` | `20` | How far out from the waterline the waves rise, in metres |
+| `shoreWaveSharpness` | `0.7` | How sharp the crests become at the shore, 0 for a sine and towards 1 for a cusp |
+| `shoreWaveLean` | `0.5` | How far the crests lean towards the shore, 0 for upright, 1 for a steep front face |
+| `shoreWaveIrregularity` | `0.6` | 0 for parallel crests a fixed wavelength apart; higher gives each wave a period and a bend of its own |
 
-The color comes from `material.foamColor`, shared with crest foam.
+ShoreWave reads the shoreline from the height map of the scene's first terrain, in four levels around the camera, each twice the size of the one before, covering 1024 m square with the waves fading out from about 450 m, matching the foam field; props and piers on the beach do not bend the waves. Foam against walls still comes from the scene SDF, within about 50 m of the camera, so it needs the scene SDF enabled. Without a terrain the waves fall back to the scene SDF too, with the same 50 m reach. WebGPU only. Select `Shore field levels` (`'shoreLevels'`) to see which level answers where: red, green, blue and yellow from the nearest, blending where levels hand over and darkening towards the edge of the farthest; light and dark bands every 2 m of the distance to the waterline should run on unbroken across the handovers.
 
-The effect is derived from what the camera can see, which sets its limits:
+### Shore Foam
 
-- Foam near an object disappears once that object leaves the frame
-- An object hidden behind something in the foreground produces no foam
-- An object only a few pixels wide on screen - a cable, a railing - may produce no foam at all. Lowering `shoreFoamDepth` helps
+Shore-wave foam rises and falls with the waves: each broken wave carries a sheet of white water shoreward that fades behind the crest, runs up the beach with the swash, and stays on the sand to fade away once the water drains. The foam in the water and on the beach is one foam field; the shallower the water, the less the foam drifts and the slower it fades, so the beach foam and the sea foam form one sheet.
+
+| Property | Default | Meaning |
+| --- | --- | --- |
+| `shoreWaveFoamStrength` | `1` | How much foam the breaking shore waves make |
+| `shoreWaveFoamCoverage` | `0.55` | How much of the shore waves makes foam, 0..1, higher for more |
+| `shoreWaveShallowFoamDepth` | `0.65` | Water shallower than this many metres makes foam |
+| `shoreWaveShallowFoamStrength` | `2` | How much foam shallow water makes |
+| `surfFoamDuration` | `1.5` | How long, in seconds, the foam of each breaking wave lasts. Higher gives longer white trails behind the crests and foam that stays longer on the sand |
+| `foamSettleDepth` | `0.02` | Water depth in metres below which foam stops drifting and stays where it is until it fades. Higher widens the band of foam lying in the shallows and on the beach |
+| `foamDriftDepth` | `0.3` | Water depth in metres above which foam drifts freely; in between, the shallower the water the slower it drifts |
+| `settledFoamFade` | `0.25` | How fast foam resting in the shallows and on the sand fades compared with open water. Lower leaves it on the beach longer after each wave drains; 1 fades it as fast as at sea |
+
+Where water hits walls, rocks and piers standing in it, it rings them with foam. Wall foam only appears while the shore waves are on, and comes from the scene SDF (see above).
+
+| Property | Default | Meaning |
+| --- | --- | --- |
+| `wallFoamStrength` | `1` | Opacity of the wall foam, 0..1 |
+| `wallFoamMinSpeed` | `0.2` | Speed in metres per second the water has to hit a wall at before it makes any foam |
+| `wallFoamMaxSpeed` | `1.5` | Speed in metres per second at which water hitting a wall makes the most foam |
+| `wallFoamDrift` | `0.3` | Speed in metres per second the foam drifts out from the wall at; higher for a wider ring |
+
+### Debug Views
+
+Select `Shore regions (geometry)` under `Debug Output` in the editor, or set `water.debugOutput = 'shoreRegions'`, to inspect the coastal geometry. Blue marks base water, cyan the offshore ShoreWave region, orange the wet inland swash, and magenta the dry inland carrier. The fade from blue to a coastal color shows the ShoreWave envelope weight. ShoreWave and base water share one displaced mesh; the colors identify regions rather than separate meshes.
+
+This view bypasses wet-edge clipping, foam shading, and projected-ground depth correction in both color and depth passes. It preserves the actual geometry and terrain occlusion, revealing dry carrier surfaces that normal rendering hides. Combine it with `wireframe` to inspect mesh coverage. Select `None` (`'none'`) to restore normal rendering.
+
+Three RGB views keep normal wet clipping and ground-depth handling for diagnosing swash foam. `swashHandover` shows carrier wet coverage in red, reconstructed ground wet coverage in green, and ground replacement weight in blue. `swashFoamSources` shows surface foam density in red, the foam field's density at the ground in green, and the breaking waves' foam on the wet ground in blue. `swashFoamCuts` shows the surface foam opacity after texture cutting in red, the ground foam opacity in green, and the replacement weight in blue. Compare these views at the same paused wave phase to locate a break between density, texture cutting, and final handover. Temporarily set `animationSpeed` to 0 to pause the waves, then restore its original value.
+
+`swashVisibility` reveals fragments normally clipped or hidden: red marks wet-edge discard, green marks a selected depth behind the opaque surface, and blue shows projected ground foam density. `swashGroundSupport` shows the beach-bed mask in red, foam-field coverage in green, and ground wet coverage in blue. Both bypass wet-edge clipping and draw at the ground depth where the beach-bed mask is valid. Use them to distinguish a missing mesh from rejected shading support; they intentionally reveal dry carrier pixels.
 
 ## Wave Generators
 
@@ -342,7 +362,7 @@ A disturber injects the change in the water column its shape displaces since the
 
 The window follows the water the camera is looking at by default (`followMode: 'camera'`), can follow a node (`'node'` with `followNode`) for a first-person view, or stay put (`'fixed'` with `center`) for a pool or a pond. A band inside the window edge absorbs outgoing waves so the edge never shows; the `interaction` debug output shows the field on its own and dims everything outside the window.
 
-Disturbances also lay down foam - where a shape moves, where a stone lands, along the steep fast crests of the field's own waves - which fades at `foamDecay` and is drawn with the same look as the crest and shoreline foam. `foamAmount` scales it; at its default of 0.15 a wake reads as a trail rather than a sheet.
+Disturbances also lay down foam - where a shape moves, where a stone lands, along the steep fast crests of the field's own waves - which fades at `foamDecay` and is drawn with the same look as the crest and shoreline foam. `interaction.foamAmount` is the coverage made per second where the water is churned to the full, default 3, and 0 turns this foam off; `foamDecay` (default 0.6, in 1/s) sets how fast it fades.
 
 The field needs a filterable float or half-float render target; `interaction.isOk()` reports whether the device has one, and the water falls back to the wave generator alone when it does not. Tutorial `tut-75` drives a boat through the field and floats a buoy on the result.
 
@@ -372,7 +392,7 @@ app.on('tick', (deltaMs) => {
 
 A rigid body should read `sampleWorldYRaw`; the eased `sampleWorldY` is for objects placed directly at the surface height. With a physics library, call `BuoyancyVolume.computeForces()` from its step and apply the force and torque to the body instead.
 
-<div class="showcase" case="tut-66"></div>
+<div class="showcase" case="tut-75"></div>
 
 Buoyancy sampling excludes all WaterDisturber wakes by default, retaining ambient waves and external addImpulse waves to prevent feedback oscillations. Rendering still includes all waves. Set WaterSurfaceSampler includeDisturbers: true for the complete visual surface. Water.getSurfacePoint queries the complete surface by default; pass false as its fourth argument to exclude wakes. Interaction maintains an additional texture pair and simulation pass for the external field.
 
@@ -391,7 +411,7 @@ Use the largest `gridScale` that still gives enough near-camera detail. Keep the
 - **Small decorative water**: `FBMWaveGenerator` is usually sufficient.
 - **Oceans / broad swells**: use `FFTWaveGenerator`, especially when you want foam or folded crests. It allocates several FFT textures and updates every frame; the GPU cost rises quickly with resolution.
 - **Low-end hardware**: set `refractionMode` to `offset` to drop the 24 depth reads per pixel.
-- **Caustics**: need a shadow-casting directional light. Keep `causticsEnabled = false` when you do not want them.
-- **Shoreline foam**: adds around a dozen depth samples per water pixel and a second channel to the scene's depth pyramid. Keep `shoreFoamAmount = 0` when you do not want it.
+- **Caustics**: need a shadow-casting directional light, and are on by default. Set `causticsEnabled = false` when you do not want them.
+- **Shore waves**: once on, the shore field (the terrain height map in four levels, or the scene SDF) is maintained every frame and the foam field simulated with it. With `shoreWaveHeight = 0` (the default) none of this runs.
 - **Refraction blur / directional scattering**: nearly free, and they pull a lot of look from the medium coefficients.
 - **Underwater**: costs nothing while the camera is above the surface - the pass is not built into the frame at all. Once submerged it is two full-screen draws, plus `underwaterGodRaySteps` caustic-map samples per pixel when the shafts are on, and the same number of shadow map lookups again when `underwaterGodRayShadow` is. Lower the step count before turning the shafts off.

@@ -64,15 +64,15 @@ const ub = device.createStructuredBuffer(bufferType, { usage: 'uniform' });
 
 ## 存储缓冲区
 
-存储缓冲区(Storage Buffer)允许着色器对结构化数据缓冲区进行读写操作。
+存储缓冲区(Storage Buffer)允许着色器对结构化数据缓冲区进行读写操作。仅 WebGPU 支持，WebGL2 下声明存储缓冲区的程序会构建失败。
 
 ```javascript
 
-// 假定我们要为shaderProgram中声明的名为myBuffer的UAV缓冲区创建Buffer，首先获取缓冲区的结构类型
+// 假定我们要为shaderProgram中声明的名为myBuffer的存储缓冲区创建Buffer，首先获取缓冲区的结构类型
 const bufferType = shaderProgram.getBindingInfo('myBuffer').type;
 
-// 根据该结构类型创建缓冲区
-const ub = device.createStructuredBuffer(bufferType, { usage: 'storage' });
+// 根据该结构类型创建缓冲区。存储用途用 storage: true 指定，BufferUsage 里没有 'storage'
+const ub = device.createStructuredBuffer(bufferType, { storage: true });
 
 ```
 

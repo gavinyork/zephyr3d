@@ -25,6 +25,8 @@ Enable or disable the Screen Space Reflection effect.
 camera.SSR = true;  
 ```
 
+> SSR needs radiance from the environment light (a reflection probe or IBL). If `scene.env.light` has no radiance, `camera.SSR = true` has no effect, and no warning is printed.
+
 ### Enable HiZ Acceleration
 
 - **Interface:** [Camera.HiZ](/doc/markdown/./scene.camera.hiz)  
@@ -32,14 +34,14 @@ camera.SSR = true;
 - **Default:** `false`
 
 Enabling **HiZ (Hierarchical Z‑buffer)** can significantly improve the performance of SSR or occlusion computations.  
-It uses a hierarchical depth‑pyramid structure to accelerate screen‑space ray tracing and is supported in **WebGL2** and **WebGPU** backends.
+It uses a hierarchical depth‑pyramid structure to accelerate screen‑space ray tracing.
 
 ```javascript  
 // Enable HiZ to improve SSR performance  
 camera.HiZ = true;  
 ```
 
-> When HiZ is enabled, some ray‑tracing parameters (such as `ssrStride` and `ssrMaxDistance`) are automatically ignored.
+> When HiZ is enabled, `ssrStride` and `ssrCalcThickness` no longer take part in the trace; `ssrMaxDistance`, `ssrIterations` and `ssrThickness` still apply.
 
 ---
 
@@ -49,7 +51,7 @@ camera.HiZ = true;
 
 - **Interface:** [Camera.ssrMaxRoughness](/doc/markdown/./scene.camera.ssrmaxroughness)  
 - **Range:** `0.0 ~ 1.0`  
-- **Default:** `0.8`
+- **Default:** `0.55`
 
 Sets the maximum surface roughness threshold for SSR to apply.  
 Only materials with roughness below this value will generate reflections.
@@ -59,6 +61,15 @@ Only materials with roughness below this value will generate reflections.
 camera.ssrMaxRoughness = 0.9;  
 ```
 
+### Roughness Factor
+
+- **Interface:** [Camera.ssrRoughnessFactor](/doc/markdown/./scene.camera.ssrroughnessfactor)  
+- **Type:** `number`  
+- **Default:** `1`
+
+While SSR is on, the roughness of every PBR material is multiplied by this factor. It changes the material's own specular response, not just the reflection.  
+Lowering it makes the whole scene look glossier, but it also mixes a roughness change into any SSR on/off comparison (the tut-49 example on this page sets it to `0.002`).
+
 ---
 
 ### Ray‑Tracing Parameters
@@ -67,7 +78,7 @@ camera.ssrMaxRoughness = 0.9;
 
 - **Interface:** [Camera.ssrStride](/doc/markdown/./scene.camera.ssrstride)  
 - **Type:** `number`  
-- **Default:** `2`
+- **Default:** `1`
 
 Defines the number of pixels each reflection ray advances per step in screen space.  
 Smaller stride = higher accuracy but lower performance.
@@ -85,7 +96,7 @@ camera.ssrStride = 4;
 
 - **Interface:** [Camera.ssrIterations](/doc/markdown/./scene.camera.ssriterations)  
 - **Type:** `number`  
-- **Default:** `120`
+- **Default:** `96`
 
 Controls the maximum number of ray‑marching iterations per reflection ray.  
 The product of *stride × iterations* determines the maximum tracing depth.  
@@ -102,7 +113,7 @@ camera.ssrIterations = 200;
 
 - **Interface:** [Camera.ssrMaxDistance](/doc/markdown/./scene.camera.ssrmaxdistance)  
 - **Type:** `number`  
-- **Default:** `100`
+- **Default:** `64`
 
 Specifies the maximum camera‑space distance that a reflection ray can travel.  
 Higher values capture reflections from distant objects but at a performance cost.
@@ -118,7 +129,7 @@ camera.ssrMaxDistance = 500;
 
 - **Interface:** [Camera.ssrThickness](/doc/markdown/./scene.camera.ssrthickness)  
 - **Type:** `number`  
-- **Default:** `0.5`
+- **Default:** `0.9`
 
 Defines the intersection thickness threshold to avoid ray penetration errors when detecting surface intersections.
 
@@ -137,7 +148,7 @@ camera.ssrThickness = 0.2;
 
 When enabled, SSR automatically renders a double‑sided depth buffer to estimate the actual thickness of objects.  
 It improves precision on complex geometries but increases GPU cost.  
-Ignored when HiZ is active.
+With HiZ active the trace does not use this thickness, but the double‑sided depth is still rendered, so keep it off under HiZ to avoid paying for nothing.
 
 ```javascript  
 // Enable automatic thickness calculation  
@@ -156,7 +167,7 @@ The engine supports Gaussian blur and depth‑aware bilateral filtering.
 
 - **Interface:** [Camera.ssrBlurScale](/doc/markdown/./scene.camera.ssrblurscale)  
 - **Type:** `number`  
-- **Default:** `0.05`
+- **Default:** `0.008`
 
 Controls the overall blur radius.  
 Larger values result in stronger blur and more detail loss.
@@ -186,7 +197,7 @@ camera.ssrBlurDepthCutoff = 4;
 
 - **Interface:** [Camera.ssrBlurKernelSize](/doc/markdown/./scene.camera.ssrblurkernelsize)  
 - **Type:** `number`  
-- **Default:** `17`
+- **Default:** `5`
 
 Specifies the kernel size used in the blur operation.  
 Larger kernels produce smoother results but have greater performance cost.
@@ -201,7 +212,7 @@ camera.ssrBlurKernelSize = 5;
 
 - **Interface:** [Camera.ssrBlurStdDev](/doc/markdown/./scene.camera.ssrblurstddev)  
 - **Type:** `number`  
-- **Default:** `10`
+- **Default:** `4`
 
 Controls the distribution width of the Gaussian weighting curve.  
 Higher values create a wider, stronger blur.
@@ -216,7 +227,7 @@ camera.ssrBlurStdDev = 4;
 
 | Target Effect | Suggested Parameters |
 |----------------|----------------------|
-| **High‑precision mirror reflection (metal)** | `stride = 2`, `iterations = 120`, `ssrMaxRoughness = 0.3`, disable auto thickness |
+| **High‑precision mirror reflection (metal)** | `stride = 1` (default), `iterations = 120`, `ssrMaxRoughness = 0.3`, disable auto thickness |
 | **Soft reflection (water, glass)** | `blurScale = 0.05`, `blurKernelSize = 9`, `blurStdDev = 6` |
 | **High‑performance mode (mobile)** | Enable `HiZ`, lower `iterations` to `60`, disable `calcThickness` |
 | **High‑quality desktop rendering** | Enable `HiZ`, `blurKernelSize = 17`, `ssrBlurDepthCutoff = 1.5` |
