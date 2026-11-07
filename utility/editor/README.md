@@ -98,9 +98,9 @@ Development shortcut update behavior:
 
 Desktop builds embed a local MCP HTTP server in the same process as the editor.
 
-- Default endpoint: `http://127.0.0.1:47231/mcp`
-- The service binds to `127.0.0.1` only
-- MCP settings are managed from `Editor > Editor Settings...`
+- Default endpoint: `http://127.0.0.1:47231/mcp?token=<token>`
+- The service binds to `127.0.0.1` only and requires the per-installation token, as the `token` query parameter or an `Authorization: Bearer <token>` header
+- MCP settings are managed from `Help > Editor Settings...`, whose "Copy MCP URL" copies the full URL with the token
 
 This makes the editor usable both as an interactive desktop tool and as an automation target for agent clients.
 

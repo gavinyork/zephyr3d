@@ -1024,7 +1024,7 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
         {
           label: FontGlyph.glyphs['link'],
           shortcut: 'Ctrl+D',
-          tooltip: () => 'Creatas an instance of current node',
+          tooltip: () => 'Creates an instance of current node',
           selected: () => {
             return (this._sceneHierarchy?.selectedNodes.size ?? 0) > 0;
           },

@@ -834,7 +834,7 @@ export class DlgSystemPlugins extends DialogRenderer<void> {
     const progress = new DlgProgress(`${title}##SystemPluginProgress`, 420);
     progress.showModal();
     progress.setProgress(0, 4);
-    progress.setMessage('准备中...');
+    progress.setMessage('Preparing...');
     this._busy = true;
     try {
       await action((current, total, message) => {
@@ -842,7 +842,7 @@ export class DlgSystemPlugins extends DialogRenderer<void> {
         progress.setMessage(message);
       });
       progress.setProgress(4, 4);
-      progress.setMessage('操作完成');
+      progress.setMessage('Done');
     } finally {
       progress.close();
       this._busy = false;
@@ -851,12 +851,12 @@ export class DlgSystemPlugins extends DialogRenderer<void> {
 
   private async refreshPlugins() {
     try {
-      await this.runPluginBusyTask('刷新插件', async (updateProgress) => {
-        updateProgress(1, 4, '正在扫描已 Link 的插件...');
+      await this.runPluginBusyTask('Refresh Plugins', async (updateProgress) => {
+        updateProgress(1, 4, 'Scanning linked plugins...');
         this._listData.elements = await this._editor.refreshSystemPluginsWithProgress((message) => {
           updateProgress(2, 4, message);
         });
-        updateProgress(4, 4, '插件列表已刷新');
+        updateProgress(4, 4, 'Plugin list refreshed');
       });
     } catch {}
   }
@@ -865,14 +865,14 @@ export class DlgSystemPlugins extends DialogRenderer<void> {
     try {
       const files = await FilePicker.chooseFiles(false, '.zip');
       if (files?.[0]) {
-        await this.runPluginBusyTask('安装插件', async (updateProgress) => {
-          updateProgress(1, 4, '正在读取插件包...');
+        await this.runPluginBusyTask('Install Plugin', async (updateProgress) => {
+          updateProgress(1, 4, 'Reading plugin package...');
           await this._editor.installSystemPluginFromFileWithProgress(files[0], (message) => {
             updateProgress(2, 4, message);
           });
-          updateProgress(3, 4, '正在刷新插件列表...');
+          updateProgress(3, 4, 'Refreshing plugin list...');
           await this.reload();
-          updateProgress(4, 4, '插件安装完成');
+          updateProgress(4, 4, 'Plugin installed');
         });
       }
     } catch {}
@@ -882,14 +882,14 @@ export class DlgSystemPlugins extends DialogRenderer<void> {
     try {
       const files = await FilePicker.chooseDirectory();
       if (files?.length) {
-        await this.runPluginBusyTask('安装插件目录', async (updateProgress) => {
-          updateProgress(1, 4, '正在读取插件目录...');
+        await this.runPluginBusyTask('Install Plugin Directory', async (updateProgress) => {
+          updateProgress(1, 4, 'Reading plugin directory...');
           await this._editor.installSystemPluginFromDirectoryWithProgress(files, (message) => {
             updateProgress(2, 4, message);
           });
-          updateProgress(3, 4, '正在刷新插件列表...');
+          updateProgress(3, 4, 'Refreshing plugin list...');
           await this.reload();
-          updateProgress(4, 4, '插件安装完成');
+          updateProgress(4, 4, 'Plugin installed');
         });
       }
     } catch {}
@@ -906,14 +906,14 @@ export class DlgSystemPlugins extends DialogRenderer<void> {
         buttonLabel: 'Link Plugin'
       });
       if (directory) {
-        await this.runPluginBusyTask('Link 插件', async (updateProgress) => {
-          updateProgress(1, 4, '正在读取插件目录...');
+        await this.runPluginBusyTask('Link Plugin', async (updateProgress) => {
+          updateProgress(1, 4, 'Reading plugin directory...');
           await this._editor.linkSystemPluginWithProgress(directory, undefined, (message) => {
             updateProgress(2, 4, message);
           });
-          updateProgress(3, 4, '正在刷新插件列表...');
+          updateProgress(3, 4, 'Refreshing plugin list...');
           await this.reload();
-          updateProgress(4, 4, '插件 Link 完成');
+          updateProgress(4, 4, 'Plugin linked');
         });
       }
     } catch (err) {

@@ -634,8 +634,7 @@ export class CodeEditor {
           {
             label: 'fn',
             kind: (window as any).monaco.languages.CompletionItemKind.Snippet,
-            insertText:
-              'function ${1:functionName}(${2:params}) {\n\t${3:// 函数体}\n\treturn ${4:result};\n}',
+            insertText: 'function ${1:functionName}(${2:params}) {\n\t${3:// body}\n\treturn ${4:result};\n}',
             insertTextRules: (window as any).monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
             documentation: 'Create function template',
             range: range
@@ -666,12 +665,12 @@ export class CodeEditor {
         const lineCount = model.getLineCount();
         const selection = this.editor.getSelection();
 
-        statusText = `行 ${position.lineNumber}, 列 ${position.column} | 共 ${lineCount} 行`;
+        statusText = `Ln ${position.lineNumber}, Col ${position.column} | ${lineCount} lines`;
 
         if (selection && !selection.isEmpty()) {
           const selectedText = model.getValueInRange(selection);
           const lines = selectedText.split('\n').length;
-          statusText += ` | 选中 ${selectedText.length} 字符${lines > 1 ? `, ${lines} 行` : ''}`;
+          statusText += ` | ${selectedText.length} selected${lines > 1 ? `, ${lines} lines` : ''}`;
         }
 
         languageInfo = `${model.getLanguageId().toUpperCase()} | UTF-8`;

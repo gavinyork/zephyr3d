@@ -1204,15 +1204,15 @@ export class Editor {
   }
 
   async refreshSystemPluginsWithProgress(onProgress?: (stage: string) => void) {
-    onProgress?.('正在刷新已 Link 的插件...');
+    onProgress?.('Refreshing linked plugins...');
     const refreshedLinkedPlugins = await SystemPluginService.refreshLinkedPlugins(onProgress);
     for (const plugin of refreshedLinkedPlugins) {
       if (plugin.enabled) {
-        onProgress?.(`正在重新加载插件 ${plugin.name || plugin.id}...`);
+        onProgress?.(`Reloading plugin ${plugin.name || plugin.id}...`);
         await this.tryLoadSystemPlugin(plugin.id, true);
       }
     }
-    onProgress?.('正在刷新插件列表...');
+    onProgress?.('Refreshing plugin list...');
     return SystemPluginService.listPlugins();
   }
 
@@ -1222,7 +1222,7 @@ export class Editor {
 
   async installSystemPluginFromFileWithProgress(file: File, onProgress?: (stage: string) => void) {
     const plugin = await SystemPluginService.installPluginFromFile(file, onProgress);
-    onProgress?.(`正在加载插件 ${plugin.name || plugin.id}...`);
+    onProgress?.(`Loading plugin ${plugin.name || plugin.id}...`);
     const loadedId = await this.tryLoadSystemPlugin(plugin.id, true);
     return (await SystemPluginService.getPlugin(loadedId ?? plugin.id)) ?? plugin;
   }
@@ -1233,7 +1233,7 @@ export class Editor {
 
   async installSystemPluginFromDirectoryWithProgress(files: File[], onProgress?: (stage: string) => void) {
     const plugin = await SystemPluginService.installPluginFromDirectory(files, onProgress);
-    onProgress?.(`正在加载插件 ${plugin.name || plugin.id}...`);
+    onProgress?.(`Loading plugin ${plugin.name || plugin.id}...`);
     const loadedId = await this.tryLoadSystemPlugin(plugin.id, true);
     return (await SystemPluginService.getPlugin(loadedId ?? plugin.id)) ?? plugin;
   }
@@ -1255,7 +1255,7 @@ export class Editor {
       },
       onProgress
     );
-    onProgress?.(`正在加载插件 ${plugin.name || plugin.id}...`);
+    onProgress?.(`Loading plugin ${plugin.name || plugin.id}...`);
     const loadedId = await this.tryLoadSystemPlugin(plugin.id, true);
     return (await SystemPluginService.getPlugin(loadedId ?? plugin.id)) ?? plugin;
   }

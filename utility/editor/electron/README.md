@@ -55,7 +55,7 @@ Electron does not use a native application menu for MCP management anymore.
 
 Use the in-editor ImGui menu instead:
 
-- `Editor > Editor Settings...`
+- `Help > Editor Settings...` (desktop only)
 
 The service binds to `127.0.0.1` only and requires a per-installation bearer token.
 The full URL (including the token) is shown in the editor settings dialog and copied
@@ -88,7 +88,7 @@ If the client supports URL-based MCP servers, point it at the local editor endpo
 }
 ```
 
-Copy the exact URL (with the token) from `Editor > Editor Settings...`.
+Copy the exact URL (with the token) from `Help > Editor Settings...`.
 
 ## Codex Example
 
