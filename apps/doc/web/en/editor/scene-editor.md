@@ -15,12 +15,17 @@
 
 Use the **Add** menu in the main menu bar to add objects to the scene:
 
-- Built‑in meshes (Box, Sphere, Plane, Cylinder, etc.)  
-- Lights (Directional Light, Point Light, Spot Light)  
-- Cameras  
-- Terrain  
-- Water  
+- Built‑in meshes (Box, Sphere, Plane, Cylinder, Torus, Tetrahedron)  
+- Lights (Directional Light, Point Light, Spot Light, Rect Light)  
+- Cameras (perspective, orthographic)  
+- Text (TextSprite, MSDFText, MSDFTextSprite)  
+- Sprites  
 - Particle systems  
+- Water  
+- Terrain  
+- Foliage  
+
+An object added from the Add menu follows the mouse at first; left-click in the viewport to place it, or press `Esc` to cancel.
 
 You can also drag prefabs (such as models) from the **Content Browser** into the **Viewport** to add them to the scene.
 
@@ -34,7 +39,7 @@ You can also drag prefabs (such as models) from the **Content Browser** into the
 
 ### Move
 
-- Activate: `T` key or the Move tool button on the toolbar  
+- Activate: `W` key or the Move tool button on the toolbar  
 - Features:
   - Drag an axis to move along a single axis  
   - Drag a plane handle to move freely within that plane  
@@ -42,14 +47,14 @@ You can also drag prefabs (such as models) from the **Content Browser** into the
 
 ### Scale
 
-- Activate: `S` key or the Scale tool button on the toolbar  
+- Activate: `R` key or the Scale tool button on the toolbar  
 - Features:
   - Drag an axis to scale along a single axis  
   - Drag the center cube to scale uniformly  
 
 ### Rotate
 
-- Activate: `R` key or the Rotate tool button on the toolbar  
+- Activate: `E` key or the Rotate tool button on the toolbar  
 - Features:
   - Drag a rotation ring to rotate around a specific axis  
   - Click empty space to enter trackball‑style free rotation mode  

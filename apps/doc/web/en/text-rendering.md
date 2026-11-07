@@ -36,9 +36,15 @@ Because the text is baked into a texture, avoid changing `text` every frame unle
 
 <<< @/../src/tut-54/main.js{76-86 js}
 
-`pageSize` controls each atlas texture size. `glyphSize` controls the base MSDF glyph resolution. Larger values improve quality for large text but use more memory and generation time. The options are applied the first time a URL is loaded; cached loads of the same URL reuse the existing `FontAsset`.
+`pageSize` controls each atlas texture size (default 1024). `glyphSize` controls the base MSDF glyph resolution (default 32). Larger values improve quality for large text but use more memory and generation time. The options are applied the first time a URL is loaded; cached loads of the same URL reuse the existing `FontAsset`.
 
 Make sure the font contains all characters used by the text. Missing glyphs are skipped during layout.
+
+**Limits**:
+
+- Only uncompressed TrueType (`.ttf`) and OpenType (`.otf`, CFF outlines) font files are supported. WOFF, WOFF2 and font collections (`.ttc`) are not; convert them to `.ttf`/`.otf` first.
+- Kerning comes from the `kern` table and GPOS pair adjustments only. GSUB is not processed, so there are no ligatures, and complex scripts that need glyph substitution, such as Arabic, are not supported.
+- Glyphs are turned into MSDF on the main thread the first time they are used. Text with many characters, such as Chinese, Japanese or Korean, can stall briefly the first time a batch of new characters appears; showing the text once during loading warms it up.
 
 ## MSDFText
 

@@ -3,14 +3,17 @@
 ## Overview
 
 **Tone mapping** is the process of converting **High Dynamic Range (HDR)** images into **Low Dynamic Range (LDR)** ones suitable for standard displays.  
-Zephyr3D's tone mapping system uses the **ACES (Academy Color Encoding System)** to ensure physically‑based color response and natural brightness compression.
+Zephyr3D's tone mapping uses a fit of the **ACES (Academy Color Encoding System)** curve for a filmic color response and natural brightness compression.
 
 ---
 
 ## Properties
 
-- `camera.toneMap`: `boolean` — Enables or disables tone mapping.  
-- `camera.toneMapExposure`: `number` — Controls exposure compensation (brightness level).
+- `camera.toneMap`: `boolean` — Enables or disables tone mapping; on by default.  
+- `camera.toneMapExposure`: `number` — Controls exposure compensation (brightness level); default `1`.  
+- `camera.toneMapDither`: `boolean` — Adds slight dithering to the output, removing the banding that shallow gradients such as bloom halos show once quantized; on by default. Turn it off for pixel-exact captures, or pixel values vary slightly from frame to frame.
+
+Tone mapping goes with HDR rendering (`camera.HDR`, on by default). Turn tone mapping off when HDR is off.
 
 ---
 

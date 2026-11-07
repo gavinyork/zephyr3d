@@ -7,6 +7,8 @@ Zephyr3D provides two related billboard systems:
 
 Use sprites for icons, markers, simple decals, and 2D elements in 3D space. Use particle systems for smoke, sparks, dust, fireflies, magic effects, and other repeated transient visuals.
 
+> The code on this page is illustrative and leaves out application setup; `getEngine` comes from `@zephyr3d/scene`.
+
 ## Sprite
 
 Create a sprite with a `SpriteMaterial` implementation. `StandardSpriteMaterial` is the common textured material.
@@ -37,7 +39,7 @@ Important sprite controls:
 | `material.rotation` | In-plane billboard rotation |
 | `setPickTarget()` | Assign logical pick target data |
 
-Use `SDFSpriteMaterial` for signed-distance-field icons or glyph-like textures that need crisp edges.
+Use `SDFSpriteMaterial` for signed-distance-field icons or glyph-like textures that need crisp edges, and call its `setSDFTextureInfo()` to describe the SDF texture.
 
 ## Particle System
 
@@ -74,6 +76,24 @@ particles.wind = new Vector3(0.4, 0, 0);
 particles.airResistence = true;
 ```
 
+Common parameters and defaults:
+
+| Property | Default | Meaning |
+| --- | --- | --- |
+| `maxParticleCount` | `100` | The most particles alive at once; the instance buffer is sized by it |
+| `emitInterval` | `100` | Time between emissions, **in milliseconds** |
+| `emitCount` | `1` | Particles per emission; 0 stops continuous emission |
+| `particleLifeMin` / `Max` | `1` / `1.5` | Particle lifetime range, **in seconds** |
+| `particleVelocityMin` / `Max` | `2` / `3` | Initial speed range |
+| `particleSize1Min` / `Max` | — | Size range at birth |
+| `particleSize2Min` / `Max` | — | Size range at death; particles go from Size1 to Size2 over their life |
+| `particleRotationMin` / `Max` | `0` / `0` | Rotation range in the billboard plane |
+| `particleAccelMin` / `Max` | `-0.01` / `-0.02` | Acceleration range along the velocity |
+| `gravity` | `(0, 0, 0)` | Constant acceleration |
+| `wind` | `(0, 0, 0)` | Wind velocity. **Only applies while `airResistence` is true**; particle velocity eases towards it |
+| `emitterBehavior` | `'surface'` | See below |
+| `worldSpace` | `true` | See below |
+
 Emission shapes:
 
 | Shape | Use |
@@ -82,7 +102,7 @@ Emission shapes:
 | `sphere` | Emit from a sphere |
 | `box` | Emit from a box |
 | `cylinder` | Emit from a cylinder |
-| `cone` | Emit from a cone |
+| `cone` | Emit from a cone, opening set by `emitterConeRadiusMin` / `Max` (default 0 / 0.1) |
 
 `emitterBehavior` can be `surface` or `volume`, depending on whether particles should start on the surface of the shape or inside it.
 
@@ -129,11 +149,14 @@ When `worldSpace` is true, moving the emitter does not drag already emitted part
 
 ## Manual Bursts
 
-The system emits continuously according to `emitInterval` and `emitCount`. For one-shot effects, set a low continuous rate and trigger a burst with `newParticle()`:
+The system emits continuously according to `emitInterval` and `emitCount`. For one-shot effects, set `emitCount` to 0 to stop continuous emission, then trigger a burst with `newParticle()`:
 
 ```ts
+particles.emitCount = 0;
 particles.newParticle(80, particles.worldMatrix);
 ```
+
+Bursts are capped by `maxParticleCount` too, and particles beyond it are not created, so leave room in `maxParticleCount` for the burst.
 
 This is useful for impacts, explosions, or interaction feedback.
 
@@ -155,4 +178,4 @@ Textures used by sprite and particle materials should have asset ids before seri
 
 ## Performance Notes
 
-Keep `maxParticleCount` close to the maximum number you actually need. Prefer a few larger particle systems over many tiny systems when they share behavior and material. Avoid replacing textures or materials every frame; animate parameters instead.
+Keep `maxParticleCount` close to the maximum number you actually need. Particles do not read scene depth (there are no soft particles), so they show hard edges where they cut into geometry; place large particles such as smoke with that in mind. Prefer a few larger particle systems over many tiny systems when they share behavior and material. Avoid replacing textures or materials every frame; animate parameters instead.

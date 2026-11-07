@@ -91,7 +91,7 @@ class CartoonMaterial extends applyMaterialMixins(MeshMaterial, mixinLambert) {
         scope.$l.litColor = this.lambertLight(scope, scope.$inputs.worldPos, scope.normal, scope.albedoColor);
         // 简单起见用R+G+B作为亮度
         scope.$l.litIntensity = pb.add(scope.litColor.r, scope.litColor.g, scope.litColor.b, 0.00001);
-        scope.$l.albedoIntensity = pb.add(scope.albedoColor.r, scope.albedoColor.g, scope.albedoColor.g, 0.00001);
+        scope.$l.albedoIntensity = pb.add(scope.albedoColor.r, scope.albedoColor.g, scope.albedoColor.b, 0.00001);
         // 光照以后的颜色除以漫反射颜色得到光照强度
         scope.$l.intensity = pb.clamp(pb.div(scope.litIntensity, scope.albedoIntensity), 0, 1);
         // 计算量化以后的光照强度

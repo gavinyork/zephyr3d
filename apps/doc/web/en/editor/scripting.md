@@ -4,7 +4,9 @@
 The editor has built-in support for **TypeScript scripts**.  
 You can create, edit, and run scripts in the Assets panel to implement project startup procedures, scene logic, node interactions, animations, and various utility functions.
 
-Overall, scripts are divided into three categories by purpose:
+> The code on this page is illustrative and leaves out some imports.
+
+Overall, scripts are divided into two categories by purpose:
 
 - **Attached Scripts**: Scripts mounted to scenes or scene nodes with complete lifecycle callbacks
 - **Helper Scripts**: Provide utility functions, data structures, business logic, etc., imported by other scripts
@@ -87,14 +89,9 @@ import { RuntimeScript } from "@zephyr3d/scene";
 
 export default class RotateScript extends RuntimeScript<SceneNode> {
   private target?: SceneNode;
-  private speed: number;
-  private rotationY: number;
-
-  constructor() {
-    // Construction phase: instance just created, not yet bound to object
-    this.speed = 2;
-    this.rotationY = 0;
-  }
+  // Field initialisers set the initial values; no constructor is needed
+  private speed = 2;
+  private rotationY = 0;
 
   async onCreated(): Promise<void> {
     // Initialization logic: can be async, e.g., loading config, resources
@@ -108,7 +105,7 @@ export default class RotateScript extends RuntimeScript<SceneNode> {
   onUpdate(dt: number): void {
     // Update rotation every frame
     this.rotationY += this.speed * dt;
-    this.target.rotation.fromEulerAngle(0, this.rotationY, 0);;
+    this.target?.rotation.fromEulerAngle(0, this.rotationY, 0);
   }
 
   onDetached(): void {
@@ -124,107 +121,109 @@ export default class RotateScript extends RuntimeScript<SceneNode> {
 
 > **Note**
 >
-> Since the script lifecycle does not exceed the associated object's lifecycle, there's no need to use weak references to hold the associated node. Strong references should also not be used, as this would cause circular references between the script and the associated node, preventing release and causing memory leaks.
+> When the host is destroyed, the engine calls the script's `onDetached()` before destroying the script, so keeping the host in a plain field as above is safe, as long as `onDetached()` clears it. Do not hold the host with a `DRef`: it adds to the host's reference count, so the host can no longer be destroyed automatically.
+>
+> If you write a constructor of your own, its first line must call `super()`, or instantiation throws a `ReferenceError`.
 
 #### 1.2 Binding Method
 
 The general workflow for using attached scripts in the editor:
 
-1. Create a new script file in the Assets panel (e.g., rotate.ts)
-2. Implement and export a class in the script (e.g., RotateScript)
+1. In the Assets panel, right-click in the `/assets` folder and choose `Create New > Typescript` to create a script file (e.g., rotate.ts); see [Create a Script](en/editor/create-script.md)
+2. Implement a class extending `RuntimeScript` in the script and make it the **default export**
 3. In the editor:
     - Select a Scene or Node
-    - Add a script component in the Script section of the Properties panel
-    - Select the corresponding script file and exported class name
+    - Drag the script file from the Assets panel onto "Drop a script here to attach" in the **Scripts** section at the bottom of the Inspector
+    - An object can have several scripts; the buttons in the list reorder or remove them
+    - With a script selected in the list, the **Config** section below edits the parameters it declares with `@scriptProp` (see below)
 4. When the scene runs, the engine will automatically:
-    - Create script instances
-    - Call lifecycle callbacks (constructor → onCreated → onAttached → onUpdate …)
+    - Create a script instance for each attachment
+    - Assign the Config values to the instance
+    - Call lifecycle callbacks (onCreated → onAttached → onUpdate …)
 
-#### 1.3 One Attached Script Can Bind Multiple Objects
+#### 1.3 Configurable Parameters
 
-**Important Feature**:
-
-A single attached script can be bound to multiple objects. If multiple objects have the same or similar behavior logic, you can reuse the same script class:
-
-- Avoid duplicating the same logic
-- Facilitate unified maintenance of behavior
-- The script can perform batch operations on all bound objects internally, improving performance to some extent
-
-Two common patterns:
-
-1. One instance per object (most common)
+Fields declared with the `@scriptProp` decorator appear in the Config section, can be set per object in the editor, and are saved with the scene. Their values are assigned to the instance before `onCreated()`.
 
 ```ts
-// Simple example: script handles a single target object
-export default class RotateScript extends RuntimeScript<SceneNode> {
-  private target?: SceneNode;
-  private speed: number;
-  private rotationY: number;
+import { RuntimeScript, scriptProp } from '@zephyr3d/scene';
+import type { SceneNode } from '@zephyr3d/scene';
 
-  constructor() {
-    this.speed = 2;
-    this.rotationY = 0;
-  }
+export default class extends RuntimeScript<SceneNode> {
+  @scriptProp({ type: 'float', label: 'Speed', default: 1, minValue: 0 })
+  speed = 1;
 
-  onAttached(target: SceneNode) {
-    this.target = target;
-  }
+  @scriptProp({ type: 'asset', label: 'Texture', mimeTypes: ['image/png', 'image/jpeg'] })
+  texture = '';
 
-  onUpdate(dt: number) {
-    this.rotationY += this.speed * dt;
-    this.target.rotation.fromEulerAngle(0, this.rotationY, 0);;
-  }
-
-  onDetached() {
-    this.target = null;
-  }
+  @scriptProp({ type: 'node', label: 'Target Node', sceneNode: { kind: 'node' } })
+  targetNode = '';
 }
 ```
 
-2. One script manages multiple objects (shared behavior + batch updates)
+Supported types include `bool`, `int`, `float`, `vec2`/`vec3`/`vec4`, `rgb`/`rgba`, `string`, `asset`, `node` and `object_array`, with optional `label`, `group`, value ranges and enumerations. The template generated for a new script includes these examples.
 
-For certain scenarios (like dozens of particle nodes, groups of moving enemies, etc.), you can use your own management script to batch manage these objects, reducing redundant logic calls:
+#### 1.4 One Script Class Can Bind Multiple Objects
 
-**Example**:
+The same script class can be attached to several objects to reuse the same behaviour. By default **each attachment creates a new script instance** that serves one object, so the script keeps a single host (as in the example above).
+
+When one instance should manage several objects (say, updating a swarm of enemies in one pass), write the script as a singleton whose constructor returns one shared instance. `onCreated()` then runs once, while `onAttached()` and `onDetached()` run once per object:
 
 ```ts
-// Simple example: script handles multiple target objects
-export default class RotateScript extends RuntimeScript<SceneNode> {
-  // Store multiple objects associated with this script
-  private targets: Set<SceneNode>;
-  private speed: number;
-  private rotationY: number;
+let shared: SwarmScript | null = null;
+
+export default class SwarmScript extends RuntimeScript<SceneNode> {
+  private targets = new Set<SceneNode>();
+  private rotationY = 0;
 
   constructor() {
-    this.speed = 2;
-    this.rotationY = 0;
-    this.targets = new Set();
+    super();
+    // With a shared instance already made, return it: every attachment uses the same instance
+    if (shared) {
+      return shared;
+    }
+    shared = this;
   }
 
   onAttached(target: SceneNode) {
-    // Add associated object
     this.targets.add(target);
   }
 
   onUpdate(dt: number) {
-    // Batch update
-    this.rotationY += this.speed * dt;
+    this.rotationY += 2 * dt;
     for (const target of this.targets) {
-      target.rotation.fromEulerAngle(0, this.rotationY, 0);;
+      target.rotation.fromEulerAngle(0, this.rotationY, 0);
     }
   }
 
   onDetached(target: SceneNode) {
-    // Remove associated object
     this.targets.delete(target);
   }
-}
 
+  onDestroy() {
+    shared = null;
+  }
+}
 ```
 
-#### 1.4 Startup Script
+#### 1.5 Startup Script
 
 Attached scripts can be set as the project's `startup script`. This script will be bound to a `null` object after engine initialization is complete and before the startup scene is loaded.
+
+With only a startup script and no startup scene, the script has to load and show a scene itself:
+
+```ts
+import { getEngine, RuntimeScript } from "@zephyr3d/scene";
+
+export default class extends RuntimeScript<null> {
+  async onAttached() {
+    const scene = await getEngine().loadSceneFromFile("/assets/main.zscn");
+    if (scene) {
+      getEngine().setRenderable(scene, 0);
+    }
+  }
+}
+```
 
 ### 2. Helper Scripts
 
@@ -253,7 +252,7 @@ export function moveTowards(
   maxDistanceDelta: number
 ): Vector3 {
   const toVector = Vector3.sub(target, current);
-  const distance = toVector.magnitude();
+  const distance = toVector.magnitude;
   if (distance <= maxDistanceDelta) {
     return target.clone();
   }
@@ -265,6 +264,8 @@ Used by other scripts:
 
 ```ts
 // assets/scripts/follow-target.ts
+import { DWeakRef } from "@zephyr3d/base";
+import { RuntimeScript } from "@zephyr3d/scene";
 import type { SceneNode } from "@zephyr3d/scene";
 import { moveTowards } from "./utils/math-utils";
 
@@ -283,7 +284,9 @@ export default class FollowTargetScript extends RuntimeScript<SceneNode> {
   }
 
   onUpdate(dt: number) {
-    if (!this.follow.get()) {
+    // The followed node is someone else's, so it is held with a DWeakRef: get() returns null once
+    // it is destroyed, and the reference does not keep it alive
+    if (!this.target || !this.follow?.get()) {
       return;
     }
     this.target.position = moveTowards(this.target.position, this.follow.get().position, this.speed * dt);
@@ -299,17 +302,19 @@ Attached scripts have a clear set of lifecycle callbacks that allow you to execu
 
 - `Constructor`: Called when instance is created
 - `onCreated()`: Initialization method, supports async
-- `onAttached()`: Called after script is attached to object
-- `onUpdate()`: Called every frame for updates
-- `onDetached()`: Called when script is detached from object
+- `onAttached(host)`: Called after script is attached to object
+- `onUpdate(dt, elapsed)`: Called every frame
+- `onFixedUpdate(fixedDt)`: Called before each fixed physics step, only while the scene has a physics world; put logic that must run at the physics rate, such as applying forces, here (see [Physics Scripting](en/physics-scripting.md))
+- `onLateUpdate(dt)`: Called every frame after scene nodes have updated and physics has stepped and written poses back; use it to read this frame's physics results, such as pointing a camera at a moving body
+- `onDetached(host)`: Called when script is detached from object
 - `onDestroy()`: Called before instance destruction
 
-Except for the constructor, all other methods are optional; you can implement only some of them as needed.
+All of these are optional; implement only the ones you need. The constructor can be left out too.
 
 ### 1. Constructor
 
   - **When called**: When the associated object is created, the engine loads this script and calls the constructor to create the script instance. At this point, the script is not yet associated.
-  - **Parameters**: Must be implemented as a parameterless constructor.
+  - **Parameters**: Must be implemented as a parameterless constructor whose first line calls `super()`. Field initialisers are usually enough, with no constructor at all.
 
 **Suitable for**:
 
@@ -323,9 +328,10 @@ Except for the constructor, all other methods are optional; you can implement on
 **Example**:
 
 ```ts
-export class ExampleScript {
+export default class ExampleScript extends RuntimeScript<SceneNode> {
   private speed: number;
   constructor() {
+    super();
     this.speed = 1.0;
   }
 }
@@ -370,14 +376,14 @@ import type { SceneNode } from "@zephyr3d/scene";
 
 onAttached(target: SceneNode): void {
   this.target = target;
-  this.target.position.set(0, 1, 0);
+  this.target.position.setXYZ(0, 1, 0);
 }
 ```
 
 ### 4. onUpdate()
 
   - **When called**: Called once per frame after successfully associating with an object.
-  - Receives a dt parameter representing the time interval (in seconds) between the current frame and the previous frame.
+  - `dt` is the time (in seconds) between the current frame and the previous one, and `elapsed` the total time (in seconds) since the script started running.
 
 **Suitable for**:
 
@@ -389,15 +395,20 @@ onAttached(target: SceneNode): void {
 
 ```ts
 onUpdate(dt: number): void {
-  if (!this.target || !(this.target instanceof SceneNode)) return;
-  // Simple rotation example
-  this.target.rotation.y += this.rotateSpeed * dt;
+  if (!this.target) return;
+  // rotation is a quaternion, so .y cannot be changed directly; set it from Euler angles instead
+  this.angle += this.rotateSpeed * dt;
+  this.target.rotation.fromEulerAngle(0, this.angle, 0);
 }
 ```
 
 **Performance tips**:
 
 - Avoid performing large synchronous blocking operations in onUpdate (e.g., massive calculations, synchronous network requests)
+
+**Reading input**: in `onUpdate`, `getInput()` (from `@zephyr3d/scene`) queries keyboard, mouse and gamepad state per frame.
+
+> **Keyboard focus**: keyboard events are only listened for on the rendering canvas. When HTML buttons are laid over the page, clicking one moves focus away from the canvas, and keyboard input stops working afterwards. Call `event.preventDefault()` in the button's `pointerdown` handler so it does not take focus, or call `getApp().focus()` after handling the click to give focus back to the canvas.
 
 ### 5. onDetached()
 
@@ -447,48 +458,42 @@ Below is a more complete attached script example that can be bound to multiple s
 // assets/scripts/move.ts
 import type { SceneNode } from "@zephyr3d/scene";
 import { Vector3 } from "@zephyr3d/base";
-import { RuntimeScript } from "@zephyr3d/scene";
+import { RuntimeScript, scriptProp } from "@zephyr3d/scene";
 
 export default class extends RuntimeScript<SceneNode> {
   private target?: SceneNode;
-  private speed: number;
-  private direction: Vector3;
-
-  constructor() {
-    // Construction phase: only initialize simple fields
-    this.speed = 2.0;
-    this.direction = new Vector3();
-  }
+  // Can be set per node in the editor's Config section
+  @scriptProp({ type: 'float', label: 'Speed', default: 2, minValue: 0 })
+  speed = 2;
+  private direction = new Vector3(1, 0, 0);
 
   async onCreated(): Promise<void> {
-    console.log("RotateScript created");
+    console.log("MoveScript created");
   }
 
   onAttached(target: SceneNode): void {
-    // Save associated object
+    // Save the associated object and put it at the starting position
     this.target = target;
-
-    if (target instanceof Node) {
-      // Place node at starting position
-      target.position.set(0, 0, 0);
-    }
+    target.position.setXYZ(0, 0, 0);
   }
 
   onUpdate(dt: number): void {
     // Move uniformly along the direction vector
-    this.target.position.addBy(Vector3.scale(this.direction, this.speed * dt));
+    this.target?.position.addBy(Vector3.scale(this.direction, this.speed * dt));
   }
 
   onDetached(): void {
-    console.log("RotateScript detached");
+    console.log("MoveScript detached");
     this.target = undefined;
   }
 
   onDestroy(): void {
-    console.log("RotateScript destroyed");
+    console.log("MoveScript destroyed");
     // Release resources or globally unregister here
   }
 }
 ```
 
-In the editor, bind this script to multiple node objects, and these nodes will all move according to the same logic.
+In the editor, bind this script to multiple node objects: each node gets its own script instance and moves by the same logic, with a speed that can be set per node.
+
+The scripts' `console.log` output appears in the browser developer tools of the preview page. The editor has no hot reload: run the preview again after changing a script.

@@ -131,6 +131,8 @@ camera.oit = new DualDepthPeelingOIT(8);
 camera.oitMode = 'dual-depth';
 ```
 
+用字符串选择时，层数由 `camera.oitABufferLayers`（默认 20）和 `camera.oitDualDepthPeels`（默认 8）决定；直接 `new ABufferOIT()` 不传参数时默认是 16 层，两种写法的结果不同。
+
 ---
 
 ## 效果对比
@@ -146,7 +148,7 @@ camera.oitMode = 'dual-depth';
 
 ## 资源管理与释放
 
-当camera被释放时会自行释放其持有的OIT资源
+当camera被释放时会自行释放其持有的OIT资源。给 `camera.oit` 赋新值时，旧的 OIT 对象也会自动释放，不需要手动处理。
 
 ---
 

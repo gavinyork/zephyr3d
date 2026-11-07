@@ -49,7 +49,10 @@ Zephyr3d Editor can be used both as a **companion tool for the Zephyr3d engine**
   <https://github.com/gavinyork/zephyr3d>
 
 - **Online Demo**  
-  [Launch the Zephyr3d Editor Online Demo](https://gavinyork.github.io/zephyr3d)  
+  [Launch the Zephyr3d Editor online](https://zephyr3d.org/editor/)
+
+- **Desktop Build**  
+  [GitHub Releases](https://github.com/gavinyork/zephyr3d/releases)  
   (Use a modern browser with WebGL2 / WebGPU support)
 
 ---

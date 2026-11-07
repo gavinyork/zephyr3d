@@ -17,13 +17,10 @@ camera.motionBlurStrength = 1;
 | --- | --- | --- |
 | `camera.motionBlur` | `boolean` | 启用或禁用效果 |
 | `camera.motionBlurStrength` | `number` | 模糊强度倍率，默认值为 `1` |
+| `camera.motionBlurShutterBias` | `number` | 拖影有多少落在物体当前位置的前方，按拖影长度的比例计。0 表示拖影全部在物体身后，默认 `0.5` 让拖影以物体为中心 |
+| `camera.motionBlurMaxLength` | `number` | 拖影的最大长度（渲染分辨率下的像素），默认 `40`。`motionBlurStrength` 调大到一定程度会被它截住；调大它会按比例增加采样数和开销 |
 
 ## 可运行示例
-
-```js
-camera.motionBlur = true;
-camera.motionBlurStrength = 1.0;
-```
 
 <div class="showcase" case="tut-73" style="width:600px;height:500px"></div>
 

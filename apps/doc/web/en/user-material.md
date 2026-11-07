@@ -2,11 +2,11 @@
 
 ## Introduction
 
-The material plays a crucial role in the rendering effect of objects. The engine's material system currently has predefined materials such as PBR, Unlit, Blinn, and Lambert. To achieve more diverse rendering effects, the material system also offers interfaces for custom material creation. These custom materials can be applied to any Mesh object.
+The material plays a crucial role in the rendering effect of objects. The engine's material system provides PBR (metallic-roughness and specular-glossiness workflows), Unlit, Blinn and Lambert, plus dedicated materials such as skin (`SSSMaterial`), hair, eyes and MToon; in the editor, [material blueprints](en/editor/material-blueprint.md) author materials as node graphs. To achieve more diverse rendering effects, the material system also offers interfaces for custom material creation. These custom materials can be applied to any Mesh object.
 
 ## Prerequisites
 
-The engine uses JavaScript to write shaders. Before attempting to create custom materials, ensure you are familiar with this area. For more information, refer to: [Writing Shaders](zh-cn/shader.md). 
+The engine uses JavaScript to write shaders. Before attempting to create custom materials, ensure you are familiar with this area. For more information, refer to: [Writing Shaders](en/shader.md). 
 
 ## Rendering process
 
@@ -14,7 +14,7 @@ Before you start creating custom materials, it's essential to understand the eng
 
 1. DepthPass
 
-  If necessary, the scene undergoes a depth rendering to generate a depth buffer, with linear depth rendered onto a Float32 texture. DepthPass only renders opaque objects.
+  The scene always starts with a depth prepass, which produces the depth buffer and data later effects need (such as motion vectors). DepthPass only renders opaque objects. Shadows on opaque objects are then computed in screen space into a shadow mask, which the lighting pass reads.
 
 2. ShadowMapPass
 
@@ -26,7 +26,7 @@ Before you start creating custom materials, it's essential to understand the eng
 
 4. Sky, Fog, and Post-Processing
 
-Custom materials require proper handling of DepthPass, ShadowMapPass, and LightingPass.
+Custom materials require proper handling of DepthPass, ShadowMapPass, and LightingPass. There is also the OBJECT_COLOR pass used for picking, and a voxelization pass while probe GI is on; a material that should take part in GI overrides `supportsVoxelization()` to return true.
 
 ## Creating Custom Materials
 
@@ -35,7 +35,7 @@ After inheriting from MeshMaterial,custom materials may need to override some cl
 
   - [MeshMaterial.supportLighting()](/doc/markdown/./scene.meshmaterial.supportlighting)
 
-    Returns true if the material is affected by lighting; otherwise, it's considered a non-illuminated material. By default, this function returns true.
+    Returns true if the material is affected by lighting; otherwise, it's considered a non-illuminated material. It returns false on `MeshMaterial`, and true once `mixinLight` is mixed in.
 
   - [MeshMaterial.getQueueType()](/doc/markdown/./scene.meshmaterial.getqueuetype)
 
@@ -52,6 +52,8 @@ After inheriting from MeshMaterial,custom materials may need to override some cl
   - [MeshMaterial.applyUniformValues(bindGroup, ctx, pass)](/doc/markdown/./scene.meshmaterial.applyuniformvalues)
 
     Used to upload uniform constants required for a specified pass of the material. If you've defined new uniform constants in your custom material, you'll need to override this function. Remember to call its default implementation when overriding.
+
+    **Note**: it only runs after the material's parameters change (call `this.uniformChanged()` after changing them), not every frame. **Values that change every frame** (data that follows the camera, say) belong in `applyUniforms(bindGroup, ctx, needUpdate, pass)`: override it, call the default implementation first, then set those values outside the `needUpdate` check. For time-based animation, read the time in the shader with `ShaderHelper.getElapsedTime(scope)` instead of uploading it.
 
   - [MeshMaterial.vertexShader(scope)](/doc/markdown/./scene.meshmaterial.vertexshader)
 
@@ -71,6 +73,8 @@ After inheriting from MeshMaterial,custom materials may need to override some cl
 
 
 The [ShaderHelper](/doc/markdown/./scene.shaderhelper) class provides numerous utility functions necessary for writing materials.
+
+> **Naming**: shader variable names go into the generated WGSL/GLSL unchanged; the engine does not rename them. WGSL reserved words (such as `set`, `pass`, `from`, `filter`, `sample`, `type`, `target`) and GLSL reserved words (such as `input`, `output`, `filter`, `sample`) cannot be used as variable names, or the program fails to compile. Watch out for materials only tested on WebGL2: the problem may only show up on WebGPU. Multi-word names are the safest.
 
 ## System desgin
 

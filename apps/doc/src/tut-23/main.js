@@ -34,7 +34,7 @@ myApp.ready().then(async () => {
   // depth bias
   dirLight.shadow.depthBias = 0.005;
   // PCF
-  dirLight.shadow.mode = 'pcf-opt';
+  dirLight.shadow.mode = 'pcf';
 
   // Create the ground and some boxes
   const material = new PBRMetallicRoughnessMaterial();
@@ -86,7 +86,7 @@ myApp.ready().then(async () => {
       const width = myApp.device.deviceXToScreen(myApp.device.canvas.width);
       const height = myApp.device.deviceYToScreen(myApp.device.canvas.height);
       scene.mainCamera.viewport = [0, 0, width, height];
-      dirLight.shadow.mode = useShadowAA ? 'pcf-opt' : 'hard';
+      dirLight.shadow.mode = useShadowAA ? 'pcf' : 'hard';
       dirLight.shadow.numShadowCascades = useShadowAA ? 4 : 1;
     }
   });

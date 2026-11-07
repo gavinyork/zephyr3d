@@ -14,11 +14,12 @@ class MyMaterial extends MeshMaterial {
 
   foo() {
     // useFeature()方法可以用来激活一个变体
-    // value参数可以是任何值，每个不同的值各代表一个变体
+    // 变体值用布尔、数字或字符串，每个不同的值各代表一个变体
+    // （变体值会转成字符串拼进 shader 的哈希，对象之类的值会互相冲突）
     // 未调用useFeature()，变体值默认为undefined
-    this.useFeature(MyMaterial.featureA, value);
+    this.useFeature(MyMaterial.featureA, 2);
     // 获取当前的变体
-    const value = this.featureUsed(MyMaterial.featureA);
+    const current = this.featureUsed(MyMaterial.featureA);
   }
   bar() {
     // 如果是简单的开关，可以使用布尔值做变体

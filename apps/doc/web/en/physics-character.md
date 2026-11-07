@@ -68,3 +68,14 @@ In the example the 0.25 m steps can be walked up; the 0.5 m ledge is higher than
 - The character's node receives `triggerenter` on its `node.physics` when it walks into a trigger. It raises no `collisionenter` against static objects (kinematic and static bodies have no contact events between them); what it ran into is in the result of `move`.
 - The capsule turns with its node: turn the node about the vertical axis only, tilting it tilts the capsule.
 - Do not move a character by setting its node's position except to teleport it.
+- Setting `node.physics` to `null` disposes the old `NodePhysics` along with its character controller, which cannot be reused afterwards; create a new one to enable it again.
+
+---
+
+## Walking Relative to the Camera, Getting In and Out of a Car
+
+The example below combines the character controller, the built-in follow camera (see [Camera Collision](en/physics-camera.md)) and input action maps: walking is turned to the camera's heading, pressing F next to the car gets in, and getting out creates a new character controller.
+
+<<< @/../src/tut-87/main.js#input
+
+<div class="showcase" case="tut-87"></div>

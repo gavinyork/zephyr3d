@@ -7,6 +7,8 @@ Zephyr3D 提供两类 billboard 系统：
 
 Sprite 适合图标、标记、简单贴花和 3D 空间中的 2D 元素。粒子系统适合烟雾、火花、尘土、萤火、魔法效果等重复且短暂的视觉元素。
 
+> 本页代码为片段示意，省略了应用初始化；`getEngine` 来自 `@zephyr3d/scene`。
+
 ## Sprite
 
 创建 Sprite 时需要一个 `SpriteMaterial` 实现。常用的纹理材质是 `StandardSpriteMaterial`。
@@ -37,7 +39,7 @@ sprite.scale.setXYZ(0.6, 0.6, 0.6);
 | `material.rotation` | billboard 平面内旋转 |
 | `setPickTarget()` | 设置逻辑拾取目标 |
 
-如果需要清晰边缘的 SDF 图标或类似字形的纹理，可以使用 `SDFSpriteMaterial`。
+如果需要清晰边缘的 SDF 图标或类似字形的纹理，可以使用 `SDFSpriteMaterial`，并调用它的 `setSDFTextureInfo()` 指定 SDF 纹理的参数。
 
 ## 粒子系统
 
@@ -74,6 +76,24 @@ particles.wind = new Vector3(0.4, 0, 0);
 particles.airResistence = true;
 ```
 
+常用参数与默认值：
+
+| 属性 | 默认值 | 含义 |
+| --- | --- | --- |
+| `maxParticleCount` | `100` | 同时存在的粒子上限，按它分配实例缓冲 |
+| `emitInterval` | `100` | 两次发射之间的间隔，**单位毫秒** |
+| `emitCount` | `1` | 每次发射的粒子数；设为 0 停止持续发射 |
+| `particleLifeMin` / `Max` | `1` / `1.5` | 粒子寿命范围，**单位秒** |
+| `particleVelocityMin` / `Max` | `2` / `3` | 初速度范围 |
+| `particleSize1Min` / `Max` | — | 粒子出生时的尺寸范围 |
+| `particleSize2Min` / `Max` | — | 粒子消亡时的尺寸范围，生命周期内从 Size1 过渡到 Size2 |
+| `particleRotationMin` / `Max` | `0` / `0` | 粒子在 billboard 平面内的旋转范围 |
+| `particleAccelMin` / `Max` | `-0.01` / `-0.02` | 沿速度方向的加速度范围 |
+| `gravity` | `(0, 0, 0)` | 恒定加速度 |
+| `wind` | `(0, 0, 0)` | 风速。**只在 `airResistence` 为 true 时生效**，粒子速度会逐渐趋近风速 |
+| `emitterBehavior` | `'surface'` | 见下文 |
+| `worldSpace` | `true` | 见下文 |
+
 发射器形状：
 
 | 形状 | 用途 |
@@ -82,7 +102,7 @@ particles.airResistence = true;
 | `sphere` | 从球体发射 |
 | `box` | 从盒体发射 |
 | `cylinder` | 从圆柱体发射 |
-| `cone` | 从锥体发射 |
+| `cone` | 从锥体发射，开口大小由 `emitterConeRadiusMin` / `Max`（默认 0 / 0.1）控制 |
 
 `emitterBehavior` 可以是 `surface` 或 `volume`，分别表示粒子从形状表面或体积内部生成。
 
@@ -129,11 +149,14 @@ particles.worldSpace = true;
 
 ## 手动爆发
 
-系统会按 `emitInterval` 和 `emitCount` 持续发射。对于一次性效果，可以把持续发射频率设低，然后通过 `newParticle()` 触发爆发：
+系统会按 `emitInterval` 和 `emitCount` 持续发射。对于一次性效果，把 `emitCount` 设为 0 停止持续发射，然后通过 `newParticle()` 触发爆发：
 
 ```ts
+particles.emitCount = 0;
 particles.newParticle(80, particles.worldMatrix);
 ```
+
+爆发同样受 `maxParticleCount` 限制，超出上限的部分不会生成，所以 `maxParticleCount` 要留出爆发需要的余量。
 
 这适合命中、爆炸或交互反馈。
 
@@ -155,4 +178,4 @@ Sprite 和粒子材质使用的纹理，应在序列化前拥有 asset id。
 
 ## 性能建议
 
-`maxParticleCount` 应接近实际需要的最大数量。多个效果共享行为和材质时，优先使用少量较大的粒子系统，而不是大量很小的粒子系统。避免每帧替换纹理或材质，优先动画参数。
+`maxParticleCount` 应接近实际需要的最大数量。粒子不读取场景深度（没有软粒子），与几何体相交处会出现硬边，烟雾等大粒子要注意摆放位置。多个效果共享行为和材质时，优先使用少量较大的粒子系统，而不是大量很小的粒子系统。避免每帧替换纹理或材质，优先动画参数。

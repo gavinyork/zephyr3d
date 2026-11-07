@@ -6,7 +6,11 @@ Use the browser build for quick access and lightweight editing. Use the desktop 
 
 ## Running It
 
-Start the desktop editor in a development checkout:
+Desktop installers can be downloaded from [GitHub Releases](https://github.com/gavinyork/zephyr3d/releases).
+
+### From source (developers)
+
+This needs the full repository. Build the editor first (`npm run build --prefix utility/editor`), then start the desktop editor:
 
 ```sh
 npm run electron:start --prefix utility/editor
@@ -28,7 +32,7 @@ The desktop runtime exposes a constrained preload bridge at `window.zephyrEditor
 
 ## Local Projects and Plugins
 
-In the browser build, project and editor data are primarily stored in IndexedDB. In the desktop build, editor metadata, system plugins, and project data are stored under Electron `app.getPath('userData')` by default.
+In the browser build, project and editor data are primarily stored in IndexedDB. In the desktop build, editor metadata, system plugins, and project data are stored in `editor-storage` under the Electron user data directory (`app.getPath('userData')/editor-storage`). A packaged Windows zip build run from a writable unpacked folder uses `<exe-dir>/userdata` instead.
 
 The desktop runtime supports:
 
@@ -46,10 +50,14 @@ The desktop editor embeds an MCP service. After the app starts, the Electron mai
 Default MCP URL:
 
 ```text
-http://127.0.0.1:47231/mcp
+http://127.0.0.1:47231/mcp?token=<token>
 ```
 
-The MCP service binds only to `127.0.0.1`. Use `Editor > Editor Settings...` to enable or disable the service, change the port, and copy the MCP URL. Enablement and port settings are persisted under Electron user data.
+The MCP service binds only to `127.0.0.1` and requires an **access token**: each installation generates one, and requests must carry it as the `?token=<token>` query parameter or an `Authorization: Bearer <token>` header, or they are rejected.
+
+The MCP Service section of `Help > Editor Settings...` (desktop only) enables or disables the service, changes the port, shows whether it is running, and **Copy MCP URL** copies the full URL with the token. **Paste that URL when configuring external clients**; replace `<token>` in the examples below with the actual token. Enablement, port and token are persisted under Electron user data.
+
+For automation (headless runs, CI agents), set the `ZEPHYR_EDITOR_MCP_TOKEN` environment variable to pin the token.
 
 Recommended startup order for external agents:
 
@@ -57,7 +65,9 @@ Recommended startup order for external agents:
 2. `tools/list`
 3. call `editor_wait_ready`
 4. call `editor_status`
-5. then use `project_*`, `asset_*`, `editor_*`, `node_*`, `mesh_*`, `material_*`, and related tools
+5. then use `project_*`, `scene_*`, `asset_*`, `node_*`, `mesh_*`, `material_*`, `script_*`, `terrain_*`, `foliage_*`, `sdf_*`, `gi_*`, and related tools
+
+The raw-bridge tools `editor_call` and `editor_eval` are disabled unless the editor is started with the environment variable `EDITOR_MCP_ENABLE_UNSAFE_TOOLS=1`.
 
 If a client calls editor tools before the editor window has connected to the MCP bridge, early calls may fail. Automation clients should wait for `editor_wait_ready` first.
 
@@ -65,13 +75,13 @@ If a client calls editor tools before the editor window has connected to the MCP
 
 ```toml
 [mcp_servers.zephyr-editor]
-url = "http://127.0.0.1:47231/mcp"
+url = "http://127.0.0.1:47231/mcp?token=<token>"
 ```
 
 Equivalent CLI command:
 
 ```sh
-codex mcp add zephyr-editor --url http://127.0.0.1:47231/mcp
+codex mcp add zephyr-editor --url http://127.0.0.1:47231/mcp?token=<token>
 ```
 
 ### Claude Desktop Example
@@ -80,32 +90,35 @@ codex mcp add zephyr-editor --url http://127.0.0.1:47231/mcp
 {
   "mcpServers": {
     "zephyr-editor": {
-      "url": "http://127.0.0.1:47231/mcp"
+      "url": "http://127.0.0.1:47231/mcp?token=<token>"
     }
   }
 }
 ```
 
-If the port is changed in editor settings, update the external MCP client configuration as well.
+If the port is changed in editor settings, update the external MCP client configuration as well. When connections are refused, first check that the URL carries the token.
 
 ## LLM Chat
 
 The desktop build includes an `Assistant` tab in the bottom panel for project-aware LLM chat. This feature is available only in the desktop runtime; the browser build does not provide the local LLM chat bridge.
 
-LLM settings are available under `Editor > Editor Settings...`:
+LLM settings are available under `Help > Editor Settings...`:
 
 | Setting | Meaning |
 | --- | --- |
-| `Provider` | OpenAI or a custom OpenAI-compatible service. The Anthropic entry is reserved, but the embedded Assistant does not implement it yet |
+| `Provider` | `OpenAI`, `Anthropic`, or `Custom` (any OpenAI-compatible service) |
 | `Base URL` | LLM endpoint. OpenAI-compatible services usually use the `/v1` root, or a direct `/chat/completions` URL |
-| `Model` | Model name |
+| `Model` | Model name. The `Fetch` button next to it lists the models the service offers |
 | `Temperature` | Response randomness |
 | `Max Output Tokens` | Maximum output length per response |
 | `Enable Tool Calling` | Allow the model to call editor tools |
 | `Require Tool Approval` | Require user approval before tool calls execute |
-| `API Key` | Store the API key for the selected provider |
+| `Unlimited Tool Steps` / `Max Tool Steps` | How many tool calls the model may make in a row within one exchange |
+| `API Key` | Store the API key for the selected provider; `Clear Stored API Key` removes the stored key |
 
-API keys are stored by the Electron main process and are not written into project files. When tool calling is enabled, the Assistant can operate on the current project context, such as querying project state, reading assets, creating nodes, editing materials, or running supported generation tasks. When `Require Tool Approval` is enabled, tool calls appear in the Assistant timeline and wait for user approval or rejection.
+API keys are stored by the Electron main process and are not written into project files. When the system offers no secret encryption, the dialog warns that keys will be stored in plaintext.
+
+`Default RHI` in the same dialog selects the rendering backend the editor starts with; it takes effect at the next start. When tool calling is enabled, the Assistant can operate on the current project context, such as querying project state, reading assets, creating nodes, editing materials, or running supported generation tasks. When `Require Tool Approval` is enabled, tool calls appear in the Assistant timeline and wait for user approval or rejection.
 
 ## Guidance
 

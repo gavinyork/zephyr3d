@@ -3,14 +3,17 @@
 ## 概述
 
 **色调映射（Tone Mapping）** 是把 **HDR（高动态范围）** 图像转换为适合标准显示设备的 **LDR（低动态范围）** 图像的过程。
-Zephyr3D 的色调映射基于 **ACES（Academy Color Encoding System）**，保证物理正确的颜色响应和自然的亮度压缩。
+Zephyr3D 的色调映射使用 **ACES（Academy Color Encoding System）** 曲线的拟合，提供电影感的颜色响应和自然的亮度压缩。
 
 ---
 
 ## 属性接口
 
-- `camera.toneMap`: `boolean` — 启用或禁用色调映射。
+- `camera.toneMap`: `boolean` — 启用或禁用色调映射，默认开启。
 - `camera.toneMapExposure`: `number` — 曝光控制，默认值 `1`。
+- `camera.toneMapDither`: `boolean` — 输出时加入轻微抖动，消除泛光光晕等平缓渐变量化后出现的色带，默认开启。做逐像素截图对比时应关闭，否则每帧的像素值会有细微差异。
+
+色调映射要配合 HDR 渲染使用（`camera.HDR`，默认开启）。关闭 HDR 时也应关闭色调映射。
 
 ---
 

@@ -3,7 +3,9 @@
 编辑器内置对 **TypeScript 脚本** 的支持。  
 你可以在资产面板中创建、编辑并运行脚本，用于实现项目的启动流程、场景逻辑、节点交互、动画以及各种辅助功能。
 
-总体上，脚本按用途分为三类：
+> 本页代码为片段示意，省略了部分 import。
+
+总体上，脚本按用途分为两类：
 
 - **绑定脚本**：挂载到场景或场景节点上的脚本，拥有完整生命周期回调
 - **辅助脚本**：提供工具函数、数据结构、业务逻辑等，被其他脚本导入使用
@@ -86,14 +88,9 @@ import { RuntimeScript } from "@zephyr3d/scene";
 
 export default class RotateScript extends RuntimeScript<SceneNode> {
   private target?: SceneNode;
-  private speed: number;
-  private rotationY: number;
-
-  constructor() {
-    // 构造阶段：实例刚被创建，还未绑定到对象
-    this.speed = 2;
-    this.rotationY = 0;
-  }
+  // 用字段初始化器设置初始值，不需要写构造函数
+  private speed = 2;
+  private rotationY = 0;
 
   async onCreated(): Promise<void> {
     // 初始化逻辑：可异步，例如加载配置、资源
@@ -107,7 +104,7 @@ export default class RotateScript extends RuntimeScript<SceneNode> {
   onUpdate(dt: number): void {
     // 每帧更新旋转
     this.rotationY += this.speed * dt;
-    this.target.rotation.fromEulerAngle(0, this.rotationY, 0);;
+    this.target?.rotation.fromEulerAngle(0, this.rotationY, 0);
   }
 
   onDetached(): void {
@@ -123,107 +120,109 @@ export default class RotateScript extends RuntimeScript<SceneNode> {
 
 > **注意**
 >
-> 因为脚本生命周期不会超出关联对象的生命周期，因此无需使用弱引用持有关联节点，也不能使用强引用持有关联节点，否则导致脚本与关联节点循环引用而无法释放，造成内存泄漏。
+> 宿主被销毁时，引擎会先调用脚本的 `onDetached()`，再销毁脚本，因此像上面这样用普通字段保存宿主是安全的，只要在 `onDetached()` 里把字段清空即可。不要用 `DRef` 持有宿主：`DRef` 会让宿主的引用计数加一，宿主因此无法被自动销毁。
+>
+> 如果要自己写构造函数，第一行必须调用 `super()`，否则实例化时会抛出 `ReferenceError`。
 
 #### 1.2 绑定方式
 
 在编辑器中使用绑定脚本的一般流程：
 
-1. 在资产面板中新建脚本文件（例如 rotate.ts）
-2. 在脚本中实现并导出一个类（如 RotateScript）
+1. 在资产面板的 `/assets` 目录下右键 `Create New > Typescript`，新建脚本文件（例如 rotate.ts），见[创建脚本](zh-cn/editor/create-script.md)
+2. 在脚本中实现一个继承 `RuntimeScript` 的类并**默认导出**
 3. 在编辑器中：
     - 选中场景（Scene）或某个节点（Node）
-    - 在属性面板的 脚本 区域添加脚本组件
-    - 选择对应脚本文件和导出的类名
+    - 把脚本文件从资产面板拖到 Inspector 底部 **Scripts** 区域的 "Drop a script here to attach" 处
+    - 一个对象可以挂多个脚本；列表中的按钮可以调整顺序或移除脚本
+    - 选中列表中的脚本后，下方的 **Config** 区域可以编辑它用 `@scriptProp` 声明的参数（见下文）
 4. 运行场景后，引擎会自动：
-    - 创建脚本实例
-    - 调用生命周期回调（constructor → onCreated → onAttached → onUpdate …）
+    - 为每个挂载创建一个脚本实例
+    - 把 Config 中的参数值赋给实例
+    - 调用生命周期回调（onCreated → onAttached → onUpdate …）
 
-#### 1.3 一个绑定脚本可以绑定多个对象
+#### 1.3 可配置参数
 
-**重要特性**：
-
-单个绑定脚本可以被绑定到 多个对象。如果多个对象具有相同或类似的行为逻辑，你可以复用同一个脚本类：
-
-- 避免重复编写相同逻辑
-- 便于统一维护行为
-- 脚本内部可以对所有绑定对象进行 批量操作，在一定程度上提升性能
-
-常见的两种模式：
-
-1. 每个对象一个实例（最常见）
+用 `@scriptProp` 装饰器声明的字段会出现在 Config 区域，可以在编辑器里按对象分别设置，并随场景保存。参数值在 `onCreated()` 之前赋给实例。
 
 ```ts
-// 简单示例：脚本负责单个目标对象
-export default class RotateScript extends RuntimeScript<SceneNode> {
-  private target?: SceneNode;
-  private speed: number;
-  private rotationY: number;
+import { RuntimeScript, scriptProp } from '@zephyr3d/scene';
+import type { SceneNode } from '@zephyr3d/scene';
 
-  constructor() {
-    this.speed = 2;
-    this.rotationY = 0;
-  }
+export default class extends RuntimeScript<SceneNode> {
+  @scriptProp({ type: 'float', label: 'Speed', default: 1, minValue: 0 })
+  speed = 1;
 
-  onAttached(target: SceneNode) {
-    this.target = target;
-  }
+  @scriptProp({ type: 'asset', label: 'Texture', mimeTypes: ['image/png', 'image/jpeg'] })
+  texture = '';
 
-  onUpdate(dt: number) {
-    this.rotationY += this.speed * dt;
-    this.target.rotation.fromEulerAngle(0, this.rotationY, 0);;
-  }
-
-  onDetached() {
-    this.target = null;
-  }
+  @scriptProp({ type: 'node', label: 'Target Node', sceneNode: { kind: 'node' } })
+  targetNode = '';
 }
 ```
 
-2. 一个脚本管理多个对象（共享行为 + 批量更新）
+支持的类型包括 `bool`、`int`、`float`、`vec2`/`vec3`/`vec4`、`rgb`/`rgba`、`string`、`asset`、`node` 和 `object_array`，还可以设置 `label`、`group`、取值范围和枚举。新建脚本时生成的模板里就带有这些示例。
 
-对于某些场景（如几十个粒子节点、成群运动的敌人等），你可以通过自己的管理脚本来批量管理这些对象，从而减少重复逻辑调用：
+#### 1.4 一个脚本类可以绑定到多个对象
 
-**示例**：
+同一个脚本类可以挂到多个对象上，复用相同的行为逻辑。默认情况下，**每次挂载都会创建一个新的脚本实例**，每个实例只服务一个对象，所以脚本里保存单个宿主即可（如上面的示例）。
+
+需要一个实例统一管理多个对象时（例如批量更新成群的敌人），可以把脚本写成单例：构造函数返回同一个共享实例。这时 `onCreated()` 只调用一次，`onAttached()` 和 `onDetached()` 会随每个对象各调用一次：
 
 ```ts
-// 简单示例：脚本负责多个目标对象
-export default class RotateScript extends RuntimeScript<SceneNode> {
-  // 存储多个关联到此脚本的对象
-  private targets: Set<SceneNode>;
-  private speed: number;
-  private rotationY: number;
+let shared: SwarmScript | null = null;
+
+export default class SwarmScript extends RuntimeScript<SceneNode> {
+  private targets = new Set<SceneNode>();
+  private rotationY = 0;
 
   constructor() {
-    this.speed = 2;
-    this.rotationY = 0;
-    this.targets = new Set();
+    super();
+    // 已有共享实例时直接返回它，所有挂载都使用同一个实例
+    if (shared) {
+      return shared;
+    }
+    shared = this;
   }
 
   onAttached(target: SceneNode) {
-    // 新增关联对象
     this.targets.add(target);
   }
 
   onUpdate(dt: number) {
-    // 批量更新
-    this.rotationY += this.speed * dt;
+    this.rotationY += 2 * dt;
     for (const target of this.targets) {
-      target.rotation.fromEulerAngle(0, this.rotationY, 0);;
+      target.rotation.fromEulerAngle(0, this.rotationY, 0);
     }
   }
 
   onDetached(target: SceneNode) {
-    // 移除关联对象
     this.targets.delete(target);
   }
-}
 
+  onDestroy() {
+    shared = null;
+  }
+}
 ```
 
-#### 1.4 启动脚本
+#### 1.5 启动脚本
 
-绑定脚本可以设置为项目的`启动脚本`，这个脚本会在引擎初始化完毕且在启动场景加载前被绑定到`null`对象
+绑定脚本可以设置为项目的`启动脚本`，这个脚本会在引擎初始化完毕且在启动场景加载前被绑定到`null`对象。
+
+只设置了启动脚本、没有设置启动场景时，需要在脚本里自己加载并显示场景：
+
+```ts
+import { getEngine, RuntimeScript } from "@zephyr3d/scene";
+
+export default class extends RuntimeScript<null> {
+  async onAttached() {
+    const scene = await getEngine().loadSceneFromFile("/assets/main.zscn");
+    if (scene) {
+      getEngine().setRenderable(scene, 0);
+    }
+  }
+}
+```
 
 ### 2. 辅助脚本（Helper Scripts）
 
@@ -252,7 +251,7 @@ export function moveTowards(
   maxDistanceDelta: number
 ): Vector3 {
   const toVector = Vector3.sub(target, current);
-  const distance = toVector.magnitude();
+  const distance = toVector.magnitude;
   if (distance <= maxDistanceDelta) {
     return target.clone();
   }
@@ -264,6 +263,8 @@ export function moveTowards(
 
 ```ts
 // assets/scripts/follow-target.ts
+import { DWeakRef } from "@zephyr3d/base";
+import { RuntimeScript } from "@zephyr3d/scene";
 import type { SceneNode } from "@zephyr3d/scene";
 import { moveTowards } from "./utils/math-utils";
 
@@ -282,7 +283,8 @@ export default class FollowTargetScript extends RuntimeScript<SceneNode> {
   }
 
   onUpdate(dt: number) {
-    if (!this.follow.get()) {
+    // 跟随的是另一个节点，用 DWeakRef 持有：它被销毁后 get() 返回 null，也不会阻止它被销毁
+    if (!this.target || !this.follow?.get()) {
       return;
     }
     this.target.position = moveTowards(this.target.position, this.follow.get().position, this.speed * dt);
@@ -298,17 +300,19 @@ export default class FollowTargetScript extends RuntimeScript<SceneNode> {
 
 - `构造函数`：实例创建时调用
 - `onCreated()`：初始化方法，支持异步
-- `onAttached()`：脚本附加到对象后调用
-- `onUpdate()`：每帧更新调用
-- `onDetached()`：脚本从对象上解除附加时调用
+- `onAttached(host)`：脚本附加到对象后调用
+- `onUpdate(dt, elapsed)`：每帧调用
+- `onFixedUpdate(fixedDt)`：每个物理固定步之前调用，只在场景有物理世界时调用；施力等需要按物理步长执行的逻辑放在这里（见[脚本控制物理](zh-cn/physics-scripting.md)）
+- `onLateUpdate(dt)`：每帧在场景节点更新、物理步进并写回位置之后调用，适合读取本帧的物理结果，例如让相机跟随运动的物体
+- `onDetached(host)`：脚本从对象上解除附加时调用
 - `onDestroy()`：实例销毁前调用
 
-除构造函数外，其余方法均为可选；你可以根据需要只实现其中若干个。
+这些方法都是可选的，根据需要实现其中若干个即可；构造函数也可以不写。
 
 ### 1. 构造函数
 
   - 调用时机：关联对象被创建时，引擎加载此脚本并调用构造函数创建脚本实例。此时脚本还未关联。
-  - 参数：必须实现为无参数构造。
+  - 参数：必须实现为无参数构造，且第一行调用 `super()`。多数情况下用字段初始化器即可，不需要写构造函数。
 
 **适合做的事情**：
 
@@ -322,9 +326,10 @@ export default class FollowTargetScript extends RuntimeScript<SceneNode> {
 **示例**：
 
 ```ts
-export class ExampleScript {
+export default class ExampleScript extends RuntimeScript<SceneNode> {
   private speed: number;
   constructor() {
+    super();
     this.speed = 1.0;
   }
 }
@@ -365,18 +370,16 @@ async onCreated(): Promise<void> {
 **示例**：
 
 ```ts
-import type { SceneNode } from "@zephyr3d/scene";
-
 onAttached(target: SceneNode): void {
   this.target = target;
-  this.target.position.set(0, 1, 0);
+  this.target.position.setXYZ(0, 1, 0);
 }
 ```
 
 ### 4. onUpdate()
 
   - 调用时机：成功关联到对象后，每帧调用一次。
-  - 接收一个 dt 参数，表示当前帧与上一帧之间的时间间隔（秒）。
+  - 参数 `dt` 是当前帧与上一帧之间的时间间隔（秒），`elapsed` 是脚本开始运行以来的总时间（秒）。
 
 **适合做的事情**：
 
@@ -388,15 +391,20 @@ onAttached(target: SceneNode): void {
 
 ```ts
 onUpdate(dt: number): void {
-  if (!this.target || !(this.target instanceof SceneNode)) return;
-  // 简单旋转示例
-  this.target.rotation.y += this.rotateSpeed * dt;
+  if (!this.target) return;
+  // rotation 是四元数，不能直接修改 .y；用欧拉角重新设置
+  this.angle += this.rotateSpeed * dt;
+  this.target.rotation.fromEulerAngle(0, this.angle, 0);
 }
 ```
 
 **性能建议**：
 
 - 避免在 onUpdate 中进行大量同步阻塞操作（例如大规模计算、同步网络请求）
+
+**读取输入**：在 `onUpdate` 中可以通过 `getInput()`（来自 `@zephyr3d/scene`）按帧查询键盘、鼠标和手柄状态。
+
+> **键盘焦点**：键盘事件只在渲染画布上监听。如果页面上叠加了 HTML 按钮，点击按钮后焦点会离开画布，之后键盘输入不再生效。可以在按钮的 `pointerdown` 事件里调用 `event.preventDefault()` 防止抢走焦点，或在点击处理完后调用 `getApp().focus()` 把焦点还给画布。
 
 ### 5. onDetached()
 
@@ -446,49 +454,43 @@ onDestroy(): void {
 // assets/scripts/move.ts
 import type { SceneNode } from "@zephyr3d/scene";
 import { Vector3 } from "@zephyr3d/base";
-import { RuntimeScript } from "@zephyr3d/scene";
+import { RuntimeScript, scriptProp } from "@zephyr3d/scene";
 
 export default class extends RuntimeScript<SceneNode> {
   private target?: SceneNode;
-  private speed: number;
-  private direction: Vector3;
-
-  constructor() {
-    // 构造阶段：仅初始化简单字段
-    this.speed = 2.0;
-    this.direction = new Vector3();
-  }
+  // 在编辑器的 Config 区域可以按节点分别设置
+  @scriptProp({ type: 'float', label: 'Speed', default: 2, minValue: 0 })
+  speed = 2;
+  private direction = new Vector3(1, 0, 0);
 
   async onCreated(): Promise<void> {
-    console.log("RotateScript created");
+    console.log("MoveScript created");
   }
 
   onAttached(target: SceneNode): void {
-    // 保存关联对象
+    // 保存关联对象，并放到起始位置
     this.target = target;
-
-    if (target instanceof Node) {
-      // 将节点放到起始位置
-      target.position.set(0, 0, 0);
-    }
+    target.position.setXYZ(0, 0, 0);
   }
 
   onUpdate(dt: number): void {
     // 沿 direction 方向匀速移动
-    this.target.position.addBy(Vector3.scale(this.direction, this.speed * dt));
+    this.target?.position.addBy(Vector3.scale(this.direction, this.speed * dt));
   }
 
   onDetached(): void {
-    console.log("RotateScript detached");
+    console.log("MoveScript detached");
     this.target = undefined;
   }
 
   onDestroy(): void {
-    console.log("RotateScript destroyed");
+    console.log("MoveScript destroyed");
     // 在此处做资源释放或全局解注册
   }
 }
 ```
 
-在编辑器中，将此脚本绑定到多个节点对象，这些节点都会按照相同逻辑移动。
+在编辑器中，将此脚本绑定到多个节点对象，每个节点会得到自己的脚本实例，按照相同逻辑移动，速度可以分别设置。
+
+脚本的 `console.log` 输出在预览页面的浏览器开发者工具中查看。编辑器没有热重载：修改脚本后需要重新运行预览。
 

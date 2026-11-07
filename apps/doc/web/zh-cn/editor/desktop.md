@@ -6,7 +6,11 @@ Zephyr3d Editor 除了浏览器版本，也提供基于 Electron 的桌面运行
 
 ## 运行方式
 
-开发环境中可以通过以下命令启动桌面编辑器：
+桌面版安装包可以从 [GitHub Releases](https://github.com/gavinyork/zephyr3d/releases) 下载。
+
+### 从源码运行（开发者）
+
+需要完整的仓库，并先构建编辑器（`npm run build --prefix utility/editor`），再启动桌面编辑器：
 
 ```sh
 npm run electron:start --prefix utility/editor
@@ -28,7 +32,7 @@ npm run electron:dev:install-shortcut --prefix utility/editor
 
 ## 本地项目与插件
 
-在浏览器版本中，项目和编辑器数据主要保存在 IndexedDB 中。桌面版本会把编辑器元数据、系统插件和项目数据保存到 Electron 的用户数据目录下，默认位置由 `app.getPath('userData')` 决定。
+在浏览器版本中，项目和编辑器数据主要保存在 IndexedDB 中。桌面版本会把编辑器元数据、系统插件和项目数据保存到 Electron 用户数据目录下的 `editor-storage` 中（`app.getPath('userData')/editor-storage`）。Windows 免安装 zip 版从可写的解压目录运行时，会改用 `<exe 所在目录>/userdata`。
 
 桌面运行时支持：
 
@@ -46,10 +50,14 @@ npm run electron:dev:install-shortcut --prefix utility/editor
 默认 MCP 地址：
 
 ```text
-http://127.0.0.1:47231/mcp
+http://127.0.0.1:47231/mcp?token=<token>
 ```
 
-MCP 服务只绑定到 `127.0.0.1`。可以在编辑器菜单 `Editor > Editor Settings...` 中启用或关闭服务、修改端口，并复制 MCP URL。启用状态和端口配置会保存在 Electron 用户数据目录中。
+MCP 服务只绑定到 `127.0.0.1`，并且要求一个**访问令牌**：每次安装会生成一个令牌，请求必须带上 `?token=<token>` 查询参数，或 `Authorization: Bearer <token>` 请求头，否则会被拒绝。
+
+在编辑器菜单 `Help > Editor Settings...`（仅桌面版）的 MCP Service 区域可以启用或关闭服务、修改端口、查看运行状态，并用 **Copy MCP URL** 复制带令牌的完整地址。**配置外部客户端时请直接粘贴这个地址**，下面示例中的 `<token>` 需要替换成实际令牌。启用状态、端口和令牌保存在 Electron 用户数据目录中。
+
+自动化场景（无界面运行、CI 中的 Agent）可以设置环境变量 `ZEPHYR_EDITOR_MCP_TOKEN` 固定令牌。
 
 推荐的外部 Agent 连接顺序：
 
@@ -57,7 +65,9 @@ MCP 服务只绑定到 `127.0.0.1`。可以在编辑器菜单 `Editor > Editor S
 2. `tools/list`
 3. 调用 `editor_wait_ready`
 4. 调用 `editor_status`
-5. 再使用 `project_*`、`asset_*`、`editor_*`、`node_*`、`mesh_*`、`material_*` 等工具
+5. 再使用 `project_*`、`scene_*`、`asset_*`、`node_*`、`mesh_*`、`material_*`、`script_*`、`terrain_*`、`foliage_*`、`sdf_*`、`gi_*` 等工具
+
+直接访问编辑器内部的 `editor_call` 和 `editor_eval` 默认被禁用，只有用环境变量 `EDITOR_MCP_ENABLE_UNSAFE_TOOLS=1` 启动编辑器时才可调用。
 
 如果客户端在编辑器窗口尚未连接 MCP bridge 时就调用编辑器工具，早期调用可能失败。因此自动化客户端应先等待 `editor_wait_ready`。
 
@@ -65,13 +75,13 @@ MCP 服务只绑定到 `127.0.0.1`。可以在编辑器菜单 `Editor > Editor S
 
 ```toml
 [mcp_servers.zephyr-editor]
-url = "http://127.0.0.1:47231/mcp"
+url = "http://127.0.0.1:47231/mcp?token=<token>"
 ```
 
 等价命令：
 
 ```sh
-codex mcp add zephyr-editor --url http://127.0.0.1:47231/mcp
+codex mcp add zephyr-editor --url http://127.0.0.1:47231/mcp?token=<token>
 ```
 
 ### Claude Desktop 配置示例
@@ -80,32 +90,35 @@ codex mcp add zephyr-editor --url http://127.0.0.1:47231/mcp
 {
   "mcpServers": {
     "zephyr-editor": {
-      "url": "http://127.0.0.1:47231/mcp"
+      "url": "http://127.0.0.1:47231/mcp?token=<token>"
     }
   }
 }
 ```
 
-如果在编辑器设置中修改了端口，外部 MCP 客户端配置也需要同步更新。
+如果在编辑器设置中修改了端口，外部 MCP 客户端配置也需要同步更新。连接被拒绝时，先确认地址里带了令牌。
 
 ## LLM Chat
 
 桌面版底部面板包含 `Assistant` 标签页，用于和 LLM 进行项目上下文相关的对话。该功能只在桌面运行时可用，浏览器版本不会直接提供本地 LLM Chat 能力。
 
-LLM 配置位于 `Editor > Editor Settings...`：
+LLM 配置位于 `Help > Editor Settings...`：
 
 | 设置 | 含义 |
 | --- | --- |
-| `Provider` | 当前可使用 OpenAI 或自定义 OpenAI-compatible 服务；Anthropic 入口保留但嵌入式 Assistant 尚未实现 |
+| `Provider` | `OpenAI`、`Anthropic`，或 `Custom`（任意 OpenAI 兼容服务） |
 | `Base URL` | LLM 服务入口。OpenAI-compatible 服务通常使用 `/v1` 根地址，或直接填写 `/chat/completions` 地址 |
-| `Model` | 使用的模型名称 |
+| `Model` | 使用的模型名称。旁边的 `Fetch` 按钮可从服务端拉取可用模型列表 |
 | `Temperature` | 回复随机性 |
 | `Max Output Tokens` | 单次回复最大输出长度 |
 | `Enable Tool Calling` | 允许模型调用编辑器工具 |
 | `Require Tool Approval` | 工具调用前要求用户确认 |
-| `API Key` | 保存当前 provider 的密钥 |
+| `Unlimited Tool Steps` / `Max Tool Steps` | 一次对话中模型最多可以连续调用多少次工具 |
+| `API Key` | 保存当前 provider 的密钥；`Clear Stored API Key` 清除已保存的密钥 |
 
-API Key 由 Electron 主进程保存，不写入项目文件。启用工具调用后，Assistant 可以围绕当前项目执行编辑器操作，例如查询项目、读取资源、创建节点、修改材质或运行受支持的生成任务。开启 `Require Tool Approval` 时，涉及工具调用的步骤会先出现在 Assistant 时间线中，等待用户批准或拒绝。
+API Key 由 Electron 主进程保存，不写入项目文件。系统不支持密钥加密时，对话框会警告密钥将以明文保存。
+
+同一对话框中的 `Default RHI` 选择编辑器启动时使用的渲染后端，下次启动生效。启用工具调用后，Assistant 可以围绕当前项目执行编辑器操作，例如查询项目、读取资源、创建节点、修改材质或运行受支持的生成任务。开启 `Require Tool Approval` 时，涉及工具调用的步骤会先出现在 Assistant 时间线中，等待用户批准或拒绝。
 
 ## 使用建议
 

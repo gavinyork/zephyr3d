@@ -93,7 +93,8 @@ terrain.physics = new NodePhysics({ colliders: [collider] });
 
 <<< @/../src/tut-77/main.js#layers
 
-- 矩阵和层名随场景保存在 `scene.physicsSettings` 里（`setLayerCollision`、`setLayerName`），编辑器里在场景的 Physics 设置中编辑。
+- 要随场景保存的矩阵和层名，设置在 `scene.physicsSettings` 上（`setLayerCollision`、`setLayerName`），编辑器里在场景的 Physics 设置中编辑。
+- 上面的示例为了运行时开关，直接调用了物理世界的 `scene.physicsWorld.setLayerCollision()`。这样改**不会保存**，而且 `scene.physicsSettings` 之后再有改动时，会覆盖掉直接对物理世界做的修改。
 - 查询（射线等）用 `layerMask` 只看某些层，见 [脚本控制](zh-cn/physics-scripting.md#查询)。
 - 层名只用于显示，层号才是数据：同一个预制体放进两个场景，层号相同，显示的名字可能不同。
 

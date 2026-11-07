@@ -142,6 +142,8 @@ You can also select a mode by string through `camera.oitMode`, where the three t
 camera.oitMode = 'dual-depth';
 ```
 
+When a mode is selected by string, the layer counts come from `camera.oitABufferLayers` (default 20) and `camera.oitDualDepthPeels` (default 8); `new ABufferOIT()` without an argument defaults to 16 layers, so the two forms give different results.
+
 ---
 
 ## Comparing the Modes
@@ -161,7 +163,7 @@ unavailable on WebGL2, for instance.
 ## Resource Management
 
 When a **camera** is released, its associated **OIT resources** are automatically released as well.  
-Manual disposal is generally unnecessary unless you reassign OIT objects explicitly.
+Reassigning `camera.oit` also releases the previous OIT object automatically, so no manual disposal is needed.
 
 ---
 

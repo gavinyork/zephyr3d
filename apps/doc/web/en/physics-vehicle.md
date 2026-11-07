@@ -101,3 +101,19 @@ world.on('fixedupdate', () => {
 - Once the body sleeps, the vehicle is not updated until there is input; any input wakes it.
 - Wheel rays find ground only on layers `vehicle.layer` collides with, and ignore triggers.
 - `vehicle.error` / `wheel.error` say why something could not be built: no dynamic rigid body on the vehicle's node, no wheels below it, or a wheel not below any vehicle.
+
+---
+
+## Driving with Keyboard, Mouse and Gamepad
+
+The example above reads the keyboard directly. Real projects usually bind each action to keyboard, mouse and gamepad at once with input action maps (`InputActionMap`), and the game logic reads only actions:
+
+<<< @/../src/tut-85/main.js#maps
+
+Every frame, read the actions and set the vehicle's inputs:
+
+<<< @/../src/tut-85/main.js#per-frame
+
+<div class="showcase" case="tut-85"></div>
+
+For a chase view, use the built-in `FollowCameraController` in `chase` mode with `fovBoost` for a sense of speed; see [Camera Collision](en/physics-camera.md).

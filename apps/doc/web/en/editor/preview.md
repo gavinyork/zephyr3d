@@ -38,15 +38,16 @@ The **Project Settings** panel mainly includes the following options:
   - If not set, the browser default icon or a system fallback will be used;
   - A square PNG/ICO/SVG is recommended.
 
-### 3. Splash Image / Splash Background (Loading Screen)
+### 3. Splash Screen / Splash Background (Loading Screen)
 
 - Purpose: Sets the loading screen shown while the application starts.
-- Required: **No (optional)**.
+- `Splash Screen`: whether the engine's built-in loading screen is shown, **on by default**.
+- `Splash Background`: the loading screen's background color (black by default), available while `Splash Screen` is on.
 - Notes:
-  - The loading screen is drawn by the web page itself and appears as soon as the page opens. It covers downloading the engine, creating the rendering device, running the startup script and loading the startup scene, and fades out once the first frame of the startup scene is on screen;
-  - It is shown whether or not it is configured: `Splash Background` is its color (black by default), `Splash Image` is an image centered on it (a logo, for example), with a loading indicator below;
+  - The loading screen is drawn by the web page itself and appears as soon as the page opens, with the engine logo, a progress bar and a status line. It covers downloading the engine, creating the rendering device, precompiling pipelines, prefetching assets, running the startup script and loading the startup scene, and fades out once the first frame of the startup scene is on screen;
+  - The progress bar moves through stages: compiling pipelines when some have been recorded (see [Build and Deploy](en/editor/build-deploy.md)), prefetching the assets the startup scene uses, then loading the scene;
   - If startup fails (for example, the browser supports none of the selected rendering backends), the loading screen stays up and shows the error;
-  - The image ships in its original format, unaffected by texture compression settings. Prefer a small PNG/WebP/SVG: the smaller it is, the sooner it appears.
+  - With `Splash Screen` off there is no loading screen; the page shows a black background while it starts. For a fully custom loading screen, turn it off and implement the `LoadingScreen` protocol yourself.
 
 ### 4. Startup Scene
 
@@ -84,7 +85,7 @@ The **Project Settings** panel mainly includes the following options:
 > - If both are set, **Startup Script has higher priority**: its `onCreated` and `onAttached` callbacks run to completion before the Startup Scene is loaded;
 > - Scripts attached to the Startup Scene can handle scene-level logic, or you can rely entirely on the Startup Script’s manual scene loading and control logic.
 
-### 6. Target RHIs (Rendering Backends)
+### 6. Targeted RHIs (Rendering Backends)
 
 - Purpose: Defines which rendering backends (RHI, Rendering Hardware Interface) the application is allowed to use at runtime.
 - Available options (multi-select):
@@ -102,24 +103,37 @@ The **Project Settings** panel mainly includes the following options:
   - If you only enable `WebGL2`:
     - WebGL2 is used even if the environment supports WebGPU.
 
+
+### 7. Other Settings
+
+| Setting | Effect |
+| --- | --- |
+| `Enable MSAA` | Turn on multisample anti-aliasing |
+| `Render Scale` | Rendering resolution relative to the page resolution; lower it to trade quality for performance |
+| `Precompile Recorded Pipelines` | Precompile the recorded render pipelines at startup; see [Build and Deploy](en/editor/build-deploy.md) |
+| `Morph Target Limit` / `Active Morph Upload Limit` | The most morph targets a mesh may have, and the most that can be active at once |
+| `Max Skin Influences` | The most bones that may influence one vertex |
+| `Additional packages` | Extra npm packages the project depends on |
+
 ---
 
 ## Starting a Live Preview
 
-Once the project settings are configured, you can start a Live Preview via the **Play button** on the toolbar:
+Once the project settings are done, start a preview with one of the three run buttons on the right of the toolbar. Each opens the running page in a **new browser tab**:
 
-1. In the editor toolbar, locate and click the **Play** button;
-2. The editor will open a **new browser window or tab** to run the project;
-3. In the newly opened page:
-   - The project will start according to the configured `Startup Scene` / `Startup Script`;
-   - All script logic will begin to execute;
-   - All related animations will start running;
-   - You can interact with the scene, observe runtime behavior, and debug both logic and animation.
+| Button | Effect |
+| --- | --- |
+| **Play** (play icon) | Runs the whole project from the `Startup Scene` / `Startup Script` in the project settings, the same way a build starts. It runs the **saved** files; unsaved changes are not included |
+| **Preview** (eye icon) | Runs only the current scene, asking you to save it first |
+| **Record Pipelines** (camera icon) | Same as Play, while recording the render pipelines the run uses so builds can precompile them. Read-only projects cannot record. See [Build and Deploy](en/editor/build-deploy.md) |
+
+On the opened page all script logic runs and all associated animations play, so you can interact with the project, observe how it runs, and debug logic and animation.
 
 > **Tips:**
 >
-> - After changing scripts, animations, or project settings, click the **Play** button again to launch a fresh preview with the new configuration;
-> - You can keep both the editor and the preview page open: edit in the editor, then restart the preview page to validate the changes.
+> - While a preview window is open, the editor viewport pauses rendering to leave the GPU to the preview; it resumes when the preview closes.
+> - After changing scripts, animations or project settings, save and run the preview again.
+> - Project settings are under `Project > Project Settings...` in the main menu.
 
 ---
 

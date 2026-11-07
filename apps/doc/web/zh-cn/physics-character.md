@@ -68,3 +68,14 @@ controller.move(new Vector3(vx * dt, vy * dt, vz * dt));
 - 角色进入触发区时，它节点的 `node.physics` 会收到 `triggerenter`。角色撞到静态物体不产生 `collisionenter`（运动学物体与静态物体之间没有接触事件），撞到了什么从 `move` 的结果里取。
 - 胶囊跟随节点的朝向：转向时只绕竖直轴旋转节点，让节点倾斜会让胶囊也倾斜。
 - 不要直接设置节点位置来移动角色，除非是传送（瞬移到新地点）。
+- 把 `node.physics` 设为 `null` 会销毁原来的 `NodePhysics` 及其中的角色控制器，之后不能再复用；要重新启用就新建一个。
+
+---
+
+## 相对相机方向行走、上下车
+
+下面的示例把角色控制器、内置的跟随相机（见[摄像机碰撞](zh-cn/physics-camera.md)）和输入动作映射组合在一起：按相机朝向换算行走方向，走到车旁按 F 上车，下车时重新创建角色控制器。
+
+<<< @/../src/tut-87/main.js#input
+
+<div class="showcase" case="tut-87"></div>

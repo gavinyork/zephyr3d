@@ -23,9 +23,9 @@ You can import assets by dragging files directly from your operating system into
 </video>
 
 > **Note**  
-> When importing model files (currently GLTF/GLB only), you should choose to import them as a **Prefab** so the engine can load and reuse them correctly.
-
-> _Image placeholder: Content Browser UI_
+> Uploaded model files (glTF/GLB, VRM/VRMA, FBX, OBJ) must be imported with **Import as Prefab** for the engine to load them; **Copy to project** only copies the original file into the project. Importing as a prefab offers three more options: **Rebuild prefab** and **Rebuild material** regenerate an existing prefab or material, and **Source Reference** only applies to single-file models with morph targets (GLB/VRM/FBX): the source file is copied into the project as well, and morph target data is rebuilt from it on demand instead of being stored in the generated mesh assets.
+>
+> Hair curves (Alembic `.abc`, `.hair`) dropped into the asset view open a separate hair import dialog that converts them to a `.zhair` asset for `HairNode`.
 
 The model import dialog also offers **Compress Textures**, **Compress Vertices** and **Generate LODs**, all off by default. They mark the imported textures and meshes for compressed shipping or levels of detail; see [Asset Compression](en/editor/asset-compression.md). Settings for assets already in the project are under **Texture Settings...** and **Mesh Settings...** in the right-click menu.
 

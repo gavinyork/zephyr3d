@@ -17,12 +17,13 @@ class MyMaterial extends MeshMaterial {
   foo() {
     /*
       Activating a variant can be achieved by calling the useFeature() method.
-      The value parameter can be any value, and each different value represents
-      a variant. The initial value for any feature is undefined.
+      Use a boolean, number or string as the value; each different value
+      represents a variant. (Values are turned into strings for the shader hash,
+      so objects and the like collide.) The initial value for any feature is undefined.
      */
-    this.useFeature(MyMaterial.featureA, value);
+    this.useFeature(MyMaterial.featureA, 2);
     // Get current variant value.
-    const value = this.featureUsed(MyMaterial.featureA);
+    const current = this.featureUsed(MyMaterial.featureA);
   }
   bar() {
     // Boolean values can be used as variants for simple switches.

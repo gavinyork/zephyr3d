@@ -99,7 +99,7 @@ class CartoonMaterial extends applyMaterialMixins(MeshMaterial, mixinLambert) {
         scope.$l.litColor = this.lambertLight(scope, scope.$inputs.worldPos, scope.normal, scope.albedoColor);
         // For simplicity, use R+G+B as the brightness.
         scope.$l.litIntensity = pb.add(scope.litColor.r, scope.litColor.g, scope.litColor.b, 0.00001);
-        scope.$l.albedoIntensity = pb.add(scope.albedoColor.r, scope.albedoColor.g, scope.albedoColor.g, 0.00001);
+        scope.$l.albedoIntensity = pb.add(scope.albedoColor.r, scope.albedoColor.g, scope.albedoColor.b, 0.00001);
         // Calcuate the illumination.
         scope.$l.intensity = pb.clamp(pb.div(scope.litIntensity, scope.albedoIntensity), 0, 1);
         // Calculating the quantified intensity of light

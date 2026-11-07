@@ -47,6 +47,7 @@
 
 <<< @/../src/tut-79/main.js#rope
 
+- `spring` 的软硬由 `stiffness`（每拉伸 1 米的拉力，默认 100）和 `damping`（回弹衰减得多快，默认 5）决定。
 - `collideConnected`：被连接的两个刚体之间是否还碰撞，默认 false，所以门不会卡在门框上。
 
 ---
@@ -56,6 +57,8 @@
 - `hinge`：`limitsEnabled` 打开后，角度限制在 `lowerLimit`～`upperLimit`（度）之间。
 - `slider`：同样的属性，单位是米。
 - `ball`：`swingLimit` 限制偏离轴的角度，`twistLimit` 限制绕轴的扭转，都是每个方向的度数。这是逐轴的近似，不是精确的圆锥。
+
+三种关节的限位都要先打开 `limitsEnabled`，否则设置的限位值不起作用，也没有提示。
 
 运行时可以读当前值：`joint.angle`（铰链，度）、`joint.position`（滑轨，米）。
 

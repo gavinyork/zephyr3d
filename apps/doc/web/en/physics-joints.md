@@ -47,6 +47,7 @@ A chain is a row of `ball` joints, each link joined to the previous one:
 
 <<< @/../src/tut-79/main.js#rope
 
+- How stiff a `spring` is comes from `stiffness` (pull per metre stretched, default 100) and `damping` (how fast it stops bouncing, default 5).
 - `collideConnected`: whether the two joined bodies still collide with each other, default false, so a door does not catch on its frame.
 
 ---
@@ -56,6 +57,8 @@ A chain is a row of `ball` joints, each link joined to the previous one:
 - `hinge`: with `limitsEnabled`, the angle stays between `lowerLimit` and `upperLimit` (degrees).
 - `slider`: the same properties, in metres.
 - `ball`: `swingLimit` limits tilting away from the axis, `twistLimit` turning about it, both in degrees each way. This is a per-axis approximation, not an exact cone.
+
+All three need `limitsEnabled` turned on first; without it the limit values have no effect, and nothing warns about it.
 
 The current value can be read while running: `joint.angle` (hinge, degrees) and `joint.position` (slider, metres).
 

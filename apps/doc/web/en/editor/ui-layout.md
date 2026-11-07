@@ -5,27 +5,49 @@ The Zephyr3d Editor interface is organized from top to bottom as follows:
 - **Main Menu** – The top menu bar, providing access to all features  
 - **Toolbar** – Shortcut buttons for commonly used tools  
 - **Workspace** – The main editing area  
-- **Status Bar** (center bottom) – Displays status information  
+- **Status Bar** (bottom) – Displays status information  
 
 The workspace is divided into four main areas:
 
 | Area                           | Description                               |
 |-------------------------------|-------------------------------------------|
-| **Scene Tree** (left)         | Shows the hierarchical structure of the scene |
+| **Scene Hierarchy** (left)    | Shows the hierarchical structure of the scene |
 | **Viewport** (center)         | 3D view and scene editing                 |
-| **Inspector Panel** (right)   | Edit properties and component parameters  |
-| **Content Browser / Log View** (bottom) | Manage assets and view logs     |
+| **Inspector** (right)         | Edit properties; the Scripts section at the bottom attaches scripts |
+| **Content Browser / Log View** (bottom) | Manage assets and view logs; the desktop build adds an **Assistant** tab |
 
-### Keyboard & Mouse Shortcuts
-
-- `Ctrl + S` – Save the current scene  
-- Mouse middle button – Pan the view  
-- Mouse right button – Rotate the camera  
-- Scroll wheel or `Ctrl + Middle Button` – Zoom the view  
-- `T` – Switch to Move tool  
-- `R` – Switch to Rotate tool  
-- `S` – Switch to Scale tool  
-- `Esc` – Switch back to Select mode  
-- `F` – Frame the selected object in the view  
+Plugins can add their own panels to the left, right and bottom areas.
 
 <img src="https://cdn.zephyr3d.org/doc/assets/images/editor-workspace.jpg" width="1024">
+
+### Viewport Navigation
+
+| Action | Effect |
+|------|------|
+| Right-drag | Turn the view in place |
+| Hold right button + `W` `A` `S` `D` | Fly forward, back, left, right |
+| Hold right button + `Q` / `E` | Move down / up |
+| `Alt` + left-drag | Orbit around the view centre |
+| `Alt` + middle-drag | Pan the view |
+| `Alt` + right-drag | Dolly in / out |
+| Scroll wheel | Dolly in / out; hold `Ctrl` for 10× speed, `Shift` for 0.1× |
+
+### Keyboard Shortcuts
+
+| Shortcut | Effect |
+|------|------|
+| `Q` | Select tool |
+| `W` | Move tool |
+| `E` | Rotate tool |
+| `R` | Scale tool |
+| `F` | Frame the selected object in the view |
+| `Delete` | Delete the selected nodes |
+| `Ctrl + D` | Duplicate whatever has focus: scene nodes, assets or blueprint nodes |
+| `Ctrl + C` / `Ctrl + V` | Copy / paste |
+| `Ctrl + Z` / `Ctrl + Y` | Undo / redo |
+| `Ctrl + N` | New scene |
+| `Ctrl + O` | Open scene |
+| `Ctrl + S` | Save scene |
+| `Ctrl + Alt + S` | Save scene as |
+| `F2` | Rename the selected asset |
+| `F12` | Toggle developer tools (desktop only) |

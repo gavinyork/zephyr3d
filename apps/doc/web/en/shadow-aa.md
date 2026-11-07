@@ -173,6 +173,16 @@ How it works:
 - Large outdoor scenes and terrains;  
 - Third‑person or free‑camera systems requiring stable shadows over distance.
 
+Only directional lights can have cascades:
+
+```javascript
+dirLight.shadow.numShadowCascades = 4; // 1 to 4, default 1
+dirLight.shadow.splitLambda = 0.5;     // 0 splits evenly, 1 logarithmically; higher gives the near cascades a smaller, finer range
+dirLight.shadow.shadowDistance = 200;  // the cascades only cover up to this distance, default 2000
+```
+
+The cascades are split within `shadowDistance`, and the default of 2000 is too far for most scenes, leaving every cascade coarse. Lowering it to the shadow distance the scene actually needs is the most effective way to sharpen CSM.
+
 Example: use the buttons to switch between 4-cascade CSM and single-cascade hard shadows.
 
 <div class="showcase" case="tut-23" style="width:600px;height:500px;"></div>

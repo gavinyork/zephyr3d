@@ -170,6 +170,16 @@ CSM 适用于：
 - 大型地形、户外场景；
 - 摄像机运动幅度较大的应用，如第三人称视角游戏。
 
+只有平行光可以分级：
+
+```javascript
+dirLight.shadow.numShadowCascades = 4; // 1～4，默认 1
+dirLight.shadow.splitLambda = 0.5;     // 0 为均匀划分，1 为按对数划分，越大近处分到的范围越小、越精细
+dirLight.shadow.shadowDistance = 200;  // 分级只覆盖到这个距离，默认 2000
+```
+
+各级在 `shadowDistance` 范围内划分，默认的 2000 对大多数场景都太远，会让每一级都很粗。按场景实际需要的阴影距离调小它，是提升 CSM 精度最有效的一步。
+
 示例：点击按钮可在 4 级 CSM 和单级硬阴影之间切换。
 
 <div class="showcase" case="tut-23" style="width:600px;height:500px;"></div>

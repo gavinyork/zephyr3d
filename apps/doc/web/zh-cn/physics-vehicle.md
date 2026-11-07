@@ -101,3 +101,19 @@ world.on('fixedupdate', () => {
 - 车身睡眠后，没有输入时载具不再更新；设置任何输入都会唤醒它。
 - 轮子射线只在 `vehicle.layer` 能碰撞的层上找地面，不检测触发器。
 - `vehicle.error` / `wheel.error` 说明没能建立的原因：车身节点上没有动态刚体、车身下面没有轮子、轮子不在任何载具下面。
+
+---
+
+## 键鼠与手柄驾驶
+
+上面的示例直接读键盘。实际项目里通常用输入动作映射（`InputActionMap`）把同一个动作同时绑定到键盘、鼠标和手柄，游戏逻辑只读动作：
+
+<<< @/../src/tut-85/main.js#maps
+
+每帧读取动作并设置载具的输入：
+
+<<< @/../src/tut-85/main.js#per-frame
+
+<div class="showcase" case="tut-85"></div>
+
+追尾视角可以直接用内置的 `FollowCameraController` 的 `chase` 模式，配合 `fovBoost` 增强速度感，见[摄像机碰撞](zh-cn/physics-camera.md)。

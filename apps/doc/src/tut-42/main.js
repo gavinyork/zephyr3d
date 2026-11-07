@@ -103,7 +103,7 @@ class CartoonMaterial extends applyMaterialMixins(MeshMaterial, mixinLambert) {
         scope.$l.albedoIntensity = pb.add(
           scope.albedoColor.r,
           scope.albedoColor.g,
-          scope.albedoColor.g,
+          scope.albedoColor.b,
           0.00001
         );
         // 光照以后的颜色除以漫反射颜色得到光照强度

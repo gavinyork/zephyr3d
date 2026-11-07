@@ -4,10 +4,10 @@
 
 ## 产品概述
 
-**Zephyr3d Editor** 是一款基于 **Zephyr3d 渲染引擎** 打造的可视化开发环境，旨在为 Web 平台提供完整、高效的 3D 项目编辑体验。  
+**Zephyr3d Editor** 是一款基于 **Zephyr3d 渲染引擎** 打造的可视化开发环境，旨在为 Web 平台提供完整、高效的 3D 项目编辑体验。  
 它集成了 **场景可视化编辑、资源管理、脚本集成、实时预览与构建发布** 等功能，为开发者提供从零开始搭建、编辑、调试到打包构建的一体化流程。
 
-Zephyr3d Editor 既可作为 **Zephyr3d 引擎的配套工具**，也可独立用于三维可视化应用、游戏与交互场景的原型设计。
+Zephyr3d Editor 既可作为 **Zephyr3d 引擎的配套工具**，也可独立用于三维可视化应用、游戏与交互场景的原型设计。
 
 ---
 
@@ -29,7 +29,7 @@ Zephyr3d Editor 既可作为 **Zephyr3d 引擎的配套工具**，也可独�
   内置实时渲染管线和调试控制台，快速预览效果；支持一键打包 WebGL / WebGPU 项目。
 
 - **现代兼容性**  
-  兼容所有支持 **ES6 模块、IndexedDB、WebGL / WebGPU** 的现代浏览器。
+  兼容所有支持 **ES6 模块、IndexedDB、WebGL / WebGPU** 的现代浏览器。
 
 - **开源开放**  
   完全开源，采用 **MIT 许可证**，开发者可自由修改、扩展或集成至自身项目。
@@ -51,7 +51,10 @@ Zephyr3d Editor 既可作为 **Zephyr3d 引擎的配套工具**，也可独�
   [https://github.com/gavinyork/zephyr3d](https://github.com/gavinyork/zephyr3d)
 
 - **在线体验（示例版）**：  
-  [点击进入 Zephyr3d Editor 在线体验](https://gavinyork.github.io/zephyr3d)  
+  [点击进入 Zephyr3d Editor 在线版](https://zephyr3d.org/editor/)  
+
+- **桌面版**：  
+  [GitHub Releases](https://github.com/gavinyork/zephyr3d/releases)  
   （请使用支持 WebGL2 / WebGPU 的现代浏览器访问）
 
 ---
@@ -67,6 +70,6 @@ Zephyr3d Editor 既可作为 **Zephyr3d 引擎的配套工具**，也可独�
 
 ---
 
-> *本指南基于最新版 Zephyr3d Editor 编写，功能与界面可能会随版本迭代更新。  
-> 欢迎开发者参与贡献、提出建议，共同完善 Zephyr3d 生态。*
+> *本指南基于最新版 Zephyr3d Editor 编写，功能与界面可能会随版本迭代更新。  
+> 欢迎开发者参与贡献、提出建议，共同完善 Zephyr3d 生态。*
 

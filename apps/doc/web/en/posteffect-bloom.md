@@ -74,5 +74,5 @@ banding comes back.
 `bloomKarisAverage` is on by default and suppresses fireflies — isolated blown-out pixels where a
 normal map happens to put NdotL near 1, which flicker violently as the surface moves. The trade is a
 slightly dimmer and tighter halo, since the weighting deliberately holds the brightest samples back.
-Turn it off for a fully static scene with no high-frequency speculars to gain a little reach.
+Turn it off for a fully static scene with no high-frequency speculars to gain a little reach. It only applies under the default `legacy` lighting mode; it has no effect in physical lighting mode.
 

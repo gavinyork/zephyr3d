@@ -76,7 +76,7 @@ myApp.ready().then(function () {
       const width = myApp.device.deviceXToScreen(myApp.device.canvas.width);
       const height = myApp.device.deviceYToScreen(myApp.device.canvas.height);
       scene.mainCamera.viewport = [0, 0, width, height];
-      dirLight.shadow.mode = useShadowAA ? 'pcf-opt' : 'hard';
+      dirLight.shadow.mode = useShadowAA ? 'pcf' : 'hard';
     }
   });
 

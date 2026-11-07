@@ -93,7 +93,8 @@ There are 16 collision layers, 0 to 15. `collider.layer` says which a collider i
 
 <<< @/../src/tut-77/main.js#layers
 
-- The matrix and the layer names are saved with the scene in `scene.physicsSettings` (`setLayerCollision`, `setLayerName`), edited in the editor in the scene's Physics settings.
+- A matrix and layer names that should be saved with the scene are set on `scene.physicsSettings` (`setLayerCollision`, `setLayerName`), edited in the editor in the scene's Physics settings.
+- The example above toggles collisions at run time by calling the physics world's `scene.physicsWorld.setLayerCollision()` directly. That change is **not saved**, and the next change to `scene.physicsSettings` overwrites it.
 - Queries (rays and so on) can look at some layers only with `layerMask`, see [Scripting](en/physics-scripting.md#queries).
 - Names are for display; the layer number is the data. The same prefab in two scenes has the same layer numbers, which may show different names.
 

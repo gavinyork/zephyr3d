@@ -183,6 +183,7 @@ myApp.ready().then(async function () {
 
   const probeMask = ~(1 << LAYER_PROPS);
   const noRotation = Quaternion.identity();
+  // #region sweep
   /**
    * Sweeps the probe sphere from `from` along the unit vector `dir`, skipping
    * the character and the props layer. Returns how far it got and what stopped it.
@@ -200,6 +201,7 @@ myApp.ready().then(async function () {
     // it touched is `from + dir * distance`; `hit.point` is on the wall's surface.
     return hit ? { distance: hit.distance, hit } : { distance: length, hit: null };
   }
+  // #endregion sweep
   /** Unit vector pointing back from where the camera looks, for the current yaw and pitch. */
   function backward() {
     return new Vector3(Math.sin(yaw) * Math.cos(pitch), Math.sin(pitch), Math.cos(yaw) * Math.cos(pitch));

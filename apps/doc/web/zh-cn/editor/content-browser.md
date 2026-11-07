@@ -23,9 +23,9 @@
 
 > 注意：
 > 
-> 如果上传模型文件(当前仅支持GLTF/GLB)，你需要选择导入为预制体(Prefab)，以便引擎读取。
-
-[图片占位：资产视图界面]
+> 上传的模型文件（glTF/GLB、VRM/VRMA、FBX、OBJ）需要选择 **Import as Prefab** 导入为预制体，引擎才能读取；选 **Copy to project** 则只把原文件复制进项目。导入为预制体时还有三个选项：**Rebuild prefab**、**Rebuild material** 重新生成已有的预制体或材质，**Source Reference** 只对带 Morph Target 的单文件模型（GLB/VRM/FBX）生效：源文件会一并复制进项目，Morph Target 数据在需要时从它重新读取，而不是存进生成的网格资产。
+>
+> 发丝曲线（Alembic `.abc`、`.hair`）拖入资产窗口时会打开单独的头发导入对话框，转换成 `.zhair` 资产，供 `HairNode` 使用。
 
 导入模型的对话框中还有 **Compress Textures**、**Compress Vertices** 和 **Generate LODs** 三个选项，默认不勾选。勾选后，导入的纹理和网格会以压缩形式发布或生成 LOD，详见[资产压缩](zh-cn/editor/asset-compression.md)。项目中已有资产的压缩设置，可以通过右键菜单中的 **Texture Settings...** 和 **Mesh Settings...** 修改。
 
