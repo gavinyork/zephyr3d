@@ -19,6 +19,32 @@ const atlasUVs = new WeakMap<object, PBShaderExp[]>();
 const tmpGrid = new Vector4();
 
 /**
+ * What an impostor shows instead of its lit colour, to check the baked atlases, see
+ * ImpostorMaterial.debugOutput
+ * @public
+ */
+export type ImpostorDebugOutput =
+  | 'none'
+  | 'albedo'
+  | 'normal'
+  | 'depth'
+  | 'occlusion'
+  | 'roughness'
+  | 'metallic'
+  | 'subsurface';
+
+const DEBUG_OUTPUTS: readonly ImpostorDebugOutput[] = [
+  'none',
+  'albedo',
+  'normal',
+  'depth',
+  'occlusion',
+  'roughness',
+  'metallic',
+  'subsurface'
+];
+
+/**
  * Draws an octahedral impostor baked by ImpostorBaker: a quad facing the view, showing the three
  * captured frames nearest the view direction blended together, lit as the object would be from
  * the surface attributes the frames hold.
@@ -51,6 +77,7 @@ export class ImpostorMaterial extends PBRMetallicRoughnessMaterial implements Cl
   private _frames: number;
   private _hemisphere: boolean;
   private _parallax: number;
+  private _debugOutput: ImpostorDebugOutput;
   constructor() {
     super();
     this._baseTexture = new DRef();
@@ -62,6 +89,7 @@ export class ImpostorMaterial extends PBRMetallicRoughnessMaterial implements Cl
     this._frames = 12;
     this._hemisphere = true;
     this._parallax = 1;
+    this._debugOutput = 'none';
     this.vertexNormal = false;
     this.vertexTangent = false;
     this.cullMode = 'none';
@@ -78,7 +106,7 @@ export class ImpostorMaterial extends PBRMetallicRoughnessMaterial implements Cl
       this.baseTexture = other.baseTexture;
       this.normalDepthTexture = other.normalDepthTexture;
       this.ormTexture = other.ormTexture;
-      this.subsurfaceTexture = other.subsurfaceTexture;
+      this.transmissionAtlas = other.transmissionAtlas;
       this.setBounds(other._center, other._radius);
       this.frames = other.frames;
       this.hemisphere = other.hemisphere;
@@ -111,12 +139,14 @@ export class ImpostorMaterial extends PBRMetallicRoughnessMaterial implements Cl
   }
   /**
    * Colour of the light the object lets through from behind, atlas; null when it lets none
-   * through. Lit as the object is, see MeshMaterial.getSubsurfaceColor.
+   * through. Lit as the object is, see MeshMaterial.getSubsurfaceColor. Not named
+   * subsurfaceTexture, which PBRMetallicRoughnessMaterial's (deprecated) subsurface scattering
+   * texture property already is, defined on each instance and so hiding an accessor here.
    */
-  get subsurfaceTexture() {
+  get transmissionAtlas() {
     return this._subsurfaceTexture.get();
   }
-  set subsurfaceTexture(tex: Nullable<Texture2D>) {
+  set transmissionAtlas(tex: Nullable<Texture2D>) {
     if (tex !== this._subsurfaceTexture.get()) {
       this._subsurfaceTexture.set(tex);
       this.optionChanged(true);
@@ -144,6 +174,17 @@ export class ImpostorMaterial extends PBRMetallicRoughnessMaterial implements Cl
   }
   set parallax(val: number) {
     this._parallax = Math.max(0, val);
+    this.uniformChanged();
+  }
+  /**
+   * Shows one baked attribute instead of the lit colour (world space normal), to check the
+   * atlases as they are sampled. Not saved.
+   */
+  get debugOutput() {
+    return this._debugOutput;
+  }
+  set debugOutput(val: ImpostorDebugOutput) {
+    this._debugOutput = DEBUG_OUTPUTS.includes(val) ? val : 'none';
     this.uniformChanged();
   }
   /**
@@ -212,6 +253,8 @@ export class ImpostorMaterial extends PBRMetallicRoughnessMaterial implements Cl
       )
     );
     scope.$outputs.worldPos = scope.worldPos;
+    // Towards the view and the world radius, to place the lit surface at its baked depth
+    scope.$outputs.zImpostorPush = pb.vec4(pb.mul(scope.toCamera, push), scope.worldRadius);
     ShaderHelper.resolveMotionVector(scope, scope.worldPos, scope.worldPos);
     scope.$l.csPos = pb.mul(ShaderHelper.getViewProjectionMatrix(scope), pb.vec4(scope.worldPos, 1));
     ShaderHelper.setClipSpacePosition(scope, scope.csPos);
@@ -264,6 +307,7 @@ export class ImpostorMaterial extends PBRMetallicRoughnessMaterial implements Cl
       scope.zImpostorBase = pb.tex2D().uniform(2);
       scope.zImpostorNormalDepth = pb.tex2D().uniform(2);
       scope.zImpostorORM = pb.tex2D().uniform(2);
+      scope.zImpostorDebug = pb.float().uniform(2);
       if (this._subsurfaceTexture.get()) {
         scope.zImpostorSubsurface = pb.tex2D().uniform(2);
       }
@@ -286,9 +330,7 @@ export class ImpostorMaterial extends PBRMetallicRoughnessMaterial implements Cl
         // Half a texel of a frame inside its edges, so sampling stays in the frame
         const margin = pb.div(pb.mul(frames, 0.5), scope.zImpostorGrid.w);
         const local = pb.clamp(uv, pb.vec2(margin), pb.vec2(pb.sub(1, margin)));
-        const a = pb.div(pb.add(frame, local), frames);
-        // Atlases are upright images: the grid counts frames from the bottom
-        return pb.vec2(a.x, pb.sub(1, a.y));
+        return impostorAtlasCoord(pb, frame, local, frames);
       };
       const shifted = (frame: PBShaderExp, uv: PBShaderExp, ray: PBShaderExp) => {
         const depth = pb.textureSample(scope.zImpostorNormalDepth, atlas(frame, uv)).a;
@@ -319,6 +361,78 @@ export class ImpostorMaterial extends PBRMetallicRoughnessMaterial implements Cl
       pb.mul(pb.textureSample(tex, uvs[1]), w.y),
       pb.mul(pb.textureSample(tex, uvs[2]), w.z)
     );
+  }
+  /**
+   * Lit at the surface the frames show rather than on the quad, which lies a radius towards the
+   * view: back along the view by (1 - depth)·2R, depth being 1 at the front of the bounds. On the
+   * quad, everything seen against the light would sit in the tree's own shadow and lose its
+   * transmitted light. Follows UE ImpostorBaker's depth derived pixel depth offset, used here for
+   * the lighting only.
+   */
+  PBRLight(
+    scope: PBInsideFunctionScope,
+    worldPos: PBShaderExp,
+    normal: PBShaderExp,
+    viewVec: PBShaderExp,
+    albedo: PBShaderExp,
+    TBN: PBShaderExp,
+    outRoughness?: PBShaderExp,
+    outSSSDiffuse?: PBShaderExp,
+    outSSSTransmission?: PBShaderExp
+  ): PBShaderExp {
+    const pb = scope.$builder;
+    const that = this;
+    const push = scope.$inputs.zImpostorPush;
+    scope.$l.zImpostorDepth = this.blendFrames(
+      scope,
+      scope.zImpostorNormalDepth,
+      this.impostorAtlasUVs(scope)
+    ).a;
+    scope.$l.zImpostorSurfacePos = pb.sub(
+      worldPos,
+      pb.mul(push.xyz, push.w, pb.mul(pb.sub(1, scope.zImpostorDepth), 2))
+    );
+    scope.$l.zImpostorLit = super.PBRLight(
+      scope,
+      scope.zImpostorSurfacePos,
+      normal,
+      viewVec,
+      albedo,
+      TBN,
+      outRoughness,
+      outSSSDiffuse,
+      outSSSTransmission
+    );
+    // Debug outputs, picked by a uniform so switching them builds no new program
+    scope.$l.zImpostorDebugMode = scope.zImpostorDebug;
+    scope.$l.zImpostorORMDebug = this.sampleORM(scope);
+    scope.$if(pb.greaterThan(scope.zImpostorDebugMode, 0.5), function () {
+      this.zImpostorLit = pb.vec3(0);
+      this.$if(pb.lessThan(this.zImpostorDebugMode, 1.5), function () {
+        this.zImpostorLit = albedo.rgb;
+      })
+        .$elseif(pb.lessThan(this.zImpostorDebugMode, 2.5), function () {
+          this.zImpostorLit = pb.add(pb.mul(normal, 0.5), pb.vec3(0.5));
+        })
+        .$elseif(pb.lessThan(this.zImpostorDebugMode, 3.5), function () {
+          this.zImpostorLit = pb.vec3(this.zImpostorDepth);
+        })
+        .$elseif(pb.lessThan(this.zImpostorDebugMode, 4.5), function () {
+          this.zImpostorLit = pb.vec3(this.zImpostorORMDebug.x);
+        })
+        .$elseif(pb.lessThan(this.zImpostorDebugMode, 5.5), function () {
+          this.zImpostorLit = pb.vec3(this.zImpostorORMDebug.y);
+        })
+        .$elseif(pb.lessThan(this.zImpostorDebugMode, 6.5), function () {
+          this.zImpostorLit = pb.vec3(this.zImpostorORMDebug.z);
+        })
+        .$else(function () {
+          if (this.zImpostorSubsurface) {
+            this.zImpostorLit = that.sampleUnshifted(this, this.zImpostorSubsurface).rgb;
+          }
+        });
+    });
+    return scope.zImpostorLit;
   }
   calculateAlbedoColor(scope: PBInsideFunctionScope, _uv?: PBShaderExp): PBShaderExp {
     return this.blendFrames(scope, scope.zImpostorBase, this.impostorAtlasUVs(scope));
@@ -370,16 +484,15 @@ export class ImpostorMaterial extends PBRMetallicRoughnessMaterial implements Cl
     return scope.zImpostorSubsurface ? this.sampleUnshifted(scope, scope.zImpostorSubsurface).rgb : null;
   }
   /** A texture blended over the three frames without the parallax shift */
-  private sampleUnshifted(scope: PBInsideFunctionScope, tex: PBShaderExp) {
+  /** @internal */
+  sampleUnshifted(scope: PBInsideFunctionScope, tex: PBShaderExp) {
     const pb = scope.$builder;
     const inputs = scope.$inputs;
     const frames = scope.zImpostorGrid.x;
     const cell = inputs.zImpostorFrame.xy;
     const second = inputs.zImpostorFrame.zw;
-    const atlas = (frame: PBShaderExp, uv: PBShaderExp) => {
-      const a = pb.div(pb.add(frame, pb.clamp(uv, pb.vec2(0), pb.vec2(1))), frames);
-      return pb.vec2(a.x, pb.sub(1, a.y));
-    };
+    const atlas = (frame: PBShaderExp, uv: PBShaderExp) =>
+      impostorAtlasCoord(pb, frame, pb.clamp(uv, pb.vec2(0), pb.vec2(1)), frames);
     return this.blendFrames(scope, tex, [
       atlas(cell, inputs.zImpostorUV01.xy),
       atlas(pb.add(cell, second), inputs.zImpostorUV01.zw),
@@ -416,6 +529,9 @@ export class ImpostorMaterial extends PBRMetallicRoughnessMaterial implements Cl
     bindGroup.setValue('zImpostorBounds', tmpBounds);
     bindGroup.setValue('zImpostorGrid', tmpGrid);
     if (this.needFragmentColorInput(ctx)) {
+      bindGroup.setValue('zImpostorDebug', DEBUG_OUTPUTS.indexOf(this._debugOutput));
+    }
+    if (this.needFragmentColorInput(ctx)) {
       const sampler = fetchSampler('clamp_linear');
       bindGroup.setTexture('zImpostorBase', this._baseTexture.get()!, sampler);
       bindGroup.setTexture('zImpostorNormalDepth', this._normalDepthTexture.get()!, sampler);
@@ -436,6 +552,24 @@ export class ImpostorMaterial extends PBRMetallicRoughnessMaterial implements Cl
     this._ormTexture.dispose();
     this._subsurfaceTexture.dispose();
   }
+}
+
+/**
+ * Texture coordinates in an atlas of a point of a frame. The atlases are upright images whose
+ * frame rows run from the top (see ImpostorBakeResult.base): frame (i, j) is the cell i from the
+ * left and j from the top, and within it the frame's y axis goes up the image.
+ *
+ * @param frame - Frame grid coordinates (i, j)
+ * @param local - Point in the frame, (0, 0) its lower left and (1, 1) its upper right
+ * @param frames - Frames along each side
+ */
+function impostorAtlasCoord(
+  pb: PBInsideFunctionScope['$builder'],
+  frame: PBShaderExp,
+  local: PBShaderExp,
+  frames: PBShaderExp
+) {
+  return pb.div(pb.vec2(pb.add(frame.x, local.x), pb.sub(pb.add(frame.y, 1), local.y)), frames);
 }
 
 /**

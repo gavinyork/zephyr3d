@@ -10,6 +10,7 @@ import { Mesh } from './mesh';
 import { Primitive } from '../render/primitive';
 import { InstanceCuller } from '../render/instance_culling';
 import { ImpostorMaterial } from '../material/impostor';
+import type { ImpostorDebugOutput } from '../material/impostor';
 import type { ImpostorInfo } from '../asset/impostor_asset';
 import { getImpostorFiles } from '../asset/impostor_asset';
 import type { ClipmapTerrain } from './terrain-cm';
@@ -261,6 +262,8 @@ export class FoliageLayer {
   _impostorLod: number;
   /** @internal */
   _fadeDistance: number;
+  /** @internal */
+  _impostorDebug: ImpostorDebugOutput;
   /** The impostor drawn far away; null when there is none, undefined until looked for @internal */
   _impostorPart: Nullable<FoliageImpostorPart> | undefined;
   /** @internal */
@@ -290,6 +293,7 @@ export class FoliageLayer {
     this._forceImpostor = false;
     this._impostorLod = Math.max(0, Math.floor(settings?.impostorLod ?? 0));
     this._fadeDistance = Math.max(0, settings?.fadeDistance ?? 10);
+    this._impostorDebug = 'none';
     this._impostorPart = undefined;
     this._impostorLoading = null;
   }
@@ -422,6 +426,17 @@ export class FoliageLayer {
     if (!!val !== this._forceImpostor) {
       this._forceImpostor = !!val;
       this._owner?.invalidate();
+    }
+  }
+  /** What the impostors show instead of their lit colour, to check them. Not saved. */
+  get impostorDebug(): ImpostorDebugOutput {
+    return this._impostorDebug;
+  }
+  set impostorDebug(val: ImpostorDebugOutput) {
+    this._impostorDebug = val;
+    const material = this._impostorPart?.material.get() as Nullable<ImpostorMaterial> | undefined;
+    if (material) {
+      (material.$isInstance ? (material.coreMaterial as ImpostorMaterial) : material).debugOutput = val;
     }
   }
   /** Loads the impostor again, after it was baked anew */
@@ -1250,11 +1265,12 @@ export class FoliageSystem extends GraphNode {
             material.normalDepthTexture = normalDepth;
             material.ormTexture = orm;
             if (info.subsurface) {
-              material.subsurfaceTexture = await manager.fetchTexture<Texture2D>(files.subsurface);
+              material.transmissionAtlas = await manager.fetchTexture<Texture2D>(files.subsurface);
             }
             material.frames = info.settings.frames;
             material.hemisphere = info.settings.hemisphere;
             material.setBounds(info.center, info.radius);
+            material.debugOutput = layer._impostorDebug;
             part = {
               primitive: new DRef(createImpostorQuad(info.center, info.radius)),
               material: new DRef(material.createInstance())

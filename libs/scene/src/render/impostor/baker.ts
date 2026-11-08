@@ -77,9 +77,9 @@ export interface ImpostorBakeResult {
   radius: number;
   /**
    * Base colour and opacity, atlasSize² RGBA8. The atlases are upright images, row 0 at the top:
-   * frame (i, j) has its lower left corner at (i, j) · cell from the lower left of the atlas, and
-   * the image of a frame has its y axis (see impostorFrameBasis) going up. Sampled from an image
-   * loaded as it is, the vertical texture coordinate is 1 - v of that layout.
+   * frame (i, j) is the cell i from the left and j from the top (frame viewports are counted from
+   * the top of the target), and the image of a frame has its y axis (see impostorFrameBasis) going
+   * up. Checked on a bake: the visible normals of every frame face its direction only this way.
    */
   base: Uint8Array;
   /** Normal in the object's space (RGB, 0.5 + 0.5·n) and depth towards the view (A, 1 nearest), at the detail size */

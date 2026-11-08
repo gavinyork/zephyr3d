@@ -11,6 +11,7 @@ import {
 } from '../../../scene';
 import { defineProps, type SerializableClass } from '../types';
 import type { ResourceManager } from '../manager';
+import type { ImpostorDebugOutput } from '../../../material/impostor';
 
 // 'FOLI' in little endian
 const FOLIAGE_DATA_MAGIC = 0x494c4f46;
@@ -215,6 +216,50 @@ export function getFoliageLayerClass(): SerializableClass {
           },
           set(this: FoliageLayer, value) {
             this.fadeDistance = value.num[0];
+          }
+        },
+        {
+          name: 'ImpostorDebug',
+          description:
+            'Shows one baked attribute of the cards instead of their lit color, to check the bake. Not saved',
+          type: 'string',
+          default: 'none',
+          options: {
+            group: 'Impostor',
+            enum: {
+              labels: [
+                'None',
+                'Albedo',
+                'Normal',
+                'Depth',
+                'Occlusion',
+                'Roughness',
+                'Metallic',
+                'Subsurface'
+              ],
+              values: [
+                'none',
+                'albedo',
+                'normal',
+                'depth',
+                'occlusion',
+                'roughness',
+                'metallic',
+                'subsurface'
+              ]
+            }
+          },
+          isHidden(this: FoliageLayer) {
+            return !this.impostor;
+          },
+          isPersistent() {
+            return false;
+          },
+          get(this: FoliageLayer, value) {
+            value.str[0] = this.impostorDebug;
+          },
+          set(this: FoliageLayer, value) {
+            this.impostorDebug = value.str[0] as ImpostorDebugOutput;
           }
         },
         {
