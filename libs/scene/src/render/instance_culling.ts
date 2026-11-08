@@ -83,7 +83,7 @@ interface CullGroup {
   /**
    * Per batch, BATCH_VEC4S vec4s: (first vec4 of the instances, instance count, vec4s per
    * instance, index of the arguments of the first level), (level count, squared nearest draw
-   * distance, squared farthest draw distance or -1 for none, 0), then the screen
+   * distance, squared farthest draw distance or -1 for none, draw distance fade width), then the screen
    * sizes of levels 1 to 7, the last component unused
    */
   batches: DRef<GPUDataBuffer>;
@@ -215,6 +215,7 @@ export class InstanceCuller {
       // Meshes of different draw distances are not batched together, see Mesh.getInstanceId
       const node = item.drawable.getNode();
       const [near, far] = node.isMesh() ? node.drawDistance : [0, Infinity];
+      const fade = node.isMesh() ? node.drawDistanceFade : 0;
       batches.push(
         data.offset >> 2,
         data.numInstances,
@@ -223,7 +224,7 @@ export class InstanceCuller {
         lodCount,
         near * near,
         far === Infinity ? -1 : far * far,
-        0,
+        fade,
         ...sizes
       );
       data.culled = {
@@ -467,11 +468,11 @@ export class InstanceCuller {
                 }
               );
             });
-            // Draw distance of the batch, to the centre of the bounds as on the CPU
+            // Draw distance of the batch, to the instance's origin as on the CPU
             // (Mesh.isWithinDrawDistance), measured from the level of detail view: the main
             // camera in shadow passes, so an instance casts a shadow exactly where it is drawn
             this.$l.batch1 = this.batches.at(pb.add(this.batchIndex, 1));
-            this.$l.toEye = pb.sub(this.wc, this.lodView.xyz);
+            this.$l.toEye = pb.sub(this.c3, this.lodView.xyz);
             this.$l.eyeDistSq = pb.dot(this.toEye, this.toEye);
             this.$if(
               pb.or(
@@ -592,7 +593,11 @@ export class InstanceCuller {
             this.$l.count = pb.uint(this.batch.y);
             this.$l.stride = pb.uint(this.batch.z);
             this.$l.argsBase = pb.uint(this.batch.w);
-            this.$l.lodCount = pb.uint(this.batches.at(pb.add(this.batchIndex, 1)).x);
+            this.$l.batchRange = this.batches.at(pb.add(this.batchIndex, 1));
+            this.$l.lodCount = pb.uint(this.batchRange.x);
+            this.$l.nearSq = this.batchRange.y;
+            this.$l.farSq = this.batchRange.z;
+            this.$l.fadeWidth = this.batchRange.w;
             this.$l.chunks = pb.div(pb.add(this.count, WORKGROUP_SIZE - 1), WORKGROUP_SIZE);
             // Barriers stay at the top level of the entry point, where control flow is
             // uniform: the loops around them read bounds from buffers WGSL takes for non-uniform
@@ -655,6 +660,28 @@ export class InstanceCuller {
                   this.$l.dst0 = pb.add(this.first, pb.mul(this.position.at(this.k), this.stride));
                   this.$for(pb.uint('j'), 0, this.stride, function () {
                     this.dst.setAt(pb.add(this.dst0, this.j), this.src.at(pb.add(this.src0, this.j)));
+                  });
+                  // Dither amount of the instance in the w of its framestamp vector, read by
+                  // MeshMaterial: 0 drawn whole, toward 1 fading out, from -1 fading in
+                  this.$if(pb.greaterThan(this.fadeWidth, 0), function () {
+                    this.$l.eyeDist = pb.distance(this.src.at(pb.add(this.src0, 3)).xyz, this.lodView.xyz);
+                    this.$l.dither = pb.float(0);
+                    this.$if(pb.greaterThanEqual(this.farSq, 0), function () {
+                      this.$l.fadeOut = pb.div(
+                        pb.sub(this.eyeDist, pb.sub(pb.sqrt(this.farSq), this.fadeWidth)),
+                        this.fadeWidth
+                      );
+                      this.dither = pb.clamp(this.fadeOut, 0, 1);
+                    });
+                    this.$if(pb.greaterThan(this.nearSq, 0), function () {
+                      this.$l.fadeIn = pb.div(pb.sub(this.eyeDist, pb.sqrt(this.nearSq)), this.fadeWidth);
+                      this.$if(pb.lessThan(this.fadeIn, 1), function () {
+                        this.dither = pb.sub(pb.clamp(this.fadeIn, 0, 1), 1);
+                      });
+                    });
+                    this.$l.stampAt = pb.add(this.dst0, 4);
+                    this.$l.stamp = this.dst.at(this.stampAt);
+                    this.dst.setAt(this.stampAt, pb.vec4(this.stamp.xyz, this.dither));
                   });
                 });
               });

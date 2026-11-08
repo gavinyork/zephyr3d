@@ -204,6 +204,20 @@ export function getFoliageLayerClass(): SerializableClass {
           }
         },
         {
+          name: 'FadeDistance',
+          description:
+            'Copies blend over this many meters instead of popping: where meshes turn into cards, and as they reach the cull distance. 0 swaps them at once. WebGPU only',
+          type: 'float',
+          default: 10,
+          options: { minValue: 0, maxValue: 200 },
+          get(this: FoliageLayer, value) {
+            value.num[0] = this.fadeDistance;
+          },
+          set(this: FoliageLayer, value) {
+            this.fadeDistance = value.num[0];
+          }
+        },
+        {
           name: 'ImpostorLod',
           description:
             'Level of detail of the asset the cards are baked from, 0 the most detailed. Pick the level the trees show around the impostor distance, so they keep their look when they turn into cards',

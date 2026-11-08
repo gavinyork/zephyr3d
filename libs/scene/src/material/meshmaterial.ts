@@ -1063,6 +1063,15 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
   supportsVoxelization(): boolean {
     return false;
   }
+  /** Whether instances of this pass may be dithered in or out, see Mesh.drawDistanceFade */
+  protected usesLodDither() {
+    const type = this.drawContext.renderPass!.type;
+    return (
+      !!(this.drawContext.materialFlags & MaterialVaryingFlags.INSTANCING) &&
+      type !== RENDER_PASS_TYPE_VOXELIZE &&
+      type !== RENDER_PASS_TYPE_CAPTURE
+    );
+  }
   /**
    * Whether the material hands its surface attributes to {@link MeshMaterial.outputSurfaceCapture}
    * in the surface capture pass, which bakes impostors. Otherwise only its colour is captured,
@@ -1155,6 +1164,10 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
       ShaderHelper.prepareSkinAnimation(scope);
     }
     if (this.drawContext.materialFlags & MaterialVaryingFlags.INSTANCING) {
+      if (this.usesLodDither()) {
+        // Written by GPU instance culling, see Mesh.drawDistanceFade
+        scope.$outputs.zLodDither = ShaderHelper.getInstanceLodDither(scope);
+      }
       if (this.drawContext.renderPass!.type === RENDER_PASS_TYPE_OBJECT_COLOR) {
         scope.$outputs.zObjectColor = this.getInstancedUniform(scope, MeshMaterial.OBJECT_COLOR_UNIFORM);
       }
@@ -1388,6 +1401,31 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
       }
     });
     pb.func(funcName, color ? [pb.vec3('worldPos'), pb.vec4('color')] : [pb.vec3('worldPos')], function () {
+      if (that.usesLodDither() && this.$inputs.zLodDither) {
+        // UE's ClipLODTransition (MaterialTemplate.ush): a fixed random value per pixel; fading
+        // out (0 to 1) keeps it above the amount, fading in (-1 to 0) below the amount + 1, so
+        // the two sides of a swap cover complementary pixels
+        this.$l.lodDither = this.$inputs.zLodDither;
+        this.$if(pb.greaterThan(pb.abs(this.lodDither), 0.001), function () {
+          this.$l.ditherArg = pb.dot(
+            pb.floor(this.$builtins.fragCoord.xy),
+            pb.vec2(347.83451793, 3343.28371963)
+          );
+          this.$l.ditherRand = pb.fract(pb.mul(pb.cos(pb.mod(this.ditherArg, 10000)), 1000));
+          this.$if(
+            pb.or(
+              pb.and(
+                pb.lessThan(this.lodDither, 0),
+                pb.lessThanEqual(pb.add(this.lodDither, 1), this.ditherRand)
+              ),
+              pb.and(pb.greaterThan(this.lodDither, 0), pb.greaterThanEqual(this.lodDither, this.ditherRand))
+            ),
+            function () {
+              pb.discard();
+            }
+          );
+        });
+      }
       this.$l.outColor = color ? this.color : pb.vec4();
       if (that.drawContext.renderPass!.type === RENDER_PASS_TYPE_LIGHT) {
         let output = true;

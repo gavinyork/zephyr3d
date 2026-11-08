@@ -257,6 +257,8 @@ export class Mesh extends MeshBase implements BatchDrawable {
   protected _minLod: number;
   /** @internal Nearest and farthest distance from the camera the mesh is drawn at */
   protected _drawDistance: [number, number];
+  /** @internal Width of the bands at the ends of the draw distance the mesh dithers in and out over */
+  protected _drawDistanceFade: number;
   /** @internal Level of detail last selected for each camera, for the hysteresis */
   protected _lodByCamera: Nullable<WeakMap<Camera, number>>;
   /**
@@ -303,6 +305,7 @@ export class Mesh extends MeshBase implements BatchDrawable {
     this._forcedLod = -1;
     this._minLod = 0;
     this._drawDistance = [0, Infinity];
+    this._drawDistanceFade = 0;
     this._lodByCamera = null;
   }
   /**
@@ -311,7 +314,7 @@ export class Mesh extends MeshBase implements BatchDrawable {
   getInstanceId(_renderPass: RenderPass) {
     // A batch is culled by distance as a whole, see InstanceCuller
     const [near, far] = this._drawDistance;
-    const range = near > 0 || far < Infinity ? `:dd${near},${far}` : '';
+    const range = near > 0 || far < Infinity ? `:dd${near},${far},${this._drawDistanceFade}` : '';
     const id = `${this._instanceHash}:${this.worldMatrixDet >= 0}${range}`;
     return this._boneMatrices.get() ? `${id}:skin:${this.getSkinSpaceKey()}` : id;
   }
@@ -447,13 +450,18 @@ export class Mesh extends MeshBase implements BatchDrawable {
     }
   }
   /**
-   * Nearest and farthest distance from the camera the mesh is drawn at, measured to the centre of
-   * its bounds. Default `[0, Infinity]`, always drawn.
+   * Nearest and farthest distance from the camera the mesh is drawn at, measured to its origin
+   * (the translation of its world matrix). Default `[0, Infinity]`, always drawn.
    *
    * @remarks
+   * Measured to the origin rather than to the centre of the bounds, so the meshes of one object
+   * placed at one transform (the parts of a tree and its impostor) are all at the same distance
+   * and swap together.
+   *
    * In shadow passes the distance is to the main camera, so a mesh casts a shadow exactly when it
    * is drawn. Two meshes whose ranges meet, one ending where the other starts, take turns without
-   * a gap or overlap: a nearer detailed one and a farther simpler one.
+   * a gap or overlap: a nearer detailed one and a farther simpler one. With a
+   * {@link Mesh.drawDistanceFade} they cross-fade instead.
    *
    * Meshes of a {@link BatchGroup} are culled by distance one by one only where instances are
    * culled on the GPU (WebGPU); elsewhere the range does not apply to them.
@@ -472,6 +480,30 @@ export class Mesh extends MeshBase implements BatchDrawable {
     }
   }
   /**
+   * Width of the bands at the ends of the {@link Mesh.drawDistance} over which the mesh dithers in
+   * (from the nearest distance on) and out (up to the farthest), in meters. Default 0, no fade.
+   *
+   * @remarks
+   * Each pixel is kept or dropped by a fixed screen-space pattern, UE's ClipLODTransition
+   * (MaterialTemplate.ush): a mesh fading out over a band keeps exactly the pixels a mesh fading in
+   * over the same band drops, so two meshes whose ranges overlap by the width cross-fade without
+   * holes or double coverage, shadows included. The fade amount follows the distance linearly, as
+   * UE's per-instance fade (InstancingFadeOutParams, LocalVertexFactory.ush).
+   *
+   * Only applies where instances are culled on the GPU (WebGPU batch groups); elsewhere the mesh
+   * switches at the ends of its range.
+   */
+  get drawDistanceFade() {
+    return this._drawDistanceFade;
+  }
+  set drawDistanceFade(val: number) {
+    val = Math.max(0, Number.isFinite(val) ? val : 0);
+    if (val !== this._drawDistanceFade) {
+      this._drawDistanceFade = val;
+      this.dispatchEvent('lod_changed', this);
+    }
+  }
+  /**
    * Whether the mesh is within its {@link Mesh.drawDistance} of a camera
    *
    * @param camera - The camera the distance is measured from
@@ -481,15 +513,11 @@ export class Mesh extends MeshBase implements BatchDrawable {
     if (near <= 0 && far === Infinity) {
       return true;
     }
-    const bv = this.getWorldBoundingVolume();
-    if (!bv) {
-      return true;
-    }
-    const box = bv.toAABB();
+    const m = this.worldMatrix;
     const eye = camera.getWorldPosition(tmpLodCenter);
-    const dx = (box.minPoint.x + box.maxPoint.x) * 0.5 - eye.x;
-    const dy = (box.minPoint.y + box.maxPoint.y) * 0.5 - eye.y;
-    const dz = (box.minPoint.z + box.maxPoint.z) * 0.5 - eye.z;
+    const dx = m.m03 - eye.x;
+    const dy = m.m13 - eye.y;
+    const dz = m.m23 - eye.z;
     const d2 = dx * dx + dy * dy + dz * dz;
     return d2 >= near * near && d2 < far * far;
   }

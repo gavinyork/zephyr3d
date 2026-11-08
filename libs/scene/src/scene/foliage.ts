@@ -45,6 +45,8 @@ export interface FoliageLayerSettings {
   impostorDistance?: number;
   /** Level of detail of the asset's meshes the impostor is baked from. Default 0. */
   impostorLod?: number;
+  /** Width in meters of the bands the instances dither over: the impostor swap and the cull distance. Default 10. */
+  fadeDistance?: number;
 }
 
 /** The quad and material an impostor layer draws its far instances with */
@@ -257,6 +259,8 @@ export class FoliageLayer {
   _forceImpostor: boolean;
   /** @internal */
   _impostorLod: number;
+  /** @internal */
+  _fadeDistance: number;
   /** The impostor drawn far away; null when there is none, undefined until looked for @internal */
   _impostorPart: Nullable<FoliageImpostorPart> | undefined;
   /** @internal */
@@ -285,6 +289,7 @@ export class FoliageLayer {
     this._impostorDistance = settings?.impostorDistance ?? 80;
     this._forceImpostor = false;
     this._impostorLod = Math.max(0, Math.floor(settings?.impostorLod ?? 0));
+    this._fadeDistance = Math.max(0, settings?.fadeDistance ?? 10);
     this._impostorPart = undefined;
     this._impostorLoading = null;
   }
@@ -391,6 +396,22 @@ export class FoliageLayer {
     if (val !== this._impostorLod) {
       this._impostorLod = val;
       this.reloadImpostor();
+    }
+  }
+  /**
+   * Width in meters of the bands the instances dither over instead of popping: centred on the
+   * impostor distance, where meshes and impostors cross-fade, and ending at the cull distance,
+   * where they fade out. 0 to switch at once. Needs GPU instance culling (WebGPU), see
+   * Mesh.drawDistanceFade.
+   */
+  get fadeDistance() {
+    return this._fadeDistance;
+  }
+  set fadeDistance(val: number) {
+    val = Math.max(0, val);
+    if (val !== this._fadeDistance) {
+      this._fadeDistance = val;
+      this._owner?.invalidate();
     }
   }
   /** Draws every instance as an impostor, to compare them with the meshes up close. Not saved. */
@@ -756,6 +777,7 @@ export class FoliageSystem extends GraphNode {
     layer._castShadow = settings.castShadow ?? layer._castShadow;
     layer._cullDistance = settings.cullDistance ?? layer._cullDistance;
     layer._impostorDistance = Math.max(0, settings.impostorDistance ?? layer._impostorDistance);
+    layer._fadeDistance = Math.max(0, settings.fadeDistance ?? layer._fadeDistance);
     if (settings.impostor !== undefined && !!settings.impostor !== layer._impostor) {
       layer._impostor = !!settings.impostor;
       layer._disposeImpostor();
@@ -1275,9 +1297,18 @@ export class FoliageSystem extends GraphNode {
     // distance, and GPU instance culling takes each instance to one of them
     const impostor =
       layer._impostor && layer._impostorPart && InstanceCuller.isSupported() ? layer._impostorPart : null;
+    // and overlap by the fade distance, over which they cross-fade (Mesh.drawDistanceFade)
     const split = Math.min(layer._impostorDistance, layer._cullDistance);
-    const meshRange: [number, number] = [0, impostor ? split : layer._cullDistance];
-    const impostorRange: [number, number] = [layer._forceImpostor ? 0 : split, layer._cullDistance];
+    // A band no wider than what lies on either side of where it is centred
+    const fade = Math.max(
+      0,
+      Math.min(layer._fadeDistance, impostor ? 2 * split : Infinity, layer._cullDistance)
+    );
+    const meshRange: [number, number] = [0, impostor ? split + fade * 0.5 : layer._cullDistance];
+    const impostorRange: [number, number] = [
+      layer._forceImpostor ? 0 : Math.max(0, split - fade * 0.5),
+      layer._cullDistance
+    ];
     const meshParts = impostor && layer._forceImpostor ? [] : parts;
     // Painted instances on any surface store their height; the others stand on the terrain
     const onTerrain = (generated: boolean) => !generated || layer._generation.surface === 'terrain';
@@ -1327,6 +1358,7 @@ export class FoliageSystem extends GraphNode {
           mesh.castShadow = layer._castShadow;
           mesh.gpuPickable = false;
           mesh.drawDistance = impostorRange;
+          mesh.drawDistanceFade = fade;
           mesh.parent = group;
           mesh.setLocalTransform(tmpMatrix);
           mesh.syncDrawableTransform();
@@ -1337,6 +1369,7 @@ export class FoliageSystem extends GraphNode {
           mesh.castShadow = layer._castShadow;
           mesh.gpuPickable = false;
           mesh.drawDistance = meshRange;
+          mesh.drawDistanceFade = fade;
           mesh.parent = group;
           mesh.setLocalTransform(Matrix4x4.multiply(tmpMatrix, part.matrix, tmpMatrix2));
           // Chunks are built in updatePerCamera, after the frame update that refreshes the

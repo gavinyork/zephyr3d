@@ -1028,6 +1028,15 @@ export class ShaderHelper {
    * @param scope - Current shader scope
    * @returns The world matrix of current object to be drawn
    */
+  /**
+   * Dither amount of the instance being drawn, written by GPU instance culling into the w of the
+   * framestamp vector of its instance data: 0 drawn whole, toward 1 fading out, from -1 fading in.
+   * See Mesh.drawDistanceFade. Vertex stage, instanced draws only.
+   * @internal
+   */
+  static getInstanceLodDither(scope: PBInsideFunctionScope) {
+    return this.getInstancedUniform(scope, 4).w as PBShaderExp;
+  }
   static getWorldMatrix(scope: PBInsideFunctionScope) {
     const pb = scope.$builder;
     return (scope[UNIFORM_NAME_WORLD_MATRIX] ??
