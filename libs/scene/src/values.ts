@@ -27,6 +27,13 @@ export const RENDER_PASS_TYPE_OBJECT_COLOR = 3;
  * @public
  */
 export const RENDER_PASS_TYPE_VOXELIZE = 4;
+/**
+ * Surface capture render pass type: a mesh is drawn with its material into three targets holding
+ * its surface attributes rather than a shaded colour, base colour and opacity, normal and depth,
+ * then occlusion, roughness and metallic. Used to bake impostors.
+ * @public
+ */
+export const RENDER_PASS_TYPE_CAPTURE = 5;
 
 /**
  * Builtin texture name for sheen LUT

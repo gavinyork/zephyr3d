@@ -67,6 +67,14 @@ export type IMixinPBRCommon = {
     data: PBShaderExp
   ): void;
   getCommonDatasStruct(scope: PBInsideFunctionScope): ShaderTypeFunc;
+  captureSurface(
+    scope: PBInsideFunctionScope,
+    worldPos: PBShaderExp,
+    normal: PBShaderExp,
+    viewVec: PBShaderExp,
+    albedo: PBShaderExp,
+    TBN: PBShaderExp
+  ): void;
   calculateEmissiveColor(scope: PBInsideFunctionScope): PBShaderExp;
   getF0(scope: PBInsideFunctionScope): PBShaderExp;
   getSheenAlbedoScaling(
@@ -626,6 +634,43 @@ export function mixinPBRCommon<T extends typeof MeshMaterial>(BaseCls: T) {
           ? [pb.vec4('iridescenceFactor'), pb.vec3('iridescenceFresnel'), pb.vec3('iridescenceF0')]
           : [])
       ]);
+    }
+    /**
+     * Writes the surface attributes the lighting would use, in the surface capture pass, see
+     * MeshMaterial.outputSurfaceCapture
+     */
+    captureSurface(
+      scope: PBInsideFunctionScope,
+      worldPos: PBShaderExp,
+      normal: PBShaderExp,
+      viewVec: PBShaderExp,
+      albedo: PBShaderExp,
+      TBN: PBShaderExp
+    ) {
+      const pb = scope.$builder;
+      scope.$l.captureData = this.getCommonData(scope, albedo, normal, viewVec, TBN);
+      // As the indirect lighting takes it, see indirectLighting
+      if (this.hasOcclusionTexture()) {
+        scope.$l.captureOcclusion = pb.add(
+          pb.mul(scope.zOcclusionStrength, pb.sub(this.sampleOcclusionTexture(scope).r, 1)),
+          1
+        );
+      } else {
+        scope.$l.captureOcclusion = pb.float(1);
+      }
+      const customOcclusion = this.getAmbientOcclusionFactor(scope);
+      if (customOcclusion) {
+        scope.captureOcclusion = pb.mul(scope.captureOcclusion, customOcclusion);
+      }
+      this.outputSurfaceCapture(
+        scope,
+        worldPos,
+        albedo,
+        normal,
+        scope.captureOcclusion,
+        scope.captureData.roughness,
+        scope.captureData.metallic
+      );
     }
     getCommonData(
       scope: PBInsideFunctionScope,

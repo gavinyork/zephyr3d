@@ -1,6 +1,7 @@
 import type { BindGroup, PBFunctionScope, PBInsideFunctionScope, PBShaderExp } from '@zephyr3d/device';
 import { DRef, Vector4, type Clonable } from '@zephyr3d/base';
 import { ShaderHelper } from './shader/helper';
+import { RENDER_PASS_TYPE_CAPTURE } from '../values';
 import type { BluePrintUniformTexture, BluePrintUniformValue } from '../utility/blueprint/material/ir';
 import { MaterialBlueprintIR } from '../utility/blueprint/material/ir';
 import { getDefaultTexture2D } from '../utility/blueprint/material/texture';
@@ -285,7 +286,8 @@ export class PBRBluePrintMaterial
     const vertexOut = this.toVertexOutputMap(outputs);
     const worldMatrix = ShaderHelper.getWorldMatrix(scope);
 
-    if (vertexOut.Position) {
+    // Impostors are captured at rest: displacement such as wind would be frozen into them
+    if (vertexOut.Position && this.drawContext.renderPass!.type !== RENDER_PASS_TYPE_CAPTURE) {
       scope.$l.oPos = vertexOut.Position as PBShaderExp;
       scope.$outputs.worldPos = pb.mul(worldMatrix, pb.vec4(scope.oPos, 1)).xyz;
       scope.zWorldPos = scope.$outputs.worldPos as PBShaderExp;

@@ -22,6 +22,7 @@ import { DlgRename } from '../views/dlg/renamedlg';
 import { DlgMessage } from '../views/dlg/messagedlg';
 import { DlgProgress } from '../views/dlg/progressdlg';
 import { MeshSDFBaker } from '../core/services/sdfbaker';
+import { ImpostorBakeService } from '../core/services/impostorbaker';
 import { DlgMessageBoxEx } from '../views/dlg/messageexdlg';
 import { templateScript } from '../core/build/templates';
 import { installDeps, reinstallPackages } from '../core/build/dep';
@@ -485,6 +486,12 @@ export class ContentListView extends ListView<{}, FileInfo | DirectoryInfo> {
             ImGui.Separator();
             if (ImGui.MenuItem('Export as GLB')) {
               this.renderer.exportPrimitiveAsGlb(item.meta.path);
+            }
+          }
+          if (item.meta.path.toLowerCase().endsWith('.zprefab') && !this.renderer.VFS.readOnly) {
+            ImGui.Separator();
+            if (ImGui.MenuItem('Bake Impostor')) {
+              void this.renderer.bakeImpostor(item.meta.path);
             }
           }
           ImGui.Separator();
@@ -2992,6 +2999,33 @@ export class VFSRenderer extends makeObservable(Disposable)<{
           }
         }
       });
+    }
+  }
+
+  /** Bakes the impostor of a prefab, see ImpostorBakeService, rebaking it even when up to date */
+  async bakeImpostor(path: string) {
+    const dlgProgressBar = new DlgProgress('Bake Impostor##ImpostorProgress', 320);
+    dlgProgressBar.showModal();
+    dlgProgressBar.setMessage(`Baking impostor of ${path}...`);
+    try {
+      const r = await ImpostorBakeService.bake(path, undefined, true);
+      if (r.err) {
+        console.error(`Bake impostor of ${path} failed: ${r.err}`);
+      } else {
+        console.info(`Impostor of ${path} baked into ${r.dir} in ${r.milliseconds} ms`);
+        if (r.uncapturedMaterials?.length) {
+          console.warn(
+            `Impostor of ${path}: ${r.uncapturedMaterials.join(', ')} only give their colour; their normals are approximate`
+          );
+        }
+        if (r.skippedMeshes?.length) {
+          console.warn(
+            `Impostor of ${path}: skinned or morphed meshes left out: ${r.skippedMeshes.join(', ')}`
+          );
+        }
+      }
+    } finally {
+      dlgProgressBar.close();
     }
   }
 

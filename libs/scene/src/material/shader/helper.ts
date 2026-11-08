@@ -23,6 +23,7 @@ import {
   RENDER_PASS_TYPE_OBJECT_COLOR,
   RENDER_PASS_TYPE_SHADOWMAP,
   RENDER_PASS_TYPE_VOXELIZE,
+  RENDER_PASS_TYPE_CAPTURE,
   LIGHT_TYPE_DIRECTIONAL
 } from '../../values';
 import type {
@@ -97,6 +98,11 @@ export const CAUSTIC_HEIGHT_BIAS = 8;
  */
 export const MAX_CAUSTIC_WATERS = 4;
 const UNIFORM_NAME_CAUSTIC_PARAMS = 'Z_UniformCausticParams';
+/**
+ * Global uniform of the surface capture pass, see RENDER_PASS_TYPE_CAPTURE
+ * @internal
+ */
+export const SURFACE_CAPTURE_PARAMS = 'Z_SurfaceCaptureParams';
 const UNIFORM_NAME_LINEAR_DEPTH_MAP = 'Z_UniformLinearDepth';
 const UNIFORM_NAME_LINEAR_DEPTH_MAP_SIZE = 'Z_UniformLinearDepthSize';
 const UNIFORM_NAME_SCENE_COLOR_MAP = 'Z_UniformSceneColor';
@@ -308,9 +314,14 @@ export class ShaderHelper {
     } else if (
       ctx.renderPass!.type === RENDER_PASS_TYPE_DEPTH ||
       ctx.renderPass!.type === RENDER_PASS_TYPE_OBJECT_COLOR ||
-      ctx.renderPass!.type === RENDER_PASS_TYPE_VOXELIZE
+      ctx.renderPass!.type === RENDER_PASS_TYPE_VOXELIZE ||
+      ctx.renderPass!.type === RENDER_PASS_TYPE_CAPTURE
     ) {
       scope.camera = cameraStruct().uniform(0);
+      if (ctx.renderPass!.type === RENDER_PASS_TYPE_CAPTURE && pb.shaderKind === 'fragment') {
+        // (centre of the captured bounds, radius), (direction to the capture camera, 0)
+        scope[SURFACE_CAPTURE_PARAMS] = pb.vec4[2]().uniform(0);
+      }
       // Write-only storage textures are fragment-only in WebGPU
       if (ctx.renderPass!.type === RENDER_PASS_TYPE_VOXELIZE && pb.shaderKind === 'fragment') {
         declareVoxelizeUniforms(scope, 0);
@@ -1149,7 +1160,8 @@ export class ShaderHelper {
       ctx.motionVectors &&
       ctx.renderPass!.type !== RENDER_PASS_TYPE_SHADOWMAP &&
       ctx.renderPass!.type !== RENDER_PASS_TYPE_OBJECT_COLOR &&
-      ctx.renderPass!.type !== RENDER_PASS_TYPE_VOXELIZE;
+      ctx.renderPass!.type !== RENDER_PASS_TYPE_VOXELIZE &&
+      ctx.renderPass!.type !== RENDER_PASS_TYPE_CAPTURE;
     const cameraStruct = {
       position: new Vector4(pos.x, pos.y, pos.z, 0),
       renderSize: new Vector2(ctx.renderWidth, ctx.renderHeight),

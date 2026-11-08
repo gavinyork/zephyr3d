@@ -41,4 +41,5 @@ export * from './gi/voxel_scene';
 export * from './gi/voxel_lighting';
 export * from './gi/probe_volume';
 export * from './gi/scene_gi';
+export * from './impostor/baker';
 export * from './volumetric_cloud/volumetric_cloud';

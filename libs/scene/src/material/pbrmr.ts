@@ -4,7 +4,7 @@ import type { BindGroup, PBFunctionScope, PBInsideFunctionScope, PBShaderExp } f
 import { mixinPBRMetallicRoughness } from './mixins/lightmodel/pbrmetallicroughness';
 import { mixinTextureProps } from './mixins/texture';
 import { ShaderHelper } from './shader/helper';
-import { MaterialVaryingFlags, RENDER_PASS_TYPE_LIGHT } from '../values';
+import { MaterialVaryingFlags, RENDER_PASS_TYPE_CAPTURE, RENDER_PASS_TYPE_LIGHT } from '../values';
 import type { Clonable } from '@zephyr3d/base';
 import { Vector3 } from '@zephyr3d/base';
 import type { DrawContext } from '../render';
@@ -47,6 +47,9 @@ export class PBRMetallicRoughnessMaterial
     const other = new PBRMetallicRoughnessMaterial();
     other.copyFrom(this);
     return other;
+  }
+  supportsSurfaceCapture() {
+    return true;
   }
   supportsVoxelization() {
     return true;
@@ -318,6 +321,23 @@ export class PBRMetallicRoughnessMaterial
             writeSSSProfile
           );
         }
+      } else if (this.drawContext.renderPass!.type === RENDER_PASS_TYPE_CAPTURE) {
+        scope.$l.normalInfo = this.calculateNormalAndTBN(
+          scope,
+          scope.$inputs.worldPos,
+          scope.$inputs.wNorm,
+          scope.$inputs.wTangent,
+          scope.$inputs.wBinormal
+        );
+        scope.$l.viewVec = this.calculateViewVector(scope, scope.$inputs.worldPos);
+        this.captureSurface(
+          scope,
+          scope.$inputs.worldPos,
+          scope.normalInfo.normal,
+          scope.viewVec,
+          scope.albedo,
+          scope.normalInfo.TBN
+        );
       } else {
         this.outputFragmentColor(scope, scope.$inputs.worldPos, scope.albedo);
       }

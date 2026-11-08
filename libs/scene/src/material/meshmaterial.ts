@@ -15,7 +15,8 @@ import {
   RENDER_PASS_TYPE_LIGHT,
   RENDER_PASS_TYPE_OBJECT_COLOR,
   RENDER_PASS_TYPE_SHADOWMAP,
-  RENDER_PASS_TYPE_VOXELIZE
+  RENDER_PASS_TYPE_VOXELIZE,
+  RENDER_PASS_TYPE_CAPTURE
 } from '../values';
 import { Material } from './material';
 import type { DepthPass } from '../render';
@@ -23,9 +24,9 @@ import { type DrawContext, type ShadowMapPass } from '../render';
 import { encodeNormalizedFloatToRGBA } from '../shaders/misc';
 import { interleavedGradientNoise } from '../shaders/noise';
 import { storeVoxelMaterial } from '../shaders/gi';
-import { ShaderHelper } from './shader/helper';
+import { ShaderHelper, SURFACE_CAPTURE_PARAMS } from './shader/helper';
 import type { Clonable, Immutable, Nullable } from '@zephyr3d/base';
-import { Vector2, Vector3, Vector4, applyMixins, DRef } from '@zephyr3d/base';
+import { Vector2, Vector3, Vector4, applyMixins, DRef, DEPTH_COMPARE_DEFAULT } from '@zephyr3d/base';
 import { RenderBundleWrapper } from '../render/renderbundle_wrapper';
 import { getEngine } from '../app/api';
 
@@ -812,6 +813,15 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
       stateSet.defaultStencilState();
       return;
     }
+    if (ctx.renderPass!.type === RENDER_PASS_TYPE_CAPTURE) {
+      // The nearest surface of either side, opaque: what an impostor shows from that way
+      stateSet.defaultBlendingState();
+      stateSet.useDepthState().setCompareFunc(DEPTH_COMPARE_DEFAULT).enableTest(true).enableWrite(true);
+      stateSet.useRasterizerState().setCullMode('none');
+      stateSet.useColorState().setColorMask(true, true, true, true);
+      stateSet.defaultStencilState();
+      return;
+    }
     const isObjectColorPass = ctx.renderPass!.type === RENDER_PASS_TYPE_OBJECT_COLOR;
     const blendMode = this.getEffectiveBlendMode(pass, ctx);
     const blending = !isObjectColorPass && (blendMode !== 'none' || ctx.lightBlending);
@@ -1040,6 +1050,7 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
     return (
       drawContext.renderPass!.type === RENDER_PASS_TYPE_LIGHT ||
       drawContext.renderPass!.type === RENDER_PASS_TYPE_VOXELIZE ||
+      drawContext.renderPass!.type === RENDER_PASS_TYPE_CAPTURE ||
       this._alphaCutoff > 0 ||
       this.alphaToCoverage
     );
@@ -1051,6 +1062,81 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
    */
   supportsVoxelization(): boolean {
     return false;
+  }
+  /**
+   * Whether the material hands its surface attributes to {@link MeshMaterial.outputSurfaceCapture}
+   * in the surface capture pass, which bakes impostors. Otherwise only its colour is captured,
+   * with the normal of the captured bounds. False by default.
+   */
+  supportsSurfaceCapture(): boolean {
+    return false;
+  }
+  /**
+   * Writes the surface attributes of a fragment in the surface capture pass, see
+   * {@link RENDER_PASS_TYPE_CAPTURE}: base colour and opacity, then the normal in the space the
+   * mesh is captured in and the depth towards the capture camera across the captured bounds
+   * (1 nearest), then occlusion, roughness and metallic. Fragments under the alpha cutoff are
+   * discarded.
+   *
+   * @param scope - Fragment shader scope
+   * @param worldPos - Fragment position
+   * @param albedo - Base colour and opacity
+   * @param normal - Shading normal, normalized
+   * @param occlusion - Ambient occlusion, 1 for none
+   * @param roughness - Perceptual roughness
+   * @param metallic - Metalness
+   */
+  outputSurfaceCapture(
+    scope: PBInsideFunctionScope,
+    worldPos: PBShaderExp,
+    albedo: PBShaderExp,
+    normal: PBShaderExp,
+    occlusion: PBShaderExp | number,
+    roughness: PBShaderExp | number,
+    metallic: PBShaderExp | number
+  ) {
+    const pb = scope.$builder;
+    const that = this;
+    pb.func(
+      'Z_outputSurfaceCapture',
+      [
+        pb.vec3('worldPos'),
+        pb.vec4('albedo'),
+        pb.vec3('normal'),
+        pb.float('occlusion'),
+        pb.float('roughness'),
+        pb.float('metallic')
+      ],
+      function () {
+        if (that.usesAlphaCutoff(that.drawContext, that.pass)) {
+          this.$if(pb.lessThan(this.albedo.a, this.zAlphaCutoff), function () {
+            pb.discard();
+          });
+        }
+        this.$l.bounds = this[SURFACE_CAPTURE_PARAMS].at(0);
+        this.$l.toCamera = this[SURFACE_CAPTURE_PARAMS].at(1).xyz;
+        this.$l.depth = pb.clamp(
+          pb.add(
+            pb.mul(pb.div(pb.dot(pb.sub(this.worldPos, this.bounds.xyz), this.toCamera), this.bounds.w), 0.5),
+            0.5
+          ),
+          0,
+          1
+        );
+        this.$outputs.zFragmentOutput = pb.vec4(this.albedo.rgb, pb.clamp(this.albedo.a, 0, 1));
+        this.$outputs.zCaptureNormalDepth = pb.vec4(
+          pb.add(pb.mul(this.normal, 0.5), pb.vec3(0.5)),
+          this.depth
+        );
+        this.$outputs.zCaptureORM = pb.vec4(
+          pb.clamp(this.occlusion, 0, 1),
+          pb.clamp(this.roughness, 0, 1),
+          pb.clamp(this.metallic, 0, 1),
+          1
+        );
+      }
+    );
+    scope.$g['Z_outputSurfaceCapture'](worldPos, albedo, normal, occlusion, roughness, metallic);
   }
   /**
    * Vertex shader hook.
@@ -1166,6 +1252,10 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
           }
           if (ctx.renderPass!.type === RENDER_PASS_TYPE_OBJECT_COLOR) {
             this.$outputs.zDistance = pb.vec4();
+          }
+          if (ctx.renderPass!.type === RENDER_PASS_TYPE_CAPTURE) {
+            this.$outputs.zCaptureNormalDepth = pb.vec4();
+            this.$outputs.zCaptureORM = pb.vec4();
           }
         }
         pb.main(function () {
@@ -1417,6 +1507,18 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
         const emissive = emissiveMaterial.calculateEmissiveColor?.(this) ?? pb.vec3(0);
         storeVoxelMaterial(this, this.worldPos, color ? this.outColor.rgb : pb.vec3(0.5), emissive);
         this.$outputs.zFragmentOutput = pb.vec4(0);
+      } else if (that.drawContext.renderPass!.type === RENDER_PASS_TYPE_CAPTURE) {
+        // A material without surface capture: its colour, and the normal of the captured bounds
+        this.$l.captureBounds = this[SURFACE_CAPTURE_PARAMS].at(0);
+        that.outputSurfaceCapture(
+          this,
+          this.worldPos,
+          color ? this.outColor : pb.vec4(0.5, 0.5, 0.5, 1),
+          pb.normalize(pb.sub(this.worldPos, this.captureBounds.xyz)),
+          1,
+          1,
+          0
+        );
       } else if (that.drawContext.renderPass!.type === RENDER_PASS_TYPE_OBJECT_COLOR) {
         if (color) {
           this.$if(pb.getGlobalScope()[alphaClipFuncName](this.outColor.a, this.zAlphaCutoff), function () {

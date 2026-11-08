@@ -10,4 +10,5 @@ export * from './asset_manifest';
 export * from './asset_preload';
 export * from './zmsh_binary';
 export * from './zsdf_binary';
+export * from './impostor_asset';
 export * from './meshopt_decoder';
