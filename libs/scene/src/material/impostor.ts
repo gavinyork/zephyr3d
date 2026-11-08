@@ -253,8 +253,8 @@ export class ImpostorMaterial extends PBRMetallicRoughnessMaterial implements Cl
       )
     );
     scope.$outputs.worldPos = scope.worldPos;
-    // Towards the view and the world radius, to place the lit surface at its baked depth
-    scope.$outputs.zImpostorPush = pb.vec4(pb.mul(scope.toCamera, push), scope.worldRadius);
+    // Towards the view and the world radius, to place the surface at its baked depth
+    scope.$outputs.zImpostorPush = pb.vec4(scope.toCamera, scope.worldRadius);
     ShaderHelper.resolveMotionVector(scope, scope.worldPos, scope.worldPos);
     scope.$l.csPos = pb.mul(ShaderHelper.getViewProjectionMatrix(scope), pb.vec4(scope.worldPos, 1));
     ShaderHelper.setClipSpacePosition(scope, scope.csPos);
@@ -302,6 +302,7 @@ export class ImpostorMaterial extends PBRMetallicRoughnessMaterial implements Cl
   }
   fragmentShader(scope: PBFunctionScope) {
     const pb = scope.$builder;
+    const shadowPass = this.drawContext.renderPass!.type === RENDER_PASS_TYPE_SHADOWMAP;
     if (this.needFragmentColorInput()) {
       scope.zImpostorGrid = pb.vec4().uniform(2);
       scope.zImpostorBase = pb.tex2D().uniform(2);
@@ -311,8 +312,48 @@ export class ImpostorMaterial extends PBRMetallicRoughnessMaterial implements Cl
       if (this._subsurfaceTexture.get()) {
         scope.zImpostorSubsurface = pb.tex2D().uniform(2);
       }
+      if (shadowPass) {
+        // Sampled first, in uniform control flow: the alpha test below may discard
+        scope.$l.zImpostorShadowDepth = this.blendFrames(
+          scope,
+          scope.zImpostorNormalDepth,
+          this.impostorAtlasUVs(scope)
+        ).a;
+      }
     }
     super.fragmentShader(scope);
+    if (shadowPass && this.needFragmentColorInput()) {
+      // Depth derived pixel depth offset (UE ImpostorBaker), for shadows only: the quad lies a
+      // radius off the object, and parts of it would sink into the ground and cast nothing
+      // there, cutting the shadow along a straight line. The depth of the surface the frames
+      // show is written instead, as the object itself would have.
+      scope.$l.zImpostorShadowPos = this.impostorSurfacePos(
+        scope,
+        scope.$inputs.worldPos,
+        scope.zImpostorShadowDepth
+      );
+      scope.$l.zImpostorShadowClip = pb.mul(
+        ShaderHelper.getViewProjectionMatrix(scope),
+        pb.vec4(scope.zImpostorShadowPos, 1)
+      );
+      // Clamped as the emulated depth clamp of the shadow pass clamps it (ProgramBuilder)
+      scope.$builtins.fragDepth = pb.clamp(
+        pb.div(scope.zImpostorShadowClip.z, scope.zImpostorShadowClip.w),
+        0,
+        1
+      );
+    }
+  }
+  /**
+   * Where the surface the frames show lies, for a point of the quad: along the view by its baked
+   * depth, (depth - 0.5)·2R from the centre of the bounds, depth being 1 at the front. The quad is
+   * pushed a radius towards the view, or away from a light it casts shadows of.
+   */
+  private impostorSurfacePos(scope: PBInsideFunctionScope, quadPos: PBShaderExp, depth: PBShaderExp) {
+    const pb = scope.$builder;
+    const toView = scope.$inputs.zImpostorPush;
+    const push = this.drawContext.renderPass!.type === RENDER_PASS_TYPE_SHADOWMAP ? -1 : 1;
+    return pb.add(quadPos, pb.mul(toView.xyz, toView.w, pb.sub(pb.sub(pb.mul(depth, 2), 1), push)));
   }
   /** The three frames' atlas coordinates, each shifted by its depth along the view */
   private impostorAtlasUVs(scope: PBInsideFunctionScope) {
@@ -382,16 +423,12 @@ export class ImpostorMaterial extends PBRMetallicRoughnessMaterial implements Cl
   ): PBShaderExp {
     const pb = scope.$builder;
     const that = this;
-    const push = scope.$inputs.zImpostorPush;
     scope.$l.zImpostorDepth = this.blendFrames(
       scope,
       scope.zImpostorNormalDepth,
       this.impostorAtlasUVs(scope)
     ).a;
-    scope.$l.zImpostorSurfacePos = pb.sub(
-      worldPos,
-      pb.mul(push.xyz, push.w, pb.mul(pb.sub(1, scope.zImpostorDepth), 2))
-    );
+    scope.$l.zImpostorSurfacePos = this.impostorSurfacePos(scope, worldPos, scope.zImpostorDepth);
     scope.$l.zImpostorLit = super.PBRLight(
       scope,
       scope.zImpostorSurfacePos,
