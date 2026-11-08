@@ -311,8 +311,10 @@ export class FoliageLayer {
     return this._cullDistance;
   }
   set cullDistance(val: number) {
-    // Only decides which chunks are shown each frame, nothing to rebuild
-    this._cullDistance = val;
+    if (val !== this._cullDistance) {
+      this._cullDistance = val;
+      this._owner?._applyCullDistance(this);
+    }
   }
   /** How much the instances lean with the ground: 0 stays upright, 1 follows the normal */
   get alignToNormal() {
@@ -650,6 +652,7 @@ export class FoliageSystem extends GraphNode {
     }
     layer._castShadow = settings.castShadow ?? layer._castShadow;
     layer._cullDistance = settings.cullDistance ?? layer._cullDistance;
+    // Rebuilt below with the new distance
     layer._alignToNormal = settings.alignToNormal ?? layer._alignToNormal;
     if (settings.collision !== undefined) {
       layer._collision = copyCollision(settings.collision);
@@ -875,6 +878,21 @@ export class FoliageSystem extends GraphNode {
     }
     if (set) {
       this.scene?.queuePerCameraUpdateNode(this);
+    }
+  }
+  /**
+   * Gives the meshes of a layer its cull distance, which GPU instance culling applies to each
+   * instance; elsewhere whole chunks are hidden, see updatePerCamera
+   * @internal
+   */
+  _applyCullDistance(layer: FoliageLayer) {
+    const range: [number, number] = [0, layer._cullDistance];
+    for (const chunk of this._chunks.get(layer)?.values() ?? []) {
+      for (const node of chunk.group.children) {
+        if (node.isMesh()) {
+          node.drawDistance = range;
+        }
+      }
     }
   }
   /** {@inheritDoc SceneNode.updatePerCamera} */
@@ -1134,6 +1152,7 @@ export class FoliageSystem extends GraphNode {
           mesh.sealed = true;
           mesh.castShadow = layer._castShadow;
           mesh.gpuPickable = false;
+          mesh.drawDistance = [0, layer._cullDistance];
           mesh.parent = group;
           mesh.setLocalTransform(Matrix4x4.multiply(tmpMatrix, part.matrix, tmpMatrix2));
           // Chunks are built in updatePerCamera, after the frame update that refreshes the

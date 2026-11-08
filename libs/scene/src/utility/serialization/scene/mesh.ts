@@ -227,6 +227,22 @@ export function getMeshClass(manager: ResourceManager): SerializableClass {
           }
         },
         {
+          name: 'DrawDistance',
+          description:
+            'The mesh only shows between these two distances from the camera, in meters, and casts shadows only there too. Pair a detailed mesh ending where a simpler one starts to swap them with distance; 0 as the farthest shows it however far',
+          type: 'vec2',
+          default: [0, 0],
+          options: { minValue: 0 },
+          get(this: Mesh, value) {
+            const [near, far] = this.drawDistance;
+            value.num[0] = near;
+            value.num[1] = far === Infinity ? 0 : far;
+          },
+          set(this: Mesh, value) {
+            this.drawDistance = [value.num[0], value.num[1] > 0 ? value.num[1] : Infinity];
+          }
+        },
+        {
           name: 'SkinnedBoundingInfo',
           description: 'Serialized skinned bounding data for the mesh',
           type: 'string',

@@ -175,7 +175,7 @@ function createMorphInfoBuffer(data: Float32Array) {
 const MeshBase = castObservable(applyMixins(GraphNode, mixinDrawable))<{
   primitive_changed: [primitive: Nullable<Primitive>];
   material_changed: [material: Nullable<MeshMaterial>];
-  /** forcedLod or minLod changed */
+  /** forcedLod, minLod or drawDistance changed */
   lod_changed: [mesh: Mesh];
   sdfmode_changed: [mesh: Mesh];
 }>();
@@ -255,6 +255,8 @@ export class Mesh extends MeshBase implements BatchDrawable {
   protected _forcedLod: number;
   /** @internal */
   protected _minLod: number;
+  /** @internal Nearest and farthest distance from the camera the mesh is drawn at */
+  protected _drawDistance: [number, number];
   /** @internal Level of detail last selected for each camera, for the hysteresis */
   protected _lodByCamera: Nullable<WeakMap<Camera, number>>;
   /**
@@ -300,13 +302,17 @@ export class Mesh extends MeshBase implements BatchDrawable {
     this._postUpdateCallbacks = new Set();
     this._forcedLod = -1;
     this._minLod = 0;
+    this._drawDistance = [0, Infinity];
     this._lodByCamera = null;
   }
   /**
    * Returns the batch instance ID for the current render pass.
    */
   getInstanceId(_renderPass: RenderPass) {
-    const id = `${this._instanceHash}:${this.worldMatrixDet >= 0}`;
+    // A batch is culled by distance as a whole, see InstanceCuller
+    const [near, far] = this._drawDistance;
+    const range = near > 0 || far < Infinity ? `:dd${near},${far}` : '';
+    const id = `${this._instanceHash}:${this.worldMatrixDet >= 0}${range}`;
     return this._boneMatrices.get() ? `${id}:skin:${this.getSkinSpaceKey()}` : id;
   }
   /**
@@ -439,6 +445,53 @@ export class Mesh extends MeshBase implements BatchDrawable {
       this._minLod = val;
       this.dispatchEvent('lod_changed', this);
     }
+  }
+  /**
+   * Nearest and farthest distance from the camera the mesh is drawn at, measured to the centre of
+   * its bounds. Default `[0, Infinity]`, always drawn.
+   *
+   * @remarks
+   * In shadow passes the distance is to the main camera, so a mesh casts a shadow exactly when it
+   * is drawn. Two meshes whose ranges meet, one ending where the other starts, take turns without
+   * a gap or overlap: a nearer detailed one and a farther simpler one.
+   *
+   * Meshes of a {@link BatchGroup} are culled by distance one by one only where instances are
+   * culled on the GPU (WebGPU); elsewhere the range does not apply to them.
+   *
+   * Reading gives a copy; assign to change it.
+   */
+  get drawDistance(): [number, number] {
+    return [this._drawDistance[0], this._drawDistance[1]];
+  }
+  set drawDistance(val: [number, number]) {
+    const near = Math.max(0, Number.isFinite(val?.[0]) ? val[0] : 0);
+    const far = typeof val?.[1] === 'number' && val[1] > near ? val[1] : Infinity;
+    if (near !== this._drawDistance[0] || far !== this._drawDistance[1]) {
+      this._drawDistance = [near, far];
+      this.dispatchEvent('lod_changed', this);
+    }
+  }
+  /**
+   * Whether the mesh is within its {@link Mesh.drawDistance} of a camera
+   *
+   * @param camera - The camera the distance is measured from
+   */
+  isWithinDrawDistance(camera: Camera) {
+    const [near, far] = this._drawDistance;
+    if (near <= 0 && far === Infinity) {
+      return true;
+    }
+    const bv = this.getWorldBoundingVolume();
+    if (!bv) {
+      return true;
+    }
+    const box = bv.toAABB();
+    const eye = camera.getWorldPosition(tmpLodCenter);
+    const dx = (box.minPoint.x + box.maxPoint.x) * 0.5 - eye.x;
+    const dy = (box.minPoint.y + box.maxPoint.y) * 0.5 - eye.y;
+    const dz = (box.minPoint.z + box.maxPoint.z) * 0.5 - eye.z;
+    const d2 = dx * dx + dy * dy + dz * dz;
+    return d2 >= near * near && d2 < far * far;
   }
   /**
    * Selects the level of detail of the primitive for a view: forced, or picked from the projected

@@ -228,14 +228,18 @@ export class BatchGroup extends GraphNode {
       queueInfo.lodColoration = lodColoration;
       queueInfo.queue.reset();
       const frustumCulling = cullVisitor.frustumCulling;
+      const distanceCulling = cullVisitor.distanceCulling;
       const renderQueue = cullVisitor.renderQueue;
+      // Kept for every view: draw distances are applied by GPU culling, see Mesh.drawDistance
       cullVisitor.frustumCulling = false;
+      cullVisitor.distanceCulling = false;
       cullVisitor.renderQueue = queueInfo.queue;
       for (const mesh of split.cached) {
         cullVisitor.visit(mesh);
       }
       queueInfo.queue.end(cullVisitor.camera, true, cullVisitor.lodCamera);
       cullVisitor.frustumCulling = frustumCulling;
+      cullVisitor.distanceCulling = distanceCulling;
       cullVisitor.renderQueue = renderQueue;
     } else if (cullVisitor.camera?.getPickResultResolveFunc()) {
       // The queue is kept across frames and was built in one that did not pick, so its drawables

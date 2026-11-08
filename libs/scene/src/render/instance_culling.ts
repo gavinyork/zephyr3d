@@ -82,7 +82,8 @@ interface CullGroup {
   boundsDirty: boolean;
   /**
    * Per batch, BATCH_VEC4S vec4s: (first vec4 of the instances, instance count, vec4s per
-   * instance, index of the arguments of the first level), (level count, 0, 0, 0), then the screen
+   * instance, index of the arguments of the first level), (level count, squared nearest draw
+   * distance, squared farthest draw distance or -1 for none, 0), then the screen
    * sizes of levels 1 to 7, the last component unused
    */
   batches: DRef<GPUDataBuffer>;
@@ -211,7 +212,20 @@ export class InstanceCuller {
       if (lodCount > 1) {
         primitive.lods.forEach((lod, i) => (sizes[i] = lod.screenSize));
       }
-      batches.push(data.offset >> 2, data.numInstances, data.stride >> 2, base, lodCount, 0, 0, 0, ...sizes);
+      // Meshes of different draw distances are not batched together, see Mesh.getInstanceId
+      const node = item.drawable.getNode();
+      const [near, far] = node.isMesh() ? node.drawDistance : [0, Infinity];
+      batches.push(
+        data.offset >> 2,
+        data.numInstances,
+        data.stride >> 2,
+        base,
+        lodCount,
+        near * near,
+        far === Infinity ? -1 : far * far,
+        0,
+        ...sizes
+      );
       data.culled = {
         bindGroup: group.outputBindGroup.get()!,
         argsBuffer: this._args.get()!,
@@ -453,9 +467,27 @@ export class InstanceCuller {
                 }
               );
             });
+            // Draw distance of the batch, to the centre of the bounds as on the CPU
+            // (Mesh.isWithinDrawDistance), measured from the level of detail view: the main
+            // camera in shadow passes, so an instance casts a shadow exactly where it is drawn
+            this.$l.batch1 = this.batches.at(pb.add(this.batchIndex, 1));
+            this.$l.toEye = pb.sub(this.wc, this.lodView.xyz);
+            this.$l.eyeDistSq = pb.dot(this.toEye, this.toEye);
+            this.$if(
+              pb.or(
+                pb.lessThan(this.eyeDistSq, this.batch1.y),
+                pb.and(
+                  pb.greaterThanEqual(this.batch1.z, 0),
+                  pb.greaterThanEqual(this.eyeDistSq, this.batch1.z)
+                )
+              ),
+              function () {
+                this.visible = false;
+              }
+            );
             // Always drawn without bounds
             this.visible = pb.or(this.visible, pb.greaterThan(this.center.w, 0));
-            this.$l.lodCount = pb.int(this.batches.at(pb.add(this.batchIndex, 1)).x);
+            this.$l.lodCount = pb.int(this.batch1.x);
             this.$l.limit = pb.int(this.extent4.w);
             this.$l.level = pb.int(0);
             this.$if(pb.lessThan(this.limit, 0), function () {

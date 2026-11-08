@@ -27,6 +27,7 @@ export class CullVisitor implements Visitor<SceneNode | OctreeNode> {
   private _camera: Camera;
   /** @internal */
   private _skipClipTest: boolean;
+  private _distanceCulling: boolean;
   /** @internal */
   private _renderQueue: RenderQueue;
   /** @internal */
@@ -49,6 +50,7 @@ export class CullVisitor implements Visitor<SceneNode | OctreeNode> {
     this._lodCamera = lodCamera ?? camera;
     this._renderQueue = renderQueue;
     this._skipClipTest = false;
+    this._distanceCulling = true;
     this._renderPass = renderPass;
     this._isGPUPicking = this._renderPass.type === RENDER_PASS_TYPE_OBJECT_COLOR;
     this._isShadowMapping = this._renderPass.type === RENDER_PASS_TYPE_SHADOWMAP;
@@ -69,6 +71,16 @@ export class CullVisitor implements Visitor<SceneNode | OctreeNode> {
   }
   set lodCamera(camera: Camera) {
     this._lodCamera = camera;
+  }
+  /**
+   * Whether meshes out of their {@link Mesh.drawDistance} are culled. Default true; off while the
+   * cached queues of batch groups are built, which serve every view.
+   */
+  get distanceCulling() {
+    return this._distanceCulling;
+  }
+  set distanceCulling(val: boolean) {
+    this._distanceCulling = val;
   }
   /** true if cull with frustum culling, otherwise false. default is true */
   get frustumCulling() {
@@ -222,7 +234,8 @@ export class CullVisitor implements Visitor<SceneNode | OctreeNode> {
     if (
       !node.hidden &&
       (node.castShadow || !this._isShadowMapping) &&
-      (node.gpuPickable || !this._isGPUPicking)
+      (node.gpuPickable || !this._isGPUPicking) &&
+      (!this._distanceCulling || node.isWithinDrawDistance(this._lodCamera))
     ) {
       const clipState = this.getClipStateWithNode(node);
       if (clipState !== ClipState.NOT_CLIPPED) {
