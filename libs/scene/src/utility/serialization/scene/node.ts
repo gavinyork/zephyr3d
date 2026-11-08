@@ -136,6 +136,9 @@ async function clearGeometryCacheBinding(node: SceneNode) {
 function getSubtreeMeshes(node: SceneNode): Mesh[] {
   const meshes: Mesh[] = [];
   node.iterate((child) => {
+    if (child.isBatchGroup()) {
+      return true;
+    }
     if (child.isMesh() && child.material) {
       meshes.push(child);
     }

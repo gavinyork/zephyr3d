@@ -4,14 +4,22 @@ import type { SceneNode } from '@zephyr3d/scene';
 export function calcHierarchyBoundingBoxWorld(node: SceneNode, bboxOut?: AABB): AABB {
   bboxOut = bboxOut ?? new AABB();
   bboxOut.beginExtend();
-  node.iterate((child) => {
-    const bbox = child.getWorldBoundingVolume();
-    if (bbox) {
-      const aabb = bbox.toAABB();
+  if (node.isClipmapTerrain()) {
+    const aabb = node.getWorldBoundingVolume()?.toAABB();
+    if (aabb) {
       bboxOut.extend(aabb.minPoint);
       bboxOut.extend(aabb.maxPoint);
     }
-  });
+  } else {
+    node.iterate((child) => {
+      const bbox = child.getWorldBoundingVolume();
+      if (bbox) {
+        const aabb = bbox.toAABB();
+        bboxOut.extend(aabb.minPoint);
+        bboxOut.extend(aabb.maxPoint);
+      }
+    });
+  }
   if (!bboxOut.isValid()) {
     const worldPos = node.getWorldPosition();
     bboxOut.minPoint.x = worldPos.x - 1;
