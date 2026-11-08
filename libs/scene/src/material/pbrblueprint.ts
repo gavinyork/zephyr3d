@@ -36,7 +36,8 @@ export type PBRBlueprintOutputName =
   | 'Tangent'
   | 'Opacity'
   | 'SpecularWeight'
-  | 'AO';
+  | 'AO'
+  | 'SubsurfaceColor';
 
 /** Inputs available while evaluating a PBR blueprint fragment graph. */
 export interface PBRBlueprintOutputInputs {
@@ -61,7 +62,8 @@ const DEFAULT_OUTPUT_NAMES: readonly PBRBlueprintOutputName[] = [
   'Tangent',
   'Opacity',
   'SpecularWeight',
-  'AO'
+  'AO',
+  'SubsurfaceColor'
 ] as const;
 
 /**
@@ -390,6 +392,18 @@ export class PBRBluePrintMaterial
     return albedo;
   }
 
+  /**
+   * Light through the surface from behind, as through leaves (UE's two-sided foliage): the
+   * graph's SubsurfaceColor when it is connected, otherwise the material's foliage transmission
+   */
+  getSubsurfaceColor(scope: PBInsideFunctionScope) {
+    const value = this.getBlueprintOutput(scope, 'SubsurfaceColor');
+    if (value !== undefined) {
+      return this.toVec3(scope, value);
+    }
+    return super.getSubsurfaceColor(scope);
+  }
+
   calculateMetallic(scope: PBInsideFunctionScope, albedo: PBShaderExp, normal: PBShaderExp) {
     const value = this.getBlueprintOutput(scope, 'Metallic');
     if (value !== undefined) {
@@ -706,6 +720,7 @@ export class PBRBluePrintMaterial
           case 'Emissive':
           case 'Normal':
           case 'Tangent':
+          case 'SubsurfaceColor':
             return pb.vec3(name);
           default:
             return pb.float(name);
@@ -741,6 +756,7 @@ export class PBRBluePrintMaterial
           let opacity: number | PBShaderExp = 1;
           let specularWeight: number | PBShaderExp = 1;
           let ao: number | PBShaderExp = 1;
+          let subsurfaceColor: number | PBShaderExp = pb.vec3(0);
           if (outputs) {
             const map = that.toOutputMap(outputs);
             if (map.BaseColor !== undefined) {
@@ -773,6 +789,9 @@ export class PBRBluePrintMaterial
             if (map.AO !== undefined) {
               ao = map.AO as PBShaderExp | number;
             }
+            if (map.SubsurfaceColor !== undefined) {
+              subsurfaceColor = that.toVec3(scope, map.SubsurfaceColor);
+            }
           }
           this.$return(
             outputsStruct(
@@ -785,7 +804,8 @@ export class PBRBluePrintMaterial
               tangent,
               opacity,
               specularWeight,
-              ao
+              ao,
+              subsurfaceColor
             )
           );
         }

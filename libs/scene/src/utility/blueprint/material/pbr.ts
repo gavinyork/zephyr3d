@@ -176,6 +176,13 @@ export class PBRBlockNode extends BaseGraphNode {
         type: ['float'],
         defaultValue: [1],
         originType: 'float'
+      },
+      {
+        id: 11,
+        name: 'SubsurfaceColor',
+        type: ['float', 'vec2', 'vec3', 'vec4'],
+        defaultValue: [0, 0, 0],
+        originType: 'vec3'
       }
     ];
   }

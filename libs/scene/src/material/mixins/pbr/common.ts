@@ -7,7 +7,7 @@ import type {
 } from '@zephyr3d/device';
 import type { MeshMaterial } from '../../meshmaterial';
 import { applyMaterialMixins } from '../../meshmaterial';
-import type { Immutable } from '@zephyr3d/base';
+import type { Immutable, Nullable } from '@zephyr3d/base';
 import { Vector3 } from '@zephyr3d/base';
 import { Vector4 } from '@zephyr3d/base';
 import type { DrawContext } from '../../../render';
@@ -51,6 +51,8 @@ export type IMixinPBRCommon = {
   iridescenceIor: number;
   iridescenceThicknessMin: number;
   iridescenceThicknessMax: number;
+  foliageTransmission: boolean;
+  foliageTransmissionColor: Vector3;
   getCommonData(
     scope: PBInsideFunctionScope,
     albedo: PBShaderExp,
@@ -135,7 +137,8 @@ export type IMixinPBRCommon = {
     'transmission',
     'thickness',
     'iridescence',
-    'iridescenceThickness'
+    'iridescenceThickness',
+    'foliageTransmission'
   ]
 > &
   IMixinPBRBRDF;
@@ -164,12 +167,14 @@ export function mixinPBRCommon<T extends typeof MeshMaterial>(BaseCls: T) {
     mixinTextureProps('transmission'),
     mixinTextureProps('thickness'),
     mixinTextureProps('iridescence'),
-    mixinTextureProps('iridescenceThickness')
+    mixinTextureProps('iridescenceThickness'),
+    mixinTextureProps('foliageTransmission')
   );
   let FEATURE_SHEEN = 0;
   let FEATURE_CLEARCOAT = 0;
   let FEATURE_TRANSMISSION = 0;
   let FEATURE_IRIDESCENCE = 0;
+  let FEATURE_FOLIAGE_TRANSMISSION = 0;
 
   const EMISSIVE_COLOR_UNIFORM = S.defineInstanceUniform('emissiveColor', 'rgb', 'EmissiveColor');
   const EMISSIVE_STRENGTH_UNIFORM = S.defineInstanceUniform('emissiveStrength', 'float', 'EmissiveStrength');
@@ -205,6 +210,7 @@ export function mixinPBRCommon<T extends typeof MeshMaterial>(BaseCls: T) {
     private readonly _attenuationColor: Vector3;
     private _attenuationDistance: number;
     private readonly _iridescenceFactor: Vector4;
+    private readonly _foliageTransmissionColor: Vector3;
     constructor() {
       super();
       this._f0 = new Vector4(0.04, 0.04, 0.04, 1.5);
@@ -224,6 +230,7 @@ export function mixinPBRCommon<T extends typeof MeshMaterial>(BaseCls: T) {
       this._attenuationColor = Vector3.one();
       this._attenuationDistance = 99999;
       this._iridescenceFactor = new Vector4(0, 1.3, 100, 400);
+      this._foliageTransmissionColor = new Vector3(0.4, 0.6, 0.1);
     }
     copyFrom(other: this) {
       super.copyFrom(other);
@@ -250,6 +257,41 @@ export function mixinPBRCommon<T extends typeof MeshMaterial>(BaseCls: T) {
       this.sheen = other.sheen;
       this.sheenColorFactor = other.sheenColorFactor;
       this.sheenRoughnessFactor = other.sheenRoughnessFactor;
+      this.foliageTransmission = other.foliageTransmission;
+      this.foliageTransmissionColor = other.foliageTransmissionColor;
+    }
+    /**
+     * Whether light passes through the surface from behind, as through leaves: UE's two-sided
+     * foliage shading (TwoSidedBxDF), see MeshMaterial.getSubsurfaceColor
+     */
+    get foliageTransmission() {
+      return this.featureUsed<boolean>(FEATURE_FOLIAGE_TRANSMISSION);
+    }
+    set foliageTransmission(val) {
+      this.useFeature(FEATURE_FOLIAGE_TRANSMISSION, !!val);
+    }
+    /**
+     * Colour of the light passing through from behind (UE's subsurface colour), multiplied by
+     * foliageTransmissionTexture when there is one
+     */
+    get foliageTransmissionColor(): Immutable<Vector3> {
+      return this._foliageTransmissionColor;
+    }
+    set foliageTransmissionColor(val: Immutable<Vector3>) {
+      if (!val.equalsTo(this._foliageTransmissionColor)) {
+        this._foliageTransmissionColor.set(val);
+        this.uniformChanged();
+      }
+    }
+    getSubsurfaceColor(scope: PBInsideFunctionScope): Nullable<PBShaderExp> {
+      if (!this.foliageTransmission || !scope.zFoliageTransmissionColor) {
+        return super.getSubsurfaceColor(scope);
+      }
+      const pb = scope.$builder;
+      const color = scope.zFoliageTransmissionColor as PBShaderExp;
+      return this.hasFoliageTransmissionTexture()
+        ? pb.mul(color, this.sampleFoliageTransmissionTexture(scope).rgb)
+        : color;
     }
     get ior() {
       return this._f0.w;
@@ -559,6 +601,9 @@ export function mixinPBRCommon<T extends typeof MeshMaterial>(BaseCls: T) {
         if (this.iridescence) {
           scope.zIridescenceFactor = pb.vec4().uniform(2);
         }
+        if (this.foliageTransmission) {
+          scope.zFoliageTransmissionColor = pb.vec3().uniform(2);
+        }
         if (this.drawContext.drawEnvLight) {
           scope.zGGXLut = pb.tex2D().uniform(2);
         }
@@ -598,6 +643,9 @@ export function mixinPBRCommon<T extends typeof MeshMaterial>(BaseCls: T) {
         }
         if (this.iridescence) {
           bindGroup.setValue('zIridescenceFactor', this._iridescenceFactor);
+        }
+        if (this.foliageTransmission) {
+          bindGroup.setValue('zFoliageTransmissionColor', this._foliageTransmissionColor);
         }
         if (ctx.drawEnvLight) {
           bindGroup.setTexture('zGGXLut', getGGXLUT(1024));
@@ -1795,9 +1843,13 @@ export function mixinPBRCommon<T extends typeof MeshMaterial>(BaseCls: T) {
             );
             const subsurfaceColor = that.getSubsurfaceColor(this);
             if (subsurfaceColor) {
+              // The sky light reaching the back of the surface comes through it: UE samples the
+              // sky at -N for two-sided foliage (SkyLightingDiffuseShared.ush,
+              // GetSkySHDiffuse(-GBuffer.WorldNormal))
+              this.$l.backIrradiance = ctx.env!.light.envLight.getIrradiance(this, pb.neg(this.normal), ctx);
               this.iblDiffuse = pb.add(
                 this.iblDiffuse,
-                pb.mul(subsurfaceColor, this.irradiance, this.diffuseOcclusion, 1 / Math.PI)
+                pb.mul(subsurfaceColor, this.backIrradiance, this.diffuseOcclusion, 1 / Math.PI)
               );
             }
             if (that.clearcoat) {
@@ -1915,5 +1967,6 @@ export function mixinPBRCommon<T extends typeof MeshMaterial>(BaseCls: T) {
   FEATURE_CLEARCOAT = cls.defineFeature();
   FEATURE_TRANSMISSION = cls.defineFeature();
   FEATURE_IRIDESCENCE = cls.defineFeature();
+  FEATURE_FOLIAGE_TRANSMISSION = cls.defineFeature();
   return cls;
 }

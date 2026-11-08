@@ -32,6 +32,8 @@ export interface ImpostorInfo {
   radius: number;
   /** Edge of the normal-depth and occlusion atlases */
   detailSize: number;
+  /** Whether the asset lets light through from behind, with a subsurface atlas */
+  subsurface?: boolean;
 }
 
 /**
@@ -59,7 +61,8 @@ export function getImpostorFiles(assetPath: string, lod = 0) {
     info: `${dir}/impostor.json`,
     base: `${dir}/base.png`,
     normalDepth: `${dir}/normaldepth.png`,
-    orm: `${dir}/orm.png`
+    orm: `${dir}/orm.png`,
+    subsurface: `${dir}/subsurface.png`
   };
 }
 

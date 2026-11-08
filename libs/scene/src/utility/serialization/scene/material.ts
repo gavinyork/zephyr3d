@@ -1155,6 +1155,48 @@ function getPBRCommonProps(manager: ResourceManager): PropertyAccessor<PBRMateri
     ...getTextureProps<PBRMaterial>(manager, 'sheenRoughnessTexture', '2D', false, 1, function () {
       return this.sheen;
     }),
+    {
+      name: 'FoliageTransmission',
+      description:
+        'Lets sunlight shine through the surface from behind, as through leaves and grass: seen against the light it glows in the transmission color. Turn on for leaves, with Cull Mode none',
+      type: 'bool',
+      phase: 0,
+      default: false,
+      get(this: PBRMaterial, value) {
+        value.bool[0] = this.foliageTransmission;
+      },
+      set(this: PBRMaterial, value) {
+        this.foliageTransmission = value.bool[0];
+      },
+      isValid() {
+        return !this.$isInstance;
+      }
+    },
+    {
+      name: 'FoliageTransmissionColor',
+      description:
+        'Color of the light coming through from behind: a saturated, darker version of the leaf color usually looks right; brighter makes backlit leaves glow more',
+      type: 'rgb',
+      phase: 1,
+      default: [0.4, 0.6, 0.1],
+      options: {
+        animatable: true
+      },
+      get(this: PBRMaterial, value) {
+        value.num[0] = this.foliageTransmissionColor.x;
+        value.num[1] = this.foliageTransmissionColor.y;
+        value.num[2] = this.foliageTransmissionColor.z;
+      },
+      set(this: PBRMaterial, value) {
+        this.foliageTransmissionColor = new Vector3(value.num[0], value.num[1], value.num[2]);
+      },
+      isValid() {
+        return !this.$isInstance && !!this.foliageTransmission;
+      }
+    },
+    ...getTextureProps<PBRMaterial>(manager, 'foliageTransmissionTexture', '2D', true, 1, function () {
+      return this.foliageTransmission;
+    }),
     ...getLitMaterialProps(manager)
   ]);
 }

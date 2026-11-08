@@ -1249,6 +1249,9 @@ export class FoliageSystem extends GraphNode {
             material.baseTexture = base;
             material.normalDepthTexture = normalDepth;
             material.ormTexture = orm;
+            if (info.subsurface) {
+              material.subsurfaceTexture = await manager.fetchTexture<Texture2D>(files.subsurface);
+            }
             material.frames = info.settings.frames;
             material.hemisphere = info.settings.hemisphere;
             material.setBounds(info.center, info.radius);

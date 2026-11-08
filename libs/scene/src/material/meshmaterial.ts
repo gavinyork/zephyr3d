@@ -1084,8 +1084,9 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
    * Writes the surface attributes of a fragment in the surface capture pass, see
    * {@link RENDER_PASS_TYPE_CAPTURE}: base colour and opacity, then the normal in the space the
    * mesh is captured in and the depth towards the capture camera across the captured bounds
-   * (1 nearest), then occlusion, roughness and metallic. Fragments under the alpha cutoff are
-   * discarded.
+   * (1 nearest), then occlusion, roughness and metallic, then the colour of the light passing
+   * through from behind (see MeshMaterial.getSubsurfaceColor), black for none. Fragments under the
+   * alpha cutoff are discarded.
    *
    * @param scope - Fragment shader scope
    * @param worldPos - Fragment position
@@ -1141,6 +1142,11 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
           pb.clamp(this.occlusion, 0, 1),
           pb.clamp(this.roughness, 0, 1),
           pb.clamp(this.metallic, 0, 1),
+          1
+        );
+        const subsurface = that.getSubsurfaceColor(this);
+        this.$outputs.zCaptureSubsurface = pb.vec4(
+          subsurface ? pb.clamp(subsurface, pb.vec3(0), pb.vec3(1)) : pb.vec3(0),
           1
         );
       }
@@ -1269,6 +1275,7 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
           if (ctx.renderPass!.type === RENDER_PASS_TYPE_CAPTURE) {
             this.$outputs.zCaptureNormalDepth = pb.vec4();
             this.$outputs.zCaptureORM = pb.vec4();
+            this.$outputs.zCaptureSubsurface = pb.vec4();
           }
         }
         pb.main(function () {

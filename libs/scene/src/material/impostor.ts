@@ -45,6 +45,7 @@ export class ImpostorMaterial extends PBRMetallicRoughnessMaterial implements Cl
   private readonly _baseTexture: DRef<Texture2D>;
   private readonly _normalDepthTexture: DRef<Texture2D>;
   private readonly _ormTexture: DRef<Texture2D>;
+  private readonly _subsurfaceTexture: DRef<Texture2D>;
   private _center: [number, number, number];
   private _radius: number;
   private _frames: number;
@@ -55,6 +56,7 @@ export class ImpostorMaterial extends PBRMetallicRoughnessMaterial implements Cl
     this._baseTexture = new DRef();
     this._normalDepthTexture = new DRef();
     this._ormTexture = new DRef();
+    this._subsurfaceTexture = new DRef();
     this._center = [0, 0, 0];
     this._radius = 1;
     this._frames = 12;
@@ -76,6 +78,7 @@ export class ImpostorMaterial extends PBRMetallicRoughnessMaterial implements Cl
       this.baseTexture = other.baseTexture;
       this.normalDepthTexture = other.normalDepthTexture;
       this.ormTexture = other.ormTexture;
+      this.subsurfaceTexture = other.subsurfaceTexture;
       this.setBounds(other._center, other._radius);
       this.frames = other.frames;
       this.hemisphere = other.hemisphere;
@@ -105,6 +108,19 @@ export class ImpostorMaterial extends PBRMetallicRoughnessMaterial implements Cl
   set ormTexture(tex: Nullable<Texture2D>) {
     this._ormTexture.set(tex);
     this.uniformChanged();
+  }
+  /**
+   * Colour of the light the object lets through from behind, atlas; null when it lets none
+   * through. Lit as the object is, see MeshMaterial.getSubsurfaceColor.
+   */
+  get subsurfaceTexture() {
+    return this._subsurfaceTexture.get();
+  }
+  set subsurfaceTexture(tex: Nullable<Texture2D>) {
+    if (tex !== this._subsurfaceTexture.get()) {
+      this._subsurfaceTexture.set(tex);
+      this.optionChanged(true);
+    }
   }
   /** Frames along each side of the grid */
   get frames() {
@@ -248,6 +264,9 @@ export class ImpostorMaterial extends PBRMetallicRoughnessMaterial implements Cl
       scope.zImpostorBase = pb.tex2D().uniform(2);
       scope.zImpostorNormalDepth = pb.tex2D().uniform(2);
       scope.zImpostorORM = pb.tex2D().uniform(2);
+      if (this._subsurfaceTexture.get()) {
+        scope.zImpostorSubsurface = pb.tex2D().uniform(2);
+      }
     }
     super.fragmentShader(scope);
   }
@@ -345,6 +364,13 @@ export class ImpostorMaterial extends PBRMetallicRoughnessMaterial implements Cl
   }
   /** Occlusion, roughness and metallic, without the parallax shift: they are read in lighting functions */
   private sampleORM(scope: PBInsideFunctionScope) {
+    return this.sampleUnshifted(scope, scope.zImpostorORM);
+  }
+  getSubsurfaceColor(scope: PBInsideFunctionScope): Nullable<PBShaderExp> {
+    return scope.zImpostorSubsurface ? this.sampleUnshifted(scope, scope.zImpostorSubsurface).rgb : null;
+  }
+  /** A texture blended over the three frames without the parallax shift */
+  private sampleUnshifted(scope: PBInsideFunctionScope, tex: PBShaderExp) {
     const pb = scope.$builder;
     const inputs = scope.$inputs;
     const frames = scope.zImpostorGrid.x;
@@ -354,7 +380,7 @@ export class ImpostorMaterial extends PBRMetallicRoughnessMaterial implements Cl
       const a = pb.div(pb.add(frame, pb.clamp(uv, pb.vec2(0), pb.vec2(1))), frames);
       return pb.vec2(a.x, pb.sub(1, a.y));
     };
-    return this.blendFrames(scope, scope.zImpostorORM, [
+    return this.blendFrames(scope, tex, [
       atlas(cell, inputs.zImpostorUV01.xy),
       atlas(pb.add(cell, second), inputs.zImpostorUV01.zw),
       atlas(pb.add(cell, pb.vec2(1)), inputs.zImpostorUV2Ray2.xy)
@@ -368,6 +394,9 @@ export class ImpostorMaterial extends PBRMetallicRoughnessMaterial implements Cl
   }
   getAmbientOcclusionFactor(scope: PBInsideFunctionScope): Nullable<PBShaderExp> {
     return this.sampleORM(scope).x;
+  }
+  protected _createHash() {
+    return `${super._createHash()}:${this._subsurfaceTexture.get() ? 1 : 0}`;
   }
   supportsSurfaceCapture() {
     return false;
@@ -391,6 +420,9 @@ export class ImpostorMaterial extends PBRMetallicRoughnessMaterial implements Cl
       bindGroup.setTexture('zImpostorBase', this._baseTexture.get()!, sampler);
       bindGroup.setTexture('zImpostorNormalDepth', this._normalDepthTexture.get()!, sampler);
       bindGroup.setTexture('zImpostorORM', this._ormTexture.get()!, sampler);
+      if (this._subsurfaceTexture.get()) {
+        bindGroup.setTexture('zImpostorSubsurface', this._subsurfaceTexture.get()!, sampler);
+      }
     }
   }
   /** @internal */
@@ -402,6 +434,7 @@ export class ImpostorMaterial extends PBRMetallicRoughnessMaterial implements Cl
     this._baseTexture.dispose();
     this._normalDepthTexture.dispose();
     this._ormTexture.dispose();
+    this._subsurfaceTexture.dispose();
   }
 }
 

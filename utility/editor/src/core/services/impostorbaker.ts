@@ -13,7 +13,7 @@ import {
 import { ProjectService } from './project';
 
 /** Bumped whenever the baker's output changes, so every impostor is rebaked */
-const IMPOSTOR_BAKER_VERSION = 2;
+const IMPOSTOR_BAKER_VERSION = 3;
 
 /** Files whose text is searched for the assets they refer to */
 const TEXT_ASSET = /\.(zprefab|zmtl|zbpt|zmf|json|zscn)$/i;
@@ -92,6 +92,12 @@ export class ImpostorBakeService {
         encoding: 'binary',
         create: true
       });
+      if (result.subsurface) {
+        await vfs.writeFile(files.subsurface, encode(result.subsurface, result.detailSize), {
+          encoding: 'binary',
+          create: true
+        });
+      }
       const info: ImpostorInfo = {
         version: IMPOSTOR_VERSION,
         asset,
@@ -99,12 +105,13 @@ export class ImpostorBakeService {
         settings: result.settings,
         center: result.center,
         radius: result.radius,
-        detailSize: result.detailSize
+        detailSize: result.detailSize,
+        subsurface: !!result.subsurface
       };
       await vfs.writeFile(files.info, JSON.stringify(info, null, 2), { encoding: 'utf8', create: true });
       // Atlases already loaded from an earlier bake are read again
       const assetManager = getEngine().resourceManager.assetManager;
-      for (const path of [files.base, files.normalDepth, files.orm, files.info]) {
+      for (const path of [files.base, files.normalDepth, files.orm, files.subsurface, files.info]) {
         assetManager.invalidateAsset(path);
       }
       return {

@@ -86,6 +86,8 @@ export interface ImpostorBakeResult {
   normalDepth: Uint8Array;
   /** Occlusion, roughness, metallic, at the detail size */
   orm: Uint8Array;
+  /** Colour of the light passing through from behind (sRGB), at the detail size; null when the object lets none through */
+  subsurface: Nullable<Uint8Array>;
   /** Edge of the normal-depth and occlusion atlases */
   detailSize: number;
   /** Meshes whose material could only give its colour, see MeshMaterial.supportsSurfaceCapture */
@@ -167,11 +169,13 @@ export class ImpostorBaker {
     const base = new Uint8Array(size * size * 4);
     const normalDepth = new Uint8Array(size * size * 4);
     const orm = new Uint8Array(size * size * 4);
+    const subsurface = new Uint8Array(size * size * 4);
     device.pushDeviceStates();
     try {
-      for (let i = 0; i < 3; i++) {
-        // Base colour encoded as sRGB, as colour textures are stored and loaded
-        const tex = device.createTexture2D(i === 0 ? 'rgba8unorm-srgb' : 'rgba8unorm', size, size, {
+      for (let i = 0; i < 4; i++) {
+        // Colours encoded as sRGB, as colour textures are stored and loaded
+        const srgb = i === 0 || i === 3;
+        const tex = device.createTexture2D(srgb ? 'rgba8unorm-srgb' : 'rgba8unorm', size, size, {
           mipmapping: false
         });
         if (!tex) {
@@ -181,7 +185,7 @@ export class ImpostorBaker {
       }
       const depth = device.createTexture2D('d32f', size, size, { mipmapping: false })!;
       targets.push(depth);
-      fb = device.createFrameBuffer(targets.slice(0, 3), depth);
+      fb = device.createFrameBuffer(targets.slice(0, 4), depth);
       device.setFramebuffer(fb);
       device.setViewport(null);
       device.setScissor(null);
@@ -227,6 +231,7 @@ export class ImpostorBaker {
       await targets[0].readPixels(0, 0, size, size, 0, 0, base);
       await targets[1].readPixels(0, 0, size, size, 0, 0, normalDepth);
       await targets[2].readPixels(0, 0, size, size, 0, 0, orm);
+      await targets[3].readPixels(0, 0, size, size, 0, 0, subsurface);
     } finally {
       device.popDeviceStates();
       fb?.dispose();
@@ -241,11 +246,17 @@ export class ImpostorBaker {
     flipRows(base, size);
     flipRows(normalDepth, size);
     flipRows(orm, size);
+    flipRows(subsurface, size);
     const coverage = new Uint8Array(size * size);
     for (let p = 0; p < size * size; p++) {
       coverage[p] = base[p * 4 + 3] > 0 ? 1 : 0;
     }
-    dilate(cell, s.frames, coverage, [base, normalDepth, orm], [3, 4, 4]);
+    let transmits = false;
+    for (let p = 0; p < size * size && !transmits; p++) {
+      transmits =
+        coverage[p] > 0 && (subsurface[p * 4] > 0 || subsurface[p * 4 + 1] > 0 || subsurface[p * 4 + 2] > 0);
+    }
+    dilate(cell, s.frames, coverage, [base, normalDepth, orm, subsurface], [3, 4, 4, 3]);
     const detailSize = Math.max(1, Math.floor(size / s.detailDivider));
     return {
       settings: s,
@@ -254,6 +265,7 @@ export class ImpostorBaker {
       base,
       normalDepth: downsample(normalDepth, size, detailSize),
       orm: downsample(orm, size, detailSize),
+      subsurface: transmits ? downsample(subsurface, size, detailSize) : null,
       detailSize,
       uncapturedMaterials: [...uncaptured]
     };
