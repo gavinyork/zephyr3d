@@ -18,6 +18,8 @@ export function renderObjectColors(
   renderQueue: RenderQueue
 ): void {
   const camera = ctx.camera;
+  // Drawn once per pick: the next frames wait for its readback instead of drawing it again
+  camera.markPickIssued();
   ctx.renderPass = _objectColorPass;
   ctx.device.pushDeviceStates();
   const fb = ctx.device.pool.fetchTemporalFramebuffer(

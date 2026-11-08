@@ -452,6 +452,8 @@ export class Camera extends SceneNode {
   protected _pickResultPromise: Nullable<Promise<Nullable<PickResult>>>;
   /** @internal Resolver for the pending pick promise. */
   protected _pickResultResolve: Nullable<(result: Nullable<PickResult>) => void>;
+  /** Whether the pending pick was drawn, its readback still running @internal */
+  protected _pickIssued: boolean;
   /** @internal Last pick X position (viewport-relative). */
   protected _pickPosX: number;
   /** @internal Last pick Y position (viewport-relative). */
@@ -626,6 +628,7 @@ export class Camera extends SceneNode {
     this._prevJitterValue = null;
     this._pickResultPromise = null;
     this._pickResultResolve = null;
+    this._pickIssued = false;
     this._pickPosX = 0;
     this._pickPosY = 0;
     this._compositor = new Compositor();
@@ -2279,14 +2282,24 @@ export class Camera extends SceneNode {
           resolve(result);
           this._pickResultPromise = null;
           this._pickResultResolve = null;
+          this._pickIssued = false;
         };
       });
     }
     return this._pickResultPromise;
   }
-  /** @internal */
+  /**
+   * The function resolving the pending pick, while it is yet to be drawn. Once drawn it is null
+   * until its readback resolves it: a pick waits for the GPU to finish the frames ahead of it, and
+   * drawing it again every frame meanwhile piles up one framebuffer per frame of that wait.
+   * @internal
+   */
   getPickResultResolveFunc() {
-    return this._pickResultResolve;
+    return this._pickIssued ? null : this._pickResultResolve;
+  }
+  /** Records that the pending pick was drawn, see getPickResultResolveFunc @internal */
+  markPickIssued() {
+    this._pickIssued = true;
   }
   /** @internal */
   getPickPosX() {
