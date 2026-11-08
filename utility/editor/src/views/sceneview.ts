@@ -179,6 +179,8 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
   /** Whether the gizmo renderer was added to the compositor for the frame being drawn. */
   private _gizmoEffectAppended: boolean;
   private _showDeviceInfo: boolean;
+  /** GPU objects alive at the last Mark of the device information window */
+  private _gpuObjectMark: Set<number> | null = null;
   private _showProfiler: boolean;
   /** Latest resolved render graph GPU profile, shown in the Profiler window. */
   private _profileResult: Nullable<RGProfileResult>;
@@ -2070,6 +2072,40 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
         ImGui.TableNextColumn();
         ImGui.Text(`${gpuObjectList.framebuffers.length}`);
         ImGui.EndTable();
+      }
+      // Leak check: what was created since Mark and is still alive
+      if (ImGui.Button('Mark')) {
+        this._gpuObjectMark = new Set<number>();
+        for (const list of Object.values(gpuObjectList) as { uid: number }[][]) {
+          for (const obj of list) {
+            this._gpuObjectMark.add(obj.uid);
+          }
+        }
+        console.info('GPU objects marked');
+      }
+      ImGui.SameLine();
+      if (ImGui.Button('Diff') && this._gpuObjectMark) {
+        const groups = new Map<string, number>();
+        for (const [kind, list] of Object.entries(gpuObjectList) as [string, any[]][]) {
+          for (const obj of list) {
+            if (this._gpuObjectMark.has(obj.uid)) {
+              continue;
+            }
+            const desc =
+              kind === 'textures'
+                ? `${obj.width}x${obj.height} ${obj.format}`
+                : kind === 'buffers'
+                  ? `${obj.byteLength} bytes`
+                  : '';
+            const key = `${kind} ${obj.constructor?.name ?? ''} "${obj.name ?? ''}" ${desc}`;
+            groups.set(key, (groups.get(key) ?? 0) + 1);
+          }
+        }
+        const rows = [...groups.entries()].sort((a, b) => b[1] - a[1]);
+        const NL = String.fromCharCode(10);
+        console.info(
+          'GPU objects created since Mark and alive:' + NL + rows.map(([k, n]) => `${n} x ${k}`).join(NL)
+        );
       }
     }
     ImGui.End();
