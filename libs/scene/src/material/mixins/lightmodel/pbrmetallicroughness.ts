@@ -516,6 +516,12 @@ export function mixinPBRMetallicRoughness<T extends typeof MeshMaterial>(BaseCls
         ],
         function () {
           this.$l.pbrData = that.getCommonData(this, this.albedo, this.normal, this.viewVec, this.TBN);
+          // Evaluated here, in uniform control flow, rather than per light inside the light loop:
+          // it may sample textures, which WGSL forbids in non-uniform control flow
+          const subsurfacePre = that.getSubsurfaceColor(this);
+          if (subsurfacePre) {
+            this.$l.zSubsurfacePre = subsurfacePre;
+          }
           this.$l.lightingColor = pb.vec3(0);
           this.$l.sssDiffuseColor = pb.vec3(0);
           this.$l.sssTransmissionColor = pb.vec3(0);
@@ -633,7 +639,7 @@ export function mixinPBRMetallicRoughness<T extends typeof MeshMaterial>(BaseCls
                 this.$l.lightShadow = that.calculateShadow(this, this.worldPos, this.TBN[2], this.NoL);
                 this.lightColor = pb.mul(this.lightColor, this.lightShadow);
               }
-              const subsurfaceColor = that.getSubsurfaceColor(this);
+              const subsurfaceColor = subsurfacePre ? (this.zSubsurfacePre as PBShaderExp) : null;
               if (subsurfaceColor) {
                 this.$l.ssWrapNoL = pb.clamp(
                   pb.div(pb.sub(0.5, pb.dot(this.normal, this.lightDir)), 2.25),
