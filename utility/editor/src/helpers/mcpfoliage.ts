@@ -173,6 +173,10 @@ export function getFoliageInfo(controller: SceneController | null, params: any) 
       cast_shadow: layer.castShadow,
       cull_distance: layer.cullDistance,
       align_to_normal: layer.alignToNormal,
+      impostor: layer.impostor,
+      impostor_distance: layer.impostorDistance,
+      impostor_lod: layer.impostorLod,
+      fade_distance: layer.fadeDistance,
       collision: layer.collision,
       local_bounds: layer.count > 0 ? { min: [minX, minZ], max: [maxX, maxZ] } : null
     });
@@ -232,6 +236,12 @@ export async function setFoliageLayers(controller: SceneController | null, param
         castShadow: info.cast_shadow,
         cullDistance: info.cull_distance,
         alignToNormal: info.align_to_normal,
+        impostor: typeof info.impostor === 'boolean' ? info.impostor : undefined,
+        impostorDistance: Number.isFinite(info.impostor_distance)
+          ? Number(info.impostor_distance)
+          : undefined,
+        impostorLod: Number.isFinite(info.impostor_lod) ? Number(info.impostor_lod) : undefined,
+        fadeDistance: Number.isFinite(info.fade_distance) ? Number(info.fade_distance) : undefined,
         collision: collisions[i],
         generation: generations[i]
       };

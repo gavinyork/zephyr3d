@@ -2733,7 +2733,7 @@ const BASE_TOOLS = [
   {
     name: 'foliage_set_layers',
     description:
-      'Set the layers of a FoliageSystem: each layer scatters one asset (a .zprefab or a model such as .glb/.gltf, ideally with LODs; every mesh in it is drawn instanced). The array replaces the layer list in order: a layer keeping its asset keeps its instances (unless clear is true), a changed asset clears them, extra layers are added and missing ones removed. collision makes the instances static obstacles in the physics simulation (trees, big rocks; leave it off for bushes and small stones so vehicles drive over them). generation sets how instances grow where the layer is painted (foliage_paint, the foliage brush); changing it does not touch existing instances until foliage_regenerate. Then place instances with foliage_paint (painted, follows the density mask and the generation settings) or foliage_scatter (placed, decided by a script over the whole terrain). Undoable. Returns { num_layers, err }.',
+      'Set the layers of a FoliageSystem: each layer scatters one asset (a .zprefab or a model such as .glb/.gltf, ideally with LODs; every mesh in it is drawn instanced). The array replaces the layer list in order: a layer keeping its asset keeps its instances (unless clear is true), a changed asset clears them, extra layers are added and missing ones removed. impostor draws far instances as octahedral impostors (a camera-facing card baked from the asset, lit like it), much cheaper for dense forests; the editor bakes the impostor when needed. collision makes the instances static obstacles in the physics simulation (trees, big rocks; leave it off for bushes and small stones so vehicles drive over them). generation sets how instances grow where the layer is painted (foliage_paint, the foliage brush); changing it does not touch existing instances until foliage_regenerate. Then place instances with foliage_paint (painted, follows the density mask and the generation settings) or foliage_scatter (placed, decided by a script over the whole terrain). Undoable. Returns { num_layers, err }.',
     inputSchema: {
       type: 'object',
       required: ['node_id', 'layers'],
@@ -2758,6 +2758,26 @@ const BASE_TOOLS = [
               cull_distance: {
                 type: 'number',
                 description: 'Instances farther from the camera are hidden. Default 300.'
+              },
+              impostor: {
+                type: 'boolean',
+                description:
+                  'Draw instances beyond impostor_distance as impostors, baked from the asset by the editor. Default false.'
+              },
+              impostor_distance: {
+                type: 'number',
+                description: 'Distance from the camera beyond which instances are impostors. Default 80.'
+              },
+              impostor_lod: {
+                type: 'integer',
+                minimum: 0,
+                description:
+                  'Level of detail of the asset the impostor is baked from; pick the level the meshes are at around impostor_distance. Default 0.'
+              },
+              fade_distance: {
+                type: 'number',
+                description:
+                  'Meters over which instances dither between mesh and impostor, and out at cull_distance, instead of popping (WebGPU). 0 switches at once. Default 10.'
               },
               align_to_normal: {
                 type: 'number',
