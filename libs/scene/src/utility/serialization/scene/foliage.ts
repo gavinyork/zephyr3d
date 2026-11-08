@@ -176,7 +176,7 @@ export function getFoliageLayerClass(): SerializableClass {
         {
           name: 'Impostor',
           description:
-            'Far copies turn into flat cards showing the asset baked from every side, lit like the asset: much cheaper to draw at a distance. The editor bakes them when this is turned on and again when the asset or its materials change. WebGPU only',
+            'Far copies turn into flat cards showing the asset baked from every side, lit like the asset: much cheaper to draw at a distance. The editor bakes them when this is turned on and again when the asset or its materials change. On WebGL a whole patch of copies swaps at once',
           type: 'bool',
           default: false,
           options: { group: 'Impostor' },

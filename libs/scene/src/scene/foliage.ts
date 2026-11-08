@@ -365,7 +365,8 @@ export class FoliageLayer {
    * Whether instances farther than {@link FoliageLayer.impostorDistance} are drawn as impostors:
    * a quad showing views of the asset baked from every side, lit as the asset is. The impostor
    * is baked by the editor into IMPOSTOR_DIR; without one the layer draws its meshes at every
-   * distance. Needs GPU instance culling (WebGPU).
+   * distance. With GPU instance culling (WebGPU) each instance swaps at its own distance; without
+   * (WebGL) a whole chunk swaps once all of it is past the impostor distance.
    */
   get impostor() {
     return this._impostor;
@@ -573,6 +574,15 @@ type FoliageChunk = {
   layer: FoliageLayer;
   key: string;
   group: BatchGroup;
+  /**
+   * The impostors of the chunk, drawn instead of its meshes when the whole chunk is far enough;
+   * only without GPU instance culling, which otherwise swaps instance by instance in one group
+   */
+  impostorGroup: Nullable<BatchGroup>;
+  /** Distance from the camera at which the chunk turns into impostors, see impostorGroup */
+  impostorSwap: number;
+  /** Whether the impostor group is the one shown */
+  showsImpostors: boolean;
   /** Static body holding the colliders of the chunk's instances */
   colliders: Nullable<SceneNode>;
   minX: number;
@@ -1056,10 +1066,18 @@ export class FoliageSystem extends GraphNode {
       for (const chunk of chunks.values()) {
         const dx = Math.max(chunk.minX - ex, 0, ex - chunk.maxX);
         const dz = Math.max(chunk.minZ - ez, 0, ez - chunk.maxZ);
-        const visible = dx * dx + dz * dz <= chunk.layer._cullDistance * chunk.layer._cullDistance;
-        if (visible !== chunk.visible) {
+        const distSq = dx * dx + dz * dz;
+        const visible = distSq <= chunk.layer._cullDistance * chunk.layer._cullDistance;
+        // Measured, like the cull distance, to the nearest point of the chunk: a chunk turns into
+        // impostors only once all of it is past the swap distance
+        const impostors = !!chunk.impostorGroup && distSq >= chunk.impostorSwap * chunk.impostorSwap;
+        if (visible !== chunk.visible || impostors !== chunk.showsImpostors) {
           chunk.visible = visible;
-          chunk.group.showState = visible ? 'inherit' : 'hidden';
+          chunk.showsImpostors = impostors;
+          chunk.group.showState = visible && !impostors ? 'inherit' : 'hidden';
+          if (chunk.impostorGroup) {
+            chunk.impostorGroup.showState = visible && impostors ? 'inherit' : 'hidden';
+          }
         }
       }
     }
@@ -1116,6 +1134,8 @@ export class FoliageSystem extends GraphNode {
       for (const chunk of chunks.values()) {
         chunk.group.remove();
         chunk.group.dispose();
+        chunk.impostorGroup?.remove();
+        chunk.impostorGroup?.dispose();
         chunk.colliders?.dispose();
       }
     }
@@ -1127,6 +1147,8 @@ export class FoliageSystem extends GraphNode {
     if (chunk) {
       chunk.group.remove();
       chunk.group.dispose();
+      chunk.impostorGroup?.remove();
+      chunk.impostorGroup?.dispose();
       chunk.colliders?.dispose();
       chunks!.delete(key);
     }
@@ -1230,9 +1252,7 @@ export class FoliageSystem extends GraphNode {
   static onImpostorNeeded: Nullable<(asset: string, lod: number) => Promise<void>> = null;
   /** Whether a layer's impostor is yet to be looked for */
   private impostorPending(layer: FoliageLayer) {
-    return (
-      layer._impostor && !!layer._asset && layer._impostorPart === undefined && InstanceCuller.isSupported()
-    );
+    return layer._impostor && !!layer._asset && layer._impostorPart === undefined;
   }
   /** Loads the impostor of a layer that wants one, see FoliageLayer.impostor */
   private loadImpostor(layer: FoliageLayer): Promise<void> {
@@ -1314,8 +1334,10 @@ export class FoliageSystem extends GraphNode {
     const templates = layer._colliderTemplates();
     // Near instances draw their meshes, far ones the impostor; the ranges meet at the impostor
     // distance, and GPU instance culling takes each instance to one of them
-    const impostor =
-      layer._impostor && layer._impostorPart && InstanceCuller.isSupported() ? layer._impostorPart : null;
+    const impostor = layer._impostor && layer._impostorPart ? layer._impostorPart : null;
+    // Without GPU instance culling distances do not apply to the meshes of a batch group: the
+    // impostors go into a group of their own, and the whole chunk swaps (see updatePerCamera)
+    const perInstance = !!impostor && InstanceCuller.isSupported();
     // and overlap by the fade distance, over which they cross-fade (Mesh.drawDistanceFade)
     const split = Math.min(layer._impostorDistance, layer._cullDistance);
     // A band no wider than what lies on either side of where it is centred
@@ -1328,13 +1350,22 @@ export class FoliageSystem extends GraphNode {
       layer._forceImpostor ? 0 : Math.max(0, split - fade * 0.5),
       layer._cullDistance
     ];
-    const meshParts = impostor && layer._forceImpostor ? [] : parts;
+    // Without GPU culling, forced impostors are a chunk that never swaps back to its meshes
+    const meshParts = impostor && layer._forceImpostor && perInstance ? [] : parts;
     // Painted instances on any surface store their height; the others stand on the terrain
     const onTerrain = (generated: boolean) => !generated || layer._generation.surface === 'terrain';
     const group = new BatchGroup(this.scene!);
     group.sealed = true;
     group.name = `Foliage chunk ${cx},${cz}`;
     group.parent = this;
+    let impostorGroup: Nullable<BatchGroup> = null;
+    if (impostor && !perInstance) {
+      impostorGroup = new BatchGroup(this.scene!);
+      impostorGroup.sealed = true;
+      impostorGroup.name = `Foliage impostors ${cx},${cz}`;
+      impostorGroup.parent = this;
+      impostorGroup.showState = 'hidden';
+    }
     // One static body per chunk, with a collider node per instance and template
     let colliders: Nullable<SceneNode> = null;
     if (templates.length > 0) {
@@ -1378,7 +1409,7 @@ export class FoliageSystem extends GraphNode {
           mesh.gpuPickable = false;
           mesh.drawDistance = impostorRange;
           mesh.drawDistanceFade = fade;
-          mesh.parent = group;
+          mesh.parent = impostorGroup ?? group;
           mesh.setLocalTransform(tmpMatrix);
           mesh.syncDrawableTransform();
         }
@@ -1422,6 +1453,9 @@ export class FoliageSystem extends GraphNode {
       layer,
       key,
       group,
+      impostorGroup,
+      impostorSwap: layer._forceImpostor ? 0 : split,
+      showsImpostors: false,
       colliders,
       minX: cx * size,
       minZ: cz * size,
