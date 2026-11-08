@@ -173,6 +173,57 @@ export function getFoliageLayerClass(): SerializableClass {
           }
         },
         {
+          name: 'Impostor',
+          description:
+            'Far copies turn into flat cards showing the asset baked from every side, lit like the asset: much cheaper to draw at a distance. The editor bakes them when this is turned on and again when the asset or its materials change. WebGPU only',
+          type: 'bool',
+          default: false,
+          options: { group: 'Impostor' },
+          get(this: FoliageLayer, value) {
+            value.bool[0] = this.impostor;
+          },
+          set(this: FoliageLayer, value) {
+            this.impostor = value.bool[0];
+          }
+        },
+        {
+          name: 'ImpostorDistance',
+          description:
+            'Copies farther than this from the camera, in meters, are drawn as cards. Nearer shows fewer full meshes but makes the swap easier to spot',
+          type: 'float',
+          default: 80,
+          options: { group: 'Impostor', minValue: 0, maxValue: 10000 },
+          isHidden(this: FoliageLayer) {
+            return !this.impostor;
+          },
+          get(this: FoliageLayer, value) {
+            value.num[0] = this.impostorDistance;
+          },
+          set(this: FoliageLayer, value) {
+            this.impostorDistance = value.num[0];
+          }
+        },
+        {
+          name: 'ForceImpostor',
+          description:
+            'Shows every copy as a card, even up close, to compare the cards with the meshes. Not saved',
+          type: 'bool',
+          default: false,
+          options: { group: 'Impostor' },
+          isHidden(this: FoliageLayer) {
+            return !this.impostor;
+          },
+          isPersistent() {
+            return false;
+          },
+          get(this: FoliageLayer, value) {
+            value.bool[0] = this.forceImpostor;
+          },
+          set(this: FoliageLayer, value) {
+            this.forceImpostor = value.bool[0];
+          }
+        },
+        {
           name: 'AlignToNormal',
           description:
             'How much the instances tilt with the slope of the terrain: 0 stands upright, 1 leans with the ground. Painted copies on any surface always stand upright',

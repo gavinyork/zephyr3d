@@ -2,6 +2,7 @@ import UPNG from 'upng-js';
 import type { ImpostorBakeSettings, ImpostorInfo } from '@zephyr3d/scene';
 import {
   defaultImpostorBakeSettings,
+  FoliageSystem,
   getEngine,
   getImpostorFiles,
   IMPOSTOR_VERSION,
@@ -12,7 +13,7 @@ import {
 import { ProjectService } from './project';
 
 /** Bumped whenever the baker's output changes, so every impostor is rebaked */
-const IMPOSTOR_BAKER_VERSION = 1;
+const IMPOSTOR_BAKER_VERSION = 2;
 
 /** Files whose text is searched for the assets they refer to */
 const TEXT_ASSET = /\.(zprefab|zmtl|zbpt|zmf|json|zscn)$/i;
@@ -183,3 +184,17 @@ export class ImpostorBakeService {
     return sha1Hex(key);
   }
 }
+
+// Foliage layers drawing impostors have theirs baked, or rebaked once the asset changed, before
+// they load them
+FoliageSystem.onImpostorNeeded = async (asset: string) => {
+  if (ProjectService.VFS.readOnly) {
+    return;
+  }
+  const r = await ImpostorBakeService.bake(asset);
+  if (r.err) {
+    console.error(`Bake impostor of ${asset} failed: ${r.err}`);
+  } else if (!r.skipped) {
+    console.info(`Impostor of ${asset} baked into ${r.dir} in ${r.milliseconds} ms`);
+  }
+};

@@ -1,12 +1,18 @@
 import type { Nullable } from '@zephyr3d/base';
 import { AABB, DRef, Matrix4x4, Quaternion, Vector3 } from '@zephyr3d/base';
+import { BoundingBox } from '../utility/bounding_volume';
+import type { Texture2D } from '@zephyr3d/device';
 import type { Scene } from './scene';
 import { SceneNode } from './scene_node';
 import { GraphNode } from './graph_node';
 import { BatchGroup } from './batchgroup';
 import { Mesh } from './mesh';
+import { Primitive } from '../render/primitive';
+import { InstanceCuller } from '../render/instance_culling';
+import { ImpostorMaterial } from '../material/impostor';
+import type { ImpostorInfo } from '../asset/impostor_asset';
+import { getImpostorFiles } from '../asset/impostor_asset';
 import type { ClipmapTerrain } from './terrain-cm';
-import type { Primitive } from '../render';
 import type { MeshMaterial } from '../material';
 import type { Camera } from '../camera';
 import { getEngine } from '../app/api';
@@ -33,7 +39,17 @@ export interface FoliageLayerSettings {
   collision?: Nullable<FoliageCollision>;
   /** How painted instances are generated; omitted fields keep their defaults */
   generation?: Partial<FoliageGeneration>;
+  /** Whether instances beyond impostorDistance are drawn as impostors, see FoliageLayer.impostor. Default false. */
+  impostor?: boolean;
+  /** Distance from the camera beyond which the instances are drawn as impostors. Default 80. */
+  impostorDistance?: number;
 }
+
+/** The quad and material an impostor layer draws its far instances with */
+type FoliageImpostorPart = {
+  primitive: DRef<Primitive>;
+  material: DRef<MeshMaterial>;
+};
 
 /**
  * Shape of the colliders of a {@link FoliageLayer}: a basic shape, or `'asset'` for the
@@ -231,6 +247,16 @@ export class FoliageLayer {
   _assetColliders: FoliageColliderTemplate[];
   /** @internal */
   _loading: Nullable<Promise<void>>;
+  /** @internal */
+  _impostor: boolean;
+  /** @internal */
+  _impostorDistance: number;
+  /** @internal */
+  _forceImpostor: boolean;
+  /** The impostor drawn far away; null when there is none, undefined until looked for @internal */
+  _impostorPart: Nullable<FoliageImpostorPart> | undefined;
+  /** @internal */
+  _impostorLoading: Nullable<Promise<void>>;
   /**
    * Creates a layer; add it to a foliage system with {@link FoliageSystem.insertLayer}
    * @param asset - Path of the prefab or model asset the layer scatters
@@ -251,6 +277,11 @@ export class FoliageLayer {
     this._bounds = null;
     this._assetColliders = [];
     this._loading = null;
+    this._impostor = settings?.impostor ?? false;
+    this._impostorDistance = settings?.impostorDistance ?? 80;
+    this._forceImpostor = false;
+    this._impostorPart = undefined;
+    this._impostorLoading = null;
   }
   /** The foliage system the layer belongs to */
   get owner() {
@@ -313,8 +344,60 @@ export class FoliageLayer {
   set cullDistance(val: number) {
     if (val !== this._cullDistance) {
       this._cullDistance = val;
-      this._owner?._applyCullDistance(this);
+      this._owner?.invalidate();
     }
+  }
+  /**
+   * Whether instances farther than {@link FoliageLayer.impostorDistance} are drawn as impostors:
+   * a quad showing views of the asset baked from every side, lit as the asset is. The impostor
+   * is baked by the editor into IMPOSTOR_DIR; without one the layer draws its meshes at every
+   * distance. Needs GPU instance culling (WebGPU).
+   */
+  get impostor() {
+    return this._impostor;
+  }
+  set impostor(val: boolean) {
+    if (!!val !== this._impostor) {
+      this._impostor = !!val;
+      this._disposeImpostor();
+      this._owner?.invalidate();
+    }
+  }
+  /** Distance from the camera beyond which the instances are drawn as impostors */
+  get impostorDistance() {
+    return this._impostorDistance;
+  }
+  set impostorDistance(val: number) {
+    val = Math.max(0, val);
+    if (val !== this._impostorDistance) {
+      this._impostorDistance = val;
+      this._owner?.invalidate();
+    }
+  }
+  /** Draws every instance as an impostor, to compare them with the meshes up close. Not saved. */
+  get forceImpostor() {
+    return this._forceImpostor;
+  }
+  set forceImpostor(val: boolean) {
+    if (!!val !== this._forceImpostor) {
+      this._forceImpostor = !!val;
+      this._owner?.invalidate();
+    }
+  }
+  /** Loads the impostor again, after it was baked anew */
+  reloadImpostor() {
+    this._disposeImpostor();
+    this._owner?.invalidate();
+  }
+  /** @internal */
+  _disposeImpostor() {
+    if (this._impostorPart) {
+      this._impostorPart.primitive.dispose();
+      this._impostorPart.material.dispose();
+    }
+    this._impostorPart = undefined;
+    // A load still running discards its result
+    this._impostorLoading = null;
   }
   /** How much the instances lean with the ground: 0 stays upright, 1 follows the normal */
   get alignToNormal() {
@@ -400,6 +483,7 @@ export class FoliageLayer {
     this._assetColliders = [];
     // A load still running is for the old asset, it discards its result
     this._loading = null;
+    this._disposeImpostor();
   }
 }
 
@@ -652,7 +736,11 @@ export class FoliageSystem extends GraphNode {
     }
     layer._castShadow = settings.castShadow ?? layer._castShadow;
     layer._cullDistance = settings.cullDistance ?? layer._cullDistance;
-    // Rebuilt below with the new distance
+    layer._impostorDistance = Math.max(0, settings.impostorDistance ?? layer._impostorDistance);
+    if (settings.impostor !== undefined && !!settings.impostor !== layer._impostor) {
+      layer._impostor = !!settings.impostor;
+      layer._disposeImpostor();
+    }
     layer._alignToNormal = settings.alignToNormal ?? layer._alignToNormal;
     if (settings.collision !== undefined) {
       layer._collision = copyCollision(settings.collision);
@@ -880,21 +968,6 @@ export class FoliageSystem extends GraphNode {
       this.scene?.queuePerCameraUpdateNode(this);
     }
   }
-  /**
-   * Gives the meshes of a layer its cull distance, which GPU instance culling applies to each
-   * instance; elsewhere whole chunks are hidden, see updatePerCamera
-   * @internal
-   */
-  _applyCullDistance(layer: FoliageLayer) {
-    const range: [number, number] = [0, layer._cullDistance];
-    for (const chunk of this._chunks.get(layer)?.values() ?? []) {
-      for (const node of chunk.group.children) {
-        if (node.isMesh()) {
-          node.drawDistance = range;
-        }
-      }
-    }
-  }
   /** {@inheritDoc SceneNode.updatePerCamera} */
   updatePerCamera(camera: Camera, _elapsedInSeconds: number, _deltaInSeconds: number) {
     this.scene?.queuePerCameraUpdateNode(this);
@@ -941,7 +1014,10 @@ export class FoliageSystem extends GraphNode {
     const serial = ++this._buildSerial;
     const terrain = this.terrain;
     const heightData = terrain?.heightData ?? null;
-    const pending = this._layers.filter((layer) => !layer._parts).map((layer) => this.loadLayer(layer));
+    const pending = [
+      ...this._layers.filter((layer) => !layer._parts).map((layer) => this.loadLayer(layer)),
+      ...this._layers.map((layer) => this.loadImpostor(layer))
+    ];
     Promise.all(pending).then(() => {
       if (serial !== this._buildSerial || this.disposed) {
         return;
@@ -958,7 +1034,7 @@ export class FoliageSystem extends GraphNode {
   }
   /** Rebuilds the chunks marked dirty, once every layer is loaded */
   private rebuildChunks() {
-    if (this._layers.some((layer) => !layer._parts)) {
+    if (this._layers.some((layer) => !layer._parts || this.impostorPending(layer))) {
       // A layer still loading: its full rebuild picks the changes up
       this._dirty = true;
       return;
@@ -1087,6 +1163,72 @@ export class FoliageSystem extends GraphNode {
     }
     return layer._loading;
   }
+  /**
+   * Called before a layer's impostor is loaded, to have it baked or brought up to date; the
+   * editor sets it. Without it, the impostor already baked is used as it is.
+   */
+  static onImpostorNeeded: Nullable<(asset: string) => Promise<void>> = null;
+  /** Whether a layer's impostor is yet to be looked for */
+  private impostorPending(layer: FoliageLayer) {
+    return (
+      layer._impostor && !!layer._asset && layer._impostorPart === undefined && InstanceCuller.isSupported()
+    );
+  }
+  /** Loads the impostor of a layer that wants one, see FoliageLayer.impostor */
+  private loadImpostor(layer: FoliageLayer): Promise<void> {
+    if (!this.impostorPending(layer)) {
+      return Promise.resolve();
+    }
+    if (!layer._impostorLoading) {
+      const asset = layer._asset;
+      let loading: Nullable<Promise<void>> = null;
+      loading = (async () => {
+        let part: Nullable<FoliageImpostorPart> = null;
+        try {
+          await FoliageSystem.onImpostorNeeded?.(asset);
+          const files = getImpostorFiles(asset);
+          const engine = getEngine();
+          const vfs = engine.resourceManager.VFS;
+          if (await vfs.exists(files.info)) {
+            const info = JSON.parse(
+              (await vfs.readFile(files.info, { encoding: 'utf8' })) as string
+            ) as ImpostorInfo;
+            const manager = engine.resourceManager;
+            const [base, normalDepth, orm] = await Promise.all([
+              manager.fetchTexture<Texture2D>(files.base),
+              manager.fetchTexture<Texture2D>(files.normalDepth, { linearColorSpace: true }),
+              manager.fetchTexture<Texture2D>(files.orm, { linearColorSpace: true })
+            ]);
+            const material = new ImpostorMaterial();
+            material.baseTexture = base;
+            material.normalDepthTexture = normalDepth;
+            material.ormTexture = orm;
+            material.frames = info.settings.frames;
+            material.hemisphere = info.settings.hemisphere;
+            material.setBounds(info.center, info.radius);
+            part = {
+              primitive: new DRef(createImpostorQuad(info.center, info.radius)),
+              material: new DRef(material.createInstance())
+            };
+          } else {
+            console.warn(`Foliage: ${asset} has no impostor baked, its meshes are drawn at every distance`);
+          }
+        } catch (err) {
+          console.error(`Foliage: cannot load the impostor of ${asset}: ${err}`);
+        }
+        if (layer._impostorLoading !== loading) {
+          // Turned off, or the asset changed, while loading
+          part?.primitive.dispose();
+          part?.material.dispose();
+          return;
+        }
+        layer._impostorPart = part;
+        layer._impostorLoading = null;
+      })();
+      layer._impostorLoading = loading;
+    }
+    return layer._impostorLoading;
+  }
   /** Builds the batch group and colliders of one chunk of a layer, from both instance groups */
   private buildChunk(layer: FoliageLayer, key: string, terrain: Nullable<ClipmapTerrain>) {
     const parts = layer._parts;
@@ -1105,6 +1247,14 @@ export class FoliageSystem extends GraphNode {
     const oy = this.worldMatrix.m13;
     const oz = this.worldMatrix.m23;
     const templates = layer._colliderTemplates();
+    // Near instances draw their meshes, far ones the impostor; the ranges meet at the impostor
+    // distance, and GPU instance culling takes each instance to one of them
+    const impostor =
+      layer._impostor && layer._impostorPart && InstanceCuller.isSupported() ? layer._impostorPart : null;
+    const split = Math.min(layer._impostorDistance, layer._cullDistance);
+    const meshRange: [number, number] = [0, impostor ? split : layer._cullDistance];
+    const impostorRange: [number, number] = [layer._forceImpostor ? 0 : split, layer._cullDistance];
+    const meshParts = impostor && layer._forceImpostor ? [] : parts;
     // Painted instances on any surface store their height; the others stand on the terrain
     const onTerrain = (generated: boolean) => !generated || layer._generation.surface === 'terrain';
     const group = new BatchGroup(this.scene!);
@@ -1147,12 +1297,22 @@ export class FoliageSystem extends GraphNode {
         }
         const s = d[o + 4];
         Matrix4x4.compose(tmpScale.setXYZ(s, s, s), tmpQuat, tmpPos.setXYZ(x, y, z), tmpMatrix);
-        for (const part of parts) {
+        if (impostor) {
+          const mesh = new Mesh(this.scene!, impostor.primitive.get()!, impostor.material.get()!);
+          mesh.sealed = true;
+          mesh.castShadow = layer._castShadow;
+          mesh.gpuPickable = false;
+          mesh.drawDistance = impostorRange;
+          mesh.parent = group;
+          mesh.setLocalTransform(tmpMatrix);
+          mesh.syncDrawableTransform();
+        }
+        for (const part of meshParts) {
           const mesh = new Mesh(this.scene!, part.primitive.get()!, part.material.get()!);
           mesh.sealed = true;
           mesh.castShadow = layer._castShadow;
           mesh.gpuPickable = false;
-          mesh.drawDistance = [0, layer._cullDistance];
+          mesh.drawDistance = meshRange;
           mesh.parent = group;
           mesh.setLocalTransform(Matrix4x4.multiply(tmpMatrix, part.matrix, tmpMatrix2));
           // Chunks are built in updatePerCamera, after the frame update that refreshes the
@@ -1220,4 +1380,23 @@ export class FoliageSystem extends GraphNode {
     this._layers = [];
     super.onDispose();
   }
+}
+
+/** The quad impostors are drawn with, corners at (±1, ±1, 0), bounded by the baked object's sphere */
+function createImpostorQuad(center: [number, number, number], radius: number) {
+  const primitive = new Primitive();
+  primitive.createAndSetVertexBuffer(
+    'position_f32x3',
+    new Float32Array([-1, -1, 0, 1, -1, 0, 1, 1, 0, -1, 1, 0])
+  );
+  primitive.createAndSetIndexBuffer(new Uint16Array([0, 1, 2, 0, 2, 3]));
+  primitive.primitiveType = 'triangle-list';
+  primitive.indexCount = 6;
+  primitive.setBoundingVolume(
+    new BoundingBox(
+      new Vector3(center[0] - radius, center[1] - radius, center[2] - radius),
+      new Vector3(center[0] + radius, center[1] + radius, center[2] + radius)
+    )
+  );
+  return primitive;
 }

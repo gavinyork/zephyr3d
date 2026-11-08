@@ -50,6 +50,7 @@ import {
   CompSubNode,
   ConstantScalarNode,
   ConstantVec3Node,
+  FoliageSystem,
   getEngine,
   isAssetMetaPath,
   PBRBlockNode,
@@ -3023,6 +3024,21 @@ export class VFSRenderer extends makeObservable(Disposable)<{
             `Impostor of ${path}: skinned or morphed meshes left out: ${r.skippedMeshes.join(', ')}`
           );
         }
+        // Foliage of the open scene drawing this impostor shows the new one
+        const controller = this._options.editor?.moduleManager.currentModule?.controller as
+          | { model?: { scene?: { rootNode?: SceneNode } } }
+          | undefined;
+        controller?.model?.scene?.rootNode?.iterate((node) => {
+          if (node instanceof FoliageSystem) {
+            for (let i = 0; i < node.numLayers; i++) {
+              const layer = node.getLayer(i);
+              if (layer?.impostor && layer.asset === path) {
+                layer.reloadImpostor();
+              }
+            }
+          }
+          return false;
+        });
       }
     } finally {
       dlgProgressBar.close();

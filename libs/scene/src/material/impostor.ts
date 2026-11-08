@@ -1,0 +1,476 @@
+import type {
+  BindGroup,
+  PBFunctionScope,
+  PBInsideFunctionScope,
+  PBShaderExp,
+  Texture2D
+} from '@zephyr3d/device';
+import type { Clonable, Nullable } from '@zephyr3d/base';
+import { DRef, Vector4 } from '@zephyr3d/base';
+import { PBRMetallicRoughnessMaterial } from './pbrmr';
+import { ShaderHelper } from './shader/helper';
+import type { DrawContext } from '../render';
+import { fetchSampler } from '../utility/misc';
+import { RENDER_PASS_TYPE_SHADOWMAP } from '../values';
+
+const tmpBounds = new Vector4();
+/** Atlas coordinates of the three frames, per fragment shader main scope */
+const atlasUVs = new WeakMap<object, PBShaderExp[]>();
+const tmpGrid = new Vector4();
+
+/**
+ * Draws an octahedral impostor baked by ImpostorBaker: a quad facing the view, showing the three
+ * captured frames nearest the view direction blended together, lit as the object would be from
+ * the surface attributes the frames hold.
+ *
+ * @remarks
+ * The mesh is a quad with corners at (±1, ±1, 0) and the bounding box of the baked object, drawn
+ * with the object's transform (uniform scale). Follows the Godot Octahedral Impostors runtime
+ * shader (wojtekpil, MIT, `ImpostorShader.shader`):
+ *
+ * - The quad faces the view and is pushed towards it by the bounding radius, as UE ImpostorBaker's
+ *   Camera Push, so the ground the object stands on does not cut it.
+ * - The view direction in the object's space picks a cell of the frame grid, cut along its
+ *   diagonal; the triangle it falls in gives three frames and their barycentric weights.
+ * - Each vertex's view ray is intersected with the plane each frame was captured on, giving the
+ *   frame's coordinates there ("virtual plane" coordinates).
+ * - Each frame is offset once by its depth along the ray (single sample parallax), then sampled.
+ *
+ * Only the colour, normal, occlusion, roughness and metallic of the object reach the lighting; it
+ * has no emission, clearcoat or sheen.
+ *
+ * @public
+ */
+export class ImpostorMaterial extends PBRMetallicRoughnessMaterial implements Clonable<ImpostorMaterial> {
+  private readonly _baseTexture: DRef<Texture2D>;
+  private readonly _normalDepthTexture: DRef<Texture2D>;
+  private readonly _ormTexture: DRef<Texture2D>;
+  private _center: [number, number, number];
+  private _radius: number;
+  private _frames: number;
+  private _hemisphere: boolean;
+  private _parallax: number;
+  constructor() {
+    super();
+    this._baseTexture = new DRef();
+    this._normalDepthTexture = new DRef();
+    this._ormTexture = new DRef();
+    this._center = [0, 0, 0];
+    this._radius = 1;
+    this._frames = 12;
+    this._hemisphere = true;
+    this._parallax = 1;
+    this.vertexNormal = false;
+    this.vertexTangent = false;
+    this.cullMode = 'none';
+    this.alphaCutoff = 0.3;
+  }
+  clone(): ImpostorMaterial {
+    const other = new ImpostorMaterial();
+    other.copyFrom(this);
+    return other;
+  }
+  copyFrom(other: this) {
+    super.copyFrom(other);
+    if (other instanceof ImpostorMaterial) {
+      this.baseTexture = other.baseTexture;
+      this.normalDepthTexture = other.normalDepthTexture;
+      this.ormTexture = other.ormTexture;
+      this.setBounds(other._center, other._radius);
+      this.frames = other.frames;
+      this.hemisphere = other.hemisphere;
+      this.parallax = other.parallax;
+    }
+  }
+  /** Base colour and opacity atlas */
+  get baseTexture() {
+    return this._baseTexture.get();
+  }
+  set baseTexture(tex: Nullable<Texture2D>) {
+    this._baseTexture.set(tex);
+    this.uniformChanged();
+  }
+  /** Normal in the object's space and depth atlas */
+  get normalDepthTexture() {
+    return this._normalDepthTexture.get();
+  }
+  set normalDepthTexture(tex: Nullable<Texture2D>) {
+    this._normalDepthTexture.set(tex);
+    this.uniformChanged();
+  }
+  /** Occlusion, roughness and metallic atlas */
+  get ormTexture() {
+    return this._ormTexture.get();
+  }
+  set ormTexture(tex: Nullable<Texture2D>) {
+    this._ormTexture.set(tex);
+    this.uniformChanged();
+  }
+  /** Frames along each side of the grid */
+  get frames() {
+    return this._frames;
+  }
+  set frames(val: number) {
+    this._frames = Math.max(2, Math.floor(val));
+    this.uniformChanged();
+  }
+  /** Whether the frames only cover views from above the horizon */
+  get hemisphere() {
+    return this._hemisphere;
+  }
+  set hemisphere(val: boolean) {
+    this._hemisphere = !!val;
+    this.uniformChanged();
+  }
+  /** How far the frames are shifted by their depth along the view, 0 for flat, 1 for as captured */
+  get parallax() {
+    return this._parallax;
+  }
+  set parallax(val: number) {
+    this._parallax = Math.max(0, val);
+    this.uniformChanged();
+  }
+  /**
+   * Sets the bounding sphere the frames were captured around, in the object's space
+   * @param center - Centre of the sphere
+   * @param radius - Radius of the sphere
+   */
+  setBounds(center: [number, number, number], radius: number) {
+    this._center = [center[0], center[1], center[2]];
+    this._radius = Math.max(radius, 1e-6);
+    this.uniformChanged();
+  }
+  vertexShader(scope: PBFunctionScope) {
+    // The mixins' vertex work (instancing, skinning flags), without the vertex position and
+    // normal PBRMetallicRoughnessMaterial computes for a regular mesh
+    (
+      Object.getPrototypeOf(PBRMetallicRoughnessMaterial.prototype) as {
+        vertexShader(this: unknown, scope: PBFunctionScope): void;
+      }
+    ).vertexShader.call(this, scope);
+    const pb = scope.$builder;
+    scope.zImpostorBounds = pb.vec4().uniform(2);
+    scope.zImpostorGrid = pb.vec4().uniform(2);
+    declareGridFunctions(scope);
+    scope.$inputs.zImpostorCorner = pb.vec3().attrib('position');
+    scope.$l.worldMatrix = ShaderHelper.getWorldMatrix(scope);
+    scope.$l.scale = pb.max(pb.length(scope.worldMatrix[0].xyz), 1e-6);
+    scope.$l.rot = pb.mat3(
+      pb.div(scope.worldMatrix[0].xyz, scope.scale),
+      pb.div(scope.worldMatrix[1].xyz, scope.scale),
+      pb.div(scope.worldMatrix[2].xyz, scope.scale)
+    );
+    scope.$l.invRot = pb.transpose(scope.rot);
+    scope.$l.center = scope.zImpostorBounds.xyz;
+    scope.$l.radius = scope.zImpostorBounds.w;
+    scope.$l.pivot = pb.mul(scope.worldMatrix, pb.vec4(scope.center, 1)).xyz;
+    scope.$l.worldRadius = pb.mul(scope.radius, scope.scale);
+    // Towards the view: along the camera's back axis for an orthographic view (shadow maps of
+    // directional lights), towards its position otherwise
+    scope.$l.cameraWorld = ShaderHelper.getInvViewMatrix(scope);
+    scope.$l.ortho = pb.greaterThan(ShaderHelper.getProjectionMatrix(scope)[3].w, 0.5);
+    scope.$l.cameraPos = ShaderHelper.getCameraPosition(scope);
+    scope.$l.toCamera = pb.normalize(
+      pb.select(pb.sub(scope.cameraPos, scope.pivot), scope.cameraWorld[2].xyz, scope.ortho)
+    );
+    // The quad, facing the view and pushed towards it by the radius. Casting shadows it is pushed
+    // away from the light instead, as Godot's shadow pass does (negative aabb_max), or it would
+    // shadow itself: its pixels then lie behind the depth it casts
+    const push = this.drawContext.renderPass!.type === RENDER_PASS_TYPE_SHADOWMAP ? -1 : 1;
+    scope.$l.up = pb.select(
+      pb.vec3(0, 1, 0),
+      pb.vec3(0, 0, -1),
+      pb.greaterThan(pb.abs(scope.toCamera.y), 0.999)
+    );
+    scope.$l.quadX = pb.normalize(pb.cross(scope.up, scope.toCamera));
+    scope.$l.quadY = pb.cross(scope.toCamera, scope.quadX);
+    scope.$l.worldPos = pb.add(
+      scope.pivot,
+      pb.mul(
+        pb.add(
+          pb.mul(scope.quadX, scope.$inputs.zImpostorCorner.x),
+          pb.mul(scope.quadY, scope.$inputs.zImpostorCorner.y),
+          pb.mul(scope.toCamera, push)
+        ),
+        scope.worldRadius
+      )
+    );
+    scope.$outputs.worldPos = scope.worldPos;
+    ShaderHelper.resolveMotionVector(scope, scope.worldPos, scope.worldPos);
+    scope.$l.csPos = pb.mul(ShaderHelper.getViewProjectionMatrix(scope), pb.vec4(scope.worldPos, 1));
+    ShaderHelper.setClipSpacePosition(scope, scope.csPos);
+    // In the object's space: the view direction picks the frames, the ray through the vertex
+    // finds where it crosses each frame's plane
+    scope.$l.dirObj = pb.normalize(pb.mul(scope.invRot, scope.toCamera));
+    scope.$l.vertexObj = pb.add(
+      scope.center,
+      pb.div(pb.mul(scope.invRot, pb.sub(scope.worldPos, scope.pivot)), scope.scale)
+    );
+    scope.$l.cameraObj = pb.add(
+      scope.center,
+      pb.div(pb.mul(scope.invRot, pb.sub(scope.cameraPos, scope.pivot)), scope.scale)
+    );
+    scope.$l.rayObj = pb.select(
+      pb.normalize(pb.sub(scope.vertexObj, scope.cameraObj)),
+      pb.neg(scope.dirObj),
+      scope.ortho
+    );
+    scope.$l.frames = scope.zImpostorGrid.x;
+    scope.$l.grid = pb.mul(scope.Z_impostorVectorToGrid(scope.dirObj), pb.sub(scope.frames, 1));
+    scope.$l.cell = pb.clamp(pb.floor(scope.grid), pb.vec2(0), pb.vec2(pb.sub(scope.frames, 2)));
+    scope.$l.fr = pb.clamp(pb.sub(scope.grid, scope.cell), pb.vec2(0), pb.vec2(1));
+    // Godot's TriangleInterpolator: the cell cut along its diagonal
+    scope.$l.second = pb.select(pb.vec2(0, 1), pb.vec2(1, 0), pb.greaterThan(scope.fr.x, scope.fr.y));
+    scope.$outputs.zImpostorFrame = pb.vec4(scope.cell, scope.second);
+    scope.$outputs.zImpostorWeights = pb.vec3(
+      pb.min(pb.sub(1, scope.fr.x), pb.sub(1, scope.fr.y)),
+      pb.abs(pb.sub(scope.fr.x, scope.fr.y)),
+      pb.min(scope.fr.x, scope.fr.y)
+    );
+    scope.$l.uvRay0 = scope.Z_impostorFrameUV(scope.cell, scope.vertexObj, scope.rayObj);
+    scope.$l.uvRay1 = scope.Z_impostorFrameUV(
+      pb.add(scope.cell, scope.second),
+      scope.vertexObj,
+      scope.rayObj
+    );
+    scope.$l.uvRay2 = scope.Z_impostorFrameUV(pb.add(scope.cell, pb.vec2(1)), scope.vertexObj, scope.rayObj);
+    scope.$outputs.zImpostorUV01 = pb.vec4(scope.uvRay0.xy, scope.uvRay1.xy);
+    scope.$outputs.zImpostorUV2Ray2 = pb.vec4(scope.uvRay2.xy, scope.uvRay2.zw);
+    scope.$outputs.zImpostorRay01 = pb.vec4(scope.uvRay0.zw, scope.uvRay1.zw);
+    scope.$outputs.zImpostorRotX = scope.rot[0];
+    scope.$outputs.zImpostorRotY = scope.rot[1];
+    scope.$outputs.zImpostorRotZ = scope.rot[2];
+  }
+  fragmentShader(scope: PBFunctionScope) {
+    const pb = scope.$builder;
+    if (this.needFragmentColorInput()) {
+      scope.zImpostorGrid = pb.vec4().uniform(2);
+      scope.zImpostorBase = pb.tex2D().uniform(2);
+      scope.zImpostorNormalDepth = pb.tex2D().uniform(2);
+      scope.zImpostorORM = pb.tex2D().uniform(2);
+    }
+    super.fragmentShader(scope);
+  }
+  /** The three frames' atlas coordinates, each shifted by its depth along the view */
+  private impostorAtlasUVs(scope: PBInsideFunctionScope) {
+    const pb = scope.$builder;
+    const cached = atlasUVs.get(scope);
+    if (cached) {
+      return cached;
+    }
+    {
+      const frames = scope.zImpostorGrid.x;
+      const inputs = scope.$inputs;
+      const cell = inputs.zImpostorFrame.xy;
+      const second = inputs.zImpostorFrame.zw;
+      const atlas = (frame: PBShaderExp, uv: PBShaderExp) => {
+        // Half a texel of a frame inside its edges, so sampling stays in the frame
+        const margin = pb.div(pb.mul(frames, 0.5), scope.zImpostorGrid.w);
+        const local = pb.clamp(uv, pb.vec2(margin), pb.vec2(pb.sub(1, margin)));
+        const a = pb.div(pb.add(frame, local), frames);
+        // Atlases are upright images: the grid counts frames from the bottom
+        return pb.vec2(a.x, pb.sub(1, a.y));
+      };
+      const shifted = (frame: PBShaderExp, uv: PBShaderExp, ray: PBShaderExp) => {
+        const depth = pb.textureSample(scope.zImpostorNormalDepth, atlas(frame, uv)).a;
+        return atlas(frame, pb.add(uv, pb.mul(ray, pb.sub(0.5, depth), scope.zImpostorGrid.z)));
+      };
+      scope.$l.zImpostorAtlasUV0 = shifted(cell, inputs.zImpostorUV01.xy, inputs.zImpostorRay01.xy);
+      scope.$l.zImpostorAtlasUV1 = shifted(
+        pb.add(cell, second),
+        inputs.zImpostorUV01.zw,
+        inputs.zImpostorRay01.zw
+      );
+      scope.$l.zImpostorAtlasUV2 = shifted(
+        pb.add(cell, pb.vec2(1)),
+        inputs.zImpostorUV2Ray2.xy,
+        inputs.zImpostorUV2Ray2.zw
+      );
+    }
+    const uvs = [scope.zImpostorAtlasUV0, scope.zImpostorAtlasUV1, scope.zImpostorAtlasUV2] as PBShaderExp[];
+    atlasUVs.set(scope, uvs);
+    return uvs;
+  }
+  /** Blends a texture sampled at the three frames by their weights */
+  private blendFrames(scope: PBInsideFunctionScope, tex: PBShaderExp, uvs: PBShaderExp[]) {
+    const pb = scope.$builder;
+    const w = scope.$inputs.zImpostorWeights;
+    return pb.add(
+      pb.mul(pb.textureSample(tex, uvs[0]), w.x),
+      pb.mul(pb.textureSample(tex, uvs[1]), w.y),
+      pb.mul(pb.textureSample(tex, uvs[2]), w.z)
+    );
+  }
+  calculateAlbedoColor(scope: PBInsideFunctionScope, _uv?: PBShaderExp): PBShaderExp {
+    return this.blendFrames(scope, scope.zImpostorBase, this.impostorAtlasUVs(scope));
+  }
+  calculateNormalAndTBN(
+    scope: PBInsideFunctionScope,
+    _worldPos: PBShaderExp,
+    _worldNormal?: PBShaderExp,
+    _worldTangent?: PBShaderExp,
+    _worldBinormal?: PBShaderExp
+  ) {
+    const pb = scope.$builder;
+    const NormalStruct = pb.defineStruct([pb.mat3('TBN'), pb.vec3('normal')]);
+    const inputs = scope.$inputs;
+    scope.$l.zImpostorNormalObj = pb.sub(
+      pb.mul(this.blendFrames(scope, scope.zImpostorNormalDepth, this.impostorAtlasUVs(scope)).xyz, 2),
+      pb.vec3(1)
+    );
+    scope.$l.zImpostorNormalW = pb.mul(
+      pb.mat3(inputs.zImpostorRotX, inputs.zImpostorRotY, inputs.zImpostorRotZ),
+      scope.zImpostorNormalObj
+    );
+    // Frames disagreeing can blend the normal to nothing; normalizing that would give NaN, which
+    // temporal accumulation then spreads over the screen
+    scope.$l.zImpostorNormalLen = pb.length(scope.zImpostorNormalW);
+    scope.$l.zImpostorNormal = pb.select(
+      pb.vec3(0, 1, 0),
+      pb.div(scope.zImpostorNormalW, pb.max(scope.zImpostorNormalLen, 1e-6)),
+      pb.greaterThan(scope.zImpostorNormalLen, 1e-4)
+    );
+    // Any basis around the normal: the impostor has no tangent space
+    scope.$l.zImpostorT = pb.normalize(
+      pb.cross(
+        pb.select(pb.vec3(0, 1, 0), pb.vec3(1, 0, 0), pb.greaterThan(pb.abs(scope.zImpostorNormal.y), 0.99)),
+        scope.zImpostorNormal
+      )
+    );
+    scope.$l.zImpostorB = pb.cross(scope.zImpostorNormal, scope.zImpostorT);
+    return NormalStruct(
+      pb.mat3(scope.zImpostorT, scope.zImpostorB, scope.zImpostorNormal),
+      scope.zImpostorNormal
+    );
+  }
+  /** Occlusion, roughness and metallic, without the parallax shift: they are read in lighting functions */
+  private sampleORM(scope: PBInsideFunctionScope) {
+    const pb = scope.$builder;
+    const inputs = scope.$inputs;
+    const frames = scope.zImpostorGrid.x;
+    const cell = inputs.zImpostorFrame.xy;
+    const second = inputs.zImpostorFrame.zw;
+    const atlas = (frame: PBShaderExp, uv: PBShaderExp) => {
+      const a = pb.div(pb.add(frame, pb.clamp(uv, pb.vec2(0), pb.vec2(1))), frames);
+      return pb.vec2(a.x, pb.sub(1, a.y));
+    };
+    return this.blendFrames(scope, scope.zImpostorORM, [
+      atlas(cell, inputs.zImpostorUV01.xy),
+      atlas(pb.add(cell, second), inputs.zImpostorUV01.zw),
+      atlas(pb.add(cell, pb.vec2(1)), inputs.zImpostorUV2Ray2.xy)
+    ]);
+  }
+  calculateMetallic(scope: PBInsideFunctionScope, _albedo: PBShaderExp, _normal: PBShaderExp) {
+    return this.sampleORM(scope).z;
+  }
+  calculateRoughness(scope: PBInsideFunctionScope, _albedo: PBShaderExp, _normal: PBShaderExp) {
+    return this.sampleORM(scope).y;
+  }
+  getAmbientOcclusionFactor(scope: PBInsideFunctionScope): Nullable<PBShaderExp> {
+    return this.sampleORM(scope).x;
+  }
+  supportsSurfaceCapture() {
+    return false;
+  }
+  supportsVoxelization() {
+    return false;
+  }
+  applyUniformValues(bindGroup: BindGroup, ctx: DrawContext, pass: number) {
+    super.applyUniformValues(bindGroup, ctx, pass);
+    tmpBounds.setXYZW(this._center[0], this._center[1], this._center[2], this._radius);
+    tmpGrid.setXYZW(
+      this._frames,
+      this._hemisphere ? 1 : 0,
+      this._parallax,
+      Math.max(1, this._baseTexture.get()?.width ?? 1)
+    );
+    bindGroup.setValue('zImpostorBounds', tmpBounds);
+    bindGroup.setValue('zImpostorGrid', tmpGrid);
+    if (this.needFragmentColorInput(ctx)) {
+      const sampler = fetchSampler('clamp_linear');
+      bindGroup.setTexture('zImpostorBase', this._baseTexture.get()!, sampler);
+      bindGroup.setTexture('zImpostorNormalDepth', this._normalDepthTexture.get()!, sampler);
+      bindGroup.setTexture('zImpostorORM', this._ormTexture.get()!, sampler);
+    }
+  }
+  /** @internal */
+  isReady() {
+    return !!this._baseTexture.get() && !!this._normalDepthTexture.get() && !!this._ormTexture.get();
+  }
+  protected onDispose() {
+    super.onDispose();
+    this._baseTexture.dispose();
+    this._normalDepthTexture.dispose();
+    this._ormTexture.dispose();
+  }
+}
+
+/**
+ * Grid mappings and frame coordinates of the impostor vertex shader, mirroring
+ * render/impostor/octahedral.ts
+ */
+function declareGridFunctions(scope: PBFunctionScope) {
+  const pb = scope.$builder;
+  pb.func('Z_impostorVectorToGrid', [pb.vec3('dir')], function () {
+    this.$if(pb.greaterThan(this.zImpostorGrid.y, 0.5), function () {
+      this.$l.y = pb.max(this.dir.y, 0.001);
+      this.$l.sum = pb.add(pb.abs(this.dir.x), this.y, pb.abs(this.dir.z));
+      this.$l.ox = pb.div(this.dir.x, this.sum);
+      this.$l.oz = pb.div(this.dir.z, this.sum);
+      this.$return(pb.mul(pb.vec2(pb.add(this.ox, this.oz, 1), pb.add(pb.sub(this.oz, this.ox), 1)), 0.5));
+    });
+    this.$l.sum = pb.add(pb.abs(this.dir.x), pb.abs(this.dir.y), pb.abs(this.dir.z));
+    this.$l.o = pb.div(this.dir.xz, this.sum);
+    this.$if(pb.lessThan(this.dir.y, 0), function () {
+      this.$l.s = pb.vec2(
+        pb.select(pb.float(-1), pb.float(1), pb.greaterThanEqual(this.o.x, 0)),
+        pb.select(pb.float(-1), pb.float(1), pb.greaterThanEqual(this.o.y, 0))
+      );
+      this.o = pb.mul(pb.sub(pb.vec2(1), pb.abs(this.o.yx)), this.s);
+    });
+    this.$return(pb.mul(pb.add(this.o, pb.vec2(1)), 0.5));
+  });
+  pb.func('Z_impostorGridToVector', [pb.vec2('c')], function () {
+    this.$if(pb.greaterThan(this.zImpostorGrid.y, 0.5), function () {
+      this.$l.x = pb.sub(this.c.x, this.c.y);
+      this.$l.z = pb.add(-1, this.c.x, this.c.y);
+      this.$return(pb.normalize(pb.vec3(this.x, pb.sub(pb.sub(1, pb.abs(this.x)), pb.abs(this.z)), this.z)));
+    });
+    this.$l.f = pb.sub(pb.mul(this.c, 2), pb.vec2(1));
+    this.$l.y = pb.sub(pb.sub(1, pb.abs(this.f.x)), pb.abs(this.f.y));
+    this.$if(pb.lessThan(this.y, 0), function () {
+      this.$l.s = pb.vec2(
+        pb.select(pb.float(-1), pb.float(1), pb.greaterThanEqual(this.f.x, 0)),
+        pb.select(pb.float(-1), pb.float(1), pb.greaterThanEqual(this.f.y, 0))
+      );
+      this.f = pb.mul(pb.sub(pb.vec2(1), pb.abs(this.f.yx)), this.s);
+    });
+    this.$return(pb.normalize(pb.vec3(this.f.x, this.y, this.f.y)));
+  });
+  // Frame coordinates where a ray crosses the frame's plane (xy), and the ray in the frame's
+  // basis per unit of depth across the bounds (zw), for the parallax shift
+  pb.func('Z_impostorFrameUV', [pb.vec2('frame'), pb.vec3('origin'), pb.vec3('ray')], function () {
+    this.$l.n = this.Z_impostorGridToVector(pb.div(this.frame, pb.sub(this.zImpostorGrid.x, 1)));
+    this.$l.up = pb.select(pb.vec3(0, 1, 0), pb.vec3(0, 0, -1), pb.greaterThan(pb.abs(this.n.y), 0.999));
+    this.$l.bx = pb.normalize(pb.cross(this.up, this.n));
+    this.$l.by = pb.normalize(pb.cross(this.n, this.bx));
+    this.$l.center = this.zImpostorBounds.xyz;
+    this.$l.radius = this.zImpostorBounds.w;
+    this.$l.rn = pb.dot(this.ray, this.n);
+    this.$l.rnSafe = pb.select(pb.float(-1e-4), this.rn, pb.lessThan(this.rn, -1e-4));
+    this.$l.t = pb.div(pb.dot(pb.sub(this.center, this.origin), this.n), this.rnSafe);
+    this.$l.q = pb.sub(pb.add(this.origin, pb.mul(this.ray, this.t)), this.center);
+    this.$l.uv = pb.add(
+      pb.div(pb.vec2(pb.dot(this.q, this.bx), pb.dot(this.q, this.by)), pb.mul(this.radius, 2)),
+      pb.vec2(0.5)
+    );
+    // A point of depth d (1 nearest) lies h = (d - 0.5)·2R above the plane, towards the view: the
+    // ray reaches it at h / ray.n past the plane (ray.n < 0), shifting the frame coordinates by
+    // (0.5 - d) · ray.xy / -ray.n
+    this.$l.shift = pb.div(
+      pb.vec2(pb.dot(this.ray, this.bx), pb.dot(this.ray, this.by)),
+      pb.max(pb.neg(this.rn), 0.05)
+    );
+    this.$return(pb.vec4(this.uv, this.shift));
+  });
+}

@@ -17,6 +17,7 @@ export * from './grassmaterial';
 export * from './terrain-cm';
 export * from './pbrmr';
 export * from './pbrsg';
+export * from './impostor';
 export * from './mtoon';
 export * from './pbrblueprint';
 export * from './pbrblueprint_instance';
