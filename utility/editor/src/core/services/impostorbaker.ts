@@ -55,15 +55,15 @@ export class ImpostorBakeService {
     force = false
   ): Promise<ImpostorBakeServiceResult> {
     const vfs = ProjectService.VFS;
-    const files = getImpostorFiles(asset);
     const s: ImpostorBakeSettings = { ...defaultImpostorBakeSettings(), ...(settings ?? {}) };
+    const files = getImpostorFiles(asset, s.lod);
     const start = performance.now();
     let scene: Scene | null = null;
     let release: (() => void) | null = null;
     let baker: ImpostorBaker | null = null;
     try {
       const hash = await this.hash(asset, s);
-      if (!force && (await this.isUpToDate(asset, hash))) {
+      if (!force && (await this.isUpToDate(asset, s.lod, hash))) {
         return { asset, dir: files.dir, skipped: true };
       }
       scene = new Scene();
@@ -125,9 +125,9 @@ export class ImpostorBakeService {
   }
 
   /** Whether the impostor of an asset was baked from what the asset and its files are now */
-  static async isUpToDate(asset: string, hash: string) {
+  static async isUpToDate(asset: string, lod: number, hash: string) {
     try {
-      const files = getImpostorFiles(asset);
+      const files = getImpostorFiles(asset, lod);
       const vfs = ProjectService.VFS;
       for (const path of [files.info, files.base, files.normalDepth, files.orm]) {
         if (!(await vfs.exists(path))) {
@@ -179,6 +179,7 @@ export class ImpostorBakeService {
       settings.atlasSize,
       settings.detailDivider,
       settings.hemisphere,
+      settings.lod,
       IMPOSTOR_BAKER_VERSION
     ]);
     return sha1Hex(key);
@@ -187,11 +188,11 @@ export class ImpostorBakeService {
 
 // Foliage layers drawing impostors have theirs baked, or rebaked once the asset changed, before
 // they load them
-FoliageSystem.onImpostorNeeded = async (asset: string) => {
+FoliageSystem.onImpostorNeeded = async (asset: string, lod: number) => {
   if (ProjectService.VFS.readOnly) {
     return;
   }
-  const r = await ImpostorBakeService.bake(asset);
+  const r = await ImpostorBakeService.bake(asset, { lod });
   if (r.err) {
     console.error(`Bake impostor of ${asset} failed: ${r.err}`);
   } else if (!r.skipped) {

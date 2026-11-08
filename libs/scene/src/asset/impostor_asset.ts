@@ -38,20 +38,22 @@ export interface ImpostorInfo {
  * Directory of the impostor baked for an asset: its path flattened into one name under
  * {@link IMPOSTOR_DIR}, so the runtime finds it without an index
  * @param assetPath - Path of the prefab or model, e.g. `/assets/trees/pine.zprefab`
+ * @param lod - Level of detail of the meshes it is baked from; each level has its own impostor
  * @public
  */
-export function getImpostorDir(assetPath: string) {
+export function getImpostorDir(assetPath: string, lod = 0) {
   const rel = assetPath.replace(/^\/assets\//, '').replace(/^\/+/, '');
-  return `${IMPOSTOR_DIR}/${rel.replace(/[\\/]/g, '__')}`;
+  return `${IMPOSTOR_DIR}/${rel.replace(/[\\/]/g, '__')}${lod > 0 ? `@lod${lod}` : ''}`;
 }
 
 /**
  * Files of the impostor baked for an asset
  * @param assetPath - Path of the prefab or model
+ * @param lod - Level of detail of the meshes it is baked from
  * @public
  */
-export function getImpostorFiles(assetPath: string) {
-  const dir = getImpostorDir(assetPath);
+export function getImpostorFiles(assetPath: string, lod = 0) {
+  const dir = getImpostorDir(assetPath, lod);
   return {
     dir,
     info: `${dir}/impostor.json`,

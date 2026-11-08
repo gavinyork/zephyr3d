@@ -204,6 +204,23 @@ export function getFoliageLayerClass(): SerializableClass {
           }
         },
         {
+          name: 'ImpostorLod',
+          description:
+            'Level of detail of the asset the cards are baked from, 0 the most detailed. Pick the level the trees show around the impostor distance, so they keep their look when they turn into cards',
+          type: 'int',
+          default: 0,
+          options: { group: 'Impostor', minValue: 0, maxValue: 7 },
+          isHidden(this: FoliageLayer) {
+            return !this.impostor;
+          },
+          get(this: FoliageLayer, value) {
+            value.num[0] = this.impostorLod;
+          },
+          set(this: FoliageLayer, value) {
+            this.impostorLod = value.num[0];
+          }
+        },
+        {
           name: 'ForceImpostor',
           description:
             'Shows every copy as a card, even up close, to compare the cards with the meshes. Not saved',

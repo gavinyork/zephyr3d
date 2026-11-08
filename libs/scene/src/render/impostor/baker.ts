@@ -58,6 +58,11 @@ export interface ImpostorBakeSettings {
   detailDivider: number;
   /** Only views from above the horizon, for objects such as trees. Default true. */
   hemisphere: boolean;
+  /**
+   * Level of detail of the meshes drawn, clamped to the levels each has. Default 0. Bake from the
+   * level the meshes are at where the impostor takes over, so the swap does not change the detail.
+   */
+  lod: number;
 }
 
 /**
@@ -89,7 +94,7 @@ export interface ImpostorBakeResult {
 
 /** Default bake settings, see {@link ImpostorBakeSettings} */
 export function defaultImpostorBakeSettings(): ImpostorBakeSettings {
-  return { frames: 12, atlasSize: 2048, detailDivider: 2, hemisphere: true };
+  return { frames: 12, atlasSize: 2048, detailDivider: 2, hemisphere: true, lod: 0 };
 }
 
 /**
@@ -133,6 +138,7 @@ export class ImpostorBaker {
     const s: ImpostorBakeSettings = { ...defaultImpostorBakeSettings(), ...(settings ?? {}) };
     s.frames = Math.max(2, Math.floor(s.frames));
     s.detailDivider = Math.max(1, Math.floor(s.detailDivider));
+    s.lod = Math.max(0, Math.floor(s.lod));
     const cell = Math.max(1, Math.floor(s.atlasSize / s.frames));
     const size = cell * s.frames;
     s.atlasSize = size;
@@ -210,6 +216,7 @@ export class ImpostorBaker {
           for (let k = 0; k < parts.length; k++) {
             device.setBindGroup(0, bindGroup);
             device.setBindGroup(1, drawableBindGroups[k]);
+            ctx.primitiveLod = Math.min(s.lod, parts[k].primitive.lodCount - 1);
             if (parts[k].material.apply(ctx)) {
               parts[k].material.draw(parts[k].primitive, ctx);
             }

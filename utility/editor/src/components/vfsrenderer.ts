@@ -3032,7 +3032,7 @@ export class VFSRenderer extends makeObservable(Disposable)<{
           if (node instanceof FoliageSystem) {
             for (let i = 0; i < node.numLayers; i++) {
               const layer = node.getLayer(i);
-              if (layer?.impostor && layer.asset === path) {
+              if (layer?.impostor && layer.asset === path && layer.impostorLod === 0) {
                 layer.reloadImpostor();
               }
             }

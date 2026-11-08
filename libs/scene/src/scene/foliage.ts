@@ -43,6 +43,8 @@ export interface FoliageLayerSettings {
   impostor?: boolean;
   /** Distance from the camera beyond which the instances are drawn as impostors. Default 80. */
   impostorDistance?: number;
+  /** Level of detail of the asset's meshes the impostor is baked from. Default 0. */
+  impostorLod?: number;
 }
 
 /** The quad and material an impostor layer draws its far instances with */
@@ -253,6 +255,8 @@ export class FoliageLayer {
   _impostorDistance: number;
   /** @internal */
   _forceImpostor: boolean;
+  /** @internal */
+  _impostorLod: number;
   /** The impostor drawn far away; null when there is none, undefined until looked for @internal */
   _impostorPart: Nullable<FoliageImpostorPart> | undefined;
   /** @internal */
@@ -280,6 +284,7 @@ export class FoliageLayer {
     this._impostor = settings?.impostor ?? false;
     this._impostorDistance = settings?.impostorDistance ?? 80;
     this._forceImpostor = false;
+    this._impostorLod = Math.max(0, Math.floor(settings?.impostorLod ?? 0));
     this._impostorPart = undefined;
     this._impostorLoading = null;
   }
@@ -372,6 +377,20 @@ export class FoliageLayer {
     if (val !== this._impostorDistance) {
       this._impostorDistance = val;
       this._owner?.invalidate();
+    }
+  }
+  /**
+   * Level of detail of the asset's meshes the impostor is baked from. Set it to the level the
+   * meshes are at around {@link FoliageLayer.impostorDistance}, so the swap keeps the detail.
+   */
+  get impostorLod() {
+    return this._impostorLod;
+  }
+  set impostorLod(val: number) {
+    val = Math.max(0, Math.floor(val));
+    if (val !== this._impostorLod) {
+      this._impostorLod = val;
+      this.reloadImpostor();
     }
   }
   /** Draws every instance as an impostor, to compare them with the meshes up close. Not saved. */
@@ -739,6 +758,10 @@ export class FoliageSystem extends GraphNode {
     layer._impostorDistance = Math.max(0, settings.impostorDistance ?? layer._impostorDistance);
     if (settings.impostor !== undefined && !!settings.impostor !== layer._impostor) {
       layer._impostor = !!settings.impostor;
+      layer._disposeImpostor();
+    }
+    if (settings.impostorLod !== undefined && Math.floor(settings.impostorLod) !== layer._impostorLod) {
+      layer._impostorLod = Math.max(0, Math.floor(settings.impostorLod));
       layer._disposeImpostor();
     }
     layer._alignToNormal = settings.alignToNormal ?? layer._alignToNormal;
@@ -1167,7 +1190,7 @@ export class FoliageSystem extends GraphNode {
    * Called before a layer's impostor is loaded, to have it baked or brought up to date; the
    * editor sets it. Without it, the impostor already baked is used as it is.
    */
-  static onImpostorNeeded: Nullable<(asset: string) => Promise<void>> = null;
+  static onImpostorNeeded: Nullable<(asset: string, lod: number) => Promise<void>> = null;
   /** Whether a layer's impostor is yet to be looked for */
   private impostorPending(layer: FoliageLayer) {
     return (
@@ -1181,12 +1204,13 @@ export class FoliageSystem extends GraphNode {
     }
     if (!layer._impostorLoading) {
       const asset = layer._asset;
+      const lod = layer._impostorLod;
       let loading: Nullable<Promise<void>> = null;
       loading = (async () => {
         let part: Nullable<FoliageImpostorPart> = null;
         try {
-          await FoliageSystem.onImpostorNeeded?.(asset);
-          const files = getImpostorFiles(asset);
+          await FoliageSystem.onImpostorNeeded?.(asset, lod);
+          const files = getImpostorFiles(asset, lod);
           const engine = getEngine();
           const vfs = engine.resourceManager.VFS;
           if (await vfs.exists(files.info)) {
