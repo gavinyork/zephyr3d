@@ -19,7 +19,7 @@ import { readHeightTexels, readSplat, writeHeightTexels, writeSplat } from './mc
 import { captureFoliageState, restoreFoliageState } from './mcpfoliage';
 import type { FoliageState } from './mcpfoliage';
 import { findRoad } from './mcproad';
-import { TerrainBase } from './roadbase';
+import { TerrainBase, summarizeTerrainBase } from './roadbase';
 import type { MapSizes, TileStore } from './roadbase';
 
 /** Settings of a terrain fitting, in meters unless noted */
@@ -571,7 +571,17 @@ export async function fitTerrainToRoad(road: RoadSpline, params: any, run: RoadC
     splatPages: splatMap.depth,
     grass: grassLayers.map((g) => ({ w: g.densityMapWidth, h: g.densityMapHeight }))
   };
-  const base = TerrainBase.decode(road.terrainBase, sizes);
+  let base: TerrainBase;
+  try {
+    base = TerrainBase.decode(road.terrainBase, sizes);
+  } catch (e) {
+    if (action !== 'commit') {
+      return { result: null, err: e instanceof Error ? e.message : String(e) };
+    }
+    // Committing only drops the kept ground, so one recorded for maps of other sizes (a grass
+    // layer added since, say) need not be read
+    base = new TerrainBase(sizes);
+  }
   const earthworks = action === 'apply' && (fit.cutLayer !== null || fit.fillLayer !== null);
   const needSplat = base.hasSplat || earthworks;
   const foliage = foliageOn(scene, terrain);
@@ -608,7 +618,7 @@ export async function fitTerrainToRoad(road: RoadSpline, params: any, run: RoadC
   let removeFoliage: Nullable<() => number> = null;
   if (action === 'commit') {
     after = { ...before, base: null };
-    result.kept_tiles_dropped = base.numTiles;
+    result.kept_tiles_dropped = summarizeTerrainBase(road.terrainBase)?.tiles ?? 0;
   } else if (action === 'restore') {
     after = { ...ground, base: null };
     result.tiles_restored = base.numTiles;
