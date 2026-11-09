@@ -113,6 +113,7 @@
 
   - Terrain
     - [Terrain Tools](en/editor/terrain-tools.md)
+    - [Road Tools](en/editor/road-tools.md)
 
   - Physics
     - [Physics in the Editor](en/editor/physics.md)

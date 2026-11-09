@@ -113,6 +113,7 @@
 
   - 地形系统
     - [编辑地形](zh-cn/editor/terrain-tools.md)
+    - [编辑道路](zh-cn/editor/road-tools.md)
 
   - 物理
     - [编辑器中的物理](zh-cn/editor/physics.md)
