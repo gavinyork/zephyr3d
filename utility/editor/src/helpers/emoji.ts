@@ -28,7 +28,8 @@ const EMOJI_TO_PRIVATE_MAP: Record<string, number> = {
   '🔌': 0xe017, // Plugin
   '🚫': 0xe018, // Forbidden
   '🦰': 0xe019, // hair
-  '🌴': 0xe01a // palm tree
+  '🌴': 0xe01a, // palm tree
+  '🛣️': 0xe01b // road
 };
 
 export function initEmojiMapping() {

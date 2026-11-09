@@ -66,6 +66,7 @@ import {
 import { getSceneClass } from './scene/scene';
 import { getTerrainClass } from './scene/terrain';
 import { getFoliageLayerClass, getFoliageSystemClass } from './scene/foliage';
+import { getRoadControlPointClass, getRoadSplineClass } from './scene/road';
 import {
   getWaterClass,
   getFFTWaveGeneratorClass,
@@ -354,6 +355,8 @@ export class ResourceManager {
         getTerrainClass(this),
         getFoliageSystemClass(this),
         getFoliageLayerClass(),
+        getRoadSplineClass(this),
+        getRoadControlPointClass(),
         getFFTWaveGeneratorClass(),
         getFBMWaveGeneratorClass(),
         getGerstnerWaveGeneratorClass(),

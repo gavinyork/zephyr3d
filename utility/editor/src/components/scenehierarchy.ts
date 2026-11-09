@@ -6,6 +6,7 @@ import {
   BatchGroup,
   ClipmapTerrain,
   FoliageSystem,
+  RoadSpline,
   Mesh,
   ParticleSystem,
   SceneNode,
@@ -57,6 +58,8 @@ class SceneData extends TreeViewData<SceneNode> {
         emoj = '⛰️';
       } else if (node instanceof FoliageSystem) {
         emoj = '🌴';
+      } else if (node instanceof RoadSpline) {
+        emoj = '🛣️';
       } else if (node instanceof ParticleSystem) {
         emoj = '✨';
       } else if (node instanceof BaseLight) {

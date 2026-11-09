@@ -9,6 +9,7 @@ const ctorNameOverrides: Record<string, string> = {
   BatchGroup: 'Batch Group',
   ClipmapTerrain: 'Terrain',
   FoliageSystem: 'Foliage',
+  RoadSpline: 'Road',
   MSDFText: 'MSDFText'
 };
 

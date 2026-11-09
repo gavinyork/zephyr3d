@@ -2238,6 +2238,7 @@ const BASE_TOOLS = [
             'OrthoCamera',
             'ClipmapTerrain',
             'FoliageSystem',
+            'RoadSpline',
             'Water',
             'ParticleSystem',
             'BatchGroup',
@@ -2995,6 +2996,104 @@ const BASE_TOOLS = [
     }
   },
   {
+    name: 'road_create',
+    description:
+      "Create a RoadSpline on a ClipmapTerrain: a road whose center line is a smooth curve through the control points (centripetal Catmull-Rom with the default auto handles), drawn as a ribbon mesh with a shoulder on each side that lies over the ground and fades into it, with static mesh colliders. The road follows the heights of its points, not the ground: with y_mode 'terrain' each point starts at the terrain height, and the curve between points can run above or below the ground until the terrain is shaped to the road. Points are world positions; the road node is placed at the origin of the terrain, so its point positions are world minus the terrain position. Use road_get_info to check bend radii, grades and how far the road leaves the ground. Undoable as one step. Returns { node_id, info (as road_get_info), err }.",
+    inputSchema: {
+      type: 'object',
+      required: ['terrain_id', 'points'],
+      properties: {
+        terrain_id: { type: 'string', description: 'Persistent id of the ClipmapTerrain to lay the road on.' },
+        points: {
+          type: 'array',
+          description:
+            'Control points in order of travel, world space: [x, z], [x, y, z], or { position: [x, z] | [x, y, z], width?: meters (0 = road width), bank?: degrees, positive raises the right edge }.',
+          items: {}
+        },
+        y_mode: {
+          type: 'string',
+          enum: ['terrain', 'given'],
+          default: 'terrain',
+          description:
+            "'terrain': every point's height is the terrain height there plus y_offset (any y given is ignored). 'given': points must be [x, y, z] and keep their y."
+        },
+        y_offset: { type: 'number', default: 0, description: "Added to the terrain height with y_mode 'terrain'." },
+        name: { type: 'string' },
+        closed: { type: 'boolean', default: false, description: 'Connect the last point back to the first (3+ points).' },
+        width: { type: 'number', default: 6, description: 'Road width in meters.' },
+        shoulder_width: { type: 'number', default: 1, description: 'Shoulder width on each side in meters, 0 for none.' },
+        material: { type: 'string', description: 'Path of a .zmtl material for the surface; a plain gray one when omitted.' },
+        shoulder_material: {
+          type: 'string',
+          description:
+            'Path of a .zmtl material for the shoulders (vertex color on, alpha dither on, alpha cutoff about 0.01). Best omitted: the shoulders then blend the surface material into the terrain through the terrain runtime virtual texture when it is on (WebGPU), or fade out a dithered copy of it otherwise.'
+        },
+        uv_tile_length: { type: 'number', default: 8, description: 'Meters along the road per texture repeat.' },
+        uv_tile_width: { type: 'number', default: 6, description: 'Meters across the road per texture repeat.' },
+        sample_spacing: { type: 'number', default: 1, description: 'Meters between mesh cross sections.' },
+        chunk_length: { type: 'number', default: 64, description: 'Meters per drawn and culled stretch.' },
+        surface_tag: { type: 'string', default: 'gravel', description: 'Kind of surface, for game code.' },
+        collision: { type: 'boolean', default: true },
+        friction: { type: 'number', default: 0.8 },
+        cast_shadow: { type: 'boolean', default: false },
+        timeout_ms: { type: 'number', default: 30000 }
+      }
+    }
+  },
+  {
+    name: 'road_update',
+    description:
+      "Change a RoadSpline: replace all control points (points), change some of them (patch, applied after points), and/or change its settings (same names as road_create). Positions are world space, with y_mode/y_offset as in road_create. To insert or remove points, read them with road_get_info and pass the new list as points. Undoable as one step. Returns { info (as road_get_info), err }.",
+    inputSchema: {
+      type: 'object',
+      required: ['node_id'],
+      properties: {
+        node_id: { type: 'string', description: 'Persistent id of the RoadSpline node.' },
+        points: { type: 'array', description: 'New control points, as in road_create.', items: {} },
+        patch: {
+          type: 'array',
+          description: 'Changes to single points: { index, position?: [x, z] | [x, y, z], width?, bank? }.',
+          items: { type: 'object' }
+        },
+        y_mode: { type: 'string', enum: ['terrain', 'given'], default: 'terrain' },
+        y_offset: { type: 'number', default: 0 },
+        name: { type: 'string' },
+        closed: { type: 'boolean' },
+        width: { type: 'number' },
+        shoulder_width: { type: 'number' },
+        material: { type: 'string', description: "Path of a .zmtl material, '' for the default." },
+        shoulder_material: { type: 'string', description: "Path of a .zmtl material, '' for the derived one." },
+        uv_tile_length: { type: 'number' },
+        uv_tile_width: { type: 'number' },
+        sample_spacing: { type: 'number' },
+        chunk_length: { type: 'number' },
+        surface_tag: { type: 'string' },
+        collision: { type: 'boolean' },
+        friction: { type: 'number' },
+        cast_shadow: { type: 'boolean' },
+        timeout_ms: { type: 'number', default: 30000 }
+      }
+    }
+  },
+  {
+    name: 'road_get_info',
+    description:
+      'Describe a RoadSpline and how drivable it is: length, settings, world bounds, the control points (world position, distance s along the road, width, bank, terrain height and height above it), the tightest bend radius of the center line and where, the steepest grade in percent and where, the largest bank, how far the center line runs above (fill) or below (cut) the current ground and where, and warnings (points off the terrain, bends too tight for the road width, too few points). Returns { info, err }.',
+    inputSchema: {
+      type: 'object',
+      required: ['node_id'],
+      properties: {
+        node_id: { type: 'string', description: 'Persistent id of the RoadSpline node.' },
+        profile_spacing: {
+          type: 'number',
+          default: 2,
+          description: 'Meters between the center line samples compared with the ground.'
+        },
+        timeout_ms: { type: 'number', default: 30000 }
+      }
+    }
+  },
+  {
     name: 'terrain_get_info',
     description:
       'Describe a ClipmapTerrain node: resolution, height map size and format, world region and cell size, height scale/base and the current height range in world units, splat map size, detail (texture) layers (including rvt_enabled, hex_tiling and hex_params per layer) and grass layers. Call it before terrain_generate to know the world extent. Returns { info, err }.',
@@ -3362,6 +3461,7 @@ const READONLY_TOOL_NAMES = new Set([
   'physics_list_presets',
   'node_get_physics',
   'foliage_get_info',
+  'road_get_info',
   'terrain_sample_height',
   'sdf_query',
   'sdf_sample',
@@ -4512,6 +4612,15 @@ const handlers = {
   async foliage_regenerate(args) {
     const timeout = Number(args.timeout_ms ?? 120000);
     return bridge.send('foliage_regenerate', args, timeout);
+  },
+  async road_create(args) {
+    return bridge.send('road_create', args, Number(args.timeout_ms ?? 30000));
+  },
+  async road_update(args) {
+    return bridge.send('road_update', args, Number(args.timeout_ms ?? 30000));
+  },
+  async road_get_info(args) {
+    return bridge.send('road_get_info', args, Number(args.timeout_ms ?? 30000));
   },
   async terrain_get_info(args) {
     return bridge.send('terrain_get_info', { node_id: args.node_id }, Number(args.timeout_ms ?? 30000));

@@ -14,6 +14,7 @@ import {
   ScriptAttachment,
   ClipmapTerrain,
   FoliageSystem,
+  RoadSpline,
   Water,
   ParticleSystem,
   BatchGroup,
@@ -76,6 +77,7 @@ import {
   scatterFoliage,
   setFoliageLayers
 } from './mcpfoliage';
+import { createRoad, getRoadInfo, updateRoad } from './mcproad';
 
 type JsonValue = null | boolean | number | string | JsonValue[] | { [key: string]: JsonValue };
 type TreeData = { files: { name: string; size: number }[]; subDirs: { [name: string]: TreeData } };
@@ -388,6 +390,7 @@ const creatableNodeClasses: Record<string, new (scene: Scene) => SceneNode> = {
   OrthoCamera,
   ClipmapTerrain,
   FoliageSystem,
+  RoadSpline,
   Water,
   ParticleSystem,
   BatchGroup,
@@ -1844,6 +1847,20 @@ async function dispatch(editor: Editor, method: string, params: any): Promise<an
       } catch (err) {
         return { err: `${err instanceof Error ? err.message : err}` };
       }
+    case 'road_create':
+      try {
+        return await createRoad(getSceneController(editor), params);
+      } catch (err) {
+        return { node_id: null, err: `${err instanceof Error ? err.message : err}` };
+      }
+    case 'road_update':
+      try {
+        return await updateRoad(getSceneController(editor), params);
+      } catch (err) {
+        return { info: null, err: `${err instanceof Error ? err.message : err}` };
+      }
+    case 'road_get_info':
+      return getRoadInfo(getSceneController(editor), params);
     case 'foliage_get_info':
       return getFoliageInfo(getSceneController(editor), params);
     case 'foliage_set_layers':

@@ -24,6 +24,7 @@ import {
   Water,
   ClipmapTerrain,
   FoliageSystem,
+  RoadSpline,
   PerspectiveCamera,
   //OrthoCamera,
   getDevice,
@@ -706,6 +707,13 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
               label: 'Foliage',
               action: () => {
                 this.handleAddNode(FoliageSystem, 'Add foliage');
+                return true;
+              }
+            },
+            {
+              label: 'Road',
+              action: () => {
+                this.handleAddNode(RoadSpline, 'Add road');
                 return true;
               }
             }
@@ -1691,14 +1699,25 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
                     eventBus.dispatchEvent('scene_changed');
                   });
                 break;
-              case 'node':
+              case 'node': {
+                let parent: SceneNode = this.controller.model.scene.rootNode;
+                let position: Vector3 | undefined = pos;
+                if (this._ctorToBePlaced === RoadSpline) {
+                  // A road lies on the terrain it is placed on, in the space of the terrain
+                  let hit = this._pickResult?.target?.node ?? null;
+                  while (hit && !hit.isClipmapTerrain()) {
+                    hit = hit.parent;
+                  }
+                  if (hit) {
+                    parent = hit;
+                    position = undefined;
+                  }
+                }
                 this._cmdManager
                   .execute(
-                    new AddChildCommand(
-                      this.controller.model.scene.rootNode,
-                      this._ctorToBePlaced!,
-                      pos
-                    ).setDesc(this._descToBePlaced ?? 'Add node')
+                    new AddChildCommand(parent, this._ctorToBePlaced!, position).setDesc(
+                      this._descToBePlaced ?? 'Add node'
+                    )
                   )
                   .then((node) => {
                     if (node instanceof DirectionalLight) {
@@ -1710,6 +1729,7 @@ export class SceneView extends BaseView<SceneModel, SceneController> {
                     eventBus.dispatchEvent('scene_changed');
                   });
                 break;
+              }
             }
           }
         }
