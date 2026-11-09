@@ -53,7 +53,7 @@ export async function readWorldHeights(terrain: ClipmapTerrain) {
 }
 
 /** Height map texel values as stored, before the terrain scale and translation */
-async function readHeightTexels(terrain: ClipmapTerrain): Promise<Float32Array> {
+export async function readHeightTexels(terrain: ClipmapTerrain): Promise<Float32Array> {
   const heightMap = terrain.heightMap!;
   const w = heightMap.width;
   const h = heightMap.height;
@@ -93,7 +93,7 @@ async function readHeightTexels(terrain: ClipmapTerrain): Promise<Float32Array> 
 }
 
 /** Writes height map texel values (before the terrain scale and translation) */
-function writeHeightTexels(terrain: ClipmapTerrain, texels: Float32Array) {
+export function writeHeightTexels(terrain: ClipmapTerrain, texels: Float32Array) {
   const heightMap = terrain.heightMap!;
   const w = heightMap.width;
   const h = heightMap.height;
@@ -112,7 +112,7 @@ function writeHeightTexels(terrain: ClipmapTerrain, texels: Float32Array) {
   }
 }
 
-async function readSplat(terrain: ClipmapTerrain) {
+export async function readSplat(terrain: ClipmapTerrain) {
   const splatMap = terrain.material!.getSplatMap();
   const w = splatMap.width;
   const h = splatMap.height;
@@ -124,7 +124,7 @@ async function readSplat(terrain: ClipmapTerrain) {
   return data;
 }
 
-function writeSplat(terrain: ClipmapTerrain, data: Uint8Array<ArrayBuffer>) {
+export function writeSplat(terrain: ClipmapTerrain, data: Uint8Array<ArrayBuffer>) {
   const splatMap = terrain.material!.getSplatMap();
   splatMap.update(data, 0, 0, 0, splatMap.width, splatMap.height, splatMap.depth);
   terrain.invalidateRuntimeVirtualTexture();

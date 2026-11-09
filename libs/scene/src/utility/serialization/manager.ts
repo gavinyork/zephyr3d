@@ -1793,6 +1793,11 @@ export class ResourceManager {
           }
           break;
         case 'embedded': {
+          // No path: nothing embedded, and nothing to read back on load. isPersistent cannot say
+          // so, it is also asked of the fresh object when loading.
+          if (!tmpVal.str[0]) {
+            break;
+          }
           const relativePath = tmpVal.str[0].startsWith('/') ? tmpVal.str[0].slice(1) : tmpVal.str[0];
           json[k] = relativePath;
           if (asyncTasks) {

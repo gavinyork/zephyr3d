@@ -348,6 +348,35 @@ export function getRoadSplineClass(manager: ResourceManager): SerializableClass 
           }
         },
         {
+          name: 'TerrainBase',
+          description: 'The terrain before the road was fitted into it, kept by the editor',
+          type: 'embedded',
+          default: null,
+          phase: 1,
+          isHidden() {
+            return true;
+          },
+          get(this: RoadSpline, value) {
+            // Without a base no path, so nothing is written (not isPersistent, which would skip
+            // loading it too)
+            value.str[0] = this.terrainBase ? `assets/.embedded.dir/${this.persistentId}-roadbase.bin` : '';
+            value.object[0] = Promise.resolve(this.terrainBase);
+          },
+          async set(this: RoadSpline, value) {
+            if (!value.str[0]) {
+              return;
+            }
+            const data = (await manager.VFS.readFile(value.str[0], { encoding: 'binary' }).catch(
+              () => null
+            )) as ArrayBuffer;
+            if (!data) {
+              console.error(`Load road terrain base failed: ${value.str[0]}`);
+              return;
+            }
+            this.terrainBase = data;
+          }
+        },
+        {
           name: 'CastShadow',
           description: 'Whether the road casts shadows',
           type: 'bool',

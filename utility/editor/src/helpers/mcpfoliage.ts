@@ -24,7 +24,7 @@ import {
 
 const DEFAULT_SCATTER_TIMEOUT_MS = 120000;
 
-type FoliageState = {
+export type FoliageState = {
   chunkSize: number;
   maskCellSize: number;
   layers: {
@@ -62,7 +62,7 @@ function findFoliage(controller: SceneController | null, id: unknown) {
   return { foliage: node, err: null };
 }
 
-function captureState(foliage: FoliageSystem): FoliageState {
+export function captureFoliageState(foliage: FoliageSystem): FoliageState {
   const layers = [];
   for (let i = 0; i < foliage.numLayers; i++) {
     const layer = foliage.getLayer(i)!;
@@ -83,7 +83,7 @@ function captureState(foliage: FoliageSystem): FoliageState {
   return { chunkSize: foliage.chunkSize, maskCellSize: foliage.maskCellSize, layers };
 }
 
-function restoreState(foliage: FoliageSystem, state: FoliageState) {
+export function restoreFoliageState(foliage: FoliageSystem, state: FoliageState) {
   foliage.chunkSize = state.chunkSize;
   foliage.maskCellSize = state.maskCellSize;
   // Layers whose asset is unchanged are kept, so their loaded meshes are reused
@@ -119,23 +119,23 @@ async function commitChange(
     }
     return node;
   };
-  const before = captureState(foliage);
+  const before = captureFoliageState(foliage);
   let after: FoliageState | null = null;
   await controller.view.cmdManager.execute(
     new CustomCommand(
       async () => {
         const target = getTarget();
         if (after) {
-          restoreState(target, after);
+          restoreFoliageState(target, after);
         } else {
           await change();
-          after = captureState(target);
+          after = captureFoliageState(target);
         }
         eventBus.dispatchEvent('scene_changed');
         eventBus.dispatchEvent('refresh_properties');
       },
       () => {
-        restoreState(getTarget(), before);
+        restoreFoliageState(getTarget(), before);
         eventBus.dispatchEvent('scene_changed');
         eventBus.dispatchEvent('refresh_properties');
       }

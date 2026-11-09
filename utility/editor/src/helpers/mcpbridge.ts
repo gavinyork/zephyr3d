@@ -77,7 +77,8 @@ import {
   scatterFoliage,
   setFoliageLayers
 } from './mcpfoliage';
-import { createRoad, getRoadInfo, updateRoad } from './mcproad';
+import { createRoad, fitRoadProfile, getRoadInfo, updateRoad } from './mcproad';
+import { applyRoadTerrain } from './roadterrain';
 
 type JsonValue = null | boolean | number | string | JsonValue[] | { [key: string]: JsonValue };
 type TreeData = { files: { name: string; size: number }[]; subDirs: { [name: string]: TreeData } };
@@ -1861,6 +1862,18 @@ async function dispatch(editor: Editor, method: string, params: any): Promise<an
       }
     case 'road_get_info':
       return getRoadInfo(getSceneController(editor), params);
+    case 'road_fit_profile':
+      try {
+        return await fitRoadProfile(getSceneController(editor), params);
+      } catch (err) {
+        return { info: null, err: String(err instanceof Error ? err.message : err) };
+      }
+    case 'road_apply_terrain':
+      try {
+        return await applyRoadTerrain(getSceneController(editor), params);
+      } catch (err) {
+        return { result: null, err: String(err instanceof Error ? err.message : err) };
+      }
     case 'foliage_get_info':
       return getFoliageInfo(getSceneController(editor), params);
     case 'foliage_set_layers':

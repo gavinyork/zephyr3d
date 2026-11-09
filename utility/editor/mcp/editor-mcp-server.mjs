@@ -3094,6 +3094,67 @@ const BASE_TOOLS = [
     }
   },
   {
+    name: 'road_fit_profile',
+    description:
+      'Set the heights of the control points of a RoadSpline to a smooth, drivable profile of the ground under its center line: the ground is sampled every meter, averaged over window_m, then limited to max_grade_percent forward and backward. Only the control point heights change; the curve between points follows them smoothly, so check max_grade_percent in the returned info. Use it before road_apply_terrain so the cuts and fills stay small. Undoable. Returns { info (as road_get_info), err }.',
+    inputSchema: {
+      type: 'object',
+      required: ['node_id'],
+      properties: {
+        node_id: { type: 'string', description: 'Persistent id of the RoadSpline node.' },
+        window_m: {
+          type: 'number',
+          default: 30,
+          description: 'Length of road the ground is averaged over; longer smooths more.'
+        },
+        max_grade_percent: { type: 'number', default: 12, description: 'Steepest grade allowed.' },
+        y_offset: { type: 'number', default: 0, description: 'Added to every point height, e.g. to keep the road a little above the ground.' },
+        timeout_ms: { type: 'number', default: 30000 }
+      }
+    }
+  },
+  {
+    name: 'road_apply_terrain',
+    description:
+      "Shape the terrain of a RoadSpline to it, as a road is built. action 'apply': under the road and bench_margin beyond each edge the ground becomes a flat bench depth below the road surface; beyond, the natural ground is limited to cut and fill slopes rising and falling from the bench edge (cut_slope / fill_slope horizontal per vertical; 1 is 45 degrees), reaching at most max_reach. Grass is cleared over the road, the shoulders and grass_clear beyond, growing back over grass_fade and thinned on the slopes; foliage instances along the road are removed; with cut_layer / fill_layer the slopes are painted with those detail layers by how much they changed. The ground as it was is kept with the road, and applying again first puts it back, so a moved road leaves no old cut behind (hand edits made in the corridor since are lost then). action 'restore': put the kept ground back and drop it (removed foliage is not restored). action 'commit': drop the kept ground so the current terrain becomes the ground. Undoable. Returns { result: { texels_changed, max_cut, max_fill, cut_volume_m3, fill_volume_m3, grass_texels_changed, foliage_removed, bounds, kept_tiles }, err }.",
+    inputSchema: {
+      type: 'object',
+      required: ['node_id'],
+      properties: {
+        node_id: { type: 'string', description: 'Persistent id of the RoadSpline node.' },
+        action: { type: 'string', enum: ['apply', 'restore', 'commit'], default: 'apply' },
+        depth: {
+          type: 'number',
+          default: 0.1,
+          description: 'Meters the bench lies below the road surface, at least (raised where the height map precision is coarser).'
+        },
+        bench_margin: { type: 'number', default: 1, description: 'Flat bench width beyond each road edge, meters.' },
+        cut_slope: { type: 'number', default: 1, description: 'Cut slope, horizontal per vertical.' },
+        fill_slope: { type: 'number', default: 1.5, description: 'Fill slope, horizontal per vertical.' },
+        max_reach: { type: 'number', default: 30, description: 'How far beyond the bench the slopes may reach, meters.' },
+        toe_rounding: {
+          type: 'number',
+          default: 3,
+          description:
+            'Meters over which a slope eases in from the flat bench (its grade grows from 0), so vehicles leaving the road meet a rounded toe rather than a crease; 0 for a sharp toe.'
+        },
+        crest_rounding: {
+          type: 'number',
+          default: 2,
+          description: 'Meters over which a slope eases into the natural ground at its top; 0 for a sharp crest.'
+        },
+        clear_grass: { type: 'boolean', default: true },
+        grass_clear: { type: 'number', default: 0.5, description: 'Grass cleared this far beyond the shoulders, meters.' },
+        grass_fade: { type: 'number', default: 1.5, description: 'Distance over which grass grows back, meters.' },
+        clear_foliage: { type: 'boolean', default: true },
+        foliage_margin: { type: 'number', default: 1.5, description: 'Foliage removed this far beyond the shoulders, meters.' },
+        cut_layer: { type: 'integer', minimum: 0, description: 'Detail layer painted where the ground was cut; none when omitted.' },
+        fill_layer: { type: 'integer', minimum: 0, description: 'Detail layer painted where the ground was filled; none when omitted.' },
+        timeout_ms: { type: 'number', default: 120000 }
+      }
+    }
+  },
+  {
     name: 'terrain_get_info',
     description:
       'Describe a ClipmapTerrain node: resolution, height map size and format, world region and cell size, height scale/base and the current height range in world units, splat map size, detail (texture) layers (including rvt_enabled, hex_tiling and hex_params per layer) and grass layers. Call it before terrain_generate to know the world extent. Returns { info, err }.',
@@ -4621,6 +4682,13 @@ const handlers = {
   },
   async road_get_info(args) {
     return bridge.send('road_get_info', args, Number(args.timeout_ms ?? 30000));
+  },
+  async road_fit_profile(args) {
+    return bridge.send('road_fit_profile', args, Number(args.timeout_ms ?? 30000));
+  },
+  async road_apply_terrain(args) {
+    const timeout = Number(args.timeout_ms ?? 120000);
+    return bridge.send('road_apply_terrain', args, timeout + 5000);
   },
   async terrain_get_info(args) {
     return bridge.send('terrain_get_info', { node_id: args.node_id }, Number(args.timeout_ms ?? 30000));

@@ -156,6 +156,7 @@ export class RoadSpline extends GraphNode {
   private _collision: boolean;
   private _friction: number;
   private _castShadow: boolean;
+  private _terrainBase: Nullable<ArrayBuffer>;
   private readonly _material: DRef<MeshMaterial>;
   private readonly _shoulderMaterial: DRef<MeshMaterial>;
   private readonly _fallbackMaterial: DRef<MeshMaterial>;
@@ -186,6 +187,7 @@ export class RoadSpline extends GraphNode {
     this._collision = true;
     this._friction = 0.8;
     this._castShadow = false;
+    this._terrainBase = null;
     this._material = new DRef();
     this._shoulderMaterial = new DRef();
     this._fallbackMaterial = new DRef();
@@ -406,6 +408,17 @@ export class RoadSpline extends GraphNode {
       this._shoulderMaterial.set(val);
       this.invalidate();
     }
+  }
+  /**
+   * The terrain as it was before the road was fitted into it, over the area the fitting changed,
+   * recorded by the editor so that fitting the road again after it moved starts from the original
+   * ground. Saved with the road; the engine does not read it.
+   */
+  get terrainBase(): Nullable<ArrayBuffer> {
+    return this._terrainBase;
+  }
+  set terrainBase(val: Nullable<ArrayBuffer>) {
+    this._terrainBase = val && val.byteLength > 0 ? val : null;
   }
   /** The center line, in the space of the road */
   get curve(): RoadCurve {

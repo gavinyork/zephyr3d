@@ -10,6 +10,7 @@ import type { SceneController } from '../controllers/scenecontroller';
 import { CustomCommand } from '../commands/scenecommands';
 import { eventBus } from '../core/eventbus';
 import { ensureNodeDefaultName } from './defaultnodename';
+import { summarizeTerrainBase } from './roadbase';
 
 const MAX_POINTS = 2000;
 
@@ -79,7 +80,7 @@ function notifyChanged() {
   eventBus.dispatchEvent('refresh_properties');
 }
 
-function findRoad(controller: Nullable<SceneController>, id: unknown) {
+export function findRoad(controller: Nullable<SceneController>, id: unknown) {
   const scene = controller?.model?.scene ?? null;
   if (!scene) {
     return { road: null, err: 'No scene is currently opened' };
@@ -386,6 +387,20 @@ export async function updateRoad(controller: Nullable<SceneController>, params: 
   if (!after.name) {
     after.name = before.name;
   }
+  return {
+    info: describeRoad(await commitRoadState(controller, road, before, after, 'Edit road')),
+    err: null
+  };
+}
+
+/** Changes a road from one state to another as an undoable command; returns the road */
+async function commitRoadState(
+  controller: SceneController,
+  road: RoadSpline,
+  before: RoadState,
+  after: RoadState,
+  desc: string
+) {
   const id = road.persistentId;
   const scene = controller.model.scene;
   const getTarget = () => {
@@ -405,9 +420,93 @@ export async function updateRoad(controller: Nullable<SceneController>, params: 
         restoreState(getTarget(), before);
         notifyChanged();
       }
-    ).setDesc('Edit road')
+    ).setDesc(desc)
   );
-  return { info: describeRoad(getTarget()), err: null };
+  return getTarget();
+}
+
+/**
+ * Sets the heights of the control points to a smoothed, grade limited profile of the ground under
+ * the center line: the ground sampled every meter, averaged over a window, then limited to the
+ * steepest grade going forward and backward. Undoable.
+ */
+export async function fitRoadProfile(controller: Nullable<SceneController>, params: any) {
+  const { road, err } = findRoad(controller, params.node_id);
+  if (!road || !controller) {
+    return { info: null, err };
+  }
+  const terrain = road.terrain;
+  if (!terrain) {
+    return { info: null, err: 'The road is not on a terrain (a ClipmapTerrain ancestor)' };
+  }
+  if (road.numPoints < 2) {
+    return { info: null, err: 'The road needs at least 2 points' };
+  }
+  const windowM = params.window_m ?? 30;
+  const maxGrade = (params.max_grade_percent ?? 12) / 100;
+  const yOffset = params.y_offset ?? 0;
+  if (!finite(windowM) || windowM < 0 || !finite(maxGrade) || maxGrade <= 0 || !finite(yOffset)) {
+    return {
+      info: null,
+      err: '`window_m` must be >= 0, `max_grade_percent` > 0 and `y_offset` a number'
+    };
+  }
+  await terrain.whenHeightDataReady();
+  const curve = road.curve;
+  const closed = curve.closed;
+  const length = curve.length;
+  const count = Math.max(2, Math.ceil(length) + 1);
+  const ds = length / (count - 1);
+  const frame = createRoadFrame();
+  const ground = new Float64Array(count);
+  for (let k = 0; k < count; k++) {
+    road.sampleAt(k * ds, frame);
+    ground[k] = terrain.getHeightAt(frame.position.x, frame.position.z) ?? frame.position.y;
+  }
+  // On a loop the last sample is the first one again
+  const n = closed ? count - 1 : count;
+  const at = (i: number) => (closed ? ((i % n) + n) % n : Math.min(Math.max(i, 0), n - 1));
+  // Two box passes, about a triangle filter over the window
+  let profile = ground.slice(0, n);
+  const r = Math.max(0, Math.round(windowM / 2 / Math.max(ds, 1e-6) / 2));
+  for (let pass = 0; pass < 2 && r > 0; pass++) {
+    const next = new Float64Array(n);
+    for (let i = 0; i < n; i++) {
+      let sum = 0;
+      for (let j = -r; j <= r; j++) {
+        sum += profile[at(i + j)];
+      }
+      next[i] = sum / (2 * r + 1);
+    }
+    profile = next;
+  }
+  const step = maxGrade * ds;
+  for (let pass = 0; pass < (closed ? 3 : 1); pass++) {
+    for (let i = closed ? 0 : 1; i < n; i++) {
+      const prev = profile[at(i - 1)];
+      profile[i] = Math.min(Math.max(profile[i], prev - step), prev + step);
+    }
+    for (let i = closed ? n - 1 : n - 2; i >= 0; i--) {
+      const next = profile[at(i + 1)];
+      profile[i] = Math.min(Math.max(profile[i], next - step), next + step);
+    }
+  }
+  const before = captureState(road);
+  const oy = road.worldMatrix.m13;
+  const points = before.points.map((p, i) => {
+    const s = curve.getPointS(i) / Math.max(ds, 1e-6);
+    const k = Math.floor(s);
+    const f = s - k;
+    const y = profile[at(k)] + (profile[at(k + 1)] - profile[at(k)]) * f + yOffset;
+    const q = p.clone();
+    q.position = q.position.clone().setXYZ(q.position.x, y - oy, q.position.z);
+    return q;
+  });
+  const after: RoadState = { ...before, points };
+  return {
+    info: describeRoad(await commitRoadState(controller, road, before, after, 'Fit road profile')),
+    err: null
+  };
 }
 
 export function getRoadInfo(controller: Nullable<SceneController>, params: any) {
@@ -520,6 +619,8 @@ function describeRoad(road: RoadSpline, profileSpacing?: unknown) {
     chunk_length: road.chunkLength,
     collision: road.collision,
     friction: road.friction,
+    // Ground kept by road_apply_terrain, null when the terrain was not fitted or was committed
+    terrain_base: summarizeTerrainBase(road.terrainBase),
     length: round(stats.length, 2),
     num_points: road.numPoints,
     num_chunks: road.numChunks,
