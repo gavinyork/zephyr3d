@@ -1,7 +1,7 @@
 import type { FileMetadata, IDisposable, Nullable, VFS } from '@zephyr3d/base';
 import { Disposable, Observable } from '@zephyr3d/base';
 import type { Scene, SceneNode, Camera, PropertyAccessor } from '@zephyr3d/scene';
-import { ClipmapTerrain, FoliageSystem } from '@zephyr3d/scene';
+import { ClipmapTerrain, FoliageSystem, RoadSpline } from '@zephyr3d/scene';
 import { ImGui } from '@zephyr3d/imgui';
 import type { MenuItemOptions } from '../components/menubar';
 import type { ToolBarItem } from '../components/toolbar';
@@ -10,6 +10,7 @@ import type { Editor } from './editor';
 import type { EditTool, EditToolContext } from '../views/edittools/edittool';
 import { TerrainEditTool } from '../views/edittools/terrain';
 import { FoliageEditTool } from '../views/edittools/foliage';
+import { RoadEditTool } from '../views/edittools/road';
 import { ProjectService } from './services/project';
 import { DlgMessage } from '../views/dlg/messagedlg';
 import { DlgMessageBoxEx } from '../views/dlg/messageexdlg';
@@ -781,6 +782,11 @@ export class EditorPluginManager extends Observable<EditorEventMap> {
       id: 'zephyr3d.editor.foliage-edit-tool',
       canEdit: (obj) => obj instanceof FoliageSystem,
       create: (obj, ctx) => (obj instanceof FoliageSystem ? new FoliageEditTool(obj, ctx) : null)
+    });
+    this.addEditToolFactory({
+      id: 'zephyr3d.editor.road-edit-tool',
+      canEdit: (obj) => obj instanceof RoadSpline,
+      create: (obj, ctx) => (obj instanceof RoadSpline ? new RoadEditTool(obj, ctx) : null)
     });
   }
 

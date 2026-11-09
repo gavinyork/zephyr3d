@@ -8,6 +8,7 @@ import type { MeshMaterial, Scene, SceneNode } from '@zephyr3d/scene';
 import { ClipmapTerrain, RoadControlPoint, RoadSpline, createRoadFrame, getEngine } from '@zephyr3d/scene';
 import type { SceneController } from '../controllers/scenecontroller';
 import { CustomCommand } from '../commands/scenecommands';
+import type { Command } from '../core/command';
 import { eventBus } from '../core/eventbus';
 import { ensureNodeDefaultName } from './defaultnodename';
 import { summarizeTerrainBase } from './roadbase';
@@ -388,21 +389,23 @@ export async function updateRoad(controller: Nullable<SceneController>, params: 
     after.name = before.name;
   }
   return {
-    info: describeRoad(await commitRoadState(controller, road, before, after, 'Edit road')),
+    info: describeRoad(
+      await commitRoadState((c) => controller.view.cmdManager.execute(c), road, before, after, 'Edit road')
+    ),
     err: null
   };
 }
 
 /** Changes a road from one state to another as an undoable command; returns the road */
 async function commitRoadState(
-  controller: SceneController,
+  run: (command: Command<void>) => Promise<unknown>,
   road: RoadSpline,
   before: RoadState,
   after: RoadState,
   desc: string
 ) {
   const id = road.persistentId;
-  const scene = controller.model.scene;
+  const scene = road.scene!;
   const getTarget = () => {
     const node = scene.findNodeById(id);
     if (!(node instanceof RoadSpline)) {
@@ -410,7 +413,7 @@ async function commitRoadState(
     }
     return node;
   };
-  await controller.view.cmdManager.execute(
+  await run(
     new CustomCommand(
       () => {
         restoreState(getTarget(), after);
@@ -435,6 +438,18 @@ export async function fitRoadProfile(controller: Nullable<SceneController>, para
   if (!road || !controller) {
     return { info: null, err };
   }
+  return fitRoadProfileOf(road, params, (command) => controller.view.cmdManager.execute(command));
+}
+
+/**
+ * {@link fitRoadProfile} on a road, as one undoable command run by `run`
+ * @param params - window_m, max_grade_percent and y_offset, all optional
+ */
+export async function fitRoadProfileOf(
+  road: RoadSpline,
+  params: any,
+  run: (command: Command<void>) => Promise<unknown>
+) {
   const terrain = road.terrain;
   if (!terrain) {
     return { info: null, err: 'The road is not on a terrain (a ClipmapTerrain ancestor)' };
@@ -504,7 +519,7 @@ export async function fitRoadProfile(controller: Nullable<SceneController>, para
   });
   const after: RoadState = { ...before, points };
   return {
-    info: describeRoad(await commitRoadState(controller, road, before, after, 'Fit road profile')),
+    info: describeRoad(await commitRoadState(run, road, before, after, 'Fit road profile')),
     err: null
   };
 }

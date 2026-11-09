@@ -13,6 +13,7 @@ import { FoliageSystem, RoadSpline, createRoadFrame } from '@zephyr3d/scene';
 import type { ClipmapTerrain, Scene, SceneNode } from '@zephyr3d/scene';
 import type { SceneController } from '../controllers/scenecontroller';
 import { CustomCommand } from '../commands/scenecommands';
+import type { Command } from '../core/command';
 import { eventBus } from '../core/eventbus';
 import { readHeightTexels, readSplat, writeHeightTexels, writeSplat } from './mcpterrain';
 import { captureFoliageState, restoreFoliageState } from './mcpfoliage';
@@ -523,15 +524,24 @@ function parseParams(params: any): RoadFitParams {
 
 const round = (v: number, digits = 3) => Math.round(v * 10 ** digits) / 10 ** digits;
 
-/**
- * Fits the terrain to a road ('apply'), puts the ground kept with it back ('restore'), or drops
- * what is kept so the current terrain becomes the ground ('commit'). Undoable.
- */
+/** Runs an undoable command, as the command manager of the scene view does */
+export type RoadCommandRunner = (command: Command<void>) => Promise<unknown>;
+
+/** MCP road_apply_terrain: {@link fitTerrainToRoad} on the road with the persistent id node_id */
 export async function applyRoadTerrain(controller: Nullable<SceneController>, params: any) {
   const { road, err } = findRoad(controller, params.node_id);
   if (!road || !controller) {
     return { result: null, err };
   }
+  return fitTerrainToRoad(road, params, (command) => controller.view.cmdManager.execute(command));
+}
+
+/**
+ * Fits the terrain to a road ('apply'), puts the ground kept with it back ('restore'), or drops
+ * what is kept so the current terrain becomes the ground ('commit'), as one undoable command.
+ * @param params - The settings as road_apply_terrain takes them (snake case), all optional
+ */
+export async function fitTerrainToRoad(road: RoadSpline, params: any, run: RoadCommandRunner) {
   const terrain = road.terrain;
   if (!terrain?.heightMap || !terrain.material) {
     return { result: null, err: 'The road is not on a terrain (a ClipmapTerrain ancestor)' };
@@ -548,7 +558,7 @@ export async function applyRoadTerrain(controller: Nullable<SceneController>, pa
     }
   }
   await terrain.whenHeightDataReady();
-  const scene = controller.model.scene;
+  const scene = road.scene!;
   const heightMap = terrain.heightMap;
   const splatMap = terrain.material.getSplatMap();
   const grassRenderer = terrain.grassRenderer;
@@ -764,7 +774,7 @@ export async function applyRoadTerrain(controller: Nullable<SceneController>, pa
       : action === 'restore'
         ? 'Restore terrain under road'
         : 'Commit road terrain base';
-  await controller.view.cmdManager.execute(
+  await run(
     new CustomCommand(
       () => {
         if (applied) {
