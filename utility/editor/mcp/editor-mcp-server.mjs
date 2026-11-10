@@ -1975,7 +1975,7 @@ const BASE_TOOLS = [
   {
     name: 'scene_get_properties',
     description:
-      'Get property values from the current scene. Property names must match scene_get_property_list. Returns { values, err }.',
+      'Get property values from the current scene. Property names must match scene_get_property_list. An embedded object property (object_types in the property list) reads as null or { class, properties } with all its fields. Returns { values, err }.',
     inputSchema: {
       type: 'object',
       required: ['properties'],
@@ -2000,19 +2000,35 @@ const BASE_TOOLS = [
         properties: {
           type: 'array',
           description:
-            'Property updates. Values may be boolean, string, number, or number arrays for vec/rgb/rgba properties.',
+            'Property updates. Values may be boolean, string, number, number arrays for vec/rgb/rgba properties, or for an embedded object property (one with object_types in the property list) { class?, properties? } to create/switch its object and set its fields, or null to remove it.',
           items: {
             type: 'object',
             required: ['property_name', 'value'],
             properties: {
               property_name: { type: 'string', description: 'Editable scene property name.' },
               value: {
-                description: 'Property value.',
+                description:
+                  'Property value. For a property listing object_types (an embedded object such as a Water WaveGenerator): { class?, properties? } or null.',
                 oneOf: [
                   { type: 'boolean' },
                   { type: 'string' },
                   { type: 'number' },
-                  { type: 'array', items: { type: 'number' } }
+                  { type: 'array', items: { type: 'number' } },
+                  {
+                    type: 'object',
+                    properties: {
+                      class: {
+                        type: 'string',
+                        description: 'One of the property object_types; a different class replaces the object.'
+                      },
+                      properties: {
+                        type: 'object',
+                        description:
+                          'Fields of the embedded object by name, values as for any property (nested embedded objects too).'
+                      }
+                    }
+                  },
+                  { type: 'null' }
                 ]
               }
             }
@@ -2025,7 +2041,7 @@ const BASE_TOOLS = [
   {
     name: 'node_get_property_list',
     description:
-      'Get the editable property metadata list for a scene node by persistent node id. Returns { propertyList, err }.',
+      'Get the editable property metadata list for a scene node by persistent node id. Properties that embed an object (a Water WaveGenerator or Interaction, for example) list object_types and the fields of each type in object_type_properties. Returns { propertyList, err }.',
     inputSchema: {
       type: 'object',
       required: ['id'],
@@ -2038,7 +2054,7 @@ const BASE_TOOLS = [
   {
     name: 'node_get_properties',
     description:
-      'Get property values from a scene node by persistent node id. Property names must match node_get_property_list. Returns { values, err }.',
+      'Get property values from a scene node by persistent node id. Property names must match node_get_property_list. An embedded object property (object_types in the property list) reads as null or { class, properties } with all its fields. Returns { values, err }.',
     inputSchema: {
       type: 'object',
       required: ['id', 'properties'],
@@ -2065,19 +2081,35 @@ const BASE_TOOLS = [
         properties: {
           type: 'array',
           description:
-            'Property updates. Values may be boolean, string, number, or number arrays for vec/rgb/rgba properties.',
+            'Property updates. Values may be boolean, string, number, number arrays for vec/rgb/rgba properties, or for an embedded object property (one with object_types in the property list) { class?, properties? } to create/switch its object and set its fields, or null to remove it.',
           items: {
             type: 'object',
             required: ['property_name', 'value'],
             properties: {
               property_name: { type: 'string', description: 'Editable node property name.' },
               value: {
-                description: 'Property value.',
+                description:
+                  'Property value. For a property listing object_types (an embedded object such as a Water WaveGenerator): { class?, properties? } or null.',
                 oneOf: [
                   { type: 'boolean' },
                   { type: 'string' },
                   { type: 'number' },
-                  { type: 'array', items: { type: 'number' } }
+                  { type: 'array', items: { type: 'number' } },
+                  {
+                    type: 'object',
+                    properties: {
+                      class: {
+                        type: 'string',
+                        description: 'One of the property object_types; a different class replaces the object.'
+                      },
+                      properties: {
+                        type: 'object',
+                        description:
+                          'Fields of the embedded object by name, values as for any property (nested embedded objects too).'
+                      }
+                    }
+                  },
+                  { type: 'null' }
                 ]
               }
             }

@@ -258,8 +258,173 @@ function describeEditableProperties(props: any[]) {
     if (prop.type === 'object_array') {
       info.note = 'object_array properties cannot be read or set through MCP';
     }
+    const classes = getEmbeddedObjectClasses(prop);
+    if (classes) {
+      info.object_types = classes.map((cls) => cls.name);
+      info.object_type_properties = classes.map((cls) => ({
+        class: cls.name,
+        properties: describeEmbeddedClassProperties(getEngine().resourceManager.getAllPropertiesByClass(cls))
+      }));
+      info.note =
+        'Embeds an object of one of object_types: reads as null or { class, properties }; set it with ' +
+        '{ class?, properties? } (class creates a new object of that type, properties edits fields of ' +
+        'the current or new one, as listed per class in object_type_properties) or null to remove it';
+    }
     return info;
   });
+}
+
+/** Property metadata of an embedded object's class, one level deep */
+function describeEmbeddedClassProperties(props: any[]) {
+  return props
+    .filter((prop) => prop.type !== 'object_array')
+    .map((prop) => {
+      const info: Record<string, unknown> = { name: prop.name, type: prop.type };
+      if (prop.description) {
+        info.description = prop.description;
+      }
+      if (prop.default !== undefined && (typeof prop.default !== 'object' || Array.isArray(prop.default))) {
+        info.default = prop.default;
+      }
+      const options = prop.options ?? {};
+      if (Array.isArray(options.enum?.values)) {
+        info.enum = options.enum.values;
+      }
+      if (options.minValue !== undefined) {
+        info.min = options.minValue;
+      }
+      if (options.maxValue !== undefined) {
+        info.max = options.maxValue;
+      }
+      const classes = getEmbeddedObjectClasses(prop);
+      if (classes) {
+        info.object_types = classes.map((cls) => cls.name);
+      }
+      return info;
+    });
+}
+
+/**
+ * Classes an object property embeds (a wave generator, an interaction field...), or null when the
+ * property is not an embedded object: asset references are object properties too, set by path.
+ */
+function getEmbeddedObjectClasses(prop: any) {
+  const ctors = prop?.options?.objectTypes;
+  if (prop?.type !== 'object' || !Array.isArray(ctors) || ctors.length === 0) {
+    return null;
+  }
+  const classes = ctors
+    .map((ctor: any) => (ctor ? getEngine().resourceManager.getClassByConstructor(ctor) : null))
+    .filter((cls: any) => !!cls);
+  return classes.length > 0 ? classes : null;
+}
+
+/** An embedded object as { class, properties } with every readable property, nested objects included */
+function serializeEmbeddedObject(obj: unknown, depth: number): unknown {
+  if (!obj || typeof obj !== 'object') {
+    return null;
+  }
+  const cls = getEngine().resourceManager.getClassByObject(obj);
+  if (!cls) {
+    return null;
+  }
+  const properties: Record<string, unknown> = {};
+  for (const prop of getEngine().resourceManager.getAllPropertiesByClass(cls)) {
+    if (!prop.get || prop.type === 'object_array') {
+      continue;
+    }
+    if (getEmbeddedObjectClasses(prop) && depth >= 3) {
+      continue;
+    }
+    try {
+      const serialized = serializeEditablePropertyValue(prop, obj, depth + 1);
+      if (!serialized.err) {
+        properties[prop.name] = serialized.value;
+      }
+    } catch {
+      // Unreadable in the object's current state; leave it out
+    }
+  }
+  return { class: cls.name, properties };
+}
+
+/**
+ * Sets an embedded object property from null (remove it) or { class?, properties? }: class creates
+ * a new object of that type, the same way the property grid does, and properties sets fields on it
+ * (or on the current object), recursing into nested embedded objects. Returns an error or null.
+ */
+async function setEmbeddedObjectProperty(
+  prop: any,
+  target: object,
+  rawValue: unknown,
+  path: string
+): Promise<string | null> {
+  const classes = getEmbeddedObjectClasses(prop)!;
+  const names = classes.map((cls: any) => cls.name).join(', ');
+  if (rawValue === null) {
+    if (prop.isNullable && !prop.isNullable.call(target, 0)) {
+      return `Property "${path}" cannot be null`;
+    }
+    await prop.set.call(target, { ...createPropertyValueBuffer(), object: [null] });
+    return null;
+  }
+  if (typeof rawValue !== 'object' || Array.isArray(rawValue)) {
+    return `Property "${path}" embeds an object (${names}): pass null, or { class?, properties? }`;
+  }
+  const { class: className, properties } = rawValue as { class?: unknown; properties?: unknown };
+  if (className !== undefined && typeof className !== 'string') {
+    return `Property "${path}": class must be one of ${names}`;
+  }
+  const current = createPropertyValueBuffer();
+  prop.get.call(target, current);
+  let obj = (current.object[0] as object | null | undefined) ?? null;
+  const currentClass = obj ? getEngine().resourceManager.getClassByObject(obj) : null;
+  if (!obj && className === undefined && classes.length > 1) {
+    return `Property "${path}" is empty: give class, one of ${names}`;
+  }
+  const wanted = className ?? currentClass?.name ?? classes[0].name;
+  if (!obj || currentClass?.name !== wanted) {
+    const cls = classes.find((item: any) => item.name === wanted);
+    if (!cls) {
+      return `Property "${path}": unknown class "${wanted}", expected one of ${names}`;
+    }
+    obj = prop.create ? prop.create.call(target, cls.ctor, 0) : new cls.ctor();
+    await prop.set.call(target, { ...createPropertyValueBuffer(), object: [obj] });
+  }
+  if (properties === undefined) {
+    return null;
+  }
+  if (!properties || typeof properties !== 'object' || Array.isArray(properties)) {
+    return `Property "${path}": properties must be an object of { name: value }`;
+  }
+  const nestedProps = getObjectEditableProperties(obj);
+  for (const [name, value] of Object.entries(properties as Record<string, unknown>)) {
+    const nested = nestedProps.find((item) => item.name === name);
+    if (!nested) {
+      return `Property "${path}" (${wanted}) has no property "${name}"; it has ${nestedProps
+        .map((item) => item.name)
+        .join(', ')}`;
+    }
+    if (!nested.set) {
+      return `Property "${path}.${name}" is read-only`;
+    }
+    if (nested.type === 'object_array') {
+      return `Property "${path}.${name}" is an object_array, which cannot be set through MCP`;
+    }
+    if (getEmbeddedObjectClasses(nested)) {
+      const err = await setEmbeddedObjectProperty(nested, obj!, value, `${path}.${name}`);
+      if (err) {
+        return err;
+      }
+      continue;
+    }
+    const parsed = parseEditablePropertyValue(nested, value);
+    if (parsed.err) {
+      return `${path}: ${parsed.err}`;
+    }
+    await nested.set.call(obj, parsed.value as any);
+  }
+  return null;
 }
 
 function toSnakeCase(value: string): string {
@@ -700,7 +865,7 @@ function getObjectEditableProperties(target: object | null | undefined) {
   return cls ? getEngine().resourceManager.getAllPropertiesByClass(cls) : [];
 }
 
-function serializeEditablePropertyValue(prop: any, target: object) {
+function serializeEditablePropertyValue(prop: any, target: object, depth = 0) {
   if (!prop.get) {
     return {
       value: null,
@@ -715,6 +880,9 @@ function serializeEditablePropertyValue(prop: any, target: object) {
   }
   const value = createPropertyValueBuffer();
   prop.get.call(target, value as any);
+  if (getEmbeddedObjectClasses(prop)) {
+    return { value: serializeEmbeddedObject(value.object[0] ?? null, depth), err: null };
+  }
   if (prop.type === 'bool') {
     return { value: value.bool[0], err: null };
   }
@@ -3075,6 +3243,18 @@ ${err.stack}`
               err: `scene_set_properties does not support object_array property "${resolved.prop.name}"`
             };
           }
+          if (getEmbeddedObjectClasses(resolved.prop)) {
+            const err = await setEmbeddedObjectProperty(
+              resolved.prop,
+              scene,
+              update.value,
+              resolved.prop.name
+            );
+            if (err) {
+              return { err };
+            }
+            continue;
+          }
           const parsed = parseEditablePropertyValue(resolved.prop, update.value);
           if (parsed.err) {
             return {
@@ -3263,6 +3443,18 @@ ${err.stack}`
             return {
               err: `node_set_properties does not support object_array property "${resolved.prop.name}"`
             };
+          }
+          if (getEmbeddedObjectClasses(resolved.prop)) {
+            const err = await setEmbeddedObjectProperty(
+              resolved.prop,
+              node.node,
+              update.value,
+              resolved.prop.name
+            );
+            if (err) {
+              return { err };
+            }
+            continue;
           }
           const parsed = parseEditablePropertyValue(resolved.prop, update.value);
           if (parsed.err) {
