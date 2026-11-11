@@ -252,7 +252,11 @@ export abstract class BaseDevice extends Observable<DeviceEventMap> {
   /** Vsync time of the frame being rendered, and the refreshes it is held for. */
   private _deferredFrameVsync: number;
   private _deferredFrameHold: number;
-  protected _endFrameTime: number;
+  /** CPU timer reading when the current frame began; unlike _beginFrameTime, never a vsync time. */
+  private _cpuFrameStart: number;
+  /** CPU time of the frames ended since the FPS was last updated, and their number. */
+  private _cpuTimeSum: number;
+  private _cpuTimeFrames: number;
   protected _fixedFrameTime: Nullable<number>;
   protected _fixedFrameClock: number;
   protected _frameInfo: FrameInfo;
@@ -301,7 +305,9 @@ export abstract class BaseDevice extends Observable<DeviceEventMap> {
     this._presentPending = false;
     this._deferredFrameVsync = 0;
     this._deferredFrameHold = 1;
-    this._endFrameTime = 0;
+    this._cpuFrameStart = 0;
+    this._cpuTimeSum = 0;
+    this._cpuTimeFrames = 0;
     this._fixedFrameTime = null;
     this._fixedFrameClock = 0;
     this._runLoopFunc = null;
@@ -336,16 +342,23 @@ export abstract class BaseDevice extends Observable<DeviceEventMap> {
     this._resizer = new ResizeHandler(
       this._canvas,
       (cssWidth, cssHeight, deviceWidth, deviceHeight) => {
+        // Layout is up to date in a resize callback, so these reads are cheap here
+        this._canvasClientWidth = this._canvas.clientWidth;
+        this._canvasClientHeight = this._canvas.clientHeight;
         this.dispatchEvent('resize', cssWidth, cssHeight, deviceWidth, deviceHeight);
       },
       this._dpr
     );
   }
+  // The client size is taken from the last resize: reading clientWidth forces a layout when the
+  // page changed, and these run for every UI draw command, viewport and scissor
   getScaleX() {
-    return this._canvas.clientWidth === 0 ? 1 : this._canvas.width / this._canvas.clientWidth;
+    const clientWidth = this._canvasClientWidth || this._canvas.clientWidth;
+    return clientWidth === 0 ? 1 : this._canvas.width / clientWidth;
   }
   getScaleY() {
-    return this._canvas.clientHeight === 0 ? 1 : this._canvas.height / this._canvas.clientHeight;
+    const clientHeight = this._canvasClientHeight || this._canvas.clientHeight;
+    return clientHeight === 0 ? 1 : this._canvas.height / clientHeight;
   }
   abstract getAdapterInfo(): any;
   abstract getFrameBufferSampleCount(): number;
@@ -716,6 +729,7 @@ export abstract class BaseDevice extends Observable<DeviceEventMap> {
       if (this.shouldSkipFrame()) {
         return false;
       }
+      this._cpuFrameStart = this._cpuTimer.now();
       for (const obj of this._disposeObjectList) {
         obj.destroy();
       }
@@ -745,9 +759,10 @@ export abstract class BaseDevice extends Observable<DeviceEventMap> {
     if (this._beginFrameCounter > 0) {
       this._beginFrameCounter--;
       if (this._beginFrameCounter === 0) {
-        this._endFrameTime = this._cpuTimer.now();
         this._frameInfo.frameCounter++;
         this.onEndFrame();
+        this._cpuTimeSum += this._cpuTimer.now() - this._cpuFrameStart;
+        this._cpuTimeFrames++;
       }
     }
   }
@@ -1124,20 +1139,22 @@ export abstract class BaseDevice extends Observable<DeviceEventMap> {
       this._frameInfo.FPS = 0;
       this._fpsCounter.time = now;
       this._fpsCounter.frame = this._frameInfo.frameCounter;
+      this._cpuTimeSum = 0;
+      this._cpuTimeFrames = 0;
     } else {
       this._frameInfo.elapsedFrame = now - this._frameInfo.frameTimestamp;
       this._frameInfo.elapsedOverall += this._frameInfo.elapsedFrame;
-      let cpuTime = 0;
-      if (this._endFrameTime !== 0) {
-        cpuTime = this._endFrameTime - this._frameInfo.frameTimestamp;
-      }
       this._frameInfo.frameTimestamp = now;
       if (now >= this._fpsCounter.time + 1000) {
         this._frameInfo.FPS =
           ((this._frameInfo.frameCounter - this._fpsCounter.frame) * 1000) / (now - this._fpsCounter.time);
         this._fpsCounter.time = now;
         this._fpsCounter.frame = this._frameInfo.frameCounter;
-        this._frameInfo.elapsedTimeCPU = cpuTime;
+        // Averaged over the frames counted for the FPS: a single sampled frame swings with
+        // every hitch. Measured on the CPU timer, as frameTimestamp is a vsync time when paced.
+        this._frameInfo.elapsedTimeCPU = this._cpuTimeFrames > 0 ? this._cpuTimeSum / this._cpuTimeFrames : 0;
+        this._cpuTimeSum = 0;
+        this._cpuTimeFrames = 0;
       }
     }
     const tmp = this._frameInfo.nextFrameCall;

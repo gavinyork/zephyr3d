@@ -146,7 +146,8 @@ function copyParentMaterialState(
   instance.shadowAlphaCutoff = parentMaterial.shadowAlphaCutoff;
   instance.cullMode = parentMaterial.cullMode;
   instance.opacity = parentMaterial.opacity;
-  instance.objectColor = parentMaterial.objectColor;
+  // objectColor is not inherited: it is the picking id of the drawable the instance is on, given by
+  // the render queue (once per cached BatchGroup queue, see RenderQueue.registerObjectColors)
   instance.TAAStrength = parentMaterial.TAAStrength;
   if (!instance.isMaterialPropertyOverridden('NormalScale')) {
     instance.normalScale = parentMaterial.normalScale;

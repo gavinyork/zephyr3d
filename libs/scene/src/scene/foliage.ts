@@ -203,6 +203,8 @@ type FoliagePart = {
   primitive: DRef<Primitive>;
   material: DRef<MeshMaterial>;
   matrix: Matrix4x4;
+  /** Most detailed level of detail the asset's mesh allows, see Mesh.minLod */
+  minLod: number;
 };
 
 /**
@@ -1220,7 +1222,8 @@ export class FoliageSystem extends GraphNode {
               primitive: new DRef(node.primitive),
               // Instance materials are what lets the copies of a mesh be drawn instanced
               material: new DRef(material.$isInstance ? material : material.createInstance()),
-              matrix: new Matrix4x4(node.worldMatrix)
+              matrix: new Matrix4x4(node.worldMatrix),
+              minLod: node.minLod
             });
           }
           return false;
@@ -1418,6 +1421,8 @@ export class FoliageSystem extends GraphNode {
           mesh.sealed = true;
           mesh.castShadow = layer._castShadow;
           mesh.gpuPickable = false;
+          // As the asset's mesh allows: a detailed mesh can be kept simpler up close
+          mesh.minLod = part.minLod;
           mesh.drawDistance = meshRange;
           mesh.drawDistanceFade = fade;
           mesh.parent = group;

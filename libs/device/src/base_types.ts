@@ -2290,7 +2290,10 @@ export interface FrameInfo {
    * its vsync time depending on {@link AbstractDevice.framePacing}.
    */
   frameTimestamp: number;
-  /** time spent by the CPU from last frame, in milliseconds */
+  /**
+   * CPU time of a frame in milliseconds, from beginFrame() to the end of endFrame(), averaged
+   * over the frames of the last FPS measurement (about one second) and updated with the FPS.
+   */
   elapsedTimeCPU: number;
   /**
    * Time spent by the GPU for the latest resolved frame, in milliseconds.

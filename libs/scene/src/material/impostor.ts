@@ -16,6 +16,8 @@ import { RENDER_PASS_TYPE_SHADOWMAP } from '../values';
 const tmpBounds = new Vector4();
 /** Atlas coordinates of the three frames, per fragment shader main scope */
 const atlasUVs = new WeakMap<object, PBShaderExp[]>();
+/** Atlas coordinate of the frame a shadow is cast from, per fragment shader main scope */
+const shadowAtlasUVs = new WeakMap<object, PBShaderExp>();
 const tmpGrid = new Vector4();
 
 /**
@@ -314,10 +316,9 @@ export class ImpostorMaterial extends PBRMetallicRoughnessMaterial implements Cl
       }
       if (shadowPass) {
         // Sampled first, in uniform control flow: the alpha test below may discard
-        scope.$l.zImpostorShadowDepth = this.blendFrames(
-          scope,
+        scope.$l.zImpostorShadowDepth = pb.textureSample(
           scope.zImpostorNormalDepth,
-          this.impostorAtlasUVs(scope)
+          this.impostorShadowAtlasUV(scope)
         ).a;
       }
     }
@@ -392,6 +393,64 @@ export class ImpostorMaterial extends PBRMetallicRoughnessMaterial implements Cl
     const uvs = [scope.zImpostorAtlasUV0, scope.zImpostorAtlasUV1, scope.zImpostorAtlasUV2] as PBShaderExp[];
     atlasUVs.set(scope, uvs);
     return uvs;
+  }
+  /**
+   * Atlas coordinate of the one frame a shadow is cast from: the one weighing most, shifted by its
+   * depth along the light.
+   *
+   * @remarks
+   * In a shadow pass the view is the light, which does not move with the camera, so the frames and
+   * their weights only change with the instance's rotation and the light: blending the three, as the
+   * camera's view does to hide frames swapping as it moves, buys nothing there, and costs three times
+   * the samples on quads that cover far more texels than the tree does
+   */
+  private impostorShadowAtlasUV(scope: PBInsideFunctionScope) {
+    const cached = shadowAtlasUVs.get(scope);
+    if (cached) {
+      return cached;
+    }
+    const pb = scope.$builder;
+    const inputs = scope.$inputs;
+    const frames = scope.zImpostorGrid.x;
+    const w = inputs.zImpostorWeights;
+    const cell = inputs.zImpostorFrame.xy;
+    // pb.select(whenFalse, whenTrue, condition)
+    scope.$l.zImpostorShadowUseSecond = pb.and(pb.greaterThan(w.y, w.x), pb.greaterThanEqual(w.y, w.z));
+    scope.$l.zImpostorShadowUseThird = pb.and(pb.greaterThan(w.z, w.x), pb.greaterThan(w.z, w.y));
+    scope.$l.zImpostorShadowFrame = pb.select(
+      pb.select(cell, pb.add(cell, inputs.zImpostorFrame.zw), scope.zImpostorShadowUseSecond),
+      pb.add(cell, pb.vec2(1)),
+      scope.zImpostorShadowUseThird
+    );
+    scope.$l.zImpostorShadowLocal = pb.select(
+      pb.select(inputs.zImpostorUV01.xy, inputs.zImpostorUV01.zw, scope.zImpostorShadowUseSecond),
+      inputs.zImpostorUV2Ray2.xy,
+      scope.zImpostorShadowUseThird
+    );
+    scope.$l.zImpostorShadowRay = pb.select(
+      pb.select(inputs.zImpostorRay01.xy, inputs.zImpostorRay01.zw, scope.zImpostorShadowUseSecond),
+      inputs.zImpostorUV2Ray2.zw,
+      scope.zImpostorShadowUseThird
+    );
+    // As impostorAtlasUVs does for each of the three frames
+    const atlas = (uv: PBShaderExp) => {
+      const margin = pb.div(pb.mul(frames, 0.5), scope.zImpostorGrid.w);
+      const local = pb.clamp(uv, pb.vec2(margin), pb.vec2(pb.sub(1, margin)));
+      return impostorAtlasCoord(pb, scope.zImpostorShadowFrame, local, frames);
+    };
+    scope.$l.zImpostorShadowUnshifted = pb.textureSample(
+      scope.zImpostorNormalDepth,
+      atlas(scope.zImpostorShadowLocal)
+    ).a;
+    scope.$l.zImpostorShadowUV = atlas(
+      pb.add(
+        scope.zImpostorShadowLocal,
+        pb.mul(scope.zImpostorShadowRay, pb.sub(0.5, scope.zImpostorShadowUnshifted), scope.zImpostorGrid.z)
+      )
+    );
+    const uv = scope.zImpostorShadowUV as PBShaderExp;
+    shadowAtlasUVs.set(scope, uv);
+    return uv;
   }
   /** Blends a texture sampled at the three frames by their weights */
   private blendFrames(scope: PBInsideFunctionScope, tex: PBShaderExp, uvs: PBShaderExp[]) {
@@ -472,6 +531,10 @@ export class ImpostorMaterial extends PBRMetallicRoughnessMaterial implements Cl
     return scope.zImpostorLit;
   }
   calculateAlbedoColor(scope: PBInsideFunctionScope, _uv?: PBShaderExp): PBShaderExp {
+    if (this.drawContext.renderPass!.type === RENDER_PASS_TYPE_SHADOWMAP) {
+      // Only its alpha is read, for the alpha test: from the frame the shadow is cast from
+      return scope.$builder.textureSample(scope.zImpostorBase, this.impostorShadowAtlasUV(scope));
+    }
     return this.blendFrames(scope, scope.zImpostorBase, this.impostorAtlasUVs(scope));
   }
   calculateNormalAndTBN(

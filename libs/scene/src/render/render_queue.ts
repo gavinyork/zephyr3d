@@ -227,6 +227,8 @@ export class RenderQueue extends Disposable {
   private _drawTransparent: boolean;
   /** @internal */
   private readonly _objectColorMaps: Map<number, Drawable>[];
+  /** @internal Whether registerObjectColors() ran since the queue was last reset */
+  private _objectColorsRegistered: boolean;
   /** @internal */
   private _cullCamera: Nullable<Camera>;
   /** @internal */
@@ -265,6 +267,7 @@ export class RenderQueue extends Disposable {
     this._needSceneColorWithDepth = false;
     this._drawTransparent = false;
     this._objectColorMaps = [new Map()];
+    this._objectColorsRegistered = false;
     this._cullCamera = null;
     this._lodCamera = null;
     this._instanceCuller = instanceCulling && InstanceCuller.isSupported() ? new InstanceCuller() : null;
@@ -617,12 +620,18 @@ export class RenderQueue extends Disposable {
    *
    * @remarks
    * {@link push} does this for queues culled in a frame that picks. A queue built once and kept
-   * across frames (BatchGroup) was usually built in a frame that did not, so it is done again
-   * whenever a frame picks.
+   * across frames (BatchGroup) was usually built in a frame that did not, so it is done in the
+   * first frame that picks after the queue was built. Once done, it stays done until the queue is
+   * reset: the lookup map is the queue's own, and a drawable's color object never changes, so
+   * setting it again changes nothing (the editor picks under the mouse every frame).
    *
    * @internal
    */
   registerObjectColors() {
+    if (this._objectColorsRegistered) {
+      return;
+    }
+    this._objectColorsRegistered = true;
     const map = this._objectColorMaps[0];
     const register = (drawable: Drawable) => {
       const material = drawable.getMaterial();
@@ -721,6 +730,7 @@ export class RenderQueue extends Disposable {
     this._childQueues.length = 0;
     this._objectColorMaps.length = 0;
     this._objectColorMaps.push(new Map());
+    this._objectColorsRegistered = false;
     this._shadowedLightList = [];
     this._unshadowedLightList = [];
     this._sunLight = null;

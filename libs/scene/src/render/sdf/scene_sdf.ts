@@ -143,6 +143,8 @@ export class SceneSDF extends makeObservable(Disposable)<SceneSDFEvents>() {
   /** Meshes listened to, whether or not they take part. */
   private readonly _tracked: Set<Mesh>;
   private readonly _instances: Map<Mesh, SDFInstance>;
+  /** Tracked meshes whose world bounds changed since the last update. */
+  private readonly _boundsChanged: Set<Mesh>;
   private readonly _assets: Map<string, MeshSDFAsset>;
   private _loading: number;
   private _time: number;
@@ -160,6 +162,7 @@ export class SceneSDF extends makeObservable(Disposable)<SceneSDFEvents>() {
     this._pendingAttach = new Set();
     this._tracked = new Set();
     this._instances = new Map();
+    this._boundsChanged = new Set();
     this._assets = new Map();
     this._loading = 0;
     this._time = 0;
@@ -349,10 +352,18 @@ export class SceneSDF extends makeObservable(Disposable)<SceneSDFEvents>() {
     this._pendingAttach.clear();
     this._updates++;
     this._camera.set(cameraPos);
+    // Only meshes that reported a bounds change: polling the bounds of every instance each
+    // frame costs about a millisecond with a few thousand foliage meshes
+    for (const mesh of this._boundsChanged) {
+      const inst = this._instances.get(mesh);
+      if (inst) {
+        this.refreshBounds(inst);
+      }
+    }
+    this._boundsChanged.clear();
     // Wanted assets, nearest instance first
     const wanted = new Map<MeshSDFAsset, number>();
     for (const inst of this._instances.values()) {
-      this.refreshBounds(inst);
       const asset = inst.asset;
       if (!asset || asset.state === 'missing' || asset.state === 'failed') {
         continue;
@@ -507,6 +518,8 @@ export class SceneSDF extends makeObservable(Disposable)<SceneSDFEvents>() {
       this._tracked.add(mesh);
       mesh.on('sdfmode_changed', this.onMeshChanged, this);
       mesh.on('primitive_changed', this.onPrimitiveChanged, this);
+      // Sent for every transform change of the mesh or an ancestor, and for local bounds changes
+      mesh.on('bvchanged', this.onMeshBoundsChanged, this);
     }
     this.retrack(mesh);
   }
@@ -565,6 +578,8 @@ export class SceneSDF extends makeObservable(Disposable)<SceneSDFEvents>() {
     }
     mesh.off('sdfmode_changed', this.onMeshChanged, this);
     mesh.off('primitive_changed', this.onPrimitiveChanged, this);
+    mesh.off('bvchanged', this.onMeshBoundsChanged, this);
+    this._boundsChanged.delete(mesh);
     const inst = this._instances.get(mesh);
     if (inst) {
       this.dropInstance(inst);
@@ -595,6 +610,11 @@ export class SceneSDF extends makeObservable(Disposable)<SceneSDFEvents>() {
   /** @internal */
   private onMeshChanged(mesh: Mesh) {
     this.retrack(mesh);
+  }
+  /** Read at the next update, so a mesh moved several times in a frame is refreshed once. @internal */
+  private onMeshBoundsChanged(node: SceneNode) {
+    // Only listened to on tracked meshes
+    this._boundsChanged.add(node as Mesh);
   }
   /** @internal */
   private onPrimitiveChanged() {
