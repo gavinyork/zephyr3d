@@ -13,19 +13,23 @@ import type { WebGPUBuffer } from './buffer_webgpu';
 import type { WebGPUBaseTexture } from './basetexture_webgpu';
 import { WebGPUMipmapGenerator } from './utils_webgpu';
 
-type LogicalSegment = {
-  uploadEncoder: Nullable<GPUCommandEncoder>;
-  bodyEncoder: Nullable<GPUCommandEncoder>;
-  hasUploadCommands: boolean;
-  hasBodyCommands: boolean;
-  buffersWithPendingUploads: WebGPUBuffer[];
-  texturesWithPendingUploads: WebGPUBaseTexture[];
-};
-
+/**
+ * Records a frame into one command encoder, submitted at the end of the frame.
+ *
+ * Uploads are written to staging memory at once and copied to their buffers and textures later,
+ * just before the next command that may read them: the copies of the uploads made since the last
+ * command are recorded in one go, the pass open at the upload having been ended, so commands
+ * recorded before an upload read the old contents and those after it the new ones. Several uploads
+ * to a buffer between two commands merge into one copy.
+ */
 export class CommandQueueImmediate {
   protected _renderPass: WebGPURenderPass;
   protected _computePass: WebGPUComputePass;
-  private _segments: LogicalSegment[];
+  /** The encoder of the frame, made by the first command recorded */
+  private _encoder: Nullable<GPUCommandEncoder>;
+  /** Buffers and textures uploaded since the last command, copied before the next one */
+  private _pendingBuffers: WebGPUBuffer[];
+  private _pendingTextures: WebGPUBaseTexture[];
   private _buffersAwaitingSyncEnd: WebGPUBuffer[];
   private _texturesAwaitingSyncEnd: WebGPUBaseTexture[];
   private readonly _device: WebGPUDevice;
@@ -34,7 +38,9 @@ export class CommandQueueImmediate {
   private _submitWaiters: Array<() => void>;
   constructor(device: WebGPUDevice) {
     this._device = device;
-    this._segments = [];
+    this._encoder = null;
+    this._pendingBuffers = [];
+    this._pendingTextures = [];
     this._buffersAwaitingSyncEnd = [];
     this._texturesAwaitingSyncEnd = [];
     this._renderPass = new WebGPURenderPass(device);
@@ -51,7 +57,9 @@ export class CommandQueueImmediate {
   }
   hasActiveWork() {
     return (
-      this._segments.length > 0 ||
+      !!this._encoder ||
+      this._pendingBuffers.length > 0 ||
+      this._pendingTextures.length > 0 ||
       this._renderPass.active ||
       this._computePass.active ||
       this._drawcallCounter > 0
@@ -60,13 +68,13 @@ export class CommandQueueImmediate {
   getDrawcallCounter() {
     return this._drawcallCounter;
   }
+  /** The encoder of the frame, to record a command into, with the uploads made so far copied */
   getEncoder() {
-    const segment = this.getOrCreateCurrentSegment();
-    segment.hasBodyCommands = true;
-    return this.getOrCreateBodyEncoder(segment);
+    this.flushPendingUploads();
+    return this.getOrCreateEncoder();
   }
   flushUploads() {
-    this.finalizeCurrentSegmentUploads();
+    this.flushPendingUploads();
   }
   get currentPass(): Nullable<WebGPURenderPass | WebGPUComputePass> {
     return this._renderPass.active ? this._renderPass : this._computePass.active ? this._computePass : null;
@@ -88,22 +96,25 @@ export class CommandQueueImmediate {
     return this._renderPass.getFrameBufferInfo();
   }
   executeRenderBundle(renderBundle: GPURenderBundle) {
+    this.flushPendingUploads();
     this.ensureRenderBodyReady();
     this._drawcallCounter++;
     this._renderPass.executeRenderBundle(renderBundle);
-    const segment = this.getOrCreateCurrentSegment();
-    segment.hasBodyCommands = true;
   }
+  /**
+   * Called before the staging memory of a buffer is written: the commands recorded so far must not
+   * see the upload, so the open pass ends here, and the copy goes before the next command
+   */
   bufferUpload(buffer: WebGPUBuffer, _offset: number, _size: number) {
-    const segment = this.getSegmentForUpload();
-    if (segment.buffersWithPendingUploads.indexOf(buffer) < 0) {
-      segment.buffersWithPendingUploads.push(buffer);
+    this.endAllBodyPasses();
+    if (this._pendingBuffers.indexOf(buffer) < 0) {
+      this._pendingBuffers.push(buffer);
     }
   }
   textureUpload(tex: WebGPUBaseTexture) {
-    const segment = this.getSegmentForUpload();
-    if (segment.texturesWithPendingUploads.indexOf(tex) < 0) {
-      segment.texturesWithPendingUploads.push(tex);
+    this.endAllBodyPasses();
+    if (this._pendingTextures.indexOf(tex) < 0) {
+      this._pendingTextures.push(tex);
     }
   }
   copyBuffer(
@@ -114,8 +125,6 @@ export class CommandQueueImmediate {
     bytes: number
   ) {
     this.endAllBodyPasses();
-    const segment = this.getOrCreateCurrentSegment();
-    segment.hasBodyCommands = true;
     const encoder = this.getEncoder();
     encoder.copyBufferToBuffer(srcBuffer.object!, srcOffset, dstBuffer.object!, dstOffset, bytes);
   }
@@ -129,8 +138,6 @@ export class CommandQueueImmediate {
     depthOrArrayLayers: number
   ) {
     this.endAllBodyPasses();
-    const segment = this.getOrCreateCurrentSegment();
-    segment.hasBodyCommands = true;
     const encoder = this.getEncoder();
     encoder.copyTextureToTexture(
       {
@@ -194,6 +201,7 @@ export class CommandQueueImmediate {
     workgroupCountY: number,
     workgroupCountZ: number
   ) {
+    this.flushPendingUploads();
     this._drawcallCounter++;
     this.ensureComputeBodyReady();
     this._computePass.compute(
@@ -204,8 +212,6 @@ export class CommandQueueImmediate {
       workgroupCountY,
       workgroupCountZ
     );
-    const segment = this.getOrCreateCurrentSegment();
-    segment.hasBodyCommands = true;
   }
   computeIndirect(
     program: WebGPUProgram,
@@ -214,11 +220,10 @@ export class CommandQueueImmediate {
     indirectBuffer: WebGPUBuffer,
     indirectOffset: number
   ) {
+    this.flushPendingUploads();
     this._drawcallCounter++;
     this.ensureComputeBodyReady();
     this._computePass.computeIndirect(program, bindGroups, bindGroupOffsets, indirectBuffer, indirectOffset);
-    const segment = this.getOrCreateCurrentSegment();
-    segment.hasBodyCommands = true;
   }
   draw(
     program: WebGPUProgram,
@@ -231,6 +236,7 @@ export class CommandQueueImmediate {
     count: number,
     numInstances: number
   ) {
+    this.flushPendingUploads();
     this.ensureRenderBodyReady();
     this._drawcallCounter++;
     this._renderPass.draw(
@@ -244,8 +250,6 @@ export class CommandQueueImmediate {
       count,
       numInstances
     );
-    const segment = this.getOrCreateCurrentSegment();
-    segment.hasBodyCommands = true;
   }
   drawIndirect(
     program: WebGPUProgram,
@@ -256,6 +260,7 @@ export class CommandQueueImmediate {
     primitiveType: PrimitiveType,
     indirect: WebGPUIndirectDrawParams
   ) {
+    this.flushPendingUploads();
     this.ensureRenderBodyReady();
     this._drawcallCounter++;
     this._renderPass.drawIndirect(
@@ -267,8 +272,6 @@ export class CommandQueueImmediate {
       primitiveType,
       indirect
     );
-    const segment = this.getOrCreateCurrentSegment();
-    segment.hasBodyCommands = true;
   }
   capture(
     renderBundleEncoder: GPURenderBundleEncoder,
@@ -331,10 +334,9 @@ export class CommandQueueImmediate {
     return this._renderPass.getScissor();
   }
   clear(color: FrameBufferClearColors, depth: Nullable<number>, stencil: Nullable<number>) {
+    this.flushPendingUploads();
     this.ensureRenderBodyReady();
     this._renderPass.clear(color, depth, stencil);
-    const segment = this.getOrCreateCurrentSegment();
-    segment.hasBodyCommands = true;
   }
   finish() {
     this.submit();
@@ -342,53 +344,15 @@ export class CommandQueueImmediate {
   }
   insertTimestampMarker(querySet: GPUQuerySet, queryIndex: number, includePendingUploads: boolean): void {
     this.endAllBodyPasses(false);
-    if (includePendingUploads) {
-      this.finalizeCurrentSegmentUploads();
-      const encoder = this.getEncoder();
-      this.encodeTimestampMarker(encoder, querySet, queryIndex);
-    } else {
-      const segment = this.getOrCreateCurrentSegment();
-      const pendingBuffers = segment.buffersWithPendingUploads.splice(0);
-      const pendingTextures = segment.texturesWithPendingUploads.splice(0);
-      segment.hasBodyCommands = true;
-      const encoder = this.getOrCreateBodyEncoder(segment);
-      this.encodeTimestampMarker(encoder, querySet, queryIndex);
-      if (pendingBuffers.length > 0 || pendingTextures.length > 0) {
-        const nextSegment = this.createSegment();
-        nextSegment.buffersWithPendingUploads.push(...pendingBuffers);
-        nextSegment.texturesWithPendingUploads.push(...pendingTextures);
-      }
+    // Without the pending uploads, the marker goes before their copies
+    const encoder = includePendingUploads ? this.getEncoder() : this.getOrCreateEncoder();
+    this.encodeTimestampMarker(encoder, querySet, queryIndex);
+  }
+  private getOrCreateEncoder() {
+    if (!this._encoder) {
+      this._encoder = this._device.device.createCommandEncoder();
     }
-  }
-  private createSegment(): LogicalSegment {
-    const segment: LogicalSegment = {
-      uploadEncoder: null,
-      bodyEncoder: null,
-      hasUploadCommands: false,
-      hasBodyCommands: false,
-      buffersWithPendingUploads: [],
-      texturesWithPendingUploads: []
-    };
-    this._segments.push(segment);
-    return segment;
-  }
-  private getCurrentSegment() {
-    return this._segments.length > 0 ? this._segments[this._segments.length - 1] : null;
-  }
-  private getOrCreateCurrentSegment() {
-    return this.getCurrentSegment() ?? this.createSegment();
-  }
-  private getOrCreateUploadEncoder(segment: LogicalSegment) {
-    if (!segment.uploadEncoder) {
-      segment.uploadEncoder = this._device.device.createCommandEncoder();
-    }
-    return segment.uploadEncoder;
-  }
-  private getOrCreateBodyEncoder(segment: LogicalSegment) {
-    if (!segment.bodyEncoder) {
-      segment.bodyEncoder = this._device.device.createCommandEncoder();
-    }
-    return segment.bodyEncoder;
+    return this._encoder;
   }
   private ensureRenderBodyReady() {
     if (this._computePass.active) {
@@ -417,17 +381,11 @@ export class CommandQueueImmediate {
   private submit() {
     this.endAllBodyPasses();
     this._renderPass.flushDeferredMipmaps();
-    this.finalizeCurrentSegmentUploads();
+    this.flushPendingUploads();
     const commandBuffers: GPUCommandBuffer[] = [];
-    if (this._segments.length > 0) {
-      for (const segment of this._segments) {
-        if (segment.uploadEncoder && segment.hasUploadCommands) {
-          commandBuffers.push(segment.uploadEncoder.finish());
-        }
-        if (segment.bodyEncoder && segment.hasBodyCommands) {
-          commandBuffers.push(segment.bodyEncoder.finish());
-        }
-      }
+    if (this._encoder) {
+      commandBuffers.push(this._encoder.finish());
+      this._encoder = null;
     }
     const timestampResolveCommandBuffer = this._device.createTimestampResolveCommandBuffer();
     if (timestampResolveCommandBuffer) {
@@ -460,7 +418,6 @@ export class CommandQueueImmediate {
       texture.endSyncChanges();
     }
     this._texturesAwaitingSyncEnd.length = 0;
-    this._segments.length = 0;
     this._drawcallCounter = 0;
   }
   private encodeTimestampMarker(encoder: GPUCommandEncoder, querySet: GPUQuerySet, queryIndex: number): void {
@@ -483,40 +440,26 @@ export class CommandQueueImmediate {
       this._texturesAwaitingSyncEnd.push(texture);
     }
   }
-  private getSegmentForUpload() {
-    let segment = this.getOrCreateCurrentSegment();
-    if (segment.hasBodyCommands) {
-      this.endAllBodyPasses();
-      this.finalizeCurrentSegmentUploads();
-      segment = this.createSegment();
-    }
-    return segment;
-  }
-  private finalizeCurrentSegmentUploads() {
-    const segment = this.getCurrentSegment();
-    if (!segment) {
+  /** Records the copies of the uploads made since the last command */
+  private flushPendingUploads() {
+    if (this._pendingBuffers.length === 0 && this._pendingTextures.length === 0) {
       return;
     }
-    if (segment.buffersWithPendingUploads.length > 0) {
-      const encoder = this.getOrCreateUploadEncoder(segment);
-      for (const buffer of segment.buffersWithPendingUploads) {
-        buffer.beginSyncChanges(encoder);
-        segment.hasUploadCommands = true;
-        this.markBufferAwaitingSyncEnd(buffer);
-      }
-      segment.buffersWithPendingUploads.length = 0;
+    // Taken first: ending a pass may generate mipmaps, which records commands and comes back here
+    const buffers = this._pendingBuffers.splice(0);
+    const textures = this._pendingTextures.splice(0);
+    this.endAllBodyPasses();
+    const encoder = this.getOrCreateEncoder();
+    for (const buffer of buffers) {
+      buffer.beginSyncChanges(encoder);
+      this.markBufferAwaitingSyncEnd(buffer);
     }
-    if (segment.texturesWithPendingUploads.length > 0) {
-      const encoder = this.getOrCreateUploadEncoder(segment);
-      for (const texture of segment.texturesWithPendingUploads) {
-        texture.beginSyncChanges(encoder);
-        if (!texture.disposed && texture.isMipmapDirty()) {
-          WebGPUMipmapGenerator.generateMipmap(this._device, texture, encoder);
-        }
-        segment.hasUploadCommands = true;
-        this.markTextureAwaitingSyncEnd(texture);
+    for (const texture of textures) {
+      texture.beginSyncChanges(encoder);
+      if (!texture.disposed && texture.isMipmapDirty()) {
+        WebGPUMipmapGenerator.generateMipmap(this._device, texture, encoder);
       }
-      segment.texturesWithPendingUploads.length = 0;
+      this.markTextureAwaitingSyncEnd(texture);
     }
   }
 }

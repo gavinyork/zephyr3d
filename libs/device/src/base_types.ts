@@ -3373,7 +3373,7 @@ export interface AbstractDevice extends IEventTarget<DeviceEventMap> {
   /** Get the current frame information */
   frameInfo: FrameInfo;
   /**
-   * Upper bound on frames the CPU may run ahead of the GPU, or 0 for no bound.
+   * Upper bound on frames the CPU may run ahead of the GPU, or 0 for no bound. Default 2.
    *
    * @remarks
    * When the GPU is the bottleneck the browser lets the CPU keep submitting, and
@@ -3386,6 +3386,10 @@ export interface AbstractDevice extends IEventTarget<DeviceEventMap> {
    * latency drop to about the bound. Throughput is unchanged, because the GPU
    * was already the limit. Two is a good value; one trades some GPU idle time
    * for the lowest latency.
+   *
+   * Unbounded, a GPU that falls behind for a while (a long shader compile, a heavy
+   * scene) also leaves every frame's uploads waiting in staging memory that cannot
+   * be reused until the GPU catches up, and memory grows by gigabytes in a minute.
    *
    * Only WebGPU enforces this. WebGL has no way to learn when a frame's work
    * finished without stalling, so it ignores the setting.

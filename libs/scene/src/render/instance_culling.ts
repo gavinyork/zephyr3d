@@ -39,6 +39,13 @@ const BATCH_VEC4S = 4;
 const MAX_LODS = 8;
 /** Sets of arguments: the solid ones, and with debug views those of the wireframe edges */
 const EDGE_ARGS_SETS = DEBUG_VIEWS ? 2 : 1;
+/**
+ * vec4s of the view instances are culled for: the 6 planes of the cull camera, the level of detail
+ * view (position, 1 if perspective) and its parameters (screen multiple, distance scale, 0, 0)
+ */
+const VIEW_VEC4S = 8;
+const VIEW_LOD = 6;
+const VIEW_LOD_PARAMS = 7;
 
 /**
  * Draw arguments of a batch whose instances are culled on the GPU.
@@ -110,10 +117,16 @@ interface CullGroup {
  */
 export class InstanceCuller {
   private static _program: Nullable<GPUProgram> = null;
-  private static readonly _planes = new Float32Array(24);
+  /**
+   * The view every culler culls for, shared: the cullers of a view run one after another before
+   * it draws, and only the first of them uploads. An upload after commands have been recorded starts
+   * a new command segment, so per culler uploads would split the frame once per culler and view.
+   */
+  private static readonly _view = new DRef<GPUDataBuffer>();
+  private static readonly _viewData = new Float32Array(VIEW_VEC4S * 4);
+  /** What the view buffer holds, NaN until first written */
+  private static readonly _viewUploaded = new Float32Array(VIEW_VEC4S * 4).fill(NaN);
   private static readonly _params = new Float32Array(4);
-  private static readonly _lodView = new Float32Array(4);
-  private static readonly _lodParams = new Float32Array(4);
   private readonly _groups: Map<CachedBindGroup, CullGroup>;
   private readonly _args: DRef<GPUDataBuffer>;
   private _argsCapacity: number;
@@ -287,8 +300,11 @@ export class InstanceCuller {
     this._lastFrame = frame;
     this.setPlanes(camera);
     this.setLodView(parent.lodCamera ?? camera);
+    const view = InstanceCuller.uploadView();
     const device = getDevice();
     const program = InstanceCuller.getProgram();
+    // Uploads before any dispatch: one made after commands were recorded starts a new command
+    // segment, which per group would split the frame once per group and view
     for (const group of this._groups.values()) {
       if (group.batchCount === 0) {
         continue;
@@ -297,9 +313,8 @@ export class InstanceCuller {
         group.bounds.get()!.bufferSubData(0, group.boundsData);
         group.boundsDirty = false;
       }
-      let bindGroup = group.computeBindGroup.get();
-      if (!bindGroup) {
-        bindGroup = device.createBindGroup(program.bindGroupLayouts[0]);
+      if (!group.computeBindGroup.get()) {
+        const bindGroup = device.createBindGroup(program.bindGroupLayouts[0]);
         bindGroup.setBuffer(
           'src',
           group.source.bindGroup.getBuffer(ShaderHelper.getInstanceDataUniformName())!
@@ -308,16 +323,21 @@ export class InstanceCuller {
         bindGroup.setBuffer('bounds', group.bounds.get()!);
         bindGroup.setBuffer('batches', group.batches.get()!);
         bindGroup.setBuffer('args', this._args.get()!);
+        bindGroup.setBuffer('cullView', view);
+        // Written once: the arguments capacity only changes with a new arguments buffer, which
+        // has the bind groups made again
+        InstanceCuller._params[0] = 0;
+        InstanceCuller._params[1] = this._argsCapacity;
+        bindGroup.setValue('params', InstanceCuller._params);
         group.computeBindGroup.set(bindGroup);
       }
-      InstanceCuller._params[0] = group.batchCount;
-      InstanceCuller._params[1] = this._argsCapacity;
-      bindGroup.setValue('params', InstanceCuller._params);
-      bindGroup.setValue('planes', InstanceCuller._planes);
-      bindGroup.setValue('lodView', InstanceCuller._lodView);
-      bindGroup.setValue('lodParams', InstanceCuller._lodParams);
-      device.setProgram(program);
-      device.setBindGroup(0, bindGroup);
+    }
+    device.setProgram(program);
+    for (const group of this._groups.values()) {
+      if (group.batchCount === 0) {
+        continue;
+      }
+      device.setBindGroup(0, group.computeBindGroup.get()!);
       device.compute(group.batchCount, 1, 1);
     }
   }
@@ -333,7 +353,7 @@ export class InstanceCuller {
   }
   /** Planes of the cull camera, those masked out by it made ones everything is inside of */
   private setPlanes(camera: Camera) {
-    const planes = InstanceCuller._planes;
+    const planes = InstanceCuller._viewData;
     const frustumPlanes = camera.frustum.planes;
     const mask = camera.clipMask || 0x3f;
     for (let i = 0; i < 6; i++) {
@@ -349,14 +369,36 @@ export class InstanceCuller {
   private setLodView(camera: Camera) {
     const pos = camera.getWorldPosition(tmpViewPos);
     const proj = camera.getProjectionMatrix();
-    const view = InstanceCuller._lodView;
-    view[0] = pos.x;
-    view[1] = pos.y;
-    view[2] = pos.z;
-    view[3] = camera.isPerspective() ? 1 : 0;
-    const params = InstanceCuller._lodParams;
-    params[0] = Math.max(0.5 * Math.abs(proj.m00), 0.5 * Math.abs(proj.m11));
-    params[1] = camera.lodDistanceScale;
+    const data = InstanceCuller._viewData;
+    const view = VIEW_LOD * 4;
+    data[view] = pos.x;
+    data[view + 1] = pos.y;
+    data[view + 2] = pos.z;
+    data[view + 3] = camera.isPerspective() ? 1 : 0;
+    const params = VIEW_LOD_PARAMS * 4;
+    data[params] = Math.max(0.5 * Math.abs(proj.m00), 0.5 * Math.abs(proj.m11));
+    data[params + 1] = camera.lodDistanceScale;
+    data[params + 2] = 0;
+    data[params + 3] = 0;
+  }
+  /** The shared view buffer, holding the view just set: uploaded only when it changed */
+  private static uploadView() {
+    let buffer = this._view.get();
+    if (!buffer || buffer.disposed) {
+      buffer = getDevice().createBuffer(VIEW_VEC4S * 16, { usage: 'uniform' });
+      this._view.set(buffer);
+      this._viewUploaded.fill(NaN);
+    }
+    const data = this._viewData;
+    const uploaded = this._viewUploaded;
+    for (let i = 0; i < data.length; i++) {
+      if (data[i] !== uploaded[i]) {
+        buffer.bufferSubData(0, data);
+        uploaded.set(data);
+        break;
+      }
+    }
+    return buffer;
   }
   private writeBounds(drawable: Drawable, entry: { group: CullGroup; slot: number }) {
     const node = drawable.getNode();
@@ -418,12 +460,10 @@ export class InstanceCuller {
         label: 'InstanceCulling',
         workgroupSize: [WORKGROUP_SIZE, 1, 1],
         compute(pb) {
-          // (batch count, index of the edge arguments of the first draw, unused, unused)
+          // (unused, index of the edge arguments of the first draw, unused, unused)
           this.params = pb.vec4().uniform(0);
-          this.planes = pb.vec4[6]().uniform(0);
-          // Level of detail view: (position, 1 if perspective), (screen multiple, distance scale, 0, 0)
-          this.lodView = pb.vec4().uniform(0);
-          this.lodParams = pb.vec4().uniform(0);
+          // Shared by all cullers, see InstanceCuller._view
+          this.cullView = pb.vec4[VIEW_VEC4S]().uniformBuffer(0);
           this.src = pb.vec4[INSTANCE_DATA_VEC4S]().uniformBuffer(0);
           this.dst = pb.vec4[0]().storageBuffer(0);
           this.bounds = pb.vec4[0]().storageBufferReadonly(0);
@@ -435,6 +475,8 @@ export class InstanceCuller {
           this.levelCount = pb.uint[MAX_LODS]().workgroup();
           this.levelNext = pb.uint[MAX_LODS]().workgroup();
           pb.func('classify', [pb.uint('base'), pb.uint('batchIndex')], function () {
+            this.$l.lodView = this.cullView.at(VIEW_LOD);
+            this.$l.lodParams = this.cullView.at(VIEW_LOD_PARAMS);
             this.$l.slot = pb.div(this.base, MIN_INSTANCE_VEC4S);
             this.$l.center = this.bounds.at(pb.mul(this.slot, 2));
             this.$l.visible = true;
@@ -457,7 +499,7 @@ export class InstanceCuller {
               pb.mul(pb.abs(this.c2), this.extent.z)
             );
             this.$for(pb.int('i'), 0, 6, function () {
-              this.$l.p = this.planes.at(this.i);
+              this.$l.p = this.cullView.at(this.i);
               this.$if(
                 pb.lessThan(
                   pb.add(pb.dot(this.p.xyz, this.wc), pb.dot(pb.abs(this.p.xyz), this.we), this.p.w),
@@ -664,7 +706,10 @@ export class InstanceCuller {
                   // Dither amount of the instance in the w of its framestamp vector, read by
                   // MeshMaterial: 0 drawn whole, toward 1 fading out, from -1 fading in
                   this.$if(pb.greaterThan(this.fadeWidth, 0), function () {
-                    this.$l.eyeDist = pb.distance(this.src.at(pb.add(this.src0, 3)).xyz, this.lodView.xyz);
+                    this.$l.eyeDist = pb.distance(
+                      this.src.at(pb.add(this.src0, 3)).xyz,
+                      this.cullView.at(VIEW_LOD).xyz
+                    );
                     this.$l.dither = pb.float(0);
                     this.$if(pb.greaterThanEqual(this.farSq, 0), function () {
                       this.$l.fadeOut = pb.div(

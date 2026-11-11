@@ -88,6 +88,12 @@ export class BatchGroup extends GraphNode {
       this.invalidate();
     };
     this.on('visiblechanged', (node) => {
+      // The group itself shown or hidden: a hidden group is not culled at all, and shown again its
+      // cached queues still hold what it draws. Rebuilding them would record every render bundle
+      // again, which a foliage system swapping chunks in and out as the view moves does all the time
+      if (node === this) {
+        return;
+      }
       node.iterate((child) => {
         if (child.isMesh()) {
           this.invalidate();

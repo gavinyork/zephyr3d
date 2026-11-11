@@ -325,7 +325,7 @@ export abstract class BaseDevice extends Observable<DeviceEventMap> {
     this._fpsCounter = { time: 0, frame: 0 };
     this._stateStack = [];
     this._beginFrameCounter = 0;
-    this._maxFramesInFlight = 0;
+    this._maxFramesInFlight = 2;
     this._poolMap = new Map();
     this._defaultPoolKey = Symbol('defaultPool');
     this._poolMap.set(this._defaultPoolKey, new Pool(this, this._defaultPoolKey));
