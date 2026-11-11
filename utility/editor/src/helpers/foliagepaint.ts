@@ -302,6 +302,11 @@ export type FoliageBrushStamp = {
   erase: boolean;
   /** When erasing, whether the placed instances go too */
   erasePlaced: boolean;
+  /**
+   * Erase weight received so far by the placed instances, shared by the stamps of one stroke so
+   * holding the brush keeps thinning them, see FoliageSystem.eraseManualInstances
+   */
+  eraseAccumulated?: Map<string, number>;
 };
 
 /**
@@ -315,8 +320,14 @@ export function applyFoliageBrushStamp(foliage: FoliageSystem, layerIndex: numbe
     return null;
   }
   if (stamp.erase && stamp.erasePlaced) {
-    foliage.eraseManualInstances(layerIndex, stamp.x, stamp.z, stamp.radius, stamp.strength, (t) =>
-      foliageBrushWeight(t, stamp.falloff)
+    foliage.eraseManualInstances(
+      layerIndex,
+      stamp.x,
+      stamp.z,
+      stamp.radius,
+      stamp.strength,
+      (t) => foliageBrushWeight(t, stamp.falloff),
+      stamp.eraseAccumulated
     );
   }
   return foliage.paintMask(

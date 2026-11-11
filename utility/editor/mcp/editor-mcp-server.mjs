@@ -3309,7 +3309,7 @@ const BASE_TOOLS = [
   {
     name: 'editor_frame_timing',
     description:
-      'Measure GPU time and frame time over the next frames frames, after skipping warmup frames so a change made just before has settled. GPU time comes from WebGPU timestamp queries and reads 0 on WebGL. Use it for A/B comparisons: toggle a feature, measure, toggle back. Returns { frames, gpu_ms: { mean, median, p90, min, max }, frame_ms: {...}, fps, err }.',
+      'Measure GPU time, CPU time and frame time over the next frames frames, after skipping warmup frames so a change made just before has settled. GPU time comes from WebGPU timestamp queries and reads 0 on WebGL. CPU time is the main thread time of a frame from beginFrame to endFrame, which the device averages over each second, so measure at least a few seconds of frames for it. Use it for A/B comparisons: toggle a feature, measure, toggle back. Returns { frames, gpu_ms: { mean, median, p90, min, max }, cpu_ms: {...}, frame_ms: {...}, fps, err }.',
     inputSchema: {
       type: 'object',
       properties: {

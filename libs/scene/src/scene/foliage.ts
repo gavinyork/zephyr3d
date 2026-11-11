@@ -925,12 +925,19 @@ export class FoliageSystem extends GraphNode {
    * Erases manual instances within a circle, by brush weight: an instance goes where the weight
    * of the brush there is above a value derived from its position, so a soft brush thins them
    * out towards its edge, the same way every time
+   *
+   * @remarks
+   * A brush applies a small strength each frame. Without `accumulated` each call only compares
+   * its own weight, so repeating a weak stamp never removes more than the first one did; pass the
+   * same map for every stamp of a stroke and the weights add up per instance instead, the way
+   * painting adds up in the density mask.
    * @param index - Layer index
    * @param x - Circle centre x, local
    * @param z - Circle centre z, local
    * @param radius - Circle radius
    * @param strength - Weight at the centre, 0 to 1
    * @param weight - Brush weight from the distance over the radius
+   * @param accumulated - Weight received so far by each instance, by position, updated in place
    * @returns Number of instances removed
    */
   eraseManualInstances(
@@ -939,7 +946,8 @@ export class FoliageSystem extends GraphNode {
     z: number,
     radius: number,
     strength: number,
-    weight: (t: number) => number
+    weight: (t: number) => number,
+    accumulated?: Map<string, number>
   ) {
     const layer = this._layers[index];
     if (!layer || !(radius > 0) || !(strength > 0)) {
@@ -950,7 +958,16 @@ export class FoliageSystem extends GraphNode {
       [x - radius, z - radius, x + radius, z + radius],
       (d, o) => {
         const t = Math.hypot(d[o] - x, d[o + 1] - z) / radius;
-        return t < 1 && strength * weight(t) > positionHash(d[o], d[o + 1]);
+        if (t >= 1) {
+          return false;
+        }
+        let amount = strength * weight(t);
+        if (accumulated) {
+          const key = `${d[o]},${d[o + 1]}`;
+          amount += accumulated.get(key) ?? 0;
+          accumulated.set(key, amount);
+        }
+        return amount > positionHash(d[o], d[o + 1]);
       },
       touched
     );

@@ -4772,12 +4772,15 @@ async function measureFrameTiming(params: any) {
   const frames = Math.max(1, Math.min(1000, Math.floor(Number(params?.frames ?? 120))));
   const warmup = Math.max(0, Math.min(1000, Math.floor(Number(params?.warmup ?? 30))));
   const gpu: number[] = [];
+  const cpu: number[] = [];
   const frame: number[] = [];
   await new Promise<void>((resolve) => {
     let n = 0;
     const tick = () => {
       if (n >= warmup) {
         gpu.push(device.frameInfo.elapsedTimeGPU);
+        // Averaged by the device over each second, see FrameInfo.elapsedTimeCPU
+        cpu.push(device.frameInfo.elapsedTimeCPU);
         frame.push(device.frameInfo.elapsedFrame);
       }
       n++;
@@ -4805,6 +4808,7 @@ async function measureFrameTiming(params: any) {
   return {
     frames,
     gpu_ms: stats(gpu),
+    cpu_ms: stats(cpu),
     frame_ms: stats(frame),
     fps: Math.round(device.frameInfo.FPS),
     err: null

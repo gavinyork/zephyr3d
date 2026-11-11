@@ -41,6 +41,9 @@ type StrokeSnapshot = {
   instances: Map<FoliageLayer, { generated: Float32Array; manual: Float32Array }>;
 };
 
+/** Erase weight the placed instances of each layer received during the current stroke */
+type StrokeErase = Map<FoliageLayer, Map<string, number>>;
+
 function unionRegion(a: Nullable<FoliageGenRegion>, b: Readonly<FoliageGenRegion>): FoliageGenRegion {
   return a
     ? [Math.min(a[0], b[0]), Math.min(a[1], b[1]), Math.max(a[2], b[2]), Math.max(a[3], b[3])]
@@ -62,6 +65,7 @@ export class FoliageEditTool extends Disposable implements EditTool {
   private _brushing: boolean;
   private _shift: boolean;
   private _stroke: Nullable<StrokeSnapshot>;
+  private readonly _strokeErase: StrokeErase;
   /** Regions painted in this stroke not regenerated yet, per layer */
   private readonly _pending: Map<FoliageLayer, FoliageGenRegion>;
   /** Regions of layers with a place script, regenerated in the worker once the stroke ends */
@@ -83,6 +87,7 @@ export class FoliageEditTool extends Disposable implements EditTool {
     this._brushing = false;
     this._shift = false;
     this._stroke = null;
+    this._strokeErase = new Map();
     this._pending = new Map();
     this._deferred = new Map();
     this._regenerating = false;
@@ -162,6 +167,7 @@ export class FoliageEditTool extends Disposable implements EditTool {
   private beginStroke() {
     this._brushing = true;
     this._stroke = { masks: new Map(), instances: new Map() };
+    this._strokeErase.clear();
   }
   /** Records what a layer was before the stroke touches an area of it, the first time only */
   private snapshot(layer: FoliageLayer, region: Readonly<FoliageGenRegion>) {
@@ -209,6 +215,11 @@ export class FoliageEditTool extends Disposable implements EditTool {
         z + this._radius
       ];
       this.snapshot(layer, reach);
+      let eraseAccumulated = this._strokeErase.get(layer);
+      if (!eraseAccumulated) {
+        eraseAccumulated = new Map();
+        this._strokeErase.set(layer, eraseAccumulated);
+      }
       const changed = applyFoliageBrushStamp(foliage, index, {
         x,
         z,
@@ -216,7 +227,8 @@ export class FoliageEditTool extends Disposable implements EditTool {
         strength: Math.min(1, this._strength * PAINT_RATE * dt),
         falloff: this._falloff,
         erase,
-        erasePlaced: this._erasePlaced
+        erasePlaced: this._erasePlaced,
+        eraseAccumulated
       });
       if (changed) {
         this._pending.set(layer, unionRegion(this._pending.get(layer) ?? null, changed));
@@ -281,6 +293,7 @@ export class FoliageEditTool extends Disposable implements EditTool {
     this._brushing = false;
     const stroke = this._stroke;
     this._stroke = null;
+    this._strokeErase.clear();
     this.flushPending();
     await this.flushDeferred();
     const foliage = this.foliage;
