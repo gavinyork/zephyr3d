@@ -129,7 +129,6 @@ type RoundInputs = {
   msOctaves: number;
   version: number;
   sunDir: Vector3;
-  cameraPos: Vector3;
 };
 
 function cloneAtmosphere(p: AtmosphereParams): AtmosphereParams {
@@ -159,6 +158,8 @@ export class VolumetricCloudSkyCache extends Disposable {
   private _framesPerUpdate: number;
   private _resolution: number;
   private _inputs: Nullable<RoundInputs>;
+  /** Camera position at the previous update, to tell a jump from travel */
+  private readonly _lastCameraPos: Vector3;
   private _rebuild: boolean;
   private readonly _bindGroups: Map<GPUProgram, BindGroup>;
   private _sphereSamplesUploaded: boolean;
@@ -176,6 +177,7 @@ export class VolumetricCloudSkyCache extends Disposable {
     this._framesPerUpdate = 0;
     this._resolution = 0;
     this._inputs = null;
+    this._lastCameraPos = new Vector3();
     this._rebuild = true;
     this._bindGroups = new Map();
     this._sphereSamplesUploaded = false;
@@ -238,18 +240,19 @@ export class VolumetricCloudSkyCache extends Disposable {
     if (!this._rebuild && this._inputs && this._needsRebuild(params, atmosphere, cameraPos)) {
       this._rebuild = true;
     }
+    this._lastCameraPos.set(cameraPos);
     if (this._rebuild) {
       this._rebuild = false;
       // Two rounds, as clayjohn's initialize_sky(): fills the map blended from and the one
       // blended to, then the regular rounds take over at full quality
       for (let round = 0; round < 2; round++) {
-        this._startRound(params, atmosphere, cameraPos, time);
+        this._startRound(params, atmosphere, time);
         for (let i = 0; i < this._framesPerUpdate; i++) {
           this._traceBlock(resources, i, REBUILD_STEP_SCALE);
         }
         this._completeRound();
       }
-      this._startRound(params, atmosphere, cameraPos, time);
+      this._startRound(params, atmosphere, time);
       this.roundCompleted = true;
       return;
     }
@@ -257,7 +260,7 @@ export class VolumetricCloudSkyCache extends Disposable {
     this._frame++;
     if (this._frame >= this._framesPerUpdate) {
       this._completeRound();
-      this._startRound(params, atmosphere, cameraPos, time);
+      this._startRound(params, atmosphere, time);
       this.roundCompleted = true;
     }
   }
@@ -306,9 +309,12 @@ export class VolumetricCloudSkyCache extends Disposable {
       return true;
     }
     // A camera jump far enough for the clouds to visibly shift: about ten texels of parallax
-    // under the cloud base
+    // under the cloud base. Only a jump since the last update: steady travel, however fast, is
+    // followed by the regular rounds, which blend into each other. Measured from the round start
+    // instead, driving at speed rebuilt the whole cache (tracing it twice, in one frame) every
+    // few hundred milliseconds.
     const scale = atmosphere.cameraHeightScale;
-    const moved = Vector3.distance(cameraPos, inputs.cameraPos) * scale;
+    const moved = Vector3.distance(cameraPos, this._lastCameraPos) * scale;
     return moved > params.layerBottomAltitude * 0.017;
   }
   private _bindGroup(program: GPUProgram) {
@@ -319,12 +325,7 @@ export class VolumetricCloudSkyCache extends Disposable {
     }
     return bindGroup;
   }
-  private _startRound(
-    params: VolumetricCloud,
-    atmosphere: AtmosphereParams,
-    cameraPos: Immutable<Vector3>,
-    time: number
-  ) {
+  private _startRound(params: VolumetricCloud, atmosphere: AtmosphereParams, time: number) {
     const atmo = cloneAtmosphere(atmosphere);
     const R = atmo.plantRadius;
     const eyeHeight = R + atmo.observerAltitude;
@@ -398,8 +399,7 @@ export class VolumetricCloudSkyCache extends Disposable {
       delta,
       msOctaves: params.msOctaves,
       version: params.version,
-      sunDir: new Vector3(atmo.lightDir),
-      cameraPos: new Vector3(cameraPos)
+      sunDir: new Vector3(atmo.lightDir)
     };
     this._deltas[this._writeIndex] = delta;
     this._frame = 0;
