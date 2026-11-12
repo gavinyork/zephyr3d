@@ -209,6 +209,11 @@ const HORIZON_REFLECT_BIAS = 0.08;
 const REFRACT_EDGE_FADE = 0.06;
 /** Normalized depth at or above which the scene behind the water is sky. */
 const SCENE_SKY_DEPTH01 = 0.999;
+/**
+ * Meters a water fragment must lie behind the depth prepass to count as hidden and go unshaded.
+ * Above the 1 mm the ground foam is drawn in front of the ground.
+ */
+const HIDDEN_WATER_DEPTH_MARGIN = 0.05;
 /** Medium path, in meters, through water with only sky behind it: deep enough to absorb everything. */
 const SKY_MEDIUM_PATH = 1e4;
 /** Floor on the subsurface term's sun-alignment factor. */
@@ -1489,6 +1494,14 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
           ),
           scope.$choice(pb.lessThanEqual(scope.surfaceCoverage, 1e-3), pb.float(1), scope.groundFoamWeight)
         );
+        // Writing the depth turns off early depth testing for all of the water: the parts the
+        // scene hides, such as the whole sea under an island, would be shaded in full before
+        // the depth test drops them. Those are skipped below, judged by the depth prepass: the
+        // depth buffer the test runs against can only be nearer.
+        scope.$l.waterHidden = pb.greaterThan(
+          ShaderHelper.nonLinearDepthToLinearNormalized(scope, scope.$builtins.fragDepth as PBShaderExp),
+          pb.add(scope.scenePos.w, pb.div(HIDDEN_WATER_DEPTH_MARGIN, ShaderHelper.getCameraParams(scope).y))
+        );
       }
       const revealSwash =
         this.debugOutput === 'foamField' ||
@@ -1599,27 +1612,38 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
               this.infinite ? pb.sub(1, scope.$inputs.skirt) : pb.float(1)
             )
           : pb.float(0);
-        scope.$l.outColor = pb.vec4(
-          this.waterShading(
-            scope,
-            scope.$inputs.worldPos,
-            scope.normal.xyz,
-            scope.normal.w,
-            scope.crestHeight,
-            scope.$inputs.clipmapPos.xz,
-            scope.restXZGrad,
-            scope.foamSample,
-            scope.surfaceCoverage,
-            scope.sheetThickness,
-            scope.wallFoam,
-            scope.scenePos,
-            scope.groundFoamDensity,
-            scope.groundFoamSample,
-            scope.groundNormal,
-            scope.groundFoamWeight
-          ),
-          1
-        );
+        const that = this;
+        const shade = (s: PBInsideFunctionScope) =>
+          pb.vec4(
+            that.waterShading(
+              s,
+              scope.$inputs.worldPos,
+              scope.normal.xyz,
+              scope.normal.w,
+              scope.crestHeight,
+              scope.$inputs.clipmapPos.xz,
+              scope.restXZGrad,
+              scope.foamSample,
+              scope.surfaceCoverage,
+              scope.sheetThickness,
+              scope.wallFoam,
+              scope.scenePos,
+              scope.groundFoamDensity,
+              scope.groundFoamSample,
+              scope.groundNormal,
+              scope.groundFoamWeight
+            ),
+            1
+          );
+        if (this._shoreWaveGenerator && this._foamFieldGenerator) {
+          // See waterHidden: what the depth test drops anyway is not shaded
+          scope.$l.outColor = pb.vec4(0, 0, 0, 1);
+          scope.$if(pb.not(scope.waterHidden), function () {
+            this.outColor = shade(this);
+          });
+        } else {
+          scope.$l.outColor = shade(scope);
+        }
       }
       if (
         this.drawContext.materialFlags &
