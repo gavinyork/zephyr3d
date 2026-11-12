@@ -320,6 +320,14 @@ export interface Drawable {
    * external Drawable implementation for the sake of a `return false`.
    */
   needHiZNearest?(): boolean;
+  /**
+   * Whether the object traces screen-space rays its shader can march through the Hi-Z pyramid
+   * instead of the linear depth. The pyramid is built for such a frame when the camera has
+   * {@link Camera.HiZ} on.
+   *
+   * Optional, like {@link Drawable.needHiZNearest}.
+   */
+  needHiZ?(): boolean;
   /** True if shading is unlit (does not depend on scene lighting). */
   isUnlit(): boolean;
   /** Returns the bound material driving shading for this drawable. */

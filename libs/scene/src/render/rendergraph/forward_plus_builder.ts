@@ -421,7 +421,9 @@ export function deriveForwardPlusOptions(
   return {
     depthPrepass: true,
     motionVectors: false,
-    hiZ: needHiZNearest,
+    // The camera's HiZ switch speeds up the screen-space rays of materials (water reflections)
+    // as well as those of the SSR effect
+    hiZ: needHiZNearest || (camera.HiZ && renderQueue.needHiZ()),
     hiZNearest: needHiZNearest,
     sceneNormal: false,
     sceneRoughness: false,
@@ -1042,12 +1044,16 @@ const VirtualTextureModule: RenderModule<FrameGraphContext> = {
       builder.setExecute((rgCtx) => {
         const depthTex = rgCtx.getTexture<Texture2D>(depthHandle);
         const stamp = ctx.device.frameInfo.frameCounter;
+        RenderGraphExecutor.profileScope('VirtualTextureMark', () => {
+          for (const client of clients) {
+            client.markFromDepth?.(ctx, depthTex);
+          }
+        });
         for (const client of clients) {
-          client.markFromDepth?.(ctx, depthTex);
-        }
-        for (const client of clients) {
-          client.virtualTexture.update(stamp);
-          client.fill(ctx);
+          RenderGraphExecutor.profileScope('VirtualTextureResidency', () =>
+            client.virtualTexture.update(stamp)
+          );
+          RenderGraphExecutor.profileScope('VirtualTextureFill', () => client.fill(ctx));
         }
       });
       return token;

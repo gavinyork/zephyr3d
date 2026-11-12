@@ -205,10 +205,42 @@ function hexWeights(scope: PBInsideFunctionScope, prefix: string, colorWeights: 
 }
 
 /**
+ * Sums the layers weighted by the splat masks. With `skipZeroWeights` each layer is evaluated in a
+ * branch only where its weight is not zero, which pays off where few layers overlap and the
+ * samples need no implicit derivatives (compute, explicit gradients).
+ */
+function sumTerrainLayers(
+  scope: PBInsideFunctionScope,
+  numLayers: number,
+  masks: PBShaderExp[],
+  name: string,
+  layer: (s: PBInsideFunctionScope, i: number) => PBShaderExp,
+  skipZeroWeights: boolean
+) {
+  const pb = scope.$builder;
+  if (!skipZeroWeights) {
+    let sum: PBShaderExp = pb.vec3(0);
+    for (let i = 0; i < numLayers; i++) {
+      sum = pb.add(sum, pb.mul(layer(scope, i), weight(masks, i)));
+    }
+    return sum;
+  }
+  scope.$l[name] = pb.vec3(0);
+  for (let i = 0; i < numLayers; i++) {
+    scope.$if(pb.greaterThan(weight(masks, i), 0), function () {
+      this[name] = pb.add(this[name], pb.mul(layer(this, i), weight(masks, i)));
+    });
+  }
+  return scope[name] as PBShaderExp;
+}
+
+/**
  * Albedo: the layers weighted by the splat masks. Weights are not normalized, uncovered area
  * stays black.
  * @param detailParams - Per layer (uv scale, roughness, 0, 0)
  * @param grad - Gradients of `uv`; required for hex tiled layers, which are sampled flat otherwise
+ * @param skipZeroWeights - Sample a layer only where its weight is not zero; needs `sampleAlbedo`
+ *   to take explicit gradients, as the samples then run in non-uniform control flow
  */
 export function blendTerrainAlbedo(
   scope: PBInsideFunctionScope,
@@ -218,48 +250,54 @@ export function blendTerrainAlbedo(
   detailParams: PBShaderExp,
   sampleAlbedo: TerrainLayerSampler,
   grad: TerrainUVGrad | null = null,
-  hex: TerrainHexTiling | null = null
+  hex: TerrainHexTiling | null = null,
+  skipZeroWeights = false
 ) {
   const pb = scope.$builder;
-  let color: PBShaderExp = pb.vec3(0);
-  for (let i = 0; i < numLayers; i++) {
-    const tiling = detailParams.at(i).x as PBShaderExp;
-    const coord = pb.mul(uv, tiling);
-    const ddx = grad ? pb.mul(grad.ddx, tiling) : null;
-    const ddy = grad ? pb.mul(grad.ddy, tiling) : null;
-    let sample: PBShaderExp;
-    if (useHex(hex, grad, i)) {
-      const prefix = `zHexA${i}`;
-      const p = hex!.params.at(i) as PBShaderExp;
-      terrainHexTile(scope, prefix, coord, p.x, p.y);
-      const [c1, c2, c3] = sampleHexTiled(scope, prefix, i, sampleAlbedo, ddx!, ddy!).map((c) => c.rgb);
-      scope.$l[`${prefix}A1`] = c1;
-      scope.$l[`${prefix}A2`] = c2;
-      scope.$l[`${prefix}A3`] = c3;
-      // Luminance as weights, mix(1, luma, contrast); Rec.709 coefficients for our linear
-      // working space (one of mx_hextiledimage's lumacoeffs choices)
-      const luma = pb.vec3(0.2126, 0.7152, 0.0722);
-      const cw = pb.mix(
-        pb.vec3(1),
-        pb.vec3(
-          pb.dot(scope[`${prefix}A1`], luma),
-          pb.dot(scope[`${prefix}A2`], luma),
-          pb.dot(scope[`${prefix}A3`], luma)
-        ),
-        pb.vec3(p.z)
-      );
-      scope.$l[`${prefix}NW`] = hexWeights(scope, prefix, cw);
-      const w = scope[`${prefix}NW`];
-      sample = pb.add(
-        pb.add(pb.mul(scope[`${prefix}A1`], w.x), pb.mul(scope[`${prefix}A2`], w.y)),
-        pb.mul(scope[`${prefix}A3`], w.z)
-      );
-    } else {
-      sample = sampleAlbedo(scope, i, coord, ddx, ddy).rgb;
-    }
-    color = pb.add(color, pb.mul(sample, weight(masks, i)));
-  }
-  return color;
+  return sumTerrainLayers(
+    scope,
+    numLayers,
+    masks,
+    'zTerrainAlbedoSum',
+    (scope, i) => {
+      const tiling = detailParams.at(i).x as PBShaderExp;
+      const coord = pb.mul(uv, tiling);
+      const ddx = grad ? pb.mul(grad.ddx, tiling) : null;
+      const ddy = grad ? pb.mul(grad.ddy, tiling) : null;
+      let sample: PBShaderExp;
+      if (useHex(hex, grad, i)) {
+        const prefix = `zHexA${i}`;
+        const p = hex!.params.at(i) as PBShaderExp;
+        terrainHexTile(scope, prefix, coord, p.x, p.y);
+        const [c1, c2, c3] = sampleHexTiled(scope, prefix, i, sampleAlbedo, ddx!, ddy!).map((c) => c.rgb);
+        scope.$l[`${prefix}A1`] = c1;
+        scope.$l[`${prefix}A2`] = c2;
+        scope.$l[`${prefix}A3`] = c3;
+        // Luminance as weights, mix(1, luma, contrast); Rec.709 coefficients for our linear
+        // working space (one of mx_hextiledimage's lumacoeffs choices)
+        const luma = pb.vec3(0.2126, 0.7152, 0.0722);
+        const cw = pb.mix(
+          pb.vec3(1),
+          pb.vec3(
+            pb.dot(scope[`${prefix}A1`], luma),
+            pb.dot(scope[`${prefix}A2`], luma),
+            pb.dot(scope[`${prefix}A3`], luma)
+          ),
+          pb.vec3(p.z)
+        );
+        scope.$l[`${prefix}NW`] = hexWeights(scope, prefix, cw);
+        const w = scope[`${prefix}NW`];
+        sample = pb.add(
+          pb.add(pb.mul(scope[`${prefix}A1`], w.x), pb.mul(scope[`${prefix}A2`], w.y)),
+          pb.mul(scope[`${prefix}A3`], w.z)
+        );
+      } else {
+        sample = sampleAlbedo(scope, i, coord, ddx, ddy).rgb;
+      }
+      return sample;
+    },
+    skipZeroWeights
+  );
 }
 
 /**
@@ -274,6 +312,7 @@ export function blendTerrainAlbedo(
  * surface, and its normals with it. (MaterialX writes mx_axis_rotation_matrix row by row into a
  * column major GLSL mat3, which turns them the other way.)
  * @param sampleNormal - Returns the raw rgb of the layer's normal map
+ * @param skipZeroWeights - As for {@link blendTerrainAlbedo}
  */
 export function blendTerrainDetailNormal(
   scope: PBInsideFunctionScope,
@@ -283,43 +322,49 @@ export function blendTerrainDetailNormal(
   detailParams: PBShaderExp,
   sampleNormal: TerrainLayerSampler,
   grad: TerrainUVGrad | null = null,
-  hex: TerrainHexTiling | null = null
+  hex: TerrainHexTiling | null = null,
+  skipZeroWeights = false
 ) {
   const pb = scope.$builder;
-  let normal: PBShaderExp = pb.vec3(0);
   const decode = (raw: PBShaderExp) => pb.normalize(pb.sub(pb.mul(raw, 2), pb.vec3(1)));
-  for (let i = 0; i < numLayers; i++) {
-    const tiling = detailParams.at(i).x as PBShaderExp;
-    const coord = pb.mul(uv, tiling);
-    const ddx = grad ? pb.mul(grad.ddx, tiling) : null;
-    const ddy = grad ? pb.mul(grad.ddy, tiling) : null;
-    let decoded: PBShaderExp;
-    if (useHex(hex, grad, i)) {
-      const prefix = `zHexN${i}`;
-      const p = hex!.params.at(i) as PBShaderExp;
-      terrainHexTile(scope, prefix, coord, p.x, p.y);
-      const samples = sampleHexTiled(scope, prefix, i, sampleNormal, ddx!, ddy!);
-      const comps = ['x', 'y', 'z'] as const;
-      samples.forEach((raw, k) => {
-        scope.$l[`${prefix}N${k}`] = decode(raw.rgb);
-        const n = scope[`${prefix}N${k}`];
-        const xy = rotate2(scope, n.xy, pb.neg(scope[`${prefix}R`][comps[k]]));
-        // surface gradient of the turned normal against (0, 0, 1)
-        scope.$l[`${prefix}G${k}`] = pb.div(xy, pb.max(pb.abs(n.z), 1e-5));
-      });
-      scope.$l[`${prefix}NW`] = hexWeights(scope, prefix, null);
-      const w = scope[`${prefix}NW`];
-      const g = pb.add(
-        pb.add(pb.mul(scope[`${prefix}G0`], w.x), pb.mul(scope[`${prefix}G1`], w.y)),
-        pb.mul(scope[`${prefix}G2`], w.z)
-      );
-      decoded = pb.normalize(pb.vec3(g, 1));
-    } else {
-      decoded = decode(sampleNormal(scope, i, coord, ddx, ddy).rgb);
-    }
-    normal = pb.add(normal, pb.mul(decoded, weight(masks, i)));
-  }
-  return normal;
+  return sumTerrainLayers(
+    scope,
+    numLayers,
+    masks,
+    'zTerrainNormalSum',
+    (scope, i) => {
+      const tiling = detailParams.at(i).x as PBShaderExp;
+      const coord = pb.mul(uv, tiling);
+      const ddx = grad ? pb.mul(grad.ddx, tiling) : null;
+      const ddy = grad ? pb.mul(grad.ddy, tiling) : null;
+      let decoded: PBShaderExp;
+      if (useHex(hex, grad, i)) {
+        const prefix = `zHexN${i}`;
+        const p = hex!.params.at(i) as PBShaderExp;
+        terrainHexTile(scope, prefix, coord, p.x, p.y);
+        const samples = sampleHexTiled(scope, prefix, i, sampleNormal, ddx!, ddy!);
+        const comps = ['x', 'y', 'z'] as const;
+        samples.forEach((raw, k) => {
+          scope.$l[`${prefix}N${k}`] = decode(raw.rgb);
+          const n = scope[`${prefix}N${k}`];
+          const xy = rotate2(scope, n.xy, pb.neg(scope[`${prefix}R`][comps[k]]));
+          // surface gradient of the turned normal against (0, 0, 1)
+          scope.$l[`${prefix}G${k}`] = pb.div(xy, pb.max(pb.abs(n.z), 1e-5));
+        });
+        scope.$l[`${prefix}NW`] = hexWeights(scope, prefix, null);
+        const w = scope[`${prefix}NW`];
+        const g = pb.add(
+          pb.add(pb.mul(scope[`${prefix}G0`], w.x), pb.mul(scope[`${prefix}G1`], w.y)),
+          pb.mul(scope[`${prefix}G2`], w.z)
+        );
+        decoded = pb.normalize(pb.vec3(g, 1));
+      } else {
+        decoded = decode(sampleNormal(scope, i, coord, ddx, ddy).rgb);
+      }
+      return decoded;
+    },
+    skipZeroWeights
+  );
 }
 
 /**

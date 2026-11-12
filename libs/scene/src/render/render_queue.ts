@@ -222,6 +222,7 @@ export class RenderQueue extends Disposable {
   private _needSceneColor: boolean;
   private _needSceneDepth: boolean;
   private _needHiZNearest: boolean;
+  private _needHiZ: boolean;
   private _needSceneColorWithDepth: boolean;
   /** @internal */
   private _drawTransparent: boolean;
@@ -264,6 +265,7 @@ export class RenderQueue extends Disposable {
     this._needSceneColor = false;
     this._needSceneDepth = false;
     this._needHiZNearest = false;
+    this._needHiZ = false;
     this._needSceneColorWithDepth = false;
     this._drawTransparent = false;
     this._objectColorMaps = [new Map()];
@@ -375,6 +377,14 @@ export class RenderQueue extends Disposable {
    */
   needHiZNearest() {
     return this._needHiZNearest;
+  }
+  /**
+   * Whether a drawable of the frame would march screen-space rays through the Hi-Z pyramid,
+   * see {@link Drawable.needHiZ}.
+   * @internal
+   */
+  needHiZ() {
+    return this._needHiZ;
   }
   /** @internal */
   needSceneColorWithDepth() {
@@ -491,6 +501,7 @@ export class RenderQueue extends Disposable {
     this._needSceneColor ||= queue._needSceneColor;
     this._needSceneDepth ||= queue._needSceneDepth;
     this._needHiZNearest ||= queue._needHiZNearest;
+    this._needHiZ ||= queue._needHiZ;
     this._needSceneColorWithDepth ||= queue._needSceneColorWithDepth;
     this._drawTransparent ||= queue._drawTransparent;
     this._sunLight ||= queue._sunLight;
@@ -535,6 +546,7 @@ export class RenderQueue extends Disposable {
       this._needSceneColor ||= transmission;
       this._needSceneDepth ||= drawable.needSceneDepth();
       this._needHiZNearest ||= !!drawable.needHiZNearest?.();
+      this._needHiZ ||= !!drawable.needHiZ?.();
       this._needSceneColorWithDepth ||= transmission && needDepth;
       this._drawTransparent ||= trans;
       if (camera.getPickResultResolveFunc()) {
@@ -740,6 +752,7 @@ export class RenderQueue extends Disposable {
     this._needSceneColor = false;
     this._needSceneDepth = false;
     this._needHiZNearest = false;
+    this._needHiZ = false;
     this._needSceneColorWithDepth = false;
     this._drawTransparent = false;
   }

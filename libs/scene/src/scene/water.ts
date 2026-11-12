@@ -1100,6 +1100,13 @@ export class Water extends applyMixins(GraphNode, mixinDrawable) implements Draw
     return this._material.get()?.needSceneDepth() ?? false;
   }
   /**
+   * {@inheritDoc Drawable.needHiZ}
+   */
+  needHiZ() {
+    // The surface's screen-space reflections
+    return !!this._material.get();
+  }
+  /**
    * {@inheritDoc Drawable.getMaterial}
    */
   getMaterial() {

@@ -422,7 +422,9 @@ export class TerrainVirtualTexture extends Disposable implements VirtualTextureC
           scope.detailParams,
           (s, i, uv, ddx, ddy) => pb.textureArraySampleGrad(s.detailAlbedoMap, uv, i, ddx!, ddy!),
           grad,
-          hex
+          hex,
+          // Most texels lie in one or two layers; the others cost all of their samples otherwise
+          true
         );
         scope.$l.detailNormal = blendTerrainDetailNormal(
           scope,
@@ -432,7 +434,8 @@ export class TerrainVirtualTexture extends Disposable implements VirtualTextureC
           scope.detailParams,
           (s, i, uv, ddx, ddy) => pb.textureArraySampleGrad(s.detailNormalMap, uv, i, ddx!, ddy!),
           grad,
-          hex
+          hex,
+          true
         );
         scope.$l.roughness = blendTerrainRoughness(
           scope,
