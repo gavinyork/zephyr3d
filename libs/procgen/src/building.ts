@@ -1,5 +1,13 @@
 import type { GeneratedModelSpec, Vec3 } from '@zephyr3d/modelgen';
-import { getStyle, listStyles, registerStyle, runGrammar, toSpec, type AnyRuleset } from './grammar';
+import {
+  getStyle,
+  listStyles,
+  registerStyle,
+  runGrammar,
+  runGrammarParts,
+  toSpec,
+  type AnyRuleset
+} from './grammar';
 import { createScope } from './scope';
 import { modernOffice } from './styles/modern-office';
 
@@ -76,6 +84,40 @@ export interface GenerateBuildingOptions {
  * @public
  */
 export function generateBuilding(options: GenerateBuildingOptions = {}): GeneratedModelSpec {
+  const { ruleset, scope, seed, params } = prepareBuilding(options);
+  const nodes = runGrammar(ruleset, { scope, seed, params });
+  return toSpec(nodes, options.tangents ? { generateTangents: true } : undefined);
+}
+
+/**
+ * One separately meshable piece of a building, see {@link generateBuildingParts}.
+ * @public
+ */
+export interface BuildingPart {
+  /** Part name given by the style, for example `mass0` or `mass1.2` for modern office. */
+  part: string;
+  spec: GeneratedModelSpec;
+}
+
+/**
+ * Generates one building like {@link generateBuilding}, split into the parts its style names
+ * (see `GrammarContext.part`), so each can become its own mesh.
+ *
+ * The parts together hold exactly the geometry {@link generateBuilding} makes for the same
+ * options.
+ *
+ * @public
+ */
+export function generateBuildingParts(options: GenerateBuildingOptions = {}): BuildingPart[] {
+  const { ruleset, scope, seed, params } = prepareBuilding(options);
+  const generation = options.tangents ? { generateTangents: true } : undefined;
+  return runGrammarParts(ruleset, { scope, seed, params }).map(({ part, nodes }) => ({
+    part,
+    spec: toSpec(nodes, generation)
+  }));
+}
+
+function prepareBuilding(options: GenerateBuildingOptions) {
   ensureBuiltinStyles();
   const ruleset =
     typeof options.style === 'object' ? options.style : getStyle(options.style ?? 'modern-office');
@@ -87,7 +129,5 @@ export function generateBuilding(options: GenerateBuildingOptions = {}): Generat
   const height = Math.max(1e-3, options.height ?? ruleset.envelopeHeight?.(params) ?? 30);
 
   const scope = createScope([width, height, depth], options.origin ?? [0, 0, 0]);
-  const nodes = runGrammar(ruleset, { scope, seed: options.seed ?? 0, params });
-
-  return toSpec(nodes, options.tangents ? { generateTangents: true } : undefined);
+  return { ruleset, scope, seed: options.seed ?? 0, params };
 }

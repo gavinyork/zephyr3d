@@ -27,10 +27,22 @@ export interface GrammarContext<P extends object, D = unknown> {
    * encoding it into symbol names.
    */
   readonly data: D | undefined;
-  /** Adds a geometry node to the output. Ignores `null` so emitters can be chained. */
-  emit(node: ProceduralNode | null): void;
-  /** Queues `symbol` to be rewritten over `scope`, optionally carrying a payload. */
-  derive(symbol: string, scope: Scope, data?: D): void;
+  /**
+   * Part of the model the current symbol builds, inherited down the derivation. The axiom
+   * starts in part `''`. Parts let a caller split one model into separately meshed pieces
+   * (see {@link runGrammarParts}) without encoding anything into the material ids.
+   */
+  readonly part: string;
+  /**
+   * Adds a geometry node to the output. Ignores `null` so emitters can be chained.
+   * @param part - Part the node belongs to; defaults to the current {@link GrammarContext.part}.
+   */
+  emit(node: ProceduralNode | null, part?: string): void;
+  /**
+   * Queues `symbol` to be rewritten over `scope`, optionally carrying a payload.
+   * @param part - Part the derived symbol builds; defaults to the current {@link GrammarContext.part}.
+   */
+  derive(symbol: string, scope: Scope, data?: D, part?: string): void;
 }
 
 /**
@@ -135,13 +147,43 @@ export function runGrammar<P extends object, D = unknown>(
   ruleset: Ruleset<P, D>,
   options: RunGrammarOptions<P>
 ): ProceduralNode[] {
+  return derivate(ruleset, options).nodes;
+}
+
+/**
+ * Geometry one part of a model emitted, see {@link GrammarContext.part}.
+ * @public
+ */
+export interface GrammarPart {
+  /** Part name, `''` for geometry emitted outside any named part. */
+  part: string;
+  /** Nodes in emission order. */
+  nodes: ProceduralNode[];
+}
+
+/**
+ * Runs a ruleset like {@link runGrammar}, keeping the emitted nodes grouped by the part that
+ * emitted them. Parts are listed in order of their first emission.
+ *
+ * @public
+ */
+export function runGrammarParts<P extends object, D = unknown>(
+  ruleset: Ruleset<P, D>,
+  options: RunGrammarOptions<P>
+): GrammarPart[] {
+  return [...derivate(ruleset, options).parts].map(([part, nodes]) => ({ part, nodes }));
+}
+
+/** Runs the derivation, collecting nodes both in emission order and per part. */
+function derivate<P extends object, D>(ruleset: Ruleset<P, D>, options: RunGrammarOptions<P>) {
   const maxDepth = options.maxDepth ?? 64;
   const maxNodes = options.maxNodes ?? 50000;
   const params = { ...ruleset.defaultParams, ...(options.params ?? {}) } as P;
   const rng = new Random(options.seed ?? 0);
   const nodes: ProceduralNode[] = [];
-  const queue: { symbol: string; scope: Scope; depth: number; data: D | undefined }[] = [
-    { symbol: ruleset.axiom, scope: options.scope, depth: 0, data: undefined }
+  const parts = new Map<string, ProceduralNode[]>();
+  const queue: { symbol: string; scope: Scope; depth: number; data: D | undefined; part: string }[] = [
+    { symbol: ruleset.axiom, scope: options.scope, depth: 0, data: undefined, part: '' }
   ];
 
   while (queue.length > 0) {
@@ -161,7 +203,8 @@ export function runGrammar<P extends object, D = unknown>(
       depth: task.depth,
       symbol: task.symbol,
       data: task.data,
-      emit(node) {
+      part: task.part,
+      emit(node, part) {
         if (!node) {
           return;
         }
@@ -169,14 +212,21 @@ export function runGrammar<P extends object, D = unknown>(
           throw new Error(`Ruleset "${ruleset.id}" exceeded max node count ${maxNodes}`);
         }
         nodes.push(node);
+        const key = part ?? task.part;
+        let list = parts.get(key);
+        if (!list) {
+          list = [];
+          parts.set(key, list);
+        }
+        list.push(node);
       },
-      derive(symbol, scope, data) {
-        queue.push({ symbol, scope, depth: task.depth + 1, data });
+      derive(symbol, scope, data, part) {
+        queue.push({ symbol, scope, depth: task.depth + 1, data, part: part ?? task.part });
       }
     };
     rule(task.scope, ctx);
   }
-  return nodes;
+  return { nodes, parts };
 }
 
 const registry = new Map<string, AnyRuleset>();

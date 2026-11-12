@@ -3,25 +3,36 @@
  * a shape grammar fills each parcel with a building, as in the procgen demo.
  *
  * The geometry is written as `.zmsh` assets next to the scene, one per material group of each
- * building, so every building stays a separate node that can be moved or deleted.
+ * part of a building, so every building stays a separate node that can be moved or deleted.
+ *
+ * The scene is built to be traced by global illumination: the ground is solid slabs in chunks
+ * rather than a scaled built-in plane (which has no distance field), and tall buildings are split
+ * at floor lines, so every mesh's baked field keeps a voxel size near {@link BUILDING_VOXEL} or
+ * {@link GROUND_VOXEL} under the baker's cap of 128 voxels per axis.
  */
 import { Vector3 } from '@zephyr3d/base';
 import {
   availableStyles,
-  cityBlockGroundSpec,
-  generateBuilding,
+  cityBlockGroundParts,
+  generateBuildingParts,
   generateCityBlock,
   getStyle,
   Random,
   type MaterialHint
 } from '@zephyr3d/procgen';
-import { BatchGroup, DirectionalLight, Mesh, SceneNode, type MeshMaterial } from '@zephyr3d/scene';
+import {
+  BatchGroup,
+  DirectionalLight,
+  Mesh,
+  SceneNode,
+  type MeshMaterial,
+  type Scene
+} from '@zephyr3d/scene';
 import { GeneratedModelRunner } from '../generatedprimitive';
 import {
-  BUILTIN_PLANE,
+  bakeGeneratedMeshSDFs,
   createSurfaceMaterial,
   ensureAssetDir,
-  fetchBuiltinPrimitive,
   numParam,
   setupCamera,
   writeGeneratedPrimitive,
@@ -30,16 +41,27 @@ import {
 } from './common';
 
 /** The procedural model spec type, without depending on @zephyr3d/modelgen directly */
-type GeneratedModelSpec = ReturnType<typeof generateBuilding>;
+type GeneratedModelSpec = ReturnType<typeof generateBuildingParts>[number]['spec'];
 
 /** Used for a material group the style's palette does not describe */
 const FALLBACK_HINT: MaterialHint = { albedo: [0.5, 0.5, 0.5], metallic: 0, roughness: 0.8 };
 
-/** Street surfaces belong to the layout rather than to a building style */
+/** Ground surfaces belong to the layout rather than to a building style */
 const GROUND_SURFACES: Record<string, MaterialHint> = {
   road: { albedo: [0.035, 0.035, 0.04], metallic: 0, roughness: 0.92 },
+  verge: { albedo: [0.15, 0.16, 0.18], metallic: 0, roughness: 0.95 },
+  ground: { albedo: [0.15, 0.16, 0.18], metallic: 0, roughness: 0.95 },
   plaza: { albedo: [0.2, 0.195, 0.18], metallic: 0, roughness: 0.78 }
 };
+
+/** Baker's cap on voxels per axis, less two voxels of padding on each side */
+const FIELD_SPAN_VOXELS = 124;
+/** Target edge of a building field voxel: fine enough for street canyons and lobbies */
+const BUILDING_VOXEL = 0.5;
+/** Target edge of a ground field voxel; a chunk of two 20 m cells comes out near 0.33 */
+const GROUND_VOXEL = 0.25;
+/** Depth of the ground slabs, a few voxels so the field resolves both faces */
+const GROUND_DEPTH = 1.5;
 
 function styleOptions() {
   try {
@@ -76,6 +98,54 @@ function safeName(name: string) {
   return name.replace(/[^A-Za-z0-9_-]+/g, '_');
 }
 
+/**
+ * Field resolution the baker gives a mesh of the given extent, as bakeMeshSDF computes it for a
+ * resolution scale below 1 (128 voxels per axis at most, two of padding on each side, eight at least).
+ */
+function fieldResolution(extent: [number, number, number], voxel: number) {
+  const longest = Math.max(extent[0], extent[1], extent[2], 1e-6);
+  const size = Math.max(voxel, longest / FIELD_SPAN_VOXELS);
+  return extent.map((e) => Math.min(128, Math.max(8, Math.ceil(e / size) + 4)));
+}
+
+/**
+ * Raises the scene's distance field and GI material atlases to hold every field of the city at
+ * once, with some slack for packing: the block fits inside the default stream radius, so all of
+ * them stay loaded. Never lowers them, and stops at sizes whose memory stays reasonable.
+ */
+function sizeFieldAtlases(scene: Scene, fields: { extent: [number, number, number]; voxel: number }[]) {
+  const roundUp = (v: number, block: number) => Math.ceil(v / block) * block;
+  let sdfDemand = 0;
+  let materialDemand = 0;
+  for (const { extent, voxel } of fields) {
+    const res = fieldResolution(extent, voxel);
+    sdfDemand += res.reduce((n, v) => n * roundUp(v, 8), 1);
+    // The material field is half the distance field's resolution
+    materialDemand += res.reduce((n, v) => n * roundUp(Math.ceil(v / 2), 4), 1);
+  }
+  const slack = 1.25;
+  const sdfSizes: [number, number, number][] = [
+    [512, 256, 256],
+    [512, 512, 256],
+    [1024, 512, 256]
+  ];
+  const current = scene.sdf.atlasSize;
+  const sdfSize =
+    sdfSizes.find(([x, y, z]) => x * y * z >= sdfDemand * slack) ?? sdfSizes[sdfSizes.length - 1];
+  if (sdfSize[0] * sdfSize[1] * sdfSize[2] > current[0] * current[1] * current[2]) {
+    scene.sdf.atlasSize = sdfSize;
+  }
+  const materialSize = [256, 320, 384].find((s) => s * s * s >= materialDemand * slack) ?? 384;
+  if (materialSize > scene.gi.atlasSize) {
+    scene.gi.atlasSize = materialSize;
+  }
+  console.info(
+    `Buildings example: ${fields.length} fields need ${(sdfDemand / 1e6).toFixed(1)}M distance voxels ` +
+      `(atlas ${scene.sdf.atlasSize.join('×')}) and ${(materialDemand / 1e6).toFixed(1)}M material voxels ` +
+      `(atlas ${scene.gi.atlasSize}³)`
+  );
+}
+
 async function writeMesh(
   ctx: ExampleSceneBuildContext,
   runner: GeneratedModelRunner,
@@ -85,11 +155,11 @@ async function writeMesh(
   parent: SceneNode,
   nodeName: string
 ) {
-  const { primitive } = await writeGeneratedPrimitive(ctx, runner, spec, fileName);
+  const { path, primitive } = await writeGeneratedPrimitive(ctx, runner, spec, fileName);
   const mesh = new Mesh(ctx.scene, primitive, material);
   mesh.name = nodeName;
   mesh.parent = parent;
-  return mesh;
+  return { mesh, path };
 }
 
 export const buildingsScene: ExampleSceneType = {
@@ -151,6 +221,34 @@ export const buildingsScene: ExampleSceneType = {
       tooltip: 'Put the block under a BatchGroup so the whole city draws with few draw calls'
     },
     {
+      type: 'bool',
+      key: 'bakeSDF',
+      label: 'Bake Distance Fields',
+      default: true,
+      tooltip:
+        'Bake a signed distance field for every ground and building mesh and turn on global illumination, so the city takes part in it. Takes longer to create'
+    },
+    {
+      type: 'float',
+      key: 'sunElevation',
+      label: 'Sun Elevation',
+      default: 50,
+      min: 5,
+      max: 90,
+      format: '%.1f°',
+      tooltip: 'Height of the sun above the horizon; a low sun throws long shadows down the streets'
+    },
+    {
+      type: 'float',
+      key: 'sunAzimuth',
+      label: 'Sun Azimuth',
+      default: 38,
+      min: 0,
+      max: 360,
+      format: '%.1f°',
+      tooltip: 'Direction the sunlight comes from, measured from +X towards +Z'
+    },
+    {
       type: 'int',
       key: 'seed',
       label: 'Seed',
@@ -182,33 +280,59 @@ export const buildingsScene: ExampleSceneType = {
 
       const spanX = layout.width * cellSize;
       const spanZ = layout.height * cellSize;
-      const groundSize = Math.max(spanX, spanZ) * 3;
-      const ground = new Mesh(
-        scene,
-        await fetchBuiltinPrimitive(BUILTIN_PLANE),
-        await createSurfaceMaterial({ albedo: [0.15, 0.16, 0.18], roughness: 0.95 })
-      );
-      ground.name = 'Ground';
-      ground.parent = scene.rootNode;
-      ground.scale = new Vector3(groundSize, 1, groundSize);
-      // The ground only receives shadows: as a caster its bounds would swallow the shadow region
-      ground.castShadow = false;
 
-      const streets = new SceneNode(scene);
-      streets.name = 'Streets';
-      streets.parent = root;
-      for (const [surface, spec] of splitByGroup(cityBlockGroundSpec(layout))) {
-        const hint = GROUND_SURFACES[surface] ?? FALLBACK_HINT;
-        const mesh = await writeMesh(
-          ctx,
-          runner,
-          spec,
-          `street_${safeName(surface)}`,
-          await createSurfaceMaterial(hint),
-          streets,
-          surface
-        );
-        mesh.castShadow = false;
+      /** Generated mesh assets per target voxel size, for the optional distance field bake */
+      const groundPaths: string[] = [];
+      const buildingPaths: string[] = [];
+      /** Local bounds of every generated mesh, to size the field atlases */
+      const fieldExtents: { extent: [number, number, number]; voxel: number }[] = [];
+      const recordExtent = (mesh: Mesh, voxel: number) => {
+        const box = mesh.primitive?.getBoundingVolume()?.toAABB();
+        if (box) {
+          const e = Vector3.sub(box.maxPoint, box.minPoint);
+          fieldExtents.push({ extent: [e.x, e.y, e.z], voxel });
+        }
+        return box;
+      };
+
+      // Solid chunked slabs, the surrounding ground included: a scaled built-in plane has no
+      // distance field and would be invisible to global illumination
+      ctx.progress('Generating ground...');
+      const groundNode = new SceneNode(scene);
+      groundNode.name = 'Ground';
+      groundNode.parent = root;
+      const groundMaterials = new Map<string, MeshMaterial>();
+      for (const { part, spec } of cityBlockGroundParts(layout, {
+        depth: GROUND_DEPTH,
+        chunkCells: 2,
+        margin: Math.max(spanX, spanZ)
+      })) {
+        const groups = splitByGroup(spec);
+        const parent = groups.size > 1 ? new SceneNode(scene) : groundNode;
+        if (parent !== groundNode) {
+          parent.name = part;
+          parent.parent = groundNode;
+        }
+        for (const [surface, sub] of groups) {
+          let material = groundMaterials.get(surface);
+          if (!material) {
+            material = await createSurfaceMaterial(GROUND_SURFACES[surface] ?? FALLBACK_HINT);
+            groundMaterials.set(surface, material);
+          }
+          const { mesh, path } = await writeMesh(
+            ctx,
+            runner,
+            sub,
+            `ground_${safeName(part)}_${safeName(surface)}`,
+            material,
+            parent,
+            groups.size > 1 ? surface : part
+          );
+          // The ground only receives shadows: as a caster its bounds would swallow the shadow region
+          mesh.castShadow = false;
+          groundPaths.push(path);
+          recordExtent(mesh, GROUND_VOXEL);
+        }
       }
 
       const rng = new Random(seed ^ 0x27d4eb2f);
@@ -228,44 +352,85 @@ export const buildingsScene: ExampleSceneType = {
         // One tone per building: shifting all groups together keeps a building reading as one object
         const tone = rng.next() * 2 - 1;
         // Built around its own footprint centre so the node's pivot sits on the building
-        const spec = generateBuilding({
+        const parts = generateBuildingParts({
           style: styleId,
           seed: buildingSeed,
           footprint: [parcel.width, parcel.depth],
           origin: [-parcel.width * 0.5, 0, -parcel.depth * 0.5],
-          params: { floors, entranceFaceMask: parcel.frontageMask || 0b1111 }
+          params: {
+            floors,
+            entranceFaceMask: parcel.frontageMask || 0b1111,
+            // Taller parts would bake coarser than BUILDING_VOXEL under the baker's cap
+            maxPartHeight: FIELD_SPAN_VOXELS * BUILDING_VOXEL
+          }
         });
         const building = new SceneNode(scene);
         building.name = `Building ${index + 1}`;
         building.parent = root;
         building.position = new Vector3(cx, 0, cz);
-        for (const [group, sub] of splitByGroup(spec)) {
-          const hint = palette[group] ?? FALLBACK_HINT;
-          const k = 1 + (hint.variation ?? 0) * tone;
-          const mesh = await writeMesh(
-            ctx,
-            runner,
-            sub,
-            `building_${String(index + 1).padStart(3, '0')}_${safeName(group)}`,
-            await createSurfaceMaterial({
-              albedo: [hint.albedo[0] * k, hint.albedo[1] * k, hint.albedo[2] * k],
-              metallic: hint.metallic,
-              roughness: hint.roughness
-            }),
-            building,
-            group
-          );
-          const box = mesh.primitive?.getBoundingVolume()?.toAABB();
-          if (box) {
-            maxHeight = Math.max(maxHeight, box.maxPoint.y);
+        const materials = new Map<string, MeshMaterial>();
+        const fileBase = `building_${String(index + 1).padStart(3, '0')}`;
+        for (const { part, spec } of parts) {
+          let parent = building;
+          if (parts.length > 1) {
+            parent = new SceneNode(scene);
+            parent.name = part || 'base';
+            parent.parent = building;
+          }
+          for (const [group, sub] of splitByGroup(spec)) {
+            let material = materials.get(group);
+            if (!material) {
+              const hint = palette[group] ?? FALLBACK_HINT;
+              const k = 1 + (hint.variation ?? 0) * tone;
+              material = await createSurfaceMaterial({
+                albedo: [hint.albedo[0] * k, hint.albedo[1] * k, hint.albedo[2] * k],
+                metallic: hint.metallic,
+                roughness: hint.roughness
+              });
+              materials.set(group, material);
+            }
+            const { mesh, path } = await writeMesh(
+              ctx,
+              runner,
+              sub,
+              parts.length > 1
+                ? `${fileBase}_${safeName(part)}_${safeName(group)}`
+                : `${fileBase}_${safeName(group)}`,
+              material,
+              parent,
+              group
+            );
+            buildingPaths.push(path);
+            const box = recordExtent(mesh, BUILDING_VOXEL);
+            if (box) {
+              maxHeight = Math.max(maxHeight, box.maxPoint.y);
+            }
           }
         }
+      }
+
+      if (params.bakeSDF) {
+        await bakeGeneratedMeshSDFs(ctx, groundPaths, GROUND_VOXEL);
+        await bakeGeneratedMeshSDFs(ctx, buildingPaths, BUILDING_VOXEL);
+        sizeFieldAtlases(scene, fieldExtents);
+        // Turns the scene SDF on as well
+        scene.gi.enabled = true;
       }
 
       const sun = new DirectionalLight(scene);
       sun.name = 'Sun';
       sun.sunLight = true;
-      sun.lookAt(new Vector3(90, 140, 70), Vector3.zero(), Vector3.axisPY());
+      const elevation = (numParam(params, 'sunElevation') * Math.PI) / 180;
+      const azimuth = (numParam(params, 'sunAzimuth') * Math.PI) / 180;
+      sun.lookAt(
+        new Vector3(
+          Math.cos(elevation) * Math.cos(azimuth),
+          Math.sin(elevation),
+          Math.cos(elevation) * Math.sin(azimuth)
+        ),
+        Vector3.zero(),
+        Vector3.axisPY()
+      );
       sun.castShadow = true;
       // Stretch the cascades over the whole block, or only the nearest buildings get shadows
       sun.shadow.shadowDistance = Math.max(200, halfSpan * 2.5);

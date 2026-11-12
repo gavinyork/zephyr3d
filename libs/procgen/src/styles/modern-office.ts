@@ -163,6 +163,16 @@ export interface ModernOfficeParams {
   setbackScale: number;
   /** Maximum number of rooftop plant boxes. */
   maxRooftopUnits: number;
+  /**
+   * Height above which a mass is split, at floor lines, into several parts (see
+   * {@link GrammarContext.part}). Each mass is always its own part, named `mass<index>`
+   * from the ground up; a split mass's pieces are `mass<index>.<k>`. Infinity, the
+   * default, never splits.
+   *
+   * Meant for callers that mesh every part separately, for example to bake a distance
+   * field per mesh at a resolution a whole tower would not get.
+   */
+  maxPartHeight: number;
 }
 
 const DEFAULTS: ModernOfficeParams = {
@@ -184,7 +194,8 @@ const DEFAULTS: ModernOfficeParams = {
   setbackChance: 0.5,
   setbackFraction: 0.62,
   setbackScale: 0.76,
-  maxRooftopUnits: 4
+  maxRooftopUnits: 4,
+  maxPartHeight: Infinity
 };
 
 /** Payload threaded from the massing rule down to the facade rules. @public */
@@ -224,11 +235,41 @@ export function modernOfficeHeight(params: ModernOfficeParams): number {
 }
 
 /**
+ * Groups consecutive storeys into runs no taller than `maxHeight`, each holding at least one
+ * storey. A non-finite or non-positive limit keeps every storey in one run.
+ */
+function chunkStoreys(storeys: Scope[], maxHeight: number): Scope[][] {
+  if (!(maxHeight > 0) || !Number.isFinite(maxHeight)) {
+    return [storeys];
+  }
+  const total = storeys.reduce((sum, storey) => sum + storey.size[1], 0);
+  // Even runs rather than full runs plus a sliver at the top
+  const target = total / Math.ceil(total / maxHeight - 1e-6);
+  const chunks: Scope[][] = [];
+  let current: Scope[] = [];
+  let height = 0;
+  for (const storey of storeys) {
+    if (current.length > 0 && height + storey.size[1] > target + 1e-6) {
+      chunks.push(current);
+      current = [];
+      height = 0;
+    }
+    current.push(storey);
+    height += storey.size[1];
+  }
+  chunks.push(current);
+  return chunks;
+}
+
+/**
  * Emits the shaft of one mass: the recessed glazing plane, the horizontal member at
  * every floor line, and the facade derivations for all four sides.
  *
  * `hasGroundFloor` makes the bottom storey taller, which is what separates a
  * street-level lobby from a typical floor.
+ *
+ * A mass taller than {@link ModernOfficeParams.maxPartHeight} is emitted as several parts
+ * named `<mass part>.<index>`, split at floor lines.
  */
 function emitShaft(scope: Scope, ctx: Ctx, hasGroundFloor: boolean): void {
   const { floorHeight, groundFloorHeight } = ctx.params;
@@ -237,31 +278,46 @@ function emitShaft(scope: Scope, ctx: Ctx, hasGroundFloor: boolean): void {
     return;
   }
 
-  // One glazing volume per mass. The members emitted over it are what carve it into
-  // readable windows, so a deeper inset plus fatter members reads as a solid wall.
-  ctx.emit(boxFromScope(inset(scope, [preset.insetDepth, 0, preset.insetDepth]), { id: 'glass' }));
-
   const height = scope.size[1];
   const storeys: Scope[] = hasGroundFloor
     ? split(scope, 'y', [abs(Math.min(groundFloorHeight, height)), flt(1)]).flatMap((part, index) =>
         index === 0 ? [part] : repeat(part, 'y', floorHeight)
       )
     : repeat(scope, 'y', floorHeight);
+  if (storeys.length === 0) {
+    return;
+  }
 
   // A band straddles the top of every storey except the last, whose edge is covered
   // by the roof deck. Straddling rather than sitting under the line centres the
   // glazing in each storey instead of pushing it to the floor.
-  for (let i = 0; i < storeys.length - 1; i++) {
-    const storey = storeys[i];
-    const bandHeight = Math.min(preset.bandHeight, storey.size[1]);
-    const base = offsetLocal(storey, 'y', storey.size[1] - bandHeight * 0.5);
-    const band = createScope([scope.size[0], bandHeight, scope.size[2]], base.origin, base.basis);
-    ctx.emit(boxFromScope(band, { id: preset.bandGroup }));
-  }
-
-  for (const face of sideFaces(scope)) {
-    ctx.derive('Facade', face, ctx.data);
-  }
+  const chunks = chunkStoreys(storeys, ctx.params.maxPartHeight);
+  const chunkParts = chunks.map((_, k) => (chunks.length > 1 ? `${ctx.part}.${k}` : ctx.part));
+  let storeyIndex = 0;
+  chunks.forEach((chunk, k) => {
+    const part = chunkParts[k];
+    const chunkHeight = chunk.reduce((sum, storey) => sum + storey.size[1], 0);
+    const chunkScope = createScope([scope.size[0], chunkHeight, scope.size[2]], chunk[0].origin, scope.basis);
+    // One glazing volume per mass (or per part of a tall mass). The members emitted over it
+    // are what carve it into readable windows, so a deeper inset plus fatter members reads
+    // as a solid wall.
+    ctx.emit(
+      boxFromScope(inset(chunkScope, [preset.insetDepth, 0, preset.insetDepth]), { id: 'glass' }),
+      part
+    );
+    for (const storey of chunk) {
+      if (storeyIndex++ === storeys.length - 1) {
+        break;
+      }
+      const bandHeight = Math.min(preset.bandHeight, storey.size[1]);
+      const base = offsetLocal(storey, 'y', storey.size[1] - bandHeight * 0.5);
+      const band = createScope([scope.size[0], bandHeight, scope.size[2]], base.origin, base.basis);
+      ctx.emit(boxFromScope(band, { id: preset.bandGroup }), part);
+    }
+    for (const face of sideFaces(chunkScope)) {
+      ctx.derive('Facade', face, ctx.data, part);
+    }
+  });
 
   if (hasGroundFloor && ctx.rng.chance(ctx.params.canopyChance)) {
     // sideFaces returns [+X, -X, +Z, -Z], which is the order the mask is defined in.
@@ -273,7 +329,10 @@ function emitShaft(scope: Scope, ctx: Ctx, hasGroundFloor: boolean): void {
       const y = Math.min(groundFloorHeight, height) - 0.75;
       // Metal rather than trim, and thin: a thick pale slab reads as a floating shelf
       // instead of an entrance canopy.
-      ctx.emit(panelFromFace(faceRect(face, x, y, width, 0.22), ctx.params.canopyDepth, { id: 'frame' }));
+      ctx.emit(
+        panelFromFace(faceRect(face, x, y, width, 0.22), ctx.params.canopyDepth, { id: 'frame' }),
+        chunkParts[0]
+      );
     }
   }
 }
@@ -343,10 +402,11 @@ const rules: Record<string, (scope: Scope, ctx: Ctx) => void> = {
     }
 
     masses.forEach((mass, index) => {
-      ctx.derive(mass.ground ? 'BaseMass' : 'Mass', mass.scope, data);
+      const part = `mass${index}`;
+      ctx.derive(mass.ground ? 'BaseMass' : 'Mass', mass.scope, data, part);
       const top = offsetLocal(mass.scope, 'y', mass.scope.size[1]);
       const deck = createScope([mass.scope.size[0], 0, mass.scope.size[2]], top.origin, top.basis);
-      ctx.derive(index === masses.length - 1 ? 'Roof' : 'Terrace', deck, data);
+      ctx.derive(index === masses.length - 1 ? 'Roof' : 'Terrace', deck, data, part);
     });
   },
 

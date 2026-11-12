@@ -391,3 +391,138 @@ export function cityBlockGroundSpec(
   }
   return { version: 1, nodes };
 }
+
+/**
+ * Options for {@link cityBlockGroundParts}.
+ * @public
+ */
+export interface CityGroundPartsOptions {
+  /** Carriageway width. Defaults to 45% of the cell, leaving verges either side. */
+  roadWidth?: number;
+  /** Grid cells per side of one chunk. Defaults to 2. */
+  chunkCells?: number;
+  /** Depth of the slabs under the block, whose tops sit at y = 0. Defaults to 1. */
+  depth?: number;
+  /** Width of the ground around the block, beyond the boundary road. Defaults to 0, none. */
+  margin?: number;
+  /** Largest side of a tile of the surrounding ground. Defaults to three chunks. */
+  marginTile?: number;
+  /** Depth of the surrounding ground. Defaults to a twentieth of `marginTile`, at least `depth`. */
+  marginDepth?: number;
+}
+
+/**
+ * One chunk of a block's ground, see {@link cityBlockGroundParts}.
+ * @public
+ */
+export interface CityGroundPart {
+  /** `chunk_<x>_<z>` for chunks of the block, `margin_<i>` for the surrounding ground. */
+  part: string;
+  spec: GeneratedModelSpec;
+}
+
+/**
+ * Emits the ground of a block as solid slabs, chunked so each chunk can be its own mesh.
+ *
+ * Unlike {@link cityBlockGroundSpec}, which lays thin road strips over a ground plane the
+ * caller provides, this covers the whole block — and optionally a margin around it — with
+ * slabs whose tops sit at y = 0 and which never overlap. Thick, closed and chunked, every
+ * piece keeps a usable signed distance field when baked per mesh, which a single plane or a
+ * block-wide strip does not.
+ *
+ * A road cell is cut into a 3 × 3 grid: the junction square and each connected arm are
+ * `'road'`, the rest `'verge'`. Lot cells are `'ground'`, plaza cells `'plaza'`, and the
+ * margin is `'ground'`.
+ *
+ * @public
+ */
+export function cityBlockGroundParts(
+  layout: CityBlockLayout,
+  options: CityGroundPartsOptions = {}
+): CityGroundPart[] {
+  const { cellSize, origin } = layout;
+  const depth = Math.max(1e-3, options.depth ?? 1);
+  const roadWidth = Math.min(cellSize, Math.max(0, options.roadWidth ?? cellSize * 0.45));
+  const chunkCells = Math.max(1, Math.floor(options.chunkCells ?? 2));
+  const verge = (cellSize - roadWidth) * 0.5;
+  const slab = (id: string, x0: number, z0: number, x1: number, z1: number, d = depth): ProceduralNode => ({
+    type: 'box',
+    id,
+    size: [x1 - x0, d, z1 - z0],
+    position: [(x0 + x1) * 0.5, -d * 0.5, (z0 + z1) * 0.5]
+  });
+
+  const parts: CityGroundPart[] = [];
+  for (let cz0 = 0; cz0 < layout.height; cz0 += chunkCells) {
+    for (let cx0 = 0; cx0 < layout.width; cx0 += chunkCells) {
+      const nodes: ProceduralNode[] = [];
+      for (let z = cz0; z < Math.min(layout.height, cz0 + chunkCells); z++) {
+        for (let x = cx0; x < Math.min(layout.width, cx0 + chunkCells); x++) {
+          const x0 = origin[0] + x * cellSize;
+          const z0 = origin[1] + z * cellSize;
+          const kind = layout.kinds[z][x];
+          if (kind !== 'road') {
+            nodes.push(slab(kind === 'plaza' ? 'plaza' : 'ground', x0, z0, x0 + cellSize, z0 + cellSize));
+            continue;
+          }
+          const links = layout.tiles[z][x].data!.links;
+          const xs = [x0, x0 + verge, x0 + verge + roadWidth, x0 + cellSize];
+          const zs = [z0, z0 + verge, z0 + verge + roadWidth, z0 + cellSize];
+          for (let j = 0; j < 3; j++) {
+            for (let i = 0; i < 3; i++) {
+              if (xs[i + 1] - xs[i] <= 1e-6 || zs[j + 1] - zs[j] <= 1e-6) {
+                continue;
+              }
+              // [+X, -X, +Z, -Z] arms sit at the middle of each edge
+              const isRoad =
+                (i === 1 && j === 1) ||
+                (i === 2 && j === 1 && links[0]) ||
+                (i === 0 && j === 1 && links[1]) ||
+                (i === 1 && j === 2 && links[2]) ||
+                (i === 1 && j === 0 && links[3]);
+              nodes.push(slab(isRoad ? 'road' : 'verge', xs[i], zs[j], xs[i + 1], zs[j + 1]));
+            }
+          }
+        }
+      }
+      parts.push({
+        part: `chunk_${cx0 / chunkCells}_${cz0 / chunkCells}`,
+        spec: { version: 1, nodes }
+      });
+    }
+  }
+
+  const margin = Math.max(0, options.margin ?? 0);
+  if (margin > 0) {
+    const tile = Math.max(cellSize, options.marginTile ?? cellSize * chunkCells * 3);
+    const marginDepth = Math.max(depth, options.marginDepth ?? tile / 20);
+    const bx = [origin[0] - margin, origin[0], origin[0] + layout.width * cellSize];
+    bx.push(bx[2] + margin);
+    const bz = [origin[1] - margin, origin[1], origin[1] + layout.height * cellSize];
+    bz.push(bz[2] + margin);
+    let index = 0;
+    // The eight regions around the block, each tiled evenly
+    for (let j = 0; j < 3; j++) {
+      for (let i = 0; i < 3; i++) {
+        if (i === 1 && j === 1) {
+          continue;
+        }
+        const nx = Math.max(1, Math.ceil((bx[i + 1] - bx[i]) / tile));
+        const nz = Math.max(1, Math.ceil((bz[j + 1] - bz[j]) / tile));
+        const sx = (bx[i + 1] - bx[i]) / nx;
+        const sz = (bz[j + 1] - bz[j]) / nz;
+        for (let tz = 0; tz < nz; tz++) {
+          for (let tx = 0; tx < nx; tx++) {
+            const x0 = bx[i] + tx * sx;
+            const z0 = bz[j] + tz * sz;
+            parts.push({
+              part: `margin_${index++}`,
+              spec: { version: 1, nodes: [slab('ground', x0, z0, x0 + sx, z0 + sz, marginDepth)] }
+            });
+          }
+        }
+      }
+    }
+  }
+  return parts;
+}
