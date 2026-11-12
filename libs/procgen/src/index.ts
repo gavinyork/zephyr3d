@@ -25,3 +25,5 @@ export * from './wfc/model';
 export * from './wfc/solve';
 export * from './layout/city-block';
 export * from './styles/modern-office';
+export * from './styles/urban-residential';
+export * from './plan';

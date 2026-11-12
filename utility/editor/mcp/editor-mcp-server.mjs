@@ -743,6 +743,34 @@ function createRevolveNodeSchema() {
   };
 }
 
+function createExtrudeNodeSchema() {
+  return {
+    type: 'object',
+    description:
+      'Prism: a closed [x, z] outline swept straight up along +Y from y = 0. Good for building plans (L, U, T shapes), slabs with chamfered or rounded corners, kerbs and walls. The outline may be concave but must not cross itself.',
+    properties: {
+      ...createBaseNodeProperties(),
+      type: { type: 'string', enum: ['extrude'] },
+      profile: {
+        type: 'array',
+        minItems: 3,
+        items: numberTupleSchema(2, 'Outline point as [x, z].'),
+        description: 'Outline points in order, either winding; the last point joins the first.'
+      },
+      height: { type: 'number', exclusiveMinimum: 0, description: 'Extent along +Y. Defaults to 1.' },
+      cap_top: { type: 'boolean', description: 'Close the top. Defaults to true.' },
+      cap_bottom: { type: 'boolean', description: 'Close the bottom. Defaults to true.' },
+      smooth_angle: {
+        type: 'number',
+        minimum: 0,
+        description:
+          'Corners turning by less than this many degrees get smoothed wall normals, so sampled arcs shade round. Defaults to 30; 0 keeps all corners sharp.'
+      }
+    },
+    required: ['type', 'profile']
+  };
+}
+
 function createSurfacePatchSchema() {
   return {
     description: 'Bezier patch definition using 16 indices, 16 inline points, or a patch object.',
@@ -1030,6 +1058,7 @@ function createProceduralNodeSchema(depth = 2) {
     createCylinderNodeSchema(),
     createSphereNodeSchema(),
     createRevolveNodeSchema(),
+    createExtrudeNodeSchema(),
     createSurfaceNodeSchema(),
     createCurveNodeSchema(),
     createMeshNodeSchema(),
@@ -1199,7 +1228,7 @@ const MODEL_GENERATE_BEGIN_EXAMPLES = [
 const GENERATED_MODEL_SPEC_SCHEMA = {
   type: 'object',
   description:
-    'Procedural model spec. Prefer built-in primitives, revolve, surface, curve, and csg before falling back to raw mesh buffers. See examples for a pedestal box, a revolve vase, and a CSG arch cutout.',
+    'Procedural model spec. Prefer built-in primitives, revolve, extrude, surface, curve, and csg before falling back to raw mesh buffers. See examples for a pedestal box, a revolve vase, and a CSG arch cutout.',
   properties: {
     version: {
       type: 'integer',

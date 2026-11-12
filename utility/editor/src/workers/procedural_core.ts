@@ -18,6 +18,7 @@ type ProceduralNode =
   | CylinderNode
   | SphereNode
   | RevolveNode
+  | ExtrudeNode
   | SurfaceNode
   | CurveNode
   | MeshNode
@@ -83,6 +84,30 @@ type RevolveNode = BaseNode & {
   segments?: number;
   capTop?: boolean;
   capBottom?: boolean;
+};
+
+/**
+ * A prism: a closed outline in the XZ plane swept straight up along +Y.
+ *
+ * The outline may be concave (an L or U shaped plan, a rounded kerb) but must not cross
+ * itself; either winding works. Side walls get UVs of (distance along the outline, height),
+ * caps get (x, z), all in world units.
+ */
+type ExtrudeNode = BaseNode & {
+  type: 'extrude';
+  /** Outline points as `[x, z]`; the last point joins the first. */
+  profile: Vec2[];
+  /** Extent along +Y from y = 0. Defaults to 1. */
+  height?: number;
+  /** Close the top. Defaults to true. */
+  capTop?: boolean;
+  /** Close the bottom. Defaults to true. */
+  capBottom?: boolean;
+  /**
+   * Outline corners turning by less than this many degrees share a smoothed wall normal, so a
+   * finely sampled arc shades round. Defaults to 30; 0 keeps every corner sharp.
+   */
+  smoothAngle?: number;
 };
 
 type SurfaceNode = BaseNode & {
@@ -328,6 +353,9 @@ function tessellateNode(node: ProceduralNode, deadlineAt: number): MeshData {
     case 'revolve':
       mesh = tessellateRevolve(node, deadlineAt);
       break;
+    case 'extrude':
+      mesh = tessellateExtrude(node, deadlineAt);
+      break;
     case 'surface':
       mesh = tessellateSurface(node, deadlineAt);
       break;
@@ -535,6 +563,169 @@ function tessellateRevolve(node: RevolveNode, deadlineAt: number): MeshData {
     capRevolve(mesh, node, profile[profile.length - 1], segments, true);
   }
   return mesh;
+}
+
+function tessellateExtrude(node: ExtrudeNode, deadlineAt: number): MeshData {
+  if (!Array.isArray(node.profile)) {
+    throw new Error('extrude.profile requires at least three [x, z] points');
+  }
+  const height = positive(node.height, 1, 'extrude.height');
+  const smoothCos = Math.cos((nonNegative(node.smoothAngle, 30, 'extrude.smoothAngle') * Math.PI) / 180);
+  const points: Vec2[] = [];
+  for (const p of node.profile) {
+    if (!Array.isArray(p) || p.length !== 2 || !isFiniteNumber(p[0]) || !isFiniteNumber(p[1])) {
+      throw new Error('extrude.profile entries must be [x, z]');
+    }
+    const last = points[points.length - 1];
+    if (!last || Math.abs(last[0] - p[0]) > 1e-9 || Math.abs(last[1] - p[1]) > 1e-9) {
+      points.push([p[0], p[1]]);
+    }
+  }
+  while (
+    points.length > 1 &&
+    Math.abs(points[0][0] - points[points.length - 1][0]) <= 1e-9 &&
+    Math.abs(points[0][1] - points[points.length - 1][1]) <= 1e-9
+  ) {
+    points.pop();
+  }
+  if (points.length < 3) {
+    throw new Error('extrude.profile requires at least three distinct [x, z] points');
+  }
+  // Counter-clockwise in (x, z), so the outward wall normal of edge d is (dz, 0, -dx)
+  let area = 0;
+  for (let i = 0; i < points.length; i++) {
+    const a = points[i];
+    const b = points[(i + 1) % points.length];
+    area += a[0] * b[1] - b[0] * a[1];
+  }
+  if (Math.abs(area) < 1e-12) {
+    throw new Error('extrude.profile encloses no area');
+  }
+  if (area < 0) {
+    points.reverse();
+  }
+  const n = points.length;
+  const edgeNormals: Vec3[] = [];
+  for (let i = 0; i < n; i++) {
+    const a = points[i];
+    const b = points[(i + 1) % n];
+    edgeNormals.push(normalize([b[1] - a[1], 0, -(b[0] - a[0])]));
+  }
+  // Wall normal at the start and end of each edge: smoothed with the neighbour across a gentle corner
+  const cornerNormal = (before: number, after: number, own: number): Vec3 => {
+    const nb = edgeNormals[before];
+    const na = edgeNormals[after];
+    return dot(nb, na) >= smoothCos ? normalize(addVec3(nb, na)) : edgeNormals[own];
+  };
+
+  const mesh = emptyMesh();
+  let distance = 0;
+  for (let i = 0; i < n; i++) {
+    checkDeadline(deadlineAt);
+    const a = points[i];
+    const b = points[(i + 1) % n];
+    const length = Math.hypot(b[0] - a[0], b[1] - a[1]);
+    const na = cornerNormal((i + n - 1) % n, i, i);
+    const nb = cornerNormal(i, (i + 1) % n, i);
+    const base = mesh.positions.length / 3;
+    for (const [p, normal, u, v] of [
+      [[a[0], 0, a[1]], na, distance, 0],
+      [[b[0], 0, b[1]], nb, distance + length, 0],
+      [[b[0], height, b[1]], nb, distance + length, height],
+      [[a[0], height, a[1]], na, distance, height]
+    ] as Array<[Vec3, Vec3, number, number]>) {
+      pushVec3(mesh.positions, p);
+      pushVec3(mesh.normals, normal);
+      pushUV(mesh, node, u, v);
+    }
+    mesh.indices.push(base, base + 1, base + 2, base, base + 2, base + 3);
+    distance += length;
+  }
+
+  const capTop = node.capTop ?? true;
+  const capBottom = node.capBottom ?? true;
+  if (capTop || capBottom) {
+    const triangles = triangulateSimplePolygon(points, deadlineAt);
+    for (const [y, normal, enabled] of [
+      [height, [0, 1, 0], capTop],
+      [0, [0, -1, 0], capBottom]
+    ] as Array<[number, Vec3, boolean]>) {
+      if (!enabled) {
+        continue;
+      }
+      const base = mesh.positions.length / 3;
+      for (const p of points) {
+        pushVec3(mesh.positions, [p[0], y, p[1]]);
+        pushVec3(mesh.normals, normal);
+        pushUV(mesh, node, p[0], p[1]);
+      }
+      for (const [i, j, k] of triangles) {
+        mesh.indices.push(base + i, base + j, base + k);
+      }
+    }
+  }
+  return mesh;
+}
+
+/**
+ * Triangulates a simple polygon, counter-clockwise in its own 2D frame, by ear clipping
+ * (Meisters' two ears theorem; Eberly, "Triangulation by Ear Clipping", 2002). Quadratic,
+ * which suits outlines of a few hundred points. Triangles index into `points`; their winding
+ * is left to the caller.
+ */
+function triangulateSimplePolygon(points: Vec2[], deadlineAt: number): Array<[number, number, number]> {
+  const remaining = points.map((_, i) => i);
+  const triangles: Array<[number, number, number]> = [];
+  const cross = (o: Vec2, a: Vec2, b: Vec2) => (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]);
+  const inside = (p: Vec2, a: Vec2, b: Vec2, c: Vec2) =>
+    cross(a, b, p) >= 0 && cross(b, c, p) >= 0 && cross(c, a, p) >= 0;
+  while (remaining.length > 3) {
+    checkDeadline(deadlineAt);
+    let clipped = false;
+    for (let i = 0; i < remaining.length; i++) {
+      const ip = remaining[(i + remaining.length - 1) % remaining.length];
+      const ic = remaining[i];
+      const inext = remaining[(i + 1) % remaining.length];
+      const [a, b, c] = [points[ip], points[ic], points[inext]];
+      if (cross(a, b, c) <= 1e-12) {
+        continue; // reflex or degenerate corner
+      }
+      let blocked = false;
+      for (const other of remaining) {
+        if (other === ip || other === ic || other === inext) {
+          continue;
+        }
+        const p = points[other];
+        // A vertex coinciding with a corner does not block it
+        if (
+          distanceSq([p[0], 0, p[1]], [a[0], 0, a[1]]) < 1e-18 ||
+          distanceSq([p[0], 0, p[1]], [b[0], 0, b[1]]) < 1e-18 ||
+          distanceSq([p[0], 0, p[1]], [c[0], 0, c[1]]) < 1e-18
+        ) {
+          continue;
+        }
+        if (inside(p, a, b, c)) {
+          blocked = true;
+          break;
+        }
+      }
+      if (!blocked) {
+        triangles.push([ip, ic, inext]);
+        remaining.splice(i, 1);
+        clipped = true;
+        break;
+      }
+    }
+    if (!clipped) {
+      // Only a self-crossing or degenerate outline has no ear; fan the rest rather than fail
+      for (let i = 1; i + 1 < remaining.length; i++) {
+        triangles.push([remaining[0], remaining[i], remaining[i + 1]]);
+      }
+      return triangles;
+    }
+  }
+  triangles.push([remaining[0], remaining[1], remaining[2]]);
+  return triangles;
 }
 
 function tessellateSurface(node: SurfaceNode, deadlineAt: number): MeshData {

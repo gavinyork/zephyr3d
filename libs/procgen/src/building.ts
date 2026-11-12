@@ -10,8 +10,9 @@ import {
 } from './grammar';
 import { createScope } from './scope';
 import { modernOffice } from './styles/modern-office';
+import { urbanResidential } from './styles/urban-residential';
 
-const BUILTIN_STYLES: AnyRuleset[] = [modernOffice];
+const BUILTIN_STYLES: AnyRuleset[] = [modernOffice, urbanResidential];
 
 let builtinsRegistered = false;
 
