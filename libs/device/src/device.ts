@@ -952,6 +952,9 @@ export abstract class BaseDevice extends Observable<DeviceEventMap> {
       return;
     }
     const that = this;
+    // A frame the GPU is too far behind for waits for the next refresh: dropped
+    // in beginFrame() instead, the pacer would count it and wait a whole hold.
+    const blocked = () => that._beginFrameCounter === 0 && that.shouldSkipFrame();
     that._runLoopFunc = func;
     that._framePacer.reset();
     if (that._presentPending) {
@@ -967,7 +970,7 @@ export abstract class BaseDevice extends Observable<DeviceEventMap> {
         if (vsyncTime !== null) {
           const pacer = that._framePacer;
           that.pollDeferredFrame();
-          if (!pacer.shouldRender(vsyncTime)) {
+          if (!pacer.shouldRender(vsyncTime, blocked)) {
             // Not rendering at this refresh; present a held frame if this is its last refresh.
             if (that._presentPending && pacer.refreshesSinceRender >= pacer.wantedRefreshes - 1) {
               that.presentDeferredFrame();

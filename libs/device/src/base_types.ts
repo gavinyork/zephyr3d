@@ -3385,7 +3385,8 @@ export interface AbstractDevice extends IEventTarget<DeviceEventMap> {
    * {@link BaseTexture.readPixels} resolve only after every frame ahead of them
    * has finished, and so does the picture on screen. With a bound set, a frame
    * whose turn comes while that many earlier frames are still unfinished is
-   * skipped, so the CPU falls in step with the GPU and readback and display
+   * put off to the next display refresh (skipped outside a vsync'ed run loop),
+   * so the CPU falls in step with the GPU and readback and display
    * latency drop to about the bound. Throughput is unchanged, because the GPU
    * was already the limit. Two is a good value; one trades some GPU idle time
    * for the lowest latency.

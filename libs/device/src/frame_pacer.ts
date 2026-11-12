@@ -186,15 +186,22 @@ export class FramePacer {
   }
   /**
    * Called on every display refresh with its requestAnimationFrame timestamp.
+   * @param blocked - Asked only when a frame is due: whether the device cannot take one now
+   *   (the GPU is behind). The frame is then tried again at the next refresh, which makes the
+   *   frame before a missed refresh, instead of being counted as rendered and waiting for the
+   *   whole next hold.
    * @returns Whether to render a frame at this refresh.
    */
-  shouldRender(time: number): boolean {
+  shouldRender(time: number, blocked?: () => boolean): boolean {
     if (this._lastVsync >= 0) {
       this._measureRefresh(time - this._lastVsync);
     }
     this._lastVsync = time;
     const refresh = this._refresh;
     if (this._lastRender < 0 || refresh <= 0) {
+      if (blocked?.()) {
+        return false;
+      }
       this._lastRender = time;
       this._stableSince = time;
       this._sinceRender = 0;
@@ -209,7 +216,7 @@ export class FramePacer {
       this._waitingHeadroom = false;
       pushSample(this._headroom, time, refreshes <= wanted - 1);
     }
-    if (refreshes < wanted) {
+    if (refreshes < wanted || blocked?.()) {
       return false;
     }
     // Later than wanted: the frame before missed a refresh. Far later is a
