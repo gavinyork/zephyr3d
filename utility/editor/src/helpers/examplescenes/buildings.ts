@@ -12,12 +12,15 @@
  */
 import { Vector3 } from '@zephyr3d/base';
 import {
+  applyMaterialTone,
   availableStyles,
   cityBlockGroundParts,
   generateBuildingParts,
   generateCityBlock,
   getStyle,
+  pickMaterialScheme,
   Random,
+  randomMaterialTone,
   type MaterialHint
 } from '@zephyr3d/procgen';
 import {
@@ -47,14 +50,30 @@ type GeneratedModelSpec = ReturnType<typeof generateBuildingParts>[number]['spec
 const FALLBACK_HINT: MaterialHint = { albedo: [0.5, 0.5, 0.5], metallic: 0, roughness: 0.8 };
 
 /** Ground surfaces belong to the layout rather than to a building style */
-const GROUND_SURFACES: Record<string, MaterialHint> = {
+const REALISTIC_GROUND: Record<string, MaterialHint> = {
   road: { albedo: [0.045, 0.045, 0.05], metallic: 0, roughness: 0.9 },
-  sidewalk: { albedo: [0.28, 0.27, 0.25], metallic: 0, roughness: 0.85 },
+  sidewalk: { albedo: [0.3, 0.29, 0.27], metallic: 0, roughness: 0.85 },
   kerb: { albedo: [0.42, 0.41, 0.39], metallic: 0, roughness: 0.8 },
   marking: { albedo: [0.7, 0.7, 0.68], metallic: 0, roughness: 0.55 },
-  ground: { albedo: [0.15, 0.16, 0.18], metallic: 0, roughness: 0.95 },
-  plaza: { albedo: [0.2, 0.195, 0.18], metallic: 0, roughness: 0.78 }
+  // Lawns between the buildings and a park around the block
+  ground: { albedo: [0.045, 0.08, 0.025], metallic: 0, roughness: 0.95 },
+  margin: { albedo: [0.035, 0.062, 0.02], metallic: 0, roughness: 0.95 },
+  plaza: { albedo: [0.32, 0.27, 0.2], metallic: 0, roughness: 0.78 }
 };
+
+/** Light neutral ground under the vivid palette, so colour bled from the facades shows on it */
+const NEUTRAL_GROUND: Record<string, MaterialHint> = {
+  road: { albedo: [0.08, 0.08, 0.08], metallic: 0, roughness: 0.9 },
+  sidewalk: { albedo: [0.55, 0.55, 0.55], metallic: 0, roughness: 0.85 },
+  kerb: { albedo: [0.6, 0.6, 0.6], metallic: 0, roughness: 0.8 },
+  marking: { albedo: [0.8, 0.8, 0.8], metallic: 0, roughness: 0.55 },
+  ground: { albedo: [0.45, 0.45, 0.45], metallic: 0, roughness: 0.9 },
+  margin: { albedo: [0.3, 0.3, 0.3], metallic: 0, roughness: 0.9 },
+  plaza: { albedo: [0.5, 0.5, 0.5], metallic: 0, roughness: 0.8 }
+};
+
+/** Palette choices: a scheme set of the style, or the style's single reference palette */
+type PaletteMode = 'realistic' | 'vivid' | 'style';
 
 /** Ground groups too thin for a distance field; they keep out of it and of shadow casting */
 const PAINT_GROUPS = new Set(['marking']);
@@ -182,6 +201,19 @@ export const buildingsScene: ExampleSceneType = {
       options: styleOptions()
     },
     {
+      type: 'enum',
+      key: 'palette',
+      label: 'Palette',
+      default: 'realistic',
+      options: [
+        { value: 'realistic', label: 'Realistic' },
+        { value: 'vivid', label: 'Vivid (GI test)' },
+        { value: 'style', label: 'Style Default' }
+      ],
+      tooltip:
+        'Realistic dresses each building in a real facade material, from glass towers to brick and render, over lawns and paving. Vivid paints whole facades in strong flat colours over light grey ground, so colour bleeding from global illumination shows plainly. Style Default uses the single reference palette of the building style'
+    },
+    {
       type: 'int',
       key: 'gridWidth',
       label: 'Block Width',
@@ -248,7 +280,7 @@ export const buildingsScene: ExampleSceneType = {
       type: 'float',
       key: 'sunElevation',
       label: 'Sun Elevation',
-      default: 50,
+      default: 35,
       min: 5,
       max: 90,
       format: '%.1f°',
@@ -258,7 +290,7 @@ export const buildingsScene: ExampleSceneType = {
       type: 'float',
       key: 'sunAzimuth',
       label: 'Sun Azimuth',
-      default: 38,
+      default: 345,
       min: 0,
       max: 360,
       format: '%.1f°',
@@ -277,7 +309,10 @@ export const buildingsScene: ExampleSceneType = {
     const scene = ctx.scene;
     const styleId = String(params.style);
     const style = getStyle(styleId);
-    const palette = style.palette ?? {};
+    const paletteMode = String(params.palette ?? 'realistic') as PaletteMode;
+    // A style without the chosen scheme set falls back to its reference palette
+    const schemes = paletteMode === 'style' ? [] : (style.schemeSets?.[paletteMode] ?? []);
+    const groundSurfaces = paletteMode === 'vivid' ? NEUTRAL_GROUND : REALISTIC_GROUND;
     const width = Math.max(3, Math.round(numParam(params, 'gridWidth')));
     const depth = Math.max(3, Math.round(numParam(params, 'gridDepth')));
     const cellSize = Math.max(1, numParam(params, 'cellSize'));
@@ -335,7 +370,7 @@ export const buildingsScene: ExampleSceneType = {
         for (const [surface, sub] of groups) {
           let material = groundMaterials.get(surface);
           if (!material) {
-            material = await createSurfaceMaterial(GROUND_SURFACES[surface] ?? FALLBACK_HINT);
+            material = await createSurfaceMaterial(groundSurfaces[surface] ?? FALLBACK_HINT);
             groundMaterials.set(surface, material);
           }
           const { mesh, path } = await writeMesh(
@@ -373,8 +408,13 @@ export const buildingsScene: ExampleSceneType = {
         const falloff = 1 - Math.min(1, Math.hypot(cx - centreX, cz - centreZ) / halfSpan) * 0.65;
         const floors = Math.max(2, Math.round(rng.int(3, maxFloors) * falloff));
         const buildingSeed = rng.int(0, 1 << 30);
-        // One tone per building: shifting all groups together keeps a building reading as one object
-        const tone = rng.next() * 2 - 1;
+        // One scheme and one tone per building: shifting all groups together keeps a building
+        // reading as one object
+        const scheme = pickMaterialScheme(schemes, rng);
+        const palette = scheme?.palette ?? style.palette ?? {};
+        const tone = scheme
+          ? randomMaterialTone(rng)
+          : { lightness: rng.next() * 2 - 1, hue: 0, saturation: 0 };
         // Built around its own footprint centre so the node's pivot sits on the building
         const parts = generateBuildingParts({
           style: styleId,
@@ -382,6 +422,7 @@ export const buildingsScene: ExampleSceneType = {
           footprint: [parcel.width, parcel.depth],
           origin: [-parcel.width * 0.5, 0, -parcel.depth * 0.5],
           params: {
+            ...scheme?.params,
             floors,
             entranceFaceMask: parcel.frontageMask || 0b1111,
             // Taller parts would bake coarser than BUILDING_VOXEL under the baker's cap
@@ -389,7 +430,9 @@ export const buildingsScene: ExampleSceneType = {
           }
         });
         const building = new SceneNode(scene);
-        building.name = `Building ${index + 1}`;
+        building.name = scheme
+          ? `Building ${index + 1} (${scheme.displayName ?? scheme.id})`
+          : `Building ${index + 1}`;
         building.parent = root;
         building.position = new Vector3(cx, 0, cz);
         const materials = new Map<string, MeshMaterial>();
@@ -404,10 +447,9 @@ export const buildingsScene: ExampleSceneType = {
           for (const [group, sub] of splitByGroup(spec)) {
             let material = materials.get(group);
             if (!material) {
-              const hint = palette[group] ?? FALLBACK_HINT;
-              const k = 1 + (hint.variation ?? 0) * tone;
+              const hint = applyMaterialTone(palette[group] ?? FALLBACK_HINT, tone);
               material = await createSurfaceMaterial({
-                albedo: [hint.albedo[0] * k, hint.albedo[1] * k, hint.albedo[2] * k],
+                albedo: hint.albedo,
                 metallic: hint.metallic,
                 roughness: hint.roughness
               });

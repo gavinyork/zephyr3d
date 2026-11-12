@@ -1,6 +1,7 @@
 import type { Vec3 } from '@zephyr3d/modelgen';
 import { boxFromScope, panelFromFace } from '../emit';
 import type { GrammarContext, MaterialHint, Ruleset } from '../grammar';
+import type { MaterialScheme } from '../palette';
 import {
   abs,
   createScope,
@@ -503,12 +504,158 @@ const PALETTE: Record<MaterialGroup, MaterialHint> = {
 };
 
 /**
+ * Builds a scheme. `frame` covers the mullions of a curtain wall but also the piers of a
+ * punched or ribbon facade, so a scheme whose walls are masonry gives its frame the wall's
+ * colour and keeps curtain walls out through its facade weights.
+ */
+function scheme(
+  id: string,
+  displayName: string,
+  weight: number,
+  palette: Record<MaterialGroup, MaterialHint>,
+  facades: { curtain: number; punched: number; banded: number }
+): MaterialScheme {
+  return {
+    id,
+    displayName,
+    weight,
+    palette,
+    params: {
+      curtainWeight: facades.curtain,
+      punchedWeight: facades.punched,
+      bandedWeight: facades.banded
+    }
+  };
+}
+
+/** Clear glass: a dielectric, its look coming from the sky it reflects */
+const CLEAR_GLASS: MaterialHint = {
+  albedo: [0.02, 0.025, 0.03],
+  metallic: 0,
+  roughness: 0.05,
+  variation: 0.2
+};
+
+/**
+ * Looks of real buildings, for a block that should read as a believable city. Linear albedo
+ * within the range of real materials, from dark bronze glass to white render.
+ */
+const REALISTIC_SCHEMES: MaterialScheme[] = [
+  scheme(
+    'blue-glass',
+    'Blue glass tower',
+    1.2,
+    {
+      glass: { albedo: [0.018, 0.04, 0.055], metallic: 0, roughness: 0.05, variation: 0.25 },
+      frame: { albedo: [0.45, 0.46, 0.48], metallic: 0.9, roughness: 0.3, variation: 0.1 },
+      wall: { albedo: [0.32, 0.32, 0.33], metallic: 0, roughness: 0.7, variation: 0.15 },
+      trim: { albedo: [0.22, 0.22, 0.23], metallic: 0, roughness: 0.8, variation: 0.1 }
+    },
+    { curtain: 3, punched: 0, banded: 0.6 }
+  ),
+  scheme(
+    'bronze-glass',
+    'Bronze glass tower',
+    0.6,
+    {
+      glass: { albedo: [0.04, 0.034, 0.024], metallic: 0, roughness: 0.05, variation: 0.2 },
+      frame: { albedo: [0.2, 0.13, 0.07], metallic: 0.9, roughness: 0.35, variation: 0.15 },
+      wall: { albedo: [0.12, 0.11, 0.1], metallic: 0, roughness: 0.7, variation: 0.15 },
+      trim: { albedo: [0.18, 0.17, 0.16], metallic: 0, roughness: 0.8, variation: 0.1 }
+    },
+    { curtain: 2, punched: 0, banded: 1 }
+  ),
+  scheme(
+    'limestone',
+    'Limestone',
+    1,
+    {
+      glass: CLEAR_GLASS,
+      frame: { albedo: [0.4, 0.35, 0.26], metallic: 0, roughness: 0.8, variation: 0.12 },
+      wall: { albedo: [0.44, 0.38, 0.28], metallic: 0, roughness: 0.8, variation: 0.12 },
+      trim: { albedo: [0.3, 0.27, 0.21], metallic: 0, roughness: 0.85, variation: 0.1 }
+    },
+    { curtain: 0, punched: 2.5, banded: 1 }
+  ),
+  scheme(
+    'red-brick',
+    'Red brick',
+    1,
+    {
+      glass: CLEAR_GLASS,
+      frame: { albedo: [0.22, 0.068, 0.038], metallic: 0, roughness: 0.85, variation: 0.2 },
+      wall: { albedo: [0.25, 0.075, 0.04], metallic: 0, roughness: 0.85, variation: 0.2 },
+      trim: { albedo: [0.36, 0.34, 0.3], metallic: 0, roughness: 0.8, variation: 0.1 }
+    },
+    { curtain: 0, punched: 3, banded: 0.5 }
+  ),
+  scheme(
+    'white-render',
+    'White render',
+    1,
+    {
+      glass: { albedo: [0.02, 0.03, 0.04], metallic: 0, roughness: 0.05, variation: 0.2 },
+      frame: { albedo: [0.6, 0.58, 0.54], metallic: 0, roughness: 0.75, variation: 0.06 },
+      wall: { albedo: [0.62, 0.6, 0.56], metallic: 0, roughness: 0.75, variation: 0.06 },
+      trim: { albedo: [0.4, 0.39, 0.37], metallic: 0, roughness: 0.8, variation: 0.08 }
+    },
+    { curtain: 0, punched: 1, banded: 2 }
+  ),
+  scheme(
+    'terracotta',
+    'Terracotta',
+    0.7,
+    {
+      glass: CLEAR_GLASS,
+      frame: { albedo: [0.36, 0.13, 0.05], metallic: 0, roughness: 0.8, variation: 0.15 },
+      wall: { albedo: [0.4, 0.15, 0.06], metallic: 0, roughness: 0.8, variation: 0.15 },
+      trim: { albedo: [0.45, 0.4, 0.33], metallic: 0, roughness: 0.8, variation: 0.1 }
+    },
+    { curtain: 0, punched: 1.5, banded: 2 }
+  )
+];
+
+/** One saturated colour for a whole facade, framed by a pale roof */
+function vivid(id: string, displayName: string, albedo: [number, number, number]): MaterialScheme {
+  return scheme(
+    id,
+    displayName,
+    1,
+    {
+      glass: CLEAR_GLASS,
+      frame: { albedo: [albedo[0] * 0.9, albedo[1] * 0.9, albedo[2] * 0.9], metallic: 0, roughness: 0.8 },
+      wall: { albedo, metallic: 0, roughness: 0.8 },
+      trim: { albedo: [0.7, 0.7, 0.7], metallic: 0, roughness: 0.8 }
+    },
+    // Solid facades: a curtain wall would hide the colour behind glass
+    { curtain: 0, punched: 2, banded: 1 }
+  );
+}
+
+/**
+ * Strong, flat colours with no per-building drift, for testing global illumination: colour
+ * bleeding between facades and onto the street shows plainly. Albedo stays at or below 0.8.
+ */
+const VIVID_SCHEMES: MaterialScheme[] = [
+  vivid('red', 'Red', [0.65, 0.05, 0.03]),
+  vivid('green', 'Green', [0.08, 0.45, 0.08]),
+  vivid('blue', 'Blue', [0.05, 0.12, 0.6]),
+  vivid('yellow', 'Yellow', [0.75, 0.55, 0.03]),
+  vivid('orange', 'Orange', [0.8, 0.25, 0.03]),
+  vivid('white', 'White', [0.8, 0.8, 0.8])
+];
+
+/**
  * A contemporary office building in one of three facade languages: glass curtain
  * wall, punched windows, or horizontal ribbons — with an optional podium, setback
  * and a plant-cluttered roof.
  *
  * This is the reference ruleset. A new style registers its own {@link Ruleset} and
  * needs no changes here or in the engine.
+ *
+ * Besides its reference {@link Ruleset.palette}, it offers two scheme sets: `realistic`,
+ * real facade materials from glass towers to brick and render, and `vivid`, saturated flat
+ * colours for testing global illumination.
  *
  * @public
  */
@@ -518,6 +665,7 @@ export const modernOffice: Ruleset<ModernOfficeParams, ModernOfficeData> = {
   axiom: 'Building',
   defaultParams: DEFAULTS,
   palette: PALETTE,
+  schemeSets: { realistic: REALISTIC_SCHEMES, vivid: VIVID_SCHEMES },
   envelopeHeight: modernOfficeHeight,
   rules
 };

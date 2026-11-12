@@ -19,6 +19,7 @@ export * from './scope';
 export * from './emit';
 export * from './random';
 export * from './grammar';
+export * from './palette';
 export * from './building';
 export * from './wfc/model';
 export * from './wfc/solve';

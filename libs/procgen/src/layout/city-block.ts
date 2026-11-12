@@ -454,7 +454,7 @@ const MARKING = {
  * carriageway sits {@link CityGroundPartsOptions.kerbHeight} lower. A road cell is cut into a
  * 3 × 3 grid: the junction square and each connected arm are `'road'`, the rest `'sidewalk'`,
  * with a `'kerb'` strip cut from the pavement wherever it meets the carriageway. Lot cells
- * are `'ground'`, plaza cells `'plaza'`, the margin `'ground'`.
+ * are `'ground'`, plaza cells `'plaza'`, the margin `'margin'`.
  *
  * Markings are thin `'marking'` boxes on the carriageway, the only nodes that overlap others;
  * a caller baking distance fields should leave them out of the field. Traffic keeps right.
@@ -590,7 +590,7 @@ export function cityBlockGroundParts(
             const z0 = bz[j] + tz * sz;
             parts.push({
               part: `margin_${index++}`,
-              spec: { version: 1, nodes: [slab('ground', x0, z0, x0 + sx, z0 + sz, marginDepth)] }
+              spec: { version: 1, nodes: [slab('margin', x0, z0, x0 + sx, z0 + sz, marginDepth)] }
             });
           }
         }

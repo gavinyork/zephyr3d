@@ -1,4 +1,5 @@
 import type { GeneratedModelSpec, ProceduralNode } from '@zephyr3d/modelgen';
+import type { MaterialScheme } from './palette';
 import { Random } from './random';
 import type { Scope } from './scope';
 
@@ -101,6 +102,12 @@ export interface Ruleset<P extends object = Record<string, never>, D = unknown> 
    * Optional: a style that leaves shading entirely to the caller simply omits it.
    */
   palette?: Readonly<Record<string, MaterialHint>>;
+  /**
+   * Named families of {@link MaterialScheme}s, for callers that dress each building
+   * differently (see {@link pickMaterialScheme}). Optional; {@link Ruleset.palette} stays
+   * the style's single reference look.
+   */
+  schemeSets?: Readonly<Record<string, readonly MaterialScheme[]>>;
   /**
    * Derives the total envelope height from the parameters, so callers can size the
    * axiom scope without knowing anything about the style. A style whose height is
