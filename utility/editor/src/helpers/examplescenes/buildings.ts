@@ -48,11 +48,16 @@ const FALLBACK_HINT: MaterialHint = { albedo: [0.5, 0.5, 0.5], metallic: 0, roug
 
 /** Ground surfaces belong to the layout rather than to a building style */
 const GROUND_SURFACES: Record<string, MaterialHint> = {
-  road: { albedo: [0.035, 0.035, 0.04], metallic: 0, roughness: 0.92 },
-  verge: { albedo: [0.15, 0.16, 0.18], metallic: 0, roughness: 0.95 },
+  road: { albedo: [0.045, 0.045, 0.05], metallic: 0, roughness: 0.9 },
+  sidewalk: { albedo: [0.28, 0.27, 0.25], metallic: 0, roughness: 0.85 },
+  kerb: { albedo: [0.42, 0.41, 0.39], metallic: 0, roughness: 0.8 },
+  marking: { albedo: [0.7, 0.7, 0.68], metallic: 0, roughness: 0.55 },
   ground: { albedo: [0.15, 0.16, 0.18], metallic: 0, roughness: 0.95 },
   plaza: { albedo: [0.2, 0.195, 0.18], metallic: 0, roughness: 0.78 }
 };
+
+/** Ground groups too thin for a distance field; they keep out of it and of shadow casting */
+const PAINT_GROUPS = new Set(['marking']);
 
 /** Baker's cap on voxels per axis, less two voxels of padding on each side */
 const FIELD_SPAN_VOXELS = 124;
@@ -205,6 +210,17 @@ export const buildingsScene: ExampleSceneType = {
       tooltip: 'Width of one grid cell in world units; a road or a part of a parcel fills one cell'
     },
     {
+      type: 'float',
+      key: 'roadWidth',
+      label: 'Road Width',
+      default: 9,
+      min: 4,
+      max: 40,
+      format: '%.1f',
+      tooltip:
+        'Carriageway width between the kerbs; the rest of a road cell is pavement. Narrow roads between tall buildings make deep street canyons'
+    },
+    {
       type: 'int',
       key: 'maxFloors',
       label: 'Max Floors',
@@ -265,6 +281,8 @@ export const buildingsScene: ExampleSceneType = {
     const width = Math.max(3, Math.round(numParam(params, 'gridWidth')));
     const depth = Math.max(3, Math.round(numParam(params, 'gridDepth')));
     const cellSize = Math.max(1, numParam(params, 'cellSize'));
+    // Keeps at least a metre of pavement on each side
+    const roadWidth = Math.max(1, Math.min(numParam(params, 'roadWidth'), cellSize - 2));
     const maxFloors = Math.max(3, Math.round(numParam(params, 'maxFloors')));
     const seed = Math.round(numParam(params, 'seed'));
 
@@ -304,6 +322,7 @@ export const buildingsScene: ExampleSceneType = {
       const groundMaterials = new Map<string, MeshMaterial>();
       for (const { part, spec } of cityBlockGroundParts(layout, {
         depth: GROUND_DEPTH,
+        roadWidth,
         chunkCells: 2,
         margin: Math.max(spanX, spanZ)
       })) {
@@ -330,6 +349,11 @@ export const buildingsScene: ExampleSceneType = {
           );
           // The ground only receives shadows: as a caster its bounds would swallow the shadow region
           mesh.castShadow = false;
+          if (PAINT_GROUPS.has(surface)) {
+            // A centimetre of paint has no usable field; the road under it stands in for it
+            mesh.sdfMode = 'none';
+            continue;
+          }
           groundPaths.push(path);
           recordExtent(mesh, GROUND_VOXEL);
         }
