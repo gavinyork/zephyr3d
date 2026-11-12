@@ -601,6 +601,61 @@ export function cityBlockGroundParts(
 }
 
 /**
+ * Where a street lamp stands, see {@link cityBlockStreetLights}.
+ * @public
+ */
+export interface CityStreetLight {
+  /** Foot of the lamp post, on the pavement, at y = 0. */
+  position: [number, number, number];
+  /** Unit direction in `[x, z]` from the post towards the middle of the road. */
+  toward: [number, number];
+}
+
+/**
+ * Places street lamps along a block's roads: one per straight road cell, on the pavement just
+ * behind the kerb, alternating sides from cell to cell so the light falls evenly along a street.
+ * Junctions and corners get none.
+ *
+ * @param options - `roadWidth` as given to {@link cityBlockGroundParts}; `kerbOffset`, the gap
+ *   between the kerb line and the post, defaults to 0.6.
+ * @public
+ */
+export function cityBlockStreetLights(
+  layout: CityBlockLayout,
+  options: { roadWidth?: number; kerbOffset?: number } = {}
+): CityStreetLight[] {
+  const { cellSize, origin } = layout;
+  const roadWidth = Math.min(cellSize, Math.max(0, options.roadWidth ?? cellSize * 0.45));
+  const offset = roadWidth * 0.5 + Math.max(0, options.kerbOffset ?? 0.6);
+  if (offset >= cellSize * 0.5) {
+    return [];
+  }
+  const lights: CityStreetLight[] = [];
+  for (let z = 0; z < layout.height; z++) {
+    for (let x = 0; x < layout.width; x++) {
+      if (layout.kinds[z][x] !== 'road') {
+        continue;
+      }
+      const links = layout.tiles[z][x].data!.links;
+      const alongX = links[0] && links[1] && !links[2] && !links[3];
+      const alongZ = links[2] && links[3] && !links[0] && !links[1];
+      if (!alongX && !alongZ) {
+        continue;
+      }
+      const side = (x + z) % 2 === 0 ? 1 : -1;
+      const perp: [number, number] = alongX ? [0, side] : [side, 0];
+      const cx = origin[0] + (x + 0.5) * cellSize;
+      const cz = origin[1] + (z + 0.5) * cellSize;
+      lights.push({
+        position: [cx + perp[0] * offset, 0, cz + perp[1] * offset],
+        toward: [-perp[0], -perp[1]]
+      });
+    }
+  }
+  return lights;
+}
+
+/**
  * Paints the markings of one road cell.
  *
  * A straight cell gets a dashed centre line, with its dash pattern anchored at the cell edges

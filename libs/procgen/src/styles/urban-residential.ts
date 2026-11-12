@@ -12,6 +12,7 @@ import {
   type Plan
 } from '../plan';
 import { createScope, localToWorld, offsetLocal, repeat, type Scope } from '../scope';
+import { bayOpenings, emitLitPanes } from './windows';
 
 /**
  * Material group an emitted node of {@link urbanResidential} belongs to, carried as the node `id`.
@@ -95,6 +96,11 @@ export interface UrbanResidentialParams {
   /** Maximum number of rooftop plant boxes. */
   maxRooftopUnits: number;
   /**
+   * Fraction of upper-floor windows lit from inside, each emitted as a `'glass-lit'` pane just
+   * proud of the glazing. 0, the default, lights none.
+   */
+  litWindowChance: number;
+  /**
    * Sides facing a street, as a bit mask over `[+X, -X, +Z, -Z]` (bit 0 is +X). Arcades only
    * line these; courtyards and L notches open away from them.
    */
@@ -136,6 +142,7 @@ const DEFAULTS: UrbanResidentialParams = {
   parapetThickness: 0.25,
   roofSlab: 0.35,
   maxRooftopUnits: 3,
+  litWindowChance: 0,
   entranceFaceMask: 0b1111,
   maxPartHeight: Infinity
 };
@@ -347,7 +354,23 @@ const rules: Record<string, (scope: Scope, ctx: Ctx) => void> = {
         ctx.emit(extrudePlan(scope, offsetPlan(plan, p.insetDepth), y0, y1 - y0, { id: 'glass' }), part);
         plan.forEach((_, e) => {
           const face = planEdgeFace(scope, plan, e, y0, y1 - y0);
-          emitPiers(face, ctx, part, p.bayWidth, Math.max(0.3, p.bayWidth - p.windowWidth));
+          const pierWidth = Math.max(0.3, p.bayWidth - p.windowWidth);
+          emitPiers(face, ctx, part, p.bayWidth, pierWidth);
+          emitLitPanes(
+            (node) => ctx.emit(node, part),
+            ctx.rng,
+            face,
+            bayOpenings(face.size[0], p.cornerPierWidth, p.bayWidth, pierWidth),
+            upper.map((i) => {
+              const band = Math.min(p.bandHeight, (storeyTop(i) - storeyBottoms[i]) * 0.8) * 0.5;
+              return [storeyBottoms[i] - y0 + band, storeyTop(i) - y0 - (i + 1 < floors ? band : 0)] as [
+                number,
+                number
+              ];
+            }),
+            p.insetDepth,
+            p.litWindowChance
+          );
           if (!balconyEdges[e]) {
             return;
           }

@@ -2,6 +2,7 @@ import type { Vec3 } from '@zephyr3d/modelgen';
 import { boxFromScope, panelFromFace } from '../emit';
 import type { GrammarContext, MaterialHint, Ruleset } from '../grammar';
 import type { MaterialScheme } from '../palette';
+import { bayOpenings, emitLitPanes } from './windows';
 import {
   abs,
   createScope,
@@ -165,6 +166,11 @@ export interface ModernOfficeParams {
   /** Maximum number of rooftop plant boxes. */
   maxRooftopUnits: number;
   /**
+   * Fraction of windows lit from inside, each emitted as a `'glass-lit'` pane just proud of the
+   * glazing so a caller can give it an emissive material. 0, the default, lights none.
+   */
+  litWindowChance: number;
+  /**
    * Height above which a mass is split, at floor lines, into several parts (see
    * {@link GrammarContext.part}). Each mass is always its own part, named `mass<index>`
    * from the ground up; a split mass's pieces are `mass<index>.<k>`. Infinity, the
@@ -196,12 +202,18 @@ const DEFAULTS: ModernOfficeParams = {
   setbackFraction: 0.62,
   setbackScale: 0.76,
   maxRooftopUnits: 4,
+  litWindowChance: 0,
   maxPartHeight: Infinity
 };
 
 /** Payload threaded from the massing rule down to the facade rules. @public */
 export interface ModernOfficeData {
   facade: FacadePreset;
+  /**
+   * Glazed height of each storey on the face a facade rule builds, as `[bottom, top]` from the
+   * face's foot. Set by the shaft for its facades.
+   */
+  windows?: [number, number][];
 }
 
 type Ctx = GrammarContext<ModernOfficeParams, ModernOfficeData>;
@@ -299,6 +311,16 @@ function emitShaft(scope: Scope, ctx: Ctx, hasGroundFloor: boolean): void {
     const part = chunkParts[k];
     const chunkHeight = chunk.reduce((sum, storey) => sum + storey.size[1], 0);
     const chunkScope = createScope([scope.size[0], chunkHeight, scope.size[2]], chunk[0].origin, scope.basis);
+    // Glazed height of each storey in this part, between the bands, for lit windows
+    const windows: [number, number][] = [];
+    let y = 0;
+    chunk.forEach((storey, s) => {
+      const index = storeyIndex + s;
+      const below = index > 0 ? Math.min(preset.bandHeight, storeys[index - 1].size[1]) * 0.5 : 0;
+      const above = index < storeys.length - 1 ? Math.min(preset.bandHeight, storey.size[1]) * 0.5 : 0;
+      windows.push([y + below, y + storey.size[1] - above]);
+      y += storey.size[1];
+    });
     // One glazing volume per mass (or per part of a tall mass). The members emitted over it
     // are what carve it into readable windows, so a deeper inset plus fatter members reads
     // as a solid wall.
@@ -316,7 +338,7 @@ function emitShaft(scope: Scope, ctx: Ctx, hasGroundFloor: boolean): void {
       ctx.emit(boxFromScope(band, { id: preset.bandGroup }), part);
     }
     for (const face of sideFaces(chunkScope)) {
-      ctx.derive('Facade', face, ctx.data, part);
+      ctx.derive('Facade', face, { ...ctx.data!, windows }, part);
     }
   });
 
@@ -444,6 +466,16 @@ const rules: Record<string, (scope: Scope, ctx: Ctx) => void> = {
     for (const x of [0, face.size[0] - corner]) {
       emitPier(faceRect(face, x, 0, corner, face.size[1]));
     }
+    // A ribbon facade has no intermediate piers, but its lights still go bay by bay
+    emitLitPanes(
+      (node) => ctx.emit(node),
+      ctx.rng,
+      face,
+      bayOpenings(face.size[0], preset.cornerPierWidth, preset.bayWidth, preset.pierWidth),
+      ctx.data?.windows ?? [],
+      preset.insetDepth,
+      ctx.params.litWindowChance
+    );
     if (preset.pierWidth <= 0) {
       return;
     }

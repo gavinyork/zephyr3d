@@ -10,11 +10,12 @@
  * at floor lines, so every mesh's baked field keeps a voxel size near {@link BUILDING_VOXEL} or
  * {@link GROUND_VOXEL} under the baker's cap of 128 voxels per axis.
  */
-import { Vector3 } from '@zephyr3d/base';
+import { Quaternion, Vector3, Vector4 } from '@zephyr3d/base';
 import {
   applyMaterialTone,
   availableStyles,
   cityBlockGroundParts,
+  cityBlockStreetLights,
   generateBuildingParts,
   generateCityBlock,
   getStyle,
@@ -28,6 +29,7 @@ import {
   DirectionalLight,
   Mesh,
   SceneNode,
+  SpotLight,
   type MeshMaterial,
   type Scene
 } from '@zephyr3d/scene';
@@ -74,6 +76,42 @@ const NEUTRAL_GROUND: Record<string, MaterialHint> = {
 
 /** Palette choices: a scheme set of the style, or the style's single reference palette */
 type PaletteMode = 'realistic' | 'vivid' | 'style';
+
+/** A lit window: a pale diffuser glowing in the building's light colour */
+const LIT_WINDOW = { albedo: [0.35, 0.3, 0.22] as [number, number, number], metallic: 0, roughness: 0.6 };
+/** Incandescent home lighting */
+const WARM_LIGHT: [number, number, number] = [1, 0.72, 0.42];
+/** Fluorescent office lighting */
+const COOL_LIGHT: [number, number, number] = [0.78, 0.88, 1];
+/** Shop window lighting */
+const SHOP_LIGHT: [number, number, number] = [1, 0.84, 0.62];
+/** Sodium-free warm white of the street lamps */
+const STREET_LIGHT = new Vector4(1, 0.8, 0.55, 1);
+/** Height of a street lamp's head above the pavement */
+const LAMP_HEIGHT = 6;
+/** Sun elevation at dusk, in degrees */
+const DUSK_SUN_ELEVATION = 3;
+/** How far a street lamp's arm reaches out over the road */
+const LAMP_REACH = 1.5;
+/** A street lamp: pole at the origin, arm and head reaching along +X */
+const LAMP_SPEC = {
+  version: 1,
+  nodes: [
+    {
+      type: 'cylinder',
+      radius: 0.08,
+      height: LAMP_HEIGHT,
+      segments: 12,
+      position: [0, LAMP_HEIGHT * 0.5, 0]
+    },
+    {
+      type: 'box',
+      size: [LAMP_REACH + 0.1, 0.08, 0.08],
+      position: [(LAMP_REACH + 0.1) * 0.5, LAMP_HEIGHT - 0.05, 0]
+    },
+    { type: 'box', size: [0.6, 0.14, 0.3], position: [LAMP_REACH, LAMP_HEIGHT - 0.12, 0] }
+  ]
+};
 
 /** Groups far thinner than a field voxel (road paint, balcony railings); they keep out of the distance field */
 const PAINT_GROUPS = new Set(['marking', 'railing']);
@@ -308,6 +346,55 @@ export const buildingsScene: ExampleSceneType = {
       tooltip: 'Direction the sunlight comes from, measured from +X towards +Z'
     },
     {
+      type: 'enum',
+      key: 'timeOfDay',
+      label: 'Time of Day',
+      default: 'day',
+      options: [
+        { value: 'day', label: 'Day' },
+        { value: 'dusk', label: 'Dusk' }
+      ],
+      tooltip:
+        'Dusk drops the sun to just above the horizon (Sun Elevation is ignored), lights some windows and every shop front, and turns on the street lamps, so emissive surfaces and local lights carry the indirect lighting'
+    },
+    {
+      type: 'float',
+      key: 'litWindows',
+      label: 'Lit Windows',
+      default: 0.35,
+      min: 0,
+      max: 1,
+      format: '%.2f',
+      tooltip: 'At dusk, the share of windows lit from inside'
+    },
+    {
+      type: 'float',
+      key: 'windowGlow',
+      label: 'Window Glow',
+      default: 3,
+      min: 0,
+      max: 50,
+      format: '%.2f',
+      tooltip: 'At dusk, how brightly lit windows and shop fronts glow'
+    },
+    {
+      type: 'bool',
+      key: 'streetLights',
+      label: 'Street Lamps',
+      default: true,
+      tooltip: 'At dusk, a lamp on every straight stretch of road, alternating sides'
+    },
+    {
+      type: 'float',
+      key: 'streetLightIntensity',
+      label: 'Street Lamp Intensity',
+      default: 50,
+      min: 0,
+      max: 500,
+      format: '%.1f',
+      tooltip: 'How brightly each street lamp lights the road under it'
+    },
+    {
       type: 'int',
       key: 'seed',
       label: 'Seed',
@@ -328,6 +415,9 @@ export const buildingsScene: ExampleSceneType = {
     const roadWidth = Math.max(1, Math.min(numParam(params, 'roadWidth'), cellSize - 2));
     const maxFloors = Math.max(3, Math.round(numParam(params, 'maxFloors')));
     const seed = Math.round(numParam(params, 'seed'));
+    const dusk = params.timeOfDay === 'dusk';
+    const litWindows = dusk ? Math.min(1, Math.max(0, numParam(params, 'litWindows'))) : 0;
+    const windowGlow = Math.max(0, numParam(params, 'windowGlow'));
 
     await ensureAssetDir(ctx);
     const runner = new GeneratedModelRunner();
@@ -436,6 +526,8 @@ export const buildingsScene: ExampleSceneType = {
         const tone = scheme
           ? randomMaterialTone(rng)
           : { lightness: rng.next() * 2 - 1, hue: 0, saturation: 0 };
+        // Lighting colour of the building's windows: mostly warm homes, some cool offices
+        const litTint = dusk ? (rng.chance(0.7) ? WARM_LIGHT : COOL_LIGHT) : WARM_LIGHT;
         // Built around its own footprint centre so the node's pivot sits on the building
         const parts = generateBuildingParts({
           style: styleId,
@@ -446,6 +538,7 @@ export const buildingsScene: ExampleSceneType = {
             ...scheme?.params,
             floors,
             entranceFaceMask: parcel.frontageMask || 0b1111,
+            litWindowChance: litWindows,
             // Taller parts would bake coarser than BUILDING_VOXEL under the baker's cap
             maxPartHeight: FIELD_SPAN_VOXELS * BUILDING_VOXEL
           }
@@ -468,12 +561,17 @@ export const buildingsScene: ExampleSceneType = {
           for (const [group, sub] of splitByGroup(spec)) {
             let material = materials.get(group);
             if (!material) {
-              const hint = applyMaterialTone(palette[group] ?? FALLBACK_HINT, tone);
-              material = await createSurfaceMaterial({
-                albedo: hint.albedo,
-                metallic: hint.metallic,
-                roughness: hint.roughness
-              });
+              material = await createSurfaceMaterial(
+                group === 'glass-lit'
+                  ? { ...LIT_WINDOW, emissive: litTint, emissiveStrength: windowGlow }
+                  : group === 'storefront' && dusk
+                    ? {
+                        ...applyMaterialTone(palette[group] ?? FALLBACK_HINT, tone),
+                        emissive: SHOP_LIGHT,
+                        emissiveStrength: windowGlow * 1.2
+                      }
+                    : applyMaterialTone(palette[group] ?? FALLBACK_HINT, tone)
+              );
               materials.set(group, material);
             }
             const { mesh, path } = await writeMesh(
@@ -502,6 +600,47 @@ export const buildingsScene: ExampleSceneType = {
         }
       }
 
+      if (dusk && params.streetLights) {
+        const placements = cityBlockStreetLights(layout, { roadWidth });
+        if (placements.length > 0) {
+          ctx.progress('Placing street lamps...');
+          // One shared lamp mesh with its arm along +X, turned per lamp to face the road
+          const { primitive } = await writeGeneratedPrimitive(ctx, runner, LAMP_SPEC, 'street_lamp');
+          const poleMaterial = await createSurfaceMaterial({
+            albedo: [0.06, 0.065, 0.07],
+            metallic: 0.7,
+            roughness: 0.45
+          });
+          const lamps = new SceneNode(scene);
+          lamps.name = 'Street Lamps';
+          lamps.parent = scene.rootNode;
+          const intensity = Math.max(0, numParam(params, 'streetLightIntensity'));
+          placements.forEach((placement, i) => {
+            const [x, , z] = placement.position;
+            const [tx, tz] = placement.toward;
+            const lamp = new Mesh(scene, primitive, poleMaterial);
+            lamp.name = `Lamp ${i + 1}`;
+            lamp.parent = lamps;
+            lamp.position = new Vector3(x, 0, z);
+            lamp.rotation = Quaternion.fromAxisAngle(Vector3.axisPY(), Math.atan2(-tz, tx));
+            // A pole is far thinner than a field voxel
+            lamp.sdfMode = 'none';
+            lamp.castShadow = false;
+            const head = new Vector3(x + tx * LAMP_REACH, LAMP_HEIGHT - 0.2, z + tz * LAMP_REACH);
+            const light = new SpotLight(scene);
+            light.name = `Lamp Light ${i + 1}`;
+            light.parent = lamps;
+            light.color = new Vector4(STREET_LIGHT);
+            light.intensity = intensity;
+            light.range = LAMP_HEIGHT * 2.5;
+            light.cutoff = Math.cos((60 * Math.PI) / 180);
+            light.castShadow = false;
+            // Aimed down and a little out over the road
+            light.lookAt(head, new Vector3(head.x + tx * 2, 0, head.z + tz * 2), Vector3.axisPY());
+          });
+        }
+      }
+
       if (params.bakeSDF) {
         await bakeGeneratedMeshSDFs(ctx, groundPaths, GROUND_VOXEL);
         await bakeGeneratedMeshSDFs(ctx, buildingPaths, BUILDING_VOXEL);
@@ -513,7 +652,7 @@ export const buildingsScene: ExampleSceneType = {
       const sun = new DirectionalLight(scene);
       sun.name = 'Sun';
       sun.sunLight = true;
-      const elevation = (numParam(params, 'sunElevation') * Math.PI) / 180;
+      const elevation = ((dusk ? DUSK_SUN_ELEVATION : numParam(params, 'sunElevation')) * Math.PI) / 180;
       const azimuth = (numParam(params, 'sunAzimuth') * Math.PI) / 180;
       sun.lookAt(
         new Vector3(
