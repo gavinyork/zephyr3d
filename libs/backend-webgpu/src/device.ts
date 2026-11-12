@@ -67,6 +67,7 @@ import { WebGPUStructuredBuffer } from './structuredbuffer_webgpu';
 import { textureFormatInvMap } from './constants_webgpu';
 import { WebGPUBaseTexture } from './basetexture_webgpu';
 import { WebGPUTimestampQueryManager } from './timestamp_query';
+import { UploadStaging } from './upload_staging';
 import type {
   TimestampQueryFilter,
   TimestampQueryHandle,
@@ -151,6 +152,7 @@ export class WebGPUDevice extends BaseDevice {
   private _currentBindGroups: WebGPUBindGroup[];
   private _currentBindGroupOffsets: Nullable<Iterable<number>>[];
   private _commandQueue!: CommandQueueImmediate;
+  private _uploadStaging!: UploadStaging;
   private _gpuObjectHashCounter: number;
   private readonly _gpuObjectHasher: WeakMap<GPUObjectBase, number>;
   private _defaultRenderPassDesc!: GPURenderPassDescriptor;
@@ -214,6 +216,10 @@ export class WebGPUDevice extends BaseDevice {
   }
   get commandQueue() {
     return this._commandQueue;
+  }
+  /** @internal */
+  get uploadStaging() {
+    return this._uploadStaging;
   }
   /** The held image, the size of the canvas; made when first needed and after a resize. */
   private get presentProxy(): GPUTexture {
@@ -423,6 +429,7 @@ export class WebGPUDevice extends BaseDevice {
     this._pipelineCache = new PipelineCache(this);
     this._bindGroupCache = new BindGroupCache(this);
     this._vertexLayoutCache = new VertexLayoutCache();
+    this._uploadStaging = new UploadStaging(this);
     this._commandQueue = new CommandQueueImmediate(this);
     this._timestampQueries = new WebGPUTimestampQueryManager(this);
     this._canRender = true;

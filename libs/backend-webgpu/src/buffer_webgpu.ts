@@ -1,10 +1,8 @@
 import type { GPUDataBuffer } from '@zephyr3d/device';
 import { GPUResourceUsageFlags } from '@zephyr3d/device';
 import { WebGPUObject } from './gpuobject_webgpu';
-import { UploadRingBuffer } from './uploadringbuffer';
 import type { Nullable, TypedArray, TypedArrayConstructor } from '@zephyr3d/base';
 import type { WebGPUDevice } from './device';
-import type { MappedBuffer } from './uploadringbuffer';
 
 type PendingUploadRange = {
   offset: number;
@@ -16,9 +14,13 @@ export class WebGPUBuffer extends WebGPUObject<GPUBuffer> implements GPUDataBuff
   private readonly _usage: number;
   private _gpuUsage: number;
   private _memCost: number;
-  private readonly _ringBuffer: UploadRingBuffer;
   protected _pendingUploads: PendingUploadRange[];
-  private _pendingUploadBuffer: Nullable<MappedBuffer>;
+  /**
+   * The bytes uploaded with bufferSubData(), at their place in the buffer: several uploads to a
+   * buffer between two commands go out as one copy per merged range, staged when it is recorded.
+   * Kept by dynamic buffers, dropped by the others once the copies are submitted.
+   */
+  private _shadow: Nullable<Uint8Array<ArrayBuffer>>;
   constructor(device: WebGPUDevice, usage: number, data: TypedArray | number) {
     super(device);
     this._object = null;
@@ -29,9 +31,8 @@ export class WebGPUBuffer extends WebGPUObject<GPUBuffer> implements GPUDataBuff
     if (this._size <= 0) {
       throw new Error('can not create buffer with zero size');
     }
-    this._ringBuffer = new UploadRingBuffer(device, (this._size + 15) & ~15);
     this._pendingUploads = [];
-    this._pendingUploadBuffer = null;
+    this._shadow = null;
     this.load(typeof data === 'number' ? null : data);
   }
   get hash() {
@@ -87,14 +88,11 @@ export class WebGPUBuffer extends WebGPUObject<GPUBuffer> implements GPUDataBuff
       );
     }
     const uploadOffset = data.byteOffset + srcOffset * data.BYTES_PER_ELEMENT;
-    // Resolve segment ownership before mutating the shared staging page. If this
-    // upload has to start a new segment, the previous segment must snapshot its
-    // pending uploads against the old staging contents first.
+    // First: the commands recorded so far must not see this upload. Uploads made since the last
+    // command merge in the shadow and are staged when the next command is recorded.
     this._device.bufferUpload(this, dstByteOffset, uploadSize);
-    this._pendingUploadBuffer ??= this._ringBuffer.fetchBufferMapped((this.byteLength + 15) & ~15);
-    new Uint8Array(this._pendingUploadBuffer.mappedRange!, dstByteOffset, uploadSize).set(
-      new Uint8Array(data.buffer, uploadOffset, uploadSize)
-    );
+    this._shadow ??= new Uint8Array((this.byteLength + 15) & ~15);
+    this._shadow.set(new Uint8Array(data.buffer, uploadOffset, uploadSize), dstByteOffset);
     this.mergePendingUpload(dstByteOffset, uploadSize);
   }
   async getBufferSubData(
@@ -156,54 +154,39 @@ export class WebGPUBuffer extends WebGPUObject<GPUBuffer> implements GPUDataBuff
     }
   }
   destroy() {
-    // Release staging buffers owned by this dynamic buffer as well. Without
-    // this, pending mapAsync() operations can retain orphaned GPUBuffer
-    // objects after the owner has been disposed.
-    this._ringBuffer.purge();
+    this._shadow = null;
+    this._pendingUploads.length = 0;
     if (this._object) {
       this._device.gpuRemoveObjectHash(this._object);
       this._object.destroy();
       this._object = null;
       this._gpuUsage = 0;
       this._memCost = 0;
-      this._pendingUploadBuffer = null;
-      this._pendingUploads.length = 0;
     }
   }
   isBuffer(): this is GPUDataBuffer {
     return true;
   }
+  /**
+   * Records the copies of the pending uploads into the encoder, their bytes staged for the
+   * submit of that encoder (see UploadStaging).
+   */
   beginSyncChanges(encoder: GPUCommandEncoder) {
     if (this._pendingUploads.length > 0) {
-      if (!this._object || !this._pendingUploadBuffer) {
-        this._pendingUploads.length = 0;
-        this._pendingUploadBuffer = null;
-        this._ringBuffer.beginUploads();
-        return;
-      }
-      const cmdEncoder = encoder || this._device.device.createCommandEncoder();
-      for (const upload of this._pendingUploads) {
-        cmdEncoder.copyBufferToBuffer(
-          this._pendingUploadBuffer.buffer,
-          upload.offset,
-          this._object!,
-          upload.offset,
-          upload.size
-        );
-      }
-      if (!encoder) {
-        this._device.device.queue.submit([cmdEncoder.finish()]);
+      if (this._object && this._shadow) {
+        const staging = this._device.uploadStaging;
+        for (const upload of this._pendingUploads) {
+          const src = staging.stage(this._shadow, upload.offset, upload.size);
+          encoder.copyBufferToBuffer(src.buffer, src.offset, this._object, upload.offset, upload.size);
+        }
       }
       this._pendingUploads.length = 0;
-      this._pendingUploadBuffer = null;
-      this._ringBuffer.beginUploads();
     }
   }
   endSyncChanges() {
-    if (this._usage & GPUResourceUsageFlags.DYNAMIC) {
-      this._ringBuffer.endUploads();
-    } else {
-      this._ringBuffer.purge();
+    if (!(this._usage & GPUResourceUsageFlags.DYNAMIC) && this._pendingUploads.length === 0) {
+      // Rarely updated: not worth the memory between updates
+      this._shadow = null;
     }
   }
   private load(data?: Nullable<TypedArray>) {

@@ -392,6 +392,8 @@ export class CommandQueueImmediate {
       commandBuffers.push(timestampResolveCommandBuffer);
     }
     if (commandBuffers.length > 0) {
+      // The bytes the recorded buffer copies read go to staging first, see UploadStaging
+      this._device.uploadStaging.flush(this._device.device.queue);
       this._device.device.queue.submit(commandBuffers);
       this._device.onTimestampCommandBuffersSubmitted();
     }
