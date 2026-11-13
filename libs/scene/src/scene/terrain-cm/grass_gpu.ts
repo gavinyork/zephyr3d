@@ -9,7 +9,7 @@ import type {
   Texture2D
 } from '@zephyr3d/device';
 import type { Nullable } from '@zephyr3d/base';
-import { DEBUG_VIEWS, Disposable, DRef, nextPowerOf2, Vector3, Vector4 } from '@zephyr3d/base';
+import { DEBUG_VIEWS, Disposable, DRef, Vector3, Vector4 } from '@zephyr3d/base';
 import type { Camera } from '../../camera';
 import { Primitive } from '../../render';
 import { getDevice } from '../../app/api';
@@ -23,6 +23,24 @@ const WORKGROUP_SIZE = 8;
  * when the draw distance is unlimited or the cells are tiny.
  */
 const MAX_WINDOW_CELLS = 2048;
+/**
+ * Largest window side of a detail level of procedural blades, in its units: each level spans as
+ * many units as the first, and the first is high detail blades, so this bounds both the threads
+ * and the blades of a level. Smaller than MAX_WINDOW_CELLS, which would let the first level place
+ * millions of high detail blades.
+ */
+const BLADE_WINDOW_UNITS = 1024;
+/** Instance buffers grow in steps of this many instances */
+const CAPACITY_STEP = 65536;
+/**
+ * Frames between reads of the blade counts of a target, by which its lists are sized, see
+ * GrassGpuPlacement.readCounts
+ */
+const COUNT_READBACK_INTERVAL = 30;
+/** Fewest instances a procedural blade list is sized for */
+const MIN_LIST_ROOM = 4096;
+/** Instances a procedural blade list is sized for before its count is first read back */
+const INITIAL_LIST_ROOM = 262144;
 /**
  * Width of the band, in density LOD hash units, over which a blade shrinks before the density
  * LOD drops it. Hashes are scaled into [0, 1 - band) so that full density keeps every blade whole.
@@ -84,6 +102,51 @@ const NO_LIMIT = 1e30;
 export function grassBladeLodDistance(lodDistance: number, drawDistance: number) {
   return lodDistance > 0 && (drawDistance <= 0 || lodDistance < drawDistance) ? lodDistance : NO_LIMIT;
 }
+/** Most detail levels procedural blades are placed in, see grassBladeLevels */
+const GRASS_BLADE_MAX_LEVELS = 8;
+/**
+ * Widest a procedural blade grows by the detail levels, as a multiple of its height: a level
+ * keeps a blade in four and widens it fourfold to keep the ground as covered, which would soon
+ * turn blades into wide strips; past this the deeper levels let the ground show through instead.
+ * @internal
+ */
+export const GRASS_BLADE_MAX_ASPECT = 1;
+/**
+ * Detail levels of procedural blades: (distance the first level reaches, number of levels).
+ *
+ * Level 0 places a high detail blade per cell out to the low detail distance. Each level after it
+ * places low detail blades, one per 2x2 units of the level before (whose units are cells for level
+ * 0), out to twice the distance of that level, and the last one out to the draw distance. A level
+ * thus spans as many units as the first, however small the cells, and the blades are as far apart
+ * on screen where each level hands over to the next.
+ *
+ * The first level is brought in when it would span more than BLADE_WINDOW_UNITS cells, and so
+ * are the others with it, so that no level is cut short of its distance. Blades with no low
+ * detail level get them that way too.
+ * @param lodDistance - Low detail distance, 0 for none
+ * @param drawDistance - Draw distance, 0 for unlimited
+ * @param cellSize - Smaller side of a placement cell
+ * @param extent - Farthest the terrain reaches from the camera, which an unlimited draw distance
+ *   stops at
+ */
+function grassBladeLevels(
+  lodDistance: number,
+  drawDistance: number,
+  cellSize: number,
+  extent: number
+): [number, number] {
+  const drawRadius = drawDistance > 0 ? drawDistance : extent;
+  const first = Math.min(
+    grassBladeLodDistance(lodDistance, drawDistance),
+    drawRadius,
+    (BLADE_WINDOW_UNITS / 2) * cellSize
+  );
+  let levels = 1;
+  while (levels < GRASS_BLADE_MAX_LEVELS && first * 2 ** (levels - 1) < drawRadius) {
+    levels++;
+  }
+  return [first, levels];
+}
 /**
  * Number of culling planes of the placement pass: the six of a view frustum, or up to the twelve
  * of a shadow caster culling volume (see GrassRenderer). Unused ones are planes everything is
@@ -134,7 +197,24 @@ type PlacementTarget = {
   edgeArgsBuffer: DRef<GPUDataBuffer>;
   bindGroup: DRef<BindGroup>;
   primitive: DRef<Primitive>;
+  /** Instances the buffer holds */
   capacity: number;
+  /**
+   * Procedural blades only: first instance of the low detail list, which is also the most
+   * instances the high detail list holds; the low one holds the rest of the buffer
+   */
+  lowBase: number;
+  /**
+   * Procedural blades only: instances each list is sized for, from the counts read back (see
+   * GrassGpuPlacement.readCounts), and the most blades each list can receive
+   */
+  highRoom: number;
+  lowRoom: number;
+  highBound: number;
+  lowBound: number;
+  /** Frames until the counts are read again, and whether a read is under way */
+  readCountdown: number;
+  reading: boolean;
 };
 
 /**
@@ -146,18 +226,21 @@ type PlacementTarget = {
  * them to an instance buffer whose count lands in an indirect draw argument buffer.
  *
  * The output uses the instance format of the CPU path (u, v, facing angle, density LOD hash), so the grass material
- * is shared. Each dispatched thread emits at most one blade and the instance buffer holds one
- * per thread, so the output can never overflow.
+ * is shared. Each dispatched thread emits at most one blade. For cards the instance buffer holds
+ * one per thread, so the output can never overflow; procedural blade lists are sized for the
+ * blades the rings of their levels can hold, and the blades placed past the end of a list are
+ * dropped.
  *
- * Procedural blades have two detail levels, after "Procedural Grass in Ghost of Tsushima"
- * (Wohllaib, GDC 2021): low detail blades are spaced twice as far apart, and the high detail
- * blades thin out by three quarters before the switch so the two meet seamlessly. Here the
- * dispatch has two layers: z = 0 places a blade per cell around the camera, up to the low detail
- * distance, into the high detail list; z = 1 places one blade per 2x2 block of cells beyond it
- * into the low detail list. The blade kept for a block is one of its four cells picked by a
- * hash, placed exactly as the near layer places it, so a blade moving from one list to the other
- * stays where it is. Both lists share the instance buffer, the low one from `lowListBase` on,
- * and each has its own indirect draw arguments.
+ * Procedural blades have detail levels, after "Procedural Grass in Ghost of Tsushima" (Wohllaib,
+ * GDC 2021): low detail blades are spaced twice as far apart, and the high detail blades thin out
+ * by three quarters before the switch so the two meet seamlessly. Here every level after the
+ * first thins out the one before it the same way (see grassBladeLevels), and the dispatch has a
+ * layer per level: z = 0 places a blade per cell around the camera, up to the low detail
+ * distance, into the high detail list; z = k places one blade per 2^k x 2^k block of cells, from
+ * where level k - 1 ends, into the low detail list. The blade kept for a block is the blade kept
+ * for one of its four sub-blocks, picked by a hash, so it is placed exactly as the levels before
+ * place it, and a blade moving from one level to the next stays where it is. Both lists share the
+ * instance buffer, the low one from `lowBase` on, and each has its own indirect draw arguments.
  *
  * Placements go to numbered targets, each with its own lists: target 0 holds the blades seen
  * from the camera, the others the blades casting shadows into a shadow map. A shadow target is
@@ -184,9 +267,18 @@ export class GrassGpuPlacement extends Disposable {
   /** Index count of each detail level; they follow each other in the index buffer */
   private readonly _lodIndexCounts: number[];
   private readonly _window: Vector4;
-  /** Far window, in 2x2 blocks of cells (procedural blades only) */
-  private readonly _window2: Vector4;
-  /** (low detail distance, first instance of the low detail list, shadow fade start, 1 / fade length) */
+  /**
+   * Procedural blades only: window of each level, in its units (see cellWindow), and (unit side in
+   * cells, distance the level starts at, distance it ends at, blade bounding radius)
+   */
+  private readonly _levelWindows: Float32Array<ArrayBuffer>;
+  private readonly _levelInfo: Float32Array<ArrayBuffer>;
+  /** (distance the first level reaches, number of levels) of the last generate() call */
+  private readonly _detailLevels: [number, number];
+  /**
+   * (first instance of the low detail list, instances the low detail list holds, shadow fade
+   * start, 1 / fade length)
+   */
   private readonly _lod: Vector4;
   /** Camera forward axis and offset, see generate() */
   private readonly _viewDepth: Vector4;
@@ -233,7 +325,9 @@ export class GrassGpuPlacement extends Disposable {
     // Five draw arguments per detail level, then with debug views the same for the wireframe edges
     this._args = new Uint32Array(this._lodIndexCounts.length * 5 * (DEBUG_VIEWS ? 2 : 1));
     this._window = new Vector4();
-    this._window2 = new Vector4();
+    this._levelWindows = new Float32Array(GRASS_BLADE_MAX_LEVELS * 4);
+    this._levelInfo = new Float32Array(GRASS_BLADE_MAX_LEVELS * 4);
+    this._detailLevels = [NO_LIMIT, 1];
     this._lod = new Vector4();
     this._viewDepth = new Vector4();
     this._cells = new Vector4();
@@ -351,63 +445,69 @@ export class GrassGpuPlacement extends Disposable {
     const centerX = (cameraPos.x - region.x) / cellSizeX;
     const centerZ = (cameraPos.z - region.y) / cellSizeZ;
     const drawRadius = drawDistance > 0 ? drawDistance : Infinity;
-    // Near window: cells within the draw distance, or within the low detail distance of blades
-    // that have one; far window: 2x2 blocks of cells from there on to the draw distance
-    const lodDistance = blade ? grassBladeLodDistance(bladeShape[15], drawDistance) : NO_LIMIT;
-    const nearRadius = Math.min(drawRadius, lodDistance);
-    const near = GrassGpuPlacement.cellWindow(
-      centerX,
-      centerZ,
-      nearRadius / cellSizeX,
-      nearRadius / cellSizeZ,
-      cellsW,
-      cellsH,
-      1
-    );
-    const far =
-      lodDistance < NO_LIMIT && lodDistance < drawRadius
-        ? GrassGpuPlacement.cellWindow(
-            centerX,
-            centerZ,
-            drawRadius / cellSizeX,
-            drawRadius / cellSizeZ,
-            cellsW,
-            cellsH,
-            2
-          )
-        : [0, 0, 0, 0];
-    const nearCount = near[2] * near[3];
-    const farCount = far[2] * far[3];
-    if (nearCount <= 0 && farCount <= 0) {
-      return;
-    }
-    // Each list holds at most one blade per thread of its layer
-    this.ensureCapacity(placementTarget, Math.max(nearCount, farCount));
-    const bindGroup = this.getBindGroup(placementTarget);
-    this._window.setXYZW(near[0], near[1], near[2], near[3]);
-    this._window2.setXYZW(far[0], far[1], far[2], far[3]);
-    // (fade start, 1 / fade length); a zero length leaves every blade in
-    const fadeLength = shadowFade ? shadowFade[1] - shadowFade[0] : 0;
-    this._lod.setXYZW(
-      lodDistance,
-      placementTarget.capacity,
-      shadowFade ? shadowFade[0] : 0,
-      fadeLength > 0 ? 1 / fadeLength : 0
-    );
-    // View depth of a point: dot(xyz, p) + w, along the camera's forward axis
-    const m = camera.worldMatrix;
-    const forward = GrassGpuPlacement._forward.setXYZ(-m.m02, -m.m12, -m.m22).inplaceNormalize();
-    this._viewDepth.setXYZW(forward.x, forward.y, forward.z, -Vector3.dot(forward, cameraPos));
-    this._cells.setXYZW(cellsW, cellsH, density.width, density.height);
-    // Bounding sphere of a blade, centred halfway up; the density LOD widens distant blades
+    // Placement windows: for cards the cells within the draw distance; for procedural blades the
+    // units of each detail level within the distance it ends at
+    let numLevels = 1;
+    let windowWidth = 0;
+    let windowHeight = 0;
+    // Most blades the high and the low detail lists receive
+    let highCount = 0;
+    let lowCount = 0;
     const lod = grassDensityLod(drawDistance, farDensity);
-    this._densityLod.setXYZW(lod[0], lod[1], 0, 0);
     if (blade) {
       // A blade reaches at most its tallest height from its base in any direction, plus half its
-      // width, which grows fourfold toward the low detail level
+      // width, which grows fourfold toward each next level, up to GRASS_BLADE_MAX_ASPECT times
+      // the height
       const maxHeight =
         bladeShape[0] * (1 + Math.abs(bladeShape[1])) * (1 + Math.abs(bladeShape[9])) * (1 + bladeShape[14]);
-      const maxWidth = bladeShape[2] * (1 + Math.abs(bladeShape[3])) * 4;
+      const baseWidth = bladeShape[2] * (1 + Math.abs(bladeShape[3]));
+      const maxWidth = Math.max(baseWidth, maxHeight * GRASS_BLADE_MAX_ASPECT);
+      const [first, levels] = grassBladeLevels(
+        bladeShape[15],
+        drawDistance,
+        Math.min(cellSizeX, cellSizeZ),
+        Math.hypot(region.z - region.x, region.w - region.y)
+      );
+      this._detailLevels[0] = first;
+      this._detailLevels[1] = levels;
+      numLevels = levels;
+      // How far the pull toward the clump point can take a blade from its cell
+      const pull = Math.min(1, Math.max(0, bladeShape[10])) * bladeShape[8];
+      for (let k = 0; k < levels; k++) {
+        const unit = 2 ** k;
+        const start = k === 0 ? 0 : first * 2 ** (k - 1);
+        const end = k === levels - 1 ? NO_LIMIT : first * 2 ** k;
+        const reach = Math.min(end, drawRadius);
+        const win = GrassGpuPlacement.cellWindow(
+          centerX,
+          centerZ,
+          reach / cellSizeX,
+          reach / cellSizeZ,
+          cellsW,
+          cellsH,
+          unit
+        );
+        // The blades a level keeps for the next widen fourfold toward it
+        const width = Math.min(baseWidth * 4 ** (k < levels - 1 ? k + 1 : k), maxWidth);
+        this._levelWindows.set(win, k * 4);
+        this._levelInfo.set([unit, start, end, maxHeight + width * 0.5], k * 4);
+        windowWidth = Math.max(windowWidth, win[2]);
+        windowHeight = Math.max(windowHeight, win[3]);
+        // The units of the ring the level covers, widened by a unit and a half and by the pull,
+        // and no more than its threads
+        const margin = unit * Math.max(cellSizeX, cellSizeZ) * 1.5 + pull;
+        const outer = reach + margin;
+        const inner = Math.max(0, start - margin);
+        const count = Math.min(
+          win[2] * win[3],
+          Math.ceil((Math.PI * (outer * outer - inner * inner)) / (unit * unit * cellSizeX * cellSizeZ))
+        );
+        if (k === 0) {
+          highCount = count;
+        } else {
+          lowCount += count;
+        }
+      }
       this._shape0.setXYZW(bladeShape[0], bladeShape[1], bladeShape[2], bladeShape[3]);
       this._shape1.setXYZW(bladeShape[4], bladeShape[5], bladeShape[6], bladeShape[7]);
       this._clump0.setXYZW(1 / Math.max(1e-3, bladeShape[8]), bladeShape[9], bladeShape[10], bladeShape[11]);
@@ -415,6 +515,20 @@ export class GrassGpuPlacement extends Disposable {
       this._params.setXYZW(seed * 4, drawDistance, maxHeight + maxWidth * 0.5, 0);
       bladeHeight = maxHeight;
     } else {
+      const win = GrassGpuPlacement.cellWindow(
+        centerX,
+        centerZ,
+        drawRadius / cellSizeX,
+        drawRadius / cellSizeZ,
+        cellsW,
+        cellsH,
+        1
+      );
+      this._window.setXYZW(win[0], win[1], win[2], win[3]);
+      windowWidth = win[2];
+      windowHeight = win[3];
+      highCount = win[2] * win[3];
+      // Bounding sphere of a blade, centred halfway up; the density LOD widens distant blades
       const maxWidth = bladeWidth / lod[1];
       // The wind turns a card about its base, which takes its top up to 1.12 times its height
       // from the centre of the card
@@ -424,6 +538,28 @@ export class GrassGpuPlacement extends Disposable {
           : Math.sqrt(maxWidth * maxWidth * 0.25 + bladeHeight * bladeHeight * 0.25);
       this._params.setXYZW(seed * 4, drawDistance, radius, bladeHeight * 0.5);
     }
+    if (highCount + lowCount <= 0) {
+      return;
+    }
+    if (blade) {
+      [highCount, lowCount] = GrassGpuPlacement.listRooms(placementTarget, highCount, lowCount);
+    }
+    this.ensureCapacity(placementTarget, highCount, lowCount);
+    const bindGroup = this.getBindGroup(placementTarget);
+    // (fade start, 1 / fade length); a zero length leaves every blade in
+    const fadeLength = shadowFade ? shadowFade[1] - shadowFade[0] : 0;
+    this._lod.setXYZW(
+      placementTarget.lowBase,
+      placementTarget.capacity - placementTarget.lowBase,
+      shadowFade ? shadowFade[0] : 0,
+      fadeLength > 0 ? 1 / fadeLength : 0
+    );
+    // View depth of a point: dot(xyz, p) + w, along the camera's forward axis
+    const m = camera.worldMatrix;
+    const forward = GrassGpuPlacement._forward.setXYZ(-m.m02, -m.m12, -m.m22).inplaceNormalize();
+    this._viewDepth.setXYZW(forward.x, forward.y, forward.z, -Vector3.dot(forward, cameraPos));
+    this._cells.setXYZW(cellsW, cellsH, density.width, density.height);
+    this._densityLod.setXYZW(lod[0], lod[1], 0, 0);
     this._posScale.setXYZW(terrain.scale.x, terrain.scale.y, terrain.scale.z, terrain.worldMatrix.m13);
     this._camera.setXYZW(cameraPos.x, cameraPos.y, cameraPos.z, 0);
     // Terrain occlusion needs the height pyramid, and heights that grow upwards
@@ -455,7 +591,6 @@ export class GrassGpuPlacement extends Disposable {
         planes[i * 4 + 3] = enabled ? p.d : 1e30;
       }
     }
-    bindGroup.setValue('window', this._window);
     bindGroup.setValue('cells', this._cells);
     bindGroup.setValue('params', this._params);
     bindGroup.setValue('region', region);
@@ -466,7 +601,8 @@ export class GrassGpuPlacement extends Disposable {
     bindGroup.setValue('densityLod', this._densityLod);
     bindGroup.setValue('heightInfo', this._heightInfo);
     if (this._kind === 'blade') {
-      bindGroup.setValue('window2', this._window2);
+      bindGroup.setValue('levelWindows', this._levelWindows);
+      bindGroup.setValue('levelInfo', this._levelInfo);
       bindGroup.setValue('lod', this._lod);
       bindGroup.setValue('viewDepth', this._viewDepth);
       bindGroup.setValue('shape0', this._shape0);
@@ -474,6 +610,8 @@ export class GrassGpuPlacement extends Disposable {
       bindGroup.setValue('clump0', this._clump0);
       bindGroup.setValue('clump1', this._clump1);
       bindGroup.setValue('wind', windParams ?? GrassGpuPlacement._calmWind);
+    } else {
+      bindGroup.setValue('window', this._window);
     }
     // Any texture of the right sample type does when occlusion is off. Declared unfilterable
     // (read with textureLoad only), so the sampler bound with it must be a non-filtering one
@@ -489,12 +627,15 @@ export class GrassGpuPlacement extends Disposable {
     const device = getDevice();
     device.setProgram(GrassGpuPlacement.getProgram(this._kind));
     device.setBindGroup(0, bindGroup);
-    // The far layer, when there is one, runs as z = 1 of the same dispatch
+    // Each detail level runs as its own z of the same dispatch
     device.compute(
-      Math.ceil(Math.max(near[2], far[2]) / WORKGROUP_SIZE),
-      Math.ceil(Math.max(near[3], far[3]) / WORKGROUP_SIZE),
-      farCount > 0 ? 2 : 1
+      Math.ceil(windowWidth / WORKGROUP_SIZE),
+      Math.ceil(windowHeight / WORKGROUP_SIZE),
+      numLevels
     );
+    if (blade) {
+      this.readCounts(placementTarget);
+    }
     // The instance counts placement wrote, for drawing the edges in a wireframe view
     const edgeArgs = placementTarget.edgeArgsBuffer.get();
     if (edgeArgs) {
@@ -547,7 +688,15 @@ export class GrassGpuPlacement extends Disposable {
    * @param target - The target
    */
   getLowListBase(target = 0) {
-    return this._targets[target]?.capacity ?? 0;
+    return this._targets[target]?.lowBase ?? 0;
+  }
+  /**
+   * Detail levels of the procedural blades of the last generate() call: (distance the first level
+   * reaches, number of levels), the same for every target. Blade k of the low detail list knows its
+   * level from its instance data; level k ends at the first distance times 2^k.
+   */
+  getDetailLevels(): Readonly<[number, number]> {
+    return this._detailLevels;
   }
   /**
    * Draws the blades of the last generate() call into a target; the material must be bound
@@ -615,10 +764,73 @@ export class GrassGpuPlacement extends Disposable {
         ),
         bindGroup: new DRef(),
         primitive: new DRef(),
-        capacity: 0
+        capacity: 0,
+        lowBase: 0,
+        highRoom: 0,
+        lowRoom: 0,
+        highBound: 0,
+        lowBound: 0,
+        readCountdown: 0,
+        reading: false
       });
     }
     return this._targets[index];
+  }
+  /**
+   * Instances each procedural blade list of a target is sized for: the blades the rings of its
+   * levels can hold are several times the blades in view, so the lists follow the counts read
+   * back instead, bounded by those
+   * @param highBound - Most blades the high detail list can receive
+   * @param lowBound - Most blades the low detail list can receive
+   */
+  private static listRooms(target: PlacementTarget, highBound: number, lowBound: number) {
+    target.highBound = highBound;
+    target.lowBound = lowBound;
+    // Until the first counts are read
+    if (target.highRoom <= 0) {
+      target.highRoom = INITIAL_LIST_ROOM;
+      target.lowRoom = INITIAL_LIST_ROOM;
+    }
+    return [Math.min(target.highRoom, highBound), Math.min(target.lowRoom, lowBound)];
+  }
+  /**
+   * Every COUNT_READBACK_INTERVAL frames, reads back the blade counts of a target's lists and
+   * resizes each list to twice its count when the count passes 70% of its room or falls below a
+   * quarter of it. A list that runs full drops the blades past its end (see generate()) until it
+   * is regrown, so after growing a list the counts are read again a couple of frames later.
+   */
+  private readCounts(target: PlacementTarget) {
+    if (target.reading || --target.readCountdown > 0) {
+      return;
+    }
+    target.reading = true;
+    target.readCountdown = COUNT_READBACK_INTERVAL;
+    target.argsBuffer
+      .get()!
+      .getBufferSubData(null, 0, 40)
+      .then((bytes) => {
+        target.reading = false;
+        if (this.disposed) {
+          return;
+        }
+        const counts = new Uint32Array(bytes.buffer, bytes.byteOffset, 10);
+        const highRoom = GrassGpuPlacement.resizeRoom(target.highRoom, counts[1], target.highBound);
+        const lowRoom = GrassGpuPlacement.resizeRoom(target.lowRoom, counts[6], target.lowBound);
+        if (highRoom > target.highRoom || lowRoom > target.lowRoom) {
+          target.readCountdown = 2;
+        }
+        target.highRoom = highRoom;
+        target.lowRoom = lowRoom;
+      })
+      .catch(() => {
+        target.reading = false;
+      });
+  }
+  private static resizeRoom(room: number, count: number, bound: number) {
+    if (count > room * 0.7 || count * 4 < room) {
+      room = Math.max(count * 2, MIN_LIST_ROOM);
+    }
+    return Math.min(room, Math.max(bound, MIN_LIST_ROOM));
   }
   private static disposeTarget(target: PlacementTarget) {
     target.instanceBuffer.dispose();
@@ -627,17 +839,25 @@ export class GrassGpuPlacement extends Disposable {
     target.bindGroup.dispose();
     target.primitive.dispose();
   }
-  private ensureCapacity(target: PlacementTarget, numInstances: number) {
-    if (numInstances > target.capacity) {
-      target.capacity = nextPowerOf2(numInstances);
+  /**
+   * Sizes a target's instance buffer for the lists, regrowing it with some slack, which goes to the
+   * low detail list, or shrinking it when it is much too large
+   * @param highCount - Most instances of the high detail list, or of the only list of cards
+   * @param lowCount - Most instances of the low detail list
+   */
+  private ensureCapacity(target: PlacementTarget, highCount: number, lowCount: number) {
+    const numInstances = highCount + lowCount;
+    target.lowBase = highCount;
+    if (numInstances > target.capacity || numInstances < target.capacity / 4) {
+      // A quarter more, in steps of 64K instances, so a window growing a little does not regrow it
+      target.capacity = Math.ceil((numInstances * 1.25) / CAPACITY_STEP) * CAPACITY_STEP;
       const device = getDevice();
       const buffer =
         this._kind === 'card'
           ? device.createVertexBuffer('tex1_f32x4', new Float32Array(target.capacity * 4), {
               storage: true
             })!
-          : // The high and the low detail lists, each of the capacity
-            device.createBuffer(target.capacity * 2 * INSTANCE_VEC4.blade * 16, {
+          : device.createBuffer(target.capacity * INSTANCE_VEC4.blade * 16, {
               usage: 'uniform',
               storage: true,
               dynamic: false,
@@ -674,8 +894,6 @@ export class GrassGpuPlacement extends Disposable {
         label: blade ? 'GrassBladePlacement' : 'GrassPlacement',
         workgroupSize: [WORKGROUP_SIZE, WORKGROUP_SIZE, 1],
         compute(pb) {
-          // (first cell x, first cell z, cells wide, cells high)
-          this.window = pb.vec4().uniform(0);
           // (cells x, cells z, density width, density height)
           this.cells = pb.vec4().uniform(0);
           // (seed, draw distance, blade bounding radius, blade centre height)
@@ -691,11 +909,17 @@ export class GrassGpuPlacement extends Disposable {
           this.densityLod = pb.vec4().uniform(0);
           // (height map width, height map height, pyramid mip count, grid cell size)
           this.heightInfo = pb.vec4().uniform(0);
-          if (blade) {
-            // Far window: (first block x, first block z, blocks wide, blocks high), 2x2 cells a block
-            this.window2 = pb.vec4().uniform(0);
-            // (low detail distance, first instance of the low detail list, shadow fade start depth,
-            // 1 / shadow fade length or 0 for no fade)
+          if (!blade) {
+            // (first cell x, first cell z, cells wide, cells high)
+            this.window = pb.vec4().uniform(0);
+          } else {
+            // Window of each detail level: (first unit x, first unit z, units wide, units high)
+            this.levelWindows = pb.vec4[GRASS_BLADE_MAX_LEVELS]().uniform(0);
+            // (unit side in cells, distance the level starts at, distance it ends at, blade bounding
+            // radius) of each detail level
+            this.levelInfo = pb.vec4[GRASS_BLADE_MAX_LEVELS]().uniform(0);
+            // (first instance of the low detail list, instances the low detail list holds, shadow
+            // fade start depth, 1 / shadow fade length or 0 for no fade)
             this.lod = pb.vec4().uniform(0);
             // (camera forward, -dot(forward, camera position)): view depth of a point
             this.viewDepth = pb.vec4().uniform(0);
@@ -726,6 +950,19 @@ export class GrassGpuPlacement extends Disposable {
             this.h = pb.compXor(this.h, pb.sar(this.h, 16));
             this.$return(pb.mul(pb.float(pb.sar(this.h, 8)), 1 / 16777216));
           });
+          if (blade) {
+            // Which of its four sub-units (x + 2z) a unit of detail level lv >= 1 keeps the blade
+            // of, by a hash of the unit seeded per level; level 1 takes seed offset 5
+            pb.func('keptQuarter', [pb.uint('x'), pb.uint('z'), pb.uint('lv'), pb.uint('bs')], function () {
+              this.$l.levelSeed = pb.add(
+                this.bs,
+                pb.add(pb.uint(5), pb.mul(pb.sub(this.lv, 1), pb.uint(65536)))
+              );
+              this.$return(
+                pb.min(pb.uint(pb.mul(this.grassHash(this.x, this.z, this.levelSeed), 4)), pb.uint(3))
+              );
+            });
+          }
           // Bilinear density, the same filtering as GrassLayer.sampleDensity()
           pb.func('sampleDensity', [pb.vec2('uv')], function () {
             this.$l.size = this.cells.zw;
@@ -774,16 +1011,17 @@ export class GrassGpuPlacement extends Disposable {
             );
           });
           pb.main(function () {
-            // Placement units of this thread's layer: cells of the near window, or 2x2 blocks of
-            // cells of the far window (z = 1, procedural blades only)
-            this.$l.far = pb.notEqual(this.$builtins.globalInvocationId.z, pb.uint(0));
-            this.$l.win = this.window;
-            this.$l.unit = pb.float(1);
+            // Placement units of this thread's layer: cells for cards; for procedural blades the
+            // units of detail level z, 2^z x 2^z cells each
             if (blade) {
-              this.$if(this.far, function () {
-                this.win = this.window2;
-                this.unit = pb.float(2);
-              });
+              this.$l.level = this.$builtins.globalInvocationId.z;
+              this.$l.far = pb.notEqual(this.level, pb.uint(0));
+              this.$l.win = this.levelWindows.at(this.level);
+              this.$l.levelRange = this.levelInfo.at(this.level);
+              this.$l.unit = this.levelRange.x;
+            } else {
+              this.$l.win = this.window;
+              this.$l.unit = pb.float(1);
             }
             // Terrain occlusion, one test per workgroup: the group's blades are hidden if every
             // line of sight to them dips below the terrain somewhere in front of them. Each
@@ -908,31 +1146,35 @@ export class GrassGpuPlacement extends Disposable {
                 this.$l.cx = pb.add(pb.uint(this.win.x), this.id.x);
                 this.$l.cz = pb.add(pb.uint(this.win.y), this.id.y);
                 this.$l.seed = pb.uint(this.params.x);
-                // Blades that give way to the low detail level: 1 for the three cells of each
-                // 2x2 block that the far layer does not keep
+                // Blades that give way to the next detail level: 1 for the three units of each 2x2
+                // block of units that the next level does not keep
                 this.$l.extra = pb.float(0);
                 if (blade) {
                   this.$l.bseed = pb.add(pb.mul(this.seed, 16), pb.uint(BLADE_SEED_BASE));
-                  // The cell of a 2x2 block the far layer keeps, picked by a hash of the block
-                  this.$l.block = this.$choice(
-                    this.far,
-                    pb.uvec2(this.cx, this.cz),
-                    pb.uvec2(pb.sar(this.cx, 1), pb.sar(this.cz, 1))
-                  );
-                  this.$l.kept = pb.min(
-                    pb.uint(pb.mul(this.grassHash(this.block.x, this.block.y, pb.add(this.bseed, 5)), 4)),
-                    pb.uint(3)
-                  );
-                  this.$if(this.far, function () {
-                    this.cx = pb.add(pb.mul(this.block.x, 2), pb.compAnd(this.kept, pb.uint(1)));
-                    this.cz = pb.add(pb.mul(this.block.y, 2), pb.sar(this.kept, 1));
-                  }).$else(function () {
+                  // The last level has no next one
+                  this.$if(pb.lessThan(this.levelRange.z, NO_LIMIT * 0.5), function () {
                     this.extra = pb.float(
                       pb.notEqual(
                         pb.add(pb.compAnd(this.cx, pb.uint(1)), pb.mul(pb.compAnd(this.cz, pb.uint(1)), 2)),
-                        this.kept
+                        this.keptQuarter(
+                          pb.sar(this.cx, 1),
+                          pb.sar(this.cz, 1),
+                          pb.add(this.level, 1),
+                          this.bseed
+                        )
                       )
                     );
+                  });
+                  // Down from the unit to the cell it keeps, through the units of the levels below
+                  this.$for(pb.uint('j'), 0, this.level, function () {
+                    this.$l.quarter = this.keptQuarter(
+                      this.cx,
+                      this.cz,
+                      pb.sub(this.level, this.j),
+                      this.bseed
+                    );
+                    this.cx = pb.add(pb.mul(this.cx, 2), pb.compAnd(this.quarter, pb.uint(1)));
+                    this.cz = pb.add(pb.mul(this.cz, 2), pb.sar(this.quarter, 1));
                   });
                 }
                 this.$l.uv = pb.div(
@@ -1029,11 +1271,14 @@ export class GrassGpuPlacement extends Disposable {
                     );
                     this.$l.lodHash = this.grassHash(this.cx, this.cz, pb.add(this.seed, 4));
                     if (blade) {
-                      // Detail level: each blade belongs to the near layer up to the low detail
-                      // distance and to the far layer from there on, measured the same way in both
+                      // Detail level: each blade belongs to the level whose range of distances
+                      // holds it, measured the same way in all
                       this.visible = pb.and(
                         this.visible,
-                        pb.equal(this.far, pb.greaterThanEqual(this.dist, this.lod.x))
+                        pb.and(
+                          pb.greaterThanEqual(this.dist, this.levelRange.y),
+                          pb.lessThan(this.dist, this.levelRange.z)
+                        )
                       );
                     } else {
                       // Density LOD, see ClipmapGrassMaterial: drop the blades the material would
@@ -1071,7 +1316,7 @@ export class GrassGpuPlacement extends Disposable {
                         this.visible,
                         pb.greaterThanEqual(
                           pb.add(pb.dot(this.planes.at(i).xyz, this.center), this.planes.at(i).w),
-                          pb.neg(this.params.z)
+                          pb.neg(blade ? this.levelRange.w : this.params.z)
                         )
                       );
                     }
@@ -1082,163 +1327,167 @@ export class GrassGpuPlacement extends Disposable {
                       );
                       // Occluded blades kept for debugging are flagged by adding 2 to the hash; blade
                       // instances carry the extra flag in its place, their density LOD is the
-                      // detail levels
+                      // detail levels, plus 4 times their level
                       this.$l.flaggedHash = pb.add(
-                        blade ? this.extra : this.lodHash,
+                        blade ? pb.add(this.extra, pb.mul(pb.float(this.level), 4)) : this.lodHash,
                         pb.mul(pb.float(pb.notEqual(this.occluded, 0)), 2)
                       );
-                      if (blade) {
-                        // Near blades append to the high detail list, far ones to the low detail
-                        // list, whose draw arguments follow and whose instances start at lod.y
-                        this.$l.slot = pb.uint(0);
-                        this.$if(this.far, function () {
-                          this.slot = pb.add(pb.atomicAdd(this.args.at(6), 1), pb.uint(this.lod.y));
-                        }).$else(function () {
-                          this.slot = pb.atomicAdd(this.args.at(1), 1);
-                        });
-                      } else {
-                        this.$l.slot = pb.atomicAdd(this.args.at(1), 1);
-                      }
                       if (!blade) {
+                        this.$l.slot = pb.atomicAdd(this.args.at(1), 1);
                         this.instances.setAt(this.slot, pb.vec4(this.uv, this.angle, this.flaggedHash));
                       } else {
-                        // Layout: see ClipmapBladeGrassMaterial
-                        const signedHash = (scope: PBInsideFunctionScope, k: number) =>
-                          pb.sub(pb.mul(scope.grassHash(scope.cx, scope.cz, pb.add(scope.bseed, k)), 2), 1);
-                        this.$l.bladeHeight = pb.mul(
-                          this.shape0.x,
-                          pb.max(0, pb.add(1, pb.mul(this.shape0.y, signedHash(this, 0)))),
-                          pb.max(0, pb.add(1, pb.mul(this.clump0.y, this.clumpHeight)))
-                        );
-                        this.$l.bladeWidth = pb.mul(
-                          this.shape0.z,
-                          pb.max(0, pb.add(1, pb.mul(this.shape0.w, signedHash(this, 1))))
-                        );
-                        this.$l.tilt = pb.clamp(
-                          pb.add(this.shape1.x, pb.mul(this.shape1.y, signedHash(this, 2))),
-                          0,
-                          1
-                        );
-                        this.$l.bend = pb.add(this.shape1.z, pb.mul(this.shape1.w, signedHash(this, 3)));
-                        this.$l.bladeHash = this.grassHash(this.cx, this.cz, pb.add(this.bseed, 4));
-                        // Facing: toward the clump's shared direction, then away from its point
-                        this.$l.clumpDir = pb.vec2(pb.cos(this.clumpAngle), pb.sin(this.clumpAngle));
-                        this.$l.facing = pb.mix(
-                          pb.vec2(pb.cos(this.angle), pb.sin(this.angle)),
-                          this.clumpDir,
-                          this.clump0.w
-                        );
-                        this.$l.away = pb.sub(this.xz, this.clumpCenter);
-                        this.$l.awayLen = pb.length(this.away);
-                        this.$if(pb.greaterThan(this.awayLen, 1e-5), function () {
-                          this.facing = pb.mix(this.facing, pb.div(this.away, this.awayLen), this.clump1.x);
+                        // Level 0 appends to the high detail list, the others to the low detail list,
+                        // whose draw arguments follow and whose instances start at lod.x. A blade
+                        // past the end of its list is dropped, and taken off the count again.
+                        this.$l.countIndex = this.$choice(this.far, pb.uint(6), pb.uint(1));
+                        this.$l.room = this.$choice(this.far, pb.uint(this.lod.y), pb.uint(this.lod.x));
+                        this.$l.slot = pb.atomicAdd(this.args.at(this.countIndex), 1);
+                        this.$if(pb.greaterThanEqual(this.slot, this.room), function () {
+                          pb.atomicSub(this.args.at(this.countIndex), 1);
                         });
-                        this.$if(pb.lessThan(pb.dot(this.facing, this.facing), 1e-8), function () {
-                          this.facing = this.clumpDir;
-                        });
-                        this.$l.facingAngle = pb.atan2(this.facing.y, this.facing.x);
-                        // Wind: sample the push for this frame and the last one, and turn the facing
-                        // downwind by it; the vertex shader rebuilds both frames for motion vectors
-                        this.$l.windPush = WindField.shaderPush(
-                          this,
-                          this.xz,
-                          this.wind.at(0),
-                          this.wind.at(1),
-                          this.wind.at(2),
-                          this.wind.at(3)
-                        );
-                        this.$l.windPushPrev = WindField.shaderPush(
-                          this,
-                          this.xz,
-                          this.wind.at(4),
-                          this.wind.at(5),
-                          this.wind.at(6),
-                          this.wind.at(7)
-                        );
-                        this.$l.facingNow = this.facingAngle;
-                        this.$l.facingPrev = this.facingAngle;
-                        this.$l.bladeDir = pb.vec2(pb.cos(this.facingAngle), pb.sin(this.facingAngle));
-                        const turn = (
-                          scope: PBInsideFunctionScope,
-                          out: string,
-                          push: string,
-                          dir: PBShaderExp
-                        ) => {
-                          scope.$if(
-                            pb.and(pb.greaterThan(scope[push], 0), pb.greaterThan(pb.dot(dir, dir), 1e-6)),
-                            function () {
-                              this[out] = pb.add(
-                                this.facingAngle,
-                                pb.mul(
-                                  pb.atan2(
-                                    pb.sub(pb.mul(this.bladeDir.x, dir.y), pb.mul(this.bladeDir.y, dir.x)),
-                                    pb.dot(this.bladeDir, dir)
-                                  ),
-                                  pb.clamp(pb.mul(this[push], this.clump1.y), 0, 1)
-                                )
-                              );
-                            }
+                        this.$if(pb.lessThan(this.slot, this.room), function () {
+                          this.slot = pb.add(
+                            this.slot,
+                            this.$choice(this.far, pb.uint(this.lod.x), pb.uint(0))
                           );
-                        };
-                        turn(this, 'facingNow', 'windPush', this.wind.at(0).xy);
-                        turn(this, 'facingPrev', 'windPushPrev', this.wind.at(4).xy);
-                        // Terrain normal under the blade (central differences of the height map, as
-                        // in ClipmapGrassMaterial), x and z quantized to 12 bits each and packed into
-                        // an integer a float holds exactly. Distant blades shade toward it.
-                        this.$l.texel = pb.div(pb.vec2(1), this.heightInfo.xy);
-                        this.$l.sampleDist = pb.mul(this.regionSize, pb.mul(this.texel, 2));
-                        this.$l.hL = pb.textureSampleLevel(
-                          this.heightMap,
-                          pb.sub(this.uv, pb.vec2(this.texel.x, 0)),
-                          0
-                        ).r;
-                        this.$l.hR = pb.textureSampleLevel(
-                          this.heightMap,
-                          pb.add(this.uv, pb.vec2(this.texel.x, 0)),
-                          0
-                        ).r;
-                        this.$l.hU = pb.textureSampleLevel(
-                          this.heightMap,
-                          pb.sub(this.uv, pb.vec2(0, this.texel.y)),
-                          0
-                        ).r;
-                        this.$l.hD = pb.textureSampleLevel(
-                          this.heightMap,
-                          pb.add(this.uv, pb.vec2(0, this.texel.y)),
-                          0
-                        ).r;
-                        this.$l.terrainNormal = pb.normalize(
-                          pb.vec3(
-                            pb.neg(
-                              pb.div(pb.mul(pb.sub(this.hR, this.hL), this.posScale.y), this.sampleDist.x)
-                            ),
-                            1,
-                            pb.neg(
-                              pb.div(pb.mul(pb.sub(this.hD, this.hU), this.posScale.y), this.sampleDist.y)
+                          // Layout: see ClipmapBladeGrassMaterial
+                          const signedHash = (scope: PBInsideFunctionScope, k: number) =>
+                            pb.sub(pb.mul(scope.grassHash(scope.cx, scope.cz, pb.add(scope.bseed, k)), 2), 1);
+                          this.$l.bladeHeight = pb.mul(
+                            this.shape0.x,
+                            pb.max(0, pb.add(1, pb.mul(this.shape0.y, signedHash(this, 0)))),
+                            pb.max(0, pb.add(1, pb.mul(this.clump0.y, this.clumpHeight)))
+                          );
+                          this.$l.bladeWidth = pb.mul(
+                            this.shape0.z,
+                            pb.max(0, pb.add(1, pb.mul(this.shape0.w, signedHash(this, 1))))
+                          );
+                          this.$l.tilt = pb.clamp(
+                            pb.add(this.shape1.x, pb.mul(this.shape1.y, signedHash(this, 2))),
+                            0,
+                            1
+                          );
+                          this.$l.bend = pb.add(this.shape1.z, pb.mul(this.shape1.w, signedHash(this, 3)));
+                          this.$l.bladeHash = this.grassHash(this.cx, this.cz, pb.add(this.bseed, 4));
+                          // Facing: toward the clump's shared direction, then away from its point
+                          this.$l.clumpDir = pb.vec2(pb.cos(this.clumpAngle), pb.sin(this.clumpAngle));
+                          this.$l.facing = pb.mix(
+                            pb.vec2(pb.cos(this.angle), pb.sin(this.angle)),
+                            this.clumpDir,
+                            this.clump0.w
+                          );
+                          this.$l.away = pb.sub(this.xz, this.clumpCenter);
+                          this.$l.awayLen = pb.length(this.away);
+                          this.$if(pb.greaterThan(this.awayLen, 1e-5), function () {
+                            this.facing = pb.mix(this.facing, pb.div(this.away, this.awayLen), this.clump1.x);
+                          });
+                          this.$if(pb.lessThan(pb.dot(this.facing, this.facing), 1e-8), function () {
+                            this.facing = this.clumpDir;
+                          });
+                          this.$l.facingAngle = pb.atan2(this.facing.y, this.facing.x);
+                          // Wind: sample the push for this frame and the last one, and turn the facing
+                          // downwind by it; the vertex shader rebuilds both frames for motion vectors
+                          this.$l.windPush = WindField.shaderPush(
+                            this,
+                            this.xz,
+                            this.wind.at(0),
+                            this.wind.at(1),
+                            this.wind.at(2),
+                            this.wind.at(3)
+                          );
+                          this.$l.windPushPrev = WindField.shaderPush(
+                            this,
+                            this.xz,
+                            this.wind.at(4),
+                            this.wind.at(5),
+                            this.wind.at(6),
+                            this.wind.at(7)
+                          );
+                          this.$l.facingNow = this.facingAngle;
+                          this.$l.facingPrev = this.facingAngle;
+                          this.$l.bladeDir = pb.vec2(pb.cos(this.facingAngle), pb.sin(this.facingAngle));
+                          const turn = (
+                            scope: PBInsideFunctionScope,
+                            out: string,
+                            push: string,
+                            dir: PBShaderExp
+                          ) => {
+                            scope.$if(
+                              pb.and(pb.greaterThan(scope[push], 0), pb.greaterThan(pb.dot(dir, dir), 1e-6)),
+                              function () {
+                                this[out] = pb.add(
+                                  this.facingAngle,
+                                  pb.mul(
+                                    pb.atan2(
+                                      pb.sub(pb.mul(this.bladeDir.x, dir.y), pb.mul(this.bladeDir.y, dir.x)),
+                                      pb.dot(this.bladeDir, dir)
+                                    ),
+                                    pb.clamp(pb.mul(this[push], this.clump1.y), 0, 1)
+                                  )
+                                );
+                              }
+                            );
+                          };
+                          turn(this, 'facingNow', 'windPush', this.wind.at(0).xy);
+                          turn(this, 'facingPrev', 'windPushPrev', this.wind.at(4).xy);
+                          // Terrain normal under the blade (central differences of the height map, as
+                          // in ClipmapGrassMaterial), x and z quantized to 12 bits each and packed into
+                          // an integer a float holds exactly. Distant blades shade toward it.
+                          this.$l.texel = pb.div(pb.vec2(1), this.heightInfo.xy);
+                          this.$l.sampleDist = pb.mul(this.regionSize, pb.mul(this.texel, 2));
+                          this.$l.hL = pb.textureSampleLevel(
+                            this.heightMap,
+                            pb.sub(this.uv, pb.vec2(this.texel.x, 0)),
+                            0
+                          ).r;
+                          this.$l.hR = pb.textureSampleLevel(
+                            this.heightMap,
+                            pb.add(this.uv, pb.vec2(this.texel.x, 0)),
+                            0
+                          ).r;
+                          this.$l.hU = pb.textureSampleLevel(
+                            this.heightMap,
+                            pb.sub(this.uv, pb.vec2(0, this.texel.y)),
+                            0
+                          ).r;
+                          this.$l.hD = pb.textureSampleLevel(
+                            this.heightMap,
+                            pb.add(this.uv, pb.vec2(0, this.texel.y)),
+                            0
+                          ).r;
+                          this.$l.terrainNormal = pb.normalize(
+                            pb.vec3(
+                              pb.neg(
+                                pb.div(pb.mul(pb.sub(this.hR, this.hL), this.posScale.y), this.sampleDist.x)
+                              ),
+                              1,
+                              pb.neg(
+                                pb.div(pb.mul(pb.sub(this.hD, this.hU), this.posScale.y), this.sampleDist.y)
+                              )
                             )
-                          )
-                        );
-                        this.$l.quantized = pb.floor(
-                          pb.add(
-                            pb.mul(pb.add(pb.mul(this.terrainNormal.xz, 0.5), pb.vec2(0.5)), 4095),
-                            pb.vec2(0.5)
-                          )
-                        );
-                        this.$l.packedNormal = pb.add(pb.mul(this.quantized.x, 4096), this.quantized.y);
-                        this.$l.first = pb.mul(this.slot, INSTANCE_VEC4.blade);
-                        this.instances.setAt(this.first, pb.vec4(this.base, this.flaggedHash));
-                        this.instances.setAt(
-                          pb.add(this.first, 1),
-                          pb.vec4(this.facingNow, this.facingPrev, this.windPush, this.windPushPrev)
-                        );
-                        this.instances.setAt(
-                          pb.add(this.first, 2),
-                          pb.vec4(this.clumpAngle, this.clumpColor, this.packedNormal, this.bladeHash)
-                        );
-                        this.instances.setAt(
-                          pb.add(this.first, 3),
-                          pb.vec4(this.bladeHeight, this.bladeWidth, this.tilt, this.bend)
-                        );
+                          );
+                          this.$l.quantized = pb.floor(
+                            pb.add(
+                              pb.mul(pb.add(pb.mul(this.terrainNormal.xz, 0.5), pb.vec2(0.5)), 4095),
+                              pb.vec2(0.5)
+                            )
+                          );
+                          this.$l.packedNormal = pb.add(pb.mul(this.quantized.x, 4096), this.quantized.y);
+                          this.$l.first = pb.mul(this.slot, INSTANCE_VEC4.blade);
+                          this.instances.setAt(this.first, pb.vec4(this.base, this.flaggedHash));
+                          this.instances.setAt(
+                            pb.add(this.first, 1),
+                            pb.vec4(this.facingNow, this.facingPrev, this.windPush, this.windPushPrev)
+                          );
+                          this.instances.setAt(
+                            pb.add(this.first, 2),
+                            pb.vec4(this.clumpAngle, this.clumpColor, this.packedNormal, this.bladeHash)
+                          );
+                          this.instances.setAt(
+                            pb.add(this.first, 3),
+                            pb.vec4(this.bladeHeight, this.bladeWidth, this.tilt, this.bend)
+                          );
+                        });
                       }
                     });
                   }

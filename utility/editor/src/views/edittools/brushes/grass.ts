@@ -68,7 +68,7 @@ export class GrassBrush extends BaseTerrainBrush {
           this.renderCardSettings(grassLayer);
         }
         const density = [grassLayer.cellsPerTexel] as [number];
-        if (ImGui.SliderInt('Density', density, 1, 4)) {
+        if (ImGui.SliderInt('Density', density, 1, grassLayer.maxCellsPerTexel)) {
           grassLayer.cellsPerTexel = density[0];
         }
         const groundOcclusion = [grassLayer.groundOcclusion] as [number];

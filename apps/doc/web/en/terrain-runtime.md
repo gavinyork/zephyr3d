@@ -145,7 +145,7 @@ for (let z = 10; z < 20; z++) {
 layer.updateDensityRegion(10, 10, 20, 20);
 ```
 
-Density texel (x, z) covers the terrain region `[x/w..(x+1)/w, z/h..(z+1)/h]`. `cellsPerTexel` sets how many placement cells a texel has per axis; a texel holds at most its square in blades. Batch density writes and call `updateDensityRegion()` once per edit; `setDensityData(w, h, cellsPerTexel, data)` replaces the whole map.
+Density texel (x, z) covers the terrain region `[x/w..(x+1)/w, z/h..(z+1)/h]`. `cellsPerTexel` sets how many placement cells a texel has per axis; a texel holds at most its square in blades. It goes up to 32 where blades are placed on the GPU (WebGPU), and up to 8 for card layers placed on the CPU. Batch density writes and call `updateDensityRegion()` once per edit; `setDensityData(w, h, cellsPerTexel, data)` replaces the whole map.
 
 <div class="showcase" case="tut-69"></div>
 
@@ -171,8 +171,8 @@ The parameters, all with defaults that give a plausible lawn, fall into groups:
 | --- | --- | --- |
 | Shape | `tilt`, `bend`, `taper`, `tipDetail`, `heightRandomness`, `widthRandomness`, `tiltRandomness`, `bendRandomness` | Lean, arch and outline of each blade, and how much they vary |
 | Clumps | `clumpSize`, `clumpHeightVariation`, `clumpPull`, `clumpSameDirection`, `clumpFaceAway`, `clumpColorVariation` | Breaks the field into patches: tufts, combed areas, color variation |
-| Color and lighting | `rootColor`, `tipColor`, `colorMap`, `rootOcclusion`, `roundness`, `transmissionColor` | Gradient or texture from root to tip, darkening at the root, curved shading, light glowing through backlit blades |
-| Distance | `viewThickening`, `farNormalStart`, `farNormalEnd`, `farRoughness`, `lodDistance` | Keeps fields full at low angles and calm in the distance; `lodDistance` switches to a quarter as many, wider blades |
+| Color and lighting | `rootColor`, `tipColor`, `colorMap`, `rootOcclusion`, `selfShadow`, `roundness`, `transmissionColor` | Gradient or texture from root to tip, darkening at the root (ambient light, and the sunlight the blades above take away), curved shading, light glowing through backlit blades |
+| Distance | `viewThickening`, `farNormalStart`, `farNormalEnd`, `farRoughness`, `lodDistance` | Keeps fields full at low angles and calm in the distance; `lodDistance` switches to a quarter as many, wider blades, and each doubling of the distance after it thins them out the same way again |
 | Wind | `windFacing`, `windLean`, `swayAmplitude`, `swaySpeed` | How the blades respond to the scene wind; card layers have `windLean`, `swayAmplitude` and `swaySpeed` too |
 
 Both kinds of grass sway in the scene-wide wind:
@@ -185,7 +185,10 @@ wind.gustStrength = 0.5;
 wind.gustScale = 20;
 ```
 
-Geometry blades cast shadows from the sun into the two nearest cascades of its shadow map (`grassRenderer.castShadow`, on by default; the terrain must cast shadows too), fading out over `grassRenderer.shadowFadeFraction` of the last of them. Farther away, grass casts no shadow of its own; screen-space contact shadows and ambient occlusion, when enabled, darken it there.
+Geometry blades cast shadows from the sun into the two nearest cascades of its shadow map (`grassRenderer.castShadow`, on by default; the terrain must cast shadows too), fading out over `grassRenderer.shadowFadeFraction` of the last of them. Farther away, grass casts no shadow of its own; screen-space contact shadows and ambient occlusion, when enabled, darken it there. Thin blades leave little in a shadow map but blur, so `layer.castShadow = false` takes a single layer out of the shadow maps, which also saves placing its casters. Two effects that need no shadow map darken grass anyway:
+
+- `layer.selfShadow` (geometry layers, default 1): the sunlight a blade loses through the blades above it, more toward the root and the lower the sun. 0 turns it off.
+- `layer.groundOcclusion` (both kinds, default 0.5): how much a full density of the layer darkens the ground under it, baked from the density map into the terrain's color, so the soil between the blades and the light it bounces are darker where the grass is thick. 0 turns it off.
 
 In the editor, the grass brush's **Add Blade Layer** button adds a geometry layer, whose settings appear in the brush panel when it is selected.
 
@@ -233,6 +236,7 @@ For terrain generated at runtime, assign stable asset ids to the generated heigh
 - The clipmap keeps the triangle count roughly constant; `clipMapTileSize` trades near detail for vertex cost.
 - Detail layers multiply the per-pixel cost; on WebGPU turn on the runtime virtual texture once there are more than a few layers or hex tiling is used.
 - Grass costs grow with density and draw distance. Lower `drawDistance` first, then density; for blade layers, a shorter `lodDistance` cuts distant geometry.
+- Each detail level of a blade layer spans as many placement cells as the first, out to `lodDistance`, so for dense blade grass (a high `cellsPerTexel`) lower `lodDistance` with it: the cost follows the cells within `lodDistance`, not the density alone. A first level that would span more than 512 cells from the camera is brought in on its own.
 - Height map resolution beyond the terrain size in world units rarely adds visible detail.
 
 For engine-wide techniques see [Performance Optimization](en/performance.md).

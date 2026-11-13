@@ -15,7 +15,7 @@ import type { Camera } from '../../camera';
 import type { WindField } from '../wind';
 import { RENDER_PASS_TYPE_LIGHT, RENDER_PASS_TYPE_SHADOWMAP } from '../../values';
 import type { ClipmapTerrain } from './terrain-cm';
-import { GRASS_BLADE_LOD_BAND, grassBladeLodDistance } from './grass_gpu';
+import { GRASS_BLADE_LOD_BAND, GRASS_BLADE_MAX_ASPECT } from './grass_gpu';
 import { fetchSampler } from '../../utility/misc';
 
 /**
@@ -87,18 +87,18 @@ export function createBladeIndices(): Uint16Array<ArrayBuffer> {
  * clump (a color texture, or root and tip colors with a per-clump brightness), and an ambient
  * occlusion that darkens toward the root, where the other blades hide the sky.
  *
- * Two detail levels (see GrassGpuPlacement): near the switch distance, the three blades in four
- * that give way shrink away while the fourth widens to four times its width - Outerra's
+ * Detail levels (see GrassGpuPlacement): near the distance a level ends at, the three blades in
+ * four that give way shrink away while the fourth widens to four times its width - Outerra's
  * procedural grass (outerra.blogspot.com, 2012) doubles the width for each halving of the blades
- * to keep the ground as covered, and a quarter of the blades is two halvings - and morphs toward
- * its low detail shape - the
- * talk blends the high detail vertices toward the low detail shape; each vertex here moves onto
- * the low detail outline the way CDLOD (Strugar, 2009) morphs terrain vertices onto the coarser
- * grid - so the switch does not pop.
+ * to keep the ground as covered, and a quarter of the blades is two halvings - up to
+ * GRASS_BLADE_MAX_ASPECT times its height. Going from the first level to the second, it also
+ * morphs toward its low detail shape - the talk blends the high detail vertices toward the low
+ * detail shape; each vertex here moves onto the low detail outline the way CDLOD (Strugar, 2009)
+ * morphs terrain vertices onto the coarser grid - so the switch does not pop.
  *
  * Instance data is written by the GPU placement pass (GrassGpuPlacement), four vec4 per blade:
- * - (base position xyz, 1 for a blade that gives way to the low detail level; +2 when flagged as
- *   occluded)
+ * - (base position xyz, 1 for a blade that gives way to the next detail level, +2 when flagged
+ *   as occluded, +4 times its detail level)
  * - (facing angle, previous facing angle, wind push, previous wind push); the placement pass
  *   samples the scene wind for this frame and the last one and turns the facing downwind
  * - (clump facing angle, clump color, packed terrain normal, per-blade hash)
@@ -134,10 +134,11 @@ export class ClipmapBladeGrassMaterial
   private readonly _transmissionColor: Vector4;
   /** @internal */
   private readonly _distanceFade: Vector2;
-  /** (low detail distance, first instance of the low detail list, unused, unused) @internal */
+  /**
+   * (distance the first detail level reaches, first instance of the low detail list, last detail
+   * level, unused), see GrassGpuPlacement.getDetailLevels @internal
+   */
   private readonly _lod: Vector4;
-  /** @internal */
-  private _lodDistance: number;
   /** @internal */
   private readonly _prevCameraPos: Vector4;
   /**
@@ -182,7 +183,6 @@ export class ClipmapBladeGrassMaterial
     this._transmissionColor = new Vector4(0.45, 0.55, 0.12, 1);
     this._distanceFade = new Vector2(0, 0);
     this._lod = new Vector4(0, 0, 0, 0);
-    this._lodDistance = 0;
     this._prevCameraPos = new Vector4();
     this._viewCameraPos = new Vector4();
     this._drawDistance = 0;
@@ -210,34 +210,32 @@ export class ClipmapBladeGrassMaterial
     this._drawDistance = other._drawDistance;
     this._farDensity = other._farDensity;
     this._pixelSize.set(other._pixelSize);
-    this._lodDistance = other._lodDistance;
+    this._lod.x = other._lod.x;
+    this._lod.z = other._lod.z;
     this.updateDistanceParams();
   }
   /**
    * Sets the instance buffer written by the GPU placement pass
    * @internal
    */
-  setInstanceBuffer(buffer: Nullable<GPUDataBuffer>, lowListBase: number) {
+  setInstanceBuffer(
+    buffer: Nullable<GPUDataBuffer>,
+    lowListBase: number,
+    detailLevels: Readonly<[number, number]>
+  ) {
     // Bound uniforms are only re-applied after uniformChanged(), and the placement pass
-    // reallocates the buffer whenever its placement window grows
-    if (buffer !== this._instances.get() || lowListBase !== this._lod.y) {
+    // reallocates the buffer whenever its placement windows grow
+    const lod = this._lod;
+    const lastLevel = detailLevels[1] - 1;
+    if (
+      buffer !== this._instances.get() ||
+      lowListBase !== lod.y ||
+      detailLevels[0] !== lod.x ||
+      lastLevel !== lod.z
+    ) {
       this._instances.set(buffer);
-      this._lod.y = lowListBase;
+      lod.setXYZW(detailLevels[0], lowListBase, lastLevel, 0);
       this.uniformChanged();
-    }
-  }
-  /**
-   * Distance at which the blades switch to the low detail level; 0 keeps them all at high detail
-   * @internal
-   */
-  get lodDistance() {
-    return this._lodDistance;
-  }
-  set lodDistance(val: number) {
-    val = Math.max(0, val);
-    if (val !== this._lodDistance) {
-      this._lodDistance = val;
-      this.updateDistanceParams();
     }
   }
   /**
@@ -506,8 +504,6 @@ export class ClipmapBladeGrassMaterial
   private updateDistanceParams() {
     const distance = this._drawDistance;
     this._distanceFade.setXY(distance > 0 ? distance * 0.75 : 0, distance > 0 ? distance : 0);
-    // The same switch distance as the placement pass
-    this._lod.x = grassBladeLodDistance(this._lodDistance, distance);
     this.uniformChanged();
   }
   /** @internal */
@@ -585,18 +581,28 @@ export class ClipmapBladeGrassMaterial
       pb.mul(scope[v('facing')], pb.neg(pb.cos(scope[v('tiltAngle')]))),
       pb.vec3(0, pb.sin(scope[v('tiltAngle')]), 0)
     );
-    // Detail level transition over the last band before the switch distance: 0 before it, 1 at and
-    // past it, which is where every blade of the low detail list is
+    // Transition to the next detail level over the last band before the distance the blade's level
+    // ends at, the first level's times 2^level: 0 before it, 1 at and past it, where the next level
+    // takes over. The last level hands over to none.
     scope.$l[v('bladeDist')] = pb.distance(cameraPos, scope.base);
-    scope.$l[v('lodFade')] = pb.smoothStep(
-      pb.mul(scope.zBladeLod.x, 1 - GRASS_BLADE_LOD_BAND),
-      scope.zBladeLod.x,
-      scope[v('bladeDist')]
+    scope.$l[v('levelEnd')] = pb.mul(scope.zBladeLod.x, pb.exp2(scope.level));
+    scope.$l[v('lodFade')] = pb.mul(
+      pb.smoothStep(
+        pb.mul(scope[v('levelEnd')], 1 - GRASS_BLADE_LOD_BAND),
+        scope[v('levelEnd')],
+        scope[v('bladeDist')]
+      ),
+      pb.step(pb.add(scope.level, 0.5), scope.zBladeLod.z)
     );
-    // (width scale, overall scale): the blades that stay widen to four times their width, the others
-    // shrink away; everything shrinks into the ground over the last quarter of the draw distance
+    // (width scale, overall scale): blades are four times as wide for each level, up to
+    // GRASS_BLADE_MAX_ASPECT times their height, and toward the next level the ones that stay widen
+    // fourfold again while the others shrink away; everything shrinks into the ground over the
+    // last quarter of the draw distance
     scope.$l[v('bladeScale')] = pb.vec2(
-      pb.add(1, pb.mul(scope[v('lodFade')], 3)),
+      pb.min(
+        pb.mul(pb.exp2(pb.mul(scope.level, 2)), pb.add(1, pb.mul(scope[v('lodFade')], 3))),
+        pb.max(1, pb.div(pb.mul(scope.inst3.x, GRASS_BLADE_MAX_ASPECT), pb.max(scope.inst3.y, 1e-6)))
+      ),
       pb.sub(1, pb.mul(scope.extra, scope[v('lodFade')]))
     );
     scope.$if(pb.greaterThan(scope.zDistanceFade.y, 0), function () {
@@ -744,7 +750,8 @@ export class ClipmapBladeGrassMaterial
     scope.zBladeLook = pb.vec4().uniform(2);
     scope.zBladeLook2 = pb.vec4().uniform(2);
     scope.zDistanceFade = pb.vec2().uniform(2);
-    // (low detail distance, first instance of the low detail list, unused, unused)
+    // (distance the first detail level reaches, first instance of the low detail list, last detail
+    // level, unused)
     scope.zBladeLod = pb.vec4().uniform(2);
     scope.zPrevCameraPos = pb.vec4().uniform(2);
     // (pixel size at distance 1, perspective flag, minimum screen width in pixels, unused)
@@ -788,13 +795,15 @@ export class ClipmapBladeGrassMaterial
     scope.$l.inst2 = scope.zBladeInstances.at(pb.add(scope.first, 2));
     scope.$l.inst3 = scope.zBladeInstances.at(pb.add(scope.first, 3));
     scope.$l.base = scope.inst0.xyz;
-    // The placement pass adds 2 to the hash of blades it flags as occluded
-    scope.$l.occluded = pb.step(1.5, scope.inst0.w);
+    // Detail level, then the flags: +2 for blades the placement pass flags as occluded, +1 for those
+    // that give way to the next level
+    scope.$l.level = pb.floor(pb.add(pb.mul(scope.inst0.w, 0.25), 0.01));
+    scope.$l.flags = pb.sub(scope.inst0.w, pb.mul(scope.level, 4));
+    scope.$l.occluded = pb.step(1.5, scope.flags);
     if (this.occlusionDebug) {
       scope.$outputs.zOccludedFlag = scope.occluded;
     }
-    // 1 for a blade that gives way to the low detail level
-    scope.$l.extra = pb.sub(scope.inst0.w, pb.mul(scope.occluded, 2));
+    scope.$l.extra = pb.sub(scope.flags, pb.mul(scope.occluded, 2));
     // Where the vertex lies along the blade and on which side; the tip vertex sits on the center
     // line
     scope.$l.isTip = pb.greaterThanEqual(scope.vid, pb.uint(pb.mul(scope.pairs, 2)));

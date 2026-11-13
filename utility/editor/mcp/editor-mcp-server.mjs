@@ -3523,8 +3523,9 @@ const BASE_TOOLS = [
               cells_per_texel: {
                 type: 'integer',
                 minimum: 1,
-                maximum: 8,
-                description: 'Placement cells per density texel along each axis.'
+                maximum: 32,
+                description:
+                  'Placement cells per density texel along each axis: at most one blade per cell. Up to 32 with GPU placement (WebGPU), 8 otherwise. For dense blade grass lower lod_distance too: each blade detail level spans as many cells as the first.'
               },
               settings: { type: 'object', additionalProperties: true }
             }

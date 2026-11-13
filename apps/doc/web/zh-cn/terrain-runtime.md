@@ -145,7 +145,7 @@ for (let z = 10; z < 20; z++) {
 layer.updateDensityRegion(10, 10, 20, 20);
 ```
 
-密度纹素 (x, z) 覆盖地形区域 `[x/w..(x+1)/w, z/h..(z+1)/h]`。`cellsPerTexel` 是每个纹素在每个轴上的放置格数，一个纹素最多容纳它的平方个草叶。应把多次密度写入合并后只调用一次 `updateDensityRegion()`；`setDensityData(w, h, cellsPerTexel, data)` 替换整张密度图。
+密度纹素 (x, z) 覆盖地形区域 `[x/w..(x+1)/w, z/h..(z+1)/h]`。`cellsPerTexel` 是每个纹素在每个轴上的放置格数，一个纹素最多容纳它的平方个草叶。在 GPU 上放置草叶时（WebGPU）最大为 32，在 CPU 上生成的卡片层最大为 8。应把多次密度写入合并后只调用一次 `updateDensityRegion()`；`setDensityData(w, h, cellsPerTexel, data)` 替换整张密度图。
 
 <div class="showcase" case="tut-69"></div>
 
@@ -171,8 +171,8 @@ meadow.lodDistance = 30; // 在此距离切换到低细节
 | --- | --- | --- |
 | 形状 | `tilt`、`bend`、`taper`、`tipDetail`、`heightRandomness`、`widthRandomness`、`tiltRandomness`、`bendRandomness` | 每片草叶的倾倒、弯曲、轮廓，以及它们的随机变化程度 |
 | 成簇 | `clumpSize`、`clumpHeightVariation`、`clumpPull`、`clumpSameDirection`、`clumpFaceAway`、`clumpColorVariation` | 把草地分成一块块：草丛、被梳理过的区域、颜色变化 |
-| 颜色与光照 | `rootColor`、`tipColor`、`colorMap`、`rootOcclusion`、`roundness`、`transmissionColor` | 从根到尖的渐变或纹理、根部变暗、模拟曲面的着色、逆光时草叶透光 |
-| 距离 | `viewThickening`、`farNormalStart`、`farNormalEnd`、`farRoughness`、`lodDistance` | 低角度时草地依然饱满，远处不闪烁；`lodDistance` 处切换为四分之一数量、更宽的草叶 |
+| 颜色与光照 | `rootColor`、`tipColor`、`colorMap`、`rootOcclusion`、`selfShadow`、`roundness`、`transmissionColor` | 从根到尖的渐变或纹理、根部变暗（环境光，以及被上方草叶挡掉的阳光）、模拟曲面的着色、逆光时草叶透光 |
+| 距离 | `viewThickening`、`farNormalStart`、`farNormalEnd`、`farRoughness`、`lodDistance` | 低角度时草地依然饱满，远处不闪烁；`lodDistance` 处切换为四分之一数量、更宽的草叶，之后距离每翻一倍再以同样方式减少一次 |
 | 风 | `windFacing`、`windLean`、`swayAmplitude`、`swaySpeed` | 草叶对场景风的响应；卡片层也有 `windLean`、`swayAmplitude`、`swaySpeed` |
 
 两种草都会随场景风场摆动：
@@ -185,7 +185,10 @@ wind.gustStrength = 0.5;
 wind.gustScale = 20;
 ```
 
-几何草会向太阳阴影贴图最近的两个级联投射阴影（`grassRenderer.castShadow`，默认开启；地形本身也要开启投影），并在后一个级联的最后 `grassRenderer.shadowFadeFraction` 范围内逐渐淡出。更远处的草不投射自身的阴影，如果开启了屏幕空间接触阴影和环境光遮蔽，会由它们压暗。
+几何草会向太阳阴影贴图最近的两个级联投射阴影（`grassRenderer.castShadow`，默认开启；地形本身也要开启投影），并在后一个级联的最后 `grassRenderer.shadowFadeFraction` 范围内逐渐淡出。更远处的草不投射自身的阴影，如果开启了屏幕空间接触阴影和环境光遮蔽，会由它们压暗。纤细的草叶在阴影贴图里只剩一片模糊，`layer.castShadow = false` 可以让单个草层不进阴影贴图，同时省去为它放置投影草叶的开销。另有两个不依赖阴影贴图的效果让草地变暗：
+
+- `layer.selfShadow`（几何草层，默认 1）：草叶被上方草叶挡掉的阳光，越靠近根部、太阳越低就越暗。0 表示关闭。
+- `layer.groundOcclusion`（两种草层，默认 0.5）：该层满密度时把下方地面压暗的程度，由密度图烘焙进地形颜色，草越密，草叶间露出的地面以及它反弹的光就越暗。0 表示关闭。
 
 编辑器中，草地笔刷的 **Add Blade Layer** 按钮可以添加几何草层，选中该层后，参数显示在笔刷面板中。
 
@@ -233,6 +236,7 @@ terrain.material.debugMode = 'vertex_normal';
 - clipmap 让三角形数大致恒定；`clipMapTileSize` 在近处细节和顶点开销之间取舍。
 - 细节层会成倍增加逐像素开销；在 WebGPU 上，层数较多或使用六边形平铺时应开启运行时虚拟纹理。
 - 草地开销随密度和绘制距离增长。先调低 `drawDistance`，再调低密度；几何草层可以缩短 `lodDistance` 来减少远处的几何体。
+- 几何草层的每个细节级覆盖的放置格数与第一级（到 `lodDistance` 为止）相同，所以草很密（`cellsPerTexel` 较大）时要同时调低 `lodDistance`：开销取决于 `lodDistance` 以内的格数，而不只是密度。第一级如果会从相机向外覆盖超过 512 格，会自动收近。
 - 高度图分辨率超过地形的世界尺寸后，通常看不出更多细节。
 
 引擎层面的优化手段见[性能优化](zh-cn/performance.md)。

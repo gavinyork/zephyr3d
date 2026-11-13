@@ -19,7 +19,10 @@ const INSTANCE_BYTES = 4 * 4;
 const TILE_CELLS = 64;
 /** Default number of placement cells per density map texel along each axis */
 const DEFAULT_CELLS_PER_TEXEL = 2;
-const MAX_CELLS_PER_TEXEL = 8;
+/** Most placement cells per density map texel along each axis where blades are placed on the GPU */
+const MAX_CELLS_PER_TEXEL = 32;
+/** The same where they are placed on the CPU, which keeps an instance per blade */
+const MAX_CELLS_PER_TEXEL_CPU = 8;
 /** Default distance from the camera beyond which grass is not drawn */
 const DEFAULT_DRAW_DISTANCE = 150;
 /** Default fraction of blades kept at the draw distance */
@@ -235,7 +238,6 @@ export class GrassLayer extends Disposable {
     if (kind === 'blade') {
       this._bladeShape[0] = bladeHeight;
       this._bladeShape[2] = bladeWidth;
-      this.bladeMaterial!.lodDistance = this._bladeShape[15];
     }
     this._gpu?.setDensity(this._densityWidth, this._densityHeight, this._densityMap);
     this.drawDistance = DEFAULT_DRAW_DISTANCE;
@@ -647,7 +649,12 @@ export class GrassLayer extends Disposable {
   /**
    * Distance from the camera at which blades switch to their low detail level: a quarter as many
    * blades, each four times as wide and with fewer vertices, blending in over the last quarter of this
-   * distance. 0 keeps every blade at high detail up to the draw distance. Blade layers only.
+   * distance. Each further doubling of the distance thins the blades out to a quarter again, the
+   * ones left widening fourfold up to as wide as they are tall, so that a level spans as many
+   * placement cells as the first: lower it for denser grass (see {@link GrassLayer.cellsPerTexel}),
+   * whose cost grows with the cells it spans. Brought in on its own where the first level would
+   * span more than 1024 cells from the camera. 0 keeps every blade at high detail up to the draw
+   * distance, as far as that limit allows. Blade layers only.
    */
   get lodDistance() {
     return this._bladeShape[15];
@@ -655,10 +662,6 @@ export class GrassLayer extends Disposable {
   set lodDistance(val: number) {
     val = Math.max(0, Number(val) || 0);
     this.setShape(15, val);
-    const material = this.bladeMaterial;
-    if (material) {
-      material.lodDistance = val;
-    }
   }
   /** How fast the blades bob in the wind, in radians per second */
   get swaySpeed() {
@@ -728,17 +731,22 @@ export class GrassLayer extends Disposable {
   }
   /**
    * Number of placement cells per density map texel along each axis.
-   * The maximum blade count per texel is the square of this value.
+   * The maximum blade count per texel is the square of this value. At most 32 where blades are
+   * placed on the GPU (WebGPU), 8 elsewhere.
    */
   get cellsPerTexel() {
     return this._cellsPerTexel;
   }
   set cellsPerTexel(val: number) {
-    val = Math.max(1, Math.min(MAX_CELLS_PER_TEXEL, val | 0));
+    val = Math.max(1, Math.min(this.maxCellsPerTexel, val | 0));
     if (val !== this._cellsPerTexel) {
       this._cellsPerTexel = val;
       this.rebuild();
     }
+  }
+  /** Most placement cells per density map texel, see {@link GrassLayer.cellsPerTexel} */
+  get maxCellsPerTexel() {
+    return this._gpu ? MAX_CELLS_PER_TEXEL : MAX_CELLS_PER_TEXEL_CPU;
   }
   /**
    * Replaces the density map and regenerates all blade instances
@@ -754,7 +762,7 @@ export class GrassLayer extends Disposable {
     }
     this._densityWidth = width;
     this._densityHeight = height;
-    this._cellsPerTexel = Math.max(1, Math.min(MAX_CELLS_PER_TEXEL, cellsPerTexel | 0));
+    this._cellsPerTexel = Math.max(1, Math.min(this.maxCellsPerTexel, cellsPerTexel | 0));
     this._densityMap = data;
     this.rebuild();
     this._onGroundChanged?.();
@@ -1184,7 +1192,7 @@ export class GrassLayer extends Disposable {
       if (!instances) {
         return;
       }
-      material.setInstanceBuffer(instances, gpu.getLowListBase(target));
+      material.setInstanceBuffer(instances, gpu.getLowListBase(target), gpu.getDetailLevels());
       // The camera the blades were placed for, also in the shadow map passes
       material.prepareDraw(
         ctx.camera,
