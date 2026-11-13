@@ -1332,34 +1332,58 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
         pb.dpdx(scope.$inputs.clipmapPos.xz),
         pb.dpdy(scope.$inputs.clipmapPos.xz)
       );
-      // The foam texture here, drifting; a generator carrying foam of its own
-      // blends in where its foam is
-      scope.$l.foamSample = sampleFoamTexture(
-        scope,
-        scope.foamTex,
-        pb.mul(
-          pb.add(
-            scope.$inputs.clipmapPos.xz,
-            pb.vec2(pb.mul(ShaderHelper.getElapsedTime(scope), FOAM_DRIFT))
+      const that = this;
+      // A generator reporting the slopes it filters out is given the footprint to filter by
+      const slopeFootprint = !!this.waveGenerator?.calcUnresolvedSlopeVariance;
+      // The waves' normal and foam, the most of the work after the shading, are left to the
+      // fragments not hidden (see waterHidden) where that is known. It is found in a branch,
+      // so only when the footprint stands in for every screen derivative the waves would take.
+      const deferWaves =
+        !!(this._shoreWaveGenerator && this._foamFieldGenerator) &&
+        slopeFootprint &&
+        this.debugOutput !== 'swashFoamSources';
+      scope.$l.foamSample = pb.vec3(0);
+      scope.$l.normal = pb.vec4(0, 1, 0, 0);
+      // In a branch, its scope must be the one declaring and assigning
+      const calcWaves = (s: PBInsideFunctionScope) => {
+        // The foam texture here, drifting; a generator carrying foam of its own
+        // blends in where its foam is
+        s.foamSample = sampleFoamTexture(
+          s,
+          scope.foamTex,
+          pb.mul(
+            pb.add(scope.$inputs.clipmapPos.xz, pb.vec2(pb.mul(ShaderHelper.getElapsedTime(s), FOAM_DRIFT))),
+            scope.foamUVScale
           ),
+          scope.restXZGrad,
           scope.foamUVScale
-        ),
-        scope.restXZGrad,
-        scope.foamUVScale
-      );
-      scope.$l.normal = this.waveGenerator
-        ? this.waveGenerator.calcFragmentNormalAndFoam(
-            scope,
+        );
+        s.normal = that.waveGenerator
+          ? that.waveGenerator.calcFragmentNormalAndFoam(
+              s,
+              scope.$inputs.clipmapPos.xz,
+              scope.$inputs.worldNormal,
+              scope.foamSample,
+              slopeFootprint ? scope.restXZGrad : undefined
+            )
+          : pb.vec4(scope.$inputs.worldNormal, 0);
+        if (that.infinite) {
+          // Flat and foamless on the skirt: waves evaluated at kilometres per
+          // pixel alias into speckle.
+          s.normal = pb.mix(scope.normal, pb.vec4(0, 1, 0, 0), scope.$inputs.skirt);
+        }
+        if (that._shoreWaveGenerator) {
+          // Near the shore the foam is at least the near-shore density, joining
+          // the breaking waves' foam to the beach's (see nearShore).
+          s.normal.w = that._shoreWaveGenerator.calcNearShoreFoam(
+            s,
             scope.$inputs.clipmapPos.xz,
-            scope.$inputs.worldNormal,
-            scope.foamSample,
-            this.waveGenerator.calcUnresolvedSlopeVariance ? scope.restXZGrad : undefined
-          )
-        : pb.vec4(scope.$inputs.worldNormal, 0);
-      if (this.infinite) {
-        // Flat and foamless on the skirt: waves evaluated at kilometres per
-        // pixel alias into speckle.
-        scope.normal = pb.mix(scope.normal, pb.vec4(0, 1, 0, 0), scope.$inputs.skirt);
+            scope.normal.w
+          );
+        }
+      };
+      if (!deferWaves) {
+        calcWaves(scope);
       }
       // Vertical wave displacement, interpolated from the vertices. Zero on the skirt.
       scope.$l.crestHeight = pb.sub(scope.$inputs.worldPos.y, scope.$inputs.clipmapPos.y);
@@ -1371,15 +1395,6 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
       scope.$l.sheetThickness = sheetThickness
         ? sheetThickness.call(this.waveGenerator, scope, scope.$inputs.clipmapPos.xz)
         : pb.float(-1);
-      if (this._shoreWaveGenerator) {
-        // Near the shore the foam is at least the near-shore density, joining
-        // the breaking waves' foam to the beach's (see nearShore).
-        scope.normal.w = this._shoreWaveGenerator.calcNearShoreFoam(
-          scope,
-          scope.$inputs.clipmapPos.xz,
-          scope.normal.w
-        );
-      }
       // Reconstruct the opaque surface before the swash's discard. Deposited
       // foam is projected onto this ground, independently of the raised mesh.
       scope.$l.scenePos = ShaderHelper.samplePositionFromDepth(
@@ -1605,16 +1620,15 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
           1
         );
       } else {
-        // The foam field's wall foam layer, see FOAM_WALL
-        scope.$l.wallFoam = this._foamFieldGenerator
-          ? pb.mul(
-              this._foamField.sample(scope, scope.$inputs.clipmapPos.xz).z,
-              this.infinite ? pb.sub(1, scope.$inputs.skirt) : pb.float(1)
-            )
-          : pb.float(0);
-        const that = this;
-        const shade = (s: PBInsideFunctionScope) =>
-          pb.vec4(
+        const shade = (s: PBInsideFunctionScope) => {
+          // The foam field's wall foam layer, see FOAM_WALL
+          s.$l.wallFoam = that._foamFieldGenerator
+            ? pb.mul(
+                that._foamField.sample(s, scope.$inputs.clipmapPos.xz).z,
+                that.infinite ? pb.sub(1, scope.$inputs.skirt) : pb.float(1)
+              )
+            : pb.float(0);
+          return pb.vec4(
             that.waterShading(
               s,
               scope.$inputs.worldPos,
@@ -1626,7 +1640,7 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
               scope.foamSample,
               scope.surfaceCoverage,
               scope.sheetThickness,
-              scope.wallFoam,
+              s.wallFoam,
               scope.scenePos,
               scope.groundFoamDensity,
               scope.groundFoamSample,
@@ -1635,10 +1649,15 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
             ),
             1
           );
+        };
         if (this._shoreWaveGenerator && this._foamFieldGenerator) {
-          // See waterHidden: what the depth test drops anyway is not shaded
+          // See waterHidden: what the depth test drops anyway is not shaded,
+          // nor are its waves found when they can be left to here (deferWaves)
           scope.$l.outColor = pb.vec4(0, 0, 0, 1);
           scope.$if(pb.not(scope.waterHidden), function () {
+            if (deferWaves) {
+              calcWaves(this);
+            }
             this.outColor = shade(this);
           });
         } else {

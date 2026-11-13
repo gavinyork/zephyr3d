@@ -782,9 +782,10 @@ export class FoamFieldWaveGenerator extends Disposable implements WaveGenerator 
     }
     const funcName = `ffCalcNormalAndFoam${foamSample ? 'S' : ''}${footprint ? 'F' : ''}`;
     pb.func(funcName, params, function () {
-      // Screen derivatives for the foam texture, here in uniform control flow
+      // Screen derivatives for the foam texture: the footprint of xz when given, which a caller
+      // may then call this in a branch with; else taken here, needing uniform control flow
       if (foamSample) {
-        this.$l.xzGrad = pb.vec4(pb.dpdx(this.xz), pb.dpdy(this.xz));
+        this.$l.xzGrad = footprint ? this.fp : pb.vec4(pb.dpdx(this.xz), pb.dpdy(this.xz));
       }
       this.$l.nf = that._base.calcFragmentNormalAndFoam(
         this,
