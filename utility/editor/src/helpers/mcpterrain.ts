@@ -210,7 +210,9 @@ export async function getTerrainInfo(controller: SceneController | null, params:
       draw_distance: grass.getDrawDistance(i),
       far_density: grass.getFarDensity(i),
       density_map_size: [layer.densityMapWidth, layer.densityMapHeight],
-      cells_per_texel: layer.cellsPerTexel
+      cells_per_texel: layer.cellsPerTexel,
+      ground_occlusion: layer.groundOcclusion,
+      ...(layer.kind === 'blade' ? { cast_shadow: layer.castShadow, self_shadow: layer.selfShadow } : {})
     });
   }
   const splatMap = material.getSplatMap();
@@ -393,8 +395,11 @@ const GRASS_LAYER_NUMBER_KEYS = [
   'windLean',
   'swayAmplitude',
   'swaySpeed',
-  'lodDistance'
+  'lodDistance',
+  'selfShadow',
+  'groundOcclusion'
 ];
+const GRASS_LAYER_BOOLEAN_KEYS = ['castShadow'];
 const GRASS_LAYER_COLOR_KEYS = ['rootColor', 'tipColor', 'transmissionColor'];
 
 async function fetchTextureAsset(path: string, linear: boolean): Promise<Texture2D> {
@@ -518,9 +523,13 @@ export async function setTerrainGrassLayers(controller: SceneController | null, 
     }
     const settings = info.settings ?? {};
     for (const key of Object.keys(settings)) {
-      if (!GRASS_LAYER_NUMBER_KEYS.includes(key) && !GRASS_LAYER_COLOR_KEYS.includes(key)) {
+      if (
+        !GRASS_LAYER_NUMBER_KEYS.includes(key) &&
+        !GRASS_LAYER_BOOLEAN_KEYS.includes(key) &&
+        !GRASS_LAYER_COLOR_KEYS.includes(key)
+      ) {
         return {
-          err: `Grass layer ${i}: unknown setting "${key}"; supported: ${[...GRASS_LAYER_NUMBER_KEYS, ...GRASS_LAYER_COLOR_KEYS].join(', ')}`
+          err: `Grass layer ${i}: unknown setting "${key}"; supported: ${[...GRASS_LAYER_NUMBER_KEYS, ...GRASS_LAYER_BOOLEAN_KEYS, ...GRASS_LAYER_COLOR_KEYS].join(', ')}`
         };
       }
     }
@@ -570,7 +579,10 @@ export async function setTerrainGrassLayers(controller: SceneController | null, 
         if (Array.isArray(value) && value.length >= 3) {
           layer[key] = new Vector4(Number(value[0]), Number(value[1]), Number(value[2]), 1);
         }
-      } else if (typeof value === 'number') {
+      } else if (
+        typeof value === 'number' ||
+        (typeof value === 'boolean' && GRASS_LAYER_BOOLEAN_KEYS.includes(key))
+      ) {
         layer[key] = value;
       }
     }

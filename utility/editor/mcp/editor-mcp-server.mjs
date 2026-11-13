@@ -3503,7 +3503,7 @@ const BASE_TOOLS = [
   {
     name: 'terrain_set_grass_layers',
     description:
-      'Add or update the grass layers of a ClipmapTerrain. Existing layers are updated in order (their painted density is kept, their kind cannot change, they cannot be removed); extra entries add new layers. kind "card" draws textured crossed cards (needs a texture with alpha, works everywhere); kind "blade" draws procedural blades (WebGPU only). Paint density with terrain_generate target grass afterwards. settings accepts layer fields such as windLean, swayAmplitude, swaySpeed, and for blades heightRandomness, widthRandomness, tilt, bend, taper, clumpSize, rootOcclusion, lodDistance, rootColor/tipColor/transmissionColor ([r,g,b]). Not undoable. Returns { num_layers, err }.',
+      'Add or update the grass layers of a ClipmapTerrain. Existing layers are updated in order (their painted density is kept, their kind cannot change, they cannot be removed); extra entries add new layers. kind "card" draws textured crossed cards (needs a texture with alpha, works everywhere); kind "blade" draws procedural blades (WebGPU only). Paint density with terrain_generate target grass afterwards. settings accepts layer fields such as windLean, swayAmplitude, swaySpeed, groundOcclusion (0..1, how much the ground darkens under full-density grass), and for blades heightRandomness, widthRandomness, tilt, bend, taper, clumpSize, rootOcclusion, selfShadow (0..8, how much the blades keep direct light off their lower parts), castShadow (boolean, cast sun shadows), lodDistance, rootColor/tipColor/transmissionColor ([r,g,b]). Not undoable. Returns { num_layers, err }.',
     inputSchema: {
       type: 'object',
       required: ['node_id', 'layers'],

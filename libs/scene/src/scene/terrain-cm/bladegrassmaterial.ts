@@ -22,6 +22,11 @@ import { fetchSampler } from '../../utility/misc';
  * Vertex pairs across a blade at the high and the low detail level, each closed by one tip
  * vertex: 15 and 7 vertices, as in "Procedural Grass in Ghost of Tsushima" (Wohllaib, GDC 2021)
  */
+/**
+ * Sine of the light's elevation the way through the blades is taken at, at least: a light at the
+ * horizon would cross the field without end, and blades lean, so some light comes in between.
+ */
+const BLADE_SELF_SHADOW_MIN_ELEVATION = 0.1;
 const BLADE_HIGH_PAIRS = 7;
 const BLADE_LOW_PAIRS = 3;
 /**
@@ -115,7 +120,7 @@ export class ClipmapBladeGrassMaterial
   private readonly _shape: Vector4;
   /** (roundness, view thickening, far normal start, far normal end) @internal */
   private readonly _look: Vector4;
-  /** (far roughness, unused...) @internal */
+  /** (far roughness, self shadow, unused, unused) @internal */
   private readonly _look2: Vector4;
   /** (wind lean, sway amplitude, sway speed, unused) @internal */
   private readonly _wind: Vector4;
@@ -169,7 +174,7 @@ export class ClipmapBladeGrassMaterial
     this._colorMap = new DRef();
     this._shape = new Vector4(0.7, 1.5, 0.6, 0.5);
     this._look = new Vector4(0.5, 0.5, 15, 60);
-    this._look2 = new Vector4(0.9, 0, 0, 0);
+    this._look2 = new Vector4(0.9, 1, 0, 0);
     this._wind = new Vector4(0.5, 0.15, 2.5, 0);
     this._windTime = new Vector2(0, 0);
     this._rootColor = new Vector4(0.06, 0.12, 0.02, 1);
@@ -332,6 +337,20 @@ export class ClipmapBladeGrassMaterial
     val = Math.min(1, Math.max(0, val));
     if (val !== this._shape.w) {
       this._shape.w = val;
+      this.uniformChanged();
+    }
+  }
+  /**
+   * Optical depth of the field for the direct light from the tips down to the roots with the light
+   * overhead, see GrassLayer.selfShadow. 0 for none.
+   */
+  get selfShadow() {
+    return this._look2.y;
+  }
+  set selfShadow(val: number) {
+    val = Math.min(8, Math.max(0, Number(val) || 0));
+    if (val !== this._look2.y) {
+      this._look2.y = val;
       this.uniformChanged();
     }
   }
@@ -527,6 +546,7 @@ export class ClipmapBladeGrassMaterial
       bindGroup.setValue('zTipColor', this._tipColor);
       bindGroup.setValue('zBladeTransmission', this._transmissionColor);
       bindGroup.setValue('zBladeRoundness', this._look.x);
+      bindGroup.setValue('zBladeSelfShadow', this._look2.y);
       if (this._colorMap.get()) {
         bindGroup.setTexture('zColorMap', this._colorMap.get()!, fetchSampler('clamp_linear'));
       }
@@ -850,6 +870,7 @@ export class ClipmapBladeGrassMaterial
       scope.zTipColor = pb.vec4().uniform(2);
       scope.zBladeTransmission = pb.vec4().uniform(2);
       scope.zBladeRoundness = pb.float().uniform(2);
+      scope.zBladeSelfShadow = pb.float().uniform(2);
       if (this.featureUsed<boolean>(ClipmapBladeGrassMaterial.FEATURE_COLOR_MAP)) {
         scope.zColorMap = pb.tex2D().uniform(2);
         scope.$l.albedo = pb.textureSampleLevel(
@@ -915,6 +936,33 @@ export class ClipmapBladeGrassMaterial
   getSubsurfaceColor(scope: PBInsideFunctionScope): Nullable<PBShaderExp> {
     const pb = scope.$builder;
     return pb.mul(scope.zBladeTransmission.rgb, scope.$inputs.zBladeT);
+  }
+  /**
+   * The direct light let through by the blades above the fragment: Beer-Lambert through a field of
+   * even density, whose optical depth grows from 0 at the tips to selfShadow at the roots, along
+   * the way to the light, longer the lower it stands. Covers the light through the blade from
+   * behind too (getSubsurfaceColor), which crosses the same blades.
+   */
+  calculateLightAttenuation(
+    scope: PBInsideFunctionScope,
+    type: PBShaderExp,
+    worldPos: PBShaderExp,
+    posRange: PBShaderExp,
+    dirCutoff: PBShaderExp,
+    extra?: PBShaderExp
+  ) {
+    const attenuation = super.calculateLightAttenuation(scope, type, worldPos, posRange, dirCutoff, extra);
+    if (!this.needFragmentColor()) {
+      return attenuation;
+    }
+    const pb = scope.$builder;
+    // Rect lights by the direction of their centre, which is all the height of the light takes
+    const lightDir = this.calculateLightDirection(scope, type, worldPos, posRange, dirCutoff);
+    const depth = pb.mul(scope.zBladeSelfShadow, pb.sub(1, scope.$inputs.zBladeT));
+    return pb.mul(
+      attenuation,
+      pb.exp(pb.neg(pb.div(depth, pb.max(lightDir.y, BLADE_SELF_SHADOW_MIN_ELEVATION))))
+    );
   }
   /** Ambient occlusion darkening toward the root, see MeshMaterial.getAmbientOcclusionFactor */
   getAmbientOcclusionFactor(scope: PBInsideFunctionScope): Nullable<PBShaderExp> {

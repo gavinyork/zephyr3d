@@ -24,6 +24,8 @@ const MAX_CELLS_PER_TEXEL = 8;
 const DEFAULT_DRAW_DISTANCE = 150;
 /** Default fraction of blades kept at the draw distance */
 const DEFAULT_FAR_DENSITY = 0.25;
+/** Default share of its albedo the ground loses under grass of full density, see GrassLayer.groundOcclusion */
+const DEFAULT_GROUND_OCCLUSION = 0.5;
 /**
  * Number of the nearest cascades of the sun's shadow map procedural blades cast shadows into.
  * Farther cascades have texels too coarse for single blades.
@@ -154,6 +156,13 @@ export class GrassLayer extends Disposable {
   private readonly _gpu: Nullable<GrassGpuPlacement>;
   /** Number of shadow maps the blades were placed for by the last updatePerCamera() call */
   private _numShadowTargets: number;
+  private _castShadow: boolean;
+  private _groundOcclusion: number;
+  /**
+   * Told when what the layer darkens the ground by changes, over a rectangle of density map
+   * texels [x0, x1) x [z0, z1), or everywhere without one; see GrassRenderer.groundOcclusionMap
+   */
+  private _onGroundChanged: Nullable<(rect?: [number, number, number, number]) => void>;
   /**
    * Creates an instance of GrassLayer
    * @param terrain - Clipmap terrain object
@@ -201,6 +210,9 @@ export class GrassLayer extends Disposable {
     this._drawDistance = 0;
     this._farDensity = 1;
     this._numShadowTargets = 0;
+    this._castShadow = true;
+    this._groundOcclusion = DEFAULT_GROUND_OCCLUSION;
+    this._onGroundChanged = null;
     if (!GrassGpuPlacement.isSupported()) {
       this._gpu = null;
       if (kind === 'blade') {
@@ -433,6 +445,59 @@ export class GrassLayer extends Disposable {
     if (material) {
       material.colorMap = val;
     }
+  }
+  /**
+   * Whether the blades cast shadows from the sun into the nearest cascades of its shadow map
+   * (WebGPU only), as long as {@link GrassRenderer.castShadow} lets any. Blade layers only.
+   *
+   * Blades a few centimetres wide leave little more than a blur in shadow maps whose texels are
+   * larger than they are; {@link GrassLayer.selfShadow} and {@link GrassLayer.groundOcclusion}
+   * darken the field without them.
+   */
+  get castShadow() {
+    return this._castShadow;
+  }
+  set castShadow(val: boolean) {
+    this._castShadow = !!val;
+  }
+  /**
+   * How much the other blades keep the direct light off the lower part of a blade, as the optical
+   * depth of the field from the tips down to the roots with the light overhead: 0 for none, 1 lets
+   * a third of the light reach the roots, and the lower the light, the longer its way through the
+   * blades. Blade layers only.
+   */
+  get selfShadow() {
+    return this.bladeMaterial?.selfShadow ?? 0;
+  }
+  set selfShadow(val: number) {
+    const material = this.bladeMaterial;
+    if (material) {
+      material.selfShadow = val;
+    }
+  }
+  /**
+   * Share of its albedo the ground loses under the grass of this layer at full density, in
+   * proportion to the density elsewhere: the blades keep the sky and the sun off it. 0 leaves
+   * the ground as it is. Written into the terrain's albedo, so its runtime virtual texture and
+   * global illumination see it too.
+   */
+  get groundOcclusion() {
+    return this._groundOcclusion;
+  }
+  set groundOcclusion(val: number) {
+    val = Math.min(1, Math.max(0, Number(val) || 0));
+    if (val !== this._groundOcclusion) {
+      this._groundOcclusion = val;
+      this._onGroundChanged?.();
+    }
+  }
+  /** Whether the layer is drawn here: blade layers are not without the GPU placement @internal */
+  get drawn() {
+    return this._kind !== 'blade' || !!this._gpu;
+  }
+  /** @internal */
+  setGroundChangedCallback(callback: Nullable<(rect?: [number, number, number, number]) => void>) {
+    this._onGroundChanged = callback;
   }
   /**
    * How much the ambient light darkens toward the root, where the neighboring blades hide the
@@ -692,6 +757,7 @@ export class GrassLayer extends Disposable {
     this._cellsPerTexel = Math.max(1, Math.min(MAX_CELLS_PER_TEXEL, cellsPerTexel | 0));
     this._densityMap = data;
     this.rebuild();
+    this._onGroundChanged?.();
   }
   /**
    * Regenerates blade instances for all tiles overlapping a density map region
@@ -701,6 +767,7 @@ export class GrassLayer extends Disposable {
    * @param maxTexelZ - Maximum z texel of the region (exclusive)
    */
   updateDensityRegion(minTexelX: number, minTexelZ: number, maxTexelX: number, maxTexelZ: number) {
+    this._onGroundChanged?.([minTexelX, minTexelZ, maxTexelX, maxTexelZ]);
     if (this._kind === 'blade' && !this._gpu) {
       return;
     }
@@ -1025,7 +1092,7 @@ export class GrassLayer extends Disposable {
     place(0, occlusionMode, null, null);
     // Target i + 1 holds the casters of shadow map i. Blades hidden behind the terrain from the
     // camera still cast shadows, so these skip the occlusion culling.
-    const numShadowTargets = this._kind === 'blade' ? shadowCullPlanes.length : 0;
+    const numShadowTargets = this._kind === 'blade' && this._castShadow ? shadowCullPlanes.length : 0;
     for (let i = 0; i < numShadowTargets; i++) {
       place(i + 1, GrassOcclusionMode.Off, shadowCullPlanes[i], shadowFade);
     }
@@ -1173,6 +1240,9 @@ export class GrassRenderer extends Disposable {
   private _shadowFade: Nullable<[number, number]>;
   /** The light whose shadow map casters the blades were last placed for */
   private readonly _shadowLight: DWeakRef<DirectionalLight>;
+  /** See groundOcclusionMap; its texels on the CPU, null without one */
+  private readonly _groundMap: DRef<Texture2D>;
+  private _groundData: Nullable<Uint8Array<ArrayBuffer>>;
   /**
    * Creates an instance of GrassRenderer
    * @param terrain - Clipmap terrain object
@@ -1188,6 +1258,114 @@ export class GrassRenderer extends Disposable {
     this._shadowFadeFraction = 0.5;
     this._shadowFade = null;
     this._shadowLight = new DWeakRef();
+    this._groundMap = new DRef();
+    this._groundData = null;
+  }
+  /**
+   * How much of its albedo the ground loses under the grass, one byte per texel over the terrain
+   * region (see {@link GrassLayer.groundOcclusion}); null when no drawn layer darkens it. The
+   * terrain material multiplies its albedo by one minus it.
+   */
+  get groundOcclusionMap(): Nullable<Texture2D> {
+    return this._groundMap.get() ?? null;
+  }
+  /**
+   * Recomputes the ground occlusion map from the layers that darken the ground, over the texels
+   * a rectangle of a layer's density map covers, or everywhere, and refills the terrain's runtime
+   * virtual texture there. Each layer lets through 1 - groundOcclusion * density of the light.
+   */
+  private updateGroundOcclusion(layer: Nullable<GrassLayer>, rect?: [number, number, number, number]) {
+    const terrain = this._terrain.get();
+    if (!terrain) {
+      return;
+    }
+    const layers = this._layers.filter((l) => l.drawn && l.groundOcclusion > 0);
+    if (layers.length === 0) {
+      if (this._groundMap.get()) {
+        this._groundMap.set(null);
+        this._groundData = null;
+        if (terrain.material) {
+          terrain.material.grassOcclusionMap = null;
+        }
+        terrain.invalidateRuntimeVirtualTexture();
+      }
+      return;
+    }
+    // A changed layer that does not darken the ground leaves the map as it is
+    if (layer && rect && !layers.includes(layer)) {
+      return;
+    }
+    let w = 1;
+    let h = 1;
+    for (const l of layers) {
+      w = Math.max(w, l.densityMapWidth);
+      h = Math.max(h, l.densityMapHeight);
+    }
+    let tex = this._groundMap.get();
+    let full = !layer || !rect;
+    if (!tex || tex.width !== w || tex.height !== h || !this._groundData) {
+      tex = getDevice().createTexture2D('r8unorm', w, h, { mipmapping: false })!;
+      tex.name = 'GrassGroundOcclusion';
+      this._groundMap.set(tex);
+      this._groundData = new Uint8Array(w * h);
+      full = true;
+    }
+    let x0 = 0;
+    let z0 = 0;
+    let x1 = w;
+    let z1 = h;
+    if (!full) {
+      const sx = w / layer!.densityMapWidth;
+      const sz = h / layer!.densityMapHeight;
+      x0 = Math.max(0, Math.floor(rect![0] * sx));
+      z0 = Math.max(0, Math.floor(rect![1] * sz));
+      x1 = Math.min(w, Math.ceil(rect![2] * sx));
+      z1 = Math.min(h, Math.ceil(rect![3] * sz));
+      if (x1 <= x0 || z1 <= z0) {
+        return;
+      }
+    }
+    const data = this._groundData!;
+    for (let z = z0; z < z1; z++) {
+      for (let x = x0; x < x1; x++) {
+        let lit = 1;
+        for (const l of layers) {
+          const lw = l.densityMapWidth;
+          const lh = l.densityMapHeight;
+          const lx = Math.min(lw - 1, Math.floor(((x + 0.5) * lw) / w));
+          const lz = Math.min(lh - 1, Math.floor(((z + 0.5) * lh) / h));
+          lit *= 1 - (l.groundOcclusion * l.densityMap[lz * lw + lx]) / 255;
+        }
+        data[z * w + x] = Math.round((1 - lit) * 255);
+      }
+    }
+    if (full) {
+      tex.update(data, 0, 0, w, h);
+    } else {
+      const rw = x1 - x0;
+      const rect8 = new Uint8Array(rw * (z1 - z0));
+      for (let z = z0; z < z1; z++) {
+        rect8.set(data.subarray(z * w + x0, z * w + x1), (z - z0) * rw);
+      }
+      tex.update(rect8, x0, z0, rw, z1 - z0);
+    }
+    if (terrain.material) {
+      terrain.material.grassOcclusionMap = tex;
+    }
+    if (full) {
+      terrain.invalidateRuntimeVirtualTexture();
+    } else {
+      // A texel more each way: the map is sampled bilinearly
+      const region = terrain.worldRegion;
+      const tx = (region.z - region.x) / w;
+      const tz = (region.w - region.y) / h;
+      terrain.invalidateRuntimeVirtualTexture(
+        region.x + (x0 - 1) * tx,
+        region.y + (z0 - 1) * tz,
+        region.x + (x1 + 1) * tx,
+        region.y + (z1 + 1) * tz
+      );
+    }
   }
   /**
    * Whether to skip grass hidden behind the terrain itself (WebGPU only).
@@ -1281,7 +1459,7 @@ export class GrassRenderer extends Disposable {
       !sun ||
       !sun.castShadow ||
       !GrassGpuPlacement.isSupported() ||
-      !this._layers.some((layer) => layer.kind === 'blade')
+      !this._layers.some((layer) => layer.kind === 'blade' && layer.castShadow)
     ) {
       return [];
     }
@@ -1458,6 +1636,7 @@ export class GrassRenderer extends Disposable {
       kind
     );
     layer.setOcclusionDebug(this._occlusionDebug);
+    layer.setGroundChangedCallback((rect) => this.updateGroundOcclusion(layer, rect));
     this._layers.push(layer);
     return this._layers.length - 1;
   }
@@ -1578,6 +1757,8 @@ export class GrassRenderer extends Disposable {
     super.onDispose();
     this._terrain.dispose();
     this._shadowLight.dispose();
+    this._groundMap.dispose();
+    this._groundData = null;
     for (const layer of this._layers) {
       layer.dispose();
     }

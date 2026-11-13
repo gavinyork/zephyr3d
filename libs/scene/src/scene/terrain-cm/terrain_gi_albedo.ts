@@ -3,7 +3,11 @@ import { Disposable, DRef, Vector4 } from '@zephyr3d/base';
 import type { BindGroup, GPUProgram, PBShaderExp, Texture2D } from '@zephyr3d/device';
 import { getDevice } from '../../app/api';
 import { fetchSampler } from '../../utility/misc';
-import { blendTerrainAlbedo, terrainSplatMaskCount } from '../../material/shader/terrain_blend';
+import {
+  applyGrassGroundOcclusion,
+  blendTerrainAlbedo,
+  terrainSplatMaskCount
+} from '../../material/shader/terrain_blend';
 import type { ClipmapTerrain } from './terrain-cm';
 
 /** Texels along the longer side of the capture; GI only needs the low frequencies. */
@@ -127,6 +131,11 @@ export class TerrainGIAlbedo extends Disposable {
         bindGroup.setValue('detailHexParams', material.detailHexParams.subarray(0, numLayers * 4));
       }
       bindGroup.setValue('splatSize', splatMap.width);
+      bindGroup.setTexture(
+        'grassOcclusion',
+        material.grassOcclusionTexture,
+        fetchSampler('clamp_linear_nomip')
+      );
     }
     const device = getDevice();
     device.setProgram(this._program);
@@ -207,6 +216,7 @@ function createCaptureProgram(numLayers: number, hexMask: number) {
           this.detailHexParams = pb.vec4[numLayers]().uniform(0);
         }
         this.splatSize = pb.float().uniform(0);
+        this.grassOcclusion = pb.tex2D().uniform(0);
       }
       pb.main(function () {
         this.$l.size = pb.vec2(this.params.xy);
@@ -240,6 +250,7 @@ function createCaptureProgram(numLayers: number, hexMask: number) {
             grad,
             hex
           );
+          this.albedo = applyGrassGroundOcclusion(this, this.albedo, this.grassOcclusion, this.uv);
           pb.textureStore(
             this.dst,
             pb.uvec2(this.texel),

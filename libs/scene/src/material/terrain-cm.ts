@@ -20,6 +20,7 @@ import { CopyBlitter } from '../blitter';
 import { getDevice } from '../app/api';
 import type { VirtualTexture } from '../render/virtualtexture/virtual_texture';
 import {
+  applyGrassGroundOcclusion,
   blendTerrainAlbedo,
   blendTerrainDetailNormal,
   blendTerrainRoughness,
@@ -70,6 +71,8 @@ export class ClipmapTerrainMaterial extends applyMaterialMixins(
   private static readonly FEATURE_HEX_TILING = this.defineFeature();
   private static readonly _defaultDetailMap: DRef<Texture2D> = new DRef();
   private static readonly _defaultNormalMap: DRef<Texture2D> = new DRef();
+  /** No grass over the ground, see grassOcclusionTexture */
+  private static readonly _noGrassOcclusion: DRef<Texture2D> = new DRef();
   private readonly _region: Vector4;
   private readonly _clipmapGridInfo: Vector4;
   private readonly _heightMap: DRef<Texture2D>;
@@ -81,6 +84,7 @@ export class ClipmapTerrainMaterial extends applyMaterialMixins(
   private readonly _levelDataBuffer: DRef<GPUDataBuffer>;
   private _virtualTexture: Nullable<VirtualTexture>;
   private _contentVersion: number;
+  private readonly _grassOcclusionMap: DRef<Texture2D>;
   constructor(heightMap: Texture2D) {
     super();
     this.metallic = 0;
@@ -109,6 +113,7 @@ export class ClipmapTerrainMaterial extends applyMaterialMixins(
     this.useFeature(ClipmapTerrainMaterial.FEATURE_HEX_TILING, 0);
     this._virtualTexture = null;
     this._contentVersion = 0;
+    this._grassOcclusionMap = new DRef();
   }
   static get MAX_DETAIL_MAP_COUNT() {
     return MAX_DETAIL_MAPS;
@@ -138,6 +143,37 @@ export class ClipmapTerrainMaterial extends applyMaterialMixins(
   set virtualTexture(vt: Nullable<VirtualTexture>) {
     this._virtualTexture = vt;
     this.updateVirtualTextureFeature();
+  }
+  /**
+   * Share of its albedo the ground loses under the grass, one byte per texel over the terrain
+   * region; null for none. Set by the terrain's grass renderer, see
+   * GrassRenderer.groundOcclusionMap. Whoever fills the runtime virtual texture from the material
+   * refills the area it changed.
+   * @internal
+   */
+  get grassOcclusionMap(): Nullable<Texture2D> {
+    return this._grassOcclusionMap.get() ?? null;
+  }
+  set grassOcclusionMap(val: Nullable<Texture2D>) {
+    if (val !== this._grassOcclusionMap.get()) {
+      this._grassOcclusionMap.set(val);
+      this.uniformChanged();
+    }
+  }
+  /** grassOcclusionMap, or a texture of no occlusion to bind in its place @internal */
+  get grassOcclusionTexture(): Texture2D {
+    const map = this._grassOcclusionMap.get();
+    if (map) {
+      return map;
+    }
+    let none = ClipmapTerrainMaterial._noGrassOcclusion.get();
+    if (!none) {
+      none = getDevice().createTexture2D('r8unorm', 1, 1, { mipmapping: false })!;
+      none.update(new Uint8Array(4), 0, 0, 1, 1);
+      none.name = 'NoGrassOcclusion';
+      ClipmapTerrainMaterial._noGrassOcclusion.set(none);
+    }
+    return none;
   }
   /** Whether shading reads the runtime virtual texture instead of blending the layers @internal */
   get virtualTextureUsed() {
@@ -934,7 +970,12 @@ export class ClipmapTerrainMaterial extends applyMaterialMixins(
       for (let i = 0; i < (numDetailMaps + 3) >> 2; i++) {
         scope.$l[`terrainSplatMask${i}`] = this.sampleSplatMask(scope, i);
       }
+      scope.zGrassOcclusion = pb.tex2D().uniform(2);
       scope.$l.albedo = this.calculateAlbedoColor(scope);
+      scope.albedo = pb.vec4(
+        applyGrassGroundOcclusion(scope, scope.albedo.rgb, scope.zGrassOcclusion, scope.$inputs.uv),
+        scope.albedo.a
+      );
       scope.$l.terrainT = pb.vec3();
       scope.$l.terrainB = pb.vec3();
       scope.$l.terrainN = pb.vec3();
@@ -1026,6 +1067,9 @@ export class ClipmapTerrainMaterial extends applyMaterialMixins(
     );
     bindGroup.setValue('heightMapSize', this._heightMapSize);
     bindGroup.setBuffer('levelData', this._levelDataBuffer.get()!);
+    if (this.needFragmentColor(ctx) && !this.virtualTextureUsed) {
+      bindGroup.setTexture('zGrassOcclusion', this.grassOcclusionTexture, fetchSampler('clamp_linear_nomip'));
+    }
     if (this.needFragmentColor(ctx) && this.virtualTextureUsed) {
       const vt = this._virtualTexture!;
       vt.applyBindings(bindGroup, false);
@@ -1118,6 +1162,7 @@ export class ClipmapTerrainMaterial extends applyMaterialMixins(
     super.onDispose();
     this._heightMap.dispose();
     this._levelDataBuffer.dispose();
+    this._grassOcclusionMap.dispose();
     if (this._detailMapInfo) {
       this._detailMapInfo.detailMap?.dispose();
       this._detailMapInfo.detailNormalMap?.dispose();

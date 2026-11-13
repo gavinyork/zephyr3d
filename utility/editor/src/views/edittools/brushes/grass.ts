@@ -5,7 +5,7 @@ import { Vector4 } from '@zephyr3d/base';
 import type { GrassLayer } from '@zephyr3d/scene';
 
 /** Rows of the procedural blade settings, see renderBladeSettings() */
-const BLADE_SETTING_ROWS = 28;
+const BLADE_SETTING_ROWS = 30;
 /** Rows of the card settings, see renderCardSettings() */
 const CARD_SETTING_ROWS = 3;
 
@@ -18,7 +18,7 @@ export class GrassBrush extends BaseTerrainBrush {
     const grassRenderer = tool.terrain.grassRenderer;
     const selectedLayer = grassRenderer.getLayer(tool.grassAlbedo.selected);
     const rows =
-      8 + (selectedLayer ? (selectedLayer.kind === 'blade' ? BLADE_SETTING_ROWS : CARD_SETTING_ROWS) : 0);
+      9 + (selectedLayer ? (selectedLayer.kind === 'blade' ? BLADE_SETTING_ROWS : CARD_SETTING_ROWS) : 0);
     ImGui.BeginChild(
       'GrassTexture',
       new ImGui.ImVec2(
@@ -70,6 +70,10 @@ export class GrassBrush extends BaseTerrainBrush {
         const density = [grassLayer.cellsPerTexel] as [number];
         if (ImGui.SliderInt('Density', density, 1, 4)) {
           grassLayer.cellsPerTexel = density[0];
+        }
+        const groundOcclusion = [grassLayer.groundOcclusion] as [number];
+        if (ImGui.SliderFloat('GroundOcclusion', groundOcclusion, 0, 1)) {
+          grassLayer.groundOcclusion = groundOcclusion[0];
         }
         const drawDistance = [grassLayer.drawDistance] as [number];
         if (ImGui.SliderFloat('DrawDistance', drawDistance, 0, 1000)) {
@@ -129,6 +133,11 @@ export class GrassBrush extends BaseTerrainBrush {
     slider('ClumpFaceAway', layer.clumpFaceAway, 0, 1, (v) => (layer.clumpFaceAway = v));
     slider('ClumpColorVariation', layer.clumpColorVariation, 0, 1, (v) => (layer.clumpColorVariation = v));
     slider('RootOcclusion', layer.rootOcclusion, 0, 1, (v) => (layer.rootOcclusion = v));
+    slider('SelfShadow', layer.selfShadow, 0, 4, (v) => (layer.selfShadow = v));
+    const castShadow = [layer.castShadow] as [boolean];
+    if (ImGui.Checkbox('CastShadow', castShadow)) {
+      layer.castShadow = castShadow[0];
+    }
     slider('Roundness', layer.roundness, 0, 2, (v) => (layer.roundness = v));
     slider('ViewThickening', layer.viewThickening, 0, 2, (v) => (layer.viewThickening = v));
     slider('FarNormalStart', layer.farNormalStart, 0, 500, (v) => (layer.farNormalStart = v));

@@ -22,6 +22,7 @@ type GrassLayerData = {
   bladeHeight: number;
   drawDistance?: number;
   farDensity?: number;
+  groundOcclusion?: number;
   /** Absent in scenes saved before blade layers, which are all card layers */
   kind?: 'card' | 'blade';
   blade?: {
@@ -51,6 +52,8 @@ type GrassLayerData = {
     swayAmplitude?: number;
     swaySpeed?: number;
     lodDistance?: number;
+    castShadow?: boolean;
+    selfShadow?: number;
     rootColor?: [number, number, number];
     tipColor?: [number, number, number];
     transmissionColor?: [number, number, number];
@@ -300,7 +303,8 @@ export function getTerrainClass(manager: ResourceManager): SerializableClass {
                 bladeWidth: this.grassRenderer.getBladeWidth(i),
                 bladeHeight: this.grassRenderer.getBladeHeight(i),
                 drawDistance: this.grassRenderer.getDrawDistance(i),
-                farDensity: this.grassRenderer.getFarDensity(i)
+                farDensity: this.grassRenderer.getFarDensity(i),
+                groundOcclusion: layer.groundOcclusion
               };
               if (layer.kind === 'blade') {
                 info.kind = 'blade';
@@ -331,6 +335,8 @@ export function getTerrainClass(manager: ResourceManager): SerializableClass {
                   swayAmplitude: layer.swayAmplitude,
                   swaySpeed: layer.swaySpeed,
                   lodDistance: layer.lodDistance,
+                  castShadow: layer.castShadow,
+                  selfShadow: layer.selfShadow,
                   rootColor: [layer.rootColor.x, layer.rootColor.y, layer.rootColor.z],
                   tipColor: [layer.tipColor.x, layer.tipColor.y, layer.tipColor.z],
                   transmissionColor: [
@@ -414,6 +420,8 @@ export function getTerrainClass(manager: ResourceManager): SerializableClass {
                 grassLayer.swayAmplitude = blade.swayAmplitude ?? grassLayer.swayAmplitude;
                 grassLayer.swaySpeed = blade.swaySpeed ?? grassLayer.swaySpeed;
                 grassLayer.lodDistance = blade.lodDistance ?? grassLayer.lodDistance;
+                grassLayer.castShadow = blade.castShadow ?? grassLayer.castShadow;
+                grassLayer.selfShadow = blade.selfShadow ?? grassLayer.selfShadow;
                 if (blade.rootColor) {
                   grassLayer.rootColor = new Vector4(
                     blade.rootColor[0],
@@ -444,6 +452,9 @@ export function getTerrainClass(manager: ResourceManager): SerializableClass {
               }
               if (info.farDensity !== undefined) {
                 this.grassRenderer.setFarDensity(layer, info.farDensity);
+              }
+              if (info.groundOcclusion !== undefined) {
+                this.grassRenderer.getLayer(layer).groundOcclusion = info.groundOcclusion;
               }
             }
           }

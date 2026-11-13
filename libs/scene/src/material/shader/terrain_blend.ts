@@ -33,6 +33,22 @@ export interface TerrainHexTiling {
   params: PBShaderExp;
 }
 
+/**
+ * Terrain albedo darkened by the grass over the ground: `map` holds the share of its albedo the
+ * ground loses at each texel of the terrain region (GrassRenderer.groundOcclusionMap), read at the
+ * terrain uv. Shared by the material's live path, the runtime virtual texture page fill and the
+ * albedo global illumination reads.
+ */
+export function applyGrassGroundOcclusion(
+  scope: PBInsideFunctionScope,
+  albedo: PBShaderExp,
+  map: PBShaderExp,
+  uv: PBShaderExp
+): PBShaderExp {
+  const pb = scope.$builder;
+  return pb.mul(albedo, pb.sub(1, pb.textureSampleLevel(map, uv, 0).r));
+}
+
 /** Number of splat mask vectors for `numLayers` detail layers, 4 weights each */
 export function terrainSplatMaskCount(numLayers: number) {
   return (numLayers + 3) >> 2;

@@ -5,6 +5,7 @@ import type { DrawContext, RenderQueue, VirtualTextureClient } from '../../rende
 import { VirtualTexture, virtualMipChain } from '../../render/virtualtexture/virtual_texture';
 import { ShaderHelper } from '../../material/shader/helper';
 import {
+  applyGrassGroundOcclusion,
   blendTerrainAlbedo,
   blendTerrainDetailNormal,
   blendTerrainRoughness,
@@ -190,6 +191,11 @@ export class TerrainVirtualTexture extends Disposable implements VirtualTextureC
     );
     bindGroup.setValue('fillParams', this._fillParams);
     bindGroup.setValue('fillSizes', this._fillSizes);
+    bindGroup.setTexture(
+      'grassOcclusion',
+      material.grassOcclusionTexture,
+      fetchSampler('clamp_linear_nomip')
+    );
     this._vt.fill(this._fillProgram, bindGroup);
   }
   /**
@@ -394,6 +400,7 @@ export class TerrainVirtualTexture extends Disposable implements VirtualTextureC
         scope.fillParams = pb.vec4().uniform(0);
         // (height map width, height map height, splat map size, detail map size)
         scope.fillSizes = pb.vec4().uniform(0);
+        scope.grassOcclusion = pb.tex2D().uniform(0);
       },
       (scope, level, texel) => {
         const pb = scope.$builder;
@@ -426,6 +433,7 @@ export class TerrainVirtualTexture extends Disposable implements VirtualTextureC
           // Most texels lie in one or two layers; the others cost all of their samples otherwise
           true
         );
+        scope.albedo = applyGrassGroundOcclusion(scope, scope.albedo, scope.grassOcclusion, scope.uv);
         scope.$l.detailNormal = blendTerrainDetailNormal(
           scope,
           numLayers,
