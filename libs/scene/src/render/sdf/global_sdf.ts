@@ -38,6 +38,13 @@ const BRICK = GLOBAL_SDF_BRICK;
 const BRICK_VEC4S = 3;
 /** Most points per {@link GlobalSDF.queryDistances} call. */
 const MAX_QUERY_POINTS = 4096;
+/**
+ * The waterline grid follows the camera every 8 of its cells, and catches up with the clipmap a
+ * quarter second behind at 60 fps: compositing new bricks as the camera moves changes the
+ * clipmap's version most frames, which rebuilt the whole grid each frame of a drive.
+ */
+const WATERLINE_RECENTER = 8;
+const WATERLINE_VERSION_LAG = 15;
 
 /**
  * Writes an instance in the layout of {@link SDF_INSTANCE_VEC4S}: world-to-local rows, field box
@@ -271,7 +278,10 @@ export class GlobalSDF {
    */
   get waterline() {
     if (!this._waterline) {
-      this._waterline = new WaterlineField(new SDFWaterlineSource(this));
+      this._waterline = new WaterlineField(new SDFWaterlineSource(this), {
+        recenterCells: WATERLINE_RECENTER,
+        versionLag: WATERLINE_VERSION_LAG
+      });
     }
     return this._waterline;
   }

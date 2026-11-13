@@ -236,6 +236,12 @@ export interface WaterlineFieldOptions {
    * rebuilt around it again. Default 0: whenever the camera moves into another cell.
    */
   recenterCells?: number;
+  /**
+   * Updates a level built from an older version of the source is kept for before it is rebuilt.
+   * For a source that changes most frames without much changing, as the global clipmap filling
+   * in around a moving camera does. Default 0: rebuilt in the update the version changes in.
+   */
+  versionLag?: number;
 }
 
 /**
@@ -280,6 +286,7 @@ export class WaterlineField {
   readonly cellSize: number;
   readonly maxRebuilds: number;
   readonly recenterCells: number;
+  readonly versionLag: number;
   private readonly _source: WaterlineSource;
   private _level: Nullable<number>;
   private _requested: boolean;
@@ -304,6 +311,10 @@ export class WaterlineField {
   private readonly _regions: Vector4[];
   /** Per level: source version, centre cell x, centre cell z and water level it was last built at. */
   private readonly _builtAt: [number, number, number, number][];
+  /** Per level: the update it was last built in. */
+  private readonly _builtUpdate: number[];
+  /** Updates run so far. */
+  private _updates: number;
   constructor(source: WaterlineSource, options?: WaterlineFieldOptions) {
     this._source = source;
     this.levels = Math.max(1, Math.min(8, Math.floor(options?.levels ?? 1)));
@@ -311,6 +322,7 @@ export class WaterlineField {
     this.cellSize = Math.max(1e-3, options?.cellSize ?? 0.5);
     this.maxRebuilds = Math.max(1, Math.floor(options?.maxRebuilds ?? this.levels));
     this.recenterCells = Math.max(0, Math.min(this.resolution / 4, Math.floor(options?.recenterCells ?? 0)));
+    this.versionLag = Math.max(0, Math.floor(options?.versionLag ?? 0));
     this._level = null;
     this._requested = false;
     this._seedA = null;
@@ -329,6 +341,8 @@ export class WaterlineField {
     this._bindGroups = [];
     this._regions = Array.from({ length: this.levels }, () => new Vector4(0, 0, 0, 0));
     this._builtAt = Array.from({ length: this.levels }, () => [NaN, NaN, NaN, NaN]);
+    this._builtUpdate = Array.from({ length: this.levels }, () => 0);
+    this._updates = 0;
   }
   /** Grids built so far, a level each, for diagnosis. */
   get rebuilds() {
@@ -387,6 +401,7 @@ export class WaterlineField {
       return;
     }
     this._requested = false;
+    this._updates++;
     this.ensureResources();
     const version = this._source.version;
     let budget = this.maxRebuilds;
@@ -402,7 +417,7 @@ export class WaterlineField {
       const at = this._builtAt[i];
       if (
         this._regions[i].w > 0 &&
-        at[0] === version &&
+        (at[0] === version || this._updates - this._builtUpdate[i] < this.versionLag) &&
         Math.abs(cx - at[1]) <= this.recenterCells &&
         Math.abs(cz - at[2]) <= this.recenterCells &&
         at[3] === this._level
@@ -413,6 +428,7 @@ export class WaterlineField {
       at[1] = cx;
       at[2] = cz;
       at[3] = this._level;
+      this._builtUpdate[i] = this._updates;
       const ox = (cx - n / 2) * h;
       const oz = (cz - n / 2) * h;
       this.buildLevel(i, ox, oz, h);
