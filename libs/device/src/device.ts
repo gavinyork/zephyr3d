@@ -268,6 +268,7 @@ export abstract class BaseDevice extends Observable<DeviceEventMap> {
   protected _backend: DeviceBackend;
   protected _beginFrameCounter: number;
   protected _maxFramesInFlight: number;
+  protected _defaultMaxAnisotropy: number;
   protected _programBuilder: ProgramBuilder;
   protected _poolMap: Map<string | symbol, Pool>;
   protected _defaultPoolKey: symbol;
@@ -332,6 +333,7 @@ export abstract class BaseDevice extends Observable<DeviceEventMap> {
     this._stateStack = [];
     this._beginFrameCounter = 0;
     this._maxFramesInFlight = 2;
+    this._defaultMaxAnisotropy = 16;
     this._poolMap = new Map();
     this._defaultPoolKey = Symbol('defaultPool');
     this._poolMap.set(this._defaultPoolKey, new Pool(this, this._defaultPoolKey));
@@ -534,6 +536,12 @@ export abstract class BaseDevice extends Observable<DeviceEventMap> {
   }
   set maxFramesInFlight(value: number) {
     this._maxFramesInFlight = Math.max(0, Math.floor(Number(value) || 0));
+  }
+  get defaultMaxAnisotropy() {
+    return this._defaultMaxAnisotropy;
+  }
+  set defaultMaxAnisotropy(value: number) {
+    this._defaultMaxAnisotropy = Math.max(1, Math.floor(Number(value) || 1));
   }
   get isRendering() {
     return this._runningLoop !== null;

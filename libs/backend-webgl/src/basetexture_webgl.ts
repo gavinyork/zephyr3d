@@ -372,7 +372,11 @@ export abstract class WebGLBaseTexture extends WebGLGPUObject<WebGLTexture> {
       mipFilter,
       lodMin: 0,
       lodMax: 32,
-      maxAnisotropy: 1,
+      // Only with linear filtering throughout, as on WebGPU, where an anisotropic sampler needs it
+      maxAnisotropy:
+        magFilter === 'linear' && minFilter === 'linear' && mipFilter === 'linear'
+          ? Math.min(this._device.defaultMaxAnisotropy, this.getTextureCaps().maxAnisotropy)
+          : 1,
       compare: comparison ? DEPTH_COMPARE_CLOSER : null
     } as const;
   }

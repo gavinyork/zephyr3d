@@ -118,8 +118,13 @@ export class WebGLTextureSampler
           compareFuncMap[this._options.compare]
         );
       }
-      if (this._device.getDeviceCaps().textureCaps.supportAnisotropicFiltering) {
-        gl.samplerParameterf(this._object, WebGLEnum.TEXTURE_MAX_ANISOTROPY, this._options.maxAnisotropy);
+      const textureCaps = this._device.getDeviceCaps().textureCaps;
+      if (textureCaps.supportAnisotropicFiltering) {
+        gl.samplerParameterf(
+          this._object,
+          WebGLEnum.TEXTURE_MAX_ANISOTROPY,
+          Math.min(Math.max(this._options.maxAnisotropy || 1, 1), textureCaps.maxAnisotropy)
+        );
       }
     }
     return true;

@@ -2586,6 +2586,8 @@ export interface TextureCaps {
   supportLinearHalfFloatTexture: boolean;
   /** True if device supports anisotropic filtering */
   supportAnisotropicFiltering: boolean;
+  /** Largest maxAnisotropy a sampler can use, 1 without anisotropic filtering */
+  maxAnisotropy: number;
   /** True if device supports rendering into a 32bit floating-point frame buffer */
   supportFloatColorBuffer: boolean;
   /** True if device supports rendering into a 16bit floating-point frame buffer */
@@ -3399,6 +3401,17 @@ export interface AbstractDevice extends IEventTarget<DeviceEventMap> {
    * finished without stalling, so it ignores the setting.
    */
   maxFramesInFlight: number;
+  /**
+   * Anisotropic filtering of the default sampler of a texture (see {@link BaseTexture.getDefaultSampler}):
+   * the most samples taken along the footprint of a texture seen at a grazing angle, such as a road
+   * or a floor further away, which mipmapping alone blurs into its average. Used by a texture
+   * whose filtering is linear throughout, mipmaps included, and clamped to what the device
+   * supports ({@link TextureCaps.maxAnisotropy}); 1 turns it off. Default 16.
+   *
+   * Taken whenever a default sampler is asked for, so a sampler made from one earlier, such as a
+   * material's with its own address modes, keeps the value it was made with.
+   */
+  defaultMaxAnisotropy: number;
   /** Check if the device is running a rendering loop by calling {@link AbstractDevice.runLoop} */
   isRendering: boolean;
   /** Get the canvas element for this device */

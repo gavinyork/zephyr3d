@@ -298,6 +298,7 @@ export class WebGLTextureCaps implements TextureCaps {
   supportHalfFloatTexture: boolean;
   supportLinearHalfFloatTexture: boolean;
   supportAnisotropicFiltering: boolean;
+  maxAnisotropy: number;
   supportFloatColorBuffer: boolean;
   supportHalfFloatColorBuffer: boolean;
   supportFloatBlending: boolean;
@@ -309,6 +310,14 @@ export class WebGLTextureCaps implements TextureCaps {
       gl.getExtension('MOZ_EXT_texture_filter_anisotropic') ||
       gl.getExtension('WEBKIT_EXT_texture_filter_anisotropic');
     this.supportAnisotropicFiltering = !!this._extTextureFilterAnisotropic;
+    this.maxAnisotropy = this._extTextureFilterAnisotropic
+      ? Math.max(
+          1,
+          Math.floor(
+            Number(gl.getParameter(this._extTextureFilterAnisotropic.MAX_TEXTURE_MAX_ANISOTROPY_EXT)) || 1
+          )
+        )
+      : 1;
     this.supportDepthTexture = true;
     this.support3DTexture = true;
     this.supportSRGBTexture = true;

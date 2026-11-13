@@ -165,6 +165,7 @@ export class WebGPUTextureCaps implements TextureCaps {
   supportHalfFloatTexture: boolean;
   supportLinearHalfFloatTexture: boolean;
   supportAnisotropicFiltering: boolean;
+  maxAnisotropy: number;
   supportFloatColorBuffer: boolean;
   supportHalfFloatColorBuffer: boolean;
   supportFloatBlending: boolean;
@@ -172,6 +173,8 @@ export class WebGPUTextureCaps implements TextureCaps {
   supportTextureFormatsTier2: boolean;
   constructor(device: WebGPUDevice) {
     this.supportAnisotropicFiltering = true;
+    // WebGPU clamps maxAnisotropy to at most 16
+    this.maxAnisotropy = 16;
     this.supportDepthTexture = true;
     this.support3DTexture = true;
     this.supportSRGBTexture = true;

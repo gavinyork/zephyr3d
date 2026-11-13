@@ -78,7 +78,14 @@ export class WebGPUTextureSampler extends WebGPUObject<GPUSampler> implements Te
       lodMinClamp: this._options.lodMin,
       lodMaxClamp: this._options.lodMax,
       compare: this._options.compare ? compareFuncMap[this._options.compare] : undefined,
-      maxAnisotropy: this._options.maxAnisotropy
+      // Anisotropy needs linear filtering throughout, or the sampler fails validation: options
+      // merged over a texture's defaults may change the filters but keep its anisotropy
+      maxAnisotropy:
+        this._options.magFilter === 'linear' &&
+        this._options.minFilter === 'linear' &&
+        this._options.mipFilter === 'linear'
+          ? Math.min(Math.max(Math.floor(this._options.maxAnisotropy) || 1, 1), 16)
+          : 1
     });
     return !!this._object;
   }

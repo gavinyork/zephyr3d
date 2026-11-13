@@ -187,6 +187,7 @@ export class NullTextureCaps implements TextureCaps {
   supportHalfFloatTexture: boolean;
   supportLinearHalfFloatTexture: boolean;
   supportAnisotropicFiltering: boolean;
+  maxAnisotropy: number;
   supportFloatColorBuffer: boolean;
   supportHalfFloatColorBuffer: boolean;
   supportFloatBlending: boolean;
@@ -216,6 +217,7 @@ export class NullTextureCaps implements TextureCaps {
     this.supportHalfFloatTexture = true;
     this.supportLinearHalfFloatTexture = true;
     this.supportAnisotropicFiltering = true;
+    this.maxAnisotropy = 16;
     this.supportFloatColorBuffer = true;
     this.supportHalfFloatColorBuffer = true;
     this.supportFloatBlending = type === 'webgpu';
