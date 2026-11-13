@@ -231,6 +231,11 @@ export interface WaterlineFieldOptions {
    * the next. Default all.
    */
   maxRebuilds?: number;
+  /**
+   * Cells the camera may stray from the centre of a level, along either axis, before the level is
+   * rebuilt around it again. Default 0: whenever the camera moves into another cell.
+   */
+  recenterCells?: number;
 }
 
 /**
@@ -274,6 +279,7 @@ export class WaterlineField {
   readonly resolution: number;
   readonly cellSize: number;
   readonly maxRebuilds: number;
+  readonly recenterCells: number;
   private readonly _source: WaterlineSource;
   private _level: Nullable<number>;
   private _requested: boolean;
@@ -296,7 +302,7 @@ export class WaterlineField {
   private _bindGroups: LevelBindGroups[];
   /** Per level: (origin x, origin z, cell size, resolution) as last built; 0 cells before it is. */
   private readonly _regions: Vector4[];
-  /** Per level: source version, origin x, origin z and water level it was last built at. */
+  /** Per level: source version, centre cell x, centre cell z and water level it was last built at. */
   private readonly _builtAt: [number, number, number, number][];
   constructor(source: WaterlineSource, options?: WaterlineFieldOptions) {
     this._source = source;
@@ -304,6 +310,7 @@ export class WaterlineField {
     this.resolution = Math.max(16, 2 ** Math.round(Math.log2(options?.resolution ?? 256)));
     this.cellSize = Math.max(1e-3, options?.cellSize ?? 0.5);
     this.maxRebuilds = Math.max(1, Math.floor(options?.maxRebuilds ?? this.levels));
+    this.recenterCells = Math.max(0, Math.min(this.resolution / 4, Math.floor(options?.recenterCells ?? 0)));
     this._level = null;
     this._requested = false;
     this._seedA = null;
@@ -389,23 +396,25 @@ export class WaterlineField {
     for (let i = 0; i < this.levels && budget > 0; i++) {
       const h = this.cellSize * 2 ** i;
       const n = this.resolution;
-      // Snapped to cells, so the grid does not swim as the camera moves
-      const ox = (Math.floor(cameraPos.x / h) - n / 2) * h;
-      const oz = (Math.floor(cameraPos.z / h) - n / 2) * h;
+      // The camera's cell: grids are snapped to cells, so they do not swim as the camera moves
+      const cx = Math.floor(cameraPos.x / h);
+      const cz = Math.floor(cameraPos.z / h);
       const at = this._builtAt[i];
       if (
         this._regions[i].w > 0 &&
         at[0] === version &&
-        at[1] === ox &&
-        at[2] === oz &&
+        Math.abs(cx - at[1]) <= this.recenterCells &&
+        Math.abs(cz - at[2]) <= this.recenterCells &&
         at[3] === this._level
       ) {
         continue;
       }
       at[0] = version;
-      at[1] = ox;
-      at[2] = oz;
+      at[1] = cx;
+      at[2] = cz;
       at[3] = this._level;
+      const ox = (cx - n / 2) * h;
+      const oz = (cz - n / 2) * h;
       this.buildLevel(i, ox, oz, h);
       this._regions[i].setXYZW(ox, oz, h, n);
       this._rebuilds++;

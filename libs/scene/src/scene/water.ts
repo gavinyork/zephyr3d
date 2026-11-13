@@ -51,6 +51,11 @@ const SHORE_FIELD_CELLS = 256;
 const SHORE_FIELD_CELL_SIZE = 0.5;
 /** Shore field levels rebuilt in a frame at most, so the camera crossing every level's cell at once is no spike. */
 const SHORE_FIELD_REBUILDS = 2;
+/**
+ * Cells the camera may stray from a shore field level's centre before it is rebuilt around it:
+ * rebuilt every cell, the finest level took a whole build each frame of a drive.
+ */
+const SHORE_FIELD_RECENTER = 8;
 /** No waterline grid: 0 cells. */
 const NO_REGIONS: readonly Vector4[] = [new Vector4(0, 0, 1, 0)];
 
@@ -959,7 +964,8 @@ export class Water extends applyMixins(GraphNode, mixinDrawable) implements Draw
         levels: SHORE_FIELD_LEVELS,
         resolution: SHORE_FIELD_CELLS,
         cellSize: SHORE_FIELD_CELL_SIZE,
-        maxRebuilds: SHORE_FIELD_REBUILDS
+        maxRebuilds: SHORE_FIELD_REBUILDS,
+        recenterCells: SHORE_FIELD_RECENTER
       });
     }
     this._shoreSource!.setTerrain(terrain);
