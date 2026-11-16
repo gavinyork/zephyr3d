@@ -33,14 +33,17 @@ const BLADE_WINDOW_UNITS = 1024;
 /** Instance buffers grow in steps of this many instances */
 const CAPACITY_STEP = 65536;
 /**
- * Frames between reads of the blade counts of a target, by which its lists are sized, see
- * GrassGpuPlacement.readCounts
+ * Room a procedural blade list is given beyond the blades the density map holds for its windows
+ * (see GrassGpuPlacement.densityBlades): a fraction and a number more, for how far the blades
+ * that pass the density by their hashes stray from that average
  */
-const COUNT_READBACK_INTERVAL = 30;
-/** Fewest instances a procedural blade list is sized for */
-const MIN_LIST_ROOM = 4096;
-/** Instances a procedural blade list is sized for before its count is first read back */
-const INITIAL_LIST_ROOM = 262144;
+const LIST_ROOM_MARGIN = 1.05;
+const LIST_ROOM_SLACK = 1024;
+/**
+ * Most blocks along each side of the density sums by which the procedural blade lists are sized,
+ * see GrassGpuPlacement.densityBlades
+ */
+const DENSITY_SUM_MAX_BLOCKS = 512;
 /**
  * Width of the band, in density LOD hash units, over which a blade shrinks before the density
  * LOD drops it. Hashes are scaled into [0, 1 - band) so that full density keeps every blade whole.
@@ -107,10 +110,12 @@ const GRASS_BLADE_MAX_LEVELS = 8;
 /**
  * Widest a procedural blade grows by the detail levels, as a multiple of its height: a level
  * keeps a blade in four and widens it fourfold to keep the ground as covered, which would soon
- * turn blades into wide strips; past this the deeper levels let the ground show through instead.
+ * turn blades into wide strips, and as wide as tall they read as leaves, a vegetable patch rather
+ * than grass. A quarter of the height keeps them blades; past it the deeper levels let the ground
+ * show through instead.
  * @internal
  */
-export const GRASS_BLADE_MAX_ASPECT = 1;
+export const GRASS_BLADE_MAX_ASPECT = 0.25;
 /**
  * Detail levels of procedural blades: (distance the first level reaches, number of levels).
  *
@@ -204,17 +209,6 @@ type PlacementTarget = {
    * instances the high detail list holds; the low one holds the rest of the buffer
    */
   lowBase: number;
-  /**
-   * Procedural blades only: instances each list is sized for, from the counts read back (see
-   * GrassGpuPlacement.readCounts), and the most blades each list can receive
-   */
-  highRoom: number;
-  lowRoom: number;
-  highBound: number;
-  lowBound: number;
-  /** Frames until the counts are read again, and whether a read is under way */
-  readCountdown: number;
-  reading: boolean;
 };
 
 /**
@@ -227,9 +221,9 @@ type PlacementTarget = {
  *
  * The output uses the instance format of the CPU path (u, v, facing angle, density LOD hash), so the grass material
  * is shared. Each dispatched thread emits at most one blade. For cards the instance buffer holds
- * one per thread, so the output can never overflow; procedural blade lists are sized for the
- * blades the rings of their levels can hold, and the blades placed past the end of a list are
- * dropped.
+ * one per thread, so the output can never overflow; procedural blade lists are sized every frame
+ * for the blades the density map holds around the camera (see densityBlades), and the few blades
+ * placed past the end of a list are dropped.
  *
  * Procedural blades have detail levels, after "Procedural Grass in Ghost of Tsushima" (Wohllaib,
  * GDC 2021): low detail blades are spaced twice as far apart, and the high detail blades thin out
@@ -291,6 +285,22 @@ export class GrassGpuPlacement extends Disposable {
   private readonly _heightInfo: Vector4;
   private readonly _densityLod: Vector4;
   /**
+   * Procedural blades only: the density map summed over square blocks of texels, and the
+   * summed-area table of those, (blocks x + 1) x (blocks z + 1) entries, entry (x, z) the sum of the
+   * blocks [0, x) x [0, z). Size the blade lists, see densityBlades. The blocks keep the table at
+   * most DENSITY_SUM_MAX_BLOCKS a side, so neither its memory nor the work after a brush stroke
+   * grows with the map.
+   */
+  private _densityBlocks: Nullable<Uint32Array<ArrayBuffer>>;
+  private _densitySum: Nullable<Float64Array<ArrayBuffer>>;
+  /** The density map summed, its size in texels, and the side of a block in texels */
+  private _densityData: Nullable<Uint8Array>;
+  private _densityWidth: number;
+  private _densityHeight: number;
+  private _densityBlock: number;
+  /** Texels (x0, z0, x1, z1) changed since the density was last summed, empty when x0 >= x1 */
+  private readonly _densityDirty: [number, number, number, number];
+  /**
    * Whether the current device can run the GPU path
    */
   static isSupported() {
@@ -337,6 +347,13 @@ export class GrassGpuPlacement extends Disposable {
     this._occlusion = new Vector4();
     this._heightInfo = new Vector4();
     this._densityLod = new Vector4();
+    this._densityBlocks = null;
+    this._densitySum = null;
+    this._densityData = null;
+    this._densityWidth = 0;
+    this._densityHeight = 0;
+    this._densityBlock = 1;
+    this._densityDirty = [0, 0, 0, 0];
   }
   setBaseVertexBuffer(baseVertexBuffer: StructuredBuffer) {
     if (baseVertexBuffer !== this._baseVertexBuffer.get()) {
@@ -366,6 +383,29 @@ export class GrassGpuPlacement extends Disposable {
     const bytes =
       data.buffer instanceof ArrayBuffer ? (data as Uint8Array<ArrayBuffer>) : new Uint8Array(data);
     tex.update(bytes, 0, 0, width, height);
+    if (this._kind === 'blade') {
+      const block = Math.max(1, Math.ceil(Math.max(width, height) / DENSITY_SUM_MAX_BLOCKS));
+      const blocksX = Math.ceil(width / block);
+      const blocksZ = Math.ceil(height / block);
+      if (this._densityBlocks?.length !== blocksX * blocksZ) {
+        this._densityBlocks = new Uint32Array(blocksX * blocksZ);
+      }
+      const entries = (blocksX + 1) * (blocksZ + 1);
+      if (this._densitySum?.length !== entries) {
+        this._densitySum = new Float64Array(entries);
+      } else {
+        // The first row and column stay zero; a table of another shape put sums there
+        this._densitySum.fill(0);
+      }
+      this._densityData = data;
+      this._densityWidth = width;
+      this._densityHeight = height;
+      this._densityBlock = block;
+      this._densityDirty[0] = 0;
+      this._densityDirty[1] = 0;
+      this._densityDirty[2] = width;
+      this._densityDirty[3] = height;
+    }
   }
   /**
    * Uploads a rectangle of the density map
@@ -388,6 +428,99 @@ export class GrassGpuPlacement extends Disposable {
       rect.set(data.subarray((z0 + z) * width + x0, (z0 + z) * width + x1), z * w);
     }
     tex.update(rect, x0, z0, w, h);
+    // Summed again at the next placement, once however many strokes come before it
+    if (this._densitySum) {
+      const dirty = this._densityDirty;
+      const empty = dirty[0] >= dirty[2] || dirty[1] >= dirty[3];
+      this._densityData = data;
+      dirty[0] = empty ? x0 : Math.min(dirty[0], x0);
+      dirty[1] = empty ? z0 : Math.min(dirty[1], z0);
+      dirty[2] = empty ? x1 : Math.max(dirty[2], x1);
+      dirty[3] = empty ? z1 : Math.max(dirty[3], z1);
+    }
+  }
+  /**
+   * Brings the density sums up to date: sums the blocks over the texels changed, then the table
+   * entries past the first of those blocks, which are all that sum them
+   */
+  private updateDensitySum() {
+    const blocks = this._densityBlocks;
+    const sum = this._densitySum;
+    const data = this._densityData;
+    const dirty = this._densityDirty;
+    if (!blocks || !sum || !data || dirty[0] >= dirty[2] || dirty[1] >= dirty[3]) {
+      return;
+    }
+    const width = this._densityWidth;
+    const height = this._densityHeight;
+    const block = this._densityBlock;
+    const blocksX = Math.ceil(width / block);
+    const blocksZ = Math.ceil(height / block);
+    const bx0 = Math.max(0, Math.floor(dirty[0] / block));
+    const bz0 = Math.max(0, Math.floor(dirty[1] / block));
+    const bx1 = Math.min(blocksX, Math.ceil(dirty[2] / block));
+    const bz1 = Math.min(blocksZ, Math.ceil(dirty[3] / block));
+    dirty.fill(0);
+    for (let bz = bz0; bz < bz1; bz++) {
+      const z1 = Math.min(height, (bz + 1) * block);
+      for (let bx = bx0; bx < bx1; bx++) {
+        const x0 = bx * block;
+        const x1 = Math.min(width, x0 + block);
+        let total = 0;
+        for (let z = bz * block; z < z1; z++) {
+          for (let i = z * width + x0, end = z * width + x1; i < end; i++) {
+            total += data[i];
+          }
+        }
+        blocks[bz * blocksX + bx] = total;
+      }
+    }
+    const stride = blocksX + 1;
+    for (let bz = bz0; bz < blocksZ; bz++) {
+      const row = bz * stride;
+      const next = row + stride;
+      for (let bx = bx0; bx < blocksX; bx++) {
+        sum[next + bx + 1] = blocks[bz * blocksX + bx] + sum[next + bx] + sum[row + bx + 1] - sum[row + bx];
+      }
+    }
+  }
+  /**
+   * Blades a window of placement units of a detail level holds by the density map: every unit
+   * keeps at most one blade, by the density at one of its cells, so this is the density summed
+   * over the window's texels times the units in a texel. Summed over the blocks under the texels
+   * and a texel around them for the bilinear lookups, so it counts up to a block more on each
+   * side. The units in the window are all those whose blades the level can keep, wherever the
+   * camera looks and however high it is, so the blades it keeps are at most these, give or take
+   * how the hashes fall.
+   * @param win - The window, see cellWindow
+   * @param unit - Unit side, in cells
+   * @param cellsPerTexel - Placement cells per density texel along each axis
+   */
+  private densityBlades(
+    win: Readonly<[number, number, number, number]>,
+    unit: number,
+    cellsPerTexel: number
+  ) {
+    const sum = this._densitySum;
+    const units = win[2] * win[3];
+    if (!sum || units <= 0) {
+      return units;
+    }
+    const block = this._densityBlock;
+    const blocksX = Math.ceil(this._densityWidth / block);
+    const blocksZ = Math.ceil(this._densityHeight / block);
+    const stride = blocksX + 1;
+    const texels = unit / cellsPerTexel;
+    const x0 = Math.max(0, Math.floor((Math.floor(win[0] * texels) - 1) / block));
+    const z0 = Math.max(0, Math.floor((Math.floor(win[1] * texels) - 1) / block));
+    const x1 = Math.min(blocksX, Math.ceil((Math.ceil((win[0] + win[2]) * texels) + 1) / block));
+    const z1 = Math.min(blocksZ, Math.ceil((Math.ceil((win[1] + win[3]) * texels) + 1) / block));
+    if (x1 <= x0 || z1 <= z0) {
+      return 0;
+    }
+    const total =
+      sum[z1 * stride + x1] - sum[z0 * stride + x1] - sum[z1 * stride + x0] + sum[z0 * stride + x0];
+    return Math.min(units, total / 255 / (texels * texels));
   }
   /**
    * Places and culls the blades seen from a camera. Runs a compute pass, so it must be called
@@ -473,6 +606,7 @@ export class GrassGpuPlacement extends Disposable {
       numLevels = levels;
       // How far the pull toward the clump point can take a blade from its cell
       const pull = Math.min(1, Math.max(0, bladeShape[10])) * bladeShape[8];
+      this.updateDensitySum();
       for (let k = 0; k < levels; k++) {
         const unit = 2 ** k;
         const start = k === 0 ? 0 : first * 2 ** (k - 1);
@@ -498,9 +632,16 @@ export class GrassGpuPlacement extends Disposable {
         const margin = unit * Math.max(cellSizeX, cellSizeZ) * 1.5 + pull;
         const outer = reach + margin;
         const inner = Math.max(0, start - margin);
-        const count = Math.min(
+        const ring = Math.min(
           win[2] * win[3],
           Math.ceil((Math.PI * (outer * outer - inner * inner)) / (unit * unit * cellSizeX * cellSizeZ))
+        );
+        // Sized for this frame's camera position, so no move of the camera, however fast, finds
+        // the lists short: the blades the density map holds in the window, give or take the
+        // hashes, and no more than the ring holds at full density
+        const count = Math.min(
+          ring,
+          Math.ceil(this.densityBlades(win, unit, cellsPerTexel) * LIST_ROOM_MARGIN) + LIST_ROOM_SLACK
         );
         if (k === 0) {
           highCount = count;
@@ -540,9 +681,6 @@ export class GrassGpuPlacement extends Disposable {
     }
     if (highCount + lowCount <= 0) {
       return;
-    }
-    if (blade) {
-      [highCount, lowCount] = GrassGpuPlacement.listRooms(placementTarget, highCount, lowCount);
     }
     this.ensureCapacity(placementTarget, highCount, lowCount);
     const bindGroup = this.getBindGroup(placementTarget);
@@ -633,9 +771,6 @@ export class GrassGpuPlacement extends Disposable {
       Math.ceil(windowHeight / WORKGROUP_SIZE),
       numLevels
     );
-    if (blade) {
-      this.readCounts(placementTarget);
-    }
     // The instance counts placement wrote, for drawing the edges in a wireframe view
     const edgeArgs = placementTarget.edgeArgsBuffer.get();
     if (edgeArgs) {
@@ -765,72 +900,10 @@ export class GrassGpuPlacement extends Disposable {
         bindGroup: new DRef(),
         primitive: new DRef(),
         capacity: 0,
-        lowBase: 0,
-        highRoom: 0,
-        lowRoom: 0,
-        highBound: 0,
-        lowBound: 0,
-        readCountdown: 0,
-        reading: false
+        lowBase: 0
       });
     }
     return this._targets[index];
-  }
-  /**
-   * Instances each procedural blade list of a target is sized for: the blades the rings of its
-   * levels can hold are several times the blades in view, so the lists follow the counts read
-   * back instead, bounded by those
-   * @param highBound - Most blades the high detail list can receive
-   * @param lowBound - Most blades the low detail list can receive
-   */
-  private static listRooms(target: PlacementTarget, highBound: number, lowBound: number) {
-    target.highBound = highBound;
-    target.lowBound = lowBound;
-    // Until the first counts are read
-    if (target.highRoom <= 0) {
-      target.highRoom = INITIAL_LIST_ROOM;
-      target.lowRoom = INITIAL_LIST_ROOM;
-    }
-    return [Math.min(target.highRoom, highBound), Math.min(target.lowRoom, lowBound)];
-  }
-  /**
-   * Every COUNT_READBACK_INTERVAL frames, reads back the blade counts of a target's lists and
-   * resizes each list to twice its count when the count passes 70% of its room or falls below a
-   * quarter of it. A list that runs full drops the blades past its end (see generate()) until it
-   * is regrown, so after growing a list the counts are read again a couple of frames later.
-   */
-  private readCounts(target: PlacementTarget) {
-    if (target.reading || --target.readCountdown > 0) {
-      return;
-    }
-    target.reading = true;
-    target.readCountdown = COUNT_READBACK_INTERVAL;
-    target.argsBuffer
-      .get()!
-      .getBufferSubData(null, 0, 40)
-      .then((bytes) => {
-        target.reading = false;
-        if (this.disposed) {
-          return;
-        }
-        const counts = new Uint32Array(bytes.buffer, bytes.byteOffset, 10);
-        const highRoom = GrassGpuPlacement.resizeRoom(target.highRoom, counts[1], target.highBound);
-        const lowRoom = GrassGpuPlacement.resizeRoom(target.lowRoom, counts[6], target.lowBound);
-        if (highRoom > target.highRoom || lowRoom > target.lowRoom) {
-          target.readCountdown = 2;
-        }
-        target.highRoom = highRoom;
-        target.lowRoom = lowRoom;
-      })
-      .catch(() => {
-        target.reading = false;
-      });
-  }
-  private static resizeRoom(room: number, count: number, bound: number) {
-    if (count > room * 0.7 || count * 4 < room) {
-      room = Math.max(count * 2, MIN_LIST_ROOM);
-    }
-    return Math.min(room, Math.max(bound, MIN_LIST_ROOM));
   }
   private static disposeTarget(target: PlacementTarget) {
     target.instanceBuffer.dispose();
