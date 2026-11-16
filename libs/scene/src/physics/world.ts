@@ -166,6 +166,7 @@ export interface PhysicsWorld extends IEventTarget<PhysicsWorldEventMap> {
   _registerWheel(wheel: Wheel): void;
   _unregisterWheel(wheel: Wheel): void;
   _markVehiclesDirty(): void;
+  _wheelFrictionChanged(wheel: Wheel): void;
   _vehicleSpeed(vehicle: Vehicle): number;
   _vehicleWheels(vehicle: Vehicle): readonly Wheel[];
   _colliderNodeByKey(key: number): Nullable<SceneNode>;

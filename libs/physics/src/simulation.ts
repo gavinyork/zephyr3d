@@ -948,6 +948,27 @@ export class PhysicsSimulation
   _markVehiclesDirty() {
     this._vehiclesDirty = true;
   }
+  /**
+   * A wheel's grip changed: handed to its vehicle as it is, as a script changing the grip with
+   * the ground under each wheel does every few steps. Building the vehicle again would start its
+   * wheels over, spin and all.
+   */
+  _wheelFrictionChanged(wheel: Wheel) {
+    if (this._vehiclesDirty) {
+      return;
+    }
+    for (const entry of this._vehicles.values()) {
+      const index = entry.wheels.indexOf(wheel);
+      if (index >= 0) {
+        if (entry.vehicle.setWheelFriction) {
+          entry.vehicle.setWheelFriction(index, wheel.frictionSlip, wheel.sideFriction);
+        } else {
+          this._vehiclesDirty = true;
+        }
+        return;
+      }
+    }
+  }
   _vehicleSpeed(component: Vehicle) {
     const entry = this._vehicles.get(component);
     if (!entry) {

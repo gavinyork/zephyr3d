@@ -277,6 +277,11 @@ export interface BackendVehicle {
    * (N), the most braking impulse per step (N·s), steering angle (radians).
    */
   setWheelInput(index: number, engineForce: number, brakeImpulse: number, steering: number): void;
+  /**
+   * Changes a wheel's grip in place, as {@link VehicleWheelDesc} gives it. Without it, the
+   * vehicle is built again.
+   */
+  setWheelFriction?(index: number, frictionSlip: number, sideFriction: number): void;
   /** Casts the wheel rays and applies the wheels' impulses to the chassis; before a step. */
   update(dt: number, filter: QueryPredicate): void;
   wheelState(index: number, out: VehicleWheelState): VehicleWheelState;

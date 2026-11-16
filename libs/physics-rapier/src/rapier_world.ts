@@ -250,6 +250,10 @@ class RapierVehicle implements BackendVehicle {
     c.setWheelBrake(index, brakeImpulse);
     c.setWheelSteering(index, steering);
   }
+  setWheelFriction(index: number, frictionSlip: number, sideFriction: number) {
+    this._controller.setWheelFrictionSlip(index, frictionSlip);
+    this._controller.setWheelSideFrictionStiffness(index, sideFriction);
+  }
   update(dt: number, filter: QueryPredicate) {
     // Triggers are driven through, not over.
     this._controller.updateVehicle(dt, this.R.QueryFilterFlags.EXCLUDE_SENSORS, undefined, (other) =>

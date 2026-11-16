@@ -316,14 +316,14 @@ export class Wheel extends PhysicsPart {
     return this._frictionSlip;
   }
   set frictionSlip(value: number) {
-    this._set('_frictionSlip', Math.max(0, value));
+    this._setFriction('_frictionSlip', Math.max(0, value));
   }
   /** Scales the sideways grip; lower lets the wheel slide out. Default 1. */
   get sideFriction() {
     return this._sideFriction;
   }
   set sideFriction(value: number) {
-    this._set('_sideFriction', Math.max(0, value));
+    this._setFriction('_sideFriction', Math.max(0, value));
   }
   /** Share of the steering: 1 turns with the wheel, -1 against it (rear steer), 0 not at all. Default 0. */
   get steer() {
@@ -391,6 +391,14 @@ export class Wheel extends PhysicsPart {
     if (self[key] !== value) {
       self[key] = value;
       this.world?._markVehiclesDirty();
+    }
+  }
+  /** Grip changes go to the running vehicle as they are, as a script may change them often */
+  private _setFriction(key: string, value: number) {
+    const self = this as unknown as Record<string, number>;
+    if (self[key] !== value) {
+      self[key] = value;
+      this.world?._wheelFrictionChanged(this);
     }
   }
   protected _join(world: PhysicsWorld) {
