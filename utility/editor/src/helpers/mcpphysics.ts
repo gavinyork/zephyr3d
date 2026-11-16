@@ -3,7 +3,8 @@
  * (rigid bodies, colliders, characters, vehicle chassis and wheels, joints) and reading back what
  * a node has.
  */
-import { NodePhysics, getEngine } from '@zephyr3d/scene';
+import { Mesh, NodePhysics, getEngine } from '@zephyr3d/scene';
+import type { Collider, SceneNode } from '@zephyr3d/scene';
 import { Quaternion, Vector3 } from '@zephyr3d/base';
 import type { SceneController } from '../controllers/scenecontroller';
 import {
@@ -107,8 +108,47 @@ const OVERRIDE_GROUPS: readonly [string, string][] = [
   ['joint', 'Joint']
 ];
 
+/**
+ * The presets fit a collider as a box around what its node shows, setting only its size. When
+ * the overrides turn it into another shape, fit that shape's own dimensions to the same box,
+ * unless the overrides give them: a sphere spans the box, a capsule or a cylinder stands in it.
+ * Without this the radius and height keep their defaults and the shape is a small one floating
+ * in the middle of the object.
+ */
+function refitShape(collider: Collider, overrides: Record<string, unknown>) {
+  const given = (name: string) => name in overrides || toCamelCase(name) in overrides;
+  if (!given('shape') || given('size')) {
+    return;
+  }
+  const size = collider.size;
+  const across = Math.max(size.x, size.z) / 2;
+  switch (collider.shape) {
+    case 'sphere':
+      if (!given('radius')) {
+        collider.radius = Math.max(size.x, size.y, size.z) / 2;
+      }
+      break;
+    case 'capsule':
+      if (!given('radius')) {
+        collider.radius = Math.min(across, size.y / 2);
+      }
+      if (!given('height')) {
+        collider.height = size.y;
+      }
+      break;
+    case 'cylinder':
+      if (!given('radius')) {
+        collider.radius = across;
+      }
+      if (!given('height')) {
+        collider.height = size.y;
+      }
+      break;
+  }
+}
+
 /** Applies every override group of a call. Returns the first error, or null. */
-function applyAllOverrides(physics: NodePhysics, params: any) {
+function applyAllOverrides(node: SceneNode, physics: NodePhysics, params: any) {
   const get = (name: string) =>
     ({
       body: physics.body,
@@ -135,6 +175,25 @@ function applyAllOverrides(physics: NodePhysics, params: any) {
       const err = applyOverrides(collider, params.collider, 'collider');
       if (err) {
         return err;
+      }
+      if (typeof params.collider === 'object' && !Array.isArray(params.collider)) {
+        refitShape(collider, params.collider);
+      }
+      // The simulation reads mesh and convex shapes from the triangles of the collider's own node,
+      // so on a group (a prefab root, say) it would fail to build and nothing would collide
+      if ((collider.shape === 'mesh' || collider.shape === 'convex') && !(node instanceof Mesh)) {
+        const meshes: string[] = [];
+        node.iterate((child) => {
+          if (child instanceof Mesh && meshes.length < 16) {
+            meshes.push(`${child.name || '(unnamed)'} ${child.persistentId}`);
+          }
+          return false;
+        });
+        return (
+          `A ${collider.shape} collider takes the triangles of its own node, which must be a mesh; ` +
+          `"${node.name}" is not one. Put it on the meshes below it instead` +
+          (meshes.length > 0 ? `: ${meshes.join(', ')}` : ' (it has none)')
+        );
       }
     }
   }
@@ -209,7 +268,7 @@ export async function setNodePhysics(controller: SceneController | null, params:
       )
     : new NodePhysics();
   preset.apply(node, scratch);
-  const invalid = applyAllOverrides(scratch, params);
+  const invalid = applyAllOverrides(node, scratch, params);
   scratch.dispose();
   if (invalid) {
     return { err: invalid };
@@ -220,7 +279,7 @@ export async function setNodePhysics(controller: SceneController | null, params:
       description: preset.description,
       apply(target, physics) {
         preset.apply(target, physics);
-        applyAllOverrides(physics, params);
+        applyAllOverrides(target, physics, params);
       }
     })
   );
