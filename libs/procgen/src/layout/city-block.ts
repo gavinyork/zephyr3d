@@ -391,3 +391,352 @@ export function cityBlockGroundSpec(
   }
   return { version: 1, nodes };
 }
+
+/**
+ * Options for {@link cityBlockGroundParts}.
+ * @public
+ */
+export interface CityGroundPartsOptions {
+  /** Carriageway width, kerb to kerb. Defaults to 45% of the cell, leaving a pavement either side. */
+  roadWidth?: number;
+  /** Grid cells per side of one chunk. Defaults to 2. */
+  chunkCells?: number;
+  /** Depth of the slabs under the block, whose tops sit at y = 0. Defaults to 1. */
+  depth?: number;
+  /** How far the carriageway sits below the pavement, the height of the kerb face. Defaults to 0.15. */
+  kerbHeight?: number;
+  /** Width of the kerb stones along the carriageway edge. Defaults to 0.3; 0 leaves them out. */
+  kerbWidth?: number;
+  /** Paint road markings: centre lines, and crossings and stop lines at junctions. Defaults to true. */
+  markings?: boolean;
+  /** Width of the ground around the block, beyond the boundary road. Defaults to 0, none. */
+  margin?: number;
+  /** Largest side of a tile of the surrounding ground. Defaults to three chunks. */
+  marginTile?: number;
+  /** Depth of the surrounding ground. Defaults to a twentieth of `marginTile`, at least `depth`. */
+  marginDepth?: number;
+}
+
+/**
+ * One chunk of a block's ground, see {@link cityBlockGroundParts}.
+ * @public
+ */
+export interface CityGroundPart {
+  /** `chunk_<x>_<z>` for chunks of the block, `margin_<i>` for the surrounding ground. */
+  part: string;
+  spec: GeneratedModelSpec;
+}
+
+/** Road marking dimensions, in world units */
+const MARKING = {
+  /** Paint thickness; half of it sits below the carriageway surface */
+  thickness: 0.02,
+  centreWidth: 0.15,
+  /** Preferred dash plus gap of the centre line; adjusted so dashes meet at cell edges */
+  dashPeriod: 6,
+  dashFraction: 0.5,
+  crossingOffset: 0.5,
+  crossingLength: 3,
+  stripeWidth: 0.5,
+  stopGap: 0.5,
+  stopWidth: 0.4
+};
+
+/**
+ * Emits the ground of a block as solid slabs, chunked so each chunk can be its own mesh.
+ *
+ * Unlike {@link cityBlockGroundSpec}, which lays thin road strips over a ground plane the
+ * caller provides, this covers the whole block — and optionally a margin around it — with
+ * slabs that never overlap. Thick, closed and chunked, every piece keeps a usable signed
+ * distance field when baked per mesh, which a single plane or a block-wide strip does not.
+ *
+ * Pavements, lots, plazas and the margin have their tops at y = 0, where buildings stand; the
+ * carriageway sits {@link CityGroundPartsOptions.kerbHeight} lower. A road cell is cut into a
+ * 3 × 3 grid: the junction square and each connected arm are `'road'`, the rest `'sidewalk'`,
+ * with a `'kerb'` strip cut from the pavement wherever it meets the carriageway. Lot cells
+ * are `'ground'`, plaza cells `'plaza'`, the margin `'margin'`.
+ *
+ * Markings are thin `'marking'` boxes on the carriageway, the only nodes that overlap others;
+ * a caller baking distance fields should leave them out of the field. Traffic keeps right.
+ *
+ * @public
+ */
+export function cityBlockGroundParts(
+  layout: CityBlockLayout,
+  options: CityGroundPartsOptions = {}
+): CityGroundPart[] {
+  const { cellSize, origin } = layout;
+  const depth = Math.max(1e-3, options.depth ?? 1);
+  const roadWidth = Math.min(cellSize, Math.max(0, options.roadWidth ?? cellSize * 0.45));
+  const chunkCells = Math.max(1, Math.floor(options.chunkCells ?? 2));
+  const kerbHeight = Math.min(depth * 0.5, Math.max(0, options.kerbHeight ?? 0.15));
+  const verge = (cellSize - roadWidth) * 0.5;
+  const kerbWidth = Math.min(verge, Math.max(0, options.kerbWidth ?? 0.3));
+  const markings = options.markings ?? true;
+  const slab = (
+    id: string,
+    x0: number,
+    z0: number,
+    x1: number,
+    z1: number,
+    d = depth,
+    top = 0
+  ): ProceduralNode => ({
+    type: 'box',
+    id,
+    size: [x1 - x0, d, z1 - z0],
+    position: [(x0 + x1) * 0.5, top - d * 0.5, (z0 + z1) * 0.5]
+  });
+  const roadTop = -kerbHeight;
+
+  const parts: CityGroundPart[] = [];
+  for (let cz0 = 0; cz0 < layout.height; cz0 += chunkCells) {
+    for (let cx0 = 0; cx0 < layout.width; cx0 += chunkCells) {
+      const nodes: ProceduralNode[] = [];
+      for (let z = cz0; z < Math.min(layout.height, cz0 + chunkCells); z++) {
+        for (let x = cx0; x < Math.min(layout.width, cx0 + chunkCells); x++) {
+          const x0 = origin[0] + x * cellSize;
+          const z0 = origin[1] + z * cellSize;
+          const kind = layout.kinds[z][x];
+          if (kind !== 'road') {
+            nodes.push(slab(kind === 'plaza' ? 'plaza' : 'ground', x0, z0, x0 + cellSize, z0 + cellSize));
+            continue;
+          }
+          const links = layout.tiles[z][x].data!.links;
+          const xs = [x0, x0 + verge, x0 + verge + roadWidth, x0 + cellSize];
+          const zs = [z0, z0 + verge, z0 + verge + roadWidth, z0 + cellSize];
+          // [+X, -X, +Z, -Z] arms sit at the middle of each edge
+          const isRoad = (i: number, j: number) =>
+            (i === 1 && j === 1) ||
+            (i === 2 && j === 1 && links[0]) ||
+            (i === 0 && j === 1 && links[1]) ||
+            (i === 1 && j === 2 && links[2]) ||
+            (i === 1 && j === 0 && links[3]);
+          for (let j = 0; j < 3; j++) {
+            for (let i = 0; i < 3; i++) {
+              let [rx0, rx1, rz0, rz1] = [xs[i], xs[i + 1], zs[j], zs[j + 1]];
+              if (rx1 - rx0 <= 1e-6 || rz1 - rz0 <= 1e-6) {
+                continue;
+              }
+              if (isRoad(i, j)) {
+                nodes.push(slab('road', rx0, rz0, rx1, rz1, depth - kerbHeight, roadTop));
+                continue;
+              }
+              // Kerb stones along every side that meets the carriageway, cut from the pavement
+              if (kerbWidth > 0) {
+                if (i < 2 && isRoad(i + 1, j)) {
+                  nodes.push(slab('kerb', rx1 - kerbWidth, rz0, rx1, rz1));
+                  rx1 -= kerbWidth;
+                }
+                if (i > 0 && isRoad(i - 1, j)) {
+                  nodes.push(slab('kerb', rx0, rz0, rx0 + kerbWidth, rz1));
+                  rx0 += kerbWidth;
+                }
+                if (j < 2 && isRoad(i, j + 1)) {
+                  nodes.push(slab('kerb', rx0, rz1 - kerbWidth, rx1, rz1));
+                  rz1 -= kerbWidth;
+                }
+                if (j > 0 && isRoad(i, j - 1)) {
+                  nodes.push(slab('kerb', rx0, rz0, rx1, rz0 + kerbWidth));
+                  rz0 += kerbWidth;
+                }
+              }
+              if (rx1 - rx0 > 1e-6 && rz1 - rz0 > 1e-6) {
+                nodes.push(slab('sidewalk', rx0, rz0, rx1, rz1));
+              }
+            }
+          }
+          if (markings) {
+            emitMarkings(
+              nodes,
+              links,
+              [x0 + cellSize * 0.5, z0 + cellSize * 0.5],
+              cellSize,
+              roadWidth,
+              roadTop
+            );
+          }
+        }
+      }
+      parts.push({
+        part: `chunk_${cx0 / chunkCells}_${cz0 / chunkCells}`,
+        spec: { version: 1, nodes }
+      });
+    }
+  }
+
+  const margin = Math.max(0, options.margin ?? 0);
+  if (margin > 0) {
+    const tile = Math.max(cellSize, options.marginTile ?? cellSize * chunkCells * 3);
+    const marginDepth = Math.max(depth, options.marginDepth ?? tile / 20);
+    const bx = [origin[0] - margin, origin[0], origin[0] + layout.width * cellSize];
+    bx.push(bx[2] + margin);
+    const bz = [origin[1] - margin, origin[1], origin[1] + layout.height * cellSize];
+    bz.push(bz[2] + margin);
+    let index = 0;
+    // The eight regions around the block, each tiled evenly
+    for (let j = 0; j < 3; j++) {
+      for (let i = 0; i < 3; i++) {
+        if (i === 1 && j === 1) {
+          continue;
+        }
+        const nx = Math.max(1, Math.ceil((bx[i + 1] - bx[i]) / tile));
+        const nz = Math.max(1, Math.ceil((bz[j + 1] - bz[j]) / tile));
+        const sx = (bx[i + 1] - bx[i]) / nx;
+        const sz = (bz[j + 1] - bz[j]) / nz;
+        for (let tz = 0; tz < nz; tz++) {
+          for (let tx = 0; tx < nx; tx++) {
+            const x0 = bx[i] + tx * sx;
+            const z0 = bz[j] + tz * sz;
+            parts.push({
+              part: `margin_${index++}`,
+              spec: { version: 1, nodes: [slab('margin', x0, z0, x0 + sx, z0 + sz, marginDepth)] }
+            });
+          }
+        }
+      }
+    }
+  }
+  return parts;
+}
+
+/**
+ * Where a street lamp stands, see {@link cityBlockStreetLights}.
+ * @public
+ */
+export interface CityStreetLight {
+  /** Foot of the lamp post, on the pavement, at y = 0. */
+  position: [number, number, number];
+  /** Unit direction in `[x, z]` from the post towards the middle of the road. */
+  toward: [number, number];
+}
+
+/**
+ * Places street lamps along a block's roads: one per straight road cell, on the pavement just
+ * behind the kerb, alternating sides from cell to cell so the light falls evenly along a street.
+ * Junctions and corners get none.
+ *
+ * @param options - `roadWidth` as given to {@link cityBlockGroundParts}; `kerbOffset`, the gap
+ *   between the kerb line and the post, defaults to 0.6.
+ * @public
+ */
+export function cityBlockStreetLights(
+  layout: CityBlockLayout,
+  options: { roadWidth?: number; kerbOffset?: number } = {}
+): CityStreetLight[] {
+  const { cellSize, origin } = layout;
+  const roadWidth = Math.min(cellSize, Math.max(0, options.roadWidth ?? cellSize * 0.45));
+  const offset = roadWidth * 0.5 + Math.max(0, options.kerbOffset ?? 0.6);
+  if (offset >= cellSize * 0.5) {
+    return [];
+  }
+  const lights: CityStreetLight[] = [];
+  for (let z = 0; z < layout.height; z++) {
+    for (let x = 0; x < layout.width; x++) {
+      if (layout.kinds[z][x] !== 'road') {
+        continue;
+      }
+      const links = layout.tiles[z][x].data!.links;
+      const alongX = links[0] && links[1] && !links[2] && !links[3];
+      const alongZ = links[2] && links[3] && !links[0] && !links[1];
+      if (!alongX && !alongZ) {
+        continue;
+      }
+      const side = (x + z) % 2 === 0 ? 1 : -1;
+      const perp: [number, number] = alongX ? [0, side] : [side, 0];
+      const cx = origin[0] + (x + 0.5) * cellSize;
+      const cz = origin[1] + (z + 0.5) * cellSize;
+      lights.push({
+        position: [cx + perp[0] * offset, 0, cz + perp[1] * offset],
+        toward: [-perp[0], -perp[1]]
+      });
+    }
+  }
+  return lights;
+}
+
+/**
+ * Paints the markings of one road cell.
+ *
+ * A straight cell gets a dashed centre line, with its dash pattern anchored at the cell edges
+ * so lines run on unbroken into the next cell. A junction (three or four arms) gets, on each
+ * arm, a zebra crossing beside the junction, a stop line across the lane coming in, and the
+ * centre line beyond. A corner only continues the centre lines up to its square.
+ */
+function emitMarkings(
+  nodes: ProceduralNode[],
+  links: readonly boolean[],
+  centre: [number, number],
+  cellSize: number,
+  roadWidth: number,
+  roadTop: number
+) {
+  const m = MARKING;
+  const half = roadWidth * 0.5;
+  const arm = cellSize * 0.5;
+  const count = links.filter(Boolean).length;
+  const straight = count === 2 && ((links[0] && links[1]) || (links[2] && links[3]));
+  const junction = count >= 3;
+  const period = cellSize / Math.max(1, Math.round(cellSize / m.dashPeriod));
+  const dash = period * m.dashFraction;
+  // Along an arm, `s` runs from the cell centre to the edge and `t` across it, positive on the
+  // right of traffic heading into the junction
+  const paint = (axis: [number, number], s0: number, s1: number, t0: number, t1: number) => {
+    if (s1 - s0 <= 1e-6 || t1 - t0 <= 1e-6) {
+      return;
+    }
+    const right: [number, number] = [axis[1], -axis[0]];
+    const sc = (s0 + s1) * 0.5;
+    const tc = (t0 + t1) * 0.5;
+    nodes.push({
+      type: 'box',
+      id: 'marking',
+      size: [
+        Math.abs(axis[0]) * (s1 - s0) + Math.abs(right[0]) * (t1 - t0),
+        m.thickness,
+        Math.abs(axis[1]) * (s1 - s0) + Math.abs(right[1]) * (t1 - t0)
+      ],
+      position: [centre[0] + axis[0] * sc + right[0] * tc, roadTop, centre[1] + axis[1] * sc + right[1] * tc]
+    });
+  };
+  /** Centre line dashes from `start` out to the cell edge, centred in each period from the edge */
+  const centreLine = (axis: [number, number], start: number) => {
+    for (let end = arm - (period - dash) * 0.5; end - dash >= start - 1e-6; end -= period) {
+      paint(axis, end - dash, end, -m.centreWidth * 0.5, m.centreWidth * 0.5);
+    }
+  };
+  const axes: [number, number][] = [
+    [1, 0],
+    [-1, 0],
+    [0, 1],
+    [0, -1]
+  ];
+
+  if (straight) {
+    // One line across the whole cell, so the dash pattern runs on through the centre
+    const axis = links[0] ? axes[0] : axes[2];
+    centreLine(axis, -arm);
+    return;
+  }
+  const crossingEnd = half + m.crossingOffset + m.crossingLength;
+  const stopEnd = crossingEnd + m.stopGap + m.stopWidth;
+  for (let dir = 0; dir < 4; dir++) {
+    if (!links[dir]) {
+      continue;
+    }
+    const axis = axes[dir];
+    let lineStart = half;
+    if (junction && stopEnd <= arm) {
+      const edge = half - 0.3;
+      const stripes = Math.max(1, Math.floor((edge * 2 + m.stripeWidth) / (m.stripeWidth * 2)));
+      const t0 = -(stripes * m.stripeWidth * 2 - m.stripeWidth) * 0.5;
+      for (let k = 0; k < stripes; k++) {
+        const t = t0 + k * m.stripeWidth * 2;
+        paint(axis, half + m.crossingOffset, crossingEnd, t, t + m.stripeWidth);
+      }
+      paint(axis, crossingEnd + m.stopGap, stopEnd, m.centreWidth * 0.5, edge);
+      lineStart = stopEnd;
+    }
+    centreLine(axis, lineStart);
+  }
+}

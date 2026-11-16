@@ -1,6 +1,8 @@
 import type { Vec3 } from '@zephyr3d/modelgen';
 import { boxFromScope, panelFromFace } from '../emit';
 import type { GrammarContext, MaterialHint, Ruleset } from '../grammar';
+import type { MaterialScheme } from '../palette';
+import { bayOpenings, emitLitPanes } from './windows';
 import {
   abs,
   createScope,
@@ -163,6 +165,21 @@ export interface ModernOfficeParams {
   setbackScale: number;
   /** Maximum number of rooftop plant boxes. */
   maxRooftopUnits: number;
+  /**
+   * Fraction of windows lit from inside, each emitted as a `'glass-lit'` pane just proud of the
+   * glazing so a caller can give it an emissive material. 0, the default, lights none.
+   */
+  litWindowChance: number;
+  /**
+   * Height above which a mass is split, at floor lines, into several parts (see
+   * {@link GrammarContext.part}). Each mass is always its own part, named `mass<index>`
+   * from the ground up; a split mass's pieces are `mass<index>.<k>`. Infinity, the
+   * default, never splits.
+   *
+   * Meant for callers that mesh every part separately, for example to bake a distance
+   * field per mesh at a resolution a whole tower would not get.
+   */
+  maxPartHeight: number;
 }
 
 const DEFAULTS: ModernOfficeParams = {
@@ -184,12 +201,19 @@ const DEFAULTS: ModernOfficeParams = {
   setbackChance: 0.5,
   setbackFraction: 0.62,
   setbackScale: 0.76,
-  maxRooftopUnits: 4
+  maxRooftopUnits: 4,
+  litWindowChance: 0,
+  maxPartHeight: Infinity
 };
 
 /** Payload threaded from the massing rule down to the facade rules. @public */
 export interface ModernOfficeData {
   facade: FacadePreset;
+  /**
+   * Glazed height of each storey on the face a facade rule builds, as `[bottom, top]` from the
+   * face's foot. Set by the shaft for its facades.
+   */
+  windows?: [number, number][];
 }
 
 type Ctx = GrammarContext<ModernOfficeParams, ModernOfficeData>;
@@ -224,11 +248,41 @@ export function modernOfficeHeight(params: ModernOfficeParams): number {
 }
 
 /**
+ * Groups consecutive storeys into runs no taller than `maxHeight`, each holding at least one
+ * storey. A non-finite or non-positive limit keeps every storey in one run.
+ */
+function chunkStoreys(storeys: Scope[], maxHeight: number): Scope[][] {
+  if (!(maxHeight > 0) || !Number.isFinite(maxHeight)) {
+    return [storeys];
+  }
+  const total = storeys.reduce((sum, storey) => sum + storey.size[1], 0);
+  // Even runs rather than full runs plus a sliver at the top
+  const target = total / Math.ceil(total / maxHeight - 1e-6);
+  const chunks: Scope[][] = [];
+  let current: Scope[] = [];
+  let height = 0;
+  for (const storey of storeys) {
+    if (current.length > 0 && height + storey.size[1] > target + 1e-6) {
+      chunks.push(current);
+      current = [];
+      height = 0;
+    }
+    current.push(storey);
+    height += storey.size[1];
+  }
+  chunks.push(current);
+  return chunks;
+}
+
+/**
  * Emits the shaft of one mass: the recessed glazing plane, the horizontal member at
  * every floor line, and the facade derivations for all four sides.
  *
  * `hasGroundFloor` makes the bottom storey taller, which is what separates a
  * street-level lobby from a typical floor.
+ *
+ * A mass taller than {@link ModernOfficeParams.maxPartHeight} is emitted as several parts
+ * named `<mass part>.<index>`, split at floor lines.
  */
 function emitShaft(scope: Scope, ctx: Ctx, hasGroundFloor: boolean): void {
   const { floorHeight, groundFloorHeight } = ctx.params;
@@ -237,31 +291,56 @@ function emitShaft(scope: Scope, ctx: Ctx, hasGroundFloor: boolean): void {
     return;
   }
 
-  // One glazing volume per mass. The members emitted over it are what carve it into
-  // readable windows, so a deeper inset plus fatter members reads as a solid wall.
-  ctx.emit(boxFromScope(inset(scope, [preset.insetDepth, 0, preset.insetDepth]), { id: 'glass' }));
-
   const height = scope.size[1];
   const storeys: Scope[] = hasGroundFloor
     ? split(scope, 'y', [abs(Math.min(groundFloorHeight, height)), flt(1)]).flatMap((part, index) =>
         index === 0 ? [part] : repeat(part, 'y', floorHeight)
       )
     : repeat(scope, 'y', floorHeight);
+  if (storeys.length === 0) {
+    return;
+  }
 
   // A band straddles the top of every storey except the last, whose edge is covered
   // by the roof deck. Straddling rather than sitting under the line centres the
   // glazing in each storey instead of pushing it to the floor.
-  for (let i = 0; i < storeys.length - 1; i++) {
-    const storey = storeys[i];
-    const bandHeight = Math.min(preset.bandHeight, storey.size[1]);
-    const base = offsetLocal(storey, 'y', storey.size[1] - bandHeight * 0.5);
-    const band = createScope([scope.size[0], bandHeight, scope.size[2]], base.origin, base.basis);
-    ctx.emit(boxFromScope(band, { id: preset.bandGroup }));
-  }
-
-  for (const face of sideFaces(scope)) {
-    ctx.derive('Facade', face, ctx.data);
-  }
+  const chunks = chunkStoreys(storeys, ctx.params.maxPartHeight);
+  const chunkParts = chunks.map((_, k) => (chunks.length > 1 ? `${ctx.part}.${k}` : ctx.part));
+  let storeyIndex = 0;
+  chunks.forEach((chunk, k) => {
+    const part = chunkParts[k];
+    const chunkHeight = chunk.reduce((sum, storey) => sum + storey.size[1], 0);
+    const chunkScope = createScope([scope.size[0], chunkHeight, scope.size[2]], chunk[0].origin, scope.basis);
+    // Glazed height of each storey in this part, between the bands, for lit windows
+    const windows: [number, number][] = [];
+    let y = 0;
+    chunk.forEach((storey, s) => {
+      const index = storeyIndex + s;
+      const below = index > 0 ? Math.min(preset.bandHeight, storeys[index - 1].size[1]) * 0.5 : 0;
+      const above = index < storeys.length - 1 ? Math.min(preset.bandHeight, storey.size[1]) * 0.5 : 0;
+      windows.push([y + below, y + storey.size[1] - above]);
+      y += storey.size[1];
+    });
+    // One glazing volume per mass (or per part of a tall mass). The members emitted over it
+    // are what carve it into readable windows, so a deeper inset plus fatter members reads
+    // as a solid wall.
+    ctx.emit(
+      boxFromScope(inset(chunkScope, [preset.insetDepth, 0, preset.insetDepth]), { id: 'glass' }),
+      part
+    );
+    for (const storey of chunk) {
+      if (storeyIndex++ === storeys.length - 1) {
+        break;
+      }
+      const bandHeight = Math.min(preset.bandHeight, storey.size[1]);
+      const base = offsetLocal(storey, 'y', storey.size[1] - bandHeight * 0.5);
+      const band = createScope([scope.size[0], bandHeight, scope.size[2]], base.origin, base.basis);
+      ctx.emit(boxFromScope(band, { id: preset.bandGroup }), part);
+    }
+    for (const face of sideFaces(chunkScope)) {
+      ctx.derive('Facade', face, { ...ctx.data!, windows }, part);
+    }
+  });
 
   if (hasGroundFloor && ctx.rng.chance(ctx.params.canopyChance)) {
     // sideFaces returns [+X, -X, +Z, -Z], which is the order the mask is defined in.
@@ -273,7 +352,10 @@ function emitShaft(scope: Scope, ctx: Ctx, hasGroundFloor: boolean): void {
       const y = Math.min(groundFloorHeight, height) - 0.75;
       // Metal rather than trim, and thin: a thick pale slab reads as a floating shelf
       // instead of an entrance canopy.
-      ctx.emit(panelFromFace(faceRect(face, x, y, width, 0.22), ctx.params.canopyDepth, { id: 'frame' }));
+      ctx.emit(
+        panelFromFace(faceRect(face, x, y, width, 0.22), ctx.params.canopyDepth, { id: 'frame' }),
+        chunkParts[0]
+      );
     }
   }
 }
@@ -343,10 +425,11 @@ const rules: Record<string, (scope: Scope, ctx: Ctx) => void> = {
     }
 
     masses.forEach((mass, index) => {
-      ctx.derive(mass.ground ? 'BaseMass' : 'Mass', mass.scope, data);
+      const part = `mass${index}`;
+      ctx.derive(mass.ground ? 'BaseMass' : 'Mass', mass.scope, data, part);
       const top = offsetLocal(mass.scope, 'y', mass.scope.size[1]);
       const deck = createScope([mass.scope.size[0], 0, mass.scope.size[2]], top.origin, top.basis);
-      ctx.derive(index === masses.length - 1 ? 'Roof' : 'Terrace', deck, data);
+      ctx.derive(index === masses.length - 1 ? 'Roof' : 'Terrace', deck, data, part);
     });
   },
 
@@ -383,6 +466,16 @@ const rules: Record<string, (scope: Scope, ctx: Ctx) => void> = {
     for (const x of [0, face.size[0] - corner]) {
       emitPier(faceRect(face, x, 0, corner, face.size[1]));
     }
+    // A ribbon facade has no intermediate piers, but its lights still go bay by bay
+    emitLitPanes(
+      (node) => ctx.emit(node),
+      ctx.rng,
+      face,
+      bayOpenings(face.size[0], preset.cornerPierWidth, preset.bayWidth, preset.pierWidth),
+      ctx.data?.windows ?? [],
+      preset.insetDepth,
+      ctx.params.litWindowChance
+    );
     if (preset.pierWidth <= 0) {
       return;
     }
@@ -443,12 +536,158 @@ const PALETTE: Record<MaterialGroup, MaterialHint> = {
 };
 
 /**
+ * Builds a scheme. `frame` covers the mullions of a curtain wall but also the piers of a
+ * punched or ribbon facade, so a scheme whose walls are masonry gives its frame the wall's
+ * colour and keeps curtain walls out through its facade weights.
+ */
+function scheme(
+  id: string,
+  displayName: string,
+  weight: number,
+  palette: Record<MaterialGroup, MaterialHint>,
+  facades: { curtain: number; punched: number; banded: number }
+): MaterialScheme {
+  return {
+    id,
+    displayName,
+    weight,
+    palette,
+    params: {
+      curtainWeight: facades.curtain,
+      punchedWeight: facades.punched,
+      bandedWeight: facades.banded
+    }
+  };
+}
+
+/** Clear glass: a dielectric, its look coming from the sky it reflects */
+const CLEAR_GLASS: MaterialHint = {
+  albedo: [0.02, 0.025, 0.03],
+  metallic: 0,
+  roughness: 0.05,
+  variation: 0.2
+};
+
+/**
+ * Looks of real buildings, for a block that should read as a believable city. Linear albedo
+ * within the range of real materials, from dark bronze glass to white render.
+ */
+const REALISTIC_SCHEMES: MaterialScheme[] = [
+  scheme(
+    'blue-glass',
+    'Blue glass tower',
+    1.2,
+    {
+      glass: { albedo: [0.018, 0.04, 0.055], metallic: 0, roughness: 0.05, variation: 0.25 },
+      frame: { albedo: [0.45, 0.46, 0.48], metallic: 0.9, roughness: 0.3, variation: 0.1 },
+      wall: { albedo: [0.32, 0.32, 0.33], metallic: 0, roughness: 0.7, variation: 0.15 },
+      trim: { albedo: [0.22, 0.22, 0.23], metallic: 0, roughness: 0.8, variation: 0.1 }
+    },
+    { curtain: 3, punched: 0, banded: 0.6 }
+  ),
+  scheme(
+    'bronze-glass',
+    'Bronze glass tower',
+    0.6,
+    {
+      glass: { albedo: [0.04, 0.034, 0.024], metallic: 0, roughness: 0.05, variation: 0.2 },
+      frame: { albedo: [0.2, 0.13, 0.07], metallic: 0.9, roughness: 0.35, variation: 0.15 },
+      wall: { albedo: [0.12, 0.11, 0.1], metallic: 0, roughness: 0.7, variation: 0.15 },
+      trim: { albedo: [0.18, 0.17, 0.16], metallic: 0, roughness: 0.8, variation: 0.1 }
+    },
+    { curtain: 2, punched: 0, banded: 1 }
+  ),
+  scheme(
+    'limestone',
+    'Limestone',
+    1,
+    {
+      glass: CLEAR_GLASS,
+      frame: { albedo: [0.4, 0.35, 0.26], metallic: 0, roughness: 0.8, variation: 0.12 },
+      wall: { albedo: [0.44, 0.38, 0.28], metallic: 0, roughness: 0.8, variation: 0.12 },
+      trim: { albedo: [0.3, 0.27, 0.21], metallic: 0, roughness: 0.85, variation: 0.1 }
+    },
+    { curtain: 0, punched: 2.5, banded: 1 }
+  ),
+  scheme(
+    'red-brick',
+    'Red brick',
+    1,
+    {
+      glass: CLEAR_GLASS,
+      frame: { albedo: [0.22, 0.068, 0.038], metallic: 0, roughness: 0.85, variation: 0.2 },
+      wall: { albedo: [0.25, 0.075, 0.04], metallic: 0, roughness: 0.85, variation: 0.2 },
+      trim: { albedo: [0.36, 0.34, 0.3], metallic: 0, roughness: 0.8, variation: 0.1 }
+    },
+    { curtain: 0, punched: 3, banded: 0.5 }
+  ),
+  scheme(
+    'white-render',
+    'White render',
+    1,
+    {
+      glass: { albedo: [0.02, 0.03, 0.04], metallic: 0, roughness: 0.05, variation: 0.2 },
+      frame: { albedo: [0.6, 0.58, 0.54], metallic: 0, roughness: 0.75, variation: 0.06 },
+      wall: { albedo: [0.62, 0.6, 0.56], metallic: 0, roughness: 0.75, variation: 0.06 },
+      trim: { albedo: [0.4, 0.39, 0.37], metallic: 0, roughness: 0.8, variation: 0.08 }
+    },
+    { curtain: 0, punched: 1, banded: 2 }
+  ),
+  scheme(
+    'terracotta',
+    'Terracotta',
+    0.7,
+    {
+      glass: CLEAR_GLASS,
+      frame: { albedo: [0.36, 0.13, 0.05], metallic: 0, roughness: 0.8, variation: 0.15 },
+      wall: { albedo: [0.4, 0.15, 0.06], metallic: 0, roughness: 0.8, variation: 0.15 },
+      trim: { albedo: [0.45, 0.4, 0.33], metallic: 0, roughness: 0.8, variation: 0.1 }
+    },
+    { curtain: 0, punched: 1.5, banded: 2 }
+  )
+];
+
+/** One saturated colour for a whole facade, framed by a pale roof */
+function vivid(id: string, displayName: string, albedo: [number, number, number]): MaterialScheme {
+  return scheme(
+    id,
+    displayName,
+    1,
+    {
+      glass: CLEAR_GLASS,
+      frame: { albedo: [albedo[0] * 0.9, albedo[1] * 0.9, albedo[2] * 0.9], metallic: 0, roughness: 0.8 },
+      wall: { albedo, metallic: 0, roughness: 0.8 },
+      trim: { albedo: [0.7, 0.7, 0.7], metallic: 0, roughness: 0.8 }
+    },
+    // Solid facades: a curtain wall would hide the colour behind glass
+    { curtain: 0, punched: 2, banded: 1 }
+  );
+}
+
+/**
+ * Strong, flat colours with no per-building drift, for testing global illumination: colour
+ * bleeding between facades and onto the street shows plainly. Albedo stays at or below 0.8.
+ */
+const VIVID_SCHEMES: MaterialScheme[] = [
+  vivid('red', 'Red', [0.65, 0.05, 0.03]),
+  vivid('green', 'Green', [0.08, 0.45, 0.08]),
+  vivid('blue', 'Blue', [0.05, 0.12, 0.6]),
+  vivid('yellow', 'Yellow', [0.75, 0.55, 0.03]),
+  vivid('orange', 'Orange', [0.8, 0.25, 0.03]),
+  vivid('white', 'White', [0.8, 0.8, 0.8])
+];
+
+/**
  * A contemporary office building in one of three facade languages: glass curtain
  * wall, punched windows, or horizontal ribbons — with an optional podium, setback
  * and a plant-cluttered roof.
  *
  * This is the reference ruleset. A new style registers its own {@link Ruleset} and
  * needs no changes here or in the engine.
+ *
+ * Besides its reference {@link Ruleset.palette}, it offers two scheme sets: `realistic`,
+ * real facade materials from glass towers to brick and render, and `vivid`, saturated flat
+ * colours for testing global illumination.
  *
  * @public
  */
@@ -458,6 +697,7 @@ export const modernOffice: Ruleset<ModernOfficeParams, ModernOfficeData> = {
   axiom: 'Building',
   defaultParams: DEFAULTS,
   palette: PALETTE,
+  schemeSets: { realistic: REALISTIC_SCHEMES, vivid: VIVID_SCHEMES },
   envelopeHeight: modernOfficeHeight,
   rules
 };

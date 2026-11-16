@@ -3,25 +3,41 @@
  * a shape grammar fills each parcel with a building, as in the procgen demo.
  *
  * The geometry is written as `.zmsh` assets next to the scene, one per material group of each
- * building, so every building stays a separate node that can be moved or deleted.
+ * part of a building, so every building stays a separate node that can be moved or deleted.
+ *
+ * The scene is built to be traced by global illumination: the ground is solid slabs in chunks
+ * rather than a scaled built-in plane (which has no distance field), and tall buildings are split
+ * at floor lines, so every mesh's baked field keeps a voxel size near {@link BUILDING_VOXEL} or
+ * {@link GROUND_VOXEL} under the baker's cap of 128 voxels per axis.
  */
-import { Vector3 } from '@zephyr3d/base';
+import { Quaternion, Vector3, Vector4 } from '@zephyr3d/base';
 import {
+  applyMaterialTone,
   availableStyles,
-  cityBlockGroundSpec,
-  generateBuilding,
+  cityBlockGroundParts,
+  cityBlockStreetLights,
+  generateBuildingParts,
   generateCityBlock,
   getStyle,
+  pickMaterialScheme,
   Random,
+  randomMaterialTone,
   type MaterialHint
 } from '@zephyr3d/procgen';
-import { BatchGroup, DirectionalLight, Mesh, SceneNode, type MeshMaterial } from '@zephyr3d/scene';
+import {
+  BatchGroup,
+  DirectionalLight,
+  Mesh,
+  SceneNode,
+  SpotLight,
+  type MeshMaterial,
+  type Scene
+} from '@zephyr3d/scene';
 import { GeneratedModelRunner } from '../generatedprimitive';
 import {
-  BUILTIN_PLANE,
+  bakeGeneratedMeshSDFs,
   createSurfaceMaterial,
   ensureAssetDir,
-  fetchBuiltinPrimitive,
   numParam,
   setupCamera,
   writeGeneratedPrimitive,
@@ -30,30 +46,109 @@ import {
 } from './common';
 
 /** The procedural model spec type, without depending on @zephyr3d/modelgen directly */
-type GeneratedModelSpec = ReturnType<typeof generateBuilding>;
+type GeneratedModelSpec = ReturnType<typeof generateBuildingParts>[number]['spec'];
 
 /** Used for a material group the style's palette does not describe */
 const FALLBACK_HINT: MaterialHint = { albedo: [0.5, 0.5, 0.5], metallic: 0, roughness: 0.8 };
 
-/** Street surfaces belong to the layout rather than to a building style */
-const GROUND_SURFACES: Record<string, MaterialHint> = {
-  road: { albedo: [0.035, 0.035, 0.04], metallic: 0, roughness: 0.92 },
-  plaza: { albedo: [0.2, 0.195, 0.18], metallic: 0, roughness: 0.78 }
+/** Ground surfaces belong to the layout rather than to a building style */
+const REALISTIC_GROUND: Record<string, MaterialHint> = {
+  road: { albedo: [0.045, 0.045, 0.05], metallic: 0, roughness: 0.9 },
+  sidewalk: { albedo: [0.3, 0.29, 0.27], metallic: 0, roughness: 0.85 },
+  kerb: { albedo: [0.42, 0.41, 0.39], metallic: 0, roughness: 0.8 },
+  marking: { albedo: [0.7, 0.7, 0.68], metallic: 0, roughness: 0.55 },
+  // Lawns between the buildings and a park around the block
+  ground: { albedo: [0.045, 0.08, 0.025], metallic: 0, roughness: 0.95 },
+  margin: { albedo: [0.035, 0.062, 0.02], metallic: 0, roughness: 0.95 },
+  plaza: { albedo: [0.32, 0.27, 0.2], metallic: 0, roughness: 0.78 }
 };
 
+/** Light neutral ground under the vivid palette, so colour bled from the facades shows on it */
+const NEUTRAL_GROUND: Record<string, MaterialHint> = {
+  road: { albedo: [0.08, 0.08, 0.08], metallic: 0, roughness: 0.9 },
+  sidewalk: { albedo: [0.55, 0.55, 0.55], metallic: 0, roughness: 0.85 },
+  kerb: { albedo: [0.6, 0.6, 0.6], metallic: 0, roughness: 0.8 },
+  marking: { albedo: [0.8, 0.8, 0.8], metallic: 0, roughness: 0.55 },
+  ground: { albedo: [0.45, 0.45, 0.45], metallic: 0, roughness: 0.9 },
+  margin: { albedo: [0.3, 0.3, 0.3], metallic: 0, roughness: 0.9 },
+  plaza: { albedo: [0.5, 0.5, 0.5], metallic: 0, roughness: 0.8 }
+};
+
+/** Palette choices: a scheme set of the style, or the style's single reference palette */
+type PaletteMode = 'realistic' | 'vivid' | 'style';
+
+/** A lit window: a pale diffuser glowing in the building's light colour */
+const LIT_WINDOW = { albedo: [0.35, 0.3, 0.22] as [number, number, number], metallic: 0, roughness: 0.6 };
+/** Incandescent home lighting */
+const WARM_LIGHT: [number, number, number] = [1, 0.72, 0.42];
+/** Fluorescent office lighting */
+const COOL_LIGHT: [number, number, number] = [0.78, 0.88, 1];
+/** Shop window lighting */
+const SHOP_LIGHT: [number, number, number] = [1, 0.84, 0.62];
+/** Sodium-free warm white of the street lamps */
+const STREET_LIGHT = new Vector4(1, 0.8, 0.55, 1);
+/** Height of a street lamp's head above the pavement */
+const LAMP_HEIGHT = 6;
+/** Sun elevation at dusk, in degrees */
+const DUSK_SUN_ELEVATION = 3;
+/** How far a street lamp's arm reaches out over the road */
+const LAMP_REACH = 1.5;
+/** A street lamp: pole at the origin, arm and head reaching along +X */
+const LAMP_SPEC = {
+  version: 1,
+  nodes: [
+    {
+      type: 'cylinder',
+      radius: 0.08,
+      height: LAMP_HEIGHT,
+      segments: 12,
+      position: [0, LAMP_HEIGHT * 0.5, 0]
+    },
+    {
+      type: 'box',
+      size: [LAMP_REACH + 0.1, 0.08, 0.08],
+      position: [(LAMP_REACH + 0.1) * 0.5, LAMP_HEIGHT - 0.05, 0]
+    },
+    { type: 'box', size: [0.6, 0.14, 0.3], position: [LAMP_REACH, LAMP_HEIGHT - 0.12, 0] }
+  ]
+};
+
+/** Groups far thinner than a field voxel (road paint, balcony railings); they keep out of the distance field */
+const PAINT_GROUPS = new Set(['marking', 'railing']);
+
+/** Baker's cap on voxels per axis, less two voxels of padding on each side */
+const FIELD_SPAN_VOXELS = 124;
+/** Target edge of a building field voxel: fine enough for street canyons and lobbies */
+const BUILDING_VOXEL = 0.5;
+/** Target edge of a ground field voxel; a chunk of two 20 m cells comes out near 0.33 */
+const GROUND_VOXEL = 0.25;
+/** Depth of the ground slabs, a few voxels so the field resolves both faces */
+const GROUND_DEPTH = 1.5;
+
+/** Style choice that mixes the built-in styles across the block */
+const MIXED_STYLE = 'mixed';
+const OFFICE_STYLE = 'modern-office';
+const RESIDENTIAL_STYLE = 'urban-residential';
+/** Tallest residential block the mixed choice builds */
+const RESIDENTIAL_MAX_FLOORS = 10;
+
 function styleOptions() {
+  const mixed = { value: MIXED_STYLE, label: 'Mixed (offices in the centre)' };
   try {
-    return availableStyles().map((id) => {
-      let label = id;
-      try {
-        label = (getStyle(id) as { displayName?: string }).displayName ?? id;
-      } catch {
-        // keep the id
-      }
-      return { value: id, label };
-    });
+    return [
+      mixed,
+      ...availableStyles().map((id) => {
+        let label = id;
+        try {
+          label = (getStyle(id) as { displayName?: string }).displayName ?? id;
+        } catch {
+          // keep the id
+        }
+        return { value: id, label };
+      })
+    ];
   } catch {
-    return [{ value: 'modern-office', label: 'Modern office' }];
+    return [mixed, { value: OFFICE_STYLE, label: 'Modern office' }];
   }
 }
 
@@ -76,6 +171,54 @@ function safeName(name: string) {
   return name.replace(/[^A-Za-z0-9_-]+/g, '_');
 }
 
+/**
+ * Field resolution the baker gives a mesh of the given extent, as bakeMeshSDF computes it for a
+ * resolution scale below 1 (128 voxels per axis at most, two of padding on each side, eight at least).
+ */
+function fieldResolution(extent: [number, number, number], voxel: number) {
+  const longest = Math.max(extent[0], extent[1], extent[2], 1e-6);
+  const size = Math.max(voxel, longest / FIELD_SPAN_VOXELS);
+  return extent.map((e) => Math.min(128, Math.max(8, Math.ceil(e / size) + 4)));
+}
+
+/**
+ * Raises the scene's distance field and GI material atlases to hold every field of the city at
+ * once, with some slack for packing: the block fits inside the default stream radius, so all of
+ * them stay loaded. Never lowers them, and stops at sizes whose memory stays reasonable.
+ */
+function sizeFieldAtlases(scene: Scene, fields: { extent: [number, number, number]; voxel: number }[]) {
+  const roundUp = (v: number, block: number) => Math.ceil(v / block) * block;
+  let sdfDemand = 0;
+  let materialDemand = 0;
+  for (const { extent, voxel } of fields) {
+    const res = fieldResolution(extent, voxel);
+    sdfDemand += res.reduce((n, v) => n * roundUp(v, 8), 1);
+    // The material field is half the distance field's resolution
+    materialDemand += res.reduce((n, v) => n * roundUp(Math.ceil(v / 2), 4), 1);
+  }
+  const slack = 1.25;
+  const sdfSizes: [number, number, number][] = [
+    [512, 256, 256],
+    [512, 512, 256],
+    [1024, 512, 256]
+  ];
+  const current = scene.sdf.atlasSize;
+  const sdfSize =
+    sdfSizes.find(([x, y, z]) => x * y * z >= sdfDemand * slack) ?? sdfSizes[sdfSizes.length - 1];
+  if (sdfSize[0] * sdfSize[1] * sdfSize[2] > current[0] * current[1] * current[2]) {
+    scene.sdf.atlasSize = sdfSize;
+  }
+  const materialSize = [256, 320, 384].find((s) => s * s * s >= materialDemand * slack) ?? 384;
+  if (materialSize > scene.gi.atlasSize) {
+    scene.gi.atlasSize = materialSize;
+  }
+  console.info(
+    `Buildings example: ${fields.length} fields need ${(sdfDemand / 1e6).toFixed(1)}M distance voxels ` +
+      `(atlas ${scene.sdf.atlasSize.join('×')}) and ${(materialDemand / 1e6).toFixed(1)}M material voxels ` +
+      `(atlas ${scene.gi.atlasSize}³)`
+  );
+}
+
 async function writeMesh(
   ctx: ExampleSceneBuildContext,
   runner: GeneratedModelRunner,
@@ -85,26 +228,39 @@ async function writeMesh(
   parent: SceneNode,
   nodeName: string
 ) {
-  const { primitive } = await writeGeneratedPrimitive(ctx, runner, spec, fileName);
+  const { path, primitive } = await writeGeneratedPrimitive(ctx, runner, spec, fileName);
   const mesh = new Mesh(ctx.scene, primitive, material);
   mesh.name = nodeName;
   mesh.parent = parent;
-  return mesh;
+  return { mesh, path };
 }
 
 export const buildingsScene: ExampleSceneType = {
   id: 'buildings',
   label: 'Buildings',
   description:
-    'A city block generated by @zephyr3d/procgen: streets from wave function collapse, buildings from a shape grammar.',
+    'A city block generated by @zephyr3d/procgen: streets from wave function collapse, office towers and apartment blocks with arcades, balconies and courtyards from shape grammars. Built for testing global illumination.',
   writesAssets: true,
   params: [
     {
       type: 'enum',
       key: 'style',
       label: 'Building Style',
-      default: 'modern-office',
+      default: MIXED_STYLE,
       options: styleOptions()
+    },
+    {
+      type: 'enum',
+      key: 'palette',
+      label: 'Palette',
+      default: 'realistic',
+      options: [
+        { value: 'realistic', label: 'Realistic' },
+        { value: 'vivid', label: 'Vivid (GI test)' },
+        { value: 'style', label: 'Style Default' }
+      ],
+      tooltip:
+        'Realistic dresses each building in a real facade material, from glass towers to brick and render, over lawns and paving. Vivid paints whole facades in strong flat colours over light grey ground, so colour bleeding from global illumination shows plainly. Style Default uses the single reference palette of the building style'
     },
     {
       type: 'int',
@@ -135,6 +291,17 @@ export const buildingsScene: ExampleSceneType = {
       tooltip: 'Width of one grid cell in world units; a road or a part of a parcel fills one cell'
     },
     {
+      type: 'float',
+      key: 'roadWidth',
+      label: 'Road Width',
+      default: 9,
+      min: 4,
+      max: 40,
+      format: '%.1f',
+      tooltip:
+        'Carriageway width between the kerbs; the rest of a road cell is pavement. Narrow roads between tall buildings make deep street canyons'
+    },
+    {
       type: 'int',
       key: 'maxFloors',
       label: 'Max Floors',
@@ -151,6 +318,83 @@ export const buildingsScene: ExampleSceneType = {
       tooltip: 'Put the block under a BatchGroup so the whole city draws with few draw calls'
     },
     {
+      type: 'bool',
+      key: 'bakeSDF',
+      label: 'Bake Distance Fields',
+      default: true,
+      tooltip:
+        'Bake a signed distance field for every ground and building mesh and turn on global illumination, so the city takes part in it. Takes longer to create'
+    },
+    {
+      type: 'float',
+      key: 'sunElevation',
+      label: 'Sun Elevation',
+      default: 35,
+      min: 5,
+      max: 90,
+      format: '%.1f°',
+      tooltip: 'Height of the sun above the horizon; a low sun throws long shadows down the streets'
+    },
+    {
+      type: 'float',
+      key: 'sunAzimuth',
+      label: 'Sun Azimuth',
+      default: 345,
+      min: 0,
+      max: 360,
+      format: '%.1f°',
+      tooltip: 'Direction the sunlight comes from, measured from +X towards +Z'
+    },
+    {
+      type: 'enum',
+      key: 'timeOfDay',
+      label: 'Time of Day',
+      default: 'day',
+      options: [
+        { value: 'day', label: 'Day' },
+        { value: 'dusk', label: 'Dusk' }
+      ],
+      tooltip:
+        'Dusk drops the sun to just above the horizon (Sun Elevation is ignored), lights some windows and every shop front, and turns on the street lamps, so emissive surfaces and local lights carry the indirect lighting'
+    },
+    {
+      type: 'float',
+      key: 'litWindows',
+      label: 'Lit Windows',
+      default: 0.35,
+      min: 0,
+      max: 1,
+      format: '%.2f',
+      tooltip: 'At dusk, the share of windows lit from inside'
+    },
+    {
+      type: 'float',
+      key: 'windowGlow',
+      label: 'Window Glow',
+      default: 3,
+      min: 0,
+      max: 50,
+      format: '%.2f',
+      tooltip: 'At dusk, how brightly lit windows and shop fronts glow'
+    },
+    {
+      type: 'bool',
+      key: 'streetLights',
+      label: 'Street Lamps',
+      default: true,
+      tooltip: 'At dusk, a lamp on every straight stretch of road, alternating sides'
+    },
+    {
+      type: 'float',
+      key: 'streetLightIntensity',
+      label: 'Street Lamp Intensity',
+      default: 50,
+      min: 0,
+      max: 500,
+      format: '%.1f',
+      tooltip: 'How brightly each street lamp lights the road under it'
+    },
+    {
       type: 'int',
       key: 'seed',
       label: 'Seed',
@@ -161,14 +405,19 @@ export const buildingsScene: ExampleSceneType = {
   ],
   async build(ctx, params) {
     const scene = ctx.scene;
-    const styleId = String(params.style);
-    const style = getStyle(styleId);
-    const palette = style.palette ?? {};
+    const chosenStyle = String(params.style);
+    const paletteMode = String(params.palette ?? 'realistic') as PaletteMode;
+    const groundSurfaces = paletteMode === 'vivid' ? NEUTRAL_GROUND : REALISTIC_GROUND;
     const width = Math.max(3, Math.round(numParam(params, 'gridWidth')));
     const depth = Math.max(3, Math.round(numParam(params, 'gridDepth')));
     const cellSize = Math.max(1, numParam(params, 'cellSize'));
+    // Keeps at least a metre of pavement on each side
+    const roadWidth = Math.max(1, Math.min(numParam(params, 'roadWidth'), cellSize - 2));
     const maxFloors = Math.max(3, Math.round(numParam(params, 'maxFloors')));
     const seed = Math.round(numParam(params, 'seed'));
+    const dusk = params.timeOfDay === 'dusk';
+    const litWindows = dusk ? Math.min(1, Math.max(0, numParam(params, 'litWindows'))) : 0;
+    const windowGlow = Math.max(0, numParam(params, 'windowGlow'));
 
     await ensureAssetDir(ctx);
     const runner = new GeneratedModelRunner();
@@ -182,33 +431,65 @@ export const buildingsScene: ExampleSceneType = {
 
       const spanX = layout.width * cellSize;
       const spanZ = layout.height * cellSize;
-      const groundSize = Math.max(spanX, spanZ) * 3;
-      const ground = new Mesh(
-        scene,
-        await fetchBuiltinPrimitive(BUILTIN_PLANE),
-        await createSurfaceMaterial({ albedo: [0.15, 0.16, 0.18], roughness: 0.95 })
-      );
-      ground.name = 'Ground';
-      ground.parent = scene.rootNode;
-      ground.scale = new Vector3(groundSize, 1, groundSize);
-      // The ground only receives shadows: as a caster its bounds would swallow the shadow region
-      ground.castShadow = false;
 
-      const streets = new SceneNode(scene);
-      streets.name = 'Streets';
-      streets.parent = root;
-      for (const [surface, spec] of splitByGroup(cityBlockGroundSpec(layout))) {
-        const hint = GROUND_SURFACES[surface] ?? FALLBACK_HINT;
-        const mesh = await writeMesh(
-          ctx,
-          runner,
-          spec,
-          `street_${safeName(surface)}`,
-          await createSurfaceMaterial(hint),
-          streets,
-          surface
-        );
-        mesh.castShadow = false;
+      /** Generated mesh assets per target voxel size, for the optional distance field bake */
+      const groundPaths: string[] = [];
+      const buildingPaths: string[] = [];
+      /** Local bounds of every generated mesh, to size the field atlases */
+      const fieldExtents: { extent: [number, number, number]; voxel: number }[] = [];
+      const recordExtent = (mesh: Mesh, voxel: number, field = true) => {
+        const box = mesh.primitive?.getBoundingVolume()?.toAABB();
+        if (box && field) {
+          const e = Vector3.sub(box.maxPoint, box.minPoint);
+          fieldExtents.push({ extent: [e.x, e.y, e.z], voxel });
+        }
+        return box;
+      };
+
+      // Solid chunked slabs, the surrounding ground included: a scaled built-in plane has no
+      // distance field and would be invisible to global illumination
+      ctx.progress('Generating ground...');
+      const groundNode = new SceneNode(scene);
+      groundNode.name = 'Ground';
+      groundNode.parent = root;
+      const groundMaterials = new Map<string, MeshMaterial>();
+      for (const { part, spec } of cityBlockGroundParts(layout, {
+        depth: GROUND_DEPTH,
+        roadWidth,
+        chunkCells: 2,
+        margin: Math.max(spanX, spanZ)
+      })) {
+        const groups = splitByGroup(spec);
+        const parent = groups.size > 1 ? new SceneNode(scene) : groundNode;
+        if (parent !== groundNode) {
+          parent.name = part;
+          parent.parent = groundNode;
+        }
+        for (const [surface, sub] of groups) {
+          let material = groundMaterials.get(surface);
+          if (!material) {
+            material = await createSurfaceMaterial(groundSurfaces[surface] ?? FALLBACK_HINT);
+            groundMaterials.set(surface, material);
+          }
+          const { mesh, path } = await writeMesh(
+            ctx,
+            runner,
+            sub,
+            `ground_${safeName(part)}_${safeName(surface)}`,
+            material,
+            parent,
+            groups.size > 1 ? surface : part
+          );
+          // The ground only receives shadows: as a caster its bounds would swallow the shadow region
+          mesh.castShadow = false;
+          if (PAINT_GROUPS.has(surface)) {
+            // A centimetre of paint has no usable field; the road under it stands in for it
+            mesh.sdfMode = 'none';
+            continue;
+          }
+          groundPaths.push(path);
+          recordExtent(mesh, GROUND_VOXEL);
+        }
       }
 
       const rng = new Random(seed ^ 0x27d4eb2f);
@@ -222,50 +503,166 @@ export const buildingsScene: ExampleSceneType = {
         // Taper the skyline towards the edges of the block
         const cx = parcel.x + parcel.width * 0.5;
         const cz = parcel.z + parcel.depth * 0.5;
-        const falloff = 1 - Math.min(1, Math.hypot(cx - centreX, cz - centreZ) / halfSpan) * 0.65;
-        const floors = Math.max(2, Math.round(rng.int(3, maxFloors) * falloff));
+        const radius = Math.min(1, Math.hypot(cx - centreX, cz - centreZ) / halfSpan);
+        const falloff = 1 - radius * 0.65;
+        // Mixed: offices hold the centre, apartment blocks take over towards the edge
+        const styleId =
+          chosenStyle !== MIXED_STYLE
+            ? chosenStyle
+            : rng.chance(Math.min(0.9, Math.max(0.1, 1.1 - radius * 1.6)))
+              ? OFFICE_STYLE
+              : RESIDENTIAL_STYLE;
+        const style = getStyle(styleId);
+        const floors =
+          styleId === RESIDENTIAL_STYLE
+            ? rng.int(Math.min(4, maxFloors), Math.min(RESIDENTIAL_MAX_FLOORS, maxFloors))
+            : Math.max(2, Math.round(rng.int(3, maxFloors) * falloff));
         const buildingSeed = rng.int(0, 1 << 30);
-        // One tone per building: shifting all groups together keeps a building reading as one object
-        const tone = rng.next() * 2 - 1;
+        // One scheme and one tone per building: shifting all groups together keeps a building
+        // reading as one object; a style without the chosen scheme set keeps its reference palette
+        const schemes = paletteMode === 'style' ? [] : (style.schemeSets?.[paletteMode] ?? []);
+        const scheme = pickMaterialScheme(schemes, rng);
+        const palette = scheme?.palette ?? style.palette ?? {};
+        const tone = scheme
+          ? randomMaterialTone(rng)
+          : { lightness: rng.next() * 2 - 1, hue: 0, saturation: 0 };
+        // Lighting colour of the building's windows: mostly warm homes, some cool offices
+        const litTint = dusk ? (rng.chance(0.7) ? WARM_LIGHT : COOL_LIGHT) : WARM_LIGHT;
         // Built around its own footprint centre so the node's pivot sits on the building
-        const spec = generateBuilding({
+        const parts = generateBuildingParts({
           style: styleId,
           seed: buildingSeed,
           footprint: [parcel.width, parcel.depth],
           origin: [-parcel.width * 0.5, 0, -parcel.depth * 0.5],
-          params: { floors, entranceFaceMask: parcel.frontageMask || 0b1111 }
+          params: {
+            ...scheme?.params,
+            floors,
+            entranceFaceMask: parcel.frontageMask || 0b1111,
+            litWindowChance: litWindows,
+            // Taller parts would bake coarser than BUILDING_VOXEL under the baker's cap
+            maxPartHeight: FIELD_SPAN_VOXELS * BUILDING_VOXEL
+          }
         });
         const building = new SceneNode(scene);
-        building.name = `Building ${index + 1}`;
+        building.name = scheme
+          ? `Building ${index + 1} (${scheme.displayName ?? scheme.id})`
+          : `Building ${index + 1}`;
         building.parent = root;
         building.position = new Vector3(cx, 0, cz);
-        for (const [group, sub] of splitByGroup(spec)) {
-          const hint = palette[group] ?? FALLBACK_HINT;
-          const k = 1 + (hint.variation ?? 0) * tone;
-          const mesh = await writeMesh(
-            ctx,
-            runner,
-            sub,
-            `building_${String(index + 1).padStart(3, '0')}_${safeName(group)}`,
-            await createSurfaceMaterial({
-              albedo: [hint.albedo[0] * k, hint.albedo[1] * k, hint.albedo[2] * k],
-              metallic: hint.metallic,
-              roughness: hint.roughness
-            }),
-            building,
-            group
-          );
-          const box = mesh.primitive?.getBoundingVolume()?.toAABB();
-          if (box) {
-            maxHeight = Math.max(maxHeight, box.maxPoint.y);
+        const materials = new Map<string, MeshMaterial>();
+        const fileBase = `building_${String(index + 1).padStart(3, '0')}`;
+        for (const { part, spec } of parts) {
+          let parent = building;
+          if (parts.length > 1) {
+            parent = new SceneNode(scene);
+            parent.name = part || 'base';
+            parent.parent = building;
+          }
+          for (const [group, sub] of splitByGroup(spec)) {
+            let material = materials.get(group);
+            if (!material) {
+              material = await createSurfaceMaterial(
+                group === 'glass-lit'
+                  ? { ...LIT_WINDOW, emissive: litTint, emissiveStrength: windowGlow }
+                  : group === 'storefront' && dusk
+                    ? {
+                        ...applyMaterialTone(palette[group] ?? FALLBACK_HINT, tone),
+                        emissive: SHOP_LIGHT,
+                        emissiveStrength: windowGlow * 1.2
+                      }
+                    : applyMaterialTone(palette[group] ?? FALLBACK_HINT, tone)
+              );
+              materials.set(group, material);
+            }
+            const { mesh, path } = await writeMesh(
+              ctx,
+              runner,
+              sub,
+              parts.length > 1
+                ? `${fileBase}_${safeName(part)}_${safeName(group)}`
+                : `${fileBase}_${safeName(group)}`,
+              material,
+              parent,
+              group
+            );
+            const thin = PAINT_GROUPS.has(group);
+            if (thin) {
+              // Railings are far thinner than a field voxel; the slab under them stands in
+              mesh.sdfMode = 'none';
+            } else {
+              buildingPaths.push(path);
+            }
+            const box = recordExtent(mesh, BUILDING_VOXEL, !thin);
+            if (box) {
+              maxHeight = Math.max(maxHeight, box.maxPoint.y);
+            }
           }
         }
+      }
+
+      if (dusk && params.streetLights) {
+        const placements = cityBlockStreetLights(layout, { roadWidth });
+        if (placements.length > 0) {
+          ctx.progress('Placing street lamps...');
+          // One shared lamp mesh with its arm along +X, turned per lamp to face the road
+          const { primitive } = await writeGeneratedPrimitive(ctx, runner, LAMP_SPEC, 'street_lamp');
+          const poleMaterial = await createSurfaceMaterial({
+            albedo: [0.06, 0.065, 0.07],
+            metallic: 0.7,
+            roughness: 0.45
+          });
+          const lamps = new SceneNode(scene);
+          lamps.name = 'Street Lamps';
+          lamps.parent = scene.rootNode;
+          const intensity = Math.max(0, numParam(params, 'streetLightIntensity'));
+          placements.forEach((placement, i) => {
+            const [x, , z] = placement.position;
+            const [tx, tz] = placement.toward;
+            const lamp = new Mesh(scene, primitive, poleMaterial);
+            lamp.name = `Lamp ${i + 1}`;
+            lamp.parent = lamps;
+            lamp.position = new Vector3(x, 0, z);
+            lamp.rotation = Quaternion.fromAxisAngle(Vector3.axisPY(), Math.atan2(-tz, tx));
+            // A pole is far thinner than a field voxel
+            lamp.sdfMode = 'none';
+            lamp.castShadow = false;
+            const head = new Vector3(x + tx * LAMP_REACH, LAMP_HEIGHT - 0.2, z + tz * LAMP_REACH);
+            const light = new SpotLight(scene);
+            light.name = `Lamp Light ${i + 1}`;
+            light.parent = lamps;
+            light.color = new Vector4(STREET_LIGHT);
+            light.intensity = intensity;
+            light.range = LAMP_HEIGHT * 2.5;
+            light.cutoff = Math.cos((60 * Math.PI) / 180);
+            light.castShadow = false;
+            // Aimed down and a little out over the road
+            light.lookAt(head, new Vector3(head.x + tx * 2, 0, head.z + tz * 2), Vector3.axisPY());
+          });
+        }
+      }
+
+      if (params.bakeSDF) {
+        await bakeGeneratedMeshSDFs(ctx, groundPaths, GROUND_VOXEL);
+        await bakeGeneratedMeshSDFs(ctx, buildingPaths, BUILDING_VOXEL);
+        sizeFieldAtlases(scene, fieldExtents);
+        // Turns the scene SDF on as well
+        scene.gi.enabled = true;
       }
 
       const sun = new DirectionalLight(scene);
       sun.name = 'Sun';
       sun.sunLight = true;
-      sun.lookAt(new Vector3(90, 140, 70), Vector3.zero(), Vector3.axisPY());
+      const elevation = ((dusk ? DUSK_SUN_ELEVATION : numParam(params, 'sunElevation')) * Math.PI) / 180;
+      const azimuth = (numParam(params, 'sunAzimuth') * Math.PI) / 180;
+      sun.lookAt(
+        new Vector3(
+          Math.cos(elevation) * Math.cos(azimuth),
+          Math.sin(elevation),
+          Math.cos(elevation) * Math.sin(azimuth)
+        ),
+        Vector3.zero(),
+        Vector3.axisPY()
+      );
       sun.castShadow = true;
       // Stretch the cascades over the whole block, or only the nearest buildings get shadows
       sun.shadow.shadowDistance = Math.max(200, halfSpan * 2.5);
