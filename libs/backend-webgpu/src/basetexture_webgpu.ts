@@ -112,9 +112,20 @@ export abstract class WebGPUBaseTexture<
   set samplerOptions(options: Nullable<Immutable<SamplerOptions>>) {
     if (this._format) {
       const params = (this.getTextureCaps() as WebGPUTextureCaps).getTextureFormatInfo(this._format);
-      this._samplerOptions = options
-        ? Object.assign({}, this._getSamplerOptions(params, !!options.compare), options)
-        : null;
+      if (options) {
+        // Merge defaults with user options first
+        const merged = Object.assign({}, this._getSamplerOptions(params, !!options.compare), options);
+        // Then compute maxAnisotropy based on the merged filter settings, unless explicitly set
+        if (options.maxAnisotropy === undefined) {
+          merged.maxAnisotropy =
+            merged.magFilter === 'linear' && merged.minFilter === 'linear' && merged.mipFilter === 'linear'
+              ? Math.min(this._device.defaultMaxAnisotropy, this.getTextureCaps().maxAnisotropy)
+              : 1;
+        }
+        this._samplerOptions = merged;
+      } else {
+        this._samplerOptions = null;
+      }
     } else {
       console.error('Set sampler options failed: texture not initialized');
     }
