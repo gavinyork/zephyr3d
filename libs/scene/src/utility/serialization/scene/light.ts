@@ -759,6 +759,171 @@ export function getDirectionalLightClass(): SerializableClass {
           set(this: DirectionalLight, value) {
             this.sunLight = value.bool[0];
           }
+        },
+        {
+          name: 'CastCloudShadows',
+          description:
+            'If true and this is the sun light, the volumetric clouds cast moving shadows on the scene',
+          type: 'bool',
+          default: false,
+          options: {
+            group: 'CloudShadow'
+          },
+          get(this: DirectionalLight, value) {
+            value.bool[0] = this.castCloudShadows;
+          },
+          set(this: DirectionalLight, value) {
+            this.castCloudShadows = value.bool[0];
+          }
+        },
+        {
+          name: 'CloudShadowExtent',
+          description:
+            'Size of the area around the camera that gets cloud shadows; smaller gives sharper cloud shadows, larger reaches farther',
+          type: 'float',
+          default: 150000,
+          options: {
+            label: 'Extent',
+            group: 'CloudShadow',
+            minValue: 1000,
+            maxValue: 500000
+          },
+          get(this: DirectionalLight, value) {
+            value.num[0] = this.cloudShadowExtent;
+          },
+          set(this: DirectionalLight, value) {
+            this.cloudShadowExtent = value.num[0];
+          },
+          isHidden(this: DirectionalLight) {
+            return !this.castCloudShadows;
+          }
+        },
+        {
+          name: 'CloudShadowStrength',
+          description: 'How dark the cloud shadows get under thick clouds',
+          type: 'float',
+          default: 1,
+          options: {
+            label: 'Strength',
+            group: 'CloudShadow',
+            minValue: 0,
+            maxValue: 4
+          },
+          get(this: DirectionalLight, value) {
+            value.num[0] = this.cloudShadowStrength;
+          },
+          set(this: DirectionalLight, value) {
+            this.cloudShadowStrength = value.num[0];
+          },
+          isHidden(this: DirectionalLight) {
+            return !this.castCloudShadows;
+          }
+        },
+        {
+          name: 'CloudShadowOnSurfaceStrength',
+          description: 'How much the cloud shadows darken the ground and objects',
+          type: 'float',
+          default: 1,
+          options: {
+            label: 'OnSurfaceStrength',
+            group: 'CloudShadow',
+            minValue: 0,
+            maxValue: 1
+          },
+          get(this: DirectionalLight, value) {
+            value.num[0] = this.cloudShadowOnSurfaceStrength;
+          },
+          set(this: DirectionalLight, value) {
+            this.cloudShadowOnSurfaceStrength = value.num[0];
+          },
+          isHidden(this: DirectionalLight) {
+            return !this.castCloudShadows;
+          }
+        },
+        {
+          name: 'CloudShadowOnAtmosphereStrength',
+          description: 'How much the cloud shadows darken the sky and the haze, making light shafts',
+          type: 'float',
+          default: 1,
+          options: {
+            label: 'OnAtmosphereStrength',
+            group: 'CloudShadow',
+            minValue: 0,
+            maxValue: 1
+          },
+          get(this: DirectionalLight, value) {
+            value.num[0] = this.cloudShadowOnAtmosphereStrength;
+          },
+          set(this: DirectionalLight, value) {
+            this.cloudShadowOnAtmosphereStrength = value.num[0];
+          },
+          isHidden(this: DirectionalLight) {
+            return !this.castCloudShadows;
+          }
+        },
+        {
+          name: 'CloudShadowMapResolutionScale',
+          description: 'Sharper cloud shadow edges at a higher cost',
+          type: 'float',
+          default: 0.5,
+          options: {
+            label: 'ResolutionScale',
+            group: 'CloudShadow',
+            minValue: 0.25,
+            maxValue: 8
+          },
+          get(this: DirectionalLight, value) {
+            value.num[0] = this.cloudShadowMapResolutionScale;
+          },
+          set(this: DirectionalLight, value) {
+            this.cloudShadowMapResolutionScale = value.num[0];
+          },
+          isHidden(this: DirectionalLight) {
+            return !this.castCloudShadows;
+          }
+        },
+        {
+          name: 'CloudShadowRaySampleCountScale',
+          description: 'Smoother cloud shadows through thick clouds at a higher cost',
+          type: 'float',
+          default: 1,
+          options: {
+            label: 'RaySampleCountScale',
+            group: 'CloudShadow',
+            minValue: 0.25,
+            maxValue: 8
+          },
+          get(this: DirectionalLight, value) {
+            value.num[0] = this.cloudShadowRaySampleCountScale;
+          },
+          set(this: DirectionalLight, value) {
+            this.cloudShadowRaySampleCountScale = value.num[0];
+          },
+          isHidden(this: DirectionalLight) {
+            return !this.castCloudShadows;
+          }
+        },
+        {
+          name: 'CloudShadowDepthBias',
+          description:
+            'Moves the start of the cloud shadows along the sunlight, to lift them off cloud bases that look too dark',
+          type: 'float',
+          default: 0,
+          options: {
+            label: 'DepthBias',
+            group: 'CloudShadow',
+            minValue: -1000,
+            maxValue: 1000
+          },
+          get(this: DirectionalLight, value) {
+            value.num[0] = this.cloudShadowDepthBias;
+          },
+          set(this: DirectionalLight, value) {
+            this.cloudShadowDepthBias = value.num[0];
+          },
+          isHidden(this: DirectionalLight) {
+            return !this.castCloudShadows;
+          }
         }
       ]);
     }

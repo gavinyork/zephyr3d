@@ -395,6 +395,14 @@ export class PunctualLight extends BaseLight {
 export class DirectionalLight extends PunctualLight {
   private static readonly _currentSunLight: WeakMap<Scene, DWeakRef<DirectionalLight>> = new WeakMap();
   private _illuminance: number;
+  private _castCloudShadows: boolean;
+  private _cloudShadowExtent: number;
+  private _cloudShadowMapResolutionScale: number;
+  private _cloudShadowRaySampleCountScale: number;
+  private _cloudShadowStrength: number;
+  private _cloudShadowOnSurfaceStrength: number;
+  private _cloudShadowOnAtmosphereStrength: number;
+  private _cloudShadowDepthBias: number;
   /**
    * Creates an instance of directional light
    * @param scene - The scene to which the light belongs
@@ -403,6 +411,16 @@ export class DirectionalLight extends PunctualLight {
     super(scene, LIGHT_TYPE_DIRECTIONAL);
     this.intensity = 10;
     this._illuminance = 100000;
+    // Unreal's UDirectionalLightComponent defaults
+    this._castCloudShadows = false;
+    this._cloudShadowExtent = 150000;
+    // UE defaults to 1; half keeps the trace affordable on integrated GPUs
+    this._cloudShadowMapResolutionScale = 0.5;
+    this._cloudShadowRaySampleCountScale = 1;
+    this._cloudShadowStrength = 1;
+    this._cloudShadowOnSurfaceStrength = 1;
+    this._cloudShadowOnAtmosphereStrength = 1;
+    this._cloudShadowDepthBias = 0;
     if (!DirectionalLight.getSunLight(scene)) {
       DirectionalLight.setSunLight(scene, this);
     }
@@ -417,6 +435,67 @@ export class DirectionalLight extends PunctualLight {
       this._illuminance = illuminance;
       this.invalidateUniforms();
     }
+  }
+  /**
+   * Whether the volumetric clouds shade this light, when it is the sun light. Default false.
+   */
+  get castCloudShadows() {
+    return this._castCloudShadows;
+  }
+  set castCloudShadows(val: boolean) {
+    this._castCloudShadows = !!val;
+  }
+  /**
+   * Half the size of the area around the camera the cloud shadow map covers is twice this, in
+   * meters of the atmosphere. Smaller keeps finer cloud shadows. Default 150000.
+   */
+  get cloudShadowExtent() {
+    return this._cloudShadowExtent;
+  }
+  set cloudShadowExtent(val: number) {
+    this._cloudShadowExtent = Math.max(1000, val);
+  }
+  /** Scales the cloud shadow map resolution (512 at 1, halved by its filter). Default 0.5. */
+  get cloudShadowMapResolutionScale() {
+    return this._cloudShadowMapResolutionScale;
+  }
+  set cloudShadowMapResolutionScale(val: number) {
+    this._cloudShadowMapResolutionScale = Math.min(8, Math.max(0.25, val));
+  }
+  /** Scales the samples traced through the clouds per cloud shadow map texel. Default 1. */
+  get cloudShadowRaySampleCountScale() {
+    return this._cloudShadowRaySampleCountScale;
+  }
+  set cloudShadowRaySampleCountScale(val: number) {
+    this._cloudShadowRaySampleCountScale = Math.min(8, Math.max(0.25, val));
+  }
+  /** Scales the cloud optical depth the shadow is computed from. Default 1. */
+  get cloudShadowStrength() {
+    return this._cloudShadowStrength;
+  }
+  set cloudShadowStrength(val: number) {
+    this._cloudShadowStrength = Math.max(0, val);
+  }
+  /** How much of the cloud shadow reaches lit surfaces, 0 to 1. Default 1. */
+  get cloudShadowOnSurfaceStrength() {
+    return this._cloudShadowOnSurfaceStrength;
+  }
+  set cloudShadowOnSurfaceStrength(val: number) {
+    this._cloudShadowOnSurfaceStrength = Math.min(1, Math.max(0, val));
+  }
+  /** How much of the cloud shadow reaches the atmosphere, 0 to 1. Default 1. */
+  get cloudShadowOnAtmosphereStrength() {
+    return this._cloudShadowOnAtmosphereStrength;
+  }
+  set cloudShadowOnAtmosphereStrength(val: number) {
+    this._cloudShadowOnAtmosphereStrength = Math.min(1, Math.max(0, val));
+  }
+  /** Moves where the cloud shadow starts along the light, in meters. Default 0. */
+  get cloudShadowDepthBias() {
+    return this._cloudShadowDepthBias;
+  }
+  set cloudShadowDepthBias(val: number) {
+    this._cloudShadowDepthBias = val;
   }
   static getSunLight(scene: Scene) {
     return this._currentSunLight.get(scene)?.get() ?? null;

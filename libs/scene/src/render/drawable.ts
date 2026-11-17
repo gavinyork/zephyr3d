@@ -1,4 +1,4 @@
-import type { DRef, Nullable, TypedArray, Vector4 } from '@zephyr3d/base';
+import type { DRef, Immutable, Nullable, TypedArray, Vector4 } from '@zephyr3d/base';
 import type {
   AbstractDevice,
   ColorState,
@@ -21,6 +21,7 @@ import type { MeshMaterial } from '../material';
 import type { GlobalBindGroupAllocator } from './globalbindgroup_allocator';
 import type { OIT } from './oit';
 import type { WaterCausticUniforms } from './water_caustics';
+import type { CloudShadowUniforms } from './volumetric_cloud/cloud_shadow';
 import type { UnderwaterState } from './underwater';
 
 /**
@@ -125,6 +126,15 @@ export interface DrawContext {
   waterCausticHeightTexture?: Nullable<Texture2D>;
   /** Parameters describing the projection of {@link DrawContext.waterCausticTexture}. */
   waterCausticUniforms?: Nullable<WaterCausticUniforms>;
+  /**
+   * Volumetric cloud shadow map of the sun produced this frame, or null. Keyed into the light pass
+   * shader/bind group hashes, so the declared and bound global layouts always agree.
+   */
+  cloudShadowTexture?: Nullable<Texture2D>;
+  /** Projection of {@link DrawContext.cloudShadowTexture}. @internal */
+  cloudShadowUniforms?: Nullable<Immutable<CloudShadowUniforms>>;
+  /** How much of the cloud shadow reaches lit surfaces, 0 to 1. */
+  cloudShadowSurfaceStrength?: number;
   /**
    * The body of water the camera is inside this frame, or null when it is above
    * all of them.

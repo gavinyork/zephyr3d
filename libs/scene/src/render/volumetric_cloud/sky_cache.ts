@@ -54,9 +54,9 @@ function getTraceProgram(msOctaves: number) {
         const CloudParams = getCloudParamsStruct(pb);
         this.atmo = AtmosphereParams().uniform(0);
         this.cloud = CloudParams().uniform(0);
-        // (block origin x, y, cache size, step scale)
+        // (texel offset x, y, cache size, step scale)
         this.block = pb.vec4().uniform(0);
-        // (delta, 0, 0, 0)
+        // (delta, texel stride, 0, 0)
         this.cacheParams = pb.vec4().uniform(0);
         this.weatherMap = pb.tex2D().uniform(0);
         this.baseNoise = pb.tex3D().uniform(0);
@@ -66,7 +66,21 @@ function getTraceProgram(msOctaves: number) {
         this.ambientTex = pb.tex2D().sampleType('unfilterable-float').uniform(0);
         this.dst = pb.texStorage2D.rgba16float().storage(0);
         pb.main(function () {
-          this.$l.texel = pb.add(pb.uvec2(this.block.xy), this.$builtins.globalInvocationId.xy);
+          // Every stride-th texel in both axes from the offset: each frame traces a sparse grid
+          // over the whole sky, so near-horizon and zenith rays share every frame's work evenly
+          this.$l.texel = pb.add(
+            pb.uvec2(this.block.xy),
+            pb.mul(this.$builtins.globalInvocationId.xy, pb.uint(this.cacheParams.y))
+          );
+          this.$if(
+            pb.or(
+              pb.greaterThanEqual(this.texel.x, pb.uint(this.block.z)),
+              pb.greaterThanEqual(this.texel.y, pb.uint(this.block.z))
+            ),
+            function () {
+              this.$return();
+            }
+          );
           this.$l.uv = pb.div(pb.add(pb.vec2(this.texel), pb.vec2(0.5)), this.block.z);
           this.$l.dir = cloudCacheDecode(this, this.uv, this.cacheParams.x);
           this.$l.ambient = pb.textureLoad(this.ambientTex, pb.ivec2(0), 0).rgb;
@@ -139,6 +153,87 @@ function cloneAtmosphere(p: AtmosphereParams): AtmosphereParams {
     lightDir: new Vector3(p.lightDir),
     lightColor: new Vector4(p.lightColor),
     skyViewReferential: new Matrix4x4(p.skyViewReferential)
+  };
+}
+
+/**
+ * Uniform values of the cloud passes ({@link getCloudParamsStruct}).
+ *
+ * @param referential - Rotation from the trace space to the planet-fixed frame
+ * @param eyeHeight - Distance of the eye from the planet center, in the trace space
+ * @param time - Seconds, drives the wind
+ * @internal
+ */
+export function buildCloudParams(
+  params: VolumetricCloud,
+  atmo: AtmosphereParams,
+  time: number,
+  referential: Immutable<Matrix4x4>,
+  eyeHeight: number
+): Record<string, Vector4 | Matrix4x4> {
+  const R = atmo.plantRadius;
+  const bottom = R + params.layerBottomAltitude;
+  const top = bottom + params.layerHeight;
+  const wind = params.wind;
+  const windSpeed = Math.hypot(wind.x, wind.y);
+  const windDir = windSpeed > 0 ? new Vector2(wind.x / windSpeed, wind.y / windSpeed) : new Vector2(1, 0);
+  const sunIlluminance = new Vector3(atmo.lightColor.x, atmo.lightColor.y, atmo.lightColor.z).scaleBy(
+    atmo.lightColor.w
+  );
+  return {
+    referential: new Matrix4x4(referential),
+    layer: new Vector4(bottom, top, R, params.tracingMaxDistance),
+    march: new Vector4(
+      Math.min(CLOUD_BASE_VIEW_SAMPLE_COUNT * params.viewSampleCountScale, CLOUD_VIEW_SAMPLE_COUNT_MAX),
+      Math.max(
+        1,
+        Math.round(
+          Math.min(
+            CLOUD_BASE_SHADOW_SAMPLE_COUNT * params.shadowSampleCountScale,
+            CLOUD_SHADOW_SAMPLE_COUNT_MAX
+          )
+        )
+      ),
+      params.shadowTracingDistance,
+      params.stopTracingTransmittanceThreshold
+    ),
+    eye: new Vector4(0, eyeHeight, 0, 0),
+    sunDir: new Vector4(
+      atmo.lightDir.x,
+      atmo.lightDir.y,
+      atmo.lightDir.z,
+      params.perSampleAtmosphericLightTransmittance ? 1 : 0
+    ),
+    sunIlluminance: new Vector4(sunIlluminance.x, sunIlluminance.y, sunIlluminance.z, 0),
+    phase: new Vector4(
+      params.phaseG,
+      params.phaseG2,
+      params.phaseBlend,
+      1 - params.skyLightCloudBottomOcclusion
+    ),
+    ms: new Vector4(params.msContribution, params.msOcclusion, params.msEccentricity, 0),
+    density: new Vector4(
+      cloudCoverageThreshold(params.coverage, params.formation),
+      params.density,
+      params.detailErosion,
+      params.anvilBias
+    ),
+    shape: new Vector4(
+      params.shapeStrength,
+      params.detailBottomErosion,
+      params.coverage,
+      params.baseHeightVariation
+    ),
+    albedo: new Vector4(params.albedo.x, params.albedo.y, params.albedo.z, 0),
+    scales: new Vector4(
+      1 / params.weatherMapScale,
+      1 / params.baseNoiseScale,
+      1 / params.detailNoiseScale,
+      CLOUD_TOP_OFFSET
+    ),
+    // [Schneider15]: drift along the wind, rising at a tenth of its speed
+    windOffset: new Vector4(wind.x * time, windSpeed * 0.1 * time, wind.y * time, 0),
+    windDir: new Vector4(windDir.x, windDir.y, params.formation === 'isolated' ? 1 : 0, 0)
   };
 }
 
@@ -331,71 +426,9 @@ export class VolumetricCloudSkyCache extends Disposable {
     const eyeHeight = R + atmo.observerAltitude;
     // Horizon dip of the raised observer plus a margin
     const delta = Math.acos(Math.min(1, R / eyeHeight)) + HORIZON_MARGIN;
-    const bottom = R + params.layerBottomAltitude;
-    const top = bottom + params.layerHeight;
-    const wind = params.wind;
-    const windSpeed = Math.hypot(wind.x, wind.y);
-    const windDir = windSpeed > 0 ? new Vector2(wind.x / windSpeed, wind.y / windSpeed) : new Vector2(1, 0);
-    const sunIlluminance = new Vector3(atmo.lightColor.x, atmo.lightColor.y, atmo.lightColor.z).scaleBy(
-      atmo.lightColor.w
-    );
     this._inputs = {
       atmosphere: atmo,
-      cloud: {
-        referential: new Matrix4x4(atmo.skyViewReferential),
-        layer: new Vector4(bottom, top, R, params.tracingMaxDistance),
-        march: new Vector4(
-          Math.min(CLOUD_BASE_VIEW_SAMPLE_COUNT * params.viewSampleCountScale, CLOUD_VIEW_SAMPLE_COUNT_MAX),
-          Math.max(
-            1,
-            Math.round(
-              Math.min(
-                CLOUD_BASE_SHADOW_SAMPLE_COUNT * params.shadowSampleCountScale,
-                CLOUD_SHADOW_SAMPLE_COUNT_MAX
-              )
-            )
-          ),
-          params.shadowTracingDistance,
-          params.stopTracingTransmittanceThreshold
-        ),
-        eye: new Vector4(0, eyeHeight, 0, 0),
-        sunDir: new Vector4(
-          atmo.lightDir.x,
-          atmo.lightDir.y,
-          atmo.lightDir.z,
-          params.perSampleAtmosphericLightTransmittance ? 1 : 0
-        ),
-        sunIlluminance: new Vector4(sunIlluminance.x, sunIlluminance.y, sunIlluminance.z, 0),
-        phase: new Vector4(
-          params.phaseG,
-          params.phaseG2,
-          params.phaseBlend,
-          1 - params.skyLightCloudBottomOcclusion
-        ),
-        ms: new Vector4(params.msContribution, params.msOcclusion, params.msEccentricity, 0),
-        density: new Vector4(
-          cloudCoverageThreshold(params.coverage, params.formation),
-          params.density,
-          params.detailErosion,
-          params.anvilBias
-        ),
-        shape: new Vector4(
-          params.shapeStrength,
-          params.detailBottomErosion,
-          params.coverage,
-          params.baseHeightVariation
-        ),
-        albedo: new Vector4(params.albedo.x, params.albedo.y, params.albedo.z, 0),
-        scales: new Vector4(
-          1 / params.weatherMapScale,
-          1 / params.baseNoiseScale,
-          1 / params.detailNoiseScale,
-          CLOUD_TOP_OFFSET
-        ),
-        // [Schneider15]: drift along the wind, rising at a tenth of its speed
-        windOffset: new Vector4(wind.x * time, windSpeed * 0.1 * time, wind.y * time, 0),
-        windDir: new Vector4(windDir.x, windDir.y, params.formation === 'isolated' ? 1 : 0, 0)
-      },
+      cloud: buildCloudParams(params, atmo, time, atmo.skyViewReferential, eyeHeight),
       delta,
       msOctaves: params.msOctaves,
       version: params.version,
@@ -440,14 +473,17 @@ export class VolumetricCloudSkyCache extends Disposable {
     const device = getDevice();
     const program = getTraceProgram(inputs.msOctaves);
     const bindGroup = this._bindGroup(program);
-    const blocksPerSide = Math.round(Math.sqrt(this._framesPerUpdate));
-    const blockSize = this._resolution / blocksPerSide;
-    const bx = (index % blocksPerSide) * blockSize;
-    const by = Math.floor(index / blocksPerSide) * blockSize;
+    // clayjohn traces one contiguous block per frame; its cost then swings with how far the rays
+    // of that part of the sky cross the layer. The same texels are traced here interleaved: frame
+    // `index` takes the texels at that offset in every stride x stride cell.
+    const stride = Math.round(Math.sqrt(this._framesPerUpdate));
+    const count = Math.ceil(this._resolution / stride);
+    const bx = index % stride;
+    const by = Math.floor(index / stride);
     bindGroup.setValue('atmo', inputs.atmosphere);
     bindGroup.setValue('cloud', inputs.cloud);
     bindGroup.setValue('block', new Vector4(bx, by, this._resolution, stepScale));
-    bindGroup.setValue('cacheParams', new Vector4(inputs.delta, 0, 0, 0));
+    bindGroup.setValue('cacheParams', new Vector4(inputs.delta, stride, 0, 0));
     bindGroup.setTexture('weatherMap', resources.weatherMap!, fetchSampler('repeat_linear'));
     // Their own samplers: the predefined ones leave the w axis clamped
     bindGroup.setTexture('baseNoise', resources.baseNoise!);
@@ -458,7 +494,7 @@ export class VolumetricCloudSkyCache extends Disposable {
     bindGroup.setTexture('dst', this._maps[this._writeIndex].get()!);
     device.setProgram(program);
     device.setBindGroup(0, bindGroup);
-    const groups = Math.ceil(blockSize / 8);
+    const groups = Math.ceil(count / 8);
     device.compute(groups, groups, 1);
   }
 }

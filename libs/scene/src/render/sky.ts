@@ -19,7 +19,7 @@ import {
   createAPLutProgram,
   atmosphereLUTRendered
 } from '../shaders';
-import type { Immutable, Nullable } from '@zephyr3d/base';
+import type { IDisposable, Immutable, Nullable } from '@zephyr3d/base';
 import { Disposable, DRef, objectKeys, Vector3 } from '@zephyr3d/base';
 import {
   CubeFace,
@@ -67,6 +67,7 @@ import { VolumetricCloud } from './volumetric_cloud/volumetric_cloud';
 import { VolumetricCloudResources } from './volumetric_cloud/resources';
 import { drawVolumetricCloudDebug } from './volumetric_cloud/debug_view';
 import { VolumetricCloudSkyCache } from './volumetric_cloud/sky_cache';
+import { VolumetricCloudShadowMap } from './volumetric_cloud/cloud_shadow';
 import { cloudCacheEncode } from './volumetric_cloud/cloud_common';
 import { PerspectiveCamera } from '../camera';
 
@@ -168,6 +169,23 @@ export class SkyRenderer extends Disposable {
   private readonly _radianceFrameBuffer: DRef<FrameBuffer>;
   private readonly _irradianceSH: DRef<GPUDataBuffer>;
   private readonly _irradianceSHFB: DRef<FrameBuffer>;
+  /**
+   * Targets of a time-sliced rebake, swapped with the baked skybox, the radiance map and the
+   * irradiance SH once it completes, so lighting never reads a half-updated environment.
+   */
+  private readonly _captureTexture: DRef<TextureCube>;
+  private readonly _captureFrameBuffer: DRef<FrameBuffer>;
+  private readonly _radianceMapWork: DRef<TextureCube>;
+  private readonly _radianceFrameBufferWork: DRef<FrameBuffer>;
+  private readonly _irradianceSHFBWork: DRef<FrameBuffer>;
+  /** A gradual change (cloud round, 2D cloud wind) asks for a time-sliced rebake */
+  private _bakedSkyboxGradual: boolean;
+  /** Step of the time-sliced rebake in flight, -1 when idle */
+  private _sliceState: number;
+  /** Frame the time-sliced rebake last advanced in, so several views advance it once */
+  private _sliceFrame: number;
+  /** Whether the time-sliced rebake in flight updates the scene IBL */
+  private _sliceUpdatesIBL: boolean;
   private readonly _skyDistantLightLut: DRef<FrameBuffer>;
   private readonly _irradianceFrameBuffer: DRef<FrameBuffer>;
   private readonly _radianceMapWidth: number;
@@ -190,6 +208,7 @@ export class SkyRenderer extends Disposable {
   private readonly _volumetricCloud: VolumetricCloud;
   private readonly _volumetricCloudResources: VolumetricCloudResources;
   private readonly _volumetricCloudCache: VolumetricCloudSkyCache;
+  private readonly _cloudShadowMap: VolumetricCloudShadowMap;
   /** Volumetric clouds drawn this frame: requested, supported and the observer below the layer */
   private _volumetricActive: boolean;
   private readonly _bindgroupSkyVolumetric: DRef<BindGroup>;
@@ -246,6 +265,15 @@ export class SkyRenderer extends Disposable {
     this._radianceMapWidth = 128;
     this._irradianceSH = new DRef();
     this._irradianceSHFB = new DRef();
+    this._captureTexture = new DRef();
+    this._captureFrameBuffer = new DRef();
+    this._radianceMapWork = new DRef();
+    this._radianceFrameBufferWork = new DRef();
+    this._irradianceSHFBWork = new DRef();
+    this._bakedSkyboxGradual = false;
+    this._sliceState = -1;
+    this._sliceFrame = -1;
+    this._sliceUpdatesIBL = false;
     this._skyDistantLightLut = new DRef();
     this._irradianceFrameBuffer = new DRef();
     this._atmosphereParams = getDefaultAtmosphereParams();
@@ -266,6 +294,7 @@ export class SkyRenderer extends Disposable {
     this._volumetricCloud = new VolumetricCloud();
     this._volumetricCloudResources = new VolumetricCloudResources();
     this._volumetricCloudCache = new VolumetricCloudSkyCache();
+    this._cloudShadowMap = new VolumetricCloudShadowMap();
     this._volumetricActive = false;
     this._bindgroupSkyVolumetric = new DRef();
     this._cloudDebugView = 'none';
@@ -822,10 +851,15 @@ export class SkyRenderer extends Disposable {
    */
   get radianceMap() {
     if (!this._radianceMap.get()) {
-      this._radianceMap.set(getDevice().createCubeTexture(this.envTextureFormat, this._radianceMapWidth)!);
-      this._radianceMap.get()!.name = 'SkyRadianceMap';
+      this._radianceMap.set(this._createRadianceMap());
     }
     return this._radianceMap.get()!;
+  }
+  /** @internal */
+  private _createRadianceMap() {
+    const tex = getDevice().createCubeTexture(this.envTextureFormat, this._radianceMapWidth)!;
+    tex.name = 'SkyRadianceMap';
+    return tex;
   }
   /**
    * Radiance map of the sky reused for sheen.
@@ -866,18 +900,22 @@ export class SkyRenderer extends Disposable {
    */
   get irradianceSHFB() {
     if (!this._irradianceSHFB.get()) {
-      const device = getDevice();
-      const texCaps = device.getDeviceCaps().textureCaps;
-      const format =
-        !device.getDeviceCaps().framebufferCaps.supportFloatBlending && texCaps.supportHalfFloatColorBuffer
-          ? 'rgba16f'
-          : 'rgba32f';
-      const texture = device.createTexture2D(format, 3, 3, {
-        mipmapping: false
-      })!;
-      this._irradianceSHFB.set(device.createFrameBuffer([texture], null));
+      this._irradianceSHFB.set(SkyRenderer._createSHFrameBuffer());
     }
     return this._irradianceSHFB.get()!;
+  }
+  /** @internal */
+  private static _createSHFrameBuffer() {
+    const device = getDevice();
+    const texCaps = device.getDeviceCaps().textureCaps;
+    const format =
+      !device.getDeviceCaps().framebufferCaps.supportFloatBlending && texCaps.supportHalfFloatColorBuffer
+        ? 'rgba16f'
+        : 'rgba32f';
+    const texture = device.createTexture2D(format, 3, 3, {
+      mipmapping: false
+    })!;
+    return device.createFrameBuffer([texture], null);
   }
   /**
    * Cube texture for skybox.
@@ -963,8 +1001,23 @@ export class SkyRenderer extends Disposable {
   getSkyDistantLightLUT(_ctx: DrawContext) {
     return this._skyDistantLightLut.get()!.getColorAttachments()[0] as Texture2D;
   }
+  /**
+   * Updates everything the sky provides for the frame. Returns the sun light color before the
+   * atmosphere transmittance was applied to it.
+   *
+   * @remarks
+   * Runs the stages {@link SkyRenderer.updateAtmosphere}, {@link SkyRenderer.updateClouds},
+   * {@link SkyRenderer.updateCloudShadow} and {@link SkyRenderer.updateEnvironment} in order; the
+   * render graph calls them one by one so each is timed on its own.
+   */
   update(ctx: DrawContext) {
-    const wantVolumetric = this._skyType === 'scatter' && this.effectiveCloudMode === 'volumetric';
+    this.updateAtmosphere(ctx);
+    this.updateClouds(ctx);
+    this.updateCloudShadow(ctx);
+    return this.updateEnvironment(ctx);
+  }
+  /** @internal First stage of {@link SkyRenderer.update}: frame parameters and atmosphere LUTs */
+  updateAtmosphere(ctx: DrawContext) {
     // Latch the fog scales for this frame. The bake path (updateBakedSkyMap) uses the sky camera
     // whose scene is null, so it cannot read lightingMode itself; both bake and main pass run after
     // update(), so caching them here keeps them consistent.
@@ -995,7 +1048,24 @@ export class SkyRenderer extends Disposable {
     if (useScatter || !atmosphereLUTRendered()) {
       this.renderAtmosphereLUTs(ctx);
     }
-    this._updateVolumetricClouds(ctx, wantVolumetric);
+  }
+  /** @internal Second stage of {@link SkyRenderer.update}: the volumetric cloud sky cache */
+  updateClouds(ctx: DrawContext) {
+    this._updateVolumetricClouds(
+      ctx,
+      this._skyType === 'scatter' && this.effectiveCloudMode === 'volumetric'
+    );
+  }
+  /** @internal Third stage of {@link SkyRenderer.update}: the sun's volumetric cloud shadow map */
+  updateCloudShadow(ctx: DrawContext) {
+    this._updateCloudShadow(ctx);
+  }
+  /**
+   * @internal Last stage of {@link SkyRenderer.update}: the baked sky and IBL, the sun light
+   * color and the height fog. Returns the sun light color before the atmosphere transmittance.
+   */
+  updateEnvironment(ctx: DrawContext) {
+    const useScatter = this._skyType === 'scatter';
     const oldSunLight = ctx.sunLight && useScatter ? ctx.sunLight.color : null;
     const sunDir = SkyRenderer._getSunDir(ctx.sunLight);
     const sunColor = SkyRenderer._getSunColor(ctx.sunLight);
@@ -1004,7 +1074,8 @@ export class SkyRenderer extends Disposable {
       !this._volumetricActive &&
       (this._wind.x !== 0 || this._wind.y !== 0)
     ) {
-      this._bakedSkyboxDirty = true;
+      // The 2D clouds drift a little each frame: the environment follows them time-sliced
+      this._bakedSkyboxGradual = true;
     }
     if (!this._skyDistantLightLut.get()) {
       const tex = ctx.device.createTexture2D(this.envTextureFormat, 1, 1, { mipmapping: false })!;
@@ -1034,10 +1105,15 @@ export class SkyRenderer extends Disposable {
     }
     if (this._bakedSkyboxDirty) {
       this._bakedSkyboxDirty = false;
+      // A full rebake supersedes a time-sliced one in flight or asked for
+      this._bakedSkyboxGradual = false;
+      this._sliceState = -1;
       // updateBakedSkyMap derives both the IBL and the distant-sky LUT from the fog-free cubemap,
       // before compositing fog. Deriving the distant-sky LUT from the fogged cubemap would feed the
       // fog color back into its own ambient term.
       this.updateBakedSkyMap(ctx);
+    } else {
+      this._advanceSlicedBake(ctx);
     }
     // Atmosphere extinction times cloud occlusion. The cloud term intentionally applies only to
     // the scene's directional light, not to the sky bake: the clouds in the cubemap are lit by
@@ -1105,8 +1181,8 @@ export class SkyRenderer extends Disposable {
       );
       active = !!this._volumetricCloudCache.toMap;
       if (this._volumetricCloudCache.roundCompleted) {
-        // The environment lighting follows the clouds once per round
-        this._bakedSkyboxDirty = true;
+        // The environment lighting follows the clouds once per round, time-sliced
+        this._bakedSkyboxGradual = true;
       }
     } else if (this._volumetricActive) {
       // Resumes with a full rebuild rather than a fade from stale maps
@@ -1115,6 +1191,39 @@ export class SkyRenderer extends Disposable {
     if (active !== this._volumetricActive) {
       this._volumetricActive = active;
       this._bakedSkyboxDirty = true;
+    }
+  }
+  /** Traces the sun's volumetric cloud shadow map and publishes it to the light passes */
+  private _updateCloudShadow(ctx: DrawContext) {
+    const sun = ctx.sunLight;
+    if (
+      !this._volumetricActive ||
+      !sun ||
+      !sun.castCloudShadows ||
+      sun.cloudShadowStrength <= 0 ||
+      sun.cloudShadowOnSurfaceStrength <= 0
+    ) {
+      return;
+    }
+    const ready = this._cloudShadowMap.update(
+      this._volumetricCloud,
+      this._volumetricCloudResources,
+      this._atmosphereParams,
+      {
+        extent: sun.cloudShadowExtent,
+        resolutionScale: sun.cloudShadowMapResolutionScale,
+        raySampleCountScale: sun.cloudShadowRaySampleCountScale,
+        strength: sun.cloudShadowStrength,
+        depthBias: sun.cloudShadowDepthBias
+      },
+      SkyRenderer._getSunDir(sun),
+      ctx.camera.getWorldPosition(),
+      ctx.device.frameInfo.elapsedOverall * 0.001
+    );
+    if (ready) {
+      ctx.cloudShadowTexture = this._cloudShadowMap.texture;
+      ctx.cloudShadowUniforms = this._cloudShadowMap.uniforms;
+      ctx.cloudShadowSurfaceStrength = sun.cloudShadowOnSurfaceStrength;
     }
   }
   renderAtmosphereLUTs(ctx: DrawContext) {
@@ -1239,12 +1348,7 @@ export class SkyRenderer extends Disposable {
    * with the fog-free cubemap so height fog does not leak into the environment lighting.
    */
   private _updateIBLFromBakedSky(ctx: DrawContext, skybox: TextureCube) {
-    if (
-      ctx.scene.env.light.radianceMap &&
-      (ctx.scene.env.light.radianceMap === this.radianceMap ||
-        (this._irradianceSH.get() && ctx.scene.env.light.irradianceSH === this.irradianceSH) ||
-        (this._irradianceSHFB.get() && ctx.scene.env.light.irradianceSHFB === this.irradianceSHFB))
-    ) {
+    if (this._skyDrivesIBL(ctx)) {
       prefilterCubemap(skybox, 'ggx', this.radianceFramebuffer!, this._radianceConvSamples);
       ctx.scene.env.light.sheenRadianceMap = this.radianceMap;
       this._shProjector.projectCubemapToTexture(skybox, this.irradianceSHFB);
@@ -1252,6 +1356,131 @@ export class SkyRenderer extends Disposable {
       ctx.scene.env.light.irradianceSH = null;
       ctx.scene.env.light.irradianceWindow = this._shWindowWeights;
     }
+  }
+  /** Whether the scene environment light is still driven by this dynamic sky */
+  private _skyDrivesIBL(ctx: DrawContext) {
+    const light = ctx.scene.env.light;
+    return !!(
+      light.radianceMap &&
+      (light.radianceMap === this.radianceMap ||
+        (this._irradianceSH.get() && light.irradianceSH === this.irradianceSH) ||
+        (this._irradianceSHFB.get() && light.irradianceSHFB === this.irradianceSHFB))
+    );
+  }
+  /**
+   * Advances a time-sliced rebake by one step per frame, after Unreal's real-time sky light
+   * capture (ReflectionEnvironmentRealTimeCapture.cpp, r.SkyLight.RealTimeReflectionCapture.TimeSlice):
+   * two cube faces of sky per frame, then the specular convolution of mip 0 two faces per frame,
+   * then mips 1, 2, 3, 4-5 and the rest, then the irradiance SH. Everything is written to separate
+   * targets that replace the live ones only in the last step, so lighting never reads a
+   * half-updated environment.
+   */
+  private _advanceSlicedBake(ctx: DrawContext) {
+    const frame = ctx.device.frameInfo.frameCounter;
+    if (frame === this._sliceFrame) {
+      return;
+    }
+    if (this._sliceState < 0) {
+      if (!this._bakedSkyboxGradual || !this._bakedSkyboxTexture.get()) {
+        return;
+      }
+      this._bakedSkyboxGradual = false;
+      this._sliceState = 0;
+      this._sliceUpdatesIBL = this._skyDrivesIBL(ctx);
+    }
+    this._sliceFrame = frame;
+    const state = this._sliceState++;
+    const device = ctx.device;
+    if (state <= 2) {
+      // Sky and clouds, two faces per frame
+      const size = this._bakedSkyboxTextureSize;
+      let capture = this._captureTexture.get();
+      if (!capture || capture.width !== size) {
+        capture = device.createCubeTexture(this.envTextureFormat, size, { mipmapping: false })!;
+        capture.name = 'BakedSkyboxTexture';
+        this._captureTexture.set(capture);
+        this._captureFrameBuffer.set(device.createFrameBuffer([capture], null));
+      }
+      const fb = this._captureFrameBuffer.get()!;
+      const camera = SkyRenderer._skyCamera;
+      const saveRenderStates = device.getRenderStates();
+      device.pushDeviceStates();
+      device.setFramebuffer(fb);
+      for (const face of SLICE_FACES[state]) {
+        camera.lookAtCubeFace(face);
+        fb.setColorAttachmentCubeFace(0, face);
+        // Fog-free and without the sun disk, as in updateBakedSkyMap
+        this._renderSky(
+          camera,
+          false,
+          false,
+          this._getSkyBakeLuminanceScale(ctx),
+          this._lowerHemisphereIsBlack
+        );
+      }
+      device.popDeviceStates();
+      device.setRenderStates(saveRenderStates);
+      return;
+    }
+    const capture = this._captureTexture.get()!;
+    if (state <= 10) {
+      if (this._sliceUpdatesIBL) {
+        let radianceFB = this._radianceFrameBufferWork.get();
+        if (!radianceFB) {
+          const tex = this._createRadianceMap();
+          this._radianceMapWork.set(tex);
+          radianceFB = device.createFrameBuffer([tex], null);
+          this._radianceFrameBufferWork.set(radianceFB);
+        }
+        // Mip 0 two faces per frame, then mips 1, 2, 3, 4-5 and the rest
+        const region =
+          state <= 5
+            ? { firstMip: 0, mipCount: 1, firstFace: (state - 3) * 2, faceCount: 2 }
+            : state <= 8
+              ? { firstMip: state - 5, mipCount: 1 }
+              : state === 9
+                ? { firstMip: 4, mipCount: 2 }
+                : { firstMip: 6 };
+        prefilterCubemap(capture, 'ggx', radianceFB, this._radianceConvSamples, true, region);
+      }
+      return;
+    }
+    // Last step: irradiance SH, distant sky light, then swap the new environment in
+    this._sliceState = -1;
+    if (this._sliceUpdatesIBL && this._skyDrivesIBL(ctx)) {
+      if (!this._irradianceSHFBWork.get()) {
+        this._irradianceSHFBWork.set(SkyRenderer._createSHFrameBuffer());
+      }
+      this._shProjector.projectCubemapToTexture(capture, this._irradianceSHFBWork.get()!);
+      // The live targets must exist to be swapped out
+      this.radianceFramebuffer;
+      this.irradianceSHFB;
+      swapRefs(this._radianceMap, this._radianceMapWork);
+      swapRefs(this._radianceFrameBuffer, this._radianceFrameBufferWork);
+      swapRefs(this._irradianceSHFB, this._irradianceSHFBWork);
+      const light = ctx.scene.env.light;
+      light.radianceMap = this.radianceMap;
+      light.sheenRadianceMap = this.radianceMap;
+      light.irradianceSHFB = this.irradianceSHFB;
+      light.irradianceSH = null;
+      light.irradianceWindow = this._shWindowWeights;
+    }
+    // From the fog-free cubemap, as in updateBakedSkyMap
+    this.renderSkyDistantLut(ctx, capture);
+    const camera = SkyRenderer._skyCamera;
+    const fb = this._captureFrameBuffer.get()!;
+    const saveRenderStates = device.getRenderStates();
+    device.pushDeviceStates();
+    device.setFramebuffer(fb);
+    for (const face of [CubeFace.PX, CubeFace.NX, CubeFace.PY, CubeFace.NY, CubeFace.PZ, CubeFace.NZ]) {
+      camera.lookAtCubeFace(face);
+      fb.setColorAttachmentCubeFace(0, face);
+      this.renderFog(camera);
+    }
+    device.popDeviceStates();
+    device.setRenderStates(saveRenderStates);
+    swapRefs(this._bakedSkyboxTexture, this._captureTexture);
+    swapRefs(this._bakedSkyboxFrameBuffer, this._captureFrameBuffer);
   }
   renderUberFog(camera: Camera, depthTexture: Nullable<BaseTexture>) {
     const device = getDevice();
@@ -1397,10 +1626,16 @@ export class SkyRenderer extends Disposable {
     this._radianceFrameBuffer.dispose();
     this._irradianceSH.dispose();
     this._irradianceSHFB.dispose();
+    this._captureTexture.dispose();
+    this._captureFrameBuffer.dispose();
+    this._radianceMapWork.dispose();
+    this._radianceFrameBufferWork.dispose();
+    this._irradianceSHFBWork.dispose();
     this._irradianceFrameBuffer.dispose();
     this._shProjector.dispose();
     this._volumetricCloudResources.dispose();
     this._volumetricCloudCache.dispose();
+    this._cloudShadowMap.dispose();
     this._bindgroupSkyVolumetric.dispose();
     if (this._skyDistantLightLut.get()) {
       this._skyDistantLightLut.get()!.getColorAttachments()[0].dispose();
@@ -2241,4 +2476,19 @@ export class SkyRenderer extends Disposable {
     program.name = cloud ? '@SkyScatterCloud' : volumetric ? '@SkyScatterVolumetricCloud' : '@SkyScatter';
     return program;
   }
+}
+
+/** Cube faces each sky step of a time-sliced rebake renders, two per frame */
+const SLICE_FACES: readonly (readonly CubeFace[])[] = [
+  [CubeFace.PX, CubeFace.NX],
+  [CubeFace.PY, CubeFace.NY],
+  [CubeFace.PZ, CubeFace.NZ]
+];
+
+/** Swaps the objects two references hold, without releasing either in between */
+function swapRefs<T extends IDisposable>(a: DRef<T>, b: DRef<T>) {
+  const tmp = new DRef(a.get());
+  a.set(b.get());
+  b.set(tmp.get());
+  tmp.dispose();
 }

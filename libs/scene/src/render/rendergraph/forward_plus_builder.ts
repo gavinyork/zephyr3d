@@ -595,8 +595,12 @@ const SkyUpdateModule: RenderModule<FrameGraphContext> = {
     graph.addPass('SkyUpdate', (builder) => {
       ordering.emit(builder, 'SkyUpdateDone');
       builder.sideEffect();
-      builder.setExecute(() => {
-        frame.sunLightColor = ctx.scene.env.sky.update(ctx);
+      // Subpasses so the profiler times each stage of the sky on its own
+      builder.addSubpass('Atmosphere', () => ctx.scene.env.sky.updateAtmosphere(ctx));
+      builder.addSubpass('CloudCache', () => ctx.scene.env.sky.updateClouds(ctx));
+      builder.addSubpass('CloudShadow', () => ctx.scene.env.sky.updateCloudShadow(ctx));
+      builder.addSubpass('Environment', () => {
+        frame.sunLightColor = ctx.scene.env.sky.updateEnvironment(ctx);
       });
     });
   }
@@ -2093,6 +2097,9 @@ function buildForwardPlusGraphInternal(
   ctx.waterCausticTexture = null;
   ctx.waterCausticHeightTexture = null;
   ctx.waterCausticUniforms = null;
+  // SkyUpdate sets these when the sun casts volumetric cloud shadows
+  ctx.cloudShadowTexture = null;
+  ctx.cloudShadowUniforms = null;
 
   const blackboard = new RGBlackboard();
 

@@ -825,7 +825,16 @@ export function mixinLight<T extends typeof MeshMaterial>(BaseCls: T) {
       const caustic = this.receivesWaterCaustics()
         ? ShaderHelper.calculateWaterCaustic(scope, worldPos.xyz, type, dirCutoff.xyz, this.drawContext)
         : null;
-      return caustic ? pb.mul(caustic, attenuation) : attenuation;
+      // Volumetric cloud shadow of the sun, the same way
+      const cloudShadow = ShaderHelper.calculateCloudShadow(
+        scope,
+        worldPos.xyz,
+        type,
+        dirCutoff.xyz,
+        this.drawContext
+      );
+      const shaded = cloudShadow ? pb.mul(attenuation, cloudShadow) : attenuation;
+      return caustic ? pb.mul(caustic, shaded) : shaded;
     }
     /**
      * Unit vector from `worldPos` towards the light.

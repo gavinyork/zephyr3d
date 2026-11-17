@@ -312,7 +312,9 @@ function doPrefilterCubemap(
   sampler: TextureSampler,
   dstFramebuffer: FrameBuffer,
   filteringInfo: Vector3,
-  numSamples: number
+  numSamples: number,
+  firstFace: number,
+  faceCount: number
 ) {
   const device = getDevice();
   const framebuffer = dstFramebuffer;
@@ -328,7 +330,7 @@ function doPrefilterCubemap(
   device.setProgram(program);
   device.setBindGroup(0, bindgroup);
   device.setFramebuffer(framebuffer);
-  for (let i = 0; i < 6; i++) {
+  for (let i = firstFace; i < firstFace + faceCount; i++) {
     framebuffer.setColorAttachmentCubeFace(0, i);
     device.setVertexLayout(vertexLayout);
     device.setRenderStates(renderStates);
@@ -340,11 +342,28 @@ function doPrefilterCubemap(
 }
 
 /**
+ * Part of the output of {@link prefilterCubemap} to write, so the work can be spread over frames.
+ *
+ * @public
+ */
+export interface PrefilterCubemapRegion {
+  /** First mip level to write. Default 0. */
+  firstMip?: number;
+  /** Number of mip levels to write, clamped to the levels left. Default all of them. */
+  mipCount?: number;
+  /** First cube face to write. Default 0. */
+  firstFace?: number;
+  /** Number of cube faces to write, clamped to the faces left. Default all of them. */
+  faceCount?: number;
+}
+
+/**
  * Prefilters an environment cubemap
  *
  * @param tex - The environment cubemap
  * @param type - The prefilter type
  * @param destTex - The output cubemap
+ * @param region - Mip levels and faces to write; all of them when omitted
  *
  * @public
  */
@@ -353,7 +372,8 @@ export function prefilterCubemap(
   type: DistributionType,
   destTexture: TextureCube | FrameBuffer,
   numSamples?: number,
-  radianceSource?: boolean
+  radianceSource?: boolean,
+  region?: PrefilterCubemapRegion
 ) {
   if (!tex || !tex.isTextureCube()) {
     console.error('prefilterCubemap(): source texture must be cube texture');
@@ -375,7 +395,11 @@ export function prefilterCubemap(
   const generateMipmap = fb.getColorAttachmentGenerateMipmaps(0);
   const destTex = fb.getColorAttachments()[0];
   const mips = type === 'ggx' || type === 'charlie' ? destTex.mipLevelCount : 1;
-  for (let i = 0; i < mips; i++) {
+  const firstMip = Math.max(0, region?.firstMip ?? 0);
+  const lastMip = Math.min(mips, firstMip + (region?.mipCount ?? mips));
+  const firstFace = Math.min(5, Math.max(0, region?.firstFace ?? 0));
+  const faceCount = Math.min(6 - firstFace, Math.max(0, region?.faceCount ?? 6));
+  for (let i = firstMip; i < lastMip; i++) {
     const alpha = i === 0 ? 0 : Math.pow(2, i) / width;
     doPrefilterCubemap(
       type,
@@ -385,7 +409,9 @@ export function prefilterCubemap(
       fetchSampler(type === 'ggx' || type === 'charlie' ? 'clamp_nearest_nomip' : 'clamp_linear')!,
       fb,
       filteringInfo,
-      numSamples ?? 64
+      numSamples ?? 64,
+      firstFace,
+      faceCount
     );
   }
   device.popDeviceStates();

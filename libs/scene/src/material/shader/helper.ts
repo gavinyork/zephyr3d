@@ -76,6 +76,8 @@ const UNIFORM_NAME_SHADOW_MASK_MODE = 'Z_UniformShadowMaskMode';
 const UNIFORM_NAME_TRANSMISSION_THICKNESS = 'Z_UniformTransmissionThickness';
 const UNIFORM_NAME_CAUSTIC_MAP = 'Z_UniformCausticMap';
 const UNIFORM_NAME_CAUSTIC_HEIGHT_MAP = 'Z_UniformCausticHeightMap';
+const UNIFORM_NAME_CLOUD_SHADOW_MAP = 'Z_UniformCloudShadowMap';
+const UNIFORM_NAME_CLOUD_SHADOW_PARAMS = 'Z_UniformCloudShadowParams';
 /**
  * Offset added to a surface height before it is stored in the caustic height
  * map, so that a cleared texel - no surface on that ray - is distinguishable
@@ -458,6 +460,9 @@ export class ShaderHelper {
       }
       if (this.usesWaterCaustics(ctx)) {
         this.declareWaterCausticUniforms(pb);
+      }
+      if (this.usesCloudShadow(ctx)) {
+        this.declareCloudShadowUniforms(pb);
       }
       if (ctx.drawEnvLight) {
         ctx.env!.light.envLight.initShaderBindings(pb, ctx);
@@ -1372,6 +1377,9 @@ export class ShaderHelper {
     if (this.usesWaterCaustics(ctx)) {
       this.setWaterCausticUniforms(bindGroup, ctx);
     }
+    if (this.usesCloudShadow(ctx)) {
+      this.setCloudShadowUniforms(bindGroup, ctx);
+    }
     if (ctx.drawEnvLight) {
       ctx.env!.light.envLight.updateBindGroup(bindGroup, ctx);
     }
@@ -1456,6 +1464,104 @@ export class ShaderHelper {
       throw new Error('ShaderHelper.sampleSceneSDF(): the scene SDF is not bound in this program');
     }
     return sampleSceneSDF(scope, worldPos, levels);
+  }
+  /**
+   * Whether the light pass being built shades the sun with the volumetric cloud shadow map.
+   * Folded into both light pass hashes, like {@link ShaderHelper.usesWaterCaustics}.
+   * @internal
+   */
+  static usesCloudShadow(ctx: DrawContext): boolean {
+    return (
+      !!ctx.cloudShadowTexture && !!ctx.cloudShadowUniforms && ctx.renderPass?.type === RENDER_PASS_TYPE_LIGHT
+    );
+  }
+  /** @internal */
+  static declareCloudShadowUniforms(pb: ProgramBuilder) {
+    const scope = pb.getGlobalScope();
+    const cloudShadowStruct = pb.defineStruct([
+      pb.vec4('rowU'),
+      pb.vec4('rowV'),
+      pb.vec4('rowDepth'),
+      // (direction the light travels, far depth km)
+      pb.vec4('lightDir'),
+      // (on surface strength, 0, 0, 0)
+      pb.vec4('params')
+    ]);
+    scope[UNIFORM_NAME_CLOUD_SHADOW_PARAMS] = cloudShadowStruct().uniform(0);
+    // Bilinear and clamped, as UE: receivers outside the map read its border
+    scope[UNIFORM_NAME_CLOUD_SHADOW_MAP] = pb
+      .tex2D()
+      .uniform(0)
+      .withSampler(getSamplerOptions('clamp_linear_nomip'));
+  }
+  /** @internal */
+  static setCloudShadowUniforms(bindGroup: BindGroup, ctx: DrawContext) {
+    const u = ctx.cloudShadowUniforms!;
+    bindGroup.setValue(UNIFORM_NAME_CLOUD_SHADOW_PARAMS, {
+      rowU: u.rowU,
+      rowV: u.rowV,
+      rowDepth: u.rowDepth,
+      lightDir: u.lightDir,
+      params: new Vector4(ctx.cloudShadowSurfaceStrength ?? 1, 0, 0, 0)
+    });
+    bindGroup.setTexture(
+      UNIFORM_NAME_CLOUD_SHADOW_MAP,
+      ctx.cloudShadowTexture!,
+      fetchSampler('clamp_linear_nomip')
+    );
+  }
+  /**
+   * Volumetric cloud shadow of the sun at a world position, after Unreal's
+   * GetCloudVolumetricShadow (VolumetricCloudCommon.ush) and the on-surface strength lerp of
+   * DeferredLightPixelShaders.usf; 1 for every other light.
+   *
+   * @param lightDirection - Direction the light travels, i.e. `directionAndCutoff.xyz`.
+   * @returns A float multiplier, or null when this pass has no cloud shadow.
+   * @internal
+   */
+  static calculateCloudShadow(
+    scope: PBInsideFunctionScope,
+    worldPos: PBShaderExp,
+    lightType: PBShaderExp,
+    lightDirection: PBShaderExp,
+    ctx: DrawContext
+  ): Nullable<PBShaderExp> {
+    if (!this.usesCloudShadow(ctx)) {
+      return null;
+    }
+    const pb = scope.$builder;
+    const funcName = 'Z_calculateCloudShadow';
+    pb.func(funcName, [pb.vec3('worldPos'), pb.int('lightType'), pb.vec3('lightDirection')], function () {
+      this.$l.cs = this[UNIFORM_NAME_CLOUD_SHADOW_PARAMS];
+      // Only the sun the map was traced for
+      this.$if(
+        pb.or(
+          pb.notEqual(this.lightType, LIGHT_TYPE_DIRECTIONAL),
+          pb.lessThan(pb.dot(this.lightDirection, this.cs.lightDir.xyz), 0.999)
+        ),
+        function () {
+          this.$return(pb.float(1));
+        }
+      );
+      this.$l.uv = pb.vec2(
+        pb.add(pb.dot(this.cs.rowU.xyz, this.worldPos), this.cs.rowU.w),
+        pb.add(pb.dot(this.cs.rowV.xyz, this.worldPos), this.cs.rowV.w)
+      );
+      this.$l.sampleDepthKm = pb.clamp(
+        pb.add(pb.dot(this.cs.rowDepth.xyz, this.worldPos), this.cs.rowDepth.w),
+        0,
+        this.cs.lightDir.w
+      );
+      // (front depth km, mean extinction 1/m, max optical depth)
+      this.$l.data = pb.textureSampleLevel(this[UNIFORM_NAME_CLOUD_SHADOW_MAP], this.uv, 0).rgb;
+      this.$l.opticalDepth = pb.min(
+        this.data.z,
+        pb.mul(this.data.y, pb.max(0, pb.sub(this.sampleDepthKm, this.data.x)), 1000)
+      );
+      this.$l.transmittance = pb.clamp(pb.exp(pb.neg(this.opticalDepth)), 0, 1);
+      this.$return(pb.mix(1, this.transmittance, this.cs.params.x));
+    });
+    return pb.getGlobalScope()[funcName](worldPos, lightType, lightDirection) as PBShaderExp;
   }
   static usesWaterCaustics(ctx: DrawContext): boolean {
     return !!ctx.waterCaustics && !!ctx.waterCausticLight && ctx.renderPass!.type === RENDER_PASS_TYPE_LIGHT;
@@ -1852,6 +1958,9 @@ export class ShaderHelper {
     );
     if (this.usesWaterCaustics(ctx)) {
       this.setWaterCausticUniforms(bindGroup, ctx);
+    }
+    if (this.usesCloudShadow(ctx)) {
+      this.setCloudShadowUniforms(bindGroup, ctx);
     }
     bindGroup.setTexture(UNIFORM_NAME_BAKED_SKY_MAP, ctx.scene.env.sky.getBakedSkyTexture(ctx));
     if (ctx.drawEnvLight) {

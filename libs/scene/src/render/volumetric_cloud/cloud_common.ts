@@ -95,8 +95,9 @@ export function getCloudParamsStruct(pb: ProgramBuilder) {
 
 /**
  * Both roots of a ray / origin-centred sphere intersection, (-1, -1) when missed.
+ * @internal
  */
-function raySphereSolutions(
+export function raySphereSolutions(
   scope: PBInsideFunctionScope,
   origin: PBShaderExp,
   dir: PBShaderExp,
