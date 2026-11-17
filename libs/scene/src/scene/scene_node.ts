@@ -1223,6 +1223,7 @@ export class SceneNode
     if (newParent !== lastParent) {
       const willDetach = (!p || !p.attached) && this.attached;
       const willAttach = !this.attached && p && p.attached;
+      const prevHidden = this.hidden;
       if (newParent) {
         newParent._children.push(new DRef(this));
       }
@@ -1238,6 +1239,10 @@ export class SceneNode
       }
       if (willAttach) {
         this._attached();
+      }
+      if (!willDetach && !willAttach && this.attached && prevHidden !== this.hidden) {
+        // Moved under a parent that is hidden while the old one was not, or the other way.
+        this.notifyHiddenChanged();
       }
       while (lastParent) {
         lastParent.dispatchEvent('noderemoved', this);
@@ -1311,6 +1316,7 @@ export class SceneNode
   /** @internal */
   notifyHiddenChanged() {
     this._visibleChanged();
+    this._physics?._hostHiddenChanged();
     for (const child of this._children) {
       if (child.get()!.showState === 'inherit') {
         child.get()!.notifyHiddenChanged();

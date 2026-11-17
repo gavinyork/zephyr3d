@@ -82,10 +82,10 @@ export abstract class PhysicsPart extends makeObservable(Disposable)<PhysicsPart
       this._enterWorld();
     }
   }
-  /** Joins the world of the node's scene, if the node is in one. */
+  /** Joins the world of the node's scene, if the node is in one and not hidden. */
   _enterWorld() {
     const node = this.node;
-    if (this._world || !node?.attached || !node.scene) {
+    if (this._world || !node?.attached || !node.scene || node.hidden) {
       return;
     }
     const world = node.scene.physicsWorld;

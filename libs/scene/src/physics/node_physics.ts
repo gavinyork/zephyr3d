@@ -243,6 +243,17 @@ export class NodePhysics extends makeObservable(Disposable)<PhysicsEventMap>() {
       part._leaveWorld();
     }
   }
+  /** The node was hidden or shown: a hidden node takes no part in the simulation. */
+  _hostHiddenChanged() {
+    const hidden = !!this._node?.hidden;
+    for (const part of this.parts) {
+      if (hidden) {
+        part._leaveWorld();
+      } else {
+        part._enterWorld();
+      }
+    }
+  }
   private _check(part: Nullable<PhysicsPart>) {
     if (part?.owner && part.owner !== this) {
       throw new Error('Physics data already belongs to another node.');
