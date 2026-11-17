@@ -212,6 +212,8 @@ export class SkyRenderer extends Disposable {
   private readonly _cloudShadowMap: VolumetricCloudShadowMap;
   /** The sky view and aerial perspective LUTs of this frame wait for the cloud shadow map */
   private _viewLUTsDeferred: boolean;
+  /** On surface strength of the cloud shadow map of the last update, 0 when it was not traced */
+  private _cloudShadowSurfaceStrength: number;
   /** Volumetric clouds drawn this frame: requested, supported and the observer below the layer */
   private _volumetricActive: boolean;
   private readonly _bindgroupSkyVolumetric: DRef<BindGroup>;
@@ -299,6 +301,7 @@ export class SkyRenderer extends Disposable {
     this._volumetricCloudCache = new VolumetricCloudSkyCache();
     this._cloudShadowMap = new VolumetricCloudShadowMap();
     this._viewLUTsDeferred = false;
+    this._cloudShadowSurfaceStrength = 0;
     this._volumetricActive = false;
     this._bindgroupSkyVolumetric = new DRef();
     this._cloudDebugView = 'none';
@@ -1225,10 +1228,26 @@ export class SkyRenderer extends Disposable {
     }
   }
   /**
+   * The sun's cloud shadow map of the last update, for passes that run before this frame's, such
+   * as the GI voxel lighting; null when the sun cast no cloud shadow on surfaces then.
+   * @internal
+   */
+  get lastSurfaceCloudShadow() {
+    const texture = this._cloudShadowMap.texture;
+    return this._cloudShadowSurfaceStrength > 0 && texture
+      ? {
+          texture,
+          uniforms: this._cloudShadowMap.uniforms,
+          surfaceStrength: this._cloudShadowSurfaceStrength
+        }
+      : null;
+  }
+  /**
    * Traces the sun's volumetric cloud shadow map and publishes it to the light passes. Returns
    * whether the map is ready this frame.
    */
   private _updateCloudShadow(ctx: DrawContext) {
+    this._cloudShadowSurfaceStrength = 0;
     const sun = ctx.sunLight;
     if (
       !this._volumetricActive ||
@@ -1258,6 +1277,7 @@ export class SkyRenderer extends Disposable {
       ctx.cloudShadowTexture = this._cloudShadowMap.texture;
       ctx.cloudShadowUniforms = this._cloudShadowMap.uniforms;
       ctx.cloudShadowSurfaceStrength = sun.cloudShadowOnSurfaceStrength;
+      this._cloudShadowSurfaceStrength = sun.cloudShadowOnSurfaceStrength;
     }
     return ready;
   }

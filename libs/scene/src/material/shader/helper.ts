@@ -7,7 +7,8 @@ import {
   Vector3,
   Vector4
 } from '@zephyr3d/base';
-import type { Nullable } from '@zephyr3d/base';
+import type { Immutable, Nullable } from '@zephyr3d/base';
+import type { CloudShadowUniforms } from '../../render/volumetric_cloud/cloud_shadow';
 import type { DrawContext } from '../../render/drawable';
 import type { ClusteredLight } from '../../render/cluster_light';
 import {
@@ -1496,19 +1497,74 @@ export class ShaderHelper {
   }
   /** @internal */
   static setCloudShadowUniforms(bindGroup: BindGroup, ctx: DrawContext) {
-    const u = ctx.cloudShadowUniforms!;
+    this.bindCloudShadow(
+      bindGroup,
+      ctx.cloudShadowTexture!,
+      ctx.cloudShadowUniforms!,
+      ctx.cloudShadowSurfaceStrength ?? 1
+    );
+  }
+  /**
+   * Binds what {@link ShaderHelper.declareCloudShadowUniforms} declared.
+   * @internal
+   */
+  static bindCloudShadow(
+    bindGroup: BindGroup,
+    texture: Texture2D,
+    u: Immutable<CloudShadowUniforms>,
+    surfaceStrength: number
+  ) {
     bindGroup.setValue(UNIFORM_NAME_CLOUD_SHADOW_PARAMS, {
       rowU: u.rowU,
       rowV: u.rowV,
       rowDepth: u.rowDepth,
       lightDir: u.lightDir,
-      params: new Vector4(ctx.cloudShadowSurfaceStrength ?? 1, 0, 0, 0)
+      params: new Vector4(surfaceStrength, 0, 0, 0)
     });
-    bindGroup.setTexture(
-      UNIFORM_NAME_CLOUD_SHADOW_MAP,
-      ctx.cloudShadowTexture!,
-      fetchSampler('clamp_linear_nomip')
+    bindGroup.setTexture(UNIFORM_NAME_CLOUD_SHADOW_MAP, texture, fetchSampler('clamp_linear_nomip'));
+  }
+  /**
+   * Whether a directional light travelling along `lightDirection` is the one the cloud shadow map
+   * declared by {@link ShaderHelper.declareCloudShadowUniforms} was traced for.
+   * @internal
+   */
+  static isCloudShadowLight(scope: PBInsideFunctionScope, lightDirection: PBShaderExp): PBShaderExp {
+    const pb = scope.$builder;
+    return pb.greaterThanEqual(
+      pb.dot(lightDirection, scope[UNIFORM_NAME_CLOUD_SHADOW_PARAMS].lightDir.xyz),
+      0.999
     );
+  }
+  /**
+   * Cloud shadow of the sun at a world position from the map
+   * {@link ShaderHelper.declareCloudShadowUniforms} declared, with the on-surface strength
+   * applied, for a pass that already knows it shades the sun.
+   * @internal
+   */
+  static sampleCloudShadow(scope: PBInsideFunctionScope, worldPos: PBShaderExp): PBShaderExp {
+    const pb = scope.$builder;
+    const funcName = 'Z_sampleCloudShadow';
+    pb.func(funcName, [pb.vec3('worldPos')], function () {
+      this.$l.cs = this[UNIFORM_NAME_CLOUD_SHADOW_PARAMS];
+      this.$l.uv = pb.vec2(
+        pb.add(pb.dot(this.cs.rowU.xyz, this.worldPos), this.cs.rowU.w),
+        pb.add(pb.dot(this.cs.rowV.xyz, this.worldPos), this.cs.rowV.w)
+      );
+      this.$l.sampleDepthKm = pb.clamp(
+        pb.add(pb.dot(this.cs.rowDepth.xyz, this.worldPos), this.cs.rowDepth.w),
+        0,
+        this.cs.lightDir.w
+      );
+      // (front depth km, mean extinction 1/m, max optical depth)
+      this.$l.data = pb.textureSampleLevel(this[UNIFORM_NAME_CLOUD_SHADOW_MAP], this.uv, 0).rgb;
+      this.$l.opticalDepth = pb.min(
+        this.data.z,
+        pb.mul(this.data.y, pb.max(0, pb.sub(this.sampleDepthKm, this.data.x)), 1000)
+      );
+      this.$l.transmittance = pb.clamp(pb.exp(pb.neg(this.opticalDepth)), 0, 1);
+      this.$return(pb.mix(1, this.transmittance, this.cs.params.x));
+    });
+    return pb.getGlobalScope()[funcName](worldPos) as PBShaderExp;
   }
   /**
    * Volumetric cloud shadow of the sun at a world position, after Unreal's
@@ -1543,23 +1599,7 @@ export class ShaderHelper {
           this.$return(pb.float(1));
         }
       );
-      this.$l.uv = pb.vec2(
-        pb.add(pb.dot(this.cs.rowU.xyz, this.worldPos), this.cs.rowU.w),
-        pb.add(pb.dot(this.cs.rowV.xyz, this.worldPos), this.cs.rowV.w)
-      );
-      this.$l.sampleDepthKm = pb.clamp(
-        pb.add(pb.dot(this.cs.rowDepth.xyz, this.worldPos), this.cs.rowDepth.w),
-        0,
-        this.cs.lightDir.w
-      );
-      // (front depth km, mean extinction 1/m, max optical depth)
-      this.$l.data = pb.textureSampleLevel(this[UNIFORM_NAME_CLOUD_SHADOW_MAP], this.uv, 0).rgb;
-      this.$l.opticalDepth = pb.min(
-        this.data.z,
-        pb.mul(this.data.y, pb.max(0, pb.sub(this.sampleDepthKm, this.data.x)), 1000)
-      );
-      this.$l.transmittance = pb.clamp(pb.exp(pb.neg(this.opticalDepth)), 0, 1);
-      this.$return(pb.mix(1, this.transmittance, this.cs.params.x));
+      this.$return(ShaderHelper.sampleCloudShadow(this, this.worldPos));
     });
     return pb.getGlobalScope()[funcName](worldPos, lightType, lightDirection) as PBShaderExp;
   }

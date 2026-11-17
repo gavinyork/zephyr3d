@@ -29,6 +29,7 @@ import {
 import { sdfConeShadow } from '../../shaders/gi';
 import { declareProbeUniforms, sampleProbeIrradiance } from '../../shaders/probes';
 import { getActiveProbeVolume } from './probe_volume';
+import { ShaderHelper } from '../../material/shader/helper';
 
 /** Most lights the voxels are lit by, the sun aside. */
 export const MAX_VOXEL_LIGHTS = 64;
@@ -215,12 +216,21 @@ export class VoxelLighting {
     // No sky without an environment light (its stand-in carries only the probes)
     const skyIrradiance = scene.env.light.type !== 'none' && envLight.hasIrradiance();
     const probes = getActiveProbeVolume(scene);
+    // The sky traces this frame's cloud shadow map later in the frame: the voxels take the last one
+    const cloudShadow = scene.env.sky.lastSurfaceCloudShadow;
     const key = `${global.levels}:${scene.lightingMode}:${skyIrradiance ? envLight.getType() : 'none'}:${
       skyIrradiance ? this.envVariant() : ''
-    }:probes${probes ? 1 : 0}`;
+    }:probes${probes ? 1 : 0}:cs${cloudShadow ? 1 : 0}`;
     if (!this._program || this._programKey !== key) {
       this.disposePrograms();
-      this._program = this.createProgram(global.levels, physical, skyIrradiance, !!probes, false);
+      this._program = this.createProgram(
+        global.levels,
+        physical,
+        skyIrradiance,
+        !!probes,
+        false,
+        !!cloudShadow
+      );
       this._programKey = key;
       this._bindGroup = device.createBindGroup(this._program.bindGroupLayouts[0]);
     }
@@ -245,6 +255,14 @@ export class VoxelLighting {
         envLight.updateBindGroup(bg);
       }
       probes?.applyBindGroup(bg);
+      if (cloudShadow) {
+        ShaderHelper.bindCloudShadow(
+          bg,
+          cloudShadow.texture,
+          cloudShadow.uniforms,
+          cloudShadow.surfaceStrength
+        );
+      }
     };
     if (!this._renderStates) {
       this._renderStates = device.createRenderStateSet();
@@ -277,7 +295,14 @@ export class VoxelLighting {
     const fresh = global.freshMaterialBricks;
     if (fresh.count > 0) {
       if (!this._brickProgram) {
-        this._brickProgram = this.createProgram(global.levels, physical, skyIrradiance, !!probes, true);
+        this._brickProgram = this.createProgram(
+          global.levels,
+          physical,
+          skyIrradiance,
+          !!probes,
+          true,
+          !!cloudShadow
+        );
         this._brickBindGroup = device.createBindGroup(this._brickProgram.bindGroupLayouts[0]);
       }
       const bytes = fresh.data.byteLength;
@@ -411,7 +436,8 @@ export class VoxelLighting {
     physical: boolean,
     skyIrradiance: boolean,
     useProbes: boolean,
-    bricks: boolean
+    bricks: boolean,
+    cloudShadow: boolean
   ) {
     const scene = this._scene;
     const envLight = scene.env.light.envLight;
@@ -453,6 +479,9 @@ export class VoxelLighting {
         }
         if (useProbes) {
           declareProbeUniforms(this, 0);
+        }
+        if (cloudShadow) {
+          ShaderHelper.declareCloudShadowUniforms(pb);
         }
         pb.func('Z_pointAttenuation', [pb.vec3('p'), pb.vec4('posRange')], function () {
           this.$l.d = pb.sub(this.p, this.posRange.xyz);
@@ -604,6 +633,12 @@ export class VoxelLighting {
                 SHADOW_STEPS,
                 this.level
               );
+              if (cloudShadow) {
+                // Volumetric cloud shadow, as surfaces take it, for the sun the map was traced for
+                this.$if(ShaderHelper.isCloudShadowLight(this, this.sunDir.xyz), function () {
+                  this.shadow = pb.mul(this.shadow, ShaderHelper.sampleCloudShadow(this, this.p));
+                });
+              }
               this.$if(pb.greaterThan(this.shadow, 0), function () {
                 this.$l.sun = pb.mul(this.albedo, this.sunColor.rgb, this.shadow, 1 / Math.PI);
                 for (let k = 0; k < 6; k++) {
