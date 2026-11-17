@@ -8,6 +8,7 @@ import {
   getTransmittanceLut,
   getMultiScatteringLut,
   renderAtmosphereLUTs,
+  renderAtmosphereViewLUTs,
   rayIntersectSphere,
   transmittanceToSky,
   MIN_OBSERVER_ALTITUDE,
@@ -209,6 +210,8 @@ export class SkyRenderer extends Disposable {
   private readonly _volumetricCloudResources: VolumetricCloudResources;
   private readonly _volumetricCloudCache: VolumetricCloudSkyCache;
   private readonly _cloudShadowMap: VolumetricCloudShadowMap;
+  /** The sky view and aerial perspective LUTs of this frame wait for the cloud shadow map */
+  private _viewLUTsDeferred: boolean;
   /** Volumetric clouds drawn this frame: requested, supported and the observer below the layer */
   private _volumetricActive: boolean;
   private readonly _bindgroupSkyVolumetric: DRef<BindGroup>;
@@ -295,6 +298,7 @@ export class SkyRenderer extends Disposable {
     this._volumetricCloudResources = new VolumetricCloudResources();
     this._volumetricCloudCache = new VolumetricCloudSkyCache();
     this._cloudShadowMap = new VolumetricCloudShadowMap();
+    this._viewLUTsDeferred = false;
     this._volumetricActive = false;
     this._bindgroupSkyVolumetric = new DRef();
     this._cloudDebugView = 'none';
@@ -1045,8 +1049,19 @@ export class SkyRenderer extends Disposable {
         ? ctx.scene.env.light.intensity * ShaderHelper.getPreExposure(ctx)
         : 1;
     const useScatter = this._skyType === 'scatter';
+    // With cloud shadows on the atmosphere the sky view and aerial perspective LUTs wait for the
+    // cloud shadow map of this frame (updateCloudShadow)
+    const sun = ctx.sunLight;
+    this._viewLUTsDeferred =
+      useScatter &&
+      this.effectiveCloudMode === 'volumetric' &&
+      !!sun?.castCloudShadows &&
+      sun.cloudShadowStrength > 0 &&
+      sun.cloudShadowOnAtmosphereStrength > 0;
     if (useScatter || !atmosphereLUTRendered()) {
-      this.renderAtmosphereLUTs(ctx);
+      this.renderAtmosphereLUTs(ctx, this._viewLUTsDeferred);
+    } else {
+      this._viewLUTsDeferred = false;
     }
   }
   /** @internal Second stage of {@link SkyRenderer.update}: the volumetric cloud sky cache */
@@ -1058,7 +1073,23 @@ export class SkyRenderer extends Disposable {
   }
   /** @internal Third stage of {@link SkyRenderer.update}: the sun's volumetric cloud shadow map */
   updateCloudShadow(ctx: DrawContext) {
-    this._updateCloudShadow(ctx);
+    const ready = this._updateCloudShadow(ctx);
+    if (this._viewLUTsDeferred) {
+      this._viewLUTsDeferred = false;
+      const sun = ctx.sunLight!;
+      const u = this._cloudShadowMap.uniforms;
+      renderAtmosphereViewLUTs(
+        ready
+          ? {
+              texture: this._cloudShadowMap.texture!,
+              rowU: u.planetRowU,
+              rowV: u.planetRowV,
+              rowDepth: u.planetRowDepth,
+              params: new Vector4(u.lightDir.w, sun.cloudShadowOnAtmosphereStrength, 0, 0)
+            }
+          : null
+      );
+    }
   }
   /**
    * @internal Last stage of {@link SkyRenderer.update}: the baked sky and IBL, the sun light
@@ -1193,7 +1224,10 @@ export class SkyRenderer extends Disposable {
       this._bakedSkyboxDirty = true;
     }
   }
-  /** Traces the sun's volumetric cloud shadow map and publishes it to the light passes */
+  /**
+   * Traces the sun's volumetric cloud shadow map and publishes it to the light passes. Returns
+   * whether the map is ready this frame.
+   */
   private _updateCloudShadow(ctx: DrawContext) {
     const sun = ctx.sunLight;
     if (
@@ -1201,9 +1235,9 @@ export class SkyRenderer extends Disposable {
       !sun ||
       !sun.castCloudShadows ||
       sun.cloudShadowStrength <= 0 ||
-      sun.cloudShadowOnSurfaceStrength <= 0
+      (sun.cloudShadowOnSurfaceStrength <= 0 && sun.cloudShadowOnAtmosphereStrength <= 0)
     ) {
-      return;
+      return false;
     }
     const ready = this._cloudShadowMap.update(
       this._volumetricCloud,
@@ -1220,13 +1254,14 @@ export class SkyRenderer extends Disposable {
       ctx.camera.getWorldPosition(),
       ctx.device.frameInfo.elapsedOverall * 0.001
     );
-    if (ready) {
+    if (ready && sun.cloudShadowOnSurfaceStrength > 0) {
       ctx.cloudShadowTexture = this._cloudShadowMap.texture;
       ctx.cloudShadowUniforms = this._cloudShadowMap.uniforms;
       ctx.cloudShadowSurfaceStrength = sun.cloudShadowOnSurfaceStrength;
     }
+    return ready;
   }
-  renderAtmosphereLUTs(ctx: DrawContext) {
+  renderAtmosphereLUTs(ctx: DrawContext, deferViewLUTs = false) {
     this._atmosphereParams.lightDir.set(SkyRenderer._getSunDir(ctx.sunLight));
     this._atmosphereParams.lightColor.set(SkyRenderer._getSunColor(ctx.sunLight));
     this._atmosphereParams.lightColor.w *=
@@ -1239,7 +1274,7 @@ export class SkyRenderer extends Disposable {
     const referential = this._updateObserver(ctx.camera.getWorldPosition());
     Matrix4x4.multiply(referential, ctx.camera.worldMatrix, this._atmosphereParams.cameraWorldMatrix);
     referential.transformVectorAffine(this._atmosphereParams.lightDir, this._atmosphereParams.lightDir);
-    renderAtmosphereLUTs(this._atmosphereParams);
+    renderAtmosphereLUTs(this._atmosphereParams, deferViewLUTs);
   }
   /**
    * Places the observer for the camera at `cameraPos` and returns the world to observer-local

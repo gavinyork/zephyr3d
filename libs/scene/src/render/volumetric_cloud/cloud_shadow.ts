@@ -60,6 +60,10 @@ export interface CloudShadowUniforms {
   rowDepth: Vector4;
   /** (direction the light travels, far depth in km) */
   lightDir: Vector4;
+  /** The same as rowU, rowV and rowDepth for planet-fixed positions, for the atmosphere */
+  planetRowU: Vector4;
+  planetRowV: Vector4;
+  planetRowDepth: Vector4;
 }
 
 let traceProgram: Nullable<GPUProgram> = null;
@@ -244,7 +248,10 @@ export class VolumetricCloudShadowMap extends Disposable {
       rowU: new Vector4(),
       rowV: new Vector4(),
       rowDepth: new Vector4(),
-      lightDir: new Vector4()
+      lightDir: new Vector4(),
+      planetRowU: new Vector4(),
+      planetRowV: new Vector4(),
+      planetRowDepth: new Vector4()
     };
   }
   /** The map, after {@link VolumetricCloudShadowMap.update}: (front depth km, mean extinction, max optical depth) */
@@ -369,6 +376,14 @@ export class VolumetricCloudShadowMap extends Disposable {
       Vector3.dot(base, dir) * 0.001
     );
     u.lightDir.setXYZW(dir.x, dir.y, dir.z, farDepth * 0.001);
+    u.planetRowU.setXYZW(axisX.x * k, axisX.y * k, axisX.z * k, 0.5 - Vector3.dot(lightPos, axisX) * k);
+    u.planetRowV.setXYZW(axisY.x * k, axisY.y * k, axisY.z * k, 0.5 - Vector3.dot(lightPos, axisY) * k);
+    u.planetRowDepth.setXYZW(
+      dir.x * 0.001,
+      dir.y * 0.001,
+      dir.z * 0.001,
+      -Vector3.dot(lightPos, dir) * 0.001
+    );
     return true;
   }
   protected onDispose() {

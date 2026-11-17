@@ -5,6 +5,7 @@ import type {
   GPUDataBuffer,
   GPUProgram,
   PBInsideFunctionScope,
+  PBGlobalScope,
   PBShaderExp,
   ProgramBuilder,
   Texture2D
@@ -417,6 +418,73 @@ export function groundBounce(
  * @param apScale - Scale the integrated segment lengths by `params.apViewDistanceScale`, for the
  *   aerial perspective. The medium is still sampled at the true positions.
  */
+/**
+ * Cloud shadow map a sky view integration samples, see {@link getSkyView}.
+ * @internal
+ */
+export interface AtmosphereCloudShadowBindings {
+  /** The map: (front depth km, mean extinction 1/m, max optical depth) */
+  texture: PBShaderExp;
+  /** Struct of {@link getAtmosphereCloudShadowStruct} */
+  params: PBShaderExp;
+}
+
+/**
+ * Uniforms of the cloud shadow map in the atmosphere passes: planet-fixed position to map u, v
+ * and depth along the light in km as dot(row.xyz, p) + row.w, and (far depth km, strength).
+ * @internal
+ */
+export function getAtmosphereCloudShadowStruct(pb: ProgramBuilder) {
+  return pb.defineStruct([pb.vec4('rowU'), pb.vec4('rowV'), pb.vec4('rowDepth'), pb.vec4('params')]);
+}
+
+/**
+ * Values of a cloud shadow map for the atmosphere passes.
+ * @internal
+ */
+export interface AtmosphereCloudShadow {
+  texture: Texture2D;
+  rowU: Vector4;
+  rowV: Vector4;
+  rowDepth: Vector4;
+  /** (far depth km, on atmosphere strength, 0, 0) */
+  params: Vector4;
+}
+
+/**
+ * Cloud shadow factor at an observer-local position, after UE's GetCloudVolumetricShadow
+ * (VolumetricCloudCommon.ush) and its atmosphere strength lerp.
+ */
+function atmosphereCloudShadow(
+  scope: PBInsideFunctionScope,
+  stParams: PBShaderExp,
+  pos: PBShaderExp,
+  cloudShadow: AtmosphereCloudShadowBindings
+) {
+  const pb = scope.$builder;
+  const Params = getAtmosphereParamsStruct(pb);
+  const funcName = 'z_atmosphereCloudShadow';
+  pb.func(funcName, [Params('params'), pb.vec3('pos')], function () {
+    this.$l.cs = cloudShadow.params;
+    // Observer-local to planet-fixed, as the clouds are traced
+    this.$l.planet = pb.mul(pb.vec4(this.pos, 0), this.params.skyViewReferential).xyz;
+    this.$l.uv = pb.vec2(
+      pb.add(pb.dot(this.cs.rowU.xyz, this.planet), this.cs.rowU.w),
+      pb.add(pb.dot(this.cs.rowV.xyz, this.planet), this.cs.rowV.w)
+    );
+    this.$l.depthKm = pb.clamp(
+      pb.add(pb.dot(this.cs.rowDepth.xyz, this.planet), this.cs.rowDepth.w),
+      0,
+      this.cs.params.x
+    );
+    this.$l.data = pb.textureSampleLevel(cloudShadow.texture, this.uv, 0).rgb;
+    this.$l.od = pb.min(this.data.z, pb.mul(this.data.y, pb.max(0, pb.sub(this.depthKm, this.data.x)), 1000));
+    this.$l.t = pb.clamp(pb.exp(pb.neg(this.od)), 0, 1);
+    this.$return(pb.clamp(pb.mix(1, this.t, this.cs.params.y), 0, 1));
+  });
+  return pb.getGlobalScope()[funcName](stParams, pos) as PBShaderExp;
+}
+
 export function getSkyView(
   scope: PBInsideFunctionScope,
   stParams: PBShaderExp,
@@ -427,11 +495,14 @@ export function getSkyView(
   texMultiScatteringLut: PBShaderExp,
   withGround = true,
   groundLit = false,
-  apScale = false
+  apScale = false,
+  cloudShadow?: Nullable<AtmosphereCloudShadowBindings>
 ) {
   const pb = scope.$builder;
   const Params = getAtmosphereParamsStruct(pb);
-  const funcName = `z_getSkyView${withGround ? '_G' : ''}${groundLit ? '_L' : ''}${apScale ? '_AP' : ''}`;
+  const funcName = `z_getSkyView${withGround ? '_G' : ''}${groundLit ? '_L' : ''}${apScale ? '_AP' : ''}${
+    cloudShadow ? '_CS' : ''
+  }`;
   pb.func(
     funcName,
     [Params('params'), pb.vec3('eyePos'), pb.vec3('viewDir'), pb.float('maxDis')],
@@ -488,6 +559,11 @@ export function getSkyView(
           pb.neg(pb.mul(this.extinction, this.ds, apScale ? this.params.apViewDistanceScale : 1))
         );
         this.$l.t1 = transmittanceToSky(this, this.params, this.p, this.params.lightDir, texTransmittanceLut);
+        if (cloudShadow) {
+          // Volumetric cloud shadow on the single scattering only, as UE's SkyAtmosphere.usf
+          // (PlanetShadow *= saturate(lerp(1, cloud transmittance, OnAtmosphereStrength)))
+          this.t1 = pb.mul(this.t1, atmosphereCloudShadow(this, this.params, this.p, cloudShadow));
+        }
         this.$l.s = scattering(this, this.params, this.p, this.viewDir);
         // Multi-scattering is diffuse light left after single scattering: not planet shadowed.
         this.$l.multiScattering = getMultiScattering(this, this.params, this.p, texMultiScatteringLut);
@@ -1105,11 +1181,12 @@ export function aerialPerspectiveLut(
   f2UV: PBShaderExp,
   f3VoxelDim: PBShaderExp,
   texTransmittanceLut: PBShaderExp,
-  texMultiScatteringLut: PBShaderExp
+  texMultiScatteringLut: PBShaderExp,
+  cloudShadow?: Nullable<AtmosphereCloudShadowBindings>
 ) {
   const pb = scope.$builder;
   const Params = getAtmosphereParamsStruct(pb);
-  const funcName = 'z_aerialPerspectiveLut';
+  const funcName = cloudShadow ? 'z_aerialPerspectiveLut_CS' : 'z_aerialPerspectiveLut';
   pb.func(funcName, [Params('params'), pb.vec2('uv'), pb.vec3('dim')], function () {
     // uv arrives at the texel center of the dim.x * dim.z wide atlas.
     this.$l.px = pb.floor(pb.mul(this.uv.x, this.dim.x, this.dim.z));
@@ -1190,7 +1267,8 @@ export function aerialPerspectiveLut(
         texMultiScatteringLut,
         true,
         false,
-        true
+        true,
+        cloudShadow
       )
     );
   });
@@ -1203,11 +1281,12 @@ export function skyViewLut(
   stParams: PBShaderExp,
   f2UV: PBShaderExp,
   texTransmittanceLut: PBShaderExp,
-  texMultiScatteringLut: PBShaderExp
+  texMultiScatteringLut: PBShaderExp,
+  cloudShadow?: Nullable<AtmosphereCloudShadowBindings>
 ) {
   const pb = scope.$builder;
   const Params = getAtmosphereParamsStruct(pb);
-  const funcName = 'v_skyViewLut';
+  const funcName = cloudShadow ? 'v_skyViewLut_CS' : 'v_skyViewLut';
   pb.func(funcName, [Params('params'), pb.vec2('uv')], function () {
     this.$l.viewDir = uvToViewDir(this, this.params, this.uv);
     this.$l.h = pb.add(this.params.plantRadius, this.params.observerAltitude);
@@ -1221,7 +1300,9 @@ export function skyViewLut(
       texTransmittanceLut,
       texMultiScatteringLut,
       true,
-      true
+      true,
+      false,
+      cloudShadow
     ).rgb;
     this.$return(pb.vec4(this.rgb, 1));
   });
@@ -1279,7 +1360,7 @@ export function atmosphereLUTRendered() {
 }
 
 /** @internal */
-export function renderAtmosphereLUTs(params?: Partial<AtmosphereParams>) {
+export function renderAtmosphereLUTs(params?: Partial<AtmosphereParams>, deferViewLUTs = false) {
   const checkResult = checkParams(params);
   if (checkResult.transmittance || !transmittanceLUT) {
     renderTransmittanceLut(currentAtmosphereParams!);
@@ -1287,13 +1368,35 @@ export function renderAtmosphereLUTs(params?: Partial<AtmosphereParams>) {
   if (checkResult.multiScattering || !multiScatteringLUT) {
     renderMultiScatteringLut(currentAtmosphereParams!);
   }
-  if (checkResult.skyView || !skyViewLUT) {
+  if (deferViewLUTs) {
+    // renderAtmosphereViewLUTs() follows this frame
+    return;
+  }
+  // LUTs last drawn with a cloud shadow are drawn again without it
+  const force = viewLUTsCloudShadowed;
+  viewLUTsCloudShadowed = false;
+  if (checkResult.skyView || !skyViewLUT || force) {
     renderSkyViewLut(currentAtmosphereParams!);
   }
-  if (checkResult.aerialPerspective || !ApLut) {
+  if (checkResult.aerialPerspective || !ApLut || force) {
     renderAPLut(currentAtmosphereParams!);
   }
 }
+
+/**
+ * Draws the sky view and aerial perspective LUTs with the parameters of the last
+ * {@link renderAtmosphereLUTs}, which deferred them, shadowing the single scattering by the
+ * volumetric cloud shadow map when given. The map changes every frame, so do they.
+ * @internal
+ */
+export function renderAtmosphereViewLUTs(cloudShadow: Nullable<AtmosphereCloudShadow>) {
+  viewLUTsCloudShadowed = !!cloudShadow;
+  renderSkyViewLut(currentAtmosphereParams!, cloudShadow);
+  renderAPLut(currentAtmosphereParams!, cloudShadow);
+}
+
+/** Whether the view LUTs were last drawn with a cloud shadow */
+let viewLUTsCloudShadowed = false;
 
 /* For debug */
 let transmittanceLutProgram: GPUProgram;
@@ -1310,10 +1413,14 @@ let uniformSphereSampleBuffer: GPUDataBuffer;
 let multiScatteringFramebuffer: FrameBuffer;
 
 let skyViewLutBindGroup: BindGroup;
+let skyViewLutProgramCS: GPUProgram | undefined;
+let skyViewLutBindGroupCS: BindGroup;
 let skyViewLUT: Texture2D;
 let skyViewFramebuffer: FrameBuffer;
 
 let APLutBindGroup: BindGroup;
+let APLutProgramCS: GPUProgram | undefined;
+let APLutBindGroupCS: BindGroup;
 let ApLut: Texture2D;
 let APFramebuffer: FrameBuffer;
 
@@ -1360,6 +1467,24 @@ export function getAtmosphereParamsStruct(pb: ProgramBuilder) {
     pb.float('observerAltitude'),
     pb.mat4('skyViewReferential')
   ]);
+}
+
+/** Declares the cloud shadow map of the view LUT programs as cloudShadowMap / cloudShadowParams */
+function declareAtmosphereCloudShadow(scope: PBGlobalScope, pb: ProgramBuilder) {
+  const CloudShadow = getAtmosphereCloudShadowStruct(pb);
+  scope.cloudShadowParams = CloudShadow().uniform(0);
+  scope.cloudShadowMap = pb.tex2D().uniform(0);
+}
+
+/** Binds the cloud shadow map declared by declareAtmosphereCloudShadow */
+function bindAtmosphereCloudShadow(bindGroup: BindGroup, cloudShadow: AtmosphereCloudShadow) {
+  bindGroup.setValue('cloudShadowParams', {
+    rowU: cloudShadow.rowU,
+    rowV: cloudShadow.rowV,
+    rowDepth: cloudShadow.rowDepth,
+    params: cloudShadow.params
+  });
+  bindGroup.setTexture('cloudShadowMap', cloudShadow.texture, fetchSampler('clamp_linear_nomip'));
 }
 
 /** @internal */
@@ -1497,7 +1622,7 @@ export function renderMultiScatteringLut(params: AtmosphereParams) {
 }
 
 /** @internal */
-export function createSkyViewLutProgram(device: AbstractDevice) {
+export function createSkyViewLutProgram(device: AbstractDevice, cloudShadow = false) {
   const program = device.buildRenderProgram({
     vertex(pb) {
       this.flip = pb.int().uniform(0);
@@ -1516,6 +1641,9 @@ export function createSkyViewLutProgram(device: AbstractDevice) {
       this.params = Params().uniform(0);
       this.transmittanceLut = pb.tex2D().uniform(0);
       this.multiScatteringLut = pb.tex2D().uniform(0);
+      if (cloudShadow) {
+        declareAtmosphereCloudShadow(this, pb);
+      }
       this.$outputs.outColor = pb.vec4();
       pb.main(function () {
         this.$outputs.outColor = skyViewLut(
@@ -1523,17 +1651,18 @@ export function createSkyViewLutProgram(device: AbstractDevice) {
           this.params,
           this.$inputs.uv,
           this.transmittanceLut,
-          this.multiScatteringLut
+          this.multiScatteringLut,
+          cloudShadow ? { texture: this.cloudShadowMap, params: this.cloudShadowParams } : null
         );
       });
     }
   })!;
-  program.name = '@SkyViewLutProgram';
+  program.name = cloudShadow ? '@SkyViewLutProgramCloudShadow' : '@SkyViewLutProgram';
   return program;
 }
 
 /** @internal */
-export function renderSkyViewLut(params: AtmosphereParams) {
+export function renderSkyViewLut(params: AtmosphereParams, cloudShadow?: Nullable<AtmosphereCloudShadow>) {
   const device = getDevice();
   if (skyViewLutProgram === undefined) {
     try {
@@ -1548,26 +1677,35 @@ export function renderSkyViewLut(params: AtmosphereParams) {
       console.error(err);
     }
   }
-  if (skyViewLutProgram) {
-    skyViewLutBindGroup.setValue('flip', device.type === 'webgpu' ? 1 : 0);
-    skyViewLutBindGroup.setValue('params', params);
-    skyViewLutBindGroup.setTexture('transmittanceLut', transmittanceLUT, fetchSampler('clamp_linear_nomip'));
-    skyViewLutBindGroup.setTexture(
-      'multiScatteringLut',
-      multiScatteringLUT,
-      fetchSampler('clamp_linear_nomip')
-    );
+  if (cloudShadow && skyViewLutProgramCS === undefined) {
+    try {
+      skyViewLutProgramCS = createSkyViewLutProgram(device, true);
+      skyViewLutBindGroupCS = device.createBindGroup(skyViewLutProgramCS.bindGroupLayouts[0]);
+    } catch (err) {
+      console.error(err);
+    }
+  }
+  const program = cloudShadow ? skyViewLutProgramCS : skyViewLutProgram;
+  const bindGroup = cloudShadow ? skyViewLutBindGroupCS : skyViewLutBindGroup;
+  if (program && skyViewFramebuffer) {
+    bindGroup.setValue('flip', device.type === 'webgpu' ? 1 : 0);
+    bindGroup.setValue('params', params);
+    bindGroup.setTexture('transmittanceLut', transmittanceLUT, fetchSampler('clamp_linear_nomip'));
+    bindGroup.setTexture('multiScatteringLut', multiScatteringLUT, fetchSampler('clamp_linear_nomip'));
+    if (cloudShadow) {
+      bindAtmosphereCloudShadow(bindGroup, cloudShadow);
+    }
     device.pushDeviceStates();
     device.setFramebuffer(skyViewFramebuffer);
-    device.setProgram(skyViewLutProgram);
-    device.setBindGroup(0, skyViewLutBindGroup);
+    device.setProgram(program);
+    device.setBindGroup(0, bindGroup);
     drawFullscreenQuad();
     device.popDeviceStates();
   }
 }
 
 /** @internal */
-export function createAPLutProgram(device: AbstractDevice) {
+export function createAPLutProgram(device: AbstractDevice, cloudShadow = false) {
   const program = device.buildRenderProgram({
     vertex(pb) {
       this.flip = pb.int().uniform(0);
@@ -1586,6 +1724,9 @@ export function createAPLutProgram(device: AbstractDevice) {
       this.params = Params().uniform(0);
       this.transmittanceLut = pb.tex2D().uniform(0);
       this.multiScatteringLut = pb.tex2D().uniform(0);
+      if (cloudShadow) {
+        declareAtmosphereCloudShadow(this, pb);
+      }
       this.$outputs.outColor = pb.vec4();
       pb.main(function () {
         this.$outputs.outColor = aerialPerspectiveLut(
@@ -1594,17 +1735,18 @@ export function createAPLutProgram(device: AbstractDevice) {
           this.$inputs.uv,
           pb.vec3(AP_LUT_SLICE_SIZE, AP_LUT_SLICE_SIZE, AP_LUT_DEPTH_SLICES),
           this.transmittanceLut,
-          this.multiScatteringLut
+          this.multiScatteringLut,
+          cloudShadow ? { texture: this.cloudShadowMap, params: this.cloudShadowParams } : null
         );
       });
     }
   })!;
-  program.name = '@APLutProgram';
+  program.name = cloudShadow ? '@APLutProgramCloudShadow' : '@APLutProgram';
   return program;
 }
 
 /** @internal */
-export function renderAPLut(params: AtmosphereParams) {
+export function renderAPLut(params: AtmosphereParams, cloudShadow?: Nullable<AtmosphereCloudShadow>) {
   const device = getDevice();
   if (APLutProgram === undefined) {
     try {
@@ -1619,15 +1761,28 @@ export function renderAPLut(params: AtmosphereParams) {
       console.error(err);
     }
   }
-  if (APLutProgram) {
-    APLutBindGroup.setValue('flip', device.type === 'webgpu' ? 1 : 0);
-    APLutBindGroup.setValue('params', params);
-    APLutBindGroup.setTexture('transmittanceLut', transmittanceLUT, fetchSampler('clamp_linear_nomip'));
-    APLutBindGroup.setTexture('multiScatteringLut', multiScatteringLUT, fetchSampler('clamp_linear_nomip'));
+  if (cloudShadow && APLutProgramCS === undefined) {
+    try {
+      APLutProgramCS = createAPLutProgram(device, true);
+      APLutBindGroupCS = device.createBindGroup(APLutProgramCS.bindGroupLayouts[0]);
+    } catch (err) {
+      console.error(err);
+    }
+  }
+  const program = cloudShadow ? APLutProgramCS : APLutProgram;
+  const bindGroup = cloudShadow ? APLutBindGroupCS : APLutBindGroup;
+  if (program && APFramebuffer) {
+    bindGroup.setValue('flip', device.type === 'webgpu' ? 1 : 0);
+    bindGroup.setValue('params', params);
+    bindGroup.setTexture('transmittanceLut', transmittanceLUT, fetchSampler('clamp_linear_nomip'));
+    bindGroup.setTexture('multiScatteringLut', multiScatteringLUT, fetchSampler('clamp_linear_nomip'));
+    if (cloudShadow) {
+      bindAtmosphereCloudShadow(bindGroup, cloudShadow);
+    }
     device.pushDeviceStates();
     device.setFramebuffer(APFramebuffer);
-    device.setProgram(APLutProgram);
-    device.setBindGroup(0, APLutBindGroup);
+    device.setProgram(program);
+    device.setBindGroup(0, bindGroup);
     drawFullscreenQuad();
     device.popDeviceStates();
   }
