@@ -161,6 +161,8 @@ function grassBladeLevels(
 export const GRASS_CULL_PLANES = 12;
 /** Samples along the line of sight of the terrain occlusion test, one per workgroup thread */
 const OCCLUSION_SAMPLES = WORKGROUP_SIZE * WORKGROUP_SIZE;
+/** Metres a workgroup's culling box is widened by, for rounding in the blade positions */
+const GROUP_CULL_SLACK = 0.01;
 
 /**
  * Terrain occlusion culling mode of the GPU grass placement
@@ -282,6 +284,8 @@ export class GrassGpuPlacement extends Disposable {
   private readonly _posScale: Vector4;
   private readonly _camera: Vector4;
   private readonly _occlusion: Vector4;
+  /** See the workgroup culling of the placement program */
+  private readonly _groupCull: Vector4;
   private readonly _heightInfo: Vector4;
   private readonly _densityLod: Vector4;
   /**
@@ -345,6 +349,7 @@ export class GrassGpuPlacement extends Disposable {
     this._posScale = new Vector4();
     this._camera = new Vector4();
     this._occlusion = new Vector4();
+    this._groupCull = new Vector4();
     this._heightInfo = new Vector4();
     this._densityLod = new Vector4();
     this._densityBlocks = null;
@@ -707,6 +712,17 @@ export class GrassGpuPlacement extends Disposable {
     // Absorbs half float and interpolation error in the heights
     const epsilon = bounds ? (bounds.maxPoint.y - bounds.minPoint.y) * 1e-3 + 1e-4 : 1e-3;
     this._occlusion.setXYZW(occlusion, terrain.clipmapTileResolution, epsilon, bladeHeight);
+    // Workgroup culling: the heights blades stand at, how far one can stand from its cell (the
+    // clump pull moves it toward the nearest clump point, at most a clump cell diagonal away),
+    // and whether the height pyramid can narrow the heights under a group
+    const pullReach =
+      blade && bladeShape ? Math.abs(bladeShape[10]) * Math.SQRT2 * Math.max(1e-3, bladeShape[8]) : 0;
+    this._groupCull.setXYZW(
+      bounds ? bounds.minPoint.y - epsilon : -NO_LIMIT,
+      bounds ? bounds.maxPoint.y + epsilon : NO_LIMIT,
+      pullReach + GROUP_CULL_SLACK,
+      pyramid && terrain.scale.y > 0 ? 1 : 0
+    );
     this._heightInfo.setXYZW(
       heightMap.width,
       heightMap.height,
@@ -736,6 +752,7 @@ export class GrassGpuPlacement extends Disposable {
     bindGroup.setValue('cameraPos', this._camera);
     bindGroup.setValue('planes', planes);
     bindGroup.setValue('occlusion', this._occlusion);
+    bindGroup.setValue('groupCull', this._groupCull);
     bindGroup.setValue('densityLod', this._densityLod);
     bindGroup.setValue('heightInfo', this._heightInfo);
     if (this._kind === 'blade') {
@@ -978,6 +995,9 @@ export class GrassGpuPlacement extends Disposable {
           this.planes = pb.vec4[GRASS_CULL_PLANES]().uniform(0);
           // (mode, clipmap tile resolution, height epsilon, blade height)
           this.occlusion = pb.vec4().uniform(0);
+          // (lowest terrain height, highest terrain height, how far a blade can stand from its
+          // cell, 1 to narrow the heights under a workgroup by the height pyramid)
+          this.groupCull = pb.vec4().uniform(0);
           // (density falloff start distance, density at the draw distance, unused, unused)
           this.densityLod = pb.vec4().uniform(0);
           // (height map width, height map height, pyramid mip count, grid cell size)
@@ -1083,6 +1103,51 @@ export class GrassGpuPlacement extends Disposable {
               )
             );
           });
+          // Whether no blade standing in a box (xz in [lo, hi], base height in [yLo, yHi]) passes
+          // the tests of the placement below: its base is nearer than range.x, as far as range.y or
+          // past the draw distance from the camera, or its centre, range.w above the base, lies
+          // more than the bounding radius range.z outside a culling plane
+          pb.func(
+            'groupOutside',
+            [pb.vec2('lo'), pb.vec2('hi'), pb.float('yLo'), pb.float('yHi'), pb.vec4('range')],
+            function () {
+              this.$l.bmin = pb.vec3(this.lo.x, this.yLo, this.lo.y);
+              this.$l.bmax = pb.vec3(this.hi.x, this.yHi, this.hi.y);
+              this.$l.eye = this.cameraPos.xyz;
+              this.$l.dNear = pb.length(
+                pb.max(pb.max(pb.sub(this.bmin, this.eye), pb.sub(this.eye, this.bmax)), pb.vec3(0))
+              );
+              this.$l.dFar = pb.length(
+                pb.max(pb.abs(pb.sub(this.eye, this.bmin)), pb.abs(pb.sub(this.eye, this.bmax)))
+              );
+              this.$l.outside = pb.or(
+                pb.or(pb.lessThan(this.dFar, this.range.x), pb.greaterThanEqual(this.dNear, this.range.y)),
+                pb.and(pb.greaterThan(this.params.y, 0), pb.greaterThan(this.dNear, this.params.y))
+              );
+              this.$l.boxCenter = pb.add(
+                pb.mul(pb.add(this.bmin, this.bmax), 0.5),
+                pb.vec3(0, this.range.w, 0)
+              );
+              this.$l.boxHalf = pb.mul(pb.sub(this.bmax, this.bmin), 0.5);
+              for (let i = 0; i < GRASS_CULL_PLANES; i++) {
+                // The box corner farthest along the plane normal
+                this.outside = pb.or(
+                  this.outside,
+                  pb.lessThan(
+                    pb.add(
+                      pb.add(
+                        pb.dot(this.planes.at(i).xyz, this.boxCenter),
+                        pb.dot(pb.abs(this.planes.at(i).xyz), this.boxHalf)
+                      ),
+                      this.planes.at(i).w
+                    ),
+                    pb.neg(this.range.z)
+                  )
+                );
+              }
+              this.$return(this.outside);
+            }
+          );
           pb.main(function () {
             // Placement units of this thread's layer: cells for cards; for procedural blades the
             // units of detail level z, 2^z x 2^z cells each
@@ -1096,113 +1161,180 @@ export class GrassGpuPlacement extends Disposable {
               this.$l.win = this.window;
               this.$l.unit = pb.float(1);
             }
-            // Terrain occlusion, one test per workgroup: the group's blades are hidden if every
-            // line of sight to them dips below the terrain somewhere in front of them. Each
-            // thread checks one point along the way.
-            this.$l.occluded = pb.uint(0);
-            this.$if(pb.greaterThan(this.occlusion.x, 0.5), function () {
-              this.$l.cellSize = pb.div(pb.sub(this.region.zw, this.region.xy), this.cells.xy);
-              this.$l.toTexel = pb.div(this.heightInfo.xy, pb.sub(this.region.zw, this.region.xy));
-              this.$l.g0 = pb.mul(
-                pb.add(this.win.xy, pb.mul(pb.vec2(this.$builtins.workGroupId.xy), WORKGROUP_SIZE)),
+            // Workgroup culling, before any blade is worked out. A group is skipped when the box
+            // its blades can stand in (the cells of its units, widened by how far a blade can
+            // stand from its cell, over the heights of the terrain) lies past its window, outside
+            // the distances its level covers, or outside a culling plane: most groups, as the
+            // window is a square around the camera whatever way it looks, and a shadow map's
+            // casters lie in a small part of it. Bounded by the terrain's height range first and,
+            // when that keeps the group, by the heights under it in the height pyramid. Every
+            // input is the same across the group, so all of it takes the same way.
+            this.$l.groupUnits = pb.vec2(pb.mul(this.$builtins.workGroupId.xy, WORKGROUP_SIZE));
+            this.$l.groupCulled = pb.or(
+              pb.greaterThanEqual(this.groupUnits.x, this.win.z),
+              pb.greaterThanEqual(this.groupUnits.y, this.win.w)
+            );
+            this.$if(pb.not(this.groupCulled), function () {
+              this.$l.groupStep = pb.mul(
+                pb.div(pb.sub(this.region.zw, this.region.xy), this.cells.xy),
                 this.unit
               );
-              this.$l.g1 = pb.min(
-                pb.add(this.g0, pb.vec2(pb.mul(this.unit, WORKGROUP_SIZE))),
-                pb.mul(pb.add(this.win.xy, this.win.zw), this.unit)
+              this.$l.u0 = pb.add(this.win.xy, this.groupUnits);
+              this.$l.u1 = pb.min(pb.add(this.u0, pb.vec2(WORKGROUP_SIZE)), pb.add(this.win.xy, this.win.zw));
+              this.$l.gmin = pb.sub(
+                pb.add(this.region.xy, pb.mul(this.u0, this.groupStep)),
+                pb.vec2(this.groupCull.z)
               );
-              this.$l.fmin = pb.add(this.region.xy, pb.mul(this.g0, this.cellSize));
-              this.$l.fmax = pb.add(this.region.xy, pb.mul(this.g1, this.cellSize));
-              this.$l.cam = this.cameraPos.xz;
-              this.$l.camY = this.cameraPos.y;
-              // Highest blade tip of the group; one texel of margin for the bilinear heights
-              this.$l.groupRange = this.pyramidRange(
-                pb.sub(pb.mul(pb.sub(this.fmin, this.region.xy), this.toTexel), pb.vec2(1)),
-                pb.add(pb.mul(pb.sub(this.fmax, this.region.xy), this.toTexel), pb.vec2(1))
+              this.$l.gmax = pb.add(
+                pb.add(this.region.xy, pb.mul(this.u1, this.groupStep)),
+                pb.vec2(this.groupCull.z)
               );
-              this.$l.topY = pb.add(
-                pb.add(pb.mul(this.groupRange.x, this.posScale.y), this.posScale.w),
-                this.occlusion.w
+              // (nearest distance, farthest distance, bounding radius, centre height above the base)
+              this.$l.cullRange = blade
+                ? pb.vec4(this.levelRange.y, this.levelRange.z, this.levelRange.w, this.params.w)
+                : pb.vec4(0, NO_LIMIT, this.params.z, this.params.w);
+              this.groupCulled = this.groupOutside(
+                this.gmin,
+                this.gmax,
+                this.groupCull.x,
+                this.groupCull.y,
+                this.cullRange
               );
-              this.$l.dNear = pb.length(
-                pb.max(pb.max(pb.sub(this.fmin, this.cam), pb.sub(this.cam, this.fmax)), pb.vec2(0))
-              );
-              this.$l.dFar = pb.length(
-                pb.max(pb.abs(pb.sub(this.cam, this.fmin)), pb.abs(pb.sub(this.cam, this.fmax)))
-              );
-              this.$l.center = pb.mul(pb.add(this.fmin, this.fmax), 0.5);
-              this.$l.groupRadius = pb.mul(pb.length(pb.sub(this.fmax, this.fmin)), 0.5);
-              this.$l.sMin = pb.mul(this.heightInfo.w, 2);
-              this.$l.sEnd = pb.sub(this.dNear, this.groupRadius);
-              // A camera below the terrain would see everything as occluded
-              this.$l.camTexel = pb.mul(pb.sub(this.cam, this.region.xy), this.toTexel);
-              this.$l.camGround = pb.add(
-                pb.mul(this.pyramidRange(this.camTexel, this.camTexel).y, this.posScale.y),
-                this.posScale.w
-              );
-              this.$if(
-                pb.and(pb.greaterThan(this.sEnd, this.sMin), pb.greaterThanEqual(this.camY, this.camGround)),
-                function () {
-                  // Steepest line of sight to the group: to the nearest edge when looking up at
-                  // its highest tip, to the farthest one when looking down
-                  this.$l.slope = pb.div(
-                    pb.sub(this.topY, this.camY),
-                    pb.mix(this.dFar, this.dNear, pb.step(this.camY, this.topY))
-                  );
-                  this.$l.dir = pb.normalize(pb.sub(this.center, this.cam));
-                  this.$l.k = pb.float(
-                    pb.add(
-                      pb.mul(this.$builtins.localInvocationId.y, WORKGROUP_SIZE),
-                      this.$builtins.localInvocationId.x
-                    )
-                  );
-                  this.$l.s = pb.add(
-                    this.sMin,
-                    pb.mul(pb.sub(this.sEnd, this.sMin), pb.div(pb.add(this.k, 0.5), OCCLUSION_SAMPLES))
-                  );
-                  this.$l.p = pb.add(this.cam, pb.mul(this.dir, this.s));
-                  // Lateral spread of the lines of sight at this distance, plus how far below the
-                  // samples the rendered surface can reach: a clipmap level of 2^L cells averages
-                  // heights within 4 * 2^L cells, and 2^L <= s / (T * cell) there, doubled for safety
-                  this.$l.spread = pb.div(pb.mul(this.groupRadius, this.s), this.dNear);
-                  this.$l.lodReach = pb.mul(
-                    pb.mul(
-                      pb.max(1, pb.div(pb.mul(this.s, 2), pb.mul(this.occlusion.y, this.heightInfo.w))),
-                      this.heightInfo.w
-                    ),
-                    4
-                  );
-                  this.$l.halfSize = pb.mul(pb.vec2(pb.add(this.spread, this.lodReach)), this.toTexel);
-                  this.$l.pc = pb.mul(pb.sub(this.p, this.region.xy), this.toTexel);
-                  this.$l.lo = pb.sub(this.pc, this.halfSize);
-                  this.$l.hi = pb.add(this.pc, this.halfSize);
-                  // Beyond the terrain there is nothing to hide behind
-                  this.$if(
-                    pb.and(
-                      pb.and(pb.greaterThanEqual(this.lo.x, 0), pb.greaterThanEqual(this.lo.y, 0)),
-                      pb.and(
-                        pb.lessThanEqual(this.hi.x, this.heightInfo.x),
-                        pb.lessThanEqual(this.hi.y, this.heightInfo.y)
+              this.$if(pb.and(pb.not(this.groupCulled), pb.greaterThan(this.groupCull.w, 0.5)), function () {
+                // One texel of margin for the bilinear heights
+                this.$l.groupTexel = pb.div(this.heightInfo.xy, pb.sub(this.region.zw, this.region.xy));
+                this.$l.groupHeights = this.pyramidRange(
+                  pb.sub(pb.mul(pb.sub(this.gmin, this.region.xy), this.groupTexel), pb.vec2(1)),
+                  pb.add(pb.mul(pb.sub(this.gmax, this.region.xy), this.groupTexel), pb.vec2(1))
+                );
+                this.groupCulled = this.groupOutside(
+                  this.gmin,
+                  this.gmax,
+                  pb.sub(
+                    pb.add(pb.mul(this.groupHeights.y, this.posScale.y), this.posScale.w),
+                    this.occlusion.z
+                  ),
+                  pb.add(
+                    pb.add(pb.mul(this.groupHeights.x, this.posScale.y), this.posScale.w),
+                    this.occlusion.z
+                  ),
+                  this.cullRange
+                );
+              });
+            });
+            // Terrain occlusion, one test per workgroup: the group's blades are hidden if every
+            // line of sight to them dips below the terrain somewhere in front of them. Each
+            // thread checks one point along the way. Culled groups skip it, but still meet at the
+            // barrier, which the whole workgroup must reach.
+            this.$l.occluded = pb.uint(0);
+            this.$if(pb.greaterThan(this.occlusion.x, 0.5), function () {
+              this.$if(pb.not(this.groupCulled), function () {
+                this.$l.cellSize = pb.div(pb.sub(this.region.zw, this.region.xy), this.cells.xy);
+                this.$l.toTexel = pb.div(this.heightInfo.xy, pb.sub(this.region.zw, this.region.xy));
+                this.$l.g0 = pb.mul(
+                  pb.add(this.win.xy, pb.mul(pb.vec2(this.$builtins.workGroupId.xy), WORKGROUP_SIZE)),
+                  this.unit
+                );
+                this.$l.g1 = pb.min(
+                  pb.add(this.g0, pb.vec2(pb.mul(this.unit, WORKGROUP_SIZE))),
+                  pb.mul(pb.add(this.win.xy, this.win.zw), this.unit)
+                );
+                this.$l.fmin = pb.add(this.region.xy, pb.mul(this.g0, this.cellSize));
+                this.$l.fmax = pb.add(this.region.xy, pb.mul(this.g1, this.cellSize));
+                this.$l.cam = this.cameraPos.xz;
+                this.$l.camY = this.cameraPos.y;
+                // Highest blade tip of the group; one texel of margin for the bilinear heights
+                this.$l.groupRange = this.pyramidRange(
+                  pb.sub(pb.mul(pb.sub(this.fmin, this.region.xy), this.toTexel), pb.vec2(1)),
+                  pb.add(pb.mul(pb.sub(this.fmax, this.region.xy), this.toTexel), pb.vec2(1))
+                );
+                this.$l.topY = pb.add(
+                  pb.add(pb.mul(this.groupRange.x, this.posScale.y), this.posScale.w),
+                  this.occlusion.w
+                );
+                this.$l.dNear = pb.length(
+                  pb.max(pb.max(pb.sub(this.fmin, this.cam), pb.sub(this.cam, this.fmax)), pb.vec2(0))
+                );
+                this.$l.dFar = pb.length(
+                  pb.max(pb.abs(pb.sub(this.cam, this.fmin)), pb.abs(pb.sub(this.cam, this.fmax)))
+                );
+                this.$l.center = pb.mul(pb.add(this.fmin, this.fmax), 0.5);
+                this.$l.groupRadius = pb.mul(pb.length(pb.sub(this.fmax, this.fmin)), 0.5);
+                this.$l.sMin = pb.mul(this.heightInfo.w, 2);
+                this.$l.sEnd = pb.sub(this.dNear, this.groupRadius);
+                // A camera below the terrain would see everything as occluded
+                this.$l.camTexel = pb.mul(pb.sub(this.cam, this.region.xy), this.toTexel);
+                this.$l.camGround = pb.add(
+                  pb.mul(this.pyramidRange(this.camTexel, this.camTexel).y, this.posScale.y),
+                  this.posScale.w
+                );
+                this.$if(
+                  pb.and(
+                    pb.greaterThan(this.sEnd, this.sMin),
+                    pb.greaterThanEqual(this.camY, this.camGround)
+                  ),
+                  function () {
+                    // Steepest line of sight to the group: to the nearest edge when looking up at
+                    // its highest tip, to the farthest one when looking down
+                    this.$l.slope = pb.div(
+                      pb.sub(this.topY, this.camY),
+                      pb.mix(this.dFar, this.dNear, pb.step(this.camY, this.topY))
+                    );
+                    this.$l.dir = pb.normalize(pb.sub(this.center, this.cam));
+                    this.$l.k = pb.float(
+                      pb.add(
+                        pb.mul(this.$builtins.localInvocationId.y, WORKGROUP_SIZE),
+                        this.$builtins.localInvocationId.x
                       )
-                    ),
-                    function () {
-                      this.$l.ground = pb.sub(
-                        pb.add(
-                          pb.mul(this.pyramidRange(this.lo, this.hi).y, this.posScale.y),
-                          this.posScale.w
-                        ),
-                        this.occlusion.z
-                      );
-                      this.$if(
-                        pb.lessThan(pb.add(this.camY, pb.mul(this.slope, this.s)), this.ground),
-                        function () {
-                          pb.atomicOr(this.occludedFlag, 1);
-                        }
-                      );
-                    }
-                  );
-                }
-              );
+                    );
+                    this.$l.s = pb.add(
+                      this.sMin,
+                      pb.mul(pb.sub(this.sEnd, this.sMin), pb.div(pb.add(this.k, 0.5), OCCLUSION_SAMPLES))
+                    );
+                    this.$l.p = pb.add(this.cam, pb.mul(this.dir, this.s));
+                    // Lateral spread of the lines of sight at this distance, plus how far below the
+                    // samples the rendered surface can reach: a clipmap level of 2^L cells averages
+                    // heights within 4 * 2^L cells, and 2^L <= s / (T * cell) there, doubled for safety
+                    this.$l.spread = pb.div(pb.mul(this.groupRadius, this.s), this.dNear);
+                    this.$l.lodReach = pb.mul(
+                      pb.mul(
+                        pb.max(1, pb.div(pb.mul(this.s, 2), pb.mul(this.occlusion.y, this.heightInfo.w))),
+                        this.heightInfo.w
+                      ),
+                      4
+                    );
+                    this.$l.halfSize = pb.mul(pb.vec2(pb.add(this.spread, this.lodReach)), this.toTexel);
+                    this.$l.pc = pb.mul(pb.sub(this.p, this.region.xy), this.toTexel);
+                    this.$l.lo = pb.sub(this.pc, this.halfSize);
+                    this.$l.hi = pb.add(this.pc, this.halfSize);
+                    // Beyond the terrain there is nothing to hide behind
+                    this.$if(
+                      pb.and(
+                        pb.and(pb.greaterThanEqual(this.lo.x, 0), pb.greaterThanEqual(this.lo.y, 0)),
+                        pb.and(
+                          pb.lessThanEqual(this.hi.x, this.heightInfo.x),
+                          pb.lessThanEqual(this.hi.y, this.heightInfo.y)
+                        )
+                      ),
+                      function () {
+                        this.$l.ground = pb.sub(
+                          pb.add(
+                            pb.mul(this.pyramidRange(this.lo, this.hi).y, this.posScale.y),
+                            this.posScale.w
+                          ),
+                          this.occlusion.z
+                        );
+                        this.$if(
+                          pb.lessThan(pb.add(this.camY, pb.mul(this.slope, this.s)), this.ground),
+                          function () {
+                            pb.atomicOr(this.occludedFlag, 1);
+                          }
+                        );
+                      }
+                    );
+                  }
+                );
+              });
               pb.workgroupBarrier();
               this.occluded = pb.atomicOr(this.occludedFlag, 0);
             });
@@ -1210,8 +1342,11 @@ export class GrassGpuPlacement extends Disposable {
             this.$if(
               pb.and(
                 pb.and(
-                  pb.lessThan(this.id.x, pb.uint(this.win.z)),
-                  pb.lessThan(this.id.y, pb.uint(this.win.w))
+                  pb.and(
+                    pb.lessThan(this.id.x, pb.uint(this.win.z)),
+                    pb.lessThan(this.id.y, pb.uint(this.win.w))
+                  ),
+                  pb.not(this.groupCulled)
                 ),
                 pb.or(pb.equal(this.occluded, 0), pb.greaterThan(this.occlusion.x, 1.5))
               ),
