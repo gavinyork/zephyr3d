@@ -39,6 +39,17 @@ export interface TerrainVirtualTextureOptions {
 const TOLERANCE_DISTANCE_SCALE = 0.02;
 const TOLERANCE_MIN_CELLS = 2;
 const BORDER = 4;
+/**
+ * Marking takes one pixel of each 2x2 block of the depth per frame, a different one each frame in
+ * this order, (x, y) offsets 0 or 1: every pixel is marked once every four frames, well within the
+ * frames a requested page stays in use without being requested again (freeThreshold).
+ */
+const MARK_OFFSETS = [
+  [0, 0],
+  [1, 1],
+  [1, 0],
+  [0, 1]
+];
 
 /**
  * The runtime virtual texture of a clipmap terrain: the detail layers blended once per page
@@ -113,10 +124,11 @@ export class TerrainVirtualTexture extends Disposable implements VirtualTextureC
     this._vt.invalidate();
   }
   /**
-   * Marks the pages this camera sees on the terrain, one thread per depth pixel: the world
-   * position is rebuilt from the depth and projected to the terrain uv, the level comes from the
-   * uv step to the neighbouring pixels. A neighbour off the terrain is never taken as zero footprint,
-   * see plans/sparse-virtual-texture.md, phase 2.
+   * Marks the pages this camera sees on the terrain, one thread per marked depth pixel, a quarter
+   * of them each frame (see MARK_OFFSETS): the world position is rebuilt from the depth and
+   * projected to the terrain uv, the level comes from the uv step to the neighbouring pixels. A
+   * neighbour off the terrain is never taken as zero footprint, see
+   * plans/sparse-virtual-texture.md, phase 2.
    */
   markFromDepth(ctx: DrawContext, linearDepth: Texture2D) {
     this.sync();
@@ -132,6 +144,7 @@ export class TerrainVirtualTexture extends Disposable implements VirtualTextureC
     const heightMap = material.heightMap;
     const cell = Math.max((region.z - region.x) / heightMap.width, (region.w - region.y) / heightMap.height);
     const cameraPos = camera.getWorldPosition();
+    const [offsetX, offsetY] = MARK_OFFSETS[device.frameInfo.frameCounter % MARK_OFFSETS.length];
     this._vt.applyBindings(bindGroup);
     // Unfilterable float: the sampler must not filter
     bindGroup.setTexture('depthTex', linearDepth, fetchSampler('clamp_nearest_nomip'));
@@ -144,10 +157,11 @@ export class TerrainVirtualTexture extends Disposable implements VirtualTextureC
       'markParams',
       new Vector4(this._terrain.worldMatrix.m13, material.terrainScale.y, cell * TOLERANCE_MIN_CELLS, 0)
     );
+    bindGroup.setValue('markOffset', new Vector2(offsetX, offsetY));
     bindGroup.setValue('cameraPos', cameraPos);
     device.setProgram(this._markProgram);
     device.setBindGroup(0, bindGroup);
-    device.compute(Math.ceil(linearDepth.width / 8), Math.ceil(linearDepth.height / 8), 1);
+    device.compute(Math.ceil(linearDepth.width / 16), Math.ceil(linearDepth.height / 16), 1);
   }
   fill(_ctx: DrawContext) {
     const material = this._terrain.material!;
@@ -292,6 +306,8 @@ export class TerrainVirtualTexture extends Disposable implements VirtualTextureC
         this.region = pb.vec4().uniform(0);
         // (terrain origin y, height scale, minimum height tolerance, 0)
         this.markParams = pb.vec4().uniform(0);
+        // Pixel of each 2x2 block marked this frame, see MARK_OFFSETS
+        this.markOffset = pb.vec2().uniform(0);
         this.cameraPos = pb.vec3().uniform(0);
         // (terrain uv, 1) at a pixel whose depth lies on the terrain, z = 0 otherwise
         pb.func('terrainUV', [pb.ivec2('p')], function () {
@@ -350,7 +366,10 @@ export class TerrainVirtualTexture extends Disposable implements VirtualTextureC
           this.$return(pb.vec3(0));
         });
         pb.main(function () {
-          this.$l.p = pb.ivec2(this.$builtins.globalInvocationId.xy);
+          this.$l.p = pb.add(
+            pb.ivec2(pb.mul(this.$builtins.globalInvocationId.xy, 2)),
+            pb.ivec2(this.markOffset)
+          );
           this.$l.size = pb.ivec2(this.depthSize);
           this.$if(
             pb.or(pb.greaterThanEqual(this.p.x, this.size.x), pb.greaterThanEqual(this.p.y, this.size.y)),
