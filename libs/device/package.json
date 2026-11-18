@@ -1,6 +1,6 @@
 {
   "name": "@zephyr3d/device",
-  "version": "1.0.0",
+  "version": "0.3.0",
   "description": "WebGPU/WebGL2 graphics abstraction with a TypeScript shader system that generates WGSL and GLSL from a single source",
   "homepage": "https://github.com/gavinyork/zephyr3d#readme",
   "type": "module",
@@ -79,6 +79,6 @@
   },
   "dependencies": {
     "@webgpu/types": "^0.1.65",
-    "@zephyr3d/base": "workspace:^1.0.0"
+    "@zephyr3d/base": "workspace:^0.2.11"
   }
 }

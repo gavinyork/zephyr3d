@@ -1,6 +1,6 @@
 {
   "name": "@zephyr3d/backend-webgl",
-  "version": "1.0.0",
+  "version": "0.2.0",
   "description": "WebGL2 backend for Zephyr3D, used as the fallback when WebGPU is unavailable",
   "homepage": "https://github.com/gavinyork/zephyr3d#readme",
   "type": "module",
@@ -76,7 +76,7 @@
   },
   "dependencies": {
     "@webgpu/types": "^0.1.65",
-    "@zephyr3d/base": "workspace:^1.0.0",
-    "@zephyr3d/device": "workspace:^1.0.0"
+    "@zephyr3d/base": "workspace:^0.2.11",
+    "@zephyr3d/device": "workspace:^0.3.0"
   }
 }

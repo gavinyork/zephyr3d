@@ -1,6 +1,6 @@
 {
   "name": "@zephyr3d/imgui",
-  "version": "1.0.0",
+  "version": "0.2.9",
   "description": "Dear ImGui bindings for Zephyr3D, rendered on WebGPU and WebGL2",
   "homepage": "https://github.com/gavinyork/zephyr3d#readme",
   "type": "module",
@@ -76,7 +76,7 @@
   "dependencies": {
     "@types/emscripten": "^1.39.6",
     "@webgpu/types": "^0.1.65",
-    "@zephyr3d/base": "workspace:^1.0.0",
-    "@zephyr3d/device": "workspace:^1.0.0"
+    "@zephyr3d/base": "workspace:^0.2.11",
+    "@zephyr3d/device": "workspace:^0.3.0"
   }
 }
