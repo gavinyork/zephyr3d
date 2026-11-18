@@ -13,6 +13,7 @@ import { DirectionalLight } from '../light';
 import { RENDER_PASS_TYPE_SHADOWMAP } from '../../values';
 import { BLADE_LOD_INDEX_COUNTS, ClipmapBladeGrassMaterial, createBladeIndices } from './bladegrassmaterial';
 import { warnUnsupported } from '../../utility/unsupported';
+import { RenderGraphExecutor } from '../../render/rendergraph/executor';
 
 const INSTANCE_BYTES = 4 * 4;
 /** Number of placement cells along each axis of a grass tile */
@@ -31,9 +32,10 @@ const DEFAULT_FAR_DENSITY = 0.25;
 const DEFAULT_GROUND_OCCLUSION = 0.5;
 /**
  * Number of the nearest cascades of the sun's shadow map procedural blades cast shadows into.
- * Farther cascades have texels too coarse for single blades.
+ * Only the first: blades a centimetre or so wide leave little more than a blur in the next one,
+ * whose casters cost about as much to place as the blades the camera sees.
  */
-const GRASS_SHADOW_CASCADES = 2;
+const GRASS_SHADOW_CASCADES = 1;
 /** Default shape and clumping of procedural blades, see GrassBladeShape */
 const DEFAULT_BLADE_SHAPE = [
   1.5, 0.3, 0.08, 0.2, 0.25, 0.2, 0.15, 0.1, 1.9, 0.48, 0.2, 0.3, 0.2, 0.5, 0.15, 80
@@ -449,7 +451,7 @@ export class GrassLayer extends Disposable {
     }
   }
   /**
-   * Whether the blades cast shadows from the sun into the nearest cascades of its shadow map
+   * Whether the blades cast shadows from the sun into the nearest cascade of its shadow map
    * (WebGPU only), as long as {@link GrassRenderer.castShadow} lets any. Blade layers only.
    *
    * Blades a few centimetres wide leave little more than a blur in shadow maps whose texels are
@@ -1075,31 +1077,36 @@ export class GrassLayer extends Disposable {
       return;
     }
     const wind = terrain.scene?.env.wind.shaderParams ?? null;
+    // Timed one by one under the renderer's TerrainGrass scope
     const place = (
       target: number,
       mode: GrassOcclusionMode,
       planes: Nullable<Float32Array<ArrayBuffer>>,
       fade: Nullable<[number, number]>
     ) =>
-      this._gpu!.generate(
-        camera,
-        terrain,
-        this._seed,
-        this._cellsPerTexel,
-        this._drawDistance,
-        this._bladeWidth,
-        this._bladeHeight,
-        mode,
-        this._farDensity,
-        this._bladeShape,
-        wind,
-        target,
-        planes,
-        fade
+      RenderGraphExecutor.profileScope(target === 0 ? 'GrassView' : `GrassShadow${target - 1}`, () =>
+        this._gpu!.generate(
+          camera,
+          terrain,
+          this._seed,
+          this._cellsPerTexel,
+          this._drawDistance,
+          this._bladeWidth,
+          this._bladeHeight,
+          mode,
+          this._farDensity,
+          this._bladeShape,
+          wind,
+          target,
+          planes,
+          fade
+        )
       );
     place(0, occlusionMode, null, null);
     // Target i + 1 holds the casters of shadow map i. Blades hidden behind the terrain from the
-    // camera still cast shadows, so these skip the occlusion culling.
+    // camera still cast shadows, so these skip the occlusion culling. A layer casting no
+    // shadows, or no shadow maps to cast into (see GrassRenderer.calcShadowCullPlanes), places
+    // none, and drops the lists it had.
     const numShadowTargets = this._kind === 'blade' && this._castShadow ? shadowCullPlanes.length : 0;
     for (let i = 0; i < numShadowTargets; i++) {
       place(i + 1, GrassOcclusionMode.Off, shadowCullPlanes[i], shadowFade);
@@ -1239,6 +1246,7 @@ export class GrassRenderer extends Disposable {
   private static readonly _shadowCullPlanes: Float32Array<ArrayBuffer>[] = [];
   private readonly _terrain: DWeakRef<ClipmapTerrain>;
   private _layers: GrassLayer[];
+  private _enabled: boolean;
   private _occlusionCulling: boolean;
   private _occlusionDebug: boolean;
   private _suspendOcclusionCulling: boolean;
@@ -1259,6 +1267,7 @@ export class GrassRenderer extends Disposable {
     super();
     this._terrain = new DWeakRef(terrain);
     this._layers = [];
+    this._enabled = true;
     this._occlusionCulling = true;
     this._occlusionDebug = false;
     this._suspendOcclusionCulling = false;
@@ -1268,6 +1277,23 @@ export class GrassRenderer extends Disposable {
     this._shadowLight = new DWeakRef();
     this._groundMap = new DRef();
     this._groundData = null;
+  }
+  /**
+   * Whether the grass is drawn at all, a runtime switch such as a quality setting: off, no blades
+   * are placed, drawn or cast shadows, and the ground under the grass is no longer darkened (see
+   * {@link GrassLayer.groundOcclusion}). The layers and their density maps are kept. Not saved
+   * with the terrain.
+   */
+  get enabled() {
+    return this._enabled;
+  }
+  set enabled(val: boolean) {
+    val = !!val;
+    if (val !== this._enabled) {
+      this._enabled = val;
+      this._shadowLight.set(null);
+      this.updateGroundOcclusion(null);
+    }
   }
   /**
    * How much of its albedo the ground loses under the grass, one byte per texel over the terrain
@@ -1287,7 +1313,7 @@ export class GrassRenderer extends Disposable {
     if (!terrain) {
       return;
     }
-    const layers = this._layers.filter((l) => l.drawn && l.groundOcclusion > 0);
+    const layers = this._enabled ? this._layers.filter((l) => l.drawn && l.groundOcclusion > 0) : [];
     if (layers.length === 0) {
       if (this._groundMap.get()) {
         this._groundMap.set(null);
@@ -1417,8 +1443,9 @@ export class GrassRenderer extends Disposable {
     }
   }
   /**
-   * Whether procedural blades cast shadows from the sun into the nearest cascades of its shadow
-   * map (WebGPU only). Also needs the terrain to cast shadows.
+   * Whether procedural blades cast shadows from the sun into the nearest cascade of its shadow
+   * map (WebGPU only). Also needs the terrain to cast shadows. Without any blades casting
+   * shadows, none are placed for the shadow map.
    */
   get castShadow() {
     return this._castShadow;
@@ -1439,7 +1466,7 @@ export class GrassRenderer extends Disposable {
   /** @internal */
   updatePerCamera(camera: Camera) {
     const terrain = this._terrain.get();
-    if (terrain) {
+    if (terrain && this._enabled && this._layers.length > 0) {
       const mode =
         !this._occlusionCulling || this._suspendOcclusionCulling
           ? GrassOcclusionMode.Off
@@ -1447,9 +1474,19 @@ export class GrassRenderer extends Disposable {
             ? GrassOcclusionMode.Debug
             : GrassOcclusionMode.Cull;
       const shadowCullPlanes = this.calcShadowCullPlanes(camera, terrain);
-      for (const layer of this._layers) {
-        layer.updatePerCamera(camera, terrain, mode, shadowCullPlanes, this._shadowFade);
-      }
+      // The placement on the GPU, timed per layer when there are several, and per target (the
+      // camera's view, each shadow map) in GrassLayer.updatePerCamera
+      RenderGraphExecutor.profileScope('TerrainGrass', () => {
+        this._layers.forEach((layer, i) => {
+          const update = () =>
+            layer.updatePerCamera(camera, terrain, mode, shadowCullPlanes, this._shadowFade);
+          if (this._layers.length > 1) {
+            RenderGraphExecutor.profileScope(`GrassLayer${i}`, update);
+          } else {
+            update();
+          }
+        });
+      });
     }
   }
   /**
@@ -1743,6 +1780,9 @@ export class GrassRenderer extends Disposable {
   }
   /** @internal */
   draw(ctx: DrawContext) {
+    if (!this._enabled) {
+      return;
+    }
     if (ctx.renderPass!.type === RENDER_PASS_TYPE_SHADOWMAP) {
       // Only into the cascades of the light the blades were placed for
       const light = (ctx.renderPass as ShadowMapPass).light;

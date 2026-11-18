@@ -185,7 +185,7 @@ wind.gustStrength = 0.5;
 wind.gustScale = 20;
 ```
 
-Geometry blades cast shadows from the sun into the two nearest cascades of its shadow map (`grassRenderer.castShadow`, on by default; the terrain must cast shadows too), fading out over `grassRenderer.shadowFadeFraction` of the last of them. Farther away, grass casts no shadow of its own; screen-space contact shadows and ambient occlusion, when enabled, darken it there. Thin blades leave little in a shadow map but blur, so `layer.castShadow = false` takes a single layer out of the shadow maps, which also saves placing its casters. Two effects that need no shadow map darken grass anyway:
+Geometry blades cast shadows from the sun into the nearest cascade of its shadow map (`grassRenderer.castShadow`, on by default; the terrain must cast shadows too), fading out over `grassRenderer.shadowFadeFraction` of it toward its far end. Farther away, grass casts no shadow of its own; screen-space contact shadows and ambient occlusion, when enabled, darken it there. Thin blades leave little in a shadow map but blur, so `layer.castShadow = false` takes a single layer out of the shadow maps, which also saves placing its casters. Two effects that need no shadow map darken grass anyway:
 
 - `layer.selfShadow` (geometry layers, default 1): the sunlight a blade loses through the blades above it, more toward the root and the lower the sun. 0 turns it off.
 - `layer.groundOcclusion` (both kinds, default 0.5): how much a full density of the layer darkens the ground under it, baked from the density map into the terrain's color, so the soil between the blades and the light it bounces are darker where the grass is thick. 0 turns it off.
