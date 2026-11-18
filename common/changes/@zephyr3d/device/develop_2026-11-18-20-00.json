@@ -1,0 +1,15 @@
+{
+  "changes": [
+    {
+      "packageName": "@zephyr3d/device",
+      "comment": "Filter default texture samplers anisotropically, configurable with device.defaultMaxAnisotropy (16x by default).",
+      "type": "minor"
+    },
+    {
+      "packageName": "@zephyr3d/device",
+      "comment": "Defer frames the GPU lags behind to the next refresh in the frame pacer instead of dropping them, and default maxFramesInFlight to 0.",
+      "type": "patch"
+    }
+  ],
+  "packageName": "@zephyr3d/device"
+}

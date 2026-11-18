@@ -1,0 +1,45 @@
+{
+  "changes": [
+    {
+      "packageName": "@zephyr3d/scene",
+      "comment": "Add octahedral foliage impostors with dithered cross-fade, LOD-based baking, WebGL2 support and foliage transmission in PBR and blueprint materials.",
+      "type": "minor"
+    },
+    {
+      "packageName": "@zephyr3d/scene",
+      "comment": "Add Mesh.drawDistance with per-instance GPU distance culling.",
+      "type": "minor"
+    },
+    {
+      "packageName": "@zephyr3d/scene",
+      "comment": "Add RoadSpline, a spline road blended into the terrain that can fit the terrain and clear grass and foliage along it.",
+      "type": "minor"
+    },
+    {
+      "packageName": "@zephyr3d/scene",
+      "comment": "Improve procedural grass with detail level chains, per-layer shadow casting, self-shadowing, ground darkening and a runtime switch.",
+      "type": "minor"
+    },
+    {
+      "packageName": "@zephyr3d/scene",
+      "comment": "Time-slice sky light updates and add volumetric cloud shadow maps that also shade the atmosphere and GI.",
+      "type": "minor"
+    },
+    {
+      "packageName": "@zephyr3d/scene",
+      "comment": "Improve performance of water shading, waterline and shore field updates, virtual texture page marking and filling, and GPU grass placement.",
+      "type": "patch"
+    },
+    {
+      "packageName": "@zephyr3d/scene",
+      "comment": "Fix pickAsync returning the hit x coordinate instead of the distance.",
+      "type": "patch"
+    },
+    {
+      "packageName": "@zephyr3d/scene",
+      "comment": "Fix loadSceneFromFile, particle burst limits, GPU pick framebuffer buildup, hidden node physics, impostor shading and other issues.",
+      "type": "patch"
+    }
+  ],
+  "packageName": "@zephyr3d/scene"
+}

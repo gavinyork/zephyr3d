@@ -1,0 +1,10 @@
+{
+  "changes": [
+    {
+      "packageName": "@zephyr3d/physics",
+      "comment": "Update wheel grip on a running vehicle without rebuilding it.",
+      "type": "patch"
+    }
+  ],
+  "packageName": "@zephyr3d/physics"
+}

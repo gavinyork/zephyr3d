@@ -1,0 +1,25 @@
+{
+  "changes": [
+    {
+      "packageName": "@zephyr3d/editor",
+      "comment": "Add a road edit tool and road MCP tools.",
+      "type": "minor"
+    },
+    {
+      "packageName": "@zephyr3d/editor",
+      "comment": "Bake foliage impostors from the asset browser and expose impostor settings through foliage MCP tools.",
+      "type": "minor"
+    },
+    {
+      "packageName": "@zephyr3d/editor",
+      "comment": "Add Mark and Diff to the device information window, and read and set embedded object properties through MCP.",
+      "type": "minor"
+    },
+    {
+      "packageName": "@zephyr3d/editor",
+      "comment": "Fix MCP physics collider fitting, road terrain commit and plugin message issues.",
+      "type": "patch"
+    }
+  ],
+  "packageName": "@zephyr3d/editor"
+}

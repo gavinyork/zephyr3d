@@ -1,0 +1,10 @@
+{
+  "changes": [
+    {
+      "packageName": "@zephyr3d/procgen",
+      "comment": "Split buildings and ground into separate meshes and add road cross-sections, material scheme sets, an urban residential style and a dusk lighting mode.",
+      "type": "minor"
+    }
+  ],
+  "packageName": "@zephyr3d/procgen"
+}

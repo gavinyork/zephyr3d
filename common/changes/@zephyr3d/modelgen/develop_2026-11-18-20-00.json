@@ -2,8 +2,8 @@
   "changes": [
     {
       "packageName": "@zephyr3d/modelgen",
-      "comment": "",
-      "type": "none"
+      "comment": "Add an extrude node.",
+      "type": "minor"
     }
   ],
   "packageName": "@zephyr3d/modelgen"

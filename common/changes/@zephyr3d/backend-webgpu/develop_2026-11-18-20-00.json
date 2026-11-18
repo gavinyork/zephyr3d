@@ -1,0 +1,15 @@
+{
+  "changes": [
+    {
+      "packageName": "@zephyr3d/backend-webgpu",
+      "comment": "Batch buffer uploads into shared staging chunks and record each frame into one command encoder.",
+      "type": "patch"
+    },
+    {
+      "packageName": "@zephyr3d/backend-webgpu",
+      "comment": "Support anisotropic default samplers.",
+      "type": "patch"
+    }
+  ],
+  "packageName": "@zephyr3d/backend-webgpu"
+}

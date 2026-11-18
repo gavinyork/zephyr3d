@@ -1,0 +1,10 @@
+{
+  "changes": [
+    {
+      "packageName": "@zephyr3d/backend-null",
+      "comment": "Support device.defaultMaxAnisotropy.",
+      "type": "patch"
+    }
+  ],
+  "packageName": "@zephyr3d/backend-null"
+}

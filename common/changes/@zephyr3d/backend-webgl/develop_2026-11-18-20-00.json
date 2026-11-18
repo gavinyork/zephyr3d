@@ -1,0 +1,10 @@
+{
+  "changes": [
+    {
+      "packageName": "@zephyr3d/backend-webgl",
+      "comment": "Support anisotropic default samplers.",
+      "type": "patch"
+    }
+  ],
+  "packageName": "@zephyr3d/backend-webgl"
+}
