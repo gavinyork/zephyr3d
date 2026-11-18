@@ -4,8 +4,8 @@
 
 ### Bringing advanced real-time rendering techniques to the browser.
 
-A WebGPU-first TypeScript engine with skin, hair, water and terrain rendering,<br/>
-a single-source shader system, and a visual editor.
+Characters and open worlds, rendered in the browser with WebGPU.<br/>
+A TypeScript engine with a visual editor, falling back to WebGL2.
 
 [Documentation](https://zephyr3d.org/doc/) &nbsp;|&nbsp; [Demos](https://zephyr3d.org/en/demos.html) &nbsp;|&nbsp; [Online Editor](https://zephyr3d.org/editor/) &nbsp;|&nbsp; [API Reference](https://zephyr3d.org/doc/api/)
 
@@ -133,12 +133,16 @@ Skin with subsurface scattering and transmission, an eye material with socket oc
 with Kajiya-Kay and Marschner shading, expanded into strands on the GPU and simulated in compute
 shaders. MToon and VRM support for stylized characters.
 
-**Natural environments**
-[Ocean water](https://zephyr3d.org/doc/en/water.html) driven by FFT, Gerstner or FBM waves, with
-caustics, refraction and interaction with floating objects.
-[Clipmap terrain](https://zephyr3d.org/doc/en/terrain-runtime.html) with runtime texturing,
-virtual texturing and grass layers. [Atmospheric sky](https://zephyr3d.org/doc/en/sky.html) and
-height fog.
+**Open worlds**
+[Clipmap terrain](https://zephyr3d.org/doc/en/terrain-runtime.html) with virtual texturing, spline
+roads that cut and fill the terrain, procedural grass, and foliage that turns into octahedral
+impostors in the distance. [Ocean water](https://zephyr3d.org/doc/en/water.html) driven by FFT,
+Gerstner or FBM waves, with breaking shore waves, foam, caustics, refraction and floating objects.
+An [atmospheric sky](https://zephyr3d.org/doc/en/sky.html) with volumetric clouds and cloud
+shadows, dynamic global illumination from DDGI probes, and vehicles and rigid bodies on
+[Rapier physics](https://zephyr3d.org/doc/en/physics-intro.html). These systems work together: a road
+clears the grass along it, cloud shadows reach the sky and the bounce light, and the GI reads the
+terrain's colour.
 
 **[Shadows](https://zephyr3d.org/doc/en/shadow-intro.html) and [transparency](https://zephyr3d.org/doc/en/oit.html)**
 PCF (several variants), PCSS, ESM, VSM, SSM and DOM shadows, with cascaded shadow maps and contact
@@ -148,7 +152,8 @@ transparency backends: A-buffer (WebGPU), dual depth peeling, and weighted blend
 **Lighting and [post-processing](https://zephyr3d.org/doc/en/posteffect-intro.html)**
 PBR materials (metallic-roughness and specular-glossiness) with
 [image-based lighting](https://zephyr3d.org/doc/en/lighting-intro.html) and physical lighting
-units, clustered lighting for hundreds of dynamic lights, and rect area lights. TAA, SSGI, SSR,
+units, clustered lighting for hundreds of dynamic lights, rect area lights, and probe-based global
+illumination (WebGPU). TAA, SSGI, SSR,
 SSAO, bloom, motion blur, tonemapping and color grading.
 
 ### Also in the box
@@ -249,7 +254,7 @@ Editor documentation: [overview](https://zephyr3d.org/doc/en/editor/overview.htm
 
 **Zephyr3D is a good fit if you are**
 
-- building a web project that needs character, water or terrain rendering beyond what
+- building a web project that needs character or open-world rendering beyond what
   general-purpose libraries offer out of the box;
 - building custom tools or an in-house editor, and want an engine whose source you can follow
   end to end;
@@ -260,13 +265,17 @@ Editor documentation: [overview](https://zephyr3d.org/doc/en/editor/overview.htm
 - you depend on a large third-party ecosystem of plugins, loaders and community examples;
 - your scenes rely heavily on bounce light indoors — DDGI probe-based global illumination is
   available on WebGPU but is still maturing; screen-space GI supplements it on both backends;
+- you need a game framework — Zephyr3D provides rendering, scenes, physics and an editor, but no
+  gameplay framework or networking;
+- most of your users are on WebGL2 only — global illumination, volumetric clouds, GPU grass and
+  virtual texturing need WebGPU;
 - you need long-term API stability guarantees today (see [Status](#status)).
+
 ---
 
 ## Support
 
-Zephyr3D is developed and maintained by one person in their free time — the engine, the editor,
-the documentation and the demos are all unpaid work. If any of it has been useful to you,
+Zephyr3D is independent and has no company behind it. If any of it has been useful to you,
 sponsorship is what pays for hosting, CI and testing hardware, and buys focused blocks of time
 for new features, performance work and documentation.
 
@@ -318,7 +327,8 @@ The engine is split so you install only what you use. Packages are versioned ind
 The engine targets two graphics APIs and falls back silently when a capability is missing, so
 test on your actual targets rather than assuming that error-free code means a feature is active.
 
-- **WebGPU** — the full feature set, including compute shaders. Required for A-buffer OIT, DOM
+- **WebGPU** — the full feature set, including compute shaders. Required for global illumination,
+  volumetric clouds, GPU grass, terrain virtual texturing, water caustics, A-buffer OIT, DOM
   shadows, GPU cloth and hair simulation, and terrain shading cache.
 - **WebGL2** — broad coverage, no compute shaders. WebGL1 is no longer supported.
 
@@ -350,11 +360,12 @@ Documentation is available in [English](https://zephyr3d.org/doc/en/intro.html) 
 
 ## Status
 
-Actively developed, maintained by one person. The engine drives its own editor and a set of demos.
-The 1.0 release marks a stable core API with semver guarantees and a documented deprecation policy.
+Actively developed. The engine drives its own editor and a set of demos.
+Before 1.0, minor versions may still change the API; 1.0 will mark a stable core API with semver
+guarantees and a documented deprecation policy.
 
 Every change runs through unit tests and a visual regression suite that renders reference scenes
-on both WebGPU and WebGL2 in CI. Long-term API stability is a promise this project now makes.
+on both WebGPU and WebGL2 in CI.
 
 Questions and design discussions are best raised in
 [Discussions](https://github.com/gavinyork/zephyr3d/discussions); bugs and confirmed feature
