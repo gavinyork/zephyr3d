@@ -85,6 +85,7 @@
     - [Depth Convention (Reverse-Z)](en/reverse-z.md)
     - [Render Graph and Custom Passes](en/rendergraph.md)
     - [Serialization and Prefabs](en/serialization.md)
+    - [Pipeline Precompilation and Asset Preloading](en/pipeline-cache.md)
     - [Memory Management](en/lifetime.md)
     - [Virtual File System](en/vfs.md)
 

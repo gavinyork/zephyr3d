@@ -24,6 +24,10 @@ The build also writes `asset-manifest.json` to the output root. It maps each sou
 
 When the build finishes, a report shows how many textures and meshes were compressed, the download size before and after, and the GPU memory saved; per-asset details are written to the console. An asset that fails to compress is shipped as its source file and flagged in the report.
 
+### Shader Precompilation and Preloading
+
+If the project has recorded pipelines (the record button next to Play in the scene view toolbar), the build ships `pipeline-cache.json` and compiles those pipelines behind the splash screen, so the first frames do not stall. The build also records which assets each scene needs and preloads those of the startup scene, so the splash screen shows real progress. See [Pipeline Precompilation and Asset Preloading](en/pipeline-cache.md).
+
 ### Deployment (Quick Overview)
 
 - **Local preview**:

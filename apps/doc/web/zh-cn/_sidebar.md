@@ -85,6 +85,7 @@
     - [深度约定（Reverse-Z）](zh-cn/reverse-z.md)
     - [渲染图与自定义 Pass](zh-cn/rendergraph.md)
     - [序列化与预制体](zh-cn/serialization.md)
+    - [管线预编译与资源预加载](zh-cn/pipeline-cache.md)
     - [内存管理](zh-cn/lifetime.md)
     - [虚拟文件系统](zh-cn/vfs.md)
 
