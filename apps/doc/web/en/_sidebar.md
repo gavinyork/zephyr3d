@@ -25,6 +25,7 @@
     - [Sky](en/sky.md)
     - [Water](en/water.md)
     - [Runtime Terrain](en/terrain-runtime.md)
+    - [Foliage](en/foliage.md)
   - Shadows
     - [Overview](en/shadow-intro.md)
     - [Anti-aliasing](en/shadow-aa.md)
@@ -114,6 +115,7 @@
   - Terrain
     - [Terrain Tools](en/editor/terrain-tools.md)
     - [Road Tools](en/editor/road-tools.md)
+    - [Foliage Tools](en/editor/foliage-tools.md)
 
   - Physics
     - [Physics in the Editor](en/editor/physics.md)

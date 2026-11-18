@@ -126,3 +126,17 @@ Volumetric mode is WebGPU-only. Other backends fall back to `effectiveCloudMode 
 **Volumetric clouds are only drawn from below the layer.** When the observer is higher than `layerBottomAltitude` minus 500 m, the engine draws the 2D clouds instead and warns once in the console; `effectiveCloudMode` still reports `'volumetric'`, since it only reflects backend support. Keep this in mind for flight or high-altitude shots.
 
 Cloud parameters are in atmosphere metres. World units map to atmosphere metres through `scene.env.sky.cameraHeightScale` (atmosphere metres per world unit, default 1), not `scene.metersPerUnit`. When scene units are not metres, adjust `cameraHeightScale`, or the camera height and the cloud layer will not line up.
+
+#### Cloud shadows
+
+Volumetric clouds can shade the sun light, so cloud shadows sweep over the ground as the clouds drift:
+
+```ts
+sunLight.castCloudShadows = true;
+sunLight.cloudShadowExtent = 150000;
+sunLight.cloudShadowStrength = 1;
+```
+
+The shadow is traced into a cloud shadow map centred on the camera, reaching twice `cloudShadowExtent` atmosphere metres to each side; a smaller extent gives sharper shadows over a smaller area. The same map darkens lit surfaces, the sky and aerial perspective, and the [DDGI](en/lighting-indirect.md#sdf-based-ddgi) voxel lighting, so the bounce light dims under a cloud too. `cloudShadowOnSurfaceStrength` and `cloudShadowOnAtmosphereStrength` (0 to 1) scale the two effects separately, and `cloudShadowMapResolutionScale` and `cloudShadowRaySampleCountScale` trade quality for cost (the default resolution scale of 0.5 keeps the trace affordable on integrated GPUs).
+
+Only the sun light (`DirectionalLight.getSunLight(scene)`) casts cloud shadows, and only in volumetric cloud mode, which is WebGPU-only.

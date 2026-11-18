@@ -134,3 +134,17 @@ sky.cloudDebugView = 'weather'; // 也可用 baseNoise、detailNoise、densityXY
 - **体积云只在云层下方绘制。** 观察者高度高于 `layerBottomAltitude` 减 500 米时，引擎改画 2D 云层，并在控制台警告一次。此时 `effectiveCloudMode` 仍报告 `'volumetric'`（它只反映后端是否支持）。飞行或高空镜头需要考虑这一点。
 - 体积云不是场景几何体，不参与 Mesh LOD、SDF 或物理碰撞。
 - 云层参数是大气中的米。世界坐标到大气米的换算由 `scene.env.sky.cameraHeightScale`（每个世界单位对应的大气米数，默认 1）决定，与 `scene.metersPerUnit` 无关。场景单位不是米时，调整 `cameraHeightScale`，否则相机高度和云层的相对位置会不对。
+
+#### 云阴影
+
+体积云可以遮挡太阳光，云层飘动时云影随之掠过地面：
+
+```ts
+sunLight.castCloudShadows = true;
+sunLight.cloudShadowExtent = 150000;
+sunLight.cloudShadowStrength = 1;
+```
+
+云影被追踪到一张以相机为中心的云阴影图中，向每一侧覆盖两倍 `cloudShadowExtent` 大气米；范围越小，阴影越清晰，覆盖面积也越小。同一张图会压暗受光表面、天空与大气透视，以及 [DDGI](zh-cn/lighting-indirect.md#基于-sdf-的-ddgi) 的体素光照，因此云下的反弹光也会变暗。`cloudShadowOnSurfaceStrength` 和 `cloudShadowOnAtmosphereStrength`（0 到 1）分别调节这两部分效果，`cloudShadowMapResolutionScale` 和 `cloudShadowRaySampleCountScale` 在质量与开销之间取舍（分辨率缩放默认 0.5，让集成显卡也能负担追踪）。
+
+只有太阳光（`DirectionalLight.getSunLight(scene)`）会投射云阴影，且只在体积云模式下生效，该模式仅支持 WebGPU。

@@ -186,7 +186,7 @@ scene.gi.probeRays = 128;
 scene.gi.probeBudget = 4096;
 ```
 
-`scene.gi.enabled` 会自动保持 `scene.sdf` 开启。只有带 SDF 字段（烘焙资源或 `bakeField()`）的静态网格会进入体素材质场；场景中的地形会自动参与，反照率取自地形本身，无需额外设置。
+`scene.gi.enabled` 会自动保持 `scene.sdf` 开启。只有带 SDF 字段（烘焙资源或 `bakeField()`）的静态网格会进入体素材质场；场景中的地形会自动参与，反照率取自地形本身，无需额外设置。太阳投射[体积云阴影](zh-cn/sky.md#云阴影)时，体素光照也会被云影遮挡，云下的反弹光随之变暗。
 
 **收敛与画质：**
 

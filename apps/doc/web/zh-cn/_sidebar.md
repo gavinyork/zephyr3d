@@ -25,6 +25,7 @@
     - [天空](zh-cn/sky.md)
     - [水面](zh-cn/water.md)
     - [运行时地形](zh-cn/terrain-runtime.md)
+    - [植被](zh-cn/foliage.md)
   - 阴影
     - [概述](zh-cn/shadow-intro.md)
     - [反走样](zh-cn/shadow-aa.md)
@@ -114,6 +115,7 @@
   - 地形系统
     - [编辑地形](zh-cn/editor/terrain-tools.md)
     - [编辑道路](zh-cn/editor/road-tools.md)
+    - [植被工具](zh-cn/editor/foliage-tools.md)
 
   - 物理
     - [编辑器中的物理](zh-cn/editor/physics.md)

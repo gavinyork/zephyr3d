@@ -191,7 +191,7 @@ scene.gi.probeRays = 128;
 scene.gi.probeBudget = 4096;
 ```
 
-Enabling `scene.gi` keeps the scene SDF enabled. Only static meshes with a field (a baked asset or `bakeField()`) enter the voxel material field; terrain in the scene takes part automatically, with its albedo taken from the terrain itself.
+Enabling `scene.gi` keeps the scene SDF enabled. Only static meshes with a field (a baked asset or `bakeField()`) enter the voxel material field; terrain in the scene takes part automatically, with its albedo taken from the terrain itself. When the sun casts [volumetric cloud shadows](en/sky.md#cloud-shadows), they shade the voxel lighting as well, so bounce light dims under clouds.
 
 **Convergence and quality:**
 
