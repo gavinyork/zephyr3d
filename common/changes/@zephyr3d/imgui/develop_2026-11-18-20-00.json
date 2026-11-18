@@ -1,0 +1,10 @@
+{
+  "changes": [
+    {
+      "packageName": "@zephyr3d/imgui",
+      "comment": "Move build-only packages out of runtime dependencies.",
+      "type": "patch"
+    }
+  ],
+  "packageName": "@zephyr3d/imgui"
+}

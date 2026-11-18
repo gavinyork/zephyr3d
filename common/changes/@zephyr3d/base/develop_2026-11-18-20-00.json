@@ -1,0 +1,10 @@
+{
+  "changes": [
+    {
+      "packageName": "@zephyr3d/base",
+      "comment": "Require Node.js 20 or later and move build-only packages out of runtime dependencies.",
+      "type": "patch"
+    }
+  ],
+  "packageName": "@zephyr3d/base"
+}
