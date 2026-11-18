@@ -684,8 +684,8 @@ function remapElevation(pb: ProgramBuilder, elevation: PBShaderExp, delta: PBSha
 
 /**
  * Observer-local direction to cloud cache uv: the upper hemisphere octahedron rotated 45 degrees
- * to fill the square (clayjohn clouds.gdshader vec3_to_oct, after J. White, "Signed Octahedron
- * Normal Encoding"), elevation remapped by `delta`. Directions below -delta are clamped to it.
+ * to fill the square (after J. White, "Signed Octahedron Normal Encoding"), elevation remapped by
+ * `delta`. Directions below -delta are clamped to it.
  * @internal
  */
 export function cloudCacheEncode(scope: PBInsideFunctionScope, dir: PBShaderExp, delta: PBShaderExp) {
@@ -714,8 +714,7 @@ export function cloudCacheEncode(scope: PBInsideFunctionScope, dir: PBShaderExp,
 }
 
 /**
- * Cloud cache uv to observer-local direction, inverse of {@link cloudCacheEncode}
- * (clayjohn clouds.glsl oct_to_vec3).
+ * Cloud cache uv to observer-local direction, inverse of {@link cloudCacheEncode}.
  * @internal
  */
 export function cloudCacheDecode(scope: PBInsideFunctionScope, uv: PBShaderExp, delta: PBShaderExp) {

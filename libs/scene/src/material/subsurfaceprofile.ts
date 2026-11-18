@@ -211,8 +211,7 @@ const SUBSURFACE_PROFILE_PRESET_RESPONSE: Record<
  *
  * @remarks
  * The profile stores the channel-dependent scattering radius and falloff used
- * by the screen-space SSS post effect. Materials can share a profile instance
- * to emulate Unreal-style skin profile assets.
+ * by the screen-space SSS post effect. Materials can share a profile instance.
  *
  * @public
  */

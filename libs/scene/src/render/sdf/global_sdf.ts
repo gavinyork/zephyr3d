@@ -41,7 +41,7 @@ const MAX_QUERY_POINTS = 4096;
 /**
  * The waterline grid follows the camera every 8 of its cells, and catches up with the clipmap a
  * quarter second behind at 60 fps: compositing new bricks as the camera moves changes the
- * clipmap's version most frames, which rebuilt the whole grid each frame of a drive.
+ * clipmap's version most frames, and rebuilding the whole grid each time is too costly.
  */
 const WATERLINE_RECENTER = 8;
 const WATERLINE_VERSION_LAG = 15;

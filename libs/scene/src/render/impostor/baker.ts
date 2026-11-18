@@ -79,7 +79,7 @@ export interface ImpostorBakeResult {
    * Base colour and opacity, atlasSize² RGBA8. The atlases are upright images, row 0 at the top:
    * frame (i, j) is the cell i from the left and j from the top (frame viewports are counted from
    * the top of the target), and the image of a frame has its y axis (see impostorFrameBasis) going
-   * up. Checked on a bake: the visible normals of every frame face its direction only this way.
+   * up.
    */
   base: Uint8Array;
   /** Normal in the object's space (RGB, 0.5 + 0.5·n) and depth towards the view (A, 1 nearest), at the detail size */
@@ -106,11 +106,10 @@ export function defaultImpostorBakeSettings(): ImpostorBakeSettings {
  * a lit colour, so that the impostor is shaded with the same lighting as the object.
  *
  * @remarks
- * Follows the Godot Octahedral Impostors baker (wojtekpil, MIT, `multi_bake_scene.gd`): an
- * orthographic camera sized to the bounding box diagonal, aimed at the box centre from
- * grid_to_vector(frame / (N - 1)). Frames are drawn one viewport each rather than as N² copies.
- * Empty pixels are then filled from their nearest covered neighbours, ring by ring, as UE
- * ImpostorBaker's M_Sample_Frame does, so that mipmaps do not bleed the background in.
+ * Each frame uses an orthographic camera sized to the bounding box diagonal, aimed at the box
+ * centre from grid_to_vector(frame / (N - 1)), drawn into its own viewport. Empty pixels are then
+ * filled from their nearest covered neighbours, ring by ring, so that mipmaps do not bleed the
+ * background in.
  *
  * @public
  */
@@ -352,8 +351,8 @@ function flipRows(data: Uint8Array, size: number) {
 }
 
 /**
- * Fills the empty pixels of every frame from their covered 8-neighbours, ring by ring, as UE
- * ImpostorBaker's M_Sample_Frame. Stays within each frame, so frames do not bleed into each other.
+ * Fills the empty pixels of every frame from their covered 8-neighbours, ring by ring. Stays
+ * within each frame, so frames do not bleed into each other.
  * Opacity is left at 0 where there is no surface.
  *
  * @param channels - Channels to fill of each image: 3 keeps the alpha of the base colour

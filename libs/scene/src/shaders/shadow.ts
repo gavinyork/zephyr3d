@@ -304,13 +304,9 @@ export function computeReceiverPlaneDepthBias(scope: PBInsideFunctionScope, texC
       this.$return(pb.vec3(0));
     });
     this.uv = pb.div(this.uv, this.det);
-    // `.z` used to carry a scalar "static bias" capped at a hardcoded 0.01.
-    // That constant came from a Unity shader operating on perspective (non
-    // linear) shadow depth; for a directional light's orthographic camera the
-    // depth is linear, so 0.01 means 1% of the whole depth range - metres of
-    // world-space push on a typical scene, which is what produced the light
-    // leaks around the terminator. Constant depth bias plus normal offset cover
-    // this properly now, so only the plane gradient survives.
+    // No static bias in `.z`: on a directional light's orthographic (linear) depth a fixed
+    // offset spans a share of the whole depth range, metres in world space, and leaks light
+    // around the terminator. Constant depth bias plus normal offset cover it instead.
     this.$return(pb.vec3(this.uv, 0));
   });
   return pb.getGlobalScope()[funcNameComputeReceiverPlaneDepthBias](texCoord) as PBShaderExp;

@@ -127,8 +127,7 @@ export class TerrainVirtualTexture extends Disposable implements VirtualTextureC
    * Marks the pages this camera sees on the terrain, one thread per marked depth pixel, a quarter
    * of them each frame (see MARK_OFFSETS): the world position is rebuilt from the depth and
    * projected to the terrain uv, the level comes from the uv step to the neighbouring pixels. A
-   * neighbour off the terrain is never taken as zero footprint, see
-   * plans/sparse-virtual-texture.md, phase 2.
+   * neighbour off the terrain is never taken as zero footprint.
    */
   markFromDepth(ctx: DrawContext, linearDepth: Texture2D) {
     this.sync();
@@ -492,7 +491,7 @@ export class TerrainVirtualTexture extends Disposable implements VirtualTextureC
         scope.$l.b = pb.normalize(pb.vec3(0, scope.dHdV, 1));
         scope.$l.n = pb.normalize(pb.cross(scope.b, scope.t));
         scope.$l.normal = pb.normalize(pb.mul(pb.mat3(scope.t, scope.b, scope.n), scope.detailNormal));
-        // PackNormal and LinearToSrgb (VirtualTextureMaterial.usf)
+        // Pack the normal to [0, 1] and encode the albedo as sRGB
         scope.$l.packed = pb.add(pb.mul(scope.normal, 127 / 255), pb.vec3(127 / 255));
         scope.$l.srgb = pb.mix(
           pb.sub(pb.mul(pb.pow(scope.albedo, pb.vec3(1 / 2.4)), 1.055), pb.vec3(0.055)),

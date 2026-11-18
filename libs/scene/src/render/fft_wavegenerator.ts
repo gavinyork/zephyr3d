@@ -447,7 +447,7 @@ export class FFTWaveGenerator extends Disposable implements WaveGenerator {
     this._h0BindGroup.setValue('resolution', this._params.resolution);
     this._h0BindGroup.setValue('wind', this._params.wind);
     this._h0BindGroup.setValue('alignment', this._params.alignment);
-    // Bands split as in Bruneton's ocean demo (and Ceto, its Unity port): each
+    // Bands split as in Bruneton's ocean demo: each
     // cascade keeps the wave numbers outside the square |kx|, |ky| < kMin, kMin the
     // Nyquist pi N / L of the next larger cascade (pi / L for the largest), and
     // stops at its own Nyquist, so the cascades share no wave number.

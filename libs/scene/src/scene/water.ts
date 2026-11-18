@@ -53,7 +53,7 @@ const SHORE_FIELD_CELL_SIZE = 0.5;
 const SHORE_FIELD_REBUILDS = 2;
 /**
  * Cells the camera may stray from a shore field level's centre before it is rebuilt around it:
- * rebuilt every cell, the finest level took a whole build each frame of a drive.
+ * rebuilding every cell would rebuild the finest level each frame while the camera moves fast.
  */
 const SHORE_FIELD_RECENTER = 8;
 /** No waterline grid: 0 cells. */
@@ -540,7 +540,7 @@ export class Water extends applyMixins(GraphNode, mixinDrawable) implements Draw
   set shoreWaveIrregularity(val: number) {
     this.material.shoreWaveIrregularity = val;
   }
-  /** How fast the foam fades, per second (Crest's Foam Fade Rate): lower leaves longer trails behind breaking waves. */
+  /** How fast the foam fades, per second: lower leaves longer trails behind breaking waves. */
   get foamFadeRate() {
     return this.material.foamFadeRate;
   }
@@ -568,28 +568,28 @@ export class Water extends applyMixins(GraphNode, mixinDrawable) implements Draw
   set foamFieldSize(val: number) {
     this.material.foamFieldSize = val;
   }
-  /** How much foam the breaking shore waves make (Crest's Wave Foam Strength). */
+  /** How much foam the breaking shore waves make. */
   get shoreWaveFoamStrength() {
     return this.material.shoreWaveFoamStrength;
   }
   set shoreWaveFoamStrength(val: number) {
     this.material.shoreWaveFoamStrength = val;
   }
-  /** How much of the shore waves makes foam, 0..1, higher for more (Crest's Wave Foam Coverage). */
+  /** How much of the shore waves makes foam, 0..1, higher for more. */
   get shoreWaveFoamCoverage() {
     return this.material.shoreWaveFoamCoverage;
   }
   set shoreWaveFoamCoverage(val: number) {
     this.material.shoreWaveFoamCoverage = val;
   }
-  /** Water shallower than this many metres makes foam (Crest's Shoreline Foam Max Depth). */
+  /** Water shallower than this many metres makes foam. */
   get shoreWaveShallowFoamDepth() {
     return this.material.shoreWaveShallowFoamDepth;
   }
   set shoreWaveShallowFoamDepth(val: number) {
     this.material.shoreWaveShallowFoamDepth = val;
   }
-  /** How much foam shallow water makes (Crest's Shoreline Foam Strength). */
+  /** How much foam shallow water makes. */
   get shoreWaveShallowFoamStrength() {
     return this.material.shoreWaveShallowFoamStrength;
   }

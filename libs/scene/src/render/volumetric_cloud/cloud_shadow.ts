@@ -15,9 +15,7 @@ import { buildCloudParams } from './sky_cache';
 import type { VolumetricCloud } from './volumetric_cloud';
 
 /*
- * Volumetric cloud shadow map, after Unreal's CloudShadowmap (VolumetricCloudRendering.cpp,
- * VolumetricCloud.usf MainPS with SHADER_SHADOW_PS, sampled by GetCloudVolumetricShadow in
- * VolumetricCloudCommon.ush). An orthographic map seen from the sun stores per texel the depth
+ * Volumetric cloud shadow map. An orthographic map seen from the sun stores per texel the depth
  * along the light where the clouds start, their mean extinction and the optical depth through the
  * whole layer; a receiver reconstructs its transmittance from its own depth along the light.
  *
@@ -26,13 +24,13 @@ import type { VolumetricCloud } from './volumetric_cloud';
  * planet radius.
  */
 
-/** r.VolumetricCloud.ShadowMap.SnapLength, meters */
+/** Grid the map center snaps to, meters */
 const SNAP_LENGTH = 20000;
-/** r.VolumetricCloud.ShadowMap.MaxResolution */
+/** Maximum map resolution */
 const MAX_RESOLUTION = 2048;
-/** r.VolumetricCloud.ShadowMap.RaySampleMaxCount */
+/** Maximum samples per texel ray */
 const RAY_SAMPLE_MAX_COUNT = 128;
-/** r.VolumetricCloud.ShadowMap.RaySampleHorizonMultiplier */
+/** Sample count multiplier with the sun at the horizon */
 const RAY_SAMPLE_HORIZON_MULTIPLIER = 2;
 
 /**
@@ -40,7 +38,7 @@ const RAY_SAMPLE_HORIZON_MULTIPLIER = 2;
  * @internal
  */
 export interface CloudShadowSettings {
-  /** Half the side the map covers is twice this, in planet meters (UE CloudShadowExtent) */
+  /** Half the side the map covers is twice this, in planet meters */
   extent: number;
   resolutionScale: number;
   raySampleCountScale: number;
@@ -103,7 +101,7 @@ function getTraceProgram() {
           this.$l.texel = this.$builtins.globalInvocationId.xy;
           this.$l.uv = pb.div(pb.add(pb.vec2(this.texel), pb.vec2(0.5)), this.params.w);
           this.$l.ndc = pb.sub(pb.mul(this.uv, 2), pb.vec2(1));
-          // CloudShadowUvToWorldSpace: the texel on the near plane
+          // The texel on the near plane
           this.$l.nearPos = pb.add(
             this.lightPos.xyz,
             pb.mul(this.axisX.xyz, pb.mul(this.ndc.x, this.lightPos.w)),
@@ -221,7 +219,7 @@ function getFilterProgram() {
           this.$l.d1 = pb.textureLoad(this.src, pb.add(this.p, pb.ivec2(1, 0)), 0);
           this.$l.d2 = pb.textureLoad(this.src, pb.add(this.p, pb.ivec2(1, 1)), 0);
           this.$l.d3 = pb.textureLoad(this.src, pb.add(this.p, pb.ivec2(0, 1)), 0);
-          // MainShadowFilterCS: its depth "Mean - StdDev" works out to the plain average too
+          // A plain 2x2 average of all channels, depth included
           pb.textureStore(this.dst, this.texel, pb.mul(pb.add(this.d0, this.d1, this.d2, this.d3), 0.25));
         });
       }
@@ -287,9 +285,8 @@ export class VolumetricCloudShadowMap extends Disposable {
     const R = atmosphere.plantRadius;
     const scale = atmosphere.cameraHeightScale;
     const extent = settings.extent;
-    // FReversedZOrthoMatrix takes half sizes, and UE hands it the sphere diameter: the map covers
-    // twice the extent on each side, with the light twice the extent away and the far plane at
-    // twice that.
+    // The map covers twice the extent on each side, with the light twice the extent away and the
+    // far plane at twice that.
     const halfWidth = 2 * extent;
     const lightDistance = 2 * extent;
     const farDepth = 2 * lightDistance;
@@ -308,7 +305,7 @@ export class VolumetricCloudShadowMap extends Disposable {
     const ref = Math.abs(dir.y) > 0.99 ? Vector3.axisPZ() : Vector3.axisPY();
     const axisX = Vector3.cross(ref, dir).inplaceNormalize();
     const axisY = Vector3.cross(dir, axisX).inplaceNormalize();
-    // SnapToPixelGrid: the planet origin lands on a texel of the filtered map
+    // Snap so the planet origin lands on a texel of the filtered map
     const grid = traceRes / 4;
     for (const axis of [axisX, axisY]) {
       const c = -Vector3.dot(lightPos, axis) / halfWidth;
@@ -343,7 +340,7 @@ export class VolumetricCloudShadowMap extends Disposable {
     device.setProgram(trace);
     device.setBindGroup(0, bindGroup);
     device.compute(Math.ceil(traceRes / 8), Math.ceil(traceRes / 8), 1);
-    // r.VolumetricCloud.ShadowMap.SpatialFiltering 1: one 2x2 downsample
+    // One 2x2 downsample
     const filter = getFilterProgram();
     const filterBindGroup = this._bindGroup(filter);
     filterBindGroup.setTexture('src', this._traceTexture.get()!, fetchSampler('clamp_nearest_nomip'));

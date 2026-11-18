@@ -26,10 +26,9 @@ import type { VolumetricCloudResources } from './resources';
 import type { VolumetricCloud } from './volumetric_cloud';
 
 /*
- * Volumetric clouds cached over the sky hemisphere, after clayjohn's
- * godot-volumetric-cloud-demo-v2 (cloud_sky.gd): the clouds seen from below the layer depend on
- * the view direction only, so they are traced into an octahedral map of the hemisphere one block
- * per frame. Three maps rotate: one is being written while the sky blends between the two that
+ * Volumetric clouds cached over the sky hemisphere: the clouds seen from below the layer depend
+ * on the view direction only, so they are traced into an octahedral map of the hemisphere, part of
+ * it per frame. Three maps rotate: one is being written while the sky blends between the two that
  * were completed last, by the progress of the one being written. Every input of a round (eye,
  * sun, time, parameters) is frozen when it starts so the blocks of one map agree.
  */
@@ -338,7 +337,7 @@ export class VolumetricCloudSkyCache extends Disposable {
     this._lastCameraPos.set(cameraPos);
     if (this._rebuild) {
       this._rebuild = false;
-      // Two rounds, as clayjohn's initialize_sky(): fills the map blended from and the one
+      // Two rounds fill the map blended from and the one
       // blended to, then the regular rounds take over at full quality
       for (let round = 0; round < 2; round++) {
         this._startRound(params, atmosphere, time);
@@ -404,10 +403,8 @@ export class VolumetricCloudSkyCache extends Disposable {
       return true;
     }
     // A camera jump far enough for the clouds to visibly shift: about ten texels of parallax
-    // under the cloud base. Only a jump since the last update: steady travel, however fast, is
-    // followed by the regular rounds, which blend into each other. Measured from the round start
-    // instead, driving at speed rebuilt the whole cache (tracing it twice, in one frame) every
-    // few hundred milliseconds.
+    // under the cloud base. Measured since the last update, not the round start: steady travel,
+    // however fast, is followed by the blending regular rounds instead of full rebuilds.
     const scale = atmosphere.cameraHeightScale;
     const moved = Vector3.distance(cameraPos, this._lastCameraPos) * scale;
     return moved > params.layerBottomAltitude * 0.017;
@@ -473,9 +470,9 @@ export class VolumetricCloudSkyCache extends Disposable {
     const device = getDevice();
     const program = getTraceProgram(inputs.msOctaves);
     const bindGroup = this._bindGroup(program);
-    // clayjohn traces one contiguous block per frame; its cost then swings with how far the rays
-    // of that part of the sky cross the layer. The same texels are traced here interleaved: frame
-    // `index` takes the texels at that offset in every stride x stride cell.
+    // Interleaved rather than one contiguous block per frame, whose cost would swing with how far
+    // that part of the sky's rays cross the layer: frame `index` takes the texel at that offset
+    // in every stride x stride cell.
     const stride = Math.round(Math.sqrt(this._framesPerUpdate));
     const count = Math.ceil(this._resolution / stride);
     const bx = index % stride;

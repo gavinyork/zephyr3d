@@ -1955,7 +1955,7 @@ export class SkinBinding extends Disposable {
    * If a complete mapping is found, it returns an object containing the mapped joints for the body and hands.
    * If any required joint is missing, it returns `null`.
    *
-   * This method tries to find the best match for humanoid rigs, designed to work with Mixamo, VRoid, Unity Humanoid,
+   * This method tries to find the best match for humanoid rigs, designed to work with Mixamo, VRoid,
    * Biped, and similar skeletons. It is not guaranteed to work with all models, and may require manual adjustments or
    * custom modifiers for non-standard rigs.
    *

@@ -2,10 +2,8 @@
  * Edit tool of a FoliageSystem: a brush painting the density mask of a layer, whose painted
  * instances are regenerated under the brush as it moves, and erasing them and the placed ones.
  *
- * Painting follows the PCG paint tool of Unreal Engine 5 (PCGPaintTool.cpp): the brush writes
- * where things grow and how densely, not instances; the layer's generation rule turns that into
- * instances. Shift erases, as there and in the classic foliage mode; [ and ] resize the brush,
- * as in the Unreal editor.
+ * The brush writes where things grow and how densely, not instances; the layer's generation rule
+ * turns that into instances. Shift erases; [ and ] resize the brush.
  */
 import { Disposable, DRef, Vector3 } from '@zephyr3d/base';
 import type { Nullable } from '@zephyr3d/base';

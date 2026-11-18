@@ -1409,7 +1409,7 @@ export class MeshMaterial extends Material implements Clonable<MeshMaterial> {
     });
     pb.func(funcName, color ? [pb.vec3('worldPos'), pb.vec4('color')] : [pb.vec3('worldPos')], function () {
       if (that.usesLodDither() && this.$inputs.zLodDither) {
-        // UE's ClipLODTransition (MaterialTemplate.ush): a fixed random value per pixel; fading
+        // LOD dither: a fixed random value per pixel; fading
         // out (0 to 1) keeps it above the amount, fading in (-1 to 0) below the amount + 1, so
         // the two sides of a swap cover complementary pixels
         this.$l.lodDither = this.$inputs.zLodDither;

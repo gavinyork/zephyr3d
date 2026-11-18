@@ -52,8 +52,8 @@ function aniso1Format(): 'rg8unorm' | 'rgba8unorm' {
 /** Most local lights whose voxel lighting is shadowed, the nearest the camera first. */
 export const MAX_SHADOWED_VOXEL_LIGHTS = 8;
 /**
- * Cone of a local light shadow ray. Lumen traces these as hard hit tests; a vanishing cone through
- * {@link sdfConeShadow} is the same test with its expanded surfaces.
+ * Cone of a local light shadow ray: a vanishing cone through {@link sdfConeShadow} makes it a hard
+ * hit test with the expanded surfaces.
  */
 const HARD_SHADOW_TAN = 1e-4;
 /** Cone tracing steps of the sun shadow and the local light shadows. */
@@ -715,11 +715,10 @@ export class VoxelLighting {
                   });
                 }
               });
-              // Local light shadow, as Lumen's offscreen shadowing through the global field
-              // (LumenSceneDirectLightingSoftwareRayTracing.usf, TraceOffscreenShadows): one hard
-              // ray from the voxel to the light position, a rect light's centre included,
-              // stopping one field voxel short of the light so geometry right next to it does
-              // not shadow it (VoxelSizeRelativeRayEndBias). Traced only where it lights a face.
+              // Local light shadow through the global field: one hard ray from the voxel to the
+              // light position (a rect light's centre), stopping one field voxel short of the
+              // light so geometry right next to it does not shadow it. Traced only where it
+              // lights a face.
               this.$l.lightSum = pb.add(this.lf0, this.lf1, this.lf2, this.lf3, this.lf4, this.lf5);
               this.$l.lightShadow = pb.float(1);
               this.$if(

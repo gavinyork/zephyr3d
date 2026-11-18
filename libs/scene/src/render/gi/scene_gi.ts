@@ -63,7 +63,7 @@ export class SceneGI {
       raysPerProbe: 128,
       budget: 4096,
       hysteresis: 0.97,
-      // Lumen's irradiance field gather: (0.2 N + 0.8 V) * 0.75 * cell * 0.8
+      // Gather bias: (0.2 N + 0.8 V) * 0.75 * cell * 0.8
       normalBias: 0.12,
       viewBias: 0.48,
       intensity: 1,

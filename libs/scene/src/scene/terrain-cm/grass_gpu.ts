@@ -109,10 +109,8 @@ export function grassBladeLodDistance(lodDistance: number, drawDistance: number)
 const GRASS_BLADE_MAX_LEVELS = 8;
 /**
  * Widest a procedural blade grows by the detail levels, as a multiple of its height: a level
- * keeps a blade in four and widens it fourfold to keep the ground as covered, which would soon
- * turn blades into wide strips, and as wide as tall they read as leaves, a vegetable patch rather
- * than grass. A quarter of the height keeps them blades; past it the deeper levels let the ground
- * show through instead.
+ * keeps a blade in four and widens it fourfold to keep the ground covered, and blades much wider
+ * than this read as leaves. Past the cap the deeper levels let the ground show through instead.
  * @internal
  */
 export const GRASS_BLADE_MAX_ASPECT = 0.25;

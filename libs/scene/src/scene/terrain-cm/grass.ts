@@ -1287,7 +1287,7 @@ export class GrassRenderer extends Disposable {
   }
   /**
    * Whether the grass is drawn at all, a runtime switch such as a quality setting: off, no blades
-   * are placed, drawn or cast shadows, and the ground under the grass is no longer darkened (see
+   * are placed, drawn or cast shadows, and the ground under the grass is not darkened (see
    * {@link GrassLayer.groundOcclusion}). The layers and their density maps are kept. Not saved
    * with the terrain.
    */

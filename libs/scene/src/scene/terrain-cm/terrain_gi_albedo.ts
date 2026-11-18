@@ -16,9 +16,8 @@ const CAPTURE_SIZE = 1024;
 const CHECKER_MEAN_ALBEDO = 0.7;
 
 /**
- * Top-down capture of a terrain's material albedo for global illumination, after the Lumen
- * surface cache, which captures a landscape into a heightfield card seen from above
- * (LumenSceneCardCapture.cpp) and reads it where heightfield rays hit.
+ * Top-down capture of a terrain's material albedo for global illumination, read where heightfield
+ * rays hit.
  *
  * One rgba8 texture over the terrain region, 1024 texels along its longer side, with mips so
  * coarse material voxels read an average. Each texel blends the detail layers by the splat map

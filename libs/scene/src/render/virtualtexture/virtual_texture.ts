@@ -451,8 +451,8 @@ export class VirtualTexture extends Disposable {
    * Builds a compute program filling the pages mapped by the last update, calling `fillTexel`
    * once per texel of each page, border included. Each workgroup fills one block of
    * FILL_GROUP x FILL_GROUP texels of a page, one texel per thread: the pages of an update are
-   * few, and a workgroup per page left most of the GPU idle while its threads looped over the
-   * page one block after the other. The program belongs to the caller, who disposes it.
+   * few, so a workgroup per page would leave most of the GPU idle. The program belongs to the
+   * caller, who disposes it.
    *
    * @param label - Program label
    * @param setup - Declares the owner's own bindings (group 0)

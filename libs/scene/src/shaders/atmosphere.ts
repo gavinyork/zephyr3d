@@ -452,8 +452,8 @@ export interface AtmosphereCloudShadow {
 }
 
 /**
- * Cloud shadow factor at an observer-local position, after UE's GetCloudVolumetricShadow
- * (VolumetricCloudCommon.ush) and its atmosphere strength lerp.
+ * Cloud shadow factor at an observer-local position, lerped toward 1 by the on-atmosphere
+ * strength.
  */
 function atmosphereCloudShadow(
   scope: PBInsideFunctionScope,
@@ -560,8 +560,8 @@ export function getSkyView(
         );
         this.$l.t1 = transmittanceToSky(this, this.params, this.p, this.params.lightDir, texTransmittanceLut);
         if (cloudShadow) {
-          // Volumetric cloud shadow on the single scattering only, as UE's SkyAtmosphere.usf
-          // (PlanetShadow *= saturate(lerp(1, cloud transmittance, OnAtmosphereStrength)))
+          // Cloud shadow on the single scattering only:
+          // shadow *= saturate(lerp(1, cloud transmittance, onAtmosphereStrength))
           this.t1 = pb.mul(this.t1, atmosphereCloudShadow(this, this.params, this.p, cloudShadow));
         }
         this.$l.s = scattering(this, this.params, this.p, this.viewDir);

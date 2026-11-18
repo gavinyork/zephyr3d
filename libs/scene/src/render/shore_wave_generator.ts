@@ -48,9 +48,8 @@ const IRREGULAR_STEP = 0.05;
 const SEGMENT_SCALE = 0.06;
 const SEGMENT_DEPTH = 0.85;
 /**
- * Band limit of the displacement against the mesh, after Crest's per-LOD
- * wavelength filtering (Bowles, "Crest: Novel ocean rendering techniques in an
- * open source framework", SIGGRAPH 2017): as mesh vertices per crest spacing
+ * Band limit of the displacement against the mesh, by per-LOD wavelength
+ * filtering (Bowles 2017, SIGGRAPH Advances course): as mesh vertices per crest spacing
  * fall from SHARP_SAMPLES_FULL to SHARP_SAMPLES_MIN the sharpened profile eases
  * back to a sine; from AMP_SAMPLES_FULL to AMP_SAMPLES_MIN the wave flattens.
  * The fragment stage keeps the full profile in its normals.
@@ -193,8 +192,7 @@ const SHORE_LEVELS_MAX = 4;
 const SHORE_TRUST_START = 0.5;
 /**
  * The foam the shore waves make feeds the water's foam field (see
- * {@link WaterFoamField}), as Crest's UpdateFoam.compute (Wave Harmonic, MIT)
- * is fed: by the waves where their displacement is squeezed (the determinant
+ * {@link WaterFoamField}): by the waves where their displacement is squeezed (the determinant
  * of its Jacobian below a coverage threshold) and by shallow water.
  */
 
@@ -265,13 +263,13 @@ export interface ShoreWaveSettings {
    * bend of its own. Defaults to 0.6.
    */
   irregularity?: number;
-  /** Scale of the foam the breaking waves make (Crest's Wave Foam Strength). Defaults to 1. */
+  /** Scale of the foam the breaking waves make. Defaults to 1. */
   waveFoamStrength?: number;
-  /** How much of the waves makes foam, 0..1, higher for more (Crest's Wave Foam Coverage). Defaults to 0.55. */
+  /** How much of the waves makes foam, 0..1, higher for more. Defaults to 0.55. */
   waveFoamCoverage?: number;
-  /** Water shallower than this many metres makes foam (Crest's Shoreline Foam Max Depth). Defaults to 0.65. */
+  /** Water shallower than this many metres makes foam. Defaults to 0.65. */
   shorelineFoamMaxDepth?: number;
-  /** Scale of the foam shallow water makes (Crest's Shoreline Foam Strength). Defaults to 2. */
+  /** Scale of the foam shallow water makes. Defaults to 2. */
   shorelineFoamStrength?: number;
   /** How opaque the foam the water makes dashing against walls, rocks and piers is, 0..1 (see FOAM_WALL). Defaults to 1. */
   wallFoamStrength?: number;
@@ -462,7 +460,7 @@ export class ShoreWaveGenerator extends Disposable implements WaveGenerator, Foa
    * The velocity carrying the foam (the drift, led along walls, slowed in
    * shallow water, see FOAM_SETTLE) and the foam the shore waves make this
    * step: from the waves where their displacement squeezes the water and from
-   * shallow water past the surf, both prewarmed as Crest does, and from the
+   * shallow water past the surf, both prewarmed, and from the
    * water dashing against walls (see FOAM_WALL); added to the open water's.
    * Raises the foam to the surf's (see SURF_FOAM) through the state's z, and
    * keeps the wrapped generator's displacement in the field's state near walls.
@@ -541,8 +539,8 @@ export class ShoreWaveGenerator extends Disposable implements WaveGenerator, Foa
           this.waveStrength,
           pb.clamp(pb.sub(this.swFoamSource.y, this.sw.z), 0, 1)
         );
-        // Foam from shallow water, by the depth under the displaced surface, as
-        // Crest makes it, scaled by the kinetic-energy potential of Ihmsen et al.
+        // Foam from shallow water, by the depth under the displaced surface,
+        // scaled by the kinetic-energy potential of Ihmsen et al.
         // (eq. (8), I_k = Phi(E_k)) of the water's speed under the shore waves,
         // per unit mass between the wall foam's speeds: made while a crest surges
         // in, not where the water lies still. Only where there is water, only on
@@ -587,9 +585,9 @@ export class ShoreWaveGenerator extends Disposable implements WaveGenerator, Foa
             this.$l.waveNormal = pb.vec3(0, 1, 0);
             that._base.calcVertexPositionAndNormal(this, this.restPos, this.wavePos, this.waveNormal);
             this.$l.rise = pb.sub(this.wavePos.y, this.restPos.y);
-            // The wall as seen from where the waves carry this water, as Crest takes
-            // the shallow water foam's depth at the displaced position
-            // (UpdateFoam.compute): the field is kept at undisplaced positions
+            // The wall as seen from where the waves carry this water, as the shallow
+            // water foam's depth is taken at the displaced position: the field is
+            // kept at undisplaced positions
             this.$l.wallAt = that.wall(this, pb.add(this.xz, pb.sub(this.wavePos.xz, this.restPos.xz)));
             this.$l.wallReach = pb.max(0, pb.sub(1, pb.div(this.wallAt.z, FOAM_SLIP_BAND)));
             this.$l.wallW = this.$choice(
@@ -698,8 +696,7 @@ export class ShoreWaveGenerator extends Disposable implements WaveGenerator, Foa
     const that = this;
     pb.func('swFoamFlow', [pb.vec2('xz'), pb.vec2('drift')], function () {
       // The drift only, not the waves' water: flow mapping (Vlachos, "Water Flow
-      // in Portal 2", SIGGRAPH 2010) needs a smooth, slowly varying flow, as
-      // Crest's currents are, and the surge and swash jump at the waterline and
+      // in Portal 2", SIGGRAPH 2010) needs a smooth, slowly varying flow, and the surge and swash jump at the waterline and
       // shear along the beach. The field still carries the foam with the waves.
       // Slowed in shallow water as the field's foam is (see FOAM_SETTLE), so
       // the water's foam pattern and the beach's are one; by the still-water
@@ -1187,7 +1184,7 @@ export class ShoreWaveGenerator extends Disposable implements WaveGenerator, Foa
           this.wl.z,
           pb.float(-1e4)
         );
-        // Speed of the water carrying the foam along the way in. In place of Crest's
+        // Speed of the water carrying the foam along the way in: in place of a
         // flow simulation, the velocity under a long wave, u = g eta / c with c the
         // crest speed, towards the shore.
         this.$l.flow = pb.clamp(

@@ -304,7 +304,7 @@ export function globalSDFCovered(scope: PBInsideFunctionScope, worldPos: PBShade
 }
 
 /**
- * Lumen surface expand (GlobalDistanceFieldUtils.ush) for a {@link sampleSceneSDFWithVoxel}
+ * Surface expand distance for a {@link sampleSceneSDFWithVoxel}
  * sample at `p`, `t` along a trace: one voxel of the level read ({@link SDF_NOT_COVERED_EXPAND_SCALE}
  * in two-sided bricks), ramping from 0 over the first two voxels. Zero for dynamic instances.
  * @internal

@@ -5,9 +5,7 @@ import { Vector3 } from '@zephyr3d/base';
  *
  * @remarks
  * The hemispherical layout keeps only views from above the horizon, gaining more views where trees
- * are seen from. It follows the Godot Octahedral Impostors addon (wojtekpil, MIT,
- * `octahedral_utils.gd` and `ImpostorShader.shader`, `VecToHemiSphereOct` / `OctaHemiSphereEnc`).
- * The full layout is the usual octahedral map (Cigolle et al., "A Survey of Efficient
+ * are seen from. The full layout is the usual octahedral map (Cigolle et al., "A Survey of Efficient
  * Representations for Independent Unit Vectors", JCGT 2014) with Y as the pole.
  *
  * Grid coordinates are in [0, 1]: frame (i, j) of an N × N grid is captured from the direction at

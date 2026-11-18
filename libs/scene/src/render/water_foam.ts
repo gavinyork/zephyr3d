@@ -19,22 +19,20 @@ import type { WaveGenerator } from './wavegenerator';
 import { ShaderHelper } from '../material/shader/helper';
 
 /**
- * The foam field is stepped as Crest steps its persistent simulations
- * (UpdateFoam.compute, Wave Harmonic, MIT): FOAM_FIELD_FREQUENCY steps per
+ * The foam field is stepped at a fixed rate: FOAM_FIELD_FREQUENCY steps per
  * second, each advecting the field by the water's velocity, fading it and
  * adding what the sources make; at most FOAM_FIELD_MAX_STEPS catch up per
  * frame.
  */
 const FOAM_FIELD_FREQUENCY = 30;
 const FOAM_FIELD_MAX_STEPS = 8;
-/** Crest's flow foam: two samples, each slid for up to FOAM_FLOW_PERIOD seconds and faded across. */
+/** Flow foam: two samples, each slid for up to FOAM_FLOW_PERIOD seconds and faded across. */
 const FOAM_FLOW_PERIOD = 2;
 /**
- * Levels of the field, laid out as Crest's LODs are: all centred on the view,
- * each twice the size of the one before at the same number of cells, each
- * stepped on its own, and an advection that would read off a level reading
- * the next coarser one instead (UpdateFoam.compute). The material reads the
- * finest level holding a point, blended into the next over its edge.
+ * Levels of the field: all centred on the view, each twice the size of the one
+ * before at the same number of cells, each stepped on its own; an advection
+ * that would read off a level reads the next coarser one instead. The material
+ * reads the finest level holding a point, blended into the next over its edge.
  */
 const FOAM_FIELD_LEVELS = 4;
 /** Cells along each side of a level. */
@@ -45,9 +43,8 @@ const FOAM_FIELD_CELLS = 256;
  */
 const FOAM_FIELD_EDGE_BLEND = 0.15;
 /**
- * Crest's gain on the foam the waves make (UpdateFoam.compute): foam is added
- * at FOAM_WAVE_GAIN times the strength times how squeezed the water is, per
- * second.
+ * Gain on the foam the waves make: foam is added at FOAM_WAVE_GAIN times the
+ * strength times how squeezed the water is, per second.
  */
 export const FOAM_WAVE_GAIN = 5;
 
@@ -164,7 +161,7 @@ export class WaterFoamField extends Disposable {
     this._clock = new Vector4();
     this._version = 0;
   }
-  /** How fast the foam fades, per second (Crest's Foam Fade Rate). */
+  /** How fast the foam fades, per second. */
   get fadeRate() {
     return this._fadeRate;
   }
@@ -182,8 +179,8 @@ export class WaterFoamField extends Disposable {
     this._size = Math.max(8, val);
   }
   /**
-   * Scale of the foam the open water's breaking crests leave behind, as
-   * Crest's Wave Foam Strength: 0 leaves foam only while the crest breaks.
+   * Scale of the foam the open water's breaking crests leave behind: 0 leaves
+   * foam only while the crest breaks.
    */
   get baseStrength() {
     return this._baseStrength;
@@ -359,11 +356,10 @@ export class WaterFoamField extends Disposable {
     return scope.ffSample(xz) as PBShaderExp;
   }
   /**
-   * The foam texture carried by the water, as Crest's ComputeFoamWithFlow:
-   * two samples, each slid along the flow for up to FOAM_FLOW_PERIOD seconds
-   * and then set back, half a period apart, faded across so neither jump
-   * shows. Returns (value, slope along x, slope along z) as
-   * {@link sampleFoamTexture} does.
+   * The foam texture carried by the water: two samples, each slid along the
+   * flow for up to FOAM_FLOW_PERIOD seconds and then set back, half a period
+   * apart, faded across so neither jump shows. Returns (value, slope along x,
+   * slope along z) as {@link sampleFoamTexture} does.
    * @param time - Clock in seconds.
    * @param flow - Velocity of the water in metres per second.
    */
@@ -592,10 +588,9 @@ export class WaterFoamField extends Disposable {
 
 /**
  * The open water's share of the foam field: foam left where the wrapped
- * generator's crests break, drifting on the wind. Crest feeds its foam
- * simulation from the Jacobian of its animated waves the same way
- * (UpdateFoam.compute); here the generator's own foam density stands for the
- * squeeze, so the field is fed by the same crests the generator shows foam on.
+ * generator's crests break, drifting on the wind. The generator's own foam
+ * density stands in for the wave Jacobian's squeeze, so the field is fed by
+ * the same crests the generator shows foam on.
  * @internal
  */
 export class WaveFoamSource implements FoamFieldSource {
@@ -652,7 +647,7 @@ export class WaveFoamSource implements FoamFieldSource {
             1
           );
         }
-        // Crest's prewarm of the wave source
+        // On prewarm, feed the source over a longer step so the field starts with foam
         this.$l.waveDt = this.$choice(
           this.prewarm,
           pb.max(this.dt, pb.div(pb.min(1, pb.sub(this.strength, 1)), this.fadeRate)),
@@ -782,8 +777,8 @@ export class FoamFieldWaveGenerator extends Disposable implements WaveGenerator 
     }
     const funcName = `ffCalcNormalAndFoam${foamSample ? 'S' : ''}${footprint ? 'F' : ''}`;
     pb.func(funcName, params, function () {
-      // Screen derivatives for the foam texture: the footprint of xz when given, which a caller
-      // may then call this in a branch with; else taken here, needing uniform control flow
+      // Foam texture derivatives: the caller's xz footprint if given (callable in a branch),
+      // else dpdx/dpdy here, which needs uniform control flow
       if (foamSample) {
         this.$l.xzGrad = footprint ? this.fp : pb.vec4(pb.dpdx(this.xz), pb.dpdy(this.xz));
       }

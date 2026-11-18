@@ -393,7 +393,7 @@ export class PBRBluePrintMaterial
   }
 
   /**
-   * Light through the surface from behind, as through leaves (UE's two-sided foliage): the
+   * Light through the surface from behind, as through leaves (two-sided foliage): the
    * graph's SubsurfaceColor when it is connected, otherwise the material's foliage transmission
    */
   getSubsurfaceColor(scope: PBInsideFunctionScope) {

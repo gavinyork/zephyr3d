@@ -1423,12 +1423,10 @@ export class SkyRenderer extends Disposable {
     );
   }
   /**
-   * Advances a time-sliced rebake by one step per frame, after Unreal's real-time sky light
-   * capture (ReflectionEnvironmentRealTimeCapture.cpp, r.SkyLight.RealTimeReflectionCapture.TimeSlice):
-   * two cube faces of sky per frame, then the specular convolution of mip 0 two faces per frame,
-   * then mips 1, 2, 3, 4-5 and the rest, then the irradiance SH. Everything is written to separate
-   * targets that replace the live ones only in the last step, so lighting never reads a
-   * half-updated environment.
+   * Advances a time-sliced rebake by one step per frame: two cube faces of sky per frame, then
+   * the specular convolution of mip 0 two faces per frame, then mips 1, 2, 3, 4-5 and the rest,
+   * then the irradiance SH. Everything is written to separate targets that replace the live ones
+   * only in the last step, so lighting never reads a half-updated environment.
    */
   private _advanceSlicedBake(ctx: DrawContext) {
     const frame = ctx.device.frameInfo.frameCounter;

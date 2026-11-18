@@ -187,9 +187,8 @@ export class FramePacer {
   /**
    * Called on every display refresh with its requestAnimationFrame timestamp.
    * @param blocked - Asked only when a frame is due: whether the device cannot take one now
-   *   (the GPU is behind). The frame is then tried again at the next refresh, which makes the
-   *   frame before a missed refresh, instead of being counted as rendered and waiting for the
-   *   whole next hold.
+   *   (the GPU is behind). The frame is then retried at the next refresh rather than counted as
+   *   rendered, so it does not wait out the whole next hold.
    * @returns Whether to render a frame at this refresh.
    */
   shouldRender(time: number, blocked?: () => boolean): boolean {

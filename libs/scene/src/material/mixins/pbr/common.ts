@@ -261,8 +261,8 @@ export function mixinPBRCommon<T extends typeof MeshMaterial>(BaseCls: T) {
       this.foliageTransmissionColor = other.foliageTransmissionColor;
     }
     /**
-     * Whether light passes through the surface from behind, as through leaves: UE's two-sided
-     * foliage shading (TwoSidedBxDF), see MeshMaterial.getSubsurfaceColor
+     * Whether light passes through the surface from behind, as through leaves (two-sided
+     * foliage shading), see MeshMaterial.getSubsurfaceColor
      */
     get foliageTransmission() {
       return this.featureUsed<boolean>(FEATURE_FOLIAGE_TRANSMISSION);
@@ -271,7 +271,7 @@ export function mixinPBRCommon<T extends typeof MeshMaterial>(BaseCls: T) {
       this.useFeature(FEATURE_FOLIAGE_TRANSMISSION, !!val);
     }
     /**
-     * Colour of the light passing through from behind (UE's subsurface colour), multiplied by
+     * Colour of the light passing through from behind, multiplied by
      * foliageTransmissionTexture when there is one
      */
     get foliageTransmissionColor(): Immutable<Vector3> {
@@ -1843,9 +1843,8 @@ export function mixinPBRCommon<T extends typeof MeshMaterial>(BaseCls: T) {
             );
             const subsurfaceColor = that.getSubsurfaceColor(this);
             if (subsurfaceColor) {
-              // The sky light reaching the back of the surface comes through it: UE samples the
-              // sky at -N for two-sided foliage (SkyLightingDiffuseShared.ush,
-              // GetSkySHDiffuse(-GBuffer.WorldNormal))
+              // The sky light reaching the back of the surface comes through it, so the
+              // sky is sampled at -N
               this.$l.backIrradiance = ctx.env!.light.envLight.getIrradiance(this, pb.neg(this.normal), ctx);
               this.iblDiffuse = pb.add(
                 this.iblDiffuse,

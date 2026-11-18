@@ -51,9 +51,8 @@ export interface MeshSDFData {
 }
 
 /**
- * Voxels per world unit (metre) of a baked field at resolution scale 1, matching UE5's
- * r.DistanceFields.DefaultVoxelDensity (0.2/cm). Scaled by {@link MeshSDFBakeOptions.unitScale}
- * since meshes keep their authored units.
+ * Voxels per world unit (metre) of a baked field at resolution scale 1. Scaled by
+ * {@link MeshSDFBakeOptions.unitScale} since meshes keep their authored units.
  * @public
  */
 export const SDF_VOXELS_PER_UNIT = 20;
@@ -201,8 +200,8 @@ function computeUnsignedDistances(
 
 /**
  * Bakes the signed distance field of a triangle mesh on the CPU. Unsigned distance by
- * closest-triangle propagation; sign by back-face ray voting near the surface (as UE5's mesh
- * distance field builder), so open and single-sided meshes work without a closed surface.
+ * closest-triangle propagation; sign by back-face ray voting near the surface, so open
+ * and single-sided meshes work without a closed surface.
  *
  * @param positions - Vertex positions, xyz per vertex.
  * @param indices - Three indices per triangle.
@@ -342,8 +341,8 @@ function sphereDirections(perHemisphere: number) {
 
 /**
  * Signs the unsigned distances. Voxels within SIGN_BAND_VOXELS of the surface are inside when
- * they hit anything and more than SIGN_BACK_FRACTION of the rays hit a back face (UE5 mesh
- * distance field criterion). Six-connected regions beyond the band are outside if they reach the
+ * they hit anything and more than SIGN_BACK_FRACTION of the rays hit a back face.
+ * Six-connected regions beyond the band are outside if they reach the
  * volume border, else take the majority sign of their surrounding band voxels.
  */
 function signDistances(

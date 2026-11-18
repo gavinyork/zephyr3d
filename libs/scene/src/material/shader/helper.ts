@@ -1289,9 +1289,8 @@ export class ShaderHelper {
    * Light color/intensity vector with the camera pre-exposure folded into the intensity component.
    *
    * @remarks
-   * Only the intensity (`w`) is scaled; the color stays untouched, matching Filament's
-   * `FScene::prepareDynamicLights`. The light's own cached vector is never mutated because it is
-   * shared across every camera rendering the scene.
+   * Only the intensity (`w`) is scaled; the color stays untouched. The light's own cached vector
+   * is never mutated because it is shared across every camera rendering the scene.
    */
   static getPreExposedColorIntensity(light: PunctualLight, ctx: DrawContext, out?: Vector4) {
     const src = light.diffuseAndIntensity;
@@ -1489,7 +1488,7 @@ export class ShaderHelper {
       pb.vec4('params')
     ]);
     scope[UNIFORM_NAME_CLOUD_SHADOW_PARAMS] = cloudShadowStruct().uniform(0);
-    // Bilinear and clamped, as UE: receivers outside the map read its border
+    // Bilinear and clamped: receivers outside the map read its border
     scope[UNIFORM_NAME_CLOUD_SHADOW_MAP] = pb
       .tex2D()
       .uniform(0)
@@ -1567,9 +1566,8 @@ export class ShaderHelper {
     return pb.getGlobalScope()[funcName](worldPos) as PBShaderExp;
   }
   /**
-   * Volumetric cloud shadow of the sun at a world position, after Unreal's
-   * GetCloudVolumetricShadow (VolumetricCloudCommon.ush) and the on-surface strength lerp of
-   * DeferredLightPixelShaders.usf; 1 for every other light.
+   * Volumetric cloud shadow of the sun at a world position, with the on-surface strength applied;
+   * 1 for every other light.
    *
    * @param lightDirection - Direction the light travels, i.e. `directionAndCutoff.xyz`.
    * @returns A float multiplier, or null when this pass has no cloud shadow.

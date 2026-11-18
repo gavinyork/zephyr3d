@@ -8,9 +8,6 @@
  * its threshold, its rotation and its scale. A candidate is thus the same whenever and wherever
  * it is evaluated, which is what lets one area be regenerated on its own: the instances outside
  * stay untouched, and the ones inside that already existed come out bit for bit the same.
- *
- * The approach follows the PCG paint tool of Unreal Engine 5, which also seeds every point from
- * its position (PCGHelpers::ComputeSeedFromPosition) so that painted points stay stable.
  */
 
 /** Number of floats per foliage instance: x, z, y offset, rotation about Y, scale */

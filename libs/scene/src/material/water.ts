@@ -176,8 +176,7 @@ const COX_MUNK_CROSSWIND_BASE = 0.003;
 const COX_MUNK_CROSSWIND = 1.92e-3;
 /**
  * Roughness over which the sky reflection hands over from the sharp baked sky
- * to the environment's GGX-prefiltered radiance map, as Crest picks its
- * reflection mip by roughness.
+ * to the environment's GGX-prefiltered radiance map.
  */
 const SKY_PREFILTER_START = 0.06;
 const SKY_PREFILTER_FULL = 0.15;
@@ -242,14 +241,12 @@ const REFRACT_BLUR_DENSITY = 1.5;
 /** Cap on the refraction blur LOD. */
 export const REFRACT_BLUR_MAX_LOD = 6;
 /**
- * The foam's look follows Crest's OceanFoam.hlsl (Wave Harmonic, MIT): a
- * white foam layer cut from the foam texture by the foam density with a
- * feathered black point, lit through a normal taken from the slope of that
+ * Foam look: a white foam layer cut from the foam texture by the foam
+ * density with a feathered black point, lit through a normal taken from the slope of that
  * cut over a step of a quarter texel per metre of view depth, with a narrow
  * glint; and beneath it bubbles, the same texture blurred three mips and
  * shifted by parallax as if under the surface, tinted and lit by the sky.
- * The texture drifts at FOAM_DRIFT metres per second along x and z, Crest's
- * time / 10.
+ * The texture drifts at FOAM_DRIFT metres per second along x and z.
  */
 const FOAM_DRIFT = 0.1;
 const FOAM_BUBBLE_MIP_SCALE = 8;
@@ -443,7 +440,7 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
     this._foamFalloff = 1.5;
     this._foamColor = new Vector3(0.92, 0.95, 0.97);
     this._foamParams = new Vector4();
-    // Crest's defaults
+    // Foam look defaults
     this._foamFeather = 0.4;
     this._foamNormalStrength = 3.5;
     this._foamBubbleColor = new Vector3(0.64, 0.83, 0.82);
@@ -2176,7 +2173,7 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
       }
     );
     // White foam revealed from a foam texture sample (value, slopes along x
-    // and z) by a density, Crest's feathered black point; as (white foam, its
+    // and z) by a density with a feathered black point; as (white foam, its
     // slope along x, along z).
     pb.func('waterWhiteFoam', [pb.float('density'), pb.vec3('tex'), pb.float('feather')], function () {
       this.$l.t = pb.clamp(
@@ -2466,9 +2463,9 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
           1,
           pb.mul(pb.sub(1, this.crestDensity), pb.sub(1, pb.mul(this.wallDensity, this.foamShadingParams.z)))
         );
-        // Normal of the white foam's relief: Crest differences the cut over a
+        // Normal of the white foam's relief: the cut's slope times a step of a
         // quarter texel per metre of view depth, which keeps the relief at a
-        // distance; the slope times that step here
+        // distance
         this.$l.foamStep = pb.mul(this.dist, 0.25, foamTexelSize(this, this.foamTex, this.foamUVScale));
         this.$l.foamNormal = pb.normalize(
           pb.add(
@@ -2481,7 +2478,7 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
           )
         );
         // The white foam covers the water, its mirror and what is seen through
-        // it alike, as Crest lays it over the finished water colour
+        // it alike, laid over the finished water colour
         // (lerp(col, whiteFoam, a)): both only on the share without foam.
         // `bodyWeight`, the exit transmission on that share, weighs the
         // refraction and every body term below.
@@ -2548,7 +2545,7 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
         this.$l.dbgSunScatter = pb.vec3(0);
         this.$l.dbgShadow = pb.vec3(1);
         this.$l.dbgSpecular = pb.vec3(0);
-        // Subsurface crest gate, after Ceto: the lit wall thins with height,
+        // Subsurface crest gate: the lit wall thins with height,
         // path = max(floor, exp(-softplus(h / H))), gate = exp(-sigma_t *
         // scale * path). On the vertex displacement, not the normal tilt,
         // which is zero at the crest and carries every ripple.
@@ -2625,7 +2622,7 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
             );
           });
           this.$l.lightContrib = this.specularTerm;
-          // Backlit-crest subsurface, after Ceto: grazing^2 * (view ray mirrored
+          // Backlit-crest subsurface: grazing^2 * (view ray mirrored
           // in the rest plane, against the sun)^4 * sun-above-horizon fade.
           // Both cosines are floored.
           this.$l.sssToEye = pb.neg(this.eyeVecNorm);
@@ -2637,7 +2634,7 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
           this.sssAlign = pb.mix(SSS_SUN_ALIGN_FLOOR, 1, pb.mul(this.sssAlign, this.sssAlign));
           this.$l.sssSunUp = pb.smoothStep(0, 0.1, this.lightDir.y);
           this.$l.sssFacing = pb.mul(this.sssGrazing, this.sssAlign, this.sssSunUp);
-          // Scaled by the light colour as in Crest, and by 1 / pi like the other
+          // Scaled by the light colour, and by 1 / pi like the other
           // diffuse terms. Directional lights only; carries `bodyWeight`.
           this.$l.subsurfaceTerm = pb.vec3(0);
           this.$if(pb.equal(type, LIGHT_TYPE_DIRECTIONAL), function () {
@@ -2667,7 +2664,7 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
             );
             this.lightContrib = pb.add(this.lightContrib, this.sunScatterTerm);
           });
-          // Foam as a matte layer, with Crest's narrow glint off its relief.
+          // Foam as a matte layer, with a narrow glint off its relief.
           this.$l.foamGlint = pb.mul(
             pb.pow(
               pb.max(pb.dot(pb.reflect(this.eyeVecNorm, this.foamNormal), this.lightDir), 0),
@@ -2747,7 +2744,7 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
               )
             );
           }
-          // Bubbles under the white foam, part of the water body as in Crest,
+          // Bubbles under the white foam, part of the water body,
           // so under the white foam and the mirror: the foam texture blurred and
           // shifted by parallax, as seen at a depth under the surface
           this.$if(pb.greaterThan(this.bubbleDensity, 0), function () {
@@ -3053,7 +3050,7 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
   set shoreWaveIrregularity(val: number) {
     this._shoreWaves.irregularity = Math.min(Math.max(val, 0), 1);
   }
-  /** How fast the foam fades, per second (Crest's Foam Fade Rate): lower leaves longer trails behind breaking waves. */
+  /** How fast the foam fades, per second: lower leaves longer trails behind breaking waves. */
   get foamFadeRate() {
     return this._foamField.fadeRate;
   }
@@ -3081,28 +3078,28 @@ export class WaterMaterial extends applyMaterialMixins(MeshMaterial, mixinLight)
   set foamFieldSize(val: number) {
     this._foamField.size = val;
   }
-  /** How much foam the breaking shore waves make (Crest's Wave Foam Strength). */
+  /** How much foam the breaking shore waves make. */
   get shoreWaveFoamStrength() {
     return this._shoreWaves.waveFoamStrength!;
   }
   set shoreWaveFoamStrength(val: number) {
     this._shoreWaves.waveFoamStrength = Math.max(0, val);
   }
-  /** How much of the shore waves makes foam, 0..1, higher for more (Crest's Wave Foam Coverage). */
+  /** How much of the shore waves makes foam, 0..1, higher for more. */
   get shoreWaveFoamCoverage() {
     return this._shoreWaves.waveFoamCoverage!;
   }
   set shoreWaveFoamCoverage(val: number) {
     this._shoreWaves.waveFoamCoverage = Math.min(Math.max(val, 0), 1);
   }
-  /** Water shallower than this many metres makes foam (Crest's Shoreline Foam Max Depth). */
+  /** Water shallower than this many metres makes foam. */
   get shoreWaveShallowFoamDepth() {
     return this._shoreWaves.shorelineFoamMaxDepth!;
   }
   set shoreWaveShallowFoamDepth(val: number) {
     this._shoreWaves.shorelineFoamMaxDepth = Math.max(0.01, val);
   }
-  /** How much foam shallow water makes (Crest's Shoreline Foam Strength). */
+  /** How much foam shallow water makes. */
   get shoreWaveShallowFoamStrength() {
     return this._shoreWaves.shorelineFoamStrength!;
   }

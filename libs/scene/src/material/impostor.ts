@@ -53,11 +53,10 @@ const DEBUG_OUTPUTS: readonly ImpostorDebugOutput[] = [
  *
  * @remarks
  * The mesh is a quad with corners at (±1, ±1, 0) and the bounding box of the baked object, drawn
- * with the object's transform (uniform scale). Follows the Godot Octahedral Impostors runtime
- * shader (wojtekpil, MIT, `ImpostorShader.shader`):
+ * with the object's transform (uniform scale):
  *
- * - The quad faces the view and is pushed towards it by the bounding radius, as UE ImpostorBaker's
- *   Camera Push, so the ground the object stands on does not cut it.
+ * - The quad faces the view and is pushed towards it by the bounding radius, so the ground the
+ *   object stands on does not cut it.
  * - The view direction in the object's space picks a cell of the frame grid, cut along its
  *   diagonal; the triangle it falls in gives three frames and their barycentric weights.
  * - Each vertex's view ray is intersected with the plane each frame was captured on, giving the
@@ -142,8 +141,8 @@ export class ImpostorMaterial extends PBRMetallicRoughnessMaterial implements Cl
   /**
    * Colour of the light the object lets through from behind, atlas; null when it lets none
    * through. Lit as the object is, see MeshMaterial.getSubsurfaceColor. Not named
-   * subsurfaceTexture, which PBRMetallicRoughnessMaterial's (deprecated) subsurface scattering
-   * texture property already is, defined on each instance and so hiding an accessor here.
+   * subsurfaceTexture: that instance property of PBRMetallicRoughnessMaterial would hide an
+   * accessor here.
    */
   get transmissionAtlas() {
     return this._subsurfaceTexture.get();
@@ -233,8 +232,8 @@ export class ImpostorMaterial extends PBRMetallicRoughnessMaterial implements Cl
       pb.select(pb.sub(scope.cameraPos, scope.pivot), scope.cameraWorld[2].xyz, scope.ortho)
     );
     // The quad, facing the view and pushed towards it by the radius. Casting shadows it is pushed
-    // away from the light instead, as Godot's shadow pass does (negative aabb_max), or it would
-    // shadow itself: its pixels then lie behind the depth it casts
+    // away from the light instead, or it would shadow itself: its pixels then lie behind the
+    // depth it casts
     const push = this.drawContext.renderPass!.type === RENDER_PASS_TYPE_SHADOWMAP ? -1 : 1;
     scope.$l.up = pb.select(
       pb.vec3(0, 1, 0),
@@ -280,7 +279,7 @@ export class ImpostorMaterial extends PBRMetallicRoughnessMaterial implements Cl
     scope.$l.grid = pb.mul(scope.Z_impostorVectorToGrid(scope.dirObj), pb.sub(scope.frames, 1));
     scope.$l.cell = pb.clamp(pb.floor(scope.grid), pb.vec2(0), pb.vec2(pb.sub(scope.frames, 2)));
     scope.$l.fr = pb.clamp(pb.sub(scope.grid, scope.cell), pb.vec2(0), pb.vec2(1));
-    // Godot's TriangleInterpolator: the cell cut along its diagonal
+    // The cell cut along its diagonal
     scope.$l.second = pb.select(pb.vec2(0, 1), pb.vec2(1, 0), pb.greaterThan(scope.fr.x, scope.fr.y));
     scope.$outputs.zImpostorFrame = pb.vec4(scope.cell, scope.second);
     scope.$outputs.zImpostorWeights = pb.vec3(
@@ -324,7 +323,7 @@ export class ImpostorMaterial extends PBRMetallicRoughnessMaterial implements Cl
     }
     super.fragmentShader(scope);
     if (shadowPass && this.needFragmentColorInput()) {
-      // Depth derived pixel depth offset (UE ImpostorBaker), for shadows only: the quad lies a
+      // Depth derived pixel depth offset, for shadows only: the quad lies a
       // radius off the object, and parts of it would sink into the ground and cast nothing
       // there, cutting the shadow along a straight line. The depth of the surface the frames
       // show is written instead, as the object itself would have.
@@ -466,8 +465,7 @@ export class ImpostorMaterial extends PBRMetallicRoughnessMaterial implements Cl
    * Lit at the surface the frames show rather than on the quad, which lies a radius towards the
    * view: back along the view by (1 - depth)·2R, depth being 1 at the front of the bounds. On the
    * quad, everything seen against the light would sit in the tree's own shadow and lose its
-   * transmitted light. Follows UE ImpostorBaker's depth derived pixel depth offset, used here for
-   * the lighting only.
+   * transmitted light.
    */
   PBRLight(
     scope: PBInsideFunctionScope,

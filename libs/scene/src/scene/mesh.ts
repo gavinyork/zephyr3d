@@ -484,11 +484,10 @@ export class Mesh extends MeshBase implements BatchDrawable {
    * (from the nearest distance on) and out (up to the farthest), in meters. Default 0, no fade.
    *
    * @remarks
-   * Each pixel is kept or dropped by a fixed screen-space pattern, UE's ClipLODTransition
-   * (MaterialTemplate.ush): a mesh fading out over a band keeps exactly the pixels a mesh fading in
-   * over the same band drops, so two meshes whose ranges overlap by the width cross-fade without
-   * holes or double coverage, shadows included. The fade amount follows the distance linearly, as
-   * UE's per-instance fade (InstancingFadeOutParams, LocalVertexFactory.ush).
+   * Each pixel is kept or dropped by a fixed screen-space pattern: a mesh fading out over a band
+   * keeps exactly the pixels a mesh fading in over the same band drops, so two meshes whose ranges
+   * overlap by the width cross-fade without holes or double coverage, shadows included. The fade
+   * amount follows the distance linearly.
    *
    * Only applies where instances are culled on the GPU (WebGPU batch groups); elsewhere the mesh
    * switches at the ends of its range.

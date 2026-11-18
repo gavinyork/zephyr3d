@@ -17,10 +17,9 @@ const FOAM_RIM_WIDTH = 0.18;
 const FOAM_CLUMPS = 4;
 const FOAM_CLUMP_WEIGHT = 0.5;
 /**
- * Grey levels of Crest's default foam texture (Foam2.png, Wave Harmonic, MIT)
- * at every sixteenth of its texels in order, darkest to brightest. The
- * default texture is remapped to them rank for rank, so a foam density
- * uncovers as much of it as of Crest's.
+ * Target grey levels at every sixteenth of the texels in order, darkest to
+ * brightest. The default texture is remapped to them rank for rank, which
+ * fixes how much of it a given foam density uncovers.
  */
 const FOAM_LEVELS = [
   0.0, 0.455, 0.51, 0.557, 0.596, 0.631, 0.655, 0.675, 0.694, 0.71, 0.722, 0.737, 0.753, 0.769, 0.796, 0.839,
@@ -95,8 +94,7 @@ function rim(d: number, width: number) {
  * Default foam texture: a tile of bubbles, cells of Worley's basis at two
  * scales whose walls (where F2 - F1, the distance to the edge between two
  * cells, is small) are bright and whose middles dark, over clumps of value
- * noise, its grey levels those of Crest's default foam texture (see
- * FOAM_LEVELS). Value in the red channel.
+ * noise, its grey levels remapped to FOAM_LEVELS. Value in the red channel.
  *
  * @internal
  */
@@ -116,7 +114,7 @@ export function getDefaultFoamTexture() {
         values[y * n + x] = FOAM_CLUMP_WEIGHT * clumps + (1 - FOAM_CLUMP_WEIGHT) * bubbles;
       }
     }
-    // Rank for rank onto Crest's grey levels
+    // Rank for rank onto FOAM_LEVELS
     const order = Array.from(values.keys()).sort((a, b) => values[a] - values[b]);
     const data = new Uint8Array(n * n * 4);
     const last = FOAM_LEVELS.length - 1;

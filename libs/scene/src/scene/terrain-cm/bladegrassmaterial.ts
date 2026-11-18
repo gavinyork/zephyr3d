@@ -79,9 +79,8 @@ export function createBladeIndices(): Uint16Array<ArrayBuffer> {
  *   does not thin out to nothing;
  * - distant normals: farther away the normal blends toward a normal shared by the whole clump and
  *   the surface gets rougher, which keeps distant fields from glittering. The talk does not say
- *   what that normal is; here it is the terrain normal (as in the cainrademan/Unity-Grass
- *   reimplementation) leaned toward the clump's facing by its tilt, so a distant field shades
- *   like a canopy lit from above instead of like blades turned away from a low sun.
+ *   what that normal is; here it is the terrain normal leaned toward the clump's facing by its
+ *   tilt, so a distant field shades like a canopy lit from above instead of like blades turned away from a low sun.
  *
  * Color follows the talk too: a gradient along the blade whose column is picked by the blade's
  * clump (a color texture, or root and tip colors with a per-clump brightness), and an ambient
@@ -624,8 +623,8 @@ export class ClipmapBladeGrassMaterial
     scope.$l[v('p1')] = pb.add(pb.mul(scope[v('p3')], 1 / 3), scope[v('bendOffset')]);
     scope.$l[v('p2')] = pb.add(pb.mul(scope[v('p3')], 2 / 3), scope[v('bendOffset')]);
     // Sway: a sine bob of the upper control points, whose phase comes from the blade's hash and
-    // the position along the blade (Ghost of Tsushima), scaled by the wind push. Applying it to
-    // the last two control points with weights 2/3 and 1 follows cainrademan/Unity-Grass.
+    // the position along the blade (Ghost of Tsushima), scaled by the wind push, applied to the
+    // last two control points with weights 2/3 and 1.
     scope.$l[v('swayPhase')] = pb.add(
       pb.mul(windTime, scope.zBladeWind.z),
       pb.mul(scope.inst2.w, Math.PI * 2)
@@ -661,8 +660,7 @@ export class ClipmapBladeGrassMaterial
       );
       sc.$l[`${tag}HalfWidth`] = pb.mul(sc[v('widthScale')], pb.mix(1, omt, sc.zBladeShape.x));
       // View-space thickening: when the blade's normal is nearly orthogonal to the view vector the
-      // blade is seen edge-on, so its sides also step apart across the view. The response curve
-      // is the one of the cainrademan/Unity-Grass reimplementation.
+      // blade is seen edge-on, so its sides also step apart across the view.
       sc.$l[`${tag}Centre`] = pb.add(sc.base, sc[`${tag}Curve`]);
       sc.$l[`${tag}ToCamera`] = pb.normalize(pb.sub(cameraPos, sc[`${tag}Centre`]));
       sc.$l[`${tag}Normal`] = pb.normalize(pb.cross(sc[v('widthDir')], sc[`${tag}Tangent`]));

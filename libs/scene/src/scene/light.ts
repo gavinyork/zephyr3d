@@ -411,10 +411,9 @@ export class DirectionalLight extends PunctualLight {
     super(scene, LIGHT_TYPE_DIRECTIONAL);
     this.intensity = 10;
     this._illuminance = 100000;
-    // Unreal's UDirectionalLightComponent defaults
     this._castCloudShadows = false;
     this._cloudShadowExtent = 150000;
-    // UE defaults to 1; half keeps the trace affordable on integrated GPUs
+    // Half resolution keeps the trace affordable on integrated GPUs
     this._cloudShadowMapResolutionScale = 0.5;
     this._cloudShadowRaySampleCountScale = 1;
     this._cloudShadowStrength = 1;
@@ -446,8 +445,8 @@ export class DirectionalLight extends PunctualLight {
     this._castCloudShadows = !!val;
   }
   /**
-   * Half the size of the area around the camera the cloud shadow map covers is twice this, in
-   * meters of the atmosphere. Smaller keeps finer cloud shadows. Default 150000.
+   * Size of the area around the camera the cloud shadow map covers, in atmosphere meters: it
+   * reaches twice this to each side. Smaller gives finer cloud shadows. Default 150000.
    */
   get cloudShadowExtent() {
     return this._cloudShadowExtent;

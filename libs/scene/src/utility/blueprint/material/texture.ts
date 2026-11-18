@@ -1247,8 +1247,7 @@ export class TextureSampleNode extends BaseGraphNode {
  * Texture property query node
  *
  * @remarks
- * Queries metadata derived from a texture object, similar to Unreal Engine's
- * `TextureProperty` material expression.
+ * Queries metadata derived from a texture object.
  *
  * Supported properties:
  * - `TextureSize`: returns the texture dimensions as a vec2
