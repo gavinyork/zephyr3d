@@ -163,6 +163,13 @@ export const GRASS_CULL_PLANES = 12;
 const OCCLUSION_SAMPLES = WORKGROUP_SIZE * WORKGROUP_SIZE;
 /** Metres a workgroup's culling box is widened by, for rounding in the blade positions */
 const GROUP_CULL_SLACK = 0.01;
+/**
+ * Steepest a view frustum's edges may turn away from the camera's facing, seen from above, for
+ * the placement windows to be clipped to the wedge they span (see cullRect)
+ */
+const CULL_RECT_MAX_HALF_WEDGE = Math.PI / 2 - 0.01;
+/** Least the way back toward the light must climb per unit, for windows clipped to the casters */
+const CULL_RECT_MIN_LIGHT_RISE = 1e-3;
 
 /**
  * Terrain occlusion culling mode of the GPU grass placement
@@ -536,6 +543,9 @@ export class GrassGpuPlacement extends Disposable {
    * @param shadowFade - Procedural blades only: (start, end) view depth over which the blades thin
    *   out to none, each leaving at its own depth by a hash. Lets the blades casting shadows fade
    *   out before the last cascade they are drawn into instead of stopping at its far split.
+   * @param casterHull - With cullPlanes of a shadow map: the 8 corners (xyz) of the slice of the
+   *   view its cascade covers, then the direction the light travels in. The casters lie in the
+   *   slice swept toward the light, and the placement windows are clipped to where that reaches.
    */
   generate(
     camera: Camera,
@@ -551,7 +561,8 @@ export class GrassGpuPlacement extends Disposable {
     windParams?: Nullable<Float32Array<ArrayBuffer>>,
     target = 0,
     cullPlanes?: Nullable<Float32Array<ArrayBuffer>>,
-    shadowFade?: Nullable<[number, number]>
+    shadowFade?: Nullable<[number, number]>,
+    casterHull?: Nullable<Float32Array<ArrayBuffer>>
   ) {
     const placementTarget = this.getTarget(target);
     const density = this._densityTexture.get();
@@ -592,6 +603,29 @@ export class GrassGpuPlacement extends Disposable {
     let highCount = 0;
     let lowCount = 0;
     const lod = grassDensityLod(drawDistance, farDensity);
+    const bounds = terrain.getWorldBoundingVolume()?.toAABB();
+    // How far a blade can stand from its cell: the clump pull moves it toward the nearest clump
+    // point, at most a clump cell diagonal away
+    const pullReach =
+      blade && bladeShape ? Math.abs(bladeShape[10]) * Math.SQRT2 * Math.max(1e-3, bladeShape[8]) : 0;
+    // A placement window clipped to the part of the culling volume within a distance, for blades
+    // of a bounding radius: what the view sees, or a shadow map's casters
+    const clip = (win: [number, number, number, number], reach: number, radius: number, unit: number) =>
+      GrassGpuPlacement.clipWindow(
+        win,
+        GrassGpuPlacement.cullRect(
+          camera,
+          cameraPos,
+          reach,
+          radius + pullReach + GROUP_CULL_SLACK,
+          cullPlanes ? (casterHull ?? null) : null,
+          !!cullPlanes,
+          bounds ? bounds.maxPoint.y : null
+        ),
+        region,
+        cellSizeX * unit,
+        cellSizeZ * unit
+      );
     if (blade) {
       // A blade reaches at most its tallest height from its base in any direction, plus half its
       // width, which grows fourfold toward each next level, up to GRASS_BLADE_MAX_ASPECT times
@@ -617,19 +651,25 @@ export class GrassGpuPlacement extends Disposable {
         const start = k === 0 ? 0 : first * 2 ** (k - 1);
         const end = k === levels - 1 ? NO_LIMIT : first * 2 ** k;
         const reach = Math.min(end, drawRadius);
-        const win = GrassGpuPlacement.cellWindow(
-          centerX,
-          centerZ,
-          reach / cellSizeX,
-          reach / cellSizeZ,
-          cellsW,
-          cellsH,
-          unit
-        );
         // The blades a level keeps for the next widen fourfold toward it
         const width = Math.min(baseWidth * 4 ** (k < levels - 1 ? k + 1 : k), maxWidth);
+        const radius = maxHeight + width * 0.5;
+        const win = clip(
+          GrassGpuPlacement.cellWindow(
+            centerX,
+            centerZ,
+            reach / cellSizeX,
+            reach / cellSizeZ,
+            cellsW,
+            cellsH,
+            unit
+          ),
+          reach,
+          radius,
+          unit
+        );
         this._levelWindows.set(win, k * 4);
-        this._levelInfo.set([unit, start, end, maxHeight + width * 0.5], k * 4);
+        this._levelInfo.set([unit, start, end, radius], k * 4);
         windowWidth = Math.max(windowWidth, win[2]);
         windowHeight = Math.max(windowHeight, win[3]);
         // The units of the ring the level covers, widened by a unit and a half and by the pull,
@@ -661,19 +701,6 @@ export class GrassGpuPlacement extends Disposable {
       this._params.setXYZW(seed * 4, drawDistance, maxHeight + maxWidth * 0.5, 0);
       bladeHeight = maxHeight;
     } else {
-      const win = GrassGpuPlacement.cellWindow(
-        centerX,
-        centerZ,
-        drawRadius / cellSizeX,
-        drawRadius / cellSizeZ,
-        cellsW,
-        cellsH,
-        1
-      );
-      this._window.setXYZW(win[0], win[1], win[2], win[3]);
-      windowWidth = win[2];
-      windowHeight = win[3];
-      highCount = win[2] * win[3];
       // Bounding sphere of a blade, centred halfway up; the density LOD widens distant blades
       const maxWidth = bladeWidth / lod[1];
       // The wind turns a card about its base, which takes its top up to 1.12 times its height
@@ -682,6 +709,24 @@ export class GrassGpuPlacement extends Disposable {
         windParams && windParams[2] > 0
           ? maxWidth * 0.5 + bladeHeight * 1.12
           : Math.sqrt(maxWidth * maxWidth * 0.25 + bladeHeight * bladeHeight * 0.25);
+      const win = clip(
+        GrassGpuPlacement.cellWindow(
+          centerX,
+          centerZ,
+          drawRadius / cellSizeX,
+          drawRadius / cellSizeZ,
+          cellsW,
+          cellsH,
+          1
+        ),
+        drawRadius,
+        radius + bladeHeight * 0.5,
+        1
+      );
+      this._window.setXYZW(win[0], win[1], win[2], win[3]);
+      windowWidth = win[2];
+      windowHeight = win[3];
+      highCount = win[2] * win[3];
       this._params.setXYZW(seed * 4, drawDistance, radius, bladeHeight * 0.5);
     }
     if (highCount + lowCount <= 0) {
@@ -708,15 +753,11 @@ export class GrassGpuPlacement extends Disposable {
     // Terrain occlusion needs the height pyramid, and heights that grow upwards
     const pyramid = terrain.heightPyramid;
     const occlusion = pyramid && terrain.scale.y > 0 ? occlusionMode : GrassOcclusionMode.Off;
-    const bounds = terrain.getWorldBoundingVolume()?.toAABB();
     // Absorbs half float and interpolation error in the heights
     const epsilon = bounds ? (bounds.maxPoint.y - bounds.minPoint.y) * 1e-3 + 1e-4 : 1e-3;
     this._occlusion.setXYZW(occlusion, terrain.clipmapTileResolution, epsilon, bladeHeight);
-    // Workgroup culling: the heights blades stand at, how far one can stand from its cell (the
-    // clump pull moves it toward the nearest clump point, at most a clump cell diagonal away),
-    // and whether the height pyramid can narrow the heights under a group
-    const pullReach =
-      blade && bladeShape ? Math.abs(bladeShape[10]) * Math.SQRT2 * Math.max(1e-3, bladeShape[8]) : 0;
+    // Workgroup culling: the heights blades stand at, how far one can stand from its cell, and
+    // whether the height pyramid can narrow the heights under a group
     this._groupCull.setXYZW(
       bounds ? bounds.minPoint.y - epsilon : -NO_LIMIT,
       bounds ? bounds.maxPoint.y + epsilon : NO_LIMIT,
@@ -826,6 +867,138 @@ export class GrassGpuPlacement extends Disposable {
     const z0 = Math.max(0, Math.floor(cz - rz));
     const z1 = Math.min(Math.ceil(cellsH / unit), Math.ceil(cz + rz));
     return [x0, z0, Math.max(0, x1 - x0), Math.max(0, z1 - z0)];
+  }
+  /**
+   * A window of placement units clipped to a world XZ rectangle, null for none
+   * @param win - (first x, first z, units wide, units high)
+   * @param rect - (min x, min z, max x, max z)
+   * @param region - Terrain region the units are laid over from its corner
+   * @param unitX - Unit width
+   * @param unitZ - Unit depth
+   */
+  private static clipWindow(
+    win: [number, number, number, number],
+    rect: Nullable<[number, number, number, number]>,
+    region: Vector4,
+    unitX: number,
+    unitZ: number
+  ): [number, number, number, number] {
+    if (!rect) {
+      return win;
+    }
+    const x0 = Math.max(win[0], Math.floor((rect[0] - region.x) / unitX));
+    const z0 = Math.max(win[1], Math.floor((rect[1] - region.y) / unitZ));
+    const x1 = Math.min(win[0] + win[2], Math.ceil((rect[2] - region.x) / unitX));
+    const z1 = Math.min(win[1] + win[3], Math.ceil((rect[3] - region.y) / unitZ));
+    return x1 > x0 && z1 > z0 ? [x0, z0, x1 - x0, z1 - z0] : [win[0], win[1], 0, 0];
+  }
+  /**
+   * World XZ rectangle (min x, min z, max x, max z) holding every blade, of a bounding radius
+   * plus how far it can stand from its cell (`margin`), that can pass the culling planes within a
+   * distance of the camera; null where none is worked out and the whole window is placed.
+   *
+   * - The view: the frustum, seen from above, lies in the wedge from the camera spanned by its
+   *   edges, which bounds it out to the distance unless it opens to a half turn or wider (looking
+   *   steeply up or down) or the camera is orthographic.
+   * - A shadow map (`shadow`): its casters lie in the slice of the view its cascade covers (the
+   *   8 corners of `hull`, then the light direction) swept toward the light, and no higher than
+   *   the terrain's top (`top`, null if unknown); a light near the horizon sweeps too far.
+   */
+  private static cullRect(
+    camera: Camera,
+    eye: Vector3,
+    reach: number,
+    margin: number,
+    hull: Nullable<Float32Array<ArrayBuffer>>,
+    shadow: boolean,
+    top: Nullable<number>
+  ): Nullable<[number, number, number, number]> {
+    let minX = Infinity;
+    let minZ = Infinity;
+    let maxX = -Infinity;
+    let maxZ = -Infinity;
+    const add = (x: number, z: number) => {
+      minX = Math.min(minX, x);
+      minZ = Math.min(minZ, z);
+      maxX = Math.max(maxX, x);
+      maxZ = Math.max(maxZ, z);
+    };
+    if (shadow) {
+      if (!hull) {
+        return null;
+      }
+      const lx = hull[24];
+      const lz = hull[26];
+      // How fast the way back toward the light climbs
+      const rise = -hull[25];
+      if (rise < CULL_RECT_MIN_LIGHT_RISE) {
+        return null;
+      }
+      let highest = -Infinity;
+      for (let i = 0; i < 8; i++) {
+        highest = Math.max(highest, hull[i * 3 + 1]);
+      }
+      const ceiling = (top ?? highest) + margin;
+      for (let i = 0; i < 8; i++) {
+        const x = hull[i * 3];
+        const y = hull[i * 3 + 1];
+        const z = hull[i * 3 + 2];
+        // The corner, and where its way back toward the light passes the ceiling
+        const t = Math.max(0, (ceiling - y) / rise);
+        add(x, z);
+        add(x - lx * t, z - lz * t);
+      }
+    } else {
+      if (!camera.isPerspective() || !Number.isFinite(reach) || reach >= NO_LIMIT * 0.5) {
+        return null;
+      }
+      const m = camera.worldMatrix;
+      const fx = -m.m02;
+      const fz = -m.m22;
+      if (Math.hypot(fx, fz) < 1e-3) {
+        return null;
+      }
+      const facing = Math.atan2(fz, fx);
+      // Angle from the facing, in (-pi, pi]
+      const turn = (a: number) => {
+        let d = (a - facing) % (Math.PI * 2);
+        if (d > Math.PI) {
+          d -= Math.PI * 2;
+        } else if (d <= -Math.PI) {
+          d += Math.PI * 2;
+        }
+        return d;
+      };
+      const corners = camera.frustum.corners;
+      let lo = Infinity;
+      let hi = -Infinity;
+      // The far corners, odd indices (see Frustum.CORNER_LEFT_TOP_FAR)
+      for (let i = 1; i < 8; i += 2) {
+        const dx = corners[i].x - eye.x;
+        const dz = corners[i].z - eye.z;
+        if (Math.hypot(dx, dz) < 1e-6) {
+          return null;
+        }
+        const d = turn(Math.atan2(dz, dx));
+        if (Math.abs(d) >= CULL_RECT_MAX_HALF_WEDGE) {
+          return null;
+        }
+        lo = Math.min(lo, d);
+        hi = Math.max(hi, d);
+      }
+      add(eye.x, eye.z);
+      add(eye.x + reach * Math.cos(facing + lo), eye.z + reach * Math.sin(facing + lo));
+      add(eye.x + reach * Math.cos(facing + hi), eye.z + reach * Math.sin(facing + hi));
+      // The circle's extremes along the axes, where the wedge holds them
+      for (let a = 0; a < 4; a++) {
+        const angle = (a * Math.PI) / 2;
+        const d = turn(angle);
+        if (d >= lo && d <= hi) {
+          add(eye.x + reach * Math.cos(angle), eye.z + reach * Math.sin(angle));
+        }
+      }
+    }
+    return [minX - margin, minZ - margin, maxX + margin, maxZ + margin];
   }
   /**
    * Instance buffer written by the last generate() call into a target

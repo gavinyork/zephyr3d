@@ -1063,6 +1063,8 @@ export class GrassLayer extends Disposable {
    * Places the blades seen from a camera on the GPU path; nothing to do on the CPU one.
    * @param shadowCullPlanes - For each shadow map the blades cast shadows into, the planes
    *   bounding where its casters can be (see GrassRenderer); blade layers only
+   * @param shadowCasterHulls - For each of those, the corners of the slice of the view it covers
+   *   and the light direction, see GrassGpuPlacement.generate
    * @param shadowFade - View depths over which the shadow casting blades thin out
    * @internal
    */
@@ -1071,6 +1073,7 @@ export class GrassLayer extends Disposable {
     terrain: ClipmapTerrain,
     occlusionMode: GrassOcclusionMode,
     shadowCullPlanes: Float32Array<ArrayBuffer>[],
+    shadowCasterHulls: Float32Array<ArrayBuffer>[],
     shadowFade: Nullable<[number, number]>
   ) {
     if (!this._gpu) {
@@ -1082,7 +1085,8 @@ export class GrassLayer extends Disposable {
       target: number,
       mode: GrassOcclusionMode,
       planes: Nullable<Float32Array<ArrayBuffer>>,
-      fade: Nullable<[number, number]>
+      fade: Nullable<[number, number]>,
+      hull: Nullable<Float32Array<ArrayBuffer>>
     ) =>
       RenderGraphExecutor.profileScope(target === 0 ? 'GrassView' : `GrassShadow${target - 1}`, () =>
         this._gpu!.generate(
@@ -1099,17 +1103,18 @@ export class GrassLayer extends Disposable {
           wind,
           target,
           planes,
-          fade
+          fade,
+          hull
         )
       );
-    place(0, occlusionMode, null, null);
+    place(0, occlusionMode, null, null, null);
     // Target i + 1 holds the casters of shadow map i. Blades hidden behind the terrain from the
     // camera still cast shadows, so these skip the occlusion culling. A layer casting no
     // shadows, or no shadow maps to cast into (see GrassRenderer.calcShadowCullPlanes), places
     // none, and drops the lists it had.
     const numShadowTargets = this._kind === 'blade' && this._castShadow ? shadowCullPlanes.length : 0;
     for (let i = 0; i < numShadowTargets; i++) {
-      place(i + 1, GrassOcclusionMode.Off, shadowCullPlanes[i], shadowFade);
+      place(i + 1, GrassOcclusionMode.Off, shadowCullPlanes[i], shadowFade, shadowCasterHulls[i] ?? null);
     }
     this._gpu.trimTargets(numShadowTargets + 1);
     this._numShadowTargets = numShadowTargets;
@@ -1244,6 +1249,8 @@ export class GrassRenderer extends Disposable {
   private static readonly _faceDots = [0, 0, 0, 0, 0, 0];
   private static readonly _facePlane = new Float32Array(4);
   private static readonly _shadowCullPlanes: Float32Array<ArrayBuffer>[] = [];
+  /** Per shadow map cascade: the 8 corners of its slice of the view, then the light direction */
+  private static readonly _shadowCasterHulls: Float32Array<ArrayBuffer>[] = [];
   private readonly _terrain: DWeakRef<ClipmapTerrain>;
   private _layers: GrassLayer[];
   private _enabled: boolean;
@@ -1479,7 +1486,14 @@ export class GrassRenderer extends Disposable {
       RenderGraphExecutor.profileScope('TerrainGrass', () => {
         this._layers.forEach((layer, i) => {
           const update = () =>
-            layer.updatePerCamera(camera, terrain, mode, shadowCullPlanes, this._shadowFade);
+            layer.updatePerCamera(
+              camera,
+              terrain,
+              mode,
+              shadowCullPlanes,
+              GrassRenderer._shadowCasterHulls,
+              this._shadowFade
+            );
           if (this._layers.length > 1) {
             RenderGraphExecutor.profileScope(`GrassLayer${i}`, update);
           } else {
@@ -1547,6 +1561,16 @@ export class GrassRenderer extends Disposable {
         Vector3.add(center, corners[c], center);
       }
       center.scaleBy(1 / 8);
+      // The slice and the light direction, which the placement clips its windows by
+      const hull = (GrassRenderer._shadowCasterHulls[i] ??= new Float32Array(27));
+      for (let c = 0; c < 8; c++) {
+        hull[c * 3] = corners[c].x;
+        hull[c * 3 + 1] = corners[c].y;
+        hull[c * 3 + 2] = corners[c].z;
+      }
+      hull[24] = lightDir.x;
+      hull[25] = lightDir.y;
+      hull[26] = lightDir.z;
       // Faces of the slice: the four corners sharing one bit, normals pointing inward
       const faceDots = GrassRenderer._faceDots;
       const planes = (GrassRenderer._shadowCullPlanes[i] ??= new Float32Array(GRASS_CULL_PLANES * 4));
