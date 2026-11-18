@@ -448,9 +448,11 @@ export class VirtualTexture extends Disposable {
     }
   }
   /**
-   * Builds a compute program filling the pages mapped by the last update. Each workgroup fills
-   * one page, border included, calling `fillTexel` once per texel. The program belongs to the
-   * caller, who disposes it.
+   * Builds a compute program filling the pages mapped by the last update, calling `fillTexel`
+   * once per texel of each page, border included. Each workgroup fills one block of
+   * FILL_GROUP x FILL_GROUP texels of a page, one texel per thread: the pages of an update are
+   * few, and a workgroup per page left most of the GPU idle while its threads looped over the
+   * page one block after the other. The program belongs to the caller, who disposes it.
    *
    * @param label - Program label
    * @param setup - Declares the owner's own bindings (group 0)
@@ -465,7 +467,6 @@ export class VirtualTexture extends Disposable {
   ) {
     const that = this;
     const S = this._slotSize;
-    const iterations = Math.ceil(S / FILL_GROUP);
     return this._device.buildComputeProgram({
       label,
       workgroupSize: [FILL_GROUP, FILL_GROUP, 1],
@@ -478,11 +479,26 @@ export class VirtualTexture extends Disposable {
         setup?.(this);
         that.defineLevelOf(pb);
         pb.main(function () {
+          // Workgroups (entry, block x, block y), see finalize
           this.$l.entry = this.$builtins.workGroupId.x;
+          this.$l.tx = pb.add(
+            pb.mul(this.$builtins.workGroupId.y, FILL_GROUP),
+            this.$builtins.localInvocationId.x
+          );
+          this.$l.ty = pb.add(
+            pb.mul(this.$builtins.workGroupId.z, FILL_GROUP),
+            this.$builtins.localInvocationId.y
+          );
           this.$l.pageId = this.zVT_fillList.at(pb.mul(this.entry, 2));
-          this.$if(pb.equal(this.pageId, INDEX_NONE), function () {
-            this.$return();
-          });
+          this.$if(
+            pb.or(
+              pb.equal(this.pageId, INDEX_NONE),
+              pb.or(pb.greaterThanEqual(this.tx, S), pb.greaterThanEqual(this.ty, S))
+            ),
+            function () {
+              this.$return();
+            }
+          );
           this.$l.phys = this.zVT_fillList.at(pb.add(pb.mul(this.entry, 2), 1));
           this.$l.level = this.zVT_levelOf(this.pageId);
           this.$l.info = this.zVT_params.at(pb.add(this.level, 4));
@@ -498,24 +514,16 @@ export class VirtualTexture extends Disposable {
             ),
             S
           );
-          this.$for(pb.uint('iy'), 0, iterations, function () {
-            this.$l.ty = pb.add(pb.mul(this.iy, FILL_GROUP), this.$builtins.localInvocationId.y);
-            this.$for(pb.uint('ix'), 0, iterations, function () {
-              this.$l.tx = pb.add(pb.mul(this.ix, FILL_GROUP), this.$builtins.localInvocationId.x);
-              this.$if(pb.and(pb.lessThan(this.tx, S), pb.lessThan(this.ty, S)), function () {
-                this.$l.texel = pb.add(
-                  pb.sub(
-                    pb.mul(pb.vec2(pb.float(this.page.x), pb.float(this.page.y)), that._pageSize),
-                    pb.vec2(that._border)
-                  ),
-                  pb.add(pb.vec2(pb.float(this.tx), pb.float(this.ty)), pb.vec2(0.5))
-                );
-                const values = fillTexel(this, this.level, this.texel);
-                values.forEach((v, i) => {
-                  pb.textureStore(this[`zVT_plane${i}`], pb.add(this.origin, pb.uvec2(this.tx, this.ty)), v);
-                });
-              });
-            });
+          this.$l.texel = pb.add(
+            pb.sub(
+              pb.mul(pb.vec2(pb.float(this.page.x), pb.float(this.page.y)), that._pageSize),
+              pb.vec2(that._border)
+            ),
+            pb.add(pb.vec2(pb.float(this.tx), pb.float(this.ty)), pb.vec2(0.5))
+          );
+          const values = fillTexel(this, this.level, this.texel);
+          values.forEach((v, i) => {
+            pb.textureStore(this[`zVT_plane${i}`], pb.add(this.origin, pb.uvec2(this.tx, this.ty)), v);
           });
         });
       }
@@ -885,6 +893,8 @@ export class VirtualTexture extends Disposable {
   private buildProgram(name: string): GPUProgram {
     const that = this;
     const base = name.replace(/[01]$/, '');
+    // Blocks of FILL_GROUP texels along each side of a page slot, see createFillProgram
+    const fillBlocks = Math.ceil(this._slotSize / FILL_GROUP);
     const common = (pb: ProgramBuilder, scope: PBGlobalScope) => {
       that.declareParams(pb, scope);
     };
@@ -1301,12 +1311,13 @@ export class VirtualTexture extends Disposable {
               }
             );
             this.zVT_state.setAt(0, pb.vec4(this.bias, this.state.yzw));
+            // Fill: a workgroup per block of each page to fill, see createFillProgram
             this.zVT_dispatchArgs.setAt(
               3,
               pb.min(pb.atomicAdd(this.zVT_counters.at(C_FILL), 0), this.zVT_params.at(1).y)
             );
-            this.zVT_dispatchArgs.setAt(4, pb.uint(1));
-            this.zVT_dispatchArgs.setAt(5, pb.uint(1));
+            this.zVT_dispatchArgs.setAt(4, pb.uint(fillBlocks));
+            this.zVT_dispatchArgs.setAt(5, pb.uint(fillBlocks));
           });
         });
       case 'propagate':
