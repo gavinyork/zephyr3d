@@ -8,6 +8,7 @@ import type {
   PBGlobalScope,
   PBInsideFunctionScope,
   PBShaderExp,
+  ProgramBuilder,
   Texture2D,
   Texture2DArray
 } from '@zephyr3d/device';
@@ -17,6 +18,7 @@ import { fetchSampler } from '../utility/misc';
 import { getDefaultFoamTexture, sampleFoamTexture } from '../utility/textures/foam';
 import type { WaveGenerator } from './wavegenerator';
 import { ShaderHelper } from '../material/shader/helper';
+import { RenderGraphExecutor } from './rendergraph/executor';
 
 /**
  * The foam field is stepped at a fixed rate: FOAM_FIELD_FREQUENCY steps per
@@ -30,13 +32,26 @@ const FOAM_FIELD_MAX_STEPS = 8;
 const FOAM_FLOW_PERIOD = 2;
 /**
  * Levels of the field: all centred on the view, each twice the size of the one
- * before at the same number of cells, each stepped on its own; an advection
- * that would read off a level reads the next coarser one instead. The material
- * reads the finest level holding a point, blended into the next over its edge.
+ * before at the same number of cells; an advection that would read off a level
+ * reads the next coarser one instead. The material reads the finest level
+ * holding a point, blended into the next over its edge.
+ *
+ * Level i steps once every 2^i steps of the finest, over that much time: its
+ * cells are 2^i times as wide, so the foam crosses as many of them in a step
+ * (refined in time as in space, Berger & Oliger, "Adaptive Mesh Refinement for
+ * Hyperbolic Partial Differential Equations", J. Comput. Phys. 53, 1984). The
+ * coarser levels take turns, level i at the steps n with n mod 2^i = 2^(i-1),
+ * so no step works out more than two levels.
  */
 const FOAM_FIELD_LEVELS = 4;
+/** All the levels, as a mask of them. */
+const FOAM_FIELD_ALL_LEVELS = (1 << FOAM_FIELD_LEVELS) - 1;
+/** Steps of the finest level after which the turns of the coarser levels repeat. */
+const FOAM_FIELD_CYCLE = 1 << (FOAM_FIELD_LEVELS - 1);
 /** Cells along each side of a level. */
 const FOAM_FIELD_CELLS = 256;
+/** Threads along each side of a workgroup of the compute step. */
+const FOAM_FIELD_GROUP_SIZE = 8;
 /**
  * Share of a level, from each edge inwards, over which its coverage falls to
  * 0, so the foam with memory hands over to the foam without it with no seam.
@@ -79,6 +94,9 @@ export interface FoamFieldSource {
    *   is raised to at least this step, for foam whose amount the source knows
    *   outright rather than as a rate; in y the share of the fade rate the foam
    *   here fades at.
+   * @param cell - Side in metres of the cell the step works out. A level's
+   *   grid holds nothing finer, so a source reads its own fields filtered over
+   *   it rather than at a point, which would alias what is finer into the field.
    */
   calcFoamStep(
     scope: PBInsideFunctionScope,
@@ -87,7 +105,8 @@ export interface FoamFieldSource {
     fadeRate: PBShaderExp,
     prewarm: PBShaderExp,
     state: PBShaderExp,
-    shape: PBShaderExp
+    shape: PBShaderExp,
+    cell: PBShaderExp
   ): PBShaderExp;
 }
 
@@ -95,6 +114,8 @@ export interface FoamFieldSource {
 interface FoamStepProgram {
   program: GPUProgram;
   bindGroup: BindGroup;
+  /** A compute program stepping every level in one dispatch, else a fragment program drawing one level */
+  compute: boolean;
 }
 
 /**
@@ -108,17 +129,32 @@ interface FoamStepProgram {
 export class WaterFoamField extends Disposable {
   /** Ping-pong pair of arrays, a layer per level: the foam in r, the wall foam in g, the sources' state in ba. */
   private _arrays: Nullable<[Texture2DArray, Texture2DArray]>;
+  /** Fragment path: a framebuffer on each array of the pair */
   private _framebuffers: Nullable<[FrameBuffer, FrameBuffer]>;
   private _current: number;
   /** Per level: (origin x, origin z, cell size, cells) as the field holds it; 0 cells before it does. */
   private readonly _regions: Vector4[];
   /** Per level: where the grid goes this frame. */
   private readonly _targets: Vector4[];
+  /** Compute path: the targets, a vec4 per level */
+  private readonly _levelRegions: Float32Array<ArrayBuffer>;
+  /** Compute path: where the levels lay at the last step, a vec4 per level and one of 0 cells past the coarsest */
+  private readonly _levelPrevRegions: Float32Array<ArrayBuffer>;
   private _programs: Map<string, FoamStepProgram>;
   private _timeToSimulate: number;
   private _lastTime: number;
-  /** Clock at which the sources last wrote their per-cell state; negative for never. */
-  private _stateTime: number;
+  /** Per level: clock at which the sources last wrote its per-cell state; negative for never. */
+  private readonly _stateTimes: number[];
+  /** Per level: seconds since then, as of this frame. */
+  private readonly _sinceState: number[];
+  /** Per level: steps of the finest level since it last stepped, the time its next step covers. */
+  private readonly _pendingSteps: number[];
+  /** Per level: the last step of this frame that works it out, -1 for none. */
+  private readonly _lastSteps: number[];
+  /** Per step of this frame: the levels it works out, as a mask. */
+  private readonly _stepMasks: number[];
+  /** Steps of the finest level since prewarming, modulo FOAM_FIELD_CYCLE: whose turn it is. */
+  private _stepCount: number;
   private _prewarm: boolean;
   private _fadeRate: number;
   private _size: number;
@@ -127,10 +163,16 @@ export class WaterFoamField extends Disposable {
   /** Velocity the foam drifts at on the wind, metres per second. */
   private readonly _driftVelocity: Vector2;
   private _dummy: Nullable<Texture2DArray>;
-  /** (dt, fade rate, prewarm, level) */
+  /** (seconds a step of the finest level covers, fade rate, prewarm, level on the fragment path) */
   private readonly _params: Vector4;
-  /** (seconds since the sources' state was written, whether this step writes it, 0, 0) */
-  private readonly _stateParams: Vector4;
+  /**
+   * Per level: (seconds its step covers, steps of the finest level it covers,
+   * seconds since its sources' state was written, 0 kept as it is / 1 stepped /
+   * 2 stepped and writing the state)
+   */
+  private readonly _levelParams: Vector4[];
+  /** Compute path: the level parameters, a vec4 per level */
+  private readonly _levelParamArray: Float32Array<ArrayBuffer>;
   /** (clock in seconds, 0, 0, 0) */
   private readonly _clock: Vector4;
   private _version: number;
@@ -145,10 +187,19 @@ export class WaterFoamField extends Disposable {
       this._regions.push(new Vector4());
       this._targets.push(new Vector4());
     }
+    this._levelRegions = new Float32Array(FOAM_FIELD_LEVELS * 4);
+    this._levelPrevRegions = new Float32Array((FOAM_FIELD_LEVELS + 1) * 4);
+    this._levelParams = Array.from({ length: FOAM_FIELD_LEVELS }, () => new Vector4());
+    this._levelParamArray = new Float32Array(FOAM_FIELD_LEVELS * 4);
+    this._stateTimes = new Array<number>(FOAM_FIELD_LEVELS).fill(-1);
+    this._sinceState = new Array<number>(FOAM_FIELD_LEVELS).fill(0);
+    this._pendingSteps = new Array<number>(FOAM_FIELD_LEVELS).fill(0);
+    this._lastSteps = new Array<number>(FOAM_FIELD_LEVELS).fill(-1);
+    this._stepMasks = new Array<number>(FOAM_FIELD_MAX_STEPS).fill(0);
+    this._stepCount = 0;
     this._programs = new Map();
     this._timeToSimulate = 0;
     this._lastTime = -1;
-    this._stateTime = -1;
     this._prewarm = true;
     this._fadeRate = 0.8;
     this._size = 128;
@@ -157,7 +208,6 @@ export class WaterFoamField extends Disposable {
     this._driftVelocity = new Vector2();
     this._dummy = null;
     this._params = new Vector4();
-    this._stateParams = new Vector4();
     this._clock = new Vector4();
     this._version = 0;
   }
@@ -208,9 +258,11 @@ export class WaterFoamField extends Disposable {
    * Places the levels around a point of the water, each on whole cells of its
    * own so that the field is carried over without resampling while the point
    * stays put, and steps the field to a clock time there. The time behind is
-   * caught up in fixed steps of 1 / FOAM_FIELD_FREQUENCY; with no step due, a
-   * step of no time still carries the field over to where the grids now lie.
-   * The first step prewarms it.
+   * caught up in fixed steps of 1 / FOAM_FIELD_FREQUENCY, which the coarser
+   * levels take in turns (see FOAM_FIELD_LEVELS). A level not stepped stays
+   * where it lies: its next step carries it over to where it then goes, so it
+   * trails the point by at most a step of its own, and the material reads the
+   * field where it holds it either way. The first step prewarms every level.
    * @param focusX - World x the levels are centred on.
    * @param focusZ - World z the levels are centred on.
    * @param time - Clock in seconds.
@@ -224,7 +276,6 @@ export class WaterFoamField extends Disposable {
     wind: Nullable<Immutable<Vector2>>,
     source: FoamFieldSource
   ) {
-    let moved = false;
     for (let i = 0; i < FOAM_FIELD_LEVELS; i++) {
       const size = this._size * (1 << i);
       const cell = size / FOAM_FIELD_CELLS;
@@ -235,7 +286,6 @@ export class WaterFoamField extends Disposable {
         cell,
         FOAM_FIELD_CELLS
       );
-      moved = moved || !this._regions[i].equalsTo(this._targets[i]);
     }
     this._driftVelocity.setXY((wind?.x ?? 0) * this._drift, (wind?.y ?? 0) * this._drift);
     const device = getDevice();
@@ -255,48 +305,130 @@ export class WaterFoamField extends Disposable {
       this._timeToSimulate -= steps * stepDt;
     }
     if (steps === 0) {
-      if (!moved && !this._prewarm) {
+      if (!this._prewarm) {
         return;
       }
       steps = 1;
       stepDt = 0;
     }
-    const { program, bindGroup } = this.getStepProgram(device, source);
+    const { program, bindGroup, compute } = this.getStepProgram(device, source);
     source.applyFoamSourceBindGroup(bindGroup);
     bindGroup.setValue('ffDrift', this._driftVelocity);
-    // The sources' state is of the water as it is this frame, which every step
-    // of the frame sees alike: it is read as of the last frame that wrote it
-    // and written at the frame's last step
-    const sinceState = this._stateTime < 0 ? 0 : Math.max(time - this._stateTime, 0);
+    // The levels each step works out: the finest, and the coarser one whose
+    // turn it is; on prewarming all of them
+    for (let step = 0; step < steps; step++) {
+      if (step === 0 && this._prewarm) {
+        this._stepMasks[step] = FOAM_FIELD_ALL_LEVELS;
+      } else {
+        this._stepMasks[step] = WaterFoamField.levelsSteppedAt(this._stepCount);
+        this._stepCount = (this._stepCount + 1) % FOAM_FIELD_CYCLE;
+      }
+    }
+    // A level's sources' state is of the water as it is this frame, which all
+    // its steps of the frame see alike: it is read as of the last frame that
+    // wrote it and written at its last step of the frame
+    for (let i = 0; i < FOAM_FIELD_LEVELS; i++) {
+      this._sinceState[i] = this._stateTimes[i] < 0 ? 0 : Math.max(time - this._stateTimes[i], 0);
+      this._lastSteps[i] = -1;
+      for (let step = 0; step < steps; step++) {
+        if ((this._stepMasks[step] >> i) & 1) {
+          this._lastSteps[i] = step;
+        }
+      }
+    }
     const sampler = fetchSampler('clamp_linear_nomip');
     device.pushDeviceStates();
     for (let step = 0; step < steps; step++) {
-      const fb = this._framebuffers![1 - this._current];
-      bindGroup.setTexture('ffSrc', this._arrays![this._current], sampler);
-      this._stateParams.setXYZW(sinceState, step === steps - 1 ? 1 : 0, 0, 0);
-      bindGroup.setValue('ffState', this._stateParams);
+      const mask = this._stepMasks[step];
       for (let i = 0; i < FOAM_FIELD_LEVELS; i++) {
-        // Only the first step carries the field across a move of the grids
-        const prev = step === 0 ? this._regions : this._targets;
-        bindGroup.setValue('ffRegion', this._targets[i]);
-        bindGroup.setValue('ffPrevRegion', prev[i]);
-        bindGroup.setValue('ffPrevRegionNext', i + 1 < FOAM_FIELD_LEVELS ? prev[i + 1] : Vector4.zero());
-        this._params.setXYZW(stepDt, this._fadeRate, this._prewarm ? 1 : 0, i);
-        bindGroup.setValue('ffParams', this._params);
-        fb.setColorAttachmentLayer(0, i);
-        device.setFramebuffer(fb);
-        device.setProgram(program);
-        device.setBindGroup(0, bindGroup);
-        drawFullscreenQuad();
+        // Every level has the time of a step of the finest to cover
+        if (stepDt > 0) {
+          this._pendingSteps[i]++;
+        }
+        const stepped = ((mask >> i) & 1) !== 0;
+        const covered = stepped ? this._pendingSteps[i] : 0;
+        if (stepped) {
+          this._pendingSteps[i] = 0;
+        }
+        this._levelParams[i].setXYZW(
+          covered * stepDt,
+          covered,
+          this._sinceState[i],
+          stepped ? (step === this._lastSteps[i] ? 2 : 1) : 0
+        );
+      }
+      bindGroup.setTexture('ffSrc', this._arrays![this._current], sampler);
+      // Timed apart, so a frame catching up shows how many steps it took
+      RenderGraphExecutor.profileScope('FoamStep', () => {
+        if (compute) {
+          // Every level in one dispatch, the level its third dimension; a level
+          // kept as it is stays where it lies
+          for (let i = 0; i < FOAM_FIELD_LEVELS; i++) {
+            this._levelRegions.set((mask >> i) & 1 ? this._targets[i] : this._regions[i], i * 4);
+            this._levelPrevRegions.set(this._regions[i], i * 4);
+            this._levelParamArray.set(this._levelParams[i], i * 4);
+          }
+          bindGroup.setValue('ffRegions', this._levelRegions);
+          bindGroup.setValue('ffPrevRegions', this._levelPrevRegions);
+          bindGroup.setValue('ffLevelParams', this._levelParamArray);
+          this._params.setXYZW(stepDt, this._fadeRate, this._prewarm ? 1 : 0, 0);
+          bindGroup.setValue('ffParams', this._params);
+          bindGroup.setTexture('ffDst', this._arrays![1 - this._current]);
+          device.setProgram(program);
+          device.setBindGroup(0, bindGroup);
+          device.compute(
+            FOAM_FIELD_CELLS / FOAM_FIELD_GROUP_SIZE,
+            FOAM_FIELD_CELLS / FOAM_FIELD_GROUP_SIZE,
+            FOAM_FIELD_LEVELS
+          );
+        } else {
+          const fb = this._framebuffers![1 - this._current];
+          for (let i = 0; i < FOAM_FIELD_LEVELS; i++) {
+            bindGroup.setValue('ffRegion', (mask >> i) & 1 ? this._targets[i] : this._regions[i]);
+            bindGroup.setValue('ffPrevRegion', this._regions[i]);
+            bindGroup.setValue(
+              'ffPrevRegionNext',
+              i + 1 < FOAM_FIELD_LEVELS ? this._regions[i + 1] : Vector4.zero()
+            );
+            bindGroup.setValue('ffLevelParam', this._levelParams[i]);
+            this._params.setXYZW(stepDt, this._fadeRate, this._prewarm ? 1 : 0, i);
+            bindGroup.setValue('ffParams', this._params);
+            fb.setColorAttachmentLayer(0, i);
+            device.setFramebuffer(fb);
+            device.setProgram(program);
+            device.setBindGroup(0, bindGroup);
+            drawFullscreenQuad();
+          }
+        }
+      });
+      for (let i = 0; i < FOAM_FIELD_LEVELS; i++) {
+        if ((mask >> i) & 1) {
+          this._regions[i].set(this._targets[i]);
+        }
       }
       this._current = 1 - this._current;
       this._prewarm = false;
     }
     device.popDeviceStates();
     for (let i = 0; i < FOAM_FIELD_LEVELS; i++) {
-      this._regions[i].set(this._targets[i]);
+      if (this._lastSteps[i] >= 0) {
+        this._stateTimes[i] = time;
+      }
     }
-    this._stateTime = time;
+  }
+  /**
+   * The levels step n of the finest level works out, as a mask: the finest,
+   * and the coarser level i whose turn it is, n mod 2^i = 2^(i-1).
+   * @internal
+   */
+  private static levelsSteppedAt(n: number) {
+    let mask = 1;
+    for (let i = 1; i < FOAM_FIELD_LEVELS; i++) {
+      if (n % (1 << i) === 1 << (i - 1)) {
+        mask |= 1 << i;
+      }
+    }
+    return mask;
   }
   /** Declares the uniforms {@link WaterFoamField.sample} reads. */
   setupUniforms(scope: PBGlobalScope, uniformGroup: number) {
@@ -417,6 +549,9 @@ export class WaterFoamField extends Disposable {
     if (this._arrays) {
       return;
     }
+    // The compute step writes the arrays as storage textures, which cannot be
+    // render targets; a new WebGPU texture reads as zero, so needs no clearing
+    const compute = device.type === 'webgpu';
     const createArray = (name: string) => {
       const tex = device.createTexture2DArray(
         'rgba16f',
@@ -424,17 +559,20 @@ export class WaterFoamField extends Disposable {
         FOAM_FIELD_CELLS,
         FOAM_FIELD_LEVELS,
         {
-          mipmapping: false
+          mipmapping: false,
+          writable: compute
         }
       )!;
       tex.name = name;
-      const fb = device.createFrameBuffer([tex], null);
-      for (let i = 0; i < FOAM_FIELD_LEVELS; i++) {
-        fb.setColorAttachmentLayer(0, i);
-        device.setFramebuffer(fb);
-        device.clearFrameBuffer(Vector4.zero(), null, null);
+      if (!compute) {
+        const fb = device.createFrameBuffer([tex], null);
+        for (let i = 0; i < FOAM_FIELD_LEVELS; i++) {
+          fb.setColorAttachmentLayer(0, i);
+          device.setFramebuffer(fb);
+          device.clearFrameBuffer(Vector4.zero(), null, null);
+        }
+        fb.dispose();
       }
-      fb.dispose();
       return tex;
     };
     device.pushDeviceStates();
@@ -445,11 +583,15 @@ export class WaterFoamField extends Disposable {
         r.setXYZW(0, 0, 0, 0);
       }
       this._prewarm = true;
-      this._stateTime = -1;
-      this._framebuffers = [0, 1].map((i) => device.createFrameBuffer([this._arrays![i]], null)) as [
-        FrameBuffer,
-        FrameBuffer
-      ];
+      this._stateTimes.fill(-1);
+      this._pendingSteps.fill(0);
+      this._stepCount = 0;
+      this._framebuffers = compute
+        ? null
+        : ([0, 1].map((i) => device.createFrameBuffer([this._arrays![i]], null)) as [
+            FrameBuffer,
+            FrameBuffer
+          ]);
     } finally {
       device.popDeviceStates();
     }
@@ -459,113 +601,176 @@ export class WaterFoamField extends Disposable {
     const programKey = source.foamSourceKey;
     let entry = this._programs.get(programKey);
     if (!entry) {
-      const program = device.buildRenderProgram({
-        vertex(pb) {
-          this.$inputs.pos = pb.vec2().attrib('position');
-          pb.main(function () {
-            this.$builtins.position = pb.vec4(this.$inputs.pos, 0, 1);
-          });
-        },
-        fragment(pb) {
-          this.$outputs.outColor = pb.vec4();
-          source.setupFoamSourceUniforms(this);
-          this.ffSrc = pb.tex2DArray().uniform(0);
+      const compute = device.type === 'webgpu';
+      // Uniforms of the step: on the compute path the per-level ones are arrays
+      // indexed by the level, on the fragment path those of the level drawn
+      const declare = function (this: PBGlobalScope, pb: ProgramBuilder) {
+        source.setupFoamSourceUniforms(this);
+        this.ffSrc = pb.tex2DArray().uniform(0);
+        if (compute) {
+          this.ffDst = pb.texStorage2DArray.rgba16float().storage(0);
+          // Per level: where it lies
+          this.ffRegions = pb.vec4[FOAM_FIELD_LEVELS]().uniform(0);
+          // Per level: where it lay at the last step, and past the coarsest a level of 0 cells
+          this.ffPrevRegions = pb.vec4[FOAM_FIELD_LEVELS + 1]().uniform(0);
+          // Per level: see WaterFoamField._levelParams
+          this.ffLevelParams = pb.vec4[FOAM_FIELD_LEVELS]().uniform(0);
+        } else {
           this.ffRegion = pb.vec4().uniform(0);
           // Where this level and the next coarser one lay at the last step; 0 cells for none
           this.ffPrevRegion = pb.vec4().uniform(0);
           this.ffPrevRegionNext = pb.vec4().uniform(0);
-          // (dt, fade rate, prewarm, level)
-          this.ffParams = pb.vec4().uniform(0);
-          this.ffDrift = pb.vec2().uniform(0);
-          // (seconds since the sources' state was written, whether this step writes it, 0, 0)
-          this.ffState = pb.vec4().uniform(0);
-          // A point of a level as it was: its uv, and whether the level held it
-          pb.func('ffPrevUV', [pb.vec2('wp'), pb.vec4('region')], function () {
-            this.$l.uv = pb.div(
-              pb.sub(this.wp, this.region.xy),
-              pb.max(pb.mul(this.region.z, this.region.w), 1e-4)
-            );
-            this.$l.rMax = pb.sub(0.5, pb.div(1, pb.max(this.region.w, 1)));
-            this.$l.r = pb.abs(pb.sub(this.uv, pb.vec2(0.5)));
-            this.$return(
-              pb.vec3(
-                this.uv,
-                this.$choice(
-                  pb.and(
-                    pb.greaterThan(this.region.w, 0),
-                    pb.lessThanEqual(pb.max(this.r.x, this.r.y), this.rMax)
-                  ),
-                  pb.float(1),
-                  pb.float(0)
-                )
-              )
-            );
-          });
-          pb.main(function () {
-            this.$l.dt = this.ffParams.x;
-            this.$l.fadeRate = this.ffParams.y;
-            this.$l.prewarm = pb.greaterThan(this.ffParams.z, 0.5);
-            this.$l.level = pb.int(this.ffParams.w);
-            // World position of this cell's centre
-            this.$l.xz = pb.add(this.ffRegion.xy, pb.mul(this.$builtins.fragCoord.xy, this.ffRegion.z));
-            // The sources' state stays with the cell: from the same place, on
-            // the grid as it was, where that grid held it
-            this.$l.stateAt = this.ffPrevUV(this.xz, this.ffPrevRegion);
-            this.$l.prevState = pb.vec2(0);
-            this.$l.stateAge = pb.float(-1);
-            this.$if(pb.greaterThan(this.stateAt.z, 0.5), function () {
-              this.prevState = pb.textureArraySampleLevel(this.ffSrc, this.stateAt.xy, this.level, 0).ba;
-              this.$if(pb.and(pb.not(this.prewarm), pb.greaterThan(this.ffState.x, 0)), function () {
-                this.stateAge = this.ffState.x;
-              });
-            });
-            this.$l.state = pb.vec4(this.prevState, 0, this.stateAge);
-            this.$l.shape = pb.vec2(0, 1);
-            this.$l.src = source.calcFoamStep(
-              this,
-              this.xz,
-              this.dt,
-              this.fadeRate,
-              this.prewarm,
-              this.state,
-              this.shape
-            );
-            // Sample from the previous step, upstream of the flow: this level as
-            // it was, else the next coarser one, nothing where neither held it
-            this.$l.flowed = pb.sub(this.xz, pb.mul(this.src.xy, this.dt));
-            this.$l.at = this.ffPrevUV(this.flowed, this.ffPrevRegion);
-            // (foam, wall foam)
-            this.$l.foam = pb.vec2(0);
-            this.$if(pb.greaterThan(this.at.z, 0.5), function () {
-              this.foam = pb.textureArraySampleLevel(this.ffSrc, this.at.xy, this.level, 0).rg;
-            }).$else(function () {
-              this.$l.atNext = this.ffPrevUV(this.flowed, this.ffPrevRegionNext);
-              this.$if(pb.greaterThan(this.atNext.z, 0.5), function () {
-                this.foam = pb.textureArraySampleLevel(
-                  this.ffSrc,
-                  this.atNext.xy,
-                  pb.add(this.level, 1),
-                  0
-                ).rg;
-              });
-            });
-            // Fade, then what the sources make
-            this.foam = pb.mul(
-              this.foam,
-              pb.max(0, pb.sub(1, pb.mul(this.fadeRate, pb.max(this.shape.y, 0), this.dt)))
-            );
-            this.foam = pb.add(this.foam, this.src.zw);
-            // At least what the source knows is here
-            this.foam.x = pb.max(this.foam.x, pb.clamp(this.shape.x, 0, 1));
-            this.$outputs.outColor = pb.vec4(
-              pb.clamp(this.foam, pb.vec2(0), pb.vec2(1)),
-              this.$choice(pb.greaterThan(this.ffState.y, 0.5), this.state.xy, this.prevState)
-            );
-          });
+          this.ffLevelParam = pb.vec4().uniform(0);
         }
-      })!;
+        // (seconds a step of the finest level covers, fade rate, prewarm, level on the fragment path)
+        this.ffParams = pb.vec4().uniform(0);
+        this.ffDrift = pb.vec2().uniform(0);
+        // A point of a level as it was: its uv, and whether the level held it
+        pb.func('ffPrevUV', [pb.vec2('wp'), pb.vec4('region')], function () {
+          this.$l.uv = pb.div(
+            pb.sub(this.wp, this.region.xy),
+            pb.max(pb.mul(this.region.z, this.region.w), 1e-4)
+          );
+          this.$l.rMax = pb.sub(0.5, pb.div(1, pb.max(this.region.w, 1)));
+          this.$l.r = pb.abs(pb.sub(this.uv, pb.vec2(0.5)));
+          this.$return(
+            pb.vec3(
+              this.uv,
+              this.$choice(
+                pb.and(
+                  pb.greaterThan(this.region.w, 0),
+                  pb.lessThanEqual(pb.max(this.r.x, this.r.y), this.rMax)
+                ),
+                pb.float(1),
+                pb.float(0)
+              )
+            )
+          );
+        });
+      };
+      // The step of one cell, from the locals `cell` (its centre, in cells),
+      // `level`, `region`, `prevRegion`, `prevRegionNext` and
+      // `levelParams`: leaves its new texel in `ffOut`
+      const step = function (this: PBInsideFunctionScope, pb: ProgramBuilder) {
+        this.$l.ffOut = pb.vec4(0);
+        this.$if(pb.lessThan(this.levelParams.w, 0.5), function () {
+          // Not stepped: kept as it is, where it lies
+          this.ffOut = pb.textureArrayLoad(this.ffSrc, pb.ivec2(this.cell), this.level, 0);
+        }).$else(function () {
+          stepCell.call(this, pb);
+        });
+      };
+      const stepCell = function (this: PBInsideFunctionScope, pb: ProgramBuilder) {
+        this.$l.dt = this.levelParams.x;
+        this.$l.fadeRate = this.ffParams.y;
+        this.$l.prewarm = pb.greaterThan(this.ffParams.z, 0.5);
+        // World position of this cell's centre
+        this.$l.xz = pb.add(this.region.xy, pb.mul(this.cell, this.region.z));
+        // The sources' state stays with the cell: from the same place, on
+        // the grid as it was, where that grid held it
+        this.$l.stateAt = this.ffPrevUV(this.xz, this.prevRegion);
+        this.$l.prevState = pb.vec2(0);
+        this.$l.stateAge = pb.float(-1);
+        this.$if(pb.greaterThan(this.stateAt.z, 0.5), function () {
+          this.prevState = pb.textureArraySampleLevel(this.ffSrc, this.stateAt.xy, this.level, 0).ba;
+          this.$if(pb.and(pb.not(this.prewarm), pb.greaterThan(this.levelParams.z, 0)), function () {
+            this.stateAge = this.levelParams.z;
+          });
+        });
+        this.$l.state = pb.vec4(this.prevState, 0, this.stateAge);
+        this.$l.shape = pb.vec2(0, 1);
+        this.$l.src = source.calcFoamStep(
+          this,
+          this.xz,
+          this.dt,
+          this.fadeRate,
+          this.prewarm,
+          this.state,
+          this.shape,
+          this.region.z
+        );
+        // Sample from the previous step, upstream of the flow: this level as
+        // it was, else the next coarser one, nothing where neither held it
+        this.$l.flowed = pb.sub(this.xz, pb.mul(this.src.xy, this.dt));
+        this.$l.at = this.ffPrevUV(this.flowed, this.prevRegion);
+        // (foam, wall foam)
+        this.$l.foam = pb.vec2(0);
+        this.$if(pb.greaterThan(this.at.z, 0.5), function () {
+          this.foam = pb.textureArraySampleLevel(this.ffSrc, this.at.xy, this.level, 0).rg;
+        }).$else(function () {
+          this.$l.atNext = this.ffPrevUV(this.flowed, this.prevRegionNext);
+          this.$if(pb.greaterThan(this.atNext.z, 0.5), function () {
+            this.foam = pb.textureArraySampleLevel(this.ffSrc, this.atNext.xy, pb.add(this.level, 1), 0).rg;
+          });
+        });
+        // Fade, as over the steps of the finest level the step covers, then what
+        // the sources make
+        this.$l.fadeStep = pb.max(
+          0,
+          pb.sub(1, pb.mul(this.fadeRate, pb.max(this.shape.y, 0), this.ffParams.x))
+        );
+        this.foam = pb.mul(
+          this.foam,
+          this.$choice(
+            pb.greaterThan(this.levelParams.y, 0),
+            pb.pow(this.fadeStep, this.levelParams.y),
+            pb.float(1)
+          )
+        );
+        this.foam = pb.add(this.foam, this.src.zw);
+        // At least what the source knows is here
+        this.foam.x = pb.max(this.foam.x, pb.clamp(this.shape.x, 0, 1));
+        this.ffOut = pb.vec4(
+          pb.clamp(this.foam, pb.vec2(0), pb.vec2(1)),
+          this.$choice(pb.greaterThan(this.levelParams.w, 1.5), this.state.xy, this.prevState)
+        );
+      };
+      const program = compute
+        ? device.buildComputeProgram({
+            workgroupSize: [FOAM_FIELD_GROUP_SIZE, FOAM_FIELD_GROUP_SIZE, 1],
+            compute(pb) {
+              declare.call(this, pb);
+              pb.main(function () {
+                this.$l.level = pb.int(this.$builtins.globalInvocationId.z);
+                this.$l.cell = pb.add(pb.vec2(this.$builtins.globalInvocationId.xy), pb.vec2(0.5));
+                this.$l.region = this.ffRegions.at(this.level);
+                this.$l.prevRegion = this.ffPrevRegions.at(this.level);
+                this.$l.prevRegionNext = this.ffPrevRegions.at(pb.add(this.level, 1));
+                this.$l.levelParams = this.ffLevelParams.at(this.level);
+                step.call(this, pb);
+                pb.textureArrayStore(
+                  this.ffDst,
+                  this.$builtins.globalInvocationId.xy,
+                  this.level,
+                  this.ffOut
+                );
+              });
+            }
+          })!
+        : device.buildRenderProgram({
+            vertex(pb) {
+              this.$inputs.pos = pb.vec2().attrib('position');
+              pb.main(function () {
+                this.$builtins.position = pb.vec4(this.$inputs.pos, 0, 1);
+              });
+            },
+            fragment(pb) {
+              this.$outputs.outColor = pb.vec4();
+              declare.call(this, pb);
+              pb.main(function () {
+                this.$l.level = pb.int(this.ffParams.w);
+                this.$l.cell = this.$builtins.fragCoord.xy;
+                this.$l.region = this.ffRegion;
+                this.$l.prevRegion = this.ffPrevRegion;
+                this.$l.prevRegionNext = this.ffPrevRegionNext;
+                this.$l.levelParams = this.ffLevelParam;
+                step.call(this, pb);
+                this.$outputs.outColor = this.ffOut;
+              });
+            }
+          })!;
       program.name = `@WaterFoamFieldStep:${programKey}`;
-      entry = { program, bindGroup: device.createBindGroup(program.bindGroupLayouts[0]) };
+      entry = { program, bindGroup: device.createBindGroup(program.bindGroupLayouts[0]), compute };
       this._programs.set(programKey, entry);
     }
     return entry;
@@ -590,7 +795,9 @@ export class WaterFoamField extends Disposable {
  * The open water's share of the foam field: foam left where the wrapped
  * generator's crests break, drifting on the wind. The generator's own foam
  * density stands in for the wave Jacobian's squeeze, so the field is fed by
- * the same crests the generator shows foam on.
+ * the same crests the generator shows foam on, as the generator shows them
+ * over a pixel the size of the cell: the waves too short for the cell are
+ * filtered out rather than sampled sparsely.
  * @internal
  */
 export class WaveFoamSource implements FoamFieldSource {
@@ -630,19 +837,27 @@ export class WaveFoamSource implements FoamFieldSource {
     fadeRate: PBShaderExp,
     prewarm: PBShaderExp,
     _state: PBShaderExp,
-    _shape: PBShaderExp
+    _shape: PBShaderExp,
+    cell: PBShaderExp
   ): PBShaderExp {
     const pb = scope.$builder;
     const that = this;
     pb.func(
       'wgFoamStep',
-      [pb.vec2('xz'), pb.float('dt'), pb.float('fadeRate'), pb.bool('prewarm')],
+      [pb.vec2('xz'), pb.float('dt'), pb.float('fadeRate'), pb.bool('prewarm'), pb.float('cell')],
       function () {
         this.$l.strength = this.wgFoamSource.x;
         this.$l.density = pb.float(0);
         if (that._generator) {
+          // The cell's footprint, as the screen derivatives of a pixel that size
           this.density = pb.clamp(
-            that._generator.calcFragmentNormalAndFoam(this, this.xz, pb.vec3(0, 1, 0)).w,
+            that._generator.calcFragmentNormalAndFoam(
+              this,
+              this.xz,
+              pb.vec3(0, 1, 0),
+              undefined,
+              pb.vec4(this.cell, 0, 0, this.cell)
+            ).w,
             0,
             1
           );
@@ -658,7 +873,7 @@ export class WaveFoamSource implements FoamFieldSource {
         );
       }
     );
-    return scope.wgFoamStep(xz, dt, fadeRate, prewarm) as PBShaderExp;
+    return scope.wgFoamStep(xz, dt, fadeRate, prewarm, cell) as PBShaderExp;
   }
 }
 
