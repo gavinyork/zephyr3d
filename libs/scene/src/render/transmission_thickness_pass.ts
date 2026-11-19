@@ -438,7 +438,13 @@ export class TransmissionThicknessRenderer {
           });
           this.$l.trParams = this.zReadProfile(this.profileId, pb.float(SSSProfile.transmissionParamColumn));
           this.$l.scalingParams = this.zReadProfile(this.profileId, pb.float(SSSProfile.scalingParamColumn));
-          this.$l.opticalDepthScale = pb.mul(SKIN_OPTICAL_DEPTH_PER_WORLD_UNIT, this.trParams.x);
+          // Measured world distance to optical depth. Dividing by worldUnitScale (world units
+          // per metre) measures in the profile's metres, so the clamp range, floor and bias stay
+          // physical: a model at four times life size with worldUnitScale 4 reads the same
+          this.$l.opticalDepthScale = pb.div(
+            pb.mul(SKIN_OPTICAL_DEPTH_PER_WORLD_UNIT, this.trParams.x),
+            pb.max(this.scalingParams.x, 1e-4)
+          );
           this.$l.shrinkDistance = pb.mul(this.trParams.y, 0.5 * 0.01, this.scalingParams.x);
           this.$l.normalScaleBias = pb.mul(this.shrinkDistance, this.opticalDepthScale);
           this.$if(pb.lessThan(this.pos.w, 1), function () {

@@ -71,16 +71,16 @@ const TRANSMISSION_LUT_MAX_DISTANCE_MM = 50;
 const TRANSMISSION_LUT_RADIUS_OFFSET_MM = 0.6;
 
 /**
- * Profile-space millimetres per world unit, before the profile's own world unit
- * scale is applied.
+ * Profile-space millimetres per profile metre: the world unit at a world unit scale of 1.
  *
  * @internal
  */
 const WORLD_UNITS_TO_PROFILE_MM = 1000;
 
 /**
- * Optical depth accumulated per world unit of light path, before the profile's
- * `extinctionScale`.
+ * Optical depth accumulated per profile metre of light path, before the profile's
+ * `extinctionScale`. The thickness pass divides measured world distances by the
+ * profile's `worldUnitScale` first, so this is per world unit only at a scale of 1.
  *
  * @internal
  */
@@ -464,7 +464,8 @@ export class SSSProfile {
    *
    * @remarks
    * Read by the transmission thickness pass, which needs the world unit scale to
-   * size its normal shrink against the asset.
+   * convert measured thickness to profile metres and to size its normal shrink
+   * against the asset.
    *
    * @public
    */
@@ -641,7 +642,11 @@ export class SSSProfile {
     }
   }
 
-  /** How much surface normal detail survives the diffusion. @public */
+  /**
+   * How far, scaled by 5 mm of profile space, the transmission thickness pass pulls its
+   * sample point back along the normal before measuring, to escape shadow-map depth
+   * quantisation. @public
+   */
   get normalScale() {
     return this._normalScale;
   }
@@ -900,7 +905,8 @@ export class SSSProfile {
    * @public
    */
   writeTransmissionProfile(out: Float32Array, offset = 0) {
-    const invUnitScale = 1 / Math.max(this._worldUnitScale, 1e-4);
+    // The thickness pass already converts to the profile's metres (see worldUnitScale), so the
+    // table's distance axis is plain profile millimetres
     const d = this.getScatterDistance();
     const l = [
       d.x * WORLD_UNITS_TO_PROFILE_MM,
@@ -913,7 +919,7 @@ export class SSSProfile {
       searchLightDiffuseScalingFactor(this._surfaceAlbedo.z)
     ];
     const tint = [this._transmissionTint.x, this._transmissionTint.y, this._transmissionTint.z];
-    const offsetMM = TRANSMISSION_LUT_RADIUS_OFFSET_MM * invUnitScale;
+    const offsetMM = TRANSMISSION_LUT_RADIUS_OFFSET_MM;
     for (let i = 0; i < SKIN_TRANSMISSION_LUT_SIZE; i++) {
       const o = offset + i * 4;
       if (i === SKIN_TRANSMISSION_LUT_SIZE - 1) {
@@ -923,7 +929,7 @@ export class SSSProfile {
         out[o + 3] = 0;
         break;
       }
-      const distanceMM = (i / SKIN_TRANSMISSION_LUT_SIZE) * TRANSMISSION_LUT_MAX_DISTANCE_MM * invUnitScale;
+      const distanceMM = (i / SKIN_TRANSMISSION_LUT_SIZE) * TRANSMISSION_LUT_MAX_DISTANCE_MM;
       const r = distanceMM + offsetMM;
       for (let c = 0; c < 3; c++) {
         out[o + c] =
