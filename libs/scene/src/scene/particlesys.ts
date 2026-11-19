@@ -452,7 +452,8 @@ export class ParticleSystem extends applyMixins(GraphNode, mixinDrawable) implem
           let x = Math.random() * 2 - 1;
           let y = Math.random() * 2 - 1;
           let z = Math.random() * 2 - 1;
-          if (this._emitterBehavior === 'volume') {
+          if (this._emitterBehavior === 'surface') {
+            // Push the point out along its ray onto the nearest face
             const t = Math.max(Math.abs(x), Math.abs(y), Math.abs(z));
             if (t !== 0) {
               x /= t;
