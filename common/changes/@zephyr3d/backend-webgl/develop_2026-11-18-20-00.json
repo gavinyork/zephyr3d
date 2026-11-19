@@ -4,6 +4,11 @@
       "packageName": "@zephyr3d/backend-webgl",
       "comment": "Support anisotropic default samplers.",
       "type": "patch"
+    },
+    {
+      "packageName": "@zephyr3d/backend-webgl",
+      "comment": "Fix textures not being reallocated when their format or size changes.",
+      "type": "patch"
     }
   ],
   "packageName": "@zephyr3d/backend-webgl"

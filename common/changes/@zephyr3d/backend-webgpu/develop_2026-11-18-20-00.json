@@ -9,6 +9,16 @@
       "packageName": "@zephyr3d/backend-webgpu",
       "comment": "Support anisotropic default samplers.",
       "type": "patch"
+    },
+    {
+      "packageName": "@zephyr3d/backend-webgpu",
+      "comment": "Generate the mip chains of array and cube textures in one dispatch per level.",
+      "type": "patch"
+    },
+    {
+      "packageName": "@zephyr3d/backend-webgpu",
+      "comment": "Fix textures not being reallocated when their format or size changes, and bind groups keeping the views of a reallocated texture.",
+      "type": "patch"
     }
   ],
   "packageName": "@zephyr3d/backend-webgpu"
