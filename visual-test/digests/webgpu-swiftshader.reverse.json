@@ -82,10 +82,10 @@
     "eye-angled": {
       "accepted": {
         "linux-x64": [
-          "68a688e017ea30dafb3261eb34fcba92"
+          "7cdf689a402da50d37e36ccc873b7525"
         ],
         "win32-x64": [
-          "68a688e017ea30dafb3261eb34fcba92"
+          "7cdf689a402da50d37e36ccc873b7525"
         ]
       },
       "size": 512
@@ -93,10 +93,10 @@
     "eye-frontal": {
       "accepted": {
         "linux-x64": [
-          "1e3d6164d34e400567a2efbbaaf349d3"
+          "3928361db497f814d1fcda16c266d2d5"
         ],
         "win32-x64": [
-          "1e3d6164d34e400567a2efbbaaf349d3"
+          "3928361db497f814d1fcda16c266d2d5"
         ]
       },
       "size": 512
@@ -104,10 +104,10 @@
     "eye-pupil-dilated": {
       "accepted": {
         "linux-x64": [
-          "a369b37b78757e2b021a2264f1dda0bc"
+          "6bf30b4149495c51c779938e05ed1a5d"
         ],
         "win32-x64": [
-          "a369b37b78757e2b021a2264f1dda0bc"
+          "6bf30b4149495c51c779938e05ed1a5d"
         ]
       },
       "size": 512
@@ -115,10 +115,10 @@
     "eye-socket-occlusion": {
       "accepted": {
         "linux-x64": [
-          "8e56edac4e70c35b5f9507a8332efc2d"
+          "8682830a059b05e2a8a105c83a611920"
         ],
         "win32-x64": [
-          "8e56edac4e70c35b5f9507a8332efc2d"
+          "8682830a059b05e2a8a105c83a611920"
         ]
       },
       "size": 512
@@ -560,10 +560,10 @@
     "quantized-vertices": {
       "accepted": {
         "linux-x64": [
-          "cf28b7a4f2800d6b9646ed8dbde46c87"
+          "99127f41b966050adff6c73706526f89"
         ],
         "win32-x64": [
-          "cf28b7a4f2800d6b9646ed8dbde46c87"
+          "99127f41b966050adff6c73706526f89"
         ]
       },
       "size": 512
@@ -912,10 +912,10 @@
     "transmission-rect-backlit": {
       "accepted": {
         "linux-x64": [
-          "54940d96983ab4bfed4624f9deaaac02"
+          "6956711f8ea33461f9bdb7614065c004"
         ],
         "win32-x64": [
-          "54940d96983ab4bfed4624f9deaaac02"
+          "6956711f8ea33461f9bdb7614065c004"
         ]
       },
       "size": 512
@@ -956,10 +956,10 @@
     "transmission-thickness-scale": {
       "accepted": {
         "linux-x64": [
-          "008d917d0fa1d0d99723f1b0110d1eba"
+          "4cd3cfc41380902622dd61982817742e"
         ],
         "win32-x64": [
-          "008d917d0fa1d0d99723f1b0110d1eba"
+          "4cd3cfc41380902622dd61982817742e"
         ]
       },
       "size": 512
@@ -1000,10 +1000,10 @@
     "unlit-textured": {
       "accepted": {
         "linux-x64": [
-          "e5d9ae1775c72fd448b2c78d56a7fb1d"
+          "7ea632562ec0f0417bc9460648e1573f"
         ],
         "win32-x64": [
-          "e5d9ae1775c72fd448b2c78d56a7fb1d"
+          "7ea632562ec0f0417bc9460648e1573f"
         ]
       },
       "size": 512
@@ -1011,10 +1011,10 @@
     "water-caustics-crest": {
       "accepted": {
         "linux-x64": [
-          "30966467724dfff914756b5ffd123da9"
+          "52217e47bdcea591b30e3e85dd3280ef"
         ],
         "win32-x64": [
-          "30966467724dfff914756b5ffd123da9"
+          "52217e47bdcea591b30e3e85dd3280ef"
         ]
       },
       "size": 512
@@ -1121,10 +1121,10 @@
     "water-infinite-horizon": {
       "accepted": {
         "linux-x64": [
-          "c4ccdafd68bfac960109ae640b8eed86"
+          "f1c511691eb6d7fa8abebac8b3b22494"
         ],
         "win32-x64": [
-          "c4ccdafd68bfac960109ae640b8eed86"
+          "f1c511691eb6d7fa8abebac8b3b22494"
         ]
       },
       "size": 512
@@ -1154,10 +1154,10 @@
     "water-refraction-cheap": {
       "accepted": {
         "linux-x64": [
-          "a7e61674c6489e997499dd9cf9403d76"
+          "5be42371566076818bb8adb26a93fe7e"
         ],
         "win32-x64": [
-          "a7e61674c6489e997499dd9cf9403d76"
+          "5be42371566076818bb8adb26a93fe7e"
         ]
       },
       "size": 512

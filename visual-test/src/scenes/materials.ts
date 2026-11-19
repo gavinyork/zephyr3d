@@ -61,10 +61,10 @@ export const pbrMetalRoughGrid: VisualScene = {
  * Subsurface skin, the material the digital-human work leans on hardest.
  *
  * Back-lit transmission is *not* covered here, and the scene should not claim to
- * be: the term is gated on `subsurfaceTexture`, whose B channel carries the
- * thickness it needs, and this scene sets no such texture. `transmissionStrength`
- * is left at a nonzero value only so a regression that ungates the term shows up
- * as a diff rather than silently doing nothing.
+ * be: the term needs a light with `transmission` on that casts shadows, since its
+ * thickness comes from the light's shadow map, and this scene's key light has
+ * neither. `transmissionStrength` is left at a nonzero value only so a regression
+ * that ungates the term shows up as a diff rather than silently doing nothing.
  */
 export const sss: VisualScene = {
   name: 'sss',
