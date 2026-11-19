@@ -14,7 +14,7 @@ const myApp = new Application({
   backend: backendWebGL2,
   canvas: document.querySelector('#my-canvas'),
   runtimeOptions: {
-    // When using the editor workflow, the asset path must be correctly configured
+    // The assets live on a CDN, not next to this page, so the VFS root points there (default: new HttpFS('./'))
     VFS: new HttpFS('https://cdn.zephyr3d.org/doc/tut-10')
   }
 });

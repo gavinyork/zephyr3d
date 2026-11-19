@@ -1,125 +1,169 @@
-# 皮肤材质与次表面散射
+# 皮肤与次表面散射
 
-真实的皮肤不是不透明的：光线进入表层、在皮下散射一段距离再射出，所以皮肤在明暗交界处会有
-偏红的过渡，薄的部位（耳廓、鼻翼）被背光照射时会透光。引擎用**材质 + 后处理**两部分配合
-来模拟这个现象。
+皮肤、蜡、玉、大理石都不是不透明的：光线进入表层，在下面散射一段距离，再从别处射出。所以皮肤上的
+阴影边缘会带一圈柔和的红边，耳廓这类薄的部位被背光照射时会透光。`SSSMaterial` 同时模拟这两种现象，
+本页讲怎样设定尺度才能让效果真正显现，以及它对场景其他部分有什么要求。
 
-## 三个组件的分工
+## 三个部分的分工
 
-这套方案由三个部分组成，理解它们的分工是用好它的前提：
-
-| 组件 | 类型 | 负责什么 |
+| 部分 | 类型 | 负责什么 |
 | --- | --- | --- |
-| `SkinMaterial` | 材质 | 直接光照的**形状**：漫反射 ramp、高光、背光透射 |
-| `SkinSSS` | 相机后处理 | **扩散**：把材质算出的可散射部分做屏幕空间模糊再合成回去 |
-| `SubsurfaceProfile` | 数据 | 各颜色通道的散射半径**比例**，决定"像皮肤还是像蜡" |
+| `SSSMaterial` | 材质 | 表面光照：Burley 漫反射、双瓣 GGX 高光和背光透射。同时逐像素记下结果里有多少是漫反射光，以及用哪个 profile |
+| `SSSProfile` | 数据，每个 `SSSMaterial` 各自持有 | 光在表面下能走多远（红、绿、蓝分别给出），以及透射和高光双瓣的参数 |
+| `PostSSS` | 后处理，由相机持有 | 按每个像素的 profile 把这些像素的漫反射部分在屏幕空间扩散开，再把高光原样加回 |
 
-关键在于**风格化与扩散是分开的**：材质决定光照 ramp 长什么样，后处理只负责把这个 ramp 扩散开。
-所以你调出来的风格化 ramp 在散射之后依然保持风格，而不会被平均掉。
+材质决定每一点的光照是什么样，扩散只负责把其中的漫反射部分挪动开。高光从不经过扩散，所以柔和的皮肤上
+高光依然清晰。扩散又是归一化的加权平均，因此是**能量守恒**的：它只重新分配光，不增不减，均匀受光的区域
+开不开扩散看起来都一样。可见的变化集中在光照突变的地方，首先是阴影边缘。
 
-由此推论出一条容易搞错的规则：**散射的色调、强度和半径都在后处理上，不在材质上。**
-材质上没有 `scatterRadius`，相机上才有。
+## 最小示例
 
-## 最小用法
+<div class="showcase" case="tut-94"></div>
 
-```javascript
-import { SkinMaterial } from '@zephyr3d/scene';
+场景按真实尺寸搭建，单位是米：一个 20 厘米的球代替头部，一盏掠射的主光让明暗交界线从中间穿过，一根细杆
+在受光面上投下一道硬边阴影。勾选 **Subsurface** 时，这道阴影的边缘带上一圈渗进阴影里的红边；取消勾选，
+同样的表面换成普通 PBR 材质，边缘就是生硬的灰色。头部旁边那块 5 毫米厚的圆片只被身后的光源照亮，光是
+透过来的。
 
-const material = new SkinMaterial();
-material.albedoTexture = skinColorTexture;
-material.normalTexture = skinNormalTexture;
+设置材质只要三行：
 
-// 后处理必须打开，否则只有材质的 ramp，没有扩散
-camera.skinSSS = true;
-```
+<<< @/../src/tut-94/main.js#material
 
-**只设材质不开 `camera.skinSSS` 是最常见的问题**：画面不会报错，但看不到散射效果，
-因为扩散那一步根本没执行。
+**没有需要打开的开关。** 渲染器每帧检查是否正在绘制不透明的 `SSSMaterial`，只在这一帧启用 `PostSSS`，
+所以画面里没有这种材质时这个 pass 没有开销。反过来，要关掉效果就得换一个材质来画，示例里的复选框就是
+这样做的：
 
-反过来，效果是**能量守恒**的：后处理把可散射部分减掉再加回扩散后的版本，
-所以关掉 `camera.skinSSS` 时画面保持不变，不会突然变暗或变亮。
+<<< @/../src/tut-94/main.js#toggle
 
-## 材质侧：光照的形状
+## Profile：光能走多远
 
-`SkinMaterial` 上的参数塑造直接光照，不涉及扩散：
+`material.subsurfaceProfile` 只读且永不为 `null`：每个 `SSSMaterial` 在构造时创建自己的 profile 并终身
+持有，所以要原地修改，不能赋值替换。profile 不能共享；想让另一个材质用同样的效果，用
+`subsurfaceProfile.copyFrom(otherProfile)` 复制参数。正因为每个材质有自己的 profile，并逐像素写出它的 id，
+脸、耳朵、嘴唇才能在同一个屏幕空间 pass 里各自按不同的方式散射。
+
+设置 `preset` 会用一组内置参数覆盖 profile 的全部参数：
+
+| 预设 | `meanFreePathDistance` | `meanFreePath`（R : G : B） | 观感 |
+| --- | --- | --- | --- |
+| `skin`（默认） | 26.7 毫米 | 1 : 0.089 : 0.072 | 皮肤：红光比绿光、蓝光走得远得多 |
+| `skin_pale` | 29.4 毫米 | 1 : 0.1 : 0.083 | 偏白的皮肤 |
+| `skin_tan` | 25.4 毫米 | 1 : 0.082 : 0.066 | 晒黑的皮肤 |
+| `skin_dark` | 22.7 毫米 | 1 : 0.072 : 0.057 | 深色皮肤 |
+| `wax` | 50 毫米 | 1 : 0.85 : 0.68 | 蜡：范围大，几乎不偏色 |
+| `jade` | 45 毫米 | 0.6 : 1 : 0.85 | 玉：绿光走得最远 |
+| `marble` | 35 毫米 | 1 : 0.96 : 0.92 | 大理石：几乎不偏色 |
+
+决定材质"性格"的是通道之间的比例。皮肤的红通道比绿、蓝通道扩散得远十倍以上，这正是阴影边缘那圈红边的
+来源；`wax`、`jade`、`marble` 走的是同一套代码，只是比例不同，并不是特例。预设不管表面颜色——颜色仍然
+是材质的 `albedoColor` / `albedoTexture`——所以示例两样一起设：
+
+<<< @/../src/tut-94/main.js#preset
+
+预设接近但不完全合适时，值得调的是这些参数：
+
+| 属性 | 改变什么 | 什么时候调 |
+| --- | --- | --- |
+| `meanFreePathDistance` | 最宽通道的平均自由程，单位米 | 散射的绝对大小 |
+| `meanFreePath` | 各通道相对这个距离的比例 | 边缘那圈颜色 |
+| `scatterScale` | 距离的倍数（默认 1），对扩散和透射同时生效 | 在不改变颜色的前提下夸大或减弱效果 |
+| `worldUnitScale` | 每米对应多少世界单位（默认 1） | 不以米为单位的场景，例如厘米制设为 100。不是美术参数 |
+| `surfaceAlbedo` | 逐通道的形状项：接近 0.33 扩散最宽，越靠近 0 或 1 越收紧 | 微调每个通道衰减的快慢 |
+| `boundaryColorBleed` | 从相邻的、profile 不同的像素取到的光要乘上的颜色（默认白色） | 柔化或染色两种 profile 之间的接缝，比如脸和嘴唇 |
+| `transmissionTint`、`extinctionScale` | 透过薄处的光的颜色，以及它随厚度衰减得多快 | 背光下的耳朵、手指 |
+| `scatteringDistribution`、`ior` | 透射光有多偏向前方（Henyey-Greenstein，-1 到 1），以及在此之前对视线做的折射 | 透光效果在多大程度上取决于是否朝着光源看 |
+| `roughness0`、`roughness1`、`lobeMix` | 窄、宽两个高光瓣相对材质粗糙度的倍数，以及两者的混合比例 | 油性还是干性的光泽 |
+
+半径放在 profile 上而不是相机上，是有意为之：同一组距离同时决定屏幕空间扩散和透射的大小，所以
+`scatterScale` 会让两者一起变化，而不会各走各的。
+
+::: tip 半径是物理尺寸
+`skin` 红通道的平均自由程是 26.7 毫米，经过形状项之后，肉眼可见的扩散范围是几毫米。在占满屏幕的头部大小
+的物体上，这是几十个像素；在几米大小的物体上只有一两个像素，扩散本来就该看不见。如果觉得"散射没效果"，
+先查物体的世界尺寸和 `worldUnitScale`，再去动别的参数。确实想夸大效果时，调大 `scatterScale`。
+:::
+
+## 材质参数
+
+`SSSMaterial` 本身的参数不多，散射相关的都在 profile 上。
 
 | 属性 | 默认值 | 作用 |
 | --- | --- | --- |
-| `diffuseWrap` | 0.28 | 漫反射环绕量，让光照越过几何明暗界线 |
-| `diffuseSoftness` | 0.45 | ramp 的软硬程度 |
-| `shininess` | 72 | 高光锐度 |
-| `specularStrength` | 1 | 高光强度 |
-| `scatterWrap` | 0.65 | 可散射项的环绕量，决定交界处过渡带的宽度 |
-| `scatterStrength` | 1.5 | 写入可散射项的强度 |
-| `scatterColor` | (1, 0.42, 0.28) | 可散射项的色调 |
-| `transmissionStrength` | 0 | 背光透射强度，**默认关闭** |
-| `transmissionPower` | 4 | 透射的方向性 |
-| `shadowTint` | 黑 | 暗部 ramp 染色，黑色为原始行为 |
-| `brightening` | 0 | 漫反射整体增益 |
+| `roughness` | 0.5 | GGX 基础粗糙度（限制在 0.045–1），两个高光瓣由它乘上 profile 里的倍数得到 |
+| `specularF0` | 0.04 | 正入射反射率（限制在 0–0.2） |
+| `transmissionStrength` | 1 | 背光透射的倍数，设为 0 即对该材质关闭透射 |
+| `subsurfaceTexture` | 无 | 散射遮罩，见下文 |
+
+此外还有常用的 `albedoColor` / `albedoTexture`、`normalTexture` / `normalScale` 和 `vertexColor`。
 
 ### 遮罩贴图
 
-可选的 `subsurfaceTexture` 用三个通道携带不同信息：
+`subsurfaceTexture` 只读 **R 通道**，作为遮罩。值为 0 的像素不参与扩散，邻近像素也不会从它那里取光，
+高光也从双瓣退回单瓣。同一个网格上不该表现得像皮肤的部分，用它抠掉。其余通道不使用；特别是透射所需的
+厚度不靠手绘，而是实时测量，见下一节。
 
-- **R = 皮肤遮罩** —— 哪些像素参与散射。**衣服、头发、眼睛应当在这里被抠掉**，
-  否则会被染上皮肤的散射色。
-- **G = 局部软硬** —— 逐像素调节 ramp 软硬。
-- **B = 厚度** —— 供背光透射使用，薄的部位（耳廓、鼻翼）取高值。
+## 透射：光穿过薄的部位
 
-透射默认是关的，要用得把 `transmissionStrength` 调上去，并提供 B 通道厚度信息。
+透射需要逐个光源开启，并满足三个条件：
 
-## 后处理侧：扩散与合成
+- `light.transmission = true`（默认 `false`）；
+- 该光源投射阴影（`light.castShadow = true`），因为光穿过的厚度是每帧从它的阴影贴图测出来的；
+- 这一帧画了 `SSSMaterial`。
 
-相机侧只有一个开关：
+<<< @/../src/tut-94/main.js#transmission
 
-| 属性 | 默认值 | 作用 |
+厚度不需要手工制作，但阴影贴图的分辨率决定了能分辨多薄的结构，所以 `shadowDistance`（或光源的
+range）要尽量收紧在主体周围。在以米为单位的场景里、`extinctionScale` 为 1 时，超过约 5 厘米厚的材料就
+完全不透光，而皮肤类预设的光大部分在一两厘米内就衰减掉了：耳朵、手指会透光，整个头部不会。透射光会加到
+漫反射光里，所以在 WebGPU 上它也会一起被扩散。
+
+材质上的 `transmissionStrength` 缩放透射结果，profile 上的 `transmissionTint` 和 `extinctionScale` 决定
+它的颜色和衰减速度。
+
+## 调试输出
+
+`camera.SSSDebugOutput` 把扩散后的像素替换成这个 pass 的某个中间量，用来区分"输入有问题"和"核函数有
+问题"：
+
+<<< @/../src/tut-94/main.js#debug
+
+| 要回答的问题 | 输出 | 显示内容 |
 | --- | --- | --- |
-| `skinSSS` | false | 开启扩散 pass（仅 WebGPU） |
-| `skinSSSDebugOutput` | `'none'` | 输出扩散过程的某个中间量，替代最终着色结果 |
+| 输入对不对？ | `diffusible` | pass 将要扩散的漫反射光 |
+| | `diffuseAmount` | 每个像素中漫反射所占的比例（白色 = 全是漫反射） |
+| | `profileId` | 逐像素的 profile id，用灰度表示（id 为 8 及以上时为白色） |
+| | `normal` | pass 用来阻止光越过折角的法线 |
+| 核的大小对不对？ | `diffusionDistance` | 各通道的扩散距离，单位毫米（1 毫米 = 满亮度） |
+| | `sampleRadius` | 采样点的平均距离，单位像素（32 像素 = 白色） |
+| | `centerWeight` | 核有多少落在像素自身上；白色说明扩散不到一个像素 |
+| 采样有没有被拒绝？ | `acceptance` | 落在散射像素上的采样比例 |
+| | `weight` | 归一化之前累积的核权重 |
+| 输出 | `diffused` | 单独的扩散结果，不含高光 |
+| 透射 | `thickness` | 透射 pass 测出的光源空间厚度（越亮越厚）；纯蓝表示没有透射光源照到该像素 |
 
-**相机上没有任何散射参数。** 光走多远、多强、什么颜色，全部是材质所指向的
-[`SkinProfile`](#散射-profile) 的属性，由材质逐像素写出的 profile id 供 pass 查表读取。
-这与 UE5 一致——那里也只有 subsurface profile 资产能塑造扩散形状。这样做还能保证屏幕空间扩散
-和烘焙的透射 profile 不会走样：一个 pass 级的半径倍数只会缩放前者而不动后者。
+调试视图里是数值而不是颜色，所以示例在选中调试输出时会关掉色调映射；开着的话，色调曲线会扭曲数值并混合
+各通道。相机上没有针对这些视图的曝光控制。
 
-`skinSSSDebugOutput` 是区分"输入有问题"和"核函数有问题"的实用手段，可以显示可扩散能量、
-逐像素 profile id、法线、逐通道扩散距离、采样半径、采样接受率、单独的扩散结果，以及光源空间
-厚度。有几个中间量落在很窄的区间里，读起来是一片平色，这时配合后处理的 `debugExposure` 一起用。
+## 限制与坑
 
-## 散射 profile
-
-`SkinProfile` 持有全部散射参数，材质通过 `SkinMaterial.subsurfaceProfile` 引用它。所有 profile
-被打包进一张以 profile id 为索引的共享 GPU 表，所以脸、耳朵、嘴唇可以各带一份 profile，在同一
-个屏幕空间 pass 里独立扩散。
-
-其中最关键的几个参数：
-
-| 属性 | 作用 |
-| --- | --- |
-| `surfaceAlbedo` | 逐通道散射反照率，驱动 Burley 的形状项 |
-| `meanFreePath` | 逐通道散射**比例**——决定材质性格的就是它 |
-| `meanFreePathDistance` | 散射的绝对距离，世界单位 |
-| `worldUnitScale` | profile 空间到世界单位的换算，供非米制场景使用 |
-| `scatterScale` | 扩散宽度的总体倍数 |
-| `transmissionTint` | 穿透薄处的透射光染色 |
-| `scatteringDistribution` | 透射光的 Henyey-Greenstein 各向异性 |
-| `roughness0` / `roughness1` / `lobeMix` | 双瓣高光 |
-
-让散射材质读起来像皮肤而不是一团中性模糊的，是 `meanFreePath` 的**比例**。在 `skin` 预设里红光
-传播距离大约是蓝光的十倍，这正是明暗交界处那条红黄渐变的来源。改预设就是改这个比例，所以
-`wax`（蜡）和 `jade`（玉）与皮肤走的是同一套代码，而不是特例分支。
-
-可选预设：`skin`、`skin_pale`、`skin_tan`、`skin_dark`、`wax`、`jade`、`marble`。
-
-绝对尺度由 `meanFreePathDistance` 和 `worldUnitScale` 决定，预设只管比例。
-
-::: tip 尺度是物理量
-散射距离是物理量：`skin` 的平均自由程约 27 毫米。在米级大小的物体上，扩散本来就看不见。
-如果觉得"散射没效果"，先查物体的世界尺寸，再去动参数。
-:::
+- **扩散仅支持 WebGPU。** 在 WebGL2 上 `PostSSS` 原样输出画面，并在控制台打印一次警告。材质自身的光照和
+  透射照常工作，所以同一个材质可以在两个后端上使用。要按后端调整界面或内容，检查
+  `device.type === 'webgpu'`，示例就是这样做的；另见[后端支持](zh-cn/backend-support.md)。
+- **只有不透明表面会被扩散。** 混合（半透明）的 `SSSMaterial` 会被照亮但不会被扩散，也不会启用这个 pass。
+- **在硬边上判断效果。** 对平滑的明暗交界线做扩散几乎没有变化，因为向两侧均匀摊开的光平均下来还是原来的
+  渐变。像示例那样的硬边投影才能清楚地看出效果。
+- **保持 `camera.HDR` 开启**（默认开启）。漫反射所占的比例放在场景颜色的 alpha 通道里传递；关掉 HDR 后
+  场景颜色是 8 位的，超过 1 的值会被截断，亮部的漫反射和高光就分不准了。
+- **同时最多约 255 个 profile。** 每个 `SSSMaterial`（包括克隆出来的）在释放之前都占用一张共享的 255 行
+  表中的一行；再多创建一个会抛出 `SSSProfile limit exceeded`。不再使用的材质要释放掉。
+- **`camera.SSS` 是另一回事。** `camera.SSS` 和 `camera.sss*` 系列属性属于一条较早的屏幕空间路径，
+  由 `PBRMetallicRoughnessMaterial.subsurfaceProfile`（`SubsurfaceProfile`）驱动。它们既不会启用、也不会
+  调节 `SSSMaterial`，保持关闭即可。
+- **开销。** 扩散以全分辨率运行，每个散射像素采样 64 次，其他像素会提前跳过。因此开销随材质覆盖的屏幕
+  面积增长，面部特写是最贵的情况。透射在光源阴影贴图之外，每帧还要多一个屏幕空间厚度 pass。
 
 ## 相关
 
-- [自定义材质](zh-cn/user-material.md) —— 材质系统的通用机制
 - [后处理](zh-cn/posteffect-intro.md) —— 相机后处理链
-- [光照](zh-cn/lighting-intro.md) —— 光源配置
+- [阴影](zh-cn/shadow-intro.md) —— 阴影贴图，透射从它测量厚度
+- [头发](zh-cn/material-hair.md) 和 [眼睛](zh-cn/material-eye.md) —— 角色渲染的其他部分

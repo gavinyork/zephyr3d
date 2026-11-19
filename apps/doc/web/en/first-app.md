@@ -103,6 +103,38 @@ it explicitly when you need to work with it later.
 
 <div class="showcase" case="tut-2"></div>
 
+### Render layers and render order
+
+The second argument of `setRenderable(renderable, layer)` is a **render layer** index. The engine
+keeps one renderable per layer and, every frame after the `tick` event, renders the layers in
+ascending index order:
+
+- **One renderable per layer.** Calling it again for the same layer replaces the previous
+  renderable; passing `null` clears the layer. Indices need not be contiguous; empty layers are
+  skipped.
+- **Higher layers draw later, on top of lower ones.** Layering is mainly for overlays: layer 0
+  draws the main scene, higher layers draw a minimap, picture-in-picture or a debug view. A camera
+  clears its own render area to black by default, so give an overlay layer's camera a `viewport`
+  limiting where it draws; a full-screen upper layer would cover everything below it.
+- **A scene only updates while it is rendered.** Node updates, animation and the main camera's
+  controller run as part of rendering the scene. A scene taken off all layers stops updating; a
+  scene placed on several layers is still updated once per frame.
+- **A layer holds a reference to its scene.** A scene on a layer is never released. Once it is
+  replaced or cleared and nothing else references it, it is disposed on the next frame. If you
+  switch back and forth between scenes, hold each one yourself with a `DRef` (from
+  `@zephyr3d/base`), or it will already be disposed when you switch back.
+
+The optional third argument is a hook object: `beforeRender(scene)` is called before the layer
+renders and can return `false` to skip it; `afterRender(scene)` is called afterwards. Here is
+picture-in-picture: the same scene sits on layers 0 and 1, and layer 1 shrinks the camera
+viewport to a small window in the lower-left corner before rendering, then restores it.
+
+<<< @/../src/tut-46/main.js{36-45 js}
+
+`setRenderable()` also accepts a function, called every frame on that layer. Use it when you drive
+rendering yourself, for example calling `camera.render(scene)` for several cameras. See
+[Multi-viewport rendering](en/multi-views.md) for more.
+
 ## Making the camera interactive
 
 The scene is empty and the camera cannot move yet. Add an orbit controller:

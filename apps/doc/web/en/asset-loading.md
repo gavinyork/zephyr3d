@@ -27,7 +27,15 @@ import { getEngine } from '@zephyr3d/scene';
 const resourceManager = getEngine().resourceManager;
 ```
 
-The paths passed to resource methods are VFS paths. With `HttpFS`, `/assets/model.glb` is resolved under the HTTP root. With an in-memory or IndexedDB file system, the same path can point to data stored locally.
+The paths passed to resource methods are normally VFS paths. With `HttpFS`, `/assets/model.glb` is resolved under the HTTP root. With an in-memory or IndexedDB file system, the same path can point to data stored locally.
+
+Resource methods also accept absolute URLs starting with `http://` or `https://`. Path normalization keeps such URLs as they are, and reading one requests that address directly, bypassing the VFS root and any mounts. Whatever VFS is configured, you can therefore load a single file from another server this way (cross-origin servers must allow CORS):
+
+```ts
+const sky = await getEngine().resourceManager.fetchTexture('https://cdn.example.com/images/sky.hdr');
+```
+
+Absolute URLs only suit self-contained files such as images, HDR, GLB and JSON. Editor resources such as prefabs, scenes and materials reference other resources by VFS path, and those references are still loaded from the current VFS. To serve such resources from another server, mount that server into the VFS; see [Loading from several domains at once](en/first-scene.md#loading-from-several-domains-at-once).
 
 ## Loading Textures
 

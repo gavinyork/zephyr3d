@@ -10,6 +10,28 @@ zephyr3d 的 LOD 是**离散 LOD 链**：
 
 LOD 一般在编辑器里生成，见[资产压缩](zh-cn/editor/asset-compression.md)中的“细节层次（LOD）”一节。生成后的网格无需任何代码，加载后自动按距离切换。不使用编辑器时，也可以在加载模型时生成，见[加载时生成](#加载时生成)。
 
+## 示例
+
+下面是一片共用两个形状的网格：球体和圆环在创建选项中带上了 `lod`，创建时自动生成 LOD，每个网格再按自己在屏幕上的大小选级。页面打开时已经开着 LOD 着色，离相机越远的网格级别越高、颜色越靠后（颜色对照见[查看 LOD 效果](#查看-lod-效果)）。拖动、缩放视角，可以看到网格在各级之间切换。面板下方显示每个形状实际生成了几级，以及当前画出的三角形数与全部用第 0 级时的对比；每个网格当前的级别用 `Mesh.selectLod(camera)` 查询。
+
+<div class="showcase" case="tut-89"></div>
+
+生成 LOD 只需要在形状的创建选项里加上 `lod`：
+
+<<< @/../src/tut-89/main.js#shapes
+
+- `lodMinTriangles`、`lodReduction`、`lodPixelError` 分别对应编辑器网格设置中的 **Min Triangles**、**Triangles Per Level**、**Pixel Error**。
+- Pixel Error 决定切换距离：它越小，每一级越晚换上，画面越接近原始网格，画出的三角形也越多。示例用 2 而不是编辑器默认的 8，是为了让整片网格里能看到所有级别；在面板上把它改成 8，各级会明显提前切换。
+- 精简器的 WebAssembly 模块第一次使用时才初始化，LOD 会比形状晚一点出现，在此之前网格都按第 0 级绘制。
+
+面板上的其他选项直接对应下面这些属性，作用见[控制选级](#控制选级)和[查看 LOD 效果](#查看-lod-效果)：
+
+<<< @/../src/tut-89/main.js#view
+
+其中 `lodColoration` 和 `wireframe` 是调试视图，示例在 `index.html` 里打开了调试视图的开关。
+
+---
+
 ## 在编辑器中生成
 
 导入 GLB、FBX 或 OBJ 时，在导入选项中勾选 **Generate LODs**，设置 **Min Triangles**、**Triangles Per Level** 和 **Pixel Error**，点击 **OK**。导入进度中的 `Generating levels of detail...` 完成后，派生网格即可使用。
@@ -48,14 +70,9 @@ camera.lodDistanceScale = lowQuality ? 2 : 1;
 
 ## 查看 LOD 效果
 
-有两个调试视图，可以单独开，也可以同时开。调试视图只在引擎加载前设置了 `globalThis.__ZEPHYR3D_DEBUG_VIEWS__ = true`（或在构建时把 `__ZEPHYR3D_DEBUG_VIEWS__` 定义为 `true`）时可用。编辑器已经设置；发布的应用默认不设置，这时下面的属性没有效果，并会打印一次警告。
+有两个调试视图，可以单独开，也可以同时开。调试视图只在引擎加载前设置了 `globalThis.__ZEPHYR3D_DEBUG_VIEWS__ = true`（或在构建时把 `__ZEPHYR3D_DEBUG_VIEWS__` 定义为 `true`）时可用。编辑器已经设置；发布的应用默认不设置，这时下面的属性没有效果，并会打印一次警告。示例的 `index.html` 在加载引擎的模块脚本之前设置它：
 
-```html
-<script>
-  globalThis.__ZEPHYR3D_DEBUG_VIEWS__ = true;
-</script>
-```
-
+<<< @/../src/tut-89/index.html#debug-views
 
 - **线框**：`camera.wireframe = true` 把这个视图里的所有对象画成三角形的边，包括网格、BatchGroup、粒子、精灵、头发、地形、水体和草。线框跟随当前的 LOD，拉远拉近能直接看到三角形变少。带索引几何的线框需要从 GPU 读回索引后生成，打开后会晚几帧出现。阴影和拾取不受影响。
 - **LOD 着色**：`camera.lodColoration = true` 把每个网格按当前所在的级别着色：
@@ -91,25 +108,22 @@ const sharedModel = await new GLTFImporter().loadModel('/models/tree.glb', undef
 已经加载成 `SharedModel` 的模型，可以在创建场景节点之前调用 `SharedModel.generateLods()` 生成 LOD：
 
 ```ts
-await model.generateLods({ lodMinTriangles: 200 });
+await sharedModel.generateLods({ lodMinTriangles: 200 });
 ```
 
 生成使用引擎自带的 meshoptimizer 精简器（`getMeshoptSimplifier()`），在主线程进行，大模型会比较耗时；经过编辑器处理的模型直接带着 LOD 发布，没有这项开销。
 
 ### 参数化形状
 
-内置形状（`SphereShape`、`BoxShape`、`CylinderShape` 等）在创建选项中带上 `lod` 时，会自动生成 LOD：
+内置形状（`SphereShape`、`TorusShape`、`CylinderShape` 等）在创建选项中带上 `lod` 时，会自动生成 LOD，写法见上文的[示例](#示例)。
 
-```ts
-const sphere = new SphereShape({
-  radius: 1,
-  verticalDetail: 32,
-  horizonalDetail: 64,
-  lod: { lodMinTriangles: 100, lodReduction: 0.5, lodPixelError: 8 }
-});
-```
+形状每次重建时都会重新生成 LOD，所以修改选项后 LOD 始终与之一致；保存时只存设置。示例在面板上修改 Pixel Error 时，就是重设两个形状的选项，用到它们的网格随之更新：
 
-形状每次重建时都会重新生成 LOD，所以修改选项后 LOD 始终与之一致；保存时只存设置。编辑器里，形状资产的属性中会显示 **GenerateLODs**、**LODMinTriangles**、**LODReduction**、**LODPixelError** 四项。第一次使用时，要等精简器的 WebAssembly 模块加载完，LOD 会在形状创建后稍晚出现。
+<<< @/../src/tut-89/main.js#rebuild
+
+编辑器里，形状资产的属性中会显示 **GenerateLODs**、**LODMinTriangles**、**LODReduction**、**LODPixelError** 四项。第一次使用时，要等精简器的 WebAssembly 模块加载完，LOD 会在形状创建后稍晚出现。
+
+三角形太少的形状不会生成 LOD：简化后不足 `lodMinTriangles` 个三角形的级别不会加入，按默认设置（100、0.5），形状至少要有 200 个三角形才有第 1 级。`BoxShape` 只有 12 个三角形，不会有 LOD；其他形状要先调高细节选项，例如 `SphereShape` 的 `verticalDetail` 和 `horizonalDetail`。注意后者的拼写是 `horizonal`，在 JavaScript 里写成 `horizontalDetail` 不会报错，只会被忽略。
 
 ### 手动设置
 

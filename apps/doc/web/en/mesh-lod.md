@@ -10,6 +10,28 @@ zephyr3d uses **discrete LOD chains**:
 
 Levels of detail are usually generated in the editor, see the "Levels of Detail (LOD)" section of [Asset Compression](en/editor/asset-compression.md). Generated meshes need no code: once loaded they switch by distance on their own. Without the editor, models can generate them as they load, see [Generating when Loading](#generating-when-loading).
 
+## Example
+
+Below is a field of meshes sharing two shapes: the sphere and the torus have `lod` in their creation options, so they generate levels of detail as they are created, and every mesh picks a level by its own size on screen. LOD coloration is on from the start: the farther a mesh, the higher its level and the later its color in the list (see [Seeing the Levels](#seeing-the-levels) for the colors). Orbit and zoom to watch the meshes switch levels. Under the controls, the panel shows how many levels each shape actually got, and the triangles drawn against all meshes at level 0; the level of each mesh comes from `Mesh.selectLod(camera)`.
+
+<div class="showcase" case="tut-89"></div>
+
+Generating levels of detail only takes `lod` in the creation options of a shape:
+
+<<< @/../src/tut-89/main.js#shapes
+
+- `lodMinTriangles`, `lodReduction` and `lodPixelError` are the **Min Triangles**, **Triangles Per Level** and **Pixel Error** of the editor's mesh settings.
+- The pixel error sets the switch distances: the smaller it is, the later each level takes over, the closer the picture stays to the original mesh, and the more triangles are drawn. The example uses 2 instead of the editor's default of 8 so that every level shows within the field; set it to 8 in the panel and the levels switch noticeably sooner.
+- The simplifier's WebAssembly module initializes on first use, so the levels appear a little after the shapes; until then the meshes draw at level 0.
+
+The other controls map straight to these properties, see [Controlling the Choice](#controlling-the-choice) and [Seeing the Levels](#seeing-the-levels) for what they do:
+
+<<< @/../src/tut-89/main.js#view
+
+`lodColoration` and `wireframe` are debug views; the example's `index.html` turns debug views on.
+
+---
+
 ## Generate in the editor
 
 When importing a GLB, FBX, or OBJ, enable **Generate LODs** in the import options, set **Min Triangles**, **Triangles Per Level**, and **Pixel Error**, then click **OK**. The progress dialog shows `Generating levels of detail...` while the derived mesh is built.
@@ -48,14 +70,9 @@ camera.lodDistanceScale = lowQuality ? 2 : 1;
 
 ## Seeing the Levels
 
-Two debug views help, on their own or together. Debug views are only available when `globalThis.__ZEPHYR3D_DEBUG_VIEWS__ = true` is set before the engine loads (or `__ZEPHYR3D_DEBUG_VIEWS__` is defined as `true` at build time); the editor sets it, shipped applications do not, and the properties below then have no effect and log a warning once.
+Two debug views help, on their own or together. Debug views are only available when `globalThis.__ZEPHYR3D_DEBUG_VIEWS__ = true` is set before the engine loads (or `__ZEPHYR3D_DEBUG_VIEWS__` is defined as `true` at build time); the editor sets it, shipped applications do not, and the properties below then have no effect and log a warning once. The example's `index.html` sets it before the module script that loads the engine:
 
-```html
-<script>
-  globalThis.__ZEPHYR3D_DEBUG_VIEWS__ = true;
-</script>
-```
-
+<<< @/../src/tut-89/index.html#debug-views
 
 - **Wireframe**: `camera.wireframe = true` draws everything in the view as the edges of its triangles: meshes, batch groups, particles, sprites, hair, terrain, water and grass. The wireframe follows the level in use, so moving the camera shows the triangle count change directly. Edges of indexed geometry are built from index data read back from the GPU and appear a few frames after it is turned on. Shadows and picking are unaffected.
 - **LOD coloration**: `camera.lodColoration = true` shades every mesh in the color of its current level:
@@ -91,25 +108,22 @@ const sharedModel = await new GLTFImporter().loadModel('/models/tree.glb', undef
 A model already in memory as a `SharedModel` can be given levels with `SharedModel.generateLods()`, before creating scene nodes from it:
 
 ```ts
-await model.generateLods({ lodMinTriangles: 200 });
+await sharedModel.generateLods({ lodMinTriangles: 200 });
 ```
 
 Generation uses the meshoptimizer simplifier the engine ships (`getMeshoptSimplifier()`). It runs on the main thread and takes time on large models; models processed in the editor ship their levels instead.
 
 ### Shapes
 
-Built-in shapes (`SphereShape`, `BoxShape`, `CylinderShape`, ...) generate levels of detail when their creation options include `lod`:
+Built-in shapes (`SphereShape`, `TorusShape`, `CylinderShape`, ...) generate levels of detail when their creation options include `lod`, as in the [Example](#example) above.
 
-```ts
-const sphere = new SphereShape({
-  radius: 1,
-  verticalDetail: 32,
-  horizonalDetail: 64,
-  lod: { lodMinTriangles: 100, lodReduction: 0.5, lodPixelError: 8 }
-});
-```
+The levels are regenerated whenever the shape is, so changing its options keeps them matching, and only the settings are saved with the shape. Changing the pixel error in the example's panel does exactly that, setting new options on both shapes; the meshes using them follow:
 
-The levels are regenerated whenever the shape is, so changing its options keeps them matching, and only the settings are saved with the shape. In the editor, shape assets show these settings as **GenerateLODs**, **LODMinTriangles**, **LODReduction** and **LODPixelError**. The first time, levels appear once the simplifier's WebAssembly module has loaded, a moment after the shape is created.
+<<< @/../src/tut-89/main.js#rebuild
+
+In the editor, shape assets show these settings as **GenerateLODs**, **LODMinTriangles**, **LODReduction** and **LODPixelError**. The first time, levels appear once the simplifier's WebAssembly module has loaded, a moment after the shape is created.
+
+Shapes with few triangles get no levels: a level simplified to fewer than `lodMinTriangles` triangles is not added, so with the default settings (100, 0.5) a shape needs at least 200 triangles for a level 1. `BoxShape` has 12 triangles and never gets levels; raise the detail options of other shapes first, such as `verticalDetail` and `horizonalDetail` of `SphereShape`. Note the spelling `horizonal`: in JavaScript, `horizontalDetail` raises no error and is simply ignored.
 
 ### Setting Levels by Hand
 

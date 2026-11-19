@@ -72,11 +72,51 @@ path when you need to load arbitrary user-supplied models at runtime. See
 
 <<< @/../src/tut-10/main.js{js}
 
-Loading editor-produced assets **requires a configured VFS** (lines 18–21) — the path given to
-`instantiatePrefab()` is a VFS path, not a URL, and `HttpFS` maps it onto an HTTP root here. Other
-VFS implementations (in-memory, IndexedDB) are covered in [Virtual File System](en/vfs.md).
+The path given to `instantiatePrefab()` is a VFS path, not a URL. The VFS comes from
+`runtimeOptions.VFS` when the application is created; without it, the default is `new HttpFS('./')`,
+which maps the VFS root to **the directory of the current page**: for a page at
+`https://example.com/game/index.html`, `/assets/Duck.zprefab` requests
+`https://example.com/game/assets/Duck.zprefab`. When the assets are deployed next to the page (which
+is how the editor's **Build Project** lays out its output), the default works and nothing needs to
+be configured.
+
+The example above is the other case: the page lives on the docs site while the assets sit on a CDN
+under a different domain, so lines 16–19 replace the VFS with an `HttpFS` pointing at the CDN
+directory. Passing a URL to `instantiatePrefab()` would not be enough: the prefab references its
+meshes and materials by VFS paths such as `/assets/Duck_mesh_0.zmsh`, which always resolve against
+the VFS root, so the VFS root must correspond to the project root the assets came from. For
+cross-origin loading the asset server must also allow cross-origin requests (CORS).
 
 <div class="showcase" case="tut-10"></div>
+
+### Loading from several domains at once
+
+When resources are spread over several servers, use one `HttpFS` as the root and **mount** the
+others at paths under it:
+
+```javascript
+const vfs = new HttpFS('./'); // the page's directory: scripts, configuration, ...
+// Editor-produced assets on a CDN. Mounted at /assets, so the /assets/... references
+// inside prefabs go to the CDN as well
+await vfs.mount('/assets', new HttpFS('https://cdn.example.com/game/assets'));
+// Textures on another server, accessed as /textures/...
+await vfs.mount('/textures', new HttpFS('https://images.example.com/textures'));
+```
+
+A read uses the longest matching mount path and replaces that part with the path inside the mounted
+file system; paths matching no mount go to the root file system. Pass this `vfs` as
+`runtimeOptions.VFS`, or call `mount()` on `getEngine().VFS` at runtime.
+
+Two ways that skip mounting:
+
+- A **self-contained** single file such as a texture, a GLB model or a JSON file can be loaded by
+  passing a full `https://` URL to the resource API. The engine requests that URL as-is, bypassing
+  the VFS root.
+- The loading options accept `overrideVFS`, which makes just that one load use another file system.
+
+Neither works for prefabs and scenes: the other assets they reference are still loaded by VFS path
+from the current VFS. See [Resource Loading](en/asset-loading.md) and
+[Virtual File System](en/vfs.md#mounting-and-combining-file-systems).
 
 ## Organising the hierarchy
 

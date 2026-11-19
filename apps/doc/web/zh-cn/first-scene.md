@@ -66,11 +66,42 @@ sRGB 编码的颜色，需要转换到线性空间参与光照；而法线贴图
 
 <<< @/../src/tut-10/main.js{js}
 
-加载编辑器产出的资产**必须先配好 VFS**（第 18–21 行）——`instantiatePrefab()` 的路径是
-VFS 路径而不是 URL，上例用 `HttpFS` 把它映射到一个 HTTP 根目录。VFS 的其他实现（内存、
-IndexedDB）见[虚拟文件系统](zh-cn/vfs.md)。
+`instantiatePrefab()` 的路径是 VFS 路径而不是 URL。VFS 由创建应用时的 `runtimeOptions.VFS`
+指定，不传时默认是 `new HttpFS('./')`，也就是把 VFS 根目录映射到**当前页面所在的目录**：页面在
+`https://example.com/game/index.html` 时，`/assets/Duck.zprefab` 会请求
+`https://example.com/game/assets/Duck.zprefab`。资产和页面部署在一起（编辑器的 **Build Project**
+就是这样输出的）时，用默认值即可，什么都不用配。
+
+上例是另一种情况：示例页面在文档站点上，资产放在另一个域名的 CDN 上，所以第 16–19 行把 VFS 换成
+指向 CDN 目录的 `HttpFS`。这里不能只把 URL 写进 `instantiatePrefab()`：预制体内部用
+`/assets/Duck_mesh_0.zmsh` 这样的 VFS 路径引用网格和材质，这些路径总是相对于 VFS 根目录解析，
+所以 VFS 根目录必须对应资产所在的项目根目录。跨域加载时，资产服务器还要允许跨域请求（CORS）。
 
 <div class="showcase" case="tut-10"></div>
+
+### 同时从多个域名加载
+
+资源分布在几个服务器上时，以一个 `HttpFS` 为根，再把其他服务器**挂载**到根下的某个路径：
+
+```javascript
+const vfs = new HttpFS('./'); // 页面所在目录：脚本、配置等
+// 编辑器产出的资产放在 CDN 上。挂载在 /assets，预制体内部的 /assets/... 引用也会走 CDN
+await vfs.mount('/assets', new HttpFS('https://cdn.example.com/game/assets'));
+// 另一个服务器上的贴图，用 /textures/... 访问
+await vfs.mount('/textures', new HttpFS('https://images.example.com/textures'));
+```
+
+读取时按最长的挂载路径匹配，匹配到的部分换成被挂载文件系统里的路径，没有匹配的路径由根文件系统
+处理。把这个 `vfs` 传给 `runtimeOptions.VFS`，或者在运行中对 `getEngine().VFS` 调用 `mount()`。
+
+另外两种不经过挂载的方式：
+
+- 贴图、GLB 模型、JSON 这类**自包含**的单个文件，可以直接把 `https://` 开头的完整 URL 传给
+  资源接口，引擎会原样请求这个 URL，不经过 VFS 根目录。
+- 加载接口的选项里有 `overrideVFS`，可以只让这一次加载使用另一个文件系统。
+
+这两种方式都不适合预制体和场景：它们内部引用的其他资产仍按 VFS 路径从当前 VFS 加载。详见
+[资源加载](zh-cn/asset-loading.md)和[虚拟文件系统](zh-cn/vfs.md#文件系统挂载与组合)。
 
 ## 组织场景层级
 

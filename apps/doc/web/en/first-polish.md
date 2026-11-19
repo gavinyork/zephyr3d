@@ -10,14 +10,15 @@ Shadows are controlled from both the light and the mesh side:
 
 <<< @/../src/tut-16/main.js{28-35 js}
 
-- `light.castShadow = true` — makes that light cast shadows. Directional, point, spot and rect lights
-  all support it.
+- `light.castShadow = true` — makes that light cast shadows; it **defaults to false**. Directional,
+  point, spot and rect lights all support it.
 - `mesh.castShadow` — controls whether an individual mesh casts a shadow. It **defaults to true**, so
   you normally only set it explicitly to exclude something.
 
-`shadow.depthBias` removes the self-shadowing stripes known as shadow acne. Too small leaves stripes,
-too large detaches the shadow from the object (peter-panning), so it needs tuning against your scene
-scale.
+`shadow.depthBias` (default 0.003) removes the self-shadowing stripes known as shadow acne. Too small
+leaves stripes, too large detaches the shadow from the object (peter-panning), so it needs tuning
+against your scene scale. The shadow map is 1024×1024 by default (`shadow.shadowMapSize`) and the
+default mode is PCF.
 
 <div class="showcase" case="tut-16"></div>
 
@@ -33,21 +34,22 @@ covered in [Shadow Anti-aliasing](en/shadow-aa.md).
 
 ## Enabling post-processing
 
-Post effects live on the camera, and the common ones are plain property switches:
+Post effects live on the camera, and the common ones are plain property switches (the comments give
+each property's default):
 
 ```javascript
-// HDR rendering + tone mapping
-camera.HDR = true;
-camera.toneMap = true;
-camera.toneMapExposure = 1.1;
+// HDR rendering + tone mapping: both are on by default
+camera.HDR = true;              // default true
+camera.toneMap = true;          // default true
+camera.toneMapExposure = 1.1;   // default 1; not used when scene.lightingMode is 'physical'
 
 // Bloom
-camera.bloom = true;
-camera.bloomThreshold = 0.85;
-camera.bloomIntensity = 1.2;
+camera.bloom = true;            // default false
+camera.bloomThreshold = 0.85;   // default 0.8
+camera.bloomIntensity = 1.2;    // default 1
 
-// Anti-aliasing: FXAA is cheap; TAA looks better and is turned on with camera.TAA = true
-camera.FXAA = true;
+// Anti-aliasing: FXAA is cheap; TAA looks better and is turned on with camera.TAA = true (default false)
+camera.FXAA = true;             // default false
 ```
 
 **Tone mapping is almost always something you want on.** Lighting is computed in high dynamic range,
@@ -67,13 +69,15 @@ Scenes have ambient (indirect) lighting by default: `scene.env.light.type` defau
 
 ```javascript
 // Default: image-based lighting from the sky; a sky box texture can be used instead, see Indirect lighting
-scene.env.light.type = 'ibl';
+scene.env.light.type = 'ibl';          // default 'ibl'; also 'hemisphere' | 'constant' | 'none'
 
-// Or hemispheric sky light, which is cheaper
+// Or hemispheric sky light, which is cheaper. Set the upper and lower colors with ambientUp / ambientDown
 scene.env.light.type = 'hemisphere';
+scene.env.light.ambientUp.setXYZW(0.3, 0.5, 0.8, 1);    // default (0.3, 0.5, 0.8, 1)
+scene.env.light.ambientDown.setXYZW(0.2, 0.2, 0.2, 1);  // default (0.2, 0.2, 0.2, 1)
 
-// Ambient strength, default 1
-scene.env.light.strength = 0.6;
+// Ambient strength
+scene.env.light.strength = 0.6;        // default 1
 ```
 
 The shadow example above (tut-16) turns ambient light off (`scene.env.light.type = 'none'`) to isolate
@@ -86,20 +90,20 @@ Putting it together, a realistic-looking scene can start from this and be tuned 
 
 ```javascript
 // Environment
-scene.env.sky.skyType = 'scatter';       // atmospheric scattering sky
-scene.env.light.type = 'ibl';            // ambient lighting
-scene.env.light.strength = 0.6;
+scene.env.sky.skyType = 'scatter';       // atmospheric scattering sky (default)
+scene.env.light.type = 'ibl';            // ambient lighting (default)
+scene.env.light.strength = 0.6;          // default 1
 
 // Main light + shadows
 const sun = new DirectionalLight(scene);
 sun.lookAt(new Vector3(0, 15, -10), Vector3.zero(), Vector3.axisPY());
-sun.castShadow = true;
+sun.castShadow = true;                   // default false
 
 // Camera post-processing
-camera.HDR = true;
-camera.toneMap = true;
-camera.bloom = true;
-camera.FXAA = true;
+camera.HDR = true;                       // default
+camera.toneMap = true;                   // default
+camera.bloom = true;                     // default false
+camera.FXAA = true;                      // default false
 ```
 
 ## Next

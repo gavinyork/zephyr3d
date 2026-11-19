@@ -27,7 +27,15 @@ import { getEngine } from '@zephyr3d/scene';
 const resourceManager = getEngine().resourceManager;
 ```
 
-传给资源接口的路径都是 VFS 路径。使用 `HttpFS` 时，`/assets/model.glb` 会解析到 HTTP 根目录下；使用内存文件系统或 IndexedDB 文件系统时，同一个路径也可以指向本地保存的数据。
+传给资源接口的路径通常是 VFS 路径。使用 `HttpFS` 时，`/assets/model.glb` 会解析到 HTTP 根目录下；使用内存文件系统或 IndexedDB 文件系统时，同一个路径也可以指向本地保存的数据。
+
+资源接口也接受 `http://` 或 `https://` 开头的绝对 URL。VFS 规范化路径时会原样保留这类 URL，读取时直接请求该地址，不经过 VFS 根目录和挂载点，所以不论当前配置的是哪种 VFS，都可以用它加载另一个服务器上的单个文件（跨域时服务器需要允许 CORS）：
+
+```ts
+const sky = await getEngine().resourceManager.fetchTexture('https://cdn.example.com/images/sky.hdr');
+```
+
+绝对 URL 只适合自包含的文件，例如图片、HDR、GLB、JSON。预制体、场景、材质等编辑器资源内部用 VFS 路径引用其他资源，这些引用仍从当前 VFS 加载；这类资源放在其他服务器上时，应把该服务器挂载到 VFS 中，见[同时从多个域名加载](zh-cn/first-scene.md#同时从多个域名加载)。
 
 ## 加载纹理
 

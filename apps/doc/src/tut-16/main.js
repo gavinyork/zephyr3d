@@ -29,9 +29,9 @@ myApp.ready().then(function () {
   const dirLight = new DirectionalLight(scene);
   // light direction
   dirLight.rotation.fromEulerAngle(-Math.PI / 4, Math.PI / 4, 0);
-  // Enable shadowing
+  // Enable shadowing (lights do not cast shadows by default)
   dirLight.castShadow = true;
-  // Depth bias
+  // Depth bias (default 0.003)
   dirLight.shadow.depthBias = 0.001;
 
   // Create several boxes

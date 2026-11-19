@@ -9,12 +9,13 @@
 
 <<< @/../src/tut-16/main.js{28-35 js}
 
-- `light.castShadow = true` —— 让该光源投射阴影。平行光、点光、锥光和矩形面光源都支持。
+- `light.castShadow = true` —— 让该光源投射阴影，**默认为 false**。平行光、点光、锥光和矩形面光源都支持。
 - `mesh.castShadow` —— 控制单个网格是否投射阴影，**默认为 true**，通常只在需要排除某些
   物体时才显式设为 false。
 
-`shadow.depthBias` 用来消除自遮挡产生的条纹（shadow acne）。值太小会有条纹，太大会让阴影
-和物体脱开（peter-panning），需要按场景尺度调。
+`shadow.depthBias`（默认 0.003）用来消除自遮挡产生的条纹（shadow acne）。值太小会有条纹，太大会让阴影
+和物体脱开（peter-panning），需要按场景尺度调。阴影贴图默认 1024×1024（`shadow.shadowMapSize`），
+默认模式为 PCF。
 
 <div class="showcase" case="tut-16"></div>
 
@@ -30,21 +31,21 @@ light.shadow.shadowRegion.addStaticCaster(box);
 
 ## 开启后处理
 
-后处理效果挂在相机上，大多数常用效果直接用属性开关即可：
+后处理效果挂在相机上，大多数常用效果直接用属性开关即可（注释里是各属性的默认值）：
 
 ```javascript
-// HDR 渲染 + 色调映射
-camera.HDR = true;
-camera.toneMap = true;
-camera.toneMapExposure = 1.1;
+// HDR 渲染 + 色调映射：两者默认都已开启
+camera.HDR = true;              // 默认 true
+camera.toneMap = true;          // 默认 true
+camera.toneMapExposure = 1.1;   // 默认 1；scene.lightingMode 为 'physical' 时不使用
 
 // 泛光
-camera.bloom = true;
-camera.bloomThreshold = 0.85;
-camera.bloomIntensity = 1.2;
+camera.bloom = true;            // 默认 false
+camera.bloomThreshold = 0.85;   // 默认 0.8
+camera.bloomIntensity = 1.2;    // 默认 1
 
-// 抗锯齿：FXAA 开销低；TAA 质量更好，用 camera.TAA = true 开启
-camera.FXAA = true;
+// 抗锯齿：FXAA 开销低；TAA 质量更好，用 camera.TAA = true 开启（默认 false）
+camera.FXAA = true;             // 默认 false
 ```
 
 **色调映射几乎总是要开的。** 引擎的光照计算在高动态范围下进行，不做色调映射直接输出会让
@@ -63,13 +64,15 @@ camera.FXAA = true;
 
 ```javascript
 // 默认：基于图像的光照，取自天空；也可以改用天空盒贴图，见间接光照页
-scene.env.light.type = 'ibl';
+scene.env.light.type = 'ibl';          // 默认 'ibl'；可选 'hemisphere' | 'constant' | 'none'
 
-// 或者用半球形天光，开销更低
+// 或者用半球形天光，开销更低。上下半球颜色由 ambientUp / ambientDown 设置
 scene.env.light.type = 'hemisphere';
+scene.env.light.ambientUp.setXYZW(0.3, 0.5, 0.8, 1);    // 默认 (0.3, 0.5, 0.8, 1)
+scene.env.light.ambientDown.setXYZW(0.2, 0.2, 0.2, 1);  // 默认 (0.2, 0.2, 0.2, 1)
 
-// 环境光强度，默认 1
-scene.env.light.strength = 0.6;
+// 环境光强度
+scene.env.light.strength = 0.6;        // 默认 1
 ```
 
 上面的阴影示例（tut-16）为了突出光源本身的效果，显式关掉了环境光
@@ -82,20 +85,20 @@ scene.env.light.strength = 0.6;
 
 ```javascript
 // 环境
-scene.env.sky.skyType = 'scatter';       // 大气散射天空
-scene.env.light.type = 'ibl';            // 环境光
-scene.env.light.strength = 0.6;
+scene.env.sky.skyType = 'scatter';       // 大气散射天空（默认值）
+scene.env.light.type = 'ibl';            // 环境光（默认值）
+scene.env.light.strength = 0.6;          // 默认 1
 
 // 主光源 + 阴影
 const sun = new DirectionalLight(scene);
 sun.lookAt(new Vector3(0, 15, -10), Vector3.zero(), Vector3.axisPY());
-sun.castShadow = true;
+sun.castShadow = true;                   // 默认 false
 
 // 相机后处理
-camera.HDR = true;
-camera.toneMap = true;
-camera.bloom = true;
-camera.FXAA = true;
+camera.HDR = true;                       // 默认值
+camera.toneMap = true;                   // 默认值
+camera.bloom = true;                     // 默认 false
+camera.FXAA = true;                      // 默认 false
 ```
 
 ## 下一步

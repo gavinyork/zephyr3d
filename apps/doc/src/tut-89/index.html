@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Zephyr3d Mesh LOD</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+      }
+      canvas {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        z-index: 0;
+      }
+      #ui {
+        position: absolute;
+        top: 8px;
+        left: 8px;
+        z-index: 10;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        width: 230px;
+        padding: 8px;
+        border: 1px solid rgba(255, 255, 255, 0.14);
+        border-radius: 6px;
+        background: rgba(15, 20, 28, 0.78);
+        color: #f4f7fb;
+        color-scheme: dark;
+        font:
+          12px/1.25 system-ui,
+          -apple-system,
+          BlinkMacSystemFont,
+          'Segoe UI',
+          sans-serif;
+        backdrop-filter: blur(8px);
+      }
+      #ui label {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        white-space: nowrap;
+      }
+      #ui label > span:first-child {
+        min-width: 76px;
+      }
+      #ui select,
+      #ui input[type='range'] {
+        flex: 1;
+        min-width: 0;
+      }
+      #ui select {
+        min-height: 22px;
+        padding: 0 4px;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        border-radius: 4px;
+        background: #222b36;
+        color: inherit;
+        font: inherit;
+        cursor: pointer;
+      }
+      #ui select:disabled {
+        opacity: 0.5;
+        cursor: default;
+      }
+      #ui option {
+        background: #1b2430;
+        color: #f4f7fb;
+      }
+      #ui input[type='range'],
+      #ui input[type='checkbox'] {
+        accent-color: #7fb2ff;
+        cursor: pointer;
+      }
+      #ui #scale-value {
+        min-width: 28px;
+        text-align: right;
+      }
+      #legend {
+        display: flex;
+        gap: 3px;
+      }
+      #legend span {
+        flex: 1;
+        border-radius: 3px;
+        color: #000;
+        text-align: center;
+        line-height: 16px;
+      }
+      #stats {
+        white-space: pre;
+        font-family: ui-monospace, Consolas, monospace;
+      }
+      #ui .note {
+        opacity: 0.7;
+        white-space: normal;
+      }
+    </style>
+  </head>
+  <body>
+    <canvas id="my-canvas"></canvas>
+    <div id="ui" aria-label="Mesh LOD options">
+      <label>
+        <span>LOD coloration</span>
+        <input id="coloration-check" type="checkbox" checked />
+      </label>
+      <div id="legend" title="LOD coloration: level 0 to 7">
+        <span style="background: #fff">0</span>
+        <span style="background: #f00">1</span>
+        <span style="background: #0f0">2</span>
+        <span style="background: #00f; color: #fff">3</span>
+        <span style="background: #ff0">4</span>
+        <span style="background: #f0f">5</span>
+        <span style="background: #0ff">6</span>
+        <span style="background: #800080; color: #fff">7</span>
+      </div>
+      <label>
+        <span>Wireframe</span>
+        <input id="wireframe-check" type="checkbox" />
+      </label>
+      <label>
+        <span>Distance scale</span>
+        <input id="scale-range" type="range" min="0.25" max="4" step="0.05" value="1" />
+        <span id="scale-value">1.00</span>
+      </label>
+      <label>
+        <span>Forced LOD</span>
+        <select id="forced-select">
+          <option value="-1" selected>Auto (-1)</option>
+          <option value="0">0</option>
+          <option value="1">1</option>
+          <option value="2">2</option>
+          <option value="3">3</option>
+          <option value="4">4</option>
+          <option value="5">5</option>
+        </select>
+      </label>
+      <label>
+        <span>Min LOD</span>
+        <select id="min-select">
+          <option value="0" selected>0</option>
+          <option value="1">1</option>
+          <option value="2">2</option>
+          <option value="3">3</option>
+          <option value="4">4</option>
+          <option value="5">5</option>
+        </select>
+      </label>
+      <label>
+        <span>Pixel error</span>
+        <select id="error-select">
+          <option value="1">1</option>
+          <option value="2" selected>2</option>
+          <option value="4">4</option>
+          <option value="8">8 (editor default)</option>
+          <option value="16">16</option>
+        </select>
+      </label>
+      <div id="stats"></div>
+      <div class="note">Left drag: orbit. Wheel: zoom.</div>
+    </div>
+    <!-- #region debug-views -->
+    <script>
+      // Debug views (wireframe, LOD coloration) must be enabled before any
+      // engine module loads
+      globalThis.__ZEPHYR3D_DEBUG_VIEWS__ = true;
+    </script>
+    <!-- #endregion debug-views -->
+    <script type="module" src="js/tut-89.js"></script>
+  </body>
+</html>
