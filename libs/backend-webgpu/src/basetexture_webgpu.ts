@@ -118,7 +118,11 @@ export abstract class WebGPUBaseTexture<
       const params = (this.getTextureCaps() as WebGPUTextureCaps).getTextureFormatInfo(this._format);
       if (options) {
         // Merge defaults with user options first
-        const merged = Object.assign({}, this._getSamplerOptions(params, !!options.compare), options);
+        const merged: RequireOptionals<SamplerOptions> = Object.assign(
+          {},
+          this._getSamplerOptions(params, !!options.compare),
+          options
+        );
         // Then compute maxAnisotropy based on the merged filter settings, unless explicitly set
         if (options.maxAnisotropy === undefined) {
           merged.maxAnisotropy =
@@ -182,23 +186,27 @@ export abstract class WebGPUBaseTexture<
         (this._object as GPUTexture).destroy();
       }
       this._object = null;
-      this._storageView = null;
       this._device.updateVideoMemoryCost(-this._memCost);
       this._memCost = 0;
       this._ringBuffer.purge();
-      this._views = [];
-      for (const face of this._mipBindGroups) {
-        for (const level of face) {
-          level?.dispose();
-        }
-      }
-      this._mipBindGroups = [];
-      for (const level of this._mipComputeBindGroups) {
+      this.releaseViews();
+    }
+  }
+  /** Drops the views of the texture object, and the mip generation bind groups made of them */
+  private releaseViews() {
+    this._storageView = null;
+    this._views = [];
+    this._layersViews = [];
+    for (const face of this._mipBindGroups) {
+      for (const level of face) {
         level?.dispose();
       }
-      this._mipComputeBindGroups = [];
-      this._layersViews = [];
     }
+    this._mipBindGroups = [];
+    for (const level of this._mipComputeBindGroups) {
+      level?.dispose();
+    }
+    this._mipComputeBindGroups = [];
   }
   restore() {
     if (!this._object && !this._device.isContextLost()) {
@@ -470,14 +478,19 @@ export abstract class WebGPUBaseTexture<
     }
     if (
       this._object &&
-      (this._format !== format || this._width !== width || this._height !== height || this._depth !== depth,
-      this._mipLevelCount !== numMipLevels)
+      (this._format !== format ||
+        this._width !== width ||
+        this._height !== height ||
+        this._depth !== depth ||
+        this._mipLevelCount !== numMipLevels)
     ) {
       const obj = this._object;
+      this._device.gpuRemoveObjectHash(obj);
       this._device.runNextFrame(() => {
         (obj as GPUTexture).destroy();
       });
       this._object = null;
+      this.releaseViews();
     }
     if (!this._object) {
       this._format = format;

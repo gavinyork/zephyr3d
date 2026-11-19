@@ -79,7 +79,11 @@ export abstract class WebGLBaseTexture extends WebGLGPUObject<WebGLTexture> {
       const params = (this.getTextureCaps() as WebGLTextureCaps).getTextureFormatInfo(this._format);
       if (options) {
         // Merge defaults with user options first
-        const merged = Object.assign({}, this._getSamplerOptions(params, !!options.compare), options);
+        const merged: RequireOptionals<SamplerOptions> = Object.assign(
+          {},
+          this._getSamplerOptions(params, !!options.compare),
+          options
+        );
         // Then compute maxAnisotropy based on the merged filter settings, unless explicitly set
         if (options.maxAnisotropy === undefined) {
           merged.maxAnisotropy =
@@ -107,18 +111,22 @@ export abstract class WebGLBaseTexture extends WebGLGPUObject<WebGLTexture> {
       this._device.invalidateBindingTextures();
       this._object = null;
       this._device.updateVideoMemoryCost(-this._memCost);
-      for (const x of this._readFrameBuffers) {
-        if (x) {
-          for (const fb of x) {
-            if (fb) {
-              fb.dispose();
-            }
+      this.releaseReadFrameBuffers();
+      this._memCost = 0;
+    }
+  }
+  /** Drops the framebuffers reading back the texture object, which attach it */
+  private releaseReadFrameBuffers() {
+    for (const x of this._readFrameBuffers) {
+      if (x) {
+        for (const fb of x) {
+          if (fb) {
+            fb.dispose();
           }
         }
       }
-      this._readFrameBuffers = [];
-      this._memCost = 0;
     }
+    this._readFrameBuffers = [];
   }
   restore() {
     if (!this._object && !this._device.isContextLost()) {
@@ -223,8 +231,11 @@ export abstract class WebGLBaseTexture extends WebGLGPUObject<WebGLTexture> {
     }
     if (
       this._object &&
-      (this._format !== format || this._width !== width || this._height !== height || this._depth !== depth,
-      this._mipLevelCount !== numMipLevels)
+      (this._format !== format ||
+        this._width !== width ||
+        this._height !== height ||
+        this._depth !== depth ||
+        this._mipLevelCount !== numMipLevels)
     ) {
       const obj = this._object;
       this._device.runNextFrame(() => {
@@ -232,6 +243,7 @@ export abstract class WebGLBaseTexture extends WebGLGPUObject<WebGLTexture> {
         this._device.invalidateBindingTextures();
       });
       this._object = null;
+      this.releaseReadFrameBuffers();
     }
     if (!this._object) {
       this._format = format;

@@ -316,7 +316,10 @@ export class WebGPUBindGroup extends WebGPUObject<GPUObjectBase> implements Bind
           if (!entry.externalTexture && !view) {
             throw new Error('WebGPUBindGroup.setTexture() failed: create texture view failed');
           }
-          if (!t || (t as [WebGPUBaseTexture, Nullable<GPUTextureView>])[0] !== value) {
+          // The view changes with the texture object, which a texture reallocates when
+          // its format, size or mip count changes
+          const bound = t as Nullable<[WebGPUBaseTexture, Nullable<GPUTextureView>]>;
+          if (!bound || bound[0] !== value || bound[1] !== view) {
             this._resources[name] = [value as WebGPUBaseTexture, view];
             this.invalidate();
           }
