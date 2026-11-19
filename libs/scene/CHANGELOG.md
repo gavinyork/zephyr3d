@@ -84,7 +84,7 @@ Tue, 01 Sep 2026 07:54:12 GMT
 - Morph target system: sparse storage with active-subset upload, configurable morph target limit and active upload limit, and a new Source GLB Morph Reference mode for prefab import.
 - Automatically disable the corresponding backend PBR texture channel when a blueprint output takes it over (isMaterialTextureEnabled / hasXxxTexture); metallicRoughness supports single-channel takeover.
 - Extend the blueprint material system: material instances switched to an inheritance model, Expose toggle for texture parameters, value range limits for scalar parameters, material functions with tex2D inputs, single-output returns and explicit interface ordering, plus new TextureProperty / ChannelSDFMask / MorphBlur nodes.
-- Rework the skin material: per-channel, energy-conserving SkinSSS diffusion, shadow tint / scatter color, and smoothness and specular detail tuning.
+- Rework the skin material: per-channel, energy-conserving diffusion (SSSMaterial, SSSProfile, PostSSS), profile presets, shadow-map transmission, and dual-lobe specular tuning.
 - Add EyeMaterial: corneal refraction, limbal ring, pupil dilation, socket occlusion, energy conservation.
 - Add HairStrandMaterial strand-based hair pipeline: Kajiya-Kay plus an optional Marschner scattering model, multiple scattering, round-strand normals and spline sampling, distance decimation LOD, and motion vector output.
 - Add deep opacity map shadows for hair self-shadowing: kernel-filtered lookups, optical depth recorded so solid casters shadow correctly, and caster alpha passed to shadow implementations explicitly.

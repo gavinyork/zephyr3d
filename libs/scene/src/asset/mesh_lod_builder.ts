@@ -4,8 +4,7 @@
 
 /**
  * The subset of meshoptimizer's MeshoptSimplifier the level of detail generation uses. The engine
- * does not ship the simplifier: pass meshoptimizer's, which `loadMeshoptSimplifier()` of the
- * loaders package returns.
+ * ships one: {@link getMeshoptSimplifier} loads it on first use.
  * @public
  */
 export interface MeshSimplifier {

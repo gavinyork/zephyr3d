@@ -62,8 +62,9 @@ All notable changes to Zephyr3D are documented in this file. Per-package changel
 
 - Reworked water: FFT cascades split into non-overlapping bands, slopes filtered by mip footprint,
   refraction blur, foam shading, persistent advected foam field, interaction waves.
-- Reworked skin SSS: per-channel energy-conserving diffusion, Burley normalised sampling, shadow
-  tint and scatter colour, per-pixel profile lookup from a shared parameter table.
+- Reworked skin SSS (`SSSMaterial`, `SSSProfile`, `PostSSS`): per-channel energy-conserving
+  diffusion, Burley normalised sampling, profile presets, shadow-map transmission, per-pixel profile
+  lookup from a shared parameter table.
 - Eye material with corneal refraction, limbal ring, pupil dilation and socket occlusion.
 - Rect area lights with LTC normalisation, cube-map PCSS shadows and transmission.
 - Screen-space contact shadows.
@@ -88,7 +89,8 @@ All notable changes to Zephyr3D are documented in this file. Per-package changel
   (`IControllerPointerDownEvent` etc.) are removed.
 - Water legacy ramp medium mode (`mediumMode`, `scatterRampTexture`, `absorptionRampTexture`) and
   shoreline foam band properties (`shoreFoam*`) are removed.
-- `SubsurfaceScatteringMaterial.sss` is deprecated in favour of `SSSMaterial`.
+- Skin is rendered with `SSSMaterial` and an `SSSProfile`; the camera's `SSS` path and
+  `SubsurfaceProfile` remain only for `PBRMetallicRoughnessMaterial.subsurfaceProfile`.
 - `SpringModifier` is renamed to `JointDynamicsModifier`.
 
 ### Infrastructure
